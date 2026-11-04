@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SphereX</title>
+<title>Helios</title>
 <style>
 /* ---------- tokens (animate-ui / shadcn language, dark) ---------- */
 :root{
@@ -108,9 +108,9 @@ svg{display:block}
 
 /* ---------- bottom bar ---------- */
 .bottom{grid-area:bottom;display:flex;align-items:center;justify-content:center;padding:0 var(--rail) 6px}
-.player{display:flex;align-items:center;gap:8px;height:44px;padding:0 14px 0 6px;border-radius:22px;
+.player{display:flex;align-items:center;gap:8px;height:48px;padding:0 16px 0 8px;border-radius:14px;
   background:var(--muted);border:1px solid var(--border);box-shadow:0 8px 24px #0008}
-.btn-i{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:transparent;
+.btn-i{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:transparent;
   border:0;transition:transform .25s var(--spring),background .2s}
 .btn-i:hover{background:var(--muted-2)}.btn-i:active{transform:scale(.88)}
 .btn-i .ico{width:16px;height:16px}
@@ -148,7 +148,7 @@ svg{display:block}
 .btn.ghost{background:var(--muted);color:var(--fg);border:1px solid var(--border)}
 #spec{width:100%;max-width:284px;height:104px;margin-top:10px;border-radius:10px;background:var(--bezel);border:1px solid var(--border)}
 
-/* ---------- flipbook settings (inside the Penrose card) ---------- */
+/* ---------- flipbook settings (inside the Helios card) ---------- */
 .grp{margin-top:14px}
 .grp h4{font-size:13px;font-weight:600;margin-bottom:3px}
 .grp p{font-size:12px!important}
@@ -188,6 +188,51 @@ svg{display:block}
 .count{font:11px var(--mono);color:var(--dim);margin-top:10px}
 
 
+
+/* ---------- Animate UI icons: same shapes and motion, done in CSS ---------- */
+.ai,.ai *{transform-box:fill-box;transform-origin:center}
+.pi{display:grid;place-items:center}
+.ai-play polygon{fill:currentColor}
+.ai-pause rect{fill:currentColor}
+@media (prefers-reduced-motion:no-preference){
+  button:hover .ai-orbit{animation:aiSpin 2s linear infinite}
+  button:hover .ai-star{animation:aiPop 1s ease-in-out}
+  .ai-comet .v-t1,.ai-comet .v-t2,.ai-comet .v-t3{stroke-dasharray:1}
+  button:hover .ai-comet .v-head{animation:aiPop 1s ease-in-out}
+  button:hover .ai-comet .v-t1{animation:aiDraw .7s ease-in-out}
+  button:hover .ai-comet .v-t2{animation:aiDraw .7s ease-in-out .12s both}
+  button:hover .ai-comet .v-t3{animation:aiDraw .7s ease-in-out .24s both}
+  button:hover .ai-sparkles{animation:aiPop2 .6s ease-in-out}
+  button:hover .ai-sparkles .v-circle{animation:aiBlink .6s ease-in-out}
+  button:hover .ai-sparkles .v-plus{animation:aiBlink .6s ease-in-out .15s}
+  button:hover .ai-volume-2 .v-path1{animation:aiBlink .6s ease-in-out}
+  button:hover .ai-volume-2 .v-path2{animation:aiBlink .6s ease-in-out .2s}
+  .ai-activity .v-path{stroke-dasharray:1}
+  button:hover .ai-activity .v-path{animation:aiDraw .8s ease-in-out}
+  button:hover .ai-fingerprint{animation:aiPop3 1.5s ease-in-out}
+  .ai-fingerprint .v-path{stroke-opacity:.25}
+  .ai-fingerprint [class^="v-path"]:not(.v-path){stroke-dasharray:1}
+  button:hover .ai-fingerprint [class^="v-path"]:not(.v-path){animation:aiFp 1.5s ease-in-out}
+  .ai-layers .v-path1,.ai-layers .v-path3,.ai-play .v-polygon{transition:transform .3s ease-in-out}
+  button:hover .ai-layers .v-path1{transform:translateY(5px)}
+  button:hover .ai-layers .v-path3{transform:translateY(-5px)}
+  button:hover .ai-play .v-polygon{transform:translateX(3px)}
+  .ai-rotate-ccw{transition:rotate .6s cubic-bezier(.34,1.3,.64,1)}
+  button:hover .ai-rotate-ccw{rotate:-45deg}
+  button:hover .ai-search,.search:hover .ai-search,.search:focus-within .ai-search{animation:aiWiggle .8s ease-in-out;transform-origin:100% 100%}
+  .ai-x .v-line1,.ai-x .v-line2{transition:rotate .4s ease-in-out}
+  .ai-x .v-line2{transition-delay:.1s}
+  button:hover .ai-x .v-line1,button:hover .ai-x .v-line2{rotate:90deg}
+}
+@keyframes aiSpin{to{rotate:360deg}}
+@keyframes aiPop{0%{scale:1}25%{scale:.9}60%{scale:1.2}100%{scale:1}}
+@keyframes aiPop2{0%{scale:1}25%{scale:.9}60%{scale:1.1}100%{scale:1}}
+@keyframes aiPop3{0%{scale:1}50%{scale:1.1}100%{scale:1}}
+@keyframes aiBlink{0%{opacity:1;scale:1}33%,67%{opacity:0;scale:0}100%{opacity:1;scale:1}}
+@keyframes aiDraw{0%{stroke-dashoffset:1;opacity:0}1%{opacity:1}100%{stroke-dashoffset:0;opacity:1}}
+@keyframes aiFp{0%,100%{stroke-dashoffset:0}50%{stroke-dashoffset:.95}}
+@keyframes aiWiggle{0%{rotate:0deg}25%{rotate:17deg}50%{rotate:-10deg}70%{rotate:5deg}85%{rotate:-1deg}100%{rotate:0deg}}
+
 /* ---------- comet trail view (3D comet left, spectrum + controls right) ---------- */
 #tCanvas{position:absolute;inset:0;width:100%;height:100%;display:none;cursor:grab;touch-action:none}
 .view.trailing #tCanvas{display:block}
@@ -207,7 +252,23 @@ svg{display:block}
 .gchip.on i{opacity:1;box-shadow:0 0 10px 0 var(--c)}
 .gchip:hover{transform:translateY(-1px)}
 .gchip:active{transform:scale(.97)}
-.tp-sw{display:flex;gap:22px}
+.tp-sw{display:flex;gap:22px;align-items:center}
+.btn.sm{height:32px;font-size:12px;padding:0 13px;gap:7px;display:inline-flex;align-items:center}
+.btn.sm svg{width:12px;height:12px}
+.bp-tools #bpFeel{width:auto;padding:0 11px 0 9px;display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;margin-right:4px}
+.bp-tools .x.on,.bp-tools .x.on:hover{background:#4ade8026;color:var(--green)}
+.bp-stage{touch-action:none}
+.bp-wave{display:none;padding:0 18px 20px}
+.bpane.feeling .bp-steps{display:none}
+.bpane.feeling .bp-wave{display:block}
+.bw-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:12.5px;color:var(--mfg)}
+.bw-head b{font:600 13px var(--mono);color:var(--fg);font-variant-numeric:tabular-nums}
+#bwCanvas{display:block;width:100%;height:124px;border-radius:14px;background:var(--card);box-shadow:inset 0 0 0 1px var(--border)}
+.bp-stage.feel{cursor:none}
+#bpRing{position:absolute;left:0;top:0;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;pointer-events:none;opacity:0;
+  box-shadow:inset 0 0 0 1.5px #4ade80cc,0 0 18px #4ade8055;transition:opacity .2s,scale .12s;will-change:transform}
+#bpRing.on{opacity:1}
+#bpRing.tick{scale:1.35;transition:none}
 
 /* ---------- build view (sky left, generated body right) ---------- */
 #skyPane{position:absolute;inset:0;transition:right .75s var(--spring)}
@@ -262,12 +323,12 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
 
 /* ---------- Gemini island ---------- */
 .island-wrap{position:absolute;right:6px;bottom:6px;z-index:40}
-.island{--edge:#222;max-width:460px;position:relative;height:52px;width:52px;border-radius:26px;background:#000;border:1px solid var(--edge);
+.island{--edge:#222;max-width:300px;position:relative;height:52px;width:52px;border-radius:26px;background:#000;border:1px solid var(--edge);
   box-shadow:0 0 0 1px var(--edge),0 8px 32px #000e,0 2px 12px #000b;overflow:hidden;cursor:pointer;
   display:flex;align-items:center;justify-content:center;white-space:nowrap;
   transition:width .6s var(--spring),height .6s var(--spring),border-radius .6s var(--spring),border-color .2s,transform .25s var(--spring)}
 .island:hover{--edge:#3d3d3d}.island:active{transform:scale(.94)}
-.island[data-card="true"]{cursor:default;flex-direction:column;align-items:stretch;justify-content:flex-start;
+.island[data-card="true"]{max-width:none;cursor:default;flex-direction:column;align-items:stretch;justify-content:flex-start;
   background:#050506;box-shadow:0 0 0 1px var(--edge),0 24px 70px #000f,0 2px 12px #000b}
 .island[data-card="true"]:active{transform:none}
 .island[data-card="true"] .island-in{width:var(--cw,318px);padding:12px 12px 2px 14px;height:auto;align-items:flex-start}
@@ -290,7 +351,7 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
 .island[data-open="false"] .label{opacity:0;filter:blur(6px);position:absolute;pointer-events:none}
 .label b{font-size:14px;font-weight:500;color:#fff}
 .label b{white-space:nowrap}
-.label span{font-size:12.5px;line-height:1.35;color:var(--mfg);white-space:normal;margin-top:2px}
+.label span{font-size:12.5px;line-height:1.35;color:var(--mfg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;margin-top:2px}
 .glow{position:absolute;inset:-14px;border-radius:50%;pointer-events:none;opacity:0;
   background:radial-gradient(closest-side,var(--gc,#4ade80)55,transparent);transition:opacity .5s}
 .island-wrap[data-live="true"] .glow{opacity:.35;animation:glow 2.6s infinite var(--ease)}
@@ -318,10 +379,10 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
     <header class="top">
       <div class="brand">
         <div class="brand-mark" aria-hidden="true"><span class="on"></span><span></span><span class="on"></span><span></span><span class="on"></span><span></span><span class="on"></span><span></span><span class="on"></span></div>
-        <div>SphereX <small>sky</small></div>
+        <div>Helios</div>
       </div>
       <form class="search" id="searchForm" autocomplete="off">
-        <svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <svg class="ico ai ai-search" viewBox="0 0 24 24"><path class="v-path" d="m21 21-4.34-4.34"/><circle class="v-circle" cx="11" cy="11" r="8"/></svg>
         <input id="q" placeholder="Name or RA Dec  (e.g. Barnard's Star, 269.45 4.69)" aria-label="Search the sky">
         <span class="kbd">/</span>
         <div class="suggest" id="suggest" role="listbox"></div>
@@ -346,16 +407,18 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
       <aside class="bpane" id="bpane" aria-label="Procedural build" aria-hidden="true">
         <div class="bp-head"><div><h3 id="bpTitle"></h3><p id="bpSub"></p></div>
           <div class="bp-tools">
-            <button class="x" id="bpReplay" type="button" title="Replay" aria-label="Replay the build"><svg class="ico" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+            <button class="x" id="bpFeel" type="button" title="Feel the surface" aria-label="Feel the surface" aria-pressed="false"><svg class="ico ai ai-fingerprint" viewBox="0 0 24 24"><path class="v-path" stroke="currentColor" d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4 M14 13.12c0 2.38 0 6.38-1 8.88 M17.29 21.02c.12-.6.43-2.3.5-3.02 M2 12a10 10 0 0 1 18-6 M2 16h.01 M21.8 16c.2-2 .131-5.354 0-6 M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2 M8.65 22c.21-.66.45-1.32.57-2 M9 6.8a6 6 0 0 1 9 5.2v2"/><path class="v-path1" d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" pathLength="1"/><path class="v-path2" d="M14 13.12c0 2.38 0 6.38-1 8.88" pathLength="1"/><path class="v-path3" d="M17.29 21.02c.12-.6.43-2.3.5-3.02" pathLength="1"/><path class="v-path4" d="M2 12a10 10 0 0 1 18-6" pathLength="1"/><path class="v-path5" d="M2 16h.01" pathLength="1"/><path class="v-path6" d="M21.8 16c.2-2 .131-5.354 0-6" pathLength="1"/><path class="v-path7" d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" pathLength="1"/><path class="v-path8" d="M8.65 22c.21-.66.45-1.32.57-2" pathLength="1"/><path class="v-path9" d="M9 6.8a6 6 0 0 1 9 5.2v2" pathLength="1"/></svg><span>Feel</span></button>
+            <button class="x" id="bpReplay" type="button" title="Replay" aria-label="Replay the build"><svg class="ico ai ai-rotate-ccw" viewBox="0 0 24 24"><path class="v-path1" d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path class="v-path2" d="M3 3v5h5"/></svg></button>
             <button class="x" id="bpSeed" type="button" title="New seed" aria-label="Build a different one"><svg class="ico" viewBox="0 0 24 24"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
             <i class="sep"></i>
-            <button class="x" id="bpClose" type="button" aria-label="Close build view"><svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div></div>
-        <div class="bp-stage"><canvas id="bpCanvas"></canvas><div class="bp-msg" id="bpMsg" hidden></div></div>
+            <button class="x" id="bpClose" type="button" aria-label="Close build view"><svg class="ico ai ai-x" viewBox="0 0 24 24"><line class="v-line1" x1="6" y1="18" x2="18" y2="6"/><line class="v-line2" x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>
+        <div class="bp-stage" id="bpStage"><canvas id="bpCanvas"></canvas><i id="bpRing"></i><div class="bp-msg" id="bpMsg" hidden></div></div>
         <ol class="bp-steps" id="bpSteps"></ol>
+        <div class="bp-wave"><div class="bw-head"><span>Vibration</span><b id="bwHz">0 Hz</b></div><canvas id="bwCanvas"></canvas></div>
       </aside>
       <aside class="bpane" id="tpane" aria-label="Comet trail" aria-hidden="true">
         <div class="bp-head"><div><h3 id="tpTitle"></h3><p>Comet trail</p></div>
-          <div class="bp-tools"><button class="x" id="tpClose" type="button" aria-label="Close comet trail"><svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div></div>
+          <div class="bp-tools"><button class="x" id="tpClose" type="button" aria-label="Close comet trail"><svg class="ico ai ai-x" viewBox="0 0 24 24"><line class="v-line1" x1="6" y1="18" x2="18" y2="6"/><line class="v-line2" x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>
         <div class="tp-body">
           <div class="tp-top"><span class="lab">What it gives off</span>
             <div class="seg" id="tpEpoch" role="radiogroup" aria-label="Date"><span class="pill"></span>
@@ -367,7 +430,8 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
             <button type="button" class="gchip on" data-g="co" style="--c:#f9844a"><i></i>CO</button>
             <button type="button" class="gchip on" data-g="dust" style="--c:#e3eaf7"><i></i>Dust</button></div>
           <div class="opts tp-sw"><label class="opt"><input type="checkbox" id="tpSpin" checked><span class="tr"></span>Spin</label>
-            <label class="opt"><input type="checkbox" id="tpSky" checked><span class="tr"></span>Night sky</label></div>
+            <label class="opt"><input type="checkbox" id="tpSky" checked><span class="tr"></span>Night sky</label>
+            <button type="button" class="btn ghost sm" id="tpHear" style="margin-left:auto"><svg viewBox="0 0 16 16" fill="currentColor" id="tpHearIc"><path d="M4 2.5v11l9-5.5z"/></svg><span id="tpHearTx">Listen</span></button></div>
         </div>
       </aside>
       <div class="toast" id="toast"></div>
@@ -382,7 +446,7 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
     <!-- bottom: flipbook -->
     <footer class="bottom"><div class="player">
       <button class="btn-i" id="prev" aria-label="Previous frame"><svg class="ico" viewBox="0 0 24 24"><path d="M19 5v14L8 12zM5 5v14"/></svg></button>
-      <button class="btn-i play" id="play" aria-label="Play"><svg class="ico" id="playIco" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg></button>
+      <button class="btn-i play" id="play" aria-label="Play"><span id="playIco" class="pi"><svg class="ico ai ai-play" viewBox="0 0 24 24"><polygon class="v-polygon" points="6 3 20 12 6 21 6 3"/></svg></span></button>
       <button class="btn-i" id="next" aria-label="Next frame"><svg class="ico" viewBox="0 0 24 24"><path d="M5 5v14l11-7zM19 5v14"/></svg></button>
       <div class="scrub"><input type="range" id="scrub" min="0" max="11" value="0" aria-label="Frame"></div>
       <div class="frame-info"><span class="dot" id="wdot"></span><span>Frame <b id="fnum">1</b>/12</span><span class="hide-s"><b id="wl">0.75</b> µm</span><span id="fdate" hidden></span></div>
@@ -391,11 +455,11 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
     <!-- Gemini live avatar -->
     <div class="island-wrap" id="islandWrap" data-live="false">
       <div class="glow"></div>
-      <div class="island" id="island" role="button" tabindex="0" aria-label="Penrose" data-open="false">
+      <div class="island" id="island" role="button" tabindex="0" aria-label="Helios" data-open="false">
         <div class="island-in">
           <div id="grid"></div>
           <div class="label"><b id="lbl"></b><span id="sub"></span></div>
-          <button class="x" id="xIsl" aria-label="Close" type="button"><svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+          <button class="x" id="xIsl" aria-label="Close" type="button"><svg class="ico ai ai-x" viewBox="0 0 24 24"><line class="v-line1" x1="6" y1="18" x2="18" y2="6"/><line class="v-line2" x1="6" y1="6" x2="18" y2="18"/></svg></button>
         </div>
         <div class="island-body" id="islBody"></div>
       </div>
@@ -485,7 +549,7 @@ const island = (() => {
         lbl = document.getElementById("lbl"), sub = document.getElementById("sub"), body = document.getElementById("islBody");
   const grid = GridLoader(document.getElementById("grid"), {size:28, gap:1, blur:1.4, rounded:true, ...STATES.idle});
   let state = "idle", token = 0, live = false, card = false, last = null, clearT;
-  function measure(){            // natural size of the pill for its current text (max 460px wide, then it wraps)
+  function measure(){            // natural size of the pill for its current text (never wider than 300px, text is cut with …)
     const pw = el.style.width, ph = el.style.height;
     el.style.transition = "none"; el.style.width = "auto"; el.style.height = "auto";
     const r = [el.offsetWidth, el.offsetHeight];
@@ -499,12 +563,12 @@ const island = (() => {
     lbl.textContent = s.label || ""; sub.textContent = sentence || "";
     sub.style.display = sentence ? "" : "none";
     el.dataset.open = String(s.open);
-    el.setAttribute("aria-label", "Penrose: " + (s.label || "idle"));
+    el.setAttribute("aria-label", "Helios: " + (s.label || "idle"));
     if(s.open){ const [w, h] = measure(); el.style.width = w + "px"; el.style.height = Math.max(52, h) + "px";
       el.style.borderRadius = Math.min(Math.max(52, h) / 2, 28) + "px"; }
     else { el.style.width = "52px"; el.style.height = "52px"; el.style.borderRadius = "26px"; }
   }
-  /* The card: Penrose grows into a panel (width + height spring), content fades in. */
+  /* The card: Helios grows into a panel (width + height spring), content fades in. */
   function openCard(c){
     token++; card = true; last = c; clearTimeout(clearT);
     const s = STATES.card; state = "card";
@@ -512,7 +576,7 @@ const island = (() => {
     lbl.textContent = c.title; sub.textContent = c.sub || ""; sub.style.display = c.sub ? "" : "none";
     body.innerHTML = c.html; if(c.bind) c.bind(body);
     el.dataset.card = "true"; el.dataset.open = "true";
-    el.setAttribute("aria-label", "Penrose: " + c.title);
+    el.setAttribute("aria-label", "Helios: " + c.title);
     const cw = c.width || 320, maxh = Math.max(240, document.getElementById("bezel").clientHeight - 100);
     el.style.setProperty("--cw", (cw - 2) + "px"); el.style.setProperty("--maxh", maxh + "px");
     el.style.transition = "none"; const hh = el.style.height; el.style.height = "auto"; el.style.width = cw + "px";
@@ -534,11 +598,11 @@ const island = (() => {
     if(card) return;
     if(state !== "idle"){ token++; set("idle"); return; }
     run([["listening",2600],["thinking",2200],
-         ["speaking",5200,"Barnard's Star moves about 10 arcseconds a year, the fastest of any star we know. In these frames you can watch it drift across the field."]]);
+         ["speaking",5200,"It drifts about 10″ a year"]]);
   }
   el.addEventListener("click", toggleDemo);
   el.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleDemo(); } });
-  // right-click Penrose: bring the card back (or put it away)
+  // right-click Helios: bring the card back (or put it away)
   el.addEventListener("contextmenu", e => { e.preventDefault();
     if(card){ api.onClose && api.onClose(); closeCard(); }
     else if(api.reopen) api.reopen(); });
@@ -584,27 +648,22 @@ const wcol = w => w<1.1 ? "#f87171" : w<1.8 ? "#fb923c" : w<2.8 ? "#fbbf24" : w<
    Left rail: tools (animate-ui "highlight" slides between items)
    ============================================================ */
 const I = (d, extra="") => `<svg class="ico" viewBox="0 0 24 24">${d}${extra}</svg>`;
+/* icons from Animate UI (lucide shapes, animated on hover in CSS) */
+const AI = {"orbit": "<svg class=\"ico ai ai-orbit\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M20.341 6.484A10 10 0 0 1 10.266 21.85\"/><path class=\"v-path2\" d=\"M3.659 17.516A10 10 0 0 1 13.74 2.152\"/><circle class=\"v-circle1\" cx=\"12\" cy=\"12\" r=\"3\"/><circle class=\"v-circle2\" cx=\"19\" cy=\"5\" r=\"2\"/><circle class=\"v-circle3\" cx=\"5\" cy=\"19\" r=\"2\"/></svg>", "sparkles": "<svg class=\"ico ai ai-sparkles\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\"/><path class=\"v-plus\" d=\"M20 2v4 M22 4h-4\"/><circle class=\"v-circle\" cx=\"4\" cy=\"20\" r=\"2\"/></svg>", "volume-2": "<svg class=\"ico ai ai-volume-2\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M16 9a5 5 0 0 1 0 6\"/><path class=\"v-path2\" d=\"M19.364 18.364a9 9 0 0 0 0-12.728\"/><path class=\"v-path3\" d=\"M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z\"/></svg>", "activity": "<svg class=\"ico ai ai-activity\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\" pathLength=\"1\"/></svg>", "star": "<svg class=\"ico ai ai-star\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z\"/></svg>", "layers": "<svg class=\"ico ai ai-layers\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\"/><path class=\"v-path2\" d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\"/><path class=\"v-path3\" d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\"/></svg>", "fingerprint": "<svg class=\"ico ai ai-fingerprint\" viewBox=\"0 0 24 24\"><path class=\"v-path\" stroke=\"currentColor\" d=\"M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4 M14 13.12c0 2.38 0 6.38-1 8.88 M17.29 21.02c.12-.6.43-2.3.5-3.02 M2 12a10 10 0 0 1 18-6 M2 16h.01 M21.8 16c.2-2 .131-5.354 0-6 M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2 M8.65 22c.21-.66.45-1.32.57-2 M9 6.8a6 6 0 0 1 9 5.2v2\"/><path class=\"v-path1\" d=\"M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4\" pathLength=\"1\"/><path class=\"v-path2\" d=\"M14 13.12c0 2.38 0 6.38-1 8.88\" pathLength=\"1\"/><path class=\"v-path3\" d=\"M17.29 21.02c.12-.6.43-2.3.5-3.02\" pathLength=\"1\"/><path class=\"v-path4\" d=\"M2 12a10 10 0 0 1 18-6\" pathLength=\"1\"/><path class=\"v-path5\" d=\"M2 16h.01\" pathLength=\"1\"/><path class=\"v-path6\" d=\"M21.8 16c.2-2 .131-5.354 0-6\" pathLength=\"1\"/><path class=\"v-path7\" d=\"M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2\" pathLength=\"1\"/><path class=\"v-path8\" d=\"M8.65 22c.21-.66.45-1.32.57-2\" pathLength=\"1\"/><path class=\"v-path9\" d=\"M9 6.8a6 6 0 0 1 9 5.2v2\" pathLength=\"1\"/></svg>", "play": "<svg class=\"ico ai ai-play\" viewBox=\"0 0 24 24\"><polygon class=\"v-polygon\" points=\"6 3 20 12 6 21 6 3\"/></svg>", "pause": "<svg class=\"ico ai ai-pause\" viewBox=\"0 0 24 24\"><rect class=\"v-rect1\" x=\"14\" y=\"4\" width=\"4\" height=\"16\" rx=\"1\"/><rect class=\"v-rect2\" x=\"6\" y=\"4\" width=\"4\" height=\"16\" rx=\"1\"/></svg>", "rotate-ccw": "<svg class=\"ico ai ai-rotate-ccw\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path class=\"v-path2\" d=\"M3 3v5h5\"/></svg>", "search": "<svg class=\"ico ai ai-search\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"m21 21-4.34-4.34\"/><circle class=\"v-circle\" cx=\"11\" cy=\"11\" r=\"8\"/></svg>", "x": "<svg class=\"ico ai ai-x\" viewBox=\"0 0 24 24\"><line class=\"v-line1\" x1=\"6\" y1=\"18\" x2=\"18\" y2=\"6\"/><line class=\"v-line2\" x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"/></svg>", "comet": "<svg class=\"ico ai ai-comet\" viewBox=\"0 0 24 24\"><circle class=\"v-head\" cx=\"17\" cy=\"7\" r=\"3\"/><path class=\"v-t1\" pathLength=\"1\" d=\"M14.5 9.5L4 20\"/><path class=\"v-t2\" pathLength=\"1\" d=\"M13 12L6 21\"/><path class=\"v-t3\" pathLength=\"1\" d=\"M16 13l-5 8\"/></svg>"};
 const TOOLS = [
-  {id:"sky", name:"Sky", key:"1", ico:I('<circle cx="12" cy="12" r="9"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/>'),
+  {id:"sky", name:"Sky", key:"1", ico:AI["orbit"],
     t:"Sky view", p:"Pan with drag, zoom with the wheel. Search for a name or coordinates at the top."},
-  {id:"flip", name:"Flipbook", key:"2", ico:I('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>'),
-    t:"Flipbook", p:"Step through every SPHEREx pass over this spot. Things that move across frames stand out."},
-  {id:"spec", name:"Fingerprint", key:"3", ico:I('<path d="M3 20h18M4 16l4-6 3 4 4-9 5 11"/>'),
-    t:"Fingerprint", p:"How bright it is at each colour of infrared light. Every material leaves its own pattern, so this tells you what it is made of.", spec:true},
-  {id:"comet", name:"Comet Breath", key:"4", ico:I('<circle cx="17" cy="7" r="3"/><path d="M14.5 9.5L4 20M13 12L6 21M16 13l-5 8"/>'),
-    t:"Comet Breath", p:"Subtract frames to see the gas and dust a comet releases. Sculpt the cloud on the sky."},
-  {id:"lab", name:"Surface Lab", key:"5", ico:I('<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>'),
-    t:"Surface Lab", p:"Builds a 3D body from a small settings file: asteroid, rocky world, gas giant, brown dwarf and more."},
-  {id:"listen", name:"Listen", key:"6", ico:I('<path d="M4 15v-3a8 8 0 0116 0v3"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/>'),
-    t:"Listen", p:"Turn the spectrum into sound. Imagined, not recorded."},
-  {id:"alarm", name:"Outburst Alarm", key:"7", ico:I('<path d="M6 16v-5a6 6 0 0112 0v5l1.5 2h-15z"/><path d="M10 21h4"/>'),
-    t:"Outburst Alarm", p:"Flags a star that suddenly brightens between passes."},
-  {id:"water", name:"Water Rocks", key:"8", ico:I('<path d="M12 3s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/>'),
-    t:"Water Rocks", p:"Looks for the 3 µm water signature on asteroids."}
+  {id:"comet", name:"Comet Breath", key:"2", ico:AI["comet"],
+    t:"Comet Breath", p:"The gas and dust a comet gives off. Type a comet in the search bar to load it."},
+  {id:"listen", name:"Audio", key:"3", ico:AI["volume-2"],
+    t:"Audio", p:"Turn the spectrum into sound. Higher pitch means brighter. Bells mark the gases and dips.", spec:true},
+  {id:"haptics", name:"Haptics", key:"4", ico:AI["activity"],
+    t:"Haptics", p:"Rub the surface of a body and feel it."}
 ];
+const SPEC_CARD = {id:"spec", t:"Fingerprint", p:"How bright it is at each colour of infrared light. Every material leaves its own pattern, so this tells you what it is made of.", spec:true};
 const LAYERS = [
-  {id:"gaia", name:"Gaia", ico:I('<path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.5 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/>'), on:true},
-  {id:"wise", name:"WISE", ico:I('<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/>'), on:false},
+  {id:"gaia", name:"Gaia", ico:AI["star"], on:true},
+  {id:"wise", name:"WISE", ico:AI["layers"], on:false},
   {id:"grid", name:"Grid", ico:I('<path d="M4 9h16M4 15h16M9 4v16M15 4v16"/>'), on:false},
   {id:"labels", name:"Labels", ico:I('<path d="M3 12V4h8l10 10-8 8z"/><circle cx="8" cy="8" r="1"/>'), on:true},
   {id:"flags", name:"Contamination", ico:I('<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/>'), on:false}
@@ -668,7 +727,7 @@ const hms = d => { const h = d/15, H = Math.floor(h), m = Math.floor((h-H)*60), 
   return `${H}h ${String(m).padStart(2,"0")}m ${s.toFixed(1).padStart(4,"0")}s`; };
 const dms = d => { const a = Math.abs(d), D = Math.floor(a), m = Math.floor((a-D)*60), s = ((a-D)*60-m)*60;
   return `${d<0?"−":"+"}${D}° ${String(m).padStart(2,"0")}′ ${s.toFixed(0).padStart(2,"0")}″`; };
-function hint(){ if(!hinted){ hinted = true; toast("Right-click Penrose to bring it back"); } }
+function hint(){ if(!hinted){ hinted = true; toast("Right-click Helios to bring it back"); } }
 const KIND_NAME = {star:"Star", dwarf:"Brown dwarf", asteroid:"Asteroid", comet:"Comet", rocky:"Rocky world", water:"Water world", gas:"Gas giant", nebula:"Gas cloud", nova:"Supernova remnant"};
 function bodyCoords(o){
   if(o.ra !== undefined) return [o.ra, o.dec];
@@ -688,7 +747,7 @@ function showInfo(t){
     }});
 }
 island.onClose = () => { tool = "sky"; markTool("sky"); hint(); };
-function openFlip(){ tool = "flip"; markTool("flip"); flipCard(); }
+function openFlip(){ tool = "sky"; markTool("sky"); flipCard(); }
 island.reopen = () => { lastCard === "body" ? showInfo(sel || cur) : openFlip(); };
 const CHK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 function flipCard(){
@@ -723,22 +782,22 @@ function markTool(id){
   moveHl(toolsEl.querySelector(".active"));
 }
 function selectTool(id){
-  tool = id; markTool(id);
-  const t = TOOLS.find(x => x.id === id);
+  tool = id; markTool(id === "spec" ? "listen" : id);
+  const t = TOOLS.find(x => x.id === id) || SPEC_CARD;
+  if(id !== "haptics" && B.building) closeBuild(); if(id !== "comet" && TR.open) closeTrail(); markTool(id === "spec" ? "listen" : id);
+  if(id === "haptics"){ openHaptics(); return; }
   if(id === "sky"){ if(island.closeCard()) hint(); return; }
   if(id === "flip"){ flipCard(); return; }
   if(id === "comet"){ const c = (sel && sel.kind === "comet") ? sel : (cur && cur.kind === "comet" ? cur : movers.find(m => m.kind === "comet")); if(c){ sel = c; openTrail(c); return; } }
   island.openCard({title:t.t, sub:"Tool · " + ((sel || cur) ? (sel || cur).n : "no target"),
     html:`<p>${t.p}</p>${t.spec ? '<canvas id="spec"></canvas>' : ""}
-    <div class="row-btn"><button class="btn ghost" id="back">Back to target</button></div>`,
-    bind:b => { b.querySelector("#back").onclick = () => { tool = "sky"; markTool("sky"); showInfo(sel || cur); }; },
+    <div class="row-btn">${t.spec ? '<button class="btn" id="hear">Hear it</button>' : ""}<button class="btn ghost" id="back">Back to target</button></div>`,
+    bind:b => { b.querySelector("#back").onclick = () => { SFX.stop(); tool = "sky"; markTool("sky"); showInfo(sel || cur); };
+      const hb = b.querySelector("#hear"); if(hb) hb.onclick = () => hearSpec(hb); },
     after:() => { if(t.spec) drawSpec(); }});
 }
-function drawSpec(){
-  const c = document.getElementById("spec"); if(!c) return;
-  const dpr = devicePixelRatio||1, w = 284, h = 104; c.width = w*dpr; c.height = h*dpr;
-  const g = c.getContext("2d"); g.scale(dpr,dpr);
-  const o = sel || cur || {}, k = o.kind || "star", G = (x, m, sg) => Math.exp(-((x-m)**2)/(2*sg*sg));
+function specFor(k){
+  const G = (x, m, sg) => Math.exp(-((x-m)**2)/(2*sg*sg));
   const F = {
     star:     wl => .14 + .78*Math.exp(-(wl-.75)/1.5) - .05*G(wl, 4.6, .15),
     dwarf:    wl => .1 + .5*G(wl,1.25,.13) + .3*G(wl,2.1,.16) + .5*G(wl,4.1,.38) - .18*G(wl,3.3,.2) - .1*G(wl,1.65,.08),
@@ -751,6 +810,13 @@ function drawSpec(){
     nova:     wl => .1 + .7*G(wl,1.64,.04) + .55*G(wl,1.87,.03) + .45*G(wl,2.12,.04)
   }[k] || (wl => .3);
   const marks = {star:[[4.6,"CO"]], dwarf:[[1.65,"CH₄"],[3.3,"CH₄"]], asteroid:[[3.0,"H₂O ice"]], comet:[[2.7,"H₂O"],[4.26,"CO₂"],[4.65,"CO"]], rocky:[[1.0,"Silicate"]], water:[[1.4,"H₂O"],[1.9,"H₂O"],[2.7,"H₂O"]], gas:[[1.7,"CH₄"],[2.3,"CH₄"],[3.3,"CH₄"]], nebula:[[1.28,"Paβ"],[1.87,"Paα"],[3.3,"PAH"],[4.05,"Brα"]], nova:[[1.64,"[Fe II]"],[1.87,"H"],[2.12,"H₂"]]}[k] || [];
+  return {F, marks};
+}
+function drawSpec(prog){
+  const c = document.getElementById("spec"); if(!c) return;
+  const dpr = devicePixelRatio||1, w = 284, h = 104; c.width = w*dpr; c.height = h*dpr;
+  const g = c.getContext("2d"); g.scale(dpr,dpr);
+  const o = sel || cur || {}, k = o.kind || "star", {F, marks} = specFor(k);
   const X = wl => (wl-.75)/4.25*w, Y = v => h - 16 - Math.max(0, Math.min(1, v))*(h-34);
   g.strokeStyle = "#4ade80"; g.lineWidth = 1.6; g.beginPath();
   for(let i = 0; i <= 120; i++){ const wl = .75 + i/120*4.25; g.lineTo(X(wl), Y(F(wl) + .012*Math.sin(i*1.9))); }
@@ -759,6 +825,8 @@ function drawSpec(){
   g.fillText("0.75 µm", 6, h - 4); g.fillText("5 µm", w - 34, h - 4);
   g.fillStyle = "#fbbf24";
   for(const [wl, t] of marks){ g.fillRect(X(wl) - .5, Y(F(wl)) - 5, 1, 4); g.fillText(t, Math.min(w - 36, X(wl) - 10), Y(F(wl)) - 8); }
+  if(prog != null){ const px = X(.75 + prog*4.25); g.strokeStyle = "#fafafa99"; g.lineWidth = 1; g.beginPath(); g.moveTo(px, 4); g.lineTo(px, h - 16); g.stroke();
+    g.fillStyle = "#fafafa"; g.beginPath(); g.arc(px, Y(F(.75 + prog*4.25)), 3.5, 0, 6.3); g.fill(); }
 }
 
 /* ============================================================
@@ -944,7 +1012,7 @@ function setFrame(f){
 }
 function startPlay(on){
   playing = on;
-  document.getElementById("playIco").innerHTML = on ? '<path d="M7 5v14M17 5v14" stroke-width="3"/>' : '<path d="M7 4l13 8-13 8z" fill="currentColor"/>';
+  document.getElementById("playIco").innerHTML = on ? AI["pause"] : AI["play"];
   playBtn.setAttribute("aria-label", on ? "Pause" : "Play");
 }
 function step(dir){
@@ -976,7 +1044,7 @@ function parseCoords(s){
 }
 function find(s){
   const k = s.toLowerCase().replace(/[’']/g,"").trim(); if(!k) return null;
-  const hit = TARGETS.find(t => t.n.toLowerCase().replace(/[’']/g,"").includes(k) || t.a.some(a => a.includes(k) || k.includes(a)));
+  const hit = TARGETS.find(t => t.n.toLowerCase().replace(/[’']/g,"").includes(k) || t.a.some(a => a.includes(k) || k.includes(a))) || (/comet|meteor/.test(k) ? TARGETS.find(t => t.n === "3I/ATLAS") : null);
   if(hit) return hit;
   const c = parseCoords(s);
   return c && c.ra >= 0 && c.ra < 360 && Math.abs(c.dec) <= 90
@@ -985,7 +1053,7 @@ function find(s){
 }
 function suggestions(){
   const k = q.value.toLowerCase();
-  const list = TARGETS.filter(t => !k || t.n.toLowerCase().includes(k) || t.a.some(a => a.includes(k)));
+  const list = TARGETS.filter(t => !k || t.n.toLowerCase().includes(k) || t.a.some(a => a.includes(k)) || (/comet|meteor/.test(k) && t.kind === "comet"));
   sug.innerHTML = (list.length ? list.map((t, i) => `<button type="button" data-i="${TARGETS.indexOf(t)}" class="${i===0?'sel':''}" role="option"><span>${t.n}</span><em>${t.cls}</em></button>`).join("")
     : `<div class="hint">No match. Press Enter to try as coordinates.</div>`) + `<div class="hint">Try "WISE 0855" or "12.5 -3.2"</div>`;
   sug.classList.add("open");
@@ -1001,7 +1069,11 @@ document.getElementById("searchForm").addEventListener("submit", async e => {
 function goTo(t){
   sug.classList.remove("open"); q.blur();
   closeBuild(); island.closeCard(); tool = "sky"; markTool("sky");
-  island.run([["searching",1500]], openFlip);      // zoom first, then Penrose opens into the flipbook settings
+  if(t.kind === "comet"){            // a comet goes straight to Comet Breath
+    cur = t; sel = t; buildSky(t); camT.x = camT.y = cam.x = cam.y = 0; camT.z = 1.15; cam.z = .22; setFrame(0); openTrail(t); return;
+  }
+  if(TR.open) closeTrail();
+  island.run([["searching",1500]], openFlip);      // zoom first, then Helios opens into the flipbook settings
   setTimeout(() => {
     cur = t; sel = t; buildSky(t); camT.x = camT.y = cam.x = cam.y = 0; camT.z = 1.15; cam.z = .22; setFrame(0);
   }, 450);
@@ -1029,7 +1101,7 @@ void main(){
   vec3 p = d * r * mix(vec3(1.0), uElong, uShape);
   vObj = d; vPos = p; gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }`;
-const ROCK_FS = NOISE + `uniform float uSeed, uRelief, uColor, uBump, uCrat; uniform vec3 uTint, uSunO; varying vec3 vObj; varying vec3 vPos;
+const ROCK_FS = NOISE + `uniform float uSeed, uRelief, uColor, uBump, uCrat, uHO; uniform vec3 uTint, uSunO; varying vec3 vObj; varying vec3 vPos;
 float cr(vec3 p, float s, float dens){
   vec3 q = p * s; vec3 c0 = floor(q); float h = 0.0;
   for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) for (int k = -1; k <= 1; k++) {
@@ -1052,6 +1124,7 @@ void main(){
   float e = 0.01, h0 = H(d), h1 = H(normalize(d + t1 * e)), h2 = H(normalize(d + t2 * e));
   vec3 pv = (((h1 - h0) / e) * t1 + ((h2 - h0) / e) * t2) * uBump * uRelief;
   pv *= min(1.0, 0.8 / max(length(pv), 0.0001)); n = normalize(n - pv);
+  if (uHO > 0.5) { gl_FragColor = vec4(clamp(h0 * 2.0 + 0.5, 0.0, 1.0), clamp(length(pv) * 1.5, 0.0, 1.0), 0.0, 1.0); return; }
   float mu0 = max(dot(n, uSunO), 0.0);
   float alb = 0.55 + 0.6 * (fbm(d * 5.0 + uSeed, 4) - 0.5) + 0.25 * h0 * uRelief;
   vec3 base = mix(vec3(0.62, 0.66, 0.72), uTint * (0.45 + 1.1 * alb), uColor);
@@ -1062,13 +1135,14 @@ void main(){
 const WIRE_FS = `uniform float uWire; void main(){ gl_FragColor = vec4(0.45, 0.82, 1.0, uWire); }`;
 /* star */
 const STAR_VS = `varying vec3 vObj; varying vec3 vN; void main(){ vObj = position; vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-const STAR_FS = NOISE + `uniform float uTime, uGran, uSpots, uColor, uSeed, uFreq; uniform vec3 uCol; varying vec3 vObj; varying vec3 vN;
+const STAR_FS = NOISE + `uniform float uTime, uGran, uSpots, uColor, uSeed, uFreq, uHO; uniform vec3 uCol; varying vec3 vObj; varying vec3 vN;
 void main(){
   vec3 d = normalize(vObj); float mu = clamp(normalize(vN).z, 0.0, 1.0);
   float g = fbm(d * uFreq + vec3(uTime * 0.05, 0.0, uSeed), 4), cells = vnoise(d * uFreq * 2.2 + vec3(0.0, uTime * 0.08, uSeed));
   float gran = mix(0.5, g * 0.6 + cells * 0.4, uGran);
   float sp = smoothstep(0.6, 0.7, fbm(d * 2.4 + uSeed * 3.0, 4)) * uSpots;
   float b = (0.62 + 1.2 * (gran - 0.5)) * (1.0 - sp * 0.75);
+  if (uHO > 0.5) { gl_FragColor = vec4(clamp(gran, 0.0, 1.0), clamp((abs(dFdx(gran)) + abs(dFdy(gran))) * 30.0, 0.0, 1.0), 0.0, 1.0); return; }
   float limb = 1.0 - 0.65 * (1.0 - mu);
   vec3 clay = vec3(0.7, 0.72, 0.78) * (0.3 + 0.7 * mu) * (0.8 + 0.5 * (gran - 0.5));
   vec3 hot = uCol * b * limb * 1.7;
@@ -1077,7 +1151,7 @@ void main(){
 }`;
 /* brown dwarf: banded cloud deck, patched with stage uniforms */
 const GAS_VS = `uniform vec3 uScale; varying vec3 vD; varying vec3 vN; void main(){ vD = normalize(position); vN = normalize(normal / uScale); gl_Position = projectionMatrix * modelViewMatrix * vec4(position * uScale, 1.0); }`;
-const GAS_FS = NOISE + `uniform vec3 uSun, uView, uC0, uC1, uC2, uC3; uniform float uBands, uTurb, uStorms, uTime, uSeed, uSelf, uGlow, uDet, uStormAmt, uColor; varying vec3 vD; varying vec3 vN;
+const GAS_FS = NOISE + `uniform vec3 uSun, uView, uC0, uC1, uC2, uC3; uniform float uBands, uTurb, uStorms, uTime, uSeed, uSelf, uGlow, uDet, uStormAmt, uColor, uHO; varying vec3 vD; varying vec3 vN;
 vec3 rotY(vec3 p, float a){ float c = cos(a), s = sin(a); return vec3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z); }
 void main(){
   vec3 d = normalize(vD); vec3 n = normalize(vN); float lat = d.y;
@@ -1086,6 +1160,7 @@ void main(){
   float b = sin(lat * uBands * 3.14159 + (warp - 0.5) * uTurb * 8.0); float v = 0.5 + 0.5 * b;
   float fine = fbm(vec3(p.x * 7.0, p.y * 28.0, p.z * 7.0) + uSeed * 2.0, 4);
   v = clamp(v * 0.7 + (fine - 0.5) * 0.55 * (0.3 + uTurb) + 0.15, 0.0, 1.0); v = mix(0.5, v, uDet);
+  if (uHO > 0.5) { gl_FragColor = vec4(v, clamp((abs(dFdx(v)) + abs(dFdy(v))) * 18.0, 0.0, 1.0), 0.0, 1.0); return; }
   vec3 col = v < 0.5 ? mix(uC0, uC1, v * 2.0) : mix(uC1, uC2, (v - 0.5) * 2.0);
   for (int i = 0; i < 8; i++) { if (float(i) >= uStorms) break;
     float h1 = hash13(vec3(float(i), uSeed, 1.0)), h2 = hash13(vec3(float(i), uSeed, 2.0)), h3 = hash13(vec3(float(i), uSeed, 3.0));
@@ -1121,7 +1196,7 @@ function bb(T){ const t = T/100; let r, g, b;
 /* ----- worlds: rocky / water (terrain + sea + clouds + sky), gas giant (+ rings) ----- */
 const TERRA_VS = `uniform vec3 uScale; varying vec3 vP; varying vec3 vN; varying vec3 vD;
 void main(){ vD = normalize(position); vP = position * uScale; vN = normalize(normal / uScale); gl_Position = projectionMatrix * modelViewMatrix * vec4(vP, 1.0); }`;
-const TERRA_FS = NOISE + `uniform vec3 uSun, uView; uniform float uSeed, uFreq, uSea, uIce, uHeat, uHue, uBump, uColor; varying vec3 vP; varying vec3 vN; varying vec3 vD;
+const TERRA_FS = NOISE + `uniform vec3 uSun, uView; uniform float uSeed, uFreq, uSea, uIce, uHeat, uHue, uBump, uColor, uHO; varying vec3 vP; varying vec3 vN; varying vec3 vD;
 void main(){
   vec3 d = normalize(vD); vec3 n = normalize(vN);
   vec3 sp = d * uFreq + vec3(uSeed * 7.1, uSeed * 3.3, uSeed * 1.7);
@@ -1148,6 +1223,7 @@ void main(){
   vec3 gr = sign(det) * (dx * r1 + dy * r2);
   vec3 pv = uBump * gr / max(abs(det), 0.000001); float pl = length(pv); pv *= min(1.0, 0.85 / max(pl, 0.00001));
   n = normalize(n - pv);
+  if (uHO > 0.5) { gl_FragColor = vec4(clamp(HHv, 0.0, 1.0), clamp((abs(dx) + abs(dy)) * 60.0, 0.0, 1.0), water, 1.0); return; }
   float dif = max(dot(n, uSun), 0.0);
   float spec = water * (1.0 - iceM) * pow(max(dot(n, normalize(uSun + uView)), 0.0), 80.0) * 0.7;
   vec3 lit = col * (dif * 1.15 + 0.03) + vec3(spec);
@@ -1265,9 +1341,9 @@ function makeBody(o, seed){
   if(k === "asteroid" || k === "comet"){
     const comet = k === "comet", el = o.elong || [1.5,.9,.8];
     const U = {uSeed:{value:seed}, uShape:{value:0}, uElong:{value:new V(...el)}, uRelief:{value:0}, uColor:{value:0}, uBump:{value:.28}, uCrat:{value:comet ? .3 : .55},
-      uTint:{value:new V(...(o.tint || [.6,.55,.5]))}, uSunO:{value:new V()}};
+      uTint:{value:new V(...(o.tint || [.6,.55,.5]))}, uSunO:{value:new V()}, uHO:{value:0}};
     const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 40), new THREE.ShaderMaterial({vertexShader:ROCK_VS, fragmentShader:ROCK_FS, uniforms:U}));
-    const wire = wireMesh(U, 5); root.add(mesh, wire);
+    const wire = wireMesh(U, 5); root.add(mesh, wire); res.mesh = mesh; res.HO = U.uHO;
     let pts, pos, col, N = 2600, dat;
     if(comet){
       root.position.set(-1.25, .75, 0); fixed.position.copy(root.position);
@@ -1297,23 +1373,23 @@ function makeBody(o, seed){
     };
   } else if(k === "star"){
     const c = bb(o.T || 4500).map(v => Math.pow(v, 1.8));   // push the colour so cool stars read orange-red
-    const U = {uTime:{value:0}, uGran:{value:0}, uSpots:{value:0}, uColor:{value:0}, uSeed:{value:seed}, uFreq:{value:o.giant ? 4 : 10}, uCol:{value:new V(...c)}};
+    const U = {uTime:{value:0}, uGran:{value:0}, uSpots:{value:0}, uColor:{value:0}, uSeed:{value:seed}, uFreq:{value:o.giant ? 4 : 10}, uCol:{value:new V(...c)}, uHO:{value:0}};
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), new THREE.ShaderMaterial({vertexShader:STAR_VS, fragmentShader:STAR_FS, uniforms:U}));
     const wire = wireMesh({uSeed:U.uSeed, uShape:{value:0}, uElong:{value:new V(1,1,1)}}, 5);
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({map:B.dotTex, color:new THREE.Color(...c), blending:THREE.AdditiveBlending, transparent:true, depthWrite:false, opacity:0}));
-    glow.scale.set(4.2, 4.2, 1); fixed.add(glow); root.add(mesh, wire);
+    glow.scale.set(4.2, 4.2, 1); fixed.add(glow); root.add(mesh, wire); res.mesh = mesh; res.HO = U.uHO;
     res.apply = (P, t) => { U.uTime.value = t; U.uGran.value = P[1]; U.uSpots.value = P[2]; U.uColor.value = P[3];
       wire.material.uniforms.uWire.value = .9*P[0]*(1 - P[1]); glow.material.opacity = P[3]*.85; root.scale.setScalar(.55 + .45*P[0]); };
   } else if(k === "rocky" || k === "water"){
     const water = k === "water", sunU = {value:new V()}, viewU = {value:new V()}, scaleU = {value:new V(1,1,1)}, sd = {value:seed % 97 * .37};
     const geo = new THREE.SphereGeometry(1, 128, 96);
-    const BU = {uScale:scaleU, uSun:sunU, uView:viewU, uSeed:sd, uFreq:{value:water ? 2 : 1.6}, uSea:{value:-1}, uIce:{value:0}, uHeat:{value:0}, uHue:{value:water ? .5 : .2}, uBump:{value:0}, uColor:{value:0}};
+    const BU = {uScale:scaleU, uSun:sunU, uView:viewU, uSeed:sd, uFreq:{value:water ? 2 : 1.6}, uSea:{value:-1}, uIce:{value:0}, uHeat:{value:0}, uHue:{value:water ? .5 : .2}, uBump:{value:0}, uColor:{value:0}, uHO:{value:0}};
     const mesh = new THREE.Mesh(geo, new THREE.ShaderMaterial({vertexShader:TERRA_VS, fragmentShader:TERRA_FS, uniforms:BU, extensions:{derivatives:true}}));
     const CU = {uScale:{value:new V(1.012,1.012,1.012)}, uSun:sunU, uCloud:{value:0}, uTime:{value:0}, uSeed:sd};
     mesh.add(new THREE.Mesh(geo, new THREE.ShaderMaterial({vertexShader:TERRA_VS, fragmentShader:CLOUD_FS, uniforms:CU, transparent:true, depthWrite:false})));
     const AU = {uScale:scaleU, uGrow:{value:1.07}, uCol:{value:new V(...(water ? [.35,.6,1] : [1,.55,.25]))}, uSunW:{value:B.SUN.clone()}, uAtmo:{value:0}};
     const atm = new THREE.Mesh(geo, new THREE.ShaderMaterial({vertexShader:ATM_VS, fragmentShader:ATM_FS, uniforms:AU, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending}));
-    const wire = wireMesh({uSeed:sd, uShape:{value:0}, uElong:{value:new V(1,1,1)}}, 5); root.add(mesh, atm, wire);
+    const wire = wireMesh({uSeed:sd, uShape:{value:0}, uElong:{value:new V(1,1,1)}}, 5); root.add(mesh, atm, wire); res.mesh = mesh; res.HO = BU.uHO;
     res.apply = (P, t) => {
       const oc = water ? P[2] : 0, co = water ? P[3] : P[2], air = water ? P[4] : P[3];
       wire.material.uniforms.uWire.value = .9*P[0]*(1 - P[1]);
@@ -1326,12 +1402,12 @@ function makeBody(o, seed){
   } else if(k === "gas"){
     const pal = keyed(GASK, o.T || 140), tilt = new THREE.Group(); tilt.rotation.z = .35; root.add(tilt);
     const U = {uSun:{value:new V()}, uView:{value:new V()}, uScale:{value:new V(1,1,1)}, uC0:{value:new V(...pal[0])}, uC1:{value:new V(...pal[1])}, uC2:{value:new V(...pal[2])}, uC3:{value:new V(...pal[3])},
-      uBands:{value:12}, uTurb:{value:.5}, uStorms:{value:5}, uTime:{value:0}, uSeed:{value:seed}, uSelf:{value:1}, uGlow:{value:(o.T || 140) > 900 ? .3 : 0}, uDet:{value:0}, uStormAmt:{value:0}, uColor:{value:0}};
+      uBands:{value:12}, uTurb:{value:.5}, uStorms:{value:5}, uTime:{value:0}, uSeed:{value:seed}, uSelf:{value:1}, uGlow:{value:(o.T || 140) > 900 ? .3 : 0}, uDet:{value:0}, uStormAmt:{value:0}, uColor:{value:0}, uHO:{value:0}};
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), new THREE.ShaderMaterial({vertexShader:GAS_VS, fragmentShader:GAS_FS, uniforms:U}));
     const wire = wireMesh({uSeed:U.uSeed, uShape:{value:0}, uElong:{value:new V(1,1,1)}}, 5);
     const c1 = pal[1], RU = {uRings:{value:0}, uSeed:{value:seed % 53*.7}, uTintR:{value:new V(Math.min(1, c1[0]*1.05 + .1), Math.min(1, c1[1] + .08), Math.min(1, c1[2]*.9))}};
     const ring = new THREE.Mesh(new THREE.RingGeometry(1.45, 2.55, 160, 1), new THREE.ShaderMaterial({vertexShader:RING_VS, fragmentShader:RING_FS, uniforms:RU, transparent:true, depthWrite:false, side:THREE.DoubleSide}));
-    ring.rotation.x = Math.PI/2; ring.visible = false; tilt.add(mesh, wire, ring);
+    ring.rotation.x = Math.PI/2; ring.visible = false; tilt.add(mesh, wire, ring); res.mesh = mesh; res.HO = U.uHO;
     res.apply = (P, t) => { U.uTime.value = t*3; U.uDet.value = P[1]; U.uStormAmt.value = P[2]; U.uColor.value = P[3]; RU.uRings.value = P[4]; ring.visible = P[4] > .01;
       wire.material.uniforms.uWire.value = .9*P[0]*(1 - P[1]); objSun(mesh, U.uView.value, new V(0,0,1)); objSun(mesh, U.uSun.value, B.SUN); root.scale.setScalar(.55 + .45*P[0]); };
   } else if(k === "nebula"){
@@ -1407,9 +1483,9 @@ function makeBody(o, seed){
   } else {
     const T = o.T || 1000, kc = keyed(BDK, T);
     const U = {uSun:{value:new V()}, uView:{value:new V()}, uScale:{value:new V(1,1,1)}, uC0:{value:new V(...kc[0])}, uC1:{value:new V(...kc[1])}, uC2:{value:new V(...kc[2])}, uC3:{value:new V(...kc[3])},
-      uBands:{value:8}, uTurb:{value:.45}, uStorms:{value:5}, uTime:{value:0}, uSeed:{value:seed}, uSelf:{value:1}, uGlow:{value:T > 1200 ? .45 : .14}, uDet:{value:0}, uStormAmt:{value:0}, uColor:{value:0}};
+      uBands:{value:8}, uTurb:{value:.45}, uStorms:{value:5}, uTime:{value:0}, uSeed:{value:seed}, uSelf:{value:1}, uGlow:{value:T > 1200 ? .45 : .14}, uDet:{value:0}, uStormAmt:{value:0}, uColor:{value:0}, uHO:{value:0}};
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), new THREE.ShaderMaterial({vertexShader:GAS_VS, fragmentShader:GAS_FS, uniforms:U}));
-    const wire = wireMesh({uSeed:U.uSeed, uShape:{value:0}, uElong:{value:new V(1,1,1)}}, 5); root.add(mesh, wire);
+    const wire = wireMesh({uSeed:U.uSeed, uShape:{value:0}, uElong:{value:new V(1,1,1)}}, 5); root.add(mesh, wire); res.mesh = mesh; res.HO = U.uHO;
     res.apply = (P, t) => { U.uTime.value = t*3; U.uDet.value = P[1]; U.uStormAmt.value = P[2]; U.uColor.value = P[3];
       wire.material.uniforms.uWire.value = .9*P[0]*(1 - P[1]); objSun(mesh, U.uView.value, new V(0,0,1)); root.scale.setScalar(.55 + .45*P[0]); };
   }
@@ -1437,35 +1513,39 @@ function loop(now){
   B.body.apply(P, t);
   if(!B.drag) B.rot.y += dt*.28;
   B.body.root.rotation.set(B.rot.x, B.rot.y, 0);
-  B.renderer.render(B.scene, B.camera);
+  B.renderer.render(B.scene, B.camera); feelStep(now); if(FG.on) drawWave(now);
   const lis = $("bpSteps").children;
   for(let i = 0; i < lis.length; i++){ const p = P[i]; lis[i].classList.toggle("done", p >= 1); lis[i].classList.toggle("active", p > 0 && p < 1); lis[i].lastChild.style.transform = `scaleX(${p})`; }
   if(!B.done && t > B.n*STAGE_S + .3){ B.done = true; island.run([["done",1900]]); }
 }
-function openBuild(o){
-  o = o || sel || cur; if(!o) return;
+function openBuild(o, opt){
+  o = o || sel || cur; if(!o) return; B.quick = !!(opt && opt.feel);
   island.closeCard(); startPlay(false); tool = "sky"; markTool("sky");
   B.obj = o; B.kind = o.kind || "star"; B.building = true; B.seed = 3 + Math.floor((o.ra || o.x || 1) * 13) % 40;
   document.body.classList.add("split"); $("view").classList.add("building"); bpane.classList.add("open"); bpane.setAttribute("aria-hidden", "false");
-  history.replaceState(null, "", "#build"); camT.z = Math.max(camT.z, 1.5); fillBuildUI(); island.set("building");
+  history.replaceState(null, "", "#build"); camT.z = Math.max(camT.z, 1.5); fillBuildUI(); if(B.quick) $("bpTitle").textContent = o.n; island.set(B.quick ? "idle" : "building");
   ensureThree(ok => {
     if(!ok){ bpMsg.hidden = false; bpMsg.textContent = "The 3D build needs the three.js script from the internet, and it could not load."; return; }
     try{ initGL(); }catch(err){ bpMsg.hidden = false; bpMsg.textContent = "The 3D build needs WebGL, which this browser could not start."; return; }
     if(!B.building) return;
-    bpMsg.hidden = true; sizeGL(); setBody(); replay(); cancelAnimationFrame(B.raf); B.raf = requestAnimationFrame(loop);
+    bpMsg.hidden = true; sizeGL(); setBody(); replay();
+    if(B.quick){ B.t0 = performance.now() - 1e5; B.done = true; island.set("idle"); if(!FG.on) bpFeel.onclick(); }
+    cancelAnimationFrame(B.raf); B.raf = requestAnimationFrame(loop);
   });
 }
 function closeBuild(){
-  if(!B.building) return; B.building = false; cancelAnimationFrame(B.raf);
+  if(!B.building) return; if(FG.on) bpFeel.onclick(); feelEnd(); SFX.stop(); B.building = false; cancelAnimationFrame(B.raf);
   document.body.classList.remove("split"); $("view").classList.remove("building"); bpane.classList.remove("open"); bpane.setAttribute("aria-hidden", "true");
-  history.replaceState(null, "", location.pathname + location.search); island.run([["idle",1]]);
+  history.replaceState(null, "", location.pathname + location.search); island.run([["idle",1]]); tool = "sky"; markTool("sky");
 }
 $("bpClose").onclick = closeBuild;
-$("bpReplay").onclick = () => replay();
+$("bpReplay").onclick = () => { replay(); const ic = $("bpReplay").querySelector("svg"); if(ic && ic.animate) ic.animate([{rotate:"0deg"},{rotate:"-360deg"}], {duration:650, easing:"cubic-bezier(.34,1.2,.64,1)"}); };
 $("bpSeed").onclick = () => { B.seed = Math.floor(Math.random()*90) + 1; if(B.renderer){ setBody(); replay(); } };
-bpCanvas.parentElement.addEventListener("pointerdown", e => { B.drag = {x:e.clientX, y:e.clientY, rx:B.rot.x, ry:B.rot.y}; e.currentTarget.setPointerCapture(e.pointerId); });
-bpCanvas.parentElement.addEventListener("pointermove", e => { if(!B.drag) return; B.rot.y = B.drag.ry + (e.clientX - B.drag.x)*.008; B.rot.x = Math.max(-1.2, Math.min(1.2, B.drag.rx + (e.clientY - B.drag.y)*.008)); });
-bpCanvas.parentElement.addEventListener("pointerup", () => { B.drag = null; });
+bpCanvas.parentElement.addEventListener("pointerdown", e => { if(FG.on){ const r = bpCanvas.getBoundingClientRect(); FG.down = true; FG.x = e.clientX - r.left; FG.y = e.clientY - r.top; FG.t = performance.now(); FG.last = null; SFX.rubStart(); e.currentTarget.setPointerCapture(e.pointerId); return; }
+  B.drag = {x:e.clientX, y:e.clientY, rx:B.rot.x, ry:B.rot.y}; e.currentTarget.setPointerCapture(e.pointerId); });
+bpCanvas.parentElement.addEventListener("pointermove", e => { if(FG.on){ const r = bpCanvas.getBoundingClientRect(); FG.x = e.clientX - r.left; FG.y = e.clientY - r.top; if(!FG.down){ bpRing.style.transform = `translate(${FG.x}px,${FG.y}px)`; bpRing.classList.add("on"); } return; } if(!B.drag) return; B.rot.y = B.drag.ry + (e.clientX - B.drag.x)*.008; B.rot.x = Math.max(-1.2, Math.min(1.2, B.drag.rx + (e.clientY - B.drag.y)*.008)); });
+bpCanvas.parentElement.addEventListener("pointerup", () => { B.drag = null; feelEnd(); });
+bpCanvas.parentElement.addEventListener("pointerleave", () => { if(!FG.down) bpRing.classList.remove("on"); });
 
 
 /* ============================================================
@@ -1579,6 +1659,7 @@ function drawTrailChart(){
     g.globalAlpha = 1; }
   g.shadowColor = "#ffffff55"; g.shadowBlur = 8; g.strokeStyle = "#f4f4f5"; g.lineWidth = 2; g.lineJoin = "round"; g.beginPath();
   for(let i = 0; i <= 220; i++){ const x = 1.5 + i/220*3.5; i ? g.lineTo(X(x), Y(curve(x))) : g.moveTo(X(x), Y(curve(x))); } g.stroke(); g.shadowBlur = 0; g.restore();
+  { const p = SFX.progress(); if(p !== null){ const px = L + p*(w - L - R); g.strokeStyle = "#fafafaaa"; g.lineWidth = 1; g.beginPath(); g.moveTo(px, T - 8); g.lineTo(px, h - Bt); g.stroke(); } }
   // crosshair that follows the pointer
   if(TR.cx !== null && TR.cx > L && TR.cx < w - R){ const x = 1.5 + (TR.cx - L)/(w - L - R)*3.5, px = TR.cx, py = Y(curve(x));
     g.strokeStyle = "#ffffff44"; g.setLineDash([3,3]); g.beginPath(); g.moveTo(px, T - 8); g.lineTo(px, h - Bt); g.stroke(); g.setLineDash([]);
@@ -1588,7 +1669,8 @@ function drawTrailChart(){
 }
 function openTrail(o){
   o = o || sel || cur; if(!o) return;
-  if(B.building) closeBuild(); island.closeCard(); startPlay(false); tool = "sky"; markTool("sky");
+  if(TR.open && TR.grp){ TR.o = o; TR.ct = 0; $("tpTitle").textContent = o.n; trailBody(); return; }
+  if(B.building) closeBuild(); island.closeCard(); startPlay(false); tool = "comet"; markTool("comet");
   TR.o = o; TR.open = true; TR.ct = 0; $("tpTitle").textContent = o.n;
   document.body.classList.add("split"); $("view").classList.add("building", "trailing"); tpane.classList.add("open"); tpane.setAttribute("aria-hidden", "false");
   history.replaceState(null, "", "#comet-trail"); island.set("thinking");
@@ -1601,11 +1683,12 @@ function openTrail(o){
   });
 }
 function closeTrail(){
-  if(!TR.open) return; TR.open = false; cancelAnimationFrame(TR.raf);
+  if(!TR.open) return; SFX.stop(); tool = "sky"; markTool("sky"); TR.open = false; cancelAnimationFrame(TR.raf);
   document.body.classList.remove("split"); $("view").classList.remove("building", "trailing"); tpane.classList.remove("open"); tpane.setAttribute("aria-hidden", "true");
   history.replaceState(null, "", location.pathname + location.search); island.run([["idle",1]]);
 }
 $("tpClose").onclick = closeTrail;
+$("tpHear").onclick = hearTrail;
 tpChart.addEventListener("pointermove", e => { TR.cx = e.clientX - tpChart.getBoundingClientRect().left; });
 tpChart.addEventListener("pointerleave", () => { TR.cx = null; });
 $("tpEpoch").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; TR.epoch = b.dataset.v; segSet($("tpEpoch"), TR.epoch); });
@@ -1617,6 +1700,194 @@ $("tpSky").onchange = e => { TR.sky = e.target.checked; $("view").classList.togg
 tCanvas.addEventListener("pointerdown", e => { TR.drag = {x:e.clientX, y:e.clientY, rx:TR.rot.x, ry:TR.rot.y}; tCanvas.setPointerCapture(e.pointerId); });
 tCanvas.addEventListener("pointermove", e => { if(!TR.drag) return; TR.rot.y = TR.drag.ry + (e.clientX - TR.drag.x)*.006; TR.rot.x = Math.max(-1.1, Math.min(1.1, TR.drag.rx + (e.clientY - TR.drag.y)*.006)); });
 tCanvas.addEventListener("pointerup", () => { TR.drag = null; });
+
+/* ============================================================
+   Sound. Data sound turns a spectrum into pitch (brighter = higher) with a bell on each feature.
+   The surface rub is a rolling hiss with a crunch for every bump under the finger.
+   ============================================================ */
+const SFX = (() => {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  let ctx = null, master, noiseL, noiseS, nodes = [], playing = false, t0 = 0, dur = 1, rub = null, run = 0, onEnd = null;
+  function ensure(){
+    if(!AC) return false;
+    if(!ctx){
+      ctx = new AC(); master = ctx.createGain(); master.gain.value = .45; master.connect(ctx.destination);
+      let n = Math.floor(ctx.sampleRate*2), b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0), last = 0;
+      for(let i = 0; i < n; i++){ last = (last + .02*(Math.random()*2 - 1))/1.02; d[i] = last*3.5; } noiseL = b;
+      n = Math.floor(ctx.sampleRate*.15); b = ctx.createBuffer(1, n, ctx.sampleRate); d = b.getChannelData(0);
+      for(let i = 0; i < n; i++) d[i] = Math.random()*2 - 1; noiseS = b;
+    }
+    if(ctx.state === "suspended") ctx.resume(); return true;
+  }
+  function bell(f, when, amp){
+    const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain(), g2 = ctx.createGain();
+    o1.frequency.value = f; o2.frequency.value = f*2.01; g2.gain.value = .3;
+    g.gain.setValueAtTime(.0001, when); g.gain.linearRampToValueAtTime(amp, when + .012); g.gain.exponentialRampToValueAtTime(.0001, when + 1.1);
+    o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(master); o1.start(when); o2.start(when); o1.stop(when + 1.2); o2.stop(when + 1.2); nodes.push(o1, o2);
+  }
+  /* F(x): brightness at wavelength x. marks: [{x, f, amp}] bells. Returns false if audio is unavailable. */
+  function sweep(F, x0, x1, marks, T, done){
+    if(!ensure()) return false; stop(true); playing = true; const my = ++run; onEnd = done;
+    const now = ctx.currentTime + .08, N = 90, ys = []; let mn = 1e9, mx = -1e9;
+    for(let i = 0; i <= N; i++){ const y = F(x0 + (x1 - x0)*i/N); ys.push(y); mn = Math.min(mn, y); mx = Math.max(mx, y); }
+    const osc = ctx.createOscillator(), g = ctx.createGain(), pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    osc.type = "triangle"; g.gain.setValueAtTime(.0001, now);
+    for(let i = 0; i <= N; i++){ const tt = now + T*i/N, nv = (ys[i] - mn)/((mx - mn) || 1), fq = 220*Math.pow(2, nv*2.4);
+      if(i === 0){ osc.frequency.setValueAtTime(fq, now); g.gain.linearRampToValueAtTime(.12 + .2*nv, now + .02); }
+      else { osc.frequency.linearRampToValueAtTime(fq, tt); g.gain.linearRampToValueAtTime(.12 + .2*nv, tt); } }
+    g.gain.linearRampToValueAtTime(.0001, now + T + .12); osc.connect(g);
+    if(pan){ pan.pan.setValueAtTime(-.8, now); pan.pan.linearRampToValueAtTime(.8, now + T); g.connect(pan); pan.connect(master); } else g.connect(master);
+    marks.forEach(m => bell(m.f, now + (m.x - x0)/(x1 - x0)*T, .1 + .3*m.amp));
+    osc.start(now); osc.stop(now + T + 1.3); nodes.push(osc); t0 = now; dur = T;
+    osc.onended = () => { if(my === run && playing){ playing = false; if(onEnd) onEnd(); } };
+    return true;
+  }
+  function progress(){ return playing && ctx ? Math.max(0, Math.min(1, (ctx.currentTime - t0)/dur)) : null; }
+  function stop(quiet){
+    run++; const was = playing; playing = false; const old = nodes; nodes = [];
+    if(ctx && !quiet){ const t = ctx.currentTime; master.gain.cancelScheduledValues(t); master.gain.setTargetAtTime(0, t, .02);
+      setTimeout(() => { old.forEach(n => { try{ n.stop(); }catch(e){} }); master.gain.setTargetAtTime(.45, ctx.currentTime, .01); }, 120); }
+    else old.forEach(n => { try{ n.stop(); }catch(e){} });
+    if(was && onEnd){ const f = onEnd; onEnd = null; f(); }
+  }
+  /* rubbing a surface: a hiss that follows finger speed, plus a crunch per bump */
+  function rubStart(){
+    if(rub || !ensure()) return; const now = ctx.currentTime;
+    const src = ctx.createBufferSource(); src.buffer = noiseL; src.loop = true;
+    const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 200; const g = ctx.createGain(); g.gain.value = 0;
+    src.connect(lp); lp.connect(g); g.connect(master); src.start(now); rub = {src, lp, g};
+  }
+  function rubSet(speed, rough, material){
+    if(!rub) return; const t = ctx.currentTime, soft = material === "gas" || material === "ocean";
+    rub.lp.frequency.setTargetAtTime((soft ? 120 : 160) + rough*(soft ? 200 : 700), t, .06);
+    rub.g.gain.setTargetAtTime(Math.min(1, speed)*(soft ? .3 : .1 + .55*rough), t, .06);
+  }
+  function crunch(intensity, sharp){
+    if(!ensure()) return; const when = ctx.currentTime, s = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = noiseS; bp.type = "bandpass"; bp.frequency.value = 500 + sharp*3200 + Math.random()*900; bp.Q.value = .9;
+    g.gain.setValueAtTime(.05 + .22*intensity, when); g.gain.exponentialRampToValueAtTime(.0001, when + .03 + .05*(1 - sharp));
+    s.connect(bp); bp.connect(g); g.connect(master); s.start(when, Math.random()*.05); s.stop(when + .12);
+  }
+  function rubStop(){ if(!rub) return; const r = rub; rub = null; r.g.gain.setTargetAtTime(0, ctx.currentTime, .05); setTimeout(() => { try{ r.src.stop(); }catch(e){} }, 300); }
+  return {sweep, stop, progress, playing:() => playing, rubStart, rubSet, rubStop, crunch};
+})();
+
+/* "Hear it" on the fingerprint card */
+function hearSpec(btn){
+  if(SFX.playing()){ SFX.stop(); return; }
+  const o = sel || cur || {}, k = o.kind || "star", {F, marks} = specFor(k), low = ["dwarf","asteroid","rocky","water","gas"].includes(k);
+  const bells = marks.map(([wl], i) => ({x:wl, f:low ? 196*(1 + .25*i) : 523*Math.pow(1.26, i), amp:.7}));
+  const label = btn.textContent, setT = on => { btn.textContent = on ? "Stop" : label; };
+  if(!SFX.sweep(F, .75, 5, bells, 6, () => setT(false))){ toast("This browser cannot play sound"); return; }
+  setT(true);
+  (function tick(){ const p = SFX.progress(); if(p === null || !document.body.contains(btn)){ drawSpec(); return; } drawSpec(p); requestAnimationFrame(tick); })();
+}
+/* "Listen" on the comet trail: follows the spectrum on screen, a bell for each gas that is switched on */
+function hearTrail(){
+  const ic = $("tpHearIc"), tx = $("tpHearTx"), set = on => { tx.textContent = on ? "Stop" : "Listen";
+    ic.innerHTML = on ? '<rect x="3" y="3" width="10" height="10" rx="2"/>' : '<path d="M4 2.5v11l9-5.5z"/>'; };
+  if(SFX.playing()){ SFX.stop(); return; }
+  const G = (x, m, sg) => Math.exp(-((x - m)**2)/(2*sg*sg)), A = {...TR.amp};
+  const F = x => .08 + .02*x + (TR.on.h2o ? A.h2o*G(x, 2.75, .075) : 0) + (TR.on.co2 ? A.co2*G(x, 4.25, .05) : 0) + (TR.on.co ? A.co*G(x, 4.67, .06) : 0);
+  const bells = [["h2o", 523], ["co2", 659], ["co", 784]].filter(([g]) => TR.on[g]).map(([g, f]) => ({x:GASES[g].x, f, amp:.25 + .75*A[g]}));
+  if(!SFX.sweep(F, 1.5, 5, bells, 6, () => set(false))){ toast("This browser cannot play sound"); return; } set(true);
+}
+
+/* ============================================================
+   Haptics. The surface under the finger becomes a stream of numbers any haptic engine can play.
+   Atish: call SphereXHaptics.setEngine({sample(s), tick(t), stop()}) and drive the vibration motor from it.
+     sample(s): about once per frame while the finger moves, s = {type:"texture", intensity, sharpness, speed, roughness, height, material, body}
+     tick(t):   one short tap each time the finger crosses a bump, t = {type:"tick", intensity, sharpness, duration, material, body}
+   With no engine set it falls back to: a native bridge (window.SphereXNative.haptic or the webkit message handler "sphereXHaptic"),
+   then navigator.vibrate (Android browsers), plus the rub sound so it can be shown on a laptop.
+   Every message is also fired as a "spherex:haptic" event on window.
+   ============================================================ */
+const Haptics = window.SphereXHaptics = {
+  engine:null, sound:true,
+  setEngine(e){ this.engine = e; },
+  _send(kind, msg){
+    try{ window.dispatchEvent(new CustomEvent("spherex:haptic", {detail:msg})); }catch(e){}
+    const eng = this.engine;
+    if(eng && typeof eng[kind] === "function"){ eng[kind](msg); return; }
+    const nat = window.SphereXNative, wk = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.sphereXHaptic;
+    if(nat && typeof nat.haptic === "function") nat.haptic(JSON.stringify(msg)); else if(wk) wk.postMessage(msg);
+    else if(kind === "tick" && navigator.vibrate) navigator.vibrate(Math.round(6 + 16*msg.intensity));
+  },
+  sample(s){ this._send("sample", s); },
+  tick(t){ this._send("tick", t); if(this.sound) SFX.crunch(t.intensity, t.sharpness); },
+  stop(){ this._send("stop", {type:"stop"}); }
+};
+const MATERIAL = {asteroid:"rock", comet:"rock", rocky:"rock", water:"terrain", gas:"gas", dwarf:"gas", star:"plasma"};
+const FEEL = {rock:{h:9, g:1.5, sharp:.9}, terrain:{h:8, g:1.6, sharp:.6}, gas:{h:3, g:.45, sharp:.15}, plasma:{h:6, g:.9, sharp:.5}};
+
+/* read the surface at a screen point by re-drawing that one pixel as height + slope */
+function surfAt(px, py){
+  const b = B.body, R = B.renderer; if(!b || !b.mesh || !b.HO) return null;
+  const w = bpCanvas.clientWidth, h = bpCanvas.clientHeight; if(px < 0 || py < 0 || px >= w || py >= h) return null;
+  if(!B.hrt){ B.hrt = new THREE.WebGLRenderTarget(2, 2, {format:THREE.RGBAFormat, type:THREE.UnsignedByteType, minFilter:THREE.NearestFilter, magFilter:THREE.NearestFilter}); B.hbuf = new Uint8Array(16); }
+  const hide = []; B.scene.traverse(o => { if((o.isMesh || o.isPoints || o.isSprite) && o !== b.mesh && o.visible){ o.visible = false; hide.push(o); } });
+  b.HO.value = 1; B.camera.setViewOffset(w, h, Math.floor(px), Math.floor(py), 2, 2);
+  R.setRenderTarget(B.hrt); R.setClearColor(0x000000, 0); R.clear(); R.render(B.scene, B.camera); R.readRenderTargetPixels(B.hrt, 0, 0, 2, 2, B.hbuf); R.setRenderTarget(null);
+  B.camera.clearViewOffset(); b.HO.value = 0; hide.forEach(o => o.visible = true);
+  let n = 0, hh = 0, gg = 0, ww = 0; for(let i = 0; i < 4; i++) if(B.hbuf[i*4 + 3] > 128){ n++; hh += B.hbuf[i*4]/255; gg += B.hbuf[i*4 + 1]/255; ww += B.hbuf[i*4 + 2]/255; }
+  return n ? {h:hh/n, g:gg/n, w:ww/n} : {hit:false};
+}
+function openHaptics(){
+  const o = sel || cur; if(!o) return;
+  if(o.kind === "nebula" || o.kind === "nova"){ toast("A gas cloud has no surface to feel. Pick a rock, planet or star."); tool = "sky"; markTool("sky"); return; }
+  openBuild(o, {feel:true}); tool = "haptics"; markTool("haptics");
+}
+const bpStage = $("bpStage"), bpRing = $("bpRing"), bpFeel = $("bpFeel");
+const FG = {on:false, x:0, y:0, down:false, last:null, acc:0, spd:0, t:0};
+function feelStep(now){
+  if(!FG.on || !FG.down || !B.body) return;
+  const o = B.obj, mat = MATERIAL[B.kind] || "rock", K = FEEL[mat], s = surfAt(FG.x, FG.y);
+  bpRing.classList.add("on"); bpRing.style.transform = `translate(${FG.x}px,${FG.y}px)`;
+  if(!s || s.hit === false){ FG.last = null; SFX.rubSet(0, 0, mat); return; }
+  const dt = Math.max(.008, (now - FG.t)/1000); FG.t = now;
+  let dist = 0, dh = 0; if(FG.last){ dist = Math.hypot(FG.x - FG.last.x, FG.y - FG.last.y); dh = s.h - FG.last.h; }
+  FG.last = {x:FG.x, y:FG.y, h:s.h};
+  FG.spd += (dist/dt - FG.spd)*.35;
+  const ocean = mat === "terrain" && s.w > .5, rough = Math.min(1, ocean ? .12 : s.g*K.g), mv = Math.min(1, FG.spd/140);
+  const intensity = Math.min(1, (rough*.8 + Math.min(1, Math.abs(dh)*K.h)*.6))*mv, sharp = (ocean ? .1 : K.sharp)*(.4 + .6*rough);
+  Haptics.sample({type:"texture", intensity, sharpness:sharp, speed:FG.spd, roughness:rough, height:s.h, material:ocean ? "ocean" : mat, body:B.kind});
+  SFX.rubSet(mv, rough, ocean ? "ocean" : mat);
+  FG.acc += Math.abs(dh)*K.h*3 + rough*dist*.02;
+  if(FG.acc >= 1 && mv > .05){ FG.acc = 0;
+    Haptics.tick({type:"tick", intensity:Math.min(1, .25 + rough*.9), sharpness:sharp, duration:Math.round(8 + 14*(1 - sharp)), material:ocean ? "ocean" : mat, body:B.kind});
+    bpRing.classList.add("tick"); requestAnimationFrame(() => requestAnimationFrame(() => bpRing.classList.remove("tick"))); }
+}
+bpFeel.onclick = () => {
+  FG.on = !FG.on; bpane.classList.toggle("feeling", FG.on); bpFeel.classList.toggle("on", FG.on); bpFeel.setAttribute("aria-pressed", String(FG.on)); bpStage.classList.toggle("feel", FG.on);
+  if(!FG.on){ bpRing.classList.remove("on"); SFX.rubStop(); Haptics.stop(); } else toast("Drag over the body to feel it");
+};
+/* the vibration as it would be felt: a wave whose height is the strength and whose speed is the pitch (60 to 250 Hz) */
+const WV = {amp:0, f:100, tf:100, target:0, spike:0, last:0, ph:0, hist:[], now:0};
+window.addEventListener("spherex:haptic", e => { const d = e.detail; if(!d) return; WV.now = performance.now();
+  if(d.type === "texture"){ WV.target = d.intensity; WV.tf = 60 + 190*d.sharpness; WV.last = WV.now; }
+  else if(d.type === "tick"){ WV.spike = Math.min(1, .45 + .55*d.intensity); WV.tf = 60 + 190*d.sharpness; WV.last = WV.now; }
+  else if(d.type === "stop") WV.target = 0; });
+function drawWave(now){
+  const c = $("bwCanvas"), w = c.clientWidth, h = c.clientHeight; if(!w || !h) return;
+  const dpr = Math.min(devicePixelRatio||1, 2); if(c.width !== Math.round(w*dpr) || c.height !== Math.round(h*dpr)){ c.width = Math.round(w*dpr); c.height = Math.round(h*dpr); }
+  const dt = Math.min(.05, Math.max(.001, (now - (WV.t || now))/1000)); WV.t = now;
+  if(now - WV.last > 140) WV.target = 0;
+  WV.amp += (WV.target - WV.amp)*(1 - Math.exp(-dt*16)); WV.spike *= Math.exp(-dt*12); WV.f += (WV.tf - WV.f)*(1 - Math.exp(-dt*10));
+  const a = Math.min(1, WV.amp + WV.spike*.7); WV.ph = (WV.ph + 6.2832*WV.f*dt) % 62831.85;
+  WV.hist.push({t:now, a, f:WV.f, ph:WV.ph}); while(WV.hist.length > 2 && now - WV.hist[0].t > 260) WV.hist.shift();
+  const g = c.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
+  const mid = h/2, A = h/2 - 14, WIN = 160;
+  g.strokeStyle = "#ffffff12"; g.lineWidth = 1; for(const y of [mid - A, mid, mid + A]){ g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+  g.strokeStyle = "#4ade80"; g.lineWidth = 1.8; g.lineJoin = "round"; g.shadowColor = "#4ade8088"; g.shadowBlur = a > .03 ? 10 : 0; g.beginPath();
+  let j = 0; const H = WV.hist;
+  for(let x = 0; x <= w; x += 1.5){ const tm = now - (1 - x/w)*WIN; while(j < H.length - 1 && H[j + 1].t <= tm) j++;
+    const p = H[j], v = p.a*Math.sin(p.ph + 6.2832*p.f*(tm - p.t)/1000);
+    x ? g.lineTo(x, mid - v*A) : g.moveTo(x, mid - v*A); }
+  g.stroke(); g.shadowBlur = 0;
+  if(a < .02 && !FG.down){ g.fillStyle = "#6b6b75"; g.font = "12px system-ui,sans-serif"; g.textAlign = "center"; g.fillText("Drag over the body to feel it", w/2, mid - 12); }
+  $("bwHz").textContent = a > .03 ? Math.round(WV.f) + " Hz" : "0 Hz";
+}
+function feelEnd(){ FG.down = false; FG.last = null; FG.acc = 0; FG.spd = 0; SFX.rubStop(); Haptics.stop(); bpRing.classList.remove("on"); }
 
 /* ============================================================
    Keys
