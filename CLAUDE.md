@@ -26,6 +26,12 @@ If two docs disagree and `decisions.md` is silent, follow the precedence (decisi
 - **Never blank.** The code path loads first; optional layers (Gemini) swap in only on success.
 - Do not invent fields, endpoints or library APIs that are not in the specs. Items marked **[verify]** must be checked against real output first.
 
+## Git workflow
+
+- **All development happens on a branch** (`feat/…`, `fix/…`, `docs/…`) and reaches `main` through a pull request. Review it with `/sx-pr-review`.
+- **Never commit or push directly to `main`.** The only exceptions were the initial repo and frontend setup (4 Nov 2026), which the user approved explicitly.
+- Agents may create branches and commit locally. Pushing and opening PRs happen when the user asks.
+
 ## Agents and skills
 
 Project agents live in `.claude/agents/` and skills in `.claude/skills/`. Agents work autonomously: they don't stop to ask for permission. They make the smallest reasonable choice and report their assumptions.
