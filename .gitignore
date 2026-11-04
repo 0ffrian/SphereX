@@ -9,6 +9,12 @@ __pycache__/
 node_modules/
 dist/
 .vite/
+*.tsbuildinfo
+
+# Playwright output
+playwright-report/
+test-results/
+blob-report/
 
 # Env and secrets (Gemini key is server-side only)
 .env

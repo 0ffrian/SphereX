@@ -130,7 +130,7 @@ classDiagram
 ## Notes
 
 - `candidate` has no renderer. The panel shows "Not enough data for a 3D model: distance and albedo unknown" (rendering doc §7.6).
-- The five baked renderers use backend textures (rendering doc §6); `ShaderBody` uses the shader generators from the mock-up, ported to ES modules (D-01, D-03). `ShaderBody` is not in rendering doc §10 yet.
+- The five baked renderers use backend textures (rendering doc §6); `ShaderBody` uses the shader generators from the mock-up, ported to ES modules (D-01, D-03). `ShaderBody` is listed in rendering doc §10 (name **[verify]**).
 - Mesh budget: D-05 sets ≤ 50k triangles, tighter than the 300k in older text; D-05 wins.
 - Pixel ratio is `min(devicePixelRatio, 1.5)`, and the scene renders only when the view changes (D-05).
 - If a required card field is missing, the renderer does not draw that layer and it is listed in `RenderParams.missing`.

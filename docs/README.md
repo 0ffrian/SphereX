@@ -40,6 +40,7 @@ Always load `decisions.md` first. It is short, and it overrides everything else.
 | Spectrum haptics and the Listen sweep | [rendering/haptics/profiles.md](rendering/haptics/profiles.md), [rendering/haptics/audio-pairing.md](rendering/haptics/audio-pairing.md), [architecture/sound-voice.md](architecture/sound-voice.md) |
 | Audio driver | [rendering/haptics/audio-pairing.md](rendering/haptics/audio-pairing.md), [rendering/haptics/engine-api.md](rendering/haptics/engine-api.md) |
 | Calibration and settings | [rendering/haptics/calibration.md](rendering/haptics/calibration.md) |
+| Frontend setup, scripts, phone testing | [../frontend/README.md](../frontend/README.md), [architecture/frontend-platform.md](architecture/frontend-platform.md) |
 | Frontend setup, hosting, performance | [architecture/frontend-platform.md](architecture/frontend-platform.md), [rendering/display-rules.md](rendering/display-rules.md) (R5.5) |
 | Labels and honesty in the UI | [architecture/honesty-policy.md](architecture/honesty-policy.md), [rendering/display-rules.md](rendering/display-rules.md) (R5.3) |
 | Tests | [architecture/testing.md](architecture/testing.md), [rendering/layout-tests-open-items.md](rendering/layout-tests-open-items.md) |

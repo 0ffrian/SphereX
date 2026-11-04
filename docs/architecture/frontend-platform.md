@@ -18,6 +18,8 @@
 | Hash routing | Share a link with coordinates or an asset id in the URL | Optional challenge item. |
 | Fallbacks | Procedural look, procedural sound, audio when there is no vibration, recorded backup demo | Every optional service has one. |
 
+**Installed versions** (exact, from `frontend/package.json`, scaffold of 4 Nov 2026): three 0.187.0, React 19.3.1, Vite 8.3.5, TypeScript 6.0.3, Tailwind 4.3.4, Zustand 5.0.16. TypeScript is held at 6.0.3 because `typescript-eslint` 8.72.1 supports only TypeScript < 6.1. The full list is in the [frontend README](../../frontend/README.md#pinned-versions).
+
 ### A10.1 Performance budget (D-05)
 
 Two targets:

@@ -14,13 +14,20 @@ backend/app/api/objects.py           (Kevin)  # /card, /render-params, texture U
 frontend/src/viewer/                 (Moon)
   ViewerApp.ts lighting.ts modes.ts honesty.ts scaleBar.ts altText.ts
   renderers/AsteroidMesh.ts AsteroidProcedural.ts Comet.ts BrownDwarf.ts Star.ts
-  fields/             # Web Worker field generator for shader kinds (§7.7, D-12)
-frontend/src/haptics/                (Moon, with Atish for sources)
+  renderers/ShaderBody.ts   # browser-shader kinds (§7.7, D-01, D-12); name [verify]
+  fields/             # Web Worker field generator for shader kinds (§7.7, D-12); scaffold file fieldWorker.ts [verify]
+frontend/src/haptics/                (haptics design: Atish, D-13; code: Moon and Atish)
   haptics.ts calibration.ts
   drivers/webVibrate.ts drivers/audio.ts drivers/tauri.ts (stub, B-01)
   sources/heightMap.ts meshNormal.ts field.ts terrain.ts flow.ts spectrum.ts lightcurve.ts
+frontend/src/contract/               (owner Q-14)  # §3 and §8.8 types as TS: Tag, TV, ObjectCard, RenderParams,
+                                                   # HapticEvent, HapticDriver, HapticProfile; assertTagged()
+frontend/src/state/                  (owner Q-14)  # Zustand store: card, params, honesty, overrides (A10, D-02)
+frontend/src/app/                    (owner Q-14)  # React shell: App, ViewerPanel, StatusLine
 shared/schemas/object-card.schema.json  render-params.schema.json
 ```
+
+`contract/`, `state/` and `app/` were added when the frontend was scaffolded (4 Nov 2026). They are not part of the original R10 list. See the [frontend README](../../frontend/README.md#layout).
 
 ---
 

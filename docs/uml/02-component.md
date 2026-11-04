@@ -121,7 +121,7 @@ flowchart TB
     end
     subgraph Drivers["drivers/"]
       DVib["WebVibrateDriver"]
-      DAud["AudioDriver (audioClick.ts)"]
+      DAud["AudioDriver (audio.ts)"]
       DTauri["TauriDriver stub (B-01, post-event)"]
     end
   end
@@ -171,5 +171,5 @@ flowchart TB
 - Baked types (rendering doc types) fetch textures from the backend; shader kinds generate a field in the browser instead (D-01, D-12).
 - The flipbook and search endpoints are not named in either spec. Only `/v1/objects/{id}/card` and `/render-params` are.
 - The physics layer is drawn on the backend, feeding derived values into the card. Whether sliders re-run it on the client is part of Q-03.
-- `ShaderBody` and the `fields/` folder are not in rendering doc §10 yet; they follow from D-01 and D-12. Their file names are **[verify]**.
+- `ShaderBody` and the `fields/` folder follow from D-01 and D-12 and are now listed in rendering doc §10. Their file names are **[verify]**.
 - The `terrain` and `flow` sources come from D-12. The brown dwarf `bands` source and the `flux_pulse`, `teq_pulse`, `motion` and `detections` data haptics have no source file named in §10 **[verify]**.

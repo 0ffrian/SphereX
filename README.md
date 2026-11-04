@@ -14,6 +14,20 @@ A public web tool: enter coordinates or a name, watch real SPHEREx frames of tha
 | [frontend/](frontend/) | Web app, 3D viewer, haptics and audio (empty until the event). |
 | [shared/](shared/) | JSON schemas for the ObjectCard and RenderParams. |
 
+## Run it (from the repo root)
+
+Needs Node 24 or later.
+
+```bash
+npm run setup       # first time: installs frontend dependencies from the lockfile
+                    # (setup:clean = npm ci; stop any running dev server first on Windows)
+npm run dev         # http://localhost:5173, and on the LAN at http://<this-PC's-IP>:5173 (Vite prints it)
+npm run dev:phone   # same on HTTPS (self-signed); use this on phones so WebGPU is available
+npm run check       # typecheck + lint + unit tests + build
+```
+
+Other root scripts: `build`, `preview`, `test`, `test:e2e`, `lint`, `typecheck`, `format`. They all forward to `frontend/`, and the dependencies live in `frontend/package.json`.
+
 ## Status
 
 Pre-event: design and documentation only. Building starts 14 Nov 2026.

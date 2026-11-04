@@ -46,7 +46,7 @@ classDiagram
     +stop() void
   }
   class AudioDriver {
-    <<drivers/audioClick.ts>>
+    <<drivers/audio.ts>>
     +supported: boolean
     +enabled: boolean
     +volume: number
