@@ -1,0 +1,65 @@
+# 17 Activity: pipeline stages 1–6 and RenderParams
+
+The backend pipeline from a name or RA/Dec to an `ObjectCard` and `RenderParams`, including every "refuse rather than invent" branch. Drawn from architecture spec §4.1–4.6, rendering doc §1 (principles), §3, §5.2, §6.2, §7 and decisions D-01, D-02 and D-04. The old stage 5 "settings file" is replaced by the card builder (D-02).
+
+```mermaid
+flowchart TD
+  Start(("Start")) --> In[/"Name or RA/Dec"/]
+  In --> IsName{"Is it a name?"}
+  IsName -->|yes| Resolve["Resolve name (SIMBAD or SBDB, Q-05)"]
+  IsName -->|no| HaveCoord["Use RA/Dec"]
+  Resolve --> Resolved{"Resolved?"}
+  Resolved -->|no| NotFound["Show: name not found"] --> Stop1(("Stop"))
+  Resolved -->|yes| HaveCoord
+
+  HaveCoord --> Moving{"Moving object?"}
+  Moving -->|yes| Horizons["Position per frame from Horizons, neighbours from SkyBoT"]
+  Moving -->|no| Static["Fixed RA/Dec (proper motion for stars)"]
+  Horizons --> WCS["Sky to pixel per frame via WCS"]
+  Static --> WCS
+  WCS --> Frames{"Any SPHEREx frames?"}
+  Frames -->|no| NoCov["Show: no SPHEREx coverage"] --> Stop2(("Stop"))
+  Frames -->|yes| S1Out[/"Stage 1 out: frame_id, x, y, time"/]
+
+  S1Out --> Phot["Stage 2: aperture flux minus local background"]
+  Phot --> Flags["Drop flagged pixels, mark saturated points"]
+  Flags --> Err["Variance layer to error bars, wavelength from WCS-WAVE"]
+  Err --> S2Out[/"Spectrum and light curve"/]
+
+  S2Out --> Classify["Stage 3: match reference types, Gaia colours if known"]
+  Classify --> TypeSel["Type selection (see diagram 18)"]
+  TypeSel --> Lookup{"Stage 4: saved asset?"}
+  Lookup -->|saved| LoadSaved["Load saved asset"]
+  Lookup -->|"generated or sketch"| Card["Card builder: one TV per field"]
+
+  Card --> Field{"Value available from a source?"}
+  Field -->|yes| Tagged["TV with value, tag, source, formula or assumption"]
+  Field -->|no| NullV["value = null, never a guess"]
+  Tagged --> Physics["Stage 6: physics layer adds derived TVs with formula"]
+  NullV --> Physics
+  Physics --> SpxCh{"At least 2 points in each spherex_rgb channel window?"}
+  SpxCh -->|yes| SpxOK["spherex_rgb measured"]
+  SpxCh -->|no| SpxMiss["IR mode disabled, add to missing"]
+  SpxOK --> CardOut[/"ObjectCard"/]
+  SpxMiss --> CardOut
+  LoadSaved --> CardOut
+
+  CardOut --> C2P["card_to_params: rules of rendering doc 6.2, each with a tag"]
+  C2P --> Layer{"For each layer: all required fields present?"}
+  Layer -->|yes| AddLayer["Add layer with its tag"]
+  Layer -->|no| Refuse["Refuse layer, add to missing"]
+  AddLayer --> Kind{"Rendering-doc type or shader kind?"}
+  Refuse --> Kind
+  Kind -->|"rendering-doc type (D-01)"| Bake["Procedural maps needed: texture URLs from cache, bake if missing"]
+  Kind -->|"shader kind"| NoTex["No textures, browser builds the field"]
+  Bake --> RPOut[/"RenderParams"/]
+  NoTex --> RPOut
+  RPOut --> Done(("End"))
+```
+
+## Notes
+
+- Refusal examples: an asteroid card without `diameter_km` puts the mesh in `missing` with no crash (rendering doc §11); a comet without published `gas_Q` gets no gas shells (§7.3).
+- Saturated points are excluded from brightness mapping and shown hatched (rendering doc §7.5).
+- `candidate` stops after the card: it has no 3D layers, so RenderParams is not used for it **[verify]** whether the endpoint returns one.
+- The physics layer is "reduced, physically inspired" formulas (architecture spec §7); its outputs are tagged `derived`.

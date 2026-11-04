@@ -1,0 +1,161 @@
+# Decision log
+
+Decisions that reconcile the [architecture spec](architecture/README.md) with the [rendering & haptics spec](rendering/README.md). Where this file states a decision, it wins over both. "Architecture spec §x" means section **Ax** and "rendering doc §x" means **Rx**; each spec index has a section map.
+
+Format: one entry per decision. Status is **Accepted** unless marked otherwise. Recorded 4 Nov 2026.
+
+---
+
+## D-01 Where surfaces are generated
+
+- **Context:** The architecture spec (§6) generated every body in the browser with shaders and triplanar mapping. The rendering doc (§5.5, §6) bakes height, normal and albedo maps on the backend in Python, as equirectangular images.
+- **Decision:**
+  - Every type defined in the rendering doc (`asteroid_shape`, `asteroid_procedural`, `comet`, `brown_dwarf`, `brown_dwarf_binary`, `star`, `star_mira`, `star_ttauri`, `candidate`) follows the rendering doc. Procedural maps are **baked by the backend**, never computed per frame.
+  - The kinds that exist only in the architecture spec (`planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova`; see D-04) keep the **browser shader generators** with triplanar mapping. Their haptics come from a shared CPU field (D-12).
+- **Why:** Rendering doc principle 6 ("one height map drives everything") needs a height field that the finger, the normals and the sound can all sample. A shader-only surface does not provide one.
+
+## D-02 Data model and provenance tags
+
+- **Context:** The architecture spec used a "settings file" with 3 sources (measured / estimated / default). The rendering doc uses `ObjectCard` + `RenderParams` with 5 tags.
+- **Decision:**
+  - `ObjectCard` and `RenderParams` (rendering doc §3) are the data contract. The settings-file schema (architecture spec §5) is retired.
+  - Internally every value carries one of the 5 tags. The UI shows 3 badges:
+
+    | Tag | Badge |
+    |---|---|
+    | `measured` | **Measured** |
+    | `derived`, `model_dependent`, `inferred_from_analog` | **Estimated** (tooltip shows the formula, assumption or analog) |
+    | `artistic` | **Default** (artist's choice) |
+
+  - User slider edits live in a client-side `overrides` map, separate from the card, so Reset restores the data values. See Q-03 for sliders on baked bodies.
+
+## D-03 three.js version
+
+- **Decision:** The app uses **three r187** through `three/webgpu` (`WebGPURenderer`, WebGL2 fallback **[verify]**). The mock-up stays on r128 and is not ported in place.
+- **Why:** r187 is the pinned version in the rendering doc. Generators move from the mock-up into ES modules anyway.
+
+## D-04 Object types
+
+- **Decision:** `ObjectType` is the union of both lists:
+  - From the rendering doc: `asteroid_shape`, `asteroid_procedural`, `comet`, `brown_dwarf`, `brown_dwarf_binary`, `star_mira`, `star_ttauri`, `star`, `candidate`.
+  - From the architecture spec: `planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova`. These are P2 or lower and come from the Exoplanet Archive or user sliders, not from SPHEREx detections.
+- The architecture spec's old `dwarf` kind maps to `brown_dwarf`, and `asteroid` maps to `asteroid_shape` or `asteroid_procedural`.
+
+## D-05 Target hardware and budgets
+
+- **Decision:** Two targets. The **demo laptop** is an Intel Iris Xe (Zenbook 14X). The **phones** are the realme 14 Pro and a Samsung, both Android 16 with Chrome. Haptics can only be shown on the phones. Where the budgets differ, take the tighter one:
+
+  | Item | Budget |
+  |---|---|
+  | Frame rate | ≥ 30 fps while rotating; render only on change |
+  | Pixel ratio | `min(devicePixelRatio, 1.5)` |
+  | Mesh | ≤ 50k triangles (decimate NASA GLBs offline) |
+  | Points | ≤ 60k |
+  | Textures | 2048×1024 desktop, 1024×512 mobile |
+  | Displacement | Desktop only |
+
+## D-06 Scope cuts for the event
+
+- **Decision:** Move these to the post-event backlog: Gemini Live voice control, ElevenLabs and other AI sound clips, image-to-3D (TRELLIS, Hunyuan3D, TripoSR), and the Tauri Android app.
+- **Stays in scope:** procedural sound (the data sweep and the "imagined drive"), with the Gemini artistic paint as a P3 stretch.
+
+## D-07 Gemini artistic layer
+
+- **Decision:** Use the rendering doc's method (§6.6). Gemini repaints albedo using a hillshade of the baked height map as its reference. Output whose edge correlation is below 0.3 is rejected. The call is made server-side only and the result is labelled "AI-made".
+- The architecture spec's seamless-tile-plus-triplanar method (§6.2) applies only to the browser-shader kinds (D-01).
+
+## D-08 Haptics run on the web, not in a native app
+
+- **Decision:** For the event, haptics use `navigator.vibrate` in Android Chrome. iPhone, iPad and desktop get audio only. No Tauri build.
+- **Why:**
+  - The challenge requires a web tool, and judges will not sideload an APK.
+  - `navigator.vibrate` covers every pattern in rendering doc §8.3.
+  - The `HapticDriver` interface lets `drivers/tauri.ts` be added later (B-01) without touching the event sources.
+
+## D-09 Haptic strength is quantised
+
+- **Context:** `navigator.vibrate` takes durations only. There is no amplitude control in Chrome as far as we know **[verify]**.
+- **Decision:**
+  - The web driver maps `strength` to **3–4 discrete levels** (soft, medium, firm, plus an optional pulse-width "whisper" if the phone can render it). It does not use a continuous scale.
+  - Fine detail is carried by **rhythm, rate and spacing**, and by the paired audio (D-10).
+  - Calibration measures both the faintest pulse each phone can render (`minMs`) and how many levels can be told apart, stored per device.
+
+## D-10 Audio pairing on every platform
+
+- **Decision:**
+  - The audio driver is no longer only a fallback. It plays **alongside** the vibration on every platform, with its own on/off switch and volume.
+  - Every `HapticEvent` goes to both drivers.
+  - Audio carries continuous strength (gain), pitch, stereo pan and provenance, which is shown by timbre: clean tone for `measured`, grainy click for `artistic`.
+  - Spec: rendering doc §8.9.
+
+## D-11 Repo and doc layout
+
+- **Decision:**
+  - Docs live in `docs/`, the mock-up in `mockup/`, and the code in `backend/`, `frontend/` and `shared/`, as laid out in rendering doc §10.
+  - `CLAUDE.md` at the root points to the docs and states the precedence.
+  - The handover doc was renamed `initial.md` → `docs/handover.md`.
+
+## D-12 Haptics on gas giants, water worlds and other shader-generated bodies
+
+- **Status:** Proposed. Needs team sign-off.
+- **Context:** These kinds are drawn by browser shaders (D-01), so there is no baked height map for a finger to sample. For exoplanets there is also no measured surface at all, so every texture haptic is `artistic`.
+- **Decision:**
+  - **One shared field per body.** When a body loads, a Web Worker generates an equirectangular field at 512×256 from the same seed and functions as the shader. It does this once, not per frame. The field has channels for height, band index, ocean mask, ice mask and storm id.
+  - The shader samples the field as a `DataTexture`, and the haptic sources sample the same array. This keeps rendering doc principle 6 ("one height map drives everything") true for these kinds.
+  - The shader may add finer visual noise below the field's resolution. That detail is seen but not felt.
+
+  | Kind | Texture haptics (`artistic`) | Data haptics |
+  |---|---|---|
+  | `gas_giant` | No surface, so the finger feels the **flow**: a soft tick crossing each band boundary (strength = band contrast); inside a jet, a pulse train whose rate ∝ the zonal wind speed at that latitude; on a storm, a firm tick at its edge and a pulse rate that rises towards its centre (a "swirl"); dragging across rings gives a tick at each gap | Holding still gives a steady pulse, rate ∝ normalised `Teq` (`derived`, 2–12 Hz), as for brown dwarfs |
+  | `planet_water` | Open ocean: near-silent slow swell (1–2 Hz, lowest level); coastline: one firm tick; land: height-map ticks as for `asteroid_procedural`; polar ice: dense, fine, soft ticks; clouds: not felt (optional "feel clouds" toggle) | As for `gas_giant` (`Teq` pulse) |
+  | `planet_rocky` | Height-map ticks; lava cracks give a double tick | As for `gas_giant` |
+  | `nebula`, `nova` | Field source as for the comet (§8.4): pulse rate ∝ local point density | — |
+
+  - **Audio pairing (D-10):**
+    - Gas giant bands: a tone whose pitch follows latitude.
+    - Ocean: filtered noise, a "surf" sound.
+    - Land: clicks, as for asteroids.
+    - Every texture sound uses the `artistic` timbre.
+  - **Honesty:** in "Measured only" all texture haptics on these kinds are silent, because nothing about their surfaces is measured. Only the data pulse remains.
+  - **HapticProfile:** `texture` gains `'terrain'` (height plus ocean and ice masks) and `'flow'` (bands, jets, storms). `data` gains `'teq_pulse'`.
+  - **Field channels and packing.** There are six channels, packed into two RGBA `Float32` `DataTexture`s. The haptics read the same `Float32Array`s.
+    - Texture A: R = height, G = band index, B = storm id, A = unused.
+    - Texture B: R = ocean mask, G = ice mask, B = lava-crack mask, A = unused.
+  - **Jet pulse rate:** clamp(k · |zonal wind| / max |zonal wind|, 2, 20) Hz **[verify on phones]**.
+  - **New ObjectCard field:** `teq_K?: TV` (planet equilibrium temperature, from Exoplanet Archive `pl_eqt` when present, tagged `measured`, otherwise `derived` from architecture spec §7.1). `teq_pulse` is refused and listed in `missing` when it is null.
+  - `nebula` and `nova` have no catalogue rule. They are slider-only showcase bodies, and every value is tagged `artistic`.
+  - **Strength quantisation (D-09):** split 0–1 into equal bins as a starting point. Calibration may move the bin edges per device.
+
+---
+
+## Post-event backlog
+
+| ID | Item | From |
+|---|---|---|
+| B-01 | Tauri Android app with `VibrationEffect` composition and amplitude | Rendering doc §8.1, D-08 |
+| B-02 | Gemini Live voice control | Architecture spec §8, D-06 |
+| B-03 | AI sound clips (ElevenLabs or similar) | Architecture spec §8, D-06 |
+| B-04 | Image-to-3D (TRELLIS, Hunyuan3D, TripoSR) | Architecture spec §6.3, D-06 |
+
+## Open questions
+
+| ID | Question | Owner |
+|---|---|---|
+| Q-01 | Backend framework. Both specs say "Python 3.12 API" but neither names one. | Kevin |
+| Q-02 | Frontend hosting: the same AWS server or static hosting? | Kevin |
+| Q-03 | Sliders on baked bodies. Changing relief needs a re-bake. Should the event build allow only colour, lighting and spin sliders on baked types? | Atish |
+| Q-04 | How Rainbow Trails (handover §5) relates to the flipbook. Is it a view mode of the flipbook or a separate P1 feature? | Team |
+| Q-05 | Name resolver order: SIMBAD first or SBDB first (architecture spec §4.1)? Rendering doc §3.3 uses both. | Atish |
+| Q-06 | Endpoints for search, frames and the flipbook. Only `/v1/objects/{id}/card` and `/render-params` are specified. | Kevin |
+| Q-07 | Owners for `shared/schemas`, `frontend/src/viewer/fields` and the backend pipeline stages (rendering doc §10 covers only render, API, viewer and haptics). | Team |
+| Q-08 | Honesty toggle: what is the starting state? In "Measured only", do `derived` data haptics (e.g. the D-12 `teq_pulse`) stay on? The toggle table hides only `artistic` and `inferred_from_analog`, but D-12 treats the derived pulse as kept. | Atish, Moon |
+| Q-09 | With the settings file retired (D-02), what does a "saved" asset hold? Proposal: the ObjectCard, RenderParams and texture URLs. IndexedDB would cache those plus the user's `overrides`. | Atish |
+| Q-10 | Architecture spec §13 (Plan) schedules build work from 5 Nov, but the event rules say not to build before 14 Nov. Should the plan be re-dated, or should the pre-event days be relabelled as research and prep? | Team |
+| Q-11 | The mock-up's Haptics tool (commit `4629305`, `mockup/spherex-ui.html`, `SphereXHaptics`) differs from rendering doc R8.8. See the differences listed below this table. Which one becomes the app API? Possible merge: keep R8.8's `HapticEvent`, add `sharpness` for the native path, and keep the mock-up's `spherex:haptic` event for debugging. | Atish, Munazir, Moon |
+
+**Q-11 differences between the mock-up and R8.8:**
+
+1. **Event shape.** The mock-up streams continuous `sample({intensity, sharpness, speed, roughness, height, material})` plus `tick()`. R8.8 uses discrete `HapticEvent`s (`kind`, `strength`, `rateHz`, `tag`, `pitch`, `pan`). The mock-up has no provenance tag.
+2. **Bridges.** The mock-up tries `window.SphereXNative.haptic` and an iOS `webkit.messageHandlers.sphereXHaptic` bridge before `navigator.vibrate`. D-08 is web only for the event.
+3. **Nebulae and novae.** The mock-up refuses them ("no surface to feel"). D-12 gives them a field pulse.
+4. **Tick length.** The mock-up uses 6–22 ms. R8.3 uses 8–25 ms with calibrated `minMs`.

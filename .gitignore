@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Env and secrets (Gemini key is server-side only)
+.env
+.env.*
+!.env.example
+
+# Generated data (baked textures, cached cutouts)
+/data/
+*.fits
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
