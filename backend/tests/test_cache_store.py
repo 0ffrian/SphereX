@@ -102,6 +102,15 @@ def test_corrupt_meta_is_a_miss(tmp_path: Path, meta_bytes: bytes) -> None:
     assert cache.fetch(KEY, live_ok).from_cache is False
 
 
+def test_corrupt_meta_reads_as_no_meta(tmp_path: Path) -> None:
+    cache = ReadThroughCache(tmp_path, offline=False)
+    cache.fetch(KEY, live_ok)
+    assert cache.get_meta(KEY) is not None
+    _, meta_path = cache._paths(KEY)
+    meta_path.write_bytes(b'{"body_sha256": "ab')
+    assert cache.get_meta(KEY) is None
+
+
 def test_no_temp_files_left(tmp_path: Path) -> None:
     ReadThroughCache(tmp_path, offline=False).fetch(KEY, live_ok)
     assert not list(tmp_path.rglob("*.tmp"))

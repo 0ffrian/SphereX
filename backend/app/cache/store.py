@@ -114,15 +114,21 @@ class ReadThroughCache:
     def _lock(self, key: CacheKey) -> threading.Lock:
         return self._locks[int(key.digest[:8], 16) % LOCK_STRIPES]
 
+    @staticmethod
+    def _read_meta(meta_path: Path) -> dict[str, Any] | None:
+        """A corrupt or truncated meta file (incl. bad UTF-8) reads as a miss, never a 500."""
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except ValueError:
+            return None
+        return meta if isinstance(meta, dict) else None
+
     def get(self, key: CacheKey) -> CacheEntry | None:
         body_path, meta_path = self._paths(key)
         if not meta_path.is_file() or not body_path.is_file():
             return None
-        try:
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-        except ValueError:  # corrupt or truncated meta (incl. bad UTF-8): treat as a miss
-            return None
-        if not isinstance(meta, dict):
+        meta = self._read_meta(meta_path)
+        if meta is None:
             return None
         body = body_path.read_bytes()
         if meta.get("body_sha256") != hashlib.sha256(body).hexdigest():
@@ -132,12 +138,12 @@ class ReadThroughCache:
     def get_meta(self, key: CacheKey) -> dict[str, Any] | None:
         """The meta of a committed entry without reading its body (issue #2: Stage 2 keys its
         derived spectrum on the cutouts' ``body_sha256``). The body is not verified here; a
-        later ``get`` does that."""
+        later ``get`` does that. A corrupt meta returns ``None``, so the caller treats the
+        cutout as not cached."""
         body_path, meta_path = self._paths(key)
         if not meta_path.is_file() or not body_path.is_file():
             return None
-        meta: dict[str, Any] = json.loads(meta_path.read_text(encoding="utf-8"))
-        return meta
+        return self._read_meta(meta_path)
 
     def put(
         self,
