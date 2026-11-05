@@ -1,0 +1,2 @@
+# Recorded cache entries are byte-exact (their SHA-256 is in the meta). Never convert line endings.
+backend/tests/fixtures/** -text

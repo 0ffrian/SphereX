@@ -10,7 +10,12 @@ backend/app/core/render/            (Atish)
   noise.py craters.py height.py normals.py palette.py bake.py
   gemini_paint.py     # stretch, behind the admin token
   spherex_rgb.py      # §5.2 channel extraction
-backend/app/api/                     (Kevin)  # D-16 endpoints; objects.py: /card, /render-params, texture URLs
+backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; objects.py: /frames, /cutouts, later /card, /render-params, texture URLs
+backend/app/adapters/                (Kevin)  # IRSA SIA + cutouts, SIMBAD, SBDB, Horizons, SkyBoT (A3), all through the cache
+backend/app/cache/                   (Kevin)  # D-25 read-through disk cache
+backend/app/core/find/               (Kevin)  # pipeline stage 1 (A4.1): resolver, proper motion, WCS, frames, cutout PNG
+backend/app/core/measure/            (Munazir, provisional)  # pipeline stage 2 (A4.2), issue #2: config, flags, aperture,
+                                                            # solid_angle, photometry, spectrum; endpoint in app/api/spectrum.py
 frontend/src/viewer/                 (Moon)
   ViewerApp.ts lighting.ts modes.ts honesty.ts scaleBar.ts altText.ts
   renderers/AsteroidMesh.ts AsteroidProcedural.ts Comet.ts BrownDwarf.ts Star.ts

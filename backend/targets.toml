@@ -1,0 +1,42 @@
+# Targets for the pre-fetch script (D-25) and the recorded test fixtures.
+# `query` is what is sent to /v1/resolve; `aliases` are short names that SIMBAD does not know
+# (ASSUMPTION: a name mapping, not a physical value).
+# Demo objects: add them below with group = "demo" once the team picks them.
+
+[[target]]
+name = "Barnard's Star"
+query = "Barnard's star"
+group = "test"
+aliases = []
+
+[[target]]
+name = "Epsilon Indi B"
+query = "eps Ind B"
+group = "test"
+aliases = []
+
+[[target]]
+name = "WISE 0855"
+query = "WISE J085510.83-071442.5"
+group = "test"
+aliases = ["WISE 0855", "WISE 0855-0714"]
+
+[[target]]
+name = "RW Aurigae"
+query = "RW Aur"
+group = "test"
+aliases = []
+
+[[target]]
+name = "R Draconis"
+query = "R Dra"
+group = "test"
+aliases = []
+
+# A moving object, so the SBDB + Horizons path and the moving-object refusal (Q-21) are
+# recorded and tested offline.
+[[target]]
+name = "433 Eros"
+query = "433 Eros"
+group = "fixture"
+aliases = []

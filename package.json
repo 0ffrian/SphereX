@@ -17,6 +17,12 @@
     "format": "npm --prefix frontend run format",
     "test": "npm --prefix frontend run test",
     "test:e2e": "npm --prefix frontend run test:e2e",
-    "check": "npm --prefix frontend run typecheck && npm --prefix frontend run lint && npm --prefix frontend run test && npm --prefix frontend run build"
+    "check": "npm --prefix frontend run typecheck && npm --prefix frontend run lint && npm --prefix frontend run test && npm --prefix frontend run build",
+    "backend:setup": "uv --directory backend sync --locked",
+    "backend:dev": "uv --directory backend run uvicorn app.main:create_app --factory --host localhost --port 8000 --reload",
+    "backend:test": "uv --directory backend run pytest -q",
+    "backend:check": "uv --directory backend run ruff check . && uv --directory backend run ruff format --check . && uv --directory backend run mypy && uv --directory backend run pytest -q",
+    "backend:prefetch": "uv --directory backend run python -m scripts.prefetch",
+    "backend:smoke-offline": "uv --directory backend run python -m scripts.smoke_offline"
   }
 }
