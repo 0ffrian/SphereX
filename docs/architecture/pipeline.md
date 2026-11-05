@@ -34,15 +34,17 @@ Each stage has one job, takes defined inputs and returns defined outputs. Stages
 
 ### A4.2 Stage 2: Measure brightness and spectrum
 
-- **Input:** pixel positions and frame cutouts.
-- **Process:**
-  1. Sum flux in a small aperture, subtract local background.
-  2. Drop pixels with bad flags.
-  3. Use the variance layer for error bars.
-  4. Look up each frame's wavelength at the object's pixel from the wavelength map.
-- **Output:** a spectrum `[(wavelength_um, flux, error)]` and a light curve `[(time, flux)]`.
-- **Endpoint:** `GET /v1/objects/{id}/spectrum` returns both, tagged `measured` (D-16).
-- **Status:** To build.
+- **Input:** pixel positions and frame cutouts (Stage 1: `x_fits0`, `y_fits0`, `wavelength_um` per frame; cached cutouts with `IMAGE`, `FLAGS`, `VARIANCE`, `WCS-WAVE`).
+- **Process** (forced photometry at the Stage 1 pixel, no re-centring; code in `backend/app/core/measure/`):
+  1. Sum flux in a small aperture, subtract local background. Aperture radius 3 px with 10×10 sub-pixel weights; background = sigma-clipped mean (3σ, 5 iterations) of an annulus 6–9 px (clipped with the ordinary sample std when the annulus MAD is zero). These are method settings, reported verbatim in the response's `method` block.
+  2. Drop pixels with bad flags. Bit numbers are read from the `MP_*` keywords of the `FLAGS` header; a header that does not define `OVERFLOW` and `SUR_ERROR` refuses the frame (`flags_header`), because saturation could not be detected, and other undefined reject names are listed in `method.reject_flags_absent`. Rejected: the IRSA tutorial list `TRANSIENT, OVERFLOW, SUR_ERROR, PHANTOM, REFERENCE, NONFUNC, DICHROIC, MISSING_DATA, HOT, COLD, FULLSAMPLE, PHANMISS, NONLINEAR, PERSIST, OUTLIER`. Checked 5 Nov 2026 against the Explanatory Supplement (SSDC-DP-017 v2.0, Table 16) and the cached QR2 headers; Table 16's newer flags `CROSSTALK`, `STREAK` and `SATELLITE_HALO` are not in the list (Q-31). `SOURCE` is kept everywhere (its mask covers whole regions around bright stars). A bad pixel within 1.5 px of the object refuses the point; a bad pixel further out is dropped and the point is `flagged`. The sum is never rescaled.
+  3. Use the variance layer for error bars: `σ = 1e12·Ω·sqrt(Σ w²V + (Σw)²·var_B)`, `var_B = max(ΣV/N², s²/N)`.
+  4. Look up each frame's wavelength at the object's pixel from the wavelength map. Stage 1's `wcs.wavelength_at` already does this (SIP cleared); Stage 2 reuses the frame's value.
+  5. Convert to flux density: `F = 1e12·Ω·Σ w (I − B)` in **µJy** (`flux_unit: "uJy"`), with Ω the pixel solid angle at the object pixel from the TAN-SIP WCS (checked 5 Nov 2026: Ω/(1″)² agrees with the IMAGE header's `OMEGA_MEDIAN`, the median of IRSA's solid-angle pixel map in arcsec², to within 0.8 % on all 15 cached cutouts; the map's own spread `OMEGA_STDDEV` is about 0.5 %). No aperture correction (Q-23).
+- **Refusals** (in `missing` as `<reason>:<frame_id>`, never a guessed value): `saturated` (core `OVERFLOW`, or a NaN core with `OVERFLOW`/`SUR_ERROR` in the aperture), `aperture_flags`, `aperture_edge`, `background`, `unit`, `extension`, `flags_header`, `pixel_area`, `measure`, `cutout`. When every frame is refused as saturated, `missing` also holds `spectrum:saturated` (Q-26). Stage 1's own `missing` entries are passed through.
+- **Output:** a spectrum `[(wavelength_um, flux, error, flagged)]` and a light curve `[(time, flux, error)]`, built from the same measurements. Optional per-point fields: `bandwidth_um`, `dropped_flags`, `dropped_weight_fraction`, `flag_reasons` (incl. `no_proper_motion`); light-curve points carry `wavelength_um` and `flagged`, because each SPHEREx frame is a different band (Q-24).
+- **Endpoint:** `GET /v1/objects/{id}/spectrum` returns both, tagged `measured` (D-16), with a `provenance` map (flux and error formulas) and `cached_at`. Stage 2 reads only cutouts already in the cache (one read each) and never downloads; an uncached cutout is refused as `cutout:<frame_id>`. The result is cached as `derived.spectrum`, keyed by `DERIVATION_VERSION`, the measure version, the method settings, Stage 1's `missing`, every frame record and every cutout's SHA-256; it is stored, and served from the cache, only while the frame list is complete.
+- **Status:** Built (issue #2). On the recorded fixtures, Epsilon Indi B and WISE 0855 give measured points; Barnard's Star, RW Aur and R Dra are refused as saturated in every recorded frame (Q-26).
 
 ### A4.3 Stage 3: Classify and pick a type
 

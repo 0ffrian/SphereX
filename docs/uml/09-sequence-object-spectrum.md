@@ -20,9 +20,15 @@ sequenceDiagram
   FB->>P: Open panel for object id
   P->>API: GET /v1/objects/{id}/spectrum
   API->>PL: Stage 1: positions per frame
-  PL->>PL: Stage 2: aperture flux minus background, drop flagged pixels, variance to sigma, wavelength from WCS-WAVE
-  PL-->>API: Spectrum and light curve
-  API-->>P: Spectrum and light curve, tagged measured (cached_at if from cache)
+  alt derived.spectrum cached for this frame list, method and cutouts
+    API->>API: Serve the stored spectrum (no cutout read)
+  else not cached
+    PL->>PL: Stage 2 per cached cutout: 3 px aperture minus 6-9 px annulus background, drop flagged pixels, variance to sigma, flux in uJy (pixel solid angle from WCS), wavelength from WCS-WAVE
+    PL->>PL: Refuse a frame as saturated (core OVERFLOW) or aperture_flags, edge, background...; flag points with dropped outer pixels
+    PL-->>API: Spectrum and light curve (same measurements), refusals in missing
+    API->>API: Store as derived.spectrum when the frame list is complete
+  end
+  API-->>P: Spectrum and light curve, tagged measured, flux_unit uJy (cached_at if from cache; spectrum:saturated when every frame saturated)
   P->>API: GET /v1/objects/{id}/card
   API->>PL: Stage 3: match reference types (asteroid classes, brown dwarf types, gas features 2.7, 4.25, 4.67 um)
   PL->>EXT: Gaia colours if a known asteroid
@@ -62,5 +68,5 @@ sequenceDiagram
 
 - Type selection order follows rendering doc §3.3; see [18-activity-type-selection.md](18-activity-type-selection.md). Name resolution happens earlier, in `resolve` (D-19, [08-sequence-search-flipbook.md](08-sequence-search-flipbook.md)).
 - The Estimated badge covers `derived`, `model_dependent` and `inferred_from_analog`; its tooltip shows the formula, assumption or analog (D-02).
-- Spectra and cards are cached in the backend's read-through cache, like every external call (D-25). Calls to SBDB, SIMBAD, DAMIT, Gaia and the Exoplanet Archive also go through it.
+- Spectra and cards are cached in the backend's read-through cache, like every external call (D-25). The spectrum entry (`derived.spectrum`) is keyed by the method, Stage 1's `missing`, every frame record and every cutout's SHA-256, and is stored only for a complete frame list. Stage 2 reads cached cutouts only and never downloads (A4.2). Saturated frames are refused, never measured (Q-26). Calls to SBDB, SIMBAD, DAMIT, Gaia and the Exoplanet Archive also go through it.
 - Spectrum haptic events go through the same `HapticEngine` and drivers as touch mode ([11-sequence-touch-haptics.md](11-sequence-touch-haptics.md)).

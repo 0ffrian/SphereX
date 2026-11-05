@@ -25,9 +25,10 @@ In development the frontend's Vite server proxies `/v1` to `http://localhost:800
 | `GET /v1/resolve?q=<name or "ra,dec">` | `{id, name, ra, dec, moving, resolver, cached_at}` plus optional `epoch`, `pm_ra_mas_yr`, `pm_dec_mas_yr` and `provenance` |
 | `GET /v1/objects/{id}/frames` | `{id, frames[], stretch, data_release, cached_at, missing, north_up}` plus a `provenance` map. Each frame: `frame_id, time, wavelength_um, x, y, cutout_url, flags`, plus optional `ra, dec, bandwidth_um, detector, width, height, north_angle_deg, mirrored` |
 | `GET /v1/objects/{id}/cutouts/{frame_id}.png` | 8-bit grey PNG, asinh stretch, the same bytes every time |
+| `GET /v1/objects/{id}/spectrum` | `{id, spectrum[], light_curve[], flux_unit, tag, cached_at, missing}` plus optional `data_release`, `method`, `provenance`. Flux in `uJy`, tagged `measured`. Spectrum points: `wavelength_um, flux, error, flagged, frame_id` plus optional `bandwidth_um, dropped_flags, dropped_weight_fraction, flag_reasons`. Light-curve points: `time, flux, error, frame_id` plus optional `wavelength_um, flagged`. Refused frames are listed in `missing` as `<reason>:<frame_id>` (e.g. `saturated:…`); `spectrum:saturated` when every frame saturated (A4.2, Q-26) |
 | `GET /v1/health` | `{status, offline, data_release}` |
 
-`/v1/objects/{id}/spectrum` is added by issue #2. Its code goes in `app/core/measure/`, which is reserved for it.
+Per-target spectrum report on a cache: `SX_OFFLINE=1 uv run python -m app.core.measure [--only NAME]`.
 
 Errors are `{"error": code, "detail": sentence}`. The codes are:
 - `bad_query` and `bad_request` (400)
@@ -101,11 +102,11 @@ uv run python -m scripts.record_fixtures          # re-record tests/fixtures/cac
 
 ```
 app/main.py, settings.py, errors.py, context.py, offline.py, timefmt.py
-app/api/          (Kevin, R10)  resolve.py, objects.py, models.py, deps.py
+app/api/          (Kevin, R10)  resolve.py, objects.py, models.py, deps.py; spectrum.py (issue #2)
 app/cache/        keys.py, store.py: D-25 read-through cache
 app/adapters/     http.py, irsa_sia.py, irsa_cutout.py, simbad.py, sbdb.py, horizons.py, skybot.py
 app/core/find/    (Kevin, Stage 1, A4.1) ids, resolver, propagate, wcs, frames, cutouts, png
-app/core/measure/ (issue #2, Stage 2, A4.2): reserved
+app/core/measure/ (Munazir, Stage 2, A4.2) config, flags, aperture, solid_angle, photometry, spectrum
 app/core/render/  (Atish, R10): not created yet
 scripts/          prefetch, smoke_offline, backup_cache, record_fixtures
 tests/            pytest; tests/fixtures/cache holds the recorded cache entries
