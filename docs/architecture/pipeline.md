@@ -17,12 +17,20 @@ Each stage has one job, takes defined inputs and returns defined outputs. Stages
   1. Resolve names to RA/Dec (D-19). Names that look like small bodies (numbered asteroids such as `433 Eros`, provisional designations such as `2024 AB`, comets such as `C/…`, interstellar objects such as `3I/ATLAS`) go to SBDB first. Everything else goes to SIMBAD first. On a miss, try the other one. RA/Dec input skips name resolution.
   2. For moving objects, get position at each frame time from Horizons, and neighbours from SkyBoT.
   3. Convert sky position to pixel position in each frame using the frame's WCS.
+  - Stars with a catalogue proper motion are propagated linearly from J2000 to each frame time (`derived`; Barnard's Star moves about 269″, 44 px, by 2026). `moving` means a solar-system body only (Q-22). Frames of moving objects are refused in M1 (Q-21).
+  - One time per frame (the SIA exposure midpoint, UTC) drives the position, the cutout centre, `x`/`y` and `time`.
 - **Output:** list of `(frame_id, x, y, time)`.
 - **Endpoints (D-16):**
   - `GET /v1/resolve?q=<name or ra,dec>` returns `{ id, ra, dec, moving }`.
   - `GET /v1/objects/{id}/frames` returns `[{ frame_id, time, wavelength_um, x, y, cutout_url }]`. The flipbook plays this list in order; there is no separate flipbook endpoint.
   - `GET /v1/objects/{id}/cutouts/{frame_id}.png` returns the cutout, stretched to PNG by the server. The frames response states the stretch used.
-- **Status:** To build.
+  - Contract details for M1 (issue #1; full list in [backend/README.md](../../backend/README.md#endpoints-d-16)):
+    - Times are ISO-8601 UTC with a trailing `Z`.
+    - `x`, `y` are 0-based pixels of the PNG as served (top-left origin, y down, integer = pixel centre). The PNG is the FITS array flipped vertically.
+    - `north_up` is `false` (native orientation). Optional `north_angle_deg` and `mirrored` let the UI rotate. Optional per-frame `ra`, `dec`.
+    - A `provenance` map tags every field: cutout pixels, time, wavelength and flags are `measured`; `x`, `y`, the propagated `ra`/`dec` and the stretch are `derived`, each with its formula.
+    - Frames that cannot be computed are left out and named in `missing` (`cutout:<id>`, `wavelength:<id>`, `outside_cutout:<id>`, `frames:truncated`, and `cutouts:deferred:<n>` when one request would download more than `SX_LIVE_CUTOUTS_PER_REQUEST` cutouts live).
+- **Status:** Built for stars and coordinates (issue #1, `backend/app/core/find/`). Moving-object frame search: Q-21.
 
 ### A4.2 Stage 2: Measure brightness and spectrum
 

@@ -47,10 +47,12 @@ sequenceDiagram
   else cache miss with SX_OFFLINE=1
     API-->>UI: Refuse, never touch the network
   end
-  opt moving object (asteroid, comet, high proper motion)
-    API->>HZ: Position at each frame time, neighbours in field (SkyBoT -ep as JD), via the cache
+  alt star with a catalogue proper motion (Q-22: moving = false)
+    API->>API: Propagate the SIMBAD position to each frame time (derived), then sky to pixel via WCS
+  else moving object, asteroid or comet (moving = true)
+    API->>HZ: Position at the resolve epoch, neighbours in field (SkyBoT -ep as JD), via the cache
     HZ-->>API: Positions and known objects
-    API->>API: Sky to pixel per frame via WCS
+    API-->>UI: M1 refuses: frames empty, missing frames:moving_object_search (Q-21)
   end
   API-->>UI: frame_id, time, wavelength_um, x, y, cutout_url per frame, plus the stretch used and cached_at if from cache
   UI->>FB: Load frames
@@ -78,3 +80,5 @@ sequenceDiagram
 - All five test targets (Barnard's Star, Epsilon Indi B, WISE 0855, RW Aurigae, R Draconis) and the demo objects are pre-fetched, so the demo runs with `SX_OFFLINE=1` and always hits the cache (D-25).
 - A `candidate` source gets one haptic tick per frame where it is detected (rendering doc §8.5). That path is not drawn here.
 - Rainbow Trails is built after basic playback works (D-28).
+- `moving` means a solar-system body (Q-22). High proper-motion stars are not `moving`; their positions come from the SIMBAD proper motion, propagated to each frame time. The ephemeris-driven frame search for moving objects is not built in M1 (Q-21).
+- The SIA search and every cutout go through the cache. A cut-off SIA answer (`QUERY_STATUS=OVERFLOW`) adds `frames:truncated` to `missing`.
