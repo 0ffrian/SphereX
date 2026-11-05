@@ -48,6 +48,6 @@ Every `HapticEvent` goes to both drivers: vibrate and audio. Audio is not only a
 
 ### A9.5 Honesty rule
 
-The honesty toggle (rendering doc §5.3) applies to haptics too, with the same tag filter (D-21). In **Measured only**, only `measured` haptics play: every `artistic` texture haptic and every Estimated data haptic is silent. Texture haptics then come only from real shape meshes. On shader-drawn bodies nothing about the surface is measured, so only the `teq_pulse` can remain, and only when Teq comes from Exoplanet Archive `pl_eqt` (`measured`).
+The honesty toggle (rendering doc §5.3) applies to haptics too, with the same tag filter (D-21). In **Measured only**, only `measured` haptics play: every `artistic` texture haptic and every Estimated data haptic is silent. Texture haptics then come only from real shape meshes. On shader-drawn bodies nothing about the surface is measured, so only the `teq_pulse` can remain, and only when Teq comes from Exoplanet Archive `pl_eqt` (`measured`). A `derived` `teq_pulse` plays from + Estimated; `artistic` texture haptics play only in + Artistic.
 
 Haptics never carry information that is not also available as text or sound (rendering doc §9).

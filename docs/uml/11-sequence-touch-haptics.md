@@ -59,7 +59,7 @@ sequenceDiagram
 
 - Touch mode only exists on the 3D view. Spectrum haptics on the panel use the same engine ([09-sequence-object-spectrum.md](09-sequence-object-spectrum.md)).
 - Rate limit: ≤ 40 events/s and ≥ 25 ms between ticks (rendering doc §8.3). Only `tick` events are throttled in the §8.8 code.
-- Measured only plays only `measured` events (D-21): procedural relief and every texture haptic on shader kinds are silent; real meshes still tick; `derived` data haptics are silent, so the `teq_pulse` plays only when `teq_K` is `measured` (rendering doc §8.2, §7.7).
+- Measured only plays only `measured` events (D-21): procedural relief and every texture haptic on shader kinds are silent; real meshes still tick; every data haptic not tagged `measured` is silent, so the `teq_pulse` plays only when `teq_K` is `measured` (rendering doc §8.2, §7.7).
 - `sharpness` is optional and ignored by the web driver (D-20).
 - The `spherex:haptic` event drives an on-screen pulse indicator, so an audience watching the laptop can see what the phone feels (D-20). Which module fires it is not stated; it is drawn from the engine.
 - How `audioOffsetMs` is applied is in rendering doc §8.9 **[verify once written]**.
