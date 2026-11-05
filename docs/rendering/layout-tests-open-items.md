@@ -14,7 +14,7 @@ backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; obje
 backend/app/adapters/                (Kevin)  # IRSA SIA + cutouts, SIMBAD, SBDB, Horizons, SkyBoT (A3), all through the cache
 backend/app/cache/                   (Kevin)  # D-25 read-through disk cache
 backend/app/core/find/               (Kevin)  # pipeline stage 1 (A4.1): resolver, proper motion, WCS, frames, cutout PNG
-backend/app/core/measure/            (Munazir, provisional)  # pipeline stage 2 (A4.2), issue #2: config, flags, aperture,
+backend/app/core/measure/            (Moon)  # pipeline stage 2 (A4.2), issue #2: config, flags, aperture,
                                                             # solid_angle, photometry, spectrum; endpoint in app/api/spectrum.py
 frontend/src/viewer/                 (Moon)
   ViewerApp.ts lighting.ts modes.ts honesty.ts scaleBar.ts altText.ts
@@ -41,16 +41,16 @@ frontend/src/test/                           # test-only helpers (fixtureFetch.t
 frontend/fixtures/                           # dev and test only: SYNTHETIC fixture server, a Vite dev-server plugin
                                              # enabled by `npm run dev:fixtures`; never part of a build
 frontend/scripts/                            # check-dist.js: ends `npm run build`, fails if a fixture marker is in dist/
-shared/schemas/object-card.schema.json  render-params.schema.json   (Munazir, provisional)
-shared/fixtures/                     (Munazir, provisional)
+shared/schemas/object-card.schema.json  render-params.schema.json   (Moon)
+shared/fixtures/                     (Moon)
 ```
 
-Owners follow D-17. Munazir's assignments are provisional until Munazir confirms them (Q-16). `frontend/src/contract/` is generated code and follows the owner of `shared/schemas/`.
+Owners follow D-17 (Munazir is Moon). `frontend/src/contract/` is generated code and follows the owner of `shared/schemas/`.
 
 | Owner (D-17) | Also owns, outside the paths above |
 |---|---|
 | Kevin | Backend scaffold, data adapters (including Gaia and WISE), pipeline stages 1, 4 and 5, local hosting (D-24) |
-| Munazir | Pipeline stage 2 (brightness and spectrum), the physics layer (architecture spec §7) |
+| Moon (Munazir) | Pipeline stage 2 (brightness and spectrum), the physics layer (architecture spec §7) |
 | Atish | Pipeline stage 3 (classify), stage 7 (`card_to_params`), the texture baker, the Gemini layer |
 | Moon | The flipbook UI, the shader kinds, the overlay UI |
 

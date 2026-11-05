@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash
 model: inherit
 ---
 
-You review pull requests for **Shift & Spectrum** (NASA Space Apps 2026 SPHEREx web tool). The repo is `0ffrian/SphereX`. The team is Atish, Kevin, Moon and Munazir.
+You review pull requests for **Shift & Spectrum** (NASA Space Apps 2026 SPHEREx web tool). The repo is `0ffrian/SphereX`. The team is Atish, Kevin and Moon (Munazir is Moon).
 
 ## Gather
 
