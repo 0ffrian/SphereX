@@ -2,7 +2,7 @@
 
 Vite + TypeScript + React web app. three.js **r187** (`three/webgpu`).
 
-Status: **scaffold only** (set up 4 Nov 2026, before the 14 Nov build start, at the team's request). It has the tooling, the data-contract types, typed placeholder modules for every R10 file and a viewer smoke scene (one plain sphere). No object is loaded yet.
+Status: the tooling, the data-contract types, typed placeholder modules for every R10 file and a viewer smoke scene (one plain sphere), set up on 4 Nov 2026. M1 (issue #3, 5 Nov 2026) adds the SPHEREx flipbook and spectrum view: search by name or RA/Dec, frame playback, the spectrum chart, Rainbow Trails and the shareable URL hash. The 3D viewer does not load an object yet.
 
 ## Run it
 
@@ -11,8 +11,15 @@ Needs Node 24 (`.nvmrc`) and npm.
 ```sh
 cd frontend
 npm ci              # exact versions from package-lock.json
-npm run dev         # http://localhost:5173
+npm run dev         # http://localhost:5173, /v1 proxied to the backend
+npm run dev:fixtures  # same app, /v1 answered by SYNTHETIC fixtures (no backend)
 ```
+
+### Backend and fixtures
+
+- `npm run dev` proxies `/v1` (the D-16 API) to `http://localhost:8000`. Set `SX_API_TARGET` to use another address. `npm run preview` proxies the same way.
+- `npm run dev:fixtures` (`vite --mode fixtures`) answers `/v1` from [`fixtures/`](fixtures/README.md) instead. That data is **synthetic**; the page then shows a "Fixture data" banner and "Fixture" badges. The fixtures exist only on the dev server: no app module imports them, and `npm run build` fails if a fixture marker reaches `dist/` (`scripts/check-dist.js`).
+- Playwright always runs on the fixtures.
 
 ### Phone testing over the LAN (Android Chrome)
 
@@ -30,17 +37,19 @@ If Windows Firewall prompts for Node.js, allow it on private networks. Setting `
 
 ### Scripts
 
-| Script                    | Does                                                                           |
-| ------------------------- | ------------------------------------------------------------------------------ |
-| `dev`                     | Vite dev server                                                                |
-| `dev:phone`               | Vite on the LAN (`--host`) with HTTPS                                          |
-| `build`                   | `tsc -b && vite build`                                                         |
-| `preview`                 | serve `dist/`                                                                  |
-| `typecheck`               | `tsc -b --noEmit` (strict, `noUncheckedIndexedAccess`, `noImplicitOverride`)   |
-| `lint`                    | ESLint flat config (typescript-eslint, react-hooks)                            |
-| `format` / `format:check` | Prettier                                                                       |
-| `test`                    | Vitest (jsdom)                                                                 |
-| `test:e2e`                | Playwright smoke test, Chromium only (`npx playwright install chromium` first) |
+| Script                    | Does                                                                                                     |
+| ------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `dev`                     | Vite dev server                                                                                          |
+| `dev:phone`               | Vite on the LAN (`--host`) with HTTPS                                                                    |
+| `dev:fixtures`            | Vite dev server with `/v1` served from the synthetic fixtures                                            |
+| `build`                   | `tsc -b && vite build`, then `check:dist`                                                                |
+| `check:dist`              | Fails if fixture code or data is in `dist/`                                                              |
+| `preview`                 | serve `dist/`                                                                                            |
+| `typecheck`               | `tsc -b --noEmit` (strict, `noUncheckedIndexedAccess`, `noImplicitOverride`)                             |
+| `lint`                    | ESLint flat config (typescript-eslint, react-hooks)                                                      |
+| `format` / `format:check` | Prettier                                                                                                 |
+| `test`                    | Vitest (jsdom)                                                                                           |
+| `test:e2e`                | Playwright smoke and flipbook tests on fixtures, Chromium only (`npx playwright install chromium` first) |
 
 CI: [`.github/workflows/frontend.yml`](../.github/workflows/frontend.yml) runs typecheck, lint, format check, unit tests and build, plus a separate Playwright job.
 
@@ -82,15 +91,24 @@ This follows [rendering doc R10](../docs/rendering/layout-tests-open-items.md#r1
 src/
   contract/       data contract types: Tag, TV, ObjectType, ObjectCard, RenderParams, Layer (R3, D-04, D-12),
                   HapticKind, HapticEvent, HapticDriver, HapticProfile (R8.8, D-10, D-12), assertTagged()
-  state/          Zustand store: card, params, honesty (null until Q-08), overrides (D-02)
-  app/            React shell: App, ViewerPanel (canvas + on-screen controls), StatusLine
+  state/          Zustand store: card, params, honesty (null until Q-08), overrides (D-02),
+                  and the `sky` slice (flipbook session: search, frames, playback, spectrum)
+  app/            React shell: App, ViewerPanel (canvas + on-screen controls), StatusLine,
+                  FixtureBanner, LiveAnnouncer, useHashSync + urlHash (A10 hash routing)
+    api/                  M1 API client (D-16): types (TEMPORARY until D-18 generation), checks, errors
+    search/               SearchBar, parseQuery (name or RA, Dec in degrees), the 5 test targets
+    flipbook/             Flipbook player, cutout preloading, playback, Rainbow Trails (D-28)
+    spectrum/             SpectrumPanel, hand-rolled SVG SpectrumChart, scales
+  test/           test-only helpers (fixtureFetch)
   viewer/         (Moon)  ViewerApp [smoke scene], lighting, modes, honesty, scaleBar, altText
     renderers/            AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody
     fields/               fieldWorker (D-12 shared field; file name [verify])
   haptics/        (Moon, Atish for sources)  haptics, calibration
     drivers/              webVibrate, audio, tauri (stub, B-01)
     sources/              heightMap, meshNormal, field, terrain, flow, spectrum, lightcurve
-e2e/              Playwright smoke test
+e2e/              Playwright smoke test and flipbook flow (fixtures mode)
+fixtures/         SYNTHETIC dev/test fixtures and their Vite dev plugin (see fixtures/README.md)
+scripts/          check-dist.js (post-build check)
 ```
 
 Modules that are not built yet export a single `*_PLACEHOLDER = { spec, implemented: false }` and contain no behaviour. Each file's header names its spec section. `src/layout.test.ts` checks that every R10 file exists and exports something.
@@ -103,3 +121,14 @@ Modules that are not built yet export a single `*_PLACEHOLDER = { spec, implemen
 - OrbitControls handle drag and wheel. Keyboard: arrows rotate, `+`/`−` zoom, `R` resets. There are on-screen rotate, zoom and reset buttons (R5.6, WCAG 2.5.7).
 - On unmount, everything (controls, geometry, material, renderer, canvas) is disposed.
 - In headless Chromium (Playwright), the renderer falls back to WebGL2. WebGPU on the phones is still **[verify]** (R12 item 1).
+
+### Flipbook and spectrum (M1, issue #3)
+
+- **Search:** a name, or RA, Dec in decimal degrees (`parseQuery`). Three or more numbers (sexagesimal) ask for decimal degrees. Quick picks for the five A1.1 targets.
+- **Flipbook:** plays the frames in the order the API lists them. Play/pause, step, first/last, a scrubber and a speed control; it shows each frame's number, wavelength, UTC time and flags. Play is enabled once the current frame and the next 3 cutouts have loaded or failed; a failed cutout shows "Cutout unavailable" instead of a picture. When `north_up` is false, a note says the picture may rotate between frames.
+- **Keyboard:** in the flipbook, Space or K plays and pauses, ←/→ step, Home/End go to the first and last frame. These keys are ignored while focus is on a button or form field (which keep their own keys) and when Alt, Ctrl or Meta is held. Space/K do nothing while the Play button is disabled.
+- **Spectrum:** the ring on the object (or "Show spectrum") loads `GET /v1/objects/{id}/spectrum`. The SVG chart draws 1σ error bars; flagged points are hollow orange diamonds, named in the legend. A data table lists every point and can jump to its frame.
+- **Rainbow Trails (D-28):** one dot per frame, in false colour: hue = wavelength. The colour is `derived` and wears the Estimated badge; in "Measured only" the dots go monochrome. Offered only for moving objects whose frames share a north-up grid and once a cutout has loaded; otherwise the button is disabled with the reason.
+- **URL hash:** `#ra=<deg>&dec=<deg>[&name=<search>][&frame=<frame_id>]`. A typed search pushes a history entry; pausing or stepping updates `frame` in place. Going back to the page without a hash clears the search; unusable parts of a link are shown under the search field and announced.
+- **States:** staged loading messages (with elapsed seconds after 5 s), `role="alert"` errors with "Try again", empty and refused results explained from `missing`, and a polite live region for status changes (R9).
+- **Honesty:** SPHEREx values wear a "Measured" badge and the display stretch an "Estimated" one (`derived`, the tooltip gives its parameters); fixture data wears "Fixture" instead, plus the page banner.

@@ -9,7 +9,9 @@
   "scripts": {
     "dev": "vite",
     "dev:phone": "vite --host --mode phone",
-    "build": "tsc -b && vite build",
+    "dev:fixtures": "vite --mode fixtures",
+    "build": "tsc -b && vite build && node scripts/check-dist.js",
+    "check:dist": "node scripts/check-dist.js",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",

@@ -24,7 +24,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npm run dev -- --port ${PORT} --strictPort`,
+    // Every e2e test runs on the SYNTHETIC fixtures (no backend needed); see fixtures/README.md.
+    command: `npm run dev:fixtures -- --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
