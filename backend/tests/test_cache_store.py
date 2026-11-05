@@ -91,6 +91,17 @@ def test_corrupt_body_is_a_miss(tmp_path: Path) -> None:
     assert cache.get(KEY) is None
 
 
+@pytest.mark.parametrize("meta_bytes", [b'{"body_sha256": "ab', b"\xff\xfe", b"[]"])
+def test_corrupt_meta_is_a_miss(tmp_path: Path, meta_bytes: bytes) -> None:
+    cache = ReadThroughCache(tmp_path, offline=False)
+    cache.fetch(KEY, live_ok)
+    _, meta_path = cache._paths(KEY)
+    meta_path.write_bytes(meta_bytes)
+    assert cache.get(KEY) is None
+    # a miss falls through to the live call rather than raising
+    assert cache.fetch(KEY, live_ok).from_cache is False
+
+
 def test_no_temp_files_left(tmp_path: Path) -> None:
     ReadThroughCache(tmp_path, offline=False).fetch(KEY, live_ok)
     assert not list(tmp_path.rglob("*.tmp"))

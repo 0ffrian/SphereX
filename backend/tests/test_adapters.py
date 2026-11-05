@@ -7,9 +7,11 @@ from pathlib import Path
 
 import httpx
 import numpy as np
+import pytest
 from astropy.io import fits
 
 from app.adapters import horizons, irsa_cutout, irsa_sia, sbdb, simbad, skybot
+from app.cache.store import UpstreamUnavailable
 from app.context import make_context
 from tests.conftest import make_settings
 from tests.helpers import entries, entry
@@ -140,3 +142,38 @@ def test_strip_hdus_byte_slices_at_boundaries() -> None:
     # every kept byte is exactly as served
     img = spans[1]
     assert raw[img.start : img.end] in out
+
+
+def _cutout_row(access_url: str) -> irsa_sia.SiaRow:
+    return irsa_sia.SiaRow("F1", "O1", 1, access_url, 60000.0, 60000.01, 1.0, 1.1)
+
+
+def test_cutout_rejects_off_host_access_url(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"no request should be made: {request.url}")
+
+    settings = make_settings(tmp_path, offline=False, http_retries=0)
+    ctx = make_context(settings, transport=httpx.MockTransport(handler))
+    for url in (
+        "https://irsa.ipac.caltech.edu.evil.example/ibe/x.fits",
+        "https://irsa.ipac.caltech.edu@evil.example/ibe/x.fits",
+        "http://irsa.ipac.caltech.edu/ibe/x.fits",
+    ):
+        with pytest.raises(UpstreamUnavailable, match="unexpected access_url host"):
+            irsa_cutout.fetch_cutout(ctx, _cutout_row(url), 10.0, 20.0)
+
+
+def test_cutout_rejects_redirect_off_host(tmp_path: Path) -> None:
+    _, fits_body = next(iter(entries("irsa_cutout")))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "irsa.ipac.caltech.edu":
+            return httpx.Response(302, headers={"location": "https://evil.example/x.fits"})
+        return httpx.Response(200, content=fits_body)
+
+    settings = make_settings(tmp_path, offline=False, http_retries=0)
+    ctx = make_context(settings, transport=httpx.MockTransport(handler))
+    row = _cutout_row("https://irsa.ipac.caltech.edu/ibe/data/x.fits")
+    with pytest.raises(UpstreamUnavailable, match="redirected off the IRSA host"):
+        irsa_cutout.fetch_cutout(ctx, row, 10.0, 20.0)
+    assert ctx.cache.get(irsa_cutout.key_for(ctx, row, 10.0, 20.0)) is None  # nothing cached
