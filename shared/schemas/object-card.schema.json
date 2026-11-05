@@ -1,0 +1,701 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "object-card.schema.json",
+  "title": "ObjectCard",
+  "description": "What is known about one object (R3.2). Served by GET /v1/objects/{id}/card (D-16). Single source of the contract (D-18).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "type"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable id, e.g. sbdb:101955 (A5.1)."
+    },
+    "name": {
+      "type": "string"
+    },
+    "type": {
+      "$ref": "#/definitions/ObjectType"
+    },
+    "diameter_km": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "radius_rjup": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "radius_rsun": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "shape_source": {
+      "$ref": "#/definitions/TVString"
+    },
+    "rot_period_h": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "lightcurve_amp_mag": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "albedo": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "gaia_rgb": {
+      "$ref": "#/definitions/TVRgb"
+    },
+    "spherex_rgb": {
+      "$ref": "#/definitions/TVRgb"
+    },
+    "spectral_class": {
+      "$ref": "#/definitions/TVString"
+    },
+    "band_depth_1um": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "band_depth_2um": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "band_depth_3um": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "slope_075_25": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "ch4_depth_33": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "flux_45um": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "teff_K": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "teq_K": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "period_var_d": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "lightcurve": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/LightcurvePoint"
+      }
+    },
+    "phase_angle_deg": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "sun_vector": {
+      "$ref": "#/definitions/TVVec3"
+    },
+    "gas_Q": {
+      "$ref": "#/definitions/GasQ"
+    },
+    "coma_radius_km": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "nucleus_radius_km_max": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "epochs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CometEpoch"
+      }
+    },
+    "pm_mas_yr": {
+      "$ref": "#/definitions/TVPair"
+    }
+  },
+  "definitions": {
+    "Tag": {
+      "title": "Tag",
+      "description": "The five provenance tags (R3.1, D-02).",
+      "type": "string",
+      "enum": [
+        "measured",
+        "derived",
+        "model_dependent",
+        "inferred_from_analog",
+        "artistic"
+      ]
+    },
+    "ObjectType": {
+      "title": "ObjectType",
+      "description": "R3.2 and D-04.",
+      "type": "string",
+      "enum": [
+        "asteroid_shape",
+        "asteroid_procedural",
+        "comet",
+        "brown_dwarf",
+        "brown_dwarf_binary",
+        "star_mira",
+        "star_ttauri",
+        "star",
+        "candidate",
+        "planet_rocky",
+        "planet_water",
+        "gas_giant",
+        "nebula",
+        "nova"
+      ]
+    },
+    "Pair": {
+      "title": "Pair",
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "Triple": {
+      "title": "Triple",
+      "description": "An RGB triple or a 3-vector.",
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "TVNumber": {
+      "title": "TVNumber",
+      "description": "Tagged value (R3.1) holding a number.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "tag",
+        "source"
+      ],
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "null = unknown, never a guess."
+        },
+        "err": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/definitions/Pair"
+            }
+          ]
+        },
+        "tag": {
+          "$ref": "#/definitions/Tag"
+        },
+        "source": {
+          "type": "string"
+        },
+        "formula": {
+          "type": "string",
+          "description": "Required, non-blank, when tag is derived."
+        },
+        "assumption": {
+          "type": "string",
+          "description": "Required, non-blank, when tag is model_dependent."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "derived"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "formula"
+            ],
+            "properties": {
+              "formula": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "model_dependent"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "assumption"
+            ],
+            "properties": {
+              "assumption": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "TVString": {
+      "title": "TVString",
+      "description": "Tagged value (R3.1) holding a string.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "tag",
+        "source"
+      ],
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "null = unknown, never a guess."
+        },
+        "err": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/definitions/Pair"
+            }
+          ]
+        },
+        "tag": {
+          "$ref": "#/definitions/Tag"
+        },
+        "source": {
+          "type": "string"
+        },
+        "formula": {
+          "type": "string",
+          "description": "Required, non-blank, when tag is derived."
+        },
+        "assumption": {
+          "type": "string",
+          "description": "Required, non-blank, when tag is model_dependent."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "derived"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "formula"
+            ],
+            "properties": {
+              "formula": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "model_dependent"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "assumption"
+            ],
+            "properties": {
+              "assumption": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "TVRgb": {
+      "title": "TVRgb",
+      "description": "Tagged value (R3.1) holding an RGB triple.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "tag",
+        "source"
+      ],
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Triple"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "null = unknown, never a guess."
+        },
+        "err": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/definitions/Pair"
+            }
+          ]
+        },
+        "tag": {
+          "$ref": "#/definitions/Tag"
+        },
+        "source": {
+          "type": "string"
+        },
+        "formula": {
+          "type": "string",
+          "description": "Required, non-blank, when tag is derived."
+        },
+        "assumption": {
+          "type": "string",
+          "description": "Required, non-blank, when tag is model_dependent."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "derived"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "formula"
+            ],
+            "properties": {
+              "formula": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "model_dependent"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "assumption"
+            ],
+            "properties": {
+              "assumption": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "TVVec3": {
+      "title": "TVVec3",
+      "description": "Tagged value (R3.1) holding a 3-vector.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "tag",
+        "source"
+      ],
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Triple"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "null = unknown, never a guess."
+        },
+        "err": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/definitions/Pair"
+            }
+          ]
+        },
+        "tag": {
+          "$ref": "#/definitions/Tag"
+        },
+        "source": {
+          "type": "string"
+        },
+        "formula": {
+          "type": "string",
+          "description": "Required, non-blank, when tag is derived."
+        },
+        "assumption": {
+          "type": "string",
+          "description": "Required, non-blank, when tag is model_dependent."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "derived"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "formula"
+            ],
+            "properties": {
+              "formula": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "model_dependent"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "assumption"
+            ],
+            "properties": {
+              "assumption": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "TVPair": {
+      "title": "TVPair",
+      "description": "Tagged value (R3.1) holding a pair of numbers.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "tag",
+        "source"
+      ],
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Pair"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "null = unknown, never a guess."
+        },
+        "err": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/definitions/Pair"
+            }
+          ]
+        },
+        "tag": {
+          "$ref": "#/definitions/Tag"
+        },
+        "source": {
+          "type": "string"
+        },
+        "formula": {
+          "type": "string",
+          "description": "Required, non-blank, when tag is derived."
+        },
+        "assumption": {
+          "type": "string",
+          "description": "Required, non-blank, when tag is model_dependent."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "derived"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "formula"
+            ],
+            "properties": {
+              "formula": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "model_dependent"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "assumption"
+            ],
+            "properties": {
+              "assumption": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "LightcurvePoint": {
+      "title": "LightcurvePoint",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "t_mjd",
+        "flux",
+        "sigma",
+        "lambda_um",
+        "flags"
+      ],
+      "properties": {
+        "t_mjd": {
+          "type": "number"
+        },
+        "flux": {
+          "type": "number"
+        },
+        "sigma": {
+          "type": "number"
+        },
+        "lambda_um": {
+          "type": "number"
+        },
+        "flags": {
+          "type": "number"
+        }
+      }
+    },
+    "GasQ": {
+      "title": "GasQ",
+      "description": "Gas production rates, molecules/s. One value per molecule; R3.2's 'per epoch' does not fit this shape (Q-32).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "co2": {
+          "$ref": "#/definitions/TVNumber"
+        },
+        "h2o": {
+          "$ref": "#/definitions/TVNumber"
+        },
+        "co": {
+          "$ref": "#/definitions/TVNumber"
+        }
+      }
+    },
+    "CometEpoch": {
+      "title": "CometEpoch",
+      "type": "string",
+      "enum": [
+        "2025-08",
+        "2025-12"
+      ]
+    }
+  }
+}

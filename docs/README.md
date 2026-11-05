@@ -31,7 +31,7 @@ Always load `decisions.md` first. It is short, and it overrides everything else.
 | Add or fix a data adapter (IRSA, Gaia, Horizons, SBDB…) | [architecture/data-sources.md](architecture/data-sources.md), [architecture/pipeline.md](architecture/pipeline.md), decisions D-19 (resolver order) and D-25 (cache) |
 | API endpoints (resolve, frames, cutouts, spectrum, card, render-params) | [architecture/pipeline.md](architecture/pipeline.md), [rendering/data-contract.md](rendering/data-contract.md), decisions D-16 |
 | Pipeline: find, measure, classify, build the card | [architecture/pipeline.md](architecture/pipeline.md), [rendering/data-contract.md](rendering/data-contract.md) |
-| Schemas: ObjectCard, RenderParams, tags, generated contract code | [rendering/data-contract.md](rendering/data-contract.md), [architecture/data-contract.md](architecture/data-contract.md) (D-18) |
+| Schemas: ObjectCard, RenderParams, tags, generated contract code, shared fixtures | [rendering/data-contract.md](rendering/data-contract.md), [architecture/data-contract.md](architecture/data-contract.md) (D-18), [../shared/README.md](../shared/README.md), [uml/05-class-data-contract.md](uml/05-class-data-contract.md) |
 | Backend texture baker | [rendering/surface-generation.md](rendering/surface-generation.md), [rendering/data-contract.md](rendering/data-contract.md) |
 | 3D viewer shell: lighting, modes, honesty, interaction | [rendering/display-rules.md](rendering/display-rules.md), [rendering/accessibility.md](rendering/accessibility.md) |
 | A renderer for one type | the matching file in [rendering/renderers/](rendering/README.md), plus [rendering/display-rules.md](rendering/display-rules.md) |

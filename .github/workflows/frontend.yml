@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - 'frontend/**'
+      - 'shared/**'
       - '.github/workflows/frontend.yml'
   pull_request:
     paths:
       - 'frontend/**'
+      - 'shared/**'
       - '.github/workflows/frontend.yml'
 
 permissions:
@@ -33,6 +35,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm run contract:check
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
