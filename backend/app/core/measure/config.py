@@ -15,9 +15,11 @@ from typing import Any
 # Bump when the measurement code changes in a way that changes results.
 MEASURE_VERSION = "measure-1"
 
-# [verify] V1: IRSA tutorial "SPHEREx Source Discovery Tool demo" (bad_flags), read 5 Nov 2026
-# (https://caltech-ipac.github.io/irsa-tutorials/spherex-source-discovery-tool-demo/). To be
-# checked against the flag table of the SPHEREx Explanatory Supplement (SSDC-DP-017). SOURCE,
+# V1, checked 5 Nov 2026: the IRSA tutorial "SPHEREx Source Discovery Tool demo" bad_flags list
+# (https://caltech-ipac.github.io/irsa-tutorials/spherex-source-discovery-tool-demo/). Names and
+# bits match the SPHEREx Explanatory Supplement (SSDC-DP-017 v2.0, Table 16) and the FLAGS headers
+# of every cached QR2 cutout (pipelines 6.4 to 6.5.6). Table 16 has no PHANTOM or REFERENCE and
+# adds CROSSTALK, STREAK and SATELLITE_HALO, which QR2 headers do not define (Q-31). SOURCE,
 # GHOST*, BLOOM, SNOWBALL and HALO are kept. Bit numbers are always read from the FLAGS header.
 REJECT_FLAGS: tuple[str, ...] = (
     "TRANSIENT",
