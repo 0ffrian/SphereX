@@ -10,7 +10,7 @@ import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import objects, resolve
+from app.api import objects, resolve, spectrum
 from app.context import make_context
 from app.core.find.frames import FrameService
 from app.core.find.resolver import load_aliases
@@ -58,6 +58,7 @@ def create_app(
     install_error_handlers(app)
     app.include_router(resolve.router)
     app.include_router(objects.router)
+    app.include_router(spectrum.router)
 
     @app.get("/v1/health", tags=["meta"])
     def health() -> dict[str, object]:
