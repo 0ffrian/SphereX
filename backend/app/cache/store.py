@@ -124,6 +124,16 @@ class ReadThroughCache:
             return None  # torn or tampered entry: treat as a miss
         return CacheEntry(key, body, meta)
 
+    def get_meta(self, key: CacheKey) -> dict[str, Any] | None:
+        """The meta of a committed entry without reading its body (issue #2: Stage 2 keys its
+        derived spectrum on the cutouts' ``body_sha256``). The body is not verified here; a
+        later ``get`` does that."""
+        body_path, meta_path = self._paths(key)
+        if not meta_path.is_file() or not body_path.is_file():
+            return None
+        meta: dict[str, Any] = json.loads(meta_path.read_text(encoding="utf-8"))
+        return meta
+
     def put(
         self,
         key: CacheKey,

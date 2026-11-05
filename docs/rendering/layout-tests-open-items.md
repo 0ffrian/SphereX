@@ -14,7 +14,8 @@ backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; obje
 backend/app/adapters/                (Kevin)  # IRSA SIA + cutouts, SIMBAD, SBDB, Horizons, SkyBoT (A3), all through the cache
 backend/app/cache/                   (Kevin)  # D-25 read-through disk cache
 backend/app/core/find/               (Kevin)  # pipeline stage 1 (A4.1): resolver, proper motion, WCS, frames, cutout PNG
-backend/app/core/measure/            (Munazir, provisional)  # pipeline stage 2 (A4.2), issue #2: /spectrum
+backend/app/core/measure/            (Munazir, provisional)  # pipeline stage 2 (A4.2), issue #2: config, flags, aperture,
+                                                            # solid_angle, photometry, spectrum; endpoint in app/api/spectrum.py
 frontend/src/viewer/                 (Moon)
   ViewerApp.ts lighting.ts modes.ts honesty.ts scaleBar.ts altText.ts
   renderers/AsteroidMesh.ts AsteroidProcedural.ts Comet.ts BrownDwarf.ts Star.ts
