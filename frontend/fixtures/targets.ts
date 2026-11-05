@@ -2,8 +2,9 @@
 // The five A1.1 test targets plus two synthetic objects. Only the names and J2000 coordinates of
 // the real targets are meant to be real; everything the generators make from them is synthetic.
 //
-// [verify] RA/Dec below are J2000 values written from memory, rounded; SIMBAD could not be
-// reached from the dev machine on 5 Nov 2026. Check them against SIMBAD before relying on them.
+// RA/Dec: ICRS, epoch J2000, from SIMBAD (checked 5 Nov 2026 against the backend's recorded SIMBAD
+// replies). Barnard's Star, eps Ind B and WISE 0855 move 2-4.6 arcmin from these positions by the
+// SPHEREx epochs (2025-26).
 
 export interface FixtureTarget {
   id: string;
@@ -31,8 +32,8 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     id: 'barnards-star',
     name: "Barnard's Star",
     aliases: ["Barnard's Star", 'Barnards Star', 'GJ 699'],
-    ra: 269.45208, // [verify]
-    dec: 4.69339, // [verify]
+    ra: 269.45208,
+    dec: 4.69336,
     moving: false,
     northUp: false,
     frameCount: 24,
@@ -42,8 +43,8 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     id: 'eps-indi-b',
     name: 'Epsilon Indi B',
     aliases: ['Epsilon Indi B', 'eps Ind B', 'Eps Indi B', 'Epsilon Indi Ba'],
-    ra: 331.04383, // [verify]
-    dec: -56.78269, // [verify]
+    ra: 331.04415,
+    dec: -56.78284,
     moving: false,
     northUp: false,
     frameCount: 24,
@@ -53,8 +54,8 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     id: 'wise-0855',
     name: 'WISE 0855-0714',
     aliases: ['WISE 0855', 'WISE 0855-0714', 'WISE J085510.83-071442.5'],
-    ra: 133.79513, // [verify]
-    dec: -7.24514, // [verify]
+    ra: 133.81891,
+    dec: -7.24705,
     moving: false,
     northUp: false,
     frameCount: 24,
@@ -64,8 +65,8 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     id: 'rw-aur',
     name: 'RW Aurigae',
     aliases: ['RW Aurigae', 'RW Aur'],
-    ra: 76.95642, // [verify]
-    dec: 30.40142, // [verify]
+    ra: 76.95653,
+    dec: 30.40144,
     moving: false,
     northUp: false,
     frameCount: 24,
@@ -75,8 +76,8 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     id: 'r-dra',
     name: 'R Draconis',
     aliases: ['R Draconis', 'R Dra'],
-    ra: 248.16742, // [verify]
-    dec: 66.755, // [verify]
+    ra: 248.16761,
+    dec: 66.75498,
     moving: false,
     northUp: false,
     frameCount: 24,

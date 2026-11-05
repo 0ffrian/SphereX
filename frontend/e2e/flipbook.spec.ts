@@ -79,6 +79,8 @@ test.describe('the five A1.1 targets', () => {
       await expect(chart.getByTestId('flagged-point')).toHaveCount(3);
       await expect(chart.getByTestId('point')).toHaveCount(21);
       await expect(page.locator('#spectrum-heading')).toBeFocused();
+      // Q-23: never presented as absolute photometry.
+      await expect(page.getByTestId('spectrum-caveat')).toContainText('Not absolute photometry');
 
       // Shareable link with coordinates.
       expect(new URL(page.url()).hash).toMatch(/^#ra=[\d.]+&dec=-?[\d.]+&name=/);
@@ -101,15 +103,15 @@ test('R Draconis: a missing cutout is refused, not drawn', async ({ page }) => {
 
 test('a shared link with coordinates loads the object', async ({ page }) => {
   const errors = trackErrors(page);
-  await page.goto('/#ra=76.95642&dec=30.40142');
-  await expect(page.getByTestId('object-name')).toHaveText('RA 76.95642°, Dec +30.40142°');
+  await page.goto('/#ra=76.95653&dec=30.40144');
+  await expect(page.getByTestId('object-name')).toHaveText('RA 76.95653°, Dec +30.40144°');
   await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
-  await expect(page.getByTestId('search-input')).toHaveValue('76.95642,30.40142');
+  await expect(page.getByTestId('search-input')).toHaveValue('76.95653,30.40144');
   expect(errors, errors.join('\n')).toEqual([]);
 });
 
 test('a shared link with a name and frame opens on that frame', async ({ page }) => {
-  await page.goto('/#ra=248.16742&dec=66.755&name=R%20Dra&frame=r-dra-f007');
+  await page.goto('/#ra=248.16761&dec=66.75498&name=R%20Dra&frame=r-dra-f007');
   await expect(page.getByTestId('object-name')).toHaveText('R Draconis');
   await expect(page.getByTestId('frame-counter')).toHaveText('Frame 8 of 24');
 });

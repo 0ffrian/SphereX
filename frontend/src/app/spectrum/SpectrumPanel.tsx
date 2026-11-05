@@ -57,6 +57,11 @@ export function SpectrumPanel() {
               {data.cached_at ? ` · Cached ${formatUtc(data.cached_at)}` : ''}
             </span>
           </p>
+          {/* Q-23: no aperture correction yet, so this is not absolute photometry. */}
+          <p className="text-sm text-neutral-300" data-testid="spectrum-caveat">
+            Not absolute photometry: no aperture correction is applied yet, so fluxes read low by an
+            amount that changes with wavelength.
+          </p>
           {data.spectrum.length === 0 ? (
             <p className="text-sm text-neutral-200" data-testid="no-spectrum">
               No spectrum points for this object.
