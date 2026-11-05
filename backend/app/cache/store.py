@@ -118,7 +118,12 @@ class ReadThroughCache:
         body_path, meta_path = self._paths(key)
         if not meta_path.is_file() or not body_path.is_file():
             return None
-        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except ValueError:  # corrupt or truncated meta (incl. bad UTF-8): treat as a miss
+            return None
+        if not isinstance(meta, dict):
+            return None
         body = body_path.read_bytes()
         if meta.get("body_sha256") != hashlib.sha256(body).hexdigest():
             return None  # torn or tampered entry: treat as a miss

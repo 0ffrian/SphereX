@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 from app.adapters.http import UpstreamError
 from app.adapters.irsa_sia import SiaRow
@@ -21,6 +22,13 @@ SOURCE = "irsa_cutout"
 BLOCK = 2880
 CARD = 80
 DROPPED_HDUS = ("PSF",)
+IRSA_HOST = "irsa.ipac.caltech.edu"
+
+
+def is_irsa_url(url: str) -> bool:
+    """HTTPS on the IRSA host exactly (no look-alike hosts, ports or userinfo tricks)."""
+    parts = urlsplit(url)
+    return parts.scheme == "https" and parts.hostname == IRSA_HOST and parts.port in (None, 443)
 
 
 @dataclass(frozen=True)
@@ -131,11 +139,14 @@ def fetch_cutout(
     q = dict(key.query)
 
     def live() -> LiveResponse:
-        if not row.access_url.startswith("https://irsa.ipac.caltech.edu/"):
+        if not is_irsa_url(row.access_url):
             raise UpstreamError(f"unexpected access_url host: {row.access_url}")
         size_deg = norm_float(s.cutout_size_arcsec / 3600.0, 6)
         params = {"center": f"{q['ra']},{q['dec']}", "size": size_deg}
         resp = ctx.http.get(row.access_url, params, read_timeout_s=read_timeout_s)
+        # The client follows redirects, so check where the body actually came from.
+        if not is_irsa_url(resp.url):
+            raise UpstreamError(f"cutout redirected off the IRSA host: {resp.url}")
         if not resp.body.startswith(b"SIMPLE  ="):
             raise UpstreamError("cutout response is not FITS")
         try:
