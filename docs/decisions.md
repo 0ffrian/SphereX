@@ -97,7 +97,7 @@ Format: one entry per decision. Status is **Accepted** unless marked otherwise. 
 
 ## D-12 Haptics on gas giants, water worlds and other shader-generated bodies
 
-- **Status:** Proposed. Needs team sign-off.
+- **Status:** Accepted, signed off by Atish (D-13) on 5 Nov 2026. The jet pulse rate stays **[verify on phones]**.
 - **Context:** These kinds are drawn by browser shaders (D-01), so there is no baked height map for a finger to sample. For exoplanets there is also no measured surface at all, so every texture haptic is `artistic`.
 - **Decision:**
   - **One shared field per body.** When a body loads, a Web Worker generates an equirectangular field at 512×256 from the same seed and functions as the shader. It does this once, not per frame. The field has channels for height, band index, ocean mask, ice mask and storm id.
@@ -137,6 +137,163 @@ Format: one entry per decision. Status is **Accepted** unless marked otherwise. 
 
 ---
 
+Decisions D-14 to D-29 were recorded on 5 Nov 2026. They answer Q-01 to Q-14 and add the hosting, caching and milestone decisions.
+
+## D-14 Build from 5 Nov (answers Q-10)
+
+- **Decision:** The team builds from 5 Nov, following the dates in architecture spec §13. The team has chosen to set aside the event rule against building before 14 Nov; that call and its risk belong to the team.
+- **How it applies:** `CLAUDE.md` no longer limits the repo to docs and scaffolding before the event.
+
+## D-15 Backend framework: FastAPI (answers Q-01)
+
+- **Decision:** The backend is **FastAPI** on Python 3.12, with Pydantic v2 models. Versions are pinned exactly when installed.
+- **Why:** async calls suit the slow external services (IRSA, Gaia); Pydantic validates cards and render params at the API boundary; Astropy works without glue.
+
+## D-16 API endpoints (answers Q-06)
+
+- **Decision:** Every endpoint is keyed by one object id, returned by `resolve`. There is no separate flipbook endpoint: the flipbook plays the frame list in order.
+
+  | Endpoint | Returns |
+  |---|---|
+  | `GET /v1/resolve?q=<name or ra,dec>` | `{ id, ra, dec, moving }` |
+  | `GET /v1/objects/{id}/frames` | `[{ frame_id, time, wavelength_um, x, y, cutout_url }]` |
+  | `GET /v1/objects/{id}/cutouts/{frame_id}.png` | The cutout, stretched to PNG by the server. The stretch used is stated in the frames response. |
+  | `GET /v1/objects/{id}/spectrum` | Spectrum `[(wavelength_um, flux, error)]` and light curve `[(time, flux)]`, tagged `measured` |
+  | `GET /v1/objects/{id}/card` | ObjectCard (rendering doc §3.2) |
+  | `GET /v1/objects/{id}/render-params` | RenderParams (rendering doc §3.4) |
+
+- Responses served from the cache carry `cached_at` (D-25).
+
+## D-17 Owners (answers Q-07 and the ownership part of Q-14)
+
+- **Decision:**
+
+  | Person | Owns |
+  |---|---|
+  | Kevin | Backend scaffold, data adapters, pipeline stages 1, 4 and 5, the API, the Gaia and WISE adapters, local hosting (D-24) |
+  | Munazir | Pipeline stage 2 (brightness and spectrum), `shared/schemas/` and `shared/fixtures/`, the physics layer (architecture spec §7) |
+  | Atish | Pipeline stage 3 (classify), stage 7 (`card_to_params`), the texture baker, all haptics (D-13), `frontend/src/viewer/fields/`, the Gemini layer |
+  | Moon | `frontend/src/app/`, `frontend/src/state/`, the flipbook UI, the viewer, the shader kinds, the overlay UI |
+
+- `frontend/src/contract/` is generated code (D-18) and follows the owner of `shared/schemas/`.
+- **Provisional:** Munazir's assignments are a proposal until Munazir confirms them.
+
+## D-18 The contract is generated from `shared/schemas/` (answers Q-14)
+
+- **Decision:**
+  - `shared/schemas/*.json` (JSON Schema) is the single source of the data contract.
+  - The backend generates its Pydantic models with `datamodel-code-generator`. The frontend generates `frontend/src/contract/` types with `json-schema-to-typescript`. Both tools are pinned exactly when installed **[verify versions]**.
+  - CI fails if regenerated files differ from the committed ones, so the two sides cannot drift.
+  - `assertTagged()` and other hand-written helpers move next to the generated types, not into them.
+- The hand-written types from the 4 Nov scaffold stay until the schemas exist, then get replaced.
+
+## D-19 Name resolver order (answers Q-05)
+
+- **Decision:** Route by the shape of the name, then fall back to the other service.
+  - Names that look like small bodies (numbered asteroids such as `433 Eros`, provisional designations such as `2024 AB`, comets such as `C/…`, interstellar objects such as `3I/ATLAS`) go to **SBDB** first.
+  - Everything else goes to **SIMBAD** first.
+  - On a miss, try the other one. RA/Dec input skips name resolution.
+
+## D-20 Haptics API (answers Q-11)
+
+- **Decision (Atish, D-13):** the merge proposed in Q-11.
+  - Rendering doc R8.8's discrete `HapticEvent` is the core API. It carries the provenance `tag`, which the honesty rule and the audio timbre need.
+  - `HapticEvent` gains an optional `sharpness`. The web driver ignores it; a future Tauri driver (B-01) uses it.
+  - The mock-up's native and iOS bridges are dropped for the event (D-08). The `HapticDriver` interface keeps the door open.
+  - The mock-up's `spherex:haptic` DOM event stays as a debug hook. It also drives an on-screen pulse indicator, so an audience watching the laptop can see what the phone feels.
+  - Nebulae and novae get the D-12 field pulse, not a refusal.
+  - Tick lengths follow R8.3: 8–25 ms with the calibrated `minMs`.
+
+## D-21 Honesty toggle follows the three badges (answers Q-08)
+
+- **Context:** Rendering doc R5.3's states did not line up with the D-02 badges: "Measured only" still showed `derived` layers, and "+ Derived" split the Estimated badge.
+- **Decision:** The toggle has three states, one per badge:
+
+  | State | Shows tags |
+  |---|---|
+  | **Measured only** | `measured` |
+  | **+ Estimated** (starting state) | adds `derived`, `model_dependent`, `inferred_from_analog` |
+  | **+ Artistic** | adds `artistic` |
+
+- Haptics use the same filter. `teq_pulse` plays in "Measured only" only when Teq comes from Exoplanet Archive `pl_eqt` (`measured`); when it is `derived` it is silent there.
+- **Why start at + Estimated:** everything shown on load is backed by data or a stated formula. Moving up to Artistic and down to Measured is the demo of the honesty story.
+
+## D-22 What a saved asset holds (answers Q-09)
+
+- **Decision:** A saved asset holds the ObjectCard, the RenderParams, the texture URLs, `generator_version`, `seed` and `created_at`. `generator_version` and `seed` keep the rendering doc §6.7 cache key reproducible.
+- `overrides` stay in the browser (IndexedDB) and are never sent to the server.
+
+## D-23 Fields of `VisibleMode` and `IRMode` (answers Q-12)
+
+- **Decision:** Both use one shape:
+
+  ```ts
+  {
+    available: boolean;
+    badge: string;
+    rgb: TV<[number, number, number]> | null;             // same type as gaia_rgb / spherex_rgb; TV carries the tag
+    source: 'gaia_rgb' | 'class_palette' | 'spherex_rgb';
+    channels_um?: [number, number, number];               // IRMode only (rendering doc §5.2)
+  }
+  ```
+
+- When a mode is not available, the reason goes in `missing`, as rendering doc §5.2 already says.
+
+## D-24 Hosting: local on the Asus A15 (answers Q-02)
+
+- **Decision:** The event build runs locally on the team's **Asus A15** laptop. One process serves the built frontend and the API from one origin. The phones and other laptops connect over the local network.
+- **How it applies:**
+  - Serve over HTTPS, because WebGPU needs a secure context. Install a local root certificate on both Android phones (e.g. `mkcert`); whether a clicked-through self-signed certificate is enough is **[verify]**.
+  - Bring a router or hotspot. Venue Wi-Fi may block device-to-device traffic.
+  - The demo must run with no internet (D-25). The Gemini layer then stays off and the code path shows.
+  - There is no public URL after the event. A static hosted copy is a later, separate decision.
+- Whether the A15 also replaces the Zenbook as the demo screen is open (Q-15).
+
+## D-25 Cache every external call; offline demo mode
+
+- **Context:** IRSA times out (architecture spec §3.1), Gaia takes about 24 s per query, and the venue internet may fail.
+- **Decision:**
+  - Every external call (IRSA, Gaia, WISE, Horizons, SkyBoT, SBDB, SIMBAD, Exoplanet Archive, Gemini) goes through one read-through disk cache in the backend.
+  - **Key:** source + data release (e.g. `spherex_qr2`) + the normalised query, with coordinates rounded. **Value:** the raw response, `fetched_at` and the source URL.
+  - **Order:** cache → live call with a timeout and retries with backoff → an older cached entry → refuse. A refused layer goes in `missing`; nothing is invented.
+  - **No expiry for the event.** Catalogue releases do not change, and ephemerides for fixed times do not change.
+  - **`SX_OFFLINE=1`** never touches the network. The demo runs in this mode.
+  - A **pre-fetch script** fills the cache for the 5 test targets and every demo object while the internet is good.
+  - Cutouts only, never whole frames (about 72 MB each). The cache lives on the A15, outside git, with a zipped backup.
+  - Derived results (spectra, cards, render params) are cached too. Textures follow rendering doc §6.7.
+  - The cached responses double as the recorded test fixtures (architecture spec §12).
+  - Responses served from cache carry `cached_at`, so the UI can show the data's date.
+- **Optional:** the phones may keep the last loaded object in browser storage to survive a short Wi-Fi drop.
+
+## D-26 Sliders on baked bodies (answers Q-03)
+
+- **Decision:** For the event, baked types allow only **colour, lighting and spin** sliders. Relief sliders exist only on the shader kinds, which redraw live. A re-bake on every drag would be too slow.
+
+## D-27 Type of `overrides` (answers Q-13)
+
+- **Decision:** `overrides` is `Partial<Record<SliderKey, number | boolean>>`. A slider registry lists every allowed key as `{ key, min, max, step, unit, appliesTo: ObjectType[] }`, so an unknown key fails the type check. Values use the same units as the card.
+
+## D-28 Rainbow Trails is a flipbook view mode (answers Q-04)
+
+- **Decision:** Rainbow Trails (handover §5: one dot per band along a moving object's path) is a view mode of the flipbook, not a separate feature. It uses the frames and mover positions the flipbook already loads. Priority P1, built after basic playback works.
+
+## D-29 Milestones are independent tracks
+
+- **Decision:** Work is tracked in the GitHub project "SphereX and PlanetX - NASA COMPETITION 2026" with five milestones:
+
+  | Milestone | Due |
+  |---|---|
+  | M1 SPHEREx core: flipbook + spectrum (P0) | 8 Nov |
+  | M2 Sky Sculptor: 3D body (P1) | 10 Nov |
+  | M3 Haptics & sound (P1/P2) | 11 Nov |
+  | M4 Extras (P1–P3, cut from the bottom) | 12 Nov |
+  | M5 Demo & submission | 15 Nov |
+
+- M1 to M4 do not depend on each other. Each builds against its own fixtures (recorded responses, sample cards and spectra). Only M5 joins them. Each milestone holds as few tickets as possible.
+- Open questions and **[verify]** items sit inside the ticket that needs them.
+
+---
+
 ## Post-event backlog
 
 | ID | Item | From |
@@ -148,22 +305,29 @@ Format: one entry per decision. Status is **Accepted** unless marked otherwise. 
 
 ## Open questions
 
-| ID | Question | Owner |
-|---|---|---|
-| Q-01 | Backend framework. Both specs say "Python 3.12 API" but neither names one. | Kevin |
-| Q-02 | Frontend hosting: the same AWS server or static hosting? | Kevin |
-| Q-03 | Sliders on baked bodies. Changing relief needs a re-bake. Should the event build allow only colour, lighting and spin sliders on baked types? | Atish |
-| Q-04 | How Rainbow Trails (handover §5) relates to the flipbook. Is it a view mode of the flipbook or a separate P1 feature? | Team |
-| Q-05 | Name resolver order: SIMBAD first or SBDB first (architecture spec §4.1)? Rendering doc §3.3 uses both. | Atish |
-| Q-06 | Endpoints for search, frames and the flipbook. Only `/v1/objects/{id}/card` and `/render-params` are specified. | Kevin |
-| Q-07 | Owners for `shared/schemas`, `frontend/src/viewer/fields` and the backend pipeline stages (rendering doc §10 covers only render, API, viewer and haptics). | Team |
-| Q-08 | Honesty toggle: what is the starting state? In "Measured only", do `derived` data haptics (e.g. the D-12 `teq_pulse`) stay on? The toggle table hides only `artistic` and `inferred_from_analog`, but D-12 treats the derived pulse as kept. | Atish, Moon |
-| Q-09 | With the settings file retired (D-02), what does a "saved" asset hold? Proposal: the ObjectCard, RenderParams and texture URLs. IndexedDB would cache those plus the user's `overrides`. | Atish |
-| Q-10 | Architecture spec §13 (Plan) schedules build work from 5 Nov, but the event rules say not to build before 14 Nov. Should the plan be re-dated, or should the pre-event days be relabelled as research and prep? | Team |
-| Q-11 | The mock-up's Haptics tool (commit `4629305`, `mockup/spherex-ui.html`, `SphereXHaptics`) differs from rendering doc R8.8. See the differences listed below this table. Which one becomes the app API? Possible merge: keep R8.8's `HapticEvent`, add `sharpness` for the native path, and keep the mock-up's `spherex:haptic` event for debugging. **Atish decides (D-13)**; Munazir and Moon give input. | Atish |
-| Q-12 | `RenderParams.view_modes` uses `VisibleMode` and `IRMode` (rendering doc R3.4), but no spec defines their fields. The frontend scaffold types them as opaque `Readonly<Record<string, unknown>>` (`frontend/src/contract/renderParams.ts`, marked `ASSUMPTION`). What fields do they carry (e.g. badge text, disabled flag, channel windows from R5.2)? | Atish, Kevin |
-| Q-13 | The type of the client-side `overrides` map (D-02). The scaffold stores `Record<string, unknown>` (`frontend/src/state/store.ts`, marked `ASSUMPTION`), because the slider set and value types are not specified (see Q-03). Which keys and value types are allowed? | Atish, Moon |
-| Q-14 | The frontend scaffold added `src/contract/` (TS copies of R3 and R8.8 types), `src/state/` (Zustand store) and `src/app/` (React shell), which R10 does not list. Who owns them? Should `src/contract/` be generated from `shared/schemas/` so the backend and frontend contracts cannot drift? (Related: Q-07.) | Team |
+Q-01 to Q-14 were answered on 5 Nov 2026; the Status column points to the decision. They stay here for history.
+
+| ID | Question | Owner | Status |
+|---|---|---|---|
+| Q-01 | Backend framework. Both specs say "Python 3.12 API" but neither names one. | Kevin | Answered: D-15 |
+| Q-02 | Frontend hosting: the same AWS server or static hosting? | Kevin | Answered: D-24 |
+| Q-03 | Sliders on baked bodies. Changing relief needs a re-bake. Should the event build allow only colour, lighting and spin sliders on baked types? | Atish | Answered: D-26 |
+| Q-04 | How Rainbow Trails (handover §5) relates to the flipbook. Is it a view mode of the flipbook or a separate P1 feature? | Team | Answered: D-28 |
+| Q-05 | Name resolver order: SIMBAD first or SBDB first (architecture spec §4.1)? Rendering doc §3.3 uses both. | Atish | Answered: D-19 |
+| Q-06 | Endpoints for search, frames and the flipbook. Only `/v1/objects/{id}/card` and `/render-params` are specified. | Kevin | Answered: D-16 |
+| Q-07 | Owners for `shared/schemas`, `frontend/src/viewer/fields` and the backend pipeline stages (rendering doc §10 covers only render, API, viewer and haptics). | Team | Answered: D-17 |
+| Q-08 | Honesty toggle: what is the starting state? In "Measured only", do `derived` data haptics (e.g. the D-12 `teq_pulse`) stay on? The toggle table hides only `artistic` and `inferred_from_analog`, but D-12 treats the derived pulse as kept. | Atish, Moon | Answered: D-21 |
+| Q-09 | With the settings file retired (D-02), what does a "saved" asset hold? Proposal: the ObjectCard, RenderParams and texture URLs. IndexedDB would cache those plus the user's `overrides`. | Atish | Answered: D-22 |
+| Q-10 | Architecture spec §13 (Plan) schedules build work from 5 Nov, but the event rules say not to build before 14 Nov. Should the plan be re-dated, or should the pre-event days be relabelled as research and prep? | Team | Answered: D-14 |
+| Q-11 | The mock-up's Haptics tool (commit `4629305`, `mockup/spherex-ui.html`, `SphereXHaptics`) differs from rendering doc R8.8. See the differences listed below this table. Which one becomes the app API? Possible merge: keep R8.8's `HapticEvent`, add `sharpness` for the native path, and keep the mock-up's `spherex:haptic` event for debugging. **Atish decides (D-13)**; Munazir and Moon give input. | Atish | Answered: D-20 |
+| Q-12 | `RenderParams.view_modes` uses `VisibleMode` and `IRMode` (rendering doc R3.4), but no spec defines their fields. The frontend scaffold types them as opaque `Readonly<Record<string, unknown>>` (`frontend/src/contract/renderParams.ts`, marked `ASSUMPTION`). What fields do they carry (e.g. badge text, disabled flag, channel windows from R5.2)? | Atish, Kevin | Answered: D-23 |
+| Q-13 | The type of the client-side `overrides` map (D-02). The scaffold stores `Record<string, unknown>` (`frontend/src/state/store.ts`, marked `ASSUMPTION`), because the slider set and value types are not specified (see Q-03). Which keys and value types are allowed? | Atish, Moon | Answered: D-27 |
+| Q-14 | The frontend scaffold added `src/contract/` (TS copies of R3 and R8.8 types), `src/state/` (Zustand store) and `src/app/` (React shell), which R10 does not list. Who owns them? Should `src/contract/` be generated from `shared/schemas/` so the backend and frontend contracts cannot drift? (Related: Q-07.) | Team | Answered: D-17, D-18 |
+| Q-15 | Does the Asus A15 (D-24) also replace the Zenbook 14X as the demo screen? If so, D-05 and architecture spec §10.1 should target the A15's GPU instead of Iris Xe. | Atish | Open |
+| Q-16 | Munazir to confirm the D-17 assignments (stage 2, `shared/schemas/`, physics). Munazir is not yet a repo collaborator, and `CLAUDE.md` did not list Munazir in the team. | Munazir | Open |
+| Q-17 | Rendering doc R8.4 tags the comet field source `measured` + `model_dependent`, but a `HapticEvent` carries one `tag` (R8.8), and under D-21 "Measured only" hides `model_dependent`. Which tag does the comet field pulse carry, and does it play in "Measured only"? | Atish | Open |
+| Q-18 | D-23 types the view-mode `rgb` as `TV \| null`. With R3.1's default `TV<T = number>` that holds one number, while `gaia_rgb` and `spherex_rgb` in R3.2 are `TV<[number, number, number]>`. Should the schema use `TV<[number, number, number]> \| null`? | Atish, Kevin | Answered: D-23 corrected to `TV<[number, number, number]> \| null` (5 Nov 2026) |
+| Q-19 | Once `frontend/src/contract/` is generated from `shared/schemas/` (D-17, D-18), where do the frontend-only R8.8 types live (`HapticKind`, `HapticEvent`, `HapticDriver`)? They are not sent by the backend, and `HapticDriver` has methods that JSON Schema cannot express. Options: hand-written next to the generated types (like `assertTagged()`), or in `frontend/src/haptics/`. | Atish, Munazir | Open |
 
 **Q-11 differences between the mock-up and R8.8:**
 

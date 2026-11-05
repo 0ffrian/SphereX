@@ -1,6 +1,6 @@
 # 05 Data contract (classes)
 
-The data contract between backend and frontend: `ObjectCard` (what we know) and `RenderParams` (how to draw and feel it). Drawn from rendering doc §3.1–3.4, §5.1–5.3, §8.8 and decisions D-02 (replaces the settings file), D-04 (type union) and D-12 (extended `HapticProfile`, new `teq_K` field).
+The data contract between backend and frontend: `ObjectCard` (what we know) and `RenderParams` (how to draw and feel it). Drawn from rendering doc §3.1–3.4, §5.1–5.3, §8.8 and decisions D-02 (replaces the settings file), D-04 (type union), D-12 (extended `HapticProfile`, new `teq_K` field), D-23 (view-mode fields) and D-27 (`overrides` type).
 
 ## Diagram 1: tagged values and the ObjectCard
 
@@ -89,8 +89,17 @@ classDiagram
     +co: TV, optional
   }
   class Overrides {
-    <<client-side, D-02>>
-    +field to value map
+    <<client-side, IndexedDB, D-22, D-27>>
+    +SliderKey to number or boolean, partial
+  }
+  class SliderRegistry {
+    <<D-27, one entry per allowed key>>
+    +key: SliderKey
+    +min: number
+    +max: number
+    +step: number
+    +unit: string
+    +appliesTo: ObjectType list
   }
 
   TV --> "1" Tag : tag
@@ -101,6 +110,8 @@ classDiagram
   ObjectCard "1" *-- "0..1" GasQ : gas_Q
   GasQ "1" *-- "0..3" TV
   Overrides "0..1" ..> "1" ObjectCard : overrides values, Reset clears
+  Overrides ..> SliderRegistry : keys must be in the registry
+  SliderRegistry --> ObjectType : appliesTo
 ```
 
 ## Diagram 2: RenderParams
@@ -150,10 +161,19 @@ classDiagram
     +spherex_ir: IRMode, optional
   }
   class VisibleMode {
-    <<fields not defined in spec>>
+    <<D-23>>
+    +available: boolean
+    +badge: string
+    +rgb: TV~rgb~ or null
+    +source: gaia_rgb or class_palette or spherex_rgb
   }
   class IRMode {
-    <<fields not defined in spec>>
+    <<D-23, same shape as VisibleMode>>
+    +available: boolean
+    +badge: string
+    +rgb: TV~rgb~ or null
+    +source: gaia_rgb or class_palette or spherex_rgb
+    +channels_um: rgb, optional
   }
   class HapticProfile {
     +texture: TextureHaptic
@@ -208,6 +228,8 @@ classDiagram
 
 - `rgb` and `vec3` stand for `[number, number, number]`; `pair` stands for `[number, number]`. They are written in words because Mermaid class members cannot hold brackets reliably.
 - `textures` is present only for the baked types (D-01). Shader kinds (`planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova`) get their field from the browser worker, so it is absent **[verify]**.
-- `terrain`, `flow`, `teq_pulse` and the ObjectCard field `teq_K` are added by D-12, which is still Proposed. `teq_K` is in D-12 and in `frontend/src/contract/objectCard.ts`, but not yet in the rendering doc R3.2 listing. `teq_pulse` is refused and listed in `missing` when `teq_K` is null.
+- `terrain`, `flow`, `teq_pulse` and the ObjectCard field `teq_K` are added by D-12 (Accepted). `teq_K` is in the rendering doc R3.2 listing: `measured` from Exoplanet Archive `pl_eqt`, otherwise `derived`. `teq_pulse` is refused and listed in `missing` when `teq_K` is null.
+- `VisibleMode` and `IRMode` share one shape (D-23); `channels_um` is set on `IRMode` only. When a mode is not available, the reason goes in `missing`.
 - `lighting.mode` is `sun` for solar-system bodies (`phase_angle_deg` from Horizons quantity 24) and `self` for stars and brown dwarfs (rendering doc §5.1).
-- `Overrides` holds user slider edits on the client, separate from the card, so Reset restores the data values. Which sliders apply to baked bodies is Q-03 open.
+- `Overrides` holds user slider edits on the client, separate from the card, so Reset restores the data values. It is `Partial<Record<SliderKey, number | boolean>>`, and an unknown key fails the type check (D-27). It stays in IndexedDB and is never sent to the server (D-22).
+- Baked types allow only colour, lighting and spin sliders for the event; relief sliders exist only on the shader kinds (D-26).

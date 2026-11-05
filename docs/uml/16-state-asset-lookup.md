@@ -1,6 +1,6 @@
 # 16 State: asset lookup and texture cache
 
-Diagram 1 is the asset status from pipeline stage 4 (`saved`, `generated`, `sketch`). Diagram 2 is the life of one backend texture-cache entry. Drawn from architecture spec §4.4, §5.4 and §10, rendering doc §6.6–6.7, §7.7, and decisions D-01, D-02 and D-07.
+Diagram 1 is the asset status from pipeline stage 4 (`saved`, `generated`, `sketch`). Diagram 2 is the life of one backend texture-cache entry. Drawn from architecture spec §4.4, §5.4 and §10, rendering doc §6.6–6.7, §7.7, and decisions D-01, D-02, D-07 and D-22.
 
 ## Diagram 1: asset status
 
@@ -28,6 +28,8 @@ stateDiagram-v2
   end note
   note right of Saved
     Pre-baked demo assets, always available offline.
+    Holds card, RenderParams, texture URLs,
+    generator_version, seed, created_at (D-22).
   end note
 ```
 
@@ -70,7 +72,7 @@ stateDiagram-v2
 
 ## Notes
 
-- With D-02 the settings file is retired. What a `saved` asset contains now (card, RenderParams, textures) is not restated in the specs **[verify]**.
-- The architecture spec put generated assets in browser IndexedDB; the backend texture cache is separate.
+- With D-02 the settings file is retired. A `saved` asset holds the ObjectCard, the RenderParams, the texture URLs, `generator_version`, `seed` and `created_at` (D-22, architecture spec §5.4). `generator_version` and `seed` keep the texture cache key reproducible.
+- The architecture spec puts generated assets and the user's `overrides` in browser IndexedDB; `overrides` are never sent to the server (D-22). The backend texture cache is separate, and so is the read-through cache of external calls (D-25).
 - Bumping `generator_version` does not delete old entries; it changes the key. Clean-up is not specified.
 - Baking failures are not specified **[verify]**.

@@ -1,6 +1,6 @@
 # Haptics: engine API
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.8 · **Implements:** D-08, D-09, D-10 ([decisions](../../decisions.md)) · **Read with:** [data-contract.md](../data-contract.md)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.8 · **Implements:** D-08, D-09, D-10, D-20 ([decisions](../../decisions.md)) · **Read with:** [data-contract.md](../data-contract.md)
 
 ### R8.8 Engine API
 
@@ -11,6 +11,7 @@ export interface HapticEvent {
   kind: HapticKind; strength: number; rateHz?: number; tag: Tag;
   pitch?: number;   // 0–1. Audio only. Spectrum: λ→pitch as in the Listen sweep; surfaces: height or latitude
   pan?: number;     // −1 (left) to 1 (right). Audio only. From the finger's x on screen
+  sharpness?: number; // Optional (D-20). The web driver ignores it; a future Tauri driver (B-01) uses it
 }
 
 export interface HapticDriver { readonly supported: boolean; emit(e: HapticEvent): void; stop(): void }
@@ -62,6 +63,12 @@ export class WebVibrateDriver implements HapticDriver {
 ```
 
 Event sources (`sources/heightMap.ts`, `meshNormal.ts`, `field.ts`, `terrain.ts`, `flow.ts`, `spectrum.ts`, `lightcurve.ts`) read the `HapticProfile` from RenderParams and call `engine.emit`. Drivers never know about objects.
+
+**From the mock-up (D-20).** This discrete `HapticEvent` is the app API; it carries the `tag` that the honesty rule and the audio timbre need.
+- The mock-up's native and iOS bridges are dropped for the event (D-08). The `HapticDriver` interface keeps the door open.
+- The mock-up's `spherex:haptic` DOM event (a `CustomEvent` on `window` in `mockup/spherex-ui.html`) stays as a **debug hook**. It also drives an **on-screen pulse indicator**, so an audience watching the laptop can see what the phone feels.
+- Tick lengths follow [§8.3](platform-encoding.md#r83-encoding-web-driver-d-09): 8–25 ms with the calibrated `minMs`, not the mock-up's 6–22 ms.
+- Nebulae and novae get the field pulse ([§8.5](profiles.md#r85-per-type-haptic-profile)), not the mock-up's refusal.
 
 ```ts
 interface HapticProfile {

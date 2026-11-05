@@ -1,11 +1,11 @@
 # Honesty policy
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A11–A11.1 · **Read with:** [data-contract.md](data-contract.md)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A11–A11.1 · **Implements:** D-21 · **Read with:** [data-contract.md](data-contract.md)
 
 ## A11 Honesty policy (user-facing)
 
 - Show the Measured, Estimated or Default badge next to every value ([section 5.2](data-contract.md#a52-provenance-tags-and-badges)). The Estimated tooltip shows the formula, assumption or analog.
-- Offer the 3-state honesty toggle (Measured only, + Derived, + Artistic). It applies to layers and haptics alike (rendering doc §5.3).
+- Offer the 3-state honesty toggle, one state per badge: Measured only, + Estimated, + Artistic (D-21). It starts at + Estimated. It applies to layers and haptics alike (rendering doc §5.3).
 - Label every rendering an artist's impression. Label imagined sounds "Imagined" and AI images "AI-made".
 - New objects are labelled "Sketch from SPHEREx only".
 - Real spacecraft photos are used only to compare against our output, never as textures.

@@ -1,6 +1,6 @@
 # 06 Haptics and audio (classes)
 
-The haptics engine, its drivers, the calibration store and the event sources. Drawn from rendering doc §8.3–8.8 and §10, and decisions D-08 (web only), D-09 (quantised strength), D-10 (audio on every platform, `pitch` and `pan`), D-12 (`terrain` and `flow` sources) and B-01 (Tauri, post-event). The engine fans out every event to all active drivers.
+The haptics engine, its drivers, the calibration store and the event sources. Drawn from rendering doc §8.3–8.8 and §10, and decisions D-08 (web only), D-09 (quantised strength), D-10 (audio on every platform, `pitch` and `pan`), D-12 (`terrain` and `flow` sources, shared field), D-20 (`sharpness`, `spherex:haptic` debug hook) and B-01 (Tauri, post-event). The engine fans out every event to all active drivers.
 
 ## Diagram 1: engine, drivers and calibration
 
@@ -22,6 +22,7 @@ classDiagram
     +tag: Tag
     +pitch: number, optional, D-10
     +pan: number, optional, D-10
+    +sharpness: number, optional, D-20
   }
   class HapticDriver {
     <<interface>>
@@ -72,6 +73,11 @@ classDiagram
   class LocalStorage {
     <<browser>>
   }
+  class PulseIndicator {
+    <<on-screen, D-20>>
+    listens to the spherex:haptic DOM event
+    shows each pulse so the audience can see it
+  }
   class Tag {
     <<enumeration, see 05>>
   }
@@ -86,6 +92,7 @@ classDiagram
   WebVibrateDriver --> Calibration : minMs, levels, gain
   AudioDriver --> Calibration : audioOffsetMs, gain
   Calibration ..> LocalStorage : persists
+  HapticEngine ..> PulseIndicator : spherex haptic debug event, firing module verify
 
 ```
 
@@ -145,15 +152,19 @@ classDiagram
     <<D-12, texture terrain, file verify>>
     height ticks, coastline firm tick
     ocean swell 1 to 2 Hz, ice fine ticks
+    lava-crack mask gives a double tick
   }
   class FlowSource {
     <<D-12, texture flow, file verify>>
     tick at band boundary
-    jet pulse train, storm swirl, ring gaps
+    jet pulse train 2 to 20 Hz, verify on phones
+    storm swirl, ring gaps
   }
   class SharedField {
     <<D-12, 512 x 256 per body>>
-    height, band, ocean, ice, storm channels
+    texture A: height, band index, storm id
+    texture B: ocean mask, ice mask, lava-crack mask
+    two RGBA Float32 DataTextures, same Float32Arrays
   }
   class HeightBin {
     <<baked float16 W x H>>
@@ -181,3 +192,6 @@ classDiagram
 - `Calibration.gain` is the strength multiplier from rendering doc §8.7. `levels` and `audioOffsetMs` come from D-09 and D-10; their exact measurement is in rendering doc §8.9 **[verify once written]**.
 - The brown dwarf `bands` texture and the `flux_pulse`, `teq_pulse`, `motion` and `detections` data haptics have no source file in rendering doc §10 **[verify]**.
 - Drivers never know about objects; only sources read `HapticProfile`.
+- `sharpness` is optional. The web driver ignores it; a future Tauri driver (B-01) uses it (D-20).
+- The `spherex:haptic` DOM event from the mock-up stays as a debug hook and drives an on-screen pulse indicator (D-20). Which module fires it is not stated; the diagram draws it from the engine.
+- Honesty: sources stay silent for any event whose tag the current toggle state hides (D-21). In Measured only, only `measured` events play.

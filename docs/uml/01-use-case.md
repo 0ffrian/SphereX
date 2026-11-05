@@ -1,6 +1,6 @@
 # 01 Use cases
 
-Who uses Shift & Spectrum and for what. Drawn from architecture spec §1.1 (tiers), §9 (hash routing), rendering doc §4 (display levels), §5.2–5.6 (view modes, honesty, interaction), §8.6–8.7 (spectrum haptics, calibration) and decisions D-06, D-07, D-08.
+Who uses Shift & Spectrum and for what. Drawn from architecture spec §1.1 (tiers), §9 (hash routing), rendering doc §4 (display levels), §5.2–5.6 (view modes, honesty, interaction), §8.6–8.7 (spectrum haptics, calibration) and decisions D-06, D-07, D-08, D-25 and D-28.
 
 Mermaid has no native use-case diagram, so this is a `flowchart LR`: actors are circles, use cases are rounded boxes inside the system boundary. Dashed boxes are stretch goals.
 
@@ -15,6 +15,7 @@ flowchart LR
     direction TB
     UCSearch(["Search by name or RA/Dec"])
     UCFlip(["Play flipbook of SPHEREx frames"])
+    UCTrails(["Rainbow Trails view mode (P1)"])
     UCOverlay(["Toggle Gaia / WISE overlays (P1)"])
     UCSpectrum(["Click object to see spectrum and card"])
     UCListen(["Listen (data sweep)"])
@@ -27,7 +28,7 @@ flowchart LR
     UCScrub(["Scrub epoch or light curve"])
     UCCalib(["Calibrate haptics"])
     UCShare(["Share link (URL hash)"])
-    UCPrebake(["Pre-bake demo assets and cache"])
+    UCPrebake(["Pre-fetch the cache and pre-bake demo assets"])
     UCGemini(["Gemini artistic repaint (P3 stretch)"])
   end
 
@@ -43,6 +44,7 @@ flowchart LR
   Public --- UCScrub
   Public --- UCShare
   Public --- UCOverlay
+  Public --- UCTrails
 
   Blind --- UCListen
   Blind --- UCFeelSpec
@@ -58,6 +60,7 @@ flowchart LR
 
   UCSearch -.->|"«include»"| UCFlip
   UCSpectrum -.->|"«extend»"| UCFlip
+  UCTrails -.->|"«extend»"| UCFlip
   UCListen -.->|"«extend»"| UCSpectrum
   UCFeelSpec -.->|"«extend»"| UCSpectrum
   UCView3D -.->|"«extend»"| UCSpectrum
@@ -84,4 +87,5 @@ flowchart LR
 - Touch mode feels the surface only on Android Chrome. iPhone, iPad and desktop get the paired audio only (D-08, D-10).
 - Gemini repaint is server-side and behind the admin token (rendering doc §10, D-07).
 - Post-event, not drawn: Gemini Live voice control (B-02), AI sound clips (B-03), image-to-3D (B-04).
-- How Rainbow Trails relates to the flipbook is Q-04 open, so it is not drawn as a separate use case.
+- Rainbow Trails is a view mode of the flipbook (D-28), so it extends "Play flipbook". It is P1, built after basic playback works.
+- Pre-fetch fills the backend's read-through cache for the test targets and demo objects, so the demo runs offline (D-25).

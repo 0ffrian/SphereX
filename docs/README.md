@@ -28,9 +28,10 @@ Always load `decisions.md` first. It is short, and it overrides everything else.
 | Task | Load |
 |---|---|
 | Get oriented | [architecture/overview.md](architecture/overview.md), [rendering/principles-stack.md](rendering/principles-stack.md) |
-| Add or fix a data adapter (IRSA, Gaia, Horizons, SBDB…) | [architecture/data-sources.md](architecture/data-sources.md), [architecture/pipeline.md](architecture/pipeline.md) |
+| Add or fix a data adapter (IRSA, Gaia, Horizons, SBDB…) | [architecture/data-sources.md](architecture/data-sources.md), [architecture/pipeline.md](architecture/pipeline.md), decisions D-19 (resolver order) and D-25 (cache) |
+| API endpoints (resolve, frames, cutouts, spectrum, card, render-params) | [architecture/pipeline.md](architecture/pipeline.md), [rendering/data-contract.md](rendering/data-contract.md), decisions D-16 |
 | Pipeline: find, measure, classify, build the card | [architecture/pipeline.md](architecture/pipeline.md), [rendering/data-contract.md](rendering/data-contract.md) |
-| Schemas: ObjectCard, RenderParams, tags | [rendering/data-contract.md](rendering/data-contract.md), [architecture/data-contract.md](architecture/data-contract.md) |
+| Schemas: ObjectCard, RenderParams, tags, generated contract code | [rendering/data-contract.md](rendering/data-contract.md), [architecture/data-contract.md](architecture/data-contract.md) (D-18) |
 | Backend texture baker | [rendering/surface-generation.md](rendering/surface-generation.md), [rendering/data-contract.md](rendering/data-contract.md) |
 | 3D viewer shell: lighting, modes, honesty, interaction | [rendering/display-rules.md](rendering/display-rules.md), [rendering/accessibility.md](rendering/accessibility.md) |
 | A renderer for one type | the matching file in [rendering/renderers/](rendering/README.md), plus [rendering/display-rules.md](rendering/display-rules.md) |
@@ -41,11 +42,13 @@ Always load `decisions.md` first. It is short, and it overrides everything else.
 | Audio driver | [rendering/haptics/audio-pairing.md](rendering/haptics/audio-pairing.md), [rendering/haptics/engine-api.md](rendering/haptics/engine-api.md) |
 | Calibration and settings | [rendering/haptics/calibration.md](rendering/haptics/calibration.md) |
 | Frontend setup, scripts, phone testing | [../frontend/README.md](../frontend/README.md), [architecture/frontend-platform.md](architecture/frontend-platform.md) |
-| Frontend setup, hosting, performance | [architecture/frontend-platform.md](architecture/frontend-platform.md), [rendering/display-rules.md](rendering/display-rules.md) (R5.5) |
-| Labels and honesty in the UI | [architecture/honesty-policy.md](architecture/honesty-policy.md), [rendering/display-rules.md](rendering/display-rules.md) (R5.3) |
+| Frontend setup, performance | [architecture/frontend-platform.md](architecture/frontend-platform.md), [rendering/display-rules.md](rendering/display-rules.md) (R5.5) |
+| Hosting on the A15, HTTPS, cache and offline demo mode | [architecture/frontend-platform.md](architecture/frontend-platform.md) (A10), [architecture/risks.md](architecture/risks.md), decisions D-24 and D-25 |
+| Flipbook and Rainbow Trails view mode | [architecture/overview.md](architecture/overview.md) (A1.1), [architecture/pipeline.md](architecture/pipeline.md) (A4.1), decisions D-28 |
+| Labels and honesty in the UI | [architecture/honesty-policy.md](architecture/honesty-policy.md), [rendering/display-rules.md](rendering/display-rules.md) (R5.3, D-21) |
 | Tests | [architecture/testing.md](architecture/testing.md), [rendering/layout-tests-open-items.md](rendering/layout-tests-open-items.md) |
-| Where code lives and who owns it | [rendering/layout-tests-open-items.md](rendering/layout-tests-open-items.md) (R10), [uml/04-package.md](uml/04-package.md) |
-| Plan, risks | [architecture/plan.md](architecture/plan.md), [architecture/risks.md](architecture/risks.md) |
+| Where code lives and who owns it | [rendering/layout-tests-open-items.md](rendering/layout-tests-open-items.md) (R10), [uml/04-package.md](uml/04-package.md), decisions D-17 |
+| Plan, milestones, risks | [architecture/plan.md](architecture/plan.md), [architecture/risks.md](architecture/risks.md), decisions D-14 and D-29 |
 
 ## Editing rules
 

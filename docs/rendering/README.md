@@ -1,7 +1,7 @@
 # CONTEXT: Celestial Object Display, Surface Generation and Haptics
 
 **Project:** Shift & Spectrum, NASA Space Apps 2026, challenge "Planet X and SPHEREx"
-**Audience:** the team (Atish, Kevin, Moon) and Claude Code. This spec lives in `docs/rendering/` (this index plus the fragments below) and is referenced from `CLAUDE.md`.
+**Audience:** the team (Atish, Kevin, Moon, Munazir) and Claude Code. This spec lives in `docs/rendering/` (this index plus the fragments below) and is referenced from `CLAUDE.md`.
 **Status:** v2, 4 Nov 2026. Items marked **[verify]** must be checked against real output before relying on them.
 **Precedence:** decisions in [decisions.md](../decisions.md) override this doc. Decision IDs (D-xx), backlog IDs (B-xx) and question IDs (Q-xx) refer to that file.
 
@@ -12,7 +12,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | File | Sections | Load this when… |
 |---|---|---|
 | [principles-stack.md](principles-stack.md) | R0, R1, R2 | starting any rendering/haptics task: scope, non-goals, the 6 principles, pinned package versions |
-| [data-contract.md](data-contract.md) | R3, R3.1–R3.4 | touching the card/render-params schema, provenance tags or backend type selection (canonical TV / ObjectCard / RenderParams) |
+| [data-contract.md](data-contract.md) | R3, R3.1–R3.4 | touching the card/render-params schema, provenance tags, view-mode fields or backend type selection (canonical TV / ObjectCard / RenderParams) |
 | [display-rules.md](display-rules.md) | R4, R5, R5.1–R5.6 | working on the viewer: lighting, view modes, honesty toggle, scale bar, performance budget, interaction |
 | [surface-generation.md](surface-generation.md) | R6, R6.1–R6.7 | baking height/normal/albedo maps: card→params rules, noise, craters, Sobel normals, Gemini/depth paths, caching |
 | [renderers/asteroid.md](renderers/asteroid.md) | R7 (intro), R7.1, R7.2 | rendering `asteroid_shape` or `asteroid_procedural` (also holds the R7 intro rule on refused layers) |
