@@ -1,0 +1,39 @@
+# Fixtures (dev and test only)
+
+**Everything served from here is synthetic.** Frame times, wavelengths, pixel positions, fluxes, errors, flags and cutout pixels are invented to exercise the flipbook and spectrum UI. They do not imitate the real objects and are not SPHEREx data.
+
+## Switching them on
+
+| Command                                         | `/v1` goes to                                                                                |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `npm run dev`                                   | the backend, through the Vite proxy (`http://localhost:8000`, override with `SX_API_TARGET`) |
+| `npm run dev:fixtures` (`vite --mode fixtures`) | these synthetic fixtures; no backend needed                                                  |
+| `npm run test:e2e`                              | always the fixtures (Playwright starts `dev:fixtures`)                                       |
+
+## Why a normal build can never show them
+
+1. `vitePlugin.ts` is a dev-server plugin (`apply: 'serve'`), added only in `--mode fixtures`. `vite build` and `vite preview` never run it.
+2. No app module under `src/` imports `fixtures/`. `src/fixtures.test.ts` checks this.
+3. `npm run build` ends with `scripts/check-dist.js`, which fails if a fixture marker string is found in `dist/`.
+4. Every fixture reply carries `X-SX-Fixture: synthetic`. The UI then shows a page-wide "Fixture data" banner, "Fixture" badges instead of "Measured", and a SYNTHETIC label on the image.
+
+## What is in them
+
+| Item        | Detail                                                                                                                                                                                                                                                                                        |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Targets     | The five A1.1 targets (Barnard's Star, Epsilon Indi B, WISE 0855-0714, RW Aurigae, R Draconis), plus `synthetic-mover` (to test Rainbow Trails) and `synthetic-refused-mover` (empty frames with `missing: ["frames:moving_object_search"]`, as the M1 backend does for Solar System movers). |
+| Coordinates | ICRS J2000 RA/Dec of the five targets from SIMBAD, checked 5 Nov 2026 against the backend's recorded SIMBAD replies. The synthetic objects have made-up positions.                                                                                                                            |
+| Frames      | 24 per target (16 for the mover), 64×64 PNG cutouts, `data_release: "synthetic_fixture"`. The five targets use `north_up: false` with a synthetic `north_angle_deg`, so the star field rotates between frames. The mover uses `north_up: true` with per-frame `ra`/`dec`.                     |
+| Spectrum    | One point per frame, generic smooth curve plus seeded noise, `flux_unit: "synthetic units (fixture)"`, 3 flagged points per target.                                                                                                                                                           |
+| Refusal     | R Draconis frame `r-dra-f005` has no cutout (404) and is listed in `missing`.                                                                                                                                                                                                                 |
+| Determinism | Seeded (mulberry32). Same target → byte-identical JSON and PNG.                                                                                                                                                                                                                               |
+
+## Files
+
+- `targets.ts`: the targets, aliases and name/coordinate matching.
+- `synthetic.ts`: frame, spectrum and cutout generators.
+- `png.ts`: a small grayscale PNG encoder (stored deflate, no zlib).
+- `handler.ts`: answers `/v1/resolve`, `/frames`, `/cutouts/{frame_id}.png` and `/spectrum` with the D-16 shapes and error bodies.
+- `vitePlugin.ts`: mounts the handler on the dev server.
+
+When the backend (#1, #2) records real responses, they can replace these for tests (D-25), but that is not wired up in M1.
