@@ -1,6 +1,6 @@
 # 03 Deployment
 
-Where each part runs at the event, and what talks to what. Drawn from architecture spec §3, §6.3, §9 and §12, rendering doc §2, §5.5, §8.1, and decisions D-05, D-06, D-08, Q-01, Q-02. Dashed nodes are post-event or optional.
+Where each part runs at the event, and what talks to what. Drawn from architecture spec §3, §6.3, §9, §10 and §12, rendering doc §2, §5.5, §8.1, and decisions D-05, D-06, D-08, D-15, D-24 and D-25. Dashed nodes are post-event or optional.
 
 ```mermaid
 flowchart LR
@@ -16,34 +16,38 @@ flowchart LR
     Safari --- AudioOnly1
   end
 
-  subgraph Laptop["Demo laptop: Zenbook 14X, Intel Iris Xe"]
+  subgraph Laptop["Demo laptop: Zenbook 14X, Intel Iris Xe (Q-15: may be replaced by the A15)"]
     LaptopBrowser["Browser [verify which]: web app"]
     AudioOnly2["Web Audio only"]
     LaptopBrowser --- AudioOnly2
   end
 
-  subgraph Hosting["Frontend hosting (Q-02 open: same AWS server or static host)"]
-    Bundle["Static bundle: Vite build"]
-  end
+  LAN["Local network: own router or hotspot (D-24)"]
 
-  subgraph AWS["AWS server (CPU only, no GPU)"]
-    PyAPI["Python 3.12 API (framework Q-01 open)"]
+  subgraph A15["Asus A15 laptop: local server (D-24)"]
+    subgraph Origin["One process, one origin, HTTPS"]
+      Bundle["Built frontend: Vite bundle"]
+      PyAPI["FastAPI API (D-15, D-16)"]
+    end
     PipelineN["Pipeline + data adapters"]
-    BakerN["Texture baker: numpy, scipy, opencv-headless, Pillow"]
-    GemN["gemini_paint (P3, admin token)"]
-    DataDir[("/data: pre-fetched cutouts, cards, /data/textures")]
+    BakerN["Texture baker: numpy, scipy, opencv-headless, Pillow (CPU only)"]
+    GemN["gemini_paint (P3, admin token, off when offline)"]
+    Cache[("Read-through cache (D-25): outside git, zipped backup")]
+    Textures[("/data/textures")]
+    PreFetch["Pre-fetch script (D-25): 5 test targets + every demo object"]
     PyAPI --- PipelineN
     PyAPI --- BakerN
     PyAPI --- GemN
-    PipelineN --- DataDir
-    BakerN --- DataDir
+    PipelineN --- Cache
+    BakerN --- Textures
+    PreFetch --> Cache
   end
 
   subgraph TeamLaptop["Team laptop (offline jobs, RTX 3050 4 GB)"]
     DepthAny["Depth Anything V2 Small"]
     Marigold["Marigold v1-1 fp16 + TAESD (fallback)"]
     Decimate["Mesh decimation to 50k triangles (D-05)"]
-    Prebake["Pre-fetch cutouts, pre-bake demo assets"]
+    Prebake["Pre-bake demo assets"]
   end
 
   subgraph Archives["External archives and APIs"]
@@ -61,40 +65,40 @@ flowchart LR
   Tauri["Tauri Android app (B-01, post-event)"]
   Colab["Colab: image-to-3D (B-04, post-event)"]
 
-  Chrome -->|"HTTPS: load app"| Bundle
-  Safari -->|"HTTPS: load app"| Bundle
-  LaptopBrowser -->|"HTTPS: load app"| Bundle
-  Chrome -->|"HTTPS: /v1/objects/{id}/card, /render-params, textures"| PyAPI
-  Safari -->|"HTTPS"| PyAPI
-  LaptopBrowser -->|"HTTPS"| PyAPI
+  Chrome -->|"HTTPS: app + /v1 API"| LAN
+  Safari -->|"HTTPS"| LAN
+  LaptopBrowser -->|"HTTPS"| LAN
+  LAN --> Origin
 
-  PipelineN -->|"HTTPS (proxy, cached)"| IRSA
-  PipelineN --> Gaia
-  PipelineN --> Horizons
-  PipelineN --> SkyBoT
-  PipelineN --> SBDB
-  PipelineN --> DAMIT
-  PipelineN --> SIMBAD
-  PipelineN -.-> Exo
-  GemN -->|"server-side key only"| GeminiAPI
+  Cache -.->|"only on a cache miss and when SX_OFFLINE is not set"| IRSA
+  Cache -.-> Gaia
+  Cache -.-> Horizons
+  Cache -.-> SkyBoT
+  Cache -.-> SBDB
+  Cache -.-> DAMIT
+  Cache -.-> SIMBAD
+  Cache -.-> Exo
+  GemN -.->|"server-side key only, through the cache"| GeminiAPI
 
-  Prebake -->|"upload assets and cache [verify how]"| DataDir
+  Prebake -->|"copy assets to the A15 [verify how]"| Textures
   Decimate --> Prebake
   DepthAny --> Prebake
   Marigold -.-> Prebake
-  Prebake --> IRSA
 
-  Tauri -.->|"HTTPS"| PyAPI
+  Tauri -.->|"HTTPS"| Origin
   Colab -.-> Prebake
 
   classDef post stroke-dasharray: 5 5
-  class Tauri,Colab,Marigold,Exo post
+  class Tauri,Colab,Marigold,Exo,GemN post
 ```
 
 ## Notes
 
 - Haptics can only be shown on the two Android phones (D-05, D-08). Every device gets the paired audio (D-10).
 - Budgets (D-05): ≥ 30 fps while rotating, pixel ratio ≤ 1.5, textures 2048×1024 desktop and 1024×512 mobile, displacement on desktop only.
-- IRSA is slow and sometimes returns 504, so every demo target is pre-fetched into `/data` before the event (architecture spec §3.1, §13).
-- The AWS server has no GPU and needs none; the baker is CPU-only (rendering doc §2).
-- Q-02: if the frontend is hosted on the same AWS server, the "Frontend hosting" node merges into it.
+- HTTPS is needed because WebGPU needs a secure context. A local root certificate (e.g. `mkcert`) is installed on both Android phones; whether a clicked-through self-signed certificate is enough is **[verify]** (D-24).
+- Venue Wi-Fi may block device-to-device traffic, so the team brings a router or hotspot (D-24).
+- The demo runs with `SX_OFFLINE=1`: nothing touches the network, and the Gemini layer stays off so the code path shows (D-24, D-25). The pre-fetch script fills the cache while the internet is good. Cutouts only, never whole frames. Where the script runs is not stated; it is drawn on the A15 because the cache lives there.
+- The baker is CPU-only (rendering doc §2).
+- There is no public URL after the event. A static hosted copy is a later, separate decision (D-24).
+- Whether the A15 also replaces the Zenbook as the demo screen is Q-15. Whether the team laptop for offline jobs is the A15 is not stated.

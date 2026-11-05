@@ -1,6 +1,6 @@
 # Data sources
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A3–A3.10 · **Implements:** D-07
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A3–A3.10 · **Implements:** D-07, D-19, D-25
 
 ## A3 Data sources
 
@@ -20,7 +20,7 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 | Cutouts | Work through the same service. Use small cutouts, never whole frames. |
 | Storage path | `s3://nasa-irsa-spherex/qr2/level2/<week>/<obs>/<detector>/` |
 | Data releases | QR2 (DOI 10.26131/IRSA652), QR3 (DOI 10.26131/IRSA662, began Sept 2026) |
-| Known problems | A time filter or a large cone timed out with 504 errors. A tiny cone worked. **Cache every result ahead of time.** |
+| Known problems | A time filter or a large cone timed out with 504 errors. A tiny cone worked. **Cache every result ahead of time.** Every call goes through the backend's read-through cache, filled by the pre-fetch script; the demo runs offline (D-25). |
 | Not checked | Whether frames exist for 3I/ATLAS on its exact dates. |
 
 ### A3.2 Gaia DR3
@@ -99,5 +99,5 @@ These sources come from the rendering doc. Neither has been called yet.
 
 | Item | Status | Use |
 |---|---|---|
-| SIMBAD | **Not confirmed** | Name resolution and object type, which sets stars and brown dwarfs (rendering doc §3.3). Resolver order with SBDB is open (Q-05). |
+| SIMBAD | **Not confirmed** | Name resolution and object type, which sets stars and brown dwarfs (rendering doc §3.3). Resolver order with SBDB: D-19 ([section 4.1](pipeline.md#a41-stage-1-find-the-object)). |
 | NASA mission shape models | **Not confirmed** | Real meshes (GLB) for `asteroid_shape`, such as Bennu, Eros and Vesta. Decimate offline to the mesh budget ([section 10.1](frontend-platform.md#a101-performance-budget-d-05)). |

@@ -1,6 +1,6 @@
 # File layout, acceptance tests and open items
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R10, R11, R12 · **Implements:** D-11 ([decisions](../decisions.md))
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R10, R11, R12 · **Implements:** D-11, D-17, D-18, D-21 ([decisions](../decisions.md))
 
 ## R10. File layout and ownership
 
@@ -10,24 +10,35 @@ backend/app/core/render/            (Atish)
   noise.py craters.py height.py normals.py palette.py bake.py
   gemini_paint.py     # stretch, behind the admin token
   spherex_rgb.py      # §5.2 channel extraction
-backend/app/api/objects.py           (Kevin)  # /card, /render-params, texture URLs
+backend/app/api/                     (Kevin)  # D-16 endpoints; objects.py: /card, /render-params, texture URLs
 frontend/src/viewer/                 (Moon)
   ViewerApp.ts lighting.ts modes.ts honesty.ts scaleBar.ts altText.ts
   renderers/AsteroidMesh.ts AsteroidProcedural.ts Comet.ts BrownDwarf.ts Star.ts
   renderers/ShaderBody.ts   # browser-shader kinds (§7.7, D-01, D-12); name [verify]
-  fields/             # Web Worker field generator for shader kinds (§7.7, D-12); scaffold file fieldWorker.ts [verify]
-frontend/src/haptics/                (haptics design: Atish, D-13; code: Moon and Atish)
+  fields/             (Atish)  # Web Worker field generator for shader kinds (§7.7, D-12); scaffold file fieldWorker.ts [verify]
+frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
   haptics.ts calibration.ts
   drivers/webVibrate.ts drivers/audio.ts drivers/tauri.ts (stub, B-01)
   sources/heightMap.ts meshNormal.ts field.ts terrain.ts flow.ts spectrum.ts lightcurve.ts
-frontend/src/contract/               (owner Q-14)  # §3 and §8.8 types as TS: Tag, TV, ObjectCard, RenderParams,
-                                                   # HapticEvent, HapticDriver, HapticProfile; assertTagged()
-frontend/src/state/                  (owner Q-14)  # Zustand store: card, params, honesty, overrides (A10, D-02)
-frontend/src/app/                    (owner Q-14)  # React shell: App, ViewerPanel, StatusLine
-shared/schemas/object-card.schema.json  render-params.schema.json
+frontend/src/contract/               (generated, D-18)  # TS types generated from shared/schemas/ by json-schema-to-typescript;
+                                                        # hand-written helpers such as assertTagged() sit next to them;
+                                                        # where the R8.8 haptic types live: Q-19
+frontend/src/state/                  (Moon)  # Zustand store: card, params, honesty, overrides (A10, D-02)
+frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, StatusLine
+shared/schemas/object-card.schema.json  render-params.schema.json   (Munazir, provisional)
+shared/fixtures/                     (Munazir, provisional)
 ```
 
-`contract/`, `state/` and `app/` were added when the frontend was scaffolded (4 Nov 2026). They are not part of the original R10 list. See the [frontend README](../../frontend/README.md#layout).
+Owners follow D-17. Munazir's assignments are provisional until Munazir confirms them (Q-16). `frontend/src/contract/` is generated code and follows the owner of `shared/schemas/`.
+
+| Owner (D-17) | Also owns, outside the paths above |
+|---|---|
+| Kevin | Backend scaffold, data adapters (including Gaia and WISE), pipeline stages 1, 4 and 5, local hosting (D-24) |
+| Munazir | Pipeline stage 2 (brightness and spectrum), the physics layer (architecture spec §7) |
+| Atish | Pipeline stage 3 (classify), stage 7 (`card_to_params`), the texture baker, the Gemini layer |
+| Moon | The flipbook UI, the shader kinds, the overlay UI |
+
+`contract/`, `state/` and `app/` were added when the frontend was scaffolded (4 Nov 2026). See the [frontend README](../../frontend/README.md#layout). `contract/` is generated from `shared/schemas/` (D-18); CI fails if regenerated files differ from the committed ones. The hand-written scaffold types stay until the schemas exist, then get replaced.
 
 ---
 
@@ -36,7 +47,7 @@ shared/schemas/object-card.schema.json  render-params.schema.json
 - **Determinism:** the same card and seed give the same SHA-256 for every texture.
 - **Seam:** the mean absolute height difference between column 0 and column W−1 is less than the median neighbour difference.
 - **Normals:** every decoded normal has length 1 ± 0.02.
-- **Honesty:** in Measured only, no layer tagged `artistic` or `inferred_from_analog` is drawn, and procedural texture haptics are silent.
+- **Honesty:** the toggle starts at + Estimated. In Measured only, no layer with a tag other than `measured` is drawn, and procedural texture haptics are silent (D-21).
 - **Refusal:** removing `diameter_km` from an asteroid card puts the mesh in `missing`, with no crash.
 - **Performance:** ≥30 fps rotating `asteroid_procedural` at 1024×512 on the realme 14 Pro.
 - **Haptics:**
@@ -45,7 +56,7 @@ shared/schemas/object-card.schema.json  render-params.schema.json
   - the calibration values (`minMs`, level set, `avOffsetMs`) persist
   - both Android phones feel the 8 ms tick after calibration
   - after calibration, the audio–vibration offset is under a threshold (threshold: **[verify]**)
-  - in Measured only, gas giant and planet texture haptics are silent; the `teq_pulse` still plays
+  - in Measured only, gas giant and planet texture haptics are silent; the `teq_pulse` plays only when `teq_K` is `measured` (D-21)
 - **Shared field:** on a gas giant, band-boundary ticks line up with the drawn band edges, so the shader and the field agree.
 - **Spectrum haptics:** dragging across a known absorption dip gives at least 3 consecutive quiet steps.
 - **Comet:** toggling Aug/Dec changes the CO and H₂O shells. No tail is drawn for August.
@@ -65,6 +76,6 @@ shared/schemas/object-card.schema.json  render-params.schema.json
 9. Chrome's pattern-length cap, believed about 99 entries ([§8.3](haptics/platform-encoding.md#r83-encoding-web-driver-d-09)).
 10. `AudioContext.outputLatency` support in Android Chrome, and the "high latency" threshold ([§8.9](haptics/audio-pairing.md#r89-audio-pairing-d-10)).
 11. Whether battery saver suppresses vibration on both phones.
-12. Exoplanet type thresholds for `planet_rocky` / `planet_water` / `gas_giant` ([§3.3](data-contract.md#r33-type-selection-backend)). Also the ObjectCard fields for exoplanets (e.g. `Teq`), which are not yet defined in [§3.2](data-contract.md#r32-objectcard-produced-by-the-backend-get-v1objectsidcard).
+12. Exoplanet type thresholds for `planet_rocky` / `planet_water` / `gas_giant` ([§3.3](data-contract.md#r33-type-selection-backend)). Teq is now `teq_K` in [§3.2](data-contract.md#r32-objectcard-produced-by-the-backend-get-v1objectsidcard) (D-12); any other ObjectCard fields for exoplanets are not yet defined.
 13. Whether the pulse-width whisper (e.g. `[4, 4, 4, 4, 4]`) is felt as distinct on each phone ([§8.3](haptics/platform-encoding.md#r83-encoding-web-driver-d-09), [§8.7](haptics/calibration.md#r87-calibration-and-settings)).
-14. The field's channel packing and a lava-crack channel ([§7.7](renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova), [§8.4](haptics/sources.md#r84-event-sources)). D-12 itself needs team sign-off.
+14. The gas giant jet pulse rate, clamp(k · |zonal wind| / max |zonal wind|, 2, 20) Hz, felt on both phones ([§8.4](haptics/sources.md#r84-event-sources), D-12). The field's channel packing and lava-crack channel are settled by D-12 ([§7.7](renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova)).

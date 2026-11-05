@@ -1,6 +1,6 @@
 # 02 Components
 
-The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12.
+The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12, D-15, D-16, D-18, D-19, D-20, D-22, D-25 and D-28.
 
 ## Diagram 1: system and backend
 
@@ -12,10 +12,10 @@ flowchart LR
     FEViewer["Sky Sculptor viewer"]
   end
 
-  subgraph BE["Backend (Python 3.12, framework Q-01 open)"]
-    API["API objects.py"]
+  subgraph BE["Backend (FastAPI on Python 3.12, D-15)"]
+    API["API (D-16): resolve, frames, cutouts, spectrum, card, render-params"]
     Adapters["Data adapters (proxy)"]
-    DataCache[("/data cache: SIA results, cutouts, cards")]
+    DataCache[("Read-through disk cache (D-25): raw responses, spectra, cards, render params; SX_OFFLINE=1 never calls out")]
     subgraph Pipe["Pipeline"]
       S1["1 Find object"]
       S2["2 Measure flux and spectrum"]
@@ -34,14 +34,15 @@ flowchart LR
     TexCache[("/data/textures/{id}/{generator_version}/{seed}/")]
   end
 
-  subgraph Shared["shared/schemas"]
-    CardSchema["object-card.schema.json"]
-    RPSchema["render-params.schema.json"]
+  subgraph Shared["shared/ (single source of the contract, D-18)"]
+    CardSchema["schemas/object-card.schema.json"]
+    RPSchema["schemas/render-params.schema.json"]
+    Fixtures["fixtures/ (D-17)"]
   end
 
   subgraph Ext["External services"]
     IRSA["IRSA SIA + S3 (SPHEREx QR2)"]
-    Resolver["SIMBAD / SBDB name resolve (Q-05)"]
+    Resolver["SBDB / SIMBAD name resolve (D-19: SBDB first for small-body names, SIMBAD first otherwise)"]
     Horizons["JPL Horizons"]
     SkyBoT["IMCCE SkyBoT"]
     Gaia["Gaia DR3 TAP"]
@@ -51,8 +52,8 @@ flowchart LR
     Gemini["Gemini image API"]
   end
 
-  FEFlip -->|"search + frames + cutouts (endpoint not named in spec)"| API
-  FEPanel -->|"GET /v1/objects/{id}/card"| API
+  FEFlip -->|"GET /v1/resolve, /v1/objects/{id}/frames, /cutouts/{frame_id}.png"| API
+  FEPanel -->|"GET /v1/objects/{id}/spectrum, /card"| API
   FEViewer -->|"GET /v1/objects/{id}/render-params"| API
   FEViewer -->|"texture URLs: albedo.webp, height.png, height.bin, normal.png"| TexCache
 
@@ -78,9 +79,9 @@ flowchart LR
   Adapters -.->|"planet columns (P2)"| Exo
   GemPaint -->|"hillshade + prompt (server-side key)"| Gemini
 
-  CardB -.->|"validates against"| CardSchema
+  CardB -.->|"validates against (Pydantic models generated from it)"| CardSchema
   C2P -.->|"validates against"| RPSchema
-  FE -.->|"types from"| Shared
+  FE -.->|"src/contract generated from (D-18)"| Shared
 
   classDef stretch stroke-dasharray: 5 5
   class GemPaint,Exo stretch
@@ -94,10 +95,11 @@ flowchart TB
 
   subgraph UI["UI shell (React, Tailwind, animate-ui)"]
     Router["Hash routing: share link"]
-    Flipbook["Flipbook"]
+    Flipbook["Flipbook, with the Rainbow Trails view mode (P1, D-28)"]
     Panel["Object panel: spectrum, card, 3 badges"]
     Listen["Audio / Listen: data sweep, imagined drive"]
-    Store["Store (Zustand): card, RenderParams, overrides"]
+    Store["Store (Zustand): card, RenderParams, honesty state, overrides"]
+    PulseInd["On-screen pulse indicator (D-20)"]
     Settings["Haptics + audio settings"]
   end
 
@@ -126,14 +128,14 @@ flowchart TB
     end
   end
 
-  IDB[("IndexedDB: session assets [verify role after D-02]")]
+  IDB[("IndexedDB: session assets, overrides (D-22)")]
   LS[("localStorage: calibration, settings")]
   Vibrate["navigator.vibrate"]
   WebAudio["Web Audio AudioContext"]
 
   Router --> Store
-  Flipbook -->|"frames"| BackendAPI
-  Panel -->|"GET card"| BackendAPI
+  Flipbook -->|"resolve, frames, cutouts"| BackendAPI
+  Panel -->|"GET spectrum, card"| BackendAPI
   ViewerApp -->|"GET render-params, textures"| BackendAPI
   Flipbook -->|"click ring: object id"| Panel
   Panel -->|"View in 3D"| ViewerApp
@@ -154,6 +156,7 @@ flowchart TB
   Engine -->|"emit"| DVib
   Engine -->|"emit"| DAud
   Engine -.->|"emit"| DTauri
+  Engine -.->|"spherex:haptic debug event"| PulseInd
   DVib --> Vibrate
   DAud --> WebAudio
   Listen --> WebAudio
@@ -169,7 +172,9 @@ flowchart TB
 ## Notes
 
 - Baked types (rendering doc types) fetch textures from the backend; shader kinds generate a field in the browser instead (D-01, D-12).
-- The flipbook and search endpoints are not named in either spec. Only `/v1/objects/{id}/card` and `/render-params` are.
-- The physics layer is drawn on the backend, feeding derived values into the card. Whether sliders re-run it on the client is part of Q-03.
+- Endpoints follow D-16. Every endpoint is keyed by the object id that `resolve` returns; there is no separate flipbook endpoint. Responses served from the cache carry `cached_at` (D-25).
+- Every external call goes through the read-through cache (D-25): cache, then a live call with a timeout and retries, then an older cached entry, then refuse.
+- The physics layer is drawn on the backend, feeding derived values into the card. The browser reruns the same functions on slider changes (architecture spec §4.6). Baked types allow only colour, lighting and spin sliders; relief sliders exist only on the shader kinds (D-26).
+- The `spherex:haptic` DOM event is a debug hook that also drives the on-screen pulse indicator (D-20). Which module fires it is not stated; it is drawn from the engine.
 - `ShaderBody` and the `fields/` folder follow from D-01 and D-12 and are now listed in rendering doc §10. Their file names are **[verify]**.
 - The `terrain` and `flow` sources come from D-12. The brown dwarf `bands` source and the `flux_pulse`, `teq_pulse`, `motion` and `detections` data haptics have no source file named in §10 **[verify]**.

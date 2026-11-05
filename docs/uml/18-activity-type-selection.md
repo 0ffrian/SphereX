@@ -49,7 +49,7 @@ flowchart TD
 
 ## Notes
 
-- Q-05 open: whether SIMBAD or SBDB resolves names first. The type rules above check SBDB, then SIMBAD.
+- Name resolution order is D-19: SBDB first for names that look like small bodies, SIMBAD first otherwise. The type rules above check SBDB, then SIMBAD.
 - No catalogue rule exists for `nebula` and `nova`; they come from user sliders only (rendering doc §3.3).
 - For orientation only, not a type rule: brown dwarf spectral types are roughly L above ~1,400 K, T from ~1,400 K to 500 K, Y below ~500 K (architecture spec §7.3, approximate).
 - The old architecture-spec kinds map as `dwarf` → `brown_dwarf` and `asteroid` → `asteroid_shape` or `asteroid_procedural` (D-04).

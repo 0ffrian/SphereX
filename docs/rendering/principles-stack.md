@@ -1,6 +1,6 @@
 # Principles and pinned stack
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R0, R1, R2 · **Implements:** D-03, D-06 ([decisions](../decisions.md))
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R0, R1, R2 · **Implements:** D-03, D-06, D-24 ([decisions](../decisions.md))
 
 ## R0. How to use this document
 
@@ -57,7 +57,7 @@
 | Raycast acceleration | `three-mesh-bvh` | pin at install | Only for real shape-model meshes |
 | Build | Vite + TypeScript | pin at install | Record exact versions in `package.json` and lockfile |
 | Browser ML (optional) | `@huggingface/transformers` | pin at install | Only for the image-first path ([§6.6](surface-generation.md#r66-optional-paths)) |
-| Backend texture gen | Python 3.12, `numpy`, `scipy`, `opencv-python-headless`, `Pillow` | pin in `uv.lock` | CPU only. The AWS server has no GPU, and none is needed |
+| Backend texture gen | Python 3.12, `numpy`, `scipy`, `opencv-python-headless`, `Pillow` | pin in `uv.lock` | CPU only; no GPU is needed. The event build runs locally on the team's Asus A15 (D-24) |
 | Optional ML (laptop) | `transformers` + `depth-anything/Depth-Anything-V2-Small-hf` | pin in `uv.lock` | Apache-2.0. Only the Small size is permissively licensed |
 | Optional heavy ML (laptop) | `diffusers==0.38.0` + Marigold v1-1 fp16 + `madebyollin/taesd` | — | Fallback only; RTX 3050 4 GB works with fp16 + tiny VAE + batch 1 |
 

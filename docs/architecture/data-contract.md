@@ -1,6 +1,6 @@
 # Data contract
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A5–A5.4 · **Implements:** D-02 · **Read with:** [../rendering/README.md](../rendering/README.md)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A5–A5.4 · **Implements:** D-02, D-18, D-22, D-26, D-27 · **Read with:** [../rendering/README.md](../rendering/README.md)
 
 ## A5 Data contract
 
@@ -12,9 +12,11 @@ The settings-file schema of draft v1 is retired (D-02). The data contract is in 
 | `ObjectCard` | Rendering doc §3.2 | Backend, `GET /v1/objects/{id}/card` |
 | Type selection | Rendering doc §3.3 | Backend, stage 3 |
 | `RenderParams` | Rendering doc §3.4 | Backend, `GET /v1/objects/{id}/render-params` |
-| JSON schemas | `shared/schemas/object-card.schema.json`, `render-params.schema.json` (rendering doc §10) | Shared by backend and frontend |
+| JSON schemas | `shared/schemas/object-card.schema.json`, `render-params.schema.json` (rendering doc §10) | Shared by backend and frontend. Owner: D-17 |
 
 Do not copy the type definitions into this doc. Change them in the rendering doc.
+
+**Generated code (D-18).** `shared/schemas/*.json` is the single source of the contract in code. The backend generates its Pydantic models with `datamodel-code-generator`; the frontend generates `frontend/src/contract/` with `json-schema-to-typescript`. Both tools are pinned exactly when installed **[verify versions]**. CI fails if regenerated files differ from the committed ones. Hand-written helpers such as `assertTagged()` sit next to the generated types, not inside them.
 
 ### A5.1 Ids and seeds
 
@@ -37,13 +39,19 @@ SPHEREx gives only spectrum, brightness, position and time. Most values will the
 
 - User slider edits live in a client-side `overrides` map, kept separate from the card.
 - Reset clears the map and restores the data values.
-- Sliders on baked bodies are open (Q-03). Changing relief needs a re-bake, so the event build may allow only colour, lighting and spin sliders on baked types.
+- **Type (D-27):** `overrides` is `Partial<Record<SliderKey, number | boolean>>`. A slider registry lists every allowed key as `{ key, min, max, step, unit, appliesTo: ObjectType[] }`, so an unknown key fails the type check. Values use the same units as the card.
+- **Sliders on baked bodies (D-26):** for the event, baked types allow only colour, lighting and spin sliders. Relief sliders exist only on the shader kinds, which redraw live. A re-bake on every drag would be too slow.
+- `overrides` stay in the browser (IndexedDB) and are never sent to the server (D-22).
 
 ### A5.4 Asset store
+
+A saved asset holds the ObjectCard, the RenderParams, the texture URLs, `generator_version`, `seed` and `created_at` (D-22). `generator_version` and `seed` keep the rendering doc §6.7 cache key reproducible.
 
 | Layer | Where | Purpose |
 |---|---|---|
 | Pre-baked | JSON files in the repo, `assets/<type>/<id>.json` | Demo objects. Always available offline. |
 | Baked texture cache | Backend, `/data/textures/{id}/{generator_version}/{seed}/` (`albedo.webp`, `height.png`, `height.bin`, `normal.png`) | Baked maps for rendering-doc types. The cache key includes `generator_version` (rendering doc §6.7). |
-| Generated | Browser IndexedDB | Files created during a session. |
+| Generated | Browser IndexedDB | Files created during a session, and the user's `overrides` (D-22). |
 | Optional backend | Small service | Shared saves. Not needed for the demo. |
+
+The read-through cache of external calls (D-25) is separate from the asset store. It lives on the A15, outside git, with a zipped backup.

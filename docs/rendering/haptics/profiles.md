@@ -1,6 +1,6 @@
 # Haptics: per-type profiles and spectrum haptics
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.5, R8.6 · **Implements:** D-12 ([decisions](../../decisions.md)) · **Read with:** [engine-api.md](engine-api.md), [sources.md](sources.md)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.5, R8.6 · **Implements:** D-12, D-21 ([decisions](../../decisions.md)) · **Read with:** [engine-api.md](engine-api.md), [sources.md](sources.md)
 
 ### R8.5 Per-type haptic profile
 
@@ -15,12 +15,12 @@
 | `star_ttauri` | — | Steady pulse that weakens and stutters (dropped beats ∝ dimming depth) as you scrub the 2025 dimming |
 | `star` | — | Ticks while tracing the motion trail; spacing ∝ distance moved per year |
 | `candidate` | — | In the flipbook: one tick per frame where it's detected |
-| `gas_giant` | No surface, so the finger feels the **flow**: a soft tick crossing each band boundary (strength = band contrast); inside a jet, a pulse train whose rate ∝ the zonal wind speed at that latitude; on a storm, a firm tick at its edge and a pulse rate that rises towards its centre (a "swirl"); dragging across rings gives a tick at each gap | Holding still gives a steady pulse, rate ∝ normalised `Teq` (`derived`, 2–12 Hz), as for brown dwarfs |
+| `gas_giant` | No surface, so the finger feels the **flow**: a soft tick crossing each band boundary (strength = band contrast); inside a jet, a pulse train whose rate ∝ the zonal wind speed at that latitude; on a storm, a firm tick at its edge and a pulse rate that rises towards its centre (a "swirl"); dragging across rings gives a tick at each gap | Holding still gives a steady pulse (`teq_pulse`), rate ∝ normalised `Teq` (2–12 Hz), as for brown dwarfs. Tag follows `teq_K`: `measured` from `pl_eqt`, otherwise `derived` |
 | `planet_water` | Open ocean: near-silent slow swell (1–2 Hz, lowest level); coastline: one firm tick; land: height-map ticks as for `asteroid_procedural`; polar ice: dense, fine, soft ticks; clouds: not felt (optional "feel clouds" toggle) | As for `gas_giant` (`Teq` pulse) |
 | `planet_rocky` | Height-map ticks; lava cracks give a double tick | As for `gas_giant` |
 | `nebula`, `nova` | Field source as for the comet ([§8.4](sources.md#r84-event-sources)): pulse rate ∝ local point density | — |
 
-- The last 4 rows come from D-12, which is **Proposed** and needs team sign-off. All their texture haptics are `artistic`, so they are silent in Measured only.
+- The last 4 rows come from D-12 (Accepted). All their texture haptics are `artistic`, so they play only in + Artistic and are silent in Measured only and + Estimated (D-21). The `teq_pulse` follows the tag of `teq_K`: when it is `measured` (Exoplanet Archive `pl_eqt`) it plays in every state; when it is `derived` it is silent in Measured only and plays from + Estimated.
 
 ### R8.6 Spectrum haptics (every object; the most useful for blind and low-vision users)
 

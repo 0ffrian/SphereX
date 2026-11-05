@@ -1,6 +1,6 @@
 # Overview
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A1–A2.1 · **Implements:** D-02, D-05, D-06, D-12
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A1–A2.1 · **Implements:** D-02, D-05, D-06, D-12, D-16, D-25, D-28
 
 ## A1 What we are building
 
@@ -15,6 +15,7 @@ The base tool must exist before any extra. If time runs short, cut from the bott
 | **P0** | Flipbook: coordinates or name in, SPHEREx frames out, played as a series. Must work on Barnard's Star, Epsilon Indi B, WISE 0855, RW Aurigae, R Draconis. | Required by the challenge. |
 | **P0** | Spectrum on the fly for a clicked object (flux per frame against wavelength, with error bars and flags). | The twist, and an optional challenge item. |
 | **P1** | Gaia and WISE overlays, URL coordinates, contamination flags, field of view, add and subtract images. | Optional items in the challenge. |
+| **P1** | Rainbow Trails: a view mode of the flipbook, one dot per band along a moving object's path. Uses the frames and mover positions the flipbook already loads. Built after basic playback works (D-28). | The team's early concept ([handover](../handover.md) §5). |
 | **P1** | Classify the object, then Sky Sculptor (3D body from the ObjectCard and RenderParams). | Headline wow. |
 | **P1** | Spectrum haptics with audio pairing, for every object (rendering doc §8.6, §8.9). | Access for blind and low-vision users. Works on every object, even a `candidate`. |
 | **P2** | Physics layer, all body types, sliders. | Depth. |
@@ -53,7 +54,8 @@ flowchart TD
     TEX[("Texture cache /data/textures/")]
     STORE[("Asset store")]
     GEM["Gemini proxy (P3 stretch)"]
-    API["API: /card, /render-params, texture URLs"]
+    API["API (FastAPI, D-16): resolve, frames, cutouts, spectrum, card, render-params, texture URLs"]
+    XC[("Read-through cache of external calls (D-25)")]
   end
 
   subgraph FE["Frontend (browser)"]
@@ -74,6 +76,7 @@ flowchart TD
     TAURI["Tauri Android app (B-01)"]
   end
 
+  SRC -.->|"every call goes through"| XC
   SPX --> S1
   POS --> S1
   SIMBAD --> S1
@@ -119,6 +122,8 @@ flowchart TD
 
   style BL stroke-dasharray: 5 5
 ```
+
+Every arrow from a source passes through the backend's read-through cache (D-25); the diagram draws it once. The event build runs locally on the team's Asus A15 (D-24).
 
 Full UML set: [uml/](../uml/README.md)
 

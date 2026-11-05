@@ -1,16 +1,20 @@
 # Risks and open questions
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A14 · **Implements:** D-09, D-10
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A14 · **Implements:** D-09, D-10, D-14, D-19, D-24, D-25
 
 ## A14 Risks and open questions
 
 | Risk or question | Why it matters | Plan |
 |---|---|---|
-| SPHEREx search is slow and fails | The base tool depends on it | Cache all test targets. Ship pre-fetched cutouts. |
+| SPHEREx search is slow and fails | The base tool depends on it | Read-through cache for every external call, filled by the pre-fetch script; the demo runs with `SX_OFFLINE=1` (D-25). Ship pre-fetched cutouts. |
+| Venue internet fails | Live calls and the Gemini layer fail | The demo runs offline from the cache (D-25). The Gemini layer stays off and the code path shows (D-24). |
+| Venue Wi-Fi blocks device-to-device traffic | Phones cannot reach the A15 | Bring a router or hotspot (D-24). |
+| WebGPU needs a secure context | The app may not start on the phones over plain HTTP | Serve over HTTPS. Install a local root certificate on both Android phones (e.g. `mkcert`). Whether a clicked-through self-signed certificate is enough **[verify]** (D-24). |
+| Building before 14 Nov | The event rules say not to build before the event | The team's call and risk (D-14). |
 | Frames on 3I/ATLAS dates unchecked | The headline comet may have no data | Check early. Keep a known asteroid as fallback. |
 | NEOWISE access unconfirmed | Diameter and albedo | Use JPL values. |
 | Exoplanet Archive untested | Planet cards | Test first. |
-| SIMBAD untested | Star and brown dwarf types | Test first. Decide resolver order (Q-05). |
+| SIMBAD untested | Star and brown dwarf types | Test first. Resolver order: SBDB first for small-body names, SIMBAD first for the rest (D-19). |
 | CORS to science services unknown | Browser may be blocked | Use a backend proxy. |
 | Gemini model name may change | Code would break | Read it from config. Confirm before coding. |
 | Gemini key exposure | Key theft | Server-side call only. |

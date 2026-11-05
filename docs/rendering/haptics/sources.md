@@ -21,7 +21,7 @@
 
 1. Compute the distance r from the nucleus in the projected view.
 2. Pulse rate = clamp(k · Q_selected / r, 2, 30) Hz, re-issued as a pattern every 250 ms. Touching the nucleus gives one firm tick.
-3. Selecting CO₂, H₂O or CO on the spectrum switches Q. December feels denser than August. Tag `measured` + `model_dependent`.
+3. Selecting CO₂, H₂O or CO on the spectrum switches Q. December feels denser than August. Tag `measured` + `model_dependent` (which single event tag, and whether it plays in Measured only: Q-17).
 4. `nebula` and `nova` reuse this source: pulse rate ∝ local point density instead of Q/r. Tag `artistic`.
 
 **Terrain source** (`planet_rocky`, `planet_water`; D-12). Tag `artistic`.
@@ -31,13 +31,13 @@
 3. **Coastline:** one firm tick when the ocean mask changes between consecutive samples.
 4. **Open ocean:** near-silent slow swell, a pulse train at 1–2 Hz at the lowest level.
 5. **Polar ice:** dense, fine, soft ticks.
-6. **Lava cracks** (`planet_rocky`): double tick. D-12 lists no lava-crack channel in the field yet; to decide.
+6. **Lava cracks** (`planet_rocky`): double tick, from the field's lava-crack mask (texture B, channel B; D-12).
 7. **Clouds:** not felt. An optional "feel clouds" toggle may add them.
 
 **Flow source** (`gas_giant`; D-12). There is no surface, so the finger feels the flow. Tag `artistic`.
 
 1. Sample band index and storm id from the shared field ([§7.7](../renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova)).
 2. **Band boundary:** a soft tick each time the band index changes. Strength = band contrast.
-3. **Jet:** inside a jet, a pulse train whose rate ∝ the zonal wind speed at that latitude. The wind comes from the same functions as the shader. Rate range: to decide.
+3. **Jet:** inside a jet, a pulse train whose rate ∝ the zonal wind speed at that latitude. The wind comes from the same functions as the shader. Rate = clamp(k · |zonal wind| / max |zonal wind|, 2, 20) Hz (D-12) **[verify on phones]**.
 4. **Storm swirl:** a firm tick at the storm's edge, then a pulse rate that rises towards its centre.
 5. **Rings:** dragging across the rings gives a tick at each gap.

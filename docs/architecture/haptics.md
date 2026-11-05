@@ -1,6 +1,6 @@
 # Haptics
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A9–A9.5 · **Implements:** D-08, D-09, D-10, D-12 · **Read with:** [../rendering/README.md](../rendering/README.md), [sound-voice.md](sound-voice.md)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A9–A9.5 · **Implements:** D-08, D-09, D-10, D-12, D-20, D-21 · **Read with:** [../rendering/README.md](../rendering/README.md), [sound-voice.md](sound-voice.md)
 
 ## A9 Haptics
 
@@ -15,6 +15,8 @@ The rendering doc is the authority: see **rendering doc §8** for encoding, even
 | Tauri Android app | Post-event backlog (B-01). The `HapticDriver` interface lets `drivers/tauri.ts` be added later without touching the event sources. |
 
 The challenge requires a web tool, and judges will not sideload an APK. Haptics can only be shown on the phones.
+
+The app API is rendering doc §8.8's `HapticEvent` (D-20). The mock-up's native and iOS bridges are dropped for the event. `HapticEvent` gains an optional `sharpness`, which the web driver ignores and a future Tauri driver uses. The mock-up's `spherex:haptic` event stays as a debug hook and drives an on-screen pulse indicator, so an audience watching the laptop can see what the phone feels.
 
 ### A9.2 Strength and detail (D-09)
 
@@ -33,11 +35,11 @@ Every `HapticEvent` goes to both drivers: vibrate and audio. Audio is not only a
 - **Two kinds**, both labelled in the UI: texture haptics (from the height map or mesh) and data haptics (encode a measured quantity) (rendering doc §8.2).
 - **Spectrum haptics** work on every object and are P1 (rendering doc §8.6).
 - **Rendering-doc types:** per-type profile in rendering doc §8.5.
-- **Gas giants, water worlds and other shader-drawn bodies** (D-12, **Proposed**, needs team sign-off): a Web Worker builds one shared field per body (512×256) from the same seed as the shader. The shader and the haptics sample the same field.
+- **Gas giants, water worlds and other shader-drawn bodies** (D-12, Accepted 5 Nov 2026): a Web Worker builds one shared field per body (512×256) from the same seed as the shader. The shader and the haptics sample the same field.
 
   | Type | Texture haptics (`artistic`) | Data haptics |
   |---|---|---|
-  | `gas_giant` | The finger feels the flow: ticks at band boundaries, pulse trains in jets, a "swirl" on storms, ticks at ring gaps | Steady pulse, rate ∝ normalised `Teq` (`derived`) |
+  | `gas_giant` | The finger feels the flow: ticks at band boundaries, pulse trains in jets, a "swirl" on storms, ticks at ring gaps | Steady pulse (`teq_pulse`), rate ∝ normalised `Teq`. Tag follows `teq_K`: `measured` from Exoplanet Archive `pl_eqt`, otherwise `derived` |
   | `planet_water` | Slow swell on ocean, a firm tick at the coast, height ticks on land, fine soft ticks on ice | As for `gas_giant` |
   | `planet_rocky` | Height-map ticks; lava cracks give a double tick | As for `gas_giant` |
   | `nebula`, `nova` | Pulse rate ∝ local point density, as for the comet field | — |
@@ -46,6 +48,6 @@ Every `HapticEvent` goes to both drivers: vibrate and audio. Audio is not only a
 
 ### A9.5 Honesty rule
 
-The honesty toggle (rendering doc §5.3) applies to haptics too. In **Measured only**, every `artistic` texture haptic is silent. Texture haptics then come only from real shape meshes. On shader-drawn bodies only the data pulse remains, because nothing about their surfaces is measured.
+The honesty toggle (rendering doc §5.3) applies to haptics too, with the same tag filter (D-21). In **Measured only**, only `measured` haptics play: every `artistic` texture haptic and every Estimated data haptic is silent. Texture haptics then come only from real shape meshes. On shader-drawn bodies nothing about the surface is measured, so only the `teq_pulse` can remain, and only when Teq comes from Exoplanet Archive `pl_eqt` (`measured`). A `derived` `teq_pulse` plays from + Estimated; `artistic` texture haptics play only in + Artistic.
 
 Haptics never carry information that is not also available as text or sound (rendering doc §9).
