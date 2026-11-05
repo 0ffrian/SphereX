@@ -1,0 +1,16 @@
+{
+  "id": "fixture:planet_water",
+  "name": "Synthetic fixture: water planet",
+  "type": "planet_water",
+  "radius_rjup": {
+    "value": 0.1,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "teq_K": {
+    "value": 300.0,
+    "tag": "derived",
+    "source": "synthetic fixture: not a real measurement",
+    "formula": "Teq = T_star * sqrt(R_star / (2a)) * (1 - A)^(1/4) (A7.1)"
+  }
+}

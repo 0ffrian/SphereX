@@ -14,6 +14,8 @@ backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; obje
 backend/app/adapters/                (Kevin)  # IRSA SIA + cutouts, SIMBAD, SBDB, Horizons, SkyBoT (A3), all through the cache
 backend/app/cache/                   (Kevin)  # D-25 read-through disk cache
 backend/app/core/find/               (Kevin)  # pipeline stage 1 (A4.1): resolver, proper motion, WCS, frames, cutout PNG
+backend/app/contract/                (generated, D-18)  # Pydantic models generated from shared/schemas/ by
+                                                        # scripts/generate_contract.py; follows the owner of shared/schemas/
 backend/app/core/measure/            (Munazir, provisional)  # pipeline stage 2 (A4.2), issue #2: config, flags, aperture,
                                                             # solid_angle, photometry, spectrum; endpoint in app/api/spectrum.py
 frontend/src/viewer/                 (Moon)
@@ -25,13 +27,13 @@ frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
   haptics.ts calibration.ts
   drivers/webVibrate.ts drivers/audio.ts drivers/tauri.ts (stub, B-01)
   sources/heightMap.ts meshNormal.ts field.ts terrain.ts flow.ts spectrum.ts lightcurve.ts
-frontend/src/contract/               (generated, D-18)  # TS types generated from shared/schemas/ by json-schema-to-typescript;
-                                                        # hand-written helpers such as assertTagged() sit next to them;
-                                                        # where the R8.8 haptic types live: Q-19
+frontend/src/contract/               (generated, D-18)  # generated.ts comes from shared/schemas/ by json-schema-to-typescript;
+                                                        # hand-written helpers such as assertTagged() and TV<T> sit next to it;
+                                                        # the R8.8 runtime types stay hand-written in haptics.ts for now (Q-19)
 frontend/src/state/                  (Moon)  # Zustand store: card, params, honesty, overrides (A10, D-02)
 frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, StatusLine
 shared/schemas/object-card.schema.json  render-params.schema.json   (Munazir, provisional)
-shared/fixtures/                     (Munazir, provisional)
+shared/fixtures/                     (Munazir, provisional)  # cards/ and params/: one synthetic pair per ObjectType; invalid/: rejected cases
 ```
 
 Owners follow D-17. Munazir's assignments are provisional until Munazir confirms them (Q-16). `frontend/src/contract/` is generated code and follows the owner of `shared/schemas/`.
@@ -43,7 +45,7 @@ Owners follow D-17. Munazir's assignments are provisional until Munazir confirms
 | Atish | Pipeline stage 3 (classify), stage 7 (`card_to_params`), the texture baker, the Gemini layer |
 | Moon | The flipbook UI, the shader kinds, the overlay UI |
 
-`contract/`, `state/` and `app/` were added when the frontend was scaffolded (4 Nov 2026). See the [frontend README](../../frontend/README.md#layout). `contract/` is generated from `shared/schemas/` (D-18); CI fails if regenerated files differ from the committed ones. The hand-written scaffold types stay until the schemas exist, then get replaced.
+`contract/`, `state/` and `app/` were added when the frontend was scaffolded (4 Nov 2026). See the [frontend README](../../frontend/README.md#layout). `contract/` is generated from `shared/schemas/` (D-18); CI fails if regenerated files differ from the committed ones. The generated types replaced the hand-written scaffold types in issue #4.
 
 ---
 

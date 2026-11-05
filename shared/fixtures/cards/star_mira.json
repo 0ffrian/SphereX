@@ -1,0 +1,43 @@
+{
+  "id": "fixture:star_mira",
+  "name": "Synthetic fixture: Mira variable",
+  "type": "star_mira",
+  "radius_rsun": {
+    "value": 1.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "teff_K": {
+    "value": 3000.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "period_var_d": {
+    "value": 100.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "lightcurve": [
+    {
+      "t_mjd": 60000.0,
+      "flux": 10.0,
+      "sigma": 1.0,
+      "lambda_um": 1.0,
+      "flags": 0
+    },
+    {
+      "t_mjd": 60001.0,
+      "flux": 20.0,
+      "sigma": 1.0,
+      "lambda_um": 1.0,
+      "flags": 0
+    },
+    {
+      "t_mjd": 60002.0,
+      "flux": 10.0,
+      "sigma": 1.0,
+      "lambda_um": 1.0,
+      "flags": 0
+    }
+  ]
+}

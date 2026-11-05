@@ -1,0 +1,45 @@
+{
+  "id": "fixture:nebula",
+  "type": "nebula",
+  "generator_version": "fixture-0",
+  "seed": 13,
+  "scale_m": 500000000000.0,
+  "layers": [
+    {
+      "id": "point_cloud",
+      "tag": "artistic",
+      "description": "Point cloud from the sliders (R7.7).",
+      "requires": [
+        "diameter_km"
+      ]
+    }
+  ],
+  "lighting": {
+    "mode": "self"
+  },
+  "view_modes": {
+    "visible": {
+      "available": true,
+      "badge": "Default (artist's choice)",
+      "rgb": {
+        "value": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "tag": "artistic",
+        "source": "synthetic fixture: artist's default colour"
+      },
+      "source": "class_palette"
+    }
+  },
+  "haptics": {
+    "texture": "none",
+    "texture_tag": "artistic",
+    "data": "field",
+    "data_tag": "artistic",
+    "params": {}
+  },
+  "alt_text": "Synthetic fixture. Nebula, size from a slider (artistic), artist's colour, self-luminous. Surface relief: illustrative.",
+  "missing": []
+}

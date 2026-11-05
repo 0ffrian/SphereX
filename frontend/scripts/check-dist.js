@@ -4,7 +4,13 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const MARKERS = ['SX_FIXTURE_MARKER', 'synthetic_fixture', 'synthetic-mover', 'SYNTHETIC_FLAG'];
+const MARKERS = [
+  'SX_FIXTURE_MARKER',
+  'synthetic_fixture',
+  'synthetic-mover',
+  'SYNTHETIC_FLAG',
+  'synthetic fixture:', // source strings in shared/fixtures/
+];
 const dist = fileURLToPath(new URL('../dist', import.meta.url));
 
 function* files(dir) {

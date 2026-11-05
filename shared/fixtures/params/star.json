@@ -1,0 +1,60 @@
+{
+  "id": "fixture:star",
+  "type": "star",
+  "generator_version": "fixture-0",
+  "seed": 8,
+  "scale_m": 695000000.0,
+  "layers": [
+    {
+      "id": "colour",
+      "tag": "derived",
+      "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+      "requires": [
+        "teff_K"
+      ]
+    },
+    {
+      "id": "limb_darkening",
+      "tag": "model_dependent",
+      "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+      "requires": []
+    },
+    {
+      "id": "motion_trail",
+      "tag": "measured",
+      "description": "Motion trail from pm_mas_yr over the SPHEREx epochs (R7.5).",
+      "requires": [
+        "pm_mas_yr"
+      ]
+    }
+  ],
+  "lighting": {
+    "mode": "self"
+  },
+  "view_modes": {
+    "visible": {
+      "available": true,
+      "badge": "Estimated visible colour",
+      "rgb": {
+        "value": [
+          1.0,
+          0.5,
+          0.25
+        ],
+        "tag": "derived",
+        "source": "synthetic fixture: not a real measurement",
+        "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+      },
+      "source": "class_palette"
+    }
+  },
+  "haptics": {
+    "texture": "none",
+    "texture_tag": "artistic",
+    "data": "motion",
+    "data_tag": "measured",
+    "params": {}
+  },
+  "alt_text": "Synthetic fixture. Star, 1 solar radius (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
+  "missing": []
+}

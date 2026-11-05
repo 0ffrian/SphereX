@@ -1,0 +1,277 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "render-params.schema.json",
+  "title": "RenderParams",
+  "description": "How to draw and feel one object (R3.4). Served by GET /v1/objects/{id}/render-params (D-16). Single source of the contract (D-18).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "type",
+    "generator_version",
+    "seed",
+    "scale_m",
+    "layers",
+    "lighting",
+    "view_modes",
+    "haptics",
+    "alt_text",
+    "missing"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "$ref": "object-card.schema.json#/definitions/ObjectType"
+    },
+    "generator_version": {
+      "type": "string"
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Seed = hash of (object id + generator version) (R1, A5.1). The hash is not specified yet (Q-35)."
+    },
+    "scale_m": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Physical radius in metres. null when the size is unknown: the body is refused, never guessed (Q-33)."
+    },
+    "layers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Layer"
+      },
+      "description": "Ordered, each with a tag."
+    },
+    "textures": {
+      "$ref": "#/definitions/RenderTextures"
+    },
+    "lighting": {
+      "$ref": "#/definitions/RenderLighting"
+    },
+    "view_modes": {
+      "$ref": "#/definitions/ViewModes"
+    },
+    "haptics": {
+      "$ref": "#/definitions/HapticProfile"
+    },
+    "alt_text": {
+      "type": "string",
+      "description": "R9."
+    },
+    "missing": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Layers refused for missing data, shown to the user."
+    }
+  },
+  "definitions": {
+    "Layer": {
+      "title": "Layer",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "tag",
+        "description",
+        "requires"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "tag": {
+          "$ref": "object-card.schema.json#/definitions/Tag"
+        },
+        "description": {
+          "type": "string"
+        },
+        "requires": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "RenderTextures": {
+      "title": "RenderTextures",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "albedo",
+        "height",
+        "normal"
+      ],
+      "properties": {
+        "albedo": {
+          "type": "string"
+        },
+        "height": {
+          "type": "string"
+        },
+        "normal": {
+          "type": "string"
+        },
+        "roughness": {
+          "type": "string"
+        },
+        "height_bin": {
+          "type": "string"
+        }
+      }
+    },
+    "RenderLighting": {
+      "title": "RenderLighting",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "sun",
+            "self"
+          ]
+        },
+        "sun_dir": {
+          "$ref": "object-card.schema.json#/definitions/Triple"
+        },
+        "phase_angle_deg": {
+          "type": "number"
+        }
+      }
+    },
+    "ViewModes": {
+      "title": "ViewModes",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visible"
+      ],
+      "properties": {
+        "visible": {
+          "$ref": "#/definitions/VisibleMode"
+        },
+        "spherex_ir": {
+          "$ref": "#/definitions/VisibleMode"
+        }
+      }
+    },
+    "VisibleMode": {
+      "title": "VisibleMode",
+      "description": "D-23. IRMode uses the same shape. When a mode is not available, the reason goes in missing.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "available",
+        "badge",
+        "rgb",
+        "source"
+      ],
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "badge": {
+          "type": "string"
+        },
+        "rgb": {
+          "anyOf": [
+            {
+              "$ref": "object-card.schema.json#/definitions/TVRgb"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "gaia_rgb",
+            "class_palette",
+            "spherex_rgb"
+          ]
+        },
+        "channels_um": {
+          "$ref": "object-card.schema.json#/definitions/Triple"
+        }
+      }
+    },
+    "TextureHaptic": {
+      "title": "TextureHaptic",
+      "description": "terrain = height plus ocean and ice masks; flow = bands, jets, storms (D-12).",
+      "type": "string",
+      "enum": [
+        "height",
+        "mesh",
+        "bands",
+        "terrain",
+        "flow",
+        "none"
+      ]
+    },
+    "DataHaptic": {
+      "title": "DataHaptic",
+      "type": "string",
+      "enum": [
+        "field",
+        "flux_pulse",
+        "teq_pulse",
+        "heartbeat",
+        "dimming",
+        "motion",
+        "detections",
+        "none"
+      ]
+    },
+    "HapticProfile": {
+      "title": "HapticProfile",
+      "description": "R8.8.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "texture",
+        "texture_tag",
+        "data",
+        "data_tag",
+        "params"
+      ],
+      "properties": {
+        "texture": {
+          "$ref": "#/definitions/TextureHaptic"
+        },
+        "texture_tag": {
+          "$ref": "object-card.schema.json#/definitions/Tag"
+        },
+        "data": {
+          "$ref": "#/definitions/DataHaptic"
+        },
+        "data_tag": {
+          "$ref": "object-card.schema.json#/definitions/Tag"
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "For example tau, k, softness, maxRateHz."
+        }
+      }
+    }
+  }
+}

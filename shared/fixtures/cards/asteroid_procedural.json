@@ -1,0 +1,66 @@
+{
+  "id": "fixture:asteroid_procedural",
+  "name": "Synthetic fixture: asteroid without a shape model",
+  "type": "asteroid_procedural",
+  "diameter_km": {
+    "value": 2.0,
+    "tag": "derived",
+    "source": "synthetic fixture: not a real measurement",
+    "formula": "stands in for the size formula of the real pipeline"
+  },
+  "rot_period_h": {
+    "value": 5.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "lightcurve_amp_mag": {
+    "value": 0.5,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement",
+    "err": [
+      0.25,
+      0.25
+    ]
+  },
+  "albedo": {
+    "value": 0.1,
+    "tag": "model_dependent",
+    "source": "synthetic fixture: not a real measurement",
+    "assumption": "albedo taken from the spectral class"
+  },
+  "spherex_rgb": {
+    "value": null,
+    "tag": "measured",
+    "source": "synthetic fixture: fewer than 2 points fall in a channel window (R5.2)"
+  },
+  "spectral_class": {
+    "value": "C",
+    "tag": "inferred_from_analog",
+    "source": "synthetic fixture: assigned without a spectrum"
+  },
+  "band_depth_3um": {
+    "value": 0.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "slope_075_25": {
+    "value": 1.0,
+    "tag": "derived",
+    "source": "synthetic fixture: not a real measurement",
+    "formula": "stands in for the spectral slope fit"
+  },
+  "phase_angle_deg": {
+    "value": 30.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "sun_vector": {
+    "value": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  }
+}

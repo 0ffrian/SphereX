@@ -1,0 +1,31 @@
+{
+  "id": "fixture:candidate",
+  "type": "candidate",
+  "generator_version": "fixture-0",
+  "seed": 9,
+  "scale_m": null,
+  "layers": [],
+  "lighting": {
+    "mode": "self"
+  },
+  "view_modes": {
+    "visible": {
+      "available": false,
+      "badge": "Estimated visible colour",
+      "rgb": null,
+      "source": "class_palette"
+    }
+  },
+  "haptics": {
+    "texture": "none",
+    "texture_tag": "artistic",
+    "data": "detections",
+    "data_tag": "measured",
+    "params": {}
+  },
+  "alt_text": "Synthetic fixture. Not enough data for a 3D model: distance and albedo unknown.",
+  "missing": [
+    "mesh",
+    "visible"
+  ]
+}
