@@ -1,6 +1,6 @@
 # 10 Sequence: View in 3D
 
-Opening the Sky Sculptor view: the frontend asks for `RenderParams`, the backend looks up the asset, bakes textures if they are not cached, and the viewer picks a renderer by `type`. Drawn from architecture spec §4.4, rendering doc §3.4, §4, §5, §6.7, §7, §7.7, and decisions D-01, D-05 and D-12.
+Opening the Sky Sculptor view: the frontend asks for `RenderParams`, the backend looks up the asset, bakes textures if they are not cached, and the viewer picks a renderer by `type`. Drawn from architecture spec §4.4, rendering doc §3.4, §4, §5, §6.7, §7, §7.7, and decisions D-01, D-05, D-12, D-21 and D-22.
 
 ```mermaid
 sequenceDiagram
@@ -24,7 +24,7 @@ sequenceDiagram
     V->>API: GET /v1/objects/{id}/render-params
     API->>AS: Look up asset for id
     alt saved
-      AS-->>API: Saved (pre-baked demo asset)
+      AS-->>API: Saved: card, RenderParams, texture URLs, generator_version, seed, created_at (D-22)
     else generated
       AS-->>API: Generated from catalogues + spectrum
     else sketch
@@ -49,7 +49,7 @@ sequenceDiagram
       FW-->>V: 512x256 field array
     end
     V->>R: Create renderer for type
-    R->>R: Build body, drop layers hidden by honesty state
+    R->>R: Build body, drop layers hidden by the honesty state (starts at + Estimated, D-21)
     R-->>V: Scene ready
     V->>V: Lighting (sun at phase angle, or self-lit)
     V->>V: Set canvas aria-label from alt_text
@@ -62,5 +62,6 @@ sequenceDiagram
 
 - Asset status labels: new objects show "Sketch from SPHEREx only" (architecture spec §10). See [16-state-asset-lookup.md](16-state-asset-lookup.md).
 - How the client picks the texture size (mobile vs desktop) is not stated **[verify]**.
-- The field worker uses the same seed and functions as the shader, so the picture and the haptics agree (D-12, Proposed).
+- The field worker uses the same seed and functions as the shader, so the picture and the haptics agree (D-12).
+- RenderParams responses served from the backend cache carry `cached_at` (D-25).
 - If the view is unchanged, the viewer does not render a new frame (D-05).

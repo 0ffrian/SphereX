@@ -1,6 +1,6 @@
 # Haptics: platform reality and encoding
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8, R8.1–R8.3 · **Implements:** D-08, D-09 ([decisions](../../decisions.md)) · **Read with:** [engine-api.md](engine-api.md)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8, R8.1–R8.3 · **Implements:** D-08, D-09, D-21 ([decisions](../../decisions.md)) · **Read with:** [engine-api.md](engine-api.md)
 
 ## R8. Haptics
 
@@ -20,7 +20,7 @@
 - **Texture haptics:** derived from the height map or mesh. As honest as the relief: tagged `artistic` for procedural relief, `measured` for real shape models.
 - **Data haptics:** encode a measured quantity (spectrum, Q, light curve, proper motion). Tagged `measured` or `derived`.
 
-The honesty toggle applies here too. In **Measured only**, texture haptics come only from real meshes, and procedural relief is silent. On the shader-generated kinds ([§7.7](../renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova)) all texture haptics are silent; only the data pulse remains.
+The honesty toggle applies here too, with the same tag filter as the layers ([§5.3](../display-rules.md#r53-honesty-toggle-3-states), D-21). In **Measured only**, only `measured` haptics play: texture haptics come only from real meshes, procedural relief is silent, and every data haptic not tagged `measured` is silent. On the shader-generated kinds ([§7.7](../renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova)) all texture haptics are silent; the `teq_pulse` remains only when `teq_K` is `measured` (Exoplanet Archive `pl_eqt`). `artistic` texture haptics play only in + Artistic.
 
 ### R8.3 Encoding (web driver, D-09)
 

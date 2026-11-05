@@ -1,12 +1,12 @@
 # Plan to 14 Nov
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A13
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A13 · **Implements:** D-14, D-29
 
 ## A13 Plan to 14 Nov
 
 About 10 days. Dates are targets, not promises.
 
-Note: the official rules say not to start building before 14 Nov (see `CLAUDE.md`). Check this table against that rule.
+The team builds from 5 Nov and has set aside the event rule against building before 14 Nov (decisions D-14). Work is tracked as milestones M1–M5 with their due dates in D-29. M1–M4 build against their own fixtures and do not depend on each other; only M5 joins them.
 
 | Dates | Work |
 |---|---|

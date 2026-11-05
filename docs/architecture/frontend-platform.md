@@ -1,6 +1,6 @@
 # Frontend and platform
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A10–A10.1 · **Implements:** D-03, D-05
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A10–A10.1 · **Implements:** D-03, D-05, D-15, D-24, D-25
 
 ## A10 Frontend and platform
 
@@ -9,12 +9,12 @@
 | Build | Vite + TypeScript | Pin exact versions in `package.json` and the lockfile. |
 | UI | React, TypeScript, Tailwind, animate-ui components | animate-ui is the agreed UI library. |
 | 3D | three.js **r187** through `three/webgpu` (`WebGPURenderer`, WebGL2 fallback **[verify]**) (D-03) | The mock-up stays on r128 and is not ported in place. Generators move from the mock-up into ES modules, kept as plain modules so they work with or without React. |
-| State | Zustand. One store holding the current ObjectCard, RenderParams, overrides and edited sliders. | |
+| State | Zustand. One store holding the current ObjectCard, RenderParams, overrides and edited sliders. | `overrides` type: D-27. They stay in the browser (IndexedDB, D-22). |
 | Haptics | `frontend/src/haptics/`: engine, web vibrate driver, audio driver, event sources (rendering doc §8.8, §10) | [Section 9](haptics.md#a9-haptics). |
-| Backend | Python 3.12 API with Astropy, plus the texture baker (`numpy`, `scipy`, `opencv-python-headless`, `Pillow`, CPU only) | Framework not chosen yet (Q-01). |
+| Backend | **FastAPI** on Python 3.12 with Pydantic v2 models and Astropy, plus the texture baker (`numpy`, `scipy`, `opencv-python-headless`, `Pillow`, CPU only) (D-15) | Versions pinned exactly when installed. Endpoints: D-16. |
 | Data access | A thin backend proxy for IRSA, Gaia, Horizons, SBDB, SIMBAD and the Exoplanet Archive | Browser access (CORS) was **not tested**. A proxy also gives caching and keeps API keys off the client. Python with Astropy fits the challenge's Astropy hint. |
-| Hosting | Not decided: the same AWS server or static hosting (Q-02) | |
-| Caching | Pre-fetch and store results for all five test targets and the demo objects. Pre-bake their textures. | IRSA times out, so a live demo must not depend on it. |
+| Hosting | Local on the team's **Asus A15** laptop (D-24). One process serves the built frontend and the API from one origin, over HTTPS. Phones and other laptops connect over the local network. | WebGPU needs a secure context. Install a local root certificate on both Android phones (e.g. `mkcert`); whether a clicked-through self-signed certificate is enough is **[verify]**. Bring a router or hotspot. No public URL after the event. |
+| Caching | One read-through disk cache in the backend for every external call (D-25). `SX_OFFLINE=1` never touches the network; the demo runs in this mode. A pre-fetch script fills the cache for the five test targets and every demo object. The cached responses are also the test fixtures: never hand-edit them, re-record them with the pre-fetch script. Pre-bake their textures. | IRSA times out and Gaia takes about 24 s per query, so a live demo must not depend on them. Key, order and storage rules: D-25. |
 | Hash routing | Share a link with coordinates or an asset id in the URL | Optional challenge item. |
 | Fallbacks | Procedural look, procedural sound, audio when there is no vibration, recorded backup demo | Every optional service has one. |
 

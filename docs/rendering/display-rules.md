@@ -1,6 +1,6 @@
 # Display levels and shared 3D view rules
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.6 · **Implements:** D-05 ([decisions](../decisions.md))
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.6 · **Implements:** D-05, D-21, D-23 ([decisions](../decisions.md))
 
 ## R4. Display levels
 
@@ -25,16 +25,21 @@
   - Brown dwarfs: R = 4.5 µm, G = 3.3 µm, B = 1.25 µm.
   - Badge: "SPHEREx infrared, whole-body average (false colour)".
   - If fewer than 2 points fall in a channel window, the mode is disabled and listed in `missing`.
+- The fields of both modes are in [§3.4](data-contract.md#r34-renderparams-produced-by-the-backend-get-v1objectsidrender-params) (D-23).
 
 ### R5.3 Honesty toggle (3 states)
 
-| State | Shows | Hides |
-|---|---|---|
-| Measured only | Real mesh or a plain sphere/ellipsoid at measured size, flat measured tint, measured lighting | All `artistic` and `inferred_from_analog` layers |
-| + Derived | Class palette, derived colours, brightness from Teff/flux | Artistic relief |
-| + Artistic | Procedural relief, AI paint, band patterns, orbit drawings | — |
+One state per badge (D-21):
 
-Each visible layer shows a small tag chip in the legend. The haptics follow the same state ([§8.2](haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui)).
+| State | Shows tags | Examples |
+|---|---|---|
+| Measured only | `measured` | Real mesh or a plain sphere/ellipsoid at measured size, flat measured tint, measured lighting |
+| + Estimated (starting state) | adds `derived`, `model_dependent`, `inferred_from_analog` | Class palette, derived colours, brightness from Teff/flux |
+| + Artistic | adds `artistic` | Procedural relief, AI paint, band patterns, orbit drawings |
+
+- The toggle starts at **+ Estimated**: everything shown on load is backed by data or a stated formula.
+- Each visible layer shows a small tag chip in the legend.
+- The haptics use the same filter ([§8.2](haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui)). Only `measured` haptics stay in Measured only: `teq_pulse` stays there only when `teq_K` is `measured` (Exoplanet Archive `pl_eqt`); when it is `derived` it is silent there and plays from + Estimated. `artistic` texture haptics play only in + Artistic.
 
 ### R5.4 Scale bar
 The scale bar shows the physical size plus one familiar comparison:

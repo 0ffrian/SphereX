@@ -1,14 +1,17 @@
 # 17 Activity: pipeline stages 1–6 and RenderParams
 
-The backend pipeline from a name or RA/Dec to an `ObjectCard` and `RenderParams`, including every "refuse rather than invent" branch. Drawn from architecture spec §4.1–4.6, rendering doc §1 (principles), §3, §5.2, §6.2, §7 and decisions D-01, D-02 and D-04. The old stage 5 "settings file" is replaced by the card builder (D-02).
+The backend pipeline from a name or RA/Dec to an `ObjectCard` and `RenderParams`, including every "refuse rather than invent" branch. Drawn from architecture spec §4.1–4.6, rendering doc §1 (principles), §3, §5.2, §6.2, §7 and decisions D-01, D-02, D-04, D-19 and D-25. The old stage 5 "settings file" is replaced by the card builder (D-02).
 
 ```mermaid
 flowchart TD
   Start(("Start")) --> In[/"Name or RA/Dec"/]
   In --> IsName{"Is it a name?"}
-  IsName -->|yes| Resolve["Resolve name (SIMBAD or SBDB, Q-05)"]
+  IsName -->|yes| SmallBody{"Looks like a small body? (D-19)"}
   IsName -->|no| HaveCoord["Use RA/Dec"]
-  Resolve --> Resolved{"Resolved?"}
+  SmallBody -->|yes| ResSBDB["SBDB first, SIMBAD on a miss"]
+  SmallBody -->|no| ResSIMBAD["SIMBAD first, SBDB on a miss"]
+  ResSBDB --> Resolved{"Resolved?"}
+  ResSIMBAD --> Resolved
   Resolved -->|no| NotFound["Show: name not found"] --> Stop1(("Stop"))
   Resolved -->|yes| HaveCoord
 
@@ -63,3 +66,5 @@ flowchart TD
 - Saturated points are excluded from brightness mapping and shown hatched (rendering doc §7.5).
 - `candidate` stops after the card: it has no 3D layers, so RenderParams is not used for it **[verify]** whether the endpoint returns one.
 - The physics layer is "reduced, physically inspired" formulas (architecture spec §7); its outputs are tagged `derived`.
+- Every external call in this flow goes through the backend's read-through cache (D-25). With `SX_OFFLINE=1` a cache miss is refused, and the refused layer goes in `missing`.
+- Small-body names are numbered asteroids, provisional designations, comets and interstellar objects (D-19).

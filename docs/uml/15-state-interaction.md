@@ -1,6 +1,6 @@
 # 15 State: viewer interaction
 
-How pointer, keyboard and the Touch-mode toggle change what the 3D view does. Drawn from rendering doc §5.6, §8.4, §9 and decisions D-08 and D-10.
+How pointer, keyboard and the Touch-mode toggle change what the 3D view does. Drawn from rendering doc §5.6, §8.4, §9 and decisions D-08, D-10 and D-20.
 
 ```mermaid
 stateDiagram-v2
@@ -50,3 +50,4 @@ stateDiagram-v2
 - `prefers-reduced-motion` disables auto-spin (rendering doc §9).
 - Whether a `stop` event is sent on pointer up is not stated **[verify]**.
 - On iPhone, iPad and desktop, Feeling produces sound only (D-08, D-10).
+- Feeling works on every kind: nebulae and novae get the D-12 field pulse, not a refusal (D-20). Each emitted event also fires the `spherex:haptic` debug event, which drives the on-screen pulse indicator ([11-sequence-touch-haptics.md](11-sequence-touch-haptics.md)).

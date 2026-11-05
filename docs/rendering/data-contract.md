@@ -1,8 +1,10 @@
 # Data contract: TV, ObjectCard, RenderParams
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1–R3.4 · **Implements:** D-02, D-04 ([decisions](../decisions.md))
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1–R3.4 · **Implements:** D-02, D-04, D-12, D-16, D-18, D-23 ([decisions](../decisions.md))
 
 ## R3. Data contract
+
+The types below are the spec. In code, `shared/schemas/*.json` is the single source: the backend's Pydantic models and `frontend/src/contract/` are generated from it, and CI fails on drift (D-18). Endpoints: D-16.
 
 ### R3.1 Tagged value
 
@@ -54,6 +56,8 @@ interface ObjectCard {
   slope_075_25?: TV;                  // spectral slope, %/µm
   ch4_depth_33?: TV; flux_45um?: TV;  // brown dwarfs
   teff_K?: TV;
+  teq_K?: TV;                         // planet equilibrium temperature (D-12): Exoplanet Archive pl_eqt → 'measured',
+                                      // otherwise 'derived' (architecture spec §7.1). null → teq_pulse refused, listed in missing
   // variability
   period_var_d?: TV;                  // Mira period
   lightcurve?: { t_mjd: number; flux: number; sigma: number; lambda_um: number; flags: number }[];
@@ -80,7 +84,7 @@ interface ObjectCard {
 4. NASA Exoplanet Archive match → `planet_rocky`, `planet_water` or `gas_giant`.
    - Classification thresholds (which columns, which cut-offs): **[verify] / to decide**. Open item, [§12](layout-tests-open-items.md#r12-open-items-verify). Do not hard-code values until they are agreed.
    - The Exoplanet Archive service itself is not yet confirmed ([architecture spec §3.8](../architecture/README.md)).
-5. `nebula` and `nova` come from user sliders only. No catalogue rule is defined (to decide).
+5. `nebula` and `nova` come from user sliders only. They have no catalogue rule; they are slider-only showcase bodies, and every value is tagged `artistic` (D-12).
 6. Anything else → `candidate`.
 
 ### R3.4 RenderParams (produced by the backend: `GET /v1/objects/{id}/render-params`)
@@ -100,4 +104,16 @@ interface RenderParams {
   missing: string[];                   // layers refused for missing data, shown to the user
 }
 interface Layer { id: string; tag: Tag; description: string; requires: string[] }
+
+// D-23: VisibleMode and IRMode use one shape
+interface VisibleMode {
+  available: boolean;
+  badge: string;
+  rgb: TV<[number, number, number]> | null;             // same type as gaia_rgb / spherex_rgb; TV carries the tag
+  source: 'gaia_rgb' | 'class_palette' | 'spherex_rgb';
+  channels_um?: [number, number, number];               // IRMode only (§5.2)
+}
+type IRMode = VisibleMode;
 ```
+
+When a mode is not available, the reason goes in `missing` ([§5.2](display-rules.md#r52-view-modes)).

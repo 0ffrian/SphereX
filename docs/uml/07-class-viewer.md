@@ -1,6 +1,6 @@
 # 07 Sky Sculptor viewer (classes)
 
-The 3D viewer: the app class, the renderer chosen by `type`, and the helpers for lighting, view modes, honesty, scale and alt text. Drawn from rendering doc §4, §5, §7, §9, §10 and decisions D-01 (baked types vs shader kinds), D-03 (three r187), D-05 (budgets) and D-12 (shared field worker). Method names are illustrative where the spec gives only file names **[verify]**.
+The 3D viewer: the app class, the renderer chosen by `type`, and the helpers for lighting, view modes, honesty, scale and alt text. Drawn from rendering doc §4, §5, §7, §9, §10 and decisions D-01 (baked types vs shader kinds), D-03 (three r187), D-05 (budgets), D-12 (shared field worker) and D-21 (honesty states). Method names are illustrative where the spec gives only file names **[verify]**.
 
 ```mermaid
 classDiagram
@@ -85,13 +85,13 @@ classDiagram
   }
   class Honesty {
     <<honesty.ts>>
-    +state: HonestyState
+    +state: HonestyState, starts at PlusEstimated
     +visible(layer: Layer) boolean
   }
   class HonestyState {
-    <<enumeration>>
+    <<enumeration, D-21>>
     MeasuredOnly
-    PlusDerived
+    PlusEstimated
     PlusArtistic
   }
   class ScaleBar {
@@ -134,3 +134,4 @@ classDiagram
 - Mesh budget: D-05 sets ≤ 50k triangles, tighter than the 300k in older text; D-05 wins.
 - Pixel ratio is `min(devicePixelRatio, 1.5)`, and the scene renders only when the view changes (D-05).
 - If a required card field is missing, the renderer does not draw that layer and it is listed in `RenderParams.missing`.
+- Honesty states follow the badges (D-21): Measured only shows `measured`; + Estimated adds `derived`, `model_dependent` and `inferred_from_analog`; + Artistic adds `artistic`. The enum names are illustrative **[verify]**.

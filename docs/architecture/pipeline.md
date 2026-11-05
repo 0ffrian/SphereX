@@ -1,19 +1,27 @@
 # Pipeline
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4–A4.8 · **Implements:** D-04 · **Read with:** [data-contract.md](data-contract.md)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4–A4.8 · **Implements:** D-04, D-16, D-19 · **Read with:** [data-contract.md](data-contract.md)
 
 ## A4 Pipeline
 
 Each stage has one job, takes defined inputs and returns defined outputs. Stages 1 to 5 produce the **ObjectCard**. Stages 6 and 7 turn it into **RenderParams**. Stages 8 to 10 turn those into the body, its sound and its touch.
 
+- **Endpoints:** every endpoint is keyed by one object id, returned by `resolve` (D-16). Responses served from the cache carry `cached_at` (D-25).
+- **External calls:** every call to an external service goes through the backend's read-through disk cache (D-25).
+- **Owners** of each stage: D-17.
+
 ### A4.1 Stage 1: Find the object
 
 - **Input:** a name or RA/Dec.
 - **Process:**
-  1. Resolve names (SIMBAD or SBDB, order to be decided, Q-05) to RA/Dec.
+  1. Resolve names to RA/Dec (D-19). Names that look like small bodies (numbered asteroids such as `433 Eros`, provisional designations such as `2024 AB`, comets such as `C/…`, interstellar objects such as `3I/ATLAS`) go to SBDB first. Everything else goes to SIMBAD first. On a miss, try the other one. RA/Dec input skips name resolution.
   2. For moving objects, get position at each frame time from Horizons, and neighbours from SkyBoT.
   3. Convert sky position to pixel position in each frame using the frame's WCS.
 - **Output:** list of `(frame_id, x, y, time)`.
+- **Endpoints (D-16):**
+  - `GET /v1/resolve?q=<name or ra,dec>` returns `{ id, ra, dec, moving }`.
+  - `GET /v1/objects/{id}/frames` returns `[{ frame_id, time, wavelength_um, x, y, cutout_url }]`. The flipbook plays this list in order; there is no separate flipbook endpoint.
+  - `GET /v1/objects/{id}/cutouts/{frame_id}.png` returns the cutout, stretched to PNG by the server. The frames response states the stretch used.
 - **Status:** To build.
 
 ### A4.2 Stage 2: Measure brightness and spectrum
@@ -25,6 +33,7 @@ Each stage has one job, takes defined inputs and returns defined outputs. Stages
   3. Use the variance layer for error bars.
   4. Look up each frame's wavelength at the object's pixel from the wavelength map.
 - **Output:** a spectrum `[(wavelength_um, flux, error)]` and a light curve `[(time, flux)]`.
+- **Endpoint:** `GET /v1/objects/{id}/spectrum` returns both, tagged `measured` (D-16).
 - **Status:** To build.
 
 ### A4.3 Stage 3: Classify and pick a type
@@ -56,13 +65,15 @@ save the new card to the store
 
 A sketch from SPHEREx only is often a `candidate`, which gets no 3D body (rendering doc §7.6).
 
+What a saved asset holds: [section 5.4](data-contract.md#a54-asset-store) (D-22).
+
 This is the lookup flow shown in the Surface Lab "Lookup" card of the mock-up.
 
 ### A4.5 Stage 5: ObjectCard
 
 The backend builds the **ObjectCard**: every known value for the object, each as a tagged value with its source (rendering doc §3.1, §3.2). Missing values are `null`, never a guess.
 
-- **Endpoint:** `GET /v1/objects/{id}/card`.
+- **Endpoint:** `GET /v1/objects/{id}/card` (D-16).
 - **Schema:** [section 5](data-contract.md#a5-data-contract).
 
 ### A4.6 Stage 6: Physics layer
@@ -73,7 +84,7 @@ Pure functions that turn measured values into `derived` values, each with its st
 
 The backend turns the ObjectCard into **RenderParams** with deterministic rules (rendering doc §3.4, §6.2). The frontend renders RenderParams only. RenderParams lists the layers (each with a tag), texture URLs, lighting, view modes, the haptic profile, the alt text and the layers refused for `missing` data.
 
-- **Endpoint:** `GET /v1/objects/{id}/render-params`.
+- **Endpoint:** `GET /v1/objects/{id}/render-params` (D-16).
 - **Status:** To build.
 
 ### A4.8 Stages 8 to 10: Generators

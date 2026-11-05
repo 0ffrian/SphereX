@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Project: **Shift & Spectrum**, a public web tool for NASA Space Apps 2026 (Port Louis, 14–15 Nov 2026), challenge "Planet X and SPHEREx". Team: Atish, Kevin, Moon.
+Project: **Shift & Spectrum**, a public web tool for NASA Space Apps 2026 (Port Louis, 14–15 Nov 2026), challenge "Planet X and SPHEREx". Team: Atish, Kevin, Moon, Munazir.
 
 ## Read these first
 
@@ -57,16 +57,18 @@ Project agents live in `.claude/agents/` and skills in `.claude/skills/`. Agents
 - Developer experience: `dependency-manager`, `documentation-engineer`, `git-workflow-manager`, `refactoring-specialist`, `build-engineer`, `deployment-engineer`
 - Other: `game-developer` (three.js/WebGL), `ux-microcopy-reviewer`
 
-## Hackathon rule
+## Build schedule
 
-The official rules say not to start building before the event begins (14 Nov 2026). Before then this repo holds docs, the mock-up and empty scaffolding only.
+The team builds from 5 Nov 2026 (decisions D-14), setting aside the event rule against building before 14 Nov. Work is tracked in the GitHub project "SphereX and PlanetX - NASA COMPETITION 2026" as milestones M1–M5 (D-29). M1–M4 build against fixtures and do not depend on each other; only M5 integrates them.
 
 ## Layout
 
 ```
 docs/       specs, decisions, UML
 mockup/     single-file HTML mock-up (three.js r128, not the app)
-backend/    Python 3.12 API, pipeline, texture baker        (Atish, Kevin)
-frontend/   Vite + TypeScript + React app, viewer, haptics   (Moon)
-shared/     JSON schemas shared by backend and frontend
+backend/    Python 3.12 API, pipeline, texture baker        (Kevin, Munazir, Atish)
+frontend/   Vite + TypeScript + React app, viewer, haptics   (Moon; Atish for haptics and viewer/fields)
+shared/     JSON schemas shared by backend and frontend      (Munazir, provisional)
 ```
+
+Owners per area: decisions D-17.
