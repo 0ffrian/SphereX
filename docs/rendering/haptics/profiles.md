@@ -20,7 +20,7 @@
 | `planet_rocky` | Height-map ticks; lava cracks give a double tick | As for `gas_giant` |
 | `nebula`, `nova` | Field source as for the comet ([§8.4](sources.md#r84-event-sources)): pulse rate ∝ local point density | — |
 
-- The last 4 rows come from D-12 (Accepted). All their texture haptics are `artistic`, so they are silent in Measured only. The `teq_pulse` plays in Measured only only when `teq_K` is `measured` (D-21).
+- The last 4 rows come from D-12 (Accepted). All their texture haptics are `artistic`, so they play only in + Artistic and are silent in Measured only and + Estimated (D-21). The `teq_pulse` follows the tag of `teq_K`: when it is `measured` (Exoplanet Archive `pl_eqt`) it plays in every state; when it is `derived` it is silent in Measured only and plays from + Estimated.
 
 ### R8.6 Spectrum haptics (every object; the most useful for blind and low-vision users)
 

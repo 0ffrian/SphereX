@@ -97,7 +97,7 @@ Format: one entry per decision. Status is **Accepted** unless marked otherwise. 
 
 ## D-12 Haptics on gas giants, water worlds and other shader-generated bodies
 
-- **Status:** Accepted, signed off by Atish (D-13) on 5 Nov 2026. The jet pulse rate stays **[verify on phones]**.
+- **Status:** Accepted, signed off by Atish (D-13) on 5 Nov 2026. Moon's confirmation of the shader-kind architecture (the shared field and its packing) was requested in PR #18 and is pending. The jet pulse rate stays **[verify on phones]**.
 - **Context:** These kinds are drawn by browser shaders (D-01), so there is no baked height map for a finger to sample. For exoplanets there is also no measured surface at all, so every texture haptic is `artistic`.
 - **Decision:**
   - **One shared field per body.** When a body loads, a Web Worker generates an equirectangular field at 512×256 from the same seed and functions as the shader. It does this once, not per frame. The field has channels for height, band index, ocean mask, ice mask and storm id.
@@ -116,7 +116,7 @@ Format: one entry per decision. Status is **Accepted** unless marked otherwise. 
     - Ocean: filtered noise, a "surf" sound.
     - Land: clicks, as for asteroids.
     - Every texture sound uses the `artistic` timbre.
-  - **Honesty:** in "Measured only" all texture haptics on these kinds are silent, because nothing about their surfaces is measured. Only the data pulse remains.
+  - **Honesty:** in "Measured only" all texture haptics on these kinds are silent, because nothing about their surfaces is measured. The data pulse remains only when `teq_K` is `measured` (Exoplanet Archive `pl_eqt`); a `derived` pulse plays from "+ Estimated" (D-21).
   - **HapticProfile:** `texture` gains `'terrain'` (height plus ocean and ice masks) and `'flow'` (bands, jets, storms). `data` gains `'teq_pulse'`.
   - **Field channels and packing.** There are six channels, packed into two RGBA `Float32` `DataTexture`s. The haptics read the same `Float32Array`s.
     - Texture A: R = height, G = band index, B = storm id, A = unused.
@@ -143,6 +143,7 @@ Decisions D-14 to D-29 were recorded on 5 Nov 2026. They answer Q-01 to Q-14 and
 
 - **Decision:** The team builds from 5 Nov, following the dates in architecture spec §13. The team has chosen to set aside the event rule against building before 14 Nov; that call and its risk belong to the team.
 - **How it applies:** `CLAUDE.md` no longer limits the repo to docs and scaffolding before the event.
+- **Approval:** Atish, 5 Nov 2026. Kevin, Moon and Munazir were asked to confirm in PR #18; their confirmations are pending and will be recorded here. Because this sets aside an event rule and could risk disqualification, any teammate may reopen it.
 
 ## D-15 Backend framework: FastAPI (answers Q-01)
 
@@ -261,7 +262,7 @@ Decisions D-14 to D-29 were recorded on 5 Nov 2026. They answer Q-01 to Q-14 and
   - A **pre-fetch script** fills the cache for the 5 test targets and every demo object while the internet is good.
   - Cutouts only, never whole frames (about 72 MB each). The cache lives on the A15, outside git, with a zipped backup.
   - Derived results (spectra, cards, render params) are cached too. Textures follow rendering doc §6.7.
-  - The cached responses double as the recorded test fixtures (architecture spec §12).
+  - The cached responses double as the recorded test fixtures (architecture spec §12). The responses used under `SX_OFFLINE=1` are therefore test fixtures: never hand-edit them. To change one, re-record it with the pre-fetch script.
   - Responses served from cache carry `cached_at`, so the UI can show the data's date.
 - **Optional:** the phones may keep the last loaded object in browser storage to survive a short Wi-Fi drop.
 
@@ -325,7 +326,7 @@ Q-01 to Q-14 were answered on 5 Nov 2026; the Status column points to the decisi
 | Q-14 | The frontend scaffold added `src/contract/` (TS copies of R3 and R8.8 types), `src/state/` (Zustand store) and `src/app/` (React shell), which R10 does not list. Who owns them? Should `src/contract/` be generated from `shared/schemas/` so the backend and frontend contracts cannot drift? (Related: Q-07.) | Team | Answered: D-17, D-18 |
 | Q-15 | Does the Asus A15 (D-24) also replace the Zenbook 14X as the demo screen? If so, D-05 and architecture spec §10.1 should target the A15's GPU instead of Iris Xe. | Atish | Open |
 | Q-16 | Munazir to confirm the D-17 assignments (stage 2, `shared/schemas/`, physics). Munazir is not yet a repo collaborator, and `CLAUDE.md` did not list Munazir in the team. | Munazir | Open |
-| Q-17 | Rendering doc R8.4 tags the comet field source `measured` + `model_dependent`, but a `HapticEvent` carries one `tag` (R8.8), and under D-21 "Measured only" hides `model_dependent`. Which tag does the comet field pulse carry, and does it play in "Measured only"? | Atish | Open |
+| Q-17 | Rendering doc R8.4 tags the comet field source `measured` + `model_dependent`, but a `HapticEvent` carries one `tag` (R8.8), and under D-21 "Measured only" hides `model_dependent`. Which tag does the comet field pulse carry, and does it play in "Measured only"? Blocks the haptics sources implementation. | Atish | Open |
 | Q-18 | D-23 types the view-mode `rgb` as `TV \| null`. With R3.1's default `TV<T = number>` that holds one number, while `gaia_rgb` and `spherex_rgb` in R3.2 are `TV<[number, number, number]>`. Should the schema use `TV<[number, number, number]> \| null`? | Atish, Kevin | Answered: D-23 corrected to `TV<[number, number, number]> \| null` (5 Nov 2026) |
 | Q-19 | Once `frontend/src/contract/` is generated from `shared/schemas/` (D-17, D-18), where do the frontend-only R8.8 types live (`HapticKind`, `HapticEvent`, `HapticDriver`)? They are not sent by the backend, and `HapticDriver` has methods that JSON Schema cannot express. Options: hand-written next to the generated types (like `assertTagged()`), or in `frontend/src/haptics/`. | Atish, Munazir | Open |
 | Q-20 | D-25 says the cache value is "the raw response", but A3.1 lists the SPHEREx `PSF` extension as skipped, and in an IBE cutout it is about 4.9 MB of about 5.06 MB. The backend (issue #1) caches the cutout with the `PSF` HDU cut out at its FITS byte boundaries; every other byte is kept as served, and the meta records the original SHA-256 and size. `SX_CUTOUT_KEEP_PSF=1` keeps it. Accept this as the reading of D-25 for cutouts? | Kevin | Open (implemented as proposed) |
@@ -334,7 +335,9 @@ Q-01 to Q-14 were answered on 5 Nov 2026; the Status column points to the decisi
 | Q-23 | Stage 2 (issue #2) applies no aperture correction: the `PSF` extension is not cached (Q-20), so the fraction of a star's flux outside the 3 px aperture is unknown. SPHEREx fluxes are therefore systematically low by a wavelength-dependent fraction, which can tilt a spectrum slightly. Options: keep the `PSF` HDU, or record each cutout's enclosed-energy fraction for the aperture in the cache meta at pre-fetch time before stripping. | Munazir | Open |
 | Q-24 | Each SPHEREx frame samples a different wavelength, so `light_curve` (flux against time) mixes spectral shape with variability. Light-curve points carry an optional `wavelength_um`. Proposal: the UI colours light-curve points by wavelength and labels the plot "flux per visit (different bands)"; a variability claim needs same-band visits. | Munazir, Moon | Open |
 | Q-25 | How should user-typed coordinates be tagged? They are input, not an observation, and none of the five tags fits exactly. The backend (issue #1) tags them `derived` with the formula "the coordinates typed in the query (user input, not an observation)", so they show as **Estimated** and stay visible in the starting honesty state (D-21). Frame positions of a typed-coordinate object reuse that tag. | Atish, Kevin | Open (implemented as described) |
-| Q-26 | SPHEREx saturates on Barnard's Star, RW Aur and R Dra in the recorded frames (core pixels flagged `OVERFLOW`, some cores NaN); their spectrum is refused as `saturated:<frame_id>` plus `spectrum:saturated`. A live check on 5 Nov found 0 of 30 R Dra frames unsaturated and 17 of 38 RW Aur frames at 0.74–1.12 µm unsaturated, but the first of those is row 57 of the SIA answer, beyond what the ~5 MB fixture budget can record. Options later: PSF-wing photometry (needs the PSF, reverses Q-20) or different demo targets. | Munazir, Atish | Open (implemented as refusal) |
+| Q-26 | SPHEREx saturates on Barnard's Star, RW Aur and R Dra in the recorded frames (core pixels flagged `OVERFLOW`, some cores NaN); their spectrum is refused as `saturated:<frame_id>` plus `spectrum:saturated`. A live check on 5 Nov found 0 of 30 R Dra frames unsaturated and 17 of 38 RW Aur frames at 0.74–1.12 µm unsaturated, but the first of those is row 57 of the SIA answer, beyond what the ~5 MB fixture budget can record. Options later: PSF-wing photometry (needs the PSF, reverses Q-20) or different demo targets. | Munazir, Atish | Open. Refusal accepted for M1 by Atish (5 Nov 2026); Munazir to confirm; PSF-wing photometry or new demo targets later |
+| Q-29 | Under `SX_OFFLINE=1`, may a Gemini repaint already in the cache be shown? D-25 routes Gemini through the read-through cache, which serves hits offline, while D-24 says the Gemini layer stays off when there is no internet. | Atish | Open |
+| Q-30 | Issue #3 (PR #21) keeps the frontend's synthetic fixtures (fake API replies and PNGs served by a Vite plugin, `frontend/fixtures/`) next to the frontend, while D-17 gives `shared/fixtures/` to Munazir. For M1 they stay in `frontend/fixtures/` (Atish, 5 Nov 2026), because they are frontend-only test data and M1–M4 build against fixtures independently (D-29). Should M5 move them, or replace them with replies recorded from the backend, into `shared/fixtures/`? | Munazir | Open (kept in `frontend/fixtures/` for M1) |
 
 **Q-11 differences between the mock-up and R8.8:**
 

@@ -13,6 +13,6 @@
 | Haptics | No more than 40 events per second under fast drags. Silent no-op on iPhone, where the audio driver takes over. The calibration value persists. Both Android phones feel the faintest calibrated tick |
 | Audio pairing | Measure the offset between the sound and the vibration of the same event on both phones |
 | UI | Playwright with headless Chromium. Already used for the mock-up, checks console errors and clicks |
-| Data adapters | Recorded responses so tests do not hit IRSA. The cached responses of the read-through cache double as these fixtures (D-25) |
+| Data adapters | Recorded responses so tests do not hit IRSA. The cached responses of the read-through cache double as these fixtures (D-25). Never hand-edit them; re-record them with the pre-fetch script |
 | Milestones | M1–M4 each build against their own fixtures (recorded responses, sample cards and spectra), so they do not depend on each other (D-29) |
 | Hardware | Run the real app on the Zenbook and both phones and record frame rate |

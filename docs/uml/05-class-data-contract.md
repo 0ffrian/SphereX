@@ -229,7 +229,7 @@ classDiagram
 - `rgb` and `vec3` stand for `[number, number, number]`; `pair` stands for `[number, number]`. They are written in words because Mermaid class members cannot hold brackets reliably.
 - `textures` is present only for the baked types (D-01). Shader kinds (`planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova`) get their field from the browser worker, so it is absent **[verify]**.
 - `terrain`, `flow`, `teq_pulse` and the ObjectCard field `teq_K` are added by D-12 (Accepted). `teq_K` is in the rendering doc R3.2 listing: `measured` from Exoplanet Archive `pl_eqt`, otherwise `derived`. `teq_pulse` is refused and listed in `missing` when `teq_K` is null.
-- `VisibleMode` and `IRMode` share one shape (D-23); `channels_um` is set on `IRMode` only. When a mode is not available, the reason goes in `missing`.
+- `VisibleMode` and `IRMode` share one shape (D-23); `channels_um` is set on `IRMode` only. Their `rgb` field, drawn as `TV~rgb~ or null`, is `TV<[number, number, number]> | null`, the same type as `gaia_rgb` and `spherex_rgb` (D-23, Q-18). When a mode is not available, the reason goes in `missing`.
 - `lighting.mode` is `sun` for solar-system bodies (`phase_angle_deg` from Horizons quantity 24) and `self` for stars and brown dwarfs (rendering doc §5.1).
 - `Overrides` holds user slider edits on the client, separate from the card, so Reset restores the data values. It is `Partial<Record<SliderKey, number | boolean>>`, and an unknown key fails the type check (D-27). It stays in IndexedDB and is never sent to the server (D-22).
 - Baked types allow only colour, lighting and spin sliders for the event; relief sliders exist only on the shader kinds (D-26).
