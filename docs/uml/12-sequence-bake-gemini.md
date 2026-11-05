@@ -1,6 +1,6 @@
 # 12 Sequence: texture bake and optional Gemini repaint
 
-How the backend bakes the maps for a rendering-doc type, and the optional Gemini repaint with its alignment check. Drawn from rendering doc §1 (determinism), §6.1–6.7 and §10, and decisions D-01, D-06 and D-07.
+How the backend bakes the maps for a rendering-doc type, and the optional Gemini repaint with its alignment check. Drawn from rendering doc §1 (determinism), §6.1–6.7 and §10, and decisions D-01, D-06, D-07, D-24 (Gemini off in the offline demo) and D-25 (read-through cache, `SX_OFFLINE`).
 
 ```mermaid
 sequenceDiagram
@@ -14,6 +14,7 @@ sequenceDiagram
   participant TC as /data/textures
   actor A as Team admin
   participant GP as gemini_paint.py
+  participant DC as Read-through cache (D-25)
   participant GM as Gemini image API
 
   API->>C2P: card_to_params(ObjectCard)
@@ -33,12 +34,24 @@ sequenceDiagram
     A->>API: Request repaint for id
     API->>GP: Repaint
     GP->>GP: Hillshade of the height map (no colour)
-    GP->>GM: Hillshade + prompt "Paint albedo only..." (model name [verify])
-    alt timeout or error
-      GM-->>GP: No usable image
+    GP->>DC: Look up hillshade + prompt
+    alt cache hit
+      DC-->>GP: Cached image (under SX_OFFLINE=1 see Q-20)
+    else cache miss with SX_OFFLINE=1
+      DC-->>GP: Refused, no network call
+    else cache miss, online
+      DC->>GM: Hillshade + prompt "Paint albedo only..." (model name [verify]), timeout and retries
+      alt image returned
+        GM-->>DC: Image
+        DC-->>GP: Image, stored with fetched_at
+      else timeout or error
+        GM-->>DC: No usable image
+        DC-->>GP: Refused
+      end
+    end
+    alt refused
       GP-->>API: Keep code colour, "Failed, using code"
-    else image returned
-      GM-->>GP: Image
+    else image
       GP->>GP: Resample to 2:1, correlate Sobel edges with hillshade
       alt correlation below 0.3
         GP-->>API: Reject, keep code colour
@@ -56,5 +69,6 @@ sequenceDiagram
 - Same card + seed must give byte-identical textures (SHA-256 test, rendering doc §11). Bump `generator_version` whenever a rule in §6.2–6.5 changes; it is part of the cache key.
 - The code-colour albedo always loads first; the AI layer only swaps in on success ("never blank").
 - The Gemini call is server-side only; the key never reaches the browser (D-07).
+- The Gemini call goes through the backend's read-through cache like every external call (D-25). With `SX_OFFLINE=1` a miss is refused and the code colour stays (D-24). Whether a cached repaint is shown under `SX_OFFLINE=1` is Q-20.
 - Shader kinds are not baked here (D-01); their field is built in the browser ([10-sequence-view-3d.md](10-sequence-view-3d.md)).
 - Image-first (Depth Anything V2 Small) and Marigold paths are offline options, not drawn (rendering doc §6.6).

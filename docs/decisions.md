@@ -261,7 +261,7 @@ Decisions D-14 to D-29 were recorded on 5 Nov 2026. They answer Q-01 to Q-14 and
   - A **pre-fetch script** fills the cache for the 5 test targets and every demo object while the internet is good.
   - Cutouts only, never whole frames (about 72 MB each). The cache lives on the A15, outside git, with a zipped backup.
   - Derived results (spectra, cards, render params) are cached too. Textures follow rendering doc §6.7.
-  - The cached responses double as the recorded test fixtures (architecture spec §12).
+  - The cached responses double as the recorded test fixtures (architecture spec §12). The responses used under `SX_OFFLINE=1` are therefore test fixtures: never hand-edit them. To change one, re-record it with the pre-fetch script.
   - Responses served from cache carry `cached_at`, so the UI can show the data's date.
 - **Optional:** the phones may keep the last loaded object in browser storage to survive a short Wi-Fi drop.
 
@@ -328,6 +328,7 @@ Q-01 to Q-14 were answered on 5 Nov 2026; the Status column points to the decisi
 | Q-17 | Rendering doc R8.4 tags the comet field source `measured` + `model_dependent`, but a `HapticEvent` carries one `tag` (R8.8), and under D-21 "Measured only" hides `model_dependent`. Which tag does the comet field pulse carry, and does it play in "Measured only"? | Atish | Open |
 | Q-18 | D-23 types the view-mode `rgb` as `TV \| null`. With R3.1's default `TV<T = number>` that holds one number, while `gaia_rgb` and `spherex_rgb` in R3.2 are `TV<[number, number, number]>`. Should the schema use `TV<[number, number, number]> \| null`? | Atish, Kevin | Answered: D-23 corrected to `TV<[number, number, number]> \| null` (5 Nov 2026) |
 | Q-19 | Once `frontend/src/contract/` is generated from `shared/schemas/` (D-17, D-18), where do the frontend-only R8.8 types live (`HapticKind`, `HapticEvent`, `HapticDriver`)? They are not sent by the backend, and `HapticDriver` has methods that JSON Schema cannot express. Options: hand-written next to the generated types (like `assertTagged()`), or in `frontend/src/haptics/`. | Atish, Munazir | Open |
+| Q-20 | Under `SX_OFFLINE=1`, may a Gemini repaint already in the cache be shown? D-25 routes Gemini through the read-through cache, which serves hits offline, while D-24 says the Gemini layer stays off when there is no internet. | Atish | Open |
 
 **Q-11 differences between the mock-up and R8.8:**
 
