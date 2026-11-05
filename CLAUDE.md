@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Project: **Shift & Spectrum**, a public web tool for NASA Space Apps 2026 (Port Louis, 14–15 Nov 2026), challenge "Planet X and SPHEREx". Team: Atish, Kevin, Moon, Munazir.
+Project: **Shift & Spectrum**, a public web tool for NASA Space Apps 2026 (Port Louis, 14–15 Nov 2026), challenge "Planet X and SPHEREx". Team: Atish, Kevin and Moon (Munazir).
 
 ## Read these first
 

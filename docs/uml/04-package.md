@@ -12,9 +12,9 @@ flowchart TB
 
     Mockup["mockup/ : spherex-ui.html (three r128, not the app)"]
 
-    subgraph Backend["backend/ (FastAPI, Python 3.12) : Kevin, Munazir, Atish"]
+    subgraph Backend["backend/ (FastAPI, Python 3.12) : Kevin, Moon, Atish"]
       BApi["app/api (Kevin) : D-16 endpoints; objects.py : /card, /render-params, texture URLs"]
-      BPipe["app/core/find (stage 1), app/adapters, app/cache : Kevin; app/core/measure (stage 2) and physics : Munazir; stage 3 : Atish"]
+      BPipe["app/core/find (stage 1), app/adapters, app/cache : Kevin; app/core/measure (stage 2) and physics : Moon; stage 3 : Atish"]
       BRender["app/core/render (Atish) : card_to_params, noise, craters, height, normals, palette, bake, spherex_rgb, gemini_paint"]
     end
 
@@ -35,7 +35,7 @@ flowchart TB
       end
     end
 
-    Schemas["shared/schemas : object-card.schema.json, render-params.schema.json; shared/fixtures : Munazir (provisional, Q-16)"]
+    Schemas["shared/schemas : object-card.schema.json, render-params.schema.json; shared/fixtures : Moon"]
   end
 
   DocUML -.->|"illustrates"| DocSpecs
@@ -71,8 +71,8 @@ flowchart TB
 |---|---|
 | `backend/app/core/render` (baker, `card_to_params`, Gemini layer) | Atish |
 | `backend/app/api`, `backend/app/adapters`, `backend/app/cache`, `backend/app/core/find` (stage 1), backend scaffold, pipeline stages 4, 5 | Kevin |
-| `backend/app/core/measure` (stage 2) | Munazir (provisional, Q-16) |
-| Pipeline stage 2, physics layer, `shared/schemas`, `shared/fixtures` | Munazir (provisional until confirmed, Q-16) |
+| `backend/app/core/measure` (stage 2) | Moon |
+| Pipeline stage 2, physics layer, `shared/schemas`, `shared/fixtures` | Moon (Munazir) |
 | Pipeline stage 3 | Atish |
 | `frontend/src/viewer`, `viewer/renderers`, shader kinds, `src/app`, `src/state` | Moon |
 | `src/app/api`, `src/app/search`, `src/app/flipbook`, `src/app/spectrum` (flipbook UI) | Moon |

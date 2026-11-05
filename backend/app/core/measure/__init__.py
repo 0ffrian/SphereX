@@ -1,4 +1,4 @@
-"""Stage 2: measure brightness and spectrum (architecture spec A4.2). Issue #2, owner Munazir
+"""Stage 2: measure brightness and spectrum (architecture spec A4.2). Issue #2, owner Moon
 (D-17, provisional).
 
 - ``config``: method settings (aperture 3 px, annulus 6-9 px, reject flags) and their hash.

@@ -13,7 +13,7 @@ Mermaid renders natively on GitHub, and in VS Code with a Mermaid extension (for
 | [01-use-case.md](01-use-case.md) | Use case (as flowchart) | Actors (public user, blind or low-vision user, judge, team admin, external archives) and what they can do |
 | [02-component.md](02-component.md) | Component (2 diagrams) | Backend components, pipeline, render core, external services and endpoints; frontend UI, viewer, haptics, drivers, sources, storage |
 | [03-deployment.md](03-deployment.md) | Deployment | Phones, iPhone/iPad, demo laptop, the Asus A15 local server (one origin, HTTPS, read-through cache, offline mode), team laptop offline jobs, external archives, post-event Tauri |
-| [04-package.md](04-package.md) | Package | Repo and code layout with dependencies and owners (Atish, Kevin, Moon, Munazir; D-17) |
+| [04-package.md](04-package.md) | Package | Repo and code layout with dependencies and owners (Atish, Kevin, Moon; D-17) |
 | [05-class-data-contract.md](05-class-data-contract.md) | Class (2 diagrams) | `Tag`, `TV<T>`, `ObjectType`, `ObjectCard`, `RenderParams`, `Layer`, textures, lighting, view modes, `HapticProfile`, `overrides` and the slider registry |
 | [06-class-haptics-audio.md](06-class-haptics-audio.md) | Class (2 diagrams) | `HapticEvent`, `HapticDriver` and its drivers, `HapticEngine` fan-out, calibration, the debug pulse indicator, the event sources behind `HapticSource` |
 | [07-class-viewer.md](07-class-viewer.md) | Class | `ViewerApp`, the renderer interface and per-type renderers, `ShaderBody`, field worker, lighting, modes, honesty, scale bar, alt text |
