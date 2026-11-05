@@ -36,7 +36,7 @@ sequenceDiagram
     GP->>GP: Hillshade of the height map (no colour)
     GP->>DC: Look up hillshade + prompt
     alt cache hit
-      DC-->>GP: Cached image (under SX_OFFLINE=1 see Q-20)
+      DC-->>GP: Cached image (under SX_OFFLINE=1 see Q-29)
     else cache miss with SX_OFFLINE=1
       DC-->>GP: Refused, no network call
     else cache miss, online
@@ -69,6 +69,6 @@ sequenceDiagram
 - Same card + seed must give byte-identical textures (SHA-256 test, rendering doc §11). Bump `generator_version` whenever a rule in §6.2–6.5 changes; it is part of the cache key.
 - The code-colour albedo always loads first; the AI layer only swaps in on success ("never blank").
 - The Gemini call is server-side only; the key never reaches the browser (D-07).
-- The Gemini call goes through the backend's read-through cache like every external call (D-25). With `SX_OFFLINE=1` a miss is refused and the code colour stays (D-24). Whether a cached repaint is shown under `SX_OFFLINE=1` is Q-20.
+- The Gemini call goes through the backend's read-through cache like every external call (D-25). With `SX_OFFLINE=1` a miss is refused and the code colour stays (D-24). Whether a cached repaint is shown under `SX_OFFLINE=1` is Q-29.
 - Shader kinds are not baked here (D-01); their field is built in the browser ([10-sequence-view-3d.md](10-sequence-view-3d.md)).
 - Image-first (Depth Anything V2 Small) and Marigold paths are offline options, not drawn (rendering doc §6.6).
