@@ -26,7 +26,7 @@ stateDiagram-v2
     shape models, measured data haptics (spectrum, light curve),
     teq_pulse only when teq_K is measured (pl_eqt).
     Silent: procedural relief, all texture haptics on shader
-    kinds, derived data haptics.
+    kinds, every non-measured data haptic.
   end note
 
   note right of PlusEstimated

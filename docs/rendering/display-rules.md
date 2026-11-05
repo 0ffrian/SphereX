@@ -39,7 +39,7 @@ One state per badge (D-21):
 
 - The toggle starts at **+ Estimated**: everything shown on load is backed by data or a stated formula.
 - Each visible layer shows a small tag chip in the legend.
-- The haptics use the same filter ([§8.2](haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui)). `teq_pulse` plays in Measured only only when `teq_K` is `measured` (Exoplanet Archive `pl_eqt`); when it is `derived` it is silent there.
+- The haptics use the same filter ([§8.2](haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui)). Only `measured` haptics stay in Measured only: `teq_pulse` stays there only when `teq_K` is `measured` (Exoplanet Archive `pl_eqt`); when it is `derived` it is silent there and plays from + Estimated. `artistic` texture haptics play only in + Artistic.
 
 ### R5.4 Scale bar
 The scale bar shows the physical size plus one familiar comparison:

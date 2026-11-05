@@ -21,14 +21,14 @@ Mermaid renders natively on GitHub, and in VS Code with a Mermaid extension (for
 | [09-sequence-object-spectrum.md](09-sequence-object-spectrum.md) | Sequence | Click a source, photometry and spectrum, classify, type selection, `ObjectCard`, panel with badges and Listen |
 | [10-sequence-view-3d.md](10-sequence-view-3d.md) | Sequence | View in 3D: render-params, asset lookup, bake if not cached, renderer by type, `missing` layers |
 | [11-sequence-touch-haptics.md](11-sequence-touch-haptics.md) | Sequence | Touch mode: unlock, pointermove, intersect, sample, source, rate limit, fan-out to vibrate and audio |
-| [12-sequence-bake-gemini.md](12-sequence-bake-gemini.md) | Sequence | Backend texture bake, then the optional Gemini repaint with the alignment check |
+| [12-sequence-bake-gemini.md](12-sequence-bake-gemini.md) | Sequence | Backend texture bake, then the optional Gemini repaint through the read-through cache, with the alignment check |
 | [13-sequence-calibration.md](13-sequence-calibration.md) | Sequence | First-use calibration: `minMs`, levels, audio offset, saved to localStorage |
 | [14-state-honesty.md](14-state-honesty.md) | State | The 3-state honesty toggle (one state per badge) and which layers and haptics each state allows |
 | [15-state-interaction.md](15-state-interaction.md) | State | Default mode and Touch mode, with Feeling and Rotate/zoom substates |
 | [16-state-asset-lookup.md](16-state-asset-lookup.md) | State (2 diagrams) | Asset status (saved, generated, sketch) and the texture cache entry |
 | [17-activity-pipeline.md](17-activity-pipeline.md) | Activity | Pipeline stages 1–6 to `ObjectCard` and `RenderParams`, with refuse-rather-than-invent branches |
 | [18-activity-type-selection.md](18-activity-type-selection.md) | Activity | Type selection: SBDB, SIMBAD, Exoplanet Archive, sliders, candidate |
-| [19-activity-haptic-driver-select.md](19-activity-haptic-driver-select.md) | Activity | Choosing drivers at start-up, and when calibration runs |
+| [19-activity-haptic-driver-select.md](19-activity-haptic-driver-select.md) | Activity | Choosing drivers at start-up, the `spherex:haptic` debug hook, and when calibration runs |
 
 ## Conventions
 

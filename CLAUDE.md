@@ -66,7 +66,9 @@ The team builds from 5 Nov 2026 (decisions D-14), setting aside the event rule a
 ```
 docs/       specs, decisions, UML
 mockup/     single-file HTML mock-up (three.js r128, not the app)
-backend/    Python 3.12 API, pipeline, texture baker        (Atish, Kevin)
-frontend/   Vite + TypeScript + React app, viewer, haptics   (Moon)
-shared/     JSON schemas shared by backend and frontend
+backend/    Python 3.12 API, pipeline, texture baker        (Kevin, Munazir, Atish)
+frontend/   Vite + TypeScript + React app, viewer, haptics   (Moon; Atish for haptics and viewer/fields)
+shared/     JSON schemas shared by backend and frontend      (Munazir, provisional)
 ```
+
+Owners per area: decisions D-17.
