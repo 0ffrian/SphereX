@@ -14,7 +14,7 @@ flowchart TB
 
     subgraph Backend["backend/ (FastAPI, Python 3.12) : Kevin, Munazir, Atish"]
       BApi["app/api (Kevin) : D-16 endpoints; objects.py : /card, /render-params, texture URLs"]
-      BPipe["pipeline + data adapters (path not in §10 [verify]) : stages 1, 4, 5 and adapters Kevin; stage 2 and physics Munazir; stage 3 Atish"]
+      BPipe["app/core/find (stage 1), app/adapters, app/cache : Kevin; app/core/measure (stage 2) and physics : Munazir; stage 3 : Atish"]
       BRender["app/core/render (Atish) : card_to_params, noise, craters, height, normals, palette, bake, spherex_rgb, gemini_paint"]
     end
 
@@ -66,7 +66,8 @@ flowchart TB
 | Package | Owner (rendering doc §10, D-17) |
 |---|---|
 | `backend/app/core/render` (baker, `card_to_params`, Gemini layer) | Atish |
-| `backend/app/api`, backend scaffold, data adapters, pipeline stages 1, 4, 5 | Kevin |
+| `backend/app/api`, `backend/app/adapters`, `backend/app/cache`, `backend/app/core/find` (stage 1), backend scaffold, pipeline stages 4, 5 | Kevin |
+| `backend/app/core/measure` (stage 2) | Munazir (provisional, Q-16) |
 | Pipeline stage 2, physics layer, `shared/schemas`, `shared/fixtures` | Munazir (provisional until confirmed, Q-16) |
 | Pipeline stage 3 | Atish |
 | `frontend/src/viewer`, `viewer/renderers`, shader kinds, `src/app`, `src/state` | Moon |

@@ -1,0 +1,15 @@
+{
+ "body_sha256": "4fd1b608084edb027ecc8b23ace968c99bc2d8b051812698ca315bf9474b8aec",
+ "body_size": 1491,
+ "content_type": "application/json;charset=UTF-8",
+ "fetched_at": "2026-11-05T12:44:10.099Z",
+ "key": {
+  "query": {
+   "ident": "Barnard's star"
+  },
+  "release": "-",
+  "source": "simbad"
+ },
+ "status": 200,
+ "url": "https://simbad.harvard.edu/simbad/sim-tap/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=json&QUERY=SELECT+basic.main_id%2C+basic.ra%2C+basic.dec%2C+basic.pmra%2C+basic.pmdec%2C+basic.plx_value%2C+basic.otype%2C+basic.sp_type+FROM+ident+JOIN+basic+ON+ident.oidref+%3D+basic.oid+WHERE+ident.id+%3D+%27Barnard%27%27s+star%27"
+}

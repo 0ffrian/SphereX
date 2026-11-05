@@ -10,7 +10,7 @@ A public web tool: enter coordinates or a name, watch real SPHEREx frames of tha
 |---|---|
 | [docs/](docs/) | Specs, decision log and UML diagrams. Start with [docs/README.md](docs/README.md). |
 | [mockup/spherex-ui.html](mockup/spherex-ui.html) | Single-file UI mock-up. Open it in a browser. |
-| [backend/](backend/) | Python API, data pipeline and texture baker (empty until the event). |
+| [backend/](backend/README.md) | Python 3.12 FastAPI: name resolver, SPHEREx frames and cutouts, read-through cache (see its README). |
 | [frontend/](frontend/) | Web app, 3D viewer, haptics and audio (empty until the event). |
 | [shared/](shared/) | JSON schemas for the ObjectCard and RenderParams. |
 
@@ -27,6 +27,19 @@ npm run check       # typecheck + lint + unit tests + build
 ```
 
 Other root scripts: `build`, `preview`, `test`, `test:e2e`, `lint`, `typecheck`, `format`. They all forward to `frontend/`, and the dependencies live in `frontend/package.json`.
+
+## Backend (from the repo root)
+
+Needs Python 3.12 and [uv](https://docs.astral.sh/uv/) 0.12.
+
+```bash
+npm run backend:setup      # uv sync from backend/uv.lock
+npm run backend:dev        # API on http://localhost:8000, all routes under /v1
+npm run backend:check      # ruff + mypy + pytest (offline, recorded fixtures)
+npm run backend:prefetch   # fill the cache for the test targets while the internet is good
+```
+
+`SX_OFFLINE=1` never touches the network (the demo runs this way). The cache lives outside the repo; details in [backend/README.md](backend/README.md).
 
 ## Status
 

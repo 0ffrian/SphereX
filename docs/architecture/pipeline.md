@@ -17,24 +17,34 @@ Each stage has one job, takes defined inputs and returns defined outputs. Stages
   1. Resolve names to RA/Dec (D-19). Names that look like small bodies (numbered asteroids such as `433 Eros`, provisional designations such as `2024 AB`, comets such as `C/…`, interstellar objects such as `3I/ATLAS`) go to SBDB first. Everything else goes to SIMBAD first. On a miss, try the other one. RA/Dec input skips name resolution.
   2. For moving objects, get position at each frame time from Horizons, and neighbours from SkyBoT.
   3. Convert sky position to pixel position in each frame using the frame's WCS.
+  - Stars with a catalogue proper motion are propagated linearly from J2000 to each frame time (`derived`; Barnard's Star moves about 269″, 44 px, by 2026). `moving` means a solar-system body only (Q-22). Frames of moving objects are refused in M1 (Q-21).
+  - One time per frame (the SIA exposure midpoint, UTC) drives the position, the cutout centre, `x`/`y` and `time`.
 - **Output:** list of `(frame_id, x, y, time)`.
 - **Endpoints (D-16):**
   - `GET /v1/resolve?q=<name or ra,dec>` returns `{ id, ra, dec, moving }`.
   - `GET /v1/objects/{id}/frames` returns `[{ frame_id, time, wavelength_um, x, y, cutout_url }]`. The flipbook plays this list in order; there is no separate flipbook endpoint.
   - `GET /v1/objects/{id}/cutouts/{frame_id}.png` returns the cutout, stretched to PNG by the server. The frames response states the stretch used.
-- **Status:** To build.
+  - Contract details for M1 (issue #1; full list in [backend/README.md](../../backend/README.md#endpoints-d-16)):
+    - Times are ISO-8601 UTC with a trailing `Z`.
+    - `x`, `y` are 0-based pixels of the PNG as served (top-left origin, y down, integer = pixel centre). The PNG is the FITS array flipped vertically.
+    - `north_up` is `false` (native orientation). Optional `north_angle_deg` and `mirrored` let the UI rotate. Optional per-frame `ra`, `dec`.
+    - A `provenance` map tags every field: cutout pixels, time, wavelength and flags are `measured`; `x`, `y`, the propagated `ra`/`dec` and the stretch are `derived`, each with its formula.
+    - Frames that cannot be computed are left out and named in `missing` (`cutout:<id>`, `wavelength:<id>`, `outside_cutout:<id>`, `frames:truncated`, and `cutouts:deferred:<n>` when one request would download more than `SX_LIVE_CUTOUTS_PER_REQUEST` cutouts live).
+- **Status:** Built for stars and coordinates (issue #1, `backend/app/core/find/`). Moving-object frame search: Q-21.
 
 ### A4.2 Stage 2: Measure brightness and spectrum
 
-- **Input:** pixel positions and frame cutouts.
-- **Process:**
-  1. Sum flux in a small aperture, subtract local background.
-  2. Drop pixels with bad flags.
-  3. Use the variance layer for error bars.
-  4. Look up each frame's wavelength at the object's pixel from the wavelength map.
-- **Output:** a spectrum `[(wavelength_um, flux, error)]` and a light curve `[(time, flux)]`.
-- **Endpoint:** `GET /v1/objects/{id}/spectrum` returns both, tagged `measured` (D-16).
-- **Status:** To build.
+- **Input:** pixel positions and frame cutouts (Stage 1: `x_fits0`, `y_fits0`, `wavelength_um` per frame; cached cutouts with `IMAGE`, `FLAGS`, `VARIANCE`, `WCS-WAVE`).
+- **Process** (forced photometry at the Stage 1 pixel, no re-centring; code in `backend/app/core/measure/`):
+  1. Sum flux in a small aperture, subtract local background. Aperture radius 3 px with 10×10 sub-pixel weights; background = sigma-clipped mean (3σ, 5 iterations) of an annulus 6–9 px (clipped with the ordinary sample std when the annulus MAD is zero). These are method settings, reported verbatim in the response's `method` block.
+  2. Drop pixels with bad flags. Bit numbers are read from the `MP_*` keywords of the `FLAGS` header; a header that does not define `OVERFLOW` and `SUR_ERROR` refuses the frame (`flags_header`), because saturation could not be detected, and other undefined reject names are listed in `method.reject_flags_absent`. Rejected: the IRSA tutorial list `TRANSIENT, OVERFLOW, SUR_ERROR, PHANTOM, REFERENCE, NONFUNC, DICHROIC, MISSING_DATA, HOT, COLD, FULLSAMPLE, PHANMISS, NONLINEAR, PERSIST, OUTLIER`. Checked 5 Nov 2026 against the Explanatory Supplement (SSDC-DP-017 v2.0, Table 16) and the cached QR2 headers; Table 16's newer flags `CROSSTALK`, `STREAK` and `SATELLITE_HALO` are not in the list (Q-31). `SOURCE` is kept everywhere (its mask covers whole regions around bright stars). A bad pixel within 1.5 px of the object refuses the point; a bad pixel further out is dropped and the point is `flagged`. The sum is never rescaled.
+  3. Use the variance layer for error bars: `σ = 1e12·Ω·sqrt(Σ w²V + (Σw)²·var_B)`, `var_B = max(ΣV/N², s²/N)`.
+  4. Look up each frame's wavelength at the object's pixel from the wavelength map. Stage 1's `wcs.wavelength_at` already does this (SIP cleared); Stage 2 reuses the frame's value.
+  5. Convert to flux density: `F = 1e12·Ω·Σ w (I − B)` in **µJy** (`flux_unit: "uJy"`), with Ω the pixel solid angle at the object pixel from the TAN-SIP WCS (checked 5 Nov 2026: Ω/(1″)² agrees with the IMAGE header's `OMEGA_MEDIAN`, the median of IRSA's solid-angle pixel map in arcsec², to within 0.8 % on all 15 cached cutouts; the map's own spread `OMEGA_STDDEV` is about 0.5 %). No aperture correction (Q-23).
+- **Refusals** (in `missing` as `<reason>:<frame_id>`, never a guessed value): `saturated` (core `OVERFLOW`, or a NaN core with `OVERFLOW`/`SUR_ERROR` in the aperture), `aperture_flags`, `aperture_edge`, `background`, `unit`, `extension`, `flags_header`, `pixel_area`, `measure`, `cutout`. When every frame is refused as saturated, `missing` also holds `spectrum:saturated` (Q-26). Stage 1's own `missing` entries are passed through.
+- **Output:** a spectrum `[(wavelength_um, flux, error, flagged)]` and a light curve `[(time, flux, error)]`, built from the same measurements. Optional per-point fields: `bandwidth_um`, `dropped_flags`, `dropped_weight_fraction`, `flag_reasons` (incl. `no_proper_motion`); light-curve points carry `wavelength_um` and `flagged`, because each SPHEREx frame is a different band (Q-24).
+- **Endpoint:** `GET /v1/objects/{id}/spectrum` returns both, tagged `measured` (D-16), with a `provenance` map (flux and error formulas) and `cached_at`. Stage 2 reads only cutouts already in the cache (one read each) and never downloads; an uncached cutout is refused as `cutout:<frame_id>`. The result is cached as `derived.spectrum`, keyed by `DERIVATION_VERSION`, the measure version, the method settings, Stage 1's `missing`, every frame record and every cutout's SHA-256; it is stored, and served from the cache, only while the frame list is complete.
+- **Status:** Built (issue #2). On the recorded fixtures, Epsilon Indi B and WISE 0855 give measured points; Barnard's Star, RW Aur and R Dra are refused as saturated in every recorded frame (Q-26).
 
 ### A4.3 Stage 3: Classify and pick a type
 

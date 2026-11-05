@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Helios</title>
+<title>Odysseus</title>
 <style>
 /* ---------- tokens (animate-ui / shadcn language, dark) ---------- */
 :root{
@@ -30,8 +30,8 @@ svg{display:block}
   border:1px solid var(--border);
   box-shadow:0 0 0 1px #000,inset 0 1px 0 #ffffff0d,0 30px 80px #000;
   display:grid;grid-template-columns:var(--rail) 1fr var(--rail);grid-template-rows:var(--top) 1fr var(--bot);
-  grid-template-areas:"top top top" "left view right" "bottom bottom bottom";
-  animation:bezelIn .8s var(--ease) both}
+  grid-template-areas:"left top right" "left view right" "bottom bottom bottom";
+  overflow:hidden;animation:bezelIn .8s var(--ease) both}
 @keyframes bezelIn{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}
 
 /* ---------- viewport (the sky) ---------- */
@@ -47,7 +47,7 @@ svg{display:block}
 .scalebar i{display:block;width:80px;height:6px;border:1px solid var(--mfg);border-top:0}
 
 /* ---------- top bar ---------- */
-.top{grid-area:top;display:flex;align-items:center;gap:16px;padding:0 20px 0 22px}
+.top{grid-area:top;display:flex;align-items:center;gap:16px;padding:0 6px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:-.01em;min-width:150px}
 .brand-mark{width:22px;height:22px;display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
 .brand-mark span{background:var(--green);border-radius:50%;opacity:.25;animation:bm 2.4s infinite var(--ease)}
@@ -55,7 +55,7 @@ svg{display:block}
 .brand-mark span.on{opacity:1}
 @keyframes bm{0%,100%{opacity:.25}50%{opacity:1}}
 .brand small{color:var(--dim);font-weight:500}
-.search{flex:1;max-width:560px;margin:0 auto;position:relative}
+.search{flex:0 1 340px;margin:0 0 0 auto;position:relative}
 .search input{width:100%;height:38px;border-radius:var(--r-md);background:var(--muted);color:var(--fg);
   border:1px solid var(--border);padding:0 74px 0 38px;font:inherit;outline:none;
   transition:border-color .2s,box-shadow .3s var(--ease),background .2s}
@@ -64,9 +64,9 @@ svg{display:block}
 .search .ico{position:absolute;left:11px;top:9px;width:18px;height:18px;color:var(--dim);pointer-events:none}
 .kbd{position:absolute;right:9px;top:8px;font:11px var(--mono);color:var(--mfg);background:var(--bg);
   border:1px solid var(--border);border-radius:6px;padding:2px 6px}
-.suggest{position:absolute;left:0;right:0;top:46px;background:var(--card);border:1px solid var(--border);
+.suggest{position:absolute;right:0;width:380px;bottom:46px;background:var(--card);border:1px solid var(--border);
   border-radius:var(--r-md);padding:6px;z-index:20;box-shadow:0 20px 50px #000c;
-  transform-origin:top;opacity:0;transform:translateY(-6px) scale(.98);pointer-events:none;
+  transform-origin:bottom;opacity:0;transform:translateY(6px) scale(.98);pointer-events:none;
   transition:opacity .18s,transform .3s var(--spring)}
 .suggest.open{opacity:1;transform:none;pointer-events:auto}
 .suggest button{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;
@@ -74,11 +74,11 @@ svg{display:block}
 .suggest button:hover,.suggest button.sel{background:var(--muted-2)}
 .suggest em{font:11px var(--mono);color:var(--dim);font-style:normal}
 .suggest .hint{padding:6px 10px 4px;font-size:11px;color:var(--dim)}
-.coords{min-width:150px;text-align:right;font:12px var(--mono);color:var(--mfg);line-height:1.4}
+.coords{margin-left:auto;min-width:150px;text-align:right;font:12px var(--mono);color:var(--mfg);line-height:1.4}
 .coords b{color:var(--fg);font-weight:500}
 
 /* ---------- rails ---------- */
-.rail{display:flex;flex-direction:column;align-items:center;padding:6px 0;position:relative}
+.rail{display:flex;flex-direction:column;align-items:center;padding:12px 0 6px;position:relative}
 .rail.left{grid-area:left;gap:4px}
 .rail.right{grid-area:right;gap:4px}
 .rail-inner{position:relative;display:flex;flex-direction:column;gap:4px}
@@ -97,6 +97,21 @@ svg{display:block}
 .right .tool[aria-pressed="true"]::after{content:"";position:absolute;right:7px;top:7px;width:6px;height:6px;
   border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
 .sep{width:24px;height:1px;background:var(--border);margin:6px 0}
+/* overlays: one parent icon that opens the layer toggles */
+.layers-pop{display:grid;grid-template-rows:0fr;transition:grid-template-rows .5s var(--ease)}
+.layers-pop.open{grid-template-rows:1fr}
+.layers-in{overflow:hidden;min-height:0;display:flex;flex-direction:column;gap:4px;align-items:center;padding-top:0;transition:padding .5s var(--ease)}
+.layers-pop.open .layers-in{padding-top:6px;overflow:visible}
+.layers-in .tool{opacity:0;transform:translateY(-10px) scale(.7);pointer-events:none;
+  transition:opacity .3s,transform .5s var(--spring),color .2s;transition-delay:calc(var(--i,0)*45ms)}
+.layers-pop.open .layers-in .tool{opacity:1;transform:none;pointer-events:auto}
+#layersToggle[aria-expanded="true"]{background:var(--muted-2);color:var(--fg)}
+#layersToggle.has-on::after{content:"";position:absolute;right:7px;top:7px;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+@media (prefers-reduced-motion:no-preference){
+  .ai-draw :is(path,circle,line,ellipse,rect){stroke-dasharray:1}
+  button:hover .ai-draw :is(path,circle,line,ellipse,rect){animation:aiDraw2 .8s cubic-bezier(.22,1,.36,1)}
+}
+@keyframes aiDraw2{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
 .rail-label{font:10px var(--mono);color:var(--dim);letter-spacing:.08em;writing-mode:vertical-rl;margin:auto 0 0;padding-bottom:10px}
 
 /* tooltip */
@@ -107,7 +122,7 @@ svg{display:block}
 .tip kbd{font:10px var(--mono);opacity:.55;margin-left:6px}
 
 /* ---------- bottom bar ---------- */
-.bottom{grid-area:bottom;display:flex;align-items:center;justify-content:center;padding:0 var(--rail) 6px}
+.bottom{grid-area:bottom;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 calc(var(--rail) + 6px) 6px var(--rail)}
 .player{display:flex;align-items:center;gap:8px;height:48px;padding:0 16px 0 8px;border-radius:14px;
   background:var(--muted);border:1px solid var(--border);box-shadow:0 8px 24px #0008}
 .btn-i{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:transparent;
@@ -148,7 +163,7 @@ svg{display:block}
 .btn.ghost{background:var(--muted);color:var(--fg);border:1px solid var(--border)}
 #spec{width:100%;max-width:284px;height:104px;margin-top:10px;border-radius:10px;background:var(--bezel);border:1px solid var(--border)}
 
-/* ---------- flipbook settings (inside the Helios card) ---------- */
+/* ---------- flipbook settings (inside the Odysseus card) ---------- */
 .grp{margin-top:14px}
 .grp h4{font-size:13px;font-weight:600;margin-bottom:3px}
 .grp p{font-size:12px!important}
@@ -189,6 +204,12 @@ svg{display:block}
 
 
 
+/* ---------- smoothui grid loader used across the UI ---------- */
+.mg,.mgw{display:inline-grid;place-items:center;width:14px;height:14px;flex:none}
+.mg{margin-right:8px;vertical-align:-2px}
+.wgrid{display:inline-grid;place-items:center;width:18px;height:18px}
+.gload{position:absolute;inset:0;display:none;place-items:center;align-content:center;gap:14px;pointer-events:none;color:var(--mfg);font-size:12.5px;text-align:center}
+.gload.on{display:grid}
 /* ---------- Animate UI icons: same shapes and motion, done in CSS ---------- */
 .ai,.ai *{transform-box:fill-box;transform-origin:center}
 .pi{display:grid;place-items:center}
@@ -322,11 +343,11 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
 .row-btn.wrap{flex-wrap:wrap}
 
 /* ---------- Gemini island ---------- */
-.island-wrap{position:absolute;right:6px;bottom:6px;z-index:40}
+.island-wrap{position:absolute;left:50%;top:4px;transform:translateX(-50%);z-index:40}
 .island{--edge:#222;max-width:300px;position:relative;height:52px;width:52px;border-radius:26px;background:#000;border:1px solid var(--edge);
   box-shadow:0 0 0 1px var(--edge),0 8px 32px #000e,0 2px 12px #000b;overflow:hidden;cursor:pointer;
   display:flex;align-items:center;justify-content:center;white-space:nowrap;
-  transition:width .6s var(--spring),height .6s var(--spring),border-radius .6s var(--spring),border-color .2s,transform .25s var(--spring)}
+  transition:width .6s var(--ease),height .6s var(--ease),border-radius .6s var(--ease),border-color .2s,transform .25s var(--spring)}
 .island:hover{--edge:#3d3d3d}.island:active{transform:scale(.94)}
 .island[data-card="true"]{max-width:none;cursor:default;flex-direction:column;align-items:stretch;justify-content:flex-start;
   background:#050506;box-shadow:0 0 0 1px var(--edge),0 24px 70px #000f,0 2px 12px #000b}
@@ -366,7 +387,6 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
 @media (max-width:820px){
   :root{--rail:52px}
   .coords,.brand small,.frame-info .hide-s{display:none}.brand{min-width:0}
-  .bottom{padding-right:70px}
 }
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
@@ -377,16 +397,6 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
 
     <!-- top -->
     <header class="top">
-      <div class="brand">
-        <div class="brand-mark" aria-hidden="true"><span class="on"></span><span></span><span class="on"></span><span></span><span class="on"></span><span></span><span class="on"></span><span></span><span class="on"></span></div>
-        <div>Helios</div>
-      </div>
-      <form class="search" id="searchForm" autocomplete="off">
-        <svg class="ico ai ai-search" viewBox="0 0 24 24"><path class="v-path" d="m21 21-4.34-4.34"/><circle class="v-circle" cx="11" cy="11" r="8"/></svg>
-        <input id="q" placeholder="Name or RA Dec  (e.g. Barnard's Star, 269.45 4.69)" aria-label="Search the sky">
-        <span class="kbd">/</span>
-        <div class="suggest" id="suggest" role="listbox"></div>
-      </form>
       <div class="coords" id="coords"><b>RA</b> --  <b>Dec</b> --<br><span id="fovTxt"></span></div>
     </header>
 
@@ -398,7 +408,7 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
 
     <!-- sky -->
     <main class="view" id="view">
-      <div id="skyPane"><canvas id="sky"></canvas><canvas id="tCanvas" aria-label="3D comet with its gas clouds and tails. Drag to turn it."></canvas></div>
+      <div id="skyPane"><canvas id="sky"></canvas><div class="gload" id="tLoad"><div id="tLoadG"></div><span>Loading the 3D view</span></div><canvas id="tCanvas" aria-label="3D comet with its gas clouds and tails. Drag to turn it."></canvas></div>
       <div class="vignette"></div>
       <div class="hud tl" id="hudTl"></div>
       <div class="hud bl"><div class="scalebar"><i></i><span id="scaleTxt"></span></div></div>
@@ -412,7 +422,7 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
             <button class="x" id="bpSeed" type="button" title="New seed" aria-label="Build a different one"><svg class="ico" viewBox="0 0 24 24"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
             <i class="sep"></i>
             <button class="x" id="bpClose" type="button" aria-label="Close build view"><svg class="ico ai ai-x" viewBox="0 0 24 24"><line class="v-line1" x1="6" y1="18" x2="18" y2="6"/><line class="v-line2" x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>
-        <div class="bp-stage" id="bpStage"><canvas id="bpCanvas"></canvas><i id="bpRing"></i><div class="bp-msg" id="bpMsg" hidden></div></div>
+        <div class="bp-stage" id="bpStage"><canvas id="bpCanvas"></canvas><i id="bpRing"></i><div class="bp-msg" id="bpMsg" hidden></div><div class="gload" id="bLoad"><div id="bLoadG"></div><span>Loading the 3D view</span></div></div>
         <ol class="bp-steps" id="bpSteps"></ol>
         <div class="bp-wave"><div class="bw-head"><span>Vibration</span><b id="bwHz">0 Hz</b></div><canvas id="bwCanvas"></canvas></div>
       </aside>
@@ -431,7 +441,7 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
             <button type="button" class="gchip on" data-g="dust" style="--c:#e3eaf7"><i></i>Dust</button></div>
           <div class="opts tp-sw"><label class="opt"><input type="checkbox" id="tpSpin" checked><span class="tr"></span>Spin</label>
             <label class="opt"><input type="checkbox" id="tpSky" checked><span class="tr"></span>Night sky</label>
-            <button type="button" class="btn ghost sm" id="tpHear" style="margin-left:auto"><svg viewBox="0 0 16 16" fill="currentColor" id="tpHearIc"><path d="M4 2.5v11l9-5.5z"/></svg><span id="tpHearTx">Listen</span></button></div>
+            <button type="button" class="btn ghost sm" id="tpHear" style="margin-left:auto"><span class="mgw" id="tpHearIc"><svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M4 2.5v11l9-5.5z"/></svg></span><span id="tpHearTx">Listen</span></button></div>
         </div>
       </aside>
       <div class="toast" id="toast"></div>
@@ -439,7 +449,10 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
 
     <!-- right rail: layers -->
     <nav class="rail right" aria-label="Overlays">
-      <div class="rail-inner" id="layers"></div>
+      <div class="rail-inner">
+        <button class="tool" id="layersToggle" type="button" aria-expanded="false" aria-controls="layers" aria-label="Overlays" data-tip="Overlays" data-side="left"><svg class="ico ai ai-draw ai-eye" viewBox="0 0 24 24"><path pathLength="1" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle pathLength="1" cx="12" cy="12" r="3"/></svg></button>
+        <div class="layers-pop" id="layersPop"><div class="layers-in" id="layers"></div></div>
+      </div>
       <div class="rail-label" style="margin-bottom:56px">LAYERS</div>
     </nav>
 
@@ -449,13 +462,20 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
       <button class="btn-i play" id="play" aria-label="Play"><span id="playIco" class="pi"><svg class="ico ai ai-play" viewBox="0 0 24 24"><polygon class="v-polygon" points="6 3 20 12 6 21 6 3"/></svg></span></button>
       <button class="btn-i" id="next" aria-label="Next frame"><svg class="ico" viewBox="0 0 24 24"><path d="M5 5v14l11-7zM19 5v14"/></svg></button>
       <div class="scrub"><input type="range" id="scrub" min="0" max="11" value="0" aria-label="Frame"></div>
-      <div class="frame-info"><span class="dot" id="wdot"></span><span>Frame <b id="fnum">1</b>/12</span><span class="hide-s"><b id="wl">0.75</b> µm</span><span id="fdate" hidden></span></div>
-    </div></footer>
+      <div class="frame-info"><span class="wgrid" id="wdot"></span><span>Frame <b id="fnum">1</b>/12</span><span class="hide-s"><b id="wl">0.75</b> µm</span><span id="fdate" hidden></span></div>
+    </div>
+      <form class="search" id="searchForm" autocomplete="off">
+        <svg class="ico ai ai-search" viewBox="0 0 24 24"><path class="v-path" d="m21 21-4.34-4.34"/><circle class="v-circle" cx="11" cy="11" r="8"/></svg>
+        <input id="q" placeholder="Search a name or RA Dec" aria-label="Search the sky">
+        <span class="kbd">/</span>
+        <div class="suggest" id="suggest" role="listbox"></div>
+      </form>
+    </footer>
 
     <!-- Gemini live avatar -->
     <div class="island-wrap" id="islandWrap" data-live="false">
       <div class="glow"></div>
-      <div class="island" id="island" role="button" tabindex="0" aria-label="Helios" data-open="false">
+      <div class="island" id="island" role="button" tabindex="0" aria-label="Odysseus" data-open="false">
         <div class="island-in">
           <div id="grid"></div>
           <div class="label"><b id="lbl"></b><span id="sub"></span></div>
@@ -474,16 +494,7 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
    GridLoader (vanilla port of smoothui grid-loader, same patterns / timing)
    ============================================================ */
 const P = s => s.split("").map(Number);
-const PATTERNS = {
-  "solo-center":"000010000","line-h-mid":"000111000","line-v-mid":"010010010","corners":"101000101",
-  "plus-hollow":"010101010","plus-full":"010111010","frame":"111101111","wave-lr":"110110110","wave-rl":"011011011",
-  "wave-tb":"111111000","wave-bt":"000111111","ripple-out":"111101111","ripple-in":"000010000","x-shape":"101010101",
-  "checkerboard":"101010101","spiral-cw":"111001001","snake":"110010000","rain":"010010000","breathing":"000010000",
-  "heartbeat":"010111010","twinkle":"100001010","sparkle":"101010101","chaos":"101010100","border":"111101111",
-  "diamond":"010101010","line-diag-1":"100010001","line-diag-2":"001010100","sparse-1":"100001010",
-  "face-soft":"101000010","face-grin":"101000111","face-surprised":"101010000","face-wince":"011000110",
-  "face-worried":"101010110","face-delight":"101111010","face-sleep":"000101000","face-flat":"101000000"
-};
+const PATTERNS = {"solo-center": "000010000", "solo-tl": "100000000", "solo-tr": "001000000", "solo-bl": "000000100", "solo-br": "000000001", "line-h-top": "111000000", "line-h-mid": "000111000", "line-h-bot": "000000111", "line-v-left": "100100100", "line-v-mid": "010010010", "line-v-right": "001001001", "line-diag-1": "100010001", "line-diag-2": "001010100", "corners-only": "101000101", "corners-sync": "101000101", "corners": "101000101", "plus-hollow": "010101010", "plus-full": "010111010", "L-tl": "110100000", "L-tr": "011001000", "L-bl": "000100110", "L-br": "000001011", "T-top": "111010000", "T-bot": "000010111", "T-left": "100110100", "T-right": "001011001", "duo-h": "000110000", "duo-v": "010010000", "duo-diag": "100010000", "frame": "111101111", "frame-sync": "111101111", "sparse-1": "100001010", "sparse-2": "010100001", "sparse-3": "001010100", "wave-lr": "110110110", "wave-rl": "011011011", "wave-tb": "111111000", "wave-bt": "000111111", "diagonal-tl": "110110000", "diagonal-tr": "011011000", "diagonal-bl": "000110110", "diagonal-br": "000011011", "ripple-out": "111101111", "ripple-in": "000010000", "cross": "010111010", "x-shape": "101010101", "diamond": "010101010", "stripes-h": "111000111", "stripes-v": "101101101", "checkerboard": "101010101", "rows-alt": "111000111", "spiral-cw": "111001001", "spiral-ccw": "111100100", "snake": "110010000", "snake-rev": "000010011", "rain": "010010000", "rain-rev": "000010010", "waterfall": "110000000", "breathing": "000010000", "heartbeat": "010111010", "twinkle": "100001010", "sparkle": "101010101", "chaos": "101010100", "edge-cw": "111000000", "border": "111101111", "face-grin": "101000111", "face-wink": "100000111", "face-drowsy": "000101010", "face-sleep": "000101000", "face-surprised": "101010000", "face-flat": "101000000", "face-squint": "000101111", "face-wince": "011000110", "face-soft": "101000010", "face-smug": "100000011", "face-side-eye": "011000010", "face-beam": "101010111", "face-worried": "101010110", "face-sulk": "101000001", "face-delight": "101111010", "face-bored": "001000111", "face-tear": "101100100", "face-eyeroll": "010000111", "face-bashful": "101101010", "face-smirk": "101000110", "face-oh": "101000011", "face-pleading": "010101111"};
 const GCOL = {white:"#f5f5f4",red:"#f87171",blue:"#38bdf8",green:"#4ade80",amber:"#fbbf24"};
 const SPEEDS = {slow:1500,normal:800,fast:400};
 const EASE = "cubic-bezier(0.645,0.045,0.355,1)";
@@ -563,12 +574,12 @@ const island = (() => {
     lbl.textContent = s.label || ""; sub.textContent = sentence || "";
     sub.style.display = sentence ? "" : "none";
     el.dataset.open = String(s.open);
-    el.setAttribute("aria-label", "Helios: " + (s.label || "idle"));
+    el.setAttribute("aria-label", "Odysseus: " + (s.label || "idle"));
     if(s.open){ const [w, h] = measure(); el.style.width = w + "px"; el.style.height = Math.max(52, h) + "px";
       el.style.borderRadius = Math.min(Math.max(52, h) / 2, 28) + "px"; }
     else { el.style.width = "52px"; el.style.height = "52px"; el.style.borderRadius = "26px"; }
   }
-  /* The card: Helios grows into a panel (width + height spring), content fades in. */
+  /* The card: Odysseus grows into a panel (width + height spring), content fades in. */
   function openCard(c){
     token++; card = true; last = c; clearTimeout(clearT);
     const s = STATES.card; state = "card";
@@ -576,8 +587,8 @@ const island = (() => {
     lbl.textContent = c.title; sub.textContent = c.sub || ""; sub.style.display = c.sub ? "" : "none";
     body.innerHTML = c.html; if(c.bind) c.bind(body);
     el.dataset.card = "true"; el.dataset.open = "true";
-    el.setAttribute("aria-label", "Helios: " + c.title);
-    const cw = c.width || 320, maxh = Math.max(240, document.getElementById("bezel").clientHeight - 100);
+    el.setAttribute("aria-label", "Odysseus: " + c.title);
+    const bz = document.getElementById("bezel"), cw = Math.min(c.width || 320, bz.clientWidth - 28), maxh = Math.max(200, bz.clientHeight - 30);
     el.style.setProperty("--cw", (cw - 2) + "px"); el.style.setProperty("--maxh", maxh + "px");
     el.style.transition = "none"; const hh = el.style.height; el.style.height = "auto"; el.style.width = cw + "px";
     const h = Math.min(el.offsetHeight, maxh); el.style.height = hh; void el.offsetWidth; el.style.transition = "";
@@ -602,7 +613,7 @@ const island = (() => {
   }
   el.addEventListener("click", toggleDemo);
   el.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleDemo(); } });
-  // right-click Helios: bring the card back (or put it away)
+  // right-click Odysseus: bring the card back (or put it away)
   el.addEventListener("contextmenu", e => { e.preventDefault();
     if(card){ api.onClose && api.onClose(); closeCard(); }
     else if(api.reopen) api.reopen(); });
@@ -649,24 +660,24 @@ const wcol = w => w<1.1 ? "#f87171" : w<1.8 ? "#fb923c" : w<2.8 ? "#fbbf24" : w<
    ============================================================ */
 const I = (d, extra="") => `<svg class="ico" viewBox="0 0 24 24">${d}${extra}</svg>`;
 /* icons from Animate UI (lucide shapes, animated on hover in CSS) */
-const AI = {"orbit": "<svg class=\"ico ai ai-orbit\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M20.341 6.484A10 10 0 0 1 10.266 21.85\"/><path class=\"v-path2\" d=\"M3.659 17.516A10 10 0 0 1 13.74 2.152\"/><circle class=\"v-circle1\" cx=\"12\" cy=\"12\" r=\"3\"/><circle class=\"v-circle2\" cx=\"19\" cy=\"5\" r=\"2\"/><circle class=\"v-circle3\" cx=\"5\" cy=\"19\" r=\"2\"/></svg>", "sparkles": "<svg class=\"ico ai ai-sparkles\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\"/><path class=\"v-plus\" d=\"M20 2v4 M22 4h-4\"/><circle class=\"v-circle\" cx=\"4\" cy=\"20\" r=\"2\"/></svg>", "volume-2": "<svg class=\"ico ai ai-volume-2\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M16 9a5 5 0 0 1 0 6\"/><path class=\"v-path2\" d=\"M19.364 18.364a9 9 0 0 0 0-12.728\"/><path class=\"v-path3\" d=\"M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z\"/></svg>", "activity": "<svg class=\"ico ai ai-activity\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\" pathLength=\"1\"/></svg>", "star": "<svg class=\"ico ai ai-star\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z\"/></svg>", "layers": "<svg class=\"ico ai ai-layers\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\"/><path class=\"v-path2\" d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\"/><path class=\"v-path3\" d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\"/></svg>", "fingerprint": "<svg class=\"ico ai ai-fingerprint\" viewBox=\"0 0 24 24\"><path class=\"v-path\" stroke=\"currentColor\" d=\"M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4 M14 13.12c0 2.38 0 6.38-1 8.88 M17.29 21.02c.12-.6.43-2.3.5-3.02 M2 12a10 10 0 0 1 18-6 M2 16h.01 M21.8 16c.2-2 .131-5.354 0-6 M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2 M8.65 22c.21-.66.45-1.32.57-2 M9 6.8a6 6 0 0 1 9 5.2v2\"/><path class=\"v-path1\" d=\"M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4\" pathLength=\"1\"/><path class=\"v-path2\" d=\"M14 13.12c0 2.38 0 6.38-1 8.88\" pathLength=\"1\"/><path class=\"v-path3\" d=\"M17.29 21.02c.12-.6.43-2.3.5-3.02\" pathLength=\"1\"/><path class=\"v-path4\" d=\"M2 12a10 10 0 0 1 18-6\" pathLength=\"1\"/><path class=\"v-path5\" d=\"M2 16h.01\" pathLength=\"1\"/><path class=\"v-path6\" d=\"M21.8 16c.2-2 .131-5.354 0-6\" pathLength=\"1\"/><path class=\"v-path7\" d=\"M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2\" pathLength=\"1\"/><path class=\"v-path8\" d=\"M8.65 22c.21-.66.45-1.32.57-2\" pathLength=\"1\"/><path class=\"v-path9\" d=\"M9 6.8a6 6 0 0 1 9 5.2v2\" pathLength=\"1\"/></svg>", "play": "<svg class=\"ico ai ai-play\" viewBox=\"0 0 24 24\"><polygon class=\"v-polygon\" points=\"6 3 20 12 6 21 6 3\"/></svg>", "pause": "<svg class=\"ico ai ai-pause\" viewBox=\"0 0 24 24\"><rect class=\"v-rect1\" x=\"14\" y=\"4\" width=\"4\" height=\"16\" rx=\"1\"/><rect class=\"v-rect2\" x=\"6\" y=\"4\" width=\"4\" height=\"16\" rx=\"1\"/></svg>", "rotate-ccw": "<svg class=\"ico ai ai-rotate-ccw\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path class=\"v-path2\" d=\"M3 3v5h5\"/></svg>", "search": "<svg class=\"ico ai ai-search\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"m21 21-4.34-4.34\"/><circle class=\"v-circle\" cx=\"11\" cy=\"11\" r=\"8\"/></svg>", "x": "<svg class=\"ico ai ai-x\" viewBox=\"0 0 24 24\"><line class=\"v-line1\" x1=\"6\" y1=\"18\" x2=\"18\" y2=\"6\"/><line class=\"v-line2\" x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"/></svg>", "comet": "<svg class=\"ico ai ai-comet\" viewBox=\"0 0 24 24\"><circle class=\"v-head\" cx=\"17\" cy=\"7\" r=\"3\"/><path class=\"v-t1\" pathLength=\"1\" d=\"M14.5 9.5L4 20\"/><path class=\"v-t2\" pathLength=\"1\" d=\"M13 12L6 21\"/><path class=\"v-t3\" pathLength=\"1\" d=\"M16 13l-5 8\"/></svg>"};
+const AI = {"orbit": "<svg class=\"ico ai ai-orbit\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M20.341 6.484A10 10 0 0 1 10.266 21.85\"/><path class=\"v-path2\" d=\"M3.659 17.516A10 10 0 0 1 13.74 2.152\"/><circle class=\"v-circle1\" cx=\"12\" cy=\"12\" r=\"3\"/><circle class=\"v-circle2\" cx=\"19\" cy=\"5\" r=\"2\"/><circle class=\"v-circle3\" cx=\"5\" cy=\"19\" r=\"2\"/></svg>", "sparkles": "<svg class=\"ico ai ai-sparkles\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\"/><path class=\"v-plus\" d=\"M20 2v4 M22 4h-4\"/><circle class=\"v-circle\" cx=\"4\" cy=\"20\" r=\"2\"/></svg>", "volume-2": "<svg class=\"ico ai ai-volume-2\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M16 9a5 5 0 0 1 0 6\"/><path class=\"v-path2\" d=\"M19.364 18.364a9 9 0 0 0 0-12.728\"/><path class=\"v-path3\" d=\"M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z\"/></svg>", "activity": "<svg class=\"ico ai ai-activity\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\" pathLength=\"1\"/></svg>", "star": "<svg class=\"ico ai ai-star\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z\"/></svg>", "layers": "<svg class=\"ico ai ai-layers\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\"/><path class=\"v-path2\" d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\"/><path class=\"v-path3\" d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\"/></svg>", "fingerprint": "<svg class=\"ico ai ai-fingerprint\" viewBox=\"0 0 24 24\"><path class=\"v-path\" stroke=\"currentColor\" d=\"M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4 M14 13.12c0 2.38 0 6.38-1 8.88 M17.29 21.02c.12-.6.43-2.3.5-3.02 M2 12a10 10 0 0 1 18-6 M2 16h.01 M21.8 16c.2-2 .131-5.354 0-6 M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2 M8.65 22c.21-.66.45-1.32.57-2 M9 6.8a6 6 0 0 1 9 5.2v2\"/><path class=\"v-path1\" d=\"M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4\" pathLength=\"1\"/><path class=\"v-path2\" d=\"M14 13.12c0 2.38 0 6.38-1 8.88\" pathLength=\"1\"/><path class=\"v-path3\" d=\"M17.29 21.02c.12-.6.43-2.3.5-3.02\" pathLength=\"1\"/><path class=\"v-path4\" d=\"M2 12a10 10 0 0 1 18-6\" pathLength=\"1\"/><path class=\"v-path5\" d=\"M2 16h.01\" pathLength=\"1\"/><path class=\"v-path6\" d=\"M21.8 16c.2-2 .131-5.354 0-6\" pathLength=\"1\"/><path class=\"v-path7\" d=\"M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2\" pathLength=\"1\"/><path class=\"v-path8\" d=\"M8.65 22c.21-.66.45-1.32.57-2\" pathLength=\"1\"/><path class=\"v-path9\" d=\"M9 6.8a6 6 0 0 1 9 5.2v2\" pathLength=\"1\"/></svg>", "play": "<svg class=\"ico ai ai-play\" viewBox=\"0 0 24 24\"><polygon class=\"v-polygon\" points=\"6 3 20 12 6 21 6 3\"/></svg>", "pause": "<svg class=\"ico ai ai-pause\" viewBox=\"0 0 24 24\"><rect class=\"v-rect1\" x=\"14\" y=\"4\" width=\"4\" height=\"16\" rx=\"1\"/><rect class=\"v-rect2\" x=\"6\" y=\"4\" width=\"4\" height=\"16\" rx=\"1\"/></svg>", "rotate-ccw": "<svg class=\"ico ai ai-rotate-ccw\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path class=\"v-path2\" d=\"M3 3v5h5\"/></svg>", "search": "<svg class=\"ico ai ai-search\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"m21 21-4.34-4.34\"/><circle class=\"v-circle\" cx=\"11\" cy=\"11\" r=\"8\"/></svg>", "x": "<svg class=\"ico ai ai-x\" viewBox=\"0 0 24 24\"><line class=\"v-line1\" x1=\"6\" y1=\"18\" x2=\"18\" y2=\"6\"/><line class=\"v-line2\" x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"/></svg>", "comet": "<svg class=\"ico ai ai-comet\" viewBox=\"0 0 24 24\"><circle class=\"v-head\" cx=\"17\" cy=\"7\" r=\"3\"/><path class=\"v-t1\" pathLength=\"1\" d=\"M14.5 9.5L4 20\"/><path class=\"v-t2\" pathLength=\"1\" d=\"M13 12L6 21\"/><path class=\"v-t3\" pathLength=\"1\" d=\"M16 13l-5 8\"/></svg>", "reticle": "<svg class=\"ico ai ai-draw ai-reticle\" viewBox=\"0 0 24 24\"><circle pathLength=\"1\" cx=\"12\" cy=\"12\" r=\"7\"/><path pathLength=\"1\" d=\"M12 2v4M12 18v4M2 12h4M18 12h4\"/><circle pathLength=\"1\" cx=\"12\" cy=\"12\" r=\".8\"/></svg>", "ice": "<svg class=\"ico ai ai-draw ai-ice\" viewBox=\"0 0 24 24\"><path pathLength=\"1\" d=\"M12 2v20M3.3 7l17.4 10M3.3 17l17.4-10\"/><path pathLength=\"1\" d=\"M9.5 4L12 6.5 14.5 4M9.5 20L12 17.5l2.5 2.5\"/></svg>", "bars": "<svg class=\"ico ai ai-draw ai-bars\" viewBox=\"0 0 24 24\"><path pathLength=\"1\" d=\"M3 10v4M7 7v10M11 3v18M15 8v8M19 5v14\"/></svg>", "ringedstar": "<svg class=\"ico ai ai-draw ai-ringedstar\" viewBox=\"0 0 24 24\"><circle pathLength=\"1\" cx=\"12\" cy=\"12\" r=\"8\"/><circle pathLength=\"1\" cx=\"12\" cy=\"12\" r=\"1.8\"/></svg>", "hash": "<svg class=\"ico ai ai-draw ai-hash\" viewBox=\"0 0 24 24\"><path pathLength=\"1\" d=\"M4 9h16M4 15h16M9 4v16M15 4v16\"/></svg>", "pin": "<svg class=\"ico ai ai-draw ai-pin\" viewBox=\"0 0 24 24\"><path pathLength=\"1\" d=\"M12 21s7-6.2 7-11.5a7 7 0 10-14 0C5 14.8 12 21 12 21z\"/><circle pathLength=\"1\" cx=\"12\" cy=\"9.5\" r=\"2.5\"/></svg>", "warning": "<svg class=\"ico ai ai-draw ai-warning\" viewBox=\"0 0 24 24\"><path pathLength=\"1\" d=\"M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z\"/><path pathLength=\"1\" d=\"M12 9v4M12 17h.01\"/></svg>", "eye": "<svg class=\"ico ai ai-draw ai-eye\" viewBox=\"0 0 24 24\"><path pathLength=\"1\" d=\"M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z\"/><circle pathLength=\"1\" cx=\"12\" cy=\"12\" r=\"3\"/></svg>"};
 const TOOLS = [
-  {id:"sky", name:"Sky", key:"1", ico:AI["orbit"],
+  {id:"sky", name:"Sky", key:"1", ico:AI["reticle"],
     t:"Sky view", p:"Pan with drag, zoom with the wheel. Search for a name or coordinates at the top."},
-  {id:"comet", name:"Comet Breath", key:"2", ico:AI["comet"],
+  {id:"comet", name:"Comet Breath", key:"2", ico:AI["ice"],
     t:"Comet Breath", p:"The gas and dust a comet gives off. Type a comet in the search bar to load it."},
-  {id:"listen", name:"Audio", key:"3", ico:AI["volume-2"],
+  {id:"listen", name:"Audio", key:"3", ico:AI["bars"],
     t:"Audio", p:"Turn the spectrum into sound. Higher pitch means brighter. Bells mark the gases and dips.", spec:true},
-  {id:"haptics", name:"Haptics", key:"4", ico:AI["activity"],
+  {id:"haptics", name:"Haptics", key:"4", ico:AI["fingerprint"],
     t:"Haptics", p:"Rub the surface of a body and feel it."}
 ];
 const SPEC_CARD = {id:"spec", t:"Fingerprint", p:"How bright it is at each colour of infrared light. Every material leaves its own pattern, so this tells you what it is made of.", spec:true};
 const LAYERS = [
-  {id:"gaia", name:"Gaia", ico:AI["star"], on:true},
+  {id:"gaia", name:"Gaia", ico:AI["ringedstar"], on:true},
   {id:"wise", name:"WISE", ico:AI["layers"], on:false},
-  {id:"grid", name:"Grid", ico:I('<path d="M4 9h16M4 15h16M9 4v16M15 4v16"/>'), on:false},
-  {id:"labels", name:"Labels", ico:I('<path d="M3 12V4h8l10 10-8 8z"/><circle cx="8" cy="8" r="1"/>'), on:true},
-  {id:"flags", name:"Contamination", ico:I('<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/>'), on:false}
+  {id:"grid", name:"Grid", ico:AI["hash"], on:false},
+  {id:"labels", name:"Labels", ico:AI["pin"], on:true},
+  {id:"flags", name:"Contamination", ico:AI["warning"], on:false}
 ];
 const layerOn = {}; LAYERS.forEach(l => layerOn[l.id] = l.on);
 let tool = "sky";
@@ -684,7 +695,7 @@ LAYERS.forEach(l => {
   const b = document.createElement("button");
   b.className = "tool"; b.dataset.id = l.id; b.innerHTML = l.ico; b.setAttribute("aria-label", l.name);
   b.setAttribute("aria-pressed", String(l.on)); b.dataset.tip = l.name; b.dataset.side = "left";
-  layersEl.appendChild(b);
+  b.style.setProperty("--i", LAYERS.indexOf(l)); layersEl.appendChild(b);
 });
 function moveHl(btn){
   if(!btn){ hl.style.opacity = 0; return; }
@@ -693,8 +704,12 @@ function moveHl(btn){
 toolsEl.addEventListener("pointerover", e => { const b = e.target.closest(".tool"); if(b) moveHl(b); });
 toolsEl.addEventListener("pointerleave", () => moveHl(toolsEl.querySelector(".active")));
 toolsEl.addEventListener("click", e => { const b = e.target.closest(".tool"); if(b) selectTool(b.dataset.id); });
+const layersToggle = document.getElementById("layersToggle"), layersPop = document.getElementById("layersPop");
+function syncLayersParent(){ layersToggle.classList.toggle("has-on", Object.values(layerOn).some(Boolean)); }
+layersToggle.addEventListener("click", () => { const o = !layersPop.classList.contains("open"); layersPop.classList.toggle("open", o); layersToggle.setAttribute("aria-expanded", String(o)); });
+syncLayersParent();
 function setLayer(id, on){
-  layerOn[id] = on; const b = layersEl.querySelector(`[data-id="${id}"]`); if(b) b.setAttribute("aria-pressed", String(on));
+  layerOn[id] = on; syncLayersParent(); const b = layersEl.querySelector(`[data-id="${id}"]`); if(b) b.setAttribute("aria-pressed", String(on));
   const c = document.getElementById("lay-" + id); if(c) c.checked = on;
 }
 layersEl.addEventListener("click", e => {
@@ -727,7 +742,7 @@ const hms = d => { const h = d/15, H = Math.floor(h), m = Math.floor((h-H)*60), 
   return `${H}h ${String(m).padStart(2,"0")}m ${s.toFixed(1).padStart(4,"0")}s`; };
 const dms = d => { const a = Math.abs(d), D = Math.floor(a), m = Math.floor((a-D)*60), s = ((a-D)*60-m)*60;
   return `${d<0?"−":"+"}${D}° ${String(m).padStart(2,"0")}′ ${s.toFixed(0).padStart(2,"0")}″`; };
-function hint(){ if(!hinted){ hinted = true; toast("Right-click Helios to bring it back"); } }
+function hint(){ if(!hinted){ hinted = true; toast("Right-click Odysseus to bring it back"); } }
 const KIND_NAME = {star:"Star", dwarf:"Brown dwarf", asteroid:"Asteroid", comet:"Comet", rocky:"Rocky world", water:"Water world", gas:"Gas giant", nebula:"Gas cloud", nova:"Supernova remnant"};
 function bodyCoords(o){
   if(o.ra !== undefined) return [o.ra, o.dec];
@@ -1008,10 +1023,12 @@ function setFrame(f){
   document.getElementById("fnum").textContent = frame + 1;
   document.getElementById("wl").textContent = WAVES[frame].toFixed(2);
   document.getElementById("fdate").textContent = fmtDate(frame);
-  document.getElementById("wdot").style.color = wcol(WAVES[frame]);
+  wgrid.set({color:wcol(WAVES[frame])});
 }
+const wgrid = GridLoader(document.getElementById("wdot"), {size:18, gap:1, rounded:true, color:"#4ade80", mode:"pulse", pattern:"plus-hollow", speed:"slow"});
 function startPlay(on){
   playing = on;
+  wgrid.set(on ? {mode:"sequence", sequence:["wave-lr","ripple-out","wave-rl","ripple-in"], speed:"fast"} : {mode:"pulse", pattern:"plus-hollow", speed:"slow"});
   document.getElementById("playIco").innerHTML = on ? AI["pause"] : AI["play"];
   playBtn.setAttribute("aria-label", on ? "Pause" : "Play");
 }
@@ -1073,7 +1090,7 @@ function goTo(t){
     cur = t; sel = t; buildSky(t); camT.x = camT.y = cam.x = cam.y = 0; camT.z = 1.15; cam.z = .22; setFrame(0); openTrail(t); return;
   }
   if(TR.open) closeTrail();
-  island.run([["searching",1500]], openFlip);      // zoom first, then Helios opens into the flipbook settings
+  island.run([["searching",1500]], openFlip);      // zoom first, then Odysseus opens into the flipbook settings
   setTimeout(() => {
     cur = t; sel = t; buildSky(t); camT.x = camT.y = cam.x = cam.y = 0; camT.z = 1.15; cam.z = .22; setFrame(0);
   }, 450);
@@ -1524,17 +1541,18 @@ function openBuild(o, opt){
   B.obj = o; B.kind = o.kind || "star"; B.building = true; B.seed = 3 + Math.floor((o.ra || o.x || 1) * 13) % 40;
   document.body.classList.add("split"); $("view").classList.add("building"); bpane.classList.add("open"); bpane.setAttribute("aria-hidden", "false");
   history.replaceState(null, "", "#build"); camT.z = Math.max(camT.z, 1.5); fillBuildUI(); if(B.quick) $("bpTitle").textContent = o.n; island.set(B.quick ? "idle" : "building");
+  loading("bLoad", true);
   ensureThree(ok => {
-    if(!ok){ bpMsg.hidden = false; bpMsg.textContent = "The 3D build needs the three.js script from the internet, and it could not load."; return; }
-    try{ initGL(); }catch(err){ bpMsg.hidden = false; bpMsg.textContent = "The 3D build needs WebGL, which this browser could not start."; return; }
+    if(!ok){ loading("bLoad", false); bpMsg.hidden = false; bpMsg.textContent = "The 3D build needs the three.js script from the internet, and it could not load."; return; }
+    try{ initGL(); }catch(err){ loading("bLoad", false); bpMsg.hidden = false; bpMsg.textContent = "The 3D build needs WebGL, which this browser could not start."; return; }
     if(!B.building) return;
-    bpMsg.hidden = true; sizeGL(); setBody(); replay();
+    loading("bLoad", false); bpMsg.hidden = true; sizeGL(); setBody(); replay();
     if(B.quick){ B.t0 = performance.now() - 1e5; B.done = true; island.set("idle"); if(!FG.on) bpFeel.onclick(); }
     cancelAnimationFrame(B.raf); B.raf = requestAnimationFrame(loop);
   });
 }
 function closeBuild(){
-  if(!B.building) return; if(FG.on) bpFeel.onclick(); feelEnd(); SFX.stop(); B.building = false; cancelAnimationFrame(B.raf);
+  if(!B.building) return; loading("bLoad", false); if(FG.on) bpFeel.onclick(); feelEnd(); SFX.stop(); B.building = false; cancelAnimationFrame(B.raf);
   document.body.classList.remove("split"); $("view").classList.remove("building"); bpane.classList.remove("open"); bpane.setAttribute("aria-hidden", "true");
   history.replaceState(null, "", location.pathname + location.search); island.run([["idle",1]]); tool = "sky"; markTool("sky");
 }
@@ -1675,15 +1693,16 @@ function openTrail(o){
   document.body.classList.add("split"); $("view").classList.add("building", "trailing"); tpane.classList.add("open"); tpane.setAttribute("aria-hidden", "false");
   history.replaceState(null, "", "#comet-trail"); island.set("thinking");
   requestAnimationFrame(() => segSet($("tpEpoch"), TR.epoch, true));
+  loading("tLoad", true);
   ensureThree(ok => {
-    if(!ok){ island.run([["error",1800],["idle",1]]); toast("The 3D view needs the three.js script from the internet"); closeTrail(); return; }
+    if(!ok){ loading("tLoad", false); island.run([["error",1800],["idle",1]]); toast("The 3D view needs the three.js script from the internet"); closeTrail(); return; }
     try{ initGL(); trailBuild(); }catch(err){ toast("The 3D view needs WebGL"); closeTrail(); return; }
     if(!TR.open) return;
-    trailSize(); trailBody(); island.set("idle"); TR.t0 = TR.last = performance.now(); cancelAnimationFrame(TR.raf); TR.raf = requestAnimationFrame(trailLoop);
+    trailSize(); trailBody(); loading("tLoad", false); island.set("idle"); TR.t0 = TR.last = performance.now(); cancelAnimationFrame(TR.raf); TR.raf = requestAnimationFrame(trailLoop);
   });
 }
 function closeTrail(){
-  if(!TR.open) return; SFX.stop(); tool = "sky"; markTool("sky"); TR.open = false; cancelAnimationFrame(TR.raf);
+  if(!TR.open) return; loading("tLoad", false); SFX.stop(); tool = "sky"; markTool("sky"); TR.open = false; cancelAnimationFrame(TR.raf);
   document.body.classList.remove("split"); $("view").classList.remove("building", "trailing"); tpane.classList.remove("open"); tpane.setAttribute("aria-hidden", "true");
   history.replaceState(null, "", location.pathname + location.search); island.run([["idle",1]]);
 }
@@ -1777,7 +1796,8 @@ function hearSpec(btn){
   if(SFX.playing()){ SFX.stop(); return; }
   const o = sel || cur || {}, k = o.kind || "star", {F, marks} = specFor(k), low = ["dwarf","asteroid","rocky","water","gas"].includes(k);
   const bells = marks.map(([wl], i) => ({x:wl, f:low ? 196*(1 + .25*i) : 523*Math.pow(1.26, i), amp:.7}));
-  const label = btn.textContent, setT = on => { btn.textContent = on ? "Stop" : label; };
+  const label = btn.dataset.label || (btn.dataset.label = btn.textContent);
+  const setT = on => { if(on){ btn.innerHTML = '<span class="mg"></span>Stop'; GridLoader(btn.querySelector(".mg"), {size:14, gap:1, rounded:true, color:"#09090b", mode:"sequence", sequence:["wave-lr","wave-tb","wave-rl","wave-bt"], speed:"fast"}); } else btn.textContent = label; };
   if(!SFX.sweep(F, .75, 5, bells, 6, () => setT(false))){ toast("This browser cannot play sound"); return; }
   setT(true);
   (function tick(){ const p = SFX.progress(); if(p === null || !document.body.contains(btn)){ drawSpec(); return; } drawSpec(p); requestAnimationFrame(tick); })();
@@ -1785,7 +1805,8 @@ function hearSpec(btn){
 /* "Listen" on the comet trail: follows the spectrum on screen, a bell for each gas that is switched on */
 function hearTrail(){
   const ic = $("tpHearIc"), tx = $("tpHearTx"), set = on => { tx.textContent = on ? "Stop" : "Listen";
-    ic.innerHTML = on ? '<rect x="3" y="3" width="10" height="10" rx="2"/>' : '<path d="M4 2.5v11l9-5.5z"/>'; };
+    ic.innerHTML = on ? "" : '<svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M4 2.5v11l9-5.5z"/></svg>';
+    if(on) GridLoader(ic, {size:14, gap:1, rounded:true, color:"#fafafa", mode:"sequence", sequence:["wave-lr","wave-tb","wave-rl","wave-bt"], speed:"fast"}); };
   if(SFX.playing()){ SFX.stop(); return; }
   const G = (x, m, sg) => Math.exp(-((x - m)**2)/(2*sg*sg)), A = {...TR.amp};
   const F = x => .08 + .02*x + (TR.on.h2o ? A.h2o*G(x, 2.75, .075) : 0) + (TR.on.co2 ? A.co2*G(x, 4.25, .05) : 0) + (TR.on.co ? A.co*G(x, 4.67, .06) : 0);
@@ -1836,6 +1857,11 @@ function openHaptics(){
   const o = sel || cur; if(!o) return;
   if(o.kind === "nebula" || o.kind === "nova"){ toast("A gas cloud has no surface to feel. Pick a rock, planet or star."); tool = "sky"; markTool("sky"); return; }
   openBuild(o, {feel:true}); tool = "haptics"; markTool("haptics");
+}
+const loadG = {};
+function loading(id, on){
+  const box = $(id), host = $(id + "G"); box.classList.toggle("on", on);
+  if(on && !loadG[id]) loadG[id] = GridLoader(host, {size:44, gap:2, rounded:true, blur:.3, color:"#4ade80", mode:"sequence", sequence:["spiral-cw","ripple-out","plus-full","frame","ripple-in","spiral-ccw"], speed:"normal"});
 }
 const bpStage = $("bpStage"), bpRing = $("bpRing"), bpFeel = $("bpFeel");
 const FG = {on:false, x:0, y:0, down:false, last:null, acc:0, spd:0, t:0};
