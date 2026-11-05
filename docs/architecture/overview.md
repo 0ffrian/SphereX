@@ -15,7 +15,7 @@ The base tool must exist before any extra. If time runs short, cut from the bott
 | **P0** | Flipbook: coordinates or name in, SPHEREx frames out, played as a series. Must work on Barnard's Star, Epsilon Indi B, WISE 0855, RW Aurigae, R Draconis. | Required by the challenge. |
 | **P0** | Spectrum on the fly for a clicked object (flux per frame against wavelength, with error bars and flags). | The twist, and an optional challenge item. |
 | **P1** | Gaia and WISE overlays, URL coordinates, contamination flags, field of view, add and subtract images. | Optional items in the challenge. |
-| **P1** | Rainbow Trails: a view mode of the flipbook, one dot per band along a moving object's path. Uses the frames and mover positions the flipbook already loads. Built after basic playback works (D-28). | The team's early concept ([handover](../handover.md) §5). |
+| **P1** | Rainbow Trails: a view mode of the flipbook, one dot per band along a moving object's path. Uses the frames and mover positions the flipbook already loads. Built after basic playback works (D-28). Dot colour is a false colour, hue = wavelength, tagged `derived` (Estimated badge); in "Measured only" the dots are drawn in one colour (D-21, Q-27). UI built in M1 (issue #3); real movers wait for Q-21. | The team's early concept ([handover](../handover.md) §5). |
 | **P1** | Classify the object, then Sky Sculptor (3D body from the ObjectCard and RenderParams). | Headline wow. |
 | **P1** | Spectrum haptics with audio pairing, for every object (rendering doc §8.6, §8.9). | Access for blind and low-vision users. Works on every object, even a `candidate`. |
 | **P2** | Physics layer, all body types, sliders. | Depth. |

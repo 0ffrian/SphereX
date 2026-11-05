@@ -17,7 +17,7 @@ Mermaid renders natively on GitHub, and in VS Code with a Mermaid extension (for
 | [05-class-data-contract.md](05-class-data-contract.md) | Class (2 diagrams) | `Tag`, `TV<T>`, `ObjectType`, `ObjectCard`, `RenderParams`, `Layer`, textures, lighting, view modes, `HapticProfile`, `overrides` and the slider registry |
 | [06-class-haptics-audio.md](06-class-haptics-audio.md) | Class (2 diagrams) | `HapticEvent`, `HapticDriver` and its drivers, `HapticEngine` fan-out, calibration, the debug pulse indicator, the event sources behind `HapticSource` |
 | [07-class-viewer.md](07-class-viewer.md) | Class | `ViewerApp`, the renderer interface and per-type renderers, `ShaderBody`, field worker, lighting, modes, honesty, scale bar, alt text |
-| [08-sequence-search-flipbook.md](08-sequence-search-flipbook.md) | Sequence | Search, name resolve, frames through the read-through cache, cutouts, flipbook playback, Rainbow Trails |
+| [08-sequence-search-flipbook.md](08-sequence-search-flipbook.md) | Sequence | Search, name resolve, frames through the read-through cache, cutouts, flipbook playback, Rainbow Trails, URL hash links, the dev-only fixture path |
 | [09-sequence-object-spectrum.md](09-sequence-object-spectrum.md) | Sequence | Click a source, photometry and spectrum, classify, type selection, `ObjectCard`, panel with badges and Listen |
 | [10-sequence-view-3d.md](10-sequence-view-3d.md) | Sequence | View in 3D: render-params, asset lookup, bake if not cached, renderer by type, `missing` layers |
 | [11-sequence-touch-haptics.md](11-sequence-touch-haptics.md) | Sequence | Touch mode: unlock, pointermove, intersect, sample, source, rate limit, fan-out to vibrate and audio |

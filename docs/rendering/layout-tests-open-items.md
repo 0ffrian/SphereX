@@ -28,8 +28,19 @@ frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
 frontend/src/contract/               (generated, D-18)  # TS types generated from shared/schemas/ by json-schema-to-typescript;
                                                         # hand-written helpers such as assertTagged() sit next to them;
                                                         # where the R8.8 haptic types live: Q-19
-frontend/src/state/                  (Moon)  # Zustand store: card, params, honesty, overrides (A10, D-02)
-frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, StatusLine
+frontend/src/state/                  (Moon)  # Zustand store: card, params, honesty, overrides (A10, D-02);
+                                             # store.ts also holds the `sky` slice (flipbook session: search, frames,
+                                             # playback, view mode, spectrum, link problems; A1.1, A4.1, A4.2)
+frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, StatusLine, FixtureBanner, LiveAnnouncer,
+                                             # Badge, urlHash.ts + useHashSync.ts (A10 hash routing)
+  api/                # M1 API client (D-16): client, config, errors, validate; types.ts is hand-written until D-18 generation
+  search/             # SearchBar, parseQuery (name, or RA, Dec in decimal degrees), testTargets (the five A1.1 targets)
+  flipbook/           # Flipbook player, playback, keys, cutout preloading, RainbowTrails + wavelengthColor (D-28)
+  spectrum/           # SpectrumPanel, SVG SpectrumChart, scale (displays the A4.2 output)
+frontend/src/test/                           # test-only helpers (fixtureFetch.ts)
+frontend/fixtures/                           # dev and test only: SYNTHETIC fixture server, a Vite dev-server plugin
+                                             # enabled by `npm run dev:fixtures`; never part of a build
+frontend/scripts/                            # check-dist.js: ends `npm run build`, fails if a fixture marker is in dist/
 shared/schemas/object-card.schema.json  render-params.schema.json   (Munazir, provisional)
 shared/fixtures/                     (Munazir, provisional)
 ```
@@ -44,6 +55,8 @@ Owners follow D-17. Munazir's assignments are provisional until Munazir confirms
 | Moon | The flipbook UI, the shader kinds, the overlay UI |
 
 `contract/`, `state/` and `app/` were added when the frontend was scaffolded (4 Nov 2026). See the [frontend README](../../frontend/README.md#layout). `contract/` is generated from `shared/schemas/` (D-18); CI fails if regenerated files differ from the committed ones. The hand-written scaffold types stay until the schemas exist, then get replaced.
+
+The `app/` subfolders (`api/`, `search/`, `flipbook/`, `spectrum/`), the `sky` slice, `src/test/`, `fixtures/` and `scripts/` were added by the flipbook and spectrum view (M1, issue #3, 5 Nov 2026). The fixture server answers `/v1` with synthetic data and marks every reply with `X-SX-Fixture: synthetic`; see the [fixtures README](../../frontend/fixtures/README.md). D-17 names no owner for `src/test/`, `fixtures/` and `scripts/`; they are dev and test tooling for the flipbook UI.
 
 ---
 

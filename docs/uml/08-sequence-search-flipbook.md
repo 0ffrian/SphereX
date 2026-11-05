@@ -1,6 +1,6 @@
 # 08 Sequence: search and flipbook
 
-A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1 and §9, rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache) and D-28 (Rainbow Trails).
+A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache) and D-28 (Rainbow Trails).
 
 ```mermaid
 sequenceDiagram
@@ -13,9 +13,25 @@ sequenceDiagram
   participant R as Name resolver (SBDB, SIMBAD)
   participant SIA as IRSA SIA (spherex_qr2)
   participant HZ as Horizons + SkyBoT
+  participant FX as Fixture server (dev only)
 
-  U->>UI: Enter name or RA/Dec
-  UI->>UI: Write coordinates or id to URL hash (share link)
+  opt dev only: npm run dev:fixtures
+    Note over UI,FX: A Vite dev-server plugin answers every /v1 call below instead of the backend. Never part of a build.
+    UI->>FX: The same /v1 requests
+    FX-->>UI: Synthetic replies with header X-SX-Fixture: synthetic
+    UI->>UI: Page-wide "Fixture data" banner, Fixture badges instead of Measured, SYNTHETIC image label
+  end
+  alt user types a name or RA/Dec
+    U->>UI: Enter name or RA/Dec
+  else user opens a shared link or presses Back
+    U->>UI: URL hash #35;ra=…&dec=…[&name=…][&frame=…]
+    UI->>UI: Parse the hash. Unusable parts are ignored, never guessed, shown under the search field and announced (live region)
+    alt hash has a name or valid coordinates
+      UI->>UI: Search the name if present, else the coordinates (frame= reopens that frame)
+    else hash is empty (Back to the page without a hash) or has neither
+      UI->>UI: Reset the search to the empty start state, no request
+    end
+  end
   UI->>API: GET /v1/resolve?q=name or ra,dec
   alt input is a name that looks like a small body
     API->>R: SBDB first, SIMBAD on a miss (via the cache)
@@ -27,6 +43,7 @@ sequenceDiagram
     API->>API: Skip name resolution
   end
   API-->>UI: id, ra, dec, moving
+  UI->>UI: Write #35;ra=…&dec=…[&name=…] to the URL hash (share link). A typed search adds a history entry, a link replaces it
   UI->>API: GET /v1/objects/{id}/frames
   API->>C: Look up (source + data release + normalised query)
   alt cache hit
@@ -55,6 +72,7 @@ sequenceDiagram
     API-->>UI: M1 refuses: frames empty, missing frames:moving_object_search (Q-21)
   end
   API-->>UI: frame_id, time, wavelength_um, x, y, cutout_url per frame, plus the stretch used and cached_at if from cache
+  UI->>UI: Badges: wavelength and time Measured, display stretch Estimated (derived, tooltip gives its parameters)
   UI->>FB: Load frames
   loop each frame
     FB->>API: GET /v1/objects/{id}/cutouts/{frame_id}.png
@@ -63,12 +81,17 @@ sequenceDiagram
   loop play
     FB->>FB: Show next frame, clickable rings on sources
   end
+  opt user pauses or steps
+    FB->>UI: Current frame
+    UI->>UI: Replace the hash in place with frame=… (no new history entry)
+  end
   opt P1 overlays
     U->>FB: Toggle Gaia / WISE markers
   end
   opt P1 Rainbow Trails view mode (D-28)
     U->>FB: Switch to Rainbow Trails
     FB->>FB: One dot per band along the mover's path, from the frames and positions already loaded
+    FB->>FB: Dot colour = false colour, hue = wavelength (derived, Estimated badge). Monochrome in Measured only
   end
 ```
 
@@ -79,6 +102,8 @@ sequenceDiagram
 - Cache order (D-25): cache, then a live call with a timeout and retries with backoff, then an older cached entry, then refuse. There is no expiry for the event. A refused layer goes in `missing`.
 - All five test targets (Barnard's Star, Epsilon Indi B, WISE 0855, RW Aurigae, R Draconis) and the demo objects are pre-fetched, so the demo runs with `SX_OFFLINE=1` and always hits the cache (D-25).
 - A `candidate` source gets one haptic tick per frame where it is detected (rendering doc §8.5). That path is not drawn here.
-- Rainbow Trails is built after basic playback works (D-28).
+- Rainbow Trails is built after basic playback works (D-28). As built in M1 (issue #3), the dot colour is a false colour, hue = wavelength, tagged `derived` with that formula, so it wears the Estimated badge. In "Measured only" (D-21) the dots are drawn in one colour. The mode is offered only for a `moving` object whose frames share a north-up grid, so with real data it waits for Q-21. The M1 UI has no honesty toggle yet, so the monochrome state is not reachable from the page. Tagging question: Q-27.
+- URL hash (architecture spec §10, hash routing): `#ra=<deg>&dec=<deg>[&name=<search text>][&frame=<frame_id>]`. `name` is kept for a name search, so a link to a moving object reopens the same object id. A link with a name searches the name, otherwise the coordinates. Going back to the page without a hash resets the search. Unusable parts (bad coordinates, or no name and no coordinates) are ignored, never guessed: they are shown under the search field and announced in the polite live region.
+- Dev-only fixture path: `npm run dev:fixtures` (`vite --mode fixtures`) mounts a Vite dev-server plugin from `frontend/fixtures/` that answers `/v1` with synthetic data, and `npm run test:e2e` always uses it. Every reply carries `X-SX-Fixture: synthetic`. The UI then shows a page-wide "Fixture data" banner, "Fixture" badges instead of "Measured" (and instead of the stretch's Estimated badge) and a SYNTHETIC label on the image. `vite build` never runs the plugin, and `scripts/check-dist.js` fails the build if a fixture marker reaches `dist/` ([fixtures README](../../frontend/fixtures/README.md)).
 - `moving` means a solar-system body (Q-22). High proper-motion stars are not `moving`; their positions come from the SIMBAD proper motion, propagated to each frame time. The ephemeris-driven frame search for moving objects is not built in M1 (Q-21).
 - The SIA search and every cutout go through the cache. A cut-off SIA answer (`QUERY_STATUS=OVERFLOW`) adds `frames:truncated` to `missing`.
