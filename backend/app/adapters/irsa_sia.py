@@ -1,0 +1,159 @@
+"""IRSA Simple Image Access search for SPHEREx frames (A3.1). Tiny cones only."""
+
+from __future__ import annotations
+
+import io
+import warnings
+from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
+
+from app.adapters.http import UpstreamError
+from app.cache.keys import CacheKey, norm_dec, norm_float, norm_ra
+from app.cache.store import CacheEntry, LiveResponse, Served
+from app.context import Context
+
+SOURCE = "irsa_sia"
+
+
+@dataclass(frozen=True)
+class SiaRow:
+    frame_id: str
+    obs_id: str
+    detector: int
+    access_url: str
+    t_min_mjd: float
+    t_max_mjd: float
+    em_min_um: float
+    em_max_um: float
+
+
+@dataclass(frozen=True)
+class SiaResult:
+    rows: list[SiaRow]
+    truncated: bool
+    served: Served
+
+
+def sia_key(release: str, ra: float, dec: float, radius_deg: float) -> CacheKey:
+    # MAXREC is deliberately not in the key: the prefetch may lower it after a timeout, and the
+    # server must still find the entry. The MAXREC used is stored in the entry's meta.
+    return CacheKey.make(
+        SOURCE, release, ra=norm_ra(ra), dec=norm_dec(dec), radius=norm_float(radius_deg, 6)
+    )
+
+
+def _votable(body: bytes):  # type: ignore[no-untyped-def]
+    from astropy.io.votable import parse
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return parse(io.BytesIO(body), verify="ignore")
+
+
+def query_status(body: bytes) -> str:
+    vot = _votable(body)
+    for res in vot.resources:
+        for info in res.infos:
+            if info.name == "QUERY_STATUS":
+                return str(info.value).upper()
+    for info in vot.infos:
+        if info.name == "QUERY_STATUS":
+            return str(info.value).upper()
+    return "OK"
+
+
+def _frame_id(did: str, obs_id: str, band: str) -> str:
+    """``ivo://irsa.ipac/spherex_qr2?2026W12_1A_0311_3/D2`` -> ``2026W12_1A_0311_3_D2``."""
+    if "?" in did:
+        return did.split("?", 1)[1].replace("/", "_")
+    det = band.rsplit("-", 1)[-1] if band else "D0"
+    return f"{obs_id}_{det}"
+
+
+def parse_rows(body: bytes) -> list[SiaRow]:
+    vot = _votable(body)
+    tables = list(vot.iter_tables())
+    if not tables:
+        return []
+    table = tables[0].to_table(use_names_over_ids=True)
+    names = set(table.colnames)
+    rows: list[SiaRow] = []
+
+    def s(rec: Any, col: str) -> str:
+        if col not in names:
+            return ""
+        v = rec[col]
+        if v is np.ma.masked:
+            return ""
+        return v.decode() if isinstance(v, bytes) else str(v)
+
+    for rec in table:
+        if s(rec, "dataproduct_type") != "image" or s(rec, "calib_level") not in ("2", "2.0"):
+            continue
+        band = s(rec, "energy_bandpassname")
+        obs_id = s(rec, "obs_id")
+        frame_id = _frame_id(s(rec, "obs_publisher_did"), obs_id, band)
+        det_text = frame_id.rsplit("_D", 1)[-1]
+        rows.append(
+            SiaRow(
+                frame_id=frame_id,
+                obs_id=obs_id,
+                detector=int(det_text) if det_text.isdigit() else 0,
+                access_url=s(rec, "access_url"),
+                t_min_mjd=float(s(rec, "t_min")),
+                t_max_mjd=float(s(rec, "t_max")),
+                em_min_um=float(s(rec, "em_min")) * 1e6,
+                em_max_um=float(s(rec, "em_max")) * 1e6,
+            )
+        )
+    return rows
+
+
+def raw_row_count(body: bytes) -> int:
+    """Rows in the answer before any filtering (what MAXREC limits)."""
+    tables = list(_votable(body).iter_tables())
+    return len(tables[0].array) if tables else 0
+
+
+def is_truncated(body: bytes, maxrec: object) -> bool:
+    if query_status(body) == "OVERFLOW":
+        return True
+    return isinstance(maxrec, int) and maxrec > 0 and raw_row_count(body) >= maxrec
+
+
+def _result(entry: CacheEntry, served: Served) -> SiaResult:
+    rows = parse_rows(entry.body)
+    truncated = is_truncated(entry.body, entry.meta.get("maxrec"))
+    return SiaResult(rows=rows, truncated=truncated, served=served)
+
+
+def search(
+    ctx: Context,
+    ra: float,
+    dec: float,
+    *,
+    refresh: bool = False,
+    maxrec: int | None = None,
+    read_timeout_s: float | None = None,
+) -> SiaResult:
+    s = ctx.settings
+    key = sia_key(s.data_release, ra, dec, s.sia_radius_deg)
+    n = maxrec or s.sia_maxrec
+    ra_t, dec_t, rad_t = dict(key.query)["ra"], dict(key.query)["dec"], dict(key.query)["radius"]
+
+    def live() -> LiveResponse:
+        params = {
+            "COLLECTION": s.data_release,
+            "POS": f"circle {ra_t} {dec_t} {rad_t}",
+            "MAXREC": str(n),
+        }
+        resp = ctx.http.get(s.sia_url, params, read_timeout_s=read_timeout_s)
+        status = query_status(resp.body)
+        if status == "ERROR":
+            raise UpstreamError("SIA returned QUERY_STATUS=ERROR")
+        return LiveResponse(resp.body, resp.url, resp.status, resp.content_type, {"maxrec": n})
+
+    served = ctx.cache.fetch(key, live, refresh=refresh)
+    return _result(served.entry, served)
