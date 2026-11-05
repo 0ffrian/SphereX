@@ -4,13 +4,9 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const MARKERS = [
-  'SX_FIXTURE_MARKER',
-  'synthetic_fixture',
-  'synthetic-mover',
-  'SYNTHETIC_FLAG',
-  'synthetic fixture:', // source strings in shared/fixtures/
-];
+const MARKERS = ['SX_FIXTURE_MARKER', 'synthetic_fixture', 'synthetic-mover', 'SYNTHETIC_FLAG'];
+// Text in every file of shared/fixtures/. The flipbook's "synthetic fixture data" label must not match.
+const SHARED_FIXTURE_TEXT = /synthetic fixture[:.]/i;
 const dist = fileURLToPath(new URL('../dist', import.meta.url));
 
 function* files(dir) {
@@ -25,6 +21,7 @@ const hits = [];
 for (const file of files(dist)) {
   const text = readFileSync(file, 'utf8');
   for (const m of MARKERS) if (text.includes(m)) hits.push(`${file}: ${m}`);
+  if (SHARED_FIXTURE_TEXT.test(text)) hits.push(`${file}: ${SHARED_FIXTURE_TEXT}`);
 }
 
 if (hits.length > 0) {
