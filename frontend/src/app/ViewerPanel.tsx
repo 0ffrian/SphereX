@@ -56,6 +56,9 @@ interface Choices {
   scrub: number;
 }
 
+/** Said (live region) when the governor lowers the render quality. */
+export const QUALITY_DROP_ANNOUNCEMENT = 'Lowered render quality to keep motion smooth';
+
 const PLACEHOLDER_LABEL = 'Viewer placeholder: no object loaded';
 
 const ROTATE_BUTTONS: { dir: 'left' | 'right' | 'up' | 'down'; label: string; glyph: string }[] = [
@@ -197,6 +200,15 @@ export function ViewerPanel() {
       viewer.setLoadFailedHandler(null);
     };
   }, [viewer, objectKey]);
+
+  // A tier drop from the frame-time governor is said in plain words (R9, never silent).
+  useEffect(() => {
+    if (!viewer) return;
+    viewer.setQualityChangeHandler((e) => {
+      if (e.auto) setAnnouncement(QUALITY_DROP_ANNOUNCEMENT);
+    });
+    return () => viewer.setQualityChangeHandler(null);
+  }, [viewer]);
 
   // The pause choice is the user's; the viewer keeps it across rebuilds.
   useEffect(() => {
@@ -502,6 +514,16 @@ export function ViewerPanel() {
               )}
             </div>
           )}
+
+          {/* Every time-lapse states its speed-up (plan 09). The spin has its own note above. */}
+          {viewer
+            ?.timeLapses?.()
+            .filter((t) => t.id !== 'spin')
+            .map((t) => (
+              <p key={t.id} className="text-sm text-neutral-200" data-testid="time-lapse-note">
+                {t.label} sped up ×{t.speedup}.
+              </p>
+            ))}
 
           <section aria-labelledby="legend-heading" className="flex flex-col gap-1">
             <h3 id="legend-heading" className="text-sm font-medium text-neutral-200">
