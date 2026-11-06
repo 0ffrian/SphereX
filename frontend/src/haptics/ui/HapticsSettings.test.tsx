@@ -90,6 +90,8 @@ describe('HapticsSettings (R8.7)', () => {
       root.render(<HapticsSettings canVibrate onCalibrate={onCalibrate} platform={desktop} />),
     );
     expect(host.textContent).not.toContain('Calibrate vibration');
+    // Desktop Chrome has navigator.vibrate, but it does not vibrate: say so.
+    expect(host.textContent).toContain('This device cannot vibrate');
     const phone = { android: true, coarsePointer: true };
     act(() =>
       root.render(<HapticsSettings canVibrate onCalibrate={onCalibrate} platform={phone} />),
@@ -108,10 +110,17 @@ describe('HapticsSettings (R8.7)', () => {
     const reset = [...host.querySelectorAll('button')].find(
       (el) => el.textContent === 'Reset to defaults',
     )!;
+    const status = () => host.querySelector('[role="status"]')!.textContent!;
     act(() => reset.click());
     expect(localStorage.getItem(SETTINGS_STORAGE_KEY)).toBeNull();
-    expect(host.querySelector('[role="status"]')!.textContent).toBe(
-      "Settings reset to this device's defaults.",
-    );
+    expect(status().trim()).toBe("Settings reset to this device's defaults.");
+    const first = status();
+    // A second reset changes the live text, so it is announced again.
+    act(() => reset.click());
+    expect(status()).not.toBe(first);
+    expect(status().trim()).toBe("Settings reset to this device's defaults.");
+    // Any later change clears the confirmation.
+    act(() => setRange(input(/^Volume/), '0.4'));
+    expect(status().trim()).toBe('');
   });
 });

@@ -7,7 +7,6 @@ import type { SpectrumPoint } from '@/app/api/types';
 import { buttonClass } from '@/app/ui';
 import {
   applyStoredCalibration,
-  calibrationAvailable,
   clearCalibration,
   defaultCalibration,
   levelsToVibrate,
@@ -17,6 +16,7 @@ import {
 import { CalibrationWizard } from '@/haptics/ui/CalibrationWizard';
 import { HapticsSettings } from '@/haptics/ui/HapticsSettings';
 import { SpectrumHapticsPad } from '@/haptics/ui/SpectrumHapticsPad';
+import { deviceVibrates as platformDeviceVibrates } from '@/haptics/platform';
 import { UnlockButton } from '@/haptics/ui/UnlockButton';
 import type { TestPanelProps } from '../panelProps';
 
@@ -88,7 +88,7 @@ export function SpectrumPanel({ haptics }: TestPanelProps) {
   const [calibrating, setCalibrating] = useState(false);
   const [saved, setSaved] = useState<Calibration | null>(loadCalibration);
   // R8.7 phone rule (vibrate API, Android, touch screen): desktop Chrome has vibrate but no motor.
-  const [deviceVibrates] = useState(() => calibrationAvailable(haptics.vibrate.supported));
+  const [deviceVibrates] = useState(() => platformDeviceVibrates(haptics.vibrate.supported));
   const calibrateButton = useRef<HTMLButtonElement>(null);
 
   // Apply this device's calibration (or the defaults) to the drivers.

@@ -48,7 +48,7 @@ sequenceDiagram
     alt Cancel at any step
       W->>NV: vibrate(0) if a pattern may still play
       W->>AD: stop() if a sound beat may still play
-      W->>U: Closed, nothing saved, focus back to the opener
+      W->>U: Closed (focus back to the opener) or back to the intro, run forgotten, nothing saved
     else Save
       W->>CL: saveCalibration, only when a step was re-measured
       CL->>LS: Write sx.haptics.calibration (validated)
