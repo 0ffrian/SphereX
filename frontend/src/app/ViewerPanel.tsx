@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '@/state/store';
 import { prefersReducedMotion, ViewerApp } from '@/viewer/ViewerApp';
+import { showsBody } from '@/viewer/planCommon';
 import {
   canvasLabel,
   epochAnnouncement,
@@ -22,11 +23,11 @@ import {
   HONESTY_STATES,
   type HonestyState,
 } from '@/viewer/honesty';
-import type { PlanContext, ViewModeId } from '@/viewer/planTypes';
+import type { PlanContext, RenderPlan, ViewModeId } from '@/viewer/planTypes';
 import { defaultContext, planRender } from '@/viewer/renderPlan';
 import { COMET_EPOCHS, epochsWithQ, EPOCH_LABEL } from '@/viewer/renderers/Comet';
 import { scaleBarFor } from '@/viewer/scaleBar';
-import type { CometEpoch } from '@/contract';
+import type { CometEpoch, ObjectCard, RenderParams } from '@/contract';
 import { ProvenanceBadge } from './Badge';
 import { describeRefusal, layerName } from './messages';
 import { buttonClass, pressedClass } from './ui';
@@ -145,6 +146,24 @@ export function ViewerPanel() {
         canvas.dataset.backend = created.backend;
         console.info(`[viewer] three r187 WebGPURenderer backend: ${created.backend}`);
         setRendererStatus(created.backend);
+        // Test hook for e2e/shaderKinds.spec.ts; dead-code-eliminated from production builds.
+        if (import.meta.env.MODE === 'fixtures') {
+          const w = window as unknown as {
+            __sxViewer?: ViewerApp;
+            __sxShow?: (
+              card: ObjectCard,
+              params: RenderParams,
+              honesty: HonestyState,
+            ) => RenderPlan;
+          };
+          w.__sxViewer = created;
+          // Plans and draws like the panel does, for a given honesty state.
+          w.__sxShow = (c, p, honesty) => {
+            const shown = planRender(c, p, defaultContext({ honesty }));
+            created.showPlan(shown);
+            return shown;
+          };
+        }
         setViewer(created);
       },
       (err: unknown) => {
@@ -215,8 +234,7 @@ export function ViewerPanel() {
   // Not announced here: the slider's own value text is read by screen readers when it moves.
   const onScrub = (i: number) => setChoices({ ...choices, scrub: i });
 
-  const nothingDrawn =
-    plan && plan.threeD && plan.bodies.length === 0 ? nothingDrawnReason(plan) : null;
+  const nothingDrawn = plan && plan.threeD && !showsBody(plan) ? nothingDrawnReason(plan) : null;
   const defaultsShown = plan?.missing.filter((m) => m.defaultShown) ?? [];
   const notDrawn = plan?.missing.filter((m) => !m.defaultShown) ?? [];
   const disabled = viewer === null;
@@ -230,7 +248,10 @@ export function ViewerPanel() {
       </h2>
       <div className="relative aspect-square w-full max-w-xl overflow-hidden rounded-lg border border-neutral-800 bg-black sm:aspect-[4/3]">
         <div ref={hostRef} className="absolute inset-0" />
-        <p className="pointer-events-none absolute left-3 top-3 max-w-[85%] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300">
+        <p
+          data-testid="viewer-label"
+          className="pointer-events-none absolute left-3 top-3 max-w-[85%] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300"
+        >
           {plan ? `${plan.name}${plan.threeD ? '' : ' (no 3D model)'}` : PLACEHOLDER_LABEL}
         </p>
         {plan && !plan.threeD && plan.message && (
@@ -241,7 +262,7 @@ export function ViewerPanel() {
             {plan.message}
           </p>
         )}
-        {plan && plan.threeD && plan.bodies.length === 0 && (
+        {plan && plan.threeD && !showsBody(plan) && (
           <p
             className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 rounded bg-neutral-900/90 px-3 py-2 text-center text-sm text-neutral-100"
             data-testid="viewer-nothing"
@@ -338,7 +359,7 @@ export function ViewerPanel() {
             )}
           </div>
 
-          {plan.threeD && (
+          {plan.threeD && plan.modes.length > 0 && (
             <div role="group" aria-label="View mode" className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-neutral-300">Colour:</span>
               {plan.modes.map((m) => (

@@ -23,7 +23,8 @@ import type { ObjectCard, RenderParams } from '@/contract';
 import { buildLights, MAX_AMBIENT_INTENSITY } from './lighting';
 import type { PlanContext, RenderPlan } from './planTypes';
 import { planRender } from './renderPlan';
-import { AssetCache, buildScene, type BuiltScene } from './renderers/build';
+import type { BodyRenderer } from './renderers/bodyRenderer';
+import { AssetCache, buildScene, type BuildHooks, type BuiltScene } from './renderers/build';
 
 /** Which backend `WebGPURenderer` ended up on after `init()`. */
 export type RendererBackend = 'webgpu' | 'webgl2';
@@ -70,6 +71,9 @@ export function sceneKey(plan: RenderPlan): string {
     plan.trails,
     plan.dust,
     plan.spin,
+    // The shader kinds: what the body is built from. Honesty and light are not in it (they update
+    // the body in place), so a toggle does not regenerate the field.
+    plan.shader?.key ?? null,
   ]);
 }
 
@@ -172,6 +176,8 @@ export class ViewerApp {
   private motionQuery: MediaQueryList | null = null;
   /** Called when a mesh or texture fails to load; the panel adds the layer to `failed` and re-plans. */
   private onLoadFailed: ((layerId: string) => void) | null = null;
+  /** Tests only: field and point sources and slider overrides for the shader kinds. */
+  private shaderOptions: BuildHooks['shader'];
 
   setLoadFailedHandler(handler: ((layerId: string) => void) | null): void {
     this.onLoadFailed = handler;
@@ -261,6 +267,16 @@ export class ViewerApp {
     return plan;
   }
 
+  /** Tests and sliders (D-27): replaces the field source or sets overrides for the next build. */
+  setShaderOptions(options: BuildHooks['shader']): void {
+    this.shaderOptions = options;
+  }
+
+  /** The generated body of a shader kind (haptics read its field and points), else null. */
+  get body(): BodyRenderer | null {
+    return this.built?.body ?? null;
+  }
+
   /** Draws a plan made with `planRender` (the panel plans once and reuses the plan for its UI). */
   showPlan(plan: RenderPlan): void {
     if (this.disposed) return;
@@ -268,22 +284,28 @@ export class ViewerApp {
     this.setLights(buildLights(plan.lighting));
     const key = sceneKey(plan);
     if (this.built && key === this.builtKey) {
-      // Nothing that is drawn changed: only the lights (and the labels in the panel) did.
+      // Nothing that is built changed: only the lights, the honesty state or the labels did. A
+      // generated body takes the new tags and light in place (no field is regenerated).
+      this.built.update(plan);
       this.renderNow();
       return;
     }
     this.clearBuilt();
-    if (plan.threeD && plan.bodies.length > 0) {
+    if (plan.threeD && (plan.bodies.length > 0 || plan.shader !== null)) {
       try {
         this.built = buildScene(
           plan,
-          { onLoadFailed: (id) => this.onLoadFailed?.(id), onChange: this.requestRender },
+          {
+            onLoadFailed: (id) => this.onLoadFailed?.(id),
+            onChange: this.requestRender,
+            shader: this.shaderOptions,
+          },
           this.assets,
         );
         this.builtKey = key;
         this.applySpinAngle();
         this.scene.add(this.built.group);
-        this.frame(plan.id, plan.extent);
+        this.frame(plan.id, plan.extent, plan.shader?.distance ?? 0);
       } catch (err) {
         // Never blank, never crash: the plan stays on screen as text and the canvas stays empty.
         console.warn('[viewer] could not build the scene', err);
@@ -300,7 +322,7 @@ export class ViewerApp {
     this.clearBuilt();
     this.placeholder.visible = true;
     this.setLights(this.placeholderLights);
-    this.frame('', 1);
+    this.frame('', 1, 0);
     this.updateSpinLoop();
     this.renderNow();
   }
@@ -310,11 +332,12 @@ export class ViewerApp {
    * past the unit sphere). Only when the object or its extent changes, so a user's zoom survives
    * an honesty or mode change.
    */
-  private frame(id: string, extent: number): void {
-    const key = `${id}|${extent}`;
+  private frame(id: string, extent: number, minDistance: number): void {
+    const key = `${id}|${extent}|${minDistance}`;
     if (key === this.framedKey) return;
     this.framedKey = key;
-    const d = cameraDistanceFor(extent);
+    // A generated body brings its own framing distance (ShaderPlan.distance, a display value).
+    const d = Math.max(cameraDistanceFor(extent), minDistance);
     this.controls.maxDistance = Math.max(20, d * 2);
     this.camera.position.set(0, 0, d);
     this.controls.target.set(0, 0, 0);

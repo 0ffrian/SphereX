@@ -26,7 +26,12 @@ frontend/src/viewer/                 (Moon)
   renderers/AsteroidMesh.ts AsteroidProcedural.ts Comet.ts BrownDwarf.ts Star.ts   # per-type plan functions
   renderers/build.ts        # turns a RenderPlan into three.js objects
   renderers/ShaderBody.ts   # browser-shader kinds (§7.7, D-01, D-12); name [verify]
-  fields/             (Atish)  # Web Worker field generator for shader kinds (§7.7, D-12); scaffold file fieldWorker.ts [verify]
+  renderers/bodyRenderer.ts # BodyRenderer contract (field, status, onChange) of the generated body
+  renderers/shaderPlan.ts   # plan function of the shader kinds (honesty, Q-45 plain sphere, missing)
+  renderers/shaderSpec.ts shaderPalette.ts pointClouds.ts   # card -> what to draw, palettes and lava thresholds, nebula / nova point sets
+  sliders.ts          # D-26 / D-27 slider registry and overrides
+  fields/             (Atish)  # field generator for shader kinds (§7.7, D-12): fieldGenerator.ts (pure, FieldSampler), noise.ts,
+                               # fieldWorker.ts (field and point requests) [verify], fieldClient.ts (main-thread side, falls back)
 frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
   haptics.ts calibration.ts
   drivers/webVibrate.ts drivers/audio.ts drivers/tauri.ts (stub, B-01)

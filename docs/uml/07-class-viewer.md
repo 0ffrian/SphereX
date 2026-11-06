@@ -84,16 +84,29 @@ classDiagram
   }
   class ShaderBody {
     <<planet_rocky, planet_water, gas_giant, nebula, nova>>
-    browser shader generator, triplanar
-    samples field as DataTexture
+    made by buildScene from plan.shader (ShaderBody.start), kept across plans that only change honesty or light
+    visibleTags from allowedTags(plan.honesty), light from planLighting, onChange from BuildHooks
+    plain sphere at once (never blank), surface swaps in when the field is ready
+    plain sphere follows Q-45: only while the size on the card is shown
+    TSL node materials on three r187
+    reads field as 2 Float32 DataTextures via textureLoad
     finer noise is seen, not felt
+    nebula and nova are instanced Sprites
+    refused layers go in missing
   }
   class FieldWorker {
     <<Web Worker, D-12>>
-    +seed: number
-    512 x 256 equirectangular
-    channels height, band, ocean, ice, storm
+    fieldWorker.ts wraps generateField
+    fieldGenerator.ts is pure and seeded
+    512 x 256 equirectangular, R6.1 mapping
+    texture A height, band, storm
+    texture B ocean, ice, lava crack
     runs once per body, not per frame
+  }
+  class FieldSampler {
+    <<fieldGenerator.ts>>
+    bilinear height and masks, nearest ids
+    sampleDirection and sampleUV
   }
   class Lighting {
     <<lighting.ts>>
@@ -143,7 +156,8 @@ classDiagram
   PlanRender ..> RenderPlan : returns
   ViewerApp ..> PlanBuild : showPlan builds the plan
   PlanBuild ..> RenderPlan : reads
-  ViewerApp "1" --> "0..1" BodyRenderer : chosen by type, none for candidate
+  ViewerApp "1" --> "0..1" BodyRenderer : the generated body of a shader kind (ViewerApp.body), none for the baked kinds and candidate
+  PlanBuild ..> ShaderBody : creates it from plan.shader
   ViewerApp "1" --> "0..*" HapticSource : touch mode pointer UV
   Honesty --> HonestyState
   AsteroidMesh ..|> BodyRenderer
@@ -153,7 +167,8 @@ classDiagram
   Star ..|> BodyRenderer
   ShaderBody ..|> BodyRenderer
   ShaderBody --> "1" FieldWorker : requests field
-  HapticSource ..> FieldWorker : samples same array
+  HapticSource ..> FieldSampler : samples same array
+  FieldSampler --> FieldWorker : reads its arrays
 ```
 
 ## Notes
@@ -161,7 +176,7 @@ classDiagram
 - Plan layer (issue #7): `ViewerApp.setObject` calls `planRender` to get a pure `RenderPlan`, and `showPlan` passes it to `renderers/build.ts`, which makes the three.js objects. The per-type renderer files hold the plan functions. `BodyRenderer` above is the conceptual contract; in code it is the plan function plus `build.ts`.
 
 - `candidate` has no renderer. The panel shows "Not enough data for a 3D model: distance and albedo unknown" (rendering doc §7.6).
-- The five baked renderers use backend textures (rendering doc §6); `ShaderBody` uses the shader generators from the mock-up, ported to ES modules (D-01, D-03). `ShaderBody` is listed in rendering doc §10 (name **[verify]**).
+- The five baked renderers use backend textures (rendering doc §6); `ShaderBody` uses the shader generators from the mock-up, ported to ES modules (D-01, D-03). `ShaderBody` is listed in rendering doc §10 (name **[verify]**). The shader kinds use the same entry point as the baked kinds: `renderers/shaderPlan.ts` (pure) plans them with `PlanBuilder` (legend, missing, notes, Q-45 plain sphere), `renderers/build.ts` creates the `ShaderBody` from `plan.shader`, and `BuiltScene.update(plan)` applies a new honesty state or light to it in place, so a toggle never regenerates the field (Q-49). `bodyRenderer.ts` holds the `BodyRenderer` contract. There is no per-type registry and no `ViewerApp.setBody`.
 - Mesh budget: D-05 sets ≤ 50k triangles, tighter than the 300k in older text; D-05 wins.
 - Pixel ratio is `min(devicePixelRatio, 1.5)`, and the scene renders only when the view changes (D-05).
 - If a required card field is missing, the renderer does not draw that layer and it is listed in `RenderParams.missing`.

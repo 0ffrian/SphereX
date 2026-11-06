@@ -46,15 +46,15 @@ sequenceDiagram
       API-->>V: RenderParams (mesh from shape_source, or point clouds and self-lit spheres built in the browser)
     else shader kind (planet_rocky, planet_water, gas_giant, nebula, nova)
       API-->>V: RenderParams without textures
-      V->>FW: Generate field from seed (once per body)
-      FW-->>V: 512x256 field array
     end
     V->>PL: setObject: planRender(card, params, context)
-    PL-->>V: RenderPlan (layers hidden by the honesty state dropped, starts at + Estimated, D-21; missing listed)
-    V->>R: showPlan(plan)
-    R-->>V: Scene ready
-    V->>V: Lighting (sun at phase angle, or self-lit)
-    V->>V: Set canvas aria-label from the plan (altText.ts; size with its tag, "at most" for an upper limit)
+    PL-->>V: RenderPlan (layers hidden by the honesty state dropped, starts at + Estimated, D-21; missing listed; shader kinds: plan.shader with surface and plain-sphere flags, Q-45)
+    V->>R: showPlan(plan): buildScene (a shader kind gets a ShaderBody from plan.shader, tags from allowedTags(plan.honesty), light from planLighting)
+    R->>FW: Field (planets, gas giants) or points (nebula, nova), once per body; the plain sphere shows until it arrives (never blank)
+    R-->>V: Scene ready (onChange requests one render, D-05)
+    V->>V: Lighting from planLighting (sun at phase angle, sun_dir or head-on, or self-lit); the same direction goes to the scene sun and the body
+    V->>V: Set canvas aria-label from the plan (altText.ts; size with its tag, "at most" for an upper limit; a shader kind adds the artist's-impression note)
+    V->>V: Honesty change with the same sceneKey: BuiltScene.update(plan) sets the tags and light in place, no field is regenerated
     V-->>U: Render body, tag chips in legend, scale bar
     V-->>U: List missing layers: "Not enough data for X"
   end

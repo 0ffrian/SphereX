@@ -10,14 +10,14 @@ import { planAsteroidMesh } from './renderers/AsteroidMesh';
 import { planAsteroidProcedural } from './renderers/AsteroidProcedural';
 import { planBrownDwarf } from './renderers/BrownDwarf';
 import { planComet } from './renderers/Comet';
+import { planShaderKind } from './renderers/shaderPlan';
 import { planStar } from './renderers/Star';
 
 /** R7.6: the message shown for a `candidate`. */
 export const CANDIDATE_MESSAGE = 'Not enough data for a 3D model: distance and albedo unknown';
 
-/** The shader-generated kinds (D-01) have no renderer in this build (ShaderBody is a placeholder). */
-export const UNSUPPORTED_MESSAGE =
-  'This kind of object is drawn by the shader renderers, which are not built yet.';
+/** A type with no plan at all. Every ObjectType has one now, so this is the safety net for a new type. */
+export const UNSUPPORTED_MESSAGE = 'This kind of object cannot be drawn yet.';
 
 export const DEFAULT_EPOCH: CometEpoch = '2025-12';
 
@@ -57,6 +57,12 @@ export function planRender(card: ObjectCard, params: RenderParams, ctx: PlanCont
         return planStar(input);
       case 'candidate':
         return planNoBody(input, CANDIDATE_MESSAGE);
+      case 'planet_rocky':
+      case 'planet_water':
+      case 'gas_giant':
+      case 'nebula':
+      case 'nova':
+        return planShaderKind(input);
       default:
         return planNoBody(input, UNSUPPORTED_MESSAGE);
     }
@@ -103,6 +109,7 @@ export function planRender(card: ObjectCard, params: RenderParams, ctx: PlanCont
       spin: null,
       scrub: null,
       relief: 'illustrative',
+      shader: null,
     };
   }
 }
