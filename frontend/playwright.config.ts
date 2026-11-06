@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 5174;
+// SX_E2E_PORT lets parallel worktrees run e2e at once without reusing each other's dev server.
+const PORT = Number(process.env.SX_E2E_PORT ?? 5174);
 
 export default defineConfig({
   testDir: './e2e',
