@@ -260,9 +260,10 @@ classDiagram
     <<sound/listenSweep.ts, A8>>
     +planSweep(mapping, lines, options) SweepPlan or null
     +play(plan, honesty) boolean
-    +stop(), progress()
+    +setHonesty(state), stop(), progress()
     8 samples per point, gas chimes for Q in the epoch
     tone and chimes gated by their tags, D-21
+    ends with its last sound
     follows volume and the sound switch
   }
   class AudioGraph {
