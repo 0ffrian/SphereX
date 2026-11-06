@@ -38,11 +38,11 @@ frontend/src/viewer/                 (Moon)
   fields/             (Atish)  # field generator for shader kinds (§7.7, D-12): fieldGenerator.ts (pure, FieldSampler), noise.ts,
                                # fieldWorker.ts (field and point requests) [verify], fieldClient.ts (main-thread side, falls back)
 frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
-  haptics.ts          # R8.8 HapticEngine: honesty gate, rate cap, multiplier, trains (Q-59), createHaptics; issue #9
+  haptics.ts          # R8.8 HapticEngine: honesty gate, rate cap, multiplier, trains (Q-71), createHaptics; issue #9
   audioContext.ts     # the one shared AudioContext, created only by a click (R8.9)
   settings.ts         # R8.7 settings, own Zustand store, one localStorage key; bindEngine
   calibration.ts      # R8.7 Calibration types, applyCalibration (offset rule); wizard logic in issue #10
-  platform.ts pitch.ts spectrumMapping.ts   # default outputs (Q-61), pitch from λ (Q-58), spectrum → sample (R8.6)
+  platform.ts pitch.ts spectrumMapping.ts   # default outputs (Q-73), pitch from λ (Q-70), spectrum → sample (R8.6)
   tuning.ts           # every tuning constant, marked CREATIVE placeholder (D-13) or [verify on phones]
   drivers/webVibrate.ts drivers/audio.ts drivers/tauri.ts (stub, B-01)
   sources/heightMap.ts meshNormal.ts field.ts terrain.ts flow.ts spectrum.ts lightcurve.ts

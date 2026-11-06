@@ -67,7 +67,7 @@ export const PITCH_OCTAVES = 2.4;
 export const DEFAULT_PITCH = 0.5;
 /**
  * R8.6/R8.9: pitch follows λ, over the SPHEREx band (0.75–5.0 µm, A3 data sources) so the same λ
- * sounds the same on every object (Q-58). Direction and range: CREATIVE placeholder — Atish to decide (D-13).
+ * sounds the same on every object (Q-70). Direction and range: CREATIVE placeholder — Atish to decide (D-13).
  */
 export const PITCH_LAMBDA_MIN_UM = 0.75;
 export const PITCH_LAMBDA_MAX_UM = 5.0;
@@ -85,7 +85,7 @@ export const SOFT_TONE_GAIN = 0.6;
 /** SPEC R8.9 `artistic`: a 4 ms noise burst with a 2 ms decay. */
 export const NOISE_BURST_S = 0.004;
 export const NOISE_DECAY_S = 0.002;
-/** Q-60: an `artistic` sound with a pitch is the noise burst through a band-pass at that pitch; its Q. CREATIVE placeholder — Atish to decide (D-13). */
+/** Q-72: an `artistic` sound with a pitch is the noise burst through a band-pass at that pitch; its Q. CREATIVE placeholder — Atish to decide (D-13). */
 export const GRAIN_BANDPASS_Q = 4;
 /** D-12 ocean "surf": low-passed noise. Cut-off (Hz) and length (s): CREATIVE placeholder — Atish to decide (D-13). */
 export const SURF_LOWPASS_HZ = 600;

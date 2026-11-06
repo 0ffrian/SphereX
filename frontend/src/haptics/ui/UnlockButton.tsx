@@ -1,6 +1,6 @@
 // R8.9, D-10: the button whose click unlocks output. Its click is the user activation that both
 // `navigator.vibrate` and the AudioContext need, and the AudioContext is created or resumed inside
-// that same click (a `click`, not `pointerdown`: Q-61). After the click its label says what is
+// that same click (a `click`, not `pointerdown`: Q-73). After the click its label says what is
 // actually on, from the device and the haptics and sound switches (R8.7).
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
