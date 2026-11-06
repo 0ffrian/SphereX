@@ -15,7 +15,7 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy
 uv run python -m scripts.generate_contract   # after changing shared/schemas/ (add --check to compare only)
 ```
 
-`app/contract/` is generated from [`shared/schemas/`](../shared/README.md) by `datamodel-code-generator` 0.89.0 (D-18). Do not edit it. The Pydantic models cannot express the R3.1 `formula` and `assumption` rules; fixture tests use `jsonschema` 4.26.0 for those. Serialise them with `exclude_unset=True`: a plain dump adds `null` for unset fields, and `exclude_none` drops the required `value: null` and `scale_m: null` (Q-40). `app/api/models.py` still holds the hand-written M1 response models.
+`app/contract/` is generated from [`shared/schemas/`](../shared/README.md) by `datamodel-code-generator` 0.89.0 (D-18). Do not edit it. The Pydantic models cannot express the R3.1 `formula` and `assumption` rules; fixture tests use `jsonschema` 4.26.0 for those. Serialise them with `exclude_unset=True`: a plain dump adds `null` for unset fields, and `exclude_none` drops the required `value: null` and `scale_m: null` (Q-40). `app/api/models.py` still holds the hand-written M1 response models. `/card` and `/render-params` are built as plain dicts and checked with `jsonschema` 4.26.0 (now a runtime dependency) by `app/core/card/validate.py` (Q-40).
 
 From the repo root: `npm run backend:setup`, `backend:dev`, `backend:test`, `backend:check`, `backend:prefetch` and `backend:smoke-offline`.
 
@@ -29,6 +29,8 @@ In development the frontend's Vite server proxies `/v1` to `http://localhost:800
 | `GET /v1/objects/{id}/frames` | `{id, frames[], stretch, data_release, cached_at, missing, north_up}` plus a `provenance` map. Each frame: `frame_id, time, wavelength_um, x, y, cutout_url, flags`, plus optional `ra, dec, bandwidth_um, detector, width, height, north_angle_deg, mirrored` |
 | `GET /v1/objects/{id}/cutouts/{frame_id}.png` | 8-bit grey PNG, asinh stretch, the same bytes every time |
 | `GET /v1/objects/{id}/spectrum` | `{id, spectrum[], light_curve[], flux_unit, tag, cached_at, missing}` plus optional `data_release`, `method`, `provenance`. Flux in `uJy`, tagged `measured`. Spectrum points: `wavelength_um, flux, error, flagged, frame_id` plus optional `bandwidth_um, dropped_flags, dropped_weight_fraction, flag_reasons`. Light-curve points: `time, flux, error, frame_id` plus optional `wavelength_um, flagged`. Refused frames are listed in `missing` as `<reason>:<frame_id>` (e.g. `saturated:…`); `spectrum:saturated` when every frame saturated (A4.2, D-31) |
+| `GET /v1/objects/{id}/card` | ObjectCard (R3.2), exactly the `shared/schemas` shape and validated with `jsonschema` before it is sent. Headers: `X-SX-Asset-Status` (`saved`, `generated` or `sketch`, A4.4) and `X-SX-Cached-At` (D-16; the schema forbids extra fields, Q-39) |
+| `GET /v1/objects/{id}/render-params` | RenderParams (R3.4), validated the same way, with the same headers. Refused layers are listed in `missing` |
 | `GET /v1/health` | `{status, offline, data_release}` |
 
 Per-target spectrum report on a cache: `SX_OFFLINE=1 uv run python -m app.core.measure [--group test|demo] [--only NAME]` (default `--group test`).
@@ -52,6 +54,16 @@ Errors are `{"error": code, "detail": sentence}`. The codes are:
 - A Flamsteed name (`61 Cyg`, `51 Pegasi`) goes to SIMBAD first. Its SBDB fallback is accepted only when the asteroid's name is the query (`849 Ara`), so a star name never resolves to a numbered asteroid.
 - Moving objects (solar-system bodies, Q-22) get `frames: []` and `missing: ["frames:moving_object_search"]` in M1 (Q-21).
 
+## Texture baker (R6, issue #6)
+
+`app/core/render/` bakes equirectangular maps on the CPU with numpy and Pillow: `albedo.webp` (lossless), `height.png`, `height.bin` (float16 little-endian, W×H) and `normal.png`, and `bake.json` (a hash of parameters, size and rules version; a mismatch rebakes) into `{root}/{id}/{generator_version}/{seed}/{width}x{height}/` (R6.7 plus a size directory, Q-47; `:` and other unsafe characters in the id are percent-encoded, so `sbdb:101955` is `sbdb%3A101955`). Baked types: `asteroid_procedural`, `brown_dwarf`, `brown_dwarf_binary`; any other type is refused (Q-47).
+
+```bash
+uv run python -m app.core.render ../shared/fixtures/cards/asteroid_procedural.json --seed 2 --out ./textures   # ~17 s at 2048x1024
+```
+
+`params_from_card(card, seed)` applies the R6.2 rules. It raises `BakeRefusal` (with the missing card fields) only when an asteroid's diameter is missing or not finite, a brown dwarf's spectral class has no palette, or the type has no recipe. Other missing inputs bake flat and are listed in `BakeParams.missing` (`albedo_map` for no colour, `gaia_rgb` for an unusable one, `brightness`, `bands`); NaN and infinity count as missing. `bake()` returns the arrays; `bake_to_cache()` writes the files atomically and skips a bake whose four files exist and whose `bake.json` hash matches; it is safe for concurrent callers. Bump `BAKER_RULES_VERSION` whenever a rule in R6.2 to R6.5 changes. Same card and seed give the same bytes on a given numpy and Pillow build; the tests check it by SHA-256.
+
 ## Settings (`SX_*` environment variables)
 
 | Variable | Default | Meaning |
@@ -69,7 +81,8 @@ Errors are `{"error": code, "detail": sentence}`. The codes are:
 | `SX_EPHEMERIS_EPOCH` | `2026-11-14T00:00:00Z` | The time used for a moving object's `resolve` position. |
 | `SX_SEARCH_EPOCH` | `2026-01-01T00:00:00Z` | The time used for a proper-motion star's SIA search cone. |
 | `SX_HTTP_*` | 10 s connect, 60 s read, 3 retries, 1 s backoff (doubles) | |
-| `SX_CORS_ORIGINS` | empty | Needed only when the frontend runs without the Vite proxy. |
+| `SX_CORS_ORIGINS` | empty | Needed only when the frontend runs without the Vite proxy. CORS then exposes the `X-SX-Cached-At` and `X-SX-Asset-Status` headers (Q-39) so the browser can read them. |
+| `SX_ASSETS_DIR` | `backend/assets` | Pre-baked assets read by stage 4 (A5.4), `<type>/<id>.json` with the D-22 fields. |
 
 ## Cache (D-25)
 
@@ -113,7 +126,10 @@ app/adapters/     http.py, irsa_sia.py, irsa_cutout.py, simbad.py, sbdb.py, hori
 app/contract/     generated from shared/schemas/ (D-18, do not edit): ObjectCard, RenderParams
 app/core/find/    (Kevin, Stage 1, A4.1) ids, resolver, propagate, wcs, frames, cutouts, png
 app/core/measure/ (Moon, Stage 2, A4.2) config, flags, aperture, solid_angle, photometry, spectrum
-app/core/render/  (Atish, R10): not created yet
+app/core/classify/ (Atish, Stage 3, A4.3) rules.py: R3.3 type selection; R12 #12 exoplanet thresholds block (all None)
+app/core/card/    (Kevin, Stages 4-5, A4.4-A4.5) catalogue, build, assets (A5.4 store), validate, service
+app/core/render/  (Atish, R10) texture baker; card_to_params (Stage 7, A4.7), blackbody, spherex_rgb
+assets/           A5.4 pre-baked assets, <type>/<id>.json (SX_ASSETS_DIR; none yet)
 scripts/          prefetch, smoke_offline, backup_cache, record_fixtures, generate_contract
 tests/            pytest; tests/fixtures/cache holds the recorded cache entries
 ```

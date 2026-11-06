@@ -61,7 +61,7 @@ Each stage has one job, takes defined inputs and returns defined outputs. Stages
   | This doc | `planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova` |
 
   The old `dwarf` kind maps to `brown_dwarf`. The old `asteroid` kind maps to `asteroid_shape` or `asteroid_procedural`.
-- **Status:** To build.
+- **Status:** Built (issue #5, `backend/app/core/classify/`). The class label is taken from the catalogue only (SIMBAD `sp_type`, SBDB `spec_B` then `spec_T`); its confidence is `catalogue` or `none`, and spectrum matching against reference types (step 2) is not built (Q-55). Exoplanet types are refused while R12 #12 has no thresholds: the object falls through to `candidate` with `type:exoplanet_thresholds` in `missing` (Q-56).
 
 ### A4.4 Stage 4: Check for a saved asset
 
@@ -79,12 +79,15 @@ What a saved asset holds: [section 5.4](data-contract.md#a54-asset-store) (D-22)
 
 This is the lookup flow shown in the Surface Lab "Lookup" card of the mock-up.
 
+**Status:** Built (issue #5, `backend/app/core/card/assets.py`). Pre-baked assets are read from `backend/assets/<type>/<id>.json` (A5.4; the id is percent-encoded). Generated assets are saved as `derived.asset` cache entries keyed by id, data release, `ASSET_VERSION` and the stage 7 `GENERATOR_VERSION` (which holds the baker's rules version), so a rule or release change never serves a stale asset, and only when their inputs are final (a spectrum from a complete frame list, and a catalogue match or typed coordinates), so a truncated search is never frozen into a saved asset. A saved asset is returned without re-running stages 3 and 7. A saved or pre-baked asset whose card id or params id is not the requested id, whose card and params disagree on `type`, or that fails the schema check is ignored with a warning, and the asset is built from the catalogues instead of returning an error. Where this differs from A5.4 (generated assets in IndexedDB) is Q-57. The status is sent as the `X-SX-Asset-Status` response header (Q-39).
+
 ### A4.5 Stage 5: ObjectCard
 
 The backend builds the **ObjectCard**: every known value for the object, each as a tagged value with its source (rendering doc §3.1, §3.2). Missing values are `null`, never a guess.
 
 - **Endpoint:** `GET /v1/objects/{id}/card` (D-16).
 - **Schema:** [section 5](data-contract.md#a5-data-contract).
+- **Status:** Built (issue #5, `backend/app/core/card/build.py`). Only the fields the object's type uses (R7) are written; a field with no source is `value: null` with the reason in `source`. Every reply is validated with `jsonschema` against `shared/schemas/` (Q-40). `cached_at` (D-16) is the `X-SX-Cached-At` response header, because the R3.2 shape forbids extra fields (Q-39).
 
 ### A4.6 Stage 6: Physics layer
 
@@ -95,7 +98,7 @@ Pure functions that turn measured values into `derived` values, each with its st
 The backend turns the ObjectCard into **RenderParams** with deterministic rules (rendering doc §3.4, §6.2). The frontend renders RenderParams only. RenderParams lists the layers (each with a tag), texture URLs, lighting, view modes, the haptic profile, the alt text and the layers refused for `missing` data.
 
 - **Endpoint:** `GET /v1/objects/{id}/render-params` (D-16).
-- **Status:** To build.
+- **Status:** Built (issue #5, `backend/app/core/render/card_to_params.py`). Seed = first 4 bytes of SHA-256(`id` + newline + `generator_version`) (Q-35). Texture URLs follow R6.7 with the Q-47 size directory (`2048x1024`); the endpoint does not bake or serve the textures yet. `candidate` gets a RenderParams with no layers and `mesh` in `missing` (Q-33). Refusals from earlier stages (`catalogue`, `spectrum`, `type:exoplanet_thresholds`) are appended to `missing`.
 
 ### A4.8 Stages 8 to 10: Generators
 

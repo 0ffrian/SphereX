@@ -6,11 +6,18 @@
 
 ```
 backend/app/core/render/            (Atish)
-  card_to_params.py   # §6.2 rules + tags; unit-tested
-  noise.py craters.py height.py normals.py palette.py bake.py
+  card_to_params.py   # §6.2 rules + tags; pipeline stage 7 (A4.7), issue #5, built
+  blackbody.py        # §7.5 Teff -> display colour, issue #5
+  noise.py craters.py height.py normals.py palette.py bake.py   # issue #6, built
+  params.py           # §6.2 generator parameters (BakeParams, BakeRefusal); card_to_params adds the tags
+  __main__.py         # python -m app.core.render <card.json> --seed N --out DIR
   gemini_paint.py     # stretch, behind the admin token
-  spherex_rgb.py      # §5.2 channel extraction
-backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; objects.py: /frames, /cutouts, later /card, /render-params, texture URLs
+  spherex_rgb.py      # §5.2 channel extraction, issue #5, built
+backend/app/core/classify/           (Atish)  # pipeline stage 3 (A4.3), issue #5: rules.py (R3.3, R12 #12 thresholds block)
+backend/app/core/card/               (Kevin)  # pipeline stages 4 and 5 (A4.4, A4.5), issue #5: catalogue.py, build.py,
+                                              # assets.py (A5.4 store), validate.py (jsonschema, Q-40), service.py
+backend/assets/                               # A5.4 pre-baked assets, <type>/<id>.json (none yet)
+backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; objects.py: /frames, /cutouts, /card, /render-params (issue #5)
 backend/app/adapters/                (Kevin)  # IRSA SIA + cutouts, SIMBAD, SBDB, Horizons, SkyBoT (A3), all through the cache
 backend/app/cache/                   (Kevin)  # D-25 read-through disk cache
 backend/app/core/find/               (Kevin)  # pipeline stage 1 (A4.1): resolver, proper motion, WCS, frames, cutout PNG
@@ -20,9 +27,16 @@ backend/app/core/measure/            (Moon)  # pipeline stage 2 (A4.2), issue #2
                                                             # solid_angle, photometry, spectrum; endpoint in app/api/spectrum.py
 frontend/src/viewer/                 (Moon)
   ViewerApp.ts lighting.ts modes.ts honesty.ts scaleBar.ts altText.ts
-  renderers/AsteroidMesh.ts AsteroidProcedural.ts Comet.ts BrownDwarf.ts Star.ts
+  planTypes.ts planCommon.ts renderPlan.ts   # pure RenderPlan: types, shared helpers, planRender (no GPU)
+  renderers/AsteroidMesh.ts AsteroidProcedural.ts Comet.ts BrownDwarf.ts Star.ts   # per-type plan functions
+  renderers/build.ts        # turns a RenderPlan into three.js objects
   renderers/ShaderBody.ts   # browser-shader kinds (§7.7, D-01, D-12); name [verify]
-  fields/             (Atish)  # Web Worker field generator for shader kinds (§7.7, D-12); scaffold file fieldWorker.ts [verify]
+  renderers/bodyRenderer.ts # BodyRenderer contract (field, status, onChange) of the generated body
+  renderers/shaderPlan.ts   # plan function of the shader kinds (honesty, Q-45 plain sphere, missing)
+  renderers/shaderSpec.ts shaderPalette.ts pointClouds.ts   # card -> what to draw, palettes and lava thresholds, nebula / nova point sets
+  sliders.ts          # D-26 / D-27 slider registry and overrides
+  fields/             (Atish)  # field generator for shader kinds (§7.7, D-12): fieldGenerator.ts (pure, FieldSampler), noise.ts,
+                               # fieldWorker.ts (field and point requests) [verify], fieldClient.ts (main-thread side, falls back)
 frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
   haptics.ts calibration.ts
   drivers/webVibrate.ts drivers/audio.ts drivers/tauri.ts (stub, B-01)
@@ -43,7 +57,7 @@ frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, St
   search/             # SearchBar, parseQuery (name, or RA, Dec in decimal degrees), testTargets (the five A1.1 targets)
   flipbook/           # Flipbook player, playback, keys, cutout preloading, RainbowTrails + wavelengthColor (D-28)
   spectrum/           # SpectrumPanel, SVG SpectrumChart, scale (displays the A4.2 output)
-frontend/src/test/                           # test-only helpers (fixtureFetch.ts)
+frontend/src/test/                           # test-only helpers (fixtureFetch.ts, sharedFixtures.ts: loads shared/fixtures)
 frontend/src/fixtures.test.ts                # fixtures are deterministic, pass the API validators, never imported by app code
 frontend/e2e/                                # Playwright tests (smoke, flipbook) against the fixture server
 frontend/fixtures/                           # dev and test only: SYNTHETIC fixture server, a Vite dev-server plugin
@@ -91,7 +105,7 @@ The `app/` subfolders (`api/`, `search/`, `flipbook/`, `spectrum/`), the `sky` s
 ## R12. Open items [verify]
 
 1. Fallback behaviour of `WebGPURenderer` from `three/webgpu` (r187) on both phones; check via `chrome://gpu`.
-2. Normal map green-channel convention ([§6.5](surface-generation.md#r65-normals-from-height-sobel-equirectangular-aware)).
+2. Normal map green-channel convention ([§6.5](surface-generation.md#r65-normals-from-height-sobel-equirectangular-aware)). Baker side verified numerically (6 Nov 2026); the viewer check (north-facing slopes brighten with light from the north) is still open.
 3. The Gemini image model name and its supported aspect ratios.
 4. The 3I/ATLAS nucleus size limit and coma radius values, with exact citations.
 5. Eps Indi Ba/Bb orbit numbers; WISE 0855 class details.
@@ -104,3 +118,7 @@ The `app/` subfolders (`api/`, `search/`, `flipbook/`, `spectrum/`), the `sky` s
 12. Exoplanet type thresholds for `planet_rocky` / `planet_water` / `gas_giant` ([§3.3](data-contract.md#r33-type-selection-backend)). Teq is now `teq_K` in [§3.2](data-contract.md#r32-objectcard-produced-by-the-backend-get-v1objectsidcard) (D-12); any other ObjectCard fields for exoplanets are not yet defined.
 13. Whether the pulse-width whisper (e.g. `[4, 4, 4, 4, 4]`) is felt as distinct on each phone ([§8.3](haptics/platform-encoding.md#r83-encoding-web-driver-d-09), [§8.7](haptics/calibration.md#r87-calibration-and-settings)).
 14. The gas giant jet pulse rate, clamp(k · |zonal wind| / max |zonal wind|, 2, 20) Hz, felt on both phones ([§8.4](haptics/sources.md#r84-event-sources), D-12). The field's channel packing and lava-crack channel are settled by D-12 ([§7.7](renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova)).
+15. Brown dwarf `flux_45um` normalisation reference (`BROWN_DWARF_CONFIG.flux45Reference`, null): without it the `emissive` layer is not drawn ([§7.4](renderers/brown-dwarf.md)).
+16. SPHEREx time span for the star proper-motion trail (`STAR_CONFIG.spherexBaselineYears`, null): without it `motion_trail` is not drawn.
+17. Which `FLAGS` bit means saturation in the SPHEREx light curve. The viewer excludes any point with non-zero `flags` until this is known.
+18. Mauritius length in the scale bar (R5.4, ~65 km): the comparison is not offered while `COMPARISONS` holds `null`.

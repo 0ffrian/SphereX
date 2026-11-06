@@ -4,7 +4,7 @@
 
 ### R7.5 Stars: `star`, `star_mira`, `star_ttauri`
 
-- **Requires:** `teff_K`. Optional: `radius_rsun`, `lightcurve`, `period_var_d`.
+- **Requires:** `teff_K`. Optional: `radius_rsun`, `lightcurve`, `period_var_d`. Without `radius_rsun` the star is a unit sphere with no scale bar ("size unknown"); colour and limb darkening are kept (Q-45).
 - **Colour:** Teff → sRGB through a blackbody lookup table (e.g., Mitchell Charity's CIE 1931 2° D65 table). Tag `derived`.
 - **Limb darkening:** linear, I(μ) = 1 − 0.6·(1 − μ). Tag `model_dependent`.
 - **`star` (Barnard's Star):** red-dwarf sphere plus a **motion trail** across the background stars, drawn from `pm_mas_yr` over the SPHEREx epochs (`measured`).

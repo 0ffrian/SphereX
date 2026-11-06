@@ -17,21 +17,30 @@ flowchart LR
     Adapters["Data adapters (proxy)"]
     DataCache[("Read-through disk cache (D-25): raw responses, spectra, cards, render params; SX_OFFLINE=1 never calls out")]
     subgraph Pipe["Pipeline"]
-      S1["1 Find object"]
-      S2["2 Measure flux and spectrum"]
-      S3["3 Classify"]
-      TypeSel["Type selection (rendering doc §3.3)"]
-      S4["4 Asset lookup: saved / generated / sketch"]
-      CardB["Card builder: ObjectCard with tags"]
+      S1["1 Find object (core/find)"]
+      S2["2 Measure flux and spectrum (core/measure)"]
+      subgraph Classify["core/classify"]
+        S3["3 Classify: rules.py (catalogue label, Q-55)"]
+        TypeSel["Type selection (rendering doc §3.3; exoplanet thresholds Q-56)"]
+      end
+      subgraph CardPkg["core/card"]
+        Svc["service.py: ObjectPipeline, stages 3-5 and 7 for one id"]
+        Catalogue["catalogue.py: re-reads the cached SIMBAD / SBDB answer"]
+        S4["4 Asset lookup, assets.py: saved / generated / sketch"]
+        CardB["5 Card builder, build.py: ObjectCard with tags"]
+        Validate["validate.py: jsonschema check of every reply (Q-40)"]
+      end
       Physics["6 Physics layer (derived values)"]
     end
     subgraph Render["core/render"]
-      C2P["card_to_params.py"]
+      C2P["7 card_to_params.py"]
       SpxRGB["spherex_rgb.py"]
+      Blackbody["blackbody.py: Teff to display colour"]
       Baker["Texture baker: noise, craters, height, normals, palette, bake"]
       GemPaint["gemini_paint.py (P3, admin token)"]
     end
     TexCache[("/data/textures/{id}/{generator_version}/{seed}/")]
+    Prebaked[("backend/assets/{type}/{id}.json (SX_ASSETS_DIR), pre-baked assets")]
   end
 
   subgraph Shared["shared/ (single source of the contract, D-18)"]
@@ -58,16 +67,23 @@ flowchart LR
   FEViewer -->|"texture URLs: albedo.webp, height.png, height.bin, normal.png"| TexCache
 
   API --> S1
+  API -->|"/card, /render-params"| Svc
+  Svc --> S4
   S1 --> S2 --> S3 --> TypeSel --> S4 --> CardB
+  Catalogue -->|"catalogue facts"| S3
+  Catalogue -->|"SBDB phys-par, SIMBAD values"| CardB
+  S4 -->|"read"| Prebaked
+  S4 <-->|"derived.asset (Q-57)"| DataCache
   Physics -->|"derived TVs with formula"| CardB
   SpxRGB -->|"spherex_rgb TV"| CardB
+  Blackbody -->|"star colour from Teff"| C2P
   CardB --> C2P
   C2P -->|"RenderParams"| API
   C2P -->|"baked types only (D-01)"| Baker
   Baker -->|"write maps"| TexCache
   GemPaint -->|"AI albedo if corr >= 0.3"| TexCache
 
-  S1 & S2 & CardB --> Adapters
+  S1 & S2 & Catalogue --> Adapters
   Adapters <--> DataCache
   Adapters -->|"SIA?COLLECTION=spherex_qr2, cutouts"| IRSA
   Adapters -->|"name to RA/Dec"| Resolver
@@ -79,8 +95,8 @@ flowchart LR
   Adapters -.->|"planet columns (P2)"| Exo
   GemPaint -->|"hillshade + prompt (server-side key)"| Gemini
 
-  CardB -.->|"validates against (Pydantic models generated from it)"| CardSchema
-  C2P -.->|"validates against"| RPSchema
+  Validate -.->|"validates cards against"| CardSchema
+  Validate -.->|"validates render params against"| RPSchema
   FE -.->|"src/contract generated from (D-18)"| Shared
 
   classDef stretch stroke-dasharray: 5 5
@@ -172,8 +188,9 @@ flowchart TB
 ## Notes
 
 - Baked types (rendering doc types) fetch textures from the backend; shader kinds generate a field in the browser instead (D-01, D-12).
-- Endpoints follow D-16. Every endpoint is keyed by the object id that `resolve` returns; there is no separate flipbook endpoint. Responses served from the cache carry `cached_at` (D-25).
+- Endpoints follow D-16. Every endpoint is keyed by the object id that `resolve` returns; there is no separate flipbook endpoint. Responses served from the cache carry `cached_at` (D-25); for `/card` and `/render-params` it is the `X-SX-Cached-At` header, next to `X-SX-Asset-Status`, because the R3 shapes forbid extra fields (Q-39).
 - Every external call goes through the read-through cache (D-25): cache, then a live call with a timeout and retries, then an older cached entry, then refuse.
+- `core/classify`, `core/card` and the `card_to_params`, `blackbody` and `spherex_rgb` modules of `core/render` were built in issue #5. The `/card` and `/render-params` replies are plain dicts checked with `jsonschema`; the generated Pydantic models (D-18) only describe them in the OpenAPI docs (Q-40). The render-params endpoint names the texture URLs but does not call the baker yet.
 - The physics layer is drawn on the backend, feeding derived values into the card. The browser reruns the same functions on slider changes (architecture spec §4.6). Baked types allow only colour, lighting and spin sliders; relief sliders exist only on the shader kinds (D-26).
 - The `spherex:haptic` DOM event is a debug hook that also drives the on-screen pulse indicator (D-20). Which module fires it is not stated; it is drawn from the engine.
 - `ShaderBody` and the `fields/` folder follow from D-01 and D-12 and are now listed in rendering doc §10. Their file names are **[verify]**.
