@@ -20,8 +20,23 @@ export interface FixtureTarget {
   northUp: boolean;
   frameCount: number;
   seed: number;
-  /** Frame indices whose cutout returns 404 (refusal path). */
+  /** Frame indices whose cutout returns 404 (refusal path); refused as `cutout` in the spectrum. */
   brokenCutouts?: readonly number[];
+  /**
+   * Which listed frames give a spectrum point; the rest are refused like the backend's Stage 2
+   * (A4.2). Precedence per frame: `refusals` > `brokenCutouts` (→ `cutout`) > `measured` > the
+   * default refusal `saturated`. Unset: every frame is measured.
+   */
+  spectrumShape?: {
+    measured: 'all' | readonly number[];
+    /** Frame index → Stage 2 refusal reason. */
+    refusals?: Readonly<Record<number, string>>;
+  };
+  /**
+   * Stage 1 refusals of frames that never reach the frame list (index ≥ frameCount), e.g.
+   * `outside_cutout`: listed in the frames' `missing` and passed through to the spectrum's.
+   */
+  unlistedRefusals?: Readonly<Record<number, string>>;
   /** When set, the frames reply is empty and lists this in `missing` (backend M1 behaviour). */
   refuseFrames?: string;
   refuseSpectrum?: string;
@@ -38,6 +53,8 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     northUp: false,
     frameCount: 24,
     seed: 101,
+    // Shape of the 6 Nov full-cache run (synthetic): saturated in all but one frame.
+    spectrumShape: { measured: [], refusals: { 11: 'aperture_flags' } },
   },
   {
     id: 'eps-indi-b',
@@ -49,6 +66,7 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     northUp: false,
     frameCount: 24,
     seed: 202,
+    spectrumShape: { measured: 'all', refusals: { 7: 'aperture_flags', 15: 'aperture_flags' } },
   },
   {
     id: 'wise-0855',
@@ -60,6 +78,7 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     northUp: false,
     frameCount: 24,
     seed: 303,
+    spectrumShape: { measured: 'all', refusals: { 7: 'aperture_flags', 15: 'aperture_flags' } },
   },
   {
     id: 'rw-aur',
@@ -71,6 +90,11 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     northUp: false,
     frameCount: 24,
     seed: 404,
+    // A few short-wavelength points only; the rest saturated (synthetic shape).
+    spectrumShape: {
+      measured: [0, 1, 2, 3],
+      refusals: { 10: 'aperture_flags', 20: 'aperture_edge' },
+    },
   },
   {
     id: 'r-dra',
@@ -83,6 +107,10 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     frameCount: 24,
     seed: 505,
     brokenCutouts: [5],
+    // Saturated in every listed frame the aperture fits in; one more frame is refused by Stage 1
+    // (synthetic shape).
+    spectrumShape: { measured: [], refusals: { 21: 'aperture_edge', 22: 'aperture_edge' } },
+    unlistedRefusals: { 24: 'outside_cutout' },
   },
   {
     id: 'synthetic-mover',
