@@ -21,11 +21,21 @@ async function search(page: Page, text: string) {
   await input.press('Enter');
 }
 
-const TARGETS = ["Barnard's Star", 'Epsilon Indi B', 'WISE 0855-0714', 'RW Aurigae', 'R Draconis'];
+/**
+ * Spectrum shape per target, like the real backend on the full cache (issue #24): Barnard's Star
+ * and R Draconis saturate (no points), RW Aurigae has a few short-wavelength points only.
+ */
+const TARGETS: readonly { name: string; points: number; flagged: number }[] = [
+  { name: "Barnard's Star", points: 0, flagged: 0 },
+  { name: 'Epsilon Indi B', points: 22, flagged: 3 },
+  { name: 'WISE 0855-0714', points: 22, flagged: 3 },
+  { name: 'RW Aurigae', points: 4, flagged: 0 },
+  { name: 'R Draconis', points: 0, flagged: 0 },
+];
 
 test.describe('the five A1.1 targets', () => {
-  for (const [i, name] of TARGETS.entries()) {
-    test(`${name}: plays its frames and shows a spectrum`, async ({ page }) => {
+  for (const [i, { name, points, flagged }] of TARGETS.entries()) {
+    test(`${name}: plays its frames and shows its spectrum or says why not`, async ({ page }) => {
       // R Draconis has one deliberately missing cutout (refusal path), which logs a 404.
       const errors = trackErrors(page, [/r-dra-f005\.png/]);
       await page.goto('/');
@@ -71,16 +81,26 @@ test.describe('the five A1.1 targets', () => {
       await expect(page.getByTestId('frame-time')).not.toHaveText(time ?? '');
       await expect(page.getByTestId('frame-time')).toHaveText(/^2025-05-03 \d\d:\d\d:\d\d UTC$/);
 
-      // Click the object: spectrum with error bars and flagged points.
+      // Click the object: spectrum with error bars and flagged points, or why there is none.
       await page.getByTestId('object-ring').click();
-      const chart = page.getByTestId('spectrum-chart');
-      await expect(chart).toBeVisible();
-      await expect(chart.getByTestId('error-bar')).toHaveCount(24);
-      await expect(chart.getByTestId('flagged-point')).toHaveCount(3);
-      await expect(chart.getByTestId('point')).toHaveCount(21);
       await expect(page.locator('#spectrum-heading')).toBeFocused();
-      // Q-23: never presented as absolute photometry.
-      await expect(page.getByTestId('spectrum-caveat')).toContainText('Not absolute photometry');
+      const chart = page.getByTestId('spectrum-chart');
+      if (points === 0) {
+        await expect(page.getByTestId('no-spectrum')).toContainText(
+          'too bright for SPHEREx’s detector (saturated)',
+        );
+        await expect(chart).toHaveCount(0);
+        await expect(page.getByTestId('spectrum-caveat')).toHaveCount(0);
+      } else {
+        await expect(chart).toBeVisible();
+        await expect(chart.getByTestId('error-bar')).toHaveCount(points);
+        await expect(chart.getByTestId('flagged-point')).toHaveCount(flagged);
+        await expect(chart.getByTestId('point')).toHaveCount(points - flagged);
+        // Q-23: never presented as absolute photometry.
+        await expect(page.getByTestId('spectrum-caveat')).toContainText('Not absolute photometry');
+      }
+      await expect(page.getByTestId('spectrum-missing')).toBeVisible();
+      await expect(page.getByTestId('spectrum-panel')).not.toContainText('Not available:');
 
       // Shareable link with coordinates.
       expect(new URL(page.url()).hash).toMatch(/^#ra=[\d.]+&dec=-?[\d.]+&name=/);
@@ -98,7 +118,121 @@ test('R Draconis: a missing cutout is refused, not drawn', async ({ page }) => {
   await expect(page.getByTestId('frame-counter')).toHaveText('Frame 6 of 24');
   await expect(page.getByTestId('cutout-unavailable')).toBeVisible();
   await expect(page.getByTestId('object-ring')).toHaveCount(0);
-  await expect(page.getByTestId('missing')).toContainText('cutout:r-dra-f005');
+  const missing = page.getByTestId('missing');
+  await expect(missing).toContainText('Frames found but not shown:');
+  await expect(missing).toContainText(
+    '1 frame whose image could not be loaded from the archive or the cache.',
+  );
+  await expect(missing).toContainText(
+    '1 frame where the object’s position falls outside the image.',
+  );
+  await expect(missing).not.toContainText('Not available:');
+  // The frame IDs sit behind a disclosure.
+  const cutout = missing.locator('[data-testid="refusal-group"][data-reason="cutout"]');
+  await expect(cutout.getByText('r-dra-f005')).toHaveCount(0);
+  await cutout.locator('summary').click();
+  await expect(cutout.getByText('r-dra-f005')).toBeVisible();
+  await expect(cutout.locator('summary')).toContainText('(hide frame IDs)');
+  const outside = missing.locator('[data-testid="refusal-group"][data-reason="outside_cutout"]');
+  await outside.locator('summary').click();
+  await expect(outside.getByText('r-dra-f024')).toBeVisible();
+
+  // Keys pressed in the ID box stay there: no flipbook step, seek or play (D7, R9).
+  const box = outside.getByRole('region', {
+    name: 'Frames found but not shown, frame IDs: outside the image',
+  });
+  await box.focus();
+  for (const key of ['End', 'Home', 'ArrowRight', ' ']) await page.keyboard.press(key);
+  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 6 of 24');
+  await expect(page.getByTestId('play-pause')).toHaveText('Play');
+});
+
+test("Barnard's Star: a saturated object says why there is no spectrum", async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('/');
+  await search(page, "Barnard's Star");
+  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  await expect(page.getByTestId('missing')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show spectrum', exact: true }).click();
+
+  await expect(page.getByTestId('no-spectrum')).toHaveText(
+    'There is no spectrum: this tool could not measure any of the 24 frames found. In 23 of them, the object’s centre is too bright for SPHEREx’s detector (saturated); the reason for the other frame is below.',
+  );
+  // D-02: the frame checks still wear the provenance badge, above the sentence.
+  const badge = page.getByTestId('spectrum-panel').getByTestId('badge');
+  await expect(badge).toHaveText('Fixture');
+  const html = await page
+    .getByTestId('spectrum-panel')
+    .evaluate((el: { innerHTML: string }) => el.innerHTML);
+  expect(html.indexOf('data-testid="badge"')).toBeGreaterThan(-1);
+  expect(html.indexOf('data-testid="badge"')).toBeLessThan(
+    html.indexOf('data-testid="no-spectrum"'),
+  );
+  await expect(page.getByTestId('spectrum-chart')).toHaveCount(0);
+  await expect(page.getByTestId('spectrum-caveat')).toHaveCount(0);
+  await expect(page.getByTestId('spectrum-table')).toHaveCount(0);
+
+  const list = page.getByTestId('spectrum-missing');
+  await expect(list).toContainText('Frames not measured:');
+  const groups = list.getByTestId('refusal-group');
+  await expect(groups).toHaveCount(2);
+  await expect(groups.nth(0)).toHaveAttribute('data-reason', 'saturated');
+  await expect(groups.nth(0).locator('summary')).toContainText(
+    '23 frames saturated: the object’s centre is too bright for the detector.',
+  );
+  await expect(groups.nth(1)).toHaveAttribute('data-reason', 'aperture_flags');
+  await expect(page.getByTestId('spectrum-panel')).not.toContainText('Not available:');
+  await expect(page.getByTestId('announcer')).toContainText(
+    "No spectrum for Barnard's Star: the object is too bright for the detector (saturated) in 23 of 24 frames.",
+  );
+
+  // Keyboard: focus the saturated group's summary and open it with Enter.
+  await groups.nth(0).locator('summary').focus();
+  await page.keyboard.press('Enter');
+  const ids = groups
+    .nth(0)
+    .getByRole('region', { name: 'Frames not measured, frame IDs: saturated' });
+  await expect(ids).toBeVisible();
+  await expect(ids.getByText('barnards-star-f000', { exact: true })).toBeVisible();
+  await expect(ids.getByRole('listitem')).toHaveCount(23);
+  expect(errors, errors.join('\n')).toEqual([]);
+});
+
+test('RW Aurigae: a partial spectrum says which frames it covers', async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('/');
+  await search(page, 'RW Aur');
+  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  await page.getByRole('button', { name: 'Show spectrum', exact: true }).click();
+
+  const chart = page.getByTestId('spectrum-chart');
+  await expect(chart).toBeVisible();
+  await expect(chart.getByTestId('point')).toHaveCount(4);
+  const coverage = page.getByTestId('spectrum-coverage');
+  await expect(coverage).toHaveText(
+    /^This tool could measure 4 of the 24 frames found\. They cover only \d\.\d{3} µm to \d\.\d{3} µm; the frames found cover /,
+  );
+  await expect(page.getByTestId('spectrum-caveat')).toBeVisible();
+  const groups = page.getByTestId('spectrum-missing').getByTestId('refusal-group');
+  await expect(groups).toHaveCount(3);
+  expect(
+    await groups.evaluateAll((els) => els.map((el) => el.getAttribute('data-reason'))),
+  ).toEqual(['saturated', 'aperture_edge', 'aperture_flags']);
+  await expect(groups.nth(0).locator('summary')).toContainText('18 frames saturated');
+  // The refusals come after the data table, so the chart sits next to its text equivalent.
+  await page.getByText('Show data table').click();
+  await expect(page.getByTestId('spectrum-table')).toBeVisible();
+  const html = await page
+    .getByTestId('spectrum-panel')
+    .evaluate((el: { innerHTML: string }) => el.innerHTML);
+  expect(html.indexOf('data-testid="spectrum-table"')).toBeGreaterThan(-1);
+  expect(html.indexOf('data-testid="spectrum-table"')).toBeLessThan(
+    html.indexOf('data-testid="spectrum-missing"'),
+  );
+  await expect(page.getByTestId('announcer')).toContainText(
+    /Spectrum loaded: 4 points, 0 flagged, .* 20 frames not measured\./,
+  );
+  expect(errors, errors.join('\n')).toEqual([]);
 });
 
 test('a shared link with coordinates loads the object', async ({ page }) => {
