@@ -5,6 +5,7 @@ An LLM never produces a number here. Missing data means ``BakeRefusal``, not a g
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -19,11 +20,16 @@ _STYLE_RULES: dict[str, tuple[int, float, float, int, float]] = {
     "large_cratered": (6, 2.0, 0.02, 500, 0.05),
 }
 
+NEUTRAL_RGB = (0.5, 0.5, 0.5)  # placeholder when no colour source exists; see missing
 BAKED_TYPES = ("asteroid_procedural", "brown_dwarf", "brown_dwarf_binary")
 
 
 class BakeRefusal(Exception):
-    """The card lacks what the baker needs. ``missing`` lists card fields, not layers."""
+    """The card lacks what the baker needs. ``missing`` lists card fields, not layers.
+
+    Only a missing diameter (asteroids), spectral class (brown dwarfs) or an unbaked type
+    refuses the whole bake; other gaps bake flat and are listed in ``BakeParams.missing``.
+    """
 
     def __init__(self, reason: str, missing: list[str]) -> None:
         super().__init__(reason)
@@ -48,7 +54,9 @@ class BakeParams:
     redness: float = 0.0
     band_contrast: float = 0.0
     haze: float = 0.0
-    missing: tuple[str, ...] = ()  # layers baked flat because their input is absent
+    # Inputs that were absent: "colour" (neutral grey albedo), "brightness" (no albedo value),
+    # "bands" (no ch4_depth_33). The viewer must not draw those layers as data.
+    missing: tuple[str, ...] = ()
 
 
 def _val(card: Mapping[str, Any], key: str) -> Any:
@@ -58,7 +66,22 @@ def _val(card: Mapping[str, Any], key: str) -> Any:
 
 def _number(card: Mapping[str, Any], key: str) -> float | None:
     v = _val(card, key)
-    return float(v) if isinstance(v, int | float) and not isinstance(v, bool) else None
+    if isinstance(v, bool) or not isinstance(v, int | float):
+        return None
+    x = float(v)
+    return x if math.isfinite(x) else None  # NaN and inf are unknown, never a value (Q-40)
+
+
+def _rgb(card: Mapping[str, Any], key: str) -> tuple[float, float, float] | None:
+    v = _val(card, key)
+    if not isinstance(v, list | tuple) or len(v) != 3:
+        return None
+    out: list[float] = []
+    for c in v:
+        if isinstance(c, bool) or not isinstance(c, int | float) or not math.isfinite(c):
+            return None
+        out.append(float(c))
+    return (out[0], out[1], out[2])
 
 
 def style_for(diameter_km: float) -> Style:
@@ -76,22 +99,23 @@ def _asteroid(card: Mapping[str, Any], seed: int) -> BakeParams:
     from app.core.render.palette import ASTEROID_PALETTE
 
     d = _number(card, "diameter_km")
-    if d is None or d <= 0:
+    if d is None or d <= 0 or not math.isfinite(d * 500.0):
         raise BakeRefusal("no diameter: the relief and its scale cannot be set", ["diameter_km"])
-    rgb_v = _val(card, "gaia_rgb")
+    missing: list[str] = []
     cls = _val(card, "spectral_class")
     letter = cls.strip()[:1].upper() if isinstance(cls, str) else ""
-    if isinstance(rgb_v, list) and len(rgb_v) == 3:
-        base = (float(rgb_v[0]), float(rgb_v[1]), float(rgb_v[2]))
-    elif letter in ASTEROID_PALETTE:
-        base = ASTEROID_PALETTE[letter]
-    else:
-        raise BakeRefusal(
-            "no colour: neither gaia_rgb nor a spectral class with a palette (S, C, V, X)",
-            ["gaia_rgb or spectral_class"],
-        )
+    base = _rgb(card, "gaia_rgb") or ASTEROID_PALETTE.get(letter)
+    if base is None:
+        # Only the albedo layer needs a colour (R7.2): height and normals are still baked,
+        # and the albedo map is a neutral grey that the viewer must not present as colour.
+        base = NEUTRAL_RGB
+        missing.append("colour")
     albedo = _number(card, "albedo")
-    brightness = _clamp(0.12 + 1.6 * albedo, 0.12, 0.8) if albedo is not None else 1.0
+    if albedo is None:
+        brightness = 1.0  # not the R6.2 formula: listed so card_to_params can say so
+        missing.append("brightness")
+    else:
+        brightness = _clamp(0.12 + 1.6 * albedo, 0.12, 0.8)
     depth3 = _number(card, "band_depth_3um")
     slope = _number(card, "slope_075_25")
     style = style_for(d)
@@ -110,6 +134,7 @@ def _asteroid(card: Mapping[str, Any], seed: int) -> BakeParams:
         boulder_density=boulders,
         hydration=depth3 is not None and depth3 > 0.05,
         redness=_clamp(slope / 100.0, -0.08, 0.08) if slope is not None else 0.0,
+        missing=tuple(missing),
     )
 
 

@@ -17,7 +17,7 @@ ASTEROID_PALETTE: dict[str, tuple[float, float, float]] = {
 }
 
 # PLACEHOLDER (inferred_from_analog): R7.4 says "T is warmer, Y is cooler with a water-cloud
-# haze" but gives no numbers. Values are (base linear RGB, haze fraction). See Q-43.
+# haze" but gives no numbers. Values are (base linear RGB, haze fraction). See Q-47.
 BROWN_DWARF_PALETTE: dict[str, tuple[tuple[float, float, float], float]] = {
     "T": ((0.50, 0.24, 0.14), 0.0),
     "Y": ((0.30, 0.26, 0.36), 0.2),

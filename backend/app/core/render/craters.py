@@ -10,7 +10,7 @@ import math
 
 import numpy as np
 
-from app.core.render.noise import F64, seed32
+from app.core.render.noise import F64
 
 # CREATIVE constants (artistic): the spec fixes the profile but not the size range.
 CRATER_R_MIN = 0.02  # angular radius, radians
@@ -75,7 +75,7 @@ def craters(height: int, width: int, seed: int, count: int) -> tuple[F64, F64]:
     floor = np.zeros((height, width), dtype=np.float64)
     if count <= 0:
         return h, floor
-    rng = np.random.Generator(np.random.PCG64(np.random.SeedSequence([seed32(seed), 1])))
+    rng = np.random.Generator(np.random.PCG64(np.random.SeedSequence([seed, 1])))
     radii = np.minimum(CRATER_R_MIN * (1.0 - rng.random(count)) ** -0.5, CRATER_R_MAX)
     theta_c, phi_c = _centres(rng, count)
     grid = _Grid(height, width)
@@ -100,7 +100,7 @@ def boulders(height: int, width: int, seed: int, density: float) -> F64:
     count = round(density * BOULDERS_PER_UNIT_DENSITY)
     if count <= 0:
         return h
-    rng = np.random.Generator(np.random.PCG64(np.random.SeedSequence([seed32(seed), 2])))
+    rng = np.random.Generator(np.random.PCG64(np.random.SeedSequence([seed, 2])))
     theta_c, phi_c = _centres(rng, count)
     grid = _Grid(height, width)
     for tc, pc in zip(theta_c, phi_c, strict=True):
