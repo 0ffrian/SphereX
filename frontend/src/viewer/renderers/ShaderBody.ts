@@ -89,7 +89,7 @@ import {
   type Vec3,
 } from '../fields/fieldGenerator';
 import { requestField, requestPoints } from '../fields/fieldClient';
-import { boundedSeed } from '../fields/noise';
+import { shaderSeedOffsets } from '../fields/noise';
 import { DEFAULT_SUN_DIR } from '../lighting';
 import type { Overrides } from '../sliders';
 import {
@@ -230,8 +230,8 @@ function buildPlanet(
 
   if (style.cloudCover > 0.001) {
     const cm = new MeshStandardNodeMaterial();
-    // B1: a bounded seed offset, not the raw seed (float32 would drown the direction term).
-    const seedOff = vec3(0, 0, boundedSeed(spec.seed) * 2.3);
+    // B1/NF-3: a bounded seed offset, not the raw seed (float32 would drown the direction term).
+    const seedOff = vec3(0, 0, shaderSeedOffsets(spec.seed).cloud);
     const p = dir.mul(3).add(seedOff);
     const q = vec3(vnoise3(p.add(3.3), 3), vnoise3(p.add(7.7), 3), vnoise3(p.add(1.1), 3));
     const c = vnoise3(p.mul(1.2).add(q.mul(1.6)), 4);
@@ -281,7 +281,7 @@ function buildGas(spec: ShaderSpec, field: FieldData, textures: DataTexture[]): 
   // R = band profile from the field. 0.5 is a band edge and maps to 0.5 here, so the drawn edges
   // are the field's edges; the noise only breaks up the colour inside a band.
   const fine = vnoise3(
-    vec3(dir.x.mul(7), dir.y.mul(28), dir.z.mul(7)).add(boundedSeed(spec.seed) * 2),
+    vec3(dir.x.mul(7), dir.y.mul(28), dir.z.mul(7)).add(shaderSeedOffsets(spec.seed).gasFine),
     3,
   );
   const val = clamp(
@@ -324,7 +324,7 @@ function buildGas(spec: ShaderSpec, field: FieldData, textures: DataTexture[]): 
     const rm = new MeshBasicNodeMaterial();
     const r = length(positionLocal.xy);
     const t = r.sub(RING_INNER).div(RING_OUTER - RING_INNER);
-    const n = mx_noise_float(vec3(r.mul(35), 0.5, (boundedSeed(spec.seed) % 53) * 0.7))
+    const n = mx_noise_float(vec3(r.mul(35), 0.5, shaderSeedOffsets(spec.seed).ringGrain))
       .mul(0.5)
       .add(0.5);
     const bands = sin(r.mul(70))
@@ -495,8 +495,9 @@ export class ShaderBody implements BodyRenderer {
         state: 'hidden',
         message: this.hasPlainSphere()
           ? "Showing a plain grey sphere. The surface is an artist's impression and is hidden at this honesty level; choose + Artistic to see it."
-          : "Nothing is shown. This cloud is an artist's impression and is hidden at this honesty level; choose + Artistic to see it.",
-        tags: [tag],
+          : `Nothing is shown. This ${this.spec.kind === 'nova' ? 'explosion' : 'cloud'} is an artist's impression and is hidden at this honesty level; choose + Artistic to see it.`,
+        // NF-5: what is on screen. The plain grey sphere is a placeholder, not a layer.
+        tags: [],
       };
     }
     return {
@@ -536,6 +537,7 @@ export class ShaderBody implements BodyRenderer {
   }
 
   setVisibleTags(tags: readonly Tag[]): void {
+    if (this.disposed) return;
     this.visibleTags = tags;
     this.applyVisibility();
     this.onChange?.();
@@ -561,6 +563,7 @@ export class ShaderBody implements BodyRenderer {
     this.textures = [];
     this.sampler = null;
     this.points = null;
+    this.frame = null;
     if (this.plain) {
       disposeTree(this.plain);
       this.plain = null;
@@ -617,7 +620,11 @@ export class ShaderBody implements BodyRenderer {
   private async rebuild(): Promise<void> {
     const spec = this.spec;
     const built = spec.drawable ? await this.build(spec) : null;
-    if (this.disposed || spec !== this.spec) return;
+    if (this.disposed || spec !== this.spec) {
+      // NF-1: disposed or superseded after build() resolved; free what it made, it was never added.
+      if (built) this.release(built.group, built.textures);
+      return;
+    }
     const oldGroup = this.surface;
     const oldTextures = this.textures;
     this.surface = built?.group ?? null;

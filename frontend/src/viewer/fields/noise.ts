@@ -6,7 +6,7 @@
 // lattice cell or band index. Byte identity across engines is therefore NOT guaranteed (review N4);
 // the tests check one engine (V8). Tabulating the trig would be the fix if it is ever needed.
 
-/** Modulus of the visual seed offset. Prime, so offsets of nearby seeds do not repeat. */
+/** Modulus of the visual seed offset. Prime, so seeds closer than this give different offsets (seeds that differ by a multiple of it share their shader-only grain). */
 export const SEED_OFFSET_MOD = 997;
 
 /**
@@ -18,6 +18,21 @@ export const SEED_OFFSET_MOD = 997;
 export function boundedSeed(seed: number): number {
   const s = Math.floor(Number.isFinite(seed) ? seed : 0);
   return ((s % SEED_OFFSET_MOD) + SEED_OFFSET_MOD) % SEED_OFFSET_MOD;
+}
+
+/**
+ * Seed-dependent offsets added to the shader-only float32 noise (gas bands, clouds, ring grain).
+ * Pure so a test can pin that ShaderBody uses the bounded seed (review NF-3). Seeds `s` and
+ * `s + 997` share these offsets; the field and the storms use the seed itself (low 32 bits), so
+ * that only repeats visual-only grain.
+ */
+export function shaderSeedOffsets(seed: number): {
+  cloud: number;
+  gasFine: number;
+  ringGrain: number;
+} {
+  const b = boundedSeed(seed);
+  return { cloud: b * 2.3, gasFine: b * 2, ringGrain: (b % 53) * 0.7 };
 }
 
 /** murmur3 fmix32 finaliser. */

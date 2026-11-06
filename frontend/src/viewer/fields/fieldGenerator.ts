@@ -134,7 +134,7 @@ export const STORM_RING_WIDTH = 0.4;
  * Storm influence: the field marks a pixel as inside a storm within this many sizes. It is the
  * radius where the drawn ring has faded to exp(-2.25), about 10%, of its peak (review N3).
  */
-export const STORM_EDGE_FACTOR = STORM_RING_CENTRE + 1.5 * STORM_RING_WIDTH;
+export const STORM_EDGE_FACTOR = STORM_RING_CENTRE + 1.5 * STORM_RING_WIDTH; // 1.9 (was 1.5, signed off by Atish)
 
 /** Id of the storm covering `d` (nearest in units of its size), or 0. */
 export function stormIdAt(d: Vec3, storms: readonly Storm[]): number {
@@ -154,14 +154,14 @@ export function stormIdAt(d: Vec3, storms: readonly Storm[]): number {
 // ---- gas giant flow and rings (D-12 flow source, R8.4) ------------------------------------------
 
 /**
- * Zonal wind at a latitude, in units of the strongest jet (-1..1, `artistic`: the mock-up's
- * differential rotation `sin(lat * bands * pi)`, without its time scale). Adjacent bands flow in
- * opposite directions (counter-flowing jets, A6). `y` is sin(latitude), i.e. the direction's Y.
- * The still picture has no motion (D-05), so this is the one flow input the shader does not use;
- * it derives from the same `bands` parameter as the band profile (`gasBandAt`).
+ * Zonal wind in the direction `d`, in units of the strongest jet (-1..1, `artistic`: the mock-up's
+ * differential rotation without its time scale). It is `sin` of the same warped band phase the
+ * shader draws (`gasBandAt`), so adjacent bands flow in opposite directions and the felt jets
+ * follow the drawn bands exactly, warp included (R8.4, review NF-4). The still picture has no
+ * motion (D-05), so this is the one flow input the shader does not use.
  */
-export function zonalWind(y: number, p: Pick<FieldParams, 'bands'>): number {
-  return Math.sin(Math.max(-1, Math.min(1, y)) * p.bands * Math.PI);
+export function zonalWind(d: Vec3, p: FieldParams): number {
+  return Math.sin(gasBandAt(d, p).phase);
 }
 
 /** Ring plane geometry in body radii (ShaderBody draws the ring from these). */

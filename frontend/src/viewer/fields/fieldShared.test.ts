@@ -14,13 +14,15 @@ import {
   generateField,
   ringGapAt,
   ringT,
+  gasBandAt,
+  pixelDirection,
   stormIdAt,
   stormsFor,
   zonalWind,
   type FieldParams,
   type Vec3,
 } from './fieldGenerator';
-import { SEED_OFFSET_MOD, boundedSeed, mulberry32 } from './noise';
+import { SEED_OFFSET_MOD, boundedSeed, mulberry32, shaderSeedOffsets } from './noise';
 
 const f32 = Math.fround;
 const gas: FieldParams = {
@@ -117,17 +119,59 @@ describe('storm edge (review N3)', () => {
   });
 });
 
-describe('zonal wind and ring gaps (review N2)', () => {
-  it('wind is bounded, zero at the equator and alternates between neighbouring jets', () => {
-    expect(zonalWind(0, gas)).toBeCloseTo(0, 12);
-    const samples: number[] = [];
-    for (let i = 0; i <= 1000; i++) samples.push(zonalWind(-1 + i / 500, gas));
-    expect(Math.max(...samples)).toBeLessThanOrEqual(1);
-    expect(Math.min(...samples)).toBeGreaterThanOrEqual(-1);
-    // Counter-flowing: peaks at y = (k + 1/2) / bands with alternating sign.
-    expect(zonalWind(0.5 / 12, gas)).toBeCloseTo(1, 9);
-    expect(zonalWind(1.5 / 12, gas)).toBeCloseTo(-1, 9);
-    expect(zonalWind(5, gas)).toBe(zonalWind(1, gas)); // clamped
+describe('shaderSeedOffsets (review NF-3)', () => {
+  it('stays small for any seed, so float32 never drowns the direction term', () => {
+    for (const seed of [12, 1e6, 2 ** 31 + 5, 2 ** 32 - 1, 2 ** 53 - 1, -7, NaN]) {
+      const o = shaderSeedOffsets(seed);
+      expect(o.cloud).toBeLessThan(SEED_OFFSET_MOD * 2.3);
+      expect(o.gasFine).toBeLessThan(SEED_OFFSET_MOD * 2);
+      expect(o.ringGrain).toBeLessThan(53 * 0.7);
+      expect(o.cloud).toBeGreaterThanOrEqual(0);
+    }
+  });
+  it('is the bounded seed scaled, and differs for seeds above 2^20', () => {
+    const o = shaderSeedOffsets(2 ** 31 + 5);
+    expect(o.gasFine).toBe(boundedSeed(2 ** 31 + 5) * 2);
+    expect(shaderSeedOffsets(2 ** 31 + 1).gasFine).not.toBe(shaderSeedOffsets(2 ** 31 + 2).gasFine);
+  });
+});
+
+describe('zonal wind and ring gaps (review N2, NF-4)', () => {
+  it('wind is bounded, zero on a band edge, and alternates between neighbouring jets', () => {
+    const flat = { ...gas, turbulence: 0 };
+    // Without warp the phase is y * bands * pi: peaks at y = (k + 1/2) / bands with alternating sign.
+    expect(zonalWind([0, 0, 1], flat)).toBeCloseTo(0, 12);
+    expect(zonalWind([0, 0.5 / 12, 1], flat)).toBeCloseTo(1, 9);
+    expect(zonalWind([0, 1.5 / 12, 1], flat)).toBeCloseTo(-1, 9);
+    for (let i = 0; i <= 500; i++) {
+      const y = -1 + i / 250;
+      const w = zonalWind([Math.sqrt(1 - y * y), y, 0], gas);
+      expect(Math.abs(w)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('the wind sign is constant inside each drawn band at the fixture turbulence', () => {
+    // The drawn band is the warped phase (gasBandAt); wind must follow it, not a plain latitude.
+    expect(gas.turbulence).toBeGreaterThan(0);
+    const signByBand = new Map<number, number>();
+    for (let r = 0; r < 128; r++) {
+      for (let c = 0; c < 256; c++) {
+        const d = pixelDirection(c, r, 256, 128);
+        const band = gasBandAt(d, gas);
+        const w = zonalWind(d, gas);
+        if (Math.abs(w) < 1e-9) continue;
+        const sign = Math.sign(w);
+        const seen = signByBand.get(band.index);
+        if (seen === undefined) signByBand.set(band.index, sign);
+        else expect(sign, `band ${band.index}`).toBe(seen);
+      }
+    }
+    // Neighbouring band indexes flow in opposite directions.
+    for (const [i, sg] of signByBand) {
+      const next = signByBand.get(i + 1);
+      if (next !== undefined) expect(next).toBe(-sg);
+    }
+    expect(signByBand.size).toBeGreaterThan(10);
   });
 
   it('the ring gap is 1 inside the gap, 0 outside, and maps radius to t', () => {
