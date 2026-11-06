@@ -2,17 +2,21 @@
 // saves them and, through `bindEngine`, applies them to the engine and drivers. Haptics on/off,
 // sound on/off, volume, the strength multiplier (0.5–1.5×) and the texture-vs-data labels toggle.
 // Native controls with visible labels; every target is at least 24 px (R9).
-import { useEffect, useId } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { buttonClass } from '@/app/ui';
+import { calibrationAvailable } from '../calibration';
+import { platformEnv, type PlatformEnv } from '../platform';
 import { ensureLoaded, useHapticSettings } from '../settings';
 import { STRENGTH_MULTIPLIER_MAX, STRENGTH_MULTIPLIER_MIN } from '../tuning';
 
 export interface HapticsSettingsProps {
   /** The vibrate driver's `supported`. Without it the haptics switch says it has no effect here. */
   canVibrate: boolean;
-  /** Shown as "Calibrate vibration" when given and the device can vibrate. */
+  /** Shown as "Calibrate vibration" when given and this is a phone that vibrates (R8.7). */
   onCalibrate?: () => void;
+  /** Android + touch screen. Default: read from the browser. */
+  platform?: PlatformEnv;
   className?: string;
 }
 
@@ -20,7 +24,14 @@ const rowClass = 'flex min-h-11 items-center gap-3';
 const checkClass = 'size-6 accent-sky-400';
 const rangeClass = 'h-6 w-full max-w-xs accent-sky-400';
 
-export function HapticsSettings({ canVibrate, onCalibrate, className }: HapticsSettingsProps) {
+export function HapticsSettings({
+  canVibrate,
+  onCalibrate,
+  platform,
+  className,
+}: HapticsSettingsProps) {
+  const [browserEnv] = useState<PlatformEnv>(platformEnv);
+  const canCalibrate = calibrationAvailable(canVibrate, platform ?? browserEnv);
   const s = useHapticSettings(
     useShallow((st) => ({
       hapticsOn: st.hapticsOn,
@@ -53,7 +64,9 @@ export function HapticsSettings({ canVibrate, onCalibrate, className }: HapticsS
       </label>
       {!canVibrate && (
         <p id={`${id}-novib`} className="-mt-2 text-sm text-neutral-400">
-          This device cannot vibrate. Everything you would feel also plays as sound.
+          {s.soundOn
+            ? 'This device cannot vibrate. What you would feel plays as sound instead.'
+            : 'This device cannot vibrate, and sound is off: turn sound on to hear what you would feel.'}
         </p>
       )}
 
@@ -109,7 +122,7 @@ export function HapticsSettings({ canVibrate, onCalibrate, className }: HapticsS
       </label>
 
       <div className="flex flex-wrap gap-2">
-        {onCalibrate && canVibrate && (
+        {onCalibrate && canCalibrate && (
           <button type="button" className={buttonClass} onClick={onCalibrate}>
             Calibrate vibration
           </button>

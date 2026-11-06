@@ -15,7 +15,9 @@ import {
   levelSetFromAnswers,
   levelsToVibrate,
   loadCalibration,
-  meanTapLag,
+  tapLag,
+  CALIBRATION_TRAIN_SEQ,
+  calibrationAvailable,
   minMsFromAnswer,
   parseCalibration,
   saveCalibration,
@@ -26,7 +28,7 @@ import {
   type Calibration,
 } from './calibration';
 import { AudioDriver } from './drivers/audio';
-import { WebVibrateDriver } from './drivers/webVibrate';
+import { WebVibrateDriver, validLevels } from './drivers/webVibrate';
 import { HapticEngine, type HapticOutputs } from './haptics';
 import {
   AV_OFFSET_MAX_MS,
@@ -58,6 +60,15 @@ function outputs(): HapticOutputs {
   return { engine, vibrate, audio };
 }
 
+describe('where calibration runs (R8.7 "phones that vibrate")', () => {
+  it('needs vibrate, Android and a touch screen', () => {
+    expect(calibrationAvailable(true, { android: true, coarsePointer: true })).toBe(true);
+    expect(calibrationAvailable(false, { android: true, coarsePointer: true })).toBe(false);
+    expect(calibrationAvailable(true, { android: false, coarsePointer: true })).toBe(false);
+    expect(calibrationAvailable(true, { android: true, coarsePointer: false })).toBe(false);
+  });
+});
+
 describe('step 1: faintest pulse (minMs)', () => {
   it('is the probe picked; none felt keeps the R8.3 soft tick', () => {
     expect(CALIBRATION_PROBE_MS).toEqual([5, 10, 20]);
@@ -74,16 +85,27 @@ describe('step 1: faintest pulse (minMs)', () => {
 });
 
 describe('step 2: distinct levels (D-09)', () => {
-  it('keeps the whisper only when it is felt and distinct', () => {
-    expect(levelSetFromAnswers({ whisperFelt: true, whisperDistinct: true })).toEqual([
+  it('keeps the whisper only when it is felt and weaker than soft (Q-62)', () => {
+    expect(levelSetFromAnswers({ whisperFelt: true, whisperWeaker: true })).toEqual([
       ...FOUR_LEVELS,
     ]);
-    expect(levelSetFromAnswers({ whisperFelt: true, whisperDistinct: false })).toEqual([
+    expect(levelSetFromAnswers({ whisperFelt: true, whisperWeaker: false })).toEqual([
       ...THREE_LEVELS,
     ]);
-    expect(levelSetFromAnswers({ whisperFelt: false, whisperDistinct: true })).toEqual([
+    expect(levelSetFromAnswers({ whisperFelt: false, whisperWeaker: true })).toEqual([
       ...THREE_LEVELS,
     ]);
+  });
+
+  it('every level set it makes is one the vibrate driver accepts (validLevels)', () => {
+    for (const minMs of [1, 5, 8, 10, 20, 50]) {
+      for (const levels of [THREE_LEVELS, FOUR_LEVELS]) {
+        const v = levelsToVibrate(cal({ minMs, levels: [...levels] }));
+        expect(validLevels(v), `${minMs} ms, ${levels.length} levels`).toBe(true);
+        expect(new WebVibrateDriver({ vibrate: null }).setLevels(v)).toBe(true);
+        if (levels.length === 4) expect(Array.isArray(v[0])).toBe(true); // whisper first
+      }
+    }
   });
 
   it('plays whisper, soft, medium and firm in turn, the whisper as its pulse-width pattern', () => {
@@ -109,21 +131,24 @@ describe('step 3: tap-along offset (R8.7, R8.9 sign)', () => {
   const plan = beatPlan();
   const beats = (t0: number) => plan.offsetsMs.map((o) => t0 + o);
 
-  it('the beats: firm ticks one period apart, and a measured tone window', () => {
+  it('the beats: firm ticks one period apart, and a measured tone window on a fresh anchor', () => {
     const pattern = vibrationBeatPattern(plan);
     expect(pattern).toHaveLength(2 * plan.count - 1);
     expect(pattern[0]).toBe(25);
     expect(pattern[1]! + pattern[2]!).toBe(TAP_BEAT_PERIOD_MS);
-    const w = soundBeatWindow(plan);
+    const w = soundBeatWindow(plan, 1234);
     expect(w.tag).toBe('measured');
     expect(w.pulseOffsetsMs).toEqual(plan.offsetsMs);
     expect(w.resentCount).toBe(0);
+    expect(w.atMs).toBe(1234);
+    expect(w.trainSeq).toBe(CALIBRATION_TRAIN_SEQ);
+    expect(CALIBRATION_TRAIN_SEQ).toBeLessThan(-1);
   });
 
-  it('mean lag skips warm-up beats, far taps and double taps', () => {
+  it('the lag is the median: warm-up beats, far taps and double taps are skipped', () => {
     const b = beats(1000);
     const taps = [
-      b[0]! + 300 - 1, // warm-up beat: ignored
+      b[0]! + 300, // warm-up beat: ignored
       b[1]! + 5, // warm-up beat: ignored
       b[2]! + 40,
       b[2]! + 60, // second tap on beat 2: ignored
@@ -131,34 +156,62 @@ describe('step 3: tap-along offset (R8.7, R8.9 sign)', () => {
       b[4]! + 30,
       b[5]! + 40,
       b[6]! + 80,
+      b[7]! + 45,
     ];
-    expect(meanTapLag(taps, b)).toBeCloseTo((40 + 50 + 30 + 40 + 80) / 5, 9);
+    expect(tapLag(taps, b)).toEqual({ ok: true, lagMs: 42.5, spreadMs: 5, taps: 6 });
+  });
+
+  it('one stray tap does not move the median', () => {
+    const b = beats(0);
+    const taps = [2, 3, 4, 5, 6].map((k) => b[k]! + 100);
+    taps.push(b[7]! - 350); // a wild early tap
+    const r = tapLag(taps, b);
+    expect(r.ok && r.lagMs).toBe(100);
   });
 
   it('taps before the beat count as negative lag', () => {
     const b = beats(0);
     const taps = [2, 3, 4, 5].map((k) => b[k]! - 20);
-    expect(meanTapLag(taps, b)).toBe(-20);
+    expect(tapLag(taps, b)).toMatchObject({ ok: true, lagMs: -20 });
   });
 
-  it('too few taps give no lag, and no offset', () => {
+  it('a lag near half a period wraps between beats and is refused as irregular', () => {
     const b = beats(0);
-    expect(meanTapLag([b[2]!, b[3]!, b[4]!], b)).toBeNull();
-    expect(meanTapLag([], b)).toBeNull();
+    const half = TAP_BEAT_PERIOD_MS / 2;
+    // True lag ≈ half a period: half the taps land just before the midpoint (+385 ms, matched to
+    // their beat), half just after it (matched to the next beat, −385 ms). A mean would say 0 ms.
+    const taps = [
+      ...[2, 3, 4].map((k) => b[k]! + half - 15),
+      ...[5, 7, 8].map((k) => b[k]! + half + 15),
+    ];
+    expect(tapLag(taps, b)).toMatchObject({ ok: false, reason: 'irregular' });
+    // Lags around ±300 ms are well inside the 800 ms period and measured.
+    const late = [2, 3, 4, 5, 6].map((k) => b[k]! + 300);
+    expect(tapLag(late, b)).toMatchObject({ ok: true, lagMs: 300 });
+    const early = [2, 3, 4, 5, 6].map((k) => b[k]! - 300);
+    expect(tapLag(early, b)).toMatchObject({ ok: true, lagMs: -300 });
+  });
+
+  it('scattered taps are refused; too few taps give no lag and no offset', () => {
+    const b = beats(0);
+    const scattered = [2, 3, 4, 5, 6, 7].map((k, i) => b[k]! + [0, 200, -150, 180, -100, 90][i]!);
+    expect(tapLag(scattered, b)).toMatchObject({ ok: false, reason: 'irregular' });
+    expect(tapLag([b[2]!, b[3]!, b[4]!], b)).toEqual({ ok: false, reason: 'too-few', taps: 3 });
+    expect(tapLag([], b)).toMatchObject({ ok: false, reason: 'too-few' });
     expect(computeAvOffset(null, 10)).toBeNull();
     expect(computeAvOffset(10, null)).toBeNull();
   });
 
   it('vibration felt later gives a positive offset, which delays the audio', () => {
-    const vibLag = meanTapLag(
+    const vib = tapLag(
       [2, 3, 4, 5, 6].map((k) => beats(0)[k]! + 120),
       beats(0),
     );
-    const soundLag = meanTapLag(
-      [2, 3, 4, 5, 6].map((k) => beats(5000)[k]! + 70),
-      beats(5000),
+    const sound = tapLag(
+      [2, 3, 4, 5, 6].map((k) => beats(9000)[k]! + 70),
+      beats(9000),
     );
-    const off = computeAvOffset(vibLag, soundLag);
+    const off = computeAvOffset(vib.ok ? vib.lagMs : null, sound.ok ? sound.lagMs : null);
     expect(off).toBe(50);
     const o = outputs();
     applyStoredCalibrationFrom(o, cal({ avOffsetMs: off! }));

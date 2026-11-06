@@ -71,14 +71,26 @@ describe('HapticsSettings (R8.7)', () => {
     expect(saved().showChannelLabels).toBe(false);
   });
 
-  it('says when the device cannot vibrate, and offers calibration only where it can', () => {
+  it('says when the device cannot vibrate, and offers calibration only on phones', () => {
     const onCalibrate = vi.fn();
     act(() => root.render(<HapticsSettings canVibrate={false} onCalibrate={onCalibrate} />));
-    expect(host.textContent).toContain('cannot vibrate');
+    expect(host.textContent).toContain('plays as sound instead');
+    act(() => input(/^Sound/).click());
+    expect(host.textContent).toContain('sound is off: turn sound on');
+    expect(host.textContent).not.toContain('plays as sound instead');
     expect(input(/^Vibration/).getAttribute('aria-describedby')).toBeTruthy();
     expect(host.textContent).not.toContain('Calibrate vibration');
 
-    act(() => root.render(<HapticsSettings canVibrate onCalibrate={onCalibrate} />));
+    // Desktop Chrome has navigator.vibrate but is not a phone: no calibration (R8.7).
+    const desktop = { android: false, coarsePointer: false };
+    act(() =>
+      root.render(<HapticsSettings canVibrate onCalibrate={onCalibrate} platform={desktop} />),
+    );
+    expect(host.textContent).not.toContain('Calibrate vibration');
+    const phone = { android: true, coarsePointer: true };
+    act(() =>
+      root.render(<HapticsSettings canVibrate onCalibrate={onCalibrate} platform={phone} />),
+    );
     const b = [...host.querySelectorAll('button')].find(
       (el) => el.textContent === 'Calibrate vibration',
     )!;

@@ -4,6 +4,7 @@
 // Pure apart from `localStorage`, which is read only when a function asks for it, never at import.
 import type { HapticOutputs, TrainWindow } from './haptics';
 import { levelDurationMs, type VibrateLevel } from './drivers/webVibrate';
+import { platformEnv, type PlatformEnv } from './platform';
 import {
   AV_OFFSET_MAX_MS,
   CALIBRATION_GAP_MS,
@@ -14,6 +15,7 @@ import {
   STRENGTH_FIRM,
   TAP_BEAT_COUNT,
   TAP_BEAT_PERIOD_MS,
+  TAP_MAX_SPREAD_MS,
   TAP_MIN_TAPS,
   TAP_WARMUP_BEATS,
   VIBRATE_LEVELS_MS,
@@ -54,6 +56,18 @@ export function defaultCalibration(): Calibration {
   };
 }
 
+/**
+ * R8.7 "first use, on phones that vibrate": a vibrate API **and** an Android phone with a touch
+ * screen (the platform.ts rule, Q-61). Desktop Chrome and Chromebooks have `navigator.vibrate` but
+ * no phone motor, so they are not offered calibration.
+ */
+export function calibrationAvailable(
+  vibrateSupported: boolean,
+  env: PlatformEnv = platformEnv(),
+): boolean {
+  return vibrateSupported && env.android && env.coarsePointer;
+}
+
 // ------------------------------------------------------------------ levels (R8.3, R8.7, D-09)
 
 /**
@@ -82,13 +96,17 @@ export function minMsFromAnswer(
 export interface LevelAnswers {
   /** The whisper was felt at all. */
   whisperFelt: boolean;
-  /** It felt different from the soft tick. */
-  whisperDistinct: boolean;
+  /**
+   * It felt weaker than the soft tick. A pulse-width whisper has more on-time than a short soft
+   * tick ([4,4,4,4,4] is 12 ms on against `minMs` = 5), so only the user can say which is weaker;
+   * one that feels the same or stronger is dropped, so the levels stay weakest first (Q-62).
+   */
+  whisperWeaker: boolean;
 }
 
-/** R8.7 step 2: 4 levels when the whisper is felt and distinct from soft, otherwise 3. */
+/** R8.7 step 2: 4 levels when the whisper is felt and weaker than soft, otherwise 3. */
 export function levelSetFromAnswers(a: LevelAnswers): CalibrationLevel[] {
-  return a.whisperFelt && a.whisperDistinct ? [...FOUR_LEVELS] : [...THREE_LEVELS];
+  return a.whisperFelt && a.whisperWeaker ? [...FOUR_LEVELS] : [...THREE_LEVELS];
 }
 
 // ------------------------------------------------------------------ vibrate patterns for the wizard
@@ -169,36 +187,63 @@ export function vibrationBeatPattern(plan: BeatPlan = beatPlan()): number[] {
 }
 
 /**
+ * `trainSeq` of the calibration beat. The engine numbers its trains from 1 and the audio driver's
+ * "no anchor" is −1, so after a `stop()` this always starts a fresh audio-clock anchor.
+ */
+export const CALIBRATION_TRAIN_SEQ = -2;
+
+/**
  * The sound-only beat as one train window for the audio driver: the `measured` clean tone at full
  * strength, scheduled on the audio clock with the driver's own lookahead, exactly as an event
- * emitted at each beat time would be (so the measured lag includes that lookahead).
+ * emitted at each beat time would be (so the measured lag includes that lookahead). Stop the
+ * driver first, so the window anchors at `currentTime` + lookahead.
  */
-export function soundBeatWindow(plan: BeatPlan = beatPlan()): TrainWindow {
+export function soundBeatWindow(plan: BeatPlan = beatPlan(), atMs = 0): TrainWindow {
   return {
     rateHz: 1000 / plan.periodMs,
     strength: STRENGTH_FIRM,
     tag: 'measured',
     pulseOffsetsMs: plan.offsetsMs,
     resentCount: 0,
+    atMs,
+    trainSeq: CALIBRATION_TRAIN_SEQ,
   };
 }
 
+export type TapLag =
+  | {
+      ok: true;
+      /** Median lag (ms), positive when the taps come after the beats. */ lagMs: number;
+      /** Median absolute deviation of the lags (ms). */ spreadMs: number;
+      taps: number;
+    }
+  | { ok: false; reason: 'too-few' | 'irregular'; taps: number };
+
+function median(sorted: readonly number[]): number {
+  const n = sorted.length;
+  const m = n >> 1;
+  return n % 2 ? sorted[m]! : (sorted[m - 1]! + sorted[m]!) / 2;
+}
+
 /**
- * Mean lag (ms) of the taps behind the beats, or null with fewer than TAP_MIN_TAPS usable taps.
- * Each tap is matched to the nearest beat; taps more than half a period away, taps on the warm-up
- * beats, and second taps on a beat are ignored. Times share one clock (e.g. `performance.now`).
+ * How far the taps lag the beats (R8.7 step 3, Q-63). Each tap is matched to the nearest beat;
+ * taps on the warm-up beats, beyond the last beat or more than half a period away, and second taps
+ * on a beat are ignored. The lag is the **median** of the rest, so a stray tap or one matched to
+ * the wrong beat does not move it. A run with fewer than `minTaps` taps, or whose taps scatter
+ * more than `maxSpreadMs` (median absolute deviation, e.g. a lag near half a period that wraps
+ * between two beats), is refused. Times share one clock (e.g. `performance.now`).
  */
-export function meanTapLag(
+export function tapLag(
   tapTimes: readonly number[],
   beatTimes: readonly number[],
   periodMs: number = TAP_BEAT_PERIOD_MS,
   warmup: number = TAP_WARMUP_BEATS,
   minTaps: number = TAP_MIN_TAPS,
-): number | null {
-  if (beatTimes.length === 0 || !(periodMs > 0)) return null;
+  maxSpreadMs: number = TAP_MAX_SPREAD_MS,
+): TapLag {
+  if (beatTimes.length === 0 || !(periodMs > 0)) return { ok: false, reason: 'too-few', taps: 0 };
   const used = new Set<number>();
-  let sum = 0;
-  let n = 0;
+  const lags: number[] = [];
   const first = beatTimes[0]!;
   for (const tap of tapTimes) {
     if (!Number.isFinite(tap)) continue;
@@ -207,14 +252,18 @@ export function meanTapLag(
     const lag = tap - beatTimes[k]!;
     if (Math.abs(lag) > periodMs / 2) continue;
     used.add(k);
-    sum += lag;
-    n++;
+    lags.push(lag);
   }
-  return n >= minTaps ? sum / n : null;
+  if (lags.length < minTaps) return { ok: false, reason: 'too-few', taps: lags.length };
+  lags.sort((x, y) => x - y);
+  const lagMs = median(lags);
+  const spreadMs = median(lags.map((l) => Math.abs(l - lagMs)).sort((x, y) => x - y));
+  if (spreadMs > maxSpreadMs) return { ok: false, reason: 'irregular', taps: lags.length };
+  return { ok: true, lagMs, spreadMs, taps: lags.length };
 }
 
 /**
- * R8.7 step 3: avOffsetMs = mean tap lag to the vibration − mean tap lag to the sound, rounded.
+ * R8.7 step 3: avOffsetMs = tap lag to the vibration − tap lag to the sound, rounded.
  * Null when either lag is missing or the result is beyond ±AV_OFFSET_MAX_MS (a failed run).
  */
 export function computeAvOffset(

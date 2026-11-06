@@ -197,13 +197,18 @@ export const CALIBRATION_LEVEL_STEP_MS = 5;
 export const CALIBRATION_MIN_MS_FLOOR = 1;
 export const CALIBRATION_MIN_MS_CEIL = 50;
 
-/** R8.7 step 3 tap-along (method [verify] in R8.7, Q-63): beat period (ms) … [verify on phones] */
-export const TAP_BEAT_PERIOD_MS = 600;
+/**
+ * R8.7 step 3 tap-along (method [verify] in R8.7, Q-63): beat period (ms). Half of it is the
+ * largest lag that can be told from the next beat, so it is twice AV_OFFSET_MAX_MS. [verify on phones]
+ */
+export const TAP_BEAT_PERIOD_MS = 800;
 /** … number of beats per channel … [verify on phones] */
 export const TAP_BEAT_COUNT = 10;
 /** … beats ignored at the start while the user locks on … [verify on phones] */
 export const TAP_WARMUP_BEATS = 2;
 /** … and the fewest matched taps that give a lag. Engineering. */
 export const TAP_MIN_TAPS = 4;
+/** … and the largest scatter (median absolute deviation, ms) of a usable run. [verify on phones] */
+export const TAP_MAX_SPREAD_MS = 60;
 /** Engineering (Q-63): |avOffsetMs| above this is a failed measurement (and corrupt in storage). */
 export const AV_OFFSET_MAX_MS = 400;
