@@ -13,6 +13,7 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -173,8 +174,7 @@ export function CalibrationWizard({
   /** A sound beat is waiting for the AudioContext to resume. */
   const soundPending = useRef(false);
   const mounted = useRef(true);
-  /** Focus is inside the wizard: when it unmounts, focus goes back to `returnFocusRef`. */
-  const focusInside = useRef(false);
+  const sectionRef = useRef<HTMLElement>(null);
   /** The latest `returnFocusRef`, read when the wizard unmounts. */
   const returnTarget = useRef(returnFocusRef);
   const tapButton = useRef<HTMLButtonElement>(null);
@@ -199,9 +199,20 @@ export function CalibrationWizard({
       soundSent.current = false;
       if (savedOffset.current !== null) haptics.audio.setOffsetMs(savedOffset.current);
       savedOffset.current = null;
-      if (focusInside.current) returnTarget.current?.current?.focus();
     };
   }, [haptics, vibrateFn]);
+
+  // Unmounted while focus is inside (the host closed it, e.g. in onDone): focus goes back to the
+  // opener. A layout-effect cleanup runs while the section is still in the document, before the
+  // browser moves focus to <body> on removal, so `contains(activeElement)` is still true then.
+  useLayoutEffect(() => {
+    const section = sectionRef.current;
+    return () => {
+      if (section && typeof document !== 'undefined' && section.contains(document.activeElement)) {
+        returnTarget.current?.current?.focus();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     returnTarget.current = returnFocusRef;
@@ -268,11 +279,28 @@ export function CalibrationWizard({
     rawSent.current = true;
   };
 
+  /** Forget everything this run measured or played: a restart begins from this device's values. */
+  const resetRun = () => {
+    setMinMs(base.minMs);
+    setLevels([...base.levels]);
+    setAvOffsetMs(base.avOffsetMs);
+    setMeasured({ minMs: false, levels: false, offset: false });
+    setNoneFelt(false);
+    setPlayed({ probes: false, levels: false });
+    setTapPhase('ready-vibration');
+    setTapCount(0);
+    setBeatNo(0);
+    setResult(null);
+    vibrationLag.current = null;
+    taps.current = [];
+    beats.current = [];
+  };
+
   const cancel = () => {
     stopAll();
     if (onCancel) close();
     else {
-      setTapPhase('ready-vibration');
+      resetRun();
       go('intro', 'Calibration cancelled. Nothing was saved.');
     }
   };
@@ -282,6 +310,7 @@ export function CalibrationWizard({
   const playProbes = () => {
     play(sequencePattern(CALIBRATION_PROBE_MS));
     setPlayed((p) => ({ ...p, probes: true }));
+    announce('Played. Now pick the faintest one you felt.');
   };
   const pickFaintest = (index: number | null) => {
     if (index === null) {
@@ -311,6 +340,7 @@ export function CalibrationWizard({
       ),
     );
     setPlayed((p) => ({ ...p, levels: true }));
+    announce('Played. Was the first buzz weaker than the second?');
   };
   const answerLevels = (whisperFelt: boolean, whisperWeaker: boolean) => {
     setLevels(levelSetFromAnswers({ whisperFelt, whisperWeaker }));
@@ -330,7 +360,13 @@ export function CalibrationWizard({
     applyCalibration(haptics, cal);
     setMeasured(m);
     setResult({ cal, saved });
-    go('done');
+    // A failure to save goes through the status line, so it is announced (Q-74).
+    go(
+      'done',
+      changed && !saved
+        ? 'Could not save on this device; it applies until you close the page.'
+        : '',
+    );
     onDone?.(cal, saved);
   };
 
@@ -513,6 +549,11 @@ export function CalibrationWizard({
         <div className="flex flex-wrap gap-2">
           <PlainButton label="Play the three pulses" onClick={playProbes} />
         </div>
+        {!played.probes && (
+          <p className="text-sm text-neutral-300">
+            Play the pulses first; these buttons unlock then.
+          </p>
+        )}
         <div
           role="group"
           aria-label={
@@ -555,6 +596,11 @@ export function CalibrationWizard({
         <div className="flex flex-wrap gap-2">
           <PlainButton label="Play the four buzzes" onClick={playLevels} />
         </div>
+        {!played.levels && (
+          <p className="text-sm text-neutral-300">
+            Play the buzzes first; these buttons unlock then.
+          </p>
+        )}
         <div
           role="group"
           aria-label={played.levels ? 'The first buzz' : 'The first buzz (play them first)'}
@@ -696,7 +742,7 @@ export function CalibrationWizard({
             ? 'Nothing was measured, so nothing changed.'
             : result?.saved
               ? 'Saved on this device. You can calibrate again from the settings.'
-              : 'Could not save on this device; it applies until you close the page.'}
+              : 'Not saved: see the message below.'}
         </p>
       </>
     );
@@ -704,14 +750,7 @@ export function CalibrationWizard({
   }
 
   return (
-    <section
-      aria-labelledby={titleId}
-      className="flex flex-col gap-3"
-      onFocus={() => (focusInside.current = true)}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) focusInside.current = false;
-      }}
-    >
+    <section ref={sectionRef} aria-labelledby={titleId} className="flex flex-col gap-3">
       {head}
       <p role="status" className="min-h-6 text-sky-200">
         {status.text}

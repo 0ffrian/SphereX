@@ -81,6 +81,8 @@ describe('SpectrumHapticSource (R8.6)', () => {
     expect(steps.map((s) => s.x)).toEqual([18, 26, 34, 42, 50]);
     expect(sink.events).toHaveLength(5);
     expect(sink.events.every((e) => e.kind === 'tick' && e.tag === 'measured')).toBe(true);
+    expect(sink.events[0]!.channel).toBe('data'); // R8.2: labelled as a data haptic
+    expect(sink.events.every((e) => e.channel === 'data')).toBe(true);
   });
 
   it('counts travel in both directions, and only the last step of a long move plays', () => {
@@ -134,6 +136,7 @@ describe('SpectrumHapticSource (R8.6)', () => {
     const played = steps.filter((s) => s.emitted).length;
     expect(vib.events).toHaveLength(played);
     expect(audio.events).toHaveLength(played);
+    expect(vib.events.every((e) => e.channel === 'data')).toBe(true); // reaches the drivers
     const dipLow = DIP_UM - DIP_SIGMA_UM / 2;
     const dipHigh = DIP_UM + DIP_SIGMA_UM / 2;
     const dipPitches = [dipLow, dipHigh].map((l) => wavelengthToPitch(l));
