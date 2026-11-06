@@ -28,7 +28,8 @@ sequenceDiagram
     PL-->>API: Spectrum and light curve (same measurements), refusals in missing
     API->>API: Store as derived.spectrum when the frame list is complete
   end
-  API-->>P: Spectrum and light curve, tagged measured, flux_unit uJy (cached_at if from cache, spectrum:saturated when every frame saturated)
+  API-->>P: Spectrum and light curve, tagged measured, flux_unit uJy (cached_at if from cache, spectrum:saturated when every listed frame saturated)
+  P->>P: Group missing by reason with counts, IDs behind a disclosure; no points: say why (saturated counts); some refused: measured range against the frames' span
   P->>API: GET /v1/objects/{id}/card
   API->>PL: Stage 3: match reference types (asteroid classes, brown dwarf types, gas features 2.7, 4.25, 4.67 um)
   PL->>EXT: Gaia colours if a known asteroid
@@ -68,5 +69,5 @@ sequenceDiagram
 
 - Type selection order follows rendering doc §3.3; see [18-activity-type-selection.md](18-activity-type-selection.md). Name resolution happens earlier, in `resolve` (D-19, [08-sequence-search-flipbook.md](08-sequence-search-flipbook.md)).
 - The Estimated badge covers `derived`, `model_dependent` and `inferred_from_analog`; its tooltip shows the formula, assumption or analog (D-02).
-- Spectra and cards are cached in the backend's read-through cache, like every external call (D-25). The spectrum entry (`derived.spectrum`) is keyed by the method, Stage 1's `missing`, every frame record and every cutout's SHA-256, and is stored only for a complete frame list. Stage 2 reads cached cutouts only and never downloads (A4.2). Saturated frames are refused, never measured (Q-26). Calls to SBDB, SIMBAD, DAMIT, Gaia and the Exoplanet Archive also go through it.
+- Spectra and cards are cached in the backend's read-through cache, like every external call (D-25). The spectrum entry (`derived.spectrum`) is keyed by the method, Stage 1's `missing`, every frame record and every cutout's SHA-256, and is stored only for a complete frame list. Stage 2 reads cached cutouts only and never downloads (A4.2). Saturated frames are refused, never measured (Q-26). The panel groups `missing` by reason (A11, issue #24) and words the empty state from the grouped counts, not from `spectrum:saturated`, which is absent when any listed frame was refused for another reason (Barnard's Star and R Dra on the full cache, A4.2). Calls to SBDB, SIMBAD, DAMIT, Gaia and the Exoplanet Archive also go through it.
 - Spectrum haptic events go through the same `HapticEngine` and drivers as touch mode ([11-sequence-touch-haptics.md](11-sequence-touch-haptics.md)).

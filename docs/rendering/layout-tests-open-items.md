@@ -34,7 +34,9 @@ frontend/src/state/                  (Moon)  # Zustand store: card, params, hone
 frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, StatusLine, FixtureBanner, LiveAnnouncer,
                                              # Badge, StatusBoxes (loading and error boxes), urlHash.ts + useHashSync.ts
                                              # (A10 hash routing), format.ts (numbers, dates), messages.ts (user-facing
-                                             # error and `missing` texts), ui.ts (shared class names)
+                                             # error and `missing` texts), refusals.ts (groups `missing` by reason),
+                                             # RefusalList (grouped refusals with frame IDs behind a disclosure),
+                                             # ui.ts (shared class names)
   api/                # M1 API client (D-16): client, config, errors, validate; types.ts is hand-written until D-18 generation
   search/             # SearchBar, parseQuery (name, or RA, Dec in decimal degrees), testTargets (the five A1.1 targets)
   flipbook/           # Flipbook player, playback, keys, cutout preloading, RainbowTrails + wavelengthColor (D-28)
