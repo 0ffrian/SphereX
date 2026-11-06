@@ -100,14 +100,16 @@ describe('SpectrumHapticsPad (R8.6)', () => {
   const key = (k: string) =>
     act(() => pad().dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })));
 
-  it('is a labelled, focusable slider over λ with an unlock button', () => {
+  it('is a labelled, focusable slider over λ with its provenance badge and no unlock button', () => {
     render();
     const p = pad();
     expect(p.tabIndex).toBe(0);
     expect(p.getAttribute('aria-label')).toBe('Feel the spectrum of Test star');
     expect(p.getAttribute('aria-valuemin')).toBe('1');
     expect(p.getAttribute('aria-valuemax')).toBe('5');
-    expect(host.querySelector('button')!.textContent).toBe('Turn on haptics and sound');
+    expect(host.querySelector('button')).toBeNull(); // the host page owns unlocking
+    expect(host.querySelector('[data-testid="pad-badge"]')!.textContent).toBe('Data · Measured');
+    expect(host.textContent).toContain('With TalkBack, double-tap and hold, then drag');
   });
 
   it('a drag ticks every 8 px and the dip is silent', () => {
@@ -199,6 +201,64 @@ describe('SpectrumHapticsPad (R8.6)', () => {
     // Two points at the same λ are one wavelength too (#9 averages them).
     render([one[0]!, { ...one[0]!, flux: 5, frame_id: 'f-dup' }]);
     expect(host.querySelector('[role="slider"]')).toBeNull();
+  });
+
+  it('the readout follows the finger during a drag, once per frame', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => frames.push(cb));
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+    render();
+    pointer('pointerdown', 0);
+    for (let x = 1; x <= 40; x++) pointer('pointermove', x);
+    expect(frames).toHaveLength(1); // several steps, one frame
+    act(() => frames.shift()!(0));
+    expect(pad().getAttribute('aria-valuetext')).toMatch(/^1\.20 µm, 100% of peak flux/);
+    vi.unstubAllGlobals();
+  });
+
+  it('says when the honesty state hides the ticks, and calls large σ "uncertain"', () => {
+    haptics.engine.setHonesty('measured');
+    const noisy = spectrum().map((p) => ({ ...p, error: p.flux }));
+    act(() =>
+      root.render(
+        <SpectrumHapticsPad
+          haptics={haptics}
+          spectrum={{ spectrum: noisy, tag: 'derived' }}
+          objectName="Test star"
+        />,
+      ),
+    );
+    expect(host.querySelector('[data-testid="pad-badge"]')!.textContent).toBe('Data · Estimated');
+    pad().focus();
+    key('ArrowRight');
+    expect(driver.events).toHaveLength(0);
+    expect(pad().getAttribute('aria-valuetext')).toBe(
+      '1.00 µm, 100% of peak flux, uncertain (hidden by Measured only)',
+    );
+  });
+
+  it('a quiet dip is not reported as hidden', () => {
+    haptics.engine.setHonesty('measured');
+    render();
+    pad().focus();
+    key('Home');
+    for (let i = 0; i < 50; i++) key('ArrowRight');
+    expect(pad().getAttribute('aria-valuetext')).toMatch(/quiet/);
+    expect(pad().getAttribute('aria-valuetext')).not.toMatch(/hidden/);
+  });
+
+  it('fixture data is badged Fixture, never Measured', () => {
+    act(() =>
+      root.render(
+        <SpectrumHapticsPad
+          haptics={haptics}
+          spectrum={{ spectrum: spectrum(), tag: 'measured' }}
+          objectName="Test star"
+          fixture
+        />,
+      ),
+    );
+    expect(host.querySelector('[data-testid="pad-badge"]')!.textContent).toBe('Data · Fixture');
   });
 
   it('refuses an empty spectrum with a sentence instead of a pad', () => {
