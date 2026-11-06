@@ -3,7 +3,7 @@
 The class label (``spectral_class``) comes from a catalogue only. Matching the SPHEREx spectrum
 against reference types (A4.3 step 2) needs reference spectra, which the repo does not hold yet;
 until then the label's confidence is ``"catalogue"`` (taken as published) or ``"none"`` (no
-label), never a fitted number. The card has no confidence field (Q-50).
+label), never a fitted number. The card has no confidence field (Q-55).
 """
 
 from __future__ import annotations
@@ -32,14 +32,14 @@ Confidence = Literal["catalogue", "none"]
 
 # --- R12 #12 [verify]: exoplanet type thresholds -------------------------------------------
 # R3.3 step 4 and R12 #12: "Do not hard-code values until they are agreed." The docs give no
-# columns and no cut-offs, so every entry is None and `classify_exoplanet` refuses (Q-51 lists
+# columns and no cut-offs, so every entry is None and `classify_exoplanet` refuses (Q-56 lists
 # sourced candidates for the team). Patch the values here, in this one place, once agreed.
 EXOPLANET_THRESHOLDS: dict[str, float | None] = {
     "rocky_max_radius_earth": None,  # planet_rocky below this pl_rade [verify]
     "giant_min_radius_earth": None,  # gas_giant from this pl_rade [verify]
     "giant_min_mass_jup": None,  # gas_giant by mass when pl_rade is missing [verify]
 }
-# planet_water has no catalogue observable yet (Q-51); there is no threshold for it.
+# planet_water has no catalogue observable yet (Q-56); there is no threshold for it.
 # --------------------------------------------------------------------------------------------
 
 # SIMBAD object types (otype codes). R3.3 names the classes; these are SIMBAD's codes for them.

@@ -319,7 +319,7 @@ def _asteroid_procedural(
     plan.layer(
         colour_ok and brightness_ok,
         "albedo_map",
-        _weakest(str(rgb["tag"]) if rgb else "artistic", _tag(card, "albedo")),
+        _weakest(str(rgb["tag"]) if rgb else "artistic", _tag(card, "albedo"), "derived"),
         f"{desc}; brightness = clamp(0.12 + 1.6 * albedo, 0.12, 0.8).",
         [field, "albedo"],
     )

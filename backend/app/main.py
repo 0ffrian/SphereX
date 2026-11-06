@@ -59,7 +59,13 @@ def create_app(
     # that CORS wraps it and a 500 still carries CORS headers.
     install_catch_all(app)
     if s.cors_list:
-        app.add_middleware(CORSMiddleware, allow_origins=s.cors_list, allow_methods=["GET"])
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=s.cors_list,
+            allow_methods=["GET"],
+            # Let the browser read the D-16 cached_at and the asset status (Q-39).
+            expose_headers=["X-SX-Cached-At", "X-SX-Asset-Status"],
+        )
     install_error_handlers(app)
     app.include_router(resolve.router)
     app.include_router(objects.router)

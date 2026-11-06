@@ -81,7 +81,7 @@ uv run python -m app.core.render ../shared/fixtures/cards/asteroid_procedural.js
 | `SX_EPHEMERIS_EPOCH` | `2026-11-14T00:00:00Z` | The time used for a moving object's `resolve` position. |
 | `SX_SEARCH_EPOCH` | `2026-01-01T00:00:00Z` | The time used for a proper-motion star's SIA search cone. |
 | `SX_HTTP_*` | 10 s connect, 60 s read, 3 retries, 1 s backoff (doubles) | |
-| `SX_CORS_ORIGINS` | empty | Needed only when the frontend runs without the Vite proxy. |
+| `SX_CORS_ORIGINS` | empty | Needed only when the frontend runs without the Vite proxy. CORS then exposes the `X-SX-Cached-At` and `X-SX-Asset-Status` headers (Q-39) so the browser can read them. |
 | `SX_ASSETS_DIR` | `backend/assets` | Pre-baked assets read by stage 4 (A5.4), `<type>/<id>.json` with the D-22 fields. |
 
 ## Cache (D-25)

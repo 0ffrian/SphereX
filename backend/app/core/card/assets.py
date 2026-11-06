@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import quote
@@ -93,10 +94,11 @@ class AssetStore:
             return asset
         return None
 
-    def get(self, object_id: str) -> Asset | None:
+    def lookup(self, object_id: str) -> tuple[Asset, datetime | None] | None:
+        """The saved asset and, for a generated one, when it was cached (None if pre-baked)."""
         asset = self._prebaked(object_id)
         if asset is not None:
-            return asset
+            return asset, None
         entry = self.cache.get(asset_key(object_id, self.release))
         if entry is None:
             return None
@@ -104,7 +106,13 @@ class AssetStore:
             asset = Asset.from_json(json.loads(entry.body))
         except ValueError:
             return None
-        return asset if asset is not None and _matches(asset, object_id) else None
+        if asset is None or not _matches(asset, object_id):
+            return None
+        return asset, entry.fetched_at
+
+    def get(self, object_id: str) -> Asset | None:
+        found = self.lookup(object_id)
+        return found[0] if found is not None else None
 
     def put(self, asset: Asset) -> None:
         data = json.dumps(asset.to_json(), sort_keys=True, separators=(",", ":")).encode()

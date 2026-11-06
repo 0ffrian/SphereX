@@ -108,6 +108,8 @@ def test_final_inputs_are_saved_and_served_as_saved(client: TestClient) -> None:
     again = client.get(f"/v1/objects/{oid}/card")
     assert again.headers["X-SX-Asset-Status"] == "saved"
     assert again.json() == first.json()
+    # A saved generated asset is a D-25 cache entry, so it still reports when it was cached.
+    assert again.headers["X-SX-Cached-At"].endswith("Z")
     # Truncated fixture searches (MAXREC=3) are not final, so stars are never saved.
     star = resolve_id(client, "R Dra")
     for _ in range(2):
@@ -124,6 +126,20 @@ def test_typed_coordinates_are_a_sketch_candidate(client: TestClient) -> None:
     assert errors(params, "render-params.schema.json") == []
     assert params["scale_m"] is None and params["layers"] == []
     assert "mesh" in params["missing"]
+    # Once saved, a sketch keeps its sketch label on every later request (UML 16, Q-57).
+    for _ in range(2):
+        again = client.get(f"/v1/objects/{oid}/card")
+        assert again.headers["X-SX-Asset-Status"] == "sketch"
+
+
+def test_cors_exposes_the_custom_headers(fixture_cache: Path) -> None:
+    """With SX_CORS_ORIGINS set (no Vite proxy) the browser can read cached_at and the status."""
+    settings = make_settings(fixture_cache, cors_origins="https://example.test")
+    with TestClient(create_app(settings)) as c:
+        oid = resolve_id(c, "433 Eros")
+        r = c.get(f"/v1/objects/{oid}/card", headers={"Origin": "https://example.test"})
+    exposed = {h.strip().lower() for h in r.headers["access-control-expose-headers"].split(",")}
+    assert {"x-sx-cached-at", "x-sx-asset-status"} <= exposed
 
 
 def test_unknown_object_is_404(client: TestClient) -> None:
@@ -176,8 +192,10 @@ def test_fixture_objects_are_served_as_saved_assets(
             # Register the id in the object registry, as resolve would.
             save_object(ctx, ResolvedObject(oid, f"fixture {kind}", 0.0, 0.0, False, "simbad"), [])
             card_r, params_r = get_both(c, oid)
-            assert card_r.headers["X-SX-Asset-Status"] == "saved"
-            assert params_r.headers["X-SX-Asset-Status"] == "saved"
+            # A saved candidate is still a sketch from SPHEREx only (UML 16, Q-57).
+            status = "sketch" if kind == "candidate" else "saved"
+            assert card_r.headers["X-SX-Asset-Status"] == status
+            assert params_r.headers["X-SX-Asset-Status"] == status
             card, params = card_r.json(), params_r.json()
             assert errors(card, "object-card.schema.json") == []
             assert errors(params, "render-params.schema.json") == []

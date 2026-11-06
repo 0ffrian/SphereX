@@ -53,8 +53,9 @@ class ObjectPipeline:
         return result.body, result.cached_at
 
     def run(self, obj: ResolvedObject) -> ObjectResult:
-        saved = self.assets.get(obj.id)
-        if saved is not None:
+        found = self.assets.lookup(obj.id)
+        if found is not None:
+            saved, saved_at = found
             try:
                 check_card(saved.card)
                 check_params(saved.render_params)
@@ -63,7 +64,11 @@ class ObjectPipeline:
                 # from the catalogues instead of failing every request for this object.
                 log.warning("ignoring saved asset for %s: %s", obj.id, exc)
             else:
-                return ObjectResult(saved.card, saved.render_params, "saved", None, None)
+                # A saved sketch keeps its "Sketch from SPHEREx only" label (UML 16, Q-57).
+                saved_status: AssetStatus = (
+                    "sketch" if saved.card.get("type") == "candidate" else "saved"
+                )
+                return ObjectResult(saved.card, saved.render_params, saved_status, saved_at, None)
 
         data = gather(self.ctx, obj)
         cls = classify(data.facts)

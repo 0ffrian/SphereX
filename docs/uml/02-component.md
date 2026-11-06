@@ -20,8 +20,8 @@ flowchart LR
       S1["1 Find object (core/find)"]
       S2["2 Measure flux and spectrum (core/measure)"]
       subgraph Classify["core/classify"]
-        S3["3 Classify: rules.py (catalogue label, Q-50)"]
-        TypeSel["Type selection (rendering doc §3.3; exoplanet thresholds Q-51)"]
+        S3["3 Classify: rules.py (catalogue label, Q-55)"]
+        TypeSel["Type selection (rendering doc §3.3; exoplanet thresholds Q-56)"]
       end
       subgraph CardPkg["core/card"]
         Svc["service.py: ObjectPipeline, stages 3-5 and 7 for one id"]
@@ -73,7 +73,7 @@ flowchart LR
   Catalogue -->|"catalogue facts"| S3
   Catalogue -->|"SBDB phys-par, SIMBAD values"| CardB
   S4 -->|"read"| Prebaked
-  S4 <-->|"derived.asset (Q-52)"| DataCache
+  S4 <-->|"derived.asset (Q-57)"| DataCache
   Physics -->|"derived TVs with formula"| CardB
   SpxRGB -->|"spherex_rgb TV"| CardB
   Blackbody -->|"star colour from Teff"| C2P
