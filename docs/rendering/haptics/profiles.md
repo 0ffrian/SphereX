@@ -28,3 +28,13 @@
 2. Strength = normalised flux. Absorption dips fall below the 20% threshold and go **quiet**. Points with large σ (σ/flux > 0.3) jitter.
 3. The same events drive the Listen sweep and the audio driver ([§8.9](audio-pairing.md#r89-audio-pairing-d-10)), with `pitch` from λ, so sound and touch match.
 4. Tag `measured`.
+
+**As built (issue #10):** `frontend/src/haptics/sources/spectrum.ts` (`SpectrumHapticSource`) with the pad `haptics/ui/SpectrumHapticsPad.tsx`. Choices where R8.6 is silent are in Q-64.
+
+- x → λ goes through `app/spectrum/scale.ts` (`linearScale`), read from the pad's box once per gesture.
+- Strength, quiet, noisy and pitch come from the shared `spectrumMapping.ts` (the one the Listen sweep uses); pitch from λ (Q-58); pan from the finger's x across the plot; the tag from `SpectrumResponse.tag`.
+- Quiet steps emit nothing. A step outside the spectrum's λ range emits nothing.
+- After a noisy point the spacing to the next step is 8 px ± 30%, from a hash of (seed, step index), so the same seed and gesture give the same ticks (R8.3).
+- When one pointer move crosses several steps, only the last plays (the engine's 25 ms rule would drop the others anyway).
+- Keyboard: the pad is a `role="slider"` over λ; the arrow keys move one step and emit the same events; the value text gives λ and the flux as a share of the peak, and says "quiet" (R9).
+- R11 test: a synthetic spectrum with a 90%-deep dip at 4.25 µm gives at least 3 consecutive quiet steps (`sources/spectrum.test.ts`).

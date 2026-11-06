@@ -14,3 +14,12 @@ First use, on phones that vibrate. Three short steps:
 - **Settings:** haptics on/off, sound on/off, volume, strength multiplier (0.5–1.5×), texture-vs-data labels shown in the legend.
 - **Defaults:** on Android, haptics and sound both on. On iPhone, iPad and desktop, "sound only".
 - The audio driver is **not** an iPhone-only fallback any more. It runs alongside vibration on every platform ([§8.9](audio-pairing.md#r89-audio-pairing-d-10)).
+
+**As built (issue #10):** logic in `frontend/src/haptics/calibration.ts`, wizard in `haptics/ui/CalibrationWizard.tsx`, settings in `haptics/ui/HapticsSettings.tsx` (on the `useHapticSettings` store). Choices where R8.7 is silent are in Q-62 and Q-63; every tuning value is in `haptics/tuning.ts`.
+
+- The wizard runs only where `navigator.vibrate` exists. Elsewhere it says there is nothing to calibrate (sound needs no calibration).
+- Every step can be skipped; a skipped step keeps the R8.3 default (soft 8 ms, 3 levels, offset 0).
+- **Step 1:** the 5, 10 and 20 ms probes play as one pattern, 700 ms apart. "I felt none" keeps 8 ms and suggests checking vibration settings and battery saver (R12 #11).
+- **Step 2:** whisper, soft (= `minMs`), medium and firm play in turn. The whisper is kept only when it was felt **and** felt different from soft. Tick lengths stay strictly increasing: medium and firm are raised to at least the level below plus 5 ms (Q-62).
+- **Step 3:** 10 beats at 600 ms, first as vibration only (firm ticks), then as sound only (the `measured` tone through the audio driver, with its lookahead and the offset set to 0). Taps come from touch, Space or Enter. Each tap is matched to the nearest beat within half a period; the first 2 beats are warm-up; at least 4 matched taps are needed. `avOffsetMs` = mean vibration lag − mean sound lag, rounded; beyond ±400 ms the run is refused (Q-63).
+- **Storage:** `sx.haptics.calibration` holds `{version: 1, minMs, levels, avOffsetMs}`. A stored value is validated on load (version, `minMs` 1–50 ms, a level set of exactly `soft, medium, firm` or `whisper, soft, medium, firm`, `|avOffsetMs|` ≤ 400). Anything else, unparsable JSON or blocked storage loads as "not calibrated", and the defaults apply.
