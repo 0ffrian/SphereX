@@ -131,6 +131,7 @@ export async function unlockAudio(): Promise<boolean> {
     }
   }
   const audio = audioStateOf(ctx);
-  setUnlockState({ unlocked: true, audio });
+  // A newer context may have replaced this one while it resumed; it owns the state then.
+  if (shared === ctx) setUnlockState({ unlocked: true, audio });
   return audio === 'running';
 }

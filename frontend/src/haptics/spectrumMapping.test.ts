@@ -62,6 +62,16 @@ describe('spectrumMapping (R8.6)', () => {
     expect(m.sampleAt(1)!.noisy).toBe(true); // mean σ 1.2 / mean flux 3 = 0.4
   });
 
+  it('averages huge duplicates without overflow; a non-finite mean is refused (review S3)', () => {
+    const m = buildSpectrumMapping([pt(1, 1e308), pt(1, 1.5e308), pt(2, 1e308)]);
+    expect(m.empty).toBe(false);
+    expect(m.sampleAt(1)!.strength).toBeCloseTo(1);
+    expect(Number.isFinite(m.sampleAt(1.5)!.strength)).toBe(true);
+    const bad = buildSpectrumMapping([pt(1, -1.7e308), pt(1, 1.7e308), pt(2, 5)]);
+    expect(bad.count).toBeGreaterThanOrEqual(1);
+    expect(Number.isFinite(bad.sampleAt(2)!.strength)).toBe(true);
+  });
+
   it('reuses the out object and takes pitch from λ, not brightness (Q-70)', () => {
     const m = buildSpectrumMapping([pt(1, 10), pt(4, 1)]);
     const out = { wavelengthUm: 0, strength: 0, quiet: false, noisy: false, pitch: 0 };

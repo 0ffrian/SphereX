@@ -7,7 +7,7 @@ import { TAGS, type HapticEvent, type HapticVoice, type Tag } from '@/contract';
 import { HAPTIC_DEBUG_EVENT } from '@/haptics/haptics';
 import { deviceVibrates } from '@/haptics/platform';
 import { useHapticSettings } from '@/haptics/settings';
-import { PulseIndicator } from '@/haptics/ui/PulseIndicator';
+import { PulseIndicator, isHapticEventDetail } from '@/haptics/ui/PulseIndicator';
 import { UnlockButton } from '@/haptics/ui/UnlockButton';
 import { HONESTY_LABEL, HONESTY_STATES, type HonestyState } from '@/viewer/honesty';
 import type { TestPanelProps } from './panelProps';
@@ -51,17 +51,7 @@ export function EnginePanel({ haptics }: TestPanelProps) {
   const [pitch, setPitch] = useState(0.5);
   const [pan, setPan] = useState(0);
   const [latency, setLatency] = useState('not read yet');
-  const [log, setLog] = useState<string[]>([]);
   const [result, setResult] = useState('');
-
-  useEffect(() => {
-    const onHaptic = (ev: Event) => {
-      const line = describeEvent((ev as CustomEvent<HapticEvent>).detail);
-      setLog((l) => [line, ...l].slice(0, LOG_SIZE));
-    };
-    window.addEventListener(HAPTIC_DEBUG_EVENT, onHaptic);
-    return () => window.removeEventListener(HAPTIC_DEBUG_EVENT, onHaptic);
-  }, []);
 
   const extras = { pitch, pan, ...(voice === 'none' ? {} : { voice }) };
 
@@ -153,7 +143,7 @@ export function EnginePanel({ haptics }: TestPanelProps) {
 
       <div className="flex flex-wrap gap-4">
         <label className={fieldClass}>
-          Honesty
+          Show
           <select
             className={selectClass}
             value={honesty}
@@ -269,14 +259,48 @@ export function EnginePanel({ haptics }: TestPanelProps) {
 
       <p aria-live="polite">{result}</p>
 
-      <div>
-        <h3 className="font-semibold">Last events played</h3>
-        <ol className="font-mono text-sm text-neutral-300">
-          {log.map((line, i) => (
-            <li key={`${i}-${line}`}>{line}</li>
-          ))}
-        </ol>
-      </div>
+      <EventLog />
     </section>
+  );
+}
+
+/**
+ * The last events played. Its own component, flushed at most once per animation frame, so up to
+ * 40 events a second do not re-render the whole panel.
+ */
+function EventLog() {
+  const [log, setLog] = useState<string[]>([]);
+
+  useEffect(() => {
+    let pending: string[] = [];
+    let frame: number | null = null;
+    const flush = () => {
+      frame = null;
+      const lines = pending;
+      pending = [];
+      setLog((l) => [...lines.reverse(), ...l].slice(0, LOG_SIZE));
+    };
+    const onHaptic = (ev: Event) => {
+      const detail: unknown = (ev as CustomEvent<unknown>).detail;
+      if (!isHapticEventDetail(detail)) return;
+      pending.push(describeEvent(detail));
+      if (frame === null) frame = requestAnimationFrame(flush);
+    };
+    window.addEventListener(HAPTIC_DEBUG_EVENT, onHaptic);
+    return () => {
+      window.removeEventListener(HAPTIC_DEBUG_EVENT, onHaptic);
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  return (
+    <div>
+      <h3 className="font-semibold">Last events played</h3>
+      <ol className="font-mono text-sm text-neutral-300">
+        {log.map((line, i) => (
+          <li key={`${i}-${line}`}>{line}</li>
+        ))}
+      </ol>
+    </div>
   );
 }

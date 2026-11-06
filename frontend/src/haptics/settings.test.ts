@@ -19,7 +19,10 @@ import {
   SETTINGS_STORAGE_KEY,
   bindEngine,
   defaultSettings,
+  SAVE_DEBOUNCE_MS,
+  bindPageLifecycle,
   ensureLoaded,
+  flushHapticSettings,
   getHapticSettings,
   loadHapticSettings,
   useHapticSettings,
@@ -76,8 +79,50 @@ describe('platform defaults (R8.7, D-08)', () => {
 
 describe('settings store (R8.7)', () => {
   beforeEach(() => {
+    flushHapticSettings(); // no debounced save from an earlier test may land in this one
     localStorage.clear();
     resetStore();
+  });
+
+  it('importing the module reads no storage (fresh module)', async () => {
+    const read = vi.spyOn(Storage.prototype, 'getItem');
+    vi.resetModules();
+    const fresh = await import('./settings');
+    expect(read).not.toHaveBeenCalled();
+    fresh.useHapticSettings.getState();
+    expect(read).toHaveBeenCalledTimes(1);
+    read.mockRestore();
+  });
+
+  it('update() before any read loads first, so it cannot save over the stored settings', () => {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ soundOn: false, volume: 0.2 }));
+    useHapticSettings.getState().update({ strengthMultiplier: 1.2 }); // getState() loads
+    resetStore(); // and an update straight from the store object, without a read before it
+    const { update } = useHapticSettings.getInitialState();
+    update({ strengthMultiplier: 1.3 });
+    flushHapticSettings();
+    expect(JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!)).toMatchObject({
+      soundOn: false,
+      volume: 0.2,
+      strengthMultiplier: 1.3,
+    });
+  });
+
+  it('debounces saves during a drag and flushes when the page hides', () => {
+    vi.useFakeTimers();
+    const write = vi.spyOn(Storage.prototype, 'setItem');
+    for (let i = 0; i < 30; i++) useHapticSettings.getState().update({ volume: i / 30 });
+    expect(write).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(SAVE_DEBOUNCE_MS);
+    expect(write).toHaveBeenCalledTimes(1);
+    useHapticSettings.getState().update({ volume: 0.9 });
+    window.dispatchEvent(new Event('pagehide'));
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!).volume).toBe(0.9);
+    vi.advanceTimersByTime(SAVE_DEBOUNCE_MS);
+    expect(write).toHaveBeenCalledTimes(2); // nothing left to save
+    write.mockRestore();
+    vi.useRealTimers();
   });
 
   it('loads on the first read, so no consumer sees the unloaded defaults', () => {
@@ -104,6 +149,7 @@ describe('settings store (R8.7)', () => {
 
   it('saves under one key, clamped, and loads back', () => {
     useHapticSettings.getState().update({ volume: 2, strengthMultiplier: 0.1, hapticsOn: true });
+    flushHapticSettings();
     const saved = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!);
     expect(saved).toEqual({
       hapticsOn: true,
@@ -148,6 +194,7 @@ describe('settings store (R8.7)', () => {
 
 describe('bindEngine', () => {
   beforeEach(() => {
+    flushHapticSettings(); // no debounced save from an earlier test may land in this one
     localStorage.clear();
     resetStore();
   });
@@ -204,8 +251,51 @@ describe('applyCalibration (R8.7, R8.9 offset rule)', () => {
   });
 });
 
+describe('page lifecycle (P2)', () => {
+  it('stops the engine when the page is hidden or unloaded, until unbound', () => {
+    const o = outputs();
+    const stop = vi.spyOn(o.engine, 'stop');
+    const unbind = bindEngine(o);
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(stop).toHaveBeenCalledTimes(1);
+    hidden.mockReturnValue(false);
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(stop).toHaveBeenCalledTimes(1);
+    window.dispatchEvent(new Event('pagehide'));
+    expect(stop).toHaveBeenCalledTimes(2);
+    unbind();
+    window.dispatchEvent(new Event('pagehide'));
+    expect(stop).toHaveBeenCalledTimes(2);
+    const off = bindPageLifecycle(o);
+    window.dispatchEvent(new Event('pagehide'));
+    expect(stop).toHaveBeenCalledTimes(3);
+    off();
+    hidden.mockRestore();
+  });
+});
+
 describe('shared AudioContext (R8.9)', () => {
   afterEach(() => setAudioContextFactory(null));
+
+  it('follows the OS: suspended after unlock, closed → none; an old context is ignored', async () => {
+    const first = new FakeAudioContext({ state: 'suspended' });
+    const second = new FakeAudioContext({ state: 'suspended' });
+    const made = [first, second];
+    setAudioContextFactory(() => made.shift()!.asAudioContext());
+    await unlockAudio();
+    expect(getUnlockState()).toEqual({ unlocked: true, audio: 'running' });
+    first.simulateState('suspended'); // an OS interruption
+    expect(getUnlockState().audio).toBe('suspended');
+    first.simulateState('closed');
+    expect(getUnlockState().audio).toBe('none');
+    await unlockAudio(); // closed → a new context
+    expect(getAudioContext()).toBe(second);
+    expect(getUnlockState().audio).toBe('running');
+    first.simulateState('running'); // the old context's listener is inert
+    first.simulateState('suspended');
+    expect(getUnlockState().audio).toBe('running');
+  });
 
   it('is created only by unlock, once, and resumed', async () => {
     const ctx = new FakeAudioContext({ state: 'suspended' });

@@ -83,6 +83,8 @@ classDiagram
     +hapticsOn, soundOn, showChannelLabels
     +volume 0 to 1, strengthMultiplier 0.5 to 1.5
     +bindEngine(outputs) unsubscribe
+    +bindPageLifecycle(outputs): stop when hidden
+    saves debounced, flushed on pagehide
   }
   class Calibration {
     <<calibration.ts, per device>>
@@ -99,6 +101,7 @@ classDiagram
     <<ui/PulseIndicator.tsx, D-20>>
     listens to spherex:haptic
     48 px dot aria-hidden, caption: kind, badge, channel
+    at most 3 flashes per s, steady glow for trains
   }
   class UnlockButton {
     <<ui/UnlockButton.tsx>>
