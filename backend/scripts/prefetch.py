@@ -18,9 +18,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.adapters import irsa_cutout, irsa_sia, skybot
+from app.adapters import exoplanet_archive, irsa_cutout, irsa_sia, simbad, skybot
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context, make_context
+from app.core.classify.rules import SIMBAD_PLANET
 from app.core.find.frames import FrameService, frame_time, is_complete, position_at
 from app.core.find.resolver import load_aliases, resolve
 from app.settings import Settings
@@ -87,6 +88,21 @@ def prefetch_target(
         return rep
     rep.object_id = obj.id
     print(f"  resolved {target['name']!r} -> {obj.id} ({obj.ra:.5f}, {obj.dec:+.5f})", flush=True)
+
+    if obj.resolver == "simbad":
+        # A3.8: a SIMBAD planet (otype Pl) also needs its Exoplanet Archive row for the card.
+        try:
+            hit, _ = simbad.query(ctx, obj.query or obj.name)
+            if hit is not None and hit.otype in SIMBAD_PLANET:
+                row, _ = exoplanet_archive.query(
+                    ctx, (obj.query or obj.name, hit.main_id), refresh=args.refresh
+                )
+                print(f"  Exoplanet Archive: {'row ' + row['pl_name'] if row else 'no row'}")
+        except (CacheMissOffline, UpstreamUnavailable) as exc:
+            rep.error = f"Exoplanet Archive failed: {exc}"
+            return rep
+    if str(target.get("frames", True)).lower() == "false":
+        return rep  # `frames = false` in targets.toml: catalogue answers only (small fixtures)
 
     if obj.moving:
         # Record the neighbours in the field at the resolve epoch (A4.1 step 2, SkyBoT).

@@ -11,10 +11,11 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.adapters import sbdb, simbad
+from app.adapters import exoplanet_archive, sbdb, simbad
 from app.cache.store import CacheMissOffline, Served, UpstreamUnavailable
 from app.context import Context
 from app.core.classify import CatalogueFacts
+from app.core.classify.rules import SIMBAD_PLANET
 from app.core.find.resolver import ResolvedObject
 
 # ASSUMPTION: no DAMIT or NASA shape-model lookup exists yet (A3.7 is not built), so this maps
@@ -67,10 +68,27 @@ def gather(ctx: Context, obj: ResolvedObject) -> CatalogueData:
             hit, served = simbad.query(ctx, name)
             if hit is None:
                 return CatalogueData(CatalogueFacts(), served=(served,), missing=("catalogue",))
+            row = None
+            served_all: tuple[Served, ...] = (served,)
+            missing: tuple[str, ...] = ()
+            if hit.otype in SIMBAD_PLANET:
+                # A3.8: an extrasolar planet gets its Exoplanet Archive row. A miss is not an error.
+                try:
+                    row, planet_served = exoplanet_archive.query(ctx, (name, hit.main_id))
+                except (CacheMissOffline, UpstreamUnavailable):
+                    row, planet_served = None, None
+                    missing = ("exoplanet_archive",)
+                if planet_served is not None:
+                    served_all = (served, planet_served)
+                if row is None:
+                    missing = ("exoplanet_archive",)
             facts = CatalogueFacts(
-                simbad_otype=hit.otype, simbad_sp_type=hit.sp_type, simbad_id=hit.main_id
+                simbad_otype=hit.otype,
+                simbad_sp_type=hit.sp_type,
+                simbad_id=hit.main_id,
+                exoplanet=row,
             )
-            return CatalogueData(facts, simbad_hit=hit, served=(served,))
+            return CatalogueData(facts, simbad_hit=hit, served=served_all, missing=missing)
         if obj.resolver == "sbdb":
             answer, served = sbdb.query(ctx, name)
             if answer.hit is None:
