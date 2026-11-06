@@ -100,7 +100,12 @@ export function makeFrames(t: FixtureTarget): FramesResponse {
   }
   const missing = t.refuseFrames
     ? [t.refuseFrames]
-    : (t.brokenCutouts ?? []).map((i) => `cutout:${fixtureFrameId(t, i)}`);
+    : [
+        ...(t.brokenCutouts ?? []).map((i) => `cutout:${fixtureFrameId(t, i)}`),
+        ...Object.entries(t.unlistedRefusals ?? {}).map(
+          ([i, reason]) => `${reason}:${fixtureFrameId(t, Number(i))}`,
+        ),
+      ];
   return {
     id: t.id,
     frames,
@@ -125,11 +130,13 @@ export function makeSpectrum(t: FixtureTarget): SpectrumResponse {
       missing: [t.refuseSpectrum],
     };
   }
-  const frames = makeFrames(t).frames;
+  const framesReply = makeFrames(t);
+  const frames = framesReply.frames;
   const rng = mulberry32(t.seed + 1);
   const level = 2 + rng() * 8;
   const peak = 1 + rng() * 3;
-  const spectrum = frames.map((f, i) => {
+  // Every frame's values first (same RNG order whatever the shape), then the refusals.
+  const all = frames.map((f, i) => {
     const shape = 0.5 + 0.5 * Math.exp(-((f.wavelength_um - peak) ** 2) / 1.5);
     const flux = level * shape * (1 + (rng() - 0.5) * 0.06);
     const error = flux * (0.03 + 0.07 * rng());
@@ -144,19 +151,43 @@ export function makeSpectrum(t: FixtureTarget): SpectrumResponse {
     if (flagged) point.flag_reasons = [FIXTURE_FLAG];
     return point;
   });
+  const refusals = new Map<number, string>();
+  const shape = t.spectrumShape;
+  const broken = new Set(t.brokenCutouts ?? []);
+  for (let i = 0; i < frames.length; i++) {
+    const reason =
+      shape?.refusals?.[i] ??
+      (broken.has(i)
+        ? 'cutout'
+        : !shape || shape.measured === 'all' || shape.measured.includes(i)
+          ? undefined
+          : 'saturated');
+    if (reason !== undefined) refusals.set(i, reason);
+  }
+  const kept = frames.flatMap((f, i) => (refusals.has(i) ? [] : [{ f, p: all[i]! }]));
+  const missing = new Set(framesReply.missing);
+  for (const [i, reason] of refusals) missing.add(`${reason}:${frames[i]!.frame_id}`);
+  // Backend rule (spectrum.py): every listed frame refused, all as saturated.
+  if (
+    frames.length > 0 &&
+    refusals.size === frames.length &&
+    [...refusals.values()].every((r) => r === 'saturated')
+  ) {
+    missing.add('spectrum:saturated');
+  }
   return {
     id: t.id,
-    spectrum,
-    light_curve: frames.map((f, i) => ({
+    spectrum: kept.map((k) => k.p),
+    light_curve: kept.map(({ f, p }) => ({
       time: f.time,
-      flux: spectrum[i]!.flux,
-      error: spectrum[i]!.error,
+      flux: p.flux,
+      error: p.error,
       frame_id: f.frame_id,
     })),
     flux_unit: FIXTURE_FLUX_UNIT,
     tag: 'measured',
     cached_at: null,
-    missing: [],
+    missing: [...missing].sort(),
   };
 }
 
