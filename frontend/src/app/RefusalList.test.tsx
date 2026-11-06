@@ -55,7 +55,7 @@ describe('RefusalList', () => {
       'zzz_new',
     ]);
     expect(groups[0]!.querySelector('summary')!.textContent).toBe(
-      '3 frames saturated: the object’s centre is too bright for the detector. (show frame IDs)',
+      '3 frames where the detector flagged the object’s centre as saturated or unusable. (show frame IDs)',
     );
     expect(groups[2]!.querySelector('summary')!.textContent).toContain('reason code “zzz_new”');
     const notes = [...host.querySelectorAll('[data-testid="refusal-note"]')];

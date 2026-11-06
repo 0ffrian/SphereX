@@ -29,7 +29,7 @@ sequenceDiagram
     API->>API: Store as derived.spectrum when the frame list is complete
   end
   API-->>P: Spectrum and light curve, tagged measured, flux_unit uJy (cached_at if from cache, spectrum:saturated when every listed frame saturated)
-  P->>P: Group missing by reason with counts, IDs behind a disclosure; no points: say why (saturated counts); some refused: measured range against the frames' span
+  P->>P: Group missing by reason with counts, IDs behind a disclosure; no points: say why (counts flagged saturated or unusable); some refused: where the points lie, large gaps, the frames' span
   P->>API: GET /v1/objects/{id}/card
   API->>PL: Stage 3: match reference types (asteroid classes, brown dwarf types, gas features 2.7, 4.25, 4.67 um)
   PL->>EXT: Gaia colours if a known asteroid

@@ -45,7 +45,7 @@ function pluralPoints(n: number): string {
 /** Each frame reason: the list line (after the count) and a short label for the ID list. */
 const FRAME_TEXT: Readonly<Record<FrameReason, { line: string; short: string }>> = {
   saturated: {
-    line: 'saturated: the object’s centre is too bright for the detector.',
+    line: 'where the detector flagged the object’s centre as saturated or unusable.',
     short: 'saturated',
   },
   aperture_flags: {
@@ -61,7 +61,10 @@ const FRAME_TEXT: Readonly<Record<FrameReason, { line: string; short: string }>>
     short: 'too little clean sky',
   },
   unit: { line: 'stored in units this tool can’t convert.', short: 'unknown units' },
-  extension: { line: 'missing the image, flag or uncertainty layer.', short: 'missing layer' },
+  extension: {
+    line: 'missing the image, flag or uncertainty layer, or with layers that don’t match.',
+    short: 'missing or mismatched layer',
+  },
   flags_header: {
     line: 'whose quality flags can’t be read, so saturation can’t be checked.',
     short: 'unreadable quality flags',
@@ -97,7 +100,7 @@ const NOTE_TEXT: Readonly<Record<string, string>> = {
   'frames:moving_object_search':
     'Frames for moving Solar System objects are not searched yet, so there are no frames to show.',
   'spectrum:saturated':
-    'SPHEREx saturates on this object in every frame, so this tool can’t measure a spectrum.',
+    'The detector flagged the object’s centre as saturated or unusable in every frame found, so this tool can’t measure a spectrum.',
   'spectrum:moving_object_search': 'Spectra for moving Solar System objects are not measured yet.',
 };
 
@@ -118,7 +121,7 @@ export function describeRefusalGroup(g: RefusalGroup): string {
       ? '1 more frame is not downloaded yet. Search again in a moment to load it.'
       : `${g.count} more frames are not downloaded yet. Search again in a moment to load them.`;
   }
-  return NOTE_TEXT[g.reason] ?? `Not available: ${g.reason}`;
+  return Object.hasOwn(NOTE_TEXT, g.reason) ? NOTE_TEXT[g.reason]! : `Not available: ${g.reason}`;
 }
 
 /** Short label for a frame group's ID list, e.g. "saturated". */
@@ -127,7 +130,12 @@ export function refusalShortLabel(reason: string): string {
 }
 
 const NOT_CHECKED = ' More frames have not been checked yet.';
-const TOO_BRIGHT = 'the object’s centre is too bright for SPHEREx’s detector (saturated)';
+/**
+ * Cause-neutral on purpose: the backend's `saturated` also covers a blank (NaN) centre pixel with a
+ * saturation flag nearby (photometry.py), which a dead pixel on a faint object can produce. So the
+ * text never says the object is too bright.
+ */
+const FLAGGED = 'the detector flagged the object’s centre as saturated or unusable';
 
 /**
  * The spectrum panel's empty state: why there is no spectrum. No object name: the heading names
@@ -136,12 +144,12 @@ const TOO_BRIGHT = 'the object’s centre is too bright for SPHEREx’s detector
 export function spectrumEmptyMessage(o: SpectrumOutcome): string {
   const t = o.total;
   const head = 'There is no spectrum:';
-  if (t === 0) return `${head} no frames of this object were available to measure.`;
-  const found = o.incomplete ? 'checked so far' : 'found';
   const tail = o.incomplete ? NOT_CHECKED : '';
+  if (t === 0) return `${head} no frames of this object were available to measure.${tail}`;
+  const found = o.incomplete ? 'checked so far' : 'found';
   const which = t === 1 ? `the only frame ${found}` : `any of the ${t} frames ${found}`;
   if (o.saturated === t) {
-    const why = t === 1 ? `because ${TOO_BRIGHT}` : `because in every one ${TOO_BRIGHT}`;
+    const why = t === 1 ? `because ${FLAGGED}` : `because in every one ${FLAGGED}`;
     return `${head} this tool could not measure ${which}, ${why}.${tail}`;
   }
   if (o.saturated > 0 && o.largestReason === 'saturated') {
@@ -150,33 +158,52 @@ export function spectrumEmptyMessage(o: SpectrumOutcome): string {
       rest === 1
         ? 'the reason for the other frame is below'
         : `the reasons for the other ${rest} frames are below`;
-    return `${head} this tool could not measure ${which}. In ${o.saturated} of them, ${TOO_BRIGHT}; ${others}.${tail}`;
+    return `${head} this tool could not measure ${which}. In ${o.saturated} of them, ${FLAGGED}; ${others}.${tail}`;
   }
   const reasons = t === 1 ? 'The reason is below.' : 'The reasons are below.';
   return `${head} this tool could not measure ${which}. ${reasons}${tail}`;
 }
 
-/** Share of the frames' wavelength span the points may miss before that span is named. */
+/**
+ * Share of the reference wavelength span (the frames', else the measured one) above which a wider
+ * frames span, or a gap between measured points, is named. A display threshold, not a physical one.
+ */
 const SPAN_DIFFERENCE = 0.05;
 
+/** "1.000 µm to 2.000 µm", or "1.000 µm" when both ends print the same. */
+function formatRange(r: readonly [number, number]): string {
+  const lo = formatWavelength(r[0]);
+  const hi = formatWavelength(r[1]);
+  return lo === hi ? lo : `${lo} to ${hi}`;
+}
+
 /**
- * Shown when some frames were measured and some refused: what the points cover, and the span of
- * the frames found when it is clearly wider (RW Aur: points only below about 1.1 µm).
+ * Shown when some frames were measured and some refused: where the measured points lie (never
+ * claiming they cover that range evenly), the widest gap between them when it is large, and the
+ * frames' span when it is clearly wider (RW Aur: points only below about 1.1 µm).
  */
 export function spectrumCoverageMessage(o: SpectrumOutcome): string {
-  const fmt = (r: readonly [number, number]) =>
-    `${formatWavelength(r[0])} to ${formatWavelength(r[1])}`;
   const found = o.incomplete ? 'checked so far' : 'found';
   const head = `This tool could measure ${o.points} of the ${o.total} frames ${found}`;
   const tail = o.incomplete ? NOT_CHECKED : '';
   const m = o.measuredRange;
   if (!m) return `${head}.${tail}`;
   const f = o.framesRange;
+  const mw = m[1] - m[0];
   const fw = f ? f[1] - f[0] : 0;
-  if (f && fw > 0 && (fw - (m[1] - m[0])) / fw > SPAN_DIFFERENCE) {
-    return `${head}. They cover only ${fmt(m)}; the frames ${found} cover ${fmt(f)}.${tail}`;
+  const ref = fw > 0 ? fw : mw;
+  const single = formatWavelength(m[0]) === formatWavelength(m[1]);
+  let text = single
+    ? `${head}, ${o.points === 1 ? 'at' : 'all at'} ${formatWavelength(m[0])}`
+    : `${head}. The measured points lie between ${formatWavelength(m[0])} and ${formatWavelength(m[1])}`;
+  const g = o.largestGap;
+  if (!single && g && ref > 0 && (g[1] - g[0]) / ref > SPAN_DIFFERENCE) {
+    text += `, with none from ${formatWavelength(g[0])} to ${formatWavelength(g[1])}`;
   }
-  return `${head}, covering ${fmt(m)}.${tail}`;
+  if (f && fw > 0 && (fw - mw) / fw > SPAN_DIFFERENCE) {
+    text += `; the frames ${found} span ${formatRange(f)}`;
+  }
+  return `${text}.${tail}`;
 }
 
 /** Text for the polite live region once the spectrum reply is in (R9). Keeps the name. */
@@ -187,17 +214,17 @@ export function spectrumAnnouncement(o: SpectrumOutcome, name: string): string {
     if (t === 0) return `No spectrum for ${name}: no frames were available to measure.${tail}`;
     // Saturation is named as the reason only when it covers most frames (no overclaim).
     if (o.saturated * 2 > t) {
-      const bright = `No spectrum for ${name}: the object is too bright for the detector (saturated) in`;
-      if (o.saturated < t) return `${bright} ${o.saturated} of ${t} frames.${tail}`;
-      if (o.incomplete)
-        return `${bright} ${t === 1 ? 'its only frame' : `all ${t} frames`} checked so far.${tail}`;
-      return `${bright} ${t === 1 ? 'its only frame' : `all ${t} frames`}.`;
+      const flagged = `No spectrum for ${name}: ${FLAGGED} in`;
+      if (o.saturated < t) return `${flagged} ${o.saturated} of ${t} frames.${tail}`;
+      const where = t === 1 ? 'its only frame' : `all ${t} frames`;
+      return o.incomplete ? `${flagged} ${where} checked so far.${tail}` : `${flagged} ${where}.`;
     }
     const none = t === 1 ? 'its only frame could not' : `none of the ${t} frames could`;
     return `No spectrum for ${name}: ${none} be measured.${tail}`;
   }
   const head = `Spectrum loaded: ${pluralPoints(o.points)}, ${o.flagged} flagged`;
   if (o.refused === 0 || !o.measuredRange) return `${head}.${tail}`;
-  const [lo, hi] = o.measuredRange;
-  return `${head}, ${formatWavelength(lo)} to ${formatWavelength(hi)}. ${pluralFrames(o.refused)} not measured.${tail}`;
+  const range = formatRange(o.measuredRange);
+  const at = range.includes(' to ') ? range : `at ${range}`;
+  return `${head}, ${at}. ${pluralFrames(o.refused)} not measured.${tail}`;
 }
