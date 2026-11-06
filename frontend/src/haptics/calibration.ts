@@ -4,7 +4,7 @@
 // Pure apart from `localStorage`, which is read only when a function asks for it, never at import.
 import type { HapticOutputs, TrainWindow } from './haptics';
 import { levelDurationMs, type VibrateLevel } from './drivers/webVibrate';
-import { platformEnv, type PlatformEnv } from './platform';
+import { deviceVibrates, platformEnv, type PlatformEnv } from './platform';
 import {
   AV_OFFSET_MAX_MS,
   CALIBRATION_GAP_MS,
@@ -59,13 +59,13 @@ export function defaultCalibration(): Calibration {
 /**
  * R8.7 "first use, on phones that vibrate": a vibrate API **and** an Android phone with a touch
  * screen (the platform.ts rule, Q-73). Desktop Chrome and Chromebooks have `navigator.vibrate` but
- * no phone motor, so they are not offered calibration.
+ * no phone motor, so they are not offered calibration. The same rule as `deviceVibrates`.
  */
 export function calibrationAvailable(
   vibrateSupported: boolean,
   env: PlatformEnv = platformEnv(),
 ): boolean {
-  return vibrateSupported && env.android && env.coarsePointer;
+  return deviceVibrates(vibrateSupported, env);
 }
 
 // ------------------------------------------------------------------ levels (R8.3, R8.7, D-09)
