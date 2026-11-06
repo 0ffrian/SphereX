@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     # ASSUMPTION: A5.4 says "assets/<type>/<id>.json" in the repo; the backend's copy lives here.
     assets_dir: Path = BACKEND_DIR / "assets"
     targets_file: Path = BACKEND_DIR / "targets.toml"
+    # A3.7 / Q-61: shape-model GLBs and `registry.toml`, written by scripts/ingest_shape.py.
+    shapes_dir: Path = BACKEND_DIR / "assets" / "shapes"
 
     @property
     def simbad_urls(self) -> list[str]:
