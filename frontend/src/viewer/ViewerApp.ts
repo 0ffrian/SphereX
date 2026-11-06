@@ -17,8 +17,9 @@ import {
 } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { ObjectCard, RenderParams } from '@/contract';
-import { MAX_AMBIENT_INTENSITY } from './lighting';
-import type { BodyContext, BodyRenderer } from './renderers/bodyRenderer';
+import { DEFAULT_SUN_DIR, MAX_AMBIENT_INTENSITY } from './lighting';
+import type { BodyContext, BodyRenderer, BodyStatus } from './renderers/bodyRenderer';
+import type { Tag } from '@/contract';
 import { createBodyRenderer } from './renderers/registry';
 
 /** Which backend `WebGPURenderer` ended up on after `init()`. */
@@ -104,6 +105,13 @@ export function viewerKeyAction(
   }
 }
 
+/** What the panel needs to describe the shown body (null = placeholder, no object). */
+export interface BodyInfo {
+  /** Canvas text alternative (A11); includes the artist's-impression note. */
+  altText: string;
+  status: BodyStatus;
+}
+
 export class ViewerApp {
   readonly backend: RendererBackend;
 
@@ -117,6 +125,7 @@ export class ViewerApp {
   private readonly sun: DirectionalLight;
   private body: BodyRenderer | null = null;
   private bodyToken = 0;
+  private readonly bodyListeners = new Set<(info: BodyInfo | null) => void>();
   private readonly resizeObserver: ResizeObserver | null;
   private dprQuery: MediaQueryList | null = null;
   private frameRequest: number | null = null;
@@ -161,7 +170,7 @@ export class ViewerApp {
     // R5.1: one DirectionalLight plus ambient ≤ 0.03. The direction is a placeholder ('artistic');
     // real scenes place it at phase_angle_deg from RenderParams.lighting.
     this.sun = new DirectionalLight(0xffffff, 2);
-    this.sun.position.set(3, 1.5, 2);
+    this.sun.position.set(...DEFAULT_SUN_DIR);
     this.scene.add(this.sun);
     this.scene.add(new AmbientLight(0xffffff, MAX_AMBIENT_INTENSITY));
 
@@ -213,11 +222,24 @@ export class ViewerApp {
     ctx: BodyContext = {},
   ): Promise<BodyRenderer | null> {
     const token = ++this.bodyToken;
-    const pending = createBodyRenderer(card, params, ctx);
+    // The viewer owns the light: sun_dir when given, else the default, passed to the body (B5).
+    const sd = params.lighting.sun_dir ?? DEFAULT_SUN_DIR;
+    const callerChange = ctx.onChange;
+    const pending = createBodyRenderer(card, params, {
+      ...ctx,
+      lightDir: ctx.lightDir ?? sd,
+      // B3: bodies ask for a render (and the panel for a fresh status) after any visible change.
+      onChange: () => {
+        this.requestRender();
+        if (this.body) this.notifyBody();
+        callerChange?.();
+      },
+    });
     if (!pending) {
       // No renderer for this type: drop the previous body so it is not shown as this object.
       this.clearBody();
       this.requestRender();
+      this.notifyBody();
       return null;
     }
     const next = await pending;
@@ -230,14 +252,35 @@ export class ViewerApp {
     this.placeholder.visible = false;
     this.scene.add(next.object);
     // R5.1: the light direction comes from RenderParams.lighting.sun_dir when given.
-    const sd = params.lighting.sun_dir;
-    if (sd) this.sun.position.set(sd[0], sd[1], sd[2]).multiplyScalar(5);
+    this.sun.position.set(sd[0], sd[1], sd[2]).normalize().multiplyScalar(5);
     this.camera.position.set(0, 0, next.suggestedDistance);
     this.controls.maxDistance = Math.max(20, next.suggestedDistance * 3);
     this.controls.saveState();
     this.controls.reset();
     this.requestRender();
+    this.notifyBody();
     return next;
+  }
+
+  /** Forwards a new honesty filter to the shown body; the body requests the render. */
+  setVisibleTags(tags: readonly Tag[]): void {
+    this.body?.setVisibleTags(tags);
+  }
+
+  /** The shown body's description for the panel; null while the placeholder is shown. */
+  get bodyInfo(): BodyInfo | null {
+    return this.body ? { altText: this.body.altText, status: this.body.status } : null;
+  }
+
+  /** Calls `cb` whenever the shown body or its status changes. Returns an unsubscribe function. */
+  onBodyChange(cb: (info: BodyInfo | null) => void): () => void {
+    this.bodyListeners.add(cb);
+    return () => this.bodyListeners.delete(cb);
+  }
+
+  private notifyBody(): void {
+    const info = this.bodyInfo;
+    for (const cb of this.bodyListeners) cb(info);
   }
 
   private clearBody(): void {
@@ -246,6 +289,7 @@ export class ViewerApp {
     this.body.dispose();
     this.body = null;
     this.placeholder.visible = true;
+    this.sun.position.set(...DEFAULT_SUN_DIR);
   }
 
   /** Coalesces any number of change events into one render on the next frame. */
@@ -268,6 +312,7 @@ export class ViewerApp {
     this.canvas.removeEventListener('keydown', this.onKeyDown);
     this.controls.removeEventListener('change', this.requestRender);
     this.clearBody();
+    this.bodyListeners.clear();
     this.controls.dispose();
     this.geometry.dispose();
     this.material.dispose();

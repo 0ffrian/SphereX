@@ -48,3 +48,20 @@ export const ICE_COLOUR: Rgb = [0.92, 0.95, 0.98];
 export const LAVA_COLOUR: Rgb = [1, 0.33, 0.06];
 export const ATMOSPHERE_WATER: Rgb = [0.35, 0.6, 1];
 export const ATMOSPHERE_ROCKY: Rgb = [1, 0.55, 0.25];
+
+/**
+ * Lava glow starts near 700 K (A7.1 / physics.md "Ice, ocean, steam"; the mock-up draws cracks at a
+ * fixed strength). Below it, or when teq_K is unknown, a rocky planet has no glow.
+ */
+export const LAVA_START_K = 700;
+/**
+ * Temperature at which the glow reaches full strength. [verify] ASSUMPTION: no spec gives it; the
+ * ramp from LAVA_START_K is artistic.
+ */
+export const LAVA_FULL_K = 1500;
+
+/** Lava-crack strength 0..1 from teq_K; 0 when teq_K is unknown (refuse rather than invent). */
+export function lavaHeatFromTeq(teqK: number | null): number {
+  if (teqK === null || !(teqK > LAVA_START_K)) return 0;
+  return Math.min(1, (teqK - LAVA_START_K) / (LAVA_FULL_K - LAVA_START_K));
+}

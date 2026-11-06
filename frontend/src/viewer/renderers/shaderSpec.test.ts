@@ -79,12 +79,31 @@ describe('resolveShaderSpec', () => {
     expect(sliderValue({ storms: NaN }, 'storms', 'gas_giant')).toBeUndefined();
   });
 
-  it('the rocky planet has lava, the water planet has an ocean (defaults)', () => {
+  it('the water planet has an ocean and no lava; the rocky planet has no ocean (defaults)', () => {
     const r = resolveShaderSpec(fixture('planet_rocky').card, fixture('planet_rocky').params);
-    expect(r.field?.heat).toBeGreaterThan(0);
     expect(r.field?.seaLevel).toBe(0);
     const w = resolveShaderSpec(fixture('planet_water').card, fixture('planet_water').params);
     expect(w.field?.seaLevel).toBeGreaterThan(0);
     expect(w.field?.heat).toBe(0);
+  });
+
+  it('lava cracks follow teq_K: none when unknown or cool, glowing from about 700 K (N9, A7.1)', () => {
+    const f = fixture('planet_rocky');
+    const withT = (value: number | null): ObjectCard => ({
+      ...f.card,
+      teq_K: { ...f.card.teq_K!, value },
+    });
+    // The fixture's teq_K is null: refuse rather than invent a glow.
+    expect(resolveShaderSpec(f.card, f.params).field?.heat).toBe(0);
+    expect(resolveShaderSpec(withT(null), f.params).field?.heat).toBe(0);
+    expect(resolveShaderSpec(withT(300), f.params).field?.heat).toBe(0);
+    expect(resolveShaderSpec(withT(700), f.params).field?.heat).toBe(0);
+    const warm = resolveShaderSpec(withT(900), f.params).field!.heat;
+    const hot = resolveShaderSpec(withT(1400), f.params).field!.heat;
+    expect(warm).toBeGreaterThan(0);
+    expect(hot).toBeGreaterThan(warm);
+    expect(resolveShaderSpec(withT(5000), f.params).field?.heat).toBe(1);
+    // A slider is the visitor's own artistic choice and still wins.
+    expect(resolveShaderSpec(withT(null), f.params, { lava_heat: 0.4 }).field?.heat).toBe(0.4);
   });
 });

@@ -183,3 +183,11 @@ export function generateNova(seed: number): NovaPoints {
     },
   };
 }
+
+export type PointKind = 'nebula' | 'nova';
+export type PointSets = NebulaPoints | NovaPoints;
+
+/** Entry point for the field worker (N8): one call per body, pure and seeded. */
+export function generatePoints(type: PointKind, seed: number): PointSets {
+  return type === 'nebula' ? generateNebula(seed) : generateNova(seed);
+}

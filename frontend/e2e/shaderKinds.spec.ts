@@ -5,6 +5,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 
+// Honesty: the D-21 default (+ Estimated) hides artistic layers, so the render tests ask for all.
+const ALL_TAGS = ['measured', 'derived', 'model_dependent', 'inferred_from_analog', 'artistic'];
 const KINDS = ['planet_rocky', 'planet_water', 'gas_giant', 'nebula', 'nova'] as const;
 const read = (dir: string, k: string) =>
   JSON.parse(
@@ -23,9 +25,6 @@ for (const kind of KINDS) {
     });
     page.on('pageerror', (e) => errors.push(e.message));
 
-    let workers = 0;
-    page.on('worker', () => workers++);
-
     await page.goto('/');
     const status = page.getByTestId('renderer-status');
     await expect(status).not.toHaveAttribute('data-status', 'starting', { timeout: 30_000 });
@@ -35,24 +34,32 @@ for (const kind of KINDS) {
     const canvas = page.locator('canvas[aria-label]');
     const before = await canvas.screenshot();
     const result = await page.evaluate(
-      async ({ card, params }) => {
+      async ({ card, params, tags }) => {
         const v = (
           globalThis as unknown as {
-            __sxViewer: { setBody(c: unknown, p: unknown): Promise<unknown> };
+            __sxViewer: { setBody(c: unknown, p: unknown, x: unknown): Promise<unknown> };
           }
         ).__sxViewer;
-        const body = (await v.setBody(card, params)) as {
+        const body = (await v.setBody(card, params, { visibleTags: tags })) as {
           drawn: string[];
           missing: string[];
         } | null;
         return body ? { drawn: body.drawn, missing: body.missing } : null;
       },
-      { card: read('cards', kind), params: read('params', kind) },
+      { card: read('cards', kind), params: read('params', kind), tags: ALL_TAGS },
     );
     expect(result).not.toBeNull();
     expect(result!.drawn.length).toBe(1);
-    // Planets and gas giants get their field from the Web Worker (D-12); point clouds need none.
-    if (kind !== 'nebula' && kind !== 'nova') expect(workers).toBeGreaterThan(0);
+    // The field and the nebula / nova points come from the Web Worker (D-12, N8). A worker that was
+    // created but failed would fall back to the main thread, so count what actually served.
+    const stats = await page.evaluate(
+      () =>
+        (globalThis as unknown as { __sxFieldStats?: { worker: number; main: number } })
+          .__sxFieldStats,
+    );
+    expect(stats, 'field stats hook (fixtures mode)').toBeDefined();
+    expect(stats!.main, 'served on the main thread (worker fallback)').toBe(0);
+    expect(stats!.worker).toBeGreaterThan(0);
 
     await expect
       .poll(async () => !(await canvas.screenshot()).equals(before), { timeout: 20_000 })
@@ -66,5 +73,44 @@ for (const kind of KINDS) {
       writeFileSync(`${dir}/${kind}.png`, shot);
     }
     expect(errors, errors.join('\n')).toEqual([]);
+
+    // A12 reference screenshot: the deterministic fixture must keep drawing the same picture.
+    // SwiftShader (software WebGL2) is stable on one machine; the tolerance absorbs rasteriser
+    // rounding between versions. Update with `npx playwright test shaderKinds --update-snapshots`
+    // after a deliberate look change and review the diff.
+    await expect(canvas).toHaveScreenshot(`${kind}.png`, {
+      maxDiffPixelRatio: 0.02,
+      threshold: 0.2,
+    });
   });
 }
+
+test('honesty default: with no tags passed, artistic layers are hidden and the status says so', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.goto('/');
+  const status = page.getByTestId('renderer-status');
+  await expect(status).not.toHaveAttribute('data-status', 'starting', { timeout: 30_000 });
+  test.skip((await status.getAttribute('data-status')) === 'unavailable', 'no 3D backend');
+  await page.waitForFunction(() => '__sxViewer' in globalThis);
+  const out = await page.evaluate(
+    async ({ card, params }) => {
+      const v = (
+        globalThis as unknown as {
+          __sxViewer: {
+            setBody(c: unknown, p: unknown): Promise<{ drawn: string[]; hidden: string[] }>;
+            bodyInfo: { status: { state: string } } | null;
+          };
+        }
+      ).__sxViewer;
+      const body = await v.setBody(card, params);
+      return { drawn: body.drawn, hidden: body.hidden, state: v.bodyInfo?.status.state };
+    },
+    { card: read('cards', 'gas_giant'), params: read('params', 'gas_giant') },
+  );
+  expect(out).toEqual({ drawn: [], hidden: ['surface'], state: 'hidden' });
+  // The panel shows the plain-words status and the canvas label follows the body (N6, N7).
+  await expect(page.getByText(/plain grey sphere/)).toBeVisible();
+  await expect(page.locator('canvas[aria-label]')).toHaveAttribute('aria-label', /grey sphere/);
+});
