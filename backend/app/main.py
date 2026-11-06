@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from app.api import objects, resolve, spectrum
 from app.context import make_context
@@ -35,6 +37,9 @@ def _inside_git_worktree(path: Path) -> bool:
     except (OSError, subprocess.SubprocessError):
         return False
     return out.stdout.strip() == "true"
+
+
+_SHAPE_NAME = re.compile(r"[a-z0-9][a-z0-9._-]*\.glb")
 
 
 def create_app(
@@ -70,6 +75,17 @@ def create_app(
     app.include_router(resolve.router)
     app.include_router(objects.router)
     app.include_router(spectrum.router)
+
+    shapes_dir = s.shapes_dir
+
+    # Q-44 / Q-61: same-origin, read-only shape meshes. Only `<slug>.glb` / `<slug>.lod1.glb`
+    # names that match the pattern are served, so no path can leave the folder.
+    @app.get("/data/shapes/{name}", include_in_schema=False)
+    def shape_mesh(name: str) -> FileResponse:
+        path = shapes_dir / name
+        if not _SHAPE_NAME.fullmatch(name) or not path.is_file():
+            raise HTTPException(status_code=404, detail="no such shape model")
+        return FileResponse(path, media_type="model/gltf-binary")
 
     @app.get("/v1/health", tags=["meta"])
     def health() -> dict[str, object]:
