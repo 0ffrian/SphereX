@@ -5,8 +5,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 
-// Honesty: the D-21 default (+ Estimated) hides artistic layers, so the render tests ask for all.
-const ALL_TAGS = ['measured', 'derived', 'model_dependent', 'inferred_from_analog', 'artistic'];
+// Honesty: the D-21 default (+ Estimated) hides artistic layers, so the render tests ask for
+// "+ Artistic". They draw through the panel's own path (planRender -> showPlan, window.__sxShow).
 const KINDS = ['planet_rocky', 'planet_water', 'gas_giant', 'nebula', 'nova'] as const;
 const read = (dir: string, k: string) =>
   JSON.parse(
@@ -68,23 +68,26 @@ for (const view of VIEWS) {
     const canvas = page.locator('canvas[aria-label]');
     const before = await canvas.screenshot();
     const result = await page.evaluate(
-      async ({ card, params, tags, lightDir, overrides, rotateLeft, rotateUp }) => {
-        const v = (
-          globalThis as unknown as {
-            __sxViewer: {
-              setBody(c: unknown, p: unknown, x: unknown): Promise<unknown>;
-              rotate(d: 'left' | 'up'): void;
-            };
-          }
-        ).__sxViewer;
-        const body = (await v.setBody(card, params, {
-          visibleTags: tags,
-          lightDir,
-          overrides,
-        })) as {
-          drawn: string[];
-          missing: string[];
-        } | null;
+      async ({ card, params, lightDir, overrides, rotateLeft, rotateUp }) => {
+        const g = globalThis as unknown as {
+          __sxViewer: {
+            setShaderOptions(o: unknown): void;
+            rotate(d: 'left' | 'up'): void;
+            body: { drawn: string[]; missing: string[]; field: unknown } | null;
+          };
+          __sxShow(c: unknown, p: unknown, honesty: string): unknown;
+        };
+        const v = g.__sxViewer;
+        v.setShaderOptions({ overrides });
+        // The light comes from the plan (planLighting): a sun_dir on the params gives the view.
+        const lit = lightDir
+          ? { ...(params as object), lighting: { mode: 'sun', sun_dir: lightDir } }
+          : params;
+        g.__sxShow(card, lit, 'artistic');
+        // The body is on screen at once (plain sphere); wait for its generated surface.
+        for (let i = 0; i < 400 && !(v.body && v.body.drawn.length > 0); i++)
+          await new Promise((r) => setTimeout(r, 25));
+        const body = v.body;
         for (let i = 0; i < (rotateLeft ?? 0); i++) v.rotate('left');
         for (let i = 0; i < (rotateUp ?? 0); i++) v.rotate('up');
         return body ? { drawn: body.drawn, missing: body.missing } : null;
@@ -92,7 +95,6 @@ for (const view of VIEWS) {
       {
         card: read('cards', kind),
         params: read('params', kind),
-        tags: ALL_TAGS,
         lightDir,
         overrides,
         rotateLeft,
@@ -129,17 +131,17 @@ for (const view of VIEWS) {
     // SwiftShader (software WebGL2) is stable on one machine; the tolerance absorbs rasteriser
     // rounding between versions. Update with `npx playwright test shaderKinds --update-snapshots`
     // after a deliberate look change and review the diff.
-    // NF-7: the DOM status overlay sits on the canvas box, so it is masked; the body is compared
+    // NF-7: the DOM name label sits on the canvas box, so it is masked; the body is compared
     // tightly enough that a changed storm count, band warp, seed, sea level or ice extent shows.
     await expect(canvas).toHaveScreenshot(`${name}.png`, {
-      mask: [page.getByTestId('body-status')],
+      mask: [page.getByTestId('viewer-label')],
       maxDiffPixelRatio: 0.002,
       threshold: view.threshold ?? 0.05,
     });
   });
 }
 
-test('honesty default: with no tags passed, artistic layers are hidden and the status says so', async ({
+test('honesty default: at + Estimated the artistic surface is hidden, a toggle shows it, and the field is made once', async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -147,24 +149,37 @@ test('honesty default: with no tags passed, artistic layers are hidden and the s
   const status = page.getByTestId('renderer-status');
   await expect(status).not.toHaveAttribute('data-status', 'starting', { timeout: 30_000 });
   test.skip((await status.getAttribute('data-status')) === 'unavailable', 'no 3D backend');
-  await page.waitForFunction(() => '__sxViewer' in globalThis);
+  await page.waitForFunction(() => '__sxShow' in globalThis);
   const out = await page.evaluate(
     async ({ card, params }) => {
-      const v = (
-        globalThis as unknown as {
-          __sxViewer: {
-            setBody(c: unknown, p: unknown): Promise<{ drawn: string[]; hidden: string[] }>;
-            bodyInfo: { status: { state: string } } | null;
-          };
-        }
-      ).__sxViewer;
-      const body = await v.setBody(card, params);
-      return { drawn: body.drawn, hidden: body.hidden, state: v.bodyInfo?.status.state };
+      const g = globalThis as unknown as {
+        __sxViewer: { body: { drawn: string[]; hidden: string[]; field: unknown } | null };
+        __sxShow(c: unknown, p: unknown, honesty: string): unknown;
+        __sxFieldStats?: { worker: number; main: number };
+      };
+      const wait = async () => {
+        for (let i = 0; i < 400 && !g.__sxViewer.body?.field; i++)
+          await new Promise((r) => setTimeout(r, 25));
+      };
+      g.__sxShow(card, params, 'derived');
+      await wait();
+      const b = g.__sxViewer.body!;
+      const first = { drawn: [...b.drawn], hidden: [...b.hidden] };
+      const made = g.__sxFieldStats!.worker + g.__sxFieldStats!.main;
+      g.__sxShow(card, params, 'artistic');
+      g.__sxShow(card, params, 'measured');
+      g.__sxShow(card, params, 'artistic');
+      const shown = { drawn: [...b.drawn], same: g.__sxViewer.body === b };
+      return {
+        first,
+        shown,
+        again: g.__sxFieldStats!.worker + g.__sxFieldStats!.main - made,
+      };
     },
     { card: read('cards', 'gas_giant'), params: read('params', 'gas_giant') },
   );
-  expect(out).toEqual({ drawn: [], hidden: ['surface'], state: 'hidden' });
-  // The panel shows the plain-words status and the canvas label follows the body (N6, N7).
-  await expect(page.getByText(/plain grey sphere/)).toBeVisible();
-  await expect(page.locator('canvas[aria-label]')).toHaveAttribute('aria-label', /grey sphere/);
+  expect(out.first).toEqual({ drawn: [], hidden: ['surface'] });
+  expect(out.shown).toEqual({ drawn: ['surface'], same: true });
+  expect(out.again, 'field regenerated on an honesty toggle').toBe(0);
+  await expect(page.getByTestId('viewer-nothing')).toHaveCount(0);
 });

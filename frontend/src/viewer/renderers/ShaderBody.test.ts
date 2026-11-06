@@ -3,8 +3,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DataTexture, Texture } from 'three/webgpu';
 import { generateField } from '../fields/fieldGenerator';
-import { ALL_TAGS, ESTIMATED_TAGS, createBodyRenderer } from './bodyRenderer';
-import './registry';
+import { ALL_TAGS, ESTIMATED_TAGS } from './bodyRenderer';
 import { ShaderBody } from './ShaderBody';
 import { fixture } from './fixtures.testutil';
 import type { BodyContext } from './bodyRenderer';
@@ -294,15 +293,40 @@ describe('ShaderBody field and point access for the haptic sources (review N1)',
   });
 });
 
-describe('body registry', () => {
-  it('resolves the five shader kinds and returns null for baked types', async () => {
-    for (const k of KINDS) {
-      const f = fixture(k);
-      const pending = createBodyRenderer(f.card, f.params, ctx);
-      expect(pending, k).not.toBeNull();
-      (await pending!).dispose();
-    }
-    const a = fixture('asteroid_shape');
-    expect(createBodyRenderer(a.card, a.params, ctx)).toBeNull();
+describe('ShaderBody.start (the plan path builds without waiting)', () => {
+  it('has the plain sphere at once and the surface when the field arrives', async () => {
+    const f = fixture('planet_water');
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const body = ShaderBody.start(f.card, f.params, {
+      visibleTags: ALL_TAGS,
+      fieldSource: async (p) => {
+        await gate;
+        return generateField(p, 64, 32);
+      },
+    });
+    // Never blank: a body is on screen before the field exists.
+    expect(body.object.children.filter((c) => c.visible).length).toBe(1);
+    expect(body.field).toBeNull();
+    release();
+    await vi.waitFor(() => expect(body.field).not.toBeNull());
+    expect(body.drawn).toEqual(['surface']);
+    expect(body.object.children.filter((c) => c.visible).length).toBe(1);
+    body.dispose();
+  });
+
+  it('reports a failed field through onFailed and keeps the plain sphere', async () => {
+    const f = fixture('gas_giant');
+    const failed: string[] = [];
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const body = ShaderBody.start(f.card, f.params, {
+      visibleTags: ALL_TAGS,
+      fieldSource: () => Promise.reject(new Error('no worker')),
+      onFailed: (id) => failed.push(id),
+    });
+    await vi.waitFor(() => expect(failed).toEqual(['surface']));
+    expect(body.object.children.some((c) => c.visible)).toBe(true);
+    warn.mockRestore();
+    body.dispose();
   });
 });
