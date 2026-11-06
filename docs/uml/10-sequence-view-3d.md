@@ -31,8 +31,10 @@ sequenceDiagram
     else sketch
       AS-->>API: Sketch from SPHEREx only
     end
-    API->>C2P: card_to_params(ObjectCard)
-    C2P-->>API: RenderParams: layers with tags, missing list
+    opt generated or sketch (a saved asset already holds its RenderParams)
+      API->>C2P: card_to_params(ObjectCard)
+      C2P-->>API: RenderParams: layers with tags, missing list
+    end
     alt rendering-doc type with procedural maps (D-01)
       API->>TC: Textures for id, generator_version, seed?
       opt not cached
@@ -48,12 +50,12 @@ sequenceDiagram
       API-->>V: RenderParams without textures
     end
     V->>PL: setObject: planRender(card, params, context)
-    PL-->>V: RenderPlan (layers hidden by the honesty state dropped, starts at + Estimated, D-21; missing listed; shader kinds: plan.shader with surface and plain-sphere flags, Q-45)
+    PL-->>V: RenderPlan (layers hidden by the honesty state dropped, starts at + Estimated, D-21#59; missing listed#59; shader kinds: plan.shader with surface and plain-sphere flags, Q-45)
     V->>R: showPlan(plan): buildScene (a shader kind gets a ShaderBody from plan.shader, tags from allowedTags(plan.honesty), light from planLighting)
-    R->>FW: Field (planets, gas giants) or points (nebula, nova), once per body; the plain sphere shows until it arrives (never blank)
+    R->>FW: Field (planets, gas giants) or points (nebula, nova), once per body#59; the plain sphere shows until it arrives (never blank)
     R-->>V: Scene ready (onChange requests one render, D-05)
-    V->>V: Lighting from planLighting (sun at phase angle, sun_dir or head-on, or self-lit); the same direction goes to the scene sun and the body
-    V->>V: Set canvas aria-label from the plan (altText.ts; size with its tag, "at most" for an upper limit; a shader kind adds the artist's-impression note)
+    V->>V: Lighting from planLighting (sun at phase angle, sun_dir or head-on, or self-lit)#59; the same direction goes to the scene sun and the body
+    V->>V: Set canvas aria-label from the plan (altText.ts#59; size with its tag, "at most" for an upper limit#59; a shader kind adds the artist's-impression note)
     V->>V: Honesty change with the same sceneKey: BuiltScene.update(plan) sets the tags and light in place, no field is regenerated
     V-->>U: Render body, tag chips in legend, scale bar
     V-->>U: List missing layers: "Not enough data for X"
@@ -65,5 +67,6 @@ sequenceDiagram
 - Asset status labels: new objects show "Sketch from SPHEREx only" (architecture spec §10). See [16-state-asset-lookup.md](16-state-asset-lookup.md).
 - How the client picks the texture size (mobile vs desktop) is not stated **[verify]**.
 - The field worker uses the same seed and functions as the shader, so the picture and the haptics agree (D-12).
-- RenderParams responses served from the backend cache carry `cached_at` (D-25).
+- RenderParams responses served from the backend cache carry `cached_at` (D-25). As built (issue #5) it is the `X-SX-Cached-At` header, and the asset status is the `X-SX-Asset-Status` header (Q-39).
 - If the view is unchanged, the viewer does not render a new frame (D-05).
+- As built (issue #5): the render-params endpoint names the R6.7 texture URLs (in the `2048x1024` size directory, Q-47) but does not call the baker or serve the files yet, so the bake branch above is still to build. The reply is checked with `jsonschema` before it is sent (Q-40); `candidate` still gets a RenderParams with no layers (Q-33).
