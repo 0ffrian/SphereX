@@ -523,7 +523,8 @@ export const useAppStore = create<AppStore>()((set, get) => {
         // Not announced here: the overlay error box is role="alert".
         const now = get().sky;
         setSky({
-          overlays: { ...now.overlays, status: 'error', data: null, error: toSkyError(e) },
+          // A failed reload keeps the last good reply drawn; the error box offers a retry.
+          overlays: { ...now.overlays, status: 'error', error: toSkyError(e) },
           announcement: '',
         });
       }

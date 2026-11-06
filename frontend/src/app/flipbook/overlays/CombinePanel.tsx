@@ -1,5 +1,5 @@
 // "Combine frames" (issue #12): the backend adds or subtracts two frames on frame A's grid and
-// returns a grey PNG. The result is `derived` (Estimated badge, formula as tooltip). The warning
+// returns a grey PNG. The badge follows the reply's tag (`derived`: Estimated, formula as tooltip). The warning
 // that the frames are at different wavelengths is always shown: a sum or difference of two SPHEREx
 // frames mixes the spectrum's shape with change over time.
 import { useEffect, useId } from 'react';
