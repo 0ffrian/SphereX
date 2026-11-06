@@ -488,3 +488,31 @@ describe('review fixes', () => {
     expect(engine.activeTrainId).toBeNull();
   });
 });
+
+describe('updateTrain in the hot path (review P3)', () => {
+  it('changes the train in place and only moves the timer when the fire time moves > 5 ms', () => {
+    const clock = new FakeClock();
+    const driver = new FakeDriver(clock.clock);
+    let sets = 0;
+    const timers: HapticTimers = {
+      setTimeout: (fn, ms) => {
+        sets++;
+        return clock.setTimeout(fn, ms);
+      },
+      clearTimeout: (h) => clock.clearTimeout(h),
+    };
+    const engine = new HapticEngine([driver], { clock: clock.clock, timers, debugTarget: null });
+    engine.startTrain('t', { rateHz: 10, strength: 0.5, tag: 'measured', pitch: 0.2 });
+    clock.advance(10);
+    const before = sets;
+    for (let i = 1; i <= 10; i++) engine.updateTrain('t', { rateHz: 10 + i * 0.01 }); // tiny moves
+    expect(sets).toBe(before);
+    engine.updateTrain('t', { rateHz: 20 }); // a real change
+    expect(sets).toBe(before + 1);
+    expect(engine.updateTrain('t', { strength: undefined, pitch: undefined })).toBe(true);
+    clock.advance(500);
+    const w = driver.windows.at(-1)!;
+    expect(w.strength).toBe(0.5); // an undefined strength keeps the old one
+    expect(w.rateHz).toBe(20);
+  });
+});

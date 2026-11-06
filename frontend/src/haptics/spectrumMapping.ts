@@ -61,19 +61,23 @@ function mergeSameWavelength(sorted: readonly SpectrumMappingPoint[]): Merged[] 
   let i = 0;
   while (i < sorted.length) {
     const l = sorted[i]!.wavelength_um;
+    // Running means (m += (x − m) / n), so two huge values cannot overflow to Infinity.
     let flux = 0;
     let error = 0;
     let errors = 0;
     let n = 0;
     for (; i < sorted.length && sorted[i]!.wavelength_um === l; i++) {
-      flux += sorted[i]!.flux;
       n++;
+      flux += (sorted[i]!.flux - flux) / n;
       if (Number.isFinite(sorted[i]!.error)) {
-        error += sorted[i]!.error;
         errors++;
+        error += (sorted[i]!.error - error) / errors;
       }
     }
-    out.push({ wavelength_um: l, flux: flux / n, error: errors > 0 ? error / errors : NaN });
+    // A mean that still is not finite (opposite extremes) is refused, like any non-finite flux.
+    if (Number.isFinite(flux)) {
+      out.push({ wavelength_um: l, flux, error: errors > 0 ? error : NaN });
+    }
   }
   return out;
 }
@@ -85,7 +89,7 @@ export function buildSpectrumMapping(points: readonly SpectrumMappingPoint[]): S
       .sort((a, b) => a.wavelength_um - b.wavelength_um),
   );
   const maxFlux = usable.reduce((m, p) => Math.max(m, p.flux), -Infinity);
-  const empty = usable.length === 0 || !(maxFlux > 0);
+  const empty = usable.length === 0 || !(maxFlux > 0) || !Number.isFinite(maxFlux);
 
   const n = empty ? 0 : usable.length;
   const lambda = new Float64Array(n);

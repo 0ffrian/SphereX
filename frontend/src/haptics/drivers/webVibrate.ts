@@ -8,9 +8,17 @@ import {
   DOUBLE_PATTERN,
   HEARTBEAT_PATTERN,
   MAX_PATTERN,
+  TRAIN_MAX_RATE_HZ,
+  TRAIN_MIN_RATE_HZ,
   TRAIN_WINDOW_MS,
   VIBRATE_LEVELS_MS,
 } from '../tuning';
+
+/** A fallback `emit(pulseTrain)` rate, clamped like the engine's trains; null when unusable. */
+export function clampTrainRate(rateHz: number | undefined): number | null {
+  if (rateHz === undefined || !Number.isFinite(rateHz) || rateHz <= 0) return null;
+  return Math.min(TRAIN_MAX_RATE_HZ, Math.max(TRAIN_MIN_RATE_HZ, rateHz));
+}
 
 /** One strength level: a tick length in ms, or a pulse-width pattern (the whisper, R8.3). */
 export type VibrateLevel = number | readonly number[];
@@ -176,8 +184,8 @@ export class WebVibrateDriver implements TrainCapableDriver {
         break;
       case 'pulseTrain': {
         // R8.8 fallback, without phase: one window from now. The engine sends playTrain instead.
-        const rate = e.rateHz ?? 0;
-        if (!(rate > 0)) return;
+        const rate = clampTrainRate(e.rateHz);
+        if (rate === null) return;
         const period = 1000 / rate;
         this.buf.length = 0;
         let cursor = 0;

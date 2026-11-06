@@ -68,6 +68,8 @@ export class WebVibrateDriver implements HapticDriver {
 - **`voice` (Q-72).** `HapticEvent` gains an optional audio hint, `voice?: 'tone' | 'click' | 'surf' | 'chime'`, for the D-12 per-kind sounds. The vibrate driver ignores it. The tag still sets the timbre family ([§8.9](audio-pairing.md#r89-audio-pairing-d-10)).
 - **`channel` (Q-85).** An optional display hint, `channel?: 'texture' | 'data'` (R8.2), on `HapticEvent` and `TrainParams`. Drivers ignore it; the on-screen pulse indicator shows it with the event's D-02 badge.
 - **Audio output.** Every module's sound goes through one master bus per AudioContext, `getMasterBus(ctx)` in `audioGraph.ts` (gain → one limiter → destination), and the bell is the shared `playBell(ctx, dest, {freqHz, when, gain, …})`.
+- **Page lifecycle.** `bindEngine` also stops the engine when the page is hidden or unloaded (`bindPageLifecycle`), so a held train does not keep sounding in a background tab; settings saves are debounced and flushed when the page hides.
+- **Pulse indicator (D-20).** At most 3 flashes a second for every user (WCAG 2.3.1), and a steady glow while a train plays; it ignores a `spherex:haptic` detail that is not a well-formed `HapticEvent`.
 - **Unlock and "can vibrate" (Q-73).** `engine.unlock()` from a click; the unlock state is shared (`getUnlockState`, `subscribeUnlockState`, `engine.unlocked`). User-facing "can vibrate" is `deviceVibrates(vibrate.supported)` (`platform.ts`): `navigator.vibrate` also exists in desktop Chrome.
 - All tuning values live in `haptics/tuning.ts` (D-13).
 
