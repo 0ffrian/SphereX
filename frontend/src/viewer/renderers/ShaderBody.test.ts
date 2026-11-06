@@ -1,6 +1,7 @@
 // R7.7, D-01, D-21: each shader kind builds from the shared fixtures without a GPU (jsdom), keeps
 // the honesty filter, and refuses rather than invents.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { DataTexture, Texture } from 'three/webgpu';
 import { generateField } from '../fields/fieldGenerator';
 import { ALL_TAGS, ESTIMATED_TAGS, createBodyRenderer } from './bodyRenderer';
 import './registry';
@@ -167,13 +168,78 @@ describe('ShaderBody honesty and redraw (review B2, B3, N7)', () => {
     expect(drawn.altText).toMatch(/artist's impression/);
     drawn.setVisibleTags(ESTIMATED_TAGS);
     expect(drawn.status.state).toBe('hidden');
-    expect(drawn.status.tags).toEqual(['artistic']);
+    // NF-5: nothing from the layer is on screen, so no tag (the contract says empty).
+    expect(drawn.status.tags).toEqual([]);
     expect(drawn.status.message).toMatch(/plain grey sphere/);
     const refused = await ShaderBody.create(f.card, { ...f.params, scale_m: null }, ctx);
     expect(refused.status.state).toBe('refused');
     expect(refused.status.tags).toEqual([]);
     expect(refused.status.message).toMatch(/not drawn/i);
     expect(refused.object.children.every((c) => !c.visible)).toBe(true);
+  });
+});
+
+describe('ShaderBody disposal and hidden copy (review NF-1, NF-8)', () => {
+  it('frees the new surface when dispose lands between build and swap (any microtask delay)', async () => {
+    for (let hops = 1; hops <= 6; hops++) {
+      const f = fixture('planet_water'); // 2 field textures per build
+      const disposed = vi.spyOn(DataTexture.prototype, 'dispose');
+      const built = vi.spyOn(Texture.prototype, 'needsUpdate', 'set'); // once per floatTexture()
+      let armed = false;
+      const holder: { body?: ShaderBody } = {};
+      const body = await ShaderBody.create(f.card, f.params, {
+        visibleTags: ALL_TAGS,
+        fieldSource: async (p) => {
+          const field = generateField(p, 64, 32);
+          if (armed) {
+            // dispose() lands `hops` microtasks after the field resolved.
+            let n = 0;
+            const tick = (): void => {
+              if (++n >= hops) holder.body?.dispose();
+              else void Promise.resolve().then(tick);
+            };
+            void Promise.resolve().then(tick);
+          }
+          return field;
+        },
+      });
+      holder.body = body;
+      armed = true;
+      await body.setOverrides({ sea_level: 0.5 });
+      await new Promise((r) => setTimeout(r, 0));
+      body.dispose(); // idempotent when the hook already disposed
+      const made = new Set<unknown>(built.mock.contexts);
+      const freed = new Set<unknown>(disposed.mock.contexts);
+      expect(made.size, `hops=${hops}`).toBeGreaterThanOrEqual(2);
+      for (const t of made) expect(freed.has(t), `hops=${hops}: a built texture leaked`).toBe(true);
+      disposed.mockRestore();
+      built.mockRestore();
+    }
+  });
+
+  it('dispose clears the frame; setVisibleTags after dispose is a no-op', async () => {
+    const g = fixture('gas_giant');
+    let calls = 0;
+    const body = await ShaderBody.create(g.card, g.params, { ...ctx, onChange: () => calls++ });
+    const live = body.worldToBody([0, 1, 0]);
+    body.dispose();
+    expect(body.worldToBody([0, 1, 0])).not.toEqual(live);
+    expect(body.worldToBody([0, 1, 0])).toEqual([0, 1, 0]); // identity: no stale tilt
+    const before = calls;
+    body.setVisibleTags(ESTIMATED_TAGS);
+    expect(calls).toBe(before);
+    expect(body.hidden).toEqual([]);
+  });
+
+  it('the hidden copy names the object kind (nova is not "This cloud")', async () => {
+    const n = fixture('nova');
+    const nova = await ShaderBody.create(n.card, n.params, { ...ctx, visibleTags: ['measured'] });
+    expect(nova.status.message).not.toMatch(/This cloud/);
+    expect(nova.status.message).toMatch(/Nothing is shown/);
+    const b = fixture('nebula');
+    const neb = await ShaderBody.create(b.card, b.params, { ...ctx, visibleTags: ['measured'] });
+    expect(neb.status.message).toMatch(/This cloud/);
+    expect(neb.status.tags).toEqual([]);
   });
 });
 

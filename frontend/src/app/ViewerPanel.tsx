@@ -104,7 +104,10 @@ export function ViewerPanel() {
       </h2>
       <div className="relative aspect-square w-full max-w-xl overflow-hidden rounded-lg border border-neutral-800 bg-black sm:aspect-[4/3]">
         <div ref={hostRef} className="absolute inset-0" />
-        <p className="pointer-events-none absolute left-3 top-3 max-w-[calc(100%-1.5rem)] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300">
+        <p
+          data-testid="body-status"
+          className="pointer-events-none absolute left-3 top-3 max-w-[calc(100%-1.5rem)] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300"
+        >
           {bodyStatus ?? PLACEHOLDER_LABEL}
         </p>
         {rendererStatus === 'unavailable' && (

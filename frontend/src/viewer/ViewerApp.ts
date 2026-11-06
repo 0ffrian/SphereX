@@ -18,7 +18,12 @@ import {
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { ObjectCard, RenderParams } from '@/contract';
 import { DEFAULT_SUN_DIR, MAX_AMBIENT_INTENSITY } from './lighting';
-import type { BodyContext, BodyRenderer, BodyStatus } from './renderers/bodyRenderer';
+import {
+  ESTIMATED_TAGS,
+  type BodyContext,
+  type BodyRenderer,
+  type BodyStatus,
+} from './renderers/bodyRenderer';
 import type { Tag } from '@/contract';
 import { createBodyRenderer } from './renderers/registry';
 
@@ -125,6 +130,8 @@ export class ViewerApp {
   private readonly sun: DirectionalLight;
   private body: BodyRenderer | null = null;
   private bodyToken = 0;
+  /** NF-2: the honesty filter the visitor chose; D-21 starting state until told otherwise. */
+  private visibleTags: readonly Tag[] = ESTIMATED_TAGS;
   private readonly bodyListeners = new Set<(info: BodyInfo | null) => void>();
   private readonly resizeObserver: ResizeObserver | null;
   private dprQuery: MediaQueryList | null = null;
@@ -223,11 +230,15 @@ export class ViewerApp {
   ): Promise<BodyRenderer | null> {
     const token = ++this.bodyToken;
     // The viewer owns the light: sun_dir when given, else the default, passed to the body (B5).
-    const sd = params.lighting.sun_dir ?? DEFAULT_SUN_DIR;
+    // NF-6: one direction for the scene's sun and the body (its atmosphere and gas-giant shading).
+    const sd = ctx.lightDir ?? params.lighting.sun_dir ?? DEFAULT_SUN_DIR;
+    // NF-2: a caller that passes tags states the current filter; otherwise the remembered one.
+    if (ctx.visibleTags) this.visibleTags = ctx.visibleTags;
     const callerChange = ctx.onChange;
     const pending = createBodyRenderer(card, params, {
       ...ctx,
-      lightDir: ctx.lightDir ?? sd,
+      lightDir: sd,
+      visibleTags: this.visibleTags,
       // B3: bodies ask for a render (and the panel for a fresh status) after any visible change.
       onChange: () => {
         this.requestRender();
@@ -247,6 +258,8 @@ export class ViewerApp {
       next.dispose();
       return null;
     }
+    // NF-2: the filter may have changed while the body was loading.
+    next.setVisibleTags(this.visibleTags);
     this.clearBody();
     this.body = next;
     this.placeholder.visible = false;
@@ -264,6 +277,7 @@ export class ViewerApp {
 
   /** Forwards a new honesty filter to the shown body; the body requests the render. */
   setVisibleTags(tags: readonly Tag[]): void {
+    this.visibleTags = tags;
     this.body?.setVisibleTags(tags);
   }
 
