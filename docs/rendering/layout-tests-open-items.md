@@ -6,13 +6,18 @@
 
 ```
 backend/app/core/render/            (Atish)
-  card_to_params.py   # §6.2 rules + tags; unit-tested
+  card_to_params.py   # §6.2 rules + tags; pipeline stage 7 (A4.7), issue #5, built
+  blackbody.py        # §7.5 Teff -> display colour, issue #5
   noise.py craters.py height.py normals.py palette.py bake.py   # issue #6, built
   params.py           # §6.2 generator parameters (BakeParams, BakeRefusal); card_to_params adds the tags
   __main__.py         # python -m app.core.render <card.json> --seed N --out DIR
   gemini_paint.py     # stretch, behind the admin token
-  spherex_rgb.py      # §5.2 channel extraction
-backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; objects.py: /frames, /cutouts, later /card, /render-params, texture URLs
+  spherex_rgb.py      # §5.2 channel extraction, issue #5, built
+backend/app/core/classify/           (Atish)  # pipeline stage 3 (A4.3), issue #5: rules.py (R3.3, R12 #12 thresholds block)
+backend/app/core/card/               (Kevin)  # pipeline stages 4 and 5 (A4.4, A4.5), issue #5: catalogue.py, build.py,
+                                              # assets.py (A5.4 store), validate.py (jsonschema, Q-40), service.py
+backend/assets/                               # A5.4 pre-baked assets, <type>/<id>.json (none yet)
+backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; objects.py: /frames, /cutouts, /card, /render-params (issue #5)
 backend/app/adapters/                (Kevin)  # IRSA SIA + cutouts, SIMBAD, SBDB, Horizons, SkyBoT (A3), all through the cache
 backend/app/cache/                   (Kevin)  # D-25 read-through disk cache
 backend/app/core/find/               (Kevin)  # pipeline stage 1 (A4.1): resolver, proper motion, WCS, frames, cutout PNG

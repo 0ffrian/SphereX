@@ -29,7 +29,7 @@ sequenceDiagram
     API->>API: Store as derived.spectrum when the frame list is complete
   end
   API-->>P: Spectrum and light curve, tagged measured, flux_unit uJy (cached_at if from cache, spectrum:saturated when every listed frame saturated)
-  P->>P: Group missing by reason with counts, IDs behind a disclosure; no points: say why (counts flagged saturated or unusable); some refused: where the points lie, large gaps, the frames' span
+  P->>P: Group missing by reason with counts, IDs behind a disclosure#59; no points: say why (counts flagged saturated or unusable)#59; some refused: where the points lie, large gaps, the frames' span
   P->>API: GET /v1/objects/{id}/card
   API->>PL: Stage 3: match reference types (asteroid classes, brown dwarf types, gas features 2.7, 4.25, 4.67 um)
   PL->>EXT: Gaia colours if a known asteroid
@@ -71,3 +71,4 @@ sequenceDiagram
 - The Estimated badge covers `derived`, `model_dependent` and `inferred_from_analog`; its tooltip shows the formula, assumption or analog (D-02).
 - Spectra and cards are cached in the backend's read-through cache, like every external call (D-25). The spectrum entry (`derived.spectrum`) is keyed by the method, Stage 1's `missing`, every frame record and every cutout's SHA-256, and is stored only for a complete frame list. Stage 2 reads cached cutouts only and never downloads (A4.2). Saturated frames are refused, never measured (Q-26). The panel groups `missing` by reason (A11, issue #24) and words the empty state from the grouped counts, not from `spectrum:saturated`, which is absent when any listed frame was refused for another reason (Barnard's Star and R Dra on the full cache, A4.2). Calls to SBDB, SIMBAD, DAMIT, Gaia and the Exoplanet Archive also go through it.
 - Spectrum haptic events go through the same `HapticEngine` and drivers as touch mode ([11-sequence-touch-haptics.md](11-sequence-touch-haptics.md)).
+- As built (issue #5, `backend/app/core/card/service.py`): `/card` first looks up a saved asset (stage 4, [16-state-asset-lookup.md](16-state-asset-lookup.md)) and returns its card unchanged. Otherwise stage 3 takes the class label from the catalogue only (SIMBAD `sp_type`, SBDB `spec_B` then `spec_T`) with confidence `catalogue` or `none`, which the card does not carry; spectrum matching and the Gaia call are not built (Q-55). No DAMIT lookup or Exoplanet Archive adapter exists yet (Q-55, Q-56). The card is checked with `jsonschema` before it is sent (Q-40), and `cached_at` and the asset status travel as the `X-SX-Cached-At` and `X-SX-Asset-Status` headers (Q-39).
