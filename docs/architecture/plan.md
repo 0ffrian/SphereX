@@ -1,6 +1,6 @@
 # Plan to 14 Nov
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A13 · **Implements:** D-14, D-29
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A13 · **Implements:** D-14, D-29, D-30
 
 ## A13 Plan to 14 Nov
 
@@ -18,7 +18,7 @@ The team builds from 5 Nov and has set aside the event rule against building bef
 | 13 Nov | Test on the Zenbook. Test haptics, audio sync and calibration on both Android phones. Fix performance. Record backup demo. |
 | 14 to 15 Nov | Event. |
 
-**Milestone dependencies (D-29, D-30).** Solid arrows are hard dependencies; dashed arrows are soft links that can be built against fixtures first. Owners in brackets.
+**Milestone dependencies (D-29, D-30).** Solid arrows are hard dependencies; dashed arrows are soft links that can be built against fixtures first. Owners in parentheses. Node labels are GitHub issue numbers.
 
 ```mermaid
 flowchart LR

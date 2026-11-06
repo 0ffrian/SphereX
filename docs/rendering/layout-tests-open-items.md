@@ -32,12 +32,16 @@ frontend/src/state/                  (Moon)  # Zustand store: card, params, hone
                                              # store.ts also holds the `sky` slice (flipbook session: search, frames,
                                              # playback, view mode, spectrum, link problems; A1.1, A4.1, A4.2)
 frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, StatusLine, FixtureBanner, LiveAnnouncer,
-                                             # Badge, urlHash.ts + useHashSync.ts (A10 hash routing)
+                                             # Badge, StatusBoxes (loading and error boxes), urlHash.ts + useHashSync.ts
+                                             # (A10 hash routing), format.ts (numbers, dates), messages.ts (user-facing
+                                             # error and `missing` texts), ui.ts (shared class names)
   api/                # M1 API client (D-16): client, config, errors, validate; types.ts is hand-written until D-18 generation
   search/             # SearchBar, parseQuery (name, or RA, Dec in decimal degrees), testTargets (the five A1.1 targets)
   flipbook/           # Flipbook player, playback, keys, cutout preloading, RainbowTrails + wavelengthColor (D-28)
   spectrum/           # SpectrumPanel, SVG SpectrumChart, scale (displays the A4.2 output)
 frontend/src/test/                           # test-only helpers (fixtureFetch.ts)
+frontend/src/fixtures.test.ts                # fixtures are deterministic, pass the API validators, never imported by app code
+frontend/e2e/                                # Playwright tests (smoke, flipbook) against the fixture server
 frontend/fixtures/                           # dev and test only: SYNTHETIC fixture server, a Vite dev-server plugin
                                              # enabled by `npm run dev:fixtures`; never part of a build
 frontend/scripts/                            # check-dist.js: ends `npm run build`, fails if a fixture marker is in dist/
@@ -50,9 +54,8 @@ Owners follow D-17 (Munazir is Moon). `frontend/src/contract/` is generated code
 | Owner (D-17) | Also owns, outside the paths above |
 |---|---|
 | Kevin | Backend scaffold, data adapters (including Gaia and WISE), pipeline stages 1, 4 and 5, local hosting (D-24) |
-| Moon (Munazir) | Pipeline stage 2 (brightness and spectrum), the physics layer (architecture spec §7) |
+| Moon (Munazir) | The flipbook UI, the shader kinds, the overlay UI; pipeline stage 2 (brightness and spectrum), the physics layer (architecture spec §7) |
 | Atish | Pipeline stage 3 (classify), stage 7 (`card_to_params`), the texture baker, the Gemini layer |
-| Moon | The flipbook UI, the shader kinds, the overlay UI |
 
 `contract/`, `state/` and `app/` were added when the frontend was scaffolded (4 Nov 2026). See the [frontend README](../../frontend/README.md#layout). `contract/` is generated from `shared/schemas/` (D-18); CI fails if regenerated files differ from the committed ones. The hand-written scaffold types stay until the schemas exist, then get replaced.
 

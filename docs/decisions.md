@@ -27,6 +27,7 @@ Format: one entry per decision. Status is **Accepted** unless marked otherwise. 
     | `derived`, `model_dependent`, `inferred_from_analog` | **Estimated** (tooltip shows the formula, assumption or analog) |
     | `artistic` | **Default** (artist's choice) |
 
+  - A fourth, dev-only "Fixture" badge for synthetic fixture data is proposed as an exception, not decided: see Q-32.
   - User slider edits live in a client-side `overrides` map, separate from the card, so Reset restores the data values. See Q-03 for sliders on baked bodies.
 
 ## D-03 three.js version
@@ -143,7 +144,7 @@ Decisions D-14 to D-29 were recorded on 5 Nov 2026. They answer Q-01 to Q-14 and
 
 - **Decision:** The team builds from 5 Nov, following the dates in architecture spec §13. The team has chosen to set aside the event rule against building before 14 Nov; that call and its risk belong to the team.
 - **How it applies:** `CLAUDE.md` no longer limits the repo to docs and scaffolding before the event.
-- **Approval:** Atish, 5 Nov 2026. Kevin, Moon and Munazir were asked to confirm in PR #18; their confirmations are pending and will be recorded here. Because this sets aside an event rule and could risk disqualification, any teammate may reopen it.
+- **Approval:** Atish, 5 Nov 2026. Kevin and Moon were asked to confirm in PR #18; their confirmations are pending and will be recorded here. Because this sets aside an event rule and could risk disqualification, any teammate may reopen it.
 
 ## D-15 Backend framework: FastAPI (answers Q-01)
 
@@ -298,13 +299,14 @@ Decisions D-14 to D-29 were recorded on 5 Nov 2026. They answer Q-01 to Q-14 and
 
   | Milestone | Owner |
   |---|---|
-  | M1 SPHEREx core | Shared (implemented; in review as PRs #19–#21) |
+  | M1 SPHEREx core | Shared (issues #1–#3, merged as PRs #19–#21) |
   | M2 Sky Sculptor | Moon (`MintHerbs`) |
   | M3 Haptics & sound | Atish (`JoottunAtish`) |
   | M4 Extras | Shared |
   | M5 Demo & submission | Kevin (`KevinYerkiah`, assigned on GitHub once he accepts the repo invite) |
 
 - The milestone owner leads and signs off the milestone; ticket owners from D-17 still apply inside it.
+- Numbering: `#1`–`#17` below and in architecture spec §13 are GitHub **issue** numbers (one per ticket); PR numbers are written as "PR #n".
 - **Dependencies:** M1–M4 have no hard dependency on each other (D-29). Three soft links run across milestones: texture haptics (#11, M3) read the shared CPU field from #8 (M2); the Gemini layer (#14, M4) repaints the albedo from the baker's height map (#6, M2, D-07); physics sliders (#13, M4) need the viewer (#7, M2) to be seen. Each can be built against fixtures first. M5 depends on all of them. The map is in architecture spec §13.
 
 ---
@@ -342,7 +344,7 @@ Q-01 to Q-14 were answered on 5 Nov 2026; the Status column points to the decisi
 | Q-16 | Munazir to confirm the D-17 assignments (stage 2, `shared/schemas/`, physics). Munazir is not yet a repo collaborator, and `CLAUDE.md` did not list Munazir in the team. | Munazir | Answered: Munazir is Moon (`MintHerbs`); D-17 rows merged (5 Nov 2026) |
 | Q-17 | Rendering doc R8.4 tags the comet field source `measured` + `model_dependent`, but a `HapticEvent` carries one `tag` (R8.8), and under D-21 "Measured only" hides `model_dependent`. Which tag does the comet field pulse carry, and does it play in "Measured only"? Blocks the haptics sources implementation. | Atish | Open |
 | Q-18 | D-23 types the view-mode `rgb` as `TV \| null`. With R3.1's default `TV<T = number>` that holds one number, while `gaia_rgb` and `spherex_rgb` in R3.2 are `TV<[number, number, number]>`. Should the schema use `TV<[number, number, number]> \| null`? | Atish, Kevin | Answered: D-23 corrected to `TV<[number, number, number]> \| null` (5 Nov 2026) |
-| Q-19 | Once `frontend/src/contract/` is generated from `shared/schemas/` (D-17, D-18), where do the frontend-only R8.8 types live (`HapticKind`, `HapticEvent`, `HapticDriver`)? They are not sent by the backend, and `HapticDriver` has methods that JSON Schema cannot express. Options: hand-written next to the generated types (like `assertTagged()`), or in `frontend/src/haptics/`. | Atish, Munazir | Open |
+| Q-19 | Once `frontend/src/contract/` is generated from `shared/schemas/` (D-17, D-18), where do the frontend-only R8.8 types live (`HapticKind`, `HapticEvent`, `HapticDriver`)? They are not sent by the backend, and `HapticDriver` has methods that JSON Schema cannot express. Options: hand-written next to the generated types (like `assertTagged()`), or in `frontend/src/haptics/`. | Atish, Moon | Open |
 | Q-20 | D-25 says the cache value is "the raw response", but A3.1 lists the SPHEREx `PSF` extension as skipped, and in an IBE cutout it is about 4.9 MB of about 5.06 MB. The backend (issue #1) caches the cutout with the `PSF` HDU cut out at its FITS byte boundaries; every other byte is kept as served, and the meta records the original SHA-256 and size. `SX_CUTOUT_KEEP_PSF=1` keeps it. Accept this as the reading of D-25 for cutouts? | Kevin | Open (implemented as proposed) |
 | Q-21 | Frames for moving objects. A moving body needs an ephemeris-driven SIA search (many tiny cones along its path over the data release window); one cone does not find it. In M1, `/v1/objects/{id}/frames` for a moving object returns `frames: []` and `missing: ["frames:moving_object_search"]`. The 3I/ATLAS demo and Rainbow Trails (D-28) depend on this search. When is it built, and how many cones can IRSA take? | Kevin | Open |
 | Q-22 | Meaning of `moving` in `/v1/resolve` (D-16). UML 08 drew Horizons for "asteroid, comet, high proper motion". The backend sets `moving = true` only for solar-system bodies (SBDB hits, positions from Horizons). High proper-motion stars (Barnard's Star, eps Ind B, WISE 0855) are `moving = false`; their position is propagated from the SIMBAD proper motion to each frame time (tagged `derived`), and Horizons is not used for them. Confirm. | Kevin, Moon | Open (implemented as proposed) |
@@ -355,6 +357,7 @@ Q-01 to Q-14 were answered on 5 Nov 2026; the Status column points to the decisi
 | Q-29 | Under `SX_OFFLINE=1`, may a Gemini repaint already in the cache be shown? D-25 routes Gemini through the read-through cache, which serves hits offline, while D-24 says the Gemini layer stays off when there is no internet. | Atish | Open |
 | Q-30 | Issue #3 (PR #21) keeps the frontend's synthetic fixtures (fake API replies and PNGs served by a Vite plugin, `frontend/fixtures/`) next to the frontend, while D-17 gives `shared/fixtures/` to Moon. For M1 they stay in `frontend/fixtures/` (Atish, 5 Nov 2026), because they are frontend-only test data and M1–M4 build against fixtures independently (D-29). Should M5 move them, or replace them with replies recorded from the backend, into `shared/fixtures/`? | Moon | Open (kept in `frontend/fixtures/` for M1) |
 | Q-31 | SPHEREx FLAGS beyond QR2 (checked 5 Nov 2026 for PR #20). The Explanatory Supplement (SSDC-DP-017 v2.0, Table 16) drops `PHANTOM` and `REFERENCE` and adds `CROSSTALK` (20), `STREAK` (25) and `SATELLITE_HALO` (29); the L3 photometry's `CONTAINS_BAD_PIXEL` warning also counts `GHOST*`, `BLOOM`, `SNOWBALL` and `HALO`, which Stage 2 keeps. An IRSA draft (tutorials PR #401) says QR3 and DR1 (12 Nov 2026) name flags with `MSKNnnnn`/`MSKDnnnn` keywords, while `wcs.flag_names` reads only `MP_*`, so a DR1 cutout would refuse every frame as `flags_header`. The demo serves cached QR2 (D-25), so nothing breaks today. Before moving to DR1: add the three new flags to `REJECT_FLAGS`, and read `MSKN*` with `MP_*` as fallback? | Moon | Open |
+| Q-32 | A fourth, dev-only badge. D-02 says the UI shows 3 badges. The M1 flipbook (issue #3, PR #21) shows a **Fixture** badge instead of Measured, a page-wide "Fixture data" banner and a SYNTHETIC label on images whenever a reply carries `X-SX-Fixture: synthetic`. Those replies come only from the dev-only fixture server; `scripts/check-dist.js` fails a production build that contains a fixture marker ([UML 08](uml/08-sequence-search-flipbook.md#notes), [A11](architecture/honesty-policy.md#a11-honesty-policy-user-facing)). Proposal: record it in D-02 as a dev-only exception that sits outside the 5 tags and never appears in a production build. Accept? | Atish, Moon | Open (implemented as proposed, dev only) |
 
 **Q-11 differences between the mock-up and R8.8:**
 

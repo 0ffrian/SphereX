@@ -19,9 +19,9 @@ flowchart TB
     end
 
     subgraph Frontend["frontend/ (Vite + TS + React) : owners per package"]
-      FApp["src/app (React shell: App, ViewerPanel, StatusLine, FixtureBanner, LiveAnnouncer, urlHash + useHashSync), src/state (Zustand store with the sky slice) : Moon"]
+      FApp["src/app (React shell: App, ViewerPanel, StatusLine, FixtureBanner, LiveAnnouncer, Badge, StatusBoxes, urlHash + useHashSync, format, messages, ui), src/state (Zustand store with the sky slice) : Moon"]
       FFlip["src/app/api (M1 client, D-16), src/app/search, src/app/flipbook (with Rainbow Trails, D-28), src/app/spectrum : Moon"]
-      FDev["fixtures/ (dev-only synthetic fixture server), scripts/ (check-dist), src/test (test helpers) : dev and test only"]
+      FDev["fixtures/ (dev-only synthetic fixture server), scripts/ (check-dist), src/test (test helpers), src/fixtures.test.ts, e2e/ (Playwright) : dev and test only"]
       FContract["src/contract : generated from shared/schemas (D-18), assertTagged next to it : follows the schemas owner"]
       subgraph FViewer["src/viewer (Moon)"]
         VCore["ViewerApp, lighting, modes, honesty, scaleBar, altText"]
@@ -71,12 +71,11 @@ flowchart TB
 |---|---|
 | `backend/app/core/render` (baker, `card_to_params`, Gemini layer) | Atish |
 | `backend/app/api`, `backend/app/adapters`, `backend/app/cache`, `backend/app/core/find` (stage 1), backend scaffold, pipeline stages 4, 5 | Kevin |
-| `backend/app/core/measure` (stage 2) | Moon |
-| Pipeline stage 2, physics layer, `shared/schemas`, `shared/fixtures` | Moon (Munazir) |
+| `backend/app/core/measure` (stage 2), physics layer, `shared/schemas`, `shared/fixtures` | Moon (Munazir) |
 | Pipeline stage 3 | Atish |
 | `frontend/src/viewer`, `viewer/renderers`, shader kinds, `src/app`, `src/state` | Moon |
 | `src/app/api`, `src/app/search`, `src/app/flipbook`, `src/app/spectrum` (flipbook UI) | Moon |
-| `frontend/fixtures`, `frontend/scripts`, `src/test` | Not named in D-17; dev and test tooling for the flipbook UI |
+| `frontend/fixtures`, `frontend/scripts`, `src/test`, `src/fixtures.test.ts`, `frontend/e2e` | Not named in D-17; dev and test tooling for the flipbook UI |
 | `frontend/src/viewer/fields` | Atish |
 | `frontend/src/haptics` (engine, `drivers`, `sources`) | Atish (D-13, D-17) |
 | `src/contract` | Generated (D-18); follows the owner of `shared/schemas` |

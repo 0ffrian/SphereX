@@ -1,5 +1,5 @@
 """Stage 2: measure brightness and spectrum (architecture spec A4.2). Issue #2, owner Moon
-(D-17, provisional).
+(D-17).
 
 - ``config``: method settings (aperture 3 px, annulus 6-9 px, reject flags) and their hash.
 - ``photometry.measure_frame(hdul, x_fits0, y_fits0)``: forced aperture photometry on one
