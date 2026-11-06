@@ -137,7 +137,7 @@ describe('sky slice', () => {
   });
 
   it('loads the spectrum and retries a failed one', async () => {
-    await store().skySearch({ q: 'R Dra', kind: 'name', origin: 'input' });
+    await store().skySearch({ q: 'eps Ind B', kind: 'name', origin: 'input' });
     setSkyApi({
       ...fixtureApi,
       spectrum: async () => {
@@ -151,8 +151,22 @@ describe('sky slice', () => {
     setSkyApi(fixtureApi);
     await store().skyRetry();
     expect(sky().spectrum.status).toBe('ready');
-    expect(sky().spectrum.data?.spectrum).toHaveLength(24);
-    expect(sky().announcement).toMatch(/Spectrum loaded: 24 points, 3 flagged/);
+    expect(sky().spectrum.data?.spectrum).toHaveLength(22);
+    expect(sky().announcement).toMatch(
+      /^Spectrum loaded: 22 points, 3 flagged, \d\.\d{3} µm to \d\.\d{3} µm\. 2 frames not measured\.$/,
+    );
+  });
+
+  it('announces why a saturated object has no spectrum', async () => {
+    await store().skySearch({ q: 'R Dra', kind: 'name', origin: 'input' });
+    const pending = store().skyLoadSpectrum();
+    // The resolved name, as in the panel heading, not the typed query.
+    expect(sky().announcement).toBe('Loading the spectrum of R Draconis.');
+    await pending;
+    expect(sky().spectrum.data?.spectrum).toEqual([]);
+    expect(sky().announcement).toBe(
+      'No spectrum for R Draconis: the detector flagged the object’s centre as saturated or unusable in 21 of 25 frames.',
+    );
   });
 
   it('a new search clears the old spectrum and keeps the fixture banner flag', async () => {
