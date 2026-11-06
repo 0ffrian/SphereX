@@ -41,7 +41,7 @@ frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
   haptics.ts          # R8.8 HapticEngine: honesty gate, rate cap, multiplier, trains (Q-59), createHaptics; issue #9
   audioContext.ts     # the one shared AudioContext, created only by a click (R8.9)
   settings.ts         # R8.7 settings, own Zustand store, one localStorage key; bindEngine
-  calibration.ts      # R8.7 Calibration types, applyCalibration (offset rule); wizard logic in issue #10
+  calibration.ts      # R8.7 calibration: types, offset rule (#9); levels, tap-along maths, validated persistence (#10)
   platform.ts pitch.ts spectrumMapping.ts   # default outputs (Q-61), pitch from λ (Q-58), spectrum → sample (R8.6)
   tuning.ts           # every tuning constant, marked CREATIVE placeholder (D-13) or [verify on phones]
   drivers/webVibrate.ts drivers/audio.ts drivers/tauri.ts (stub, B-01)
@@ -49,7 +49,7 @@ frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
   sources/types.ts relief.ts dataPulse.ts   # TouchSample, TrainSlot; R8.4 peak rule; teq, flux and binary pulses (#11)
   profiles.ts         # R8.5 buildHaptics per ObjectType + TouchHaptics (move, hold-still poll, scrub); issue #11
   probe.ts            # pointer → ray → analytic ellipsoid → body direction, UV, normal, distance, ring radius, pan (#11)
-  ui/                 # PulseIndicator (D-20), UnlockButton; the settings and calibration UI come with issue #10
+  ui/                 # PulseIndicator (D-20), UnlockButton (#9); CalibrationWizard, HapticsSettings, SpectrumHapticsPad (#10)
   sound/              # listenSweep.ts (A8 Listen sweep, issue #11); imagined drive not built yet
 frontend/src/hapticsTestPage/        (Atish)  # dev-only test page behind frontend/haptics-test.html; not a build input;
                                               # panels/SpectrumPanel.tsx (#10), panels/TexturePanel.tsx (#11)
