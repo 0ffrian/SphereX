@@ -1,6 +1,6 @@
 # 05 Data contract (classes)
 
-The data contract between backend and frontend: `ObjectCard` (what we know) and `RenderParams` (how to draw and feel it). Drawn from rendering doc §3.1–3.4, §5.1–5.3, §8.8 and decisions D-02 (replaces the settings file), D-04 (type union), D-12 (extended `HapticProfile`, new `teq_K` field), D-23 (view-mode fields) and D-27 (`overrides` type).
+The data contract between backend and frontend: `ObjectCard` (what we know) and `RenderParams` (how to draw and feel it). Drawn from `shared/schemas/`, rendering doc §3.1–3.4, §5.1–5.3, §8.8 and decisions D-02 (replaces the settings file), D-04 (type union), D-12 (extended `HapticProfile`, new `teq_K` field), D-23 (view-mode fields) and D-27 (`overrides` type).
 
 ## Diagram 1: tagged values and the ObjectCard
 
@@ -123,8 +123,8 @@ classDiagram
     +id: string
     +type: ObjectType
     +generator_version: string
-    +seed: number
-    +scale_m: number
+    +seed: integer, minimum 0
+    +scale_m: number or null
     +layers: Layer list
     +textures: Textures, optional
     +lighting: Lighting
@@ -226,6 +226,9 @@ classDiagram
 
 ## Notes
 
+- `TV~T~` is one schema definition per payload in code (`TVNumber`, `TVString`, `TVRgb`, `TVVec3`, `TVPair`), because JSON Schema has no generics; `TV<T>` is a hand-written view of them in `frontend/src/contract/tags.ts`. Generated code: `backend/app/contract/`, `frontend/src/contract/generated.ts` (D-18).
+- `scale_m` is null when the size is unknown, for example on a `candidate` (Q-33).
+- `Textures` and `Lighting` are named `RenderTextures` and `RenderLighting` in the schema and the generated code. The schema has no `IRMode` definition: `spherex_ir` refers to `VisibleMode`, and `IRMode` is a type alias in `frontend/src/contract/index.ts` (D-23).
 - `rgb` and `vec3` stand for `[number, number, number]`; `pair` stands for `[number, number]`. They are written in words because Mermaid class members cannot hold brackets reliably.
 - `textures` is present only for the baked types (D-01). Shader kinds (`planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova`) get their field from the browser worker, so it is absent **[verify]**.
 - `terrain`, `flow`, `teq_pulse` and the ObjectCard field `teq_K` are added by D-12 (Accepted). `teq_K` is in the rendering doc R3.2 listing: `measured` from Exoplanet Archive `pl_eqt`, otherwise `derived`. `teq_pulse` is refused and listed in `missing` when `teq_K` is null.

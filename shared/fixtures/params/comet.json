@@ -1,0 +1,75 @@
+{
+  "id": "fixture:comet",
+  "type": "comet",
+  "generator_version": "fixture-0",
+  "seed": 3,
+  "scale_m": 1000.0,
+  "layers": [
+    {
+      "id": "nucleus",
+      "tag": "measured",
+      "description": "Dark sphere at the upper size limit (R7.3).",
+      "requires": [
+        "nucleus_radius_km_max"
+      ]
+    },
+    {
+      "id": "gas_shells",
+      "tag": "model_dependent",
+      "description": "Assumption: density falls as 1/r^2 out to the coma radius; Q itself is measured (R7.3, Q-38).",
+      "requires": [
+        "gas_Q",
+        "coma_radius_km"
+      ]
+    }
+  ],
+  "lighting": {
+    "mode": "sun",
+    "sun_dir": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "phase_angle_deg": 30.0
+  },
+  "view_modes": {
+    "visible": {
+      "available": false,
+      "badge": "Estimated visible colour",
+      "rgb": null,
+      "source": "class_palette"
+    },
+    "spherex_ir": {
+      "available": true,
+      "badge": "SPHEREx infrared, whole-body average (false colour)",
+      "rgb": {
+        "value": [
+          1.0,
+          0.75,
+          0.5
+        ],
+        "tag": "measured",
+        "source": "synthetic fixture: not a real measurement"
+      },
+      "source": "spherex_rgb",
+      "channels_um": [
+        3.0,
+        2.0,
+        1.0
+      ]
+    }
+  },
+  "haptics": {
+    "texture": "none",
+    "texture_tag": "artistic",
+    "data": "field",
+    "data_tag": "model_dependent",
+    "params": {
+      "maxRateHz": 30.0
+    }
+  },
+  "alt_text": "Synthetic fixture. Comet, nucleus at most 1 km in radius (measured limit), no visible colour basis, viewed at 30 degrees. Surface relief: illustrative.",
+  "missing": [
+    "visible"
+  ]
+}

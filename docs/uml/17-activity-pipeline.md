@@ -64,7 +64,7 @@ flowchart TD
 
 - Refusal examples: an asteroid card without `diameter_km` puts the mesh in `missing` with no crash (rendering doc §11); a comet without published `gas_Q` gets no gas shells (§7.3).
 - Saturated points are excluded from brightness mapping and shown hatched (rendering doc §7.5).
-- `candidate` stops after the card: it has no 3D layers, so RenderParams is not used for it **[verify]** whether the endpoint returns one.
+- `candidate` stops after the card: it has no 3D layers, so RenderParams is not used for it **[verify]** whether the endpoint returns one. See Q-33.
 - The physics layer is "reduced, physically inspired" formulas (architecture spec §7); its outputs are tagged `derived`.
 - Every external call in this flow goes through the backend's read-through cache (D-25). With `SX_OFFLINE=1` a cache miss is refused, and the refused layer goes in `missing`.
 - Small-body names are numbered asteroids, provisional designations, comets and interstellar objects (D-19).

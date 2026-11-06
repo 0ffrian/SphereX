@@ -1,0 +1,36 @@
+{
+  "id": "fixture:brown_dwarf",
+  "name": "Synthetic fixture: brown dwarf",
+  "type": "brown_dwarf",
+  "radius_rjup": {
+    "value": 1.0,
+    "tag": "model_dependent",
+    "source": "synthetic fixture: not a real measurement",
+    "assumption": "brown dwarf radii are about 1 Jupiter radius"
+  },
+  "spectral_class": {
+    "value": "T6",
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "ch4_depth_33": {
+    "value": 0.25,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "flux_45um": {
+    "value": 100.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement",
+    "err": 1.0
+  },
+  "spherex_rgb": {
+    "value": [
+      1.0,
+      0.75,
+      0.5
+    ],
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  }
+}
