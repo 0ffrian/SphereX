@@ -63,3 +63,50 @@ export function ssim(a: Luma, b: Luma): number {
   }
   return sum / count;
 }
+
+export interface Rgb {
+  width: number;
+  height: number;
+  /** RGBA bytes, row-major. */
+  rgba: Uint8Array;
+}
+
+export interface FrameScore {
+  /** Mean SSIM of the luminance. */
+  luma: number;
+  /** Lowest of the per-channel SSIMs (R, G, B). */
+  channelMin: number;
+  /** Mean absolute difference per channel (0..255) over pixels lit in either frame. */
+  colourDelta: number;
+}
+
+/** Pixels darker than this in both frames (luminance) are background and do not count for colourDelta. */
+const LIT = 8;
+
+function channel(img: Rgb, c: number): Luma {
+  const data = new Uint8Array(img.width * img.height);
+  for (let i = 0; i < data.length; i++) data[i] = img.rgba[i * 4 + c]!;
+  return { width: img.width, height: img.height, data };
+}
+
+/**
+ * Colour-sensitive comparison. Luminance SSIM alone misses a change of chroma or hue at equal
+ * luminance (e.g. tone mapping that mutes a star's colour), and colour is honesty-critical (Teff,
+ * equilibrium-temperature colours). So a frame passes only if luminance SSIM, every channel's SSIM
+ * and the mean colour difference over lit pixels are all within their thresholds (golden.ts).
+ */
+export function scoreFrames(a: Rgb, b: Rgb): FrameScore {
+  const la = lumaFromRgba(a.width, a.height, a.rgba);
+  const lb = lumaFromRgba(b.width, b.height, b.rgba);
+  const luma = ssim(la, lb);
+  let channelMin = 1;
+  for (let c = 0; c < 3; c++) channelMin = Math.min(channelMin, ssim(channel(a, c), channel(b, c)));
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i < la.data.length; i++) {
+    if (la.data[i]! < LIT && lb.data[i]! < LIT) continue;
+    for (let c = 0; c < 3; c++) sum += Math.abs(a.rgba[i * 4 + c]! - b.rgba[i * 4 + c]!);
+    n += 3;
+  }
+  return { luma, channelMin, colourDelta: n ? sum / n : 0 };
+}

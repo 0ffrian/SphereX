@@ -14,8 +14,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
-import { GOLDEN_MIN_SSIM } from './golden';
-import { lumaFromRgba, ssim, type Luma } from './ssim';
+import { GOLDEN_MAX_COLOUR_DELTA, GOLDEN_MIN_CHANNEL_SSIM, GOLDEN_MIN_SSIM } from './golden';
+import { scoreFrames, type Rgb } from './ssim';
 
 const EXCLUDED = new Set(['candidate']);
 const HONESTY = ['measured', 'derived', 'artistic'] as const;
@@ -35,7 +35,7 @@ const read = (dir: string, k: string) =>
   JSON.parse(readFileSync(`${FIXTURES}${dir}/${k}.json`, 'utf8')) as unknown;
 
 /** Decode a PNG to luminance in a blank page (no dependencies in Node). */
-async function decode(page: Page, png: Buffer): Promise<Luma> {
+async function decode(page: Page, png: Buffer): Promise<Rgb> {
   // Plain string: the e2e tsconfig has no DOM lib, and this runs in the browser.
   const out = (await page.evaluate(`(async () => {
     const img = new Image();
@@ -51,7 +51,7 @@ async function decode(page: Page, png: Buffer): Promise<Luma> {
     for (let i = 0; i < d.length; i += 0x8000) s += String.fromCharCode(...d.subarray(i, i + 0x8000));
     return { w: c.width, h: c.height, rgba: btoa(s) };
   })()`)) as { w: number; h: number; rgba: string };
-  return lumaFromRgba(out.w, out.h, Uint8Array.from(Buffer.from(out.rgba, 'base64')));
+  return { width: out.w, height: out.h, rgba: Uint8Array.from(Buffer.from(out.rgba, 'base64')) };
 }
 
 for (const kind of kinds) {
@@ -131,13 +131,13 @@ for (const kind of kinds) {
       expect(existsSync(path), `no golden ${name}; run with SX_UPDATE_GOLDENS=1`).toBe(true);
       const expected = readFileSync(path);
       await info.attach(`expected-${name}`, { body: expected, contentType: 'image/png' });
-      const score = ssim(await decode(decoder, expected), await decode(decoder, shot));
-      await info.attach(`score-${name}.txt`, {
-        body: `ssim ${score.toFixed(5)} (min ${GOLDEN_MIN_SSIM})`,
-        contentType: 'text/plain',
-      });
-      if (process.env.SX_GOLDEN_SCORES) console.log(`ssim ${name} ${score.toFixed(5)}`);
-      expect(score, `${name}: ssim ${score.toFixed(5)}`).toBeGreaterThanOrEqual(GOLDEN_MIN_SSIM);
+      const sc = scoreFrames(await decode(decoder, expected), await decode(decoder, shot));
+      const line = `luma ${sc.luma.toFixed(5)} channelMin ${sc.channelMin.toFixed(5)} colourDelta ${sc.colourDelta.toFixed(4)}`;
+      await info.attach(`score-${name}.txt`, { body: line, contentType: 'text/plain' });
+      if (process.env.SX_GOLDEN_SCORES) console.log(`ssim ${name} ${line}`);
+      expect(sc.luma, `${name}: ${line}`).toBeGreaterThanOrEqual(GOLDEN_MIN_SSIM);
+      expect(sc.channelMin, `${name}: ${line}`).toBeGreaterThanOrEqual(GOLDEN_MIN_CHANNEL_SSIM);
+      expect(sc.colourDelta, `${name}: ${line}`).toBeLessThanOrEqual(GOLDEN_MAX_COLOUR_DELTA);
     }
     expect(errors, errors.join('\n')).toEqual([]);
   });
