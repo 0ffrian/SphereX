@@ -4,7 +4,7 @@
 // the functions the shader uses (fieldGenerator.ts), so the felt edges are the drawn edges (R11).
 //   - Band boundary: a soft tick each time the band index changes, voice `tone`, pitch from latitude.
 //     "Strength = band contrast": the gas field has no per-boundary contrast (every boundary crosses
-//     the same 0–1 profile), so the soft-tick strength is used (Q-67).
+//     the same 0–1 profile), so the soft-tick strength is used (Q-79).
 //   - Jet: a train at clamp(k · |wind| / max|wind|, 2, 20) Hz; max |wind| is 1 by construction.
 //   - Storm: a firm tick at its edge, then a "swirl" train whose rate rises towards the centre.
 //   - Rings: a tick on entering each gap, when the rings are drawn and the ray meets them first.

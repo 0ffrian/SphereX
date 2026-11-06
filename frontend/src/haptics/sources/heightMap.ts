@@ -5,13 +5,13 @@
 //
 // Refused, not invented: the R8.4 crater-rim double tick and silent crater floor need a crater mask
 // channel, and the bake ships none (height.bin holds height only). `CRATER_RIMS_MISSING` goes in
-// `missing` (Q-66).
+// `missing` (Q-78).
 import type { ObjectCard, Tag } from '@/contract';
 import { HEIGHT_TAU_FRACTION, HYDRATED_BAND_DEPTH_3UM, HYDRATED_STRENGTH_SCALE } from '../tuning';
 import { PeakDetector, ReliefStats } from './relief';
 import { clamp, OneShot, type HapticSink, type HapticSource, type TouchSample } from './types';
 
-/** `missing` id for the refused crater-rim double tick and silent floor (no crater mask, Q-66). */
+/** `missing` id for the refused crater-rim double tick and silent floor (no crater mask, Q-78). */
 export const CRATER_RIMS_MISSING = 'crater_rims';
 
 /** IEEE 754 half → number. */

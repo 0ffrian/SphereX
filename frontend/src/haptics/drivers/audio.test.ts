@@ -41,7 +41,7 @@ function envelopeOf(src: FakeSource): FakeGain {
   return n as FakeGain;
 }
 
-describe('timbre (R8.9, D-12, Q-60)', () => {
+describe('timbre (R8.9, D-12, Q-72)', () => {
   it.each([
     ['measured', undefined, 'tone', false],
     ['derived', undefined, 'tone', true],

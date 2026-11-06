@@ -1,7 +1,7 @@
 // R8.1, R8.7, D-08, D-10: which outputs are on by default. Android Chrome phones get haptics and
 // sound; iPhone, iPad and desktop get sound only. "Android" also needs a coarse (touch) pointer, so
 // an Android desktop-mode browser or a Chromebook with vibrate but no motor starts on sound only
-// (Q-61). Every browser global is guarded; nothing runs at import time.
+// (Q-73). Every browser global is guarded; nothing runs at import time.
 
 export interface OutputDefaults {
   hapticsOn: boolean;

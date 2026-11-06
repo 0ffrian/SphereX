@@ -8,7 +8,7 @@ flowchart TD
   Create --> Bind["bindEngine(): read settings from localStorage (one key; corrupt → defaults)"]
   Bind --> Saved{"Settings saved on this device?"}
   Saved -->|yes| UseSaved["Use the saved switches, volume, multiplier"]
-  Saved -->|no| Plat{"Android and pointer: coarse? (platform.ts, Q-61)"}
+  Saved -->|no| Plat{"Android and pointer: coarse? (platform.ts, Q-73)"}
   Plat -->|yes| BothOn["Default: haptics on, sound on"]
   Plat -->|"no: iPhone, iPad, desktop"| SoundOnly["Default: sound only"]
   UseSaved --> Enable
@@ -22,7 +22,7 @@ flowchart TD
   RunCal --> Apply
   Apply --> Gesture
   Cal -.->|"skipped"| Gesture
-  Gesture["Wait for the click on 'Turn on haptics and sound': engine.unlock() creates or resumes the shared AudioContext (Q-61)"] --> Ready(("Ready"))
+  Gesture["Wait for the click on 'Turn on haptics and sound': engine.unlock() creates or resumes the shared AudioContext (Q-73)"] --> Ready(("Ready"))
   Ready -.-> Debug["spherex:haptic per played event, even with no driver on: pulse indicator (D-20)"]
   Tauri["TauriDriver (B-01, post-event, uses sharpness)"] -.-> Create
 
@@ -34,7 +34,7 @@ flowchart TD
 
 ## Notes
 
-- With default settings, an Android phone gets WebVibrateDriver + AudioDriver; iPhone, iPad and desktop get AudioDriver only (D-08, D-10, R8.7). An Android browser without a touch screen (desktop mode, Chromebook) starts on sound only (Q-61).
+- With default settings, an Android phone gets WebVibrateDriver + AudioDriver; iPhone, iPad and desktop get AudioDriver only (D-08, D-10, R8.7). An Android browser without a touch screen (desktop mode, Chromebook) starts on sound only (Q-73).
 - Both drivers are always in the engine's list; the settings switches enable or disable them, and a disabled driver is stopped. The engine never runs on its own timers unless a source starts a train.
 - The mock-up's `window.SphereXNative.haptic` and iOS `webkit.messageHandlers.sphereXHaptic` bridges are not checked: they are dropped for the event (D-20).
 - The `spherex:haptic` debug event is fired by the engine for every event that passes the honesty gate and the rate cap, whether or not a driver is on (D-20).

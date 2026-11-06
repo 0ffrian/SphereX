@@ -85,7 +85,7 @@ describe('step 1: faintest pulse (minMs)', () => {
 });
 
 describe('step 2: distinct levels (D-09)', () => {
-  it('keeps the whisper only when it is felt and weaker than soft (Q-62)', () => {
+  it('keeps the whisper only when it is felt and weaker than soft (Q-74)', () => {
     expect(levelSetFromAnswers({ whisperFelt: true, whisperWeaker: true })).toEqual([
       ...FOUR_LEVELS,
     ]);
@@ -115,7 +115,7 @@ describe('step 2: distinct levels (D-09)', () => {
     expect(sequencePattern(levels)).toEqual([4, 4, 4, 4, 4, gap, 5, gap, 15, gap, 25]);
   });
 
-  it('tick lengths are strictly increasing whatever minMs is, soft = minMs (Q-62)', () => {
+  it('tick lengths are strictly increasing whatever minMs is, soft = minMs (Q-74)', () => {
     for (const minMs of [1, 5, 8, 10, 14, 15, 20, 24, 30, 50]) {
       const v = levelsToVibrate(cal({ minMs })) as number[];
       expect(v[0]).toBe(minMs);
