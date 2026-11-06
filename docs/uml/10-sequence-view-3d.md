@@ -45,14 +45,14 @@ sequenceDiagram
       API-->>V: RenderParams (mesh from shape_source, or point clouds and self-lit spheres built in the browser)
     else shader kind (planet_rocky, planet_water, gas_giant, nebula, nova)
       API-->>V: RenderParams without textures
-      V->>FW: Generate field from seed (once per body)
-      FW-->>V: 512x256 field array
     end
-    V->>R: Create renderer for type
-    R->>R: Build body, drop layers hidden by the honesty state (starts at + Estimated, D-21)
-    R-->>V: Scene ready
-    V->>V: Lighting (sun at phase angle, or self-lit)
-    V->>V: Set canvas aria-label from alt_text
+    V->>R: setBody(card, params, ctx{visibleTags, lightDir, onChange}): create renderer for type
+    R->>FW: Field (planets, gas giants) or points (nebula, nova), once per body
+    R->>R: Build the new body first, then swap out the old one (never blank). Drop layers hidden by the honesty state (starts at + Estimated, D-21)
+    R-->>V: Scene ready: drawn, missing, hidden, status, altText, field sampler
+    V->>V: Lighting (sun at phase angle or sun_dir, passed to the renderer as lightDir, or self-lit)
+    V->>V: Set canvas aria-label from alt_text plus the artist's-impression note, show the status line
+    R-->>V: onChange after a tag change or rebuild: request one render (D-05)
     V-->>U: Render body, tag chips in legend, scale bar
     V-->>U: List missing layers: "Not enough data for X"
   end
