@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Project: **Shift & Spectrum**, a public web tool for NASA Space Apps 2026 (Port Louis, 14–15 Nov 2026), challenge "Planet X and SPHEREx". Team: Atish, Kevin, Moon, Munazir.
+Project: **Shift & Spectrum**, a public web tool for NASA Space Apps 2026 (Port Louis, 14–15 Nov 2026), challenge "Planet X and SPHEREx". Team: Atish, Kevin and Moon (Munazir).
 
 ## Read these first
 
@@ -66,9 +66,9 @@ The team builds from 5 Nov 2026 (decisions D-14), setting aside the event rule a
 ```
 docs/       specs, decisions, UML
 mockup/     single-file HTML mock-up (three.js r128, not the app)
-backend/    Python 3.12 API, pipeline, texture baker        (Kevin, Munazir, Atish)
+backend/    Python 3.12 API, pipeline, texture baker        (Kevin, Moon, Atish)
 frontend/   Vite + TypeScript + React app, viewer, haptics   (Moon; Atish for haptics and viewer/fields)
-shared/     JSON schemas shared by backend and frontend      (Munazir, provisional)
+shared/     JSON schemas shared by backend and frontend      (Moon)
 ```
 
 Owners per area: decisions D-17.

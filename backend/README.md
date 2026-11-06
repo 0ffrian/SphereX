@@ -110,7 +110,7 @@ app/cache/        keys.py, store.py: D-25 read-through cache
 app/adapters/     http.py, irsa_sia.py, irsa_cutout.py, simbad.py, sbdb.py, horizons.py, skybot.py
 app/contract/     generated from shared/schemas/ (D-18, do not edit): ObjectCard, RenderParams
 app/core/find/    (Kevin, Stage 1, A4.1) ids, resolver, propagate, wcs, frames, cutouts, png
-app/core/measure/ (Munazir, Stage 2, A4.2) config, flags, aperture, solid_angle, photometry, spectrum
+app/core/measure/ (Moon, Stage 2, A4.2) config, flags, aperture, solid_angle, photometry, spectrum
 app/core/render/  (Atish, R10): not created yet
 scripts/          prefetch, smoke_offline, backup_cache, record_fixtures, generate_contract
 tests/            pytest; tests/fixtures/cache holds the recorded cache entries

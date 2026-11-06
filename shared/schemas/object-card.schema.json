@@ -674,7 +674,7 @@
     },
     "GasQ": {
       "title": "GasQ",
-      "description": "Gas production rates, molecules/s. One value per molecule; R3.2's 'per epoch' does not fit this shape (Q-32).",
+      "description": "Gas production rates, molecules/s. One value per molecule; R3.2's 'per epoch' does not fit this shape (Q-42).",
       "type": "object",
       "additionalProperties": false,
       "properties": {

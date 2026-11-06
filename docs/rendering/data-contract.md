@@ -66,7 +66,7 @@ interface ObjectCard {
   // geometry of observation (solar-system bodies)
   phase_angle_deg?: TV; sun_vector?: TV<[number, number, number]>;
   // comet
-  gas_Q?: { co2?: TV; h2o?: TV; co?: TV };   // molecules/s, per epoch (the shape holds one epoch: Q-32)
+  gas_Q?: { co2?: TV; h2o?: TV; co?: TV };   // molecules/s, per epoch (the shape holds one epoch: Q-42)
   coma_radius_km?: TV; nucleus_radius_km_max?: TV;
   epochs?: ('2025-08' | '2025-12')[];
   // motion
