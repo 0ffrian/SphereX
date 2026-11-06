@@ -27,8 +27,8 @@ from app.core.render.card_to_params import GENERATOR_VERSION
 log = logging.getLogger("shift_spectrum")
 
 ASSET_SOURCE = "derived.asset"
-# Bump when stage 3, 5 or 7 rules change. "2": stage 5 now fills phase_angle_deg and sun_vector from
-# Horizons for comets and asteroids (Q-62); saved assets from "1" held null for both.
+# Bump when stage 3, 5 or 7 rules change. "2": stage 5 fills phase_angle_deg and sun_vector from
+# Horizons (Q-62) and stage 3 classifies exoplanets (Q-63); saved "1" assets lack both.
 ASSET_VERSION = "2"
 AssetStatus = Literal["saved", "generated", "sketch"]
 FIELDS = ("card", "render_params", "textures", "generator_version", "seed", "created_at")

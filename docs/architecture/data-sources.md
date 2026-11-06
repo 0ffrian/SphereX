@@ -81,10 +81,11 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 
 | Item | Detail |
 |---|---|
-| Status | **Not confirmed** (never called) |
-| Planned columns | planet radius, planet mass, equilibrium temperature, orbit distance, star temperature, star radius |
-| Use | Values for `planet_rocky`, `planet_water` and `gas_giant` cards. |
-| Action | Test the table service before relying on it. |
+| Status | **Tested** 2026-11-07, live and with recorded offline fixtures (`backend/app/adapters/exoplanet_archive.py`) |
+| Endpoint | `https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=<ADQL>&format=json` (`SX_EXOPLANET_TAP_URL`); table `pscomppars` (one composite row per planet); ADQL `lower()` works |
+| Columns | `pl_name`, `hostname`, `pl_rade`, `pl_radj`, `pl_bmasse`, `pl_bmassj` (each with `err1`/`err2`), `pl_bmassprov` (`Mass`, `Msini`, `Msin(i)/sin(i)`, `M-R relationship`), `pl_dens`, `pl_eqt`, `pl_orbsmax`, `pl_orbper`, `pl_orbeccen`, `st_teff`, `st_rad`, `st_mass`, `sy_dist`, and `pl_*_reflink` for the radius, mass, `pl_eqt` and `pl_orbsmax` |
+| Use | Values and type thresholds for `planet_rocky`, `planet_water` and `gas_giant` cards (rule: Q-63). Reached through SIMBAD otype `Pl`; names matched as in Q-63. No row is not an error: the type becomes `candidate` and `exoplanet_archive` goes in `missing`. |
+| Cache | D-25 source `exoplanet_archive`, key `pl_name` = the lower-case candidate names. |
 
 ### A3.9 Not used for the base path
 

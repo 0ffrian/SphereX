@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.adapters import horizons
+from app.adapters.exoplanet_archive import ref_text
 from app.core.card.catalogue import CatalogueData
 from app.core.classify import Classification
 from app.core.find.resolver import ResolvedObject
@@ -141,7 +142,7 @@ def _pm(obj: ResolvedObject) -> dict[str, Any] | None:
     return _measured([pmra, pmdec], source)
 
 
-def _phase_angle(obj: ResolvedObject, data: CatalogueData) -> dict[str, Any]:
+def _phase_angle(data: CatalogueData) -> dict[str, Any]:
     g = data.geometry
     if g is None:
         return _null(f"not available: {data.geometry_reason or 'no Horizons geometry'}")
@@ -158,7 +159,7 @@ def _phase_angle(obj: ResolvedObject, data: CatalogueData) -> dict[str, Any]:
     }
 
 
-def _sun_vector(obj: ResolvedObject, data: CatalogueData) -> dict[str, Any]:
+def _sun_vector(data: CatalogueData) -> dict[str, Any]:
     g = data.geometry
     if g is None:
         out = _null(f"not available: {data.geometry_reason or 'no Horizons geometry'}", "derived")
@@ -172,6 +173,34 @@ def _sun_vector(obj: ResolvedObject, data: CatalogueData) -> dict[str, Any]:
         "formula": "-r/|r|, r = heliocentric ICRF position from JPL Horizons VECTORS "
         f"(CENTER 500@10) at {when}; frame ICRF (equatorial J2000), direction target to Sun",
     }
+
+
+def _planet_fields(card: dict[str, Any], row: Mapping[str, Any] | None) -> None:
+    """R7.7 size and D-12 temperature from the Exoplanet Archive row (A3.8). Mass, orbit and host
+    star stay in the row: R12 #12 defines no card field for them (Q-63 proposes some)."""
+    row = row or {}
+    radius = _finite(row.get("pl_radj"))
+    if radius is None or radius <= 0:
+        card["radius_rjup"] = _null("not available: the Exoplanet Archive has no pl_radj")
+    else:
+        errs = [abs(e) for e in (_finite(row.get(k)) for k in ("pl_radjerr1", "pl_radjerr2")) if e]
+        card["radius_rjup"] = _measured(
+            radius,
+            f"NASA Exoplanet Archive PSCompPars pl_radj ({ref_text(row, 'pl_radj')})",
+            max(errs) if errs else None,
+        )
+    teq = _finite(row.get("pl_eqt"))
+    if teq is not None and teq > 0:
+        card["teq_K"] = _measured(
+            teq, f"NASA Exoplanet Archive PSCompPars pl_eqt ({ref_text(row, 'pl_eqt')})"
+        )
+    else:
+        card["teq_K"] = {
+            "value": None,
+            "tag": "derived",
+            "source": "not available: pl_eqt is empty and no albedo is given to apply A7.1",
+            "formula": "Teq = T_star * sqrt(R_star / (2a)) * (1 - A)^(1/4) (A7.1)",
+        }
 
 
 def build_card(
@@ -198,15 +227,15 @@ def build_card(
         card["spectral_class"] = _spectral_class(cls)
         card["band_depth_3um"] = _null(NO_SOURCE + " (no band-depth rule in the specs)")
         card["slope_075_25"] = _null(NO_SOURCE + " (no slope-fit rule in the specs)")
-        card["phase_angle_deg"] = _phase_angle(obj, data)
-        card["sun_vector"] = _sun_vector(obj, data)
+        card["phase_angle_deg"] = _phase_angle(data)
+        card["sun_vector"] = _sun_vector(data)
     elif kind == "comet":
         # R7.3: gas_Q and coma radius come from the published papers with citations; none are
         # loaded, so they are null and the shells are refused.
         card["coma_radius_km"] = _null("not available: published values not loaded (R7.3)")
         card["nucleus_radius_km_max"] = _null("not available: published values not loaded (R7.3)")
-        card["phase_angle_deg"] = _phase_angle(obj, data)
-        card["sun_vector"] = _sun_vector(obj, data)
+        card["phase_angle_deg"] = _phase_angle(data)
+        card["sun_vector"] = _sun_vector(data)
     elif kind in ("brown_dwarf", "brown_dwarf_binary"):
         card["radius_rjup"] = {
             "value": BROWN_DWARF_RADIUS_RJUP,
@@ -217,6 +246,8 @@ def build_card(
         card["spectral_class"] = _spectral_class(cls)
         card["flux_45um"] = _flux_45um(spectrum)
         card["ch4_depth_33"] = _null(NO_SOURCE + " (no CH4 band-depth rule in the specs)")
+    elif kind in ("planet_rocky", "planet_water", "gas_giant"):
+        _planet_fields(card, data.facts.exoplanet)
     elif kind in ("star", "star_mira", "star_ttauri"):
         card["spectral_class"] = _spectral_class(cls)
         card["teff_K"] = _null("not available: the SIMBAD query has no Teff column")
