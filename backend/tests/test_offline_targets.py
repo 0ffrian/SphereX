@@ -33,8 +33,19 @@ def test_target_frames_and_cutouts_offline(client: TestClient, name: str) -> Non
         assert 0 <= f["x"] < img.size[0] and 0 <= f["y"] < img.size[1]
 
 
-@pytest.mark.parametrize("alias", ["2M1207", "2M1207 A", "2M1207A"])
-def test_demo_alias_resolves_to_the_same_object(client: TestClient, alias: str) -> None:
-    # targets.toml maps the planet host's short names to its SIMBAD query (D-31: TWA 27 = 2M1207 A).
-    ids = {client.get("/v1/resolve", params={"q": q}).json()["id"] for q in ("TWA 27", alias)}
-    assert len(ids) == 1
+@pytest.mark.parametrize(
+    ("name", "alias"),
+    [
+        ("TWA 27", "2M1207"),
+        ("TWA 27", "2M1207 A"),
+        ("TWA 27", "2M1207A"),
+        ("SIMP 0136", "SIMP 0136+0933"),
+        ("SIMP 0136", "SIMP J0136+0933"),
+        ("IRAS 04302+2247", "IRAS 04302"),
+    ],
+)
+def test_demo_alias_resolves_to_the_same_object(client: TestClient, name: str, alias: str) -> None:
+    # targets.toml maps short names to each demo object's SIMBAD query (D-31: TWA 27 = 2M1207 A).
+    replies = [client.get("/v1/resolve", params={"q": q}) for q in (name, alias)]
+    assert all(r.status_code == 200 for r in replies), [r.text for r in replies]
+    assert len({r.json()["id"] for r in replies}) == 1
