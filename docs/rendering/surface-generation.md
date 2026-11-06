@@ -137,4 +137,5 @@ def normals_from_height(h, radius_m, strength=1.0):
 ### R6.7 Output and caching
 
 - Backend writes `/data/textures/{id}/{generator_version}/{seed}/{albedo.webp, height.png, height.bin, normal.png}`.
+- Beside the four maps the baker writes `bake.json`: a hash of the generator parameters, the map size and the baker rules version (Q-47). A directory whose hash differs is rebaked, so a changed card or size is never served stale.
 - The cache key includes `generator_version`. Bump the version whenever any rule in [§6.2](#r62-card--generator-parameters-deterministic-rules)–6.5 changes.

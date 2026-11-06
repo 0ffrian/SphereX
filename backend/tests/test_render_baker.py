@@ -8,6 +8,8 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -86,7 +88,7 @@ def seam_ratio(h: np.ndarray) -> float:
 
     R11 compares the seam's mean with the *median* neighbour difference. Heavy-tailed relief
     (crater rims) puts the mean of any column pair above the median, so a seamless map can fail
-    that. Mean against mean is the like-for-like form (Q-43).
+    that. Mean against mean is the like-for-like form (Q-47).
     """
     return float(np.abs(h[:, 0] - h[:, -1]).mean() / np.abs(np.diff(h, axis=1)).mean())
 
@@ -110,9 +112,13 @@ def test_different_seed_gives_different_maps() -> None:
     assert all(a[k] != b[k] for k in a)
 
 
-def test_seeds_past_32_bits_do_not_overflow() -> None:
-    p = params_from_card(card("asteroid_procedural"), 2**40 + 5)
-    assert bake(p, 64, 32).height.shape == (32, 64)
+def test_seeds_past_32_bits_do_not_overflow_and_all_bits_count() -> None:
+    """N7: seeds 0 and 2**32 must not give the same maps."""
+    c = card("asteroid_procedural")
+    assert bake(params_from_card(c, 2**40 + 5), 64, 32).height.shape == (32, 64)
+    a = sha(encode(bake(params_from_card(c, 0), 64, 32)))
+    b = sha(encode(bake(params_from_card(c, 2**32), 64, 32)))
+    assert all(a[k] != b[k] for k in a)
 
 
 def test_style_rules_match_r62() -> None:
@@ -171,12 +177,80 @@ def test_missing_diameter_is_refused_not_crashed() -> None:
         params_from_card(c, 1)
 
 
-def test_no_colour_source_is_refused() -> None:
+def test_no_colour_source_bakes_relief_and_lists_colour_missing() -> None:
+    """B3: R7.2 makes colour optional, so only the albedo layer is lost."""
     c = card("asteroid_procedural")
-    c["spectral_class"]["value"] = "Q-unknown"
+    c["spectral_class"]["value"] = "B"  # no palette for B
+    p = params_from_card(c, 1)
+    assert "colour" in p.missing
+    r = bake(p, W, H)
+    assert r.height.std() > 0 and np.all(
+        np.abs(np.linalg.norm(r.normal / 255 * 2 - 1, axis=-1) - 1) <= 0.02
+    )
+    del c["spectral_class"]
+    assert "colour" in params_from_card(c, 1).missing
+    assert "colour" not in params_from_card(card("asteroid_procedural"), 1).missing
+
+
+def test_missing_albedo_value_is_listed_not_silent() -> None:
+    """N4: brightness 1.0 is outside the R6.2 range, so the card must be able to say so."""
+    c = card("asteroid_procedural")
+    del c["albedo"]
+    p = params_from_card(c, 1)
+    assert p.missing == ("brightness",)
+
+
+NON_FINITE = [float("nan"), float("inf"), float("-inf")]
+
+
+@pytest.mark.parametrize("bad", NON_FINITE, ids=str)
+@pytest.mark.parametrize("field", ["albedo", "slope_075_25", "band_depth_3um"])
+def test_non_finite_optional_value_is_treated_as_missing(field: str, bad: float) -> None:
+    c = card("asteroid_procedural")
+    c[field]["value"] = bad
+    p = params_from_card(c, 1)
+    assert math.isfinite(p.brightness) and math.isfinite(p.redness)
+    if field == "albedo":
+        assert p.missing == ("brightness",)
+    elif field == "slope_075_25":
+        assert p.redness == 0.0
+    else:
+        assert not p.hydration
+
+
+@pytest.mark.parametrize("bad", [*NON_FINITE, 1e306, 0.0, -1.0], ids=str)
+def test_non_finite_or_absurd_diameter_is_refused(bad: float) -> None:
+    c = card("asteroid_procedural")
+    c["diameter_km"]["value"] = bad
     with pytest.raises(BakeRefusal) as e:
         params_from_card(c, 1)
-    assert e.value.missing == ["gaia_rgb or spectral_class"]
+    assert e.value.missing == ["diameter_km"]
+
+
+@pytest.mark.parametrize("bad", NON_FINITE, ids=str)
+def test_non_finite_ch4_depth_means_no_bands(bad: float) -> None:
+    c = card("brown_dwarf")
+    c["ch4_depth_33"]["value"] = bad
+    p = params_from_card(c, 4)
+    assert p.band_contrast == 0.0 and p.missing == ("bands",)
+
+
+@pytest.mark.parametrize(
+    "rgb", [[float("nan")] * 3, [None] * 3, ["a", "b", "c"], [0.1, 0.2], [True, 0.1, 0.2]], ids=str
+)
+def test_bad_gaia_rgb_falls_back_instead_of_crashing(rgb: list[Any]) -> None:
+    c = card("asteroid_procedural")
+    c["gaia_rgb"] = {"value": rgb, "tag": "derived", "source": "t", "formula": "t"}
+    assert params_from_card(c, 1).base_rgb == (0.26, 0.25, 0.24)  # class C palette
+
+
+def test_normals_reject_non_finite_height() -> None:
+    h = np.zeros((8, 16))
+    h[2, 3] = np.nan
+    with pytest.raises(ValueError):
+        normals_from_height(h, 1.0)
+    with pytest.raises(ValueError):
+        normals_from_height(np.zeros((8, 16)), float("inf"))
 
 
 def test_type_without_baked_textures_is_refused() -> None:
@@ -273,6 +347,7 @@ def test_cache_layout_and_files(tmp_path: Path) -> None:
     assert out == tmp_path / "sbdb%3A101955" / "v1" / "2"
     assert sorted(f.name for f in out.iterdir()) == [
         "albedo.webp",
+        "bake.json",
         "height.bin",
         "height.png",
         "normal.png",
@@ -333,3 +408,99 @@ def test_full_size_budget() -> None:
     r = bake(p, 2048, 1024)
     assert time.perf_counter() - t0 < 90
     assert r.albedo.shape == (1024, 2048, 3)
+
+
+# ---- cache validity and concurrency (B2, N2, N3, N5) -------------------------------------
+
+
+def test_cache_is_keyed_by_size(tmp_path: Path) -> None:
+    """B2: a small pre-bake must not be served as the large texture."""
+    p = params_from_card(card("brown_dwarf"), 4)
+    out = bake_to_cache(p, tmp_path, "x", "v1", 64, 32)
+    assert Image.open(out / "normal.png").size == (64, 32)
+    assert bake_to_cache(p, tmp_path, "x", "v1", 128, 64) == out
+    assert Image.open(out / "normal.png").size == (128, 64)
+    assert (out / "height.bin").stat().st_size == 128 * 64 * 2
+
+
+def test_changed_card_data_is_rebaked(tmp_path: Path) -> None:
+    """N3: same id, version and seed but a different diameter must not return old bytes."""
+    c = asteroid_card(0.5)
+    out = bake_to_cache(params_from_card(c, 7), tmp_path, "b", "v1", 64, 32)
+    before = (out / "height.bin").read_bytes()
+    c["diameter_km"]["value"] = 120.0
+    bake_to_cache(params_from_card(c, 7), tmp_path, "b", "v1", 64, 32)
+    assert (out / "height.bin").read_bytes() != before
+
+
+def test_corrupt_meta_is_rebaked(tmp_path: Path) -> None:
+    p = params_from_card(card("brown_dwarf"), 4)
+    out = bake_to_cache(p, tmp_path, "x", "v1", 64, 32)
+    (out / "bake.json").write_text("not json")
+    bake_to_cache(p, tmp_path, "x", "v1", 64, 32)
+    assert json.loads((out / "bake.json").read_text())["key"]
+
+
+def test_concurrent_bakes_of_one_key_all_succeed(tmp_path: Path) -> None:
+    """N2: six workers on one key: no exception, one valid entry, no leftovers."""
+    p = params_from_card(card("brown_dwarf"), 4)
+    errors: list[BaseException] = []
+    barrier = threading.Barrier(6)
+
+    def work() -> None:
+        try:
+            barrier.wait()
+            bake_to_cache(p, tmp_path, "x", "v1", 64, 32)
+        except BaseException as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=work) for _ in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
+    parent = texture_dir(tmp_path, "x", "v1", 4).parent
+    assert [x.name for x in parent.iterdir()] == ["4"]
+
+
+def test_windows_aliasing_ids_are_escaped(tmp_path: Path) -> None:
+    names = {texture_dir(tmp_path, i, "v1", 1).parent.parent.name for i in ("foo", "foo.", "foo ")}
+    assert len(names) == 3
+    for dev in ("nul", "NUL", "com1", "nul.txt"):
+        seg = texture_dir(tmp_path, dev, "v1", 1).parent.parent.name
+        assert seg.split(".")[0].lower() not in {"nul", "com1"}
+    assert texture_dir(tmp_path, "sbdb:101955", "v1", 1).parent.parent.name == "sbdb%3A101955"
+
+
+# ---- golden hashes (N6) ------------------------------------------------------------------
+
+GOLDEN: dict[str, dict[str, str]] = {
+    "asteroid_procedural": {
+        "albedo.webp": "7beee5f1eb6d2bdcc772606d40e12a3ca5152192f3ae24a93a22e99aee7f1f21",
+        "height.png": "b0365eb54d1ed776d466f1099cda8a374ad3fe084e38bff003d24af29138ea95",
+        "height.bin": "d5931f6840e8ff905440c01f4c3429ab8682e8dc818a283ec050d44832f61cd0",
+        "normal.png": "3cf9e731035e0eac4c4a7c5f460ab0cea3b2c959b077500584a6f853123c029c",
+    },
+    "brown_dwarf": {
+        "albedo.webp": "e6f9fc0f3d6c472460ac1045df2361a4834af91a10bbd8de0086cd964e021274",
+        "height.png": "0bf44f29f0ed386179ef48776cd6abe65387390db90beed489fa884e1663d494",
+        "height.bin": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7",
+        "normal.png": "64f853ff231c08ab920de83e4c7e103994204281c865d018195026fea52b7289",
+    },
+    "brown_dwarf_binary": {
+        "albedo.webp": "b730a2a677e60765691aadb61fcd76e024235e7bf4304493caf81cee36db556c",
+        "height.png": "0bf44f29f0ed386179ef48776cd6abe65387390db90beed489fa884e1663d494",
+        "height.bin": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7",
+        "normal.png": "64f853ff231c08ab920de83e4c7e103994204281c865d018195026fea52b7289",
+    },
+}
+
+
+@pytest.mark.parametrize("name", [t for t, _ in BAKED])
+def test_golden_hashes_at_64x32(name: str) -> None:
+    """Fails if a rule, or numpy, libwebp or zlib, changes the bytes. Update on purpose only:
+    bump BAKER_RULES_VERSION when the cause is a rule change."""
+    seed = dict(BAKED)[name]
+    got = sha(encode(bake(params_from_card(card(name), seed), 64, 32)))
+    assert got == GOLDEN[name]

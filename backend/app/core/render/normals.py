@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -12,9 +14,11 @@ def normals_from_height(h: F64, radius_m: float, strength: float = 1.0) -> NDArr
     """Tangent-space normals, OpenGL convention (+X east/u, +Y north/up v, +Z out), as RGB8.
 
     ``h`` is in body-radius units, row 0 = north pole. Longitude wraps; the poles are padded.
-    Unlike the R6.5 snippet, the encoding rounds instead of truncating, so a flat surface
-    encodes as (128, 128, 255), not (127, 127, 255).
+    The encoding rounds (R6.5), so a flat surface is (128, 128, 255). Non-finite heights would
+    give zero-length normals, so they are rejected here as well as at the card.
     """
+    if not np.all(np.isfinite(h)) or not math.isfinite(radius_m) or radius_m <= 0:
+        raise ValueError("height map and radius must be finite, radius > 0")
     rows, cols = h.shape
     theta = (np.arange(rows) + 0.5) / rows * np.pi
     coslat = np.clip(np.sin(theta), 0.05, None)[:, None]

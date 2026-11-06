@@ -54,13 +54,13 @@ Errors are `{"error": code, "detail": sentence}`. The codes are:
 
 ## Texture baker (R6, issue #6)
 
-`app/core/render/` bakes equirectangular maps on the CPU with numpy and Pillow: `albedo.webp` (lossless), `height.png`, `height.bin` (float16 little-endian, W×H) and `normal.png`, into `{root}/{id}/{generator_version}/{seed}/` (R6.7; `:` and other unsafe characters in the id are percent-encoded, so `sbdb:101955` is `sbdb%3A101955`). Baked types: `asteroid_procedural`, `brown_dwarf`, `brown_dwarf_binary`; any other type is refused (Q-43).
+`app/core/render/` bakes equirectangular maps on the CPU with numpy and Pillow: `albedo.webp` (lossless), `height.png`, `height.bin` (float16 little-endian, W×H) and `normal.png`, and `bake.json` (a hash of parameters, size and rules version; a mismatch rebakes) into `{root}/{id}/{generator_version}/{seed}/` (R6.7; `:` and other unsafe characters in the id are percent-encoded, so `sbdb:101955` is `sbdb%3A101955`). Baked types: `asteroid_procedural`, `brown_dwarf`, `brown_dwarf_binary`; any other type is refused (Q-47).
 
 ```bash
 uv run python -m app.core.render ../shared/fixtures/cards/asteroid_procedural.json --seed 2 --out ./textures   # ~17 s at 2048x1024
 ```
 
-`params_from_card(card, seed)` applies the R6.2 rules and raises `BakeRefusal` (with the missing card fields) instead of inventing a value. `bake()` returns the arrays; `bake_to_cache()` writes the files atomically and skips a bake whose four files exist. Bump `BAKER_RULES_VERSION` whenever a rule in R6.2 to R6.5 changes. Same card and seed give the same bytes on a given numpy and Pillow build; the tests check it by SHA-256.
+`params_from_card(card, seed)` applies the R6.2 rules. It raises `BakeRefusal` (with the missing card fields) only when the diameter is missing or not finite, or the type has no recipe. Other missing inputs (colour, albedo, `ch4_depth_33`) bake flat and are listed in `BakeParams.missing`; NaN and infinity count as missing. `bake()` returns the arrays; `bake_to_cache()` writes the files atomically and skips a bake whose four files exist. Bump `BAKER_RULES_VERSION` whenever a rule in R6.2 to R6.5 changes. Same card and seed give the same bytes on a given numpy and Pillow build; the tests check it by SHA-256.
 
 ## Settings (`SX_*` environment variables)
 

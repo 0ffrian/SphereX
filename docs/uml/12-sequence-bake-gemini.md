@@ -21,13 +21,13 @@ sequenceDiagram
   C2P-->>API: style, ellipsoid_axes, octaves, relief_amp, crater_count, boulder_density, base_rgb, brightness, hydration, redness, roughness (each tagged)
   API->>B: Bake(params, seed = hash of id + generator_version)
   B->>H: fbm of 3D value noise on the unit sphere (equirectangular)
-  B->>H: Craters (power-law radii, bounding box only), boulders if rubble
+  B->>H: Craters (power-law radii, bounding box only), boulders (density by style)
   H-->>B: height = relief_amp x fbm + craters + boulders
   B->>N: normals_from_height (Sobel, wraps in longitude)
   N-->>B: Normal map
   B->>PA: base_rgb x brightness x small variation, hydration and redness rules
   PA-->>B: Albedo map
-  B->>TC: Write albedo.webp, height.png, height.bin (float16), normal.png under id/generator_version/seed
+  B->>TC: Write albedo.webp, height.png, height.bin (float16), normal.png and bake.json (params hash) under id/generator_version/seed; skip if bake.json matches
   B-->>API: Texture URLs
 
   opt Gemini repaint (P3 stretch, behind admin token)
@@ -66,7 +66,7 @@ sequenceDiagram
 
 ## Notes
 
-- Same card + seed must give byte-identical textures (SHA-256 test, rendering doc §11). Bump `generator_version` whenever a rule in §6.2–6.5 changes; it is part of the cache key.
+- Same card + seed must give byte-identical textures (SHA-256 test, rendering doc §11). Bump `generator_version` whenever a rule in §6.2–6.5 changes; it is part of the cache key. `bake.json` inside the directory also rebakes a changed card or size (Q-47).
 - The code-colour albedo always loads first; the AI layer only swaps in on success ("never blank").
 - The Gemini call is server-side only; the key never reaches the browser (D-07).
 - The Gemini call goes through the backend's read-through cache like every external call (D-25). With `SX_OFFLINE=1` a miss is refused and the code colour stays (D-24). Whether a cached repaint is shown under `SX_OFFLINE=1` is Q-29.

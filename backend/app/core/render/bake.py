@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
+import json
 import os
 import shutil
 import tempfile
-from dataclasses import dataclass
+import uuid
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from urllib.parse import quote
 
@@ -21,7 +24,7 @@ from app.core.render.normals import normals_from_height
 from app.core.render.params import BakeParams
 
 # R6.7: bump whenever a rule in R6.2 to R6.5 changes, so cached maps are not reused.
-BAKER_RULES_VERSION = "1"
+BAKER_RULES_VERSION = "2"
 
 FILES = ("albedo.webp", "height.png", "height.bin", "normal.png")
 
@@ -71,15 +74,57 @@ def encode(r: BakeResult) -> dict[str, bytes]:
     }
 
 
+_WIN_RESERVED = {
+    "con",
+    "prn",
+    "aux",
+    "nul",
+    *(f"com{i}" for i in range(1, 10)),
+    *(f"lpt{i}" for i in range(1, 10)),
+}
+META = "bake.json"
+
+
 def _segment(name: str, what: str) -> str:
+    """One safe path segment: percent-encoded, with Windows aliasing removed.
+
+    ``:`` and other unsafe characters become ``%XX``. A trailing dot or space (stripped by
+    Windows, so ``foo.`` would alias ``foo``) and device names such as ``nul`` have their last
+    character or first character escaped. Ids that differ only in letter case still share a
+    directory on Windows and macOS; real ids do not (SBDB, SIMBAD, Exoplanet Archive).
+    """
     if name in ("", ".", ".."):
         raise ValueError(f"unsafe {what}: {name!r}")
-    return quote(name, safe="")  # ':' becomes %3A so ids such as sbdb:101955 work on Windows
+    seg = quote(name, safe="")
+    if seg[-1] in ". ":
+        seg = seg[:-1] + f"%{ord(seg[-1]):02X}"
+    if seg.split(".")[0].lower() in _WIN_RESERVED:
+        seg = f"%{ord(seg[0]):02X}" + seg[1:]
+    return seg
 
 
 def texture_dir(root: Path, object_id: str, generator_version: str, seed: int) -> Path:
     """``{root}/{id}/{generator_version}/{seed}`` (R6.7); segments are percent-encoded."""
     return root / _segment(object_id, "id") / _segment(generator_version, "version") / str(seed)
+
+
+def bake_key(p: BakeParams, width: int, height: int) -> str:
+    """Hash of everything that decides the bytes: the parameters, the size and the rules version.
+
+    R6.7 keys the directory by id, version and seed only; this key lives inside it, so a card
+    that changed (N3) or a different size (B2) is rebaked instead of served stale.
+    """
+    doc = {"rules": BAKER_RULES_VERSION, "w": width, "h": height, "params": asdict(p)}
+    return hashlib.sha256(json.dumps(doc, sort_keys=True).encode()).hexdigest()
+
+
+def _is_valid(out: Path, key: str) -> bool:
+    try:
+        if json.loads((out / META).read_text(encoding="utf-8")).get("key") != key:
+            return False
+    except (OSError, ValueError):
+        return False
+    return all((out / f).is_file() for f in FILES)
 
 
 def bake_to_cache(
@@ -90,9 +135,14 @@ def bake_to_cache(
     width: int = 2048,
     height: int = 1024,
 ) -> Path:
-    """Bake unless all four files exist; write atomically (a half-written bake is never seen)."""
+    """Bake unless a valid entry exists; safe for concurrent callers on the same key.
+
+    Files are written to a temporary directory and moved into place in one rename. A valid
+    entry is never deleted: if another worker finishes first, this one discards its own copy.
+    """
     out = texture_dir(root, object_id, generator_version, p.seed)
-    if all((out / f).is_file() for f in FILES):
+    key = bake_key(p, width, height)
+    if _is_valid(out, key):
         return out
     files = encode(bake(p, width, height))
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -100,10 +150,25 @@ def bake_to_cache(
     try:
         for name, data in files.items():
             (tmp / name).write_bytes(data)
+        (tmp / META).write_text(json.dumps({"key": key}), encoding="utf-8")
         tmp.chmod(0o755)  # mkdtemp makes it 0700; the API process must be able to serve it
-        if out.exists():
-            shutil.rmtree(out)  # an incomplete earlier bake
-        os.replace(tmp, out)
+        for _ in range(3):
+            if _is_valid(out, key):
+                return out  # another worker won the race
+            if out.exists():  # stale or incomplete: move it aside, never delete in place
+                aside = out.parent / f".stale-{uuid.uuid4().hex}"
+                try:
+                    os.rename(out, aside)
+                except OSError:
+                    continue
+                shutil.rmtree(aside, ignore_errors=True)
+            try:
+                os.replace(tmp, out)
+                return out
+            except OSError:
+                continue  # someone created out between our checks: look again
+        if _is_valid(out, key):
+            return out
+        raise OSError(f"could not publish textures to {out}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
-    return out

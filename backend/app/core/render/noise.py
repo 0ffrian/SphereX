@@ -6,6 +6,8 @@ construction and the same inputs always give the same array.
 
 from __future__ import annotations
 
+import hashlib
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -14,8 +16,11 @@ _MASK = 0xFFFFFFFF
 
 
 def seed32(seed: int) -> int:
-    """Fold any non-negative seed (Q-35) into the 32 bits the hash uses."""
-    return seed & _MASK
+    """Fold any non-negative seed (Q-35) into the 32 bits the noise hash uses.
+
+    SHA-256 of the decimal seed, so every bit of a 64-bit seed matters (seeds 0 and 2**32 differ).
+    """
+    return int.from_bytes(hashlib.sha256(str(seed).encode("ascii")).digest()[:4], "big")
 
 
 def sphere_dirs(height: int, width: int) -> F64:
