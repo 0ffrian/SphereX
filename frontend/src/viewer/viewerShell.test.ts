@@ -28,7 +28,14 @@ import {
   planLighting,
 } from './lighting';
 import { defaultContext, planRender } from './renderPlan';
-import { buildScene, dustPositions, shellPositions, spinRateRadPerS } from './renderers/build';
+import {
+  AssetCache,
+  buildScene,
+  dustPositions,
+  shellPositions,
+  spinRateRadPerS,
+} from './renderers/build';
+import { Sprite } from 'three/webgpu';
 import { COMPARISONS, formatLength, pickComparison, scaleBarFor } from './scaleBar';
 
 describe('honesty (R5.3, D-21)', () => {
@@ -148,7 +155,43 @@ describe('alt text and announcements (R9)', () => {
     expect(alt).toContain('10 km across (measured)');
     expect(alt).toContain('colour from Gaia (estimated)');
     expect(alt).toContain('viewed at 30°');
-    expect(alt).toMatch(/Surface relief: illustrative\.$/);
+    // A plain sphere has no relief to describe.
+    expect(alt).not.toContain('Surface relief');
+    expect(alt).toMatch(/viewed at 30°\.$/);
+    // A shape model has: the relief is then the measured shape.
+    card.shape_source = { value: '/meshes/bennu.glb', tag: 'measured', source: 'test' };
+    const withMesh = buildAltText(planRender(card, params, defaultContext({ mode: 'visible' })));
+    expect(withMesh).toMatch(/Surface relief: measured\.$/);
+    // A normal map is illustrative relief.
+    const p = fixture('asteroid_procedural');
+    const art = buildAltText(
+      planRender(p.card, p.params, defaultContext({ honesty: 'artistic', mode: 'visible' })),
+    );
+    expect(art).toMatch(/Surface relief: illustrative\.$/);
+  });
+
+  it('reads an upper limit as a bound (B2) and names no colour that is not drawn (N9)', () => {
+    const { card, params } = fixture('comet');
+    const plan = planRender(card, params, defaultContext({ epoch: '2025-08' }));
+    expect(plan.sizeQualifier).toBe('upper_limit');
+    const alt = buildAltText(plan);
+    expect(alt).toContain('at most 2 km across (upper limit, measured)');
+    expect(alt).not.toContain(', 2 km across');
+    // August has no dust, so the infrared colour is applied to nothing and is not named.
+    expect(plan.tintUsed).toBe(false);
+    expect(alt).not.toContain('infrared false colour');
+    expect(alt).not.toContain('Surface relief');
+    const bar = scaleBarFor(plan.scaleM, plan.sizeQualifier)!;
+    expect(bar.headline).toBe('At most 2 km across');
+    expect(bar.comparison.text).toMatch(/^at most about /);
+    expect(scaleBarFor(plan.scaleM)!.headline).toBe('2 km across');
+  });
+
+  it('the candidate label is a full sentence with no controls help', () => {
+    const { card, params } = fixture('candidate');
+    const label = canvasLabel(planRender(card, params, defaultContext()));
+    expect(label).toMatch(/unknown\.$/);
+    expect(label).not.toContain('arrow keys');
   });
 
   it('changes with the mode and with the honesty state', () => {
@@ -262,5 +305,39 @@ describe('scene builder (no GPU)', () => {
     expect(spinRateRadPerS({ periodH: 1, speedup: 1 })).toBeCloseTo((2 * Math.PI) / 3600);
     expect(spinRateRadPerS({ periodH: 1, speedup: 1000 })).toBeCloseTo((2000 * Math.PI) / 3600);
     expect(spinRateRadPerS({ periodH: 0, speedup: 1000 })).toBe(0);
+  });
+
+  it('shells and dust are instanced sprites, so their point size is honoured in r187 (N5)', () => {
+    const { card, params } = fixture('comet');
+    const plan = planRender(card, params, defaultContext({ epoch: '2025-08' }));
+    const built = buildScene(plan, { onLoadFailed: () => {}, onChange: () => {} });
+    const clouds = built.group.children.filter((c): c is Sprite => c instanceof Sprite);
+    expect(clouds).toHaveLength(plan.shells.length);
+    expect(clouds.map((c) => c.count)).toEqual(plan.shells.map((sh) => sh.count));
+    for (const c of clouds) {
+      expect((c.material as unknown as { size: number }).size).toBeGreaterThan(1);
+      expect(c.frustumCulled).toBe(false);
+    }
+    built.dispose();
+  });
+
+  it('a cache given to the builder survives the scene, and is dropped by its owner (N6)', () => {
+    const { card, params } = fixture('asteroid_procedural');
+    const plan = planRender(card, params, defaultContext({ honesty: 'artistic', mode: 'visible' }));
+    const cache = new AssetCache();
+    const spy = { disposed: 0 };
+    const tex = { dispose: () => spy.disposed++ };
+    (cache as unknown as { loadedTextures: Map<string, unknown> }).loadedTextures.set(
+      plan.bodies[0]!.albedoUrl!,
+      tex,
+    );
+    const built = buildScene(plan, { onLoadFailed: () => {}, onChange: () => {} }, cache);
+    // The texture is already loaded, so it is on the material at once (no flat flash).
+    const mesh = built.group.children[0] as unknown as { material: { map: unknown } };
+    expect(mesh.material.map).toBe(tex);
+    built.dispose();
+    expect(spy.disposed).toBe(0);
+    cache.dispose();
+    expect(spy.disposed).toBe(1);
   });
 });

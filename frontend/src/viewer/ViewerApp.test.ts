@@ -3,7 +3,15 @@
 import { describe, expect, it } from 'vitest';
 import { PerspectiveCamera } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { rotateControls, viewerKeyAction, zoomControls } from './ViewerApp';
+import { fixture } from '@/test/sharedFixtures';
+import {
+  cameraDistanceFor,
+  rotateControls,
+  sceneKey,
+  viewerKeyAction,
+  zoomControls,
+} from './ViewerApp';
+import { defaultContext, planRender } from './renderPlan';
 
 const START_DISTANCE = 4;
 
@@ -89,5 +97,38 @@ describe('viewerKeyAction (R5.6 keyboard)', () => {
     expect(key('=', { ctrlKey: true })).toBeNull();
     expect(key('-', { metaKey: true })).toBeNull();
     expect(key('ArrowLeft', { altKey: true })).toBeNull();
+  });
+});
+
+describe('framing (N17)', () => {
+  it('keeps the unit sphere at the usual distance and moves back for a wider scene', () => {
+    expect(cameraDistanceFor(1)).toBe(4);
+    const wide = cameraDistanceFor(2.6);
+    expect(wide).toBeGreaterThan(4);
+    // The farthest point (radius 2.6) is inside the vertical half-view at that distance.
+    expect(wide * Math.tan((20 * Math.PI) / 180)).toBeGreaterThan(2.6);
+  });
+
+  it('the T Tauri disc is framed, which the default camera could not hold', () => {
+    const { card, params } = fixture('star_ttauri');
+    const plan = planRender(card, params, defaultContext({ honesty: 'artistic' }));
+    expect(plan.extent).toBeGreaterThan(2);
+    expect(4 * Math.tan((20 * Math.PI) / 180)).toBeLessThan(plan.extent);
+    expect(cameraDistanceFor(plan.extent) * Math.tan((20 * Math.PI) / 180)).toBeGreaterThan(
+      plan.extent,
+    );
+  });
+});
+
+describe('sceneKey (N6): changes that draw the same thing do not rebuild', () => {
+  it('is equal when only the labels change, and different when the drawing does', () => {
+    const { card, params } = fixture('asteroid_shape');
+    const a = planRender(card, params, defaultContext({ mode: 'visible' }));
+    const b = planRender(card, params, defaultContext({ mode: 'visible', honesty: 'artistic' }));
+    expect(sceneKey(a)).toBe(sceneKey(b));
+    const c = fixture('comet');
+    const e1 = planRender(c.card, c.params, defaultContext({ epoch: '2025-08' }));
+    const e2 = planRender(c.card, c.params, defaultContext({ epoch: '2025-12' }));
+    expect(sceneKey(e1)).not.toBe(sceneKey(e2));
   });
 });

@@ -256,6 +256,8 @@ const LAYER_NAME: Readonly<Record<string, string>> = {
   disc: 'Disc',
   dust_screen: 'Dust screen',
   lighting: 'Sun direction',
+  tint: 'Body colour',
+  size: 'Size and scale bar',
   visible: 'Visible-colour view',
   spherex_ir: 'SPHEREx infrared view',
   teq_pulse: 'Temperature pulse',
@@ -294,6 +296,8 @@ function fieldList(fields: readonly string[]): string {
 /** One short line for a layer or view mode that is not drawn, with what would change it. */
 export function describeRefusal(item: MissingItem): string {
   const name = layerName(item.id);
+  // Not drawn from data, but a display default is shown instead (the panel adds a Default chip).
+  if (item.defaultShown) return `${name}: shown as a default. ${item.defaultShown}`;
   switch (item.reason) {
     case 'honesty': {
       const badge = item.tag ? badgeForTag(item.tag) : 'Estimated';
@@ -308,8 +312,12 @@ export function describeRefusal(item: MissingItem): string {
       return `${name}: not drawn. The data pipeline left it out.`;
     case 'load':
       return `${name}: not drawn. ${item.detail ?? 'Its file could not be loaded.'}`;
-    case 'epoch':
-      return `${name}: not shown for ${item.detail === '2025-08' ? 'August 2025' : 'December 2025'}.`;
+    case 'epoch': {
+      const when = item.detail === '2025-08' ? 'August 2025' : 'December 2025';
+      return `${name}: not drawn for ${when}. ${item.note ?? ''}`.trim();
+    }
+    case 'mode':
+      return `${name}: not shown in this view. ${item.detail ?? ''}`.trim();
     case 'unverified':
       return `${name}: not drawn yet. ${item.detail ?? 'A value it needs is still being checked.'}`;
   }

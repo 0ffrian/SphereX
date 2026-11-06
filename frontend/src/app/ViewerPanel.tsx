@@ -5,15 +5,16 @@
 // plain-words list of layers that are not drawn. Rotate/zoom buttons are the WCAG 2.5.7
 // alternative to dragging (R5.6). R9: canvas aria-label follows the view; a polite live region
 // announces mode, epoch and honesty changes.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '@/state/store';
 import { prefersReducedMotion, ViewerApp } from '@/viewer/ViewerApp';
 import {
   canvasLabel,
   epochAnnouncement,
+  formatMjdDate,
   honestyAnnouncement,
   modeAnnouncement,
-  scrubAnnouncement,
+  nothingDrawnReason,
 } from '@/viewer/altText';
 import {
   effectiveHonesty,
@@ -23,14 +24,36 @@ import {
 } from '@/viewer/honesty';
 import type { PlanContext, ViewModeId } from '@/viewer/planTypes';
 import { defaultContext, planRender } from '@/viewer/renderPlan';
-import { COMET_EPOCHS, EPOCH_LABEL } from '@/viewer/renderers/Comet';
+import { COMET_EPOCHS, epochsWithQ, EPOCH_LABEL } from '@/viewer/renderers/Comet';
 import { scaleBarFor } from '@/viewer/scaleBar';
 import type { CometEpoch } from '@/contract';
 import { ProvenanceBadge } from './Badge';
-import { describeRefusal } from './messages';
+import { describeRefusal, layerName } from './messages';
 import { buttonClass, pressedClass } from './ui';
 
 const NO_FAILED: readonly string[] = [];
+
+/** `prefers-reduced-motion`, kept current when the setting changes while the page is open. */
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(prefersReducedMotion);
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = () => setReduced(query.matches);
+    onChange();
+    query.addEventListener?.('change', onChange);
+    return () => query.removeEventListener?.('change', onChange);
+  }, []);
+  return reduced;
+}
+
+/** The viewer choices that belong to one object; a new object starts from the defaults. */
+interface Choices {
+  key: string;
+  mode: ViewModeId | null;
+  epoch: CometEpoch | null;
+  scrub: number;
+}
 
 const PLACEHOLDER_LABEL = 'Viewer placeholder: no object loaded';
 
@@ -53,17 +76,30 @@ export function ViewerPanel() {
   const setHonesty = useAppStore((s) => s.setHonesty);
   const honesty = effectiveHonesty(storedHonesty);
 
-  // Viewer choices that belong to this panel, not to the data.
-  const [modeChoice, setModeChoice] = useState<ViewModeId | null>(null);
-  const [epoch, setEpoch] = useState<CometEpoch>(defaultContext().epoch);
-  const [scrubIndex, setScrubIndex] = useState(0);
-  // Layers whose mesh or texture failed to load, per object. Keyed so a new object starts clean.
+  // Viewer choices that belong to this panel, not to the data. Keyed by object so that a new
+  // object starts from its defaults (the comet opens on its latest epoch with gas data).
   const objectKey = params ? `${params.id}|${params.generator_version}|${params.seed}` : '';
+  const [stored, setChoices] = useState<Choices>({ key: '', mode: null, epoch: null, scrub: 0 });
+  const choices: Choices =
+    stored.key === objectKey ? stored : { key: objectKey, mode: null, epoch: null, scrub: 0 };
+  const modeChoice = choices.mode;
+  const scrubIndex = choices.scrub;
+  const epochsWithData = useMemo(
+    () => (card && params?.type === 'comet' ? epochsWithQ(card) : []),
+    [card, params],
+  );
+  const epoch: CometEpoch = choices.epoch ?? epochsWithData.at(-1) ?? defaultContext().epoch;
+  // Layers whose mesh or texture failed to load, per object. Keyed so a new object starts clean.
   const [failedState, setFailedState] = useState<{ key: string; ids: string[] }>({
     key: '',
     ids: [],
   });
   const failed = failedState.key === objectKey ? failedState.ids : NO_FAILED;
+  const reducedMotion = useReducedMotion();
+  const [spinPaused, setSpinPaused] = useState(false);
+  const [whyOpen, setWhyOpen] = useState(false);
+  const whyId = useId();
+  const fixture = useAppStore((s) => s.sky.fixture);
   const [announcement, setAnnouncement] = useState('');
 
   const ctx: PlanContext = useMemo(
@@ -74,7 +110,7 @@ export function ViewerPanel() {
     () => (card && params ? planRender(card, params, ctx) : null),
     [card, params, ctx],
   );
-  const bar = useMemo(() => (plan ? scaleBarFor(plan.scaleM) : null), [plan]);
+  const bar = useMemo(() => (plan ? scaleBarFor(plan.scaleM, plan.sizeQualifier) : null), [plan]);
 
   // Mount the renderer once.
   useEffect(() => {
@@ -143,6 +179,11 @@ export function ViewerPanel() {
     };
   }, [viewer, objectKey]);
 
+  // The pause choice is the user's; the viewer keeps it across rebuilds.
+  useEffect(() => {
+    viewer?.setSpinPaused(spinPaused);
+  }, [viewer, spinPaused]);
+
   // Draw the plan, and keep the canvas label in step with it (R9).
   useEffect(() => {
     if (viewer) {
@@ -162,22 +203,24 @@ export function ViewerPanel() {
     announce(next ? honestyAnnouncement(state, next) : HONESTY_LABEL[state]);
   };
   const onMode = (mode: ViewModeId) => {
-    setModeChoice(mode);
+    setChoices({ ...choices, mode });
     const next = planWith({ mode });
     if (next) announce(modeAnnouncement(mode, next));
   };
   const onEpoch = (e: CometEpoch) => {
-    setEpoch(e);
+    setChoices({ ...choices, epoch: e });
     const next = planWith({ epoch: e });
     if (next) announce(epochAnnouncement(e, next));
   };
-  const onScrub = (i: number) => {
-    setScrubIndex(i);
-    const next = planWith({ scrubIndex: i });
-    if (next) announce(scrubAnnouncement(next));
-  };
+  // Not announced here: the slider's own value text is read by screen readers when it moves.
+  const onScrub = (i: number) => setChoices({ ...choices, scrub: i });
 
+  const nothingDrawn =
+    plan && plan.threeD && plan.bodies.length === 0 ? nothingDrawnReason(plan) : null;
+  const defaultsShown = plan?.missing.filter((m) => m.defaultShown) ?? [];
+  const notDrawn = plan?.missing.filter((m) => !m.defaultShown) ?? [];
   const disabled = viewer === null;
+  const objectIsFixture = fixture || (card?.id.startsWith('fixture:') ?? false);
   const hiddenCount = plan?.missing.filter((m) => m.reason === 'honesty').length ?? 0;
 
   return (
@@ -203,7 +246,13 @@ export function ViewerPanel() {
             className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 rounded bg-neutral-900/90 px-3 py-2 text-center text-sm text-neutral-100"
             data-testid="viewer-nothing"
           >
-            Nothing can be drawn at this honesty level. See the list below.
+            {nothingDrawn
+              ? `Nothing is drawn. ${nothingDrawn.text}${
+                  nothingDrawn.needs
+                    ? ` Switch to “${HONESTY_LABEL[nothingDrawn.needs]}” to see it.`
+                    : ''
+                } See the list below.`
+              : ''}
           </p>
         )}
         {rendererStatus === 'unavailable' && (
@@ -331,6 +380,9 @@ export function ViewerPanel() {
                   onClick={() => onEpoch(e)}
                 >
                   {EPOCH_LABEL[e]}
+                  {!plan.epochs.includes(e) && (
+                    <span className="ml-1 text-xs text-neutral-400">(no gas data)</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -345,11 +397,11 @@ export function ViewerPanel() {
                 max={Math.max(0, plan.scrub.count - 1)}
                 value={plan.scrub.index}
                 className="min-h-11 w-full max-w-xl"
-                aria-valuetext={`Point ${plan.scrub.index + 1} of ${plan.scrub.count}, brightness ${Math.round(plan.scrub.brightness * 100)}% of the maximum`}
+                aria-valuetext={`Point ${plan.scrub.index + 1} of ${plan.scrub.count}, ${formatMjdDate(plan.scrub.tMjd)}, brightness ${Math.round(plan.scrub.brightness * 100)}% of the maximum`}
                 onChange={(e) => onScrub(Number(e.target.value))}
               />
               <span className="text-xs text-neutral-400">
-                MJD {plan.scrub.tMjd.toFixed(1)}, brightness{' '}
+                {formatMjdDate(plan.scrub.tMjd)}, brightness{' '}
                 {Math.round(plan.scrub.brightness * 100)}% of the maximum
                 {plan.scrub.flagged > 0
                   ? `; ${plan.scrub.flagged} flagged points are left out`
@@ -371,31 +423,73 @@ export function ViewerPanel() {
                 />
               </div>
               <figcaption className="text-sm text-neutral-200">
-                {bar.diameterText} across
+                {bar.headline}
+                {bar.qualifier === 'upper_limit' && ' (upper limit)'}
                 {plan.sizeTag && (
                   <>
                     {' '}
-                    <ProvenanceBadge tag={plan.sizeTag} />
+                    <ProvenanceBadge
+                      tag={plan.sizeTag}
+                      tooltip={plan.sizeWhy ?? undefined}
+                      srText
+                      fixture={objectIsFixture}
+                    />
                   </>
                 )}
                 , {bar.comparison.text}.
               </figcaption>
+              {plan.sizeWhy && (
+                <div className="flex flex-col items-start gap-1">
+                  <button
+                    type="button"
+                    className={buttonClass}
+                    aria-expanded={whyOpen}
+                    aria-controls={whyId}
+                    onClick={() => setWhyOpen((o) => !o)}
+                  >
+                    Why this size?
+                  </button>
+                  {whyOpen && (
+                    <p id={whyId} className="text-sm text-neutral-300" data-testid="size-why">
+                      {plan.sizeWhy}
+                    </p>
+                  )}
+                </div>
+              )}
             </figure>
           )}
 
           {plan.spin && (
-            <p className="text-sm text-neutral-200" data-testid="spin-note">
-              Spin sped up ×{plan.spin.speedup}
-              {prefersReducedMotion()
-                ? '. Auto-spin is off because your device asks for reduced motion.'
-                : '.'}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm text-neutral-200" data-testid="spin-note">
+                Spin sped up ×{plan.spin.speedup}
+                {reducedMotion
+                  ? '. Auto-spin is off because your device asks for reduced motion.'
+                  : spinPaused
+                    ? '. Auto-spin is paused.'
+                    : '.'}
+              </p>
+              {!reducedMotion && (
+                <button
+                  type="button"
+                  className={buttonClass}
+                  aria-pressed={spinPaused}
+                  onClick={() => setSpinPaused((p) => !p)}
+                >
+                  {spinPaused ? 'Resume spin' : 'Pause spin'}
+                </button>
+              )}
+            </div>
           )}
 
           <section aria-labelledby="legend-heading" className="flex flex-col gap-1">
             <h3 id="legend-heading" className="text-sm font-medium text-neutral-200">
               What is drawn
             </h3>
+            <p className="text-xs text-neutral-400">
+              Measured: from observations. Estimated: worked out from data with a stated method.
+              Default: the artist&rsquo;s choice.
+            </p>
             {plan.drawn.length === 0 ? (
               <p className="text-sm text-neutral-400">Nothing yet.</p>
             ) : (
@@ -405,8 +499,8 @@ export function ViewerPanel() {
                     key={l.id}
                     className="flex flex-wrap items-center gap-2 text-sm text-neutral-200"
                   >
-                    <ProvenanceBadge tag={l.tag} tooltip={l.description} />
-                    <span>{l.description}</span>
+                    <ProvenanceBadge tag={l.tag} fixture={objectIsFixture} />
+                    <span>{layerName(l.id)}</span>
                     {l.swatches?.map((s) => (
                       <span
                         key={s.label}
@@ -420,19 +514,46 @@ export function ViewerPanel() {
                         {s.label}
                       </span>
                     ))}
+                    {l.description && (
+                      <details className="w-full text-xs text-neutral-300">
+                        <summary className="min-h-11 cursor-pointer py-2 focus-visible:outline-2 focus-visible:outline-sky-400">
+                          How it is made
+                        </summary>
+                        <p className="pb-1">{l.description}</p>
+                      </details>
+                    )}
                   </li>
                 ))}
               </ul>
             )}
           </section>
 
-          {plan.missing.length > 0 && (
+          {defaultsShown.length > 0 && (
+            <section aria-labelledby="defaults-heading" className="flex flex-col gap-1">
+              <h3 id="defaults-heading" className="text-sm font-medium text-neutral-200">
+                Shown as a default
+              </h3>
+              <ul
+                className="flex flex-col gap-1 text-sm text-neutral-300"
+                data-testid="default-list"
+              >
+                {defaultsShown.map((m) => (
+                  <li key={m.id} className="flex flex-wrap items-center gap-2">
+                    <ProvenanceBadge tag="artistic" />
+                    <span>{describeRefusal(m)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {notDrawn.length > 0 && (
             <section aria-labelledby="missing-heading" className="flex flex-col gap-1">
               <h3 id="missing-heading" className="text-sm font-medium text-neutral-200">
                 Not drawn
               </h3>
               <ul className="list-disc pl-5 text-sm text-neutral-300" data-testid="missing-list">
-                {plan.missing.map((m) => (
+                {notDrawn.map((m) => (
                   <li key={m.id}>{describeRefusal(m)}</li>
                 ))}
               </ul>
