@@ -87,7 +87,7 @@ test.describe('the five A1.1 targets', () => {
       const chart = page.getByTestId('spectrum-chart');
       if (points === 0) {
         await expect(page.getByTestId('no-spectrum')).toContainText(
-          'too bright for SPHEREx’s detector (saturated)',
+          'the detector flagged the object’s centre as saturated or unusable',
         );
         await expect(chart).toHaveCount(0);
         await expect(page.getByTestId('spectrum-caveat')).toHaveCount(0);
@@ -137,7 +137,7 @@ test('R Draconis: a missing cutout is refused, not drawn', async ({ page }) => {
   await outside.locator('summary').click();
   await expect(outside.getByText('r-dra-f024')).toBeVisible();
 
-  // Keys pressed in the ID box stay there: no flipbook step, seek or play (D7, R9).
+  // Keys pressed in the ID box stay there: no flipbook step, seek or play (keyboard, R9).
   const box = outside.getByRole('region', {
     name: 'Frames found but not shown, frame IDs: outside the image',
   });
@@ -156,7 +156,7 @@ test("Barnard's Star: a saturated object says why there is no spectrum", async (
   await page.getByRole('button', { name: 'Show spectrum', exact: true }).click();
 
   await expect(page.getByTestId('no-spectrum')).toHaveText(
-    'There is no spectrum: this tool could not measure any of the 24 frames found. In 23 of them, the object’s centre is too bright for SPHEREx’s detector (saturated); the reason for the other frame is below.',
+    'There is no spectrum: this tool could not measure any of the 24 frames found. In 23 of them, the detector flagged the object’s centre as saturated or unusable; the reason for the other frame is below.',
   );
   // D-02: the frame checks still wear the provenance badge, above the sentence.
   const badge = page.getByTestId('spectrum-panel').getByTestId('badge');
@@ -178,12 +178,12 @@ test("Barnard's Star: a saturated object says why there is no spectrum", async (
   await expect(groups).toHaveCount(2);
   await expect(groups.nth(0)).toHaveAttribute('data-reason', 'saturated');
   await expect(groups.nth(0).locator('summary')).toContainText(
-    '23 frames saturated: the object’s centre is too bright for the detector.',
+    '23 frames where the detector flagged the object’s centre as saturated or unusable.',
   );
   await expect(groups.nth(1)).toHaveAttribute('data-reason', 'aperture_flags');
   await expect(page.getByTestId('spectrum-panel')).not.toContainText('Not available:');
   await expect(page.getByTestId('announcer')).toContainText(
-    "No spectrum for Barnard's Star: the object is too bright for the detector (saturated) in 23 of 24 frames.",
+    "No spectrum for Barnard's Star: the detector flagged the object’s centre as saturated or unusable in 23 of 24 frames.",
   );
 
   // Keyboard: focus the saturated group's summary and open it with Enter.
@@ -210,7 +210,7 @@ test('RW Aurigae: a partial spectrum says which frames it covers', async ({ page
   await expect(chart.getByTestId('point')).toHaveCount(4);
   const coverage = page.getByTestId('spectrum-coverage');
   await expect(coverage).toHaveText(
-    /^This tool could measure 4 of the 24 frames found\. They cover only \d\.\d{3} µm to \d\.\d{3} µm; the frames found cover /,
+    /^This tool could measure 4 of the 24 frames found\. The measured points lie between \d\.\d{3} µm and \d\.\d{3} µm; the frames found span /,
   );
   await expect(page.getByTestId('spectrum-caveat')).toBeVisible();
   const groups = page.getByTestId('spectrum-missing').getByTestId('refusal-group');
@@ -218,7 +218,9 @@ test('RW Aurigae: a partial spectrum says which frames it covers', async ({ page
   expect(
     await groups.evaluateAll((els) => els.map((el) => el.getAttribute('data-reason'))),
   ).toEqual(['saturated', 'aperture_edge', 'aperture_flags']);
-  await expect(groups.nth(0).locator('summary')).toContainText('18 frames saturated');
+  await expect(groups.nth(0).locator('summary')).toContainText(
+    '18 frames where the detector flagged',
+  );
   // The refusals come after the data table, so the chart sits next to its text equivalent.
   await page.getByText('Show data table').click();
   await expect(page.getByTestId('spectrum-table')).toBeVisible();

@@ -165,7 +165,7 @@ describe('sky slice', () => {
     await pending;
     expect(sky().spectrum.data?.spectrum).toEqual([]);
     expect(sky().announcement).toBe(
-      'No spectrum for R Draconis: the object is too bright for the detector (saturated) in 21 of 25 frames.',
+      'No spectrum for R Draconis: the detector flagged the object’s centre as saturated or unusable in 21 of 25 frames.',
     );
   });
 

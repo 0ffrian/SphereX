@@ -1,5 +1,6 @@
 // Groups the backend's `missing` codes (A4.1, A4.2) by reason, so a refused frame list reads as
-// "239 frames saturated" instead of 239 raw codes. Logic only: the wording is in messages.ts.
+// "239 frames where the detector flagged …" instead of 239 raw codes. Logic only: the wording is
+// in messages.ts.
 //
 // Code formats the backend emits (backend/app/core/find/frames.py, backend/app/core/measure/):
 //   per frame      `<reason>:<frame_id>`, e.g. `saturated:2026W17_1B_0634_4_D3`
@@ -132,11 +133,24 @@ export interface SpectrumOutcome {
   measuredRange: readonly [number, number] | null;
   /** Wavelength span of the frames the flipbook lists, µm. */
   framesRange: readonly [number, number] | null;
+  /** Widest gap between neighbouring measured wavelengths, µm; null with fewer than 2 points. */
+  largestGap: readonly [number, number] | null;
   /**
    * Groups to list under the spectrum. `spectrum:saturated` is left out when saturated frames are
    * listed (the empty state says it); otherwise it is kept, so no code is ever dropped.
    */
   groups: readonly RefusalGroup[];
+}
+
+function widestGap(values: readonly number[]): readonly [number, number] | null {
+  const sorted = [...values].sort((a, b) => a - b);
+  let best: readonly [number, number] | null = null;
+  for (let i = 1; i < sorted.length; i++) {
+    const lo = sorted[i - 1]!;
+    const hi = sorted[i]!;
+    if (!best || hi - lo > best[1] - best[0]) best = [lo, hi];
+  }
+  return best;
 }
 
 function span(values: readonly number[]): readonly [number, number] | null {
@@ -169,6 +183,7 @@ export function summarizeSpectrum(
     incomplete: missing.some((c) => c === TRUNCATED || DEFERRED_RE.test(c)),
     measuredRange: span(points.map((p) => p.wavelength_um)),
     framesRange: frames ? span(frames.map((f) => f.wavelength_um)) : null,
+    largestGap: widestGap(points.map((p) => p.wavelength_um)),
     groups: saturated > 0 ? all.filter((g) => g.reason !== ALL_SATURATED) : all,
   };
 }
