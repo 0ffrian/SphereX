@@ -138,9 +138,9 @@ const NOTE_TEXT: Readonly<Record<string, string>> = {
   'overlay:wise':
     'WISE source positions are not available for this object, so WISE sources are not shown.',
   'overlay:gaia:pending':
-    'Gaia star positions are still loading from the archive. Turn Gaia off and on again in a minute to show them.',
+    'Gaia star positions are still loading from the archive. Choose Try again in a minute to show them.',
   'overlay:wise:pending':
-    'WISE source positions are still loading from the archive. Turn WISE off and on again in a minute to show them.',
+    'WISE source positions are still loading from the archive. Choose Try again in a minute to show them.',
   'overlay:gaia:truncated':
     'The Gaia list hit its size limit, so only the brightest stars are shown.',
   'overlay:wise:truncated':

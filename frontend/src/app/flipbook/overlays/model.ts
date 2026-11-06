@@ -32,10 +32,10 @@ export function provenanceOf(data: OverlaysResponse, key: string): ProvenanceEnt
   return Object.hasOwn(data.provenance, key) ? data.provenance[key] : undefined;
 }
 
-/** Null until the overlays have loaded. */
+/** Null until the overlays have loaded. While a reload runs, the previous reply is still drawn. */
 export function overlayView(state: OverlaysState, frameId: string): OverlayView | null {
   const data = state.data;
-  if (state.status !== 'ready' || !data) return null;
+  if (state.status === 'error' || !data) return null;
   const frame = data.frames.find((f) => f.frame_id === frameId);
   const extra = new Set<string>();
   const tagged = (part: OverlayLayer | 'contamination', wanted: boolean) => {

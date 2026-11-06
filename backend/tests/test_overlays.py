@@ -6,6 +6,7 @@ Done when (issue #12): overlays show on the 5 test targets from cache.
 
 from __future__ import annotations
 
+import csv
 import io
 import json
 import threading
@@ -209,6 +210,26 @@ def test_query_csv_all_mirrors_fail() -> None:
     ctx: Any = SimpleNamespace(http=SimpleNamespace(get=get))
     with pytest.raises(UpstreamError, match="u1 down; u2 down"):
         tap.query_csv(ctx, [("u1", "t"), ("u2", "t")], lambda t: t, ("a",), read_timeout_s=None)
+
+
+def test_query_csv_parses_every_row_before_caching() -> None:
+    # A good header with an unparsable number in a row must fail the call, not be cached.
+    bad_row = SimpleNamespace(
+        body=b"a\n1\nnot-a-number\n", url="u1", status=200, content_type="text/csv"
+    )
+
+    def get(url: str, params: Any, **_: Any) -> Any:
+        return bad_row
+
+    def parse(body: bytes) -> list[float]:
+        return [float(r["a"]) for r in tap.read_csv(body, ("a",))]
+
+    ctx: Any = SimpleNamespace(http=SimpleNamespace(get=get))
+    with pytest.raises(UpstreamError, match="not the expected CSV"):
+        tap.query_csv(ctx, [("u1", "t")], lambda t: t, ("a",), read_timeout_s=None, parse=parse)
+    # Without a parser only the header is checked (the old behaviour).
+    live = tap.query_csv(ctx, [("u1", "t")], lambda t: t, ("a",), read_timeout_s=None)
+    assert live.body == bad_row.body
 
 
 def test_gaia_parse_defaults_epoch_and_keeps_missing_motion() -> None:
@@ -421,6 +442,24 @@ def test_failed_catalogue_is_not_retried_at_once(
     service._failed.clear()  # the TTL has passed
     _overlays(slow_client, oid)
     assert calls.count("wise") == 2
+
+
+def test_unparsable_cached_catalogue_is_refused_not_500(
+    slow_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = overlays_mod.fetch_catalog
+
+    def broken(ctx: Any, cat: Any, cone: Any, **kw: Any) -> Any:
+        if cat == "gaia":
+            raise csv.Error("line contains NUL")
+        return real(ctx, cat, cone, **kw)
+
+    monkeypatch.setattr(overlays_mod, "fetch_catalog", broken)
+    oid = _oid(slow_client, "RW Aurigae")
+    body = _overlays(slow_client, oid)
+    assert body["missing"] == ["overlay:gaia"]
+    cats = {c["catalog"]: c for c in body["catalogs"]}
+    assert not cats["gaia"]["available"] and cats["wise"]["available"]
 
 
 def test_concurrent_requests_share_one_computation(

@@ -505,7 +505,9 @@ export const useAppStore = create<AppStore>()((set, get) => {
       const controller = new AbortController();
       overlaysAbort = controller;
       const { requestId } = sky;
-      setSky({ overlays: { ...sky.overlays, status: 'loading', data: null, error: null } });
+      // The previous reply stays drawn until the new one arrives, so retrying one catalogue does
+      // not hide the other layers while the backend waits (up to 75 s).
+      setSky({ overlays: { ...sky.overlays, status: 'loading', error: null } });
       try {
         const res = await skyApi.getOverlays(sky.resolved.id, controller.signal);
         if (!isCurrent(requestId)) return;

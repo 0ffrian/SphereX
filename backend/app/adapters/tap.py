@@ -53,9 +53,14 @@ def query_csv(
     columns: Sequence[str],
     *,
     read_timeout_s: float | None,
+    parse: Callable[[bytes], object] | None = None,
 ) -> LiveResponse:
     """Try each ``(url, table)`` mirror in order; the first valid CSV wins. ``build_adql`` maps
-    a table name to the ADQL text. The table used is stored in the meta as ``table``."""
+    a table name to the ADQL text. The table used is stored in the meta as ``table``.
+
+    ``parse`` is the adapter's full row parser. It runs on every row before the reply is
+    returned (and so cached): a body with one unparsable number is a failed call, never a cached
+    value that is refused on every later request. Without it only the header is checked."""
     errors: list[str] = []
     for i, (url, table) in enumerate(mirrors):
         params = {
@@ -72,8 +77,11 @@ def query_csv(
             errors.append(str(exc))
             continue
         try:
-            read_csv(resp.body, columns)
-        except (ValueError, UnicodeDecodeError) as exc:
+            if parse is None:
+                read_csv(resp.body, columns)
+            else:
+                parse(resp.body)
+        except (ValueError, KeyError, UnicodeDecodeError, csv.Error) as exc:
             errors.append(f"{url}: not the expected CSV ({exc})")
             continue
         extra = {"table": table, "adql": params["QUERY"]}

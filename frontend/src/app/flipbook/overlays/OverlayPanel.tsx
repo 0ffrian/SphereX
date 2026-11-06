@@ -17,6 +17,8 @@ import { provenanceOf, type OverlayView } from './model';
 import { ProvenanceBadge } from './ProvenanceBadge';
 import {
   CATALOG_LABEL,
+  catalogPending,
+  catalogPendingText,
   catalogUnavailableReason,
   contaminationLines,
   describeCatalog,
@@ -43,6 +45,11 @@ export function OverlayControls({ sky, view }: { sky: SkyState; view: OverlayVie
     return why ? [{ layer, why }] : [];
   });
   const reasonOf = (layer: OverlayLayer) => reasons.find((r) => r.layer === layer)?.why ?? null;
+  // A switched-on catalogue the backend was still fetching: enabled, with a "Try again" button.
+  const pending = view
+    ? (['gaia', 'wise'] as const).filter((c) => overlays.toggles[c] && catalogPending(view.data, c))
+    : [];
+  const loading = overlays.status === 'loading';
 
   return (
     <div className="flex flex-col gap-2" data-testid="overlay-controls">
@@ -79,7 +86,25 @@ export function OverlayControls({ sky, view }: { sky: SkyState; view: OverlayVie
           {why}
         </p>
       ))}
-      {overlays.status === 'loading' && <LoadingBox text="Loading overlays…" startedAt={null} />}
+      {pending.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2" data-testid="overlay-pending">
+          {pending.map((c) => (
+            <p key={c} className="text-sm text-neutral-300" data-testid="overlay-pending-line">
+              {catalogPendingText(c)}
+            </p>
+          ))}
+          <button
+            type="button"
+            className={buttonClass}
+            disabled={loading}
+            onClick={() => void reload()}
+            data-testid="overlay-retry"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+      {loading && <LoadingBox text="Loading overlays…" startedAt={null} />}
       {overlays.status === 'error' && overlays.error && (
         <ErrorBox
           message={overlaysErrorMessage(overlays.error)}

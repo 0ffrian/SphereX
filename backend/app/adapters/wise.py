@@ -106,6 +106,7 @@ def cone(
             adql,
             COLUMNS,
             read_timeout_s=ctx.settings.catalog_read_timeout_s,
+            parse=parse,
         )
 
     served = ctx.cache.fetch(key, live, refresh=refresh)

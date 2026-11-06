@@ -35,13 +35,31 @@ export function findCatalog(
   return data.catalogs.find((c) => c.catalog === name);
 }
 
-/** Why a catalogue's toggle is disabled, or null when it can be shown. */
+/**
+ * True while the backend is still fetching this catalogue (`overlay:<cat>:pending`). Not a refusal:
+ * the toggle stays enabled and the user can ask again.
+ */
+export function catalogPending(data: OverlaysResponse, name: OverlayCatalogName): boolean {
+  return data.missing.includes(`overlay:${name}:pending`);
+}
+
+/** The line next to "Try again" while a catalogue is still loading. */
+export function catalogPendingText(name: OverlayCatalogName): string {
+  return name === 'gaia'
+    ? 'Gaia stars are still loading from the archive. Try again in a minute.'
+    : 'WISE sources are still loading from the archive. Try again in a minute.';
+}
+
+/**
+ * Why a catalogue's toggle is disabled, or null when it can be switched. A catalogue that is
+ * still loading (`catalogPending`) is not disabled.
+ */
 export function catalogUnavailableReason(
   data: OverlaysResponse,
   name: OverlayCatalogName,
 ): string | null {
   const c = findCatalog(data, name);
-  if (c?.available) return null;
+  if (c?.available || catalogPending(data, name)) return null;
   return name === 'gaia'
     ? 'Gaia stars are not available for this object.'
     : 'WISE sources are not available for this object.';
@@ -56,7 +74,10 @@ export function formatMag(band: string, mag: number | null): string {
 export function describeCatalog(c: OverlayCatalog): string {
   const epoch = c.epoch === null ? 'epoch not stated' : `epoch ${c.epoch}`;
   const limit = c.mag_limit === null ? '' : `, ${c.mag_band} to ${c.mag_limit.toFixed(1)}`;
-  return `Table ${c.table}, ${epoch}${limit}`;
+  // An available catalogue with no rows near the object (CatWISE2020 at R Dra, Q-51) says so,
+  // so "0 sources" is not read as a fault.
+  const empty = c.sources.length === 0 ? '. The catalogue has no sources in this area.' : '';
+  return `Table ${c.table}, ${epoch}${limit}${empty}`;
 }
 
 const ZONE_TEXT: Readonly<Record<Contamination['zone'], string>> = {
@@ -110,4 +131,15 @@ export function combineWarning(aUm: number, bUm: number): string {
     return `Frames A and B are both at ${a}, so the result shows change over time, not spectral shape.`;
   }
   return `Frames are at different wavelengths (${a} and ${b}); the result mixes spectral shape with change over time.`;
+}
+
+const STRETCH_TEXT: Readonly<Record<string, string>> = {
+  asinh: 'Shown with an asinh brightness scale.',
+  asinh_symmetric: 'Shown with a symmetric asinh scale: mid-grey is zero, lighter is A brighter.',
+  linear: 'Shown with a linear brightness scale.',
+};
+
+/** The display stretch in words. An unknown kind is named as is, never hidden. */
+export function stretchText(kind: string): string {
+  return Object.hasOwn(STRETCH_TEXT, kind) ? STRETCH_TEXT[kind]! : `Display stretch: ${kind}.`;
 }

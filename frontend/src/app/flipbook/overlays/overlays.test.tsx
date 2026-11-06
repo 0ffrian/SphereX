@@ -1,21 +1,24 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApiClient } from '@/app/api/client';
 import type { Frame, OverlayFrame, OverlaysResponse } from '@/app/api/types';
 import {
   initialAppData,
   initialOverlaysState,
   initialSkyState,
   useAppStore,
+  setSkyApi,
   type SkyState,
 } from '@/state/store';
+import { fixtureFetch } from '@/test/fixtureFetch';
 import { CombinePanel } from './CombinePanel';
 import { FieldOfView, FOV_NO_FOOTPRINT } from './FieldOfView';
 import { markerPercent, niceScale, tangentPlane, toMap } from './geometry';
 import { MarkerLayer } from './MarkerLayer';
 import { overlayView } from './model';
 import { ContaminationNote, OverlayControls, OverlayDetails } from './OverlayPanel';
-import { combineWarning, contaminationLines } from './text';
+import { combineWarning, contaminationLines, describeCatalog } from './text';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -127,6 +130,14 @@ describe('overlay geometry', () => {
 });
 
 describe('overlay wording', () => {
+  it('an available catalogue with no rows says so', () => {
+    const wise = data.catalogs[1]!;
+    expect(describeCatalog({ ...wise, sources: [] })).toBe(
+      'Table wise_table, epoch not stated. The catalogue has no sources in this area.',
+    );
+    expect(describeCatalog(wise)).toBe('Table wise_table, epoch not stated');
+  });
+
   it('says what sits in the aperture and the annulus', () => {
     expect(contaminationLines(ovFrame.contamination, data)).toEqual([
       '1 Gaia star inside the photometry aperture (G 14.2, 1.8 px away)',
@@ -265,6 +276,67 @@ describe('overlay components', () => {
     expect(reason.textContent).toBe('Gaia stars are not available for this object.');
     expect(gaia.getAttribute('aria-describedby')).toBe(reason.id);
     expect((q('overlay-toggle-wise') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('a catalogue still loading stays enabled, and Try again reloads it through the button', async () => {
+    const fixtureApi = createApiClient({
+      fetchImpl: fixtureFetch,
+      createObjectUrl: () => 'blob:t',
+    });
+    setSkyApi(fixtureApi);
+    const flush = () => new Promise((r) => setTimeout(r, 0));
+    await act(() =>
+      useAppStore.getState().skySearch({ q: 'RW Aur', kind: 'name', origin: 'input' }),
+    );
+    const real = fixtureApi.getOverlays.bind(fixtureApi);
+    let pending = true;
+    const getOverlays = vi.spyOn(fixtureApi, 'getOverlays').mockImplementation(async (...args) => {
+      const res = await real(...args);
+      if (!pending) return res;
+      return {
+        ...res,
+        data: {
+          ...res.data,
+          catalogs: res.data.catalogs.map((c) =>
+            c.catalog === 'gaia' ? { ...c, available: false, sources: [] } : c,
+          ),
+          missing: [...res.data.missing, 'overlay:gaia:pending'],
+        },
+      };
+    });
+    const render = () => {
+      const s = useAppStore.getState().sky;
+      root.render(
+        <OverlayControls sky={s} view={overlayView(s.overlays, s.frames!.frames[0]!.frame_id)} />,
+      );
+    };
+    act(render);
+    await act(async () => {
+      q('overlay-toggle-gaia')!.click();
+      await flush();
+      await flush();
+    });
+    act(render);
+    const gaia = q('overlay-toggle-gaia') as HTMLButtonElement;
+    expect(gaia.disabled).toBe(false);
+    expect(gaia.getAttribute('aria-pressed')).toBe('true');
+    expect(q('overlay-reason')).toBeNull();
+    expect(q('overlay-pending-line')!.textContent).toBe(
+      'Gaia stars are still loading from the archive. Try again in a minute.',
+    );
+    expect(getOverlays).toHaveBeenCalledTimes(1);
+
+    pending = false;
+    await act(async () => {
+      q('overlay-retry')!.click();
+      await flush();
+      await flush();
+    });
+    act(render);
+    expect(getOverlays).toHaveBeenCalledTimes(2);
+    expect(q('overlay-pending')).toBeNull();
+    expect(useAppStore.getState().sky.overlays.toggles.gaia).toBe(true);
+    getOverlays.mockRestore();
   });
 
   it('shows the overlay error without breaking anything else', () => {
@@ -445,6 +517,10 @@ describe('overlay components', () => {
     expect(q('combine-warning')!.textContent).toMatch(/2\.250 µm and 0\.900 µm/);
     expect(q('combine-image')!.getAttribute('src')).toBe('blob:x');
     expect(q('badge-estimated')!.getAttribute('title')).toBe('A - B on A grid');
+    expect(q('combine-caption')!.textContent).toBe(
+      'Subtract (A − B), on frame A’s grid. Unit MJy/sr. Shown with a linear brightness scale.',
+    );
+    expect(q('combine-caption')!.textContent).not.toContain('{');
   });
 
   it('combine panel: Show is disabled for the same frame, with the reason', () => {
