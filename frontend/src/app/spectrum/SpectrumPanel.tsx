@@ -1,10 +1,18 @@
 // A1.1 P0 spectrum for the clicked object (UML 09, display level 2): loading and error states,
-// the provenance badge (D-02), the chart, refused items (`missing`) and a data table as the text
-// equivalent of the chart (R9). The light curve is parsed but not drawn in M1.
-import { useEffect, useRef } from 'react';
+// the provenance badge (D-02), the chart, refused items (`missing`, grouped by reason, A11) and a
+// data table as the text equivalent of the chart (R9). With no points, the panel says why (Q-26);
+// with some frames refused, it says which part of the frames' range the points cover. The light
+// curve is parsed but not drawn in M1.
+import { useEffect, useMemo, useRef } from 'react';
 import { DataBadge } from '@/app/Badge';
 import { formatCoords, formatNumber, formatUtc, formatWavelength } from '@/app/format';
-import { describeMissing, spectrumErrorMessage } from '@/app/messages';
+import {
+  spectrumCoverageMessage,
+  spectrumEmptyMessage,
+  spectrumErrorMessage,
+} from '@/app/messages';
+import { RefusalList } from '@/app/RefusalList';
+import { summarizeSpectrum } from '@/app/refusals';
 import { ErrorBox, LoadingBox } from '@/app/StatusBoxes';
 import { buttonClass } from '@/app/ui';
 import { useAppStore } from '@/state/store';
@@ -16,6 +24,11 @@ export function SpectrumPanel() {
   const seekFrame = useAppStore((s) => s.skySeekFrame);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const { status, data, error } = sky.spectrum;
+  const listed = sky.frames?.frames;
+  const outcome = useMemo(
+    () => (data ? summarizeSpectrum(data.spectrum, data.missing, listed) : null),
+    [data, listed],
+  );
 
   // Move focus to the panel when it opens, so keyboard and screen-reader users land on it.
   useEffect(() => {
@@ -48,39 +61,48 @@ export function SpectrumPanel() {
           onRetry={() => void loadSpectrum()}
         />
       )}
-      {status === 'ready' && data && (
+      {status === 'ready' && data && outcome && (
         <>
-          <p className="flex flex-wrap items-center gap-2 text-sm text-neutral-300">
-            <DataBadge fixture={sky.fixture} />
-            <span>
-              Flux per frame against wavelength, unit: {data.flux_unit}
-              {data.cached_at ? ` · Cached ${formatUtc(data.cached_at)}` : ''}
-            </span>
-          </p>
-          {/* Q-23: no aperture correction yet, so this is not absolute photometry. */}
-          <p className="text-sm text-neutral-300" data-testid="spectrum-caveat">
-            Not absolute photometry: no aperture correction is applied yet, so fluxes read low by an
-            amount that changes with wavelength.
-          </p>
-          {data.spectrum.length === 0 ? (
-            <p className="text-sm text-neutral-200" data-testid="no-spectrum">
-              No spectrum points for this object.
-            </p>
+          {outcome.points > 0 ? (
+            <>
+              <p className="flex flex-wrap items-center gap-2 text-sm text-neutral-300">
+                <DataBadge fixture={sky.fixture} />
+                <span>
+                  Flux per frame against wavelength, unit: {data.flux_unit}
+                  {data.cached_at ? ` · Cached ${formatUtc(data.cached_at)}` : ''}
+                </span>
+              </p>
+              {/* Q-23: no aperture correction yet, so this is not absolute photometry. */}
+              <p className="text-sm text-neutral-300" data-testid="spectrum-caveat">
+                Not absolute photometry: no aperture correction is applied yet, so fluxes read low
+                by an amount that changes with wavelength.
+              </p>
+              {outcome.refused > 0 && (
+                <p className="text-sm text-neutral-200" data-testid="spectrum-coverage">
+                  {spectrumCoverageMessage(outcome)}
+                </p>
+              )}
+              <SpectrumChart
+                points={data.spectrum}
+                fluxUnit={data.flux_unit}
+                objectName={name}
+                selectedFrameId={currentFrameId}
+                onSelectFrame={seekFrame}
+              />
+            </>
           ) : (
-            <SpectrumChart
-              points={data.spectrum}
-              fluxUnit={data.flux_unit}
-              objectName={name}
-              selectedFrameId={currentFrameId}
-              onSelectFrame={seekFrame}
-            />
-          )}
-          {data.missing.length > 0 && (
-            <ul className="list-disc pl-5 text-sm text-neutral-300">
-              {data.missing.map((code) => (
-                <li key={code}>{describeMissing(code)}</li>
-              ))}
-            </ul>
+            <>
+              {/* D-02: the frame checks are SPHEREx data too, so the badge stays. */}
+              <p className="flex flex-wrap items-center gap-2 text-sm text-neutral-300">
+                <DataBadge fixture={sky.fixture} />
+                <span>
+                  Frame checks{data.cached_at ? ` · Cached ${formatUtc(data.cached_at)}` : ''}
+                </span>
+              </p>
+              <p className="text-sm text-neutral-200" data-testid="no-spectrum">
+                {spectrumEmptyMessage(outcome)}
+              </p>
+            </>
           )}
           {data.spectrum.length > 0 && (
             <details className="text-sm">
@@ -145,6 +167,12 @@ export function SpectrumPanel() {
               </div>
             </details>
           )}
+          {/* After the data table, so the chart stays next to its text equivalent (R9). */}
+          <RefusalList
+            groups={outcome.groups}
+            lead="Frames not measured:"
+            testId="spectrum-missing"
+          />
         </>
       )}
     </section>
