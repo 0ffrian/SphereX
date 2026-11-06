@@ -50,7 +50,7 @@ sequenceDiagram
     R->>FW: Field (planets, gas giants) or points (nebula, nova), once per body
     R->>R: Build the new body first, then swap out the old one (never blank). Drop layers hidden by the honesty state (starts at + Estimated, D-21)
     R-->>V: Scene ready: drawn, missing, hidden, status, altText, field sampler
-    V->>V: Lighting (sun at phase angle or sun_dir, passed to the renderer as lightDir, or self-lit)
+    V->>V: Lighting (today: sun_dir or a default direction, computed once and passed to the renderer as lightDir; the phase angle and self-lit bodies arrive with the PR #29 rebase)
     V->>V: Set canvas aria-label from alt_text plus the artist's-impression note, show the status line
     R-->>V: onChange after a tag change or rebuild: request one render (D-05)
     V-->>U: Render body, tag chips in legend, scale bar
