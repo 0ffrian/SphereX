@@ -118,7 +118,7 @@ export class HeightMapSource implements HapticSource {
     readonly tag: Tag,
     options: HeightMapOptions = {},
   ) {
-    this.out = new OneShot(engine, tag);
+    this.out = new OneShot(engine, tag, 'texture');
     this.stats = new ReliefStats(grid.width, grid.height, (c, r) => grid.texel(c, r));
     const t = options.tauFraction;
     this.tauFraction = typeof t === 'number' && t > 0 ? t : HEIGHT_TAU_FRACTION;

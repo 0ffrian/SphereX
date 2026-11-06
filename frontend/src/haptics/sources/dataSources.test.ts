@@ -274,7 +274,7 @@ describe('mesh normals (R8.4): synthetic geometry', () => {
 describe('TrainSlot', () => {
   it('updates a running train when the pan moves, not on tiny changes', () => {
     const sink = new RecordingSink();
-    const slot = new TrainSlot(sink, 'x', 'artistic');
+    const slot = new TrainSlot(sink, 'x', 'artistic', 'data');
     slot.play(4, 0.5, -0.5);
     slot.play(4, 0.5, -0.48);
     expect(sink.trains.filter((t) => t.op === 'update')).toHaveLength(0);

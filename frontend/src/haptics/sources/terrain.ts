@@ -16,6 +16,8 @@ import {
   HEIGHT_TAU_FRACTION,
   ICE_TICK_SPACING_PX,
   MASK_THRESHOLD,
+  COAST_ENTER,
+  COAST_LEAVE,
   OCEAN_SWELL_HZ,
   PLAIN_TICK_STRENGTH,
   STRENGTH_FIRM,
@@ -23,9 +25,6 @@ import {
   STRENGTH_SOFT,
 } from '../tuning';
 
-/** Coastline hysteresis on open ocean = ocean · (1 − ice): enter at or above, leave at or below. Engineering. */
-export const COAST_ENTER = 0.6;
-export const COAST_LEAVE = 0.4;
 import { PeakDetector, ReliefStats } from './relief';
 import { OneShot, TrainSlot, type HapticSink, type HapticSource, type TouchSample } from './types';
 
@@ -73,8 +72,8 @@ export class TerrainSource implements HapticSource {
     readonly tag: Tag,
     options: TerrainOptions = {},
   ) {
-    this.out = new OneShot(engine, tag);
-    this.swell = new TrainSlot(engine, SWELL_TRAIN_ID, tag, 'surf');
+    this.out = new OneShot(engine, tag, 'texture');
+    this.swell = new TrainSlot(engine, SWELL_TRAIN_ID, tag, 'texture', 'surf');
     this.stats = terrainReliefStats(field);
     const t = options.tauFraction;
     this.tauFraction = typeof t === 'number' && t > 0 ? t : HEIGHT_TAU_FRACTION;

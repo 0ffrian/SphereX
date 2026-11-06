@@ -38,7 +38,7 @@ export class MeshNormalSource implements HapticSource {
     engine: HapticSink,
     readonly tag: Tag,
   ) {
-    this.out = new OneShot(engine, tag);
+    this.out = new OneShot(engine, tag, 'texture');
   }
 
   move(s: TouchSample): void {

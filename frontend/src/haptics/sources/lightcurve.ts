@@ -31,7 +31,7 @@ export class MiraHeartbeatSource implements HapticSource {
     private readonly card: ObjectCard,
     readonly tag: Tag,
   ) {
-    this.out = new OneShot(engine, tag);
+    this.out = new OneShot(engine, tag, 'data');
   }
 
   move(): void {}
@@ -60,7 +60,7 @@ export class TTauriDimmingSource implements HapticSource {
     private readonly card: ObjectCard,
     readonly tag: Tag,
   ) {
-    this.train = new TrainSlot(engine, DIMMING_TRAIN_ID, tag);
+    this.train = new TrainSlot(engine, DIMMING_TRAIN_ID, tag, 'data');
   }
 
   move(): void {}
