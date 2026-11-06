@@ -14,7 +14,8 @@ sequenceDiagram
   participant BK as Texture baker
   participant TC as Texture cache
   participant FW as Field worker
-  participant R as Renderer
+  participant PL as planRender (pure RenderPlan)
+  participant R as build.ts (three.js)
 
   alt type is candidate
     P-->>U: No button. "Not enough data for a 3D model: distance and albedo unknown"
@@ -48,11 +49,12 @@ sequenceDiagram
       V->>FW: Generate field from seed (once per body)
       FW-->>V: 512x256 field array
     end
-    V->>R: Create renderer for type
-    R->>R: Build body, drop layers hidden by the honesty state (starts at + Estimated, D-21)
+    V->>PL: setObject: planRender(card, params, context)
+    PL-->>V: RenderPlan (layers hidden by the honesty state dropped, starts at + Estimated, D-21; missing listed)
+    V->>R: showPlan(plan)
     R-->>V: Scene ready
     V->>V: Lighting (sun at phase angle, or self-lit)
-    V->>V: Set canvas aria-label from alt_text
+    V->>V: Set canvas aria-label from the plan (altText.ts; size with its tag, "at most" for an upper limit)
     V-->>U: Render body, tag chips in legend, scale bar
     V-->>U: List missing layers: "Not enough data for X"
   end
