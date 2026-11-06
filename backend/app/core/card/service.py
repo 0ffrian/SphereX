@@ -18,7 +18,7 @@ from typing import Any
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.core.card.assets import Asset, AssetStatus, AssetStore
 from app.core.card.build import build_card
-from app.core.card.catalogue import gather
+from app.core.card.catalogue import gather, with_geometry
 from app.core.card.validate import ContractViolation, check_card, check_params
 from app.core.classify import Classification, classify
 from app.core.find.frames import FrameService, is_complete
@@ -28,6 +28,9 @@ from app.core.render.card_to_params import GENERATOR_VERSION, card_to_params, se
 from app.timefmt import iso_utc_z, utc_now
 
 log = logging.getLogger("shift_spectrum")
+
+
+GEOMETRY_TYPES = frozenset({"comet", "asteroid_shape", "asteroid_procedural"})
 
 
 @dataclass(frozen=True)
@@ -72,6 +75,8 @@ class ObjectPipeline:
 
         data = gather(self.ctx, obj)
         cls = classify(data.facts)
+        if cls.type in GEOMETRY_TYPES:
+            data = with_geometry(self.ctx, data, obj)
         status: AssetStatus = "sketch" if cls.type == "candidate" else "generated"
         spectrum, spectrum_at = self._spectrum(obj)
         card = build_card(obj, data, cls, spectrum)
