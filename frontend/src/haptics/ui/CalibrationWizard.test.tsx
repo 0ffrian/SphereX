@@ -460,6 +460,57 @@ describe('CalibrationWizard (R8.7)', () => {
     expect(host.textContent).toContain('nothing changed');
   });
 
+  it('Cancel then Start begins a fresh run: nothing from the cancelled run is saved', async () => {
+    const { haptics, vib } = outputs();
+    render({ haptics, vibrate: vib.fn });
+    await click('Start');
+    await click('Play the three pulses');
+    await click('Second (10 ms)');
+    await click('Play the four buzzes');
+    await click('Yes, it was weaker');
+    await click('Cancel');
+    expect(live()).toBe('Calibration cancelled. Nothing was saved.');
+    await click('Start');
+    // The answers are locked again until the pulses play in this run.
+    expect(button('Second (10 ms)').disabled).toBe(true);
+    await click('Skip this step');
+    expect(button('Yes, it was weaker').disabled).toBe(true);
+    await click('Skip this step');
+    await click('Skip this step');
+    expect(loadCalibration()).toBeNull();
+    expect(host.textContent).toContain('Nothing was measured, so nothing changed.');
+    expect(host.textContent).toContain('Faintest pulse: 8 ms (kept)');
+  });
+
+  it('playing announces what to do next; a hint says the answers unlock after playing', async () => {
+    const { haptics, vib } = outputs();
+    render({ haptics, vibrate: vib.fn });
+    await click('Start');
+    expect(host.textContent).toContain('Play the pulses first; these buttons unlock then.');
+    await click('Play the three pulses');
+    expect(live()).toBe('Played. Now pick the faintest one you felt.');
+    expect(host.textContent).not.toContain('these buttons unlock then');
+    await click('First (5 ms)');
+    expect(host.textContent).toContain('Play the buzzes first; these buttons unlock then.');
+    await click('Play the four buzzes');
+    expect(live()).toBe('Played. Was the first buzz weaker than the second?');
+  });
+
+  it('a failed save is said in the status line', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+    const { haptics, vib } = outputs();
+    render({ haptics, vibrate: vib.fn });
+    await click('Start');
+    await click('Play the three pulses');
+    await click('First (5 ms)');
+    await click('Skip this step');
+    await click('Skip this step');
+    expect(live()).toBe('Could not save on this device; it applies until you close the page.');
+    expect(haptics.vibrate.levels[0]).toBe(5); // applied for this session
+  });
+
   it('every button is a real button with a text label and a 44 px target', async () => {
     const { haptics, vib } = outputs();
     render({ haptics, vibrate: vib.fn });

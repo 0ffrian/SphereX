@@ -15,6 +15,7 @@ import {
   type PointerEvent,
 } from 'react';
 import type { SpectrumResponse } from '@/app/api/types';
+import { ProvenanceBadge } from '@/app/Badge';
 import type { Tag } from '@/contract';
 import { HONESTY_LABEL, badgeForTag, isTagShown, type HonestyState } from '@/viewer/honesty';
 import type { HapticOutputs } from '../haptics';
@@ -31,7 +32,7 @@ export interface SpectrumHapticsPadProps {
   lambdaDomain?: readonly [number, number];
   /** Seed of the R8.3 jitter (M5 passes the card's seed). */
   seed?: number;
-  /** Synthetic fixture data: badged "Fixture", never "Measured" (as `DataBadge` in app/Badge). */
+  /** Synthetic fixture data: badged "Fixture (synthetic)", never "Measured" (app/Badge, Q-32). */
   fixture?: boolean;
   className?: string;
 }
@@ -48,13 +49,6 @@ interface Readout {
   lambdaUm: number;
   text: string;
 }
-
-const BADGE_CLASS: Record<ReturnType<typeof badgeForTag> | 'Fixture', string> = {
-  Measured: 'border-emerald-400 text-emerald-300',
-  Estimated: 'border-sky-400 text-sky-300',
-  Default: 'border-neutral-400 text-neutral-300',
-  Fixture: 'border-amber-400 text-amber-300',
-};
 
 /**
  * The readout and slider value text: λ, the flux as a share of the peak, "quiet" and
@@ -88,7 +82,10 @@ export function SpectrumHapticsPad({
   const cursorRef = useRef<SVGLineElement>(null);
   /** The pointer driving the drag (one finger, or the main mouse button); null when none. */
   const dragPointer = useRef<number | null>(null);
+  // The visible readout follows the finger (once per frame); the slider's ARIA value changes only
+  // when a drag ends or a key moves it, so a screen reader is not flooded during a drag.
   const [readout, setReadout] = useState<Readout | null>(null);
+  const [ariaReadout, setAriaReadout] = useState<Readout | null>(null);
   /** One readout update per animation frame while dragging. */
   const frame = useRef<number | null>(null);
 
@@ -168,26 +165,25 @@ export function SpectrumHapticsPad({
     c.setAttribute('visibility', 'visible');
   };
 
-  const showStep = () => {
+  /** Show the latest step; `aria` also moves the slider's value (drag end, keys). */
+  const showStep = (aria: boolean) => {
     const s = source.lastStep;
-    if (s) {
-      setReadout({
-        lambdaUm: s.lambdaUm,
-        text: describeStep(s, haptics.engine.honesty, spectrum.tag),
-      });
-    }
+    if (!s) return;
+    const r = { lambdaUm: s.lambdaUm, text: describeStep(s, haptics.engine.honesty, spectrum.tag) };
+    setReadout(r);
+    if (aria) setAriaReadout(r);
   };
 
   /** During a drag: at most one readout update per frame (no React work per pointermove). */
   const showStepSoon = () => {
     if (typeof requestAnimationFrame !== 'function') {
-      showStep();
+      showStep(false);
       return;
     }
     if (frame.current !== null) return;
     frame.current = requestAnimationFrame(() => {
       frame.current = null;
-      showStep();
+      showStep(false);
     });
   };
 
@@ -214,7 +210,7 @@ export function SpectrumHapticsPad({
     if (dragPointer.current === null || pointerOf(e) !== dragPointer.current) return;
     dragPointer.current = null;
     source.end();
-    showStep();
+    showStep(true);
   };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const k = e.key;
@@ -230,26 +226,21 @@ export function SpectrumHapticsPad({
     syncScale();
     if (move()) {
       moveCursor(source.cursorX);
-      showStep();
+      showStep(true);
     }
   };
 
   const quietY = VIEW_H * (1 - SPECTRUM_QUIET_THRESHOLD);
-  const badge = fixture ? 'Fixture' : badgeForTag(spectrum.tag);
+  const badge = badgeForTag(spectrum.tag);
+  const startText = `Start of the spectrum, ${l0.toFixed(2)} µm; no step yet`;
 
   return (
     <div className={className ?? 'flex flex-col gap-2'}>
       <p className="flex flex-wrap items-center gap-2 text-sm">
-        <span
-          className={`rounded border px-1.5 py-0.5 text-xs font-medium ${BADGE_CLASS[badge]}`}
-          title={
-            fixture
-              ? 'Synthetic fixture data for development, not a SPHEREx measurement'
-              : 'What you feel and hear here encodes the measured spectrum'
-          }
-          data-testid="pad-badge"
-        >
-          Data · {badge}
+        <span className="flex items-center gap-1.5" data-testid="pad-badge">
+          <span>Data ·</span> <ProvenanceBadge tag={spectrum.tag} fixture={fixture} />
+          {fixture && <span> (synthetic)</span>}
+          {!fixture && badge === 'Default' && <span> (artist&rsquo;s choice)</span>}
         </span>
         <span className="text-neutral-400">Spectrum: vibration and sound follow the flux</span>
       </p>
@@ -269,8 +260,8 @@ export function SpectrumHapticsPad({
         aria-orientation="horizontal"
         aria-valuemin={Number(l0.toFixed(2))}
         aria-valuemax={Number(l1.toFixed(2))}
-        aria-valuenow={readout ? Number(readout.lambdaUm.toFixed(2)) : Number(l0.toFixed(2))}
-        aria-valuetext={readout?.text ?? 'No step yet'}
+        aria-valuenow={Number((ariaReadout ? ariaReadout.lambdaUm : l0).toFixed(2))}
+        aria-valuetext={ariaReadout?.text ?? startText}
         className={
           'relative h-28 w-full cursor-crosshair touch-none rounded-md border border-neutral-500 ' +
           'bg-neutral-900 select-none focus-visible:outline-2 focus-visible:outline-offset-2 ' +
@@ -322,7 +313,9 @@ export function SpectrumHapticsPad({
         <span>dashed line: quiet below this</span>
         <span>{l1.toFixed(2)} µm</span>
       </div>
-      <p className="text-sm">{readout ? readout.text : 'No step yet.'}</p>
+      <p className="text-sm" aria-hidden="true">
+        {readout ? readout.text : `${startText}.`}
+      </p>
     </div>
   );
 }

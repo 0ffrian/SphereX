@@ -25,7 +25,7 @@ export interface HapticSettings {
 export interface HapticSettingsState extends HapticSettings {
   /** True once storage has been read. */
   loaded: boolean;
-  /** Change settings; values are clamped and saved. Loads first if needed. */
+  /** Change settings; values are clamped and saved (debounced, flushed when the page hides). Loads first if needed. */
   update(changes: Partial<HapticSettings>): void;
   /** Back to the platform defaults; clears the saved settings. */
   reset(): void;
@@ -87,6 +87,41 @@ function save(s: HapticSettings): void {
   }
 }
 
+/** Saves wait this long after the last change (a slider drag changes the settings 60 times a second). */
+export const SAVE_DEBOUNCE_MS = 200;
+let pendingSave: HapticSettings | null = null;
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let flushOnHideBound = false;
+
+/** Write a pending save now (also run when the page is hidden or unloaded). */
+export function flushHapticSettings(): void {
+  if (saveTimer !== null) clearTimeout(saveTimer);
+  saveTimer = null;
+  const s = pendingSave;
+  pendingSave = null;
+  if (s) save(s);
+}
+
+function cancelPendingSave(): void {
+  if (saveTimer !== null) clearTimeout(saveTimer);
+  saveTimer = null;
+  pendingSave = null;
+}
+
+function scheduleSave(s: HapticSettings): void {
+  pendingSave = s;
+  if (saveTimer !== null) clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushHapticSettings, SAVE_DEBOUNCE_MS);
+  if (!flushOnHideBound && typeof window !== 'undefined' && typeof document !== 'undefined') {
+    // Registered on the first change, never at import.
+    flushOnHideBound = true;
+    window.addEventListener('pagehide', flushHapticSettings);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) flushHapticSettings();
+    });
+  }
+}
+
 function pick(s: HapticSettings): HapticSettings {
   const { hapticsOn, soundOn, volume, strengthMultiplier, showChannelLabels } = s;
   return { hapticsOn, soundOn, volume, strengthMultiplier, showChannelLabels };
@@ -101,15 +136,17 @@ const INITIAL: HapticSettings = {
   showChannelLabels: true,
 };
 
-const store = createStore<HapticSettingsState>()((set, get) => ({
+const store = createStore<HapticSettingsState>()((set) => ({
   ...INITIAL,
   loaded: false,
   update(changes) {
-    const next = sanitizeSettings(changes, pick(get()));
+    // store.getState() (not `get`) loads storage first, so an early change cannot save over it.
+    const next = sanitizeSettings(changes, pick(store.getState()));
     set(next);
-    save(next);
+    scheduleSave(next);
   },
   reset() {
+    cancelPendingSave();
     try {
       storage()?.removeItem(SETTINGS_STORAGE_KEY);
     } catch {
@@ -166,5 +203,29 @@ export function applySettings(outputs: HapticOutputs, s: HapticSettings): void {
 export function bindEngine(outputs: HapticOutputs): () => void {
   ensureLoaded();
   applySettings(outputs, useHapticSettings.getState());
-  return useHapticSettings.subscribe((s) => applySettings(outputs, s));
+  const unsubscribe = useHapticSettings.subscribe((s) => applySettings(outputs, s));
+  const unbindPage = bindPageLifecycle(outputs);
+  return () => {
+    unsubscribe();
+    unbindPage();
+  };
+}
+
+/**
+ * Stop every train and sound when the page is hidden (another tab, the screen locked) or
+ * unloaded: a held train would otherwise keep sounding on throttled timers. `bindEngine` calls
+ * this. Returns the function that removes the listeners.
+ */
+export function bindPageLifecycle(outputs: Pick<HapticOutputs, 'engine'>): () => void {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return () => undefined;
+  const onVisibility = () => {
+    if (document.hidden) outputs.engine.stop();
+  };
+  const onPageHide = () => outputs.engine.stop();
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('pagehide', onPageHide);
+  return () => {
+    document.removeEventListener('visibilitychange', onVisibility);
+    window.removeEventListener('pagehide', onPageHide);
+  };
 }

@@ -2,13 +2,13 @@
 // saves them and, through `bindEngine`, applies them to the engine and drivers. Vibration on/off,
 // sound on/off, volume, the strength multiplier (0.5–1.5×) and the texture-vs-data labels toggle.
 // Native controls with visible labels; every target is at least 24 px (R9). "This device
-// vibrates" follows the R8.7 phone rule (`calibrationAvailable`: vibrate API, Android, touch
+// vibrates" follows the R8.7 phone rule (platform.ts `deviceVibrates`: vibrate API, Android, touch
 // screen), not the bare `navigator.vibrate`, which desktop Chrome also has.
 import { useEffect, useId, useState, type Ref } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { buttonClass } from '@/app/ui';
 import { calibrationAvailable } from '../calibration';
-import { platformEnv, type PlatformEnv } from '../platform';
+import { deviceVibrates, platformEnv, type PlatformEnv } from '../platform';
 import { ensureLoaded, useHapticSettings } from '../settings';
 import { STRENGTH_MULTIPLIER_MAX, STRENGTH_MULTIPLIER_MIN } from '../tuning';
 
@@ -25,6 +25,7 @@ export interface HapticsSettingsProps {
 }
 
 const rowClass = 'flex min-h-11 items-center gap-3';
+const NBSP = '\u00a0';
 const checkClass = 'size-6 shrink-0 accent-sky-400';
 const rangeClass = 'h-6 w-full max-w-xs accent-sky-400';
 
@@ -36,7 +37,9 @@ export function HapticsSettings({
   className,
 }: HapticsSettingsProps) {
   const [browserEnv] = useState<PlatformEnv>(platformEnv);
-  const vibrates = calibrationAvailable(canVibrate, platform ?? browserEnv);
+  const env = platform ?? browserEnv;
+  const vibrates = deviceVibrates(canVibrate, env);
+  const canCalibrate = calibrationAvailable(canVibrate, env);
   const s = useHapticSettings(
     useShallow((st) => ({
       hapticsOn: st.hapticsOn,
@@ -49,7 +52,13 @@ export function HapticsSettings({
     })),
   );
   const id = useId();
-  const [status, setStatus] = useState('');
+  // The reset confirmation: cleared by any later change; a repeat alternates a no-break space so
+  // it is announced again.
+  const [status, setStatus] = useState({ text: '', seq: 0 });
+  const update: typeof s.update = (changes) => {
+    setStatus((st) => (st.text ? { text: '', seq: st.seq } : st));
+    s.update(changes);
+  };
 
   // Read the saved settings once the panel is shown (never at import).
   useEffect(() => ensureLoaded(), []);
@@ -65,7 +74,7 @@ export function HapticsSettings({
           type="checkbox"
           className={checkClass}
           checked={s.hapticsOn}
-          onChange={(e) => s.update({ hapticsOn: e.target.checked })}
+          onChange={(e) => update({ hapticsOn: e.target.checked })}
           aria-describedby={vibrates ? undefined : `${id}-novib`}
         />
         Vibration
@@ -83,7 +92,7 @@ export function HapticsSettings({
           type="checkbox"
           className={checkClass}
           checked={s.soundOn}
-          onChange={(e) => s.update({ soundOn: e.target.checked })}
+          onChange={(e) => update({ soundOn: e.target.checked })}
         />
         Sound
       </label>
@@ -100,7 +109,7 @@ export function HapticsSettings({
           value={s.volume}
           aria-valuetext={`${Math.round(s.volume * 100)}%`}
           disabled={!s.soundOn}
-          onChange={(e) => s.update({ volume: Number(e.target.value) })}
+          onChange={(e) => update({ volume: Number(e.target.value) })}
         />
       </label>
 
@@ -117,7 +126,7 @@ export function HapticsSettings({
           step={0.05}
           value={s.strengthMultiplier}
           aria-valuetext={`${s.strengthMultiplier.toFixed(2)} times${normal ? ', normal' : ''}`}
-          onChange={(e) => s.update({ strengthMultiplier: Number(e.target.value) })}
+          onChange={(e) => update({ strengthMultiplier: Number(e.target.value) })}
         />
       </label>
 
@@ -126,13 +135,13 @@ export function HapticsSettings({
           type="checkbox"
           className={checkClass}
           checked={s.showChannelLabels}
-          onChange={(e) => s.update({ showChannelLabels: e.target.checked })}
+          onChange={(e) => update({ showChannelLabels: e.target.checked })}
         />
         Label what you feel as surface texture or data
       </label>
 
       <div className="flex flex-wrap gap-2">
-        {onCalibrate && vibrates && (
+        {onCalibrate && canCalibrate && (
           <button
             ref={calibrateButtonRef}
             type="button"
@@ -147,14 +156,18 @@ export function HapticsSettings({
           className={buttonClass}
           onClick={() => {
             s.reset();
-            setStatus("Settings reset to this device's defaults.");
+            setStatus((st) => ({
+              text: "Settings reset to this device's defaults.",
+              seq: st.seq + 1,
+            }));
           }}
         >
           Reset to defaults
         </button>
       </div>
       <p role="status" className="text-sm text-neutral-300">
-        {status}
+        {status.text}
+        {status.seq % 2 === 1 && status.text ? NBSP : ''}
       </p>
     </fieldset>
   );

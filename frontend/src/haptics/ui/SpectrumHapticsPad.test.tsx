@@ -212,7 +212,16 @@ describe('SpectrumHapticsPad (R8.6)', () => {
     for (let x = 1; x <= 40; x++) pointer('pointermove', x);
     expect(frames).toHaveLength(1); // several steps, one frame
     act(() => frames.shift()!(0));
+    // The visible readout follows the finger …
+    expect(host.textContent).toContain('1.20 µm, 100% of peak flux');
+    // … but the slider's ARIA value waits for the end of the drag (no screen-reader chatter).
+    expect(pad().getAttribute('aria-valuetext')).toBe(
+      'Start of the spectrum, 1.00 µm; no step yet',
+    );
+    expect(pad().getAttribute('aria-valuenow')).toBe('1');
+    pointer('pointerup', 40);
     expect(pad().getAttribute('aria-valuetext')).toMatch(/^1\.20 µm, 100% of peak flux/);
+    expect(pad().getAttribute('aria-valuenow')).toBe('1.2');
     vi.unstubAllGlobals();
   });
 
@@ -237,14 +246,31 @@ describe('SpectrumHapticsPad (R8.6)', () => {
     );
   });
 
-  it('a quiet dip is not reported as hidden', () => {
+  it('a quiet dip is not reported as hidden, even when the tag is hidden', () => {
     haptics.engine.setHonesty('measured');
-    render();
+    act(() =>
+      root.render(
+        <SpectrumHapticsPad
+          haptics={haptics}
+          spectrum={{ spectrum: spectrum(), tag: 'derived' }}
+          objectName="Test star"
+        />,
+      ),
+    );
     pad().focus();
     key('Home');
     for (let i = 0; i < 50; i++) key('ArrowRight');
     expect(pad().getAttribute('aria-valuetext')).toMatch(/quiet/);
     expect(pad().getAttribute('aria-valuetext')).not.toMatch(/hidden/);
+  });
+
+  it('a tick dropped by the rate cap is not labelled hidden', () => {
+    render(); // default honesty: + Estimated
+    pad().focus();
+    key('ArrowRight');
+    key('ArrowRight'); // same clock time: under 25 ms, the engine drops it
+    expect(driver.events).toHaveLength(1);
+    expect(pad().getAttribute('aria-valuetext')).toBe('1.04 µm, 100% of peak flux');
   });
 
   it('fixture data is badged Fixture, never Measured', () => {
@@ -258,7 +284,9 @@ describe('SpectrumHapticsPad (R8.6)', () => {
         />,
       ),
     );
-    expect(host.querySelector('[data-testid="pad-badge"]')!.textContent).toBe('Data · Fixture');
+    expect(host.querySelector('[data-testid="pad-badge"]')!.textContent).toBe(
+      'Data · Fixture (synthetic)',
+    );
   });
 
   it('refuses an empty spectrum with a sentence instead of a pad', () => {

@@ -104,7 +104,13 @@ export class SpectrumHapticSource {
     noisy: false,
     pitch: 0,
   };
-  private readonly event: HapticEvent = { kind: 'tick', strength: 0, tag: 'measured' };
+  // R8.2, Q-85: a spectrum tick is a data haptic; the pulse indicator labels it "Data".
+  private readonly event: HapticEvent = {
+    kind: 'tick',
+    strength: 0,
+    tag: 'measured',
+    channel: 'data',
+  };
   private readonly step: SpectrumStep = {
     x: 0,
     lambdaUm: 0,

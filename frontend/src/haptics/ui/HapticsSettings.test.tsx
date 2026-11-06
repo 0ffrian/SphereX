@@ -3,7 +3,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SETTINGS_STORAGE_KEY, defaultSettings, useHapticSettings } from '../settings';
+import {
+  SETTINGS_STORAGE_KEY,
+  defaultSettings,
+  flushHapticSettings,
+  useHapticSettings,
+} from '../settings';
 import { HapticsSettings } from './HapticsSettings';
 
 declare global {
@@ -44,8 +49,11 @@ describe('HapticsSettings (R8.7)', () => {
     if (!l) throw new Error(`no label ${label}`);
     return l.querySelector('input')!;
   };
-  const saved = () =>
-    JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!) as Record<string, unknown>;
+  // Saves are debounced (settings.ts SAVE_DEBOUNCE_MS); flush before reading storage.
+  const saved = () => {
+    flushHapticSettings();
+    return JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!) as Record<string, unknown>;
+  };
 
   it('each control updates and saves the settings', () => {
     act(() => root.render(<HapticsSettings canVibrate />));
@@ -90,6 +98,8 @@ describe('HapticsSettings (R8.7)', () => {
       root.render(<HapticsSettings canVibrate onCalibrate={onCalibrate} platform={desktop} />),
     );
     expect(host.textContent).not.toContain('Calibrate vibration');
+    // Desktop Chrome has navigator.vibrate, but it does not vibrate: say so.
+    expect(host.textContent).toContain('This device cannot vibrate');
     const phone = { android: true, coarsePointer: true };
     act(() =>
       root.render(<HapticsSettings canVibrate onCalibrate={onCalibrate} platform={phone} />),
@@ -104,14 +114,22 @@ describe('HapticsSettings (R8.7)', () => {
   it('reset clears the saved settings', () => {
     act(() => root.render(<HapticsSettings canVibrate />));
     act(() => setRange(input(/^Volume/), '0.2'));
+    flushHapticSettings();
     expect(localStorage.getItem(SETTINGS_STORAGE_KEY)).not.toBeNull();
     const reset = [...host.querySelectorAll('button')].find(
       (el) => el.textContent === 'Reset to defaults',
     )!;
+    const status = () => host.querySelector('[role="status"]')!.textContent!;
     act(() => reset.click());
     expect(localStorage.getItem(SETTINGS_STORAGE_KEY)).toBeNull();
-    expect(host.querySelector('[role="status"]')!.textContent).toBe(
-      "Settings reset to this device's defaults.",
-    );
+    expect(status().trim()).toBe("Settings reset to this device's defaults.");
+    const first = status();
+    // A second reset changes the live text, so it is announced again.
+    act(() => reset.click());
+    expect(status()).not.toBe(first);
+    expect(status().trim()).toBe("Settings reset to this device's defaults.");
+    // Any later change clears the confirmation.
+    act(() => setRange(input(/^Volume/), '0.4'));
+    expect(status().trim()).toBe('');
   });
 });
