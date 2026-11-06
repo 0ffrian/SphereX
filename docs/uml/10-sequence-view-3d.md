@@ -14,7 +14,8 @@ sequenceDiagram
   participant BK as Texture baker
   participant TC as Texture cache
   participant FW as Field worker
-  participant R as Renderer
+  participant PL as planRender (pure RenderPlan)
+  participant R as build.ts (three.js)
 
   alt type is candidate
     P-->>U: No button. "Not enough data for a 3D model: distance and albedo unknown"
@@ -46,13 +47,14 @@ sequenceDiagram
     else shader kind (planet_rocky, planet_water, gas_giant, nebula, nova)
       API-->>V: RenderParams without textures
     end
-    V->>R: setBody(card, params, ctx{visibleTags, lightDir, onChange}): create renderer for type
-    R->>FW: Field (planets, gas giants) or points (nebula, nova), once per body
-    R->>R: Build the new body first, then swap out the old one (never blank). Drop layers hidden by the honesty state (starts at + Estimated, D-21)
-    R-->>V: Scene ready: drawn, missing, hidden, status, altText, field sampler
-    V->>V: Lighting (today: sun_dir or a default direction, computed once and passed to the renderer as lightDir; the phase angle and self-lit bodies arrive with the PR #29 rebase)
-    V->>V: Set canvas aria-label from alt_text plus the artist's-impression note, show the status line
-    R-->>V: onChange after a tag change or rebuild: request one render (D-05)
+    V->>PL: setObject: planRender(card, params, context)
+    PL-->>V: RenderPlan (layers hidden by the honesty state dropped, starts at + Estimated, D-21; missing listed; shader kinds: plan.shader with surface and plain-sphere flags, Q-45)
+    V->>R: showPlan(plan): buildScene (a shader kind gets a ShaderBody from plan.shader, tags from allowedTags(plan.honesty), light from planLighting)
+    R->>FW: Field (planets, gas giants) or points (nebula, nova), once per body; the plain sphere shows until it arrives (never blank)
+    R-->>V: Scene ready (onChange requests one render, D-05)
+    V->>V: Lighting from planLighting (sun at phase angle, sun_dir or head-on, or self-lit); the same direction goes to the scene sun and the body
+    V->>V: Set canvas aria-label from the plan (altText.ts; size with its tag, "at most" for an upper limit; a shader kind adds the artist's-impression note)
+    V->>V: Honesty change with the same sceneKey: BuiltScene.update(plan) sets the tags and light in place, no field is regenerated
     V-->>U: Render body, tag chips in legend, scale bar
     V-->>U: List missing layers: "Not enough data for X"
   end

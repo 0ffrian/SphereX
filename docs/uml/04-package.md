@@ -15,18 +15,18 @@ flowchart TB
     subgraph Backend["backend/ (FastAPI, Python 3.12) : Kevin, Moon, Atish"]
       BApi["app/api (Kevin) : D-16 endpoints; objects.py : /card, /render-params, texture URLs"]
       BPipe["app/core/find (stage 1), app/adapters, app/cache : Kevin; app/core/measure (stage 2) and physics : Moon; stage 3 : Atish"]
-      BRender["app/core/render (Atish) : card_to_params, noise, craters, height, normals, palette, bake, spherex_rgb, gemini_paint"]
+      BRender["app/core/render (Atish) : card_to_params, params, noise, craters, height, normals, palette, bake, __main__, spherex_rgb, gemini_paint"]
       BContract["app/contract : generated from shared/schemas (D-18) : follows the schemas owner"]
     end
 
     subgraph Frontend["frontend/ (Vite + TS + React) : owners per package"]
-      FApp["src/app (React shell: App, ViewerPanel, StatusLine, FixtureBanner, LiveAnnouncer, Badge, StatusBoxes, urlHash + useHashSync, format, messages, ui), src/state (Zustand store with the sky slice) : Moon"]
+      FApp["src/app (React shell: App, ViewerPanel, StatusLine, FixtureBanner, LiveAnnouncer, Badge, StatusBoxes, urlHash + useHashSync, format, messages, refusals, RefusalList, ui), src/state (Zustand store with the sky slice) : Moon"]
       FFlip["src/app/api (M1 client, D-16), src/app/search, src/app/flipbook (with Rainbow Trails, D-28), src/app/spectrum : Moon"]
       FDev["fixtures/ (dev-only synthetic fixture server), scripts/ (check-dist), src/test (test helpers), src/fixtures.test.ts, e2e/ (Playwright) : dev and test only"]
       FContract["src/contract : generated from shared/schemas (D-18), assertTagged next to it : follows the schemas owner"]
       subgraph FViewer["src/viewer (Moon)"]
         VCore["ViewerApp, lighting, modes, honesty, scaleBar, altText"]
-        VRend["renderers/ : AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody [verify], bodyRenderer + registry, shaderSpec, shaderPalette, pointClouds; sliders.ts"]
+        VRend["renderers/ : AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody [verify], bodyRenderer, shaderPlan, shaderSpec, shaderPalette, pointClouds; sliders.ts"]
         VFields["fields/ : fieldGenerator, noise, fieldWorker, fieldClient (D-12) : Atish (D-17); shader generators (D-01) : Moon [verify path]"]
       end
       subgraph FHaptics["src/haptics : Atish (D-13, D-17)"]

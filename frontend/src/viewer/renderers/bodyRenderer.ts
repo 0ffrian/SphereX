@@ -1,9 +1,9 @@
-// Renderer registry contract: one BodyRenderer per displayed object, picked by ObjectType.
-// ASSUMPTION: not in the specs. It is the smallest hook that lets ViewerApp.setBody pick a renderer
-// per type, so the baked types (issue #7) can register next to the shader kinds without editing
-// ViewerApp again. Types here are plain data; no three.js renderer is needed to build one.
+// Contract of a generated body (the shader kinds, D-01). The plan (`shaderPlan.ts`) decides what is
+// shown; `buildScene` makes the body from the plan; the viewer keeps it across plans that change
+// only the honesty state or the light. Types here are plain data; no GPU is needed to import them.
 import type { Object3D } from 'three/webgpu';
-import type { ObjectCard, ObjectType, RenderParams, Tag } from '@/contract';
+import type { Tag } from '@/contract';
+import { allowedTags, DEFAULT_HONESTY } from '../honesty';
 import type { Overrides } from '../sliders';
 import type { FieldData, FieldParams, FieldSampler, Vec3 } from '../fields/fieldGenerator';
 import type { PointKind, PointSet, PointSets } from './pointClouds';
@@ -18,15 +18,10 @@ export const ALL_TAGS: readonly Tag[] = [
 
 /**
  * D-21 "+ Estimated", the starting state: `measured` plus everything `derived`, `model_dependent`
- * or `inferred_from_analog`. `artistic` is NOT in it. ASSUMPTION: a local constant until the
- * honesty model of PR #29 (`allowedTags(DEFAULT_HONESTY)`) is on main; swap it for that then.
+ * or `inferred_from_analog`. `artistic` is NOT in it. The same set as the honesty model's
+ * `allowedTags(DEFAULT_HONESTY)` (honesty.ts), which the plan passes in.
  */
-export const ESTIMATED_TAGS: readonly Tag[] = [
-  'measured',
-  'derived',
-  'model_dependent',
-  'inferred_from_analog',
-];
+export const ESTIMATED_TAGS: readonly Tag[] = allowedTags(DEFAULT_HONESTY);
 
 /** What the panel can say about the body in plain words (R5.3, A11). */
 export interface BodyStatus {
@@ -41,13 +36,15 @@ export interface BodyContext {
   /**
    * Tags the honesty toggle currently shows (D-21). Layers whose tag is not listed are hidden, not
    * refused. Default: `ESTIMATED_TAGS` (the D-21 starting state), so `artistic` surfaces are
-   * hidden unless the caller asks for them. ASSUMPTION: the honesty toggle itself is issue #7's.
+   * hidden unless the caller asks for them. The viewer passes `allowedTags(plan.honesty)`.
    */
   visibleTags?: readonly Tag[];
   /** Unit vector toward the light, in world space. The viewer owns lighting; the body only uses it. */
   lightDir?: Vec3;
   /** Called after anything visible changed (tags, rebuild), so a render-on-change viewer redraws. */
   onChange?: () => void;
+  /** The generated layer could not be built (the field failed): the plan refuses it with reason `load`. */
+  onFailed?: (layerId: string) => void;
   /** Replaces the point-cloud Web Worker call (tests). Default: `requestPoints`. */
   pointSource?: (type: PointKind, seed: number) => Promise<PointSets>;
   /** D-27 slider overrides (relief sliders live on the shader kinds, D-26). */
@@ -85,26 +82,4 @@ export interface BodyRenderer {
   /** D-27. Rebuilds what the changed sliders affect; resolves when drawn. */
   setOverrides(overrides: Overrides): Promise<void>;
   dispose(): void;
-}
-
-export type BodyFactory = (
-  card: ObjectCard,
-  params: RenderParams,
-  ctx: BodyContext,
-) => Promise<BodyRenderer>;
-
-const factories = new Map<ObjectType, BodyFactory>();
-
-export function registerBodyRenderer(types: readonly ObjectType[], factory: BodyFactory): void {
-  for (const t of types) factories.set(t, factory);
-}
-
-/** Null when no renderer is registered for the type (ViewerApp then keeps its placeholder). */
-export function createBodyRenderer(
-  card: ObjectCard,
-  params: RenderParams,
-  ctx: BodyContext = {},
-): Promise<BodyRenderer> | null {
-  const factory = factories.get(params.type);
-  return factory ? factory(card, params, ctx) : null;
 }

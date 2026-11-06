@@ -9,7 +9,9 @@ import { createApiClient, type ApiClient } from '@/app/api/client';
 import { isApiError, type ApiErrorKind } from '@/app/api/errors';
 import type { FramesResponse, ResolveResponse, SpectrumResponse } from '@/app/api/types';
 import { clampIndex, DEFAULT_FPS, nextIndex, type Fps } from '@/app/flipbook/playback';
-import { formatUtc, formatWavelength } from '@/app/format';
+import { formatCoords, formatUtc, formatWavelength } from '@/app/format';
+import { spectrumAnnouncement } from '@/app/messages';
+import { summarizeSpectrum } from '@/app/refusals';
 
 /**
  * Honesty toggle (D-21, R5.3): Measured only, + Estimated, + Artistic. The value names the most
@@ -130,8 +132,11 @@ export function describeFrame(frames: FramesResponse, index: number): string {
   return `Frame ${index + 1} of ${frames.frames.length}, ${formatWavelength(f.wavelength_um)}, ${formatUtc(f.time)}`;
 }
 
-function objectLabel(sky: SkyState): string {
-  return sky.resolved?.name ?? sky.query?.q ?? 'this object';
+/** The name the panels show: the resolved name, else the coordinates, else the query. */
+function displayName(sky: SkyState): string {
+  const r = sky.resolved;
+  if (r) return r.name ?? formatCoords(r.ra, r.dec);
+  return sky.query?.q ?? 'this object';
 }
 
 // ---- Store -------------------------------------------------------------------------------------
@@ -140,8 +145,8 @@ export interface AppData {
   card: ObjectCard | null;
   params: RenderParams | null;
   /**
-   * D-21 sets the starting state to + Estimated; wiring that default is a follow-up (M2), so
-   * this is still `null` here. Code must not treat `null` as any of the three states.
+   * D-21 (answers Q-08): the toggle starts at + Estimated (`derived`). The type still allows
+   * `null`; the viewer reads it through `effectiveHonesty()`, which maps `null` to the same default.
    */
   honesty: HonestyState | null;
   overrides: Overrides;
@@ -186,7 +191,7 @@ export type AppStore = AppData & AppActions;
 export const initialAppData: AppData = {
   card: null,
   params: null,
-  honesty: null,
+  honesty: 'derived',
   overrides: {},
   rendererStatus: 'starting',
   sky: initialSkyState,
@@ -281,21 +286,20 @@ export const useAppStore = create<AppStore>()((set, get) => {
       const id = sky.resolved.id;
       setSky({
         spectrum: { status: 'loading', data: null, error: null },
-        announcement: `Loading the spectrum of ${objectLabel(sky)}.`,
+        announcement: `Loading the spectrum of ${displayName(sky)}.`,
       });
       try {
         const res = await skyApi.spectrum(id, controller.signal);
         if (!isCurrent(requestId)) return;
-        const points = res.data.spectrum;
-        const flagged = points.filter((p) => p.flagged).length;
+        const now = get().sky;
+        const outcome = summarizeSpectrum(res.data.spectrum, res.data.missing, now.frames?.frames);
+        // Same display name as the panel heading and the loading announcement.
+        const name = displayName(now);
         setSky({
           fixture: get().sky.fixture || res.fixture !== null,
           fixtureSeen: get().sky.fixtureSeen || res.fixture !== null,
           spectrum: { status: 'ready', data: res.data, error: null },
-          announcement:
-            points.length === 0
-              ? 'No spectrum points for this object.'
-              : `Spectrum loaded: ${points.length} points, ${flagged} flagged.`,
+          announcement: spectrumAnnouncement(outcome, name),
         });
       } catch (e) {
         if (!isCurrent(requestId) || isAborted(e)) return;

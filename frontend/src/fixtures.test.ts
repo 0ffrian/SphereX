@@ -37,10 +37,60 @@ describe('synthetic fixtures', () => {
     expect(frames.frames.length).toBeGreaterThan(1);
     expect(frames.data_release).toBe(FIXTURE_DATA_RELEASE);
     expect(frames.north_up).toBe(false);
-    expect(spectrum.spectrum).toHaveLength(frames.frames.length);
-    expect(spectrum.spectrum.some((p) => p.flagged)).toBe(true);
     expect(spectrum.flux_unit).toMatch(/synthetic/);
+    // Like the backend (A4.2): every listed frame is either a point or a `<reason>:<id>` refusal.
+    const points = new Set(spectrum.spectrum.map((p) => p.frame_id));
+    for (const f of frames.frames) {
+      const refusals = spectrum.missing.filter((m) => m.endsWith(`:${f.frame_id}`));
+      expect(Number(points.has(f.frame_id)) + refusals.length, f.frame_id).toBe(1);
+    }
+    // Stage 1's own refusals are passed through.
+    for (const m of frames.missing) expect(spectrum.missing).toContain(m);
+    expect(spectrum.light_curve.map((p) => p.frame_id)).toEqual(
+      spectrum.spectrum.map((p) => p.frame_id),
+    );
     for (const f of frames.frames) expect(f.time.endsWith('Z')).toBe(true);
+  });
+
+  // Shapes mirror the 6 Nov full-cache run against the real backend (numbers are synthetic).
+  it.each([
+    ['barnards-star', 0, 0, { saturated: 23, aperture_flags: 1 }],
+    ['eps-indi-b', 22, 3, { aperture_flags: 2 }],
+    ['wise-0855', 22, 3, { aperture_flags: 2 }],
+    ['rw-aur', 4, 0, { saturated: 18, aperture_flags: 1, aperture_edge: 1 }],
+    ['r-dra', 0, 0, { saturated: 21, aperture_edge: 2, cutout: 1, outside_cutout: 1 }],
+  ] as const)('%s spectrum: %i points, %i flagged, refusals %o', (id, n, flagged, refusals) => {
+    const spectrum = parseSpectrum(json(`/v1/objects/${id}/spectrum`).data);
+    expect(spectrum.spectrum).toHaveLength(n);
+    expect(spectrum.spectrum.filter((p) => p.flagged)).toHaveLength(flagged);
+    const counts: Record<string, number> = {};
+    for (const m of spectrum.missing) {
+      const reason = m.slice(0, m.indexOf(':'));
+      counts[reason] = (counts[reason] ?? 0) + 1;
+    }
+    expect(counts).toEqual(refusals);
+    // Not every listed frame is saturated in any of them, so no `spectrum:saturated`.
+    expect(spectrum.missing).not.toContain('spectrum:saturated');
+  });
+
+  it('R Draconis frames list a Stage 1 refusal of an unlisted frame', () => {
+    const frames = parseFrames(json('/v1/objects/r-dra/frames').data);
+    expect(frames.frames).toHaveLength(24);
+    expect(frames.missing).toEqual(['cutout:r-dra-f005', 'outside_cutout:r-dra-f024']);
+  });
+
+  it('RW Aurigae keeps only short-wavelength points', () => {
+    const spectrum = parseSpectrum(json('/v1/objects/rw-aur/spectrum').data);
+    expect(Math.max(...spectrum.spectrum.map((p) => p.wavelength_um))).toBeLessThan(1.5);
+  });
+
+  it('adds spectrum:saturated exactly when every listed frame is saturated (backend rule)', () => {
+    const base = FIXTURE_TARGETS.find((t) => t.id === 'barnards-star')!;
+    const allSat = makeSpectrum({ ...base, id: 'all-saturated', spectrumShape: { measured: [] } });
+    expect(allSat.spectrum).toEqual([]);
+    expect(allSat.light_curve).toEqual([]);
+    expect(allSat.missing).toContain('spectrum:saturated');
+    expect(allSat.missing.filter((m) => m.startsWith('saturated:'))).toHaveLength(24);
   });
 
   it('the mover is on a north-up grid with per-frame positions', () => {

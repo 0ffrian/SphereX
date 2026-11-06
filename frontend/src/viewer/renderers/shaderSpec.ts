@@ -28,6 +28,28 @@ export const SHADER_KINDS = [
 ] as const satisfies readonly ObjectType[];
 export type ShaderKind = (typeof SHADER_KINDS)[number];
 
+/** Planets and gas giants keep a plain sphere when the surface is hidden; nebulae and novae do not. */
+export function kindHasPlainSphere(kind: ShaderKind): boolean {
+  return kind !== 'nebula' && kind !== 'nova';
+}
+
+/** The card field that holds the body's size (Q-33): the radius of a world, the extent of a cloud. */
+export function sizeFieldFor(kind: ShaderKind): 'radius_rjup' | 'diameter_km' {
+  return kindHasPlainSphere(kind) ? 'radius_rjup' : 'diameter_km';
+}
+
+// ASSUMPTION: camera distances frame each body; mock-up used 4.4 (worlds), 7.2 (gas), 5.4 / 5.
+const DISTANCE = { world: 4, gasNoRings: 4, gasRings: 7.2, nebula: 5.4, nova: 5 } as const;
+
+/** Camera distance that frames the body (display value). */
+export function shaderDistance(spec: Pick<ShaderSpec, 'kind' | 'gas'>): number {
+  if (spec.kind === 'nebula') return DISTANCE.nebula;
+  if (spec.kind === 'nova') return DISTANCE.nova;
+  if (spec.kind === 'gas_giant')
+    return (spec.gas?.rings ?? 0) > 0.01 ? DISTANCE.gasRings : DISTANCE.gasNoRings;
+  return DISTANCE.world;
+}
+
 export function isShaderKind(t: ObjectType): t is ShaderKind {
   return (SHADER_KINDS as readonly string[]).includes(t);
 }
@@ -106,7 +128,8 @@ export function resolveShaderSpec(
   const missing = new Set(params.missing);
 
   const layer = params.layers.find((l) => l.id === layerId);
-  let drawable = layer !== undefined;
+  // A layer the backend lists as missing is refused, as the plan does (planCommon `draw`).
+  let drawable = layer !== undefined && !params.missing.includes(layerId);
   if (layer) {
     for (const req of layer.requires) if (cardValue(card, req) === null) drawable = false;
   }

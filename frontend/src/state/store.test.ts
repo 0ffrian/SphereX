@@ -31,11 +31,11 @@ describe('app store', () => {
     useAppStore.setState(initialAppData);
   });
 
-  it('starts empty, with no honesty default (Q-08)', () => {
+  it('starts empty, with honesty at + Estimated (D-21)', () => {
     const s = useAppStore.getState();
     expect(s.card).toBeNull();
     expect(s.params).toBeNull();
-    expect(s.honesty).toBeNull();
+    expect(s.honesty).toBe('derived');
     expect(s.overrides).toEqual({});
     expect(s.rendererStatus).toBe('starting');
   });

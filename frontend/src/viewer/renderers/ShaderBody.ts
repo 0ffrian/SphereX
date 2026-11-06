@@ -90,7 +90,6 @@ import {
 } from '../fields/fieldGenerator';
 import { requestField, requestPoints } from '../fields/fieldClient';
 import { shaderSeedOffsets } from '../fields/noise';
-import { DEFAULT_SUN_DIR } from '../lighting';
 import type { Overrides } from '../sliders';
 import {
   ESTIMATED_TAGS,
@@ -110,15 +109,24 @@ import {
   type Rgb,
 } from './shaderPalette';
 import type { NebulaPoints, NovaPoints, PointSet, PointSets } from './pointClouds';
-import { resolveShaderSpec, type ShaderSpec } from './shaderSpec';
+import {
+  kindHasPlainSphere,
+  resolveShaderSpec,
+  shaderDistance,
+  sizeFieldFor,
+  type ShaderSpec,
+} from './shaderSpec';
 
 const rgb3 = (c: Rgb) => vec3(c[0], c[1], c[2]);
 const TWO_PI = Math.PI * 2;
 
 /** Neutral grey used for the plain sphere when no layer may be shown. Not a measured colour. */
 const PLAIN_COLOUR = 0x8a8a8a;
-// ASSUMPTION: camera distances frame each body; mock-up used 4.4 (worlds), 7.2 (gas), 5.4 / 5.
-const DISTANCE = { world: 4, gasNoRings: 4, gasRings: 7.2, nebula: 5.4, nova: 5 } as const;
+/**
+ * Light direction until the viewer gives one. A body is lit from the plan's light (`planLighting`,
+ * R5.1), which falls back to this head-on direction when the card has no phase angle or sun_dir.
+ */
+const HEAD_ON: Vec3 = [0, 0, 1];
 // Mock-up final-state group scales (artistic).
 const NEBULA_SCALE = 1.35;
 const NOVA_SCALE = 0.925;
@@ -432,10 +440,11 @@ export class ShaderBody implements BodyRenderer {
   private visibleTags: readonly Tag[];
   private overrides: Overrides;
   private disposed = false;
-  private readonly sun = uniform(new Vector3(...DEFAULT_SUN_DIR).normalize());
+  private readonly sun = uniform(new Vector3(...HEAD_ON));
   private readonly fieldSource: NonNullable<BodyContext['fieldSource']>;
   private readonly pointSource: NonNullable<BodyContext['pointSource']>;
   private readonly onChange: (() => void) | undefined;
+  private readonly onFailed: ((layerId: string) => void) | undefined;
 
   private constructor(
     private readonly card: ObjectCard,
@@ -448,6 +457,7 @@ export class ShaderBody implements BodyRenderer {
     this.fieldSource = ctx.fieldSource ?? requestField;
     this.pointSource = ctx.pointSource ?? requestPoints;
     this.onChange = ctx.onChange;
+    this.onFailed = ctx.onFailed;
     this.spec = resolveShaderSpec(card, params, this.overrides);
     if (ctx.lightDir) this.setSunDirection(ctx.lightDir);
   }
@@ -462,6 +472,23 @@ export class ShaderBody implements BodyRenderer {
     return body;
   }
 
+  /**
+   * Starts the body without waiting: the plain sphere is there at once and the generated surface
+   * swaps in when the field is ready (never blank). A failed field is reported through
+   * `ctx.onFailed(layerId)` and logged; the body stays as it is.
+   */
+  static start(card: ObjectCard, params: RenderParams, ctx: BodyContext = {}): ShaderBody {
+    const body = new ShaderBody(card, params, ctx);
+    body.ensurePlain();
+    body.rebuild().catch((err: unknown) => {
+      if (body.disposed) return;
+      console.warn('[viewer] could not build the generated surface', err);
+      body.onFailed?.(body.spec.layerId);
+      body.onChange?.();
+    });
+    return body;
+  }
+
   get drawn(): readonly string[] {
     return this.surface?.visible ? [this.spec.layerId] : [];
   }
@@ -473,12 +500,7 @@ export class ShaderBody implements BodyRenderer {
     return this.visibleTags.includes(this.spec.tag) ? [] : [this.spec.layerId];
   }
   get suggestedDistance(): number {
-    const k = this.spec.kind;
-    if (k === 'nebula') return DISTANCE.nebula;
-    if (k === 'nova') return DISTANCE.nova;
-    if (k === 'gas_giant')
-      return (this.spec.gas?.rings ?? 0) > 0.01 ? DISTANCE.gasRings : DISTANCE.gasNoRings;
-    return DISTANCE.world;
+    return shaderDistance(this.spec);
   }
 
   get status(): BodyStatus {
@@ -493,9 +515,11 @@ export class ShaderBody implements BodyRenderer {
     if (!this.visibleTags.includes(tag)) {
       return {
         state: 'hidden',
-        message: this.hasPlainSphere()
-          ? "Showing a plain grey sphere. The surface is an artist's impression and is hidden at this honesty level; choose + Artistic to see it."
-          : `Nothing is shown. This ${this.spec.kind === 'nova' ? 'explosion' : 'cloud'} is an artist's impression and is hidden at this honesty level; choose + Artistic to see it.`,
+        message: this.plainShown()
+          ? "Showing a plain grey sphere at the size on the card. The surface is an artist's impression and is hidden at this honesty level; choose + Artistic to see it."
+          : this.spec.kind === 'nebula' || this.spec.kind === 'nova'
+            ? `Nothing is shown. This ${this.spec.kind === 'nova' ? 'explosion' : 'cloud'} is an artist's impression and is hidden at this honesty level; choose + Artistic to see it.`
+            : "Nothing is shown. The surface is an artist's impression and the size is only an estimate, so both are hidden at this honesty level.",
         // NF-5: what is on screen. The plain grey sphere is a placeholder, not a layer.
         tags: [],
       };
@@ -581,13 +605,35 @@ export class ShaderBody implements BodyRenderer {
   private applyVisibility(): void {
     const show = this.spec.drawable && this.visibleTags.includes(this.spec.tag);
     if (this.surface) this.surface.visible = show;
-    // Planets and gas giants keep a plain sphere when their surface layer is hidden; a refused
-    // body (no size, no radius) draws nothing, and nebula / nova have nothing measured to show.
-    if (this.plain) this.plain.visible = this.spec.drawable && !show && this.hasPlainSphere();
+    if (this.plain) this.plain.visible = this.plainShown();
   }
 
-  private hasPlainSphere(): boolean {
-    return this.spec.kind !== 'nebula' && this.spec.kind !== 'nova';
+  /**
+   * Q-45 (R5.3): planets and gas giants keep a plain sphere when their surface layer is hidden,
+   * but only while the size on the card is shown at this honesty level (Measured only: only when
+   * it is `measured`). A refused body draws nothing, and nebula / nova have no plain sphere. The
+   * plan (`shaderPlan.ts`) applies the same rule, so the two agree.
+   */
+  private plainShown(): boolean {
+    const { kind, drawable, tag } = this.spec;
+    if (!kindHasPlainSphere(kind) || !drawable) return false;
+    if (this.visibleTags.includes(tag)) {
+      // The surface is allowed: the plain sphere only stands in while it is being built (never
+      // blank) or if building it failed.
+      return this.surface === null;
+    }
+    const size = this.card[sizeFieldFor(kind)];
+    return size !== undefined && this.visibleTags.includes(size.tag);
+  }
+
+  private ensurePlain(): void {
+    if (this.plain || !kindHasPlainSphere(this.spec.kind)) return;
+    this.plain = new Mesh(
+      new SphereGeometry(1, 64, 32),
+      new MeshStandardNodeMaterial({ color: PLAIN_COLOUR, roughness: 0.9 }),
+    );
+    this.object.add(this.plain);
+    this.applyVisibility();
   }
 
   /** Builds everything for `spec` without touching the scene (async work happens here). */
@@ -634,22 +680,8 @@ export class ShaderBody implements BodyRenderer {
     this.points = built?.points ?? null;
     if (built) this.object.add(built.group);
     this.release(oldGroup, oldTextures);
-    if (!this.plain && this.hasPlainSphere()) {
-      this.plain = new Mesh(
-        new SphereGeometry(1, 64, 32),
-        new MeshStandardNodeMaterial({ color: PLAIN_COLOUR, roughness: 0.9 }),
-      );
-      this.object.add(this.plain);
-    }
+    this.ensurePlain();
     this.applyVisibility();
     this.onChange?.();
   }
-}
-
-export function createShaderBody(
-  card: ObjectCard,
-  params: RenderParams,
-  ctx: BodyContext,
-): Promise<BodyRenderer> {
-  return ShaderBody.create(card, params, ctx);
 }
