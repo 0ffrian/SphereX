@@ -52,6 +52,16 @@ Errors are `{"error": code, "detail": sentence}`. The codes are:
 - A Flamsteed name (`61 Cyg`, `51 Pegasi`) goes to SIMBAD first. Its SBDB fallback is accepted only when the asteroid's name is the query (`849 Ara`), so a star name never resolves to a numbered asteroid.
 - Moving objects (solar-system bodies, Q-22) get `frames: []` and `missing: ["frames:moving_object_search"]` in M1 (Q-21).
 
+## Texture baker (R6, issue #6)
+
+`app/core/render/` bakes equirectangular maps on the CPU with numpy and Pillow: `albedo.webp` (lossless), `height.png`, `height.bin` (float16 little-endian, W×H) and `normal.png`, into `{root}/{id}/{generator_version}/{seed}/` (R6.7; `:` and other unsafe characters in the id are percent-encoded, so `sbdb:101955` is `sbdb%3A101955`). Baked types: `asteroid_procedural`, `brown_dwarf`, `brown_dwarf_binary`; any other type is refused (Q-43).
+
+```bash
+uv run python -m app.core.render ../shared/fixtures/cards/asteroid_procedural.json --seed 2 --out ./textures   # ~17 s at 2048x1024
+```
+
+`params_from_card(card, seed)` applies the R6.2 rules and raises `BakeRefusal` (with the missing card fields) instead of inventing a value. `bake()` returns the arrays; `bake_to_cache()` writes the files atomically and skips a bake whose four files exist. Bump `BAKER_RULES_VERSION` whenever a rule in R6.2 to R6.5 changes. Same card and seed give the same bytes on a given numpy and Pillow build; the tests check it by SHA-256.
+
 ## Settings (`SX_*` environment variables)
 
 | Variable | Default | Meaning |

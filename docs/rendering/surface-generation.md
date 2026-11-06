@@ -108,10 +108,12 @@ def normals_from_height(h, radius_m, strength=1.0):
     nz = np.ones_like(nx)
     n = np.stack([nx, ny, nz], -1)
     n /= np.linalg.norm(n, axis=-1, keepdims=True)
-    return ((n * 0.5 + 0.5) * 255).astype(np.uint8)
+    return np.rint((n * 0.5 + 0.5) * 255).astype(np.uint8)   # rint, not truncation: flat = (128, 128, 255)
 ```
 
 **[verify]** With the light from the north, north-facing slopes must brighten. If they darken, set `material.normalScale.y = -1`; don't change the generator.
+
+**Status (6 Nov 2026):** the baker side is checked. `tests/test_render_baker.py::test_normal_green_channel_is_opengl_y_up` rebuilds the true normals of the displaced sphere from the R6.1 pixel mapping (u = +φ, north = −θ) and compares them with the baked map: the green channel is +north (OpenGL, +Y up), and flipping it is clearly worse. What stays open is the visual check in the viewer (issue #7).
 
 ### R6.6 Optional paths
 
