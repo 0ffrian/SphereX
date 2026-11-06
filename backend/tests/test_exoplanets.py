@@ -176,6 +176,7 @@ def test_fixture_planets_offline(client: TestClient, name: str, want: str) -> No
     assert errors(card, "object-card.schema.json") == []
     assert errors(params, "render-params.schema.json") == []
     assert card["type"] == params["type"] == want
+    assert card["name"] == name  # the archive's pl_name, not SIMBAD's main_id (Q-63)
     assert "type:exoplanet_thresholds" not in params["missing"]
     if want == "candidate":
         assert "type:exoplanet_envelope" in params["missing"]

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import shutil
+import tomllib
 from pathlib import Path
 
 import numpy as np
@@ -12,7 +15,9 @@ from fastapi.testclient import TestClient
 
 from app.core.card.catalogue import load_shape_registry
 from app.core.card.validate import errors
+from app.main import create_app
 from scripts import ingest_shape as ing
+from tests.conftest import make_settings
 from tests.test_api import resolve_id
 
 SHAPES = Path(__file__).resolve().parents[1] / "assets" / "shapes"
@@ -154,6 +159,34 @@ def test_committed_registry_matches_files() -> None:
     for path in (eros.lod0, eros.lod1):
         doc, _ = ing.read_glb((SHAPES / Path(path).name).read_bytes())
         assert doc["accessors"][2]["count"] // 3 <= ing.TRIANGLE_BUDGET
+    raw = tomllib.loads((SHAPES / "registry.toml").read_text("utf-8"))["model"][0]
+    for level in ("lod0", "lod1"):  # the committed GLBs are the ones the registry describes
+        blob = (SHAPES / Path(raw[level]).name).read_bytes()
+        assert hashlib.sha256(blob).hexdigest() == raw[f"{level}_sha256"]
+
+
+def test_registry_entry_without_its_mesh_is_skipped(tmp_path: Path) -> None:
+    shutil.copy(SHAPES / "registry.toml", tmp_path / "registry.toml")
+    shutil.copy(SHAPES / "eros-gaskell.glb", tmp_path / "eros-gaskell.glb")  # lod1 missing
+    assert load_shape_registry(tmp_path) == {}  # refuse rather than serve a 404 mesh
+    shutil.copy(SHAPES / "eros-gaskell.lod1.glb", tmp_path / "eros-gaskell.lod1.glb")
+    assert "20000433" in load_shape_registry(tmp_path)
+
+
+def test_unregistered_glb_on_disk_is_not_served(tmp_path: Path) -> None:
+    shapes = tmp_path / "shapes"
+    shutil.copytree(SHAPES, shapes)
+    shutil.copy(shapes / "eros-gaskell.glb", shapes / "stray.glb")
+    client = TestClient(create_app(make_settings(tmp_path / "cache", shapes_dir=shapes)))
+    assert client.get("/data/shapes/eros-gaskell.glb").status_code == 200
+    assert client.get("/data/shapes/stray.glb").status_code == 404
+
+
+@pytest.mark.parametrize("slug", ["Eros", "../x", "a/b", "-x", ""])
+def test_ingest_rejects_unservable_slug(slug: str) -> None:
+    args = argparse.Namespace(slug=slug)
+    with pytest.raises(ing.ShapeError):
+        ing.ingest(args)
 
 
 def test_eros_card_is_asteroid_shape_with_served_mesh(client: TestClient) -> None:

@@ -13,7 +13,7 @@
 | Building before 14 Nov | The event rules say not to build before the event | The team's call and risk (D-14). |
 | Frames on 3I/ATLAS dates unchecked | The headline comet may have no data | Check early. Keep a known asteroid as fallback. |
 | NEOWISE access unconfirmed | Diameter and albedo | Use JPL values. |
-| Exoplanet Archive untested | Planet cards | Test first. |
+| Exoplanet Archive thresholds unverified | Planet cards | Adapter tested live 2026-11-07 (Q-63). The radius, mass and Zeng 2019 cut-offs stay **[verify]** until Atish confirms (Q-56). |
 | SIMBAD untested | Star and brown dwarf types | Test first. Resolver order: SBDB first for small-body names, SIMBAD first for the rest (D-19). |
 | CORS to science services unknown | Browser may be blocked | Use a backend proxy. |
 | Gemini model name may change | Code would break | Read it from config. Confirm before coding. |

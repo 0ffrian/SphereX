@@ -22,7 +22,7 @@ from app.core.classify.rules import SIMBAD_PLANET
 from app.core.find.resolver import ResolvedObject
 from app.timefmt import parse_utc
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("shift_spectrum")
 
 
 @dataclass(frozen=True)
@@ -66,7 +66,26 @@ def load_shape_registry(shapes_dir: Path) -> dict[str, ShapeModel]:
     except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
         log.warning("shape registry %s unreadable, no shape models: %s", path, e)
         return {}
-    return {m.spkid: m for m in models}
+    out: dict[str, ShapeModel] = {}
+    for m in models:
+        # Refuse rather than invent: a registry row whose mesh is not on disk would type the
+        # object asteroid_shape with a `measured` shape_source that answers 404.
+        if not all(mesh_file(shapes_dir, p) is not None for p in (m.lod0, m.lod1)):
+            log.warning("shape model %s (%s) skipped: mesh file missing", m.spkid, m.lod0)
+            continue
+        out[m.spkid] = m
+    return out
+
+
+SHAPE_URL_ROOT = "/data/shapes/"
+
+
+def mesh_file(shapes_dir: Path, url: str) -> Path | None:
+    """The file behind a registry mesh path (``/data/shapes/<name>.glb``), or None."""
+    if not url.startswith(SHAPE_URL_ROOT):
+        return None
+    path = shapes_dir / url.removeprefix(SHAPE_URL_ROOT)
+    return path if "/" not in url.removeprefix(SHAPE_URL_ROOT) and path.is_file() else None
 
 
 @dataclass(frozen=True)
@@ -164,7 +183,11 @@ def with_geometry(ctx: Context, data: CatalogueData, obj: ResolvedObject) -> Cat
     try:
         geom, served = horizons.geometry(ctx, obj.spkid, parse_utc(obj.epoch))
     except CacheMissOffline:
-        return replace(data, geometry_reason="Horizons geometry not cached and offline")
+        reason = "Horizons geometry not cached and offline"
     except UpstreamUnavailable:
-        return replace(data, geometry_reason="Horizons geometry unavailable")
-    return replace(data, geometry=geom, served=(*data.served, *served))
+        reason = "Horizons geometry unavailable"
+    else:
+        return replace(data, geometry=geom, served=(*data.served, *served))
+    # "lighting" in missing: the user sees the refusal, and the asset is not saved with null
+    # lighting (service.py saves only when `missing` is empty), so a later run can fill it.
+    return replace(data, geometry_reason=reason, missing=(*data.missing, "lighting"))

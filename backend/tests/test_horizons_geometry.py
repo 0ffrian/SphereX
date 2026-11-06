@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.adapters import horizons
-from app.cache.store import CacheMissOffline
+from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import make_context
 from app.core.card.catalogue import CatalogueData, with_geometry
 from app.core.classify import CatalogueFacts
@@ -84,6 +84,38 @@ def test_geocentre_fallback_when_spherex_has_no_ephemeris(tmp_path: Path) -> Non
     assert centers[:2] == ["'500@-163182'", "'500@399'"]
 
 
+def test_network_error_does_not_fall_back(tmp_path: Path) -> None:
+    centers: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        centers.append(request.url.params["CENTER"])
+        raise httpx.ConnectError("down", request=request)
+
+    ctx = make_context(
+        make_settings(tmp_path, offline=False), transport=httpx.MockTransport(handler)
+    )
+    with pytest.raises(UpstreamUnavailable):
+        horizons.geometry(ctx, "20000433", EPOCH)
+    assert set(centers) == {"'500@-163182'"}  # an outage never switches the observer
+
+
+def test_offline_uses_recorded_geocentre_fallback(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.params.get("EPHEM_TYPE") == "VECTORS":
+            return httpx.Response(200, content=_body(VEC_ROW))
+        if "-163182" in request.url.params["CENTER"]:
+            return httpx.Response(200, content=b'{"result": "No ephemeris for target"}')
+        return httpx.Response(200, content=_body(PHASE_ROW))
+
+    live = make_context(
+        make_settings(tmp_path, offline=False), transport=httpx.MockTransport(handler)
+    )
+    assert horizons.geometry(live, "20000433", EPOCH)[0].observer == horizons.GEOCENTRE
+    offline = make_context(make_settings(tmp_path))  # same cache, no network
+    g, _ = horizons.geometry(offline, "20000433", EPOCH)
+    assert g.observer == horizons.GEOCENTRE and g.phase_angle_deg == EROS_PHASE_DEG
+
+
 def test_geometry_is_null_with_reason_on_cache_miss(tmp_path: Path) -> None:
     ctx = make_context(make_settings(tmp_path))  # empty cache, offline
     with pytest.raises(CacheMissOffline):
@@ -93,6 +125,8 @@ def test_geometry_is_null_with_reason_on_cache_miss(tmp_path: Path) -> None:
     )
     data = with_geometry(ctx, CatalogueData(CatalogueFacts()), obj)
     assert data.geometry is None and "offline" in (data.geometry_reason or "")
+    # Listed as refused, which also keeps the asset from being saved with null lighting.
+    assert "lighting" in data.missing
 
 
 def test_catalogue_without_sbdb_is_untouched(tmp_path: Path) -> None:

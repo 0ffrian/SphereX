@@ -89,13 +89,14 @@ def prefetch_target(
     rep.object_id = obj.id
     print(f"  resolved {target['name']!r} -> {obj.id} ({obj.ra:.5f}, {obj.dec:+.5f})", flush=True)
 
-    if obj.resolver == "simbad":
+    simbad_name = obj.query or obj.name
+    if obj.resolver == "simbad" and simbad_name:
         # A3.8: a SIMBAD planet (otype Pl) also needs its Exoplanet Archive row for the card.
         try:
-            hit, _ = simbad.query(ctx, obj.query or obj.name)
+            hit, _ = simbad.query(ctx, simbad_name)
             if hit is not None and hit.otype in SIMBAD_PLANET:
                 row, _ = exoplanet_archive.query(
-                    ctx, (obj.query or obj.name, hit.main_id), refresh=args.refresh
+                    ctx, (simbad_name, hit.main_id), refresh=args.refresh
                 )
                 print(f"  Exoplanet Archive: {'row ' + row['pl_name'] if row else 'no row'}")
         except (CacheMissOffline, UpstreamUnavailable) as exc:
@@ -115,12 +116,13 @@ def prefetch_target(
             rep.error = f"SkyBoT failed: {exc}"
             return rep
         # Phase angle and Sun vector for the card (Q-62); the same two cached Horizons calls.
-        try:
-            geom, _ = horizons.geometry(ctx, obj.spkid or "", when, refresh=args.refresh)
-            print(f"  Horizons: phase {geom.phase_angle_deg:.2f} deg ({geom.observer})", flush=True)
-        except (CacheMissOffline, UpstreamUnavailable) as exc:
-            rep.error = f"Horizons geometry failed: {exc}"
-            return rep
+        # Optional, like in the app: a failure is reported but the frames are still fetched.
+        if obj.spkid:
+            try:
+                geom, _ = horizons.geometry(ctx, obj.spkid, when, refresh=args.refresh)
+                print(f"  Horizons: phase {geom.phase_angle_deg:.2f} deg ({geom.observer})")
+            except (CacheMissOffline, UpstreamUnavailable) as exc:
+                print(f"  Horizons geometry failed (card lighting refused): {exc}", flush=True)
         rep.missing = FrameService(ctx).get_frames(obj, rebuild=True).missing
         return rep
 

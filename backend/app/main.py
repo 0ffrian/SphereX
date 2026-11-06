@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse
 from app.api import objects, resolve, spectrum
 from app.context import make_context
 from app.core.card.assets import AssetStore
+from app.core.card.catalogue import SHAPE_URL_ROOT, load_shape_registry, mesh_file
 from app.core.card.service import ObjectPipeline
 from app.core.find.frames import FrameService
 from app.core.find.resolver import load_aliases
@@ -78,12 +79,17 @@ def create_app(
 
     shapes_dir = s.shapes_dir
 
-    # Q-44 / Q-61: same-origin, read-only shape meshes. Only `<slug>.glb` / `<slug>.lod1.glb`
-    # names that match the pattern are served, so no path can leave the folder.
+    # Q-44 / Q-61: same-origin, read-only shape meshes. Only names that match the pattern and
+    # that the registry lists (lod0 / lod1) are served, so no path can leave the folder and no
+    # stray file is published.
     @app.get("/data/shapes/{name}", include_in_schema=False)
     def shape_mesh(name: str) -> FileResponse:
-        path = shapes_dir / name
-        if not _SHAPE_NAME.fullmatch(name) or not path.is_file():
+        path = None
+        if _SHAPE_NAME.fullmatch(name):
+            listed = {u for m in load_shape_registry(shapes_dir).values() for u in (m.lod0, m.lod1)}
+            url = SHAPE_URL_ROOT + name
+            path = mesh_file(shapes_dir, url) if url in listed else None
+        if path is None:
             raise HTTPException(status_code=404, detail="no such shape model")
         return FileResponse(path, media_type="model/gltf-binary")
 
