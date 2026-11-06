@@ -2,7 +2,7 @@
 // Brown dwarfs are baked (D-01), so by D-26 no slider feeds these; the inputs come from the card.
 // Absorption features and colour are handled by the spectrum view and the baker (R7.4).
 import type { ObjectCard } from '@/contract';
-import type { Overrides } from './sliders';
+import type { Overrides } from '@/viewer/sliders';
 import { derive, InputReader, ResultBuilder, type PhysicsResult } from './tagging';
 
 /** A7.3 boundaries, "approximate": L above about 1,400 K, T from 1,400 K to 500 K, Y below 500 K. */

@@ -1,10 +1,10 @@
 // A7.5 Supernova remnants: Sedov-Taylor radius. Drawn by the `nova` shell-remnant kind (A6);
-// ASSUMPTION: A7.5 applies to `nova` bodies (Q-44). Every input is a slider, and D-12 makes every
+// ASSUMPTION: A7.5 applies to `nova` bodies (Q-59). Every input is a slider, and D-12 makes every
 // value on this slider-only kind `artistic`, so the outputs carry that tag (the formula is kept).
 // The phases (free expansion, Sedov, radiative) need transition times A7.5 does not give, so no
 // phase is computed.
 import type { ObjectCard } from '@/contract';
-import type { Overrides } from './sliders';
+import type { Overrides } from '@/viewer/sliders';
 import { InputReader, need, positive, ResultBuilder, type PhysicsResult } from './tagging';
 
 // The SI form `R = 1.15 * (E t^2 / rho)^(1/5)` is not used by the app; the test checks it against

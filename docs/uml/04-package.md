@@ -14,8 +14,8 @@ flowchart TB
 
     subgraph Backend["backend/ (FastAPI, Python 3.12) : Kevin, Moon, Atish"]
       BApi["app/api (Kevin) : D-16 endpoints; objects.py : /card, /render-params, texture URLs"]
-      BPipe["app/core/find (stage 1), app/adapters, app/cache : Kevin; app/core/measure (stage 2) and physics : Moon; stage 3 : Atish"]
-      BRender["app/core/render (Atish) : card_to_params, noise, craters, height, normals, palette, bake, spherex_rgb, gemini_paint"]
+      BPipe["app/core/find (stage 1), app/adapters, app/cache, app/core/card (stages 4, 5) : Kevin; app/core/measure (stage 2) and physics : Moon; app/core/classify (stage 3) : Atish"]
+      BRender["app/core/render (Atish) : card_to_params, blackbody, params, noise, craters, height, normals, palette, bake, __main__, spherex_rgb, gemini_paint"]
       BContract["app/contract : generated from shared/schemas (D-18) : follows the schemas owner"]
     end
 
@@ -27,8 +27,8 @@ flowchart TB
       FContract["src/contract : generated from shared/schemas (D-18), assertTagged next to it : follows the schemas owner"]
       subgraph FViewer["src/viewer (Moon)"]
         VCore["ViewerApp, lighting, modes, honesty, scaleBar, altText"]
-        VRend["renderers/ : AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody [verify]"]
-        VFields["fields/ : field worker (D-12) : Atish (D-17); shader generators (D-01) : Moon [verify path]"]
+        VRend["renderers/ : AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody [verify], bodyRenderer, shaderPlan, shaderSpec, shaderPalette, pointClouds; sliders.ts"]
+        VFields["fields/ : fieldGenerator, noise, fieldWorker, fieldClient (D-12) : Atish (D-17); shader generators (D-01) : Moon [verify path]"]
       end
       subgraph FHaptics["src/haptics : Atish (D-13, D-17)"]
         HCore["haptics.ts, calibration.ts"]
@@ -49,7 +49,9 @@ flowchart TB
   BContract -.->|"generated from (D-18)"| Schemas
 
   FApp --> VCore
-  FApp -->|"Overrides, SliderKey types (src/state)"| FPhysics
+  FApp --> FPhysics
+  FPhysics -->|"SliderKey, Overrides (viewer/sliders.ts)"| VRend
+  VRend -->|"LAVA_START_K"| FPhysics
   FPhysics --> FContract
   FApp --> FContract
   VCore --> FContract
@@ -74,8 +76,8 @@ flowchart TB
 
 | Package | Owner (rendering doc §10, D-17) |
 |---|---|
-| `backend/app/core/render` (baker, `card_to_params`, Gemini layer) | Atish |
-| `backend/app/api`, `backend/app/adapters`, `backend/app/cache`, `backend/app/core/find` (stage 1), backend scaffold, pipeline stages 4, 5 | Kevin |
+| `backend/app/core/render` (baker, `card_to_params`, Gemini layer), `backend/app/core/classify` (stage 3) | Atish |
+| `backend/app/api`, `backend/app/adapters`, `backend/app/cache`, `backend/app/core/find` (stage 1), `backend/app/core/card` (stages 4, 5), backend scaffold | Kevin |
 | `backend/app/core/measure` (stage 2), physics layer, `shared/schemas`, `shared/fixtures` | Moon (Munazir) |
 | Pipeline stage 3 | Atish |
 | `frontend/src/viewer`, `viewer/renderers`, shader kinds, `src/app`, `src/state`, `src/physics` | Moon |
@@ -88,6 +90,6 @@ flowchart TB
 - `viewer/fields`, `ShaderBody`, `sources/terrain` and `sources/flow` follow from D-01 and D-12. They are listed in rendering doc §10, but the `ShaderBody` and `fields/fieldWorker` file names stay **[verify]**.
 - `src/contract`, `src/state` and `src/app` were added by the frontend scaffold (4 Nov 2026) and are listed in rendering doc §10. `src/contract/generated.ts` is generated from `shared/schemas` (D-18), as is `backend/app/contract/`; the hand-written scaffold types were replaced in issue #4.
 - The flipbook and spectrum view (M1, issue #3, 5 Nov 2026) added `src/app/api`, `src/app/search`, `src/app/flipbook`, `src/app/spectrum`, the `sky` slice in `src/state/store.ts`, `src/test`, `fixtures/` and `scripts/` (rendering doc §10). `fixtures/` is a Vite dev-server plugin used only by `npm run dev:fixtures` and the Playwright tests; `scripts/check-dist.js` fails the build if a fixture marker reaches `dist/`.
-- The physics layer and slider registry (issue #13) added `src/physics` (rendering doc §10, architecture spec §7). `src/state/store.ts` takes its `Overrides` and `SliderKey` types from `src/physics/sliders.ts`. The backend half of stage 6 is not built (Q-45).
+- The physics layer and slider registry (issue #13) added `src/physics` (rendering doc §10, architecture spec §7). There is one slider registry, `src/viewer/sliders.ts` (drawn in the `VRend` box): `src/state/store.ts`, the shader kinds and `src/physics` all take `SliderKey` and `Overrides` from it (D-27). `shaderPalette` takes the lava threshold `LAVA_START_K` from `src/physics/constants.ts`, so the two agree. The backend half of stage 6 is not built (Q-60).
 - D-13: Atish owns the creative direction of haptics (what each body feels like, patterns, sound pairing). Engineering choices (drivers, timing, rate limits) stay with the implementer.
 - The shader generators move from the mock-up into ES modules; the mock-up is not ported in place (D-03).

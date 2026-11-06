@@ -1,0 +1,18 @@
+{
+ "body_sha256": "d97d127d71105464371ff2f5da42c89c93b38def77d09304a7d63197063a17c2",
+ "body_size": 33429,
+ "content_type": "application/x-votable+xml",
+ "fetched_at": "2026-11-06T04:45:24.591Z",
+ "key": {
+  "query": {
+   "dec": "9.56303",
+   "ra": "24.24474",
+   "radius": "0.001000"
+  },
+  "release": "spherex_qr2",
+  "source": "irsa_sia"
+ },
+ "maxrec": 3,
+ "status": 200,
+ "url": "https://irsa.ipac.caltech.edu/SIA?COLLECTION=spherex_qr2&POS=circle+24.24474+9.56303+0.001000&MAXREC=3"
+}

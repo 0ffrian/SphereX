@@ -6,12 +6,11 @@ import { deriveAsteroid } from './asteroids';
 import { deriveBrownDwarf } from './brownDwarfs';
 import { deriveGasGiant } from './gasGiants';
 import { derivePlanet } from './planets';
-import type { Overrides } from './sliders';
+import type { Overrides } from '@/viewer/sliders';
 import { deriveSnr } from './snr';
 import type { PhysicsResult } from './tagging';
 
 export type { PhysicsResult, PhysicsInput } from './tagging';
-export * from './sliders';
 
 const FAMILY: Partial<Record<ObjectType, (card: ObjectCard, o: Overrides) => PhysicsResult>> = {
   planet_rocky: derivePlanet,

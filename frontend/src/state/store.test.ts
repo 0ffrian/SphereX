@@ -33,11 +33,11 @@ describe('app store', () => {
     useAppStore.setState(initialAppData);
   });
 
-  it('starts empty, with no honesty default (Q-08)', () => {
+  it('starts empty, with honesty at + Estimated (D-21)', () => {
     const s = useAppStore.getState();
     expect(s.card).toBeNull();
     expect(s.params).toBeNull();
-    expect(s.honesty).toBeNull();
+    expect(s.honesty).toBe('derived');
     expect(s.overrides).toEqual({});
     expect(s.rendererStatus).toBe('starting');
   });
@@ -66,14 +66,27 @@ describe('app store', () => {
   });
 
   it('setOverride stores only valid values for the loaded type (D-27)', () => {
-    useAppStore.getState().setOverride('rot_period_h', 5); // no card loaded
+    const { setOverride } = useAppStore.getState();
+    expect(setOverride('rot_period_h', 5)).toBe(false); // no card loaded
     expect(useAppStore.getState().overrides).toEqual({});
 
     useAppStore.getState().setObject(asteroid, params);
-    useAppStore.getState().setOverride('rot_period_h', Number.NaN);
-    useAppStore.getState().setOverride('bulk_density_kg_m3', 1e9); // out of range
-    useAppStore.getState().setOverride('zonal_wind_ms', 50); // gas giants only
+    expect(setOverride('rot_period_h', Number.NaN)).toBe(false);
+    expect(setOverride('bulk_density_kg_m3', 1e9)).toBe(false); // out of range
+    expect(setOverride('zonal_wind_ms', 50)).toBe(false); // gas giants only
+    expect(setOverride('relief', 0.1)).toBe(false); // shader kinds only (D-26)
     expect(useAppStore.getState().overrides).toEqual({});
+    expect(setOverride('rot_period_h', 5)).toBe(true);
+    expect(useAppStore.getState().overrides).toEqual({ rot_period_h: 5 });
+  });
+
+  it('one registry: the store keeps the viewer relief sliders on a shader kind (D-27)', () => {
+    const gas = { ...asteroid, type: 'gas_giant' } as typeof asteroid;
+    useAppStore.getState().setObject(gas, { ...params, type: 'gas_giant' });
+    const { setOverride } = useAppStore.getState();
+    expect(setOverride('bands', 16)).toBe(true);
+    expect(setOverride('rot_period_h', 9.9)).toBe(true);
+    expect(useAppStore.getState().overrides).toEqual({ bands: 16, rot_period_h: 9.9 });
   });
 
   it('setOverride(key, undefined) clears one slider and keeps the others', () => {

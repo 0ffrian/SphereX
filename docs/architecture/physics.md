@@ -6,7 +6,7 @@
 
 This is **reduced, physically inspired physics**, not simulation. Each rule is a short formula or table, shown next to its slider so reviewers can check it. Rules marked "built" already exist in the Surface Lab; "Built (app)" means the rule is in `frontend/src/physics/` (issue #13).
 
-**In the app:** `derivePhysics(card, overrides)` returns tagged values, the ids it refused in `missing` (with the inputs each lacked in `needs`) and the overrides it ignored. A slider value wins over the card value of the same name. Outputs are `derived` with their formula, weakened to the weakest input tag (a `model_dependent` input or rule gives `model_dependent` with the assumption); slider inputs count as `derived` (Q-43). Nothing is written back to the card (D-02). The backend half of stage 6 (A4.6) is not built yet (Q-45).
+**In the app:** `derivePhysics(card, overrides)` returns tagged values, the ids it refused in `missing` (with the inputs each lacked in `needs`) and the overrides it ignored. A slider value wins over the card value of the same name. Outputs are `derived` with their formula, weakened to the weakest input tag (a `model_dependent` input or rule gives `model_dependent` with the assumption). A slider value is the visitor's choice, not a measurement (R1.2), so it enters as `artistic` with the assumption "`<value>` (your setting)", and every output it feeds is `artistic` with its formula kept (Q-58 b). The Teq the rules used is echoed in `teq_used_K` with the tag of its source (card, `teq_K` slider or star sliders). Slider keys come from the one registry in `frontend/src/viewer/sliders.ts` (D-27). Nothing is written back to the card (D-02). The backend half of stage 6 (A4.6) is not built yet (Q-60).
 
 ### A7.1 Planets
 
@@ -17,14 +17,14 @@ This is **reduced, physically inspired physics**, not simulation. Each rule is a
 | Surface gravity | `g = G M / R^2` | Built (app) |
 | Escape speed | `v_esc = sqrt(2 G M / R)` | Built (app) |
 | Atmosphere kept | Keep if `v_esc` is well above the gas thermal speed `sqrt(2 k T / m)` (rule of thumb: about 6 times) | Built (app) for H2, He, H2O, N2, CO2 with T = Teq, tagged `model_dependent` |
-| Ice, ocean, steam | Cold below about 330 K gets polar ice, growing as temperature falls. Oceans are removed above about 450 K. Lava glow starts near 700 K. | Built (as simple thresholds); the app gives on/off flags only |
+| Ice, ocean, steam | Cold below about 330 K gets polar ice, growing as temperature falls. Oceans are removed above about 450 K. Lava glow starts near 700 K. | Built (as simple thresholds); the app gives on/off flags only. The lava threshold `LAVA_START_K` (`physics/constants.ts`) is shared with the viewer, and both use `Teq > 700 K` |
 | Ocean share to sea level | Sea level from the inverse normal curve of the terrain height distribution | Built |
 
 ### A7.2 Gas giants (storms that respond)
 
 | Quantity | Rule | Status |
 |---|---|---|
-| Spin to band count | Rhines scale `L = pi * sqrt(U / beta)`, `beta = 2 Omega / R`. Number of bands about `sqrt(2 Omega R / U)`. For Jupiter (`Omega = 1.76e-4 /s`, `R = 7e7 m`, `U = 50 m/s`) this gives about 22. Order of magnitude only. | Built (app), with the Rhines length |
+| Spin to band count | Rhines scale `L = pi * sqrt(U / beta)`, `beta = 2 Omega / R`. Number of bands about `sqrt(2 Omega R / U)`. For Jupiter (`Omega = 1.76e-4 /s`, `R = 7e7 m`, `U = 50 m/s`) this gives about 22. Order of magnitude only. | Built (app), with the Rhines length. Shown next to the artistic `bands` slider, which is what the shader draws (default 12); `band_count` does not drive the shader yet. The `zonal_wind_ms` slider feeds only this rule; the drawn wind comes from the band phase (`zonalWind`, `viewer/fields`) |
 | Flattening | `f = 0.7 * q`, `q = Omega^2 R^3 / (G M)`. Rule of thumb calibrated on Jupiter and Saturn. | Built (app); not yet linked to the shader |
 | Colour family | Chosen by temperature: pale cyan (about 60 K), blue (100), cream (130), gold (200), cobalt (600), dark (1,100), glowing (1,800). | Built |
 | Storm placement | Place storms where wind shear between neighbouring jets is anticyclonic, so spots sit between counter-flowing jets. | To build |
@@ -56,6 +56,6 @@ This is **reduced, physically inspired physics**, not simulation. Each rule is a
 
 | Quantity | Rule | Status |
 |---|---|---|
-| Radius | Sedov-Taylor: `R = 1.15 * (E t^2 / rho)^(1/5)`. Typical form: `R ~ 12.4 pc * (E51 / n)^(1/5) * (t / 10^4 yr)^(2/5)`. | Built (age to the power 0.4 only); built (app) for `nova` bodies (Q-44), typical form, tagged `artistic` (D-12) |
+| Radius | Sedov-Taylor: `R = 1.15 * (E t^2 / rho)^(1/5)`. Typical form: `R ~ 12.4 pc * (E51 / n)^(1/5) * (t / 10^4 yr)^(2/5)`. | Built (age to the power 0.4 only); built (app) for `nova` bodies (Q-59), typical form, tagged `artistic` (D-12) |
 | Phases | Free expansion, Sedov, then radiative. Look and colour differ. | To build |
 | Colour | Hydrogen red, oxygen teal, hot gas blue. | Built, estimated |

@@ -1,9 +1,9 @@
 // A7.4 Asteroids: minimum elongation from the light-curve amplitude, and the rubble-pile spin
 // barrier. Asteroids are baked (D-01); by D-26 only the spin sliders (period, and bulk density,
-// which only moves the barrier; Q-43) feed these.
+// which only moves the barrier; Q-58) feed these.
 import type { ObjectCard } from '@/contract';
 import { G, HOUR_S } from './constants';
-import type { Overrides } from './sliders';
+import type { Overrides } from '@/viewer/sliders';
 import { derive, InputReader, positive, ResultBuilder, type PhysicsResult } from './tagging';
 
 // Bulk density comes from the slider only. The A7.4 example uses 2,000 kg/m^3, but that is an
