@@ -3,7 +3,7 @@
 // rhythm, rate and spacing. Each call cancels the previous pattern. iPhone, iPad and desktop have
 // no navigator.vibrate: `supported` is false there and every call is a silent no-op (R11).
 import type { HapticEvent } from '@/contract';
-import type { TrainCapableDriver, TrainWindow } from '../haptics';
+import type { HapticTimers, TrainCapableDriver, TrainWindow } from '../haptics';
 import {
   DOUBLE_PATTERN,
   HEARTBEAT_PATTERN,
@@ -23,6 +23,8 @@ export interface WebVibrateOptions {
   vibrate?: VibrateFn | null;
   /** Default VIBRATE_LEVELS_MS (soft, medium, firm). */
   levels?: readonly VibrateLevel[];
+  /** Timers for the R8.9 delay. Default: the global timers. */
+  timers?: HapticTimers;
 }
 
 function browserVibrate(): VibrateFn | null {
@@ -30,14 +32,39 @@ function browserVibrate(): VibrateFn | null {
   return (pattern) => navigator.vibrate(pattern);
 }
 
-function validLevel(l: VibrateLevel): boolean {
-  if (typeof l === 'number') return Number.isFinite(l) && l > 0;
-  return l.length > 0 && l.every((v) => Number.isFinite(v) && v >= 0) && l.some((v) => v > 0);
+function defaultTimers(): HapticTimers {
+  return {
+    setTimeout: (fn, ms) => globalThis.setTimeout(fn, ms),
+    clearTimeout: (h) => globalThis.clearTimeout(h as ReturnType<typeof globalThis.setTimeout>),
+  };
 }
 
 /** Total length in ms of a level. */
 export function levelDurationMs(level: VibrateLevel): number {
   return typeof level === 'number' ? level : level.reduce((a, b) => a + b, 0);
+}
+
+function validPattern(l: readonly number[]): boolean {
+  return l.length > 0 && l.every((v) => Number.isFinite(v) && v >= 0) && l.some((v) => v > 0);
+}
+
+/**
+ * A valid level set, weakest first: 1–4 levels (D-09 uses 3 or 4). Only the first may be a
+ * pulse-width pattern (the whisper); the tick lengths after it must be positive and strictly
+ * increasing.
+ */
+export function validLevels(levels: readonly VibrateLevel[]): boolean {
+  if (levels.length < 1 || levels.length > 4) return false;
+  let prev = 0;
+  for (const [i, l] of levels.entries()) {
+    if (typeof l !== 'number') {
+      if (i !== 0 || !validPattern(l)) return false;
+      continue;
+    }
+    if (!Number.isFinite(l) || l <= prev) return false;
+    prev = l;
+  }
+  return true;
 }
 
 /** D-09: strength 0–1 → level index, splitting 0–1 into `count` equal bins. */
@@ -47,30 +74,62 @@ export function quantise(strength: number, count: number): number {
   return Math.min(count - 1, Math.floor(s * count));
 }
 
+/**
+ * A level shortened to at most `capMs`. A tick length is clipped; a pulse-width pattern keeps its
+ * pulse width and loses its tail, so a whisper never turns into a solid, stronger pulse.
+ */
+export function fitLevel(level: VibrateLevel, capMs: number): VibrateLevel {
+  if (levelDurationMs(level) <= capMs) return level;
+  if (typeof level === 'number') return capMs;
+  const out: number[] = [];
+  let total = 0;
+  for (const [i, v] of level.entries()) {
+    if (total + v > capMs) break;
+    out.push(v);
+    total += v;
+    if (i % 2 === 1 && total >= capMs) break;
+  }
+  if (out.length % 2 === 0) out.pop(); // end on a vibration
+  return out.length > 0 ? out : Math.min(capMs, level[0] ?? capMs);
+}
+
+interface Deferred {
+  handle: unknown;
+  readonly train: boolean;
+}
+
 export class WebVibrateDriver implements TrainCapableDriver {
   readonly supported: boolean;
   private readonly vibrateFn: VibrateFn | null;
+  private readonly timers: HapticTimers;
   private levelList: VibrateLevel[];
   private delay = 0;
-  /** A pattern was sent since the last stop. Stopping is skipped otherwise: a vibrate(0) before
-   * the first tap only logs a "blocked" intervention in Chrome. */
+  /**
+   * A pattern was sent since the last stop. Stopping is skipped otherwise: a vibrate(0) before
+   * the first tap only logs a "blocked" intervention in Chrome.
+   */
   private sent = false;
+  /** The last pattern handed to navigator.vibrate was a train window (not a one-shot). */
+  private lastWasTrain = false;
+  /** Patterns waiting for the R8.9 delay. */
+  private readonly deferred = new Set<Deferred>();
   /** Reused pattern buffer: even indices vibrate, odd indices pause. */
   private readonly buf: number[] = [];
 
   constructor(options: WebVibrateOptions = {}) {
     this.vibrateFn = options.vibrate !== undefined ? options.vibrate : browserVibrate();
     this.supported = this.vibrateFn !== null;
+    this.timers = options.timers ?? defaultTimers();
     this.levelList = [...VIBRATE_LEVELS_MS];
     if (options.levels) this.setLevels(options.levels);
   }
 
   /**
    * The levels the phone renders distinctly, weakest first (R8.7 step 2): 3 (soft, medium, firm)
-   * or 4 (whisper first). Invalid input is ignored and returns false.
+   * or 4 (whisper first), see `validLevels`. Invalid input is ignored and returns false.
    */
   setLevels(levels: readonly VibrateLevel[]): boolean {
-    if (levels.length < 1 || levels.length > 4 || !levels.every(validLevel)) return false;
+    if (!validLevels(levels)) return false;
     this.levelList = levels.map((l) => (typeof l === 'number' ? l : [...l]));
     return true;
   }
@@ -83,7 +142,12 @@ export class WebVibrateDriver implements TrainCapableDriver {
     return quantise(strength, this.levelList.length);
   }
 
-  /** R8.9 offset: delay every vibration by this many ms (when sound is heard later than felt). */
+  /**
+   * R8.9 offset: delay every vibration by this many ms (when sound is heard later than felt).
+   * Each pattern is handed to navigator.vibrate by a timer, so patterns keep their relative timing
+   * and a later one cannot cancel an earlier one before it has played. Relies on Chrome's sticky
+   * user activation for calls made outside the gesture [verify on phones].
+   */
   setDelayMs(ms: number): void {
     this.delay = Number.isFinite(ms) && ms > 0 ? Math.round(ms) : 0;
   }
@@ -96,30 +160,30 @@ export class WebVibrateDriver implements TrainCapableDriver {
     if (!this.vibrateFn) return;
     switch (e.kind) {
       case 'tick':
-        this.begin();
+        this.buf.length = 0;
         this.pushLevel(this.levelFor(e.strength));
-        this.play();
+        this.play(false);
         break;
       case 'double':
-        this.begin();
+        this.buf.length = 0;
         this.pushLevel(DOUBLE_PATTERN);
-        this.play();
+        this.play(false);
         break;
       case 'heartbeat':
-        this.begin();
+        this.buf.length = 0;
         this.pushLevel(HEARTBEAT_PATTERN);
-        this.play();
+        this.play(false);
         break;
       case 'pulseTrain': {
         // R8.8 fallback, without phase: one window from now. The engine sends playTrain instead.
         const rate = e.rateHz ?? 0;
         if (!(rate > 0)) return;
         const period = 1000 / rate;
-        this.begin();
+        this.buf.length = 0;
         let cursor = 0;
         for (let t = 0; t < TRAIN_WINDOW_MS; t += period)
           cursor = this.pushPulse(t, cursor, e.strength, period);
-        this.play();
+        this.play(true);
         break;
       }
       case 'stop':
@@ -131,42 +195,53 @@ export class WebVibrateDriver implements TrainCapableDriver {
   playTrain(w: TrainWindow): void {
     if (!this.vibrateFn || w.pulseOffsetsMs.length === 0) return;
     const period = 1000 / w.rateHz;
-    this.begin();
+    this.buf.length = 0;
     let cursor = 0;
     for (const t of w.pulseOffsetsMs) cursor = this.pushPulse(t, cursor, w.strength, period);
-    this.play();
+    this.play(true);
   }
 
+  /** The delay shifts one-shots and train windows alike, so it does not lengthen the block. */
   oneShotBlockMs(e: HapticEvent): number {
     if (!this.vibrateFn) return 0;
     switch (e.kind) {
       case 'tick':
-        return this.delay + levelDurationMs(this.levelFor(e.strength));
+        return levelDurationMs(this.levelFor(e.strength));
       case 'double':
-        return this.delay + levelDurationMs(DOUBLE_PATTERN);
+        return levelDurationMs(DOUBLE_PATTERN);
       case 'heartbeat':
-        return this.delay + levelDurationMs(HEARTBEAT_PATTERN);
+        return levelDurationMs(HEARTBEAT_PATTERN);
       default:
         return 0;
     }
   }
 
+  /** Cancel train windows only; a playing or delayed one-shot is left alone. */
+  stopTrain(): void {
+    for (const d of this.deferred) {
+      if (!d.train) continue;
+      this.timers.clearTimeout(d.handle);
+      this.deferred.delete(d);
+    }
+    if (this.sent && this.lastWasTrain) this.halt();
+  }
+
   stop(): void {
-    if (!this.sent || !this.vibrateFn) return;
-    this.sent = false;
-    this.vibrateFn(0);
+    for (const d of this.deferred) this.timers.clearTimeout(d.handle);
+    this.deferred.clear();
+    if (this.sent) this.halt();
   }
 
   // ------------------------------------------------------------ pattern building
 
-  private levelFor(strength: number): VibrateLevel {
-    return this.levelList[this.levelIndex(strength)]!;
+  private halt(): void {
+    this.sent = false;
+    this.lastWasTrain = false;
+    this.vibrateFn?.(0);
   }
 
-  /** Start a pattern; a delay becomes a leading zero-length vibration and a pause [verify on phones]. */
-  private begin(): void {
-    this.buf.length = 0;
-    if (this.delay > 0) this.pause(this.delay);
+  private levelFor(strength: number): VibrateLevel {
+    return this.levelList[this.levelIndex(strength)]!;
   }
 
   private vib(ms: number): void {
@@ -189,27 +264,37 @@ export class WebVibrateDriver implements TrainCapableDriver {
   }
 
   /**
-   * One train pulse at `t` ms (after the delay). The pulse is at most half the period long, so
-   * pulses stay apart at high rates. Returns the new cursor (end of this pulse).
+   * One train pulse at `t` ms. The pulse is at most half the period long, so pulses stay apart at
+   * high rates. Returns the new cursor (end of this pulse).
    */
   private pushPulse(t: number, cursor: number, strength: number, period: number): number {
     const start = Math.max(cursor, Math.round(t));
     this.pause(start - cursor);
-    const level = this.levelFor(strength);
-    const cap = Math.max(1, Math.floor(period / 2));
-    const fitted: VibrateLevel =
-      levelDurationMs(level) <= cap
-        ? level
-        : Math.min(cap, typeof level === 'number' ? level : cap);
+    const fitted = fitLevel(this.levelFor(strength), Math.max(1, Math.floor(period / 2)));
     this.pushLevel(fitted);
     return start + levelDurationMs(fitted);
   }
 
-  private play(): void {
+  private play(train: boolean): void {
     const b = this.buf;
     if (b.length === 0 || !this.vibrateFn) return;
     if (b.length > MAX_PATTERN) b.length = MAX_PATTERN;
+    if (this.delay <= 0) {
+      this.call(b.length === 1 ? b[0]! : b, train);
+      return;
+    }
+    const pattern = b.length === 1 ? b[0]! : b.slice();
+    const job: Deferred = { handle: null, train };
+    job.handle = this.timers.setTimeout(() => {
+      this.deferred.delete(job);
+      this.call(pattern, train);
+    }, this.delay);
+    this.deferred.add(job);
+  }
+
+  private call(pattern: number | number[], train: boolean): void {
     this.sent = true;
-    this.vibrateFn(b.length === 1 ? b[0]! : b);
+    this.lastWasTrain = train;
+    this.vibrateFn!(pattern);
   }
 }

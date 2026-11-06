@@ -55,6 +55,13 @@ describe('spectrumMapping (R8.6)', () => {
     expect(buildSpectrumMapping([pt(1, NaN), pt(2, 4)]).count).toBe(1);
   });
 
+  it('averages points that share a λ (mean flux, mean σ)', () => {
+    const m = buildSpectrumMapping([pt(1, 4, 0.4), pt(2, 10), pt(1, 2, 2)]);
+    expect(m.count).toBe(2);
+    expect(m.sampleAt(1)!.strength).toBeCloseTo(0.3); // (4 + 2) / 2 / 10
+    expect(m.sampleAt(1)!.noisy).toBe(true); // mean σ 1.2 / mean flux 3 = 0.4
+  });
+
   it('reuses the out object and takes pitch from λ, not brightness (Q-58)', () => {
     const m = buildSpectrumMapping([pt(1, 10), pt(4, 1)]);
     const out = { wavelengthUm: 0, strength: 0, quiet: false, noisy: false, pitch: 0 };

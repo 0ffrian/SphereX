@@ -7,8 +7,14 @@ import { audioContextSupported, getAudioContext } from '../audioContext';
 import type { TrainCapableDriver, TrainWindow } from '../haptics';
 import { clamp01, pitchToHz } from '../pitch';
 import {
+  AUDIO_FLOOR_STRENGTH,
   AUDIO_LOOKAHEAD_S,
   AUDIO_PEAK_GAIN,
+  AUDIO_REANCHOR_TOLERANCE_S,
+  LIMITER_ATTACK_S,
+  LIMITER_RATIO,
+  LIMITER_RELEASE_S,
+  LIMITER_THRESHOLD_DB,
   CHIME_DECAY_S,
   CHIME_PARTIAL_GAIN,
   CHIME_PARTIAL_RATIO,
@@ -90,9 +96,29 @@ export interface AudioDriverOptions {
   supported?: boolean;
 }
 
+/**
+ * Gain of one sound at volume 1, before the soft-tone scale. Continuous in strength (R8.9), with an
+ * audible floor so the lowest level sounds whenever it vibrates: a quiet dip is silent because the
+ * source emits nothing, never because the gain is 0.
+ */
+export function audioGain(strength: number): number {
+  return Math.max(AUDIO_FLOOR_STRENGTH, clamp01(strength)) * AUDIO_PEAK_GAIN;
+}
+
 interface Voice {
   sources: AudioScheduledSourceNode[];
   nodes: AudioNode[];
+  /** Part of a pulse train: `stopTrain` cancels it, one-shots are left alone. */
+  train: boolean;
+}
+
+/** What one sound needs from a HapticEvent or a TrainWindow. */
+interface SoundSpec {
+  strength: number;
+  tag: Tag;
+  pitch?: number;
+  pan?: number;
+  voice?: HapticVoice;
 }
 
 export class AudioDriver implements TrainCapableDriver {
@@ -105,6 +131,8 @@ export class AudioDriver implements TrainCapableDriver {
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private readonly live = new Set<Voice>();
+  /** Engine time ↔ audio time of the running train (`seq` −1: none yet). */
+  private readonly anchor = { seq: -1, engineMs: 0, audioS: 0 };
 
   constructor(options: AudioDriverOptions = {}) {
     this.getContext = options.context ?? getAudioContext;
@@ -146,13 +174,13 @@ export class AudioDriver implements TrainCapableDriver {
   emit(e: HapticEvent): void {
     switch (e.kind) {
       case 'tick':
-        this.playOnsets(SINGLE_ONSET, 0, e.strength, e.tag, e.pitch, e.pan, e.voice);
+        this.playEvent(SINGLE_ONSET, e);
         break;
       case 'double':
-        this.playOnsets(DOUBLE_ONSETS, 0, e.strength, e.tag, e.pitch, e.pan, e.voice);
+        this.playEvent(DOUBLE_ONSETS, e);
         break;
       case 'heartbeat':
-        this.playOnsets(HEARTBEAT_ONSETS, 0, e.strength, e.tag, e.pitch, e.pan, e.voice);
+        this.playEvent(HEARTBEAT_ONSETS, e);
         break;
       case 'pulseTrain': {
         // R8.8 fallback, without phase: one window from now. The engine sends playTrain instead.
@@ -160,7 +188,7 @@ export class AudioDriver implements TrainCapableDriver {
         if (!(rate > 0)) return;
         const onsets: number[] = [];
         for (let t = 0; t < TRAIN_WINDOW_MS; t += 1000 / rate) onsets.push(t);
-        this.playOnsets(onsets, 0, e.strength, e.tag, e.pitch, e.pan, e.voice);
+        this.playEvent(onsets, e);
         break;
       }
       case 'stop':
@@ -169,8 +197,28 @@ export class AudioDriver implements TrainCapableDriver {
     }
   }
 
+  /**
+   * Train pulses are scheduled from one engine-time → audio-time anchor per train, set by its
+   * first window, so pulses stay sample-accurate across windows (R8.9). The anchor is reset when
+   * the audio clock has drifted from it by more than AUDIO_REANCHOR_TOLERANCE_S (a glitch, or a
+   * suspended context).
+   */
   playTrain(w: TrainWindow): void {
-    this.playOnsets(w.pulseOffsetsMs, w.resentCount, w.strength, w.tag, w.pitch, w.pan, w.voice);
+    if (!this.supported || w.pulseOffsetsMs.length <= w.resentCount) return;
+    const ctx = this.ready();
+    if (!ctx) return;
+    const a = this.anchor;
+    const predicted = a.audioS + (w.atMs - a.engineMs) / 1000;
+    if (
+      a.seq !== w.trainSeq ||
+      Math.abs(predicted - (ctx.currentTime + AUDIO_LOOKAHEAD_S)) > AUDIO_REANCHOR_TOLERANCE_S
+    ) {
+      a.seq = w.trainSeq;
+      a.engineMs = w.atMs;
+      a.audioS = ctx.currentTime + AUDIO_LOOKAHEAD_S;
+    }
+    const base = a.audioS + (w.atMs - a.engineMs) / 1000 + this.offset / 1000;
+    this.playOnsets(ctx, base, w.pulseOffsetsMs, w.resentCount, w, true);
   }
 
   /** Sound is never cancelled by a one-shot. */
@@ -178,10 +226,21 @@ export class AudioDriver implements TrainCapableDriver {
     return 0;
   }
 
+  /** Cancel train sounds only; one-shots (a firm coastline tick, a ringing chime) play on. */
+  stopTrain(): void {
+    for (const v of this.live) {
+      if (!v.train) continue;
+      this.release(v, true);
+      this.live.delete(v);
+    }
+    this.anchor.seq = -1;
+  }
+
   /** Cancel every scheduled and playing sound. */
   stop(): void {
     for (const v of this.live) this.release(v, true);
     this.live.clear();
+    this.anchor.seq = -1;
   }
 
   // ------------------------------------------------------------ graph
@@ -191,9 +250,22 @@ export class AudioDriver implements TrainCapableDriver {
     if (!ctx || ctx.state !== 'running') return null;
     if (ctx !== this.ctx) {
       this.ctx = ctx;
+      this.anchor.seq = -1;
       this.master = ctx.createGain();
       this.master.gain.value = this.vol;
-      this.master.connect(ctx.destination);
+      // A limiter after the master, so overlapping sounds (chimes, dense trains) do not clip.
+      if (typeof ctx.createDynamicsCompressor === 'function') {
+        const lim = ctx.createDynamicsCompressor();
+        lim.threshold.value = LIMITER_THRESHOLD_DB;
+        lim.knee.value = 0;
+        lim.ratio.value = LIMITER_RATIO;
+        lim.attack.value = LIMITER_ATTACK_S;
+        lim.release.value = LIMITER_RELEASE_S;
+        this.master.connect(lim);
+        lim.connect(ctx.destination);
+      } else {
+        this.master.connect(ctx.destination);
+      }
       const length = Math.max(1, Math.ceil(ctx.sampleRate * SURF_DURATION_S));
       this.noise = ctx.createBuffer(1, length, ctx.sampleRate);
       fillNoise(this.noise.getChannelData(0), NOISE_SEED);
@@ -201,24 +273,28 @@ export class AudioDriver implements TrainCapableDriver {
     return ctx;
   }
 
-  private playOnsets(
-    onsetsMs: readonly number[],
-    skip: number,
-    strength: number,
-    tag: Tag,
-    pitch: number | undefined,
-    pan: number | undefined,
-    voice: HapticVoice | undefined,
-  ): void {
-    if (!this.supported || onsetsMs.length <= skip) return;
+  private playEvent(onsetsMs: readonly number[], e: SoundSpec): void {
+    if (!this.supported) return;
     const ctx = this.ready();
     if (!ctx) return;
-    const timbre = selectTimbre(tag, voice);
-    const gain = clamp01(strength) * AUDIO_PEAK_GAIN * (timbre.soft ? SOFT_TONE_GAIN : 1);
-    if (gain <= 0) return; // quiet is silent in both channels (R8.9)
     const base = ctx.currentTime + AUDIO_LOOKAHEAD_S + this.offset / 1000;
+    this.playOnsets(ctx, base, onsetsMs, 0, e, false);
+  }
+
+  private playOnsets(
+    ctx: AudioContext,
+    baseS: number,
+    onsetsMs: readonly number[],
+    skip: number,
+    e: SoundSpec,
+    train: boolean,
+  ): void {
+    const timbre = selectTimbre(e.tag, e.voice);
+    const gain = audioGain(e.strength) * (timbre.soft ? SOFT_TONE_GAIN : 1);
+    if (!(gain > 0)) return;
     for (let i = skip; i < onsetsMs.length; i++) {
-      this.sound(ctx, base + onsetsMs[i]! / 1000, gain, timbre, pitch, pan);
+      const when = Math.max(ctx.currentTime, baseS + onsetsMs[i]! / 1000);
+      this.sound(ctx, when, gain, timbre, e.pitch, e.pan, train);
     }
   }
 
@@ -229,9 +305,10 @@ export class AudioDriver implements TrainCapableDriver {
     timbre: Timbre,
     pitch: number | undefined,
     pan: number | undefined,
+    train: boolean,
   ): void {
     const env = ctx.createGain();
-    const voice: Voice = { sources: [], nodes: [env] };
+    const voice: Voice = { sources: [], nodes: [env], train };
     let out: AudioNode = env;
     if (pan !== undefined && Number.isFinite(pan) && typeof ctx.createStereoPanner === 'function') {
       const p = ctx.createStereoPanner();

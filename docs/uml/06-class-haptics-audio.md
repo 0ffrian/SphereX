@@ -26,6 +26,7 @@ classDiagram
     <<interface>>
     +playTrain(w: TrainWindow) void
     +oneShotBlockMs(e: HapticEvent) number
+    +stopTrain() void
   }
   class TrainWindow {
     +rateHz, strength, tag, pitch, pan, voice
@@ -57,6 +58,7 @@ classDiagram
     +setVolume(v), setOffsetMs(ms)
     +outputLatency(), isHighLatency()
     timbre from tag, refined by voice
+    one clock anchor per train, limiter on the master
   }
   class SharedAudioContext {
     <<audioContext.ts>>
@@ -208,7 +210,7 @@ classDiagram
 ## Notes
 
 - The engine applies, in order: the honesty gate (D-21; `stop` is exempt), the R8.3 rate cap (≥ 25 ms between `tick`, `double` and `heartbeat`; at most 40 events in any 1 s window, a train window counting as one; `stop` exempt; extra events dropped, never queued), then the strength multiplier (R8.7). Only then does it fan out and fire `spherex:haptic` (D-20), even when no driver is active.
-- Pulse trains belong to the engine (Q-59): sources call `startTrain` / `updateTrain` / `stopTrain` and own no timers. The engine keeps each train's phase and sends explicit pulse times per 250 ms window, so 1–2 Hz swells play at their rate. One train at a time. A one-shot cancels the vibration pattern; the engine re-sends the cancelled pulses to vibration only (`resentCount`) once it ends.
+- Pulse trains belong to the engine (Q-59): sources call `startTrain` / `updateTrain` / `stopTrain` and own no timers. The engine keeps each train's phase and sends explicit pulse times per 250 ms window, so 1–2 Hz swells play at their rate; a late timer never moves the grid. One train at a time. A one-shot cancels the vibration pattern; the engine re-sends the cancelled pulses to vibration only (`resentCount`) once it ends. Stopping a train calls each driver's `stopTrain()`, which cancels train output only, never a playing one-shot. The vibration delay of the R8.9 offset is a timer per pattern (Q-61).
 - `WebVibrateDriver` maps `strength` to 3–4 equal bins (D-09). Its `supported` is false on iPhone, iPad and desktop, so it is a silent no-op there.
 - `AudioDriver` timbre (R8.9, Q-60): clean tone for `measured`, softer tone for the Estimated tags, a 4 ms noise grain for `artistic`. `voice` refines it: `surf` low-passed noise and `tone` a band-passed grain for `artistic`; `chime` a bell for the other tags. `artistic` never becomes a tone and the other tags never become noise.
 - Settings and calibration each persist under one `localStorage` key. `Calibration` types and `applyCalibration` are pinned in #9; the wizard, the maths and persistence come with #10 (diagram 13). Offset rule (R8.9): a positive `avOffsetMs` delays the audio, a negative one the vibration.

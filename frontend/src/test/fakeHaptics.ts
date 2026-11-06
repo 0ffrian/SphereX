@@ -55,6 +55,7 @@ export interface RecordedWindow {
   tag: HapticEvent['tag'];
   pulseOffsetsMs: number[];
   resentCount: number;
+  trainSeq: number;
 }
 
 /** Records everything it gets. Copies, because the engine reuses its event and window objects. */
@@ -62,6 +63,7 @@ export class FakeDriver implements TrainCapableDriver {
   readonly events: (HapticEvent & { at: number })[] = [];
   readonly windows: RecordedWindow[] = [];
   stops = 0;
+  trainStops = 0;
 
   constructor(
     private readonly clock: () => number,
@@ -81,6 +83,7 @@ export class FakeDriver implements TrainCapableDriver {
       tag: w.tag,
       pulseOffsetsMs: [...w.pulseOffsetsMs],
       resentCount: w.resentCount,
+      trainSeq: w.trainSeq,
     });
   }
 
@@ -90,6 +93,10 @@ export class FakeDriver implements TrainCapableDriver {
 
   stop(): void {
     this.stops++;
+  }
+
+  stopTrain(): void {
+    this.trainStops++;
   }
 
   /** Absolute times of every pulse sent for the first time (re-sent pulses excluded). */
@@ -124,4 +131,43 @@ export function fakeVibrate(): {
       return true;
     },
   };
+}
+
+export interface TimedCall {
+  at: number;
+  pattern: number | number[];
+}
+
+/** A recording `navigator.vibrate` that also notes when each call happened. */
+export function timedVibrate(clock: () => number): {
+  fn: (p: number | number[]) => boolean;
+  calls: TimedCall[];
+} {
+  const calls: TimedCall[] = [];
+  return {
+    calls,
+    fn: (p) => {
+      calls.push({ at: clock(), pattern: Array.isArray(p) ? [...p] : p });
+      return true;
+    },
+  };
+}
+
+/**
+ * What a phone motor would play for these calls: the start time of every vibration segment that
+ * actually starts. Each call replaces the previous pattern, so a segment that has not started
+ * when the next call comes never plays (navigator.vibrate semantics).
+ */
+export function motorOnsets(calls: readonly TimedCall[]): number[] {
+  const onsets: number[] = [];
+  calls.forEach((c, i) => {
+    const next = calls[i + 1]?.at ?? Infinity;
+    const p = typeof c.pattern === 'number' ? [c.pattern] : c.pattern;
+    let t = c.at;
+    p.forEach((v, j) => {
+      if (j % 2 === 0 && v > 0 && t < next) onsets.push(t);
+      t += v;
+    });
+  });
+  return onsets;
 }
