@@ -1,4 +1,350 @@
-// R8.9, D-10 audio driver (plays alongside vibration) — not implemented yet.
-// Placeholder only: no behaviour. Replace this export when the module is built.
+// R8.9, D-10, D-12: the audio driver. It plays alongside vibration on every platform, and is the
+// only output on iPhone, iPad and desktop. Strength is continuous gain (× volume), `pitch` sets the
+// frequency, `pan` a StereoPannerNode, and the provenance `tag` the timbre. Every sound is scheduled
+// on the shared AudioContext's clock (currentTime + lookahead), never with timers.
+import type { HapticEvent, HapticVoice, Tag } from '@/contract';
+import { audioContextSupported, getAudioContext } from '../audioContext';
+import type { TrainCapableDriver, TrainWindow } from '../haptics';
+import { clamp01, pitchToHz } from '../pitch';
+import {
+  AUDIO_LOOKAHEAD_S,
+  AUDIO_PEAK_GAIN,
+  CHIME_DECAY_S,
+  CHIME_PARTIAL_GAIN,
+  CHIME_PARTIAL_RATIO,
+  DEFAULT_VOLUME,
+  DOUBLE_PATTERN,
+  GRAIN_BANDPASS_Q,
+  HEARTBEAT_PATTERN,
+  HIGH_OUTPUT_LATENCY_S,
+  NOISE_BURST_S,
+  NOISE_DECAY_S,
+  SOFT_TONE_ATTACK_S,
+  SOFT_TONE_GAIN,
+  SURF_DURATION_S,
+  SURF_LOWPASS_HZ,
+  TONE_ATTACK_S,
+  TONE_BLIP_S,
+  TRAIN_WINDOW_MS,
+} from '../tuning';
 
-export const AUDIO_DRIVER_PLACEHOLDER = { spec: 'R8.9, D-10', implemented: false } as const;
+/** What makes the sound: a tone, a bell, a noise grain or low-passed noise (surf). */
+export type AudioSource = 'tone' | 'bell' | 'grain' | 'surf';
+
+export interface Timbre {
+  readonly source: AudioSource;
+  /** R8.9 "softer tone" for the Estimated tags: slower attack, lower gain. */
+  readonly soft: boolean;
+}
+
+const TIMBRES = {
+  tone: { source: 'tone', soft: false },
+  softTone: { source: 'tone', soft: true },
+  bell: { source: 'bell', soft: false },
+  softBell: { source: 'bell', soft: true },
+  grain: { source: 'grain', soft: false },
+  surf: { source: 'surf', soft: false },
+} as const satisfies Record<string, Timbre>;
+
+/**
+ * R8.9 provenance by timbre, refined by the D-12 `voice` hint (Q-60). The tag decides the family:
+ * `artistic` is always noise (grain, or surf for the ocean), so it keeps its grainy character
+ * whatever the voice says; the other tags are always tones (a bell for `chime`), never noise.
+ */
+export function selectTimbre(tag: Tag, voice?: HapticVoice): Timbre {
+  if (tag === 'artistic') return voice === 'surf' ? TIMBRES.surf : TIMBRES.grain;
+  const soft = tag !== 'measured';
+  if (voice === 'chime') return soft ? TIMBRES.softBell : TIMBRES.bell;
+  return soft ? TIMBRES.softTone : TIMBRES.tone;
+}
+
+/** Start times (ms) of the vibrating segments of a pattern: double and heartbeat sound in step. */
+export function patternOnsetsMs(pattern: readonly number[]): number[] {
+  const onsets: number[] = [];
+  let t = 0;
+  pattern.forEach((v, i) => {
+    if (i % 2 === 0) onsets.push(t);
+    t += v;
+  });
+  return onsets;
+}
+
+const DOUBLE_ONSETS = patternOnsetsMs(DOUBLE_PATTERN);
+const HEARTBEAT_ONSETS = patternOnsetsMs(HEARTBEAT_PATTERN);
+const SINGLE_ONSET: readonly number[] = [0];
+
+/** Deterministic noise (no Math.random): a 32-bit LCG. */
+function fillNoise(data: Float32Array, seed: number): void {
+  let x = seed >>> 0;
+  for (let i = 0; i < data.length; i++) {
+    x = (Math.imul(x, 1664525) + 1013904223) >>> 0;
+    data[i] = x / 2147483648 - 1;
+  }
+}
+const NOISE_SEED = 0x5eed;
+
+export interface AudioDriverOptions {
+  /** Where the context comes from. Default: the shared one (audioContext.ts), once unlocked. */
+  context?: () => AudioContext | null;
+  /** Default: a context can be made here (`audioContextSupported()`). */
+  supported?: boolean;
+}
+
+interface Voice {
+  sources: AudioScheduledSourceNode[];
+  nodes: AudioNode[];
+}
+
+export class AudioDriver implements TrainCapableDriver {
+  readonly supported: boolean;
+  private readonly getContext: () => AudioContext | null;
+  private vol = DEFAULT_VOLUME;
+  private offset = 0;
+  // Reused across sounds, per context.
+  private ctx: AudioContext | null = null;
+  private master: GainNode | null = null;
+  private noise: AudioBuffer | null = null;
+  private readonly live = new Set<Voice>();
+
+  constructor(options: AudioDriverOptions = {}) {
+    this.getContext = options.context ?? getAudioContext;
+    this.supported = options.supported ?? audioContextSupported();
+  }
+
+  /** R8.7 volume, 0–1. */
+  setVolume(v: number): void {
+    this.vol = clamp01(v);
+    if (this.master && this.ctx) this.master.gain.setValueAtTime(this.vol, this.ctx.currentTime);
+  }
+
+  get volume(): number {
+    return this.vol;
+  }
+
+  /** R8.9 offset: delay every sound by this many ms (when vibration is felt later than heard). */
+  setOffsetMs(ms: number): void {
+    this.offset = Number.isFinite(ms) && ms > 0 ? ms : 0;
+  }
+
+  get offsetMs(): number {
+    return this.offset;
+  }
+
+  /** `AudioContext.outputLatency` in seconds, or null where it is missing [verify on phones] (R12 #10). */
+  outputLatency(): number | null {
+    const ctx = this.getContext();
+    const v = (ctx as { outputLatency?: number } | null)?.outputLatency;
+    return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  }
+
+  /** R8.9: high output latency (likely Bluetooth): suggest the phone speaker or wired earphones. */
+  isHighLatency(): boolean {
+    const l = this.outputLatency();
+    return l !== null && l > HIGH_OUTPUT_LATENCY_S;
+  }
+
+  emit(e: HapticEvent): void {
+    switch (e.kind) {
+      case 'tick':
+        this.playOnsets(SINGLE_ONSET, 0, e.strength, e.tag, e.pitch, e.pan, e.voice);
+        break;
+      case 'double':
+        this.playOnsets(DOUBLE_ONSETS, 0, e.strength, e.tag, e.pitch, e.pan, e.voice);
+        break;
+      case 'heartbeat':
+        this.playOnsets(HEARTBEAT_ONSETS, 0, e.strength, e.tag, e.pitch, e.pan, e.voice);
+        break;
+      case 'pulseTrain': {
+        // R8.8 fallback, without phase: one window from now. The engine sends playTrain instead.
+        const rate = e.rateHz ?? 0;
+        if (!(rate > 0)) return;
+        const onsets: number[] = [];
+        for (let t = 0; t < TRAIN_WINDOW_MS; t += 1000 / rate) onsets.push(t);
+        this.playOnsets(onsets, 0, e.strength, e.tag, e.pitch, e.pan, e.voice);
+        break;
+      }
+      case 'stop':
+        this.stop();
+        break;
+    }
+  }
+
+  playTrain(w: TrainWindow): void {
+    this.playOnsets(w.pulseOffsetsMs, w.resentCount, w.strength, w.tag, w.pitch, w.pan, w.voice);
+  }
+
+  /** Sound is never cancelled by a one-shot. */
+  oneShotBlockMs(): number {
+    return 0;
+  }
+
+  /** Cancel every scheduled and playing sound. */
+  stop(): void {
+    for (const v of this.live) this.release(v, true);
+    this.live.clear();
+  }
+
+  // ------------------------------------------------------------ graph
+
+  private ready(): AudioContext | null {
+    const ctx = this.getContext();
+    if (!ctx || ctx.state !== 'running') return null;
+    if (ctx !== this.ctx) {
+      this.ctx = ctx;
+      this.master = ctx.createGain();
+      this.master.gain.value = this.vol;
+      this.master.connect(ctx.destination);
+      const length = Math.max(1, Math.ceil(ctx.sampleRate * SURF_DURATION_S));
+      this.noise = ctx.createBuffer(1, length, ctx.sampleRate);
+      fillNoise(this.noise.getChannelData(0), NOISE_SEED);
+    }
+    return ctx;
+  }
+
+  private playOnsets(
+    onsetsMs: readonly number[],
+    skip: number,
+    strength: number,
+    tag: Tag,
+    pitch: number | undefined,
+    pan: number | undefined,
+    voice: HapticVoice | undefined,
+  ): void {
+    if (!this.supported || onsetsMs.length <= skip) return;
+    const ctx = this.ready();
+    if (!ctx) return;
+    const timbre = selectTimbre(tag, voice);
+    const gain = clamp01(strength) * AUDIO_PEAK_GAIN * (timbre.soft ? SOFT_TONE_GAIN : 1);
+    if (gain <= 0) return; // quiet is silent in both channels (R8.9)
+    const base = ctx.currentTime + AUDIO_LOOKAHEAD_S + this.offset / 1000;
+    for (let i = skip; i < onsetsMs.length; i++) {
+      this.sound(ctx, base + onsetsMs[i]! / 1000, gain, timbre, pitch, pan);
+    }
+  }
+
+  private sound(
+    ctx: AudioContext,
+    when: number,
+    gain: number,
+    timbre: Timbre,
+    pitch: number | undefined,
+    pan: number | undefined,
+  ): void {
+    const env = ctx.createGain();
+    const voice: Voice = { sources: [], nodes: [env] };
+    let out: AudioNode = env;
+    if (pan !== undefined && Number.isFinite(pan) && typeof ctx.createStereoPanner === 'function') {
+      const p = ctx.createStereoPanner();
+      p.pan.value = Math.max(-1, Math.min(1, pan));
+      env.connect(p);
+      voice.nodes.push(p);
+      out = p;
+    }
+    out.connect(this.master!);
+    const g = env.gain;
+    g.setValueAtTime(0, when);
+    let end: number;
+
+    switch (timbre.source) {
+      case 'tone': {
+        const attack = timbre.soft ? SOFT_TONE_ATTACK_S : TONE_ATTACK_S;
+        end = when + Math.max(TONE_BLIP_S, attack * 2);
+        g.linearRampToValueAtTime(gain, when + attack);
+        g.linearRampToValueAtTime(0, end);
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = pitchToHz(pitch);
+        osc.connect(env);
+        voice.sources.push(osc);
+        break;
+      }
+      case 'bell': {
+        const attack = timbre.soft ? SOFT_TONE_ATTACK_S : TONE_ATTACK_S;
+        end = when + CHIME_DECAY_S;
+        g.linearRampToValueAtTime(gain, when + attack);
+        g.exponentialRampToValueAtTime(0.0001, end);
+        const f = pitchToHz(pitch);
+        const o1 = ctx.createOscillator();
+        o1.frequency.value = f;
+        o1.connect(env);
+        const o2 = ctx.createOscillator();
+        o2.frequency.value = f * CHIME_PARTIAL_RATIO;
+        const g2 = ctx.createGain();
+        g2.gain.value = CHIME_PARTIAL_GAIN;
+        o2.connect(g2);
+        g2.connect(env);
+        voice.sources.push(o1, o2);
+        voice.nodes.push(g2);
+        break;
+      }
+      case 'grain': {
+        // R8.9: a 4 ms noise burst with a 2 ms decay; with a pitch, band-passed there (Q-60).
+        end = when + NOISE_BURST_S + NOISE_DECAY_S;
+        g.setValueAtTime(gain, when);
+        g.setValueAtTime(gain, when + NOISE_BURST_S);
+        g.linearRampToValueAtTime(0, end);
+        const src = this.noiseSource(ctx);
+        if (pitch !== undefined && Number.isFinite(pitch)) {
+          const bp = ctx.createBiquadFilter();
+          bp.type = 'bandpass';
+          bp.frequency.value = pitchToHz(pitch);
+          bp.Q.value = GRAIN_BANDPASS_Q;
+          src.connect(bp);
+          bp.connect(env);
+          voice.nodes.push(bp);
+        } else {
+          src.connect(env);
+        }
+        voice.sources.push(src);
+        break;
+      }
+      case 'surf': {
+        // D-12 ocean: low-passed noise that swells and fades.
+        end = when + SURF_DURATION_S;
+        g.linearRampToValueAtTime(gain, when + SURF_DURATION_S / 2);
+        g.linearRampToValueAtTime(0, end);
+        const src = this.noiseSource(ctx);
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = SURF_LOWPASS_HZ;
+        src.connect(lp);
+        lp.connect(env);
+        voice.sources.push(src);
+        voice.nodes.push(lp);
+        break;
+      }
+    }
+
+    const first = voice.sources[0]!;
+    first.onended = () => {
+      if (this.live.delete(voice)) this.release(voice, false);
+    };
+    for (const s of voice.sources) {
+      s.start(when);
+      s.stop(end + 0.01);
+    }
+    this.live.add(voice);
+  }
+
+  private noiseSource(ctx: AudioContext): AudioBufferSourceNode {
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    return src;
+  }
+
+  /** Stop (when cancelling) and disconnect every node of a sound, so nothing leaks. */
+  private release(v: Voice, cancel: boolean): void {
+    for (const s of v.sources) {
+      if (cancel) {
+        s.onended = null;
+        try {
+          s.stop();
+        } catch {
+          // Already stopped.
+        }
+      }
+      s.disconnect();
+    }
+    for (const n of v.nodes) n.disconnect();
+  }
+}

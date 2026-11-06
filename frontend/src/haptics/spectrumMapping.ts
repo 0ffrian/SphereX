@@ -1,0 +1,95 @@
+// R8.6, R8.9: the one spectrum → sample mapping. The spectrum haptics source (#10) and the Listen
+// sweep (#11) both use it, so touch and sound match (R8.6 item 3). Pure: no browser globals.
+//   - flagged and non-finite points are dropped, the rest sorted by λ
+//   - strength = flux ÷ the largest flux of those points, linearly interpolated in λ, clamped 0–1
+//   - quiet when strength < 0.2 (absorption dips go silent in both channels)
+//   - noisy when σ/flux > 0.3 at the nearest point (its source jitters the tick spacing)
+//   - pitch from λ (pitch.ts)
+import type { SpectrumPoint } from '@/app/api/types';
+import { wavelengthToPitch } from './pitch';
+import { SPECTRUM_NOISY_SIGMA_RATIO, SPECTRUM_QUIET_THRESHOLD } from './tuning';
+
+export type SpectrumMappingPoint = Pick<
+  SpectrumPoint,
+  'wavelength_um' | 'flux' | 'error' | 'flagged'
+>;
+
+export interface SpectrumSample {
+  wavelengthUm: number;
+  /** Normalised flux, 0–1. */
+  strength: number;
+  quiet: boolean;
+  noisy: boolean;
+  /** 0–1, from λ. */
+  pitch: number;
+}
+
+export interface SpectrumMapping {
+  /** No usable point (none left, or no positive flux): nothing can be felt or heard. */
+  readonly empty: boolean;
+  /** λ range of the usable points (µm); NaN when empty. */
+  readonly lambdaMinUm: number;
+  readonly lambdaMaxUm: number;
+  /** Usable points kept, sorted by λ. */
+  readonly count: number;
+  /**
+   * The sample at λ, or null outside the usable range (or when empty). Pass `out` to reuse one
+   * object in a pointermove handler.
+   */
+  sampleAt(lambdaUm: number, out?: SpectrumSample): SpectrumSample | null;
+}
+
+export function isNoisy(flux: number, error: number): boolean {
+  if (!Number.isFinite(error) || error <= 0) return false;
+  if (!(flux > 0)) return true;
+  return error / flux > SPECTRUM_NOISY_SIGMA_RATIO;
+}
+
+export function buildSpectrumMapping(points: readonly SpectrumMappingPoint[]): SpectrumMapping {
+  const usable = points
+    .filter((p) => !p.flagged && Number.isFinite(p.wavelength_um) && Number.isFinite(p.flux))
+    .sort((a, b) => a.wavelength_um - b.wavelength_um);
+  const maxFlux = usable.reduce((m, p) => Math.max(m, p.flux), -Infinity);
+  const empty = usable.length === 0 || !(maxFlux > 0);
+
+  const n = empty ? 0 : usable.length;
+  const lambda = new Float64Array(n);
+  const norm = new Float64Array(n);
+  const noisy = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    const p = usable[i]!;
+    lambda[i] = p.wavelength_um;
+    norm[i] = Math.max(0, p.flux / maxFlux);
+    noisy[i] = isNoisy(p.flux, p.error) ? 1 : 0;
+  }
+  const lambdaMinUm = n > 0 ? lambda[0]! : NaN;
+  const lambdaMaxUm = n > 0 ? lambda[n - 1]! : NaN;
+
+  function sampleAt(lambdaUm: number, out?: SpectrumSample): SpectrumSample | null {
+    if (n === 0 || !(lambdaUm >= lambdaMinUm && lambdaUm <= lambdaMaxUm)) return null;
+    // First index with λ ≥ lambdaUm (binary search).
+    let lo = 0;
+    let hi = n - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (lambda[mid]! < lambdaUm) lo = mid + 1;
+      else hi = mid;
+    }
+    const i1 = lo;
+    const i0 = i1 > 0 ? i1 - 1 : 0;
+    const l0 = lambda[i0]!;
+    const l1 = lambda[i1]!;
+    const t = l1 > l0 ? (lambdaUm - l0) / (l1 - l0) : 1;
+    const strength = Math.min(1, Math.max(0, norm[i0]! + t * (norm[i1]! - norm[i0]!)));
+    const nearest = t < 0.5 ? i0 : i1;
+    const s = out ?? ({} as SpectrumSample);
+    s.wavelengthUm = lambdaUm;
+    s.strength = strength;
+    s.quiet = strength < SPECTRUM_QUIET_THRESHOLD;
+    s.noisy = noisy[nearest] === 1;
+    s.pitch = wavelengthToPitch(lambdaUm);
+    return s;
+  }
+
+  return { empty, lambdaMinUm, lambdaMaxUm, count: n, sampleAt };
+}

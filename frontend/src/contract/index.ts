@@ -31,6 +31,7 @@ export type {
   HapticKind,
   HapticEvent,
   HapticDriver,
+  HapticVoice,
   HapticProfile,
   TextureHaptic,
   DataHaptic,
