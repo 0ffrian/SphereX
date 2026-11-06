@@ -28,3 +28,9 @@ export const YEAR_S = 365.25 * 86400;
 export const E51_J = 1e44;
 
 export const HOUR_S = 3600;
+
+/**
+ * A7.1 rule threshold shared by the physics layer and the viewer: lava glow starts near 700 K.
+ * Both use `Teq > LAVA_START_K` (glow strength is 0 at exactly 700 K), so they never disagree.
+ */
+export const LAVA_START_K = 700;

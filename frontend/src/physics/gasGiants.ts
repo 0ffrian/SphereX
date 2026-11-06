@@ -4,7 +4,7 @@
 import type { ObjectCard } from '@/contract';
 import { G, GM_EARTH, HOUR_S, R_JUP_M } from './constants';
 import { derivePlanetInto } from './planets';
-import type { Overrides } from './sliders';
+import type { Overrides } from '@/viewer/sliders';
 import { InputReader, need, positive, ResultBuilder, type PhysicsResult } from './tagging';
 
 /** A7.2: `f = 0.7 * q`, a rule of thumb calibrated on Jupiter and Saturn. */

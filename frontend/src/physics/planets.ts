@@ -2,10 +2,20 @@
 // atmosphere is kept, and the ice / ocean / lava thresholds. Used by planet_rocky, planet_water and
 // gas_giant (gas giants add A7.2 in gasGiants.ts). Pure functions; same inputs, same outputs.
 import type { ObjectCard } from '@/contract';
-import { AMU_KG, AU_M, GM_EARTH, K_B, R_EARTH_M, R_JUP_M, R_SUN_M } from './constants';
-import type { Overrides } from './sliders';
+import {
+  AMU_KG,
+  AU_M,
+  GM_EARTH,
+  K_B,
+  LAVA_START_K,
+  R_EARTH_M,
+  R_JUP_M,
+  R_SUN_M,
+} from './constants';
+import type { Overrides } from '@/viewer/sliders';
 import {
   asInput,
+  inputAsValue,
   InputReader,
   need,
   positive,
@@ -23,7 +33,7 @@ export const ATMOSPHERE_RETENTION_FACTOR = 6;
 /** A7.1: polar ice below about 330 K, oceans removed above about 450 K, lava glow near 700 K. */
 export const POLAR_ICE_BELOW_K = 330;
 export const OCEANS_REMOVED_ABOVE_K = 450;
-export const LAVA_GLOW_FROM_K = 700;
+// The lava threshold, LAVA_START_K, lives in constants.ts: the viewer (shaderPalette.ts) uses it too.
 
 /**
  * Gases tested for retention, molar mass in g/mol (standard atomic weights).
@@ -87,6 +97,11 @@ export const rjupToRearth = (rjup: number): number => (rjup * R_JUP_M) / R_EARTH
 // ---- Family function --------------------------------------------------------------------------
 
 const S = 'A7.1';
+/**
+ * Echo of the Teq the rules used (star sliders, the teq_K slider, or the card), with the tag and
+ * source of where it came from. Not a new value: a card Teq keeps the card's own tag.
+ */
+export const TEQ_USED_ID = 'teq_used_K';
 const SURFACE_TYPES = new Set(['planet_rocky', 'planet_water']);
 const STAR_KEYS = ['star_teff_K', 'star_radius_rsun', 'semi_major_axis_au', 'bond_albedo'] as const;
 
@@ -95,12 +110,16 @@ const STAR_KEYS = ['star_teff_K', 'star_radius_rsun', 'semi_major_axis_au', 'bon
  * else the card's `teq_K` (Exoplanet Archive `pl_eqt` or the backend's A7.1 value, D-12).
  * Star sliders that are set but unused are reported: shadowed by the `teq_K` slider they go in
  * `ignored`; when only some are set, `teq_from_star` is refused and names the ones still needed.
- * A Teq that is not above 0 K is not usable and is treated as missing.
+ * A Teq that is not above 0 K is not usable and is treated as missing. When the star sliders are
+ * all set but give no usable Teq, `teq_K` is refused and the card value is not used either, so
+ * `missing` never contradicts the Teq in use. The Teq actually used, from whichever source, is
+ * echoed with its own tag in `values.teq_used_K` (TEQ_USED_ID).
  */
 function readTeq(r: InputReader, out: ResultBuilder): PhysicsInput | null {
   const slider = r.read('teq_K');
   if (slider) {
     for (const k of STAR_KEYS) if (r.has(k)) r.ignore(k);
+    out.set(TEQ_USED_ID, inputAsValue(slider, S));
     return slider;
   }
   const star = need({
@@ -123,12 +142,16 @@ function readTeq(r: InputReader, out: ResultBuilder): PhysicsInput | null {
       inputs,
       { section: S, formula: 'Teq = T_star * sqrt(R_star / (2a)) * (1 - A)^(1/4)' },
     );
-    if (tv) return asInput('teq_K', tv);
+    if (!tv) return null;
+    out.set(TEQ_USED_ID, { ...tv });
+    return asInput('teq_K', tv);
   } else if (STAR_KEYS.some((k) => r.has(k))) {
     out.refuse('teq_from_star', star.absent);
   }
   const card = r.readCard('teq_K');
-  return card && positive(card.value) ? card : null;
+  if (!card || !positive(card.value) || !r.cardTv('teq_K')) return null;
+  out.set(TEQ_USED_ID, { ...r.cardTv('teq_K')! });
+  return card;
 }
 
 /** A7.1 values for one planet. Returns `values`, the refused quantities and ignored overrides. */
@@ -220,7 +243,8 @@ function deriveSurface(teq: PhysicsInput | null, out: ResultBuilder): void {
   const rules: Record<(typeof ids)[number], [boolean, string]> = {
     polar_ice: [t < POLAR_ICE_BELOW_K, `Teq < ${POLAR_ICE_BELOW_K} K`],
     oceans: [t <= OCEANS_REMOVED_ABOVE_K, `Teq <= ${OCEANS_REMOVED_ABOVE_K} K`],
-    lava_glow: [t >= LAVA_GLOW_FROM_K, `Teq >= ${LAVA_GLOW_FROM_K} K`],
+    // Same comparison as the viewer's lavaHeatFromTeq: glow is 0 at exactly LAVA_START_K.
+    lava_glow: [t > LAVA_START_K, `Teq > ${LAVA_START_K} K`],
   };
   for (const id of ids) {
     const [value, formula] = rules[id];

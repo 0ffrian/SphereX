@@ -1,6 +1,6 @@
 # Pipeline
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4–A4.8 · **Implements:** D-04, D-16, D-19 · **Read with:** [data-contract.md](data-contract.md)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4–A4.8 · **Implements:** D-04, D-16, D-19, D-31 · **Read with:** [data-contract.md](data-contract.md)
 
 ## A4 Pipeline
 
@@ -41,10 +41,10 @@ Each stage has one job, takes defined inputs and returns defined outputs. Stages
   3. Use the variance layer for error bars: `σ = 1e12·Ω·sqrt(Σ w²V + (Σw)²·var_B)`, `var_B = max(ΣV/N², s²/N)`.
   4. Look up each frame's wavelength at the object's pixel from the wavelength map. Stage 1's `wcs.wavelength_at` already does this (SIP cleared); Stage 2 reuses the frame's value.
   5. Convert to flux density: `F = 1e12·Ω·Σ w (I − B)` in **µJy** (`flux_unit: "uJy"`), with Ω the pixel solid angle at the object pixel from the TAN-SIP WCS (checked 5 Nov 2026: Ω/(1″)² agrees with the IMAGE header's `OMEGA_MEDIAN`, the median of IRSA's solid-angle pixel map in arcsec², to within 0.8 % on all 15 cached cutouts; the map's own spread `OMEGA_STDDEV` is about 0.5 %). No aperture correction (Q-23).
-- **Refusals** (in `missing` as `<reason>:<frame_id>`, never a guessed value): `saturated` (core `OVERFLOW`, or a NaN core with `OVERFLOW`/`SUR_ERROR` in the aperture), `aperture_flags`, `aperture_edge`, `background`, `unit`, `extension`, `flags_header`, `pixel_area`, `measure`, `cutout_unreadable`, `cutout`. When every listed frame is refused as saturated, `missing` also holds `spectrum:saturated` (Q-26). Stage 1's own `missing` entries are passed through.
+- **Refusals** (in `missing` as `<reason>:<frame_id>`, never a guessed value): `saturated` (core `OVERFLOW`, or a NaN core with `OVERFLOW`/`SUR_ERROR` in the aperture), `aperture_flags`, `aperture_edge`, `background`, `unit`, `extension`, `flags_header`, `pixel_area`, `measure`, `cutout_unreadable`, `cutout`. When every listed frame is refused as saturated, `missing` also holds `spectrum:saturated` (D-31). Stage 1's own `missing` entries are passed through.
 - **Output:** a spectrum `[(wavelength_um, flux, error, flagged)]` and a light curve `[(time, flux, error)]`, built from the same measurements. Optional per-point fields: `bandwidth_um`, `dropped_flags`, `dropped_weight_fraction`, `flag_reasons` (incl. `no_proper_motion`); light-curve points carry `wavelength_um` and `flagged`, because each SPHEREx frame is a different band (Q-24).
 - **Endpoint:** `GET /v1/objects/{id}/spectrum` returns both, tagged `measured` (D-16), with a `provenance` map (flux and error formulas) and `cached_at`. Stage 2 reads only cutouts already in the cache (one read each) and never downloads; an uncached cutout is refused as `cutout:<frame_id>`. The result is cached as `derived.spectrum`, keyed by `DERIVATION_VERSION`, the measure version, the method settings, Stage 1's `missing`, every frame record and every cutout's SHA-256; it is stored, and served from the cache, only while the frame list is complete.
-- **Status:** Built (issue #2). On the recorded fixtures, Epsilon Indi B and WISE 0855 give measured points; Barnard's Star, RW Aur and R Dra are refused as saturated in every recorded frame (Q-26). On the full offline cache (6 Nov 2026) the counts are: Barnard's Star 0 points (239 `saturated`, 1 `aperture_flags`); eps Ind B 297 points (28 `aperture_flags`); WISE 0855 237 points (19 `aperture_flags`); RW Aur 15 points at 0.74–1.09 µm (200 `saturated`, 7 `aperture_flags`, 2 `aperture_edge`); R Dra 0 points (530 `saturated`, 6 `aperture_edge`, 1 Stage 1 `outside_cutout`). `spectrum:saturated` is therefore absent for Barnard's Star and R Dra there; the UI states why there is no spectrum from the grouped counts, not from that code (issue #24).
+- **Status:** Built (issue #2). On the recorded fixtures, Epsilon Indi B and WISE 0855 give measured points; Barnard's Star, RW Aur and R Dra are refused as saturated in every recorded frame (D-31). On the full offline cache (6 Nov 2026) the counts are: Barnard's Star 0 points (239 `saturated`, 1 `aperture_flags`); eps Ind B 297 points (28 `aperture_flags`); WISE 0855 237 points (19 `aperture_flags`); RW Aur 15 points at 0.74–1.09 µm (200 `saturated`, 7 `aperture_flags`, 2 `aperture_edge`); R Dra 0 points (530 `saturated`, 6 `aperture_edge`, 1 Stage 1 `outside_cutout`). `spectrum:saturated` is therefore absent for Barnard's Star and R Dra there; the UI states why there is no spectrum from the grouped counts, not from that code (issue #24). The demo objects (D-31) on the same cache: SIMP 0136 236 points (13 `aperture_flags`); TWA 27 377 points (43 `aperture_flags`, 1 `saturated`); IRAS 04302+2247 197 points, every one flagged `no_proper_motion` (13 `aperture_flags`, 1 `aperture_edge`, 1 `saturated`). Each of those two `saturated` refusals is a dead core pixel (NaN with `NONFUNC` and `OVERFLOW`), not a saturated source.
 
 ### A4.3 Stage 3: Classify and pick a type
 
@@ -61,7 +61,7 @@ Each stage has one job, takes defined inputs and returns defined outputs. Stages
   | This doc | `planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova` |
 
   The old `dwarf` kind maps to `brown_dwarf`. The old `asteroid` kind maps to `asteroid_shape` or `asteroid_procedural`.
-- **Status:** To build.
+- **Status:** Built (issue #5, `backend/app/core/classify/`). The class label is taken from the catalogue only (SIMBAD `sp_type`, SBDB `spec_B` then `spec_T`); its confidence is `catalogue` or `none`, and spectrum matching against reference types (step 2) is not built (Q-55). Exoplanet types are refused while R12 #12 has no thresholds: the object falls through to `candidate` with `type:exoplanet_thresholds` in `missing` (Q-56).
 
 ### A4.4 Stage 4: Check for a saved asset
 
@@ -79,25 +79,28 @@ What a saved asset holds: [section 5.4](data-contract.md#a54-asset-store) (D-22)
 
 This is the lookup flow shown in the Surface Lab "Lookup" card of the mock-up.
 
+**Status:** Built (issue #5, `backend/app/core/card/assets.py`). Pre-baked assets are read from `backend/assets/<type>/<id>.json` (A5.4; the id is percent-encoded). Generated assets are saved as `derived.asset` cache entries keyed by id, data release, `ASSET_VERSION` and the stage 7 `GENERATOR_VERSION` (which holds the baker's rules version), so a rule or release change never serves a stale asset, and only when their inputs are final (a spectrum from a complete frame list, and a catalogue match or typed coordinates), so a truncated search is never frozen into a saved asset. A saved asset is returned without re-running stages 3 and 7. A saved or pre-baked asset whose card id or params id is not the requested id, whose card and params disagree on `type`, or that fails the schema check is ignored with a warning, and the asset is built from the catalogues instead of returning an error. Where this differs from A5.4 (generated assets in IndexedDB) is Q-57. The status is sent as the `X-SX-Asset-Status` response header (Q-39).
+
 ### A4.5 Stage 5: ObjectCard
 
 The backend builds the **ObjectCard**: every known value for the object, each as a tagged value with its source (rendering doc §3.1, §3.2). Missing values are `null`, never a guess.
 
 - **Endpoint:** `GET /v1/objects/{id}/card` (D-16).
 - **Schema:** [section 5](data-contract.md#a5-data-contract).
+- **Status:** Built (issue #5, `backend/app/core/card/build.py`). Only the fields the object's type uses (R7) are written; a field with no source is `value: null` with the reason in `source`. Every reply is validated with `jsonschema` against `shared/schemas/` (Q-40). `cached_at` (D-16) is the `X-SX-Cached-At` response header, because the R3.2 shape forbids extra fields (Q-39).
 
 ### A4.6 Stage 6: Physics layer
 
 Pure functions that turn measured values into `derived` values, each with its stated formula ([section 7](physics.md#a7-physics-layer)). The backend fills them into the card. In the browser the same functions rerun on every slider change against the `overrides` ([section 5.3](data-contract.md#a53-overrides)). The result is never written back to the card as truth.
 
-- **Status:** Built in the browser only (`frontend/src/physics/`, issue #13). The backend half is not built (Q-45).
+- **Status:** Built in the browser only (`frontend/src/physics/`, issue #13). The backend half is not built (Q-60).
 
 ### A4.7 Stage 7: RenderParams
 
 The backend turns the ObjectCard into **RenderParams** with deterministic rules (rendering doc §3.4, §6.2). The frontend renders RenderParams only. RenderParams lists the layers (each with a tag), texture URLs, lighting, view modes, the haptic profile, the alt text and the layers refused for `missing` data.
 
 - **Endpoint:** `GET /v1/objects/{id}/render-params` (D-16).
-- **Status:** To build.
+- **Status:** Built (issue #5, `backend/app/core/render/card_to_params.py`). Seed = first 4 bytes of SHA-256(`id` + newline + `generator_version`) (Q-35). Texture URLs follow R6.7 with the Q-47 size directory (`2048x1024`); the endpoint does not bake or serve the textures yet. `candidate` gets a RenderParams with no layers and `mesh` in `missing` (Q-33). Refusals from earlier stages (`catalogue`, `spectrum`, `type:exoplanet_thresholds`) are appended to `missing`.
 
 ### A4.8 Stages 8 to 10: Generators
 

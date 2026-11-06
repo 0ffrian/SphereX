@@ -12,7 +12,7 @@ import { clampIndex, DEFAULT_FPS, nextIndex, type Fps } from '@/app/flipbook/pla
 import { formatCoords, formatUtc, formatWavelength } from '@/app/format';
 import { spectrumAnnouncement } from '@/app/messages';
 import { summarizeSpectrum } from '@/app/refusals';
-import { isValidOverride, type Overrides, type SliderKey } from '@/physics/sliders';
+import { isValidOverride, type Overrides, type SliderKey } from '@/viewer/sliders';
 
 /**
  * Honesty toggle (D-21, R5.3): Measured only, + Estimated, + Artistic. The value names the most
@@ -21,8 +21,8 @@ import { isValidOverride, type Overrides, type SliderKey } from '@/physics/slide
  */
 export type HonestyState = 'measured' | 'derived' | 'artistic';
 
-/** D-02 / D-27 client-side overrides: slider key → value in card units (`@/physics/sliders`). */
-export type { Overrides } from '@/physics/sliders';
+/** D-02 / D-27 client-side overrides: slider key → value in card units (`@/viewer/sliders`). */
+export type { Overrides } from '@/viewer/sliders';
 
 /** What the status line reports about the 3D renderer. */
 export type RendererStatus = 'starting' | RendererBackend | 'unavailable';
@@ -142,8 +142,8 @@ export interface AppData {
   card: ObjectCard | null;
   params: RenderParams | null;
   /**
-   * D-21 sets the starting state to + Estimated; wiring that default is a follow-up (M2), so
-   * this is still `null` here. Code must not treat `null` as any of the three states.
+   * D-21 (answers Q-08): the toggle starts at + Estimated (`derived`). The type still allows
+   * `null`; the viewer reads it through `effectiveHonesty()`, which maps `null` to the same default.
    */
   honesty: HonestyState | null;
   overrides: Overrides;
@@ -159,9 +159,10 @@ export interface AppActions {
   /**
    * D-27: only registered slider keys type-check. A value is stored only when a card is loaded and
    * `isValidOverride` accepts it for the card's type (applies, finite, in range); otherwise the
-   * call is a no-op. `undefined` clears that one slider so its data value shows again.
+   * call changes nothing and returns false, so the caller can say why. `undefined` clears that
+   * one slider so its data value shows again (returns true).
    */
-  setOverride(key: SliderKey, value: number | boolean | undefined): void;
+  setOverride(key: SliderKey, value: number | boolean | undefined): boolean;
   /** D-02 Reset: drop every user edit so the card's data values show again. */
   resetOverrides(): void;
   setRendererStatus(status: RendererStatus): void;
@@ -193,7 +194,7 @@ export type AppStore = AppData & AppActions;
 export const initialAppData: AppData = {
   card: null,
   params: null,
-  honesty: null,
+  honesty: 'derived',
   overrides: {},
   rendererStatus: 'starting',
   sky: initialSkyState,
@@ -208,17 +209,20 @@ export const useAppStore = create<AppStore>()((set, get) => {
     setObject: (card, params) => set({ card, params, overrides: {} }),
     clearObject: () => set({ card: null, params: null, overrides: {} }),
     setHonesty: (honesty) => set({ honesty }),
-    setOverride: (key, value) =>
-      set((s) => {
-        if (value === undefined) {
-          if (!(key in s.overrides)) return s;
+    setOverride: (key, value) => {
+      const s = get();
+      if (value === undefined) {
+        if (key in s.overrides) {
           const rest = { ...s.overrides };
           delete rest[key];
-          return { overrides: rest };
+          set({ overrides: rest });
         }
-        if (!s.card || !isValidOverride(s.card.type, key, value)) return s;
-        return { overrides: { ...s.overrides, [key]: value } };
-      }),
+        return true;
+      }
+      if (!s.card || !isValidOverride(s.card.type, key, value)) return false;
+      set({ overrides: { ...s.overrides, [key]: value } });
+      return true;
+    },
     resetOverrides: () => set({ overrides: {} }),
     setRendererStatus: (rendererStatus) => set({ rendererStatus }),
 

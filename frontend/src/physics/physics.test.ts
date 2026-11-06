@@ -4,18 +4,19 @@ import { describe, expect, it } from 'vitest';
 import { assertTagged, OBJECT_TYPES, type ObjectCard, type ObjectType, type TV } from '@/contract';
 import { minElongation, spinLimitH } from './asteroids';
 import { spectralLetterFromTeff } from './brownDwarfs';
-import { AMU_KG, E51_J, PC_M, YEAR_S } from './constants';
+import { AMU_KG, E51_J, LAVA_START_K, PC_M, R_EARTH_M, R_JUP_M, YEAR_S } from './constants';
 import { bandCount, flattening, mearthToKg, rhinesLengthM, spinRateRadS } from './gasGiants';
+import { derivePhysics, selectPhysics } from './index';
 import {
   BAKED_SLIDER_GROUPS,
-  derivePhysics,
   isValidOverride,
-  selectPhysics,
-  SHADER_KINDS,
+  SLIDERS,
   SLIDER_REGISTRY,
   slidersFor,
   type Overrides,
-} from './index';
+} from '@/viewer/sliders';
+import { isShaderKind } from '@/viewer/renderers/shaderSpec';
+import { lavaHeatFromTeq } from '@/viewer/renderers/shaderPalette';
 import {
   bulkDensityGcm3,
   equilibriumTempK,
@@ -29,7 +30,6 @@ import { sedovRadiusPc } from './snr';
 /** A7.5 SI form `R = 1.15 * (E t^2 / rho)^(1/5)`, metres. Test-only cross-check of the typical form. */
 const sedovRadiusM = (energyJ: number, ageS: number, densityKgM3: number): number =>
   1.15 * Math.pow((energyJ * ageS ** 2) / densityKgM3, 1 / 5);
-import { R_EARTH_M, R_JUP_M } from './constants';
 
 const CARDS = import.meta.glob<ObjectCard>('../../../shared/fixtures/cards/*.json', {
   eager: true,
@@ -82,7 +82,7 @@ describe('A7.2 Jupiter band count', () => {
     const res = derivePhysics(card, { rot_period_h: 9.9, zonal_wind_ms: 50, mass_mearth: 317.83 });
     const n = res.values.band_count!;
     expect(Math.round(n.value as number)).toBe(22); // R = 7.1492e7 m, P = 9.9 h: about 22.4
-    expect(n.tag).toBe('derived');
+    expect(n.tag).toBe('artistic'); // spin and wind are slider settings (R1.2, Q-58 b)
     expect(n.formula).toMatch(/sqrt\(2 Omega R \/ U\)/);
     expect(res.values.flattening).toBeDefined();
   });
@@ -184,7 +184,8 @@ describe('A7.1 planets', () => {
     expect(hot.values.keeps_N2!.value).toBe(true);
     expect(hot.values.keeps_CO2!.value).toBe(true);
     expect(hot.values.keeps_H2!.value).toBe(false); // 6 * 2.87 km/s > 11.2 km/s
-    expect(hot.values.keeps_N2!.tag).toBe('model_dependent');
+    // Every input is a slider, so the rule's model_dependent tag is weakened to artistic.
+    expect(hot.values.keeps_N2!.tag).toBe('artistic');
     expect(hot.values.keeps_N2!.assumption).toMatch(/T = Teq/);
     expect(hot.values.lava_glow!.value).toBe(true);
 
@@ -205,7 +206,55 @@ describe('A7.1 planets', () => {
       bond_albedo: 0.306,
     });
     expect(tvNum(res.values.teq_K)).toBeCloseTo(254, 0);
-    expect(res.values.teq_K!.tag).toBe('derived');
+    expect(res.values.teq_K!.tag).toBe('artistic');
+    expect(res.values.teq_K!.formula).toMatch(/T_star/);
+  });
+
+  it('R1.2: values computed from a slider are artistic ("your setting"), never derived', () => {
+    const card: ObjectCard = {
+      id: 't',
+      name: 't',
+      type: 'planet_rocky',
+      radius_rjup: {
+        value: R_EARTH_M / R_JUP_M,
+        tag: 'measured',
+        source: 'test input',
+      },
+    };
+    const res = derivePhysics(card, { mass_mearth: 6000 });
+    for (const id of ['density_g_cm3', 'gravity_m_s2', 'escape_speed_km_s']) {
+      expect(res.values[id]!.tag, id).toBe('artistic');
+      expect(res.values[id]!.assumption, id).toMatch(/mass_mearth: 6000 \(your setting\)/);
+      expect(res.values[id]!.formula, id).toBeTruthy();
+    }
+  });
+
+  it('reports the Teq used, from the card or from the teq_K slider', () => {
+    const card: ObjectCard = {
+      id: 't',
+      name: 't',
+      type: 'planet_rocky',
+      teq_K: { value: 900, tag: 'measured', source: 'test input' },
+    };
+    const fromCard = derivePhysics(card, {});
+    expect(fromCard.values.teq_used_K).toEqual(card.teq_K);
+    expect(fromCard.values.teq_K).toBeUndefined(); // not computed here
+    const fromSlider = derivePhysics(card, { teq_K: 400 });
+    expect(tvNum(fromSlider.values.teq_used_K)).toBe(400);
+    expect(fromSlider.values.teq_used_K!.tag).toBe('artistic');
+    expect(fromSlider.values.lava_glow!.value).toBe(false);
+  });
+
+  it('lava glow agrees with the viewer at the shared threshold (exactly 700 K: no glow)', () => {
+    const card: ObjectCard = { id: 't', name: 't', type: 'planet_rocky' };
+    for (const t of [LAVA_START_K - 1, LAVA_START_K, LAVA_START_K + 1]) {
+      const glow = derivePhysics(card, { teq_K: t }).values.lava_glow!.value;
+      expect(glow, `${t} K`).toBe(lavaHeatFromTeq(t) > 0);
+    }
+  });
+
+  it('rot_period_h reaches slow rotators (Venus, about 5,832 h)', () => {
+    expect(isValidOverride('asteroid_shape', 'rot_period_h', 5832)).toBe(true);
   });
 
   it('refuses mass-based values when no mass is set (the card has no mass field)', () => {
@@ -242,6 +291,7 @@ describe('A7.1 planets', () => {
       'bond_albedo',
     ]);
     expect(res.values.teq_K).toBeUndefined();
+    expect(res.values.teq_used_K).toEqual(card.teq_K); // the card value, with the card's tag
   });
 
   it('a teq_K slider shadows the star sliders, which are reported as ignored', () => {
@@ -320,6 +370,7 @@ describe('physics results', () => {
     const res = derivePhysics(fixture(type), RICH[type] ?? {});
     for (const [id, tv] of Object.entries(res.values)) {
       expect(() => assertTagged(tv, id)).not.toThrow();
+      if (id === 'teq_used_K') continue; // an echo of an input, keeping the input's own tag
       expect(tv.formula, id).toBeTruthy();
       expect(tv.source).toMatch(/^physics layer A7\./);
     }
@@ -366,7 +417,7 @@ describe('physics results', () => {
   });
 
   it('reports an invalid override even when no A7 rule reads it (viewer-only spin)', () => {
-    const res = derivePhysics(fixture('brown_dwarf'), { rot_period_h: 5000 });
+    const res = derivePhysics(fixture('brown_dwarf'), { rot_period_h: 20000 });
     expect(res.ignored).toEqual(['rot_period_h']);
   });
 
@@ -385,9 +436,8 @@ describe('physics results', () => {
 
 describe('slider registry', () => {
   it('keys are unique and every range is sane', () => {
-    const keys = SLIDER_REGISTRY.map((s) => s.key);
-    expect(new Set(keys).size).toBe(keys.length);
-    for (const s of SLIDER_REGISTRY) {
+    for (const [name, s] of Object.entries(SLIDER_REGISTRY)) expect(s.key).toBe(name);
+    for (const s of SLIDERS) {
       expect(s.min, s.key).toBeLessThan(s.max);
       expect(s.step, s.key).toBeGreaterThan(0);
       expect(s.appliesTo.length, s.key).toBeGreaterThan(0);
@@ -396,7 +446,7 @@ describe('slider registry', () => {
 
   it('D-26: baked types only get colour, lighting and spin sliders', () => {
     for (const type of OBJECT_TYPES) {
-      if (SHADER_KINDS.includes(type)) continue;
+      if (isShaderKind(type)) continue;
       for (const s of slidersFor(type))
         expect(BAKED_SLIDER_GROUPS, `${type}/${s.key}`).toContain(s.group);
     }

@@ -1,7 +1,7 @@
 // Shared plumbing for the physics families: read an input from the card or the overrides, and
 // wrap a computed number in a tagged value (R3.1, D-02). Nothing here writes to the card.
 import type { ObjectCard, Tag, TV, TVNumber } from '@/contract';
-import { isValidOverride, sliderApplies, type Overrides, type SliderKey } from './sliders';
+import { isValidOverride, sliderApplies, type Overrides, type SliderKey } from '@/viewer/sliders';
 
 /** One resolved input: its value, where it came from, and the provenance it carries. */
 export interface PhysicsInput {
@@ -24,6 +24,35 @@ export interface PhysicsResult {
    * not finite) or shadowed by another slider. Keys that do not apply to the type are left out.
    */
   ignored: SliderKey[];
+}
+
+/**
+ * A slider value is the visitor's choice, not a measurement, so it is not `derived` (R1.2). It is
+ * tagged `artistic` (D-12, D-02 "Default" badge) with the value named as "your setting", and every
+ * output it feeds is weakened to `artistic` by the weakest-input rule (Q-58 b).
+ */
+export function sliderInput(key: SliderKey, value: number): PhysicsInput {
+  return {
+    name: key,
+    value,
+    from: 'slider',
+    tag: 'artistic',
+    assumption: `${value} (your setting)`,
+  };
+}
+
+/**
+ * A slider or physics input shown as a value of its own (e.g. the Teq actually used), keeping its
+ * tag and assumption. A card input is shown as the card's own TV instead (it keeps its formula).
+ */
+export function inputAsValue(input: PhysicsInput, section: string): TV<number> {
+  const tv: TV<number> = {
+    value: input.value,
+    tag: input.tag,
+    source: `physics layer ${section}; ${input.from} ${input.name}`,
+  };
+  if (input.assumption) tv.assumption = input.assumption;
+  return tv;
 }
 
 /** Card fields a slider may override, by the same name and unit (D-27). */
@@ -52,7 +81,7 @@ export class InputReader {
   read(key: SliderKey, cardKey?: CardNumberKey): PhysicsInput | null {
     const o = this.overrides[key];
     if (o !== undefined && isValidOverride(this.card.type, key, o)) {
-      return { name: key, value: o as number, from: 'slider', tag: 'derived' };
+      return sliderInput(key, o);
     }
     return cardKey ? this.readCard(cardKey) : null;
   }
@@ -65,6 +94,11 @@ export class InputReader {
   /** Records an override that was set but not used. */
   ignore(key: SliderKey): void {
     if (!this.ignored.includes(key)) this.ignored.push(key);
+  }
+
+  /** The card's own tagged value for `cardKey`, or undefined. */
+  cardTv(cardKey: CardNumberKey): TVNumber | undefined {
+    return this.card[cardKey] as TVNumber | undefined;
   }
 
   /** A card-only input (no slider exists for it). */
@@ -99,7 +133,8 @@ export interface DeriveOptions {
 /**
  * Tag rule: `derived` with the formula, weakened to the weakest input tag (a `model_dependent`
  * input or rule makes the output `model_dependent`, with every assumption listed). Slider inputs
- * count as `derived` here (Q-43). The formula is kept on every tag.
+ * are `artistic` (`sliderInput`), so anything computed from one is `artistic` (Q-58 b). The
+ * formula is kept on every tag.
  */
 export function derive<T extends number | boolean | string>(
   value: T,
