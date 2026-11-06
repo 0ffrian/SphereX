@@ -37,3 +37,15 @@ export function platformEnv(): PlatformEnv {
 export function defaultOutputs(env: PlatformEnv = platformEnv()): OutputDefaults {
   return { hapticsOn: env.android && env.coarsePointer, soundOn: true };
 }
+
+/**
+ * Whether this device has a vibration motor the app should talk about (Q-73). `navigator.vibrate`
+ * also exists in desktop Chrome, where nothing vibrates, so "supported" alone is not enough: the
+ * device must also be Android with a touch screen. Use this for every user-facing "can vibrate".
+ */
+export function deviceVibrates(
+  vibrateSupported: boolean,
+  env: PlatformEnv = platformEnv(),
+): boolean {
+  return vibrateSupported && env.android && env.coarsePointer;
+}
