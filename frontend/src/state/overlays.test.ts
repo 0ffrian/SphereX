@@ -92,6 +92,21 @@ describe('overlays in the sky slice', () => {
     expect(sky().overlays.status).toBe('ready');
   });
 
+  it('keeps the previous reply drawn when a reload fails', async () => {
+    store().skyToggleOverlay('fov');
+    await flush();
+    await flush();
+    const before = sky().overlays.data;
+    expect(before).not.toBeNull();
+    setSkyApi({
+      ...fixtureApi,
+      getOverlays: () => Promise.reject(new ApiError('server', 'down', 503)),
+    });
+    await store().skyLoadOverlays();
+    expect(sky().overlays.status).toBe('error');
+    expect(sky().overlays.data).toBe(before);
+  });
+
   it('does not load on switch-off or on a search', async () => {
     const getOverlays = vi.spyOn(fixtureApi, 'getOverlays');
     await store().skySearch({ q: 'R Dra', kind: 'name', origin: 'input' });
