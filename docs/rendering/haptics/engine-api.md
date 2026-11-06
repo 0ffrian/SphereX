@@ -82,7 +82,7 @@ Event sources (`sources/heightMap.ts`, `meshNormal.ts`, `field.ts`, `dataPulse.t
 6. **`buildHaptics` options:** `overrides` (required, the D-27 overrides the body was built with), `planBodies` (the comet nucleus), `heightGrid` (`loadHeightGrid(params.textures.height_bin)`), `epoch` and `gas` (the comet toggle and the gas selected on the spectrum), and `meshNormals: true` only once a `three-mesh-bvh` raycast fills `TouchSample.normal` (Q-78). Rebuild when the body, overrides, epoch or gas change; show `missing` with the other refusals.
 7. **Light curve:** the scrubber calls `TouchHaptics.scrub(index)` and `endScrub()`.
 8. **Spectrum:** mount `SpectrumHapticsPad` over `SpectrumChart` with the chart's `lambdaDomain`.
-9. **Listen tab:** `ListenSweep.play(planSweep(mapping, gasLinesForEpoch(card, epoch)), engine.honesty)` from the Listen button's click, after `engine.unlock()`.
+9. **Listen tab:** from the Listen button's click, `const plan = planSweep(mapping, gasLinesForEpoch(card, epoch))`; when `plan` is null (no usable spectrum, or one wavelength) say there is nothing to play, otherwise `engine.unlock()` and then `sweep.play(plan, engine.honesty)` (as the test page's Texture panel does). Bind the sweep to the honesty toggle as well, `bindHonesty(sweep, get, subscribe)`, so `ListenSweep.setHonesty` stops a tone or chime the new state hides.
 10. **PR #33** changes `viewer/sliders.ts` (`Overrides` readonly; invalid overrides no longer clamped). `profiles.ts` passes `overrides` to `resolveShaderSpec`: re-run the `profiles` tests after #33 merges.
 
 **From the mock-up (D-20).** This discrete `HapticEvent` is the app API; it carries the `tag` that the honesty rule and the audio timbre need.
