@@ -6,6 +6,7 @@ An LLM never produces a number here. Missing data means ``BakeRefusal``, not a g
 from __future__ import annotations
 
 import math
+import numbers
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -54,8 +55,9 @@ class BakeParams:
     redness: float = 0.0
     band_contrast: float = 0.0
     haze: float = 0.0
-    # Inputs that were absent: "colour" (neutral grey albedo), "brightness" (no albedo value),
-    # "bands" (no ch4_depth_33). The viewer must not draw those layers as data.
+    # Inputs that were absent: "albedo_map" (no colour: neutral grey), "gaia_rgb" (present but
+    # unusable), "brightness" (no albedo value), "bands" (no ch4_depth_33). The viewer must not
+    # draw those layers as data.
     missing: tuple[str, ...] = ()
 
 
@@ -66,9 +68,12 @@ def _val(card: Mapping[str, Any], key: str) -> Any:
 
 def _number(card: Mapping[str, Any], key: str) -> float | None:
     v = _val(card, key)
-    if isinstance(v, bool) or not isinstance(v, int | float):
+    if isinstance(v, bool) or not isinstance(v, numbers.Real):
         return None
-    x = float(v)
+    try:
+        x = float(v)
+    except OverflowError:  # a JSON integer such as 10**400
+        return None
     return x if math.isfinite(x) else None  # NaN and inf are unknown, never a value (Q-40)
 
 
@@ -78,9 +83,10 @@ def _rgb(card: Mapping[str, Any], key: str) -> tuple[float, float, float] | None
         return None
     out: list[float] = []
     for c in v:
-        if isinstance(c, bool) or not isinstance(c, int | float) or not math.isfinite(c):
+        x = _number({"c": {"value": c}}, "c")
+        if x is None:
             return None
-        out.append(float(c))
+        out.append(x)
     return (out[0], out[1], out[2])
 
 
@@ -104,12 +110,19 @@ def _asteroid(card: Mapping[str, Any], seed: int) -> BakeParams:
     missing: list[str] = []
     cls = _val(card, "spectral_class")
     letter = cls.strip()[:1].upper() if isinstance(cls, str) else ""
-    base = _rgb(card, "gaia_rgb") or ASTEROID_PALETTE.get(letter)
+    gaia = _rgb(card, "gaia_rgb")
+    if gaia is None and _val(card, "gaia_rgb") is not None:
+        missing.append(
+            "gaia_rgb"
+        )  # present but unusable: the palette colour is analog, not derived
+    base = gaia or ASTEROID_PALETTE.get(letter)
     if base is None:
-        # Only the albedo layer needs a colour (R7.2): height and normals are still baked,
-        # and the albedo map is a neutral grey that the viewer must not present as colour.
+        # Only the albedo layer needs a colour (R7.2): height and normals are still baked.
+        # The albedo.webp stays only because RenderParams.textures requires it; it is a neutral
+        # grey from no measurement, so card_to_params must refuse the `albedo_map` layer and the
+        # visible mode when `albedo_map` is listed here (Q-47).
         base = NEUTRAL_RGB
-        missing.append("colour")
+        missing.append("albedo_map")
     albedo = _number(card, "albedo")
     if albedo is None:
         brightness = 1.0  # not the R6.2 formula: listed so card_to_params can say so

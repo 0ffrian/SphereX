@@ -27,7 +27,7 @@ sequenceDiagram
   N-->>B: Normal map
   B->>PA: base_rgb x brightness x small variation, hydration and redness rules
   PA-->>B: Albedo map
-  B->>TC: Write albedo.webp, height.png, height.bin (float16), normal.png and bake.json (params hash) under id/generator_version/seed; skip if bake.json matches
+  B->>TC: Write albedo.webp, height.png, height.bin (float16), normal.png and bake.json (params hash) under id/generator_version/seed/WxH; skip if bake.json matches
   B-->>API: Texture URLs
 
   opt Gemini repaint (P3 stretch, behind admin token)
