@@ -21,7 +21,7 @@ If two docs disagree and `decisions.md` is silent, follow the precedence (decisi
 - **Pinned versions only.** Never "latest". three.js is **r187** (`three/webgpu`). If an API is not in r187, check the r187 docs before using it.
 - **Data first.** An LLM never produces a physical number. Code converts measurements to parameters deterministically.
 - **Provenance on everything.** Every value and render layer carries one tag: `measured`, `derived`, `model_dependent`, `inferred_from_analog`, `artistic`. The UI shows them as 3 badges (see decisions D-02).
-- **Refuse rather than invent.** Missing data → the layer is not drawn and is listed in `missing`.
+- **Fall back a tier, don't invent.** A missing value drops one tier and is labelled with it (D-31); a layer is refused and listed in `missing` only when no tier can answer. Physical size and ObjectCard values are still never guessed.
 - **Determinism.** Same ObjectCard + seed → byte-identical textures.
 - **Never blank.** The code path loads first; optional layers (Gemini) swap in only on success.
 - Do not invent fields, endpoints or library APIs that are not in the specs. Items marked **[verify]** must be checked against real output first.

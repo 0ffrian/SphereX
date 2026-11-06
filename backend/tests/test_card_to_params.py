@@ -45,10 +45,23 @@ def test_fixture_card_matches_the_fixture_params(kind: str) -> None:
     """The hand-written fixtures encode the R7 rules; the code must give the same plan."""
     ref = load(kind, "params")
     p = params_for(load(kind, "cards"))
-    assert [(x["id"], x["tag"], x["requires"]) for x in p["layers"]] == [
-        (x["id"], x["tag"], x["requires"]) for x in ref["layers"]
-    ]
-    assert p["missing"] == ref["missing"]
+
+    def plan(layers: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
+        return [
+            (
+                x["id"],
+                x["tag"],
+                x["tier"],
+                x["requires"],
+                "formula" in x,
+                sorted(x.get("assumed", {})),
+            )
+            for x in layers
+        ]
+
+    assert plan(p["layers"]) == plan(ref["layers"])  # D-31: tier, formula and assumed keys too
+    # Stage 6 (dynamics, a later ticket) is not built, so its refusals are not in the live output.
+    assert p["missing"] == [m for m in ref["missing"] if not m.startswith("dynamics:")]
     assert p["haptics"] == ref["haptics"]
     if "sun_vector" in load(kind, "cards"):
         assert p["lighting"] == ref["lighting"]
@@ -218,3 +231,32 @@ def test_spherex_rgb_window_rule() -> None:
     assert spherex_rgb(pts[:-1], CHANNELS_SMALL_BODY) is None
     assert spherex_rgb([*pts[:-1], pt(1.01, 1.0, True)], CHANNELS_SMALL_BODY) is None
     assert window_median([pt(4.5, 1.0), pt(4.56, 9.0)], 4.5) is None
+
+
+def test_model_dependent_input_without_a_value_states_its_assumption() -> None:
+    """D-31: `assumed` names what was assumed; a null input falls back to its R3.1 assumption."""
+    from app.core.render.card_to_params import _Plan
+
+    card = {
+        "albedo": {
+            "value": None,
+            "tag": "model_dependent",
+            "source": "test",
+            "assumption": "typical S-type albedo",
+        }
+    }
+    plan = _Plan()
+    plan.layer(True, "material", "model_dependent", "d", ["albedo"], card=card, formula="f")
+    assert plan.layers[0]["assumed"] == {"albedo": "typical S-type albedo"}
+    assert plan.layers[0]["tier"] == 3
+
+
+def test_model_dependent_layer_with_nothing_assumed_is_a_bug_not_a_guess() -> None:
+    """Measured inputs are never relabelled as assumed (D-31)."""
+    from app.core.render.card_to_params import _Plan
+
+    card = {"diameter_km": {"value": 10.0, "tag": "measured", "source": "test"}}
+    with pytest.raises(ValueError, match="assumed"):
+        _Plan().layer(True, "x", "model_dependent", "d", ["diameter_km"], card=card, formula="f")
+    with pytest.raises(ValueError, match="formula"):
+        _Plan().layer(True, "x", "derived", "d", ["diameter_km"], card=card)

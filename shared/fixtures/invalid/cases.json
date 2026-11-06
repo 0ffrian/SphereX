@@ -422,7 +422,8 @@
           "id": "x",
           "tag": "estimated",
           "description": "x",
-          "requires": []
+          "requires": [],
+          "tier": 5
         }
       ],
       "lighting": {
@@ -574,6 +575,849 @@
         "mesh",
         "visible"
       ]
+    }
+  },
+  {
+    "name": "layer with a tier that does not match its tag",
+    "schema": "render-params",
+    "expect": {
+      "path": "/layers/2/tier",
+      "keyword": "const"
+    },
+    "instance": {
+      "id": "fixture:star",
+      "type": "star",
+      "generator_version": "fixture-0",
+      "seed": 8,
+      "scale_m": 695000000.0,
+      "layers": [
+        {
+          "id": "colour",
+          "tag": "derived",
+          "tier": 2,
+          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "requires": [
+            "teff_K"
+          ],
+          "formula": "Teff to sRGB through a blackbody lookup table"
+        },
+        {
+          "id": "limb_darkening",
+          "tag": "model_dependent",
+          "tier": 3,
+          "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+          "requires": [],
+          "formula": "I(mu) = 1 - 0.6 * (1 - mu)",
+          "assumed": {
+            "limb_u": 0.6
+          }
+        },
+        {
+          "id": "motion_trail",
+          "tag": "measured",
+          "tier": 2,
+          "description": "Motion trail from pm_mas_yr over the SPHEREx epochs (R7.5).",
+          "requires": [
+            "pm_mas_yr"
+          ]
+        }
+      ],
+      "lighting": {
+        "mode": "self"
+      },
+      "view_modes": {
+        "visible": {
+          "available": true,
+          "badge": "Estimated visible colour",
+          "rgb": {
+            "value": [
+              1.0,
+              0.5,
+              0.25
+            ],
+            "tag": "derived",
+            "source": "synthetic fixture: not a real measurement",
+            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+          },
+          "source": "class_palette"
+        }
+      },
+      "haptics": {
+        "texture": "none",
+        "texture_tag": "artistic",
+        "data": "motion",
+        "data_tag": "measured",
+        "params": {}
+      },
+      "dynamics": {
+        "spin_period_h": {
+          "value": 600.0,
+          "tag": "derived",
+          "tier": 2,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "P = 2 pi R / v_eq"
+        },
+        "spot_lifetime_d": {
+          "value": 30.0,
+          "tag": "model_dependent",
+          "tier": 3,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "tau = 30 d * (R / R_sun)^2",
+          "assumed": {
+            "typical_class_lifetime_d": 30.0
+          }
+        },
+        "flare_rate_per_d": {
+          "value": 0.5,
+          "tag": "inferred_from_analog",
+          "tier": 4,
+          "source": "synthetic fixture: not a real measurement"
+        },
+        "speedup": {
+          "spin": 86400,
+          "spots": 86400,
+          "flares": 86400
+        }
+      },
+      "alt_text": "Synthetic fixture. Star, 1 solar radius (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
+      "missing": []
+    }
+  },
+  {
+    "name": "layer without a tier",
+    "schema": "render-params",
+    "expect": {
+      "path": "/layers/2",
+      "keyword": "required",
+      "detail": "tier"
+    },
+    "instance": {
+      "id": "fixture:star",
+      "type": "star",
+      "generator_version": "fixture-0",
+      "seed": 8,
+      "scale_m": 695000000.0,
+      "layers": [
+        {
+          "id": "colour",
+          "tag": "derived",
+          "tier": 2,
+          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "requires": [
+            "teff_K"
+          ],
+          "formula": "Teff to sRGB through a blackbody lookup table"
+        },
+        {
+          "id": "limb_darkening",
+          "tag": "model_dependent",
+          "tier": 3,
+          "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+          "requires": [],
+          "formula": "I(mu) = 1 - 0.6 * (1 - mu)",
+          "assumed": {
+            "limb_u": 0.6
+          }
+        },
+        {
+          "id": "motion_trail",
+          "tag": "measured",
+          "description": "Motion trail from pm_mas_yr over the SPHEREx epochs (R7.5).",
+          "requires": [
+            "pm_mas_yr"
+          ]
+        }
+      ],
+      "lighting": {
+        "mode": "self"
+      },
+      "view_modes": {
+        "visible": {
+          "available": true,
+          "badge": "Estimated visible colour",
+          "rgb": {
+            "value": [
+              1.0,
+              0.5,
+              0.25
+            ],
+            "tag": "derived",
+            "source": "synthetic fixture: not a real measurement",
+            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+          },
+          "source": "class_palette"
+        }
+      },
+      "haptics": {
+        "texture": "none",
+        "texture_tag": "artistic",
+        "data": "motion",
+        "data_tag": "measured",
+        "params": {}
+      },
+      "dynamics": {
+        "spin_period_h": {
+          "value": 600.0,
+          "tag": "derived",
+          "tier": 2,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "P = 2 pi R / v_eq"
+        },
+        "spot_lifetime_d": {
+          "value": 30.0,
+          "tag": "model_dependent",
+          "tier": 3,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "tau = 30 d * (R / R_sun)^2",
+          "assumed": {
+            "typical_class_lifetime_d": 30.0
+          }
+        },
+        "flare_rate_per_d": {
+          "value": 0.5,
+          "tag": "inferred_from_analog",
+          "tier": 4,
+          "source": "synthetic fixture: not a real measurement"
+        },
+        "speedup": {
+          "spin": 86400,
+          "spots": 86400,
+          "flares": 86400
+        }
+      },
+      "alt_text": "Synthetic fixture. Star, 1 solar radius (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
+      "missing": []
+    }
+  },
+  {
+    "name": "derived layer without a formula",
+    "schema": "render-params",
+    "expect": {
+      "path": "/layers/0",
+      "keyword": "required",
+      "detail": "formula"
+    },
+    "instance": {
+      "id": "fixture:star",
+      "type": "star",
+      "generator_version": "fixture-0",
+      "seed": 8,
+      "scale_m": 695000000.0,
+      "layers": [
+        {
+          "id": "colour",
+          "tag": "derived",
+          "tier": 2,
+          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "requires": [
+            "teff_K"
+          ]
+        },
+        {
+          "id": "limb_darkening",
+          "tag": "model_dependent",
+          "tier": 3,
+          "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+          "requires": [],
+          "formula": "I(mu) = 1 - 0.6 * (1 - mu)",
+          "assumed": {
+            "limb_u": 0.6
+          }
+        },
+        {
+          "id": "motion_trail",
+          "tag": "measured",
+          "tier": 1,
+          "description": "Motion trail from pm_mas_yr over the SPHEREx epochs (R7.5).",
+          "requires": [
+            "pm_mas_yr"
+          ]
+        }
+      ],
+      "lighting": {
+        "mode": "self"
+      },
+      "view_modes": {
+        "visible": {
+          "available": true,
+          "badge": "Estimated visible colour",
+          "rgb": {
+            "value": [
+              1.0,
+              0.5,
+              0.25
+            ],
+            "tag": "derived",
+            "source": "synthetic fixture: not a real measurement",
+            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+          },
+          "source": "class_palette"
+        }
+      },
+      "haptics": {
+        "texture": "none",
+        "texture_tag": "artistic",
+        "data": "motion",
+        "data_tag": "measured",
+        "params": {}
+      },
+      "dynamics": {
+        "spin_period_h": {
+          "value": 600.0,
+          "tag": "derived",
+          "tier": 2,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "P = 2 pi R / v_eq"
+        },
+        "spot_lifetime_d": {
+          "value": 30.0,
+          "tag": "model_dependent",
+          "tier": 3,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "tau = 30 d * (R / R_sun)^2",
+          "assumed": {
+            "typical_class_lifetime_d": 30.0
+          }
+        },
+        "flare_rate_per_d": {
+          "value": 0.5,
+          "tag": "inferred_from_analog",
+          "tier": 4,
+          "source": "synthetic fixture: not a real measurement"
+        },
+        "speedup": {
+          "spin": 86400,
+          "spots": 86400,
+          "flares": 86400
+        }
+      },
+      "alt_text": "Synthetic fixture. Star, 1 solar radius (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
+      "missing": []
+    }
+  },
+  {
+    "name": "model_dependent layer without assumed",
+    "schema": "render-params",
+    "expect": {
+      "path": "/layers/1",
+      "keyword": "required",
+      "detail": "assumed"
+    },
+    "instance": {
+      "id": "fixture:star",
+      "type": "star",
+      "generator_version": "fixture-0",
+      "seed": 8,
+      "scale_m": 695000000.0,
+      "layers": [
+        {
+          "id": "colour",
+          "tag": "derived",
+          "tier": 2,
+          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "requires": [
+            "teff_K"
+          ],
+          "formula": "Teff to sRGB through a blackbody lookup table"
+        },
+        {
+          "id": "limb_darkening",
+          "tag": "model_dependent",
+          "tier": 3,
+          "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+          "requires": [],
+          "formula": "I(mu) = 1 - 0.6 * (1 - mu)"
+        },
+        {
+          "id": "motion_trail",
+          "tag": "measured",
+          "tier": 1,
+          "description": "Motion trail from pm_mas_yr over the SPHEREx epochs (R7.5).",
+          "requires": [
+            "pm_mas_yr"
+          ]
+        }
+      ],
+      "lighting": {
+        "mode": "self"
+      },
+      "view_modes": {
+        "visible": {
+          "available": true,
+          "badge": "Estimated visible colour",
+          "rgb": {
+            "value": [
+              1.0,
+              0.5,
+              0.25
+            ],
+            "tag": "derived",
+            "source": "synthetic fixture: not a real measurement",
+            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+          },
+          "source": "class_palette"
+        }
+      },
+      "haptics": {
+        "texture": "none",
+        "texture_tag": "artistic",
+        "data": "motion",
+        "data_tag": "measured",
+        "params": {}
+      },
+      "dynamics": {
+        "spin_period_h": {
+          "value": 600.0,
+          "tag": "derived",
+          "tier": 2,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "P = 2 pi R / v_eq"
+        },
+        "spot_lifetime_d": {
+          "value": 30.0,
+          "tag": "model_dependent",
+          "tier": 3,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "tau = 30 d * (R / R_sun)^2",
+          "assumed": {
+            "typical_class_lifetime_d": 30.0
+          }
+        },
+        "flare_rate_per_d": {
+          "value": 0.5,
+          "tag": "inferred_from_analog",
+          "tier": 4,
+          "source": "synthetic fixture: not a real measurement"
+        },
+        "speedup": {
+          "spin": 86400,
+          "spots": 86400,
+          "flares": 86400
+        }
+      },
+      "alt_text": "Synthetic fixture. Star, 1 solar radius (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
+      "missing": []
+    }
+  },
+  {
+    "name": "dynamics value with a tier that does not match its tag",
+    "schema": "render-params",
+    "expect": {
+      "path": "/dynamics/spin_period_h/tier",
+      "keyword": "const"
+    },
+    "instance": {
+      "id": "fixture:star",
+      "type": "star",
+      "generator_version": "fixture-0",
+      "seed": 8,
+      "scale_m": 695000000.0,
+      "layers": [
+        {
+          "id": "colour",
+          "tag": "derived",
+          "tier": 2,
+          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "requires": [
+            "teff_K"
+          ],
+          "formula": "Teff to sRGB through a blackbody lookup table"
+        },
+        {
+          "id": "limb_darkening",
+          "tag": "model_dependent",
+          "tier": 3,
+          "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+          "requires": [],
+          "formula": "I(mu) = 1 - 0.6 * (1 - mu)",
+          "assumed": {
+            "limb_u": 0.6
+          }
+        },
+        {
+          "id": "motion_trail",
+          "tag": "measured",
+          "tier": 1,
+          "description": "Motion trail from pm_mas_yr over the SPHEREx epochs (R7.5).",
+          "requires": [
+            "pm_mas_yr"
+          ]
+        }
+      ],
+      "lighting": {
+        "mode": "self"
+      },
+      "view_modes": {
+        "visible": {
+          "available": true,
+          "badge": "Estimated visible colour",
+          "rgb": {
+            "value": [
+              1.0,
+              0.5,
+              0.25
+            ],
+            "tag": "derived",
+            "source": "synthetic fixture: not a real measurement",
+            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+          },
+          "source": "class_palette"
+        }
+      },
+      "haptics": {
+        "texture": "none",
+        "texture_tag": "artistic",
+        "data": "motion",
+        "data_tag": "measured",
+        "params": {}
+      },
+      "dynamics": {
+        "spin_period_h": {
+          "value": 600.0,
+          "tag": "derived",
+          "tier": 4,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "P = 2 pi R / v_eq"
+        },
+        "spot_lifetime_d": {
+          "value": 30.0,
+          "tag": "model_dependent",
+          "tier": 3,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "tau = 30 d * (R / R_sun)^2",
+          "assumed": {
+            "typical_class_lifetime_d": 30.0
+          }
+        },
+        "flare_rate_per_d": {
+          "value": 0.5,
+          "tag": "inferred_from_analog",
+          "tier": 4,
+          "source": "synthetic fixture: not a real measurement"
+        },
+        "speedup": {
+          "spin": 86400,
+          "spots": 86400,
+          "flares": 86400
+        }
+      },
+      "alt_text": "Synthetic fixture. Star, 1 solar radius (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
+      "missing": []
+    }
+  },
+  {
+    "name": "dynamics without speedup",
+    "schema": "render-params",
+    "expect": {
+      "path": "/dynamics",
+      "keyword": "required",
+      "detail": "speedup"
+    },
+    "instance": {
+      "id": "fixture:star",
+      "type": "star",
+      "generator_version": "fixture-0",
+      "seed": 8,
+      "scale_m": 695000000.0,
+      "layers": [
+        {
+          "id": "colour",
+          "tag": "derived",
+          "tier": 2,
+          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "requires": [
+            "teff_K"
+          ],
+          "formula": "Teff to sRGB through a blackbody lookup table"
+        },
+        {
+          "id": "limb_darkening",
+          "tag": "model_dependent",
+          "tier": 3,
+          "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+          "requires": [],
+          "formula": "I(mu) = 1 - 0.6 * (1 - mu)",
+          "assumed": {
+            "limb_u": 0.6
+          }
+        },
+        {
+          "id": "motion_trail",
+          "tag": "measured",
+          "tier": 1,
+          "description": "Motion trail from pm_mas_yr over the SPHEREx epochs (R7.5).",
+          "requires": [
+            "pm_mas_yr"
+          ]
+        }
+      ],
+      "lighting": {
+        "mode": "self"
+      },
+      "view_modes": {
+        "visible": {
+          "available": true,
+          "badge": "Estimated visible colour",
+          "rgb": {
+            "value": [
+              1.0,
+              0.5,
+              0.25
+            ],
+            "tag": "derived",
+            "source": "synthetic fixture: not a real measurement",
+            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+          },
+          "source": "class_palette"
+        }
+      },
+      "haptics": {
+        "texture": "none",
+        "texture_tag": "artistic",
+        "data": "motion",
+        "data_tag": "measured",
+        "params": {}
+      },
+      "dynamics": {
+        "spin_period_h": {
+          "value": 600.0,
+          "tag": "derived",
+          "tier": 2,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "P = 2 pi R / v_eq"
+        },
+        "spot_lifetime_d": {
+          "value": 30.0,
+          "tag": "model_dependent",
+          "tier": 3,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "tau = 30 d * (R / R_sun)^2",
+          "assumed": {
+            "typical_class_lifetime_d": 30.0
+          }
+        },
+        "flare_rate_per_d": {
+          "value": 0.5,
+          "tag": "inferred_from_analog",
+          "tier": 4,
+          "source": "synthetic fixture: not a real measurement"
+        }
+      },
+      "alt_text": "Synthetic fixture. Star, 1 solar radius (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
+      "missing": []
+    }
+  },
+  {
+    "name": "dynamics speedup with an unknown process key",
+    "schema": "render-params",
+    "expect": {
+      "path": "/dynamics/speedup",
+      "keyword": "enum"
+    },
+    "instance": {
+      "id": "fixture:star",
+      "type": "star",
+      "generator_version": "fixture-0",
+      "seed": 8,
+      "scale_m": 695000000.0,
+      "layers": [
+        {
+          "id": "colour",
+          "tag": "derived",
+          "tier": 2,
+          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "requires": [
+            "teff_K"
+          ],
+          "formula": "Teff to sRGB through a blackbody lookup table"
+        },
+        {
+          "id": "limb_darkening",
+          "tag": "model_dependent",
+          "tier": 3,
+          "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+          "requires": [],
+          "formula": "I(mu) = 1 - 0.6 * (1 - mu)",
+          "assumed": {
+            "limb_u": 0.6
+          }
+        },
+        {
+          "id": "motion_trail",
+          "tag": "measured",
+          "tier": 1,
+          "description": "Motion trail from pm_mas_yr over the SPHEREx epochs (R7.5).",
+          "requires": [
+            "pm_mas_yr"
+          ]
+        }
+      ],
+      "lighting": {
+        "mode": "self"
+      },
+      "view_modes": {
+        "visible": {
+          "available": true,
+          "badge": "Estimated visible colour",
+          "rgb": {
+            "value": [
+              1.0,
+              0.5,
+              0.25
+            ],
+            "tag": "derived",
+            "source": "synthetic fixture: not a real measurement",
+            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+          },
+          "source": "class_palette"
+        }
+      },
+      "haptics": {
+        "texture": "none",
+        "texture_tag": "artistic",
+        "data": "motion",
+        "data_tag": "measured",
+        "params": {}
+      },
+      "dynamics": {
+        "spin_period_h": {
+          "value": 600.0,
+          "tag": "derived",
+          "tier": 2,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "P = 2 pi R / v_eq"
+        },
+        "spot_lifetime_d": {
+          "value": 30.0,
+          "tag": "model_dependent",
+          "tier": 3,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "tau = 30 d * (R / R_sun)^2",
+          "assumed": {
+            "typical_class_lifetime_d": 30.0
+          }
+        },
+        "flare_rate_per_d": {
+          "value": 0.5,
+          "tag": "inferred_from_analog",
+          "tier": 4,
+          "source": "synthetic fixture: not a real measurement"
+        },
+        "speedup": {
+          "spin": 86400,
+          "spots": 86400,
+          "flares": 86400,
+          "warp": 10
+        }
+      },
+      "alt_text": "Synthetic fixture. Star, 1 solar radius (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
+      "missing": []
+    }
+  },
+  {
+    "name": "dynamics speedup of zero",
+    "schema": "render-params",
+    "expect": {
+      "path": "/dynamics/speedup/spin",
+      "keyword": "exclusiveMinimum"
+    },
+    "instance": {
+      "id": "fixture:star",
+      "type": "star",
+      "generator_version": "fixture-0",
+      "seed": 8,
+      "scale_m": 695000000.0,
+      "layers": [
+        {
+          "id": "colour",
+          "tag": "derived",
+          "tier": 2,
+          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "requires": [
+            "teff_K"
+          ],
+          "formula": "Teff to sRGB through a blackbody lookup table"
+        },
+        {
+          "id": "limb_darkening",
+          "tag": "model_dependent",
+          "tier": 3,
+          "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+          "requires": [],
+          "formula": "I(mu) = 1 - 0.6 * (1 - mu)",
+          "assumed": {
+            "limb_u": 0.6
+          }
+        },
+        {
+          "id": "motion_trail",
+          "tag": "measured",
+          "tier": 1,
+          "description": "Motion trail from pm_mas_yr over the SPHEREx epochs (R7.5).",
+          "requires": [
+            "pm_mas_yr"
+          ]
+        }
+      ],
+      "lighting": {
+        "mode": "self"
+      },
+      "view_modes": {
+        "visible": {
+          "available": true,
+          "badge": "Estimated visible colour",
+          "rgb": {
+            "value": [
+              1.0,
+              0.5,
+              0.25
+            ],
+            "tag": "derived",
+            "source": "synthetic fixture: not a real measurement",
+            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+          },
+          "source": "class_palette"
+        }
+      },
+      "haptics": {
+        "texture": "none",
+        "texture_tag": "artistic",
+        "data": "motion",
+        "data_tag": "measured",
+        "params": {}
+      },
+      "dynamics": {
+        "spin_period_h": {
+          "value": 600.0,
+          "tag": "derived",
+          "tier": 2,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "P = 2 pi R / v_eq"
+        },
+        "spot_lifetime_d": {
+          "value": 30.0,
+          "tag": "model_dependent",
+          "tier": 3,
+          "source": "synthetic fixture: not a real measurement",
+          "formula": "tau = 30 d * (R / R_sun)^2",
+          "assumed": {
+            "typical_class_lifetime_d": 30.0
+          }
+        },
+        "flare_rate_per_d": {
+          "value": 0.5,
+          "tag": "inferred_from_analog",
+          "tier": 4,
+          "source": "synthetic fixture: not a real measurement"
+        },
+        "speedup": {
+          "spin": 0,
+          "spots": 86400,
+          "flares": 86400
+        }
+      },
+      "alt_text": "Synthetic fixture. Star, 1 solar radius (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
+      "missing": []
     }
   }
 ]

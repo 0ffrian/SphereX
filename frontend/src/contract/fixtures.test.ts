@@ -34,8 +34,22 @@ function taggedValues(node: unknown): Tagged[] {
   if (Array.isArray(node)) return node.flatMap(taggedValues);
   if (typeof node !== 'object' || node === null) return [];
   const own = 'value' in node && 'tag' in node ? [node as Tagged] : [];
-  return [...own, ...Object.values(node).flatMap(taggedValues)];
+  // DynamicsValue is not a card TV: its model_dependent rule is `assumed`, not `assumption` (D-31).
+  const rest = Object.entries(node).filter(([k]) => k !== 'dynamics');
+  return [...own, ...rest.flatMap(([, v]) => taggedValues(v))];
 }
+
+const SPEEDUP_NEEDS: Record<string, string[]> = {
+  spin: ['spin_period_h'],
+  spots: ['spot_lifetime_d'],
+  flares: ['flare_rate_per_d'],
+  winds: ['jet_speed_ms'],
+  clouds: ['jet_speed_ms', 'diff_rotation', 'spin_period_h'],
+  pulsation: ['pulsation_period_d'],
+};
+type Dyn = Record<string, { tag: string; tier: number; source: string }> & {
+  speedup: Record<string, number>;
+};
 
 describe('shared fixtures (D-04, D-18)', () => {
   const types = [...OBJECT_TYPES].sort();
@@ -67,6 +81,27 @@ describe('shared fixtures (D-04, D-18)', () => {
 
   it.each(types)('%s: every tagged value passes assertTagged', (type) => {
     for (const v of taggedValues([cards.get(type), params.get(type)])) assertTagged(v, type);
+  });
+
+  it.each(types)('%s: dynamics is present, synthetic and speeds up only what moves', (type) => {
+    const p = params.get(type)!;
+    const dyn = p.dynamics as unknown as Dyn;
+    expect(dyn.speedup).toBeDefined();
+    const present = Object.keys(dyn).filter((k) => k !== 'speedup');
+    for (const process of Object.keys(dyn.speedup)) {
+      expect(
+        SPEEDUP_NEEDS[process]!.some((k) => present.includes(k)),
+        process,
+      ).toBe(true);
+    }
+    for (const k of present) {
+      const v = dyn[k]!;
+      expect(v.source.startsWith('synthetic fixture: ')).toBe(true);
+      expect(v.tier).toBe(TAGS.indexOf(v.tag as (typeof TAGS)[number]) + 1);
+    }
+    for (const m of p.missing as string[]) {
+      if (m.startsWith('dynamics:')) expect(present).not.toContain(m.slice('dynamics:'.length));
+    }
   });
 
   it.each(invalidCases.map((c) => [c.name, c] as const))('rejects: %s', (_name, c) => {

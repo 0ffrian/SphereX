@@ -73,7 +73,10 @@ def _with_context(error: jsonschema.ValidationError) -> Iterator[jsonschema.Vali
 def _is_provenance_rule(case: dict[str, Any]) -> bool:
     """The R3.1 if/then rules, which the generators drop."""
     expect = case["expect"]
-    return expect["keyword"] == "pattern" or expect.get("detail") in {"formula", "assumption"}
+    return (
+        expect["keyword"] in {"pattern", "const"}  # const: the tier must match the tag (D-31)
+        or expect.get("detail") in {"formula", "assumption", "assumed"}
+    )
 
 
 def test_schemas_are_valid_draft7() -> None:
@@ -178,6 +181,57 @@ def test_fixture_is_unmistakably_synthetic(object_type: str) -> None:
     assert params["generator_version"].startswith("fixture-")
     for value in _tagged([card, params]):
         assert value["source"].startswith(f"{SYNTHETIC}: ")
+
+
+def _dynamics_values(params: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    dynamics = params.get("dynamics", {})
+    return [(k, v) for k, v in dynamics.items() if k != "speedup"]
+
+
+# DynamicsValue has no assertTagged twin: its model_dependent rule is `assumed` (D-31).
+_SPEEDUP_NEEDS = {
+    "spin": {"spin_period_h"},
+    "spots": {"spot_lifetime_d"},
+    "flares": {"flare_rate_per_d"},
+    "winds": {"jet_speed_ms"},
+    "clouds": {"jet_speed_ms", "diff_rotation", "spin_period_h"},
+    "pulsation": {"pulsation_period_d"},
+}
+
+
+@pytest.mark.parametrize("object_type", OBJECT_TYPES)
+def test_every_params_fixture_has_dynamics_with_matching_speedup(object_type: str) -> None:
+    params = PARAMS[object_type]
+    assert "speedup" in params["dynamics"]
+    present = {key for key, _ in _dynamics_values(params)}
+    for process in params["dynamics"]["speedup"]:
+        assert _SPEEDUP_NEEDS[process] & present, process  # only animated processes are sped up
+    for _key, value in _dynamics_values(params):
+        assert value["source"].startswith(f"{SYNTHETIC}: ")
+        assert value["tier"] == TAGS.index(value["tag"]) + 1
+    for item in params["missing"]:
+        if item.startswith("dynamics:"):
+            assert item.removeprefix("dynamics:") not in present
+
+
+def test_layer_and_dynamics_value_share_the_tier_rules() -> None:
+    """The tier/formula/assumed rules are written out twice (no generics); they must not drift."""
+    schema = PARAMS_SCHEMA["definitions"]
+    assert schema["Layer"]["allOf"] == schema["DynamicsValue"]["allOf"]
+    for key in ("tier", "formula", "assumed"):
+        assert schema["Layer"]["properties"][key] == schema["DynamicsValue"]["properties"][key]
+
+
+def test_fixtures_exercise_every_tier_and_a_dynamics_refusal() -> None:
+    tiers = {
+        v["tier"]
+        for p in PARAMS.values()
+        for v in [*p["layers"], *dict(_dynamics_values(p)).values()]
+    }
+    assert tiers == {1, 2, 3, 4, 5}
+    dyn_tiers = {v["tier"] for p in PARAMS.values() for _, v in _dynamics_values(p)}
+    assert dyn_tiers == {1, 2, 3, 4, 5}
+    assert any(item.startswith("dynamics:") for p in PARAMS.values() for item in p["missing"])
 
 
 def test_fixtures_exercise_every_tag() -> None:

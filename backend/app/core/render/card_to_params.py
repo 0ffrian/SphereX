@@ -27,7 +27,7 @@ from app.core.render.spherex_rgb import CHANNELS_BY_TYPE
 
 # Bump when a rule in this module changes. The baker's rules version is part of it, so the R6.7
 # texture path changes whenever either changes.
-CARD_TO_PARAMS_VERSION = "1"
+CARD_TO_PARAMS_VERSION = "2"  # 2: Layer.tier, formula, assumed (D-31)
 GENERATOR_VERSION = f"p{CARD_TO_PARAMS_VERSION}-b{BAKER_RULES_VERSION}"
 
 # Texture size named in the URLs (D-05 desktop budget; the viewer downsamples for phones).
@@ -55,6 +55,14 @@ _RANK = {
     "inferred_from_analog": 3,
     "artistic": 4,
 }
+
+TIER_OF_TAG = {tag: rank + 1 for tag, rank in _RANK.items()}  # D-31: tier 1..5 = the five tags
+
+# Rule inputs that are not on the card, stated as `assumed` (D-31). The values are the ones the
+# cited rules fix (R6.2, R7.3, R7.5); none is a measurement.
+ASSUMED_C_OVER_B = 1.0  # R6.2: c = b
+ASSUMED_DENSITY_EXPONENT = 2.0  # R7.3: coma gas density falls as 1/r^2
+ASSUMED_LIMB_U = 0.6  # R7.5: linear limb darkening coefficient
 
 SHADER_KINDS = ("planet_rocky", "planet_water", "gas_giant", "nebula", "nova")
 SUN_LIT = ("asteroid_shape", "asteroid_procedural", "comet", "planet_rocky", "planet_water")
@@ -136,6 +144,31 @@ def _tag(card: Mapping[str, Any], key: str) -> str:
     return str(tv["tag"]) if tv else "artistic"
 
 
+def _assumed(
+    card: Mapping[str, Any], requires: list[str], rule_inputs: Mapping[str, float] | None = None
+) -> dict[str, float | str]:
+    """Inputs that were not measured (D-31): the explicit rule inputs, then each required card
+    field whose value is model_dependent, keyed by field name. Deterministic order."""
+    out: dict[str, float | str] = dict(rule_inputs or {})
+    for key in requires:
+        tv = _tv(card, key)
+        if tv is None or tv.get("tag") != "model_dependent":
+            continue
+        v = tv.get("value")
+        if isinstance(v, bool):
+            continue
+        if isinstance(v, numbers.Real) and math.isfinite(float(v)):
+            out[key] = float(v)
+        elif isinstance(v, str):
+            out[key] = v
+        elif isinstance(v, list | tuple) and v:
+            out[key] = ", ".join(f"{float(c):g}" for c in v)
+        elif isinstance(tv.get("assumption"), str) and tv["assumption"].strip():
+            # No usable value (null, NaN): state the card's own assumption instead (R3.1).
+            out[key] = tv["assumption"].strip()
+    return out
+
+
 def _weakest(*tags: str) -> str:
     return max(tags, key=lambda t: _RANK[t])
 
@@ -167,12 +200,40 @@ class _Plan:
         self.missing: list[str] = []
 
     def layer(
-        self, ok: bool, layer_id: str, tag: str, description: str, requires: list[str]
+        self,
+        ok: bool,
+        layer_id: str,
+        tag: str,
+        description: str,
+        requires: list[str],
+        *,
+        card: Mapping[str, Any] | None = None,
+        formula: str | None = None,
+        rule_inputs: Mapping[str, float] | None = None,
     ) -> bool:
+        """Add a layer, or refuse it. ``formula`` is required for any layer whose tag can come out
+        derived or model_dependent; ``card`` is needed to state ``assumed`` (D-31)."""
         if ok:
-            self.layers.append(
-                {"id": layer_id, "tag": tag, "description": description, "requires": requires}
-            )
+            layer: dict[str, Any] = {
+                "id": layer_id,
+                "tag": tag,
+                "tier": TIER_OF_TAG[tag],
+                "description": description,
+                "requires": requires,
+            }
+            if tag in ("derived", "model_dependent"):
+                if not formula:
+                    raise ValueError(f"layer {layer_id}: tag {tag} needs a formula (D-31)")
+                layer["formula"] = formula
+            if tag == "model_dependent":
+                assumed = _assumed(card or {}, requires, rule_inputs)
+                if not assumed:
+                    # Never label measured inputs as assumed: the rule must name what it assumed.
+                    raise ValueError(
+                        f"layer {layer_id}: model_dependent needs an assumed input (D-31)"
+                    )
+                layer["assumed"] = assumed
+            self.layers.append(layer)
         else:
             self.refuse(layer_id)
         return ok
@@ -263,6 +324,8 @@ def _asteroid_shape(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         _weakest(_tag(card, "shape_source"), _tag(card, "diameter_km")),
         "Shape model scaled to the diameter on the card (R7.1).",
         ["shape_source", "diameter_km"],
+        card=card,
+        formula="Shape model scaled to diameter_km",
     )
     plan.layer(
         _has(card, "rot_period_h"),
@@ -270,6 +333,8 @@ def _asteroid_shape(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         _tag(card, "rot_period_h"),
         "Rotation sped up, with the factor shown on screen (R7.1).",
         ["rot_period_h"],
+        card=card,
+        formula="spin rate = 2 pi / rot_period_h",
     )
     rgb, _, field = _asteroid_colour(card)
     plan.layer(
@@ -278,6 +343,8 @@ def _asteroid_shape(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         _weakest(str(rgb["tag"]) if rgb else "artistic", _tag(card, "albedo"), "derived"),
         "Colour = base_rgb * brightness; display L = clamp(0.12 + 1.6 * albedo, 0.12, 0.8) (R6.2).",
         [field, "albedo"],
+        card=card,
+        formula="L = clamp(0.12 + 1.6 * albedo, 0.12, 0.8)",
     )
     return {
         "texture": "mesh" if mesh else "none",
@@ -303,6 +370,9 @@ def _asteroid_procedural(
         "model_dependent",
         "Assumption: a/b = 10^(0.4 * A), c = b, from the light-curve amplitude (R6.2).",
         ["diameter_km", "lightcurve_amp_mag"],
+        card=card,
+        formula="a/b = 10^(0.4 * A), c = b",
+        rule_inputs={"c_over_b": ASSUMED_C_OVER_B},
     )
     rgb, _, field = _asteroid_colour(card)
     assert bake is not None
@@ -322,6 +392,8 @@ def _asteroid_procedural(
         _weakest(str(rgb["tag"]) if rgb else "artistic", _tag(card, "albedo"), "derived"),
         f"{desc}; brightness = clamp(0.12 + 1.6 * albedo, 0.12, 0.8).",
         [field, "albedo"],
+        card=card,
+        formula="L = clamp(0.12 + 1.6 * albedo, 0.12, 0.8)",
     )
     plan.layer(
         True,
@@ -346,6 +418,8 @@ def _comet(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         _tag(card, "nucleus_radius_km_max"),
         "Dark sphere at the upper size limit (R7.3).",
         ["nucleus_radius_km_max"],
+        card=card,
+        formula="nucleus radius = nucleus_radius_km_max",
     )
     gas = card.get("gas_Q")
     has_q = isinstance(gas, Mapping) and any(_has(gas, k) for k in ("co2", "h2o", "co"))
@@ -358,6 +432,9 @@ def _comet(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         "Assumption: density falls as 1/r^2 out to the coma radius; Q itself is measured "
         "(R7.3, Q-38).",
         ["gas_Q", "coma_radius_km"],
+        card=card,
+        formula="n(r) proportional to Q / r^2 out to coma_radius_km",
+        rule_inputs={"density_exponent": ASSUMED_DENSITY_EXPONENT},
     )
     if not shells:
         plan.refuse("field")
@@ -377,6 +454,8 @@ def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) 
         _tag(card, "radius_rjup"),
         "Assumption: brown dwarf radii are about 1 Jupiter radius (R7.4).",
         ["radius_rjup"],
+        card=card,
+        formula="radius = radius_rjup * R_Jup",
     )
     emissive = plan.layer(
         _has(card, "flux_45um"),
@@ -384,6 +463,8 @@ def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) 
         _tag(card, "flux_45um"),
         "Emissive intensity from normalised flux_45um (R7.4).",
         ["flux_45um"],
+        card=card,
+        formula="intensity = normalised flux_45um",
     )
     bands = plan.layer(
         bake is not None and _has(card, "ch4_depth_33") and "bands" not in bake.missing,
@@ -420,6 +501,8 @@ def _star(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         _weakest(_tag(card, "teff_K"), "derived"),
         "Teff to sRGB through a blackbody colour calculation (R7.5).",
         ["teff_K"],
+        card=card,
+        formula=TEFF_FORMULA,
     )
     plan.layer(
         True,
@@ -427,6 +510,9 @@ def _star(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         "model_dependent",
         "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
         [],
+        card=card,
+        formula="I(mu) = 1 - u * (1 - mu), u = 0.6",
+        rule_inputs={"limb_darkening_u": ASSUMED_LIMB_U},
     )
     data, data_tag = "none", "artistic"
     if kind == "star":
@@ -436,6 +522,8 @@ def _star(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
             _tag(card, "pm_mas_yr"),
             "Motion trail from pm_mas_yr over the SPHEREx epochs (R7.5).",
             ["pm_mas_yr"],
+            card=card,
+            formula="trail = pm_mas_yr * elapsed time",
         ):
             data, data_tag = "motion", _tag(card, "pm_mas_yr")
         else:
@@ -447,6 +535,8 @@ def _star(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
             "measured",
             "Brightness follows the measured light curve as you scrub (R7.5).",
             ["lightcurve"],
+            card=card,
+            formula="brightness = measured lightcurve flux",
         ):
             data, data_tag = "heartbeat", "measured"
         else:
@@ -457,6 +547,8 @@ def _star(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
             "artistic",
             "Radius pulsation of 10 percent (R7.5).",
             ["period_var_d"],
+            card=card,
+            formula="radius = 1 + 0.1 * pulsation phase",
         )
     elif kind == "star_ttauri":
         plan.layer(True, "disc", "artistic", "Tilted disc (R7.5).", [])
