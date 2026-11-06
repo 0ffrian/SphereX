@@ -17,3 +17,11 @@ export const GOLDEN_MIN_CHANNEL_SSIM = 0.97;
  * [verify] tuned on SwiftShader reruns.
  */
 export const GOLDEN_MAX_COLOUR_DELTA = 4;
+
+/**
+ * The viewer's deep-space background (ViewerApp SPACE_BACKGROUND, 0x05060a) in 8-bit sRGB, checked
+ * at a canvas corner. The SSIM and colour terms both ignore dark flat regions, so a background lost in
+ * the HDR pass (it once came out black) needs its own check. Tolerance in levels per channel.
+ */
+export const SPACE_BACKGROUND_RGB = [5, 6, 10] as const;
+export const BACKGROUND_TOLERANCE = 2;

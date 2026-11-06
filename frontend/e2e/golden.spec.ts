@@ -14,7 +14,13 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
-import { GOLDEN_MAX_COLOUR_DELTA, GOLDEN_MIN_CHANNEL_SSIM, GOLDEN_MIN_SSIM } from './golden';
+import {
+  BACKGROUND_TOLERANCE,
+  GOLDEN_MAX_COLOUR_DELTA,
+  GOLDEN_MIN_CHANNEL_SSIM,
+  GOLDEN_MIN_SSIM,
+  SPACE_BACKGROUND_RGB,
+} from './golden';
 import { scoreFrames, type Rgb } from './ssim';
 
 const EXCLUDED = new Set(['candidate']);
@@ -122,6 +128,16 @@ for (const kind of kinds) {
       }
 
       const name = `${kind}.${honesty}.png`;
+      // Bottom-left corner: clear of the masked label, the scale bar and every fixture's body.
+      const frame = await decode(decoder, shot);
+      const at = ((frame.height - 4) * frame.width + 3) * 4;
+      const corner = Array.from(frame.rgba.subarray(at, at + 3));
+      SPACE_BACKGROUND_RGB.forEach((v, i) =>
+        expect(
+          Math.abs(corner[i]! - v),
+          `${name}: background ${corner.join(',')} is not ${SPACE_BACKGROUND_RGB.join(',')}`,
+        ).toBeLessThanOrEqual(BACKGROUND_TOLERANCE),
+      );
       const path = `${GOLDEN_DIR}${name}`;
       await info.attach(`actual-${name}`, { body: shot, contentType: 'image/png' });
       if (UPDATE) {
@@ -131,7 +147,7 @@ for (const kind of kinds) {
       expect(existsSync(path), `no golden ${name}; run with SX_UPDATE_GOLDENS=1`).toBe(true);
       const expected = readFileSync(path);
       await info.attach(`expected-${name}`, { body: expected, contentType: 'image/png' });
-      const sc = scoreFrames(await decode(decoder, expected), await decode(decoder, shot));
+      const sc = scoreFrames(await decode(decoder, expected), frame);
       const line = `luma ${sc.luma.toFixed(5)} channelMin ${sc.channelMin.toFixed(5)} colourDelta ${sc.colourDelta.toFixed(4)}`;
       await info.attach(`score-${name}.txt`, { body: line, contentType: 'text/plain' });
       if (process.env.SX_GOLDEN_SCORES) console.log(`ssim ${name} ${line}`);
