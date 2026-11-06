@@ -54,6 +54,9 @@ function abortError(): Error {
   return e;
 }
 
+/** Replacements per slot after crashes before the slot is given up (stops a crash loop). */
+export const MAX_RESPAWNS = 3;
+
 export class WorkerPool<Req, Res> {
   private readonly workers: PoolWorkerLike[] = [];
   private readonly busy: number[] = [];
@@ -61,21 +64,30 @@ export class WorkerPool<Req, Res> {
   private nextId = 1;
   private disposed = false;
   private readonly inline: (req: Req) => Res | Promise<Res>;
+  private readonly createWorker: (() => PoolWorkerLike | undefined) | undefined;
+  /** Respawns used per slot; a slot past MAX_RESPAWNS is dead (busy = Infinity, never chosen). */
+  private readonly respawns: number[] = [];
 
   constructor(opts: WorkerPoolOptions<Req, Res>) {
     this.inline = opts.inline;
+    this.createWorker = opts.createWorker;
     const n =
       opts.size ??
       poolSize(typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : undefined);
     for (let i = 0; i < n; i++) {
-      const w = opts.createWorker?.();
+      const w = this.createWorker?.();
       if (!w) break;
       const idx = this.workers.length;
-      w.onmessage = (e) => this.onMessage(idx, e.data as PoolResponse<Res>);
-      w.onerror = (e) => this.onCrash(idx, e);
       this.workers.push(w);
       this.busy.push(0);
+      this.respawns.push(0);
+      this.attach(idx, w);
     }
+  }
+
+  private attach(idx: number, w: PoolWorkerLike): void {
+    w.onmessage = (e) => this.onMessage(idx, e.data as PoolResponse<Res>);
+    w.onerror = (e) => this.onCrash(idx, e);
   }
 
   get size(): number {
@@ -86,10 +98,12 @@ export class WorkerPool<Req, Res> {
     const { signal, transfer } = opts;
     if (this.disposed) return Promise.reject(new Error('WorkerPool disposed'));
     if (signal?.aborted) return Promise.reject(abortError());
-    if (this.workers.length === 0) return this.runInline(payload, signal);
-
     let w = 0;
     for (let i = 1; i < this.busy.length; i++) if (this.busy[i]! < this.busy[w]!) w = i;
+    // No workers, or every slot dead after repeated crashes: run inline so callers never hang.
+    if (this.workers.length === 0 || this.busy[w] === Infinity) {
+      return this.runInline(payload, signal);
+    }
     const id = this.nextId++;
     return new Promise<Res>((resolve, reject) => {
       const onAbort = () => {
@@ -103,7 +117,15 @@ export class WorkerPool<Req, Res> {
       this.tasks.set(id, { resolve, reject, worker: w, cleanup });
       this.busy[w]!++;
       const msg: PoolRequest<Req> = { id, payload };
-      this.workers[w]!.postMessage(msg, transfer ?? []);
+      try {
+        this.workers[w]!.postMessage(msg, transfer ?? []);
+      } catch (err) {
+        // e.g. DataCloneError: undo the bookkeeping so the slot is not counted busy forever.
+        this.tasks.delete(id);
+        this.busy[w]!--;
+        cleanup();
+        reject(err);
+      }
     });
   }
 
@@ -128,14 +150,27 @@ export class WorkerPool<Req, Res> {
     else t.reject(new Error(r.error)); // per-task error: pool keeps running
   }
 
-  /** A worker-level error rejects that worker's in-flight tasks only. */
+  /**
+   * A worker-level error rejects that worker's in-flight tasks only, then replaces the worker (a
+   * worker that failed to load would otherwise stay least-busy and swallow every later task).
+   */
   private onCrash(idx: number, e: unknown): void {
     for (const [id, t] of this.tasks) {
       if (t.worker !== idx) continue;
       this.tasks.delete(id);
-      this.busy[idx]!--;
       t.cleanup();
       t.reject(e instanceof Error ? e : new Error('Worker error'));
+    }
+    if (this.disposed) return;
+    this.workers[idx]!.terminate();
+    const next = this.respawns[idx]! < MAX_RESPAWNS ? this.createWorker?.() : undefined;
+    if (next) {
+      this.respawns[idx]!++;
+      this.workers[idx] = next;
+      this.busy[idx] = 0;
+      this.attach(idx, next);
+    } else {
+      this.busy[idx] = Infinity;
     }
   }
 

@@ -201,11 +201,14 @@ export function ViewerPanel() {
     };
   }, [viewer, objectKey]);
 
-  // A tier drop from the frame-time governor is said in plain words (R9, never silent).
+  // A tier drop from the frame-time governor is said in plain words and shown (R9, never silent).
+  const [qualityLowered, setQualityLowered] = useState(false);
   useEffect(() => {
     if (!viewer) return;
     viewer.setQualityChangeHandler((e) => {
-      if (e.auto) setAnnouncement(QUALITY_DROP_ANNOUNCEMENT);
+      if (!e.auto) return;
+      setAnnouncement(QUALITY_DROP_ANNOUNCEMENT);
+      setQualityLowered(true);
     });
     return () => viewer.setQualityChangeHandler(null);
   }, [viewer]);
@@ -513,6 +516,12 @@ export function ViewerPanel() {
                 </button>
               )}
             </div>
+          )}
+
+          {qualityLowered && (
+            <p className="text-sm text-neutral-200" data-testid="quality-note">
+              {QUALITY_DROP_ANNOUNCEMENT}.
+            </p>
           )}
 
           {/* Every time-lapse states its speed-up (plan 09). The spin has its own note above. */}

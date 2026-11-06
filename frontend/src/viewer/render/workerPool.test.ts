@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_POOL_SIZE, poolSize, WorkerPool, type PoolWorkerLike } from './workerPool';
+import {
+  MAX_POOL_SIZE,
+  MAX_RESPAWNS,
+  poolSize,
+  WorkerPool,
+  type PoolWorkerLike,
+} from './workerPool';
 
 class FakeWorker implements PoolWorkerLike {
   onmessage: ((e: { data: unknown }) => void) | null = null;
@@ -91,6 +97,38 @@ describe('WorkerPool', () => {
     await expect(a).rejects.toThrow('crash');
     ws[1]!.reply(ws[1]!.posted[0]!.id, 5);
     await expect(b).resolves.toBe(5);
+  });
+
+  it('replaces a crashed worker, and new tasks go to the replacement', async () => {
+    const { pool, ws } = make(1);
+    const a = pool.run(1);
+    ws[0]!.onerror?.(new Error('load failed'));
+    await expect(a).rejects.toThrow('load failed');
+    expect(ws[0]!.terminated).toBe(true);
+    expect(ws).toHaveLength(2);
+    const b = pool.run(2);
+    ws[1]!.reply(ws[1]!.posted[0]!.id, 7);
+    await expect(b).resolves.toBe(7);
+  });
+
+  it('after repeated crashes the slot is given up and tasks run inline', async () => {
+    const { pool, ws } = make(1);
+    for (let i = 0; i <= MAX_RESPAWNS; i++) ws[ws.length - 1]!.onerror?.(new Error('crash'));
+    expect(ws).toHaveLength(MAX_RESPAWNS + 1);
+    await expect(pool.run(3)).resolves.toBe(3); // inline handler is identity
+  });
+
+  it('a postMessage throw rejects the task and frees the slot', async () => {
+    const { pool, ws } = make(1);
+    ws[0]!.postMessage = () => {
+      throw new Error('DataCloneError');
+    };
+    await expect(pool.run(1)).rejects.toThrow('DataCloneError');
+    ws[0]!.postMessage = FakeWorker.prototype.postMessage;
+    const b = pool.run(2);
+    expect(ws[0]!.posted).toHaveLength(1);
+    ws[0]!.reply(ws[0]!.posted[0]!.id, 9);
+    await expect(b).resolves.toBe(9);
   });
 
   it('runs inline without Worker', async () => {

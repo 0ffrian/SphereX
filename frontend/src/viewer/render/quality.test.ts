@@ -99,3 +99,12 @@ describe('FrameGovernor', () => {
     expect(run(g, 60, 3040, 6000)?.to).toBe('low');
   });
 });
+
+describe('FrameGovernor at a steady 30 fps', () => {
+  it('does not drop: 33.3 ms frames meet D-05', () => {
+    const g = new FrameGovernor('medium');
+    let drop = null;
+    for (let t = 0; t <= 5000; t += 1000 / 30) drop = drop ?? g.feed(1000 / 30, t);
+    expect(drop).toBeNull();
+  });
+});

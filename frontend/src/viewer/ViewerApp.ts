@@ -357,13 +357,16 @@ export class ViewerApp {
   /** Draws a plan made with `planRender` (the panel plans once and reuses the plan for its UI). */
   showPlan(plan: RenderPlan): void {
     if (this.disposed) return;
-    this.setLights(buildLights(plan.lighting));
+    // The new lights go on with the content they belong to: an old object still on screen while
+    // the new one compiles is not lit from the new object's phase angle.
+    const lights = buildLights(plan.lighting);
     const key = sceneKey(plan);
     if (this.built && key === this.builtKey) {
       // Nothing that is built changed: only the lights, the honesty state or the labels did. A
       // generated body takes the new tags and light in place (no field is regenerated).
+      this.setLights(lights);
       this.built.update(plan);
-      this.renderNow();
+      this.restartSettle();
       return;
     }
     // A build that never reached the screen (still compiling) is dropped for the newer one.
@@ -389,6 +392,7 @@ export class ViewerApp {
       }
     }
     if (!next) {
+      this.setLights(lights);
       this.removeOnScreen();
       this.placeholder.visible = false;
       this.syncProcesses(null, null);
@@ -399,7 +403,7 @@ export class ViewerApp {
     this.builtKey = key;
     this.syncProcesses(plan.spin, next);
     this.frame(plan.id, plan.extent, plan.shader?.distance ?? 0);
-    this.swapInAfterCompile(next);
+    this.swapInAfterCompile(next, lights);
   }
 
   /**
@@ -407,16 +411,17 @@ export class ViewerApp {
    * the old content (or the placeholder) stays on screen, so no frame is blank. A renderer
    * without `compileAsync` (test stubs) swaps at once.
    */
-  private swapInAfterCompile(next: BuiltScene): void {
+  private swapInAfterCompile(next: BuiltScene, lights: Object3D[]): void {
     const token = this.compileToken;
     const swap = () => {
       if (this.disposed || token !== this.compileToken || this.built !== next) return;
       this.removeOnScreen();
+      this.setLights(lights);
       this.scene.add(next.group);
       this.onScreen = next;
       this.placeholder.visible = false;
       this.applySpinAngle();
-      this.renderNow();
+      this.restartSettle();
     };
     if (typeof this.renderer.compileAsync !== 'function') {
       swap();
@@ -468,7 +473,7 @@ export class ViewerApp {
     this.setLights(this.placeholderLights);
     this.frame('', 1, 0);
     this.syncProcesses(null, null);
-    this.renderNow();
+    this.restartSettle();
   }
 
   /**
@@ -530,6 +535,16 @@ export class ViewerApp {
     for (const l of next) this.scene.add(l);
   }
 
+  /**
+   * New content: restart temporal AA history so the settled frame depends only on what is shown
+   * now (same card, seed and time give the same frame), then draw and settle. Orbit changes keep
+   * the history (`requestRender`), since that is what temporal AA is for while moving.
+   */
+  private restartSettle(): void {
+    this.chain?.restartTemporal();
+    this.renderNow();
+  }
+
   /** Draws now (no blank frame on resize) and starts a settle burst for temporal AA. */
   private renderNow(): void {
     this.draw();
@@ -569,7 +584,13 @@ export class ViewerApp {
   /** Builds the HDR pipeline and warms up the placeholder; a failure leaves plain rendering. */
   private async initPipeline(): Promise<void> {
     try {
-      this.chain = new RenderChain(this.renderer, this.scene, this.camera, this.tier);
+      this.chain = new RenderChain(
+        this.renderer,
+        this.scene,
+        this.camera,
+        this.tier,
+        prefersReducedMotion(),
+      );
     } catch (err) {
       this.dropChain(err);
       return;
@@ -622,13 +643,14 @@ export class ViewerApp {
   /**
    * Test hook: pauses the clock (reason 'test'), puts every process at the given sim time, renders
    * the settle burst and resolves when it is done. The same card, seed and time give one picture.
+   * The 'test' pause is never lifted: a frozen viewer stays frozen (tests and golden frames only).
    */
   async freezeClock(simSeconds: number): Promise<void> {
     if (this.disposed) return;
     this.setPause('test', true);
     this.clock.setAllSimTimes(simSeconds);
     this.applySpinAngle();
-    this.renderNow();
+    this.restartSettle();
     await this.whenSettled();
   }
 
@@ -753,7 +775,15 @@ export class ViewerApp {
   }
 
   private readonly onMotionChange = (): void => {
-    if (!this.disposed) this.setPause('reduced-motion', prefersReducedMotion());
+    if (this.disposed) return;
+    const reduced = prefersReducedMotion();
+    try {
+      this.chain?.setReducedMotion(reduced);
+    } catch (err) {
+      this.dropChain(err);
+    }
+    this.setPause('reduced-motion', reduced);
+    this.renderNow();
   };
 
   private readonly onVisibility = (): void => {

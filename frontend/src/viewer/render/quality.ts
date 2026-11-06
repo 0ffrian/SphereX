@@ -74,8 +74,12 @@ export function initialTier(env: TierEnv): TierName {
   return 'medium';
 }
 
-/** A frame slower than this counts as over budget (plan 10.5: 33 ms). */
-export const SLOW_FRAME_MS = 33;
+/**
+ * A frame slower than this counts as over budget. Plan 10.5 says 33 ms, but a steady 30 fps is
+ * 33.3 ms per frame and meets D-05 (Chrome's energy saver caps rAF at 30 fps), so the line sits a
+ * little above 1000/30.
+ */
+export const SLOW_FRAME_MS = 36;
 /** Frames must stay over budget this long before the tier drops (plan 10.5: two seconds). */
 export const SLOW_WINDOW_MS = 2000;
 /** A gap between fed frames longer than this means rendering was not continuous: start over. */
