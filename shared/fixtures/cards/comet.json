@@ -1,0 +1,58 @@
+{
+  "id": "fixture:comet",
+  "name": "Synthetic fixture: comet",
+  "type": "comet",
+  "gas_Q": {
+    "co2": {
+      "value": 1e+26,
+      "tag": "measured",
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "h2o": {
+      "value": 1e+26,
+      "tag": "measured",
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "co": {
+      "value": 1e+26,
+      "tag": "measured",
+      "source": "synthetic fixture: not a real measurement"
+    }
+  },
+  "coma_radius_km": {
+    "value": 1000.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "nucleus_radius_km_max": {
+    "value": 1.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "epochs": [
+    "2025-08"
+  ],
+  "spherex_rgb": {
+    "value": [
+      1.0,
+      0.75,
+      0.5
+    ],
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "phase_angle_deg": {
+    "value": 30.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "sun_vector": {
+    "value": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  }
+}

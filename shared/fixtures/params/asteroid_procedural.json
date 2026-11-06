@@ -1,0 +1,90 @@
+{
+  "id": "fixture:asteroid_procedural",
+  "type": "asteroid_procedural",
+  "generator_version": "fixture-0",
+  "seed": 2,
+  "scale_m": 1000.0,
+  "layers": [
+    {
+      "id": "ellipsoid",
+      "tag": "model_dependent",
+      "description": "Assumption: a/b = 10^(0.4 * A), c = b, from the light-curve amplitude (R6.2).",
+      "requires": [
+        "diameter_km",
+        "lightcurve_amp_mag"
+      ]
+    },
+    {
+      "id": "albedo_map",
+      "tag": "inferred_from_analog",
+      "description": "Class palette C, as no gaia_rgb is present (R6.4).",
+      "requires": [
+        "spectral_class",
+        "albedo"
+      ]
+    },
+    {
+      "id": "relief",
+      "tag": "artistic",
+      "description": "Procedural height field from the seed (R6.3).",
+      "requires": [
+        "diameter_km"
+      ]
+    }
+  ],
+  "textures": {
+    "albedo": "/data/textures/fixture:asteroid_procedural/fixture-0/2/albedo.webp",
+    "height": "/data/textures/fixture:asteroid_procedural/fixture-0/2/height.png",
+    "normal": "/data/textures/fixture:asteroid_procedural/fixture-0/2/normal.png",
+    "height_bin": "/data/textures/fixture:asteroid_procedural/fixture-0/2/height.bin"
+  },
+  "lighting": {
+    "mode": "sun",
+    "sun_dir": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "phase_angle_deg": 30.0
+  },
+  "view_modes": {
+    "visible": {
+      "available": true,
+      "badge": "Estimated visible colour",
+      "rgb": {
+        "value": [
+          0.26,
+          0.25,
+          0.24
+        ],
+        "tag": "inferred_from_analog",
+        "source": "synthetic fixture: R6.4 class palette C"
+      },
+      "source": "class_palette"
+    },
+    "spherex_ir": {
+      "available": false,
+      "badge": "SPHEREx infrared, whole-body average (false colour)",
+      "rgb": null,
+      "source": "spherex_rgb",
+      "channels_um": [
+        3.0,
+        2.0,
+        1.0
+      ]
+    }
+  },
+  "haptics": {
+    "texture": "height",
+    "texture_tag": "artistic",
+    "data": "none",
+    "data_tag": "artistic",
+    "params": {
+      "tau": 0.15
+    }
+  },
+  "alt_text": "Synthetic fixture. Asteroid, 2 km across (derived), colour from a class palette, viewed at 30 degrees. Surface relief: illustrative.",
+  "missing": [
+    "spherex_ir"
+  ]
+}

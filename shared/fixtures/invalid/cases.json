@@ -1,0 +1,579 @@
+[
+  {
+    "name": "derived without a formula",
+    "schema": "object-card",
+    "expect": {
+      "path": "/albedo",
+      "keyword": "required",
+      "detail": "formula"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "name": "Synthetic fixture: invalid case",
+      "type": "candidate",
+      "albedo": {
+        "value": 1.0,
+        "tag": "derived",
+        "source": "synthetic fixture: not a real measurement"
+      }
+    }
+  },
+  {
+    "name": "derived with a blank formula",
+    "schema": "object-card",
+    "expect": {
+      "path": "/albedo/formula",
+      "keyword": "pattern"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "name": "Synthetic fixture: invalid case",
+      "type": "candidate",
+      "albedo": {
+        "value": 1.0,
+        "tag": "derived",
+        "source": "synthetic fixture: not a real measurement",
+        "formula": "   "
+      }
+    }
+  },
+  {
+    "name": "model_dependent without an assumption",
+    "schema": "object-card",
+    "expect": {
+      "path": "/albedo",
+      "keyword": "required",
+      "detail": "assumption"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "name": "Synthetic fixture: invalid case",
+      "type": "candidate",
+      "albedo": {
+        "value": 1.0,
+        "tag": "model_dependent",
+        "source": "synthetic fixture: not a real measurement"
+      }
+    }
+  },
+  {
+    "name": "model_dependent with a blank assumption",
+    "schema": "object-card",
+    "expect": {
+      "path": "/albedo/assumption",
+      "keyword": "pattern"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "name": "Synthetic fixture: invalid case",
+      "type": "candidate",
+      "albedo": {
+        "value": 1.0,
+        "tag": "model_dependent",
+        "source": "synthetic fixture: not a real measurement",
+        "assumption": " "
+      }
+    }
+  },
+  {
+    "name": "model_dependent with only a formula",
+    "schema": "object-card",
+    "expect": {
+      "path": "/albedo",
+      "keyword": "required",
+      "detail": "assumption"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "name": "Synthetic fixture: invalid case",
+      "type": "candidate",
+      "albedo": {
+        "value": 1.0,
+        "tag": "model_dependent",
+        "source": "synthetic fixture: not a real measurement",
+        "formula": "x = y"
+      }
+    }
+  },
+  {
+    "name": "derived rgb without a formula",
+    "schema": "object-card",
+    "expect": {
+      "path": "/gaia_rgb",
+      "keyword": "required",
+      "detail": "formula"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "name": "Synthetic fixture: invalid case",
+      "type": "candidate",
+      "gaia_rgb": {
+        "value": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "tag": "derived",
+        "source": "synthetic fixture: not a real measurement"
+      }
+    }
+  },
+  {
+    "name": "unknown tag",
+    "schema": "object-card",
+    "expect": {
+      "path": "/albedo/tag",
+      "keyword": "enum"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "name": "Synthetic fixture: invalid case",
+      "type": "candidate",
+      "albedo": {
+        "value": 1.0,
+        "tag": "estimated",
+        "source": "synthetic fixture: not a real measurement"
+      }
+    }
+  },
+  {
+    "name": "tagged value without a source",
+    "schema": "object-card",
+    "expect": {
+      "path": "/albedo",
+      "keyword": "required",
+      "detail": "source"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "name": "Synthetic fixture: invalid case",
+      "type": "candidate",
+      "albedo": {
+        "value": 1.0,
+        "tag": "measured"
+      }
+    }
+  },
+  {
+    "name": "tagged value without a value key",
+    "schema": "object-card",
+    "expect": {
+      "path": "/albedo",
+      "keyword": "required",
+      "detail": "value"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "name": "Synthetic fixture: invalid case",
+      "type": "candidate",
+      "albedo": {
+        "tag": "measured",
+        "source": "synthetic fixture: not a real measurement"
+      }
+    }
+  },
+  {
+    "name": "rgb with two channels",
+    "schema": "object-card",
+    "expect": {
+      "path": "/gaia_rgb/value",
+      "keyword": "minItems"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "name": "Synthetic fixture: invalid case",
+      "type": "candidate",
+      "gaia_rgb": {
+        "value": [
+          0.5,
+          0.5
+        ],
+        "tag": "measured",
+        "source": "synthetic fixture: not a real measurement"
+      }
+    }
+  },
+  {
+    "name": "number field holding a string",
+    "schema": "object-card",
+    "expect": {
+      "path": "/albedo/value",
+      "keyword": "type"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "name": "Synthetic fixture: invalid case",
+      "type": "candidate",
+      "albedo": {
+        "value": "dark",
+        "tag": "measured",
+        "source": "synthetic fixture: not a real measurement"
+      }
+    }
+  },
+  {
+    "name": "unknown card field",
+    "schema": "object-card",
+    "expect": {
+      "path": "",
+      "keyword": "additionalProperties",
+      "detail": "made_up"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "name": "Synthetic fixture: invalid case",
+      "type": "candidate",
+      "made_up": 1
+    }
+  },
+  {
+    "name": "unknown field on a tagged value",
+    "schema": "object-card",
+    "expect": {
+      "path": "/albedo",
+      "keyword": "additionalProperties",
+      "detail": "note"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "name": "Synthetic fixture: invalid case",
+      "type": "candidate",
+      "albedo": {
+        "value": 1.0,
+        "tag": "measured",
+        "source": "synthetic fixture: not a real measurement",
+        "note": "x"
+      }
+    }
+  },
+  {
+    "name": "unknown object type",
+    "schema": "object-card",
+    "expect": {
+      "path": "/type",
+      "keyword": "enum"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "name": "Synthetic fixture: invalid case",
+      "type": "dwarf"
+    }
+  },
+  {
+    "name": "card without a name",
+    "schema": "object-card",
+    "expect": {
+      "path": "",
+      "keyword": "required",
+      "detail": "name"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "type": "candidate"
+    }
+  },
+  {
+    "name": "unknown epoch",
+    "schema": "object-card",
+    "expect": {
+      "path": "/epochs/0",
+      "keyword": "enum"
+    },
+    "instance": {
+      "id": "fixture:invalid",
+      "name": "Synthetic fixture: invalid case",
+      "type": "candidate",
+      "epochs": [
+        "2025-09"
+      ]
+    }
+  },
+  {
+    "name": "unknown render-params field",
+    "schema": "render-params",
+    "expect": {
+      "path": "",
+      "keyword": "additionalProperties",
+      "detail": "made_up"
+    },
+    "instance": {
+      "id": "fixture:candidate",
+      "type": "candidate",
+      "generator_version": "fixture-0",
+      "seed": 9,
+      "scale_m": null,
+      "layers": [],
+      "lighting": {
+        "mode": "self"
+      },
+      "view_modes": {
+        "visible": {
+          "available": false,
+          "badge": "Estimated visible colour",
+          "rgb": null,
+          "source": "class_palette"
+        }
+      },
+      "haptics": {
+        "texture": "none",
+        "texture_tag": "artistic",
+        "data": "detections",
+        "data_tag": "measured",
+        "params": {}
+      },
+      "alt_text": "Synthetic fixture. Not enough data for a 3D model: distance and albedo unknown.",
+      "missing": [
+        "mesh",
+        "visible"
+      ],
+      "made_up": 1
+    }
+  },
+  {
+    "name": "params without missing",
+    "schema": "render-params",
+    "expect": {
+      "path": "",
+      "keyword": "required",
+      "detail": "missing"
+    },
+    "instance": {
+      "id": "fixture:candidate",
+      "type": "candidate",
+      "generator_version": "fixture-0",
+      "seed": 9,
+      "scale_m": null,
+      "layers": [],
+      "lighting": {
+        "mode": "self"
+      },
+      "view_modes": {
+        "visible": {
+          "available": false,
+          "badge": "Estimated visible colour",
+          "rgb": null,
+          "source": "class_palette"
+        }
+      },
+      "haptics": {
+        "texture": "none",
+        "texture_tag": "artistic",
+        "data": "detections",
+        "data_tag": "measured",
+        "params": {}
+      },
+      "alt_text": "Synthetic fixture. Not enough data for a 3D model: distance and albedo unknown."
+    }
+  },
+  {
+    "name": "unknown texture haptic",
+    "schema": "render-params",
+    "expect": {
+      "path": "/haptics/texture",
+      "keyword": "enum"
+    },
+    "instance": {
+      "id": "fixture:candidate",
+      "type": "candidate",
+      "generator_version": "fixture-0",
+      "seed": 9,
+      "scale_m": null,
+      "layers": [],
+      "lighting": {
+        "mode": "self"
+      },
+      "view_modes": {
+        "visible": {
+          "available": false,
+          "badge": "Estimated visible colour",
+          "rgb": null,
+          "source": "class_palette"
+        }
+      },
+      "haptics": {
+        "texture": "field",
+        "texture_tag": "artistic",
+        "data": "detections",
+        "data_tag": "measured",
+        "params": {}
+      },
+      "alt_text": "Synthetic fixture. Not enough data for a 3D model: distance and albedo unknown.",
+      "missing": [
+        "mesh",
+        "visible"
+      ]
+    }
+  },
+  {
+    "name": "layer with an unknown tag",
+    "schema": "render-params",
+    "expect": {
+      "path": "/layers/0/tag",
+      "keyword": "enum"
+    },
+    "instance": {
+      "id": "fixture:candidate",
+      "type": "candidate",
+      "generator_version": "fixture-0",
+      "seed": 9,
+      "scale_m": null,
+      "layers": [
+        {
+          "id": "x",
+          "tag": "estimated",
+          "description": "x",
+          "requires": []
+        }
+      ],
+      "lighting": {
+        "mode": "self"
+      },
+      "view_modes": {
+        "visible": {
+          "available": false,
+          "badge": "Estimated visible colour",
+          "rgb": null,
+          "source": "class_palette"
+        }
+      },
+      "haptics": {
+        "texture": "none",
+        "texture_tag": "artistic",
+        "data": "detections",
+        "data_tag": "measured",
+        "params": {}
+      },
+      "alt_text": "Synthetic fixture. Not enough data for a 3D model: distance and albedo unknown.",
+      "missing": [
+        "mesh",
+        "visible"
+      ]
+    }
+  },
+  {
+    "name": "view mode rgb that breaks the provenance rules",
+    "schema": "render-params",
+    "expect": {
+      "path": "/view_modes/visible/rgb",
+      "keyword": "required",
+      "detail": "formula"
+    },
+    "instance": {
+      "id": "fixture:candidate",
+      "type": "candidate",
+      "generator_version": "fixture-0",
+      "seed": 9,
+      "scale_m": null,
+      "layers": [],
+      "lighting": {
+        "mode": "self"
+      },
+      "view_modes": {
+        "visible": {
+          "available": true,
+          "badge": "x",
+          "rgb": {
+            "value": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "tag": "derived",
+            "source": "synthetic fixture: not a real measurement"
+          },
+          "source": "gaia_rgb"
+        }
+      },
+      "haptics": {
+        "texture": "none",
+        "texture_tag": "artistic",
+        "data": "detections",
+        "data_tag": "measured",
+        "params": {}
+      },
+      "alt_text": "Synthetic fixture. Not enough data for a 3D model: distance and albedo unknown.",
+      "missing": [
+        "mesh",
+        "visible"
+      ]
+    }
+  },
+  {
+    "name": "view mode with an unknown source",
+    "schema": "render-params",
+    "expect": {
+      "path": "/view_modes/visible/source",
+      "keyword": "enum"
+    },
+    "instance": {
+      "id": "fixture:candidate",
+      "type": "candidate",
+      "generator_version": "fixture-0",
+      "seed": 9,
+      "scale_m": null,
+      "layers": [],
+      "lighting": {
+        "mode": "self"
+      },
+      "view_modes": {
+        "visible": {
+          "available": false,
+          "badge": "x",
+          "rgb": null,
+          "source": "teff"
+        }
+      },
+      "haptics": {
+        "texture": "none",
+        "texture_tag": "artistic",
+        "data": "detections",
+        "data_tag": "measured",
+        "params": {}
+      },
+      "alt_text": "Synthetic fixture. Not enough data for a 3D model: distance and albedo unknown.",
+      "missing": [
+        "mesh",
+        "visible"
+      ]
+    }
+  },
+  {
+    "name": "non-integer seed",
+    "schema": "render-params",
+    "expect": {
+      "path": "/seed",
+      "keyword": "type"
+    },
+    "instance": {
+      "id": "fixture:candidate",
+      "type": "candidate",
+      "generator_version": "fixture-0",
+      "seed": 1.5,
+      "scale_m": null,
+      "layers": [],
+      "lighting": {
+        "mode": "self"
+      },
+      "view_modes": {
+        "visible": {
+          "available": false,
+          "badge": "Estimated visible colour",
+          "rgb": null,
+          "source": "class_palette"
+        }
+      },
+      "haptics": {
+        "texture": "none",
+        "texture_tag": "artistic",
+        "data": "detections",
+        "data_tag": "measured",
+        "params": {}
+      },
+      "alt_text": "Synthetic fixture. Not enough data for a 3D model: distance and albedo unknown.",
+      "missing": [
+        "mesh",
+        "visible"
+      ]
+    }
+  }
+]

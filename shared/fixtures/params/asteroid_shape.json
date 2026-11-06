@@ -1,0 +1,89 @@
+{
+  "id": "fixture:asteroid_shape",
+  "type": "asteroid_shape",
+  "generator_version": "fixture-0",
+  "seed": 1,
+  "scale_m": 5000.0,
+  "layers": [
+    {
+      "id": "mesh",
+      "tag": "measured",
+      "description": "Shape model scaled to the measured diameter (R7.1).",
+      "requires": [
+        "shape_source",
+        "diameter_km"
+      ]
+    },
+    {
+      "id": "spin",
+      "tag": "measured",
+      "description": "Rotation sped up, with the factor shown on screen (R7.1).",
+      "requires": [
+        "rot_period_h"
+      ]
+    },
+    {
+      "id": "material",
+      "tag": "derived",
+      "description": "Colour = base_rgb * brightness; display L = clamp(0.12 + 1.6 * albedo, 0.12, 0.8) (R6.2).",
+      "requires": [
+        "gaia_rgb",
+        "albedo"
+      ]
+    }
+  ],
+  "lighting": {
+    "mode": "sun",
+    "sun_dir": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "phase_angle_deg": 30.0
+  },
+  "view_modes": {
+    "visible": {
+      "available": true,
+      "badge": "Estimated visible colour",
+      "rgb": {
+        "value": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "tag": "derived",
+        "source": "synthetic fixture: not a real measurement",
+        "formula": "stands in for the Gaia colour conversion, which is not specified here"
+      },
+      "source": "gaia_rgb"
+    },
+    "spherex_ir": {
+      "available": true,
+      "badge": "SPHEREx infrared, whole-body average (false colour)",
+      "rgb": {
+        "value": [
+          1.0,
+          0.75,
+          0.5
+        ],
+        "tag": "measured",
+        "source": "synthetic fixture: not a real measurement"
+      },
+      "source": "spherex_rgb",
+      "channels_um": [
+        3.0,
+        2.0,
+        1.0
+      ]
+    }
+  },
+  "haptics": {
+    "texture": "mesh",
+    "texture_tag": "measured",
+    "data": "none",
+    "data_tag": "artistic",
+    "params": {}
+  },
+  "alt_text": "Synthetic fixture. Asteroid, 10 km across (measured), colour from gaia_rgb, viewed at 30 degrees. Surface relief: measured.",
+  "missing": []
+}

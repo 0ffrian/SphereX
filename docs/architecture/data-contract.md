@@ -16,12 +16,12 @@ The settings-file schema of draft v1 is retired (D-02). The data contract is in 
 
 Do not copy the type definitions into this doc. Change them in the rendering doc.
 
-**Generated code (D-18).** `shared/schemas/*.json` is the single source of the contract in code. The backend generates its Pydantic models with `datamodel-code-generator`; the frontend generates `frontend/src/contract/` with `json-schema-to-typescript`. Both tools are pinned exactly when installed **[verify versions]**. CI fails if regenerated files differ from the committed ones. Hand-written helpers such as `assertTagged()` sit next to the generated types, not inside them.
+**Generated code (D-18).** `shared/schemas/*.json` (JSON Schema draft-07) is the single source of the contract in code. The backend generates `backend/app/contract/` with `datamodel-code-generator` 0.89.0; the frontend generates `frontend/src/contract/generated.ts` with `json-schema-to-typescript` 16.0.0. CI fails if regenerated files differ from the committed ones. Hand-written helpers such as `assertTagged()` sit next to the generated types, not inside them. How to regenerate: [shared/README.md](../../shared/README.md).
 
 ### A5.1 Ids and seeds
 
 - `id` is a stable id, for example `sbdb:101955` or `exo:trappist-1e`.
-- Seed = hash of (object id + generator version) (rendering doc §1, principle 5).
+- Seed = hash of (object id + generator version) (rendering doc §1, principle 5). The hash itself is not specified yet (Q-35).
 
 ### A5.2 Provenance tags and badges
 

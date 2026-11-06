@@ -96,7 +96,7 @@ classDiagram
   }
   class ScaleBar {
     <<scaleBar.ts>>
-    +scale_m: number
+    +scale_m: number or null
     one familiar comparison
   }
   class AltText {

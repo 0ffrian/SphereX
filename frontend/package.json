@@ -18,7 +18,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "contract:gen": "node scripts/generate-contract.js",
+    "contract:check": "node scripts/generate-contract.js --check"
   },
   "dependencies": {
     "react": "19.3.1",
@@ -37,10 +39,12 @@
     "@types/three": "0.187.0",
     "@vitejs/plugin-basic-ssl": "2.3.0",
     "@vitejs/plugin-react": "6.2.1",
+    "ajv": "8.20.0",
     "eslint": "10.14.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.14.0",
     "jsdom": "30.1.3",
+    "json-schema-to-typescript": "16.0.0",
     "prettier": "3.9.10",
     "tailwindcss": "4.3.4",
     "typescript": "6.0.3",

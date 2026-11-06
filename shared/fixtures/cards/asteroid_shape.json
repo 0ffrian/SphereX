@@ -1,0 +1,64 @@
+{
+  "id": "fixture:asteroid_shape",
+  "name": "Synthetic fixture: asteroid with a shape model",
+  "type": "asteroid_shape",
+  "diameter_km": {
+    "value": 10.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "shape_source": {
+    "value": "fixture://meshes/asteroid_shape.glb",
+    "tag": "measured",
+    "source": "synthetic fixture: this mesh does not exist"
+  },
+  "rot_period_h": {
+    "value": 5.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "albedo": {
+    "value": 0.2,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement",
+    "err": 0.05
+  },
+  "gaia_rgb": {
+    "value": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "tag": "derived",
+    "source": "synthetic fixture: not a real measurement",
+    "formula": "stands in for the Gaia colour conversion, which is not specified here"
+  },
+  "spherex_rgb": {
+    "value": [
+      1.0,
+      0.75,
+      0.5
+    ],
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "spectral_class": {
+    "value": "S",
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "phase_angle_deg": {
+    "value": 30.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "sun_vector": {
+    "value": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  }
+}
