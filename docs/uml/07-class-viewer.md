@@ -14,8 +14,10 @@ classDiagram
     -touchMode: boolean
     +setObject(card: ObjectCard, params: RenderParams, ctx: PlanContext) void
     +showPlan(plan: RenderPlan) void
+    +setSpinPaused(paused: boolean) void
     +setTouchMode(on: boolean) void
     +render() void
+    frames the camera to plan.extent, rebuilds only when sceneKey changes
   }
   class BodyRenderer {
     <<interface>>
@@ -37,7 +39,9 @@ classDiagram
   }
   class PlanBuild {
     <<renderers/build.ts>>
-    +build(plan: RenderPlan) three.js objects
+    +build(plan: RenderPlan, hooks, cache: AssetCache) three.js objects
+    AssetCache keeps textures and meshes by URL across rebuilds
+    gas shells and dust are instanced Sprites (r187 Points are 1 px)
   }
   class AsteroidMesh {
     <<asteroid_shape>>
@@ -50,13 +54,14 @@ classDiagram
     <<asteroid_procedural>>
     requires diameter_km
     SphereGeometry 1, 256, 128 scaled by ellipsoid_axes
-    baked albedo, normal, roughness maps
+    baked albedo (visible mode only), normal, roughness maps
     displacement on desktop only
   }
   class Comet {
     <<comet>>
-    requires gas_Q per epoch, coma_radius_km
-    nucleus at upper size limit
+    requires gas_Q per epoch (Q-42), coma_radius_km
+    one-epoch gas_Q only when epochs has one entry
+    nucleus at upper size limit, sizeQualifier upper_limit
     one point cloud per gas, density 1 over r squared
     dust cloud December only
     epoch toggle Aug or Dec 2025
@@ -71,7 +76,7 @@ classDiagram
   }
   class Star {
     <<star, star_mira, star_ttauri>>
-    requires teff_K
+    requires teff_K, radius_rsun optional (no radius: unit sphere, no scale bar)
     blackbody colour, linear limb darkening
     Mira brightness follows light curve
     T Tauri disc and dust screen
@@ -115,11 +120,13 @@ classDiagram
   class ScaleBar {
     <<scaleBar.ts>>
     +scale_m: number or null
-    one familiar comparison
+    +sizeQualifier: upper_limit or null
+    one familiar comparison, "at most" for an upper limit
   }
   class AltText {
     <<altText.ts>>
-    +alt_text: string
+    +buildAltText(plan: RenderPlan) string
+    built from the plan, not from RenderParams.alt_text
     updates canvas aria-label
     aria-live polite announcements
   }
