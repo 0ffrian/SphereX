@@ -179,3 +179,64 @@ export const BINARY_WARM_HZ = 8;
 export const BINARY_COOL_HZ = 4;
 /** R8.5 `star_ttauri`: steady pulse rate before dimming drops beats (Hz). CREATIVE placeholder — Atish to decide (D-13). */
 export const TTAURI_PULSE_HZ = 4;
+
+// ================================================================ #11 texture, data and sound
+// Added by issue #11 (texture haptics per type, and sound). The constants above stay as #9 set them.
+
+// ---------------------------------------------------------------- strengths without a data value
+/**
+ * R8.4/R8.5 say "tick" or "double tick" without a strength (ring gap, lava crack, nucleus is
+ * "firm"). The middle of 0–1, so it lands in the medium bin with 3 levels. CREATIVE placeholder — Atish to decide (D-13).
+ */
+export const PLAIN_TICK_STRENGTH = 0.5;
+/** R8.5 data pulses ("steady pulse": teq, flux, binary, field): their strength. CREATIVE placeholder — Atish to decide (D-13). */
+export const DATA_PULSE_STRENGTH = 0.5;
+
+// ---------------------------------------------------------------- relief (R8.4 height rule)
+/**
+ * R8.4 "0.15 of *local* relief std": the std is taken over square tiles of this many texels
+ * (of a 512×256 map; scaled with the map). Engineering: "local" is not sized in the spec.
+ */
+export const RELIEF_STD_TILE_TEXELS = 16;
+/** Tiles with fewer usable texels than this fall back to the whole map's std. Engineering. */
+export const RELIEF_STD_MIN_TEXELS = 8;
+
+// ---------------------------------------------------------------- terrain (R8.4, D-12)
+/** A field mask (ocean, ice, lava) counts as "inside" at or above this; 0.5 is the drawn edge of its smoothstep. Engineering. */
+export const MASK_THRESHOLD = 0.5;
+/** D-12 open-ocean swell rate, inside OCEAN_SWELL_MIN_HZ–OCEAN_SWELL_MAX_HZ. CREATIVE placeholder — Atish to decide (D-13). [verify on phones] */
+export const OCEAN_SWELL_HZ = 1.5;
+/**
+ * D-12 "lowest level". Strength 0 would make the paired surf sound silent (gain = strength), so a
+ * small value that still lands in the lowest vibrate bin with 3 or 4 levels. CREATIVE placeholder — Atish to decide (D-13).
+ */
+export const OCEAN_SWELL_STRENGTH = 0.1;
+
+// ---------------------------------------------------------------- flow (R8.4, D-12)
+/**
+ * "Inside a jet": |zonal wind| / max |zonal wind| at or above this. 0 = the jet train plays
+ * wherever the wind blows (the 2 Hz floor covers the calm band edges). CREATIVE placeholder — Atish to decide (D-13).
+ */
+export const FLOW_JET_MIN_WIND = 0;
+/** Ring gap: `ringGapAt(t)` at or above this is "in the gap" (its smoothstep edge). Engineering. */
+export const RING_GAP_THRESHOLD = 0.5;
+
+// ---------------------------------------------------------------- point density (nebula, nova; R8.4 item 4)
+/** Radius (body units, cloud radius 1) of the disc around the finger's ray in which points are counted. CREATIVE placeholder — Atish to decide (D-13). */
+export const DENSITY_RADIUS = 0.08;
+/** rate = clamp(DENSITY_K · density ÷ uniform-disc density, FIELD_MIN_HZ, max). CREATIVE placeholder — Atish to decide (D-13). */
+export const DENSITY_K = 4;
+
+// ---------------------------------------------------------------- Listen sweep (A8, R8.6, R8.9)
+/** The mock-up's sweep: 6 s across the spectrum. CREATIVE placeholder — Atish to decide (D-13). */
+export const SWEEP_DURATION_S = 6;
+/** Gain steps across the sweep (the mock-up's 90). Engineering. */
+export const SWEEP_STEPS = 90;
+/** The mock-up's triangle oscillator. CREATIVE placeholder — Atish to decide (D-13). */
+export const SWEEP_WAVE: OscillatorType = 'triangle';
+/** Peak gain of the sweep tone at strength 1 and volume 1. CREATIVE placeholder — Atish to decide (D-13). */
+export const SWEEP_PEAK_GAIN = 0.3;
+/** Stereo travel, left to right (the mock-up's ±0.8). CREATIVE placeholder — Atish to decide (D-13). */
+export const SWEEP_PAN = 0.8;
+/** Gain of a gas-line chime. CREATIVE placeholder — Atish to decide (D-13). */
+export const SWEEP_CHIME_GAIN = 0.3;
