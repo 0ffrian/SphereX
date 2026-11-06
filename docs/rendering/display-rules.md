@@ -35,7 +35,7 @@ One state per badge (D-21):
 
 | State | Shows tags | Examples |
 |---|---|---|
-| Measured only | `measured` | Real mesh or a plain sphere/ellipsoid at measured size, flat measured tint, measured lighting |
+| Measured only | `measured` | Real mesh or a plain sphere at measured size, flat measured tint, measured lighting. The body is kept only when its size value is `measured`; the `ellipsoid` layer is `model_dependent`, so Measured only shows a sphere |
 | + Estimated (starting state) | adds `derived`, `model_dependent`, `inferred_from_analog` | Class palette, derived colours, brightness from Teff/flux |
 | + Artistic | adds `artistic` | Procedural relief, AI paint, band patterns, orbit drawings |
 
