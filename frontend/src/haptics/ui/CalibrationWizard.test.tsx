@@ -96,7 +96,9 @@ describe('CalibrationWizard (R8.7)', () => {
   const click = async (name: string | RegExp) => {
     await act(async () => button(name).click());
   };
-  const live = () => host.querySelector('[aria-live="polite"]')!.textContent!.trim();
+  const statusLine = () => host.querySelector<HTMLElement>('[role="status"]')!;
+  const live = () => statusLine().textContent!.trim();
+  const focused = () => document.activeElement?.textContent;
   const endBeat = async () => {
     await act(async () => {
       vi.advanceTimersByTime((TAP_BEAT_COUNT + 1) * TAP_BEAT_PERIOD_MS);
@@ -107,7 +109,7 @@ describe('CalibrationWizard (R8.7)', () => {
   const tapAlong = async (start: string, lagMs: number, via: 'pointer' | 'space' = 'pointer') => {
     await click(start);
     const t0 = t;
-    const tap = button('Tap');
+    const tap = button(/beat: tap with each/);
     for (let k = 0; k < TAP_BEAT_COUNT; k++) {
       t = t0 + k * TAP_BEAT_PERIOD_MS + lagMs;
       act(() => {
@@ -138,19 +140,21 @@ describe('CalibrationWizard (R8.7)', () => {
 
     await click('Start');
     expect(haptics.engine.unlock).toHaveBeenCalledTimes(1);
-    expect(live()).toBe('Step 1 of 3: the faintest pulse');
-    expect(document.activeElement?.textContent).toBe('Step 1 of 3: the faintest pulse');
+    // The focused heading says the step; the status line does not repeat it.
+    expect(focused()).toBe('Step 1 of 3: the faintest pulse');
+    expect(live()).toBe('');
 
     await click('Play the three pulses');
     expect(vib.calls.at(-1)).toEqual([5, CALIBRATION_GAP_MS, 10, CALIBRATION_GAP_MS, 20]);
     await click('Second (10 ms)');
-    expect(live()).toMatch(/^Step 2 of 3/);
+    expect(focused()).toMatch(/^Step 2 of 3/);
 
     await click('Play the four buzzes');
     const g = CALIBRATION_GAP_MS;
     expect(vib.calls.at(-1)).toEqual([4, 4, 4, 4, 4, g, 10, g, 15, g, 25]);
     await click('Yes, it was weaker');
-    expect(live()).toMatch(/^Step 3 of 3/);
+    expect(focused()).toMatch(/^Step 3 of 3/);
+    expect(host.textContent).toContain('media volume up and silent mode off');
 
     // Vibration felt 100 ms after the beat, sound heard 40 ms after: +60 ms, audio waits.
     await tapAlong('Start the vibration beat', 100);
@@ -230,6 +234,7 @@ describe('CalibrationWizard (R8.7)', () => {
     render({ haptics, vibrate: vib.fn });
     await click('Start');
     await click('Skip this step');
+    await click('Play the four buzzes');
     await click('No, the same or stronger');
     await click('Skip this step');
     expect(loadCalibration()).toEqual({ ...STORED, levels: ['soft', 'medium', 'firm'] });
@@ -342,7 +347,7 @@ describe('CalibrationWizard (R8.7)', () => {
     expect(live()).toMatch(/Sound is off/);
     expect(find('Save without the offset')).toBeDefined();
     // The same sentence twice in a row still changes the live region, so it is announced again.
-    const region = host.querySelector('[aria-live="polite"]')!;
+    const region = statusLine();
     const first = region.textContent;
     await click('Try the sound beat again');
     expect(region.textContent).not.toBe(first);
@@ -353,13 +358,106 @@ describe('CalibrationWizard (R8.7)', () => {
     const { haptics, vib } = outputs();
     render({ haptics, vibrate: vib.fn });
     await click('Start');
+    await click('Play the three pulses');
     await click('I felt none');
+    await click('Play the four buzzes');
     await click('I did not feel the first one');
     await click('Skip this step');
     expect(loadCalibration()?.minMs).toBe(8);
     expect(loadCalibration()?.levels).toHaveLength(3);
+    expect(host.textContent).toContain('Faintest pulse: 8 ms (default: no pulse felt)');
     expect(host.textContent).toContain('battery saver');
     expect(localStorage.key(0)).toBe(CALIBRATION_STORAGE_KEY);
+  });
+
+  it('status and failures are visible, and the beat says its channel and count', async () => {
+    vi.useFakeTimers();
+    const { haptics, vib } = outputs();
+    render({ haptics, vibrate: vib.fn });
+    await click('Start');
+    await click('Skip this step');
+    await click('Skip this step');
+    await click('Start the vibration beat');
+    expect(find('Vibration beat: tap with each buzz')).toBeDefined();
+    expect(host.textContent).toContain(`Beat 1 of ${TAP_BEAT_COUNT} · 0 taps`);
+    await act(async () => {
+      vi.advanceTimersByTime(TAP_BEAT_PERIOD_MS);
+    });
+    expect(host.textContent).toContain(`Beat 2 of ${TAP_BEAT_COUNT}`);
+    await endBeat();
+    const line = statusLine();
+    expect(line.className).not.toContain('sr-only');
+    expect(line.textContent).toMatch(/Not enough taps/);
+    // The status line sits right under the step text, before the controls.
+    expect(line.previousElementSibling?.tagName).toBe('P');
+    expect(line.nextElementSibling?.querySelector('button')?.textContent).toBe('Try again');
+  });
+
+  it('answers wait until the pulses or buzzes have played', async () => {
+    const { haptics, vib } = outputs();
+    render({ haptics, vibrate: vib.fn });
+    await click('Start');
+    expect(button('Second (10 ms)').disabled).toBe(true);
+    expect(host.querySelector('[role="group"]')!.getAttribute('aria-label')).toMatch(
+      /play them first/,
+    );
+    await click('Play the three pulses');
+    expect(button('Second (10 ms)').disabled).toBe(false);
+    await click('Second (10 ms)');
+    expect(button('Yes, it was weaker').disabled).toBe(true);
+    await click('Play the four buzzes');
+    expect(button('Yes, it was weaker').disabled).toBe(false);
+  });
+
+  it('opening focuses the intro heading and scrolls it into view', () => {
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    const { haptics, vib } = outputs();
+    render({ haptics, vibrate: vib.fn });
+    expect(focused()).toBe('Calibrate vibration for this phone');
+    expect(scroll).toHaveBeenCalled();
+    delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+  });
+
+  it('closing returns focus to the opener; cancelling without a host goes back to the intro', async () => {
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    const ref = { current: opener };
+    const { haptics, vib } = outputs();
+    const onCancel = vi.fn();
+    render({ haptics, vibrate: vib.fn, onCancel, returnFocusRef: ref });
+    await click('Start');
+    await click('Cancel');
+    expect(onCancel).toHaveBeenCalled();
+    expect(document.activeElement).toBe(opener);
+
+    // The host closes the wizard itself (e.g. in onDone) while focus is inside it.
+    act(() => root.render(<p />));
+    render({ haptics, vibrate: vib.fn, returnFocusRef: ref });
+    expect(focused()).toBe('Calibrate vibration for this phone');
+    act(() => root.render(<p />));
+    expect(document.activeElement).toBe(opener);
+
+    render({ haptics, vibrate: vib.fn });
+    await click('Start');
+    await click('Cancel');
+    expect(focused()).toBe('Calibrate vibration for this phone');
+    expect(live()).toBe('Calibration cancelled. Nothing was saved.');
+    opener.remove();
+  });
+
+  it('"I felt none" keeps the stored faintest pulse and does not count as a measurement', async () => {
+    saveCalibration(STORED);
+    const { haptics, vib } = outputs();
+    render({ haptics, vibrate: vib.fn });
+    await click('Start');
+    await click('Play the three pulses');
+    await click('I felt none');
+    await click('Skip this step');
+    await click('Skip this step');
+    expect(loadCalibration()).toEqual(STORED);
+    expect(host.textContent).toContain('Faintest pulse: 20 ms (kept: no pulse felt)');
+    expect(host.textContent).toContain('nothing changed');
   });
 
   it('every button is a real button with a text label and a 44 px target', async () => {

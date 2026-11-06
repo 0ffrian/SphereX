@@ -62,12 +62,15 @@ describe('HapticsSettings (R8.7)', () => {
     expect(useHapticSettings.getState().volume).toBeCloseTo(0.3);
     expect(host.textContent).toContain('Volume: 30%');
 
-    act(() => setRange(input(/^Strength/), '1.5'));
+    expect(host.textContent).toContain('Vibration strength: 1.00× (normal)');
+    act(() => setRange(input(/^Vibration strength/), '1.5'));
+    expect(host.textContent).toContain('Vibration strength: 1.50×');
+    expect(host.textContent).not.toContain('(normal)');
     expect(useHapticSettings.getState().strengthMultiplier).toBe(1.5);
-    expect(input(/^Strength/).min).toBe('0.5');
-    expect(input(/^Strength/).max).toBe('1.5');
+    expect(input(/^Vibration strength/).min).toBe('0.5');
+    expect(input(/^Vibration strength/).max).toBe('1.5');
 
-    act(() => input(/texture and data labels/).click());
+    act(() => input(/surface texture or data/).click());
     expect(saved().showChannelLabels).toBe(false);
   });
 
@@ -107,5 +110,8 @@ describe('HapticsSettings (R8.7)', () => {
     )!;
     act(() => reset.click());
     expect(localStorage.getItem(SETTINGS_STORAGE_KEY)).toBeNull();
+    expect(host.querySelector('[role="status"]')!.textContent).toBe(
+      "Settings reset to this device's defaults.",
+    );
   });
 });

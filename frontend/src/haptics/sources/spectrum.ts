@@ -22,7 +22,7 @@ import {
 import { JITTER_FRACTION, SPECTRUM_DEFAULT_SEED, SPECTRUM_TICK_PX } from '../tuning';
 
 /** Anything with the engine's `emit` (the HapticEngine; a recorder in tests). */
-export interface HapticSink {
+export interface SpectrumSink {
   emit(e: HapticEvent): boolean;
 }
 
@@ -36,8 +36,10 @@ export interface SpectrumStep {
   strength: number;
   quiet: boolean;
   noisy: boolean;
-  /** A tick was sent to the engine for this step (it may still be rate-limited there). */
+  /** A tick was sent to the engine for this step. */
   emitted: boolean;
+  /** The engine played it (false: hidden by the honesty state, or dropped by the rate cap). */
+  played: boolean;
   /** Steps since the gesture began, from 0. */
   index: number;
 }
@@ -77,7 +79,7 @@ export function jitterUnit(seed: number, k: number): number {
 
 export class SpectrumHapticSource {
   readonly mapping: SpectrumMapping;
-  private readonly sink: HapticSink;
+  private readonly sink: SpectrumSink;
   private readonly tag: Tag;
   private readonly seed: number;
   private readonly onStep: ((s: Readonly<SpectrumStep>) => void) | undefined;
@@ -111,11 +113,12 @@ export class SpectrumHapticSource {
     quiet: true,
     noisy: false,
     emitted: false,
+    played: false,
     index: 0,
   };
   private hasStep = false;
 
-  constructor(sink: HapticSink, options: SpectrumSourceOptions) {
+  constructor(sink: SpectrumSink, options: SpectrumSourceOptions) {
     this.sink = sink;
     this.mapping = buildSpectrumMapping(options.points);
     this.tag = options.tag;
@@ -232,6 +235,7 @@ export class SpectrumHapticSource {
     st.quiet = s ? s.quiet : true;
     st.noisy = s ? s.noisy : false;
     st.emitted = false;
+    st.played = false;
     this.hasStep = true;
     this.cursor = x;
     this.cursorLambda = lambda;
@@ -257,7 +261,7 @@ export class SpectrumHapticSource {
       e.tag = this.tag;
       e.pitch = this.sample.pitch;
       e.pan = this.panAt(st.x);
-      this.sink.emit(e);
+      st.played = this.sink.emit(e);
       st.emitted = true;
     }
     this.onStep?.(st);

@@ -24,7 +24,8 @@ sequenceDiagram
     W->>E: unlock() (creates or resumes the AudioContext)
     Note over W,U: Step 1, faintest pulse (Skip or Cancel)
     W->>NV: One pattern: 5, 10, 20 ms, 700 ms apart
-    U->>W: Picks the faintest felt, or none
+    U->>W: Picks the faintest felt (answers enabled once played)
+    Note over W,U: None felt keeps the stored minMs
     W->>CL: minMsFromAnswer
     Note over W,U: Step 2, levels (Skip or Cancel)
     W->>NV: One pattern: whisper, soft = minMs, medium, firm
@@ -32,6 +33,7 @@ sequenceDiagram
     W->>CL: levelSetFromAnswers (3 or 4 levels, D-09)
     Note over W,U: Step 3, tap-along (Skip or Cancel)
     W->>NV: Vibration-only beat (10 firm ticks, 800 ms)
+    Note over W,U: Tap area names the channel, Beat n of 10
     loop each beat
       U->>W: Tap (touch, Space or Enter)
     end
@@ -46,7 +48,7 @@ sequenceDiagram
     alt Cancel at any step
       W->>NV: vibrate(0) if a pattern may still play
       W->>AD: stop() if a sound beat may still play
-      W->>U: Closed, nothing saved
+      W->>U: Closed, nothing saved, focus back to the opener
     else Save
       W->>CL: saveCalibration, only when a step was re-measured
       CL->>LS: Write sx.haptics.calibration (validated)
