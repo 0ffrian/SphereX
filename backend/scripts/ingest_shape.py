@@ -1,7 +1,7 @@
 """Ingest a shape model into two GLB levels of detail and a registry entry (A3.7, A3.10, R7.1).
 
     uv run python -m scripts.ingest_shape --zip PATH --member NAME.tab --slug eros-gaskell \\
-        --spkid 2000433 --name "433 Eros" --citation ... --doi ... --licence CC0-1.0
+        --spkid 20000433 --name "433 Eros" --citation ... --doi ... --licence CC0-1.0
 
 Input is an ICQ file (Gaskell, PDS) or a Wavefront OBJ (DAMIT). Output is ``<slug>.glb`` (LOD0)
 and ``<slug>.lod1.glb`` (LOD1) in ``assets/shapes`` plus an entry in ``registry.toml``.
@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import struct
 import sys
 import tomllib
@@ -344,7 +345,14 @@ def build_levels(
     return out
 
 
+# The same rule as the /data/shapes route (app/main.py), so every registered mesh is servable and
+# no slug can write outside --out-dir.
+SLUG = re.compile(r"[a-z0-9][a-z0-9_-]*")
+
+
 def ingest(args: argparse.Namespace) -> dict[str, Any]:
+    if not SLUG.fullmatch(args.slug):
+        raise ShapeError(f"slug {args.slug!r} must match {SLUG.pattern} (lower case, no paths)")
     if args.zip:
         with zipfile.ZipFile(args.zip) as z:
             data = z.read(args.member)
@@ -400,7 +408,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--member", help="path of the file inside --zip")
     p.add_argument("--format", choices=["auto", "icq", "obj"], default="auto")
     p.add_argument("--slug", required=True)
-    p.add_argument("--spkid", required=True, help="SBDB spkid, e.g. 2000433")
+    p.add_argument(
+        "--spkid",
+        required=True,
+        help="SBDB spkid as resolve reports it, e.g. 20000433 for 433 Eros (not the NAIF id)",
+    )
     p.add_argument("--name", required=True)
     p.add_argument("--citation", required=True)
     p.add_argument("--doi", required=True)

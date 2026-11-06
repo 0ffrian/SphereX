@@ -34,6 +34,7 @@ flowchart LR
     GemN["gemini_paint (P3, admin token, off when offline)"]
     Cache[("Read-through cache (D-25): outside git, zipped backup")]
     Textures[("/data/textures")]
+    Shapes[("/data/shapes/{name}.glb from backend/assets/shapes")]
     PreFetch["Pre-fetch script (D-25): 5 test targets + every demo object"]
     PyAPI --- PipelineN
     PyAPI --- BakerN
@@ -56,9 +57,9 @@ flowchart LR
     Horizons["JPL Horizons"]
     SkyBoT["IMCCE SkyBoT"]
     SBDB["JPL SBDB"]
-    DAMIT["DAMIT"]
+    DAMIT["DAMIT (not called live: OBJ converter only, site was down)"]
     SIMBAD["SIMBAD"]
-    Exo["NASA Exoplanet Archive (untested)"]
+    Exo["NASA Exoplanet Archive (PSCompPars, tested)"]
     GeminiAPI["Gemini image API"]
   end
 

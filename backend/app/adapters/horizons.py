@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 
 from app.adapters.http import UpstreamError
 from app.cache.keys import CacheKey
-from app.cache.store import LiveResponse, Served, UpstreamUnavailable
+from app.cache.store import CacheMissOffline, LiveResponse, Served, UpstreamUnavailable
 from app.context import Context
 from app.timefmt import utc_to_jd
 
@@ -96,6 +96,10 @@ def ephemeris(
 # R5.1: phase angle from Horizons quantity 24 with observer SPHEREx (NAIF -163182).
 OBSERVER_SPHEREX = "500@-163182"
 SUN_CENTER = "500@10"  # Sun body centre: the target's heliocentric vector (ICRF)
+
+
+class NoEphemeris(UpstreamError):
+    """Horizons answered, but with no phase angle (e.g. no observer ephemeris at the epoch)."""
 
 
 @dataclass(frozen=True)
@@ -195,7 +199,7 @@ def _fetch_phase(
         try:
             parse_phase_angle(resp.body)
         except ValueError as exc:
-            raise UpstreamError(str(exc)) from exc
+            raise NoEphemeris(str(exc)) from exc
         return resp
 
     served = ctx.cache.fetch(phase_key(spkid, jd, center), live, refresh=refresh)
@@ -236,15 +240,23 @@ def geometry(
 ) -> tuple[Geometry, list[Served]]:
     """Phase angle (observer SPHEREx, else geocentre) and Sun direction at ``time``.
 
-    Only an upstream error for the SPHEREx observer falls back to the geocentre; an offline
-    cache miss or an outage of both is raised to the caller.
+    Live, only a Horizons reply with no phase angle for the SPHEREx observer (``NoEphemeris``,
+    e.g. no spacecraft ephemeris at the epoch) falls back to the geocentre; a network outage is
+    raised, so the observer never depends on a transient error. Offline, a SPHEREx cache miss
+    tries the recorded geocentre answer (what a live run that fell back left in the cache).
+
+    The VECTORS call sends no TIME_TYPE, so its JD is read as TDB, about 69 s after the UT
+    phase-angle epoch; negligible for a direction (Q-62).
     """
     jd = f"{utc_to_jd(time):.6f}"
     observer = OBSERVER_SPHEREX
     try:
         phase, served_p = _fetch_phase(ctx, spkid, jd, observer, refresh)
-    except UpstreamUnavailable:
-        if ctx.settings.offline:
+    except CacheMissOffline:
+        observer = GEOCENTRE
+        phase, served_p = _fetch_phase(ctx, spkid, jd, observer, refresh)
+    except UpstreamUnavailable as exc:
+        if not isinstance(exc.__cause__, NoEphemeris):
             raise
         observer = GEOCENTRE
         phase, served_p = _fetch_phase(ctx, spkid, jd, observer, refresh)

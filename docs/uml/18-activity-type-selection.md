@@ -6,7 +6,7 @@ How the backend chooses the `ObjectType` that picks the renderer and haptic prof
 flowchart TD
   Start(("Object to type")) --> SBDBq{"JPL SBDB match?"}
   SBDBq -->|comet| Comet["comet"]
-  SBDBq -->|asteroid| Shape{"DAMIT or NASA shape model exists?"}
+  SBDBq -->|asteroid| Shape{"Shape model in registry.toml? (Q-61)"}
   Shape -->|yes| AstShape["asteroid_shape"]
   Shape -->|no| AstProc["asteroid_procedural"]
   SBDBq -->|no match| SIMq{"SIMBAD object type?"}
@@ -17,14 +17,27 @@ flowchart TD
   SIMq -->|Mira variable| Mira["star_mira"]
   SIMq -->|T Tauri| TTau["star_ttauri"]
   SIMq -->|other star| Star["star"]
-  SIMq -->|no match| Exoq{"NASA Exoplanet Archive match? (D-04, P2, service untested)"}
+  SIMq -->|"Pl (planet)"| Exoq{"Exoplanet Archive PSCompPars row? (Q-63)"}
+  SIMq -->|other| Slider
 
-  Exoq -->|yes| PlanetCut{"Planet class by radius, mass, Teq: cut-offs [verify], to decide"}
-  PlanetCut --> Rocky["planet_rocky"]
-  PlanetCut --> Water["planet_water"]
-  PlanetCut --> Giant["gas_giant"]
-  PlanetCut -->|"cut-offs not agreed (Q-56): refused, type:exoplanet_thresholds in missing"| Slider
-  Exoq -->|no| Slider{"Built from user sliders?"}
+  Exoq -->|no| Slider
+  Exoq -->|yes| Rad{"pl_rade (R, Earth radii)"}
+  Rad -->|"R >= 6 [verify]"| Giant
+  Rad -->|missing| MassOnly{"True mass >= 0.414 M_J? [verify]"}
+  MassOnly -->|yes| Giant
+  MassOnly -->|no| RefR["candidate: type:exoplanet_radius"]
+  Rad -->|"R < 1.5 [verify]"| Rocky
+  Rad -->|"1.5 <= R < 6"| TrueM{"True mass? pl_bmassprov == Mass"}
+  TrueM -->|no| RefM["candidate: type:exoplanet_mass"]
+  TrueM -->|yes| Zeng{"R vs Zeng 2019 curves [verify]"}
+  Zeng -->|"mass outside table"| RefMR["candidate: type:exoplanet_mass_range"]
+  Zeng -->|"at or below Earth-like rocky curve"| Rocky
+  Zeng -->|"above it: water curve nearest pl_eqt (300/500/700/1000 K)"| Teq{"pl_eqt present and <= 1000 K?"}
+  Teq -->|no| RefW["candidate: type:exoplanet_water_model_range"]
+  Teq -->|yes| Wat{"R vs 100% H2O curve"}
+  Wat -->|"at or below"| Water
+  Wat -->|above| RefE["candidate: type:exoplanet_envelope"]
+  Slider{"Built from user sliders?"}
   Slider -->|nebula| Neb["nebula"]
   Slider -->|nova| Nova["nova"]
   Slider -->|no| Cand["candidate (no 3D)"]
@@ -55,4 +68,4 @@ flowchart TD
 - For orientation only, not a type rule: brown dwarf spectral types are roughly L above ~1,400 K, T from ~1,400 K to 500 K, Y below ~500 K (architecture spec §7.3, approximate).
 - The old architecture-spec kinds map as `dwarf` → `brown_dwarf` and `asteroid` → `asteroid_shape` or `asteroid_procedural` (D-04).
 - Stars are self-lit and drawn from their own data (blackbody colour, limb darkening), not from the shader generators; they are grouped with the rendering-doc renderers because they follow the rendering doc, not the browser-shader path. Only types that need procedural maps (for example `asteroid_procedural`, brown dwarf bands) are baked.
-- As built (issue #5, `backend/app/core/classify/rules.py`): SIMBAD otypes are `BD*` (brown dwarf), `Mi*` (Mira), `TT*` (T Tauri), and any otype ending in `*` plus `s*r`, `s*y`, `s*b`, `Y*O` (other star); "known components" means a composite spectral type with `+` (Q-55). The shape-model list is empty, so every asteroid is `asteroid_procedural` (Q-55). Every exoplanet threshold is `None`, so a planet match is refused and falls through to sliders, then `candidate` (Q-56); no Exoplanet Archive adapter exists yet.
+- As built (issue #5, `backend/app/core/classify/rules.py`, updated for issue #40): SIMBAD otypes are `BD*` (brown dwarf), `Mi*` (Mira), `TT*` (T Tauri), `Pl` (planet, not `Pl?`), and any otype ending in `*` plus `s*r`, `s*y`, `s*b`, `Y*O` (other star); "known components" means a composite spectral type with `+` (Q-55). The shape-model branch reads `backend/assets/shapes/registry.toml` (Q-61); it holds only Gaskell Eros, so every other asteroid is `asteroid_procedural`. Planets follow Q-63: the thresholds live in `EXOPLANET_THRESHOLDS` and the Zeng et al. 2019 tables in `zeng2019.py`, all still **[verify]**; central values only. A refused planet becomes `candidate` with the reason in `missing`. The Exoplanet Archive adapter queries `pscomppars` by name through the TAP service.

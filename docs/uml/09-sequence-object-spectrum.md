@@ -36,10 +36,11 @@ sequenceDiagram
   EXT-->>PL: Reflectance spectrum
   PL-->>API: Class + confidence
   API->>TS: Select ObjectType
-  TS->>EXT: SBDB kind, DAMIT model, SIMBAD otype, Exoplanet Archive match
+  TS->>EXT: SBDB kind, shape registry lookup (registry.toml, Q-61), SIMBAD otype, Exoplanet Archive PSCompPars row if otype Pl (Q-63)
   EXT-->>TS: Matches
   TS-->>API: type (comet, asteroid_*, brown_dwarf*, star*, planet kinds, or candidate)
   API->>CB: Build ObjectCard
+  CB->>EXT: Horizons geometry for comets and asteroids (phase angle, Sun vector, Q-62)
   CB->>EXT: SBDB phys-par (diameter, albedo, rot_per, spec_B, spec_T)
   EXT-->>CB: Values with their sources
   CB->>CB: Wrap each value as TV with tag and source, null if unknown
@@ -71,4 +72,4 @@ sequenceDiagram
 - The Estimated badge covers `derived`, `model_dependent` and `inferred_from_analog`; its tooltip shows the formula, assumption or analog (D-02).
 - Spectra and cards are cached in the backend's read-through cache, like every external call (D-25). The spectrum entry (`derived.spectrum`) is keyed by the method, Stage 1's `missing`, every frame record and every cutout's SHA-256, and is stored only for a complete frame list. Stage 2 reads cached cutouts only and never downloads (A4.2). Saturated frames are refused, never measured (Q-26). The panel groups `missing` by reason (A11, issue #24) and words the empty state from the grouped counts, not from `spectrum:saturated`, which is absent when any listed frame was refused for another reason (Barnard's Star and R Dra on the full cache, A4.2). Calls to SBDB, SIMBAD, DAMIT, Gaia and the Exoplanet Archive also go through it.
 - Spectrum haptic events go through the same `HapticEngine` and drivers as touch mode ([11-sequence-touch-haptics.md](11-sequence-touch-haptics.md)).
-- As built (issue #5, `backend/app/core/card/service.py`): `/card` first looks up a saved asset (stage 4, [16-state-asset-lookup.md](16-state-asset-lookup.md)) and returns its card unchanged. Otherwise stage 3 takes the class label from the catalogue only (SIMBAD `sp_type`, SBDB `spec_B` then `spec_T`) with confidence `catalogue` or `none`, which the card does not carry; spectrum matching and the Gaia call are not built (Q-55). No DAMIT lookup or Exoplanet Archive adapter exists yet (Q-55, Q-56). The card is checked with `jsonschema` before it is sent (Q-40), and `cached_at` and the asset status travel as the `X-SX-Cached-At` and `X-SX-Asset-Status` headers (Q-39).
+- As built (issue #5, `backend/app/core/card/service.py`): `/card` first looks up a saved asset (stage 4, [16-state-asset-lookup.md](16-state-asset-lookup.md)) and returns its card unchanged. Otherwise stage 3 takes the class label from the catalogue only (SIMBAD `sp_type`, SBDB `spec_B` then `spec_T`) with confidence `catalogue` or `none`, which the card does not carry; spectrum matching and the Gaia call are not built (Q-55). Issue #40 added the shape registry lookup (Q-61), the Horizons phase angle and Sun vector for comet and asteroid cards (Q-62) and the Exoplanet Archive adapter for SIMBAD `Pl` (Q-63); DAMIT is not called live. The card is checked with `jsonschema` before it is sent (Q-40), and `cached_at` and the asset status travel as the `X-SX-Cached-At` and `X-SX-Asset-Status` headers (Q-39).

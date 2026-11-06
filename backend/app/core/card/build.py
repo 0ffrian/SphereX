@@ -210,7 +210,12 @@ def build_card(
     spectrum: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     kind = cls.type
-    card: dict[str, Any] = {"id": obj.id, "name": obj.name or obj.id, "type": kind}
+    name = obj.name or obj.id
+    planet = data.facts.exoplanet
+    if planet and isinstance(planet.get("pl_name"), str) and planet["pl_name"].strip():
+        # The archive's planet name ("GJ 1214 b"), not SIMBAD's main_id ("NAME G 139-21b").
+        name = planet["pl_name"].strip()
+    card: dict[str, Any] = {"id": obj.id, "name": name, "type": kind}
 
     if kind in ("asteroid_shape", "asteroid_procedural"):
         card["diameter_km"] = _sbdb_value(data, "diameter")

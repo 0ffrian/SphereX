@@ -84,7 +84,7 @@ interface ObjectCard {
    - T Tauri → `star_ttauri`
    - any other star → `star`
 4. NASA Exoplanet Archive match → `planet_rocky`, `planet_water` or `gas_giant`.
-   - Classification thresholds: now set in `backend/app/core/classify/rules.py` (Q-63: radius cuts, true mass, Zeng 2019 mass-radius curves) pending team agreement; all values stay **[verify]**. Open item, [§12](layout-tests-open-items.md#r12-open-items-verify).
+   - Classification thresholds: **provisional** values in `backend/app/core/classify/rules.py` (Q-63: radius cuts, true mass, Zeng 2019 mass-radius curves), chosen by Moon on 7 Nov 2026 and not agreed until Atish (classify owner, D-17) confirms Q-63; all values stay **[verify]**. Open item, [§12](layout-tests-open-items.md#r12-open-items-verify).
    - The Exoplanet Archive service is tested ([architecture spec §3.8](../architecture/README.md)).
 5. `nebula` and `nova` come from user sliders only. They have no catalogue rule; they are slider-only showcase bodies, and every value is tagged `artistic` (D-12).
 6. Anything else → `candidate`.

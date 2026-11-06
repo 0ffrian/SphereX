@@ -56,9 +56,14 @@ flowchart LR
     SkyBoT["IMCCE SkyBoT"]
     Gaia["Gaia DR3 TAP"]
     SBDB["JPL SBDB phys-par"]
-    DAMIT["DAMIT shape.obj"]
-    Exo["NASA Exoplanet Archive (untested)"]
+    DAMIT["DAMIT (not called live: OBJ converter only, site was down)"]
+    Exo["NASA Exoplanet Archive (PSCompPars, tested)"]
     Gemini["Gemini image API"]
+  end
+
+  subgraph ShapesB["Shape models"]
+    Shapes["Static route /data/shapes"]
+    ShapeDir["backend/assets/shapes: registry.toml + GLBs (Q-61)"]
   end
 
   FEFlip -->|"GET /v1/resolve, /v1/objects/{id}/frames, /cutouts/{frame_id}.png"| API
@@ -87,12 +92,14 @@ flowchart LR
   Adapters <--> DataCache
   Adapters -->|"SIA?COLLECTION=spherex_qr2, cutouts"| IRSA
   Adapters -->|"name to RA/Dec"| Resolver
-  Adapters -->|"position per frame"| Horizons
+  Adapters -->|"position per frame, phase angle (quantity 24, observer SPHEREx), heliocentric vectors for sun_vector"| Horizons
   Adapters -->|"conesearch.php, -ep in JD"| SkyBoT
   Adapters -->|"sso_reflectance_spectrum"| Gaia
   Adapters -->|"sbdb.api?sstr=...&phys-par=1"| SBDB
-  Adapters -->|"shape.obj"| DAMIT
-  Adapters -.->|"planet columns (P2)"| Exo
+  Adapters -.->|"OBJ converter, no live call"| DAMIT
+  Adapters -->|"pscomppars by name, TAP sync"| Exo
+  API -->|"GET /data/shapes/{name}.glb"| Shapes
+  Shapes --> ShapeDir
   GemPaint -->|"hillshade + prompt (server-side key)"| Gemini
 
   Validate -.->|"validates cards against"| CardSchema
