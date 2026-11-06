@@ -18,6 +18,7 @@ import {
   AUDIO_PEAK_GAIN,
   NOISE_BURST_S,
   NOISE_DECAY_S,
+  MAX_AUDIO_VOICES,
 } from '../tuning';
 import { AudioDriver, audioGain, patternOnsetsMs, selectTimbre } from './audio';
 
@@ -255,5 +256,52 @@ describe('latency (R8.9, R12 #10)', () => {
     const none = setup();
     expect(none.driver.outputLatency()).toBeNull();
     expect(none.driver.isHighLatency()).toBe(false);
+  });
+});
+
+describe('resources (review P4, P5, S2)', () => {
+  it('keeps at most MAX_AUDIO_VOICES sounds; the oldest is cut first', () => {
+    const { ctx, driver } = setup();
+    for (let i = 0; i < MAX_AUDIO_VOICES + 5; i++) driver.emit(ev());
+    const sources = ctx.sources();
+    expect(sources.filter((s) => s.stopCalls === 2)).toEqual(sources.slice(0, 5));
+    driver.stop();
+    expect(sources.every((s) => s.stopCalls === 2 && s.disconnected)).toBe(true);
+  });
+
+  it('a bell is released only when both partials have ended', () => {
+    const { ctx, driver } = setup();
+    driver.emit(ev({ voice: 'chime' }));
+    const [o1, o2] = ctx.sources();
+    o1!.end();
+    expect(o2!.disconnected).toBe(false);
+    o2!.end();
+    expect(o1!.disconnected && o2!.disconnected).toBe(true);
+  });
+
+  it('a new context drops the sounds of the old one', () => {
+    let ctx = new FakeAudioContext();
+    const driver = new AudioDriver({ context: () => ctx.asAudioContext(), supported: true });
+    driver.emit(ev({ voice: 'chime' }));
+    const old = ctx.sources();
+    ctx = new FakeAudioContext();
+    driver.emit(ev());
+    for (const s of old) expect(s.disconnected).toBe(true);
+  });
+
+  it('setVolume replaces the scheduled value instead of piling events up', () => {
+    const { ctx, driver } = setup();
+    driver.emit(ev());
+    const volume = ctx.nodes.find(
+      (n) => n instanceof FakeGain && n.outputs[0] instanceof FakeGain && n !== n.outputs[0],
+    ) as FakeGain;
+    for (let i = 0; i < 5; i++) driver.setVolume(i / 5);
+    expect(volume.gain.calls.filter((c) => c[0] === 'cancel')).toHaveLength(5);
+  });
+
+  it.each([1e20, Infinity, NaN, -4, 0])('emit(pulseTrain) at %s Hz is bounded', (rateHz) => {
+    const { ctx, driver } = setup();
+    driver.emit(ev({ kind: 'pulseTrain', rateHz }));
+    expect(ctx.sources().length).toBeLessThanOrEqual(11);
   });
 });

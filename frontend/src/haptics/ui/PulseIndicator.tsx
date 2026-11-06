@@ -3,10 +3,11 @@
 // A large dot (decorative, aria-hidden) flashes with each event; a visible caption beside it names
 // the last event and its provenance badge (D-02, R8.2), plus "Texture" or "Data" when the event
 // says which. The caption is not a live region: haptics repeat what is already text or sound (R9).
-// With prefers-reduced-motion the dot only fades, at most 3 flashes a second, and glows steadily
-// while a pulse train plays.
+// For every user (WCAG 2.3.1 margin): at most 3 flashes a second, and a steady glow, not flashes,
+// while a pulse train plays. With prefers-reduced-motion a flash only fades (no scaling).
+// The event detail is checked before use: anything on the page can dispatch this event.
 import { useEffect, useRef, useState } from 'react';
-import type { HapticEvent } from '@/contract';
+import { TAGS, type HapticEvent } from '@/contract';
 import { badgeForTag, type BadgeName } from '@/viewer/honesty';
 import { HAPTIC_DEBUG_EVENT } from '../haptics';
 
@@ -16,10 +17,13 @@ export interface PulseIndicatorProps {
   className?: string;
 }
 
-/** Reduced motion: at most this many flashes a second. */
-export const REDUCED_MOTION_MAX_FLASHES_PER_S = 3;
-/** A train's steady glow fades this long after its last window. */
-const TRAIN_GLOW_MS = 400;
+/** At most this many flashes a second, for everyone (WCAG 2.3.1 allows 3). */
+export const MAX_FLASHES_PER_S = 3;
+/** @deprecated The cap now applies to everyone; use MAX_FLASHES_PER_S. */
+export const REDUCED_MOTION_MAX_FLASHES_PER_S = MAX_FLASHES_PER_S;
+/** A train's steady glow lasts at least this long after its last window. */
+const MIN_GLOW_MS = 400;
+const FLASH_MS = 250;
 const REST_OPACITY = 0.3;
 
 function reducedMotion(): boolean {
@@ -30,21 +34,22 @@ function reducedMotion(): boolean {
   );
 }
 
-/** Flashes per event: one for a tick, two for double and heartbeat, the window's pulses for a train. */
-export function flashPlan(e: HapticEvent): { count: number; periodMs: number } {
+/**
+ * How the dot shows an event: one capped flash for a one-shot, a steady glow for a train (kept
+ * until one period after the next expected pulse), nothing for `stop`.
+ */
+export function flashPlan(e: HapticEvent): { mode: 'flash' | 'glow' | 'none'; glowMs: number } {
   switch (e.kind) {
     case 'tick':
-      return { count: 1, periodMs: 120 };
     case 'double':
-      return { count: 2, periodMs: 52 };
     case 'heartbeat':
-      return { count: 2, periodMs: 140 };
+      return { mode: 'flash', glowMs: 0 };
     case 'pulseTrain': {
       const rate = e.rateHz && e.rateHz > 0 ? e.rateHz : 4;
-      return { count: Math.max(1, Math.round(rate / 4)), periodMs: 1000 / rate };
+      return { mode: 'glow', glowMs: Math.max(MIN_GLOW_MS, 1000 / rate + 100) };
     }
     case 'stop':
-      return { count: 0, periodMs: 0 };
+      return { mode: 'none', glowMs: 0 };
   }
 }
 
@@ -55,6 +60,22 @@ const KIND_LABEL: Record<HapticEvent['kind'], string> = {
   pulseTrain: 'Pulse train',
   stop: 'Stopped',
 };
+
+/** Whether a `spherex:haptic` detail is a well-formed HapticEvent (anything can dispatch one). */
+export function isHapticEventDetail(d: unknown): d is HapticEvent {
+  if (typeof d !== 'object' || d === null) return false;
+  const e = d as Record<string, unknown>;
+  return (
+    typeof e.kind === 'string' &&
+    Object.hasOwn(KIND_LABEL, e.kind) &&
+    typeof e.tag === 'string' &&
+    (TAGS as readonly string[]).includes(e.tag) &&
+    typeof e.strength === 'number' &&
+    Number.isFinite(e.strength) &&
+    (e.rateHz === undefined || (typeof e.rateHz === 'number' && Number.isFinite(e.rateHz))) &&
+    (e.channel === undefined || e.channel === 'texture' || e.channel === 'data')
+  );
+}
 
 const BADGE_LABEL: Record<BadgeName, string> = {
   Measured: 'Measured',
@@ -83,6 +104,10 @@ export function pulseCaption(e: HapticEvent): PulseCaption {
   };
 }
 
+function sameCaption(a: PulseCaption | null, b: PulseCaption): boolean {
+  return a !== null && a.kind === b.kind && a.badge === b.badge && a.channel === b.channel;
+}
+
 export function PulseIndicator({ target, className }: PulseIndicatorProps) {
   const dot = useRef<HTMLSpanElement>(null);
   const [caption, setCaption] = useState<PulseCaption | null>(null);
@@ -101,49 +126,40 @@ export function PulseIndicator({ target, className }: PulseIndicatorProps) {
 
     const onHaptic = (ev: Event) => {
       const el = dot.current;
-      const e = (ev as CustomEvent<HapticEvent>).detail;
-      if (!el || !e) return;
-      setCaption(pulseCaption(e));
-      const { count, periodMs } = flashPlan(e);
+      const e: unknown = (ev as CustomEvent<unknown>).detail;
+      if (!el || !isHapticEventDetail(e)) return;
+      const next = pulseCaption(e);
+      // Same caption → keep the old object, so React skips the render (up to 40 events/s).
+      setCaption((prev) => (sameCaption(prev, next) ? prev : next));
+      const plan = flashPlan(e);
       const peak = 0.5 + 0.5 * Math.min(1, Math.max(0, e.strength));
-      if (count === 0) {
+      if (plan.mode === 'none') {
         running?.cancel();
         running = null;
         endGlow();
         return;
       }
-      if (reducedMotion()) {
-        if (e.kind === 'pulseTrain') {
-          // A steady glow for the whole train instead of 2–20 flashes a second.
-          running?.cancel();
-          running = null;
-          el.style.opacity = String(peak);
-          if (glowTimer !== null) clearTimeout(glowTimer);
-          glowTimer = setTimeout(endGlow, TRAIN_GLOW_MS);
-          return;
-        }
-        const now = performance.now();
-        if (now - lastFlash < 1000 / REDUCED_MOTION_MAX_FLASHES_PER_S) return;
-        lastFlash = now;
-        endGlow();
-        if (typeof el.animate !== 'function') return;
+      if (plan.mode === 'glow') {
         running?.cancel();
-        running = el.animate([{ opacity: peak }, { opacity: REST_OPACITY }], {
-          duration: 250,
-          iterations: 1,
-          easing: 'ease-out',
-        });
+        running = null;
+        el.style.opacity = String(peak);
+        if (glowTimer !== null) clearTimeout(glowTimer);
+        glowTimer = setTimeout(endGlow, plan.glowMs);
         return;
       }
+      const now = performance.now();
+      if (now - lastFlash < 1000 / MAX_FLASHES_PER_S) return;
+      lastFlash = now;
+      endGlow();
       if (typeof el.animate !== 'function') return;
       running?.cancel();
-      running = el.animate(
-        [
-          { opacity: peak, transform: `scale(${1 + 0.3 * peak})` },
-          { opacity: REST_OPACITY, transform: 'scale(1)' },
-        ],
-        { duration: Math.max(20, periodMs * 0.8), iterations: count, easing: 'ease-out' },
-      );
+      const keyframes: Keyframe[] = reducedMotion()
+        ? [{ opacity: peak }, { opacity: REST_OPACITY }]
+        : [
+            { opacity: peak, transform: `scale(${1 + 0.3 * peak})` },
+            { opacity: REST_OPACITY, transform: 'scale(1)' },
+          ];
+      running = el.animate(keyframes, { duration: FLASH_MS, iterations: 1, easing: 'ease-out' });
     };
     t.addEventListener(HAPTIC_DEBUG_EVENT, onHaptic);
     return () => {

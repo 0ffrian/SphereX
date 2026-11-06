@@ -191,3 +191,13 @@ describe('unsupported (iPhone, iPad, desktop; R11)', () => {
     expect(new WebVibrateDriver().supported).toBe(typeof navigator.vibrate === 'function');
   });
 });
+
+describe('fallback pulseTrain (review S2)', () => {
+  it.each([1e20, Infinity, NaN, -4, 0])('emit(pulseTrain) at %s Hz is bounded', (rateHz) => {
+    const v = fakeVibrate();
+    const d = new WebVibrateDriver({ vibrate: v.fn });
+    d.emit({ kind: 'pulseTrain', rateHz, strength: 0.5, tag: 'measured' });
+    for (const c of v.calls)
+      expect(Array.isArray(c) ? c.length : 1).toBeLessThanOrEqual(MAX_PATTERN);
+  });
+});
