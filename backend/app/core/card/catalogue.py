@@ -8,14 +8,15 @@ object is typed ``candidate`` and the reason goes in ``missing``.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
-from app.adapters import sbdb, simbad
+from app.adapters import horizons, sbdb, simbad
 from app.cache.store import CacheMissOffline, Served, UpstreamUnavailable
 from app.context import Context
 from app.core.classify import CatalogueFacts
 from app.core.find.resolver import ResolvedObject
+from app.timefmt import parse_utc
 
 # ASSUMPTION: no DAMIT or NASA shape-model lookup exists yet (A3.7 is not built), so this maps
 # an SBDB spkid to a same-origin mesh path (Q-44) by hand. Empty: every asteroid is
@@ -30,6 +31,8 @@ class CatalogueData:
     sbdb_phys: dict[str, dict[str, Any]] = field(default_factory=dict)
     served: tuple[Served, ...] = ()
     missing: tuple[str, ...] = ()
+    geometry: horizons.Geometry | None = None  # Q-62: Horizons phase angle and Sun vector
+    geometry_reason: str | None = None
 
 
 def _sbdb_phys(body: bytes) -> dict[str, dict[str, Any]]:
@@ -87,3 +90,17 @@ def gather(ctx: Context, obj: ResolvedObject) -> CatalogueData:
     except (CacheMissOffline, UpstreamUnavailable):
         return CatalogueData(CatalogueFacts(), missing=("catalogue",))
     return CatalogueData(CatalogueFacts(), missing=("catalogue",))
+
+
+def with_geometry(ctx: Context, data: CatalogueData, obj: ResolvedObject) -> CatalogueData:
+    """Add the Horizons phase angle and Sun vector for a moving SBDB object at its resolve
+    epoch (Q-62). A miss or outage leaves ``geometry`` empty with a reason; never raises."""
+    if obj.resolver != "sbdb" or not obj.spkid or not obj.epoch:
+        return data
+    try:
+        geom, served = horizons.geometry(ctx, obj.spkid, parse_utc(obj.epoch))
+    except CacheMissOffline:
+        return replace(data, geometry_reason="Horizons geometry not cached and offline")
+    except UpstreamUnavailable:
+        return replace(data, geometry_reason="Horizons geometry unavailable")
+    return replace(data, geometry=geom, served=(*data.served, *served))
