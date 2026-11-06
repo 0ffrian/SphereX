@@ -121,7 +121,7 @@ def measure_frame(
     dist = aperture.distance(shape, x0, y0)
     core = in_ap & (dist <= cfg.core_radius_px)
 
-    # Saturation first, so the UI can say it plainly (Q-26).
+    # Saturation first, so the UI can say it plainly (D-31).
     sat, _ = flags.mask_of(flag_arr, cfg.saturation_flags, bits)
     sat_ctx, _ = flags.mask_of(flag_arr, cfg.saturation_context_flags, bits)
     if (sat & core).any() or ((~np.isfinite(image) & core).any() and (sat_ctx & in_ap).any()):

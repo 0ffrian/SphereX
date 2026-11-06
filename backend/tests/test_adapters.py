@@ -106,7 +106,7 @@ def test_sia_key_has_no_maxrec() -> None:
 
 def test_recorded_cutouts_have_no_psf_and_keep_science_hdus() -> None:
     recorded = entries("irsa_cutout")
-    assert len(recorded) == 15
+    assert len(recorded) == 24  # 3 frames (MAXREC=3) x 8 fixed targets: 5 test + 3 demo (D-31)
     for meta, body in recorded:
         with fits.open(io.BytesIO(body)) as h:
             names = [hdu.name for hdu in h]
