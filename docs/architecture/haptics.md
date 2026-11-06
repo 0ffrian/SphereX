@@ -4,7 +4,7 @@
 
 ## A9 Haptics
 
-The rendering doc is the authority: see **rendering doc §8** for encoding, event sources, per-type profiles, calibration and the engine API. This section summarises the decisions. Status: **To build**.
+The rendering doc is the authority: see **rendering doc §8** for encoding, event sources, per-type profiles, calibration and the engine API. This section summarises the decisions. Status: **Engine, web drivers, settings and test page built** (issue #9, 6 Nov 2026; not yet felt on the phones); spectrum haptics and calibration (#10) and the per-type sources and sound (#11) **to build**.
 
 ### A9.1 Platform (D-08)
 

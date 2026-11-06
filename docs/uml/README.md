@@ -15,7 +15,7 @@ Mermaid renders natively on GitHub, and in VS Code with a Mermaid extension (for
 | [03-deployment.md](03-deployment.md) | Deployment | Phones, iPhone/iPad, demo laptop, the Asus A15 local server (one origin, HTTPS, read-through cache, offline mode), team laptop offline jobs, external archives, post-event Tauri |
 | [04-package.md](04-package.md) | Package | Repo and code layout with dependencies and owners (Atish, Kevin, Moon; D-17) |
 | [05-class-data-contract.md](05-class-data-contract.md) | Class (2 diagrams) | `Tag`, `TV<T>`, `ObjectType`, `ObjectCard`, `RenderParams`, `Layer`, textures, lighting, view modes, `HapticProfile`, `overrides` and the slider registry |
-| [06-class-haptics-audio.md](06-class-haptics-audio.md) | Class (2 diagrams) | `HapticEvent`, `HapticDriver` and its drivers, `HapticEngine` fan-out, calibration, the debug pulse indicator, the event sources behind `HapticSource` |
+| [06-class-haptics-audio.md](06-class-haptics-audio.md) | Class (2 diagrams) | `HapticEvent`, `HapticDriver` and its drivers, `HapticEngine` (gate, rate cap, fan-out, pulse trains), the shared AudioContext, settings, calibration, the pulse indicator and unlock button, the event sources behind `HapticSource` |
 | [07-class-viewer.md](07-class-viewer.md) | Class | `ViewerApp`, the renderer interface and per-type renderers, `ShaderBody`, field worker, lighting, modes, honesty, scale bar, alt text |
 | [08-sequence-search-flipbook.md](08-sequence-search-flipbook.md) | Sequence | Search, name resolve, frames through the read-through cache, cutouts, flipbook playback, Rainbow Trails, URL hash links, the dev-only fixture path |
 | [09-sequence-object-spectrum.md](09-sequence-object-spectrum.md) | Sequence | Click a source, photometry and spectrum, classify, type selection, `ObjectCard`, panel with badges and Listen |
@@ -28,7 +28,7 @@ Mermaid renders natively on GitHub, and in VS Code with a Mermaid extension (for
 | [16-state-asset-lookup.md](16-state-asset-lookup.md) | State (2 diagrams) | Asset status (saved, generated, sketch) and the texture cache entry |
 | [17-activity-pipeline.md](17-activity-pipeline.md) | Activity | Pipeline stages 1–6 to `ObjectCard` and `RenderParams`, with refuse-rather-than-invent branches |
 | [18-activity-type-selection.md](18-activity-type-selection.md) | Activity | Type selection: SBDB, SIMBAD, Exoplanet Archive, sliders, candidate |
-| [19-activity-haptic-driver-select.md](19-activity-haptic-driver-select.md) | Activity | Choosing drivers at start-up, the `spherex:haptic` debug hook, and when calibration runs |
+| [19-activity-haptic-driver-select.md](19-activity-haptic-driver-select.md) | Activity | Choosing drivers at start-up (settings, platform defaults), calibration, the click that unlocks output, the `spherex:haptic` debug hook |
 
 ## Conventions
 
