@@ -1,7 +1,24 @@
 // R7.7, D-12: integer-hash value noise for the shared CPU field. Ported from the mock-up's
-// NOISE block (hash13/vnoise/fbm, mockup/spherex-ui.html) with an integer hash, so the same seed
-// gives the same numbers on every machine (R1 determinism). Only +, -, *, floor and Math.imul are
-// used here, all exactly specified by IEEE 754 and ECMAScript, so no transcendental rounding.
+// NOISE block (hash13/vnoise/fbm, mockup/spherex-ui.html) with an integer hash. Deterministic per
+// engine (R1): the noise itself uses only +, -, *, floor and Math.imul, which IEEE 754 and
+// ECMAScript specify exactly. The callers (fieldGenerator.ts) also use Math.sin / cos / acos /
+// atan2 / pow, which ECMAScript only approximates, so two engines may differ by an ulp and flip a
+// lattice cell or band index. Byte identity across engines is therefore NOT guaranteed (review N4);
+// the tests check one engine (V8). Tabulating the trig would be the fix if it is ever needed.
+
+/** Modulus of the visual seed offset. Prime, so offsets of nearby seeds do not repeat. */
+export const SEED_OFFSET_MOD = 997;
+
+/**
+ * Seed reduced to a small bounded offset for float32 shader noise (review B1). `RenderParams.seed`
+ * is an unbounded integer (a hash, Q-35); adding it raw to a float32 noise coordinate drowns out the
+ * direction term above about 2^20. The CPU reduces it once, here, so the shader only ever sees
+ * 0..996. Non-integer or negative input is floored and wrapped into the same range.
+ */
+export function boundedSeed(seed: number): number {
+  const s = Math.floor(Number.isFinite(seed) ? seed : 0);
+  return ((s % SEED_OFFSET_MOD) + SEED_OFFSET_MOD) % SEED_OFFSET_MOD;
+}
 
 /** murmur3 fmix32 finaliser. */
 function fmix(h: number): number {
