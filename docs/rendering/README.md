@@ -29,6 +29,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | [haptics/audio-pairing.md](haptics/audio-pairing.md) | R8.9 | writing the audio driver: timing, mapping, timbre by tag, Bluetooth latency |
 | [accessibility.md](accessibility.md) | R9 | alt text, aria-live, control sizes, reduced motion |
 | [layout-tests-open-items.md](layout-tests-open-items.md) | R10, R11, R12 | finding where code lives / who owns it, writing tests, or checking unverified items |
+| [reference/README.md](reference/README.md) | R11 | the target reference frames, seed/time convention for comparing renders, golden frames; with [checklist](reference/checklist.md) (visual review) and [frame-time](reference/frame-time.md) (device checks) |
 
 ## Section map
 
