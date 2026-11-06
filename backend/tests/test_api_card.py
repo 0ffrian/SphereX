@@ -31,7 +31,7 @@ TARGETS = {
     "WISE 0855": "brown_dwarf",
     "RW Aurigae": "star_ttauri",
     "R Draconis": "star_mira",
-    "433 Eros": "asteroid_procedural",
+    "433 Eros": "asteroid_shape",
 }
 
 
