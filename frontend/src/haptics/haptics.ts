@@ -622,3 +622,17 @@ export function createHaptics(options: HapticEngineOptions = {}): HapticOutputs 
   const engine = new HapticEngine([vibrate, audio], options);
   return { engine, vibrate, audio };
 }
+
+/**
+ * Keep the engine's honesty state in step with the app's honesty toggle (D-21): applies it now and
+ * on every change. `get` reads the toggle (for example the app store's honesty state) and
+ * `subscribe` calls back on change (a Zustand store's `subscribe` fits). Returns the unsubscribe.
+ */
+export function bindHonesty(
+  engine: Pick<HapticEngine, 'setHonesty'>,
+  get: () => HonestyState,
+  subscribe: (listener: () => void) => () => void,
+): () => void {
+  engine.setHonesty(get());
+  return subscribe(() => engine.setHonesty(get()));
+}

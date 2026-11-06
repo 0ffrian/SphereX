@@ -43,7 +43,7 @@ export class HoldPulseSource implements HapticSource {
     readonly tag: Tag,
     readonly rateHz: number,
   ) {
-    this.train = new TrainSlot(engine, DATA_TRAIN_ID, tag);
+    this.train = new TrainSlot(engine, DATA_TRAIN_ID, tag, 'data');
   }
 
   move(s: TouchSample): void {
@@ -99,7 +99,7 @@ export class BinaryPulseSource implements HapticSource {
     readonly tag: Tag,
     private readonly rates: readonly [number, number],
   ) {
-    this.train = new TrainSlot(engine, DATA_TRAIN_ID, tag);
+    this.train = new TrainSlot(engine, DATA_TRAIN_ID, tag, 'data');
   }
 
   move(s: TouchSample): void {

@@ -220,6 +220,12 @@ export const AV_OFFSET_MAX_MS = 400;
 // ================================================================ #11 texture, data and sound
 // Added by issue #11 (texture haptics per type, and sound). The constants above stay as #9 set them.
 
+// ---------------------------------------------------------------- source trains
+/** A running source train is not updated for a relative change of rate, strength or pitch below this. Engineering. */
+export const TRAIN_UPDATE_EPSILON = 0.02;
+/** … nor for a change of pan (−1..1) below this. Engineering. */
+export const TRAIN_PAN_EPSILON = 0.05;
+
 // ---------------------------------------------------------------- strengths without a data value
 /**
  * R8.4/R8.5 say "tick" or "double tick" without a strength (ring gap, lava crack, nucleus is
@@ -241,6 +247,9 @@ export const RELIEF_STD_MIN_TEXELS = 8;
 // ---------------------------------------------------------------- terrain (R8.4, D-12)
 /** A field mask (ocean, ice, lava) counts as "inside" at or above this; 0.5 is the drawn edge of its smoothstep. Engineering. */
 export const MASK_THRESHOLD = 0.5;
+/** Coastline hysteresis on open ocean = ocean · (1 − ice): enter at or above, leave at or below. Engineering. */
+export const COAST_ENTER = 0.6;
+export const COAST_LEAVE = 0.4;
 /** D-12 open-ocean swell rate, inside OCEAN_SWELL_MIN_HZ–OCEAN_SWELL_MAX_HZ. CREATIVE placeholder — Atish to decide (D-13). [verify on phones] */
 export const OCEAN_SWELL_HZ = 1.5;
 

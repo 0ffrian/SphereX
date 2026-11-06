@@ -86,9 +86,9 @@ export class FlowSource implements HapticSource {
     readonly tag: Tag,
     options: FlowOptions = {},
   ) {
-    this.out = new OneShot(engine, tag);
-    this.jet = new TrainSlot(engine, JET_TRAIN_ID, tag, 'tone');
-    this.swirl = new TrainSlot(engine, STORM_TRAIN_ID, tag, 'tone');
+    this.out = new OneShot(engine, tag, 'texture');
+    this.jet = new TrainSlot(engine, JET_TRAIN_ID, tag, 'texture', 'tone');
+    this.swirl = new TrainSlot(engine, STORM_TRAIN_ID, tag, 'texture', 'tone');
     this.storms = stormsFor(params.seed, MAX_STORMS);
     this.k = typeof options.k === 'number' && options.k > 0 ? options.k : FLOW_JET_K;
     this.rings = (options.rings ?? 0) > 0.01;

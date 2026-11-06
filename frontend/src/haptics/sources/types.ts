@@ -7,7 +7,8 @@
 //     owns no timers: one-shots go to `emit`, pulse trains to `startTrain` / `updateTrain` /
 //     `stopTrain` (Q-71), so the engine keeps their phase, the rate cap and the honesty gate.
 //   - `TrainSlot`: one source's train, started or updated only when something changed.
-import type { HapticEvent, HapticVoice, Tag } from '@/contract';
+import type { HapticChannel, HapticEvent, HapticVoice, Tag } from '@/contract';
+import { TRAIN_PAN_EPSILON, TRAIN_UPDATE_EPSILON } from '../tuning';
 import type { HapticEngine, TrainParams } from '../haptics';
 
 /** The engine calls a source needs. `HapticEngine` satisfies it; tests may pass a fake. */
@@ -96,11 +97,14 @@ export interface HapticSource {
 export class OneShot {
   private readonly e: HapticEvent = { kind: 'tick', strength: 0, tag: 'artistic' };
 
+  /** `channel` labels every event texture or data (R8.2; D-20 pulse indicator, Q-85). */
   constructor(
     private readonly engine: HapticSink,
     tag: Tag,
+    channel: HapticChannel,
   ) {
     this.e.tag = tag;
+    this.e.channel = channel;
   }
 
   play(
@@ -120,11 +124,6 @@ export class OneShot {
   }
 }
 
-/** Relative change of rate, strength or pitch below which a running train is not updated. Engineering. */
-const TRAIN_UPDATE_EPSILON = 0.02;
-/** Change of pan (−1..1) below which a running train is not updated. Engineering. */
-const TRAIN_PAN_EPSILON = 0.05;
-
 /**
  * One source's pulse train. `play` starts it (or takes it back after another train replaced it)
  * and updates it only when the rate, strength, pitch (2%) or pan (0.05) moved, so a pointermove
@@ -138,9 +137,10 @@ export class TrainSlot {
     private readonly engine: HapticSink,
     readonly id: string,
     tag: Tag,
+    channel: HapticChannel,
     voice?: HapticVoice,
   ) {
-    this.p = { rateHz: 1, strength: 0, tag, voice };
+    this.p = { rateHz: 1, strength: 0, tag, voice, channel };
   }
 
   play(rateHz: number, strength: number, pan: number, pitch?: number): void {

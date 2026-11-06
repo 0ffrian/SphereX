@@ -63,8 +63,8 @@ export class CometFieldSource implements HapticSource {
     readonly tag: Tag,
     private readonly opts: CometFieldOptions,
   ) {
-    this.out = new OneShot(engine, tag);
-    this.train = new TrainSlot(engine, FIELD_TRAIN_ID, tag);
+    this.out = new OneShot(engine, tag, 'data');
+    this.train = new TrainSlot(engine, FIELD_TRAIN_ID, tag, 'data');
     this.k = typeof opts.k === 'number' && opts.k > 0 ? opts.k : FIELD_K;
     this.maxHz =
       typeof opts.maxRateHz === 'number' && opts.maxRateHz > FIELD_MIN_HZ
@@ -157,7 +157,7 @@ export class PointDensitySource implements HapticSource {
     readonly tag: Tag,
     options: DensityOptions = {},
   ) {
-    this.train = new TrainSlot(engine, FIELD_TRAIN_ID, tag);
+    this.train = new TrainSlot(engine, FIELD_TRAIN_ID, tag, 'data');
     this.sets = Object.values(pointSets);
     const total = this.sets.reduce((n, s) => n + s.count, 0);
     this.uniform = total * DENSITY_RADIUS * DENSITY_RADIUS;

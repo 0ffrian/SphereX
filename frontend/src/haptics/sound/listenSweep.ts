@@ -4,26 +4,24 @@
 //     dip (< 20%) is silent here too;
 //   - stereo pan from left to right as it goes;
 //   - a bell chime at each comet gas feature (A4.3: H₂O 2.7 µm, CO₂ 4.25 µm, CO 4.67 µm), only for
-//     the gases that have a Q in the selected epoch (no Q, no chime).
-// It uses the shared AudioContext (audioContext.ts), follows the settings volume live and the
-// "sound" switch (off = no sweep), limits its own output like the audio driver, schedules everything
-// on the audio clock (currentTime + lookahead), and disconnects every node when it ends or is
-// stopped. It does not go through the haptic engine: it is a sound, not a HapticEvent.
-import type { CometEpoch, ObjectCard } from '@/contract';
+//     the gases that have a Q in the selected epoch (no Q, no chime);
+//   - the honesty filter (D-21): the tone carries the spectrum's tag and each chime its Q's tag, and
+//     what the current state hides does not sound (a model_dependent Q is silent in Measured only).
+// It uses the shared AudioContext (audioContext.ts) and the shared master bus with its limiter
+// (audioGraph.ts), follows the settings volume live and the "sound" switch (off = no sweep),
+// schedules everything on the audio clock (currentTime + lookahead), and disconnects every node of
+// its own when it ends or is stopped. It does not go through the haptic engine: it is a sound, not
+// a HapticEvent.
+import type { CometEpoch, ObjectCard, Tag } from '@/contract';
+import { isTagShown, type HonestyState } from '@/viewer/honesty';
 import { gasQForEpoch } from '@/viewer/renderers/Comet';
 import { getAudioContext } from '../audioContext';
+import { getMasterBus, playBell } from '../audioGraph';
 import { pitchToHz, wavelengthToPitch } from '../pitch';
-import { useHapticSettings } from '../settings';
+import { getHapticSettings, useHapticSettings } from '../settings';
 import type { SpectrumMapping, SpectrumSample } from '../spectrumMapping';
 import {
   AUDIO_LOOKAHEAD_S,
-  CHIME_DECAY_S,
-  CHIME_PARTIAL_GAIN,
-  CHIME_PARTIAL_RATIO,
-  LIMITER_ATTACK_S,
-  LIMITER_RATIO,
-  LIMITER_RELEASE_S,
-  LIMITER_THRESHOLD_DB,
   SWEEP_CHIME_GAIN,
   SWEEP_DURATION_S,
   SWEEP_EDGE_S,
@@ -32,7 +30,6 @@ import {
   SWEEP_SAMPLES_PER_POINT,
   SWEEP_STEPS,
   SWEEP_WAVE,
-  TONE_ATTACK_S,
 } from '../tuning';
 
 export type SweepGas = 'h2o' | 'co2' | 'co';
@@ -43,17 +40,23 @@ export const GAS_LINES_UM: Readonly<Record<SweepGas, number>> = { h2o: 2.7, co2:
 export interface GasLine {
   gas: SweepGas;
   lambdaUm: number;
+  /** The tag of the Q that backs the chime (D-21: hidden tags do not chime). */
+  tag: Tag;
 }
 
-/** Gas lines to chime for a comet in `epoch`: only gases with a positive Q there (Comet.ts rule). */
+/**
+ * Gas lines to chime for a comet in `epoch`: only gases with a positive Q there (Comet.ts rule),
+ * each carrying its Q's tag.
+ */
 export function gasLinesForEpoch(card: ObjectCard, epoch: CometEpoch): GasLine[] {
   if (card.type !== 'comet') return [];
   const q = gasQForEpoch(card, epoch);
   const out: GasLine[] = [];
   for (const gas of ['h2o', 'co2', 'co'] as const) {
-    const v = q?.[gas]?.value;
-    if (typeof v === 'number' && Number.isFinite(v) && v > 0) {
-      out.push({ gas, lambdaUm: GAS_LINES_UM[gas] });
+    const tv = q?.[gas];
+    const v = tv?.value;
+    if (tv && typeof v === 'number' && Number.isFinite(v) && v > 0) {
+      out.push({ gas, lambdaUm: GAS_LINES_UM[gas], tag: tv.tag });
     }
   }
   return out;
@@ -74,27 +77,41 @@ export interface SweepChime {
   gas: SweepGas;
   lambdaUm: number;
   hz: number;
+  tag: Tag;
 }
 
 export interface SweepPlan {
   durationS: number;
+  /** The spectrum's tag (SpectrumResponse.tag, `measured`): the tone sounds only when it is shown. */
+  tag: Tag;
   steps: SweepStep[];
   chimes: SweepChime[];
 }
 
+export interface PlanSweepOptions {
+  /** Default SWEEP_DURATION_S. */
+  durationS?: number;
+  /** Default max(SWEEP_STEPS, SWEEP_SAMPLES_PER_POINT × points). */
+  steps?: number;
+  /** The spectrum's tag. Default `measured` (SpectrumResponse.tag). */
+  tag?: Tag;
+}
+
 /**
  * The sweep as data (pure, testable): `steps + 1` points evenly spaced in λ over the mapping's
- * usable range, and the chimes that fall inside it. Null when the spectrum has nothing to play.
+ * usable range, and the chimes that fall inside it. Null when the spectrum has nothing to play:
+ * no usable point, or a single wavelength, which the spectrum pad cannot sweep either (R8.6 item 3).
  * By default there are SWEEP_SAMPLES_PER_POINT samples per spectrum point (at least SWEEP_STEPS),
- * so a dip one channel wide is quiet here as it is under the finger (R8.6 item 3).
+ * so a dip one channel wide is quiet here as it is under the finger.
  */
 export function planSweep(
   mapping: SpectrumMapping,
   lines: readonly GasLine[] = [],
-  durationS: number = SWEEP_DURATION_S,
-  steps: number = Math.max(SWEEP_STEPS, SWEEP_SAMPLES_PER_POINT * mapping.count),
+  options: PlanSweepOptions = {},
 ): SweepPlan | null {
-  if (mapping.empty || !(durationS > 0) || steps < 1) return null;
+  const durationS = options.durationS ?? SWEEP_DURATION_S;
+  const steps = options.steps ?? Math.max(SWEEP_STEPS, SWEEP_SAMPLES_PER_POINT * mapping.count);
+  if (mapping.empty || mapping.count < 2 || !(durationS > 0) || steps < 1) return null;
   const lo = mapping.lambdaMinUm;
   const hi = mapping.lambdaMaxUm;
   const span = hi - lo;
@@ -120,9 +137,10 @@ export function planSweep(
       gas: l.gas,
       lambdaUm: l.lambdaUm,
       hz: pitchToHz(wavelengthToPitch(l.lambdaUm)),
+      tag: l.tag,
     });
   }
-  return { durationS, steps: out, chimes };
+  return { durationS, tag: options.tag ?? 'measured', steps: out, chimes };
 }
 
 /** Pan at `t` seconds into a sweep of `durationS`: left to right (−SWEEP_PAN → SWEEP_PAN). */
@@ -139,7 +157,8 @@ export interface SweepSettings {
 }
 
 const SETTINGS: SweepSettings = {
-  get: () => useHapticSettings.getState(),
+  // Lazy: the first read loads the stored settings, so the sweep never sees unloaded defaults.
+  get: () => getHapticSettings(),
   subscribe: (fn) => useHapticSettings.subscribe(fn),
 };
 
@@ -173,22 +192,22 @@ function release(v: Voice, cancel: boolean): void {
 /**
  * Plays a `SweepPlan`. One sweep at a time; `play` stops the previous one. "Sound off" in the
  * settings means off: `play` refuses, and switching sound off mid-sweep stops it. The volume is
- * followed live through the sweep's own master gain, which feeds a limiter like the audio
- * driver's, so the tone and overlapping chimes do not clip.
+ * followed live through the sweep's own volume gain, which feeds the shared master bus and its
+ * limiter (audioGraph.ts), so the sweep and the haptics audio cannot add up past it.
  */
 export class ListenSweep {
   private readonly getContext: () => AudioContext | null;
   private readonly settings: SweepSettings;
   private readonly live = new Set<Voice>();
-  /** Master gain and limiter of the current sweep (freed when the last voice ends). */
-  private bus: Voice | null = null;
+  /** This sweep's volume gain into the master bus (freed when the last voice ends). */
+  private volumeGain: GainNode | null = null;
   private unsubscribe: (() => void) | null = null;
   private startAt = 0;
   private duration = 0;
   private active = false;
   private ctx: AudioContext | null = null;
   private run = 0;
-  /** Called once when the sweep tone ends on its own or is stopped. */
+  /** Called once when the sweep ends on its own or is stopped. */
   onEnd: (() => void) | null = null;
 
   constructor(options: ListenSweepOptions = {}) {
@@ -200,9 +219,9 @@ export class ListenSweep {
     return this.active;
   }
 
-  /** Voices still connected, the bus included (tests: nothing leaks after the end or `stop`). */
+  /** Voices still connected, the volume gain included (tests: nothing leaks after the end or `stop`). */
   get liveVoices(): number {
-    return this.live.size + (this.bus ? 1 : 0);
+    return this.live.size + (this.volumeGain ? 1 : 0);
   }
 
   /** 0–1 through the sweep, or null when not playing. */
@@ -212,48 +231,82 @@ export class ListenSweep {
   }
 
   /**
-   * Schedule the sweep. Returns false (and plays nothing) when sound is switched off or there is
-   * no running AudioContext: call `engine.unlock()` from the click first.
+   * Schedule the sweep under the honesty state `honesty` (D-21): the tone plays only when the
+   * spectrum's tag is shown, and each chime only when its Q's tag is. Returns false (and plays
+   * nothing) when sound is switched off, there is no running AudioContext (call `engine.unlock()`
+   * from the click first), or the honesty state hides everything.
    */
-  play(plan: SweepPlan): boolean {
+  play(plan: SweepPlan, honesty: HonestyState): boolean {
     this.stop();
     const st0 = this.settings.get();
     if (!st0.soundOn) return false;
+    const toneShown = isTagShown(honesty, plan.tag);
+    const chimes = plan.chimes.filter((c) => isTagShown(honesty, c.tag));
+    if (!toneShown && chimes.length === 0) return false;
     const ctx = this.getContext();
     if (!ctx || ctx.state !== 'running') return false;
     const my = ++this.run;
     this.ctx = ctx;
     const base = ctx.currentTime + AUDIO_LOOKAHEAD_S;
     const end = base + plan.durationS;
-    const master = this.makeBus(ctx, st0.volume);
+    const volume = ctx.createGain();
+    volume.gain.value = clampVolume(st0.volume);
+    volume.connect(getMasterBus(ctx));
+    this.volumeGain = volume;
 
-    const osc = ctx.createOscillator();
-    osc.type = SWEEP_WAVE;
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    const voice: Voice = { sources: [osc], nodes: [gain] };
-    let out: AudioNode = gain;
-    if (typeof ctx.createStereoPanner === 'function') {
-      const pan = ctx.createStereoPanner();
-      pan.pan.setValueAtTime(-SWEEP_PAN, base);
-      pan.pan.linearRampToValueAtTime(SWEEP_PAN, end);
-      gain.connect(pan);
-      out = pan;
-      voice.nodes.push(pan);
-    }
-    out.connect(master);
-    this.scheduleGain(gain.gain, osc.frequency, plan, base);
-    osc.onended = () => {
-      if (this.live.delete(voice)) release(voice, false);
-      this.freeBusIfIdle();
-      if (my === this.run) this.ended();
+    // The sweep's "end" is its last sound: the tone, or the last chime when the tone is hidden.
+    const finish = () => {
+      this.freeIfIdle();
+      if (my === this.run && this.live.size === 0) this.ended();
     };
-    osc.start(base);
-    osc.stop(end + SWEEP_EDGE_S + 0.05);
-    this.live.add(voice);
 
-    for (const c of plan.chimes) {
-      this.bell(ctx, master, base + c.t, c.hz, sweepPanAt(c.t, plan.durationS));
+    if (toneShown) {
+      const osc = ctx.createOscillator();
+      osc.type = SWEEP_WAVE;
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      const voice: Voice = { sources: [osc], nodes: [gain] };
+      let out: AudioNode = gain;
+      if (typeof ctx.createStereoPanner === 'function') {
+        const pan = ctx.createStereoPanner();
+        pan.pan.setValueAtTime(-SWEEP_PAN, base);
+        pan.pan.linearRampToValueAtTime(SWEEP_PAN, end);
+        gain.connect(pan);
+        out = pan;
+        voice.nodes.push(pan);
+      }
+      out.connect(volume);
+      this.scheduleGain(gain.gain, osc.frequency, plan, base);
+      osc.onended = () => {
+        if (this.live.delete(voice)) release(voice, false);
+        // The tone ending ends the sweep; chimes still ringing free themselves.
+        this.freeIfIdle();
+        if (my === this.run) this.ended();
+      };
+      osc.start(base);
+      osc.stop(end + SWEEP_EDGE_S + 0.05);
+      this.live.add(voice);
+    }
+
+    for (const c of chimes) {
+      // Panned where the sweep is when the chime rings.
+      let dest: AudioNode = volume;
+      const extra: AudioNode[] = [];
+      if (typeof ctx.createStereoPanner === 'function') {
+        const p = ctx.createStereoPanner();
+        p.pan.value = sweepPanAt(c.t, plan.durationS);
+        p.connect(volume);
+        dest = p;
+        extra.push(p);
+      }
+      const bell = playBell(ctx, dest, { freqHz: c.hz, when: base + c.t, gain: SWEEP_CHIME_GAIN });
+      const voice: Voice = { sources: [...bell.sources], nodes: [...bell.nodes, ...extra] };
+      bell.sources[0]!.onended = () => {
+        if (this.live.delete(voice)) release(voice, false);
+        if (toneShown) this.freeIfIdle();
+        else finish();
+      };
+      this.live.add(voice);
     }
 
     // Follow the volume live; "sound off" stops the sweep.
@@ -262,8 +315,7 @@ export class ListenSweep {
         this.stop();
         return;
       }
-      const g = this.bus?.nodes[0] as GainNode | undefined;
-      g?.gain.setTargetAtTime(clampVolume(s.volume), ctx.currentTime, 0.02);
+      this.volumeGain?.gain.setTargetAtTime(clampVolume(s.volume), ctx.currentTime, 0.02);
     });
 
     this.startAt = base;
@@ -272,12 +324,12 @@ export class ListenSweep {
     return true;
   }
 
-  /** Stop at once (sweep and chimes) and free every node. */
+  /** Stop at once (sweep and chimes) and free every node of the sweep. */
   stop(): void {
     this.run++;
     for (const v of this.live) release(v, true);
     this.live.clear();
-    this.freeBusIfIdle();
+    this.freeIfIdle();
     this.ended();
   }
 
@@ -312,69 +364,11 @@ export class ListenSweep {
     g.linearRampToValueAtTime(0, prevAt + SWEEP_EDGE_S);
   }
 
-  /** Master gain (volume) → limiter → destination, for this sweep. */
-  private makeBus(ctx: AudioContext, volume: number): GainNode {
-    const master = ctx.createGain();
-    master.gain.value = clampVolume(volume);
-    const bus: Voice = { sources: [], nodes: [master] };
-    if (typeof ctx.createDynamicsCompressor === 'function') {
-      const lim = ctx.createDynamicsCompressor();
-      lim.threshold.value = LIMITER_THRESHOLD_DB;
-      lim.knee.value = 0;
-      lim.ratio.value = LIMITER_RATIO;
-      lim.attack.value = LIMITER_ATTACK_S;
-      lim.release.value = LIMITER_RELEASE_S;
-      master.connect(lim);
-      lim.connect(ctx.destination);
-      bus.nodes.push(lim);
-    } else {
-      master.connect(ctx.destination);
-    }
-    this.bus = bus;
-    return master;
-  }
-
-  private freeBusIfIdle(): void {
-    if (this.live.size > 0 || !this.bus) return;
-    release(this.bus, false);
-    this.bus = null;
-  }
-
-  private bell(ctx: AudioContext, master: AudioNode, when: number, hz: number, pan: number): void {
-    const env = ctx.createGain();
-    env.gain.setValueAtTime(0, when);
-    env.gain.linearRampToValueAtTime(SWEEP_CHIME_GAIN, when + TONE_ATTACK_S);
-    env.gain.exponentialRampToValueAtTime(0.0001, when + CHIME_DECAY_S);
-    const o1 = ctx.createOscillator();
-    o1.frequency.value = hz;
-    o1.connect(env);
-    const o2 = ctx.createOscillator();
-    o2.frequency.value = hz * CHIME_PARTIAL_RATIO;
-    const g2 = ctx.createGain();
-    g2.gain.value = CHIME_PARTIAL_GAIN;
-    o2.connect(g2);
-    g2.connect(env);
-    const voice: Voice = { sources: [o1, o2], nodes: [env, g2] };
-    // Panned where the sweep is when the chime rings.
-    if (typeof ctx.createStereoPanner === 'function') {
-      const p = ctx.createStereoPanner();
-      p.pan.value = pan;
-      env.connect(p);
-      p.connect(master);
-      voice.nodes.push(p);
-    } else {
-      env.connect(master);
-    }
-    // The bell may ring past the sweep's end; it frees itself when it stops.
-    o1.onended = () => {
-      if (this.live.delete(voice)) release(voice, false);
-      this.freeBusIfIdle();
-    };
-    for (const o of voice.sources) {
-      o.start(when);
-      o.stop(when + CHIME_DECAY_S + 0.05);
-    }
-    this.live.add(voice);
+  /** Disconnect the volume gain once no voice uses it (the shared master bus stays). */
+  private freeIfIdle(): void {
+    if (this.live.size > 0 || !this.volumeGain) return;
+    this.volumeGain.disconnect();
+    this.volumeGain = null;
   }
 
   private ended(): void {
