@@ -413,27 +413,49 @@ describe('R11 honesty: haptics follow the D-21 filter (through the real engine)'
 // ---------------------------------------------------------------- holding still
 
 describe('R8.2 channel labels: texture events say texture, data events say data (Q-85)', () => {
-  it.each(['gas_giant', 'planet_water', 'asteroid_procedural', 'comet', 'nebula'])('%s', (name) => {
+  /** Drive ONE source alone on its own sink, so every event and train it makes is its own. */
+  function driveAlone(name: string, which: 'texture' | 'data'): RecordingSink {
     const sink = new RecordingSink();
-    const b = build(name, sink);
-    const touch = new TouchHaptics(b);
+    const src = build(name, sink)[which];
+    if (!src) return sink;
     for (let i = 0; i <= 120; i++) {
       const s = sampleUV(i / 120, 0.3 + 0.4 * Math.sin(i / 7) ** 2, { t: i * 30, x: i * 6 });
-      s.centreDistance = 0.02 + i / 140;
+      s.centreDistance = 0.01 + i / 140;
       s.rayOrigin = [-0.6 + i / 100, 0, 5];
       s.rayDir = [0, 0, -1];
-      touch.move(s);
+      src.move(s);
+      src.hold?.(s);
+      src.scrub?.(i % 3);
     }
-    touch.poll(120 * 30 + 1000);
-    expect(sink.events.length + sink.trains.length).toBeGreaterThan(0);
-    // One-shots: only a texture source emits them when there is no data source, and vice versa.
-    const want = !b.data ? ['texture'] : !b.texture ? ['data'] : ['texture', 'data'];
-    for (const e of sink.events) expect(want, `${name} event`).toContain(e.channel);
-    // Trains: the source that started them decides the channel.
-    for (const t of sink.trains.filter((x) => x.params)) {
-      const fromData = ['data', 'field', 'dimming'].includes(t.id);
-      expect(t.params!.channel, `${name} train ${t.id}`).toBe(fromData ? 'data' : 'texture');
+    return sink;
+  }
+
+  const cases = [
+    'gas_giant',
+    'planet_water',
+    'planet_rocky',
+    'asteroid_procedural',
+    'comet',
+    'nebula',
+    'brown_dwarf_binary',
+    'star_mira',
+    'star_ttauri',
+  ];
+  it.each(cases)('%s', (name) => {
+    const b = build(name);
+    let checked = 0;
+    for (const which of ['texture', 'data'] as const) {
+      if (!b[which]) continue;
+      const sink = driveAlone(name, which);
+      const made = [
+        ...sink.events.map((e) => e.channel),
+        ...sink.trains.filter((t) => t.params).map((t) => t.params!.channel),
+      ];
+      expect(made.length, `${name} ${which} made nothing`).toBeGreaterThan(0);
+      for (const ch of made) expect(ch, `${name} ${which}`).toBe(which);
+      checked++;
     }
+    expect(checked).toBeGreaterThan(0);
   });
 });
 

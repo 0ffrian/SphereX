@@ -267,6 +267,8 @@ export const RING_GAP_THRESHOLD = 0.5;
 export const DENSITY_RADIUS = 0.08;
 /** rate = clamp(DENSITY_K · density ÷ uniform-disc density, FIELD_MIN_HZ, max). CREATIVE placeholder — Atish to decide (D-13). */
 export const DENSITY_K = 4;
+/** The point count is redone only after the finger moved this many px (it is O(points)). Engineering. */
+export const DENSITY_RECOUNT_PX = 1;
 
 // ---------------------------------------------------------------- Listen sweep (A8, R8.6, R8.9)
 /** The mock-up's sweep: 6 s across the spectrum. CREATIVE placeholder — Atish to decide (D-13). */
@@ -278,6 +280,11 @@ export const SWEEP_STEPS = 90;
  * the finger (R8.6 item 3; issue #11 review M3). Engineering.
  */
 export const SWEEP_SAMPLES_PER_POINT = 8;
+/**
+ * Most gain steps one sweep schedules (security review): 8 per point up to 512 points, far above a
+ * SPHEREx spectrum's ~102, so a huge input cannot schedule millions of AudioParam events. Engineering.
+ */
+export const SWEEP_MAX_STEPS = 4096;
 /** Gain ramp at the sweep's start and end and at every quiet edge, so it does not click (s). Engineering. */
 export const SWEEP_EDGE_S = 0.008;
 /** The mock-up's triangle oscillator. CREATIVE placeholder — Atish to decide (D-13). */

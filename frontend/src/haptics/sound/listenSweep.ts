@@ -25,6 +25,7 @@ import {
   SWEEP_CHIME_GAIN,
   SWEEP_DURATION_S,
   SWEEP_EDGE_S,
+  SWEEP_MAX_STEPS,
   SWEEP_PAN,
   SWEEP_PEAK_GAIN,
   SWEEP_SAMPLES_PER_POINT,
@@ -102,7 +103,8 @@ export interface PlanSweepOptions {
  * usable range, and the chimes that fall inside it. Null when the spectrum has nothing to play:
  * no usable point, or a single wavelength, which the spectrum pad cannot sweep either (R8.6 item 3).
  * By default there are SWEEP_SAMPLES_PER_POINT samples per spectrum point (at least SWEEP_STEPS),
- * so a dip one channel wide is quiet here as it is under the finger.
+ * so a dip one channel wide is quiet here as it is under the finger, up to SWEEP_MAX_STEPS (512
+ * points; a SPHEREx spectrum has about 102), so one click cannot schedule millions of events.
  */
 export function planSweep(
   mapping: SpectrumMapping,
@@ -110,7 +112,10 @@ export function planSweep(
   options: PlanSweepOptions = {},
 ): SweepPlan | null {
   const durationS = options.durationS ?? SWEEP_DURATION_S;
-  const steps = options.steps ?? Math.max(SWEEP_STEPS, SWEEP_SAMPLES_PER_POINT * mapping.count);
+  const steps = Math.min(
+    SWEEP_MAX_STEPS,
+    options.steps ?? Math.max(SWEEP_STEPS, SWEEP_SAMPLES_PER_POINT * mapping.count),
+  );
   if (mapping.empty || mapping.count < 2 || !(durationS > 0) || steps < 1) return null;
   const lo = mapping.lambdaMinUm;
   const hi = mapping.lambdaMaxUm;
@@ -120,7 +125,8 @@ export function planSweep(
   for (let i = 0; i <= steps; i++) {
     const lambda = span > 0 ? lo + (span * i) / steps : lo;
     const got = mapping.sampleAt(lambda, s);
-    const quiet = !got || got.quiet;
+    // A non-finite strength (overflowing flux) is treated as quiet: never scheduled as NaN.
+    const quiet = !got || got.quiet || !Number.isFinite(got.strength);
     out.push({
       t: (durationS * i) / steps,
       lambdaUm: lambda,
@@ -172,6 +178,8 @@ export interface ListenSweepOptions {
 interface Voice {
   sources: AudioScheduledSourceNode[];
   nodes: AudioNode[];
+  /** The tag behind the sound (the spectrum's or the chime's Q): `setHonesty` silences hidden ones. */
+  tag: Tag;
 }
 
 function release(v: Voice, cancel: boolean): void {
@@ -207,7 +215,8 @@ export class ListenSweep {
   private active = false;
   private ctx: AudioContext | null = null;
   private run = 0;
-  /** Called once when the sweep ends on its own or is stopped. */
+  private honesty: HonestyState = 'derived';
+  /** Called once when the sweep's last sound ends, or when it is stopped. */
   onEnd: (() => void) | null = null;
 
   constructor(options: ListenSweepOptions = {}) {
@@ -247,6 +256,7 @@ export class ListenSweep {
     if (!ctx || ctx.state !== 'running') return false;
     const my = ++this.run;
     this.ctx = ctx;
+    this.honesty = honesty;
     const base = ctx.currentTime + AUDIO_LOOKAHEAD_S;
     const end = base + plan.durationS;
     const volume = ctx.createGain();
@@ -254,7 +264,8 @@ export class ListenSweep {
     volume.connect(getMasterBus(ctx));
     this.volumeGain = volume;
 
-    // The sweep's "end" is its last sound: the tone, or the last chime when the tone is hidden.
+    // The sweep ends with its last sound (the tone or a chime still ringing after it), so the
+    // settings subscription and `playing` last as long as anything is audible.
     const finish = () => {
       this.freeIfIdle();
       if (my === this.run && this.live.size === 0) this.ended();
@@ -265,7 +276,7 @@ export class ListenSweep {
       osc.type = SWEEP_WAVE;
       const gain = ctx.createGain();
       osc.connect(gain);
-      const voice: Voice = { sources: [osc], nodes: [gain] };
+      const voice: Voice = { sources: [osc], nodes: [gain], tag: plan.tag };
       let out: AudioNode = gain;
       if (typeof ctx.createStereoPanner === 'function') {
         const pan = ctx.createStereoPanner();
@@ -279,9 +290,7 @@ export class ListenSweep {
       this.scheduleGain(gain.gain, osc.frequency, plan, base);
       osc.onended = () => {
         if (this.live.delete(voice)) release(voice, false);
-        // The tone ending ends the sweep; chimes still ringing free themselves.
-        this.freeIfIdle();
-        if (my === this.run) this.ended();
+        finish();
       };
       osc.start(base);
       osc.stop(end + SWEEP_EDGE_S + 0.05);
@@ -300,11 +309,14 @@ export class ListenSweep {
         extra.push(p);
       }
       const bell = playBell(ctx, dest, { freqHz: c.hz, when: base + c.t, gain: SWEEP_CHIME_GAIN });
-      const voice: Voice = { sources: [...bell.sources], nodes: [...bell.nodes, ...extra] };
+      const voice: Voice = {
+        sources: [...bell.sources],
+        nodes: [...bell.nodes, ...extra],
+        tag: c.tag,
+      };
       bell.sources[0]!.onended = () => {
         if (this.live.delete(voice)) release(voice, false);
-        if (toneShown) this.freeIfIdle();
-        else finish();
+        finish();
       };
       this.live.add(voice);
     }
@@ -322,6 +334,31 @@ export class ListenSweep {
     this.duration = plan.durationS;
     this.active = true;
     return true;
+  }
+
+  /**
+   * D-21: the honesty state changed while the sweep plays. Every scheduled or ringing sound whose
+   * tag is now hidden stops at once (as the engine stops a hidden train); when nothing is left, the
+   * sweep ends. Sounds already silenced do not come back if the state widens again.
+   */
+  setHonesty(state: HonestyState): void {
+    this.honesty = state;
+    if (!this.active) return;
+    for (const v of [...this.live]) {
+      if (isTagShown(state, v.tag)) continue;
+      this.live.delete(v);
+      release(v, true);
+    }
+    this.freeIfIdle();
+    if (this.live.size === 0) {
+      this.run++;
+      this.ended();
+    }
+  }
+
+  /** The honesty state of the current (or last) sweep. */
+  get honestyState(): HonestyState {
+    return this.honesty;
   }
 
   /** Stop at once (sweep and chimes) and free every node of the sweep. */
