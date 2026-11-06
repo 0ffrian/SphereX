@@ -2,9 +2,9 @@
 // `startTrain` / `updateTrain` / `stopTrain` for pulse trains; the engine applies the honesty gate,
 // the R8.3 rate cap and the strength multiplier, then fans every event out to all active drivers.
 // Drivers never know about objects. Nothing here runs at import time.
-import type { HapticDriver, HapticEvent, HapticVoice, Tag } from '@/contract';
+import type { HapticChannel, HapticDriver, HapticEvent, HapticVoice, Tag } from '@/contract';
 import { DEFAULT_HONESTY, isTagShown, type HonestyState } from '@/viewer/honesty';
-import { unlockAudio } from './audioContext';
+import { getUnlockState, unlockAudio } from './audioContext';
 import { AudioDriver } from './drivers/audio';
 import { WebVibrateDriver } from './drivers/webVibrate';
 import {
@@ -24,6 +24,7 @@ export type {
   HapticEvent,
   HapticDriver,
   HapticVoice,
+  HapticChannel,
   HapticProfile,
   TextureHaptic,
   DataHaptic,
@@ -46,6 +47,8 @@ export interface TrainParams {
   pitch?: number;
   pan?: number;
   voice?: HapticVoice;
+  /** Display hint for the pulse indicator (Q-85); drivers ignore it. */
+  channel?: HapticChannel;
 }
 
 /**
@@ -61,6 +64,7 @@ export interface TrainWindow {
   readonly pitch?: number;
   readonly pan?: number;
   readonly voice?: HapticVoice;
+  readonly channel?: HapticChannel;
   /** Start of each pulse in ms from now, ascending, all below TRAIN_WINDOW_MS + TRAIN_LEAD_MS. */
   readonly pulseOffsetsMs: readonly number[];
   /**
@@ -149,6 +153,7 @@ interface WindowBuffer {
   pitch?: number;
   pan?: number;
   voice?: HapticVoice;
+  channel?: HapticChannel;
   pulseOffsetsMs: number[];
   resentCount: number;
   atMs: number;
@@ -261,6 +266,14 @@ export class HapticEngine {
    */
   unlock(): Promise<boolean> {
     return unlockAudio();
+  }
+
+  /**
+   * Whether a click has unlocked output (shared by every UnlockButton). Subscribe with
+   * `subscribeUnlockState` (audioContext.ts) to follow changes.
+   */
+  get unlocked(): boolean {
+    return getUnlockState().unlocked;
   }
 
   // ------------------------------------------------------------ one-shots
@@ -416,6 +429,7 @@ export class HapticEngine {
     s.pan = e.pan;
     s.sharpness = e.sharpness;
     s.voice = e.voice;
+    s.channel = e.channel;
     return s;
   }
 
@@ -502,6 +516,7 @@ export class HapticEngine {
       w.pitch = t.p.pitch;
       w.pan = t.p.pan;
       w.voice = t.p.voice;
+      w.channel = t.p.channel;
       w.atMs = now;
       w.trainSeq = t.seq;
       for (const d of this.active) {
@@ -524,6 +539,7 @@ export class HapticEngine {
     s.pan = w.pan;
     s.sharpness = undefined;
     s.voice = w.voice;
+    s.channel = w.channel;
     return s;
   }
 
@@ -575,6 +591,7 @@ export class HapticEngine {
     w.pitch = e.pitch;
     w.pan = e.pan;
     w.voice = e.voice;
+    w.channel = e.channel;
     w.atMs = now;
     w.trainSeq = ++this.trainSeq;
     const ev = this.trainEvent(w);

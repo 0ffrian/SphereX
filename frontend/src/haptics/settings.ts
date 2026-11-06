@@ -1,7 +1,9 @@
 // R8.7 haptics and sound settings: their own Zustand store (not state/store.ts), saved to
-// localStorage under one key. Loading is lazy (first `ensureLoaded`, `bindEngine` or UI use), so
-// importing this module touches no browser storage. Corrupt or missing storage gives the defaults.
-import { create } from 'zustand';
+// localStorage under one key. Loading is lazy: the first read of the store (`getState()`, the hook,
+// `bindEngine`) loads it, so no consumer ever sees the unloaded defaults, and importing this module
+// touches no browser storage. Corrupt or missing storage gives the defaults.
+import { useStore } from 'zustand';
+import { createStore, type StoreApi } from 'zustand/vanilla';
 import type { HapticOutputs } from './haptics';
 import { clamp01 } from './pitch';
 import { defaultOutputs, type OutputDefaults } from './platform';
@@ -99,11 +101,10 @@ const INITIAL: HapticSettings = {
   showChannelLabels: true,
 };
 
-export const useHapticSettings = create<HapticSettingsState>()((set, get) => ({
+const store = createStore<HapticSettingsState>()((set, get) => ({
   ...INITIAL,
   loaded: false,
   update(changes) {
-    if (!get().loaded) ensureLoaded();
     const next = sanitizeSettings(changes, pick(get()));
     set(next);
     save(next);
@@ -118,10 +119,36 @@ export const useHapticSettings = create<HapticSettingsState>()((set, get) => ({
   },
 }));
 
-/** Read storage once (first call only). */
+// Every read goes through the lazy loader: the first read (after import, or after a test sets
+// `loaded: false`) reads storage before it returns.
+const rawGetState = store.getState;
+store.getState = () => {
+  const s = rawGetState();
+  if (s.loaded) return s;
+  store.setState({ ...loadHapticSettings(), loaded: true });
+  return rawGetState();
+};
+
+type SettingsHook = {
+  (): HapticSettingsState;
+  <T>(selector: (s: HapticSettingsState) => T): T;
+} & StoreApi<HapticSettingsState>;
+
+/** The settings store: a React hook with `getState`, `setState` and `subscribe` (Zustand). */
+export const useHapticSettings: SettingsHook = Object.assign(
+  <T>(selector?: (s: HapticSettingsState) => T) =>
+    useStore(store, selector ?? ((s: HapticSettingsState) => s as unknown as T)),
+  store,
+) as SettingsHook;
+
+/** The current settings, loaded from storage on first use. */
+export function getHapticSettings(): HapticSettingsState {
+  return store.getState();
+}
+
+/** Read storage once (first call only). Reads do this by themselves; kept for callers. */
 export function ensureLoaded(): void {
-  if (useHapticSettings.getState().loaded) return;
-  useHapticSettings.setState({ ...loadHapticSettings(), loaded: true });
+  store.getState();
 }
 
 /** Push settings into the engine and drivers. */
