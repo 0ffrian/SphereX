@@ -22,6 +22,8 @@ export type MissingReason =
   | 'load'
   /** Not part of the selected comet epoch. */
   | 'epoch'
+  /** Not shown in the selected view mode (a baked texture is in visible-palette colour). */
+  | 'mode'
   /** A reference value is still [verify]; nothing is invented in its place. */
   | 'unverified';
 
@@ -32,6 +34,13 @@ export interface MissingItem {
   tag?: Tag;
   fields?: string[];
   detail?: string;
+  /** An extra plain sentence for the list (why an epoch has nothing). */
+  note?: string;
+  /**
+   * Set when the thing is not drawn from data but IS shown as a display default (the light
+   * comes from the front, the glow is at a fixed level). The panel lists it with a Default chip.
+   */
+  defaultShown?: string;
 }
 
 export interface LegendEntry {
@@ -157,6 +166,14 @@ export interface RenderPlan {
   lighting: LightingPlan;
   scaleM: number | null;
   sizeTag: Tag | null;
+  /** 'upper_limit' when the size is a bound, not a value (comet nucleus, R7.3). */
+  sizeQualifier: 'upper_limit' | null;
+  /** Formula, else assumption, else source of the size value: the "why?" of the scale bar (A11). */
+  sizeWhy: string | null;
+  /** True when the view mode's colour is applied to something drawn (so the alt text may name it). */
+  tintUsed: boolean;
+  /** Largest distance from the origin to anything drawn, in scene units: the camera frames this. */
+  extent: number;
   spin: SpinPlan | null;
   scrub: ScrubPlan | null;
   relief: 'measured' | 'illustrative';

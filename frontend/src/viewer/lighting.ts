@@ -24,7 +24,10 @@ export interface LightingPlan {
   intensity: number;
   /** Stars and brown dwarfs: the material emits its own light. */
   emissive: boolean;
-  /** `measured` when the angle comes from the data; `artistic` when it had to be assumed. */
+  /**
+   * The tag of the phase angle on the card; `artistic` when the angle is a display default or
+   * the card gives no tag for it (never `measured` by default: that claims the most).
+   */
   tag: Tag;
   source: 'phase_angle' | 'sun_dir' | 'view' | 'self';
   phaseAngleDeg: number | null;
@@ -50,7 +53,7 @@ export function planLighting(params: RenderParams, card?: ObjectCard | null): Li
       direction: null,
       intensity: 0,
       emissive: true,
-      tag: 'measured',
+      tag: 'artistic',
       source: 'self',
       phaseAngleDeg: null,
     };
@@ -63,7 +66,7 @@ export function planLighting(params: RenderParams, card?: ObjectCard | null): Li
       direction: directionFromPhaseAngle(phase),
       intensity: DIRECTIONAL_INTENSITY,
       emissive: false,
-      tag: card?.phase_angle_deg?.tag ?? 'measured',
+      tag: card?.phase_angle_deg?.tag ?? 'artistic',
       source: 'phase_angle',
       phaseAngleDeg: phase,
     };

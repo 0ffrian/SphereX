@@ -4,7 +4,7 @@
 //   Binary (Eps Indi Ba T1 + Bb T6): two bodies on an illustrative orbit (artistic). No orbit
 //   numbers are shown: period and separation are [verify].
 import { litBody, numberField, PlanBuilder, type PlanInput } from '../planCommon';
-import type { BodyPlan, RenderPlan } from '../planTypes';
+import type { BodyPlan, RenderPlan, Rgb } from '../planTypes';
 
 export interface BrownDwarfConfig {
   /**
@@ -65,14 +65,14 @@ export function planBrownDwarf(
         id: 'emissive',
         reason: 'unverified',
         detail: 'What the 4.5 µm flux is normalised by is not confirmed yet.',
+        defaultShown: 'The body glows at a fixed level, not the measured 4.5 µm flux.',
       });
-      b.notes.push('The glow is a default level, not the measured 4.5 µm flux.');
     }
   } else {
     b.draw('emissive');
   }
 
-  const bands = b.draw('bands', { asset: tex?.albedo ?? null });
+  const bands = b.drawBaked('bands', tex?.albedo);
 
   // Binary: two bodies on an illustrative orbit; without the orbit layer only the first is drawn.
   const orbit = binary ? b.draw('orbit') : false;
@@ -92,7 +92,7 @@ export function planBrownDwarf(
   if (!bodyOk) b.dropDrawn();
 
   const make = (id: string, x: number, radius: number): BodyPlan =>
-    litBody(id, [radius, radius, radius], b.tint.rgb, {
+    litBody(id, [radius, radius, radius], bands ? ([1, 1, 1] as Rgb) : b.tint.rgb, {
       position: [x, 0, 0],
       emissive,
       segments: [64, 32],

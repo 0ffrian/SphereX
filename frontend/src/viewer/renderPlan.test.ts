@@ -3,11 +3,11 @@
 import { describe, expect, it } from 'vitest';
 import type { CometEpoch, Layer, ObjectCard, Tag } from '@/contract';
 import { BAKED_NAMES, FIXTURE_NAMES, fixture } from '@/test/sharedFixtures';
-import { HONESTY_STATES, isTagShown } from './honesty';
+import { HONESTY_STATES, isTagShown, type HonestyState } from './honesty';
 import { MAX_AMBIENT_INTENSITY } from './lighting';
 import { defaultContext, planRender, CANDIDATE_MESSAGE, UNSUPPORTED_MESSAGE } from './renderPlan';
 import { planBrownDwarf, EMISSIVE_FLOOR } from './renderers/BrownDwarf';
-import { gasQForEpoch, GAS_STYLE, planShells } from './renderers/Comet';
+import { gasQForEpoch, GAS_STYLE, MAX_TOTAL_POINTS, planShells } from './renderers/Comet';
 import { lightcurveScrub, planStar, screenOpacity } from './renderers/Star';
 import type { PlanInput } from './planCommon';
 import type { RenderPlan } from './planTypes';
@@ -29,6 +29,8 @@ describe('every baked-type fixture plans without throwing', () => {
         expect(plan.type).toBe(params.type);
         for (const l of plan.drawn) expect(isTagShown(honesty, l.tag)).toBe(true);
         expect(plan.lighting.ambient).toBeLessThanOrEqual(MAX_AMBIENT_INTENSITY);
+        // A drawn body is never next to an empty legend (B6).
+        if (plan.bodies.length > 0) expect(plan.drawn.length).toBeGreaterThan(0);
         // Everything in `missing` has a reason and none of it is also drawn.
         for (const m of plan.missing) {
           expect(m.reason).toBeTruthy();
@@ -291,6 +293,22 @@ function keyedComet(): { card: ObjectCard; params: ReturnType<typeof fixture>['p
   return { card, params };
 }
 
+describe('baked albedo and the view mode (B3)', () => {
+  it('a baked asteroid albedo is white in the visible view and dropped in the infrared view', () => {
+    const { card, params } = fixture('asteroid_procedural');
+    params.view_modes.spherex_ir = fixture('asteroid_shape').params.view_modes.spherex_ir;
+    const vis = planRender(card, params, defaultContext({ mode: 'visible' }));
+    expect(vis.bodies[0]?.albedoUrl).toBe(params.textures?.albedo);
+    expect(vis.bodies[0]?.tint).toEqual([1, 1, 1]);
+    expect(ids(vis.drawn)).not.toContain('tint');
+    const ir = planRender(card, params, defaultContext({ mode: 'spherex_ir' }));
+    expect(ir.bodies[0]?.albedoUrl).toBeNull();
+    expect(ir.bodies[0]?.tint).toEqual(ir.tint.rgb);
+    expect(missing(ir, 'albedo_map')).toMatchObject({ reason: 'mode' });
+    expect(ids(ir.drawn)).not.toContain('albedo_map');
+  });
+});
+
 describe('R11 comet (R7.3)', () => {
   it('toggling Aug/Dec changes the CO and H2O shells', () => {
     const { card, params } = keyedComet();
@@ -353,6 +371,77 @@ describe('R11 comet (R7.3)', () => {
     expect(aug.epochs).toEqual(['2025-08']);
   });
 
+  it('the R3.2 shape is one epoch only: with both epochs listed it is refused for both (B1)', () => {
+    const { card, params } = fixture('comet');
+    card.epochs = ['2025-08', '2025-12'];
+    expect(gasQForEpoch(card, '2025-08')).toBeNull();
+    expect(gasQForEpoch(card, '2025-12')).toBeNull();
+    for (const epoch of ['2025-08', '2025-12'] as CometEpoch[]) {
+      const plan = planRender(card, params, defaultContext({ epoch }));
+      expect(plan.shells).toEqual([]);
+      expect(missing(plan, 'gas_shells')).toMatchObject({ reason: 'epoch' });
+      expect(missing(plan, 'gas_shells')?.note).toMatch(/both epochs/);
+      expect(plan.epochs).toEqual([]);
+    }
+    // One epoch listed, and it is the selected one: used. The other epoch gets nothing.
+    card.epochs = ['2025-12'];
+    expect(planRender(card, params, defaultContext({ epoch: '2025-12' })).shells).toHaveLength(3);
+    expect(planRender(card, params, defaultContext({ epoch: '2025-08' })).shells).toEqual([]);
+  });
+
+  it('the nucleus is an upper limit in the plan (B2)', () => {
+    const { card, params } = fixture('comet');
+    const plan = planRender(card, params, defaultContext({ epoch: '2025-08' }));
+    expect(plan.sizeQualifier).toBe('upper_limit');
+    expect(plan.sizeTag).toBe('measured');
+    // Hidden by the honesty state: no size, no qualifier.
+    const hidden = planRender(card, params, defaultContext({ honesty: 'measured' }));
+    expect(hidden.sizeQualifier).toBe('upper_limit'); // nucleus is measured on the fixture
+    card.nucleus_radius_km_max = tv(1, 'derived');
+    const est = planRender(card, params, defaultContext({ honesty: 'measured' }));
+    expect(est.sizeQualifier).toBeNull();
+    expect(est.scaleM).toBeNull();
+    // Worded by cause (N3): the size is known but hidden.
+    expect(est.notes.join(' ')).toMatch(/hidden at this level/);
+    expect(est.notes.join(' ')).not.toMatch(/not known/);
+  });
+
+  it('the nucleus keeps its size across epochs and honesty levels while the coma radius is known (N2)', () => {
+    const { card, params } = keyedComet();
+    const radii = new Set<number>();
+    for (const epoch of ['2025-08', '2025-12'] as CometEpoch[]) {
+      for (const honesty of ['measured', 'derived', 'artistic'] as HonestyState[]) {
+        radii.add(planRender(card, params, defaultContext({ epoch, honesty })).bodies[0]!.axes[0]);
+      }
+    }
+    expect(radii.size).toBe(1);
+  });
+
+  it('with no coma radius the nucleus says it is not to scale (N2)', () => {
+    const { card, params } = fixture('comet');
+    delete card.coma_radius_km;
+    const plan = planRender(card, params, defaultContext({ epoch: '2025-08' }));
+    expect(plan.notes.join(' ')).toMatch(/not drawn to scale/);
+  });
+
+  it('never exceeds 60k points with every gas at its maximum plus the dust (R5.5, N4)', () => {
+    const { card, params } = keyedComet();
+    card.gas_Q = {
+      '2025-08': { co2: tv(1e26), h2o: tv(1e26), co: tv(1e26) },
+      '2025-12': { co2: tv(1e26), h2o: tv(1e26), co: tv(1e26) },
+    } as unknown as ObjectCard['gas_Q'];
+    const plan = planRender(
+      card,
+      params,
+      defaultContext({ epoch: '2025-12', honesty: 'artistic' }),
+    );
+    expect(plan.shells).toHaveLength(3);
+    expect(plan.dust).not.toBeNull();
+    const total = plan.shells.reduce((n, s) => n + s.count, 0) + plan.dust!.count;
+    expect(total).toBeLessThanOrEqual(MAX_TOTAL_POINTS);
+    expect(MAX_TOTAL_POINTS).toBe(60_000);
+  });
+
   it('shells are measured Q with the 1/r^2 profile labelled model_dependent, and the legend has colours', () => {
     const { card, params } = fixture('comet');
     const plan = planRender(card, params, defaultContext({ epoch: '2025-08' }));
@@ -401,12 +490,20 @@ describe('brown dwarfs (R7.4)', () => {
     expect(big.bodies[0]?.emissive).toBe(1);
   });
 
-  it('draws the band texture only at + Artistic', () => {
+  it('draws the band texture only at + Artistic, and only in the visible view (B3)', () => {
     const { card, params } = fixture('brown_dwarf');
-    expect(planRender(card, params, defaultContext()).bodies[0]?.albedoUrl).toBeNull();
-    expect(
-      planRender(card, params, defaultContext({ honesty: 'artistic' })).bodies[0]?.albedoUrl,
-    ).toBe(params.textures?.albedo);
+    const at = (honesty: HonestyState, mode: 'visible' | 'spherex_ir') =>
+      planRender(card, params, defaultContext({ honesty, mode }));
+    expect(at('derived', 'visible').bodies[0]?.albedoUrl).toBeNull();
+    const vis = at('artistic', 'visible');
+    expect(vis.bodies[0]?.albedoUrl).toBe(params.textures?.albedo);
+    // The baked map holds the colour, so the tint is white and not applied a second time.
+    expect(vis.bodies[0]?.tint).toEqual([1, 1, 1]);
+    // In the infrared view the visible-palette map is dropped, and the SPHEREx average shows.
+    const ir = at('artistic', 'spherex_ir');
+    expect(ir.bodies[0]?.albedoUrl).toBeNull();
+    expect(missing(ir, 'bands')?.reason).toBe('mode');
+    expect(ir.bodies[0]?.tint).toEqual(ir.tint.rgb);
   });
 
   it('the binary has two bodies only with the illustrative orbit, and no numbers are shown', () => {
@@ -476,6 +573,129 @@ describe('stars (R7.5)', () => {
     const art = planRender(card, params, defaultContext({ scrubIndex: 2, honesty: 'artistic' }));
     expect(art.discs).toHaveLength(1);
     expect(art.screens[0]?.opacity).toBeCloseTo(0.9);
+  });
+});
+
+describe('a star without a radius (B5, B6)', () => {
+  it('is still drawn as a unit sphere with colour and limb darkening, but no scale bar', () => {
+    const { card, params } = fixture('star');
+    delete card.radius_rsun;
+    const plan = planRender(card, params, defaultContext());
+    expect(plan.bodies).toHaveLength(1);
+    expect(plan.bodies[0]?.axes).toEqual([1, 1, 1]);
+    expect(plan.bodies[0]?.limbDarkening).toBe(true);
+    expect(ids(plan.drawn)).toEqual(expect.arrayContaining(['colour', 'limb_darkening']));
+    expect(plan.scaleM).toBeNull();
+    expect(plan.sizeTag).toBeNull();
+    expect(missing(plan, 'size')).toMatchObject({ reason: 'data', fields: ['radius_rsun'] });
+    expect(missing(plan, 'body')).toBeUndefined();
+    expect(plan.notes.join(' ')).toMatch(/no scale bar/);
+  });
+
+  it('draws no bare grey ball when nothing can be shown on it', () => {
+    const { card, params } = fixture('star');
+    delete card.radius_rsun;
+    const plan = planRender(card, params, defaultContext({ honesty: 'measured' }));
+    expect(plan.bodies).toEqual([]);
+    expect(missing(plan, 'body')).toMatchObject({ reason: 'data' });
+  });
+
+  it('a drawn star has a legend line for the sphere at the radius on the card', () => {
+    const { card, params } = fixture('star');
+    for (const honesty of HONESTY_STATES) {
+      const plan = planRender(card, params, defaultContext({ honesty }));
+      if (plan.bodies.length > 0) {
+        expect(ids(plan.drawn)).toContain('body');
+        expect(plan.drawn.length).toBeGreaterThan(0);
+      }
+    }
+    expect(planRender(card, params, defaultContext()).drawn[0]).toMatchObject({ id: 'body' });
+  });
+
+  it('the T Tauri disc and star trail are inside the framed view (N17)', () => {
+    const { card, params } = fixture('star_ttauri');
+    const plan = planRender(card, params, defaultContext({ honesty: 'artistic' }));
+    expect(plan.discs).toHaveLength(1);
+    expect(plan.extent).toBeGreaterThanOrEqual(plan.discs[0]!.outerRadius);
+    const sphere = planRender(
+      ...(Object.values(fixture('asteroid_shape')) as [ObjectCard, never]),
+      defaultContext(),
+    );
+    expect(sphere.extent).toBe(1);
+  });
+});
+
+describe('display defaults and the lighting tag (N10)', () => {
+  it('a light from the front is a listed default, and its tag is not measured', () => {
+    const { card, params } = fixture('asteroid_shape');
+    delete params.lighting.phase_angle_deg;
+    delete params.lighting.sun_dir;
+    const plan = planRender(card, params, defaultContext());
+    expect(missing(plan, 'lighting')?.defaultShown).toMatch(/light comes from the front/);
+    expect(plan.lighting.tag).toBe('artistic');
+    // A phase angle that the card does not tag is not claimed as measured either.
+    const q = fixture('asteroid_shape');
+    delete q.card.phase_angle_deg;
+    expect(planRender(q.card, q.params, defaultContext()).lighting.tag).toBe('artistic');
+  });
+
+  it('the brown dwarf glow at the default level is a listed default', () => {
+    const { card, params } = fixture('brown_dwarf');
+    const plan = planRender(card, params, defaultContext());
+    expect(missing(plan, 'emissive')?.defaultShown).toMatch(/fixed level/);
+  });
+});
+
+describe('Measured only prefers a measured infrared tint to plain grey (N8)', () => {
+  it('opens on the mode whose colour passes the honesty state', () => {
+    const { card, params } = fixture('asteroid_shape');
+    const plan = planRender(card, params, defaultContext({ honesty: 'measured' }));
+    expect(plan.mode).toBe('spherex_ir');
+    expect(plan.tint.tag).toBe('measured');
+    // The user's own choice is kept.
+    const chosen = planRender(
+      card,
+      params,
+      defaultContext({ honesty: 'measured', mode: 'visible' }),
+    );
+    expect(chosen.mode).toBe('visible');
+    expect(chosen.tint.tag).toBeNull();
+    // At + Estimated the usual default stays.
+    expect(planRender(card, params, defaultContext()).mode).toBe('visible');
+  });
+});
+
+describe('mesh addresses (Q-44)', () => {
+  it('a cross-origin address is a refused mesh layer; a same-origin path is used', () => {
+    const { card, params } = fixture('asteroid_shape');
+    card.shape_source = { value: 'https://example.org/bennu.glb', tag: 'measured', source: 't' };
+    const remote = planRender(card, params, defaultContext());
+    expect(missing(remote, 'mesh')?.reason).toBe('load');
+    expect(remote.bodies[0]?.meshUrl).toBeNull();
+    card.shape_source = { value: '//example.org/bennu.glb', tag: 'measured', source: 't' };
+    expect(planRender(card, params, defaultContext()).bodies[0]?.meshUrl).toBeNull();
+    card.shape_source = { value: '/meshes/bennu.glb', tag: 'measured', source: 't' };
+    expect(planRender(card, params, defaultContext()).bodies[0]?.meshUrl).toBe('/meshes/bennu.glb');
+  });
+});
+
+describe('size explanation (B4)', () => {
+  it('carries the formula, assumption or source of the size into the plan', () => {
+    const { card, params } = fixture('brown_dwarf');
+    card.radius_rjup = {
+      value: 1,
+      tag: 'model_dependent',
+      source: 'src',
+      assumption: 'about 1 Jupiter radius',
+    };
+    expect(planRender(card, params, defaultContext()).sizeWhy).toBe('about 1 Jupiter radius');
+    card.radius_rjup = { value: 1, tag: 'derived', source: 'src', formula: 'R = f(L)' };
+    expect(planRender(card, params, defaultContext()).sizeWhy).toBe('R = f(L)');
+    card.radius_rjup = { value: 1, tag: 'measured', source: 'a catalogue' };
+    expect(planRender(card, params, defaultContext()).sizeWhy).toBe('a catalogue');
+    // No size shown, no explanation of it.
+    card.radius_rjup = { value: 1, tag: 'derived', source: 'src', formula: 'R = f(L)' };
+    expect(planRender(card, params, defaultContext({ honesty: 'measured' })).sizeWhy).toBeNull();
   });
 });
 

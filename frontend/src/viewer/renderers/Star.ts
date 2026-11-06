@@ -78,7 +78,10 @@ export function planStar(input: PlanInput, config: StarConfig = STAR_CONFIG): Re
   b.tintLegend = false; // the `colour` layer is the colour's legend line
   const type = params.type;
 
-  const bodyOk = b.body('radius_rsun');
+  // R7.5: the radius is optional. Without it the star is a unit sphere with no scale bar.
+  const size = b.bodyOptionalSize('radius_rsun');
+  let bodyOk = size.ok;
+  if (bodyOk && size.sizeKnown) b.legendBody('Sphere at the radius on the card.');
   const colour = b.draw('colour');
   const limb = b.draw('limb_darkening');
 
@@ -126,6 +129,22 @@ export function planStar(input: PlanInput, config: StarConfig = STAR_CONFIG): Re
   }
 
   if (!bodyOk) b.dropDrawn();
+  if (bodyOk && !size.sizeKnown) {
+    if (b.drawn.length === 0) {
+      // Nothing to show on a sphere of no known size: draw no body (never a bare grey ball).
+      b.refuse({
+        id: 'body',
+        reason: 'data',
+        fields: ['radius_rsun'],
+        detail: 'The radius is unknown and no other layer can be shown on the sphere.',
+      });
+      bodyOk = false;
+    } else {
+      b.notes.push(
+        'The radius is not on the card, so the sphere has no set size and there is no scale bar.',
+      );
+    }
+  }
   if (bodyOk && !colour)
     b.notes.push('The star is plain grey: its colour is not shown at this level.');
 
@@ -145,6 +164,7 @@ export function planStar(input: PlanInput, config: StarConfig = STAR_CONFIG): Re
     screens: bodyOk ? screens : [],
     trails: bodyOk ? trails : [],
     scrub: bodyOk ? scrub : null,
+    tintUsed: colour,
     relief: 'illustrative',
   });
 }
