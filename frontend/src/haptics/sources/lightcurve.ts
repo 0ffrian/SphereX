@@ -5,7 +5,7 @@
 //   - star_ttauri: a steady pulse that weakens and thins out as you scrub into the dimming:
 //     strength = DATA_PULSE_STRENGTH × (1 − depth) and rate = TTAURI_PULSE_HZ × (1 − depth),
 //     depth = the dust-screen opacity clamp(1 − flux/median, 0, 0.9). The rate drop is the "dropped beats ∝ depth"; true
-//     irregular dropping needs per-pulse masks in the engine train (Q-68).
+//     irregular dropping needs per-pulse masks in the engine train (Q-80).
 import type { ObjectCard, Tag } from '@/contract';
 import { lightcurveScrub, screenOpacity, usableLightcurve } from '@/viewer/renderers/Star';
 import { DATA_PULSE_STRENGTH, TTAURI_PULSE_HZ } from '../tuning';

@@ -38,7 +38,7 @@ export interface HapticTimers {
   clearTimeout(handle: unknown): void;
 }
 
-/** What a source asks for when it starts or updates a pulse train (Q-59). */
+/** What a source asks for when it starts or updates a pulse train (Q-71). */
 export interface TrainParams {
   rateHz: number;
   strength: number;
@@ -50,7 +50,7 @@ export interface TrainParams {
 
 /**
  * One window of a pulse train, as the engine sends it to a train-capable driver. Pulse times are
- * explicit, so a driver never has to derive phase from `rateHz` (Q-59). The object and its array
+ * explicit, so a driver never has to derive phase from `rateHz` (Q-71). The object and its array
  * are reused: a driver must not keep them after `playTrain` returns.
  */
 export interface TrainWindow {
@@ -270,7 +270,7 @@ export class HapticEngine {
    * is not a finite number, or dropped by the rate cap; dropped events are never queued). `stop`
    * is exempt from all of these.
    * `pulseTrain` here plays a single 250 ms window from its `rateHz` (R8.8); sources should use
-   * `startTrain` instead, which keeps the phase across windows (Q-59).
+   * `startTrain` instead, which keeps the phase across windows (Q-71).
    */
   emit(e: HapticEvent): boolean {
     if (e.kind === 'stop') {
@@ -304,7 +304,7 @@ export class HapticEngine {
     for (const d of this.drivers) d.stop();
   }
 
-  // ------------------------------------------------------------ trains (Q-59)
+  // ------------------------------------------------------------ trains (Q-71)
 
   /**
    * Start a phase-continuous pulse train. Only one train plays at a time: a new id replaces the

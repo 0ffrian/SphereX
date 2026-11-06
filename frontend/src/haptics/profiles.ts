@@ -5,7 +5,7 @@
 // moving gives texture events, holding still gives the data pulse (R8.5 "holding still").
 //
 // Tags (R8.2): texture events carry `texture_tag`; data events carry `data_tag`, except
-// `teq_pulse` (teq_K's own tag, D-12) and the binary pulse (spectral_class's tag, Q-69). The
+// `teq_pulse` (teq_K's own tag, D-12) and the binary pulse (spectral_class's tag, Q-81). The
 // honesty filter is the engine's (D-21): sources never check it, so Measured only silences every
 // non-`measured` event in one place.
 //
@@ -170,7 +170,7 @@ export function buildHaptics(
     case 'none':
       break;
     case 'height': {
-      // R8.4 item 3 needs a crater mask the bake does not ship: refused (Q-66).
+      // R8.4 item 3 needs a crater mask the bake does not ship: refused (Q-78).
       refuse(MISSING.craterRims);
       const grid = options.heightGrid ?? null;
       texture = grid
@@ -183,14 +183,14 @@ export function buildHaptics(
     }
     case 'mesh':
       // Only a real mesh raycast can say where a face turns or where the silhouette is; a bounding
-      // sphere would invent `measured` ticks. Refused until the viewer provides the normals (Q-66).
+      // sphere would invent `measured` ticks. Refused until the viewer provides the normals (Q-78).
       texture = options.meshNormals
         ? new MeshNormalSource(engine, tt)
         : refuse(MISSING.meshNormals);
       break;
     case 'bands':
       // Brown dwarf bands are only in the baked albedo image; the client has no band index to
-      // tick on, so the band-boundary ticks are refused (Q-70).
+      // tick on, so the band-boundary ticks are refused (Q-82).
       texture = refuse(MISSING.bands);
       break;
     case 'terrain': {

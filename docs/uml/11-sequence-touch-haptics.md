@@ -17,7 +17,7 @@ sequenceDiagram
   participant PI as Pulse indicator (debug)
 
   U->>V: Click "Turn on haptics and sound" (Touch mode)
-  Note over V,AD: This click unlocks navigator.vibrate and creates or resumes the AudioContext (Q-61)
+  Note over V,AD: This click unlocks navigator.vibrate and creates or resumes the AudioContext (Q-73)
   V->>V: buildHaptics(engine, params, card, body, overrides) gives the texture and data sources, the rings flag and missing (R8.5)
   V->>V: Orbit controls off while exactly one pointer is down
   loop pointermove with one pointer
@@ -40,7 +40,7 @@ sequenceDiagram
       end
       Note over S: Comet, cloud and binary sources use the projected distance, the ray or the body id instead
       S->>S: Decide a tick, a double, a train or nothing (quiet)
-      S->>E: emit(event) or startTrain / updateTrain / stopTrain (no timers in sources, Q-59)
+      S->>E: emit(event) or startTrain / updateTrain / stopTrain (no timers in sources, Q-71)
     end
   end
   loop frame loop while the pointer is down
@@ -80,8 +80,8 @@ sequenceDiagram
 
 - Touch mode only exists on the 3D view. Spectrum haptics on the panel use the same engine ([09-sequence-object-spectrum.md](09-sequence-object-spectrum.md)). The light-curve pulses (Mira heartbeat, T Tauri dimming) are driven by the scrubber through `TouchHaptics.scrub`, not by the finger on the body.
 - Rate limit: ≤ 40 events/s and ≥ 25 ms between ticks, doubles and heartbeats (rendering doc §8.3); a 250 ms train window counts as one event.
-- The honesty filter lives in the engine, not in the sources (D-21). Measured only plays only `measured` events: procedural relief and every texture haptic on shader kinds are silent; real meshes still tick; every data haptic not tagged `measured` is silent, so the `teq_pulse` plays only when `teq_K` is `measured` (rendering doc §8.2, §7.7). Texture events carry `texture_tag`; data events carry `data_tag`, except `teq_pulse` (`teq_K`'s tag) and the binary pulse (`spectral_class`'s tag, Q-69).
-- Holding still: `pointermove` does not fire while a finger is still, so the viewer's frame loop calls `poll` (Q-71). The shader kinds' sources read `BodyRenderer.field` and `pointSets`, which include the D-27 slider overrides.
+- The honesty filter lives in the engine, not in the sources (D-21). Measured only plays only `measured` events: procedural relief and every texture haptic on shader kinds are silent; real meshes still tick; every data haptic not tagged `measured` is silent, so the `teq_pulse` plays only when `teq_K` is `measured` (rendering doc §8.2, §7.7). Texture events carry `texture_tag`; data events carry `data_tag`, except `teq_pulse` (`teq_K`'s tag) and the binary pulse (`spectral_class`'s tag, Q-81).
+- Holding still: `pointermove` does not fire while a finger is still, so the viewer's frame loop calls `poll` (Q-83). The shader kinds' sources read `BodyRenderer.field` and `pointSets`, which include the D-27 slider overrides.
 - `sharpness` is optional and ignored by the web driver (D-20).
 - The `spherex:haptic` event drives an on-screen pulse indicator, so an audience watching the laptop can see what the phone feels (D-20). The engine fires it after the honesty gate.
 - The audio offset follows rendering doc §8.9: a positive `avOffsetMs` (vibration felt later) delays the audio; otherwise the vibration is delayed.

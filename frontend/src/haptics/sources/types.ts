@@ -5,7 +5,7 @@
 //     BodyRenderer.worldToBody) still return small objects.
 //   - `HapticSource`: a source reads samples (or a scrub index) and emits through the engine. It
 //     owns no timers: one-shots go to `emit`, pulse trains to `startTrain` / `updateTrain` /
-//     `stopTrain` (Q-59), so the engine keeps their phase, the rate cap and the honesty gate.
+//     `stopTrain` (Q-71), so the engine keeps their phase, the rate cap and the honesty gate.
 //   - `TrainSlot`: one source's train, started or updated only when something changed.
 import type { HapticEvent, HapticVoice, Tag } from '@/contract';
 import type { HapticEngine, TrainParams } from '../haptics';
