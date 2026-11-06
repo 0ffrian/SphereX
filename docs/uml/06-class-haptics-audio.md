@@ -14,7 +14,7 @@ classDiagram
     +kind: tick, double, heartbeat, pulseTrain, stop
     +strength: 0 to 1, tag: Tag, rateHz optional
     +pitch, pan: optional, D-10, sharpness: optional, D-20
-    +voice: tone, click, surf or chime, optional, Q-60
+    +voice: tone, click, surf or chime, optional, Q-72
   }
   class HapticDriver {
     <<interface>>
@@ -42,7 +42,7 @@ classDiagram
     +setDrivers, setDriverEnabled
     +unlock() Promise of boolean
     honesty gate, then rate cap 40 per s and 25 ms ticks
-    phase-continuous train scheduler, Q-59
+    phase-continuous train scheduler, Q-71
   }
   class WebVibrateDriver {
     <<drivers/webVibrate.ts>>
@@ -217,9 +217,9 @@ classDiagram
 - `SpectrumSource` is not profile-driven: every object with a spectrum gets it (R8.6). It reads the spectrum's points and `SpectrumResponse.tag` and calls only `emit`, so the honesty gate and the rate cap apply. Its UI is `ui/SpectrumHapticsPad.tsx` (a `role="slider"` over λ).
 
 - The engine applies, in order: the honesty gate (D-21; `stop` is exempt), the R8.3 rate cap (≥ 25 ms between `tick`, `double` and `heartbeat`; at most 40 events in any 1 s window, a train window counting as one; `stop` exempt; extra events dropped, never queued), then the strength multiplier (R8.7). Only then does it fan out and fire `spherex:haptic` (D-20), even when no driver is active.
-- Pulse trains belong to the engine (Q-59): sources call `startTrain` / `updateTrain` / `stopTrain` and own no timers. The engine keeps each train's phase and sends explicit pulse times per 250 ms window, so 1–2 Hz swells play at their rate; a late timer never moves the grid. One train at a time. A one-shot cancels the vibration pattern; the engine re-sends the cancelled pulses to vibration only (`resentCount`) once it ends. Stopping a train calls each driver's `stopTrain()`, which cancels train output only, never a playing one-shot. The vibration delay of the R8.9 offset is a timer per pattern (Q-61).
+- Pulse trains belong to the engine (Q-71): sources call `startTrain` / `updateTrain` / `stopTrain` and own no timers. The engine keeps each train's phase and sends explicit pulse times per 250 ms window, so 1–2 Hz swells play at their rate; a late timer never moves the grid. One train at a time. A one-shot cancels the vibration pattern; the engine re-sends the cancelled pulses to vibration only (`resentCount`) once it ends. Stopping a train calls each driver's `stopTrain()`, which cancels train output only, never a playing one-shot. The vibration delay of the R8.9 offset is a timer per pattern (Q-73).
 - `WebVibrateDriver` maps `strength` to 3–4 equal bins (D-09). Its `supported` is false on iPhone, iPad and desktop, so it is a silent no-op there.
-- `AudioDriver` timbre (R8.9, Q-60): clean tone for `measured`, softer tone for the Estimated tags, a 4 ms noise grain for `artistic`. `voice` refines it: `surf` low-passed noise and `tone` a band-passed grain for `artistic`; `chime` a bell for the other tags. `artistic` never becomes a tone and the other tags never become noise.
+- `AudioDriver` timbre (R8.9, Q-72): clean tone for `measured`, softer tone for the Estimated tags, a 4 ms noise grain for `artistic`. `voice` refines it: `surf` low-passed noise and `tone` a band-passed grain for `artistic`; `chime` a bell for the other tags. `artistic` never becomes a tone and the other tags never become noise.
 - Settings and calibration each persist under one `localStorage` key. `Calibration` types and `applyCalibration` were pinned in #9; #10 built the maths, the persistence (validated on load) and the wizard, `ui/CalibrationWizard.tsx` (diagram 13). Offset rule (R8.9): a positive `avOffsetMs` delays the audio, a negative one the vibration.
 - Drivers never know about objects; only sources read `HapticProfile`. `sharpness` is ignored by the web driver (D-20).
 - The brown dwarf `bands` texture and the `flux_pulse`, `teq_pulse`, `motion` and `detections` data haptics have no source file in rendering doc §10 **[verify]** (issue #11).

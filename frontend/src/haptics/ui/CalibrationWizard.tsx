@@ -2,7 +2,7 @@
 //   1. faintest pulse: 5 / 10 / 20 ms probes → `minMs`
 //   2. distinct levels: whisper, soft, medium, firm → 3 or 4 levels (the whisper is kept only when
 //      it is felt and weaker than soft)
-//   3. tap-along: a vibration-only beat, then a sound-only beat → `avOffsetMs` (Q-63)
+//   3. tap-along: a vibration-only beat, then a sound-only beat → `avOffsetMs` (Q-75)
 // Every step can be skipped, and a skipped step keeps what this device already has saved (or the
 // R8.3 default). Cancel leaves at any point without saving and stops anything still playing. The
 // result is saved under the one localStorage key and applied to the drivers. Step changes are

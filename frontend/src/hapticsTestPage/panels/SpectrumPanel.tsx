@@ -1,7 +1,7 @@
 // Spectrum haptics, calibration and settings panel of the test page (issue #10). Synthetic spectra
 // only. The R11 check ("≥ 3 quiet steps across a known absorption dip") on a phone: at 360 px the
 // pad is about 296 px wide, so a narrow dip needs the zoomed λ range, while a broad band (the
-// brown-dwarf-like CH₄ trough) is wide enough over the full band (Q-65). Dev only.
+// brown-dwarf-like CH₄ trough) is wide enough over the full band (Q-77). Dev only.
 import { useEffect, useState } from 'react';
 import type { SpectrumPoint } from '@/app/api/types';
 import { buttonClass } from '@/app/ui';
@@ -134,7 +134,7 @@ export function SpectrumPanel({ haptics }: TestPanelProps) {
       </div>
       <p className="text-sm text-neutral-400">
         R11 check on a phone: drag across the dip and count the quiet steps (at least 3). On a
-        narrow screen, use the zoomed range for the 4.25 µm dip (Q-65).
+        narrow screen, use the zoomed range for the 4.25 µm dip (Q-77).
       </p>
 
       <SpectrumHapticsPad

@@ -67,7 +67,7 @@ export const PITCH_OCTAVES = 2.4;
 export const DEFAULT_PITCH = 0.5;
 /**
  * R8.6/R8.9: pitch follows λ, over the SPHEREx band (0.75–5.0 µm, A3 data sources) so the same λ
- * sounds the same on every object (Q-58). Direction and range: CREATIVE placeholder — Atish to decide (D-13).
+ * sounds the same on every object (Q-70). Direction and range: CREATIVE placeholder — Atish to decide (D-13).
  */
 export const PITCH_LAMBDA_MIN_UM = 0.75;
 export const PITCH_LAMBDA_MAX_UM = 5.0;
@@ -85,7 +85,7 @@ export const SOFT_TONE_GAIN = 0.6;
 /** SPEC R8.9 `artistic`: a 4 ms noise burst with a 2 ms decay. */
 export const NOISE_BURST_S = 0.004;
 export const NOISE_DECAY_S = 0.002;
-/** Q-60: an `artistic` sound with a pitch is the noise burst through a band-pass at that pitch; its Q. CREATIVE placeholder — Atish to decide (D-13). */
+/** Q-72: an `artistic` sound with a pitch is the noise burst through a band-pass at that pitch; its Q. CREATIVE placeholder — Atish to decide (D-13). */
 export const GRAIN_BANDPASS_Q = 4;
 /** D-12 ocean "surf": low-passed noise. Cut-off (Hz) and length (s): CREATIVE placeholder — Atish to decide (D-13). */
 export const SURF_LOWPASS_HZ = 600;
@@ -189,7 +189,7 @@ export const SPECTRUM_DEFAULT_SEED = 0;
 /** Engineering: gap (ms) between the R8.7 step 1 probe pulses and the step 2 levels. [verify on phones] */
 export const CALIBRATION_GAP_MS = 700;
 /**
- * Engineering (Q-62): the smallest step (ms) between successive tick levels, so the calibrated
+ * Engineering (Q-74): the smallest step (ms) between successive tick levels, so the calibrated
  * levels stay strictly increasing when `minMs` is close to medium. [verify on phones] R12 #7
  */
 export const CALIBRATION_LEVEL_STEP_MS = 5;
@@ -198,7 +198,7 @@ export const CALIBRATION_MIN_MS_FLOOR = 1;
 export const CALIBRATION_MIN_MS_CEIL = 50;
 
 /**
- * R8.7 step 3 tap-along (method [verify] in R8.7, Q-63): beat period (ms). Half of it is the
+ * R8.7 step 3 tap-along (method [verify] in R8.7, Q-75): beat period (ms). Half of it is the
  * largest lag that can be told from the next beat, so it is twice AV_OFFSET_MAX_MS. [verify on phones]
  */
 export const TAP_BEAT_PERIOD_MS = 800;
@@ -210,5 +210,5 @@ export const TAP_WARMUP_BEATS = 2;
 export const TAP_MIN_TAPS = 4;
 /** … and the largest scatter (median absolute deviation, ms) of a usable run. [verify on phones] */
 export const TAP_MAX_SPREAD_MS = 60;
-/** Engineering (Q-63): |avOffsetMs| above this is a failed measurement (and corrupt in storage). */
+/** Engineering (Q-75): |avOffsetMs| above this is a failed measurement (and corrupt in storage). */
 export const AV_OFFSET_MAX_MS = 400;
