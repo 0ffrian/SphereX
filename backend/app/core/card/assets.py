@@ -1,0 +1,115 @@
+"""Asset store for stage 4 (A4.4, A5.4, D-22).
+
+A saved asset holds the ObjectCard, the RenderParams, the texture URLs, ``generator_version``,
+``seed`` and ``created_at``. Two layers are read, in order:
+
+1. **Pre-baked:** JSON files in the repo, ``<assets_dir>/<type>/<id>.json`` (A5.4). Read only.
+2. **Generated:** assets this backend built and saved, kept as ``derived.asset`` entries in the
+   D-25 cache. The key holds ``ASSET_VERSION``, the stage 7 ``GENERATOR_VERSION`` (which holds
+   the baker's rules version) and the data release, so a rule or release change never serves a
+   stale asset.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Literal
+from urllib.parse import quote
+
+from app.cache.keys import CacheKey
+from app.cache.store import LiveResponse, ReadThroughCache
+from app.core.render.card_to_params import GENERATOR_VERSION
+
+log = logging.getLogger("shift_spectrum")
+
+ASSET_SOURCE = "derived.asset"
+ASSET_VERSION = "1"  # bump when stage 3, 5 or 7 rules change
+AssetStatus = Literal["saved", "generated", "sketch"]
+FIELDS = ("card", "render_params", "textures", "generator_version", "seed", "created_at")
+
+
+@dataclass(frozen=True)
+class Asset:
+    card: dict[str, Any]
+    render_params: dict[str, Any]
+    textures: dict[str, str] | None
+    generator_version: str
+    seed: int
+    created_at: str  # ISO-8601 UTC with Z
+
+    def to_json(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_json(cls, d: Any) -> Asset | None:
+        if not isinstance(d, dict) or set(d) != set(FIELDS):
+            return None
+        if not isinstance(d["card"], dict) or not isinstance(d["render_params"], dict):
+            return None
+        if not isinstance(d["seed"], int) or not isinstance(d["generator_version"], str):
+            return None
+        return cls(**d)
+
+
+def asset_key(object_id: str, release: str | None = None) -> CacheKey:
+    return CacheKey.make(
+        ASSET_SOURCE, release, id=object_id, v=ASSET_VERSION, generator=GENERATOR_VERSION
+    )
+
+
+def _matches(asset: Asset, object_id: str) -> bool:
+    """The card and the render params both belong to ``object_id`` and agree on the type."""
+    card, params = asset.card, asset.render_params
+    return (
+        card.get("id") == object_id
+        and params.get("id") == object_id
+        and card.get("type") == params.get("type")
+    )
+
+
+class AssetStore:
+    def __init__(
+        self, cache: ReadThroughCache, prebaked_dir: Path | None, release: str | None = None
+    ) -> None:
+        self.cache = cache
+        self.prebaked_dir = prebaked_dir
+        self.release = release
+
+    def _prebaked(self, object_id: str) -> Asset | None:
+        if self.prebaked_dir is None or not self.prebaked_dir.is_dir():
+            return None
+        name = quote(object_id, safe="") + ".json"
+        for path in sorted(self.prebaked_dir.glob(f"*/{name}")):
+            try:
+                asset = Asset.from_json(json.loads(path.read_text(encoding="utf-8")))
+            except (OSError, ValueError):
+                asset = None
+            if asset is None or not _matches(asset, object_id):
+                log.warning("ignoring unreadable pre-baked asset %s", path)
+                continue
+            return asset
+        return None
+
+    def get(self, object_id: str) -> Asset | None:
+        asset = self._prebaked(object_id)
+        if asset is not None:
+            return asset
+        entry = self.cache.get(asset_key(object_id, self.release))
+        if entry is None:
+            return None
+        try:
+            asset = Asset.from_json(json.loads(entry.body))
+        except ValueError:
+            return None
+        return asset if asset is not None and _matches(asset, object_id) else None
+
+    def put(self, asset: Asset) -> None:
+        data = json.dumps(asset.to_json(), sort_keys=True, separators=(",", ":")).encode()
+        self.cache.put(
+            asset_key(str(asset.card["id"]), self.release),
+            LiveResponse(data, "derived:asset", 200, "application/json"),
+            if_changed=True,
+        )

@@ -58,6 +58,10 @@ class ResolvedObject:
     pm_dec_mas_yr: float | None = None
     spkid: str | None = None
     provenance: dict[str, dict[str, str]] = field(default_factory=dict)
+    # The name sent to SIMBAD or SBDB (after alias mapping). Stage 3 re-reads that cached
+    # catalogue answer for the object type and physical values (A4.3); None for typed
+    # coordinates and for registry entries written before issue #5.
+    query: str | None = None
 
     def to_json(self) -> dict[str, Any]:
         return asdict(self)
@@ -130,6 +134,7 @@ def _from_simbad(
         pm_ra_mas_yr=hit.pmra_mas_yr,
         pm_dec_mas_yr=hit.pmdec_mas_yr,
         provenance=prov,
+        query=name,
     )
     return obj, [served]
 
@@ -170,6 +175,7 @@ def _from_sbdb(
             "ra": {"tag": "model_dependent", "assumption": basis},
             "dec": {"tag": "model_dependent", "assumption": basis},
         },
+        query=name,
     )
     return obj, [served, served_h], False
 

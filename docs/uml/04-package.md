@@ -14,8 +14,8 @@ flowchart TB
 
     subgraph Backend["backend/ (FastAPI, Python 3.12) : Kevin, Moon, Atish"]
       BApi["app/api (Kevin) : D-16 endpoints; objects.py : /card, /render-params, texture URLs"]
-      BPipe["app/core/find (stage 1), app/adapters, app/cache : Kevin; app/core/measure (stage 2) and physics : Moon; stage 3 : Atish"]
-      BRender["app/core/render (Atish) : card_to_params, params, noise, craters, height, normals, palette, bake, __main__, spherex_rgb, gemini_paint"]
+      BPipe["app/core/find (stage 1), app/adapters, app/cache, app/core/card (stages 4, 5) : Kevin; app/core/measure (stage 2) and physics : Moon; app/core/classify (stage 3) : Atish"]
+      BRender["app/core/render (Atish) : card_to_params, blackbody, params, noise, craters, height, normals, palette, bake, __main__, spherex_rgb, gemini_paint"]
       BContract["app/contract : generated from shared/schemas (D-18) : follows the schemas owner"]
     end
 
@@ -71,8 +71,8 @@ flowchart TB
 
 | Package | Owner (rendering doc §10, D-17) |
 |---|---|
-| `backend/app/core/render` (baker, `card_to_params`, Gemini layer) | Atish |
-| `backend/app/api`, `backend/app/adapters`, `backend/app/cache`, `backend/app/core/find` (stage 1), backend scaffold, pipeline stages 4, 5 | Kevin |
+| `backend/app/core/render` (baker, `card_to_params`, Gemini layer), `backend/app/core/classify` (stage 3) | Atish |
+| `backend/app/api`, `backend/app/adapters`, `backend/app/cache`, `backend/app/core/find` (stage 1), `backend/app/core/card` (stages 4, 5), backend scaffold | Kevin |
 | `backend/app/core/measure` (stage 2), physics layer, `shared/schemas`, `shared/fixtures` | Moon (Munazir) |
 | Pipeline stage 3 | Atish |
 | `frontend/src/viewer`, `viewer/renderers`, shader kinds, `src/app`, `src/state` | Moon |
