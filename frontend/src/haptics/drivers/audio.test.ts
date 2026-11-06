@@ -2,11 +2,24 @@
 // pitch, pan, scheduling on the audio clock, offsets, stop, cleanup and latency.
 import { describe, expect, it } from 'vitest';
 import type { HapticEvent } from '@/contract';
-import { FakeAudioContext, FakeFilter, FakeGain, FakePanner, FakeSource } from '@/test/fakeAudio';
+import {
+  FakeAudioContext,
+  FakeCompressor,
+  FakeFilter,
+  FakeGain,
+  FakePanner,
+  FakeSource,
+} from '@/test/fakeAudio';
 import type { TrainWindow } from '../haptics';
 import { pitchToHz } from '../pitch';
-import { AUDIO_LOOKAHEAD_S, AUDIO_PEAK_GAIN, NOISE_BURST_S, NOISE_DECAY_S } from '../tuning';
-import { AudioDriver, patternOnsetsMs, selectTimbre } from './audio';
+import {
+  AUDIO_FLOOR_STRENGTH,
+  AUDIO_LOOKAHEAD_S,
+  AUDIO_PEAK_GAIN,
+  NOISE_BURST_S,
+  NOISE_DECAY_S,
+} from '../tuning';
+import { AudioDriver, audioGain, patternOnsetsMs, selectTimbre } from './audio';
 
 function setup(options: ConstructorParameters<typeof FakeAudioContext>[0] = {}) {
   const ctx = new FakeAudioContext(options);
@@ -94,10 +107,13 @@ describe('timbre (R8.9, D-12, Q-60)', () => {
     expect(b.ctx.sources()).toHaveLength(1);
   });
 
-  it('strength 0 is silent', () => {
+  it('strength 0 (the lowest vibrate level) is still heard, at the floor gain', () => {
     const { ctx, driver } = setup();
     driver.emit(ev({ strength: 0 }));
-    expect(ctx.sources()).toHaveLength(0);
+    const [osc] = ctx.sources();
+    const peak = Math.max(...envelopeOf(osc!).gain.calls.map((c) => c[1]));
+    expect(peak).toBeCloseTo(AUDIO_FLOOR_STRENGTH * AUDIO_PEAK_GAIN);
+    expect(audioGain(0.5)).toBeCloseTo(0.5 * AUDIO_PEAK_GAIN); // continuous above the floor
   });
 });
 
@@ -123,6 +139,8 @@ describe('scheduling (R8.9)', () => {
       tag: 'measured',
       pulseOffsetsMs: [15, 65, 115, 165],
       resentCount: 2,
+      atMs: 0,
+      trainSeq: 1,
     };
     driver.playTrain(w);
     const base = AUDIO_LOOKAHEAD_S + 0.1;
@@ -152,9 +170,11 @@ describe('scheduling (R8.9)', () => {
     const [osc] = ctx.sources();
     osc!.end();
     const made = ctx.nodes.filter((n) => n.nodeType !== 'destination');
-    const master = made.find((n) => n instanceof FakeGain && n.outputs[0] === ctx.destination);
-    for (const n of made) if (n !== master) expect(n.disconnected).toBe(true);
+    const limiter = made.find((n) => n instanceof FakeCompressor)!;
+    const master = made.find((n) => n instanceof FakeGain && n.outputs[0] === limiter);
+    for (const n of made) if (n !== master && n !== limiter) expect(n.disconnected).toBe(true);
     expect(master?.disconnected).toBe(false);
+    expect(limiter.outputs[0]).toBe(ctx.destination);
   });
 
   it('reuses the master gain and the noise buffer', () => {
@@ -163,10 +183,65 @@ describe('scheduling (R8.9)', () => {
     driver.emit(ev({ tag: 'artistic' }));
     const [a, b] = ctx.sources();
     expect(a!.buffer).toBe(b!.buffer);
-    const masters = ctx.nodes.filter(
-      (n) => n instanceof FakeGain && n.outputs[0] === ctx.destination,
-    );
-    expect(masters).toHaveLength(1);
+    expect(ctx.nodes.filter((n) => n instanceof FakeCompressor)).toHaveLength(1);
+  });
+
+  it('limits the master so overlapping sounds do not clip; plain master where no compressor', () => {
+    const { ctx, driver } = setup();
+    driver.emit(ev({ voice: 'chime' }));
+    const limiter = ctx.nodes.find((n) => n instanceof FakeCompressor) as FakeCompressor;
+    expect(limiter.ratio.value).toBeGreaterThanOrEqual(10);
+    expect(limiter.threshold.value).toBeLessThan(0);
+    const b = setup({ compressor: false });
+    b.driver.emit(ev());
+    const env = envelopeOf(b.ctx.sources()[0]!);
+    expect((env.outputs[0] as FakeGain).outputs[0]).toBe(b.ctx.destination);
+  });
+
+  it('keeps one audio-clock anchor per train across windows (sample-accurate, R8.9)', () => {
+    const { ctx, driver } = setup();
+    const win = (atMs: number, trainSeq: number, offsets: number[]): TrainWindow => ({
+      rateHz: 20,
+      strength: 1,
+      tag: 'measured',
+      pulseOffsetsMs: offsets,
+      resentCount: 0,
+      atMs,
+      trainSeq,
+    });
+    ctx.currentTime = 1;
+    driver.playTrain(win(0, 1, [0, 50]));
+    ctx.currentTime = 1.2337; // the next window's timer ran with some jitter
+    driver.playTrain(win(230, 1, [20, 70]));
+    const t0 = 1 + AUDIO_LOOKAHEAD_S;
+    const starts = ctx.sources().map((s) => s.startAt!);
+    [0, 0.05, 0.25, 0.3].forEach((d, i) => expect(starts[i]).toBeCloseTo(t0 + d, 9));
+    // A new train re-anchors; so does a clock that drifted past the tolerance.
+    ctx.currentTime = 5;
+    driver.playTrain(win(300, 2, [0]));
+    expect(ctx.sources().at(-1)!.startAt).toBeCloseTo(5 + AUDIO_LOOKAHEAD_S, 9);
+    ctx.currentTime = 7;
+    driver.playTrain(win(400, 2, [0]));
+    expect(ctx.sources().at(-1)!.startAt).toBeCloseTo(7 + AUDIO_LOOKAHEAD_S, 9);
+  });
+
+  it('stopTrain cancels train sounds and leaves one-shots ringing', () => {
+    const { ctx, driver } = setup();
+    driver.playTrain({
+      rateHz: 4,
+      strength: 1,
+      tag: 'measured',
+      pulseOffsetsMs: [0],
+      resentCount: 0,
+      atMs: 0,
+      trainSeq: 1,
+    });
+    driver.emit(ev({ voice: 'chime' }));
+    driver.stopTrain();
+    const [train, o1, o2] = ctx.sources();
+    expect(train!.stopCalls).toBe(2);
+    expect(o1!.stopCalls).toBe(1);
+    expect(o2!.stopCalls).toBe(1);
   });
 });
 

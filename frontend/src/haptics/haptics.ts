@@ -68,6 +68,10 @@ export interface TrainWindow {
    * on the vibration motor. Drivers whose output a one-shot does not cancel (audio) skip them.
    */
   readonly resentCount: number;
+  /** Engine-clock time (ms) the offsets count from, so a driver can keep one clock anchor per train. */
+  readonly atMs: number;
+  /** Changes for every new train (and every single-window `emit(pulseTrain)`). */
+  readonly trainSeq: number;
 }
 
 /** A driver that plays train windows itself. Others get a `pulseTrain` HapticEvent per window. */
@@ -78,6 +82,11 @@ export interface TrainCapableDriver extends HapticDriver {
    * cancels the playing pattern, so the train resumes after it. 0 when one-shots do not interfere.
    */
   oneShotBlockMs(e: HapticEvent): number;
+  /**
+   * Cancel this driver's train output only (scheduled and playing train pulses). One-shots that
+   * are playing or scheduled are left alone. Plain R8.8 drivers get `stop()` instead.
+   */
+  stopTrain(): void;
 }
 
 export function playsTrains(d: HapticDriver): d is TrainCapableDriver {
@@ -107,6 +116,7 @@ interface Train {
   /** The last pulse that had already been sent when the one-shot cancelled the pattern. */
   resendTo: number;
   timer: unknown;
+  readonly seq: number;
 }
 
 const ONE_SECOND_MS = 1000;
@@ -141,6 +151,8 @@ interface WindowBuffer {
   voice?: HapticVoice;
   pulseOffsetsMs: number[];
   resentCount: number;
+  atMs: number;
+  trainSeq: number;
 }
 
 export class HapticEngine {
@@ -171,7 +183,10 @@ export class HapticEngine {
     tag: 'measured',
     pulseOffsetsMs: [],
     resentCount: 0,
+    atMs: 0,
+    trainSeq: 0,
   };
+  private trainSeq = 0;
 
   constructor(drivers: HapticDriver[], options: HapticEngineOptions = {}) {
     this.drivers = [...drivers];
@@ -251,8 +266,9 @@ export class HapticEngine {
   // ------------------------------------------------------------ one-shots
 
   /**
-   * Play one event. Returns whether it played (false: hidden by the honesty state, or dropped by
-   * the rate cap; dropped events are never queued). `stop` is exempt from both.
+   * Play one event. Returns whether it played (false: hidden by the honesty state, a strength that
+   * is not a finite number, or dropped by the rate cap; dropped events are never queued). `stop`
+   * is exempt from all of these.
    * `pulseTrain` here plays a single 250 ms window from its `rateHz` (R8.8); sources should use
    * `startTrain` instead, which keeps the phase across windows (Q-59).
    */
@@ -262,7 +278,7 @@ export class HapticEngine {
       this.dispatchDebug(e);
       return true;
     }
-    if (!isTagShown(this.honestyState, e.tag)) return false;
+    if (!Number.isFinite(e.strength) || !isTagShown(this.honestyState, e.tag)) return false;
     const now = this.clock();
     if (e.kind === 'pulseTrain') return this.emitSingleWindow(e, now);
 
@@ -293,12 +309,13 @@ export class HapticEngine {
   /**
    * Start a phase-continuous pulse train. Only one train plays at a time: a new id replaces the
    * old one; the same id updates it. Returns false (and plays nothing) when the honesty state
-   * hides `tag` or the rate is not a positive number.
+   * hides `tag`, the rate is not a positive number or the strength is not a finite number.
    */
   startTrain(id: string, params: TrainParams): boolean {
     if (this.train?.id === id) return this.updateTrain(id, params);
     const rate = clampRate(params.rateHz);
-    if (rate === null || !isTagShown(this.honestyState, params.tag)) return false;
+    if (rate === null || !Number.isFinite(params.strength)) return false;
+    if (!isTagShown(this.honestyState, params.tag)) return false;
     this.stopTrain();
     this.train = {
       id,
@@ -308,6 +325,7 @@ export class HapticEngine {
       resendFrom: null,
       resendTo: -Infinity,
       timer: null,
+      seq: ++this.trainSeq,
     };
     this.issueWindow(this.train);
     return true;
@@ -315,12 +333,15 @@ export class HapticEngine {
 
   /**
    * Change a running train. The change applies from the next window (≤ 250 ms). A tag the honesty
-   * state hides stops the train. Returns false when `id` is not the running train.
+   * state hides, or a rate that is not a positive number, stops the train. A strength that is not
+   * finite is refused and the train plays on unchanged. Returns false in those cases and when `id`
+   * is not the running train.
    */
   updateTrain(id: string, changes: Partial<TrainParams>): boolean {
     const t = this.train;
     if (!t || t.id !== id) return false;
     const next: TrainParams = { ...t.p, ...changes };
+    if (!Number.isFinite(next.strength)) return false;
     const rate = clampRate(next.rateHz);
     if (rate === null || !isTagShown(this.honestyState, next.tag)) {
       this.stopTrain();
@@ -337,11 +358,14 @@ export class HapticEngine {
     return true;
   }
 
-  /** Stop the running train (only if it is `id`, when given) and silence the drivers. */
+  /**
+   * Stop the running train (only if it is `id`, when given) and cancel its output. One-shots that
+   * are playing are left alone on train-capable drivers; a plain R8.8 driver gets `stop()`.
+   */
   stopTrain(id?: string): void {
     if (!this.train || (id !== undefined && this.train.id !== id)) return;
     this.cancelTrain();
-    for (const d of this.active) d.stop();
+    this.stopTrainOutput();
   }
 
   /** Stop timers. Call when the engine is dropped. */
@@ -350,6 +374,13 @@ export class HapticEngine {
   }
 
   // ------------------------------------------------------------ internals
+
+  private stopTrainOutput(): void {
+    for (const d of this.active) {
+      if (playsTrains(d)) d.stopTrain();
+      else d.stop();
+    }
+  }
 
   private refreshActive(): void {
     this.active = this.drivers.filter((d) => !this.disabled.has(d));
@@ -369,8 +400,9 @@ export class HapticEngine {
     return true;
   }
 
+  /** Non-finite strengths are refused before this. */
   private scale(strength: number): number {
-    const s = (Number.isFinite(strength) ? strength : 0) * this.multiplier;
+    const s = strength * this.multiplier;
     return s <= 0 ? 0 : Math.min(1, s);
   }
 
@@ -414,12 +446,15 @@ export class HapticEngine {
     this.train = null;
   }
 
-  /** The next pulse on the train's grid at or after `now` (a slightly late pulse plays now). */
-  private nextPulse(t: Train, now: number): number {
-    if (t.lastPulse === null) return now;
-    let p = t.lastPulse + t.periodMs;
-    if (p < now - TRAIN_LATE_TOLERANCE_MS) p += Math.ceil((now - p) / t.periodMs) * t.periodMs;
-    return Math.max(p, now);
+  /**
+   * The first pulse on the train's grid from grid time `g`. Of the pulses already due, only the
+   * latest is kept, and only if it is at most TRAIN_LATE_TOLERANCE_MS late (it then plays at once).
+   * The grid itself never moves, so a late timer does not shift the phase.
+   */
+  private gridFrom(g: number, periodMs: number, now: number): number {
+    if (g >= now) return g;
+    const due = g + Math.floor((now - g) / periodMs) * periodMs;
+    return due < now - TRAIN_LATE_TOLERANCE_MS ? due + periodMs : due;
   }
 
   /** Send the pulses of [now, now + 250 ms) and schedule the next window from the train's phase. */
@@ -429,14 +464,15 @@ export class HapticEngine {
       this.schedule(t, this.oneShotUntil);
       return;
     }
+    // Grid time of the window's first pulse (if slightly past, it plays now).
     let p: number;
     let resendTo = -Infinity;
     if (t.resendFrom !== null) {
-      p = t.resendFrom >= now ? t.resendFrom : this.nextPulse(t, now);
+      p = this.gridFrom(t.resendFrom, t.periodMs, now);
       resendTo = t.resendTo;
       t.resendFrom = null;
     } else {
-      p = this.nextPulse(t, now);
+      p = t.lastPulse === null ? now : this.gridFrom(t.lastPulse + t.periodMs, t.periodMs, now);
     }
     const end = now + TRAIN_WINDOW_MS;
     if (p >= end) {
@@ -449,22 +485,25 @@ export class HapticEngine {
     w.resentCount = 0;
     let last = p;
     while (p < end && w.pulseOffsetsMs.length < MAX_PULSES_PER_WINDOW) {
-      w.pulseOffsetsMs.push(p - now);
+      w.pulseOffsetsMs.push(Math.max(0, p - now));
       if (p <= resendTo) w.resentCount++;
       last = p;
       p += t.periodMs;
     }
     t.lastPulse = Math.max(t.lastPulse ?? -Infinity, last);
-    // A window counts as one event (R8.3); a capped window is dropped, the phase goes on.
-    if (this.admit(now)) {
+    // Pulses after the re-sent ones are new to every driver.
+    const fresh = w.resentCount < w.pulseOffsetsMs.length;
+    // A window counts as one event (R8.3), unless it only repeats pulses already counted.
+    // A capped window is dropped; the phase goes on.
+    if (!fresh || this.admit(now)) {
       w.rateHz = ONE_SECOND_MS / t.periodMs;
       w.strength = this.scale(t.p.strength);
       w.tag = t.p.tag;
       w.pitch = t.p.pitch;
       w.pan = t.p.pan;
       w.voice = t.p.voice;
-      // Pulses after the re-sent ones are new to every driver.
-      const fresh = w.resentCount < w.pulseOffsetsMs.length;
+      w.atMs = now;
+      w.trainSeq = t.seq;
       for (const d of this.active) {
         if (!d.supported) continue;
         if (playsTrains(d)) d.playTrain(w);
@@ -515,7 +554,10 @@ export class HapticEngine {
     const rate = clampRate(e.rateHz ?? NaN);
     if (rate === null) return false;
     if (!this.admit(now)) return false;
-    this.cancelTrain();
+    if (this.train) {
+      this.cancelTrain();
+      this.stopTrainOutput();
+    }
     const w = this.win;
     w.pulseOffsetsMs.length = 0;
     w.resentCount = 0;
@@ -533,6 +575,8 @@ export class HapticEngine {
     w.pitch = e.pitch;
     w.pan = e.pan;
     w.voice = e.voice;
+    w.atMs = now;
+    w.trainSeq = ++this.trainSeq;
     const ev = this.trainEvent(w);
     for (const d of this.active) {
       if (!d.supported) continue;
@@ -556,7 +600,7 @@ export interface HapticOutputs {
  * for `engine.unlock()` in a click). Wire the settings with `bindEngine` (settings.ts).
  */
 export function createHaptics(options: HapticEngineOptions = {}): HapticOutputs {
-  const vibrate = new WebVibrateDriver();
+  const vibrate = new WebVibrateDriver({ timers: options.timers });
   const audio = new AudioDriver();
   const engine = new HapticEngine([vibrate, audio], options);
   return { engine, vibrate, audio };

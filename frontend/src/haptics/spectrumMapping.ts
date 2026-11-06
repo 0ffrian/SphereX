@@ -1,6 +1,7 @@
 // R8.6, R8.9: the one spectrum → sample mapping. The spectrum haptics source (#10) and the Listen
 // sweep (#11) both use it, so touch and sound match (R8.6 item 3). Pure: no browser globals.
-//   - flagged and non-finite points are dropped, the rest sorted by λ
+//   - flagged and non-finite points are dropped, the rest sorted by λ; points at the same λ are
+//     averaged (mean flux, mean σ)
 //   - strength = flux ÷ the largest flux of those points, linearly interpolated in λ, clamped 0–1
 //   - quiet when strength < 0.2 (absorption dips go silent in both channels)
 //   - noisy when σ/flux > 0.3 at the nearest point (its source jitters the tick spacing)
@@ -30,7 +31,7 @@ export interface SpectrumMapping {
   /** λ range of the usable points (µm); NaN when empty. */
   readonly lambdaMinUm: number;
   readonly lambdaMaxUm: number;
-  /** Usable points kept, sorted by λ. */
+  /** Usable points kept (one per distinct λ), sorted by λ. */
   readonly count: number;
   /**
    * The sample at λ, or null outside the usable range (or when empty). Pass `out` to reuse one
@@ -45,10 +46,44 @@ export function isNoisy(flux: number, error: number): boolean {
   return error / flux > SPECTRUM_NOISY_SIGMA_RATIO;
 }
 
+interface Merged {
+  wavelength_um: number;
+  flux: number;
+  error: number;
+}
+
+/**
+ * Points that share a λ (two frames at the same wavelength) become one: the mean flux and the mean
+ * σ. The mean σ, not the σ of the mean, so averaging does not make a noisy point feel smooth.
+ */
+function mergeSameWavelength(sorted: readonly SpectrumMappingPoint[]): Merged[] {
+  const out: Merged[] = [];
+  let i = 0;
+  while (i < sorted.length) {
+    const l = sorted[i]!.wavelength_um;
+    let flux = 0;
+    let error = 0;
+    let errors = 0;
+    let n = 0;
+    for (; i < sorted.length && sorted[i]!.wavelength_um === l; i++) {
+      flux += sorted[i]!.flux;
+      n++;
+      if (Number.isFinite(sorted[i]!.error)) {
+        error += sorted[i]!.error;
+        errors++;
+      }
+    }
+    out.push({ wavelength_um: l, flux: flux / n, error: errors > 0 ? error / errors : NaN });
+  }
+  return out;
+}
+
 export function buildSpectrumMapping(points: readonly SpectrumMappingPoint[]): SpectrumMapping {
-  const usable = points
-    .filter((p) => !p.flagged && Number.isFinite(p.wavelength_um) && Number.isFinite(p.flux))
-    .sort((a, b) => a.wavelength_um - b.wavelength_um);
+  const usable = mergeSameWavelength(
+    points
+      .filter((p) => !p.flagged && Number.isFinite(p.wavelength_um) && Number.isFinite(p.flux))
+      .sort((a, b) => a.wavelength_um - b.wavelength_um),
+  );
   const maxFlux = usable.reduce((m, p) => Math.max(m, p.flux), -Infinity);
   const empty = usable.length === 0 || !(maxFlux > 0);
 

@@ -2,10 +2,10 @@
 // the pattern cap, the R8.9 delay and the silent no-op where vibrate is missing.
 import { describe, expect, it } from 'vitest';
 import type { HapticEvent } from '@/contract';
-import { fakeVibrate } from '@/test/fakeHaptics';
+import { FakeClock, fakeVibrate, timedVibrate } from '@/test/fakeHaptics';
 import type { TrainWindow } from '../haptics';
 import { MAX_PATTERN, WHISPER_PATTERN } from '../tuning';
-import { WebVibrateDriver, quantise } from './webVibrate';
+import { WebVibrateDriver, fitLevel, quantise, validLevels } from './webVibrate';
 
 const ev = (kind: HapticEvent['kind'], strength = 0.5): HapticEvent => ({
   kind,
@@ -19,6 +19,8 @@ const train = (rateHz: number, offsets: number[], strength = 0.5): TrainWindow =
   tag: 'measured',
   pulseOffsetsMs: offsets,
   resentCount: 0,
+  atMs: 0,
+  trainSeq: 1,
 });
 
 describe('quantisation (D-09)', () => {
@@ -57,7 +59,12 @@ describe('quantisation (D-09)', () => {
     expect(d.setLevels([])).toBe(false);
     expect(d.setLevels([1, 2, 3, 4, 5])).toBe(false);
     expect(d.setLevels([8, -1, 25])).toBe(false);
+    expect(d.setLevels([8, 8, 25])).toBe(false); // not strictly increasing
+    expect(d.setLevels([15, 8, 25])).toBe(false);
+    expect(d.setLevels([8, WHISPER_PATTERN, 25])).toBe(false); // whisper only as the weakest
     expect(d.levels).toEqual([8, 15, 25]);
+    expect(validLevels([WHISPER_PATTERN, 10, 15, 25])).toBe(true);
+    expect(validLevels([10, 15, 25])).toBe(true);
   });
 });
 
@@ -94,19 +101,61 @@ describe('patterns (R8.3)', () => {
     expect(p.length).toBe(MAX_PATTERN);
   });
 
-  it('a delay (R8.9 offset) leads every pattern with a silent gap', () => {
-    const v = fakeVibrate();
-    const d = new WebVibrateDriver({ vibrate: v.fn });
+  it('a delay (R8.9 offset) hands each pattern over later, unchanged and in order', () => {
+    const clock = new FakeClock();
+    const v = timedVibrate(clock.clock);
+    const d = new WebVibrateDriver({ vibrate: v.fn, timers: clock });
     d.setDelayMs(30);
     d.emit(ev('tick', 0));
+    clock.advance(25);
     d.emit(ev('double'));
     d.playTrain(train(4, [10], 0));
+    expect(v.calls).toEqual([]);
+    clock.advance(100);
     expect(v.calls).toEqual([
-      [0, 30, 8],
-      [0, 30, 12, 40, 12],
-      [0, 40, 8],
+      { at: 30, pattern: 8 },
+      { at: 55, pattern: [12, 40, 12] },
+      { at: 55, pattern: [0, 10, 8] },
     ]);
-    expect(d.oneShotBlockMs(ev('double'))).toBe(30 + 64);
+    // The delay shifts one-shots and trains alike, so a one-shot blocks no longer.
+    expect(d.oneShotBlockMs(ev('double'))).toBe(64);
+  });
+
+  it('stop cancels delayed patterns; stopTrain cancels only delayed train windows', () => {
+    const clock = new FakeClock();
+    const v = timedVibrate(clock.clock);
+    const d = new WebVibrateDriver({ vibrate: v.fn, timers: clock });
+    d.setDelayMs(30);
+    d.playTrain(train(4, [0], 0));
+    d.emit(ev('tick', 1));
+    d.stopTrain();
+    clock.advance(100);
+    expect(v.calls.map((c) => c.pattern)).toEqual([25]); // the train window never played
+    d.emit(ev('tick', 1));
+    d.stop();
+    clock.advance(100);
+    expect(v.calls.map((c) => c.pattern)).toEqual([25, 0]);
+  });
+
+  it('stopTrain stops a playing train window but not a playing one-shot', () => {
+    const v = fakeVibrate();
+    const d = new WebVibrateDriver({ vibrate: v.fn });
+    d.playTrain(train(4, [0], 0));
+    d.stopTrain();
+    d.emit(ev('tick', 1));
+    d.stopTrain();
+    expect(v.calls).toEqual([8, 0, 25]);
+  });
+
+  it('a whisper keeps its pulse width at high train rates (never a solid pulse)', () => {
+    expect(fitLevel(WHISPER_PATTERN, 16)).toEqual([4, 4, 4]); // 30 Hz
+    expect(fitLevel(WHISPER_PATTERN, 12)).toEqual([4, 4, 4]); // 40 Hz
+    expect(fitLevel(WHISPER_PATTERN, 20)).toEqual(WHISPER_PATTERN);
+    expect(fitLevel(25, 12)).toBe(12);
+    const v = fakeVibrate();
+    const d = new WebVibrateDriver({ vibrate: v.fn, levels: [WHISPER_PATTERN, 10, 15, 25] });
+    d.playTrain(train(30, [0, 100 / 3], 0));
+    expect(v.calls).toEqual([[4, 4, 4, 21, 4, 4, 4]]);
   });
 
   it('reports how long a one-shot blocks a train', () => {

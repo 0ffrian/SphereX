@@ -184,6 +184,19 @@ describe('shared AudioContext (R8.9)', () => {
     expect(getAudioContext()).toBe(ctx);
   });
 
+  it('makes a new context when the shared one was closed', async () => {
+    const first = new FakeAudioContext();
+    const second = new FakeAudioContext();
+    const made = [first, second];
+    setAudioContextFactory(() => made.shift()!.asAudioContext());
+    await unlockAudio();
+    expect(getAudioContext()).toBe(first);
+    await first.close();
+    expect(getAudioContext()).toBeNull();
+    expect(await unlockAudio()).toBe(true);
+    expect(getAudioContext()).toBe(second);
+  });
+
   it('reports false where Web Audio is missing', async () => {
     setAudioContextFactory(() => null);
     expect(await unlockAudio()).toBe(false);

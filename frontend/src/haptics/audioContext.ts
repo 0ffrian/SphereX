@@ -60,18 +60,21 @@ export function audioContextSupported(): boolean {
   return factoryOverridden || audioContextCtor() !== null;
 }
 
-/** The shared context if it exists. Never creates one, so it is safe outside a gesture. */
+/**
+ * The shared context if it exists and is not closed. Never creates one, so it is safe outside a
+ * gesture.
+ */
 export function getAudioContext(): AudioContext | null {
-  return shared;
+  return shared && shared.state !== 'closed' ? shared : null;
 }
 
 /**
- * Create the shared context if needed and resume it. Call it synchronously inside a `click`
- * handler; browsers only let a context start from a user activation. Resolves to whether the
- * context is running.
+ * Create the shared context if needed (or if the old one was closed) and resume it. Call it
+ * synchronously inside a `click` handler; browsers only let a context start from a user
+ * activation. Resolves to whether the context is running.
  */
 export async function unlockAudio(): Promise<boolean> {
-  if (!shared) shared = factory();
+  if (!shared || shared.state === 'closed') shared = factory();
   const ctx = shared;
   if (!ctx) return false;
   if (ctx.state === 'running') return true;

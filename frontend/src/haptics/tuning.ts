@@ -96,8 +96,21 @@ export const CHIME_PARTIAL_GAIN = 0.3;
 export const CHIME_DECAY_S = 1.1;
 /** Peak gain of one sound at strength 1 and volume 1, below clipping when pulses overlap. Engineering. */
 export const AUDIO_PEAK_GAIN = 0.5;
+/**
+ * Audible floor: strengths below this sound at this strength, so the lowest vibrate level (e.g.
+ * the ocean swell at STRENGTH_LOWEST) is also heard (R8.9: both channels or neither).
+ * CREATIVE placeholder — Atish to decide (D-13).
+ */
+export const AUDIO_FLOOR_STRENGTH = 0.08;
 /** Default volume setting (R8.7 settings). CREATIVE placeholder — Atish to decide (D-13). */
 export const DEFAULT_VOLUME = 0.7;
+/** Engineering: a train's audio clock anchor is reset when it drifts by more than this (s). */
+export const AUDIO_REANCHOR_TOLERANCE_S = 0.05;
+/** Engineering: limiter on the audio master so overlapping sounds do not clip. */
+export const LIMITER_THRESHOLD_DB = -6;
+export const LIMITER_RATIO = 20;
+export const LIMITER_ATTACK_S = 0.003;
+export const LIMITER_RELEASE_S = 0.1;
 
 // ---------------------------------------------------------------- settings (R8.7)
 

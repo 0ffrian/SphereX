@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HapticEvent } from '@/contract';
 import { HAPTIC_DEBUG_EVENT, HapticEngine } from '../haptics';
 import { PulseIndicator, flashPlan } from './PulseIndicator';
-import { UnlockButton } from './UnlockButton';
+import { useHapticSettings } from '../settings';
+import { UnlockButton, unlockedLabel } from './UnlockButton';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -71,11 +72,31 @@ describe('haptics UI', () => {
   it('the unlock button calls engine.unlock from its click', async () => {
     const engine = new HapticEngine([], { debugTarget: null });
     const unlock = vi.spyOn(engine, 'unlock').mockResolvedValue(true);
+    useHapticSettings.setState({ hapticsOn: true, soundOn: true });
     act(() => root.render(<UnlockButton engine={engine} canVibrate />));
     const button = host.querySelector('button')!;
     expect(button.textContent).toBe('Turn on haptics and sound');
     await act(async () => button.click());
     expect(unlock).toHaveBeenCalledTimes(1);
     expect(button.textContent).toBe('Haptics and sound on');
+    act(() => useHapticSettings.setState({ hapticsOn: false }));
+    expect(button.textContent).toBe('Sound on, haptics off');
+  });
+
+  it('the unlock label never claims an output that is off', () => {
+    const on = { hapticsOn: true, soundOn: true };
+    expect(unlockedLabel(true, true, on)).toBe('Haptics and sound on');
+    expect(unlockedLabel(false, true, on)).toBe('Sound on (this device cannot vibrate)');
+    expect(unlockedLabel(true, true, { hapticsOn: false, soundOn: true })).toBe(
+      'Sound on, haptics off',
+    );
+    expect(unlockedLabel(true, false, on)).toBe('Haptics on, sound unavailable here');
+    expect(unlockedLabel(true, true, { hapticsOn: true, soundOn: false })).toBe(
+      'Haptics on, sound off',
+    );
+    expect(unlockedLabel(false, false, on)).toBe('Sound unavailable here');
+    expect(unlockedLabel(true, true, { hapticsOn: false, soundOn: false })).toBe(
+      'Haptics and sound are off in settings',
+    );
   });
 });

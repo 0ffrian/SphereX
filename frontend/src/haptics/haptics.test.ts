@@ -2,8 +2,15 @@
 // phase-continuous train scheduler (Q-59), all on a fake clock and fake drivers.
 import { describe, expect, it } from 'vitest';
 import type { HapticEvent } from '@/contract';
-import { FakeAudioContext } from '@/test/fakeAudio';
-import { FakeClock, FakeDriver, PlainDriver, fakeVibrate } from '@/test/fakeHaptics';
+import { FakeAudioContext, type FakeSource } from '@/test/fakeAudio';
+import {
+  FakeClock,
+  FakeDriver,
+  PlainDriver,
+  fakeVibrate,
+  motorOnsets,
+  timedVibrate,
+} from '@/test/fakeHaptics';
 import { AudioDriver } from './drivers/audio';
 import { WebVibrateDriver } from './drivers/webVibrate';
 import {
@@ -11,6 +18,7 @@ import {
   HapticEngine,
   createHaptics,
   type HapticEngineOptions,
+  type HapticTimers,
 } from './haptics';
 
 const tick = (over: Partial<HapticEvent> = {}): HapticEvent => ({
@@ -208,7 +216,8 @@ describe('pulse trains (Q-59)', () => {
     for (let i = 1; i < later.length; i++) expect(later[i]! - later[i - 1]!).toBeCloseTo(125, 6);
     engine.startTrain('b', { rateHz: 1, strength: 0.5, tag: 'measured' });
     expect(engine.activeTrainId).toBe('b');
-    expect(driver.stops).toBe(1);
+    expect(driver.trainStops).toBe(1); // train output only
+    expect(driver.stops).toBe(0);
   });
 
   it('updateTrain to a hidden tag stops it; stopTrain ignores another id', () => {
@@ -315,5 +324,158 @@ describe('web drivers together (D-08, D-10, R11)', () => {
     const h = createHaptics({ debugTarget: null });
     expect(h.engine.activeDrivers).toEqual([h.vibrate, h.audio]);
     h.engine.dispose();
+  });
+});
+
+/** Real web drivers on a fake clock, fake navigator.vibrate and fake AudioContext. */
+function web(timers?: HapticTimers) {
+  const clock = new FakeClock();
+  const t = timers ?? clock;
+  const v = timedVibrate(clock.clock);
+  const ctx = new FakeAudioContext();
+  const vibrate = new WebVibrateDriver({ vibrate: v.fn, timers: t });
+  const audio = new AudioDriver({ context: () => ctx.asAudioContext(), supported: true });
+  const engine = new HapticEngine([vibrate, audio], {
+    clock: clock.clock,
+    timers: t,
+    debugTarget: null,
+  });
+  return { clock, v, ctx, vibrate, audio, engine };
+}
+
+/** Timers that fire `ms` late. */
+const lateBy = (clock: FakeClock, ms: number): HapticTimers => ({
+  setTimeout: (fn, d) => clock.setTimeout(fn, d + ms),
+  clearTimeout: (h) => clock.clearTimeout(h),
+});
+
+describe('review fixes', () => {
+  it('a vibration delay (R8.9 offset) loses no train pulse and no tick (finding 1)', () => {
+    const { clock, v, vibrate, engine } = web();
+    vibrate.setDelayMs(40);
+    engine.startTrain('t', { rateHz: 20, strength: 0.5, tag: 'measured' });
+    clock.advance(1100);
+    const alone = motorOnsets(v.calls).filter((t) => t < 1040);
+    expect(alone).toEqual(Array.from({ length: 20 }, (_, i) => 40 + 50 * i));
+
+    const b = web();
+    b.vibrate.setDelayMs(40);
+    b.engine.startTrain('t', { rateHz: 20, strength: 0.5, tag: 'measured' });
+    b.clock.advance(310);
+    for (let i = 0; i < 3; i++) {
+      expect(b.engine.emit(tick({ strength: 1 }))).toBe(true);
+      b.clock.advance(25);
+    }
+    b.clock.advance(800);
+    const ticks = [350, 375, 400];
+    const onsets = motorOnsets(b.v.calls);
+    for (const t of ticks) expect(onsets).toContain(t); // every tick plays
+    const train = onsets.filter((t) => !ticks.includes(t) && t < 1040);
+    for (const t of train) expect((t - 40) % 50).toBe(0); // on the delayed grid
+    expect(train.length).toBeGreaterThanOrEqual(17); // only pulses under the ticks are lost
+  });
+
+  it('stopTrain leaves a just-played one-shot alone in both channels (finding 2)', () => {
+    const { clock, v, ctx, engine } = web();
+    engine.startTrain('ocean', { rateHz: 2, strength: 0.5, tag: 'measured' });
+    clock.advance(100);
+    const trainSources = ctx.sources().length;
+    expect(trainSources).toBe(1);
+    engine.emit(tick({ strength: 1, voice: 'chime' })); // a coastline tick that rings on
+    engine.stopTrain('ocean');
+    expect(v.calls.at(-1)!.pattern).toBe(25); // no vibrate(0) after the tick
+    const sources = ctx.sources();
+    for (const s of sources.slice(0, trainSources)) expect(s.stopCalls).toBe(2); // cancelled
+    for (const s of sources.slice(trainSources)) expect(s.stopCalls).toBe(1); // still ringing
+  });
+
+  it('stopTrain silences the motor when a train window is what plays (finding 2)', () => {
+    const { clock, v, engine } = web();
+    engine.startTrain('t', { rateHz: 20, strength: 0.5, tag: 'measured' });
+    clock.advance(10);
+    engine.stopTrain('t');
+    expect(v.calls.at(-1)!.pattern).toBe(0);
+  });
+
+  it('refuses non-finite strengths; strength 0 plays in both channels (finding 3)', () => {
+    const { clock, v, ctx, engine } = web();
+    expect(engine.emit(tick({ strength: NaN }))).toBe(false);
+    expect(engine.emit(tick({ strength: Infinity }))).toBe(false);
+    expect(engine.startTrain('t', { rateHz: 4, strength: NaN, tag: 'measured' })).toBe(false);
+    expect(engine.startTrain('t', { rateHz: 4, strength: 0.5, tag: 'measured' })).toBe(true);
+    expect(engine.updateTrain('t', { strength: NaN })).toBe(false);
+    expect(engine.activeTrainId).toBe('t'); // refused, still playing
+    engine.stopTrain();
+    const before = ctx.sources().length;
+    clock.advance(100);
+    v.calls.length = 0;
+    expect(engine.emit(tick({ strength: 0 }))).toBe(true);
+    expect(v.calls.map((c) => c.pattern)).toEqual([8]);
+    expect(ctx.sources().length).toBe(before + 1);
+  });
+
+  it('a timer later than the lead does not shift the phase (finding 5)', () => {
+    const clock = new FakeClock();
+    const driver = new FakeDriver(clock.clock);
+    const engine = new HapticEngine([driver], {
+      clock: clock.clock,
+      timers: lateBy(clock, 30),
+      debugTarget: null,
+    });
+    engine.startTrain('t', { rateHz: 2, strength: 0.5, tag: 'measured' });
+    clock.advance(3000);
+    const pulses = driver.freshPulseTimes().filter((t) => t < 3000);
+    expect(pulses).toHaveLength(6);
+    pulses.forEach((t, i) => {
+      expect(t).toBeGreaterThanOrEqual(i * 500);
+      expect(t).toBeLessThanOrEqual(i * 500 + 10); // 10 ms late at most, never accumulating
+    });
+  });
+
+  it('a re-send-only window takes no rate-cap slot (finding 7)', () => {
+    const { clock, driver, engine } = setup({}, 25);
+    const single = { kind: 'pulseTrain', rateHz: 4, strength: 1, tag: 'measured' } as const;
+    for (let i = 0; i < 38; i++) engine.emit(single);
+    engine.startTrain('t', { rateHz: 5, strength: 0.5, tag: 'measured' }); // slot 39: [0, 200]
+    clock.advance(10);
+    expect(engine.emit(tick())).toBe(true); // slot 40; cancels 200 until t = 35
+    clock.advance(30);
+    const resend = driver.windows.at(-1)!;
+    expect(resend.at).toBe(35);
+    expect(resend.resentCount).toBe(resend.pulseOffsetsMs.length);
+    expect(resend.pulseOffsetsMs.map((o) => o + resend.at)).toEqual([200]);
+  });
+
+  it('a late re-send timer still re-sends the cancelled pulses (finding 7)', () => {
+    const clock = new FakeClock();
+    const driver = new FakeDriver(clock.clock, true, 25);
+    const engine = new HapticEngine([driver], {
+      clock: clock.clock,
+      timers: lateBy(clock, 30),
+      debugTarget: null,
+    });
+    engine.startTrain('t', { rateHz: 20, strength: 0.5, tag: 'measured' }); // 0..200 at t = 0
+    clock.advance(60);
+    engine.emit(tick()); // cancels 100, 150, 200 until 85; the timer fires at 115
+    clock.advance(100);
+    const resend = driver.windows.find((w) => w.resentCount > 0)!;
+    expect(resend.at).toBe(115);
+    expect(resend.pulseOffsetsMs.slice(0, resend.resentCount).map((o) => o + resend.at)).toEqual([
+      115, 150, 200,
+    ]);
+  });
+
+  it('emit(pulseTrain) over a running train cancels the old train sound (finding 8)', () => {
+    const { clock, ctx, engine } = web();
+    engine.startTrain('t', { rateHz: 20, strength: 0.5, tag: 'measured' });
+    clock.advance(10);
+    const old: FakeSource[] = ctx.sources();
+    expect(old.length).toBe(5);
+    engine.emit({ kind: 'pulseTrain', rateHz: 8, strength: 1, tag: 'measured' });
+    for (const s of old) expect(s.stopCalls).toBe(2);
+    const fresh = ctx.sources().slice(old.length);
+    expect(fresh).toHaveLength(2);
+    for (const s of fresh) expect(s.stopCalls).toBe(1);
+    expect(engine.activeTrainId).toBeNull();
   });
 });

@@ -89,10 +89,22 @@ export class FakePanner extends FakeNode {
   }
 }
 
+export class FakeCompressor extends FakeNode {
+  readonly threshold = new FakeParam();
+  readonly knee = new FakeParam();
+  readonly ratio = new FakeParam();
+  readonly attack = new FakeParam();
+  readonly release = new FakeParam();
+  constructor(ctx: FakeAudioContext) {
+    super(ctx, 'compressor');
+  }
+}
+
 export interface FakeAudioOptions {
   state?: AudioContextState;
   outputLatency?: number;
   stereoPanner?: boolean;
+  compressor?: boolean;
 }
 
 export class FakeAudioContext {
@@ -104,12 +116,16 @@ export class FakeAudioContext {
   readonly destination: FakeNode;
   resumes = 0;
   createStereoPanner?: () => FakePanner;
+  createDynamicsCompressor?: () => FakeCompressor;
 
   constructor(options: FakeAudioOptions = {}) {
     this.state = options.state ?? 'running';
     this.outputLatency = options.outputLatency;
     this.destination = new FakeNode(this, 'destination');
     if (options.stereoPanner !== false) this.createStereoPanner = () => new FakePanner(this);
+    if (options.compressor !== false) {
+      this.createDynamicsCompressor = () => new FakeCompressor(this);
+    }
   }
 
   async resume() {
@@ -131,6 +147,10 @@ export class FakeAudioContext {
   createBuffer(_channels: number, length: number, sampleRate: number) {
     const data = new Float32Array(length);
     return { length, sampleRate, getChannelData: () => data };
+  }
+
+  async close() {
+    this.state = 'closed';
   }
 
   /** Every source node created, in order. */
