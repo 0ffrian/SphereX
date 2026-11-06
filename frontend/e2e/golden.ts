@@ -7,3 +7,13 @@
  * Re-tune if the CI rasteriser version changes and honest reruns start to fail.
  */
 export const GOLDEN_MIN_SSIM = 0.97;
+
+/** Minimum SSIM of the worst colour channel (R, G or B). [verify] tuned like GOLDEN_MIN_SSIM. */
+export const GOLDEN_MIN_CHANNEL_SSIM = 0.97;
+
+/**
+ * Maximum mean absolute colour difference (0..255 per channel) over lit pixels. A 15% desaturation
+ * or a hue rotation moves this by to about 9 and about 110 (ssim.spec.ts; luminance SSIM stays 0.9999 for the desaturation); rerun noise was at most 0.11.
+ * [verify] tuned on SwiftShader reruns.
+ */
+export const GOLDEN_MAX_COLOUR_DELTA = 4;

@@ -24,14 +24,14 @@ Device pixel ratio is capped at 1.5 (D-05). The frame-time governor drops one ti
    ```js
    __sxViewer.renderStats();
    ```
-   Record the frame time (mean and p95 in ms), the fps it implies, the tier in use, and whether the governor dropped a tier. (The exact field names are set by the render-core hook; copy what it prints and note the field names here the first time.)
+   It returns `{ tier, backend, frames, p50Ms, p95Ms, drops }`. Record `p50Ms` and `p95Ms` (and the fps they imply), `tier`, `backend` (WebGPU or WebGL2) and `drops` (governor tier drops; any drop is a miss). Call it after the 30 s run, so `frames` covers the whole run.
 6. To force a tier for a comparison: `__sxViewer.setQualityTier('low' | 'medium' | 'high')`.
 7. Repeat for each body type: star, gas giant or brown dwarf, rocky or water world, nebula or remnant, asteroid (shape model), comet.
-8. Pass when mean fps meets the target and the governor did not fire.
+8. Pass when the fps implied by p50 meets the target and `drops` is 0.
 
 ## Results
 
-Do not fill in numbers that were not measured. Cell format: `mean ms / p95 ms / tier / governor (y/n)`.
+Do not fill in numbers that were not measured. Cell format: `p50 ms / p95 ms / tier / drops`.
 
 | Body type               | Zenbook 14X | Asus A15   | realme 14 Pro | Samsung    |
 | ----------------------- | ----------- | ---------- | ------------- | ---------- |
