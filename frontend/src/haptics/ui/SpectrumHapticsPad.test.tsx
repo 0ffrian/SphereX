@@ -83,6 +83,20 @@ describe('SpectrumHapticsPad (R8.6)', () => {
   const pad = () => host.querySelector<HTMLElement>('[role="slider"]')!;
   const pointer = (type: string, clientX: number) =>
     act(() => pad().dispatchEvent(new MouseEvent(type, { bubbles: true, clientX })));
+  /** A pointer event with the fields jsdom's MouseEvent lacks. */
+  const ptr = (
+    type: string,
+    clientX: number,
+    extra: { pointerId: number; isPrimary?: boolean; pointerType?: string; button?: number },
+  ) => {
+    const ev = new MouseEvent(type, { bubbles: true, clientX, button: extra.button ?? 0 });
+    Object.defineProperties(ev, {
+      pointerId: { value: extra.pointerId },
+      isPrimary: { value: extra.isPrimary ?? true },
+      pointerType: { value: extra.pointerType ?? 'touch' },
+    });
+    act(() => pad().dispatchEvent(ev));
+  };
   const key = (k: string) =>
     act(() => pad().dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })));
 
@@ -130,6 +144,61 @@ describe('SpectrumHapticsPad (R8.6)', () => {
     expect(driver.events.length).toBe(atDip); // still in the dip: quiet
     key('Tab');
     expect(driver.events.length).toBe(atDip);
+  });
+
+  it('a second finger neither drives nor ends the drag', () => {
+    render();
+    ptr('pointerdown', 0, { pointerId: 1 });
+    ptr('pointerdown', 400, { pointerId: 2, isPrimary: false });
+    ptr('pointermove', 600, { pointerId: 2, isPrimary: false });
+    expect(driver.events).toHaveLength(0);
+    ptr('pointerup', 600, { pointerId: 2, isPrimary: false });
+    ptr('pointermove', 8, { pointerId: 1 });
+    expect(driver.events).toHaveLength(1); // finger 1 still drags
+    clock.advance(30);
+    ptr('pointerup', 8, { pointerId: 1 });
+    ptr('pointermove', 16, { pointerId: 1 });
+    expect(driver.events).toHaveLength(1); // ended
+  });
+
+  it('ignores the right mouse button', () => {
+    render();
+    ptr('pointerdown', 0, { pointerId: 1, pointerType: 'mouse', button: 2 });
+    ptr('pointermove', 40, { pointerId: 1, pointerType: 'mouse', button: 2 });
+    expect(driver.events).toHaveLength(0);
+  });
+
+  it('Home, End, Page Up and Page Down move along the slider, and the end is reachable', () => {
+    render();
+    pad().focus();
+    key('End');
+    expect(pad().getAttribute('aria-valuenow')).toBe('5');
+    clock.advance(30);
+    key('Home');
+    expect(pad().getAttribute('aria-valuenow')).toBe('1');
+    clock.advance(30);
+    key('PageUp'); // 10 steps of 8 px = 80 px of 800 = 0.4 µm
+    expect(pad().getAttribute('aria-valuenow')).toBe('1.4');
+    clock.advance(30);
+    key('PageDown');
+    expect(pad().getAttribute('aria-valuenow')).toBe('1');
+    for (let i = 0; i < 120; i++) key('ArrowRight');
+    expect(pad().getAttribute('aria-valuenow')).toBe('5');
+  });
+
+  it('says how pitch follows wavelength from the tuning constant', () => {
+    render();
+    expect(host.textContent).toMatch(/Pitch (rises|falls) with wavelength/);
+  });
+
+  it('refuses a single-wavelength spectrum instead of spreading it over the pad', () => {
+    const one = spectrum().slice(0, 1);
+    render(one);
+    expect(host.querySelector('[role="slider"]')).toBeNull();
+    expect(host.textContent).toContain('usable flux at only one wavelength');
+    // Two points at the same λ are one wavelength too (#9 averages them).
+    render([one[0]!, { ...one[0]!, flux: 5, frame_id: 'f-dup' }]);
+    expect(host.querySelector('[role="slider"]')).toBeNull();
   });
 
   it('refuses an empty spectrum with a sentence instead of a pad', () => {

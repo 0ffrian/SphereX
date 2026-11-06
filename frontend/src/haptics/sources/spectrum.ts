@@ -148,6 +148,7 @@ export class SpectrumHapticSource {
 
   /** Pointer down at `x`: a drag begins. Plays nothing; the first tick comes after 8 px. */
   begin(x: number): void {
+    if (!Number.isFinite(x)) return;
     this.lastX = x;
     this.travelled = 0;
     this.gap = SPECTRUM_TICK_PX;
@@ -190,22 +191,28 @@ export class SpectrumHapticSource {
   }
 
   /**
-   * Keyboard: move one step left (−1) or right (+1) and play it like a drag step. The first press
-   * starts at the end of the plot it moves away from. Returns false at the edge (no step).
+   * Keyboard: move `steps` steps left (−1) or right (+1) and play where it lands, like one drag
+   * move. The first press starts at the end of the plot it moves away from. A move past an edge
+   * stops on the edge, so the last pixels are reachable; at the edge it returns false (no step).
    */
-  stepBy(dir: -1 | 1): boolean {
-    const [a, b] = this.scale.domain;
-    const lo = Math.min(a, b);
-    const hi = Math.max(a, b);
-    let next: number;
+  stepBy(dir: -1 | 1, steps = 1): boolean {
+    const [lo, hi] = this.bounds();
     if (this.cursor === null) {
-      next = dir > 0 ? lo : hi;
       this.stepIndex = 0;
-    } else {
-      next = this.cursorX! + dir * this.gap;
-      if (next < lo || next > hi) return false;
+      return this.jumpTo(dir > 0 ? 'start' : 'end');
     }
+    const cur = this.cursorX!;
+    const next = Math.min(hi, Math.max(lo, cur + dir * this.gap * Math.max(1, Math.floor(steps))));
+    if (Math.abs(next - cur) < 1e-9) return false;
     this.advanceTo(next);
+    this.finish(true);
+    return true;
+  }
+
+  /** Keyboard Home / End: a step at the start or end of the plot. */
+  jumpTo(edge: 'start' | 'end'): boolean {
+    const [lo, hi] = this.bounds();
+    this.advanceTo(edge === 'start' ? lo : hi);
     this.finish(true);
     return true;
   }
@@ -230,8 +237,13 @@ export class SpectrumHapticSource {
     this.cursorLambda = lambda;
     this.cursorScale = this.scale;
     // R8.3 roughness: after a noisy point the spacing to the next step jitters ±30%.
+    // At least 1 px, whatever JITTER_FRACTION is tuned to, so a step always moves.
     this.gap = st.noisy
-      ? SPECTRUM_TICK_PX * (1 + JITTER_FRACTION * (2 * jitterUnit(this.seed, this.stepIndex) - 1))
+      ? Math.max(
+          1,
+          SPECTRUM_TICK_PX *
+            (1 + JITTER_FRACTION * (2 * jitterUnit(this.seed, this.stepIndex) - 1)),
+        )
       : SPECTRUM_TICK_PX;
     this.stepIndex++;
   }
@@ -249,6 +261,11 @@ export class SpectrumHapticSource {
       st.emitted = true;
     }
     this.onStep?.(st);
+  }
+
+  private bounds(): [number, number] {
+    const [a, b] = this.scale.domain;
+    return [Math.min(a, b), Math.max(a, b)];
   }
 
   /** −1 at the left of the plot, 1 at the right (R8.9 pan from the finger's x). */

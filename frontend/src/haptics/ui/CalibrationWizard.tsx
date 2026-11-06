@@ -1,10 +1,13 @@
-// R8.7 first-use calibration, three short steps, only on devices that vibrate (D-08, D-09, D-10):
+// R8.7 first-use calibration, three short steps, only on phones that vibrate (D-08, D-09, D-10):
 //   1. faintest pulse: 5 / 10 / 20 ms probes → `minMs`
-//   2. distinct levels: whisper, soft, medium, firm → 3 or 4 levels (whisper dropped if not distinct)
+//   2. distinct levels: whisper, soft, medium, firm → 3 or 4 levels (the whisper is kept only when
+//      it is felt and weaker than soft)
 //   3. tap-along: a vibration-only beat, then a sound-only beat → `avOffsetMs` (Q-63)
-// Every step can be skipped (it keeps the R8.3 default). The result is saved under the one
-// localStorage key and applied to the drivers. Step changes are announced (aria-live); the
-// tap-along takes the Space or Enter key as well as touch (R9).
+// Every step can be skipped, and a skipped step keeps what this device already has saved (or the
+// R8.3 default). Cancel leaves at any point without saving and stops anything still playing. The
+// result is saved under the one localStorage key and applied to the drivers. Step changes are
+// announced (aria-live), focus follows the next action, and the tap-along takes the Space or Enter
+// key as well as touch (R9).
 import {
   useEffect,
   useId,
@@ -13,29 +16,34 @@ import {
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
+  type Ref,
 } from 'react';
 import { buttonClass } from '@/app/ui';
 import {
   CALIBRATION_VERSION,
   FOUR_LEVELS,
-  THREE_LEVELS,
   applyCalibration,
   beatPlan,
+  calibrationAvailable,
   computeAvOffset,
   defaultCalibration,
   levelSetFromAnswers,
   levelsToVibrate,
-  meanTapLag,
+  loadCalibration,
   minMsFromAnswer,
   saveCalibration,
   sequencePattern,
   soundBeatWindow,
+  tapLag,
   vibrationBeatPattern,
   type Calibration,
   type CalibrationLevel,
+  type TapLag,
 } from '../calibration';
 import type { VibrateFn } from '../drivers/webVibrate';
 import type { HapticOutputs } from '../haptics';
+import { platformEnv, type PlatformEnv } from '../platform';
+import { ensureLoaded, useHapticSettings } from '../settings';
 import { CALIBRATION_PROBE_MS } from '../tuning';
 
 export interface CalibrationWizardProps {
@@ -47,9 +55,11 @@ export interface CalibrationWizardProps {
   vibrate?: VibrateFn | null;
   /** Clock for the tap-along (ms). Default: event time stamps and `performance.now`. */
   now?: () => number;
-  /** Called with the saved calibration when the user finishes. */
+  /** Android + touch screen (R8.7 "phones that vibrate"). Default: read from the browser. */
+  platform?: PlatformEnv;
+  /** Called when the user finishes: the calibration in force, and whether it was saved. */
   onDone?: (cal: Calibration, saved: boolean) => void;
-  /** Close without saving. */
+  /** Leave (Cancel at any step, or Close at the end). Nothing is saved by cancelling. */
   onCancel?: () => void;
 }
 
@@ -75,9 +85,23 @@ function defaultNow(): number {
   return performance.now();
 }
 
-function PlainButton({ label, onClick }: { label: string; onClick: () => void }) {
+function failure(r: TapLag): string {
+  return !r.ok && r.reason === 'irregular'
+    ? 'The taps were too uneven to measure. Try again, or skip this step.'
+    : 'Not enough taps on the beat. Try again, or skip this step.';
+}
+
+function PlainButton({
+  label,
+  onClick,
+  buttonRef,
+}: {
+  label: string;
+  onClick: () => void;
+  buttonRef?: Ref<HTMLButtonElement>;
+}) {
   return (
-    <button type="button" className={buttonClass} onClick={onClick}>
+    <button ref={buttonRef} type="button" className={buttonClass} onClick={onClick}>
       {label}
     </button>
   );
@@ -92,61 +116,82 @@ export function CalibrationWizard({
   haptics,
   vibrate,
   now,
+  platform,
   onDone,
   onCancel,
 }: CalibrationWizardProps) {
   const [vibrateFn] = useState<VibrateFn | null>(() =>
     vibrate !== undefined ? vibrate : browserVibrate(),
   );
-  const supported = haptics.vibrate.supported && vibrateFn !== null;
+  const [env] = useState<PlatformEnv>(() => platform ?? platformEnv());
+  const supported = vibrateFn !== null && calibrationAvailable(haptics.vibrate.supported, env);
   const id = useId();
 
+  // What this device has now: a skipped step keeps it.
+  const [base] = useState<Calibration>(() => loadCalibration() ?? defaultCalibration());
   const [step, setStep] = useState<Step>('intro');
-  const [status, setStatus] = useState('');
-  const [minMs, setMinMs] = useState(() => defaultCalibration().minMs);
+  const [status, setStatus] = useState({ text: '', seq: 0 });
+  const [minMs, setMinMs] = useState(base.minMs);
+  const [levels, setLevels] = useState<CalibrationLevel[]>(() => [...base.levels]);
+  const [avOffsetMs, setAvOffsetMs] = useState(base.avOffsetMs);
+  const [measured, setMeasured] = useState({ minMs: false, levels: false, offset: false });
   const [noneFelt, setNoneFelt] = useState(false);
-  const [levels, setLevels] = useState<CalibrationLevel[]>(() => [...THREE_LEVELS]);
-  const [avOffsetMs, setAvOffsetMs] = useState(0);
-  const [offsetMeasured, setOffsetMeasured] = useState(false);
   const [tapPhase, setTapPhase] = useState<TapPhase>('ready-vibration');
   const [tapCount, setTapCount] = useState(0);
   const [result, setResult] = useState<{ cal: Calibration; saved: boolean } | null>(null);
 
-  // Tap-along bookkeeping, touched only in handlers and timers.
+  // Tap-along and playback bookkeeping, touched only in handlers, timers and effects.
   const taps = useRef<number[]>([]);
   const beats = useRef<number[]>([]);
   const vibrationLag = useRef<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** The audio offset in force before a running sound beat zeroed it; null when none runs. */
   const savedOffset = useRef<number | null>(null);
+  /** A raw vibrate pattern / a sound beat was sent and may still be playing. */
+  const rawSent = useRef(false);
+  const soundSent = useRef(false);
+  /** A sound beat is waiting for the AudioContext to resume. */
+  const soundPending = useRef(false);
+  const mounted = useRef(true);
   const tapButton = useRef<HTMLButtonElement>(null);
+  const actionButton = useRef<HTMLButtonElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
 
   const clock = now ?? defaultNow;
 
-  // Leaving mid-beat: stop the timer and give the audio driver its offset back.
-  useEffect(
-    () => () => {
+  // Leaving (unmount) mid-step: stop the timer, the raw pattern and any scheduled sound, and give
+  // the audio driver its offset back.
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
       if (timer.current !== null) clearTimeout(timer.current);
       timer.current = null;
+      if (rawSent.current) vibrateFn?.(0);
+      if (soundSent.current) haptics.audio.stop();
+      rawSent.current = false;
+      soundSent.current = false;
       if (savedOffset.current !== null) haptics.audio.setOffsetMs(savedOffset.current);
       savedOffset.current = null;
-    },
-    [haptics],
-  );
+    };
+  }, [haptics, vibrateFn]);
 
-  // Move focus to the new step's heading so keyboard and screen reader users follow along.
+  // Focus follows the step (its heading) and, in the tap-along, the next thing to press.
   useEffect(() => {
     if (step !== 'intro') heading.current?.focus();
   }, [step]);
 
   useEffect(() => {
     if (tapPhase === 'vibration' || tapPhase === 'sound') tapButton.current?.focus();
+    else actionButton.current?.focus();
   }, [tapPhase]);
 
-  const go = (next: Step, announce?: string) => {
+  /** Update the live region; the same sentence twice is still announced (it alternates a space). */
+  const announce = (text: string) => setStatus((s) => ({ text, seq: s.seq + 1 }));
+
+  const go = (next: Step, text?: string) => {
     setStep(next);
-    setStatus(announce ?? (next === 'done' || next === 'intro' ? '' : STEP_TITLE[next]));
+    announce(text ?? (next === 'done' || next === 'intro' ? '' : STEP_TITLE[next]));
   };
 
   const restoreOffset = () => {
@@ -154,9 +199,35 @@ export function CalibrationWizard({
     savedOffset.current = null;
   };
 
+  /**
+   * Stop everything this wizard may have started: the beat timer, a raw vibrate pattern (the
+   * driver's own stop does not cancel it) and a scheduled sound beat. Other output is left alone.
+   */
+  const stopAll = () => {
+    if (timer.current !== null) clearTimeout(timer.current);
+    timer.current = null;
+    soundPending.current = false;
+    if (rawSent.current) vibrateFn?.(0);
+    if (soundSent.current) haptics.audio.stop();
+    rawSent.current = false;
+    soundSent.current = false;
+    restoreOffset();
+  };
+
   const play = (pattern: number[]) => {
     haptics.engine.stop();
-    vibrateFn?.(pattern);
+    if (!vibrateFn) return;
+    vibrateFn(pattern);
+    rawSent.current = true;
+  };
+
+  const cancel = () => {
+    stopAll();
+    if (onCancel) onCancel();
+    else {
+      setTapPhase('ready-vibration');
+      go('intro', 'Calibration cancelled. Nothing was saved.');
+    }
   };
 
   // ------------------------------------------------------------ step 1
@@ -165,6 +236,7 @@ export function CalibrationWizard({
   const pickFaintest = (index: number | null) => {
     setMinMs(minMsFromAnswer(index));
     setNoneFelt(index === null);
+    setMeasured((m) => ({ ...m, minMs: true }));
     go('levels');
   };
 
@@ -181,19 +253,32 @@ export function CalibrationWizard({
         }),
       ),
     );
-  const answerLevels = (whisperFelt: boolean, whisperDistinct: boolean) => {
-    setLevels(levelSetFromAnswers({ whisperFelt, whisperDistinct }));
+  const answerLevels = (whisperFelt: boolean, whisperWeaker: boolean) => {
+    setLevels(levelSetFromAnswers({ whisperFelt, whisperWeaker }));
+    setMeasured((m) => ({ ...m, levels: true }));
     go('tap');
   };
 
   // ------------------------------------------------------------ done (used by step 3)
 
-  const finish = (offset: number = avOffsetMs) => {
+  const finish = (offset: number, offsetMeasured: boolean) => {
+    stopAll();
+    const m = { ...measured, offset: offsetMeasured };
     const cal: Calibration = { version: CALIBRATION_VERSION, minMs, levels, avOffsetMs: offset };
-    const saved = saveCalibration(cal);
+    const changed = m.minMs || m.levels || m.offset;
+    // Nothing measured: keep what is saved (or nothing) rather than write the same values again.
+    const saved = changed ? saveCalibration(cal) : false;
     applyCalibration(haptics, cal);
+    setMeasured(m);
     setResult({ cal, saved });
-    go('done', saved ? 'Calibration saved on this device.' : 'Calibration applied, not saved.');
+    go(
+      'done',
+      !changed
+        ? 'Nothing was measured. Your calibration is unchanged.'
+        : saved
+          ? 'Calibration saved on this device.'
+          : 'Calibration applied, not saved.',
+    );
     onDone?.(cal, saved);
   };
 
@@ -204,49 +289,57 @@ export function CalibrationWizard({
 
   const finishBeat = (channel: 'vibration' | 'sound') => {
     timer.current = null;
-    const lag = meanTapLag(taps.current, beats.current, plan.periodMs);
+    rawSent.current = false;
+    soundSent.current = false;
+    const r = tapLag(taps.current, beats.current, plan.periodMs);
     if (channel === 'vibration') {
-      vibrationLag.current = lag;
-      if (lag === null) {
+      vibrationLag.current = r.ok ? r.lagMs : null;
+      if (!r.ok) {
         setTapPhase('vibration-failed');
-        setStatus('Not enough taps on the beat. Try again, or skip this step.');
+        announce(failure(r));
       } else {
         setTapPhase('ready-sound');
-        setStatus('Got it. Now the same with sound only.');
+        announce('Got it. Now the same with sound only.');
       }
       return;
     }
     restoreOffset();
-    const off = computeAvOffset(vibrationLag.current, lag);
+    const off = r.ok ? computeAvOffset(vibrationLag.current, r.lagMs) : null;
     if (off === null) {
       setTapPhase('sound-failed');
-      setStatus('Not enough taps on the beat. Try again, or skip this step.');
+      announce(
+        r.ok ? 'The two beats were too far apart to trust. Try the sound beat again.' : failure(r),
+      );
       return;
     }
     setAvOffsetMs(off);
-    setOffsetMeasured(true);
     setTapPhase('measured');
-    setStatus(`Offset measured: ${describeOffset(off)}`);
+    announce(`Offset measured: ${describeOffset(off)}`);
   };
 
   const startBeat = (channel: 'vibration' | 'sound') => {
+    if (tapPhase === 'vibration' || tapPhase === 'sound' || soundPending.current) return;
     if (timer.current !== null) clearTimeout(timer.current);
+    timer.current = null;
     haptics.engine.stop();
     taps.current = [];
     setTapCount(0);
     const begin = () => {
+      if (timer.current !== null) clearTimeout(timer.current);
       const t0 = clock();
       beats.current = plan.offsetsMs.map((o) => t0 + o);
       if (channel === 'vibration') {
-        vibrateFn?.(vibrationBeatPattern(plan));
+        play(vibrationBeatPattern(plan));
       } else {
         // Measure with no offset applied, through the audio driver's own scheduling.
+        haptics.audio.stop();
         savedOffset.current ??= haptics.audio.offsetMs;
         haptics.audio.setOffsetMs(0);
-        haptics.audio.playTrain(soundBeatWindow(plan));
+        haptics.audio.playTrain(soundBeatWindow(plan, t0));
+        soundSent.current = true;
       }
       setTapPhase(channel);
-      setStatus(
+      announce(
         channel === 'vibration'
           ? 'Vibration beat playing. Tap along.'
           : 'Sound beat playing. Tap along.',
@@ -257,12 +350,25 @@ export function CalibrationWizard({
       begin();
       return;
     }
+    // The sound beat plays only when sound is on and audible (R8.7 settings).
+    ensureLoaded();
+    const settings = useHapticSettings.getState();
+    if (!settings.soundOn || !(settings.volume > 0)) {
+      setTapPhase('no-sound');
+      announce(
+        'Sound is off or the volume is 0 in the settings. Turn it up to measure the offset, or save without it.',
+      );
+      return;
+    }
     // The sound needs a running AudioContext; this click is the user gesture that resumes it.
+    soundPending.current = true;
     void haptics.engine.unlock().then((running) => {
+      if (!mounted.current || !soundPending.current) return;
+      soundPending.current = false;
       if (running && haptics.audio.supported) begin();
       else {
         setTapPhase('no-sound');
-        setStatus('Sound is not available here, so the offset cannot be measured.');
+        announce('Sound is not available here, so the offset cannot be measured.');
       }
     });
   };
@@ -279,19 +385,20 @@ export function CalibrationWizard({
     if (!e.repeat) recordTap(now ? now() : e.timeStamp);
   };
 
-  const skipTap = () => {
-    if (timer.current !== null) clearTimeout(timer.current);
-    timer.current = null;
-    haptics.engine.stop();
-    restoreOffset();
-    setAvOffsetMs(0);
-    setOffsetMeasured(false);
-    finish(0);
+  /** Skip the tap-along: keep the offset this device already has. */
+  const skipTap = () => finish(base.avOffsetMs, false);
+
+  const measureAgain = () => {
+    vibrationLag.current = null;
+    setAvOffsetMs(base.avOffsetMs);
+    setTapPhase('ready-vibration');
+    announce('Measure again: start with the vibration beat.');
   };
 
   // ------------------------------------------------------------ render
 
   const titleId = `${id}-title`;
+  const cancelButton = <PlainButton label="Cancel" onClick={cancel} />;
 
   let body: ReactNode;
   if (!supported) {
@@ -301,8 +408,8 @@ export function CalibrationWizard({
           Vibration calibration
         </h3>
         <p>
-          This device cannot vibrate, so there is nothing to calibrate. Everything you would feel
-          also plays as sound.
+          Calibration is for phones that vibrate, and this device is not one, so there is nothing to
+          calibrate here.
         </p>
         {onCancel && <PlainButton label="Close" onClick={onCancel} />}
       </>
@@ -314,8 +421,8 @@ export function CalibrationWizard({
           Calibrate vibration for this phone
         </h3>
         <p>
-          Three short steps, about a minute. You can skip any of them. Turn off battery saver first:
-          it can stop the phone vibrating.
+          Three short steps, about a minute. You can skip any of them; a skipped step keeps what
+          this phone already has. Turn off battery saver first: it can stop the phone vibrating.
         </p>
         <div className="flex flex-wrap gap-2">
           <button
@@ -354,7 +461,10 @@ export function CalibrationWizard({
             I felt none
           </button>
         </div>
-        <PlainButton label="Skip this step" onClick={() => go('levels')} />
+        <div className="flex flex-wrap gap-2">
+          <PlainButton label="Skip this step" onClick={() => go('levels')} />
+          {cancelButton}
+        </div>
       </>
     );
   } else if (step === 'levels') {
@@ -364,7 +474,7 @@ export function CalibrationWizard({
           {STEP_TITLE.levels}
         </h3>
         <p>
-          Play four buzzes, from weakest to strongest. Was the first, faintest one different from
+          Play four buzzes, meant to go from weakest to strongest. Was the first buzz weaker than
           the second?
         </p>
         <div className="flex flex-wrap gap-2">
@@ -374,16 +484,19 @@ export function CalibrationWizard({
         </div>
         <div role="group" aria-label="The first buzz" className="flex flex-wrap gap-2">
           <button type="button" className={buttonClass} onClick={() => answerLevels(true, true)}>
-            Yes, it was different
+            Yes, it was weaker
           </button>
           <button type="button" className={buttonClass} onClick={() => answerLevels(true, false)}>
-            No, they felt the same
+            No, the same or stronger
           </button>
           <button type="button" className={buttonClass} onClick={() => answerLevels(false, false)}>
             I did not feel the first one
           </button>
         </div>
-        <PlainButton label="Skip this step" onClick={() => answerLevels(false, false)} />
+        <div className="flex flex-wrap gap-2">
+          <PlainButton label="Skip this step" onClick={() => go('tap')} />
+          {cancelButton}
+        </div>
       </>
     );
   } else if (step === 'tap') {
@@ -399,19 +512,32 @@ export function CalibrationWizard({
         </p>
         <div className="flex flex-wrap gap-2">
           {(tapPhase === 'ready-vibration' || tapPhase === 'vibration-failed') && (
-            <button type="button" className={buttonClass} onClick={() => startBeat('vibration')}>
-              {tapPhase === 'ready-vibration' ? 'Start the vibration beat' : 'Try again'}
-            </button>
+            <PlainButton
+              buttonRef={actionButton}
+              label={tapPhase === 'ready-vibration' ? 'Start the vibration beat' : 'Try again'}
+              onClick={() => startBeat('vibration')}
+            />
           )}
-          {(tapPhase === 'ready-sound' || tapPhase === 'sound-failed') && (
-            <button type="button" className={buttonClass} onClick={() => startBeat('sound')}>
-              {tapPhase === 'ready-sound' ? 'Start the sound beat' : 'Try the sound beat again'}
-            </button>
+          {(tapPhase === 'ready-sound' ||
+            tapPhase === 'sound-failed' ||
+            tapPhase === 'no-sound') && (
+            <PlainButton
+              buttonRef={actionButton}
+              label={
+                tapPhase === 'ready-sound' ? 'Start the sound beat' : 'Try the sound beat again'
+              }
+              onClick={() => startBeat('sound')}
+            />
           )}
           {tapPhase === 'measured' && (
-            <button type="button" className={buttonClass} onClick={() => finish()}>
-              Save calibration
-            </button>
+            <>
+              <PlainButton
+                buttonRef={actionButton}
+                label="Save calibration"
+                onClick={() => finish(avOffsetMs, true)}
+              />
+              <PlainButton label="Measure again" onClick={measureAgain} />
+            </>
           )}
         </div>
         {collecting && (
@@ -432,16 +558,23 @@ export function CalibrationWizard({
           </p>
         )}
         {tapPhase === 'measured' && <p>Offset: {describeOffset(avOffsetMs)}</p>}
-        {tapPhase !== 'measured' && (
-          <PlainButton
-            label={tapPhase === 'no-sound' ? 'Save without the offset' : 'Skip this step'}
-            onClick={skipTap}
-          />
+        {tapPhase === 'no-sound' && (
+          <p>Sound is off or unavailable, so the offset cannot be measured.</p>
         )}
+        <div className="flex flex-wrap gap-2">
+          {tapPhase !== 'measured' && (
+            <PlainButton
+              label={tapPhase === 'no-sound' ? 'Save without the offset' : 'Skip this step'}
+              onClick={skipTap}
+            />
+          )}
+          {cancelButton}
+        </div>
       </>
     );
   } else {
     const cal = result?.cal;
+    const changed = measured.minMs || measured.levels || measured.offset;
     body = (
       <>
         <h3 id={titleId} ref={heading} tabIndex={-1} className="text-lg font-semibold">
@@ -449,13 +582,16 @@ export function CalibrationWizard({
         </h3>
         {cal && (
           <ul className="list-disc pl-5">
-            <li>Faintest pulse: {cal.minMs} ms</li>
             <li>
-              Strength levels: {cal.levels.length} ({cal.levels.join(', ')})
+              Faintest pulse: {cal.minMs} ms{measured.minMs ? '' : ' (kept)'}
             </li>
             <li>
-              Sound and vibration offset:{' '}
-              {offsetMeasured ? describeOffset(cal.avOffsetMs) : 'not measured (0 ms)'}
+              Strength levels: {cal.levels.length} ({cal.levels.join(', ')})
+              {measured.levels ? '' : ' (kept)'}
+            </li>
+            <li>
+              Sound and vibration offset: {describeOffset(cal.avOffsetMs)}
+              {measured.offset ? '' : ' (kept)'}
             </li>
           </ul>
         )}
@@ -466,9 +602,11 @@ export function CalibrationWizard({
           </p>
         )}
         <p>
-          {result?.saved
-            ? 'Saved on this device. You can calibrate again from the settings.'
-            : 'Could not save on this device; it applies until you close the page.'}
+          {!changed
+            ? 'Nothing was measured, so nothing changed.'
+            : result?.saved
+              ? 'Saved on this device. You can calibrate again from the settings.'
+              : 'Could not save on this device; it applies until you close the page.'}
         </p>
         {onCancel && <PlainButton label="Close" onClick={onCancel} />}
       </>
@@ -479,7 +617,8 @@ export function CalibrationWizard({
     <section aria-labelledby={titleId} className="flex flex-col gap-3">
       {body}
       <p aria-live="polite" className="sr-only">
-        {status}
+        {status.text}
+        {status.seq % 2 === 1 ? ' ' : ''}
       </p>
     </section>
   );

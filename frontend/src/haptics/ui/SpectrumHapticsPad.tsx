@@ -1,4 +1,4 @@
-// R8.6 spectrum haptics pad: drag along it (or use the arrow keys) to feel and hear the spectrum.
+// R8.6 spectrum haptics pad: drag along it (or use the keyboard) to feel and hear the spectrum.
 // x maps to λ; a tick every 8 px; absorption dips below 20% of the peak are quiet in both
 // channels. It is a slider for assistive tech: the value is λ and the value text says the flux
 // as a share of the peak, so nothing is carried by touch alone (R9). M5 lays it over the
@@ -7,7 +7,7 @@ import { useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent
 import type { SpectrumResponse } from '@/app/api/types';
 import type { HapticOutputs } from '../haptics';
 import { SpectrumHapticSource, spectrumXToLambda, type SpectrumStep } from '../sources/spectrum';
-import { SPECTRUM_QUIET_THRESHOLD } from '../tuning';
+import { PITCH_RISES_WITH_WAVELENGTH, SPECTRUM_QUIET_THRESHOLD } from '../tuning';
 import { UnlockButton } from './UnlockButton';
 
 export interface SpectrumHapticsPadProps {
@@ -27,6 +27,8 @@ const VIEW_H = 100;
 const LINE_SAMPLES = 200;
 const COLOR_LINE = '#3987e5';
 const COLOR_QUIET = '#c3c2b7';
+/** PageUp / PageDown move this many steps. */
+const PAGE_STEPS = 10;
 
 interface Readout {
   lambdaUm: number;
@@ -54,7 +56,8 @@ export function SpectrumHapticsPad({
   const padRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<DOMRect | null>(null);
   const cursorRef = useRef<SVGLineElement>(null);
-  const dragging = useRef(false);
+  /** The pointer driving the drag (one finger, or the main mouse button); null when none. */
+  const dragPointer = useRef<number | null>(null);
   const [readout, setReadout] = useState<Readout | null>(null);
 
   const source = useMemo(
@@ -92,6 +95,14 @@ export function SpectrumHapticsPad({
       </p>
     );
   }
+  // One wavelength (or a zero-width range) is a value, not a spectrum: refuse to stretch it.
+  if (mapping.count < 2 || !(l1 > l0)) {
+    return (
+      <p className={className}>
+        {objectName} has usable flux at only one wavelength, so there is no spectrum to drag along.
+      </p>
+    );
+  }
 
   /** Read the pad's box once per gesture (not per move) and map its x range onto λ. */
   const syncScale = () => {
@@ -121,31 +132,41 @@ export function SpectrumHapticsPad({
     if (s) setReadout({ lambdaUm: s.lambdaUm, text: describeStep(s) });
   };
 
+  /** jsdom and old engines may lack pointerId; one id stands for "the" pointer there. */
+  const pointerOf = (e: PointerEvent<HTMLDivElement>) => e.pointerId ?? 0;
+
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (e.isPrimary === false) return; // one finger drives the pad
+    if (dragPointer.current !== null) return; // a second finger does not take over
+    if (e.isPrimary === false) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return; // main button only
+    dragPointer.current = pointerOf(e);
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    dragging.current = true;
     syncScale();
     source.begin(e.clientX);
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (!dragging.current) return;
+    if (dragPointer.current === null || pointerOf(e) !== dragPointer.current) return;
     if (source.move(e.clientX) > 0) moveCursor(source.cursorX);
   };
-  const onPointerEnd = () => {
-    if (!dragging.current) return;
-    dragging.current = false;
+  const onPointerEnd = (e: PointerEvent<HTMLDivElement>) => {
+    if (dragPointer.current === null || pointerOf(e) !== dragPointer.current) return;
+    dragPointer.current = null;
     source.end();
     showStep();
   };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    let dir: -1 | 1;
-    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') dir = 1;
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') dir = -1;
-    else return;
+    const k = e.key;
+    let move: (() => boolean) | null = null;
+    if (k === 'ArrowRight' || k === 'ArrowUp') move = () => source.stepBy(1);
+    else if (k === 'ArrowLeft' || k === 'ArrowDown') move = () => source.stepBy(-1);
+    else if (k === 'PageUp') move = () => source.stepBy(1, PAGE_STEPS);
+    else if (k === 'PageDown') move = () => source.stepBy(-1, PAGE_STEPS);
+    else if (k === 'Home') move = () => source.jumpTo('start');
+    else if (k === 'End') move = () => source.jumpTo('end');
+    if (!move) return;
     e.preventDefault();
     syncScale();
-    if (source.stepBy(dir)) {
+    if (move()) {
       moveCursor(source.cursorX);
       showStep();
     }
@@ -159,9 +180,10 @@ export function SpectrumHapticsPad({
         <UnlockButton engine={haptics.engine} canVibrate={haptics.vibrate.supported} />
       </div>
       <p id={`${id}-help`} className="text-sm text-neutral-400">
-        Drag along the spectrum, or focus it and use the arrow keys. Each step ticks with the flux;
-        absorption dips (below {Math.round(SPECTRUM_QUIET_THRESHOLD * 100)}% of the peak) are quiet.
-        Pitch rises with wavelength.
+        Drag along the spectrum, or focus it and use the arrow keys (Page Up, Page Down, Home and
+        End jump further). Each step ticks with the flux; absorption dips (below{' '}
+        {Math.round(SPECTRUM_QUIET_THRESHOLD * 100)}% of the peak) are quiet. Pitch{' '}
+        {PITCH_RISES_WITH_WAVELENGTH ? 'rises' : 'falls'} with wavelength.
       </p>
       <div
         ref={padRef}

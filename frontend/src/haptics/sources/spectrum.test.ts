@@ -168,6 +168,16 @@ describe('SpectrumHapticSource (R8.6)', () => {
     }
   });
 
+  it('ignores non-finite positions', () => {
+    const { steps, source } = setup(dipSpectrum());
+    source.begin(Number.NaN);
+    expect(source.move(50)).toBe(0);
+    source.begin(10);
+    expect(source.move(Number.NaN)).toBe(0);
+    expect(source.move(18)).toBe(1);
+    expect(steps).toHaveLength(1);
+  });
+
   it('outside the spectrum λ range nothing plays', () => {
     const { sink, steps, source } = setup(dipSpectrum());
     source.setScale(spectrumXToLambda(0, PX, [0.1, 0.7]));
@@ -257,6 +267,31 @@ describe('keyboard stepping (R9)', () => {
     expect(source.cursorX).toBe(PX);
   });
 
+  it('a step past an edge lands on the edge, so the last pixels are reachable', () => {
+    const { steps, source } = setup(dipSpectrum());
+    source.setScale(spectrumXToLambda(0, 803, [L0, L1])); // not a multiple of 8 px
+    while (source.stepBy(1));
+    expect(steps.at(-1)!.x).toBe(803);
+    expect(steps.at(-2)!.x).toBe(800);
+    expect(steps.at(-1)!.lambdaUm).toBeCloseTo(L1, 9);
+  });
+
+  it('Home and End jump to the ends; several steps at once play only where they land', () => {
+    const { sink, steps, source } = setup(dipSpectrum());
+    expect(source.jumpTo('end')).toBe(true);
+    expect(source.cursorX).toBe(PX);
+    source.jumpTo('start');
+    expect(source.cursorX).toBe(0);
+    const before = sink.events.length;
+    expect(source.stepBy(1, 10)).toBe(true);
+    expect(source.cursorX).toBe(80);
+    expect(sink.events.length).toBe(before + 1);
+    expect(steps.at(-1)!.emitted).toBe(true);
+    expect(source.stepBy(-1, 100)).toBe(true);
+    expect(source.cursorX).toBe(0);
+    expect(source.stepBy(-1, 10)).toBe(false);
+  });
+
   it('quiet steps are silent from the keyboard too', () => {
     const { sink, steps, source } = setup(dipSpectrum());
     while (source.stepBy(1));
@@ -294,5 +329,51 @@ describe('honesty (D-21)', () => {
     clock.advance(30);
     artistic.stepBy(1);
     expect(vib.events).toHaveLength(2);
+  });
+});
+
+// R11 at phone width (Q-65). A 360 px viewport leaves about 296 px for the pad (the page and panel
+// padding). Over the full 0.75–5 µm band that is 69.6 px/µm; three quiet 8 px steps need a quiet
+// stretch of 16–24 px, i.e. 0.23–0.35 µm of λ.
+describe('R11 at phone width (360 px viewport, Q-65)', () => {
+  const PHONE_PX = 296;
+
+  /** T/Y-dwarf-like (WISE 0855): a 4–5 µm peak and a deep, broad CH₄ trough at 3.0–3.8 µm. */
+  function brownDwarfLike(): SpectrumMappingPoint[] {
+    const sig = (x: number) => 1 / (1 + Math.exp(-x));
+    const pts: SpectrumMappingPoint[] = [];
+    for (let i = 0; i <= 200; i++) {
+      const wavelength_um = L0 + ((L1 - L0) * i) / 200;
+      const trough = 0.95 * sig((wavelength_um - 2.95) / 0.05) * sig((3.85 - wavelength_um) / 0.05);
+      const flux = 100 * (1 - trough);
+      pts.push({ wavelength_um, flux, error: 1, flagged: false });
+    }
+    return pts;
+  }
+
+  function runAt(points: SpectrumMappingPoint[], domain: [number, number]) {
+    const sink = new Recorder();
+    const steps: SpectrumStep[] = [];
+    const source = new SpectrumHapticSource(sink, {
+      points,
+      tag: 'measured',
+      xToLambda: spectrumXToLambda(0, PHONE_PX, domain),
+      onStep: (s) => steps.push({ ...s }),
+    });
+    drag(source, 0, PHONE_PX);
+    return { steps, run: longestQuietRun(steps).length };
+  }
+
+  it('a broad band (brown dwarf CH₄) gives ≥ 3 quiet steps over the full band', () => {
+    expect(runAt(brownDwarfLike(), [L0, L1]).run).toBeGreaterThanOrEqual(3);
+  });
+
+  it('a narrow dip (σ 0.2 µm) gives ≥ 3 quiet steps once the pad is zoomed to 3.5–5 µm', () => {
+    expect(runAt(dipSpectrum(), [3.5, L1]).run).toBeGreaterThanOrEqual(3);
+  });
+
+  it('documents the limit: the same narrow dip over the full band is too narrow (Q-65)', () => {
+    // Quiet where 1 − 0.9·g < 0.2: |Δλ| < 0.2·√(2 ln 1.125) ≈ 0.097 µm, so 0.194 µm ≈ 13.5 px.
+    expect(runAt(dipSpectrum(), [L0, L1]).run).toBeLessThan(3);
   });
 });
