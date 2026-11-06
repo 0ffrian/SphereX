@@ -47,9 +47,21 @@ describe('every baked-type fixture plans without throwing', () => {
     }
   }
 
-  it('shader-only types give a message, not a crash', () => {
+  it('the five shader kinds get a shader plan, not a message', () => {
+    for (const k of ['planet_rocky', 'planet_water', 'gas_giant', 'nebula', 'nova'] as const) {
+      const { card, params } = fixture(k);
+      const plan = planRender(card, params, defaultContext());
+      expect(plan.threeD, k).toBe(true);
+      expect(plan.message, k).toBeNull();
+      expect(plan.shader, k).not.toBeNull();
+      expect(plan.bodies, k).toEqual([]);
+    }
+  });
+
+  it('a type with no plan gives a message, not a crash', () => {
     const { card, params } = fixture('gas_giant');
-    const plan = planRender(card, params, defaultContext());
+    const odd = { ...params, type: 'mystery' } as unknown as typeof params;
+    const plan = planRender(card, odd, defaultContext());
     expect(plan.threeD).toBe(false);
     expect(plan.message).toBe(UNSUPPORTED_MESSAGE);
   });

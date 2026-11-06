@@ -4,6 +4,7 @@
 import type { CometEpoch, ObjectType, Tag } from '@/contract';
 import { badgeForTag, HONESTY_LABEL, stateThatShows, type HonestyState } from './honesty';
 import { MODE_LABEL } from './modes';
+import { showsBody } from './planCommon';
 import type { RenderPlan, ViewModeId } from './planTypes';
 import { formatLength } from './scaleBar';
 
@@ -60,6 +61,16 @@ function colourBasis(plan: RenderPlan): string {
 
 /** Why nothing is drawn, in plain words, and the honesty state that would show it (or null). */
 export function nothingDrawnReason(plan: RenderPlan): { text: string; needs: HonestyState | null } {
+  // The generated kinds: the layer itself is an artist's impression (R7.7).
+  const layer = plan.shader
+    ? plan.missing.find((m) => m.id === 'surface' || m.id === 'point_cloud')
+    : undefined;
+  if (layer?.reason === 'honesty' && layer.tag) {
+    return {
+      text: "It is an artist's impression, so it is hidden at this level.",
+      needs: stateThatShows(layer.tag),
+    };
+  }
   const body = plan.missing.find((m) => m.id === 'body' || m.id === 'size');
   if (body?.reason === 'honesty' && body.tag) {
     return {
@@ -82,8 +93,15 @@ export function buildAltText(plan: RenderPlan): string {
   if (!plan.threeD) {
     return `${plan.name}, ${type}. ${sentence(plan.message ?? 'No 3D view.')}`;
   }
-  if (plan.bodies.length === 0) {
+  if (!showsBody(plan)) {
     return `${plan.name}, ${type}. Nothing is drawn: ${nothingDrawnReason(plan).text}`;
+  }
+  if (plan.shader) {
+    // The generated kinds: the backend's own description, and what the viewer is honest about (R5.3).
+    const alt = sentence(plan.shader.params.alt_text.trim());
+    return plan.shader.surface
+      ? `${alt} This is an artist's impression, not a measured image.`
+      : `${plan.name}, ${type}, ${sizeText(plan)}. A plain grey sphere: the surface is an artist's impression and is hidden at this level.`;
   }
   const phase =
     plan.lighting.phaseAngleDeg !== null
@@ -104,7 +122,7 @@ export function canvasLabel(plan: RenderPlan | null): string {
   const help = '3D view: drag or use the arrow keys to rotate, plus and minus to zoom, R to reset.';
   if (!plan) return `Viewer placeholder: no object loaded. ${help}`;
   // No help when there is no 3D view to operate.
-  if (!plan.threeD || plan.bodies.length === 0) return buildAltText(plan);
+  if (!plan.threeD || !showsBody(plan)) return buildAltText(plan);
   return `${buildAltText(plan)} ${help}`;
 }
 

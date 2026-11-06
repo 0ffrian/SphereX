@@ -302,12 +302,20 @@ export class PlanBuilder {
       spin: null,
       scrub: null,
       relief: 'illustrative',
+      shader: null,
       ...over,
     };
     plan.sizeWhy = sizeWhy;
     plan.extent = over.extent ?? sceneExtent(plan);
     return plan;
   }
+}
+
+/** True when the plan puts something on screen: a body, or a generated body with a part shown. */
+export function showsBody(plan: RenderPlan): boolean {
+  return (
+    plan.bodies.length > 0 || (plan.shader !== null && (plan.shader.surface || plan.shader.plain))
+  );
 }
 
 /** The largest distance from the origin to anything the plan draws (at least 1, the unit sphere). */

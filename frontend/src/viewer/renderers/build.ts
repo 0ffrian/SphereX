@@ -33,6 +33,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import type { BodyPlan, DustPlan, RenderPlan, Rgb, ShellPlan, SpinPlan } from '../planTypes';
 import { TRAIL_HALF_LENGTH } from '../planCommon';
+import { allowedTags } from '../honesty';
+import type { BodyContext, BodyRenderer } from './bodyRenderer';
+import { ShaderBody } from './ShaderBody';
 import { LIMB_DARKENING_U } from './Star';
 
 export interface BuildHooks {
@@ -40,6 +43,8 @@ export interface BuildHooks {
   onLoadFailed(layerId: string): void;
   /** Something finished loading: draw again. */
   onChange(): void;
+  /** Tests only: replaces the field and point workers, or sets slider overrides (D-27). */
+  shader?: Pick<BodyContext, 'fieldSource' | 'pointSource' | 'overrides'>;
 }
 
 /**
@@ -122,6 +127,13 @@ export interface BuiltScene {
   spinners: Object3D[];
   /** Spin rate in radians per second; 0 when nothing spins. */
   spinRate: number;
+  /** The generated body of a shader kind (haptics read its field), else null. */
+  body: BodyRenderer | null;
+  /**
+   * A new plan with the same `sceneKey` (honesty, light or mode changed): applies what changed to
+   * the body in place, so a toggle never regenerates the field. A no-op for the baked kinds.
+   */
+  update(plan: RenderPlan): void;
   dispose(): void;
 }
 
@@ -317,6 +329,26 @@ export function buildScene(
     }
   }
 
+  // Shader kinds (D-01) --------------------------------------------------------------------
+  // The plan says what is shown; the body builds its surface from the shared CPU field and keeps
+  // a plain sphere meanwhile (never blank). Honesty and light are applied by `update`.
+  let shaderBody: ShaderBody | null = null;
+  if (plan.shader) {
+    shaderBody = ShaderBody.start(plan.shader.card, plan.shader.params, {
+      visibleTags: allowedTags(plan.honesty),
+      lightDir: plan.lighting.direction ?? undefined,
+      onChange: () => {
+        if (!disposed) hooks.onChange();
+      },
+      onFailed: (id) => {
+        if (!disposed) hooks.onLoadFailed(id);
+      },
+      ...hooks.shader,
+    });
+    track(shaderBody);
+    group.add(shaderBody.object);
+  }
+
   // Gas shells and dust --------------------------------------------------------------------
   // r187 note (PointsNodeMaterial doc comment): WebGPU draws `Points` at 1 px whatever the size,
   // so a point cloud is one instanced `Sprite` whose positions come from an instanced attribute.
@@ -400,6 +432,12 @@ export function buildScene(
     group,
     spinners,
     spinRate: spinRateRadPerS(plan.spin),
+    body: shaderBody,
+    update(next) {
+      if (!shaderBody || disposed) return;
+      if (next.lighting.direction) shaderBody.setSunDirection(next.lighting.direction);
+      shaderBody.setVisibleTags(allowedTags(next.honesty));
+    },
     dispose() {
       disposed = true;
       if (!sharedCache) cache.dispose();

@@ -235,6 +235,8 @@ export function spectrumAnnouncement(o: SpectrumOutcome, name: string): string {
 
 const LAYER_NAME: Readonly<Record<string, string>> = {
   body: 'Body',
+  surface: 'Generated surface',
+  point_cloud: 'Generated cloud of points',
   mesh: 'Shape model',
   spin: 'Spin',
   material: 'Surface colour',

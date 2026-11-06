@@ -1,7 +1,7 @@
 // Types of the render plan: the pure, GPU-free description of what the viewer draws for one
 // ObjectCard + RenderParams under one honesty state, view mode and epoch. Renderers produce a
 // plan; renderers/build.ts turns it into three.js objects. Tests inspect the plan.
-import type { CometEpoch, ObjectType, Tag } from '@/contract';
+import type { CometEpoch, ObjectCard, ObjectType, RenderParams, Tag } from '@/contract';
 import type { HonestyState } from './honesty';
 import type { LightingPlan } from './lighting';
 
@@ -141,6 +141,27 @@ export interface ScrubPlan {
   flagged: number;
 }
 
+/**
+ * The shader-generated kinds (D-01: planet_rocky, planet_water, gas_giant, nebula, nova). The
+ * plan holds no geometry; `buildScene` makes a ShaderBody from `card` and `params`, which draws the
+ * surface from the shared CPU field (D-12). Everything that shows or hides it is decided here.
+ */
+export interface ShaderPlan {
+  card: ObjectCard;
+  params: RenderParams;
+  /**
+   * What the body is built from (the resolved spec: seed, field, style). Honesty, light and mode
+   * are not in it, so a change of those updates the body in place instead of regenerating the field.
+   */
+  key: string;
+  /** The generated surface (or point cloud) is shown at this honesty level. */
+  surface: boolean;
+  /** The plain grey sphere is shown: the surface is hidden and the size on the card is shown (Q-45). */
+  plain: boolean;
+  /** Camera distance that frames the body, in scene units (display value). */
+  distance: number;
+}
+
 export interface RenderPlan {
   id: string;
   type: ObjectType;
@@ -177,6 +198,8 @@ export interface RenderPlan {
   spin: SpinPlan | null;
   scrub: ScrubPlan | null;
   relief: 'measured' | 'illustrative';
+  /** Set for the shader kinds only; `bodies` is empty for them. */
+  shader: ShaderPlan | null;
 }
 
 /** User-controlled inputs of a plan, kept apart from the data. */
