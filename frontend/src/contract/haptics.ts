@@ -15,6 +15,12 @@ export type HapticKind = 'tick' | 'double' | 'heartbeat' | 'pulseTrain' | 'stop'
  */
 export type HapticVoice = 'tone' | 'click' | 'surf' | 'chime';
 
+/**
+ * Display-only hint (Q-85): whether an event is a texture or a data haptic (R8.2), for the
+ * on-screen pulse indicator and the legend labels. Every driver ignores it.
+ */
+export type HapticChannel = 'texture' | 'data';
+
 export interface HapticEvent {
   kind: HapticKind;
   strength: number;
@@ -24,6 +30,7 @@ export interface HapticEvent {
   pan?: number; // −1 (left) to 1 (right). Audio only. From the finger's x on screen
   sharpness?: number; // Optional (D-20). The web driver ignores it; a future Tauri driver (B-01) uses it
   voice?: HapticVoice; // Optional audio hint (D-12, Q-72). The vibrate driver ignores it
+  channel?: HapticChannel; // Optional display hint, texture or data (R8.2, Q-85). Drivers ignore it
 }
 
 export interface HapticDriver {

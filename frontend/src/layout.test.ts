@@ -23,6 +23,7 @@ const R10_MODULES = [
   './haptics/haptics.ts',
   './haptics/calibration.ts',
   './haptics/audioContext.ts',
+  './haptics/audioGraph.ts',
   './haptics/settings.ts',
   './haptics/platform.ts',
   './haptics/pitch.ts',

@@ -4,6 +4,7 @@
 // on the shared AudioContext's clock (currentTime + lookahead), never with timers.
 import type { HapticEvent, HapticVoice, Tag } from '@/contract';
 import { audioContextSupported, getAudioContext } from '../audioContext';
+import { getMasterBus, playBell } from '../audioGraph';
 import type { TrainCapableDriver, TrainWindow } from '../haptics';
 import { clamp01, pitchToHz } from '../pitch';
 import {
@@ -11,13 +12,6 @@ import {
   AUDIO_LOOKAHEAD_S,
   AUDIO_PEAK_GAIN,
   AUDIO_REANCHOR_TOLERANCE_S,
-  LIMITER_ATTACK_S,
-  LIMITER_RATIO,
-  LIMITER_RELEASE_S,
-  LIMITER_THRESHOLD_DB,
-  CHIME_DECAY_S,
-  CHIME_PARTIAL_GAIN,
-  CHIME_PARTIAL_RATIO,
   DEFAULT_VOLUME,
   DOUBLE_PATTERN,
   GRAIN_BANDPASS_Q,
@@ -251,21 +245,10 @@ export class AudioDriver implements TrainCapableDriver {
     if (ctx !== this.ctx) {
       this.ctx = ctx;
       this.anchor.seq = -1;
+      // The driver's volume, into the app's one master bus and limiter (audioGraph.ts).
       this.master = ctx.createGain();
       this.master.gain.value = this.vol;
-      // A limiter after the master, so overlapping sounds (chimes, dense trains) do not clip.
-      if (typeof ctx.createDynamicsCompressor === 'function') {
-        const lim = ctx.createDynamicsCompressor();
-        lim.threshold.value = LIMITER_THRESHOLD_DB;
-        lim.knee.value = 0;
-        lim.ratio.value = LIMITER_RATIO;
-        lim.attack.value = LIMITER_ATTACK_S;
-        lim.release.value = LIMITER_RELEASE_S;
-        this.master.connect(lim);
-        lim.connect(ctx.destination);
-      } else {
-        this.master.connect(ctx.destination);
-      }
+      this.master.connect(getMasterBus(ctx));
       const length = Math.max(1, Math.ceil(ctx.sampleRate * SURF_DURATION_S));
       this.noise = ctx.createBuffer(1, length, ctx.sampleRate);
       fillNoise(this.noise.getChannelData(0), NOISE_SEED);
@@ -307,17 +290,33 @@ export class AudioDriver implements TrainCapableDriver {
     pan: number | undefined,
     train: boolean,
   ): void {
-    const env = ctx.createGain();
-    const voice: Voice = { sources: [], nodes: [env], train };
-    let out: AudioNode = env;
+    const voice: Voice = { sources: [], nodes: [], train };
+    let out: AudioNode = this.master!;
     if (pan !== undefined && Number.isFinite(pan) && typeof ctx.createStereoPanner === 'function') {
       const p = ctx.createStereoPanner();
       p.pan.value = Math.max(-1, Math.min(1, pan));
-      env.connect(p);
+      p.connect(out);
       voice.nodes.push(p);
       out = p;
     }
-    out.connect(this.master!);
+
+    if (timbre.source === 'bell') {
+      // The shared bell (audioGraph.ts), also used by the Listen sweep.
+      const bell = playBell(ctx, out, {
+        freqHz: pitchToHz(pitch),
+        when,
+        gain,
+        attackS: timbre.soft ? SOFT_TONE_ATTACK_S : TONE_ATTACK_S,
+      });
+      voice.sources.push(...bell.sources);
+      voice.nodes.push(...bell.nodes);
+      this.track(voice);
+      return;
+    }
+
+    const env = ctx.createGain();
+    voice.nodes.push(env);
+    env.connect(out);
     const g = env.gain;
     g.setValueAtTime(0, when);
     let end: number;
@@ -333,25 +332,6 @@ export class AudioDriver implements TrainCapableDriver {
         osc.frequency.value = pitchToHz(pitch);
         osc.connect(env);
         voice.sources.push(osc);
-        break;
-      }
-      case 'bell': {
-        const attack = timbre.soft ? SOFT_TONE_ATTACK_S : TONE_ATTACK_S;
-        end = when + CHIME_DECAY_S;
-        g.linearRampToValueAtTime(gain, when + attack);
-        g.exponentialRampToValueAtTime(0.0001, end);
-        const f = pitchToHz(pitch);
-        const o1 = ctx.createOscillator();
-        o1.frequency.value = f;
-        o1.connect(env);
-        const o2 = ctx.createOscillator();
-        o2.frequency.value = f * CHIME_PARTIAL_RATIO;
-        const g2 = ctx.createGain();
-        g2.gain.value = CHIME_PARTIAL_GAIN;
-        o2.connect(g2);
-        g2.connect(env);
-        voice.sources.push(o1, o2);
-        voice.nodes.push(g2);
         break;
       }
       case 'grain': {
@@ -392,14 +372,18 @@ export class AudioDriver implements TrainCapableDriver {
       }
     }
 
-    const first = voice.sources[0]!;
-    first.onended = () => {
+    for (const src of voice.sources) {
+      src.start(when);
+      src.stop(end + 0.01);
+    }
+    this.track(voice);
+  }
+
+  /** Keep a sound until it ends (then disconnect it), so `stop` / `stopTrain` can cancel it. */
+  private track(voice: Voice): void {
+    voice.sources[0]!.onended = () => {
       if (this.live.delete(voice)) this.release(voice, false);
     };
-    for (const s of voice.sources) {
-      s.start(when);
-      s.stop(end + 0.01);
-    }
     this.live.add(voice);
   }
 

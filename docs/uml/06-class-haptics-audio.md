@@ -15,6 +15,7 @@ classDiagram
     +strength: 0 to 1, tag: Tag, rateHz optional
     +pitch, pan: optional, D-10, sharpness: optional, D-20
     +voice: tone, click, surf or chime, optional, Q-72
+    +channel: texture or data, optional, Q-85
   }
   class HapticDriver {
     <<interface>>
@@ -41,6 +42,7 @@ classDiagram
     +setHonesty, setStrengthMultiplier
     +setDrivers, setDriverEnabled
     +unlock() Promise of boolean
+    +unlocked: boolean
     honesty gate, then rate cap 40 per s and 25 ms ticks
     phase-continuous train scheduler, Q-71
   }
@@ -64,7 +66,14 @@ classDiagram
     <<audioContext.ts>>
     +unlockAudio() Promise of boolean
     +getAudioContext() AudioContext or null
+    +getUnlockState(), subscribeUnlockState()
     created only from a click
+  }
+  class AudioGraph {
+    <<audioGraph.ts>>
+    +getMasterBus(ctx) AudioNode
+    +playBell(ctx, dest, options) ScheduledSound
+    one limiter per context for every module
   }
   class TauriDriver {
     <<stub, B-01 post-event>>
@@ -86,14 +95,17 @@ classDiagram
   class Platform {
     <<platform.ts>>
     +defaultOutputs() hapticsOn and soundOn
+    +deviceVibrates(supported) boolean
   }
   class PulseIndicator {
     <<ui/PulseIndicator.tsx, D-20>>
-    listens to spherex:haptic, aria-hidden
+    listens to spherex:haptic
+    48 px dot aria-hidden, caption: kind, badge, channel
   }
   class UnlockButton {
     <<ui/UnlockButton.tsx>>
     click calls engine.unlock
+    shared unlock state, then a live status
   }
 
   TrainCapableDriver --|> HapticDriver
@@ -104,6 +116,7 @@ classDiagram
   AudioDriver ..|> TrainCapableDriver
   TauriDriver ..|> HapticDriver
   AudioDriver --> SharedAudioContext : schedules on currentTime
+  AudioDriver --> AudioGraph : master bus, bell
   HapticEngine --> SharedAudioContext : unlock
   HapticSettings ..> HapticEngine : enable drivers, multiplier
   HapticSettings ..> AudioDriver : volume
@@ -112,6 +125,8 @@ classDiagram
   Calibration ..> AudioDriver : offset
   HapticEngine ..> PulseIndicator : spherex haptic event after the gate
   UnlockButton --> HapticEngine : unlock
+  UnlockButton ..> SharedAudioContext : unlock state
+  UnlockButton ..> Platform : deviceVibrates
 ```
 
 ## Diagram 2: event sources
