@@ -107,7 +107,7 @@ export interface FakeAudioOptions {
   compressor?: boolean;
 }
 
-export class FakeAudioContext {
+export class FakeAudioContext extends EventTarget {
   state: AudioContextState;
   currentTime = 0;
   readonly sampleRate = 8000;
@@ -119,6 +119,7 @@ export class FakeAudioContext {
   createDynamicsCompressor?: () => FakeCompressor;
 
   constructor(options: FakeAudioOptions = {}) {
+    super();
     this.state = options.state ?? 'running';
     this.outputLatency = options.outputLatency;
     this.destination = new FakeNode(this, 'destination');
@@ -130,7 +131,14 @@ export class FakeAudioContext {
 
   async resume() {
     this.resumes++;
-    this.state = 'running';
+    this.simulateState('running');
+  }
+
+  /** Change the state as the browser would (an OS interruption, a close) and fire `statechange`. */
+  simulateState(s: AudioContextState) {
+    if (this.state === s) return;
+    this.state = s;
+    this.dispatchEvent(new Event('statechange'));
   }
   createGain() {
     return new FakeGain(this);
@@ -150,7 +158,7 @@ export class FakeAudioContext {
   }
 
   async close() {
-    this.state = 'closed';
+    this.simulateState('closed');
   }
 
   /** Every source node created, in order. */

@@ -5,6 +5,7 @@
 import type { HapticEvent, HapticVoice, Tag } from '@/contract';
 import { audioContextSupported, getAudioContext } from '../audioContext';
 import { getMasterBus, playBell } from '../audioGraph';
+import { clampTrainRate } from './webVibrate';
 import type { TrainCapableDriver, TrainWindow } from '../haptics';
 import { clamp01, pitchToHz } from '../pitch';
 import {
@@ -12,6 +13,7 @@ import {
   AUDIO_LOOKAHEAD_S,
   AUDIO_PEAK_GAIN,
   AUDIO_REANCHOR_TOLERANCE_S,
+  MAX_AUDIO_VOICES,
   DEFAULT_VOLUME,
   DOUBLE_PATTERN,
   GRAIN_BANDPASS_Q,
@@ -136,7 +138,13 @@ export class AudioDriver implements TrainCapableDriver {
   /** R8.7 volume, 0–1. */
   setVolume(v: number): void {
     this.vol = clamp01(v);
-    if (this.master && this.ctx) this.master.gain.setValueAtTime(this.vol, this.ctx.currentTime);
+    if (this.master && this.ctx) {
+      // A slider drag calls this often: replace the scheduled value instead of piling events up.
+      const g = this.master.gain;
+      const t = this.ctx.currentTime;
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(this.vol, t);
+    }
   }
 
   get volume(): number {
@@ -178,8 +186,8 @@ export class AudioDriver implements TrainCapableDriver {
         break;
       case 'pulseTrain': {
         // R8.8 fallback, without phase: one window from now. The engine sends playTrain instead.
-        const rate = e.rateHz ?? 0;
-        if (!(rate > 0)) return;
+        const rate = clampTrainRate(e.rateHz);
+        if (rate === null) return;
         const onsets: number[] = [];
         for (let t = 0; t < TRAIN_WINDOW_MS; t += 1000 / rate) onsets.push(t);
         this.playEvent(onsets, e);
@@ -243,6 +251,9 @@ export class AudioDriver implements TrainCapableDriver {
     const ctx = this.getContext();
     if (!ctx || ctx.state !== 'running') return null;
     if (ctx !== this.ctx) {
+      // Sounds of a previous (closed) context never end there: drop and disconnect them.
+      for (const v of this.live) this.release(v, true);
+      this.live.clear();
       this.ctx = ctx;
       this.anchor.seq = -1;
       // The driver's volume, into the app's one master bus and limiter (audioGraph.ts).
@@ -380,10 +391,21 @@ export class AudioDriver implements TrainCapableDriver {
   }
 
   /** Keep a sound until it ends (then disconnect it), so `stop` / `stopTrain` can cancel it. */
+  /**
+   * Keep a sound until all its sources have ended (then disconnect it), so `stop` / `stopTrain`
+   * can cancel it. At most MAX_AUDIO_VOICES live at once: the oldest is cut first.
+   */
   private track(voice: Voice): void {
-    voice.sources[0]!.onended = () => {
-      if (this.live.delete(voice)) this.release(voice, false);
+    let playing = voice.sources.length;
+    const ended = () => {
+      if (--playing === 0 && this.live.delete(voice)) this.release(voice, false);
     };
+    for (const src of voice.sources) src.onended = ended;
+    while (this.live.size >= MAX_AUDIO_VOICES) {
+      const oldest = this.live.values().next().value as Voice;
+      this.live.delete(oldest);
+      this.release(oldest, true);
+    }
     this.live.add(voice);
   }
 

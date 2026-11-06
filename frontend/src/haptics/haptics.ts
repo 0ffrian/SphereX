@@ -120,8 +120,13 @@ interface Train {
   /** The last pulse that had already been sent when the one-shot cancelled the pattern. */
   resendTo: number;
   timer: unknown;
+  /** Engine-clock time the pending timer fires. */
+  wakeAt: number;
   readonly seq: number;
 }
+
+/** updateTrain moves a pending timer only when its fire time changes by more than this (ms). */
+const RESCHEDULE_SLACK_MS = 5;
 
 const ONE_SECOND_MS = 1000;
 const MAX_PULSES_PER_WINDOW = Math.ceil(
@@ -338,6 +343,7 @@ export class HapticEngine {
       resendFrom: null,
       resendTo: -Infinity,
       timer: null,
+      wakeAt: -Infinity,
       seq: ++this.trainSeq,
     };
     this.issueWindow(this.train);
@@ -353,19 +359,30 @@ export class HapticEngine {
   updateTrain(id: string, changes: Partial<TrainParams>): boolean {
     const t = this.train;
     if (!t || t.id !== id) return false;
-    const next: TrainParams = { ...t.p, ...changes };
-    if (!Number.isFinite(next.strength)) return false;
-    const rate = clampRate(next.rateHz);
-    if (rate === null || !isTagShown(this.honestyState, next.tag)) {
+    // Called on nearly every pointer move: validate, then change in place (no allocation).
+    const strength = changes.strength ?? t.p.strength;
+    if (!Number.isFinite(strength)) return false;
+    const rateHz = changes.rateHz ?? t.p.rateHz;
+    const tag = changes.tag ?? t.p.tag;
+    const rate = clampRate(rateHz);
+    if (rate === null || !isTagShown(this.honestyState, tag)) {
       this.stopTrain();
       return false;
     }
-    t.p = next;
+    const p = t.p;
+    p.strength = strength;
+    p.rateHz = rateHz;
+    p.tag = tag;
+    if ('pitch' in changes) p.pitch = changes.pitch;
+    if ('pan' in changes) p.pan = changes.pan;
+    if ('voice' in changes) p.voice = changes.voice;
+    if ('channel' in changes) p.channel = changes.channel;
     const period = ONE_SECOND_MS / rate;
     if (period !== t.periodMs) {
       t.periodMs = period;
       if (t.resendFrom === null && t.lastPulse !== null) {
-        this.schedule(t, Math.max(this.clock(), t.lastPulse + period - this.lead(t)));
+        const at = Math.max(this.clock(), t.lastPulse + period - this.lead(t));
+        if (t.timer === null || Math.abs(at - t.wakeAt) > RESCHEDULE_SLACK_MS) this.schedule(t, at);
       }
     }
     return true;
@@ -445,7 +462,9 @@ export class HapticEngine {
 
   private schedule(t: Train, at: number): void {
     if (t.timer !== null) this.timers.clearTimeout(t.timer);
-    const delay = Math.max(0, at - this.clock());
+    const now = this.clock();
+    const delay = Math.max(0, at - now);
+    t.wakeAt = now + delay;
     t.timer = this.timers.setTimeout(() => {
       t.timer = null;
       if (this.train === t) this.issueWindow(t);

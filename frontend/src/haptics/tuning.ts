@@ -104,6 +104,8 @@ export const AUDIO_PEAK_GAIN = 0.5;
 export const AUDIO_FLOOR_STRENGTH = 0.08;
 /** Default volume setting (R8.7 settings). CREATIVE placeholder — Atish to decide (D-13). */
 export const DEFAULT_VOLUME = 0.7;
+/** Engineering: at most this many sounds are scheduled or playing at once; the oldest is cut. */
+export const MAX_AUDIO_VOICES = 32;
 /** Engineering: a train's audio clock anchor is reset when it drifts by more than this (s). */
 export const AUDIO_REANCHOR_TOLERANCE_S = 0.05;
 /** Engineering: limiter on the audio master so overlapping sounds do not clip. */
