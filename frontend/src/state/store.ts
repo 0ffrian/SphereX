@@ -12,6 +12,7 @@ import { clampIndex, DEFAULT_FPS, nextIndex, type Fps } from '@/app/flipbook/pla
 import { formatCoords, formatUtc, formatWavelength } from '@/app/format';
 import { spectrumAnnouncement } from '@/app/messages';
 import { summarizeSpectrum } from '@/app/refusals';
+import { isValidOverride, type Overrides, type SliderKey } from '@/physics/sliders';
 
 /**
  * Honesty toggle (D-21, R5.3): Measured only, + Estimated, + Artistic. The value names the most
@@ -20,12 +21,8 @@ import { summarizeSpectrum } from '@/app/refusals';
  */
 export type HonestyState = 'measured' | 'derived' | 'artistic';
 
-/**
- * D-02 client-side overrides: field name → user value.
- * ASSUMPTION: value types are not specified (sliders may be numbers, colours or flags) and the
- * allowed keys on baked bodies are open (Q-03), so values are `unknown` until those are settled.
- */
-export type Overrides = Readonly<Record<string, unknown>>;
+/** D-02 / D-27 client-side overrides: slider key → value in card units (`@/physics/sliders`). */
+export type { Overrides } from '@/physics/sliders';
 
 /** What the status line reports about the 3D renderer. */
 export type RendererStatus = 'starting' | RendererBackend | 'unavailable';
@@ -159,7 +156,12 @@ export interface AppActions {
   setObject(card: ObjectCard, params: RenderParams): void;
   clearObject(): void;
   setHonesty(state: HonestyState): void;
-  setOverride(key: string, value: unknown): void;
+  /**
+   * D-27: only registered slider keys type-check. A value is stored only when a card is loaded and
+   * `isValidOverride` accepts it for the card's type (applies, finite, in range); otherwise the
+   * call is a no-op. `undefined` clears that one slider so its data value shows again.
+   */
+  setOverride(key: SliderKey, value: number | boolean | undefined): void;
   /** D-02 Reset: drop every user edit so the card's data values show again. */
   resetOverrides(): void;
   setRendererStatus(status: RendererStatus): void;
@@ -206,7 +208,17 @@ export const useAppStore = create<AppStore>()((set, get) => {
     setObject: (card, params) => set({ card, params, overrides: {} }),
     clearObject: () => set({ card: null, params: null, overrides: {} }),
     setHonesty: (honesty) => set({ honesty }),
-    setOverride: (key, value) => set((s) => ({ overrides: { ...s.overrides, [key]: value } })),
+    setOverride: (key, value) =>
+      set((s) => {
+        if (value === undefined) {
+          if (!(key in s.overrides)) return s;
+          const rest = { ...s.overrides };
+          delete rest[key];
+          return { overrides: rest };
+        }
+        if (!s.card || !isValidOverride(s.card.type, key, value)) return s;
+        return { overrides: { ...s.overrides, [key]: value } };
+      }),
     resetOverrides: () => set({ overrides: {} }),
     setRendererStatus: (rendererStatus) => set({ rendererStatus }),
 

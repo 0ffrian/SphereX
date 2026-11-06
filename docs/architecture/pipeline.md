@@ -90,6 +90,8 @@ The backend builds the **ObjectCard**: every known value for the object, each as
 
 Pure functions that turn measured values into `derived` values, each with its stated formula ([section 7](physics.md#a7-physics-layer)). The backend fills them into the card. In the browser the same functions rerun on every slider change against the `overrides` ([section 5.3](data-contract.md#a53-overrides)). The result is never written back to the card as truth.
 
+- **Status:** Built in the browser only (`frontend/src/physics/`, issue #13). The backend half is not built (Q-45).
+
 ### A4.7 Stage 7: RenderParams
 
 The backend turns the ObjectCard into **RenderParams** with deterministic rules (rendering doc §3.4, §6.2). The frontend renders RenderParams only. RenderParams lists the layers (each with a tag), texture URLs, lighting, view modes, the haptic profile, the alt text and the layers refused for `missing` data.
