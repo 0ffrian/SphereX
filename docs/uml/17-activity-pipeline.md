@@ -69,4 +69,4 @@ flowchart TD
 - The physics layer is "reduced, physically inspired" formulas (architecture spec §7); its outputs are tagged `derived`.
 - Every external call in this flow goes through the backend's read-through cache (D-25). With `SX_OFFLINE=1` a cache miss is refused, and the refused layer goes in `missing`.
 - Small-body names are numbered asteroids, provisional designations, comets and interstellar objects (D-19).
-- As built (issue #5): the saved-asset check runs before stage 3, as in A4.4's pseudocode, so a saved asset skips classification. Stage 3 takes the class label from the catalogue only; spectrum matching and Gaia colours are not built (Q-50). Generated assets are saved only when their inputs are final (Q-52).
+- As built (issue #5): the saved-asset check runs before stage 3, as in A4.4's pseudocode, so a saved asset skips classification. Stage 3 takes the class label from the catalogue only; spectrum matching and Gaia colours are not built (Q-55). Generated assets are saved only when their inputs are final (Q-57).

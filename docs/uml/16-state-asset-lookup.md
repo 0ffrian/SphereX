@@ -16,7 +16,7 @@ stateDiagram-v2
 
   state "Look up asset" as Lookup
   state "saved" as Saved
-  state "Ignored with a warning (Q-52)" as Rejected
+  state "Ignored with a warning (Q-57)" as Rejected
   state "generated" as Generated
   state "sketch" as Sketch
   state "Stored" as Stored
@@ -24,8 +24,8 @@ stateDiagram-v2
   Saved --> Loaded : load it
   Generated --> Stored : build from catalogues + spectrum, save if inputs final
   Sketch --> Stored : build from SPHEREx only, save if inputs final
-  Generated --> Loaded : inputs not final, not saved (Q-52)
-  Sketch --> Loaded : inputs not final, not saved (Q-52)
+  Generated --> Loaded : inputs not final, not saved (Q-57)
+  Sketch --> Loaded : inputs not final, not saved (Q-57)
   Stored --> Loaded
   Loaded --> [*]
 
@@ -83,4 +83,4 @@ stateDiagram-v2
 - The architecture spec puts generated assets and the user's `overrides` in browser IndexedDB; `overrides` are never sent to the server (D-22). The backend texture cache is separate, and so is the read-through cache of external calls (D-25).
 - Bumping `generator_version` does not delete old entries; it changes the key. Clean-up is not specified.
 - Baking failures are not specified **[verify]**.
-- As built (issue #5): a `generated` or `sketch` asset is stored only when its inputs are final (a spectrum from a complete frame list, and a catalogue match or typed coordinates); otherwise it is rebuilt on every request (Q-52). The status reaches the client as the `X-SX-Asset-Status` header (Q-39). Pre-baked assets live in `backend/assets/<type>/<id>.json` (`SX_ASSETS_DIR`); generated ones in the D-25 cache as `derived.asset`, keyed by id, data release, `ASSET_VERSION` and `GENERATOR_VERSION`. A saved or pre-baked asset whose card or params id is not the requested id, whose card and params disagree on `type`, or that fails the `jsonschema` check is ignored with a warning and rebuilt from the catalogues, never returned as an error (the Rejected state). This differs from A5.4, which puts generated assets in IndexedDB (Q-52).
+- As built (issue #5): a `generated` or `sketch` asset is stored only when its inputs are final (a spectrum from a complete frame list, and a catalogue match or typed coordinates); otherwise it is rebuilt on every request (Q-57). The status reaches the client as the `X-SX-Asset-Status` header (Q-39). Pre-baked assets live in `backend/assets/<type>/<id>.json` (`SX_ASSETS_DIR`); generated ones in the D-25 cache as `derived.asset`, keyed by id, data release, `ASSET_VERSION` and `GENERATOR_VERSION`. A saved or pre-baked asset whose card or params id is not the requested id, whose card and params disagree on `type`, or that fails the `jsonschema` check is ignored with a warning and rebuilt from the catalogues, never returned as an error (the Rejected state). This differs from A5.4, which puts generated assets in IndexedDB (Q-57). A saved asset whose card type is `candidate` is reported as `sketch`, not `saved`, so the "Sketch from SPHEREx only" label survives the save; a saved generated asset reports the `fetched_at` of its cache entry as `X-SX-Cached-At` (PR #34 review).

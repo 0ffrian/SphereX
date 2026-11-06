@@ -23,7 +23,7 @@ flowchart TD
   PlanetCut --> Rocky["planet_rocky"]
   PlanetCut --> Water["planet_water"]
   PlanetCut --> Giant["gas_giant"]
-  PlanetCut -->|"cut-offs not agreed (Q-51): refused, type:exoplanet_thresholds in missing"| Slider
+  PlanetCut -->|"cut-offs not agreed (Q-56): refused, type:exoplanet_thresholds in missing"| Slider
   Exoq -->|no| Slider{"Built from user sliders?"}
   Slider -->|nebula| Neb["nebula"]
   Slider -->|nova| Nova["nova"]
@@ -55,4 +55,4 @@ flowchart TD
 - For orientation only, not a type rule: brown dwarf spectral types are roughly L above ~1,400 K, T from ~1,400 K to 500 K, Y below ~500 K (architecture spec §7.3, approximate).
 - The old architecture-spec kinds map as `dwarf` → `brown_dwarf` and `asteroid` → `asteroid_shape` or `asteroid_procedural` (D-04).
 - Stars are self-lit and drawn from their own data (blackbody colour, limb darkening), not from the shader generators; they are grouped with the rendering-doc renderers because they follow the rendering doc, not the browser-shader path. Only types that need procedural maps (for example `asteroid_procedural`, brown dwarf bands) are baked.
-- As built (issue #5, `backend/app/core/classify/rules.py`): SIMBAD otypes are `BD*` (brown dwarf), `Mi*` (Mira), `TT*` (T Tauri), and any otype ending in `*` plus `s*r`, `s*y`, `s*b`, `Y*O` (other star); "known components" means a composite spectral type with `+` (Q-50). The shape-model list is empty, so every asteroid is `asteroid_procedural` (Q-50). Every exoplanet threshold is `None`, so a planet match is refused and falls through to sliders, then `candidate` (Q-51); no Exoplanet Archive adapter exists yet.
+- As built (issue #5, `backend/app/core/classify/rules.py`): SIMBAD otypes are `BD*` (brown dwarf), `Mi*` (Mira), `TT*` (T Tauri), and any otype ending in `*` plus `s*r`, `s*y`, `s*b`, `Y*O` (other star); "known components" means a composite spectral type with `+` (Q-55). The shape-model list is empty, so every asteroid is `asteroid_procedural` (Q-55). Every exoplanet threshold is `None`, so a planet match is refused and falls through to sliders, then `candidate` (Q-56); no Exoplanet Archive adapter exists yet.
