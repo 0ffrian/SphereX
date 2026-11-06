@@ -214,7 +214,12 @@ export class ViewerApp {
   ): Promise<BodyRenderer | null> {
     const token = ++this.bodyToken;
     const pending = createBodyRenderer(card, params, ctx);
-    if (!pending) return null;
+    if (!pending) {
+      // No renderer for this type: drop the previous body so it is not shown as this object.
+      this.clearBody();
+      this.requestRender();
+      return null;
+    }
     const next = await pending;
     if (this.disposed || token !== this.bodyToken) {
       next.dispose();

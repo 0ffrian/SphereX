@@ -321,8 +321,15 @@ function buildGas(spec: ShaderSpec, field: FieldData, textures: DataTexture[]): 
 /** One instanced Sprite per point set (WebGPU Points are 1 px; Sprite + instancing honours size). */
 function pointSprite(set: PointSet, size: number, opacity: number, additive: boolean): Sprite {
   const mat = new PointsNodeMaterial();
-  mat.positionNode = instancedBufferAttribute(new InstancedBufferAttribute(set.positions, 3));
-  const color: any = instancedBufferAttribute(new InstancedBufferAttribute(set.colors, 3));
+  const posAttr = new InstancedBufferAttribute(set.positions, 3);
+  const colAttr = new InstancedBufferAttribute(set.colors, 3);
+  // Standalone attributes are not freed by geometry.dispose(); free them with the material (D-05).
+  mat.addEventListener('dispose', () => {
+    posAttr.dispose();
+    colAttr.dispose();
+  });
+  mat.positionNode = instancedBufferAttribute(posAttr);
+  const color: any = instancedBufferAttribute(colAttr);
   // Soft round dot from the sprite quad's uv.
   const falloff = smoothstep(0.5, 0.0, length(uv().sub(0.5)));
   mat.colorNode = vec4(color, 1);
