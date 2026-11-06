@@ -6,6 +6,7 @@
 //   published result shows one, and the card holds no such field, so it is never drawn.
 //   Epoch toggle: Aug 2025 / Dec 2025.
 import type { CometEpoch, GasQ, ObjectCard } from '@/contract';
+import { isTagShown } from '../honesty';
 import { isPresent, litBody, numberField, PlanBuilder, type PlanInput } from '../planCommon';
 import type { RenderPlan, ShellPlan, Vec3 } from '../planTypes';
 
@@ -16,15 +17,20 @@ export const EPOCH_LABEL: Readonly<Record<CometEpoch, string>> = {
   '2025-12': 'Dec 2025',
 };
 
-/** Display budget: R5.5 allows up to 60k points, shared by three gases. All values here are artistic. */
-export const MAX_SHELL_POINTS = 20_000;
+/**
+ * Display budget. R5.5 allows at most 60k points in total: three gas shells plus the dust cloud.
+ * 3 x 18,000 + 6,000 = 60,000. All values here are artistic.
+ */
+export const MAX_SHELL_POINTS = 18_000;
+export const DUST_POINTS = 6000;
+/** R5.5: points <= 60k, for every gas at its maximum plus the dust. */
+export const MAX_TOTAL_POINTS = 60_000;
 /** Inner edge of the 1/r^2 profile, as a fraction of the coma radius (avoids the r = 0 singularity). */
 export const SHELL_INNER_FRACTION = 0.03;
 /** Smallest nucleus radius drawn, in scene units (coma radius = 1), so it stays visible. */
 export const MIN_NUCLEUS_SCENE_RADIUS = 0.02;
 /** Nucleus radius in scene units when the coma radius is unknown, so there is no ratio to use. */
 const NUCLEUS_ALONE_SCENE_RADIUS = 0.5;
-export const DUST_POINTS = 6000;
 /** Dark nucleus colour: a display default, not a measured albedo. */
 const NUCLEUS_TINT: [number, number, number] = [0.06, 0.06, 0.06];
 
@@ -40,15 +46,16 @@ type EpochKeyedGasQ = Partial<Record<CometEpoch, GasQ>>;
 
 /**
  * Q of the selected epoch. ASSUMPTION (Q-42 is open): a card either keys `gas_Q` by epoch (the
- * Q-42 proposal) or holds one epoch's Q in the R3.2 shape, which then applies only to the epochs
- * listed in `epochs`. Anything else gives null: no Q is guessed for an epoch.
+ * Q-42 proposal) or holds one epoch's Q in the R3.2 shape. The R3.2 shape belongs to an epoch
+ * only when `epochs` has exactly one entry and it is that epoch. With both epochs listed, one
+ * set of values cannot be assigned to either, so the result is null: no Q is guessed (R7.3).
  */
 export function gasQForEpoch(card: ObjectCard, epoch: CometEpoch): GasQ | null {
   const q = card.gas_Q;
   if (!q) return null;
   const keyed = q as EpochKeyedGasQ;
   if (COMET_EPOCHS.some((e) => e in keyed)) return keyed[epoch] ?? null;
-  return card.epochs?.includes(epoch) ? q : null;
+  return card.epochs?.length === 1 && card.epochs[0] === epoch ? q : null;
 }
 
 function qValue(q: GasQ | null, key: 'co2' | 'h2o' | 'co'): number | null {
@@ -105,21 +112,38 @@ export function planComet(input: PlanInput): RenderPlan {
   let shells: ShellPlan[] = [];
   const layer = params.layers.find((l) => l.id === 'gas_shells');
   if (layer && b.ready('gas_shells') && isPresent(card.gas_Q) && !hasQ) {
-    b.refuseForEpoch('gas_shells', epoch);
+    // R3.2 shape with both epochs listed: one set of values, two epochs. Never guessed (R7.3).
+    const ambiguous =
+      !COMET_EPOCHS.some((e) => e in (card.gas_Q as object)) && (card.epochs?.length ?? 0) > 1;
+    b.refuseForEpoch(
+      'gas_shells',
+      epoch,
+      ambiguous
+        ? 'The card lists both epochs but holds one set of gas values, so they cannot be assigned to an epoch.'
+        : 'The card has no gas measurements for this epoch.',
+    );
   } else if (
     b.draw('gas_shells', { swatches: GAS_STYLE.map((g) => ({ label: g.label, css: g.css })) })
   ) {
     shells = planShells(card, epoch, params.seed);
   }
-  const comaDrawn = shells.length > 0;
 
-  // Nucleus: a dark sphere at the upper size limit; a point if the value is missing.
+  // Nucleus: a dark sphere at the upper size limit; a point if the value is missing or hidden.
   const nucleusKm = numberField(card, 'nucleus_radius_km_max');
   const comaKm = numberField(card, 'coma_radius_km');
   const nucleusDrawn = b.draw('nucleus');
+  const nucleusTv = card.nucleus_radius_km_max;
   let nucleusScene = MIN_NUCLEUS_SCENE_RADIUS;
-  if (nucleusDrawn && nucleusKm !== null) {
-    if (comaDrawn && comaKm !== null && comaKm > 0) {
+  // The size value has its own tag; a size the honesty state hides is not shown anywhere.
+  const sizeShown =
+    nucleusDrawn &&
+    nucleusKm !== null &&
+    nucleusTv !== undefined &&
+    isTagShown(ctx.honesty, nucleusTv.tag);
+  if (sizeShown) {
+    if (comaKm !== null && comaKm > 0) {
+      // Sized against the coma radius whether or not the gas shells are drawn, so the nucleus
+      // does not change size when the epoch or honesty level changes.
       const ratio = nucleusKm / comaKm;
       nucleusScene = Math.max(ratio, MIN_NUCLEUS_SCENE_RADIUS);
       if (ratio < MIN_NUCLEUS_SCENE_RADIUS)
@@ -128,15 +152,21 @@ export function planComet(input: PlanInput): RenderPlan {
         );
     } else {
       nucleusScene = NUCLEUS_ALONE_SCENE_RADIUS;
+      b.notes.push('The nucleus is not drawn to scale: the coma size is not known.');
     }
     b.notes.push('The nucleus size is an upper limit.');
+  } else if (
+    (nucleusDrawn && nucleusKm !== null) ||
+    b.missing.find((m) => m.id === 'nucleus')?.reason === 'honesty'
+  ) {
+    b.notes.push('The nucleus size is hidden at this level, so the nucleus is drawn as a point.');
   } else {
     b.notes.push('The nucleus size is not known, so it is drawn as a point.');
   }
 
   // Dust: December only. Sun-pointing. Never invented for August.
   let dust: RenderPlan['dust'] = null;
-  if (epoch !== '2025-12') b.refuseForEpoch('dust', epoch);
+  if (epoch !== '2025-12') b.refuseForEpoch('dust', epoch, 'Dust is drawn for December 2025 only.');
   else if (b.draw('dust')) {
     const dir: Vec3 = b.lighting.direction ?? [1, 0, 0];
     dust = {
@@ -166,7 +196,13 @@ export function planComet(input: PlanInput): RenderPlan {
     dust,
     epoch,
     epochs,
-    sizeTag: nucleusDrawn ? (card.nucleus_radius_km_max?.tag ?? null) : null,
+    sizeTag: sizeShown ? (nucleusTv?.tag ?? null) : null,
+    // R7.3: the size is an upper limit, never a measured radius.
+    sizeQualifier: sizeShown ? 'upper_limit' : null,
+    sizeWhy: nucleusTv
+      ? (nucleusTv.formula ?? nucleusTv.assumption ?? nucleusTv.source ?? null)
+      : null,
+    tintUsed: dust !== null,
     relief: 'illustrative',
   });
 }

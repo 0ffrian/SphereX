@@ -4,7 +4,9 @@
 //   backend (R6) and only loaded here. Measured-only state: plain sphere with a flat tint.
 //   Displacement (desktop only) is not implemented: the normal map carries the relief.
 import { ellipsoidAxes, litBody, numberField, PlanBuilder, type PlanInput } from '../planCommon';
-import type { RenderPlan } from '../planTypes';
+import type { RenderPlan, Rgb } from '../planTypes';
+
+const WHITE: Rgb = [1, 1, 1];
 
 export function planAsteroidProcedural(input: PlanInput): RenderPlan {
   const b = new PlanBuilder(input);
@@ -13,7 +15,7 @@ export function planAsteroidProcedural(input: PlanInput): RenderPlan {
 
   // R6.2: a/b = 10^(0.4 A), c = b (model_dependent). Hidden or refused: plain sphere.
   const ellipsoid = b.draw('ellipsoid');
-  const albedo = b.draw('albedo_map', { asset: tex?.albedo ?? null });
+  const albedo = b.drawBaked('albedo_map', tex?.albedo);
   const relief = b.draw('relief', { asset: tex?.normal ?? null });
   if (!bodyOk) b.dropDrawn();
 
@@ -26,7 +28,8 @@ export function planAsteroidProcedural(input: PlanInput): RenderPlan {
   return b.build({
     bodies: bodyOk
       ? [
-          litBody('body', axes ?? [1, 1, 1], b.tint.rgb, {
+          // The baked albedo already holds the colour; the tint is then white (not applied twice).
+          litBody('body', axes ?? [1, 1, 1], albedo ? WHITE : b.tint.rgb, {
             segments: [256, 128],
             albedoUrl: albedo ? (tex?.albedo ?? null) : null,
             normalUrl: relief ? (tex?.normal ?? null) : null,

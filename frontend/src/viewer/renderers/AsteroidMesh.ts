@@ -15,12 +15,13 @@ export const SPIN_SPEEDUP = 1000;
 const MESH_EXTENSIONS = /\.(glb|gltf|obj)(\?.*)?$/i;
 
 /**
- * ASSUMPTION: `shape_source` is "URL/DOI of mesh" (R3.2) and the renderer can only load a mesh
- * file it can fetch: an http(s) or same-origin path ending in .glb, .gltf or .obj.
+ * ASSUMPTION (Q-44): `shape_source` is "URL/DOI of mesh" (R3.2) and the renderer loads a mesh only
+ * from a same-origin path (`/…` or `./…`) ending in .glb, .gltf or .obj. An http(s) address would
+ * bypass the backend cache (D-25) and fail offline, so it is a refused layer, not fetched.
  */
 export function isLoadableMeshUrl(value: string | null | undefined): value is string {
   if (!value) return false;
-  if (!/^(https?:\/\/|\/|\.\/)/.test(value)) return false;
+  if (!/^(\/(?!\/)|\.\/)/.test(value)) return false;
   return MESH_EXTENSIONS.test(value);
 }
 

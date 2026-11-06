@@ -25,6 +25,9 @@ export interface ScaleBar {
   /** Diameter of the body in metres (2 x scale_m). */
   diameterM: number;
   diameterText: string;
+  /** "2 km across", or "at most 2 km across" for an upper limit. */
+  headline: string;
+  qualifier: 'upper_limit' | null;
   comparison: { id: string; name: string; detail: string; lengthM: number; text: string };
   /** Bar lengths as fractions of the longer of the two (0 to 1], so both fit on screen. */
   bodyFraction: number;
@@ -61,19 +64,27 @@ export function pickComparison(diameterM: number): Offered {
 }
 
 /** `scaleM` is RenderParams.scale_m, the physical radius in metres; null = unknown, no bar. */
-export function scaleBarFor(scaleM: number | null): ScaleBar | null {
+export function scaleBarFor(
+  scaleM: number | null,
+  qualifier: 'upper_limit' | null = null,
+): ScaleBar | null {
   if (scaleM === null || !Number.isFinite(scaleM) || scaleM <= 0) return null;
   const diameterM = 2 * scaleM;
   const c = pickComparison(diameterM);
   const ratio = diameterM / c.lengthM;
+  // An upper limit is a bound, so the comparison is a bound too: "at most about ...".
+  const atMost = qualifier === 'upper_limit' ? 'at most ' : '';
   let text: string;
-  if (ratio >= 0.95 && ratio <= 1.05) text = `about the same size as ${c.name} (${c.detail})`;
-  else if (ratio > 1) text = `about ${sig(ratio)} times ${c.name} (${c.detail})`;
-  else text = `about 1/${sig(1 / ratio)} of ${c.name} (${c.detail})`;
+  if (ratio >= 0.95 && ratio <= 1.05)
+    text = `${atMost}about the same size as ${c.name} (${c.detail})`;
+  else if (ratio > 1) text = `${atMost}about ${sig(ratio)} times ${c.name} (${c.detail})`;
+  else text = `${atMost}about 1/${sig(1 / ratio)} of ${c.name} (${c.detail})`;
   const longest = Math.max(diameterM, c.lengthM);
   return {
     diameterM,
     diameterText: formatLength(diameterM),
+    headline: `${qualifier === 'upper_limit' ? 'At most ' : ''}${formatLength(diameterM)} across`,
+    qualifier,
     comparison: { id: c.id, name: c.name, detail: c.detail, lengthM: c.lengthM, text },
     bodyFraction: diameterM / longest,
     comparisonFraction: c.lengthM / longest,

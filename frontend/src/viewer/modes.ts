@@ -1,7 +1,7 @@
 // R5.2 view modes (visible / SPHEREx infrared) using the D-23 VisibleMode / IRMode fields.
 // Pure functions. A mode that is not available is listed in `missing`, never faked.
 import type { ObjectType, RenderParams, VisibleMode } from '@/contract';
-import { isTagShown, type HonestyState } from './honesty';
+import { DEFAULT_HONESTY, isTagShown, type HonestyState } from './honesty';
 import type { MissingItem, ModeInfo, Rgb, Tint, ViewModeId } from './planTypes';
 
 export const MODE_LABEL: Readonly<Record<ViewModeId, string>> = {
@@ -60,23 +60,36 @@ export function resolveModes(params: RenderParams): { modes: ModeInfo[]; missing
   return { modes, missing };
 }
 
-/** R7.4: brown dwarfs are almost black in visible light, so they open in the infrared view. */
-export function defaultMode(type: ObjectType, modes: readonly ModeInfo[]): ViewModeId | null {
+/**
+ * R7.4: brown dwarfs open in the infrared view (almost black in visible light). R5.3: Measured
+ * only shows a flat measured tint, so when the honesty state hides the preferred mode's colour, a
+ * usable mode whose colour passes the state is preferred over plain grey.
+ */
+export function defaultMode(
+  type: ObjectType,
+  modes: readonly ModeInfo[],
+  honesty: HonestyState = DEFAULT_HONESTY,
+): ViewModeId | null {
   const usable = (id: ViewModeId) => modes.find((m) => m.id === id)?.available === true;
+  const shown = (id: ViewModeId) => {
+    const tag = modes.find((m) => m.id === id)?.tag;
+    return tag != null && isTagShown(honesty, tag);
+  };
   const order: ViewModeId[] =
     type === 'brown_dwarf' || type === 'brown_dwarf_binary'
       ? ['spherex_ir', 'visible']
       : ['visible', 'spherex_ir'];
-  return order.find(usable) ?? null;
+  return order.find((id) => usable(id) && shown(id)) ?? order.find(usable) ?? null;
 }
 
 export function chooseMode(
   requested: ViewModeId | null,
   type: ObjectType,
   modes: readonly ModeInfo[],
+  honesty: HonestyState = DEFAULT_HONESTY,
 ): ViewModeId | null {
   if (requested && modes.find((m) => m.id === requested)?.available) return requested;
-  return defaultMode(type, modes);
+  return defaultMode(type, modes, honesty);
 }
 
 /** Colour of the body in a mode. A tint whose tag the honesty state hides becomes plain grey. */

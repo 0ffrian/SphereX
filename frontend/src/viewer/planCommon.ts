@@ -8,6 +8,9 @@ import { planLighting } from './lighting';
 import { chooseMode, resolveModes, resolveTint } from './modes';
 import type { LegendEntry, MissingItem, PlanContext, RenderPlan, Rgb, Vec3 } from './planTypes';
 
+/** Half the length of the proper-motion line of a star, in scene units. A display value (artistic). */
+export const TRAIL_HALF_LENGTH = 2.5;
+
 export interface PlanInput {
   card: ObjectCard;
   params: RenderParams;
@@ -56,6 +59,10 @@ export class PlanBuilder {
   readonly tint: ReturnType<typeof resolveTint>;
   readonly lighting: ReturnType<typeof planLighting>;
   sizeTag: Tag | null = null;
+  /** Formula, else assumption, else source of the size value. */
+  sizeWhy: string | null = null;
+  /** Set false by a planner whose mode colour is not applied to anything drawn. */
+  tintUsed = true;
   /** Add a legend line for the colour mode's tint (off where a named layer already is the colour). */
   tintLegend = true;
   private readonly evaluated = new Map<string, boolean>();
@@ -65,14 +72,17 @@ export class PlanBuilder {
     this.layers = new Map(params.layers.map((l) => [l.id, l]));
     this.modeInfo = resolveModes(params);
     this.missing.push(...this.modeInfo.missing);
-    this.mode = chooseMode(ctx.mode, params.type, this.modeInfo.modes);
+    this.mode = chooseMode(ctx.mode, params.type, this.modeInfo.modes, ctx.honesty);
     this.tint = resolveTint(params, this.mode, ctx.honesty);
     this.lighting = planLighting(params, card);
     if (params.lighting.mode === 'sun' && this.lighting.source !== 'phase_angle') {
-      this.refuse({ id: 'lighting', reason: 'data', fields: ['phase_angle_deg'] });
-      this.notes.push(
-        'No phase angle: the light comes from the front, which is a display default.',
-      );
+      // The body is lit anyway, from a display default, so the panel lists this as a default.
+      this.refuse({
+        id: 'lighting',
+        reason: 'data',
+        fields: ['phase_angle_deg'],
+        defaultShown: 'There is no phase angle, so the light comes from the front.',
+      });
     }
     if (this.tint.tag === null && this.mode !== null) {
       this.notes.push('Colour is plain grey: no colour data is shown at this honesty level.');
@@ -166,17 +176,17 @@ export class PlanBuilder {
   }
 
   /** Like draw() for a part that exists only in some comet epochs. */
-  refuseForEpoch(id: string, epoch: CometEpoch): void {
+  refuseForEpoch(id: string, epoch: CometEpoch, note?: string): void {
     if (this.layers.has(id)) {
       this.evaluated.set(id, false);
-      this.refuse({ id, reason: 'epoch', detail: epoch });
+      this.refuse({ id, reason: 'epoch', detail: epoch, note });
     }
   }
 
   /**
-   * The plain sphere/ellipsoid at the size on the card (R5.3: "a plain sphere/ellipsoid at
-   * measured size" is what Measured only keeps). Needs scale_m and the size field; its tag is the
-   * size value's own tag, so an estimated size is hidden in Measured only.
+   * The plain body at the size on the card. R5.3 (as edited in issue #7, Q-45): Measured only
+   * keeps the body "only when its size value is `measured`". Needs scale_m and the size field; its
+   * tag is the size value's own tag, so an estimated size is hidden in Measured only.
    */
   body(sizeField: SizeField): boolean {
     const tv = this.card[sizeField];
@@ -194,7 +204,49 @@ export class PlanBuilder {
       return false;
     }
     this.sizeTag = tv!.tag;
+    this.sizeWhy = tv!.formula ?? tv!.assumption ?? tv!.source ?? null;
     return true;
+  }
+
+  /**
+   * Like body(), for a type whose size is optional (R7.5 star). A missing size is not a reason to
+   * lose the body: it is drawn as a unit sphere with no scale bar, and `size` is listed as not
+   * drawn. A size that is present but hidden by the honesty state is still refused (R5.3).
+   */
+  bodyOptionalSize(sizeField: SizeField): { ok: boolean; sizeKnown: boolean } {
+    const tv = this.card[sizeField];
+    if (this.params.scale_m === null || !isPresent(tv)) {
+      this.refuse({
+        id: 'size',
+        reason: 'data',
+        fields: [sizeField],
+        detail: 'The size is unknown, so the sphere has no scale bar.',
+      });
+      return { ok: true, sizeKnown: false };
+    }
+    const ok = this.body(sizeField);
+    return { ok, sizeKnown: ok };
+  }
+
+  /**
+   * A drawn baked texture (albedo, bands) is in the backend's visible palette, so it is shown in
+   * the visible mode only (colour = white, so the tint is not applied twice) and dropped in the
+   * infrared mode, where the colour is the whole-body SPHEREx average (R5.2). Refused with
+   * reason 'mode' in that case.
+   */
+  drawBaked(id: string, asset: string | null | undefined): boolean {
+    if (!this.layers.has(id)) return false;
+    if (this.mode === 'spherex_ir' && this.ready(id)) {
+      this.reject({
+        id,
+        reason: 'mode',
+        detail: 'Its colours are the visible palette, so it is left out of the infrared view.',
+      });
+      return false;
+    }
+    const ok = this.draw(id, { asset: asset ?? null });
+    if (ok) this.tintLegend = false; // the texture is the colour; no second colour line
+    return ok;
   }
 
   /** Legend line for the plain body, for plans where no named layer covers it. */
@@ -217,7 +269,9 @@ export class PlanBuilder {
     // A size whose tag the honesty state hides (or that was refused) is not shown anywhere,
     // including the scale bar and the alt text: no unlabelled estimated number.
     const sizeTag = 'sizeTag' in over ? (over.sizeTag ?? null) : this.sizeTag;
-    return {
+    const sizeWhy =
+      sizeTag === null ? null : 'sizeWhy' in over ? (over.sizeWhy ?? null) : this.sizeWhy;
+    const plan: RenderPlan = {
       id: this.params.id,
       type: this.params.type,
       name: this.card.name,
@@ -241,12 +295,33 @@ export class PlanBuilder {
       lighting: this.lighting,
       scaleM: sizeTag !== null ? this.params.scale_m : null,
       sizeTag,
+      sizeQualifier: null,
+      sizeWhy,
+      tintUsed: this.tintUsed,
+      extent: 1,
       spin: null,
       scrub: null,
       relief: 'illustrative',
       ...over,
     };
+    plan.sizeWhy = sizeWhy;
+    plan.extent = over.extent ?? sceneExtent(plan);
+    return plan;
   }
+}
+
+/** The largest distance from the origin to anything the plan draws (at least 1, the unit sphere). */
+export function sceneExtent(plan: RenderPlan): number {
+  let e = 1;
+  for (const b of plan.bodies) {
+    e = Math.max(e, Math.hypot(...b.position) + Math.max(...b.axes));
+  }
+  for (const s of plan.shells) e = Math.max(e, s.outerRadius);
+  for (const d of plan.discs) e = Math.max(e, d.outerRadius);
+  for (const s of plan.screens) e = Math.max(e, Math.hypot(s.radius, s.z));
+  if (plan.trails.length > 0) e = Math.max(e, TRAIL_HALF_LENGTH);
+  if (plan.dust) e = Math.max(e, 1);
+  return e;
 }
 
 export const DEFAULT_SEGMENTS: [number, number] = [64, 32];
