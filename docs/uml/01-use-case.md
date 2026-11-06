@@ -1,6 +1,6 @@
 # 01 Use cases
 
-Who uses Shift & Spectrum and for what. Drawn from architecture spec §1.1 (tiers), §9 (hash routing), rendering doc §4 (display levels), §5.2–5.6 (view modes, honesty, interaction), §8.6–8.7 (spectrum haptics, calibration) and decisions D-06, D-07, D-08, D-25 and D-28.
+Who uses Shift & Spectrum and for what. Drawn from architecture spec §1.1 (tiers), §10 (hash routing), rendering doc §4 (display levels), §5.2–5.6 (view modes, honesty, interaction), §8.6–8.7 (spectrum haptics, calibration) and decisions D-06, D-07, D-08, D-25 and D-28.
 
 Mermaid has no native use-case diagram, so this is a `flowchart LR`: actors are circles, use cases are rounded boxes inside the system boundary. Dashed boxes are stretch goals.
 
