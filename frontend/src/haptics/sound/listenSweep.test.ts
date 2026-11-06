@@ -10,10 +10,16 @@ import {
 import { fixture } from '@/test/sharedFixtures';
 import { getMasterBus } from '../audioGraph';
 import { pitchToHz, wavelengthToPitch } from '../pitch';
-import { buildSpectrumMapping, type SpectrumMappingPoint } from '../spectrumMapping';
+import {
+  buildSpectrumMapping,
+  type SpectrumMapping,
+  type SpectrumMappingPoint,
+  type SpectrumSample,
+} from '../spectrumMapping';
 import {
   AUDIO_LOOKAHEAD_S,
   SWEEP_CHIME_GAIN,
+  SWEEP_MAX_STEPS,
   SWEEP_PAN,
   SWEEP_PEAK_GAIN,
   SWEEP_SAMPLES_PER_POINT,
@@ -225,14 +231,18 @@ describe('ListenSweep on the audio clock', () => {
     ctx.currentTime = 10 + AUDIO_LOOKAHEAD_S + 3;
     expect(s2.progress()).toBeCloseTo(0.5);
 
-    // Natural end: the tone ends, then the bell; every node of the sweep is disconnected.
+    // Natural end: the tone ends while the bell still rings, so the sweep goes on until the bell
+    // ends; then every node of the sweep is disconnected.
     tone.end();
+    expect(s2.playing).toBe(true);
+    expect(ended).toBe(0);
+    expect(settings.subscribers).toBe(1);
+    expect(s2.liveVoices).toBe(2); // the bell and the volume gain
+    (sources[1] as FakeSource).end();
     expect(s2.playing).toBe(false);
     expect(s2.progress()).toBeNull();
     expect(ended).toBe(1);
     expect(settings.subscribers).toBe(0);
-    expect(s2.liveVoices).toBe(2); // the bell and the volume gain
-    (sources[1] as FakeSource).end();
     expect(s2.liveVoices).toBe(0);
     expect(freed(ctx)).toBe(true);
     expect(bus.disconnected).toBe(false);
@@ -314,5 +324,103 @@ describe('ListenSweep on the audio clock', () => {
     firstTone.end();
     expect(ended).toBe(1);
     expect(sweep.playing).toBe(true);
+  });
+
+  it('a chime ringing after the tone ends keeps the sweep alive: sound off still stops it', () => {
+    const ctx = new FakeAudioContext();
+    const settings = fakeSettings();
+    const sweep = new ListenSweep({ context: () => ctx.asAudioContext(), settings });
+    let ended = 0;
+    sweep.onEnd = () => ended++;
+    sweep.play(plan(), 'derived');
+    ctx.sources()[0]!.end(); // the tone
+    expect(sweep.playing).toBe(true);
+    settings.set({ soundOn: false });
+    expect(sweep.playing).toBe(false);
+    expect(ended).toBe(1);
+    expect(sweep.liveVoices).toBe(0);
+    expect(freed(ctx)).toBe(true);
+  });
+
+  it('with the tone hidden, onEnd waits for the last of several chimes', () => {
+    const ctx = new FakeAudioContext();
+    const sweep = new ListenSweep({
+      context: () => ctx.asAudioContext(),
+      settings: fakeSettings(),
+    });
+    let ended = 0;
+    sweep.onEnd = () => ended++;
+    const p = planSweep(
+      buildSpectrumMapping(dipSpectrum()),
+      [H2O, { gas: 'co2', lambdaUm: GAS_LINES_UM.co2, tag: 'measured' }],
+      { tag: 'derived' },
+    )!;
+    expect(sweep.play(p, 'measured')).toBe(true);
+    const [b1, , b2] = ctx.sources();
+    b1!.end();
+    expect(ended).toBe(0);
+    expect(sweep.playing).toBe(true);
+    b2!.end();
+    expect(ended).toBe(1);
+    expect(freed(ctx)).toBe(true);
+  });
+
+  it('D-21 mid-sweep: setHonesty silences what is now hidden, and ends when nothing is left', () => {
+    const ctx = new FakeAudioContext();
+    const sweep = new ListenSweep({
+      context: () => ctx.asAudioContext(),
+      settings: fakeSettings(),
+    });
+    let ended = 0;
+    sweep.onEnd = () => ended++;
+    // A measured tone and a model_dependent chime, started at + Estimated.
+    sweep.play(plan([{ ...H2O, tag: 'model_dependent' }]), 'derived');
+    const [tone, bell] = ctx.sources();
+    sweep.setHonesty('measured');
+    expect(bell!.stopCalls).toBeGreaterThanOrEqual(2); // cancelled
+    expect(tone!.stopCalls).toBe(1); // only its scheduled stop
+    expect(sweep.playing).toBe(true);
+    expect(sweep.honestyState).toBe('measured');
+    // A derived spectrum tone: hiding it too leaves nothing, so the sweep ends.
+    const derived = planSweep(buildSpectrumMapping(dipSpectrum()), [], { tag: 'derived' })!;
+    sweep.play(derived, 'derived');
+    sweep.setHonesty('measured');
+    expect(sweep.playing).toBe(false);
+    expect(ended).toBe(2);
+    expect(freed(ctx)).toBe(true);
+  });
+});
+
+describe('planSweep limits (security review)', () => {
+  it('caps the steps for a huge spectrum', () => {
+    const pts = Array.from({ length: 20000 }, (_, i) => ({
+      wavelength_um: 0.75 + (4.25 * i) / 19999,
+      flux: 1,
+      error: 0.01,
+      flagged: false,
+    }));
+    const p = planSweep(buildSpectrumMapping(pts))!;
+    expect(p.steps.length).toBe(SWEEP_MAX_STEPS + 1);
+  });
+
+  it('treats a non-finite strength as quiet, never NaN', () => {
+    const mapping: SpectrumMapping = {
+      empty: false,
+      lambdaMinUm: 1,
+      lambdaMaxUm: 2,
+      count: 2,
+      sampleAt: (l, out) => {
+        const s = out ?? ({} as SpectrumSample);
+        s.wavelengthUm = l;
+        s.strength = l > 1.5 ? NaN : 1;
+        s.quiet = false;
+        s.noisy = false;
+        s.pitch = 0.5;
+        return s;
+      },
+    };
+    const p = planSweep(mapping)!;
+    expect(p.steps.every((st) => Number.isFinite(st.level))).toBe(true);
+    expect(p.steps.filter((st) => st.lambdaUm > 1.5).every((st) => st.quiet)).toBe(true);
   });
 });

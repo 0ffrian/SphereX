@@ -174,8 +174,8 @@ describe('nebula / nova point density (R8.4 item 4)', () => {
     for (let i = 0; i < 2000; i++) dense.push([0.9, 0.5, i / 2000 - 0.5]);
     const sink = new RecordingSink();
     const src = new PointDensitySource(sink, { glow: set(dense) }, 'artistic');
-    const ray = (x: number) => {
-      const s = sampleAt([0, 0, 1], { bodyId: null });
+    const ray = (x: number, px = x * 100) => {
+      const s = sampleAt([0, 0, 1], { bodyId: null, x: px });
       s.rayOrigin = [x, 0, 5];
       s.rayDir = [0, 0, -1];
       src.move(s);
@@ -188,6 +188,14 @@ describe('nebula / nova point density (R8.4 item 4)', () => {
     ray(-0.7);
     expect(sink.activeTrainId).toBeNull();
     expect(src.rateFor(0)).toBe(0);
+
+    // Under 1 px of finger travel the O(points) count is skipped (perf review).
+    ray(0, 0);
+    const before = src.recounts;
+    ray(0, 0.4); // 0.4 px from the last count at px 0
+    expect(src.recounts).toBe(before);
+    ray(0, 5);
+    expect(src.recounts).toBe(before + 1);
   });
 });
 

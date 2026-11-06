@@ -2,7 +2,8 @@
 // sweep (A8). Each body is a synthetic card + render params (textureObjects.ts) built through
 // `buildHaptics`, exactly as the viewer will, so its refusals show here too. The pad shows the
 // body's equirectangular map (or the coma / cloud seen face-on); dragging feels it, holding still
-// for a moment plays the data pulse. Synthetic inputs only: no fixtures, no backend.
+// for a moment plays the data pulse. The pad is also a keyboard control (arrow keys move the same
+// point, R9 / WCAG 2.1.1). Synthetic inputs only: no fixtures, no backend.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buttonClass } from '@/app/ui';
 import type { Tag } from '@/contract';
@@ -19,7 +20,7 @@ import {
 import { createTouchSample, type TouchSample } from '@/haptics/sources/types';
 import { buildSpectrumMapping, type SpectrumMappingPoint } from '@/haptics/spectrumMapping';
 import { UnlockButton } from '@/haptics/ui/UnlockButton';
-import { HONESTY_LABEL, isTagShown, type HonestyState } from '@/viewer/honesty';
+import { HONESTY_LABEL, isTagShown, stateThatShows, type HonestyState } from '@/viewer/honesty';
 import type { TestPanelProps } from '../panelProps';
 import {
   BODY_LABEL,
@@ -35,6 +36,10 @@ const selectClass =
   'min-h-11 w-full max-w-full rounded-md border border-neutral-500 bg-neutral-900 px-2 text-base';
 const checkLabelClass = 'flex min-h-11 items-center gap-2';
 const checkClass = 'h-6 w-6 shrink-0';
+/** Arrow-key step across the pad, in pad px (64 steps across, 32 down). */
+const KEY_STEP = W / 64;
+/** Pad px → the px the hold-still rule sees: one key step is past HOLD_STILL_TOLERANCE_PX. */
+const KEY_PX_SCALE = 2;
 
 /** Ring plane radii felt across the pad in "rings" mode (fieldGenerator RING_INNER..RING_OUTER). */
 const RING_FROM = 1.45;
@@ -120,18 +125,26 @@ function syntheticSpectrum(): SpectrumMappingPoint[] {
 
 type Touch = 'idle' | 'moving' | 'holding';
 
+/** "shown only with + Artistic" or "shown from + Estimated": when `tag` is shown (D-21). */
+function whenShown(tag: Tag): string {
+  const from = stateThatShows(tag);
+  return from === 'artistic' ? 'shown only with + Artistic' : `shown from ${HONESTY_LABEL[from]}`;
+}
+
 /** What the finger should be feeling right now, honest about the honesty gate (D-21). */
 export function touchStatus(touch: Touch, build: HapticsBuild, honesty: HonestyState): string {
   if (touch === 'idle') return 'Not touching.';
-  const label = HONESTY_LABEL[honesty];
+  const now = `now ${HONESTY_LABEL[honesty]}`;
   const { texture, data } = build;
   if (touch === 'holding' && data?.trigger === 'hold') {
     return isTagShown(honesty, data.tag)
       ? `Holding still: data pulse (${data.tag}).`
-      : `Data pulse silent: its tag (${data.tag}) is hidden at ${label}.`;
+      : `Data pulse silent: ${whenShown(data.tag)} (${now}).`;
   }
   if (texture) {
-    if (!isTagShown(honesty, texture.tag)) return `Texture silent: Honesty is ${label}.`;
+    if (!isTagShown(honesty, texture.tag)) {
+      return `Texture silent: ${whenShown(texture.tag)} (${now}).`;
+    }
     return texture.tag === 'artistic'
       ? 'Moving: texture (artist’s impression; plays only in + Artistic).'
       : 'Moving: texture.';
@@ -139,9 +152,16 @@ export function touchStatus(touch: Touch, build: HapticsBuild, honesty: HonestyS
   if (data && data.trigger === 'move') {
     return isTagShown(honesty, data.tag)
       ? `Moving: data field (${data.tag}).`
-      : `Data field silent: its tag (${data.tag}) is hidden at ${label}.`;
+      : `Data field silent: ${whenShown(data.tag)} (${now}).`;
   }
   return 'Nothing to feel by moving here; hold still for the data pulse.';
+}
+
+/** Where on the pad a point is, in words (the keyboard value text). */
+export function padRegion(px: number, py: number): string {
+  const v = py < H / 3 ? 'upper' : py < (2 * H) / 3 ? 'middle' : 'lower';
+  const h = px < W / 3 ? 'left' : px < (2 * W) / 3 ? 'centre' : 'right';
+  return v === 'middle' && h === 'centre' ? 'centre' : `${v} ${h}`;
 }
 
 export function TexturePanel({ haptics }: TestPanelProps) {
@@ -152,6 +172,13 @@ export function TexturePanel({ haptics }: TestPanelProps) {
   const [epoch, setEpoch] = useState<'2025-08' | '2025-12'>('2025-08');
   const [onRing, setOnRing] = useState(false);
   const [touchState, setTouchState] = useState<Touch>('idle');
+  // The honesty select lives in the Engine panel (#9); this panel samples the engine's state on
+  // every interaction and keeps it here, so render never reads the engine.
+  const [honesty, setHonesty] = useState<HonestyState>(() => engine.honesty);
+  /** Keyboard point on the pad (pad px), and its spoken description. */
+  const keyPos = useRef<[number, number]>([W / 2, H / 2]);
+  const [valueText, setValueText] = useState('Centre. Not touching.');
+  const [valueNow, setValueNow] = useState(50);
   const [gases, setGases] = useState<Record<SweepGas, boolean>>({
     h2o: true,
     co2: true,
@@ -205,6 +232,7 @@ export function TexturePanel({ haptics }: TestPanelProps) {
     stopPolling();
     const loop = () => {
       touch.poll(performance.now());
+      setHonesty(engine.honesty);
       if (touch.isHolding) setTouchState('holding');
       frame.current = requestAnimationFrame(loop);
     };
@@ -214,20 +242,19 @@ export function TexturePanel({ haptics }: TestPanelProps) {
     stopPolling();
     touch.release();
     setTouchState('idle');
+    setHonesty(engine.honesty);
   };
 
-  const feel = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const px = ((e.clientX - rect.left) / rect.width) * W;
-    const py = ((e.clientY - rect.top) / rect.height) * H;
-    const pan = Math.max(-1, Math.min(1, ((e.clientX - rect.left) / rect.width) * 2 - 1));
+  /** Feel pad point (px, py) in pad px; (xPx, yPx) is what the hold-still rule measures. */
+  const feelAt = (px: number, py: number, xPx: number, yPx: number): Touch => {
+    const pan = Math.max(-1, Math.min(1, (px / W) * 2 - 1));
     const now = performance.now();
     sampleRef.current ??= createTouchSample();
     const sample = sampleRef.current;
     if (obj.view === 'map') {
       sample.timeMs = now;
-      sample.xPx = e.clientX;
-      sample.yPx = e.clientY;
+      sample.xPx = xPx;
+      sample.yPx = yPx;
       sample.pan = pan;
       fillFromUV(sample, px / W, py / H);
       if (build.rings && onRing) {
@@ -237,10 +264,43 @@ export function TexturePanel({ haptics }: TestPanelProps) {
       }
     } else {
       const [x, y] = pxToFace(px, py);
-      probe.fromWorldRay([x, y, 5], [0, 0, -1], e.clientX, e.clientY, pan, now, sample);
+      probe.fromWorldRay([x, y, 5], [0, 0, -1], xPx, yPx, pan, now, sample);
     }
     touch.move(sample);
-    setTouchState(touch.isHolding ? 'holding' : 'moving');
+    const state: Touch = touch.isHolding ? 'holding' : 'moving';
+    setTouchState(state);
+    setHonesty(engine.honesty);
+    return state;
+  };
+
+  const feel = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = ((e.clientX - rect.left) / rect.width) * W;
+    const py = ((e.clientY - rect.top) / rect.height) * H;
+    keyPos.current = [px, py];
+    feelAt(px, py, e.clientX, e.clientY);
+  };
+
+  /** Arrow keys move the same point the finger would, and emit the same events. */
+  const onKeyDown = (e: React.KeyboardEvent<HTMLCanvasElement>) => {
+    const d: Record<string, [number, number]> = {
+      ArrowLeft: [-KEY_STEP, 0],
+      ArrowRight: [KEY_STEP, 0],
+      ArrowUp: [0, -KEY_STEP],
+      ArrowDown: [0, KEY_STEP],
+    };
+    const step = d[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const [x0, y0] = keyPos.current;
+    const px = Math.min(W - 0.5, Math.max(0.5, x0 + step[0]));
+    const py = Math.min(H - 0.5, Math.max(0.5, y0 + step[1]));
+    keyPos.current = [px, py];
+    if (frame.current === null) startPolling();
+    const state = feelAt(px, py, px * KEY_PX_SCALE, py * KEY_PX_SCALE);
+    const h = engine.honesty;
+    setValueText(`${BODY_LABEL[kind]}: ${padRegion(px, py)}. ${touchStatus(state, build, h)}`);
+    setValueNow(Math.round((px / W) * 100));
   };
 
   const listen = () => {
@@ -276,9 +336,13 @@ export function TexturePanel({ haptics }: TestPanelProps) {
         Texture haptics and sound
       </h2>
       <p className="text-neutral-400">
-        Drag on the pad to feel the surface; hold still for a moment to feel the data pulse. The
-        surfaces are artist’s impressions: set Honesty to “+ Artistic” in the Engine panel to feel
-        them.
+        Drag on the pad, or focus it and use the arrow keys, to feel the surface; hold still for a
+        moment to feel the data pulse. The surfaces are artist’s impressions: set Honesty to “+
+        Artistic” in the Engine panel to feel them.
+      </p>
+      <p className="text-neutral-400">
+        Synthetic test bodies: their values and tags are illustrative, not measurements. Some are
+        tagged “measured” only to show what plays in Measured only.
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <UnlockButton engine={engine} canVibrate={canVibrate} />
@@ -343,8 +407,17 @@ export function TexturePanel({ haptics }: TestPanelProps) {
           ref={canvas}
           width={W}
           height={H}
-          aria-label={`Feel pad: ${BODY_LABEL[kind]}, an artist’s impression. Drag to feel; hold still for the data pulse.`}
-          className="block w-full touch-none rounded-md border border-neutral-600 [image-rendering:pixelated]"
+          tabIndex={0}
+          role="slider"
+          aria-roledescription="feel pad"
+          aria-label={`Feel pad: ${BODY_LABEL[kind]}, an artist’s impression. Arrow keys move; hold still for the data pulse.`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={valueNow}
+          aria-valuetext={valueText}
+          onKeyDown={onKeyDown}
+          onBlur={endTouch}
+          className="block w-full touch-none rounded-md border border-neutral-600 [image-rendering:pixelated] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
             startPolling();
@@ -364,13 +437,13 @@ export function TexturePanel({ haptics }: TestPanelProps) {
           Artist’s impression
         </span>
       </div>
-      <p aria-live="polite" className="text-neutral-300">
-        {touchStatus(touchState, build, engine.honesty)}
+      {/* Shown always; announced only when a feel state starts (not on every lift). */}
+      <p className="text-neutral-300">{touchStatus(touchState, build, honesty)}</p>
+      <p aria-live="polite" className="sr-only">
+        {touchState === 'idle' ? '' : touchStatus(touchState, build, honesty)}
       </p>
       {build.missing.length > 0 && (
-        <p className="text-neutral-400">
-          Refused, not invented (no data for them): {build.missing.join(', ')}.
-        </p>
+        <p className="text-neutral-400">Not shown: no data for {build.missing.join(', ')}.</p>
       )}
 
       <fieldset className="flex flex-wrap items-center gap-4">

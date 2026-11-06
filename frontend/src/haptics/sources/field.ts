@@ -12,6 +12,7 @@ import {
   DATA_PULSE_STRENGTH,
   DENSITY_K,
   DENSITY_RADIUS,
+  DENSITY_RECOUNT_PX,
   FIELD_K,
   FIELD_MAX_HZ,
   FIELD_MIN_HZ,
@@ -150,6 +151,10 @@ export class PointDensitySource implements HapticSource {
   /** Points a uniform disc of radius 1 would put inside DENSITY_RADIUS: the reference density. */
   private readonly uniform: number;
   private readonly maxHz: number;
+  private lastX = NaN;
+  private lastY = NaN;
+  private rate = 0;
+  private counts = 0;
 
   constructor(
     engine: HapticSink,
@@ -174,12 +179,27 @@ export class PointDensitySource implements HapticSource {
   }
 
   move(s: TouchSample): void {
-    const rate = this.rateFor(pointsNearRay(this.sets, s.rayOrigin, s.rayDir, DENSITY_RADIUS));
-    if (rate > 0) this.train.play(rate, DATA_PULSE_STRENGTH, s.pan);
+    // The count is O(points) (about 20k): skip it while the finger moved less than
+    // DENSITY_RECOUNT_PX since the last count (the camera does not move while touching).
+    const moved = Math.hypot(s.xPx - this.lastX, s.yPx - this.lastY);
+    if (!(moved < DENSITY_RECOUNT_PX)) {
+      this.lastX = s.xPx;
+      this.lastY = s.yPx;
+      this.rate = this.rateFor(pointsNearRay(this.sets, s.rayOrigin, s.rayDir, DENSITY_RADIUS));
+      this.counts++;
+    }
+    if (this.rate > 0) this.train.play(this.rate, DATA_PULSE_STRENGTH, s.pan);
     else this.train.stop();
+  }
+
+  /** How many times the points were counted (tests). */
+  get recounts(): number {
+    return this.counts;
   }
 
   release(): void {
     this.train.stop();
+    this.lastX = NaN;
+    this.lastY = NaN;
   }
 }

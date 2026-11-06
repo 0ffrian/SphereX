@@ -2,6 +2,9 @@
 // kinds) a body like ShaderBody's, so the panel builds its sources through `buildHaptics` exactly as
 // the viewer will, and shows the same refusals. Synthetic values only, never fixtures (the app
 // must not import fixtures): every value says "synthetic" in its source.
+// The tags are illustrative: some synthetic values are tagged `measured` (the gas giant's Teq, the
+// comet's Q) only to exercise the R11 honesty path (what still plays in Measured only), though
+// their `source` says they are not measurements. The panel says so on screen.
 import type { HapticProfile, ObjectCard, ObjectType, RenderParams, Tag } from '@/contract';
 import type { BuildHapticsOptions, HapticBody, PlanBodyLike } from '@/haptics/profiles';
 import { HeightGrid } from '@/haptics/sources/heightMap';
