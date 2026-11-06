@@ -61,6 +61,10 @@ export function ViewerPanel() {
         canvas.dataset.backend = created.backend;
         console.info(`[viewer] three r187 WebGPURenderer backend: ${created.backend}`);
         setRendererStatus(created.backend);
+        // Test hook for e2e/shaderKinds.spec.ts; dead-code-eliminated from production builds.
+        if (import.meta.env.MODE === 'fixtures') {
+          (window as unknown as { __sxViewer?: ViewerApp }).__sxViewer = created;
+        }
         setViewer(created);
       },
       (err: unknown) => {

@@ -16,7 +16,10 @@ import {
   WebGPURenderer,
 } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import type { ObjectCard, RenderParams } from '@/contract';
 import { MAX_AMBIENT_INTENSITY } from './lighting';
+import type { BodyContext, BodyRenderer } from './renderers/bodyRenderer';
+import { createBodyRenderer } from './renderers/registry';
 
 /** Which backend `WebGPURenderer` ended up on after `init()`. */
 export type RendererBackend = 'webgpu' | 'webgl2';
@@ -110,6 +113,10 @@ export class ViewerApp {
   private readonly controls: OrbitControls;
   private readonly geometry: SphereGeometry;
   private readonly material: MeshStandardNodeMaterial;
+  private readonly placeholder: Mesh;
+  private readonly sun: DirectionalLight;
+  private body: BodyRenderer | null = null;
+  private bodyToken = 0;
   private readonly resizeObserver: ResizeObserver | null;
   private dprQuery: MediaQueryList | null = null;
   private frameRequest: number | null = null;
@@ -148,13 +155,14 @@ export class ViewerApp {
     // Placeholder body: a plain unit sphere. Not an object; tag 'artistic' (no data drawn).
     this.geometry = new SphereGeometry(1, 64, 32);
     this.material = new MeshStandardNodeMaterial({ color: 0x8a8a8a, roughness: 0.9 });
-    this.scene.add(new Mesh(this.geometry, this.material));
+    this.placeholder = new Mesh(this.geometry, this.material);
+    this.scene.add(this.placeholder);
 
     // R5.1: one DirectionalLight plus ambient ≤ 0.03. The direction is a placeholder ('artistic');
     // real scenes place it at phase_angle_deg from RenderParams.lighting.
-    const sun = new DirectionalLight(0xffffff, 2);
-    sun.position.set(3, 1.5, 2);
-    this.scene.add(sun);
+    this.sun = new DirectionalLight(0xffffff, 2);
+    this.sun.position.set(3, 1.5, 2);
+    this.scene.add(this.sun);
     this.scene.add(new AmbientLight(0xffffff, MAX_AMBIENT_INTENSITY));
 
     // R5.6 default mode: drag rotates, wheel/pinch zooms. No damping, so nothing animates
@@ -194,6 +202,47 @@ export class ViewerApp {
     this.controls.reset();
   }
 
+  /**
+   * Shows the object described by `card` + `params` with the renderer registered for its type
+   * (renderers/registry.ts). Types without a renderer keep the placeholder sphere and resolve to
+   * null. A newer call supersedes an older one that is still loading.
+   */
+  async setBody(
+    card: ObjectCard,
+    params: RenderParams,
+    ctx: BodyContext = {},
+  ): Promise<BodyRenderer | null> {
+    const token = ++this.bodyToken;
+    const pending = createBodyRenderer(card, params, ctx);
+    if (!pending) return null;
+    const next = await pending;
+    if (this.disposed || token !== this.bodyToken) {
+      next.dispose();
+      return null;
+    }
+    this.clearBody();
+    this.body = next;
+    this.placeholder.visible = false;
+    this.scene.add(next.object);
+    // R5.1: the light direction comes from RenderParams.lighting.sun_dir when given.
+    const sd = params.lighting.sun_dir;
+    if (sd) this.sun.position.set(sd[0], sd[1], sd[2]).multiplyScalar(5);
+    this.camera.position.set(0, 0, next.suggestedDistance);
+    this.controls.maxDistance = Math.max(20, next.suggestedDistance * 3);
+    this.controls.saveState();
+    this.controls.reset();
+    this.requestRender();
+    return next;
+  }
+
+  private clearBody(): void {
+    if (!this.body) return;
+    this.scene.remove(this.body.object);
+    this.body.dispose();
+    this.body = null;
+    this.placeholder.visible = true;
+  }
+
   /** Coalesces any number of change events into one render on the next frame. */
   readonly requestRender = (): void => {
     if (this.disposed || this.frameRequest !== null) return;
@@ -213,6 +262,7 @@ export class ViewerApp {
     this.dprQuery = null;
     this.canvas.removeEventListener('keydown', this.onKeyDown);
     this.controls.removeEventListener('change', this.requestRender);
+    this.clearBody();
     this.controls.dispose();
     this.geometry.dispose();
     this.material.dispose();

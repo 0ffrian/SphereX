@@ -17,4 +17,9 @@
 - **Nebulae and novae** are point clouds. Their haptics use local point density (field source, [§8.4](../haptics/sources.md#r84-event-sources)).
 - **Honesty:** nothing about these surfaces is measured. Every texture layer and texture haptic is `artistic`. In Measured only, texture haptics are silent. The data pulse (`teq_pulse`) remains only when `teq_K` is `measured` (Exoplanet Archive `pl_eqt`, D-21).
 - **Haptics:** terrain and flow sources ([§8.4](../haptics/sources.md#r84-event-sources)), profile rows in [§8.5](../haptics/profiles.md#r85-per-type-haptic-profile).
+- **Implementation (issue #8):**
+  - `viewer/fields/fieldGenerator.ts` (pure, seeded, integer-hash noise) is the source of truth for the field; `fieldWorker.ts` wraps it and `fieldClient.ts` falls back to the main thread. `FieldSampler` is the typed sampler for haptic sources.
+  - The shader reads the two textures with `textureLoad` and filters by hand, so float32 filtering support does not matter. It recomputes only sub-resolution noise and the analytic storm shapes (centres from `stormsFor`, the same function the field uses).
+  - Gas giants: R holds the band profile (0.5 is a band edge), G the band index, B the storm id; a gas giant has no relief (Q-43). Terrain: R is the raw terrain height, ocean flattened by consumers using the ocean mask.
+  - Layer `surface` (planets, gas giants) or `point_cloud` (nebula, nova) is refused, and listed in `missing`, when `scale_m` or the size field is null.
 - **Status:** D-12 is **Accepted** (signed off by Atish, 5 Nov 2026). The jet pulse rate stays **[verify on phones]** ([§8.4](../haptics/sources.md#r84-event-sources)).
