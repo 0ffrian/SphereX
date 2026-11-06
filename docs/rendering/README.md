@@ -1,7 +1,7 @@
 # CONTEXT: Celestial Object Display, Surface Generation and Haptics
 
 **Project:** Shift & Spectrum, NASA Space Apps 2026, challenge "Planet X and SPHEREx"
-**Audience:** the team (Atish, Kevin, Moon, Munazir) and Claude Code. This spec lives in `docs/rendering/` (this index plus the fragments below) and is referenced from `CLAUDE.md`.
+**Audience:** the team (Atish, Kevin and Moon, who is also called Munazir) and Claude Code. This spec lives in `docs/rendering/` (this index plus the fragments below) and is referenced from `CLAUDE.md`.
 **Status:** v2, 4 Nov 2026. Items marked **[verify]** must be checked against real output before relying on them.
 **Precedence:** decisions in [decisions.md](../decisions.md) override this doc. Decision IDs (D-xx), backlog IDs (B-xx) and question IDs (Q-xx) refer to that file.
 
