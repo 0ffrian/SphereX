@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import math
 import warnings
 from dataclasses import dataclass
 from typing import Any
@@ -27,6 +28,9 @@ class SiaRow:
     t_max_mjd: float
     em_min_um: float
     em_max_um: float
+    # Detector footprint from ``s_region`` (issue #12): (ra, dec) vertices in degrees, ICRS, the
+    # closing repeat of the first vertex removed. ``None`` when absent or not a POLYGON.
+    s_region: tuple[tuple[float, float], ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -72,6 +76,33 @@ def _frame_id(did: str, obs_id: str, band: str) -> str:
     return f"{obs_id}_{det}"
 
 
+def parse_s_region(text: str) -> tuple[tuple[float, float], ...] | None:
+    """``POLYGON ICRS ra1 dec1 ra2 dec2 ...`` (as served by IRSA for SPHEREx, checked 6 Nov 2026)
+    -> vertices. Anything else (another shape, another frame, odd numbers) gives ``None``."""
+    parts = text.split()
+    if len(parts) < 2 or parts[0].upper() != "POLYGON":
+        return None
+    nums = parts[1:]
+    if nums and not _is_number(nums[0]):
+        if nums[0].upper() not in ("ICRS", "J2000", "FK5"):
+            return None
+        nums = nums[1:]
+    if len(nums) < 6 or len(nums) % 2 or not all(_is_number(n) for n in nums):
+        return None
+    pts = [(float(nums[i]), float(nums[i + 1])) for i in range(0, len(nums), 2)]
+    if len(pts) > 3 and pts[-1] == pts[0]:
+        pts = pts[:-1]
+    return tuple(pts)
+
+
+def _is_number(text: str) -> bool:
+    """A finite number: ``nan`` and ``inf`` parse as floats but are not usable vertices."""
+    try:
+        return math.isfinite(float(text))
+    except ValueError:
+        return False
+
+
 def parse_rows(body: bytes) -> list[SiaRow]:
     vot = _votable(body)
     tables = list(vot.iter_tables())
@@ -106,6 +137,7 @@ def parse_rows(body: bytes) -> list[SiaRow]:
                 t_max_mjd=float(s(rec, "t_max")),
                 em_min_um=float(s(rec, "em_min")) * 1e6,
                 em_max_um=float(s(rec, "em_max")) * 1e6,
+                s_region=parse_s_region(s(rec, "s_region")),
             )
         )
     return rows

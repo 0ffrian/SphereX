@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import logging
 import subprocess
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import objects, resolve, spectrum
+from app.api import objects, overlays, resolve, spectrum
 from app.context import make_context
 from app.core.find.frames import FrameService
+from app.core.find.overlays import OverlayService
 from app.core.find.resolver import load_aliases
 from app.errors import install_catch_all, install_error_handlers
 from app.settings import Settings, get_settings
@@ -46,19 +49,31 @@ def create_app(
             s.cache_dir,
         )
 
-    app = FastAPI(title="Shift & Spectrum API", version="0.1.0")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        yield
+        app.state.overlays.close()  # stop the catalogue fetch pool (issue #12)
+
+    app = FastAPI(title="Shift & Spectrum API", version="0.1.0", lifespan=lifespan)
     app.state.ctx = ctx
     app.state.frames = FrameService(ctx)
+    app.state.overlays = OverlayService(app.state.frames)
     app.state.aliases = load_aliases(s.targets_file)
     # Order matters: the middleware added last is outermost. The catch-all goes in first so
     # that CORS wraps it and a 500 still carries CORS headers.
     install_catch_all(app)
     if s.cors_list:
-        app.add_middleware(CORSMiddleware, allow_origins=s.cors_list, allow_methods=["GET"])
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=s.cors_list,
+            allow_methods=["GET"],
+            expose_headers=["X-SX-Combine"],
+        )
     install_error_handlers(app)
     app.include_router(resolve.router)
     app.include_router(objects.router)
     app.include_router(spectrum.router)
+    app.include_router(overlays.router)
 
     @app.get("/v1/health", tags=["meta"])
     def health() -> dict[str, object]:
