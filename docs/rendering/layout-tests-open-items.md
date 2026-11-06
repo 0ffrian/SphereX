@@ -71,7 +71,8 @@ frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, St
   flipbook/           # Flipbook player, playback, keys, cutout preloading, RainbowTrails + wavelengthColor (D-28)
   spectrum/           # SpectrumPanel, SVG SpectrumChart, scale (displays the A4.2 output)
 frontend/src/test/                           # test-only helpers (fixtureFetch.ts, sharedFixtures.ts: loads shared/fixtures;
-                                             # fakeHaptics.ts, fakeAudio.ts: fake clock, drivers and AudioContext)
+                                             # fakeHaptics.ts, fakeAudio.ts: fake clock, drivers and AudioContext;
+                                             # hapticRecorder.ts: recording sink and TouchSample helpers, issue #11)
 frontend/src/fixtures.test.ts                # fixtures are deterministic, pass the API validators, never imported by app code
 frontend/e2e/                                # Playwright tests (smoke, flipbook) against the fixture server
 frontend/fixtures/                           # dev and test only: SYNTHETIC fixture server, a Vite dev-server plugin

@@ -2,7 +2,7 @@
 
 Vite + TypeScript + React web app. three.js **r187** (`three/webgpu`).
 
-Status: the tooling, the data-contract types, typed placeholder modules for every R10 file and a viewer smoke scene (one plain sphere), set up on 4 Nov 2026. M1 (issue #3, 5 Nov 2026) adds the SPHEREx flipbook and spectrum view: search by name or RA/Dec, frame playback, the spectrum chart, Rainbow Trails and the shareable URL hash. Issue #7 (M2) adds the 3D viewer for the baked types: see "Viewer: baked types" below.
+Status: the tooling, the data-contract types, typed placeholder modules for every R10 file and a viewer smoke scene (one plain sphere), set up on 4 Nov 2026. M1 (issue #3, 5 Nov 2026) adds the SPHEREx flipbook and spectrum view: search by name or RA/Dec, frame playback, the spectrum chart, Rainbow Trails and the shareable URL hash. Issue #7 (M2) adds the 3D viewer for the baked types: see "Viewer: baked types" below. Issues #9, #10 and #11 (M3) add the haptics and sound modules (`src/haptics`), built and tested against fixtures and the haptics test page; M5 wires them into the app.
 
 ## Run it
 
@@ -103,26 +103,36 @@ src/
     search/               SearchBar, parseQuery (name or RA, Dec in degrees), the 5 test targets
     flipbook/             Flipbook player, cutout preloading, playback, Rainbow Trails (D-28)
     spectrum/             SpectrumPanel, hand-rolled SVG SpectrumChart, scales
-  test/           test-only helpers (fixtureFetch, sharedFixtures: loads shared/fixtures)
+  test/           test-only helpers (fixtureFetch, sharedFixtures: loads shared/fixtures; fakeHaptics,
+                  fakeAudio, hapticRecorder: haptics fakes)
   viewer/         (Moon)  ViewerApp, lighting, modes, honesty, scaleBar, altText, renderPlan + planCommon + planTypes (pure plan)
     renderers/            AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star (plan functions), build (plan to three.js), ShaderBody
     fields/               fieldWorker (D-12 shared field; file name [verify])
-  haptics/        (Atish)  haptics (engine), audioContext, settings, calibration, platform, pitch,
-                  spectrumMapping, tuning (every tuning constant, D-13)
+  haptics/        (Atish)  haptics (engine), audioContext, audioGraph, settings, calibration, platform,
+                  pitch, spectrumMapping, tuning (every tuning constant, D-13), profiles (buildHaptics,
+                  TouchHaptics), probe (TouchProbe)
     drivers/              webVibrate, audio, tauri (stub, B-01)
-    sources/              heightMap, meshNormal, field, terrain, flow, spectrum, lightcurve
-    ui/                   PulseIndicator, UnlockButton
+    sources/              types, relief, heightMap, meshNormal, field, dataPulse, terrain, flow,
+                          spectrum, lightcurve
+    sound/                listenSweep (A8 Listen sweep)
+    ui/                   PulseIndicator, UnlockButton, SpectrumHapticsPad, CalibrationWizard, HapticsSettings
   hapticsTestPage/  dev-only haptics test page (/haptics-test.html on the dev server; not built)
 e2e/              Playwright smoke test and flipbook flow (fixtures mode)
 fixtures/         SYNTHETIC dev/test fixtures and their Vite dev plugin (see fixtures/README.md)
 scripts/          check-dist.js (post-build check)
 ```
 
-Modules that are not built yet (now only `ShaderBody`, `fieldWorker`, the haptics sources and the Tauri driver) export a single `*_PLACEHOLDER = { spec, implemented: false }` and contain no behaviour. Each file's header names its spec section. `src/layout.test.ts` checks that every R10 file exists and exports something.
+Modules that are not built yet (now only the Tauri driver) export a single `*_PLACEHOLDER = { spec, implemented: false }` and contain no behaviour. Each file's header names its spec section. `src/layout.test.ts` checks that every R10 file exists and exports something.
 
 ### Haptics test page
 
-`npm run dev` (or `npm run dev:phone` for HTTPS on a phone over the LAN), then open `/haptics-test.html`. It has synthetic inputs only: every event kind, level and tag, pulse trains at 1, 2, 4, 12 and 20 Hz, the output switches, the audio latency readout and the pulse indicator. Tap "Turn on haptics and sound" first. Debug a phone with `chrome://inspect`. The page is not a build input, so `vite build` never includes it.
+`npm run dev` (or `npm run dev:phone` for HTTPS on a phone over the LAN), then open `/haptics-test.html`. It has synthetic inputs only, in three panels:
+
+- **Engine:** every event kind, level and tag, pulse trains at 1, 2, 4, 12 and 20 Hz, the output switches, the honesty state, the audio latency readout and the pulse indicator.
+- **Spectrum** (issue #10): a synthetic spectrum with a dip to feel with the spectrum pad, the calibration wizard and the settings.
+- **Texture** (issue #11): a feel pad per synthetic body (gas giant, water world, rocky world, procedural asteroid, comet coma, nebula), built through `buildHaptics` with its refusals listed, and the Listen sweep.
+
+Tap "Turn on vibration and sound" first. Debug a phone with `chrome://inspect`. The page is not a build input, so `vite build` never includes it.
 
 ### Viewer smoke scene
 
