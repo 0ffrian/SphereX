@@ -20,7 +20,7 @@ RELEASE = "gaia_dr3"
 DEFAULT_TABLE = "gaia_dr3_source"  # IRSA's name; ESA serves the same data as gaiadr3.gaia_source
 # Gaia DR3 reference epoch for every source (Gaia DR3 documentation, ``ref_epoch``).
 DR3_EPOCH_JYEAR = 2016.0
-# ASSUMPTION (Q-45): a display cut, not a physical value. Fainter sources are invisible at
+# ASSUMPTION (Q-52): a display cut, not a physical value. Fainter sources are invisible at
 # SPHEREx depth and would only crowd the overlay.
 MAG_LIMIT_G = 20.0
 # ASSUMPTION: row cap for one cone; brightest first, so a capped answer keeps the bright ones and

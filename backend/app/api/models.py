@@ -77,7 +77,7 @@ class FramesResponse(BaseModel):
     provenance: dict[str, Provenance] | None = Field(default=None)
 
 
-# Overlays (issue #12; Q-43). Contract shared with the frontend overlay UI: do not rename.
+# Overlays (issue #12; Q-50). Contract shared with the frontend overlay UI: do not rename.
 CatalogName = Literal["gaia", "wise"]
 
 

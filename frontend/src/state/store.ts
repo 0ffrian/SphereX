@@ -222,8 +222,8 @@ export interface AppData {
   card: ObjectCard | null;
   params: RenderParams | null;
   /**
-   * D-21 sets the starting state to + Estimated; wiring that default is a follow-up (M2), so
-   * this is still `null` here. Code must not treat `null` as any of the three states.
+   * D-21 (answers Q-08): the toggle starts at + Estimated (`derived`). The type still allows
+   * `null`; the viewer reads it through `effectiveHonesty()`, which maps `null` to the same default.
    */
   honesty: HonestyState | null;
   overrides: Overrides;
@@ -281,7 +281,7 @@ export type AppStore = AppData & AppActions;
 export const initialAppData: AppData = {
   card: null,
   params: null,
-  honesty: null,
+  honesty: 'derived',
   overrides: {},
   rendererStatus: 'starting',
   sky: initialSkyState,

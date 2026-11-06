@@ -3,7 +3,7 @@
 B's IMAGE is resampled onto A's pixels by bilinear interpolation through the two WCSs
 (A pixel -> sky -> B pixel). A B pixel outside B, or touching a non-finite B pixel, is NaN.
 Both frames must be in the same unit. Each SPHEREx frame samples a different wavelength, so a
-combination of two frames mixes bands (Q-47); the reply header states both wavelengths.
+combination of two frames mixes bands (Q-54); the reply header states both wavelengths.
 """
 
 from __future__ import annotations
