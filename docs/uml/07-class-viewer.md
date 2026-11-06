@@ -10,16 +10,38 @@ classDiagram
     -renderer: WebGPURenderer, three r187
     -params: RenderParams
     -body: BodyRenderer
+    -plan: RenderPlan
     -touchMode: boolean
-    +open(params: RenderParams) void
+    +setObject(card: ObjectCard, params: RenderParams, ctx: PlanContext) void
+    +showPlan(plan: RenderPlan) void
+    +setSpinPaused(paused: boolean) void
     +setTouchMode(on: boolean) void
     +render() void
+    frames the camera to plan.extent, rebuilds only when sceneKey changes
   }
   class BodyRenderer {
     <<interface>>
     +build(params: RenderParams) void
     +applyHonesty(state: HonestyState) void
     +dispose() void
+  }
+  class RenderPlan {
+    <<planTypes.ts>>
+    pure data, no GPU
+    layers drawn, notes, missing
+    all honesty, mode and epoch decisions
+  }
+  class PlanRender {
+    <<renderPlan.ts, planCommon.ts>>
+    +planRender(card, params, ctx: PlanContext) RenderPlan
+    PlanContext: honesty, view mode, comet epoch, light-curve scrub, failed loads
+    per-type plan functions in renderers/
+  }
+  class PlanBuild {
+    <<renderers/build.ts>>
+    +build(plan: RenderPlan, hooks, cache: AssetCache) three.js objects
+    AssetCache keeps textures and meshes by URL across rebuilds
+    gas shells and dust are instanced Sprites (r187 Points are 1 px)
   }
   class AsteroidMesh {
     <<asteroid_shape>>
@@ -32,13 +54,14 @@ classDiagram
     <<asteroid_procedural>>
     requires diameter_km
     SphereGeometry 1, 256, 128 scaled by ellipsoid_axes
-    baked albedo, normal, roughness maps
+    baked albedo (visible mode only), normal, roughness maps
     displacement on desktop only
   }
   class Comet {
     <<comet>>
-    requires gas_Q per epoch, coma_radius_km
-    nucleus at upper size limit
+    requires gas_Q per epoch (Q-42), coma_radius_km
+    one-epoch gas_Q only when epochs has one entry
+    nucleus at upper size limit, sizeQualifier upper_limit
     one point cloud per gas, density 1 over r squared
     dust cloud December only
     epoch toggle Aug or Dec 2025
@@ -53,7 +76,7 @@ classDiagram
   }
   class Star {
     <<star, star_mira, star_ttauri>>
-    requires teff_K
+    requires teff_K, radius_rsun optional (no radius: unit sphere, no scale bar)
     blackbody colour, linear limb darkening
     Mira brightness follows light curve
     T Tauri disc and dust screen
@@ -61,16 +84,29 @@ classDiagram
   }
   class ShaderBody {
     <<planet_rocky, planet_water, gas_giant, nebula, nova>>
-    browser shader generator, triplanar
-    samples field as DataTexture
+    made by buildScene from plan.shader (ShaderBody.start), kept across plans that only change honesty or light
+    visibleTags from allowedTags(plan.honesty), light from planLighting, onChange from BuildHooks
+    plain sphere at once (never blank), surface swaps in when the field is ready
+    plain sphere follows Q-45: only while the size on the card is shown
+    TSL node materials on three r187
+    reads field as 2 Float32 DataTextures via textureLoad
     finer noise is seen, not felt
+    nebula and nova are instanced Sprites
+    refused layers go in missing
   }
   class FieldWorker {
     <<Web Worker, D-12>>
-    +seed: number
-    512 x 256 equirectangular
-    channels height, band, ocean, ice, storm
+    fieldWorker.ts wraps generateField
+    fieldGenerator.ts is pure and seeded
+    512 x 256 equirectangular, R6.1 mapping
+    texture A height, band, storm
+    texture B ocean, ice, lava crack
     runs once per body, not per frame
+  }
+  class FieldSampler {
+    <<fieldGenerator.ts>>
+    bilinear height and masks, nearest ids
+    sampleDirection and sampleUV
   }
   class Lighting {
     <<lighting.ts>>
@@ -97,11 +133,13 @@ classDiagram
   class ScaleBar {
     <<scaleBar.ts>>
     +scale_m: number or null
-    one familiar comparison
+    +sizeQualifier: upper_limit or null
+    one familiar comparison, "at most" for an upper limit
   }
   class AltText {
     <<altText.ts>>
-    +alt_text: string
+    +buildAltText(plan: RenderPlan) string
+    built from the plan, not from RenderParams.alt_text
     updates canvas aria-label
     aria-live polite announcements
   }
@@ -114,7 +152,12 @@ classDiagram
   ViewerApp "1" *-- "1" Honesty
   ViewerApp "1" *-- "1" ScaleBar
   ViewerApp "1" *-- "1" AltText
-  ViewerApp "1" --> "0..1" BodyRenderer : chosen by type, none for candidate
+  ViewerApp ..> PlanRender : setObject calls planRender
+  PlanRender ..> RenderPlan : returns
+  ViewerApp ..> PlanBuild : showPlan builds the plan
+  PlanBuild ..> RenderPlan : reads
+  ViewerApp "1" --> "0..1" BodyRenderer : the generated body of a shader kind (ViewerApp.body), none for the baked kinds and candidate
+  PlanBuild ..> ShaderBody : creates it from plan.shader
   ViewerApp "1" --> "0..*" HapticSource : touch mode pointer UV
   Honesty --> HonestyState
   AsteroidMesh ..|> BodyRenderer
@@ -124,13 +167,16 @@ classDiagram
   Star ..|> BodyRenderer
   ShaderBody ..|> BodyRenderer
   ShaderBody --> "1" FieldWorker : requests field
-  HapticSource ..> FieldWorker : samples same array
+  HapticSource ..> FieldSampler : samples same array
+  FieldSampler --> FieldWorker : reads its arrays
 ```
 
 ## Notes
 
+- Plan layer (issue #7): `ViewerApp.setObject` calls `planRender` to get a pure `RenderPlan`, and `showPlan` passes it to `renderers/build.ts`, which makes the three.js objects. The per-type renderer files hold the plan functions. `BodyRenderer` above is the conceptual contract; in code it is the plan function plus `build.ts`.
+
 - `candidate` has no renderer. The panel shows "Not enough data for a 3D model: distance and albedo unknown" (rendering doc §7.6).
-- The five baked renderers use backend textures (rendering doc §6); `ShaderBody` uses the shader generators from the mock-up, ported to ES modules (D-01, D-03). `ShaderBody` is listed in rendering doc §10 (name **[verify]**).
+- The five baked renderers use backend textures (rendering doc §6); `ShaderBody` uses the shader generators from the mock-up, ported to ES modules (D-01, D-03). `ShaderBody` is listed in rendering doc §10 (name **[verify]**). The shader kinds use the same entry point as the baked kinds: `renderers/shaderPlan.ts` (pure) plans them with `PlanBuilder` (legend, missing, notes, Q-45 plain sphere), `renderers/build.ts` creates the `ShaderBody` from `plan.shader`, and `BuiltScene.update(plan)` applies a new honesty state or light to it in place, so a toggle never regenerates the field (Q-49). `bodyRenderer.ts` holds the `BodyRenderer` contract. There is no per-type registry and no `ViewerApp.setBody`.
 - Mesh budget: D-05 sets ≤ 50k triangles, tighter than the 300k in older text; D-05 wins.
 - Pixel ratio is `min(devicePixelRatio, 1.5)`, and the scene renders only when the view changes (D-05).
 - If a required card field is missing, the renderer does not draw that layer and it is listed in `RenderParams.missing`.

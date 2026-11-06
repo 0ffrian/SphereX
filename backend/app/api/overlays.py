@@ -1,4 +1,4 @@
-"""Overlay endpoints (issue #12, Q-43): catalogue markers and contamination, the FLAGS mask PNG
+"""Overlay endpoints (issue #12, Q-50): catalogue markers and contamination, the FLAGS mask PNG
 and a two-frame combination PNG. Plain ``def`` routes: the FITS work runs in the threadpool.
 """
 

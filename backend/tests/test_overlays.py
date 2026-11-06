@@ -1,4 +1,4 @@
-"""Overlays (issue #12, Q-43..Q-47): Gaia and CatWISE markers, contamination, FLAGS mask, field
+"""Overlays (issue #12, Q-50..Q-54): Gaia and CatWISE markers, contamination, FLAGS mask, field
 of view and add/subtract, offline from the recorded cache.
 
 Done when (issue #12): overlays show on the 5 test targets from cache.

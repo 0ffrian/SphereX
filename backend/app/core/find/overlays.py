@@ -40,7 +40,7 @@ CATALOGS: tuple[Catalog, ...] = ("gaia", "wise")
 # ASSUMPTION: slack for field-star proper motions between the catalogue epoch and the frame time
 # (30 arcsec = 3 arcsec/yr over 10 years) and for rounding. Not a physical value of any object.
 CONE_MARGIN_ARCSEC = 30.0
-# ASSUMPTION (Q-46): the catalogue source nearest the object, within this distance, is the
+# ASSUMPTION (Q-53): the catalogue source nearest the object, within this distance, is the
 # target itself. It stays a marker but is left out of the contamination list.
 TARGET_MATCH_PX = 2.0
 MEMO_SIZE = 32
