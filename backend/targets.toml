@@ -40,3 +40,36 @@ name = "433 Eros"
 query = "433 Eros"
 group = "fixture"
 aliases = []
+
+# Exoplanet fixtures (Q-63, A3.8): one per kind the rule gives, plus the envelope refusal, with
+# `frames = false` so only the SIMBAD and Exoplanet Archive answers are recorded (no SPHEREx
+# frames: the card then has a null spectrum with a reason). Classes under the Q-63 rule:
+# TRAPPIST-1 e R 0.92 -> planet_rocky; K2-18 b R 2.37, M 8.92 -> planet_water;
+# HD 209458 b R 15.58 -> gas_giant; GJ 1214 b R 2.73, M 8.41 -> candidate (envelope).
+[[target]]
+name = "TRAPPIST-1 e"
+query = "TRAPPIST-1 e"
+group = "fixture"
+frames = false
+aliases = []
+
+[[target]]
+name = "K2-18 b"
+query = "K2-18 b"
+group = "fixture"
+frames = false
+aliases = []
+
+[[target]]
+name = "HD 209458 b"
+query = "HD 209458 b"
+group = "fixture"
+frames = false
+aliases = []
+
+[[target]]
+name = "GJ 1214 b"
+query = "GJ 1214 b"
+group = "fixture"
+frames = false
+aliases = []
