@@ -10,8 +10,10 @@ classDiagram
     -renderer: WebGPURenderer, three r187
     -params: RenderParams
     -body: BodyRenderer
+    -plan: RenderPlan
     -touchMode: boolean
-    +open(params: RenderParams) void
+    +setObject(card: ObjectCard, params: RenderParams, ctx: PlanContext) void
+    +showPlan(plan: RenderPlan) void
     +setTouchMode(on: boolean) void
     +render() void
   }
@@ -20,6 +22,22 @@ classDiagram
     +build(params: RenderParams) void
     +applyHonesty(state: HonestyState) void
     +dispose() void
+  }
+  class RenderPlan {
+    <<planTypes.ts>>
+    pure data, no GPU
+    layers drawn, notes, missing
+    all honesty, mode and epoch decisions
+  }
+  class PlanRender {
+    <<renderPlan.ts, planCommon.ts>>
+    +planRender(card, params, ctx: PlanContext) RenderPlan
+    PlanContext: honesty, view mode, comet epoch, light-curve scrub, failed loads
+    per-type plan functions in renderers/
+  }
+  class PlanBuild {
+    <<renderers/build.ts>>
+    +build(plan: RenderPlan) three.js objects
   }
   class AsteroidMesh {
     <<asteroid_shape>>
@@ -114,6 +132,10 @@ classDiagram
   ViewerApp "1" *-- "1" Honesty
   ViewerApp "1" *-- "1" ScaleBar
   ViewerApp "1" *-- "1" AltText
+  ViewerApp ..> PlanRender : setObject calls planRender
+  PlanRender ..> RenderPlan : returns
+  ViewerApp ..> PlanBuild : showPlan builds the plan
+  PlanBuild ..> RenderPlan : reads
   ViewerApp "1" --> "0..1" BodyRenderer : chosen by type, none for candidate
   ViewerApp "1" --> "0..*" HapticSource : touch mode pointer UV
   Honesty --> HonestyState
@@ -128,6 +150,8 @@ classDiagram
 ```
 
 ## Notes
+
+- Plan layer (issue #7): `ViewerApp.setObject` calls `planRender` to get a pure `RenderPlan`, and `showPlan` passes it to `renderers/build.ts`, which makes the three.js objects. The per-type renderer files hold the plan functions. `BodyRenderer` above is the conceptual contract; in code it is the plan function plus `build.ts`.
 
 - `candidate` has no renderer. The panel shows "Not enough data for a 3D model: distance and albedo unknown" (rendering doc §7.6).
 - The five baked renderers use backend textures (rendering doc §6); `ShaderBody` uses the shader generators from the mock-up, ported to ES modules (D-01, D-03). `ShaderBody` is listed in rendering doc §10 (name **[verify]**).

@@ -20,7 +20,9 @@ backend/app/core/measure/            (Moon)  # pipeline stage 2 (A4.2), issue #2
                                                             # solid_angle, photometry, spectrum; endpoint in app/api/spectrum.py
 frontend/src/viewer/                 (Moon)
   ViewerApp.ts lighting.ts modes.ts honesty.ts scaleBar.ts altText.ts
-  renderers/AsteroidMesh.ts AsteroidProcedural.ts Comet.ts BrownDwarf.ts Star.ts
+  planTypes.ts planCommon.ts renderPlan.ts   # pure RenderPlan: types, shared helpers, planRender (no GPU)
+  renderers/AsteroidMesh.ts AsteroidProcedural.ts Comet.ts BrownDwarf.ts Star.ts   # per-type plan functions
+  renderers/build.ts        # turns a RenderPlan into three.js objects
   renderers/ShaderBody.ts   # browser-shader kinds (§7.7, D-01, D-12); name [verify]
   fields/             (Atish)  # Web Worker field generator for shader kinds (§7.7, D-12); scaffold file fieldWorker.ts [verify]
 frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
@@ -41,7 +43,7 @@ frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, St
   search/             # SearchBar, parseQuery (name, or RA, Dec in decimal degrees), testTargets (the five A1.1 targets)
   flipbook/           # Flipbook player, playback, keys, cutout preloading, RainbowTrails + wavelengthColor (D-28)
   spectrum/           # SpectrumPanel, SVG SpectrumChart, scale (displays the A4.2 output)
-frontend/src/test/                           # test-only helpers (fixtureFetch.ts)
+frontend/src/test/                           # test-only helpers (fixtureFetch.ts, sharedFixtures.ts: loads shared/fixtures)
 frontend/src/fixtures.test.ts                # fixtures are deterministic, pass the API validators, never imported by app code
 frontend/e2e/                                # Playwright tests (smoke, flipbook) against the fixture server
 frontend/fixtures/                           # dev and test only: SYNTHETIC fixture server, a Vite dev-server plugin
@@ -102,3 +104,7 @@ The `app/` subfolders (`api/`, `search/`, `flipbook/`, `spectrum/`), the `sky` s
 12. Exoplanet type thresholds for `planet_rocky` / `planet_water` / `gas_giant` ([§3.3](data-contract.md#r33-type-selection-backend)). Teq is now `teq_K` in [§3.2](data-contract.md#r32-objectcard-produced-by-the-backend-get-v1objectsidcard) (D-12); any other ObjectCard fields for exoplanets are not yet defined.
 13. Whether the pulse-width whisper (e.g. `[4, 4, 4, 4, 4]`) is felt as distinct on each phone ([§8.3](haptics/platform-encoding.md#r83-encoding-web-driver-d-09), [§8.7](haptics/calibration.md#r87-calibration-and-settings)).
 14. The gas giant jet pulse rate, clamp(k · |zonal wind| / max |zonal wind|, 2, 20) Hz, felt on both phones ([§8.4](haptics/sources.md#r84-event-sources), D-12). The field's channel packing and lava-crack channel are settled by D-12 ([§7.7](renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova)).
+15. Brown dwarf `flux_45um` normalisation reference (`BROWN_DWARF_CONFIG.flux45Reference`, null): without it the `emissive` layer is not drawn ([§7.4](renderers/brown-dwarf.md)).
+16. SPHEREx time span for the star proper-motion trail (`STAR_CONFIG.spherexBaselineYears`, null): without it `motion_trail` is not drawn.
+17. Which `FLAGS` bit means saturation in the SPHEREx light curve. The viewer excludes any point with non-zero `flags` until this is known.
+18. Mauritius length in the scale bar (R5.4, ~65 km): the comparison is not offered while `COMPARISONS` holds `null`.

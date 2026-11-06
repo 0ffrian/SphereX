@@ -2,7 +2,7 @@
 
 Vite + TypeScript + React web app. three.js **r187** (`three/webgpu`).
 
-Status: the tooling, the data-contract types, typed placeholder modules for every R10 file and a viewer smoke scene (one plain sphere), set up on 4 Nov 2026. M1 (issue #3, 5 Nov 2026) adds the SPHEREx flipbook and spectrum view: search by name or RA/Dec, frame playback, the spectrum chart, Rainbow Trails and the shareable URL hash. The 3D viewer does not load an object yet.
+Status: the tooling, the data-contract types, typed placeholder modules for every R10 file and a viewer smoke scene (one plain sphere), set up on 4 Nov 2026. M1 (issue #3, 5 Nov 2026) adds the SPHEREx flipbook and spectrum view: search by name or RA/Dec, frame playback, the spectrum chart, Rainbow Trails and the shareable URL hash. Issue #7 (M2) adds the 3D viewer for the baked types: see "Viewer: baked types" below.
 
 ## Run it
 
@@ -95,17 +95,17 @@ This follows [rendering doc R10](../docs/rendering/layout-tests-open-items.md#r1
 src/
   contract/       generated.ts: types from shared/schemas/ (D-18, do not edit). Hand-written next to it:
                   TV<T>, HapticKind, HapticEvent, HapticDriver (R8.8, Q-19), assertTagged()
-  state/          Zustand store: card, params, honesty (null until Q-08), overrides (D-02),
+  state/          Zustand store: card, params, honesty (starts at `derived`, D-21), overrides (D-02),
                   and the `sky` slice (flipbook session: search, frames, playback, spectrum)
   app/            React shell: App, ViewerPanel (canvas + on-screen controls), StatusLine,
-                  FixtureBanner, LiveAnnouncer, useHashSync + urlHash (A10 hash routing)
+                  FixtureBanner, LiveAnnouncer, ViewerPanel.test.tsx, useHashSync + urlHash (A10 hash routing)
     api/                  M1 API client (D-16): types (TEMPORARY until D-18 generation), checks, errors
     search/               SearchBar, parseQuery (name or RA, Dec in degrees), the 5 test targets
     flipbook/             Flipbook player, cutout preloading, playback, Rainbow Trails (D-28)
     spectrum/             SpectrumPanel, hand-rolled SVG SpectrumChart, scales
-  test/           test-only helpers (fixtureFetch)
-  viewer/         (Moon)  ViewerApp [smoke scene], lighting, modes, honesty, scaleBar, altText
-    renderers/            AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody
+  test/           test-only helpers (fixtureFetch, sharedFixtures: loads shared/fixtures)
+  viewer/         (Moon)  ViewerApp, lighting, modes, honesty, scaleBar, altText, renderPlan + planCommon + planTypes (pure plan)
+    renderers/            AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star (plan functions), build (plan to three.js), ShaderBody
     fields/               fieldWorker (D-12 shared field; file name [verify])
   haptics/        (Moon, Atish for sources)  haptics, calibration
     drivers/              webVibrate, audio, tauri (stub, B-01)
@@ -115,7 +115,7 @@ fixtures/         SYNTHETIC dev/test fixtures and their Vite dev plugin (see fix
 scripts/          check-dist.js (post-build check)
 ```
 
-Modules that are not built yet export a single `*_PLACEHOLDER = { spec, implemented: false }` and contain no behaviour. Each file's header names its spec section. `src/layout.test.ts` checks that every R10 file exists and exports something.
+Modules that are not built yet (now only `ShaderBody`, `fieldWorker` and the haptics files) export a single `*_PLACEHOLDER = { spec, implemented: false }` and contain no behaviour. Each file's header names its spec section. `src/layout.test.ts` checks that every R10 file exists and exports something.
 
 ### Viewer smoke scene
 
@@ -125,6 +125,16 @@ Modules that are not built yet export a single `*_PLACEHOLDER = { spec, implemen
 - OrbitControls handle drag and wheel. Keyboard: arrows rotate, `+`/`−` zoom, `R` resets. There are on-screen rotate, zoom and reset buttons (R5.6, WCAG 2.5.7).
 - On unmount, everything (controls, geometry, material, renderer, canvas) is disposed.
 - In headless Chromium (Playwright), the renderer falls back to WebGL2. WebGPU on the phones is still **[verify]** (R12 item 1).
+
+### Viewer: baked types (M2, issue #7)
+
+- **Plan, then draw.** `viewer/renderPlan.ts` turns an `ObjectCard` + `RenderParams` + `PlanContext` (honesty, view mode, comet epoch, light-curve scrub, failed loads) into a pure `RenderPlan`; `renderers/build.ts` turns the plan into three.js objects. All decisions are in the plan and are tested without a GPU. `ViewerApp.setObject(card, params, ctx)` / `showPlan(plan)` draw it.
+- **Refuse rather than invent.** A layer is drawn only if the backend offered it (`params.layers`), every field in its `requires` is on the card, its tag passes the honesty state (D-21), and its mesh or texture loaded. Otherwise it is listed in `plan.missing` with a reason (`honesty`, `data`, `backend`, `load`, `epoch`, `unverified`) and shown in plain words under "Not drawn" (`app/messages.ts`). A body falls back to a plain flat-tinted sphere, never blank.
+- **Renderers:** `AsteroidMesh` (R7.1), `AsteroidProcedural` (R7.2), `Comet` with the Aug/Dec toggle (R7.3), `BrownDwarf` incl. binary (R7.4), `Star` incl. Mira and T Tauri (R7.5); `candidate` (R7.6) shows the message instead. Shader-only types (D-01) are not drawn yet.
+- **Shell modules:** `lighting.ts` (R5.1), `modes.ts` (R5.2, D-23), `honesty.ts` (R5.3, D-21), `scaleBar.ts` (R5.4), `altText.ts` (R9).
+- **Panel:** 3-state honesty control (starts at + Estimated), view-mode buttons, comet epoch buttons, light-curve slider, scale bar, legend with a Measured/Estimated/Default badge per layer, "Not drawn" list, canvas `aria-label` that follows the view, and a polite live region. Auto-spin runs only if the plan spins and `prefers-reduced-motion` is not set.
+- **Open values (config, `[verify]`):** `BROWN_DWARF_CONFIG.flux45Reference` and `STAR_CONFIG.spherexBaselineYears` are `null`, so the brown-dwarf glow and the `star` motion trail are refused as "unverified"; the Mauritius comparison length in `scaleBar.ts` is `null`.
+- The panel draws whatever `card` and `params` are in the store; nothing loads them yet (the M5 integration does), so in the browser the placeholder shows until then. Tests load the synthetic shared fixtures through `src/test/sharedFixtures.ts`.
 
 ### Flipbook and spectrum (M1, issue #3)
 
