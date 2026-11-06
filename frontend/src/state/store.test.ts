@@ -12,7 +12,9 @@ const params: RenderParams = {
   scale_m: 1,
   layers: [],
   lighting: { mode: 'sun' },
-  view_modes: { visible: {} },
+  view_modes: {
+    visible: { available: false, badge: 'Test', rgb: null, source: 'class_palette' },
+  },
   haptics: {
     texture: 'none',
     texture_tag: 'artistic',

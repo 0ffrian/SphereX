@@ -4,7 +4,7 @@
 
 ## R3. Data contract
 
-The types below are the spec. In code, `shared/schemas/*.json` is the single source: the backend's Pydantic models and `frontend/src/contract/` are generated from it, and CI fails on drift (D-18). Endpoints: D-16.
+The types below are the spec. In code, `shared/schemas/*.json` is the single source: the backend's Pydantic models (`backend/app/contract/`) and `frontend/src/contract/generated.ts` are generated from it, and CI fails on drift (D-18). Endpoints: D-16.
 
 ### R3.1 Tagged value
 
@@ -20,6 +20,8 @@ interface TV<T = number> {
   assumption?: string;      // required when tag === 'model_dependent'
 }
 ```
+
+JSON Schema has no generics, so the schema has one definition per payload: `TVNumber`, `TVString`, `TVRgb`, `TVVec3`, `TVPair`. `TV<T>` stays as a hand-written generic view of them in `frontend/src/contract/tags.ts`; `typeParity.test.ts` proves it equals each one. The `formula` and `assumption` rules are `if`/`then` in the schema and must be non-blank. The generators drop them, so fixtures are checked with a real validator on both sides. What enforces them on live replies is open (Q-40).
 
 ### R3.2 ObjectCard (produced by the backend: `GET /v1/objects/{id}/card`)
 
@@ -64,7 +66,7 @@ interface ObjectCard {
   // geometry of observation (solar-system bodies)
   phase_angle_deg?: TV; sun_vector?: TV<[number, number, number]>;
   // comet
-  gas_Q?: { co2?: TV; h2o?: TV; co?: TV };   // molecules/s, per epoch
+  gas_Q?: { co2?: TV; h2o?: TV; co?: TV };   // molecules/s, per epoch (the shape holds one epoch: Q-42)
   coma_radius_km?: TV; nucleus_radius_km_max?: TV;
   epochs?: ('2025-08' | '2025-12')[];
   // motion
@@ -93,8 +95,8 @@ The backend converts an ObjectCard into RenderParams with deterministic rules ([
 
 ```ts
 interface RenderParams {
-  id: string; type: ObjectType; generator_version: string; seed: number;
-  scale_m: number;                     // physical radius in metres
+  id: string; type: ObjectType; generator_version: string; seed: number;   // seed: integer >= 0 (Q-35)
+  scale_m: number | null;              // physical radius in metres; null = size unknown, body refused (Q-33)
   layers: Layer[];                     // ordered, each with a tag
   textures?: { albedo: string; height: string; normal: string; roughness?: string; height_bin?: string };
   lighting: { mode: 'sun' | 'self'; sun_dir?: [number, number, number]; phase_angle_deg?: number };

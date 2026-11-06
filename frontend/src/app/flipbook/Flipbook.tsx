@@ -3,11 +3,13 @@
 // ring on the object opens its spectrum (UML 09). Rainbow Trails is a view mode (D-28, P1).
 // Keyboard (R9): Space or K play/pause, ←/→ step, Home/End first/last, while focus is in the
 // flipbook but not on a button or form field (those keep their own keys).
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { FramesResponse, ResolveResponse } from '@/app/api/types';
 import { DataBadge, EstimatedBadge } from '@/app/Badge';
 import { formatCoords, formatUtc, formatWavelength } from '@/app/format';
-import { describeMissing, searchErrorMessage } from '@/app/messages';
+import { searchErrorMessage } from '@/app/messages';
+import { RefusalList } from '@/app/RefusalList';
+import { groupMissing } from '@/app/refusals';
 import { ErrorBox, LoadingBox } from '@/app/StatusBoxes';
 import { buttonClass, pressedClass } from '@/app/ui';
 import { describeFrame, useAppStore, type SkyState } from '@/state/store';
@@ -107,15 +109,10 @@ function stretchFormula(frames: FramesResponse): string {
   return `Display stretch ${frames.stretch.kind}, parameters ${JSON.stringify(frames.stretch.params)}`;
 }
 
+/** Refused frames and notes from the frames reply (A4.1), grouped by reason. */
 function MissingList({ missing }: { missing: readonly string[] }) {
-  if (missing.length === 0) return null;
-  return (
-    <ul className="list-disc pl-5 text-sm text-neutral-300" data-testid="missing">
-      {missing.map((code) => (
-        <li key={code}>{describeMissing(code)}</li>
-      ))}
-    </ul>
-  );
+  const groups = useMemo(() => groupMissing(missing), [missing]);
+  return <RefusalList groups={groups} lead="Frames found but not shown:" testId="missing" />;
 }
 
 function NoFrames({ frames }: { frames: FramesResponse }) {
@@ -130,7 +127,8 @@ function NoFrames({ frames }: { frames: FramesResponse }) {
   );
 }
 
-const CONTROL_TAGS = 'button, input, select, textarea, a, summary';
+/** Focus inside these keeps its own keys; `[data-own-keys]` marks scroll boxes (RefusalList). */
+const CONTROL_TAGS = 'button, input, select, textarea, a, summary, [data-own-keys]';
 
 function Player({
   sky,
