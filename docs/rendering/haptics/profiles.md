@@ -34,7 +34,7 @@
 | `star_mira` | — | heartbeat per scrub step | `heartbeat` without a usable light curve |
 | `star_ttauri` | — | dimming pulse per scrub step (Q-80) | `dimming` without a usable light curve |
 | `star` | — | — | `motion` (R12 #16) |
-| `candidate` | — | — | `detections` (frames carry no detection field) |
+| `candidate` | — | — | `detections` (frames carry no detection field, Q-86) |
 | `gas_giant` | flow | `teq_pulse` (`teq_K` tag) | `flow` without a field; `teq_pulse` when `teq_K` is null |
 | `planet_water` | terrain | `teq_pulse` (`teq_K` tag) | as above, `terrain` |
 | `planet_rocky` | terrain with lava cracks | `teq_pulse` when offered | as above |

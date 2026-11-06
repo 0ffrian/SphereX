@@ -71,7 +71,19 @@ export class WebVibrateDriver implements HapticDriver {
 - **Unlock and "can vibrate" (Q-73).** `engine.unlock()` from a click; the unlock state is shared (`getUnlockState`, `subscribeUnlockState`, `engine.unlocked`). User-facing "can vibrate" is `deviceVibrates(vibrate.supported)` (`platform.ts`): `navigator.vibrate` also exists in desktop Chrome.
 - All tuning values live in `haptics/tuning.ts` (D-13).
 
-Event sources (`sources/heightMap.ts`, `meshNormal.ts`, `field.ts`, `terrain.ts`, `flow.ts`, `spectrum.ts`, `lightcurve.ts`) read the `HapticProfile` from RenderParams and call `engine.emit`. Drivers never know about objects.
+Event sources (`sources/heightMap.ts`, `meshNormal.ts`, `field.ts`, `dataPulse.ts`, `terrain.ts`, `flow.ts`, `lightcurve.ts`) are built by `buildHaptics` in `profiles.ts` from the `HapticProfile` in RenderParams (R8.5) and driven by `TouchHaptics`; `sources/spectrum.ts` serves every object's spectrum (R8.6). They call `engine.emit` and the train API only. Drivers never know about objects.
+
+**M5 integration checklist** (issues #9–#11 are built against fixtures; nothing below is wired into the app yet):
+1. **One engine:** `createHaptics()` once; `bindEngine(outputs)` for the settings (R8.7); `applyStoredCalibration` at start-up (R8.7).
+2. **Honesty:** `bindHonesty(engine, get, subscribe)` (`haptics.ts`) from the store's honesty toggle (D-21), so the haptics follow the same filter as the layers.
+3. **Unlock and indicator:** a single `UnlockButton` with `canVibrate = deviceVibrates(vibrate.supported)`, whose click is the Touch-mode tap (Q-73); mount `PulseIndicator` (D-20).
+4. **Calibration:** decide when `CalibrationWizard` first runs (start-up or first entry to Touch mode); it runs only where `deviceVibrates` is true.
+5. **Touch mode (R5.6):** one pointer down turns orbit controls off; each `pointermove` goes through `TouchProbe` (`shaderProbeOptions(body, build)` for shader kinds, `planProbeBodies(plan.bodies)` for planned kinds) into `TouchHaptics.move`; the viewer's frame loop calls `TouchHaptics.poll(now)` while the pointer is down (Q-83); pointerup, pointercancel and pointerleave call `release`.
+6. **`buildHaptics` options:** `overrides` (required, the D-27 overrides the body was built with), `planBodies` (the comet nucleus), `heightGrid` (`loadHeightGrid(params.textures.height_bin)`), `epoch` and `gas` (the comet toggle and the gas selected on the spectrum), and `meshNormals: true` only once a `three-mesh-bvh` raycast fills `TouchSample.normal` (Q-78). Rebuild when the body, overrides, epoch or gas change; show `missing` with the other refusals.
+7. **Light curve:** the scrubber calls `TouchHaptics.scrub(index)` and `endScrub()`.
+8. **Spectrum:** mount `SpectrumHapticsPad` over `SpectrumChart` with the chart's `lambdaDomain`.
+9. **Listen tab:** `ListenSweep.play(planSweep(mapping, gasLinesForEpoch(card, epoch)), engine.honesty)` from the Listen button's click, after `engine.unlock()`.
+10. **PR #33** changes `viewer/sliders.ts` (`Overrides` readonly; invalid overrides no longer clamped). `profiles.ts` passes `overrides` to `resolveShaderSpec`: re-run the `profiles` tests after #33 merges.
 
 **From the mock-up (D-20).** This discrete `HapticEvent` is the app API; it carries the `tag` that the honesty rule and the audio timbre need.
 - The mock-up's native and iOS bridges are dropped for the event (D-08). The `HapticDriver` interface keeps the door open.
