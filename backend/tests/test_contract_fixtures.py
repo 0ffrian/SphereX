@@ -1,0 +1,261 @@
+"""Shared fixtures against the real JSON Schemas (A12, D-18).
+
+The generated Pydantic models drop the R3.1 if/then rules, so validation uses ``jsonschema``.
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any, get_args
+
+import jsonschema
+import pytest
+from pydantic import ValidationError
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT7
+
+from app.api.models import Tag as ApiTag
+from app.contract.object_card_schema import ObjectCard
+from app.contract.render_params_schema import RenderParams
+from app.settings import BACKEND_DIR
+
+SHARED = BACKEND_DIR.parent / "shared"
+SHADER_KINDS = {"planet_rocky", "planet_water", "gas_giant", "nebula", "nova"}
+ALL_ARTISTIC_KINDS = {"nebula", "nova"}
+SYNTHETIC = "synthetic fixture"
+
+
+def _load(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+CARD_SCHEMA = _load(SHARED / "schemas" / "object-card.schema.json")
+PARAMS_SCHEMA = _load(SHARED / "schemas" / "render-params.schema.json")
+OBJECT_TYPES: list[str] = CARD_SCHEMA["definitions"]["ObjectType"]["enum"]
+TAGS: list[str] = CARD_SCHEMA["definitions"]["Tag"]["enum"]
+TV_DEFINITIONS = ["TVNumber", "TVString", "TVRgb", "TVVec3", "TVPair"]
+
+CARDS = {p.stem: _load(p) for p in sorted((SHARED / "fixtures" / "cards").glob("*.json"))}
+PARAMS = {p.stem: _load(p) for p in sorted((SHARED / "fixtures" / "params").glob("*.json"))}
+INVALID = _load(SHARED / "fixtures" / "invalid" / "cases.json")
+
+_REGISTRY: Registry[Any] = Registry().with_resources(
+    (schema["$id"], Resource.from_contents(schema, default_specification=DRAFT7))
+    for schema in (CARD_SCHEMA, PARAMS_SCHEMA)
+)
+VALIDATORS = {
+    "object-card": jsonschema.Draft7Validator(CARD_SCHEMA, registry=_REGISTRY),
+    "render-params": jsonschema.Draft7Validator(PARAMS_SCHEMA, registry=_REGISTRY),
+}
+
+
+def _tagged(node: Any) -> Iterator[dict[str, Any]]:
+    """Every tagged value (TV) inside a card or params object."""
+    if isinstance(node, list):
+        for item in node:
+            yield from _tagged(item)
+    elif isinstance(node, dict):
+        if "value" in node and "tag" in node:
+            yield node
+        for item in node.values():
+            yield from _tagged(item)
+
+
+def _with_context(error: jsonschema.ValidationError) -> Iterator[jsonschema.ValidationError]:
+    """An error and, for ``anyOf``, the errors of each branch."""
+    yield error
+    for child in error.context or []:
+        yield from _with_context(child)
+
+
+def _is_provenance_rule(case: dict[str, Any]) -> bool:
+    """The R3.1 if/then rules, which the generators drop."""
+    expect = case["expect"]
+    return expect["keyword"] == "pattern" or expect.get("detail") in {"formula", "assumption"}
+
+
+def test_schemas_are_valid_draft7() -> None:
+    jsonschema.Draft7Validator.check_schema(CARD_SCHEMA)
+    jsonschema.Draft7Validator.check_schema(PARAMS_SCHEMA)
+
+
+def test_one_card_and_one_params_fixture_per_object_type() -> None:
+    assert sorted(CARDS) == sorted(OBJECT_TYPES)
+    assert sorted(PARAMS) == sorted(OBJECT_TYPES)
+
+
+def test_api_tag_literal_matches_the_schema() -> None:
+    assert list(get_args(ApiTag)) == TAGS
+
+
+def test_every_tagged_value_definition_has_the_same_rules() -> None:
+    """The schema repeats the TV body per payload (no generics); only ``value`` may differ."""
+    bodies = []
+    for name in TV_DEFINITIONS:
+        body = json.loads(json.dumps(CARD_SCHEMA["definitions"][name]))
+        for key in ("title", "description"):
+            del body[key]
+        del body["properties"]["value"]
+        bodies.append(body)
+    assert all(body == bodies[0] for body in bodies)
+
+
+@pytest.mark.parametrize("object_type", OBJECT_TYPES)
+def test_fixture_pair_validates_and_agrees(object_type: str) -> None:
+    card, params = CARDS[object_type], PARAMS[object_type]
+    VALIDATORS["object-card"].validate(card)
+    VALIDATORS["render-params"].validate(params)
+    assert card["type"] == params["type"] == object_type
+    assert card["id"] == params["id"]
+
+
+@pytest.mark.parametrize("object_type", OBJECT_TYPES)
+def test_fixture_pair_round_trips_through_the_generated_models(object_type: str) -> None:
+    # exclude_unset is the only dump that matches the schema: a plain dump adds null for every unset
+    # field, and exclude_none drops the required `value: null` and `scale_m: null` (Q-40).
+    card, params = CARDS[object_type], PARAMS[object_type]
+    assert ObjectCard.model_validate(card).model_dump(mode="json", exclude_unset=True) == card
+    assert RenderParams.model_validate(params).model_dump(mode="json", exclude_unset=True) == params
+
+
+@pytest.mark.parametrize("case", INVALID, ids=[case["name"] for case in INVALID])
+def test_invalid_case_is_rejected_for_its_stated_reason(case: dict[str, Any]) -> None:
+    errors = list(VALIDATORS[case["schema"]].iter_errors(case["instance"]))
+    assert len(errors) == 1  # the stated defect, and nothing else wrong with the instance
+    expect = case["expect"]
+    assert any(
+        "".join(f"/{part}" for part in error.absolute_path) == expect["path"]
+        and error.validator == expect["keyword"]
+        and expect.get("detail", "") in error.message
+        for error in _with_context(errors[0])
+    )
+
+
+@pytest.mark.parametrize("case", INVALID, ids=[case["name"] for case in INVALID])
+def test_generated_models_enforce_all_but_the_provenance_rules(case: dict[str, Any]) -> None:
+    """Pydantic drops the R3.1 if/then rules, so it alone cannot guard a live reply (Q-40)."""
+    model = {"object-card": ObjectCard, "render-params": RenderParams}[case["schema"]]
+    if _is_provenance_rule(case):
+        model.model_validate(case["instance"])
+    else:
+        with pytest.raises(ValidationError):
+            model.model_validate(case["instance"])
+
+
+@pytest.mark.parametrize(
+    ("tagged", "accepted"),
+    [
+        ({"tag": "derived", "formula": "a*b"}, True),
+        ({"tag": "derived", "formula": " \t"}, False),
+        ({"tag": "model_dependent", "assumption": "  "}, False),
+        ({"tag": "measured", "formula": "  "}, True),  # same as assertTagged: tag rules only
+    ],
+)
+def test_blank_rules_match_assert_tagged(tagged: dict[str, str], accepted: bool) -> None:
+    card = {"id": "fixture:t", "name": "t", "type": "candidate"}
+    albedo = {"value": 1.0, "source": SYNTHETIC, **tagged}
+    assert VALIDATORS["object-card"].is_valid({**card, "albedo": albedo}) is accepted
+
+
+def test_generated_models_refuse_unknown_fields() -> None:
+    with pytest.raises(ValidationError):
+        ObjectCard.model_validate({**CARDS["candidate"], "made_up": 1})
+    with pytest.raises(ValidationError):
+        RenderParams.model_validate({**PARAMS["candidate"], "made_up": 1})
+
+
+# Fixture honesty: nothing here may be mistaken for a real result (CLAUDE.md, data first).
+
+
+@pytest.mark.parametrize("object_type", OBJECT_TYPES)
+def test_fixture_is_unmistakably_synthetic(object_type: str) -> None:
+    card, params = CARDS[object_type], PARAMS[object_type]
+    assert card["id"] == f"fixture:{object_type}"
+    assert card["name"].startswith(f"{SYNTHETIC.capitalize()}: ")
+    assert params["alt_text"].startswith(f"{SYNTHETIC.capitalize()}. ")
+    assert params["generator_version"].startswith("fixture-")
+    for value in _tagged([card, params]):
+        assert value["source"].startswith(f"{SYNTHETIC}: ")
+
+
+def test_fixtures_exercise_every_tag() -> None:
+    tags = {value["tag"] for value in _tagged(list(CARDS.values()))}
+    assert tags == set(TAGS)
+
+
+# Per-type rules from the specs.
+
+
+@pytest.mark.parametrize("object_type", sorted(ALL_ARTISTIC_KINDS))
+def test_nebula_and_nova_are_all_artistic(object_type: str) -> None:
+    card, params = CARDS[object_type], PARAMS[object_type]
+    assert {value["tag"] for value in _tagged([card, params])} == {"artistic"}  # D-12
+    assert {layer["tag"] for layer in params["layers"]} == {"artistic"}
+    assert {params["haptics"]["texture_tag"], params["haptics"]["data_tag"]} == {"artistic"}
+
+
+@pytest.mark.parametrize("object_type", OBJECT_TYPES)
+def test_textures_follow_d01_and_r67(object_type: str) -> None:
+    params = PARAMS[object_type]
+    if object_type in SHADER_KINDS:
+        assert "textures" not in params  # D-01: drawn by browser shaders
+        return
+    textures = params.get("textures", {})
+    prefix = f"/data/textures/{params['id']}/{params['generator_version']}/{params['seed']}/"
+    assert all(url.startswith(prefix) for url in textures.values())
+    if params["haptics"]["texture"] == "height":
+        assert "height_bin" in textures  # R8.4: the height-map source samples height.bin
+
+
+def test_candidate_has_no_3d_body() -> None:
+    params = PARAMS["candidate"]
+    assert params["layers"] == []
+    assert params["scale_m"] is None
+    assert "mesh" in params["missing"]
+
+
+@pytest.mark.parametrize("object_type", OBJECT_TYPES)
+def test_unknown_size_refuses_the_body(object_type: str) -> None:
+    params = PARAMS[object_type]
+    assert (params["scale_m"] is None) == ("mesh" in params["missing"])  # Q-33, R11
+
+
+@pytest.mark.parametrize("object_type", ["planet_rocky", "planet_water", "gas_giant"])
+def test_teq_pulse_follows_teq_k(object_type: str) -> None:
+    teq, params = CARDS[object_type]["teq_K"], PARAMS[object_type]
+    if teq["value"] is None:  # D-12: refused and listed
+        assert "teq_pulse" in params["missing"]
+        assert params["haptics"]["data"] == "none"
+    else:
+        assert params["haptics"]["data"] == "teq_pulse"
+        assert params["haptics"]["data_tag"] == teq["tag"]
+
+
+def test_a_fixture_has_a_refused_teq_pulse() -> None:
+    assert CARDS["planet_rocky"]["teq_K"]["value"] is None
+    assert "teq_pulse" in PARAMS["planet_rocky"]["missing"]
+
+
+@pytest.mark.parametrize("object_type", OBJECT_TYPES)
+def test_layers_only_use_present_data(object_type: str) -> None:
+    """Refuse rather than invent: a drawn layer's required card fields exist and are known."""
+    card, params = CARDS[object_type], PARAMS[object_type]
+    for layer in params["layers"]:
+        for name in layer["requires"]:
+            assert name in CARD_SCHEMA["properties"]
+            field = card.get(name)
+            assert field is not None
+            assert not isinstance(field, dict) or field.get("value", True) is not None
+    assert not {layer["id"] for layer in params["layers"]} & set(params["missing"])
+
+
+@pytest.mark.parametrize("object_type", OBJECT_TYPES)
+def test_view_modes_follow_d23_and_r52(object_type: str) -> None:
+    params = PARAMS[object_type]
+    modes = params["view_modes"]
+    assert "channels_um" not in modes["visible"]  # D-23: IRMode only
+    for key, mode in modes.items():
+        assert (mode["rgb"] is not None) == mode["available"]
+        assert (key in params["missing"]) == (not mode["available"])  # D-23

@@ -1,0 +1,10 @@
+{
+  "id": "fixture:nova",
+  "name": "Synthetic fixture: nova (slider-only)",
+  "type": "nova",
+  "diameter_km": {
+    "value": 1000000000.0,
+    "tag": "artistic",
+    "source": "synthetic fixture: slider default"
+  }
+}

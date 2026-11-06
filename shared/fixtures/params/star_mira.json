@@ -1,0 +1,68 @@
+{
+  "id": "fixture:star_mira",
+  "type": "star_mira",
+  "generator_version": "fixture-0",
+  "seed": 6,
+  "scale_m": 695000000.0,
+  "layers": [
+    {
+      "id": "colour",
+      "tag": "derived",
+      "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+      "requires": [
+        "teff_K"
+      ]
+    },
+    {
+      "id": "limb_darkening",
+      "tag": "model_dependent",
+      "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+      "requires": []
+    },
+    {
+      "id": "brightness_curve",
+      "tag": "measured",
+      "description": "Brightness follows the measured light curve as you scrub (R7.5).",
+      "requires": [
+        "lightcurve"
+      ]
+    },
+    {
+      "id": "radius_pulsation",
+      "tag": "artistic",
+      "description": "Radius pulsation of 10 percent (R7.5).",
+      "requires": [
+        "period_var_d"
+      ]
+    }
+  ],
+  "lighting": {
+    "mode": "self"
+  },
+  "view_modes": {
+    "visible": {
+      "available": true,
+      "badge": "Estimated visible colour",
+      "rgb": {
+        "value": [
+          1.0,
+          0.5,
+          0.25
+        ],
+        "tag": "derived",
+        "source": "synthetic fixture: not a real measurement",
+        "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+      },
+      "source": "class_palette"
+    }
+  },
+  "haptics": {
+    "texture": "none",
+    "texture_tag": "artistic",
+    "data": "heartbeat",
+    "data_tag": "measured",
+    "params": {}
+  },
+  "alt_text": "Synthetic fixture. Mira variable, 1 solar radius (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
+  "missing": []
+}

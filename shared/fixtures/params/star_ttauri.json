@@ -1,0 +1,66 @@
+{
+  "id": "fixture:star_ttauri",
+  "type": "star_ttauri",
+  "generator_version": "fixture-0",
+  "seed": 7,
+  "scale_m": 695000000.0,
+  "layers": [
+    {
+      "id": "colour",
+      "tag": "derived",
+      "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+      "requires": [
+        "teff_K"
+      ]
+    },
+    {
+      "id": "limb_darkening",
+      "tag": "model_dependent",
+      "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+      "requires": []
+    },
+    {
+      "id": "disc",
+      "tag": "artistic",
+      "description": "Tilted disc (R7.5).",
+      "requires": []
+    },
+    {
+      "id": "dust_screen",
+      "tag": "artistic",
+      "description": "Screen opacity = clamp(1 - flux/median_flux, 0, 0.9). The timing is measured, the geometry is artistic (R7.5, Q-38).",
+      "requires": [
+        "lightcurve"
+      ]
+    }
+  ],
+  "lighting": {
+    "mode": "self"
+  },
+  "view_modes": {
+    "visible": {
+      "available": true,
+      "badge": "Estimated visible colour",
+      "rgb": {
+        "value": [
+          1.0,
+          0.5,
+          0.25
+        ],
+        "tag": "derived",
+        "source": "synthetic fixture: not a real measurement",
+        "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+      },
+      "source": "class_palette"
+    }
+  },
+  "haptics": {
+    "texture": "none",
+    "texture_tag": "artistic",
+    "data": "dimming",
+    "data_tag": "measured",
+    "params": {}
+  },
+  "alt_text": "Synthetic fixture. T Tauri star, 1 solar radius (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
+  "missing": []
+}

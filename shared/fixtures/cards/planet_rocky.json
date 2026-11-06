@@ -1,0 +1,16 @@
+{
+  "id": "fixture:planet_rocky",
+  "name": "Synthetic fixture: rocky planet with no temperature",
+  "type": "planet_rocky",
+  "radius_rjup": {
+    "value": 0.1,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "teq_K": {
+    "value": null,
+    "tag": "derived",
+    "source": "synthetic fixture: pl_eqt is empty and the A7.1 inputs are absent",
+    "formula": "Teq = T_star * sqrt(R_star / (2a)) * (1 - A)^(1/4) (A7.1)"
+  }
+}
