@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import tempfile
+import time
 import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -108,6 +109,16 @@ def texture_dir(root: Path, object_id: str, generator_version: str, seed: int) -
     return root / _segment(object_id, "id") / _segment(generator_version, "version") / str(seed)
 
 
+def bake_dir(
+    root: Path, object_id: str, generator_version: str, seed: int, width: int, height: int
+) -> Path:
+    """Where one size is written: ``{texture_dir}/{width}x{height}``.
+
+    Each size has its own directory, so two sizes of one object never replace each other.
+    """
+    return texture_dir(root, object_id, generator_version, seed) / f"{width}x{height}"
+
+
 def bake_key(p: BakeParams, width: int, height: int) -> str:
     """Hash of everything that decides the bytes: the parameters, the size and the rules version.
 
@@ -120,9 +131,10 @@ def bake_key(p: BakeParams, width: int, height: int) -> str:
 
 def _is_valid(out: Path, key: str) -> bool:
     try:
-        if json.loads((out / META).read_text(encoding="utf-8")).get("key") != key:
-            return False
+        meta = json.loads((out / META).read_text(encoding="utf-8"))
     except (OSError, ValueError):
+        return False
+    if not isinstance(meta, dict) or meta.get("key") != key:
         return False
     return all((out / f).is_file() for f in FILES)
 
@@ -137,10 +149,11 @@ def bake_to_cache(
 ) -> Path:
     """Bake unless a valid entry exists; safe for concurrent callers on the same key.
 
-    Files are written to a temporary directory and moved into place in one rename. A valid
-    entry is never deleted: if another worker finishes first, this one discards its own copy.
+    The directory holds one size (``bake_dir``). Files are written to a temporary directory and
+    moved into place in one rename. A valid entry is never deleted: if another worker finishes
+    first, this one discards its own copy.
     """
-    out = texture_dir(root, object_id, generator_version, p.seed)
+    out = bake_dir(root, object_id, generator_version, p.seed, width, height)
     key = bake_key(p, width, height)
     if _is_valid(out, key):
         return out
@@ -152,7 +165,9 @@ def bake_to_cache(
             (tmp / name).write_bytes(data)
         (tmp / META).write_text(json.dumps({"key": key}), encoding="utf-8")
         tmp.chmod(0o755)  # mkdtemp makes it 0700; the API process must be able to serve it
-        for _ in range(3):
+        for attempt in range(5):
+            if attempt:
+                time.sleep(0.05 * attempt)  # Windows: a file of the old entry may still be open
             if _is_valid(out, key):
                 return out  # another worker won the race
             if out.exists():  # stale or incomplete: move it aside, never delete in place

@@ -9,6 +9,7 @@ import copy
 import hashlib
 import json
 import math
+import sys
 import threading
 import time
 from pathlib import Path
@@ -22,6 +23,7 @@ from app.core.render import (
     BakeParams,
     BakeRefusal,
     bake,
+    bake_dir,
     bake_to_cache,
     encode,
     params_from_card,
@@ -119,6 +121,11 @@ def test_seeds_past_32_bits_do_not_overflow_and_all_bits_count() -> None:
     a = sha(encode(bake(params_from_card(c, 0), 64, 32)))
     b = sha(encode(bake(params_from_card(c, 2**32), 64, 32)))
     assert all(a[k] != b[k] for k in a)
+    # Brown dwarf bands use only the hashed noise seed, so this catches a 32-bit fold on its own.
+    d = card("brown_dwarf")
+    a = sha(encode(bake(params_from_card(d, 0), 64, 32)))
+    b = sha(encode(bake(params_from_card(d, 2**32), 64, 32)))
+    assert a["albedo.webp"] != b["albedo.webp"]
 
 
 def test_style_rules_match_r62() -> None:
@@ -177,19 +184,19 @@ def test_missing_diameter_is_refused_not_crashed() -> None:
         params_from_card(c, 1)
 
 
-def test_no_colour_source_bakes_relief_and_lists_colour_missing() -> None:
+def test_no_colour_source_bakes_relief_and_lists_albedo_map_missing() -> None:
     """B3: R7.2 makes colour optional, so only the albedo layer is lost."""
     c = card("asteroid_procedural")
     c["spectral_class"]["value"] = "B"  # no palette for B
     p = params_from_card(c, 1)
-    assert "colour" in p.missing
+    assert "albedo_map" in p.missing
     r = bake(p, W, H)
     assert r.height.std() > 0 and np.all(
         np.abs(np.linalg.norm(r.normal / 255 * 2 - 1, axis=-1) - 1) <= 0.02
     )
     del c["spectral_class"]
-    assert "colour" in params_from_card(c, 1).missing
-    assert "colour" not in params_from_card(card("asteroid_procedural"), 1).missing
+    assert "albedo_map" in params_from_card(c, 1).missing
+    assert "albedo_map" not in params_from_card(card("asteroid_procedural"), 1).missing
 
 
 def test_missing_albedo_value_is_listed_not_silent() -> None:
@@ -344,7 +351,7 @@ def test_flat_surface_encodes_as_128_128_255() -> None:
 def test_cache_layout_and_files(tmp_path: Path) -> None:
     p = params_from_card(card("asteroid_procedural"), 2)
     out = bake_to_cache(p, tmp_path, "sbdb:101955", "v1", 128, 64)
-    assert out == tmp_path / "sbdb%3A101955" / "v1" / "2"
+    assert out == tmp_path / "sbdb%3A101955" / "v1" / "2" / "128x64"
     assert sorted(f.name for f in out.iterdir()) == [
         "albedo.webp",
         "bake.json",
@@ -372,7 +379,7 @@ def test_cache_hit_does_not_rebake(tmp_path: Path) -> None:
 
 def test_incomplete_cache_dir_is_rebuilt(tmp_path: Path) -> None:
     p = params_from_card(card("brown_dwarf"), 4)
-    out = texture_dir(tmp_path, "x", "v1", 4)
+    out = bake_dir(tmp_path, "x", "v1", 4, 64, 32)
     out.mkdir(parents=True)
     (out / "albedo.webp").write_bytes(b"partial")
     bake_to_cache(p, tmp_path, "x", "v1", 64, 32)
@@ -413,14 +420,37 @@ def test_full_size_budget() -> None:
 # ---- cache validity and concurrency (B2, N2, N3, N5) -------------------------------------
 
 
-def test_cache_is_keyed_by_size(tmp_path: Path) -> None:
-    """B2: a small pre-bake must not be served as the large texture."""
+def test_each_size_has_its_own_directory(tmp_path: Path) -> None:
+    """B2 and N-A: sizes never replace each other, and each is served at its own size."""
     p = params_from_card(card("brown_dwarf"), 4)
-    out = bake_to_cache(p, tmp_path, "x", "v1", 64, 32)
-    assert Image.open(out / "normal.png").size == (64, 32)
-    assert bake_to_cache(p, tmp_path, "x", "v1", 128, 64) == out
-    assert Image.open(out / "normal.png").size == (128, 64)
-    assert (out / "height.bin").stat().st_size == 128 * 64 * 2
+    small = bake_to_cache(p, tmp_path, "x", "v1", 64, 32)
+    big = bake_to_cache(p, tmp_path, "x", "v1", 128, 64)
+    assert small != big and small.name == "64x32" and big.name == "128x64"
+    assert (small / "height.bin").stat().st_size == 64 * 32 * 2
+    assert (big / "height.bin").stat().st_size == 128 * 64 * 2
+    mt = (small / "bake.json").stat().st_mtime_ns
+    assert bake_to_cache(p, tmp_path, "x", "v1", 64, 32) == small  # alternating: no rebake
+    assert (small / "bake.json").stat().st_mtime_ns == mt
+
+
+def test_two_sizes_concurrently_each_get_their_own_files(tmp_path: Path) -> None:
+    p = params_from_card(card("brown_dwarf"), 4)
+    bad: list[str] = []
+    barrier = threading.Barrier(8)
+
+    def work(i: int) -> None:
+        w, h = (64, 32) if i % 2 else (128, 64)
+        barrier.wait()
+        out = bake_to_cache(p, tmp_path, "x", "v1", w, h)
+        if (out / "height.bin").stat().st_size != w * h * 2:
+            bad.append(f"{i}: wrong size")
+
+    ts = [threading.Thread(target=work, args=(i,)) for i in range(8)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    assert bad == []
 
 
 def test_changed_card_data_is_rebaked(tmp_path: Path) -> None:
@@ -436,9 +466,10 @@ def test_changed_card_data_is_rebaked(tmp_path: Path) -> None:
 def test_corrupt_meta_is_rebaked(tmp_path: Path) -> None:
     p = params_from_card(card("brown_dwarf"), 4)
     out = bake_to_cache(p, tmp_path, "x", "v1", 64, 32)
-    (out / "bake.json").write_text("not json")
-    bake_to_cache(p, tmp_path, "x", "v1", 64, 32)
-    assert json.loads((out / "bake.json").read_text())["key"]
+    for junk in ("not json", "null", "[]", '"s"', "7"):
+        (out / "bake.json").write_text(junk)
+        assert bake_to_cache(p, tmp_path, "x", "v1", 64, 32) == out
+        assert json.loads((out / "bake.json").read_text())["key"]
 
 
 def test_concurrent_bakes_of_one_key_all_succeed(tmp_path: Path) -> None:
@@ -465,8 +496,10 @@ def test_concurrent_bakes_of_one_key_all_succeed(tmp_path: Path) -> None:
 
 
 def test_windows_aliasing_ids_are_escaped(tmp_path: Path) -> None:
-    names = {texture_dir(tmp_path, i, "v1", 1).parent.parent.name for i in ("foo", "foo.", "foo ")}
-    assert len(names) == 3
+    segs = {
+        i: texture_dir(tmp_path, i, "v1", 1).parent.parent.name for i in ("foo", "foo.", "foo ")
+    }
+    assert segs == {"foo": "foo", "foo.": "foo%2E", "foo ": "foo%20"}
     for dev in ("nul", "NUL", "com1", "nul.txt"):
         seg = texture_dir(tmp_path, dev, "v1", 1).parent.parent.name
         assert seg.split(".")[0].lower() not in {"nul", "com1"}
@@ -504,3 +537,61 @@ def test_golden_hashes_at_64x32(name: str) -> None:
     seed = dict(BAKED)[name]
     got = sha(encode(bake(params_from_card(card(name), seed), 64, 32)))
     assert got == GOLDEN[name]
+
+
+def test_a_valid_entry_published_by_another_worker_is_never_deleted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """N-D(c): the other worker finishes while this one is still encoding."""
+    bake_mod = sys.modules["app.core.render.bake"]  # the package's `bake` is the function
+
+    p = params_from_card(card("brown_dwarf"), 4)
+    real_encode = bake_mod.encode
+    state = {"first": True}
+    mtimes: dict[str, int] = {}
+
+    def racing_encode(r: Any) -> dict[str, bytes]:
+        files = real_encode(r)
+        if state["first"]:
+            state["first"] = False
+            other = bake_to_cache(p, tmp_path, "x", "v1", 64, 32)  # the other worker
+            mtimes["h"] = (other / "height.bin").stat().st_mtime_ns
+        return files
+
+    monkeypatch.setattr(bake_mod, "encode", racing_encode)
+    out = bake_to_cache(p, tmp_path, "x", "v1", 64, 32)
+    assert (out / "height.bin").stat().st_mtime_ns == mtimes["h"]  # same file, not a rebake
+
+
+# ---- odd JSON numbers (N-B) --------------------------------------------------------------
+
+
+def test_huge_json_integer_is_missing_not_a_crash() -> None:
+    c = json.loads(
+        '{"type": "asteroid_procedural", "id": "x", "diameter_km": {"value": 1' + "0" * 400 + "}}"
+    )
+    with pytest.raises(BakeRefusal):
+        params_from_card(c, 1)
+    c = card("asteroid_procedural")
+    c["albedo"]["value"] = 10**400
+    c["gaia_rgb"] = {"value": [10**400, 0.1, 0.1], "tag": "derived", "source": "t", "formula": "t"}
+    p = params_from_card(c, 1)
+    assert p.missing == ("gaia_rgb", "brightness")
+
+
+def test_numpy_scalars_are_accepted() -> None:
+    c = card("asteroid_procedural")
+    c["diameter_km"]["value"] = np.float32(2.0)
+    assert params_from_card(c, 1).radius_m == pytest.approx(1000.0)
+
+
+def test_unusable_gaia_rgb_is_listed_so_the_colour_is_not_called_derived() -> None:
+    c = card("asteroid_procedural")
+    c["gaia_rgb"] = {
+        "value": [0.3, float("nan"), 0.3],
+        "tag": "derived",
+        "source": "t",
+        "formula": "t",
+    }
+    p = params_from_card(c, 1)
+    assert "gaia_rgb" in p.missing and p.base_rgb == (0.26, 0.25, 0.24)
