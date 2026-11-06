@@ -11,7 +11,7 @@ import {
   SpectrumHapticSource,
   jitterUnit,
   spectrumXToLambda,
-  type HapticSink,
+  type SpectrumSink,
   type SpectrumStep,
 } from './spectrum';
 
@@ -33,7 +33,7 @@ function dipSpectrum(opts: { noisy?: boolean } = {}): SpectrumMappingPoint[] {
   return pts;
 }
 
-class Recorder implements HapticSink {
+class Recorder implements SpectrumSink {
   readonly events: HapticEvent[] = [];
   emit(e: HapticEvent): boolean {
     this.events.push({ ...e });
