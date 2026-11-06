@@ -53,7 +53,7 @@ const TIMBRES = {
 } as const satisfies Record<string, Timbre>;
 
 /**
- * R8.9 provenance by timbre, refined by the D-12 `voice` hint (Q-60). The tag decides the family:
+ * R8.9 provenance by timbre, refined by the D-12 `voice` hint (Q-72). The tag decides the family:
  * `artistic` is always noise (grain, or surf for the ocean), so it keeps its grainy character
  * whatever the voice says; the other tags are always tones (a bell for `chime`), never noise.
  */
@@ -355,7 +355,7 @@ export class AudioDriver implements TrainCapableDriver {
         break;
       }
       case 'grain': {
-        // R8.9: a 4 ms noise burst with a 2 ms decay; with a pitch, band-passed there (Q-60).
+        // R8.9: a 4 ms noise burst with a 2 ms decay; with a pitch, band-passed there (Q-72).
         end = when + NOISE_BURST_S + NOISE_DECAY_S;
         g.setValueAtTime(gain, when);
         g.setValueAtTime(gain, when + NOISE_BURST_S);

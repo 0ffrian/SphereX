@@ -1,5 +1,5 @@
 // R8.3, R8.8, R11: the engine's honesty gate, rate cap, strength multiplier, debug hook and the
-// phase-continuous train scheduler (Q-59), all on a fake clock and fake drivers.
+// phase-continuous train scheduler (Q-71), all on a fake clock and fake drivers.
 import { describe, expect, it } from 'vitest';
 import type { HapticEvent } from '@/contract';
 import { FakeAudioContext, type FakeSource } from '@/test/fakeAudio';
@@ -166,7 +166,7 @@ describe('strength multiplier (R8.7)', () => {
   });
 });
 
-describe('pulse trains (Q-59)', () => {
+describe('pulse trains (Q-71)', () => {
   it.each([
     [1, 3],
     [2, 6],

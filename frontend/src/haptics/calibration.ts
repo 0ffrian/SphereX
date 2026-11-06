@@ -58,7 +58,7 @@ export function defaultCalibration(): Calibration {
 
 /**
  * R8.7 "first use, on phones that vibrate": a vibrate API **and** an Android phone with a touch
- * screen (the platform.ts rule, Q-61). Desktop Chrome and Chromebooks have `navigator.vibrate` but
+ * screen (the platform.ts rule, Q-73). Desktop Chrome and Chromebooks have `navigator.vibrate` but
  * no phone motor, so they are not offered calibration.
  */
 export function calibrationAvailable(
@@ -73,7 +73,7 @@ export function calibrationAvailable(
 /**
  * Vibrate levels for a calibration, weakest first. Whisper → WHISPER_PATTERN; soft → `minMs`;
  * medium and firm → R8.3's 15 and 25 ms, each raised to at least the level below it plus
- * CALIBRATION_LEVEL_STEP_MS, so the tick lengths are strictly increasing whatever `minMs` is (Q-62).
+ * CALIBRATION_LEVEL_STEP_MS, so the tick lengths are strictly increasing whatever `minMs` is (Q-74).
  */
 export function levelsToVibrate(cal: Calibration): VibrateLevel[] {
   const soft = cal.minMs;
@@ -99,7 +99,7 @@ export interface LevelAnswers {
   /**
    * It felt weaker than the soft tick. A pulse-width whisper has more on-time than a short soft
    * tick ([4,4,4,4,4] is 12 ms on against `minMs` = 5), so only the user can say which is weaker;
-   * one that feels the same or stronger is dropped, so the levels stay weakest first (Q-62).
+   * one that feels the same or stronger is dropped, so the levels stay weakest first (Q-74).
    */
   whisperWeaker: boolean;
 }
@@ -157,7 +157,7 @@ export function sequenceOnsetsMs(
   return onsets;
 }
 
-// ------------------------------------------------------------------ tap-along (R8.7 step 3, Q-63)
+// ------------------------------------------------------------------ tap-along (R8.7 step 3, Q-75)
 
 export interface BeatPlan {
   periodMs: number;
@@ -226,7 +226,7 @@ function median(sorted: readonly number[]): number {
 }
 
 /**
- * How far the taps lag the beats (R8.7 step 3, Q-63). Each tap is matched to the nearest beat;
+ * How far the taps lag the beats (R8.7 step 3, Q-75). Each tap is matched to the nearest beat;
  * taps on the warm-up beats, beyond the last beat or more than half a period away, and second taps
  * on a beat are ignored. The lag is the **median** of the rest, so a stray tap or one matched to
  * the wrong beat does not move it. A run with fewer than `minTaps` taps, or whose taps scatter

@@ -1,6 +1,6 @@
 // R8.6, R8.9, D-10, D-12: the `pitch` (0–1) of a HapticEvent and its frequency. One mapping for the
 // audio driver, the spectrum source and the Listen sweep, so sound and touch match (R8.6 item 3).
-// Pitch follows λ (R8.6/R8.9), not brightness as in the mock-up's sweep (Q-58).
+// Pitch follows λ (R8.6/R8.9), not brightness as in the mock-up's sweep (Q-70).
 import {
   DEFAULT_PITCH,
   PITCH_LAMBDA_MAX_UM,
@@ -23,7 +23,7 @@ export function pitchToHz(pitch: number | undefined): number {
 
 /**
  * λ (µm) → pitch 0–1 over [λmin, λmax], clamped. The default range is the SPHEREx band, so the same
- * λ sounds the same on every object (Q-58). A degenerate range gives the middle pitch.
+ * λ sounds the same on every object (Q-70). A degenerate range gives the middle pitch.
  */
 export function wavelengthToPitch(
   lambdaUm: number,

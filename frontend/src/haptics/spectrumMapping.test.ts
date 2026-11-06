@@ -62,7 +62,7 @@ describe('spectrumMapping (R8.6)', () => {
     expect(m.sampleAt(1)!.noisy).toBe(true); // mean σ 1.2 / mean flux 3 = 0.4
   });
 
-  it('reuses the out object and takes pitch from λ, not brightness (Q-58)', () => {
+  it('reuses the out object and takes pitch from λ, not brightness (Q-70)', () => {
     const m = buildSpectrumMapping([pt(1, 10), pt(4, 1)]);
     const out = { wavelengthUm: 0, strength: 0, quiet: false, noisy: false, pitch: 0 };
     expect(m.sampleAt(2, out)).toBe(out);

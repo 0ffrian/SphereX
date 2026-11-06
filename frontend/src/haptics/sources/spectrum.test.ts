@@ -332,10 +332,10 @@ describe('honesty (D-21)', () => {
   });
 });
 
-// R11 at phone width (Q-65). A 360 px viewport leaves about 296 px for the pad (the page and panel
+// R11 at phone width (Q-77). A 360 px viewport leaves about 296 px for the pad (the page and panel
 // padding). Over the full 0.75–5 µm band that is 69.6 px/µm; three quiet 8 px steps need a quiet
 // stretch of 16–24 px, i.e. 0.23–0.35 µm of λ.
-describe('R11 at phone width (360 px viewport, Q-65)', () => {
+describe('R11 at phone width (360 px viewport, Q-77)', () => {
   const PHONE_PX = 296;
 
   /** T/Y-dwarf-like (WISE 0855): a 4–5 µm peak and a deep, broad CH₄ trough at 3.0–3.8 µm. */
@@ -372,7 +372,7 @@ describe('R11 at phone width (360 px viewport, Q-65)', () => {
     expect(runAt(dipSpectrum(), [3.5, L1]).run).toBeGreaterThanOrEqual(3);
   });
 
-  it('documents the limit: the same narrow dip over the full band is too narrow (Q-65)', () => {
+  it('documents the limit: the same narrow dip over the full band is too narrow (Q-77)', () => {
     // Quiet where 1 − 0.9·g < 0.2: |Δλ| < 0.2·√(2 ln 1.125) ≈ 0.097 µm, so 0.194 µm ≈ 13.5 px.
     expect(runAt(dipSpectrum(), [L0, L1]).run).toBeLessThan(3);
   });
