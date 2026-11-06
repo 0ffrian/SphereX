@@ -1,10 +1,12 @@
 // R4 level 3 (Sky Sculptor) panel: mounts the ViewerApp canvas and the on-screen controls
 // (R5.6, WCAG 2.5.7 alternative to dragging). Placeholder until RenderParams loading exists.
 import { useEffect, useRef, useState } from 'react';
-import { ViewerApp, type RotateDirection } from '@/viewer/ViewerApp';
+import { ViewerApp, type BodyInfo, type RotateDirection } from '@/viewer/ViewerApp';
 import { useAppStore } from '@/state/store';
 
 const PLACEHOLDER_LABEL = 'Viewer placeholder: no object loaded';
+const CONTROLS_HINT =
+  '3D view: drag or use the arrow keys to rotate, plus and minus to zoom, R to reset.';
 
 const ROTATE_BUTTONS: { dir: RotateDirection; label: string; glyph: string }[] = [
   { dir: 'left', label: 'Rotate left', glyph: '←' },
@@ -24,6 +26,8 @@ const buttonClass =
 export function ViewerPanel() {
   const hostRef = useRef<HTMLDivElement>(null);
   const [viewer, setViewer] = useState<ViewerApp | null>(null);
+  // PR #31 (N6, N7): the shown body's status line; the canvas label follows its alt_text.
+  const [bodyStatus, setBodyStatus] = useState<string | null>(null);
   const setRendererStatus = useAppStore((s) => s.setRendererStatus);
   const rendererStatus = useAppStore((s) => s.rendererStatus);
 
@@ -41,14 +45,19 @@ export function ViewerPanel() {
       'focus-visible:outline-sky-400';
     canvas.tabIndex = 0;
     canvas.setAttribute('role', 'img');
-    canvas.setAttribute(
-      'aria-label',
-      `${PLACEHOLDER_LABEL}. 3D view: drag or use the arrow keys to rotate, plus and minus to zoom, R to reset.`,
-    );
+    canvas.setAttribute('aria-label', `${PLACEHOLDER_LABEL}. ${CONTROLS_HINT}`);
     host.appendChild(canvas);
 
     let cancelled = false;
     let app: ViewerApp | null = null;
+    let unsubscribe: (() => void) | null = null;
+    const showBody = (info: BodyInfo | null) => {
+      canvas.setAttribute(
+        'aria-label',
+        `${(info ? info.altText : PLACEHOLDER_LABEL).replace(/[.\s]+$/, '')}. ${CONTROLS_HINT}`,
+      );
+      setBodyStatus(info ? info.status.message : null);
+    };
     setRendererStatus('starting');
 
     ViewerApp.create(canvas).then(
@@ -65,6 +74,7 @@ export function ViewerPanel() {
         if (import.meta.env.MODE === 'fixtures') {
           (window as unknown as { __sxViewer?: ViewerApp }).__sxViewer = created;
         }
+        unsubscribe = created.onBodyChange(showBody);
         setViewer(created);
       },
       (err: unknown) => {
@@ -77,6 +87,7 @@ export function ViewerPanel() {
 
     return () => {
       cancelled = true;
+      unsubscribe?.();
       app?.dispose();
       app = null;
       setViewer(null);
@@ -93,8 +104,8 @@ export function ViewerPanel() {
       </h2>
       <div className="relative aspect-square w-full max-w-xl overflow-hidden rounded-lg border border-neutral-800 bg-black sm:aspect-[4/3]">
         <div ref={hostRef} className="absolute inset-0" />
-        <p className="pointer-events-none absolute left-3 top-3 rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300">
-          {PLACEHOLDER_LABEL}
+        <p className="pointer-events-none absolute left-3 top-3 max-w-[calc(100%-1.5rem)] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300">
+          {bodyStatus ?? PLACEHOLDER_LABEL}
         </p>
         {rendererStatus === 'unavailable' && (
           // Not a live region: the status line already announces this change.

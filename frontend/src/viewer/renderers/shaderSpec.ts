@@ -14,6 +14,7 @@ import {
   GASK,
   GLOW_ABOVE_K,
   keyed,
+  lavaHeatFromTeq,
   type Palette4,
   type Rgb,
 } from './shaderPalette';
@@ -33,7 +34,7 @@ export function isShaderKind(t: ObjectType): t is ShaderKind {
 
 // ASSUMPTION: defaults below are the mock-up's final-state slider values (artistic, not physical).
 const PLANET_DEFAULTS = {
-  planet_rocky: { freq: 1.6, sea: 0, ice: 0, heat: 0.55, relief: 0.081, cloud: 0.2, atmo: 0.85 },
+  planet_rocky: { freq: 1.6, sea: 0, ice: 0, heat: 0, relief: 0.081, cloud: 0.2, atmo: 0.85 },
   planet_water: { freq: 2, sea: 0.4, ice: 0.22, heat: 0, relief: 0.054, cloud: 0.7, atmo: 0.85 },
 } as const;
 const GAS_DEFAULTS = { bands: 12, turbulence: 0.5, storms: 5, rings: 0 } as const;
@@ -154,6 +155,9 @@ export function resolveShaderSpec(
   }
 
   const d = PLANET_DEFAULTS[kind];
+  // N9: lava cracks glow only when teq_K says the surface is hot (>= ~700 K, A7.1). No teq_K, no
+  // glow. A slider override still wins: it is the visitor's own artistic choice (D-26).
+  const heat = kind === 'planet_rocky' ? lavaHeatFromTeq(cardValue(card, 'teq_K')) : d.heat;
   return out({
     field: {
       kind: 'terrain',
@@ -161,7 +165,7 @@ export function resolveShaderSpec(
       freq: d.freq,
       seaLevel: sv('sea_level') ?? d.sea,
       iceExtent: sv('ice') ?? d.ice,
-      heat: sv('lava_heat') ?? d.heat,
+      heat: sv('lava_heat') ?? heat,
       bands: 0,
       turbulence: 0,
       storms: 0,

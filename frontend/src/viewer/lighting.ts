@@ -7,4 +7,10 @@
  */
 export const MAX_AMBIENT_INTENSITY = 0.03;
 
+/**
+ * Default direction toward the light when RenderParams.lighting has no sun_dir. A placeholder
+ * (`artistic`), shared by the viewer's DirectionalLight and the atmosphere shader so the two agree.
+ */
+export const DEFAULT_SUN_DIR: readonly [number, number, number] = [3, 1.5, 2];
+
 export const LIGHTING_PLACEHOLDER = { spec: 'R5.1', implemented: false } as const;

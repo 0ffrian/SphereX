@@ -90,7 +90,7 @@ describe('pixelDirection (R6.1)', () => {
 });
 
 describe('generateField determinism (R1, D-12)', () => {
-  it('same params give byte-identical 512x256 Float32Arrays', () => {
+  it('same params give byte-identical 512x256 Float32Arrays (per engine)', () => {
     const a = generateField(water);
     const b = generateField({ ...water });
     expect(a.width).toBe(512);
@@ -286,8 +286,23 @@ describe('FieldSampler (haptic sources read the same arrays)', () => {
 describe('field worker wrapper', () => {
   it('handleFieldRequest returns the same field as generateField', async () => {
     const { handleFieldRequest } = await import('./fieldWorker');
-    const res = handleFieldRequest({ id: 7, params: gas });
+    const res = handleFieldRequest({ id: 7, kind: 'field', params: gas });
     expect(res.id).toBe(7);
     expect('field' in res && fieldHash(res.field)).toBe(fieldHash(generateField(gas)));
+  });
+
+  it('generates nebula and nova points in the worker wrapper, with distinct transferable buffers', async () => {
+    const { handleFieldRequest, transferablesOf } = await import('./fieldWorker');
+    const { generateNebula } = await import('../renderers/pointClouds');
+    const res = handleFieldRequest({ id: 8, kind: 'points', type: 'nebula', seed: 13 });
+    expect('points' in res).toBe(true);
+    if (!('points' in res)) return;
+    const ref = generateNebula(13);
+    expect(Array.from((res.points as typeof ref).glow.positions.slice(0, 30))).toEqual(
+      Array.from(ref.glow.positions.slice(0, 30)),
+    );
+    const bufs = transferablesOf(res);
+    expect(bufs).toHaveLength(6);
+    expect(new Set(bufs).size).toBe(6);
   });
 });

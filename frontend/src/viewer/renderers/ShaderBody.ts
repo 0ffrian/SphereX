@@ -10,7 +10,11 @@
 // Honesty: every layer here is `artistic` (R7.7). When `artistic` is not in the visible tags the
 // layer is hidden (planets and gas giants fall back to a plain sphere; nebula and nova draw
 // nothing, because nothing about them is measured). A layer refused for missing data is not drawn
-// and is listed in `missing`.
+// and is listed in `missing`. `status` says which of these applies in plain words (R5.3).
+//
+// Plug-in shape (review B5): this class owns no lighting policy and no honesty model. The viewer
+// passes the light direction (`ctx.lightDir`), the visible tags (`ctx.visibleTags`) and an
+// `ctx.onChange` callback that requests a render.
 /* eslint-disable @typescript-eslint/no-explicit-any -- TSL node graphs are built from untyped proxies */
 import {
   AdditiveBlending,
@@ -73,10 +77,27 @@ import {
   mod,
 } from 'three/tsl';
 import type { ObjectCard, RenderParams, Tag } from '@/contract';
-import { stormsFor, type FieldData, type Vec3 } from '../fields/fieldGenerator';
-import { requestField } from '../fields/fieldClient';
+import {
+  FieldSampler,
+  RING_GAP_EDGES,
+  RING_INNER,
+  RING_OUTER,
+  STORM_RING_CENTRE,
+  STORM_RING_WIDTH,
+  stormsFor,
+  type FieldData,
+  type Vec3,
+} from '../fields/fieldGenerator';
+import { requestField, requestPoints } from '../fields/fieldClient';
+import { boundedSeed } from '../fields/noise';
+import { DEFAULT_SUN_DIR } from '../lighting';
 import type { Overrides } from '../sliders';
-import { ALL_TAGS, type BodyContext, type BodyRenderer } from './bodyRenderer';
+import {
+  ESTIMATED_TAGS,
+  type BodyContext,
+  type BodyRenderer,
+  type BodyStatus,
+} from './bodyRenderer';
 import {
   ICE_COLOUR,
   LAND_HIGH,
@@ -88,7 +109,7 @@ import {
   OCEAN_SHALLOW,
   type Rgb,
 } from './shaderPalette';
-import { generateNebula, generateNova, type PointSet } from './pointClouds';
+import type { NebulaPoints, NovaPoints, PointSet, PointSets } from './pointClouds';
 import { resolveShaderSpec, type ShaderSpec } from './shaderSpec';
 
 const rgb3 = (c: Rgb) => vec3(c[0], c[1], c[2]);
@@ -209,7 +230,8 @@ function buildPlanet(
 
   if (style.cloudCover > 0.001) {
     const cm = new MeshStandardNodeMaterial();
-    const seedOff = vec3(0, 0, spec.seed * 2.3);
+    // B1: a bounded seed offset, not the raw seed (float32 would drown the direction term).
+    const seedOff = vec3(0, 0, boundedSeed(spec.seed) * 2.3);
     const p = dir.mul(3).add(seedOff);
     const q = vec3(vnoise3(p.add(3.3), 3), vnoise3(p.add(7.7), 3), vnoise3(p.add(1.1), 3));
     const c = vnoise3(p.mul(1.2).add(q.mul(1.6)), 4);
@@ -258,7 +280,10 @@ function buildGas(spec: ShaderSpec, field: FieldData, textures: DataTexture[]): 
   const A = bilinear(texA, u, vv);
   // R = band profile from the field. 0.5 is a band edge and maps to 0.5 here, so the drawn edges
   // are the field's edges; the noise only breaks up the colour inside a band.
-  const fine = vnoise3(vec3(dir.x.mul(7), dir.y.mul(28), dir.z.mul(7)).add(spec.seed * 2), 3);
+  const fine = vnoise3(
+    vec3(dir.x.mul(7), dir.y.mul(28), dir.z.mul(7)).add(boundedSeed(spec.seed) * 2),
+    3,
+  );
   const val = clamp(
     A.x
       .mul(0.7)
@@ -272,14 +297,20 @@ function buildGas(spec: ShaderSpec, field: FieldData, textures: DataTexture[]): 
   for (const s of stormsFor(spec.seed, fp.storms)) {
     const dist = acos(clamp(dot(dir, vec3(s.center[0], s.center[1], s.center[2])), -1, 1));
     const spot = exp(pow(dist.div(s.size), 2).negate());
-    const ring = exp(pow(dist.sub(s.size * 1.3).div(s.size * 0.4), 2).negate());
+    // Same ring constants as the field's storm edge (N3).
+    const ring = exp(
+      pow(dist.div(s.size).sub(STORM_RING_CENTRE).div(STORM_RING_WIDTH), 2).negate(),
+    );
     col = mix(col, c3, spot.mul(0.85));
     col = mix(col, c2, ring.mul(0.35));
   }
-  const mu = max(normalView.z, 0);
-  const L = pow(mu, 0.6).mul(0.75).add(0.25);
-  const mat = new MeshBasicNodeMaterial();
-  mat.colorNode = col.mul(L).add(col.mul(gas.glow * 0.6));
+  // N5 / R5.1: lit by the scene's DirectionalLight (terminator, ambient floor 0.03), like the
+  // planets. Hot bodies add a self-glow term (mock-up uGlow) through the emissive channel.
+  const mat = new MeshStandardNodeMaterial();
+  mat.colorNode = col;
+  mat.roughness = 1;
+  mat.metalness = 0;
+  mat.emissiveNode = gas.glow > 0 ? col.mul(gas.glow * 0.6) : vec3(0, 0, 0);
   const mesh = new Mesh(new SphereGeometry(1, 96, 64), mat);
   tilt.add(mesh);
 
@@ -292,8 +323,8 @@ function buildGas(spec: ShaderSpec, field: FieldData, textures: DataTexture[]): 
     );
     const rm = new MeshBasicNodeMaterial();
     const r = length(positionLocal.xy);
-    const t = r.sub(1.45).div(1.1);
-    const n = mx_noise_float(vec3(r.mul(35), 0.5, (spec.seed % 53) * 0.7))
+    const t = r.sub(RING_INNER).div(RING_OUTER - RING_INNER);
+    const n = mx_noise_float(vec3(r.mul(35), 0.5, (boundedSeed(spec.seed) % 53) * 0.7))
       .mul(0.5)
       .add(0.5);
     const bands = sin(r.mul(70))
@@ -301,7 +332,9 @@ function buildGas(spec: ShaderSpec, field: FieldData, textures: DataTexture[]): 
       .mul(0.45)
       .add(0.55);
     let dens: any = clamp(n.mul(0.65).add(0.35), 0, 1).mul(bands);
-    const gap = smoothstep(0.58, 0.6, t).mul(float(1).sub(smoothstep(0.64, 0.66, t)));
+    // Same gap edges as the field's ring-gap function (N2).
+    const [ga, gb, gc, gd] = RING_GAP_EDGES;
+    const gap = smoothstep(ga, gb, t).mul(float(1).sub(smoothstep(gc, gd, t)));
     dens = dens.mul(float(1).sub(gap.mul(0.9)));
     const edge = smoothstep(0, 0.04, t).mul(float(1).sub(smoothstep(0.96, 1, t)));
     rm.colorNode = tint.mul(n.mul(0.5).add(0.7));
@@ -309,7 +342,7 @@ function buildGas(spec: ShaderSpec, field: FieldData, textures: DataTexture[]): 
     rm.transparent = true;
     rm.depthWrite = false;
     rm.side = DoubleSide;
-    const ring = new Mesh(new RingGeometry(1.45, 2.55, 160, 1), rm);
+    const ring = new Mesh(new RingGeometry(RING_INNER, RING_OUTER, 160, 1), rm);
     ring.rotation.x = Math.PI / 2;
     tilt.add(ring);
   }
@@ -344,8 +377,7 @@ function pointSprite(set: PointSet, size: number, opacity: number, additive: boo
   return sprite;
 }
 
-function buildNebula(spec: ShaderSpec): Group {
-  const pts = generateNebula(spec.seed);
+function buildNebula(pts: NebulaPoints): Group {
   const group = new Group();
   // Sizes and opacities: mock-up (PointsMaterial size, opacity at full build). Artistic.
   const dust = pointSprite(pts.dust, 0.2, 0.3, false);
@@ -355,8 +387,7 @@ function buildNebula(spec: ShaderSpec): Group {
   return group;
 }
 
-function buildNova(spec: ShaderSpec): Group {
-  const pts = generateNova(spec.seed);
+function buildNova(pts: NovaPoints): Group {
   const group = new Group();
   group.add(
     pointSprite(pts.shell, 0.06, 0.6, true),
@@ -380,29 +411,45 @@ function disposeTree(root: Object3D): void {
   });
 }
 
+interface Built {
+  group: Group;
+  /** Node the body frame is measured in: the tilt group for gas giants, else the group. */
+  frame: Object3D;
+  textures: DataTexture[];
+  field: FieldData | null;
+  points: PointSets | null;
+}
+
 export class ShaderBody implements BodyRenderer {
   readonly object = new Group();
   private surface: Group | null = null;
+  private frame: Object3D | null = null;
   private plain: Mesh | null = null;
   private textures: DataTexture[] = [];
+  private sampler: FieldSampler | null = null;
+  private points: PointSets | null = null;
   private spec: ShaderSpec;
   private visibleTags: readonly Tag[];
   private overrides: Overrides;
   private disposed = false;
-  private readonly sun = uniform(new Vector3(1, 0, 0));
+  private readonly sun = uniform(new Vector3(...DEFAULT_SUN_DIR).normalize());
   private readonly fieldSource: NonNullable<BodyContext['fieldSource']>;
+  private readonly pointSource: NonNullable<BodyContext['pointSource']>;
+  private readonly onChange: (() => void) | undefined;
 
   private constructor(
     private readonly card: ObjectCard,
     private readonly params: RenderParams,
     ctx: BodyContext,
   ) {
-    this.visibleTags = ctx.visibleTags ?? ALL_TAGS;
+    // B2 / D-21: the default is the "+ Estimated" start state, which hides artistic layers.
+    this.visibleTags = ctx.visibleTags ?? ESTIMATED_TAGS;
     this.overrides = ctx.overrides ?? {};
     this.fieldSource = ctx.fieldSource ?? requestField;
+    this.pointSource = ctx.pointSource ?? requestPoints;
+    this.onChange = ctx.onChange;
     this.spec = resolveShaderSpec(card, params, this.overrides);
-    const sd = params.lighting.sun_dir;
-    if (sd) this.setSunDirection(sd);
+    if (ctx.lightDir) this.setSunDirection(ctx.lightDir);
   }
 
   static async create(
@@ -434,6 +481,55 @@ export class ShaderBody implements BodyRenderer {
     return DISTANCE.world;
   }
 
+  get status(): BodyStatus {
+    const { drawable, tag } = this.spec;
+    if (!drawable) {
+      return {
+        state: 'refused',
+        message: 'Not drawn: the size or radius this view needs is missing, so nothing is guessed.',
+        tags: [],
+      };
+    }
+    if (!this.visibleTags.includes(tag)) {
+      return {
+        state: 'hidden',
+        message: this.hasPlainSphere()
+          ? "Showing a plain grey sphere. The surface is an artist's impression and is hidden at this honesty level; choose + Artistic to see it."
+          : "Nothing is shown. This cloud is an artist's impression and is hidden at this honesty level; choose + Artistic to see it.",
+        tags: [tag],
+      };
+    }
+    return {
+      state: 'drawn',
+      message:
+        "Artist's impression: this view is generated from a procedural model, not a measured image.",
+      tags: [tag],
+    };
+  }
+
+  get altText(): string {
+    const s = this.status;
+    return s.state === 'drawn'
+      ? `${this.params.alt_text} This is an artist's impression, not a measured image.`
+      : s.message;
+  }
+
+  get field(): FieldSampler | null {
+    return this.sampler;
+  }
+
+  get pointSets(): Readonly<Record<string, PointSet>> | null {
+    return this.points as unknown as Readonly<Record<string, PointSet>> | null;
+  }
+
+  worldToBody(p: Vec3): Vec3 {
+    const v = new Vector3(p[0], p[1], p[2]);
+    const frame = this.frame ?? this.object;
+    frame.updateWorldMatrix(true, false);
+    frame.worldToLocal(v);
+    return [v.x, v.y, v.z];
+  }
+
   setSunDirection(dir: Vec3): void {
     const d = new Vector3(dir[0], dir[1], dir[2]);
     if (d.lengthSq() > 0) this.sun.value.copy(d.normalize());
@@ -442,6 +538,7 @@ export class ShaderBody implements BodyRenderer {
   setVisibleTags(tags: readonly Tag[]): void {
     this.visibleTags = tags;
     this.applyVisibility();
+    this.onChange?.();
   }
 
   async setOverrides(overrides: Overrides): Promise<void> {
@@ -459,21 +556,23 @@ export class ShaderBody implements BodyRenderer {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.clear();
+    this.release(this.surface, this.textures);
+    this.surface = null;
+    this.textures = [];
+    this.sampler = null;
+    this.points = null;
     if (this.plain) {
       disposeTree(this.plain);
       this.plain = null;
     }
   }
 
-  private clear(): void {
-    if (this.surface) {
-      this.object.remove(this.surface);
-      disposeTree(this.surface);
-      this.surface = null;
+  private release(group: Group | null, textures: DataTexture[]): void {
+    if (group) {
+      this.object.remove(group);
+      disposeTree(group);
     }
-    for (const t of this.textures) t.dispose();
-    this.textures = [];
+    for (const t of textures) t.dispose();
   }
 
   private applyVisibility(): void {
@@ -488,24 +587,46 @@ export class ShaderBody implements BodyRenderer {
     return this.spec.kind !== 'nebula' && this.spec.kind !== 'nova';
   }
 
-  private async rebuild(): Promise<void> {
-    this.clear();
-    const spec = this.spec;
-    if (spec.drawable) {
-      let group: Group;
-      if (spec.kind === 'nebula') group = buildNebula(spec);
-      else if (spec.kind === 'nova') group = buildNova(spec);
-      else {
-        const field = await this.fieldSource(spec.field!);
-        if (this.disposed || spec !== this.spec) return;
-        group =
-          spec.kind === 'gas_giant'
-            ? buildGas(spec, field, this.textures)
-            : buildPlanet(spec, field, this.sun, this.textures);
-      }
-      this.surface = group;
-      this.object.add(group);
+  /** Builds everything for `spec` without touching the scene (async work happens here). */
+  private async build(spec: ShaderSpec): Promise<Built | null> {
+    const textures: DataTexture[] = [];
+    if (spec.kind === 'nebula' || spec.kind === 'nova') {
+      // N8: the points are generated in the field worker.
+      const points = await this.pointSource(spec.kind, spec.seed);
+      if (this.disposed || spec !== this.spec) return null;
+      const group =
+        spec.kind === 'nebula'
+          ? buildNebula(points as NebulaPoints)
+          : buildNova(points as NovaPoints);
+      return { group, frame: group, textures, field: null, points };
     }
+    const field = await this.fieldSource(spec.field!);
+    if (this.disposed || spec !== this.spec) return null;
+    if (spec.kind === 'gas_giant') {
+      const group = buildGas(spec, field, textures);
+      return { group, frame: group.children[0]!, textures, field, points: null };
+    }
+    const group = buildPlanet(spec, field, this.sun, textures);
+    return { group, frame: group, textures, field, points: null };
+  }
+
+  /**
+   * B3: builds the new surface first, then swaps it in and frees the old one, so the viewer never
+   * shows an empty body while the field is being generated. A superseded rebuild changes nothing.
+   */
+  private async rebuild(): Promise<void> {
+    const spec = this.spec;
+    const built = spec.drawable ? await this.build(spec) : null;
+    if (this.disposed || spec !== this.spec) return;
+    const oldGroup = this.surface;
+    const oldTextures = this.textures;
+    this.surface = built?.group ?? null;
+    this.frame = built?.frame ?? null;
+    this.textures = built?.textures ?? [];
+    this.sampler = built?.field ? new FieldSampler(built.field) : null;
+    this.points = built?.points ?? null;
+    if (built) this.object.add(built.group);
+    this.release(oldGroup, oldTextures);
     if (!this.plain && this.hasPlainSphere()) {
       this.plain = new Mesh(
         new SphereGeometry(1, 64, 32),
@@ -514,6 +635,7 @@ export class ShaderBody implements BodyRenderer {
       this.object.add(this.plain);
     }
     this.applyVisibility();
+    this.onChange?.();
   }
 }
 
