@@ -13,15 +13,15 @@ flowchart TB
     Mockup["mockup/ : spherex-ui.html (three r128, not the app)"]
 
     subgraph Backend["backend/ (FastAPI, Python 3.12) : Kevin, Moon, Atish"]
-      BApi["app/api (Kevin) : D-16 endpoints; objects.py : /card, /render-params, texture URLs"]
-      BPipe["app/core/find (stage 1), app/adapters, app/cache : Kevin; app/core/measure (stage 2) and physics : Moon; stage 3 : Atish"]
+      BApi["app/api (Kevin) : D-16 endpoints; objects.py : /card, /render-params, texture URLs; overlays.py : /overlays, /flags, /combine.png (Q-50)"]
+      BPipe["app/core/find (stage 1; overlays, flagmask, combine, A4.9), app/adapters (gaia, wise = CatWISE2020, tap), app/cache : Kevin; app/core/measure (stage 2) and physics : Moon; stage 3 : Atish"]
       BRender["app/core/render (Atish) : card_to_params, params, noise, craters, height, normals, palette, bake, __main__, spherex_rgb, gemini_paint"]
       BContract["app/contract : generated from shared/schemas (D-18) : follows the schemas owner"]
     end
 
     subgraph Frontend["frontend/ (Vite + TS + React) : owners per package"]
       FApp["src/app (React shell: App, ViewerPanel, StatusLine, FixtureBanner, LiveAnnouncer, Badge, StatusBoxes, urlHash + useHashSync, format, messages, refusals, RefusalList, ui), src/state (Zustand store with the sky slice) : Moon"]
-      FFlip["src/app/api (M1 client, D-16), src/app/search, src/app/flipbook (with Rainbow Trails, D-28), src/app/spectrum : Moon"]
+      FFlip["src/app/api (M1 client, D-16), src/app/search, src/app/flipbook (with Rainbow Trails, D-28; overlays/, issue #12), src/app/spectrum : Moon"]
       FDev["fixtures/ (dev-only synthetic fixture server), scripts/ (check-dist), src/test (test helpers), src/fixtures.test.ts, e2e/ (Playwright) : dev and test only"]
       FContract["src/contract : generated from shared/schemas (D-18), assertTagged next to it : follows the schemas owner"]
       subgraph FViewer["src/viewer (Moon)"]
@@ -85,5 +85,6 @@ flowchart TB
 - `viewer/fields`, `ShaderBody`, `sources/terrain` and `sources/flow` follow from D-01 and D-12. They are listed in rendering doc §10, but the `ShaderBody` and `fields/fieldWorker` file names stay **[verify]**.
 - `src/contract`, `src/state` and `src/app` were added by the frontend scaffold (4 Nov 2026) and are listed in rendering doc §10. `src/contract/generated.ts` is generated from `shared/schemas` (D-18), as is `backend/app/contract/`; the hand-written scaffold types were replaced in issue #4.
 - The flipbook and spectrum view (M1, issue #3, 5 Nov 2026) added `src/app/api`, `src/app/search`, `src/app/flipbook`, `src/app/spectrum`, the `sky` slice in `src/state/store.ts`, `src/test`, `fixtures/` and `scripts/` (rendering doc §10). `fixtures/` is a Vite dev-server plugin used only by `npm run dev:fixtures` and the Playwright tests; `scripts/check-dist.js` fails the build if a fixture marker reaches `dist/`.
+- The overlays (M4, issue #12) added `backend/app/api/overlays.py`, `backend/app/core/find/overlays.py`, `flagmask.py` and `combine.py`, the `gaia`, `wise` and `tap` adapters, `src/app/flipbook/overlays/` and the `overlays` and `combine` parts of the `sky` slice (A4.9). D-17 gives the Gaia and WISE adapters to Kevin and the overlay UI to Moon.
 - D-13: Atish owns the creative direction of haptics (what each body feels like, patterns, sound pairing). Engineering choices (drivers, timing, rate limits) stay with the implementer.
 - The shader generators move from the mock-up into ES modules; the mock-up is not ported in place (D-03).
