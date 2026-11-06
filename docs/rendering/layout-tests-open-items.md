@@ -7,7 +7,9 @@
 ```
 backend/app/core/render/            (Atish)
   card_to_params.py   # §6.2 rules + tags; unit-tested
-  noise.py craters.py height.py normals.py palette.py bake.py
+  noise.py craters.py height.py normals.py palette.py bake.py   # issue #6, built
+  params.py           # §6.2 generator parameters (BakeParams, BakeRefusal); card_to_params adds the tags
+  __main__.py         # python -m app.core.render <card.json> --seed N --out DIR
   gemini_paint.py     # stretch, behind the admin token
   spherex_rgb.py      # §5.2 channel extraction
 backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; objects.py: /frames, /cutouts, later /card, /render-params, texture URLs
@@ -93,7 +95,7 @@ The `app/` subfolders (`api/`, `search/`, `flipbook/`, `spectrum/`), the `sky` s
 ## R12. Open items [verify]
 
 1. Fallback behaviour of `WebGPURenderer` from `three/webgpu` (r187) on both phones; check via `chrome://gpu`.
-2. Normal map green-channel convention ([§6.5](surface-generation.md#r65-normals-from-height-sobel-equirectangular-aware)).
+2. Normal map green-channel convention ([§6.5](surface-generation.md#r65-normals-from-height-sobel-equirectangular-aware)). Baker side verified numerically (6 Nov 2026); the viewer check (north-facing slopes brighten with light from the north) is still open.
 3. The Gemini image model name and its supported aspect ratios.
 4. The 3I/ATLAS nucleus size limit and coma radius values, with exact citations.
 5. Eps Indi Ba/Bb orbit numbers; WISE 0855 class details.

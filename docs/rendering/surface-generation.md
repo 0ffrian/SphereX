@@ -65,6 +65,8 @@ def fbm(dirs, seed, octaves, freq, lacunarity=2.0, gain=0.5):
     return total
 ```
 
+**Seed.** The baker hashes the seed with SHA-256 to a 32-bit value for the noise (all bits of a 64-bit seed count, so seeds 0 and 2**32 differ) and gives the integer itself to the crater and boulder generator. This partly answers Q-35's "which hash, and what width?" for the baker only; how the seed is made from id and version is still open.
+
 **Craters.** Radii follow a power law, r = r_min·(1−U)^(−1/2), truncated at r_max. Centres are uniform on the sphere. Profile as a function of x = angular distance / crater angular radius:
 
 - bowl: x < 1 → −d·(1 − x²), with d = 0.2·r
@@ -108,10 +110,12 @@ def normals_from_height(h, radius_m, strength=1.0):
     nz = np.ones_like(nx)
     n = np.stack([nx, ny, nz], -1)
     n /= np.linalg.norm(n, axis=-1, keepdims=True)
-    return ((n * 0.5 + 0.5) * 255).astype(np.uint8)
+    return np.rint((n * 0.5 + 0.5) * 255).astype(np.uint8)   # rint, not truncation: flat = (128, 128, 255)
 ```
 
 **[verify]** With the light from the north, north-facing slopes must brighten. If they darken, set `material.normalScale.y = -1`; don't change the generator.
+
+**Status (6 Nov 2026):** the baker side is checked. `tests/test_render_baker.py::test_normal_green_channel_is_opengl_y_up` rebuilds the true normals of the displaced sphere from the R6.1 pixel mapping (u = +φ, north = −θ) and compares them with the baked map: the green channel is +north (OpenGL, +Y up), and flipping it is clearly worse. What stays open is the visual check in the viewer (issue #7).
 
 ### R6.6 Optional paths
 
@@ -134,5 +138,6 @@ def normals_from_height(h, radius_m, strength=1.0):
 
 ### R6.7 Output and caching
 
-- Backend writes `/data/textures/{id}/{generator_version}/{seed}/{albedo.webp, height.png, height.bin, normal.png}`.
+- Backend writes `/data/textures/{id}/{generator_version}/{seed}/{width}x{height}/{albedo.webp, height.png, height.bin, normal.png}`. The size directory keeps two sizes of one object apart (Q-47).
+- Beside the four maps the baker writes `bake.json`: a hash of the generator parameters, the map size and the baker rules version (Q-47). A directory whose hash differs is rebaked, so a changed card or size is never served stale.
 - The cache key includes `generator_version`. Bump the version whenever any rule in [§6.2](#r62-card--generator-parameters-deterministic-rules)–6.5 changes.
