@@ -1,7 +1,9 @@
 """``/v1/objects/{id}/frames`` and ``/v1/objects/{id}/cutouts/{frame_id}.png`` (D-16, A4.1).
 
-Routes are plain ``def`` so FITS and PNG work runs in FastAPI's threadpool. ``/card`` and
-``/render-params`` join this module later (R10); ``/spectrum`` is issue #2.
+Routes are plain ``def`` so FITS and PNG work runs in FastAPI's threadpool. ``/spectrum`` is
+issue #2. ``/card`` and ``/render-params`` (issue #5, A4.5, A4.7) return the R3.2 and R3.4 shapes
+exactly, validated against ``shared/schemas/``; the schemas forbid extra fields, so ``cached_at``
+(D-16) and the stage 4 asset status travel as headers (Q-39).
 """
 
 from __future__ import annotations
@@ -9,11 +11,14 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
-from app.api.deps import get_ctx, get_frame_service
+from app.api.deps import get_ctx, get_frame_service, get_pipeline
 from app.api.models import ErrorResponse, Frame, FramesResponse, Provenance, Stretch
 from app.context import Context
+from app.contract.object_card_schema import ObjectCard
+from app.contract.render_params_schema import RenderParams
+from app.core.card.service import ObjectPipeline, ObjectResult
 from app.core.find import png
 from app.core.find.cutouts import CutoutUnavailable, render_frame_png
 from app.core.find.frames import FrameService
@@ -151,3 +156,44 @@ def get_cutout_png(
     return Response(
         content=data, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"}
     )
+
+
+# ASSUMPTION (Q-39): the R3 shapes have no cached_at and forbid extra fields, so D-16's
+# cached_at and the A4.4 asset status (saved / generated / sketch) are response headers.
+CACHED_AT_HEADER = "X-SX-Cached-At"
+ASSET_STATUS_HEADER = "X-SX-Asset-Status"
+
+
+def _contract_reply(body: dict[str, object], result: ObjectResult) -> JSONResponse:
+    headers: dict[str, str] = {ASSET_STATUS_HEADER: result.status}
+    if result.cached_at is not None:
+        headers[CACHED_AT_HEADER] = iso_utc_z(result.cached_at)
+    return JSONResponse(content=body, headers=headers)
+
+
+@router.get(
+    "/{object_id}/card",
+    response_class=JSONResponse,
+    responses={200: {"model": ObjectCard}, **ERRORS},
+)
+def get_card(
+    object_id: ObjectId,
+    ctx: Annotated[Context, Depends(get_ctx)],
+    pipeline: Annotated[ObjectPipeline, Depends(get_pipeline)],
+) -> JSONResponse:
+    result = pipeline.run(_object(ctx, object_id))
+    return _contract_reply(result.card, result)
+
+
+@router.get(
+    "/{object_id}/render-params",
+    response_class=JSONResponse,
+    responses={200: {"model": RenderParams}, **ERRORS},
+)
+def get_render_params(
+    object_id: ObjectId,
+    ctx: Annotated[Context, Depends(get_ctx)],
+    pipeline: Annotated[ObjectPipeline, Depends(get_pipeline)],
+) -> JSONResponse:
+    result = pipeline.run(_object(ctx, object_id))
+    return _contract_reply(result.params, result)

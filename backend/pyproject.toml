@@ -12,6 +12,9 @@ dependencies = [
     "astropy==8.0.2",
     "numpy==2.5.4",
     "pillow==13.0.0",
+    # Validates /card and /render-params replies against shared/schemas (Q-40, issue #5).
+    "jsonschema==4.26.0",
+    "referencing==0.37.0",  # imported directly by core/card/validate.py
 ]
 
 [dependency-groups]
@@ -20,7 +23,6 @@ dev = [
     "ruff==0.17.1",
     "mypy==2.4.0",
     "datamodel-code-generator==0.89.0",
-    "jsonschema==4.26.0",
 ]
 
 [tool.uv]
@@ -53,5 +55,5 @@ strict = true
 files = ["app", "scripts"]
 
 [[tool.mypy.overrides]]
-module = ["astropy.*"]
+module = ["astropy.*", "jsonschema.*"]
 ignore_missing_imports = true
