@@ -18,6 +18,7 @@ const fake = {
   showPlan: vi.fn((p: RenderPlan) => void shown.push(p)),
   clearObject: vi.fn(),
   setLoadFailedHandler: vi.fn(),
+  setSpinPaused: vi.fn(),
   rotate: vi.fn(),
   zoom: vi.fn(),
   resetView: vi.fn(),
@@ -106,10 +107,11 @@ describe('ViewerPanel', () => {
     expect(useAppStore.getState().honesty).toBe('measured');
     const last = shown.at(-1)!;
     expect(last.drawn.every((l) => l.tag === 'measured')).toBe(true);
+    // The fixtures are synthetic, so a measured tag reads "Fixture", never "Measured" (A11, Q-32).
     for (const li of container.querySelectorAll(
       '[data-testid="legend"] [data-testid="provenance-badge"]',
     )) {
-      expect(li.textContent).toBe('Measured');
+      expect(li.textContent).toBe('Fixture');
     }
     expect(canvasLabel()).not.toBe(before);
     expect(text('viewer-announcer')).toMatch(/^Measured only\./);
@@ -137,14 +139,20 @@ describe('ViewerPanel', () => {
     const { card, params } = fixture('comet');
     useAppStore.getState().setObject(card, params);
     await mount();
-    await click('Aug 2025');
+    // Opens on the latest epoch that has gas data (August), not on a bare dot (N1).
+    expect(shown.at(-1)?.epoch).toBe('2025-08');
     expect(button('Aug 2025')?.getAttribute('aria-pressed')).toBe('true');
+    await click('Aug 2025');
     expect(shown.at(-1)?.epoch).toBe('2025-08');
     expect(shown.at(-1)?.shells).toHaveLength(3);
     expect(text('viewer-announcer')).toMatch(/^August 2025\. Gas shells: CO₂, H₂O, CO\./);
-    await click('Dec 2025');
+    // The toggle says which epoch has no gas data.
+    expect(button('Dec 2025(no gas data)')).toBeDefined();
+    await click('Dec 2025(no gas data)');
     expect(shown.at(-1)?.shells).toHaveLength(0); // the fixture card holds August Q only
-    expect(text('missing-list')).toContain('Gas shells: not shown for December 2025.');
+    expect(text('missing-list')).toContain(
+      'Gas shells: not drawn for December 2025. The card has no gas measurements for this epoch.',
+    );
   });
 
   it('shows the scale bar with a comparison', async () => {
@@ -171,6 +179,120 @@ describe('ViewerPanel', () => {
     await mount();
     expect(container.querySelector('[data-testid="viewer-nothing"]')).not.toBeNull();
     expect(text('missing-list')).toContain('hidden at this level');
+  });
+
+  it('names the cause when nothing is drawn, and the level that would show it', async () => {
+    const { card, params } = fixture('brown_dwarf');
+    useAppStore.getState().setObject(card, params);
+    useAppStore.getState().setHonesty('measured');
+    await mount();
+    expect(text('viewer-nothing')).toContain('Its size is only an estimate');
+    expect(text('viewer-nothing')).toContain('“+ Estimated”');
+    expect(canvasLabel()).toContain('Nothing is drawn');
+    expect(canvasLabel()).not.toContain('R to reset');
+  });
+
+  it('a comet nucleus is read out as an upper limit in the scale bar and the label', async () => {
+    const { card, params } = fixture('comet');
+    useAppStore.getState().setObject(card, params);
+    await mount();
+    expect(text('scale-bar')).toContain('At most 2 km across (upper limit)');
+    expect(text('scale-bar')).toContain('at most about');
+    expect(canvasLabel()).toContain('at most 2 km across (upper limit');
+    expect(canvasLabel()).not.toMatch(/, 2 km across/);
+  });
+
+  it('an estimated size gives its formula, assumption or source: tooltip, text and a Why button (B4)', async () => {
+    const { card, params } = fixture('brown_dwarf');
+    card.radius_rjup = {
+      value: 1,
+      tag: 'model_dependent',
+      source: 'test',
+      assumption: 'Brown dwarf radii are about 1 Jupiter radius.',
+    };
+    useAppStore.getState().setObject(card, params);
+    await mount();
+    const badge = container.querySelector(
+      '[data-testid="scale-bar"] [data-testid="provenance-badge"]',
+    )!;
+    expect(badge.getAttribute('title')).toBe('Brown dwarf radii are about 1 Jupiter radius.');
+    expect(badge.querySelector('.sr-only')?.textContent).toContain('about 1 Jupiter radius');
+    expect(container.querySelector('[data-testid="size-why"]')).toBeNull();
+    await click('Why this size?');
+    expect(text('size-why')).toBe('Brown dwarf radii are about 1 Jupiter radius.');
+    expect(button('Why this size?')?.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('the legend shows plain layer names, with the formula behind a disclosure', async () => {
+    const { card, params } = fixture('asteroid_procedural');
+    useAppStore.getState().setObject(card, params);
+    await mount();
+    const legend = container.querySelector('[data-testid="legend"]')!;
+    expect(legend.textContent).toContain('Surface brightness map');
+    const visible = [...legend.querySelectorAll('li > span')].map((e) => e.textContent).join(' ');
+    expect(visible).not.toMatch(/clamp\(|\(R\d/);
+    expect(legend.querySelector('details')).not.toBeNull();
+    expect(container.textContent).toContain('Default: the artist’s choice');
+  });
+
+  it('a display default is listed with a Default chip, not as "not drawn"', async () => {
+    const { card, params } = fixture('asteroid_shape');
+    delete params.lighting.phase_angle_deg;
+    delete params.lighting.sun_dir;
+    useAppStore.getState().setObject(card, params);
+    await mount();
+    expect(text('default-list')).toContain('Sun direction: shown as a default');
+    expect(
+      container.querySelector('[data-testid="default-list"] [data-tag="artistic"]'),
+    ).not.toBeNull();
+    expect(text('missing-list')).not.toContain('Sun direction');
+  });
+
+  it('a spinning body has a pause control (WCAG 2.2.2) that tells the viewer', async () => {
+    const { card, params } = fixture('asteroid_shape');
+    card.shape_source = { value: '/meshes/bennu.glb', tag: 'measured', source: 'test' };
+    useAppStore.getState().setObject(card, params);
+    await mount();
+    expect(button('Pause spin')?.getAttribute('aria-pressed')).toBe('false');
+    await click('Pause spin');
+    expect(fake.setSpinPaused).toHaveBeenLastCalledWith(true);
+    expect(text('spin-note')).toContain('Auto-spin is paused');
+    await click('Resume spin');
+    expect(fake.setSpinPaused).toHaveBeenLastCalledWith(false);
+  });
+
+  it('the light-curve slider is not announced a second time by the live region', async () => {
+    const { card, params } = fixture('star_mira');
+    card.lightcurve = [
+      { t_mjd: 60000, flux: 10, sigma: 1, lambda_um: 1, flags: 0 },
+      { t_mjd: 60010, flux: 2, sigma: 1, lambda_um: 1, flags: 0 },
+    ];
+    useAppStore.getState().setObject(card, params);
+    await mount();
+    const slider = container.querySelector('input[type="range"]') as HTMLInputElement;
+    expect(slider.getAttribute('aria-valuetext')).toContain('2023-02-25');
+    expect(container.textContent).not.toMatch(/MJD/);
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+      set.call(slider, '1');
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(shown.at(-1)?.scrub?.index).toBe(1);
+    expect(text('viewer-announcer')).toBe('');
+  });
+
+  it('a new object starts from its own epoch, not the last one chosen', async () => {
+    const a = fixture('comet');
+    useAppStore.getState().setObject(a.card, a.params);
+    await mount();
+    await click('Dec 2025(no gas data)');
+    expect(shown.at(-1)?.epoch).toBe('2025-12');
+    const b = fixture('comet');
+    b.params.id = 'fixture:comet-2';
+    await act(async () => {
+      useAppStore.getState().setObject(b.card, b.params);
+    });
+    expect(shown.at(-1)?.epoch).toBe('2025-08');
   });
 
   it('every control is at least 24 px (44 px by class)', async () => {

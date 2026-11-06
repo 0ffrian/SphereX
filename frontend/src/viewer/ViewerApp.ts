@@ -23,7 +23,7 @@ import type { ObjectCard, RenderParams } from '@/contract';
 import { buildLights, MAX_AMBIENT_INTENSITY } from './lighting';
 import type { PlanContext, RenderPlan } from './planTypes';
 import { planRender } from './renderPlan';
-import { buildScene, type BuiltScene } from './renderers/build';
+import { AssetCache, buildScene, type BuiltScene } from './renderers/build';
 
 /** Which backend `WebGPURenderer` ended up on after `init()`. */
 export type RendererBackend = 'webgpu' | 'webgl2';
@@ -42,6 +42,35 @@ export function prefersReducedMotion(): boolean {
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
+}
+
+/** Camera distance for the unit sphere, and the vertical field of view (degrees). */
+const DEFAULT_CAMERA_DISTANCE = 4;
+const CAMERA_FOV_DEG = 40;
+/** Margin around the largest thing drawn when the camera is placed to frame it. Display value. */
+const FRAME_MARGIN = 1.15;
+
+/** Camera distance that keeps a scene reaching `extent` from the origin inside the view. */
+export function cameraDistanceFor(extent: number): number {
+  const fit = (FRAME_MARGIN * extent) / Math.tan((CAMERA_FOV_DEG * Math.PI) / 360);
+  return Math.max(DEFAULT_CAMERA_DISTANCE, fit);
+}
+
+/**
+ * The parts of a plan that change what is built. Mode, honesty and epoch changes that leave these
+ * unchanged (a legend or colour-name change) do not rebuild the scene.
+ */
+export function sceneKey(plan: RenderPlan): string {
+  return JSON.stringify([
+    plan.threeD,
+    plan.bodies,
+    plan.shells,
+    plan.discs,
+    plan.screens,
+    plan.trails,
+    plan.dust,
+    plan.spin,
+  ]);
 }
 
 /** Rotate-button and arrow-key step. UI convenience, not a physical value. */
@@ -130,8 +159,17 @@ export class ViewerApp {
   private lights: Object3D[] = [];
   private placeholderLights: Object3D[] = [];
   private built: BuiltScene | null = null;
+  private builtKey = '';
+  private framedKey: string | null = null;
+  /** Textures and meshes by URL, kept across rebuilds. */
+  private readonly assets = new AssetCache();
   private spinFrame: number | null = null;
   private lastSpinTime = 0;
+  /** Accumulated spin of the spinning bodies, kept across rebuilds so the body does not jump back. */
+  private spinAngle = 0;
+  /** WCAG 2.2.2: the user can pause auto-spin. */
+  private spinPaused = false;
+  private motionQuery: MediaQueryList | null = null;
   /** Called when a mesh or texture fails to load; the panel adds the layer to `failed` and re-plans. */
   private onLoadFailed: ((layerId: string) => void) | null = null;
 
@@ -198,6 +236,12 @@ export class ViewerApp {
 
     canvas.addEventListener('keydown', this.onKeyDown);
 
+    // R9: the reduced-motion preference is read live, so spin stops when it is switched on.
+    if (typeof window.matchMedia === 'function') {
+      this.motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+      this.motionQuery.addEventListener?.('change', this.onMotionChange);
+    }
+
     this.resizeObserver =
       typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => this.resize());
     this.resizeObserver?.observe(canvas);
@@ -220,16 +264,26 @@ export class ViewerApp {
   /** Draws a plan made with `planRender` (the panel plans once and reuses the plan for its UI). */
   showPlan(plan: RenderPlan): void {
     if (this.disposed) return;
-    this.clearBuilt();
     this.placeholder.visible = false;
     this.setLights(buildLights(plan.lighting));
+    const key = sceneKey(plan);
+    if (this.built && key === this.builtKey) {
+      // Nothing that is drawn changed: only the lights (and the labels in the panel) did.
+      this.renderNow();
+      return;
+    }
+    this.clearBuilt();
     if (plan.threeD && plan.bodies.length > 0) {
       try {
-        this.built = buildScene(plan, {
-          onLoadFailed: (id) => this.onLoadFailed?.(id),
-          onChange: this.requestRender,
-        });
+        this.built = buildScene(
+          plan,
+          { onLoadFailed: (id) => this.onLoadFailed?.(id), onChange: this.requestRender },
+          this.assets,
+        );
+        this.builtKey = key;
+        this.applySpinAngle();
         this.scene.add(this.built.group);
+        this.frame(plan.id, plan.extent);
       } catch (err) {
         // Never blank, never crash: the plan stays on screen as text and the canvas stays empty.
         console.warn('[viewer] could not build the scene', err);
@@ -246,8 +300,42 @@ export class ViewerApp {
     this.clearBuilt();
     this.placeholder.visible = true;
     this.setLights(this.placeholderLights);
+    this.frame('', 1);
     this.updateSpinLoop();
     this.renderNow();
+  }
+
+  /**
+   * Places the camera so everything drawn is in view (the T Tauri disc and the star trail reach
+   * past the unit sphere). Only when the object or its extent changes, so a user's zoom survives
+   * an honesty or mode change.
+   */
+  private frame(id: string, extent: number): void {
+    const key = `${id}|${extent}`;
+    if (key === this.framedKey) return;
+    this.framedKey = key;
+    const d = cameraDistanceFor(extent);
+    this.controls.maxDistance = Math.max(20, d * 2);
+    this.camera.position.set(0, 0, d);
+    this.controls.target.set(0, 0, 0);
+    this.controls.update();
+    this.controls.saveState();
+  }
+
+  /** Pause or resume auto-spin (WCAG 2.2.2). Survives rebuilds. */
+  setSpinPaused(paused: boolean): void {
+    if (this.disposed || paused === this.spinPaused) return;
+    this.spinPaused = paused;
+    this.updateSpinLoop();
+  }
+
+  isSpinPaused(): boolean {
+    return this.spinPaused;
+  }
+
+  private applySpinAngle(): void {
+    if (!this.built) return;
+    for (const o of this.built.spinners) o.rotation.y = this.spinAngle;
   }
 
   private clearBuilt(): void {
@@ -255,6 +343,7 @@ export class ViewerApp {
     this.scene.remove(this.built.group);
     this.built.dispose();
     this.built = null;
+    this.builtKey = '';
   }
 
   private setLights(next: Object3D[]): void {
@@ -271,7 +360,8 @@ export class ViewerApp {
 
   /** Spin is the only animation. It runs only if the plan spins and reduced motion is not set. */
   private updateSpinLoop(): void {
-    const wanted = this.built !== null && this.built.spinRate > 0 && !prefersReducedMotion();
+    const wanted =
+      this.built !== null && this.built.spinRate > 0 && !this.spinPaused && !prefersReducedMotion();
     if (!wanted) {
       if (this.spinFrame !== null) cancelAnimationFrame(this.spinFrame);
       this.spinFrame = null;
@@ -284,7 +374,8 @@ export class ViewerApp {
       if (this.disposed || !this.built || this.built.spinRate <= 0) return;
       const dt = Math.min((now - this.lastSpinTime) / 1000, 0.1);
       this.lastSpinTime = now;
-      for (const o of this.built.spinners) o.rotation.y += this.built.spinRate * dt;
+      this.spinAngle += this.built.spinRate * dt;
+      this.applySpinAngle();
       this.renderer.render(this.scene, this.camera);
       this.spinFrame = requestAnimationFrame(tick);
     };
@@ -325,6 +416,9 @@ export class ViewerApp {
     if (this.spinFrame !== null) cancelAnimationFrame(this.spinFrame);
     this.spinFrame = null;
     this.clearBuilt();
+    this.assets.dispose();
+    this.motionQuery?.removeEventListener?.('change', this.onMotionChange);
+    this.motionQuery = null;
     this.resizeObserver?.disconnect();
     this.dprQuery?.removeEventListener('change', this.onPixelRatioChange);
     this.dprQuery = null;
@@ -364,6 +458,10 @@ export class ViewerApp {
     this.dprQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
     this.dprQuery.addEventListener('change', this.onPixelRatioChange);
   }
+
+  private readonly onMotionChange = (): void => {
+    if (!this.disposed) this.updateSpinLoop();
+  };
 
   private readonly onPixelRatioChange = (): void => {
     if (this.disposed) return;

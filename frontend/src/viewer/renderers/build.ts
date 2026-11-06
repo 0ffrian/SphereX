@@ -10,27 +10,29 @@ import {
   Color,
   DoubleSide,
   Group,
+  InstancedBufferAttribute,
   Line,
   LineBasicNodeMaterial,
   Mesh,
   MeshBasicNodeMaterial,
   MeshStandardNodeMaterial,
   Object3D,
-  Points,
   PointsNodeMaterial,
   RingGeometry,
+  Sphere,
   SphereGeometry,
+  Sprite,
   SRGBColorSpace,
   Texture,
   TextureLoader,
   Box3,
-  Sphere,
   Vector3,
 } from 'three/webgpu';
-import { float, normalView, saturate, vec3 } from 'three/tsl';
+import { float, instancedBufferAttribute, normalView, saturate, vec3 } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import type { BodyPlan, DustPlan, RenderPlan, Rgb, ShellPlan, SpinPlan } from '../planTypes';
+import { TRAIL_HALF_LENGTH } from '../planCommon';
 import { LIMB_DARKENING_U } from './Star';
 
 export interface BuildHooks {
@@ -38,6 +40,80 @@ export interface BuildHooks {
   onLoadFailed(layerId: string): void;
   /** Something finished loading: draw again. */
   onChange(): void;
+}
+
+/**
+ * Textures and parsed meshes by URL, shared by the scenes built for one viewer: a new scene (after
+ * an honesty, mode, epoch or scrub change) finds them already loaded, so the body does not flash
+ * flat while they are fetched again. A failed load is forgotten so a later build may retry.
+ */
+export class AssetCache {
+  private readonly textures = new Map<string, Promise<Texture>>();
+  private readonly loadedTextures = new Map<string, Texture>();
+  private readonly meshes = new Map<string, Promise<Object3D>>();
+  private readonly loadedMeshes = new Map<string, Object3D>();
+
+  /** The texture if it has finished loading, else undefined. */
+  loadedTexture(url: string): Texture | undefined {
+    return this.loadedTextures.get(url);
+  }
+
+  texture(url: string): Promise<Texture> {
+    let p = this.textures.get(url);
+    if (!p) {
+      p = new TextureLoader().loadAsync(url).then(
+        (t) => {
+          this.loadedTextures.set(url, t);
+          return t;
+        },
+        (err: unknown) => {
+          this.textures.delete(url);
+          throw err;
+        },
+      );
+      this.textures.set(url, p);
+    }
+    return p;
+  }
+
+  /** The parsed model if it has finished loading, else undefined. */
+  loadedMesh(url: string): Object3D | undefined {
+    return this.loadedMeshes.get(url);
+  }
+
+  mesh(url: string): Promise<Object3D> {
+    let p = this.meshes.get(url);
+    if (!p) {
+      const load = /\.obj(\?.*)?$/i.test(url)
+        ? new OBJLoader().loadAsync(url)
+        : new GLTFLoader().loadAsync(url).then((g) => g.scene);
+      p = load.then(
+        (root) => {
+          this.loadedMeshes.set(url, root);
+          return root;
+        },
+        (err: unknown) => {
+          this.meshes.delete(url);
+          throw err;
+        },
+      );
+      this.meshes.set(url, p);
+    }
+    return p;
+  }
+
+  dispose(): void {
+    for (const t of this.loadedTextures.values()) t.dispose();
+    for (const root of this.loadedMeshes.values()) {
+      root.traverse((o) => {
+        if (o instanceof Mesh) (o.geometry as BufferGeometry).dispose();
+      });
+    }
+    this.textures.clear();
+    this.loadedTextures.clear();
+    this.meshes.clear();
+    this.loadedMeshes.clear();
+  }
 }
 
 export interface BuiltScene {
@@ -51,6 +127,7 @@ export interface BuiltScene {
 
 /** Opacity of a gas shell at full Q (display level, artistic). Scaled by Q. */
 const SHELL_MAX_OPACITY = 0.9;
+/** Point size in pixels. Honoured because shells are instanced sprites, not `Points` (r187). */
 const SHELL_POINT_SIZE = 2;
 const DUST_OPACITY = 0.35;
 const DISC_COLOR = 0x8a7a6a; // artistic
@@ -145,7 +222,12 @@ function bodyMaterial(body: BodyPlan): MeshStandardNodeMaterial | MeshBasicNodeM
   return mat;
 }
 
-export function buildScene(plan: RenderPlan, hooks: BuildHooks): BuiltScene {
+export function buildScene(
+  plan: RenderPlan,
+  hooks: BuildHooks,
+  sharedCache?: AssetCache,
+): BuiltScene {
+  const cache = sharedCache ?? new AssetCache();
   const group = new Group();
   const spinners: Object3D[] = [];
   const disposables: { dispose(): void }[] = [];
@@ -167,16 +249,17 @@ export function buildScene(plan: RenderPlan, hooks: BuildHooks): BuiltScene {
     if (plan.spin) spinners.push(mesh);
 
     // Textures (baked by the backend). A failed load leaves the flat tint and refuses the layer.
-    const loader = new TextureLoader();
+    // A texture the cache already holds is applied at once, so a rebuilt body never flashes flat.
     const load = (url: string | null, layerId: string, apply: (t: Texture) => void) => {
       if (!url) return;
-      loader.loadAsync(url).then(
+      const ready = cache.loadedTexture(url);
+      if (ready) {
+        apply(ready);
+        return;
+      }
+      cache.texture(url).then(
         (t) => {
-          if (disposed) {
-            t.dispose();
-            return;
-          }
-          track(t);
+          if (disposed) return;
           apply(t);
           material.needsUpdate = true;
           hooks.onChange();
@@ -199,46 +282,45 @@ export function buildScene(plan: RenderPlan, hooks: BuildHooks): BuiltScene {
     // Real shape model (R7.1): replaces the placeholder sphere when it loads.
     if (body.meshUrl) {
       const url = body.meshUrl;
-      const loadMesh = /\.obj(\?.*)?$/i.test(url)
-        ? new OBJLoader().loadAsync(url)
-        : new GLTFLoader().loadAsync(url).then((g) => g.scene);
-      loadMesh.then(
-        (root) => {
-          if (disposed) return;
-          // Scale to the measured size: the bounding sphere becomes the unit sphere (ASSUMPTION:
-          // diameter_km is the diameter of the bounding sphere of the model).
-          const box = new Box3().setFromObject(root);
-          const sphere = box.getBoundingSphere(new Sphere());
-          const holder = new Group();
-          root.position.sub(sphere.center);
-          holder.add(root);
-          if (sphere.radius > 0) holder.scale.setScalar(1 / sphere.radius);
-          const shared = track(
-            new MeshStandardNodeMaterial({ color: srgb(body.tint), roughness: 0.95 }),
-          );
-          root.traverse((o) => {
-            if (o instanceof Mesh) {
-              track(o.geometry as BufferGeometry);
-              o.material = shared;
-            }
-          });
-          group.remove(mesh);
-          group.add(holder);
-          const i = spinners.indexOf(mesh);
-          if (i >= 0) spinners[i] = holder;
-          hooks.onChange();
-        },
-        () => {
+      const swap = (cached: Object3D) => {
+        if (disposed) return;
+        // The cached model is shared between scenes: clone it, and leave its geometry to the cache.
+        const root = cached.clone(true);
+        // Scale to the measured size: the bounding sphere becomes the unit sphere.
+        // ASSUMPTION (Q-43, [verify]): diameter_km is the diameter of the bounding sphere of the
+        // model. Catalogue diameters are often volume-equivalent, which would make this too large.
+        const box = new Box3().setFromObject(root);
+        const sphere = box.getBoundingSphere(new Sphere());
+        const holder = new Group();
+        root.position.sub(sphere.center);
+        holder.add(root);
+        if (sphere.radius > 0) holder.scale.setScalar(1 / sphere.radius);
+        holder.rotation.y = mesh.rotation.y; // keep the spin angle across the swap
+        const shared = track(
+          new MeshStandardNodeMaterial({ color: srgb(body.tint), roughness: 0.95 }),
+        );
+        root.traverse((o) => {
+          if (o instanceof Mesh) o.material = shared;
+        });
+        group.remove(mesh);
+        group.add(holder);
+        const i = spinners.indexOf(mesh);
+        if (i >= 0) spinners[i] = holder;
+        hooks.onChange();
+      };
+      const ready = cache.loadedMesh(url);
+      if (ready) swap(ready);
+      else
+        cache.mesh(url).then(swap, () => {
           if (!disposed) hooks.onLoadFailed('mesh');
-        },
-      );
+        });
     }
   }
 
   // Gas shells and dust --------------------------------------------------------------------
+  // r187 note (PointsNodeMaterial doc comment): WebGPU draws `Points` at 1 px whatever the size,
+  // so a point cloud is one instanced `Sprite` whose positions come from an instanced attribute.
   const addPoints = (positions: Float32Array, color: Color, opacity: number) => {
-    const geometry = track(new BufferGeometry());
-    geometry.setAttribute('position', new BufferAttribute(positions, 3));
     const material = track(
       new PointsNodeMaterial({
         color,
@@ -250,7 +332,11 @@ export function buildScene(plan: RenderPlan, hooks: BuildHooks): BuiltScene {
         depthWrite: false,
       }),
     );
-    group.add(new Points(geometry, material));
+    material.positionNode = instancedBufferAttribute(new InstancedBufferAttribute(positions, 3));
+    const cloud = new Sprite(material);
+    cloud.count = positions.length / 3;
+    cloud.frustumCulled = false; // the shared quad's bounds do not describe the instances
+    group.add(cloud);
   };
   for (const shell of plan.shells) {
     addPoints(shellPositions(shell), new Color(shell.css), SHELL_MAX_OPACITY * shell.brightness);
@@ -291,7 +377,7 @@ export function buildScene(plan: RenderPlan, hooks: BuildHooks): BuiltScene {
     // Direction of motion only: the length is a display value, not to scale.
     const [dx, dy] = trail.pm;
     const n = Math.hypot(dx, dy) || 1;
-    const half = 2.5;
+    const half = TRAIL_HALF_LENGTH;
     const geometry = track(new BufferGeometry());
     geometry.setAttribute(
       'position',
@@ -316,6 +402,7 @@ export function buildScene(plan: RenderPlan, hooks: BuildHooks): BuiltScene {
     spinRate: spinRateRadPerS(plan.spin),
     dispose() {
       disposed = true;
+      if (!sharedCache) cache.dispose();
       for (const d of disposables) d.dispose();
       disposables.length = 0;
       group.clear();
