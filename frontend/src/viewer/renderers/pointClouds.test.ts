@@ -6,7 +6,7 @@ const same = (a: Float32Array, b: Float32Array): boolean =>
   a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
 
 describe('point clouds', () => {
-  it('are byte-identical for the same seed and differ for another', () => {
+  it('are byte-identical for the same seed (per engine) and differ for another', () => {
     const a = generateNebula(13);
     const b = generateNebula(13);
     expect(same(a.glow.positions, b.glow.positions)).toBe(true);

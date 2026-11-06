@@ -1,4 +1,4 @@
-// R7.7, D-12: the shared CPU field for the shader-generated kinds. Pure and deterministic, so it
+// R7.7, D-12: the shared CPU field for the shader-generated kinds. Pure and deterministic per engine, so it
 // is unit-testable; fieldWorker.ts is a thin Web Worker wrapper around `generateField`.
 //
 // The field is the SOURCE OF TRUTH for height, band index, storm id and the ocean, ice and lava
@@ -123,8 +123,18 @@ export function stormsFor(seed: number, count: number): Storm[] {
   return out;
 }
 
-/** Storm influence: the field marks a pixel as inside a storm within this many sizes. */
-export const STORM_EDGE_FACTOR = 1.5;
+/**
+ * The drawn storm is a spot (Gaussian of width 1 size) plus a ring: a Gaussian in the angular
+ * distance centred at `STORM_RING_CENTRE` sizes with width `STORM_RING_WIDTH` sizes. The shader
+ * (ShaderBody.ts) and the field both read these, so the felt edge is the drawn edge (D-12).
+ */
+export const STORM_RING_CENTRE = 1.3;
+export const STORM_RING_WIDTH = 0.4;
+/**
+ * Storm influence: the field marks a pixel as inside a storm within this many sizes. It is the
+ * radius where the drawn ring has faded to exp(-2.25), about 10%, of its peak (review N3).
+ */
+export const STORM_EDGE_FACTOR = STORM_RING_CENTRE + 1.5 * STORM_RING_WIDTH;
 
 /** Id of the storm covering `d` (nearest in units of its size), or 0. */
 export function stormIdAt(d: Vec3, storms: readonly Storm[]): number {
@@ -139,6 +149,36 @@ export function stormIdAt(d: Vec3, storms: readonly Storm[]): number {
     }
   }
   return best;
+}
+
+// ---- gas giant flow and rings (D-12 flow source, R8.4) ------------------------------------------
+
+/**
+ * Zonal wind at a latitude, in units of the strongest jet (-1..1, `artistic`: the mock-up's
+ * differential rotation `sin(lat * bands * pi)`, without its time scale). Adjacent bands flow in
+ * opposite directions (counter-flowing jets, A6). `y` is sin(latitude), i.e. the direction's Y.
+ * The still picture has no motion (D-05), so this is the one flow input the shader does not use;
+ * it derives from the same `bands` parameter as the band profile (`gasBandAt`).
+ */
+export function zonalWind(y: number, p: Pick<FieldParams, 'bands'>): number {
+  return Math.sin(Math.max(-1, Math.min(1, y)) * p.bands * Math.PI);
+}
+
+/** Ring plane geometry in body radii (ShaderBody draws the ring from these). */
+export const RING_INNER = 1.45;
+export const RING_OUTER = 2.55;
+/** Gap edges as a fraction of the ring width, t = (r - RING_INNER) / (RING_OUTER - RING_INNER). */
+export const RING_GAP_EDGES = [0.58, 0.6, 0.64, 0.66] as const;
+
+/** Radial ring parameter t in 0..1 across the ring; outside the ring it is outside 0..1. */
+export function ringT(r: number): number {
+  return (r - RING_INNER) / (RING_OUTER - RING_INNER);
+}
+
+/** 1 inside the ring gap (the shader thins the ring there), 0 elsewhere. Shared with the shader. */
+export function ringGapAt(t: number): number {
+  const [a, b, c, d] = RING_GAP_EDGES;
+  return smoothstep(a, b, t) * (1 - smoothstep(c, d, t));
 }
 
 // ---- terrain -----------------------------------------------------------------------------------
@@ -185,8 +225,8 @@ export function terrainAt(d: Vec3, p: FieldParams): TerrainSample {
 // ---- field -------------------------------------------------------------------------------------
 
 /**
- * Generates the 512x256 field once per body. Deterministic: the same params give byte-identical
- * Float32Arrays. Gas giants: R holds the band profile 0..1 (a gas giant has no relief; this is the
+ * Generates the 512x256 field once per body. Deterministic per engine: the same params give byte-identical
+ * Float32Arrays on one engine (see noise.ts on cross-engine trig differences). Gas giants: R holds the band profile 0..1 (a gas giant has no relief; this is the
  * value the shader colours by), G the band index, B the storm id; texture B stays zero.
  */
 export function generateField(
