@@ -2,27 +2,19 @@
 
 The haptics engine, its drivers, the calibration store and the event sources. Drawn from rendering doc §8.3–8.8 and §10, and decisions D-08 (web only), D-09 (quantised strength), D-10 (audio on every platform, `pitch` and `pan`), D-12 (`terrain` and `flow` sources, shared field), D-20 (`sharpness`, `spherex:haptic` debug hook) and B-01 (Tauri, post-event). The engine fans out every event to all active drivers.
 
-## Diagram 1: engine, drivers and calibration
+## Diagram 1: engine, drivers, settings and calibration
+
+As built in issue #9 (`frontend/src/haptics/`). Every tuning value lives in `tuning.ts` (D-13).
 
 ```mermaid
 classDiagram
   direction LR
-  class HapticKind {
-    <<enumeration>>
-    tick
-    double
-    heartbeat
-    pulseTrain
-    stop
-  }
   class HapticEvent {
-    +kind: HapticKind
-    +strength: number 0 to 1
-    +rateHz: number, optional
-    +tag: Tag
-    +pitch: number, optional, D-10
-    +pan: number, optional, D-10
-    +sharpness: number, optional, D-20
+    <<contract/haptics.ts>>
+    +kind: tick, double, heartbeat, pulseTrain, stop
+    +strength: 0 to 1, tag: Tag, rateHz optional
+    +pitch, pan: optional, D-10, sharpness: optional, D-20
+    +voice: tone, click, surf or chime, optional, Q-60
   }
   class HapticDriver {
     <<interface>>
@@ -30,70 +22,92 @@ classDiagram
     +emit(e: HapticEvent) void
     +stop() void
   }
+  class TrainCapableDriver {
+    <<interface>>
+    +playTrain(w: TrainWindow) void
+    +oneShotBlockMs(e: HapticEvent) number
+  }
+  class TrainWindow {
+    +rateHz, strength, tag, pitch, pan, voice
+    +pulseOffsetsMs: number list
+    +resentCount: number
+  }
   class HapticEngine {
-    -drivers: HapticDriver list
-    -minIntervalMs: number = 25
-    -last: number
-    +emit(e: HapticEvent) void
+    <<haptics.ts>>
+    +emit(e: HapticEvent) boolean
+    +startTrain, updateTrain, stopTrain
+    +stop() void
+    +setHonesty, setStrengthMultiplier
+    +setDrivers, setDriverEnabled
+    +unlock() Promise of boolean
+    honesty gate, then rate cap 40 per s and 25 ms ticks
+    phase-continuous train scheduler, Q-59
   }
   class WebVibrateDriver {
     <<drivers/webVibrate.ts>>
-    +supported: vibrate in navigator
-    -minMs: number
-    -gain: number
-    -levels: 3 or 4, D-09
-    -ms(s: number) number
-    +emit(e: HapticEvent) void
-    +stop() void
+    +supported: navigator.vibrate exists
+    +setLevels(levels) boolean
+    +setDelayMs(ms) void
+    +levelIndex(strength) number
+    3 or 4 equal bins, D-09, MAX_PATTERN 99 verify
   }
   class AudioDriver {
     <<drivers/audio.ts>>
-    +supported: boolean
-    +enabled: boolean
-    +volume: number
-    -audioOffsetMs: number
-    +emit(e: HapticEvent) void
-    +stop() void
+    +supported: AudioContext exists
+    +setVolume(v), setOffsetMs(ms)
+    +outputLatency(), isHighLatency()
+    timbre from tag, refined by voice
+  }
+  class SharedAudioContext {
+    <<audioContext.ts>>
+    +unlockAudio() Promise of boolean
+    +getAudioContext() AudioContext or null
+    created only from a click
   }
   class TauriDriver {
     <<stub, B-01 post-event>>
-    +supported: boolean
-    +emit(e: HapticEvent) void
-    +stop() void
+  }
+  class HapticSettings {
+    <<settings.ts, own Zustand store>>
+    +hapticsOn, soundOn, showChannelLabels
+    +volume 0 to 1, strengthMultiplier 0.5 to 1.5
+    +bindEngine(outputs) unsubscribe
   }
   class Calibration {
     <<calibration.ts, per device>>
-    +minMs: number
-    +levels: number
-    +audioOffsetMs: number
-    +gain: number 0.5 to 1.5
-    +load() Calibration
-    +save() void
+    +version, minMs, avOffsetMs
+    +levels: whisper, soft, medium, firm
+    +applyCalibration(outputs, cal) void
   }
-  class LocalStorage {
-    <<browser>>
+  class Platform {
+    <<platform.ts>>
+    +defaultOutputs() hapticsOn and soundOn
   }
   class PulseIndicator {
-    <<on-screen, D-20>>
-    listens to the spherex:haptic DOM event
-    shows each pulse so the audience can see it
+    <<ui/PulseIndicator.tsx, D-20>>
+    listens to spherex:haptic, aria-hidden
   }
-  class Tag {
-    <<enumeration, see 05>>
+  class UnlockButton {
+    <<ui/UnlockButton.tsx>>
+    click calls engine.unlock
   }
 
-  HapticEvent --> "1" HapticKind
-  HapticEvent --> "1" Tag
-  HapticEngine "1" o-- "0..*" HapticDriver : drivers, fan-out
-  HapticEngine ..> HapticEvent : emit, drops ticks under minIntervalMs
-  WebVibrateDriver ..|> HapticDriver
-  AudioDriver ..|> HapticDriver
+  TrainCapableDriver --|> HapticDriver
+  HapticEngine "1" o-- "0..*" HapticDriver : fan-out
+  HapticEngine ..> TrainWindow : one per 250 ms window
+  HapticEngine ..> HapticEvent : gates, caps, multiplies
+  WebVibrateDriver ..|> TrainCapableDriver
+  AudioDriver ..|> TrainCapableDriver
   TauriDriver ..|> HapticDriver
-  WebVibrateDriver --> Calibration : minMs, levels, gain
-  AudioDriver --> Calibration : audioOffsetMs, gain
-  Calibration ..> LocalStorage : persists
-  HapticEngine ..> PulseIndicator : spherex haptic debug event, firing module verify
-
+  AudioDriver --> SharedAudioContext : schedules on currentTime
+  HapticEngine --> SharedAudioContext : unlock
+  HapticSettings ..> HapticEngine : enable drivers, multiplier
+  HapticSettings ..> AudioDriver : volume
+  HapticSettings ..> Platform : defaults
+  Calibration ..> WebVibrateDriver : levels, delay
+  Calibration ..> AudioDriver : offset
+  HapticEngine ..> PulseIndicator : spherex haptic event after the gate
+  UnlockButton --> HapticEngine : unlock
 ```
 
 ## Diagram 2: event sources
@@ -116,7 +130,13 @@ classDiagram
   }
   class HapticEngine {
     <<see diagram 1>>
-    +emit(e: HapticEvent) void
+    +emit(e: HapticEvent) boolean
+    +startTrain, updateTrain, stopTrain
+  }
+  class SpectrumMapping {
+    <<spectrumMapping.ts>>
+    +sampleAt(lambda) strength, quiet, noisy, pitch
+    shared with the Listen sweep
   }
   class HeightMapSource {
     <<sources/heightMap.ts, texture height>>
@@ -149,13 +169,13 @@ classDiagram
     T Tauri stutter by dimming depth
   }
   class TerrainSource {
-    <<D-12, texture terrain, file verify>>
+    <<sources/terrain.ts, D-12, texture terrain>>
     height ticks, coastline firm tick
     ocean swell 1 to 2 Hz, ice fine ticks
     lava-crack mask gives a double tick
   }
   class FlowSource {
-    <<D-12, texture flow, file verify>>
+    <<sources/flow.ts, D-12, texture flow>>
     tick at band boundary
     jet pulse train 2 to 20 Hz, verify on phones
     storm swirl, ring gaps
@@ -171,7 +191,8 @@ classDiagram
   }
 
   HapticSource --> "1" HapticProfile : reads
-  HapticSource --> "1" HapticEngine : emit
+  HapticSource --> "1" HapticEngine : emit, trains
+  SpectrumSource --> SpectrumMapping : samples
   HeightMapSource ..|> HapticSource
   MeshNormalSource ..|> HapticSource
   FieldSource ..|> HapticSource
@@ -186,12 +207,10 @@ classDiagram
 
 ## Notes
 
-- `HapticEngine` replaces the single `driver` in rendering doc §8.8 with a `drivers` list. Every event goes to every active driver (D-10); the rate limit (≥ 25 ms between ticks, ≤ 40 events/s) is applied once, before the fan-out, and extra ticks are dropped, not queued.
-- `WebVibrateDriver` maps `strength` to 3–4 discrete levels (D-09). Its `supported` is false on iPhone, iPad and desktop, so it is a silent no-op there.
-- `AudioDriver` timbre follows the tag: clean tone for `measured`, grainy click for `artistic` (D-10). Its on/off switch and volume are separate from the haptics switch.
-- `Calibration.gain` is the strength multiplier from rendering doc §8.7. `levels` and `audioOffsetMs` come from D-09 and D-10; their exact measurement is in rendering doc §8.9 **[verify once written]**.
-- The brown dwarf `bands` texture and the `flux_pulse`, `teq_pulse`, `motion` and `detections` data haptics have no source file in rendering doc §10 **[verify]**.
-- Drivers never know about objects; only sources read `HapticProfile`.
-- `sharpness` is optional. The web driver ignores it; a future Tauri driver (B-01) uses it (D-20).
-- The `spherex:haptic` DOM event from the mock-up stays as a debug hook and drives an on-screen pulse indicator (D-20). Which module fires it is not stated; the diagram draws it from the engine.
-- Honesty: sources stay silent for any event whose tag the current toggle state hides (D-21). In Measured only, only `measured` events play.
+- The engine applies, in order: the honesty gate (D-21; `stop` is exempt), the R8.3 rate cap (≥ 25 ms between `tick`, `double` and `heartbeat`; at most 40 events in any 1 s window, a train window counting as one; `stop` exempt; extra events dropped, never queued), then the strength multiplier (R8.7). Only then does it fan out and fire `spherex:haptic` (D-20), even when no driver is active.
+- Pulse trains belong to the engine (Q-59): sources call `startTrain` / `updateTrain` / `stopTrain` and own no timers. The engine keeps each train's phase and sends explicit pulse times per 250 ms window, so 1–2 Hz swells play at their rate. One train at a time. A one-shot cancels the vibration pattern; the engine re-sends the cancelled pulses to vibration only (`resentCount`) once it ends.
+- `WebVibrateDriver` maps `strength` to 3–4 equal bins (D-09). Its `supported` is false on iPhone, iPad and desktop, so it is a silent no-op there.
+- `AudioDriver` timbre (R8.9, Q-60): clean tone for `measured`, softer tone for the Estimated tags, a 4 ms noise grain for `artistic`. `voice` refines it: `surf` low-passed noise and `tone` a band-passed grain for `artistic`; `chime` a bell for the other tags. `artistic` never becomes a tone and the other tags never become noise.
+- Settings and calibration each persist under one `localStorage` key. `Calibration` types and `applyCalibration` are pinned in #9; the wizard, the maths and persistence come with #10 (diagram 13). Offset rule (R8.9): a positive `avOffsetMs` delays the audio, a negative one the vibration.
+- Drivers never know about objects; only sources read `HapticProfile`. `sharpness` is ignored by the web driver (D-20).
+- The brown dwarf `bands` texture and the `flux_pulse`, `teq_pulse`, `motion` and `detections` data haptics have no source file in rendering doc §10 **[verify]** (issue #11).

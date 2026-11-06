@@ -62,6 +62,12 @@ export class WebVibrateDriver implements HapticDriver {
 }
 ```
 
+**As built (issue #9, `frontend/src/haptics/`).** The code above is the reference; the built engine differs where the spec could not work as written. Each difference is a `Q-` entry for Atish to confirm:
+- **Pulse trains (Q-59).** Re-issuing `emit({kind: 'pulseTrain'})` every 250 ms cannot play below 4 Hz (a 1–2 Hz ocean swell gets one pulse per window) and loses the phase at each re-issue. The engine owns trains instead: sources call `startTrain(id, {rateHz, strength, tag, pitch?, pan?, voice?})`, `updateTrain(id, changes)` and `stopTrain(id)`, and own no timers. The engine keeps the phase and sends each 250 ms window with explicit pulse times (`TrainWindow`). One train plays at a time. `emit(pulseTrain)` still works and plays a single window.
+- **Gate and cap.** The engine applies the honesty filter (D-21) before any driver, then the R8.3 limits to every kind: ≥ 25 ms between ticks, doubles and heartbeats, and at most 40 events in any 1 s window (a train window counts as one). `stop` is exempt from both. The strength multiplier (R8.7) is applied here, once, for both drivers.
+- **`voice` (Q-60).** `HapticEvent` gains an optional audio hint, `voice?: 'tone' | 'click' | 'surf' | 'chime'`, for the D-12 per-kind sounds. The vibrate driver ignores it. The tag still sets the timbre family ([§8.9](audio-pairing.md#r89-audio-pairing-d-10)).
+- All tuning values live in `haptics/tuning.ts` (D-13).
+
 Event sources (`sources/heightMap.ts`, `meshNormal.ts`, `field.ts`, `terrain.ts`, `flow.ts`, `spectrum.ts`, `lightcurve.ts`) read the `HapticProfile` from RenderParams and call `engine.emit`. Drivers never know about objects.
 
 **From the mock-up (D-20).** This discrete `HapticEvent` is the app API; it carries the `tag` that the honesty rule and the audio timbre need.
