@@ -1,7 +1,8 @@
 // R8.4 item 1, R8.8 pan: pointer → ray → analytic sphere or ellipsoid → body direction and UV.
 // No mesh raycast is needed for these bodies (R8.4). Plain math on the camera's matrices, so it
-// runs without a GPU and allocates nothing per sample (the optional `toBody` transform of a
-// BodyRenderer is the caller's).
+// runs without a GPU and writes into the caller's reused TouchSample. Per sample it still makes a
+// few small objects it does not own: `directionToUV`'s result and, for shader bodies, the two
+// points `toBody` (BodyRenderer.worldToBody) returns.
 //
 // Frame: the "probe frame" is where the bodies are described. For the shader kinds it is the body
 // frame (`BodyRenderer.worldToBody`, unit sphere, gas-giant tilt included); for the planned kinds

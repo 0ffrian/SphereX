@@ -1,6 +1,8 @@
 // R8.4, R8.5, R8.8: what every texture and data source shares (issue #11).
 //   - `TouchSample`: one pointer sample, already turned into a body hit by `probe.ts`. One object
-//     is reused for every pointermove, so the hot path does not allocate.
+//     is reused for every pointermove. The sources and the probe allocate nothing of their own per
+//     sample; the viewer helpers they call (FieldSampler.sampleUV, directionToUV, zonalWind,
+//     BodyRenderer.worldToBody) still return small objects.
 //   - `HapticSource`: a source reads samples (or a scrub index) and emits through the engine. It
 //     owns no timers: one-shots go to `emit`, pulse trains to `startTrain` / `updateTrain` /
 //     `stopTrain` (Q-59), so the engine keeps their phase, the rate cap and the honesty gate.
@@ -118,12 +120,14 @@ export class OneShot {
   }
 }
 
-/** Relative change of rate or strength below which a running train is not updated. Engineering. */
+/** Relative change of rate, strength or pitch below which a running train is not updated. Engineering. */
 const TRAIN_UPDATE_EPSILON = 0.02;
+/** Change of pan (−1..1) below which a running train is not updated. Engineering. */
+const TRAIN_PAN_EPSILON = 0.05;
 
 /**
  * One source's pulse train. `play` starts it (or takes it back after another train replaced it)
- * and updates it only when the rate, strength or pitch moved by more than 2%, so a pointermove
+ * and updates it only when the rate, strength, pitch (2%) or pan (0.05) moved, so a pointermove
  * does not re-send the same train. The params object is reused; the engine copies it.
  */
 export class TrainSlot {
@@ -146,7 +150,8 @@ export class TrainSlot {
       mine &&
       Math.abs(rateHz - p.rateHz) <= TRAIN_UPDATE_EPSILON * p.rateHz &&
       Math.abs(strength - p.strength) <= TRAIN_UPDATE_EPSILON &&
-      Math.abs((pitch ?? 0) - (p.pitch ?? 0)) <= TRAIN_UPDATE_EPSILON
+      Math.abs((pitch ?? 0) - (p.pitch ?? 0)) <= TRAIN_UPDATE_EPSILON &&
+      Math.abs(pan - (p.pan ?? 0)) <= TRAIN_PAN_EPSILON
     ) {
       return;
     }
@@ -157,9 +162,12 @@ export class TrainSlot {
     this.running = mine ? this.engine.updateTrain(this.id, p) : this.engine.startTrain(this.id, p);
   }
 
-  /** Stop the train if it is still this slot's (another source's train is left alone). */
+  /**
+   * Stop the train if it is this slot's (the engine ignores another source's id). Always asked,
+   * so a train the engine still runs after a refused update cannot leak.
+   */
   stop(): void {
-    if (this.running) this.engine.stopTrain(this.id);
+    this.engine.stopTrain(this.id);
     this.running = false;
   }
 

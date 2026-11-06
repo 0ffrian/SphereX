@@ -3,9 +3,10 @@
 // + Artistic (D-21). It samples the SAME shared field the shader draws (BodyRenderer.field), so
 // the finger and the picture agree (D-12, R1 principle 6).
 //   - Land: height ticks with the R8.4 rule (relief.ts), voice `click` ("land is clicks").
-//   - Coastline: one firm tick when the ocean mask changes between consecutive samples.
+//   - Coastline: one firm tick when open ocean (ocean · (1 − ice)) starts or ends, with hysteresis.
 //   - Open ocean: a near-silent slow swell, a 1–2 Hz train at the lowest level, voice `surf`.
-//   - Polar ice: dense, fine, soft ticks, one every ICE_TICK_SPACING_PX of travel.
+//   - Polar ice (drawn over land and sea alike): dense, fine, soft ticks, one every
+//     ICE_TICK_SPACING_PX of travel; ice over the sea is flat (no relief ticks).
 //   - Lava cracks (planet_rocky): a double tick on entering a crack (texture B, channel B).
 //   - Clouds: not felt (the optional "feel clouds" toggle is not built).
 import type { Tag } from '@/contract';
@@ -16,11 +17,15 @@ import {
   ICE_TICK_SPACING_PX,
   MASK_THRESHOLD,
   OCEAN_SWELL_HZ,
-  OCEAN_SWELL_STRENGTH,
   PLAIN_TICK_STRENGTH,
   STRENGTH_FIRM,
+  STRENGTH_LOWEST,
   STRENGTH_SOFT,
 } from '../tuning';
+
+/** Coastline hysteresis on open ocean = ocean · (1 − ice): enter at or above, leave at or below. Engineering. */
+export const COAST_ENTER = 0.6;
+export const COAST_LEAVE = 0.4;
 import { PeakDetector, ReliefStats } from './relief';
 import { OneShot, TrainSlot, type HapticSink, type HapticSource, type TouchSample } from './types';
 
@@ -82,42 +87,53 @@ export class TerrainSource implements HapticSource {
       return;
     }
     const f: FieldSample = this.field.sampleUV(s.u, s.v);
-    const ocean = f.ocean >= MASK_THRESHOLD;
-    const zone: Zone = ocean ? 'ocean' : f.ice >= MASK_THRESHOLD ? 'ice' : 'land';
+    // The shader paints the ice cap over the ocean too, so ice wins: open ocean = ocean · (1 − ice).
+    // Hysteresis on the coastline, so a jittering finger does not buzz on it.
+    const openOcean = f.ocean * (1 - f.ice);
+    const wasOpen = this.zone === 'ocean';
+    const open =
+      this.zone === 'none'
+        ? openOcean >= MASK_THRESHOLD
+        : wasOpen
+          ? openOcean > COAST_LEAVE
+          : openOcean >= COAST_ENTER;
+    const zone: Zone = open ? 'ocean' : f.ice >= MASK_THRESHOLD ? 'ice' : 'land';
     const travel = Number.isFinite(this.lastX)
       ? Math.hypot(s.xPx - this.lastX, s.yPx - this.lastY)
       : 0;
     this.lastX = s.xPx;
     this.lastY = s.yPx;
 
-    // Coastline: the ocean mask changed between consecutive samples.
-    const wasOcean = this.zone === 'ocean';
-    if (this.zone !== 'none' && ocean !== wasOcean) {
+    // Coastline: the open-ocean state changed between consecutive samples.
+    if (this.zone !== 'none' && open !== wasOpen) {
       this.out.play('tick', STRENGTH_FIRM, s.pan, 'click');
     }
 
-    if (ocean) {
+    if (open) {
       this.peaks.reset();
       this.inLava = false;
-      this.swell.play(OCEAN_SWELL_HZ, OCEAN_SWELL_STRENGTH, s.pan);
+      this.iceTravel = 0;
+      this.swell.play(OCEAN_SWELL_HZ, STRENGTH_LOWEST, s.pan);
     } else {
       this.swell.stop();
-      if (zone === 'ice') {
-        // Dense, fine, soft ticks by distance travelled (the 25 ms rule drops the excess).
-        this.iceTravel += travel;
-        if (this.zone !== 'ice') this.iceTravel = 0;
-        if (this.iceTravel >= ICE_TICK_SPACING_PX) {
-          this.iceTravel %= ICE_TICK_SPACING_PX;
-          this.out.play('tick', STRENGTH_SOFT, s.pan, 'click');
-        }
-      }
       // Lava cracks: a double tick on entering one.
       const lava = this.lava && f.lava >= MASK_THRESHOLD;
       if (lava && !this.inLava) this.out.play('double', PLAIN_TICK_STRENGTH, s.pan, 'click');
       this.inLava = lava;
-      // Land relief (ice included: it lies on land).
-      const strength = this.peaks.step(f.height, this.tauFraction * this.stats.at(s.u, s.v));
-      if (strength >= 0) this.out.play('tick', strength, s.pan, 'click');
+      // Relief: land (ice on land included). Ice over the sea lies flat at sea level.
+      let peak = -1;
+      if (f.ocean >= MASK_THRESHOLD) this.peaks.reset();
+      else peak = this.peaks.step(f.height, this.tauFraction * this.stats.at(s.u, s.v));
+      if (peak >= 0) this.out.play('tick', peak, s.pan, 'click');
+      if (zone === 'ice') {
+        // Dense, fine, soft ticks by distance travelled. A relief tick in the same sample wins
+        // (the 25 ms rule would drop the second one anyway).
+        this.iceTravel = this.zone === 'ice' ? this.iceTravel + travel : 0;
+        if (this.iceTravel >= ICE_TICK_SPACING_PX) {
+          this.iceTravel %= ICE_TICK_SPACING_PX;
+          if (peak < 0) this.out.play('tick', STRENGTH_SOFT, s.pan, 'click');
+        }
+      }
     }
     this.zone = zone;
   }

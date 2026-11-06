@@ -16,12 +16,7 @@ import type { FieldSampler } from '@/viewer/fields/fieldGenerator';
 import type { BodyPlan } from '@/viewer/planTypes';
 import { numberField } from '@/viewer/planCommon';
 import { BROWN_DWARF_CONFIG, binaryClasses } from '@/viewer/renderers/BrownDwarf';
-import {
-  COMET_EPOCHS,
-  GAS_STYLE,
-  gasQForEpoch,
-  MIN_NUCLEUS_SCENE_RADIUS,
-} from '@/viewer/renderers/Comet';
+import { COMET_EPOCHS, GAS_STYLE, gasQForEpoch } from '@/viewer/renderers/Comet';
 import type { PointSet } from '@/viewer/renderers/pointClouds';
 import { isShaderKind, resolveShaderSpec } from '@/viewer/renderers/shaderSpec';
 import type { Overrides } from '@/viewer/sliders';
@@ -60,9 +55,23 @@ export interface HapticBody {
 
 export type CometGas = (typeof GAS_STYLE)[number]['key'];
 
+/** The parts of a RenderPlan body (planTypes.ts BodyPlan) the haptics read. */
+export type PlanBodyLike = Pick<BodyPlan, 'id' | 'axes'>;
+
 export interface BuildHapticsOptions {
-  /** D-27 slider overrides the body was built with (gas-giant wind and rings follow them). */
-  overrides?: Overrides;
+  /**
+   * D-27 slider overrides the body was built with. Required (pass `{}` for none): the gas-giant
+   * wind, storms and rings are re-derived from them, and the BodyRenderer does not expose its
+   * field parameters, so a missing value would let the felt flow drift from the drawn bands.
+   */
+  overrides: Overrides;
+  /** The built RenderPlan's bodies (planned kinds). The comet's felt nucleus is its `nucleus` body. */
+  planBodies?: readonly PlanBodyLike[];
+  /**
+   * asteroid_shape: true once the viewer fills `TouchSample.normal` from a real mesh raycast
+   * (three-mesh-bvh). Until then the mesh texture is refused (a bounding sphere is not the shape).
+   */
+  meshNormals?: boolean;
   /** Comet: the selected epoch. Default: the first epoch of COMET_EPOCHS with any Q. */
   epoch?: CometEpoch;
   /** Comet: the gas selected on the spectrum. Default: the first gas (CO₂, H₂O, CO) with Q. */
@@ -76,6 +85,8 @@ export interface BuildHapticsOptions {
 export interface HapticsBuild {
   texture: HapticSource | null;
   data: HapticSource | null;
+  /** Gas giant rings are drawn and felt: the probe must report the ring radius (`shaderProbeOptions`). */
+  rings: boolean;
   /** Haptics refused for missing or unverified data (ids, as RenderParams.missing). */
   missing: string[];
 }
@@ -84,6 +95,8 @@ export interface HapticsBuild {
 export const MISSING = {
   height: 'height',
   craterRims: CRATER_RIMS_MISSING,
+  meshNormals: 'mesh_normals',
+  nucleus: 'nucleus_tick',
   bands: 'band_ticks',
   terrain: 'terrain',
   flow: 'flow',
@@ -120,12 +133,10 @@ function defaultEpoch(card: ObjectCard): CometEpoch {
   return COMET_EPOCHS.find((e) => cometQNorm(card, e) !== null) ?? COMET_EPOCHS[0]!;
 }
 
-/** Comet nucleus radius in coma radii, as the comet plan draws it (a point when unknown). */
-export function nucleusRadiusInComa(card: ObjectCard): number {
-  const n = numberField(card, 'nucleus_radius_km_max');
-  const c = numberField(card, 'coma_radius_km');
-  if (n === null || c === null || !(c > 0)) return MIN_NUCLEUS_SCENE_RADIUS;
-  return Math.max(n / c, MIN_NUCLEUS_SCENE_RADIUS);
+/** Radius of the drawn comet nucleus (the plan's `nucleus` body), or null when not given. */
+export function drawnNucleusRadius(bodies: readonly PlanBodyLike[] | undefined): number | null {
+  const n = bodies?.find((b) => b.id === 'nucleus');
+  return n ? Math.max(n.axes[0], n.axes[1], n.axes[2]) : null;
 }
 
 /**
@@ -138,7 +149,7 @@ export function buildHaptics(
   params: RenderParams,
   card: ObjectCard,
   body: HapticBody | null,
-  options: BuildHapticsOptions = {},
+  options: BuildHapticsOptions,
 ): HapticsBuild {
   const profile = params.haptics;
   const missing: string[] = [];
@@ -153,6 +164,7 @@ export function buildHaptics(
 
   // ---- texture
   let texture: HapticSource | null = null;
+  let rings = false;
   const tt = profile.texture_tag;
   switch (profile.texture) {
     case 'none':
@@ -170,7 +182,11 @@ export function buildHaptics(
       break;
     }
     case 'mesh':
-      texture = new MeshNormalSource(engine, tt);
+      // Only a real mesh raycast can say where a face turns or where the silhouette is; a bounding
+      // sphere would invent `measured` ticks. Refused until the viewer provides the normals (Q-66).
+      texture = options.meshNormals
+        ? new MeshNormalSource(engine, tt)
+        : refuse(MISSING.meshNormals);
       break;
     case 'bands':
       // Brown dwarf bands are only in the baked albedo image; the client has no band index to
@@ -193,13 +209,16 @@ export function buildHaptics(
         isShaderKind(params.type) && card.type === params.type
           ? resolveShaderSpec(card, params, options.overrides)
           : null;
-      texture =
-        field && spec?.field?.kind === 'gas'
-          ? new FlowSource(engine, field, spec.field, tt, {
-              k: num('k'),
-              rings: spec.gas?.rings ?? 0,
-            })
-          : refuse(MISSING.flow);
+      if (field && spec?.field?.kind === 'gas') {
+        const flow = new FlowSource(engine, field, spec.field, tt, {
+          k: num('k'),
+          rings: spec.gas?.rings ?? 0,
+        });
+        rings = flow.feelsRings;
+        texture = flow;
+      } else {
+        texture = refuse(MISSING.flow);
+      }
       break;
     }
   }
@@ -247,11 +266,14 @@ export function buildHaptics(
       if (params.type === 'comet') {
         const epoch = options.epoch ?? defaultEpoch(card);
         const qNorm = cometQNorm(card, epoch, options.gas);
+        // The felt nucleus is the drawn one (the plan's `nucleus` body); without it, no tick.
+        const nucleus = drawnNucleusRadius(options.planBodies);
+        if (qNorm !== null && nucleus === null) refuse(MISSING.nucleus);
         data =
           qNorm !== null
             ? new CometFieldSource(engine, dt, {
                 qNorm,
-                nucleusRadius: nucleusRadiusInComa(card),
+                nucleusRadius: nucleus ?? -1,
                 k: num('k'),
                 maxRateHz: num('maxRateHz'),
               })
@@ -286,15 +308,21 @@ export function buildHaptics(
       break;
   }
 
-  return { texture, data, missing };
+  return { texture, data, rings, missing };
 }
 
-/** Probe set-up for a shader kind's BodyRenderer: one unit sphere in the body frame. */
-export function shaderProbeOptions(body: HapticBody, rings = false): TouchProbeOptions {
+/**
+ * Probe set-up for a shader kind's BodyRenderer: one unit sphere in the body frame, and the ring
+ * plane exactly when `build` feels the rings (one source for both).
+ */
+export function shaderProbeOptions(
+  body: HapticBody,
+  build: Pick<HapticsBuild, 'rings'>,
+): TouchProbeOptions {
   return {
     bodies: [{ id: 'body', position: [0, 0, 0], axes: [1, 1, 1] }],
     toBody: (p) => body.worldToBody(p),
-    rings,
+    rings: build.rings,
   };
 }
 

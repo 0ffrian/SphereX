@@ -36,7 +36,10 @@ export function cometFieldRateHz(qNorm: number, r: number, k: number, maxHz: num
 export interface CometFieldOptions {
   /** Selected gas's Q ÷ the largest Q of the card (planShells normalisation), > 0. */
   qNorm: number;
-  /** Nucleus radius in coma radii (the drawn nucleus); the finger inside it gets the firm tick. */
+  /**
+   * Nucleus radius in the comet plan's scene units (its `nucleus` body), so the felt nucleus is the
+   * drawn one; the finger inside it gets the firm tick.
+   */
   nucleusRadius: number;
   /** `profile.params.k`, else FIELD_K. */
   k?: number;
@@ -72,8 +75,14 @@ export class CometFieldSource implements HapticSource {
   move(s: TouchSample): void {
     const r = s.centreDistance;
     const nucleus = r <= this.opts.nucleusRadius;
-    if (nucleus && !this.onNucleus) this.out.play('tick', STRENGTH_FIRM, s.pan);
-    this.onNucleus = nucleus;
+    if (nucleus) {
+      // On the nucleus: one firm tick on entering, and no coma pulse under it (R8.4).
+      this.train.stop();
+      if (!this.onNucleus) this.out.play('tick', STRENGTH_FIRM, s.pan);
+      this.onNucleus = true;
+      return;
+    }
+    this.onNucleus = false;
     if (!(r <= 1)) {
       // Outside the coma: nothing to feel.
       this.train.stop();

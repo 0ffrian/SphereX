@@ -6,8 +6,8 @@ import {
   OCEAN_SWELL_HZ,
   OCEAN_SWELL_MAX_HZ,
   OCEAN_SWELL_MIN_HZ,
-  OCEAN_SWELL_STRENGTH,
   STRENGTH_FIRM,
+  STRENGTH_LOWEST,
   STRENGTH_SOFT,
 } from '../tuning';
 import { SWELL_TRAIN_ID, TerrainSource } from './terrain';
@@ -53,7 +53,7 @@ describe('TerrainSource (R8.4, D-12)', () => {
     expect(start!.params).toMatchObject({ rateHz: OCEAN_SWELL_HZ, voice: 'surf', tag: 'artistic' });
     expect(OCEAN_SWELL_HZ).toBeGreaterThanOrEqual(OCEAN_SWELL_MIN_HZ);
     expect(OCEAN_SWELL_HZ).toBeLessThanOrEqual(OCEAN_SWELL_MAX_HZ);
-    expect(start!.params!.strength).toBe(OCEAN_SWELL_STRENGTH);
+    expect(start!.params!.strength).toBe(STRENGTH_LOWEST);
     // Leaving the ocean stops it.
     expect(sink.trains.some((t) => t.op === 'stop' && t.id === SWELL_TRAIN_ID)).toBe(true);
 
@@ -94,5 +94,81 @@ describe('TerrainSource (R8.4, D-12)', () => {
     off.bodyId = null;
     src.move(off);
     expect(sink.activeTrainId).toBeNull();
+  });
+});
+
+/** 64×32: ocean everywhere; rows 0–7 (north) ice over the ocean; a land island at columns 40–47. */
+function icySea(): FieldSampler {
+  const a = new Float32Array(W * H * 4);
+  const b = new Float32Array(W * H * 4);
+  for (let r = 0; r < H; r++) {
+    for (let c = 0; c < W; c++) {
+      const i = (r * W + c) * 4;
+      const land = c >= 40 && c < 48;
+      // A rough sea floor: if ice over the sea were read as land it would tick.
+      a[i] = land ? 0.2 : 0.1 + 0.2 * (c % 2); // a flat island
+      b[i] = land ? 0 : 1;
+      b[i + 1] = r < 8 ? 1 : 0;
+    }
+  }
+  return new FieldSampler({ width: W, height: H, a, b });
+}
+
+describe('TerrainSource: ice drawn over the ocean (review M2)', () => {
+  it('ice over the sea is felt as ice, flat, with no hidden coastlines', () => {
+    const sink = new RecordingSink();
+    const src = new TerrainSource(sink, icySea(), 'artistic');
+    // Along an ice row over the rough sea floor and across the flat island's hidden coasts.
+    for (let i = 0; i <= 200; i++) src.move(sampleUV(uc(10 + (45 * i) / 200), 3 / H, { x: i * 2 }));
+    expect(sink.trains).toEqual([]); // no ocean swell under the ice
+    const ticks = sink.ticks();
+    expect(ticks.length).toBeGreaterThan(10);
+    expect(ticks.map((t) => t.strength).filter((x) => x !== STRENGTH_SOFT)).toEqual([]); // ice ticks only
+  });
+
+  it('leaving the ice onto open water is a coastline, then the swell', () => {
+    const sink = new RecordingSink();
+    const src = new TerrainSource(sink, icySea(), 'artistic');
+    for (let v = 2; v <= 16; v += 0.25) src.move(sampleUV(uc(10), v / H));
+    expect(sink.ticks().filter((t) => t.strength === STRENGTH_FIRM)).toHaveLength(1);
+    expect(sink.activeTrainId).toBe(SWELL_TRAIN_ID);
+  });
+});
+
+describe('TerrainSource coastline hysteresis (review m3)', () => {
+  it('a finger jittering on the coast does not buzz', () => {
+    const sink = new RecordingSink();
+    const src = new TerrainSource(sink, terrainField(), 'artistic');
+    // Column 15 is ocean, 16 land: the bilinear mask crosses 0.5 at u = 16 / W.
+    const edge = 16 / W;
+    for (let i = 0; i < 40; i++) {
+      const jitter = ((i % 2 ? 1 : -1) * 0.05) / W; // mask 0.45 to 0.55, inside the hysteresis band
+      src.move(sampleUV(edge + jitter, 0.5));
+    }
+    expect(sink.ticks().filter((t) => t.strength === STRENGTH_FIRM).length).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('TerrainSource: a relief tick and an ice tick in one sample (review m2)', () => {
+  it('the relief tick wins', () => {
+    const a = new Float32Array(W * H * 4);
+    const b = new Float32Array(W * H * 4);
+    for (let r = 0; r < H; r++) {
+      for (let c = 0; c < W; c++) {
+        const i = (r * W + c) * 4;
+        a[i] = c === 20 ? 1 : 0.5;
+        b[i + 1] = 1; // ice on land everywhere
+      }
+    }
+    const sink = new RecordingSink();
+    const src = new TerrainSource(
+      sink,
+      new FieldSampler({ width: W, height: H, a, b }),
+      'artistic',
+    );
+    // 8 px per sample: every sample is due an ice tick.
+    for (let c = 17; c <= 23; c += 0.25) src.move(sampleUV(uc(c), 0.5, { x: c * 32 }));
+    const strong = sink.ticks().filter((t) => t.strength > STRENGTH_SOFT);
+    expect(strong).toHaveLength(1);
   });
 });

@@ -15,7 +15,6 @@ import {
   buildHaptics,
   cometQNorm,
   MISSING,
-  nucleusRadiusInComa,
   shaderProbeOptions,
   TouchHaptics,
   type HapticBody,
@@ -61,9 +60,16 @@ function ridges(): HeightGrid {
   return new HeightGrid(W, H, d);
 }
 
+/** The comet plan's nucleus body (scene units, coma radius 1), as planComet draws the fixture. */
+const NUCLEUS = [{ id: 'nucleus', axes: [0.02, 0.02, 0.02] as [number, number, number] }];
+
 function build(name: string, sink = new RecordingSink()): HapticsBuild {
   const { card, params } = fixture(name);
-  return buildHaptics(sink, params, card, bodyFor(card, params), { heightGrid: ridges() });
+  return buildHaptics(sink, params, card, bodyFor(card, params), {
+    overrides: {},
+    heightGrid: ridges(),
+    planBodies: NUCLEUS,
+  });
 }
 
 interface Expect {
@@ -75,7 +81,7 @@ interface Expect {
 
 // The R8.5 table for the shared fixtures (shared/fixtures/params/*.json).
 const TABLE: Record<ObjectType, Expect> = {
-  asteroid_shape: { texture: 'mesh', data: null, missing: [] },
+  asteroid_shape: { texture: null, data: null, missing: [MISSING.meshNormals] },
   asteroid_procedural: { texture: 'height', data: null, missing: [MISSING.craterRims] },
   comet: { texture: null, data: 'field', dataTag: 'model_dependent', missing: [] },
   brown_dwarf: { texture: null, data: null, missing: [MISSING.bands, MISSING.flux] },
@@ -121,7 +127,7 @@ describe('buildHaptics: every shared fixture (R8.5)', () => {
 describe('buildHaptics refusals (refuse rather than invent)', () => {
   it('asteroid_procedural without its height.bin: height refused, crater rims refused', () => {
     const { card, params } = fixture('asteroid_procedural');
-    const got = buildHaptics(new RecordingSink(), params, card, null);
+    const got = buildHaptics(new RecordingSink(), params, card, null, { overrides: {} });
     expect(got.texture).toBeNull();
     expect(got.missing.sort()).toEqual([MISSING.craterRims, MISSING.height].sort());
   });
@@ -129,7 +135,7 @@ describe('buildHaptics refusals (refuse rather than invent)', () => {
   it('shader kinds without a field (refused or not built yet) refuse their texture', () => {
     for (const name of ['gas_giant', 'planet_water'] as const) {
       const { card, params } = fixture(name);
-      const got = buildHaptics(new RecordingSink(), params, card, null);
+      const got = buildHaptics(new RecordingSink(), params, card, null, { overrides: {} });
       expect(got.texture).toBeNull();
       expect(got.missing).toContain(params.haptics.texture);
     }
@@ -138,19 +144,20 @@ describe('buildHaptics refusals (refuse rather than invent)', () => {
   it('teq_pulse is refused when teq_K is null, and follows teq_K.tag otherwise', () => {
     const { card, params } = fixture('gas_giant');
     card.teq_K = { value: null, tag: 'derived', source: 't', formula: 'f' };
-    expect(buildHaptics(new RecordingSink(), params, card, bodyFor(card, params)).missing).toEqual([
-      MISSING.teq,
-    ]);
+    const opts = { overrides: {} };
+    expect(
+      buildHaptics(new RecordingSink(), params, card, bodyFor(card, params), opts).missing,
+    ).toEqual([MISSING.teq]);
     card.teq_K = { value: 1200, tag: 'derived', source: 't', formula: 'f' };
-    expect(buildHaptics(new RecordingSink(), params, card, bodyFor(card, params)).data?.tag).toBe(
-      'derived',
-    );
+    expect(
+      buildHaptics(new RecordingSink(), params, card, bodyFor(card, params), opts).data?.tag,
+    ).toBe('derived');
   });
 
   it('flux_pulse plays only with a verified flux_45um reference', () => {
     const { card, params } = fixture('brown_dwarf');
     const sink = new RecordingSink();
-    const got = buildHaptics(sink, params, card, null, { flux45Reference: 200 });
+    const got = buildHaptics(sink, params, card, null, { overrides: {}, flux45Reference: 200 });
     expect(got.data?.id).toBe('flux_pulse');
     expect(got.missing).toEqual([MISSING.bands]);
   });
@@ -158,7 +165,7 @@ describe('buildHaptics refusals (refuse rather than invent)', () => {
   it('binary with classes that cannot be ordered is refused', () => {
     const { card, params } = fixture('brown_dwarf_binary');
     card.spectral_class = { value: 'T5', tag: 'measured', source: 't' };
-    const got = buildHaptics(new RecordingSink(), params, card, null);
+    const got = buildHaptics(new RecordingSink(), params, card, null, { overrides: {} });
     expect(got.data).toBeNull();
     expect(got.missing).toContain(MISSING.binary);
   });
@@ -167,7 +174,11 @@ describe('buildHaptics refusals (refuse rather than invent)', () => {
     const { card, params } = fixture('comet');
     expect(cometQNorm(card, '2025-08')).toBe(1);
     expect(cometQNorm(card, '2025-12')).toBeNull();
-    const dec = buildHaptics(new RecordingSink(), params, card, null, { epoch: '2025-12' });
+    const dec = buildHaptics(new RecordingSink(), params, card, null, {
+      overrides: {},
+      epoch: '2025-12',
+      planBodies: NUCLEUS,
+    });
     expect(dec.data).toBeNull();
     expect(dec.missing).toEqual([MISSING.field]);
     // Epoch-keyed Q (Q-42 proposal): December denser than August, per gas.
@@ -182,12 +193,81 @@ describe('buildHaptics refusals (refuse rather than invent)', () => {
     expect(cometQNorm(card, '2025-12', 'co2')).toBe(1);
     expect(cometQNorm(card, '2025-12', 'h2o')).toBeCloseTo(0.5);
     expect(cometQNorm(card, '2025-08', 'h2o')).toBeNull();
-    expect(nucleusRadiusInComa(card)).toBeCloseTo(0.02);
+    // A selected gas with no Q in the epoch refuses the field too.
+    const h2oAug = buildHaptics(new RecordingSink(), params, card, null, {
+      overrides: {},
+      epoch: '2025-08',
+      gas: 'h2o',
+      planBodies: NUCLEUS,
+    });
+    expect(h2oAug.missing).toEqual([MISSING.field]);
+
+    // R8.4: December feels denser than August, at the default k, half-way out and near the edge.
+    const rateAt = (epoch: '2025-08' | '2025-12', r: number) => {
+      const sink = new RecordingSink();
+      const b = buildHaptics(sink, params, card, null, {
+        overrides: {},
+        epoch,
+        gas: 'co2',
+        planBodies: NUCLEUS,
+      });
+      const s = sampleAt([0, 0, 1], { bodyId: null });
+      s.centreDistance = r;
+      b.data!.move(s);
+      return sink.current!.rateHz;
+    };
+    expect(rateAt('2025-12', 0.5)).toBeGreaterThan(rateAt('2025-08', 0.5));
+    expect(rateAt('2025-12', 0.9)).toBeGreaterThan(rateAt('2025-08', 0.9));
+  });
+
+  it('comet: the felt nucleus is the drawn nucleus body; without the plan the tick is refused', () => {
+    const { card, params } = fixture('comet');
+    const none = buildHaptics(new RecordingSink(), params, card, null, { overrides: {} });
+    expect(none.data?.id).toBe('field');
+    expect(none.missing).toEqual([MISSING.nucleus]);
+    const sink = new RecordingSink();
+    const big = buildHaptics(sink, params, card, null, {
+      overrides: {},
+      planBodies: [{ id: 'nucleus', axes: [0.5, 0.5, 0.5] }],
+    });
+    const s = sampleAt([0, 0, 1], { bodyId: null });
+    s.centreDistance = 0.4; // inside a 0.5 drawn nucleus (the plan's size when the coma is unknown)
+    big.data!.move(s);
+    expect(sink.ticks()).toHaveLength(1);
+    expect(sink.activeTrainId).toBeNull();
+  });
+
+  it('asteroid_shape: mesh haptics only with real mesh normals (no bounding-sphere stand-in)', () => {
+    const { card, params } = fixture('asteroid_shape');
+    const off = buildHaptics(new RecordingSink(), params, card, null, { overrides: {} });
+    expect(off.texture).toBeNull();
+    expect(off.missing).toEqual([MISSING.meshNormals]);
+    const on = buildHaptics(new RecordingSink(), params, card, null, {
+      overrides: {},
+      meshNormals: true,
+    });
+    expect(on.texture?.id).toBe('mesh');
+    expect(on.missing).toEqual([]);
+  });
+
+  it('gas giant rings: one flag for the source and the probe, from the overrides', () => {
+    const { card, params } = fixture('gas_giant');
+    const body = bodyFor(card, params)!;
+    const plain = buildHaptics(new RecordingSink(), params, card, body, { overrides: {} });
+    expect(plain.rings).toBe(false);
+    expect(shaderProbeOptions(body, plain).rings).toBe(false);
+    const ringed = buildHaptics(new RecordingSink(), params, card, body, {
+      overrides: { rings: 0.8 },
+    });
+    expect(ringed.rings).toBe(true);
+    expect(shaderProbeOptions(body, ringed).rings).toBe(true);
   });
 
   it('nebula without point sets refuses the field', () => {
     const { card, params } = fixture('nebula');
-    expect(buildHaptics(new RecordingSink(), params, card, null).missing).toEqual([MISSING.field]);
+    expect(
+      buildHaptics(new RecordingSink(), params, card, null, { overrides: {} }).missing,
+    ).toEqual([MISSING.field]);
   });
 });
 
@@ -238,10 +318,14 @@ function feel(name: string, honesty: HonestyState, edit?: (card: ObjectCard) => 
   const { card, params } = fixture(name);
   edit?.(card);
   const body = bodyFor(card, params);
-  const b = buildHaptics(r.engine, params, card, body, { heightGrid: ridges() });
+  const b = buildHaptics(r.engine, params, card, body, {
+    overrides: {},
+    heightGrid: ridges(),
+    planBodies: NUCLEUS,
+  });
   const probe = new TouchProbe(
     body
-      ? shaderProbeOptions(body)
+      ? shaderProbeOptions(body, b)
       : { bodies: [{ id: 'body', position: [0, 0, 0], axes: [1, 1, 1] }] },
   );
   const touch = new TouchHaptics(b);
@@ -292,9 +376,31 @@ describe('R11 honesty: haptics follow the D-21 filter (through the real engine)'
     expect(new Set(art.tags)).toEqual(new Set(['artistic']));
   });
 
-  it('a real shape model (measured) still ticks in Measured only (limb edge)', () => {
+  it('asteroid_shape without mesh normals is silent in Measured only and listed as refused', () => {
     const p = feel('asteroid_shape', 'measured');
-    expect(p.texture).toBeGreaterThan(0);
+    expect(p.tags).toEqual([]);
+    expect(build('asteroid_shape').missing).toEqual([MISSING.meshNormals]);
+  });
+
+  it('with real mesh normals, a measured shape model ticks in Measured only', () => {
+    const r = rig('measured');
+    const { card, params } = fixture('asteroid_shape');
+    const b = buildHaptics(r.engine, params, card, null, { overrides: {}, meshNormals: true });
+    const touch = new TouchHaptics(b);
+    // Synthetic normals from the viewer's mesh raycast: a 30 degree face turn, then off the silhouette.
+    const steps: [[number, number, number], boolean][] = [
+      [[0, 0, 1], true],
+      [[0, Math.sin(Math.PI / 6), Math.cos(Math.PI / 6)], true],
+      [[0, 0, 1], false],
+    ];
+    for (const [n, onBody] of steps) {
+      const s = sampleAt([0, 0, 1], { bodyId: onBody ? 'body' : null, x: r.clock.now });
+      s.normal = [...n];
+      touch.move(s);
+      r.clock.advance(50);
+    }
+    const p = played(r);
+    expect(p.texture).toBe(2);
     expect(new Set(p.tags)).toEqual(new Set(['measured']));
   });
 

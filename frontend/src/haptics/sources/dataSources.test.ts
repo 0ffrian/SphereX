@@ -10,6 +10,8 @@ import {
   BINARY_WARM_HZ,
   DATA_PULSE_MAX_HZ,
   DATA_PULSE_MIN_HZ,
+  DATA_PULSE_STRENGTH,
+  FIELD_K,
   FIELD_MAX_HZ,
   FIELD_MIN_HZ,
   STRENGTH_FIRM,
@@ -29,6 +31,7 @@ import {
 import { CometFieldSource, cometFieldRateHz, PointDensitySource, pointsNearRay } from './field';
 import { MiraHeartbeatSource, TTauriDimmingSource } from './lightcurve';
 import { angleDeg, MeshNormalSource, normalTurnStrength } from './meshNormal';
+import { TrainSlot } from './types';
 
 describe('teq_pulse / flux_pulse rates (R8.5: 2–12 Hz)', () => {
   it('maps 0–1 onto 2–12 Hz, capped by maxRateHz', () => {
@@ -70,6 +73,12 @@ describe('brown_dwarf_binary: rate by temperature class, warmer faster', () => {
     expect(binaryRates(['T6', 'T1'])).toEqual([BINARY_COOL_HZ, BINARY_WARM_HZ]);
     expect(binaryRates(['T1', 'T1'])).toBeNull();
     expect(binaryRates(['T1'])).toBeNull();
+    // Words are not classes: the subclass digit is required and no letter may follow it.
+    for (const bad of ['Brown', 'Late T', 'mid-L', 'T', 'Tx', 'T1V', 'L dwarf', '']) {
+      expect(classRank(bad), bad).toBeNull();
+    }
+    expect(classRank('T6.5')).toBe(classRank('T6')! + 0.5);
+    expect(binaryRates(['Brown', 'T6'])).toBeNull();
     expect(BINARY_WARM_HZ).toBeGreaterThan(BINARY_COOL_HZ);
   });
 
@@ -83,6 +92,13 @@ describe('brown_dwarf_binary: rate by temperature class, warmer faster', () => {
     src.move(sampleAt([0, 0, 1], { bodyId: null }));
     expect(sink.activeTrainId).toBeNull();
   });
+
+  it('a single drawn body plays the first component', () => {
+    const sink = new RecordingSink();
+    const src = new BinaryPulseSource(sink, 'measured', [BINARY_WARM_HZ, BINARY_COOL_HZ]);
+    src.move(sampleAt([0, 0, 1], { bodyId: 'body' }));
+    expect(sink.current!.rateHz).toBe(BINARY_WARM_HZ);
+  });
 });
 
 describe('comet field (R8.4)', () => {
@@ -91,6 +107,14 @@ describe('comet field (R8.4)', () => {
     expect(cometFieldRateHz(1, 0.01, 1, 30)).toBe(30);
     expect(cometFieldRateHz(0.1, 0.9, 1, 30)).toBe(FIELD_MIN_HZ);
     expect(cometFieldRateHz(1, 0, 1, FIELD_MAX_HZ)).toBe(FIELD_MAX_HZ);
+  });
+
+  it('December (Q 1) feels denser than August (Q 0.25) across the coma at the default k', () => {
+    for (const r of [0.3, 0.5, 0.75, 1]) {
+      expect(cometFieldRateHz(1, r, FIELD_K, FIELD_MAX_HZ)).toBeGreaterThan(
+        cometFieldRateHz(0.25, r, FIELD_K, FIELD_MAX_HZ),
+      );
+    }
   });
 
   it('denser near the nucleus, firm tick on the nucleus, nothing outside the coma', () => {
@@ -107,9 +131,16 @@ describe('comet field (R8.4)', () => {
     expect(sink.current!.rateHz).toBeGreaterThan(far);
     expect(sink.current!.tag).toBe('model_dependent');
     at(0.01);
+    // On the nucleus: one firm tick and no coma pulse under the finger.
+    expect(sink.activeTrainId).toBeNull();
     at(0.005);
     expect(sink.ticks()).toHaveLength(1);
     expect(sink.ticks()[0]!.strength).toBe(STRENGTH_FIRM);
+    // Leaving and coming back ticks again.
+    at(0.2);
+    expect(sink.activeTrainId).not.toBeNull();
+    at(0.015);
+    expect(sink.ticks()).toHaveLength(2);
     at(1.5);
     expect(sink.activeTrainId).toBeNull();
   });
@@ -186,7 +217,7 @@ describe('light curve (R8.5)', () => {
       src.scrub(i);
       const depth = screenOpacity(card, i)!;
       expect(sink.current!.rateHz).toBeCloseTo(TTAURI_PULSE_HZ * (1 - depth));
-      expect(sink.current!.strength).toBeCloseTo(1 - depth);
+      expect(sink.current!.strength).toBeCloseTo(DATA_PULSE_STRENGTH * (1 - depth));
     }
     src.release();
     expect(sink.activeTrainId).toBeNull();
@@ -237,5 +268,19 @@ describe('mesh normals (R8.4): synthetic geometry', () => {
     const ticks = sink.ticks();
     expect(ticks.map((t) => t.strength)).toEqual([1, STRENGTH_FIRM]);
     expect(ticks.every((t) => t.tag === 'measured')).toBe(true);
+  });
+});
+
+describe('TrainSlot', () => {
+  it('updates a running train when the pan moves, not on tiny changes', () => {
+    const sink = new RecordingSink();
+    const slot = new TrainSlot(sink, 'x', 'artistic');
+    slot.play(4, 0.5, -0.5);
+    slot.play(4, 0.5, -0.48);
+    expect(sink.trains.filter((t) => t.op === 'update')).toHaveLength(0);
+    slot.play(4, 0.5, 0.3);
+    expect(sink.current!.pan).toBe(0.3);
+    slot.stop();
+    expect(sink.activeTrainId).toBeNull();
   });
 });
