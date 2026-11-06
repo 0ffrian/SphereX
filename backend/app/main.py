@@ -12,6 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import objects, resolve, spectrum
 from app.context import make_context
+from app.core.card.assets import AssetStore
+from app.core.card.service import ObjectPipeline
 from app.core.find.frames import FrameService
 from app.core.find.resolver import load_aliases
 from app.errors import install_catch_all, install_error_handlers
@@ -49,6 +51,9 @@ def create_app(
     app = FastAPI(title="Shift & Spectrum API", version="0.1.0")
     app.state.ctx = ctx
     app.state.frames = FrameService(ctx)
+    app.state.pipeline = ObjectPipeline(
+        app.state.frames, AssetStore(ctx.cache, s.assets_dir, s.data_release)
+    )
     app.state.aliases = load_aliases(s.targets_file)
     # Order matters: the middleware added last is outermost. The catch-all goes in first so
     # that CORS wraps it and a 500 still carries CORS headers.

@@ -54,4 +54,6 @@ A saved asset holds the ObjectCard, the RenderParams, the texture URLs, `generat
 | Generated | Browser IndexedDB | Files created during a session, and the user's `overrides` (D-22). |
 | Optional backend | Small service | Shared saves. Not needed for the demo. |
 
+As built (issue #5): the backend also stores generated assets, as `derived.asset` entries in the D-25 cache, and reads pre-baked ones from `backend/assets/<type>/<id>.json` (`SX_ASSETS_DIR`). Whether this table changes to match is Q-52.
+
 The read-through cache of external calls (D-25) is separate from the asset store. It lives on the A15, outside git, with a zipped backup.
