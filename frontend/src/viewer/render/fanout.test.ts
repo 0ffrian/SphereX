@@ -105,6 +105,9 @@ describe('meshUrls / prefetchMesh', () => {
     expect(meshUrls(card('/data/meshes/eros.glb'))).toEqual(['/data/meshes/eros.glb']);
     expect(meshUrls(card('https://example.org/eros.glb'))).toEqual([]);
     expect(meshUrls(card(null))).toEqual([]);
+    // URL parsing turns `\` into `/` and drops tabs: both would reach another host.
+    expect(meshUrls(card('/\\evil.example/x.glb'))).toEqual([]);
+    expect(meshUrls(card('/\t/evil.example/x.glb'))).toEqual([]);
   });
   it('never rejects when the mesh fails', async () => {
     const cache = { texture: vi.fn(), mesh: vi.fn(() => Promise.reject(new Error('404'))) };

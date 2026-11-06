@@ -26,4 +26,13 @@ describe('chainConfig', () => {
   it('only HDR values glow: the threshold is at the LDR ceiling', () => {
     expect(BLOOM_THRESHOLD).toBeGreaterThanOrEqual(2);
   });
+  it('reduced motion: SMAA instead of the jittering TAAU, on every tier', () => {
+    for (const tier of ['high', 'medium', 'low'] as const) {
+      expect(chainConfig(tier, true)).toMatchObject({
+        aa: 'smaa',
+        needsVelocity: false,
+        settleFrames: SETTLE_FRAMES_SMAA,
+      });
+    }
+  });
 });

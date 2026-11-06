@@ -73,9 +73,12 @@ function abortError(): Error {
 export async function loadBody(args: LoadBodyArgs): Promise<LoadedBody> {
   const { signal } = args;
   if (signal?.aborted) throw abortError();
-  const aborted = new Promise<never>((_, rej) =>
-    signal?.addEventListener('abort', () => rej(abortError()), { once: true }),
-  );
+  let onAbort: (() => void) | null = null;
+  const aborted = new Promise<never>((_, rej) => {
+    onAbort = () => rej(abortError());
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+  aborted.catch(() => undefined);
   const live = () => !signal?.aborted;
 
   const cardP = args.card().then((c) => {
@@ -95,7 +98,12 @@ export async function loadBody(args: LoadBodyArgs): Promise<LoadedBody> {
   cardP.catch(() => undefined);
   paramsP.catch(() => undefined);
 
-  const [card, params] = await Promise.race([Promise.all([cardP, paramsP]), aborted]);
-  await Promise.race([prefetchP, aborted]);
-  return { card, params };
+  try {
+    const [card, params] = await Promise.race([Promise.all([cardP, paramsP]), aborted]);
+    await Promise.race([prefetchP, aborted]);
+    return { card, params };
+  } finally {
+    // A reused AbortController must not collect one listener per load.
+    if (onAbort) signal?.removeEventListener('abort', onAbort);
+  }
 }

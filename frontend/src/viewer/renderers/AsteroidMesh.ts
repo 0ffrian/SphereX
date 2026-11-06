@@ -21,6 +21,12 @@ const MESH_EXTENSIONS = /\.(glb|gltf|obj)(\?.*)?$/i;
  */
 export function isLoadableMeshUrl(value: string | null | undefined): value is string {
   if (!value) return false;
+  // URL parsing turns `\` into `/` and drops tabs and newlines, so `/\evil.example/x.glb` would
+  // resolve to another host: refuse backslashes, whitespace and control characters outright.
+  for (const ch of value) {
+    const c = ch.charCodeAt(0);
+    if (ch === '\\' || c <= 0x20 || c === 0x7f) return false;
+  }
   if (!/^(\/(?!\/)|\.\/)/.test(value)) return false;
   return MESH_EXTENSIONS.test(value);
 }

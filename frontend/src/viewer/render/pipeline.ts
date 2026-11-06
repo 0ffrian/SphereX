@@ -16,6 +16,7 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import {
+  convertToTexture,
   Fn,
   luminance,
   max,
@@ -74,20 +75,37 @@ export interface ChainConfig {
   settleFrames: number;
 }
 
-/** What a tier asks of the pipeline (pure; the unit tests read this). */
-export function chainConfig(tier: TierName): ChainConfig {
+/**
+ * What a tier asks of the pipeline (pure; the unit tests read this). Under reduced motion (R9) the
+ * temporal path is swapped for SMAA: TAAU jitters the camera by a sub-pixel offset every frame,
+ * which shows as edge shimmer during each settle burst.
+ */
+export function chainConfig(tier: TierName, reducedMotion = false): ChainConfig {
   const t = TIERS[tier];
+  const aa: AntiAlias = reducedMotion ? 'smaa' : t.aa;
   return {
-    aa: t.aa,
+    aa,
     bloomScale: t.bloomScale,
-    needsVelocity: t.aa === 'taau',
-    settleFrames: t.aa === 'taau' ? SETTLE_FRAMES_TAAU : SETTLE_FRAMES_SMAA,
+    needsVelocity: aa === 'taau',
+    settleFrames: aa === 'taau' ? SETTLE_FRAMES_TAAU : SETTLE_FRAMES_SMAA,
   };
+}
+
+/** Anything in the chain that owns GPU targets. */
+interface Disposable {
+  dispose(): void;
 }
 
 export class RenderChain {
   private pipeline: RenderPipeline | null = null;
+  /**
+   * The nodes that own render targets. r187 RenderPipeline.dispose() frees only its own quad
+   * material, so the scene pass, bloom, the LDR copy and the AA node are disposed here, or every
+   * tier change would leak a full set of HDR, bloom and history targets.
+   */
+  private owned: Disposable[] = [];
   private cfg: ChainConfig;
+  private tier: TierName;
 
   /** Throws if the pipeline cannot be built; the caller falls back to `renderer.render`. */
   constructor(
@@ -95,8 +113,10 @@ export class RenderChain {
     private readonly scene: Scene,
     private readonly camera: PerspectiveCamera,
     tier: TierName,
+    private reducedMotion = false,
   ) {
-    this.cfg = chainConfig(tier);
+    this.tier = tier;
+    this.cfg = chainConfig(tier, reducedMotion);
     // No curve: the fallback path (plain renderer.render) then draws LDR exactly like the chain.
     renderer.toneMapping = NoToneMapping;
     this.build();
@@ -107,7 +127,16 @@ export class RenderChain {
   }
 
   setTier(tier: TierName): void {
-    this.cfg = chainConfig(tier);
+    this.tier = tier;
+    this.cfg = chainConfig(tier, this.reducedMotion);
+    this.build();
+  }
+
+  /** R9: no temporal jitter while the user asks for reduced motion. Rebuilds only on a change. */
+  setReducedMotion(reduced: boolean): void {
+    if (reduced === this.reducedMotion) return;
+    this.reducedMotion = reduced;
+    this.cfg = chainConfig(this.tier, reduced);
     this.build();
   }
 
@@ -118,10 +147,12 @@ export class RenderChain {
     const color = scenePass.getTextureNode('output');
     const glow = bloom(color, BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD);
     glow.setResolutionScale(this.cfg.bloomScale);
-    // The d.ts types taau/smaa inputs as TextureNode; the functions wrap any node (convertToTexture).
-    const toneMapped = renderOutput(clipHighlights(color.add(glow))) as unknown as TextureNode;
+    // Converted to a texture here (taau/smaa would do it internally) so its target can be disposed.
+    const toneMapped = convertToTexture(
+      renderOutput(clipHighlights(color.add(glow))),
+    ) as unknown as TextureNode;
     next.outputColorTransform = false;
-    next.outputNode =
+    const aaNode =
       this.cfg.aa === 'taau'
         ? taau(
             toneMapped,
@@ -130,9 +161,36 @@ export class RenderChain {
             this.camera,
           )
         : smaa(toneMapped);
+    next.outputNode = aaNode;
     next.needsUpdate = true;
-    this.pipeline?.dispose();
+    this.release();
     this.pipeline = next;
+    this.owned = [scenePass, glow, toneMapped, aaNode];
+  }
+
+  /**
+   * Restarts TAAU history from the current frame and the jitter sequence from its first offset, so a
+   * settled still frame depends only on the content shown now, not on what was on screen before.
+   * r187 TAAUNode has no public reset: it reseeds history from the current beauty whenever its
+   * history target's size differs from the output, so the target is shrunk to 1×1 here and the
+   * Halton index set to 0. Private fields of the pinned r187 (TAAUNode.js); guarded, so a three
+   * upgrade that renames them degrades to no reset rather than an error. No-op on SMAA.
+   */
+  restartTemporal(): void {
+    if (this.cfg.aa !== 'taau') return;
+    const node = this.owned[this.owned.length - 1] as unknown as {
+      _historyRenderTarget?: { setSize(w: number, h: number): void };
+      _jitterIndex?: number;
+    };
+    node._historyRenderTarget?.setSize(1, 1);
+    if (typeof node._jitterIndex === 'number') node._jitterIndex = 0;
+  }
+
+  private release(): void {
+    this.pipeline?.dispose();
+    this.pipeline = null;
+    for (const n of this.owned) n.dispose();
+    this.owned = [];
   }
 
   render(): void {
@@ -140,7 +198,6 @@ export class RenderChain {
   }
 
   dispose(): void {
-    this.pipeline?.dispose();
-    this.pipeline = null;
+    this.release();
   }
 }
