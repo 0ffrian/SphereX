@@ -38,5 +38,13 @@ Refusals covered:
 | `asteroid_procedural` | `spherex_ir`: too few points in a channel window (R5.2) |
 | `comet` | `visible`: no colour basis |
 | `candidate` | `mesh`, `visible`: no 3D body (R7.6) |
+| `candidate` | `dynamics:spin_period_h`: no body and no class, so no rung can answer (D-31) |
+
+Tier and dynamics (D-31):
+
+- Every `Layer` has a required `tier` (1 measured, 2 derived, 3 model_dependent, 4 inferred_from_analog, 5 artistic). The schema forces tier to agree with `tag`. A `derived` or `model_dependent` layer also needs a non-blank `formula`, and a `model_dependent` layer an `assumed` object (at least one key, number or string values) naming the inputs that were not measured. Layers have no `value`, so `assertTagged` does not apply to them.
+- Every params fixture has a `dynamics` block. `speedup` is required (`{}` when nothing moves), keys are one of `spin`, `spots`, `flares`, `winds`, `clouds`, `pulsation`, values are above 0. Each rate is a `DynamicsValue` (`value`, `tag`, `tier`, `source`, and `formula` / `assumed` under the same rules as a layer). Its `source` starts "synthetic fixture". A rate with no rung is left out and listed as `dynamics:<key>` in `missing`. Tests assert that every `speedup` key has an animated rate present. The fixtures cover tiers 1 to 5.
+- `assertTagged` checks card values only: a `DynamicsValue` is skipped, because its model_dependent rule is `assumed`, not `assumption`.
+- The live backend (stage 7) emits `tier`, `formula` and `assumed` on layers but no `dynamics` yet (stage 6, a later ticket); the field is optional.
 
 Tests: `backend/tests/test_contract_fixtures.py` and `frontend/src/contract/fixtures.test.ts`. Open contract questions: Q-33 to Q-42 in the [decision log](../docs/decisions.md#open-questions). The frontend's own M1 fixtures stay in `frontend/fixtures/` (Q-30).

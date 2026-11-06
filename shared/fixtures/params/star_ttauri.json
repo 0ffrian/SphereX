@@ -8,26 +8,35 @@
     {
       "id": "colour",
       "tag": "derived",
+      "tier": 2,
       "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
       "requires": [
         "teff_K"
-      ]
+      ],
+      "formula": "Teff to sRGB through a blackbody lookup table"
     },
     {
       "id": "limb_darkening",
       "tag": "model_dependent",
+      "tier": 3,
       "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
-      "requires": []
+      "requires": [],
+      "formula": "I(mu) = 1 - 0.6 * (1 - mu)",
+      "assumed": {
+        "limb_darkening_u": 0.6
+      }
     },
     {
       "id": "disc",
       "tag": "artistic",
+      "tier": 5,
       "description": "Tilted disc (R7.5).",
       "requires": []
     },
     {
       "id": "dust_screen",
       "tag": "artistic",
+      "tier": 5,
       "description": "Screen opacity = clamp(1 - flux/median_flux, 0, 0.9). The timing is measured, the geometry is artistic (R7.5, Q-38).",
       "requires": [
         "lightcurve"
@@ -60,6 +69,24 @@
     "data": "dimming",
     "data_tag": "measured",
     "params": {}
+  },
+  "dynamics": {
+    "spin_period_h": {
+      "value": 96.0,
+      "tag": "measured",
+      "tier": 1,
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "flare_rate_per_d": {
+      "value": 1.0,
+      "tag": "inferred_from_analog",
+      "tier": 4,
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "speedup": {
+      "spin": 86400,
+      "flares": 86400
+    }
   },
   "alt_text": "Synthetic fixture. T Tauri star, 1 solar radius (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
   "missing": []

@@ -8,6 +8,7 @@
     {
       "id": "nucleus",
       "tag": "measured",
+      "tier": 1,
       "description": "Dark sphere at the upper size limit (R7.3).",
       "requires": [
         "nucleus_radius_km_max"
@@ -16,11 +17,16 @@
     {
       "id": "gas_shells",
       "tag": "model_dependent",
+      "tier": 3,
       "description": "Assumption: density falls as 1/r^2 out to the coma radius; Q itself is measured (R7.3, Q-38).",
       "requires": [
         "gas_Q",
         "coma_radius_km"
-      ]
+      ],
+      "formula": "n(r) = Q / (4 pi v r^2) out to coma_radius_km",
+      "assumed": {
+        "density_exponent": 2.0
+      }
     }
   ],
   "lighting": {
@@ -66,6 +72,17 @@
     "data_tag": "model_dependent",
     "params": {
       "maxRateHz": 30.0
+    }
+  },
+  "dynamics": {
+    "spin_period_h": {
+      "value": 12.0,
+      "tag": "inferred_from_analog",
+      "tier": 4,
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "speedup": {
+      "spin": 3600
     }
   },
   "alt_text": "Synthetic fixture. Comet, nucleus at most 1 km in radius (measured limit), no visible colour basis, viewed at 30 degrees. Surface relief: illustrative.",

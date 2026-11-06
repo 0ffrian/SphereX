@@ -126,6 +126,7 @@ classDiagram
     +seed: integer, minimum 0
     +scale_m: number or null
     +layers: Layer list
+    +dynamics: Dynamics, optional
     +textures: Textures, optional
     +lighting: Lighting
     +view_modes: ViewModes
@@ -138,6 +139,26 @@ classDiagram
     +tag: Tag
     +description: string
     +requires: string list
+    +tier: Tier, 1 to 5
+    +formula: string, optional
+    +assumed: map, optional
+  }
+  class DynamicsValue {
+    +value: number
+    +tag: Tag
+    +tier: Tier, 1 to 5
+    +source: string
+    +formula: string, optional
+    +assumed: map, optional
+  }
+  class Dynamics {
+    +spin_period_h: DynamicsValue, optional
+    +diff_rotation: DynamicsValue, optional
+    +jet_speed_ms: DynamicsValue, optional
+    +spot_lifetime_d: DynamicsValue, optional
+    +flare_rate_per_d: DynamicsValue, optional
+    +pulsation_period_d: DynamicsValue, optional
+    +speedup: map of process to number, above 0
   }
   class Textures {
     +albedo: url
@@ -211,6 +232,9 @@ classDiagram
 
   ObjectCard ..> RenderParams : card_to_params (backend, deterministic)
   RenderParams "1" *-- "0..*" Layer : layers, ordered
+  RenderParams "1" *-- "0..1" Dynamics : absent until stage 6
+  Dynamics "1" *-- "0..6" DynamicsValue
+  DynamicsValue --> "1" Tag
   RenderParams "1" *-- "0..1" Textures : baked types only
   RenderParams "1" *-- "1" Lighting
   RenderParams "1" *-- "1" ViewModes
@@ -227,6 +251,7 @@ classDiagram
 ## Notes
 
 - `TV~T~` is one schema definition per payload in code (`TVNumber`, `TVString`, `TVRgb`, `TVVec3`, `TVPair`), because JSON Schema has no generics; `TV<T>` is a hand-written view of them in `frontend/src/contract/tags.ts`. Generated code: `backend/app/contract/`, `frontend/src/contract/generated.ts` (D-18).
+- `Layer.tier` and `DynamicsValue.tier` are fixed by the tag (1 measured, 2 derived, 3 model_dependent, 4 inferred_from_analog, 5 artistic). `formula` is required from tier 2 and `assumed` at tier 3 (D-31). A rate no rung answers is omitted and listed in `missing` as `dynamics:<key>`. `speedup` keys are `spin`, `spots`, `flares`, `winds`, `clouds`, `pulsation`.
 - `scale_m` is null when the size is unknown, for example on a `candidate` (Q-33).
 - `Textures` and `Lighting` are named `RenderTextures` and `RenderLighting` in the schema and the generated code. The schema has no `IRMode` definition: `spherex_ir` refers to `VisibleMode`, and `IRMode` is a type alias in `frontend/src/contract/index.ts` (D-23).
 - `rgb` and `vec3` stand for `[number, number, number]`; `pair` stands for `[number, number]`. They are written in words because Mermaid class members cannot hold brackets reliably.
