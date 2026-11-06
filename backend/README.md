@@ -12,7 +12,10 @@ uv sync --locked
 uv run uvicorn app.main:create_app --factory --host localhost --port 8000   # http://localhost:8000/v1/...
 uv run pytest -q          # offline, recorded fixtures only
 uv run ruff check . && uv run ruff format --check . && uv run mypy
+uv run python -m scripts.generate_contract   # after changing shared/schemas/ (add --check to compare only)
 ```
+
+`app/contract/` is generated from [`shared/schemas/`](../shared/README.md) by `datamodel-code-generator` 0.89.0 (D-18). Do not edit it. The Pydantic models cannot express the R3.1 `formula` and `assumption` rules; fixture tests use `jsonschema` 4.26.0 for those. Serialise them with `exclude_unset=True`: a plain dump adds `null` for unset fields, and `exclude_none` drops the required `value: null` and `scale_m: null` (Q-40). `app/api/models.py` still holds the hand-written M1 response models.
 
 From the repo root: `npm run backend:setup`, `backend:dev`, `backend:test`, `backend:check`, `backend:prefetch` and `backend:smoke-offline`.
 
@@ -105,9 +108,10 @@ app/main.py, settings.py, errors.py, context.py, offline.py, timefmt.py
 app/api/          (Kevin, R10)  resolve.py, objects.py, models.py, deps.py; spectrum.py (issue #2)
 app/cache/        keys.py, store.py: D-25 read-through cache
 app/adapters/     http.py, irsa_sia.py, irsa_cutout.py, simbad.py, sbdb.py, horizons.py, skybot.py
+app/contract/     generated from shared/schemas/ (D-18, do not edit): ObjectCard, RenderParams
 app/core/find/    (Kevin, Stage 1, A4.1) ids, resolver, propagate, wcs, frames, cutouts, png
 app/core/measure/ (Moon, Stage 2, A4.2) config, flags, aperture, solid_angle, photometry, spectrum
 app/core/render/  (Atish, R10): not created yet
-scripts/          prefetch, smoke_offline, backup_cache, record_fixtures
+scripts/          prefetch, smoke_offline, backup_cache, record_fixtures, generate_contract
 tests/            pytest; tests/fixtures/cache holds the recorded cache entries
 ```

@@ -1,0 +1,51 @@
+{
+  "id": "fixture:planet_water",
+  "type": "planet_water",
+  "generator_version": "fixture-0",
+  "seed": 11,
+  "scale_m": 6991000.0,
+  "layers": [
+    {
+      "id": "surface",
+      "tag": "artistic",
+      "description": "Browser shader surface and shared CPU field (R7.7). Nothing about it is measured.",
+      "requires": []
+    }
+  ],
+  "lighting": {
+    "mode": "sun",
+    "sun_dir": [
+      1.0,
+      0.0,
+      0.0
+    ]
+  },
+  "view_modes": {
+    "visible": {
+      "available": true,
+      "badge": "Default (artist's choice)",
+      "rgb": {
+        "value": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "tag": "artistic",
+        "source": "synthetic fixture: artist's default colour"
+      },
+      "source": "class_palette"
+    }
+  },
+  "haptics": {
+    "texture": "terrain",
+    "texture_tag": "artistic",
+    "data": "teq_pulse",
+    "data_tag": "derived",
+    "params": {
+      "tau": 0.15,
+      "maxRateHz": 12.0
+    }
+  },
+  "alt_text": "Synthetic fixture. Water planet, 0.1 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
+  "missing": []
+}

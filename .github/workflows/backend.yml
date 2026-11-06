@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - 'backend/**'
+      - 'shared/**'
       - '.github/workflows/backend.yml'
   pull_request:
     paths:
       - 'backend/**'
+      - 'shared/**'
       - '.github/workflows/backend.yml'
 
 permissions:
@@ -36,6 +38,7 @@ jobs:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
       - run: uv sync --locked
+      - run: uv run python -m scripts.generate_contract --check
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy

@@ -1,0 +1,15 @@
+{
+  "id": "fixture:gas_giant",
+  "name": "Synthetic fixture: gas giant",
+  "type": "gas_giant",
+  "radius_rjup": {
+    "value": 1.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "teq_K": {
+    "value": 100.0,
+    "tag": "measured",
+    "source": "synthetic fixture: stands in for Exoplanet Archive pl_eqt"
+  }
+}

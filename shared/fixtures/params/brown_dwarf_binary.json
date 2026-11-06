@@ -1,0 +1,97 @@
+{
+  "id": "fixture:brown_dwarf_binary",
+  "type": "brown_dwarf_binary",
+  "generator_version": "fixture-0",
+  "seed": 5,
+  "scale_m": 69910000.0,
+  "layers": [
+    {
+      "id": "body",
+      "tag": "model_dependent",
+      "description": "Assumption: brown dwarf radii are about 1 Jupiter radius (R7.4).",
+      "requires": [
+        "radius_rjup"
+      ]
+    },
+    {
+      "id": "emissive",
+      "tag": "measured",
+      "description": "Emissive intensity from normalised flux_45um (R7.4).",
+      "requires": [
+        "flux_45um"
+      ]
+    },
+    {
+      "id": "bands",
+      "tag": "artistic",
+      "description": "Latitude-stretched band pattern; contrast = clamp(2 * ch4_depth_33, 0.1, 0.8) (R7.4, R5.3).",
+      "requires": [
+        "ch4_depth_33",
+        "spectral_class"
+      ]
+    },
+    {
+      "id": "orbit",
+      "tag": "artistic",
+      "description": "Two bodies on an illustrative mutual orbit (R7.4). No orbit numbers are shown.",
+      "requires": [
+        "spectral_class"
+      ]
+    }
+  ],
+  "textures": {
+    "albedo": "/data/textures/fixture:brown_dwarf_binary/fixture-0/5/albedo.webp",
+    "height": "/data/textures/fixture:brown_dwarf_binary/fixture-0/5/height.png",
+    "normal": "/data/textures/fixture:brown_dwarf_binary/fixture-0/5/normal.png",
+    "height_bin": "/data/textures/fixture:brown_dwarf_binary/fixture-0/5/height.bin"
+  },
+  "lighting": {
+    "mode": "self"
+  },
+  "view_modes": {
+    "visible": {
+      "available": true,
+      "badge": "Estimated visible colour",
+      "rgb": {
+        "value": [
+          0.5,
+          0.25,
+          0.125
+        ],
+        "tag": "inferred_from_analog",
+        "source": "synthetic fixture: stands in for the class palette, which R7.4 gives no numbers for"
+      },
+      "source": "class_palette"
+    },
+    "spherex_ir": {
+      "available": true,
+      "badge": "SPHEREx infrared, whole-body average (false colour)",
+      "rgb": {
+        "value": [
+          1.0,
+          0.75,
+          0.5
+        ],
+        "tag": "measured",
+        "source": "synthetic fixture: not a real measurement"
+      },
+      "source": "spherex_rgb",
+      "channels_um": [
+        4.5,
+        3.3,
+        1.25
+      ]
+    }
+  },
+  "haptics": {
+    "texture": "bands",
+    "texture_tag": "artistic",
+    "data": "flux_pulse",
+    "data_tag": "measured",
+    "params": {
+      "maxRateHz": 12.0
+    }
+  },
+  "alt_text": "Synthetic fixture. Brown dwarf binary, each about 1 Jupiter radius (model dependent), colour from a class palette, self-luminous. Surface relief: illustrative.",
+  "missing": []
+}

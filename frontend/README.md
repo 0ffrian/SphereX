@@ -50,8 +50,10 @@ If Windows Firewall prompts for Node.js, allow it on private networks. Setting `
 | `format` / `format:check` | Prettier                                                                                                 |
 | `test`                    | Vitest (jsdom)                                                                                           |
 | `test:e2e`                | Playwright smoke and flipbook tests on fixtures, Chromium only (`npx playwright install chromium` first) |
+| `contract:gen`            | Rewrites `src/contract/generated.ts` from `../shared/schemas/` (D-18)                                    |
+| `contract:check`          | Fails if `src/contract/generated.ts` differs from a fresh generation                                     |
 
-CI: [`.github/workflows/frontend.yml`](../.github/workflows/frontend.yml) runs typecheck, lint, format check, unit tests and build, plus a separate Playwright job.
+CI: [`.github/workflows/frontend.yml`](../.github/workflows/frontend.yml) runs the contract check, typecheck, lint, format check, unit tests and build, plus a separate Playwright job.
 
 ## Pinned versions
 
@@ -78,6 +80,8 @@ All versions are exact (`.npmrc` has `save-exact=true`); no `^` or `~`. Never up
 | `@eslint/js`                       | 10.0.1  |                                                       |
 | `typescript-eslint`                | 8.72.1  |                                                       |
 | `eslint-plugin-react-hooks`        | 7.1.1   |                                                       |
+| `json-schema-to-typescript`        | 16.0.0  | generates `src/contract/generated.ts` (D-18)          |
+| `ajv`                              | 8.20.0  | validates shared fixtures in tests (draft-07)         |
 | `globals`                          | 17.14.0 |                                                       |
 | `prettier`                         | 3.9.10  |                                                       |
 
@@ -89,8 +93,8 @@ This follows [rendering doc R10](../docs/rendering/layout-tests-open-items.md#r1
 
 ```
 src/
-  contract/       data contract types: Tag, TV, ObjectType, ObjectCard, RenderParams, Layer (R3, D-04, D-12),
-                  HapticKind, HapticEvent, HapticDriver, HapticProfile (R8.8, D-10, D-12), assertTagged()
+  contract/       generated.ts: types from shared/schemas/ (D-18, do not edit). Hand-written next to it:
+                  TV<T>, HapticKind, HapticEvent, HapticDriver (R8.8, Q-19), assertTagged()
   state/          Zustand store: card, params, honesty (null until Q-08), overrides (D-02),
                   and the `sky` slice (flipbook session: search, frames, playback, spectrum)
   app/            React shell: App, ViewerPanel (canvas + on-screen controls), StatusLine,
