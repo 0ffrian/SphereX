@@ -54,7 +54,7 @@ sequenceDiagram
     V->>R: showPlan(plan)
     R-->>V: Scene ready
     V->>V: Lighting (sun at phase angle, or self-lit)
-    V->>V: Set canvas aria-label from alt_text
+    V->>V: Set canvas aria-label from the plan (altText.ts; size with its tag, "at most" for an upper limit)
     V-->>U: Render body, tag chips in legend, scale bar
     V-->>U: List missing layers: "Not enough data for X"
   end
