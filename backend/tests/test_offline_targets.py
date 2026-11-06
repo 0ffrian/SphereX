@@ -1,5 +1,6 @@
-"""Done when (issue #1): all 5 targets return their frame list and cutouts with SX_OFFLINE=1
-and the network unplugged (the autouse socket guard plays the unplugged cable)."""
+"""Done when (issue #1): all 5 test targets, and the demo objects (D-31, issue #25), return their
+frame list and cutouts with SX_OFFLINE=1 and the network unplugged (the autouse socket guard plays
+the unplugged cable)."""
 
 from __future__ import annotations
 
@@ -10,9 +11,10 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 TARGETS = ["Barnard's star", "Epsilon Indi B", "WISE 0855", "RW Aurigae", "R Draconis"]
+DEMO = ["SIMP 0136", "TWA 27", "IRAS 04302+2247"]
 
 
-@pytest.mark.parametrize("name", TARGETS)
+@pytest.mark.parametrize("name", TARGETS + DEMO)
 def test_target_frames_and_cutouts_offline(client: TestClient, name: str) -> None:
     assert client.app.state.ctx.settings.offline  # type: ignore[attr-defined]
     r = client.get("/v1/resolve", params={"q": name})
@@ -29,3 +31,10 @@ def test_target_frames_and_cutouts_offline(client: TestClient, name: str) -> Non
         img = Image.open(io.BytesIO(png.content))
         img.verify()
         assert 0 <= f["x"] < img.size[0] and 0 <= f["y"] < img.size[1]
+
+
+@pytest.mark.parametrize("alias", ["2M1207", "2M1207 A", "2M1207A"])
+def test_demo_alias_resolves_to_the_same_object(client: TestClient, alias: str) -> None:
+    # targets.toml maps the planet host's short names to its SIMBAD query (D-31: TWA 27 = 2M1207 A).
+    ids = {client.get("/v1/resolve", params={"q": q}).json()["id"] for q in ("TWA 27", alias)}
+    assert len(ids) == 1
