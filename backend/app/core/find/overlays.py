@@ -12,6 +12,7 @@ Stage 2 aperture, detector footprints and cutout boxes per frame.
 
 from __future__ import annotations
 
+import csv
 import math
 import threading
 import time
@@ -395,7 +396,8 @@ class OverlayService:
                 missing.add(f"overlay:{cat}:pending")
                 catalogs.append(entry)
                 continue
-            except (CacheMissOffline, UpstreamUnavailable, ValueError, KeyError):
+            except (CacheMissOffline, UpstreamUnavailable, ValueError, KeyError, csv.Error):
+                # A cached body that no longer parses is refused, not a 500.
                 missing.add(f"overlay:{cat}")
                 catalogs.append(entry)
                 continue

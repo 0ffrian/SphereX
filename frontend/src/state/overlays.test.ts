@@ -79,6 +79,19 @@ describe('overlays in the sky slice', () => {
     getOverlays.mockRestore();
   });
 
+  it('keeps the previous reply drawn while a reload runs', async () => {
+    store().skyToggleOverlay('fov');
+    await flush();
+    await flush();
+    const before = sky().overlays.data;
+    expect(before).not.toBeNull();
+    const reload = store().skyLoadOverlays();
+    expect(sky().overlays.status).toBe('loading');
+    expect(sky().overlays.data).toBe(before);
+    await reload;
+    expect(sky().overlays.status).toBe('ready');
+  });
+
   it('does not load on switch-off or on a search', async () => {
     const getOverlays = vi.spyOn(fixtureApi, 'getOverlays');
     await store().skySearch({ q: 'R Dra', kind: 'name', origin: 'input' });

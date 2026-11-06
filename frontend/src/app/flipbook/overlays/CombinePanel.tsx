@@ -4,13 +4,13 @@
 // frames mixes the spectrum's shape with change over time.
 import { useEffect, useId } from 'react';
 import type { CombineOp, Frame } from '@/app/api/types';
-import { DataBadge, EstimatedBadge } from '@/app/Badge';
 import { formatWavelength } from '@/app/format';
 import { combineErrorMessage } from '@/app/messages';
 import { ErrorBox, LoadingBox } from '@/app/StatusBoxes';
 import { buttonClass } from '@/app/ui';
 import { useAppStore, type SkyState } from '@/state/store';
-import { combineWarning } from './text';
+import { ProvenanceBadge } from './ProvenanceBadge';
+import { combineWarning, stretchText } from './text';
 
 const selectClass =
   'min-h-11 rounded-md border border-neutral-500 bg-neutral-900 px-2 text-neutral-100 ' +
@@ -148,18 +148,16 @@ export function CombinePanel({ sky, frames }: { sky: SkyState; frames: readonly 
                 )}
               </div>
               <figcaption className="flex flex-wrap items-center gap-x-2 gap-y-1 text-neutral-300">
-                <span>
-                  {OP_LABEL[info.op]}, on frame A’s grid · unit {info.unit} · display stretch{' '}
-                  {info.stretch.kind} {JSON.stringify(info.stretch.params)}
+                <span data-testid="combine-caption">
+                  {OP_LABEL[info.op]}, on frame A’s grid. Unit {info.unit}.{' '}
+                  {stretchText(info.stretch.kind)}
                 </span>
-                {sky.fixture ? (
-                  <>
-                    <DataBadge fixture />
-                    <span className="text-neutral-400">Formula: {info.formula}</span>
-                  </>
-                ) : (
-                  <EstimatedBadge tooltip={info.formula} />
-                )}
+                {/* The badge reads the reply's own tag (D-02); the parameters are in its formula. */}
+                <ProvenanceBadge
+                  entry={{ tag: info.tag, formula: info.formula }}
+                  fixture={sky.fixture}
+                />
+                {sky.fixture && <span className="text-neutral-400">Formula: {info.formula}</span>}
               </figcaption>
             </figure>
           )}
