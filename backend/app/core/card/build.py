@@ -154,7 +154,9 @@ def build_card(
         if kind == "asteroid_shape":
             src = data.facts.shape_model
             card["shape_source"] = (
-                _measured(src, "shape-model registry (SHAPE_MODELS)") if src else _null(NO_SOURCE)
+                _measured(src, data.shape.source if data.shape else "shape-model registry")
+                if src
+                else _null(NO_SOURCE)
             )
         card["rot_period_h"] = _sbdb_value(data, "rot_per")
         card["lightcurve_amp_mag"] = _null("not available: JPL SBDB gives no light-curve amplitude")
