@@ -2,11 +2,12 @@
 // only. The R11 check ("≥ 3 quiet steps across a known absorption dip") on a phone: at 360 px the
 // pad is about 296 px wide, so a narrow dip needs the zoomed λ range, while a broad band (the
 // brown-dwarf-like CH₄ trough) is wide enough over the full band (Q-77). Dev only.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SpectrumPoint } from '@/app/api/types';
 import { buttonClass } from '@/app/ui';
 import {
   applyStoredCalibration,
+  calibrationAvailable,
   clearCalibration,
   defaultCalibration,
   levelsToVibrate,
@@ -16,6 +17,7 @@ import {
 import { CalibrationWizard } from '@/haptics/ui/CalibrationWizard';
 import { HapticsSettings } from '@/haptics/ui/HapticsSettings';
 import { SpectrumHapticsPad } from '@/haptics/ui/SpectrumHapticsPad';
+import { UnlockButton } from '@/haptics/ui/UnlockButton';
 import type { TestPanelProps } from '../panelProps';
 
 type Variant = 'dip' | 'noisy' | 'brownDwarf';
@@ -26,7 +28,9 @@ const ZOOM: Record<Zoom, readonly [number, number]> = {
   dip: [3.5, 5],
 };
 
-const selectClass = 'min-h-11 rounded-md border border-neutral-500 bg-neutral-900 px-2 text-base';
+const inputClass = 'min-h-11 rounded-md border border-neutral-500 bg-neutral-900 px-2 text-base';
+const selectClass = `${inputClass} w-full max-w-full`;
+const fieldClass = 'flex max-w-full min-w-0 flex-col gap-1';
 
 /**
  * Synthetic, 0.75–5 µm. `dip`: flat at 100 with a 90% Gaussian dip at 4.25 µm (σ 0.2 µm) and a
@@ -83,6 +87,9 @@ export function SpectrumPanel({ haptics }: TestPanelProps) {
   const [seed, setSeed] = useState(0);
   const [calibrating, setCalibrating] = useState(false);
   const [saved, setSaved] = useState<Calibration | null>(loadCalibration);
+  // R8.7 phone rule (vibrate API, Android, touch screen): desktop Chrome has vibrate but no motor.
+  const [deviceVibrates] = useState(() => calibrationAvailable(haptics.vibrate.supported));
+  const calibrateButton = useRef<HTMLButtonElement>(null);
 
   // Apply this device's calibration (or the defaults) to the drivers.
   useEffect(() => {
@@ -95,11 +102,14 @@ export function SpectrumPanel({ haptics }: TestPanelProps) {
       className="flex flex-col gap-4 rounded-md border border-neutral-700 p-4"
     >
       <h2 id="spectrum-panel" className="text-lg font-semibold">
-        Spectrum haptics
+        Spectrum: vibration and sound
       </h2>
+      <div className="flex flex-wrap items-center gap-3">
+        <UnlockButton engine={haptics.engine} canVibrate={deviceVibrates} />
+      </div>
 
       <div className="flex flex-wrap items-end gap-4">
-        <label className="flex flex-col gap-1">
+        <label className={fieldClass}>
           Synthetic spectrum
           <select
             className={selectClass}
@@ -111,7 +121,7 @@ export function SpectrumPanel({ haptics }: TestPanelProps) {
             <option value="brownDwarf">Brown dwarf: broad CH₄ trough at 3.0–3.8 µm</option>
           </select>
         </label>
-        <label className="flex flex-col gap-1">
+        <label className={fieldClass}>
           Wavelength range of the pad
           <select
             className={selectClass}
@@ -122,11 +132,11 @@ export function SpectrumPanel({ haptics }: TestPanelProps) {
             <option value="dip">Zoomed on the 4.25 µm dip, 3.5–5 µm</option>
           </select>
         </label>
-        <label className="flex flex-col gap-1">
+        <label className={fieldClass}>
           Jitter seed
           <input
             type="number"
-            className={`${selectClass} w-28`}
+            className={`${inputClass} w-28`}
             value={seed}
             onChange={(e) => setSeed(Number(e.target.value) || 0)}
           />
@@ -143,6 +153,7 @@ export function SpectrumPanel({ haptics }: TestPanelProps) {
         objectName={`the synthetic spectrum (${variant})`}
         lambdaDomain={ZOOM[zoom]}
         seed={seed}
+        fixture
       />
 
       <h3 className="font-semibold">Calibration</h3>
@@ -158,6 +169,7 @@ export function SpectrumPanel({ haptics }: TestPanelProps) {
             haptics={haptics}
             onDone={(cal) => setSaved(cal)}
             onCancel={() => setCalibrating(false)}
+            returnFocusRef={calibrateButton}
           />
         </div>
       ) : (
@@ -177,8 +189,9 @@ export function SpectrumPanel({ haptics }: TestPanelProps) {
       )}
 
       <HapticsSettings
-        canVibrate={haptics.vibrate.supported}
+        canVibrate={deviceVibrates}
         onCalibrate={() => setCalibrating(true)}
+        calibrateButtonRef={calibrateButton}
       />
     </section>
   );

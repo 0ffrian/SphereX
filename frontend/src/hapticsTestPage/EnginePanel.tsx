@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { buttonClass } from '@/app/ui';
 import { TAGS, type HapticEvent, type HapticVoice, type Tag } from '@/contract';
 import { HAPTIC_DEBUG_EVENT } from '@/haptics/haptics';
+import { deviceVibrates } from '@/haptics/platform';
 import { useHapticSettings } from '@/haptics/settings';
 import { PulseIndicator } from '@/haptics/ui/PulseIndicator';
 import { UnlockButton } from '@/haptics/ui/UnlockButton';
@@ -17,8 +18,12 @@ const VOICES: (HapticVoice | 'none')[] = ['none', 'tone', 'click', 'surf', 'chim
 const TRAIN_ID = 'test-page';
 const LOG_SIZE = 10;
 
-const fieldClass = 'flex flex-col gap-1';
-const selectClass = 'min-h-11 rounded-md border border-neutral-500 bg-neutral-900 px-2 text-base';
+const fieldClass = 'flex w-full min-w-0 flex-col gap-1 sm:w-48';
+const selectClass =
+  'min-h-11 w-full max-w-full rounded-md border border-neutral-500 bg-neutral-900 px-2 text-base';
+// 24 px targets (R9, WCAG 2.5.8).
+const checkboxClass = 'h-6 w-6 shrink-0 accent-sky-400';
+const rangeClass = 'h-6 w-full max-w-full accent-sky-400';
 
 function describeEvent(e: HapticEvent): string {
   const parts = [e.kind, `strength ${e.strength.toFixed(2)}`, e.tag];
@@ -29,6 +34,8 @@ function describeEvent(e: HapticEvent): string {
 
 export function EnginePanel({ haptics }: TestPanelProps) {
   const { engine, vibrate, audio } = haptics;
+  // navigator.vibrate exists in desktop Chrome too; only an Android phone really vibrates.
+  const [canVibrate] = useState(() => deviceVibrates(vibrate.supported));
   const settings = useHapticSettings(
     useShallow((s) => ({
       hapticsOn: s.hapticsOn,
@@ -94,8 +101,8 @@ export function EnginePanel({ haptics }: TestPanelProps) {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <UnlockButton engine={engine} canVibrate={vibrate.supported} />
-        <span>Vibration: {vibrate.supported ? 'available' : 'not available on this device'}</span>
+        <UnlockButton engine={engine} canVibrate={canVibrate} />
+        <span>Vibration: {canVibrate ? 'available' : 'not available on this device'}</span>
       </div>
 
       <fieldset className="flex flex-wrap gap-4">
@@ -103,14 +110,16 @@ export function EnginePanel({ haptics }: TestPanelProps) {
         <label className="flex min-h-11 items-center gap-2">
           <input
             type="checkbox"
+            className={checkboxClass}
             checked={settings.hapticsOn}
             onChange={(e) => settings.update({ hapticsOn: e.target.checked })}
           />
-          Haptics
+          Vibration
         </label>
         <label className="flex min-h-11 items-center gap-2">
           <input
             type="checkbox"
+            className={checkboxClass}
             checked={settings.soundOn}
             onChange={(e) => settings.update({ soundOn: e.target.checked })}
           />
@@ -120,6 +129,7 @@ export function EnginePanel({ haptics }: TestPanelProps) {
           Volume {Math.round(settings.volume * 100)}%
           <input
             type="range"
+            className={rangeClass}
             min={0}
             max={1}
             step={0.05}
@@ -131,6 +141,7 @@ export function EnginePanel({ haptics }: TestPanelProps) {
           Strength × {settings.strengthMultiplier.toFixed(2)}
           <input
             type="range"
+            className={rangeClass}
             min={0.5}
             max={1.5}
             step={0.05}
@@ -191,6 +202,7 @@ export function EnginePanel({ haptics }: TestPanelProps) {
           Pitch {pitch.toFixed(2)}
           <input
             type="range"
+            className={rangeClass}
             min={0}
             max={1}
             step={0.05}
@@ -202,6 +214,7 @@ export function EnginePanel({ haptics }: TestPanelProps) {
           Pan {pan.toFixed(2)}
           <input
             type="range"
+            className={rangeClass}
             min={-1}
             max={1}
             step={0.1}

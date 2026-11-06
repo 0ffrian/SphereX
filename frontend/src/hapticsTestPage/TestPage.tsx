@@ -20,7 +20,7 @@ export function TestPage() {
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 p-4">
       <header>
-        <h1 className="text-2xl font-semibold">Haptics and sound test</h1>
+        <h1 className="text-2xl font-semibold">Vibration and sound test</h1>
         <p className="text-neutral-400">
           Developer page with synthetic inputs only. Not part of the app.
         </p>

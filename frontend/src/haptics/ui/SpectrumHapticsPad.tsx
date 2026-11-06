@@ -3,22 +3,36 @@
 // channels. It is a slider for assistive tech: the value is λ and the value text says the flux
 // as a share of the peak, so nothing is carried by touch alone (R9). M5 lays it over the
 // SpectrumChart (passing the chart's λ domain); here it draws its own normalised-flux line.
-import { useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+// R8.2 / D-02: it is labelled as a data haptic with its provenance badge. The host page owns the
+// unlock button (one per page), not the pad.
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+} from 'react';
 import type { SpectrumResponse } from '@/app/api/types';
+import type { Tag } from '@/contract';
+import { HONESTY_LABEL, badgeForTag, isTagShown, type HonestyState } from '@/viewer/honesty';
 import type { HapticOutputs } from '../haptics';
 import { SpectrumHapticSource, spectrumXToLambda, type SpectrumStep } from '../sources/spectrum';
 import { PITCH_RISES_WITH_WAVELENGTH, SPECTRUM_QUIET_THRESHOLD } from '../tuning';
-import { UnlockButton } from './UnlockButton';
 
 export interface SpectrumHapticsPadProps {
   haptics: HapticOutputs;
-  spectrum: Pick<SpectrumResponse, 'spectrum' | 'tag'>;
+  /** The spectrum response's points and tag (`measured` today; any tag is gated by honesty). */
+  spectrum: Pick<SpectrumResponse, 'spectrum'> & { tag: SpectrumResponse['tag'] | Tag };
   /** What the spectrum is of, for the label ("WISE 0855-0714"). */
   objectName: string;
   /** λ (µm) at the pad's left and right edges. Default: the usable points' range. */
   lambdaDomain?: readonly [number, number];
   /** Seed of the R8.3 jitter (M5 passes the card's seed). */
   seed?: number;
+  /** Synthetic fixture data: badged "Fixture", never "Measured" (as `DataBadge` in app/Badge). */
+  fixture?: boolean;
   className?: string;
 }
 
@@ -35,13 +49,28 @@ interface Readout {
   text: string;
 }
 
-function describeStep(s: Readonly<SpectrumStep>): string {
+const BADGE_CLASS: Record<ReturnType<typeof badgeForTag> | 'Fixture', string> = {
+  Measured: 'border-emerald-400 text-emerald-300',
+  Estimated: 'border-sky-400 text-sky-300',
+  Default: 'border-neutral-400 text-neutral-300',
+  Fixture: 'border-amber-400 text-amber-300',
+};
+
+/**
+ * The readout and slider value text: λ, the flux as a share of the peak, "quiet" and
+ * "uncertain" (σ/flux > 0.3). A tick the honesty state hid says so; a quiet dip is just quiet.
+ */
+export function describeStep(s: Readonly<SpectrumStep>, honesty: HonestyState, tag: Tag): string {
   const wl = `${s.lambdaUm.toFixed(2)} µm`;
   if (!s.inRange) return `${wl}: no data`;
   const pct = `${Math.round(s.strength * 100)}% of peak flux`;
   const parts = [wl, s.quiet ? `quiet, ${pct}` : pct];
-  if (s.noisy) parts.push('noisy');
-  return parts.join(', ');
+  if (s.noisy) parts.push('uncertain');
+  const text = parts.join(', ');
+  if (s.emitted && !s.played && !isTagShown(honesty, tag)) {
+    return `${text} (hidden by ${HONESTY_LABEL[honesty]})`;
+  }
+  return text;
 }
 
 export function SpectrumHapticsPad({
@@ -50,6 +79,7 @@ export function SpectrumHapticsPad({
   objectName,
   lambdaDomain,
   seed,
+  fixture = false,
   className,
 }: SpectrumHapticsPadProps) {
   const id = useId();
@@ -59,6 +89,17 @@ export function SpectrumHapticsPad({
   /** The pointer driving the drag (one finger, or the main mouse button); null when none. */
   const dragPointer = useRef<number | null>(null);
   const [readout, setReadout] = useState<Readout | null>(null);
+  /** One readout update per animation frame while dragging. */
+  const frame = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (frame.current !== null && typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(frame.current);
+      }
+    },
+    [],
+  );
 
   const source = useMemo(
     () =>
@@ -129,7 +170,25 @@ export function SpectrumHapticsPad({
 
   const showStep = () => {
     const s = source.lastStep;
-    if (s) setReadout({ lambdaUm: s.lambdaUm, text: describeStep(s) });
+    if (s) {
+      setReadout({
+        lambdaUm: s.lambdaUm,
+        text: describeStep(s, haptics.engine.honesty, spectrum.tag),
+      });
+    }
+  };
+
+  /** During a drag: at most one readout update per frame (no React work per pointermove). */
+  const showStepSoon = () => {
+    if (typeof requestAnimationFrame !== 'function') {
+      showStep();
+      return;
+    }
+    if (frame.current !== null) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = null;
+      showStep();
+    });
   };
 
   /** jsdom and old engines may lack pointerId; one id stands for "the" pointer there. */
@@ -146,7 +205,10 @@ export function SpectrumHapticsPad({
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     if (dragPointer.current === null || pointerOf(e) !== dragPointer.current) return;
-    if (source.move(e.clientX) > 0) moveCursor(source.cursorX);
+    if (source.move(e.clientX) > 0) {
+      moveCursor(source.cursorX);
+      showStepSoon();
+    }
   };
   const onPointerEnd = (e: PointerEvent<HTMLDivElement>) => {
     if (dragPointer.current === null || pointerOf(e) !== dragPointer.current) return;
@@ -173,17 +235,30 @@ export function SpectrumHapticsPad({
   };
 
   const quietY = VIEW_H * (1 - SPECTRUM_QUIET_THRESHOLD);
+  const badge = fixture ? 'Fixture' : badgeForTag(spectrum.tag);
 
   return (
     <div className={className ?? 'flex flex-col gap-2'}>
-      <div className="flex flex-wrap items-center gap-3">
-        <UnlockButton engine={haptics.engine} canVibrate={haptics.vibrate.supported} />
-      </div>
+      <p className="flex flex-wrap items-center gap-2 text-sm">
+        <span
+          className={`rounded border px-1.5 py-0.5 text-xs font-medium ${BADGE_CLASS[badge]}`}
+          title={
+            fixture
+              ? 'Synthetic fixture data for development, not a SPHEREx measurement'
+              : 'What you feel and hear here encodes the measured spectrum'
+          }
+          data-testid="pad-badge"
+        >
+          Data · {badge}
+        </span>
+        <span className="text-neutral-400">Spectrum: vibration and sound follow the flux</span>
+      </p>
       <p id={`${id}-help`} className="text-sm text-neutral-400">
         Drag along the spectrum, or focus it and use the arrow keys (Page Up, Page Down, Home and
         End jump further). Each step ticks with the flux; absorption dips (below{' '}
         {Math.round(SPECTRUM_QUIET_THRESHOLD * 100)}% of the peak) are quiet. Pitch{' '}
-        {PITCH_RISES_WITH_WAVELENGTH ? 'rises' : 'falls'} with wavelength.
+        {PITCH_RISES_WITH_WAVELENGTH ? 'rises' : 'falls'} with wavelength. With TalkBack, double-tap
+        and hold, then drag; or swipe up or down to step.
       </p>
       <div
         ref={padRef}
