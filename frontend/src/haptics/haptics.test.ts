@@ -146,6 +146,15 @@ describe('debug event (D-20)', () => {
     expect(seen.map((e) => e.kind)).toEqual(['tick']);
   });
 
+  it('passes the texture/data channel hint through, for one-shots and trains (Q-85)', () => {
+    const { clock, driver, engine, seen } = setup();
+    engine.emit(tick({ channel: 'texture' }));
+    clock.advance(30);
+    engine.startTrain('t', { rateHz: 4, strength: 0.5, tag: 'measured', channel: 'data' });
+    expect(seen.map((e) => e.channel)).toEqual(['texture', 'data']);
+    expect(driver.events[0]!.channel).toBe('texture');
+  });
+
   it('carries a copy with the multiplied strength', () => {
     const { engine, seen } = setup({ strengthMultiplier: 1.5 });
     engine.emit(tick({ strength: 0.8, pitch: 0.3, pan: -1 }));

@@ -3,17 +3,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeAudioContext } from '@/test/fakeAudio';
 import { FakeClock, fakeVibrate } from '@/test/fakeHaptics';
-import { getAudioContext, setAudioContextFactory, unlockAudio } from './audioContext';
+import {
+  getAudioContext,
+  getUnlockState,
+  setAudioContextFactory,
+  subscribeUnlockState,
+  unlockAudio,
+} from './audioContext';
 import { applyCalibration, levelsToVibrate, type Calibration } from './calibration';
 import { AudioDriver } from './drivers/audio';
 import { WebVibrateDriver } from './drivers/webVibrate';
 import { HapticEngine, type HapticOutputs } from './haptics';
-import { defaultOutputs } from './platform';
+import { defaultOutputs, deviceVibrates } from './platform';
 import {
   SETTINGS_STORAGE_KEY,
   bindEngine,
   defaultSettings,
   ensureLoaded,
+  getHapticSettings,
   loadHapticSettings,
   useHapticSettings,
 } from './settings';
@@ -52,6 +59,19 @@ describe('platform defaults (R8.7, D-08)', () => {
   it('jsdom (desktop) defaults to sound only', () => {
     expect(defaultOutputs()).toEqual({ hapticsOn: false, soundOn: true });
   });
+
+  it.each([
+    [true, true, true, true],
+    [true, true, false, false], // Android without a touch screen
+    [true, false, true, false], // desktop Chrome: navigator.vibrate exists, no motor
+    [false, true, true, false],
+  ])('deviceVibrates(supported %s, android %s, coarse %s) → %s', (sup, android, coarse, out) => {
+    expect(deviceVibrates(sup, { android, coarsePointer: coarse })).toBe(out);
+  });
+
+  it('desktop (jsdom) never vibrates, even with navigator.vibrate', () => {
+    expect(deviceVibrates(true)).toBe(false);
+  });
 });
 
 describe('settings store (R8.7)', () => {
@@ -60,11 +80,26 @@ describe('settings store (R8.7)', () => {
     resetStore();
   });
 
-  it('does not read storage until first use', () => {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ volume: 0.1 }));
-    expect(useHapticSettings.getState().loaded).toBe(false);
+  it('loads on the first read, so no consumer sees the unloaded defaults', () => {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ volume: 0.1, soundOn: false }));
+    const read = vi.spyOn(Storage.prototype, 'getItem');
+    expect(read).not.toHaveBeenCalled(); // nothing read until a consumer asks
+    expect(useHapticSettings.getState()).toMatchObject({
+      loaded: true,
+      volume: 0.1,
+      soundOn: false,
+    });
+    expect(read).toHaveBeenCalledTimes(1);
+    useHapticSettings.getState();
+    getHapticSettings();
     ensureLoaded();
-    expect(useHapticSettings.getState()).toMatchObject({ loaded: true, volume: 0.1 });
+    expect(read).toHaveBeenCalledTimes(1); // once only
+    read.mockRestore();
+  });
+
+  it('getHapticSettings loads too', () => {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ soundOn: false }));
+    expect(getHapticSettings().soundOn).toBe(false);
   });
 
   it('saves under one key, clamped, and loads back', () => {
@@ -200,6 +235,23 @@ describe('shared AudioContext (R8.9)', () => {
   it('reports false where Web Audio is missing', async () => {
     setAudioContextFactory(() => null);
     expect(await unlockAudio()).toBe(false);
+    expect(getUnlockState()).toEqual({ unlocked: true, audio: 'none' });
+  });
+
+  it('shares the unlock state with every subscriber', async () => {
+    const ctx = new FakeAudioContext({ state: 'suspended' });
+    setAudioContextFactory(() => ctx.asAudioContext());
+    expect(getUnlockState()).toEqual({ unlocked: false, audio: 'suspended' });
+    const seen: string[] = [];
+    const off = subscribeUnlockState(() => seen.push(getUnlockState().audio));
+    const before = getUnlockState();
+    expect(getUnlockState()).toBe(before); // stable until it changes
+    await unlockAudio();
+    expect(getUnlockState()).toEqual({ unlocked: true, audio: 'running' });
+    expect(seen).toEqual(['running']);
+    const engine = new HapticEngine([], { debugTarget: null });
+    expect(engine.unlocked).toBe(true);
+    off();
   });
 
   it('engine.unlock uses it', async () => {

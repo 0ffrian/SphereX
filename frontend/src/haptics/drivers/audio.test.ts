@@ -171,9 +171,11 @@ describe('scheduling (R8.9)', () => {
     osc!.end();
     const made = ctx.nodes.filter((n) => n.nodeType !== 'destination');
     const limiter = made.find((n) => n instanceof FakeCompressor)!;
-    const master = made.find((n) => n instanceof FakeGain && n.outputs[0] === limiter);
-    for (const n of made) if (n !== master && n !== limiter) expect(n.disconnected).toBe(true);
-    expect(master?.disconnected).toBe(false);
+    const bus = made.find((n) => n instanceof FakeGain && n.outputs[0] === limiter)!;
+    const volume = made.find((n) => n instanceof FakeGain && n.outputs[0] === bus)!;
+    const kept = [limiter, bus, volume];
+    for (const n of made) if (!kept.includes(n)) expect(n.disconnected).toBe(true);
+    for (const n of kept) expect(n.disconnected).toBe(false);
     expect(limiter.outputs[0]).toBe(ctx.destination);
   });
 
@@ -195,7 +197,8 @@ describe('scheduling (R8.9)', () => {
     const b = setup({ compressor: false });
     b.driver.emit(ev());
     const env = envelopeOf(b.ctx.sources()[0]!);
-    expect((env.outputs[0] as FakeGain).outputs[0]).toBe(b.ctx.destination);
+    const volume = env.outputs[0] as FakeGain;
+    expect((volume.outputs[0] as FakeGain).outputs[0]).toBe(b.ctx.destination);
   });
 
   it('keeps one audio-clock anchor per train across windows (sample-accurate, R8.9)', () => {
