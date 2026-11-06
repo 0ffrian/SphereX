@@ -75,7 +75,8 @@ export class FlowSource implements HapticSource {
   private readonly k: number;
   private readonly rings: boolean;
   private band = NaN;
-  private storm = 0;
+  /** Storm id of the previous sample (0 = none); NaN before the first, so a first touch inside a storm is not an edge. */
+  private storm = NaN;
   private inGap = false;
 
   constructor(
@@ -91,6 +92,11 @@ export class FlowSource implements HapticSource {
     this.storms = stormsFor(params.seed, MAX_STORMS);
     this.k = typeof options.k === 'number' && options.k > 0 ? options.k : FLOW_JET_K;
     this.rings = (options.rings ?? 0) > 0.01;
+  }
+
+  /** Whether the rings are drawn, so felt: the probe must then report `ringRadius`. */
+  get feelsRings(): boolean {
+    return this.rings;
   }
 
   move(s: TouchSample): void {
@@ -111,7 +117,9 @@ export class FlowSource implements HapticSource {
     this.band = f.band;
 
     if (f.storm > 0) {
-      if (f.storm !== this.storm) this.out.play('tick', STRENGTH_FIRM, s.pan, 'tone', pitch);
+      if (Number.isFinite(this.storm) && f.storm !== this.storm) {
+        this.out.play('tick', STRENGTH_FIRM, s.pan, 'tone', pitch);
+      }
       this.storm = f.storm;
       const st = this.storms[f.storm - 1];
       const ratio = st ? angularDistance(d, st.center) / st.size : STORM_EDGE_FACTOR;
@@ -146,7 +154,7 @@ export class FlowSource implements HapticSource {
     this.jet.stop();
     this.swirl.stop();
     this.band = NaN;
-    this.storm = 0;
+    this.storm = NaN;
   }
 
   release(): void {

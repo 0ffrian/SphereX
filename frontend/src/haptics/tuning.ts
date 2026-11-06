@@ -159,8 +159,12 @@ export const STORM_SWIRL_CENTRE_HZ = 16;
 /** SPEC R8.4: comet field rate = clamp(k · Q / r, 2, 30) Hz (`profile.params.maxRateHz` wins for the top). */
 export const FIELD_MIN_HZ = 2;
 export const FIELD_MAX_HZ = 30;
-/** R8.4 field `k` when `profile.params.k` is absent. CREATIVE placeholder — Atish to decide (D-13). */
-export const FIELD_K = 1;
+/**
+ * R8.4 field `k` when `profile.params.k` is absent. With Q normalised to ≤ 1 and r in coma radii,
+ * 8 keeps December (Q 1) above August (Q 0.25) over the whole coma: Aug 2–8 Hz, Dec 8–30 Hz
+ * (issue #11 review M4). CREATIVE placeholder — Atish to decide (D-13).
+ */
+export const FIELD_K = 8;
 
 // ---------------------------------------------------------------- data sources (R8.5) — #11
 
@@ -206,11 +210,6 @@ export const RELIEF_STD_MIN_TEXELS = 8;
 export const MASK_THRESHOLD = 0.5;
 /** D-12 open-ocean swell rate, inside OCEAN_SWELL_MIN_HZ–OCEAN_SWELL_MAX_HZ. CREATIVE placeholder — Atish to decide (D-13). [verify on phones] */
 export const OCEAN_SWELL_HZ = 1.5;
-/**
- * D-12 "lowest level". Strength 0 would make the paired surf sound silent (gain = strength), so a
- * small value that still lands in the lowest vibrate bin with 3 or 4 levels. CREATIVE placeholder — Atish to decide (D-13).
- */
-export const OCEAN_SWELL_STRENGTH = 0.1;
 
 // ---------------------------------------------------------------- flow (R8.4, D-12)
 /**
@@ -230,8 +229,15 @@ export const DENSITY_K = 4;
 // ---------------------------------------------------------------- Listen sweep (A8, R8.6, R8.9)
 /** The mock-up's sweep: 6 s across the spectrum. CREATIVE placeholder — Atish to decide (D-13). */
 export const SWEEP_DURATION_S = 6;
-/** Gain steps across the sweep (the mock-up's 90). Engineering. */
+/** Fewest gain steps across the sweep (the mock-up's 90). Engineering. */
 export const SWEEP_STEPS = 90;
+/**
+ * Sweep samples per spectrum point, so a dip one channel wide is quiet in the sweep as it is under
+ * the finger (R8.6 item 3; issue #11 review M3). Engineering.
+ */
+export const SWEEP_SAMPLES_PER_POINT = 8;
+/** Gain ramp at the sweep's start and end and at every quiet edge, so it does not click (s). Engineering. */
+export const SWEEP_EDGE_S = 0.008;
 /** The mock-up's triangle oscillator. CREATIVE placeholder — Atish to decide (D-13). */
 export const SWEEP_WAVE: OscillatorType = 'triangle';
 /** Peak gain of the sweep tone at strength 1 and volume 1. CREATIVE placeholder — Atish to decide (D-13). */

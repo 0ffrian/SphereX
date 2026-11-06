@@ -18,26 +18,29 @@ sequenceDiagram
 
   U->>V: Click "Turn on haptics and sound" (Touch mode)
   Note over V,AD: This click unlocks navigator.vibrate and creates or resumes the AudioContext (Q-61)
-  V->>V: buildHaptics(engine, params, card, body) gives the texture source, the data source and missing (R8.5)
+  V->>V: buildHaptics(engine, params, card, body, overrides) gives the texture and data sources, the rings flag and missing (R8.5)
   V->>V: Orbit controls off while exactly one pointer is down
   loop pointermove with one pointer
     U->>V: pointermove
     V->>P: fromPointer(x, y, rect, camera)
     alt real shape model
-      P->>P: Raycast with three-mesh-bvh (not built yet, analytic normal until M5)
+      P->>P: Raycast with three-mesh-bvh (not built yet, so mesh haptics are refused until M5)
     else sphere, ellipsoid or shader body
       P->>P: Analytic ray intersect in the body frame (worldToBody)
     end
     P-->>V: TouchSample (body id, direction, UV, normal, projected distance, ring radius, pan)
     V->>T: move(sample)
-    alt finger moved more than the hold tolerance
-      T->>S: texture.move(sample), and data.move for the comet, cloud and binary fields
-      S->>D: Bilinear sample
-      D-->>S: Height, masks, band index, storm id
+    alt a held data pulse is playing and the finger stays within the tolerance
+      T->>T: Keep the held data pulse, feed no source
+    else otherwise (moving more than the tolerance also stops a held pulse)
+      T->>S: texture.move(sample) and data.move(sample), every sample
+      opt height map, terrain or flow source
+        S->>D: Bilinear sample
+        D-->>S: Height, masks, band index, storm id
+      end
+      Note over S: Comet, cloud and binary sources use the projected distance, the ray or the body id instead
       S->>S: Decide a tick, a double, a train or nothing (quiet)
       S->>E: emit(event) or startTrain / updateTrain / stopTrain (no timers in sources, Q-59)
-    else still within the tolerance
-      T->>T: Keep the held data pulse
     end
   end
   loop frame loop while the pointer is down

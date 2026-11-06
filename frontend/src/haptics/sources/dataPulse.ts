@@ -61,13 +61,15 @@ export class HoldPulseSource implements HapticSource {
   }
 }
 
-/** "T1" → a sortable temperature rank (smaller = warmer), or null. Sequence O B A F G K M L T Y. */
+/**
+ * "T1" → a sortable temperature rank (smaller = warmer), or null. Sequence O B A F G K M L T Y.
+ * The subclass digit is required and no letter may follow it, so words ("Brown", "Late T",
+ * "mid-L") are refused rather than read as a class.
+ */
 export function classRank(cls: string): number | null {
-  const m = /^([OBAFGKMLTY])\s*(\d+(?:\.\d+)?)?/i.exec(cls.trim());
+  const m = /^([OBAFGKMLTY])(\d+(?:\.\d+)?)(?![a-z])/i.exec(cls.trim());
   if (!m) return null;
-  const letter = 'OBAFGKMLTY'.indexOf(m[1]!.toUpperCase());
-  const sub = m[2] !== undefined ? Number(m[2]) : 0;
-  return letter * 10 + sub;
+  return 'OBAFGKMLTY'.indexOf(m[1]!.toUpperCase()) * 10 + Number(m[2]);
 }
 
 /**

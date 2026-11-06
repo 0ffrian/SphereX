@@ -108,7 +108,7 @@ function makePad(
   teqTag: Tag,
   epoch: 'aug' | 'dec',
 ): Pad {
-  const none: HapticsBuild = { texture: null, data: null, missing: [] };
+  const none: HapticsBuild = { texture: null, data: null, rings: false, missing: [] };
   const teq = (teqK: number) =>
     new HoldPulseSource(engine, 'teq_pulse', teqTag, pulseRateHz(normaliseTeq(teqK)));
   const texel = (f: FieldData, c: number, r: number, ch: number, b = false) =>
@@ -123,6 +123,7 @@ function makePad(
         view: 'map',
         build: {
           ...none,
+          rings: true,
           texture: new FlowSource(engine, field, p, 'artistic', { rings: RINGS }),
           data: teq(1100),
         },
@@ -255,7 +256,15 @@ export function TexturePanel({ haptics }: TestPanelProps) {
     return () => touch.release();
   }, [pad, touch]);
 
-  useEffect(() => () => sweepRef.current?.stop(), []);
+  // Unmount: stop the sweep and the hold-still polling loop.
+  useEffect(
+    () => () => {
+      sweepRef.current?.stop();
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
+      frame.current = null;
+    },
+    [],
+  );
 
   const getSweep = (): ListenSweep => {
     if (!sweepRef.current) {
@@ -312,15 +321,19 @@ export function TexturePanel({ haptics }: TestPanelProps) {
       .map((g) => ({ gas: g, lambdaUm: GAS_LINES_UM[g] }));
     const plan = planSweep(mapping, lines);
     // unlock() creates the AudioContext synchronously inside this click (R8.9).
+    if (!plan) {
+      setSweepState('The spectrum has nothing to play.');
+      return;
+    }
     void engine.unlock().then((running) => {
-      if (!running || !plan) {
+      if (!running) {
         setSweepState('Sound is not available here.');
         return;
       }
       setSweepState(
         getSweep().play(plan)
           ? 'Playing: short to long wavelength, left to right.'
-          : 'Could not play.',
+          : 'Not played: sound is switched off in the Engine panel.',
       );
     });
   };
@@ -408,6 +421,11 @@ export function TexturePanel({ haptics }: TestPanelProps) {
           setHolding(false);
         }}
         onPointerCancel={() => {
+          stopPolling();
+          touch.release();
+          setHolding(false);
+        }}
+        onLostPointerCapture={() => {
           stopPolling();
           touch.release();
           setHolding(false);

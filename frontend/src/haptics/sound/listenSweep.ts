@@ -5,9 +5,10 @@
 //   - stereo pan from left to right as it goes;
 //   - a bell chime at each comet gas feature (A4.3: H₂O 2.7 µm, CO₂ 4.25 µm, CO 4.67 µm), only for
 //     the gases that have a Q in the selected epoch (no Q, no chime).
-// It uses the shared AudioContext (audioContext.ts) and the settings volume, schedules everything on
-// the audio clock (currentTime + lookahead), and disconnects every node when it ends or is stopped.
-// It does not go through the haptic engine: it is a sound, not a HapticEvent.
+// It uses the shared AudioContext (audioContext.ts), follows the settings volume live and the
+// "sound" switch (off = no sweep), limits its own output like the audio driver, schedules everything
+// on the audio clock (currentTime + lookahead), and disconnects every node when it ends or is
+// stopped. It does not go through the haptic engine: it is a sound, not a HapticEvent.
 import type { CometEpoch, ObjectCard } from '@/contract';
 import { gasQForEpoch } from '@/viewer/renderers/Comet';
 import { getAudioContext } from '../audioContext';
@@ -19,10 +20,16 @@ import {
   CHIME_DECAY_S,
   CHIME_PARTIAL_GAIN,
   CHIME_PARTIAL_RATIO,
+  LIMITER_ATTACK_S,
+  LIMITER_RATIO,
+  LIMITER_RELEASE_S,
+  LIMITER_THRESHOLD_DB,
   SWEEP_CHIME_GAIN,
   SWEEP_DURATION_S,
+  SWEEP_EDGE_S,
   SWEEP_PAN,
   SWEEP_PEAK_GAIN,
+  SWEEP_SAMPLES_PER_POINT,
   SWEEP_STEPS,
   SWEEP_WAVE,
   TONE_ATTACK_S,
@@ -78,12 +85,14 @@ export interface SweepPlan {
 /**
  * The sweep as data (pure, testable): `steps + 1` points evenly spaced in λ over the mapping's
  * usable range, and the chimes that fall inside it. Null when the spectrum has nothing to play.
+ * By default there are SWEEP_SAMPLES_PER_POINT samples per spectrum point (at least SWEEP_STEPS),
+ * so a dip one channel wide is quiet here as it is under the finger (R8.6 item 3).
  */
 export function planSweep(
   mapping: SpectrumMapping,
   lines: readonly GasLine[] = [],
   durationS: number = SWEEP_DURATION_S,
-  steps: number = SWEEP_STEPS,
+  steps: number = Math.max(SWEEP_STEPS, SWEEP_SAMPLES_PER_POINT * mapping.count),
 ): SweepPlan | null {
   if (mapping.empty || !(durationS > 0) || steps < 1) return null;
   const lo = mapping.lambdaMinUm;
@@ -116,11 +125,29 @@ export function planSweep(
   return { durationS, steps: out, chimes };
 }
 
+/** Pan at `t` seconds into a sweep of `durationS`: left to right (−SWEEP_PAN → SWEEP_PAN). */
+export function sweepPanAt(t: number, durationS: number): number {
+  const f = durationS > 0 ? Math.min(1, Math.max(0, t / durationS)) : 0;
+  return -SWEEP_PAN + 2 * SWEEP_PAN * f;
+}
+
+/** What the sweep reads from the haptics settings (R8.7). */
+export interface SweepSettings {
+  get(): { volume: number; soundOn: boolean };
+  /** Called on every settings change; returns the unsubscribe function. */
+  subscribe(fn: (s: { volume: number; soundOn: boolean }) => void): () => void;
+}
+
+const SETTINGS: SweepSettings = {
+  get: () => useHapticSettings.getState(),
+  subscribe: (fn) => useHapticSettings.subscribe(fn),
+};
+
 export interface ListenSweepOptions {
   /** Default: the shared context, once unlocked. */
   context?: () => AudioContext | null;
-  /** 0–1. Default: the haptics settings volume (R8.7). */
-  volume?: () => number;
+  /** Default: the haptics settings store: its volume (followed live) and its sound switch. */
+  settings?: SweepSettings;
 }
 
 interface Voice {
@@ -143,11 +170,19 @@ function release(v: Voice, cancel: boolean): void {
   for (const n of v.nodes) n.disconnect();
 }
 
-/** Plays a `SweepPlan`. One sweep at a time; `play` stops the previous one. */
+/**
+ * Plays a `SweepPlan`. One sweep at a time; `play` stops the previous one. "Sound off" in the
+ * settings means off: `play` refuses, and switching sound off mid-sweep stops it. The volume is
+ * followed live through the sweep's own master gain, which feeds a limiter like the audio
+ * driver's, so the tone and overlapping chimes do not clip.
+ */
 export class ListenSweep {
   private readonly getContext: () => AudioContext | null;
-  private readonly volume: () => number;
+  private readonly settings: SweepSettings;
   private readonly live = new Set<Voice>();
+  /** Master gain and limiter of the current sweep (freed when the last voice ends). */
+  private bus: Voice | null = null;
+  private unsubscribe: (() => void) | null = null;
   private startAt = 0;
   private duration = 0;
   private active = false;
@@ -158,16 +193,16 @@ export class ListenSweep {
 
   constructor(options: ListenSweepOptions = {}) {
     this.getContext = options.context ?? getAudioContext;
-    this.volume = options.volume ?? (() => useHapticSettings.getState().volume);
+    this.settings = options.settings ?? SETTINGS;
   }
 
   get playing(): boolean {
     return this.active;
   }
 
-  /** Nodes still connected (tests: nothing leaks after the end or `stop`). */
+  /** Voices still connected, the bus included (tests: nothing leaks after the end or `stop`). */
   get liveVoices(): number {
-    return this.live.size;
+    return this.live.size + (this.bus ? 1 : 0);
   }
 
   /** 0–1 through the sweep, or null when not playing. */
@@ -177,18 +212,20 @@ export class ListenSweep {
   }
 
   /**
-   * Schedule the sweep. Returns false (and plays nothing) without a running AudioContext: call
-   * `engine.unlock()` from the click first.
+   * Schedule the sweep. Returns false (and plays nothing) when sound is switched off or there is
+   * no running AudioContext: call `engine.unlock()` from the click first.
    */
   play(plan: SweepPlan): boolean {
     this.stop();
+    const st0 = this.settings.get();
+    if (!st0.soundOn) return false;
     const ctx = this.getContext();
     if (!ctx || ctx.state !== 'running') return false;
-    const vol = Math.min(1, Math.max(0, this.volume()));
     const my = ++this.run;
     this.ctx = ctx;
     const base = ctx.currentTime + AUDIO_LOOKAHEAD_S;
     const end = base + plan.durationS;
+    const master = this.makeBus(ctx, st0.volume);
 
     const osc = ctx.createOscillator();
     osc.type = SWEEP_WAVE;
@@ -204,32 +241,30 @@ export class ListenSweep {
       out = pan;
       voice.nodes.push(pan);
     }
-    out.connect(ctx.destination);
-
-    const g = gain.gain;
-    g.setValueAtTime(0, base);
-    let prevQuiet = true;
-    plan.steps.forEach((st, i) => {
-      const at = base + st.t;
-      const level = st.level * SWEEP_PEAK_GAIN * vol;
-      if (i === 0) osc.frequency.setValueAtTime(st.hz, at);
-      else osc.frequency.linearRampToValueAtTime(st.hz, at);
-      // Quiet steps are silent: jump to 0 and back rather than ramping across the dip.
-      if (st.quiet) g.setValueAtTime(0, at);
-      else if (prevQuiet) g.setValueAtTime(level, at);
-      else g.linearRampToValueAtTime(level, at);
-      prevQuiet = st.quiet;
-    });
-    g.linearRampToValueAtTime(0, end + 0.05);
+    out.connect(master);
+    this.scheduleGain(gain.gain, osc.frequency, plan, base);
     osc.onended = () => {
       if (this.live.delete(voice)) release(voice, false);
+      this.freeBusIfIdle();
       if (my === this.run) this.ended();
     };
     osc.start(base);
-    osc.stop(end + 0.1);
+    osc.stop(end + SWEEP_EDGE_S + 0.05);
     this.live.add(voice);
 
-    for (const c of plan.chimes) this.bell(ctx, base + c.t, c.hz, SWEEP_CHIME_GAIN * vol);
+    for (const c of plan.chimes) {
+      this.bell(ctx, master, base + c.t, c.hz, sweepPanAt(c.t, plan.durationS));
+    }
+
+    // Follow the volume live; "sound off" stops the sweep.
+    this.unsubscribe = this.settings.subscribe((s) => {
+      if (!s.soundOn) {
+        this.stop();
+        return;
+      }
+      const g = this.bus?.nodes[0] as GainNode | undefined;
+      g?.gain.setTargetAtTime(clampVolume(s.volume), ctx.currentTime, 0.02);
+    });
 
     this.startAt = base;
     this.duration = plan.durationS;
@@ -242,14 +277,73 @@ export class ListenSweep {
     this.run++;
     for (const v of this.live) release(v, true);
     this.live.clear();
+    this.freeBusIfIdle();
     this.ended();
   }
 
-  private bell(ctx: AudioContext, when: number, hz: number, peak: number): void {
-    if (!(peak > 0)) return;
+  /**
+   * Gain per step with short ramps (SWEEP_EDGE_S) at the start, the end and every quiet edge, so
+   * nothing clicks; a quiet step is at 0 (silent) at its own time, as the finger's quiet step is.
+   */
+  private scheduleGain(g: AudioParam, freq: AudioParam, plan: SweepPlan, base: number): void {
+    g.setValueAtTime(0, base);
+    let prevAt = base;
+    let prevLevel = 0;
+    let prevQuiet = true;
+    plan.steps.forEach((st, i) => {
+      const level = st.quiet ? 0 : st.level * SWEEP_PEAK_GAIN;
+      if (i === 0) {
+        freq.setValueAtTime(st.hz, base);
+        g.linearRampToValueAtTime(level, base + SWEEP_EDGE_S);
+        prevAt = base + SWEEP_EDGE_S;
+      } else {
+        const at = Math.max(base + st.t, prevAt + 1e-4);
+        freq.linearRampToValueAtTime(st.hz, at);
+        // Into or out of a quiet run: hold, then a short edge ramp.
+        if (st.quiet !== prevQuiet && at - SWEEP_EDGE_S > prevAt) {
+          g.setValueAtTime(prevLevel, at - SWEEP_EDGE_S);
+        }
+        g.linearRampToValueAtTime(level, at);
+        prevAt = at;
+      }
+      prevLevel = level;
+      prevQuiet = st.quiet;
+    });
+    g.linearRampToValueAtTime(0, prevAt + SWEEP_EDGE_S);
+  }
+
+  /** Master gain (volume) → limiter → destination, for this sweep. */
+  private makeBus(ctx: AudioContext, volume: number): GainNode {
+    const master = ctx.createGain();
+    master.gain.value = clampVolume(volume);
+    const bus: Voice = { sources: [], nodes: [master] };
+    if (typeof ctx.createDynamicsCompressor === 'function') {
+      const lim = ctx.createDynamicsCompressor();
+      lim.threshold.value = LIMITER_THRESHOLD_DB;
+      lim.knee.value = 0;
+      lim.ratio.value = LIMITER_RATIO;
+      lim.attack.value = LIMITER_ATTACK_S;
+      lim.release.value = LIMITER_RELEASE_S;
+      master.connect(lim);
+      lim.connect(ctx.destination);
+      bus.nodes.push(lim);
+    } else {
+      master.connect(ctx.destination);
+    }
+    this.bus = bus;
+    return master;
+  }
+
+  private freeBusIfIdle(): void {
+    if (this.live.size > 0 || !this.bus) return;
+    release(this.bus, false);
+    this.bus = null;
+  }
+
+  private bell(ctx: AudioContext, master: AudioNode, when: number, hz: number, pan: number): void {
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, when);
-    env.gain.linearRampToValueAtTime(peak, when + TONE_ATTACK_S);
+    env.gain.linearRampToValueAtTime(SWEEP_CHIME_GAIN, when + TONE_ATTACK_S);
     env.gain.exponentialRampToValueAtTime(0.0001, when + CHIME_DECAY_S);
     const o1 = ctx.createOscillator();
     o1.frequency.value = hz;
@@ -260,11 +354,21 @@ export class ListenSweep {
     g2.gain.value = CHIME_PARTIAL_GAIN;
     o2.connect(g2);
     g2.connect(env);
-    env.connect(ctx.destination);
     const voice: Voice = { sources: [o1, o2], nodes: [env, g2] };
+    // Panned where the sweep is when the chime rings.
+    if (typeof ctx.createStereoPanner === 'function') {
+      const p = ctx.createStereoPanner();
+      p.pan.value = pan;
+      env.connect(p);
+      p.connect(master);
+      voice.nodes.push(p);
+    } else {
+      env.connect(master);
+    }
     // The bell may ring past the sweep's end; it frees itself when it stops.
     o1.onended = () => {
       if (this.live.delete(voice)) release(voice, false);
+      this.freeBusIfIdle();
     };
     for (const o of voice.sources) {
       o.start(when);
@@ -274,8 +378,14 @@ export class ListenSweep {
   }
 
   private ended(): void {
+    this.unsubscribe?.();
+    this.unsubscribe = null;
     if (!this.active) return;
     this.active = false;
     this.onEnd?.();
   }
+}
+
+function clampVolume(v: number): number {
+  return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0;
 }

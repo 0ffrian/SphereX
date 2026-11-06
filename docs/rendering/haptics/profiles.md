@@ -22,13 +22,13 @@
 
 - The last 4 rows come from D-12 (Accepted). All their texture haptics are `artistic`, so they play only in + Artistic and are silent in Measured only and + Estimated (D-21). The `teq_pulse` follows the tag of `teq_K`: when it is `measured` (Exoplanet Archive `pl_eqt`) it plays in every state; when it is `derived` it is silent in Measured only and plays from + Estimated.
 
-**As built (issue #11, `frontend/src/haptics/profiles.ts`).** `buildHaptics(engine, params, card, body, options)` reads `params.haptics` and returns at most one texture and one data source, plus a `missing` list of refused haptics. For the shared fixtures:
+**As built (issue #11, `frontend/src/haptics/profiles.ts`).** `buildHaptics(engine, params, card, body, options)` reads `params.haptics` and returns at most one texture and one data source, plus a `missing` list of refused haptics. `options.overrides` (D-27) is required; the comet also needs the plan's bodies for its nucleus, and `asteroid_shape` needs `meshNormals: true` from a real mesh raycast. For the shared fixtures:
 
 | Type | Texture source | Data source | Refused (`missing`) |
 |---|---|---|---|
-| `asteroid_shape` | mesh normal (`texture_tag`) | — | — |
+| `asteroid_shape` | mesh normal (`texture_tag`), only with real mesh normals | — | `mesh_normals` until the mesh raycast exists (Q-66) |
 | `asteroid_procedural` | height map, once `height.bin` is loaded | — | `crater_rims` (Q-66); `height` until the map loads |
-| `comet` | — | comet field, Q per epoch and gas (`data_tag`) | `field` when the epoch has no Q |
+| `comet` | — | comet field, Q per epoch and gas (`data_tag`), nucleus tick on the drawn nucleus | `field` when the epoch, or the selected gas in it, has no Q; `nucleus_tick` without the plan's nucleus body |
 | `brown_dwarf` | — | `flux_pulse` once `flux45Reference` is verified | `band_ticks` (Q-70), `flux_pulse` (R12 #15) |
 | `brown_dwarf_binary` | — | pulse per body by temperature class (`spectral_class` tag, Q-69) | `band_ticks` (Q-70) |
 | `star_mira` | — | heartbeat per scrub step | `heartbeat` without a usable light curve |
@@ -41,7 +41,7 @@
 | `nebula`, `nova` | — | point density (`data_tag`, `artistic`) | `field` without point sets |
 
 - `TouchHaptics` drives the two sources: moving gives texture events; holding still for `HOLD_STILL_MS` starts the `teq_pulse` or `flux_pulse` (the viewer's frame loop calls `poll`, Q-71); the scrubber drives the light-curve pulses.
-- The R11 honesty test runs these through the real engine: in Measured only the gas giant and planet textures and procedural relief are silent, and the `teq_pulse` plays only when `teq_K` is `measured`.
+- The R11 honesty test runs these through the real engine: in Measured only the gas giant and planet textures and procedural relief are silent, `asteroid_shape` is silent while its mesh haptics are refused, and the `teq_pulse` plays only when `teq_K` is `measured`.
 
 ### R8.6 Spectrum haptics (every object; the most useful for blind and low-vision users)
 

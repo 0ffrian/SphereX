@@ -144,6 +144,11 @@ describe('FlowSource jets, storms and rings', () => {
     }
     expect(sink.ticks().filter((t) => t.strength === STRENGTH_FIRM)).toHaveLength(1);
     expect(rates.length).toBeGreaterThan(5);
+    // A first touch inside the storm is not an edge.
+    const first = new RecordingSink();
+    new FlowSource(first, field, p, 'artistic').move(sampleAt(storm.center));
+    expect(first.ticks().filter((t) => t.strength === STRENGTH_FIRM)).toHaveLength(0);
+    expect(first.activeTrainId).toBe(STORM_TRAIN_ID);
     expect(rates.at(-1)!).toBeGreaterThan(rates[0]!);
     expect(rates.at(-1)!).toBeCloseTo(STORM_SWIRL_CENTRE_HZ, 0);
   });
