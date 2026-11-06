@@ -1,10 +1,11 @@
-"""Done when (issue #2): the spectrum of each of the 5 targets is computed from cached cutouts,
-offline with the network blocked.
+"""Done when (issue #2): the spectrum of each of the 5 test targets and of the demo objects is
+computed from cached cutouts, offline with the network blocked.
 
-Rule (user decision, Q-26): every frame comes back exactly once, as a measured point or a named
-refusal. Barnard's Star, RW Aur and R Dra overflow the detector in every recorded frame, so they
-must come back refused as ``saturated`` (plus ``spectrum:saturated``), never as an invented flux.
-Epsilon Indi B and WISE 0855 must have at least one measured point.
+Rule (D-31): every frame comes back exactly once, as a measured point or a named refusal.
+Barnard's Star, RW Aur and R Dra overflow the detector in every recorded frame, so they must come
+back refused as ``saturated`` (plus ``spectrum:saturated``), never as an invented flux.
+Epsilon Indi B, WISE 0855 and the demo objects (issue #25) must have at least one measured point,
+and no recorded demo frame may be refused as ``saturated``.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from tests.test_api import resolve_id
 
 MEASURED = ["Epsilon Indi B", "WISE 0855"]
 SATURATED = ["Barnard's star", "RW Aurigae", "R Draconis"]
+DEMO = ["SIMP 0136", "TWA 27", "IRAS 04302+2247"]  # group = "demo" in targets.toml (D-31)
 
 
 def spectrum_and_frames(client: TestClient, name: str) -> tuple[str, dict, dict]:  # type: ignore[type-arg]
@@ -47,7 +49,7 @@ def accounting(frames: dict, body: dict) -> tuple[set[str], dict[str, str]]:  # 
     return set(points), refusals
 
 
-@pytest.mark.parametrize("name", MEASURED + SATURATED)
+@pytest.mark.parametrize("name", MEASURED + SATURATED + DEMO)
 def test_every_frame_accounted_offline(client: TestClient, name: str) -> None:
     assert client.app.state.ctx.settings.offline  # type: ignore[attr-defined]
     _, frames, body = spectrum_and_frames(client, name)
@@ -56,11 +58,17 @@ def test_every_frame_accounted_offline(client: TestClient, name: str) -> None:
     assert len(body["light_curve"]) == len(body["spectrum"])
 
 
-@pytest.mark.parametrize("name", MEASURED)
+@pytest.mark.parametrize("name", MEASURED + DEMO)
 def test_unsaturated_targets_have_measured_points(client: TestClient, name: str) -> None:
     oid, frames, body = spectrum_and_frames(client, name)
     assert body["spectrum"], body["missing"]
     assert ALL_SATURATED not in body["missing"]
+    if name in DEMO:
+        # D-31: demo objects were picked because SPHEREx does not saturate on them. This covers
+        # the recorded frames only; on the full cache TWA 27 and IRAS 04302+2247 each have one
+        # `saturated` refusal from a dead core pixel (D-31).
+        _, refusals = accounting(frames, body)
+        assert "saturated" not in refusals.values(), body["missing"]
     by_id = {f["frame_id"]: f for f in frames["frames"]}
     service = client.app.state.frames  # type: ignore[attr-defined]
     for p in body["spectrum"]:
