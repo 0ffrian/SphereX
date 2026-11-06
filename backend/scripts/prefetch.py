@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.adapters import irsa_cutout, irsa_sia, skybot
+from app.adapters import horizons, irsa_cutout, irsa_sia, skybot
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context, make_context
 from app.core.find.frames import FrameService, frame_time, is_complete, position_at
@@ -97,6 +97,13 @@ def prefetch_target(
             print(f"  SkyBoT: {len(bodies)} known bodies in the field", flush=True)
         except (CacheMissOffline, UpstreamUnavailable) as exc:
             rep.error = f"SkyBoT failed: {exc}"
+            return rep
+        # Phase angle and Sun vector for the card (Q-62); the same two cached Horizons calls.
+        try:
+            geom, _ = horizons.geometry(ctx, obj.spkid or "", when, refresh=args.refresh)
+            print(f"  Horizons: phase {geom.phase_angle_deg:.2f} deg ({geom.observer})", flush=True)
+        except (CacheMissOffline, UpstreamUnavailable) as exc:
+            rep.error = f"Horizons geometry failed: {exc}"
             return rep
         rep.missing = FrameService(ctx).get_frames(obj, rebuild=True).missing
         return rep

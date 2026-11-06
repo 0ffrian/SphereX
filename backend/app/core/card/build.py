@@ -12,12 +12,13 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
+from app.adapters import horizons
 from app.core.card.catalogue import CatalogueData
 from app.core.classify import Classification
 from app.core.find.resolver import ResolvedObject
 from app.core.render.spherex_rgb import CHANNELS_BY_TYPE, spherex_rgb, window_median
 from app.core.render.spherex_rgb import formula as spherex_formula
-from app.timefmt import parse_utc
+from app.timefmt import iso_utc_z, parse_utc
 
 MJD_EPOCH = datetime(1858, 11, 17, tzinfo=UTC)  # MJD 0 (UTC; the SIA midpoint is UTC)
 FLUX_45UM_CENTRE = 4.5  # um, the R5.2 brown-dwarf R channel, used for flux_45um (ASSUMPTION)
@@ -140,6 +141,39 @@ def _pm(obj: ResolvedObject) -> dict[str, Any] | None:
     return _measured([pmra, pmdec], source)
 
 
+def _phase_angle(obj: ResolvedObject, data: CatalogueData) -> dict[str, Any]:
+    g = data.geometry
+    if g is None:
+        return _null(f"not available: {data.geometry_reason or 'no Horizons geometry'}")
+    where = (
+        "observer SPHEREx 500@-163182"
+        if g.observer == horizons.OBSERVER_SPHEREX
+        else "geocentre 500@399 (no SPHEREx ephemeris at this epoch)"
+    )
+    return {
+        "value": g.phase_angle_deg,
+        "tag": "measured",  # R5.1; A3.4 says model_dependent for positions, rendering wins (Q-62)
+        "source": f"JPL Horizons quantity 24 (Sun-Target-Observer), {where}, "
+        f"at {iso_utc_z(g.time)}",
+    }
+
+
+def _sun_vector(obj: ResolvedObject, data: CatalogueData) -> dict[str, Any]:
+    g = data.geometry
+    if g is None:
+        out = _null(f"not available: {data.geometry_reason or 'no Horizons geometry'}", "derived")
+        out["formula"] = "-r/|r| from JPL Horizons VECTORS (not computed)"
+        return out
+    when = iso_utc_z(g.time)
+    return {
+        "value": [round(c, 9) for c in g.sun_vector],
+        "tag": "derived",
+        "source": f"JPL Horizons VECTORS, CENTER 500@10, at {when}",
+        "formula": "-r/|r|, r = heliocentric ICRF position from JPL Horizons VECTORS "
+        f"(CENTER 500@10) at {when}; frame ICRF (equatorial J2000), direction target to Sun",
+    }
+
+
 def build_card(
     obj: ResolvedObject,
     data: CatalogueData,
@@ -164,15 +198,15 @@ def build_card(
         card["spectral_class"] = _spectral_class(cls)
         card["band_depth_3um"] = _null(NO_SOURCE + " (no band-depth rule in the specs)")
         card["slope_075_25"] = _null(NO_SOURCE + " (no slope-fit rule in the specs)")
-        card["phase_angle_deg"] = _null("not available: Horizons is asked for RA/Dec only")
-        card["sun_vector"] = _null("not available: Horizons is asked for RA/Dec only")
+        card["phase_angle_deg"] = _phase_angle(obj, data)
+        card["sun_vector"] = _sun_vector(obj, data)
     elif kind == "comet":
         # R7.3: gas_Q and coma radius come from the published papers with citations; none are
         # loaded, so they are null and the shells are refused.
         card["coma_radius_km"] = _null("not available: published values not loaded (R7.3)")
         card["nucleus_radius_km_max"] = _null("not available: published values not loaded (R7.3)")
-        card["phase_angle_deg"] = _null("not available: Horizons is asked for RA/Dec only")
-        card["sun_vector"] = _null("not available: Horizons is asked for RA/Dec only")
+        card["phase_angle_deg"] = _phase_angle(obj, data)
+        card["sun_vector"] = _sun_vector(obj, data)
     elif kind in ("brown_dwarf", "brown_dwarf_binary"):
         card["radius_rjup"] = {
             "value": BROWN_DWARF_RADIUS_RJUP,
