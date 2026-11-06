@@ -277,6 +277,9 @@ export class ViewerApp {
     this.governor = new FrameGovernor(this.tier);
 
     this.scene = new Scene();
+    // The background must be scene.background: through the HDR RenderPipeline the clear colour alone
+    // came out black (0,0,0) on WebGL2. The golden spec checks it at a canvas corner.
+    this.scene.background = new Color(SPACE_BACKGROUND);
     this.camera = new PerspectiveCamera(40, 1, 0.1, 100);
     this.camera.position.set(0, 0, 4);
 
