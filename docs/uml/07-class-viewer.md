@@ -61,16 +61,25 @@ classDiagram
   }
   class ShaderBody {
     <<planet_rocky, planet_water, gas_giant, nebula, nova>>
-    browser shader generator, triplanar
-    samples field as DataTexture
+    TSL node materials on three r187
+    reads field as 2 Float32 DataTextures via textureLoad
     finer noise is seen, not felt
+    nebula and nova are instanced Sprites
+    refused layers go in missing
   }
   class FieldWorker {
     <<Web Worker, D-12>>
-    +seed: number
-    512 x 256 equirectangular
-    channels height, band, ocean, ice, storm
+    fieldWorker.ts wraps generateField
+    fieldGenerator.ts is pure and seeded
+    512 x 256 equirectangular, R6.1 mapping
+    texture A height, band, storm
+    texture B ocean, ice, lava crack
     runs once per body, not per frame
+  }
+  class FieldSampler {
+    <<fieldGenerator.ts>>
+    bilinear height and masks, nearest ids
+    sampleDirection and sampleUV
   }
   class Lighting {
     <<lighting.ts>>
@@ -124,13 +133,14 @@ classDiagram
   Star ..|> BodyRenderer
   ShaderBody ..|> BodyRenderer
   ShaderBody --> "1" FieldWorker : requests field
-  HapticSource ..> FieldWorker : samples same array
+  HapticSource ..> FieldSampler : samples same array
+  FieldSampler --> FieldWorker : reads its arrays
 ```
 
 ## Notes
 
 - `candidate` has no renderer. The panel shows "Not enough data for a 3D model: distance and albedo unknown" (rendering doc §7.6).
-- The five baked renderers use backend textures (rendering doc §6); `ShaderBody` uses the shader generators from the mock-up, ported to ES modules (D-01, D-03). `ShaderBody` is listed in rendering doc §10 (name **[verify]**).
+- The five baked renderers use backend textures (rendering doc §6); `ShaderBody` uses the shader generators from the mock-up, ported to ES modules (D-01, D-03). `ShaderBody` is listed in rendering doc §10 (name **[verify]**). Renderers register by type in `renderers/registry.ts` (`bodyRenderer.ts` holds the `BodyRenderer` contract); `ViewerApp.setBody(card, params)` picks one.
 - Mesh budget: D-05 sets ≤ 50k triangles, tighter than the 300k in older text; D-05 wins.
 - Pixel ratio is `min(devicePixelRatio, 1.5)`, and the scene renders only when the view changes (D-05).
 - If a required card field is missing, the renderer does not draw that layer and it is listed in `RenderParams.missing`.
