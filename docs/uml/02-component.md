@@ -174,7 +174,7 @@ flowchart TB
 - Baked types (rendering doc types) fetch textures from the backend; shader kinds generate a field in the browser instead (D-01, D-12).
 - Endpoints follow D-16. Every endpoint is keyed by the object id that `resolve` returns; there is no separate flipbook endpoint. Responses served from the cache carry `cached_at` (D-25).
 - Every external call goes through the read-through cache (D-25): cache, then a live call with a timeout and retries, then an older cached entry, then refuse.
-- The physics layer is drawn on the backend, feeding derived values into the card. The browser reruns the same functions on slider changes (architecture spec §4.6). Baked types allow only colour, lighting and spin sliders; relief sliders exist only on the shader kinds (D-26).
+- The physics layer is drawn on the backend, feeding derived values into the card. The browser reruns the same functions on slider changes (architecture spec §4.6). As of issue #13 only the browser half exists (`frontend/src/physics/`); whether the backend ports it is Q-45. Baked types allow only colour, lighting and spin sliders; relief sliders exist only on the shader kinds (D-26).
 - The `spherex:haptic` DOM event is a debug hook that also drives the on-screen pulse indicator (D-20). Which module fires it is not stated; it is drawn from the engine.
 - `ShaderBody` and the `fields/` folder follow from D-01 and D-12 and are now listed in rendering doc §10. Their file names are **[verify]**.
 - The `terrain` and `flow` sources come from D-12. The brown dwarf `bands` source and the `flux_pulse`, `teq_pulse`, `motion` and `detections` data haptics have no source file named in §10 **[verify]**.

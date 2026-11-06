@@ -23,6 +23,7 @@ flowchart TB
       FApp["src/app (React shell: App, ViewerPanel, StatusLine, FixtureBanner, LiveAnnouncer, Badge, StatusBoxes, urlHash + useHashSync, format, messages, refusals, RefusalList, ui), src/state (Zustand store with the sky slice) : Moon"]
       FFlip["src/app/api (M1 client, D-16), src/app/search, src/app/flipbook (with Rainbow Trails, D-28), src/app/spectrum : Moon"]
       FDev["fixtures/ (dev-only synthetic fixture server), scripts/ (check-dist), src/test (test helpers), src/fixtures.test.ts, e2e/ (Playwright) : dev and test only"]
+      FPhysics["src/physics : A7 physics layer, derivePhysics, slider registry (D-26, D-27) : Moon"]
       FContract["src/contract : generated from shared/schemas (D-18), assertTagged next to it : follows the schemas owner"]
       subgraph FViewer["src/viewer (Moon)"]
         VCore["ViewerApp, lighting, modes, honesty, scaleBar, altText"]
@@ -48,6 +49,8 @@ flowchart TB
   BContract -.->|"generated from (D-18)"| Schemas
 
   FApp --> VCore
+  FApp -->|"Overrides, SliderKey types (src/state)"| FPhysics
+  FPhysics --> FContract
   FApp --> FContract
   VCore --> FContract
   HCore --> FContract
@@ -75,7 +78,7 @@ flowchart TB
 | `backend/app/api`, `backend/app/adapters`, `backend/app/cache`, `backend/app/core/find` (stage 1), backend scaffold, pipeline stages 4, 5 | Kevin |
 | `backend/app/core/measure` (stage 2), physics layer, `shared/schemas`, `shared/fixtures` | Moon (Munazir) |
 | Pipeline stage 3 | Atish |
-| `frontend/src/viewer`, `viewer/renderers`, shader kinds, `src/app`, `src/state` | Moon |
+| `frontend/src/viewer`, `viewer/renderers`, shader kinds, `src/app`, `src/state`, `src/physics` | Moon |
 | `src/app/api`, `src/app/search`, `src/app/flipbook`, `src/app/spectrum` (flipbook UI) | Moon |
 | `frontend/fixtures`, `frontend/scripts`, `src/test`, `src/fixtures.test.ts`, `frontend/e2e` | Not named in D-17; dev and test tooling for the flipbook UI |
 | `frontend/src/viewer/fields` | Atish |
@@ -85,5 +88,6 @@ flowchart TB
 - `viewer/fields`, `ShaderBody`, `sources/terrain` and `sources/flow` follow from D-01 and D-12. They are listed in rendering doc §10, but the `ShaderBody` and `fields/fieldWorker` file names stay **[verify]**.
 - `src/contract`, `src/state` and `src/app` were added by the frontend scaffold (4 Nov 2026) and are listed in rendering doc §10. `src/contract/generated.ts` is generated from `shared/schemas` (D-18), as is `backend/app/contract/`; the hand-written scaffold types were replaced in issue #4.
 - The flipbook and spectrum view (M1, issue #3, 5 Nov 2026) added `src/app/api`, `src/app/search`, `src/app/flipbook`, `src/app/spectrum`, the `sky` slice in `src/state/store.ts`, `src/test`, `fixtures/` and `scripts/` (rendering doc §10). `fixtures/` is a Vite dev-server plugin used only by `npm run dev:fixtures` and the Playwright tests; `scripts/check-dist.js` fails the build if a fixture marker reaches `dist/`.
+- The physics layer and slider registry (issue #13) added `src/physics` (rendering doc §10, architecture spec §7). `src/state/store.ts` takes its `Overrides` and `SliderKey` types from `src/physics/sliders.ts`. The backend half of stage 6 is not built (Q-45).
 - D-13: Atish owns the creative direction of haptics (what each body feels like, patterns, sound pairing). Engineering choices (drivers, timing, rate limits) stay with the implementer.
 - The shader generators move from the mock-up into ES modules; the mock-up is not ported in place (D-03).
