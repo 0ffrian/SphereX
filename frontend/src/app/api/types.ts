@@ -199,7 +199,7 @@ export interface OverlaysResponse {
   missing: string[];
   /**
    * Keys: catalog_positions, catalog_mags, markers, contamination, footprint, cutout_box,
-   * flags_mask.
+   * flags_mask, flag_colours (`artistic`).
    */
   provenance: Readonly<Record<string, ProvenanceEntry>>;
 }

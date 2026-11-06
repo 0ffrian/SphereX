@@ -12,10 +12,12 @@ backend/app/core/render/            (Atish)
   __main__.py         # python -m app.core.render <card.json> --seed N --out DIR
   gemini_paint.py     # stretch, behind the admin token
   spherex_rgb.py      # §5.2 channel extraction
-backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; objects.py: /frames, /cutouts, later /card, /render-params, texture URLs
-backend/app/adapters/                (Kevin)  # IRSA SIA + cutouts, SIMBAD, SBDB, Horizons, SkyBoT (A3), all through the cache
+backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; objects.py: /frames, /cutouts, later /card, /render-params, texture URLs;
+                                              # overlays.py: /overlays, /flags/{frame_id}.png, /combine.png (A4.9, Q-50)
+backend/app/adapters/                (Kevin)  # IRSA SIA + cutouts, SIMBAD, SBDB, Horizons, SkyBoT, Gaia and CatWISE2020 over TAP (A3), all through the cache
 backend/app/cache/                   (Kevin)  # D-25 read-through disk cache
-backend/app/core/find/               (Kevin)  # pipeline stage 1 (A4.1): resolver, proper motion, WCS, frames, cutout PNG
+backend/app/core/find/               (Kevin)  # pipeline stage 1 (A4.1): resolver, proper motion, WCS, frames, cutout PNG;
+                                              # overlays, flagmask, combine (A4.9, issue #12)
 backend/app/contract/                (generated, D-18)  # Pydantic models generated from shared/schemas/ by
                                                         # scripts/generate_contract.py; follows the owner of shared/schemas/
 backend/app/core/measure/            (Moon)  # pipeline stage 2 (A4.2), issue #2: config, flags, aperture,
@@ -41,7 +43,7 @@ frontend/src/contract/               (generated, D-18)  # generated.ts comes fro
                                                         # the R8.8 runtime types stay hand-written in haptics.ts for now (Q-19)
 frontend/src/state/                  (Moon)  # Zustand store: card, params, honesty, overrides (A10, D-02);
                                              # store.ts also holds the `sky` slice (flipbook session: search, frames,
-                                             # playback, view mode, spectrum, link problems; A1.1, A4.1, A4.2)
+                                             # playback, view mode, spectrum, link problems, overlays, combine; A1.1, A4.1, A4.2, A4.9)
 frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, StatusLine, FixtureBanner, LiveAnnouncer,
                                              # Badge, StatusBoxes (loading and error boxes), urlHash.ts + useHashSync.ts
                                              # (A10 hash routing), format.ts (numbers, dates), messages.ts (user-facing
@@ -50,7 +52,8 @@ frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, St
                                              # ui.ts (shared class names)
   api/                # M1 API client (D-16): client, config, errors, validate; types.ts is hand-written until D-18 generation
   search/             # SearchBar, parseQuery (name, or RA, Dec in decimal degrees), testTargets (the five A1.1 targets)
-  flipbook/           # Flipbook player, playback, keys, cutout preloading, RainbowTrails + wavelengthColor (D-28)
+  flipbook/           # Flipbook player, playback, keys, cutout preloading, RainbowTrails + wavelengthColor (D-28);
+                      # overlays/: markers, flag mask, field of view, overlay panel, combine panel (A4.9, issue #12)
   spectrum/           # SpectrumPanel, SVG SpectrumChart, scale (displays the A4.2 output)
 frontend/src/test/                           # test-only helpers (fixtureFetch.ts, sharedFixtures.ts: loads shared/fixtures)
 frontend/src/fixtures.test.ts                # fixtures are deterministic, pass the API validators, never imported by app code
