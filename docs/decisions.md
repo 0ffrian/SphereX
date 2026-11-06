@@ -323,7 +323,7 @@ Decisions D-14 to D-29 were recorded on 5 Nov 2026. They answer Q-01 to Q-14 and
     | TWA 27 (2M1207 A) | `TWA 27` | Host of 2M1207 b, the first directly imaged planetary-mass companion (Chauvin et al. 2004, A&A 425, L29). Every point has S/N above 11. |
     | IRAS 04302+2247 | `IRAS 04302+2247` | A young star with an edge-on protoplanetary disk; water and CO₂ ice bands at 3.05 and 4.27 µm (Aikawa et al. 2012, A&A 538, A57). |
 
-  - Picked from a live screen of 8 candidates on QR2 (6 Nov 2026, the first ~32 frames of each object, 78 for SIMP 0136); the screen table is in PR #__. PSO J318.5−22 was picked first and dropped: a 2MASS star 1.3 mag brighter in J lies 17.5″ away, inside the 3 px aperture, so its spectrum below about 2 µm is mostly the neighbour's.
+  - Picked from a live screen of 8 candidates on QR2 (6 Nov 2026, the first ~32 frames of each object, 78 for SIMP 0136); the screen table is in PR #28. PSO J318.5−22 was picked first and dropped: a 2MASS star 1.3 mag brighter in J lies 17.5″ away, inside the 3 px aperture, so its spectrum below about 2 µm is mostly the neighbour's.
 - **Full pre-fetched cache** (`SX_OFFLINE=1 python -m app.core.measure --group demo`, 6 Nov 2026):
 
   | Object | Frames | Points (flagged) | Refusals | Wavelength |
@@ -340,7 +340,7 @@ Decisions D-14 to D-29 were recorded on 5 Nov 2026. They answer Q-01 to Q-14 and
   - Fluxes carry no aperture correction (Q-23).
 - **Saturation limit:** about 11.7 to 9.7 AB mag depending on the band, as quoted by Clark et al. 2026; the range and the per-band values are **[verify]** ([A3.1](architecture/data-sources.md#a31-spherex-irsa), Saturation row). SIMP 0136 and TWA 27 are at least 2 mag fainter than 11.7 AB in 2MASS J and K and WISE W1 and W2. IRAS 04302+2247 is closer: 1.9 mag in K (13.56 AB), 1.4 mag in W1 (13.06 AB, brighter than Epsilon Indi B's 13.42 AB) and 1.1 mag in W2 (12.81 AB). Its margin rests on its own full-cache result (no saturated source in any frame), not on an object measured before. AB = Vega + 0.894 (J), 1.840 (K) from the 2MASS zero points (Cohen et al. 2003, AJ 126, 1090) and + 2.699 (W1), 3.339 (W2) from the WISE All-Sky Explanatory Supplement Sect. 4.4.h **[verify]**. Epsilon Indi B and WISE 0855 measured cleanly in this tool (2 objects, not a limit).
 - **Out of scope:** demo quick picks in the UI go to M5 (issue #15).
-- **Approval:** Atish, 6 Nov 2026. Moon was asked to confirm in PR #__; pending, will be recorded here.
+- **Approval:** Atish, 6 Nov 2026. Moon was asked to confirm in PR #28; pending, will be recorded here.
 
 ---
 
