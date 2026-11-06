@@ -5,6 +5,8 @@
 ## R4. Display levels
 
 1. **Sky patch (2D flipbook).** Real SPHEREx pixels. Sources are points with clickable rings plus Gaia/WISE overlay markers. This is the only fully measured view.
+   - As built in M1 (issue #3): the cutout pixels, frame time and wavelength are `measured`; time and wavelength wear the Measured badge. The display stretch is `derived` (Estimated badge; the tooltip gives the stretch kind and parameters), as are the pixel positions `x`, `y` ([architecture spec §4.1](../architecture/pipeline.md#a41-stage-1-find-the-object)). How "Measured only" treats the stretched picture and the ring: Q-28.
+   - Rainbow Trails (D-28), a flipbook view mode: the dot colour is a false colour, hue = wavelength, tagged `derived` with that formula (Estimated badge). In "Measured only" (D-21) the dots are drawn in one colour. Tag question: Q-27.
 2. **Object panel.** Spectrum with σ, light curve or motion, the ObjectCard with tags, Listen, and **spectrum haptics** ([§8.6](haptics/profiles.md#r86-spectrum-haptics-every-object-the-most-useful-for-blind-and-low-vision-users)).
 3. **3D view (Sky Sculptor).** Opened with "View in 3D". The renderer is chosen by `type`. For `candidate` there is no button; the panel shows "Not enough data for a 3D model".
 

@@ -39,4 +39,4 @@ Refusals covered:
 | `comet` | `visible`: no colour basis |
 | `candidate` | `mesh`, `visible`: no 3D body (R7.6) |
 
-Tests: `backend/tests/test_contract_fixtures.py` and `frontend/src/contract/fixtures.test.ts`. Open contract questions: Q-32 to Q-40 in the [decision log](../docs/decisions.md#open-questions). The frontend's own M1 fixtures stay in `frontend/fixtures/` (Q-30).
+Tests: `backend/tests/test_contract_fixtures.py` and `frontend/src/contract/fixtures.test.ts`. Open contract questions: Q-33 to Q-42 in the [decision log](../docs/decisions.md#open-questions). The frontend's own M1 fixtures stay in `frontend/fixtures/` (Q-30).

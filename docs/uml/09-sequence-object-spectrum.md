@@ -24,11 +24,11 @@ sequenceDiagram
     API->>API: Serve the stored spectrum (no cutout read)
   else not cached
     PL->>PL: Stage 2 per cached cutout: 3 px aperture minus 6-9 px annulus background, drop flagged pixels, variance to sigma, flux in uJy (pixel solid angle from WCS), wavelength from WCS-WAVE
-    PL->>PL: Refuse a frame as saturated (core OVERFLOW) or aperture_flags, edge, background...; flag points with dropped outer pixels
+    PL->>PL: Refuse a frame as saturated (core OVERFLOW) or aperture_flags, edge, background..., and flag points with dropped outer pixels
     PL-->>API: Spectrum and light curve (same measurements), refusals in missing
     API->>API: Store as derived.spectrum when the frame list is complete
   end
-  API-->>P: Spectrum and light curve, tagged measured, flux_unit uJy (cached_at if from cache; spectrum:saturated when every frame saturated)
+  API-->>P: Spectrum and light curve, tagged measured, flux_unit uJy (cached_at if from cache, spectrum:saturated when every frame saturated)
   P->>API: GET /v1/objects/{id}/card
   API->>PL: Stage 3: match reference types (asteroid classes, brown dwarf types, gas features 2.7, 4.25, 4.67 um)
   PL->>EXT: Gaia colours if a known asteroid

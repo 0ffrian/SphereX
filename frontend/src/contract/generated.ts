@@ -196,7 +196,7 @@ export interface LightcurvePoint {
   flags: number;
 }
 /**
- * Gas production rates, molecules/s. One value per molecule; R3.2's 'per epoch' does not fit this shape (Q-32).
+ * Gas production rates, molecules/s. One value per molecule; R3.2's 'per epoch' does not fit this shape (Q-42).
  */
 export interface GasQ {
   co2?: TVNumber;
