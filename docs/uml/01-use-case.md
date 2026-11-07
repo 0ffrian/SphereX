@@ -16,7 +16,8 @@ flowchart LR
     UCSearch(["Search by name or RA/Dec"])
     UCFlip(["Play flipbook of SPHEREx frames"])
     UCTrails(["Rainbow Trails view mode (P1)"])
-    UCOverlay(["Toggle Gaia / WISE overlays (P1)"])
+    UCOverlay(["Toggle overlays: Gaia, WISE, flagged pixels, field of view (P1)"])
+    UCCombine(["Add or subtract two frames (P1)"])
     UCSpectrum(["Click object to see spectrum and card"])
     UCListen(["Listen (data sweep)"])
     UCFeelSpec(["Feel spectrum (drag along plot)"])
@@ -44,6 +45,7 @@ flowchart LR
   Public --- UCScrub
   Public --- UCShare
   Public --- UCOverlay
+  Public --- UCCombine
   Public --- UCTrails
 
   Blind --- UCListen
@@ -61,6 +63,8 @@ flowchart LR
   UCSearch -.->|"«include»"| UCFlip
   UCSpectrum -.->|"«extend»"| UCFlip
   UCTrails -.->|"«extend»"| UCFlip
+  UCOverlay -.->|"«extend»"| UCFlip
+  UCCombine -.->|"«extend»"| UCFlip
   UCListen -.->|"«extend»"| UCSpectrum
   UCFeelSpec -.->|"«extend»"| UCSpectrum
   UCView3D -.->|"«extend»"| UCSpectrum
@@ -73,6 +77,7 @@ flowchart LR
 
   UCSearch --- Archives
   UCSpectrum --- Archives
+  UCOverlay --- Archives
   UCPrebake --- Archives
   UCGemini --- Archives
 
@@ -82,10 +87,11 @@ flowchart LR
 
 ## Notes
 
-- "External archives" stands for IRSA (SPHEREx), Gaia, Horizons, SkyBoT, SBDB, DAMIT, SIMBAD, the Exoplanet Archive and the Gemini API. See [03-deployment.md](03-deployment.md).
+- "External archives" stands for IRSA (SPHEREx), Gaia, CatWISE2020 (IRSA), Horizons, SkyBoT, SBDB, DAMIT, SIMBAD, the Exoplanet Archive and the Gemini API. See [03-deployment.md](03-deployment.md).
 - View in 3D is not offered for `candidate`; the panel says "Not enough data for a 3D model" (rendering doc §4, §7.6).
 - Touch mode feels the surface only on Android Chrome. iPhone, iPad and desktop get the paired audio only (D-08, D-10).
 - Gemini repaint is server-side and behind the admin token (rendering doc §10, D-07).
 - Post-event, not drawn: Gemini Live voice control (B-02), AI sound clips (B-03), image-to-3D (B-04).
 - Rainbow Trails is a view mode of the flipbook (D-28), so it extends "Play flipbook". It is P1, built after basic playback works.
+- Overlays and combine frames extend the flipbook (A4.9, issue #12). The overlays load on the first switch-on and query Gaia DR3 and CatWISE2020 through the cache.
 - Pre-fetch fills the backend's read-through cache for the test targets and demo objects, so the demo runs offline (D-25).

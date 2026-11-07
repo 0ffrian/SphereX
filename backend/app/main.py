@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 import re
 import subprocess
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
@@ -12,12 +14,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from app.api import objects, resolve, spectrum
+from app.api import objects, overlays, resolve, spectrum
 from app.context import make_context
 from app.core.card.assets import AssetStore
 from app.core.card.catalogue import SHAPE_URL_ROOT, load_shape_registry, mesh_file
 from app.core.card.service import ObjectPipeline
 from app.core.find.frames import FrameService
+from app.core.find.overlays import OverlayService
 from app.core.find.resolver import load_aliases
 from app.errors import install_catch_all, install_error_handlers
 from app.settings import Settings, get_settings
@@ -54,9 +57,15 @@ def create_app(
             s.cache_dir,
         )
 
-    app = FastAPI(title="Shift & Spectrum API", version="0.1.0")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        yield
+        app.state.overlays.close()  # stop the catalogue fetch pool (issue #12)
+
+    app = FastAPI(title="Shift & Spectrum API", version="0.1.0", lifespan=lifespan)
     app.state.ctx = ctx
     app.state.frames = FrameService(ctx)
+    app.state.overlays = OverlayService(app.state.frames)
     app.state.pipeline = ObjectPipeline(
         app.state.frames, AssetStore(ctx.cache, s.assets_dir, s.data_release)
     )
@@ -69,13 +78,15 @@ def create_app(
             CORSMiddleware,
             allow_origins=s.cors_list,
             allow_methods=["GET"],
-            # Let the browser read the D-16 cached_at and the asset status (Q-39).
-            expose_headers=["X-SX-Cached-At", "X-SX-Asset-Status"],
+            # Let the browser read the D-16 cached_at, the asset status (Q-39) and the
+            # combine metadata (Q-50).
+            expose_headers=["X-SX-Cached-At", "X-SX-Asset-Status", "X-SX-Combine"],
         )
     install_error_handlers(app)
     app.include_router(resolve.router)
     app.include_router(objects.router)
     app.include_router(spectrum.router)
+    app.include_router(overlays.router)
 
     shapes_dir = s.shapes_dir
 
