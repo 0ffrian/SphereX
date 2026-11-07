@@ -55,7 +55,7 @@ Errors are `{"error": code, "detail": sentence}`. The codes are:
 - `epoch` in `resolve` is ISO-8601 UTC: `2000-01-01T11:58:55.816Z` (J2000.0) for SIMBAD positions, `SX_EPHEMERIS_EPOCH` for moving objects, absent for typed coordinates.
 - Typed coordinates are tagged `derived` (user input, Q-25).
 - A Flamsteed name (`61 Cyg`, `51 Pegasi`) goes to SIMBAD first. Its SBDB fallback is accepted only when the asteroid's name is the query (`849 Ara`), so a star name never resolves to a numbered asteroid.
-- Moving objects (solar-system bodies, Q-22) get `frames: []` and `missing: ["frames:moving_object_search"]` in M1 (Q-21).
+- Moving objects (solar-system bodies, Q-22) get their frames from the path search (issue #26, A4.1): SIA cones along the SPHEREx-centred Horizons path, merged and kept when the footprint holds the object at the frame midpoint. `ra`/`dec` and `x`/`y` are `model_dependent` (Q-87). Extra `missing` codes: `frames:ephemeris`, `frames:moving_window`, `frames:cone_failed:<n>`, `cones:deferred:<n>`, `frames:outside_window:<n>`, `footprint:<id>`, `ephemeris:<id>`; `frames:truncated` past the cone cap.
 
 ## Texture baker (R6, issue #6)
 
@@ -83,6 +83,14 @@ uv run python -m app.core.render ../shared/fixtures/cards/asteroid_procedural.js
 | `SX_SIMBAD_TAP_URLS` | CDS, then the Harvard mirror | Comma-separated and tried in order. |
 | `SX_EPHEMERIS_EPOCH` | `2026-11-14T00:00:00Z` | The time used for a moving object's `resolve` position. |
 | `SX_SEARCH_EPOCH` | `2026-01-01T00:00:00Z` | The time used for a proper-motion star's SIA search cone. |
+| `SX_MOVING_WINDOW_START`, `SX_MOVING_WINDOW_END` | `2025-04-01T00:00:00Z`, `2026-06-01T00:00:00Z` | **[verify]** The data release window for the moving-object path search (not published; covers every cached QR2 frame time). |
+| `SX_MOVING_EPHEM_STEP_MIN` | `60` | **[verify]** Horizons sampling of the path (cone placement and footprint check; pixels use exact per-frame positions). |
+| `SX_MOVING_CONE_RADIUS_DEG` | `0.1` | **[verify]** Cone radius R along the path. |
+| `SX_MOVING_MIN_STEP_H`, `SX_MOVING_MAX_STEP_H` | `1`, `24` | **[verify]** Clamp for the step dt = R / rate between cones. |
+| `SX_MOVING_MAX_CONES` | `450` | **[verify]** Cones per object; past it `frames:truncated`. |
+| `SX_MOVING_SIA_MAXREC` | `500` | **[verify]** MAXREC per path cone. |
+| `SX_MOVING_CONE_PACE_S` | `0` | **[verify]** Seconds between live path cones (IRSA publishes no rate limit; requests are sequential and 5xx/504 are retried with backoff). |
+| `SX_MOVING_LIVE_CONES_PER_REQUEST` | `4` | Live path cones per web request; the rest are `cones:deferred:<n>`. The pre-fetch has no cap. |
 | `SX_HTTP_*` | 10 s connect, 60 s read, 3 retries, 1 s backoff (doubles) | |
 | `SX_CORS_ORIGINS` | empty | Needed only when the frontend runs without the Vite proxy. CORS then exposes the `X-SX-Cached-At` and `X-SX-Asset-Status` headers (Q-39) so the browser can read them. |
 | `SX_ASSETS_DIR` | `backend/assets` | Pre-baked assets read by stage 4 (A5.4), `<type>/<id>.json` with the D-22 fields. |

@@ -12,7 +12,7 @@
 | WebGPU needs a secure context | The app may not start on the phones over plain HTTP | Serve over HTTPS. Install a local root certificate on both Android phones (e.g. `mkcert`). Whether a clicked-through self-signed certificate is enough **[verify]** (D-24). |
 | Building before 14 Nov | The event rules say not to build before the event | The team's call and risk (D-14). |
 | SPHEREx saturates on bright targets | Barnard's Star and R Dra get no measured point and RW Aur only 15 points at 0.74–1.09 µm; the rest are refused | Keep the saturated frames as honest refusals; the flipbook still works. Show the spectrum on demo objects fainter than the saturation limit, checked on the full pre-fetched cache (D-31, A3.1). |
-| Frames on 3I/ATLAS dates unchecked | The headline comet may have no data | Check early. Keep a known asteroid as fallback. |
+| Frames on 3I/ATLAS dates unchecked | The headline comet may have no data | Check early. Keep a known asteroid as fallback. Checked 7 Nov 2026: 3I/ATLAS has QR2 frames on 2025-08-01 to 08-16 and 2025-12-08 to 12-15 (A3.1); 433 Eros is the recorded fallback (A4.1). |
 | NEOWISE access unconfirmed | Diameter and albedo | Use JPL values. |
 | Exoplanet Archive untested | Planet cards | Test first. |
 | SIMBAD untested | Star and brown dwarf types | Test first. Resolver order: SBDB first for small-body names, SIMBAD first for the rest (D-19). |

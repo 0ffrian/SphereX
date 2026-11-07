@@ -92,7 +92,7 @@ flowchart LR
   Adapters <--> DataCache
   Adapters -->|"SIA?COLLECTION=spherex_qr2, cutouts"| IRSA
   Adapters -->|"name to RA/Dec"| Resolver
-  Adapters -->|"position per frame"| Horizons
+  Adapters -->|"path ephemeris and position per frame, seen from SPHEREx"| Horizons
   Adapters -->|"conesearch.php, -ep in JD"| SkyBoT
   Adapters -->|"sso_reflectance_spectrum; gaia_dr3_source cone, G #lt; 20"| Gaia
   Adapters -->|"catwise_2020 cone"| CatWISE

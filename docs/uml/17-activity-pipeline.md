@@ -16,7 +16,7 @@ flowchart TD
   Resolved -->|yes| HaveCoord
 
   HaveCoord --> Moving{"Moving object?"}
-  Moving -->|yes| Horizons["Position per frame from Horizons, neighbours from SkyBoT"]
+  Moving -->|yes| Horizons["Horizons path seen from SPHEREx, SIA cones along it, keep frames whose footprint holds the path, exact position per frame midpoint (model_dependent), neighbours from SkyBoT"]
   Moving -->|no| Static["Fixed RA/Dec (proper motion for stars)"]
   Horizons --> WCS["Sky to pixel per frame via WCS"]
   Static --> WCS
@@ -69,4 +69,5 @@ flowchart TD
 - The physics layer is "reduced, physically inspired" formulas (architecture spec §7); its outputs are tagged `derived`.
 - Every external call in this flow goes through the backend's read-through cache (D-25). With `SX_OFFLINE=1` a cache miss is refused, and the refused layer goes in `missing`.
 - Small-body names are numbered asteroids, provisional designations, comets and interstellar objects (D-19).
+- Moving objects (issue #26, A4.1): the frame search runs SIA cones along a SPHEREx-centred Horizons path; cone radius, step, cap and pacing are **[verify]** settings (Q-21). Positions and pixels are `model_dependent` (Q-87). MOST as the primary search: Q-88.
 - As built (issue #5): the saved-asset check runs before stage 3, as in A4.4's pseudocode, so a saved asset skips classification. Stage 3 takes the class label from the catalogue only; spectrum matching and Gaia colours are not built (Q-55). Generated assets are saved only when their inputs are final (Q-57).

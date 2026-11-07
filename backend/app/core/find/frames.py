@@ -28,16 +28,22 @@ from app.cache.store import (
     earliest_cached_at,
 )
 from app.context import Context
-from app.core.find import png, wcs
+from app.core.find import moving, png, wcs
 from app.core.find.propagate import propagate
 from app.core.find.resolver import ResolvedObject
 from app.core.find.version import DERIVATION_VERSION
 from app.timefmt import iso_utc_z, mjd_to_utc, parse_utc
 
 FRAMES_SOURCE = "derived.frames"
-MOVING_REFUSAL = "frames:moving_object_search"
 TRUNCATED = "frames:truncated"
 DEFERRED = "cutouts:deferred"
+# Moving-object path search (issue #26): codes that more data or another request can change.
+INCOMPLETE_PREFIXES = (
+    moving.EPHEMERIS,
+    moving.CONE_FAILED + ":",
+    moving.CONES_DEFERRED + ":",
+    moving.FRAME_EPHEMERIS + ":",
+)
 MEMO_SIZE = 128
 FAILED_SIZE = 4096
 
@@ -47,7 +53,11 @@ def is_complete(missing: list[str]) -> bool:
     failed and none was deferred. Geometric refusals (``outside_cutout``, ``wavelength``,
     ``cutout_stretch``) are deterministic for the cached data and do not count."""
     return not any(
-        m == TRUNCATED or m.startswith("cutout:") or m.startswith(DEFERRED + ":") for m in missing
+        m == TRUNCATED
+        or m.startswith("cutout:")
+        or m.startswith(DEFERRED + ":")
+        or m.startswith(INCOMPLETE_PREFIXES)
+        for m in missing
     )
 
 
@@ -128,9 +138,11 @@ def frame_geometry(hdul: Any, ra: float, dec: float) -> FrameGeometry:
     return FrameGeometry(x0, y0, x, y, int(nx), int(ny))
 
 
-def frames_key(ctx: Context, object_id: str) -> CacheKey:
-    """Derived frame list. Every setting that changes the result is part of the key."""
+def frames_key(ctx: Context, object_id: str, *, is_moving: bool = False) -> CacheKey:
+    """Derived frame list. Every setting that changes the result is part of the key. A moving
+    object adds the path-search settings (issue #26); a fixed object's key is unchanged."""
     s = ctx.settings
+    extra = moving.MovingConfig.from_context(ctx).key_fields() if is_moving else {}
     return CacheKey.make(
         FRAMES_SOURCE,
         s.data_release,
@@ -139,6 +151,7 @@ def frames_key(ctx: Context, object_id: str) -> CacheKey:
         radius=norm_float(s.sia_radius_deg, 6),
         search_epoch=s.search_epoch,
         v=DERIVATION_VERSION,
+        **extra,
     )
 
 
@@ -193,7 +206,7 @@ class FrameService:
     ) -> FramesResult:
         s = self.ctx.settings
         has_pm = obj.pm_ra_mas_yr is not None and obj.pm_dec_mas_yr is not None
-        key = frames_key(self.ctx, obj.id)
+        key = frames_key(self.ctx, obj.id, is_moving=obj.moving)
         if not (refresh or rebuild):
             entry = self.ctx.cache.get(key)
             if entry is not None:
@@ -206,20 +219,38 @@ class FrameService:
                     cached_at=parse_utc(cached) if cached else None,
                     has_proper_motion=has_pm,
                 )
+        served: list[Served]
+        missing: list[str]
+        rows: list[SiaRow]
         if obj.moving:
-            # Q-21: an ephemeris-driven SIA search is not built in M1. Refuse, never guess.
-            return FramesResult(obj.id, [], [MOVING_REFUSAL], None, has_pm)
+            # Q-21, issue #26: ephemeris-driven cones along the path; the object position at each
+            # frame time comes from the interpolated ephemeris, never from a guess.
+            path = moving.search_path(
+                self.ctx,
+                obj.spkid,
+                refresh=refresh,
+                live_cones=None if unlimited_live else max(0, s.moving_live_cones_per_request),
+            )
+            served, missing, rows = list(path.served), list(path.missing), path.rows
+            path_pos = path.positions
 
-        search_ra, search_dec = position_at(obj, parse_utc(s.search_epoch))
-        sia = irsa_sia.search(self.ctx, search_ra, search_dec, refresh=refresh)
-        served: list[Served] = [sia.served]
-        missing: list[str] = [TRUNCATED] if sia.truncated else []
+            def pos_of(row: SiaRow) -> tuple[float, float]:
+                return path_pos[row.frame_id]
+        else:
+            search_ra, search_dec = position_at(obj, parse_utc(s.search_epoch))
+            sia = irsa_sia.search(self.ctx, search_ra, search_dec, refresh=refresh)
+            served, missing = [sia.served], ([TRUNCATED] if sia.truncated else [])
+            rows = sorted(sia.rows, key=lambda r: (r.t_min_mjd, r.frame_id))
+
+            def pos_of(row: SiaRow) -> tuple[float, float]:
+                return position_at(obj, frame_time(row))
+
         frames: list[FrameRecord] = []
         live_budget = None if unlimited_live else max(0, s.live_cutouts_per_request)
         deferred = 0
         online = not self.ctx.cache.offline
-        for row in sorted(sia.rows, key=lambda r: (r.t_min_mjd, r.frame_id)):
-            ra, dec = position_at(obj, frame_time(row))
+        for row in rows:
+            ra, dec = pos_of(row)
             ckey = irsa_cutout.key_for(self.ctx, row, ra, dec)
             needs_live = refresh or self.ctx.cache.get(ckey) is None
             if needs_live and online and live_budget is not None:
@@ -230,7 +261,7 @@ class FrameService:
                     deferred += 1
                     continue
                 live_budget -= 1
-            rec, why, srv = self._build_frame(obj, row, refresh=refresh)
+            rec, why, srv = self._build_frame(obj, row, ra, dec, refresh=refresh)
             if needs_live and online and why == "cutout" and srv is None:
                 self._mark_failed(ckey.digest)
             if srv is not None:
@@ -266,10 +297,10 @@ class FrameService:
                 self._failed.popitem(last=False)
 
     def _build_frame(
-        self, obj: ResolvedObject, row: SiaRow, *, refresh: bool
+        self, obj: ResolvedObject, row: SiaRow, ra: float, dec: float, *, refresh: bool
     ) -> tuple[FrameRecord | None, str, Served | None]:
+        """One frame at the object's position (ra, dec) at the frame time."""
         when = frame_time(row)
-        ra, dec = position_at(obj, when)
         try:
             srv = irsa_cutout.fetch_cutout(self.ctx, row, ra, dec, refresh=refresh)
         except (CacheMissOffline, UpstreamUnavailable):

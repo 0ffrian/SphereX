@@ -169,9 +169,12 @@ def search(
     refresh: bool = False,
     maxrec: int | None = None,
     read_timeout_s: float | None = None,
+    radius_deg: float | None = None,
 ) -> SiaResult:
+    """One tiny cone. ``radius_deg`` defaults to ``SX_SIA_RADIUS_DEG``; the moving-object path
+    search (issue #26) passes its own cone radius."""
     s = ctx.settings
-    key = sia_key(s.data_release, ra, dec, s.sia_radius_deg)
+    key = sia_key(s.data_release, ra, dec, s.sia_radius_deg if radius_deg is None else radius_deg)
     n = maxrec or s.sia_maxrec
     ra_t, dec_t, rad_t = dict(key.query)["ra"], dict(key.query)["dec"], dict(key.query)["radius"]
 

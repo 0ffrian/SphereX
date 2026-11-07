@@ -8,6 +8,10 @@ Run while the internet is good, then serve with ``SX_OFFLINE=1``:
 
 Resumable: entries already cached are skipped. Exit code 1 if any target is incomplete.
 
+Moving objects (issue #26): one Horizons ephemeris over ``SX_MOVING_WINDOW_START`` to
+``SX_MOVING_WINDOW_END``, then one SIA cone every ``SX_MOVING_CONE_STEP_H`` along the path (at
+most ``SX_MOVING_MAX_CONES``, spaced by ``SX_MOVING_CONE_PACE_S``), then the cutouts.
+
 Catalogue overlays (issue #12): one Gaia DR3 and one CatWISE2020 cone per fixed target. A
 failed cone is reported (``overlays: FAILED``) but does not make the target incomplete or change
 the exit code: overlays are optional layers, and the frames and spectrum do not depend on them.
@@ -127,7 +131,17 @@ def prefetch_target(
         except (CacheMissOffline, UpstreamUnavailable) as exc:
             rep.error = f"SkyBoT failed: {exc}"
             return rep
-        rep.missing = FrameService(ctx).get_frames(obj, rebuild=True).missing
+        if getattr(args, "overlays_only", False):
+            # Movers have no catalogue cones (Q-50); skip the path search and its cutouts.
+            rep.frames_skipped = True
+            return rep
+        # Issue #26: the path search (Horizons over the window, SIA cones along the path,
+        # paced by SX_MOVING_CONE_PACE_S), then the cutouts, with no live caps.
+        result = FrameService(ctx).get_frames(
+            obj, refresh=args.refresh, rebuild=True, unlimited_live=True
+        )
+        rep.frames, rep.missing = len(result.frames), result.missing
+        print(f"  path search: {rep.frames} frames, missing={result.missing[:5]}", flush=True)
         return rep
 
     search_ra, search_dec = position_at(obj, parse_utc(ctx.settings.search_epoch))
