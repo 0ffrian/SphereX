@@ -66,3 +66,4 @@ Barnard's Star example **[verify]** (each tier needs checking):
 - **Motion:** flares use `speedup.flares`; loops sway slowly with the clock.
 - **Mira:** pulsation uses `pulsation_period_d` (tier 1 or 2, from the light curve). The ±10% amplitude stays `artistic` (Q-65).
 - In Measured only, none of R7.5.3 to R7.5.5 is drawn unless its tier is 1.
+- **Open visual findings (issue #42, Q-90):** granulation contrast is too high, the limb is not crisp and the prominence loop shape is stiff.

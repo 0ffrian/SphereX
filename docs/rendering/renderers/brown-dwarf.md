@@ -14,3 +14,4 @@
 - **Binary (Eps Indi Ba T1 + Bb T6):** two bodies on an illustrative mutual orbit, tagged `artistic`. Relative brightness from class (derived). Orbital period ~11 yr and separation **[verify before showing numbers]**.
 - **Moving jets (issue #42, Q-87):** with a stated `winds` speed-up the bands are drawn by the browser as counter-flowing jets with storms and spin flattening (`renderers/jetSurface.ts`), instead of the baked texture. Cloud cover follows the scrubbed light curve (tier 3).
 - **Haptics:** band source plus brightness pulse ([§8.5](../haptics/profiles.md#r85-per-type-haptic-profile)).
+- **Open visual finding (issue #42, Q-90):** the default SPHEREx IR view shows no motion, because the moving jets are drawn in the visible view only.
