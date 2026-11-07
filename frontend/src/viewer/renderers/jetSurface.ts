@@ -4,7 +4,7 @@
 //   - The band profile (R of texture A) is the field's, fixed in the body frame; the shader only
 //     adds detail below the field's resolution, which is seen and not felt (D-12).
 //   - Counter-flowing jets: that detail is advected by the zonal wind, which changes sign from one
-//     band to the next (`sin(phase)`, the same profile as `zonalWind`), so neighbouring bands
+//     band to the next (`2 A.x - 1 = sin(phase)`, the same profile as `zonalWind`), so neighbouring bands
 //     visibly slide past each other. Turbulence is strongest at the band edges, where the shear is.
 //     The advection is a flow-map cross-fade (motion/phase.ts), so it never stretches for ever.
 //   - Storms: positions, sizes and own turning come from the CPU (`fields/flowModel.ts`) as
@@ -116,7 +116,10 @@ export function buildJetSurface(o: JetOptions): JetSurface {
   const dir = normalize(positionLocal);
   const { u, v } = fieldUV(dir);
   const A = bilinear(o.texA, u, v);
-  const profile = sin(dir.y.mul(o.bands * Math.PI)); // -1..1, the jet direction and strength
+  // -1..1, the jet direction and strength: sin of the field's WARPED band phase, exactly the CPU's
+  // `zonalWind` (the field stores 0.5 + 0.5 sin(phase)), so the drawn shear and the drift of the
+  // storms (flowModel) flow the same way at every point.
+  const profile = A.x.mul(2).sub(1);
 
   // Detail advected by the jets (two flow-map copies).
   const detail = (shear: any, evo: any) => {
@@ -236,7 +239,9 @@ export interface JetRuntimeInput {
  * flow-map phases of the detail. A pure function of the clock times.
  */
 export function makeJetRuntime(i: JetRuntimeInput): (time: SimTimeFn) => void {
-  const peak = i.jets ? Math.abs(peakAngularRate(i.jets)) : 0;
+  // Signed, like the storms' drift in flowModel: a negative wind flows the other way in both.
+  const rate = i.jets ? peakAngularRate(i.jets) : 0;
+  const peak = Math.abs(rate);
   return (time) => {
     i.surface.mesh.rotation.y = i.spinRate * time('spin');
     const t = i.jets ? time('winds') : 0;
@@ -245,8 +250,8 @@ export function makeJetRuntime(i: JetRuntimeInput): (time: SimTimeFn) => void {
     const pair = peak > 0 ? phasePair(t, MAX_STREAK_SHEAR / peak) : { a: 0, b: 0, w: 1 };
     i.surface.update({
       storms,
-      shearA: peak * pair.a,
-      shearB: peak * pair.b,
+      shearA: rate * pair.a,
+      shearB: rate * pair.b,
       weightA: pair.w,
       evoA: EVOLVE_PER_RAD * peak * pair.a * i.evolveRatio,
       evoB: EVOLVE_PER_RAD * peak * pair.b * i.evolveRatio,

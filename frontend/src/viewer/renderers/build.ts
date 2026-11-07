@@ -310,6 +310,16 @@ export function buildScene(
     mesh.position.set(...body.position);
     group.add(mesh);
     if (plan.spin && !plan.jets) spinners.push(mesh);
+    // A Mira that pulses with the clock (Q-65): a Mira has no star surface, so it is posed here.
+    if (plan.pulsation) {
+      const pulse = plan.pulsation;
+      animators.push((time) => {
+        const s =
+          1 +
+          pulse.amplitude * Math.sin((2 * Math.PI * time('pulsation')) / (pulse.periodD * 86400));
+        mesh.scale.set(body.axes[0] * s, body.axes[1] * s, body.axes[2] * s);
+      });
+    }
 
     // A brown dwarf with moving jets (R7.4, A7.2): the flat body stays until the field is ready,
     // then the banded surface replaces it (never blank).

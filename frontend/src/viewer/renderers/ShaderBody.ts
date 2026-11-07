@@ -336,7 +336,8 @@ function buildPlanet(
       if (animatedClouds && jets) {
         const t = time('winds');
         const pair = phasePair(t, MAX_CLOUD_SHEAR / peak);
-        cloudPhase.value.set(peak * pair.a, peak * pair.b, pair.w);
+        const rate = peakAngularRate(jets); // signed: a negative wind flows the other way
+        cloudPhase.value.set(rate * pair.a, rate * pair.b, pair.w);
         cloudEvo.value.set(EVOLVE_PER_RAD * peak * pair.a, EVOLVE_PER_RAD * peak * pair.b, 0);
       }
       // Light in the surface frame, for the cloud shadows.

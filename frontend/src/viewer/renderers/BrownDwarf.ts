@@ -105,12 +105,36 @@ export function planBrownDwarf(
         { requires: bandsLayer.requires },
       ),
     );
-    bands = b.drawBaked('jets', 'procedural');
     const depth = numberField(card, 'ch4_depth_33');
+    // Band contrast comes from the CH4 depth; without it the jets are refused, not drawn with an
+    // invented contrast (and not listed as drawn).
+    if (depth === null) {
+      b.refuse({
+        id: 'jets',
+        reason: 'data',
+        detail: 'The band contrast needs the methane depth at 3.3 microns, which is missing.',
+      });
+      bands = false;
+    } else {
+      bands = b.drawBaked('jets', 'procedural');
+    }
     if (bands && depth !== null) {
       const rule = rhinesBands(motion, params.scale_m);
       const wind = motion.rates.jet_speed_ms;
+      // Flattening is a layer of its own (provenance, honesty): drawn only when it is offered and
+      // allowed, never applied silently.
       const flat = flatteningRule(motion, card, undefined);
+      let flattening = 0;
+      if (flat) {
+        offerLayer(
+          b,
+          viewerLayer('flattening', flat.tag, flat.basis, {
+            formula: flat.formula,
+            assumed: flat.assumed,
+          }),
+        );
+        if (b.draw('flattening')) flattening = flat.value;
+      }
       jets = {
         seed: params.seed,
         bands: rule?.value ?? DEFAULT_JET_BANDS,
@@ -121,7 +145,7 @@ export function planBrownDwarf(
         cover: 0,
         windMs: wind ? wind.value : null,
         radiusM: params.scale_m,
-        flattening: flat?.value ?? 0,
+        flattening,
       };
       // R7.4: "brown-dwarf cloud cover follows the measured light curve". The timing is measured,
       // the cover it implies is a model (a dimmer dwarf has thicker cloud), tier 3.
