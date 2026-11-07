@@ -57,6 +57,19 @@ interface Choices {
 }
 
 /** Said (live region) when the governor lowers the render quality. */
+/** What a provenance tier (D-32) means, in words for a non-astronomer. */
+const TIER_WORDS: Record<number, string> = {
+  1: 'measured',
+  2: 'worked out from measurements',
+  3: 'worked out with a typical value',
+  4: 'typical for this kind of object',
+  5: 'the artist\u2019s choice',
+};
+export function tierText(tier: number): string {
+  const words = TIER_WORDS[tier];
+  return words ? `tier ${tier} of 5, ${words}` : `tier ${tier} of 5`;
+}
+
 export const QUALITY_DROP_ANNOUNCEMENT = 'Lowered render quality to keep motion smooth';
 
 const PLACEHOLDER_LABEL = 'Viewer placeholder: no object loaded';
@@ -508,7 +521,7 @@ export function ViewerPanel() {
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm text-neutral-200" data-testid="spin-note">
                 Spin sped up ×{plan.spin.speedup}
-                {spinTier ? ` (tier ${spinTier})` : ''}
+                {spinTier ? ` (${tierText(spinTier)})` : ''}
                 {reducedMotion
                   ? '. Auto-spin is off because your device asks for reduced motion.'
                   : spinPaused
@@ -546,7 +559,7 @@ export function ViewerPanel() {
             .map((t) => (
               <p key={t.id} className="text-sm text-neutral-200" data-testid="time-lapse-note">
                 {t.label} sped up ×{t.speedup}
-                {t.tier ? ` (tier ${t.tier})` : ''}.
+                {t.tier ? ` (${tierText(t.tier)})` : ''}.
               </p>
             ))}
 
@@ -571,7 +584,7 @@ export function ViewerPanel() {
                     <span>{layerName(l.id)}</span>
                     {l.tier ? (
                       <span className="text-xs text-neutral-400" data-testid="layer-tier">
-                        tier {l.tier}
+                        {tierText(l.tier)}
                       </span>
                     ) : null}
                     {l.swatches?.map((s) => (
