@@ -44,6 +44,7 @@ import { bakeVertexAo } from '../shape/ShapeAo';
 import { createVolume } from '../volume/VolumeBody';
 import { TRAIL_HALF_LENGTH } from '../planCommon';
 import { allowedTags } from '../honesty';
+import { isGltfUrl } from '../scaleBar';
 import type { BodyContext, BodyRenderer } from './bodyRenderer';
 import { ShaderBody } from './ShaderBody';
 import { LIMB_DARKENING_U } from './Star';
@@ -399,7 +400,8 @@ export function buildScene(
           box.max.y - box.min.y,
           box.max.z - box.min.z,
         );
-        if (longest > 0 && Number.isFinite(longest))
+        // Only a glTF model is in metres (Q-61); an OBJ has no stated unit, so it is not reported.
+        if (longest > 0 && Number.isFinite(longest) && isGltfUrl(body.meshUrl))
           hooks.onMeshMeasured?.({ radiusM: longest / 2 });
 
         // Baked AO (derived): bake once per model in slices, then swap in the AO material.

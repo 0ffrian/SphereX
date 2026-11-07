@@ -154,7 +154,7 @@ function set(points: [number, number, number][]): PointSet {
   };
 }
 
-describe('nebula / nova point density (R8.4 item 4)', () => {
+describe('nova point density (R8.4 item 4)', () => {
   it('counts points within the radius of the ray', () => {
     const s = set([
       [0, 0, 0],

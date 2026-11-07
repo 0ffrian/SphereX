@@ -18,9 +18,10 @@
 | `gas_giant` | No surface, so the finger feels the **flow**: a soft tick crossing each band boundary (strength = band contrast); inside a jet, a pulse train whose rate ∝ the zonal wind speed at that latitude; on a storm, a firm tick at its edge and a pulse rate that rises towards its centre (a "swirl"); dragging across rings gives a tick at each gap | Holding still gives a steady pulse (`teq_pulse`), rate ∝ normalised `Teq` (2–12 Hz), as for brown dwarfs. Tag follows `teq_K`: `measured` from `pl_eqt`, otherwise `derived` |
 | `planet_water` | Open ocean: near-silent slow swell (1–2 Hz, lowest level); coastline: one firm tick; land: height-map ticks as for `asteroid_procedural`; polar ice: dense, fine, soft ticks; clouds: not felt (optional "feel clouds" toggle) | As for `gas_giant` (`Teq` pulse) |
 | `planet_rocky` | Height-map ticks; lava cracks give a double tick | As for `gas_giant` |
-| `nebula`, `nova` | Field source as for the comet ([§8.4](sources.md#r84-event-sources)): pulse rate ∝ local point density | — |
+| `nebula` | None. The nebula has no haptics (user decision, Q-87) | — |
+| `nova` | Field source as for the comet ([§8.4](sources.md#r84-event-sources)): pulse rate ∝ local point density | — |
 
-- The last 4 rows come from D-12 (Accepted). All their texture haptics are `artistic`, so they play only in + Artistic and are silent in Measured only and + Estimated (D-21). The `teq_pulse` follows the tag of `teq_K`: when it is `measured` (Exoplanet Archive `pl_eqt`) it plays in every state; when it is `derived` it is silent in Measured only and plays from + Estimated.
+- The last 4 object types come from D-12 (Accepted). All their texture haptics are `artistic`, so they play only in + Artistic and are silent in Measured only and + Estimated (D-21). The `teq_pulse` follows the tag of `teq_K`: when it is `measured` (Exoplanet Archive `pl_eqt`) it plays in every state; when it is `derived` it is silent in Measured only and plays from + Estimated.
 
 **As built (issue #11, `frontend/src/haptics/profiles.ts`).** `buildHaptics(engine, params, card, body, options)` reads `params.haptics` and returns at most one texture and one data source, plus a `missing` list of refused haptics. `options.overrides` (D-27) is required; the comet also needs the plan's bodies for its nucleus, and `asteroid_shape` needs `meshNormals: true` from a real mesh raycast. For the shared fixtures:
 
@@ -38,7 +39,8 @@
 | `gas_giant` | flow | `teq_pulse` (`teq_K` tag) | `flow` without a field; `teq_pulse` when `teq_K` is null |
 | `planet_water` | terrain | `teq_pulse` (`teq_K` tag) | as above, `terrain` |
 | `planet_rocky` | terrain with lava cracks | `teq_pulse` when offered | as above |
-| `nebula`, `nova` | — | point density (`data_tag`, `artistic`; reads the point sets, not the drawn volume, Q-87) | `field` without point sets |
+| `nebula` | — | — (no haptics, Q-87) | — |
+| `nova` | — | point density (`data_tag`, `artistic`; reads the point sets, not the drawn volume, Q-87) | `field` without point sets |
 
 - `TouchHaptics` drives the two sources: moving gives texture events; holding still for `HOLD_STILL_MS` starts the `teq_pulse` or `flux_pulse` (the viewer's frame loop calls `poll`, Q-83); the scrubber drives the light-curve pulses.
 - The R11 honesty test runs these through the real engine: in Measured only the gas giant and planet textures and procedural relief are silent, `asteroid_shape` is silent while its mesh haptics are refused, and the `teq_pulse` plays only when `teq_K` is `measured`.

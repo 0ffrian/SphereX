@@ -593,10 +593,11 @@ def _shader_kind(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
             "Point cloud from the sliders (R7.7).",
             ["diameter_km"],
         )
+        # Nebula has no haptics (Q-87); the nova keeps its point-density pulse.
         return {
             "texture": "none",
             "texture_tag": "artistic",
-            "data": "field",
+            "data": "field" if kind == "nova" else "none",
             "data_tag": "artistic",
             "params": {},
         }

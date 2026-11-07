@@ -189,7 +189,7 @@ export function planComet(input: PlanInput): RenderPlan {
     const coma = comaVolume(shells, comaLayerTag, params.seed);
     if (coma) volumes.push(coma);
   }
-  if (dust) volumes.push(dustConeVolume(dust));
+  if (dust) volumes.push(dustConeVolume(dust, b.layers.get('dust')?.tag ?? 'artistic'));
   const sunKnown = b.lighting.source === 'phase_angle' || b.lighting.source === 'sun_dir';
   let tailDrawn = false;
   for (const [id, make] of [

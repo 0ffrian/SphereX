@@ -26,7 +26,7 @@ import {
 import type { PlanContext, RenderPlan, ViewModeId } from '@/viewer/planTypes';
 import { defaultContext, planRender } from '@/viewer/renderPlan';
 import { COMET_EPOCHS, epochsWithQ, EPOCH_LABEL } from '@/viewer/renderers/Comet';
-import { scaleBarFor } from '@/viewer/scaleBar';
+import { scaleBarFor, shownSize } from '@/viewer/scaleBar';
 import type { CometEpoch, ObjectCard, RenderParams } from '@/contract';
 import { ProvenanceBadge } from './Badge';
 import { describeRefusal, layerName } from './messages';
@@ -124,16 +124,12 @@ export function ViewerPanel() {
   // Issue #43: a loaded shape model carries its own size in metres (glTF units, Q-61), which is the
   // measured size, so the scale bar shows it instead of the catalogue diameter (Eros at real size).
   const [meshSize, setMeshSize] = useState<{ key: string; radiusM: number } | null>(null);
-  const modelRadiusM =
-    meshSize?.key === objectKey &&
-    plan?.scaleM != null && // size hidden by the honesty level: no bar from the model either
-    plan.bodies.some((b) => b.meshUrl && /\.(glb|gltf)(\?.*)?$/i.test(b.meshUrl)) // metres (Q-61)
-      ? meshSize.radiusM
-      : null;
-  const bar = useMemo(
-    () => (plan ? scaleBarFor(modelRadiusM ?? plan.scaleM, plan.sizeQualifier) : null),
-    [plan, modelRadiusM],
+  const size = useMemo(
+    () =>
+      plan ? shownSize(plan, meshSize?.key === objectKey ? meshSize.radiusM : null, honesty) : null,
+    [plan, meshSize, objectKey, honesty],
   );
+  const bar = useMemo(() => (size ? scaleBarFor(size.radiusM, size.qualifier) : null), [size]);
 
   // Mount the renderer once.
   useEffect(() => {
@@ -486,12 +482,12 @@ export function ViewerPanel() {
               <figcaption className="text-sm text-neutral-200">
                 {bar.headline}
                 {bar.qualifier === 'upper_limit' && ' (upper limit)'}
-                {plan.sizeTag && (
+                {size?.tag && (
                   <>
                     {' '}
                     <ProvenanceBadge
-                      tag={plan.sizeTag}
-                      tooltip={plan.sizeWhy ?? undefined}
+                      tag={size.tag}
+                      tooltip={size.why ?? undefined}
                       srText
                       fixture={objectIsFixture}
                     />
@@ -499,7 +495,7 @@ export function ViewerPanel() {
                 )}
                 , {bar.comparison.text}.
               </figcaption>
-              {(plan.sizeWhy || modelRadiusM !== null) && (
+              {size?.why && (
                 <div className="flex flex-col items-start gap-1">
                   <button
                     type="button"
@@ -512,9 +508,7 @@ export function ViewerPanel() {
                   </button>
                   {whyOpen && (
                     <p id={whyId} className="text-sm text-neutral-300" data-testid="size-why">
-                      {plan.sizeWhy}
-                      {modelRadiusM !== null &&
-                        ' The bar uses the size of the loaded shape model, measured across its widest part.'}
+                      {size.why}
                     </p>
                   )}
                 </div>

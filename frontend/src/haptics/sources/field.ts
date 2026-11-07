@@ -4,7 +4,7 @@
 //     shells are (`planShells`: ÷ the largest Q of any gas in any epoch), so the felt density
 //     matches the drawn one. Touching the nucleus gives one firm tick. Tag = `profile.data_tag`
 //     (Q-17 stays open: which single tag the comet field carries).
-//   Nebula, nova: the same train, rate ∝ the local point density from the body's point sets
+//   Nova: the same train, rate ∝ the local point density from the body's point sets
 //     (BodyRenderer.pointSets) around the finger's ray. Tag = `profile.data_tag` (artistic).
 import type { Tag } from '@/contract';
 import type { PointSet } from '@/viewer/renderers/pointClouds';
@@ -141,7 +141,7 @@ export interface DensityOptions {
   maxRateHz?: number;
 }
 
-/** Nebula and nova: rate ∝ local point density (R8.4 item 4). */
+/** Nova (the nebula has no haptics, Q-87): rate ∝ local point density (R8.4 item 4). */
 export class PointDensitySource implements HapticSource {
   readonly id = 'field';
   readonly channel = 'data' as const;

@@ -38,8 +38,8 @@ export function planAsteroidProcedural(input: PlanInput): RenderPlan {
   // Displacement by the baked height map (one height field drives normals, relief and haptics).
   const reliefAmp = reliefAmpOf(input.params);
   const heightUrl = tex?.height ?? null;
-  const displaceDrawn = bodyOk && relief && heightUrl !== null && reliefAmp !== null;
-  if (bodyOk && relief && heightUrl !== null && reliefAmp === null) {
+  const displaceWanted = bodyOk && relief && heightUrl !== null;
+  if (displaceWanted && reliefAmp === null) {
     b.reject({
       id: 'displacement',
       reason: 'data',
@@ -47,6 +47,16 @@ export function planAsteroidProcedural(input: PlanInput): RenderPlan {
       detail: 'The height of the relief is not known, so the surface is not displaced.',
     });
   }
+  // A legend entry and a tag of its own; refused when the load failed or the honesty state hides
+  // `derived` (the scale is the baked relief amplitude, R6.2).
+  const displaceDrawn =
+    displaceWanted &&
+    reliefAmp !== null &&
+    b.drawLocal(
+      'displacement',
+      'derived',
+      'Surface displaced by the baked height map (scale = relief amplitude).',
+    );
 
   const axes = ellipsoid ? ellipsoidAxes(numberField(input.card, 'lightcurve_amp_mag')) : undefined;
   if (bodyOk && !ellipsoid) {
