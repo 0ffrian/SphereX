@@ -4,7 +4,11 @@
 //   Binary (Eps Indi Ba T1 + Bb T6): two bodies on an illustrative orbit (artistic). No orbit
 //   numbers are shown: period and separation are [verify].
 import { litBody, numberField, PlanBuilder, type PlanInput } from '../planCommon';
-import type { BodyPlan, RenderPlan, Rgb } from '../planTypes';
+import type { BodyPlan, JetSurfacePlan, RenderPlan, Rgb } from '../planTypes';
+import { processOf, resolveMotion } from '../motion/motion';
+import { listMotion, offerLayer, spinPlanOf, viewerLayer } from '../motion/planMotion';
+import { flatteningRule, rhinesBands } from './shaderSpec';
+import { lightcurveScrub } from './Star';
 
 export interface BrownDwarfConfig {
   /**
@@ -26,6 +30,12 @@ export const EMISSIVE_FLOOR = 0.2;
 export const BINARY_OFFSET = 0.8;
 /** Radius of each body of a binary, in scene units. Both are about 1 Jupiter radius (R7.4). */
 export const BINARY_BODY_RADIUS = 0.5;
+
+/** Band count when no rule gives one (artistic default; a brown dwarf has no mock-up default). */
+export const DEFAULT_JET_BANDS = 10;
+/** Turbulence and storms of a brown dwarf's jets (artistic display values). */
+export const JET_TURBULENCE = 0.55;
+export const JET_STORMS = 3;
 
 export function emissiveIntensity(flux: number, reference: number): number {
   return Math.min(1, Math.max(EMISSIVE_FLOOR, flux / reference));
@@ -72,7 +82,76 @@ export function planBrownDwarf(
     b.draw('emissive');
   }
 
-  const bands = b.drawBaked('bands', tex?.albedo);
+  // Motion (R5.7, D-34). With a stated winds speed-up the bands are drawn by the browser as moving
+  // jets (counter-flowing, turbulent edges, drifting storms): a baked texture cannot move that way.
+  // Without it the baked bands are drawn as before. Both are `artistic` (R7.4), so both are hidden
+  // at the same honesty levels.
+  const motion = resolveMotion(card, params);
+  listMotion(b, motion);
+  const winds = processOf(motion, 'winds');
+  const bandsLayer = params.layers.find((l) => l.id === 'bands');
+  const jetsMode =
+    winds !== undefined && bandsLayer !== undefined && !params.missing.includes('bands');
+  let bands: boolean;
+  let jets: JetSurfacePlan | null = null;
+  let scrub: RenderPlan['scrub'] = null;
+  if (jetsMode) {
+    offerLayer(
+      b,
+      viewerLayer(
+        'jets',
+        'artistic',
+        'Counter-flowing jets with turbulent band edges and storms that drift and turn, drawn by the browser. Band contrast = clamp(2 * ch4_depth_33, 0.1, 0.8) (R7.4). The band count follows the Rhines rule when the spin and the wind speed are known (A7.2), else an artist default.',
+        { requires: bandsLayer.requires },
+      ),
+    );
+    bands = b.drawBaked('jets', 'procedural');
+    const depth = numberField(card, 'ch4_depth_33');
+    if (bands && depth !== null) {
+      const rule = rhinesBands(motion, params.scale_m);
+      const wind = motion.rates.jet_speed_ms;
+      const flat = flatteningRule(motion, card, undefined);
+      jets = {
+        seed: params.seed,
+        bands: rule?.value ?? DEFAULT_JET_BANDS,
+        turbulence: JET_TURBULENCE,
+        storms: JET_STORMS,
+        contrast: Math.min(0.8, Math.max(0.1, 2 * depth)),
+        clouds: false,
+        cover: 0,
+        windMs: wind ? wind.value : null,
+        radiusM: params.scale_m,
+        flattening: flat?.value ?? 0,
+      };
+      // R7.4: "brown-dwarf cloud cover follows the measured light curve". The timing is measured,
+      // the cover it implies is a model (a dimmer dwarf has thicker cloud), tier 3.
+      offerLayer(
+        b,
+        viewerLayer(
+          'cloud_cover',
+          'model_dependent',
+          'Cloud patches whose cover follows the measured light curve: the dimmer the dwarf at the chosen time, the thicker the cover.',
+          {
+            requires: ['lightcurve'],
+            formula: 'cover = 1 - flux / flux_max, from the usable light-curve points',
+            assumed: { cloud_cover_vs_flux: 'dimming means thicker cloud cover' },
+          },
+        ),
+      );
+      const s = lightcurveScrub(card, input.ctx.scrubIndex);
+      if (b.draw('cloud_cover') && s) {
+        jets.clouds = true;
+        jets.cover = 1 - s.brightness;
+        scrub = s;
+      } else if (b.ready('cloud_cover')) {
+        b.notes.push('Every light-curve point is flagged, so the cloud cover is not scaled.');
+      }
+    } else if (bands) {
+      bands = false;
+    }
+  } else {
+    bands = b.drawBaked('bands', tex?.albedo);
+  }
 
   // Binary: two bodies on an illustrative orbit; without the orbit layer only the first is drawn.
   const orbit = binary ? b.draw('orbit') : false;
@@ -92,12 +171,13 @@ export function planBrownDwarf(
   if (!bodyOk) b.dropDrawn();
 
   const make = (id: string, x: number, radius: number): BodyPlan =>
-    litBody(id, [radius, radius, radius], bands ? ([1, 1, 1] as Rgb) : b.tint.rgb, {
+    litBody(id, [radius, radius, radius], texturedBands ? ([1, 1, 1] as Rgb) : b.tint.rgb, {
       position: [x, 0, 0],
       emissive,
       segments: [64, 32],
-      albedoUrl: bands ? (tex?.albedo ?? null) : null,
+      albedoUrl: texturedBands ? (tex?.albedo ?? null) : null,
     });
+  const texturedBands = bands && !jetsMode;
   const bodies: BodyPlan[] = !bodyOk
     ? []
     : twoBodies
@@ -107,5 +187,11 @@ export function planBrownDwarf(
         ]
       : [make('body', 0, 1)];
 
-  return b.build({ bodies });
+  return b.build({
+    bodies,
+    motion,
+    jets: bodyOk ? jets : null,
+    scrub: bodyOk ? scrub : null,
+    spin: bodyOk && jets ? spinPlanOf(motion) : null,
+  });
 }

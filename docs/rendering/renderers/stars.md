@@ -35,6 +35,8 @@ Barnard's Star example **[verify]** (each tier needs checking):
 | Spin | 1 | rotation period 145 ± 15 d from activity indicators (Toledo-Padrón et al. 2019, MNRAS 488, 5145, arXiv:1812.06712), verified 7 Nov 2026. Tier 1 only once the card carries it as `rot_period_h` (3,480 h, R3.4) |
 | Glow, cell noise | 5 | art |
 
+> **Implementation (issue #42, Q-87):** `bodies/starModel.ts` (CPU model of groups, flares and loops, pure in seed, rates and t), `shaders/star.ts`, `shaders/loops.ts`, `renderers/StarBody.ts`. Tiers as in Q-87: spots, faculae, prominence placement and flares tier 4; granulation, strand look and glow tier 5.
+
 ### R7.5.2 Photosphere and granulation
 
 - **Drawn:** a convective cell pattern (cells, dark lanes, slow churn) over the colour and limb darkening.

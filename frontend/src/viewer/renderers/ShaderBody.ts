@@ -7,6 +7,12 @@
 // shader adds only visual noise below the field's resolution. Nebula and nova are Sprite-instanced
 // point sets (WebGPU Points are 1 px only).
 //
+// Motion (issue #42, R5.7, D-34): when the card's `dynamics` gives rates and stated speed-ups
+// (motion/motion.ts), the body moves with the SimClock through `setTime`: it spins, the jets of a
+// gas giant slide past each other and its storms drift and turn, and the clouds of a planet are
+// carried by latitude winds. Every frame is a pure function of (card, seed, t). The storms the
+// shader draws are the ones the haptic sampler is given at the same t (`fields/flowModel.ts`).
+//
 // Honesty: every layer here is `artistic` (R7.7). When `artistic` is not in the visible tags the
 // layer is hidden (planets and gas giants fall back to a plain sphere; nebula and nova draw
 // nothing, because nothing about them is measured). A layer refused for missing data is not drawn
@@ -20,41 +26,35 @@ import {
   AdditiveBlending,
   DataTexture,
   DoubleSide,
-  FloatType,
   Group,
   InstancedBufferAttribute,
   Mesh,
   MeshBasicNodeMaterial,
   MeshStandardNodeMaterial,
-  NearestFilter,
   Object3D,
   PointsNodeMaterial,
-  RGBAFormat,
   RingGeometry,
   SphereGeometry,
   Sprite,
   Vector3,
+  Matrix4,
 } from 'three/webgpu';
 import {
   abs,
-  acos,
-  atan,
+  asin,
   clamp,
+  cos,
+  exp,
   cross,
   dFdx,
   dFdy,
   dot,
-  exp,
   float,
-  floor,
-  fract,
   instancedBufferAttribute,
-  ivec2,
   length,
   max,
   min,
   mix,
-  mx_fractal_noise_float,
   mx_noise_float,
   normalize,
   normalView,
@@ -67,14 +67,12 @@ import {
   sign,
   sin,
   smoothstep,
-  step,
-  textureLoad,
+  sqrt,
   uniform,
   uv,
   vec2,
   vec3,
   vec4,
-  mod,
 } from 'three/tsl';
 import type { ObjectCard, RenderParams, Tag } from '@/contract';
 import {
@@ -82,14 +80,20 @@ import {
   RING_GAP_EDGES,
   RING_INNER,
   RING_OUTER,
-  STORM_RING_CENTRE,
-  STORM_RING_WIDTH,
-  stormsFor,
   type FieldData,
   type Vec3,
 } from '../fields/fieldGenerator';
 import { requestField, requestPoints } from '../fields/fieldClient';
+import { peakAngularRate, MIN_COS_LAT, type JetRates } from '../fields/flowModel';
 import { shaderSeedOffsets } from '../fields/noise';
+import { phasePair } from '../motion/phase';
+import {
+  processOf,
+  resolveMotion,
+  spinRateRadPerSimS,
+  type Motion,
+  type SimTimeFn,
+} from '../motion/motion';
 import type { Overrides } from '../sliders';
 import {
   ESTIMATED_TAGS,
@@ -116,9 +120,10 @@ import {
   sizeFieldFor,
   type ShaderSpec,
 } from './shaderSpec';
+import { bilinear, fieldUV, floatTexture, vnoise3 } from './fieldTexture';
+import { buildJetSurface, EVOLVE_PER_RAD, makeJetRuntime } from './jetSurface';
 
 const rgb3 = (c: Rgb) => vec3(c[0], c[1], c[2]);
-const TWO_PI = Math.PI * 2;
 
 /** Neutral grey used for the plain sphere when no layer may be shown. Not a measured colour. */
 const PLAIN_COLOUR = 0x8a8a8a;
@@ -131,43 +136,27 @@ const HEAD_ON: Vec3 = [0, 0, 1];
 const NEBULA_SCALE = 1.35;
 const NOVA_SCALE = 0.925;
 
-// ---- field textures ----------------------------------------------------------------------------
+/** Largest cloud shear before the flow-map resets, radians (artistic). */
+const MAX_CLOUD_SHEAR = 0.9;
+/** Cloud shell scale (artistic) and the height that sets how far a cloud's shadow falls. */
+const CLOUD_SHELL = 1.012;
+const CLOUD_HEIGHT = CLOUD_SHELL - 1;
+/** Atmosphere shell scale and scale height, in planet radii (artistic). */
+const ATMO_SHELL = 1.12;
+const ATMO_SCALE_HEIGHT = 0.03;
 
-function floatTexture(data: Float32Array, w: number, h: number): DataTexture {
-  const t = new DataTexture(data, w, h, RGBAFormat, FloatType);
-  // Nearest + no mipmaps: the shader uses textureLoad and filters by hand, so float32 filtering
-  // support does not matter (WebGPU needs 'float32-filterable' for linear filtering of f32).
-  t.magFilter = NearestFilter;
-  t.minFilter = NearestFilter;
-  t.generateMipmaps = false;
-  t.needsUpdate = true;
-  return t;
+const rotY = (p: any, a: any) => {
+  const c = cos(a);
+  const s = sin(a);
+  return vec3(p.x.mul(c).add(p.z.mul(s)), p.y, p.x.negate().mul(s).add(p.z.mul(c)));
+};
+
+/** What a built surface needs each frame, from the clock (set by `ShaderBody.setTime`). */
+interface Runtime {
+  /** The object the spin rotates (carries the surface frame for haptics). */
+  frame: Object3D;
+  update(time: SimTimeFn): void;
 }
-
-/** R6.1 direction -> texel space, in the shader. Row 0 is the north pole. */
-function fieldUV(dir: any) {
-  const u = fract(atan(dir.z, dir.x.negate()).div(TWO_PI));
-  const v = acos(clamp(dir.y, -1, 1)).div(Math.PI);
-  return { u, v };
-}
-
-function bilinear(tex: DataTexture, u: any, v: any) {
-  const W = tex.image.width;
-  const H = tex.image.height;
-  const px = u.mul(W).sub(0.5);
-  const py = v.mul(H).sub(0.5);
-  const x0 = floor(px);
-  const y0 = floor(py);
-  const fx = fract(px);
-  const fy = fract(py);
-  const tap = (dx: number, dy: number) =>
-    textureLoad(tex, ivec2(mod(x0.add(dx + W), W).toInt(), clamp(y0.add(dy), 0, H - 1).toInt()));
-  return mix(mix(tap(0, 0), tap(1, 0), fx), mix(tap(0, 1), tap(1, 1), fx), fy);
-}
-
-/** Visual-only noise, 0..1 centred on 0.5 (finer than the field; seen, not felt). */
-const vnoise3 = (p: any, octaves = 3) =>
-  mx_fractal_noise_float(p, octaves, 2.0, 0.5).mul(0.5).add(0.5);
 
 // ---- planets -----------------------------------------------------------------------------------
 
@@ -176,7 +165,9 @@ function buildPlanet(
   field: FieldData,
   sunWorld: any,
   textures: DataTexture[],
-): Group {
+  motion: Motion,
+  sunValue: Vector3,
+): { group: Group; runtime: Runtime } {
   const fp = spec.field!;
   const style = spec.planet!;
   const texA = floatTexture(field.a, field.width, field.height);
@@ -184,6 +175,19 @@ function buildPlanet(
   textures.push(texA, texB);
   const group = new Group();
   const geo = new SphereGeometry(1, 128, 96);
+
+  const winds = processOf(motion, 'winds');
+  const jetRate = motion.rates.jet_speed_ms;
+  const jets: JetRates | null =
+    winds && jetRate && spec.scaleM ? { windMs: jetRate.value, radiusM: spec.scaleM } : null;
+  const peak = jets ? Math.abs(peakAngularRate(jets)) : 0;
+  const animatedClouds = jets !== null && peak > 0;
+
+  // Uniforms the runtime writes: cloud flow-map (shearA, shearB, evoA, evoB), its weight, and the
+  // light direction in the surface frame (for cloud shadows).
+  const cloudPhase = uniform(new Vector3(0, 0, 0)); // shear A, shear B, weight of A
+  const cloudEvo = uniform(new Vector3(0, 0, 0)); // evolve A, evolve B
+  const sunLocal = uniform(new Vector3(0, 0, 1));
 
   const dir = normalize(positionLocal);
   const { u, v } = fieldUV(dir);
@@ -196,6 +200,30 @@ function buildPlanet(
   const seaL = float(Math.max(fp.seaLevel, 0));
   const heat = float(fp.heat);
 
+  // Clouds: density at a direction, carried by the latitude winds and slowly re-forming. Two
+  // flow-map copies (motion/phase.ts) so the shear is bounded. A pure function of the uniforms.
+  const seedOff = vec3(0, 0, shaderSeedOffsets(spec.seed).cloud);
+  const density = (d: any, evo: any) => {
+    // B1/NF-3: a bounded seed offset, not the raw seed (float32 would drown the direction term).
+    const p = d
+      .mul(3)
+      .add(seedOff)
+      .add(vec3(0, 0, evo));
+    const q = vec3(vnoise3(p.add(3.3), 3), vnoise3(p.add(7.7), 3), vnoise3(p.add(1.1), 3));
+    return vnoise3(p.mul(1.2).add(q.mul(1.6)), 4);
+  };
+  const cloudAt = (d: any) => {
+    if (!animatedClouds) return density(d, 0);
+    const pl = cos(asin(clamp(d.y, -1, 1)).mul(3)).div(
+      max(cos(asin(clamp(d.y, -1, 1))), MIN_COS_LAT),
+    );
+    const a = density(rotY(d, cloudPhase.x.mul(pl)), cloudEvo.x);
+    const b = density(rotY(d, cloudPhase.y.mul(pl)), cloudEvo.y);
+    return mix(b, a, cloudPhase.z);
+  };
+  const cloudThr = float(0.88 - (0.88 - 0.36) * style.cloudCover);
+  const cloudMask = (c: any) => smoothstep(cloudThr, cloudThr.add(0.16), c);
+
   const hh = clamp(h.sub(seaL).div(float(1).sub(seaL)), 0, 1);
   const depth = fp.seaLevel > 0 ? clamp(seaL.sub(h).div(seaL).mul(3), 0, 1) : float(0);
   const lowC = mix(rgb3(LAND_LOW), rgb3(LAND_LOW_GREEN), style.hue);
@@ -207,6 +235,18 @@ function buildPlanet(
   let col: any = mix(landC, oceanC, ocean);
   col = mix(col, rgb3(ICE_COLOUR), ice);
   col = col.mul(float(1).sub(heat.mul(0.5)));
+
+  // Cloud shadows: the cloud that shades this ground point lies towards the Sun along the surface,
+  // displaced by the cloud height over the Sun's elevation (A7 look; artistic).
+  let shadow: any = float(1);
+  if (style.cloudCover > 0.001) {
+    const sunTan = sunLocal.sub(dir.mul(dot(sunLocal, dir)));
+    const elev = max(dot(sunLocal, dir), 0.15);
+    const shift = sunTan.mul(float(CLOUD_HEIGHT * 2.2).div(elev));
+    const shaded = cloudMask(cloudAt(normalize(dir.add(shift))));
+    shadow = float(1).sub(shaded.mul(0.55).mul(smoothstep(-0.05, 0.25, dot(sunLocal, dir))));
+  }
+  col = col.mul(shadow);
 
   // Bump from the field's height (ocean flattened), per the mock-up's screen-derivative method.
   const hv = mix(h, seaL, ocean);
@@ -228,52 +268,97 @@ function buildPlanet(
     .mul(lowH.mul(0.5).add(0.5))
     .mul(1.7)
     .add(lowH.mul(0.12).mul(float(1).sub(ocean)));
+
+  // Ocean: Fresnel reflection of the sky on the lit side (Schlick, F0 = 0.02) over the standard
+  // material's own specular, which gives the Sun glint (low roughness).
+  const wet = ocean.mul(float(1).sub(ice));
+  const mu = clamp(normalView.z, 0, 1);
+  const fres = float(0.02).add(float(0.98).mul(pow(float(1).sub(mu), 5)));
+  const sunlitWorld = smoothstep(-0.1, 0.3, dot(normalWorld, sunWorld));
+  const skyRefl =
+    style.atmosphere > 0.001
+      ? rgb3(style.atmosphereColour).mul(fres).mul(wet).mul(sunlitWorld).mul(0.9)
+      : vec3(0, 0, 0);
+
   const mat = new MeshStandardNodeMaterial();
   mat.colorNode = col;
   mat.normalNode = bumped;
-  mat.roughnessNode = mix(float(0.9), float(0.25), ocean.mul(float(1).sub(ice)));
+  mat.roughnessNode = mix(float(0.9), float(0.12), wet);
   mat.metalness = 0;
-  mat.emissiveNode = fp.heat > 0 ? rgb3(LAVA_COLOUR).mul(lava).mul(heat) : vec3(0, 0, 0);
+  mat.emissiveNode = (fp.heat > 0 ? rgb3(LAVA_COLOUR).mul(lava).mul(heat) : vec3(0, 0, 0)).add(
+    skyRefl,
+  );
   group.add(new Mesh(geo, mat));
 
   if (style.cloudCover > 0.001) {
     const cm = new MeshStandardNodeMaterial();
-    // B1/NF-3: a bounded seed offset, not the raw seed (float32 would drown the direction term).
-    const seedOff = vec3(0, 0, shaderSeedOffsets(spec.seed).cloud);
-    const p = dir.mul(3).add(seedOff);
-    const q = vec3(vnoise3(p.add(3.3), 3), vnoise3(p.add(7.7), 3), vnoise3(p.add(1.1), 3));
-    const c = vnoise3(p.mul(1.2).add(q.mul(1.6)), 4);
-    const thr = float(0.88 - (0.88 - 0.36) * style.cloudCover);
     cm.colorNode = vec3(0.97, 0.97, 0.97);
-    cm.opacityNode = smoothstep(thr, thr.add(0.16), c).mul(0.92);
+    cm.opacityNode = cloudMask(cloudAt(dir)).mul(0.92);
     cm.transparent = true;
     cm.depthWrite = false;
     cm.roughness = 1;
     const clouds = new Mesh(geo, cm);
-    clouds.scale.setScalar(1.012);
+    clouds.scale.setScalar(CLOUD_SHELL);
     group.add(clouds);
   }
 
   if (style.atmosphere > 0.001) {
+    // Single scattering along the view ray through a thin shell: the density seen at impact
+    // parameter b (in planet radii) falls off as exp(-(b - 1) / H) past the limb, and a thin haze
+    // lies over the disc; the Rayleigh phase function (1 + cos^2) makes the lit rim brightest.
     const am = new MeshBasicNodeMaterial();
     const view = normalize(cameraPosition.sub(positionWorld));
-    const f = pow(float(1).sub(max(dot(normalWorld, view), 0)), 2.6);
+    const nv = abs(dot(normalWorld, view));
+    const b = float(ATMO_SHELL).mul(sqrt(max(float(1).sub(nv.mul(nv)), 0)));
+    const rim = float(0.9).mul(exp(b.sub(1).max(0).negate().div(ATMO_SCALE_HEIGHT)));
+    const haze = float(0.14).div(max(sqrt(max(float(1).sub(b.mul(b)), 0)), 0.2));
+    const dens = mix(haze, rim, smoothstep(0.97, 1.0, b));
+    const cosG = dot(sunWorld, view).negate();
+    const phase = float(0.75).mul(float(1).add(cosG.mul(cosG)));
     const sunlit = smoothstep(-0.25, 0.45, dot(normalWorld, sunWorld));
-    am.colorNode = rgb3(style.atmosphereColour).mul(1.6);
-    am.opacityNode = f.mul(sunlit).mul(style.atmosphere);
+    am.colorNode = rgb3(style.atmosphereColour).mul(1.5);
+    am.opacityNode = clamp(dens.mul(phase).mul(sunlit).mul(style.atmosphere), 0, 1);
     am.transparent = true;
     am.depthWrite = false;
     am.blending = AdditiveBlending;
     const atm = new Mesh(geo, am);
-    atm.scale.setScalar(1.07);
+    atm.scale.setScalar(ATMO_SHELL);
     group.add(atm);
   }
-  return group;
+
+  const inv = new Matrix4();
+  const tmp = new Vector3();
+  const spinRate = spinRateRadPerSimS(motion);
+  const runtime: Runtime = {
+    frame: group,
+    update(time) {
+      group.rotation.y = spinRate * time('spin');
+      if (animatedClouds && jets) {
+        const t = time('winds');
+        const pair = phasePair(t, MAX_CLOUD_SHEAR / peak);
+        cloudPhase.value.set(peak * pair.a, peak * pair.b, pair.w);
+        cloudEvo.value.set(EVOLVE_PER_RAD * peak * pair.a, EVOLVE_PER_RAD * peak * pair.b, 0);
+      }
+      // Light in the surface frame, for the cloud shadows.
+      group.updateWorldMatrix(true, false);
+      inv.copy(group.matrixWorld).invert();
+      tmp.copy(sunValue).transformDirection(inv);
+      sunLocal.value.copy(tmp);
+    },
+  };
+  return { group, runtime };
 }
 
 // ---- gas giants --------------------------------------------------------------------------------
 
-function buildGas(spec: ShaderSpec, field: FieldData, textures: DataTexture[]): Group {
+function buildGas(
+  spec: ShaderSpec,
+  field: FieldData,
+  textures: DataTexture[],
+  motion: Motion,
+  octaves: number,
+  sampler: FieldSampler,
+): { group: Group; frame: Object3D; runtime: Runtime } {
   const fp = spec.field!;
   const gas = spec.gas!;
   const texA = floatTexture(field.a, field.width, field.height);
@@ -283,43 +368,21 @@ function buildGas(spec: ShaderSpec, field: FieldData, textures: DataTexture[]): 
   tilt.rotation.z = 0.35;
   group.add(tilt);
 
-  const dir = normalize(positionLocal);
-  const { u, v: vv } = fieldUV(dir);
-  const A = bilinear(texA, u, vv);
-  // R = band profile from the field. 0.5 is a band edge and maps to 0.5 here, so the drawn edges
-  // are the field's edges; the noise only breaks up the colour inside a band.
-  const fine = vnoise3(
-    vec3(dir.x.mul(7), dir.y.mul(28), dir.z.mul(7)).add(shaderSeedOffsets(spec.seed).gasFine),
-    3,
-  );
-  const val = clamp(
-    A.x
-      .mul(0.7)
-      .add(0.15)
-      .add(fine.sub(0.5).mul(0.2 * (0.3 + fp.turbulence))),
-    0,
-    1,
-  );
-  const [c0, c1, c2, c3] = gas.palette.map(rgb3) as [any, any, any, any];
-  let col: any = mix(mix(c0, c1, val.mul(2)), mix(c1, c2, val.mul(2).sub(1)), step(0.5, val));
-  for (const s of stormsFor(spec.seed, fp.storms)) {
-    const dist = acos(clamp(dot(dir, vec3(s.center[0], s.center[1], s.center[2])), -1, 1));
-    const spot = exp(pow(dist.div(s.size), 2).negate());
-    // Same ring constants as the field's storm edge (N3).
-    const ring = exp(
-      pow(dist.div(s.size).sub(STORM_RING_CENTRE).div(STORM_RING_WIDTH), 2).negate(),
-    );
-    col = mix(col, c3, spot.mul(0.85));
-    col = mix(col, c2, ring.mul(0.35));
-  }
-  // N5 / R5.1: lit by the scene's DirectionalLight (terminator, ambient floor 0.03), like the
-  // planets. Hot bodies add a self-glow term (mock-up uGlow) through the emissive channel.
-  const mat = new MeshStandardNodeMaterial();
-  mat.colorNode = col;
-  mat.roughness = 1;
-  mat.metalness = 0;
-  mat.emissiveNode = gas.glow > 0 ? col.mul(gas.glow * 0.6) : vec3(0, 0, 0);
-  const mesh = new Mesh(new SphereGeometry(1, 96, 64), mat);
+  const surface = buildJetSurface({
+    texA,
+    bands: fp.bands,
+    seed: spec.seed,
+    turbulence: fp.turbulence,
+    palette: gas.palette,
+    octaves,
+    selfLit: false,
+    emissive: gas.glow,
+    clouds: false,
+    storms: fp.storms,
+  });
+  const mesh = surface.mesh;
+  // Flattening from the spin (A7.2): the polar axis is shorter, so the silhouette is an ellipse.
+  mesh.scale.y = 1 - gas.flattening;
   tilt.add(mesh);
 
   if (gas.rings > 0.01) {
@@ -354,7 +417,28 @@ function buildGas(spec: ShaderSpec, field: FieldData, textures: DataTexture[]): 
     ring.rotation.x = Math.PI / 2;
     tilt.add(ring);
   }
-  return group;
+
+  const winds = processOf(motion, 'winds');
+  const clouds = processOf(motion, 'clouds');
+  const wind = motion.rates.jet_speed_ms;
+  const jets: JetRates | null =
+    winds && wind && spec.scaleM ? { windMs: wind.value, radiusM: spec.scaleM } : null;
+  const evolveRatio = winds && clouds ? clouds.speedup / winds.speedup : 0;
+  const update = makeJetRuntime({
+    surface,
+    fp,
+    jets,
+    spinRate: spinRateRadPerSimS(motion),
+    evolveRatio,
+    sampler,
+  });
+  const runtime: Runtime = {
+    // The surface frame: tilt, spin and flattening, so a world point maps to the unit sphere the
+    // field is defined on (haptics, `worldToBody`).
+    frame: mesh,
+    update,
+  };
+  return { group, frame: mesh, runtime };
 }
 
 // ---- point clouds ------------------------------------------------------------------------------
@@ -421,11 +505,14 @@ function disposeTree(root: Object3D): void {
 
 interface Built {
   group: Group;
-  /** Node the body frame is measured in: the tilt group for gas giants, else the group. */
+  /** Node the body frame is measured in: the spinning surface (tilt, spin, flattening), else the group. */
   frame: Object3D;
   textures: DataTexture[];
   field: FieldData | null;
   points: PointSets | null;
+  /** Per-frame motion (spin, jets, storms, clouds); null for the point clouds. */
+  runtime: Runtime | null;
+  sampler: FieldSampler | null;
 }
 
 export class ShaderBody implements BodyRenderer {
@@ -440,6 +527,10 @@ export class ShaderBody implements BodyRenderer {
   private visibleTags: readonly Tag[];
   private overrides: Overrides;
   private disposed = false;
+  private runtime: Runtime | null = null;
+  private time: SimTimeFn = () => 0;
+  private motion: Motion;
+  private readonly octaves: number;
   private readonly sun = uniform(new Vector3(...HEAD_ON));
   private readonly fieldSource: NonNullable<BodyContext['fieldSource']>;
   private readonly pointSource: NonNullable<BodyContext['pointSource']>;
@@ -458,7 +549,9 @@ export class ShaderBody implements BodyRenderer {
     this.pointSource = ctx.pointSource ?? requestPoints;
     this.onChange = ctx.onChange;
     this.onFailed = ctx.onFailed;
-    this.spec = resolveShaderSpec(card, params, this.overrides);
+    this.octaves = ctx.octaves ?? 4;
+    this.motion = ctx.motion ?? resolveMotion(card, params);
+    this.spec = resolveShaderSpec(card, params, this.overrides, this.motion);
     if (ctx.lightDir) this.setSunDirection(ctx.lightDir);
   }
 
@@ -558,6 +651,17 @@ export class ShaderBody implements BodyRenderer {
   setSunDirection(dir: Vec3): void {
     const d = new Vector3(dir[0], dir[1], dir[2]);
     if (d.lengthSq() > 0) this.sun.value.copy(d.normalize());
+    this.runtime?.update(this.time);
+  }
+
+  /**
+   * Poses the body for the SimClock (issue #42, D-34). `time(id)` is the simulation time of one
+   * process in sim seconds (`spin`, `winds`, `clouds`). A pure function of the time: the same time
+   * gives the same picture, and the haptic sampler gets the same storms.
+   */
+  setTime(time: SimTimeFn): void {
+    this.time = time;
+    this.runtime?.update(time);
   }
 
   setVisibleTags(tags: readonly Tag[]): void {
@@ -575,7 +679,7 @@ export class ShaderBody implements BodyRenderer {
     if (!changed) return;
     // Field sliders re-run the generator; shader-only sliders just rebuild the materials. Both
     // rebuild for simplicity (no UI drives this yet).
-    this.spec = resolveShaderSpec(this.card, this.params, overrides);
+    this.spec = resolveShaderSpec(this.card, this.params, overrides, this.motion);
     await this.rebuild();
   }
 
@@ -588,6 +692,7 @@ export class ShaderBody implements BodyRenderer {
     this.sampler = null;
     this.points = null;
     this.frame = null;
+    this.runtime = null;
     if (this.plain) {
       disposeTree(this.plain);
       this.plain = null;
@@ -647,16 +752,31 @@ export class ShaderBody implements BodyRenderer {
         spec.kind === 'nebula'
           ? buildNebula(points as NebulaPoints)
           : buildNova(points as NovaPoints);
-      return { group, frame: group, textures, field: null, points };
+      return { group, frame: group, textures, field: null, points, runtime: null, sampler: null };
     }
     const field = await this.fieldSource(spec.field!);
     if (this.disposed || spec !== this.spec) return null;
+    const sampler = new FieldSampler(field);
     if (spec.kind === 'gas_giant') {
-      const group = buildGas(spec, field, textures);
-      return { group, frame: group.children[0]!, textures, field, points: null };
+      const { group, frame, runtime } = buildGas(
+        spec,
+        field,
+        textures,
+        this.motion,
+        this.octaves,
+        sampler,
+      );
+      return { group, frame, textures, field, points: null, runtime, sampler };
     }
-    const group = buildPlanet(spec, field, this.sun, textures);
-    return { group, frame: group, textures, field, points: null };
+    const { group, runtime } = buildPlanet(
+      spec,
+      field,
+      this.sun,
+      textures,
+      this.motion,
+      this.sun.value,
+    );
+    return { group, frame: runtime.frame, textures, field, points: null, runtime, sampler };
   }
 
   /**
@@ -676,8 +796,11 @@ export class ShaderBody implements BodyRenderer {
     this.surface = built?.group ?? null;
     this.frame = built?.frame ?? null;
     this.textures = built?.textures ?? [];
-    this.sampler = built?.field ? new FieldSampler(built.field) : null;
+    this.sampler = built?.sampler ?? null;
     this.points = built?.points ?? null;
+    this.runtime = built?.runtime ?? null;
+    // A body built while the clock is running is posed at the current time at once.
+    this.runtime?.update(this.time);
     if (built) this.object.add(built.group);
     this.release(oldGroup, oldTextures);
     this.ensurePlain();

@@ -4,6 +4,8 @@
 import type { CometEpoch, ObjectCard, ObjectType, RenderParams, Tag } from '@/contract';
 import type { HonestyState } from './honesty';
 import type { LightingPlan } from './lighting';
+import type { Motion } from './motion/motion';
+import type { StarRates } from './bodies/starModel';
 
 export type Rgb = [number, number, number];
 export type Vec3 = [number, number, number];
@@ -46,6 +48,8 @@ export interface MissingItem {
 export interface LegendEntry {
   id: string;
   tag: Tag;
+  /** Provenance tier 1 to 5 of the layer (D-32), shown next to the badge. */
+  tier?: number;
   description: string;
   /** Colour key for layers with several parts (comet gas shells). */
   swatches?: { label: string; css: string }[];
@@ -162,6 +166,53 @@ export interface ShaderPlan {
   distance: number;
 }
 
+/**
+ * What the star surface draws (issue #42, R7.5.1). Each flag is one layer of the tier chain (D-32):
+ * on only when the layer's tag is shown at this honesty state and its inputs exist. `rates` are the
+ * CPU model's inputs (spot lifetime, spin, differential rotation, flare rate), from `dynamics`.
+ */
+export interface StarSurfacePlan {
+  seed: number;
+  granulation: boolean;
+  spots: boolean;
+  faculae: boolean;
+  flares: boolean;
+  prominences: boolean;
+  /** The strand look of the loops (tier 5); off draws one plain arch per group (tier 4). */
+  strands: boolean;
+  glow: boolean;
+  rates: StarRates;
+}
+
+/**
+ * A brown dwarf drawn by the browser with moving jets instead of the baked band texture (R7.4,
+ * issue #42). `cover` is the cloud cover from the light curve (0..1), which changes with the
+ * scrub and is applied in place, so it is not part of the scene key.
+ */
+export interface JetSurfacePlan {
+  seed: number;
+  /** Band count: from the Rhines rule when the spin and the wind are known (A7.2), else the artist default. */
+  bands: number;
+  turbulence: number;
+  storms: number;
+  /** R7.4: clamp(2 * ch4_depth_33, 0.1, 0.8). */
+  contrast: number;
+  /** Cloud cover patches follow the light curve (layer `cloud_cover`). */
+  clouds: boolean;
+  cover: number;
+  /** Peak zonal wind (m/s) and radius (m) for the storms' drift, or null when the winds do not move. */
+  windMs: number | null;
+  radiusM: number | null;
+  /** Flattening from the spin (0 = round). */
+  flattening: number;
+}
+
+/** Mira pulsation drawn over time (R7.5, Q-65): the period is data, the amplitude is art. */
+export interface PulsationPlan {
+  periodD: number;
+  amplitude: number;
+}
+
 export interface RenderPlan {
   id: string;
   type: ObjectType;
@@ -200,6 +251,14 @@ export interface RenderPlan {
   relief: 'measured' | 'illustrative';
   /** Set for the shader kinds only; `bodies` is empty for them. */
   shader: ShaderPlan | null;
+  /** Motion rates and animated processes with their tiers (R5.7, D-32, D-34). */
+  motion: Motion;
+  /** The moving star surface (stars), or null. */
+  star: StarSurfacePlan | null;
+  /** Moving jets on a brown dwarf, or null (the baked bands are used). */
+  jets: JetSurfacePlan | null;
+  /** Mira pulsation, or null. */
+  pulsation: PulsationPlan | null;
 }
 
 /** User-controlled inputs of a plan, kept apart from the data. */
