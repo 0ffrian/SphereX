@@ -524,7 +524,7 @@ export function ViewerPanel() {
             </p>
           )}
 
-          {/* Every time-lapse states its speed-up (plan 09). The spin has its own note above. */}
+          {/* Every time-lapse states its speed-up (R5.7). The spin has its own note above. */}
           {viewer
             ?.timeLapses?.()
             .filter((t) => t.id !== 'spin')

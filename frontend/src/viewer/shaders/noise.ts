@@ -9,7 +9,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- TSL node graphs are built from untyped proxies */
 import { abs, float, mx_noise_float, mx_worley_noise_float, vec3 } from 'three/tsl';
 
-/** Quality-tier octave counts (plan 10.4): the tier supplies one of these as a plain number. */
+/** Quality-tier octave counts (R5.7): the tier supplies one of these as a plain number. */
 export const OCTAVES = { high: 6, medium: 5, low: 4 } as const;
 export type Octaves = (typeof OCTAVES)[keyof typeof OCTAVES] | number;
 

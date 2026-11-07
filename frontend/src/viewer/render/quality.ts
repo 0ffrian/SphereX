@@ -1,5 +1,6 @@
-// Quality tiers and the frame-time governor (plan 10.5, issue #39). Pure: no DOM, no three.
-// The tier numbers are the plan's display choices ('artistic', not physical values).
+// Quality tiers and the frame-time governor (R5.7, issue #39, Q-66). Pure: no DOM, no three.
+// "Quality tier" (high/medium/low) is a rendering budget, not the provenance tier of D-32. The
+// numbers are display choices ('artistic', not physical values).
 
 import { OCTAVES } from '../shaders/noise';
 
@@ -67,7 +68,8 @@ export interface TierEnv {
  * Starting tier. The WebGL2 backend (no WebGPU: older or weaker devices, and headless CI) and
  * touch devices start Low. Desktop WebGPU starts Medium. r187 exposes no reliable high-end signal
  * (GPUAdapterInfo names vary and are frozen or empty in privacy modes), so High is never picked
- * automatically: it is opt-in through `setQualityTier`. The governor only ever lowers.
+ * automatically: it is opt-in through `?quality=high` (`qualityFromSearch`) or `setQualityTier`.
+ * The governor only ever lowers.
  */
 export function initialTier(env: TierEnv): TierName {
   if (env.backend === 'webgl2' || env.coarsePointer) return 'low';
@@ -75,12 +77,12 @@ export function initialTier(env: TierEnv): TierName {
 }
 
 /**
- * A frame slower than this counts as over budget. Plan 10.5 says 33 ms, but a steady 30 fps is
- * 33.3 ms per frame and meets D-05 (Chrome's energy saver caps rAF at 30 fps), so the line sits a
- * little above 1000/30.
+ * A frame slower than this counts as over budget (R5.7: 33 ms). A high or medium quality tier
+ * that only reaches a steady 30 fps (33.3 ms) misses its 60 fps target and drops; the low quality
+ * tier is the floor and its 30 fps meets D-05.
  */
-export const SLOW_FRAME_MS = 36;
-/** Frames must stay over budget this long before the tier drops (plan 10.5: two seconds). */
+export const SLOW_FRAME_MS = 33;
+/** Frames must stay over budget this long before the quality tier drops (R5.7: two seconds). */
 export const SLOW_WINDOW_MS = 2000;
 /** A gap between fed frames longer than this means rendering was not continuous: start over. */
 export const FEED_GAP_MS = 250;
@@ -133,6 +135,20 @@ export class FrameGovernor {
     this.current = to;
     return { kind: 'drop', from, to };
   }
+}
+
+/**
+ * Quality tier asked for in the page URL (`?quality=high`, also `medium` and `low`), else null.
+ * The only way to reach High outside the fixtures build (Q-66).
+ */
+export function qualityFromSearch(search: string): TierName | null {
+  const v = new URLSearchParams(search).get('quality');
+  return isTierName(v) ? v : null;
+}
+
+/** Shortest time between drawn frames for a quality tier's frame-rate cap, with 2 ms of rAF jitter. */
+export function minFrameIntervalMs(tier: TierName): number {
+  return 1000 / TIERS[tier].targetFps - 2;
 }
 
 /** The pixel ratio cap holds on every tier (D-05); see `viewerPixelRatio`. */

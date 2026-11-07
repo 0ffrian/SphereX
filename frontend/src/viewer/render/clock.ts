@@ -1,9 +1,10 @@
-// SimClock (plan section 09 / 10.2 step 1): one simulation time per moving process, equal to the
-// accumulated real time times that process's shown speed-up. Pure: `now` is injected. The browser
-// bindings (reduced motion, hidden tab, off-screen) live in ViewerApp and only add or remove
-// pause reasons here.
+// SimClock (R5.7, D-34): one simulation time per moving process, equal to the accumulated real
+// time times that process's shown speed-up. Pure: `now` is injected. The browser bindings (reduced
+// motion, hidden tab, off-screen, phone idle) live in ViewerApp and only add or remove pause
+// reasons here.
 
-export type PauseReason = 'reduced-motion' | 'hidden' | 'offscreen' | 'user' | 'test';
+/** `idle`: a coarse-pointer device saw no interaction for `IDLE_PAUSE_MS` (R5.7). */
+export type PauseReason = 'reduced-motion' | 'hidden' | 'offscreen' | 'user' | 'idle' | 'test';
 
 export interface ClockProcess {
   id: string;

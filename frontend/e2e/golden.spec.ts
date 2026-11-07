@@ -28,6 +28,12 @@ const HONESTY = ['measured', 'derived', 'artistic'] as const;
 const SKIP_STATES: Record<string, readonly string[]> = {
   asteroid_shape: ['derived', 'artistic'],
 };
+/** D-21 / R5.3: the tags each honesty state may draw. */
+const SHOWN_TAGS: Record<(typeof HONESTY)[number], readonly string[]> = {
+  measured: ['measured'],
+  derived: ['measured', 'derived', 'model_dependent', 'inferred_from_analog'],
+  artistic: ['measured', 'derived', 'model_dependent', 'inferred_from_analog', 'artistic'],
+};
 const GOLDEN_DIR = fileURLToPath(new URL('./__goldens__/', import.meta.url));
 const FIXTURES = fileURLToPath(new URL('../../shared/fixtures/', import.meta.url));
 const UPDATE = process.env.SX_UPDATE_GOLDENS === '1';
@@ -81,7 +87,7 @@ for (const kind of kinds) {
     for (const honesty of HONESTY) {
       if (SKIP_STATES[kind]?.includes(honesty)) continue;
       // Same fixture + seed + time must give the same golden. The render-core hooks pin the quality
-      // tier and the clock; until they exist the viewer is only waited on until it stops changing.
+      // tier and the clock; without them the viewer is only waited on until it stops changing.
       const hooks = await page.evaluate(
         async ({ card, params, honesty }) => {
           const g = globalThis as unknown as {
@@ -91,11 +97,11 @@ for (const kind of kinds) {
               whenSettled?(): Promise<void>;
               body: { drawn: string[] } | null;
             };
-            __sxShow(c: unknown, p: unknown, h: string): unknown;
+            __sxShow(c: unknown, p: unknown, h: string): { drawn: { id: string; tag: string }[] };
           };
           const v = g.__sxViewer;
           v.setQualityTier?.('low');
-          g.__sxShow(card, params, honesty);
+          const plan = g.__sxShow(card, params, honesty);
           for (let i = 0; i < 400 && !v.body; i++) await new Promise((r) => setTimeout(r, 25));
           // Generated surfaces and point clouds arrive from the worker a little later.
           for (let i = 0; i < 200 && honesty === 'artistic' && !v.body?.drawn.length; i++)
@@ -105,10 +111,22 @@ for (const kind of kinds) {
           return {
             freeze: typeof v.freezeClock === 'function',
             settled: typeof v.whenSettled === 'function',
+            layers: plan.drawn.map((d) => ({ id: d.id, tag: d.tag })),
+            bodyDrawn: v.body ? [...v.body.drawn] : null,
           };
         },
         { card: read('cards', kind), params: read('params', kind), honesty },
       );
+
+      // The state draws only layers whose tag it shows (D-21), and a generated body draws only
+      // layers the plan lists.
+      for (const l of hooks.layers)
+        expect(SHOWN_TAGS[honesty], `${kind}.${honesty}: layer ${l.id} is ${l.tag}`).toContain(
+          l.tag,
+        );
+      const listed = hooks.layers.map((l) => l.id);
+      for (const id of hooks.bodyDrawn ?? [])
+        expect(listed, `${kind}.${honesty}: body drew ${id}, not in the plan`).toContain(id);
 
       // Fallback settle: two identical frames in a row (an animated body may never settle; the
       // SSIM threshold absorbs the small remaining difference).
