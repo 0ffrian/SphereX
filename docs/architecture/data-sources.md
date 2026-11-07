@@ -34,13 +34,15 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 | Columns | wavelength, reflectance, reflectance error, flag |
 | Coverage | Visible light, 60,518 asteroids |
 | Use | Visible colour and class of known asteroids. SPHEREx starts at 0.75 micron, so it cannot give visible colour. |
+| Source catalogue (overlays, issue #12) | **Tested** 6 Nov 2026. A cone on the source table through TAP (sync, CSV): IRSA `gaia_dr3_source` first (a 0.05° cone answered in about 20 s), then the ESA archive `gaiadr3.gaia_source` (about 60 s; one attempt timed out at 90 s). Both serve the same columns: `source_id, ra, dec, ref_epoch, pmra, pmdec, parallax, phot_g_mean_mag`. Positions are ICRS at `ref_epoch` (J2016.0 in DR3), `pmra` is µα·cos δ in mas/yr. The cone keeps only `phot_g_mean_mag < 20`, brightest first, at most 5000 rows (`overlay:gaia:truncated` when capped). G < 20 is a display cut, not a physical value (Q-52). Mirrors are set by `SX_GAIA_TAP_MIRRORS`. Used by [A4.9](pipeline.md#a49-overlays-flag-mask-and-combine). |
 
 ### A3.3 WISE / NEOWISE
 
 | Item | Detail |
 |---|---|
-| Status | **Not confirmed** (IRSA TAP timed out twice) |
+| Status | **Not confirmed** for diameter and albedo (IRSA TAP timed out twice). **Tested** 6 Nov 2026 for source positions (overlays, below). |
 | Use | Diameter and albedo. Take these through the JPL Small-Body Database for now. |
+| Source catalogue (overlays, issue #12) | "WISE/NEOWISE sources" are served from **CatWISE2020** (`catwise_2020` on IRSA TAP, sync, CSV), which combines WISE and NEOWISE epochs (Q-51). Checked live 6 Nov 2026 (`TAP_SCHEMA.columns`): `ra_pm`/`dec_pm` are positions at MJD 57170 from the PSF fit with motion; `pmra`/`pmdec` are apparent motions in arcsec/yr (relative, not absolute, noisy for faint sources); `w1mpro_pm` is the W1 profile-fit magnitude. A 0.03° cone answered in about 17 s. Columns: `source_name, ra_pm, dec_pm, pmra, pmdec, w1mpro_pm`; the cone is applied to `ra`/`dec`, brightest W1 first, at most 5000 rows (`overlay:wise:truncated`); a row without `ra_pm`/`dec_pm` is dropped. Whether `pmra` includes cos δ is **[verify]**. **CatWISE2020 has no rows within at least 3′ of R Draconis** (checked live 6 Nov 2026: a box and a cone both return 0, while AllWISE returns sources there), so that target shows no WISE markers (Q-51). AllWISE and the NEOWISE single-exposure table are not used. Used by [A4.9](pipeline.md#a49-overlays-flag-mask-and-combine). |
 
 ### A3.4 JPL Horizons
 
