@@ -103,8 +103,9 @@ for (const view of VIEWS) {
     );
     expect(result).not.toBeNull();
     expect(result!.drawn.length).toBe(1);
-    // The field and the nebula / nova points come from the Web Worker (D-12, N8). A worker that was
+    // The field and the nova points come from the Web Worker (D-12, N8). A worker that was
     // created but failed would fall back to the main thread, so count what actually served.
+    // The nebula has no field or points: it is a volume with no haptics (Q-87), so nothing is served.
     const stats = await page.evaluate(
       () =>
         (globalThis as unknown as { __sxFieldStats?: { worker: number; main: number } })
@@ -112,7 +113,8 @@ for (const view of VIEWS) {
     );
     expect(stats, 'field stats hook (fixtures mode)').toBeDefined();
     expect(stats!.main, 'served on the main thread (worker fallback)').toBe(0);
-    expect(stats!.worker).toBeGreaterThan(0);
+    if (kind === 'nebula') expect(stats!.worker, 'nebula needs no worker').toBe(0);
+    else expect(stats!.worker).toBeGreaterThan(0);
 
     await expect
       .poll(async () => !(await canvas.screenshot()).equals(before), { timeout: 20_000 })
