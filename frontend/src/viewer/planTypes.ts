@@ -88,6 +88,24 @@ export interface BodyPlan {
   meshUrl: string | null;
   albedoUrl: string | null;
   normalUrl: string | null;
+  /** Baked height map (R6.3) and the displacement it drives, in units of the radius; null = none. */
+  heightUrl: string | null;
+  displacementScale: number | null;
+}
+
+/**
+ * How a shape-model asteroid (R7.1) is lit and detailed. Each flag is a drawn layer of the plan:
+ * Lommel-Seeliger reflectance always; the rest only when the plan lists them as drawn.
+ */
+export interface ShapePlan {
+  /** Lommel-Seeliger reflectance (A7.4, model_dependent); otherwise a standard material. */
+  lommelSeeliger: boolean;
+  /** Sun light casts a shadow map: crater rims shadow the surface at low Sun. */
+  shadows: boolean;
+  /** Baked per-vertex ambient occlusion. */
+  ao: boolean;
+  /** Fine regolith normals below the model's resolution (tier 5, artistic). */
+  regolith: boolean;
 }
 
 export interface ShellPlan {
@@ -129,6 +147,36 @@ export interface DustPlan {
   count: number;
   seed: number;
   tint: Rgb;
+}
+
+/** What a ray-marched emission volume shows (issue #43; R7.3 comets, R7.7 remnants and nebulae). */
+export type VolumeKind = 'coma' | 'dust' | 'ion_tail' | 'dust_tail' | 'remnant' | 'nebula';
+
+/**
+ * One emission-only volume (replaces point sprites). Pure data: `volume/VolumeBody.ts` draws it.
+ * The volume lives in a box of semi-axes `halfExtent` (scene units) centred on `center`; `basis`
+ * turns the box's local x axis toward `axis` for tails. Every colour and density is a display value
+ * and the volume carries its layer's tag.
+ */
+export interface VolumePlan {
+  id: string;
+  kind: VolumeKind;
+  tag: Tag;
+  halfExtent: Vec3;
+  center: Vec3;
+  /** Tails and the dust cone: unit direction of the box's local +x. Null for symmetric volumes. */
+  axis: Vec3 | null;
+  /** Tails: unit direction the centre line bends toward (perpendicular to `axis`). */
+  bend: Vec3 | null;
+  /** Tail bend as a fraction of the tail length (the dust tail); 0 for a straight tail. */
+  bendFraction: number;
+  seed: number;
+  /** Up to three emitters: colour (linear sRGB) and gain in 0..1. */
+  emitters: { label: string; rgb: Rgb; gain: number }[];
+  /** Strength of the dust absorption lanes, 0..1 (0 = none). */
+  dust: number;
+  /** Remnant: radius of the line-emitting shell as a fraction of the box half-size, 0..1. */
+  shell: number;
 }
 
 export interface ScrubPlan {
@@ -175,6 +223,8 @@ export interface RenderPlan {
   screens: ScreenPlan[];
   trails: TrailPlan[];
   dust: DustPlan | null;
+  /** Emission volumes drawn instead of point sprites (comet coma and tails). */
+  volumes: VolumePlan[];
   drawn: LegendEntry[];
   missing: MissingItem[];
   notes: string[];
@@ -200,6 +250,8 @@ export interface RenderPlan {
   relief: 'measured' | 'illustrative';
   /** Set for the shader kinds only; `bodies` is empty for them. */
   shader: ShaderPlan | null;
+  /** Set for a shape-model asteroid whose mesh is drawn (R7.1); null otherwise. */
+  shape: ShapePlan | null;
 }
 
 /** User-controlled inputs of a plan, kept apart from the data. */

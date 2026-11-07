@@ -6,6 +6,7 @@ import type { Tag } from '@/contract';
 import { allowedTags, DEFAULT_HONESTY } from '../honesty';
 import type { Overrides } from '../sliders';
 import type { FieldData, FieldParams, FieldSampler, Vec3 } from '../fields/fieldGenerator';
+import type { TierName } from '../render/quality';
 import type { PointKind, PointSet, PointSets } from './pointClouds';
 
 export const ALL_TAGS: readonly Tag[] = [
@@ -49,6 +50,8 @@ export interface BodyContext {
   pointSource?: (type: PointKind, seed: number) => Promise<PointSets>;
   /** D-27 slider overrides (relief sliders live on the shader kinds, D-26). */
   overrides?: Overrides;
+  /** Quality level the body is built for (volume steps). Default: medium. */
+  tier?: TierName;
   /** Replaces the field Web Worker (tests). Default: `requestField`. */
   fieldSource?: (params: FieldParams) => Promise<FieldData>;
 }
@@ -77,6 +80,8 @@ export interface BodyRenderer {
   readonly pointSets: Readonly<Record<string, PointSet>> | null;
   /** World point -> body frame (accounts for the group scale and the gas-giant tilt). */
   worldToBody(p: Vec3): Vec3;
+  /** The quality level changed (volume steps and octaves). Optional: baked bodies ignore it. */
+  setTier?(tier: TierName): void;
   setSunDirection(dir: Vec3): void;
   setVisibleTags(tags: readonly Tag[]): void;
   /** D-27. Rebuilds what the changed sliders affect; resolves when drawn. */

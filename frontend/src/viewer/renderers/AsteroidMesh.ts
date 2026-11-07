@@ -4,7 +4,7 @@
 //   with roughness 0.95 and no procedural detail. A mesh that cannot be loaded is a refused layer
 //   and the body falls back to a plain sphere with a flat tint (never blank).
 import { litBody, PlanBuilder, numberField, type PlanInput } from '../planCommon';
-import type { RenderPlan } from '../planTypes';
+import type { RenderPlan, ShapePlan } from '../planTypes';
 
 /**
  * Spin speed-up. R7.1 shows "×1000" as its example of the factor on screen; the exact factor is
@@ -50,6 +50,37 @@ export function isLoadableMeshUrl(value: string | null | undefined): value is st
   return MESH_EXTENSIONS.test(value);
 }
 
+/**
+ * Issue #43: how a loaded model is lit and detailed. Each part is its own layer with its tag, so
+ * the honesty toggle can hide it: shadows and AO come from the measured shape (derived),
+ * Lommel-Seeliger is a reflectance model (model_dependent), regolith is look only (artistic).
+ * Also used for a comet nucleus that has a shape model (67P).
+ */
+export function planShapeLayers(b: PlanBuilder): ShapePlan {
+  return {
+    lommelSeeliger: b.drawLocal(
+      'reflectance',
+      'model_dependent',
+      'Lommel-Seeliger reflectance for dark airless rock (A7.4).',
+    ),
+    shadows: b.drawLocal(
+      'self_shadow',
+      'derived',
+      'Self-shadowing: a shadow map of the shape from the Sun direction.',
+    ),
+    ao: b.drawLocal(
+      'baked_ao',
+      'derived',
+      'Ambient occlusion baked from the shape (cosine-weighted visibility).',
+    ),
+    regolith: b.drawLocal(
+      'regolith',
+      'artistic',
+      'Fine regolith texture below the resolution of the model, for looks only.',
+    ),
+  };
+}
+
 export function planAsteroidMesh(input: PlanInput): RenderPlan {
   const b = new PlanBuilder(input);
   const bodyOk = b.body('diameter_km');
@@ -67,7 +98,10 @@ export function planAsteroidMesh(input: PlanInput): RenderPlan {
     b.legendBody('Plain sphere at the size on the card.');
   }
 
+  const shape = useMesh ? planShapeLayers(b) : null;
+
   return b.build({
+    shape,
     bodies: bodyOk
       ? [
           litBody('body', [1, 1, 1], b.tint.rgb, {

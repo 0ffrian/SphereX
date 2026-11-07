@@ -22,17 +22,14 @@ import {
   DoubleSide,
   FloatType,
   Group,
-  InstancedBufferAttribute,
   Mesh,
   MeshBasicNodeMaterial,
   MeshStandardNodeMaterial,
   NearestFilter,
   Object3D,
-  PointsNodeMaterial,
   RGBAFormat,
   RingGeometry,
   SphereGeometry,
-  Sprite,
   Vector3,
 } from 'three/webgpu';
 import {
@@ -48,7 +45,6 @@ import {
   float,
   floor,
   fract,
-  instancedBufferAttribute,
   ivec2,
   length,
   max,
@@ -70,10 +66,7 @@ import {
   step,
   textureLoad,
   uniform,
-  uv,
-  vec2,
   vec3,
-  vec4,
   mod,
 } from 'three/tsl';
 import type { ObjectCard, RenderParams, Tag } from '@/contract';
@@ -90,7 +83,7 @@ import {
 } from '../fields/fieldGenerator';
 import { requestField, requestPoints } from '../fields/fieldClient';
 import { shaderSeedOffsets } from '../fields/noise';
-import type { Overrides } from '../sliders';
+import { sliderValue, type Overrides } from '../sliders';
 import {
   ESTIMATED_TAGS,
   type BodyContext,
@@ -108,7 +101,10 @@ import {
   OCEAN_SHALLOW,
   type Rgb,
 } from './shaderPalette';
-import type { NebulaPoints, NovaPoints, PointSet, PointSets } from './pointClouds';
+import type { PointSet, PointSets } from './pointClouds';
+import type { TierName } from '../render/quality';
+import { createVolume, type VolumeHandle } from '../volume/VolumeBody';
+import { nebulaVolume, remnantShell, remnantVolume } from '../volume/volumeSpecs';
 import {
   kindHasPlainSphere,
   resolveShaderSpec,
@@ -357,55 +353,6 @@ function buildGas(spec: ShaderSpec, field: FieldData, textures: DataTexture[]): 
   return group;
 }
 
-// ---- point clouds ------------------------------------------------------------------------------
-
-/** One instanced Sprite per point set (WebGPU Points are 1 px; Sprite + instancing honours size). */
-function pointSprite(set: PointSet, size: number, opacity: number, additive: boolean): Sprite {
-  const mat = new PointsNodeMaterial();
-  const posAttr = new InstancedBufferAttribute(set.positions, 3);
-  const colAttr = new InstancedBufferAttribute(set.colors, 3);
-  // Standalone attributes are not freed by geometry.dispose(); free them with the material (D-05).
-  mat.addEventListener('dispose', () => {
-    posAttr.dispose();
-    colAttr.dispose();
-  });
-  mat.positionNode = instancedBufferAttribute(posAttr);
-  const color: any = instancedBufferAttribute(colAttr);
-  // Soft round dot from the sprite quad's uv.
-  const falloff = smoothstep(0.5, 0.0, length(uv().sub(0.5)));
-  mat.colorNode = vec4(color, 1);
-  mat.opacityNode = falloff.mul(opacity);
-  mat.sizeNode = vec2(size, size);
-  mat.transparent = true;
-  mat.depthWrite = false;
-  if (additive) mat.blending = AdditiveBlending;
-  const sprite = new Sprite(mat);
-  sprite.count = set.count;
-  sprite.frustumCulled = false;
-  return sprite;
-}
-
-function buildNebula(pts: NebulaPoints): Group {
-  const group = new Group();
-  // Sizes and opacities: mock-up (PointsMaterial size, opacity at full build). Artistic.
-  const dust = pointSprite(pts.dust, 0.2, 0.3, false);
-  dust.renderOrder = 2;
-  group.add(pointSprite(pts.glow, 0.1, 0.7, true), dust, pointSprite(pts.stars, 0.1, 0.9, true));
-  group.scale.setScalar(NEBULA_SCALE);
-  return group;
-}
-
-function buildNova(pts: NovaPoints): Group {
-  const group = new Group();
-  group.add(
-    pointSprite(pts.shell, 0.06, 0.6, true),
-    pointSprite(pts.hot, 0.1, 0.35, true),
-    pointSprite(pts.core, 0.9, 0.9, true),
-  );
-  group.scale.setScalar(NOVA_SCALE);
-  return group;
-}
-
 // ---- body --------------------------------------------------------------------------------------
 
 function disposeTree(root: Object3D): void {
@@ -426,6 +373,7 @@ interface Built {
   textures: DataTexture[];
   field: FieldData | null;
   points: PointSets | null;
+  volumes?: VolumeHandle[];
 }
 
 export class ShaderBody implements BodyRenderer {
@@ -436,6 +384,8 @@ export class ShaderBody implements BodyRenderer {
   private textures: DataTexture[] = [];
   private sampler: FieldSampler | null = null;
   private points: PointSets | null = null;
+  private volumes: VolumeHandle[] = [];
+  private tier: TierName;
   private spec: ShaderSpec;
   private visibleTags: readonly Tag[];
   private overrides: Overrides;
@@ -458,6 +408,7 @@ export class ShaderBody implements BodyRenderer {
     this.pointSource = ctx.pointSource ?? requestPoints;
     this.onChange = ctx.onChange;
     this.onFailed = ctx.onFailed;
+    this.tier = ctx.tier ?? 'medium';
     this.spec = resolveShaderSpec(card, params, this.overrides);
     if (ctx.lightDir) this.setSunDirection(ctx.lightDir);
   }
@@ -560,6 +511,13 @@ export class ShaderBody implements BodyRenderer {
     if (d.lengthSq() > 0) this.sun.value.copy(d.normalize());
   }
 
+  setTier(tier: TierName): void {
+    if (this.disposed || tier === this.tier) return;
+    this.tier = tier;
+    for (const v of this.volumes) v.setTier(tier);
+    this.onChange?.();
+  }
+
   setVisibleTags(tags: readonly Tag[]): void {
     if (this.disposed) return;
     this.visibleTags = tags;
@@ -571,8 +529,18 @@ export class ShaderBody implements BodyRenderer {
     const changed = (Object.keys({ ...this.overrides, ...overrides }) as (keyof Overrides)[]).some(
       (k) => this.overrides[k] !== overrides[k],
     );
+    const onlyAge = (Object.keys({ ...this.overrides, ...overrides }) as (keyof Overrides)[])
+      .filter((k) => this.overrides[k] !== overrides[k])
+      .every((k) => k === 'age_yr');
     this.overrides = overrides;
     if (!changed) return;
+    if (onlyAge && this.spec.kind === 'nova' && this.volumes.length > 0) {
+      // The age slider only moves the shell: no rebuild, no shader recompile (issue #43, A7.5).
+      for (const v of this.volumes)
+        v.setShell(remnantShell(sliderValue(overrides, 'age_yr', 'nova') ?? null));
+      this.onChange?.();
+      return;
+    }
     // Field sliders re-run the generator; shader-only sliders just rebuild the materials. Both
     // rebuild for simplicity (no UI drives this yet).
     this.spec = resolveShaderSpec(this.card, this.params, overrides);
@@ -587,6 +555,7 @@ export class ShaderBody implements BodyRenderer {
     this.textures = [];
     this.sampler = null;
     this.points = null;
+    this.volumes = [];
     this.frame = null;
     if (this.plain) {
       disposeTree(this.plain);
@@ -643,11 +612,21 @@ export class ShaderBody implements BodyRenderer {
       // N8: the points are generated in the field worker.
       const points = await this.pointSource(spec.kind, spec.seed);
       if (this.disposed || spec !== this.spec) return null;
-      const group =
+      // Issue #43: drawn as an emission volume, not as dots. The point sets stay as data for the
+      // density haptics (D-12).
+      const plan =
         spec.kind === 'nebula'
-          ? buildNebula(points as NebulaPoints)
-          : buildNova(points as NovaPoints);
-      return { group, frame: group, textures, field: null, points };
+          ? nebulaVolume(spec.seed)
+          : remnantVolume({
+              seed: spec.seed,
+              ageYr: sliderValue(this.overrides, 'age_yr', 'nova') ?? null,
+              axisRatio: null, // ASSUMPTION: no card field holds the measured axis ratio yet
+            });
+      const volume = createVolume(plan, this.tier);
+      const group = new Group();
+      group.add(volume.mesh);
+      group.scale.setScalar(spec.kind === 'nebula' ? NEBULA_SCALE : NOVA_SCALE);
+      return { group, frame: group, textures, field: null, points, volumes: [volume] };
     }
     const field = await this.fieldSource(spec.field!);
     if (this.disposed || spec !== this.spec) return null;
@@ -678,6 +657,7 @@ export class ShaderBody implements BodyRenderer {
     this.textures = built?.textures ?? [];
     this.sampler = built?.field ? new FieldSampler(built.field) : null;
     this.points = built?.points ?? null;
+    this.volumes = built?.volumes ?? [];
     if (built) this.object.add(built.group);
     this.release(oldGroup, oldTextures);
     this.ensurePlain();
