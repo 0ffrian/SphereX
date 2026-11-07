@@ -66,7 +66,7 @@ export function isShaderKind(t: ObjectType): t is ShaderKind {
 // ASSUMPTION: defaults below are the mock-up's final-state slider values (artistic, not physical).
 const PLANET_DEFAULTS = {
   planet_rocky: { freq: 1.6, sea: 0, ice: 0, heat: 0, relief: 0.081, cloud: 0.2, atmo: 0.85 },
-  planet_water: { freq: 2, sea: 0.4, ice: 0.22, heat: 0, relief: 0.054, cloud: 0.7, atmo: 0.85 },
+  planet_water: { freq: 2, sea: 0.58, ice: 0.22, heat: 0, relief: 0.054, cloud: 0.7, atmo: 0.85 },
 } as const;
 const GAS_DEFAULTS = { bands: 12, turbulence: 0.5, storms: 5, rings: 0 } as const;
 

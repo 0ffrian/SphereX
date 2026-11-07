@@ -221,8 +221,13 @@ function buildPlanet(
     const b = density(rotY(d, cloudPhase.y.mul(pl)), cloudEvo.y);
     return mix(b, a, cloudPhase.z);
   };
-  const cloudThr = float(0.88 - (0.88 - 0.36) * style.cloudCover);
-  const cloudMask = (c: any) => smoothstep(cloudThr, cloudThr.add(0.16), c);
+  // Over an ocean the reference (water_world.jpg) shows clouds as a minority, so the same cover
+  // slider draws fewer and softer-edged clouds there (Q-90; a drawing choice, the cover is unchanged).
+  const wetWorld = fp.seaLevel > 0;
+  const cloudThr = float(
+    wetWorld ? 0.9 - 0.34 * style.cloudCover : 0.88 - (0.88 - 0.36) * style.cloudCover,
+  );
+  const cloudMask = (c: any) => smoothstep(cloudThr, cloudThr.add(wetWorld ? 0.12 : 0.16), c);
 
   const hh = clamp(h.sub(seaL).div(float(1).sub(seaL)), 0, 1);
   const depth = fp.seaLevel > 0 ? clamp(seaL.sub(h).div(seaL).mul(3), 0, 1) : float(0);
@@ -283,7 +288,7 @@ function buildPlanet(
   const mat = new MeshStandardNodeMaterial();
   mat.colorNode = col;
   mat.normalNode = bumped;
-  mat.roughnessNode = mix(float(0.9), float(0.12), wet);
+  mat.roughnessNode = mix(float(0.9), float(0.2), wet);
   mat.metalness = 0;
   mat.emissiveNode = (fp.heat > 0 ? rgb3(LAVA_COLOUR).mul(lava).mul(heat) : vec3(0, 0, 0)).add(
     skyRefl,
@@ -293,7 +298,7 @@ function buildPlanet(
   if (style.cloudCover > 0.001) {
     const cm = new MeshStandardNodeMaterial();
     cm.colorNode = vec3(0.97, 0.97, 0.97);
-    cm.opacityNode = cloudMask(cloudAt(dir)).mul(0.92);
+    cm.opacityNode = cloudMask(cloudAt(dir)).mul(wetWorld ? 0.85 : 0.92);
     cm.transparent = true;
     cm.depthWrite = false;
     cm.roughness = 1;
@@ -311,7 +316,7 @@ function buildPlanet(
     const nv = abs(dot(normalWorld, view));
     const b = float(ATMO_SHELL).mul(sqrt(max(float(1).sub(nv.mul(nv)), 0)));
     const rim = float(0.9).mul(exp(b.sub(1).max(0).negate().div(ATMO_SCALE_HEIGHT)));
-    const haze = float(0.14).div(max(sqrt(max(float(1).sub(b.mul(b)), 0)), 0.2));
+    const haze = float(wetWorld ? 0.05 : 0.14).div(max(sqrt(max(float(1).sub(b.mul(b)), 0)), 0.2));
     const dens = mix(haze, rim, smoothstep(0.97, 1.0, b));
     const cosG = dot(sunWorld, view).negate();
     const phase = float(0.75).mul(float(1).add(cosG.mul(cosG)));

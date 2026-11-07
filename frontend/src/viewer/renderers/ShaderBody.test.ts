@@ -89,7 +89,7 @@ describe('ShaderBody', () => {
       },
     });
     await body.setOverrides({ sea_level: 0.55 });
-    expect(seen).toEqual([0.4, 0.55]);
+    expect(seen).toEqual([0.58, 0.55]);
     expect(body.drawn).toEqual(['surface']);
   });
 });
