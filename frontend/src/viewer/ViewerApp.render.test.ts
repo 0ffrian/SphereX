@@ -238,7 +238,7 @@ describe('ViewerApp clock pauses (R5.7, R9)', () => {
   });
 });
 
-describe('ViewerApp quality tier from the URL', () => {
+describe('ViewerApp quality level from the URL', () => {
   it('?quality=high starts on high', () => {
     window.history.replaceState(null, '', '?quality=high');
     try {
@@ -248,5 +248,118 @@ describe('ViewerApp quality tier from the URL', () => {
     } finally {
       window.history.replaceState(null, '', '/');
     }
+  });
+});
+
+/** A display at `hz`: animation frames run only when the test advances time. */
+function fakeDisplay(hz: number) {
+  let queue: FrameRequestCallback[] = [];
+  let id = 0;
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+    queue.push(cb);
+    return ++id;
+  });
+  vi.stubGlobal('cancelAnimationFrame', () => {});
+  return {
+    /** Runs `seconds` of display refreshes. */
+    run(seconds: number) {
+      for (let i = 0; i < hz * seconds; i++) {
+        const now = (i * 1000) / hz;
+        const due = queue;
+        queue = [];
+        for (const cb of due) cb(now);
+      }
+    },
+  };
+}
+
+function coarsePointer() {
+  vi.stubGlobal('matchMedia', (q: string) => ({
+    matches: q === '(pointer: coarse)',
+    addEventListener() {},
+    removeEventListener() {},
+  }));
+}
+
+describe('ViewerApp frame-rate cap (R5.7, D-34)', () => {
+  it.each([75, 90, 144])('a phone on the low quality level draws about 30 fps at %i Hz', (hz) => {
+    coarsePointer();
+    const display = fakeDisplay(hz);
+    const { v } = make();
+    v.showPlan(planOf('asteroid_shape')); // a running spin keeps the loop going
+    const before = v.renderStats().frames;
+    display.run(10);
+    const fps = (v.renderStats().frames - before) / 10;
+    expect(fps).toBeGreaterThanOrEqual(29);
+    expect(fps).toBeLessThanOrEqual(31);
+    v.dispose();
+  });
+
+  it.each([75, 90, 144])('a desktop draws every refresh at %i Hz, also on low', (hz) => {
+    const display = fakeDisplay(hz);
+    const { v } = make();
+    expect(v.renderStats().tier).toBe('low'); // the stub is WebGL2
+    v.showPlan(planOf('asteroid_shape'));
+    const before = v.renderStats().frames;
+    display.run(10);
+    expect((v.renderStats().frames - before) / 10).toBeGreaterThanOrEqual(hz - 1);
+    v.dispose();
+  });
+
+  it('a phone on medium is not capped', () => {
+    coarsePointer();
+    const display = fakeDisplay(90);
+    const { v } = make();
+    v.setQualityTier('medium');
+    v.showPlan(planOf('asteroid_shape'));
+    const before = v.renderStats().frames;
+    display.run(10);
+    expect((v.renderStats().frames - before) / 10).toBeGreaterThanOrEqual(89);
+    v.dispose();
+  });
+});
+
+describe('ViewerApp idle pause from the UI (R5.7, D-34)', () => {
+  it('reports idle to the panel, and resumeFromIdle lifts it', () => {
+    vi.useFakeTimers();
+    coarsePointer();
+    const { v } = make();
+    const seen: boolean[] = [];
+    v.setIdleChangeHandler((idle) => seen.push(idle));
+    vi.advanceTimersByTime(IDLE_PAUSE_MS);
+    expect(v.isIdlePaused()).toBe(true);
+    v.resumeFromIdle();
+    expect(v.isIdlePaused()).toBe(false);
+    expect(internals(v).clock.pauseReasons()).not.toContain('idle');
+    expect(seen).toEqual([true, false]);
+    v.dispose();
+  });
+});
+
+describe('ViewerApp compile timeout through the chain', () => {
+  it('starts when the queued compile starts, not when it was queued', async () => {
+    vi.useFakeTimers();
+    const { v } = make({ compileAsync: () => Promise.resolve() });
+    let start: (() => void) | null = null;
+    let finish: (() => void) | null = null;
+    (v as unknown as { chain: unknown }).chain = {
+      config: { settleFrames: 0 },
+      render() {},
+      restartTemporal() {},
+      dispose() {},
+      compileAsync(_o: unknown, onStart: () => void) {
+        start = onStart; // queued behind a slow earlier compile
+        return new Promise<void>((r) => (finish = r));
+      },
+    };
+    v.showPlan(planOf('asteroid_procedural'));
+    await vi.advanceTimersByTimeAsync(COMPILE_TIMEOUT_MS * 2);
+    expect(internals(v).onScreen).toBeNull(); // still queued: no timeout yet
+    start!();
+    await vi.advanceTimersByTimeAsync(COMPILE_TIMEOUT_MS);
+    expect(internals(v).onScreen).toBe(internals(v).built);
+    finish!();
+    (v as unknown as { chain: unknown }).chain = null;
+    v.dispose();
   });
 });

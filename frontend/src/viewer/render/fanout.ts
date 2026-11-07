@@ -1,5 +1,5 @@
 /**
- * Browser fan-out (issue #39, WP3): card and render-params requests start together, each is
+ * Browser fan-out (issue #39): card and render-params requests start together, each is
  * delivered as it lands, and asset prefetch starts the moment params arrive (not after the card).
  * Built on injected fetchers; no API client exists on main yet.
  */

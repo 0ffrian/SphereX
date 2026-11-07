@@ -1,5 +1,5 @@
 /**
- * Generic worker pool (issue #39, WP3). Determinism: a task's result depends only on its request,
+ * Generic worker pool (issue #39). Determinism: a task's result depends only on its request,
  * never on which worker ran it, so workers must be stateless between tasks (D-12, R11).
  */
 

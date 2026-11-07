@@ -101,6 +101,13 @@ export function ViewerPanel() {
   const failed = failedState.key === objectKey ? failedState.ids : NO_FAILED;
   const reducedMotion = useReducedMotion();
   const [spinPaused, setSpinPaused] = useState(false);
+  // R5.7: a phone pauses the clock after a minute without input; said here, lifted by the button.
+  const [idlePaused, setIdlePaused] = useState(false);
+  useEffect(() => {
+    if (!viewer) return; // a new viewer starts not idle; the handler reports every change
+    viewer.setIdleChangeHandler?.(setIdlePaused);
+    return () => viewer.setIdleChangeHandler?.(null);
+  }, [viewer]);
   const [whyOpen, setWhyOpen] = useState(false);
   const whyId = useId();
   const fixture = useAppStore((s) => s.sky.fixture);
@@ -503,16 +510,21 @@ export function ViewerPanel() {
                   ? '. Auto-spin is off because your device asks for reduced motion.'
                   : spinPaused
                     ? '. Auto-spin is paused.'
-                    : '.'}
+                    : idlePaused
+                      ? '. Auto-spin paused after a minute without input. Tap the view or press Resume spin.'
+                      : '.'}
               </p>
               {!reducedMotion && (
                 <button
                   type="button"
                   className={buttonClass}
-                  aria-pressed={spinPaused}
-                  onClick={() => setSpinPaused((p) => !p)}
+                  aria-pressed={spinPaused || idlePaused}
+                  onClick={() => {
+                    if (idlePaused && !spinPaused) viewer?.resumeFromIdle?.();
+                    else setSpinPaused((p) => !p);
+                  }}
                 >
-                  {spinPaused ? 'Resume spin' : 'Pause spin'}
+                  {spinPaused || idlePaused ? 'Resume spin' : 'Pause spin'}
                 </button>
               )}
             </div>

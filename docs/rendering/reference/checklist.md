@@ -1,6 +1,6 @@
 # Visual review checklist
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Section:** R11 · Plan gates 3, 4 and 6 (10.6) · **Implements:** D-02, D-21
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Section:** R11 · Render-core quality gates (issue #39) · **Implements:** D-02, D-21
 
 A person and the `design-reviewer` agent run this against the [reference frames](README.md), using the seed, time and fixture convention in that README. Mark each line pass, fail or n/a, with a screenshot for every fail. A renderer does not merge with an open fail.
 

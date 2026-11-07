@@ -1,4 +1,4 @@
-// Issue #39 WP2: the shared TSL shader library compiles and draws on the WebGL2 fallback
+// Issue #39: the shared TSL shader library compiles and draws on the WebGL2 fallback
 // (headless SwiftShader) through the dev-only /shaderlab.html harness.
 import { expect, test, type Page } from '@playwright/test';
 
