@@ -10,7 +10,10 @@ import {
   spectrumCoverageMessage,
   spectrumEmptyMessage,
   spectrumErrorMessage,
+  spectrumWaitingStoppedText,
+  spectrumWaitingText,
 } from '@/app/messages';
+import { framesCounts } from '@/app/flipbook/progressive';
 import { RefusalList } from '@/app/RefusalList';
 import { summarizeSpectrum } from '@/app/refusals';
 import { ErrorBox, LoadingBox } from '@/app/StatusBoxes';
@@ -53,6 +56,30 @@ export function SpectrumPanel() {
       >
         Spectrum of {name}
       </h2>
+      {status === 'waiting' && (
+        // Frames are still arriving (progressive.ts): a spectrum from part of them would be
+        // incomplete, so it is measured once they are all in.
+        <div
+          className="flex flex-col gap-2 text-sm text-neutral-300"
+          data-testid="spectrum-waiting"
+        >
+          {sky.progress?.phase === 'fetching' || sky.status !== 'ready' ? (
+            <p>{spectrumWaitingText(sky.frames ? framesCounts(sky.frames) : null)}</p>
+          ) : (
+            <>
+              <p>{spectrumWaitingStoppedText(sky.frames ? framesCounts(sky.frames) : null)}</p>
+              <button
+                type="button"
+                className={`${buttonClass} self-start`}
+                onClick={() => void loadSpectrum()}
+                data-testid="spectrum-measure-now"
+              >
+                Measure the frames found so far
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {status === 'loading' && <LoadingBox text="Measuring the spectrum…" startedAt={null} />}
       {status === 'error' && error && (
         <ErrorBox

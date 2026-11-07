@@ -20,6 +20,7 @@ npm run dev:fixtures  # same app, /v1 answered by SYNTHETIC fixtures (no backend
 - `npm run dev` proxies `/v1` (the D-16 API) to `http://localhost:8000`. Set `SX_API_TARGET` to use another address. `npm run preview` proxies the same way.
 - `npm run dev:fixtures` (`vite --mode fixtures`) answers `/v1` from [`fixtures/`](fixtures/README.md) instead. That data is **synthetic**; the page then shows a "Fixture data" banner and "Fixture" badges. The fixtures exist only on the dev server: no app module imports them, and `npm run build` fails if a fixture marker reaches `dist/` (`scripts/check-dist.js`).
 - Playwright always runs on the fixtures.
+- **Uncached positions on a live backend:** run the backend with `SX_LIVE_CUTOUTS_PER_REQUEST=3` in dev (see the [backend README](../backend/README.md)). Each `/frames` reply then comes back well inside the 90 s request timeout, and the flipbook fetches the rest progressively (below). Any value works; with the default 24 a reply can take longer than 90 s, which the flipbook treats as "still working" and asks again.
 
 ### Phone testing over the LAN (Android Chrome)
 
@@ -37,21 +38,21 @@ If Windows Firewall prompts for Node.js, allow it on private networks. Setting `
 
 ### Scripts
 
-| Script                    | Does                                                                                                                       |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `dev`                     | Vite dev server                                                                                                            |
-| `dev:phone`               | Vite on the LAN (`--host`) with HTTPS                                                                                      |
-| `dev:fixtures`            | Vite dev server with `/v1` served from the synthetic fixtures                                                              |
-| `build`                   | `tsc -b && vite build`, then `check:dist`                                                                                  |
-| `check:dist`              | Fails if fixture code or data is in `dist/`                                                                                |
-| `preview`                 | serve `dist/`                                                                                                              |
-| `typecheck`               | `tsc -b --noEmit` (strict, `noUncheckedIndexedAccess`, `noImplicitOverride`)                                               |
-| `lint`                    | ESLint flat config (typescript-eslint, react-hooks)                                                                        |
-| `format` / `format:check` | Prettier                                                                                                                   |
-| `test`                    | Vitest (jsdom)                                                                                                             |
-| `test:e2e`                | Playwright smoke, flipbook, shader-kind and sky tests on fixtures, Chromium only (`npx playwright install chromium` first) |
-| `contract:gen`            | Rewrites `src/contract/generated.ts` from `../shared/schemas/` (D-18)                                                      |
-| `contract:check`          | Fails if `src/contract/generated.ts` differs from a fresh generation                                                       |
+| Script                    | Does                                                                                                                                            |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dev`                     | Vite dev server                                                                                                                                 |
+| `dev:phone`               | Vite on the LAN (`--host`) with HTTPS                                                                                                           |
+| `dev:fixtures`            | Vite dev server with `/v1` served from the synthetic fixtures                                                                                   |
+| `build`                   | `tsc -b && vite build`, then `check:dist`                                                                                                       |
+| `check:dist`              | Fails if fixture code or data is in `dist/`                                                                                                     |
+| `preview`                 | serve `dist/`                                                                                                                                   |
+| `typecheck`               | `tsc -b --noEmit` (strict, `noUncheckedIndexedAccess`, `noImplicitOverride`)                                                                    |
+| `lint`                    | ESLint flat config (typescript-eslint, react-hooks)                                                                                             |
+| `format` / `format:check` | Prettier                                                                                                                                        |
+| `test`                    | Vitest (jsdom)                                                                                                                                  |
+| `test:e2e`                | Playwright smoke, flipbook, shader-kind, sky, colour and progressive tests on fixtures, Chromium only (`npx playwright install chromium` first) |
+| `contract:gen`            | Rewrites `src/contract/generated.ts` from `../shared/schemas/` (D-18)                                                                           |
+| `contract:check`          | Fails if `src/contract/generated.ts` differs from a fresh generation                                                                            |
 
 CI: [`.github/workflows/frontend.yml`](../.github/workflows/frontend.yml) runs the contract check, typecheck, lint, format check, unit tests and build, plus a separate Playwright job.
 
@@ -98,11 +99,13 @@ src/
   state/          Zustand store: card, params, honesty (starts at `derived`, D-21), overrides (D-02),
                   and the `sky` slice (flipbook session: search, frames, playback, spectrum)
   app/            React shell: App, ViewerPanel (canvas + on-screen controls), StatusLine,
-                  FixtureBanner, LiveAnnouncer, ViewerPanel.test.tsx, useHashSync + urlHash (A10 hash routing)
+                  FixtureBanner, LiveAnnouncer, ViewerPanel.test.tsx, useHashSync + urlHash (A10 hash routing),
+                  Segmented (radio-group segmented control)
     api/                  M1 API client (D-16): types (TEMPORARY until D-18 generation), checks, errors
     search/               SearchBar, parseQuery (name or RA, Dec in degrees), the 5 test targets
     flipbook/             Flipbook player, cutout preloading, playback, Rainbow Trails (D-28); session.tsx
-                          (preload + playback timer shared by the panel and the transport bar)
+                          (preload + playback timer shared by the panel and the transport bar);
+                          colourMode + ColourViews (Raw | Colour: wavelength tint, SPHEREx composite)
     shell/                (prototype) ToolRail, Transport, PanelCard + Panels, Readout, icons, shellStore,
                           shortcuts ("/" focuses search)
     sky/                  (prototype) SkyPane (sky view, markers, picking), useTargetMarkers, readout feed
@@ -166,16 +169,22 @@ Tap "Turn on vibration and sound" first. Debug a phone with `chrome://inspect`. 
 - **Layout** (from `mockup/spherex-ui.html`, tokens in `src/index.css`): dark bezel; brand, fixture banner and RA/Dec readout on top; tool rail on the left (Sky, Flipbook, Spectrum, 3D viewer; no Haptics tool until M5); the sky view as the main pane; transport bar bottom left; search pill bottom right with the quick picks above it. The active tool opens a floating panel card (object info + flipbook + spectrum, or the 3D viewer). At ≤ 640 px the rail becomes a row and the panel a bottom sheet.
 - **Sky image:** `GET /v1/sky/index.json` (not in D-16, Q-87). The smallest equirect loads first; a larger one replaces it on a device that can hold it (renderer max texture size), never above 4096 px on a coarse-pointer device or with Save-Data (`SKY_PHONE_MAX_WIDTH`). With no image installed, a coordinate grid and a note show; picking still works. The picture wears the Estimated badge with the index's formula and its credit line.
 - **Orientation:** seen from inside, north up, east (higher RA) to the left. `viewer/sky/skyMath.ts` documents the frame; unit tests check it against a real r187 camera and the sphere's UVs, and `e2e/sky.spec.ts` reads it back from the screen on the synthetic fixture sky (red = RA, green = Dec).
-- **Interaction:** drag pans, wheel or pinch zooms (FOV 120° to 2°); a click (moved < 5 px) picks the position under the pointer, analytically from the camera ray, and runs the search with `ra,dec` (6 decimals, tagged `derived`, Q-25). Markers for the five quick-pick targets are placed from `/v1/resolve`. Keyboard on the canvas: arrows pan, +/− zoom, R resets, Enter picks the centre; on-screen pan and zoom buttons (WCAG 2.5.7); "/" anywhere focuses the search.
+- **Interaction:** drag pans, wheel or pinch zooms (FOV 120° to 2°); a click (moved < 5 px) picks the position under the pointer, analytically from the camera ray, and runs the search with `ra,dec` (6 decimals, tagged `derived`, Q-25). Markers for the five quick-pick targets are placed from `/v1/resolve`. Smaller "cached, loads instantly" dots mark the positions `GET /v1/sky/cached` lists (not in D-16; `sky/cachedMarkers.ts`, `useCachedMarkers.ts`); a target already marked is not marked twice (same id, or within 2″), the label shows on hover or focus, and the list is loaded again when a frame list has just become complete. Keyboard on the canvas: arrows pan, +/− zoom, R resets, Enter picks the centre; on-screen pan and zoom buttons (WCAG 2.5.7); "/" anywhere focuses the search.
 - **Performance:** render on demand, pixel ratio ≤ 1.5 (D-05), mipmaps with anisotropy, image decode off the main thread (`ImageBitmapLoader`), texture swaps wait for the end of a drag, no React render per pointer move (readout and markers are written from refs). HiPS tile LOD is not built yet.
 
 ### Flipbook and spectrum (M1, issue #3)
 
 - **Search:** a name, or RA, Dec in decimal degrees (`parseQuery`). Three or more numbers (sexagesimal) ask for decimal degrees. Quick picks for the five A1.1 targets.
 - **Flipbook:** plays the frames in the order the API lists them. Play/pause, step, a scrubber and a speed control (in the shell's transport bar; Home/End in the flipbook go to the first and last frame); it shows each frame's number, wavelength, UTC time and flags. Play is enabled once the current frame and the next 3 cutouts have loaded or failed; a failed cutout shows "Cutout unavailable" instead of a picture. When `north_up` is false, a note says the picture may rotate between frames.
+- **Fixed frame grid** (`flipbook/frameGrid.ts`): SPHEREx cutouts differ in size (58×58 to 59×59 px, smaller where a detector edge clips them), so every frame of an object is drawn on one N×N grid of source pixels (N = the largest side, rounded up to odd; 59 when no size is stated) at one scale, in a square box that never changes size. Native-orientation frames are shifted by whole pixels so the object's (x, y) lands on the grid centre; frames on a shared north-up grid are drawn at offset 0 (Rainbow Trails uses their own x, y). Outside a frame is black. The tint layer has the frame's box; the ring stays on the grid centre. The caption's flags line and the preload line reserve two lines, so nothing below moves during playback.
 - **Keyboard:** in the flipbook, Space or K plays and pauses, ←/→ step, Home/End go to the first and last frame. These keys are ignored while focus is on a button or form field (which keep their own keys) and when Alt, Ctrl or Meta is held. Space/K do nothing while the Play button is disabled.
 - **Spectrum:** the ring on the object (or "Show spectrum") loads `GET /v1/objects/{id}/spectrum`. The SVG chart draws 1σ error bars; flagged points are hollow orange diamonds, named in the legend. A data table lists every point and can jump to its frame.
 - **Rainbow Trails (D-28):** one dot per frame, in false colour: hue = wavelength. The colour is `derived` and wears the Estimated badge; in "Measured only" the dots go monochrome. Offered only for moving objects whose frames share a north-up grid and once a cutout has loaded; otherwise the button is disabled with the reason.
-- **URL hash:** `#ra=<deg>&dec=<deg>[&name=<search>][&frame=<frame_id>]`. A typed search pushes a history entry; pausing or stepping updates `frame` in place. Going back to the page without a hash clears the search; unusable parts of a link are shown under the search field and announced.
+- **Colour views** (prototype, 7 Nov 2026; `flipbook/colourMode.ts`, `ColourViews.tsx`): a "Picture" switch, Raw | Colour (default Raw), and with Colour a "Colour view" switch, Wavelength tint | SPHEREx composite. Both are radio groups (one Tab stop, arrow keys, Home/End), 32 px tall with a mouse and 44 px on touch.
+  - _Wavelength tint:_ each grey cutout is multiplied by the Rainbow Trails colour of its own wavelength (a `mix-blend-mode: multiply` layer over the pixelated image: pixel-sharp, no extra requests, nothing allocated per frame). Playback, scrubber and preload are unchanged. Estimated badge ("false colour: hue = wavelength" plus the stretch) and a legend with the current λ marked on the 0.75–5.0 µm scale.
+  - _SPHEREx composite:_ `GET /v1/objects/{id}/composite` (not in D-16; types in `app/api/types.ts`, checked by `parseComposite`: a composite with an image needs a formula, size, scale, object pixel, `north_up` and one band per channel), once per object (cached in the store). The PNG is shown pixel-sharp at the flipbook's size with a ring at (x, y), "North up, east left", a blue/green/red legend with each band's wavelength and time, and the Estimated badge with the reply's formula. The transport bar is disabled with a note while it shows. A refused composite (`image_url: null`) says why from `missing`; request errors (`offline_cache_miss`, `upstream_unavailable`, …) show an error box with Try again.
+  - In "Measured only" (D-21) both colour views fall back to the grey frames with a note (the M1 page has no honesty toggle in the flipbook; the 3D viewer's control sets it).
+- **URL hash:** `#ra=<deg>&dec=<deg>[&name=<search>][&frame=<frame_id>][&colour=tint|composite]`; without `colour` the flipbook shows the raw frames, so older links keep working. A typed search pushes a history entry; pausing or stepping updates `frame` in place. Going back to the page without a hash clears the search; unusable parts of a link are shown under the search field and announced.
+- **Progressive frames** (`flipbook/progressive.ts`, `FramesProgress.tsx`): when a frames reply lists `cutouts:deferred:<n>`, the flipbook shows (and plays) the frames it has, with "Fetching SPHEREx frames for this spot from the archive… 18 of 266 ready" and a Stop button, and asks again one request at a time (0.5 s apart) until nothing is deferred, merging new frames by `frame_id` in the backend's order without moving the current frame or playback. Numbers: _ready_ = frames listed; _found_ = ready + still to download (`cutouts:deferred`) + not usable (per-frame refusals such as `outside_cutout` or a failed `cutout:`). A client timeout is "still working" and is asked again (up to 5 in a row); server and network errors back off 2 s → 30 s and give up after 5 retries in a row with the error box and Try again (before the first reply they show the error at once, as before). Stop keeps the frames; Continue fetches the rest; a new search cancels it. The spectrum and the colour composite wait for the complete list ("measured once all frames have been downloaded"); after Stop they can be made from the frames found so far, and the backend lists the deferred cutouts in their `missing`. Progress goes to the polite live region at most every 15 s; completion and Stop always do.
 - **States:** staged loading messages (with elapsed seconds after 5 s), `role="alert"` errors with "Try again", empty and refused results explained from `missing`, and a polite live region for status changes (R9).
 - **Honesty:** SPHEREx values wear a "Measured" badge and the display stretch an "Estimated" one (`derived`, the tooltip gives its parameters); fixture data wears "Fixture" instead, plus the page banner.

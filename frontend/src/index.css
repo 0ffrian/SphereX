@@ -313,6 +313,17 @@ body {
     color: var(--color-sx-mfg);
     white-space: nowrap;
   }
+  /* Shown instead of the scrubber while the colour composite (one picture) is on screen. */
+  .sx-player-note {
+    flex: 1 1 220px;
+    min-width: 0;
+    max-width: 320px;
+    margin: 0 6px;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--color-sx-fg);
+    white-space: normal;
+  }
   .sx-frame-info b {
     color: var(--color-sx-fg);
     font-weight: 500;
@@ -658,6 +669,29 @@ body {
     border: 2px dashed var(--color-sx-amber);
     box-shadow: 0 0 0 1px #000a;
   }
+  /* Cached spots (/v1/sky/cached): a small solid dot, label on hover or focus only, so many of
+     them do not crowd the sky. The 44 px hit area stays (.sx-marker). */
+  .sx-marker-cached .sx-marker-ring {
+    width: 10px;
+    height: 10px;
+    margin-left: 6px;
+    border: 1.5px solid #0a0a0a;
+    background: #e9d5ff;
+    box-shadow:
+      0 0 0 1px #e9d5ffaa,
+      0 0 8px #c084fc88;
+  }
+  .sx-marker-cached .sx-marker-label {
+    display: none;
+  }
+  button.sx-marker-cached:hover .sx-marker-label,
+  button.sx-marker-cached:focus-visible .sx-marker-label {
+    display: inline;
+  }
+  button.sx-marker-cached:hover .sx-marker-ring {
+    border-color: #0a0a0a;
+    background: #ffffff;
+  }
 
   /* ---- phone width: rail and bars reflow, panels become a bottom sheet ---- */
   @media (max-width: 640px) {
@@ -786,8 +820,8 @@ body {
       width: 1px;
       height: 20px;
     }
-    /* The credit becomes a full-width strip on top of everything at the bottom of the sky; the bottom
-       sheet stays docked under it and keeps its content above it (D-32). */
+    /* The credit becomes a full-width strip at the bottom of the sky; the bottom sheet docks on top
+       of it (--sx-credit-h), so the credit never cuts across the sheet's text (D-32). */
     .sx-sky-credit {
       left: 0;
       right: 0;
@@ -795,22 +829,20 @@ body {
       max-width: none;
       border-radius: 0 0 14px 14px;
       border-top: 1px solid var(--color-sx-border);
-      /* Opaque: sheet text scrolls under it. */
       background: var(--color-sx-bg);
       padding: 6px 10px;
     }
     .sx-panel,
     .sx-panel-wide {
       top: auto;
-      bottom: 0;
+      bottom: var(--sx-credit-h, 0px);
       left: 0;
       right: 0;
       width: 100%;
-      max-height: 66%;
+      /* Same top edge as a sheet of 66 % that ran under the credit. */
+      max-height: calc(66% - var(--sx-credit-h, 0px));
       border-radius: 20px 20px 0 0;
-    }
-    .sx-panel-body {
-      padding-bottom: calc(16px + var(--sx-credit-h, 0px));
+      border-bottom: 0;
     }
   }
 
@@ -879,7 +911,32 @@ body {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    /* One run only: an infinite 0.01 ms pulse (animate-pulse) would flicker every frame. */
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Phone: the search help floats above the search instead of taking a row. In the flow it pushed
+   the sky up while the field had focus, and the first tap elsewhere (which blurs the field and
+   hides the help) moved the bottom sheet by its height, so that tap could miss. Unlayered, so it
+   wins over Tailwind's `not-sr-only` (position: static). Click-through, so it never eats a tap. */
+@media (max-width: 640px) {
+  .sx-search-pop > p:first-child {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    z-index: 30;
+    pointer-events: none;
+  }
+  .sx-search:has(input:focus) .sx-search-pop > p:first-child {
+    margin-bottom: 6px;
+    background: #111114f5;
+  }
+}
+/* `not-sr-only` also zeroes the help's padding (the utilities layer beats .sx-search-note). */
+.sx-search:has(input:focus) .sx-search-pop > p:first-child {
+  padding: 6px 10px;
 }

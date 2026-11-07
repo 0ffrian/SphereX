@@ -309,7 +309,9 @@ test('a slow reply shows the loading state', async ({ page }) => {
   });
   await page.goto('/');
   await search(page, 'RW Aur');
-  await expect(page.getByTestId('loading')).toContainText('Asking the archive for frames');
+  await expect(page.getByTestId('loading')).toContainText(
+    'Searching the archive for SPHEREx frames at RA 76.95653°, Dec +30.40144°',
+  );
   await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
   await expect(page.getByTestId('loading')).toHaveCount(0);
 });

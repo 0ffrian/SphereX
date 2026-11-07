@@ -4,8 +4,14 @@ import type { SkyError } from '@/state/store';
 import { badgeForTag, HONESTY_LABEL, stateThatShows } from '@/viewer/honesty';
 import type { MissingItem } from '@/viewer/planTypes';
 import { API_TIMEOUT_MS } from './api/config';
+import type { CompositeResponse } from './api/types';
 import { formatWavelength } from './format';
-import type { FrameReason, RefusalGroup, SpectrumOutcome } from './refusals';
+import {
+  groupCompositeMissing,
+  type FrameReason,
+  type RefusalGroup,
+  type SpectrumOutcome,
+} from './refusals';
 
 export function searchErrorMessage(err: SkyError, query: string): string {
   switch (err.kind) {
@@ -104,7 +110,37 @@ const NOTE_TEXT: Readonly<Record<string, string>> = {
   'spectrum:saturated':
     'The detector flagged the object’s centre as saturated or unusable in every frame found, so this tool can’t measure a spectrum.',
   'spectrum:moving_object_search': 'Spectra for moving Solar System objects are not measured yet.',
+  // Colour composite (refusals.ts COMPOSITE_WHOLE_REASONS). `saturated` is cause-neutral (A11).
+  'composite:too_few_bands':
+    'There are not enough usable frames near the three colour wavelengths to make a composite.',
+  'composite:saturated':
+    'In at least one colour band, every frame near its wavelength had the object’s centre flagged as saturated or unusable.',
+  'composite:no_common_pass':
+    'There are frames for each colour, but they come from different scans of the sky, taken too far apart in time to combine.',
+  'composite:moving_object':
+    'Colour composites are not built for moving Solar System objects: the object is in a different place in each frame.',
+  'composite:no_proper_motion':
+    'The catalogue gives no proper motion, so the picture is centred on the catalogue position.',
+  'composite:pixel_scale':
+    'The pixel size on the sky can’t be worked out, so the frames can’t be aligned.',
 };
+
+/** Per colour band (`composite:<channel>:<reason>`): the words after "Blue band:". */
+const COMPOSITE_CHANNEL_TEXT: Readonly<Record<string, string>> = {
+  no_frame: 'no frame near its wavelength.',
+  saturated:
+    'every frame near its wavelength had the object’s centre flagged as saturated or unusable.',
+  no_usable_frame: 'no usable frame near its wavelength.',
+  stretch: 'the chosen frame is blank or flat and can’t be shown.',
+};
+const COMPOSITE_CHANNEL_RE = /^composite:(blue|green|red):([a-z_]+)$/;
+
+function compositeChannelText(code: string): string | undefined {
+  const m = COMPOSITE_CHANNEL_RE.exec(code);
+  if (!m || !Object.hasOwn(COMPOSITE_CHANNEL_TEXT, m[2]!)) return undefined;
+  const band = m[1]!.charAt(0).toUpperCase() + m[1]!.slice(1);
+  return `${band} band: ${COMPOSITE_CHANNEL_TEXT[m[2]!]!}`;
+}
 
 function frameText(reason: string): { line: string; short: string } | undefined {
   return Object.hasOwn(FRAME_TEXT, reason) ? FRAME_TEXT[reason as FrameReason] : undefined;
@@ -120,10 +156,51 @@ export function describeRefusalGroup(g: RefusalGroup): string {
   }
   if (g.known && g.reason.startsWith('cutouts:deferred:')) {
     return g.count === 1
-      ? '1 more frame is not downloaded yet. Search again in a moment to load it.'
-      : `${g.count} more frames are not downloaded yet. Search again in a moment to load them.`;
+      ? '1 frame is left out because it has not been downloaded yet. Fetch the rest of the frames above to include it.'
+      : `${g.count} frames are left out because they have not been downloaded yet. Fetch the rest of the frames above to include them.`;
   }
-  return Object.hasOwn(NOTE_TEXT, g.reason) ? NOTE_TEXT[g.reason]! : `Not available: ${g.reason}`;
+  if (Object.hasOwn(NOTE_TEXT, g.reason)) return NOTE_TEXT[g.reason]!;
+  return compositeChannelText(g.reason) ?? `Not available: ${g.reason}`;
+}
+
+// ---- Colour composite -------------------------------------------------------------------------
+
+/** Why the composite request failed (the refusals in a reply are worded by describeRefusalGroup). */
+export function compositeErrorMessage(err: SkyError): string {
+  if (err.code === 'offline_cache_miss') {
+    return 'This composite is not in the local cache, and the server is in offline mode, so it can’t be built now.';
+  }
+  if (err.code === 'upstream_unavailable') {
+    return 'The archive is not answering, so the composite can’t be built right now. Try again in a moment.';
+  }
+  if (err.kind === 'not_found') return 'There is no colour composite for this object.';
+  if (err.kind === 'bad_request') return 'The server could not build a composite for this object.';
+  if (err.kind === 'bad_response') {
+    return 'The server sent a composite this page can’t read, so it is not shown.';
+  }
+  return searchErrorMessage(err, '');
+}
+
+/** Lead line of a refused composite (`image_url: null`). */
+export const COMPOSITE_REFUSED = 'There is no SPHEREx colour composite for this object.';
+/** A refused composite that gives no reason: still said in words, never a blank box. */
+export const COMPOSITE_NO_REASON = 'The server gave no reason.';
+/** What still works after a refused composite. */
+export const COMPOSITE_REFUSED_NEXT = 'Raw and Wavelength tint still show every frame.';
+/** Tooltip of the composite's Estimated badge when the reply names no formula. */
+export const COMPOSITE_NO_FORMULA =
+  'False colour: three SPHEREx frames shown as blue, green and red. The server did not say which stretch it used.';
+
+/** Text for the polite live region once the composite reply is in (R9). */
+export function compositeAnnouncement(c: CompositeResponse): string {
+  if (c.image_url === null) {
+    const first = groupCompositeMissing(c.missing)[0];
+    return first
+      ? `No colour composite: ${describeRefusalGroup(first)}`
+      : `${COMPOSITE_REFUSED} ${COMPOSITE_NO_REASON}`;
+  }
+  const bands = c.bands.map((b) => `${b.channel} ${formatWavelength(b.wavelength_um)}`).join(', ');
+  return `Colour composite shown: ${bands}.`;
 }
 
 /** Short label for a frame group's ID list, e.g. "saturated". */
@@ -323,4 +400,106 @@ export function describeRefusal(item: MissingItem): string {
     case 'unverified':
       return `${name}: not drawn yet. ${item.detail ?? 'A value it needs is still being checked.'}`;
   }
+}
+
+// ---- Progressive frame loading (flipbook/progressive.ts) -------------------------------------
+
+/** The counts the progress line shows (progressive.ts FramesCounts). */
+export interface ProgressCounts {
+  ready: number;
+  toDownload: number;
+  notUsable: number;
+  found: number;
+  truncated: boolean;
+}
+
+/** "spot" for a picked or typed position, "object" for a name. */
+export type ProgressWhere = 'spot' | 'object';
+
+/** Loading line before the first frames reply. */
+export function framesSearchingText(coords: string): string {
+  return `Searching the archive for SPHEREx frames at ${coords}… IRSA can be slow.`;
+}
+
+/** Main progress line while more frames are being fetched. */
+export function framesProgressHeadline(c: ProgressCounts, where: ProgressWhere): string {
+  return `Fetching SPHEREx frames for this ${where} from the archive… ${c.ready} of ${c.found} ready.`;
+}
+
+/** What the numbers mean: found = ready + still to download + not usable. */
+export function framesProgressDetail(c: ProgressCounts): string {
+  const parts = [`${c.ready} ready to play`, `${c.toDownload} still to download`];
+  if (c.notUsable > 0) parts.push(`${c.notUsable} not usable (listed below)`);
+  const cut = c.truncated ? ' (its list was cut short, so there may be more)' : '';
+  return `The archive search found ${pluralFrames(c.found)}${cut}: ${parts.join(', ')}.`;
+}
+
+export const FRAMES_PLAY_WHILE_LOADING =
+  'You can play the frames that are ready while the rest arrive.';
+
+export function framesStoppedHeadline(c: ProgressCounts): string {
+  return `Stopped. ${c.ready} of ${c.found} frames ready; ${c.toDownload} not downloaded.`;
+}
+
+export function framesGaveUpMessage(c: ProgressCounts): string {
+  return `Fetching the remaining frames failed after several tries. ${c.ready} of ${c.found} frames are ready to play.`;
+}
+
+/** A failed request that is being retried. */
+export function framesRetryText(r: {
+  timeout: boolean;
+  failures: number;
+  max: number;
+  delayMs: number;
+}): string {
+  if (r.timeout) {
+    return `No answer within ${Math.round(API_TIMEOUT_MS / 1000)} s. The server keeps downloading in the background, so asking again (retry ${r.failures} of ${r.max}).`;
+  }
+  return `The server did not answer. Trying again in ${Math.round(r.delayMs / 1000)} s (retry ${r.failures} of ${r.max}).`;
+}
+
+// Polite live-region texts (R9). Progress updates are throttled by the store.
+
+export function framesFirstPartAnnouncement(c: ProgressCounts, name: string): string {
+  return `Found ${pluralFrames(c.found)} for ${name}; ${c.ready} ready, fetching the rest from the archive.`;
+}
+
+export function framesProgressAnnouncement(c: ProgressCounts): string {
+  return `${c.ready} of ${c.found} frames ready.`;
+}
+
+export function framesCompleteAnnouncement(c: ProgressCounts, name: string): string {
+  const unusable = c.notUsable > 0 ? ` (${c.notUsable} not usable)` : '';
+  return `Finished fetching frames: ${pluralFrames(c.ready)} ready for ${name}${unusable}.`;
+}
+
+export function framesStoppedAnnouncement(c: ProgressCounts): string {
+  return `Stopped fetching frames. ${c.ready} of ${c.found} ready.`;
+}
+
+export function framesRetryAnnouncement(timeout: boolean, delayMs: number): string {
+  return timeout
+    ? 'The archive is slow; still fetching frames.'
+    : `The server did not answer; trying again in ${Math.round(delayMs / 1000)} seconds.`;
+}
+
+export const SPECTRUM_WAITING_ANNOUNCEMENT =
+  'The spectrum will be measured once all frames have been downloaded.';
+
+/** Spectrum panel while the frames are still being fetched. */
+export function spectrumWaitingText(c: ProgressCounts | null): string {
+  const tally = c ? ` (${c.ready} of ${c.found} ready)` : '';
+  return `The spectrum is measured once all frames have been downloaded${tally}. It will appear here.`;
+}
+
+/** Spectrum panel after Stop or giving up, with a spectrum asked for. */
+export function spectrumWaitingStoppedText(c: ProgressCounts | null): string {
+  const tally = c ? ` with ${c.ready} of ${c.found} frames ready` : '';
+  return `Fetching frames has stopped${tally}. Continue fetching above, or measure the frames found so far (the spectrum will be incomplete).`;
+}
+
+/** The colour composite while the frames are still being fetched. */
+export function compositeWaitingText(c: ProgressCounts | null): string {
+  const tally = c ? ` (${c.ready} of ${c.found} ready)` : '';
+  return `The SPHEREx colour composite is built once all frames have been downloaded${tally}.`;
 }

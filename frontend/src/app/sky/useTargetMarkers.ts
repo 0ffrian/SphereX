@@ -9,6 +9,8 @@ import { TEST_TARGETS } from '@/app/search/testTargets';
 import { getSkyApi, useAppStore } from '@/state/store';
 
 export interface TargetMarker {
+  /** The backend's object id (from /v1/resolve), so cached markers can skip this target. */
+  id: string;
   name: string;
   ra: number;
   dec: number;
@@ -24,7 +26,7 @@ export interface TargetMarkers {
 /** Delay before the marker lookups start. UI pacing, not a physical value. */
 export const MARKER_RESOLVE_DELAY_MS = 2000;
 
-function whenIdle(cb: () => void): () => void {
+export function whenIdle(cb: () => void): () => void {
   const w = window as Window & {
     requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
     cancelIdleCallback?: (id: number) => void;
@@ -53,7 +55,7 @@ export function useTargetMarkers(enabled: boolean): TargetMarkers {
           try {
             const r = await api.resolve(name, controller.signal);
             if (r.fixture) useAppStore.getState().skyMarkFixtureSeen();
-            return { name, ra: r.data.ra, dec: r.data.dec };
+            return { id: r.data.id, name, ra: r.data.ra, dec: r.data.dec };
           } catch {
             return name;
           }

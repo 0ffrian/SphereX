@@ -1,6 +1,6 @@
 # 08 Sequence: search and flipbook
 
-A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache), D-28 (Rainbow Trails) and D-32 (sky tiles). The sky-view prototype paths (sky pick, shared flipbook session, transport bar) follow Q-87 to Q-91.
+A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache), D-28 (Rainbow Trails) and D-32 (sky tiles). The sky-view prototype paths (sky pick, shared flipbook session, transport bar) follow Q-87 to Q-91; its cached markers, progressive frames and colour views follow Q-92, Q-93 and Q-95 to Q-99. How the backend builds the composite: [20](20-sequence-composite.md).
 
 ```mermaid
 sequenceDiagram
@@ -31,6 +31,10 @@ sequenceDiagram
     API-->>SP: Equirect JPEG, shown with the Estimated badge and the survey credit (Q-88, D-32)
     SP->>API: GET /v1/resolve for each quick-pick target
     API-->>SP: Marker positions (a name that does not resolve gets no marker)
+    SP->>API: GET /v1/sky/cached (Q-98, not in D-16)
+    API->>C: derived.frames meta files of this release + derived.object registry (never the cutouts)
+    API-->>SP: Positions whose frame list is complete: id, name, query, ra, dec, frames
+    SP->>SP: Small "cached, loads instantly" markers, except where a target marker already is
   end
   alt user types a name or RA/Dec
     U->>UI: Enter name or RA/Dec
@@ -41,8 +45,11 @@ sequenceDiagram
   else user clicks a target marker on the sky
     U->>SP: Click marker
     SP->>UI: Search the target name with origin sky
+  else user clicks a cached marker (prototype)
+    U->>SP: Click cached marker
+    SP->>UI: Search its query (a name) or its id coordinates (5 decimals), origin sky
   else user opens a shared link or presses Back
-    U->>UI: URL hash #35;ra=…&dec=…[&name=…][&frame=…]
+    U->>UI: URL hash #35;ra=…&dec=…[&name=…][&frame=…][&colour=…]
     UI->>UI: Parse the hash. Unusable parts are ignored, never guessed, shown under the search field and announced (live region)
     alt hash has a name or valid coordinates
       UI->>UI: Search the name if present, else the coordinates (frame= reopens that frame)
@@ -62,6 +69,7 @@ sequenceDiagram
   end
   API-->>UI: id, ra, dec, moving
   UI->>UI: Write #35;ra=…&dec=…[&name=…] to the URL hash (share link). A typed search or a sky pick adds a history entry, a link replaces it
+  UI->>UI: Loading: Searching the archive for SPHEREx frames at RA, Dec
   UI->>API: GET /v1/objects/{id}/frames
   API->>C: Look up (source + data release + normalised query)
   alt cache hit
@@ -70,9 +78,10 @@ sequenceDiagram
     API->>SIA: SIA?COLLECTION=spherex_qr2&POS=circle RA DEC RADIUS&MAXREC=N
     alt archive answers within the timeout and retries
       SIA-->>API: Frame list (time, detector, wavelength range)
-      API->>SIA: Small cutouts only, never whole frames
+      API->>SIA: Small cutouts only, never whole frames, at most SX_LIVE_CUTOUTS_PER_REQUEST live per request
       SIA-->>API: Cutouts: IMAGE, FLAGS, VARIANCE, WCS-WAVE
       API->>C: Store raw response, fetched_at, source URL
+      Note over API,C: Cutouts over the live budget are listed as cutouts:deferred:n, and the frame list is stored (derived.frames) only when complete
     else 504 or timeout (known IRSA problem)
       SIA-->>API: 504
       API->>C: Older cached entry?
@@ -92,6 +101,17 @@ sequenceDiagram
   API-->>UI: frame_id, time, wavelength_um, x, y, cutout_url per frame, plus the stretch used and cached_at if from cache
   UI->>UI: Badges: wavelength and time Measured, display stretch Estimated (derived, tooltip gives its parameters)
   UI->>S: Frames in the store
+  opt reply lists cutouts:deferred:n (progressive loading, flipbook/progressive.ts)
+    UI->>UI: Show and play the frames so far, a progress box "Fetching SPHEREx frames … ready of found ready" and a Stop button
+    loop until no cutouts:deferred, Stop, or a new search (one request at a time)
+      UI->>API: GET /v1/objects/{id}/frames again (0.5 s after the last reply)
+      API-->>UI: The cached frames plus up to the live budget more
+      UI->>UI: Merge by frame_id in time order, the current frame and playback stay
+      UI->>UI: Client timeout: still working, ask again. Server or network error: back off 2 s to 30 s, give up after 5 (error box, Try again)
+    end
+    UI->>UI: Complete: polite announcement, a spectrum asked for meanwhile is measured now, the composite is built when it shows
+    UI->>SP: Load /v1/sky/cached again, so the spot gets its cached marker
+  end
   Note over TB,FB: One session above the panel and the transport bar: closing the panel does not stop playback or restart the preload
   loop each frame
     S->>API: GET /v1/objects/{id}/cutouts/{frame_id}.png
@@ -117,6 +137,26 @@ sequenceDiagram
     FB->>FB: One dot per band along the mover's path, from the frames and positions already loaded
     FB->>FB: Dot colour = false colour, hue = wavelength (derived, Estimated badge). Monochrome in Measured only
   end
+  opt Colour view (prototype): Raw | Colour, then Wavelength tint | SPHEREx composite
+    U->>FB: Pick Colour and a colour view
+    UI->>UI: Replace the hash in place with colour=tint or colour=composite (absent: raw)
+    alt honesty state Measured only (D-21)
+      FB->>FB: Grey frames, with a note that the false colour is hidden
+    else Wavelength tint
+      FB->>FB: Each grey frame multiplied by the colour of its own wavelength (derived, Estimated badge), playback unchanged, no extra requests
+    else SPHEREx composite
+      FB->>UI: Load the composite (once per object, cached in the store)
+      UI->>API: GET /v1/objects/{id}/composite (Q-92, built as in diagram 20)
+      API-->>UI: image_url, width, height, x, y, bands (blue, green, red), tag derived + formula, missing
+      alt image_url set
+        UI->>API: GET image_url (/v1/objects/{id}/composite.png?v=…)
+        FB->>FB: One RGB picture, pixel-sharp, ring at (x, y), band legend, "North up, east left", Estimated badge with the formula
+        UI-->>TB: Playback controls disabled, with a note (the composite is one picture)
+      else image_url null
+        FB->>FB: Refusal in plain words from missing (never a blank box)
+      end
+    end
+  end
 ```
 
 ## Notes
@@ -128,9 +168,12 @@ sequenceDiagram
 - A `candidate` source gets one haptic tick per frame where it is detected (rendering doc §8.5). That path is not drawn here.
 - Rainbow Trails is built after basic playback works (D-28). As built in M1 (issue #3), the dot colour is a false colour, hue = wavelength, tagged `derived` with that formula, so it wears the Estimated badge. In "Measured only" (D-21) the dots are drawn in one colour. The mode is offered only for a `moving` object whose frames share a north-up grid, so with real data it waits for Q-21. The M1 UI has no honesty toggle yet, so the monochrome state is not reachable from the page. Tagging question: Q-27.
 - Sky pick (prototype, Q-89, Q-91): a click that moved under 5 px is a pick. The position under the pointer is computed analytically from the camera ray (`viewer/sky/skyMath.ts`), written as `ra,dec` with 6 decimals and searched with origin `sky`; from there it is an ordinary RA/Dec search. The picked position is user input, tagged `derived` (Estimated badge). The `/v1/sky` endpoints are open as Q-87 and serve only the local copy of the survey tiles (D-32).
+- Cached markers (prototype, Q-98): `GET /v1/sky/cached` reads only the derived cache and lists the positions whose frame list is complete. `app/sky/useCachedMarkers.ts` loads it and loads it again when a frame list has just become complete; `cachedMarkers.ts` skips a position already marked as a quick-pick target (same id, or within 2″) and turns a click into a search of its query or its id coordinates.
 - Flipbook session (`app/flipbook/session.tsx`): the cutout preload, the playback timer and "can play" live above the flipbook panel and the transport bar, which both read it. The flipbook's First and Last buttons are gone in the prototype; Home and End still work (Q-89).
-- URL hash (architecture spec §10, hash routing): `#ra=<deg>&dec=<deg>[&name=<search text>][&frame=<frame_id>]`. `name` is kept for a name search, so a link to a moving object reopens the same object id. A link with a name searches the name, otherwise the coordinates. Going back to the page without a hash resets the search. Unusable parts (bad coordinates, or no name and no coordinates) are ignored, never guessed: they are shown under the search field and announced in the polite live region.
+- Colour views (prototype, 7 Nov 2026): the flipbook's "Picture" switch (Raw | Colour) and "Colour view" switch (Wavelength tint | SPHEREx composite), radio groups in `app/flipbook/ColourViews.tsx`, rules in `colourMode.ts`. Both colour views are false colour, tagged `derived` (Estimated badge): the tint with "false colour: hue = wavelength" plus the stretch, the composite with the reply's `formula`. In "Measured only" both fall back to the grey frames with a note. The composite endpoint (`GET /v1/objects/{id}/composite`, `/composite.png`) is not in D-16 (Q-92); how the backend builds it is in [20](20-sequence-composite.md). Its codes (`composite:too_few_bands`, `composite:<channel>:<reason>`, `composite:moving_object` …) are worded in `app/messages.ts`. The `colour=` link parameter and the disabled transport bar: Q-95. Tagging questions: Q-27, Q-93.
+- URL hash (architecture spec §10, hash routing): `#ra=<deg>&dec=<deg>[&name=<search text>][&frame=<frame_id>][&colour=tint|composite]`; without `colour` the flipbook shows the raw frames, so older links keep working. `name` is kept for a name search, so a link to a moving object reopens the same object id. A link with a name searches the name, otherwise the coordinates. Going back to the page without a hash resets the search. Unusable parts (bad coordinates, or no name and no coordinates) are ignored, never guessed: they are shown under the search field and announced in the polite live region.
 - Dev-only fixture path: `npm run dev:fixtures` (`vite --mode fixtures`) mounts a Vite dev-server plugin from `frontend/fixtures/` that answers `/v1` with synthetic data, and `npm run test:e2e` always uses it. Every reply carries `X-SX-Fixture: synthetic`. The UI then shows a page-wide "Fixture data" banner, "Fixture" badges instead of "Measured" (and instead of the stretch's Estimated badge) and a SYNTHETIC label on the image. `vite build` never runs the plugin, and `scripts/check-dist.js` fails the build if a fixture marker reaches `dist/` ([fixtures README](../../frontend/fixtures/README.md)). The Fixture badge is a fourth badge beside the 3 of D-02; it is a proposed dev-only exception, open as Q-32 in the decisions log.
 - `moving` means a solar-system body (Q-22). High proper-motion stars are not `moving`; their positions come from the SIMBAD proper motion, propagated to each frame time. The ephemeris-driven frame search for moving objects is not built in M1 (Q-21).
 - The SIA search and every cutout go through the cache. A cut-off SIA answer (`QUERY_STATUS=OVERFLOW`) adds `frames:truncated` to `missing`.
+- Progressive frames (sky-view prototype, 7 Nov 2026, Q-97; live budget Q-99): a live backend downloads at most `SX_LIVE_CUTOUTS_PER_REQUEST` cutouts per request, one after another (about 20 s each from IRSA), and lists the rest as `cutouts:deferred:<n>`. The flipbook shows the frames it has and asks again until none is deferred. Progress numbers: ready = frames listed; found = ready + `cutouts:deferred` + per-frame refusals. The spectrum and composite wait for the complete list, because each of those requests runs Stage 1 again (and its own live budget) and would measure a partial list; after Stop they can be made from what is there, with the deferred count in their `missing`. The bounded parallel download and a two-stage answer on the server are issue #41.
 - The flipbook shows the frames reply's `missing` grouped by reason, one plain line with a count each and the frame IDs behind a disclosure; unknown codes are shown as is (A11, issue #24).

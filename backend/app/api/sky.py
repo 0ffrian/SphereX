@@ -5,15 +5,20 @@
   (``app.core.sky.surveys.CONVENTION``).
 - ``GET /v1/sky/{survey}/hips/properties``, ``.../hips/Norder3/Allsky.jpg`` and
   ``.../hips/Norder{k}/Dir{d}/Npix{n}.jpg``: the mirrored HiPS in IRSA's layout.
+- ``GET /v1/sky/cached``: positions whose frame list is complete in the derived cache, so the sky
+  can mark the spots that load at once (``cached_objects``). Read only; never calls upstream.
 
 Every path segment is matched by a regex and the file path is rebuilt from the parsed values
 and the registry id, so no request text reaches the file system. A missing file is the usual
-404 ``{"error": "not_found", ...}``. These endpoints are beyond D-16 (proposed Q- entry).
+404 ``{"error": "not_found", ...}``. These endpoints are beyond D-16 (Q-87, Q-98).
 """
 
 from __future__ import annotations
 
+import json
 import re
+import threading
+from collections import OrderedDict
 from pathlib import Path as FsPath
 from typing import Annotated, Any
 
@@ -22,7 +27,10 @@ from fastapi.responses import FileResponse
 
 from app.api.deps import get_ctx
 from app.api.models import ErrorResponse
+from app.cache.store import LAYOUT_VERSION
 from app.context import Context
+from app.core.find.frames import FRAMES_SOURCE, frames_key
+from app.core.find.resolver import load_object
 from app.core.sky.surveys import (
     ALLSKY_RELPATH,
     CONVENTION,
@@ -147,6 +155,112 @@ def sky_index(ctx: Annotated[Context, Depends(get_ctx)]) -> dict[str, Any]:
     cache_dir = ctx.settings.cache_dir
     surveys = [e for s in SURVEYS.values() if (e := survey_entry(cache_dir, s)) is not None]
     return {"surveys": surveys}
+
+
+# ---- Cached positions --------------------------------------------------------------------------
+
+CACHED_FRAMES_FORMULA = (
+    "number of frames in the stored complete frame list (derived.frames cache entry, written only "
+    "when no cutout was deferred or failed and the search was not truncated)"
+)
+COUNT_MEMO_SIZE = 4096
+_count_memo: OrderedDict[tuple[str, str], int] = OrderedDict()
+_count_lock = threading.Lock()
+
+
+def _frame_count(
+    ctx: Context, object_id: str, meta_path: FsPath, meta: dict[str, Any]
+) -> int | None:
+    """Frames in the stored list. The count is memoised by (entry, body SHA-256), so each body is
+    read (and verified by ``cache.get``) once per process; later calls only check that the body
+    file still has the size its meta states."""
+    sha = str(meta.get("body_sha256", ""))
+    memo_key = (meta_path.stem, sha)
+    with _count_lock:
+        hit = _count_memo.get(memo_key)
+    if hit is not None:
+        try:
+            size = meta_path.with_suffix(".body").stat().st_size
+        except OSError:
+            return None
+        return hit if size == meta.get("body_size") else None
+    entry = ctx.cache.get(frames_key(ctx, object_id))
+    if entry is None or entry.meta.get("body_sha256") != sha:
+        return None
+    try:
+        frames = json.loads(entry.body).get("frames")
+    except (ValueError, AttributeError):
+        return None
+    if not isinstance(frames, list):
+        return None
+    n = len(frames)
+    with _count_lock:
+        _count_memo[memo_key] = n
+        while len(_count_memo) > COUNT_MEMO_SIZE:
+            _count_memo.popitem(last=False)
+    return n
+
+
+def cached_objects(ctx: Context) -> list[dict[str, Any]]:
+    """Objects with a complete stored frame list for the current settings, with their position.
+
+    Reads only the ``derived.frames`` meta files of this data release (one per object, never the
+    raw cutouts). A meta is used only when its digest is the key ``frames_key`` builds now from
+    the id it names, so an entry made with another cutout size, search radius, epoch or
+    derivation version is skipped. The position comes from the object registry
+    (``derived.object``) or from a coordinate id; an object that is not in the registry, moving,
+    or has no frames is left out. Corrupt files are skipped, never a 500.
+    """
+    s = ctx.settings
+    base = ctx.cache.root / LAYOUT_VERSION / FRAMES_SOURCE / s.data_release
+    out: list[dict[str, Any]] = []
+    if not base.is_dir():
+        return out
+    for meta_path in sorted(base.glob("*/*.json")):
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            object_id = meta["key"]["query"]["id"]
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        if not isinstance(object_id, str) or not isinstance(meta.get("body_sha256"), str):
+            continue
+        if frames_key(ctx, object_id).digest != meta_path.stem:
+            continue
+        try:
+            # A registry body can pass its SHA-256 check and still not be a ResolvedObject (an
+            # older layout, a hand edit): skip that entry rather than fail the whole list.
+            obj = load_object(ctx, object_id)
+        except (ValueError, KeyError, TypeError):
+            continue
+        if obj is None or obj.moving:
+            continue
+        n = _frame_count(ctx, object_id, meta_path, meta)
+        if not n:
+            continue
+        out.append(
+            {
+                "id": obj.id,
+                "name": obj.name,
+                # The text the resolver was given (alias-mapped), so a search for it is a cache hit.
+                "query": obj.query,
+                "ra": obj.ra,
+                "dec": obj.dec,
+                "resolver": obj.resolver,
+                "frames": n,
+                "provenance": {k: obj.provenance[k] for k in ("ra", "dec") if k in obj.provenance},
+            }
+        )
+    out.sort(key=lambda o: str(o["id"]))
+    return out
+
+
+@router.get("/cached")
+def sky_cached(ctx: Annotated[Context, Depends(get_ctx)]) -> dict[str, Any]:
+    return {
+        "objects": cached_objects(ctx),
+        "data_release": ctx.settings.data_release,
+        "provenance": {"frames": {"tag": "derived", "formula": CACHED_FRAMES_FORMULA}},
+    }
 
 
 @router.get("/{survey_id}/hips/properties", responses=ERRORS)

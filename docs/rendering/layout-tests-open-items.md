@@ -18,7 +18,9 @@ backend/app/core/card/               (Kevin)  # pipeline stages 4 and 5 (A4.4, A
                                               # assets.py (A5.4 store), validate.py (jsonschema, Q-40), service.py
 backend/assets/                               # A5.4 pre-baked assets, <type>/<id>.json (none yet)
 backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; objects.py: /frames, /cutouts, /card, /render-params (issue #5);
-                                              # sky.py: /v1/sky/... (sky-view prototype, beyond D-16, Q-87)
+                                              # sky.py: /v1/sky/... (sky-view prototype, beyond D-16, Q-87;
+                                              # /v1/sky/cached reads the derived frames cache, Q-98);
+                                              # composite.py: /composite, /composite.png (beyond D-16, Q-92)
 backend/app/adapters/                (Kevin)  # IRSA SIA + cutouts, SIMBAD, SBDB, Horizons, SkyBoT (A3), all through the cache
 backend/app/cache/                   (Kevin)  # D-25 read-through disk cache
 backend/app/core/find/               (Kevin)  # pipeline stage 1 (A4.1): resolver, proper motion, WCS, frames, cutout PNG
@@ -26,6 +28,8 @@ backend/app/contract/                (generated, D-18)  # Pydantic models genera
                                                         # scripts/generate_contract.py; follows the owner of shared/schemas/
 backend/app/core/sky/                (no D-17 owner yet)  # sky-view prototype (Q-87, Q-88): surveys.py (registry, credit), healpix.py
                                                          # (HEALPix NESTED), bake.py (HiPS -> equirect); scripts/sky_mirror.py, sky_bake.py
+backend/app/core/composite/          (no D-17 owner yet)  # SPHEREx false-colour composite (beyond D-16, Q-92, Q-94): config, select,
+                                                         # grid, service; endpoint in app/api/composite.py; tag `derived` (Q-27)
 backend/app/core/measure/            (Moon)  # pipeline stage 2 (A4.2), issue #2: config, flags, aperture,
                                                             # solid_angle, photometry, spectrum; endpoint in app/api/spectrum.py
 frontend/src/viewer/                 (Moon)
@@ -70,19 +74,23 @@ frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, St
                                              # (A10 hash routing), format.ts (numbers, dates), messages.ts (user-facing
                                              # error and `missing` texts), refusals.ts (groups `missing` by reason),
                                              # RefusalList (grouped refusals with frame IDs behind a disclosure),
-                                             # ui.ts (shared class names)
+                                             # ui.ts (shared class names), Segmented.tsx (radio-group segmented control)
   api/                # M1 API client (D-16): client, config, errors, validate; types.ts is hand-written until D-18 generation
   search/             # SearchBar, parseQuery (name, or RA, Dec in decimal degrees), testTargets (the five A1.1 targets)
   flipbook/           # Flipbook player, playback, keys, cutout preloading, RainbowTrails + wavelengthColor (D-28),
-                      # session.tsx (preload + playback timer shared by the panel and the transport bar)
+                      # session.tsx (preload + playback timer shared by the panel and the transport bar),
+                      # progressive.ts + FramesProgress.tsx (frames that arrive in parts: merge, poll, Stop; Q-97),
+                      # frameGrid.ts (one fixed grid and scale per object, frames registered on the object),
+                      # colourMode.ts + ColourViews.tsx (Raw | Colour: wavelength tint, SPHEREx composite; Q-93, Q-95)
   spectrum/           # SpectrumPanel, SVG SpectrumChart, scale (displays the A4.2 output)
   shell/              # prototype shell in the mock-up's layout: ToolRail, Transport, PanelCard + Panels, Readout, shortcuts
-  sky/                # prototype sky pane: SkyPane (image, markers, click to pick → search), useTargetMarkers, readout feed
+  sky/                # prototype sky pane: SkyPane (image, markers, click to pick → search), useTargetMarkers, readout feed,
+                      # cachedMarkers.ts + useCachedMarkers.ts ("loads instantly" markers from /v1/sky/cached)
 frontend/src/test/                           # test-only helpers (fixtureFetch.ts, sharedFixtures.ts: loads shared/fixtures;
                                              # fakeHaptics.ts, fakeAudio.ts: fake clock, drivers and AudioContext;
                                              # hapticRecorder.ts: recording sink and TouchSample helpers, issue #11)
 frontend/src/fixtures.test.ts                # fixtures are deterministic, pass the API validators, never imported by app code
-frontend/e2e/                                # Playwright tests (smoke, flipbook, shader kinds, sky) against the fixture server
+frontend/e2e/                                # Playwright tests (smoke, flipbook, shader kinds, sky, colour, progressive) against the fixture server
 frontend/fixtures/                           # dev and test only: SYNTHETIC fixture server, a Vite dev-server plugin
                                              # enabled by `npm run dev:fixtures`; never part of a build
 frontend/scripts/                            # check-dist.js: ends `npm run build`, fails if a fixture marker is in dist/
@@ -103,6 +111,8 @@ Owners follow D-17 (Munazir is Moon). `frontend/src/contract/` is generated code
 The `app/` subfolders (`api/`, `search/`, `flipbook/`, `spectrum/`), the `sky` slice, `src/test/`, `fixtures/` and `scripts/` were added by the flipbook and spectrum view (M1, issue #3, 5 Nov 2026). The fixture server answers `/v1` with synthetic data and marks every reply with `X-SX-Fixture: synthetic`; see the [fixtures README](../../frontend/fixtures/README.md). D-17 names no owner for `src/test/`, `fixtures/` and `scripts/`; they are dev and test tooling for the flipbook UI.
 
 The sky-view prototype (branch `feat/sky-view-prototype`, 7 Nov 2026) added `app/shell/`, `app/sky/`, `viewer/sky/`, `flipbook/session.tsx`, `backend/app/core/sky/` and `backend/app/api/sky.py`. Their owners are provisional: the frontend folders fall under Moon's `app/` and `viewer/` (D-17), and Moon has not confirmed the shell yet (Q-89); D-17 names no owner for `core/sky/`. Data source: A3.11; licence: D-32.
+
+Later on the same branch (7 Nov 2026) it added `backend/app/core/composite/` and `backend/app/api/composite.py` (the colour composite, Q-92), `/v1/sky/cached` in `sky.py` (Q-98), and under `frontend/src/app/` the colour views (`flipbook/colourMode.ts`, `ColourViews.tsx`), progressive frames (`flipbook/progressive.ts`, `FramesProgress.tsx`, Q-97), the fixed frame grid (`flipbook/frameGrid.ts`), the cached markers (`sky/cachedMarkers.ts`, `useCachedMarkers.ts`) and `Segmented.tsx`. D-17 names no owner for `core/composite/` (its constants are a creative call for Atish, Q-94); `composite.py` sits in Kevin's `app/api/`; the frontend files fall under Moon's `app/` and are provisional until Moon confirms (Q-95, Q-97).
 
 ---
 
