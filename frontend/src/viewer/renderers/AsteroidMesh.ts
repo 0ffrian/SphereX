@@ -12,6 +12,25 @@ import type { RenderPlan } from '../planTypes';
  */
 export const SPIN_SPEEDUP = 1000;
 
+/**
+ * Fastest drawn spin, in revolutions per real second (WCAG 2.3.1: nothing repeats more than 3
+ * times a second; 1 keeps the motion calm, R5.7). Display choice.
+ */
+export const MAX_SPIN_REV_PER_S = 1;
+
+/**
+ * The speed-up shown and drawn for a spin period (hours): `SPIN_SPEEDUP`, lowered for a short
+ * period so the drawn spin stays at or below `MAX_SPIN_REV_PER_S`. Rounded down to 2 significant
+ * figures so the label stays readable ("×360", not "×367.2"); the label is always this value.
+ */
+export function spinSpeedup(periodH: number): number {
+  const revPerS = SPIN_SPEEDUP / (periodH * 3600);
+  if (!(revPerS > MAX_SPIN_REV_PER_S)) return SPIN_SPEEDUP;
+  const capped = (SPIN_SPEEDUP * MAX_SPIN_REV_PER_S) / revPerS;
+  const step = 10 ** (Math.floor(Math.log10(capped)) - 1);
+  return Number((Math.floor(capped / step) * step).toPrecision(2));
+}
+
 const MESH_EXTENSIONS = /\.(glb|gltf|obj)(\?.*)?$/i;
 
 /**
@@ -21,6 +40,12 @@ const MESH_EXTENSIONS = /\.(glb|gltf|obj)(\?.*)?$/i;
  */
 export function isLoadableMeshUrl(value: string | null | undefined): value is string {
   if (!value) return false;
+  // URL parsing turns `\` into `/` and drops tabs and newlines, so `/\evil.example/x.glb` would
+  // resolve to another host: refuse backslashes, whitespace and control characters outright.
+  for (const ch of value) {
+    const c = ch.charCodeAt(0);
+    if (ch === '\\' || c <= 0x20 || c === 0x7f) return false;
+  }
   if (!/^(\/(?!\/)|\.\/)/.test(value)) return false;
   return MESH_EXTENSIONS.test(value);
 }
@@ -53,7 +78,7 @@ export function planAsteroidMesh(input: PlanInput): RenderPlan {
       : [],
     spin:
       bodyOk && spinDrawn && period !== null && period > 0
-        ? { periodH: period, speedup: SPIN_SPEEDUP }
+        ? { periodH: period, speedup: spinSpeedup(period) }
         : null,
     relief: useMesh ? 'measured' : 'illustrative',
   });

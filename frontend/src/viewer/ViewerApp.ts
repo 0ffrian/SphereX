@@ -21,10 +21,22 @@ import {
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { ObjectCard, RenderParams } from '@/contract';
 import { buildLights, MAX_AMBIENT_INTENSITY } from './lighting';
-import type { PlanContext, RenderPlan } from './planTypes';
+import type { PlanContext, RenderPlan, SpinPlan } from './planTypes';
 import { planRender } from './renderPlan';
 import type { BodyRenderer } from './renderers/bodyRenderer';
 import { AssetCache, buildScene, type BuildHooks, type BuiltScene } from './renderers/build';
+import { SimClock, type PauseReason } from './render/clock';
+import { RenderChain } from './render/pipeline';
+import {
+  FEED_GAP_MS,
+  FrameGovernor,
+  initialTier,
+  isTierName,
+  capIntervalMs,
+  FrameCap,
+  qualityFromSearch,
+  type TierName,
+} from './render/quality';
 
 /** Which backend `WebGPURenderer` ended up on after `init()`. */
 export type RendererBackend = 'webgpu' | 'webgl2';
@@ -36,6 +48,37 @@ export function viewerPixelRatio(devicePixelRatio: number): number {
   return Math.min(devicePixelRatio, MAX_PIXEL_RATIO);
 }
 
+/** Longest wait for `compileAsync` before the new content is shown anyway (never stuck on the old). */
+export const COMPILE_TIMEOUT_MS = 3000;
+/** Frame times kept for `renderStats` percentiles. */
+const STATS_WINDOW = 240;
+/** R5.7: on phones the clock pauses after this long without interaction ([verify on phones]). */
+export const IDLE_PAUSE_MS = 60_000;
+
+export interface RenderStats {
+  tier: string;
+  backend: RendererBackend;
+  frames: number;
+  p50Ms: number;
+  p95Ms: number;
+  drops: number;
+}
+
+/** Fired when the governor (or `setQualityTier`) changes the tier; the panel announces it. */
+export interface QualityChange {
+  from: TierName;
+  to: TierName;
+  /** True when the frame-time governor lowered it, false for a manual change. */
+  auto: boolean;
+}
+
+/** Nearest-rank percentile of an unsorted list; 0 for an empty list. */
+export function percentile(values: readonly number[], q: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(q * sorted.length) - 1))]!;
+}
+
 /** R9: `prefers-reduced-motion` disables auto-spin. */
 export function prefersReducedMotion(): boolean {
   return (
@@ -44,6 +87,9 @@ export function prefersReducedMotion(): boolean {
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
 }
+
+/** Deep-space background (display choice, 'artistic'). */
+const SPACE_BACKGROUND = 0x05060a;
 
 /** Camera distance for the unit sphere, and the vertical field of view (degrees). */
 const DEFAULT_CAMERA_DISTANCE = 4;
@@ -150,6 +196,9 @@ export function viewerKeyAction(
   }
 }
 
+/** What counts as interaction for the R5.7 idle pause (a touch, a key, a wheel or trackpad). */
+const IDLE_EVENTS = ['pointerdown', 'keydown', 'wheel'] as const;
+
 export class ViewerApp {
   readonly backend: RendererBackend;
 
@@ -167,17 +216,49 @@ export class ViewerApp {
   private framedKey: string | null = null;
   /** Textures and meshes by URL, kept across rebuilds. */
   private readonly assets = new AssetCache();
-  private spinFrame: number | null = null;
-  private lastSpinTime = 0;
-  /** Accumulated spin of the spinning bodies, kept across rebuilds so the body does not jump back. */
-  private spinAngle = 0;
+  /** Content in the scene; `built` may be newer while its shaders compile (never blank). */
+  private onScreen: BuiltScene | null = null;
+  private compileToken = 0;
+  private compiling: Promise<void> | null = null;
+  /**
+   * What goes on with `built` when it swaps in: its lights, spin and framing. Held back while it
+   * compiles so the old content keeps its own (no relit, reframed or frozen old body).
+   */
+  private pending: { lights: Object3D[]; plan: RenderPlan } | null = null;
+  /** One sim time per moving process (R5.7); the spin is the only process today. */
+  private readonly clock = new SimClock(() => performance.now());
+  /** Radians per simulated second of the spin (the shown speed-up is the clock's, not in this). */
+  private spinBase = 0;
   /** WCAG 2.2.2: the user can pause auto-spin. */
   private spinPaused = false;
+  private chain: RenderChain | null = null;
+  private chainFailed = false;
+  private tier: TierName;
+  private readonly governor: FrameGovernor;
+  private onQualityChange: ((e: QualityChange) => void) | null = null;
+  private frames = 0;
+  private drops = 0;
+  private readonly frameTimes: number[] = [];
+  private burstLeft = 0;
+  private loopLast: number | null = null;
+  /** R5.7 phone frame-rate cap; no cap on desktop or the medium and high levels. */
+  private readonly cap = new FrameCap();
+  /** Coarse pointer (phone or tablet): 30 fps start tier and the R5.7 idle pause. */
+  private readonly coarsePointer: boolean;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private idle = false;
+  private onIdleChange: ((idle: boolean) => void) | null = null;
+  private settleWaiters: (() => void)[] = [];
+  private intersection: IntersectionObserver | null = null;
   private motionQuery: MediaQueryList | null = null;
   /** Called when a mesh or texture fails to load; the panel adds the layer to `failed` and re-plans. */
   private onLoadFailed: ((layerId: string) => void) | null = null;
   /** Tests only: field and point sources and slider overrides for the shader kinds. */
   private shaderOptions: BuildHooks['shader'];
+
+  setQualityChangeHandler(handler: ((e: QualityChange) => void) | null): void {
+    this.onQualityChange = handler;
+  }
 
   setLoadFailedHandler(handler: ((layerId: string) => void) | null): void {
     this.onLoadFailed = handler;
@@ -199,7 +280,9 @@ export class ViewerApp {
       await renderer.dispose().catch(() => undefined);
       throw err;
     }
-    return new ViewerApp(canvas, renderer);
+    const app = new ViewerApp(canvas, renderer);
+    await app.initPipeline();
+    return app;
   }
 
   private constructor(
@@ -211,9 +294,19 @@ export class ViewerApp {
     this.backend = 'isWebGPUBackend' in renderer.backend ? 'webgpu' : 'webgl2';
 
     renderer.setPixelRatio(viewerPixelRatio(window.devicePixelRatio || 1));
-    renderer.setClearColor(new Color(0x05060a), 1);
+    renderer.setClearColor(new Color(SPACE_BACKGROUND), 1);
+    this.coarsePointer =
+      typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+    this.tier =
+      qualityFromSearch(window.location?.search ?? '') ??
+      initialTier({ backend: this.backend, coarsePointer: this.coarsePointer });
+    this.governor = new FrameGovernor(this.tier);
+    this.cap.setInterval(capIntervalMs(this.tier, this.coarsePointer));
 
     this.scene = new Scene();
+    // The background must be scene.background: through the HDR RenderPipeline the clear colour alone
+    // came out black (0,0,0) on WebGL2. The golden spec checks it at a canvas corner.
+    this.scene.background = new Color(SPACE_BACKGROUND);
     this.camera = new PerspectiveCamera(40, 1, 0.1, 100);
     this.camera.position.set(0, 0, 4);
 
@@ -241,11 +334,41 @@ export class ViewerApp {
     this.controls.addEventListener('change', this.requestRender);
 
     canvas.addEventListener('keydown', this.onKeyDown);
+    // R5.7: on phones the clock pauses after a minute without interaction and resumes on touch.
+    if (this.coarsePointer) {
+      for (const type of IDLE_EVENTS)
+        canvas.addEventListener(type, this.onInteraction, { passive: true });
+      this.armIdle();
+    }
+    // WebGPU reports pipeline and validation errors asynchronously (uncapturederror), so they
+    // never reach draw()'s try/catch. r187 WebGPUBackend calls renderer.onError; drop the chain
+    // there too and keep drawing plainly (never blank). The types say a string; r187 passes info.
+    if (this.backend === 'webgpu') {
+      const r = renderer as unknown as { onError?: (info: unknown) => void };
+      const original = r.onError;
+      r.onError = (info: unknown) => {
+        original?.call(renderer, info);
+        if (this.disposed || !this.chain) return;
+        this.dropChain(info);
+        this.renderNow();
+      };
+    }
 
     // R9: the reduced-motion preference is read live, so spin stops when it is switched on.
     if (typeof window.matchMedia === 'function') {
       this.motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
       this.motionQuery.addEventListener?.('change', this.onMotionChange);
+    }
+    // The clock pauses for reduced motion, a hidden tab and an off-screen canvas.
+    this.clock.setPaused('reduced-motion', prefersReducedMotion());
+    this.clock.setPaused('hidden', typeof document !== 'undefined' && document.hidden === true);
+    document.addEventListener('visibilitychange', this.onVisibility);
+    if (typeof IntersectionObserver !== 'undefined') {
+      this.intersection = new IntersectionObserver((entries) => {
+        const last = entries[entries.length - 1];
+        if (last) this.setPause('offscreen', !last.isIntersecting);
+      });
+      this.intersection.observe(canvas);
     }
 
     this.resizeObserver =
@@ -280,20 +403,33 @@ export class ViewerApp {
   /** Draws a plan made with `planRender` (the panel plans once and reuses the plan for its UI). */
   showPlan(plan: RenderPlan): void {
     if (this.disposed) return;
-    this.placeholder.visible = false;
-    this.setLights(buildLights(plan.lighting));
+    // The new lights go on with the content they belong to: an old object still on screen while
+    // the new one compiles is not lit from the new object's phase angle.
+    const lights = buildLights(plan.lighting);
     const key = sceneKey(plan);
     if (this.built && key === this.builtKey) {
       // Nothing that is built changed: only the lights, the honesty state or the labels did. A
       // generated body takes the new tags and light in place (no field is regenerated).
       this.built.update(plan);
-      this.renderNow();
+      if (this.built !== this.onScreen && this.pending) {
+        // Still compiling: the new lights wait for the content they belong to.
+        this.pending = { lights, plan };
+        return;
+      }
+      this.setLights(lights);
+      this.restartSettle();
       return;
     }
-    this.clearBuilt();
+    // A build that never reached the screen (still compiling) is dropped for the newer one.
+    this.compileToken++;
+    if (this.built && this.built !== this.onScreen) this.built.dispose();
+    this.built = null;
+    this.builtKey = '';
+    this.pending = null;
+    let next: BuiltScene | null = null;
     if (plan.threeD && (plan.bodies.length > 0 || plan.shader !== null)) {
       try {
-        this.built = buildScene(
+        next = buildScene(
           plan,
           {
             onLoadFailed: (id) => this.onLoadFailed?.(id),
@@ -302,18 +438,104 @@ export class ViewerApp {
           },
           this.assets,
         );
-        this.builtKey = key;
-        this.applySpinAngle();
-        this.scene.add(this.built.group);
-        this.frame(plan.id, plan.extent, plan.shader?.distance ?? 0);
       } catch (err) {
         // Never blank, never crash: the plan stays on screen as text and the canvas stays empty.
         console.warn('[viewer] could not build the scene', err);
-        this.built = null;
       }
     }
-    this.updateSpinLoop();
-    this.renderNow();
+    if (!next) {
+      this.setLights(lights);
+      this.removeOnScreen();
+      this.placeholder.visible = false;
+      this.syncProcesses(null, null);
+      this.renderNow();
+      return;
+    }
+    this.built = next;
+    this.builtKey = key;
+    this.pending = { lights, plan };
+    this.swapInAfterCompile(next);
+  }
+
+  /**
+   * Compiles the new content's shaders, then swaps it in with its lights, spin and framing
+   * (`pending`). Until then the old content (or the placeholder) stays on screen with its own
+   * lights, spin and camera, so no frame is blank or wrong. A renderer without `compileAsync`
+   * (test stubs) swaps at once.
+   */
+  private swapInAfterCompile(next: BuiltScene): void {
+    const token = this.compileToken;
+    const swap = () => {
+      if (this.disposed || token !== this.compileToken || this.built !== next) return;
+      const pending = this.pending;
+      this.pending = null;
+      this.removeOnScreen();
+      this.scene.add(next.group);
+      this.onScreen = next;
+      this.placeholder.visible = false;
+      if (pending) {
+        this.setLights(pending.lights);
+        const { plan } = pending;
+        this.frame(plan.id, plan.extent, plan.shader?.distance ?? 0);
+        this.syncProcesses(plan.spin, next);
+      }
+      this.applySpinAngle();
+      this.restartSettle();
+    };
+    if (typeof this.renderer.compileAsync !== 'function') {
+      swap();
+      return;
+    }
+    const p = this.compile(next.group).then(swap);
+    this.compiling = p;
+    void p.finally(() => {
+      if (this.compiling === p) this.compiling = null;
+    });
+  }
+
+  /**
+   * `compileAsync` with a timeout and no throw. Through the chain it compiles for the pass's HDR
+   * target and MRT, which is where the object is drawn; plainly, for the canvas.
+   */
+  private compile(object: Object3D): Promise<void> {
+    // The timeout starts when this compile starts: through the chain, compiles queue behind each
+    // other, and a slow earlier one must not time this one out.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let startTimer!: () => void;
+    const timeout = new Promise<void>((resolve) => {
+      startTimer = () => {
+        timer ??= setTimeout(resolve, COMPILE_TIMEOUT_MS);
+      };
+    });
+    const chain = this.chain;
+    if (!chain) startTimer();
+    const done = Promise.resolve()
+      .then(() =>
+        chain
+          ? chain.compileAsync(object, startTimer)
+          : this.renderer.compileAsync(object, this.camera, this.scene),
+      )
+      .catch((err: unknown) => console.warn('[viewer] compileAsync failed', err));
+    return Promise.race([done, timeout]).finally(() => clearTimeout(timer));
+  }
+
+  private removeOnScreen(): void {
+    if (!this.onScreen) return;
+    this.scene.remove(this.onScreen.group);
+    this.onScreen.dispose();
+    this.onScreen = null;
+  }
+
+  /** Registers or removes the spin process on the clock. */
+  private syncProcesses(spin: SpinPlan | null, built: BuiltScene | null): void {
+    if (built && spin && built.spinRate > 0) {
+      this.spinBase = built.spinRate / spin.speedup;
+      this.clock.setProcess({ id: 'spin', label: 'Spin', speedup: spin.speedup });
+    } else {
+      this.spinBase = 0;
+      this.clock.removeProcess('spin');
+    }
+    this.updateLoop();
   }
 
   /** Back to the placeholder sphere. */
@@ -323,8 +545,8 @@ export class ViewerApp {
     this.placeholder.visible = true;
     this.setLights(this.placeholderLights);
     this.frame('', 1, 0);
-    this.updateSpinLoop();
-    this.renderNow();
+    this.syncProcesses(null, null);
+    this.restartSettle();
   }
 
   /**
@@ -349,22 +571,35 @@ export class ViewerApp {
   setSpinPaused(paused: boolean): void {
     if (this.disposed || paused === this.spinPaused) return;
     this.spinPaused = paused;
-    this.updateSpinLoop();
+    this.setPause('user', paused);
   }
 
   isSpinPaused(): boolean {
     return this.spinPaused;
   }
 
+  /** The processes that are time-lapses (each is shown with its speed-up). */
+  timeLapses(): { id: string; label: string; speedup: number }[] {
+    return this.clock.processes();
+  }
+
+  private setPause(reason: PauseReason, paused: boolean): void {
+    this.clock.setPaused(reason, paused);
+    this.updateLoop();
+  }
+
+  /** Spins what is on screen (a newer build still compiling is posed when it swaps in). */
   private applySpinAngle(): void {
-    if (!this.built) return;
-    for (const o of this.built.spinners) o.rotation.y = this.spinAngle;
+    if (!this.onScreen) return;
+    const angle = this.spinBase * this.clock.simTime('spin');
+    for (const o of this.onScreen.spinners) o.rotation.y = angle;
   }
 
   private clearBuilt(): void {
-    if (!this.built) return;
-    this.scene.remove(this.built.group);
-    this.built.dispose();
+    this.compileToken++;
+    this.pending = null;
+    this.removeOnScreen();
+    if (this.built) this.built.dispose();
     this.built = null;
     this.builtKey = '';
   }
@@ -375,34 +610,174 @@ export class ViewerApp {
     for (const l of next) this.scene.add(l);
   }
 
+  /**
+   * New content: restart temporal AA history so the settled frame depends only on what is shown
+   * now (same card, seed and time give the same frame), then draw and settle. Orbit changes keep
+   * the history (`requestRender`), since that is what temporal AA is for while moving.
+   */
+  private restartSettle(): void {
+    this.chain?.restartTemporal();
+    this.renderNow();
+  }
+
+  /** Draws now (no blank frame on resize) and starts a settle burst for temporal AA. */
   private renderNow(): void {
-    if (this.frameRequest !== null) cancelAnimationFrame(this.frameRequest);
-    this.frameRequest = null;
+    this.draw();
+    this.burstLeft = Math.max(this.burstLeft, this.settleFrames());
+    if (this.burstLeft > 0) this.schedule();
+  }
+
+  private settleFrames(): number {
+    return this.chain ? this.chain.config.settleFrames : 0;
+  }
+
+  /** One frame: through the pipeline, or plain if the pipeline is missing or failed. */
+  private draw(): void {
+    this.frames++;
+    if (this.chain) {
+      try {
+        this.chain.render();
+        return;
+      } catch (err) {
+        this.dropChain(err);
+      }
+    }
     this.renderer.render(this.scene, this.camera);
   }
 
-  /** Spin is the only animation. It runs only if the plan spins and reduced motion is not set. */
-  private updateSpinLoop(): void {
-    const wanted =
-      this.built !== null && this.built.spinRate > 0 && !this.spinPaused && !prefersReducedMotion();
-    if (!wanted) {
-      if (this.spinFrame !== null) cancelAnimationFrame(this.spinFrame);
-      this.spinFrame = null;
+  private dropChain(err: unknown): void {
+    if (!this.chainFailed) console.warn('[viewer] render pipeline failed; drawing plainly', err);
+    this.chainFailed = true;
+    try {
+      this.chain?.dispose();
+    } catch {
+      /* already broken */
+    }
+    this.chain = null;
+  }
+
+  /** Builds the HDR pipeline and warms up the placeholder; a failure leaves plain rendering. */
+  private async initPipeline(): Promise<void> {
+    try {
+      this.chain = new RenderChain(
+        this.renderer,
+        this.scene,
+        this.camera,
+        this.tier,
+        prefersReducedMotion(),
+      );
+    } catch (err) {
+      this.dropChain(err);
       return;
     }
-    if (this.spinFrame !== null) return;
-    this.lastSpinTime = performance.now();
-    const tick = (now: number) => {
-      this.spinFrame = null;
-      if (this.disposed || !this.built || this.built.spinRate <= 0) return;
-      const dt = Math.min((now - this.lastSpinTime) / 1000, 0.1);
-      this.lastSpinTime = now;
-      this.spinAngle += this.built.spinRate * dt;
-      this.applySpinAngle();
-      this.renderer.render(this.scene, this.camera);
-      this.spinFrame = requestAnimationFrame(tick);
+    if (typeof this.renderer.compileAsync === 'function') await this.compile(this.scene);
+    if (!this.disposed) this.renderNow();
+  }
+
+  /** Test hook and tier choice. Rebuilds the pipeline for the tier's bloom and anti-aliasing. */
+  setQualityTier(name: TierName): void {
+    this.applyTier(name, false);
+  }
+
+  private applyTier(name: TierName, auto: boolean): void {
+    if (this.disposed || !isTierName(name) || name === this.tier) return;
+    const from = this.tier;
+    this.tier = name;
+    this.governor.setTier(name);
+    this.cap.setInterval(capIntervalMs(name, this.coarsePointer));
+    if (this.chain) {
+      try {
+        this.chain.setTier(name);
+      } catch (err) {
+        this.dropChain(err);
+      }
+    }
+    if (auto) this.drops++;
+    this.onQualityChange?.({ from, to: name, auto });
+    this.renderNow();
+  }
+
+  /** Quality level, backend and frame-time percentiles of the continuous frames (tests, tuning). */
+  renderStats(): RenderStats {
+    return {
+      tier: this.tier,
+      backend: this.backend,
+      frames: this.frames,
+      p50Ms: percentile(this.frameTimes, 0.5),
+      p95Ms: percentile(this.frameTimes, 0.95),
+      drops: this.drops,
     };
-    this.spinFrame = requestAnimationFrame(tick);
+  }
+
+  /** Resolves when no settle burst is pending and no shader compile is in flight. */
+  async whenSettled(): Promise<void> {
+    while (this.compiling) await this.compiling;
+    if (this.disposed || this.burstLeft <= 0) return;
+    await new Promise<void>((resolve) => this.settleWaiters.push(resolve));
+  }
+
+  /**
+   * Test hook: pauses the clock (reason 'test'), puts every process at the given sim time, renders
+   * the settle burst and resolves when it is done. The same card, seed and time give one picture.
+   * The 'test' pause is never lifted: a frozen viewer stays frozen (tests and golden frames only).
+   */
+  async freezeClock(simSeconds: number): Promise<void> {
+    if (this.disposed) return;
+    this.setPause('test', true);
+    this.clock.setAllSimTimes(simSeconds);
+    this.applySpinAngle();
+    this.restartSettle();
+    await this.whenSettled();
+  }
+
+  /** Continuous rAF only while the clock runs; otherwise frames come from changes (D-05). */
+  private updateLoop(): void {
+    if (this.clock.running) this.schedule();
+  }
+
+  private schedule(): void {
+    if (this.disposed || this.frameRequest !== null) return;
+    this.frameRequest = requestAnimationFrame(this.tick);
+  }
+
+  private readonly tick = (now: number): void => {
+    this.frameRequest = null;
+    if (this.disposed) return;
+    // R5.7 phone frame-rate cap (30 fps on the low quality level): skip this display frame.
+    if (!this.cap.shouldDraw(now)) {
+      this.schedule();
+      return;
+    }
+    if (this.clock.running) {
+      this.clock.tick();
+      this.applySpinAngle();
+    }
+    this.draw();
+    // Frame time is only meaningful between consecutive frames of one continuous run. A longer
+    // gap (a hidden tab, a stalled main thread) is not a frame time and would skew p95.
+    if (this.loopLast !== null && now - this.loopLast <= FEED_GAP_MS) {
+      const ms = now - this.loopLast;
+      this.frameTimes.push(ms);
+      if (this.frameTimes.length > STATS_WINDOW) this.frameTimes.shift();
+      const drop = this.governor.feed(ms, now);
+      if (drop) this.applyTier(drop.to, true);
+    }
+    this.loopLast = now;
+    if (this.burstLeft > 0) this.burstLeft--;
+    if (this.burstLeft === 0) this.flushSettled();
+    if (this.clock.running || this.burstLeft > 0) {
+      this.schedule();
+    } else {
+      this.loopLast = null;
+      this.cap.reset();
+      this.governor.reset();
+    }
+  };
+
+  private flushSettled(): void {
+    const waiters = this.settleWaiters;
+    this.settleWaiters = [];
+    for (const w of waiters) w();
   }
 
   /** On-screen rotate buttons (WCAG 2.5.7) and arrow keys. */
@@ -424,11 +799,9 @@ export class ViewerApp {
 
   /** Coalesces any number of change events into one render on the next frame. */
   readonly requestRender = (): void => {
-    if (this.disposed || this.frameRequest !== null) return;
-    this.frameRequest = requestAnimationFrame(() => {
-      this.frameRequest = null;
-      if (!this.disposed) this.renderer.render(this.scene, this.camera);
-    });
+    if (this.disposed) return;
+    this.burstLeft = Math.max(this.burstLeft, this.settleFrames(), 1);
+    this.schedule();
   };
 
   dispose(): void {
@@ -436,9 +809,16 @@ export class ViewerApp {
     this.disposed = true;
     if (this.frameRequest !== null) cancelAnimationFrame(this.frameRequest);
     this.frameRequest = null;
-    if (this.spinFrame !== null) cancelAnimationFrame(this.spinFrame);
-    this.spinFrame = null;
+    if (this.idleTimer !== null) clearTimeout(this.idleTimer);
+    this.idleTimer = null;
+    for (const type of IDLE_EVENTS) this.canvas.removeEventListener(type, this.onInteraction);
+    this.flushSettled();
+    this.intersection?.disconnect();
+    this.intersection = null;
+    document.removeEventListener('visibilitychange', this.onVisibility);
     this.clearBuilt();
+    this.chain?.dispose();
+    this.chain = null;
     this.assets.dispose();
     this.motionQuery?.removeEventListener?.('change', this.onMotionChange);
     this.motionQuery = null;
@@ -465,9 +845,7 @@ export class ViewerApp {
     // Resizing the canvas clears its drawing buffer, and ResizeObserver callbacks run after this
     // frame's rAF callbacks, so a deferred render would leave one blank frame on screen. Render
     // now instead (still only on change, R5.5).
-    if (this.frameRequest !== null) cancelAnimationFrame(this.frameRequest);
-    this.frameRequest = null;
-    this.renderer.render(this.scene, this.camera);
+    this.renderNow();
   }
 
   /**
@@ -483,7 +861,53 @@ export class ViewerApp {
   }
 
   private readonly onMotionChange = (): void => {
-    if (!this.disposed) this.updateSpinLoop();
+    if (this.disposed) return;
+    const reduced = prefersReducedMotion();
+    try {
+      this.chain?.setReducedMotion(reduced);
+    } catch (err) {
+      this.dropChain(err);
+    }
+    this.setPause('reduced-motion', reduced);
+    this.renderNow();
+  };
+
+  /** R5.7 phone idle pause: (re)starts the 60 s countdown. */
+  private armIdle(): void {
+    if (this.idleTimer !== null) clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      if (!this.disposed) this.setIdle(true);
+    }, IDLE_PAUSE_MS);
+  }
+
+  private setIdle(idle: boolean): void {
+    if (idle === this.idle) return;
+    this.idle = idle;
+    this.setPause('idle', idle);
+    this.onIdleChange?.(idle);
+  }
+
+  /** True while the R5.7 phone idle pause holds the clock (the panel says so). */
+  isIdlePaused(): boolean {
+    return this.idle;
+  }
+
+  /** The panel's resume control lifts the idle pause too (D-34: resume on touch). */
+  resumeFromIdle(): void {
+    if (this.disposed || !this.coarsePointer) return;
+    this.setIdle(false);
+    this.armIdle();
+  }
+
+  setIdleChangeHandler(handler: ((idle: boolean) => void) | null): void {
+    this.onIdleChange = handler;
+  }
+
+  private readonly onInteraction = (): void => this.resumeFromIdle();
+
+  private readonly onVisibility = (): void => {
+    if (!this.disposed) this.setPause('hidden', document.hidden);
   };
 
   private readonly onPixelRatioChange = (): void => {
