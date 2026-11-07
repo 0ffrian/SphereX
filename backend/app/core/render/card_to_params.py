@@ -170,8 +170,8 @@ def _assumed(
             continue
         if isinstance(v, numbers.Real) and math.isfinite(float(v)):
             out[key] = float(v)
-        elif isinstance(v, str):
-            out[key] = v
+        elif isinstance(v, str) and v.strip():
+            out[key] = v.strip()
         elif isinstance(v, list | tuple) and v:
             out[key] = ", ".join(f"{float(c):g}" for c in v)
         elif isinstance(tv.get("assumption"), str) and tv["assumption"].strip():

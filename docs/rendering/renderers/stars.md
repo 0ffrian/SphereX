@@ -32,7 +32,7 @@ Barnard's Star example **[verify]** (each tier needs checking):
 | Limb darkening | 3 | linear law with a typical coefficient |
 | Granulation cell size | 3 | pressure scale height, mass assumed for an M4 dwarf |
 | Starspots | 4 | typical coverage for class and activity |
-| Spin | 1 | rotation period 145 ± 15 d from activity indicators (Toledo-Padrón et al. 2019, MNRAS 488, 5145, arXiv:1812.06712), verified 7 Nov 2026 |
+| Spin | 1 | rotation period 145 ± 15 d from activity indicators (Toledo-Padrón et al. 2019, MNRAS 488, 5145, arXiv:1812.06712), verified 7 Nov 2026. Tier 1 only once the card carries it as `rot_period_h` (3,480 h, R3.4) |
 | Glow, cell noise | 5 | art |
 
 ### R7.5.2 Photosphere and granulation

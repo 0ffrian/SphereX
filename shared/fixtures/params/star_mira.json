@@ -74,7 +74,7 @@
   },
   "dynamics": {
     "pulsation_period_d": {
-      "value": 300.0,
+      "value": 100.0,
       "tag": "measured",
       "tier": 1,
       "source": "synthetic fixture: not a real measurement"

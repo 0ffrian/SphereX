@@ -21,7 +21,7 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 |---|---|---|
 | [overview.md](overview.md) | A1–A2.1 | you need the scope, priority tiers (P0–P3, backlog), the system diagram or the design principles |
 | [data-sources.md](data-sources.md) | A3–A3.10 | you call or adapt SPHEREx/IRSA, Gaia, WISE, Horizons, SkyBoT, SBDB, DAMIT, Exoplanet Archive, SIMBAD or mission shape models |
-| [pipeline.md](pipeline.md) | A4–A4.8 | you build a backend stage: find the object, measure flux/spectrum, classify, asset lookup, ObjectCard, RenderParams |
+| [pipeline.md](pipeline.md) | A4–A4.9 | you build a backend stage: find the object, measure flux/spectrum, classify, asset lookup, ObjectCard, RenderParams; or the overlays, flag mask and combine endpoints |
 | [data-contract.md](data-contract.md) | A5–A5.4 | you touch generated contract code, ids/seeds, provenance tags and badges, slider overrides or the asset store |
 | [generators.md](generators.md) | A6–A6.3 | you work on baked or browser-shader generators, triplanar mapping, the Gemini layer or offline jobs |
 | [physics.md](physics.md) | A7–A7.5 | you implement a physics rule or slider for planets, gas giants, brown dwarfs, asteroids or supernova remnants |
@@ -62,6 +62,7 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | A4.6 | Stage 6: Physics layer | [pipeline.md#a46-stage-6-physics-layer](pipeline.md#a46-stage-6-physics-layer) |
 | A4.7 | Stage 7: RenderParams | [pipeline.md#a47-stage-7-renderparams](pipeline.md#a47-stage-7-renderparams) |
 | A4.8 | Stages 8 to 10: Generators | [pipeline.md#a48-stages-8-to-10-generators](pipeline.md#a48-stages-8-to-10-generators) |
+| A4.9 | Overlays, flag mask and combine | [pipeline.md#a49-overlays-flag-mask-and-combine](pipeline.md#a49-overlays-flag-mask-and-combine) |
 | A5 | Data contract | [data-contract.md#a5-data-contract](data-contract.md#a5-data-contract) |
 | A5.1 | Ids and seeds | [data-contract.md#a51-ids-and-seeds](data-contract.md#a51-ids-and-seeds) |
 | A5.2 | Provenance tags and badges | [data-contract.md#a52-provenance-tags-and-badges](data-contract.md#a52-provenance-tags-and-badges) |

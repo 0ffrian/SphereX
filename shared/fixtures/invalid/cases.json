@@ -595,11 +595,11 @@
           "id": "colour",
           "tag": "derived",
           "tier": 2,
-          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
           "requires": [
             "teff_K"
           ],
-          "formula": "Teff to sRGB through a blackbody lookup table"
+          "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
         },
         {
           "id": "limb_darkening",
@@ -637,7 +637,7 @@
             ],
             "tag": "derived",
             "source": "synthetic fixture: not a real measurement",
-            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+            "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
           },
           "source": "class_palette"
         }
@@ -702,11 +702,11 @@
           "id": "colour",
           "tag": "derived",
           "tier": 2,
-          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
           "requires": [
             "teff_K"
           ],
-          "formula": "Teff to sRGB through a blackbody lookup table"
+          "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
         },
         {
           "id": "limb_darkening",
@@ -743,7 +743,7 @@
             ],
             "tag": "derived",
             "source": "synthetic fixture: not a real measurement",
-            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+            "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
           },
           "source": "class_palette"
         }
@@ -808,7 +808,7 @@
           "id": "colour",
           "tag": "derived",
           "tier": 2,
-          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
           "requires": [
             "teff_K"
           ]
@@ -849,7 +849,7 @@
             ],
             "tag": "derived",
             "source": "synthetic fixture: not a real measurement",
-            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+            "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
           },
           "source": "class_palette"
         }
@@ -914,11 +914,11 @@
           "id": "colour",
           "tag": "derived",
           "tier": 2,
-          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
           "requires": [
             "teff_K"
           ],
-          "formula": "Teff to sRGB through a blackbody lookup table"
+          "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
         },
         {
           "id": "limb_darkening",
@@ -953,7 +953,7 @@
             ],
             "tag": "derived",
             "source": "synthetic fixture: not a real measurement",
-            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+            "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
           },
           "source": "class_palette"
         }
@@ -1017,11 +1017,11 @@
           "id": "colour",
           "tag": "derived",
           "tier": 2,
-          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
           "requires": [
             "teff_K"
           ],
-          "formula": "Teff to sRGB through a blackbody lookup table"
+          "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
         },
         {
           "id": "limb_darkening",
@@ -1059,7 +1059,7 @@
             ],
             "tag": "derived",
             "source": "synthetic fixture: not a real measurement",
-            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+            "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
           },
           "source": "class_palette"
         }
@@ -1124,11 +1124,11 @@
           "id": "colour",
           "tag": "derived",
           "tier": 2,
-          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
           "requires": [
             "teff_K"
           ],
-          "formula": "Teff to sRGB through a blackbody lookup table"
+          "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
         },
         {
           "id": "limb_darkening",
@@ -1166,7 +1166,7 @@
             ],
             "tag": "derived",
             "source": "synthetic fixture: not a real measurement",
-            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+            "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
           },
           "source": "class_palette"
         }
@@ -1225,11 +1225,11 @@
           "id": "colour",
           "tag": "derived",
           "tier": 2,
-          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
           "requires": [
             "teff_K"
           ],
-          "formula": "Teff to sRGB through a blackbody lookup table"
+          "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
         },
         {
           "id": "limb_darkening",
@@ -1267,7 +1267,7 @@
             ],
             "tag": "derived",
             "source": "synthetic fixture: not a real measurement",
-            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+            "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
           },
           "source": "class_palette"
         }
@@ -1332,11 +1332,11 @@
           "id": "colour",
           "tag": "derived",
           "tier": 2,
-          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
           "requires": [
             "teff_K"
           ],
-          "formula": "Teff to sRGB through a blackbody lookup table"
+          "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
         },
         {
           "id": "limb_darkening",
@@ -1374,7 +1374,7 @@
             ],
             "tag": "derived",
             "source": "synthetic fixture: not a real measurement",
-            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+            "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
           },
           "source": "class_palette"
         }
@@ -1438,11 +1438,11 @@
           "id": "colour",
           "tag": "derived",
           "tier": 2,
-          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
           "requires": [
             "teff_K"
           ],
-          "formula": "Teff to sRGB through a blackbody lookup table"
+          "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
         },
         {
           "id": "limb_darkening",
@@ -1480,7 +1480,7 @@
             ],
             "tag": "derived",
             "source": "synthetic fixture: not a real measurement",
-            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+            "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
           },
           "source": "class_palette"
         }
@@ -1544,11 +1544,11 @@
           "id": "colour",
           "tag": "derived",
           "tier": 2,
-          "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+          "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
           "requires": [
             "teff_K"
           ],
-          "formula": "Teff to sRGB through a blackbody lookup table"
+          "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
         },
         {
           "id": "limb_darkening",
@@ -1586,7 +1586,7 @@
             ],
             "tag": "derived",
             "source": "synthetic fixture: not a real measurement",
-            "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+            "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
           },
           "source": "class_palette"
         }

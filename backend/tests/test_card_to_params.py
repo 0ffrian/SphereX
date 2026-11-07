@@ -236,13 +236,15 @@ def test_spherex_rgb_window_rule() -> None:
     assert window_median([pt(4.5, 1.0), pt(4.56, 9.0)], 4.5) is None
 
 
-def test_model_dependent_input_without_a_value_states_its_assumption() -> None:
-    """D-32: `assumed` names what was assumed; a null input falls back to its R3.1 assumption."""
+@pytest.mark.parametrize("value", [None, "", "   "])
+def test_model_dependent_input_without_a_value_states_its_assumption(value: Any) -> None:
+    """D-32: `assumed` names what was assumed; a null or blank input falls back to its R3.1
+    assumption."""
     from app.core.render.card_to_params import _Plan
 
     card = {
         "albedo": {
-            "value": None,
+            "value": value,
             "tag": "model_dependent",
             "source": "test",
             "assumption": "typical S-type albedo",

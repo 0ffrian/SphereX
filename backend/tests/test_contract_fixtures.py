@@ -214,6 +214,27 @@ def test_every_params_fixture_has_dynamics_with_matching_speedup(object_type: st
             assert item.removeprefix("dynamics:") not in present
 
 
+# Card fields that measure a dynamics rate directly, in the same unit (R3.4).
+_CARD_FIELD_OF_RATE = {"spin_period_h": "rot_period_h", "pulsation_period_d": "period_var_d"}
+
+
+@pytest.mark.parametrize("object_type", OBJECT_TYPES)
+def test_measured_card_rate_wins_and_tier_1_needs_one(object_type: str) -> None:
+    """D-32: the first rung that answers wins, so a measured card value is the tier 1 rate; and a
+    tier 1 rate is never measured anywhere but on the card (R3.4)."""
+    card, rates = CARDS[object_type], dict(_dynamics_values(PARAMS[object_type]))
+    for key, field in _CARD_FIELD_OF_RATE.items():
+        tv = card.get(field)
+        if isinstance(tv, dict) and tv.get("tag") == "measured" and tv.get("value") is not None:
+            assert key in rates, key
+            assert (rates[key]["value"], rates[key]["tier"]) == (tv["value"], 1), key
+    for key, value in rates.items():
+        if value["tier"] == 1:
+            field = _CARD_FIELD_OF_RATE.get(key)
+            assert field is not None, f"{key}: no card field can measure it"
+            assert card.get(field, {}).get("tag") == "measured", key
+
+
 def test_layer_and_dynamics_value_share_the_tier_rules() -> None:
     """The tier/formula/assumed rules are written out twice (no generics); they must not drift."""
     schema = PARAMS_SCHEMA["definitions"]

@@ -1,6 +1,8 @@
 // A1.1 P0 flipbook (UML 08): plays an object's SPHEREx frames in the order the API lists them,
 // with play/pause, step, scrubber and speed; shows each frame's time and wavelength. Clicking the
 // ring on the object opens its spectrum (UML 09). Rainbow Trails is a view mode (D-28, P1).
+// Overlays (issue #12, P1): Gaia/WISE markers, flagged pixels, field of view, contamination and
+// a "Combine frames" panel; optional, loaded on first use, never block playback.
 // Keyboard (R9): Space or K play/pause, ←/→ step, Home/End first/last, while focus is in the
 // flipbook but not on a button or form field (those keep their own keys).
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
@@ -15,6 +17,11 @@ import { buttonClass, pressedClass } from '@/app/ui';
 import { describeFrame, useAppStore, type SkyState } from '@/state/store';
 import { flipbookKeyAction } from './keys';
 import { FPS_OPTIONS, readyToPlay, type Fps } from './playback';
+import { CombinePanel } from './overlays/CombinePanel';
+import { FlagMaskImage } from './overlays/FlagMask';
+import { MarkerLayer } from './overlays/MarkerLayer';
+import { overlayView } from './overlays/model';
+import { ContaminationNote, OverlayControls, OverlayDetails } from './overlays/OverlayPanel';
 import { RainbowTrails, RainbowTrailsLegend, trailsUnavailableReason } from './RainbowTrails';
 import { useCutoutPreload, type CutoutStatus } from './useCutoutPreload';
 import { trailsMonochrome } from './wavelengthColor';
@@ -171,6 +178,8 @@ function Player({
 
   // Natural size of the cutouts, from the shown image. Keeps the last known size between frames.
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  // The flag-mask URL that failed to load, if any (the legend says so; the picture stays).
+  const [failedMask, setFailedMask] = useState<string | null>(null);
 
   const settled = (i: number) => status[i] === 'loaded' || status[i] === 'failed';
   const loadedCount = status.filter((s) => s === 'loaded').length;
@@ -187,6 +196,23 @@ function Player({
   const viewMode = trailsReason ? 'frames' : sky.viewMode;
   const name = objectName(resolved);
   const frameText = describeFrame(response, index);
+
+  // Overlays for this frame (issue #12); null until loaded. Q-28: shown like the ring.
+  // Memoised on (overlays state, frame): playback re-renders on every tick, and a stable view
+  // keeps OverlayDetails' own memo (groupMissing) from recomputing.
+  const overlays = useMemo(
+    () => overlayView(sky.overlays, frame.frame_id),
+    [sky.overlays, frame.frame_id],
+  );
+  const ovFrame = overlays?.frame;
+  const markers = useMemo(
+    () => (overlays && ovFrame ? ovFrame.markers.filter((m) => overlays.show[m.catalog]) : []),
+    [overlays, ovFrame],
+  );
+  const showMask =
+    overlays?.show.flags === true && ovFrame !== undefined && failedMask !== ovFrame.flags_url;
+  // Map centre: the object's position in this frame when the reply gives one, else the resolved one.
+  const center = { ra: frame.ra ?? resolved.ra, dec: frame.dec ?? resolved.dec };
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const action = flipbookKeyAction({
@@ -261,6 +287,12 @@ function Player({
             data-testid="cutout"
           />
         )}
+        {imageSize && current === 'loaded' && showMask && ovFrame && (
+          <FlagMaskImage url={ovFrame.flags_url} onError={() => setFailedMask(ovFrame.flags_url)} />
+        )}
+        {imageSize && current === 'loaded' && markers.length > 0 && (
+          <MarkerLayer markers={markers} width={imageSize.w} height={imageSize.h} />
+        )}
         {imageSize && viewMode === 'trails' && (
           <RainbowTrails
             frames={frames}
@@ -315,6 +347,7 @@ function Player({
           {frame.flags.length > 0 ? `Flags: ${frame.flags.join(', ')}` : 'No flags'}
         </span>
       </div>
+      {overlays && <ContaminationNote view={overlays} fixture={sky.fixture} />}
 
       <div
         role="group"
@@ -433,6 +466,20 @@ function Player({
         )}
       </div>
       {viewMode === 'trails' && <RainbowTrailsLegend monochrome={monochrome} />}
+
+      <OverlayControls sky={sky} view={overlays} />
+      {overlays && (
+        <OverlayDetails
+          view={overlays}
+          sky={sky}
+          frame={frame}
+          index={index}
+          center={center}
+          flagFailed={ovFrame !== undefined && failedMask === ovFrame.flags_url}
+        />
+      )}
+
+      {n >= 2 && <CombinePanel sky={sky} frames={frames} />}
 
       <MissingList missing={response.missing} />
     </div>

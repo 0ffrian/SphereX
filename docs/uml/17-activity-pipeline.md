@@ -1,6 +1,6 @@
 # 17 Activity: pipeline stages 1–6 and RenderParams
 
-The backend pipeline from a name or RA/Dec to an `ObjectCard` and `RenderParams`, including every "refuse rather than invent" branch. Drawn from architecture spec §4.1–4.6, rendering doc §1 (principles), §3, §5.2, §6.2, §7 and decisions D-01, D-02, D-04, D-19 and D-25. The old stage 5 "settings file" is replaced by the card builder (D-02).
+The backend pipeline from a name or RA/Dec to an `ObjectCard` and `RenderParams`, including every refusal branch (since D-32, a refusal only where no tier can answer). Drawn from architecture spec §4.1–4.6, rendering doc §1 (principles), §3, §5.2, §6.2, §7 and decisions D-01, D-02, D-04, D-19 and D-25. The old stage 5 "settings file" is replaced by the card builder (D-02).
 
 ```mermaid
 flowchart TD

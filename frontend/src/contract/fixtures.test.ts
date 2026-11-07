@@ -47,7 +47,12 @@ const SPEEDUP_NEEDS: Record<string, string[]> = {
   clouds: ['jet_speed_ms', 'diff_rotation', 'spin_period_h'],
   pulsation: ['pulsation_period_d'],
 };
-type Dyn = Record<string, { tag: string; tier: number; source: string }> & {
+/** Card fields that measure a dynamics rate directly, in the same unit (R3.4). */
+const CARD_FIELD_OF_RATE: Record<string, string> = {
+  spin_period_h: 'rot_period_h',
+  pulsation_period_d: 'period_var_d',
+};
+type Dyn = Record<string, { value: number; tag: string; tier: number; source: string }> & {
   speedup: Record<string, number>;
 };
 
@@ -101,6 +106,24 @@ describe('shared fixtures (D-04, D-18)', () => {
     }
     for (const m of p.missing as string[]) {
       if (m.startsWith('dynamics:')) expect(present).not.toContain(m.slice('dynamics:'.length));
+    }
+  });
+
+  it.each(types)('%s: a measured card rate wins at tier 1, and tier 1 needs one (D-32)', (type) => {
+    const card = cards.get(type)! as Record<string, { value?: unknown; tag?: string } | undefined>;
+    const dyn = params.get(type)!.dynamics as unknown as Dyn;
+    for (const [key, field] of Object.entries(CARD_FIELD_OF_RATE)) {
+      const tv = card[field];
+      if (tv?.tag === 'measured' && tv.value != null) {
+        expect(dyn[key], key).toBeDefined();
+        expect([dyn[key]!.value, dyn[key]!.tier], key).toEqual([tv.value, 1]);
+      }
+    }
+    for (const key of Object.keys(dyn).filter((k) => k !== 'speedup')) {
+      if (dyn[key]!.tier !== 1) continue;
+      const field = CARD_FIELD_OF_RATE[key];
+      expect(field, `${key}: no card field can measure it`).toBeDefined();
+      expect(card[field!]?.tag, key).toBe('measured');
     }
   });
 

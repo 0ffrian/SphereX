@@ -1,0 +1,20 @@
+{
+ "adql": "SELECT TOP 5000 source_name, ra_pm, dec_pm, pmra, pmdec, w1mpro_pm FROM catwise_2020 WHERE 1=CONTAINS(POINT('ICRS',ra,dec),CIRCLE('ICRS',76.95659,30.40129,0.07917)) ORDER BY w1mpro_pm, source_name",
+ "body_sha256": "64c0333c46734fe9d715182e338408f3b11849aa2b0988146e3a523659f22cc4",
+ "body_size": 62830,
+ "content_type": "text/csv",
+ "fetched_at": "2026-11-06T11:31:33.516Z",
+ "key": {
+  "query": {
+   "dec": "30.40129",
+   "ra": "76.95659",
+   "radius": "0.07917",
+   "top": "5000"
+  },
+  "release": "catwise2020",
+  "source": "wise"
+ },
+ "status": 200,
+ "table": "catwise_2020",
+ "url": "https://irsa.ipac.caltech.edu/TAP/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=SELECT+TOP+5000+source_name%2C+ra_pm%2C+dec_pm%2C+pmra%2C+pmdec%2C+w1mpro_pm+FROM+catwise_2020+WHERE+1%3DCONTAINS%28POINT%28%27ICRS%27%2Cra%2Cdec%29%2CCIRCLE%28%27ICRS%27%2C76.95659%2C30.40129%2C0.07917%29%29+ORDER+BY+w1mpro_pm%2C+source_name"
+}

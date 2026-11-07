@@ -90,7 +90,7 @@
   },
   "dynamics": {
     "spin_period_h": {
-      "value": 6.0,
+      "value": 5.0,
       "tag": "measured",
       "tier": 1,
       "source": "synthetic fixture: not a real measurement"
