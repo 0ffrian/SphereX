@@ -42,12 +42,12 @@ frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
   audioContext.ts     # the one shared AudioContext, created only by a click (R8.9); shared unlock state
   audioGraph.ts       # one master bus and limiter per AudioContext; the shared bell (playBell)
   settings.ts         # R8.7 settings, own Zustand store, one localStorage key; bindEngine
-  calibration.ts      # R8.7 Calibration types, applyCalibration (offset rule); wizard logic in issue #10
+  calibration.ts      # R8.7 calibration: types, offset rule (#9); levels, tap-along maths, validated persistence (#10)
   platform.ts pitch.ts spectrumMapping.ts   # default outputs and deviceVibrates (Q-73), pitch from λ (Q-70), spectrum → sample (R8.6)
   tuning.ts           # every tuning constant, marked CREATIVE placeholder (D-13) or [verify on phones]
   drivers/webVibrate.ts drivers/audio.ts drivers/tauri.ts (stub, B-01)
   sources/heightMap.ts meshNormal.ts field.ts terrain.ts flow.ts spectrum.ts lightcurve.ts
-  ui/                 # PulseIndicator (D-20), UnlockButton; the settings and calibration UI come with issue #10
+  ui/                 # PulseIndicator (D-20), UnlockButton (#9); CalibrationWizard, HapticsSettings, SpectrumHapticsPad (#10)
   sound/              # Listen sweep, imagined drive (A8); issue #11
 frontend/src/hapticsTestPage/        (Atish)  # dev-only test page behind frontend/haptics-test.html; not a build input;
                                               # panels/SpectrumPanel.tsx (#10), panels/TexturePanel.tsx (#11)
