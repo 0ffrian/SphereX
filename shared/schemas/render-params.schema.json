@@ -64,6 +64,9 @@
     "haptics": {
       "$ref": "#/definitions/HapticProfile"
     },
+    "dynamics": {
+      "$ref": "#/definitions/Dynamics"
+    },
     "alt_text": {
       "type": "string",
       "description": "R9."
@@ -84,6 +87,7 @@
       "required": [
         "id",
         "tag",
+        "tier",
         "description",
         "requires"
       ],
@@ -94,6 +98,9 @@
         "tag": {
           "$ref": "object-card.schema.json#/definitions/Tag"
         },
+        "tier": {
+          "$ref": "object-card.schema.json#/definitions/Tier"
+        },
         "description": {
           "type": "string"
         },
@@ -102,6 +109,441 @@
           "items": {
             "type": "string"
           }
+        },
+        "formula": {
+          "type": "string",
+          "description": "Required, non-blank, when tag is derived or model_dependent."
+        },
+        "assumed": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "description": "Inputs that were not measured, keyed by card field or rule input name, with the value used. Required when tag is model_dependent."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "measured"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tier": {
+                "const": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "derived"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tier": {
+                "const": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "model_dependent"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tier": {
+                "const": 3
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "inferred_from_analog"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tier": {
+                "const": 4
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "artistic"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tier": {
+                "const": 5
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "enum": [
+                  "derived",
+                  "model_dependent"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "formula"
+            ],
+            "properties": {
+              "formula": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "model_dependent"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "assumed"
+            ],
+            "properties": {
+              "assumed": {
+                "type": "object",
+                "minProperties": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "DynamicsValue": {
+      "title": "DynamicsValue",
+      "description": "One motion rate with its provenance and the tier of the rung that answered (D-32). A rate no rung can answer is omitted and listed in missing as dynamics:<key>.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "tag",
+        "tier",
+        "source"
+      ],
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "tag": {
+          "$ref": "object-card.schema.json#/definitions/Tag"
+        },
+        "tier": {
+          "$ref": "object-card.schema.json#/definitions/Tier"
+        },
+        "source": {
+          "type": "string"
+        },
+        "formula": {
+          "type": "string",
+          "description": "Required, non-blank, when tag is derived or model_dependent."
+        },
+        "assumed": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "description": "Inputs that were not measured, keyed by card field or rule input name, with the value used. Required when tag is model_dependent."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "measured"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tier": {
+                "const": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "derived"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tier": {
+                "const": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "model_dependent"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tier": {
+                "const": 3
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "inferred_from_analog"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tier": {
+                "const": 4
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "artistic"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tier": {
+                "const": 5
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "enum": [
+                  "derived",
+                  "model_dependent"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "formula"
+            ],
+            "properties": {
+              "formula": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "model_dependent"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "assumed"
+            ],
+            "properties": {
+              "assumed": {
+                "type": "object",
+                "minProperties": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "PositiveDynamicsValue": {
+      "title": "PositiveDynamicsValue",
+      "description": "A DynamicsValue whose value is above 0 (periods and lifetimes).",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DynamicsValue"
+        }
+      ],
+      "properties": {
+        "value": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "NonNegativeDynamicsValue": {
+      "title": "NonNegativeDynamicsValue",
+      "description": "A DynamicsValue whose value is 0 or more (rates).",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DynamicsValue"
+        }
+      ],
+      "properties": {
+        "value": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "Dynamics": {
+      "title": "Dynamics",
+      "description": "Motion data (R3.4, D-32). Absent = no motion data. Rates: spin_period_h: Sidereal rotation period, hours. diff_rotation: k in Omega(phi) = Omega_eq (1 - k sin^2 phi). jet_speed_ms: Peak zonal wind speed, m/s. spot_lifetime_d: Star spot group lifetime, days. flare_rate_per_d: Flares per day above the drawn threshold. pulsation_period_d: Pulsation period, days.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "speedup"
+      ],
+      "properties": {
+        "spin_period_h": {
+          "$ref": "#/definitions/PositiveDynamicsValue"
+        },
+        "diff_rotation": {
+          "$ref": "#/definitions/DynamicsValue"
+        },
+        "jet_speed_ms": {
+          "$ref": "#/definitions/DynamicsValue"
+        },
+        "spot_lifetime_d": {
+          "$ref": "#/definitions/PositiveDynamicsValue"
+        },
+        "flare_rate_per_d": {
+          "$ref": "#/definitions/NonNegativeDynamicsValue"
+        },
+        "pulsation_period_d": {
+          "$ref": "#/definitions/PositiveDynamicsValue"
+        },
+        "speedup": {
+          "type": "object",
+          "propertyNames": {
+            "enum": [
+              "spin",
+              "spots",
+              "flares",
+              "winds",
+              "clouds",
+              "pulsation"
+            ]
+          },
+          "additionalProperties": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "description": "Time-lapse factor shown on screen for each animated process (D-34). {} when nothing moves."
         }
       }
     },
