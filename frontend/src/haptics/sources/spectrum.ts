@@ -68,9 +68,16 @@ export function spectrumXToLambda(
   return linearScale([x0, x1], lambdaDomain);
 }
 
-/** Uniform 0–1 from (seed, k): a 32-bit integer hash, so a step's jitter depends only on its index. */
+/**
+ * Uniform 0–1 from (seed, k): a 32-bit integer hash, so a step's jitter depends only on its index.
+ * A seed above 32 bits mixes its high part in, so seeds 1 and 2**32 + 1 differ; a 32-bit seed
+ * hashes as before.
+ */
 export function jitterUnit(seed: number, k: number): number {
-  let h = (Math.imul(seed | 0, 0x9e3779b1) ^ Math.imul(k | 0, 0x85ebca77)) >>> 0;
+  const lo = seed | 0;
+  const hi = Math.trunc((seed - lo) / 4294967296) | 0;
+  const s = lo ^ Math.imul(hi, 0x27d4eb2f);
+  let h = (Math.imul(s, 0x9e3779b1) ^ Math.imul(k | 0, 0x85ebca77)) >>> 0;
   h = Math.imul(h ^ (h >>> 16), 0x7feb352d) >>> 0;
   h = Math.imul(h ^ (h >>> 15), 0x846ca68b) >>> 0;
   h = (h ^ (h >>> 16)) >>> 0;

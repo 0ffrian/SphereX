@@ -271,6 +271,7 @@ export function SpectrumHapticsPad({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerEnd}
         onPointerCancel={onPointerEnd}
+        onLostPointerCapture={onPointerEnd}
         onKeyDown={onKeyDown}
       >
         <svg

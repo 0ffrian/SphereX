@@ -115,15 +115,21 @@ describe('step 2: distinct levels (D-09)', () => {
     expect(sequencePattern(levels)).toEqual([4, 4, 4, 4, 4, gap, 5, gap, 15, gap, 25]);
   });
 
-  it('tick lengths are strictly increasing whatever minMs is, soft = minMs (Q-74)', () => {
-    for (const minMs of [1, 5, 8, 10, 14, 15, 20, 24, 30, 50]) {
+  it('tick lengths are strictly increasing and never above R8.3 25 ms, soft = minMs (Q-74)', () => {
+    for (const minMs of [1, 5, 8, 10, 14, 15, 20, 23, 24, 30, 50]) {
       const v = levelsToVibrate(cal({ minMs })) as number[];
-      expect(v[0]).toBe(minMs);
+      expect(v[0]).toBe(Math.min(minMs, 23));
+      expect(v[1]!).toBeGreaterThan(v[0]!);
+      expect(v[2]!).toBeGreaterThan(v[1]!);
+      expect(v[2]).toBe(25);
+    }
+    // The 5 ms step is kept where it fits under the cap.
+    for (const minMs of [1, 5, 8, 10, 15]) {
+      const v = levelsToVibrate(cal({ minMs })) as number[];
       expect(v[1]! - v[0]!).toBeGreaterThanOrEqual(CALIBRATION_LEVEL_STEP_MS);
-      expect(v[2]! - v[1]!).toBeGreaterThanOrEqual(CALIBRATION_LEVEL_STEP_MS);
     }
     expect(levelsToVibrate(cal({ minMs: 8 }))).toEqual([8, 15, 25]);
-    expect(levelsToVibrate(cal({ minMs: 20 }))).toEqual([20, 25, 30]);
+    expect(levelsToVibrate(cal({ minMs: 20 }))).toEqual([20, 22, 25]);
   });
 });
 

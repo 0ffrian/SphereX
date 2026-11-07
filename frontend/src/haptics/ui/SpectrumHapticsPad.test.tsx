@@ -163,6 +163,16 @@ describe('SpectrumHapticsPad (R8.6)', () => {
     expect(driver.events).toHaveLength(1); // ended
   });
 
+  it('a lost pointer capture ends the drag, so the next finger can drag', () => {
+    render();
+    ptr('pointerdown', 0, { pointerId: 1 });
+    // The browser took the capture away (e.g. a system gesture) without a pointerup.
+    ptr('lostpointercapture', 0, { pointerId: 1 });
+    ptr('pointerdown', 0, { pointerId: 2 });
+    ptr('pointermove', 8, { pointerId: 2 });
+    expect(driver.events).toHaveLength(1);
+  });
+
   it('ignores the right mouse button', () => {
     render();
     ptr('pointerdown', 0, { pointerId: 1, pointerType: 'mouse', button: 2 });

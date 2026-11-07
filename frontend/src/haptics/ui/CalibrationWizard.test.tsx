@@ -511,6 +511,83 @@ describe('CalibrationWizard (R8.7)', () => {
     expect(haptics.vibrate.levels[0]).toBe(5); // applied for this session
   });
 
+  it('with vibration off in the settings it plays no raw pattern and says so', async () => {
+    const { haptics, vib } = outputs();
+    act(() => useHapticSettings.setState({ hapticsOn: false }));
+    render({ haptics, vibrate: vib.fn });
+    await click('Start');
+    const n = vib.calls.length;
+    await click('Play the three pulses');
+    expect(vib.calls.length).toBe(n);
+    expect(live()).toBe('Vibration is off in the settings. Turn it on to calibrate, or cancel.');
+    expect(button('First (5 ms)').disabled).toBe(true);
+    await click('Skip this step');
+    await click('Play the four buzzes');
+    expect(vib.calls.length).toBe(n);
+    await click('Skip this step');
+    await click('Start the vibration beat');
+    expect(vib.calls.length).toBe(n);
+    expect(find(/beat: tap with each/)).toBeUndefined();
+  });
+
+  it('skipping step 2 after a shorter faintest pulse drops the stored whisper (Q-74)', async () => {
+    saveCalibration(STORED); // minMs 20, whisper kept
+    const { haptics, vib } = outputs();
+    render({ haptics, vibrate: vib.fn });
+    await click('Start');
+    await click('Play the three pulses');
+    await click('First (5 ms)');
+    await click('Skip this step');
+    await click('Skip this step');
+    expect(loadCalibration()).toEqual({ ...STORED, minMs: 5, levels: ['soft', 'medium', 'firm'] });
+    expect(host.textContent).toContain('whisper dropped: the faintest pulse is now shorter');
+  });
+
+  it('skipping step 2 keeps the stored whisper when the faintest pulse is not shorter', async () => {
+    saveCalibration(STORED);
+    const { haptics, vib } = outputs();
+    render({ haptics, vibrate: vib.fn });
+    await click('Start');
+    await click('Play the three pulses');
+    await click('Third (20 ms)');
+    await click('Skip this step');
+    await click('Skip this step');
+    expect(loadCalibration()?.levels).toEqual(STORED.levels);
+    expect(host.textContent).not.toContain('whisper dropped');
+  });
+
+  it('a screen-reader double-tap (a click with no pointer down) counts as one tap', async () => {
+    vi.useFakeTimers();
+    const { haptics, vib } = outputs();
+    render({ haptics, vibrate: vib.fn });
+    await click('Start');
+    await click('Skip this step');
+    await click('Skip this step');
+    await click('Start the vibration beat');
+    const tap = button(/beat: tap with each/);
+    act(() => tap.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 })));
+    expect(host.textContent).toContain('· 1 tap');
+    // A finger counts on pointer down; the click that follows (detail 1) does not count again.
+    act(() => {
+      tap.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      tap.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    });
+    expect(host.textContent).toContain('· 2 taps');
+  });
+
+  it('a new haptics object mid-beat does not stall the beat', async () => {
+    vi.useFakeTimers();
+    const first = outputs();
+    render({ haptics: first.haptics, vibrate: first.vib.fn });
+    await click('Start');
+    await click('Skip this step');
+    await click('Skip this step');
+    await click('Start the vibration beat');
+    render({ haptics: outputs().haptics, vibrate: first.vib.fn });
+    await endBeat();
+    expect(live()).toMatch(/Not enough taps/);
+  });
+
   it('every button is a real button with a text label and a 44 px target', async () => {
     const { haptics, vib } = outputs();
     render({ haptics, vibrate: vib.fn });

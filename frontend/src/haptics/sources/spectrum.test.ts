@@ -233,6 +233,21 @@ describe('seeded jitter (R8.3 roughness)', () => {
     expect(jitterUnit(3, 5)).toBe(jitterUnit(3, 5));
     expect(jitterUnit(3, 5)).not.toBe(jitterUnit(4, 5));
   });
+
+  it('jitterUnit mixes in seed bits above 32; a 32-bit seed hashes as before', () => {
+    expect(jitterUnit(1, 5)).not.toBe(jitterUnit(2 ** 32 + 1, 5));
+    expect(jitterUnit(7, 9)).not.toBe(jitterUnit(2 ** 40 + 7, 9));
+    // The hash before seeds above 32 bits were mixed in: unchanged for every 32-bit seed.
+    const before = (seed: number, k: number) => {
+      let h = (Math.imul(seed | 0, 0x9e3779b1) ^ Math.imul(k | 0, 0x85ebca77)) >>> 0;
+      h = Math.imul(h ^ (h >>> 16), 0x7feb352d) >>> 0;
+      h = Math.imul(h ^ (h >>> 15), 0x846ca68b) >>> 0;
+      return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+    };
+    for (const seed of [0, 1, 3, -5, 2 ** 31 - 1, -(2 ** 31)]) {
+      for (const k of [0, 1, 17]) expect(jitterUnit(seed, k)).toBe(before(seed, k));
+    }
+  });
 });
 
 describe('keyboard stepping (R9)', () => {
