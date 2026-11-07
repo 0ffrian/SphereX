@@ -64,6 +64,6 @@ sequenceDiagram
 
 - The wizard runs only on phones that vibrate: `navigator.vibrate` and Android with a touch screen (Q-74, Q-73). On iPhone, iPad and desktop there is one output, so there is nothing to align and no level to calibrate.
 - A skipped step keeps what the device already has saved, or the R8.3 default (soft 8 ms, 3 levels, offset 0); nothing is written when no step was re-measured. "I felt none" keeps 8 ms and suggests checking vibration settings and battery saver (R12 #11).
-- Tick lengths stay strictly increasing; medium and firm are raised when `minMs` is close to them. The whisper is kept only when it felt weaker than soft (Q-74).
+- Tick lengths stay strictly increasing and never exceed 25 ms (R8.3): firm is 25 ms and medium is raised when `minMs` is close to it. The whisper is kept only when it felt weaker than soft; skipping step 2 after a shorter soft drops it (Q-74).
 - The strength multiplier (0.5 to 1.5) is a setting, not part of the calibration. Settings also hold haptics on/off, sound on/off, volume and the texture-vs-data labels toggle (rendering doc §8.7, D-10), in their own key `sx.haptics.settings`.
 - The 8 ms soft tick must be felt on both Android phones after calibration (acceptance test, rendering doc §11); the realme 14 Pro's minimum is still **[verify]**.
