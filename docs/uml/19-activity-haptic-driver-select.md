@@ -38,5 +38,5 @@ flowchart TD
 - Both drivers are always in the engine's list; the settings switches enable or disable them, and a disabled driver is stopped. The engine never runs on its own timers unless a source starts a train.
 - The mock-up's `window.SphereXNative.haptic` and iOS `webkit.messageHandlers.sphereXHaptic` bridges are not checked: they are dropped for the event (D-20).
 - The `spherex:haptic` debug event is fired by the engine for every event that passes the honesty gate and the rate cap, whether or not a driver is on (D-20).
-- The unlock must be a `click`: it is the user activation for both `navigator.vibrate` and the AudioContext (R8.9). When the calibration wizard first runs (start-up or first entry to Touch mode) is decided with issue #10.
+- The unlock must be a `click`: it is the user activation for both `navigator.vibrate` and the AudioContext (R8.9). When the calibration wizard first runs (start-up or first entry to Touch mode) is not decided yet: it is an item of the M5 integration checklist (rendering doc [§8.8](../rendering/haptics/engine-api.md#r88-engine-api)).
 - Haptics never carry information that is not also available as text or sound (rendering doc §9), so sound-only or no output loses no content.

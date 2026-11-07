@@ -47,8 +47,11 @@ frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
   tuning.ts           # every tuning constant, marked CREATIVE placeholder (D-13) or [verify on phones]
   drivers/webVibrate.ts drivers/audio.ts drivers/tauri.ts (stub, B-01)
   sources/heightMap.ts meshNormal.ts field.ts terrain.ts flow.ts spectrum.ts lightcurve.ts
+  sources/types.ts relief.ts dataPulse.ts   # TouchSample, TrainSlot; R8.4 peak rule; teq, flux and binary pulses (#11)
+  profiles.ts         # R8.5 buildHaptics per ObjectType + TouchHaptics (move, hold-still poll, scrub); issue #11
+  probe.ts            # pointer → ray → analytic ellipsoid → body direction, UV, normal, distance, ring radius, pan (#11)
   ui/                 # PulseIndicator (D-20), UnlockButton (#9); CalibrationWizard, HapticsSettings, SpectrumHapticsPad (#10)
-  sound/              # Listen sweep, imagined drive (A8); issue #11
+  sound/              # listenSweep.ts (A8 Listen sweep, issue #11); imagined drive not built yet
 frontend/src/hapticsTestPage/        (Atish)  # dev-only test page behind frontend/haptics-test.html; not a build input;
                                               # panels/SpectrumPanel.tsx (#10), panels/TexturePanel.tsx (#11)
 frontend/src/contract/               (generated, D-18)  # generated.ts comes from shared/schemas/ by json-schema-to-typescript;
@@ -68,7 +71,8 @@ frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, St
   flipbook/           # Flipbook player, playback, keys, cutout preloading, RainbowTrails + wavelengthColor (D-28)
   spectrum/           # SpectrumPanel, SVG SpectrumChart, scale (displays the A4.2 output)
 frontend/src/test/                           # test-only helpers (fixtureFetch.ts, sharedFixtures.ts: loads shared/fixtures;
-                                             # fakeHaptics.ts, fakeAudio.ts: fake clock, drivers and AudioContext)
+                                             # fakeHaptics.ts, fakeAudio.ts: fake clock, drivers and AudioContext;
+                                             # hapticRecorder.ts: recording sink and TouchSample helpers, issue #11)
 frontend/src/fixtures.test.ts                # fixtures are deterministic, pass the API validators, never imported by app code
 frontend/e2e/                                # Playwright tests (smoke, flipbook) against the fixture server
 frontend/fixtures/                           # dev and test only: SYNTHETIC fixture server, a Vite dev-server plugin

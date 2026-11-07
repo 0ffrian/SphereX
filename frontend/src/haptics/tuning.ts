@@ -161,8 +161,12 @@ export const STORM_SWIRL_CENTRE_HZ = 16;
 /** SPEC R8.4: comet field rate = clamp(k · Q / r, 2, 30) Hz (`profile.params.maxRateHz` wins for the top). */
 export const FIELD_MIN_HZ = 2;
 export const FIELD_MAX_HZ = 30;
-/** R8.4 field `k` when `profile.params.k` is absent. CREATIVE placeholder — Atish to decide (D-13). */
-export const FIELD_K = 1;
+/**
+ * R8.4 field `k` when `profile.params.k` is absent. With Q normalised to ≤ 1 and r in coma radii,
+ * 8 keeps December (Q 1) above August (Q 0.25) over the whole coma: Aug 2–8 Hz, Dec 8–30 Hz
+ * (issue #11 review M4). CREATIVE placeholder — Atish to decide (D-13).
+ */
+export const FIELD_K = 8;
 
 // ---------------------------------------------------------------- data sources (R8.5) — #11
 
@@ -214,3 +218,82 @@ export const TAP_MIN_TAPS = 4;
 export const TAP_MAX_SPREAD_MS = 60;
 /** Engineering (Q-75): |avOffsetMs| above this is a failed measurement (and corrupt in storage). */
 export const AV_OFFSET_MAX_MS = 400;
+
+// ================================================================ #11 texture, data and sound
+// Added by issue #11 (texture haptics per type, and sound). The constants above stay as #9 set them.
+
+// ---------------------------------------------------------------- source trains
+/** A running source train is not updated for a relative change of rate, strength or pitch below this. Engineering. */
+export const TRAIN_UPDATE_EPSILON = 0.02;
+/** … nor for a change of pan (−1..1) below this. Engineering. */
+export const TRAIN_PAN_EPSILON = 0.05;
+
+// ---------------------------------------------------------------- strengths without a data value
+/**
+ * R8.4/R8.5 say "tick" or "double tick" without a strength (ring gap, lava crack, nucleus is
+ * "firm"). The middle of 0–1, so it lands in the medium bin with 3 levels. CREATIVE placeholder — Atish to decide (D-13).
+ */
+export const PLAIN_TICK_STRENGTH = 0.5;
+/** R8.5 data pulses ("steady pulse": teq, flux, binary, field): their strength. CREATIVE placeholder — Atish to decide (D-13). */
+export const DATA_PULSE_STRENGTH = 0.5;
+
+// ---------------------------------------------------------------- relief (R8.4 height rule)
+/**
+ * R8.4 "0.15 of *local* relief std": the std is taken over square tiles of this many texels
+ * (of a 512×256 map; scaled with the map). Engineering: "local" is not sized in the spec.
+ */
+export const RELIEF_STD_TILE_TEXELS = 16;
+/** Tiles with fewer usable texels than this fall back to the whole map's std. Engineering. */
+export const RELIEF_STD_MIN_TEXELS = 8;
+
+// ---------------------------------------------------------------- terrain (R8.4, D-12)
+/** A field mask (ocean, ice, lava) counts as "inside" at or above this; 0.5 is the drawn edge of its smoothstep. Engineering. */
+export const MASK_THRESHOLD = 0.5;
+/** Coastline hysteresis on open ocean = ocean · (1 − ice): enter at or above, leave at or below. Engineering. */
+export const COAST_ENTER = 0.6;
+export const COAST_LEAVE = 0.4;
+/** D-12 open-ocean swell rate, inside OCEAN_SWELL_MIN_HZ–OCEAN_SWELL_MAX_HZ. CREATIVE placeholder — Atish to decide (D-13). [verify on phones] */
+export const OCEAN_SWELL_HZ = 1.5;
+
+// ---------------------------------------------------------------- flow (R8.4, D-12)
+/**
+ * "Inside a jet": |zonal wind| / max |zonal wind| at or above this. 0 = the jet train plays
+ * wherever the wind blows (the 2 Hz floor covers the calm band edges). CREATIVE placeholder — Atish to decide (D-13).
+ */
+export const FLOW_JET_MIN_WIND = 0;
+/** Ring gap: `ringGapAt(t)` at or above this is "in the gap" (its smoothstep edge). Engineering. */
+export const RING_GAP_THRESHOLD = 0.5;
+
+// ---------------------------------------------------------------- point density (nebula, nova; R8.4 item 4)
+/** Radius (body units, cloud radius 1) of the disc around the finger's ray in which points are counted. CREATIVE placeholder — Atish to decide (D-13). */
+export const DENSITY_RADIUS = 0.08;
+/** rate = clamp(DENSITY_K · density ÷ uniform-disc density, FIELD_MIN_HZ, max). CREATIVE placeholder — Atish to decide (D-13). */
+export const DENSITY_K = 4;
+/** The point count is redone only after the finger moved this many px (it is O(points)). Engineering. */
+export const DENSITY_RECOUNT_PX = 1;
+
+// ---------------------------------------------------------------- Listen sweep (A8, R8.6, R8.9)
+/** The mock-up's sweep: 6 s across the spectrum. CREATIVE placeholder — Atish to decide (D-13). */
+export const SWEEP_DURATION_S = 6;
+/** Fewest gain steps across the sweep (the mock-up's 90). Engineering. */
+export const SWEEP_STEPS = 90;
+/**
+ * Sweep samples per spectrum point, so a dip one channel wide is quiet in the sweep as it is under
+ * the finger (R8.6 item 3; issue #11 review M3). Engineering.
+ */
+export const SWEEP_SAMPLES_PER_POINT = 8;
+/**
+ * Most gain steps one sweep schedules (security review): 8 per point up to 512 points, far above a
+ * SPHEREx spectrum's ~102, so a huge input cannot schedule millions of AudioParam events. Engineering.
+ */
+export const SWEEP_MAX_STEPS = 4096;
+/** Gain ramp at the sweep's start and end and at every quiet edge, so it does not click (s). Engineering. */
+export const SWEEP_EDGE_S = 0.008;
+/** The mock-up's triangle oscillator. CREATIVE placeholder — Atish to decide (D-13). */
+export const SWEEP_WAVE: OscillatorType = 'triangle';
+/** Peak gain of the sweep tone at strength 1 and volume 1. CREATIVE placeholder — Atish to decide (D-13). */
+export const SWEEP_PEAK_GAIN = 0.3;
+/** Stereo travel, left to right (the mock-up's ±0.8). CREATIVE placeholder — Atish to decide (D-13). */
+export const SWEEP_PAN = 0.8;
+/** Gain of a gas-line chime. CREATIVE placeholder — Atish to decide (D-13). */
+export const SWEEP_CHIME_GAIN = 0.3;

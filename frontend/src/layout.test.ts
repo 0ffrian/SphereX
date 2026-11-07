@@ -39,6 +39,13 @@ const R10_MODULES = [
   './haptics/sources/flow.ts',
   './haptics/sources/spectrum.ts',
   './haptics/sources/lightcurve.ts',
+  // issue #11
+  './haptics/profiles.ts',
+  './haptics/probe.ts',
+  './haptics/sources/types.ts',
+  './haptics/sources/relief.ts',
+  './haptics/sources/dataPulse.ts',
+  './haptics/sound/listenSweep.ts',
   // extra folders (frontend README): contract, state
   './contract/index.ts',
   './state/store.ts',
