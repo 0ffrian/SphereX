@@ -5,6 +5,8 @@ import { DataTexture, Texture } from 'three/webgpu';
 import { generateField } from '../fields/fieldGenerator';
 import { ALL_TAGS, ESTIMATED_TAGS } from './bodyRenderer';
 import { ShaderBody } from './ShaderBody';
+import { resolveShaderSpec } from './shaderSpec';
+import { resolveMotion } from '../motion/motion';
 import { fixture } from './fixtures.testutil';
 import type { BodyContext } from './bodyRenderer';
 
@@ -264,9 +266,13 @@ describe('ShaderBody field and point access for the haptic sources (review N1)',
     const g = fixture('gas_giant');
     const gas = await ShaderBody.create(g.card, g.params, ctx);
     // The tilt group is rotated 0.35 rad about z, so world +y sits 0.35 rad off the body axis.
+    // The surface frame also undoes the flattening (the polar axis is 1 - f of the equatorial), so
+    // a point is mapped onto the unit sphere the field is defined on.
+    const f = resolveShaderSpec(g.card, g.params, undefined, resolveMotion(g.card, g.params)).gas!
+      .flattening;
     const [x, y, z] = gas.worldToBody([0, 1, 0]);
     expect(x).toBeCloseTo(Math.sin(0.35), 6);
-    expect(y).toBeCloseTo(Math.cos(0.35), 6);
+    expect(y).toBeCloseTo(Math.cos(0.35) / (1 - f), 6);
     expect(z).toBeCloseTo(0, 9);
     const n = fixture('nebula');
     const neb = await ShaderBody.create(n.card, n.params, ctx);

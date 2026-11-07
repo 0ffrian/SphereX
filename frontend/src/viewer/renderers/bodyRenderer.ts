@@ -7,6 +7,7 @@ import { allowedTags, DEFAULT_HONESTY } from '../honesty';
 import type { Overrides } from '../sliders';
 import type { FieldData, FieldParams, FieldSampler, Vec3 } from '../fields/fieldGenerator';
 import type { PointKind, PointSet, PointSets } from './pointClouds';
+import type { Motion, SimTimeFn } from '../motion/motion';
 
 export const ALL_TAGS: readonly Tag[] = [
   'measured',
@@ -51,6 +52,10 @@ export interface BodyContext {
   overrides?: Overrides;
   /** Replaces the field Web Worker (tests). Default: `requestField`. */
   fieldSource?: (params: FieldParams) => Promise<FieldData>;
+  /** Motion rates and processes the plan resolved (motion/motion.ts). Default: resolved from the card and params. */
+  motion?: Motion;
+  /** Noise octaves of the quality level (R5.7). Default 4 (the low level). */
+  octaves?: number;
 }
 
 export interface BodyRenderer {
@@ -78,6 +83,8 @@ export interface BodyRenderer {
   /** World point -> body frame (accounts for the group scale and the gas-giant tilt). */
   worldToBody(p: Vec3): Vec3;
   setSunDirection(dir: Vec3): void;
+  /** Poses the body at the SimClock's times (D-34). Optional: still bodies have nothing to pose. */
+  setTime?(time: SimTimeFn): void;
   setVisibleTags(tags: readonly Tag[]): void;
   /** D-27. Rebuilds what the changed sliders affect; resolves when drawn. */
   setOverrides(overrides: Overrides): Promise<void>;

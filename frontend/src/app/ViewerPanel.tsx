@@ -164,12 +164,13 @@ export function ViewerPanel() {
               card: ObjectCard,
               params: RenderParams,
               honesty: HonestyState,
+              mode?: 'visible' | 'spherex_ir',
             ) => RenderPlan;
           };
           w.__sxViewer = created;
           // Plans and draws like the panel does, for a given honesty state.
-          w.__sxShow = (c, p, honesty) => {
-            const shown = planRender(c, p, defaultContext({ honesty }));
+          w.__sxShow = (c, p, honesty, mode) => {
+            const shown = planRender(c, p, defaultContext({ honesty, mode: mode ?? null }));
             created.showPlan(shown);
             return shown;
           };
@@ -261,6 +262,7 @@ export function ViewerPanel() {
   const notDrawn = plan?.missing.filter((m) => !m.defaultShown) ?? [];
   const disabled = viewer === null;
   const objectIsFixture = fixture || (card?.id.startsWith('fixture:') ?? false);
+  const spinTier = plan?.motion.processes.find((p) => p.id === 'spin')?.tier;
   const hiddenCount = plan?.missing.filter((m) => m.reason === 'honesty').length ?? 0;
 
   return (
@@ -506,6 +508,7 @@ export function ViewerPanel() {
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm text-neutral-200" data-testid="spin-note">
                 Spin sped up ×{plan.spin.speedup}
+                {spinTier ? ` (tier ${spinTier})` : ''}
                 {reducedMotion
                   ? '. Auto-spin is off because your device asks for reduced motion.'
                   : spinPaused
@@ -542,7 +545,8 @@ export function ViewerPanel() {
             .filter((t) => t.id !== 'spin')
             .map((t) => (
               <p key={t.id} className="text-sm text-neutral-200" data-testid="time-lapse-note">
-                {t.label} sped up ×{t.speedup}.
+                {t.label} sped up ×{t.speedup}
+                {t.tier ? ` (tier ${t.tier})` : ''}.
               </p>
             ))}
 
@@ -565,6 +569,11 @@ export function ViewerPanel() {
                   >
                     <ProvenanceBadge tag={l.tag} fixture={objectIsFixture} />
                     <span>{layerName(l.id)}</span>
+                    {l.tier ? (
+                      <span className="text-xs text-neutral-400" data-testid="layer-tier">
+                        tier {l.tier}
+                      </span>
+                    ) : null}
                     {l.swatches?.map((s) => (
                       <span
                         key={s.label}

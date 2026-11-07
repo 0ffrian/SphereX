@@ -26,6 +26,7 @@ import { planRender } from './renderPlan';
 import type { BodyRenderer } from './renderers/bodyRenderer';
 import { AssetCache, buildScene, type BuildHooks, type BuiltScene } from './renderers/build';
 import { SimClock, type PauseReason } from './render/clock';
+import type { Motion } from './motion/motion';
 import { RenderChain } from './render/pipeline';
 import {
   FEED_GAP_MS,
@@ -35,6 +36,7 @@ import {
   capIntervalMs,
   FrameCap,
   qualityFromSearch,
+  TIERS,
   type TierName,
 } from './render/quality';
 
@@ -116,7 +118,14 @@ export function sceneKey(plan: RenderPlan): string {
     plan.screens,
     plan.trails,
     plan.dust,
-    plan.spin,
+    // The shader kinds' spin is applied in place (a honesty toggle must not rebuild the field).
+    plan.shader ? null : plan.spin,
+    // What moves: rates and processes (R5.7). The star's layers, a brown dwarf's jets and a Mira's
+    // pulsation change what is built; the cloud cover of a brown dwarf is applied in place.
+    plan.motion,
+    plan.star,
+    plan.jets ? { ...plan.jets, cover: 0 } : null,
+    plan.pulsation,
     // The shader kinds: what the body is built from. Honesty and light are not in it (they update
     // the body in place), so a toggle does not regenerate the field.
     plan.shader?.key ?? null,
@@ -219,6 +228,8 @@ export class ViewerApp {
   /** Content in the scene; `built` may be newer while its shaders compile (never blank). */
   private onScreen: BuiltScene | null = null;
   private compileToken = 0;
+  /** The plan last shown, so a quality-level change can rebuild it. */
+  private lastPlan: RenderPlan | null = null;
   private compiling: Promise<void> | null = null;
   /**
    * What goes on with `built` when it swaps in: its lights, spin and framing. Held back while it
@@ -403,6 +414,7 @@ export class ViewerApp {
   /** Draws a plan made with `planRender` (the panel plans once and reuses the plan for its UI). */
   showPlan(plan: RenderPlan): void {
     if (this.disposed) return;
+    this.lastPlan = plan;
     // The new lights go on with the content they belong to: an old object still on screen while
     // the new one compiles is not lit from the new object's phase angle.
     const lights = buildLights(plan.lighting);
@@ -411,6 +423,7 @@ export class ViewerApp {
       // Nothing that is built changed: only the lights, the honesty state or the labels did. A
       // generated body takes the new tags and light in place (no field is regenerated).
       this.built.update(plan);
+      if (this.built === this.onScreen) this.syncProcesses(plan.spin, this.built, plan.motion);
       if (this.built !== this.onScreen && this.pending) {
         // Still compiling: the new lights wait for the content they belong to.
         this.pending = { lights, plan };
@@ -435,6 +448,7 @@ export class ViewerApp {
             onLoadFailed: (id) => this.onLoadFailed?.(id),
             onChange: this.requestRender,
             shader: this.shaderOptions,
+            octaves: TIERS[this.tier].octaves,
           },
           this.assets,
         );
@@ -477,7 +491,7 @@ export class ViewerApp {
         this.setLights(pending.lights);
         const { plan } = pending;
         this.frame(plan.id, plan.extent, plan.shader?.distance ?? 0);
-        this.syncProcesses(plan.spin, next);
+        this.syncProcesses(plan.spin, next, plan.motion);
       }
       this.applySpinAngle();
       this.restartSettle();
@@ -526,15 +540,35 @@ export class ViewerApp {
     this.onScreen = null;
   }
 
-  /** Registers or removes the spin process on the clock. */
-  private syncProcesses(spin: SpinPlan | null, built: BuiltScene | null): void {
+  /**
+   * Registers the processes that move on the clock: the spin (shown with its own note) and the
+   * animated processes of the plan's motion (R5.7, D-34), each with the speed-up the card states
+   * and the tier of the rates it runs on. Processes of the last body that are no longer there are
+   * removed.
+   */
+  private syncProcesses(spin: SpinPlan | null, built: BuiltScene | null, motion?: Motion): void {
+    const keep = new Set<string>();
     if (built && spin && built.spinRate > 0) {
       this.spinBase = built.spinRate / spin.speedup;
       this.clock.setProcess({ id: 'spin', label: 'Spin', speedup: spin.speedup });
+      keep.add('spin');
     } else {
       this.spinBase = 0;
-      this.clock.removeProcess('spin');
     }
+    if (built && motion) {
+      for (const p of motion.processes) {
+        if (p.id === 'spin') continue; // the spin is the plan's (its speed-up may be lowered)
+        this.clock.setProcess({
+          id: p.id,
+          label: p.label,
+          speedup: p.speedup,
+          tag: p.tag,
+          tier: p.tier,
+        });
+        keep.add(p.id);
+      }
+    }
+    for (const p of this.clock.processes()) if (!keep.has(p.id)) this.clock.removeProcess(p.id);
     this.updateLoop();
   }
 
@@ -579,7 +613,7 @@ export class ViewerApp {
   }
 
   /** The processes that are time-lapses (each is shown with its speed-up). */
-  timeLapses(): { id: string; label: string; speedup: number }[] {
+  timeLapses(): { id: string; label: string; speedup: number; tier?: number }[] {
     return this.clock.processes();
   }
 
@@ -593,7 +627,11 @@ export class ViewerApp {
     if (!this.onScreen) return;
     const angle = this.spinBase * this.clock.simTime('spin');
     for (const o of this.onScreen.spinners) o.rotation.y = angle;
+    // Everything else that moves is posed from the same clock (D-34: one clock, a pure function of t).
+    this.onScreen.setTime(this.simTimeOf);
   }
+
+  private readonly simTimeOf = (id: string): number => this.clock.simTime(id);
 
   private clearBuilt(): void {
     this.compileToken++;
@@ -694,6 +732,12 @@ export class ViewerApp {
     }
     if (auto) this.drops++;
     this.onQualityChange?.({ from, to: name, auto });
+    // A body built from noise has its octave count baked in: rebuild it at the new level.
+    if (this.built?.usesQuality && this.lastPlan) {
+      this.builtKey = '';
+      this.showPlan(this.lastPlan);
+      return;
+    }
     this.renderNow();
   }
 

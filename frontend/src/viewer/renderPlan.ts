@@ -5,6 +5,7 @@ import type { CometEpoch, ObjectCard, RenderParams } from '@/contract';
 import { DEFAULT_HONESTY } from './honesty';
 import { NEUTRAL_TINT } from './modes';
 import { PlanBuilder, type PlanInput } from './planCommon';
+import { STILL_MOTION } from './motion/motion';
 import type { PlanContext, RenderPlan } from './planTypes';
 import { planAsteroidMesh } from './renderers/AsteroidMesh';
 import { planAsteroidProcedural } from './renderers/AsteroidProcedural';
@@ -110,6 +111,10 @@ export function planRender(card: ObjectCard, params: RenderParams, ctx: PlanCont
       scrub: null,
       relief: 'illustrative',
       shader: null,
+      motion: STILL_MOTION,
+      star: null,
+      jets: null,
+      pulsation: null,
     };
   }
 }

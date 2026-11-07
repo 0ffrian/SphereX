@@ -128,6 +128,14 @@ classDiagram
     Mira brightness follows light curve
     T Tauri disc and dust screen
     motion trail from pm_mas_yr
+    issue #42: StarBody draws spots, faculae, flares, loops, granulation, glow
+    from the CPU model bodies/starModel.ts (pure in seed, rates, t)
+  }
+  class MotionPlan {
+    <<issue #42, motion/motion.ts>>
+    resolveMotion: measured card field, dynamics, class value, else dynamics:key in missing
+    a process runs only with a stated speed-up and every rate it needs
+    SimClock processes carry their tag and tier
   }
   class ShaderBody {
     <<planet_rocky, planet_water, gas_giant, nebula, nova>>
@@ -140,6 +148,8 @@ classDiagram
     finer noise is seen, not felt
     nebula and nova are instanced Sprites
     refused layers go in missing
+    issue #42: setTime(time) poses spin, jets, storms, clouds; jetSurface.ts shared with brown dwarfs
+    storms from fields/flowModel.ts go to the shader and to FieldSampler.setStorms (same t)
   }
   class FieldWorker {
     <<Web Worker, D-12>>
