@@ -5,15 +5,17 @@
 //   camera ray (skyMath), and runs the normal search with "ra,dec" (6 decimals). The store aborts
 //   any older search, so a stale reply never wins. Picked coordinates are `derived` (Q-25).
 // - Markers for the quick-pick targets, placed from /v1/resolve; clicking one searches it by name.
+// - Smaller markers for positions whose frames are cached (/v1/sky/cached): they load at once.
+//   A target already marked is not marked twice (cachedMarkers.ts).
 // - Never blank: the shell and search render first; the pane shows a loading state, then the
 //   smallest image, then a larger one on capable devices. With no image installed it shows a
 //   coordinate grid and says so; clicking still picks coordinates.
 // - No React re-render per pointer move: the readout and markers are written from refs.
 // - R9: keyboard pan/zoom on the canvas (arrows, +/−, R), Enter picks the centre, on-screen pan
 //   and zoom buttons (WCAG 2.5.7), aria-label and a text alternative.
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { EstimatedBadge, ProvenanceBadge } from '@/app/Badge';
-import type { SkySurvey } from '@/app/api/types';
+import type { SkyCachedObject, SkySurvey } from '@/app/api/types';
 import { isApiError } from '@/app/api/errors';
 import { formatCoords } from '@/app/format';
 import { getSkyApi, useAppStore } from '@/state/store';
@@ -40,6 +42,13 @@ import {
 import { pickSurvey, planSkyLoad } from '@/viewer/sky/surveys';
 import { PICK_FORMULA } from './positionTags';
 import { publishReadout } from './readout';
+import {
+  cachedMarkerDescription,
+  cachedMarkerLabel,
+  cachedMarkerQuery,
+  cachedMarkersToShow,
+} from './cachedMarkers';
+import { useCachedMarkers } from './useCachedMarkers';
 import { useTargetMarkers, type TargetMarker } from './useTargetMarkers';
 
 /**
@@ -104,6 +113,12 @@ export function SkyPane({ children }: { children?: ReactNode }) {
   const resolved = useAppStore((s) => s.sky.resolved);
   const descId = useId();
   const targets = useTargetMarkers(view !== null);
+  const cachedAll = useCachedMarkers(view !== null);
+  // After the target markers are placed, so a target is never drawn twice, not even briefly.
+  const cached = useMemo(
+    () => (targets.done ? cachedMarkersToShow(cachedAll, targets.markers) : []),
+    [cachedAll, targets.done, targets.markers],
+  );
   // R9: keyboard and button pans say where the view is now (the readout is not a live region).
   const [viewSay, setViewSay] = useState('');
   const sayTimer = useRef<number | null>(null);
@@ -347,6 +362,11 @@ export function SkyPane({ children }: { children?: ReactNode }) {
   const pickTarget = (m: TargetMarker) => {
     setPicked(null);
     void search({ q: m.name, kind: 'name', origin: 'sky' });
+  };
+
+  const pickCached = (c: SkyCachedObject) => {
+    setPicked(null);
+    void search(cachedMarkerQuery(c));
   };
 
   // Any other search (typed, a quick pick, a link, Back) replaces the pick: its marker and the
@@ -629,6 +649,28 @@ export function SkyPane({ children }: { children?: ReactNode }) {
             </button>
           </li>
         ))}
+        {cached.map((c) => (
+          <li
+            key={`c:${c.id}`}
+            ref={registerMarker(`c:${c.id}`, c.ra, c.dec)}
+            className="absolute top-0 left-0 will-change-transform"
+          >
+            <button
+              type="button"
+              className="sx-marker sx-marker-cached pointer-events-auto"
+              onClick={() => pickCached(c)}
+              aria-label={cachedMarkerDescription(c)}
+              title={`${cachedMarkerLabel(c)}: cached, loads instantly`}
+              data-testid="sky-cached-marker"
+              data-object-id={c.id}
+            >
+              <span className="sx-marker-ring" aria-hidden="true" />
+              <span className="sx-marker-label">
+                {cachedMarkerLabel(c)} · cached, loads instantly
+              </span>
+            </button>
+          </li>
+        ))}
         {resolved && (
           <li
             key={`sel:${resolved.id}`}
@@ -744,6 +786,17 @@ export function SkyPane({ children }: { children?: ReactNode }) {
           <p className="text-sx-fg">
             Not shown on the sky (lookup failed): {targets.unplaced.join(', ')}. Search them by name
             instead.
+          </p>
+        )}
+        {/* Legend for the small lilac dots: their label shows only on hover or focus, and a touch
+            screen has no hover. */}
+        {cached.length > 0 && (
+          <p className="flex items-center gap-1.5" data-testid="sky-cached-legend">
+            <span
+              className="inline-block size-2.5 flex-none rounded-full border border-black bg-[#e9d5ff] shadow-[0_0_0_1px_#e9d5ffaa]"
+              aria-hidden="true"
+            />
+            <span>Lilac dots: already downloaded, open instantly.</span>
           </p>
         )}
         {/* Renderer details, for the team; hidden on phones to save space. */}

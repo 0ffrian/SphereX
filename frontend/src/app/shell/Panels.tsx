@@ -58,7 +58,7 @@ function ObjectPanel() {
       )}
       <Flipbook />
       <SpectrumPanel />
-      {tool === 'spectrum' && sky.status === 'ready' && nFrames === 0 && (
+      {tool === 'spectrum' && sky.status === 'ready' && nFrames === 0 && !sky.progress && (
         <p className="text-sm text-sx-mfg">There is no spectrum without frames.</p>
       )}
     </PanelCard>

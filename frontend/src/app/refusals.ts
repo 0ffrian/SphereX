@@ -5,7 +5,7 @@
 // Code formats the backend emits (backend/app/core/find/frames.py, backend/app/core/measure/):
 //   per frame      `<reason>:<frame_id>`, e.g. `saturated:2026W17_1B_0634_4_D3`
 //   whole result   `frames:truncated`, `frames:moving_object_search`, `spectrum:saturated`,
-//                  `cutouts:deferred:<n>`
+//                  `cutouts:deferred:<n>`, and the colour composite's `composite:<reason>`
 // Anything else is kept and shown as is, never dropped.
 import type { Frame, SpectrumPoint } from '@/app/api/types';
 
@@ -40,10 +40,35 @@ export const ALL_SATURATED = 'spectrum:saturated';
 const TRUNCATED = 'frames:truncated';
 const DEFERRED_RE = /^cutouts:deferred:(\d+)$/;
 /** Prefixes of whole-result codes; an unknown code under one of them is a note, not a frame. */
-const NAMESPACES: ReadonlySet<string> = new Set(['frames', 'spectrum', 'cutouts']);
+const NAMESPACES: ReadonlySet<string> = new Set(['frames', 'spectrum', 'cutouts', 'composite']);
 const REASON_RE = /^[a-z][a-z0-9_]*$/;
 const KNOWN_REASONS: ReadonlySet<string> = new Set(FRAME_REASONS);
 const KNOWN_WHOLE: ReadonlySet<string> = new Set(WHOLE_RESULT_CODES);
+
+/**
+ * Colour composite codes (backend/app/core/composite: select.py, service.py, 7 Nov 2026, built in
+ * parallel): whole-result reasons, and per channel `composite:<blue|green|red>:<reason>`.
+ * `composite:<channel>:skipped:<reason>:<frame_id>` (a nearer frame refused) is read as the frame
+ * refusal `<reason>:<frame_id>` (groupCompositeMissing). Any other code is shown as is.
+ */
+export const COMPOSITE_WHOLE_REASONS = [
+  'too_few_bands',
+  'saturated',
+  'no_common_pass',
+  'moving_object',
+  'no_proper_motion',
+  'pixel_scale',
+] as const;
+export const COMPOSITE_CHANNEL_REASONS = [
+  'no_frame',
+  'saturated',
+  'no_usable_frame',
+  'stretch',
+] as const;
+const COMPOSITE_CODE_RE = new RegExp(
+  `^composite:(?:(?:${COMPOSITE_WHOLE_REASONS.join('|')})|(?:blue|green|red):(?:${COMPOSITE_CHANNEL_REASONS.join('|')}))$`,
+);
+const COMPOSITE_SKIPPED_RE = /^composite:(?:blue|green|red):skipped:([a-z][a-z0-9_]*):(.+)$/;
 
 export type ParsedMissing =
   | { kind: 'frame'; reason: string; frameId: string; known: boolean }
@@ -51,7 +76,9 @@ export type ParsedMissing =
 
 /** One code. Split on the first ':' like the backend's own report (spectrum.py report_targets). */
 export function parseMissing(code: string): ParsedMissing {
-  if (KNOWN_WHOLE.has(code)) return { kind: 'note', code, known: true, count: 1 };
+  if (KNOWN_WHOLE.has(code) || COMPOSITE_CODE_RE.test(code)) {
+    return { kind: 'note', code, known: true, count: 1 };
+  }
   const deferred = DEFERRED_RE.exec(code);
   if (deferred) return { kind: 'note', code, known: true, count: Number(deferred[1]) };
   const colon = code.indexOf(':');
@@ -186,4 +213,17 @@ export function summarizeSpectrum(
     largestGap: widestGap(points.map((p) => p.wavelength_um)),
     groups: saturated > 0 ? all.filter((g) => g.reason !== ALL_SATURATED) : all,
   };
+}
+
+/**
+ * The composite's `missing`, grouped like the frames'. A nearer frame the backend skipped
+ * (`composite:<channel>:skipped:<reason>:<frame_id>`) joins the frame group of its reason.
+ */
+export function groupCompositeMissing(codes: readonly string[]): RefusalGroup[] {
+  return groupMissing(
+    codes.map((c) => {
+      const m = COMPOSITE_SKIPPED_RE.exec(c);
+      return m ? `${m[1]}:${m[2]}` : c;
+    }),
+  );
 }

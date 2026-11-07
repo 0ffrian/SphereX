@@ -10,7 +10,7 @@ import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import objects, resolve, sky, spectrum
+from app.api import composite, objects, resolve, sky, spectrum
 from app.context import make_context
 from app.core.card.assets import AssetStore
 from app.core.card.service import ObjectPipeline
@@ -70,6 +70,7 @@ def create_app(
     app.include_router(resolve.router)
     app.include_router(objects.router)
     app.include_router(spectrum.router)
+    app.include_router(composite.router)
     app.include_router(sky.router)
 
     @app.get("/v1/health", tags=["meta"])

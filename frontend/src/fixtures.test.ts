@@ -4,14 +4,17 @@ import { describe, expect, it } from 'vitest';
 import { handleFixtureRequest } from '../fixtures/handler';
 import { crc32, PNG_SIGNATURE } from '../fixtures/png';
 import {
+  COMPOSITE_OBJECT_PX,
   CUTOUT_SIZE,
   FIXTURE_DATA_RELEASE,
+  makeComposite,
   makeFrames,
   makeSpectrum,
+  renderComposite,
   renderCutout,
 } from '../fixtures/synthetic';
 import { FIXTURE_TARGETS, findTargetByCoords, findTargetByName } from '../fixtures/targets';
-import { parseFrames, parseResolve, parseSpectrum } from './app/api/validate';
+import { parseComposite, parseFrames, parseResolve, parseSpectrum } from './app/api/validate';
 
 const json = (url: string) => {
   const r = handleFixtureRequest('GET', url)!;
@@ -110,6 +113,8 @@ describe('synthetic fixtures', () => {
       expect(JSON.stringify(makeFrames(t))).toBe(JSON.stringify(makeFrames(t)));
       expect(JSON.stringify(makeSpectrum(t))).toBe(JSON.stringify(makeSpectrum(t)));
       if (t.frameCount > 0) expect(renderCutout(t, 0)).toEqual(renderCutout(t, 0));
+      expect(JSON.stringify(makeComposite(t))).toBe(JSON.stringify(makeComposite(t)));
+      expect(renderComposite(t)).toEqual(renderComposite(t));
     }
   });
 
@@ -138,6 +143,44 @@ describe('synthetic fixtures', () => {
     expect(types).toEqual(['IHDR', 'IDAT', 'IEND']);
   });
 
+  it('serves a valid SYNTHETIC colour composite whose bands are frames of the object', () => {
+    for (const id of ['barnards-star', 'eps-indi-b', 'wise-0855', 'rw-aur']) {
+      const reply = json(`/v1/objects/${id}/composite`);
+      expect(reply.headers['x-sx-fixture']).toBe('synthetic');
+      const c = parseComposite(reply.data);
+      expect(c.formula).toMatch(/^SYNTHETIC fixture, not SPHEREx data/);
+      expect([c.width, c.height]).toEqual([CUTOUT_SIZE, CUTOUT_SIZE]);
+      expect([c.x, c.y]).toEqual([COMPOSITE_OBJECT_PX.x, COMPOSITE_OBJECT_PX.y]);
+      const frames = parseFrames(json(`/v1/objects/${id}/frames`).data).frames;
+      for (const b of c.bands) {
+        const f = frames.find((fr) => fr.frame_id === b.frame_id);
+        expect(f, b.frame_id).toBeDefined();
+        expect(b.wavelength_um).toBe(f!.wavelength_um);
+        expect(b.time).toBe(f!.time);
+      }
+      const png = handleFixtureRequest('GET', c.image_url!)!;
+      expect(png.status).toBe(200);
+      expect(png.headers['content-type']).toBe('image/png');
+      const bytes = png.body as Uint8Array;
+      expect([...bytes.subarray(0, 8)]).toEqual([...PNG_SIGNATURE]);
+      // IHDR colour type 2: 8-bit RGB.
+      expect(bytes[24]).toBe(8);
+      expect(bytes[25]).toBe(2);
+    }
+  });
+
+  it('refuses the composite for R Draconis (too few bands) and the movers (moving)', () => {
+    const rDra = parseComposite(json('/v1/objects/r-dra/composite').data);
+    expect(rDra.image_url).toBeNull();
+    expect(rDra.missing).toContain('composite:too_few_bands');
+    for (const id of ['synthetic-mover', 'synthetic-refused-mover']) {
+      const c = parseComposite(json(`/v1/objects/${id}/composite`).data);
+      expect(c.image_url).toBeNull();
+      expect(c.missing).toEqual(['composite:moving_object']);
+    }
+    expect(json('/v1/objects/r-dra/composite.png').status).toBe(404);
+  });
+
   it('answers unknown names, ids, frames and broken cutouts with JSON errors', () => {
     expect(json('/v1/resolve?q=Nowhere').status).toBe(404);
     expect(json('/v1/resolve?q=Nowhere').data).toMatchObject({ error: 'not_found' });
@@ -146,6 +189,39 @@ describe('synthetic fixtures', () => {
     expect(json('/v1/objects/rw-aur/cutouts/nope.png').status).toBe(404);
     expect(json('/v1/objects/r-dra/cutouts/r-dra-f005.png').status).toBe(404);
     expect(handleFixtureRequest('GET', '/src/main.tsx')).toBeNull();
+  });
+
+  it('the progressive target answers in parts until complete, per session, reset by resolve', () => {
+    const frames = (cookie?: string) => {
+      const r = handleFixtureRequest(
+        'GET',
+        '/v1/objects/synthetic-progressive/frames',
+        cookie ? { cookie } : undefined,
+      )!;
+      expect(r.delayMs).toBeGreaterThan(0);
+      return parseFrames(JSON.parse(r.body as string));
+    };
+    const resolve = handleFixtureRequest('GET', '/v1/resolve?q=Synthetic%20progressive')!;
+    expect(resolve.headers['set-cookie']).toMatch(/^sx_fixture_session=s\d+; Path=\//);
+    const parts = [frames(), frames(), frames(), frames(), frames()];
+    expect(parts.map((f) => f.frames.length)).toEqual([4, 10, 18, 30, 30]);
+    expect(parts[0]!.missing).toEqual([
+      'outside_cutout:synthetic-progressive-f030',
+      'cutouts:deferred:26',
+    ]);
+    expect(parts[3]!.missing).toEqual(['outside_cutout:synthetic-progressive-f030']);
+    // Each part is a prefix of the complete list: the same frames, so they merge.
+    expect(JSON.stringify(parts[1]!.frames.slice(0, 4))).toBe(JSON.stringify(parts[0]!.frames));
+    // Another browser session has its own count; a resolve without a cookie restarts the shared one.
+    expect(frames('sx_fixture_session=s999').frames).toHaveLength(4);
+    handleFixtureRequest('GET', '/v1/resolve?q=Synthetic%20progressive');
+    expect(frames().frames).toHaveLength(4);
+    // Cutouts of every frame are served whatever the part.
+    const png = handleFixtureRequest(
+      'GET',
+      '/v1/objects/synthetic-progressive/cutouts/synthetic-progressive-f029.png',
+    )!;
+    expect(png.status).toBe(200);
   });
 
   it('matches names loosely and coordinates within 1 arcmin', () => {

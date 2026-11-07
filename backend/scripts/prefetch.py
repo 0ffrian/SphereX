@@ -21,6 +21,7 @@ from pathlib import Path
 from app.adapters import irsa_cutout, irsa_sia, skybot
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context, make_context
+from app.core.composite.service import CompositeService
 from app.core.find.frames import FrameService, frame_time, is_complete, position_at
 from app.core.find.resolver import load_aliases, resolve
 from app.settings import Settings
@@ -37,6 +38,7 @@ class Report:
     cutout_failures: int = 0
     missing: list[str] = field(default_factory=list)
     error: str = ""
+    composite: str = "-"
 
     @property
     def complete(self) -> bool:
@@ -144,8 +146,16 @@ def prefetch_target(
                 print(f"    cutouts {done}/{len(futures)}", flush=True)
 
     # Rebuild from the cache just filled (never the stored list), with no live-download cap.
-    result = FrameService(ctx).get_frames(obj, rebuild=True, unlimited_live=True)
+    service = FrameService(ctx)
+    result = service.get_frames(obj, rebuild=True, unlimited_live=True)
     rep.frames, rep.missing = len(result.frames), result.missing
+    # The false-colour composite (and the Stage 2 spectrum it reads) from the same frame list,
+    # so both are in the derived cache for SX_OFFLINE=1. A refusal is an answer, not a failure.
+    comp = CompositeService(service).get(obj, use_memo=True)
+    # The composite's own reasons first; a refusal for a cutout (cutout:<id>, ...) has none.
+    refusals = [m for m in comp.body["missing"] if m.startswith("composite:")]
+    why = ",".join((refusals or comp.body["missing"])[:4]) or "-"
+    rep.composite = "built" if comp.png is not None else "refused " + why
     return rep
 
 
@@ -186,6 +196,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"  {status} {r.name:<16} id={r.object_id or '-'} frames={r.frames} rows={r.rows} "
             f"cutout_failures={r.cutout_failures} missing={len(r.missing)} "
+            f"composite={r.composite} "
             f"{('error=' + r.error) if r.error else ''}"
         )
         for m in r.missing[:5]:
