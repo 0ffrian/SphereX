@@ -36,7 +36,7 @@ frontend/src/viewer/                 (Moon)
   renderers/bodyRenderer.ts # BodyRenderer contract (field, status, onChange) of the generated body
   renderers/shaderPlan.ts   # plan function of the shader kinds (honesty, Q-45 plain sphere, missing)
   renderers/shaderSpec.ts shaderPalette.ts pointClouds.ts   # card -> what to draw, palettes and lava thresholds, nebula / nova point sets
-  sliders.ts          # D-26 / D-27 slider registry and overrides
+  sliders.ts          # D-26 / D-27: the one slider registry (viewer and physics), SliderKey, overrides
   fields/             (Atish)  # field generator for shader kinds (§7.7, D-12): fieldGenerator.ts (pure, FieldSampler), noise.ts,
                                # fieldWorker.ts (field and point requests) [verify], fieldClient.ts (main-thread side, falls back)
 frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
@@ -62,6 +62,10 @@ frontend/src/contract/               (generated, D-18)  # generated.ts comes fro
 frontend/src/state/                  (Moon)  # Zustand store: card, params, honesty, overrides (A10, D-02);
                                              # store.ts also holds the `sky` slice (flipbook session: search, frames,
                                              # playback, view mode, spectrum, link problems, overlays, combine; A1.1, A4.1, A4.2, A4.9)
+frontend/src/physics/                (Moon)  # A7 physics layer (A4.6, issue #13): constants.ts, tagging.ts (inputs, tags,
+                                             # refusals), planets.ts (A7.1), gasGiants.ts (A7.2), brownDwarfs.ts (A7.3),
+                                             # asteroids.ts (A7.4), snr.ts (A7.5), index.ts (derivePhysics,
+                                             # selectPhysics); slider keys come from viewer/sliders.ts
 frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, StatusLine, FixtureBanner, LiveAnnouncer,
                                              # Badge, StatusBoxes (loading and error boxes), urlHash.ts + useHashSync.ts
                                              # (A10 hash routing), format.ts (numbers, dates), messages.ts (user-facing
