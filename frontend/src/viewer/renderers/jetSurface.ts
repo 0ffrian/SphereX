@@ -1,0 +1,256 @@
+// Issue #42, A7.2, R7.4, R7.7: the banded, moving surface of a gas giant or a brown dwarf as a three
+// r187 TSL node material.
+//
+//   - The band profile (R of texture A) is the field's, fixed in the body frame; the shader only
+//     adds detail below the field's resolution, which is seen and not felt (D-12).
+//   - Counter-flowing jets: that detail is advected by the zonal wind, which changes sign from one
+//     band to the next (`sin(phase)`, the same profile as `zonalWind`), so neighbouring bands
+//     visibly slide past each other. Turbulence is strongest at the band edges, where the shear is.
+//     The advection is a flow-map cross-fade (motion/phase.ts), so it never stretches for ever.
+//   - Storms: positions, sizes and own turning come from the CPU (`fields/flowModel.ts`) as
+//     uniforms; the haptic sampler is given the same list at the same time.
+//   - Brown dwarf cloud cover (R7.4): a patchy dimming whose coverage the caller drives from the
+//     measured light curve.
+// Every colour and amplitude is a display choice (artistic).
+/* eslint-disable @typescript-eslint/no-explicit-any -- TSL node graphs are built from untyped proxies */
+import {
+  Mesh,
+  MeshBasicNodeMaterial,
+  MeshStandardNodeMaterial,
+  SphereGeometry,
+  Vector4,
+  type DataTexture,
+} from 'three/webgpu';
+import {
+  abs,
+  acos,
+  atan,
+  clamp,
+  cos,
+  cross,
+  dot,
+  exp,
+  float,
+  log,
+  mix,
+  normalize,
+  positionLocal,
+  pow,
+  sin,
+  smoothstep,
+  step,
+  uniform,
+  vec3,
+} from 'three/tsl';
+import {
+  STORM_RING_CENTRE,
+  STORM_RING_WIDTH,
+  MAX_STORMS,
+  type FieldParams,
+  type FieldSampler,
+} from '../fields/fieldGenerator';
+import { peakAngularRate, stormsAt, type JetRates, type MovingStorm } from '../fields/flowModel';
+import { phasePair } from '../motion/phase';
+import type { SimTimeFn } from '../motion/motion';
+import { shaderSeedOffsets } from '../fields/noise';
+import type { Rgb } from './shaderPalette';
+import { bilinear, fieldUV, vnoise3 } from './fieldTexture';
+
+const rgb3 = (c: Rgb) => vec3(c[0], c[1], c[2]);
+
+/** Largest streak shear before the flow-map resets, radians (artistic). */
+export const MAX_STREAK_SHEAR = 1.0;
+
+export interface JetOptions {
+  texA: DataTexture;
+  /** Band count of the field (the shader's wind profile uses it). */
+  bands: number;
+  seed: number;
+  turbulence: number;
+  palette: readonly [Rgb, Rgb, Rgb, Rgb];
+  octaves: number;
+  /** Brown dwarf: draws with its own light (no external light). Gas giants are lit by the scene. */
+  selfLit: boolean;
+  /** Self-lit brightness multiplier (the 4.5 micron emissive layer, R7.4), or the gas glow term. */
+  emissive: number;
+  /** Brown dwarf cloud cover patches. */
+  clouds: boolean;
+  /** Storms the shader can draw (at most MAX_STORMS). */
+  storms: number;
+  /** Mesh segments. */
+  segments?: [number, number];
+}
+
+export interface JetFrame {
+  storms: readonly MovingStorm[];
+  /** Streak shear angle of the two flow-map copies (rad at peak jet), weight of A, evolve offsets. */
+  shearA: number;
+  shearB: number;
+  weightA: number;
+  evoA: number;
+  evoB: number;
+  /** 0..1 cloud cover (brown dwarf); ignored when `clouds` is off. */
+  cover: number;
+}
+
+export interface JetSurface {
+  mesh: Mesh;
+  update(f: JetFrame): void;
+}
+
+const rotY = (p: any, a: any) => {
+  const c = cos(a);
+  const s = sin(a);
+  return vec3(p.x.mul(c).add(p.z.mul(s)), p.y, p.x.negate().mul(s).add(p.z.mul(c)));
+};
+
+export function buildJetSurface(o: JetOptions): JetSurface {
+  const so = shaderSeedOffsets(o.seed);
+  const nStorm = Math.min(MAX_STORMS, Math.max(0, o.storms));
+  const stormU = Array.from({ length: nStorm }, () => uniform(new Vector4(0, 1, 0, 1)));
+  const swirlU = Array.from({ length: nStorm }, () => uniform(0));
+  const phaseU = uniform(new Vector4(0, 0, 0, 0)); // shearA, shearB, evoA, evoB
+  const weightU = uniform(1);
+  const coverU = uniform(0);
+
+  const dir = normalize(positionLocal);
+  const { u, v } = fieldUV(dir);
+  const A = bilinear(o.texA, u, v);
+  const profile = sin(dir.y.mul(o.bands * Math.PI)); // -1..1, the jet direction and strength
+
+  // Detail advected by the jets (two flow-map copies).
+  const detail = (shear: any, evo: any) => {
+    const q = rotY(dir, shear.mul(profile));
+    return vnoise3(
+      vec3(q.x.mul(7), q.y.mul(28), q.z.mul(7))
+        .add(so.gasFine)
+        .add(vec3(0, 0, evo)),
+      Math.max(3, o.octaves - 1),
+    );
+  };
+  const fine = mix(detail(phaseU.y, phaseU.w), detail(phaseU.x, phaseU.z), weightU);
+  // Shear is strongest where the profile crosses 0.5 (a band edge).
+  const edge = float(1).sub(smoothstep(0.0, 0.3, abs(A.x.sub(0.5)).mul(2)));
+  const amp = float(0.2 * (0.3 + o.turbulence)).add(edge.mul(0.5 * (0.4 + o.turbulence)));
+  const val = clamp(A.x.mul(0.7).add(0.15).add(fine.sub(0.5).mul(amp)), 0, 1);
+
+  const [c0, c1, c2, c3] = o.palette.map(rgb3) as [any, any, any, any];
+  let col: any = mix(mix(c0, c1, val.mul(2)), mix(c1, c2, val.mul(2).sub(1)), step(0.5, val));
+
+  // Storms between the jets: a spot, a ring and spiral arms that turn.
+  for (let i = 0; i < nStorm; i++) {
+    const s = stormU[i]!;
+    const c = s.xyz;
+    const size = s.w;
+    const dist = acos(clamp(dot(dir, c), -1, 1));
+    const ratio = dist.div(size);
+    const spot = exp(pow(ratio, 2).negate());
+    const ring = exp(pow(ratio.sub(STORM_RING_CENTRE).div(STORM_RING_WIDTH), 2).negate());
+    const east = normalize(cross(vec3(0, 1, 0), c));
+    const north = cross(c, east);
+    const rel = dir.sub(c);
+    const ang = atan(dot(rel, north), dot(rel, east));
+    const arms = sin(
+      ang
+        .mul(2)
+        .sub(log(ratio.add(0.15)).mul(5))
+        .add(swirlU[i]!),
+    )
+      .mul(0.5)
+      .add(0.5);
+    col = mix(col, mix(c3, c2, arms.mul(0.55)), spot.mul(0.85));
+    col = mix(col, c2, ring.mul(0.35));
+  }
+
+  // Brown dwarf cloud cover: patches that dim the surface; more cover, more patches.
+  if (o.clouds) {
+    const n = vnoise3(
+      dir
+        .mul(4.5)
+        .add(vec3(0, 0, so.cloud))
+        .add(fine.mul(0.8)),
+      3,
+    );
+    const thick = smoothstep(float(1).sub(coverU), float(1.15).sub(coverU), n);
+    col = col.mul(float(1).sub(thick.mul(coverU).mul(0.55)));
+  }
+
+  const geo = new SphereGeometry(1, o.segments?.[0] ?? 96, o.segments?.[1] ?? 64);
+  let mesh: Mesh;
+  if (o.selfLit) {
+    const mat = new MeshBasicNodeMaterial();
+    mat.colorNode = col.mul(o.emissive);
+    mesh = new Mesh(geo, mat);
+  } else {
+    // Lit by the scene's DirectionalLight (N5 / R5.1); hot bodies add a self-glow term.
+    const mat = new MeshStandardNodeMaterial();
+    mat.colorNode = col;
+    mat.roughness = 1;
+    mat.metalness = 0;
+    mat.emissiveNode = o.emissive > 0 ? col.mul(o.emissive * 0.6) : vec3(0, 0, 0);
+    mesh = new Mesh(geo, mat);
+  }
+
+  return {
+    mesh,
+    update(f) {
+      phaseU.value.set(f.shearA, f.shearB, f.evoA, f.evoB);
+      weightU.value = f.weightA;
+      coverU.value = clamp01(f.cover);
+      for (let i = 0; i < nStorm; i++) {
+        const s = f.storms[i];
+        if (!s) {
+          stormU[i]!.value.set(0, 1, 0, 1e-3);
+          continue;
+        }
+        stormU[i]!.value.set(s.center[0], s.center[1], s.center[2], s.size);
+        swirlU[i]!.value = s.swirl;
+      }
+    },
+  };
+}
+
+const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
+
+/** How fast gas-giant detail re-forms per radian of shear (artistic noise units). */
+export const EVOLVE_PER_RAD = 1.2;
+
+export interface JetRuntimeInput {
+  surface: JetSurface;
+  fp: FieldParams;
+  /** Peak wind and radius, or null when the winds do not move (storms stay where the field put them). */
+  jets: JetRates | null;
+  /** Radians per sim second of the spin (0 = not animated). */
+  spinRate: number;
+  /** Speed-up of the cloud process over the winds process (0 = detail does not re-form). */
+  evolveRatio: number;
+  /** The haptic sampler to hand the same storms (D-34), if the body has a field. */
+  sampler: FieldSampler | null;
+  /** Cloud cover now, 0..1. */
+  cover?: () => number;
+}
+
+/**
+ * The per-frame update of a jet surface: spins the mesh, asks the CPU model for the storms at this
+ * time and gives the SAME list to the shader and to the haptic sampler, and sets the bounded
+ * flow-map phases of the detail. A pure function of the clock times.
+ */
+export function makeJetRuntime(i: JetRuntimeInput): (time: SimTimeFn) => void {
+  const peak = i.jets ? Math.abs(peakAngularRate(i.jets)) : 0;
+  return (time) => {
+    i.surface.mesh.rotation.y = i.spinRate * time('spin');
+    const t = i.jets ? time('winds') : 0;
+    const storms = stormsAt(i.fp, i.jets, t);
+    i.sampler?.setStorms(storms);
+    const pair = peak > 0 ? phasePair(t, MAX_STREAK_SHEAR / peak) : { a: 0, b: 0, w: 1 };
+    i.surface.update({
+      storms,
+      shearA: peak * pair.a,
+      shearB: peak * pair.b,
+      weightA: pair.w,
+      evoA: EVOLVE_PER_RAD * peak * pair.a * i.evolveRatio,
+      evoB: EVOLVE_PER_RAD * peak * pair.b * i.evolveRatio,
+      cover: i.cover ? i.cover() : 0,
+    });
+  };
+}
