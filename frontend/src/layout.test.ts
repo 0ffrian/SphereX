@@ -19,9 +19,16 @@ const R10_MODULES = [
   './viewer/renderers/Star.ts',
   './viewer/renderers/ShaderBody.ts',
   './viewer/fields/fieldWorker.ts',
-  // src/haptics (Moon, with Atish for sources)
+  // src/haptics (Atish, D-17)
   './haptics/haptics.ts',
   './haptics/calibration.ts',
+  './haptics/audioContext.ts',
+  './haptics/audioGraph.ts',
+  './haptics/settings.ts',
+  './haptics/platform.ts',
+  './haptics/pitch.ts',
+  './haptics/spectrumMapping.ts',
+  './haptics/tuning.ts',
   './haptics/drivers/webVibrate.ts',
   './haptics/drivers/audio.ts',
   './haptics/drivers/tauri.ts',

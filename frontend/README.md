@@ -107,15 +107,22 @@ src/
   viewer/         (Moon)  ViewerApp, lighting, modes, honesty, scaleBar, altText, renderPlan + planCommon + planTypes (pure plan)
     renderers/            AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star (plan functions), build (plan to three.js), ShaderBody
     fields/               fieldWorker (D-12 shared field; file name [verify])
-  haptics/        (Moon, Atish for sources)  haptics, calibration
+  haptics/        (Atish)  haptics (engine), audioContext, settings, calibration, platform, pitch,
+                  spectrumMapping, tuning (every tuning constant, D-13)
     drivers/              webVibrate, audio, tauri (stub, B-01)
     sources/              heightMap, meshNormal, field, terrain, flow, spectrum, lightcurve
+    ui/                   PulseIndicator, UnlockButton
+  hapticsTestPage/  dev-only haptics test page (/haptics-test.html on the dev server; not built)
 e2e/              Playwright smoke test and flipbook flow (fixtures mode)
 fixtures/         SYNTHETIC dev/test fixtures and their Vite dev plugin (see fixtures/README.md)
 scripts/          check-dist.js (post-build check)
 ```
 
-Modules that are not built yet (now only `ShaderBody`, `fieldWorker` and the haptics files) export a single `*_PLACEHOLDER = { spec, implemented: false }` and contain no behaviour. Each file's header names its spec section. `src/layout.test.ts` checks that every R10 file exists and exports something.
+Modules that are not built yet (now only `ShaderBody`, `fieldWorker`, the haptics sources and the Tauri driver) export a single `*_PLACEHOLDER = { spec, implemented: false }` and contain no behaviour. Each file's header names its spec section. `src/layout.test.ts` checks that every R10 file exists and exports something.
+
+### Haptics test page
+
+`npm run dev` (or `npm run dev:phone` for HTTPS on a phone over the LAN), then open `/haptics-test.html`. It has synthetic inputs only: every event kind, level and tag, pulse trains at 1, 2, 4, 12 and 20 Hz, the output switches, the audio latency readout and the pulse indicator. Tap "Turn on haptics and sound" first. Debug a phone with `chrome://inspect`. The page is not a build input, so `vite build` never includes it.
 
 ### Viewer smoke scene
 
