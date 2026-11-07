@@ -38,9 +38,19 @@ frontend/src/viewer/                 (Moon)
   fields/             (Atish)  # field generator for shader kinds (§7.7, D-12): fieldGenerator.ts (pure, FieldSampler), noise.ts,
                                # fieldWorker.ts (field and point requests) [verify], fieldClient.ts (main-thread side, falls back)
 frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
-  haptics.ts calibration.ts
+  haptics.ts          # R8.8 HapticEngine: honesty gate, rate cap, multiplier, trains (Q-71), createHaptics; issue #9
+  audioContext.ts     # the one shared AudioContext, created only by a click (R8.9); shared unlock state
+  audioGraph.ts       # one master bus and limiter per AudioContext; the shared bell (playBell)
+  settings.ts         # R8.7 settings, own Zustand store, one localStorage key; bindEngine
+  calibration.ts      # R8.7 Calibration types, applyCalibration (offset rule); wizard logic in issue #10
+  platform.ts pitch.ts spectrumMapping.ts   # default outputs and deviceVibrates (Q-73), pitch from λ (Q-70), spectrum → sample (R8.6)
+  tuning.ts           # every tuning constant, marked CREATIVE placeholder (D-13) or [verify on phones]
   drivers/webVibrate.ts drivers/audio.ts drivers/tauri.ts (stub, B-01)
   sources/heightMap.ts meshNormal.ts field.ts terrain.ts flow.ts spectrum.ts lightcurve.ts
+  ui/                 # PulseIndicator (D-20), UnlockButton; the settings and calibration UI come with issue #10
+  sound/              # Listen sweep, imagined drive (A8); issue #11
+frontend/src/hapticsTestPage/        (Atish)  # dev-only test page behind frontend/haptics-test.html; not a build input;
+                                              # panels/SpectrumPanel.tsx (#10), panels/TexturePanel.tsx (#11)
 frontend/src/contract/               (generated, D-18)  # generated.ts comes from shared/schemas/ by json-schema-to-typescript;
                                                         # hand-written helpers such as assertTagged() and TV<T> sit next to it;
                                                         # the R8.8 runtime types stay hand-written in haptics.ts for now (Q-19)
@@ -57,7 +67,8 @@ frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, St
   search/             # SearchBar, parseQuery (name, or RA, Dec in decimal degrees), testTargets (the five A1.1 targets)
   flipbook/           # Flipbook player, playback, keys, cutout preloading, RainbowTrails + wavelengthColor (D-28)
   spectrum/           # SpectrumPanel, SVG SpectrumChart, scale (displays the A4.2 output)
-frontend/src/test/                           # test-only helpers (fixtureFetch.ts, sharedFixtures.ts: loads shared/fixtures)
+frontend/src/test/                           # test-only helpers (fixtureFetch.ts, sharedFixtures.ts: loads shared/fixtures;
+                                             # fakeHaptics.ts, fakeAudio.ts: fake clock, drivers and AudioContext)
 frontend/src/fixtures.test.ts                # fixtures are deterministic, pass the API validators, never imported by app code
 frontend/e2e/                                # Playwright tests (smoke, flipbook) against the fixture server
 frontend/fixtures/                           # dev and test only: SYNTHETIC fixture server, a Vite dev-server plugin
