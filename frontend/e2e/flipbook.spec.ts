@@ -349,6 +349,8 @@ test('Rainbow Trails: one dot per frame for a mover; disabled with a reason othe
 
 test('keyboard only: search, play and pause, open the spectrum', async ({ page }) => {
   await page.goto('/');
+  // A Tab pressed before the app has rendered lands on <body>; wait for the first control.
+  await expect(page.getByTestId('search-input')).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(page.getByTestId('search-input')).toBeFocused();
   await page.keyboard.type('RW Aur');
