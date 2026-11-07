@@ -20,7 +20,7 @@ const fake = {
   setLoadFailedHandler: vi.fn(),
   setSpinPaused: vi.fn(),
   setQualityChangeHandler: vi.fn(),
-  timeLapses: vi.fn(() => [] as { id: string; label: string; speedup: number }[]),
+  timeLapses: vi.fn(() => [] as { id: string; label: string; speedup: number; tier?: number }[]),
   rotate: vi.fn(),
   zoom: vi.fn(),
   resetView: vi.fn(),
