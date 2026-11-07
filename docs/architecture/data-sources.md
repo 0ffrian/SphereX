@@ -51,6 +51,7 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 | Status | **Tested**, 3I/ATLAS returned in 1.4 s. The backend uses `COMMAND='DES=<spkid>;'`, `TLIST_TYPE=JD`, `TIME_TYPE=UT` and the geocentre `500@399` **[verify against a SPHEREx-centred ephemeris]**. Positions are predictions, tagged `model_dependent`. |
 | Designation | 3I/ATLAS is `C/2025 N1` |
 | Use | Position over time for any moving object. Also the phase angle used for lighting (rendering doc §5.1). |
+| Lighting | **Tested 7 Nov 2026** (433 Eros). Observer ephemeris with `QUANTITIES='1,24'` and `CENTER='500@-163182'` (SPHEREx) adds the S-T-O phase angle; `EPHEM_TYPE=VECTORS`, `CENTER='500@10'`, `REF_PLANE=FRAME` gives the heliocentric ICRF vector, so the Sun direction is `-r/\|r\|`. Both are taken at the resolve epoch and the geocentre is the fallback if Horizons has no SPHEREx ephemeris (Q-62). Phase angle is tagged `measured` (R5.1), the Sun vector `derived`. |
 
 ### A3.5 IMCCE SkyBoT
 
@@ -74,7 +75,7 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 
 | Item | Detail |
 |---|---|
-| Status | **Tested** |
+| Status | **Tested** earlier; on 7 Nov 2026 the site returned HTTP 503. The OBJ reader (`backend/scripts/ingest_shape.py`) is built and tested on a synthetic file, but no DAMIT model is registered. Licence and citation terms: [verify] DAMIT licence. |
 | File | `damit.cuni.cz/.../AsteroidModel/<id>/shape.obj` |
 | Example | One model: 89 KB, 1,022 vertices, 2,040 faces |
 | Limit | Shapes are convex, so they miss dips and hollows. Look up the model number from the browse page. |
@@ -83,10 +84,11 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 
 | Item | Detail |
 |---|---|
-| Status | **Not confirmed** (never called) |
-| Planned columns | planet radius, planet mass, equilibrium temperature, orbit distance, star temperature, star radius |
-| Use | Values for `planet_rocky`, `planet_water` and `gas_giant` cards. |
-| Action | Test the table service before relying on it. |
+| Status | **Tested** 2026-11-07, live and with recorded offline fixtures (`backend/app/adapters/exoplanet_archive.py`) |
+| Endpoint | `https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=<ADQL>&format=json` (`SX_EXOPLANET_TAP_URL`); table `pscomppars` (one composite row per planet); ADQL `lower()` works |
+| Columns | `pl_name`, `hostname`, `pl_rade`, `pl_radj`, `pl_bmasse`, `pl_bmassj` (each with `err1`/`err2`), `pl_bmassprov` (`Mass`, `Msini`, `Msin(i)/sin(i)`, `M-R relationship`), `pl_dens`, `pl_eqt`, `pl_orbsmax`, `pl_orbper`, `pl_orbeccen`, `st_teff`, `st_rad`, `st_mass`, `sy_dist`, and `pl_*_reflink` for the radius, mass, `pl_eqt` and `pl_orbsmax` |
+| Use | Values and type thresholds for `planet_rocky`, `planet_water` and `gas_giant` cards (rule: Q-63). Reached through SIMBAD otype `Pl`; names matched as in Q-63. No row is not an error: the type becomes `candidate` and `exoplanet_archive` goes in `missing`. |
+| Cache | D-25 source `exoplanet_archive`, key `pl_name` = the lower-case candidate names. |
 
 ### A3.9 Not used for the base path
 
@@ -104,4 +106,4 @@ These sources come from the rendering doc. Neither has been called yet.
 | Item | Status | Use |
 |---|---|---|
 | SIMBAD | **Tested** 5 Nov 2026 through TAP (`ident.id = '<name>'`, JSON). The CDS host did not answer from the dev machine; the `simbad.harvard.edu` mirror did, so the backend tries both. `WISE 0855` is not a SIMBAD identifier (use `WISE J085510.83-071442.5`). Positions are ICRS epoch J2000; high proper-motion targets move tens of SPHEREx pixels by 2026. | Name resolution and object type, which sets stars and brown dwarfs (rendering doc §3.3). Resolver order with SBDB: D-19 ([section 4.1](pipeline.md#a41-stage-1-find-the-object)). |
-| NASA mission shape models | **Not confirmed** | Real meshes (GLB) for `asteroid_shape`, such as Bennu, Eros and Vesta. Decimate offline to the mesh budget ([section 10.1](frontend-platform.md#a101-performance-budget-d-05)). |
+| NASA mission shape models | **Tested for Eros (7 Nov 2026)** | Gaskell Eros Shape Model V1.1, PDS4 bundle `urn:nasa:pds:gaskell.ast-eros.shape-model`, DOI 10.26033/d0gq-9427, licence CC0-1.0, ICQ files `data/quad/quad{64,128,256,512}q.tab` (km, body-fixed). The PDS Small Bodies Node host (sbnarchive.psi.edu) refuses scripted clients (403), so the zip is downloaded by hand and ingested from the local file: `uv run python -m scripts.ingest_shape` (see backend README). Eros is registered (Q-61); Bennu and Vesta are not. Real meshes (GLB) for `asteroid_shape`. Reduce offline to the mesh budget ([section 10.1](frontend-platform.md#a101-performance-budget-d-05)). |

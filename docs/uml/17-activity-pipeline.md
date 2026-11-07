@@ -38,7 +38,9 @@ flowchart TD
   Card --> Field{"Value available from a source?"}
   Field -->|yes| Tagged["TV with value, tag, source, formula or assumption"]
   Field -->|no| NullV["value = null, never a guess"]
-  Tagged --> Physics["Stage 6: physics layer adds derived TVs with formula"]
+  Tagged --> Physics
+  Tagged -->|"comet or asteroid"| Light["Comets and asteroids: Horizons lighting, phase angle (measured) and sun_vector (derived), Q-62"]
+  Light --> Physics["Stage 6: physics layer adds derived TVs with formula"]
   NullV --> Physics
   Physics --> SpxCh{"At least 2 points in each spherex_rgb channel window?"}
   SpxCh -->|yes| SpxOK["spherex_rgb measured"]
