@@ -8,20 +8,28 @@
     {
       "id": "colour",
       "tag": "derived",
-      "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+      "tier": 2,
+      "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
       "requires": [
         "teff_K"
-      ]
+      ],
+      "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
     },
     {
       "id": "limb_darkening",
       "tag": "model_dependent",
+      "tier": 3,
       "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
-      "requires": []
+      "requires": [],
+      "formula": "I(mu) = 1 - u * (1 - mu), u = 0.6",
+      "assumed": {
+        "limb_darkening_u": 0.6
+      }
     },
     {
       "id": "brightness_curve",
       "tag": "measured",
+      "tier": 1,
       "description": "Brightness follows the measured light curve as you scrub (R7.5).",
       "requires": [
         "lightcurve"
@@ -30,6 +38,7 @@
     {
       "id": "radius_pulsation",
       "tag": "artistic",
+      "tier": 5,
       "description": "Radius pulsation of 10 percent (R7.5).",
       "requires": [
         "period_var_d"
@@ -51,7 +60,7 @@
         ],
         "tag": "derived",
         "source": "synthetic fixture: not a real measurement",
-        "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+        "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
       },
       "source": "class_palette"
     }
@@ -62,6 +71,17 @@
     "data": "heartbeat",
     "data_tag": "measured",
     "params": {}
+  },
+  "dynamics": {
+    "pulsation_period_d": {
+      "value": 100.0,
+      "tag": "measured",
+      "tier": 1,
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "speedup": {
+      "pulsation": 86400
+    }
   },
   "alt_text": "Synthetic fixture. Mira variable, 1 solar radius (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
   "missing": []

@@ -21,6 +21,20 @@ From the repo root: `npm run backend:setup`, `backend:dev`, `backend:test`, `bac
 
 In development the frontend's Vite server proxies `/v1` to `http://localhost:8000`. At the event, one process serves the built frontend and the API from one origin (D-24, M5).
 
+## Shape models (A3.7, Q-61)
+
+`assets/shapes/` holds the shape-model GLBs (`<slug>.glb` at full detail, `<slug>.lod1.glb` at half the grid) and `registry.toml`. The app reads the registry to type an asteroid `asteroid_shape` and serves the meshes at `/data/shapes/<name>.glb`. Set `SX_SHAPES_DIR` to use another folder. To add or refresh a model, download the dataset by hand (the PDS host blocks scripts), then:
+
+```bash
+uv run python -m scripts.ingest_shape --zip ~/Downloads/gaskell.ast-eros.shape-model_V1_1.zip \
+  --member gaskell.ast-eros.shape-model_V1_1/data/quad/quad64q.tab --slug eros-gaskell \
+  --spkid 20000433 --name "433 Eros" --doi 10.26033/d0gq-9427 --licence CC0-1.0 \
+  --citation "Gaskell, R.W., Gaskell Eros Shape Model V1.1, urn:nasa:pds:gaskell.ast-eros.shape-model, NASA Planetary Data System." \
+  --frame "Eros body-fixed frame of the model, origin as given (not recentred); see PCK note eros_alex.tpc.txt"
+```
+
+Input is an ICQ `.tab` (`--zip` plus `--member`, or `--input`) or an OBJ (`--input`, `--convex` for DAMIT). Output is byte-identical for the same input. Meshes over 50,000 triangles with no exact reduction are refused.
+
 ## Endpoints (D-16)
 
 | Endpoint | Returns |
@@ -34,6 +48,7 @@ In development the frontend's Vite server proxies `/v1` to `http://localhost:800
 | `GET /v1/objects/{id}/overlays` | `{id, data_release, cached_at, catalogs[], aperture, flag_groups[], frames[], missing, provenance}`: Gaia DR3 and CatWISE2020 sources, per-frame markers in cutout pixels, aperture/annulus contamination, SIA footprint and cutout box. `missing` holds overlay codes only (`overlay:<cat>`, `overlay:<cat>:pending`, `overlay:<cat>:truncated`, `cutout:<id>`, `footprint:<id>`, `flags_mask:<id>`). A4.9, Q-50 |
 | `GET /v1/objects/{id}/flags/{frame_id}.png` | RGBA mask from the cutout's FLAGS extension, colour per flag group; 404 `flags_unavailable` without a usable mask. A4.9 |
 | `GET /v1/objects/{id}/combine.png?op=add\|sub&a=&b=` | 8-bit grey PNG of A ± B on A's grid; metadata (both wavelengths, unit, stretch, `tag: "derived"`, formula) in the `X-SX-Combine` JSON header. A4.9, Q-54 |
+| `GET /data/shapes/{name}.glb` | A registered shape-model mesh (glTF binary, `model/gltf-binary`), metres, glTF +Y up (Q-61). Only names listed in `assets/shapes/registry.toml` are served; anything else is 404 |
 | `GET /v1/health` | `{status, offline, data_release}` |
 
 Per-target spectrum report on a cache: `SX_OFFLINE=1 uv run python -m app.core.measure [--group test|demo] [--only NAME]` (default `--group test`).
