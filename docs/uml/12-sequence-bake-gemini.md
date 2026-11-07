@@ -27,7 +27,7 @@ sequenceDiagram
   N-->>B: Normal map
   B->>PA: base_rgb x brightness x small variation, hydration and redness rules
   PA-->>B: Albedo map
-  B->>TC: Write albedo.webp, height.png, height.bin (float16), normal.png and bake.json (params hash) under id/generator_version/seed/WxH; skip if bake.json matches
+  B->>TC: Write albedo.webp, height.png, height.bin (float16), normal.png and bake.json (params hash) under id/generator_version/seed/WxH#59; skip if bake.json matches
   B-->>API: Texture URLs
 
   opt Gemini repaint (P3 stretch, behind admin token)
@@ -72,3 +72,4 @@ sequenceDiagram
 - The Gemini call goes through the backend's read-through cache like every external call (D-25). With `SX_OFFLINE=1` a miss is refused and the code colour stays (D-24). Whether a cached repaint is shown under `SX_OFFLINE=1` is Q-29.
 - Shader kinds are not baked here (D-01); their field is built in the browser ([10-sequence-view-3d.md](10-sequence-view-3d.md)).
 - Image-first (Depth Anything V2 Small) and Marigold paths are offline options, not drawn (rendering doc §6.6).
+- As built (issue #5): the seed is the first 4 bytes of SHA-256(`id` + newline + `generator_version`), and `generator_version` is `p<card_to_params version>-b<BAKER_RULES_VERSION>` (Q-35, an assumption). The render-params endpoint does not call the baker yet; `python -m app.core.render` bakes from a card file.

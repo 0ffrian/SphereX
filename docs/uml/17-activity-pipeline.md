@@ -64,7 +64,9 @@ flowchart TD
 
 - Refusal examples: an asteroid card without `diameter_km` puts the mesh in `missing` with no crash (rendering doc §11); a comet without published `gas_Q` gets no gas shells (§7.3).
 - Saturated points are excluded from brightness mapping and shown hatched (rendering doc §7.5).
-- `candidate` stops after the card: it has no 3D layers, so RenderParams is not used for it **[verify]** whether the endpoint returns one. See Q-33.
+- `candidate` has no 3D layers. As built (issue #5) the endpoint still returns a RenderParams for it, with `layers: []`, `scale_m: null` and `mesh` in `missing` (Q-33).
+- As built (issue #5) the render-params endpoint does not bake: it names the R6.7 texture URLs, and baking and serving them is still to do. Cards and render params are validated with `jsonschema` before they are sent (Q-40).
 - The physics layer is "reduced, physically inspired" formulas (architecture spec §7); its outputs are tagged `derived`.
 - Every external call in this flow goes through the backend's read-through cache (D-25). With `SX_OFFLINE=1` a cache miss is refused, and the refused layer goes in `missing`.
 - Small-body names are numbered asteroids, provisional designations, comets and interstellar objects (D-19).
+- As built (issue #5): the saved-asset check runs before stage 3, as in A4.4's pseudocode, so a saved asset skips classification. Stage 3 takes the class label from the catalogue only; spectrum matching and Gaia colours are not built (Q-55). Generated assets are saved only when their inputs are final (Q-57).

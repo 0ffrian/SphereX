@@ -80,6 +80,9 @@ class Settings(BaseSettings):
     search_epoch: str = "2026-01-01T00:00:00Z"
 
     cors_origins: str = ""
+    # A5.4 pre-baked assets: `<assets_dir>/<type>/<id>.json`, read only (stage 4).
+    # ASSUMPTION: A5.4 says "assets/<type>/<id>.json" in the repo; the backend's copy lives here.
+    assets_dir: Path = BACKEND_DIR / "assets"
     targets_file: Path = BACKEND_DIR / "targets.toml"
 
     @property
