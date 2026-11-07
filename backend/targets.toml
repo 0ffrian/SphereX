@@ -1,7 +1,7 @@
 # Targets for the pre-fetch script (D-25) and the recorded test fixtures.
 # `query` is what is sent to /v1/resolve; `aliases` are short names that SIMBAD does not know
 # (ASSUMPTION: a name mapping, not a physical value).
-# Demo objects: add them below with group = "demo" once the team picks them.
+# Demo objects (D-31) are listed last, with group = "demo".
 
 [[target]]
 name = "Barnard's Star"
@@ -73,3 +73,22 @@ query = "GJ 1214 b"
 group = "fixture"
 frames = false
 aliases = []
+
+# Demo objects (D-31): unsaturated, so SPHEREx gives them measured spectra.
+[[target]]
+name = "SIMP 0136"
+query = "SIMP J013656.5+093347.3"
+group = "demo"
+aliases = ["SIMP 0136+0933", "SIMP J0136+0933"]
+
+[[target]]
+name = "TWA 27"
+query = "TWA 27"
+group = "demo"
+aliases = ["2M1207", "2M1207 A", "2M1207A"]
+
+[[target]]
+name = "IRAS 04302+2247"
+query = "IRAS 04302+2247"
+group = "demo"
+aliases = ["IRAS 04302"]
