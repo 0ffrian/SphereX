@@ -8,16 +8,22 @@
     {
       "id": "ellipsoid",
       "tag": "model_dependent",
+      "tier": 3,
       "description": "Assumption: a/b = 10^(0.4 * A), c = b, from the light-curve amplitude (R6.2).",
       "requires": [
         "diameter_km",
         "lightcurve_amp_mag"
-      ]
+      ],
+      "formula": "a/b = 10^(0.4 * A), c = b",
+      "assumed": {
+        "c_over_b": 1.0
+      }
     },
     {
       "id": "albedo_map",
       "tag": "inferred_from_analog",
-      "description": "Class palette C, as no gaia_rgb is present (R6.4).",
+      "tier": 4,
+      "description": "Class palette C, as no gaia_rgb is present (R6.4); brightness = clamp(0.12 + 1.6 * albedo, 0.12, 0.8).",
       "requires": [
         "spectral_class",
         "albedo"
@@ -26,7 +32,8 @@
     {
       "id": "relief",
       "tag": "artistic",
-      "description": "Procedural height field from the seed (R6.3).",
+      "tier": 5,
+      "description": "Procedural height field from the seed, style cratered (R6.2, R6.3).",
       "requires": [
         "diameter_km"
       ]
@@ -81,6 +88,17 @@
     "data_tag": "artistic",
     "params": {
       "tau": 0.15
+    }
+  },
+  "dynamics": {
+    "spin_period_h": {
+      "value": 5.0,
+      "tag": "measured",
+      "tier": 1,
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "speedup": {
+      "spin": 1000
     }
   },
   "alt_text": "Synthetic fixture. Asteroid, 2 km across (derived), colour from a class palette, viewed at 30 degrees. Surface relief: illustrative.",

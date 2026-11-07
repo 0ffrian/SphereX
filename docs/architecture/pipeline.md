@@ -91,7 +91,7 @@ The backend builds the **ObjectCard**: every known value for the object, each as
 
 ### A4.6 Stage 6: Physics layer
 
-Pure functions that turn measured values into `derived` values, each with its stated formula ([section 7](physics.md#a7-physics-layer)). The backend fills them into the card. In the browser the same functions rerun on every slider change against the `overrides` ([section 5.3](data-contract.md#a53-overrides)). The result is never written back to the card as truth.
+Pure functions that turn measured values into `derived` values, each with its stated formula ([section 7](physics.md#a7-physics-layer)). The backend fills them into the card. Only tier 2 (`derived`, every input measured) goes into the card. When an input is missing, the fallback to tiers 3–5 (D-32) happens in RenderParams `layers` and `dynamics`, never in the card, which keeps `value: null` ([rendering doc §3.4](../rendering/data-contract.md#r34-renderparams-produced-by-the-backend-get-v1objectsidrender-params)). The stage 6 built so far (issue #13, `frontend/src/physics/tagging.ts`) still refuses a missing input; it falls back a tier once stage 6 adopts D-32. Where stage 6 runs, and so where the fallback lives, is Q-60. In the browser the same functions rerun on every slider change against the `overrides` ([section 5.3](data-contract.md#a53-overrides)). The result is never written back to the card as truth.
 
 - **Status:** Built in the browser only (`frontend/src/physics/`, issue #13). The backend half is not built (Q-60).
 
@@ -100,7 +100,7 @@ Pure functions that turn measured values into `derived` values, each with its st
 The backend turns the ObjectCard into **RenderParams** with deterministic rules (rendering doc §3.4, §6.2). The frontend renders RenderParams only. RenderParams lists the layers (each with a tag), texture URLs, lighting, view modes, the haptic profile, the alt text and the layers refused for `missing` data.
 
 - **Endpoint:** `GET /v1/objects/{id}/render-params` (D-16).
-- **Status:** Built (issue #5, `backend/app/core/render/card_to_params.py`). Seed = first 4 bytes of SHA-256(`id` + newline + `generator_version`) (Q-35). Texture URLs follow R6.7 with the Q-47 size directory (`2048x1024`); the endpoint does not bake or serve the textures yet. `candidate` gets a RenderParams with no layers and `mesh` in `missing` (Q-33). Refusals from earlier stages (`catalogue`, `spectrum`, `type:exoplanet_thresholds`) are appended to `missing`.
+- **Status:** Built (issue #5, `backend/app/core/render/card_to_params.py`). Seed = first 4 bytes of SHA-256(`id` + newline + `generator_version`) (Q-35). Texture URLs follow R6.7 with the Q-47 size directory (`2048x1024`); the endpoint does not bake or serve the textures yet. `candidate` gets a RenderParams with no layers and `mesh` in `missing` (Q-33). Refusals from earlier stages (`catalogue`, `spectrum`, `type:exoplanet_thresholds`) are appended to `missing`. Every layer carries `tier`, and `formula` and `assumed` where D-32 requires them. A `model_dependent` layer whose rule states nothing assumed is a code bug: stage 7 raises `ValueError` and `/render-params` answers 500 rather than label a measured input as assumed.
 
 ### A4.8 Stages 8 to 10: Generators
 
