@@ -5,7 +5,7 @@ import { badgeForTag, HONESTY_LABEL, stateThatShows } from '@/viewer/honesty';
 import type { MissingItem } from '@/viewer/planTypes';
 import { API_TIMEOUT_MS } from './api/config';
 import { formatWavelength } from './format';
-import type { FrameReason, RefusalGroup, SpectrumOutcome } from './refusals';
+import type { FrameReason, OverlayFrameReason, RefusalGroup, SpectrumOutcome } from './refusals';
 
 export function searchErrorMessage(err: SkyError, query: string): string {
   switch (err.kind) {
@@ -28,6 +28,25 @@ export function searchErrorMessage(err: SkyError, query: string): string {
   }
 }
 
+/** Overlays are optional: the flipbook keeps working, so the wording says only what is lost. */
+export function overlaysErrorMessage(err: SkyError): string {
+  if (err.kind === 'not_found') return 'There are no overlays for this object.';
+  if (err.kind === 'bad_response') {
+    return 'The server sent overlay data this page can’t read, so no overlay is shown.';
+  }
+  return `Overlays could not be loaded. ${searchErrorMessage(err, '')}`;
+}
+
+export function combineErrorMessage(err: SkyError): string {
+  if (err.kind === 'not_found')
+    return 'One of these frames was not found, so they can’t be combined.';
+  if (err.kind === 'bad_request') return 'The server can’t combine these two frames.';
+  if (err.kind === 'bad_response') {
+    return 'The server sent a combined image this page can’t read, so it is not shown.';
+  }
+  return `The frames could not be combined. ${searchErrorMessage(err, '')}`;
+}
+
 export function spectrumErrorMessage(err: SkyError): string {
   if (err.kind === 'not_found') return 'There is no spectrum for this object.';
   return searchErrorMessage(err, '');
@@ -45,7 +64,17 @@ function pluralPoints(n: number): string {
 }
 
 /** Each frame reason: the list line (after the count) and a short label for the ID list. */
-const FRAME_TEXT: Readonly<Record<FrameReason, { line: string; short: string }>> = {
+const FRAME_TEXT: Readonly<
+  Record<FrameReason | OverlayFrameReason, { line: string; short: string }>
+> = {
+  footprint: {
+    line: 'with no detector footprint on record, so the field of view can’t be drawn.',
+    short: 'no detector footprint',
+  },
+  flags_mask: {
+    line: 'with no flag mask, so flagged pixels can’t be shown.',
+    short: 'no flag mask',
+  },
   saturated: {
     line: 'where the detector flagged the object’s centre as saturated or unusable.',
     short: 'saturated',
@@ -104,10 +133,24 @@ const NOTE_TEXT: Readonly<Record<string, string>> = {
   'spectrum:saturated':
     'The detector flagged the object’s centre as saturated or unusable in every frame found, so this tool can’t measure a spectrum.',
   'spectrum:moving_object_search': 'Spectra for moving Solar System objects are not measured yet.',
+  'overlay:gaia':
+    'Gaia star positions are not available for this object, so Gaia stars are not shown.',
+  'overlay:wise':
+    'WISE source positions are not available for this object, so WISE sources are not shown.',
+  'overlay:gaia:pending':
+    'Gaia star positions are still loading from the archive. Choose Try again in a minute to show them.',
+  'overlay:wise:pending':
+    'WISE source positions are still loading from the archive. Choose Try again in a minute to show them.',
+  'overlay:gaia:truncated':
+    'The Gaia list hit its size limit, so only the brightest stars are shown.',
+  'overlay:wise:truncated':
+    'The WISE list hit its size limit, so only the brightest sources are shown.',
 };
 
 function frameText(reason: string): { line: string; short: string } | undefined {
-  return Object.hasOwn(FRAME_TEXT, reason) ? FRAME_TEXT[reason as FrameReason] : undefined;
+  return Object.hasOwn(FRAME_TEXT, reason)
+    ? FRAME_TEXT[reason as FrameReason | OverlayFrameReason]
+    : undefined;
 }
 
 /** One line per group. Unknown codes are shown as is, never hidden. */

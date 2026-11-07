@@ -45,6 +45,7 @@ Always load `decisions.md` first. It is short, and it overrides everything else.
 | Frontend setup, performance | [architecture/frontend-platform.md](architecture/frontend-platform.md), [rendering/display-rules.md](rendering/display-rules.md) (R5.5) |
 | Hosting on the A15, HTTPS, cache and offline demo mode | [architecture/frontend-platform.md](architecture/frontend-platform.md) (A10), [architecture/risks.md](architecture/risks.md), decisions D-24 and D-25 |
 | Flipbook and Rainbow Trails view mode | [architecture/overview.md](architecture/overview.md) (A1.1), [architecture/pipeline.md](architecture/pipeline.md) (A4.1), decisions D-28 |
+| Overlays (Gaia, WISE, contamination, flag mask, field of view) and combine frames | [architecture/pipeline.md](architecture/pipeline.md) (A4.9), [architecture/data-sources.md](architecture/data-sources.md) (A3.2, A3.3), [uml/08-sequence-search-flipbook.md](uml/08-sequence-search-flipbook.md), decisions D-16 and Q-50 to Q-54 |
 | Labels and honesty in the UI | [architecture/honesty-policy.md](architecture/honesty-policy.md), [rendering/display-rules.md](rendering/display-rules.md) (R5.3, D-21) |
 | Tests | [architecture/testing.md](architecture/testing.md), [rendering/layout-tests-open-items.md](rendering/layout-tests-open-items.md) |
 | Where code lives and who owns it | [rendering/layout-tests-open-items.md](rendering/layout-tests-open-items.md) (R10), [uml/04-package.md](uml/04-package.md), decisions D-17 |

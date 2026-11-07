@@ -1,6 +1,6 @@
 # 08 Sequence: search and flipbook
 
-A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache) and D-28 (Rainbow Trails).
+A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache) and D-28 (Rainbow Trails), and A4.9 (overlays, flag mask, combine).
 
 ```mermaid
 sequenceDiagram
@@ -13,6 +13,7 @@ sequenceDiagram
   participant R as Name resolver (SBDB, SIMBAD)
   participant SIA as IRSA SIA (spherex_qr2)
   participant HZ as Horizons + SkyBoT
+  participant TAP as Gaia + CatWISE TAP (IRSA, ESA)
   participant FX as Fixture server (dev only)
 
   opt dev only: npm run dev:fixtures
@@ -85,8 +86,34 @@ sequenceDiagram
     FB->>UI: Current frame
     UI->>UI: Replace the hash in place with frame=… (no new history entry)
   end
-  opt P1 overlays
-    U->>FB: Toggle Gaia / WISE markers
+  opt P1 overlays (issue #12, A4.9, Q-50)
+    U->>UI: Switch on a layer: Gaia stars, WISE sources, Flagged pixels or Field of view
+    alt first switch-on, after an error, or a catalogue was pending
+      UI->>API: GET /v1/objects/{id}/overlays (lazy). The previous reply stays drawn meanwhile, and if the reload fails
+      API->>C: Gaia cone (G #lt; 20) and CatWISE2020 cone, in parallel
+      alt cache miss and no live failure in the last catalog_failure_ttl_s
+        API->>TAP: Gaia: IRSA gaia_dr3_source, then ESA gaiadr3.gaia_source. CatWISE: IRSA catwise_2020
+        TAP-->>API: CSV, parsed row by row before it is cached
+      end
+      alt both cones answered within overlay_wait_s = 75 s
+        API-->>UI: catalogs, per-frame markers, contamination, footprint, cutout box, flag groups, missing, provenance
+      else a cone is still running
+        API-->>UI: The reply without it, missing has overlay:{cat}:pending. The fetch keeps filling the cache
+        UI->>UI: The toggle stays enabled, with a "Try again" button
+        U->>UI: Try again (or switch the layer off and on)
+        UI->>API: GET /v1/objects/{id}/overlays again
+      end
+    end
+    UI->>FB: Markers in cutout pixels, contamination note, field-of-view map
+    opt Flagged pixels
+      FB->>API: GET /v1/objects/{id}/flags/{frame_id}.png
+      API-->>FB: RGBA mask from FLAGS, or 404 flags_unavailable
+    end
+  end
+  opt P1 combine frames (issue #12, Q-54)
+    U->>UI: Choose frame A, frame B and add or subtract
+    UI->>API: GET /v1/objects/{id}/combine.png?op=add|sub&a=…&b=…
+    API-->>UI: PNG on A's grid, X-SX-Combine header (both wavelengths, unit, stretch, tag derived, formula)
   end
   opt P1 Rainbow Trails view mode (D-28)
     U->>FB: Switch to Rainbow Trails
@@ -107,4 +134,5 @@ sequenceDiagram
 - Dev-only fixture path: `npm run dev:fixtures` (`vite --mode fixtures`) mounts a Vite dev-server plugin from `frontend/fixtures/` that answers `/v1` with synthetic data, and `npm run test:e2e` always uses it. Every reply carries `X-SX-Fixture: synthetic`. The UI then shows a page-wide "Fixture data" banner, "Fixture" badges instead of "Measured" (and instead of the stretch's Estimated badge) and a SYNTHETIC label on the image. `vite build` never runs the plugin, and `scripts/check-dist.js` fails the build if a fixture marker reaches `dist/` ([fixtures README](../../frontend/fixtures/README.md)). The Fixture badge is a fourth badge beside the 3 of D-02; it is a proposed dev-only exception, open as Q-32 in the decisions log.
 - `moving` means a solar-system body (Q-22). High proper-motion stars are not `moving`; their positions come from the SIMBAD proper motion, propagated to each frame time. The ephemeris-driven frame search for moving objects is not built in M1 (Q-21).
 - The SIA search and every cutout go through the cache. A cut-off SIA answer (`QUERY_STATUS=OVERFLOW`) adds `frames:truncated` to `missing`.
+- Overlays (A4.9) load lazily on the first switch-on of any layer, not on every search, and never block the flipbook. A catalogue still being fetched after `overlay_wait_s` (75 s, below the frontend's 90 s timeout) is reported as `overlay:<cat>:pending`; its toggle stays enabled and "Try again" reloads the overlays, by which time the cone is usually cached. A cone that failed live is not retried for `catalog_failure_ttl_s`. Moving objects get `overlay:gaia` and `overlay:wise` (Q-21). The endpoints are not yet in D-16 (Q-50).
 - The flipbook shows the frames reply's `missing` grouped by reason, one plain line with a count each and the frame IDs behind a disclosure; unknown codes are shown as is (A11, issue #24).
