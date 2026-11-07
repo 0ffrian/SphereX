@@ -54,6 +54,7 @@ class Settings(BaseSettings):
         "https://simbad.cds.unistra.fr/simbad/sim-tap/sync,"
         "https://simbad.harvard.edu/simbad/sim-tap/sync"
     )
+    exoplanet_tap_url: str = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"  # A3.8
     sbdb_url: str = "https://ssd-api.jpl.nasa.gov/sbdb.api"
     horizons_url: str = "https://ssd.jpl.nasa.gov/api/horizons.api"
     skybot_url: str = "https://ssp.imcce.fr/webservices/skybot/api/conesearch.php"
@@ -84,6 +85,8 @@ class Settings(BaseSettings):
     # ASSUMPTION: A5.4 says "assets/<type>/<id>.json" in the repo; the backend's copy lives here.
     assets_dir: Path = BACKEND_DIR / "assets"
     targets_file: Path = BACKEND_DIR / "targets.toml"
+    # A3.7 / Q-61: shape-model GLBs and `registry.toml`, written by scripts/ingest_shape.py.
+    shapes_dir: Path = BACKEND_DIR / "assets" / "shapes"
 
     @property
     def simbad_urls(self) -> list[str]:
