@@ -181,3 +181,36 @@ export const BINARY_WARM_HZ = 8;
 export const BINARY_COOL_HZ = 4;
 /** R8.5 `star_ttauri`: steady pulse rate before dimming drops beats (Hz). CREATIVE placeholder — Atish to decide (D-13). */
 export const TTAURI_PULSE_HZ = 4;
+
+// ================================================================ #10 spectrum haptics + calibration
+// Added by issue #10. Kept in one block at the end of the file so #10 and #11 merge cleanly.
+
+/** Engineering: jitter seed when the caller gives none (M5 passes the card's seed). R8.3 seeded RNG. */
+export const SPECTRUM_DEFAULT_SEED = 0;
+
+/** Engineering: gap (ms) between the R8.7 step 1 probe pulses and the step 2 levels. [verify on phones] */
+export const CALIBRATION_GAP_MS = 700;
+/**
+ * Engineering (Q-74): the smallest step (ms) between successive tick levels, so the calibrated
+ * levels stay strictly increasing when `minMs` is close to medium. [verify on phones] R12 #7
+ */
+export const CALIBRATION_LEVEL_STEP_MS = 5;
+/** Engineering: a stored `minMs` outside this range (ms) is treated as corrupt. */
+export const CALIBRATION_MIN_MS_FLOOR = 1;
+export const CALIBRATION_MIN_MS_CEIL = 50;
+
+/**
+ * R8.7 step 3 tap-along (method [verify] in R8.7, Q-75): beat period (ms). Half of it is the
+ * largest lag that can be told from the next beat, so it is twice AV_OFFSET_MAX_MS. [verify on phones]
+ */
+export const TAP_BEAT_PERIOD_MS = 800;
+/** … number of beats per channel … [verify on phones] */
+export const TAP_BEAT_COUNT = 10;
+/** … beats ignored at the start while the user locks on … [verify on phones] */
+export const TAP_WARMUP_BEATS = 2;
+/** … and the fewest matched taps that give a lag. Engineering. */
+export const TAP_MIN_TAPS = 4;
+/** … and the largest scatter (median absolute deviation, ms) of a usable run. [verify on phones] */
+export const TAP_MAX_SPREAD_MS = 60;
+/** Engineering (Q-75): |avOffsetMs| above this is a failed measurement (and corrupt in storage). */
+export const AV_OFFSET_MAX_MS = 400;
