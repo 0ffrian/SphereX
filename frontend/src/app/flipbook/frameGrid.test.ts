@@ -4,8 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { parseFrames } from '@/app/api/validate';
 import { ApiError } from '@/app/api/errors';
 import {
+  cutoutPointOnGrid,
   FALLBACK_GRID_PX,
   frameSize,
+  markersOnGrid,
   gridSize,
   largestSide,
   NO_DATA_SLIVER_PX,
@@ -183,5 +185,69 @@ describe('frame width and height in the reply', () => {
     for (const bad of [{ width: 0, height: 5 }, { width: 5.5, height: 5 }, { width: 5 }]) {
       expect(() => parseFrames(reply(bad)), JSON.stringify(bad)).toThrow(ApiError);
     }
+  });
+});
+
+describe('overlay markers on the grid (issue #12 overlays on the fixed grid)', () => {
+  const N = 59;
+  // A source's sky position seen in each frame's own cutout pixels: the same sky point sits
+  // `d` pixels from the object in every frame (north-up-like here, so no rotation), whatever the
+  // frame's size or clip.
+  const d = { x: 7.25, y: -4.5 };
+
+  it('lands a source on the same grid spot in every frame, as the object does', () => {
+    const spots = BARNARD.map((f) => {
+      const p = placeFrame(N, f, { w: f.w, h: f.h }, 'object');
+      return cutoutPointOnGrid(N, p, f.x + d.x, f.y + d.y);
+    });
+    for (const [i, s] of spots.entries()) {
+      const f = BARNARD[i]!;
+      if (f.y + d.y < -0.5) {
+        // Clipped frame (y = 6.07): the source is above its top edge, so off the frame.
+        expect(s).toBeNull();
+        continue;
+      }
+      expect(s).not.toBeNull();
+      // Same whole-pixel shift as the picture: marker − object on the grid = d exactly.
+      const p = placeFrame(N, f, { w: f.w, h: f.h }, 'object');
+      const obj = objectOnGrid(p, f);
+      expect(s!.x + 0.5 - obj.x).toBeCloseTo(d.x, 9);
+      expect(s!.y + 0.5 - obj.y).toBeCloseTo(d.y, 9);
+      // And within half a pixel of the grid centre + d (the object's own rounding).
+      expect(Math.abs(s!.x - ((N - 1) / 2 + d.x))).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(s!.y - ((N - 1) / 2 + d.y))).toBeLessThanOrEqual(0.5);
+    }
+  });
+
+  it('moves a marker by the placement offset of a clipped frame', () => {
+    const f = BARNARD[4]!; // 59 × 36, object at y = 6.07
+    const p = placeFrame(N, f, { w: f.w, h: f.h }, 'object');
+    expect(p.top).toBe(23);
+    expect(cutoutPointOnGrid(N, p, 10, 20)).toEqual({ x: 10 + p.left, y: 43 });
+  });
+
+  it('drops markers off the frame (no-data hatching) or off the grid', () => {
+    const p = { left: 0, top: 23, width: 59, height: 36 };
+    expect(cutoutPointOnGrid(N, p, 3, -0.6)).toBeNull(); // above the clipped frame: hatched area
+    expect(cutoutPointOnGrid(N, p, 3, 35.6)).toBeNull(); // below its last row
+    expect(cutoutPointOnGrid(N, p, -0.5, 0)).toEqual({ x: -0.5, y: 23 }); // edge of pixel 0
+    const over = { left: -3, top: -3, width: 64, height: 64 }; // larger than the grid
+    expect(cutoutPointOnGrid(N, over, 1, 30)).toBeNull(); // on the frame, cropped off the grid
+    expect(cutoutPointOnGrid(N, over, 3, 30)).toEqual({ x: 0, y: 27 });
+    expect(cutoutPointOnGrid(N, p, Number.NaN, 3)).toBeNull();
+  });
+
+  it('keeps marker fields, never a negative zero, on a shared grid at offset 0', () => {
+    const p = placeFrame(N, { x: 12, y: 40 }, { w: 59, h: 59 }, 'grid');
+    const out = markersOnGrid(
+      [
+        { catalog: 'gaia' as const, id: 'a', x: 0, y: 5 },
+        { catalog: 'wise' as const, id: 'b', x: 70, y: 5 },
+      ],
+      N,
+      p,
+    );
+    expect(out).toEqual([{ catalog: 'gaia', id: 'a', x: 0, y: 5 }]);
+    expect(Object.is(out[0]!.x, -0)).toBe(false);
   });
 });

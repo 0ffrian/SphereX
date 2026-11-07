@@ -4,6 +4,10 @@
 // the ring on the object opens its spectrum (UML 09). Rainbow Trails is a view mode (D-28, P1).
 // Raw | Colour (colourMode.ts): the grey frames, the frames tinted by wavelength, or the backend's
 // SPHEREx colour composite (one picture; the transport bar does not drive it).
+// Overlays (issue #12, P1): Gaia/WISE markers, flagged pixels, field of view, contamination and
+// a "Combine frames" panel; optional, loaded on first use, never block playback. Markers and the
+// flag mask are drawn with the shown frame's own grid placement (frameGrid.ts), so they follow
+// the picture; they are not drawn on the colour composite (its own grid).
 // Keyboard (R9): Space or K play/pause, ←/→ step, Home/End first/last, while focus is in the
 // flipbook but not on a button or form field (those keep their own keys).
 import { useCallback, useLayoutEffect, useMemo, useState, type KeyboardEvent } from 'react';
@@ -30,6 +34,7 @@ import {
   frameSize,
   gridSize,
   largestSide,
+  markersOnGrid,
   noDataKind,
   placeFrame,
   placementStyle,
@@ -47,6 +52,11 @@ import {
   noDataCaptionVisible,
   noDataSummary,
 } from './noData';
+import { CombinePanel } from './overlays/CombinePanel';
+import { FlagMaskImage } from './overlays/FlagMask';
+import { MarkerLayer } from './overlays/MarkerLayer';
+import { overlayView } from './overlays/model';
+import { ContaminationNote, OverlayControls, OverlayDetails } from './overlays/OverlayPanel';
 import { RainbowTrails, RainbowTrailsLegend, trailsUnavailableReason } from './RainbowTrails';
 import { useFlipbookSession } from './session';
 import { useFrameSwap } from './useFrameSwap';
@@ -226,6 +236,10 @@ const CONTROL_TAGS = 'button, input, select, textarea, a, summary, [data-own-key
 
 const SLOTS = [0, 1] as const;
 
+/** Said under the overlay toggles while the colour composite shows (it has its own pixel grid). */
+const OVERLAYS_NOT_ON_COMPOSITE =
+  'Overlays are drawn on the frames, not on the colour composite. Choose Raw or Wavelength tint to see them.';
+
 function Player({
   sky,
   resolved,
@@ -276,6 +290,8 @@ function Player({
   // What the viewer draws for the shown frame; before anything is shown, no picture yet.
   const view = shownAt !== null && swap.state.shown ? swap.state.shown.kind : 'loading';
   const picture = view === 'picture';
+  // The flag-mask URL that failed to load, if any (the legend says so; the picture stays).
+  const [failedMask, setFailedMask] = useState<string | null>(null);
 
   // The transport bar's frame number and wavelength follow the picture.
   useLayoutEffect(() => setShownIndex(shownIndex), [shownIndex, setShownIndex]);
@@ -314,6 +330,31 @@ function Player({
   const name = objectName(resolved);
   const frameText = describeFrame(response, shownIndex);
   const alt = `SPHEREx cutout of ${name}. ${frameText}. Display stretch ${response.stretch.kind}.${tint ? ' Tinted by wavelength (false colour).' : ''}${noData === 'none' ? '' : ` ${NO_DATA_CAPTION[noData]} The hatched area has no data.`}`;
+
+  // Overlays for this frame (issue #12); null until loaded. Q-28: shown like the ring.
+  // Memoised on (overlays state, frame): playback re-renders on every tick, and a stable view
+  // keeps OverlayDetails' own memo (groupMissing) from recomputing.
+  const overlays = useMemo(
+    () => overlayView(sky.overlays, frame.frame_id),
+    [sky.overlays, frame.frame_id],
+  );
+  const ovFrame = overlays?.frame;
+  // On the frame's own grid placement (cutout pixels + whole-pixel offset), dropping any that
+  // would fall off the frame (hatched no-data) or off the grid; drawn only with the picture.
+  // Not memoised: a handful of markers, and `placement` is rebuilt on every render.
+  const markers =
+    overlays && ovFrame && placement
+      ? markersOnGrid(
+          ovFrame.markers.filter((m) => overlays.show[m.catalog]),
+          grid,
+          placement,
+        )
+      : [];
+  const showMask =
+    overlays?.show.flags === true && ovFrame !== undefined && failedMask !== ovFrame.flags_url;
+  const overlaysOn = Object.values(sky.overlays.toggles).some(Boolean);
+  // Map centre: the object's position in this frame when the reply gives one, else the resolved one.
+  const center = { ra: frame.ra ?? resolved.ra, dec: frame.dec ?? resolved.dec };
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     // The composite is one picture: the frame keys do nothing while it shows.
@@ -444,7 +485,19 @@ function Player({
                   data-wavelength={frame.wavelength_um}
                 />
               )}
+              {picture && showMask && ovFrame && (
+                // The shown frame's mask, in the frame's own box (same size and orientation as
+                // its cutout), above the tint so its colours stay as the legend says.
+                <FlagMaskImage
+                  url={ovFrame.flags_url}
+                  onError={() => setFailedMask(ovFrame.flags_url)}
+                />
+              )}
             </div>
+            {picture && markers.length > 0 && (
+              // Grid pixels (markersOnGrid): the same transform as the picture's placement box.
+              <MarkerLayer markers={markers} width={grid} height={grid} />
+            )}
             {view === 'failed' && (
               <p
                 className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-neutral-300"
@@ -546,6 +599,8 @@ function Player({
             )}
           </div>
 
+          {overlays && <ContaminationNote view={overlays} fixture={sky.fixture} />}
+
           <p className="min-h-10 text-sm text-neutral-400" data-testid="preload-progress">
             Cutouts loaded: {loadedCount} of {n}
             {failedCount > 0 && ` · ${failedCount} unavailable`}
@@ -590,6 +645,25 @@ function Player({
         </div>
       )}
       {viewMode === 'trails' && <RainbowTrailsLegend monochrome={monochrome} />}
+
+      <OverlayControls sky={sky} view={overlays} />
+      {composite && overlaysOn && (
+        <p className="text-sm text-neutral-400" data-testid="overlay-composite-note">
+          {OVERLAYS_NOT_ON_COMPOSITE}
+        </p>
+      )}
+      {overlays && !composite && (
+        <OverlayDetails
+          view={overlays}
+          sky={sky}
+          frame={frame}
+          index={shownIndex}
+          center={center}
+          flagFailed={ovFrame !== undefined && failedMask === ovFrame.flags_url}
+        />
+      )}
+
+      {n >= 2 && <CombinePanel sky={sky} frames={frames} />}
 
       <MissingList missing={response.missing} hideDeferred={sky.progress !== null} />
     </div>

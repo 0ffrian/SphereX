@@ -52,6 +52,28 @@ def to_png_xy(x_fits0: float, y_fits0: float, ny: int) -> tuple[float, float]:
     return x_fits0, (ny - 1) - y_fits0
 
 
+def png_xy_many(hdul: Any, ra: np.ndarray, dec: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """``object_pixel`` then ``to_png_xy`` for many positions (issue #12 markers): the same WCS
+    call and the same flip as the frames reply ``x``, ``y``."""
+    ny = np.asarray(hdul["IMAGE"].data).shape[0]
+    w = celestial_wcs(hdul["IMAGE"].header)
+    x0, y0 = w.world_to_pixel_values(np.asarray(ra, float), np.asarray(dec, float))
+    x0 = np.asarray(x0, dtype=np.float64)
+    y0 = np.asarray(y0, dtype=np.float64)
+    return x0, (ny - 1) - y0
+
+
+def png_corners_world(hdul: Any) -> list[tuple[float, float]]:
+    """(ra, dec) of the outer pixel corners of the cutout, in PNG order: top-left, top-right,
+    bottom-right, bottom-left (PNG top = last FITS row)."""
+    ny, nx = np.asarray(hdul["IMAGE"].data).shape
+    w = celestial_wcs(hdul["IMAGE"].header)
+    xs = np.array([-0.5, nx - 0.5, nx - 0.5, -0.5])
+    ys = np.array([ny - 0.5, ny - 0.5, -0.5, -0.5])
+    ra, dec = w.pixel_to_world_values(xs, ys)
+    return [(float(r) % 360.0, float(d)) for r, d in zip(ra, dec, strict=True)]
+
+
 def inside(x: float, y: float, nx: int, ny: int) -> bool:
     return -0.5 <= x < nx - 0.5 and -0.5 <= y < ny - 0.5
 

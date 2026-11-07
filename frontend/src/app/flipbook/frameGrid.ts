@@ -166,3 +166,39 @@ export function noDataKind(grid: number, p: Placement, size: PixelSize, fullSide
   if (Math.max(g.left, g.right, g.top, g.bottom) <= NO_DATA_SLIVER_PX) return 'none';
   return size.w < fullSide - 1 || size.h < fullSide - 1 ? 'edge' : 'outside';
 }
+
+/**
+ * A point given in one frame's cutout pixels (0-based, origin top-left, y down; an integer is a
+ * pixel centre: the convention of `Frame.x`, `Frame.y` and the overlay markers, A4.1, A4.9), moved
+ * onto the grid with the frame's placement: the same whole-pixel shift as the picture, so it stays
+ * on its source. Null when it is off the frame's own pixels (it would sit on the hatched no-data
+ * area, where the frame shows nothing) or off the grid (cropped with the picture).
+ */
+export function cutoutPointOnGrid(
+  grid: number,
+  p: Placement,
+  x: number,
+  y: number,
+): { x: number; y: number } | null {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  // Pixel v covers [v - 0.5, v + 0.5] around its centre.
+  const inFrame = x >= -0.5 && x <= p.width - 0.5 && y >= -0.5 && y <= p.height - 0.5;
+  const gx = p.left + x;
+  const gy = p.top + y;
+  const inGrid = gx >= -0.5 && gx <= grid - 0.5 && gy >= -0.5 && gy <= grid - 0.5;
+  return inFrame && inGrid ? { x: gx + 0, y: gy + 0 } : null;
+}
+
+/** Overlay markers (cutout pixels) on the grid; any off the frame or the grid are left out. */
+export function markersOnGrid<T extends { x: number; y: number }>(
+  markers: readonly T[],
+  grid: number,
+  p: Placement,
+): T[] {
+  const out: T[] = [];
+  for (const m of markers) {
+    const g = cutoutPointOnGrid(grid, p, m.x, m.y);
+    if (g) out.push({ ...m, x: g.x, y: g.y });
+  }
+  return out;
+}

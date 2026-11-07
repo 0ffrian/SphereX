@@ -7,6 +7,11 @@ Run while the internet is good, then serve with ``SX_OFFLINE=1``:
     uv run python -m scripts.prefetch --refresh        # re-download; keeps old entries on failure
 
 Resumable: entries already cached are skipped. Exit code 1 if any target is incomplete.
+
+Catalogue overlays (issue #12): one Gaia DR3 and one CatWISE2020 cone per fixed target. A
+failed cone is reported (``overlays: FAILED``) but does not make the target incomplete or change
+the exit code: overlays are optional layers, and the frames and spectrum do not depend on them.
+``--overlays-only`` resolves, searches SIA and fetches the cones, skipping cutout downloads.
 """
 
 from __future__ import annotations
@@ -19,11 +24,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.adapters import irsa_cutout, irsa_sia, skybot
+from app.adapters.http import UpstreamError
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context, make_context
 from app.core.composite.service import CompositeService
 from app.core.find.frames import FrameService, frame_time, is_complete, position_at
-from app.core.find.resolver import load_aliases, resolve
+from app.core.find.overlays import CATALOGS, fetch_catalog, overlay_cone
+from app.core.find.resolver import ResolvedObject, load_aliases, resolve
 from app.settings import Settings
 from app.timefmt import parse_utc
 
@@ -39,6 +46,8 @@ class Report:
     missing: list[str] = field(default_factory=list)
     error: str = ""
     composite: str = "-"
+    overlays: dict[str, str] = field(default_factory=dict)  # catalog -> "N sources" or error
+    frames_skipped: bool = False
 
     @property
     def complete(self) -> bool:
@@ -76,6 +85,26 @@ def sia_with_fallback(
                 raise
             n //= 2
             print(f"    SIA failed; retrying with MAXREC={n}", flush=True)
+
+
+def prefetch_overlays(ctx: Context, obj: ResolvedObject, refresh: bool) -> dict[str, str]:
+    """Fetch the Gaia and CatWISE cones (same keys as the overlays endpoint). Never raises."""
+    out: dict[str, str] = {}
+    try:
+        cone = overlay_cone(ctx, obj)
+    except (CacheMissOffline, UpstreamUnavailable) as exc:
+        return {cat: f"FAILED (no SIA answer: {exc})" for cat in CATALOGS}
+    for cat in CATALOGS:
+        try:
+            tbl, table, truncated, _ = fetch_catalog(ctx, cat, cone, refresh=refresh)
+        except (CacheMissOffline, UpstreamUnavailable, UpstreamError, ValueError, KeyError) as exc:
+            out[cat] = f"FAILED ({exc})"
+        else:
+            out[cat] = f"{len(tbl.ids)} sources from {table}" + (
+                " (truncated)" if truncated else ""
+            )
+        print(f'  overlay {cat}: {out[cat]} (cone r={cone.radius_deg * 3600:.0f}")', flush=True)
+    return out
 
 
 def prefetch_target(
@@ -123,6 +152,10 @@ def prefetch_target(
         f"truncated={sia.truncated})",
         flush=True,
     )
+    rep.overlays = prefetch_overlays(ctx, obj, args.refresh)
+    if getattr(args, "overlays_only", False):
+        rep.frames_skipped = True
+        return rep
 
     def one(row: irsa_sia.SiaRow) -> bool:
         ra, dec = position_at(obj, frame_time(row))
@@ -169,6 +202,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--read-timeout", type=float, default=180.0)
     p.add_argument("--maxrec", type=int, default=0, help="SIA MAXREC (default: SX_SIA_MAXREC)")
     p.add_argument("--min-maxrec", type=int, default=25)
+    p.add_argument(
+        "--overlays-only",
+        action="store_true",
+        help="resolve, SIA search and catalogue cones only; no cutouts, no frame rebuild",
+    )
     args = p.parse_args(argv)
 
     settings = Settings()
@@ -199,6 +237,10 @@ def main(argv: list[str] | None = None) -> int:
             f"composite={r.composite} "
             f"{('error=' + r.error) if r.error else ''}"
         )
+        if r.frames_skipped:
+            print("      frames: skipped (--overlays-only)")
+        for cat, text in r.overlays.items():
+            print(f"      overlays {cat}: {text}")
         for m in r.missing[:5]:
             print(f"      missing: {m}")
     return 0 if all(r.complete for r in reports) else 1

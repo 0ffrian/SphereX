@@ -23,7 +23,7 @@ async function until(pred: () => boolean, maxMs = 60_000): Promise<void> {
 
 /** The fixture API with call counters and an in-flight high-water mark for /frames. */
 function counting(base: ApiClient = fixtureApi) {
-  const c = { frames: 0, spectrum: 0, composite: 0, inFlight: 0, maxInFlight: 0 };
+  const c = { frames: 0, spectrum: 0, composite: 0, overlays: 0, inFlight: 0, maxInFlight: 0 };
   const api: ApiClient = {
     ...base,
     frames: async (id, signal) => {
@@ -43,6 +43,10 @@ function counting(base: ApiClient = fixtureApi) {
     composite: (id, signal) => {
       c.composite += 1;
       return base.composite(id, signal);
+    },
+    getOverlays: (id, signal) => {
+      c.overlays += 1;
+      return base.getOverlays(id, signal);
     },
   };
   return { api, c };
@@ -111,6 +115,56 @@ describe('progressive frames', () => {
     await store().skyLoadComposite();
     expect(c.composite).toBe(1);
     expect(sky().composite.status).toBe('ready');
+  });
+
+  it('asks for the overlays once, when the frame list is complete, not per frames reply', async () => {
+    const { api, c } = counting();
+    setSkyApi(api);
+    await store().skySearch(PROGRESSIVE);
+    store().skyToggleOverlay('gaia');
+    expect(sky().overlays.toggles.gaia).toBe(true);
+    expect(sky().overlays.status).toBe('waiting');
+    // Another layer, and a retry, while waiting: still no request.
+    store().skyToggleOverlay('flags');
+    await store().skyLoadOverlays();
+    await until(() => (sky().frames?.frames.length ?? 0) >= 10);
+    expect(sky().overlays.status).toBe('waiting');
+    expect(c.overlays).toBe(0);
+
+    await until(() => sky().progress === null);
+    await until(() => sky().overlays.status === 'ready');
+    expect(c.overlays).toBe(1);
+    // One entry per frame of the complete list.
+    expect(sky().overlays.data?.frames.map((f) => f.frame_id)).toEqual(
+      sky().frames?.frames.map((f) => f.frame_id),
+    );
+  });
+
+  it('overlays loaded after Stop are asked for again once Continue completes the list', async () => {
+    const { api, c } = counting();
+    setSkyApi(api);
+    await store().skySearch(PROGRESSIVE);
+    store().skyStopFrames();
+    store().skyToggleOverlay('wise');
+    await until(() => sky().overlays.status === 'ready');
+    expect(c.overlays).toBe(1);
+    store().skyContinueFrames();
+    await until(() => sky().progress === null);
+    await until(() => sky().overlays.status === 'ready' && c.overlays === 2);
+    expect(sky().overlays.toggles.wise).toBe(true);
+
+    // With every layer off when the list completes, the partial reply is dropped instead.
+    await store().skySearch(PROGRESSIVE);
+    store().skyStopFrames();
+    store().skyToggleOverlay('wise');
+    await until(() => sky().overlays.status === 'ready');
+    store().skyToggleOverlay('wise');
+    const before = c.overlays;
+    store().skyContinueFrames();
+    await until(() => sky().progress === null);
+    expect(sky().overlays.status).toBe('idle');
+    expect(sky().overlays.data).toBeNull();
+    expect(c.overlays).toBe(before);
   });
 
   it('Stop keeps the frames playable; Continue fetches the rest', async () => {

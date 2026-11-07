@@ -1,6 +1,7 @@
 // R7.7, A6: palettes for the shader-generated kinds, ported from the mock-up (GASK, keyed).
 // These are artist colours, not spectra: every colour here is tagged `artistic`, whether it is
 // keyed by the card's teq_K or the artist default.
+import { LAVA_START_K } from '@/physics/constants';
 export type Rgb = readonly [number, number, number];
 export type KeyedStop = readonly [number, Rgb, Rgb, Rgb, Rgb];
 
@@ -53,7 +54,7 @@ export const ATMOSPHERE_ROCKY: Rgb = [1, 0.55, 0.25];
  * Lava glow starts near 700 K (A7.1 / physics.md "Ice, ocean, steam"; the mock-up draws cracks at a
  * fixed strength). Below it, or when teq_K is unknown, a rocky planet has no glow.
  */
-export const LAVA_START_K = 700;
+export { LAVA_START_K };
 /**
  * Temperature at which the glow reaches full strength. [verify] ASSUMPTION: no spec gives it; the
  * ramp from LAVA_START_K is artistic.

@@ -28,21 +28,45 @@ export const FRAME_REASONS = [
 ] as const;
 export type FrameReason = (typeof FRAME_REASONS)[number];
 
+/**
+ * Per-frame codes of the overlays reply (issue #12): `footprint:<frame_id>` (no detector
+ * footprint) and `flags_mask:<frame_id>` (no flag mask). Kept apart from FRAME_REASONS, which
+ * mirrors the backend's Stage 1 and Stage 2 reasons (backendReasons.test.ts).
+ */
+export const OVERLAY_FRAME_REASONS = ['footprint', 'flags_mask'] as const;
+export type OverlayFrameReason = (typeof OVERLAY_FRAME_REASONS)[number];
+
 /** Whole-result codes with their own wording (no frame id). */
 export const WHOLE_RESULT_CODES = [
   'frames:truncated',
   'frames:moving_object_search',
   'spectrum:saturated',
   'spectrum:moving_object_search',
+  'overlay:gaia',
+  'overlay:wise',
+  // The cone is still being fetched (backend overlay_wait_s); a later request will have it.
+  'overlay:gaia:pending',
+  'overlay:wise:pending',
+  // The cone hit the row cap (brightest first), so the faintest sources are left out.
+  'overlay:gaia:truncated',
+  'overlay:wise:truncated',
 ] as const;
 
 export const ALL_SATURATED = 'spectrum:saturated';
 const TRUNCATED = 'frames:truncated';
 const DEFERRED_RE = /^cutouts:deferred:(\d+)$/;
 /** Prefixes of whole-result codes; an unknown code under one of them is a note, not a frame. */
-const NAMESPACES: ReadonlySet<string> = new Set(['frames', 'spectrum', 'cutouts', 'composite']);
+const NAMESPACES: ReadonlySet<string> = new Set([
+  'frames',
+  'spectrum',
+  'cutouts',
+  'composite',
+  'overlay',
+  // UI-side code for an overlay layer the reply gave no provenance for (OverlayPanel).
+  'provenance',
+]);
 const REASON_RE = /^[a-z][a-z0-9_]*$/;
-const KNOWN_REASONS: ReadonlySet<string> = new Set(FRAME_REASONS);
+const KNOWN_REASONS: ReadonlySet<string> = new Set([...FRAME_REASONS, ...OVERLAY_FRAME_REASONS]);
 const KNOWN_WHOLE: ReadonlySet<string> = new Set(WHOLE_RESULT_CODES);
 
 /**

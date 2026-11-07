@@ -75,3 +75,74 @@ class FramesResponse(BaseModel):
     missing: list[str]
     north_up: bool
     provenance: dict[str, Provenance] | None = Field(default=None)
+
+
+# Overlays (issue #12; Q-50). Contract shared with the frontend overlay UI: do not rename.
+CatalogName = Literal["gaia", "wise"]
+
+
+class CatalogSource(BaseModel):
+    id: str
+    ra: float
+    dec: float
+    mag: float | None
+    pmra_mas_yr: float | None
+    pmdec_mas_yr: float | None
+
+
+class CatalogOverlay(BaseModel):
+    catalog: CatalogName
+    available: bool
+    table: str
+    epoch: str | None
+    mag_band: str
+    mag_limit: float | None
+    sources: list[CatalogSource]
+
+
+class Aperture(BaseModel):
+    radius_px: float
+    annulus_inner_px: float
+    annulus_outer_px: float
+
+
+class FlagGroupModel(BaseModel):
+    group: Literal["saturation", "bad_pixel", "artefact", "source"]
+    rgba: list[int]
+    names: list[str]
+
+
+class Marker(BaseModel):
+    catalog: CatalogName
+    id: str
+    x: float
+    y: float
+
+
+class Contaminant(BaseModel):
+    catalog: CatalogName
+    id: str
+    mag: float | None
+    zone: Literal["aperture", "annulus"]
+    sep_px: float
+
+
+class FrameOverlay(BaseModel):
+    frame_id: str
+    flags_url: str
+    markers: list[Marker]
+    contamination: list[Contaminant]
+    footprint: list[list[float]] | None
+    cutout_box: list[list[float]]
+
+
+class OverlaysResponse(BaseModel):
+    id: str
+    data_release: str
+    cached_at: str | None
+    catalogs: list[CatalogOverlay]
+    aperture: Aperture
+    flag_groups: list[FlagGroupModel]
+    frames: list[FrameOverlay]
+    missing: list[str]
+    provenance: dict[str, Provenance]

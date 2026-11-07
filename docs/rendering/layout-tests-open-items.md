@@ -20,10 +20,12 @@ backend/assets/                               # A5.4 pre-baked assets, <type>/<i
 backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; objects.py: /frames, /cutouts, /card, /render-params (issue #5);
                                               # sky.py: /v1/sky/... (sky-view prototype, beyond D-16, Q-87;
                                               # /v1/sky/cached reads the derived frames cache, Q-98);
-                                              # composite.py: /composite, /composite.png (beyond D-16, Q-92)
-backend/app/adapters/                (Kevin)  # IRSA SIA + cutouts, SIMBAD, SBDB, Horizons, SkyBoT (A3), all through the cache
+                                              # composite.py: /composite, /composite.png (beyond D-16, Q-92);
+                                              # overlays.py: /overlays, /flags/{frame_id}.png, /combine.png (A4.9, Q-50)
+backend/app/adapters/                (Kevin)  # IRSA SIA + cutouts, SIMBAD, SBDB, Horizons, SkyBoT, Gaia and CatWISE2020 over TAP (A3), all through the cache
 backend/app/cache/                   (Kevin)  # D-25 read-through disk cache
-backend/app/core/find/               (Kevin)  # pipeline stage 1 (A4.1): resolver, proper motion, WCS, frames, cutout PNG
+backend/app/core/find/               (Kevin)  # pipeline stage 1 (A4.1): resolver, proper motion, WCS, frames, cutout PNG;
+                                              # overlays, flagmask, combine (A4.9, issue #12)
 backend/app/contract/                (generated, D-18)  # Pydantic models generated from shared/schemas/ by
                                                         # scripts/generate_contract.py; follows the owner of shared/schemas/
 backend/app/core/sky/                (no D-17 owner yet)  # sky-view prototype (Q-87, Q-88): surveys.py (registry, credit), healpix.py
@@ -41,7 +43,7 @@ frontend/src/viewer/                 (Moon)
   renderers/bodyRenderer.ts # BodyRenderer contract (field, status, onChange) of the generated body
   renderers/shaderPlan.ts   # plan function of the shader kinds (honesty, Q-45 plain sphere, missing)
   renderers/shaderSpec.ts shaderPalette.ts pointClouds.ts   # card -> what to draw, palettes and lava thresholds, nebula / nova point sets
-  sliders.ts          # D-26 / D-27 slider registry and overrides
+  sliders.ts          # D-26 / D-27: the one slider registry (viewer and physics), SliderKey, overrides
   sky/                # sky view prototype (7 Nov 2026, not yet confirmed, Q-89, Q-90): SkyView.ts (inside-out sky
                       # sphere, render on demand), skyMath.ts (pure: RA/Dec, camera, picking, pan/zoom), surveys.ts (which equirect loads)
   fields/             (Atish)  # field generator for shader kinds (§7.7, D-12): fieldGenerator.ts (pure, FieldSampler), noise.ts,
@@ -68,7 +70,11 @@ frontend/src/contract/               (generated, D-18)  # generated.ts comes fro
                                                         # the R8.8 runtime types stay hand-written in haptics.ts for now (Q-19)
 frontend/src/state/                  (Moon)  # Zustand store: card, params, honesty, overrides (A10, D-02);
                                              # store.ts also holds the `sky` slice (flipbook session: search, frames,
-                                             # playback, view mode, spectrum, link problems; A1.1, A4.1, A4.2)
+                                             # playback, view mode, spectrum, link problems, overlays, combine; A1.1, A4.1, A4.2, A4.9)
+frontend/src/physics/                (Moon)  # A7 physics layer (A4.6, issue #13): constants.ts, tagging.ts (inputs, tags,
+                                             # refusals), planets.ts (A7.1), gasGiants.ts (A7.2), brownDwarfs.ts (A7.3),
+                                             # asteroids.ts (A7.4), snr.ts (A7.5), index.ts (derivePhysics,
+                                             # selectPhysics); slider keys come from viewer/sliders.ts
 frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, StatusLine, FixtureBanner, LiveAnnouncer,
                                              # Badge, StatusBoxes (loading and error boxes), urlHash.ts + useHashSync.ts
                                              # (A10 hash routing), format.ts (numbers, dates), messages.ts (user-facing
@@ -80,10 +86,12 @@ frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, St
   flipbook/           # Flipbook player, playback, keys, cutout preloading, RainbowTrails + wavelengthColor (D-28),
                       # session.tsx (preload + playback timer shared by the panel and the transport bar),
                       # progressive.ts + FramesProgress.tsx (frames that arrive in parts: merge, poll, Stop; Q-97),
-                      # frameGrid.ts (one fixed grid and scale per object, frames registered on the object),
+                      # frameGrid.ts (one fixed grid and scale per object, frames registered on the object;
+                      # markersOnGrid places overlay markers with the same transform, Q-102),
                       # noData.ts (no-data hatching: steady line, per-frame caption only when paused),
                       # frameSwap.ts + useFrameSwap.ts (two <img> slots: show the next frame once decoded),
-                      # colourMode.ts + ColourViews.tsx (Raw | Colour: wavelength tint, SPHEREx composite; Q-93, Q-95)
+                      # colourMode.ts + ColourViews.tsx (Raw | Colour: wavelength tint, SPHEREx composite; Q-93, Q-95);
+                      # overlays/: markers, flag mask, field of view, overlay panel, combine panel (A4.9, issue #12)
   spectrum/           # SpectrumPanel, SVG SpectrumChart, scale (displays the A4.2 output)
   shell/              # prototype shell in the mock-up's layout: ToolRail, Transport, PanelCard + Panels, Readout, shortcuts
   sky/                # prototype sky pane: SkyPane (image, markers, click to pick → search), useTargetMarkers, readout feed,
