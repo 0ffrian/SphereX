@@ -257,8 +257,7 @@ describe('scene builder (no GPU)', () => {
       });
       expect(built.group.children.length).toBe(
         plan.bodies.length +
-          plan.shells.length +
-          (plan.dust ? 1 : 0) +
+          plan.volumes.length +
           plan.discs.length +
           plan.screens.length +
           plan.trails.length,
@@ -319,17 +318,22 @@ describe('scene builder (no GPU)', () => {
     }
   });
 
-  it('shells and dust are instanced sprites, so their point size is honoured in r187 (N5)', () => {
+  it('the coma and dust are ray-marched volumes, not point sprites (issue #43)', () => {
     const { card, params } = fixture('comet');
-    const plan = planRender(card, params, defaultContext({ epoch: '2025-08' }));
+    card.epochs = ['2025-08']; // the R3.2 gas_Q shape belongs to one epoch
+    const plan = planRender(
+      card,
+      params,
+      defaultContext({ honesty: 'artistic', epoch: '2025-08' }),
+    );
+    // The plan keeps the shells as data (haptics); the drawing is one coma volume.
+    expect(plan.shells.length).toBeGreaterThan(0);
+    expect(plan.volumes.map((v) => v.kind)).toContain('coma');
     const built = buildScene(plan, { onLoadFailed: () => {}, onChange: () => {} });
-    const clouds = built.group.children.filter((c): c is Sprite => c instanceof Sprite);
-    expect(clouds).toHaveLength(plan.shells.length);
-    expect(clouds.map((c) => c.count)).toEqual(plan.shells.map((sh) => sh.count));
-    for (const c of clouds) {
-      expect((c.material as unknown as { size: number }).size).toBeGreaterThan(1);
-      expect(c.frustumCulled).toBe(false);
-    }
+    expect(built.group.children.filter((c) => c instanceof Sprite)).toHaveLength(0);
+    const boxes = built.group.children.filter((c) => plan.volumes.some((v) => v.id === c.name));
+    expect(boxes).toHaveLength(plan.volumes.length);
+    for (const v of plan.volumes) expect(TAGS).toContain(v.tag);
     built.dispose();
   });
 

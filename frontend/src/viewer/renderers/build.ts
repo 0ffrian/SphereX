@@ -3,35 +3,44 @@
 // asynchronously; the scene is complete (flat tint) before they arrive, and a failed load is
 // reported through `hooks.onLoadFailed(layerId)` so the plan can refuse that layer (never blank).
 import {
-  AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
   CircleGeometry,
   Color,
   DoubleSide,
   Group,
-  InstancedBufferAttribute,
   Line,
   LineBasicNodeMaterial,
   Mesh,
   MeshBasicNodeMaterial,
   MeshStandardNodeMaterial,
   Object3D,
-  PointsNodeMaterial,
   RingGeometry,
   Sphere,
   SphereGeometry,
-  Sprite,
   SRGBColorSpace,
   Texture,
   TextureLoader,
   Box3,
   Vector3,
 } from 'three/webgpu';
-import { float, instancedBufferAttribute, normalView, saturate, vec3 } from 'three/tsl';
+import { float, normalView, saturate, vec3 } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import type { BodyPlan, DustPlan, RenderPlan, Rgb, ShellPlan, SpinPlan } from '../planTypes';
+import type { TierName } from '../render/quality';
+import { displacementActive } from './AsteroidProcedural';
+import { ShapeMaterial } from '../shape/ShapeMaterial';
+import {
+  aoRayCount,
+  chooseLod,
+  lodUrls,
+  meanEdgeLength,
+  regolithMinFrequency,
+  type LodLevel,
+} from '../shape/shapeModel';
+import { bakeVertexAo } from '../shape/ShapeAo';
+import { createVolume } from '../volume/VolumeBody';
 import { TRAIL_HALF_LENGTH } from '../planCommon';
 import { allowedTags } from '../honesty';
 import type { BodyContext, BodyRenderer } from './bodyRenderer';
@@ -43,6 +52,13 @@ export interface BuildHooks {
   onLoadFailed(layerId: string): void;
   /** Something finished loading: draw again. */
   onChange(): void;
+  /** Quality level the scene is built for (volume steps, model LOD, AO rays). Default: medium. */
+  tier?: TierName;
+  /**
+   * A shape model loaded: its bounding-sphere radius in metres (glTF units are metres, Q-61), the
+   * measured size, so the scale bar can show the real size of the model (issue #43).
+   */
+  onMeshMeasured?(m: { radiusM: number }): void;
   /** Tests only: replaces the field and point workers, or sets slider overrides (D-27). */
   shader?: Pick<BodyContext, 'fieldSource' | 'pointSource' | 'overrides'>;
 }
@@ -134,14 +150,11 @@ export interface BuiltScene {
    * the body in place, so a toggle never regenerates the field. A no-op for the baked kinds.
    */
   update(plan: RenderPlan): void;
+  /** The quality level changed: volume steps and octaves, model level of detail, displacement. */
+  setTier(tier: TierName): void;
   dispose(): void;
 }
 
-/** Opacity of a gas shell at full Q (display level, artistic). Scaled by Q. */
-const SHELL_MAX_OPACITY = 0.9;
-/** Point size in pixels. Honoured because shells are instanced sprites, not `Points` (r187). */
-const SHELL_POINT_SIZE = 2;
-const DUST_OPACITY = 0.35;
 const DISC_COLOR = 0x8a7a6a; // artistic
 
 /** Seeded PRNG (mulberry32). The same seed always gives the same stream. */
@@ -250,6 +263,8 @@ export function buildScene(
   };
 
   // Bodies --------------------------------------------------------------------------------
+  let tier: TierName = hooks.tier ?? 'medium';
+  const tierListeners: ((t: TierName) => void)[] = [];
   for (const body of plan.bodies) {
     const geometry = track(new SphereGeometry(1, body.segments[0], body.segments[1]));
     const material = track(bodyMaterial(body));
@@ -289,43 +304,130 @@ export function buildScene(
       load(body.normalUrl, 'relief', (t) => {
         material.normalMap = t;
       });
+      // R7.2: displacement by the baked height map, desktop only (the one height field also
+      // drives the normals above). The scale is relief_amp, a plan value ([verify]: R7.2).
+      const scale = body.displacementScale;
+      load(body.heightUrl, 'displacement', (t) => {
+        material.displacementMap = t;
+        material.displacementScale = displacementActive(tier, scale) ? (scale ?? 0) : 0;
+      });
+      tierListeners.push((t) => {
+        if (material.displacementMap) {
+          material.displacementScale = displacementActive(t, scale) ? (scale ?? 0) : 0;
+        }
+      });
     }
 
-    // Real shape model (R7.1): replaces the placeholder sphere when it loads.
+    // Real shape model (R7.1): replaces the placeholder sphere when it loads. Two levels of detail
+    // (backend `<slug>.glb` and `<slug>.lod1.glb`); the quality level picks one.
     if (body.meshUrl) {
-      const url = body.meshUrl;
-      const swap = (cached: Object3D) => {
+      const lods = lodUrls(body.meshUrl);
+      const shape = plan.shape;
+      let holder: Group | null = null;
+      let level: LodLevel | null = null;
+      let bakedFor: BufferGeometry[] = [];
+
+      const makeMaterial = (hasAo: boolean, edge: number | null) => {
+        if (!shape || (!shape.lommelSeeliger && !shape.regolith && !hasAo)) {
+          return track(new MeshStandardNodeMaterial({ color: srgb(body.tint), roughness: 0.95 }));
+        }
+        const m = track(
+          new ShapeMaterial({
+            hasAo,
+            // Model units: the noise runs on the model's own coordinates (metres for the backend
+            // models), at the wavelength of two mean edges and finer (D-33, tier 5).
+            regolithFrequency: shape.regolith ? regolithMinFrequency(edge) : null,
+            lommelSeeliger: shape.lommelSeeliger,
+          }),
+        );
+        m.color = srgb(body.tint);
+        return m;
+      };
+
+      const apply = (cached: Object3D, lvl: LodLevel) => {
         if (disposed) return;
         // The cached model is shared between scenes: clone it, and leave its geometry to the cache.
         const root = cached.clone(true);
-        // Scale to the measured size: the bounding sphere becomes the unit sphere.
+        // Scale to the measured size: the bounding sphere becomes the unit sphere times the body's
+        // largest axis (1 for an asteroid, the nucleus radius for a comet).
         // ASSUMPTION (Q-43, [verify]): diameter_km is the diameter of the bounding sphere of the
         // model. Catalogue diameters are often volume-equivalent, which would make this too large.
         const box = new Box3().setFromObject(root);
         const sphere = box.getBoundingSphere(new Sphere());
-        const holder = new Group();
+        const next = new Group();
         root.position.sub(sphere.center);
-        holder.add(root);
-        if (sphere.radius > 0) holder.scale.setScalar(1 / sphere.radius);
-        holder.rotation.y = mesh.rotation.y; // keep the spin angle across the swap
-        const shared = track(
-          new MeshStandardNodeMaterial({ color: srgb(body.tint), roughness: 0.95 }),
-        );
+        next.add(root);
+        if (sphere.radius > 0) next.scale.setScalar(Math.max(...body.axes) / sphere.radius);
+        next.position.set(...body.position);
+        next.rotation.y = holder ? holder.rotation.y : mesh.rotation.y; // keep the spin angle
+        const geoms: BufferGeometry[] = [];
         root.traverse((o) => {
-          if (o instanceof Mesh) o.material = shared;
+          if (o instanceof Mesh) geoms.push(o.geometry as BufferGeometry);
         });
-        group.remove(mesh);
-        group.add(holder);
-        const i = spinners.indexOf(mesh);
-        if (i >= 0) spinners[i] = holder;
+        const first = geoms[0]?.getAttribute('position');
+        const edge =
+          first && 'array' in first && !('isInterleavedBufferAttribute' in first)
+            ? meanEdgeLength(first.array as ArrayLike<number>, geoms[0]!.index?.array ?? null)
+            : null;
+        const hasAo = geoms.length > 0 && geoms.every((g) => g.getAttribute('ao'));
+        const shared = makeMaterial(hasAo, edge);
+        root.traverse((o) => {
+          if (o instanceof Mesh) {
+            o.material = shared;
+            o.castShadow = shape?.shadows === true;
+            o.receiveShadow = shape?.shadows === true;
+          }
+        });
+        if (holder) group.remove(holder);
+        else group.remove(mesh);
+        group.add(next);
+        const i = spinners.indexOf(holder ?? mesh);
+        if (i >= 0) spinners[i] = next;
+        holder = next;
+        level = lvl;
+        if (sphere.radius > 0) hooks.onMeshMeasured?.({ radiusM: sphere.radius });
+
+        // Baked AO (derived): bake once per model in slices, then swap in the AO material.
+        if (shape?.ao && !hasAo && geoms.some((g, k) => g !== bakedFor[k])) {
+          bakedFor = geoms;
+          const rays = aoRayCount(tier);
+          Promise.all(geoms.map((g) => bakeVertexAo(g, rays, () => disposed))).then(
+            (done) => {
+              if (disposed || holder !== next || !done.every(Boolean)) return;
+              const withAo = makeMaterial(true, edge);
+              next.traverse((o) => {
+                if (o instanceof Mesh) o.material = withAo;
+              });
+              hooks.onChange();
+            },
+            () => undefined, // AO is optional: the model stays lit without it (never blank)
+          );
+        }
         hooks.onChange();
       };
-      const ready = cache.loadedMesh(url);
-      if (ready) swap(ready);
-      else
-        cache.mesh(url).then(swap, () => {
-          if (!disposed) hooks.onLoadFailed('mesh');
-        });
+
+      const show = (lvl: LodLevel) => {
+        const url = lvl === 1 && lods.lod1 ? lods.lod1 : lods.lod0;
+        const ready = cache.loadedMesh(url);
+        if (ready) {
+          apply(ready, lvl);
+          return;
+        }
+        cache.mesh(url).then(
+          (m) => apply(m, lvl),
+          () => {
+            if (disposed) return;
+            // The coarse file may be missing: fall back to full detail before refusing the layer.
+            if (lvl === 1) show(0);
+            else if (!holder) hooks.onLoadFailed('mesh');
+          },
+        );
+      };
+      show(chooseLod(tier, null, lods.lod1 !== null));
+      tierListeners.push((t) => {
+        const want = chooseLod(t, null, lods.lod1 !== null);
+        if (holder && want !== level) show(want);
+      });
     }
   }
 
@@ -337,6 +439,7 @@ export function buildScene(
     shaderBody = ShaderBody.start(plan.shader.card, plan.shader.params, {
       visibleTags: allowedTags(plan.honesty),
       lightDir: plan.lighting.direction ?? undefined,
+      tier,
       onChange: () => {
         if (!disposed) hooks.onChange();
       },
@@ -349,31 +452,11 @@ export function buildScene(
     group.add(shaderBody.object);
   }
 
-  // Gas shells and dust --------------------------------------------------------------------
-  // r187 note (PointsNodeMaterial doc comment): WebGPU draws `Points` at 1 px whatever the size,
-  // so a point cloud is one instanced `Sprite` whose positions come from an instanced attribute.
-  const addPoints = (positions: Float32Array, color: Color, opacity: number) => {
-    const material = track(
-      new PointsNodeMaterial({
-        color,
-        size: SHELL_POINT_SIZE,
-        sizeAttenuation: false,
-        transparent: true,
-        opacity,
-        blending: AdditiveBlending,
-        depthWrite: false,
-      }),
-    );
-    material.positionNode = instancedBufferAttribute(new InstancedBufferAttribute(positions, 3));
-    const cloud = new Sprite(material);
-    cloud.count = positions.length / 3;
-    cloud.frustumCulled = false; // the shared quad's bounds do not describe the instances
-    group.add(cloud);
-  };
-  for (const shell of plan.shells) {
-    addPoints(shellPositions(shell), new Color(shell.css), SHELL_MAX_OPACITY * shell.brightness);
-  }
-  if (plan.dust) addPoints(dustPositions(plan.dust), srgb(plan.dust.tint), DUST_OPACITY);
+  // Emission volumes (issue #43): comet coma, dust and tails. They replace the point sprites, so
+  // no dots are drawn; the plan's `shells` and `dust` stay as data for the haptics.
+  const volumes = plan.volumes.map((v) => track(createVolume(v, tier)));
+  for (const v of volumes) group.add(v.mesh);
+  tierListeners.push((t) => volumes.forEach((v) => v.setTier(t)));
 
   // Disc, dust screen, trail ---------------------------------------------------------------
   for (const disc of plan.discs) {
@@ -437,6 +520,13 @@ export function buildScene(
       if (!shaderBody || disposed) return;
       if (next.lighting.direction) shaderBody.setSunDirection(next.lighting.direction);
       shaderBody.setVisibleTags(allowedTags(next.honesty));
+    },
+    setTier(next) {
+      if (disposed || next === tier) return;
+      tier = next;
+      shaderBody?.setTier(next);
+      for (const l of tierListeners) l(next);
+      hooks.onChange();
     },
     dispose() {
       disposed = true;

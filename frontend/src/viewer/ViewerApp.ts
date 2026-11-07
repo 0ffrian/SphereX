@@ -21,6 +21,7 @@ import {
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { ObjectCard, RenderParams } from '@/contract';
 import { buildLights, MAX_AMBIENT_INTENSITY } from './lighting';
+import { shadowSettings } from './shape/shapeModel';
 import type { PlanContext, RenderPlan, SpinPlan } from './planTypes';
 import { planRender } from './renderPlan';
 import type { BodyRenderer } from './renderers/bodyRenderer';
@@ -116,6 +117,8 @@ export function sceneKey(plan: RenderPlan): string {
     plan.screens,
     plan.trails,
     plan.dust,
+    plan.volumes,
+    plan.shape,
     plan.spin,
     // The shader kinds: what the body is built from. Honesty and light are not in it (they update
     // the body in place), so a toggle does not regenerate the field.
@@ -253,6 +256,7 @@ export class ViewerApp {
   private motionQuery: MediaQueryList | null = null;
   /** Called when a mesh or texture fails to load; the panel adds the layer to `failed` and re-plans. */
   private onLoadFailed: ((layerId: string) => void) | null = null;
+  private onMeshMeasured: ((m: { radiusM: number }) => void) | null = null;
   /** Tests only: field and point sources and slider overrides for the shader kinds. */
   private shaderOptions: BuildHooks['shader'];
 
@@ -262,6 +266,11 @@ export class ViewerApp {
 
   setLoadFailedHandler(handler: ((layerId: string) => void) | null): void {
     this.onLoadFailed = handler;
+  }
+
+  /** Called when a shape model loads, with its bounding-sphere radius in metres (the real size). */
+  setMeshMeasuredHandler(handler: ((m: { radiusM: number }) => void) | null): void {
+    this.onMeshMeasured = handler;
   }
   private readonly resizeObserver: ResizeObserver | null;
   private dprQuery: MediaQueryList | null = null;
@@ -293,6 +302,8 @@ export class ViewerApp {
     // r187: after init(), `backend` is a WebGPUBackend or, after fallback, a WebGLBackend.
     this.backend = 'isWebGPUBackend' in renderer.backend ? 'webgpu' : 'webgl2';
 
+    // R7.1: shape models self-shadow through the Sun light's shadow map (only lights that ask).
+    if (renderer.shadowMap) renderer.shadowMap.enabled = true;
     renderer.setPixelRatio(viewerPixelRatio(window.devicePixelRatio || 1));
     renderer.setClearColor(new Color(SPACE_BACKGROUND), 1);
     this.coarsePointer =
@@ -405,7 +416,10 @@ export class ViewerApp {
     if (this.disposed) return;
     // The new lights go on with the content they belong to: an old object still on screen while
     // the new one compiles is not lit from the new object's phase angle.
-    const lights = buildLights(plan.lighting);
+    const lights = buildLights(
+      plan.lighting,
+      plan.shape?.shadows ? shadowSettings(this.tier) : null,
+    );
     const key = sceneKey(plan);
     if (this.built && key === this.builtKey) {
       // Nothing that is built changed: only the lights, the honesty state or the labels did. A
@@ -434,6 +448,8 @@ export class ViewerApp {
           {
             onLoadFailed: (id) => this.onLoadFailed?.(id),
             onChange: this.requestRender,
+            tier: this.tier,
+            onMeshMeasured: (m) => this.onMeshMeasured?.(m),
             shader: this.shaderOptions,
           },
           this.assets,
@@ -685,6 +701,7 @@ export class ViewerApp {
     this.tier = name;
     this.governor.setTier(name);
     this.cap.setInterval(capIntervalMs(name, this.coarsePointer));
+    this.built?.setTier(name);
     if (this.chain) {
       try {
         this.chain.setTier(name);

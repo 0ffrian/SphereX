@@ -121,7 +121,15 @@ export function ViewerPanel() {
     () => (card && params ? planRender(card, params, ctx) : null),
     [card, params, ctx],
   );
-  const bar = useMemo(() => (plan ? scaleBarFor(plan.scaleM, plan.sizeQualifier) : null), [plan]);
+  // Issue #43: a loaded shape model carries its own size in metres (glTF units, Q-61), which is the
+  // measured size, so the scale bar shows it instead of the catalogue diameter (Eros at real size).
+  const [meshSize, setMeshSize] = useState<{ key: string; radiusM: number } | null>(null);
+  const modelRadiusM =
+    meshSize?.key === objectKey && plan?.bodies.some((b) => b.meshUrl) ? meshSize.radiusM : null;
+  const bar = useMemo(
+    () => (plan ? scaleBarFor(modelRadiusM ?? plan.scaleM, plan.sizeQualifier) : null),
+    [plan, modelRadiusM],
+  );
 
   // Mount the renderer once.
   useEffect(() => {
@@ -206,6 +214,12 @@ export function ViewerPanel() {
     return () => {
       viewer.setLoadFailedHandler(null);
     };
+  }, [viewer, objectKey]);
+
+  useEffect(() => {
+    if (!viewer) return;
+    viewer.setMeshMeasuredHandler?.((m) => setMeshSize({ key: objectKey, radiusM: m.radiusM }));
+    return () => viewer.setMeshMeasuredHandler?.(null);
   }, [viewer, objectKey]);
 
   // A tier drop from the frame-time governor is said in plain words and shown (R9, never silent).
