@@ -46,7 +46,7 @@ stateDiagram-v2
 
 ## Sim clock (motion)
 
-The `SimClock` (`frontend/src/viewer/render/clock.ts`) runs only while a process exists (the spin today) and no pause reason is set. Each reason is added and removed on its own; the clock runs again only when the set is empty.
+The `SimClock` (`frontend/src/viewer/render/clock.ts`) runs only while a process exists (the spin, and since issue #42 the star, jet, storm, cloud and pulsation processes that `motion/planMotion.ts` states; Q-87) and no pause reason is set. Each reason is added and removed on its own; the clock runs again only when the set is empty.
 
 ```mermaid
 stateDiagram-v2
@@ -56,8 +56,8 @@ stateDiagram-v2
   state "Running: continuous frames, sim time advances" as Running
   state "Paused (one or more reasons): render on change only" as Paused
 
-  Still --> Running : spin process added, no reason set
-  Still --> Paused : spin process added while a reason is set
+  Still --> Running : a process added (spin or another), no reason set
+  Still --> Paused : a process added while a reason is set
   Running --> Still : process removed
   Running --> Paused : a pause reason is added
   Paused --> Paused : another reason added, or one of several removed

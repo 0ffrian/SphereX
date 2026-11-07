@@ -20,17 +20,18 @@ flowchart TB
     end
 
     subgraph Frontend["frontend/ (Vite + TS + React) : owners per package"]
-      FApp["src/app (React shell: App, ViewerPanel, StatusLine, FixtureBanner, LiveAnnouncer, Badge, StatusBoxes, urlHash + useHashSync, format, messages, refusals, RefusalList, ui), src/state (Zustand store with the sky slice) : Moon"]
+      FApp["src/app (React shell: App, ViewerPanel (tier text "tier N of 5, <meaning>", Q-87), StatusLine, FixtureBanner, LiveAnnouncer, Badge, StatusBoxes, urlHash + useHashSync, format, messages, refusals, RefusalList, ui), src/state (Zustand store with the sky slice) : Moon"]
       FFlip["src/app/api (M1 client, D-16), src/app/search, src/app/flipbook (with Rainbow Trails, D-28; overlays/, issue #12), src/app/spectrum : Moon"]
       FDev["fixtures/ (dev-only synthetic fixture server), scripts/ (check-dist), src/test (test helpers), src/fixtures.test.ts, e2e/ (Playwright) : dev and test only"]
       FPhysics["src/physics : A7 physics layer, derivePhysics, slider registry (D-26, D-27) : Moon"]
       FContract["src/contract : generated from shared/schemas (D-18), assertTagged next to it : follows the schemas owner"]
       subgraph FViewer["src/viewer (Moon)"]
         VCore["ViewerApp, lighting, modes, honesty, scaleBar, altText"]
-        VRend["renderers/ : AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody [verify], bodyRenderer, shaderPlan, shaderSpec, shaderPalette, pointClouds; sliders.ts"]
+        VRend["renderers/ : AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody [verify], bodyRenderer, shaderPlan, shaderSpec, shaderPalette, pointClouds, StarBody, jetSurface, jetPalette; sliders.ts"]
         VRender["render/ : pipeline (RenderChain), quality (quality levels, FrameGovernor), clock (SimClock), workerPool (WorkerPool), fanout (loadBody, asset prefetch)"]
-        VShaders["shaders/ : TSL noise (fbm, ridged, domainWarp, animatedCells, OCTAVES) and sphere helpers (latLon, tangentFrame, differentialRotate)"]
-        VFields["fields/ : fieldGenerator, noise, fieldWorker, fieldClient (D-12) : Atish (D-17); shader generators (D-01) : Moon [verify path]"]
+        VShaders["shaders/ : TSL noise (fbm, ridged, domainWarp, animatedCells, OCTAVES) and sphere helpers (latLon, tangentFrame, differentialRotate), star and loops (issue #42)"]
+        VMotion["motion/ : motion (resolveMotion, D-32 chain), planMotion, phase; bodies/ : starModel (CPU star surface model, pure in seed, rates, t) : issue #42"]
+        VFields["fields/ : fieldGenerator, flowModel (storms, issue #42), noise, fieldWorker, fieldClient (D-12) : Atish (D-17); shader generators (D-01) : Moon [verify path]"]
       end
       subgraph FHaptics["src/haptics : Atish (D-13, D-17)"]
         HCore["haptics.ts (engine), audioContext, audioGraph, settings, calibration, platform, pitch, spectrumMapping, tuning"]
@@ -71,6 +72,9 @@ flowchart TB
   VCore --> VRend
   VCore -->|"RenderChain, SimClock, FrameGovernor"| VRender
   VRender -->|"OCTAVES"| VShaders
+  VCore -->|"resolveMotion, planMotion"| VMotion
+  VMotion -->|"SimClock processes"| VRender
+  VRend -->|"starModel, flowModel"| VMotion
   VRender -->|"fanout: AssetCache, isLoadableMeshUrl"| VRend
   FShaderlab -.->|"dev server only"| VShaders
   VRend --> VFields
