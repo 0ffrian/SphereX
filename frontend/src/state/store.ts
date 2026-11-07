@@ -1,17 +1,29 @@
 // A10 state: one Zustand store holding the current ObjectCard, RenderParams, honesty state and
 // the client-side `overrides` map (D-02: user edits live apart from the card so Reset restores
 // the data values), plus the flipbook session (`sky`: search, frames, playback, spectrum; A1.1,
-// D-16).
+// D-16; overlays and combined frames, issue #12).
 import { create } from 'zustand';
 import type { ObjectCard, RenderParams } from '@/contract';
 import type { RendererBackend } from '@/viewer/ViewerApp';
-import { createApiClient, type ApiClient } from '@/app/api/client';
+import {
+  createApiClient,
+  revokeObjectUrl,
+  type ApiClient,
+  type CombineResult,
+} from '@/app/api/client';
 import { isApiError, type ApiErrorKind } from '@/app/api/errors';
-import type { FramesResponse, ResolveResponse, SpectrumResponse } from '@/app/api/types';
+import type {
+  CombineOp,
+  FramesResponse,
+  OverlaysResponse,
+  ResolveResponse,
+  SpectrumResponse,
+} from '@/app/api/types';
 import { clampIndex, DEFAULT_FPS, nextIndex, type Fps } from '@/app/flipbook/playback';
 import { formatCoords, formatUtc, formatWavelength } from '@/app/format';
 import { spectrumAnnouncement } from '@/app/messages';
 import { summarizeSpectrum } from '@/app/refusals';
+import { isValidOverride, type Overrides, type SliderKey } from '@/viewer/sliders';
 
 /**
  * Honesty toggle (D-21, R5.3): Measured only, + Estimated, + Artistic. The value names the most
@@ -20,12 +32,8 @@ import { summarizeSpectrum } from '@/app/refusals';
  */
 export type HonestyState = 'measured' | 'derived' | 'artistic';
 
-/**
- * D-02 client-side overrides: field name → user value.
- * ASSUMPTION: value types are not specified (sliders may be numbers, colours or flags) and the
- * allowed keys on baked bodies are open (Q-03), so values are `unknown` until those are settled.
- */
-export type Overrides = Readonly<Record<string, unknown>>;
+/** D-02 / D-27 client-side overrides: slider key → value in card units (`@/viewer/sliders`). */
+export type { Overrides } from '@/viewer/sliders';
 
 /** What the status line reports about the 3D renderer. */
 export type RendererStatus = 'starting' | RendererBackend | 'unavailable';
@@ -58,6 +66,50 @@ export interface SpectrumState {
   error: SkyError | null;
 }
 
+/** Overlay layers the flipbook can draw over the cutout (issue #12). */
+export type OverlayLayer = 'gaia' | 'wise' | 'flags' | 'fov';
+export type OverlayToggles = Readonly<Record<OverlayLayer, boolean>>;
+
+export interface OverlaysState {
+  /** Loaded lazily: the first time any layer is switched on, not on every search. */
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  data: OverlaysResponse | null;
+  error: SkyError | null;
+  /** All off by default and after every new search. */
+  toggles: OverlayToggles;
+}
+
+/** "Combine frames" panel: frame A and frame B added or subtracted by the backend (issue #12). */
+export interface CombineState {
+  open: boolean;
+  op: CombineOp;
+  a: string | null;
+  b: string | null;
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  /** The image as an object URL; revoked whenever it is replaced or cleared. */
+  result: CombineResult | null;
+  error: SkyError | null;
+}
+
+export const OVERLAYS_OFF: OverlayToggles = { gaia: false, wise: false, flags: false, fov: false };
+
+export const initialOverlaysState: OverlaysState = {
+  status: 'idle',
+  data: null,
+  error: null,
+  toggles: OVERLAYS_OFF,
+};
+
+export const initialCombineState: CombineState = {
+  open: false,
+  op: 'sub',
+  a: null,
+  b: null,
+  status: 'idle',
+  result: null,
+  error: null,
+};
+
 export interface SkyState {
   query: SkyQuery | null;
   status: SkyStatus;
@@ -75,6 +127,8 @@ export interface SkyState {
   fps: Fps;
   viewMode: SkyViewMode;
   spectrum: SpectrumState;
+  overlays: OverlaysState;
+  combine: CombineState;
   /** Bumped by every search; a reply for an older id is dropped. */
   requestId: number;
   /** Text for the polite live region (R9). */
@@ -97,6 +151,8 @@ export const initialSkyState: SkyState = {
   fps: DEFAULT_FPS,
   viewMode: 'frames',
   spectrum: { status: 'idle', data: null, error: null },
+  overlays: initialOverlaysState,
+  combine: initialCombineState,
   requestId: 0,
   announcement: '',
   linkProblems: [],
@@ -105,6 +161,24 @@ export const initialSkyState: SkyState = {
 let skyApi: ApiClient = createApiClient();
 let searchAbort: AbortController | null = null;
 let spectrumAbort: AbortController | null = null;
+let overlaysAbort: AbortController | null = null;
+let combineAbort: AbortController | null = null;
+
+/** Aborts the overlay and combine requests and frees the combined image of `sky`. */
+function dropOverlayRequests(sky: SkyState): void {
+  overlaysAbort?.abort();
+  combineAbort?.abort();
+  overlaysAbort = null;
+  combineAbort = null;
+  revokeObjectUrl(sky.combine.result?.objectUrl);
+}
+
+const LAYER_NAMES: Readonly<Record<OverlayLayer, string>> = {
+  gaia: 'Gaia stars',
+  wise: 'WISE sources',
+  flags: 'Flagged pixels',
+  fov: 'Field of view',
+};
 
 /** Swap the API client (tests, or a different base URL). */
 export function setSkyApi(client: ApiClient): void {
@@ -159,7 +233,13 @@ export interface AppActions {
   setObject(card: ObjectCard, params: RenderParams): void;
   clearObject(): void;
   setHonesty(state: HonestyState): void;
-  setOverride(key: string, value: unknown): void;
+  /**
+   * D-27: only registered slider keys type-check. A value is stored only when a card is loaded and
+   * `isValidOverride` accepts it for the card's type (applies, finite, in range); otherwise the
+   * call changes nothing and returns false, so the caller can say why. `undefined` clears that
+   * one slider so its data value shows again (returns true).
+   */
+  setOverride(key: SliderKey, value: number | boolean | undefined): boolean;
   /** D-02 Reset: drop every user edit so the card's data values show again. */
   resetOverrides(): void;
   setRendererStatus(status: RendererStatus): void;
@@ -184,6 +264,19 @@ export interface AppActions {
   skyReset(): void;
   /** Show and announce the unusable parts of a shared link. */
   skySetLinkProblems(problems: string[]): void;
+
+  /** Switch one overlay layer; the first switch-on loads the overlays (again after an error). */
+  skyToggleOverlay(layer: OverlayLayer): void;
+  /** `GET /v1/objects/{id}/overlays` for the resolved object. Optional: never blocks the flipbook. */
+  skyLoadOverlays(): Promise<void>;
+  /** Open or close the combine panel. Opening picks the current and the previous frame. */
+  skyCombineOpen(open: boolean): void;
+  /** Change the operation or a frame; clears a result made from the old choice. */
+  skyCombineSet(patch: Partial<Pick<CombineState, 'op' | 'a' | 'b'>>): void;
+  /** `GET /v1/objects/{id}/combine.png` for the chosen frames. */
+  skyCombineShow(): Promise<void>;
+  /** Drop the combined image and free its object URL (the panel unmounted). */
+  skyCombineClear(): void;
 }
 
 export type AppStore = AppData & AppActions;
@@ -206,13 +299,27 @@ export const useAppStore = create<AppStore>()((set, get) => {
     setObject: (card, params) => set({ card, params, overrides: {} }),
     clearObject: () => set({ card: null, params: null, overrides: {} }),
     setHonesty: (honesty) => set({ honesty }),
-    setOverride: (key, value) => set((s) => ({ overrides: { ...s.overrides, [key]: value } })),
+    setOverride: (key, value) => {
+      const s = get();
+      if (value === undefined) {
+        if (key in s.overrides) {
+          const rest = { ...s.overrides };
+          delete rest[key];
+          set({ overrides: rest });
+        }
+        return true;
+      }
+      if (!s.card || !isValidOverride(s.card.type, key, value)) return false;
+      set({ overrides: { ...s.overrides, [key]: value } });
+      return true;
+    },
     resetOverrides: () => set({ overrides: {} }),
     setRendererStatus: (rendererStatus) => set({ rendererStatus }),
 
     skySearch: async (query) => {
       searchAbort?.abort();
       spectrumAbort?.abort();
+      dropOverlayRequests(get().sky);
       const controller = new AbortController();
       searchAbort = controller;
       const requestId = get().sky.requestId + 1;
@@ -366,6 +473,7 @@ export const useAppStore = create<AppStore>()((set, get) => {
     skyReset: () => {
       searchAbort?.abort();
       spectrumAbort?.abort();
+      dropOverlayRequests(get().sky);
       searchAbort = null;
       spectrumAbort = null;
       set((s) => {
@@ -388,5 +496,123 @@ export const useAppStore = create<AppStore>()((set, get) => {
         linkProblems: problems,
         announcement: problems.length > 0 ? problems.join(' ') : get().sky.announcement,
       }),
+
+    skyToggleOverlay: (layer) => {
+      const { overlays } = get().sky;
+      const on = !overlays.toggles[layer];
+      setSky({
+        overlays: { ...overlays, toggles: { ...overlays.toggles, [layer]: on } },
+        announcement: `${LAYER_NAMES[layer]} ${on ? 'shown' : 'hidden'}.`,
+      });
+      // A catalogue the backend was still fetching (`overlay:<layer>:pending`) is asked for again
+      // when it is switched back on; by then it is usually in the backend cache.
+      const pending =
+        overlays.status === 'ready' &&
+        (overlays.data?.missing.includes(`overlay:${layer}:pending`) ?? false);
+      if (on && (overlays.status === 'idle' || overlays.status === 'error' || pending)) {
+        void get().skyLoadOverlays();
+      }
+    },
+
+    skyLoadOverlays: async () => {
+      const sky = get().sky;
+      if (!sky.resolved || sky.overlays.status === 'loading') return;
+      overlaysAbort?.abort();
+      const controller = new AbortController();
+      overlaysAbort = controller;
+      const { requestId } = sky;
+      // The previous reply stays drawn until the new one arrives, so retrying one catalogue does
+      // not hide the other layers while the backend waits (up to 75 s).
+      setSky({ overlays: { ...sky.overlays, status: 'loading', error: null } });
+      try {
+        const res = await skyApi.getOverlays(sky.resolved.id, controller.signal);
+        if (!isCurrent(requestId)) return;
+        const now = get().sky;
+        setSky({
+          fixture: now.fixture || res.fixture !== null,
+          fixtureSeen: now.fixtureSeen || res.fixture !== null,
+          overlays: { ...now.overlays, status: 'ready', data: res.data, error: null },
+          announcement: 'Overlays loaded.',
+        });
+      } catch (e) {
+        if (!isCurrent(requestId) || isAborted(e)) return;
+        // Not announced here: the overlay error box is role="alert".
+        const now = get().sky;
+        setSky({
+          // A failed reload keeps the last good reply drawn; the error box offers a retry.
+          overlays: { ...now.overlays, status: 'error', error: toSkyError(e) },
+          announcement: '',
+        });
+      }
+    },
+
+    skyCombineOpen: (open) => {
+      const { combine, frames, index } = get().sky;
+      if (!open) {
+        if (combine.open) setSky({ combine: { ...combine, open } });
+        return;
+      }
+      const list = frames?.frames ?? [];
+      // Defaults: frame A = the current frame, frame B = the previous one. ASSUMPTION: on the
+      // first frame there is no previous one, so B is the next frame instead.
+      const a = combine.a ?? list[index]?.frame_id ?? null;
+      const b = combine.b ?? list[index > 0 ? index - 1 : index + 1]?.frame_id ?? null;
+      setSky({ combine: { ...combine, open, a, b } });
+    },
+
+    skyCombineSet: (patch) => {
+      const { combine } = get().sky;
+      combineAbort?.abort();
+      combineAbort = null;
+      revokeObjectUrl(combine.result?.objectUrl);
+      setSky({ combine: { ...combine, ...patch, status: 'idle', result: null, error: null } });
+    },
+
+    skyCombineShow: async () => {
+      const sky = get().sky;
+      const { a, b, op } = sky.combine;
+      if (!sky.resolved || !a || !b || a === b) return;
+      combineAbort?.abort();
+      const controller = new AbortController();
+      combineAbort = controller;
+      revokeObjectUrl(sky.combine.result?.objectUrl);
+      const { requestId } = sky;
+      setSky({
+        combine: { ...sky.combine, status: 'loading', result: null, error: null },
+        announcement: 'Combining the frames.',
+      });
+      try {
+        const res = await skyApi.getCombine(sky.resolved.id, op, a, b, controller.signal);
+        const now = get().sky;
+        const c = now.combine;
+        // A reply for an older search or an older choice of frames is dropped and freed.
+        if (!isCurrent(requestId) || c.a !== a || c.b !== b || c.op !== op) {
+          revokeObjectUrl(res.data.objectUrl);
+          return;
+        }
+        setSky({
+          fixture: now.fixture || res.fixture !== null,
+          fixtureSeen: now.fixtureSeen || res.fixture !== null,
+          combine: { ...c, status: 'ready', result: res.data, error: null },
+          announcement: 'Combined image ready.',
+        });
+      } catch (e) {
+        if (!isCurrent(requestId) || isAborted(e)) return;
+        const now = get().sky;
+        setSky({
+          combine: { ...now.combine, status: 'error', result: null, error: toSkyError(e) },
+          announcement: '',
+        });
+      }
+    },
+
+    skyCombineClear: () => {
+      const { combine } = get().sky;
+      combineAbort?.abort();
+      combineAbort = null;
+      revokeObjectUrl(combine.result?.objectUrl);
+      if (combine.status === 'idle' && combine.result === null) return;
+      setSky({ combine: { ...combine, status: 'idle', result: null, error: null } });
+    },
   };
 });

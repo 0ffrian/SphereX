@@ -100,6 +100,8 @@ classDiagram
     +step: number
     +unit: string
     +appliesTo: ObjectType list
+    +group: colour, lighting, spin, relief or physics
+    +spec: A7 section
   }
 
   TV --> "1" Tag : tag
@@ -236,3 +238,4 @@ classDiagram
 - `lighting.mode` is `sun` for solar-system bodies (`phase_angle_deg` from Horizons quantity 24) and `self` for stars and brown dwarfs (rendering doc §5.1).
 - `Overrides` holds user slider edits on the client, separate from the card, so Reset restores the data values. It is `Partial<Record<SliderKey, number | boolean>>`, and an unknown key fails the type check (D-27). It stays in IndexedDB and is never sent to the server (D-22).
 - Baked types allow only colour, lighting and spin sliders for the event; relief sliders exist only on the shader kinds (D-26).
+- The one registry lives in `frontend/src/viewer/sliders.ts` and serves the viewer and the physics layer. Each entry adds `group` (so D-26 can be checked) and `spec` (the section it feeds) to the D-27 fields (see the note under D-27); `SliderKey` is the registry's keys. A value outside the range is ignored, never clamped. Bulk density for the asteroid spin barrier is filed under `spin` (Q-58).

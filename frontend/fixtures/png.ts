@@ -1,4 +1,4 @@
-// DEV/TEST FIXTURES ONLY. A minimal 8-bit grayscale PNG encoder in plain TypeScript: CRC-32,
+// DEV/TEST FIXTURES ONLY. A minimal 8-bit grayscale and RGBA PNG encoder in plain TypeScript: CRC-32,
 // Adler-32 and stored (uncompressed) deflate blocks, so it needs no zlib and runs the same in
 // Node, the browser and Vitest. Same pixels → same bytes.
 
@@ -57,14 +57,20 @@ function zlibStored(raw: Uint8Array): Uint8Array {
 
 export const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] as const;
 
-/** `pixels` is row-major, `width × height` bytes, 0 = black. */
-export function encodePngGray(width: number, height: number, pixels: Uint8Array): Uint8Array {
-  if (pixels.length !== width * height) throw new Error('pixel count does not match size');
-  const ihdr = Uint8Array.from([...u32(width), ...u32(height), 8, 0, 0, 0, 0]); // 8-bit gray
-  const raw = new Uint8Array(height * (width + 1));
+function encodePng(
+  width: number,
+  height: number,
+  pixels: Uint8Array,
+  channels: 1 | 4,
+  colorType: 0 | 6,
+): Uint8Array {
+  const rowBytes = width * channels;
+  if (pixels.length !== rowBytes * height) throw new Error('pixel count does not match size');
+  const ihdr = Uint8Array.from([...u32(width), ...u32(height), 8, colorType, 0, 0, 0]);
+  const raw = new Uint8Array(height * (rowBytes + 1));
   for (let y = 0; y < height; y++) {
-    raw[y * (width + 1)] = 0; // filter: none
-    raw.set(pixels.subarray(y * width, (y + 1) * width), y * (width + 1) + 1);
+    raw[y * (rowBytes + 1)] = 0; // filter: none
+    raw.set(pixels.subarray(y * rowBytes, (y + 1) * rowBytes), y * (rowBytes + 1) + 1);
   }
   return Uint8Array.from([
     ...PNG_SIGNATURE,
@@ -72,4 +78,14 @@ export function encodePngGray(width: number, height: number, pixels: Uint8Array)
     ...chunk('IDAT', zlibStored(raw)),
     ...chunk('IEND', new Uint8Array(0)),
   ]);
+}
+
+/** `pixels` is row-major, `width × height` bytes, 0 = black. */
+export function encodePngGray(width: number, height: number, pixels: Uint8Array): Uint8Array {
+  return encodePng(width, height, pixels, 1, 0); // 8-bit gray
+}
+
+/** `pixels` is row-major RGBA, `width × height × 4` bytes, alpha 0 = transparent. */
+export function encodePngRgba(width: number, height: number, pixels: Uint8Array): Uint8Array {
+  return encodePng(width, height, pixels, 4, 6); // 8-bit RGBA
 }

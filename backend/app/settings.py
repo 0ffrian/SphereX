@@ -57,6 +57,21 @@ class Settings(BaseSettings):
     sbdb_url: str = "https://ssd-api.jpl.nasa.gov/sbdb.api"
     horizons_url: str = "https://ssd.jpl.nasa.gov/api/horizons.api"
     skybot_url: str = "https://ssp.imcce.fr/webservices/skybot/api/conesearch.php"
+    # Catalogue overlays (issue #12). Gaia: "<TAP sync URL> <table>" pairs, comma-separated,
+    # tried in order. Checked 6 Nov 2026: IRSA about 20 s per cone, ESA about 60 s.
+    gaia_tap_mirrors: str = (
+        "https://irsa.ipac.caltech.edu/TAP/sync gaia_dr3_source,"
+        "https://gea.esac.esa.int/tap-server/tap/sync gaiadr3.gaia_source"
+    )
+    wise_tap_url: str = "https://irsa.ipac.caltech.edu/TAP/sync"
+    catalog_read_timeout_s: float = 120.0
+    # ASSUMPTION: how long one /overlays request waits for the Gaia and CatWISE cones (fetched in
+    # parallel). Below the frontend's 90 s API timeout; a cone still running after this is
+    # reported as ``overlay:<catalog>:pending`` and keeps filling the cache in the background.
+    overlay_wait_s: float = 75.0
+    # ASSUMPTION: a cone that failed live is not retried for this long, so repeated toggles
+    # do not each start the same slow chain of mirror timeouts.
+    catalog_failure_ttl_s: float = 60.0
 
     # ASSUMPTION: fixed epoch for a moving object's position in /v1/resolve, so the answer
     # is cacheable and works offline (ephemerides for fixed times do not change, D-25).
@@ -73,6 +88,15 @@ class Settings(BaseSettings):
     @property
     def simbad_urls(self) -> list[str]:
         return [u.strip() for u in self.simbad_tap_urls.split(",") if u.strip()]
+
+    @property
+    def gaia_mirrors(self) -> list[tuple[str, str]]:
+        out: list[tuple[str, str]] = []
+        for item in self.gaia_tap_mirrors.split(","):
+            parts = item.split()
+            if len(parts) == 2:
+                out.append((parts[0], parts[1]))
+        return out
 
     @property
     def cors_list(self) -> list[str]:
