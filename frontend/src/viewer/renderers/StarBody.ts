@@ -91,10 +91,10 @@ export class StarBody {
       const g = new SpriteNodeMaterial();
       const r = length(uv().sub(0.5)).mul(GLOW_SIZE);
       // Outside the limb only: 1 at the limb, falling off exponentially; nothing over the disc.
-      const fall = exp(r.sub(1).max(0).mul(-5.5)).mul(smoothstep(0.985, 1.03, r));
+      const fall = exp(r.sub(1).max(0).mul(-9)).mul(smoothstep(0.998, 1.012, r));
       g.colorNode = vec4(vec3(o.tint[0], o.tint[1], o.tint[2]).mul(o.emissive), 1);
       g.opacityNode = fall
-        .mul(0.5)
+        .mul(0.12)
         .mul(float(1).sub(smoothstep(GLOW_SIZE * 0.45, GLOW_SIZE * 0.5, r)));
       g.transparent = true;
       g.depthWrite = false;

@@ -74,8 +74,8 @@ export interface StarFrame {
 /** Granule cells across the disc (artistic: real granules are far too small to resolve). */
 export const CELLS_ACROSS = 30;
 /** Contrast of the granules, and of the large-scale mottling (artistic). */
-const GRAIN_AMP = 0.13;
-const MOTTLE_AMP = 0.05;
+const GRAIN_AMP = 0.045;
+const MOTTLE_AMP = 0.02;
 /** Umbra and penumbra brightness relative to the photosphere (artistic). */
 const UMBRA = 0.06;
 const PENUMBRA_LO = 0.5;
@@ -122,7 +122,12 @@ export function buildStarMaterial(opts: StarShaderOptions): StarMaterial {
   let col: any = vec3(opts.tint[0], opts.tint[1], opts.tint[2]).mul(opts.emissive);
 
   // Limb darkening (R7.5, model_dependent).
-  if (opts.limbU !== null) col = col.mul(float(1).sub(float(opts.limbU).mul(float(1).sub(mu))));
+  // A crisp edge (R7.5, Q-90): the linear law plus a short steeper fall in the last few percent of
+  // the radius, so the limb reads as a dark rim instead of fading into the glow.
+  if (opts.limbU !== null) {
+    col = col.mul(float(1).sub(float(opts.limbU).mul(float(1).sub(mu))));
+    col = col.mul(mix(float(0.3), float(1), smoothstep(0.0, 0.3, mu)));
+  }
 
   // Granulation ---------------------------------------------------------------------------------
   // Two scales of warped cells (so no regular tiling or round polka dots show), dark lanes between
@@ -146,10 +151,10 @@ export function buildStarMaterial(opts: StarShaderOptions): StarMaterial {
     const layer = (freq: number, off: number) =>
       mix(cellsAt(phaseU.y, phaseU.w, freq, off), cellsAt(phaseU.x, phaseU.z, freq, off), weightU);
     // Bright cells, thin dark lanes: the lane is where the distance to the nearest centre is large.
-    const lane = (c: any) => smoothstep(0.55, 1.0, c);
-    const big = lane(layer(CELLS_ACROSS / 2, 0));
-    const small = lane(layer(CELLS_ACROSS * 0.9, 11.5));
-    const grain = float(0.5).sub(big.mul(0.65).add(small.mul(0.35)));
+    const lane = (c: any) => smoothstep(0.4, 1.0, c);
+    const big = lane(layer(CELLS_ACROSS * 0.9, 0));
+    const small = lane(layer(CELLS_ACROSS * 2.2, 11.5));
+    const grain = float(0.5).sub(big.mul(0.45).add(small.mul(0.55)));
     // Large-scale mottling (supergranule scale), steady between flow-map resets.
     let mottle: any = float(0);
     {
