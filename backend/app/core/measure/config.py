@@ -39,7 +39,7 @@ REJECT_FLAGS: tuple[str, ...] = (
     "OUTLIER",
 )
 
-# Saturation (Q-26): a core pixel has OVERFLOW, or a core pixel is not finite while OVERFLOW or
+# Saturation (D-31): a core pixel has OVERFLOW, or a core pixel is not finite while OVERFLOW or
 # SUR_ERROR is set somewhere in the aperture (the pipeline writes NaN into some saturated cores).
 SATURATION_FLAGS: tuple[str, ...] = ("OVERFLOW",)
 SATURATION_CONTEXT_FLAGS: tuple[str, ...] = ("OVERFLOW", "SUR_ERROR")
