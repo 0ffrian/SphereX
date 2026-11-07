@@ -94,6 +94,17 @@ describe('ViewerPanel', () => {
     fake.timeLapses.mockReturnValue([]);
   });
 
+  it('says what the tier of a time-lapse means in plain words', async () => {
+    fake.timeLapses.mockReturnValue([{ id: 'wind', label: 'Winds', speedup: 10000, tier: 3 }]);
+    const { card, params } = fixture('asteroid_procedural');
+    useAppStore.getState().setObject(card, params);
+    await mount();
+    expect(text('time-lapse-note')).toBe(
+      'Winds sped up ×10000 (tier 3 of 5, worked out with a typical value).',
+    );
+    fake.timeLapses.mockReturnValue([]);
+  });
+
   it('shows the placeholder when no object is loaded', async () => {
     await mount();
     expect(container.textContent).toContain('Viewer placeholder: no object loaded');
