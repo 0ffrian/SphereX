@@ -8,7 +8,8 @@
     {
       "id": "mesh",
       "tag": "measured",
-      "description": "Shape model scaled to the measured diameter (R7.1).",
+      "tier": 1,
+      "description": "Shape model scaled to the diameter on the card (R7.1).",
       "requires": [
         "shape_source",
         "diameter_km"
@@ -17,6 +18,7 @@
     {
       "id": "spin",
       "tag": "measured",
+      "tier": 1,
       "description": "Rotation sped up, with the factor shown on screen (R7.1).",
       "requires": [
         "rot_period_h"
@@ -25,11 +27,13 @@
     {
       "id": "material",
       "tag": "derived",
+      "tier": 2,
       "description": "Colour = base_rgb * brightness; display L = clamp(0.12 + 1.6 * albedo, 0.12, 0.8) (R6.2).",
       "requires": [
         "gaia_rgb",
         "albedo"
-      ]
+      ],
+      "formula": "L = clamp(0.12 + 1.6 * albedo, 0.12, 0.8)"
     }
   ],
   "lighting": {
@@ -83,6 +87,17 @@
     "data": "none",
     "data_tag": "artistic",
     "params": {}
+  },
+  "dynamics": {
+    "spin_period_h": {
+      "value": 5.0,
+      "tag": "measured",
+      "tier": 1,
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "speedup": {
+      "spin": 1000
+    }
   },
   "alt_text": "Synthetic fixture. Asteroid, 10 km across (measured), colour from gaia_rgb, viewed at 30 degrees. Surface relief: measured.",
   "missing": []

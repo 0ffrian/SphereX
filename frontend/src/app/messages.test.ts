@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  describeRefusal,
   describeRefusalGroup,
+  layerName,
   pluralFrames,
   refusalShortLabel,
   spectrumAnnouncement,
@@ -294,5 +296,20 @@ describe('spectrum coverage and announcement', () => {
   it('full: the announcement is unchanged', () => {
     const o = summarizeSpectrum([pt(1, true), pt(2)], []);
     expect(spectrumAnnouncement(o, 'X')).toBe('Spectrum loaded: 2 points, 1 flagged.');
+  });
+});
+
+describe('motion refusals (R3.4 dynamics)', () => {
+  it('names a refused rate in plain words, without the key', () => {
+    const line = describeRefusal({ id: 'dynamics:spin_period_h', reason: 'backend' });
+    expect(line).toBe('Spin (motion): not animated. No measured or typical value is known for it.');
+    expect(line).not.toContain('dynamics:');
+    expect(layerName('dynamics:flare_rate_per_d')).toBe('Flares (motion)');
+  });
+
+  it('keeps the layer wording for other backend refusals', () => {
+    expect(describeRefusal({ id: 'mesh', reason: 'backend' })).toBe(
+      'Shape model: not drawn. The data pipeline left it out.',
+    );
   });
 });

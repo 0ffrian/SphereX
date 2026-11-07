@@ -45,10 +45,25 @@ def test_fixture_card_matches_the_fixture_params(kind: str) -> None:
     """The hand-written fixtures encode the R7 rules; the code must give the same plan."""
     ref = load(kind, "params")
     p = params_for(load(kind, "cards"))
-    assert [(x["id"], x["tag"], x["requires"]) for x in p["layers"]] == [
-        (x["id"], x["tag"], x["requires"]) for x in ref["layers"]
-    ]
-    assert p["missing"] == ref["missing"]
+
+    def plan(layers: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
+        return [
+            (
+                x["id"],
+                x["tag"],
+                x["tier"],
+                x["requires"],
+                x["description"],
+                x.get("formula"),
+                x.get("assumed"),
+            )
+            for x in layers
+        ]
+
+    # D-32: tier, formula text and assumed inputs too, so the fixture text cannot drift.
+    assert plan(p["layers"]) == plan(ref["layers"])
+    # Stage 6 (dynamics, a later ticket) is not built, so its refusals are not in the live output.
+    assert p["missing"] == [m for m in ref["missing"] if not m.startswith("dynamics:")]
     assert p["haptics"] == ref["haptics"]
     if "sun_vector" in load(kind, "cards"):
         assert p["lighting"] == ref["lighting"]
@@ -64,6 +79,7 @@ def test_fixture_card_matches_the_fixture_params(kind: str) -> None:
         assert got["available"] == ref_mode["available"]
         assert got["source"] == ref_mode["source"]
         assert (got["rgb"] or {}).get("tag") == (ref_mode["rgb"] or {}).get("tag")
+        assert (got["rgb"] or {}).get("formula") == (ref_mode["rgb"] or {}).get("formula")
         assert got.get("channels_um") == ref_mode.get("channels_um")
     if ref["scale_m"] is None:
         assert p["scale_m"] is None
@@ -218,3 +234,52 @@ def test_spherex_rgb_window_rule() -> None:
     assert spherex_rgb(pts[:-1], CHANNELS_SMALL_BODY) is None
     assert spherex_rgb([*pts[:-1], pt(1.01, 1.0, True)], CHANNELS_SMALL_BODY) is None
     assert window_median([pt(4.5, 1.0), pt(4.56, 9.0)], 4.5) is None
+
+
+@pytest.mark.parametrize("value", [None, "", "   "])
+def test_model_dependent_input_without_a_value_states_its_assumption(value: Any) -> None:
+    """D-32: `assumed` names what was assumed; a null or blank input falls back to its R3.1
+    assumption."""
+    from app.core.render.card_to_params import _Plan
+
+    card = {
+        "albedo": {
+            "value": value,
+            "tag": "model_dependent",
+            "source": "test",
+            "assumption": "typical S-type albedo",
+        }
+    }
+    plan = _Plan()
+    plan.layer(True, "material", "model_dependent", "d", ["albedo"], card=card, formula="f")
+    assert plan.layers[0]["assumed"] == {"albedo": "typical S-type albedo"}
+    assert plan.layers[0]["tier"] == 3
+
+
+def test_model_dependent_layer_with_nothing_assumed_is_a_bug_not_a_guess() -> None:
+    """Measured inputs are never relabelled as assumed (D-32)."""
+    from app.core.render.card_to_params import _Plan
+
+    card = {"diameter_km": {"value": 10.0, "tag": "measured", "source": "test"}}
+    with pytest.raises(ValueError, match="assumed"):
+        _Plan().layer(True, "x", "model_dependent", "d", ["diameter_km"], card=card, formula="f")
+    with pytest.raises(ValueError, match="formula"):
+        _Plan().layer(True, "x", "derived", "d", ["diameter_km"], card=card)
+
+
+def test_model_dependent_members_of_a_group_are_stated() -> None:
+    """D-32: a model_dependent member of a group such as gas_Q is named in `assumed`."""
+    card = load("comet", "cards")
+    card["gas_Q"]["h2o"] = {
+        "value": 1.0e26,
+        "tag": "model_dependent",
+        "source": "synthetic fixture: test",
+        "formula": "test",
+        "assumption": "typical H2O/CO2 ratio",
+    }
+    p = params_for(card)
+    assert errors(p, "render-params.schema.json") == []
+    shells = next(x for x in p["layers"] if x["id"] == "gas_shells")
+    assert shells["assumed"]["gas_Q.h2o"] == 1.0e26
+    assert "gas_Q.co2" not in shells["assumed"]  # measured members are not assumed
+    assert list(shells["assumed"]) == ["density_exponent", "gas_Q.h2o"]  # rule inputs first

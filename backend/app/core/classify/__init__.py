@@ -2,16 +2,20 @@
 
 from app.core.classify.rules import (
     EXOPLANET_THRESHOLDS,
+    PROPOSED_EXOPLANET_THRESHOLDS,
     CatalogueFacts,
     Classification,
     classify,
     classify_exoplanet,
+    is_calculated,
 )
 
 __all__ = [
     "EXOPLANET_THRESHOLDS",
+    "PROPOSED_EXOPLANET_THRESHOLDS",
     "CatalogueFacts",
     "Classification",
     "classify",
     "classify_exoplanet",
+    "is_calculated",
 ]
