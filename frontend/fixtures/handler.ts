@@ -1,4 +1,5 @@
-// DEV/TEST FIXTURES ONLY. Answers the M1 endpoints (D-16) from the synthetic generators, with the
+// DEV/TEST FIXTURES ONLY. Answers the M1 endpoints (D-16), plus the prototype sky index and its
+// synthetic all-sky image (sky.ts), from the synthetic generators, with the
 // same shapes and error bodies as the real backend. Every reply carries `X-SX-Fixture: synthetic`
 // so the UI labels the data as fixture data. Served by vitePlugin.ts under `vite --mode fixtures`.
 import type { ApiErrorBody, ResolveResponse } from '../src/app/api/types';
@@ -9,6 +10,7 @@ import {
   makeSpectrum,
   renderCutout,
 } from './synthetic';
+import { FIXTURE_SKY_WIDTHS, fixtureSkyPath, makeSkyIndex, renderFixtureSky } from './sky';
 import { findTargetByCoords, findTargetById, findTargetByName } from './targets';
 
 export interface FixtureResponse {
@@ -85,6 +87,16 @@ export function handleFixtureRequest(method: string, url: string): FixtureRespon
   if (method !== 'GET' && method !== 'HEAD') return error(405, 'method_not_allowed', 'Only GET.');
 
   if (u.pathname === '/v1/resolve') return resolve(u.searchParams.get('q'));
+  if (u.pathname === '/v1/sky/index.json') return json(200, makeSkyIndex());
+  for (const w of FIXTURE_SKY_WIDTHS) {
+    if (u.pathname === fixtureSkyPath(w)) {
+      return {
+        status: 200,
+        headers: { ...BASE_HEADERS, 'content-type': 'image/png' },
+        body: renderFixtureSky(w),
+      };
+    }
+  }
 
   const m = OBJECT_PATH.exec(u.pathname);
   if (!m) return error(404, 'not_found', 'No such endpoint.');

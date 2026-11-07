@@ -1,6 +1,6 @@
 # Data sources
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A3–A3.10 · **Implements:** D-07, D-19, D-25, D-31
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A3–A3.11 · **Implements:** D-07, D-19, D-25, D-31, D-32
 
 ## A3 Data sources
 
@@ -103,3 +103,16 @@ These sources come from the rendering doc. Neither has been called yet.
 |---|---|---|
 | SIMBAD | **Tested** 5 Nov 2026 through TAP (`ident.id = '<name>'`, JSON). The CDS host did not answer from the dev machine; the `simbad.harvard.edu` mirror did, so the backend tries both. `WISE 0855` is not a SIMBAD identifier (use `WISE J085510.83-071442.5`). Positions are ICRS epoch J2000; high proper-motion targets move tens of SPHEREx pixels by 2026. | Name resolution and object type, which sets stars and brown dwarfs (rendering doc §3.3). Resolver order with SBDB: D-19 ([section 4.1](pipeline.md#a41-stage-1-find-the-object)). |
 | NASA mission shape models | **Not confirmed** | Real meshes (GLB) for `asteroid_shape`, such as Bennu, Eros and Vesta. Decimate offline to the mesh budget ([section 10.1](frontend-platform.md#a101-performance-budget-d-05)). |
+
+### A3.11 Sky background (IRSA HiPS)
+
+Added by the sky-view prototype (branch `feat/sky-view-prototype`, 7 Nov 2026). Not SPHEREx data: an all-sky picture behind the search, for context (Q-88).
+
+| Item | Detail |
+|---|---|
+| Status | **Tested** 7 Nov 2026 (mirror and bake run on the dev PC). The survey, its tag and the A15 depth are open (Q-88). |
+| Surveys | IRSA's 2MASS colour HiPS (`2mass_color`: R = Ks 2.16 µm, G = H 1.66 µm, B = J 1.23 µm, sqrt-stretched by CDS), used by the prototype; AllWISE colour (`allwise_color`: W4/W2/W1) registered as an alternative. Base URLs and credit lines are in `backend/app/core/sky/surveys.py`. |
+| Local copy | `scripts.sky_mirror` copies the tiles to `{SX_CACHE_DIR}/sky/<survey>/hips/` in IRSA's layout, lowest orders first, at most 4 requests at a time; `scripts.sky_bake` bakes equirectangular JPEGs next to them (4096×2048 and 8192×4096). Orders 0–4 on a dev machine: about 357 MB (D-32). See [backend/README.md](../../backend/README.md#sky-background-prototype). |
+| Never at request time | The copy is separate from the D-25 read-through cache. `/v1/sky/…` serves only files already on disk and never fetches upstream; `scripts.sky_mirror` refuses to run under `SX_OFFLINE=1` (Q-87). |
+| Licence | Both `properties` files say `hips_status = public mirror unclonable`. A local, non-redistributed copy is accepted for this project, with the survey credit always shown next to the sky and `--allow-unclonable` required to mirror (D-32). The exact credit line each provider asks for is **[verify]** (`surveys.py`). |
+| Budget | Under 1 GB on dev machines, up to 50 GB on the A15 (D-32). A15 depth: Q-88. |

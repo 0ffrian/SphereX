@@ -3,7 +3,18 @@
 // compile and draw something, not that they look right on a real GPU (that stays a manual check).
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+/** The 3D viewer opens from the shell's tool rail; the sky view is the main pane. */
+async function openViewer(page: Page) {
+  await page.goto('/');
+  await page
+    .getByRole('navigation', { name: 'Tools' })
+    .getByRole('button', { name: '3D viewer' })
+    .click();
+  // Off the rail, so its hover tooltip is not over the canvas in the reference screenshots.
+  await page.mouse.move(0, 0);
+}
 
 // Honesty: the D-21 default (+ Estimated) hides artistic layers, so the render tests ask for
 // "+ Artistic". They draw through the panel's own path (planRender -> showPlan, window.__sxShow).
@@ -59,13 +70,13 @@ for (const view of VIEWS) {
     });
     page.on('pageerror', (e) => errors.push(e.message));
 
-    await page.goto('/');
+    await openViewer(page);
     const status = page.getByTestId('renderer-status');
     await expect(status).not.toHaveAttribute('data-status', 'starting', { timeout: 30_000 });
     test.skip((await status.getAttribute('data-status')) === 'unavailable', 'no 3D backend');
     await page.waitForFunction(() => '__sxViewer' in globalThis);
 
-    const canvas = page.locator('canvas[aria-label]');
+    const canvas = page.getByTestId('viewer-card').locator('canvas[aria-label]');
     const before = await canvas.screenshot();
     const result = await page.evaluate(
       async ({ card, params, lightDir, overrides, rotateLeft, rotateUp }) => {
@@ -145,7 +156,7 @@ test('honesty default: at + Estimated the artistic surface is hidden, a toggle s
   page,
 }) => {
   test.setTimeout(120_000);
-  await page.goto('/');
+  await openViewer(page);
   const status = page.getByTestId('renderer-status');
   await expect(status).not.toHaveAttribute('data-status', 'starting', { timeout: 30_000 });
   test.skip((await status.getAttribute('data-status')) === 'unavailable', 'no 3D backend');

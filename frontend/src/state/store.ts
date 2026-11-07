@@ -39,8 +39,12 @@ export interface SkyQuery {
   /** Sent to `GET /v1/resolve?q=` as is: a name, or "ra,dec" in degrees. */
   q: string;
   kind: 'name' | 'coords';
-  /** 'hash' when the search came from a shared link; the URL is then replaced, not pushed. */
-  origin: 'input' | 'hash';
+  /**
+   * 'hash' when the search came from a shared link; the URL is then replaced, not pushed.
+   * 'sky' when the user picked a position or a marker on the sky view; the search field then
+   * shows the query, as for a link.
+   */
+  origin: 'input' | 'hash' | 'sky';
   /** Frame to show once frames load (from a shared link). */
   frameId?: string;
 }
@@ -109,6 +113,11 @@ let spectrumAbort: AbortController | null = null;
 /** Swap the API client (tests, or a different base URL). */
 export function setSkyApi(client: ApiClient): void {
   skyApi = client;
+}
+
+/** The API client the flipbook uses; the sky view loads its index and markers through it too. */
+export function getSkyApi(): ApiClient {
+  return skyApi;
 }
 
 function toSkyError(e: unknown): SkyError {
@@ -184,6 +193,8 @@ export interface AppActions {
   skyReset(): void;
   /** Show and announce the unusable parts of a shared link. */
   skySetLinkProblems(problems: string[]): void;
+  /** A reply outside a search (the sky index, a marker) came from the fixture server (A11). */
+  skyMarkFixtureSeen(): void;
 }
 
 export type AppStore = AppData & AppActions;
@@ -381,6 +392,10 @@ export const useAppStore = create<AppStore>()((set, get) => {
           },
         };
       });
+    },
+
+    skyMarkFixtureSeen: () => {
+      if (!get().sky.fixtureSeen) setSky({ fixtureSeen: true });
     },
 
     skySetLinkProblems: (problems) =>

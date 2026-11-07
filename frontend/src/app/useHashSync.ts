@@ -74,7 +74,8 @@ export function useHashSync(): void {
           return;
         }
         lastWritten.current = normal;
-        if (newObject && sky.query.origin === 'input') window.location.hash = next;
+        // A search the user started (typed, or picked on the sky) pushes a history entry.
+        if (newObject && sky.query.origin !== 'hash') window.location.hash = next;
         else window.history.replaceState(window.history.state, '', next);
       }),
     [],

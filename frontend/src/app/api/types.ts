@@ -1,6 +1,7 @@
 // TEMPORARY (D-18): hand-written copies of the M1 API response shapes (D-16, A4.1, A4.2 and the
 // M1 brief's pixel convention). Replace with the types generated from shared/schemas/ once they
 // exist. Optional fields are extras that the backend may send; unknown fields are ignored.
+import type { Tag } from '../../contract/tags';
 
 /** `GET /v1/resolve?q=<name | "ra,dec" in degrees>` */
 export interface ResolveResponse {
@@ -94,4 +95,43 @@ export interface SpectrumResponse {
 export interface ApiErrorBody {
   error: string;
   detail: string;
+}
+
+// ---- Sky background (feasibility prototype; not in D-16) ----------------------------------------
+// ASSUMPTION: shapes from the sky prototype brief (GET /v1/sky/index.json), built in parallel by the
+// backend. Not in D-16 or shared/schemas yet; see the report and the proposed Q- entry.
+
+/** One equirectangular all-sky image: column x → RA = 360·(x+0.5)/W, row y → Dec = 90 − 180·(y+0.5)/H. */
+export interface SkyEquirect {
+  url: string;
+  width: number;
+  height: number;
+}
+
+/** HiPS tiles of the same survey (tile LOD on zoom is not built yet). */
+export interface SkyHips {
+  url: string;
+  max_order_local: number;
+  tile_width: number;
+  format: string;
+}
+
+export interface SkySurvey {
+  id: string;
+  title: string;
+  credit: string;
+  /** Provenance of the picture (D-02): a colour composite is `derived`, with its `formula`. */
+  tag: Tag;
+  formula: string | null;
+  assumption: string | null;
+  /** Only `icrs` is drawn. */
+  frame: string;
+  convention: string | null;
+  equirect: SkyEquirect[];
+  hips: SkyHips | null;
+}
+
+/** `GET /v1/sky/index.json`. An empty list means no sky image is installed. */
+export interface SkyIndexResponse {
+  surveys: SkySurvey[];
 }
