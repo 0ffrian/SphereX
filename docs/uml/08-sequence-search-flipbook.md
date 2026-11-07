@@ -1,6 +1,6 @@
 # 08 Sequence: search and flipbook
 
-A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache), D-28 (Rainbow Trails) and D-32 (sky tiles). The sky-view prototype paths (sky pick, shared flipbook session, transport bar) follow Q-87 to Q-91; its cached markers, progressive frames and colour views follow Q-92, Q-93 and Q-95 to Q-99. How the backend builds the composite: [20](20-sequence-composite.md).
+A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache), D-28 (Rainbow Trails) and D-32 (sky tiles), and A4.9 (overlays, flag mask, combine). The sky-view prototype paths (sky pick, shared flipbook session, transport bar) follow Q-87 to Q-91; its cached markers, progressive frames and colour views follow Q-92, Q-93 and Q-95 to Q-99; overlays on the frame grid follow Q-102. How the backend builds the composite: [20](20-sequence-composite.md).
 
 ```mermaid
 sequenceDiagram
@@ -16,6 +16,7 @@ sequenceDiagram
   participant R as Name resolver (SBDB, SIMBAD)
   participant SIA as IRSA SIA (spherex_qr2)
   participant HZ as Horizons + SkyBoT
+  participant TAP as Gaia + CatWISE TAP (IRSA, ESA)
   participant FX as Fixture server (dev only)
 
   opt dev only: npm run dev:fixtures
@@ -131,8 +132,38 @@ sequenceDiagram
     TB->>UI: Current frame
     UI->>UI: Replace the hash in place with frame=… (no new history entry)
   end
-  opt P1 overlays
-    U->>FB: Toggle Gaia / WISE markers
+  opt P1 overlays (issue #12, A4.9, Q-50)
+    U->>UI: Switch on a layer: Gaia stars, WISE sources, Flagged pixels or Field of view
+    opt frame list still loading (cutouts:deferred, Q-102)
+      UI->>UI: Overlays wait, and are asked for once when the list is complete
+    end
+    alt first switch-on, after an error, or a catalogue was pending
+      UI->>API: GET /v1/objects/{id}/overlays (lazy). The previous reply stays drawn meanwhile, and if the reload fails
+      API->>C: Gaia cone (G #lt; 20) and CatWISE2020 cone, in parallel
+      alt cache miss and no live failure in the last catalog_failure_ttl_s
+        API->>TAP: Gaia: IRSA gaia_dr3_source, then ESA gaiadr3.gaia_source. CatWISE: IRSA catwise_2020
+        TAP-->>API: CSV, parsed row by row before it is cached
+      end
+      alt both cones answered within overlay_wait_s = 75 s
+        API-->>UI: catalogs, per-frame markers, contamination, footprint, cutout box, flag groups, missing, provenance
+      else a cone is still running
+        API-->>UI: The reply without it, missing has overlay:{cat}:pending. The fetch keeps filling the cache
+        UI->>UI: The toggle stays enabled, with a "Try again" button
+        U->>UI: Try again (or switch the layer off and on)
+        UI->>API: GET /v1/objects/{id}/overlays again
+      end
+    end
+    UI->>FB: Markers in cutout pixels, contamination note, field-of-view map
+    FB->>FB: Place markers and mask with the shown frame's grid offset (frameGrid.ts, Q-102), not on the composite
+    opt Flagged pixels
+      FB->>API: GET /v1/objects/{id}/flags/{frame_id}.png
+      API-->>FB: RGBA mask from FLAGS, or 404 flags_unavailable
+    end
+  end
+  opt P1 combine frames (issue #12, Q-54)
+    U->>UI: Choose frame A, frame B and add or subtract
+    UI->>API: GET /v1/objects/{id}/combine.png?op=add|sub&a=…&b=…
+    API-->>UI: PNG on A's grid, X-SX-Combine header (both wavelengths, unit, stretch, tag derived, formula)
   end
   opt P1 Rainbow Trails view mode (D-28)
     U->>FB: Switch to Rainbow Trails
@@ -178,4 +209,6 @@ sequenceDiagram
 - `moving` means a solar-system body (Q-22). High proper-motion stars are not `moving`; their positions come from the SIMBAD proper motion, propagated to each frame time. The ephemeris-driven frame search for moving objects is not built in M1 (Q-21).
 - The SIA search and every cutout go through the cache. A cut-off SIA answer (`QUERY_STATUS=OVERFLOW`) adds `frames:truncated` to `missing`.
 - Progressive frames (sky-view prototype, 7 Nov 2026, Q-97; live budget Q-99): a live backend downloads at most `SX_LIVE_CUTOUTS_PER_REQUEST` cutouts per request, one after another (about 20 s each from IRSA), and lists the rest as `cutouts:deferred:<n>`. The flipbook shows the frames it has and asks again until none is deferred. Progress numbers: ready = frames listed; found = ready + `cutouts:deferred` + per-frame refusals. The spectrum and composite wait for the complete list, because each of those requests runs Stage 1 again (and its own live budget) and would measure a partial list; after Stop they can be made from what is there, with the deferred count in their `missing`. The bounded parallel download and a two-stage answer on the server are issue #41.
+- Overlays (A4.9) load lazily on the first switch-on of any layer, not on every search, and never block the flipbook. A catalogue still being fetched after `overlay_wait_s` (75 s, below the frontend's 90 s timeout) is reported as `overlay:<cat>:pending`; its toggle stays enabled and "Try again" reloads the overlays, by which time the cone is usually cached. A cone that failed live is not retried for `catalog_failure_ttl_s`. Moving objects get `overlay:gaia` and `overlay:wise` (Q-21). The endpoints are not yet in D-16 (Q-50).
+- Overlays on the fixed frame grid (Q-102): a layer switched on while the frame list is still loading progressively waits ("Overlays load once all the frames are in") and the overlays are asked for once, when the list is complete; a reply made from a partial list (after Stop) is asked for again then. Markers (cutout pixels) and the flag mask get the shown frame's whole-pixel placement (`frameGrid.ts` `markersOnGrid`), so they stay on their sources and change with the picture, never with the requested frame; markers off the frame's own pixels (hatched no-data) are not drawn. They are not drawn on the colour composite, which has its own north-up grid; a note says so.
 - The flipbook shows the frames reply's `missing` grouped by reason, one plain line with a count each and the frame IDs behind a disclosure; unknown codes are shown as is (A11, issue #24).

@@ -22,7 +22,7 @@ export const FIXTURE_FLUX_UNIT = 'synthetic units (fixture)';
 export const CUTOUT_SIZE = 64;
 
 /** SPHEREx pixel scale, 6.15″ (A3.1). Used only to turn synthetic pixel offsets into degrees. */
-const PIXEL_SCALE_DEG = 6.15 / 3600;
+export const PIXEL_SCALE_DEG = 6.15 / 3600;
 /** Synthetic window of 0.8 days (the A3.1 revisit span), starting at a made-up date. */
 const T0_MS = Date.UTC(2025, 4, 3, 0, 0, 0);
 const WINDOW_MS = 0.8 * 86_400_000;
@@ -71,7 +71,7 @@ export function cutoutSize(t: FixtureTarget, i: number): { w: number; h: number;
   return { w, h, clipTop: 0 };
 }
 
-interface Geometry {
+export interface Geometry {
   w: number;
   h: number;
   /** Centre of the unclipped cutout in this PNG's pixels (the object is near it). */
@@ -84,7 +84,7 @@ interface Geometry {
   dec?: number;
 }
 
-function geometry(t: FixtureTarget, i: number): Geometry {
+export function geometry(t: FixtureTarget, i: number): Geometry {
   const rng = mulberry32(t.seed * 1000 + i);
   const c = (CUTOUT_SIZE - 1) / 2;
   const { w, h, clipTop } = cutoutSize(t, i);
@@ -266,10 +266,53 @@ function stampGaussian(
   }
 }
 
-/** Synthetic star field with the target at the frame's (x, y). */
-export function renderCutout(t: FixtureTarget, i: number): Uint8Array {
+/** A synthetic star fixed on the (synthetic) sky: its offset from the target in north-up pixels. */
+export interface FixtureStar {
+  /** Offset in pixels on a north-up, east-left grid (x right = west, y down = south). */
+  dx: number;
+  dy: number;
+  amp: number;
+}
+
+/** The 25 background stars of a target, fixed on the sky. */
+export function backgroundStars(t: FixtureTarget): FixtureStar[] {
+  const stars = mulberry32(t.seed + 2);
+  return Array.from({ length: 25 }, () => {
+    const dx = (stars() - 0.5) * 80;
+    const dy = (stars() - 0.5) * 80;
+    return { dx, dy, amp: 30 + stars() * 170 };
+  });
+}
+
+/**
+ * Two synthetic neighbours close to the target, so the overlay fixtures have contamination: one
+ * inside a 3 px aperture and one in a 6–10 px annulus (the fixture's own synthetic aperture).
+ */
+export const FIXTURE_NEIGHBOURS: readonly FixtureStar[] = [
+  { dx: 1.8, dy: 0.4, amp: 60 },
+  { dx: -5.5, dy: 4.5, amp: 90 },
+];
+
+/**
+ * Pixel position of a sky offset in frame `g` (rotated with the frame when not north-up), about
+ * the unclipped cutout's centre (g.cx, g.cy), so a star stays on the sky when an edge clips the
+ * cutout or it is a pixel narrower.
+ */
+export function starPixel(g: Geometry, star: { dx: number; dy: number }): { x: number; y: number } {
+  const angle = ((g.northAngle ?? 0) * Math.PI) / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return { x: g.cx + star.dx * cos - star.dy * sin, y: g.cy + star.dx * sin + star.dy * cos };
+}
+
+/**
+ * Grey pixels of frame `i`, row-major, with the target at the frame's (x, y). `gridOf` draws the
+ * star field in another frame's orientation and size (the combine fixture's "B on A's grid").
+ */
+export function cutoutPixels(t: FixtureTarget, i: number, gridOf: number = i): Uint8Array {
   const g = geometry(t, i);
-  const { w, h } = g;
+  const grid = geometry(t, gridOf);
+  const { w, h } = grid;
   const acc = new Float32Array(w * h);
 
   const noise = mulberry32(t.seed * 1000 + i + 500_000);
@@ -279,23 +322,27 @@ export function renderCutout(t: FixtureTarget, i: number): Uint8Array {
     stampGaussian(acc, w, h, sx, sy, amp, sigma);
 
   // Background stars fixed on the (synthetic) sky; rotated with the frame when not north-up.
-  const stars = mulberry32(t.seed + 2);
-  const angle = ((g.northAngle ?? 0) * Math.PI) / 180;
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  for (let s = 0; s < 25; s++) {
-    const dx = (stars() - 0.5) * 80;
-    const dy = (stars() - 0.5) * 80;
-    const amp = 30 + stars() * 170;
-    const sx = g.cx + dx * cos - dy * sin;
-    const sy = g.cy + dx * sin + dy * cos;
-    stamp(sx, sy, amp, 1.2);
+  for (const star of backgroundStars(t)) {
+    const p = starPixel(grid, star);
+    stamp(p.x, p.y, star.amp, 1.2);
   }
-  if (!t.refuseFrames) stamp(g.x, g.y, 220, 1.3);
+  if (!t.refuseFrames) {
+    for (const star of FIXTURE_NEIGHBOURS) {
+      const p = starPixel(grid, star);
+      stamp(p.x, p.y, star.amp, 1.2);
+    }
+    stamp(g.x, g.y, 220, 1.3);
+  }
 
   const px = new Uint8Array(w * h);
   for (let k = 0; k < px.length; k++) px[k] = Math.max(0, Math.min(255, Math.round(acc[k]!)));
-  return encodePngGray(w, h, px);
+  return px;
+}
+
+/** Synthetic star field with the target at the frame's (x, y), at the frame's own size. */
+export function renderCutout(t: FixtureTarget, i: number): Uint8Array {
+  const { w, h } = cutoutSize(t, i);
+  return encodePngGray(w, h, cutoutPixels(t, i));
 }
 
 // ---- Colour composite (SYNTHETIC) ---------------------------------------------------------------
