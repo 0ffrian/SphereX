@@ -98,7 +98,8 @@ const TABLE: Record<ObjectType, Expect> = {
   gas_giant: { texture: 'flow', data: 'teq_pulse', dataTag: 'measured', missing: [] },
   planet_water: { texture: 'terrain', data: 'teq_pulse', dataTag: 'derived', missing: [] },
   planet_rocky: { texture: 'terrain', data: null, missing: [] },
-  nebula: { texture: null, data: 'field', dataTag: 'artistic', missing: [] },
+  // User decision (Q-87): the nebula has no haptics.
+  nebula: { texture: null, data: null, missing: [] },
   nova: { texture: null, data: 'field', dataTag: 'artistic', missing: [] },
 };
 
@@ -263,8 +264,8 @@ describe('buildHaptics refusals (refuse rather than invent)', () => {
     expect(shaderProbeOptions(body, ringed).rings).toBe(true);
   });
 
-  it('nebula without point sets refuses the field', () => {
-    const { card, params } = fixture('nebula');
+  it('nova without point sets refuses the field', () => {
+    const { card, params } = fixture('nova');
     expect(
       buildHaptics(new RecordingSink(), params, card, null, { overrides: {} }).missing,
     ).toEqual([MISSING.field]);
@@ -404,9 +405,16 @@ describe('R11 honesty: haptics follow the D-21 filter (through the real engine)'
     expect(new Set(p.tags)).toEqual(new Set(['measured']));
   });
 
-  it('nebula and nova fields are artistic: silent below + Artistic', () => {
-    expect(feel('nebula', 'derived').tags).toEqual([]);
-    expect(feel('nebula', 'artistic').windows).toBeGreaterThan(0);
+  it('the nova field is artistic: silent below + Artistic', () => {
+    expect(feel('nova', 'derived').tags).toEqual([]);
+    expect(feel('nova', 'artistic').windows).toBeGreaterThan(0);
+  });
+
+  it('the nebula has no haptics at all, even in + Artistic (Q-87)', () => {
+    const b = build('nebula');
+    expect(b.texture).toBeNull();
+    expect(b.data).toBeNull();
+    expect(feel('nebula', 'artistic').windows).toBe(0);
   });
 });
 
@@ -436,7 +444,7 @@ describe('R8.2 channel labels: texture events say texture, data events say data 
     'planet_rocky',
     'asteroid_procedural',
     'comet',
-    'nebula',
+    'nova',
     'brown_dwarf_binary',
     'star_mira',
     'star_ttauri',

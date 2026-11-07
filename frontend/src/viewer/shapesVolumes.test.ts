@@ -125,6 +125,27 @@ describe('asteroid without a model: ellipsoid and displacement (R7.2)', () => {
     expect(plan.bodies[0]?.heightUrl).toBe(params.textures?.height);
     expect(plan.bodies[0]?.displacementScale).toBe(0.03);
     expect(missing(plan, 'displacement')).toBeUndefined();
+    // It has a legend entry and a tag of its own.
+    expect(drawnTag(plan, 'displacement')).toBe('derived');
+  });
+
+  it('refuses displacement when its load failed, and draws none in Measured only', () => {
+    const { card, params } = fixture('asteroid_procedural');
+    (params.textures as unknown as { relief_amp: number }).relief_amp = 0.03;
+    const failed = planRender(
+      card,
+      params,
+      defaultContext({ honesty: 'artistic', failed: ['displacement'] }),
+    );
+    expect(missing(failed, 'displacement')).toMatchObject({ reason: 'load' });
+    expect(failed.drawn.some((d) => d.id === 'displacement')).toBe(false);
+    expect(failed.bodies[0]?.heightUrl).toBeNull();
+    expect(failed.bodies[0]?.displacementScale).toBeNull();
+
+    const measured = planRender(card, params, defaultContext({ honesty: 'measured' }));
+    // The relief is already hidden there, so there is nothing to displace.
+    expect(measured.drawn.some((d) => d.id === 'displacement')).toBe(false);
+    expect(measured.bodies[0]?.heightUrl ?? null).toBeNull();
   });
 
   it('is on for desktop levels only, and never for a bad scale', () => {
@@ -160,6 +181,21 @@ function cometDecember(extra: Layer[] = []): {
 }
 
 describe('comet volumes and tails (R7.3)', () => {
+  it('the dust cone takes the tag of the backend dust layer', () => {
+    for (const tag of ['derived', 'model_dependent'] as const) {
+      const { card, params } = fixture('comet');
+      card.epochs = ['2025-12'];
+      params.layers.push(tailLayer('dust', tag));
+      const plan = planRender(
+        card,
+        params,
+        defaultContext({ honesty: 'artistic', epoch: '2025-12' }),
+      );
+      expect(plan.volumes.find((v) => v.kind === 'dust')?.tag).toBe(tag);
+      expect(drawnTag(plan, 'dust')).toBe(tag);
+    }
+  });
+
   it('draws the coma and the dust as volumes, from the same data as the haptic shells', () => {
     const { plan } = cometDecember();
     const kinds = plan.volumes.map((v) => v.kind);
@@ -230,7 +266,10 @@ describe('volume specs', () => {
       remnantVolume({ seed: 1, ageYr: null, axisRatio: null }),
       ionTailVolume([0, 0, 1], 1)!,
       dustTailVolume([0, 0, 1], 1)!,
-      dustConeVolume({ id: 'dust', direction: [0, 0, 1], count: 1, seed: 1, tint: [1, 1, 1] }),
+      dustConeVolume(
+        { id: 'dust', direction: [0, 0, 1], count: 1, seed: 1, tint: [1, 1, 1] },
+        'artistic',
+      ),
     ];
     for (const s of specs) {
       expect(TAGS).toContain(s.tag);

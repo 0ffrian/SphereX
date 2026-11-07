@@ -247,10 +247,14 @@ describe('ShaderBody field and point access for the haptic sources (review N1)',
     for (const k of KINDS) {
       const f = fixture(k);
       const body = await ShaderBody.create(f.card, f.params, ctx);
-      if (k === 'nebula' || k === 'nova') {
+      if (k === 'nebula') {
+        // Q-87: the nebula has no haptics, so it keeps no point sets.
+        expect(body.field).toBeNull();
+        expect(body.pointSets).toBeNull();
+      } else if (k === 'nova') {
         expect(body.field).toBeNull();
         expect(body.pointSets).not.toBeNull();
-        expect(body.pointSets!['glow'] ?? body.pointSets!['shell']).toBeDefined();
+        expect(body.pointSets!['shell']).toBeDefined();
       } else {
         expect(body.field).not.toBeNull();
         expect(body.pointSets).toBeNull();
@@ -278,8 +282,21 @@ describe('ShaderBody field and point access for the haptic sources (review N1)',
     expect(world.worldToBody([0.3, 0.4, 0.5])).toEqual([0.3, 0.4, 0.5]);
   });
 
-  it('generates nebula points through the point source (the worker path), not inline', async () => {
+  it('the nebula asks for no points (no haptics, Q-87)', async () => {
     const n = fixture('nebula');
+    const asked: string[] = [];
+    await ShaderBody.create(n.card, n.params, {
+      visibleTags: ALL_TAGS,
+      pointSource: async () => {
+        asked.push('called');
+        throw new Error('not expected');
+      },
+    });
+    expect(asked).toEqual([]);
+  });
+
+  it('generates nova points through the point source (the worker path), not inline', async () => {
+    const n = fixture('nova');
     const asked: string[] = [];
     const { generatePoints } = await import('./pointClouds');
     await ShaderBody.create(n.card, n.params, {
@@ -289,7 +306,7 @@ describe('ShaderBody field and point access for the haptic sources (review N1)',
         return generatePoints(type, seed);
       },
     });
-    expect(asked).toEqual([`nebula:${n.params.seed}`]);
+    expect(asked).toEqual([`nova:${n.params.seed}`]);
   });
 });
 

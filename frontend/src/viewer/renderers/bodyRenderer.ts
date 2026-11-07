@@ -76,7 +76,7 @@ export interface BodyRenderer {
    * `worldToBody` to convert a world-space point.
    */
   readonly field: FieldSampler | null;
-  /** Point sets in the body frame (nebula, nova), for the point-density haptic source. */
+  /** Point sets in the body frame (nova; nebula haptics were dropped, Q-87), for the point-density haptic source. */
   readonly pointSets: Readonly<Record<string, PointSet>> | null;
   /** World point -> body frame (accounts for the group scale and the gas-giant tilt). */
   worldToBody(p: Vec3): Vec3;

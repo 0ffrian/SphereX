@@ -1,4 +1,68 @@
 // R5.4 scale bar: the physical size plus one familiar comparison. Pure functions.
+import type { Tag } from '@/contract';
+import { isTagShown, type HonestyState } from './honesty';
+
+/** glTF units are metres (Q-61); an OBJ model has no stated unit, so its size is not trusted. */
+export function isGltfUrl(url: string | null | undefined): boolean {
+  return typeof url === 'string' && /\.(glb|gltf)(\?.*)?$/i.test(url);
+}
+
+/**
+ * Tag of a size read off the loaded shape model. ASSUMPTION (Q-87): a shape model is fitted to
+ * observations, so its size depends on that model (`model_dependent`); it is never the card's tag.
+ */
+export const MODEL_SIZE_TAG: Tag = 'model_dependent';
+export const MODEL_SIZE_WHY =
+  'The size of the loaded shape model, measured across its widest part (metres, Q-61). The model is fitted to observations, so the size depends on it.';
+
+export interface ShownSize {
+  radiusM: number | null;
+  tag: Tag | null;
+  why: string | null;
+  qualifier: 'upper_limit' | null;
+  /** True when the size comes from the loaded model, not from the card. */
+  fromModel: boolean;
+}
+
+/**
+ * Which size the scale bar shows, and the tag that goes with that size. The model's own size is
+ * used only for a glTF model (metres, Q-61) and only while its tag is shown; otherwise the card's
+ * size and the card's tag are used. The two are never mixed.
+ */
+export function shownSize(
+  plan: {
+    scaleM: number | null;
+    sizeTag: Tag | null;
+    sizeWhy: string | null;
+    sizeQualifier: 'upper_limit' | null;
+    bodies: readonly { meshUrl?: string | null }[];
+  },
+  modelRadiusM: number | null,
+  honesty: HonestyState,
+): ShownSize {
+  const usable =
+    modelRadiusM !== null &&
+    Number.isFinite(modelRadiusM) &&
+    modelRadiusM > 0 &&
+    plan.scaleM !== null && // the size is hidden by the honesty level: no bar from the model either
+    plan.bodies.some((b) => isGltfUrl(b.meshUrl)) &&
+    isTagShown(honesty, MODEL_SIZE_TAG);
+  if (usable)
+    return {
+      radiusM: modelRadiusM,
+      tag: MODEL_SIZE_TAG,
+      why: MODEL_SIZE_WHY,
+      qualifier: null,
+      fromModel: true,
+    };
+  return {
+    radiusM: plan.scaleM,
+    tag: plan.sizeTag,
+    why: plan.sizeWhy,
+    qualifier: plan.sizeQualifier,
+    fromModel: false,
+  };
+}
 
 export interface Comparison {
   id: string;

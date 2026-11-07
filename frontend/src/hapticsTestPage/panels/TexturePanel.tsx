@@ -64,22 +64,12 @@ function drawPad(ctx: CanvasRenderingContext2D, obj: SyntheticObject): void {
   }
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, W, H);
-  if (im.kind === 'coma') {
-    const [cx, cy] = faceToPx(0, 0);
-    const g = ctx.createRadialGradient(cx, cy, 1, cx, cy, H / (2 * FACE_HALF));
-    g.addColorStop(0, `rgba(120, 220, 255, ${0.4 + 0.6 * im.density})`);
-    g.addColorStop(1, 'rgba(120, 220, 255, 0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-    return;
-  }
-  ctx.fillStyle = 'rgba(200, 220, 255, 0.35)';
-  for (const s of im.sets) {
-    for (let i = 0; i < s.count; i++) {
-      const [x, y] = faceToPx(s.positions[3 * i]!, s.positions[3 * i + 1]!);
-      ctx.fillRect(x, y, 1, 1);
-    }
-  }
+  const [cx, cy] = faceToPx(0, 0);
+  const g = ctx.createRadialGradient(cx, cy, 1, cx, cy, H / (2 * FACE_HALF));
+  g.addColorStop(0, `rgba(120, 220, 255, ${0.4 + 0.6 * im.density})`);
+  g.addColorStop(1, 'rgba(120, 220, 255, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
 }
 
 /** Face-on pad: scene x, y in ±1.2 (y up) ↔ canvas px. The pad is 2:1, so x spans ±2.4. */

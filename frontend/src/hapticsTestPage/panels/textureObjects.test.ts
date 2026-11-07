@@ -12,7 +12,6 @@ const EXPECT: Record<BodyKind, [string | null, string | null, string[]]> = {
   rocky: ['terrain', 'teq_pulse', []],
   asteroid: ['height', null, ['crater_rims']],
   comet: [null, 'field', []],
-  nebula: [null, 'field', []],
 };
 
 function build(kind: BodyKind) {

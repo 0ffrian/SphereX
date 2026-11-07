@@ -124,8 +124,11 @@ export function comaVolume(
   };
 }
 
-/** The Sun-pointing December dust (R7.3): a pear-shaped cone along `dust.direction`. */
-export function dustConeVolume(dust: DustPlan): VolumePlan {
+/**
+ * The Sun-pointing December dust (R7.3): a pear-shaped cone along `dust.direction`. `tag` is the
+ * backend `dust` layer's own tag, not a default.
+ */
+export function dustConeVolume(dust: DustPlan, tag: Tag): VolumePlan {
   const length = 0.9;
   const [x, y, z] = dust.direction;
   const n = Math.hypot(x, y, z) || 1;
@@ -133,7 +136,7 @@ export function dustConeVolume(dust: DustPlan): VolumePlan {
   return {
     id: 'dust',
     kind: 'dust',
-    tag: 'artistic',
+    tag,
     halfExtent: [length / 2, 0.9, 0.9],
     center: [(axis[0] * length) / 2, (axis[1] * length) / 2, (axis[2] * length) / 2],
     axis,
