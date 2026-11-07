@@ -2,7 +2,7 @@
 
 Vite + TypeScript + React web app. three.js **r187** (`three/webgpu`).
 
-Status: the tooling, the data-contract types, typed placeholder modules for every R10 file and a viewer smoke scene (one plain sphere), set up on 4 Nov 2026. M1 (issue #3, 5 Nov 2026) adds the SPHEREx flipbook and spectrum view: search by name or RA/Dec, frame playback, the spectrum chart, Rainbow Trails and the shareable URL hash. Issue #7 (M2) adds the 3D viewer for the baked types: see "Viewer: baked types" below. Issues #9, #10 and #11 (M3) add the haptics and sound modules (`src/haptics`), built and tested against fixtures and the haptics test page; M5 wires them into the app.
+Status: the tooling, the data-contract types, typed placeholder modules for every R10 file and a viewer smoke scene (one plain sphere), set up on 4 Nov 2026. M1 (issue #3, 5 Nov 2026) adds the SPHEREx flipbook and spectrum view: search by name or RA/Dec, frame playback, the spectrum chart, Rainbow Trails and the shareable URL hash. Issue #7 (M2) adds the 3D viewer for the baked types: see "Viewer: baked types" below. Issues #9, #10 and #11 (M3) add the haptics and sound modules (`src/haptics`), built and tested against fixtures and the haptics test page; M5 wires them into the app. On 7 Nov 2026 a feasibility prototype (branch `feat/sky-view-prototype`, not yet confirmed by Moon, D-17) rebuilt the shell in the mock-up's layout with an all-sky image as the main view: see "Shell and sky view (prototype)" below.
 
 ## Run it
 
@@ -37,21 +37,21 @@ If Windows Firewall prompts for Node.js, allow it on private networks. Setting `
 
 ### Scripts
 
-| Script                    | Does                                                                                                     |
-| ------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `dev`                     | Vite dev server                                                                                          |
-| `dev:phone`               | Vite on the LAN (`--host`) with HTTPS                                                                    |
-| `dev:fixtures`            | Vite dev server with `/v1` served from the synthetic fixtures                                            |
-| `build`                   | `tsc -b && vite build`, then `check:dist`                                                                |
-| `check:dist`              | Fails if fixture code or data is in `dist/`                                                              |
-| `preview`                 | serve `dist/`                                                                                            |
-| `typecheck`               | `tsc -b --noEmit` (strict, `noUncheckedIndexedAccess`, `noImplicitOverride`)                             |
-| `lint`                    | ESLint flat config (typescript-eslint, react-hooks)                                                      |
-| `format` / `format:check` | Prettier                                                                                                 |
-| `test`                    | Vitest (jsdom)                                                                                           |
-| `test:e2e`                | Playwright smoke and flipbook tests on fixtures, Chromium only (`npx playwright install chromium` first) |
-| `contract:gen`            | Rewrites `src/contract/generated.ts` from `../shared/schemas/` (D-18)                                    |
-| `contract:check`          | Fails if `src/contract/generated.ts` differs from a fresh generation                                     |
+| Script                    | Does                                                                                                                       |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `dev`                     | Vite dev server                                                                                                            |
+| `dev:phone`               | Vite on the LAN (`--host`) with HTTPS                                                                                      |
+| `dev:fixtures`            | Vite dev server with `/v1` served from the synthetic fixtures                                                              |
+| `build`                   | `tsc -b && vite build`, then `check:dist`                                                                                  |
+| `check:dist`              | Fails if fixture code or data is in `dist/`                                                                                |
+| `preview`                 | serve `dist/`                                                                                                              |
+| `typecheck`               | `tsc -b --noEmit` (strict, `noUncheckedIndexedAccess`, `noImplicitOverride`)                                               |
+| `lint`                    | ESLint flat config (typescript-eslint, react-hooks)                                                                        |
+| `format` / `format:check` | Prettier                                                                                                                   |
+| `test`                    | Vitest (jsdom)                                                                                                             |
+| `test:e2e`                | Playwright smoke, flipbook, shader-kind and sky tests on fixtures, Chromium only (`npx playwright install chromium` first) |
+| `contract:gen`            | Rewrites `src/contract/generated.ts` from `../shared/schemas/` (D-18)                                                      |
+| `contract:check`          | Fails if `src/contract/generated.ts` differs from a fresh generation                                                       |
 
 CI: [`.github/workflows/frontend.yml`](../.github/workflows/frontend.yml) runs the contract check, typecheck, lint, format check, unit tests and build, plus a separate Playwright job.
 
@@ -101,13 +101,19 @@ src/
                   FixtureBanner, LiveAnnouncer, ViewerPanel.test.tsx, useHashSync + urlHash (A10 hash routing)
     api/                  M1 API client (D-16): types (TEMPORARY until D-18 generation), checks, errors
     search/               SearchBar, parseQuery (name or RA, Dec in degrees), the 5 test targets
-    flipbook/             Flipbook player, cutout preloading, playback, Rainbow Trails (D-28)
+    flipbook/             Flipbook player, cutout preloading, playback, Rainbow Trails (D-28); session.tsx
+                          (preload + playback timer shared by the panel and the transport bar)
+    shell/                (prototype) ToolRail, Transport, PanelCard + Panels, Readout, icons, shellStore,
+                          shortcuts ("/" focuses search)
+    sky/                  (prototype) SkyPane (sky view, markers, picking), useTargetMarkers, readout feed
     spectrum/             SpectrumPanel, hand-rolled SVG SpectrumChart, scales
   test/           test-only helpers (fixtureFetch, sharedFixtures: loads shared/fixtures; fakeHaptics,
                   fakeAudio, hapticRecorder: haptics fakes)
   viewer/         (Moon)  ViewerApp, lighting, modes, honesty, scaleBar, altText, renderPlan + planCommon + planTypes (pure plan)
     renderers/            AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star (plan functions), build (plan to three.js), ShaderBody
     fields/               fieldWorker (D-12 shared field; file name [verify])
+    sky/                  (prototype) SkyView (inside-out sky sphere, three r187), skyMath (pure: RA/Dec,
+                          camera, picking, pan/zoom), surveys (which equirect to load)
   haptics/        (Atish)  haptics (engine), audioContext, audioGraph, settings, calibration, platform,
                   pitch, spectrumMapping, tuning (every tuning constant, D-13), profiles (buildHaptics,
                   TouchHaptics), probe (TouchProbe)
@@ -155,10 +161,18 @@ Tap "Turn on vibration and sound" first. Debug a phone with `chrome://inspect`. 
 - **Open values (config, `[verify]`):** `BROWN_DWARF_CONFIG.flux45Reference` and `STAR_CONFIG.spherexBaselineYears` are `null`, so the brown-dwarf glow and the `star` motion trail are refused as "unverified"; the Mauritius comparison length in `scaleBar.ts` is `null`.
 - The panel draws whatever `card` and `params` are in the store; nothing loads them yet (the M5 integration does), so in the browser the placeholder shows until then. Tests load the synthetic shared fixtures through `src/test/sharedFixtures.ts`.
 
+### Shell and sky view (prototype, 7 Nov 2026)
+
+- **Layout** (from `mockup/spherex-ui.html`, tokens in `src/index.css`): dark bezel; brand, fixture banner and RA/Dec readout on top; tool rail on the left (Sky, Flipbook, Spectrum, 3D viewer; no Haptics tool until M5); the sky view as the main pane; transport bar bottom left; search pill bottom right with the quick picks above it. The active tool opens a floating panel card (object info + flipbook + spectrum, or the 3D viewer). At ≤ 640 px the rail becomes a row and the panel a bottom sheet.
+- **Sky image:** `GET /v1/sky/index.json` (not in D-16, Q-87). The smallest equirect loads first; a larger one replaces it on a device that can hold it (renderer max texture size), never above 4096 px on a coarse-pointer device or with Save-Data (`SKY_PHONE_MAX_WIDTH`). With no image installed, a coordinate grid and a note show; picking still works. The picture wears the Estimated badge with the index's formula and its credit line.
+- **Orientation:** seen from inside, north up, east (higher RA) to the left. `viewer/sky/skyMath.ts` documents the frame; unit tests check it against a real r187 camera and the sphere's UVs, and `e2e/sky.spec.ts` reads it back from the screen on the synthetic fixture sky (red = RA, green = Dec).
+- **Interaction:** drag pans, wheel or pinch zooms (FOV 120° to 2°); a click (moved < 5 px) picks the position under the pointer, analytically from the camera ray, and runs the search with `ra,dec` (6 decimals, tagged `derived`, Q-25). Markers for the five quick-pick targets are placed from `/v1/resolve`. Keyboard on the canvas: arrows pan, +/− zoom, R resets, Enter picks the centre; on-screen pan and zoom buttons (WCAG 2.5.7); "/" anywhere focuses the search.
+- **Performance:** render on demand, pixel ratio ≤ 1.5 (D-05), mipmaps with anisotropy, image decode off the main thread (`ImageBitmapLoader`), texture swaps wait for the end of a drag, no React render per pointer move (readout and markers are written from refs). HiPS tile LOD is not built yet.
+
 ### Flipbook and spectrum (M1, issue #3)
 
 - **Search:** a name, or RA, Dec in decimal degrees (`parseQuery`). Three or more numbers (sexagesimal) ask for decimal degrees. Quick picks for the five A1.1 targets.
-- **Flipbook:** plays the frames in the order the API lists them. Play/pause, step, first/last, a scrubber and a speed control; it shows each frame's number, wavelength, UTC time and flags. Play is enabled once the current frame and the next 3 cutouts have loaded or failed; a failed cutout shows "Cutout unavailable" instead of a picture. When `north_up` is false, a note says the picture may rotate between frames.
+- **Flipbook:** plays the frames in the order the API lists them. Play/pause, step, a scrubber and a speed control (in the shell's transport bar; Home/End in the flipbook go to the first and last frame); it shows each frame's number, wavelength, UTC time and flags. Play is enabled once the current frame and the next 3 cutouts have loaded or failed; a failed cutout shows "Cutout unavailable" instead of a picture. When `north_up` is false, a note says the picture may rotate between frames.
 - **Keyboard:** in the flipbook, Space or K plays and pauses, ←/→ step, Home/End go to the first and last frame. These keys are ignored while focus is on a button or form field (which keep their own keys) and when Alt, Ctrl or Meta is held. Space/K do nothing while the Play button is disabled.
 - **Spectrum:** the ring on the object (or "Show spectrum") loads `GET /v1/objects/{id}/spectrum`. The SVG chart draws 1σ error bars; flagged points are hollow orange diamonds, named in the legend. A data table lists every point and can jump to its frame.
 - **Rainbow Trails (D-28):** one dot per frame, in false colour: hue = wavelength. The colour is `derived` and wears the Estimated badge; in "Measured only" the dots go monochrome. Offered only for moving objects whose frames share a north-up grid and once a cutout has loaded; otherwise the button is disabled with the reason.

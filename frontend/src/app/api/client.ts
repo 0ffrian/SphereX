@@ -2,8 +2,8 @@
 // `cutout_url` as given. Every reply is checked against the contract (validate.ts).
 import { API_BASE, API_TIMEOUT_MS, FIXTURE_HEADER } from './config';
 import { ApiError } from './errors';
-import type { FramesResponse, ResolveResponse, SpectrumResponse } from './types';
-import { parseApiError, parseFrames, parseResolve, parseSpectrum } from './validate';
+import type { FramesResponse, ResolveResponse, SkyIndexResponse, SpectrumResponse } from './types';
+import { parseApiError, parseFrames, parseResolve, parseSkyIndex, parseSpectrum } from './validate';
 
 /** Set when the dev fixture server answered: the data is synthetic, not SPHEREx. */
 export type FixtureKind = 'synthetic' | null;
@@ -17,6 +17,8 @@ export interface ApiClient {
   resolve(q: string, signal?: AbortSignal): Promise<ApiResult<ResolveResponse>>;
   frames(id: string, signal?: AbortSignal): Promise<ApiResult<FramesResponse>>;
   spectrum(id: string, signal?: AbortSignal): Promise<ApiResult<SpectrumResponse>>;
+  /** Sky background index (prototype, not in D-16): the all-sky images that are installed. */
+  skyIndex(signal?: AbortSignal): Promise<ApiResult<SkyIndexResponse>>;
 }
 
 export interface ApiClientOptions {
@@ -96,5 +98,6 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       getJson(`/objects/${encodeURIComponent(id)}/frames`, parseFrames, signal),
     spectrum: (id, signal) =>
       getJson(`/objects/${encodeURIComponent(id)}/spectrum`, parseSpectrum, signal),
+    skyIndex: (signal) => getJson('/sky/index.json', parseSkyIndex, signal),
   };
 }

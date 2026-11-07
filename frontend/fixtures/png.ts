@@ -73,3 +73,28 @@ export function encodePngGray(width: number, height: number, pixels: Uint8Array)
     ...chunk('IEND', new Uint8Array(0)),
   ]);
 }
+
+/** `rgb` is row-major, `width × height × 3` bytes (8-bit RGB, colour type 2). */
+export function encodePngRgb(width: number, height: number, rgb: Uint8Array): Uint8Array {
+  if (rgb.length !== width * height * 3) throw new Error('pixel count does not match size');
+  const ihdr = Uint8Array.from([...u32(width), ...u32(height), 8, 2, 0, 0, 0]); // 8-bit RGB
+  const stride = width * 3;
+  const raw = new Uint8Array(height * (stride + 1));
+  for (let y = 0; y < height; y++) {
+    raw[y * (stride + 1)] = 0; // filter: none
+    raw.set(rgb.subarray(y * stride, (y + 1) * stride), y * (stride + 1) + 1);
+  }
+  const parts = [
+    Uint8Array.from(PNG_SIGNATURE),
+    Uint8Array.from(chunk('IHDR', ihdr)),
+    Uint8Array.from(chunk('IDAT', zlibStored(raw))),
+    Uint8Array.from(chunk('IEND', new Uint8Array(0))),
+  ];
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let o = 0;
+  for (const p of parts) {
+    out.set(p, o);
+    o += p.length;
+  }
+  return out;
+}

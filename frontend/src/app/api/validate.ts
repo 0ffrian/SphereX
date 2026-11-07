@@ -8,9 +8,14 @@ import type {
   FramesResponse,
   LightCurvePoint,
   ResolveResponse,
+  SkyEquirect,
+  SkyHips,
+  SkyIndexResponse,
+  SkySurvey,
   SpectrumPoint,
   SpectrumResponse,
 } from './types';
+import { TAGS, type Tag } from '@/contract';
 
 type Obj = Readonly<Record<string, unknown>>;
 
@@ -202,4 +207,61 @@ export function parseApiError(raw: unknown): ApiErrorBody | null {
   const o = raw as Obj;
   if (typeof o.error !== 'string') return null;
   return { error: o.error, detail: typeof o.detail === 'string' ? o.detail : '' };
+}
+
+// ---- Sky index (prototype; see types.ts) --------------------------------------------------------
+
+function optStr(o: Obj, key: string, path: string): string | null {
+  return o[key] === undefined || o[key] === null ? null : str(o, key, path);
+}
+
+function parseEquirect(raw: unknown, path: string): SkyEquirect {
+  const o = obj(raw, path);
+  const width = num(o, 'width', path);
+  const height = num(o, 'height', path);
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
+    fail(path, 'expected positive integer width and height');
+  }
+  return { url: str(o, 'url', path), width, height };
+}
+
+function parseHips(raw: unknown, path: string): SkyHips {
+  const o = obj(raw, path);
+  return {
+    url: str(o, 'url', path),
+    max_order_local: num(o, 'max_order_local', path),
+    tile_width: num(o, 'tile_width', path),
+    format: str(o, 'format', path),
+  };
+}
+
+function parseSurvey(raw: unknown, path: string): SkySurvey {
+  const o = obj(raw, path);
+  const tag = str(o, 'tag', path);
+  if (!(TAGS as readonly string[]).includes(tag)) fail(`${path}.tag`, 'expected a provenance tag');
+  const formula = optStr(o, 'formula', path);
+  const assumption = optStr(o, 'assumption', path);
+  // R3.1 / D-02: `derived` needs a formula and `model_dependent` an assumption.
+  if (tag === 'derived' && !formula) fail(`${path}.formula`, 'a derived image needs a formula');
+  if (tag === 'model_dependent' && !assumption) {
+    fail(`${path}.assumption`, 'a model-dependent image needs an assumption');
+  }
+  return {
+    id: str(o, 'id', path),
+    title: str(o, 'title', path),
+    credit: str(o, 'credit', path),
+    tag: tag as Tag,
+    formula,
+    assumption,
+    frame: str(o, 'frame', path),
+    convention: optStr(o, 'convention', path),
+    equirect: arr(o, 'equirect', path).map((e, i) => parseEquirect(e, `${path}.equirect[${i}]`)),
+    hips: o.hips === undefined || o.hips === null ? null : parseHips(o.hips, `${path}.hips`),
+  };
+}
+
+export function parseSkyIndex(raw: unknown): SkyIndexResponse {
+  const p = 'sky';
+  const o = obj(raw, p);
+  return { surveys: arr(o, 'surveys', p).map((s, i) => parseSurvey(s, `${p}.surveys[${i}]`)) };
 }

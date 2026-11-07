@@ -1,11 +1,13 @@
-// A1.1 P0 flipbook (UML 08): plays an object's SPHEREx frames in the order the API lists them,
-// with play/pause, step, scrubber and speed; shows each frame's time and wavelength. Clicking the
-// ring on the object opens its spectrum (UML 09). Rainbow Trails is a view mode (D-28, P1).
+// A1.1 P0 flipbook (UML 08): plays an object's SPHEREx frames in the order the API lists them and
+// shows each frame's time and wavelength. Play/pause, step, scrubber and speed sit in the shell's
+// transport bar (app/shell/Transport.tsx); both read one playback session (session.tsx). Clicking
+// the ring on the object opens its spectrum (UML 09). Rainbow Trails is a view mode (D-28, P1).
 // Keyboard (R9): Space or K play/pause, ←/→ step, Home/End first/last, while focus is in the
 // flipbook but not on a button or form field (those keep their own keys).
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useMemo, useState, type KeyboardEvent } from 'react';
 import type { FramesResponse, ResolveResponse } from '@/app/api/types';
-import { DataBadge, EstimatedBadge } from '@/app/Badge';
+import { DataBadge, EstimatedBadge, ProvenanceBadge } from '@/app/Badge';
+import { positionProvenance } from '@/app/sky/positionTags';
 import { formatCoords, formatUtc, formatWavelength } from '@/app/format';
 import { searchErrorMessage } from '@/app/messages';
 import { RefusalList } from '@/app/RefusalList';
@@ -14,9 +16,8 @@ import { ErrorBox, LoadingBox } from '@/app/StatusBoxes';
 import { buttonClass, pressedClass } from '@/app/ui';
 import { describeFrame, useAppStore, type SkyState } from '@/state/store';
 import { flipbookKeyAction } from './keys';
-import { FPS_OPTIONS, readyToPlay, type Fps } from './playback';
 import { RainbowTrails, RainbowTrailsLegend, trailsUnavailableReason } from './RainbowTrails';
-import { useCutoutPreload, type CutoutStatus } from './useCutoutPreload';
+import { useFlipbookSession } from './session';
 import { trailsMonochrome } from './wavelengthColor';
 
 export function Flipbook() {
@@ -26,9 +27,11 @@ export function Flipbook() {
 
   return (
     <section aria-labelledby="flipbook-heading" className="flex flex-col gap-3">
-      <h2 id="flipbook-heading" className="text-lg font-medium">
+      {/* A section label: the card's title already says "Flipbook" and names the object. */}
+      {/* No `uppercase`: it would turn "SPHEREx" into "SPHEREX". */}
+      <h3 id="flipbook-heading" className="text-sm font-medium text-neutral-400">
         SPHEREx frames
-      </h2>
+      </h3>
       {sky.status === 'resolving' && (
         <LoadingBox text={`Finding “${sky.query?.q ?? ''}”…`} startedAt={sky.startedAt} />
       )}
@@ -74,22 +77,37 @@ function ObjectHeader({
 }) {
   const loadSpectrum = useAppStore((s) => s.skyLoadSpectrum);
   const cachedAt = frames.cached_at ?? resolved.cached_at;
+  const position = positionProvenance(resolved.resolver, sky.query?.origin === 'sky');
+  const notes = [
+    cachedAt ? `Cached ${formatUtc(cachedAt)}` : null,
+    sky.fixture ? 'synthetic fixture data' : null,
+  ].filter((t) => t !== null);
   return (
     <div className="flex flex-col gap-1">
-      <h3 className="text-base font-semibold" data-testid="object-name">
+      {/* The card's subtitle shows the name; screen readers get it here, with the position. */}
+      <p className="sr-only" data-testid="object-name">
         {objectName(resolved)}
-      </h3>
-      <p className="text-sm text-neutral-300">
-        {formatCoords(resolved.ra, resolved.dec)}
-        {resolved.moving && ' · moving object'}
+      </p>
+      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-neutral-300">
+        <span>
+          {formatCoords(resolved.ra, resolved.dec)}
+          {resolved.moving && ' · moving object'}
+        </span>
+        {/* D-02: the position wears its badge too (Q-25, Q-91 for typed and picked ones). */}
+        <ProvenanceBadge
+          tag={position.tag}
+          tooltip={position.tooltip}
+          srText
+          fixture={sky.fixture}
+        />
       </p>
       <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-neutral-400">
         <span>Data release: {frames.data_release} ·</span>
         <span data-testid="stretch">Display stretch: {frames.stretch.kind}</span>
-        {sky.fixture ? <DataBadge fixture /> : <EstimatedBadge tooltip={stretchFormula(frames)} />}
-        {cachedAt && <span>· Cached {formatUtc(cachedAt)}</span>}
-        {sky.fixture && <span>· synthetic fixture data</span>}
+        {/* A display choice, not data: Estimated even on fixtures (Fixture replaces Measured only). */}
+        <EstimatedBadge tooltip={stretchFormula(frames)} />
       </p>
+      {notes.length > 0 && <p className="text-sm text-neutral-400">{notes.join(' · ')}</p>}
       {frames.frames.length > 0 && (
         <button
           type="button"
@@ -147,38 +165,19 @@ function Player({
   const seek = useAppStore((s) => s.skySeek);
   const step = useAppStore((s) => s.skyStep);
   const togglePlay = useAppStore((s) => s.skyTogglePlay);
-  const setFps = useAppStore((s) => s.skySetFps);
   const setViewMode = useAppStore((s) => s.skySetViewMode);
   const loadSpectrum = useAppStore((s) => s.skyLoadSpectrum);
 
   const honesty = useAppStore((s) => s.honesty);
-  const preload = useCutoutPreload(frames);
-  const status = preload.status;
-  const statusRef = useRef<readonly CutoutStatus[]>(status);
-  useEffect(() => {
-    statusRef.current = status;
-  }, [status]);
-
-  // Playback timer. Each tick reads the latest preload state through the ref.
-  useEffect(() => {
-    if (!sky.playing) return;
-    const id = setInterval(() => {
-      const s = statusRef.current;
-      useAppStore.getState().skyAdvance((i) => s[i] === 'loaded' || s[i] === 'failed');
-    }, 1000 / sky.fps);
-    return () => clearInterval(id);
-  }, [sky.playing, sky.fps]);
+  const session = useFlipbookSession();
+  const { status, canPlay, loadedCount, failedCount } = session;
 
   // Natural size of the cutouts, from the shown image. Keeps the last known size between frames.
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
 
-  const settled = (i: number) => status[i] === 'loaded' || status[i] === 'failed';
-  const loadedCount = status.filter((s) => s === 'loaded').length;
-  const failedCount = status.filter((s) => s === 'failed').length;
-  const canPlay = n >= 2 && (sky.playing || readyToPlay(index, n, settled));
   const current = status[index] ?? 'pending';
 
-  const imageSize = dims ?? preload.size;
+  const imageSize = dims ?? session.size;
   const trailsReason = trailsUnavailableReason(resolved, response, {
     imageSize,
     allSettled: status.every((s) => s !== 'pending'),
@@ -316,94 +315,10 @@ function Player({
         </span>
       </div>
 
-      <div
-        role="group"
-        aria-label="Playback controls"
-        className="flex flex-wrap items-center gap-2"
-      >
-        <button
-          type="button"
-          className={buttonClass}
-          aria-label="First frame"
-          title="First frame"
-          onClick={() => seek(0)}
-        >
-          <StepIcon kind="first" />
-        </button>
-        <button
-          type="button"
-          className={buttonClass}
-          aria-label="Previous frame"
-          title="Previous frame"
-          onClick={() => step(-1)}
-        >
-          <StepIcon kind="prev" />
-        </button>
-        <button
-          type="button"
-          className={`${buttonClass} min-w-24`}
-          onClick={togglePlay}
-          disabled={!canPlay}
-          aria-describedby={!canPlay && n >= 2 ? 'play-wait' : undefined}
-          data-testid="play-pause"
-        >
-          {sky.playing ? 'Pause' : 'Play'}
-        </button>
-        <button
-          type="button"
-          className={buttonClass}
-          aria-label="Next frame"
-          title="Next frame"
-          onClick={() => step(1)}
-        >
-          <StepIcon kind="next" />
-        </button>
-        <button
-          type="button"
-          className={buttonClass}
-          aria-label="Last frame"
-          title="Last frame"
-          onClick={() => seek(n - 1)}
-        >
-          <StepIcon kind="last" />
-        </button>
-        <label className="flex items-center gap-2 text-sm">
-          Speed
-          <select
-            className="min-h-11 rounded-md border border-neutral-500 bg-neutral-900 px-2 text-neutral-100 focus-visible:outline-2 focus-visible:outline-sky-400"
-            value={sky.fps}
-            onChange={(e) => setFps(Number(e.target.value) as Fps)}
-          >
-            {FPS_OPTIONS.map((f) => (
-              <option key={f} value={f}>
-                {f} frame{f === 1 ? '' : 's'}/s
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <label className="flex flex-col gap-1 text-sm">
-        <span>Frame</span>
-        <input
-          type="range"
-          min={0}
-          max={n - 1}
-          step={1}
-          value={index}
-          onChange={(e) => seek(Number(e.target.value))}
-          aria-valuetext={frameText}
-          className="h-11 w-full max-w-md accent-sky-400"
-          data-testid="scrubber"
-        />
-      </label>
-
       <p className="text-sm text-neutral-400" data-testid="preload-progress">
         Cutouts loaded: {loadedCount} of {n}
         {failedCount > 0 && ` · ${failedCount} unavailable`}
-        {!canPlay && n >= 2 && (
-          <span id="play-wait"> · Play starts once the next frames have loaded.</span>
-        )}
+        {!canPlay && n >= 2 && <span> · Play starts once the next frames have loaded.</span>}
       </p>
 
       <div role="group" aria-label="View mode" className="flex flex-wrap items-center gap-2">
@@ -440,7 +355,7 @@ function Player({
 }
 
 /** Plain SVG icons: the Unicode media glyphs render as colour emoji on some systems. */
-function StepIcon({ kind }: { kind: 'first' | 'prev' | 'next' | 'last' }) {
+export function StepIcon({ kind }: { kind: 'first' | 'prev' | 'next' | 'last' }) {
   const flip = kind === 'first' || kind === 'prev';
   const bar = kind === 'first' || kind === 'last';
   return (

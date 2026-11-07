@@ -7,6 +7,7 @@
 Each stage has one job, takes defined inputs and returns defined outputs. Stages 1 to 5 produce the **ObjectCard**. Stages 6 and 7 turn it into **RenderParams**. Stages 8 to 10 turn those into the body, its sound and its touch.
 
 - **Endpoints:** every endpoint is keyed by one object id, returned by `resolve` (D-16). Responses served from the cache carry `cached_at` (D-25).
+- **Sky endpoints (proposed, Q-87, open):** the sky-view prototype adds endpoints that are not keyed by an object id and sit outside the stages below: `GET /v1/sky/index.json`, `GET /v1/sky/{survey}/equirect_{W}x{H}.jpg` and `GET /v1/sky/{survey}/hips/{properties | Norder3/Allsky.jpg | Norder{k}/Dir{d}/Npix{n}.jpg}` (`backend/app/api/sky.py`). They serve only the local copy in `{SX_CACHE_DIR}/sky/` and never call upstream (source: [A3.11](data-sources.md#a311-sky-background-irsa-hips), licence D-32). Response shapes: [backend/README.md](../../backend/README.md#endpoints-d-16).
 - **External calls:** every call to an external service goes through the backend's read-through disk cache (D-25).
 - **Owners** of each stage: D-17.
 

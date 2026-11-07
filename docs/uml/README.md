@@ -11,13 +11,13 @@ Mermaid renders natively on GitHub, and in VS Code with a Mermaid extension (for
 | File | UML type | What it shows |
 |---|---|---|
 | [01-use-case.md](01-use-case.md) | Use case (as flowchart) | Actors (public user, blind or low-vision user, judge, team admin, external archives) and what they can do |
-| [02-component.md](02-component.md) | Component (2 diagrams) | Backend components, pipeline, render core, external services and endpoints; frontend UI, viewer, haptics, drivers, sources, storage |
+| [02-component.md](02-component.md) | Component (2 diagrams) | Backend components, pipeline, render core, external services and endpoints, the prototype `/v1/sky` router and sky mirror store; frontend UI, shell and sky view, viewer, haptics, drivers, sources, storage |
 | [03-deployment.md](03-deployment.md) | Deployment | Phones, iPhone/iPad, demo laptop, the Asus A15 local server (one origin, HTTPS, read-through cache, offline mode), team laptop offline jobs, external archives, post-event Tauri |
-| [04-package.md](04-package.md) | Package | Repo and code layout with dependencies and owners (Atish, Kevin, Moon; D-17) |
+| [04-package.md](04-package.md) | Package | Repo and code layout with dependencies and owners (Atish, Kevin, Moon; D-17), including the sky-view prototype packages (provisional, Q-89) |
 | [05-class-data-contract.md](05-class-data-contract.md) | Class (2 diagrams) | `Tag`, `TV<T>`, `ObjectType`, `ObjectCard`, `RenderParams`, `Layer`, textures, lighting, view modes, `HapticProfile`, `overrides` and the slider registry |
 | [06-class-haptics-audio.md](06-class-haptics-audio.md) | Class (2 diagrams) | `HapticEvent`, `HapticDriver` and its drivers, `HapticEngine` (gate, rate cap, fan-out, pulse trains), the shared AudioContext, settings, calibration, the pulse indicator and unlock button, the event sources behind `HapticSource` |
 | [07-class-viewer.md](07-class-viewer.md) | Class | `ViewerApp`, the renderer interface and per-type renderers, `ShaderBody`, field worker, lighting, modes, honesty, scale bar, alt text |
-| [08-sequence-search-flipbook.md](08-sequence-search-flipbook.md) | Sequence | Search, name resolve, frames through the read-through cache, cutouts, flipbook playback, Rainbow Trails, URL hash links, the dev-only fixture path |
+| [08-sequence-search-flipbook.md](08-sequence-search-flipbook.md) | Sequence | Search, name resolve, frames through the read-through cache, cutouts, flipbook playback through the shared session and the transport bar, Rainbow Trails, URL hash links, the dev-only fixture path, the prototype sky pick |
 | [09-sequence-object-spectrum.md](09-sequence-object-spectrum.md) | Sequence | Click a source, photometry and spectrum, classify, type selection, `ObjectCard`, panel with badges and Listen |
 | [10-sequence-view-3d.md](10-sequence-view-3d.md) | Sequence | View in 3D: render-params, asset lookup, bake if not cached, renderer by type, `missing` layers |
 | [11-sequence-touch-haptics.md](11-sequence-touch-haptics.md) | Sequence | Touch mode: unlock, pointermove, intersect, sample, source, rate limit, fan-out to vibrate and audio |

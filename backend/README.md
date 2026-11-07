@@ -17,7 +17,7 @@ uv run python -m scripts.generate_contract   # after changing shared/schemas/ (a
 
 `app/contract/` is generated from [`shared/schemas/`](../shared/README.md) by `datamodel-code-generator` 0.89.0 (D-18). Do not edit it. The Pydantic models cannot express the R3.1 `formula` and `assumption` rules; fixture tests use `jsonschema` 4.26.0 for those. Serialise them with `exclude_unset=True`: a plain dump adds `null` for unset fields, and `exclude_none` drops the required `value: null` and `scale_m: null` (Q-40). `app/api/models.py` still holds the hand-written M1 response models. `/card` and `/render-params` are built as plain dicts and checked with `jsonschema` 4.26.0 (now a runtime dependency) by `app/core/card/validate.py` (Q-40).
 
-From the repo root: `npm run backend:setup`, `backend:dev`, `backend:test`, `backend:check`, `backend:prefetch` and `backend:smoke-offline`.
+From the repo root: `npm run backend:setup`, `backend:dev`, `backend:test`, `backend:check`, `backend:prefetch`, `backend:smoke-offline`, `backend:sky-mirror` and `backend:sky-bake`.
 
 In development the frontend's Vite server proxies `/v1` to `http://localhost:8000`. At the event, one process serves the built frontend and the API from one origin (D-24, M5).
 
@@ -32,6 +32,9 @@ In development the frontend's Vite server proxies `/v1` to `http://localhost:800
 | `GET /v1/objects/{id}/card` | ObjectCard (R3.2), exactly the `shared/schemas` shape and validated with `jsonschema` before it is sent. Headers: `X-SX-Asset-Status` (`saved`, `generated` or `sketch`, A4.4) and `X-SX-Cached-At` (D-16; the schema forbids extra fields, Q-39) |
 | `GET /v1/objects/{id}/render-params` | RenderParams (R3.4), validated the same way, with the same headers. Refused layers are listed in `missing` |
 | `GET /v1/health` | `{status, offline, data_release}` |
+| `GET /v1/sky/index.json` | Sky background prototype (beyond D-16, Q-87). `{surveys: [{id, title, credit, tag: "derived", formula, frame: "icrs", convention, equirect: [{url, width, height}], hips: {url, max_order_local, tile_width, format} \| null}]}`, only surveys on disk; `[]` when none |
+| `GET /v1/sky/{survey}/equirect_{W}x{H}.jpg` | Baked all-sky image: column x is RA = 360·(x+0.5)/W° (RA 0 at the left, increasing right), row y is Dec = 90 − 180·(y+0.5)/H° (north up), ICRS |
+| `GET /v1/sky/{survey}/hips/properties`, `.../hips/Norder3/Allsky.jpg`, `.../hips/Norder{k}/Dir{d}/Npix{n}.jpg` | The mirrored HiPS files, local only (never fetched upstream from a request). `Cache-Control: immutable`; missing is 404 `not_found` |
 
 Per-target spectrum report on a cache: `SX_OFFLINE=1 uv run python -m app.core.measure [--group test|demo] [--only NAME]` (default `--group test`).
 
@@ -63,6 +66,20 @@ uv run python -m app.core.render ../shared/fixtures/cards/asteroid_procedural.js
 ```
 
 `params_from_card(card, seed)` applies the R6.2 rules. It raises `BakeRefusal` (with the missing card fields) only when an asteroid's diameter is missing or not finite, a brown dwarf's spectral class has no palette, or the type has no recipe. Other missing inputs bake flat and are listed in `BakeParams.missing` (`albedo_map` for no colour, `gaia_rgb` for an unusable one, `brightness`, `bands`); NaN and infinity count as missing. `bake()` returns the arrays; `bake_to_cache()` writes the files atomically and skips a bake whose four files exist and whose `bake.json` hash matches; it is safe for concurrent callers. Bump `BAKER_RULES_VERSION` whenever a rule in R6.2 to R6.5 changes. Same card and seed give the same bytes on a given numpy and Pillow build; the tests check it by SHA-256.
+
+## Sky background (prototype)
+
+A colour HiPS from IRSA (`2mass_color`, or `allwise_color`) mirrored into `<SX_CACHE_DIR>/sky/<survey>/hips/` in IRSA's layout, and baked to equirectangular JPEGs next to it. Both scripts are separate from the D-25 read-through cache.
+
+```bash
+uv run python -m scripts.sky_mirror --allow-unclonable              # 2mass_color, orders 0-4, --max-mb 900, --concurrency 4
+uv run python -m scripts.sky_mirror --max-order 6 --max-mb 45000 --allow-unclonable --bake   # e.g. on the A15
+uv run python -m scripts.sky_bake --preview preview.jpg             # 4096x2048 (order >= 3) and 8192x4096 (order >= 4)
+```
+
+- **Mirror:** `--max-mb` (10^6 bytes) is a hard cap on everything under `<cache>/sky/`, files already there included; a run that reaches it stops and exits 1. Files are written to a temp name and renamed, so a rerun skips what is there. Lowest orders first. At most 4 requests at a time with the `SX_HTTP_*` retries. Refuses with `SX_OFFLINE=1`. The 2MASS and AllWISE properties say `hips_status = public mirror unclonable`, so the script stops unless `--allow-unclonable` is given (licence settled by D-32; the exact credit line is **[verify]**). It writes `mirror.json` with the complete orders, which `/v1/sky/index.json` reads.
+- **Bake:** numpy HEALPix NESTED (`app/core/sky/healpix.py`), each tile box-averaged and sampled at the nearest parent pixel. In a decoded HiPS JPEG, row = `lx` and column = `ly` (the face coordinates of the nested sub-pixel); `tests/test_sky_landmarks.py` checks it on the real tiles and the bake (skipped when they are absent).
+- **Measured on 7 Nov 2026 (dev PC):** 2MASS orders 0-4 (4092 tiles plus properties and Allsky, 351 MB downloaded; 357 MB on disk with the two baked equirects) in 11 min at about 0.5 MB/s; the bake (both from order 4) took 41 s for 4096x2048 (1.1 MB) and 34 s for 8192x4096 (4.8 MB).
 
 ## Settings (`SX_*` environment variables)
 
@@ -120,7 +137,7 @@ uv run python -m scripts.record_fixtures          # re-record tests/fixtures/cac
 
 ```
 app/main.py, settings.py, errors.py, context.py, offline.py, timefmt.py
-app/api/          (Kevin, R10)  resolve.py, objects.py, models.py, deps.py; spectrum.py (issue #2)
+app/api/          (Kevin, R10)  resolve.py, objects.py, models.py, deps.py; spectrum.py (issue #2); sky.py
 app/cache/        keys.py, store.py: D-25 read-through cache
 app/adapters/     http.py, irsa_sia.py, irsa_cutout.py, simbad.py, sbdb.py, horizons.py, skybot.py
 app/contract/     generated from shared/schemas/ (D-18, do not edit): ObjectCard, RenderParams
@@ -129,7 +146,8 @@ app/core/measure/ (Moon, Stage 2, A4.2) config, flags, aperture, solid_angle, ph
 app/core/classify/ (Atish, Stage 3, A4.3) rules.py: R3.3 type selection; R12 #12 exoplanet thresholds block (all None)
 app/core/card/    (Kevin, Stages 4-5, A4.4-A4.5) catalogue, build, assets (A5.4 store), validate, service
 app/core/render/  (Atish, R10) texture baker; card_to_params (Stage 7, A4.7), blackbody, spherex_rgb
+app/core/sky/     sky background: survey registry and layout, HEALPix NESTED, HiPS -> equirect bake
 assets/           A5.4 pre-baked assets, <type>/<id>.json (SX_ASSETS_DIR; none yet)
-scripts/          prefetch, smoke_offline, backup_cache, record_fixtures, generate_contract
+scripts/          prefetch, smoke_offline, backup_cache, record_fixtures, generate_contract, sky_mirror, sky_bake
 tests/            pytest; tests/fixtures/cache holds the recorded cache entries
 ```

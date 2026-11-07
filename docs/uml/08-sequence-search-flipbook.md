@@ -1,12 +1,15 @@
 # 08 Sequence: search and flipbook
 
-A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache) and D-28 (Rainbow Trails).
+A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache), D-28 (Rainbow Trails) and D-32 (sky tiles). The sky-view prototype paths (sky pick, shared flipbook session, transport bar) follow Q-87 to Q-91.
 
 ```mermaid
 sequenceDiagram
   autonumber
   actor U as User
+  participant SP as Sky pane (SkyPane + skyMath, prototype)
   participant UI as UI shell
+  participant TB as Transport bar
+  participant S as Flipbook session (session.tsx)
   participant FB as Flipbook
   participant API as Backend API
   participant C as Read-through cache
@@ -21,8 +24,23 @@ sequenceDiagram
     FX-->>UI: Synthetic replies with header X-SX-Fixture: synthetic
     UI->>UI: Page-wide "Fixture data" banner, Fixture badges instead of Measured, SYNTHETIC image label
   end
+  opt sky view opens (prototype, Q-87)
+    SP->>API: GET /v1/sky/index.json
+    API-->>SP: Surveys on disk in {SX_CACHE_DIR}/sky/, or an empty list (never fetched upstream)
+    SP->>API: GET /v1/sky/{survey}/equirect_{W}x{H}.jpg, smallest first, a larger one if the GPU and device allow (Q-90)
+    API-->>SP: Equirect JPEG, shown with the Estimated badge and the survey credit (Q-88, D-32)
+    SP->>API: GET /v1/resolve for each quick-pick target
+    API-->>SP: Marker positions (a name that does not resolve gets no marker)
+  end
   alt user types a name or RA/Dec
     U->>UI: Enter name or RA/Dec
+  else user clicks the sky (prototype, pointer moved under 5 px)
+    U->>SP: Click
+    SP->>SP: RA/Dec from the camera ray (screenToRaDec), 6 decimals, tagged derived (Q-91)
+    SP->>UI: Search ra,dec with origin sky (the search field shows the query)
+  else user clicks a target marker on the sky
+    U->>SP: Click marker
+    SP->>UI: Search the target name with origin sky
   else user opens a shared link or presses Back
     U->>UI: URL hash #35;ra=…&dec=…[&name=…][&frame=…]
     UI->>UI: Parse the hash. Unusable parts are ignored, never guessed, shown under the search field and announced (live region)
@@ -43,7 +61,7 @@ sequenceDiagram
     API->>API: Skip name resolution
   end
   API-->>UI: id, ra, dec, moving
-  UI->>UI: Write #35;ra=…&dec=…[&name=…] to the URL hash (share link). A typed search adds a history entry, a link replaces it
+  UI->>UI: Write #35;ra=…&dec=…[&name=…] to the URL hash (share link). A typed search or a sky pick adds a history entry, a link replaces it
   UI->>API: GET /v1/objects/{id}/frames
   API->>C: Look up (source + data release + normalised query)
   alt cache hit
@@ -73,16 +91,22 @@ sequenceDiagram
   end
   API-->>UI: frame_id, time, wavelength_um, x, y, cutout_url per frame, plus the stretch used and cached_at if from cache
   UI->>UI: Badges: wavelength and time Measured, display stretch Estimated (derived, tooltip gives its parameters)
-  UI->>FB: Load frames
+  UI->>S: Frames in the store
+  Note over TB,FB: One session above the panel and the transport bar: closing the panel does not stop playback or restart the preload
   loop each frame
-    FB->>API: GET /v1/objects/{id}/cutouts/{frame_id}.png
-    API-->>FB: Cutout stretched to PNG by the server
+    S->>API: GET /v1/objects/{id}/cutouts/{frame_id}.png
+    API-->>S: Cutout stretched to PNG by the server
   end
+  U->>TB: Play (or Space or K in the flipbook)
+  TB->>S: Read can play (current frame and the next 3 cutouts loaded or failed)
   loop play
-    FB->>FB: Show next frame, clickable rings on sources
+    S->>UI: Timer at the chosen fps advances the frame index in the store
+    UI-->>TB: Frame index, play state
+    UI-->>FB: Frame index
+    FB->>FB: Show the frame, clickable rings on sources
   end
-  opt user pauses or steps
-    FB->>UI: Current frame
+  opt user pauses or steps (transport bar or flipbook keys)
+    TB->>UI: Current frame
     UI->>UI: Replace the hash in place with frame=… (no new history entry)
   end
   opt P1 overlays
@@ -103,6 +127,8 @@ sequenceDiagram
 - All five test targets (Barnard's Star, Epsilon Indi B, WISE 0855, RW Aurigae, R Draconis) and the demo objects are pre-fetched, so the demo runs with `SX_OFFLINE=1` and always hits the cache (D-25).
 - A `candidate` source gets one haptic tick per frame where it is detected (rendering doc §8.5). That path is not drawn here.
 - Rainbow Trails is built after basic playback works (D-28). As built in M1 (issue #3), the dot colour is a false colour, hue = wavelength, tagged `derived` with that formula, so it wears the Estimated badge. In "Measured only" (D-21) the dots are drawn in one colour. The mode is offered only for a `moving` object whose frames share a north-up grid, so with real data it waits for Q-21. The M1 UI has no honesty toggle yet, so the monochrome state is not reachable from the page. Tagging question: Q-27.
+- Sky pick (prototype, Q-89, Q-91): a click that moved under 5 px is a pick. The position under the pointer is computed analytically from the camera ray (`viewer/sky/skyMath.ts`), written as `ra,dec` with 6 decimals and searched with origin `sky`; from there it is an ordinary RA/Dec search. The picked position is user input, tagged `derived` (Estimated badge). The `/v1/sky` endpoints are open as Q-87 and serve only the local copy of the survey tiles (D-32).
+- Flipbook session (`app/flipbook/session.tsx`): the cutout preload, the playback timer and "can play" live above the flipbook panel and the transport bar, which both read it. The flipbook's First and Last buttons are gone in the prototype; Home and End still work (Q-89).
 - URL hash (architecture spec §10, hash routing): `#ra=<deg>&dec=<deg>[&name=<search text>][&frame=<frame_id>]`. `name` is kept for a name search, so a link to a moving object reopens the same object id. A link with a name searches the name, otherwise the coordinates. Going back to the page without a hash resets the search. Unusable parts (bad coordinates, or no name and no coordinates) are ignored, never guessed: they are shown under the search field and announced in the polite live region.
 - Dev-only fixture path: `npm run dev:fixtures` (`vite --mode fixtures`) mounts a Vite dev-server plugin from `frontend/fixtures/` that answers `/v1` with synthetic data, and `npm run test:e2e` always uses it. Every reply carries `X-SX-Fixture: synthetic`. The UI then shows a page-wide "Fixture data" banner, "Fixture" badges instead of "Measured" (and instead of the stretch's Estimated badge) and a SYNTHETIC label on the image. `vite build` never runs the plugin, and `scripts/check-dist.js` fails the build if a fixture marker reaches `dist/` ([fixtures README](../../frontend/fixtures/README.md)). The Fixture badge is a fourth badge beside the 3 of D-02; it is a proposed dev-only exception, open as Q-32 in the decisions log.
 - `moving` means a solar-system body (Q-22). High proper-motion stars are not `moving`; their positions come from the SIMBAD proper motion, propagated to each frame time. The ephemeris-driven frame search for moving objects is not built in M1 (Q-21).
