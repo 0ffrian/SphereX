@@ -6,7 +6,7 @@
 // SPHEREx colour composite (one picture; the transport bar does not drive it).
 // Keyboard (R9): Space or K play/pause, ←/→ step, Home/End first/last, while focus is in the
 // flipbook but not on a button or form field (those keep their own keys).
-import { useMemo, useState, type KeyboardEvent } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import type { FramesResponse, ResolveResponse } from '@/app/api/types';
 import { DataBadge, EstimatedBadge, ProvenanceBadge } from '@/app/Badge';
 import { positionProvenance } from '@/app/sky/positionTags';
@@ -29,15 +29,27 @@ import { FramesProgress } from './FramesProgress';
 import {
   frameSize,
   gridSize,
+  largestSide,
+  noDataKind,
   placeFrame,
   placementStyle,
   registrationFor,
   ringOnGrid,
+  type NoData,
   type PixelSize,
 } from './frameGrid';
+import { shownIndexIn } from './frameSwap';
 import { flipbookKeyAction } from './keys';
+import {
+  countNoData,
+  NO_DATA_CAPTION,
+  NO_DATA_KINDS,
+  noDataCaptionVisible,
+  noDataSummary,
+} from './noData';
 import { RainbowTrails, RainbowTrailsLegend, trailsUnavailableReason } from './RainbowTrails';
 import { useFlipbookSession } from './session';
+import { useFrameSwap } from './useFrameSwap';
 import { trailsMonochrome } from './wavelengthColor';
 
 export function Flipbook() {
@@ -201,8 +213,18 @@ function NoFrames({ frames }: { frames: FramesResponse }) {
   );
 }
 
+/**
+ * Grid area that no pixel of the frame covers (frameGrid.ts noDataKind): dark grey diagonal
+ * hatching, so "no data" does not read as black sky. Static (no transition or animation): during
+ * playback it comes and goes with the clipped frames, as part of their picture. The frame and its
+ * tint are drawn on top, so the tint never covers it. Decorative: the text says the same.
+ */
+const NO_DATA_HATCH = 'repeating-linear-gradient(135deg, #2a2a2e 0 3px, #18181b 3px 7px)';
+
 /** Focus inside these keeps its own keys; `[data-own-keys]` marks scroll boxes (RefusalList). */
 const CONTROL_TAGS = 'button, input, select, textarea, a, summary, [data-own-keys]';
+
+const SLOTS = [0, 1] as const;
 
 function Player({
   sky,
@@ -215,8 +237,10 @@ function Player({
 }) {
   const frames = response.frames;
   const n = frames.length;
+  // The requested frame (timer, keys, scrubber). The viewer shows `frame` below, which trails it
+  // until the next picture has decoded (frameSwap.ts).
   const index = Math.min(sky.index, n - 1);
-  const frame = frames[index]!;
+  const requested = frames[index]!;
 
   const seek = useAppStore((s) => s.skySeek);
   const step = useAppStore((s) => s.skyStep);
@@ -227,22 +251,54 @@ function Player({
 
   const honesty = useAppStore((s) => s.honesty);
   const session = useFlipbookSession();
-  const { status, canPlay, loadedCount, failedCount } = session;
+  const { status, canPlay, loadedCount, failedCount, setShownIndex } = session;
 
   // Decoded sizes, only for frames whose size the reply does not state (frameGrid.ts frameSize).
   const [decoded, setDecoded] = useState<ReadonlyMap<string, PixelSize>>(() => new Map());
+  const onSize = useCallback(
+    (url: string, size: PixelSize) =>
+      setDecoded((prev) => {
+        const old = prev.get(url);
+        return old && old.w === size.w && old.h === size.h ? prev : new Map(prev).set(url, size);
+      }),
+    [],
+  );
 
-  const current = status[index] ?? 'pending';
+  const requestedStatus = status[index] ?? 'pending';
+  const target = useMemo(
+    () => ({ index, url: requested.cutout_url, status: requestedStatus }),
+    [index, requested.cutout_url, requestedStatus],
+  );
+  const swap = useFrameSwap(target, onSize);
+  const shownAt = shownIndexIn(swap.state.shown, (i) => frames[i]?.cutout_url, n);
+  const shownIndex = shownAt ?? index;
+  const frame = frames[shownIndex]!;
+  // What the viewer draws for the shown frame; before anything is shown, no picture yet.
+  const view = shownAt !== null && swap.state.shown ? swap.state.shown.kind : 'loading';
+  const picture = view === 'picture';
+
+  // The transport bar's frame number and wavelength follow the picture.
+  useLayoutEffect(() => setShownIndex(shownIndex), [shownIndex, setShownIndex]);
+  useLayoutEffect(() => () => setShownIndex(null), [setShownIndex]);
 
   // One fixed grid and scale for the whole object (frameGrid.ts): the box never changes size.
-  const grid = useMemo(
-    () => gridSize(frames.map((f) => frameSize(f, decoded.get(f.cutout_url)))),
-    [frames, decoded],
-  );
   const registration = registrationFor(response.north_up);
+  const { grid, fullSide, summary } = useMemo(() => {
+    const sizes = frames.map((f) => frameSize(f, decoded.get(f.cutout_url)));
+    return {
+      grid: gridSize(sizes),
+      fullSide: largestSide(sizes),
+      // One steady line for the whole object (R9: nothing flashes during playback).
+      summary: noDataSummary(countNoData(frames, sizes, registration)),
+    };
+  }, [frames, decoded, registration]);
   const size = frameSize(frame, decoded.get(frame.cutout_url));
   const placement = size ? placeFrame(grid, frame, size, registration) : null;
   const ring = placement ? ringOnGrid(grid, placement, frame, registration) : null;
+  // Hatched only under a drawn frame: while it loads or when it failed, nothing is claimed.
+  const noData: NoData =
+    size && placement && picture ? noDataKind(grid, placement, size, fullSide) : 'none';
+  const captionOn = noDataCaptionVisible(sky.playing, noData);
 
   const trailsReason = trailsUnavailableReason(resolved, response, {
     imageSize: session.size,
@@ -256,7 +312,8 @@ function Player({
   // Rainbow Trails dots sit on the cutouts' pixel grid, not on the composite's.
   const viewMode = trailsReason || composite ? 'frames' : sky.viewMode;
   const name = objectName(resolved);
-  const frameText = describeFrame(response, index);
+  const frameText = describeFrame(response, shownIndex);
+  const alt = `SPHEREx cutout of ${name}. ${frameText}. Display stretch ${response.stretch.kind}.${tint ? ' Tinted by wavelength (false colour).' : ''}${noData === 'none' ? '' : ` ${NO_DATA_CAPTION[noData]} The hatched area has no data.`}`;
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     // The composite is one picture: the frame keys do nothing while it shows.
@@ -320,61 +377,81 @@ function Player({
             className="relative isolate aspect-square w-full max-w-md overflow-hidden rounded-lg border border-neutral-800 bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
             data-colour={colour}
             data-grid={grid}
+            // Diagnostics (frameSwap.ts): what is shown, requests passed before they were shown,
+            // older decodes dropped after the timeout, and decodes that failed.
+            data-shown={view}
+            data-shown-index={shownIndex}
+            data-late={swap.state.late}
+            data-timed-out={swap.state.timedOut}
+            data-decode-failed={swap.state.failed}
             data-testid="frame-viewer"
           >
-            {current === 'failed' ? (
+            {noData !== 'none' && (
+              // Behind the frame: only the grid area outside the frame's rectangle shows it.
+              <div
+                className="pointer-events-none absolute inset-0"
+                style={{ background: NO_DATA_HATCH }}
+                aria-hidden="true"
+                data-testid="no-data-hatch"
+                data-no-data={noData}
+              />
+            )}
+            {/* The frame at its place on the grid; the tint layer has exactly the same box. Two
+                <img> slots serve the whole object: the front one is drawn, the other decodes the
+                next frame out of sight, then they swap (frameSwap.ts); neither is remounted. A
+                frame of unknown size is not placed until it has decoded (no wrong placement). */}
+            <div
+              className="absolute"
+              style={
+                placement && picture
+                  ? placementStyle(grid, placement)
+                  : { inset: 0, visibility: 'hidden' as const }
+              }
+              data-testid="frame-place"
+            >
+              {SLOTS.map((slot) => {
+                const isFront = slot === swap.state.front;
+                const src = swap.state.srcs[slot];
+                return (
+                  <img
+                    key={slot}
+                    ref={swap.slots[slot]}
+                    src={src ?? undefined}
+                    alt={isFront ? alt : ''}
+                    aria-hidden={isFront ? undefined : true}
+                    className="absolute inset-0 h-full w-full"
+                    style={{
+                      imageRendering: 'pixelated',
+                      visibility: isFront && picture ? undefined : 'hidden',
+                    }}
+                    draggable={false}
+                    data-slot={slot}
+                    data-testid={isFront ? 'cutout' : 'cutout-next'}
+                  />
+                );
+              })}
+              {tint && picture && (
+                // Grey luminance × the frame's false colour: a multiply blend over the pixelated
+                // image, so the pixels stay sharp and nothing is decoded or allocated per frame.
+                <div
+                  className="pointer-events-none absolute inset-0"
+                  style={{
+                    background: tintColour(frame.wavelength_um),
+                    mixBlendMode: 'multiply',
+                  }}
+                  aria-hidden="true"
+                  data-testid="tint-overlay"
+                  data-wavelength={frame.wavelength_um}
+                />
+              )}
+            </div>
+            {view === 'failed' && (
               <p
                 className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-neutral-300"
                 data-testid="cutout-unavailable"
               >
                 Cutout unavailable for this frame.
               </p>
-            ) : (
-              // The frame at its place on the grid; the tint layer has exactly the same box. Until a
-              // frame of unknown size has decoded, it is loaded but not shown (no wrong placement).
-              <div
-                className="absolute"
-                style={
-                  placement
-                    ? placementStyle(grid, placement)
-                    : { inset: 0, visibility: 'hidden' as const }
-                }
-                data-testid="frame-place"
-              >
-                <img
-                  key={frame.cutout_url}
-                  src={frame.cutout_url}
-                  alt={`SPHEREx cutout of ${name}. ${frameText}. Display stretch ${response.stretch.kind}.${tint ? ' Tinted by wavelength (false colour).' : ''}`}
-                  className="absolute inset-0 h-full w-full"
-                  style={{ imageRendering: 'pixelated' }}
-                  draggable={false}
-                  onLoad={(e) => {
-                    const img = e.currentTarget;
-                    const url = frame.cutout_url;
-                    if (frame.width !== undefined || img.naturalWidth === 0 || decoded.has(url)) {
-                      return;
-                    }
-                    setDecoded((prev) =>
-                      new Map(prev).set(url, { w: img.naturalWidth, h: img.naturalHeight }),
-                    );
-                  }}
-                  data-testid="cutout"
-                />
-                {tint && current === 'loaded' && (
-                  // Grey luminance × the frame's false colour: a multiply blend over the pixelated
-                  // image, so the pixels stay sharp and nothing is decoded or allocated per frame.
-                  <div
-                    className="pointer-events-none absolute inset-0"
-                    style={{
-                      background: tintColour(frame.wavelength_um),
-                      mixBlendMode: 'multiply',
-                    }}
-                    aria-hidden="true"
-                    data-testid="tint-overlay"
-                    data-wavelength={frame.wavelength_um}
-                  />
-                )}
-              </div>
             )}
             {viewMode === 'trails' && (
               // Offered only on a shared north-up grid, where frames sit at offset 0: the dots use
@@ -383,11 +460,11 @@ function Player({
                 frames={frames}
                 width={grid}
                 height={grid}
-                currentIndex={index}
+                currentIndex={shownIndex}
                 monochrome={monochrome}
               />
             )}
-            {ring && current === 'loaded' && (
+            {ring && picture && (
               <button
                 type="button"
                 className="absolute flex size-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-sky-400"
@@ -413,11 +490,12 @@ function Player({
             )}
           </div>
 
-          {/* Fixed-width digits and reserved lines, so a frame's caption never moves what follows. */}
+          {/* Fixed-width digits and reserved lines, so a frame's caption never moves what follows.
+              Everything here names the shown frame, so it changes with the picture. */}
           <div className="flex flex-col gap-1 text-sm tabular-nums" data-testid="frame-caption">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span data-testid="frame-counter">
-                Frame {index + 1} of {n}
+                Frame {shownIndex + 1} of {n}
               </span>
               <span className="flex items-center gap-1.5">
                 <span data-testid="frame-wavelength">{formatWavelength(frame.wavelength_um)}</span>
@@ -435,6 +513,37 @@ function Player({
             >
               {frame.flags.length > 0 ? `Flags: ${frame.flags.join(', ')}` : 'No flags'}
             </span>
+            {summary !== null && (
+              // Only for objects with a hatched frame. The steady line stays for every frame; the
+              // per-frame caption shows only while paused or stopped (R9: nothing flashes during
+              // playback). Its cell holds every caption, the inactive ones invisible (and so not
+              // read out), so it is as tall as the longest at any width and nothing moves.
+              <div className="flex flex-col gap-1" data-testid="frame-no-data">
+                <span className="flex items-center gap-1.5 text-neutral-300">
+                  <span
+                    className="inline-block h-3 w-5 shrink-0 rounded-sm border border-neutral-600"
+                    style={{ background: NO_DATA_HATCH }}
+                    aria-hidden="true"
+                    data-testid="no-data-swatch"
+                  />
+                  <span data-testid="no-data-summary">{summary}</span>
+                </span>
+                <div className="grid" data-testid="no-data-caption-cell">
+                  {NO_DATA_KINDS.map((k) => {
+                    const on = captionOn && noData === k;
+                    return (
+                      <span
+                        key={k}
+                        className={`col-start-1 row-start-1 text-amber-200 ${on ? '' : 'invisible'}`}
+                        data-testid={on ? 'frame-no-data-caption' : undefined}
+                      >
+                        {NO_DATA_CAPTION[k]}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <p className="min-h-10 text-sm text-neutral-400" data-testid="preload-progress">

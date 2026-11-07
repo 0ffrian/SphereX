@@ -146,7 +146,8 @@ flowchart TB
     SkyPane["SkyPane: sky image, markers, click to pick"]
     Transport["Transport bar"]
     Session["Flipbook session (session.tsx): cutout preload, playback timer, can play"]
-    FrameGrid["frameGrid.ts: one fixed grid and scale per object"]
+    FrameGrid["frameGrid.ts: one fixed grid and scale per object; noData.ts hatching text"]
+    FrameSwap["frameSwap.ts + useFrameSwap: next frame shown once decoded"]
     ColourViews["ColourViews + colourMode (prototype, Q-93, Q-95): Raw | Colour, wavelength tint, SPHEREx composite"]
     Progressive["progressive.ts + FramesProgress (Q-97): ask again while cutouts are deferred, merge, Stop / Continue"]
     CachedMarkers["useCachedMarkers + cachedMarkers (Q-98): lilac cached, loads instantly markers"]
@@ -193,6 +194,7 @@ flowchart TB
   CachedMarkers -->|"GET /v1/sky/cached"| BackendAPI
   CachedMarkers -->|"search query or id coordinates, origin sky"| Store
   Flipbook --> FrameGrid
+  Flipbook --> FrameSwap
   Flipbook --> ColourViews
   ColourViews -->|"colour choice, composite reply"| Store
   Store -->|"GET composite (not in Measured only)"| BackendAPI
@@ -246,7 +248,7 @@ flowchart TB
 - Endpoints follow D-16. Every endpoint is keyed by the object id that `resolve` returns; there is no separate flipbook endpoint. Responses served from the cache carry `cached_at` (D-25); for `/card` and `/render-params` it is the `X-SX-Cached-At` header, next to `X-SX-Asset-Status`, because the R3 shapes forbid extra fields (Q-39).
 - Sky-view prototype (Q-87 to Q-91): the `/v1/sky` endpoints are not keyed by an object id and are outside D-16 until Q-87 is settled. They serve only the local copy written by `scripts.sky_mirror` and `scripts.sky_bake` (D-32), never the network. A click on the sky becomes an `ra,dec` search with origin `sky` and then follows the usual resolve and frames path ([08](08-sequence-search-flipbook.md)). The flipbook panel and the transport bar read one playback session, so closing the panel does not stop playback.
 - Colour composite (prototype, Q-92, Q-94): `GET /v1/objects/{id}/composite` and `/composite.png` are keyed by object id but are not in D-16 yet. `core/composite` runs Stage 1 once per request, takes Stage 2's verdict per frame, picks one frame per channel from one pass, resamples the three onto one north-up TAN grid and stretches each band; the result is stored as `derived.composite` (D-25). Sequence: [20](20-sequence-composite.md). `GET /v1/sky/cached` (Q-98) reads only `derived.frames` metas and the `derived.object` registry, never cutouts or upstream.
-- Flipbook additions (prototype): the colour views are false colour, tagged `derived` and hidden in Measured only (Q-93); the hash gains `colour=` (Q-95); progressive frames ask again while `cutouts:deferred:<n>` is listed, one request at a time (Q-97), and the spectrum and composite wait for the complete list. `frameGrid.ts` draws every frame of an object on one fixed grid.
+- Flipbook additions (prototype): the colour views are false colour, tagged `derived` and hidden in Measured only (Q-93); the hash gains `colour=` (Q-95); progressive frames ask again while `cutouts:deferred:<n>` is listed, one request at a time (Q-97), and the spectrum and composite wait for the complete list. `frameGrid.ts` draws every frame of an object on one fixed grid. `frameSwap.ts` decodes the next frame in a hidden `<img>` slot and shows it only once decoded; captions and the transport readout follow the shown frame. The no-data caption of a clipped frame shows only while paused; one steady line covers the object (`noData.ts`, R9).
 - Every external call goes through the read-through cache (D-25) (the prototype's sky mirror script writes its own store instead; open as Q-87): cache, then a live call with a timeout and retries, then an older cached entry, then refuse.
 - `core/classify`, `core/card` and the `card_to_params`, `blackbody` and `spherex_rgb` modules of `core/render` were built in issue #5. The `/card` and `/render-params` replies are plain dicts checked with `jsonschema`; the generated Pydantic models (D-18) only describe them in the OpenAPI docs (Q-40). The render-params endpoint names the texture URLs but does not call the baker yet.
 - The physics layer is drawn on the backend, feeding derived values into the card. The browser reruns the same functions on slider changes (architecture spec §4.6). Baked types allow only colour, lighting and spin sliders; relief sliders exist only on the shader kinds (D-26).

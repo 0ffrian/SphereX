@@ -2,7 +2,7 @@
 // transport bar (bottom left): cutout preloading, the playback timer and "can play". It lives
 // above both, so closing the panel does not stop playback or restart the preload, and the two
 // never keep separate copies of the playback logic.
-import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Frame } from '@/app/api/types';
 import { useAppStore } from '@/state/store';
 import { readyToPlay } from './playback';
@@ -19,6 +19,13 @@ export interface FlipbookSession {
   loadedCount: number;
   failedCount: number;
   settled(i: number): boolean;
+  /**
+   * The frame the viewer is showing (useFrameSwap.ts), which can trail `sky.index` until the next
+   * picture has decoded; null while the viewer is not on screen. The transport bar's frame number
+   * and wavelength follow it, so they change with the picture.
+   */
+  shownIndex: number | null;
+  setShownIndex(i: number | null): void;
 }
 
 const NO_FRAMES: readonly Frame[] = [];
@@ -34,6 +41,7 @@ export function FlipbookSessionProvider({ children }: { children: ReactNode }) {
   const fps = useAppStore((s) => s.sky.fps);
 
   const preload = useCutoutPreload(frames);
+  const [shownIndex, setShownIndex] = useState<number | null>(null);
   const status = preload.status;
   const statusRef = useRef<readonly CutoutStatus[]>(status);
   useEffect(() => {
@@ -61,6 +69,8 @@ export function FlipbookSessionProvider({ children }: { children: ReactNode }) {
     loadedCount: status.filter((s) => s === 'loaded').length,
     failedCount: status.filter((s) => s === 'failed').length,
     settled,
+    shownIndex,
+    setShownIndex,
   };
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
