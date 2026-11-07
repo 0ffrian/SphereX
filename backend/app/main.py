@@ -14,6 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import objects, overlays, resolve, spectrum
 from app.context import make_context
+from app.core.card.assets import AssetStore
+from app.core.card.service import ObjectPipeline
 from app.core.find.frames import FrameService
 from app.core.find.overlays import OverlayService
 from app.core.find.resolver import load_aliases
@@ -58,6 +60,9 @@ def create_app(
     app.state.ctx = ctx
     app.state.frames = FrameService(ctx)
     app.state.overlays = OverlayService(app.state.frames)
+    app.state.pipeline = ObjectPipeline(
+        app.state.frames, AssetStore(ctx.cache, s.assets_dir, s.data_release)
+    )
     app.state.aliases = load_aliases(s.targets_file)
     # Order matters: the middleware added last is outermost. The catch-all goes in first so
     # that CORS wraps it and a 500 still carries CORS headers.
@@ -67,7 +72,9 @@ def create_app(
             CORSMiddleware,
             allow_origins=s.cors_list,
             allow_methods=["GET"],
-            expose_headers=["X-SX-Combine"],
+            # Let the browser read the D-16 cached_at, the asset status (Q-39) and the
+            # combine metadata (Q-50).
+            expose_headers=["X-SX-Cached-At", "X-SX-Asset-Status", "X-SX-Combine"],
         )
     install_error_handlers(app)
     app.include_router(resolve.router)

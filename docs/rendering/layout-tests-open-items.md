@@ -6,13 +6,18 @@
 
 ```
 backend/app/core/render/            (Atish)
-  card_to_params.py   # §6.2 rules + tags; unit-tested
+  card_to_params.py   # §6.2 rules + tags; pipeline stage 7 (A4.7), issue #5, built
+  blackbody.py        # §7.5 Teff -> display colour, issue #5
   noise.py craters.py height.py normals.py palette.py bake.py   # issue #6, built
   params.py           # §6.2 generator parameters (BakeParams, BakeRefusal); card_to_params adds the tags
   __main__.py         # python -m app.core.render <card.json> --seed N --out DIR
   gemini_paint.py     # stretch, behind the admin token
-  spherex_rgb.py      # §5.2 channel extraction
-backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; objects.py: /frames, /cutouts, later /card, /render-params, texture URLs;
+  spherex_rgb.py      # §5.2 channel extraction, issue #5, built
+backend/app/core/classify/           (Atish)  # pipeline stage 3 (A4.3), issue #5: rules.py (R3.3, R12 #12 thresholds block)
+backend/app/core/card/               (Kevin)  # pipeline stages 4 and 5 (A4.4, A4.5), issue #5: catalogue.py, build.py,
+                                              # assets.py (A5.4 store), validate.py (jsonschema, Q-40), service.py
+backend/assets/                               # A5.4 pre-baked assets, <type>/<id>.json (none yet)
+backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; objects.py: /frames, /cutouts, /card, /render-params (issue #5);
                                               # overlays.py: /overlays, /flags/{frame_id}.png, /combine.png (A4.9, Q-50)
 backend/app/adapters/                (Kevin)  # IRSA SIA + cutouts, SIMBAD, SBDB, Horizons, SkyBoT, Gaia and CatWISE2020 over TAP (A3), all through the cache
 backend/app/cache/                   (Kevin)  # D-25 read-through disk cache
@@ -35,9 +40,22 @@ frontend/src/viewer/                 (Moon)
   fields/             (Atish)  # field generator for shader kinds (§7.7, D-12): fieldGenerator.ts (pure, FieldSampler), noise.ts,
                                # fieldWorker.ts (field and point requests) [verify], fieldClient.ts (main-thread side, falls back)
 frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
-  haptics.ts calibration.ts
+  haptics.ts          # R8.8 HapticEngine: honesty gate, rate cap, multiplier, trains (Q-71), createHaptics; issue #9
+  audioContext.ts     # the one shared AudioContext, created only by a click (R8.9); shared unlock state
+  audioGraph.ts       # one master bus and limiter per AudioContext; the shared bell (playBell)
+  settings.ts         # R8.7 settings, own Zustand store, one localStorage key; bindEngine
+  calibration.ts      # R8.7 calibration: types, offset rule (#9); levels, tap-along maths, validated persistence (#10)
+  platform.ts pitch.ts spectrumMapping.ts   # default outputs and deviceVibrates (Q-73), pitch from λ (Q-70), spectrum → sample (R8.6)
+  tuning.ts           # every tuning constant, marked CREATIVE placeholder (D-13) or [verify on phones]
   drivers/webVibrate.ts drivers/audio.ts drivers/tauri.ts (stub, B-01)
   sources/heightMap.ts meshNormal.ts field.ts terrain.ts flow.ts spectrum.ts lightcurve.ts
+  sources/types.ts relief.ts dataPulse.ts   # TouchSample, TrainSlot; R8.4 peak rule; teq, flux and binary pulses (#11)
+  profiles.ts         # R8.5 buildHaptics per ObjectType + TouchHaptics (move, hold-still poll, scrub); issue #11
+  probe.ts            # pointer → ray → analytic ellipsoid → body direction, UV, normal, distance, ring radius, pan (#11)
+  ui/                 # PulseIndicator (D-20), UnlockButton (#9); CalibrationWizard, HapticsSettings, SpectrumHapticsPad (#10)
+  sound/              # listenSweep.ts (A8 Listen sweep, issue #11); imagined drive not built yet
+frontend/src/hapticsTestPage/        (Atish)  # dev-only test page behind frontend/haptics-test.html; not a build input;
+                                              # panels/SpectrumPanel.tsx (#10), panels/TexturePanel.tsx (#11)
 frontend/src/contract/               (generated, D-18)  # generated.ts comes from shared/schemas/ by json-schema-to-typescript;
                                                         # hand-written helpers such as assertTagged() and TV<T> sit next to it;
                                                         # the R8.8 runtime types stay hand-written in haptics.ts for now (Q-19)
@@ -55,7 +73,9 @@ frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, St
   flipbook/           # Flipbook player, playback, keys, cutout preloading, RainbowTrails + wavelengthColor (D-28);
                       # overlays/: markers, flag mask, field of view, overlay panel, combine panel (A4.9, issue #12)
   spectrum/           # SpectrumPanel, SVG SpectrumChart, scale (displays the A4.2 output)
-frontend/src/test/                           # test-only helpers (fixtureFetch.ts, sharedFixtures.ts: loads shared/fixtures)
+frontend/src/test/                           # test-only helpers (fixtureFetch.ts, sharedFixtures.ts: loads shared/fixtures;
+                                             # fakeHaptics.ts, fakeAudio.ts: fake clock, drivers and AudioContext;
+                                             # hapticRecorder.ts: recording sink and TouchSample helpers, issue #11)
 frontend/src/fixtures.test.ts                # fixtures are deterministic, pass the API validators, never imported by app code
 frontend/e2e/                                # Playwright tests (smoke, flipbook) against the fixture server
 frontend/fixtures/                           # dev and test only: SYNTHETIC fixture server, a Vite dev-server plugin

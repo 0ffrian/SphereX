@@ -7,6 +7,7 @@ from typing import cast
 from fastapi import Request
 
 from app.context import Context
+from app.core.card.service import ObjectPipeline
 from app.core.find.frames import FrameService
 
 
@@ -20,3 +21,7 @@ def get_frame_service(request: Request) -> FrameService:
 
 def get_aliases(request: Request) -> dict[str, str]:
     return cast(dict[str, str], request.app.state.aliases)
+
+
+def get_pipeline(request: Request) -> ObjectPipeline:
+    return cast(ObjectPipeline, request.app.state.pipeline)
