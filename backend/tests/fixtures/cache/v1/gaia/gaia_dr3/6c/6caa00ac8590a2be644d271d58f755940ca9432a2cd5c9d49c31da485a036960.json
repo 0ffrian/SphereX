@@ -1,0 +1,21 @@
+{
+ "adql": "SELECT TOP 5000 source_id, ra, dec, ref_epoch, pmra, pmdec, parallax, phot_g_mean_mag FROM gaia_dr3_source WHERE 1=CONTAINS(POINT('ICRS',ra,dec),CIRCLE('ICRS',248.16723,66.75502,0.07917)) AND phot_g_mean_mag < 20.00 ORDER BY phot_g_mean_mag, source_id",
+ "body_sha256": "e9e7adc9817993d1955ccf8b4c4f8e15f184ca4b40923b01dfcf8dc05be7f86c",
+ "body_size": 7067,
+ "content_type": "text/csv",
+ "fetched_at": "2026-11-06T11:31:41.922Z",
+ "key": {
+  "query": {
+   "dec": "66.75502",
+   "g_lt": "20.00",
+   "ra": "248.16723",
+   "radius": "0.07917",
+   "top": "5000"
+  },
+  "release": "gaia_dr3",
+  "source": "gaia"
+ },
+ "status": 200,
+ "table": "gaia_dr3_source",
+ "url": "https://irsa.ipac.caltech.edu/TAP/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=SELECT+TOP+5000+source_id%2C+ra%2C+dec%2C+ref_epoch%2C+pmra%2C+pmdec%2C+parallax%2C+phot_g_mean_mag+FROM+gaia_dr3_source+WHERE+1%3DCONTAINS%28POINT%28%27ICRS%27%2Cra%2Cdec%29%2CCIRCLE%28%27ICRS%27%2C248.16723%2C66.75502%2C0.07917%29%29+AND+phot_g_mean_mag+%3C+20.00+ORDER+BY+phot_g_mean_mag%2C+source_id"
+}

@@ -97,7 +97,7 @@ Decided in D-34. Rates come from `RenderParams.dynamics` ([R3.4](data-contract.m
 | Rocky or water planet | spin, terminator, clouds on latitude winds | `spin_period_h`, `jet_speed_ms` | physics rule; art for cloud shapes |
 | Asteroid | spin about the real pole (×1000, R7.1) | `spin_period_h` | measured |
 | Comet | jets turn with the nucleus; tail sway | `spin_period_h` | measured or typical; sway is art |
-| Nebula, supernova remnant | no idle motion | none | n/a |
+| `nebula`, `nova` | no idle motion | none | n/a |
 | Variable star | light-curve scrub (done) | none | measured |
 
 **Quality levels (the battery mechanism).** Called levels, not tiers, so they are not confused with the provenance tiers 1–5 (D-32).

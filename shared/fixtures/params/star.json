@@ -66,17 +66,16 @@
   "dynamics": {
     "spin_period_h": {
       "value": 600.0,
-      "tag": "derived",
-      "tier": 2,
-      "source": "synthetic fixture: not a real measurement",
-      "formula": "P = 2 pi R / v_eq"
+      "tag": "inferred_from_analog",
+      "tier": 4,
+      "source": "synthetic fixture: not a real measurement"
     },
     "spot_lifetime_d": {
       "value": 30.0,
       "tag": "model_dependent",
       "tier": 3,
       "source": "synthetic fixture: not a real measurement",
-      "formula": "tau = 30 d * (R / R_sun)^2",
+      "formula": "placeholder, not a spec rule: tau = 30 d * (R / R_sun)^2",
       "assumed": {
         "typical_class_lifetime_d": 30.0
       }

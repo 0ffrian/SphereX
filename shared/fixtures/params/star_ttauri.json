@@ -73,9 +73,10 @@
   "dynamics": {
     "spin_period_h": {
       "value": 96.0,
-      "tag": "measured",
-      "tier": 1,
-      "source": "synthetic fixture: not a real measurement"
+      "tag": "derived",
+      "tier": 2,
+      "source": "synthetic fixture: not a real measurement",
+      "formula": "placeholder, not a spec rule: P = period of the strongest peak in the light curve (periodogram of lightcurve)"
     },
     "flare_rate_per_d": {
       "value": 1.0,

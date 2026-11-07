@@ -69,11 +69,15 @@ describe('resolveShaderSpec', () => {
     expect(() => resolveShaderSpec(a.card, a.params)).toThrow(TypeError);
   });
 
-  it('applies slider overrides inside the registry range, only for applicable types', () => {
+  it('applies valid slider overrides only for applicable types; out of range is ignored, not clamped', () => {
     const f = fixture('planet_water');
     const spec = resolveShaderSpec(f.card, f.params, { sea_level: 0.5, relief: 99, bands: 20 });
     expect(spec.field?.seaLevel).toBe(0.5);
-    expect(spec.planet?.relief).toBe(SLIDER_REGISTRY.relief.max);
+    // One invalid-value policy with the store and the physics layer (D-27): the default is drawn.
+    expect(spec.planet?.relief).toBe(resolveShaderSpec(f.card, f.params).planet?.relief);
+    expect(sliderValue({ relief: SLIDER_REGISTRY.relief.max }, 'relief', 'planet_water')).toBe(
+      SLIDER_REGISTRY.relief.max,
+    );
     expect(spec.field?.bands).toBe(0); // 'bands' does not apply to planets
     expect(sliderValue({ storms: true }, 'storms', 'gas_giant')).toBeUndefined();
     expect(sliderValue({ storms: NaN }, 'storms', 'gas_giant')).toBeUndefined();

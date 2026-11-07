@@ -105,13 +105,13 @@
       "source": "synthetic fixture: not a real measurement"
     },
     "jet_speed_ms": {
-      "value": 100.0,
+      "value": 101.7,
       "tag": "model_dependent",
       "tier": 3,
       "source": "synthetic fixture: not a real measurement",
-      "formula": "v = 0.05 * Omega_eq * R, Omega_eq = 2 pi / spin_period_h",
+      "formula": "placeholder, not a spec rule: v = 0.0025 * Omega_eq * R, Omega_eq = 2 pi / spin_period_h",
       "assumed": {
-        "jet_fraction_of_equatorial_speed": 0.05,
+        "jet_fraction_of_equatorial_speed": 0.0025,
         "spin_period_h": 3.0,
         "radius_rjup": 1.0
       }
