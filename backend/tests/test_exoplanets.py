@@ -11,7 +11,14 @@ from fastapi.testclient import TestClient
 
 from app.adapters import exoplanet_archive as ea
 from app.core.card.validate import errors
-from app.core.classify import EXOPLANET_THRESHOLDS, CatalogueFacts, classify, classify_exoplanet
+from app.core.classify import (
+    EXOPLANET_THRESHOLDS,
+    PROPOSED_EXOPLANET_THRESHOLDS,
+    CatalogueFacts,
+    classify,
+    classify_exoplanet,
+    is_calculated,
+)
 from app.core.classify.zeng2019 import (
     EARTHLIKE_ROCKY,
     PURE_WATER_300K,
@@ -20,6 +27,15 @@ from app.core.classify.zeng2019 import (
 )
 from app.core.render.card_to_params import card_to_params
 from tests.test_api import resolve_id
+
+CALC = "<a refstr=CALCULATED_VALUE href=/docs/pscp_calc.html target=_blank>Calculated Value</a>"
+
+
+@pytest.fixture
+def proposed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The Q-63 values as proposed; live they stay None until Atish signs off (PR #45)."""
+    for k, v in PROPOSED_EXOPLANET_THRESHOLDS.items():
+        monkeypatch.setitem(EXOPLANET_THRESHOLDS, k, v)
 
 
 def row(**kw: Any) -> dict[str, Any]:
@@ -98,6 +114,37 @@ def test_water_curve_temperature_choice() -> None:
 # --- rule: every branch ----------------------------------------------------------------------
 
 
+def test_thresholds_unset_refuses_every_planet() -> None:
+    assert all(v is None for v in EXOPLANET_THRESHOLDS.values())
+    assert kind(pl_rade=15.6) == (None, ("type:exoplanet_thresholds",))
+    assert kind(pl_rade=0.92) == (None, ("type:exoplanet_thresholds",))
+
+
+def test_is_calculated() -> None:
+    assert is_calculated({"pl_rade_reflink": CALC}, "pl_rade")
+    assert not is_calculated({"pl_rade_reflink": "<a refstr=AGOL>Agol 2021</a>"}, "pl_rade")
+    assert not is_calculated({}, "pl_rade")
+
+
+@pytest.mark.usefixtures("proposed")
+def test_calculated_values_never_classify() -> None:
+    # Proxima Cen b: archive radius 1.02 from a mass-radius relation, Msini mass -> refused.
+    assert kind(pl_rade=1.02, pl_rade_reflink=CALC, pl_bmasse=1.07, pl_bmassprov="Msini") == (
+        None,
+        ("type:exoplanet_radius",),
+    )
+    # 51 Peg b: calculated radius ignored, true mass above 0.414 M_J -> gas giant by mass.
+    t, _, rule = classify_exoplanet(
+        row(pl_rade=14.1, pl_rade_reflink=CALC, pl_bmasse=150.0, pl_bmassprov="Mass")
+    )
+    assert t == "gas_giant" and "R missing" in rule
+    # A calculated mass is not a true mass either, whatever pl_bmassprov says.
+    assert kind(pl_rade=2.37, pl_bmasse=8.92, pl_bmassprov="Mass", pl_bmasse_reflink=CALC)[1] == (
+        "type:exoplanet_mass",
+    )
+
+
+@pytest.mark.usefixtures("proposed")
 def test_rule_branches() -> None:
     assert kind(pl_rade=0.92)[0] == "planet_rocky"
     assert kind(pl_rade=15.6)[0] == "gas_giant"
@@ -127,6 +174,7 @@ def test_rule_branches() -> None:
     )
 
 
+@pytest.mark.usefixtures("proposed")
 def test_rule_radius_missing() -> None:
     giant = 0.414 * 317.83
     assert kind(pl_bmasse=giant + 1, pl_bmassprov="Mass")[0] == "gas_giant"
@@ -135,6 +183,7 @@ def test_rule_radius_missing() -> None:
     assert kind()[1] == ("type:exoplanet_radius",)
 
 
+@pytest.mark.usefixtures("proposed")
 def test_rule_text_states_comparison() -> None:
     _, _, rule = classify_exoplanet(
         row(pl_rade=2.37, pl_bmasse=8.92, pl_bmassprov="Mass", pl_eqt=284.0)
@@ -142,8 +191,9 @@ def test_rule_text_states_comparison() -> None:
     assert "1.5<=R<6" in rule and "Zeng 2019" in rule and "300 K" in rule
 
 
+@pytest.mark.usefixtures("proposed")
 def test_thresholds_block_is_single_source(monkeypatch: pytest.MonkeyPatch) -> None:
-    assert all(isinstance(v, float) for v in EXOPLANET_THRESHOLDS.values())
+    assert all(isinstance(v, float) for v in PROPOSED_EXOPLANET_THRESHOLDS.values())
     monkeypatch.setitem(EXOPLANET_THRESHOLDS, "giant_min_radius_earth", 20.0)
     assert kind(pl_rade=15.6, pl_bmasse=232.0, pl_bmassprov="Mass")[0] is None
     src = Path(__file__).resolve().parents[1] / "app" / "core" / "classify" / "rules.py"
@@ -166,6 +216,7 @@ PLANETS = {
 }
 
 
+@pytest.mark.usefixtures("proposed")
 @pytest.mark.parametrize(("name", "want"), PLANETS.items())
 def test_fixture_planets_offline(client: TestClient, name: str, want: str) -> None:
     oid = resolve_id(client, name)
@@ -186,6 +237,30 @@ def test_fixture_planets_offline(client: TestClient, name: str, want: str) -> No
     assert card["teq_K"]["tag"] in ("measured", "derived")
     assert params["scale_m"] > 0
     assert "spectrum" in params["missing"]  # no SPHEREx frames recorded: null with a reason
+
+
+@pytest.mark.parametrize("name", [*PLANETS, "51 Peg b", "Proxima Cen b"])
+def test_fixture_planets_refused_until_thresholds_agreed(client: TestClient, name: str) -> None:
+    oid = resolve_id(client, name)
+    params = client.get(f"/v1/objects/{oid}/render-params").json()
+    assert params["type"] == "candidate"
+    assert "type:exoplanet_thresholds" in params["missing"]
+
+
+@pytest.mark.usefixtures("proposed")
+def test_calculated_archive_values_are_not_measured(client: TestClient) -> None:
+    oid = resolve_id(client, "51 Peg b")
+    card = client.get(f"/v1/objects/{oid}/card").json()
+    assert errors(card, "object-card.schema.json") == []
+    assert card["type"] == "gas_giant"  # by its true mass; the calculated radius is not used
+    radius, teq = card["radius_rjup"], card["teq_K"]
+    assert radius["tag"] == "model_dependent" and "Chen & Kipping" in radius["assumption"]
+    assert teq["tag"] == "derived" and "(1/4)^(1/4)" in teq["formula"]
+    assert "calculated value" in radius["source"] and "calculated value" in teq["source"]
+
+    oid = resolve_id(client, "Proxima Cen b")
+    params = client.get(f"/v1/objects/{oid}/render-params").json()
+    assert params["type"] == "candidate" and "type:exoplanet_radius" in params["missing"]
 
 
 def test_card_to_params_lists_refusal_reason() -> None:

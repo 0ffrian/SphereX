@@ -99,6 +99,38 @@ def test_network_error_does_not_fall_back(tmp_path: Path) -> None:
     assert set(centers) == {"'500@-163182'"}  # an outage never switches the observer
 
 
+NA_ROW = "2026-Nov-14 00:00:00.000, , , 265.248023177, -26.005517250,   n.a.,"
+
+
+@pytest.mark.parametrize(
+    ("spherex_reply", "falls_back"),
+    [
+        (_body(NA_ROW), True),  # Horizons cannot compute S-T-O for this observer
+        (b'{"result": "No ephemeris for target \\"SPHEREx\\" after A.D. 2027"}', True),
+        (b"<html>502 Bad Gateway</html>", False),  # not JSON: an outage, not "no ephemeris"
+        (b'{"result": "header without a table"}', False),
+    ],
+)
+def test_only_no_ephemeris_falls_back(
+    tmp_path: Path, spherex_reply: bytes, falls_back: bool
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.params.get("EPHEM_TYPE") == "VECTORS":
+            return httpx.Response(200, content=_body(VEC_ROW))
+        if "-163182" in request.url.params["CENTER"]:
+            return httpx.Response(200, content=spherex_reply)
+        return httpx.Response(200, content=_body(PHASE_ROW))
+
+    ctx = make_context(
+        make_settings(tmp_path, offline=False), transport=httpx.MockTransport(handler)
+    )
+    if falls_back:
+        assert horizons.geometry(ctx, "20000433", EPOCH)[0].observer == horizons.GEOCENTRE
+    else:
+        with pytest.raises(UpstreamUnavailable):
+            horizons.geometry(ctx, "20000433", EPOCH)
+
+
 def test_offline_uses_recorded_geocentre_fallback(tmp_path: Path) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.params.get("EPHEM_TYPE") == "VECTORS":

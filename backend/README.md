@@ -45,6 +45,7 @@ Input is an ICQ `.tab` (`--zip` plus `--member`, or `--input`) or an OBJ (`--inp
 | `GET /v1/objects/{id}/spectrum` | `{id, spectrum[], light_curve[], flux_unit, tag, cached_at, missing}` plus optional `data_release`, `method`, `provenance`. Flux in `uJy`, tagged `measured`. Spectrum points: `wavelength_um, flux, error, flagged, frame_id` plus optional `bandwidth_um, dropped_flags, dropped_weight_fraction, flag_reasons`. Light-curve points: `time, flux, error, frame_id` plus optional `wavelength_um, flagged`. Refused frames are listed in `missing` as `<reason>:<frame_id>` (e.g. `saturated:…`); `spectrum:saturated` when every frame saturated (A4.2, D-31) |
 | `GET /v1/objects/{id}/card` | ObjectCard (R3.2), exactly the `shared/schemas` shape and validated with `jsonschema` before it is sent. Headers: `X-SX-Asset-Status` (`saved`, `generated` or `sketch`, A4.4) and `X-SX-Cached-At` (D-16; the schema forbids extra fields, Q-39) |
 | `GET /v1/objects/{id}/render-params` | RenderParams (R3.4), validated the same way, with the same headers. Refused layers are listed in `missing` |
+| `GET /data/shapes/{name}.glb` | A registered shape-model mesh (glTF binary, `model/gltf-binary`), metres, glTF +Y up (Q-61). Only names listed in `assets/shapes/registry.toml` are served; anything else is 404 |
 | `GET /v1/health` | `{status, offline, data_release}` |
 
 Per-target spectrum report on a cache: `SX_OFFLINE=1 uv run python -m app.core.measure [--group test|demo] [--only NAME]` (default `--group test`).

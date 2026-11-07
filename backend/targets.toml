@@ -1,6 +1,24 @@
 # Targets for the pre-fetch script (D-25) and the recorded test fixtures.
 # `query` is what is sent to /v1/resolve; `aliases` are short names that SIMBAD does not know
 # (ASSUMPTION: a name mapping, not a physical value).
+# Archive "Calculated Value" fixtures (Q-63, PR #45 review): PSCompPars fills pl_rade from a
+# mass-radius relation and marks it refstr=CALCULATED_VALUE. Neither radius is used to classify.
+# 51 Peg b: calculated R 14.1, true mass -> mass-only path; Proxima Cen b: calculated R 1.02,
+# Msini mass -> refused (type:exoplanet_radius).
+[[target]]
+name = "51 Peg b"
+query = "51 Peg b"
+group = "fixture"
+frames = false
+aliases = []
+
+[[target]]
+name = "Proxima Cen b"
+query = "Proxima Cen b"
+group = "fixture"
+frames = false
+aliases = []
+
 # Demo objects (D-31) are listed last, with group = "demo".
 
 [[target]]

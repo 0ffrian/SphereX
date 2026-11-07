@@ -34,11 +34,13 @@ ObjectTypeName = Literal[
 Confidence = Literal["catalogue", "none"]
 
 # --- R12 #12 [verify]: exoplanet type thresholds -------------------------------------------
-# R3.3 step 4 and R12 #12 say not to hard-code values until they are agreed. Q-63 sets them here,
-# pending the team's (Atish's) confirmation, so each is still [verify]. This block is the single
-# place for the numbers; the mass-radius tables sit in `zeng2019.py` (also [verify]). Set a value
-# to None to refuse the rule that needs it.
-EXOPLANET_THRESHOLDS: dict[str, float | None] = {
+# R3.3 step 4 and R12 #12 say not to hard-code values until they are agreed, and stage 3 belongs
+# to Atish (D-17). Until he signs off Q-63, every live threshold is None, so the rule refuses with
+# `type:exoplanet_thresholds` and the planet is `candidate`. The proposed values stay below with
+# their sources; turning the rule on is `EXOPLANET_THRESHOLDS = dict(PROPOSED_EXOPLANET_THRESHOLDS)`
+# plus an ASSET_VERSION bump. This block is the single place for the numbers; the mass-radius
+# tables sit in `zeng2019.py` (also [verify]). A None value refuses the rule that needs it.
+PROPOSED_EXOPLANET_THRESHOLDS: dict[str, float] = {
     # planet_rocky below this pl_rade. Weiss & Marcy 2014 (arXiv:1312.0936); Fulton et al. 2017
     # (arXiv:1703.10375, radius valley near 1.5-2 R_earth). [verify]
     "rocky_max_radius_earth": 1.5,
@@ -50,6 +52,22 @@ EXOPLANET_THRESHOLDS: dict[str, float | None] = {
     # Earth masses per Jupiter mass (IAU 2015 nominal GM ratio, M_J / M_E = 317.83). [verify]
     "earth_masses_per_jup": 317.83,
 }
+EXOPLANET_THRESHOLDS: dict[str, float | None] = dict.fromkeys(PROPOSED_EXOPLANET_THRESHOLDS)
+# PSCompPars fills gaps with its own estimates and marks them in `<column>_reflink` with
+# `refstr=CALCULATED_VALUE` (https://exoplanetarchive.ipac.caltech.edu/docs/pscp_calc.html):
+# a radius from the Chen & Kipping 2017 mass-radius relation (often from an Msini mass), a mass
+# from the radius, Teq = T_star * sqrt(R_star / a) * (1/4)^(1/4). A calculated radius or mass is
+# never used to classify (the same circularity as "M-R relationship"); on 2026-11-07, 1,540 rows
+# had a calculated pl_rade and 1,090 a calculated pl_eqt (PR #45 review).
+CALCULATED_REFSTR = "refstr=CALCULATED_VALUE"
+
+
+def is_calculated(row: Mapping[str, Any], column: str) -> bool:
+    """True when the archive computed ``column`` itself instead of taking it from a paper."""
+    link = row.get(f"{column}_reflink")
+    return isinstance(link, str) and CALCULATED_REFSTR in link
+
+
 # Archive `pl_bmassprov` values seen in PSCompPars on 2026-11-07: "Mass" (2491 rows), "Msini" (926),
 # "Msin(i)/sin(i)" (15), "M-R relationship" (3032). Only "Mass" is used as a mass; "Msini" is a
 # lower limit and "M-R relationship" is the archive's own estimate from the radius (circular).
@@ -119,7 +137,8 @@ def classify_exoplanet(
 ) -> tuple[ObjectTypeName | None, tuple[str, ...], str]:
     """R3.3 step 4 (Q-63): (type or None, refusal reasons, rule text). Central values only.
 
-    R = pl_rade; M = pl_bmasse only when pl_bmassprov is a true mass. Error bars are ignored.
+    R = pl_rade unless the archive calculated it; M = pl_bmasse only when pl_bmassprov is a true
+    mass and the archive did not calculate it. Error bars are ignored.
     """
     t = EXOPLANET_THRESHOLDS
     if any(v is None for v in t.values()):
@@ -131,8 +150,9 @@ def classify_exoplanet(
     assert rocky_max is not None and giant_r is not None
     assert giant_mj is not None and me_per_mj is not None
 
-    r = _num(row, "pl_rade")
-    m = _num(row, "pl_bmasse") if row.get("pl_bmassprov") in TRUE_MASS_PROVENANCE else None
+    r = None if is_calculated(row, "pl_rade") else _num(row, "pl_rade")
+    true_mass = row.get("pl_bmassprov") in TRUE_MASS_PROVENANCE
+    m = _num(row, "pl_bmasse") if true_mass and not is_calculated(row, "pl_bmasse") else None
     base = "R3.3.4 Exoplanet Archive"
 
     if r is None:

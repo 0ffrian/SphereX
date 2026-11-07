@@ -49,7 +49,7 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 | Status | **Tested**, 3I/ATLAS returned in 1.4 s. The backend uses `COMMAND='DES=<spkid>;'`, `TLIST_TYPE=JD`, `TIME_TYPE=UT` and the geocentre `500@399` **[verify against a SPHEREx-centred ephemeris]**. Positions are predictions, tagged `model_dependent`. |
 | Designation | 3I/ATLAS is `C/2025 N1` |
 | Use | Position over time for any moving object. Also the phase angle used for lighting (rendering doc §5.1). |
-| Lighting | **Tested 6 Nov 2026** (433 Eros). Observer ephemeris with `QUANTITIES='1,24'` and `CENTER='500@-163182'` (SPHEREx) adds the S-T-O phase angle; `EPHEM_TYPE=VECTORS`, `CENTER='500@10'`, `REF_PLANE=FRAME` gives the heliocentric ICRF vector, so the Sun direction is `-r/\|r\|`. Both are taken at the resolve epoch and the geocentre is the fallback if Horizons has no SPHEREx ephemeris (Q-62). Phase angle is tagged `measured` (R5.1), the Sun vector `derived`. |
+| Lighting | **Tested 7 Nov 2026** (433 Eros). Observer ephemeris with `QUANTITIES='1,24'` and `CENTER='500@-163182'` (SPHEREx) adds the S-T-O phase angle; `EPHEM_TYPE=VECTORS`, `CENTER='500@10'`, `REF_PLANE=FRAME` gives the heliocentric ICRF vector, so the Sun direction is `-r/\|r\|`. Both are taken at the resolve epoch and the geocentre is the fallback if Horizons has no SPHEREx ephemeris (Q-62). Phase angle is tagged `measured` (R5.1), the Sun vector `derived`. |
 
 ### A3.5 IMCCE SkyBoT
 
