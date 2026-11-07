@@ -1,4 +1,4 @@
-// WP2 (issue #39): sphere geometry helpers for shader-generated bodies, as TSL builders and CPU
+// Issue #39: sphere geometry helpers for shader-generated bodies, as TSL builders and CPU
 // reference twins using the same maths. Convention: +y is the rotation axis (north), longitude is
 // atan2(z, x), east = normalize(y x n), north = n x east. At the poles east is undefined; both
 // versions return east = +x there (and north = n x east), so the frame stays finite.

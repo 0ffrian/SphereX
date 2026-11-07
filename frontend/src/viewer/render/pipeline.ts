@@ -1,6 +1,6 @@
 // Frame pipeline (issue #39, R5.7, Q-66/Q-67): scene -> HDR (half-float) target -> bloom ->
 // highlight clip (in place of AgX, see `clipHighlights`) -> anti-alias (TAAU on the high and medium
-// quality tiers, SMAA on low). three r187 `RenderPipeline` with the TSL display nodes from
+// quality levels, SMAA on low). three r187 `RenderPipeline` with the TSL display nodes from
 // three/addons. Checked against node_modules/three r187:
 //   RenderPipeline (src/renderers/common/RenderPipeline.js): ctor(renderer), .outputNode,
 //     .outputColorTransform, .needsUpdate, .render(), .dispose()
@@ -85,7 +85,7 @@ export interface ChainConfig {
 }
 
 /**
- * What a tier asks of the pipeline (pure; the unit tests read this). Under reduced motion (R9) the
+ * What a quality level asks of the pipeline (pure; the unit tests read this). Under reduced motion (R9) the
  * temporal path is swapped for SMAA: TAAU jitters the camera by a sub-pixel offset every frame,
  * which shows as edge shimmer during each settle burst.
  */
@@ -110,7 +110,7 @@ export class RenderChain {
   /**
    * The nodes that own render targets. r187 RenderPipeline.dispose() frees only its own quad
    * material, so the scene pass, bloom, the LDR copy and the AA node are disposed here, or every
-   * tier change would leak a full set of HDR, bloom and history targets.
+   * quality-level change would leak a full set of HDR, bloom and history targets.
    */
   private owned: Disposable[] = [];
   private scenePass: PassNode | null = null;
@@ -191,8 +191,11 @@ export class RenderChain {
    * internal await), so compiles run one at a time and `render()` puts the outer target back
    * for any frame drawn meanwhile.
    */
-  compileAsync(object: Object3D): Promise<void> {
-    const run = this.compileQueue.then(() => this.compileNow(object));
+  compileAsync(object: Object3D, onStart?: () => void): Promise<void> {
+    const run = this.compileQueue.then(() => {
+      onStart?.();
+      return this.compileNow(object);
+    });
     this.compileQueue = run.catch(() => undefined);
     return run;
   }
@@ -205,7 +208,8 @@ export class RenderChain {
     const sp = this.scenePass;
     if (!sp) return;
     const r = this.renderer;
-    this.outer = { target: r.getRenderTarget(), mrt: r.getMRT() };
+    const outer = { target: r.getRenderTarget(), mrt: r.getMRT() };
+    this.outer = outer;
     r.getDrawingBufferSize(this.size);
     sp.renderTarget.samples = 0;
     sp.setSize(this.size.width, this.size.height);
@@ -214,10 +218,18 @@ export class RenderChain {
     try {
       await r.compileAsync(object, this.camera, this.scene);
     } finally {
-      r.setRenderTarget(this.outer.target);
-      r.setMRT(this.outer.mrt);
-      this.outer = null;
+      // Unless dispose() already put the outer target back.
+      if (this.outer === outer) this.restoreOuter();
     }
+  }
+
+  /** Puts back the renderer's target and MRT from before the compile in flight, if any. */
+  private restoreOuter(): void {
+    const outer = this.outer;
+    if (!outer) return;
+    this.outer = null;
+    this.renderer.setRenderTarget(outer.target);
+    this.renderer.setMRT(outer.mrt);
   }
 
   /**
@@ -269,7 +281,12 @@ export class RenderChain {
     }
   }
 
+  /**
+   * Also during a compile: the renderer must not stay on the disposed pass target, or the plain
+   * fallback would draw off-screen until the compile settles.
+   */
   dispose(): void {
+    this.restoreOuter();
     this.release();
   }
 }

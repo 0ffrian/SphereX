@@ -1,4 +1,4 @@
-// WP2 (issue #39): shared TSL noise building blocks (three r187, `three/tsl`). Pure functions of
+// Issue #39: shared TSL noise building blocks (three r187, `three/tsl`). Pure functions of
 // (position, seed, t): no Math.random, no Date, no per-frame state. For shader-generated kinds and
 // later renderers only; baked kinds never compute noise per frame (R5.5). Every output here is a
 // visual-only texture, so any layer built from it is `artistic` (R7.7).
@@ -9,7 +9,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- TSL node graphs are built from untyped proxies */
 import { abs, float, mx_noise_float, mx_worley_noise_float, vec3 } from 'three/tsl';
 
-/** Quality-tier octave counts (R5.7): the tier supplies one of these as a plain number. */
+/** Quality-level octave counts (R5.7): the tier supplies one of these as a plain number. */
 export const OCTAVES = { high: 6, medium: 5, low: 4 } as const;
 export type Octaves = (typeof OCTAVES)[keyof typeof OCTAVES] | number;
 

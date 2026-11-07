@@ -38,10 +38,10 @@ frontend/src/viewer/                 (Moon)
   renderers/shaderSpec.ts shaderPalette.ts pointClouds.ts   # card -> what to draw, palettes and lava thresholds, nebula / nova point sets
   sliders.ts          # D-26 / D-27: the one slider registry (viewer and physics), SliderKey, overrides
   render/             # render core (issue #39): pipeline.ts (RenderChain: HDR pass, bloom, highlight clip, TAAU or SMAA),
-                      # quality.ts (quality tiers low/medium/high, FrameGovernor), clock.ts (SimClock, pause reasons),
+                      # quality.ts (quality levels low/medium/high, FrameGovernor), clock.ts (SimClock, pause reasons),
                       # workerPool.ts (WorkerPool), fanout.ts (card and render-params fan-out loader, asset prefetch)
   shaders/            # TSL helpers on three r187 (issue #39): noise.ts (seeded fbm, ridged, domainWarp, animatedCells,
-                      # OCTAVES per quality tier), sphere.ts (latLon, tangentFrame, differential rotation); index.ts re-exports
+                      # OCTAVES per quality level), sphere.ts (latLon, tangentFrame, differential rotation); index.ts re-exports
   fields/             (Atish)  # field generator for shader kinds (§7.7, D-12): fieldGenerator.ts (pure, FieldSampler), noise.ts,
                                # fieldWorker.ts (field and point requests) [verify], fieldClient.ts (main-thread side, falls back)
 frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
@@ -108,7 +108,7 @@ Owners follow D-17 (Munazir is Moon). `frontend/src/contract/` is generated code
 
 The `app/` subfolders (`api/`, `search/`, `flipbook/`, `spectrum/`), the `sky` slice, `src/test/`, `fixtures/` and `scripts/` were added by the flipbook and spectrum view (M1, issue #3, 5 Nov 2026). The fixture server answers `/v1` with synthetic data and marks every reply with `X-SX-Fixture: synthetic`; see the [fixtures README](../../frontend/fixtures/README.md). D-17 names no owner for `src/test/`, `fixtures/` and `scripts/`; they are dev and test tooling for the flipbook UI.
 
-`viewer/render/`, `viewer/shaders/`, `src/shaderlab/` and `shaderlab.html` were added by the viewer render core (issue #39). Motion and quality tiers follow R5.7 and D-34; how the viewer implements them is [Q-66](../decisions.md). `shaderlab.html` is served by the dev server only; Vite builds `index.html` alone, so it never reaches `dist/`. D-17 names no owner for the harness.
+`viewer/render/`, `viewer/shaders/`, `src/shaderlab/` and `shaderlab.html` were added by the viewer render core (issue #39). Motion and quality levels follow R5.7 and D-34; how the viewer implements them is [Q-66](../decisions.md). `shaderlab.html` is served by the dev server only; Vite builds `index.html` alone, so it never reaches `dist/`. D-17 names no owner for the harness.
 
 ---
 

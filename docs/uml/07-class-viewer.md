@@ -41,11 +41,11 @@ classDiagram
   }
   class FrameGovernor {
     <<render/quality.ts>>
-    +tier: TierName, quality tier low, medium or high
+    +tier: TierName, quality level low, medium or high
     +setTier(t: TierName) void
     +reset() void
     +feed(frameMs, nowMs) TierDrop or null
-    lowers one quality tier after 2 s of slow frames, never raises
+    lowers one quality level after 2 s of slow frames, never raises
   }
   class SimClock {
     <<render/clock.ts>>
@@ -197,7 +197,7 @@ classDiagram
   ViewerApp "1" *-- "0..1" RenderChain : draws through it, compiles new content with it
   ViewerApp "1" *-- "1" SimClock : spin process, pause reasons
   ViewerApp "1" *-- "1" FrameGovernor : fed during continuous frames
-  note for WorkerPool "issue #39 WP3: built and tested, no caller in ViewerApp yet"
+  note for WorkerPool "issue #39: built and tested, no caller in ViewerApp yet"
   ViewerApp "1" *-- "1" Lighting
   ViewerApp "1" *-- "1" Modes
   ViewerApp "1" *-- "1" Honesty
@@ -224,7 +224,7 @@ classDiagram
 
 ## Notes
 
-- Render core (issue #39): `ViewerApp` draws through a `RenderChain` (`render/pipeline.ts`); if the chain cannot be built it falls back to plain `renderer.render`. New content is compiled with `RenderChain.compileAsync` before it is swapped in (diagram [10](10-sequence-view-3d.md)). The quality tier (low, medium or high, `render/quality.ts`) sets bloom resolution, anti-aliasing (TAAU or SMAA), noise octaves and volume steps. `FrameGovernor` only lowers the quality tier; `setQualityTier` picks one by hand. `SimClock` (`render/clock.ts`) holds one sim time per moving process (only the spin today) and the pause reasons shown in diagram [15](15-state-interaction.md). `renderStats`, `whenSettled` and `freezeClock` are test and tuning hooks; `timeLapses` lists each process with its shown speed-up. Motion and quality tiers follow R5.7 and D-34; the implementation is Q-66 in [decisions](../decisions.md).
+- Render core (issue #39): `ViewerApp` draws through a `RenderChain` (`render/pipeline.ts`); if the chain cannot be built it falls back to plain `renderer.render`. New content is compiled with `RenderChain.compileAsync` before it is swapped in (diagram [10](10-sequence-view-3d.md)). The quality level (low, medium or high, `render/quality.ts`) sets bloom resolution, anti-aliasing (TAAU or SMAA), noise octaves and volume steps. `FrameGovernor` only lowers the quality level; `setQualityTier` picks one by hand. `SimClock` (`render/clock.ts`) holds one sim time per moving process (only the spin today) and the pause reasons shown in diagram [15](15-state-interaction.md). `renderStats`, `whenSettled` and `freezeClock` are test and tuning hooks; `timeLapses` lists each process with its shown speed-up. Motion and quality levels follow R5.7 and D-34; the implementation is Q-66 in [decisions](../decisions.md).
 - `WorkerPool` (`render/workerPool.ts`) and the fan-out loader (`render/fanout.ts`, `loadBody`) exist and are tested, but nothing in the viewer calls them yet.
 
 - Plan layer (issue #7): `ViewerApp.setObject` calls `planRender` to get a pure `RenderPlan`, and `showPlan` passes it to `renderers/build.ts`, which makes the three.js objects. The per-type renderer files hold the plan functions. `BodyRenderer` above is the conceptual contract; in code it is the plan function plus `build.ts`.

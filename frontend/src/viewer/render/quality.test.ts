@@ -3,14 +3,16 @@ import {
   FrameGovernor,
   initialTier,
   lowerTier,
-  minFrameIntervalMs,
+  capIntervalMs,
+  FrameCap,
+  PHONE_FPS_CAP,
   qualityFromSearch,
   SLOW_FRAME_MS,
   SLOW_WINDOW_MS,
   TIERS,
 } from './quality';
 
-describe('quality tiers (R5.7)', () => {
+describe('quality levels (R5.7)', () => {
   it('match the R5.7 table', () => {
     expect(TIERS.high).toMatchObject({
       octaves: 6,
@@ -118,7 +120,7 @@ describe('FrameGovernor at a steady 30 fps', () => {
   });
 });
 
-describe('qualityFromSearch and minFrameIntervalMs', () => {
+describe('qualityFromSearch and capIntervalMs', () => {
   it('reads ?quality= and ignores anything else', () => {
     expect(qualityFromSearch('?quality=high')).toBe('high');
     expect(qualityFromSearch('?a=1&quality=low')).toBe('low');
@@ -126,8 +128,40 @@ describe('qualityFromSearch and minFrameIntervalMs', () => {
     expect(qualityFromSearch('')).toBeNull();
   });
 
-  it('caps the low quality tier at 30 fps and leaves 60 fps tiers at the display rate', () => {
-    expect(minFrameIntervalMs('low')).toBeCloseTo(1000 / 30 - 2);
-    expect(minFrameIntervalMs('medium')).toBeLessThan(1000 / 60);
+  it('caps only the low quality level on a coarse pointer (phones)', () => {
+    expect(capIntervalMs('low', true)).toBeCloseTo(1000 / PHONE_FPS_CAP);
+    expect(capIntervalMs('low', false)).toBeNull();
+    expect(capIntervalMs('medium', true)).toBeNull();
+    expect(capIntervalMs('high', false)).toBeNull();
+  });
+});
+
+describe('FrameCap', () => {
+  /** Drawn frames in `seconds` of animation frames at `hz`. */
+  function drawn(cap: FrameCap, hz: number, seconds = 10): number {
+    let n = 0;
+    for (let i = 0; i < hz * seconds; i++) if (cap.shouldDraw((i * 1000) / hz)) n++;
+    return n / seconds;
+  }
+
+  it.each([60, 75, 90, 120, 144, 165])('averages 30 fps at %i Hz', (hz) => {
+    const fps = drawn(new FrameCap(1000 / 30), hz);
+    expect(fps).toBeGreaterThanOrEqual(29.5);
+    expect(fps).toBeLessThanOrEqual(30.5);
+  });
+
+  it.each([60, 75, 90, 144])('draws every frame at %i Hz when uncapped', (hz) => {
+    expect(drawn(new FrameCap(null), hz)).toBe(hz);
+  });
+
+  it('a 30 Hz display (energy saver) draws every frame under a 30 fps cap', () => {
+    expect(drawn(new FrameCap(1000 / 30), 30)).toBe(30);
+  });
+
+  it('restarts after a stall instead of drawing a burst to catch up', () => {
+    const cap = new FrameCap(1000 / 30);
+    expect(cap.shouldDraw(0)).toBe(true);
+    expect(cap.shouldDraw(5000)).toBe(true);
+    expect(cap.shouldDraw(5000 + 1000 / 60)).toBe(false);
   });
 });

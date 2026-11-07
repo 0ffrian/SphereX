@@ -1,4 +1,4 @@
-// Dev-only harness (issue #39 WP2): one sphere per shader-library function, fixed seed and time
+// Dev-only harness (issue #39): one sphere per shader-library function, fixed seed and time
 // from the URL (?seed=7&t=0). Not part of the production build (vite builds index.html only).
 import {
   Mesh,

@@ -1,12 +1,12 @@
 # Reference frames
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Section:** R11 (acceptance tests; the quality gates of the render plan, 10.6) · **Implements:** D-21
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Section:** R11 (acceptance tests: the render-core quality gates of issue #39, R5.7) · **Implements:** D-21
 
-These are the target previews from the render plan (section 10.1, "the quality bar"). Every renderer is reviewed against them before it merges, with [checklist.md](checklist.md). Frame times are checked with [frame-time.md](frame-time.md). Golden-frame tests are a separate thing (below).
+These are the team's target previews ("the quality bar", issue #39). Every renderer is reviewed against them before it merges, with [checklist.md](checklist.md). Frame times are checked with [frame-time.md](frame-time.md). Golden-frame tests are a separate thing (below).
 
 **What they are not.** They are the team's concept previews (6 Nov 2026), 240 x 240 JPEG. They are a visual **target**, not output of the app and not measured data. They carry the `artistic` tag: a look to aim for, never evidence about a real object. Do not compare them pixel by pixel.
 
-| File                                           | Body                                   | What the frame shows (the concept caption)                       |
+| File                                           | Body                                   | What the frame shows (the concept caption)                      |
 | ---------------------------------------------- | -------------------------------------- | --------------------------------------------------------------- |
 | [eros.jpg](eros.jpg)                           | Asteroid with a shape model (433 Eros) | Real NEAR shape, to scale, lit by the Sun                       |
 | [star.jpg](star.jpg)                           | Star                                   | Sunspot groups, faculae, flare ribbons, plasma arch, crisp limb |
@@ -26,7 +26,7 @@ When you put an app render beside a reference, use the same conditions every tim
 - **Fixture**: the card and params in `shared/fixtures/` for the body type (no live data).
 - **Seed**: the seed in the fixture's RenderParams, unchanged.
 - **Time**: simulation time 0 with the clock frozen (`__sxViewer.freezeClock(0)`), so animated bodies are at the same phase.
-- **Quality tier**: `low` for CI frames (the WebGL2 fallback), the device's own tier for a device review.
+- **Quality level**: `low` for CI frames (the WebGL2 fallback), the device's own tier for a device review.
 - **Honesty**: `+ Artistic` for a look review (the art layers are what the references show); the three states are covered by the golden frames.
 - **Size**: the same canvas size and framing; reference frames are square, crop to match.
 

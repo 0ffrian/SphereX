@@ -32,7 +32,8 @@ import {
   FrameGovernor,
   initialTier,
   isTierName,
-  minFrameIntervalMs,
+  capIntervalMs,
+  FrameCap,
   qualityFromSearch,
   type TierName,
 } from './render/quality';
@@ -240,9 +241,13 @@ export class ViewerApp {
   private readonly frameTimes: number[] = [];
   private burstLeft = 0;
   private loopLast: number | null = null;
+  /** R5.7 phone frame-rate cap; no cap on desktop or the medium and high levels. */
+  private readonly cap = new FrameCap();
   /** Coarse pointer (phone or tablet): 30 fps start tier and the R5.7 idle pause. */
   private readonly coarsePointer: boolean;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private idle = false;
+  private onIdleChange: ((idle: boolean) => void) | null = null;
   private settleWaiters: (() => void)[] = [];
   private intersection: IntersectionObserver | null = null;
   private motionQuery: MediaQueryList | null = null;
@@ -296,6 +301,7 @@ export class ViewerApp {
       qualityFromSearch(window.location?.search ?? '') ??
       initialTier({ backend: this.backend, coarsePointer: this.coarsePointer });
     this.governor = new FrameGovernor(this.tier);
+    this.cap.setInterval(capIntervalMs(this.tier, this.coarsePointer));
 
     this.scene = new Scene();
     // The background must be scene.background: through the HDR RenderPipeline the clear colour alone
@@ -330,7 +336,8 @@ export class ViewerApp {
     canvas.addEventListener('keydown', this.onKeyDown);
     // R5.7: on phones the clock pauses after a minute without interaction and resumes on touch.
     if (this.coarsePointer) {
-      for (const type of IDLE_EVENTS) canvas.addEventListener(type, this.onInteraction);
+      for (const type of IDLE_EVENTS)
+        canvas.addEventListener(type, this.onInteraction, { passive: true });
       this.armIdle();
     }
     // WebGPU reports pipeline and validation errors asynchronously (uncapturederror), so they
@@ -491,14 +498,21 @@ export class ViewerApp {
    * target and MRT, which is where the object is drawn; plainly, for the canvas.
    */
   private compile(object: Object3D): Promise<void> {
+    // The timeout starts when this compile starts: through the chain, compiles queue behind each
+    // other, and a slow earlier one must not time this one out.
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let startTimer!: () => void;
     const timeout = new Promise<void>((resolve) => {
-      timer = setTimeout(resolve, COMPILE_TIMEOUT_MS);
+      startTimer = () => {
+        timer ??= setTimeout(resolve, COMPILE_TIMEOUT_MS);
+      };
     });
+    const chain = this.chain;
+    if (!chain) startTimer();
     const done = Promise.resolve()
       .then(() =>
-        this.chain
-          ? this.chain.compileAsync(object)
+        chain
+          ? chain.compileAsync(object, startTimer)
           : this.renderer.compileAsync(object, this.camera, this.scene),
       )
       .catch((err: unknown) => console.warn('[viewer] compileAsync failed', err));
@@ -670,6 +684,7 @@ export class ViewerApp {
     const from = this.tier;
     this.tier = name;
     this.governor.setTier(name);
+    this.cap.setInterval(capIntervalMs(name, this.coarsePointer));
     if (this.chain) {
       try {
         this.chain.setTier(name);
@@ -682,7 +697,7 @@ export class ViewerApp {
     this.renderNow();
   }
 
-  /** Quality tier, backend and frame-time percentiles of the continuous frames (tests, tuning). */
+  /** Quality level, backend and frame-time percentiles of the continuous frames (tests, tuning). */
   renderStats(): RenderStats {
     return {
       tier: this.tier,
@@ -728,8 +743,8 @@ export class ViewerApp {
   private readonly tick = (now: number): void => {
     this.frameRequest = null;
     if (this.disposed) return;
-    // R5.7 frame-rate cap (30 fps on the low quality tier): skip this display frame.
-    if (this.loopLast !== null && now - this.loopLast < minFrameIntervalMs(this.tier)) {
+    // R5.7 phone frame-rate cap (30 fps on the low quality level): skip this display frame.
+    if (!this.cap.shouldDraw(now)) {
       this.schedule();
       return;
     }
@@ -754,6 +769,7 @@ export class ViewerApp {
       this.schedule();
     } else {
       this.loopLast = null;
+      this.cap.reset();
       this.governor.reset();
     }
   };
@@ -861,15 +877,34 @@ export class ViewerApp {
     if (this.idleTimer !== null) clearTimeout(this.idleTimer);
     this.idleTimer = setTimeout(() => {
       this.idleTimer = null;
-      if (!this.disposed) this.setPause('idle', true);
+      if (!this.disposed) this.setIdle(true);
     }, IDLE_PAUSE_MS);
   }
 
-  private readonly onInteraction = (): void => {
-    if (this.disposed) return;
-    this.setPause('idle', false);
+  private setIdle(idle: boolean): void {
+    if (idle === this.idle) return;
+    this.idle = idle;
+    this.setPause('idle', idle);
+    this.onIdleChange?.(idle);
+  }
+
+  /** True while the R5.7 phone idle pause holds the clock (the panel says so). */
+  isIdlePaused(): boolean {
+    return this.idle;
+  }
+
+  /** The panel's resume control lifts the idle pause too (D-34: resume on touch). */
+  resumeFromIdle(): void {
+    if (this.disposed || !this.coarsePointer) return;
+    this.setIdle(false);
     this.armIdle();
-  };
+  }
+
+  setIdleChangeHandler(handler: ((idle: boolean) => void) | null): void {
+    this.onIdleChange = handler;
+  }
+
+  private readonly onInteraction = (): void => this.resumeFromIdle();
 
   private readonly onVisibility = (): void => {
     if (!this.disposed) this.setPause('hidden', document.hidden);
