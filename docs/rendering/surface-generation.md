@@ -127,6 +127,8 @@ def normals_from_height(h, radius_m, strength=1.0):
 4. **Alignment check:** compute the correlation between Sobel edges of the hillshade and of the output luminance. Below 0.3 → reject and keep the [§6.4](#r64-colour-no-ai-default) colour.
 5. Seam fix: `np.roll` by W/2, blend a 32 px band across the old seam, roll back.
 
+**Status (issue #14, 7 Nov 2026):** built server-side in `backend/app/core/render/gemini_paint.py` (routes in `backend/app/api/gemini.py`), behind the admin token. The code bake runs first and its colour loads first; the hillshade is taken from `height.bin`; the call goes through the D-25 cache. Any failure keeps the [§6.4](#r64-colour-no-ai-default) colour and lists `albedo_ai` in `missing`. Endpoints, settings and reason codes: [A6.2](../architecture/generators.md#a62-optional-gemini-artistic-layer); the contract is not decided (Q-87). Step 3's model name and aspect ratios, and the REST request/response shape, are still **[verify]** (R12 #3).
+
 **Image-first (only for images not generated from a height map).**
 
 1. Run Depth Anything V2 Small (Python on the laptop/server, or Transformers.js `onnx-community/depth-anything-v2-small` in the browser).
@@ -141,3 +143,4 @@ def normals_from_height(h, radius_m, strength=1.0):
 - Backend writes `/data/textures/{id}/{generator_version}/{seed}/{width}x{height}/{albedo.webp, height.png, height.bin, normal.png}`. The size directory keeps two sizes of one object apart (Q-47).
 - Beside the four maps the baker writes `bake.json`: a hash of the generator parameters, the map size and the baker rules version (Q-47). A directory whose hash differs is rebaked, so a changed card or size is never served stale.
 - The cache key includes `generator_version`. Bump the version whenever any rule in [§6.2](#r62-card--generator-parameters-deterministic-rules)–6.5 changes.
+- The Gemini layer ([§6.6](#r66-optional-paths), issue #14, Q-87) writes `albedo_ai.webp` and then `gemini.json` (written last: bake key, paint version, tag `artistic`, label "AI-made", model, prompt, edge correlation, hashes) into the same size directory. A rebake replaces the whole directory, so it removes them; a `gemini.json` whose bake key differs from `bake.json` is reported `stale`. The backend root is `SX_TEXTURES_DIR` (default `<SX_CACHE_DIR>/textures`, an assumption); nothing serves `/data/textures` yet.

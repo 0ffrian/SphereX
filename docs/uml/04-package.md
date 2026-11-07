@@ -13,7 +13,7 @@ flowchart TB
     Mockup["mockup/ : spherex-ui.html (three r128, not the app)"]
 
     subgraph Backend["backend/ (FastAPI, Python 3.12) : Kevin, Moon, Atish"]
-      BApi["app/api (Kevin) : D-16 endpoints; objects.py : /card, /render-params, texture URLs; overlays.py : /overlays, /flags, /combine.png (Q-50)"]
+      BApi["app/api (Kevin) : D-16 endpoints; objects.py : /card, /render-params, texture URLs; overlays.py : /overlays, /flags, /combine.png (Q-50)#59; gemini.py : /admin/.../gemini-repaint, /albedo-ai, /albedo-ai.webp (Q-87)"]
       BPipe["app/core/find (stage 1; overlays, flagmask, combine, A4.9), app/adapters (gaia, wise = CatWISE2020, tap), app/cache, app/core/card (stages 4, 5) : Kevin; app/core/measure (stage 2) and physics : Moon; app/core/classify (stage 3) : Atish"]
       BRender["app/core/render (Atish) : card_to_params, blackbody, params, noise, craters, height, normals, palette, bake, __main__, spherex_rgb, gemini_paint"]
       BContract["app/contract : generated from shared/schemas (D-18) : follows the schemas owner"]

@@ -6,10 +6,19 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
+
+
+def secret_text(value: SecretStr | None) -> str:
+    """A secret setting as plain text, surrounding whitespace removed ("" when unset or blank).
+
+    One rule for every secret (admin token, Gemini key): a trailing newline from a .env file
+    must not make a token unmatchable or a key look set.
+    """
+    return value.get_secret_value().strip() if value is not None else ""
 
 
 def default_cache_dir() -> Path:
@@ -84,6 +93,32 @@ class Settings(BaseSettings):
     # ASSUMPTION: A5.4 says "assets/<type>/<id>.json" in the repo; the backend's copy lives here.
     assets_dir: Path = BACKEND_DIR / "assets"
     targets_file: Path = BACKEND_DIR / "targets.toml"
+    # R6.7 baked textures. ASSUMPTION: unset means ``<cache_dir>/textures`` (beside the D-25
+    # cache's ``v1`` tree, outside git); nothing serves ``/data/textures`` yet.
+    textures_dir: Path | None = None
+
+    # Admin token for admin-only endpoints (R10: gemini_paint.py "behind the admin token").
+    # ASSUMPTION: unset disables every admin endpoint (404); a wrong token gets 403.
+    admin_token: SecretStr | None = None
+    # Gemini artistic layer (D-07, R6.6, A6.2). The key stays server-side: SecretStr, never
+    # returned or logged. Unset = the layer is off and the code colour shows.
+    gemini_api_key: SecretStr | None = None
+    # [verify] R12 #3: model name from R6.6, not yet confirmed against the Gemini docs.
+    gemini_model: str = "gemini-nano-banana-2.1"
+    # [verify] R12 #3 / A3: REST base URL and request shape are not in the specs.
+    gemini_api_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    # [verify] R12 #3: supported aspect ratios unknown. Empty = ask for none; the output is
+    # resampled to 2:1 (R6.6 step 3) whatever comes back.
+    gemini_aspect_ratio: str = ""
+    # ASSUMPTION: A6.2 says "a set time" but gives no number.
+    gemini_timeout_s: float = 90.0
+    # Q-29 (open): may a cached repaint be shown under SX_OFFLINE=1? Default follows D-24
+    # ("the Gemini layer then stays off"); 1 serves cache hits offline per D-25.
+    gemini_offline_cache: bool = False
+
+    @property
+    def texture_root(self) -> Path:
+        return self.textures_dir if self.textures_dir is not None else self.cache_dir / "textures"
 
     @property
     def simbad_urls(self) -> list[str]:
