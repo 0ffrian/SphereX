@@ -15,6 +15,7 @@ import {
   MeshBasicNodeMaterial,
   MeshStandardNodeMaterial,
   Object3D,
+  RepeatWrapping,
   RingGeometry,
   Sphere,
   SphereGeometry,
@@ -308,6 +309,11 @@ export function buildScene(
       // drives the normals above). The scale is relief_amp, a plan value ([verify]: R7.2).
       const scale = body.displacementScale;
       load(body.heightUrl, 'displacement', (t) => {
+        // The sphere's u = 0 and u = 1 vertices sample the same column: repeat, or the seam cracks.
+        if (t.wrapS !== RepeatWrapping) {
+          t.wrapS = RepeatWrapping;
+          t.needsUpdate = true;
+        }
         material.displacementMap = t;
         material.displacementScale = displacementActive(tier, scale) ? (scale ?? 0) : 0;
       });
@@ -325,6 +331,7 @@ export function buildScene(
       const shape = plan.shape;
       let holder: Group | null = null;
       let level: LodLevel | null = null;
+      let wanted: LodLevel = 0;
       let bakedFor: BufferGeometry[] = [];
 
       const makeMaterial = (hasAo: boolean, edge: number | null) => {
@@ -345,7 +352,7 @@ export function buildScene(
       };
 
       const apply = (cached: Object3D, lvl: LodLevel) => {
-        if (disposed) return;
+        if (disposed || lvl !== wanted) return; // a newer level was asked for meanwhile
         // The cached model is shared between scenes: clone it, and leave its geometry to the cache.
         const root = cached.clone(true);
         // Scale to the measured size: the bounding sphere becomes the unit sphere times the body's
@@ -385,7 +392,15 @@ export function buildScene(
         if (i >= 0) spinners[i] = next;
         holder = next;
         level = lvl;
-        if (sphere.radius > 0) hooks.onMeshMeasured?.({ radiusM: sphere.radius });
+        // The measured size is the longest extent of the model, not the radius of the box's
+        // bounding sphere (that overstates an elongated body such as Eros by about 20%).
+        const longest = Math.max(
+          box.max.x - box.min.x,
+          box.max.y - box.min.y,
+          box.max.z - box.min.z,
+        );
+        if (longest > 0 && Number.isFinite(longest))
+          hooks.onMeshMeasured?.({ radiusM: longest / 2 });
 
         // Baked AO (derived): bake once per model in slices, then swap in the AO material.
         if (shape?.ao && !hasAo && geoms.some((g, k) => g !== bakedFor[k])) {
@@ -407,6 +422,7 @@ export function buildScene(
       };
 
       const show = (lvl: LodLevel) => {
+        wanted = lvl;
         const url = lvl === 1 && lods.lod1 ? lods.lod1 : lods.lod0;
         const ready = cache.loadedMesh(url);
         if (ready) {

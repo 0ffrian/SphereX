@@ -38,7 +38,7 @@
 | `gas_giant` | flow | `teq_pulse` (`teq_K` tag) | `flow` without a field; `teq_pulse` when `teq_K` is null |
 | `planet_water` | terrain | `teq_pulse` (`teq_K` tag) | as above, `terrain` |
 | `planet_rocky` | terrain with lava cracks | `teq_pulse` when offered | as above |
-| `nebula`, `nova` | — | point density (`data_tag`, `artistic`) | `field` without point sets |
+| `nebula`, `nova` | — | point density (`data_tag`, `artistic`; reads the point sets, not the drawn volume, Q-87) | `field` without point sets |
 
 - `TouchHaptics` drives the two sources: moving gives texture events; holding still for `HOLD_STILL_MS` starts the `teq_pulse` or `flux_pulse` (the viewer's frame loop calls `poll`, Q-83); the scrubber drives the light-curve pulses.
 - The R11 honesty test runs these through the real engine: in Measured only the gas giant and planet textures and procedural relief are silent, `asteroid_shape` is silent while its mesh haptics are refused, and the `teq_pulse` plays only when `teq_K` is `measured`.

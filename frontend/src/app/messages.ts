@@ -306,6 +306,12 @@ const LAYER_NAME: Readonly<Record<string, string>> = {
   visible: 'Visible-colour view',
   spherex_ir: 'SPHEREx infrared view',
   teq_pulse: 'Temperature pulse',
+  reflectance: 'Realistic surface lighting',
+  self_shadow: 'Shadows cast by the shape',
+  baked_ao: 'Soft shading in dents',
+  regolith: 'Fine dust texture',
+  ion_tail: 'Gas tail',
+  dust_tail: 'Dust tail',
 };
 
 /** Motion rates (R3.4 `dynamics`); a rate no tier can answer is refused as `dynamics:<key>`. */
