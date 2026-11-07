@@ -81,6 +81,8 @@ frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, St
                       # session.tsx (preload + playback timer shared by the panel and the transport bar),
                       # progressive.ts + FramesProgress.tsx (frames that arrive in parts: merge, poll, Stop; Q-97),
                       # frameGrid.ts (one fixed grid and scale per object, frames registered on the object),
+                      # noData.ts (no-data hatching: steady line, per-frame caption only when paused),
+                      # frameSwap.ts + useFrameSwap.ts (two <img> slots: show the next frame once decoded),
                       # colourMode.ts + ColourViews.tsx (Raw | Colour: wavelength tint, SPHEREx composite; Q-93, Q-95)
   spectrum/           # SpectrumPanel, SVG SpectrumChart, scale (displays the A4.2 output)
   shell/              # prototype shell in the mock-up's layout: ToolRail, Transport, PanelCard + Panels, Readout, shortcuts

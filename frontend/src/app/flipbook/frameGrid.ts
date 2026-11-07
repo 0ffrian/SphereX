@@ -9,7 +9,10 @@
 //   the picture sharp and free of shimmer).
 // - Shared north-up grid (`north_up: true`): the frames already share one pixel grid, so they are
 //   drawn at offset 0; a moving object then moves across the grid, which Rainbow Trails needs.
-// - Outside a frame the grid is black.
+// - Where no pixel of the current frame lands (a cutout clipped at a detector edge, e.g. 34×59 px
+//   with the object at x = 4.3), the grid has no data: Flipbook.tsx hatches it, so it does not
+//   look like dark sky. A strip of at most NO_DATA_SLIVER_PX is the normal 58/59 px variation and
+//   stays black.
 // Logic only; Flipbook.tsx draws it.
 import type { Frame } from '@/app/api/types';
 
@@ -52,10 +55,16 @@ export function frameSize(
   return decoded ?? null;
 }
 
-/** Grid side N: the largest frame side, rounded up to odd; FALLBACK_GRID_PX when none is known. */
-export function gridSize(sizes: readonly (PixelSize | null)[]): number {
+/** The largest side of any known frame, source pixels; 0 when no size is known. */
+export function largestSide(sizes: readonly (PixelSize | null)[]): number {
   let max = 0;
   for (const s of sizes) if (s) max = Math.max(max, s.w, s.h);
+  return max;
+}
+
+/** Grid side N: the largest frame side, rounded up to odd; FALLBACK_GRID_PX when none is known. */
+export function gridSize(sizes: readonly (PixelSize | null)[]): number {
+  const max = largestSide(sizes);
   return max > 0 ? oddCeil(max) : FALLBACK_GRID_PX;
 }
 
@@ -115,4 +124,45 @@ export function placementStyle(
 ): { left: string; top: string; width: string; height: string } {
   const pct = (v: number) => `${(v / grid) * 100}%`;
   return { left: pct(p.left), top: pct(p.top), width: pct(p.width), height: pct(p.height) };
+}
+
+/**
+ * Widest strip of the grid without data that is still drawn plain black, source pixels. Cutouts of
+ * one object differ by a pixel (58 or 59 px) and the whole-pixel shift can leave a 1 px column or
+ * row; hatching it would mark every normal frame. Display threshold, not data.
+ */
+export const NO_DATA_SLIVER_PX = 1;
+
+/** How far the frame falls short of each grid edge, source pixels (0 where it reaches or overhangs). */
+export interface Gaps {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+export function uncoveredGaps(grid: number, p: Placement): Gaps {
+  return {
+    left: Math.max(0, p.left),
+    right: Math.max(0, grid - (p.left + p.width)),
+    top: Math.max(0, p.top),
+    bottom: Math.max(0, grid - (p.top + p.height)),
+  };
+}
+
+/**
+ * Why part of the grid has no data from this frame:
+ * - `none`: every uncovered strip is a sliver of at most NO_DATA_SLIVER_PX (normal frames);
+ * - `edge`: a wider strip, and the cutout is more than 1 px narrower or shorter than the object's
+ *   largest frame side, so IRSA clipped it at a detector edge;
+ * - `outside`: a wider strip from a full-size cutout (the object sits off its centre).
+ * `fullSide`: largestSide() over the object's frames. It is compared instead of the grid N because
+ * N is rounded up to odd (64 px frames give N = 65), so a normal 63 px frame is 2 px short of N.
+ */
+export type NoData = 'none' | 'edge' | 'outside';
+
+export function noDataKind(grid: number, p: Placement, size: PixelSize, fullSide: number): NoData {
+  const g = uncoveredGaps(grid, p);
+  if (Math.max(g.left, g.right, g.top, g.bottom) <= NO_DATA_SLIVER_PX) return 'none';
+  return size.w < fullSide - 1 || size.h < fullSide - 1 ? 'edge' : 'outside';
 }

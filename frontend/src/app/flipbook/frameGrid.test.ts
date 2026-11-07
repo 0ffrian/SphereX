@@ -7,12 +7,16 @@ import {
   FALLBACK_GRID_PX,
   frameSize,
   gridSize,
+  largestSide,
+  NO_DATA_SLIVER_PX,
+  noDataKind,
   objectOnGrid,
   oddCeil,
   placeFrame,
   placementStyle,
   registrationFor,
   ringOnGrid,
+  uncoveredGaps,
 } from './frameGrid';
 
 // The Barnard's Star mix reported on 7 Nov 2026 (sizes and object pixels, test data).
@@ -94,6 +98,57 @@ describe('placement on a shared north-up grid (Rainbow Trails)', () => {
     expect(a).toEqual({ left: 0, top: 0, width: 64, height: 64 });
     expect(b).toEqual(a);
     expect(ringOnGrid(65, b, { x: 52, y: 22 }, 'grid')).toEqual({ x: 52.5, y: 22.5 });
+  });
+});
+
+describe('grid area without data (detector edge)', () => {
+  const kind = (grid: number, f: { w: number; h: number; x: number; y: number }, full: number) =>
+    noDataKind(grid, placeFrame(grid, f, f, 'object'), f, full);
+
+  it('leaves normal 58/59 px frames unmarked (a 1 px sliver stays black)', () => {
+    expect(NO_DATA_SLIVER_PX).toBe(1);
+    const full = largestSide(BARNARD.map((f) => ({ w: f.w, h: f.h })));
+    expect(full).toBe(59);
+    for (const f of BARNARD.slice(0, 4)) {
+      const g = uncoveredGaps(59, placeFrame(59, f, f, 'object'));
+      expect(Math.max(g.left, g.right, g.top, g.bottom), JSON.stringify(f)).toBeLessThanOrEqual(1);
+      expect(kind(59, f, full), JSON.stringify(f)).toBe('none');
+    }
+    // 63 and 64 px fixture frames on their 65 px grid: 1 px each side at most.
+    expect(kind(65, { w: 63, h: 63, x: 31.2, y: 30.8 }, 64)).toBe('none');
+    expect(kind(65, { w: 64, h: 63, x: 31.7, y: 31 }, 64)).toBe('none');
+  });
+
+  it('marks cutouts clipped at a detector edge', () => {
+    // Reported: 34×59 with the object at x = 4.3, and 30×59 with x = 0.5.
+    const a = { w: 34, h: 59, x: 4.3, y: 29 };
+    const b = { w: 30, h: 59, x: 0.5, y: 29 };
+    expect(kind(59, a, 59)).toBe('edge');
+    expect(kind(59, b, 59)).toBe('edge');
+    expect(uncoveredGaps(59, placeFrame(59, a, a, 'object'))).toEqual({
+      left: 25,
+      right: 0,
+      top: 0,
+      bottom: 0,
+    });
+    expect(uncoveredGaps(59, placeFrame(59, b, b, 'object')).left).toBe(29);
+    // The clipped rows of the 7 Nov mix, and the fixture's 64×40 frame.
+    expect(kind(59, BARNARD[4], 59)).toBe('edge');
+    expect(kind(59, BARNARD[5], 59)).toBe('edge');
+    expect(kind(65, { w: 64, h: 40, x: 31.6, y: 7.4 }, 64)).toBe('edge');
+  });
+
+  it('calls a full-size cutout with the object off centre "outside this cutout"', () => {
+    expect(kind(59, { w: 59, h: 59, x: 20, y: 29 }, 59)).toBe('outside');
+  });
+
+  it('counts only the shortfall inside the grid (overhang is not a gap)', () => {
+    expect(uncoveredGaps(59, { left: -2, top: 3, width: 70, height: 50 })).toEqual({
+      left: 0,
+      right: 0,
+      top: 3,
+      bottom: 6,
+    });
   });
 });
 

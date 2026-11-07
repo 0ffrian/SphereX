@@ -22,7 +22,7 @@ export function Transport() {
   const seek = useAppStore((s) => s.skySeek);
   const togglePlay = useAppStore((s) => s.skyTogglePlay);
   const setFps = useAppStore((s) => s.skySetFps);
-  const { canPlay } = useFlipbookSession();
+  const { canPlay, shownIndex } = useFlipbookSession();
   // The dot is the Rainbow Trails false colour (`derived`, Q-27): one colour in "Measured only".
   const honesty = useAppStore((s) => s.honesty);
   const monochrome = trailsMonochrome(honesty);
@@ -33,7 +33,9 @@ export function Transport() {
   const response = sky.status === 'ready' ? sky.frames : null;
   const n = response?.frames.length ?? 0;
   const index = n > 0 ? Math.min(sky.index, n - 1) : 0;
-  const frame = response?.frames[index] ?? null;
+  // The readout names the frame on screen (it can trail the scrubber until its picture decodes).
+  const shown = shownIndex !== null && shownIndex < n ? shownIndex : index;
+  const frame = response?.frames[shown] ?? null;
   const has = n > 0 && !locked;
   const frameText = response && has ? describeFrame(response, index) : 'No frames loaded';
   const percent = n > 1 ? (index / (n - 1)) * 100 : 0;
@@ -104,7 +106,7 @@ export function Transport() {
             />
           )}
           <span>
-            Frame <b>{has ? index + 1 : '–'}</b>/{has ? n : '–'}
+            Frame <b>{has ? shown + 1 : '–'}</b>/{has ? n : '–'}
           </span>
           <span className="sx-hide-s">
             <b>{frame ? formatWavelength(frame.wavelength_um) : '– µm'}</b>
