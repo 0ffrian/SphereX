@@ -8,20 +8,28 @@
     {
       "id": "colour",
       "tag": "derived",
-      "description": "Teff to sRGB through a blackbody lookup table (R7.5).",
+      "tier": 2,
+      "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
       "requires": [
         "teff_K"
-      ]
+      ],
+      "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
     },
     {
       "id": "limb_darkening",
       "tag": "model_dependent",
+      "tier": 3,
       "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
-      "requires": []
+      "requires": [],
+      "formula": "I(mu) = 1 - u * (1 - mu), u = 0.6",
+      "assumed": {
+        "limb_darkening_u": 0.6
+      }
     },
     {
       "id": "motion_trail",
       "tag": "measured",
+      "tier": 1,
       "description": "Motion trail from pm_mas_yr over the SPHEREx epochs (R7.5).",
       "requires": [
         "pm_mas_yr"
@@ -43,7 +51,7 @@
         ],
         "tag": "derived",
         "source": "synthetic fixture: not a real measurement",
-        "formula": "Teff to sRGB through a blackbody lookup table (R7.5)"
+        "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)"
       },
       "source": "class_palette"
     }
@@ -54,6 +62,35 @@
     "data": "motion",
     "data_tag": "measured",
     "params": {}
+  },
+  "dynamics": {
+    "spin_period_h": {
+      "value": 600.0,
+      "tag": "inferred_from_analog",
+      "tier": 4,
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "spot_lifetime_d": {
+      "value": 30.0,
+      "tag": "model_dependent",
+      "tier": 3,
+      "source": "synthetic fixture: not a real measurement",
+      "formula": "placeholder, not a spec rule: tau = 30 d * (R / R_sun)^2",
+      "assumed": {
+        "typical_class_lifetime_d": 30.0
+      }
+    },
+    "flare_rate_per_d": {
+      "value": 0.5,
+      "tag": "inferred_from_analog",
+      "tier": 4,
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "speedup": {
+      "spin": 86400,
+      "spots": 86400,
+      "flares": 86400
+    }
   },
   "alt_text": "Synthetic fixture. Star, 1 solar radius (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
   "missing": []

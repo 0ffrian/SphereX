@@ -8,14 +8,20 @@
     {
       "id": "body",
       "tag": "model_dependent",
+      "tier": 3,
       "description": "Assumption: brown dwarf radii are about 1 Jupiter radius (R7.4).",
       "requires": [
         "radius_rjup"
-      ]
+      ],
+      "formula": "radius = radius_rjup * R_Jup",
+      "assumed": {
+        "radius_rjup": 1.0
+      }
     },
     {
       "id": "emissive",
       "tag": "measured",
+      "tier": 1,
       "description": "Emissive intensity from normalised flux_45um (R7.4).",
       "requires": [
         "flux_45um"
@@ -24,6 +30,7 @@
     {
       "id": "bands",
       "tag": "artistic",
+      "tier": 5,
       "description": "Latitude-stretched band pattern; contrast = clamp(2 * ch4_depth_33, 0.1, 0.8) (R7.4, R5.3).",
       "requires": [
         "ch4_depth_33",
@@ -82,6 +89,36 @@
     "data_tag": "measured",
     "params": {
       "maxRateHz": 12.0
+    }
+  },
+  "dynamics": {
+    "spin_period_h": {
+      "value": 3.0,
+      "tag": "inferred_from_analog",
+      "tier": 4,
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "diff_rotation": {
+      "value": 0.1,
+      "tag": "inferred_from_analog",
+      "tier": 4,
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "jet_speed_ms": {
+      "value": 101.7,
+      "tag": "model_dependent",
+      "tier": 3,
+      "source": "synthetic fixture: not a real measurement",
+      "formula": "placeholder, not a spec rule: v = 0.0025 * Omega_eq * R, Omega_eq = 2 pi / spin_period_h",
+      "assumed": {
+        "jet_fraction_of_equatorial_speed": 0.0025,
+        "spin_period_h": 3.0,
+        "radius_rjup": 1.0
+      }
+    },
+    "speedup": {
+      "spin": 3600,
+      "winds": 3600
     }
   },
   "alt_text": "Synthetic fixture. Brown dwarf, about 1 Jupiter radius (model dependent), colour from a class palette, self-luminous. Surface relief: illustrative.",
