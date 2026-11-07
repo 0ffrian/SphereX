@@ -17,6 +17,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type MouseEvent,
   type PointerEvent,
   type ReactNode,
   type Ref,
@@ -26,6 +27,7 @@ import { buttonClass } from '@/app/ui';
 import {
   CALIBRATION_VERSION,
   FOUR_LEVELS,
+  THREE_LEVELS,
   applyCalibration,
   beatPlan,
   calibrationAvailable,
@@ -154,6 +156,8 @@ export function CalibrationWizard({
   const [avOffsetMs, setAvOffsetMs] = useState(base.avOffsetMs);
   const [measured, setMeasured] = useState({ minMs: false, levels: false, offset: false });
   const [noneFelt, setNoneFelt] = useState(false);
+  /** Step 2 was skipped after step 1 shortened the soft tick, so the kept whisper was dropped. */
+  const [whisperDropped, setWhisperDropped] = useState(false);
   const [played, setPlayed] = useState({ probes: false, levels: false });
   const [tapPhase, setTapPhase] = useState<TapPhase>('ready-vibration');
   const [tapCount, setTapCount] = useState(0);
@@ -180,6 +184,14 @@ export function CalibrationWizard({
   const tapButton = useRef<HTMLButtonElement>(null);
   const actionButton = useRef<HTMLButtonElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  /**
+   * The latest outputs. Timers and the unmount cleanup read them here, so a host that passes a new
+   * `haptics` object mid-beat neither cancels the beat's timers nor restores the wrong driver.
+   */
+  const hapticsRef = useRef(haptics);
+  useLayoutEffect(() => {
+    hapticsRef.current = haptics;
+  }, [haptics]);
 
   const clock = now ?? defaultNow;
 
@@ -193,14 +205,15 @@ export function CalibrationWizard({
       if (beatTicker.current !== null) clearInterval(beatTicker.current);
       timer.current = null;
       beatTicker.current = null;
+      const out = hapticsRef.current;
       if (rawSent.current) vibrateFn?.(0);
-      if (soundSent.current) haptics.audio.stop();
+      if (soundSent.current) out.audio.stop();
       rawSent.current = false;
       soundSent.current = false;
-      if (savedOffset.current !== null) haptics.audio.setOffsetMs(savedOffset.current);
+      if (savedOffset.current !== null) out.audio.setOffsetMs(savedOffset.current);
       savedOffset.current = null;
     };
-  }, [haptics, vibrateFn]);
+  }, [vibrateFn]);
 
   // Unmounted while focus is inside (the host closed it, e.g. in onDone): focus goes back to the
   // opener. A layout-effect cleanup runs while the section is still in the document, before the
@@ -247,7 +260,7 @@ export function CalibrationWizard({
   };
 
   const restoreOffset = () => {
-    if (savedOffset.current !== null) haptics.audio.setOffsetMs(savedOffset.current);
+    if (savedOffset.current !== null) hapticsRef.current.audio.setOffsetMs(savedOffset.current);
     savedOffset.current = null;
   };
 
@@ -266,10 +279,21 @@ export function CalibrationWizard({
     stopBeatTicker();
     soundPending.current = false;
     if (rawSent.current) vibrateFn?.(0);
-    if (soundSent.current) haptics.audio.stop();
+    if (soundSent.current) hapticsRef.current.audio.stop();
     rawSent.current = false;
     soundSent.current = false;
     restoreOffset();
+  };
+
+  /**
+   * Vibration is off in the settings (R8.7): the wizard sends no raw pattern then, as the sound
+   * beat respects `soundOn`, and says how to go on.
+   */
+  const vibrationOff = () => {
+    ensureLoaded();
+    if (useHapticSettings.getState().hapticsOn) return false;
+    announce('Vibration is off in the settings. Turn it on to calibrate, or cancel.');
+    return true;
   };
 
   const play = (pattern: number[]) => {
@@ -286,6 +310,7 @@ export function CalibrationWizard({
     setAvOffsetMs(base.avOffsetMs);
     setMeasured({ minMs: false, levels: false, offset: false });
     setNoneFelt(false);
+    setWhisperDropped(false);
     setPlayed({ probes: false, levels: false });
     setTapPhase('ready-vibration');
     setTapCount(0);
@@ -308,6 +333,7 @@ export function CalibrationWizard({
   // ------------------------------------------------------------ step 1
 
   const playProbes = () => {
+    if (vibrationOff()) return;
     play(sequencePattern(CALIBRATION_PROBE_MS));
     setPlayed((p) => ({ ...p, probes: true }));
     announce('Played. Now pick the faintest one you felt.');
@@ -329,6 +355,7 @@ export function CalibrationWizard({
   // ------------------------------------------------------------ step 2
 
   const playLevels = () => {
+    if (vibrationOff()) return;
     play(
       sequencePattern(
         levelsToVibrate({
@@ -345,6 +372,18 @@ export function CalibrationWizard({
   const answerLevels = (whisperFelt: boolean, whisperWeaker: boolean) => {
     setLevels(levelSetFromAnswers({ whisperFelt, whisperWeaker }));
     setMeasured((m) => ({ ...m, levels: true }));
+    setWhisperDropped(false);
+    go('tap');
+  };
+  /**
+   * Skip step 2: keep this device's level set. A kept whisper was judged weaker than the stored
+   * soft tick; when step 1 has just made soft shorter, that no longer holds, so the whisper is
+   * dropped and the phone gets 3 levels (Q-74). Step 1 measured, so the change is saved.
+   */
+  const skipLevels = () => {
+    const drop = levels.includes('whisper') && minMs < base.minMs;
+    if (drop) setLevels([...THREE_LEVELS]);
+    setWhisperDropped(drop);
     go('tap');
   };
 
@@ -408,6 +447,7 @@ export function CalibrationWizard({
 
   const startBeat = (channel: 'vibration' | 'sound') => {
     if (tapPhase === 'vibration' || tapPhase === 'sound' || soundPending.current) return;
+    if (channel === 'vibration' && vibrationOff()) return;
     if (timer.current !== null) clearTimeout(timer.current);
     timer.current = null;
     haptics.engine.stop();
@@ -475,6 +515,17 @@ export function CalibrationWizard({
     if (e.key !== ' ' && e.key !== 'Enter') return;
     e.preventDefault(); // no click, no page scroll
     if (!e.repeat) recordTap(now ? now() : e.timeStamp);
+  };
+  /** Space activates a button on key-up: cancel that click too, the key-down already counted. */
+  const onTapKeyUp = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === ' ' || e.key === 'Enter') e.preventDefault();
+  };
+  /**
+   * A screen reader's double-tap (TalkBack) can arrive as a click with no pointer down (`detail`
+   * 0). A finger or mouse tap already counted on pointer down, so only that click counts here.
+   */
+  const onTapClick = (e: MouseEvent<HTMLButtonElement>) => {
+    if (e.detail === 0) recordTap(now ? now() : e.timeStamp);
   };
 
   /** Skip the tap-along: keep the offset this device already has. */
@@ -623,7 +674,7 @@ export function CalibrationWizard({
           />
         </div>
         <div className="flex flex-wrap gap-2">
-          <PlainButton label="Skip this step" onClick={() => go('tap')} />
+          <PlainButton label="Skip this step" onClick={skipLevels} />
           {cancelButton}
         </div>
       </>
@@ -679,6 +730,8 @@ export function CalibrationWizard({
             className={`${buttonClass} min-h-24 w-full text-lg`}
             onPointerDown={onTapPointer}
             onKeyDown={onTapKey}
+            onKeyUp={onTapKeyUp}
+            onClick={onTapClick}
             aria-describedby={`${id}-taps`}
           >
             {tapPhase === 'vibration'
@@ -723,7 +776,11 @@ export function CalibrationWizard({
             </li>
             <li>
               Strength levels: {cal.levels.length} ({cal.levels.join(', ')})
-              {measured.levels ? '' : ' (kept)'}
+              {measured.levels
+                ? ''
+                : whisperDropped
+                  ? ' (whisper dropped: the faintest pulse is now shorter)'
+                  : ' (kept)'}
             </li>
             <li>
               Sound and vibration offset: {describeOffset(cal.avOffsetMs)}
