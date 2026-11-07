@@ -125,7 +125,7 @@
     },
     "Tier": {
       "title": "Tier",
-      "description": "Fallback tier of the rung that answered: 1 measured, 2 derived, 3 model_dependent, 4 inferred_from_analog, 5 artistic (D-31). Always agrees with the tag.",
+      "description": "Fallback tier of the rung that answered: 1 measured, 2 derived, 3 model_dependent, 4 inferred_from_analog, 5 artistic (D-32). Always agrees with the tag.",
       "type": "integer",
       "enum": [
         1,

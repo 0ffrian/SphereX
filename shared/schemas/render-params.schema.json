@@ -279,7 +279,7 @@
     },
     "DynamicsValue": {
       "title": "DynamicsValue",
-      "description": "One motion rate with its provenance and the tier of the rung that answered (D-31). A rate no rung can answer is omitted and listed in missing as dynamics:<key>.",
+      "description": "One motion rate with its provenance and the tier of the rung that answered (D-32). A rate no rung can answer is omitted and listed in missing as dynamics:<key>.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -468,9 +468,41 @@
         }
       ]
     },
+    "PositiveDynamicsValue": {
+      "title": "PositiveDynamicsValue",
+      "description": "A DynamicsValue whose value is above 0 (periods and lifetimes).",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DynamicsValue"
+        }
+      ],
+      "properties": {
+        "value": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "NonNegativeDynamicsValue": {
+      "title": "NonNegativeDynamicsValue",
+      "description": "A DynamicsValue whose value is 0 or more (rates).",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DynamicsValue"
+        }
+      ],
+      "properties": {
+        "value": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
     "Dynamics": {
       "title": "Dynamics",
-      "description": "Motion data (R3.4, D-31). Absent = no motion data. Rates: spin_period_h: Sidereal rotation period, hours. diff_rotation: k in Omega(phi) = Omega_eq (1 - k sin^2 phi). jet_speed_ms: Peak zonal wind speed, m/s. spot_lifetime_d: Star spot group lifetime, days. flare_rate_per_d: Flares per day above the drawn threshold. pulsation_period_d: Pulsation period, days.",
+      "description": "Motion data (R3.4, D-32). Absent = no motion data. Rates: spin_period_h: Sidereal rotation period, hours. diff_rotation: k in Omega(phi) = Omega_eq (1 - k sin^2 phi). jet_speed_ms: Peak zonal wind speed, m/s. spot_lifetime_d: Star spot group lifetime, days. flare_rate_per_d: Flares per day above the drawn threshold. pulsation_period_d: Pulsation period, days.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -478,7 +510,7 @@
       ],
       "properties": {
         "spin_period_h": {
-          "$ref": "#/definitions/DynamicsValue"
+          "$ref": "#/definitions/PositiveDynamicsValue"
         },
         "diff_rotation": {
           "$ref": "#/definitions/DynamicsValue"
@@ -487,13 +519,13 @@
           "$ref": "#/definitions/DynamicsValue"
         },
         "spot_lifetime_d": {
-          "$ref": "#/definitions/DynamicsValue"
+          "$ref": "#/definitions/PositiveDynamicsValue"
         },
         "flare_rate_per_d": {
-          "$ref": "#/definitions/DynamicsValue"
+          "$ref": "#/definitions/NonNegativeDynamicsValue"
         },
         "pulsation_period_d": {
-          "$ref": "#/definitions/DynamicsValue"
+          "$ref": "#/definitions/PositiveDynamicsValue"
         },
         "speedup": {
           "type": "object",
@@ -511,7 +543,7 @@
             "type": "number",
             "exclusiveMinimum": 0
           },
-          "description": "Time-lapse factor shown on screen for each animated process (D-33). {} when nothing moves."
+          "description": "Time-lapse factor shown on screen for each animated process (D-34). {} when nothing moves."
         }
       }
     },

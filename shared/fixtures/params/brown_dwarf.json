@@ -13,7 +13,7 @@
       "requires": [
         "radius_rjup"
       ],
-      "formula": "radius = 1 R_Jup (typical brown dwarf radius)",
+      "formula": "radius = radius_rjup * R_Jup",
       "assumed": {
         "radius_rjup": 1.0
       }
@@ -109,9 +109,11 @@
       "tag": "model_dependent",
       "tier": 3,
       "source": "synthetic fixture: not a real measurement",
-      "formula": "v = Omega_eq * R * 0.05",
+      "formula": "v = 0.05 * Omega_eq * R, Omega_eq = 2 pi / spin_period_h",
       "assumed": {
-        "jet_fraction_of_equatorial_speed": 0.05
+        "jet_fraction_of_equatorial_speed": 0.05,
+        "spin_period_h": 3.0,
+        "radius_rjup": 1.0
       }
     },
     "speedup": {

@@ -74,7 +74,7 @@ def _is_provenance_rule(case: dict[str, Any]) -> bool:
     """The R3.1 if/then rules, which the generators drop."""
     expect = case["expect"]
     return (
-        expect["keyword"] in {"pattern", "const"}  # const: the tier must match the tag (D-31)
+        expect["keyword"] in {"pattern", "const"}  # const: the tier must match the tag (D-32)
         or expect.get("detail") in {"formula", "assumption", "assumed"}
     )
 
@@ -188,7 +188,7 @@ def _dynamics_values(params: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]
     return [(k, v) for k, v in dynamics.items() if k != "speedup"]
 
 
-# DynamicsValue has no assertTagged twin: its model_dependent rule is `assumed` (D-31).
+# DynamicsValue has no assertTagged twin: its model_dependent rule is `assumed` (D-32).
 _SPEEDUP_NEEDS = {
     "spin": {"spin_period_h"},
     "spots": {"spot_lifetime_d"},

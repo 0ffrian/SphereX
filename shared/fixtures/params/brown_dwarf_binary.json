@@ -13,7 +13,7 @@
       "requires": [
         "radius_rjup"
       ],
-      "formula": "radius = 1 R_Jup (typical brown dwarf radius)",
+      "formula": "radius = radius_rjup * R_Jup",
       "assumed": {
         "radius_rjup": 1.0
       }

@@ -1,6 +1,6 @@
 # Display levels and shared 3D view rules
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.7 · **Implements:** D-05, D-21, D-23, D-33 ([decisions](../decisions.md))
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.7 · **Implements:** D-05, D-21, D-23, D-34 ([decisions](../decisions.md))
 
 ## R4. Display levels
 
@@ -63,7 +63,7 @@ Two targets. Where their budgets differ, take the tighter one.
 | Demo laptop | Intel Iris Xe (Zenbook 14X) |
 | Phones | realme 14 Pro and a Samsung, both Android 16 with Chrome. Haptics can only be shown here |
 
-- ≥30 fps while rotating. Render when the view changes, or every frame while a simulation clock runs (D-33, [§5.7](#r57-motion-and-time-lapse)).
+- ≥30 fps while rotating. Render when the view changes, or every frame while a simulation clock runs (D-34, [§5.7](#r57-motion-and-time-lapse)).
 - `renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))`.
 - Textures: 2048×1024 on desktop, 1024×512 on mobile. Serve as WebP for albedo; normal maps as lossless PNG or KTX2.
 - Meshes ≤ 50k triangles. Decimate NASA GLBs offline.
@@ -79,7 +79,7 @@ Two targets. Where their budgets differ, take the tighter one.
 
 ### R5.7 Motion and time-lapse
 
-Decided in D-33. Rates come from `RenderParams.dynamics` ([R3.4](data-contract.md#r34-renderparams-produced-by-the-backend-get-v1objectsidrender-params)) and follow the tier chain (D-31).
+Decided in D-34. Rates come from `RenderParams.dynamics` ([R3.4](data-contract.md#r34-renderparams-produced-by-the-backend-get-v1objectsidrender-params)) and follow the tier chain (D-32).
 
 - **Clock:** one `SimClock`. Each frame is a pure function of (card, seed, t), with no state between frames. Same inputs, same frame.
 - **Speed-up:** shown next to every animated process, from `dynamics.speedup` (like "×1000" in R7.1). It is a display choice, not a claim. Nothing pretends to be real time.
@@ -100,13 +100,13 @@ Decided in D-33. Rates come from `RenderParams.dynamics` ([R3.4](data-contract.m
 | Nebula, supernova remnant | no idle motion | none | n/a |
 | Variable star | light-curve scrub (done) | none | measured |
 
-**Quality tiers (the battery mechanism).**
+**Quality levels (the battery mechanism).** Called levels, not tiers, so they are not confused with the provenance tiers 1–5 (D-32).
 
-| Tier | Target | Frame rate |
+| Level | Target | Frame rate |
 |---|---|---|
 | High | desktop | 60 fps |
 | Medium | Zenbook, A15 (integrated GPU) | 60 fps |
 | Low | Android phones | 30 fps |
 
-- Pixel ratio stays capped at 1.5 (D-05). A governor drops one tier when frames take more than 33 ms for 2 s, and says so on screen. Reduced motion pauses every clock. See Q-59 for the frame-rate row of D-05.
+- Pixel ratio stays capped at 1.5 (D-05). A governor drops one level when frames take more than 33 ms for 2 s, and says so on screen. Reduced motion pauses every clock. See Q-64 for the frame-rate row of D-05.
 - Battery target: 15 minutes on either phone uses at most 10% battery at demo brightness **[verify on phones]**.

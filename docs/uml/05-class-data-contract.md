@@ -152,12 +152,12 @@ classDiagram
     +assumed: map, optional
   }
   class Dynamics {
-    +spin_period_h: DynamicsValue, optional
+    +spin_period_h: DynamicsValue, optional, value > 0
     +diff_rotation: DynamicsValue, optional
     +jet_speed_ms: DynamicsValue, optional
-    +spot_lifetime_d: DynamicsValue, optional
-    +flare_rate_per_d: DynamicsValue, optional
-    +pulsation_period_d: DynamicsValue, optional
+    +spot_lifetime_d: DynamicsValue, optional, value > 0
+    +flare_rate_per_d: DynamicsValue, optional, value >= 0
+    +pulsation_period_d: DynamicsValue, optional, value > 0
     +speedup: map of process to number, above 0
   }
   class Textures {
@@ -251,7 +251,7 @@ classDiagram
 ## Notes
 
 - `TV~T~` is one schema definition per payload in code (`TVNumber`, `TVString`, `TVRgb`, `TVVec3`, `TVPair`), because JSON Schema has no generics; `TV<T>` is a hand-written view of them in `frontend/src/contract/tags.ts`. Generated code: `backend/app/contract/`, `frontend/src/contract/generated.ts` (D-18).
-- `Layer.tier` and `DynamicsValue.tier` are fixed by the tag (1 measured, 2 derived, 3 model_dependent, 4 inferred_from_analog, 5 artistic). `formula` is required from tier 2 and `assumed` at tier 3 (D-31). A rate no rung answers is omitted and listed in `missing` as `dynamics:<key>`. `speedup` keys are `spin`, `spots`, `flares`, `winds`, `clouds`, `pulsation`.
+- `Layer.tier` and `DynamicsValue.tier` are fixed by the tag (1 measured, 2 derived, 3 model_dependent, 4 inferred_from_analog, 5 artistic). `formula` is required from tier 2 and `assumed` at tier 3 (D-32). A rate no rung answers is omitted and listed in `missing` as `dynamics:<key>`. `speedup` keys are `spin`, `spots`, `flares`, `winds`, `clouds`, `pulsation`.
 - `scale_m` is null when the size is unknown, for example on a `candidate` (Q-33).
 - `Textures` and `Lighting` are named `RenderTextures` and `RenderLighting` in the schema and the generated code. The schema has no `IRMode` definition: `spherex_ir` refers to `VisibleMode`, and `IRMode` is a type alias in `frontend/src/contract/index.ts` (D-23).
 - `rgb` and `vec3` stand for `[number, number, number]`; `pair` stands for `[number, number]`. They are written in words because Mermaid class members cannot hold brackets reliably.
