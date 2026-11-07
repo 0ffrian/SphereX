@@ -125,7 +125,11 @@ export function ViewerPanel() {
   // measured size, so the scale bar shows it instead of the catalogue diameter (Eros at real size).
   const [meshSize, setMeshSize] = useState<{ key: string; radiusM: number } | null>(null);
   const modelRadiusM =
-    meshSize?.key === objectKey && plan?.bodies.some((b) => b.meshUrl) ? meshSize.radiusM : null;
+    meshSize?.key === objectKey &&
+    plan?.scaleM != null && // size hidden by the honesty level: no bar from the model either
+    plan.bodies.some((b) => b.meshUrl && /\.(glb|gltf)(\?.*)?$/i.test(b.meshUrl)) // metres (Q-61)
+      ? meshSize.radiusM
+      : null;
   const bar = useMemo(
     () => (plan ? scaleBarFor(modelRadiusM ?? plan.scaleM, plan.sizeQualifier) : null),
     [plan, modelRadiusM],
@@ -495,7 +499,7 @@ export function ViewerPanel() {
                 )}
                 , {bar.comparison.text}.
               </figcaption>
-              {plan.sizeWhy && (
+              {(plan.sizeWhy || modelRadiusM !== null) && (
                 <div className="flex flex-col items-start gap-1">
                   <button
                     type="button"
@@ -509,6 +513,8 @@ export function ViewerPanel() {
                   {whyOpen && (
                     <p id={whyId} className="text-sm text-neutral-300" data-testid="size-why">
                       {plan.sizeWhy}
+                      {modelRadiusM !== null &&
+                        ' The bar uses the size of the loaded shape model, measured across its widest part.'}
                     </p>
                   )}
                 </div>

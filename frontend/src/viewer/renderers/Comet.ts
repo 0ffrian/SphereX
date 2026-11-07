@@ -223,7 +223,7 @@ export function planComet(input: PlanInput): RenderPlan {
   if (b.has('tail')) {
     b.reject({ id: 'tail', reason: 'data', detail: 'No published tail result is on the card.' });
   }
-  if (!tailDrawn) b.notes.push('No tail is drawn: the card holds no published tail result.');
+  if (!tailDrawn) b.notes.push('No tail is drawn. The list of layers not drawn says why.');
   else b.notes.push('Tails are not to scale. The ion tail points away from the Sun.');
 
   // Nucleus from a shape model when one exists (67P): the same path as an asteroid shape (R7.1).
