@@ -71,14 +71,16 @@ export function calibrationAvailable(
 // ------------------------------------------------------------------ levels (R8.3, R8.7, D-09)
 
 /**
- * Vibrate levels for a calibration, weakest first. Whisper → WHISPER_PATTERN; soft → `minMs`;
- * medium and firm → R8.3's 15 and 25 ms, each raised to at least the level below it plus
- * CALIBRATION_LEVEL_STEP_MS, so the tick lengths are strictly increasing whatever `minMs` is (Q-74).
+ * Vibrate levels for a calibration, weakest first, never above R8.3's 25 ms (Q-74). Whisper →
+ * WHISPER_PATTERN; firm → 25 ms; soft → `minMs` (at most 23 ms, so three ticks fit under the cap);
+ * medium → R8.3's 15 ms, raised to soft + CALIBRATION_LEVEL_STEP_MS, and halfway between soft and
+ * firm when that step would reach firm. The tick lengths are strictly increasing whatever `minMs` is.
  */
 export function levelsToVibrate(cal: Calibration): VibrateLevel[] {
-  const soft = cal.minMs;
-  const medium = Math.max(VIBRATE_LEVELS_MS[1]!, soft + CALIBRATION_LEVEL_STEP_MS);
-  const firm = Math.max(VIBRATE_LEVELS_MS[2]!, medium + CALIBRATION_LEVEL_STEP_MS);
+  const firm = VIBRATE_LEVELS_MS[2]!;
+  const soft = Math.min(cal.minMs, firm - 2);
+  let medium = Math.max(VIBRATE_LEVELS_MS[1]!, soft + CALIBRATION_LEVEL_STEP_MS);
+  if (medium >= firm) medium = Math.floor((soft + firm) / 2);
   const ms: Record<Exclude<CalibrationLevel, 'whisper'>, number> = { soft, medium, firm };
   return cal.levels.map((l) => (l === 'whisper' ? [...WHISPER_PATTERN] : ms[l]));
 }
