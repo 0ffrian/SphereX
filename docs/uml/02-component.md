@@ -1,6 +1,6 @@
 # 02 Components
 
-The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12, D-15, D-16, D-18, D-19, D-20, D-22, D-25 and D-28, and A4.9 (overlays).
+The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12, D-15, D-16, D-18, D-19, D-20, D-22, D-25 and D-28, and A4.9 (overlays) and A6.2 (Gemini layer, Q-87).
 
 ## Diagram 1: system and backend
 
@@ -13,7 +13,7 @@ flowchart LR
   end
 
   subgraph BE["Backend (FastAPI on Python 3.12, D-15)"]
-    API["API (D-16): resolve, frames, cutouts, spectrum, card, render-params; overlays, flags PNG, combine PNG (A4.9, Q-50)"]
+    API["API (D-16): resolve, frames, cutouts, spectrum, card, render-params; overlays, flags PNG, combine PNG (A4.9, Q-50)#59; admin gemini-repaint, albedo-ai, albedo-ai.webp (A6.2, Q-87)"]
     Adapters["Data adapters (proxy)"]
     DataCache[("Read-through disk cache (D-25): raw responses, spectra, cards, render params; SX_OFFLINE=1 never calls out")]
     subgraph Pipe["Pipeline"]
@@ -99,7 +99,9 @@ flowchart LR
   Adapters -->|"sbdb.api?sstr=...&phys-par=1"| SBDB
   Adapters -->|"shape.obj"| DAMIT
   Adapters -.->|"planet columns (P2)"| Exo
-  GemPaint -->|"hillshade + prompt (server-side key)"| Gemini
+  API -->|"X-SX-Admin-Token (Q-87)"| GemPaint
+  GemPaint <--> DataCache
+  GemPaint -->|"hillshade + prompt (server-side key, through the cache)"| Gemini
 
   Validate -.->|"validates cards against"| CardSchema
   Validate -.->|"validates render params against"| RPSchema

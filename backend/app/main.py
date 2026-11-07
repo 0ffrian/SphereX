@@ -12,13 +12,14 @@ import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import objects, overlays, resolve, spectrum
+from app.api import gemini, objects, overlays, resolve, spectrum
 from app.context import make_context
 from app.core.card.assets import AssetStore
 from app.core.card.service import ObjectPipeline
 from app.core.find.frames import FrameService
 from app.core.find.overlays import OverlayService
 from app.core.find.resolver import load_aliases
+from app.core.render.gemini_paint import GeminiPainter, make_client
 from app.errors import install_catch_all, install_error_handlers
 from app.settings import Settings, get_settings
 
@@ -64,6 +65,8 @@ def create_app(
         app.state.frames, AssetStore(ctx.cache, s.assets_dir, s.data_release)
     )
     app.state.aliases = load_aliases(s.targets_file)
+    # Gemini layer (issue #14): no key -> client None, the layer is off and the code colour shows.
+    app.state.gemini = GeminiPainter(s, ctx.cache, make_client(s, transport=transport))
     # Order matters: the middleware added last is outermost. The catch-all goes in first so
     # that CORS wraps it and a 500 still carries CORS headers.
     install_catch_all(app)
@@ -81,6 +84,7 @@ def create_app(
     app.include_router(objects.router)
     app.include_router(spectrum.router)
     app.include_router(overlays.router)
+    app.include_router(gemini.router)
 
     @app.get("/v1/health", tags=["meta"])
     def health() -> dict[str, object]:

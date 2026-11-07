@@ -86,6 +86,14 @@ uv run python -m app.core.render ../shared/fixtures/cards/asteroid_procedural.js
 | `SX_HTTP_*` | 10 s connect, 60 s read, 3 retries, 1 s backoff (doubles) | |
 | `SX_CORS_ORIGINS` | empty | Needed only when the frontend runs without the Vite proxy. CORS then exposes the `X-SX-Cached-At` and `X-SX-Asset-Status` headers (Q-39) so the browser can read them. |
 | `SX_ASSETS_DIR` | `backend/assets` | Pre-baked assets read by stage 4 (A5.4), `<type>/<id>.json` with the D-22 fields. |
+| `SX_TEXTURES_DIR` | `<SX_CACHE_DIR>/textures` | R6.7 baked maps; the Gemini AI albedo is written beside them (Q-87). |
+| `SX_ADMIN_TOKEN` | unset | Admin endpoints (Gemini repaint) need it in the `X-SX-Admin-Token` header. Unset: they answer 404 (Q-87). |
+| `SX_GEMINI_API_KEY` | unset | Server-side only, never returned or logged (D-07). Unset: the Gemini layer is off and the code colour shows. |
+| `SX_GEMINI_MODEL` | `gemini-nano-banana-2.1` | **[verify]** R12 #3. |
+| `SX_GEMINI_API_URL` | `https://generativelanguage.googleapis.com/v1beta` | **[verify]** URL and request shape (R12 #3). |
+| `SX_GEMINI_ASPECT_RATIO` | empty | **[verify]** R12 #3. Empty: none requested; the output is resampled to 2:1 anyway. |
+| `SX_GEMINI_TIMEOUT_S` | `90` | ASSUMPTION: A6.2 says "a set time". Total budget for the call, retries and backoff included. A read or write timeout is not retried; a connect timeout is, while budget is left. |
+| `SX_GEMINI_OFFLINE_CACHE` | `0` | Q-29: `1` shows a cached repaint under `SX_OFFLINE=1`; `0` keeps the layer off offline (D-24). |
 
 ## Cache (D-25)
 
