@@ -35,6 +35,11 @@ frontend/src/viewer/                 (Moon)
   renderers/shaderPlan.ts   # plan function of the shader kinds (honesty, Q-45 plain sphere, missing)
   renderers/shaderSpec.ts shaderPalette.ts pointClouds.ts   # card -> what to draw, palettes and lava thresholds, nebula / nova point sets
   sliders.ts          # D-26 / D-27 slider registry and overrides
+  render/             # render core (issue #39): pipeline.ts (RenderChain: HDR pass, bloom, highlight clip, TAAU or SMAA),
+                      # quality.ts (quality tiers low/medium/high, FrameGovernor), clock.ts (SimClock, pause reasons),
+                      # workerPool.ts (WorkerPool), fanout.ts (card and render-params fan-out loader, asset prefetch)
+  shaders/            # TSL helpers on three r187 (issue #39): noise.ts (seeded fbm, ridged, domainWarp, animatedCells,
+                      # OCTAVES per quality tier), sphere.ts (latLon, tangentFrame, differential rotation); index.ts re-exports
   fields/             (Atish)  # field generator for shader kinds (§7.7, D-12): fieldGenerator.ts (pure, FieldSampler), noise.ts,
                                # fieldWorker.ts (field and point requests) [verify], fieldClient.ts (main-thread side, falls back)
 frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
@@ -54,6 +59,8 @@ frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
   sound/              # listenSweep.ts (A8 Listen sweep, issue #11); imagined drive not built yet
 frontend/src/hapticsTestPage/        (Atish)  # dev-only test page behind frontend/haptics-test.html; not a build input;
                                               # panels/SpectrumPanel.tsx (#10), panels/TexturePanel.tsx (#11)
+frontend/src/shaderlab/                       # dev-only shader harness behind frontend/shaderlab.html (one sphere per
+                                              # viewer/shaders function, ?seed= and ?t= from the URL); not a build input, not in dist/
 frontend/src/contract/               (generated, D-18)  # generated.ts comes from shared/schemas/ by json-schema-to-typescript;
                                                         # hand-written helpers such as assertTagged() and TV<T> sit next to it;
                                                         # the R8.8 runtime types stay hand-written in haptics.ts for now (Q-19)
@@ -93,6 +100,8 @@ Owners follow D-17 (Munazir is Moon). `frontend/src/contract/` is generated code
 `contract/`, `state/` and `app/` were added when the frontend was scaffolded (4 Nov 2026). See the [frontend README](../../frontend/README.md#layout). `contract/` is generated from `shared/schemas/` (D-18); CI fails if regenerated files differ from the committed ones. The generated types replaced the hand-written scaffold types in issue #4.
 
 The `app/` subfolders (`api/`, `search/`, `flipbook/`, `spectrum/`), the `sky` slice, `src/test/`, `fixtures/` and `scripts/` were added by the flipbook and spectrum view (M1, issue #3, 5 Nov 2026). The fixture server answers `/v1` with synthetic data and marks every reply with `X-SX-Fixture: synthetic`; see the [fixtures README](../../frontend/fixtures/README.md). D-17 names no owner for `src/test/`, `fixtures/` and `scripts/`; they are dev and test tooling for the flipbook UI.
+
+`viewer/render/`, `viewer/shaders/`, `src/shaderlab/` and `shaderlab.html` were added by the viewer render core (issue #39). Motion and quality tiers follow R5.7 and D-34; how the viewer implements them is [Q-66](../decisions.md). `shaderlab.html` is served by the dev server only; Vite builds `index.html` alone, so it never reaches `dist/`. D-17 names no owner for the harness.
 
 ---
 

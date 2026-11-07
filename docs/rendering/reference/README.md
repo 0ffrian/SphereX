@@ -4,9 +4,9 @@
 
 These are the target previews from the render plan (section 10.1, "the quality bar"). Every renderer is reviewed against them before it merges, with [checklist.md](checklist.md). Frame times are checked with [frame-time.md](frame-time.md). Golden-frame tests are a separate thing (below).
 
-**What they are not.** They are the plan's concept previews, 240 x 240 JPEG. They are a visual **target**, not output of the app and not measured data. They carry the `artistic` tag: a look to aim for, never evidence about a real object. Do not compare them pixel by pixel.
+**What they are not.** They are the team's concept previews (6 Nov 2026), 240 x 240 JPEG. They are a visual **target**, not output of the app and not measured data. They carry the `artistic` tag: a look to aim for, never evidence about a real object. Do not compare them pixel by pixel.
 
-| File                                           | Body                                   | What the frame shows (the plan's caption)                       |
+| File                                           | Body                                   | What the frame shows (the concept caption)                       |
 | ---------------------------------------------- | -------------------------------------- | --------------------------------------------------------------- |
 | [eros.jpg](eros.jpg)                           | Asteroid with a shape model (433 Eros) | Real NEAR shape, to scale, lit by the Sun                       |
 | [star.jpg](star.jpg)                           | Star                                   | Sunspot groups, faculae, flare ribbons, plasma arch, crisp limb |
@@ -17,7 +17,7 @@ These are the target previews from the render plan (section 10.1, "the quality b
 | [cold_rocky.jpg](cold_rocky.jpg)               | Cold rocky world                       | Teq rules: no lava, polar ice                                   |
 | [neutron_star.jpg](neutron_star.jpg)           | Neutron star                           | Concept: hot surface, dipole field, beams                       |
 
-Comets have no reference frame yet (the plan lists no preview for them); add one the first time a comet look is agreed.
+Comets have no reference frame yet (no concept preview exists for them); add one the first time a comet look is agreed.
 
 ## Seed and time convention for app renders
 

@@ -1,4 +1,4 @@
-// Plan 10.2 / R11: same card, seed and time give the same frame on one device, also on a temporal
+// R5.7 / R11: same card, seed and time give the same frame on one device, also on a temporal
 // (TAAU) tier. The goldens run at the low tier (SMAA), so this covers medium: a body drawn straight
 // away must match the same body drawn after another one, once the clock is frozen and settled.
 import { readFileSync } from 'node:fs';

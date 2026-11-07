@@ -3,13 +3,15 @@ import {
   FrameGovernor,
   initialTier,
   lowerTier,
+  minFrameIntervalMs,
+  qualityFromSearch,
   SLOW_FRAME_MS,
   SLOW_WINDOW_MS,
   TIERS,
 } from './quality';
 
-describe('tiers (plan 10.5)', () => {
-  it('match the plan table', () => {
+describe('quality tiers (R5.7)', () => {
+  it('match the R5.7 table', () => {
     expect(TIERS.high).toMatchObject({
       octaves: 6,
       volumeSteps: 96,
@@ -101,10 +103,31 @@ describe('FrameGovernor', () => {
 });
 
 describe('FrameGovernor at a steady 30 fps', () => {
-  it('does not drop: 33.3 ms frames meet D-05', () => {
+  it('medium drops to low: 33.3 ms misses the 60 fps target (R5.7)', () => {
     const g = new FrameGovernor('medium');
     let drop = null;
     for (let t = 0; t <= 5000; t += 1000 / 30) drop = drop ?? g.feed(1000 / 30, t);
+    expect(drop?.to).toBe('low');
+  });
+
+  it('low is the floor and does not report a drop', () => {
+    const g = new FrameGovernor('low');
+    let drop = null;
+    for (let t = 0; t <= 5000; t += 1000 / 30) drop = drop ?? g.feed(1000 / 30, t);
     expect(drop).toBeNull();
+  });
+});
+
+describe('qualityFromSearch and minFrameIntervalMs', () => {
+  it('reads ?quality= and ignores anything else', () => {
+    expect(qualityFromSearch('?quality=high')).toBe('high');
+    expect(qualityFromSearch('?a=1&quality=low')).toBe('low');
+    expect(qualityFromSearch('?quality=ultra')).toBeNull();
+    expect(qualityFromSearch('')).toBeNull();
+  });
+
+  it('caps the low quality tier at 30 fps and leaves 60 fps tiers at the display rate', () => {
+    expect(minFrameIntervalMs('low')).toBeCloseTo(1000 / 30 - 2);
+    expect(minFrameIntervalMs('medium')).toBeLessThan(1000 / 60);
   });
 });
