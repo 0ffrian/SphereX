@@ -43,14 +43,41 @@ class ShapeModel:
         return f"{self.citation} DOI {self.doi}, licence {self.licence}"
 
 
+# registry path -> ((mtime_ns, size), parsed rows). The file changes only when ingest_shape runs,
+# so /card and every mesh request reuse the parsed rows until it does. The mesh files are still
+# checked on every call (two stats), so a deleted GLB is never registered.
+_REGISTRY_CACHE: dict[Path, tuple[tuple[int, int], tuple[ShapeModel, ...]]] = {}
+
+
 def load_shape_registry(shapes_dir: Path) -> dict[str, ShapeModel]:
     """Read ``registry.toml``. A missing or broken file means no shape models, never a crash."""
     path = shapes_dir / "registry.toml"
-    if not path.exists():
+    try:
+        st = path.stat()
+    except OSError:
         return {}
+    stamp = (st.st_mtime_ns, st.st_size)
+    hit = _REGISTRY_CACHE.get(path)
+    if hit is not None and hit[0] == stamp:
+        models = hit[1]
+    else:
+        models = _parse_shape_registry(path)
+        _REGISTRY_CACHE[path] = (stamp, models)
+    out: dict[str, ShapeModel] = {}
+    for m in models:
+        # Refuse rather than invent: a registry row whose mesh is not on disk would type the
+        # object asteroid_shape with a `measured` shape_source that answers 404.
+        if not all(mesh_file(shapes_dir, p) is not None for p in (m.lod0, m.lod1)):
+            log.warning("shape model %s (%s) skipped: mesh file missing", m.spkid, m.lod0)
+            continue
+        out[m.spkid] = m
+    return out
+
+
+def _parse_shape_registry(path: Path) -> tuple[ShapeModel, ...]:
     try:
         rows = tomllib.loads(path.read_text("utf-8")).get("model", [])
-        models = [
+        return tuple(
             ShapeModel(
                 spkid=str(r["spkid"]),
                 name=str(r["name"]),
@@ -62,19 +89,10 @@ def load_shape_registry(shapes_dir: Path) -> dict[str, ShapeModel]:
                 convex=bool(r["convex"]),
             )
             for r in rows
-        ]
+        )
     except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
         log.warning("shape registry %s unreadable, no shape models: %s", path, e)
-        return {}
-    out: dict[str, ShapeModel] = {}
-    for m in models:
-        # Refuse rather than invent: a registry row whose mesh is not on disk would type the
-        # object asteroid_shape with a `measured` shape_source that answers 404.
-        if not all(mesh_file(shapes_dir, p) is not None for p in (m.lod0, m.lod1)):
-            log.warning("shape model %s (%s) skipped: mesh file missing", m.spkid, m.lod0)
-            continue
-        out[m.spkid] = m
-    return out
+        return ()
 
 
 SHAPE_URL_ROOT = "/data/shapes/"

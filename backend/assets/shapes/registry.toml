@@ -2,17 +2,18 @@
 # edit by hand. Paths are same-origin (Q-44); `convex` is true for DAMIT inversions.
 
 [[model]]
+axes = "glTF +Y up: glTF (x, y, z) = body-fixed (x, z, -y); glTF +Y is the body +Z pole"
 citation = "Gaskell, R.W., Gaskell Eros Shape Model V1.1, urn:nasa:pds:gaskell.ast-eros.shape-model, NASA Planetary Data System."
 convex = false
 doi = "10.26033/d0gq-9427"
-extents_km = [32.658, 16.883, 11.959]
+extents_km = [32.658, 11.959, 16.883]
 frame = "Eros body-fixed frame of the model, origin as given (not recentred); pole and rotation in the bundle PCK note eros_alex.tpc.txt (Yeomans, Konopliv)"
-ingest_version = "1"
+ingest_version = "2"
 licence = "CC0-1.0"
 lod0 = "/data/shapes/eros-gaskell.glb"
-lod0_sha256 = "f8183d24ad4ed4cafdb66b5fa8f76e928b4e2c84707bc56b2de7be0e5d360aeb"
+lod0_sha256 = "71012ce61e3d3fd0ccecc3a79c09ff9ac7920c456690cdc157d41ba3f324d2c1"
 lod1 = "/data/shapes/eros-gaskell.lod1.glb"
-lod1_sha256 = "36efd2e2fd2a86ef5df2dc60fa3cc8e7c1b67f76cbc60c451867ac23dfb96d09"
+lod1_sha256 = "d7a3784633791c32fdccba0771231ab4a9229babd5869129feb88c4983ae484e"
 name = "433 Eros"
 slug = "eros-gaskell"
 source_member = "gaskell.ast-eros.shape-model_V1_1/data/quad/quad64q.tab"

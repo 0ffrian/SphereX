@@ -15,7 +15,7 @@ from typing import Any
 from app.adapters import horizons
 from app.adapters.exoplanet_archive import ref_text
 from app.core.card.catalogue import CatalogueData
-from app.core.classify import Classification
+from app.core.classify import Classification, is_calculated
 from app.core.find.resolver import ResolvedObject
 from app.core.render.spherex_rgb import CHANNELS_BY_TYPE, spherex_rgb, window_median
 from app.core.render.spherex_rgb import formula as spherex_formula
@@ -175,13 +175,35 @@ def _sun_vector(data: CatalogueData) -> dict[str, Any]:
     }
 
 
+# PSCompPars "Calculated Value" methods (https://exoplanetarchive.ipac.caltech.edu/docs/pscp_calc.html).
+ARCHIVE_CALC = "NASA Exoplanet Archive PSCompPars calculated value (pscp_calc.html)"
+ARCHIVE_RADIUS_ASSUMPTION = (
+    "radius from the Chen & Kipping 2017 mass-radius relation applied by the archive to the "
+    "planet's mass (often a minimum mass, Msini); not a measured radius"
+)
+ARCHIVE_TEQ_FORMULA = (
+    "Teq = T_star * sqrt(R_star / a) * (1/4)^(1/4) (archive calculation: zero albedo, full "
+    "heat redistribution)"
+)
+
+
 def _planet_fields(card: dict[str, Any], row: Mapping[str, Any] | None) -> None:
     """R7.7 size and D-12 temperature from the Exoplanet Archive row (A3.8). Mass, orbit and host
-    star stay in the row: R12 #12 defines no card field for them (Q-63 proposes some)."""
+    star stay in the row: R12 #12 defines no card field for them (Q-63 proposes some).
+
+    A value the archive calculated itself (``refstr=CALCULATED_VALUE``) is not ``measured``:
+    the radius is ``model_dependent`` (a mass-radius relation) and Teq ``derived`` (Q-63)."""
     row = row or {}
     radius = _finite(row.get("pl_radj"))
     if radius is None or radius <= 0:
         card["radius_rjup"] = _null("not available: the Exoplanet Archive has no pl_radj")
+    elif is_calculated(row, "pl_radj"):
+        card["radius_rjup"] = {
+            "value": radius,
+            "tag": "model_dependent",
+            "source": f"{ARCHIVE_CALC}, pl_radj",
+            "assumption": ARCHIVE_RADIUS_ASSUMPTION,
+        }
     else:
         errs = [abs(e) for e in (_finite(row.get(k)) for k in ("pl_radjerr1", "pl_radjerr2")) if e]
         card["radius_rjup"] = _measured(
@@ -190,7 +212,14 @@ def _planet_fields(card: dict[str, Any], row: Mapping[str, Any] | None) -> None:
             max(errs) if errs else None,
         )
     teq = _finite(row.get("pl_eqt"))
-    if teq is not None and teq > 0:
+    if teq is not None and teq > 0 and is_calculated(row, "pl_eqt"):
+        card["teq_K"] = {
+            "value": teq,
+            "tag": "derived",
+            "source": f"{ARCHIVE_CALC}, pl_eqt",
+            "formula": ARCHIVE_TEQ_FORMULA,
+        }
+    elif teq is not None and teq > 0:
         card["teq_K"] = _measured(
             teq, f"NASA Exoplanet Archive PSCompPars pl_eqt ({ref_text(row, 'pl_eqt')})"
         )

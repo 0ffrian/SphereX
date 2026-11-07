@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -99,7 +100,27 @@ SUN_CENTER = "500@10"  # Sun body centre: the target's heliocentric vector (ICRF
 
 
 class NoEphemeris(UpstreamError):
-    """Horizons answered, but with no phase angle (e.g. no observer ephemeris at the epoch)."""
+    """Horizons answered, but has no ephemeris for this observer at the epoch."""
+
+
+# What Horizons says when it has no data for a body at the epoch ("No ephemeris for target ...
+# prior to A.D. ...") and the placeholder it prints in a quantity column it cannot compute.
+_NO_EPHEMERIS = re.compile(r"no ephemeris for", re.IGNORECASE)
+_NOT_AVAILABLE = "n.a."
+
+
+def _is_no_ephemeris(body: bytes) -> bool:
+    """True only for Horizons' own "no ephemeris" answers, not for any unparsable reply."""
+    try:
+        text = _result_text(body)
+    except ValueError:
+        return False
+    if _NO_EPHEMERIS.search(text):
+        return True
+    try:
+        return any(len(c) >= 6 and c[5] == _NOT_AVAILABLE for c in _soe_rows(body))
+    except ValueError:
+        return False
 
 
 @dataclass(frozen=True)
@@ -199,7 +220,9 @@ def _fetch_phase(
         try:
             parse_phase_angle(resp.body)
         except ValueError as exc:
-            raise NoEphemeris(str(exc)) from exc
+            if _is_no_ephemeris(resp.body):
+                raise NoEphemeris(str(exc)) from exc
+            raise UpstreamError(str(exc)) from exc
         return resp
 
     served = ctx.cache.fetch(phase_key(spkid, jd, center), live, refresh=refresh)
@@ -240,9 +263,10 @@ def geometry(
 ) -> tuple[Geometry, list[Served]]:
     """Phase angle (observer SPHEREx, else geocentre) and Sun direction at ``time``.
 
-    Live, only a Horizons reply with no phase angle for the SPHEREx observer (``NoEphemeris``,
-    e.g. no spacecraft ephemeris at the epoch) falls back to the geocentre; a network outage is
-    raised, so the observer never depends on a transient error. Offline, a SPHEREx cache miss
+    Live, only Horizons' own "no ephemeris" answer for the SPHEREx observer (``NoEphemeris``:
+    a "No ephemeris for ..." message or an ``n.a.`` phase column) falls back to the geocentre;
+    an outage or an unparsable reply is raised, so the observer never depends on a transient
+    error. Offline, a SPHEREx cache miss
     tries the recorded geocentre answer (what a live run that fell back left in the cache).
 
     The VECTORS call sends no TIME_TYPE, so its JD is read as TDB, about 69 s after the UT

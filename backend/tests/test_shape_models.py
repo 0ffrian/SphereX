@@ -165,6 +165,23 @@ def test_committed_registry_matches_files() -> None:
         assert hashlib.sha256(blob).hexdigest() == raw[f"{level}_sha256"]
 
 
+def test_axes_are_gltf_y_up() -> None:
+    # A point on the body +Z pole lands on glTF +Y; +X stays; +Y goes to -Z. Proper rotation.
+    r = ing.Z_UP_TO_Y_UP
+    assert np.allclose(r @ [0, 0, 1], [0, 1, 0]) and np.allclose(r @ [1, 0, 0], [1, 0, 0])
+    assert np.allclose(r @ [0, 1, 0], [0, 0, -1]) and np.linalg.det(r) == pytest.approx(1.0)
+
+
+def test_eros_spin_axis_is_gltf_y() -> None:
+    """The viewer spins about +Y (PR #45 review); Eros's short axis is its spin pole."""
+    raw = tomllib.loads((SHAPES / "registry.toml").read_text("utf-8"))["model"][0]
+    assert raw["axes"] == ing.AXES_NOTE
+    doc, _ = ing.read_glb((SHAPES / "eros-gaskell.glb").read_bytes())
+    ext = np.subtract(doc["accessors"][0]["max"], doc["accessors"][0]["min"]) / 1000.0
+    assert int(np.argmin(ext)) == 1  # Y is the shortest extent
+    assert np.allclose(ext, raw["extents_km"], atol=0.001)
+
+
 def test_registry_entry_without_its_mesh_is_skipped(tmp_path: Path) -> None:
     shutil.copy(SHAPES / "registry.toml", tmp_path / "registry.toml")
     shutil.copy(SHAPES / "eros-gaskell.glb", tmp_path / "eros-gaskell.glb")  # lod1 missing

@@ -7,7 +7,10 @@ Input is an ICQ file (Gaskell, PDS) or a Wavefront OBJ (DAMIT). Output is ``<slu
 and ``<slug>.lod1.glb`` (LOD1) in ``assets/shapes`` plus an entry in ``registry.toml``.
 No decimation: an ICQ grid is halved exactly (keep every second grid point); an OBJ is used as is.
 The output is byte-deterministic (no timestamps, sorted JSON keys, fixed padding).
-Units: km in, metres out (glTF). The body-fixed frame and origin are kept as given.
+Units: km in, metres out (glTF). Axes: glTF is +Y up (glTF 2.0 spec 3.4), so the body-fixed
+frame is rotated -90 deg about X: glTF (x, y, z) = body (x, z, -y). The body +Z (the spin pole
+of a body-fixed frame) becomes glTF +Y, which is the axis the viewer spins about (Q-61). The
+origin is kept as given (not recentred).
 """
 
 from __future__ import annotations
@@ -26,12 +29,16 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-INGEST_VERSION = "1"
+INGEST_VERSION = "2"  # 2: Z-up body frame rotated to glTF Y-up
 GENERATOR = f"Shift & Spectrum ingest_shape {INGEST_VERSION}"
 TRIANGLE_BUDGET = 50_000  # R5.5
 DEFAULT_OUT = Path(__file__).resolve().parent.parent / "assets" / "shapes"
 
 Array = NDArray[Any]
+
+# glTF (x, y, z) = body (x, z, -y): a proper rotation (det +1), so winding and normals stay valid.
+Z_UP_TO_Y_UP = np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]])
+AXES_NOTE = "glTF +Y up: glTF (x, y, z) = body-fixed (x, z, -y); glTF +Y is the body +Z pole"
 
 
 class ShapeError(ValueError):
@@ -341,6 +348,7 @@ def build_levels(
                 f"edges, {dup_dir} same-direction edges); refusing to ship it"
             )
         tris = orient_outward(verts, tris)
+        verts = verts @ Z_UP_TO_Y_UP.T
         out.append((verts * km_to_m, tris, vertex_normals(verts, tris)))
     return out
 
@@ -385,6 +393,7 @@ def ingest(args: argparse.Namespace) -> dict[str, Any]:
         "extents_km": [round(float(x), 3) for x in ext_km],
         "units": "metres in the GLB (source km x 1000)",
         "frame": args.frame,
+        "axes": AXES_NOTE,
         "citation": args.citation,
         "doi": args.doi,
         "licence": args.licence,

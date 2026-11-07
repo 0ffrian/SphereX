@@ -64,7 +64,8 @@ interface ObjectCard {
   period_var_d?: TV;                  // Mira period
   lightcurve?: { t_mjd: number; flux: number; sigma: number; lambda_um: number; flags: number }[];
   // geometry of observation (solar-system bodies)
-  phase_angle_deg?: TV; sun_vector?: TV<[number, number, number]>;
+  phase_angle_deg?: TV; sun_vector?: TV<[number, number, number]>;   // sun_vector: unit vector target -> Sun,
+                                      // ICRF equatorial J2000 (Horizons, Q-62)
   // comet
   gas_Q?: { co2?: TV; h2o?: TV; co?: TV };   // molecules/s, per epoch (the shape holds one epoch: Q-42)
   coma_radius_km?: TV; nucleus_radius_km_max?: TV;
@@ -84,7 +85,7 @@ interface ObjectCard {
    - T Tauri → `star_ttauri`
    - any other star → `star`
 4. NASA Exoplanet Archive match → `planet_rocky`, `planet_water` or `gas_giant`.
-   - Classification thresholds: **provisional** values in `backend/app/core/classify/rules.py` (Q-63: radius cuts, true mass, Zeng 2019 mass-radius curves), chosen by Moon on 7 Nov 2026 and not agreed until Atish (classify owner, D-17) confirms Q-63; all values stay **[verify]**. Open item, [§12](layout-tests-open-items.md#r12-open-items-verify).
+   - Classification thresholds: **proposed** values in `PROPOSED_EXOPLANET_THRESHOLDS` in `backend/app/core/classify/rules.py` (Q-63: radius cuts, true mass, Zeng 2019 mass-radius curves), chosen by Moon on 7 Nov 2026. The live thresholds stay `None` (refuse: `candidate` with `type:exoplanet_thresholds`) until Atish (classify owner, D-17) confirms Q-63; all values stay **[verify]**. Archive values marked `CALCULATED_VALUE` are never used to classify (Q-63). Open item, [§12](layout-tests-open-items.md#r12-open-items-verify).
    - The Exoplanet Archive service is tested ([architecture spec §3.8](../architecture/README.md)).
 5. `nebula` and `nova` come from user sliders only. They have no catalogue rule; they are slider-only showcase bodies, and every value is tagged `artistic` (D-12).
 6. Anything else → `candidate`.
@@ -100,6 +101,8 @@ interface RenderParams {
   layers: Layer[];                     // ordered, each with a tag
   textures?: { albedo: string; height: string; normal: string; roughness?: string; height_bin?: string };
   lighting: { mode: 'sun' | 'self'; sun_dir?: [number, number, number]; phase_angle_deg?: number };
+                                       // sun_dir: today a copy of the card's ICRF sun_vector; the viewer reads it
+                                       // as scene space. Frame conversion open (Q-62); phase_angle_deg wins
   view_modes: { visible: VisibleMode; spherex_ir?: IRMode };
   haptics: HapticProfile;              // §8
   alt_text: string;                    // §9

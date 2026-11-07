@@ -96,9 +96,12 @@ class ObjectPipeline:
         cached_at = min(times) if times else None
 
         # Save only final inputs: a spectrum from a complete frame list and a catalogue answer.
-        # A truncated search or a deferred cutout could still change the card.
+        # A truncated search or a deferred cutout could still change the card. A type refusal
+        # (`type:*`, e.g. the Q-63 thresholds still unset) is not saved either: it is not a fact
+        # about the object, and a later rule change would otherwise be hidden by the saved sketch.
         final = spectrum is not None and is_complete(list(spectrum.get("missing", [])))
-        if final and not data.missing:
+        type_refused = any(m.startswith("type:") for m in cls.missing)
+        if final and not data.missing and not type_refused:
             self.assets.put(
                 Asset(
                     card=card,
