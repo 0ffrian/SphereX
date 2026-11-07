@@ -16,7 +16,7 @@ type Tier = Annotated[
     Literal[1, 2, 3, 4, 5],
     Field(
         ...,
-        description="Fallback tier of the rung that answered: 1 measured, 2 derived, 3 model_dependent, 4 inferred_from_analog, 5 artistic (D-31). Always agrees with the tag.",
+        description="Fallback tier of the rung that answered: 1 measured, 2 derived, 3 model_dependent, 4 inferred_from_analog, 5 artistic (D-32). Always agrees with the tag.",
         title="Tier",
     ),
 ]

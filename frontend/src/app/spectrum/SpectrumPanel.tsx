@@ -1,6 +1,6 @@
 // A1.1 P0 spectrum for the clicked object (UML 09, display level 2): loading and error states,
 // the provenance badge (D-02), the chart, refused items (`missing`, grouped by reason, A11) and a
-// data table as the text equivalent of the chart (R9). With no points, the panel says why (Q-26);
+// data table as the text equivalent of the chart (R9). With no points, the panel says why (D-31);
 // with some frames refused, it says which part of the frames' range the points cover. The light
 // curve is parsed but not drawn in M1.
 import { useEffect, useMemo, useRef } from 'react';

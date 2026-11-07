@@ -154,7 +154,7 @@ export type Layer = {
   };
 };
 /**
- * Fallback tier of the rung that answered: 1 measured, 2 derived, 3 model_dependent, 4 inferred_from_analog, 5 artistic (D-31). Always agrees with the tag.
+ * Fallback tier of the rung that answered: 1 measured, 2 derived, 3 model_dependent, 4 inferred_from_analog, 5 artistic (D-32). Always agrees with the tag.
  */
 export type Tier = 1 | 2 | 3 | 4 | 5;
 /**
@@ -164,7 +164,13 @@ export type TextureHaptic = 'height' | 'mesh' | 'bands' | 'terrain' | 'flow' | '
 export type DataHaptic =
   'field' | 'flux_pulse' | 'teq_pulse' | 'heartbeat' | 'dimming' | 'motion' | 'detections' | 'none';
 /**
- * One motion rate with its provenance and the tier of the rung that answered (D-31). A rate no rung can answer is omitted and listed in missing as dynamics:<key>.
+ * A DynamicsValue whose value is above 0 (periods and lifetimes).
+ */
+export type PositiveDynamicsValue = DynamicsValue & {
+  value?: number;
+};
+/**
+ * One motion rate with its provenance and the tier of the rung that answered (D-32). A rate no rung can answer is omitted and listed in missing as dynamics:<key>.
  */
 export type DynamicsValue = {
   value: number;
@@ -181,6 +187,12 @@ export type DynamicsValue = {
   assumed?: {
     [k: string]: number | string;
   };
+};
+/**
+ * A DynamicsValue whose value is 0 or more (rates).
+ */
+export type NonNegativeDynamicsValue = DynamicsValue & {
+  value?: number;
 };
 
 /**
@@ -318,17 +330,17 @@ export interface HapticProfile {
   };
 }
 /**
- * Motion data (R3.4, D-31). Absent = no motion data. Rates: spin_period_h: Sidereal rotation period, hours. diff_rotation: k in Omega(phi) = Omega_eq (1 - k sin^2 phi). jet_speed_ms: Peak zonal wind speed, m/s. spot_lifetime_d: Star spot group lifetime, days. flare_rate_per_d: Flares per day above the drawn threshold. pulsation_period_d: Pulsation period, days.
+ * Motion data (R3.4, D-32). Absent = no motion data. Rates: spin_period_h: Sidereal rotation period, hours. diff_rotation: k in Omega(phi) = Omega_eq (1 - k sin^2 phi). jet_speed_ms: Peak zonal wind speed, m/s. spot_lifetime_d: Star spot group lifetime, days. flare_rate_per_d: Flares per day above the drawn threshold. pulsation_period_d: Pulsation period, days.
  */
 export interface Dynamics {
-  spin_period_h?: DynamicsValue;
+  spin_period_h?: PositiveDynamicsValue;
   diff_rotation?: DynamicsValue;
   jet_speed_ms?: DynamicsValue;
-  spot_lifetime_d?: DynamicsValue;
-  flare_rate_per_d?: DynamicsValue;
-  pulsation_period_d?: DynamicsValue;
+  spot_lifetime_d?: PositiveDynamicsValue;
+  flare_rate_per_d?: NonNegativeDynamicsValue;
+  pulsation_period_d?: PositiveDynamicsValue;
   /**
-   * Time-lapse factor shown on screen for each animated process (D-33). {} when nothing moves.
+   * Time-lapse factor shown on screen for each animated process (D-34). {} when nothing moves.
    */
   speedup: {
     [k: string]: number;

@@ -15,7 +15,7 @@
 
 ### R7.5.1 Star surface (what is drawn)
 
-The surface layers follow the tier chain (D-31). Each layer carries its tier and, from tier 2, its formula. Motion keys are in `RenderParams.dynamics` ([R3.4](../data-contract.md#r34-renderparams-produced-by-the-backend-get-v1objectsidrender-params)); with no `dynamics` the surface is still.
+The surface layers follow the tier chain (D-32). Each layer carries its tier and, from tier 2, its formula. Motion keys are in `RenderParams.dynamics` ([R3.4](../data-contract.md#r34-renderparams-produced-by-the-backend-get-v1objectsidrender-params)); with no `dynamics` the surface is still.
 
 | Toggle state (D-21) | What shows |
 |---|---|
@@ -62,5 +62,5 @@ Barnard's Star example **[verify]** (each tier needs checking):
 - **Flares:** a flare lights two ribbons in an active region and lifts a twisted arch of plasma strands off the limb that rises and fades. Rate by `flare_rate_per_d`: typical rate by class **[verify]**. Tier 4 from a class rate, tier 1 only when measured. Times come from a seeded schedule, so the same card, seed and t give the same flare.
 - **Prominences:** loops that follow dipole field lines between a region's leader and follower spots. Tier 5 for the strand look, tier 4 for the placement.
 - **Motion:** flares use `speedup.flares`; loops sway slowly with the clock.
-- **Mira:** pulsation uses `pulsation_period_d` (tier 1 or 2, from the light curve). The ±10% amplitude stays `artistic` (Q-60).
+- **Mira:** pulsation uses `pulsation_period_d` (tier 1 or 2, from the light curve). The ±10% amplitude stays `artistic` (Q-65).
 - In Measured only, none of R7.5.3 to R7.5.5 is drawn unless its tier is 1.

@@ -265,7 +265,23 @@ const LAYER_NAME: Readonly<Record<string, string>> = {
   teq_pulse: 'Temperature pulse',
 };
 
+/** Motion rates (R3.4 `dynamics`); a rate no tier can answer is refused as `dynamics:<key>`. */
+const MOTION_NAME: Readonly<Record<string, string>> = {
+  spin_period_h: 'Spin',
+  diff_rotation: 'Differential rotation',
+  jet_speed_ms: 'Wind motion',
+  spot_lifetime_d: 'Spot changes',
+  flare_rate_per_d: 'Flares',
+  pulsation_period_d: 'Pulsation',
+};
+
+const MOTION_PREFIX = 'dynamics:';
+
 export function layerName(id: string): string {
+  if (id.startsWith(MOTION_PREFIX)) {
+    const key = id.slice(MOTION_PREFIX.length);
+    return `${MOTION_NAME[key] ?? key.replace(/_/g, ' ')} (motion)`;
+  }
   return LAYER_NAME[id] ?? `Layer “${id.replace(/_/g, ' ')}”`;
 }
 
@@ -311,7 +327,9 @@ export function describeRefusal(item: MissingItem): string {
         ? `${name}: not drawn. Missing data: ${fieldList(item.fields)}.`
         : `${name}: not drawn. ${item.detail ?? 'The data it needs is missing.'}`;
     case 'backend':
-      return `${name}: not drawn. The data pipeline left it out.`;
+      return item.id.startsWith(MOTION_PREFIX)
+        ? `${name}: not animated. No measured or typical value is known for it.`
+        : `${name}: not drawn. The data pipeline left it out.`;
     case 'load':
       return `${name}: not drawn. ${item.detail ?? 'Its file could not be loaded.'}`;
     case 'epoch': {

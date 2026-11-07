@@ -9,7 +9,7 @@
       "id": "mesh",
       "tag": "measured",
       "tier": 1,
-      "description": "Shape model scaled to the measured diameter (R7.1).",
+      "description": "Shape model scaled to the diameter on the card (R7.1).",
       "requires": [
         "shape_source",
         "diameter_km"
@@ -96,7 +96,7 @@
       "source": "synthetic fixture: not a real measurement"
     },
     "speedup": {
-      "spin": 3600
+      "spin": 1000
     }
   },
   "alt_text": "Synthetic fixture. Asteroid, 10 km across (measured), colour from gaia_rgb, viewed at 30 degrees. Surface relief: measured.",

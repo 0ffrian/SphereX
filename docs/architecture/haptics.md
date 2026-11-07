@@ -4,7 +4,7 @@
 
 ## A9 Haptics
 
-The rendering doc is the authority: see **rendering doc §8** for encoding, event sources, per-type profiles, calibration and the engine API. This section summarises the decisions. Status: **To build**.
+The rendering doc is the authority: see **rendering doc §8** for encoding, event sources, per-type profiles, calibration and the engine API. This section summarises the decisions. Status: **Built against fixtures** (6 Nov 2026): the engine, web drivers, settings and test page (issue #9), spectrum haptics and calibration (#10), and the per-type sources, `buildHaptics`, the touch probe and the Listen sweep (#11). **M5 integration pending** (the checklist is in rendering doc §8.8); nothing has been felt or heard on the phones yet, so every **[verify on phones]** item stays open.
 
 ### A9.1 Platform (D-08)
 

@@ -27,7 +27,8 @@ from app.core.render.card_to_params import GENERATOR_VERSION
 log = logging.getLogger("shift_spectrum")
 
 ASSET_SOURCE = "derived.asset"
-ASSET_VERSION = "1"  # bump when stage 3, 5 or 7 rules change
+# Bump when stage 3, 5 or 7 rules change. 2: Layer.tier, formula and assumed (D-32).
+ASSET_VERSION = "2"
 AssetStatus = Literal["saved", "generated", "sketch"]
 FIELDS = ("card", "render_params", "textures", "generator_version", "seed", "created_at")
 

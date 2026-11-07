@@ -1,6 +1,6 @@
 # Overview
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A1–A2.1 · **Implements:** D-02, D-05, D-06, D-12, D-16, D-25, D-28
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A1–A2.1 · **Implements:** D-02, D-05, D-06, D-12, D-16, D-25, D-28, D-31
 
 ## A1 What we are building
 
@@ -13,7 +13,7 @@ The base tool must exist before any extra. If time runs short, cut from the bott
 | Tier | Feature | Why |
 |---|---|---|
 | **P0** | Flipbook: coordinates or name in, SPHEREx frames out, played as a series. Must work on Barnard's Star, Epsilon Indi B, WISE 0855, RW Aurigae, R Draconis. | Required by the challenge. |
-| **P0** | Spectrum on the fly for a clicked object (flux per frame against wavelength, with error bars and flags). | The twist, and an optional challenge item. |
+| **P0** | Spectrum on the fly for a clicked object (flux per frame against wavelength, with error bars and flags). Barnard's Star, RW Aur and R Dra saturate: Barnard's Star and R Dra have no measured point and RW Aur only 15 points at 0.74–1.09 µm. Demo objects SIMP 0136, TWA 27 and IRAS 04302+2247 have measured spectra (D-31). | The twist, and an optional challenge item. |
 | **P1** | Gaia and WISE overlays, URL coordinates, contamination flags, field of view, add and subtract images. | Optional items in the challenge. |
 | **P1** | Rainbow Trails: a view mode of the flipbook, one dot per band along a moving object's path. Uses the frames and mover positions the flipbook already loads. Built after basic playback works (D-28). Dot colour is a false colour, hue = wavelength, tagged `derived` (Estimated badge); in "Measured only" the dots are drawn in one colour (D-21, Q-27). UI built in M1 (issue #3); real movers wait for Q-21. | The team's early concept ([handover](../handover.md) §5). |
 | **P1** | Classify the object, then Sky Sculptor (3D body from the ObjectCard and RenderParams). | Headline wow. |

@@ -23,7 +23,7 @@
         "gas_Q",
         "coma_radius_km"
       ],
-      "formula": "n(r) = Q / (4 pi v r^2) out to coma_radius_km",
+      "formula": "n(r) proportional to Q / r^2 out to coma_radius_km",
       "assumed": {
         "density_exponent": 2.0
       }

@@ -26,8 +26,11 @@ from app.core.render.params import BAKED_TYPES, BakeParams, BakeRefusal, params_
 from app.core.render.spherex_rgb import CHANNELS_BY_TYPE
 
 # Bump when a rule in this module changes. The baker's rules version is part of it, so the R6.7
-# texture path changes whenever either changes.
-CARD_TO_PARAMS_VERSION = "2"  # 2: Layer.tier, formula, assumed (D-31)
+# texture path changes whenever either changes. The seed is a hash of this version (Q-35), so a
+# bump also re-seeds every procedural body: bump only when a surface rule changes. Issue #38 added
+# Layer.tier, formula and assumed without changing any surface, so it bumped ASSET_VERSION
+# (saved replies) instead and kept this at "1".
+CARD_TO_PARAMS_VERSION = "1"
 GENERATOR_VERSION = f"p{CARD_TO_PARAMS_VERSION}-b{BAKER_RULES_VERSION}"
 
 # Texture size named in the URLs (D-05 desktop budget; the viewer downsamples for phones).
@@ -56,9 +59,9 @@ _RANK = {
     "artistic": 4,
 }
 
-TIER_OF_TAG = {tag: rank + 1 for tag, rank in _RANK.items()}  # D-31: tier 1..5 = the five tags
+TIER_OF_TAG = {tag: rank + 1 for tag, rank in _RANK.items()}  # D-32: tier 1..5 = the five tags
 
-# Rule inputs that are not on the card, stated as `assumed` (D-31). The values are the ones the
+# Rule inputs that are not on the card, stated as `assumed` (D-32). The values are the ones the
 # cited rules fix (R6.2, R7.3, R7.5); none is a measurement.
 ASSUMED_C_OVER_B = 1.0  # R6.2: c = b
 ASSUMED_DENSITY_EXPONENT = 2.0  # R7.3: coma gas density falls as 1/r^2
@@ -147,10 +150,18 @@ def _tag(card: Mapping[str, Any], key: str) -> str:
 def _assumed(
     card: Mapping[str, Any], requires: list[str], rule_inputs: Mapping[str, float] | None = None
 ) -> dict[str, float | str]:
-    """Inputs that were not measured (D-31): the explicit rule inputs, then each required card
-    field whose value is model_dependent, keyed by field name. Deterministic order."""
+    """Inputs that were not measured (D-32): the explicit rule inputs, then each required card
+    field whose value is model_dependent, keyed by field name. A group of values such as
+    ``gas_Q`` is walked member by member, in sorted order, keyed ``gas_Q.co2``. Deterministic
+    order."""
     out: dict[str, float | str] = dict(rule_inputs or {})
     for key in requires:
+        group = card.get(key)
+        if isinstance(group, Mapping) and "tag" not in group:
+            members = sorted(k for k, m in group.items() if isinstance(m, Mapping) and "tag" in m)
+            for member, used in _assumed(group, members).items():
+                out[f"{key}.{member}"] = used
+            continue
         tv = _tv(card, key)
         if tv is None or tv.get("tag") != "model_dependent":
             continue
@@ -212,7 +223,7 @@ class _Plan:
         rule_inputs: Mapping[str, float] | None = None,
     ) -> bool:
         """Add a layer, or refuse it. ``formula`` is required for any layer whose tag can come out
-        derived or model_dependent; ``card`` is needed to state ``assumed`` (D-31)."""
+        derived or model_dependent; ``card`` is needed to state ``assumed`` (D-32)."""
         if ok:
             layer: dict[str, Any] = {
                 "id": layer_id,
@@ -223,14 +234,14 @@ class _Plan:
             }
             if tag in ("derived", "model_dependent"):
                 if not formula:
-                    raise ValueError(f"layer {layer_id}: tag {tag} needs a formula (D-31)")
+                    raise ValueError(f"layer {layer_id}: tag {tag} needs a formula (D-32)")
                 layer["formula"] = formula
             if tag == "model_dependent":
                 assumed = _assumed(card or {}, requires, rule_inputs)
                 if not assumed:
                     # Never label measured inputs as assumed: the rule must name what it assumed.
                     raise ValueError(
-                        f"layer {layer_id}: model_dependent needs an assumed input (D-31)"
+                        f"layer {layer_id}: model_dependent needs an assumed input (D-32)"
                     )
                 layer["assumed"] = assumed
             self.layers.append(layer)

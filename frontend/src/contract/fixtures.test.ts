@@ -34,7 +34,7 @@ function taggedValues(node: unknown): Tagged[] {
   if (Array.isArray(node)) return node.flatMap(taggedValues);
   if (typeof node !== 'object' || node === null) return [];
   const own = 'value' in node && 'tag' in node ? [node as Tagged] : [];
-  // DynamicsValue is not a card TV: its model_dependent rule is `assumed`, not `assumption` (D-31).
+  // DynamicsValue is not a card TV: its model_dependent rule is `assumed`, not `assumption` (D-32).
   const rest = Object.entries(node).filter(([k]) => k !== 'dynamics');
   return [...own, ...rest.flatMap(([, v]) => taggedValues(v))];
 }

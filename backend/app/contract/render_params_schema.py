@@ -46,6 +46,20 @@ class DynamicsValue(BaseModel):
     )
 
 
+class PositiveDynamicsValue(DynamicsValue):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    value: float = Field(..., gt=0.0)
+
+
+class NonNegativeDynamicsValue(DynamicsValue):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    value: float = Field(..., ge=0.0)
+
+
 type Speedup = Annotated[float, Field(..., gt=0.0)]
 
 
@@ -53,16 +67,16 @@ class Dynamics(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    spin_period_h: DynamicsValue | None = None
+    spin_period_h: PositiveDynamicsValue | None = None
     diff_rotation: DynamicsValue | None = None
     jet_speed_ms: DynamicsValue | None = None
-    spot_lifetime_d: DynamicsValue | None = None
-    flare_rate_per_d: DynamicsValue | None = None
-    pulsation_period_d: DynamicsValue | None = None
+    spot_lifetime_d: PositiveDynamicsValue | None = None
+    flare_rate_per_d: NonNegativeDynamicsValue | None = None
+    pulsation_period_d: PositiveDynamicsValue | None = None
     speedup: dict[Literal["spin", "spots", "flares", "winds", "clouds", "pulsation"], Speedup] = (
         Field(
             ...,
-            description="Time-lapse factor shown on screen for each animated process (D-33). {} when nothing moves.",
+            description="Time-lapse factor shown on screen for each animated process (D-34). {} when nothing moves.",
         )
     )
 
