@@ -30,10 +30,14 @@ flowchart TB
         VFields["fields/ : fieldGenerator, noise, fieldWorker, fieldClient (D-12) : Atish (D-17); shader generators (D-01) : Moon [verify path]"]
       end
       subgraph FHaptics["src/haptics : Atish (D-13, D-17)"]
-        HCore["haptics.ts, calibration.ts"]
+        HCore["haptics.ts (engine), audioContext, audioGraph, settings, calibration, platform, pitch, spectrumMapping, tuning"]
         HDrivers["drivers/ : webVibrate, audio, tauri (stub)"]
-        HSources["sources/ : heightMap, meshNormal, field, spectrum, lightcurve, terrain, flow [verify]"]
+        HProfiles["profiles.ts (buildHaptics, TouchHaptics), probe.ts (TouchProbe)"]
+        HSources["sources/ : types, relief, heightMap, meshNormal, field, dataPulse, spectrum, lightcurve, terrain, flow"]
+        HSound["sound/ : listenSweep (A8)"]
+        HUi["ui/ : PulseIndicator, UnlockButton, SpectrumHapticsPad, CalibrationWizard, HapticsSettings"]
       end
+      FHapticsTest["src/hapticsTestPage + haptics-test.html : dev-only test page, not a build input : Atish"]
     end
 
     Schemas["shared/schemas : object-card.schema.json, render-params.schema.json; shared/fixtures : Moon"]
@@ -58,10 +62,23 @@ flowchart TB
   FDev -.->|"answers /v1 instead of the backend (npm run dev:fixtures)"| FFlip
   VCore --> VRend
   VRend --> VFields
-  VCore -->|"pointer UV, honesty state"| HSources
+  VCore -->|"pointer ray, honesty state (M5)"| HProfiles
+  HProfiles --> HSources
+  HProfiles -->|"Comet, BrownDwarf, shaderSpec, planCommon, planTypes, sliders, pointClouds"| VRend
+  HProfiles -->|"directionToUV"| VFields
   HSources --> HCore
-  HSources -->|"sample field"| VFields
+  HSources -->|"field, zonalWind, storms, rings"| VFields
+  HSources -->|"Comet, Star, pointClouds"| VRend
+  HSources -->|"spectrum/scale, api/types"| FApp
+  HSound --> HCore
+  HSound -->|"Comet gasQForEpoch"| VRend
   HCore --> HDrivers
+  HUi --> HCore
+  HUi --> HSources
+  HUi -->|"app/ui, api/types"| FApp
+  FHapticsTest -.->|"dev server only"| HUi
+  FHapticsTest -.->|"dev server only"| HProfiles
+  HCore -->|"honesty filter"| VCore
   VCore -->|"types"| Schemas
   HSources -->|"HapticProfile type"| Schemas
   VFields -.->|"generators ported from"| Mockup
@@ -79,10 +96,11 @@ flowchart TB
 | `src/app/api`, `src/app/search`, `src/app/flipbook`, `src/app/spectrum` (flipbook UI) | Moon |
 | `frontend/fixtures`, `frontend/scripts`, `src/test`, `src/fixtures.test.ts`, `frontend/e2e` | Not named in D-17; dev and test tooling for the flipbook UI |
 | `frontend/src/viewer/fields` | Atish |
-| `frontend/src/haptics` (engine, `drivers`, `sources`) | Atish (D-13, D-17) |
+| `frontend/src/haptics` (engine, `drivers`, `sources`, `ui`), `src/hapticsTestPage`, `haptics-test.html` | Atish (D-13, D-17) |
 | `src/contract`, `backend/app/contract` | Generated (D-18); follows the owner of `shared/schemas` |
 
 - `viewer/fields`, `ShaderBody`, `sources/terrain` and `sources/flow` follow from D-01 and D-12. They are listed in rendering doc §10, but the `ShaderBody` and `fields/fieldWorker` file names stay **[verify]**.
+- Issue #9 (6 Nov 2026) built the haptics core: the engine, both web drivers, the shared AudioContext, the settings store, calibration types, platform defaults, the λ→pitch and spectrum mappings, `tuning.ts` (every tuning value, D-13), the `ui/` pulse indicator and unlock button, and the dev-only test page. Issues #10 and #11 added the spectrum pad, calibration wizard and settings UI, `profiles.ts`, `probe.ts`, the texture and data sources and `sound/listenSweep.ts`. Imports from outside `src/haptics` are type-only or pure functions: `viewer/honesty.ts` (honesty filter), `viewer/fields/fieldGenerator.ts` (the shared field and its functions), `viewer/renderers/` (`Comet`, `Star`, `BrownDwarf`, `shaderSpec`, `pointClouds` plan helpers), `viewer/planCommon.ts`, `viewer/planTypes.ts`, `viewer/sliders.ts` (the `Overrides` type), `app/spectrum/scale.ts`, `app/api/types.ts` and `app/ui.ts` (button class). None of them creates GPU or browser state at import.
 - `src/contract`, `src/state` and `src/app` were added by the frontend scaffold (4 Nov 2026) and are listed in rendering doc §10. `src/contract/generated.ts` is generated from `shared/schemas` (D-18), as is `backend/app/contract/`; the hand-written scaffold types were replaced in issue #4.
 - The flipbook and spectrum view (M1, issue #3, 5 Nov 2026) added `src/app/api`, `src/app/search`, `src/app/flipbook`, `src/app/spectrum`, the `sky` slice in `src/state/store.ts`, `src/test`, `fixtures/` and `scripts/` (rendering doc §10). `fixtures/` is a Vite dev-server plugin used only by `npm run dev:fixtures` and the Playwright tests; `scripts/check-dist.js` fails the build if a fixture marker reaches `dist/`.
 - D-13: Atish owns the creative direction of haptics (what each body feels like, patterns, sound pairing). Engineering choices (drivers, timing, rate limits) stay with the implementer.

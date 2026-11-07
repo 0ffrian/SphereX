@@ -28,12 +28,12 @@ In development the frontend's Vite server proxies `/v1` to `http://localhost:800
 | `GET /v1/resolve?q=<name or "ra,dec">` | `{id, name, ra, dec, moving, resolver, cached_at}` plus optional `epoch`, `pm_ra_mas_yr`, `pm_dec_mas_yr` and `provenance` |
 | `GET /v1/objects/{id}/frames` | `{id, frames[], stretch, data_release, cached_at, missing, north_up}` plus a `provenance` map. Each frame: `frame_id, time, wavelength_um, x, y, cutout_url, flags`, plus optional `ra, dec, bandwidth_um, detector, width, height, north_angle_deg, mirrored` |
 | `GET /v1/objects/{id}/cutouts/{frame_id}.png` | 8-bit grey PNG, asinh stretch, the same bytes every time |
-| `GET /v1/objects/{id}/spectrum` | `{id, spectrum[], light_curve[], flux_unit, tag, cached_at, missing}` plus optional `data_release`, `method`, `provenance`. Flux in `uJy`, tagged `measured`. Spectrum points: `wavelength_um, flux, error, flagged, frame_id` plus optional `bandwidth_um, dropped_flags, dropped_weight_fraction, flag_reasons`. Light-curve points: `time, flux, error, frame_id` plus optional `wavelength_um, flagged`. Refused frames are listed in `missing` as `<reason>:<frame_id>` (e.g. `saturated:…`); `spectrum:saturated` when every frame saturated (A4.2, Q-26) |
+| `GET /v1/objects/{id}/spectrum` | `{id, spectrum[], light_curve[], flux_unit, tag, cached_at, missing}` plus optional `data_release`, `method`, `provenance`. Flux in `uJy`, tagged `measured`. Spectrum points: `wavelength_um, flux, error, flagged, frame_id` plus optional `bandwidth_um, dropped_flags, dropped_weight_fraction, flag_reasons`. Light-curve points: `time, flux, error, frame_id` plus optional `wavelength_um, flagged`. Refused frames are listed in `missing` as `<reason>:<frame_id>` (e.g. `saturated:…`); `spectrum:saturated` when every frame saturated (A4.2, D-31) |
 | `GET /v1/objects/{id}/card` | ObjectCard (R3.2), exactly the `shared/schemas` shape and validated with `jsonschema` before it is sent. Headers: `X-SX-Asset-Status` (`saved`, `generated` or `sketch`, A4.4) and `X-SX-Cached-At` (D-16; the schema forbids extra fields, Q-39) |
 | `GET /v1/objects/{id}/render-params` | RenderParams (R3.4), validated the same way, with the same headers. Refused layers are listed in `missing` |
 | `GET /v1/health` | `{status, offline, data_release}` |
 
-Per-target spectrum report on a cache: `SX_OFFLINE=1 uv run python -m app.core.measure [--only NAME]`.
+Per-target spectrum report on a cache: `SX_OFFLINE=1 uv run python -m app.core.measure [--group test|demo] [--only NAME]` (default `--group test`).
 
 Errors are `{"error": code, "detail": sentence}`. The codes are:
 - `bad_query` and `bad_request` (400)
@@ -101,16 +101,18 @@ uv run python -m app.core.render ../shared/fixtures/cards/asteroid_procedural.js
 ```bash
 uv run python -m scripts.prefetch                 # all targets in targets.toml (resumable)
 uv run python -m scripts.prefetch --only "R Draconis" --concurrency 6
+uv run python -m scripts.prefetch --group demo --concurrency 6   # the demo objects only (D-31)
 uv run python -m scripts.prefetch --refresh       # re-download resolve, SIA and cutouts; rebuild frame lists
 uv run python -m scripts.smoke_offline --group test   # Done-when check: SX_OFFLINE=1, network blocked
+uv run python -m scripts.smoke_offline --group demo
 uv run python -m scripts.backup_cache             # zip the cache next to it
 uv run python -m scripts.record_fixtures          # re-record tests/fixtures/cache (needs the internet)
 ```
 
-- **What is pre-fetched:** `targets.toml` lists the five test targets and `433 Eros`, a moving object for the SBDB and Horizons path. Demo objects go there with `group = "demo"`.
+- **What is pre-fetched:** `targets.toml` lists the five test targets (`group = "test"`), `433 Eros`, a moving object for the SBDB and Horizons path (`group = "fixture"`), and the demo objects (`group = "demo"`, D-31): SIMP 0136, TWA 27 (2M1207 A) and IRAS 04302+2247. Barnard's Star, RW Aur and R Dra saturate: on the full cache Barnard's Star and R Dra have no measured point and RW Aur only 15 points at 0.74–1.09 µm; `spectrum:saturated` appears only on the recorded fixtures (A4.2). The demo objects are fainter and have measured spectra. A clean pre-fetch of all targets is about 320 MB on disk. The only full cache so far is on Atish's PC, not yet on the A15: 356 MB (it also holds about 35 MB of unused cutouts of a screened object), 122 MB zipped (6 Nov 2026).
 - **Timing:** a cutout takes 10–30 s to download, because IRSA sends the 5 MB PSF extension too. A full pre-fetch takes about 30 minutes per target at concurrency 6.
 - **Test fixtures:**
-  - They are plain cache entries recorded live by `record_fixtures`: three frames per target (MAXREC=3) at the default cutout size, about 2 MB in all.
+  - They are plain cache entries recorded live by `record_fixtures`: three frames per target (MAXREC=3) at the default cutout size, about 3.3 MB in all (5 test targets, 3 demo objects).
   - `derived.*` entries are removed after recording, so the tests run the real SIA, cutout and WCS path.
   - The tests block every non-loopback socket.
 
