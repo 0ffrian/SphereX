@@ -33,8 +33,8 @@ query = "R Dra"
 group = "test"
 aliases = []
 
-# A moving object, so the SBDB + Horizons path and the moving-object refusal (Q-21) are
-# recorded and tested offline.
+# A moving object, so the SBDB + Horizons path and the moving-object path search (issue #26,
+# Q-21) are recorded and tested offline.
 [[target]]
 name = "433 Eros"
 query = "433 Eros"

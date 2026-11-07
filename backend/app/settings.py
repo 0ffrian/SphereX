@@ -79,6 +79,33 @@ class Settings(BaseSettings):
     # ASSUMPTION: epoch of the SIA search cone for proper-motion stars.
     search_epoch: str = "2026-01-01T00:00:00Z"
 
+    # Moving-object frame search (issue #26, Q-21, A4.1 step 2): one SPHEREx-centred Horizons
+    # ephemeris over the data release window, then a small SIA cone along the path, the step
+    # following the ephemeris rate (dt <= R / rate, clamped to [min, max]). Defaults are [verify]
+    # placeholders: IRSA publishes no rate limit (astro-verifier, 7 Nov 2026; ask the helpdesk).
+    # [verify] QR2 window. The exact observation window of a release is not published; this one
+    # covers every frame time in the cached QR2 SIA answers (2025-04-24 to 2026-05-14).
+    moving_window_start: str = "2025-04-01T00:00:00Z"
+    moving_window_end: str = "2026-06-01T00:00:00Z"
+    # [verify] Horizons sampling for the path (cone placement and the footprint check only;
+    # Stage 1 pixels use exact SPHEREx-centred positions at each frame midpoint).
+    moving_ephem_step_min: int = Field(default=60, gt=0)
+    # [verify] Cone radius R (astro-verifier example: 0.1 deg). Larger cones timed out (A3.1).
+    moving_cone_radius_deg: float = Field(default=0.1, gt=0)
+    # [verify] Clamp for the rate-derived step between cones, in hours.
+    moving_min_step_h: float = Field(default=1.0, gt=0)
+    moving_max_step_h: float = Field(default=24.0, gt=0)
+    # [verify] Cap on cones per object; past it `frames:truncated` is reported, never dropped.
+    moving_max_cones: int = Field(default=450, gt=0)
+    # [verify] MAXREC per cone: every frame over that spot in the whole release comes back.
+    moving_sia_maxrec: int = Field(default=500, gt=0)
+    # [verify] Seconds between two live SIA cones. 0 = sequential requests only (the HTTP client
+    # already retries with exponential backoff); no published IRSA limit.
+    moving_cone_pace_s: float = Field(default=0.0, ge=0)
+    # ASSUMPTION: live cones per web request; the rest are `cones:deferred:<n>`. The pre-fetch
+    # has no cap (like SX_LIVE_CUTOUTS_PER_REQUEST).
+    moving_live_cones_per_request: int = Field(default=4, ge=0)
+
     cors_origins: str = ""
     # A5.4 pre-baked assets: `<assets_dir>/<type>/<id>.json`, read only (stage 4).
     # ASSUMPTION: A5.4 says "assets/<type>/<id>.json" in the repo; the backend's copy lives here.

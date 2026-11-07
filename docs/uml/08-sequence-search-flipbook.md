@@ -70,7 +70,17 @@ sequenceDiagram
   else moving object, asteroid or comet (moving = true)
     API->>HZ: Position at the resolve epoch, neighbours in field (SkyBoT -ep as JD), via the cache
     HZ-->>API: Positions and known objects
-    API-->>UI: M1 refuses: frames empty, missing frames:moving_object_search (Q-21)
+    API->>HZ: Path ephemeris over the release window, seen from SPHEREx (500@-163182), via the cache
+    HZ-->>API: Positions every SX_MOVING_EPHEM_STEP_MIN
+    loop each cone along the path, dt = clamp(R / rate, min, max), at most SX_MOVING_MAX_CONES
+      API->>C: SIA cone at the path position (radius R)
+      C->>SIA: On a miss, live (web request: at most SX_MOVING_LIVE_CONES_PER_REQUEST, rest cones:deferred)
+      SIA-->>API: Every frame over that spot
+    end
+    API->>API: Merge by frame_id, keep frames whose s_region holds the interpolated position at the frame midpoint
+    API->>HZ: Exact positions at the kept frame midpoints (TLIST, one per cone), via the cache
+    HZ-->>API: Positions (model_dependent)
+    API->>API: Cutout centred there, then sky to pixel via WCS#59; frames:truncated past the cap (issue #26, Q-21, Q-87)
   end
   API-->>UI: frame_id, time, wavelength_um, x, y, cutout_url per frame, plus the stretch used and cached_at if from cache
   UI->>UI: Badges: wavelength and time Measured, display stretch Estimated (derived, tooltip gives its parameters)
@@ -129,10 +139,10 @@ sequenceDiagram
 - Cache order (D-25): cache, then a live call with a timeout and retries with backoff, then an older cached entry, then refuse. There is no expiry for the event. A refused layer goes in `missing`.
 - All five test targets (Barnard's Star, Epsilon Indi B, WISE 0855, RW Aurigae, R Draconis) and the demo objects are pre-fetched, so the demo runs with `SX_OFFLINE=1` and always hits the cache (D-25).
 - A `candidate` source gets one haptic tick per frame where it is detected (rendering doc §8.5). That path is not drawn here.
-- Rainbow Trails is built after basic playback works (D-28). As built in M1 (issue #3), the dot colour is a false colour, hue = wavelength, tagged `derived` with that formula, so it wears the Estimated badge. In "Measured only" (D-21) the dots are drawn in one colour. The mode is offered only for a `moving` object whose frames share a north-up grid, so with real data it waits for Q-21. The M1 UI has no honesty toggle yet, so the monochrome state is not reachable from the page. Tagging question: Q-27.
+- Rainbow Trails is built after basic playback works (D-28). As built in M1 (issue #3), the dot colour is a false colour, hue = wavelength, tagged `derived` with that formula, so it wears the Estimated badge. In "Measured only" (D-21) the dots are drawn in one colour. The mode is offered only for a `moving` object whose frames share a north-up grid. The frame search for real movers is built (issue #26, Q-21); whether its frames meet that grid condition is not checked yet. The M1 UI has no honesty toggle yet, so the monochrome state is not reachable from the page. Tagging question: Q-27.
 - URL hash (architecture spec §10, hash routing): `#ra=<deg>&dec=<deg>[&name=<search text>][&frame=<frame_id>]`. `name` is kept for a name search, so a link to a moving object reopens the same object id. A link with a name searches the name, otherwise the coordinates. Going back to the page without a hash resets the search. Unusable parts (bad coordinates, or no name and no coordinates) are ignored, never guessed: they are shown under the search field and announced in the polite live region.
 - Dev-only fixture path: `npm run dev:fixtures` (`vite --mode fixtures`) mounts a Vite dev-server plugin from `frontend/fixtures/` that answers `/v1` with synthetic data, and `npm run test:e2e` always uses it. Every reply carries `X-SX-Fixture: synthetic`. The UI then shows a page-wide "Fixture data" banner, "Fixture" badges instead of "Measured" (and instead of the stretch's Estimated badge) and a SYNTHETIC label on the image. `vite build` never runs the plugin, and `scripts/check-dist.js` fails the build if a fixture marker reaches `dist/` ([fixtures README](../../frontend/fixtures/README.md)). The Fixture badge is a fourth badge beside the 3 of D-02; it is a proposed dev-only exception, open as Q-32 in the decisions log.
-- `moving` means a solar-system body (Q-22). High proper-motion stars are not `moving`; their positions come from the SIMBAD proper motion, propagated to each frame time. The ephemeris-driven frame search for moving objects is not built in M1 (Q-21).
+- `moving` means a solar-system body (Q-22). High proper-motion stars are not `moving`; their positions come from the SIMBAD proper motion, propagated to each frame time. Moving objects use the ephemeris-driven path search (issue #26, A4.1): SIA cones along the SPHEREx-centred Horizons path, merged and filtered by footprint; their `ra`/`dec` and `x`/`y` are `model_dependent` (Q-87). MOST as the primary search is proposed in Q-88.
 - The SIA search and every cutout go through the cache. A cut-off SIA answer (`QUERY_STATUS=OVERFLOW`) adds `frames:truncated` to `missing`.
-- Overlays (A4.9) load lazily on the first switch-on of any layer, not on every search, and never block the flipbook. A catalogue still being fetched after `overlay_wait_s` (75 s, below the frontend's 90 s timeout) is reported as `overlay:<cat>:pending`; its toggle stays enabled and "Try again" reloads the overlays, by which time the cone is usually cached. A cone that failed live is not retried for `catalog_failure_ttl_s`. Moving objects get `overlay:gaia` and `overlay:wise` (Q-21). The endpoints are not yet in D-16 (Q-50).
+- Overlays (A4.9) load lazily on the first switch-on of any layer, not on every search, and never block the flipbook. A catalogue still being fetched after `overlay_wait_s` (75 s, below the frontend's 90 s timeout) is reported as `overlay:<cat>:pending`; its toggle stays enabled and "Try again" reloads the overlays, by which time the cone is usually cached. A cone that failed live is not retried for `catalog_failure_ttl_s`. Moving objects get `overlay:gaia` and `overlay:wise`; their frames still get flag masks and cutout boxes, and `footprint:<id>` per frame (Q-87). The endpoints are not yet in D-16 (Q-50).
 - The flipbook shows the frames reply's `missing` grouped by reason, one plain line with a count each and the frame IDs behind a disclosure; unknown codes are shown as is (A11, issue #24).

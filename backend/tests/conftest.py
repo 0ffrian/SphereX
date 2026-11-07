@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 from app.settings import BACKEND_DIR, Settings
+from scripts.record_fixtures import FIXTURE_MOVING
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FIXTURE_CACHE = FIXTURES / "cache"
@@ -94,6 +95,8 @@ def make_settings(cache_dir: Path, **overrides: Any) -> Settings:
         "cutout_size_arcsec": FIXTURE_CUTOUT_SIZE_ARCSEC,
         "http_retries": 0,
         "cors_origins": "",
+        # The moving-object path search the fixtures were recorded with (issue #26).
+        **FIXTURE_MOVING,
     }
     values.update(overrides)
     return Settings(**values)

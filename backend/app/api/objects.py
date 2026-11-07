@@ -19,7 +19,7 @@ from app.context import Context
 from app.contract.object_card_schema import ObjectCard
 from app.contract.render_params_schema import RenderParams
 from app.core.card.service import ObjectPipeline, ObjectResult
-from app.core.find import png
+from app.core.find import moving, png
 from app.core.find.cutouts import CutoutUnavailable, render_frame_png
 from app.core.find.frames import FrameService
 from app.core.find.ids import ID_RE
@@ -47,8 +47,27 @@ def _object(ctx: Context, object_id: str) -> ResolvedObject:
     return obj
 
 
+PIXEL_FORMULA = (
+    "astropy WCS world_to_pixel on the cutout IMAGE header at (ra, dec); "
+    "x = x_fits0, y = (height - 1) - y_fits0; integer = pixel centre"
+)
+
+
 def _provenance(obj: ResolvedObject, has_pm: bool) -> dict[str, Provenance]:
-    if has_pm:
+    pixel = Provenance(tag="derived", formula=PIXEL_FORMULA)
+    if obj.moving:
+        # Issue #26 (Q-87): the per-frame position is the interpolated Horizons prediction, and
+        # the pixel is computed from it, so both carry the ephemeris assumption.
+        basis = moving.position_basis()
+        pos = Provenance(
+            tag="model_dependent", source="JPL Horizons, at the frame time", assumption=basis
+        )
+        pixel = Provenance(
+            tag="model_dependent",
+            formula=PIXEL_FORMULA,
+            assumption=f"(ra, dec) is the Horizons prediction at the frame time: {basis}",
+        )
+    elif has_pm:
         pos = Provenance(
             tag="derived",
             formula=f"{PM_FORMULA}; {PM_NEGLECTED}",
@@ -56,7 +75,7 @@ def _provenance(obj: ResolvedObject, has_pm: bool) -> dict[str, Provenance]:
         )
     else:
         # No propagation: the frame position is the resolved position, with its own tag
-        # (SIMBAD measured, Horizons model_dependent, typed coordinates per Q-25).
+        # (SIMBAD measured, typed coordinates per Q-25).
         pos = (
             Provenance.model_validate(obj.provenance["ra"])
             if "ra" in obj.provenance
@@ -67,11 +86,6 @@ def _provenance(obj: ResolvedObject, has_pm: bool) -> dict[str, Provenance]:
     )
     wave = Provenance(
         tag="measured", source="WCS-WAVE lookup table (alternate WCS 'W') at the object pixel"
-    )
-    pixel = Provenance(
-        tag="derived",
-        formula="astropy WCS world_to_pixel on the cutout IMAGE header at (ra, dec); "
-        "x = x_fits0, y = (height - 1) - y_fits0; integer = pixel centre",
     )
     return {
         "time": frame_time,
