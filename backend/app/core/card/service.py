@@ -91,7 +91,8 @@ class ObjectPipeline:
         self.assets = assets
         self.measure_pool = measure_pool
         self.baker = baker
-        self.jobs: JobRegistry[ObjectResult] = JobRegistry(self.ctx.settings.job_ttl_s)
+        s = self.ctx.settings
+        self.jobs: JobRegistry[ObjectResult] = JobRegistry(s.job_ttl_s, s.max_jobs)
 
     # --- entry points ---------------------------------------------------------------------
 
@@ -145,7 +146,7 @@ class ObjectPipeline:
             # The card is saved (or pre-baked), but the flipbook, spectrum and composite still
             # need the cutouts: download them, then answer with the saved asset.
             with contextlib.suppress(CacheMissOffline, UpstreamUnavailable):
-                self._frames(obj, job, premeasured)
+                self._frames(obj, job, premeasured, measure=False)  # card saved: no spectrum
             return saved
         job.update(stage="catalogue")
         # Daemon-free threads that end with their task; shutdown(wait=False) never blocks the
@@ -170,6 +171,7 @@ class ObjectPipeline:
             log.info("object %s: first-stage answer published, measuring", obj.id)
 
         frames = self._join_frames(f_frames)
+        batch_only = False
         if frames is not None and any(m.startswith(DEFERRED + ":") for m in frames.missing):
             job.update(stage="spectrum")
             spectrum, spectrum_at = self._spectrum(obj, frames, premeasured)
@@ -179,11 +181,15 @@ class ObjectPipeline:
             job.publish(partial, "partial")
             log.info("object %s: partial answer published, %d frames", obj.id, len(frames.frames))
             # If the full run fails (e.g. the SIA search on the second call), keep the batch.
-            frames = self._join_frames_now(obj, job, premeasured) or frames
+            full = self._join_frames_now(obj, job, premeasured)
+            batch_only = full is None  # the rest could not be fetched: still not the full list
+            frames = full or frames
         job.update(stage="spectrum")
         spectrum, spectrum_at = self._spectrum(obj, frames, premeasured)
         job.update(stage="card")
-        result = self._assemble(obj, data, cls, spectrum, spectrum_at, pending=False)
+        result = self._assemble(
+            obj, data, cls, spectrum, spectrum_at, pending=False, more=batch_only
+        )
         self._bake(result)
         return result
 
@@ -193,13 +199,16 @@ class ObjectPipeline:
         job: Job[ObjectResult],
         premeasured: dict[str, Premeasured],
         cap: int | None = None,
+        *,
+        measure: bool = True,
     ) -> FramesResult:
-        """The frame list: at most ``cap`` live downloads (the first batch), or all of them."""
+        """The frame list: at most ``cap`` live downloads (the first batch), or all of them.
+        ``measure``: send each landed cutout to the photometry pool."""
         job.update(stage="frames")
 
         def landed(ev: FrameEvent) -> None:
             job.update(frames_done=ev.done, frames_total=ev.total)
-            if self.measure_pool is None or ev.record is None or ev.served is None:
+            if not measure or self.measure_pool is None or ev.record is None or ev.served is None:
                 return
             body = ev.served.entry.body
             sha = str(ev.served.entry.meta.get("body_sha256") or hashlib.sha256(body).hexdigest())
