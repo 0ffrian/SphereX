@@ -44,6 +44,11 @@ frontend/src/viewer/                 (Moon)
   renderers/shaderPlan.ts   # plan function of the shader kinds (honesty, Q-45 plain sphere, missing)
   renderers/shaderSpec.ts shaderPalette.ts pointClouds.ts   # card -> what to draw, palettes and lava thresholds, nebula / nova point sets
   sliders.ts          # D-26 / D-27: the one slider registry (viewer and physics), SliderKey, overrides
+  render/             # render core (issue #39): pipeline.ts (RenderChain: HDR pass, bloom, highlight clip, TAAU or SMAA),
+                      # quality.ts (quality levels low/medium/high, FrameGovernor), clock.ts (SimClock, pause reasons),
+                      # workerPool.ts (WorkerPool), fanout.ts (card and render-params fan-out loader, asset prefetch)
+  shaders/            # TSL helpers on three r187 (issue #39): noise.ts (seeded fbm, ridged, domainWarp, animatedCells,
+                      # OCTAVES per quality level), sphere.ts (latLon, tangentFrame, differential rotation); index.ts re-exports
   sky/                # sky view prototype (7 Nov 2026, not yet confirmed, Q-89, Q-90): SkyView.ts (inside-out sky
                       # sphere, render on demand), skyMath.ts (pure: RA/Dec, camera, picking, pan/zoom), surveys.ts (which equirect loads)
   fields/             (Atish)  # field generator for shader kinds (§7.7, D-12): fieldGenerator.ts (pure, FieldSampler), noise.ts,
@@ -65,6 +70,8 @@ frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
   sound/              # listenSweep.ts (A8 Listen sweep, issue #11); imagined drive not built yet
 frontend/src/hapticsTestPage/        (Atish)  # dev-only test page behind frontend/haptics-test.html; not a build input;
                                               # panels/SpectrumPanel.tsx (#10), panels/TexturePanel.tsx (#11)
+frontend/src/shaderlab/                       # dev-only shader harness behind frontend/shaderlab.html (one sphere per
+                                              # viewer/shaders function, ?seed= and ?t= from the URL); not a build input, not in dist/
 frontend/src/contract/               (generated, D-18)  # generated.ts comes from shared/schemas/ by json-schema-to-typescript;
                                                         # hand-written helpers such as assertTagged() and TV<T> sit next to it;
                                                         # the R8.8 runtime types stay hand-written in haptics.ts for now (Q-19)
@@ -123,6 +130,8 @@ The `app/` subfolders (`api/`, `search/`, `flipbook/`, `spectrum/`), the `sky` s
 The sky-view prototype (branch `feat/sky-view-prototype`, 7 Nov 2026) added `app/shell/`, `app/sky/`, `viewer/sky/`, `flipbook/session.tsx`, `backend/app/core/sky/` and `backend/app/api/sky.py`. Their owners are provisional: the frontend folders fall under Moon's `app/` and `viewer/` (D-17), and Moon has not confirmed the shell yet (Q-89); D-17 names no owner for `core/sky/`. Data source: A3.11; licence: D-35.
 
 Later on the same branch (7 Nov 2026) it added `backend/app/core/composite/` and `backend/app/api/composite.py` (the colour composite, Q-92), `/v1/sky/cached` in `sky.py` (Q-98), and under `frontend/src/app/` the colour views (`flipbook/colourMode.ts`, `ColourViews.tsx`), progressive frames (`flipbook/progressive.ts`, `FramesProgress.tsx`, Q-97), the fixed frame grid (`flipbook/frameGrid.ts`), the cached markers (`sky/cachedMarkers.ts`, `useCachedMarkers.ts`) and `Segmented.tsx`. D-17 names no owner for `core/composite/` (its constants are a creative call for Atish, Q-94); `composite.py` sits in Kevin's `app/api/`; the frontend files fall under Moon's `app/` and are provisional until Moon confirms (Q-95, Q-97).
+
+`viewer/render/`, `viewer/shaders/`, `src/shaderlab/` and `shaderlab.html` were added by the viewer render core (issue #39). Motion and quality levels follow R5.7 and D-34; how the viewer implements them is [Q-66](../decisions.md). `shaderlab.html` is served by the dev server only; Vite builds `index.html` alone, so it never reaches `dist/`. D-17 names no owner for the harness.
 
 ---
 

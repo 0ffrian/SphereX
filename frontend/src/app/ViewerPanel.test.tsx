@@ -19,6 +19,8 @@ const fake = {
   clearObject: vi.fn(),
   setLoadFailedHandler: vi.fn(),
   setSpinPaused: vi.fn(),
+  setQualityChangeHandler: vi.fn(),
+  timeLapses: vi.fn(() => [] as { id: string; label: string; speedup: number }[]),
   rotate: vi.fn(),
   zoom: vi.fn(),
   resetView: vi.fn(),
@@ -72,6 +74,26 @@ afterEach(async () => {
 });
 
 describe('ViewerPanel', () => {
+  it('announces a governor tier drop in plain words, but not a manual tier change', async () => {
+    await mount();
+    const handler = fake.setQualityChangeHandler.mock.calls.at(-1)?.[0] as
+      ((e: { from: string; to: string; auto: boolean }) => void) | null | undefined;
+    expect(handler).toBeTypeOf('function');
+    await act(async () => handler!({ from: 'high', to: 'medium', auto: false }));
+    expect(text('viewer-announcer')).toBe('');
+    await act(async () => handler!({ from: 'high', to: 'medium', auto: true }));
+    expect(text('viewer-announcer')).toBe('Lowered render quality to keep motion smooth');
+  });
+
+  it('shows the speed-up of a running time-lapse other than the spin', async () => {
+    fake.timeLapses.mockReturnValue([{ id: 'wind', label: 'Winds', speedup: 10000 }]);
+    const { card, params } = fixture('asteroid_procedural');
+    useAppStore.getState().setObject(card, params);
+    await mount();
+    expect(text('time-lapse-note')).toBe('Winds sped up ×10000.');
+    fake.timeLapses.mockReturnValue([]);
+  });
+
   it('shows the placeholder when no object is loaded', async () => {
     await mount();
     expect(container.textContent).toContain('Viewer placeholder: no object loaded');
