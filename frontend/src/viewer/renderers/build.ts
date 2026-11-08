@@ -345,6 +345,7 @@ export function buildScene(
       const shape = plan.shape;
       let holder: Group | null = null;
       let wanted: LodLevel = 0;
+      let lod1Missing = false;
       let bakedFor: BufferGeometry[] = [];
 
       const makeMaterial = (hasAo: boolean, edge: number | null) => {
@@ -452,6 +453,11 @@ export function buildScene(
           (m) => apply(m, lvl),
           () => {
             if (disposed) return;
+            // Remember a missing coarse file: the size can change every frame, and a failed load
+            // is not cached, so it would be requested (and the full model rebuilt) again each time.
+            if (lvl === 1) lod1Missing = true;
+            // A stale failure (the wanted level has moved on) must not refuse the mesh.
+            if (lvl !== wanted) return;
             // The coarse file may be missing: fall back to full detail before refusing the layer.
             if (lvl === 1) show(0);
             else if (!holder) hooks.onLoadFailed('mesh');
@@ -459,11 +465,11 @@ export function buildScene(
         );
       };
       const refresh = () => {
-        const want = chooseLod(tier, screenPx, lods.lod1 !== null, wanted);
+        const want = chooseLod(tier, screenPx, lods.lod1 !== null && !lod1Missing, wanted);
         // Also while the first model is still loading: a later change must not be lost.
         if (want !== wanted) show(want);
       };
-      show(chooseLod(tier, screenPx, lods.lod1 !== null));
+      show(chooseLod(tier, screenPx, lods.lod1 !== null && !lod1Missing));
       tierListeners.push(refresh); // `tier` is already the new level when listeners run
       lodRefresh.push(refresh);
     }

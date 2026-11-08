@@ -323,6 +323,29 @@ describe('comet volumes and tails (R7.3)', () => {
     expect(missing(plan, 'ion_tail')).toMatchObject({ reason: 'data' });
   });
 
+  it('a tail aimed only by the sun_dir hint is artistic, not derived', () => {
+    const { card, params } = fixture('comet');
+    card.epochs = ['2025-12'];
+    params.layers.push(tailLayer('ion_tail', 'derived'));
+    delete card.phase_angle_deg;
+    delete card.sun_vector;
+    params.lighting = { mode: 'sun', sun_dir: [0, 1, 0] };
+    const plan = planRender(
+      card,
+      params,
+      defaultContext({ honesty: 'artistic', epoch: '2025-12' }),
+    );
+    expect(plan.lighting.source).toBe('sun_dir');
+    expect(plan.volumes.find((v) => v.kind === 'ion_tail')?.tag).toBe('artistic');
+    expect(drawnTag(plan, 'ion_tail')).toBe('artistic');
+    const estimated = planRender(
+      card,
+      params,
+      defaultContext({ honesty: 'derived', epoch: '2025-12' }),
+    );
+    expect(estimated.volumes.some((v) => v.kind === 'ion_tail')).toBe(false);
+  });
+
   it('the tail layer follows the honesty toggle through its own tag', () => {
     const { card, params } = fixture('comet');
     card.epochs = ['2025-12'];

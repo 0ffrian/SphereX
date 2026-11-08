@@ -6,7 +6,7 @@ import { badgeForTag, HONESTY_LABEL, stateThatShows, type HonestyState } from '.
 import { MODE_LABEL } from './modes';
 import { showsBody } from './planCommon';
 import type { RenderPlan, ViewModeId } from './planTypes';
-import { formatLength, type ShownSize } from './scaleBar';
+import { AT_AGE_MAX_PHRASE, formatLength, type ShownSize } from './scaleBar';
 
 export const TYPE_NAME: Readonly<Record<ObjectType, string>> = {
   asteroid_shape: 'asteroid with a shape model',
@@ -49,7 +49,7 @@ function sizeText(plan: RenderPlan, shown?: ShownSize | null): string {
   const qualifier = shown ? shown.qualifier : plan.sizeQualifier;
   // An upper limit is read out as a bound, never as a measurement (R7.3).
   // The remnant's age slider draws the shell smaller than its full size (Q-103).
-  const at = shown?.atSliderMax ? ' at the slider maximum' : '';
+  const at = shown?.atSliderMax ? AT_AGE_MAX_PHRASE : '';
   if (qualifier === 'upper_limit')
     return `at most ${d} long${at} (upper limit${tag ? `, ${tag}` : ''})`;
   return tag ? `${d} long${at} (${tag})` : `${d} long${at}`;

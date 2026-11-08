@@ -223,7 +223,10 @@ export function planComet(input: PlanInput): RenderPlan {
     // The tail rests on the backend layer (that it exists) and on the viewer's own shape (a
     // display value). It claims no more than the weaker of the two, so a dust tail whose bend is
     // a display choice is never shown as better than that (D-02).
-    const tag = weakerOf(v.tag, b.layers.get(id)!.tag);
+    // Only a phase angle fixes the Sun direction; the `sun_dir` hint is in an unspecified frame
+    // (lighting.ts), so a tail aimed by it alone is artistic.
+    const sunTag = b.lighting.source === 'phase_angle' ? v.tag : 'artistic';
+    const tag = weakerOf(weakerOf(v.tag, b.layers.get(id)!.tag), sunTag);
     if (b.ready(id) && !isTagShown(b.ctx.honesty, tag)) {
       b.reject({ id, reason: 'honesty', tag });
     } else if (b.draw(id)) {

@@ -10,6 +10,7 @@ import {
   attribute,
   diffuseColor,
   float,
+  length,
   mix,
   mx_noise_float,
   normalView,
@@ -20,7 +21,7 @@ import {
   transformNormalToView,
   vec3,
 } from 'three/tsl';
-import { AO_DIRECT_WEIGHT, REGOLITH_MAX_TILT } from './shapeModel';
+import { AO_DIRECT_WEIGHT, REGOLITH_TILT_PER_AXIS } from './shapeModel';
 
 /** A7.4 Lommel-Seeliger lighting: `2/pi * mu0 / (mu0 + mu)`, the CPU twin is `lommelSeeliger`. */
 class LommelSeeligerModel extends LightingModel {
@@ -76,11 +77,15 @@ export class ShapeMaterial extends MeshStandardNodeMaterial {
         mx_noise_float(p.add(vec3(11.1, 0, 0))),
         mx_noise_float(p.add(vec3(0, 23.7, 0))),
         mx_noise_float(p.add(vec3(0, 0, 37.3))),
-      ).mul(REGOLITH_MAX_TILT);
+      ).mul(REGOLITH_TILT_PER_AXIS);
       // `tilt` is in model space (it is sampled at `positionLocal`, so the detail is glued to the
       // surface). Bring it to view space before adding it to `normalView`: the object spins, and
       // an untransformed tilt would slide over the surface as the body turns.
-      this.normalNode = normalize(normalView.add(transformNormalToView(tilt)));
+      // r187 `transformNormalToView` NORMALIZES its result, which would turn the small tilt into a
+      // unit vector (a tilt of up to ~90 degrees). Keep the direction and restore the length.
+      // The tiny z offset only keeps `normalize` away from a zero vector.
+      const tiltView = transformNormalToView(tilt.add(vec3(0, 0, 1e-9))).mul(length(tilt));
+      this.normalNode = normalize(normalView.add(tiltView));
     }
   }
 
