@@ -12,7 +12,7 @@ export const AO_FORMULA =
 /** Rays only count if they hit within this fraction of the bounding radius. */
 const AO_REACH = 0.25;
 /** Vertices per slice before yielding to the browser. */
-const SLICE = 1500;
+const SLICE = 600;
 
 const yieldToBrowser = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
 

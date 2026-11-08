@@ -33,11 +33,13 @@ import type { TierName } from '../render/quality';
 import { displacementActive } from './AsteroidProcedural';
 import { ShapeMaterial } from '../shape/ShapeMaterial';
 import {
-  aoRayCount,
+  AO_RAYS,
   chooseLod,
   lodUrls,
   meanEdgeLength,
+  needsShapeMaterial,
   regolithMinFrequency,
+  bakedAoDrawn,
   type LodLevel,
 } from '../shape/shapeModel';
 import { bakeVertexAo } from '../shape/ShapeAo';
@@ -57,12 +59,12 @@ export interface BuildHooks {
   /** Quality level the scene is built for (volume steps, model LOD, AO rays). Default: medium. */
   tier?: TierName;
   /**
-   * A shape model loaded: its bounding-sphere radius in metres (glTF units are metres, Q-61), the
+   * A shape model loaded: half of its longest axis-aligned box extent in metres (glTF units are metres, Q-61), the
    * measured size, so the scale bar can show the real size of the model (issue #43).
    */
   onMeshMeasured?(m: { radiusM: number }): void;
   /** Tests only: replaces the field and point workers, or sets slider overrides (D-27). */
-  shader?: Pick<BodyContext, 'fieldSource' | 'pointSource' | 'overrides'>;
+  shader?: Pick<BodyContext, 'fieldSource' | 'overrides'>;
 }
 
 /**
@@ -331,12 +333,11 @@ export function buildScene(
       const lods = lodUrls(body.meshUrl);
       const shape = plan.shape;
       let holder: Group | null = null;
-      let level: LodLevel | null = null;
       let wanted: LodLevel = 0;
       let bakedFor: BufferGeometry[] = [];
 
       const makeMaterial = (hasAo: boolean, edge: number | null) => {
-        if (!shape || (!shape.lommelSeeliger && !shape.regolith && !hasAo)) {
+        if (!shape || !needsShapeMaterial(shape, hasAo)) {
           return track(new MeshStandardNodeMaterial({ color: srgb(body.tint), roughness: 0.95 }));
         }
         const m = track(
@@ -377,7 +378,12 @@ export function buildScene(
           first && 'array' in first && !('isInterleavedBufferAttribute' in first)
             ? meanEdgeLength(first.array as ArrayLike<number>, geoms[0]!.index?.array ?? null)
             : null;
-        const hasAo = geoms.length > 0 && geoms.every((g) => g.getAttribute('ao'));
+        // Honesty filter (D-21): the cached geometry may carry an AO baked while Estimated was on,
+        // so whether it is drawn follows the plan (`shape.ao`), never the attribute alone.
+        const hasAo = bakedAoDrawn(
+          shape?.ao,
+          geoms.map((g) => g.getAttribute('ao') !== undefined),
+        );
         const shared = makeMaterial(hasAo, edge);
         root.traverse((o) => {
           if (o instanceof Mesh) {
@@ -392,7 +398,6 @@ export function buildScene(
         const i = spinners.indexOf(holder ?? mesh);
         if (i >= 0) spinners[i] = next;
         holder = next;
-        level = lvl;
         // The measured size is the longest extent of the model, not the radius of the box's
         // bounding sphere (that overstates an elongated body such as Eros by about 20%).
         const longest = Math.max(
@@ -405,10 +410,11 @@ export function buildScene(
           hooks.onMeshMeasured?.({ radiusM: longest / 2 });
 
         // Baked AO (derived): bake once per model in slices, then swap in the AO material.
-        if (shape?.ao && !hasAo && geoms.some((g, k) => g !== bakedFor[k])) {
+        if (shape?.ao === true && !hasAo && geoms.some((g, k) => g !== bakedFor[k])) {
           bakedFor = geoms;
-          const rays = aoRayCount(tier);
-          Promise.all(geoms.map((g) => bakeVertexAo(g, rays, () => disposed))).then(
+          // One ray count for every tier: the AO is cached on the shared geometry, so it must not
+          // depend on which tier loaded the model first (determinism).
+          Promise.all(geoms.map((g) => bakeVertexAo(g, AO_RAYS, () => disposed))).then(
             (done) => {
               if (disposed || holder !== next || !done.every(Boolean)) return;
               const withAo = makeMaterial(true, edge);
@@ -444,7 +450,8 @@ export function buildScene(
       show(chooseLod(tier, null, lods.lod1 !== null));
       tierListeners.push((t) => {
         const want = chooseLod(t, null, lods.lod1 !== null);
-        if (holder && want !== level) show(want);
+        // Also while the first model is still loading: a later tier change must not be lost.
+        if (want !== wanted) show(want);
       });
     }
   }

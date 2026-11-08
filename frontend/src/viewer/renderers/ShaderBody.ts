@@ -4,8 +4,8 @@
 // Field first: planets and gas giants read their height, bands, storm ids and masks from the shared
 // CPU field (fields/fieldGenerator.ts) through two Float32 DataTextures, fetched with `textureLoad`
 // (no sampler, so it does not matter whether float32 is filterable) and filtered by hand. The
-// shader adds only visual noise below the field's resolution. Nebula and nova are Sprite-instanced
-// point sets (WebGPU Points are 1 px only).
+// shader adds only visual noise below the field's resolution. Nebula and nova are emission volumes
+// (issue #43, volume/VolumeBody.ts); they have no field, no point sets and no haptics (Q-103).
 //
 // Honesty: every layer here is `artistic` (R7.7). When `artistic` is not in the visible tags the
 // layer is hidden (planets and gas giants fall back to a plain sphere; nebula and nova draw
@@ -81,7 +81,7 @@ import {
   type FieldData,
   type Vec3,
 } from '../fields/fieldGenerator';
-import { requestField, requestPoints } from '../fields/fieldClient';
+import { requestField } from '../fields/fieldClient';
 import { shaderSeedOffsets } from '../fields/noise';
 import { sliderValue, type Overrides } from '../sliders';
 import {
@@ -392,7 +392,6 @@ export class ShaderBody implements BodyRenderer {
   private disposed = false;
   private readonly sun = uniform(new Vector3(...HEAD_ON));
   private readonly fieldSource: NonNullable<BodyContext['fieldSource']>;
-  private readonly pointSource: NonNullable<BodyContext['pointSource']>;
   private readonly onChange: (() => void) | undefined;
   private readonly onFailed: ((layerId: string) => void) | undefined;
 
@@ -405,7 +404,6 @@ export class ShaderBody implements BodyRenderer {
     this.visibleTags = ctx.visibleTags ?? ESTIMATED_TAGS;
     this.overrides = ctx.overrides ?? {};
     this.fieldSource = ctx.fieldSource ?? requestField;
-    this.pointSource = ctx.pointSource ?? requestPoints;
     this.onChange = ctx.onChange;
     this.onFailed = ctx.onFailed;
     this.tier = ctx.tier ?? 'medium';
@@ -550,7 +548,7 @@ export class ShaderBody implements BodyRenderer {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.release(this.surface, this.textures);
+    this.release(this.surface, this.textures, this.volumes);
     this.surface = null;
     this.textures = [];
     this.sampler = null;
@@ -563,12 +561,18 @@ export class ShaderBody implements BodyRenderer {
     }
   }
 
-  private release(group: Group | null, textures: DataTexture[]): void {
+  private release(
+    group: Group | null,
+    textures: DataTexture[],
+    volumes: readonly VolumeHandle[] = [],
+  ): void {
     if (group) {
       this.object.remove(group);
       disposeTree(group);
     }
     for (const t of textures) t.dispose();
+    // The baked noise cube (a Data3DTexture) belongs to the volume, not to the mesh tree.
+    for (const v of volumes) v.dispose();
   }
 
   private applyVisibility(): void {
@@ -609,11 +613,8 @@ export class ShaderBody implements BodyRenderer {
   private async build(spec: ShaderSpec): Promise<Built | null> {
     const textures: DataTexture[] = [];
     if (spec.kind === 'nebula' || spec.kind === 'nova') {
-      // N8: the points are generated in the field worker. Only the nova keeps them, as data for
-      // its density haptics (D-12); the nebula has no haptics (Q-103), so none are made.
-      const points = spec.kind === 'nova' ? await this.pointSource(spec.kind, spec.seed) : null;
-      if (this.disposed || spec !== this.spec) return null;
-      // Issue #43: drawn as an emission volume, not as dots.
+      // Issue #43: drawn as an emission volume, not as dots. Neither kind has haptics (Q-103):
+      // no point sets are made, so nothing felt can disagree with what is drawn (D-34).
       const plan =
         spec.kind === 'nebula'
           ? nebulaVolume(spec.seed)
@@ -626,7 +627,7 @@ export class ShaderBody implements BodyRenderer {
       const group = new Group();
       group.add(volume.mesh);
       group.scale.setScalar(spec.kind === 'nebula' ? NEBULA_SCALE : NOVA_SCALE);
-      return { group, frame: group, textures, field: null, points, volumes: [volume] };
+      return { group, frame: group, textures, field: null, points: null, volumes: [volume] };
     }
     const field = await this.fieldSource(spec.field!);
     if (this.disposed || spec !== this.spec) return null;
@@ -647,11 +648,12 @@ export class ShaderBody implements BodyRenderer {
     const built = spec.drawable ? await this.build(spec) : null;
     if (this.disposed || spec !== this.spec) {
       // NF-1: disposed or superseded after build() resolved; free what it made, it was never added.
-      if (built) this.release(built.group, built.textures);
+      if (built) this.release(built.group, built.textures, built.volumes);
       return;
     }
     const oldGroup = this.surface;
     const oldTextures = this.textures;
+    const oldVolumes = this.volumes;
     this.surface = built?.group ?? null;
     this.frame = built?.frame ?? null;
     this.textures = built?.textures ?? [];
@@ -659,7 +661,7 @@ export class ShaderBody implements BodyRenderer {
     this.points = built?.points ?? null;
     this.volumes = built?.volumes ?? [];
     if (built) this.object.add(built.group);
-    this.release(oldGroup, oldTextures);
+    this.release(oldGroup, oldTextures, oldVolumes);
     this.ensurePlain();
     this.applyVisibility();
     this.onChange?.();

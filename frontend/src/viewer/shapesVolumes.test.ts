@@ -1,9 +1,14 @@
 // Issue #43: plans for shape-model asteroids, displaced ellipsoids, comets with tails and the
 // volume specs of remnants and nebulae. Pure: no GPU. Mesh and shader drawing is covered by the
 // e2e frames.
+import Ajv from 'ajv';
 import { describe, expect, it } from 'vitest';
+import cardSchema from '../../../shared/schemas/object-card.schema.json';
+import paramsSchema from '../../../shared/schemas/render-params.schema.json';
 import type { Layer, ObjectCard, Tag } from '@/contract';
 import { fixture } from '@/test/sharedFixtures';
+import { epochAnnouncement } from './altText';
+import { weakerOf } from './honesty';
 import { directionFromPhaseAngle } from './lighting';
 import { defaultContext, planRender } from './renderPlan';
 import { displacementActive, reliefAmpOf } from './renderers/AsteroidProcedural';
@@ -56,6 +61,19 @@ describe('shape-model asteroid (R7.1, A7.4)', () => {
     expect(plan.shape?.regolith).toBe(false);
     expect(plan.shape?.shadows).toBe(true);
     expect(missing(plan, 'regolith')).toMatchObject({ reason: 'honesty', tag: 'artistic' });
+  });
+
+  it('shadows are not derived when the Sun direction is a default', () => {
+    const { card, params } = fixture('asteroid_shape');
+    card.shape_source = { value: MESH, tag: 'measured', source: 'test' };
+    delete params.lighting.phase_angle_deg;
+    delete params.lighting.sun_dir;
+    const artistic = planRender(card, params, defaultContext({ honesty: 'artistic' }));
+    expect(artistic.lighting.source).toBe('view');
+    expect(drawnTag(artistic, 'self_shadow')).toBe('artistic');
+    const estimated = planRender(card, params, defaultContext({ honesty: 'derived' }));
+    expect(estimated.shape?.shadows).toBe(false);
+    expect(missing(estimated, 'self_shadow')).toMatchObject({ reason: 'honesty', tag: 'artistic' });
   });
 
   it('at Measured only the mesh is the real shape and nothing modelled is drawn on it', () => {
@@ -114,12 +132,26 @@ describe('asteroid without a model: ellipsoid and displacement (R7.2)', () => {
     const plan = planRender(card, params, defaultContext({ honesty: 'artistic' }));
     expect(plan.bodies[0]?.displacementScale).toBeNull();
     expect(plan.bodies[0]?.heightUrl).toBeNull();
-    expect(missing(plan, 'displacement')).toMatchObject({ reason: 'data', fields: ['relief_amp'] });
+    expect(missing(plan, 'displacement')).toMatchObject({ reason: 'backend' });
+    expect(missing(plan, 'displacement')).not.toHaveProperty('fields');
+  });
+
+  it('relief_amp is a declared field: params that carry it validate against the schema', () => {
+    const ajv = new Ajv({ allErrors: true, strict: true });
+    ajv.addSchema(cardSchema);
+    ajv.addSchema(paramsSchema);
+    const validate = ajv.getSchema('render-params.schema.json')!;
+    const { params } = fixture('asteroid_procedural');
+    expect(validate(params), JSON.stringify(validate.errors)).toBe(true);
+    params.textures!.relief_amp = 0.03;
+    expect(validate(params), JSON.stringify(validate.errors)).toBe(true);
+    params.textures!.relief_amp = -1;
+    expect(validate(params)).toBe(false);
   });
 
   it('displaces by the baked height map once the backend gives relief_amp', () => {
     const { card, params } = fixture('asteroid_procedural');
-    (params.textures as unknown as { relief_amp: number }).relief_amp = 0.03;
+    params.textures!.relief_amp = 0.03;
     expect(reliefAmpOf(params)).toBe(0.03);
     const plan = planRender(card, params, defaultContext({ honesty: 'artistic' }));
     expect(plan.bodies[0]?.heightUrl).toBe(params.textures?.height);
@@ -131,7 +163,7 @@ describe('asteroid without a model: ellipsoid and displacement (R7.2)', () => {
 
   it('refuses displacement when its load failed, and draws none in Measured only', () => {
     const { card, params } = fixture('asteroid_procedural');
-    (params.textures as unknown as { relief_amp: number }).relief_amp = 0.03;
+    params.textures!.relief_amp = 0.03;
     const failed = planRender(
       card,
       params,
@@ -159,6 +191,7 @@ describe('asteroid without a model: ellipsoid and displacement (R7.2)', () => {
   it('reads no relief_amp from a bad value', () => {
     const { params } = fixture('asteroid_procedural');
     for (const v of [NaN, -1, 0, '0.03', null]) {
+      // Deliberately outside the type: the viewer must ignore what the schema would reject.
       (params.textures as unknown as { relief_amp: unknown }).relief_amp = v;
       expect(reliefAmpOf(params)).toBeNull();
     }
@@ -231,6 +264,47 @@ describe('comet volumes and tails (R7.3)', () => {
     const along = end.reduce((s, x, i) => s + x * sun[i]!, 0);
     expect(along).toBeCloseTo(-TAIL_LENGTH_COMA_RADII, 9);
     expect(plan.extent).toBeGreaterThanOrEqual(TAIL_LENGTH_COMA_RADII);
+  });
+
+  it('a tail claims no more than the weaker of the backend tag and its own shape', () => {
+    // The dust tail's bend is a display choice (artistic): a stronger backend tag does not lift it.
+    const { plan, card } = cometDecember([tailLayer('dust_tail', 'derived')]);
+    expect(plan.volumes.find((v) => v.kind === 'dust_tail')?.tag).toBe('artistic');
+    expect(drawnTag(plan, 'dust_tail')).toBe('artistic');
+    // So it is hidden at + Estimated, with the tag it really has.
+    const { params } = fixture('comet');
+    params.layers.push(tailLayer('dust', 'artistic'), tailLayer('dust_tail', 'derived'));
+    const estimated = planRender(
+      card,
+      params,
+      defaultContext({ honesty: 'derived', epoch: '2025-12' }),
+    );
+    expect(estimated.volumes.some((v) => v.kind === 'dust_tail')).toBe(false);
+    expect(missing(estimated, 'dust_tail')).toMatchObject({ reason: 'honesty', tag: 'artistic' });
+    // An ion tail rests on the backend tag when that is the weaker one.
+    const weakIon = cometDecember([tailLayer('ion_tail', 'artistic')]).plan;
+    expect(weakIon.volumes.find((v) => v.kind === 'ion_tail')?.tag).toBe('artistic');
+  });
+
+  it('the epoch announcement says "No tail is drawn" only when none is drawn', () => {
+    const none = cometDecember().plan;
+    expect(epochAnnouncement('2025-12', none)).toContain('No tail is drawn.');
+    const both = cometDecember([
+      tailLayer('ion_tail', 'derived'),
+      tailLayer('dust_tail', 'artistic'),
+    ]).plan;
+    const said = epochAnnouncement('2025-12', both);
+    expect(said).not.toContain('No tail is drawn');
+    expect(said).toContain('Tails drawn: gas tail and dust tail.');
+    const ionOnly = cometDecember([tailLayer('ion_tail', 'derived')]).plan;
+    expect(epochAnnouncement('2025-12', ionOnly)).toContain('Tails drawn: gas tail.');
+  });
+
+  it('weakerOf picks the tag that claims less', () => {
+    expect(weakerOf('measured', 'derived')).toBe('derived');
+    expect(weakerOf('artistic', 'derived')).toBe('artistic');
+    expect(weakerOf('derived', 'derived')).toBe('derived');
+    expect(weakerOf('model_dependent', 'inferred_from_analog')).toBe('inferred_from_analog');
   });
 
   it('a tail is refused (not guessed) when the Sun direction is unknown', () => {

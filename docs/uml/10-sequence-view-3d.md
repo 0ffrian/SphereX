@@ -53,7 +53,7 @@ sequenceDiagram
     V->>PL: setObject: planRender(card, params, context)
     PL-->>V: RenderPlan (layers hidden by the honesty state dropped, starts at + Estimated, D-21#59; missing listed#59; shader kinds: plan.shader with surface and plain-sphere flags, Q-45)
     V->>R: showPlan(plan): buildScene (a shader kind gets a ShaderBody from plan.shader, tags from allowedTags(plan.honesty), light from planLighting)
-    R->>FW: Field (planets, gas giants) or points (nebula, nova; haptic data only, the picture is a volume, Q-103), once per body#59; the plain sphere shows until it arrives (never blank)
+    R->>FW: Field (planets, gas giants), once per body#59; the plain sphere shows until it arrives (never blank). The nebula and the nova are volumes: no field, no points and no haptics (Q-103), so they are ready at once
     R-->>V: BuiltScene with a new group, not yet in the scene (onChange requests one render, D-05)
     V->>RC: compileAsync(new group) into the scene pass's HDR target (and its MRT on TAAU)
     Note over V,RC: The old content (or the placeholder) stays on screen while the shaders compile. After 3 s (COMPILE_TIMEOUT_MS) the swap happens anyway. A newer plan drops this build.

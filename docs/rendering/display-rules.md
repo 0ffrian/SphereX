@@ -68,7 +68,8 @@ Two targets. Where their budgets differ, take the tighter one.
 - `renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))`.
 - Textures: 2048×1024 on desktop, 1024×512 on mobile. Serve as WebP for albedo; normal maps as lossless PNG or KTX2.
 - Meshes ≤ 50k triangles. Decimate NASA GLBs offline.
-- Points ≤ 60k (comet shells, nebulae, novae).
+- Points ≤ 60k (comet shells; the nebula and the nova no longer use points).
+- **Volumes** (issue #43: nebula, nova, comet coma, dust and tails): one box mesh each, ray-marched with `TIERS[..].volumeSteps` samples (96, 64, 40 on High, Medium, Low) over one shared 48³ RGBA8 noise cube (about 442 KB per seed, freed with the volume). A scene has at most 4 volumes (coma, dust cone, ion tail, dust tail). The cube is baked once per seed on the CPU (about 180 ms on the CI machine; a December comet bakes two seeds) and cached. Self-shadowing uses one 2048² shadow map on High and Medium (about 16 MB of 32-bit depth) and 1024² on Low (about 4 MB), freed whenever the light is replaced.
 - Displacement on desktop only.
 - **Never compute noise per frame for baked kinds.** Their procedural maps are baked by the backend ([§6](surface-generation.md#r6-surface-generation-backend-cpu)). The shader-generated kinds follow [architecture spec §6](../architecture/README.md); their haptic field is generated once per body, not per frame ([§7.7](renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova)).
 

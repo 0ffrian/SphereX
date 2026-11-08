@@ -21,6 +21,12 @@ import {
 export const PLAIN_SPHERE_NOTE =
   "Shown as a plain grey sphere at the size on the card. The surface is an artist's impression and is hidden at this level.";
 
+const NO_TOUCH_NOTE = {
+  nebula:
+    'Nebulae have no touch feedback: they are drawn as glowing gas, so there is no surface to feel.',
+  nova: 'Supernova remnants have no touch feedback: they are drawn as glowing gas, so there is no surface to feel.',
+} as const;
+
 export function planShaderKind(input: PlanInput): RenderPlan {
   const b = new PlanBuilder(input);
   const { card, params, ctx } = input;
@@ -63,6 +69,12 @@ export function planShaderKind(input: PlanInput): RenderPlan {
   if (plain) {
     b.notes.push(PLAIN_SPHERE_NOTE);
     b.legendBody('Plain grey sphere at the size on the card.');
+  }
+
+  // Q-103: the glowing volumes have no touch feedback. Said in plain words so that Touch mode on
+  // one of them is not silent without a reason (R9). Listed whether or not it is drawn now.
+  if (spec.kind === 'nebula' || spec.kind === 'nova') {
+    b.notes.push(NO_TOUCH_NOTE[spec.kind]);
   }
 
   return b.build({

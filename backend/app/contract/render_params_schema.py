@@ -90,6 +90,11 @@ class RenderTextures(BaseModel):
     normal: str
     roughness: str | None = None
     height_bin: str | None = None
+    relief_amp: float | None = Field(
+        None,
+        description="Peak relief as a fraction of the body radius (R6.2 relief_amp): the scale of the displacement by the baked height map (R7.2). Optional; the backend does not send it yet (Q-103).",
+        gt=0.0,
+    )
 
 
 class RenderLighting(BaseModel):

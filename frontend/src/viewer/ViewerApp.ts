@@ -23,6 +23,7 @@ import type { ObjectCard, RenderParams } from '@/contract';
 import { buildLights, MAX_AMBIENT_INTENSITY } from './lighting';
 import { shadowSettings } from './shape/shapeModel';
 import type { PlanContext, RenderPlan, SpinPlan } from './planTypes';
+import type { Overrides } from './sliders';
 import { planRender } from './renderPlan';
 import type { BodyRenderer } from './renderers/bodyRenderer';
 import { AssetCache, buildScene, type BuildHooks, type BuiltScene } from './renderers/build';
@@ -268,7 +269,7 @@ export class ViewerApp {
     this.onLoadFailed = handler;
   }
 
-  /** Called when a shape model loads, with its bounding-sphere radius in metres (the real size). */
+  /** Called when a shape model loads, with half of its longest box extent in metres (the real size). */
   setMeshMeasuredHandler(handler: ((m: { radiusM: number }) => void) | null): void {
     this.onMeshMeasured = handler;
   }
@@ -406,6 +407,15 @@ export class ViewerApp {
     this.shaderOptions = options;
   }
 
+  /**
+   * D-27 slider values for the generated body: kept for the next build and applied to the body on
+   * screen now (the remnant age slider moves the shell without a rebuild).
+   */
+  setOverrides(overrides: Overrides): void {
+    this.shaderOptions = { ...this.shaderOptions, overrides };
+    void this.built?.body?.setOverrides(overrides);
+  }
+
   /** The generated body of a shader kind (haptics read its field and points), else null. */
   get body(): BodyRenderer | null {
     return this.built?.body ?? null;
@@ -441,6 +451,9 @@ export class ViewerApp {
     this.builtKey = '';
     this.pending = null;
     let next: BuiltScene | null = null;
+    // A mesh that finishes loading in a scene that is no longer the current plan must not report its
+    // size: the panel would attach it to the new object (Bennu's size on a cached Eros).
+    const buildToken = this.compileToken;
     if (plan.threeD && (plan.bodies.length > 0 || plan.shader !== null)) {
       try {
         next = buildScene(
@@ -449,7 +462,9 @@ export class ViewerApp {
             onLoadFailed: (id) => this.onLoadFailed?.(id),
             onChange: this.requestRender,
             tier: this.tier,
-            onMeshMeasured: (m) => this.onMeshMeasured?.(m),
+            onMeshMeasured: (m) => {
+              if (buildToken === this.compileToken) this.onMeshMeasured?.(m);
+            },
             shader: this.shaderOptions,
           },
           this.assets,
@@ -621,7 +636,12 @@ export class ViewerApp {
   }
 
   private setLights(next: Object3D[]): void {
-    for (const l of this.lights) this.scene.remove(l);
+    for (const l of this.lights) {
+      this.scene.remove(l);
+      // A shadow-casting light owns a shadow map (about 16 MB at 2048): free it, or every
+      // honesty, epoch or mode toggle leaves one behind.
+      if (l instanceof DirectionalLight) l.shadow.dispose();
+    }
     this.lights = next;
     for (const l of next) this.scene.add(l);
   }

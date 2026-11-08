@@ -52,7 +52,8 @@ export function isLoadableMeshUrl(value: string | null | undefined): value is st
 
 /**
  * Issue #43: how a loaded model is lit and detailed. Each part is its own layer with its tag, so
- * the honesty toggle can hide it: shadows and AO come from the measured shape (derived),
+ * the honesty toggle can hide it: shadows (derived when the Sun direction is on the card, else
+ * artistic) and AO come from the measured shape (derived),
  * Lommel-Seeliger is a reflectance model (model_dependent), regolith is look only (artistic).
  * Also used for a comet nucleus that has a shape model (67P).
  */
@@ -61,17 +62,21 @@ export function planShapeLayers(b: PlanBuilder): ShapePlan {
     lommelSeeliger: b.drawLocal(
       'reflectance',
       'model_dependent',
-      'Lommel-Seeliger reflectance for dark airless rock (A7.4).',
+      'Light scatters off the surface the way dark, airless rock does. This is a standard model, not a measurement of this body.',
     ),
+    // The shadows follow the Sun direction. Derived only when that direction comes from the phase
+    // angle on the card; a default or hinted direction makes the shadows an illustration.
     shadows: b.drawLocal(
       'self_shadow',
-      'derived',
-      'Self-shadowing: a shadow map of the shape from the Sun direction.',
+      b.lighting.source === 'phase_angle' ? 'derived' : 'artistic',
+      b.lighting.source === 'phase_angle'
+        ? 'Parts of the shape shade each other, worked out from the shape and the Sun direction.'
+        : 'Parts of the shape shade each other. The Sun direction is a default, so the shadows are an illustration.',
     ),
     ao: b.drawLocal(
       'baked_ao',
       'derived',
-      'Ambient occlusion baked from the shape (cosine-weighted visibility).',
+      'Soft shading in dents and hollows, worked out from the shape: how much open sky each point can see.',
     ),
     regolith: b.drawLocal(
       'regolith',

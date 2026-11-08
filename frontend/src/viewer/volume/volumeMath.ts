@@ -169,3 +169,31 @@ export function comaDensity(r: number, inner: number): number {
   const rr = Math.max(r, inner);
   return rr > 0 ? (inner * inner) / (rr * rr) : 0;
 }
+
+/**
+ * Orthonormal basis of a tail's box: local +x along `axis`, local +y as near to `bend` (default
+ * +y) as the axis allows. An axis parallel to the bend direction (a tail pointing straight up or
+ * down) has no cross product with it, so another reference direction is used instead of NaN.
+ * Null for a zero axis.
+ */
+export function boxBasis(
+  axis: readonly number[],
+  bend: readonly number[] | null,
+): [Vec3, Vec3, Vec3] | null {
+  const norm = (v: readonly number[]): Vec3 | null => {
+    const n = Math.hypot(v[0] ?? 0, v[1] ?? 0, v[2] ?? 0);
+    return n > 0 ? [(v[0] ?? 0) / n, (v[1] ?? 0) / n, (v[2] ?? 0) / n] : null;
+  };
+  const cross = (a: Vec3, b: Vec3): Vec3 => [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+  const x = norm(axis);
+  if (!x) return null;
+  let y = norm(bend ?? [0, 1, 0]) ?? [0, 1, 0];
+  if (Math.hypot(...cross(x, y)) < 1e-4) y = Math.abs(x[0]) < 0.9 ? [1, 0, 0] : [0, 0, 1];
+  const z = norm(cross(x, y))!;
+  const y2 = norm(cross(z, x))!;
+  return [x, y2, z];
+}

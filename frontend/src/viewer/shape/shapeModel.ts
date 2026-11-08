@@ -131,9 +131,29 @@ export function hemisphereDirections(n: number): Vec3[] {
   return out;
 }
 
-/** Rays per vertex for the baked AO, by quality level (display choice; baked once per model). */
-export function aoRayCount(tier: TierName): number {
-  return tier === 'low' ? 8 : tier === 'medium' ? 16 : 24;
+/**
+ * Rays per vertex for the baked AO (display choice; baked once per model). The same for every
+ * quality level: the AO is cached on the geometry shared between scenes, so a tier-dependent count
+ * would make the picture depend on which tier happened to load the model first (determinism).
+ */
+export const AO_RAYS = 16;
+
+/**
+ * Whether the baked AO is drawn. Pure, so the honesty rule is testable: the AO is `derived`, so it
+ * is drawn only when the plan asks for it (`shape.ao`, set from the visible tags) and every mesh
+ * has the attribute. The attribute alone is not enough: a cached geometry keeps it after the
+ * viewer switches back to Measured only (D-21, D-02).
+ */
+export function bakedAoDrawn(planAo: boolean | undefined, meshHasAo: readonly boolean[]): boolean {
+  return planAo === true && meshHasAo.length > 0 && meshHasAo.every(Boolean);
+}
+
+/** Whether the shape material is needed at all, or the plain standard material is enough. */
+export function needsShapeMaterial(
+  shape: { lommelSeeliger: boolean; regolith: boolean },
+  hasAo: boolean,
+): boolean {
+  return shape.lommelSeeliger || shape.regolith || hasAo;
 }
 
 /**
@@ -187,7 +207,7 @@ export interface ShadowSettings {
 
 /**
  * Shadow-map settings by quality level (display choice). Crater rims need resolution at low Sun,
- * so High and Medium use 2048 (4 MB of depth) and Low 1024 (phone budget).
+ * so High and Medium use 2048 (a 32-bit depth map, about 16 MB) and Low 1024 (about 4 MB, phone budget).
  */
 export function shadowSettings(tier: TierName): ShadowSettings {
   return {

@@ -50,10 +50,12 @@ import {
 import type { VolumePlan } from '../planTypes';
 import { TIERS, type TierName } from '../render/quality';
 import { NOISE_VOLUME_SIZE, noiseVolumeData } from './noiseVolume';
-import { comaDensity } from './volumeMath';
+import { boxBasis, comaDensity } from './volumeMath';
 
 /** Emission gain at gain 1 (display choice, artistic). */
 const EMISSION_GAIN = 2.2;
+/** Extra gain for the nebula, so it holds up on a projector (display choice, artistic). */
+const NEBULA_GAIN = 1.8;
 /** Extinction per unit length at dust strength 1 (display choice, artistic). */
 const DUST_EXTINCTION = 5;
 /** Inner edge of the coma's 1/r^2 profile in box units (avoids the r = 0 singularity). */
@@ -67,7 +69,12 @@ function emitterColour(plan: VolumePlan, i: number): any {
 }
 
 /** Density and colour of one volume kind at box-space point `p` (the box spans [-1, 1]^3). */
-function fieldFor(plan: VolumePlan, noise: (p: any) => any, shell: any): (p: any) => Field {
+function fieldFor(
+  plan: VolumePlan,
+  noise: (p: any) => any,
+  noiseMirrored: (p: any) => any,
+  shell: any,
+): (p: any) => Field {
   const c0 = emitterColour(plan, 0);
   const c1 = emitterColour(plan, 1);
   const c2 = emitterColour(plan, 2);
@@ -88,7 +95,7 @@ function fieldFor(plan: VolumePlan, noise: (p: any) => any, shell: any): (p: any
           .mul(n.z.mul(0.6).add(0.4));
         const emission = mix(c0, c1, smoothstep(0.35, 0.65, n.y))
           .mul(density)
-          .mul(EMISSION_GAIN);
+          .mul(EMISSION_GAIN * NEBULA_GAIN);
         const lane = smoothstep(0.55, 0.9, n.x);
         return { emission, sigma: dustAmount.mul(mask).mul(lane) };
       };
@@ -147,7 +154,8 @@ function fieldFor(plan: VolumePlan, noise: (p: any) => any, shell: any): (p: any
           .pow(ion ? 1.2 : 1.6)
           .mul(smoothstep(0.0, 0.04, u));
         // Streaks along the tail (ion: the cube is stretched along x) or soft clumps (dust).
-        const n = ion ? noise(vec3(p.x.mul(0.3), q.y.mul(3), q.z.mul(3))) : noise(p);
+        // The stretched lookup runs past the cube's edge: mirror it, since the cube does not tile.
+        const n = ion ? noiseMirrored(vec3(p.x.mul(0.3), q.y.mul(3), q.z.mul(3))) : noise(p);
         const grain = ion ? float(1).sub(n.x.sub(0.5).mul(2).abs()) : n.z;
         const density = across.mul(along).mul(grain.mul(0.6).add(0.4));
         const emission = c0.add(c1).add(c2).mul(density).mul(EMISSION_GAIN);
@@ -171,12 +179,10 @@ export interface VolumeHandle {
 /** Pose of the box: scale by `halfExtent`, local +x along `axis`, local +y along `bend`. */
 function poseBox(mesh: Mesh, plan: VolumePlan): void {
   mesh.scale.set(...plan.halfExtent);
-  if (plan.axis) {
-    const x = new Vector3(...plan.axis).normalize();
-    const y = new Vector3(...(plan.bend ?? [0, 1, 0])).normalize();
-    const z = new Vector3().crossVectors(x, y).normalize();
-    y.crossVectors(z, x).normalize();
-    mesh.quaternion.setFromRotationMatrix(new Matrix4().makeBasis(x, y, z));
+  const basis = plan.axis ? boxBasis(plan.axis, plan.bend) : null;
+  if (basis) {
+    const [x, y, z] = basis.map((v) => new Vector3(...v));
+    mesh.quaternion.setFromRotationMatrix(new Matrix4().makeBasis(x!, y!, z!));
   }
   mesh.position.set(...plan.center);
 }
@@ -220,8 +226,16 @@ export function createVolume(plan: VolumePlan, tier: TierName): VolumeHandle {
   // One fetch of the baked noise cube; coordinates repeat, and level 0 keeps it a plain fetch.
   const noise = (p: any) => texture3DLevel(noiseTex, p.mul(0.5).add(0.5), float(0));
 
+  // Same fetch with the coordinate folded back and forth (a triangle wave) instead of wrapped, so
+  // a lookup beyond the cube has no seam where the two edges, which do not match, would meet.
+  const noiseMirrored = (p: any) => {
+    const u = p.mul(0.5).add(0.5);
+    const folded = float(1).sub(fract(u.mul(0.5)).mul(2).sub(1).abs());
+    return texture3DLevel(noiseTex, folded, float(0));
+  };
+
   material.colorNode = Fn(() => {
-    const field = fieldFor(plan, noise, shell);
+    const field = fieldFor(plan, noise, noiseMirrored, shell);
     const camLocal = modelWorldMatrixInverse.mul(vec4(cameraPosition, 1)).xyz;
     const rd = normalize(positionLocal.sub(camLocal));
     // Slab test against the unit box [-1, 1]^3.
