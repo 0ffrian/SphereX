@@ -15,11 +15,12 @@ from __future__ import annotations
 
 import json
 import logging
+import queue
 import threading
 import time
 from collections import OrderedDict
 from collections.abc import Callable
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Any
@@ -380,19 +381,50 @@ class FrameService:
                 log.exception("frame listener failed for %s", row.frame_id)
 
         pool = self._download_pool()
+        if pool is None:
+            for i, row, is_live, digest in todo:
+                landed(i, row, self._build_one(obj, row, is_live, digest, refresh))
+            return built
+        # Live rows go to the shared pool, at most `cutout_concurrency` of this call's at a time,
+        # so every object's work takes turns in the pool instead of queueing behind one large
+        # object (issue #41). Results come back through done-callbacks, which also fire when
+        # close() cancels a queued download, so this call can never wait for ever.
         live = [t for t in todo if t[2]]
-        futures: dict[Future[BuiltFrame], tuple[int, SiaRow]] = {}
-        if pool is not None:
-            for i, row, is_live, digest in live:
+        done_q: queue.Queue[tuple[int, SiaRow, Future[BuiltFrame]]] = queue.Queue()
+        width = max(1, self.ctx.settings.cutout_concurrency)
+        nxt = 0
+        in_flight = 0
+
+        def submit_next() -> bool:
+            nonlocal nxt
+            i, row, is_live, digest = live[nxt]
+            nxt += 1
+            try:
                 fut = pool.submit(self._build_one, obj, row, is_live, digest, refresh)
-                futures[fut] = (i, row)
+            except RuntimeError:  # the pool was shut down: refuse this cutout
+                landed(i, row, (None, "cutout", None))
+                return False
+
+            def back(f: Future[BuiltFrame], i: int = i, row: SiaRow = row) -> None:
+                done_q.put((i, row, f))
+
+            fut.add_done_callback(back)
+            return True
+
+        while nxt < len(live) and in_flight < width:
+            in_flight += submit_next()
         for i, row, is_live, digest in todo:
-            if is_live and pool is not None:
-                continue
-            landed(i, row, self._build_one(obj, row, is_live, digest, refresh))
-        for fut in as_completed(futures):
-            i, row = futures[fut]
-            landed(i, row, fut.result())
+            if not is_live:
+                landed(i, row, self._build_one(obj, row, is_live, digest, refresh))
+        while in_flight:
+            i, row, fut = done_q.get()
+            in_flight -= 1
+            if fut.cancelled():
+                landed(i, row, (None, "cutout", None))  # dropped at shutdown: not downloaded
+            else:
+                landed(i, row, fut.result())
+            while nxt < len(live) and in_flight < width:
+                in_flight += submit_next()
         return built
 
     def _recently_failed(self, digest: str) -> bool:

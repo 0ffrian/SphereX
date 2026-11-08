@@ -160,8 +160,12 @@ class Job[T]:
 
 
 class JobRegistry[T]:
-    def __init__(self, ttl_s: float) -> None:
+    def __init__(self, ttl_s: float, max_running: int = 0) -> None:
+        """``max_running`` > 0 caps the jobs doing work at once; the others wait in stage
+        ``queued``. Object ids come from user input (coordinates), so the cap bounds the
+        threads and queued downloads one client can start."""
         self.ttl_s = ttl_s
+        self._slots = threading.BoundedSemaphore(max_running) if max_running > 0 else None
         self._jobs: OrderedDict[str, Job[T]] = OrderedDict()
         self._lock = threading.Lock()
         self._closed = False
@@ -195,7 +199,7 @@ class JobRegistry[T]:
                 job.fail(RuntimeError("shutting down"))
                 return job
         thread = threading.Thread(
-            target=self._run, args=(job, run), name=f"sx-job-{key[:40]}", daemon=True
+            target=self._run_in_slot, args=(job, run), name=f"sx-job-{key[:40]}", daemon=True
         )
         thread.start()
         return job
@@ -217,6 +221,19 @@ class JobRegistry[T]:
     def close(self) -> None:
         with self._lock:
             self._closed = True
+
+    def _run_in_slot(self, job: Job[T], run: Callable[[Job[T]], T]) -> None:
+        if self._slots is None:
+            self._run(job, run)
+            return
+        while not self._slots.acquire(timeout=1.0):
+            if self._closed:
+                job.fail(RuntimeError("shutting down"))
+                return
+        try:
+            self._run(job, run)
+        finally:
+            self._slots.release()
 
     @staticmethod
     def _run(job: Job[T], run: Callable[[Job[T]], T]) -> None:

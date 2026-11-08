@@ -606,3 +606,130 @@ def test_event_streams_do_not_use_request_threads(world: World, fake: FakeIrsa) 
             for s, r in zip(streams, opened, strict=True):
                 r.read()
                 s.__exit__(None, None, None)
+
+
+# --- second review: shutdown, fairness, job cap, batch-only final ------------------------
+
+
+def strip_cutouts(world: World, fake: FakeIrsa, query: str) -> ResolvedObject:
+    """Remove a second object's cutouts from the live cache and serve them from the fake."""
+    ctx = make_context(make_settings(world.live_cache))
+    obj = resolve(ctx, query, {}).obj
+    for f in FrameService(ctx).get_frames(obj).frames:
+        key = irsa_cutout.key_for(ctx, f.sia_row(), f.ra, f.dec)
+        entry = ctx.cache.get(key)
+        assert entry is not None
+        fake.bodies[key.digest] = (entry.body, entry.meta)
+        ctx.cache.delete(key)
+    ctx.cache.delete(frames_mod_key(ctx, obj.id))
+    return obj
+
+
+def frames_mod_key(ctx: Context, object_id: str) -> Any:
+    from app.core.find.frames import frames_key
+
+    return frames_key(ctx, object_id)
+
+
+def test_close_while_downloads_are_queued_never_hangs(world: World, fake: FakeIrsa) -> None:
+    """Review finding: shutdown(cancel_futures=True) must not strand a waiting frame list."""
+    other = strip_cutouts(world, fake, "eps Ind B")
+    fake.gate.clear()
+    fs = FrameService(live_ctx(world, cutout_concurrency=2))
+    results: dict[str, Any] = {}
+
+    def build(obj: ResolvedObject) -> None:
+        try:
+            results[obj.id] = fs.get_frames(obj, unlimited_live=True)
+        except Exception as exc:
+            results[obj.id] = exc
+
+    threads = [threading.Thread(target=build, args=(o,)) for o in (world.obj, other)]
+    for t in threads:
+        t.start()
+    deadline = time.monotonic() + 10
+    while fake.active < 2 and time.monotonic() < deadline:
+        time.sleep(0.01)
+    fs.close()  # one download running, the other object's queued behind it in the pool
+    fake.gate.set()
+    for t in threads:
+        t.join(10)
+        assert not t.is_alive(), "a frame list waited for ever after close()"
+    refused = [
+        m
+        for r in results.values()
+        if not isinstance(r, Exception)
+        for m in r.missing
+        if m.startswith("cutout:")
+    ]
+    assert refused, "downloads dropped at shutdown are listed as refused"
+
+
+def test_objects_take_turns_in_the_shared_pool(world: World, fake: FakeIrsa) -> None:
+    """Review finding: one object's queue must not hold back another object's frames."""
+    other = strip_cutouts(world, fake, "eps Ind B")
+    other_ids: set[str] = set()
+    ctx = live_ctx(world, cutout_concurrency=2)
+    for f in (
+        FrameService(make_context(make_settings(world.live_cache.parent / "base")))
+        .get_frames(
+            resolve(
+                make_context(make_settings(world.live_cache.parent / "base")), "eps Ind B", {}
+            ).obj
+        )
+        .frames
+    ):
+        other_ids.add(f.frame_id)
+    fake.gate.clear()
+    fs = FrameService(ctx)
+    try:
+        ta = threading.Thread(
+            target=fs.get_frames, args=(world.obj,), kwargs={"unlimited_live": True}
+        )
+        ta.start()
+        while fake.active < 2:
+            time.sleep(0.01)
+        tb = threading.Thread(target=fs.get_frames, args=(other,), kwargs={"unlimited_live": True})
+        tb.start()
+        time.sleep(0.2)
+        fake.gate.set()
+        ta.join(30)
+        tb.join(30)
+    finally:
+        fs.close()
+    a_calls = [i for i, c in enumerate(fake.calls) if c not in other_ids]
+    b_calls = [i for i, c in enumerate(fake.calls) if c in other_ids]
+    assert len(a_calls) == world.n_frames and b_calls
+    assert b_calls[0] < a_calls[-1], f"object B waited for all of A: {fake.calls}"
+
+
+def test_running_jobs_are_capped() -> None:
+    reg: JobRegistry[str] = JobRegistry(ttl_s=60, max_running=1)
+    release = threading.Event()
+
+    def slow(job: Any) -> str:
+        job.update(stage="frames")
+        release.wait(10)
+        return "a"
+
+    a = reg.ensure("a", slow)
+    b = reg.ensure("b", lambda job: "b")
+    time.sleep(0.2)
+    assert a.snapshot()["stage"] == "frames"
+    assert b.snapshot()["stage"] == "queued" and b.snapshot()["state"] == "running"
+    release.set()
+    assert a.wait_final(5) == "a" and b.wait_final(5) == "b"
+
+
+def test_a_batch_only_final_still_says_measuring_frames(
+    world: World, fake: FakeIrsa, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = live_ctx(world, live_cutouts_per_request=1, cutout_concurrency=1, first_answer_wait_s=0)
+    pipe, pool = pipeline_for(ctx)
+    monkeypatch.setattr(pipe, "_join_frames_now", lambda *a, **k: None)  # the full run fails
+    try:
+        final = pipe.ensure_job(world.obj).wait_final(60)
+    finally:
+        pipe.frames.close()
+        pool.close()
+    assert final is not None and "measuring:frames" in final.measuring

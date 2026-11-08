@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     # A finished object job is reused for this long, so the card and render-params requests of
     # one page load share one run. After that a new run picks up what changed meanwhile.
     job_ttl_s: float = 600.0
+    # At most this many object jobs do work at once; the rest wait (stage `queued`). Object ids
+    # come from user input, so this bounds the threads and downloads one client can start.
+    # ASSUMPTION: 4 covers a demo with a few phones; 0 means no cap.
+    max_jobs: int = 4
     # D-25 warm cache: at start-up, run the object job for every target in these groups of
     # targets.toml in the background (comma-separated). Off by default: it reaches the network.
     prefetch_on_start: bool = False

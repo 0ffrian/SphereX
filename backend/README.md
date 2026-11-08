@@ -133,9 +133,10 @@ uv run python -m scripts.sky_bake --preview preview.jpg             # 4096x2048 
 | `SX_CUTOUT_SIZE_ARCSEC` | `360` | About 58 px. A display choice, not a physical value. |
 | `SX_CUTOUT_KEEP_PSF` | `0` | Q-20: the PSF extension is not cached. With `1`, cutouts are cached under a different key. |
 | `SX_LIVE_CUTOUTS_PER_REQUEST` | `24` | Inside the API (issue #41): the size of the object job's first batch, after which a partial answer goes out and the rest download; web requests download none themselves. A `FrameService` used without the job still caps its live downloads at this and lists the rest as `cutouts:deferred:<n>` (the list is not stored). The pre-fetch has no cap. |
-| `SX_CUTOUT_CONCURRENCY` | `6` | Live cutout downloads at a time, in one pool shared by every object (issue #41, Q-112). `1` downloads one after another. **[verify]** the polite limit with IRSA. |
+| `SX_CUTOUT_CONCURRENCY` | `6` | Live cutout downloads at a time, in one pool shared by every object (issue #41, Q-112). Each object keeps at most this many of its own in the pool, so objects take turns. `1` downloads one after another. **[verify]** the polite limit with IRSA. |
 | `SX_MEASURE_WORKERS` | `2` | Photometry worker processes (`spawn`). `0` measures in the calling thread. |
 | `SX_FIRST_ANSWER_WAIT_S` | `2` | How long `/card` and `/render-params` wait for the refined answer before returning the first-stage answer (Q-111). |
+| `SX_MAX_JOBS` | `4` | Object jobs doing work at once; the rest wait (`stage: queued`). `0` means no cap. |
 | `SX_JOB_TTL_S` | `600` | A finished object job is reused this long; after that a request starts a new run. |
 | `SX_BAKE_TEXTURES` | `1` | Bake the textures a reply points at, both R5 sizes, off the request path (Q-112). Served at `/data/textures`. |
 | `SX_BAKE_WORKERS` | `1` | Bake worker processes. `0` bakes in one background thread. |
