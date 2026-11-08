@@ -1,6 +1,6 @@
 # 02 Components
 
-The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12, D-15, D-16, D-18, D-19, D-20, D-22, D-25, D-28 and D-35 (sky-view prototype: Q-87 to Q-91; colour composite, colour views, progressive frames and cached markers: Q-92 to Q-95, Q-97 and Q-98), and A4.9 (overlays; on the frame grid: Q-102).
+The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12, D-15, D-16, D-18, D-19, D-20, D-22, D-25, D-28 and D-35 (sky-view prototype: Q-87 to Q-91; colour composite, colour views, progressive frames and cached markers: Q-92 to Q-95, Q-97 and Q-98), and A4.9 (overlays; on the frame grid: Q-102). Object jobs, the shared pools, the background bake and the warm cache follow Q-111 and Q-112 (issue #41).
 
 ## Diagram 1: system and backend
 
@@ -14,7 +14,7 @@ flowchart LR
   end
 
   subgraph BE["Backend (FastAPI on Python 3.12, D-15)"]
-    API["API (D-16): resolve, frames, cutouts, spectrum, card, render-params; overlays, flags PNG, combine PNG (A4.9, Q-50)"]
+    API["API (D-16): resolve, frames, cutouts, spectrum, card, render-params; overlays, flags PNG, combine PNG (A4.9, Q-50); job, job/events (beyond D-16, Q-111)"]
     SkyAPI["/v1/sky router, api/sky.py (beyond D-16, Q-87; /v1/sky/cached, Q-98)"]
     CompAPI["api/composite.py: /v1/objects/{id}/composite, /composite.png (beyond D-16, Q-92)"]
     subgraph CompPkg["core/composite (prototype, no D-17 owner yet)"]
@@ -26,9 +26,13 @@ flowchart LR
     SkyStore[("Sky mirror store {SX_CACHE_DIR}/sky/: HiPS tiles, mirror.json, equirect JPEGs (D-35); outside the D-25 cache")]
     Adapters["Data adapters (proxy)"]
     DataCache[("Read-through disk cache (D-25): raw responses, spectra, cards, render params; SX_OFFLINE=1 never calls out")]
+    Jobs["core/jobs.py: JobRegistry, one background Job per object id, reused for SX_JOB_TTL_S (Q-111)"]
+    Warm["WarmCache, core/warm.py: SX_PREFETCH_ON_START=1 runs the object job for each SX_PREFETCH_GROUPS target, one at a time (Q-112)"]
     subgraph Pipe["Pipeline"]
       S1["1 Find object (core/find)"]
+      CutPool["Shared cutout pool (frames.py): SX_CUTOUT_CONCURRENCY at a time across all objects, fair per frame list (Q-112)"]
       S2["2 Measure flux and spectrum (core/measure)"]
+      MeasPool["MeasurePool, measure/pool.py: SX_MEASURE_WORKERS spawn processes, photometry per landed cutout (Q-112)"]
       subgraph Classify["core/classify"]
         S3["3 Classify: rules.py (catalogue label, Q-55)"]
         TypeSel["Type selection (rendering doc §3.3; exoplanet thresholds Q-56)"]
@@ -48,6 +52,7 @@ flowchart LR
       SpxRGB["spherex_rgb.py"]
       Blackbody["blackbody.py: Teff to display colour"]
       Baker["Texture baker: noise, craters, height, normals, palette, bake"]
+      TexBaker["TextureBaker, render/background.py: SX_BAKE_WORKERS spawn process, both R5 sizes, off the request path (Q-112)"]
       GemPaint["gemini_paint.py (P3, admin token)"]
     end
     TexCache[("/data/textures/{id}/{generator_version}/{seed}/")]
@@ -91,7 +96,7 @@ flowchart LR
   SkyAPI -->|"read only, never upstream"| SkyStore
   SkyAPI -->|"/v1/sky/cached: derived.frames metas, derived.object (read only)"| DataCache
   CompAPI --> CompSvc
-  CompSvc -->|"frame list (live cap per request)"| S1
+  CompSvc -->|"frame list (downloads nothing in the request: on_request, Q-111)"| S1
   CompSvc -->|"Stage 2 verdict per frame"| S2
   CompSvc --> CompSel
   CompSvc --> CompGrid
@@ -102,7 +107,17 @@ flowchart LR
   API --> S1
   API --> Ovl
   S1 -->|"frames, cached cutouts"| Ovl
-  API -->|"/card, /render-params"| Svc
+  API -->|"/card, /render-params: final within SX_FIRST_ANSWER_WAIT_S, else newest intermediate (Q-111)"| Svc
+  API -->|"/job, /job/events: read only, never starts a job"| Jobs
+  Svc -->|"start or join the object's job"| Jobs
+  S1 -->|"on_request: cutouts still to download"| Svc
+  S1 -->|"live cutouts"| CutPool
+  CutPool --> Adapters
+  Svc -->|"each landed cutout"| MeasPool
+  Svc -->|"queue bake for every reply with textures"| TexBaker
+  TexBaker -->|"bake in a worker process"| Baker
+  Warm -->|"ensure_job per demo target"| Svc
+  API -->|"mounts /data/textures (404 until the bake lands)"| TexCache
   Svc --> S4
   S1 --> S2 --> S3 --> TypeSel --> S4 --> CardB
   Catalogue -->|"catalogue facts"| S3
@@ -268,7 +283,8 @@ flowchart TB
 - Flipbook additions (prototype): the colour views are false colour, tagged `derived` and hidden in Measured only (Q-93); the hash gains `colour=` (Q-95); progressive frames ask again while `cutouts:deferred:<n>` is listed, one request at a time (Q-97), and the spectrum, composite and overlays wait for the complete list. `frameGrid.ts` draws every frame of an object on one fixed grid. `frameSwap.ts` decodes the next frame in a hidden `<img>` slot and shows it only once decoded; captions and the transport readout follow the shown frame. Overlay markers and the flag mask use the shown frame's grid placement and follow the shown frame; they are not drawn on the composite (Q-102). The no-data caption of a clipped frame shows only while paused; one steady line covers the object (`noData.ts`, R9).
 - The overlays (A4.9) are drawn as their own backend component, because they are not a numbered pipeline stage: they read Stage 1's frames and cached cutouts and the Gaia and CatWISE2020 cones. Their endpoints are not yet in D-16 (Q-50).
 - Every external call goes through the read-through cache (D-25) (the prototype's sky mirror script writes its own store instead; open as Q-87): cache, then a live call with a timeout and retries, then an older cached entry, then refuse.
-- `core/classify`, `core/card` and the `card_to_params`, `blackbody` and `spherex_rgb` modules of `core/render` were built in issue #5. The `/card` and `/render-params` replies are plain dicts checked with `jsonschema`; the generated Pydantic models (D-18) only describe them in the OpenAPI docs (Q-40). The render-params endpoint names the texture URLs but does not call the baker yet.
+- `core/classify`, `core/card` and the `card_to_params`, `blackbody` and `spherex_rgb` modules of `core/render` were built in issue #5. The `/card` and `/render-params` replies are plain dicts checked with `jsonschema`; the generated Pydantic models (D-18) only describe them in the OpenAPI docs (Q-40). The render-params endpoint names the texture URLs; since issue #41 every reply whose render params have textures queues both sizes on `TextureBaker` in a worker process off the request path, and the API serves them at `/data/textures`, so a texture URL answers 404 until its bake lands (Q-112).
+- Issue #41 (Q-111, Q-112): `/card` and `/render-params` start or join one background job per object (`core/jobs.py`, `ObjectPipeline._job`). The catalogue, the Horizons geometry and the frame list start together; cutouts download in one shared pool and each is measured in a `MeasurePool` worker as it lands. A job publishes up to three answers (first stage `measuring:`, partial `measuring:frames`, final); only the final can be saved. `/frames`, `/spectrum`, the overlays and the composite download nothing in the request: `FrameService.on_request` starts or joins the job and the rest are listed as `cutouts:deferred:<n>`. `SX_MAX_JOBS` caps only the full download after the first batch (stage `queued`). `GET /v1/objects/{id}/job` and `/job/events` are beyond D-16 (Q-111 (4)).
 - The physics layer is drawn on the backend, feeding derived values into the card. The browser reruns the same functions on slider changes (architecture spec §4.6). As of issue #13 only the browser half exists (`frontend/src/physics/`); whether the backend ports it is Q-60. Baked types allow only colour, lighting and spin sliders; relief sliders exist only on the shader kinds (D-26).
 - The `spherex:haptic` DOM event is a debug hook that also drives the on-screen pulse indicator (D-20). Which module fires it is not stated; it is drawn from the engine.
 - `ShaderBody` and the `fields/` folder follow from D-01 and D-12 and are now listed in rendering doc §10. Their file names are **[verify]**.

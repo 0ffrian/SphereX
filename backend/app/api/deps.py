@@ -9,6 +9,7 @@ from fastapi import Request
 from app.context import Context
 from app.core.card.service import ObjectPipeline
 from app.core.find.frames import FrameService
+from app.core.measure.pool import MeasurePool
 
 
 def get_ctx(request: Request) -> Context:
@@ -25,3 +26,7 @@ def get_aliases(request: Request) -> dict[str, str]:
 
 def get_pipeline(request: Request) -> ObjectPipeline:
     return cast(ObjectPipeline, request.app.state.pipeline)
+
+
+def get_measure_pool(request: Request) -> MeasurePool | None:
+    return cast(MeasurePool | None, getattr(request.app.state, "measure_pool", None))
