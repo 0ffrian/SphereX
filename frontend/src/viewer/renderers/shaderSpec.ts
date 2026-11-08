@@ -284,12 +284,13 @@ export function rhinesBands(motion: Motion, scaleM: number | null): RuleChoice |
     value: Math.min(BANDS_MAX, Math.max(BANDS_MIN, Math.round(n / 2))),
     tag,
     tier: TIER_OF_TAG[tag],
-    formula: 'bands ~ sqrt(2 Omega R / U), Omega = 2 pi / P (order of magnitude only, A7.2)',
+    formula:
+      'bands ~ sqrt(2 Omega R / U), Omega = 2 pi / P, R = the radius on the card (order of magnitude only, A7.2)',
     assumed:
       tag === 'model_dependent' || tag === 'inferred_from_analog' || tag === 'artistic'
-        ? { spin_period_h: spin.value, jet_speed_ms: wind.value }
+        ? { spin_period_h: spin.value, jet_speed_ms: wind.value, radius_m: scaleM }
         : undefined,
-    basis: `Rhines rule from the spin and the wind speed: about ${Math.round(n)} bands`,
+    basis: `Rhines rule from the spin, the wind speed and the radius on the card: about ${Math.round(n)} bands`,
   };
 }
 

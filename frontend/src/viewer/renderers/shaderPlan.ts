@@ -10,7 +10,7 @@
 import { isTagShown } from '../honesty';
 import { missingFields, PlanBuilder, type PlanInput } from '../planCommon';
 import type { RenderPlan } from '../planTypes';
-import { processOf, resolveMotion } from '../motion/motion';
+import { processOf, resolveMotion, weakestTag } from '../motion/motion';
 import { listMotion, offerLayer, spinPlanOf, viewerLayer } from '../motion/planMotion';
 import {
   kindHasPlainSphere,
@@ -74,8 +74,16 @@ export function planShaderKind(input: PlanInput): RenderPlan {
           b,
           viewerLayer(
             'jets',
-            winds.tag,
-            'Counter-flowing jets: neighbouring bands blow opposite ways at up to the wind speed on the card, and turbulence is strongest at the band edges. The band pattern itself is an artist look.',
+            weakestTag([winds.tag, 'artistic']),
+            'Counter-flowing jets: neighbouring bands blow opposite ways at up to the jet speed in the dynamics, and turbulence is strongest at the band edges. The band pattern itself is an artist look.',
+            {
+              formula:
+                'wind = peak jet speed * band profile (sign flips between bands); drift = wind / cos(latitude)',
+              assumed: {
+                jet_speed_ms: motion.rates.jet_speed_ms.value,
+                band_pattern: 'an artist look, not measured',
+              },
+            },
           ),
         );
         b.draw('jets');

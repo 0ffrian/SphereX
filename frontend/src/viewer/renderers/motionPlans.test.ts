@@ -117,7 +117,10 @@ describe('brown dwarf jets (R7.4, A7.2)', () => {
     expect(ids(p)).not.toContain('bands');
     expect(p.bodies[0]!.albedoUrl).toBeNull();
     expect(p.spin?.speedup).toBe(3600);
-    expect(p.jets!.flattening).toBeGreaterThan(0);
+    // Jupiter's density does not hold for a brown dwarf and the card has no mass: no flattening.
+    expect(p.jets!.flattening).toBe(0);
+    expect(ids(p)).not.toContain('flattening');
+    expect(p.missing.find((m) => m.id === 'flattening')?.reason).toBe('data');
   });
 
   it('is left out of the infrared view like the baked bands, and hidden below + Artistic', () => {
@@ -205,6 +208,20 @@ describe('gas giants and worlds (A7.1, A7.2)', () => {
     for (const d of p.drawn) expect(d.tier).toBeDefined();
     expect(p.spin).toEqual({ periodH: 10, speedup: 3600 });
     expect(ids(at('gas_giant', 'derived'))).not.toContain('jets');
+  });
+
+  it('tags the jets layer no stronger than artistic, names where the speed comes from, and Rhines states the radius (D-32)', () => {
+    const jets = at('gas_giant', 'artistic').drawn.find((d) => d.id === 'jets')!;
+    expect(jets.tag).toBe('artistic');
+    expect(jets.tier).toBe(5);
+    expect(jets.description).toContain('jet speed in the dynamics');
+    expect(jets.description).not.toContain('on the card');
+    const bands = rhinesBands(
+      resolveMotion(fixture('gas_giant').card, fixture('gas_giant').params),
+      fixture('gas_giant').params.scale_m,
+    )!;
+    expect(bands.formula).toContain('radius on the card');
+    expect(bands.assumed).toHaveProperty('radius_m');
   });
 
   it('ice, ocean and lava follow the Teq thresholds of A7.1', () => {
