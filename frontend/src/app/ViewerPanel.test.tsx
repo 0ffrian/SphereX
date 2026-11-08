@@ -115,6 +115,36 @@ describe('ViewerPanel', () => {
     expect(button('Pause motion')).toBeUndefined();
   });
 
+  it('a brown dwarf in the infrared view hints that the visible view moves, and only then', async () => {
+    const { card, params } = fixture('brown_dwarf');
+    useAppStore.getState().setObject(card, params);
+    useAppStore.getState().setHonesty('artistic'); // the jets are an artist's layer (R7.4)
+    await mount();
+    const region = () => container.querySelector('[data-testid="ir-jets-hint"]');
+    // Opens in the infrared view.
+    expect(canvasLabel()).toContain('SPHEREx infrared');
+    expect(region()?.getAttribute('role')).toBe('status');
+    expect(region()?.getAttribute('aria-live')).toBe('polite');
+    expect(text('ir-jets-hint')).toBe('Switch to the visible colour view to see the jets move.');
+    expect(text('ir-jets-hint')).not.toMatch(/\b[RAQD]-?\d/);
+    // Visible view draws the jets: the region stays, the text goes.
+    await click('Visible colour');
+    expect(region()).not.toBeNull();
+    expect(text('ir-jets-hint')).toBe('');
+    // Back to infrared: the hint returns. At the default level the visible view would not draw
+    // the jets either (the layer is hidden), so there is nothing to switch for.
+    await click('SPHEREx infrared');
+    expect(text('ir-jets-hint')).toBe('Switch to the visible colour view to see the jets move.');
+    await click('+ Estimated');
+    expect(text('ir-jets-hint')).toBe('');
+    // Another type in the infrared view: no hint.
+    const other = fixture('asteroid_shape');
+    useAppStore.getState().setObject(other.card, other.params);
+    await act(async () => {});
+    await click('SPHEREx infrared');
+    expect(text('ir-jets-hint')).toBe('');
+  });
+
   it('shows the placeholder when no object is loaded', async () => {
     await mount();
     expect(container.textContent).toContain('Viewer placeholder: no object loaded');
