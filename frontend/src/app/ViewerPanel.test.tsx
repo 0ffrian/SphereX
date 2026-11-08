@@ -269,7 +269,7 @@ describe('ViewerPanel', () => {
     const { card, params } = fixture('asteroid_shape');
     useAppStore.getState().setObject(card, params);
     await mount();
-    expect(text('scale-bar')).toContain('10 km long');
+    expect(text('scale-bar')).toContain('16.8 km long');
     expect(text('scale-bar')).toContain('Le Morne Brabant');
   });
 

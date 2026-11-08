@@ -5,9 +5,11 @@
 // (that is docs/rendering/reference/checklist.md).
 //   SX_UPDATE_GOLDENS=1 npx playwright test golden   writes the goldens (review the diff, then commit).
 //
-// Excluded states: `asteroid_shape` is only checked at Measured only. Once its shape-model mesh is
-// drawn (+ Estimated and up), SwiftShader never finishes a frame (page.screenshot hangs for minutes),
-// so no golden can be taken there; it needs a real GPU. [verify] re-check after the render-core merge.
+// `asteroid_shape` is the real Eros model (Gaskell, backend/assets/shapes, served at /data/shapes by
+// the fixtures server, issue #62). The low quality tier set below draws its coarse level
+// (eros-gaskell.lod1.glb, `chooseLod`), which SwiftShader finishes at every state (re-checked 9 Nov
+// 2026), so no state is skipped any more. SKIP_STATES stays for a state a software rasteriser
+// cannot draw; such a state needs a GPU-only check instead.
 // Excluded fixture: `candidate` has no 3D view (R5/D-21: a candidate has no measured size, so nothing is
 // drawn and the panel shows the "nothing to draw" message). A fixture whose body draws nothing at
 // every state would give three identical black goldens, which test nothing.
@@ -26,9 +28,7 @@ import { scoreFrames, type Rgb } from './ssim';
 
 const EXCLUDED = new Set(['candidate']);
 const HONESTY = ['measured', 'derived', 'artistic'] as const;
-const SKIP_STATES: Record<string, readonly string[]> = {
-  asteroid_shape: ['derived', 'artistic'],
-};
+const SKIP_STATES: Record<string, readonly string[]> = {};
 /** D-21 / R5.3: the tags each honesty state may draw. */
 const SHOWN_TAGS: Record<(typeof HONESTY)[number], readonly string[]> = {
   measured: ['measured'],
