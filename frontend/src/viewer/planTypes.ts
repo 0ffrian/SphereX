@@ -211,6 +211,11 @@ export interface JetSurfacePlan {
 export interface PulsationPlan {
   periodD: number;
   amplitude: number;
+  /**
+   * Phase at clock time 0, radians: the radius starts where the scrubbed light-curve point puts it
+   * (a bright point is a large radius), so radius and brightness agree. 0 with no usable point.
+   */
+  phase: number;
 }
 
 export interface RenderPlan {
