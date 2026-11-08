@@ -4,6 +4,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
+import { openViewer, viewerCanvas } from './viewer';
 
 // Honesty: the D-21 default (+ Estimated) hides artistic layers, so the render tests ask for
 // "+ Artistic". They draw through the panel's own path (planRender -> showPlan, window.__sxShow).
@@ -59,13 +60,13 @@ for (const view of VIEWS) {
     });
     page.on('pageerror', (e) => errors.push(e.message));
 
-    await page.goto('/');
+    await openViewer(page);
     const status = page.getByTestId('renderer-status');
     await expect(status).not.toHaveAttribute('data-status', 'starting', { timeout: 30_000 });
     test.skip((await status.getAttribute('data-status')) === 'unavailable', 'no 3D backend');
     await page.waitForFunction(() => '__sxViewer' in globalThis);
 
-    const canvas = page.locator('canvas[aria-label]');
+    const canvas = viewerCanvas(page);
     const before = await canvas.screenshot();
     const result = await page.evaluate(
       async ({ card, params, lightDir, overrides, rotateLeft, rotateUp }) => {
@@ -145,7 +146,7 @@ test('honesty default: at + Estimated the artistic surface is hidden, a toggle s
   page,
 }) => {
   test.setTimeout(120_000);
-  await page.goto('/');
+  await openViewer(page);
   const status = page.getByTestId('renderer-status');
   await expect(status).not.toHaveAttribute('data-status', 'starting', { timeout: 30_000 });
   test.skip((await status.getAttribute('data-status')) === 'unavailable', 'no 3D backend');

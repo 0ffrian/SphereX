@@ -1,7 +1,8 @@
 // A4.1 input (UML 08 step 1): an object name or RA, Dec in decimal degrees, plus quick picks for
-// the five A1.1 test targets.
+// the five A1.1 test targets. Shown as the mock-up's search pill (bottom right); the quick picks,
+// the help and any problem float above it. "/" focuses the field (shell/shortcuts.ts).
 import { useEffect, useId, useState, type FormEvent } from 'react';
-import { buttonClass } from '@/app/ui';
+import { Icon } from '@/app/shell/icons';
 import { useAppStore } from '@/state/store';
 import { parseQuery } from './parseQuery';
 import { TEST_TARGETS } from './testTargets';
@@ -23,7 +24,8 @@ export function SearchBar() {
       useAppStore.subscribe((s, prev) => {
         const q = s.sky.query;
         if (q === prev.sky.query) return;
-        if (q?.origin === 'hash') {
+        // A link or a pick on the sky view shows what is being searched.
+        if (q?.origin === 'hash' || q?.origin === 'sky') {
           setText(q.q);
           setProblem(null);
         } else if (q === null) {
@@ -60,55 +62,68 @@ export function SearchBar() {
   };
 
   return (
-    <section aria-label="Find an object" className="flex flex-col gap-2">
-      <form role="search" onSubmit={onSubmit} className="flex flex-col gap-2" noValidate>
-        <label htmlFor={inputId} className="text-sm font-medium">
+    <section aria-label="Find an object" className="group sx-search">
+      <form role="search" onSubmit={onSubmit} className="sx-search-form" noValidate>
+        <label htmlFor={inputId} className="sr-only">
           Object name, or RA, Dec in degrees
         </label>
-        <div className="flex flex-wrap gap-2">
-          <input
-            id={inputId}
-            type="text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="R Draconis or 269.452, 4.693"
-            autoComplete="off"
-            spellCheck={false}
-            aria-invalid={problem !== null}
-            aria-describedby={describedBy}
-            className="min-h-11 min-w-0 flex-1 rounded-md border border-neutral-500 bg-neutral-900 px-3 text-base text-neutral-100 placeholder:text-neutral-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 aria-invalid:border-red-400"
-            data-testid="search-input"
-          />
-          <button type="submit" className={buttonClass}>
-            Search
-          </button>
+        <Icon name="search" className="sx-search-icon" />
+        <input
+          id={inputId}
+          type="text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Search a name or RA Dec"
+          autoComplete="off"
+          spellCheck={false}
+          enterKeyHint="search"
+          aria-invalid={problem !== null}
+          aria-describedby={describedBy}
+          aria-keyshortcuts="/"
+          className="sx-search-input"
+          data-testid="search-input"
+        />
+        <kbd className="sx-kbd" aria-hidden="true">
+          /
+        </kbd>
+        <button type="submit" className="sx-search-go" aria-label="Search" title="Search">
+          <Icon name="search" className="size-4" />
+        </button>
+      </form>
+      <div className="sx-search-pop">
+        {/* Help sits on top, so showing it never moves the chips under the pointer. */}
+        <p
+          id={helpId}
+          className="sx-search-note sr-only text-sx-mfg group-has-[input:focus]:not-sr-only"
+        >
+          Decimal degrees only, for example 269.452, 4.693. Search by name for moving objects.
+        </p>
+        <div role="group" aria-label="Test targets" className="sx-chips">
+          <span className="sx-chips-lead">Try:</span>
+          {TEST_TARGETS.map((name) => (
+            <button key={name} type="button" className="sx-chip" onClick={() => pick(name)}>
+              {name}
+            </button>
+          ))}
         </div>
         {linkProblems.length > 0 && (
-          <p id={linkProblemId} className="text-sm text-red-300" data-testid="link-problem">
+          <p
+            id={linkProblemId}
+            className="sx-search-note border-red-400/70 text-red-200"
+            data-testid="link-problem"
+          >
             {linkProblems.join(' ')}
           </p>
         )}
         {problem && (
-          <p id={problemId} className="text-sm text-red-300" data-testid="search-problem">
+          <p
+            id={problemId}
+            className="sx-search-note border-red-400/70 text-red-200"
+            data-testid="search-problem"
+          >
             {problem}
           </p>
         )}
-        <p id={helpId} className="text-sm text-neutral-400">
-          Decimal degrees only, for example 269.452, 4.693. Search by name for moving objects.
-        </p>
-      </form>
-      <div role="group" aria-label="Test targets" className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-neutral-400">Try:</span>
-        {TEST_TARGETS.map((name) => (
-          <button
-            key={name}
-            type="button"
-            className={`${buttonClass} text-sm`}
-            onClick={() => pick(name)}
-          >
-            {name}
-          </button>
-        ))}
       </div>
     </section>
   );

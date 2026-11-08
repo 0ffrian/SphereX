@@ -1,6 +1,6 @@
 # 02 Components
 
-The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12, D-15, D-16, D-18, D-19, D-20, D-22, D-25 and D-28, and A4.9 (overlays).
+The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12, D-15, D-16, D-18, D-19, D-20, D-22, D-25, D-28 and D-35 (sky-view prototype: Q-87 to Q-91; colour composite, colour views, progressive frames and cached markers: Q-92 to Q-95, Q-97 and Q-98), and A4.9 (overlays; on the frame grid: Q-102).
 
 ## Diagram 1: system and backend
 
@@ -10,10 +10,20 @@ flowchart LR
     FEFlip["Flipbook"]
     FEPanel["Object panel"]
     FEViewer["Sky Sculptor viewer"]
+    FESky["Shell + SkyPane / SkyView (prototype, Q-89)"]
   end
 
   subgraph BE["Backend (FastAPI on Python 3.12, D-15)"]
     API["API (D-16): resolve, frames, cutouts, spectrum, card, render-params; overlays, flags PNG, combine PNG (A4.9, Q-50)"]
+    SkyAPI["/v1/sky router, api/sky.py (beyond D-16, Q-87; /v1/sky/cached, Q-98)"]
+    CompAPI["api/composite.py: /v1/objects/{id}/composite, /composite.png (beyond D-16, Q-92)"]
+    subgraph CompPkg["core/composite (prototype, no D-17 owner yet)"]
+      CompSvc["service.py: CompositeService, derived.composite"]
+      CompSel["select.py: one frame per channel, one pass (config.py constants, Q-94)"]
+      CompGrid["grid.py: flag mask, TAN grid, resample, asinh stretch, RGB PNG"]
+    end
+    SkyTools["scripts.sky_mirror, scripts.sky_bake; core/sky: surveys, healpix, bake"]
+    SkyStore[("Sky mirror store {SX_CACHE_DIR}/sky/: HiPS tiles, mirror.json, equirect JPEGs (D-35); outside the D-25 cache")]
     Adapters["Data adapters (proxy)"]
     DataCache[("Read-through disk cache (D-25): raw responses, spectra, cards, render params; SX_OFFLINE=1 never calls out")]
     subgraph Pipe["Pipeline"]
@@ -52,6 +62,7 @@ flowchart LR
 
   subgraph Ext["External services"]
     IRSA["IRSA SIA + S3 (SPHEREx QR2)"]
+    HiPS["IRSA HiPS: 2MASS colour, AllWISE colour (A3.11)"]
     Resolver["SBDB / SIMBAD name resolve (D-19: SBDB first for small-body names, SIMBAD first otherwise)"]
     Horizons["JPL Horizons"]
     SkyBoT["IMCCE SkyBoT"]
@@ -68,11 +79,25 @@ flowchart LR
     ShapeDir["backend/assets/shapes: registry.toml + GLBs (Q-61)"]
   end
 
-  FEFlip -->|"GET /v1/resolve, /v1/objects/{id}/frames, /cutouts/{frame_id}.png"| API
+  FEFlip -->|"GET /v1/resolve, /v1/objects/{id}/frames (again while cutouts are deferred, Q-97), /cutouts/{frame_id}.png"| API
   FEFlip -->|"GET /v1/objects/{id}/overlays, /flags/{frame_id}.png, /combine.png"| API
+  FEFlip -->|"GET /v1/objects/{id}/composite, /composite.png (colour view, Q-93)"| CompAPI
   FEPanel -->|"GET /v1/objects/{id}/spectrum, /card"| API
   FEViewer -->|"GET /v1/objects/{id}/render-params"| API
   FEViewer -->|"texture URLs: albedo.webp, height.png, height.bin, normal.png"| TexCache
+  FESky -->|"GET /v1/sky/index.json, equirect_{W}x{H}.jpg, /v1/sky/cached"| SkyAPI
+  FESky -->|"GET /v1/resolve for the quick-pick markers"| API
+  FESky -->|"pick: search ra,dec, origin sky"| FEFlip
+  SkyAPI -->|"read only, never upstream"| SkyStore
+  SkyAPI -->|"/v1/sky/cached: derived.frames metas, derived.object (read only)"| DataCache
+  CompAPI --> CompSvc
+  CompSvc -->|"frame list (live cap per request)"| S1
+  CompSvc -->|"Stage 2 verdict per frame"| S2
+  CompSvc --> CompSel
+  CompSvc --> CompGrid
+  CompSvc <-->|"cached cutouts, derived.composite (D-25)"| DataCache
+  SkyTools -->|"write tiles, bake equirect"| SkyStore
+  SkyTools -->|"mirror tiles (refused with SX_OFFLINE=1)"| HiPS
 
   API --> S1
   API --> Ovl
@@ -131,6 +156,15 @@ flowchart TB
     Store["Store (Zustand): card, RenderParams, honesty state, overrides"]
     PulseInd["On-screen pulse indicator (D-20)"]
     Settings["Haptics + audio settings"]
+    Shell["Shell (prototype, Q-89): ToolRail, PanelCard, Readout, shortcuts"]
+    SkyPane["SkyPane: sky image, markers, click to pick"]
+    Transport["Transport bar"]
+    Session["Flipbook session (session.tsx): cutout preload, playback timer, can play"]
+    FrameGrid["frameGrid.ts: one fixed grid and scale per object; noData.ts hatching text"]
+    FrameSwap["frameSwap.ts + useFrameSwap: next frame shown once decoded"]
+    ColourViews["ColourViews + colourMode (prototype, Q-93, Q-95): Raw | Colour, wavelength tint, SPHEREx composite"]
+    Progressive["progressive.ts + FramesProgress (Q-97): ask again while cutouts are deferred, merge, Stop / Continue"]
+    CachedMarkers["useCachedMarkers + cachedMarkers (Q-98): lilac cached, loads instantly markers"]
   end
 
   subgraph Viewer["Sky Sculptor viewer (three r187, three/webgpu)"]
@@ -142,6 +176,7 @@ flowchart TB
     end
     ShaderGen["Shader generators: terra-planet, banded-giant, gas-cloud, shell-remnant (triplanar)"]
     FieldWorker["Field worker (Web Worker): 512x256 field"]
+    SkyView["SkyView + skyMath (viewer/sky): inside-out sky sphere, render on demand, camera ray to RA/Dec"]
   end
 
   subgraph Haptics["haptics/"]
@@ -164,6 +199,28 @@ flowchart TB
   WebAudio["Web Audio AudioContext"]
 
   Router --> Store
+  Shell --> SkyPane
+  Shell --> Transport
+  Shell -->|"panel card"| Flipbook
+  Shell -->|"panel card"| Panel
+  SkyPane --> SkyView
+  SkyPane --> CachedMarkers
+  CachedMarkers -->|"GET /v1/sky/cached"| BackendAPI
+  CachedMarkers -->|"search query or id coordinates, origin sky"| Store
+  Flipbook --> FrameGrid
+  Flipbook --> FrameSwap
+  Flipbook --> ColourViews
+  ColourViews -->|"colour choice, composite reply"| Store
+  Store -->|"GET composite (not in Measured only)"| BackendAPI
+  Store -->|"pollFrames, mergeFrames"| Progressive
+  Progressive -->|"GET frames again, one at a time"| BackendAPI
+  Flipbook -->|"FramesProgress: progress, Stop / Continue"| Progressive
+  SkyPane -->|"GET /v1/sky/index.json, /v1/resolve (markers)"| BackendAPI
+  SkyView -->|"equirect JPEG"| BackendAPI
+  SkyPane -->|"search ra,dec, origin sky"| Store
+  Transport -->|"reads"| Session
+  Flipbook -->|"reads"| Session
+  Session <--> Store
   Flipbook -->|"resolve, frames, cutouts"| BackendAPI
   Flipbook --> Overlays
   Overlays -->|"overlays (lazy, first toggle), flags PNG, combine PNG"| BackendAPI
@@ -206,8 +263,11 @@ flowchart TB
 
 - Baked types (rendering doc types) fetch textures from the backend; shader kinds generate a field in the browser instead (D-01, D-12).
 - Endpoints follow D-16. Every endpoint is keyed by the object id that `resolve` returns; there is no separate flipbook endpoint. Responses served from the cache carry `cached_at` (D-25); for `/card` and `/render-params` it is the `X-SX-Cached-At` header, next to `X-SX-Asset-Status`, because the R3 shapes forbid extra fields (Q-39).
+- Sky-view prototype (Q-87 to Q-91): the `/v1/sky` endpoints are not keyed by an object id and are outside D-16 until Q-87 is settled. They serve only the local copy written by `scripts.sky_mirror` and `scripts.sky_bake` (D-35), never the network. A click on the sky becomes an `ra,dec` search with origin `sky` and then follows the usual resolve and frames path ([08](08-sequence-search-flipbook.md)). The flipbook panel and the transport bar read one playback session, so closing the panel does not stop playback.
+- Colour composite (prototype, Q-92, Q-94): `GET /v1/objects/{id}/composite` and `/composite.png` are keyed by object id but are not in D-16 yet. `core/composite` runs Stage 1 once per request, takes Stage 2's verdict per frame, picks one frame per channel from one pass, resamples the three onto one north-up TAN grid and stretches each band; the result is stored as `derived.composite` (D-25). Sequence: [20](20-sequence-composite.md). `GET /v1/sky/cached` (Q-98) reads only `derived.frames` metas and the `derived.object` registry, never cutouts or upstream.
+- Flipbook additions (prototype): the colour views are false colour, tagged `derived` and hidden in Measured only (Q-93); the hash gains `colour=` (Q-95); progressive frames ask again while `cutouts:deferred:<n>` is listed, one request at a time (Q-97), and the spectrum, composite and overlays wait for the complete list. `frameGrid.ts` draws every frame of an object on one fixed grid. `frameSwap.ts` decodes the next frame in a hidden `<img>` slot and shows it only once decoded; captions and the transport readout follow the shown frame. Overlay markers and the flag mask use the shown frame's grid placement and follow the shown frame; they are not drawn on the composite (Q-102). The no-data caption of a clipped frame shows only while paused; one steady line covers the object (`noData.ts`, R9).
 - The overlays (A4.9) are drawn as their own backend component, because they are not a numbered pipeline stage: they read Stage 1's frames and cached cutouts and the Gaia and CatWISE2020 cones. Their endpoints are not yet in D-16 (Q-50).
-- Every external call goes through the read-through cache (D-25): cache, then a live call with a timeout and retries, then an older cached entry, then refuse.
+- Every external call goes through the read-through cache (D-25) (the prototype's sky mirror script writes its own store instead; open as Q-87): cache, then a live call with a timeout and retries, then an older cached entry, then refuse.
 - `core/classify`, `core/card` and the `card_to_params`, `blackbody` and `spherex_rgb` modules of `core/render` were built in issue #5. The `/card` and `/render-params` replies are plain dicts checked with `jsonschema`; the generated Pydantic models (D-18) only describe them in the OpenAPI docs (Q-40). The render-params endpoint names the texture URLs but does not call the baker yet.
 - The physics layer is drawn on the backend, feeding derived values into the card. The browser reruns the same functions on slider changes (architecture spec §4.6). As of issue #13 only the browser half exists (`frontend/src/physics/`); whether the backend ports it is Q-60. Baked types allow only colour, lighting and spin sliders; relief sliders exist only on the shader kinds (D-26).
 - The `spherex:haptic` DOM event is a debug hook that also drives the on-screen pulse indicator (D-20). Which module fires it is not stated; it is drawn from the engine.

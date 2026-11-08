@@ -1,5 +1,6 @@
 // D-02 provenance badge for SPHEREx data shown in the flipbook and spectrum. Synthetic fixture
 // data never wears the Measured badge, even though the fixture reply says `tag: 'measured'`.
+import { useState } from 'react';
 import type { Tag } from '@/contract';
 import { badgeForTag } from '@/viewer/honesty';
 
@@ -31,17 +32,42 @@ export function DataBadge({ fixture }: { fixture: boolean }) {
  * tooltip states the formula, assumption or analog.
  */
 export function EstimatedBadge({ tooltip }: { tooltip: string }) {
+  // A `title` tooltip opens only on mouse hover, so the badge is a button: a tap or Enter shows
+  // the formula as visible text next to it (WCAG 2.1.1, 1.4.13), Escape or a second press hides it.
+  const [open, setOpen] = useState(false);
   return (
-    <span
-      className="rounded border border-sky-400 px-1.5 py-0.5 text-xs font-medium text-sky-300"
-      title={tooltip}
-      data-testid="badge-estimated"
-    >
-      Estimated
-      {/* The tooltip is not read by screen readers, so the formula is also in the text. */}
-      <span className="sr-only" data-testid="badge-estimated-formula">
-        : {tooltip}
-      </span>
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <button
+        type="button"
+        className="cursor-help rounded border border-sky-400 px-1.5 py-0.5 text-xs font-medium text-sky-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300"
+        title={tooltip}
+        // No aria-expanded: screen readers already hear the formula in the name, and the note
+        // it opens is visual only.
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && open) {
+            e.stopPropagation();
+            setOpen(false);
+          }
+        }}
+        data-testid="badge-estimated"
+      >
+        Estimated
+        {/* The tooltip is not read by screen readers, so the formula is also in the name. */}
+        <span className="sr-only" data-testid="badge-estimated-formula">
+          : {tooltip}
+        </span>
+      </button>
+      {open && (
+        // Already in the button's name, so hidden from screen readers to avoid reading it twice.
+        <span
+          className="text-xs text-sky-200"
+          aria-hidden="true"
+          data-testid="badge-estimated-note"
+        >
+          {tooltip}
+        </span>
+      )}
     </span>
   );
 }

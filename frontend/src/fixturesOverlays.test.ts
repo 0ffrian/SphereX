@@ -84,14 +84,39 @@ describe('overlay fixtures', () => {
   });
 
   it('serves RGBA flag masks the size of the cutout', () => {
-    const r = handleFixtureRequest('GET', '/v1/objects/rw-aur/flags/rw-aur-f001.png')!;
-    expect(r.status).toBe(200);
-    expect(r.headers['content-type']).toBe('image/png');
-    expect(checkPng(r.body as Uint8Array)).toEqual({
-      width: CUTOUT_SIZE,
-      height: CUTOUT_SIZE,
-      colorType: 6,
-    });
+    // Cutouts differ in size per frame (synthetic.ts cutoutSize), so the mask matches its own.
+    for (const id of ['rw-aur-f000', 'rw-aur-f001', 'rw-aur-f002', 'rw-aur-f003']) {
+      const r = handleFixtureRequest('GET', `/v1/objects/rw-aur/flags/${id}.png`)!;
+      expect(r.status).toBe(200);
+      expect(r.headers['content-type']).toBe('image/png');
+      const cutout = handleFixtureRequest('GET', `/v1/objects/rw-aur/cutouts/${id}.png`)!;
+      const c = checkPng(cutout.body as Uint8Array);
+      expect(checkPng(r.body as Uint8Array)).toEqual({
+        width: c.width,
+        height: c.height,
+        colorType: 6,
+      });
+      const f = makeFrames(FIXTURE_TARGETS.find((t) => t.id === 'rw-aur')!).frames.find(
+        (fr) => fr.frame_id === id,
+      )!;
+      expect({ width: c.width, height: c.height }).toEqual({ width: f.width, height: f.height });
+    }
+  });
+
+  it('places every marker on its own frame’s pixels (frames differ in size)', () => {
+    for (const t of withFrames) {
+      const frames = makeFrames(t).frames;
+      for (const of of makeOverlays(t).frames) {
+        const f = frames.find((fr) => fr.frame_id === of.frame_id)!;
+        for (const m of of.markers) {
+          expect(m.x).toBeGreaterThanOrEqual(-0.5);
+          expect(m.y).toBeGreaterThanOrEqual(-0.5);
+          // Rounded to 0.01 px, so a source at the very edge may read exactly w - 0.5.
+          expect(m.x).toBeLessThanOrEqual(f.width! - 0.5);
+          expect(m.y).toBeLessThanOrEqual(f.height! - 0.5);
+        }
+      }
+    }
   });
 
   it('serves combine.png with an X-SX-Combine header', () => {

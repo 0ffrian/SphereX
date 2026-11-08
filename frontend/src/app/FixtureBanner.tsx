@@ -7,7 +7,7 @@ export function FixtureBanner() {
   if (!seen) return null;
   return (
     <p
-      className="rounded-md border border-amber-400 bg-amber-950/60 px-3 py-2 text-sm text-amber-100"
+      className="min-w-0 flex-1 basis-64 rounded-lg border border-amber-400/80 bg-amber-950/70 px-2.5 py-1 text-xs leading-4 text-amber-100"
       data-testid="fixture-banner"
     >
       <strong className="font-semibold">Fixture data.</strong> The images and numbers on this page
