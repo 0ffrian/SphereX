@@ -298,6 +298,11 @@ export class FieldSampler {
     this.storms = storms;
   }
 
+  /** The storms set by `setStorms` (null = the field's own t = 0 storms), so touch reads what is drawn. */
+  get currentStorms(): readonly Storm[] | null {
+    return this.storms;
+  }
+
   sampleUV(u: number, v: number): FieldSample {
     const { width: W, height: H, a, b } = this.field;
     const px = u * W - 0.5;
