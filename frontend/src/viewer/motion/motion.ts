@@ -77,6 +77,13 @@ export interface Motion {
   rates: Partial<Record<MotionKey, RatePlan>>;
   /** Animated processes only. Empty when nothing moves. */
   processes: ProcessPlan[];
+  /**
+   * The processes that drive something DRAWN now (D-21, D-34), a subset of `processes`. Empty until
+   * the plan is finished (`finishMotion`, called by `planRender`): a process whose layer is hidden
+   * (honesty, view mode) is not registered on the clock, shows no note and does not keep the frame
+   * loop running.
+   */
+  activeProcesses: ProcessId[];
   /** `dynamics:<key>` refusals (rates no rung could answer) and stated speed-ups with no rate. */
   missing: MissingItem[];
   notes: string[];
@@ -85,7 +92,13 @@ export interface Motion {
 /** Simulation time of one process in sim seconds (the SimClock's `simTime`). */
 export type SimTimeFn = (id: string) => number;
 
-export const STILL_MOTION: Motion = { rates: {}, processes: [], missing: [], notes: [] };
+export const STILL_MOTION: Motion = {
+  rates: {},
+  processes: [],
+  activeProcesses: [],
+  missing: [],
+  notes: [],
+};
 
 export interface MotionConfig {
   /**
@@ -131,6 +144,25 @@ const PROCESS_RATES: Readonly<Record<ProcessId, readonly MotionKey[]>> = {
   clouds: ['jet_speed_ms'],
   pulsation: ['pulsation_period_d'],
 };
+
+/**
+ * WCAG 2.3.1 (no more than three flashes in any second; R5.7 keeps it far lower): a flare process
+ * starts at most this many flares per real second, however large the shown speed-up.
+ */
+export const MAX_FLARE_ONSETS_PER_REAL_S = 0.5;
+
+/**
+ * The flare speed-up shown and drawn: the one the card states, lowered so that the flare rate times
+ * the speed-up stays at or below `MAX_FLARE_ONSETS_PER_REAL_S` real flares per second. Rounded down
+ * to two significant figures; the label is always this value. Idempotent.
+ */
+export function cappedFlareSpeedup(requested: number, ratePerDay: number): number {
+  const perRealS = (ratePerDay / 86400) * requested;
+  if (!(perRealS > MAX_FLARE_ONSETS_PER_REAL_S)) return requested;
+  const capped = (requested * MAX_FLARE_ONSETS_PER_REAL_S) / perRealS;
+  const step = 10 ** (Math.floor(Math.log10(capped)) - 1);
+  return Number((Math.floor(capped / step) * step).toPrecision(2));
+}
 
 const PROCESS_ORDER: readonly ProcessId[] = [
   'spin',
@@ -242,7 +274,8 @@ export function resolveMotion(
     processes.push({
       id,
       label: PROCESS_LABEL[id],
-      speedup: speedup!,
+      speedup:
+        id === 'flares' ? cappedFlareSpeedup(speedup!, rates.flare_rate_per_d!.value) : speedup!,
       tag: weakestTag(need.map((k) => rates[k]!.tag)),
       tier: TIER_OF_TAG[weakestTag(need.map((k) => rates[k]!.tag))],
       rates: [...need],
@@ -252,7 +285,7 @@ export function resolveMotion(
   const filtered = processes.some((p) => p.id === 'winds')
     ? processes
     : processes.filter((p) => p.id !== 'clouds');
-  return { rates, processes: filtered, missing, notes };
+  return { rates, processes: filtered, activeProcesses: [], missing, notes };
 }
 
 /** The process plan with this id, if it is animated. */

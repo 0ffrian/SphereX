@@ -6,8 +6,9 @@
 // under the same id wins (`offerLayer` keeps it): the backend's tier is then the one shown.
 import type { Layer, Tag } from '@/contract';
 import type { PlanBuilder } from '../planCommon';
-import type { SpinPlan } from '../planTypes';
-import { TIER_OF_TAG, processOf, type Motion } from './motion';
+import type { RenderPlan, SpinPlan } from '../planTypes';
+import type { ClockProcess } from '../render/clock';
+import { TIER_OF_TAG, processOf, type Motion, type ProcessId } from './motion';
 
 /** WCAG 2.3.1 / R5.7: nothing spins faster than this many revolutions per real second. */
 export const MAX_SPIN_REV_PER_S = 1;
@@ -64,4 +65,81 @@ export function spinPlanOf(motion: Motion): SpinPlan | null {
   const rate = motion.rates.spin_period_h;
   if (!proc || !rate) return null;
   return { periodH: rate.value, speedup: cappedSpinSpeedup(proc.speedup, rate.value) };
+}
+
+/**
+ * The processes that drive something DRAWN in this plan (D-21, D-34), in clock order. A process the
+ * card animates but whose layer is hidden (honesty level, view mode, a refused layer) is not
+ * listed: it is not registered on the clock, has no note and does not keep the frame loop running.
+ *   spin       the spin plan exists (a body with a surface to turn),
+ *   spots      moving spot groups drawn (star spots, faculae or loops) and the spot clock is real,
+ *   flares     flares drawn and the star has a flare rate,
+ *   winds      a jets layer (brown dwarf, gas giant) or a cloud layer (planet) is drawn,
+ *   clouds     the same jets surface, whose cloud detail evolves on its own clock,
+ *   pulsation  the pulsation plan exists.
+ */
+export function activeProcessesOf(plan: RenderPlan): ProcessId[] {
+  const m = plan.motion;
+  const drawn = (id: string) => plan.drawn.some((d) => d.id === id);
+  const out: ProcessId[] = [];
+  for (const p of m.processes) {
+    let on = false;
+    switch (p.id) {
+      case 'spin':
+        on = plan.spin !== null;
+        break;
+      case 'spots': {
+        const s = plan.star;
+        on = s !== null && (s.spots || s.faculae || s.prominences) && !s.rates.frozen;
+        break;
+      }
+      case 'flares':
+        on = plan.star !== null && plan.star.flares && plan.star.rates.flareRatePerS > 0;
+        break;
+      case 'winds':
+        on = drawn('jets') || drawn('clouds');
+        break;
+      case 'clouds':
+        on = drawn('jets');
+        break;
+      case 'pulsation':
+        on = plan.pulsation !== null;
+        break;
+    }
+    if (on) out.push(p.id);
+  }
+  return out;
+}
+
+/** Fills `motion.activeProcesses` from what the finished plan draws. Called once by `planRender`. */
+export function finishMotion(plan: RenderPlan): RenderPlan {
+  const active = activeProcessesOf(plan);
+  return { ...plan, motion: { ...plan.motion, activeProcesses: active } };
+}
+
+/**
+ * What the clock runs for this plan, for the panel's notes and its pause control: the spin (with the
+ * speed-up the plan may have lowered) and every active process, each with the tag and tier of the
+ * rates it runs on. The viewer registers exactly this on its clock (`ViewerApp.syncProcesses`).
+ */
+export function timeLapsesOf(plan: RenderPlan): ClockProcess[] {
+  const out: ClockProcess[] = [];
+  for (const p of plan.motion.processes) {
+    if (p.id === 'spin') {
+      if (plan.spin)
+        out.push({
+          id: 'spin',
+          label: p.label,
+          speedup: plan.spin.speedup,
+          tag: p.tag,
+          tier: p.tier,
+        });
+    } else if (plan.motion.activeProcesses.includes(p.id)) {
+      out.push({ id: p.id, label: p.label, speedup: p.speedup, tag: p.tag, tier: p.tier });
+    }
+  }
+  // A spin with no rate record (the asteroids spin from their own card field): no tag to state.
+  if (plan.spin && !out.some((t) => t.id === 'spin'))
+    out.unshift({ id: 'spin', label: 'Spin', speedup: plan.spin.speedup });
+  return out;
 }
