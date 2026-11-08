@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   FieldSampler,
   generateField,
+  zonalWind,
   pixelDirection,
   stormIdAt,
   stormsFor,
@@ -12,6 +13,8 @@ import {
 import {
   cloudAngularRate,
   flowAngularRate,
+  invCosLat,
+  MIN_COS_LAT,
   peakAngularRate,
   stormsAt,
   type JetRates,
@@ -117,5 +120,46 @@ describe('rates', () => {
     expect(peakAngularRate(jets)).toBeCloseTo(100 / 6.991e7, 15);
     expect(cloudAngularRate(0, jets)).toBeCloseTo(peakAngularRate(jets), 15);
     expect(Math.sign(cloudAngularRate(0.3, jets))).not.toBe(Math.sign(cloudAngularRate(0.8, jets)));
+  });
+});
+
+describe('streaks and storms drift together (twin parity, review #9)', () => {
+  it('the streak shear and the storm drift share 1 / cos(lat), floored at MIN_COS_LAT', () => {
+    for (const lat of [0, 0.4, 0.75, 1.2, 1.55]) {
+      const d: [number, number, number] = [Math.cos(lat), Math.sin(lat), 0];
+      expect(invCosLat(d)).toBeCloseTo(1 / Math.max(Math.cos(lat), MIN_COS_LAT), 12);
+      // The GPU shears by (peak * profile * invCosLat); the CPU storm drift is the same product.
+      expect(flowAngularRate(d, fp, jets)).toBeCloseTo(
+        zonalWind(d, fp) * peakAngularRate(jets) * invCosLat(d),
+        15,
+      );
+    }
+    // The ratio of drift rates at two latitudes is the ratio of the shaders' shear factors.
+    const a: [number, number, number] = [Math.cos(0.75), Math.sin(0.75), 0];
+    expect(invCosLat(a) / invCosLat([1, 0, 0])).toBeCloseTo(1 / Math.cos(0.75), 12);
+  });
+
+  it('a storm follows the wind where it is: it never moves against the flow of its band', () => {
+    const fp2: FieldParams = { ...fp, bands: 14, turbulence: 1, storms: 8 };
+    const born = stormsAt(fp2, jets, 0);
+    for (const t of [1e5, 1e6, 1e7, 1e8, 3e9]) {
+      const now = stormsAt(fp2, jets, t);
+      now.forEach((s, i) => {
+        const b = born[i]!;
+        expect(s.center[1]).toBeCloseTo(b.center[1], 12);
+        expect(Math.hypot(...s.center)).toBeCloseTo(1, 12);
+        // Still in a band whose wind blows the way it was born moving (or where the wind is calm).
+        const w0 = Math.sign(zonalWind(b.center, fp2));
+        const w1 = zonalWind(s.center, fp2);
+        expect(Math.sign(w1) * w0).toBeGreaterThanOrEqual(0);
+      });
+    }
+  });
+
+  it('is deterministic and a long run is bounded (loops or stops, never runs away)', () => {
+    const fp2: FieldParams = { ...fp, bands: 14, turbulence: 1, storms: 8 };
+    expect(stormsAt(fp2, jets, 7e8)).toEqual(stormsAt(fp2, jets, 7e8));
+    const far = stormsAt(fp2, jets, 1e15);
+    far.forEach((s) => expect(Number.isFinite(s.center[0] + s.center[1] + s.center[2])).toBe(true));
   });
 });
