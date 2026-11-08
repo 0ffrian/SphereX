@@ -26,13 +26,33 @@ import {
 import type { PlanContext, RenderPlan, ViewModeId } from '@/viewer/planTypes';
 import { defaultContext, planRender } from '@/viewer/renderPlan';
 import { COMET_EPOCHS, epochsWithQ, EPOCH_LABEL } from '@/viewer/renderers/Comet';
-import { scaleBarFor } from '@/viewer/scaleBar';
+import { AT_AGE_MAX_PHRASE, scaleBarFor, shownSize } from '@/viewer/scaleBar';
+import { SLIDER_REGISTRY } from '@/viewer/sliders';
 import type { CometEpoch, ObjectCard, RenderParams } from '@/contract';
 import { ProvenanceBadge } from './Badge';
 import { describeRefusal, layerName } from './messages';
 import { buttonClass, pressedClass } from './ui';
 
 const NO_FAILED: readonly string[] = [];
+const AGE_SLIDER = SLIDER_REGISTRY.age_yr;
+
+/** The age slider runs on log10(years): one key press is the same relative change everywhere. */
+const AGE_LOG_MIN = Math.log10(AGE_SLIDER.min);
+const AGE_LOG_MAX = Math.log10(AGE_SLIDER.max);
+const AGE_LOG_STEP = 0.01;
+/** Years from a slider position, rounded to 3 significant digits and kept inside the range. */
+export function ageFromLog(pos: number): number {
+  const raw = Math.pow(10, pos);
+  // Whole years below 1,000 ("10 years", not "10.2 years"); 3 significant digits above.
+  const years = raw < 1000 ? Math.round(raw) : Number(raw.toPrecision(3));
+  return Math.min(AGE_SLIDER.max, Math.max(AGE_SLIDER.min, years));
+}
+
+/** "1,200 years", "10 years". */
+function formatYears(n: number): string {
+  const w = n < 1000 ? Math.round(n) : n;
+  return `${w.toLocaleString('en')} ${w === 1 ? 'year' : 'years'}`;
+}
 
 /** `prefers-reduced-motion`, kept current when the setting changes while the page is open. */
 function useReducedMotion(): boolean {
@@ -83,10 +103,19 @@ export function ViewerPanel() {
   // Viewer choices that belong to this panel, not to the data. Keyed by object so that a new
   // object starts from its defaults (the comet opens on its latest epoch with gas data).
   const objectKey = params ? `${params.id}|${params.generator_version}|${params.seed}` : '';
-  const [stored, setChoices] = useState<Choices>({ key: '', mode: null, epoch: null, scrub: 0 });
+  const [stored, setChoices] = useState<Choices>({
+    key: '',
+    mode: null,
+    epoch: null,
+    scrub: 0,
+  });
   const choices: Choices =
     stored.key === objectKey ? stored : { key: objectKey, mode: null, epoch: null, scrub: 0 };
   const modeChoice = choices.mode;
+  // The remnant age is a D-02 override in the store, so the store's reset clears it.
+  const overrides = useAppStore((s) => s.overrides);
+  const setOverride = useAppStore((s) => s.setOverride);
+  const ageChoice = typeof overrides.age_yr === 'number' ? overrides.age_yr : null;
   const scrubIndex = choices.scrub;
   const epochsWithData = useMemo(
     () => (card && params?.type === 'comet' ? epochsWithQ(card) : []),
@@ -121,7 +150,25 @@ export function ViewerPanel() {
     () => (card && params ? planRender(card, params, ctx) : null),
     [card, params, ctx],
   );
-  const bar = useMemo(() => (plan ? scaleBarFor(plan.scaleM, plan.sizeQualifier) : null), [plan]);
+  // Issue #43: a loaded shape model carries its own size in metres (glTF units, Q-61), which is the
+  // measured size, so the scale bar shows it instead of the catalogue diameter (Eros at real size).
+  const [meshSize, setMeshSize] = useState<{ key: string; radiusM: number } | null>(null);
+  const meshRadiusM = meshSize?.key === objectKey ? meshSize.radiusM : null;
+  const remnantShown = plan?.type === 'nova' && plan.drawn.some((l) => l.id === 'point_cloud');
+  // The age slider shrinks the drawn shell (to 3%), so the card's size is the shell at the
+  // slider maximum: say so in the bar, the label and the announcements (Q-103). Used for the
+  // plan on screen and for the plan an honesty toggle is about to show.
+  const sizeOf = (p: RenderPlan, state: HonestyState) => {
+    const s = shownSize(p, meshRadiusM, state);
+    const remnant = p.type === 'nova' && p.drawn.some((l) => l.id === 'point_cloud');
+    return remnant ? { ...s, atSliderMax: true } : s;
+  };
+  const size = useMemo(
+    () => (plan ? sizeOf(plan, honesty) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `sizeOf` only reads `meshRadiusM`
+    [plan, meshRadiusM, honesty],
+  );
+  const bar = useMemo(() => (size ? scaleBarFor(size.radiusM, size.qualifier) : null), [size]);
 
   // Mount the renderer once.
   useEffect(() => {
@@ -169,7 +216,10 @@ export function ViewerPanel() {
           w.__sxViewer = created;
           // Plans and draws like the panel does, for a given honesty state.
           w.__sxShow = (c, p, honesty) => {
-            const shown = planRender(c, p, defaultContext({ honesty }));
+            // The epoch the panel itself opens on (a comet: its latest epoch with gas data), so a
+            // fixture card is drawn at its own epoch and not at the default one.
+            const epoch = epochsWithQ(c).at(-1) ?? defaultContext().epoch;
+            const shown = planRender(c, p, defaultContext({ honesty, epoch }));
             created.showPlan(shown);
             return shown;
           };
@@ -208,6 +258,12 @@ export function ViewerPanel() {
     };
   }, [viewer, objectKey]);
 
+  useEffect(() => {
+    if (!viewer) return;
+    viewer.setMeshMeasuredHandler?.((m) => setMeshSize({ key: objectKey, radiusM: m.radiusM }));
+    return () => viewer.setMeshMeasuredHandler?.(null);
+  }, [viewer, objectKey]);
+
   // A tier drop from the frame-time governor is said in plain words and shown (R9, never silent).
   const [qualityLowered, setQualityLowered] = useState(false);
   useEffect(() => {
@@ -220,19 +276,30 @@ export function ViewerPanel() {
     return () => viewer.setQualityChangeHandler(null);
   }, [viewer]);
 
+  // The remnant age slider (D-27): moves the drawn shell without a rebuild, and is kept for the
+  // next build. Before the plan effect below, so a new object starts from its own value.
+  useEffect(() => {
+    viewer?.setOverrides?.(overrides);
+  }, [viewer, overrides]);
+
   // The pause choice is the user's; the viewer keeps it across rebuilds.
   useEffect(() => {
     viewer?.setSpinPaused(spinPaused);
   }, [viewer, spinPaused]);
 
-  // Draw the plan, and keep the canvas label in step with it (R9).
+  // Draw the plan. Not keyed on the measured size: a size report for the same plan must not
+  // re-run showPlan (it would reallocate the shadow map, rebuild lit pipelines and reset TAA).
   useEffect(() => {
-    if (viewer) {
-      if (plan) viewer.showPlan(plan);
-      else viewer.clearObject();
-    }
-    canvasRef.current?.setAttribute('aria-label', canvasLabel(plan));
+    if (!viewer) return;
+    if (plan) viewer.showPlan(plan);
+    else viewer.clearObject();
   }, [viewer, plan]);
+
+  // The canvas label (R9) reads the same size as the scale bar (the model's own size for a shape
+  // model). Also after `viewer` is set, since that is when the canvas exists.
+  useEffect(() => {
+    canvasRef.current?.setAttribute('aria-label', canvasLabel(plan, size));
+  }, [viewer, plan, size]);
 
   const announce = useCallback((text: string) => setAnnouncement(text), []);
   const planWith = (patch: Partial<PlanContext>) =>
@@ -241,7 +308,10 @@ export function ViewerPanel() {
   const onHonesty = (state: HonestyState) => {
     setHonesty(state);
     const next = planWith({ honesty: state });
-    announce(next ? honestyAnnouncement(state, next) : HONESTY_LABEL[state]);
+    // The size can change with the level (a shape model's own size swaps with the card's): say so.
+    announce(
+      next ? honestyAnnouncement(state, next, sizeOf(next, state), size) : HONESTY_LABEL[state],
+    );
   };
   const onMode = (mode: ViewModeId) => {
     setChoices({ ...choices, mode });
@@ -255,6 +325,10 @@ export function ViewerPanel() {
   };
   // Not announced here: the slider's own value text is read by screen readers when it moves.
   const onScrub = (i: number) => setChoices({ ...choices, scrub: i });
+  const onAge = (pos: number) => setOverride('age_yr', ageFromLog(pos));
+
+  // The age slider shows only while the remnant is drawn (it is an artist's impression).
+  const age = ageChoice ?? AGE_SLIDER.max;
 
   const nothingDrawn = plan && plan.threeD && !showsBody(plan) ? nothingDrawnReason(plan) : null;
   const defaultsShown = plan?.missing.filter((m) => m.defaultShown) ?? [];
@@ -453,6 +527,37 @@ export function ViewerPanel() {
             </label>
           )}
 
+          {remnantShown && (
+            <div className="flex flex-col gap-1 text-sm text-neutral-300">
+              <span className="flex flex-wrap items-center gap-2">
+                <label htmlFor={`${whyId}-age-input`} id={`${whyId}-age`}>
+                  Age of the remnant
+                </label>
+                <output aria-hidden="true" className="tabular-nums text-neutral-100">
+                  {formatYears(age)}
+                </output>
+                <ProvenanceBadge tag="artistic" fixture={objectIsFixture} />
+              </span>
+              <input
+                id={`${whyId}-age-input`}
+                type="range"
+                min={AGE_LOG_MIN}
+                max={AGE_LOG_MAX}
+                step={AGE_LOG_STEP}
+                value={Math.log10(age)}
+                className="min-h-11 w-full max-w-xl"
+                aria-labelledby={`${whyId}-age`}
+                aria-describedby={`${whyId}-age-hint`}
+                aria-valuetext={`${formatYears(age)} old`}
+                onChange={(e) => onAge(Number(e.target.value))}
+              />
+              <span id={`${whyId}-age-hint`} className="text-xs text-neutral-400">
+                Your choice, not a measurement. The shell is drawn smaller when it is younger, so
+                the size shown is the shell{AT_AGE_MAX_PHRASE}.
+              </span>
+            </div>
+          )}
+
           {bar && (
             <figure className="flex max-w-xl flex-col gap-1" data-testid="scale-bar">
               <div className="flex flex-col gap-1" aria-hidden="true">
@@ -467,13 +572,14 @@ export function ViewerPanel() {
               </div>
               <figcaption className="text-sm text-neutral-200">
                 {bar.headline}
+                {size?.atSliderMax && AT_AGE_MAX_PHRASE}
                 {bar.qualifier === 'upper_limit' && ' (upper limit)'}
-                {plan.sizeTag && (
+                {size?.tag && (
                   <>
                     {' '}
                     <ProvenanceBadge
-                      tag={plan.sizeTag}
-                      tooltip={plan.sizeWhy ?? undefined}
+                      tag={size.tag}
+                      tooltip={size.why ?? undefined}
                       srText
                       fixture={objectIsFixture}
                     />
@@ -481,7 +587,7 @@ export function ViewerPanel() {
                 )}
                 , {bar.comparison.text}.
               </figcaption>
-              {plan.sizeWhy && (
+              {size?.why && (
                 <div className="flex flex-col items-start gap-1">
                   <button
                     type="button"
@@ -494,7 +600,7 @@ export function ViewerPanel() {
                   </button>
                   {whyOpen && (
                     <p id={whyId} className="text-sm text-neutral-300" data-testid="size-why">
-                      {plan.sizeWhy}
+                      {size.why}
                     </p>
                   )}
                 </div>

@@ -107,7 +107,7 @@ describe('scale bar (R5.4)', () => {
   });
 
   it('gives the size, one comparison and bar fractions that fit', () => {
-    const bar = scaleBarFor(5000)!; // radius 5 km: 10 km across
+    const bar = scaleBarFor(5000)!; // radius 5 km: 10 km long
     expect(bar.diameterText).toBe('10 km');
     expect(bar.comparison.name).toBe('Le Morne Brabant');
     expect(bar.comparison.text).toMatch(/times Le Morne Brabant \(556 m tall\)/);
@@ -153,7 +153,7 @@ describe('alt text and announcements (R9)', () => {
     const alt = buildAltText(plan);
     expect(alt.startsWith(`${card.name}, asteroid with a shape model, `)).toBe(true);
     expect(alt).toContain('asteroid with a shape model');
-    expect(alt).toContain('10 km across (measured)');
+    expect(alt).toContain('10 km long (measured)');
     expect(alt).toContain('colour from Gaia (estimated)');
     expect(alt).toContain('viewed at 30°');
     // A plain sphere has no relief to describe.
@@ -176,16 +176,16 @@ describe('alt text and announcements (R9)', () => {
     const plan = planRender(card, params, defaultContext({ epoch: '2025-08' }));
     expect(plan.sizeQualifier).toBe('upper_limit');
     const alt = buildAltText(plan);
-    expect(alt).toContain('at most 2 km across (upper limit, measured)');
-    expect(alt).not.toContain(', 2 km across');
+    expect(alt).toContain('at most 2 km long (upper limit, measured)');
+    expect(alt).not.toContain(', 2 km long');
     // August has no dust, so the infrared colour is applied to nothing and is not named.
     expect(plan.tintUsed).toBe(false);
     expect(alt).not.toContain('infrared false colour');
     expect(alt).not.toContain('Surface relief');
     const bar = scaleBarFor(plan.scaleM, plan.sizeQualifier)!;
-    expect(bar.headline).toBe('At most 2 km across');
+    expect(bar.headline).toBe('At most 2 km long');
     expect(bar.comparison.text).toMatch(/^at most about /);
-    expect(scaleBarFor(plan.scaleM)!.headline).toBe('2 km across');
+    expect(scaleBarFor(plan.scaleM)!.headline).toBe('2 km long');
   });
 
   it('the candidate label is a full sentence with no controls help', () => {
@@ -257,8 +257,7 @@ describe('scene builder (no GPU)', () => {
       });
       expect(built.group.children.length).toBe(
         plan.bodies.length +
-          plan.shells.length +
-          (plan.dust ? 1 : 0) +
+          plan.volumes.length +
           plan.discs.length +
           plan.screens.length +
           plan.trails.length,
@@ -319,17 +318,22 @@ describe('scene builder (no GPU)', () => {
     }
   });
 
-  it('shells and dust are instanced sprites, so their point size is honoured in r187 (N5)', () => {
+  it('the coma and dust are ray-marched volumes, not point sprites (issue #43)', () => {
     const { card, params } = fixture('comet');
-    const plan = planRender(card, params, defaultContext({ epoch: '2025-08' }));
+    card.epochs = ['2025-08']; // the R3.2 gas_Q shape belongs to one epoch
+    const plan = planRender(
+      card,
+      params,
+      defaultContext({ honesty: 'artistic', epoch: '2025-08' }),
+    );
+    // The plan keeps the shells as data (haptics); the drawing is one coma volume.
+    expect(plan.shells.length).toBeGreaterThan(0);
+    expect(plan.volumes.map((v) => v.kind)).toContain('coma');
     const built = buildScene(plan, { onLoadFailed: () => {}, onChange: () => {} });
-    const clouds = built.group.children.filter((c): c is Sprite => c instanceof Sprite);
-    expect(clouds).toHaveLength(plan.shells.length);
-    expect(clouds.map((c) => c.count)).toEqual(plan.shells.map((sh) => sh.count));
-    for (const c of clouds) {
-      expect((c.material as unknown as { size: number }).size).toBeGreaterThan(1);
-      expect(c.frustumCulled).toBe(false);
-    }
+    expect(built.group.children.filter((c) => c instanceof Sprite)).toHaveLength(0);
+    const boxes = built.group.children.filter((c) => plan.volumes.some((v) => v.id === c.name));
+    expect(boxes).toHaveLength(plan.volumes.length);
+    for (const v of plan.volumes) expect(TAGS).toContain(v.tag);
     built.dispose();
   });
 
@@ -351,5 +355,36 @@ describe('scene builder (no GPU)', () => {
     expect(spy.disposed).toBe(0);
     cache.dispose();
     expect(spy.disposed).toBe(1);
+  });
+
+  it('a missing coarse model is requested once, and a stale failure does not refuse the mesh', async () => {
+    const { card, params } = fixture('asteroid_shape');
+    card.shape_source = { value: '/data/shapes/x.glb', tag: 'measured', source: 'test' };
+    const plan = planRender(card, params, defaultContext({ honesty: 'artistic' }));
+    const requested: string[] = [];
+    const cache = new AssetCache();
+    (cache as unknown as { mesh: (u: string) => Promise<never> }).mesh = (u) => {
+      requested.push(u);
+      return Promise.reject(new Error('missing'));
+    };
+    const failures: string[] = [];
+    const built = buildScene(
+      plan,
+      { onLoadFailed: (id) => failures.push(id), onChange: () => {}, tier: 'low' },
+      cache,
+    );
+    const settle = () => new Promise((r) => setTimeout(r, 0));
+    await settle();
+    // Low quality asks for the coarse file first; it fails, so the full file is tried once.
+    expect(requested).toEqual(['/data/shapes/x.lod1.glb', '/data/shapes/x.glb']);
+    expect(failures).toEqual(['mesh']);
+    // Size changes (every frame during a zoom) do not start the loop again.
+    for (const px of [40, 80, 120, 400, 60]) {
+      built.setScreenPx(px);
+      await settle();
+    }
+    expect(requested).toHaveLength(2);
+    expect(failures).toEqual(['mesh']);
+    built.dispose();
   });
 });

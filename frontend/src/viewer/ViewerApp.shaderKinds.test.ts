@@ -41,7 +41,7 @@ function show(v: ViewerApp, card: ObjectCard, params: RenderParams, honesty?: Ho
 
 /** Waits until the body has its field (the surface is built, hidden or not). */
 async function built(v: ViewerApp): Promise<ShaderBody> {
-  await vi.waitFor(() => expect(v.body?.field ?? v.body?.pointSets).toBeTruthy());
+  await vi.waitFor(() => expect(v.body?.field).toBeTruthy());
   return v.body as ShaderBody;
 }
 
@@ -89,26 +89,22 @@ describe('shader kinds through the plan path (B5)', () => {
     v.dispose();
   });
 
-  it('nebula and nova: hidden at + Estimated, drawn at + Artistic, points made once', async () => {
+  it('nebula and nova: hidden at + Estimated, drawn at + Artistic, no points or field (Q-103)', async () => {
     const { v } = makeViewer();
-    const points = vi.fn();
-    const f = fixture('nova');
-    v.setShaderOptions({
-      pointSource: async (...a) => {
-        points(...a);
-        const { requestPoints } = await import('./fields/fieldClient');
-        return requestPoints(...a);
-      },
-    });
-    const p1 = show(v, f.card, f.params);
-    expect(p1.shader).toMatchObject({ surface: false, plain: false });
-    expect(p1.missing.map((m) => m.id)).toContain('point_cloud');
-    await built(v);
-    show(v, f.card, f.params, 'artistic');
-    expect(v.body!.drawn).toEqual(['point_cloud']);
-    show(v, f.card, f.params, 'derived');
-    expect(v.body!.drawn).toEqual([]);
-    expect(points).toHaveBeenCalledTimes(1);
+    for (const kind of ['nova', 'nebula']) {
+      const f = fixture(kind);
+      const p1 = show(v, f.card, f.params);
+      expect(p1.shader).toMatchObject({ surface: false, plain: false });
+      expect(p1.missing.map((m) => m.id)).toContain('point_cloud');
+      // These kinds have no plain sphere: the volume group is the only child once built.
+      await vi.waitFor(() => expect((v.body as ShaderBody).object.children.length).toBe(1));
+      expect(v.body!.field).toBeNull();
+      expect(v.body!.pointSets).toBeNull();
+      show(v, f.card, f.params, 'artistic');
+      expect(v.body!.drawn).toEqual(['point_cloud']);
+      show(v, f.card, f.params, 'derived');
+      expect(v.body!.drawn).toEqual([]);
+    }
     v.dispose();
   });
 

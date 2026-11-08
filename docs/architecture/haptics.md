@@ -42,7 +42,7 @@ Every `HapticEvent` goes to both drivers: vibrate and audio. Audio is not only a
   | `gas_giant` | The finger feels the flow: ticks at band boundaries, pulse trains in jets, a "swirl" on storms, ticks at ring gaps | Steady pulse (`teq_pulse`), rate ∝ normalised `Teq`. Tag follows `teq_K`: `measured` from Exoplanet Archive `pl_eqt`, otherwise `derived` |
   | `planet_water` | Slow swell on ocean, a firm tick at the coast, height ticks on land, fine soft ticks on ice | As for `gas_giant` |
   | `planet_rocky` | Height-map ticks; lava cracks give a double tick | As for `gas_giant` |
-  | `nebula`, `nova` | Pulse rate ∝ local point density, as for the comet field | — |
+  | `nebula`, `nova` | None since issue #43: both are drawn as volumes, so nothing is felt (Q-103; amends D-12 and D-20). The 3D view says so in plain words | — |
 
   Full rules, including the paired sounds, are in D-12.
 
