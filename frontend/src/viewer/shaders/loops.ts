@@ -6,6 +6,7 @@
 // (`rise`) and fades it. Alpha-blended (additive strands wash a bright disc to white); a flare
 // raises the strand colour above 1 so a flaring loop still blooms. Colours are artistic.
 import {
+  BufferAttribute,
   BufferGeometry,
   CatmullRomCurve3,
   Mesh,
@@ -14,7 +15,18 @@ import {
   Vector3,
 } from 'three/webgpu';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { float, mix, normalize, positionGeometry, smoothstep, uniform, vec3 } from 'three/tsl';
+import {
+  attribute,
+  float,
+  mix,
+  normalize,
+  positionGeometry,
+  sin,
+  smoothstep,
+  transformNormalToView,
+  uniform,
+  vec3,
+} from 'three/tsl';
 import { LOOP_RISE_GAIN, loopApexHeight, loopStrands, type V3 } from '../bodies/starModel';
 
 /** Tube radius in local units (half the leader-follower separation = 1): thick enough to see. */
@@ -23,13 +35,33 @@ const PLAIN_RADIUS = 0.11;
 /** Colour of hot plasma (artistic), above 1 so a flaring loop passes the bloom threshold. */
 const LOOP_COLOUR = [1.0, 0.36, 0.12] as const;
 
+/** Radius of a strand along its length, 0..1: thin at the footpoints, full at the top (tapered, not a rod). */
+export const strandTaper = (u: number): number => 0.3 + 0.7 * Math.sqrt(Math.sin(Math.PI * u));
+
 /** The merged tube geometry of one region's loop bundle, in the local frame. Deterministic. */
 export function buildLoopGeometry(seed: number, region: number, strands: number): BufferGeometry {
   const geos: BufferGeometry[] = [];
   const radius = strands === 1 ? PLAIN_RADIUS : STRAND_RADIUS;
   for (const s of loopStrands(seed, region, strands)) {
     const curve = new CatmullRomCurve3(s.points.map((p: V3) => new Vector3(p[0], p[1], p[2])));
-    const tube = new TubeGeometry(curve, 36, radius, 4, false);
+    const tubular = 36;
+    const radial = 4;
+    const tube = new TubeGeometry(curve, tubular, radius, radial, false);
+    // Taper: pull each ring towards its centre line (rings are (radial + 1) vertices, in order).
+    // Each strand also gets its own height-wise breathing phase (`aPhase`), so they do not sway as one.
+    const pos = tube.getAttribute('position');
+    const centre = new Vector3();
+    const v = new Vector3();
+    for (let i = 0; i <= tubular; i++) {
+      curve.getPointAt(i / tubular, centre);
+      const k = strandTaper(i / tubular);
+      for (let j = 0; j <= radial; j++) {
+        const idx = i * (radial + 1) + j;
+        v.fromBufferAttribute(pos, idx).sub(centre).multiplyScalar(k).add(centre);
+        pos.setXYZ(idx, v.x, v.y, v.z);
+      }
+    }
+    tube.setAttribute('aPhase', new BufferAttribute(new Float32Array(pos.count).fill(s.phase), 1));
     // Merging needs the same attributes everywhere; only position is used.
     tube.deleteAttribute('uv');
     tube.deleteAttribute('normal');
@@ -50,7 +82,7 @@ export interface LoopFrame {
   rise: number;
   /** 0..1: how visible the loop is (the group's life envelope; 0 hides it). */
   opacity: number;
-  /** Sideways sway, small, from a slow phase (artistic). */
+  /** Slow sway phase in radians; each strand adds its own phase to it (artistic). */
   sway: number;
   /** Brightness multiplier (1 quiet, above 1 while flaring). */
   glow: number;
@@ -73,7 +105,8 @@ export function buildLoopMesh(seed: number, region: number, strands: number): Lo
   const lp = positionGeometry;
   const apex = loopApexHeight();
   const halfSep = uP.x;
-  const sway = uP.z;
+  // Each strand sways with its own phase: the bundle breathes instead of moving as one rod.
+  const sway = sin(uP.z.add(attribute('aPhase', 'float')));
   const lift = float(1).add(uP.y.mul(LOOP_RISE_GAIN));
   const lx = lp.x;
   const ly = lp.y.add(sway.mul(lp.z.max(0)).mul(0.25));
@@ -85,8 +118,12 @@ export function buildLoopMesh(seed: number, region: number, strands: number): Lo
   material.colorNode = vec3(LOOP_COLOUR[0], LOOP_COLOUR[1], LOOP_COLOUR[2]).mul(
     mix(float(0.7), float(1.3), height).mul(uO.y),
   );
+  // Seen from above (the loop's place facing the viewer) an arch is a pale bar across its own spot;
+  // real loops show against the dark sky at the limb. So they fade over the middle of the disc.
+  const facing = transformNormalToView(dir).z.clamp(0, 1);
+  const limbOnly = float(1).sub(smoothstep(0.35, 0.85, facing).mul(0.85));
   // Many strands overlap and add up, so each is faint; one plain arch is stronger.
-  material.opacityNode = uO.x.mul(strands === 1 ? 0.85 : 0.55);
+  material.opacityNode = uO.x.mul(strands === 1 ? 0.85 : 0.55).mul(limbOnly);
   material.transparent = true;
   material.depthWrite = false;
 
