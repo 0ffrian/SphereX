@@ -142,7 +142,7 @@ const MAX_CLOUD_SHEAR = 0.9;
 const CLOUD_SHELL = 1.012;
 const CLOUD_HEIGHT = CLOUD_SHELL - 1;
 /** Atmosphere shell scale and scale height, in planet radii (artistic). */
-const ATMO_SHELL = 1.12;
+const ATMO_SHELL = 1.04;
 const ATMO_SCALE_HEIGHT = 0.03;
 
 const rotY = (p: any, a: any) => {
@@ -316,12 +316,14 @@ function buildPlanet(
     const nv = abs(dot(normalWorld, view));
     const b = float(ATMO_SHELL).mul(sqrt(max(float(1).sub(nv.mul(nv)), 0)));
     const rim = float(0.9).mul(exp(b.sub(1).max(0).negate().div(ATMO_SCALE_HEIGHT)));
-    const haze = float(wetWorld ? 0.05 : 0.14).div(max(sqrt(max(float(1).sub(b.mul(b)), 0)), 0.2));
+    // A faint haze over the disc that thickens toward the limb (it must not grey the surface or
+    // light the night side).
+    const haze = float(0.03).mul(pow(float(1).sub(nv), 3));
     const dens = mix(haze, rim, smoothstep(0.97, 1.0, b));
     const cosG = dot(sunWorld, view).negate();
     const phase = float(0.75).mul(float(1).add(cosG.mul(cosG)));
-    const sunlit = smoothstep(-0.25, 0.45, dot(normalWorld, sunWorld));
-    am.colorNode = rgb3(style.atmosphereColour).mul(1.5);
+    const sunlit = smoothstep(-0.05, 0.45, dot(normalWorld, sunWorld));
+    am.colorNode = rgb3(style.atmosphereColour);
     am.opacityNode = clamp(dens.mul(phase).mul(sunlit).mul(style.atmosphere), 0, 1);
     am.transparent = true;
     am.depthWrite = false;
@@ -364,6 +366,7 @@ function buildGas(
   motion: Motion,
   octaves: number,
   sampler: FieldSampler,
+  sunWorld: any,
 ): { group: Group; frame: Object3D; runtime: Runtime } {
   const fp = spec.field!;
   const gas = spec.gas!;
@@ -385,6 +388,7 @@ function buildGas(
     emissive: gas.glow,
     clouds: false,
     storms: fp.storms,
+    sunWorld,
   });
   const mesh = surface.mesh;
   // Flattening from the spin (A7.2): the polar axis is shorter, so the silhouette is an ellipse.
@@ -771,6 +775,7 @@ export class ShaderBody implements BodyRenderer {
         this.motion,
         this.octaves,
         sampler,
+        this.sun,
       );
       return { group, frame, textures, field, points: null, runtime, sampler };
     }
