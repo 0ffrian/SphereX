@@ -44,6 +44,7 @@ import { requestField } from '../fields/fieldClient';
 import type { FieldData, FieldParams } from '../fields/fieldGenerator';
 import { spinRateRadPerSimS, type SimTimeFn } from '../motion/motion';
 import { jetPalette } from './jetPalette';
+import { srgbToLinear } from './linearColour';
 
 export interface BuildHooks {
   /** A mesh or texture failed to load: refuse the layer with this id. */
@@ -278,7 +279,7 @@ export function buildScene(
     if (plan.star && body.id === 'body') {
       const star = track(
         new StarBody(plan.star, {
-          tint: body.tint,
+          tint: srgbToLinear(body.tint),
           emissive: body.emissive,
           limbU: body.limbDarkening ? LIMB_DARKENING_U : null,
           octaves,
@@ -289,17 +290,9 @@ export function buildScene(
       star.group.position.set(...body.position);
       group.add(star.group);
       usesQuality = true;
-      // A Mira that pulses with the clock (Q-65): the period is data, the amplitude is art.
-      const pulse = plan.pulsation;
-      animators.push((time) => {
-        star.setTime(time);
-        if (pulse) {
-          const s =
-            1 +
-            pulse.amplitude * Math.sin((2 * Math.PI * time('pulsation')) / (pulse.periodD * 86400));
-          star.group.scale.set(body.axes[0] * s, body.axes[1] * s, body.axes[2] * s);
-        }
-      });
+      // The star turns itself (StarBody rotates its own frame by the spin clock), so it is not a
+      // `spinner`. A Mira has no star surface and is posed below.
+      animators.push((time) => star.setTime(time));
       continue;
     }
     const geometry = track(new SphereGeometry(1, body.segments[0], body.segments[1]));
@@ -316,7 +309,8 @@ export function buildScene(
       animators.push((time) => {
         const s =
           1 +
-          pulse.amplitude * Math.sin((2 * Math.PI * time('pulsation')) / (pulse.periodD * 86400));
+          pulse.amplitude *
+            Math.sin((2 * Math.PI * time('pulsation')) / (pulse.periodD * 86400) + pulse.phase);
         mesh.scale.set(body.axes[0] * s, body.axes[1] * s, body.axes[2] * s);
       });
     }
@@ -348,7 +342,7 @@ export function buildScene(
             bands: jp.bands,
             seed: fp.seed,
             turbulence: jp.turbulence,
-            palette: jetPalette(body.tint, jp.contrast),
+            palette: jetPalette(srgbToLinear(body.tint), jp.contrast),
             octaves,
             selfLit: true,
             emissive: body.emissive,
