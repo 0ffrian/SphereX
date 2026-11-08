@@ -126,6 +126,7 @@ describe('ViewerPanel', () => {
     expect(region()?.getAttribute('role')).toBe('status');
     expect(region()?.getAttribute('aria-live')).toBe('polite');
     expect(text('ir-jets-hint')).toBe(IR_JETS_HINT);
+    expect(button('Visible colour')?.getAttribute('aria-describedby')).toBe('ir-jets-hint');
     expect(text('ir-jets-hint')).not.toMatch(/\b[RAQD]-?\d/);
     // Visible view draws the jets: the region stays, the text goes.
     await click('Visible colour');
@@ -142,6 +143,25 @@ describe('ViewerPanel', () => {
     useAppStore.getState().setObject(other.card, other.params);
     await act(async () => {});
     await click('SPHEREx infrared');
+    expect(text('ir-jets-hint')).toBe('');
+  });
+
+  it('shows no hint when the brown dwarf jets are refused for missing methane depth', async () => {
+    const { card, params } = fixture('brown_dwarf');
+    const noDepth = { ...card, ch4_depth_33: undefined } as typeof card;
+    useAppStore.getState().setObject(noDepth, params);
+    useAppStore.getState().setHonesty('artistic');
+    await mount();
+    expect(canvasLabel()).toContain('SPHEREx infrared');
+    expect(text('ir-jets-hint')).toBe('');
+  });
+
+  it('shows no hint when the brown dwarf body is refused, since the visible view draws nothing', async () => {
+    const { card, params } = fixture('brown_dwarf');
+    const noSize = { ...card, radius_rjup: undefined } as typeof card;
+    useAppStore.getState().setObject(noSize, params);
+    useAppStore.getState().setHonesty('artistic');
+    await mount();
     expect(text('ir-jets-hint')).toBe('');
   });
 
