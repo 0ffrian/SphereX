@@ -291,7 +291,7 @@ export function ViewerPanel() {
   const lapses = plan ? timeLapsesOf(plan) : [];
   // One pause control for everything that moves (WCAG 2.2.2, R9). Under reduced motion the scene
   // starts paused and the button starts it.
-  const motionPaused = reducedMotion ? !playAnyway : spinPaused || idlePaused;
+  const motionPaused = (reducedMotion && !playAnyway) || spinPaused || idlePaused;
   const hiddenCount = plan?.missing.filter((m) => m.reason === 'honesty').length ?? 0;
 
   return (
@@ -538,11 +538,14 @@ export function ViewerPanel() {
               <button
                 type="button"
                 className={buttonClass}
-                aria-pressed={motionPaused}
                 onClick={() => {
-                  if (reducedMotion) setPlayAnyway((p) => !p);
-                  else if (idlePaused && !spinPaused) viewer?.resumeFromIdle?.();
-                  else setSpinPaused((p) => !p);
+                  if (motionPaused) {
+                    // Play: lift every pause that is on (reduced motion override, user, idle).
+                    if (reducedMotion && !playAnyway) setPlayAnyway(true);
+                    if (spinPaused) setSpinPaused(false);
+                    if (idlePaused) viewer?.resumeFromIdle?.();
+                  } else if (reducedMotion) setPlayAnyway(false);
+                  else setSpinPaused(true);
                 }}
               >
                 {motionPaused ? 'Play motion' : 'Pause motion'}

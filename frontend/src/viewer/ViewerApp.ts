@@ -702,6 +702,26 @@ export class ViewerApp {
     this.renderNow();
   }
 
+  /**
+   * Tier change and resize: the pipeline's targets or size changed, so on TAAU the history is
+   * restarted and the first loop frame is discarded, exactly as in `restartSettle`, so the settled
+   * frame is a function of content and not of which display frame this ran in. The one draw here is
+   * kept only so a resize (which clears the canvas) leaves no blank frame; it is discarded the same
+   * way as the first loop frame. SMAA draws and settles as before.
+   */
+  private renderNowPrimed(): void {
+    const chain = this.chain;
+    if (chain?.config.aa !== 'taau') {
+      this.renderNow();
+      return;
+    }
+    chain.restartTemporal();
+    this.draw();
+    this.primePending = true;
+    this.burstLeft = Math.max(this.burstLeft, this.settleFrames() + 1);
+    this.schedule();
+  }
+
   /** Draws now (no blank frame on resize) and starts a settle burst for temporal AA. */
   private renderNow(): void {
     this.draw();
@@ -736,6 +756,7 @@ export class ViewerApp {
       /* already broken */
     }
     this.chain = null;
+    this.primePending = false;
   }
 
   /** Builds the HDR pipeline and warms up the placeholder; a failure leaves plain rendering. */
@@ -782,7 +803,7 @@ export class ViewerApp {
       this.showPlan(this.lastPlan);
       return;
     }
-    this.renderNow();
+    this.renderNowPrimed();
   }
 
   /** Quality level, backend and frame-time percentiles of the continuous frames (tests, tuning). */
@@ -911,6 +932,7 @@ export class ViewerApp {
     this.clearBuilt();
     this.chain?.dispose();
     this.chain = null;
+    this.primePending = false;
     this.assets.dispose();
     this.motionQuery?.removeEventListener?.('change', this.onMotionChange);
     this.motionQuery = null;
@@ -936,8 +958,8 @@ export class ViewerApp {
     this.camera.updateProjectionMatrix();
     // Resizing the canvas clears its drawing buffer, and ResizeObserver callbacks run after this
     // frame's rAF callbacks, so a deferred render would leave one blank frame on screen. Render
-    // now instead (still only on change, R5.5).
-    this.renderNow();
+    // now instead (still only on change, R5.5); on TAAU the frame is primed (renderNowPrimed).
+    this.renderNowPrimed();
   }
 
   /**

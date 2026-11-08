@@ -21,6 +21,8 @@ const fake = {
   setSpinPaused: vi.fn(),
   setMotionOverride: vi.fn(),
   setQualityChangeHandler: vi.fn(),
+  setIdleChangeHandler: vi.fn(),
+  resumeFromIdle: vi.fn(),
   timeLapses: vi.fn(() => []),
   rotate: vi.fn(),
   zoom: vi.fn(),
@@ -293,7 +295,7 @@ describe('ViewerPanel', () => {
     useAppStore.getState().setObject(card, params);
     useAppStore.getState().setHonesty('artistic');
     await mount();
-    expect(button('Pause motion')?.getAttribute('aria-pressed')).toBe('false');
+    expect(button('Pause motion')?.hasAttribute('aria-pressed')).toBe(false);
     expect(button('Pause spin')).toBeUndefined();
     await click('Pause motion');
     expect(fake.setSpinPaused).toHaveBeenLastCalledWith(true);
@@ -321,13 +323,41 @@ describe('ViewerPanel', () => {
       card.shape_source = { value: '/meshes/bennu.glb', tag: 'measured', source: 'test' };
       useAppStore.getState().setObject(card, params);
       await mount();
-      expect(button('Play motion')?.getAttribute('aria-pressed')).toBe('true');
+      expect(button('Play motion')?.hasAttribute('aria-pressed')).toBe(false);
       expect(text('motion-status')).toContain('reduced motion');
       await click('Play motion');
       expect(fake.setMotionOverride).toHaveBeenLastCalledWith(true);
       expect(button('Pause motion')).toBeDefined();
       await click('Pause motion');
       expect(fake.setMotionOverride).toHaveBeenLastCalledWith(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('reduced motion, Play motion, then an idle pause: the button and status show the pause', async () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({
+      matches: q === '(prefers-reduced-motion: reduce)',
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    try {
+      const { card, params } = fixture('asteroid_shape');
+      card.shape_source = { value: '/meshes/bennu.glb', tag: 'measured', source: 'test' };
+      useAppStore.getState().setObject(card, params);
+      await mount();
+      await click('Play motion');
+      expect(button('Pause motion')).toBeDefined();
+      expect(text('motion-status')).toContain('Motion is playing');
+      const idle = fake.setIdleChangeHandler.mock.calls.at(-1)?.[0] as (i: boolean) => void;
+      await act(async () => idle(true));
+      expect(button('Play motion')).toBeDefined();
+      expect(button('Pause motion')).toBeUndefined();
+      expect(text('motion-status')).toContain('paused after a minute');
+      await click('Play motion');
+      expect(fake.resumeFromIdle).toHaveBeenCalled();
+      // The reduced-motion override stays on (the user asked for motion).
+      expect(fake.setMotionOverride).toHaveBeenLastCalledWith(true);
     } finally {
       vi.unstubAllGlobals();
     }
