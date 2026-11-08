@@ -516,6 +516,10 @@ export class ShaderBody implements BodyRenderer {
     this.onChange?.();
   }
 
+  setJitterFrame(index: number): void {
+    for (const v of this.volumes) v.setJitterFrame(index);
+  }
+
   setVisibleTags(tags: readonly Tag[]): void {
     if (this.disposed) return;
     this.visibleTags = tags;

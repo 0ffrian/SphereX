@@ -197,3 +197,17 @@ export function boxBasis(
   const y2 = norm(cross(z, x))!;
   return [x, y2, z];
 }
+
+/** Golden-ratio step: successive frames land far apart on the circle, whatever the length. */
+const GOLDEN_FRACTION = 0.6180339887498949;
+
+/**
+ * Jitter shift of the ray start for TAAU frame `index` (a pure function, so the settled frame
+ * after a restart (index 0) is always the same). Averaged over the 32-frame cycle, each pixel's
+ * ray starts sample 32 different offsets within one step.
+ */
+export function jitterShiftForFrame(index: number): number {
+  if (!Number.isFinite(index) || index < 0) return 0;
+  const v = (Math.floor(index) * GOLDEN_FRACTION) % 1;
+  return v;
+}

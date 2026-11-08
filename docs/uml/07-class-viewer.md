@@ -101,7 +101,10 @@ classDiagram
     emission-only ray-march in a box, interleavedGradientNoise jitter
     steps by quality level 96, 64, 40
     density from baked 48 cubed noise cube (noiseVolume.ts, deterministic)
+    sliced noise bake (no long task), empty until it arrives
+    depthTest on, depthWrite off, additive
     +setTier(t: TierName) void
+    +setJitterFrame(taauIndex: number) void
     +dispose() void
   }
   class AsteroidMesh {
@@ -109,9 +112,9 @@ classDiagram
     requires shape_source, diameter_km
     GLB or OBJ, max 50k triangles, D-05
     spin sped up, factor shown
-    three-mesh-bvh for raycast and baked AO
+    three-mesh-bvh for raycast and baked AO (BVH built in a worker on a copy, then sliced rays)
     ShapeMaterial: Lommel-Seeliger reflectance, Sun shadow map, baked_ao, regolith (tier 5)
-    lod0 and lod1 GLB by quality level
+    lod0 and lod1 GLB by quality level and on-screen size (160 px, hysteresis)
     real size in metres to the scale bar
   }
   class AsteroidProcedural {
@@ -247,7 +250,7 @@ classDiagram
 ## Notes
 
 - Render core (issue #39): `ViewerApp` draws through a `RenderChain` (`render/pipeline.ts`); if the chain cannot be built it falls back to plain `renderer.render`. New content is compiled with `RenderChain.compileAsync` before it is swapped in (diagram [10](10-sequence-view-3d.md)). The quality level (low, medium or high, `render/quality.ts`) sets bloom resolution, anti-aliasing (TAAU or SMAA), noise octaves and volume steps. `FrameGovernor` only lowers the quality level; `setQualityTier` picks one by hand. `SimClock` (`render/clock.ts`) holds one sim time per moving process (only the spin today) and the pause reasons shown in diagram [15](15-state-interaction.md). `renderStats`, `whenSettled` and `freezeClock` are test and tuning hooks; `timeLapses` lists each process with its shown speed-up. Motion and quality levels follow R5.7 and D-34; the implementation is Q-66 in [decisions](../decisions.md).
-- Shapes and volumes (issue #43): `RenderPlan.volumes` and `RenderPlan.shape` are new plan fields. `build.ts` makes a `VolumeBody` per volume and forwards `setTier` (via `BuiltScene.setTier`, called by `ViewerApp.setQualityTier`) so the ray-march step count follows the quality level. `buildLights` takes shadow settings (`shape/shapeModel.shadowSettings`) when `plan.shape.shadows` is set, and the renderer shadow map is enabled for it; `ViewerApp.setLights` disposes the shadow map of a light it replaces. The loaded model reports half of its longest box extent through `onMeshMeasured` (ignored if the scene is no longer current) so the scale bar and the screen-reader label (`canvasLabel(plan, shownSize)`) show the same real size. Volumes replace point sprites; the nebula and the nova make no point sets and have no haptics (Q-103). `ShaderBody` disposes each `VolumeHandle` (and its `Data3DTexture`) when it releases a surface. The remnant age slider in `ViewerPanel` calls `ViewerApp.setOverrides`.
+- Shapes and volumes (issue #43): `RenderPlan.volumes` and `RenderPlan.shape` are new plan fields. `build.ts` makes a `VolumeBody` per volume and forwards `setTier` (via `BuiltScene.setTier`, called by `ViewerApp.setQualityTier`) so the ray-march step count follows the quality level. `buildLights` takes shadow settings (`shape/shapeModel.shadowSettings`) when `plan.shape.shadows` is set, and the renderer shadow map is enabled for it; `ViewerApp.setLights` disposes the shadow map of a light it replaces. The loaded model reports half of its longest box extent through `onMeshMeasured` (ignored if the scene is no longer current) so the scale bar and the screen-reader label (`canvasLabel(plan, shownSize)`) show the same real size. Volumes replace point sprites; the nebula and the nova make no point sets and have no haptics (Q-103). `ShaderBody` disposes each `VolumeHandle` (and its `Data3DTexture`) when it releases a surface. The remnant age slider in `ViewerPanel` writes the store's D-02 `overrides.age_yr` (log-mapped input) and the panel passes the overrides to `ViewerApp.setOverrides`. `ViewerApp.draw` hands the TAAU frame index to `BuiltScene.setJitterFrame` and the body's on-screen size to `BuiltScene.setScreenPx` (160 px level of detail). `ViewerPanel` calls `showPlan` only when the plan changes; the canvas label follows the measured size in its own effect.
 - `WorkerPool` (`render/workerPool.ts`) and the fan-out loader (`render/fanout.ts`, `loadBody`) exist and are tested, but nothing in the viewer calls them yet.
 
 - Plan layer (issue #7): `ViewerApp.setObject` calls `planRender` to get a pure `RenderPlan`, and `showPlan` passes it to `renderers/build.ts`, which makes the three.js objects. The per-type renderer files hold the plan functions. `BodyRenderer` above is the conceptual contract; in code it is the plan function plus `build.ts`.

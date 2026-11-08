@@ -154,6 +154,12 @@ export interface BuiltScene {
    * the body in place, so a toggle never regenerates the field. A no-op for the baked kinds.
    */
   update(plan: RenderPlan): void;
+  /** Half the largest axis of the shape-model body in scene units, or null without one. */
+  readonly shapeRadius: number | null;
+  /** The body's on-screen diameter in CSS pixels (the 160 px level-of-detail rule); null = unknown. */
+  setScreenPx(px: number | null): void;
+  /** The TAAU frame index of the next frame (see BodyRenderer.setJitterFrame). */
+  setJitterFrame(index: number): void;
   /** The quality level changed: volume steps and octaves, model level of detail, displacement. */
   setTier(tier: TierName): void;
   dispose(): void;
@@ -269,6 +275,10 @@ export function buildScene(
   // Bodies --------------------------------------------------------------------------------
   let tier: TierName = hooks.tier ?? 'medium';
   const tierListeners: ((t: TierName) => void)[] = [];
+  // On-screen size of the shape model (the 160 px rule) and who re-chooses the level when it moves.
+  let screenPx: number | null = null;
+  const lodRefresh: (() => void)[] = [];
+  let shapeRadius: number | null = null;
   for (const body of plan.bodies) {
     const geometry = track(new SphereGeometry(1, body.segments[0], body.segments[1]));
     const material = track(bodyMaterial(body));
@@ -330,6 +340,7 @@ export function buildScene(
     // Real shape model (R7.1): replaces the placeholder sphere when it loads. Two levels of detail
     // (backend `<slug>.glb` and `<slug>.lod1.glb`); the quality level picks one.
     if (body.meshUrl) {
+      shapeRadius = Math.max(shapeRadius ?? 0, ...body.axes);
       const lods = lodUrls(body.meshUrl);
       const shape = plan.shape;
       let holder: Group | null = null;
@@ -447,12 +458,14 @@ export function buildScene(
           },
         );
       };
-      show(chooseLod(tier, null, lods.lod1 !== null));
-      tierListeners.push((t) => {
-        const want = chooseLod(t, null, lods.lod1 !== null);
-        // Also while the first model is still loading: a later tier change must not be lost.
+      const refresh = () => {
+        const want = chooseLod(tier, screenPx, lods.lod1 !== null, wanted);
+        // Also while the first model is still loading: a later change must not be lost.
         if (want !== wanted) show(want);
-      });
+      };
+      show(chooseLod(tier, screenPx, lods.lod1 !== null));
+      tierListeners.push(refresh); // `tier` is already the new level when listeners run
+      lodRefresh.push(refresh);
     }
   }
 
@@ -482,6 +495,7 @@ export function buildScene(
   const volumes = plan.volumes.map((v) => track(createVolume(v, tier)));
   for (const v of volumes) group.add(v.mesh);
   tierListeners.push((t) => volumes.forEach((v) => v.setTier(t)));
+  const jitterFrame = (i: number) => volumes.forEach((v) => v.setJitterFrame(i));
 
   // Disc, dust screen, trail ---------------------------------------------------------------
   for (const disc of plan.discs) {
@@ -545,6 +559,16 @@ export function buildScene(
       if (!shaderBody || disposed) return;
       if (next.lighting.direction) shaderBody.setSunDirection(next.lighting.direction);
       shaderBody.setVisibleTags(allowedTags(next.honesty));
+    },
+    shapeRadius,
+    setScreenPx(px) {
+      if (disposed || px === screenPx) return;
+      screenPx = px;
+      for (const r of lodRefresh) r();
+    },
+    setJitterFrame(index) {
+      jitterFrame(index);
+      shaderBody?.setJitterFrame(index);
     },
     setTier(next) {
       if (disposed || next === tier) return;

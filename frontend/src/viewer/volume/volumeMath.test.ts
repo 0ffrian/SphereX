@@ -7,6 +7,7 @@ import {
   DUST_TAIL_BEND,
   dustTailCurve,
   interleavedGradientNoise,
+  jitterShiftForFrame,
   ionTailDirection,
   outlineAxes,
   rayBox,
@@ -226,5 +227,26 @@ describe('boxBasis (tail box orientation)', () => {
   it('keeps +x along the axis and refuses a zero axis', () => {
     expect(boxBasis([0, 0, 2], null)![0]).toEqual([0, 0, 1]);
     expect(boxBasis([0, 0, 0], null)).toBeNull();
+  });
+});
+
+describe('jitter shift by TAAU frame', () => {
+  it('starts at 0 after a restart and is a pure function of the frame index', () => {
+    expect(jitterShiftForFrame(0)).toBe(0);
+    expect(jitterShiftForFrame(7)).toBe(jitterShiftForFrame(7));
+  });
+  it('a 32-frame cycle covers 32 distinct offsets in [0, 1), well spread', () => {
+    const v = Array.from({ length: 32 }, (_, i) => jitterShiftForFrame(i));
+    expect(new Set(v).size).toBe(32);
+    for (const x of v) {
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(x).toBeLessThan(1);
+    }
+    // Low discrepancy: the mean of the offsets is near 1/2, so the average samples evenly.
+    expect(Math.abs(v.reduce((a, b) => a + b, 0) / 32 - 0.5)).toBeLessThan(0.05);
+  });
+  it('treats an invalid index as no shift', () => {
+    expect(jitterShiftForFrame(NaN)).toBe(0);
+    expect(jitterShiftForFrame(-3)).toBe(0);
   });
 });

@@ -29,18 +29,51 @@ export const SHAPE_TRIANGLE_BUDGET = 50_000;
  */
 export const LOD1_MAX_SCREEN_PX = 160;
 
+/**
+ * Hysteresis of the 160 px rule: a body on the coarse level goes back to full detail only above
+ * this many times `LOD1_MAX_SCREEN_PX`, so a zoom that hovers around the limit does not reload
+ * the model every frame. Display choice.
+ */
+export const LOD_HYSTERESIS = 1.25;
+
 export type LodLevel = 0 | 1;
+
+/**
+ * On-screen diameter in CSS pixels of a body of scene radius `radius` seen from `distance` with a
+ * vertical field of view of `fovDeg` in a viewport `viewportPx` tall. Null if any input is not a
+ * positive finite number (the 160 px rule then does not apply). Pure.
+ */
+export function bodyScreenPx(
+  radius: number,
+  distance: number,
+  fovDeg: number,
+  viewportPx: number,
+): number | null {
+  const ok = [radius, distance, fovDeg, viewportPx].every((v) => Number.isFinite(v) && v > 0);
+  if (!ok || fovDeg >= 180) return null;
+  const visibleHeight = 2 * distance * Math.tan((fovDeg * Math.PI) / 360);
+  return ((2 * radius) / visibleHeight) * viewportPx;
+}
 
 /**
  * Level of detail to draw. The low quality level (phones, WebGL2) takes the coarse model so the
  * frame budget holds (R5.7); other levels take full detail unless the body is small on screen.
  * `screenPx` is the body's on-screen diameter in CSS pixels, when known. Falls back to level 0 when
- * the coarse file does not exist (`hasLod1` false).
+ * the coarse file does not exist (`hasLod1` false). `current` is the level now drawn: with it, the
+ * coarse level is kept until the body is `LOD_HYSTERESIS` times larger than the limit.
  */
-export function chooseLod(tier: TierName, screenPx: number | null, hasLod1: boolean): LodLevel {
+export function chooseLod(
+  tier: TierName,
+  screenPx: number | null,
+  hasLod1: boolean,
+  current: LodLevel | null = null,
+): LodLevel {
   if (!hasLod1) return 0;
   if (tier === 'low') return 1;
-  if (screenPx !== null && screenPx > 0 && screenPx < LOD1_MAX_SCREEN_PX) return 1;
+  if (screenPx !== null && screenPx > 0) {
+    if (screenPx < LOD1_MAX_SCREEN_PX) return 1;
+    if (current === 1 && screenPx < LOD1_MAX_SCREEN_PX * LOD_HYSTERESIS) return 1;
+  }
   return 0;
 }
 

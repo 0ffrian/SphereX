@@ -49,8 +49,8 @@ import {
 } from 'three/tsl';
 import type { VolumePlan } from '../planTypes';
 import { TIERS, type TierName } from '../render/quality';
-import { NOISE_VOLUME_SIZE, noiseVolumeData } from './noiseVolume';
-import { boxBasis, comaDensity } from './volumeMath';
+import { NOISE_VOLUME_SIZE, noiseVolumeAsync, noiseVolumeCached } from './noiseVolume';
+import { boxBasis, comaDensity, jitterShiftForFrame } from './volumeMath';
 
 /** Emission gain at gain 1 (display choice, artistic). */
 const EMISSION_GAIN = 2.2;
@@ -165,6 +165,16 @@ function fieldFor(
   }
 }
 
+const readyListeners = new Set<() => void>();
+/**
+ * Called when a volume's noise cube arrives after the volume was built (the sliced bake finished),
+ * so the viewer can draw again and restart its settle burst. Returns the unsubscribe function.
+ */
+export function onVolumeNoiseReady(listener: () => void): () => void {
+  readyListeners.add(listener);
+  return () => void readyListeners.delete(listener);
+}
+
 export interface VolumeHandle {
   readonly mesh: Mesh;
   /** Changes the step count for a quality level. */
@@ -173,6 +183,8 @@ export interface VolumeHandle {
   setShell(fraction: number): void;
   /** Extra per-frame jitter offset in [0, 1), so TAAU averages different samples (default 0). */
   setJitterShift(shift: number): void;
+  /** The TAAU frame index of the frame about to be drawn: sets the jitter shift from it. */
+  setJitterFrame(index: number): void;
   dispose(): void;
 }
 
@@ -187,13 +199,20 @@ function poseBox(mesh: Mesh, plan: VolumePlan): void {
   mesh.position.set(...plan.center);
 }
 
-function noiseTexture(seed: number): Data3DTexture {
-  const t = new Data3DTexture(
-    noiseVolumeData(seed),
-    NOISE_VOLUME_SIZE,
-    NOISE_VOLUME_SIZE,
-    NOISE_VOLUME_SIZE,
-  );
+/**
+ * The noise cube as a texture. A cached cube is used at once; otherwise the texture starts as
+ * all zeros (no emission, nothing drawn) and the sliced bake (noiseVolume.ts, no long task) fills
+ * it in. `onReady` runs when the data arrives, so the viewer can draw the settled frame again.
+ */
+function noiseTexture(
+  seed: number,
+  isCancelled: () => boolean,
+  onReady: () => void,
+): Data3DTexture {
+  const cached = noiseVolumeCached(seed);
+  const n = NOISE_VOLUME_SIZE;
+  const data = cached ?? new Uint8Array(n * n * n * 4);
+  const t = new Data3DTexture(data, n, n, n);
   t.format = RGBAFormat;
   t.type = UnsignedByteType;
   t.minFilter = LinearFilter;
@@ -201,21 +220,38 @@ function noiseTexture(seed: number): Data3DTexture {
   t.wrapS = t.wrapT = t.wrapR = RepeatWrapping;
   t.unpackAlignment = 1;
   t.needsUpdate = true;
+  if (!cached) {
+    void noiseVolumeAsync(seed, isCancelled).then((baked) => {
+      if (!baked || isCancelled()) return;
+      (t.image.data as Uint8Array).set(baked);
+      t.needsUpdate = true;
+      onReady();
+    });
+  }
   return t;
 }
 
 export function createVolume(plan: VolumePlan, tier: TierName): VolumeHandle {
+  let disposed = false;
   const steps = uniform(TIERS[tier].volumeSteps, 'int');
   const shell = uniform(plan.shell);
   const jitterShift = uniform(0);
   const geometry = new BoxGeometry(2, 2, 2);
-  const noiseTex = noiseTexture(plan.seed);
+  const noiseTex = noiseTexture(
+    plan.seed,
+    () => disposed,
+    () => readyListeners.forEach((l) => l()),
+  );
   const material = new MeshBasicNodeMaterial({
     transparent: true,
     blending: AdditiveBlending,
+    // Tested against the opaque bodies (the nucleus hides what is behind it) but never written,
+    // so volumes still add up. The far faces are drawn (BackSide), so a camera inside the box
+    // still works; the test uses the far face's depth, so a pixel the nucleus covers drops the
+    // volume in front of the nucleus there as well (the nucleus is small and bright).
     depthWrite: false,
-    depthTest: false,
-    side: BackSide, // the far faces are drawn, so a camera inside the box still works
+    depthTest: true,
+    side: BackSide,
   });
   const mesh = new Mesh(geometry, material);
   mesh.name = plan.id;
@@ -274,7 +310,11 @@ export function createVolume(plan: VolumePlan, tier: TierName): VolumeHandle {
     setJitterShift(shift) {
       jitterShift.value = shift - Math.floor(shift);
     },
+    setJitterFrame(index) {
+      jitterShift.value = jitterShiftForFrame(index);
+    },
     dispose() {
+      disposed = true;
       geometry.dispose();
       material.dispose();
       noiseTex.dispose();

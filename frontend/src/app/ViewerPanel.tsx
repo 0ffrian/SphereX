@@ -36,6 +36,16 @@ import { buttonClass, pressedClass } from './ui';
 const NO_FAILED: readonly string[] = [];
 const AGE_SLIDER = SLIDER_REGISTRY.age_yr;
 
+/** The age slider runs on log10(years): one key press is the same relative change everywhere. */
+const AGE_LOG_MIN = Math.log10(AGE_SLIDER.min);
+const AGE_LOG_MAX = Math.log10(AGE_SLIDER.max);
+const AGE_LOG_STEP = 0.01;
+/** Years from a slider position, rounded to 3 significant digits and kept inside the range. */
+export function ageFromLog(pos: number): number {
+  const years = Number(Math.pow(10, pos).toPrecision(3));
+  return Math.min(AGE_SLIDER.max, Math.max(AGE_SLIDER.min, years));
+}
+
 /** "1,200 years", "10 years". */
 function formatYears(n: number): string {
   return `${n.toLocaleString('en')} ${n === 1 ? 'year' : 'years'}`;
@@ -61,8 +71,6 @@ interface Choices {
   mode: ViewModeId | null;
   epoch: CometEpoch | null;
   scrub: number;
-  /** Remnant age from the slider, in years; null = the largest (the default shell). */
-  age: number | null;
 }
 
 /** Said (live region) when the governor lowers the render quality. */
@@ -97,14 +105,14 @@ export function ViewerPanel() {
     mode: null,
     epoch: null,
     scrub: 0,
-    age: null,
   });
   const choices: Choices =
-    stored.key === objectKey
-      ? stored
-      : { key: objectKey, mode: null, epoch: null, scrub: 0, age: null };
+    stored.key === objectKey ? stored : { key: objectKey, mode: null, epoch: null, scrub: 0 };
   const modeChoice = choices.mode;
-  const ageChoice = choices.age;
+  // The remnant age is a D-02 override in the store, so the store's reset clears it.
+  const overrides = useAppStore((s) => s.overrides);
+  const setOverride = useAppStore((s) => s.setOverride);
+  const ageChoice = typeof overrides.age_yr === 'number' ? overrides.age_yr : null;
   const scrubIndex = choices.scrub;
   const epochsWithData = useMemo(
     () => (card && params?.type === 'comet' ? epochsWithQ(card) : []),
@@ -143,10 +151,14 @@ export function ViewerPanel() {
   // measured size, so the scale bar shows it instead of the catalogue diameter (Eros at real size).
   const [meshSize, setMeshSize] = useState<{ key: string; radiusM: number } | null>(null);
   const meshRadiusM = meshSize?.key === objectKey ? meshSize.radiusM : null;
-  const size = useMemo(
-    () => (plan ? shownSize(plan, meshRadiusM, honesty) : null),
-    [plan, meshRadiusM, honesty],
-  );
+  const remnantShown = plan?.type === 'nova' && plan.drawn.some((l) => l.id === 'point_cloud');
+  const size = useMemo(() => {
+    if (!plan) return null;
+    const s = shownSize(plan, meshRadiusM, honesty);
+    // The age slider shrinks the drawn shell (to 3%), so the card's size is the shell at the
+    // slider maximum: say so in the bar, the label and the announcements (Q-103).
+    return remnantShown ? { ...s, atSliderMax: true } : s;
+  }, [plan, meshRadiusM, honesty, remnantShown]);
   const bar = useMemo(() => (size ? scaleBarFor(size.radiusM, size.qualifier) : null), [size]);
 
   // Mount the renderer once.
@@ -258,21 +270,25 @@ export function ViewerPanel() {
   // The remnant age slider (D-27): moves the drawn shell without a rebuild, and is kept for the
   // next build. Before the plan effect below, so a new object starts from its own value.
   useEffect(() => {
-    viewer?.setOverrides?.(ageChoice === null ? {} : { age_yr: ageChoice });
-  }, [viewer, ageChoice]);
+    viewer?.setOverrides?.(overrides);
+  }, [viewer, overrides]);
 
   // The pause choice is the user's; the viewer keeps it across rebuilds.
   useEffect(() => {
     viewer?.setSpinPaused(spinPaused);
   }, [viewer, spinPaused]);
 
-  // Draw the plan, and keep the canvas label in step with it (R9).
+  // Draw the plan. Not keyed on the measured size: a size report for the same plan must not
+  // re-run showPlan (it would reallocate the shadow map, rebuild lit pipelines and reset TAA).
   useEffect(() => {
-    if (viewer) {
-      if (plan) viewer.showPlan(plan);
-      else viewer.clearObject();
-    }
-    // The label reads the same size as the scale bar (the model's own size for a shape model).
+    if (!viewer) return;
+    if (plan) viewer.showPlan(plan);
+    else viewer.clearObject();
+  }, [viewer, plan]);
+
+  // The canvas label (R9) reads the same size as the scale bar (the model's own size for a shape
+  // model). Also after `viewer` is set, since that is when the canvas exists.
+  useEffect(() => {
     canvasRef.current?.setAttribute('aria-label', canvasLabel(plan, size));
   }, [viewer, plan, size]);
 
@@ -302,10 +318,9 @@ export function ViewerPanel() {
   };
   // Not announced here: the slider's own value text is read by screen readers when it moves.
   const onScrub = (i: number) => setChoices({ ...choices, scrub: i });
-  const onAge = (years: number) => setChoices({ ...choices, age: years });
+  const onAge = (pos: number) => setOverride('age_yr', ageFromLog(pos));
 
   // The age slider shows only while the remnant is drawn (it is an artist's impression).
-  const remnantShown = plan?.type === 'nova' && plan.drawn.some((l) => l.id === 'point_cloud');
   const age = ageChoice ?? AGE_SLIDER.max;
 
   const nothingDrawn = plan && plan.threeD && !showsBody(plan) ? nothingDrawnReason(plan) : null;
@@ -506,25 +521,28 @@ export function ViewerPanel() {
           )}
 
           {remnantShown && (
-            <label className="flex flex-col gap-1 text-sm text-neutral-300">
+            <div className="flex flex-col gap-1 text-sm text-neutral-300">
               <span className="flex flex-wrap items-center gap-2">
-                Age of the remnant: {formatYears(age)}
+                <span id={`${whyId}-age`}>Age of the remnant</span>
                 <ProvenanceBadge tag="artistic" fixture={objectIsFixture} />
               </span>
               <input
                 type="range"
-                min={AGE_SLIDER.min}
-                max={AGE_SLIDER.max}
-                step={AGE_SLIDER.step}
-                value={age}
+                min={AGE_LOG_MIN}
+                max={AGE_LOG_MAX}
+                step={AGE_LOG_STEP}
+                value={Math.log10(age)}
                 className="min-h-11 w-full max-w-xl"
+                aria-labelledby={`${whyId}-age`}
+                aria-describedby={`${whyId}-age-hint`}
                 aria-valuetext={`${formatYears(age)} old`}
                 onChange={(e) => onAge(Number(e.target.value))}
               />
-              <span className="text-xs text-neutral-400">
-                Your choice, not a measurement. The shell is drawn smaller when it is younger.
+              <span id={`${whyId}-age-hint`} className="text-xs text-neutral-400">
+                Your choice, not a measurement. The shell is drawn smaller when it is younger, so
+                the size shown is the shell at the slider maximum.
               </span>
-            </label>
+            </div>
           )}
 
           {bar && (
@@ -541,6 +559,7 @@ export function ViewerPanel() {
               </div>
               <figcaption className="text-sm text-neutral-200">
                 {bar.headline}
+                {size?.atSliderMax && ' at the slider maximum'}
                 {bar.qualifier === 'upper_limit' && ' (upper limit)'}
                 {size?.tag && (
                   <>

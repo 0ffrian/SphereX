@@ -107,7 +107,7 @@ describe('scale bar (R5.4)', () => {
   });
 
   it('gives the size, one comparison and bar fractions that fit', () => {
-    const bar = scaleBarFor(5000)!; // radius 5 km: 10 km across
+    const bar = scaleBarFor(5000)!; // radius 5 km: 10 km long
     expect(bar.diameterText).toBe('10 km');
     expect(bar.comparison.name).toBe('Le Morne Brabant');
     expect(bar.comparison.text).toMatch(/times Le Morne Brabant \(556 m tall\)/);
@@ -153,7 +153,7 @@ describe('alt text and announcements (R9)', () => {
     const alt = buildAltText(plan);
     expect(alt.startsWith(`${card.name}, asteroid with a shape model, `)).toBe(true);
     expect(alt).toContain('asteroid with a shape model');
-    expect(alt).toContain('10 km across (measured)');
+    expect(alt).toContain('10 km long (measured)');
     expect(alt).toContain('colour from Gaia (estimated)');
     expect(alt).toContain('viewed at 30°');
     // A plain sphere has no relief to describe.
@@ -176,16 +176,16 @@ describe('alt text and announcements (R9)', () => {
     const plan = planRender(card, params, defaultContext({ epoch: '2025-08' }));
     expect(plan.sizeQualifier).toBe('upper_limit');
     const alt = buildAltText(plan);
-    expect(alt).toContain('at most 2 km across (upper limit, measured)');
-    expect(alt).not.toContain(', 2 km across');
+    expect(alt).toContain('at most 2 km long (upper limit, measured)');
+    expect(alt).not.toContain(', 2 km long');
     // August has no dust, so the infrared colour is applied to nothing and is not named.
     expect(plan.tintUsed).toBe(false);
     expect(alt).not.toContain('infrared false colour');
     expect(alt).not.toContain('Surface relief');
     const bar = scaleBarFor(plan.scaleM, plan.sizeQualifier)!;
-    expect(bar.headline).toBe('At most 2 km across');
+    expect(bar.headline).toBe('At most 2 km long');
     expect(bar.comparison.text).toMatch(/^at most about /);
-    expect(scaleBarFor(plan.scaleM)!.headline).toBe('2 km across');
+    expect(scaleBarFor(plan.scaleM)!.headline).toBe('2 km long');
   });
 
   it('the candidate label is a full sentence with no controls help', () => {

@@ -13,7 +13,7 @@ export function isGltfUrl(url: string | null | undefined): boolean {
  */
 export const MODEL_SIZE_TAG: Tag = 'model_dependent';
 export const MODEL_SIZE_WHY =
-  'The size of the loaded shape model, measured across its widest part, in metres. The model is fitted to observations, so the size depends on it.';
+  'The longest extent of the loaded shape model (its units are metres). The model is fitted to observations, so the size depends on it.';
 
 export interface ShownSize {
   radiusM: number | null;
@@ -22,6 +22,11 @@ export interface ShownSize {
   qualifier: 'upper_limit' | null;
   /** True when the size comes from the loaded model, not from the card. */
   fromModel: boolean;
+  /**
+   * True when the remnant age slider can draw the shell smaller than this size (Q-103): the size
+   * is then the shell at the slider maximum. Set by the caller, not by `shownSize`.
+   */
+  atSliderMax?: boolean;
 }
 
 /**
@@ -47,6 +52,9 @@ export function shownSize(
     plan.scaleM !== null && // the size is hidden by the honesty level: no bar from the model either
     plan.bodies.some((b) => isGltfUrl(b.meshUrl)) &&
     isTagShown(honesty, MODEL_SIZE_TAG);
+  // The card's `upper_limit` qualifier (R7.3) is about the card's size. A loaded model's own size
+  // is a fitted extent, not a bound, so it legitimately drops the qualifier and carries its own
+  // tag and why-text instead (Q-103). When the card size is shown, its qualifier is kept below.
   if (usable)
     return {
       radiusM: modelRadiusM,
@@ -86,10 +94,10 @@ export const COMPARISONS: readonly Comparison[] = [
 ];
 
 export interface ScaleBar {
-  /** Diameter of the body in metres (2 x scale_m). */
+  /** Longest extent of the body in metres (2 x scale_m). */
   diameterM: number;
   diameterText: string;
-  /** "2 km across", or "at most 2 km across" for an upper limit. */
+  /** "2 km long", or "at most 2 km long" for an upper limit. */
   headline: string;
   qualifier: 'upper_limit' | null;
   comparison: { id: string; name: string; detail: string; lengthM: number; text: string };
@@ -147,7 +155,7 @@ export function scaleBarFor(
   return {
     diameterM,
     diameterText: formatLength(diameterM),
-    headline: `${qualifier === 'upper_limit' ? 'At most ' : ''}${formatLength(diameterM)} across`,
+    headline: `${qualifier === 'upper_limit' ? 'At most ' : ''}${formatLength(diameterM)} long`,
     qualifier,
     comparison: { id: c.id, name: c.name, detail: c.detail, lengthM: c.lengthM, text },
     bodyFraction: diameterM / longest,
