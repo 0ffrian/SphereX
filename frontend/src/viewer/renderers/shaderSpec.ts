@@ -59,6 +59,23 @@ export function shaderDistance(spec: Pick<ShaderSpec, 'kind' | 'gas'>): number {
   return DISTANCE.world;
 }
 
+/**
+ * Issue #62, D-32: a gas giant's surface is five layers, one per rung of the tier chain, so the
+ * honesty toggle (D-21) can show each at its own level: `bands`, `flattening`, `colour` and `storms`
+ * from "+ Estimated", `turbulence` only with "+ Artistic". The backend offers them (stage 7).
+ */
+export const GAS_LAYER_IDS = ['bands', 'flattening', 'colour', 'storms', 'turbulence'] as const;
+export type GasLayerId = (typeof GAS_LAYER_IDS)[number];
+/** Which gas layers are drawn. Every key is a layer id of `GAS_LAYER_IDS`. */
+export type GasSwitches = Readonly<Record<GasLayerId, boolean>>;
+export const NO_GAS_LAYERS: GasSwitches = {
+  bands: false,
+  flattening: false,
+  colour: false,
+  storms: false,
+  turbulence: false,
+};
+
 export function isShaderKind(t: ObjectType): t is ShaderKind {
   return (SHADER_KINDS as readonly string[]).includes(t);
 }
@@ -69,6 +86,16 @@ const PLANET_DEFAULTS = {
   planet_water: { freq: 2, sea: 0.58, ice: 0.22, heat: 0, relief: 0.054, cloud: 0.7, atmo: 0.85 },
 } as const;
 const GAS_DEFAULTS = { bands: 12, turbulence: 0.5, storms: 5, rings: 0 } as const;
+
+/**
+ * Typical values of a giant planet that stand in for a spin or a jet speed the card does not have
+ * (D-32 tier 3, always stated in `assumed`). Twins of `TYPICAL_SPIN_H`, `TYPICAL_ZONAL_WIND_MS`
+ * in `backend/app/core/render/gas_giant.py`. Both [verify]: Jupiter's sidereal rotation period
+ * (NASA Planetary Fact Sheet) and the 50 m/s that A7.2 uses as its Jupiter example. `null` would
+ * refuse the rule (nothing invented).
+ */
+export const TYPICAL_GAS_SPIN_H: number | null = 9.925;
+export const TYPICAL_GAS_WIND_MS: number | null = 50;
 
 /**
  * A choice that came from a rule or an analogue, with where it came from (D-32, R3.4). The look of
@@ -126,10 +153,17 @@ export interface GasStyle {
 export interface ShaderSpec {
   kind: ShaderKind;
   seed: number;
-  /** 'surface' for planets and gas giants, 'point_cloud' for nebula and nova. */
-  layerId: 'surface' | 'point_cloud';
-  /** R7.7: always `artistic`. */
+  /** 'surface' for planets, 'point_cloud' for nebula and nova, 'bands' (the first) for a gas giant. */
+  layerId: 'surface' | 'point_cloud' | GasLayerId;
+  /** Every layer id of the body: `GAS_LAYER_IDS` for a gas giant, else just `layerId`. */
+  layerIds: readonly string[];
+  /** R7.7: the surface of a planet, nebula or nova is always `artistic`. A gas giant's layers carry their own tags (`gasLayers`). */
   tag: Extract<Tag, 'artistic'>;
+  /**
+   * Gas giants: the layers the backend offers that can be drawn (not listed missing, every field
+   * they require on the card), with their tags. Null for every other kind.
+   */
+  gasLayers: Partial<Record<GasLayerId, Tag>> | null;
   /** False when the layer was refused. */
   drawable: boolean;
   /** Physical radius in metres (`RenderParams.scale_m`), for the rates that need it. */
@@ -171,25 +205,50 @@ export function resolveShaderSpec(
   if (!isShaderKind(kind) || card.type !== kind) {
     throw new TypeError(`ShaderBody: not a shader kind pair (card ${card.type}, params ${kind})`);
   }
-  const layerId = kind === 'nebula' || kind === 'nova' ? 'point_cloud' : 'surface';
+  const gasKind = kind === 'gas_giant';
+  const layerId = gasKind
+    ? GAS_LAYER_IDS[0]
+    : kind === 'nebula' || kind === 'nova'
+      ? 'point_cloud'
+      : 'surface';
+  const layerIds: readonly string[] = gasKind ? GAS_LAYER_IDS : [layerId];
   const missing = new Set(params.missing);
 
-  const layer = params.layers.find((l) => l.id === layerId);
   // A layer the backend lists as missing is refused, as the plan does (planCommon `draw`).
-  let drawable = layer !== undefined && !params.missing.includes(layerId);
-  if (layer) {
-    for (const req of layer.requires) if (cardValue(card, req) === null) drawable = false;
+  const usable = (id: string): Tag | null => {
+    const layer = params.layers.find((l) => l.id === id);
+    if (layer === undefined || params.missing.includes(id)) return null;
+    for (const req of layer.requires) if (cardValue(card, req) === null) return null;
+    return layer.tag;
+  };
+  const gasLayers: Partial<Record<GasLayerId, Tag>> | null = gasKind ? {} : null;
+  let drawable: boolean;
+  if (gasLayers) {
+    for (const id of GAS_LAYER_IDS) {
+      const t = usable(id);
+      if (t !== null) gasLayers[id] = t;
+    }
+    drawable = Object.keys(gasLayers).length > 0;
+  } else {
+    drawable = usable(layerId) !== null;
   }
   if (cardValue(card, REQUIRED_CARD_FIELD[kind]) === null) drawable = false;
   // Q-33: an unknown size means the body is refused, never guessed.
   if (params.scale_m === null || !(params.scale_m > 0)) drawable = false;
-  if (!drawable) missing.add(layerId);
+  if (!drawable) for (const id of layerIds) missing.add(id);
+  else if (gasLayers) {
+    // A layer that cannot be drawn is refused on its own; the others still are.
+    for (const id of GAS_LAYER_IDS)
+      if (gasLayers[id] === undefined && params.layers.some((l) => l.id === id)) missing.add(id);
+  }
 
   const base = {
     kind,
     seed: params.seed,
     layerId,
+    layerIds,
     tag: FIELD_TAG,
+    gasLayers,
     drawable,
     scaleM: params.scale_m,
   } as const;
@@ -265,6 +324,11 @@ export function resolveShaderSpec(
   });
 }
 
+/** A typical value standing in for a missing rate: `model_dependent`, or null when it is [verify]. */
+function typicalRate(value: number | null): { value: number; tag: Tag } | null {
+  return value === null ? null : { value, tag: 'model_dependent' };
+}
+
 /**
  * A7.2 Rhines band count, `N ~ sqrt(2 Omega R / U)`, from the spin and the jet speed (both from
  * `dynamics`, each with its own tier) and the radius. `N` counts bands pole to pole; the field's
@@ -273,8 +337,10 @@ export function resolveShaderSpec(
  * than `derived` (an order of magnitude only, A7.2). Null when an input is missing: nothing is invented.
  */
 export function rhinesBands(motion: Motion, scaleM: number | null): RuleChoice | null {
-  const spin = motion.rates.spin_period_h;
-  const wind = motion.rates.jet_speed_ms;
+  // A rate the card or `dynamics` does not give is the typical value of a giant planet (D-32 tier
+  // 3), stated in `assumed`; the backend's `bands` layer says the same (gas_giant.py).
+  const spin = motion.rates.spin_period_h ?? typicalRate(TYPICAL_GAS_SPIN_H);
+  const wind = motion.rates.jet_speed_ms ?? typicalRate(TYPICAL_GAS_WIND_MS);
   if (!spin || !wind || scaleM === null || !(scaleM > 0)) return null;
   const omega = spinRateRadS(spin.value);
   const n = omega === null ? null : bandCount(omega, scaleM, Math.abs(wind.value));
@@ -297,8 +363,9 @@ export function rhinesBands(motion: Motion, scaleM: number | null): RuleChoice |
 /**
  * A7.2 flattening `f = 0.7 q`, `q = Omega^2 R^3 / (G M)`. The card has no mass, so the order is:
  * a mass from the `mass_mearth` slider with the spin (the visitor's choice: `artistic`, the formula
- * kept); the spin with Jupiter's mean density assumed, `f = f_J (P_J / P)^2` (tier 3 or weaker);
- * Jupiter's flattening as an analogue when the spin is unknown (tier 4). Capped at `FLATTENING_MAX`.
+ * kept); the spin with Jupiter's mean density assumed, `f = f_J (P_J / P)^2` (tier 3 or weaker),
+ * the spin being the typical one of a giant planet when the card has none (issue #62). Null only if
+ * that typical value is [verify] (null). Capped at `FLATTENING_MAX`.
  */
 export function flatteningRule(
   motion: Motion,
@@ -322,23 +389,22 @@ export function flatteningRule(
       };
     }
   }
-  if (spin) {
-    const tag = weakestTag(['model_dependent', spin.tag]);
+  // Without a spin the typical one stands in (the backend's `flattening` layer says the same).
+  const used = spin ?? typicalRate(TYPICAL_GAS_SPIN_H);
+  if (used) {
+    const tag = weakestTag(['model_dependent', used.tag]);
     return {
-      value: cap(JUPITER_FLATTENING * (JUPITER_SPIN_H / spin.value) ** 2),
+      value: cap(JUPITER_FLATTENING * (JUPITER_SPIN_H / used.value) ** 2),
       tag,
       tier: TIER_OF_TAG[tag],
       formula: 'f = f_J (P_J / P)^2, from f = 0.7 q with q proportional to Omega^2',
-      assumed: { mean_density: 'same as Jupiter', spin_period_h: spin.value },
-      basis: 'Flattening from the spin, with a Jupiter-like mean density assumed',
+      assumed: { mean_density: 'same as Jupiter', spin_period_h: used.value },
+      basis: spin
+        ? 'Flattening from the spin, with a Jupiter-like mean density assumed'
+        : 'Flattening from the typical spin of a giant planet, with a Jupiter-like mean density assumed',
     };
   }
-  return {
-    value: JUPITER_FLATTENING,
-    tag: 'inferred_from_analog',
-    tier: 4,
-    basis: 'Flattening of Jupiter, used as a typical value because the spin is not known',
-  };
+  return null;
 }
 
 /**

@@ -264,19 +264,23 @@ describe('fixture /data files (issue #62)', () => {
     ]);
   });
 
-  it.each(textured.flatMap((p) => Object.entries(p.textures!).map(([k, u]) => [k, u])))(
-    '%s %s is served with its content type',
-    (key, url) => {
-      const r = get(url);
-      expect(r.status).toBe(200);
-      expect(r.headers['content-type']).toBe(TYPES[key]);
-      const b = bytes(url);
-      if (key === 'albedo') expect([ascii(b, 0, 4), ascii(b, 8, 12)]).toEqual(['RIFF', 'WEBP']);
-      if (key === 'height' || key === 'normal')
-        expect(Array.from(b.subarray(0, 8))).toEqual(Array.from(PNG_SIGNATURE));
-      if (key === 'height_bin') expect(b.length).toBe(2 * 512 * 256); // float16, W x H
-    },
-  );
+  // `relief_amp` is a number (R7.2), not a file.
+  it.each(
+    textured.flatMap((p) =>
+      Object.entries(p.textures!)
+        .filter(([, u]) => typeof u === 'string')
+        .map(([k, u]) => [k, u]),
+    ),
+  )('%s %s is served with its content type', (key, url) => {
+    const r = get(url);
+    expect(r.status).toBe(200);
+    expect(r.headers['content-type']).toBe(TYPES[key]);
+    const b = bytes(url);
+    if (key === 'albedo') expect([ascii(b, 0, 4), ascii(b, 8, 12)]).toEqual(['RIFF', 'WEBP']);
+    if (key === 'height' || key === 'normal')
+      expect(Array.from(b.subarray(0, 8))).toEqual(Array.from(PNG_SIGNATURE));
+    if (key === 'height_bin') expect(b.length).toBe(2 * 512 * 256); // float16, W x H
+  });
 
   it('an encoded id reaches the same files as a raw one', () => {
     const raw = '/data/textures/fixture:brown_dwarf/fixture-0/4/height.png';

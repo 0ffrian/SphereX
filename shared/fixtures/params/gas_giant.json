@@ -6,10 +6,53 @@
   "scale_m": 69910000.0,
   "layers": [
     {
-      "id": "surface",
+      "id": "bands",
+      "tag": "model_dependent",
+      "tier": 3,
+      "description": "Number of bands from the spin and the radius (Rhines scale, A7.2): about 22 from pole to pole. The jet speed is a typical value; the exact band pattern is a seeded look.",
+      "requires": [
+        "radius_rjup"
+      ],
+      "formula": "bands ~ sqrt(2 Omega R / U), Omega = 2 pi / P (Rhines scale, order of magnitude only)",
+      "assumed": {
+        "rot_period_h": 9.925,
+        "zonal_wind_ms": 50.0
+      }
+    },
+    {
+      "id": "flattening",
+      "tag": "model_dependent",
+      "tier": 3,
+      "description": "Flattening of the poles from the spin, with the mean density of Jupiter assumed (A7.2).",
+      "requires": [],
+      "formula": "f = f_J (P_J / P)^2, from f = 0.7 q with q proportional to Omega^2",
+      "assumed": {
+        "rot_period_h": 9.925,
+        "mean_density": "same as Jupiter"
+      }
+    },
+    {
+      "id": "colour",
+      "tag": "derived",
+      "tier": 2,
+      "description": "Colour family chosen by the equilibrium temperature (A7.2).",
+      "requires": [
+        "teq_K"
+      ],
+      "formula": "palette family chosen by teq_K between the stops 60, 100, 130, 200, 600, 1100, 1800 K"
+    },
+    {
+      "id": "storms",
+      "tag": "inferred_from_analog",
+      "tier": 4,
+      "description": "A few storms between the jets, as on the giant planets of the Solar System. How many and where is a seeded look; no measurement of this planet's storms is used.",
+      "requires": []
+    },
+    {
+      "id": "turbulence",
       "tag": "artistic",
       "tier": 5,
-      "description": "Browser shader surface and shared CPU field (R7.7). Nothing about it is measured.",
+      "description": "Swirling detail along the band edges. Look only.",
       "requires": []
     }
   ],

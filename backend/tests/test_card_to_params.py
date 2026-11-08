@@ -164,10 +164,16 @@ def test_volume_kinds_have_no_haptics(kind: str) -> None:
     assert errors(p, "render-params.schema.json") == []
 
 
-def test_relief_amp_is_a_declared_optional_texture_field() -> None:
-    """Q-103: the viewer reads textures.relief_amp; the backend does not send it yet (Kevin)."""
+def test_relief_amp_is_sent_for_the_procedural_asteroid_only() -> None:
+    """Q-103, issue #62: the viewer displaces by textures.relief_amp (R7.2); the value is the R6.2
+    style rule's peak relief, so it travels with an `artistic` `displacement` layer."""
     p = params_for(load("asteroid_procedural", "cards"))
-    assert "relief_amp" not in p["textures"]
+    assert p["textures"]["relief_amp"] == 0.03  # style "cratered" for a 2 km body (R6.2)
+    layer = next(x for x in p["layers"] if x["id"] == "displacement")
+    assert (layer["tag"], layer["tier"]) == ("artistic", 5)
+    assert errors(p, "render-params.schema.json") == []
+    for kind in ("brown_dwarf", "brown_dwarf_binary"):
+        assert "relief_amp" not in params_for(load(kind, "cards"))["textures"]
     p["textures"]["relief_amp"] = 0.03
     assert errors(p, "render-params.schema.json") == []
     p["textures"]["relief_amp"] = 0
@@ -215,7 +221,7 @@ def test_extra_missing_is_passed_through() -> None:
 def test_texture_urls_follow_r67() -> None:
     p = card_to_params(load("asteroid_procedural", "cards"), seed=2, generator_version="v")
     tex = p["textures"]
-    assert set(tex) == {"albedo", "height", "normal", "height_bin"}
+    assert set(tex) == {"albedo", "height", "normal", "height_bin", "relief_amp"}
     # The id's ':' is the baker's %3A directory name, quoted once more for the URL.
     assert tex["albedo"] == (
         "/data/textures/fixture%253Aasteroid_procedural/v/2/2048x1024/albedo.webp"
@@ -301,3 +307,22 @@ def test_model_dependent_members_of_a_group_are_stated() -> None:
     assert shells["assumed"]["gas_Q.h2o"] == 1.0e26
     assert "gas_Q.co2" not in shells["assumed"]  # measured members are not assumed
     assert list(shells["assumed"]) == ["density_exponent", "gas_Q.h2o"]  # rule inputs first
+
+
+@pytest.mark.parametrize("kind", ["brown_dwarf", "brown_dwarf_binary"])
+def test_brown_dwarf_limb_darkening_is_model_dependent_with_its_assumption(kind: str) -> None:
+    """Issue #62: a self-lit disc fades toward its limb. The coefficient is the star's (R7.5);
+    no brown-dwarf value is confirmed, so the layer is tier 3 and says what it assumed."""
+    p = params_for(load(kind, "cards"))
+    layer = next(x for x in p["layers"] if x["id"] == "limb_darkening")
+    assert (layer["tag"], layer["tier"]) == ("model_dependent", 3)
+    assert layer["formula"] == "I(mu) = 1 - u * (1 - mu), u = 0.6"
+    assert layer["assumed"] == {"limb_darkening_u": 0.6}
+    assert layer["requires"] == []
+
+
+def test_ttauri_disc_stays_artistic() -> None:
+    p = params_for(load("star_ttauri", "cards"))
+    disc = next(x for x in p["layers"] if x["id"] == "disc")
+    assert (disc["tag"], disc["tier"]) == ("artistic", 5)
+    assert "flared" in disc["description"]

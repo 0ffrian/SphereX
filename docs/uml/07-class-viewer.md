@@ -126,8 +126,9 @@ classDiagram
     requires diameter_km
     SphereGeometry 1, 256, 128 scaled by ellipsoid_axes
     baked albedo (visible mode only), normal, roughness maps
-    displacement by baked height map, refused (reason backend) while textures.relief_amp is not sent
-    displacement on desktop only
+    displacement by baked height map, scale textures.relief_amp (artistic layer displacement, issue #62)
+    refused (reason backend) when relief_amp is not sent
+    displacement on the high and medium quality levels only
   }
   class Comet {
     <<comet>>
@@ -153,7 +154,7 @@ classDiagram
     requires teff_K, radius_rsun optional (no radius: unit sphere, no scale bar)
     blackbody colour, linear limb darkening
     Mira brightness follows light curve
-    T Tauri disc and dust screen
+    T Tauri disc (flared, lit, depth-tested: ttauriDisc.ts, issue #62) and dust screen
     motion trail from pm_mas_yr
     issue #42: StarBody draws spots, faculae, flares, loops, granulation, glow
     from the CPU model bodies/starModel.ts (pure in seed, rates, t)
@@ -172,6 +173,8 @@ classDiagram
     visibleTags from allowedTags(plan.honesty), light from planLighting, onChange from BuildHooks
     plain sphere at once (never blank), surface swaps in when the field is ready
     plain sphere follows Q-45: only while the size on the card is shown
+    gas_giant (issue #62): five layers bands, flattening, colour, storms, turbulence, each its own switch
+    (plan.shader.gas, setGasLayers, JetLayers uniforms), shown from + Estimated except turbulence (artistic)
     TSL node materials on three r187
     reads field as 2 Float32 DataTextures via textureLoad
     finer noise is seen, not felt

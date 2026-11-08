@@ -11,6 +11,7 @@ import { stormsAt } from '../fields/flowModel';
 import { resolveMotion } from '../motion/motion';
 import { resolveShaderSpec, rhinesBands, flatteningRule, climateFromTeq } from './shaderSpec';
 import { sceneKey } from '../ViewerApp';
+import { BROWN_DWARF_CONFIG, planBrownDwarf } from './BrownDwarf';
 import type { HonestyState } from '../honesty';
 import type { RenderPlan } from '../planTypes';
 
@@ -163,6 +164,76 @@ describe('brown dwarf jets (R7.4, A7.2)', () => {
   });
 });
 
+describe('brown dwarf limb darkening and the infrared band pattern (issue #62)', () => {
+  it('limb darkening is model_dependent: shown from + Estimated, with its assumption stated', () => {
+    for (const honesty of ['derived', 'artistic'] as const) {
+      const p = at('brown_dwarf', honesty, 'spherex_ir');
+      const limb = p.drawn.find((d) => d.id === 'limb_darkening');
+      expect(limb, honesty).toMatchObject({ tag: 'model_dependent', tier: 3 });
+      expect(p.bodies[0]).toMatchObject({ limbDarkening: true, limbU: 0.6 });
+    }
+    // Measured only: nothing about the dwarf's limb is measured, so the disc is even.
+    const m = at('brown_dwarf', 'measured', 'spherex_ir');
+    expect(ids(m)).not.toContain('limb_darkening');
+    expect(m.bodies[0]?.limbDarkening ?? false).toBe(false);
+  });
+
+  it('the binary has it on both bodies', () => {
+    const p = at('brown_dwarf_binary', 'artistic', 'spherex_ir');
+    expect(p.bodies.length).toBe(2);
+    for (const b of p.bodies) expect(b).toMatchObject({ limbDarkening: true, limbU: 0.6 });
+  });
+
+  it('refuses the layer as unverified when the coefficient is not set (nothing invented)', () => {
+    const { card, params } = fixture('brown_dwarf');
+    const p = planBrownDwarf(
+      { card, params, ctx: defaultContext({ honesty: 'artistic', mode: 'spherex_ir' }) },
+      { ...BROWN_DWARF_CONFIG, limbU: null },
+    );
+    expect(p.missing.find((x) => x.id === 'limb_darkening')).toMatchObject({
+      reason: 'unverified',
+    });
+    expect(p.bodies[0]?.limbDarkening).toBe(false);
+  });
+
+  it('in the infrared view the baked bands are drawn as brightness on the SPHEREx colour', () => {
+    const p = at('brown_dwarf', 'artistic', 'spherex_ir');
+    // The jets stay refused for `mode` (Q-107 item 4: the hint still shows) ...
+    expect(p.missing.find((m) => m.id === 'jets')?.reason).toBe('mode');
+    expect(p.jets).toBeNull();
+    // ... and the band map stands in, as brightness only, so the colour stays the IR average.
+    const body = p.bodies[0]!;
+    expect(ids(p)).toContain('bands');
+    expect(body.albedoUrl).toBe(fixture('brown_dwarf').params.textures?.albedo);
+    expect(body.albedoLuma).toBe(true);
+    expect(body.tint).toEqual(p.tint.rgb);
+    expect(ids(p)).toContain('tint'); // the colour is still listed: it is not in the map
+    // The visible view keeps the map (or the jets) in colour: not brightness only.
+    expect(at('brown_dwarf', 'artistic', 'visible').bodies[0]!.albedoLuma).toBeFalsy();
+  });
+
+  it('the band pattern is an artistic look: hidden at + Estimated, so the disc is even', () => {
+    const p = at('brown_dwarf', 'derived', 'spherex_ir');
+    expect(p.bodies[0]).toMatchObject({ albedoUrl: null });
+    expect(p.bodies[0]!.albedoLuma).toBeFalsy();
+    expect(p.missing.find((m) => m.id === 'bands')).toMatchObject({
+      reason: 'honesty',
+      tag: 'artistic',
+    });
+  });
+
+  it('without a winds speed-up the infrared view uses the same pattern', () => {
+    const { card, params } = fixture('brown_dwarf');
+    delete params.dynamics!.speedup.winds;
+    const p = planRender(card, params, defaultContext({ honesty: 'artistic', mode: 'spherex_ir' }));
+    expect(p.bodies[0]).toMatchObject({ albedoLuma: true });
+  });
+
+  it('visible jets carry the limb coefficient to the surface', () => {
+    expect(at('brown_dwarf', 'artistic', 'visible').jets).toMatchObject({ limbU: 0.6 });
+  });
+});
+
 describe('gas giants and worlds (A7.1, A7.2)', () => {
   it('the band count follows the Rhines rule from the spin and the wind, never above its inputs', () => {
     const { card, params } = fixture('gas_giant');
@@ -175,13 +246,18 @@ describe('gas giants and worlds (A7.1, A7.2)', () => {
     expect(spec.field!.bands).toBe(8);
     // A slider wins (D-27).
     expect(resolveShaderSpec(card, params, { bands: 14 }, m).field!.bands).toBe(14);
-    // No spin or wind: the artist default and no rule.
+    // No spin or wind (issue #62): the typical spin and wind of a giant planet stand in (tier 3),
+    // stated in `assumed`; N = sqrt(2 Omega R / U) = 22 for Jupiter (A7.2), 11 in the field's units.
     const none = resolveShaderSpec(card, { ...params, dynamics: undefined });
-    expect(none.field!.bands).toBe(12);
-    expect(none.gas!.bandsRule).toBeNull();
+    expect(none.field!.bands).toBe(11);
+    expect(none.gas!.bandsRule).toMatchObject({
+      tag: 'model_dependent',
+      tier: 3,
+      assumed: { spin_period_h: 9.925, jet_speed_ms: 50 },
+    });
   });
 
-  it('flattening follows the spin (tier 3 or weaker), else a Jupiter analogue (tier 4), capped', () => {
+  it('flattening follows the spin (tier 3 or weaker), else the typical spin (tier 3), capped', () => {
     const { card, params } = fixture('gas_giant');
     const m = resolveMotion(card, params);
     const f = flatteningRule(m, card, undefined)!;
@@ -192,7 +268,12 @@ describe('gas giants and worlds (A7.1, A7.2)', () => {
       card,
       undefined,
     )!;
-    expect(still).toMatchObject({ tier: 4, tag: 'inferred_from_analog', value: 0.06487 });
+    expect(still).toMatchObject({
+      tier: 3,
+      tag: 'model_dependent',
+      value: 0.06487,
+      assumed: { spin_period_h: 9.925 },
+    });
     const fast = structuredClone(params);
     fast.dynamics!.spin_period_h!.value = 0.5;
     expect(flatteningRule(resolveMotion(card, fast), card, undefined)!.value).toBeLessThanOrEqual(
@@ -200,14 +281,47 @@ describe('gas giants and worlds (A7.1, A7.2)', () => {
     );
   });
 
-  it('shows jets, storms, band count and flattening as sub-layers with tiers at + Artistic only', () => {
+  it('shows bands, flattening, colour and storms from + Estimated, jets and turbulence at + Artistic only (issue #62)', () => {
+    const est = at('gas_giant', 'derived');
+    expect(ids(est)).toEqual(['bands', 'flattening', 'colour', 'storms']);
+    expect(est.shader).toMatchObject({
+      surface: true,
+      gas: { bands: true, flattening: true, colour: true, storms: true, turbulence: false },
+    });
+    expect(ids(est)).not.toContain('jets');
     const p = at('gas_giant', 'artistic');
     expect(ids(p)).toEqual(
-      expect.arrayContaining(['surface', 'jets', 'storms', 'band_count', 'flattening']),
+      expect.arrayContaining([
+        'bands',
+        'flattening',
+        'colour',
+        'storms',
+        'turbulence',
+        'jets',
+        'storm_drift',
+      ]),
     );
+    expect(ids(p)).not.toContain('surface');
     for (const d of p.drawn) expect(d.tier).toBeDefined();
     expect(p.spin).toEqual({ periodH: 10, speedup: 3600 });
-    expect(ids(at('gas_giant', 'derived'))).not.toContain('jets');
+    // Each layer keeps the tag the backend gave it (the tier chain of D-32).
+    const tags = Object.fromEntries(p.drawn.map((d) => [d.id, d.tag]));
+    expect(tags).toMatchObject({
+      bands: 'model_dependent',
+      flattening: 'model_dependent',
+      colour: 'derived',
+      storms: 'inferred_from_analog',
+      turbulence: 'artistic',
+    });
+  });
+
+  it('Measured only draws none of the gas layers: a plain sphere when the size is measured', () => {
+    const p = at('gas_giant', 'measured');
+    expect(ids(p)).toEqual(['body']); // the measured size only
+    expect(p.shader).toMatchObject({ surface: false, plain: true });
+    expect(p.missing.filter((m) => m.reason === 'honesty').map((m) => m.id)).toEqual(
+      expect.arrayContaining(['bands', 'flattening', 'colour', 'storms', 'turbulence']),
+    );
   });
 
   it('tags the jets layer no stronger than artistic, names where the speed comes from, and Rhines states the radius (D-32)', () => {

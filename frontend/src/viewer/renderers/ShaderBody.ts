@@ -13,9 +13,11 @@
 // carried by latitude winds. Every frame is a pure function of (card, seed, t). The storms the
 // shader draws are the ones the haptic sampler is given at the same t (`fields/flowModel.ts`).
 //
-// Honesty: every layer here is `artistic` (R7.7). When `artistic` is not in the visible tags the
-// layer is hidden (planets and gas giants fall back to a plain sphere; nebula and nova draw
-// nothing, because nothing about them is measured). A layer refused for missing data is not drawn
+// Honesty: the surface of a planet, nebula or nova is one `artistic` layer (R7.7). When `artistic`
+// is not in the visible tags it is hidden (planets fall back to a plain sphere; nebula and nova draw
+// nothing, because nothing about them is measured). A gas giant has five layers with their own tags
+// (issue #62: bands, flattening, colour, storms, turbulence), each switched on its own; with none
+// shown it falls back to the plain sphere too. A layer refused for missing data is not drawn
 // and is listed in `missing`. `status` says which of these applies in plain words (R5.3).
 //
 // Plug-in shape (review B5): this class owns no lighting policy and no honesty model. The viewer
@@ -110,10 +112,12 @@ import type { TierName } from '../render/quality';
 import { createVolume, type VolumeHandle } from '../volume/VolumeBody';
 import { nebulaVolume, remnantShell, remnantVolume } from '../volume/volumeSpecs';
 import {
+  GAS_LAYER_IDS,
   kindHasPlainSphere,
   resolveShaderSpec,
   shaderDistance,
   sizeFieldFor,
+  type GasSwitches,
   type ShaderSpec,
 } from './shaderSpec';
 import { bilinear, fieldUV, floatTexture, vnoise3 } from './fieldTexture';
@@ -423,7 +427,8 @@ function buildGas(
   octaves: number,
   sampler: FieldSampler,
   sunWorld: any,
-): { group: Group; frame: Object3D; runtime: Runtime } {
+  initial: GasSwitches,
+): { group: Group; frame: Object3D; runtime: Runtime; setGas(sw: GasSwitches): void } {
   const fp = spec.field!;
   const gas = spec.gas!;
   const texA = floatTexture(field.a, field.width, field.height);
@@ -447,9 +452,19 @@ function buildGas(
     sunWorld,
   });
   const mesh = surface.mesh;
-  // Flattening from the spin (A7.2): the polar axis is shorter, so the silhouette is an ellipse.
-  mesh.scale.y = 1 - gas.flattening;
   tilt.add(mesh);
+  // Issue #62: each layer is its own switch. Flattening from the spin (A7.2): the polar axis is
+  // shorter, so the silhouette is an ellipse; off, the sphere is round. The rest are uniforms.
+  const setGas = (sw: GasSwitches) => {
+    mesh.scale.y = sw.flattening ? 1 - gas.flattening : 1;
+    surface.setLayers({
+      bands: sw.bands,
+      turbulence: sw.turbulence,
+      colour: sw.colour,
+      storms: sw.storms,
+    });
+  };
+  setGas(initial);
 
   if (gas.rings > 0.01) {
     const c1 = gas.palette[1];
@@ -504,7 +519,7 @@ function buildGas(
     frame: mesh,
     update,
   };
-  return { group, frame: mesh, runtime };
+  return { group, frame: mesh, runtime, setGas };
 }
 
 // ---- body --------------------------------------------------------------------------------------
@@ -531,6 +546,8 @@ interface Built {
   runtime: Runtime | null;
   sampler: FieldSampler | null;
   volumes?: VolumeHandle[];
+  /** Gas giants: applies the layer switches without a rebuild. */
+  setGas?: (sw: GasSwitches) => void;
 }
 
 export class ShaderBody implements BodyRenderer {
@@ -548,6 +565,8 @@ export class ShaderBody implements BodyRenderer {
   private overrides: Overrides;
   private disposed = false;
   private runtime: Runtime | null = null;
+  private setGas: ((sw: GasSwitches) => void) | null = null;
+  private gasOverride: GasSwitches | null;
   private time: SimTimeFn = () => 0;
   private motion: Motion;
   private readonly octaves: number;
@@ -575,6 +594,7 @@ export class ShaderBody implements BodyRenderer {
     this.onChange = ctx.onChange;
     this.onFailed = ctx.onFailed;
     this.octaves = ctx.octaves ?? 4;
+    this.gasOverride = ctx.gasLayers ?? null;
     this.tier = ctx.tier ?? 'medium';
     this.motion = ctx.motion ?? resolveMotion(card, params);
     this.spec = resolveShaderSpec(card, params, this.overrides, this.motion);
@@ -602,20 +622,58 @@ export class ShaderBody implements BodyRenderer {
     body.rebuild().catch((err: unknown) => {
       if (body.disposed) return;
       console.warn('[viewer] could not build the generated surface', err);
-      body.onFailed?.(body.spec.layerId);
+      for (const id of body.spec.layerIds) body.onFailed?.(id);
       body.onChange?.();
     });
     return body;
   }
 
+  /**
+   * Issue #62: the gas layers that are drawn. The plan's switches when it gave them (they carry the
+   * build animation's holds), else each layer's own tag against the visible tags (D-21).
+   */
+  private gasSwitches(): GasSwitches {
+    if (this.gasOverride) return this.gasOverride;
+    const g = this.spec.gasLayers;
+    const on = (id: (typeof GAS_LAYER_IDS)[number]) => {
+      const tag = g?.[id];
+      return tag !== undefined && this.visibleTags.includes(tag);
+    };
+    return {
+      bands: on('bands'),
+      flattening: on('flattening'),
+      colour: on('colour'),
+      storms: on('storms'),
+      turbulence: on('turbulence'),
+    };
+  }
+
+  /** Something of the generated surface is shown (every kind but a gas giant: its one layer's tag). */
+  private surfaceShown(): boolean {
+    const { drawable, kind, tag } = this.spec;
+    if (!drawable) return false;
+    if (kind === 'gas_giant') {
+      const sw = this.gasSwitches();
+      return GAS_LAYER_IDS.some((id) => sw[id]);
+    }
+    return this.visibleTags.includes(tag);
+  }
+
   get drawn(): readonly string[] {
-    return this.surface?.visible ? [this.spec.layerId] : [];
+    if (!this.surface?.visible) return [];
+    if (this.spec.kind !== 'gas_giant') return [this.spec.layerId];
+    const sw = this.gasSwitches();
+    return GAS_LAYER_IDS.filter((id) => sw[id]);
   }
   get missing(): readonly string[] {
     return this.spec.missing;
   }
   get hidden(): readonly string[] {
     if (!this.spec.drawable) return [];
+    if (this.spec.kind === 'gas_giant') {
+      const sw = this.gasSwitches();
+      return GAS_LAYER_IDS.filter((id) => this.spec.gasLayers?.[id] !== undefined && !sw[id]);
+    }
     return this.visibleTags.includes(this.spec.tag) ? [] : [this.spec.layerId];
   }
   get suggestedDistance(): number {
@@ -631,7 +689,19 @@ export class ShaderBody implements BodyRenderer {
         tags: [],
       };
     }
-    if (!this.visibleTags.includes(tag)) {
+    if (this.spec.kind === 'gas_giant' && this.surfaceShown()) {
+      // Each part has its own badge (issue #62): what is on screen is the set of their tags.
+      const sw = this.gasSwitches();
+      const g = this.spec.gasLayers ?? {};
+      const tags = [...new Set(GAS_LAYER_IDS.filter((id) => sw[id]).map((id) => g[id]!))];
+      return {
+        state: 'drawn',
+        message:
+          'Generated from rules and typical values for a giant planet, not a measured image. Each part says what it rests on.',
+        tags,
+      };
+    }
+    if (!this.surfaceShown()) {
       return {
         state: 'hidden',
         message: this.plainShown()
@@ -714,6 +784,14 @@ export class ShaderBody implements BodyRenderer {
     for (const v of this.volumes) v.setJitterFrame(index);
   }
 
+  /** Issue #60/#62: the plan's gas layer switches changed (honesty or a build step): no rebuild. */
+  setGasLayers(sw: GasSwitches | null): void {
+    if (this.disposed) return;
+    this.gasOverride = sw;
+    this.applyVisibility();
+    this.onChange?.();
+  }
+
   setVisibleTags(tags: readonly Tag[]): void {
     if (this.disposed) return;
     this.visibleTags = tags;
@@ -775,8 +853,9 @@ export class ShaderBody implements BodyRenderer {
   }
 
   private applyVisibility(): void {
-    const show = this.spec.drawable && this.visibleTags.includes(this.spec.tag);
+    const show = this.surfaceShown();
     if (this.surface) this.surface.visible = show;
+    this.setGas?.(this.gasSwitches());
     if (this.plain) this.plain.visible = this.plainShown();
   }
 
@@ -787,9 +866,9 @@ export class ShaderBody implements BodyRenderer {
    * plan (`shaderPlan.ts`) applies the same rule, so the two agree.
    */
   private plainShown(): boolean {
-    const { kind, drawable, tag } = this.spec;
+    const { kind, drawable } = this.spec;
     if (!kindHasPlainSphere(kind) || !drawable) return false;
-    if (this.visibleTags.includes(tag)) {
+    if (this.surfaceShown()) {
       // The surface is allowed: the plain sphere only stands in while it is being built (never
       // blank) or if building it failed.
       return this.surface === null;
@@ -841,7 +920,7 @@ export class ShaderBody implements BodyRenderer {
     if (this.disposed || spec !== this.spec) return null;
     const sampler = new FieldSampler(field);
     if (spec.kind === 'gas_giant') {
-      const { group, frame, runtime } = buildGas(
+      const { group, frame, runtime, setGas } = buildGas(
         spec,
         field,
         textures,
@@ -849,8 +928,9 @@ export class ShaderBody implements BodyRenderer {
         this.octaves,
         sampler,
         this.sun,
+        this.gasSwitches(),
       );
-      return { group, frame, textures, field, points: null, runtime, sampler };
+      return { group, frame, textures, field, points: null, runtime, sampler, setGas };
     }
     const { group, runtime } = buildPlanet(
       spec,
@@ -885,6 +965,7 @@ export class ShaderBody implements BodyRenderer {
     this.sampler = built?.sampler ?? null;
     this.points = built?.points ?? null;
     this.runtime = built?.runtime ?? null;
+    this.setGas = built?.setGas ?? null;
     // A body built while the clock is running is posed at the current time at once.
     this.runtime?.update(this.time);
     this.volumes = built?.volumes ?? [];

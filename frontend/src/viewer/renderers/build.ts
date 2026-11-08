@@ -7,7 +7,6 @@ import {
   BufferGeometry,
   CircleGeometry,
   Color,
-  DoubleSide,
   Group,
   Line,
   LineBasicNodeMaterial,
@@ -16,7 +15,6 @@ import {
   MeshStandardNodeMaterial,
   Object3D,
   RepeatWrapping,
-  RingGeometry,
   Sphere,
   SphereGeometry,
   SRGBColorSpace,
@@ -25,7 +23,7 @@ import {
   Box3,
   Vector3,
 } from 'three/webgpu';
-import { float, normalView, saturate, vec3 } from 'three/tsl';
+import { dot, float, normalView, saturate, texture, vec3 } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import type { BodyPlan, DustPlan, RenderPlan, Rgb, ShellPlan, SpinPlan } from '../planTypes';
@@ -60,6 +58,8 @@ import { MouldRig } from '../mould/MouldRig';
 import type { MouldPose } from '../mould/mouldSteps';
 import { jetPalette } from './jetPalette';
 import { srgbToLinear } from './linearColour';
+import { meanLuma } from './textureMean';
+import { buildTTauriDisc } from './ttauriDisc';
 
 export interface BuildHooks {
   /** A mesh or texture failed to load: refuse the layer with this id. */
@@ -190,8 +190,6 @@ export interface BuiltScene {
   dispose(): void;
 }
 
-const DISC_COLOR = 0x8a7a6a; // artistic
-
 /** Seeded PRNG (mulberry32). The same seed always gives the same stream. */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -264,6 +262,38 @@ function albedoLayer(plan: RenderPlan): string {
   return plan.type === 'brown_dwarf' || plan.type === 'brown_dwarf_binary' ? 'bands' : 'albedo_map';
 }
 
+/** The limb-darkening law of a self-lit body, `1 - u (1 - mu)` (R7.5), or null when it has none. */
+function limbOf(body: BodyPlan): number | null {
+  return body.limbU ?? (body.limbDarkening ? LIMB_DARKENING_U : null);
+}
+
+/**
+ * Colour of a self-lit body (R5.1: no external light): its tint times the glow, times the baked map
+ * when there is one (the map in colour, or as brightness on the tint for `albedoLuma`, issue #62),
+ * times the limb darkening. A custom `colorNode` replaces `material.map`, so the map goes in here.
+ */
+function selfLitColour(body: BodyPlan, map: Texture | null, mapMean: number | null) {
+  const tint = srgb(body.tint);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TSL node graphs are untyped proxies
+  let col: any = vec3(tint.r * body.emissive, tint.g * body.emissive, tint.b * body.emissive);
+  if (map) {
+    const t = texture(map);
+    if (body.albedoLuma) {
+      const y = dot(t.rgb, vec3(0.2126, 0.7152, 0.0722));
+      col = col.mul(y.div(mapMean ?? 1));
+    } else {
+      col = col.mul(t.rgb);
+    }
+  }
+  const u = limbOf(body);
+  if (u !== null) {
+    // R7.5: I(mu) = 1 - u (1 - mu), mu = cos of the angle to the view direction.
+    const mu = saturate(normalView.z);
+    col = col.mul(float(1).sub(float(u).mul(float(1).sub(mu))));
+  }
+  return col;
+}
+
 function bodyMaterial(body: BodyPlan): MeshStandardNodeMaterial | MeshBasicNodeMaterial {
   const tint = srgb(body.tint);
   if (body.emissive <= 0) {
@@ -271,11 +301,8 @@ function bodyMaterial(body: BodyPlan): MeshStandardNodeMaterial | MeshBasicNodeM
   }
   // Self-luminous (R5.1): no external light, colour times the glow.
   const mat = new MeshBasicNodeMaterial();
-  const glow = vec3(tint.r * body.emissive, tint.g * body.emissive, tint.b * body.emissive);
-  if (body.limbDarkening) {
-    // R7.5: I(mu) = 1 - u (1 - mu), mu = cos of the angle to the view direction.
-    const mu = saturate(normalView.z);
-    mat.colorNode = glow.mul(float(1).sub(float(LIMB_DARKENING_U).mul(float(1).sub(mu))));
+  if (limbOf(body) !== null) {
+    mat.colorNode = selfLitColour(body, null, null);
   } else {
     mat.color = new Color(tint.r * body.emissive, tint.g * body.emissive, tint.b * body.emissive);
   }
@@ -388,6 +415,7 @@ export function buildScene(
             emissive: body.emissive,
             clouds: jp.clouds,
             storms: jp.storms,
+            limbU: jp.limbU ?? null,
           });
           surface.mesh.position.copy(mesh.position);
           surface.mesh.scale.set(body.axes[0], body.axes[1] * (1 - jp.flattening), body.axes[2]);
@@ -449,6 +477,10 @@ export function buildScene(
     load(body.albedoUrl, albedoLayer(plan), (t) => {
       t.colorSpace = SRGBColorSpace;
       material.map = t;
+      if (material instanceof MeshBasicNodeMaterial && (limbOf(body) !== null || body.albedoLuma)) {
+        // A self-lit body with limb darkening or a brightness-only map has a custom colour node.
+        material.colorNode = selfLitColour(body, t, body.albedoLuma ? meanLuma(t.image) : null);
+      }
     });
     if (material instanceof MeshStandardNodeMaterial) {
       load(body.normalUrl, 'relief', (t) => {
@@ -629,6 +661,7 @@ export function buildScene(
       },
       motion: plan.motion,
       octaves,
+      gasLayers: plan.shader.gas ?? undefined,
       ...hooks.shader,
     });
     usesQuality = true;
@@ -659,18 +692,10 @@ export function buildScene(
 
   // Disc, dust screen, trail ---------------------------------------------------------------
   for (const disc of plan.discs) {
-    const geometry = track(new RingGeometry(disc.innerRadius, disc.outerRadius, 96));
-    const material = track(
-      new MeshBasicNodeMaterial({
-        color: DISC_COLOR,
-        side: DoubleSide,
-        transparent: true,
-        opacity: 0.55,
-        depthWrite: false,
-      }),
-    );
-    const mesh = new Mesh(geometry, material);
-    mesh.rotation.x = (disc.inclinationDeg * Math.PI) / 180;
+    // Issue #62, R7.5: a flared, lit, depth-tested disc (ttauriDisc.ts), not a flat ring.
+    const mesh = buildTTauriDisc(disc);
+    track(mesh.geometry);
+    track(mesh.material as { dispose(): void });
     group.add(mesh);
   }
   for (const screen of plan.screens) {
@@ -735,6 +760,8 @@ export function buildScene(
       if (!shaderBody || disposed) return;
       if (next.lighting.direction) shaderBody.setSunDirection(next.lighting.direction);
       shaderBody.setVisibleTags(allowedTags(next.honesty));
+      // The plan's switches carry the honesty level and the build step's holds (issue #62).
+      shaderBody.setGasLayers(next.shader?.gas ?? null);
     },
     shapeRadius,
     setScreenPx(px) {

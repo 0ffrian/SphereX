@@ -19,6 +19,17 @@
       }
     },
     {
+      "id": "limb_darkening",
+      "tag": "model_dependent",
+      "tier": 3,
+      "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu), the star coefficient of R7.5. No brown-dwarf coefficient is confirmed (R7.4).",
+      "requires": [],
+      "formula": "I(mu) = 1 - u * (1 - mu), u = 0.6",
+      "assumed": {
+        "limb_darkening_u": 0.6
+      }
+    },
+    {
       "id": "emissive",
       "tag": "measured",
       "tier": 1,

@@ -105,7 +105,8 @@ for (const view of VIEWS) {
       },
     );
     expect(result).not.toBeNull();
-    expect(result!.drawn.length).toBe(1);
+    // A gas giant's surface is five layers (issue #62), every other kind has one.
+    expect(result!.drawn.length).toBe(kind === 'gas_giant' ? 5 : 1);
     // The field comes from the Web Worker (D-12, N8). A worker that was created but failed would
     // fall back to the main thread, so count what actually served. The nebula and the nova are
     // volumes with no field, no points and no haptics (Q-103), so nothing is served for them.
@@ -147,7 +148,7 @@ for (const view of VIEWS) {
   });
 }
 
-test('honesty default: at + Estimated the artistic surface is hidden, a toggle shows it, and the field is made once', async ({
+test('honesty default (gas giant, issue #62): + Estimated draws its estimated layers, + Artistic adds the swirl, the field is made once', async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -174,18 +175,25 @@ test('honesty default: at + Estimated the artistic surface is hidden, a toggle s
       const made = g.__sxFieldStats!.worker + g.__sxFieldStats!.main;
       g.__sxShow(card, params, 'artistic');
       g.__sxShow(card, params, 'measured');
+      const measured = { drawn: [...b.drawn], hidden: [...b.hidden] };
       g.__sxShow(card, params, 'artistic');
       const shown = { drawn: [...b.drawn], same: g.__sxViewer.body === b };
       return {
         first,
+        measured,
         shown,
         again: g.__sxFieldStats!.worker + g.__sxFieldStats!.main - made,
       };
     },
     { card: read('cards', 'gas_giant'), params: read('params', 'gas_giant') },
   );
-  expect(out.first).toEqual({ drawn: [], hidden: ['surface'] });
-  expect(out.shown).toEqual({ drawn: ['surface'], same: true });
+  // Issue #62: a gas giant is five layers. + Estimated draws four, the artistic swirl waits for
+  // + Artistic, and Measured only draws none of them (a plain sphere of the measured radius).
+  const four = ['bands', 'flattening', 'colour', 'storms'];
+  const all = [...four, 'turbulence'];
+  expect(out.first).toEqual({ drawn: four, hidden: ['turbulence'] });
+  expect(out.measured).toEqual({ drawn: [], hidden: all });
+  expect(out.shown).toEqual({ drawn: all, same: true });
   expect(out.again, 'field regenerated on an honesty toggle').toBe(0);
   await expect(page.getByTestId('viewer-nothing')).toHaveCount(0);
 });

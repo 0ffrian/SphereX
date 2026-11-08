@@ -18,6 +18,7 @@ import {
   MeshBasicNodeMaterial,
   MeshStandardNodeMaterial,
   SphereGeometry,
+  Vector3,
   Vector4,
   type DataTexture,
 } from 'three/webgpu';
@@ -36,10 +37,12 @@ import {
   max,
   mix,
   normalize,
+  normalView,
   normalWorld,
   positionLocal,
   positionWorld,
   pow,
+  saturate,
   sin,
   smoothstep,
   sqrt,
@@ -67,8 +70,6 @@ import { shaderSeedOffsets } from '../fields/noise';
 import type { Rgb } from './shaderPalette';
 import { bilinear, fieldUV, vnoise3 } from './fieldTexture';
 
-const rgb3 = (c: Rgb) => vec3(c[0], c[1], c[2]);
-
 /** Largest streak shear before the flow-map resets, radians (artistic). */
 export const MAX_STREAK_SHEAR = 1.0;
 
@@ -88,6 +89,8 @@ export interface JetOptions {
   clouds: boolean;
   /** Storms the shader can draw (at most MAX_STORMS). */
   storms: number;
+  /** Self-lit only: linear limb-darkening coefficient `u` (R7.5 law), or null for an even disc. */
+  limbU?: number | null;
   /** Mesh segments. */
   segments?: [number, number];
   /**
@@ -113,10 +116,39 @@ export interface JetFrame {
   cover: number;
 }
 
+/**
+ * Issue #62: which parts of the gas giant surface are drawn. Each is a layer of its own with its
+ * own tag (D-21), so each is a uniform that switches without a rebuild. All on is the full surface
+ * (and what a brown dwarf always draws).
+ */
+export interface JetLayers {
+  /** The band profile of the field; off: one flat tone, no jets to shear. */
+  bands: boolean;
+  /** The swirling fine detail; off: smooth bands. */
+  turbulence: boolean;
+  /** The palette of the class; off: the same tones as plain greys (the contrast stays). */
+  colour: boolean;
+  /** The storm spots, rings and arms. */
+  storms: boolean;
+}
+export const ALL_JET_LAYERS: JetLayers = {
+  bands: true,
+  turbulence: true,
+  colour: true,
+  storms: true,
+};
+
 export interface JetSurface {
   mesh: Mesh;
   update(f: JetFrame): void;
+  setLayers(l: JetLayers): void;
 }
+
+/** Rec. 709 luma of a linear colour: the grey a tone becomes when its colour is not shown. */
+const luma = (c: Rgb): Rgb => {
+  const y = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  return [y, y, y];
+};
 
 const rotY = (p: any, a: any) => {
   const c = cos(a);
@@ -143,10 +175,17 @@ export function buildJetSurface(o: JetOptions): JetSurface {
   const phaseU = uniform(new Vector4(0, 0, 0, 0)); // shearA, shearB, evoA, evoB
   const weightU = uniform(1);
   const coverU = uniform(0);
+  const bandsU = uniform(1);
+  const turbU = uniform(1);
+  const stormsU = uniform(1);
+  const colourU = uniform(1);
+  const palU = o.palette.map((c) => uniform(new Vector3(c[0], c[1], c[2])));
 
   const dir = normalize(positionLocal);
   const { u, v } = fieldUV(dir);
-  const A = bilinear(o.texA, u, v);
+  const Af = bilinear(o.texA, u, v);
+  // Bands off: the band profile is the flat 0.5 (a band edge is where it crosses 0.5, so no edges).
+  const A = { x: mix(float(0.5), Af.x, bandsU) };
   // -1..1, the jet direction and strength: sin of the field's WARPED band phase, exactly the CPU's
   // `zonalWind` (the field stores 0.5 + 0.5 sin(phase)), so the drawn shear and the drift of the
   // storms (flowModel) flow the same way at every point.
@@ -168,11 +207,13 @@ export function buildJetSurface(o: JetOptions): JetSurface {
   };
   const fine = mix(detail(phaseU.y, phaseU.w), detail(phaseU.x, phaseU.z), weightU);
   // Shear is strongest where the profile crosses 0.5 (a band edge).
-  const edge = float(1).sub(smoothstep(0.0, 0.3, abs(A.x.sub(0.5)).mul(2)));
+  const edge = float(1)
+    .sub(smoothstep(0.0, 0.3, abs(A.x.sub(0.5)).mul(2)))
+    .mul(bandsU);
   const amp = float(0.2 * (0.3 + o.turbulence)).add(edge.mul(0.5 * (0.4 + o.turbulence)));
-  const val = clamp(A.x.mul(0.7).add(0.15).add(fine.sub(0.5).mul(amp)), 0, 1);
+  const val = clamp(A.x.mul(0.7).add(0.15).add(fine.sub(0.5).mul(amp).mul(turbU)), 0, 1);
 
-  const [c0, c1, c2, c3] = o.palette.map(rgb3) as [any, any, any, any];
+  const [c0, c1, c2, c3] = palU as [any, any, any, any];
   let col: any = mix(mix(c0, c1, val.mul(2)), mix(c1, c2, val.mul(2).sub(1)), step(0.5, val));
 
   // Storms between the jets: a spot, a ring and spiral arms that turn.
@@ -199,8 +240,8 @@ export function buildJetSurface(o: JetOptions): JetSurface {
     )
       .mul(0.5)
       .add(0.5);
-    col = mix(col, mix(c3, c2, arms.mul(0.55)), spot.mul(0.85));
-    col = mix(col, c2, ring.mul(0.35));
+    col = mix(col, mix(c3, c2, arms.mul(0.55)), spot.mul(0.85).mul(stormsU));
+    col = mix(col, c2, ring.mul(0.35).mul(stormsU));
   }
 
   // Brown dwarf cloud cover: patches that dim the surface; more cover, more patches.
@@ -220,7 +261,12 @@ export function buildJetSurface(o: JetOptions): JetSurface {
   let mesh: Mesh;
   if (o.selfLit) {
     const mat = new MeshBasicNodeMaterial();
-    mat.colorNode = col.mul(o.emissive);
+    // R7.5 law I(mu) = 1 - u (1 - mu), mu = cos of the angle to the view direction (issue #62).
+    const limb =
+      o.limbU === null || o.limbU === undefined
+        ? float(1)
+        : float(1).sub(float(o.limbU).mul(float(1).sub(saturate(normalView.z))));
+    mat.colorNode = col.mul(o.emissive).mul(limb);
     mesh = new Mesh(geo, mat);
   } else {
     // Lit by the scene's DirectionalLight (N5 / R5.1); hot bodies add a self-glow term.
@@ -228,12 +274,22 @@ export function buildJetSurface(o: JetOptions): JetSurface {
     mat.colorNode = o.sunWorld ? col.mul(minnaert(o.sunWorld)) : col;
     mat.roughness = 1;
     mat.metalness = 0;
-    mat.emissiveNode = o.emissive > 0 ? col.mul(o.emissive * 0.6) : vec3(0, 0, 0);
+    mat.emissiveNode = o.emissive > 0 ? col.mul(colourU.mul(o.emissive * 0.6)) : vec3(0, 0, 0);
     mesh = new Mesh(geo, mat);
   }
 
   return {
     mesh,
+    setLayers(l) {
+      bandsU.value = l.bands ? 1 : 0;
+      turbU.value = l.turbulence ? 1 : 0;
+      stormsU.value = l.storms ? 1 : 0;
+      colourU.value = l.colour ? 1 : 0;
+      o.palette.forEach((c, i) => {
+        const t = l.colour ? c : luma(c);
+        palU[i]!.value.set(t[0], t[1], t[2]);
+      });
+    },
     update(f) {
       phaseU.value.set(f.shearA, f.shearB, f.evoA, f.evoB);
       weightU.value = f.weightA;
