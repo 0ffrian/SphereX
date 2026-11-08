@@ -136,7 +136,7 @@ uv run python -m scripts.sky_bake --preview preview.jpg             # 4096x2048 
 | `SX_CUTOUT_CONCURRENCY` | `6` | Live cutout downloads at a time, in one pool shared by every object (issue #41, Q-112). Each object keeps at most this many of its own in the pool, so objects take turns. `1` downloads one after another. **[verify]** the polite limit with IRSA. |
 | `SX_MEASURE_WORKERS` | `2` | Photometry worker processes (`spawn`). `0` measures in the calling thread. |
 | `SX_FIRST_ANSWER_WAIT_S` | `2` | How long `/card` and `/render-params` wait for the refined answer before returning the first-stage answer (Q-111). |
-| `SX_MAX_JOBS` | `4` | Object jobs doing work at once; the rest wait (`stage: queued`). `0` means no cap. |
+| `SX_MAX_JOBS` | `4` | Object jobs downloading all their frames at once (after the first batch); the rest wait in `stage: queued` with their first and partial answers already out. `0` means no cap. |
 | `SX_JOB_TTL_S` | `600` | A finished object job is reused this long; after that a request starts a new run. |
 | `SX_BAKE_TEXTURES` | `1` | Bake the textures a reply points at, both R5 sizes, off the request path (Q-112). Served at `/data/textures`. |
 | `SX_BAKE_WORKERS` | `1` | Bake worker processes. `0` bakes in one background thread. |
