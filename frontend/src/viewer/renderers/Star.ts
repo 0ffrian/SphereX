@@ -96,34 +96,34 @@ export function starSurfaceLayers(flareRateTag: import('@/contract').Tag | null)
     viewerLayer(
       'granulation',
       'artistic',
-      'Convective cells and dark lanes, drawn far larger than real granules so they can be seen. Their size rule (H ~ T/g) is not verified yet, so the pattern is an artist look (R7.5.2).',
+      'Convective cells and dark lanes, drawn far larger than real granules so they can be seen. How big real cells are depends on the star\u2019s mass and surface gravity, which are not checked yet, so the pattern is an artist look.',
     ),
     viewerLayer(
       'spots',
       'inferred_from_analog',
-      'A few sunspot groups alive at once, like the Sun: a leader, a broken-up follower and small pores, each with a dark umbra and a filamentary penumbra. How many, and where, is a typical value and a seeded rule, not a measurement (R7.5.3).',
+      'A few sunspot groups alive at once, like the Sun: a leader, a broken-up follower and small pores, each with a dark centre and a streaky rim. How many, and where, is a typical value and a seeded rule, not a measurement.',
     ),
     viewerLayer(
       'faculae',
       'inferred_from_analog',
-      'Bright patches around the spot groups that brighten towards the limb (R7.5.4).',
+      'Bright patches around the spot groups that brighten towards the edge of the disc.',
     ),
     viewerLayer(
       'flares',
       flareTag,
-      'Flares light two ribbons at a spot group on a seeded schedule at the flare rate. Each is drawn for a fixed length of time on screen; the speed-up applies to the schedule (R7.5.5).',
+      'Flares light two ribbons at a spot group on a seeded schedule at the flare rate. Each is drawn for a few seconds, and they start no more than about once every two seconds, so nothing flashes; the speed-up applies to the schedule.',
     ),
     viewerLayer(
       'prominences',
       'inferred_from_analog',
-      'Loops of plasma along dipole field lines between the leader and the follower of each group; a flare lifts them (R7.5.5).',
+      'Loops of plasma along magnetic field lines between the leader and the follower of each group, seen best at the edge of the disc; a flare lifts them.',
     ),
     viewerLayer(
       'prominence_strands',
       'artistic',
-      'The loops drawn as uneven strands (an artist look, R7.5.5).',
+      'The loops drawn as uneven, tapering strands (an artist look).',
     ),
-    viewerLayer('glow', 'artistic', 'A soft glow around the limb (an artist look, R7.5.1).'),
+    viewerLayer('glow', 'artistic', 'A soft glow around the edge of the star (an artist look).'),
   ];
 }
 
@@ -161,7 +161,9 @@ export function planStar(input: PlanInput, config: StarConfig = STAR_CONFIG): Re
       const proc = processOf(motion, 'pulsation');
       const period = motion.rates.pulsation_period_d;
       if (proc && period) {
-        pulsation = { periodD: period.value, amplitude: PULSATION_AMPLITUDE };
+        // Start where the scrubbed brightness puts the radius, so the two agree at clock time 0.
+        const phase = scrub ? Math.asin(2 * Math.min(1, Math.max(0, scrub.brightness)) - 1) : 0;
+        pulsation = { periodD: period.value, amplitude: PULSATION_AMPLITUDE, phase };
       } else if (scrub) {
         radiusScale = 1 - PULSATION_AMPLITUDE + 2 * PULSATION_AMPLITUDE * scrub.brightness;
       }
