@@ -28,6 +28,14 @@ export const POLL_MAX_ERRORS = 5;
  * further.
  */
 export const POLL_MAX_TIMEOUTS = 5;
+/**
+ * Consecutive replies that still list deferred cutouts but got no further (same frames, same
+ * deferred count) before giving up. Each one waits longer (backoffMs), so a backend that answers
+ * but never downloads anything cannot keep the loop asking every POLL_NEXT_DELAY_MS for ever.
+ */
+export const POLL_MAX_STALLS = 5;
+/** `code` of the ApiError a stalled run gives up with. */
+export const POLL_STALLED_CODE = 'frames_stalled';
 /** Progress updates in the polite live region at most this often (completion always speaks). */
 export const PROGRESS_ANNOUNCE_MIN_MS = 15_000;
 
@@ -194,6 +202,8 @@ export async function pollFrames(o: PollOptions): Promise<PollOutcome> {
   const sleep = o.sleep ?? abortableSleep;
   let errors = 0;
   let timeouts = 0;
+  let stalls = 0;
+  let lastProgress: string | null = null;
   let delay = o.initialDelayMs ?? 0;
   for (;;) {
     if (o.signal.aborted) return { kind: 'aborted' };
@@ -216,7 +226,7 @@ export async function pollFrames(o: PollOptions): Promise<PollOutcome> {
       if (error.kind === 'timeout') {
         timeouts += 1;
         if (timeouts > POLL_MAX_TIMEOUTS) return { kind: 'gave_up', error };
-        delay = POLL_FIRST_BACKOFF_MS;
+        delay = backoffMs(timeouts);
         o.onRetry?.({
           error,
           timeout: true,
@@ -245,6 +255,25 @@ export async function pollFrames(o: PollOptions): Promise<PollOutcome> {
     errors = 0;
     timeouts = 0;
     if (!o.onReply(res)) return { kind: 'done' };
-    delay = POLL_NEXT_DELAY_MS;
+    const progress = `${res.data.frames.length}:${deferredCount(res.data.missing)}`;
+    if (progress === lastProgress) {
+      stalls += 1;
+      if (stalls > POLL_MAX_STALLS) {
+        return {
+          kind: 'gave_up',
+          error: new ApiError(
+            'server',
+            `The server answered ${stalls} times in a row without downloading more cutouts.`,
+            null,
+            POLL_STALLED_CODE,
+          ),
+        };
+      }
+      delay = backoffMs(stalls);
+    } else {
+      stalls = 0;
+      delay = POLL_NEXT_DELAY_MS;
+    }
+    lastProgress = progress;
   }
 }

@@ -67,6 +67,26 @@ async function draw(page: Page, kinds: string[]): Promise<Buffer> {
       { card: read('cards', kind), params: read('params', kind) },
     );
   }
+  // The frame governor (R5.7: one level down after 2 s of frames over 33 ms) can lower the tier
+  // while SwiftShader is slow. A frame drawn at Low is not a TAAU frame, and comparing it with a
+  // Medium one is not a determinism check, so pin Medium again and settle until it holds.
+  const tier = await page.evaluate(async () => {
+    const v = (
+      globalThis as unknown as {
+        __sxViewer: {
+          setQualityTier(t: string): void;
+          freezeClock(s: number): Promise<void>;
+          renderStats(): { tier: string };
+        };
+      }
+    ).__sxViewer;
+    for (let i = 0; i < 3 && v.renderStats().tier !== 'medium'; i++) {
+      v.setQualityTier('medium');
+      await v.freezeClock(0);
+    }
+    return v.renderStats().tier;
+  });
+  expect(tier, 'the governor kept lowering the quality level').toBe('medium');
   const box = (await viewerCanvas(page).boundingBox())!;
   return page.screenshot({ clip: box, mask: [page.getByTestId('viewer-label')] });
 }

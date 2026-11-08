@@ -21,6 +21,9 @@ export function searchErrorMessage(err: SkyError, query: string): string {
     case 'bad_request':
       return 'The server could not use this search. Try a name, or RA, Dec in degrees.';
     case 'server':
+      // POLL_STALLED_CODE (flipbook/progressive.ts): the backend kept answering without progress.
+      if (err.code === 'frames_stalled')
+        return 'The server stopped fetching more cutouts from the archive. Try again in a moment.';
       return err.status === 504
         ? 'The archive is slow or not answering right now. Try again, or pick one of the test targets.'
         : 'The server had a problem or is not answering. Try again in a moment.';
@@ -515,7 +518,7 @@ export function framesRetryText(r: {
   delayMs: number;
 }): string {
   if (r.timeout) {
-    return `No answer within ${Math.round(API_TIMEOUT_MS / 1000)} s. The server keeps downloading in the background, so asking again (retry ${r.failures} of ${r.max}).`;
+    return `No answer within ${Math.round(API_TIMEOUT_MS / 1000)} s. The server keeps downloading in the background, so asking again in ${Math.round(r.delayMs / 1000)} s (retry ${r.failures} of ${r.max}).`;
   }
   return `The server did not answer. Trying again in ${Math.round(r.delayMs / 1000)} s (retry ${r.failures} of ${r.max}).`;
 }

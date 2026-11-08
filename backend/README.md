@@ -21,6 +21,8 @@ From the repo root: `npm run backend:setup`, `backend:dev`, `backend:test`, `bac
 
 In development the frontend's Vite server proxies `/v1` to `http://localhost:8000`. At the event, one process serves the built frontend and the API from one origin (D-24, M5).
 
+**Live budget per setting (Q-99, open):** in development and in any demo that talks to IRSA live, run with `SX_LIVE_CUTOUTS_PER_REQUEST=3`, so each `/frames` reply comes back well inside the frontend's 90 s timeout. The code default stays `24` until the parallel download (#41) lands; the pre-fetch has no cap. On the A15 at the event, `SX_OFFLINE=1` (D-25) serves only the cache, so the value does not matter. See [Settings](#settings-sx_-environment-variables).
+
 ## Shape models (A3.7, Q-61)
 
 `assets/shapes/` holds the shape-model GLBs (`<slug>.glb` at full detail, `<slug>.lod1.glb` at half the grid) and `registry.toml`. The app reads the registry to type an asteroid `asteroid_shape` and serves the meshes at `/data/shapes/<name>.glb`. Set `SX_SHAPES_DIR` to use another folder. To add or refresh a model, download the dataset by hand (the PDS host blocks scripts), then:

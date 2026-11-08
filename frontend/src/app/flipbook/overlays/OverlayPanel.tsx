@@ -138,20 +138,50 @@ function MarkerIcon({ catalog }: { catalog: OverlayCatalogName }) {
 
 /** Contamination of the photometry for this frame, under the frame caption. Nothing when empty. */
 export function ContaminationNote({ view, fixture }: { view: OverlayView; fixture: boolean }) {
+  // Every distinct note in the reply, so its cell is as tall as the longest at any width and a
+  // frame with a shorter note (or none) does not move what follows (R9: nothing jumps during
+  // playback). The same stacking as the flipbook's no-data caption.
+  const notes = useMemo(() => {
+    const byKey = new Map<string, string[]>();
+    for (const f of view.data.frames) {
+      const lines = contaminationLines(f.contamination, view.data);
+      if (lines.length > 0) byKey.set(lines.join('\n'), lines);
+    }
+    return [...byKey.entries()];
+  }, [view.data]);
   const entry = provenanceOf(view.data, 'contamination');
-  if (!view.show.contamination || !view.frame || !entry) return null;
-  const lines = contaminationLines(view.frame.contamination, view.data);
-  if (lines.length === 0) return null;
+  if (!view.show.contamination || !entry || notes.length === 0) return null;
+  const current = view.frame ? contaminationLines(view.frame.contamination, view.data) : [];
+  const currentKey = current.join('\n');
   return (
     <div className="flex flex-wrap items-start gap-x-2 gap-y-1 text-sm" data-testid="contamination">
-      <ul role="list" className="flex flex-col text-amber-100">
-        {lines.map((line) => (
-          <li key={line} className="list-none" data-testid="contamination-line">
-            {line}
-          </li>
-        ))}
-      </ul>
-      <ProvenanceBadge entry={entry} fixture={fixture} />
+      <div className="grid" data-testid="contamination-cell">
+        {notes.map(([key, lines]) => {
+          const on = key === currentKey;
+          return (
+            // `invisible` keeps the space and takes the inactive notes out of the a11y tree.
+            <ul
+              key={key}
+              role="list"
+              className={`col-start-1 row-start-1 flex flex-col text-amber-100 ${on ? '' : 'invisible'}`}
+            >
+              {lines.map((line) => (
+                <li
+                  key={line}
+                  className="list-none"
+                  data-testid={on ? 'contamination-line' : undefined}
+                >
+                  {line}
+                </li>
+              ))}
+            </ul>
+          );
+        })}
+      </div>
+      {/* Always laid out, so the row wraps the same way on every frame; shown with a note. */}
+      <span className={current.length > 0 ? '' : 'invisible'}>
+        <ProvenanceBadge entry={entry} fixture={fixture} />
+      </span>
     </div>
   );
 }

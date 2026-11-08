@@ -13,8 +13,10 @@ import {
   POLL_FIRST_BACKOFF_MS,
   POLL_MAX_BACKOFF_MS,
   POLL_MAX_ERRORS,
+  POLL_MAX_STALLS,
   POLL_MAX_TIMEOUTS,
   POLL_NEXT_DELAY_MS,
+  POLL_STALLED_CODE,
   pollFrames,
   type PollOptions,
 } from './progressive';
@@ -224,9 +226,10 @@ describe('pollFrames', () => {
     const timeout = new ApiError('timeout', 'No answer within 90 s.');
     const h = harness([timeout, timeout, part1, done], { retryErrors: () => false });
     await expect(pollFrames(h.opts)).resolves.toEqual({ kind: 'done' });
+    // Backs off like an error (2 s, 4 s, ...), so a dead backend is not asked every 2 s.
     expect(h.retries).toEqual([
       { timeout: true, failures: 1, delayMs: POLL_FIRST_BACKOFF_MS },
-      { timeout: true, failures: 2, delayMs: POLL_FIRST_BACKOFF_MS },
+      { timeout: true, failures: 2, delayMs: 2 * POLL_FIRST_BACKOFF_MS },
     ]);
     expect(h.replies).toHaveLength(2);
   });
@@ -237,6 +240,41 @@ describe('pollFrames', () => {
     const outcome = await pollFrames(h.opts);
     expect(outcome.kind).toBe('gave_up');
     expect(h.calls()).toBe(POLL_MAX_TIMEOUTS + 1);
+  });
+
+  it('replies that get no further back off, reset on progress, then give up', async () => {
+    const h = harness([
+      part1,
+      part1,
+      part1,
+      part2,
+      ...Array<FramesResponse>(POLL_MAX_STALLS + 1).fill(part2),
+    ]);
+    const outcome = await pollFrames(h.opts);
+    expect(outcome.kind).toBe('gave_up');
+    if (outcome.kind === 'gave_up') {
+      expect(outcome.error.kind).toBe('server');
+      expect(outcome.error.code).toBe(POLL_STALLED_CODE);
+    }
+    // part1 (0.5 s), stalls 2 s, 4 s; part2 is progress (0.5 s); stalls 2, 4, 8, 16, 30 s; give up.
+    expect(h.sleeps).toEqual([
+      POLL_NEXT_DELAY_MS,
+      2000,
+      4000,
+      POLL_NEXT_DELAY_MS,
+      2000,
+      4000,
+      8000,
+      16000,
+      30000,
+    ]);
+    expect(h.calls()).toBe(4 + POLL_MAX_STALLS + 1);
+  });
+
+  it('a stall count does not carry over a reply that got further', async () => {
+    const h = harness([part1, part1, part2, part2, done]);
+    await expect(pollFrames(h.opts)).resolves.toEqual({ kind: 'done' });
+    expect(h.sleeps).toEqual([POLL_NEXT_DELAY_MS, 2000, POLL_NEXT_DELAY_MS, 2000]);
   });
 
   it('before the first reply, a server error ends the search at once (no retries)', async () => {

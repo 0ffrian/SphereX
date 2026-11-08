@@ -4,6 +4,7 @@
 // While the SPHEREx colour composite shows (one picture), every control is disabled and a short
 // note says how to get the frames back (colourMode.ts).
 import { useId } from 'react';
+import { DataBadge } from '@/app/Badge';
 import { formatWavelength } from '@/app/format';
 import { FPS_OPTIONS, type Fps } from '@/app/flipbook/playback';
 import { useFlipbookSession } from '@/app/flipbook/session';
@@ -108,8 +109,13 @@ export function Transport() {
           <span>
             Frame <b>{has ? shown + 1 : '–'}</b>/{has ? n : '–'}
           </span>
+          {/* Not on the span with sx-hide-s: a display utility would beat its phone-width rule. */}
           <span className="sx-hide-s">
-            <b>{frame ? formatWavelength(frame.wavelength_um) : '– µm'}</b>
+            <span className="inline-flex items-center gap-1.5">
+              <b>{frame ? formatWavelength(frame.wavelength_um) : '– µm'}</b>
+              {/* D-02: the frame's wavelength is SPHEREx data, badged as in the frame caption. */}
+              {frame && <DataBadge fixture={sky.fixture} />}
+            </span>
           </span>
         </p>
       )}

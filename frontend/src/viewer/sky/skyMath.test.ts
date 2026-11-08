@@ -2,7 +2,7 @@
 // pointer <-> RA/Dec round trips, agreement with a real r187 PerspectiveCamera, the sphere's UVs
 // against the equirect convention, and the click-versus-drag rule.
 import { describe, expect, it } from 'vitest';
-import { PerspectiveCamera, Vector3 } from 'three';
+import { PerspectiveCamera, Vector3 } from 'three/webgpu';
 import { createSkyGeometry } from './SkyView';
 import {
   cameraBasis,
