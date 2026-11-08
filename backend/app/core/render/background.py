@@ -75,6 +75,9 @@ class TextureBaker:
                         )
                     except RuntimeError as exc:  # pool broken or shut down
                         log.warning("texture bake for %s not queued: %s", object_id, exc)
+                        broken, self._executor = self._executor, None  # rebuilt next time
+                        if broken is not None:
+                            broken.shutdown(wait=False, cancel_futures=True)
                         continue
                     self._inflight[key] = fut
                     fut.add_done_callback(functools.partial(self._done, key))
