@@ -593,10 +593,13 @@ def _shader_kind(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
             "Point cloud from the sliders (R7.7).",
             ["diameter_km"],
         )
+        # Neither has haptics (Q-103): both are drawn as volumes, and what is felt must match what
+        # is drawn (D-34). Nebula: Moon's decision. Nova: until a CPU twin of the baked noise cube
+        # can be sampled; Atish's acceptance is pending (D-13, D-17).
         return {
             "texture": "none",
             "texture_tag": "artistic",
-            "data": "field",
+            "data": "none",
             "data_tag": "artistic",
             "params": {},
         }

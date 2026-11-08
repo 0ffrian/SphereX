@@ -6,7 +6,8 @@ import type { Tag } from '@/contract';
 import { allowedTags, DEFAULT_HONESTY } from '../honesty';
 import type { Overrides } from '../sliders';
 import type { FieldData, FieldParams, FieldSampler, Vec3 } from '../fields/fieldGenerator';
-import type { PointKind, PointSet, PointSets } from './pointClouds';
+import type { TierName } from '../render/quality';
+import type { PointSet } from './pointClouds';
 
 export const ALL_TAGS: readonly Tag[] = [
   'measured',
@@ -45,10 +46,10 @@ export interface BodyContext {
   onChange?: () => void;
   /** The generated layer could not be built (the field failed): the plan refuses it with reason `load`. */
   onFailed?: (layerId: string) => void;
-  /** Replaces the point-cloud Web Worker call (tests). Default: `requestPoints`. */
-  pointSource?: (type: PointKind, seed: number) => Promise<PointSets>;
   /** D-27 slider overrides (relief sliders live on the shader kinds, D-26). */
   overrides?: Overrides;
+  /** Quality level the body is built for (volume steps). Default: medium. */
+  tier?: TierName;
   /** Replaces the field Web Worker (tests). Default: `requestField`. */
   fieldSource?: (params: FieldParams) => Promise<FieldData>;
 }
@@ -73,10 +74,18 @@ export interface BodyRenderer {
    * `worldToBody` to convert a world-space point.
    */
   readonly field: FieldSampler | null;
-  /** Point sets in the body frame (nebula, nova), for the point-density haptic source. */
+  /**
+   * Point sets in the body frame, for the point-density haptic source. No kind has them now: the
+   * nebula and the nova are drawn as volumes and have no haptics (Q-103), until a CPU twin of the
+   * baked noise cube can be sampled for what is felt.
+   */
   readonly pointSets: Readonly<Record<string, PointSet>> | null;
   /** World point -> body frame (accounts for the group scale and the gas-giant tilt). */
   worldToBody(p: Vec3): Vec3;
+  /** The quality level changed (volume steps and octaves). Optional: baked bodies ignore it. */
+  setTier?(tier: TierName): void;
+  /** The TAAU frame index of the frame about to be drawn (volumes shift their jitter by it). */
+  setJitterFrame?(index: number): void;
   setSunDirection(dir: Vec3): void;
   setVisibleTags(tags: readonly Tag[]): void;
   /** D-27. Rebuilds what the changed sliders affect; resolves when drawn. */

@@ -21,12 +21,16 @@ import {
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { ObjectCard, RenderParams } from '@/contract';
 import { buildLights, MAX_AMBIENT_INTENSITY } from './lighting';
+import { bodyScreenPx, shadowSettings } from './shape/shapeModel';
 import type { PlanContext, RenderPlan, SpinPlan } from './planTypes';
+import type { Overrides } from './sliders';
 import { planRender } from './renderPlan';
 import type { BodyRenderer } from './renderers/bodyRenderer';
 import { AssetCache, buildScene, type BuildHooks, type BuiltScene } from './renderers/build';
 import { SimClock, type PauseReason } from './render/clock';
 import { RenderChain } from './render/pipeline';
+import { noiseBakePending, whenNoiseIdle } from './volume/noiseVolume';
+import { onVolumeNoiseReady } from './volume/VolumeBody';
 import {
   FEED_GAP_MS,
   FrameGovernor,
@@ -116,6 +120,8 @@ export function sceneKey(plan: RenderPlan): string {
     plan.screens,
     plan.trails,
     plan.dust,
+    plan.volumes,
+    plan.shape,
     plan.spin,
     // The shader kinds: what the body is built from. Honesty and light are not in it (they update
     // the body in place), so a toggle does not regenerate the field.
@@ -218,6 +224,7 @@ export class ViewerApp {
   private readonly assets = new AssetCache();
   /** Content in the scene; `built` may be newer while its shaders compile (never blank). */
   private onScreen: BuiltScene | null = null;
+  private unsubscribeNoise: (() => void) | null = null;
   private compileToken = 0;
   private compiling: Promise<void> | null = null;
   /**
@@ -253,6 +260,7 @@ export class ViewerApp {
   private motionQuery: MediaQueryList | null = null;
   /** Called when a mesh or texture fails to load; the panel adds the layer to `failed` and re-plans. */
   private onLoadFailed: ((layerId: string) => void) | null = null;
+  private onMeshMeasured: ((m: { radiusM: number }) => void) | null = null;
   /** Tests only: field and point sources and slider overrides for the shader kinds. */
   private shaderOptions: BuildHooks['shader'];
 
@@ -262,6 +270,11 @@ export class ViewerApp {
 
   setLoadFailedHandler(handler: ((layerId: string) => void) | null): void {
     this.onLoadFailed = handler;
+  }
+
+  /** Called when a shape model loads, with half of its longest box extent in metres (the real size). */
+  setMeshMeasuredHandler(handler: ((m: { radiusM: number }) => void) | null): void {
+    this.onMeshMeasured = handler;
   }
   private readonly resizeObserver: ResizeObserver | null;
   private dprQuery: MediaQueryList | null = null;
@@ -293,6 +306,8 @@ export class ViewerApp {
     // r187: after init(), `backend` is a WebGPUBackend or, after fallback, a WebGLBackend.
     this.backend = 'isWebGPUBackend' in renderer.backend ? 'webgpu' : 'webgl2';
 
+    // R7.1: shape models self-shadow through the Sun light's shadow map (only lights that ask).
+    if (renderer.shadowMap) renderer.shadowMap.enabled = true;
     renderer.setPixelRatio(viewerPixelRatio(window.devicePixelRatio || 1));
     renderer.setClearColor(new Color(SPACE_BACKGROUND), 1);
     this.coarsePointer =
@@ -354,6 +369,12 @@ export class ViewerApp {
       };
     }
 
+    // A volume's noise cube arrives a little after the build (sliced bake): draw it, from a fresh
+    // temporal history so the settled frame does not depend on the empty frames before it.
+    this.unsubscribeNoise = onVolumeNoiseReady(() => {
+      if (!this.disposed && this.onScreen) this.restartSettle();
+    });
+
     // R9: the reduced-motion preference is read live, so spin stops when it is switched on.
     if (typeof window.matchMedia === 'function') {
       this.motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -395,6 +416,15 @@ export class ViewerApp {
     this.shaderOptions = options;
   }
 
+  /**
+   * D-27 slider values for the generated body: kept for the next build and applied to the body on
+   * screen now (the remnant age slider moves the shell without a rebuild).
+   */
+  setOverrides(overrides: Overrides): void {
+    this.shaderOptions = { ...this.shaderOptions, overrides };
+    void this.built?.body?.setOverrides(overrides);
+  }
+
   /** The generated body of a shader kind (haptics read its field and points), else null. */
   get body(): BodyRenderer | null {
     return this.built?.body ?? null;
@@ -405,7 +435,10 @@ export class ViewerApp {
     if (this.disposed) return;
     // The new lights go on with the content they belong to: an old object still on screen while
     // the new one compiles is not lit from the new object's phase angle.
-    const lights = buildLights(plan.lighting);
+    const lights = buildLights(
+      plan.lighting,
+      plan.shape?.shadows ? shadowSettings(this.tier) : null,
+    );
     const key = sceneKey(plan);
     if (this.built && key === this.builtKey) {
       // Nothing that is built changed: only the lights, the honesty state or the labels did. A
@@ -427,6 +460,9 @@ export class ViewerApp {
     this.builtKey = '';
     this.pending = null;
     let next: BuiltScene | null = null;
+    // A mesh that finishes loading in a scene that is no longer the current plan must not report its
+    // size: the panel would attach it to the new object (Bennu's size on a cached Eros).
+    const buildToken = this.compileToken;
     if (plan.threeD && (plan.bodies.length > 0 || plan.shader !== null)) {
       try {
         next = buildScene(
@@ -434,6 +470,10 @@ export class ViewerApp {
           {
             onLoadFailed: (id) => this.onLoadFailed?.(id),
             onChange: this.requestRender,
+            tier: this.tier,
+            onMeshMeasured: (m) => {
+              if (buildToken === this.compileToken) this.onMeshMeasured?.(m);
+            },
             shader: this.shaderOptions,
           },
           this.assets,
@@ -605,7 +645,12 @@ export class ViewerApp {
   }
 
   private setLights(next: Object3D[]): void {
-    for (const l of this.lights) this.scene.remove(l);
+    for (const l of this.lights) {
+      this.scene.remove(l);
+      // A shadow-casting light owns a shadow map (about 16 MB at 2048): free it, or every
+      // honesty, epoch or mode toggle leaves one behind.
+      if (l instanceof DirectionalLight) l.shadow.dispose();
+    }
     this.lights = next;
     for (const l of next) this.scene.add(l);
   }
@@ -634,8 +679,13 @@ export class ViewerApp {
   /** One frame: through the pipeline, or plain if the pipeline is missing or failed. */
   private draw(): void {
     this.frames++;
+    this.updateScreenSize();
     if (this.chain) {
       try {
+        // Volumes shift their per-pixel ray jitter by the TAAU frame index (same index after a
+        // restart, so a settled frame is deterministic).
+        const jitter = this.chain.jitterIndex();
+        if (jitter !== null) this.onScreen?.setJitterFrame(jitter);
         this.chain.render();
         return;
       } catch (err) {
@@ -643,6 +693,20 @@ export class ViewerApp {
       }
     }
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /** The 160 px level-of-detail rule: tell the shape model how big it is on screen now. */
+  private updateScreenSize(): void {
+    const scene = this.onScreen;
+    if (!scene || scene.shapeRadius === null) return;
+    scene.setScreenPx(
+      bodyScreenPx(
+        scene.shapeRadius,
+        this.camera.position.distanceTo(this.controls.target),
+        CAMERA_FOV_DEG,
+        this.canvas.clientHeight,
+      ),
+    );
   }
 
   private dropChain(err: unknown): void {
@@ -685,6 +749,7 @@ export class ViewerApp {
     this.tier = name;
     this.governor.setTier(name);
     this.cap.setInterval(capIntervalMs(name, this.coarsePointer));
+    this.built?.setTier(name);
     if (this.chain) {
       try {
         this.chain.setTier(name);
@@ -711,6 +776,12 @@ export class ViewerApp {
 
   /** Resolves when no settle burst is pending and no shader compile is in flight. */
   async whenSettled(): Promise<void> {
+    // A volume's noise cube is baked in slices after the build: wait for it and for the redraw it
+    // asks for, so a settled frame always has its noise.
+    if (noiseBakePending()) {
+      await whenNoiseIdle();
+      await new Promise<void>((r) => setTimeout(r, 0));
+    }
     while (this.compiling) await this.compiling;
     if (this.disposed || this.burstLeft <= 0) return;
     await new Promise<void>((resolve) => this.settleWaiters.push(resolve));
@@ -816,6 +887,8 @@ export class ViewerApp {
     this.intersection?.disconnect();
     this.intersection = null;
     document.removeEventListener('visibilitychange', this.onVisibility);
+    this.unsubscribeNoise?.();
+    this.unsubscribeNoise = null;
     this.clearBuilt();
     this.chain?.dispose();
     this.chain = null;

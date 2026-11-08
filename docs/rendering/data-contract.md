@@ -99,7 +99,8 @@ interface RenderParams {
   id: string; type: ObjectType; generator_version: string; seed: number;   // seed: integer >= 0 (Q-35)
   scale_m: number | null;              // physical radius in metres; null = size unknown, body refused (Q-33)
   layers: Layer[];                     // ordered, each with a tag
-  textures?: { albedo: string; height: string; normal: string; roughness?: string; height_bin?: string };
+  // relief_amp: peak relief, fraction of the radius (R6.2); scales the displacement (R7.2). Optional, the backend does not send it yet (Q-103)
+  textures?: { albedo: string; height: string; normal: string; roughness?: string; height_bin?: string; relief_amp?: number };
   lighting: { mode: 'sun' | 'self'; sun_dir?: [number, number, number]; phase_angle_deg?: number };
                                        // sun_dir: today a copy of the card's ICRF sun_vector; the viewer reads it
                                        // as scene space. Frame conversion open (Q-62); phase_angle_deg wins

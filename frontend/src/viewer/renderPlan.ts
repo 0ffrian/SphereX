@@ -81,6 +81,7 @@ export function planRender(card: ObjectCard, params: RenderParams, ctx: PlanCont
       screens: [],
       trails: [],
       dust: null,
+      volumes: [],
       drawn: [],
       missing: [{ id: 'body', reason: 'data', detail: 'The data was not usable.' }],
       notes: [],
@@ -110,6 +111,7 @@ export function planRender(card: ObjectCard, params: RenderParams, ctx: PlanCont
       scrub: null,
       relief: 'illustrative',
       shader: null,
+      shape: null,
     };
   }
 }
