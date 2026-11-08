@@ -1,4 +1,4 @@
-// Q-87: the scale bar uses the shape model's own size only for a glTF in metres (Q-61), with its
+// Q-103: the scale bar uses the shape model's own size only for a glTF in metres (Q-61), with its
 // own tag; otherwise it keeps the card's size and the card's tag. The two are never mixed.
 import { describe, expect, it } from 'vitest';
 import { isGltfUrl, MODEL_SIZE_TAG, shownSize } from './scaleBar';

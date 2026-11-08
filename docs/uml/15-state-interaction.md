@@ -83,4 +83,4 @@ stateDiagram-v2
 - Whatever pauses the clock, a change (honesty, new plan, rotate, zoom) still renders one settle burst. How the viewer implements motion and quality levels is Q-66 in [decisions](../decisions.md).
 - Whether a `stop` event is sent on pointer up is not stated **[verify]**.
 - On iPhone, iPad and desktop, Feeling produces sound only (D-08, D-10).
-- Feeling works on every kind except the nebula, which has no haptics (user decision, Q-87; it overrides the D-12 nebula field pulse). Novae get the D-12 field pulse (D-20). Each emitted event also fires the `spherex:haptic` debug event, which drives the on-screen pulse indicator ([11-sequence-touch-haptics.md](11-sequence-touch-haptics.md)).
+- Feeling works on every kind except the nebula, which has no haptics (user decision, Q-103; it overrides the D-12 nebula field pulse). Novae get the D-12 field pulse (D-20). Each emitted event also fires the `spherex:haptic` debug event, which drives the on-screen pulse indicator ([11-sequence-touch-haptics.md](11-sequence-touch-haptics.md)).

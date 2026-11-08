@@ -248,7 +248,7 @@ describe('ShaderBody field and point access for the haptic sources (review N1)',
       const f = fixture(k);
       const body = await ShaderBody.create(f.card, f.params, ctx);
       if (k === 'nebula') {
-        // Q-87: the nebula has no haptics, so it keeps no point sets.
+        // Q-103: the nebula has no haptics, so it keeps no point sets.
         expect(body.field).toBeNull();
         expect(body.pointSets).toBeNull();
       } else if (k === 'nova') {
@@ -282,7 +282,7 @@ describe('ShaderBody field and point access for the haptic sources (review N1)',
     expect(world.worldToBody([0.3, 0.4, 0.5])).toEqual([0.3, 0.4, 0.5]);
   });
 
-  it('the nebula asks for no points (no haptics, Q-87)', async () => {
+  it('the nebula asks for no points (no haptics, Q-103)', async () => {
     const n = fixture('nebula');
     const asked: string[] = [];
     await ShaderBody.create(n.card, n.params, {

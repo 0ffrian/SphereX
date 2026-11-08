@@ -141,7 +141,7 @@ export interface DensityOptions {
   maxRateHz?: number;
 }
 
-/** Nova (the nebula has no haptics, Q-87): rate ∝ local point density (R8.4 item 4). */
+/** Nova (the nebula has no haptics, Q-103): rate ∝ local point density (R8.4 item 4). */
 export class PointDensitySource implements HapticSource {
   readonly id = 'field';
   readonly channel = 'data' as const;
