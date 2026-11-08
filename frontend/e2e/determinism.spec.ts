@@ -4,6 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
+import { openViewer, viewerCanvas } from './viewer';
 
 const read = (dir: string, k: string) =>
   JSON.parse(
@@ -41,7 +42,7 @@ async function maxChannelDiff(page: Page, a: Buffer, b: Buffer): Promise<number>
 }
 
 async function draw(page: Page, kinds: string[]): Promise<Buffer> {
-  await page.goto('/');
+  await openViewer(page);
   const status = page.getByTestId('renderer-status');
   await expect(status).not.toHaveAttribute('data-status', 'starting', { timeout: 30_000 });
   test.skip((await status.getAttribute('data-status')) === 'unavailable', 'no 3D backend');
@@ -66,7 +67,7 @@ async function draw(page: Page, kinds: string[]): Promise<Buffer> {
       { card: read('cards', kind), params: read('params', kind) },
     );
   }
-  const box = (await page.locator('canvas[aria-label]').boundingBox())!;
+  const box = (await viewerCanvas(page).boundingBox())!;
   return page.screenshot({ clip: box, mask: [page.getByTestId('viewer-label')] });
 }
 

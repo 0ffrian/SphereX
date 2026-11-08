@@ -3,18 +3,8 @@
 // compile and draw something, not that they look right on a real GPU (that stays a manual check).
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { expect, test, type Page } from '@playwright/test';
-
-/** The 3D viewer opens from the shell's tool rail; the sky view is the main pane. */
-async function openViewer(page: Page) {
-  await page.goto('/');
-  await page
-    .getByRole('navigation', { name: 'Tools' })
-    .getByRole('button', { name: '3D viewer' })
-    .click();
-  // Off the rail, so its hover tooltip is not over the canvas in the reference screenshots.
-  await page.mouse.move(0, 0);
-}
+import { expect, test } from '@playwright/test';
+import { openViewer, viewerCanvas } from './viewer';
 
 // Honesty: the D-21 default (+ Estimated) hides artistic layers, so the render tests ask for
 // "+ Artistic". They draw through the panel's own path (planRender -> showPlan, window.__sxShow).
@@ -76,7 +66,7 @@ for (const view of VIEWS) {
     test.skip((await status.getAttribute('data-status')) === 'unavailable', 'no 3D backend');
     await page.waitForFunction(() => '__sxViewer' in globalThis);
 
-    const canvas = page.getByTestId('viewer-card').locator('canvas[aria-label]');
+    const canvas = viewerCanvas(page);
     const before = await canvas.screenshot();
     const result = await page.evaluate(
       async ({ card, params, lightDir, overrides, rotateLeft, rotateUp }) => {
