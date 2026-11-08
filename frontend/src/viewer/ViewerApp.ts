@@ -254,6 +254,8 @@ export class ViewerApp {
   private drops = 0;
   private readonly frameTimes: number[] = [];
   private burstLeft = 0;
+  /** A TAAU restart waits for its first loop frame, which is drawn and discarded (see restartSettle). */
+  private primePending = false;
   private loopLast: number | null = null;
   /** R5.7 phone frame-rate cap; no cap on desktop or the medium and high levels. */
   private readonly cap = new FrameCap();
@@ -681,7 +683,22 @@ export class ViewerApp {
    * the history (`requestRender`), since that is what temporal AA is for while moving.
    */
   private restartSettle(): void {
-    this.chain?.restartTemporal();
+    const chain = this.chain;
+    chain?.restartTemporal();
+    if (chain?.config.aa === 'taau') {
+      // r187 keeps one snapshot of the camera per display frame (VelocityNode, and TAAUNode's own
+      // matrices): the first draw of a display frame stores it, a second draw in the same frame
+      // reuses it. Drawing here, between loop frames, may land in a display frame the loop already
+      // drew in, so the next frame reprojects the history from a stale camera. Where that happens
+      // depends on timing, and it shifted the settled frame by up to 53 levels. So nothing is drawn
+      // here: the loop draws one frame per display frame, the first of them (which still sees the
+      // old camera or content) is discarded and history restarts after it, and the 32 that follow
+      // are one clean jitter cycle. The canvas keeps the last frame meanwhile (no blank frame).
+      this.primePending = true;
+      this.burstLeft = Math.max(this.burstLeft, this.settleFrames() + 1);
+      this.schedule();
+      return;
+    }
     this.renderNow();
   }
 
@@ -834,6 +851,10 @@ export class ViewerApp {
       if (drop) this.applyTier(drop.to, true);
     }
     this.loopLast = now;
+    if (this.primePending) {
+      this.primePending = false;
+      this.chain?.restartTemporal();
+    }
     if (this.burstLeft > 0) this.burstLeft--;
     if (this.burstLeft === 0) this.flushSettled();
     if (this.clock.running || this.burstLeft > 0) {
