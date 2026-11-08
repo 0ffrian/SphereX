@@ -35,7 +35,7 @@ vi.mock('@/viewer/ViewerApp', async (importOriginal) => {
 });
 
 // Imported after the mock is registered (vi.mock is hoisted).
-import { ViewerPanel } from './ViewerPanel';
+import { ageFromLog, ViewerPanel } from './ViewerPanel';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -183,7 +183,7 @@ describe('ViewerPanel', () => {
     const { card, params } = fixture('asteroid_shape');
     useAppStore.getState().setObject(card, params);
     await mount();
-    expect(text('scale-bar')).toContain('10 km across');
+    expect(text('scale-bar')).toContain('10 km long');
     expect(text('scale-bar')).toContain('Le Morne Brabant');
   });
 
@@ -220,10 +220,10 @@ describe('ViewerPanel', () => {
     const { card, params } = fixture('comet');
     useAppStore.getState().setObject(card, params);
     await mount();
-    expect(text('scale-bar')).toContain('At most 2 km across (upper limit)');
+    expect(text('scale-bar')).toContain('At most 2 km long (upper limit)');
     expect(text('scale-bar')).toContain('at most about');
-    expect(canvasLabel()).toContain('at most 2 km across (upper limit');
-    expect(canvasLabel()).not.toMatch(/, 2 km across/);
+    expect(canvasLabel()).toContain('at most 2 km long (upper limit');
+    expect(canvasLabel()).not.toMatch(/, 2 km long/);
   });
 
   it('an estimated size gives its formula, assumption or source: tooltip, text and a Why button (B4)', async () => {
@@ -336,7 +336,7 @@ describe('ViewerPanel: remnant age slider (issue #43)', () => {
   };
   const slider = () => container.querySelector('input[type="range"]') as HTMLInputElement | null;
 
-  it('is hidden while the remnant is hidden, shown at + Artistic, with a name, value text and badge', async () => {
+  it('is hidden while the remnant is hidden, shown at + Artistic, with a stable name, value text and badge', async () => {
     setNova();
     await mount();
     expect(slider()).toBeNull(); // + Estimated: the remnant is an artist's impression, not drawn
@@ -344,30 +344,56 @@ describe('ViewerPanel: remnant age slider (issue #43)', () => {
     const input = slider()!;
     expect(input).not.toBeNull();
     expect(input.className).toMatch(/min-h-11/);
+    // Log-mapped: log10 years, 1 to 5, fine steps.
+    expect([input.min, input.max, input.step]).toEqual(['1', '5', '0.01']);
     expect(input.getAttribute('aria-valuetext')).toMatch(/years old$/);
-    const label = input.closest('label')!;
-    expect(label.textContent).toMatch(/Age of the remnant/);
-    expect(label.textContent).toMatch(/Default/); // the Artistic tag shows as the Default badge
-    expect(label.textContent).toMatch(/not a measurement/);
+    // The name is the plain phrase only; the value and the hint are not part of it.
+    const name = document.getElementById(input.getAttribute('aria-labelledby')!)!;
+    expect(name.textContent).toBe('Age of the remnant');
+    const hint = document.getElementById(input.getAttribute('aria-describedby')!)!;
+    expect(hint.textContent).toMatch(/not a measurement/);
+    expect(input.closest('div')!.textContent).toMatch(/Default/); // the Artistic tag shows as Default
   });
 
-  it('passes the age to the viewer, and a new object starts from the default', async () => {
+  it('passes the age to the viewer through the store overrides, and a new object starts from the default', async () => {
     setNova();
     await mount();
     await click('+ Artistic');
     await act(async () => {
       const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
-      set.call(slider()!, '5000');
+      set.call(slider()!, String(Math.log10(5000)));
       slider()!.dispatchEvent(new Event('input', { bubbles: true }));
     });
+    expect(useAppStore.getState().overrides.age_yr).toBe(5000);
     expect(fake.setOverrides).toHaveBeenLastCalledWith({ age_yr: 5000 });
     expect(slider()!.getAttribute('aria-valuetext')).toBe('5,000 years old');
+    // The store's reset clears it too.
+    await act(async () => useAppStore.getState().resetOverrides());
+    expect(fake.setOverrides).toHaveBeenLastCalledWith({});
+    expect(slider()!.getAttribute('aria-valuetext')).toBe('100,000 years old');
+    await act(async () => {
+      useAppStore.getState().setOverride('age_yr', 300);
+    });
     const other = fixture('nova');
     other.params.id = 'fixture:nova-2';
     await act(async () => {
       useAppStore.getState().setObject(other.card, other.params);
     });
     expect(fake.setOverrides).toHaveBeenLastCalledWith({});
+  });
+
+  it('says the size is the shell at the slider maximum, in the bar', async () => {
+    setNova();
+    await mount();
+    await click('+ Artistic');
+    expect(text('scale-bar')).toMatch(/long at the slider maximum/);
+  });
+
+  it('ageFromLog maps the log position to rounded years inside the range', () => {
+    expect(ageFromLog(1)).toBe(10);
+    expect(ageFromLog(5)).toBe(100000);
+    expect(ageFromLog(3.69897)).toBe(5000);
+    expect(ageFromLog(0)).toBe(10);
   });
 
   it('is not offered for other types', async () => {
@@ -397,7 +423,7 @@ describe('ViewerPanel: one size for the bar, the label and the announcement (iss
     const cardSize = canvasLabel();
     await measured(16_500);
     expect(text('scale-bar')).toMatch(/33 km/);
-    expect(canvasLabel()).toMatch(/33 km across \(estimated\)/);
+    expect(canvasLabel()).toMatch(/33 km long \(estimated\)/);
     expect(canvasLabel()).not.toBe(cardSize);
     // Measured only hides the model-dependent size: the card's size and its own tag are read out.
     await click('Measured only');
@@ -405,6 +431,22 @@ describe('ViewerPanel: one size for the bar, the label and the announcement (iss
     expect(text('viewer-announcer')).toMatch(/Measured only/);
     // Back to + Estimated: the swap to the model's size is said.
     await click('+ Estimated');
-    expect(text('viewer-announcer')).toMatch(/Size shown: 33 km across \(estimated\)/);
+    expect(text('viewer-announcer')).toMatch(/Size shown: 33 km long \(estimated\)/);
+  });
+});
+
+describe('ViewerPanel: a size report does not redraw the plan (issue #43)', () => {
+  it('showPlan runs once for one plan, even when the model reports its size', async () => {
+    const { card, params } = fixture('asteroid_shape');
+    card.shape_source = { value: '/data/shapes/eros-gaskell.glb', tag: 'measured', source: 'test' };
+    useAppStore.getState().setObject(card, params);
+    await mount();
+    const calls = fake.showPlan.mock.calls.length;
+    const handler = fake.setMeshMeasuredHandler.mock.calls.at(-1)?.[0] as
+      ((m: { radiusM: number }) => void) | null | undefined;
+    await act(async () => handler!({ radiusM: 16_500 }));
+    await act(async () => handler!({ radiusM: 16_400 }));
+    expect(fake.showPlan.mock.calls.length).toBe(calls);
+    expect(canvasLabel()).toMatch(/km long/); // the label still follows the size
   });
 });

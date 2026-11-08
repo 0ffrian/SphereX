@@ -84,6 +84,8 @@ export interface BodyRenderer {
   worldToBody(p: Vec3): Vec3;
   /** The quality level changed (volume steps and octaves). Optional: baked bodies ignore it. */
   setTier?(tier: TierName): void;
+  /** The TAAU frame index of the frame about to be drawn (volumes shift their jitter by it). */
+  setJitterFrame?(index: number): void;
   setSunDirection(dir: Vec3): void;
   setVisibleTags(tags: readonly Tag[]): void;
   /** D-27. Rebuilds what the changed sliders affect; resolves when drawn. */

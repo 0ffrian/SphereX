@@ -1,8 +1,15 @@
 // Issue #43, R7.1: bakes per-vertex ambient occlusion into a model's geometry (`ao` attribute,
 // 0..1) with a BVH ray test. Deterministic (fixed Fibonacci directions, no random numbers), runs
-// in slices so the main thread keeps drawing (the body is lit without AO until it finishes).
+// in slices, with the BVH built in a worker, so the main thread keeps drawing (the body is lit without AO until it finishes).
 // Tag: `derived` (formula: cosine-weighted hemisphere visibility of the measured shape).
-import { BufferAttribute, DoubleSide, Ray, Vector3, type BufferGeometry } from 'three/webgpu';
+import {
+  BufferAttribute,
+  BufferGeometry as Geometry,
+  DoubleSide,
+  Ray,
+  Vector3,
+  type BufferGeometry,
+} from 'three/webgpu';
 import { MeshBVH } from 'three-mesh-bvh';
 import { aoVisibility, hemisphereDirections, type Vec3 } from './shapeModel';
 
@@ -13,6 +20,58 @@ export const AO_FORMULA =
 const AO_REACH = 0.25;
 /** Vertices per slice before yielding to the browser. */
 const SLICE = 600;
+
+/**
+ * Builds the BVH off the main thread: a Web Worker (three-mesh-bvh's own) on a private copy of the
+ * positions and indices, because the worker takes the buffers it is given and the shown geometry
+ * must keep its own. The returned tree refers to the copy, which has the same coordinates. Without
+ * Workers (or if the worker fails, or the positions are interleaved) the tree is built on the
+ * main thread, as before. The queue keeps one worker busy with one model at a time and ends it
+ * when idle.
+ */
+let queued = 0;
+let tail: Promise<unknown> = Promise.resolve();
+let sharedWorker: { generate(g: BufferGeometry): Promise<MeshBVH>; dispose(): void } | null = null;
+
+function privateCopy(geometry: BufferGeometry): BufferGeometry | null {
+  const pos = geometry.getAttribute('position');
+  if (!pos || 'isInterleavedBufferAttribute' in pos) return null;
+  const copy = new Geometry();
+  copy.setAttribute('position', new BufferAttribute(new Float32Array(pos.array), 3));
+  const index = geometry.getIndex();
+  if (index) {
+    if ('isInterleavedBufferAttribute' in index) return null;
+    const Ctor = index.array.constructor as new (a: ArrayLike<number>) => Uint16Array | Uint32Array;
+    copy.setIndex(new BufferAttribute(new Ctor(index.array), 1));
+  }
+  return copy;
+}
+
+export async function buildBvh(geometry: BufferGeometry): Promise<MeshBVH> {
+  const copy = typeof Worker === 'undefined' ? null : privateCopy(geometry);
+  if (!copy) return new MeshBVH(geometry);
+  queued++;
+  const run = tail.then(async () => {
+    try {
+      if (!sharedWorker) {
+        const { GenerateMeshBVHWorker } = await import('three-mesh-bvh/worker');
+        sharedWorker = new GenerateMeshBVHWorker();
+      }
+      return await sharedWorker.generate(copy);
+    } catch {
+      sharedWorker?.dispose();
+      sharedWorker = null;
+      return null;
+    }
+  });
+  tail = run.catch(() => undefined);
+  const bvh = await run;
+  if (--queued === 0) {
+    sharedWorker?.dispose();
+    sharedWorker = null;
+  }
+  return bvh ?? new MeshBVH(geometry);
+}
 
 const yieldToBrowser = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
 
@@ -35,7 +94,8 @@ export async function bakeVertexAo(
   const radius = geometry.boundingSphere?.radius ?? 0;
   if (!(radius > 0)) return false;
 
-  const bvh = new MeshBVH(geometry);
+  const bvh = await buildBvh(geometry);
+  if (isCancelled()) return false;
   const dirs = hemisphereDirections(rays);
   const far = radius * AO_REACH;
   const eps = radius * 1e-3;

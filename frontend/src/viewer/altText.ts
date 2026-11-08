@@ -48,12 +48,14 @@ function sizeText(plan: RenderPlan, shown?: ShownSize | null): string {
   const tag = tagOf ? tagWord(tagOf) : null;
   const qualifier = shown ? shown.qualifier : plan.sizeQualifier;
   // An upper limit is read out as a bound, never as a measurement (R7.3).
+  // The remnant's age slider draws the shell smaller than its full size (Q-103).
+  const at = shown?.atSliderMax ? ' at the slider maximum' : '';
   if (qualifier === 'upper_limit')
-    return `at most ${d} across (upper limit${tag ? `, ${tag}` : ''})`;
-  return tag ? `${d} across (${tag})` : `${d} across`;
+    return `at most ${d} long${at} (upper limit${tag ? `, ${tag}` : ''})`;
+  return tag ? `${d} long${at} (${tag})` : `${d} long${at}`;
 }
 
-/** "Size shown: 33 km across (estimated)". Said when the honesty level changes which size shows. */
+/** "Size shown: 33 km long (estimated)". Said when the honesty level changes which size shows. */
 export function sizeAnnouncement(plan: RenderPlan, shown: ShownSize): string {
   return `Size shown: ${sizeText(plan, shown)}.`;
 }

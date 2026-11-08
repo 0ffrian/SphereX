@@ -1,11 +1,13 @@
 // Issue #43: shape-model logic (LOD choice, resolution, Lommel-Seeliger, AO sampling, shadows).
 import { Float32BufferAttribute, BufferGeometry } from 'three/webgpu';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { bakeVertexAo } from './ShapeAo';
 import {
   AO_RAYS,
   aoVisibility,
+  bodyScreenPx,
   chooseLod,
+  LOD_HYSTERESIS,
   hemisphereDirections,
   LOD1_MAX_SCREEN_PX,
   lodUrls,
@@ -238,5 +240,97 @@ describe('shadow map settings', () => {
     expect(shadowSettings('low').mapSize).toBeLessThan(shadowSettings('medium').mapSize);
     expect(shadowSettings('medium').mapSize).toBe(shadowSettings('high').mapSize);
     expect(shadowSettings('low').extent).toBeGreaterThan(1);
+  });
+});
+
+describe('BVH build off the main thread (review follow-up)', () => {
+  const tri = () => {
+    const g = new BufferGeometry();
+    g.setAttribute('position', new Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 1, 0], 3));
+    g.setIndex([0, 1, 2]);
+    return g;
+  };
+
+  it('uses the worker on a private copy, leaves the shown geometry alone, and ends the worker', async () => {
+    const generated: BufferGeometry[] = [];
+    const disposed = vi.fn();
+    vi.resetModules();
+    vi.doMock('three-mesh-bvh/worker', async () => {
+      const { MeshBVH } = await import('three-mesh-bvh');
+      return {
+        GenerateMeshBVHWorker: class {
+          generate(g: BufferGeometry) {
+            generated.push(g);
+            return Promise.resolve(new MeshBVH(g));
+          }
+          dispose = disposed;
+        },
+      };
+    });
+    vi.stubGlobal('Worker', class {});
+    try {
+      const { buildBvh } = await import('./ShapeAo');
+      const shown = tri();
+      const bvh = await buildBvh(shown);
+      expect(generated).toHaveLength(1);
+      expect(generated[0]).not.toBe(shown);
+      expect(bvh.geometry).toBe(generated[0]);
+      expect(shown.getAttribute('position').array).toHaveLength(9); // still there
+      expect(disposed).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+      vi.doUnmock('three-mesh-bvh/worker');
+      vi.resetModules();
+    }
+  });
+
+  it('falls back to the main thread when there is no Worker or the worker fails', async () => {
+    const { buildBvh } = await import('./ShapeAo');
+    const g = tri();
+    expect((await buildBvh(g)).geometry).toBe(g);
+    vi.doMock('three-mesh-bvh/worker', () => ({
+      GenerateMeshBVHWorker: class {
+        generate() {
+          return Promise.reject(new Error('boom'));
+        }
+        dispose() {}
+      },
+    }));
+    vi.stubGlobal('Worker', class {});
+    try {
+      vi.resetModules();
+      const again = await import('./ShapeAo');
+      const h = tri();
+      expect((await again.buildBvh(h)).geometry).toBe(h);
+    } finally {
+      vi.unstubAllGlobals();
+      vi.doUnmock('three-mesh-bvh/worker');
+      vi.resetModules();
+    }
+  });
+});
+
+describe('160 px level-of-detail rule wired to the screen size', () => {
+  it('bodyScreenPx follows radius, distance, field of view and viewport height', () => {
+    // fov 90: the visible height at distance d is 2d, so a radius-1 body at d = 4 fills a quarter.
+    expect(bodyScreenPx(1, 4, 90, 800)).toBeCloseTo(200, 9);
+    expect(bodyScreenPx(1, 8, 90, 800)).toBeCloseTo(100, 9); // twice as far, half as big
+    expect(bodyScreenPx(2, 8, 90, 800)).toBeCloseTo(200, 9);
+  });
+  it('is null for anything that is not a positive number (the rule then does not apply)', () => {
+    expect(bodyScreenPx(0, 4, 40, 800)).toBeNull();
+    expect(bodyScreenPx(1, NaN, 40, 800)).toBeNull();
+    expect(bodyScreenPx(1, 4, 40, 0)).toBeNull();
+    expect(bodyScreenPx(1, 4, 180, 800)).toBeNull();
+  });
+  it('a small body takes the coarse level at medium and high; a large one does not', () => {
+    expect(chooseLod('medium', 100, true)).toBe(1);
+    expect(chooseLod('high', 400, true)).toBe(0);
+  });
+  it('keeps the coarse level until the body is clearly larger (hysteresis)', () => {
+    const mid = LOD1_MAX_SCREEN_PX * ((1 + LOD_HYSTERESIS) / 2);
+    expect(chooseLod('high', mid, true, 1)).toBe(1);
+    expect(chooseLod('high', mid, true, 0)).toBe(0);
+    expect(chooseLod('high', LOD1_MAX_SCREEN_PX * LOD_HYSTERESIS, true, 1)).toBe(0);
   });
 });

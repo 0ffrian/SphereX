@@ -21,7 +21,7 @@ import {
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { ObjectCard, RenderParams } from '@/contract';
 import { buildLights, MAX_AMBIENT_INTENSITY } from './lighting';
-import { shadowSettings } from './shape/shapeModel';
+import { bodyScreenPx, shadowSettings } from './shape/shapeModel';
 import type { PlanContext, RenderPlan, SpinPlan } from './planTypes';
 import type { Overrides } from './sliders';
 import { planRender } from './renderPlan';
@@ -29,6 +29,8 @@ import type { BodyRenderer } from './renderers/bodyRenderer';
 import { AssetCache, buildScene, type BuildHooks, type BuiltScene } from './renderers/build';
 import { SimClock, type PauseReason } from './render/clock';
 import { RenderChain } from './render/pipeline';
+import { noiseBakePending, whenNoiseIdle } from './volume/noiseVolume';
+import { onVolumeNoiseReady } from './volume/VolumeBody';
 import {
   FEED_GAP_MS,
   FrameGovernor,
@@ -222,6 +224,7 @@ export class ViewerApp {
   private readonly assets = new AssetCache();
   /** Content in the scene; `built` may be newer while its shaders compile (never blank). */
   private onScreen: BuiltScene | null = null;
+  private unsubscribeNoise: (() => void) | null = null;
   private compileToken = 0;
   private compiling: Promise<void> | null = null;
   /**
@@ -365,6 +368,12 @@ export class ViewerApp {
         this.renderNow();
       };
     }
+
+    // A volume's noise cube arrives a little after the build (sliced bake): draw it, from a fresh
+    // temporal history so the settled frame does not depend on the empty frames before it.
+    this.unsubscribeNoise = onVolumeNoiseReady(() => {
+      if (!this.disposed && this.onScreen) this.restartSettle();
+    });
 
     // R9: the reduced-motion preference is read live, so spin stops when it is switched on.
     if (typeof window.matchMedia === 'function') {
@@ -670,8 +679,13 @@ export class ViewerApp {
   /** One frame: through the pipeline, or plain if the pipeline is missing or failed. */
   private draw(): void {
     this.frames++;
+    this.updateScreenSize();
     if (this.chain) {
       try {
+        // Volumes shift their per-pixel ray jitter by the TAAU frame index (same index after a
+        // restart, so a settled frame is deterministic).
+        const jitter = this.chain.jitterIndex();
+        if (jitter !== null) this.onScreen?.setJitterFrame(jitter);
         this.chain.render();
         return;
       } catch (err) {
@@ -679,6 +693,20 @@ export class ViewerApp {
       }
     }
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /** The 160 px level-of-detail rule: tell the shape model how big it is on screen now. */
+  private updateScreenSize(): void {
+    const scene = this.onScreen;
+    if (!scene || scene.shapeRadius === null) return;
+    scene.setScreenPx(
+      bodyScreenPx(
+        scene.shapeRadius,
+        this.camera.position.distanceTo(this.controls.target),
+        CAMERA_FOV_DEG,
+        this.canvas.clientHeight,
+      ),
+    );
   }
 
   private dropChain(err: unknown): void {
@@ -748,6 +776,12 @@ export class ViewerApp {
 
   /** Resolves when no settle burst is pending and no shader compile is in flight. */
   async whenSettled(): Promise<void> {
+    // A volume's noise cube is baked in slices after the build: wait for it and for the redraw it
+    // asks for, so a settled frame always has its noise.
+    if (noiseBakePending()) {
+      await whenNoiseIdle();
+      await new Promise<void>((r) => setTimeout(r, 0));
+    }
     while (this.compiling) await this.compiling;
     if (this.disposed || this.burstLeft <= 0) return;
     await new Promise<void>((resolve) => this.settleWaiters.push(resolve));
@@ -853,6 +887,8 @@ export class ViewerApp {
     this.intersection?.disconnect();
     this.intersection = null;
     document.removeEventListener('visibilitychange', this.onVisibility);
+    this.unsubscribeNoise?.();
+    this.unsubscribeNoise = null;
     this.clearBuilt();
     this.chain?.dispose();
     this.chain = null;

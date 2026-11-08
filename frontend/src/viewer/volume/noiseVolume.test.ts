@@ -1,7 +1,12 @@
 // Issue #43: the baked noise cube is deterministic (same seed, same bytes) and well formed.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   bakeNoiseVolume,
+  bakeNoiseVolumeSliced,
+  noiseBakePending,
+  noiseVolumeAsync,
+  noiseVolumeCached,
+  whenNoiseIdle,
   NOISE_CHANNELS,
   NOISE_VOLUME_SIZE,
   noiseVolumeData,
@@ -51,4 +56,41 @@ describe('baked volume noise', () => {
       true,
     );
   });
+});
+
+describe('sliced noise bake (no long task)', () => {
+  it('gives the same bytes as the one-shot bake, with a yield between slabs', async () => {
+    const spy = vi.spyOn(globalThis, 'setTimeout');
+    const sliced = await bakeNoiseVolumeSliced(42, 12, () => false, 0);
+    // sliceMs 0: one slab per slice, so 12 slabs make 11 yields.
+    expect(spy.mock.calls.filter((c) => c[1] === 0).length).toBeGreaterThanOrEqual(11);
+    spy.mockRestore();
+    expect(Buffer.from(sliced!).equals(Buffer.from(bakeNoiseVolume(42, 12)))).toBe(true);
+  });
+
+  it('stops and returns null when cancelled', async () => {
+    let calls = 0;
+    const out = await bakeNoiseVolumeSliced(1, 12, () => ++calls > 2, 0);
+    expect(out).toBeNull();
+  });
+
+  it('the cached async bake is the one-shot bytes, deduplicated by seed, and reports idle', async () => {
+    expect(noiseVolumeCached(9001)).toBeNull();
+    const a = noiseVolumeAsync(9001);
+    const b = noiseVolumeAsync(9001);
+    expect(noiseBakePending()).toBe(true);
+    await whenNoiseIdle();
+    expect(noiseBakePending()).toBe(false);
+    const [x, y] = await Promise.all([a, b]);
+    expect(x).toBe(y);
+    expect(noiseVolumeCached(9001)).toBe(x);
+    expect(Buffer.from(x!).equals(Buffer.from(bakeNoiseVolume(9001)))).toBe(true);
+  }, 30_000);
+
+  it('a cancelled waiter gets null but the cube is still cached for the next scene', async () => {
+    const out = await noiseVolumeAsync(9002, () => true);
+    expect(out).toBeNull();
+    await whenNoiseIdle();
+    expect(noiseVolumeCached(9002)).not.toBeNull();
+  }, 30_000);
 });
