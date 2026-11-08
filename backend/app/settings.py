@@ -54,7 +54,8 @@ class Settings(BaseSettings):
     # IRSA (A3.1); 1 restores one-at-a-time downloads.
     cutout_concurrency: int = 6
     # Photometry worker processes (A4.2). 0 measures in the calling thread (tests, debugging).
-    # ASSUMPTION: 2 leaves cores for the API and the texture bake on the 8-core A15 (D-24).
+    # ASSUMPTION: 2 leaves cores for the API and the texture bake on the A15 (D-24; its core
+    # count is [verify]).
     measure_workers: int = 2
     # Texture bake worker processes (R6.7). 0 bakes in one background thread.
     bake_workers: int = 1

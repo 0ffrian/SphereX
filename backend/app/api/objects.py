@@ -171,7 +171,8 @@ def get_cutout_png(
 # cached_at and the A4.4 asset status (saved / generated / sketch) are response headers.
 CACHED_AT_HEADER = "X-SX-Cached-At"
 ASSET_STATUS_HEADER = "X-SX-Asset-Status"
-# Issue #41 (Q-111): present only on a first-stage answer. MEASURING lists the `measuring:` items
+# Issue #41 (Q-111 (3)): present only on a reply that still has `measuring:` items (first stage,
+# partial, or a final built from the first batch only). MEASURING lists the `measuring:` items
 # of RenderParams.missing; PROGRESS is "frames <done>/<total>" ("frames 0/?" before the search).
 MEASURING_HEADER = "X-SX-Measuring"
 PROGRESS_HEADER = "X-SX-Progress"

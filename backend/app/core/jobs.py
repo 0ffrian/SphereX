@@ -107,11 +107,15 @@ class Job[T]:
 
     def answer(self, wait_s: float) -> T:
         """The final answer if it comes within ``wait_s``; else the newest intermediate answer
-        as soon as there is one; else wait for whichever comes. Re-raises the job's error."""
+        as soon as there is one; else wait for whichever comes. If the job failed, its newest
+        intermediate answer (honestly labelled ``measuring:``) is returned if there is one;
+        otherwise the job's error is re-raised."""
         deadline = time.monotonic() + max(0.0, wait_s)
         with self._cond:
             while True:
                 if self.error is not None:
+                    if self.latest is not None:
+                        return self.latest
                     raise self.error
                 if self.final is not None:
                     return self.final

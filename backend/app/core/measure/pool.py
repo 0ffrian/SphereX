@@ -64,12 +64,19 @@ class MeasurePool:
                 return pool.submit(measure_bytes, body, x0, y0, cfg)
             except RuntimeError as exc:  # broken or shut down: measure here instead
                 log.warning("photometry pool unavailable, measuring in-thread: %s", exc)
+                self._drop(pool)  # a broken pool is rebuilt on the next submit
         done: Future[Outcome] = Future()
         try:
             done.set_result(measure_bytes(body, x0, y0, cfg))
         except Exception as exc:
             done.set_exception(exc)
         return done
+
+    def _drop(self, pool: Executor) -> None:
+        with self._lock:
+            if self._executor is pool:
+                self._executor = None
+        pool.shutdown(wait=False, cancel_futures=True)
 
     def close(self) -> None:
         with self._lock:

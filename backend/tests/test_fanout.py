@@ -807,3 +807,38 @@ def test_job_payload_matches_the_documented_model(world: World, fake: FakeIrsa) 
                 if line.startswith("data: "):
                     JobStatus.model_validate(json.loads(line[6:]))
         assert "JobStatus" in client.get("/openapi.json").text
+
+
+# --- PR #58 second review nits ----------------------------------------------------------
+
+
+def test_a_failed_job_still_serves_its_partial_answer() -> None:
+    reg: JobRegistry[str] = JobRegistry(ttl_s=60)
+
+    def run(job: Any) -> str:
+        job.publish("partial", "partial")
+        raise RuntimeError("full download crashed")
+
+    job = reg.ensure("x", run)
+    while job.snapshot()["state"] == "running":
+        time.sleep(0.01)
+    assert job.answer(0) == "partial"  # labelled measuring:, better than a 500
+    with pytest.raises(RuntimeError):
+        reg.ensure("y", lambda j: (_ for _ in ()).throw(RuntimeError("no answer"))).answer(0)
+
+
+def test_a_broken_photometry_pool_is_rebuilt(world: World) -> None:
+    pool = MeasurePool(1)
+    body = next(iter(world.bodies.values()))[0]
+    try:
+        first = pool._pool()
+        assert first is not None
+        first.shutdown(wait=True)  # stands in for a broken pool: submit now raises
+        fut = pool.submit(body, 29.0, 29.0)
+        assert fut.done()  # measured in-thread this time
+        assert pool._executor is None
+        again = pool.submit(body, 29.0, 29.0)
+        assert again.result(timeout=120) == measure_bytes(body, 29.0, 29.0)
+        assert pool._executor is not None and pool._executor is not first
+    finally:
+        pool.close()

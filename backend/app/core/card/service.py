@@ -156,8 +156,9 @@ class ObjectPipeline:
                 self._frames(obj, job, premeasured, measure=False)  # card saved: no spectrum
             return saved
         job.update(stage="catalogue")
-        # Daemon-free threads that end with their task; shutdown(wait=False) never blocks the
-        # job on a branch it no longer needs (e.g. geometry for a star).
+        # shutdown(wait=False) never blocks the job on a branch it no longer needs (e.g. geometry
+        # for a star). These are ordinary pool threads: at interpreter exit Python joins them, so
+        # a stop can wait for one running call (at most one cutout's read timeout).
         batch = self.ctx.settings.live_cutouts_per_request
         fan = ThreadPoolExecutor(3, thread_name_prefix=f"sx-fan-{obj.id[:24]}")
         try:
