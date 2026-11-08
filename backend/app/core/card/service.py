@@ -33,6 +33,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import logging
+import threading
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
@@ -92,7 +93,12 @@ class ObjectPipeline:
         self.measure_pool = measure_pool
         self.baker = baker
         s = self.ctx.settings
-        self.jobs: JobRegistry[ObjectResult] = JobRegistry(s.job_ttl_s, s.max_jobs)
+        self.jobs: JobRegistry[ObjectResult] = JobRegistry(s.job_ttl_s)
+        # SX_MAX_JOBS slots for the long part only: downloading every frame after the first
+        # batch. Catalogue, first stage and partial answer never wait for a slot, so every
+        # visitor gets an answer quickly; a job waiting for a slot reports stage "queued".
+        self._full_runs = threading.BoundedSemaphore(s.max_jobs) if s.max_jobs > 0 else None
+        self._closed = threading.Event()
 
     # --- entry points ---------------------------------------------------------------------
 
@@ -118,6 +124,7 @@ class ObjectPipeline:
         self.ensure_job(obj, restart_finished=True)
 
     def close(self) -> None:
+        self._closed.set()
         self.jobs.close()
 
     # --- the job --------------------------------------------------------------------------
@@ -229,10 +236,19 @@ class ObjectPipeline:
     def _join_frames_now(
         self, obj: ResolvedObject, job: Job[ObjectResult], premeasured: dict[str, Premeasured]
     ) -> FramesResult | None:
+        slots = self._full_runs
+        if slots is not None and not slots.acquire(blocking=False):
+            job.update(stage="queued")
+            while not slots.acquire(timeout=1.0):
+                if self._closed.is_set():
+                    return None  # shutting down: the answer stays partial
         try:
             return self._frames(obj, job, premeasured)
         except (CacheMissOffline, UpstreamUnavailable):
             return None
+        finally:
+            if slots is not None:
+                slots.release()
 
     @staticmethod
     def _join_frames(f_frames: Future[FramesResult]) -> FramesResult | None:

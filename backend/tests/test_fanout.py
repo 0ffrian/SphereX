@@ -687,7 +687,9 @@ def test_objects_take_turns_in_the_shared_pool(world: World, fake: FakeIrsa) -> 
             target=fs.get_frames, args=(world.obj,), kwargs={"unlimited_live": True}
         )
         ta.start()
+        deadline = time.monotonic() + 10
         while fake.active < 2:
+            assert time.monotonic() < deadline, "the fake never started two downloads"
             time.sleep(0.01)
         tb = threading.Thread(target=fs.get_frames, args=(other,), kwargs={"unlimited_live": True})
         tb.start()
@@ -703,22 +705,32 @@ def test_objects_take_turns_in_the_shared_pool(world: World, fake: FakeIrsa) -> 
     assert b_calls[0] < a_calls[-1], f"object B waited for all of A: {fake.calls}"
 
 
-def test_running_jobs_are_capped() -> None:
-    reg: JobRegistry[str] = JobRegistry(ttl_s=60, max_running=1)
-    release = threading.Event()
-
-    def slow(job: Any) -> str:
-        job.update(stage="frames")
-        release.wait(10)
-        return "a"
-
-    a = reg.ensure("a", slow)
-    b = reg.ensure("b", lambda job: "b")
-    time.sleep(0.2)
-    assert a.snapshot()["stage"] == "frames"
-    assert b.snapshot()["stage"] == "queued" and b.snapshot()["state"] == "running"
-    release.set()
-    assert a.wait_final(5) == "a" and b.wait_final(5) == "b"
+def test_full_runs_are_capped_but_answers_are_not(world: World, fake: FakeIrsa) -> None:
+    """With every SX_MAX_JOBS slot taken, a new object still gets its first and partial
+    answers; only its full download waits (stage "queued")."""
+    ctx = live_ctx(
+        world, max_jobs=1, live_cutouts_per_request=1, cutout_concurrency=1, first_answer_wait_s=0
+    )
+    pipe, pool = pipeline_for(ctx)
+    assert pipe._full_runs is not None
+    pipe._full_runs.acquire()  # another object's full download holds the only slot
+    try:
+        job = pipe.ensure_job(world.obj)
+        deadline = time.monotonic() + 30
+        while (job.snapshot()["stage"], job.snapshot()["answer"]) != ("queued", "partial"):
+            assert time.monotonic() < deadline, job.snapshot()
+            time.sleep(0.02)
+        snap = job.snapshot()
+        assert snap["stage"] == "queued" and snap["answer"] == "partial"
+        assert pipe.run(world.obj).measuring  # /card answers at once, with measuring:frames
+        pipe._full_runs.release()
+        final = job.wait_final(60)
+        assert final is not None and final.measuring == ()
+        assert canon(final.card) == canon(world.base.card)
+    finally:
+        pipe.close()
+        pipe.frames.close()
+        pool.close()
 
 
 def test_a_batch_only_final_still_says_measuring_frames(

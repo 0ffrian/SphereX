@@ -68,8 +68,8 @@ class Settings(BaseSettings):
     # A finished object job is reused for this long, so the card and render-params requests of
     # one page load share one run. After that a new run picks up what changed meanwhile.
     job_ttl_s: float = 600.0
-    # At most this many object jobs do work at once; the rest wait (stage `queued`). Object ids
-    # come from user input, so this bounds the threads and downloads one client can start.
+    # At most this many object jobs download all their frames at once (the long part, after
+    # the first batch); the others wait in stage `queued` with their partial answer out.
     # ASSUMPTION: 4 covers a demo with a few phones; 0 means no cap.
     max_jobs: int = 4
     # D-25 warm cache: at start-up, run the object job for every target in these groups of
