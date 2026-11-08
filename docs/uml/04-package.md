@@ -13,29 +13,29 @@ flowchart TB
     Mockup["mockup/ : spherex-ui.html (three r128, not the app)"]
 
     subgraph Backend["backend/ (FastAPI, Python 3.12) : Kevin, Moon, Atish"]
-      BApi["app/api (Kevin) : D-16 endpoints; objects.py : /card, /render-params, texture URLs; sky.py : /v1/sky (prototype, Q-87; /v1/sky/cached, Q-98); composite.py : /composite, /composite.png (prototype, Q-92); overlays.py : /overlays, /flags, /combine.png (Q-50)"]
-      BPipe["app/core/find (stage 1; overlays, flagmask, combine, A4.9), app/adapters (gaia, wise = CatWISE2020, tap), app/cache, app/core/card (stages 4, 5) : Kevin; app/core/measure (stage 2) and physics : Moon; app/core/classify (stage 3) : Atish"]
+      BApi["app/api (Kevin) : D-16 endpoints, objects.py : /card, /render-params, texture URLs, sky.py : /v1/sky (prototype, Q-87, /v1/sky/cached, Q-98), composite.py : /composite, /composite.png (prototype, Q-92), overlays.py : /overlays, /flags, /combine.png (Q-50)"]
+      BPipe["app/core/find (stage 1, overlays, flagmask, combine, A4.9), app/adapters (gaia, wise = CatWISE2020, tap), app/cache, app/core/card (stages 4, 5) : Kevin, app/core/measure (stage 2) and physics : Moon, app/core/classify (stage 3) : Atish"]
       BRender["app/core/render (Atish) : card_to_params, blackbody, params, noise, craters, height, normals, palette, bake, __main__, spherex_rgb, gemini_paint"]
       BContract["app/contract : generated from shared/schemas (D-18) : follows the schemas owner"]
-      BSky["app/core/sky : surveys, healpix, bake (HiPS to equirect); scripts/sky_mirror, sky_bake : prototype, no D-17 owner yet (Q-87, D-35)"]
+      BSky["app/core/sky : surveys, healpix, bake (HiPS to equirect), scripts/sky_mirror, sky_bake : prototype, no D-17 owner yet (Q-87, D-35)"]
       BComp["app/core/composite : config, select, grid, service (SPHEREx false colour) : prototype, no D-17 owner yet (Q-92, Q-94)"]
     end
 
     subgraph Frontend["frontend/ (Vite + TS + React) : owners per package"]
-      FApp["src/app (React shell: App, ViewerPanel (tier text "tier N of 5, <meaning>", Q-105), StatusLine, FixtureBanner, LiveAnnouncer, Badge, StatusBoxes, urlHash + useHashSync, format, messages, refusals, RefusalList, ui), src/state (Zustand store with the sky slice) : Moon"]
-      FFlip["src/app/api (M1 client, D-16; sky index, Q-87), src/app/search, src/app/flipbook (with Rainbow Trails, D-28; session.tsx shared playback; colourMode + ColourViews, Q-93, Q-95; progressive + FramesProgress, Q-97; frameGrid; overlays/, issue #12, drawn on the frame grid, Q-102), src/app/spectrum : Moon"]
+      FApp["src/app (React shell: App, ViewerPanel (tier text: tier N of 5 and its meaning, Q-105), StatusLine, FixtureBanner, LiveAnnouncer, Badge, StatusBoxes, urlHash + useHashSync, format, messages, refusals, RefusalList, ui), src/state (Zustand store with the sky slice) : Moon"]
+      FFlip["src/app/api (M1 client, D-16, sky index, Q-87), src/app/search, src/app/flipbook (with Rainbow Trails, D-28, session.tsx shared playback, colourMode + ColourViews, Q-93, Q-95, progressive + FramesProgress, Q-97, frameGrid, overlays/, issue #12, drawn on the frame grid, Q-102), src/app/spectrum : Moon"]
       FShell["src/app/shell (ToolRail, Transport, PanelCard, Panels, Readout, shellStore, shortcuts), src/app/sky (SkyPane, useTargetMarkers, cachedMarkers + useCachedMarkers (Q-98), readout, positionTags), src/app/Segmented : prototype, Moon provisional (Q-89)"]
       FDev["fixtures/ (dev-only synthetic fixture server), scripts/ (check-dist), src/test (test helpers), src/fixtures.test.ts, e2e/ (Playwright) : dev and test only"]
       FPhysics["src/physics : A7 physics layer, derivePhysics, slider registry (D-26, D-27) : Moon"]
       FContract["src/contract : generated from shared/schemas (D-18), assertTagged next to it : follows the schemas owner"]
       subgraph FViewer["src/viewer (Moon)"]
         VCore["ViewerApp, lighting, modes, honesty, scaleBar, altText"]
-        VRend["renderers/ : AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody [verify], bodyRenderer, shaderPlan, shaderSpec, shaderPalette, pointClouds, StarBody, jetSurface, jetPalette, linearColour (sRGB to linear, once); sliders.ts"]
+        VRend["renderers/ : AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody [verify], bodyRenderer, shaderPlan, shaderSpec, shaderPalette, pointClouds, StarBody, jetSurface, jetPalette, linearColour (sRGB to linear, once), sliders.ts"]
         VSky["sky/ : SkyView, skyMath, surveys (prototype, Q-89, Q-90)"]
         VRender["render/ : pipeline (RenderChain), quality (quality levels, FrameGovernor), clock (SimClock), workerPool (WorkerPool), fanout (loadBody, asset prefetch)"]
         VShaders["shaders/ : TSL noise (fbm, ridged, domainWarp, animatedCells, OCTAVES) and sphere helpers (latLon, tangentFrame, differentialRotate), star and loops (issue #42)"]
-        VMotion["motion/ : motion (resolveMotion, D-32 chain), planMotion, phase; bodies/ : starModel (CPU star surface model, pure in seed, rates, t) : issue #42"]
-        VFields["fields/ : fieldGenerator, flowModel (storms, issue #42), noise, fieldWorker, fieldClient (D-12) : Atish (D-17); shader generators (D-01) : Moon [verify path]"]
+        VMotion["motion/ : motion (resolveMotion, D-32 chain), planMotion, phase, bodies/ : starModel (CPU star surface model, pure in seed, rates, t) : issue #42"]
+        VFields["fields/ : fieldGenerator, flowModel (storms, issue #42), noise, fieldWorker, fieldClient (D-12) : Atish (D-17), shader generators (D-01) : Moon [verify path]"]
       end
       subgraph FHaptics["src/haptics : Atish (D-13, D-17)"]
         HCore["haptics.ts (engine), audioContext, audioGraph, settings, calibration, platform, pitch, spectrumMapping, tuning"]
@@ -49,7 +49,7 @@ flowchart TB
       FHapticsTest["src/hapticsTestPage + haptics-test.html : dev-only test page, not a build input : Atish"]
     end
 
-    Schemas["shared/schemas : object-card.schema.json, render-params.schema.json; shared/fixtures : Moon"]
+    Schemas["shared/schemas : object-card.schema.json, render-params.schema.json, shared/fixtures : Moon"]
   end
 
   DocUML -.->|"illustrates"| DocSpecs
@@ -79,7 +79,7 @@ flowchart TB
   BApi -->|"sky.py serves the local copy"| BSky
   BApi -->|"composite.py"| BComp
   BComp -->|"stage 1 frames, stage 2 verdicts"| BPipe
-  FFlip -->|"HTTP /v1 (D-16); /composite beyond D-16 (Q-92)"| BApi
+  FFlip -->|"HTTP /v1 (D-16), /composite beyond D-16 (Q-92)"| BApi
   FDev -.->|"answers /v1 instead of the backend (npm run dev:fixtures)"| FFlip
   VCore --> VRend
   VCore -->|"RenderChain, SimClock, FrameGovernor"| VRender

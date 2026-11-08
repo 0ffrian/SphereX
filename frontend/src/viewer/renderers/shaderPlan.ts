@@ -92,7 +92,11 @@ export function planShaderKind(input: PlanInput): RenderPlan {
           viewerLayer(
             'storms',
             'artistic',
-            'Storms sit between the jets, drift at the wind speed of their latitude and turn at about wind speed over their size (A7.2). Where they are is a seeded look.',
+            'Storms sit between the jets, drift at the wind speed of their latitude and turn at about wind speed over their size. Where they are is a seeded look.',
+            {
+              formula:
+                'drift = wind speed at the storm latitude, turn rate ~ wind speed / storm size',
+            },
           ),
         );
         b.draw('storms');
@@ -127,7 +131,7 @@ export function planShaderKind(input: PlanInput): RenderPlan {
           viewerLayer(
             'clouds',
             'artistic',
-            "Clouds carried by winds that change with latitude and slowly re-form, with cloud shadows. The wind speed is the card's; the cloud shapes are an artist look (R5.7).",
+            "Clouds carried by winds that change with latitude and slowly re-form, with cloud shadows. The wind speed is the card's; the cloud shapes are an artist look.",
           ),
         );
         b.draw('clouds');

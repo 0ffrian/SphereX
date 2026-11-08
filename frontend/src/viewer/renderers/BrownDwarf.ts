@@ -101,8 +101,11 @@ export function planBrownDwarf(
       viewerLayer(
         'jets',
         'artistic',
-        'Counter-flowing jets with turbulent band edges and storms that drift and turn, drawn by the browser. Band contrast = clamp(2 * ch4_depth_33, 0.1, 0.8) (R7.4). The band count follows the Rhines rule when the spin and the wind speed are known (A7.2), else an artist default.',
-        { requires: bandsLayer.requires },
+        'Counter-flowing jets with turbulent band edges and storms that drift and turn, drawn by the browser. The band contrast comes from the methane depth at 3.3 microns. The band count follows the Rhines rule when the spin and the wind speed are known, else an artist default.',
+        {
+          requires: bandsLayer.requires,
+          formula: 'band contrast = clamp(2 * ch4_depth_33, 0.1, 0.8)',
+        },
       ),
     );
     const depth = numberField(card, 'ch4_depth_33');

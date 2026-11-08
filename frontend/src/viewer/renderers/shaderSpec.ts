@@ -285,7 +285,7 @@ export function rhinesBands(motion: Motion, scaleM: number | null): RuleChoice |
     tag,
     tier: TIER_OF_TAG[tag],
     formula:
-      'bands ~ sqrt(2 Omega R / U), Omega = 2 pi / P, R = the radius on the card (order of magnitude only, A7.2)',
+      'bands ~ sqrt(2 Omega R / U), Omega = 2 pi / P, R = the radius on the card (order of magnitude only)',
     assumed:
       tag === 'model_dependent' || tag === 'inferred_from_analog' || tag === 'artistic'
         ? { spin_period_h: spin.value, jet_speed_ms: wind.value, radius_m: scaleM }
@@ -317,7 +317,7 @@ export function flatteningRule(
         value: cap(f),
         tag: 'artistic',
         tier: 5,
-        formula: 'f = 0.7 * q, q = Omega^2 R^3 / (G M) (A7.2)',
+        formula: 'f = 0.7 * q, q = Omega^2 R^3 / (G M)',
         basis: `Flattening from the spin and the mass you set (${mass} Earth masses)`,
       };
     }
@@ -328,7 +328,7 @@ export function flatteningRule(
       value: cap(JUPITER_FLATTENING * (JUPITER_SPIN_H / spin.value) ** 2),
       tag,
       tier: TIER_OF_TAG[tag],
-      formula: 'f = f_J (P_J / P)^2, from f = 0.7 q with q proportional to Omega^2 (A7.2)',
+      formula: 'f = f_J (P_J / P)^2, from f = 0.7 q with q proportional to Omega^2',
       assumed: { mean_density: 'same as Jupiter', spin_period_h: spin.value },
       basis: 'Flattening from the spin, with a Jupiter-like mean density assumed',
     };
@@ -367,7 +367,7 @@ export function climateFromTeq(
       value: teq,
       tag: t,
       tier: TIER_OF_TAG[t],
-      formula: `polar ice below ${POLAR_ICE_BELOW_K} K, no oceans above ${OCEANS_REMOVED_ABOVE_K} K (A7.1)`,
+      formula: `polar ice below ${POLAR_ICE_BELOW_K} K, no oceans above ${OCEANS_REMOVED_ABOVE_K} K`,
       basis: `Ice and ocean from the equilibrium temperature, ${Math.round(teq)} K`,
     },
   };
