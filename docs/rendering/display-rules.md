@@ -1,6 +1,6 @@
 # Display levels and shared 3D view rules
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.6 · **Implements:** D-05, D-21, D-23 ([decisions](../decisions.md))
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.7 · **Implements:** D-05, D-21, D-23, D-34 ([decisions](../decisions.md))
 
 ## R4. Display levels
 
@@ -64,7 +64,7 @@ Two targets. Where their budgets differ, take the tighter one.
 | Demo laptop | Intel Iris Xe (Zenbook 14X) |
 | Phones | realme 14 Pro and a Samsung, both Android 16 with Chrome. Haptics can only be shown here |
 
-- ≥30 fps while rotating; render only when the view changes.
+- ≥30 fps while rotating. Render when the view changes, or every frame while a simulation clock runs (D-34, [§5.7](#r57-motion-and-time-lapse)).
 - `renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))`.
 - Textures: 2048×1024 on desktop, 1024×512 on mobile. Serve as WebP for albedo; normal maps as lossless PNG or KTX2.
 - Meshes ≤ 50k triangles. Decimate NASA GLBs offline.
@@ -77,3 +77,37 @@ Two targets. Where their budgets differ, take the tighter one.
 - **Default mode:** one finger or mouse drag rotates, pinch or wheel zooms. Keyboard: arrows rotate, +/− zoom, `R` resets.
 - **Touch mode** (toggle button, also key `T`): one finger *feels* (haptics) and two fingers rotate/zoom. Implement this by disabling the orbit controls whenever exactly one pointer is down.
 - Rotate buttons must also exist on screen. WCAG 2.5.7 requires an alternative to dragging.
+
+### R5.7 Motion and time-lapse
+
+Decided in D-34. Rates come from `RenderParams.dynamics` ([R3.4](data-contract.md#r34-renderparams-produced-by-the-backend-get-v1objectsidrender-params)) and follow the tier chain (D-32).
+
+- **Clock:** one `SimClock`. Each frame is a pure function of (card, seed, t), with no state between frames. Same inputs, same frame.
+- **Speed-up:** shown next to every animated process, from `dynamics.speedup` (like "×1000" in R7.1). It is a display choice, not a claim. Nothing pretends to be real time.
+- **Default:** animate on load, calm and slow. Start paused when `prefers-reduced-motion` is set ([R9](accessibility.md#r9-accessibility-tie-ins)).
+- **Pause:** hidden tab, canvas off screen, and the user's pause. The pause button is always visible and keyboard reachable. On phones, auto-pause after 60 s without interaction and resume on touch **[verify on phones]**.
+- **Touch matches sight:** the haptic field worker uses the same t (D-12) and recomputes at 4 Hz or less. Atish to confirm (D-13).
+- **No `dynamics`:** the body stays still, except the R7.1 asteroid spin.
+
+| Body | What moves | `dynamics` key | Tier source |
+|---|---|---|---|
+| Star | rotation (equator faster), mottling, spots, flares with limb loops | `spin_period_h`, `diff_rotation`, `spot_lifetime_d`, `flare_rate_per_d` | measured spin; typical by class (tier 4) for the rest |
+| Mira | pulsation | `pulsation_period_d` | measured light curve; amplitude art |
+| Brown dwarf | banded rotation, weather | `spin_period_h`, `jet_speed_ms` | measured spin; physics rule or typical |
+| Gas giant | counter-flowing jets, drifting spinning storms | `jet_speed_ms`, `spin_period_h` | physics rule for winds (A7.2) |
+| Rocky or water planet | spin, terminator, clouds on latitude winds | `spin_period_h`, `jet_speed_ms` | physics rule; art for cloud shapes |
+| Asteroid | spin about the real pole (×1000, R7.1) | `spin_period_h` | measured |
+| Comet | jets turn with the nucleus; tail sway | `spin_period_h` | measured or typical; sway is art |
+| `nebula`, `nova` | no idle motion | none | n/a |
+| Variable star | light-curve scrub (done) | none | measured |
+
+**Quality levels (the battery mechanism).** Called levels, not tiers, so they are not confused with the provenance tiers 1–5 (D-32).
+
+| Level | Target | Frame rate |
+|---|---|---|
+| High | desktop | 60 fps |
+| Medium | Zenbook, A15 (integrated GPU) | 60 fps |
+| Low | Android phones | 30 fps |
+
+- Pixel ratio stays capped at 1.5 (D-05). A governor drops one level when frames take more than 33 ms for 2 s, and says so on screen. Reduced motion pauses every clock. See Q-64 for the frame-rate row of D-05.
+- Battery target: 15 minutes on either phone uses at most 10% battery at demo brightness **[verify on phones]**.

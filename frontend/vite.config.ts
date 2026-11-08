@@ -9,7 +9,7 @@ import { sxFixtures } from './fixtures/vitePlugin';
 // builds) needs a secure context, so phone testing over the LAN uses a self-signed HTTPS cert.
 // VITE_HTTPS=1 enables the same thing in any mode.
 //
-// API (D-16): `/v1` is proxied to the backend, `http://localhost:8000` by default; set
+// API (D-16): `/v1` (and `/data` for backend files) is proxied to the backend, `http://localhost:8000` by default; set
 // SX_API_TARGET to point elsewhere. `npm run dev:fixtures` (`--mode fixtures`) instead answers
 // `/v1` from the SYNTHETIC fixtures in ./fixtures (dev server only; never in a build).
 export default defineConfig(({ mode }) => {
@@ -19,8 +19,11 @@ export default defineConfig(({ mode }) => {
   if (https) plugins.push(basicSsl());
   if (fixtures) plugins.push(sxFixtures());
 
+  const apiTarget = process.env.SX_API_TARGET ?? 'http://localhost:8000';
   const proxy: Record<string, ProxyOptions> = {
-    '/v1': { target: process.env.SX_API_TARGET ?? 'http://localhost:8000', changeOrigin: true },
+    '/v1': { target: apiTarget, changeOrigin: true },
+    // Same-origin backend files (Q-44): shape meshes at /data/shapes (Q-61).
+    '/data': { target: apiTarget, changeOrigin: true },
   };
 
   return {

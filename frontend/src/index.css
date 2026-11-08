@@ -509,7 +509,7 @@ body {
     width: 32px;
     height: 32px;
   }
-  /* The survey's provenance and credit (D-32: always shown next to the sky). Nearly opaque, so the
+  /* The survey's provenance and credit (D-35: always shown next to the sky). Nearly opaque, so the
      small grey text keeps AA contrast over the brightest parts of the sky. */
   .sx-sky-credit {
     position: absolute;
@@ -534,7 +534,7 @@ body {
   /* ---- floating panel card (mock-up island card) ---- */
   /* Docked right of centre (left of the sky controls), so the object at the view centre stays
      visible; it stops short of the bottom, where the search's quick picks float and the sky credit
-     sits (--sx-credit-h, set by SkyPane; D-32). */
+     sits (--sx-credit-h, set by SkyPane; D-35). */
   .sx-panel {
     position: absolute;
     z-index: 20;
@@ -821,7 +821,7 @@ body {
       height: 20px;
     }
     /* The credit becomes a full-width strip at the bottom of the sky; the bottom sheet docks on top
-       of it (--sx-credit-h), so the credit never cuts across the sheet's text (D-32). */
+       of it (--sx-credit-h), so the credit never cuts across the sheet's text (D-35). */
     .sx-sky-credit {
       left: 0;
       right: 0;

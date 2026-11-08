@@ -8,14 +8,20 @@
     {
       "id": "body",
       "tag": "model_dependent",
+      "tier": 3,
       "description": "Assumption: brown dwarf radii are about 1 Jupiter radius (R7.4).",
       "requires": [
         "radius_rjup"
-      ]
+      ],
+      "formula": "radius = radius_rjup * R_Jup",
+      "assumed": {
+        "radius_rjup": 1.0
+      }
     },
     {
       "id": "emissive",
       "tag": "measured",
+      "tier": 1,
       "description": "Emissive intensity from normalised flux_45um (R7.4).",
       "requires": [
         "flux_45um"
@@ -24,6 +30,7 @@
     {
       "id": "bands",
       "tag": "artistic",
+      "tier": 5,
       "description": "Latitude-stretched band pattern; contrast = clamp(2 * ch4_depth_33, 0.1, 0.8) (R7.4, R5.3).",
       "requires": [
         "ch4_depth_33",
@@ -33,6 +40,7 @@
     {
       "id": "orbit",
       "tag": "artistic",
+      "tier": 5,
       "description": "Two bodies on an illustrative mutual orbit (R7.4). No orbit numbers are shown.",
       "requires": [
         "spectral_class"
@@ -90,6 +98,17 @@
     "data_tag": "measured",
     "params": {
       "maxRateHz": 12.0
+    }
+  },
+  "dynamics": {
+    "spin_period_h": {
+      "value": 3.0,
+      "tag": "inferred_from_analog",
+      "tier": 4,
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "speedup": {
+      "spin": 3600
     }
   },
   "alt_text": "Synthetic fixture. Brown dwarf binary, each about 1 Jupiter radius (model dependent), colour from a class palette, self-luminous. Surface relief: illustrative.",

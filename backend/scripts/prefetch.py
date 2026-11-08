@@ -23,10 +23,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.adapters import irsa_cutout, irsa_sia, skybot
+from app.adapters import exoplanet_archive, horizons, irsa_cutout, irsa_sia, simbad, skybot
 from app.adapters.http import UpstreamError
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context, make_context
+from app.core.classify.rules import SIMBAD_PLANET
 from app.core.composite.service import CompositeService
 from app.core.find.frames import FrameService, frame_time, is_complete, position_at
 from app.core.find.overlays import CATALOGS, fetch_catalog, overlay_cone
@@ -119,6 +120,22 @@ def prefetch_target(
     rep.object_id = obj.id
     print(f"  resolved {target['name']!r} -> {obj.id} ({obj.ra:.5f}, {obj.dec:+.5f})", flush=True)
 
+    simbad_name = obj.query or obj.name
+    if obj.resolver == "simbad" and simbad_name:
+        # A3.8: a SIMBAD planet (otype Pl) also needs its Exoplanet Archive row for the card.
+        try:
+            hit, _ = simbad.query(ctx, simbad_name)
+            if hit is not None and hit.otype in SIMBAD_PLANET:
+                row, _ = exoplanet_archive.query(
+                    ctx, (simbad_name, hit.main_id), refresh=args.refresh
+                )
+                print(f"  Exoplanet Archive: {'row ' + row['pl_name'] if row else 'no row'}")
+        except (CacheMissOffline, UpstreamUnavailable) as exc:
+            rep.error = f"Exoplanet Archive failed: {exc}"
+            return rep
+    if str(target.get("frames", True)).lower() == "false":
+        return rep  # `frames = false` in targets.toml: catalogue answers only (small fixtures)
+
     if obj.moving:
         # Record the neighbours in the field at the resolve epoch (A4.1 step 2, SkyBoT).
         when = parse_utc(ctx.settings.ephemeris_epoch)
@@ -129,6 +146,14 @@ def prefetch_target(
         except (CacheMissOffline, UpstreamUnavailable) as exc:
             rep.error = f"SkyBoT failed: {exc}"
             return rep
+        # Phase angle and Sun vector for the card (Q-62); the same two cached Horizons calls.
+        # Optional, like in the app: a failure is reported but the frames are still fetched.
+        if obj.spkid:
+            try:
+                geom, _ = horizons.geometry(ctx, obj.spkid, when, refresh=args.refresh)
+                print(f"  Horizons: phase {geom.phase_angle_deg:.2f} deg ({geom.observer})")
+            except (CacheMissOffline, UpstreamUnavailable) as exc:
+                print(f"  Horizons geometry failed (card lighting refused): {exc}", flush=True)
         rep.missing = FrameService(ctx).get_frames(obj, rebuild=True).missing
         return rep
 
