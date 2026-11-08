@@ -7,7 +7,7 @@ import { litBody, numberField, PlanBuilder, type PlanInput } from '../planCommon
 import type { BodyPlan, JetSurfacePlan, RenderPlan, Rgb } from '../planTypes';
 import { processOf, resolveMotion } from '../motion/motion';
 import { listMotion, offerLayer, spinPlanOf, viewerLayer } from '../motion/planMotion';
-import { flatteningRule, rhinesBands } from './shaderSpec';
+import { rhinesBands } from './shaderSpec';
 import { lightcurveScrub } from './Star';
 
 export interface BrownDwarfConfig {
@@ -121,20 +121,17 @@ export function planBrownDwarf(
     if (bands && depth !== null) {
       const rule = rhinesBands(motion, params.scale_m);
       const wind = motion.rates.jet_speed_ms;
-      // Flattening is a layer of its own (provenance, honesty): drawn only when it is offered and
-      // allowed, never applied silently.
-      const flat = flatteningRule(motion, card, undefined);
-      let flattening = 0;
-      if (flat) {
-        offerLayer(
-          b,
-          viewerLayer('flattening', flat.tag, flat.basis, {
-            formula: flat.formula,
-            assumed: flat.assumed,
-          }),
-        );
-        if (b.draw('flattening')) flattening = flat.value;
-      }
+      // Flattening needs a mass (f = 0.7 Omega^2 R^3 / (G M)). `flatteningRule` assumes Jupiter's
+      // mean density, which is wrong for a brown dwarf (13 to 80 Jupiter masses at about one Jupiter
+      // radius: f is 10 to 50 times smaller), and the card has no mass. So it is refused, not drawn
+      // from the display cap (Q-103/PR #52 review item 7, D-32).
+      const flattening = 0;
+      b.refuse({
+        id: 'flattening',
+        reason: 'data',
+        detail:
+          "The flattening needs the mass of the brown dwarf, which the card does not give; Jupiter's density does not apply here.",
+      });
       jets = {
         seed: params.seed,
         bands: rule?.value ?? DEFAULT_JET_BANDS,
