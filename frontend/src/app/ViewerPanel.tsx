@@ -95,7 +95,7 @@ export const QUALITY_DROP_ANNOUNCEMENT = 'Lowered render quality to keep motion 
 
 /** Said when a brown dwarf is in the infrared view, which is a plain disc, and the visible view moves. */
 export const IR_JETS_HINT =
-  'Choose "Visible colour" to see the gas jets move (artist\'s impression).';
+  'Switch to "Visible colour" to see the jets move. This motion is an artist\u2019s impression.';
 
 const PLACEHOLDER_LABEL = 'Viewer placeholder: no object loaded';
 
@@ -473,11 +473,6 @@ export function ViewerPanel() {
         </button>
       </div>
 
-      {/* Mounted whether or not a plan exists, so a screen reader announces the text when it appears. */}
-      <div role="status" aria-live="polite" className="empty:hidden" data-testid="ir-jets-hint">
-        {irHidesJets && <p className="text-sm text-neutral-200">{IR_JETS_HINT}</p>}
-      </div>
-
       {plan && (
         <>
           <div
@@ -511,6 +506,7 @@ export function ViewerPanel() {
                   type="button"
                   className={`${buttonClass} ${pressedClass}`}
                   aria-pressed={plan.mode === m.id}
+                  aria-describedby={irHidesJets && m.id === 'visible' ? 'ir-jets-hint' : undefined}
                   disabled={!m.available}
                   title={
                     m.available ? m.badge : 'Not available for this object. See the list below.'
@@ -527,6 +523,18 @@ export function ViewerPanel() {
               )}
             </div>
           )}
+
+          {/* Sits under the mode buttons it refers to. The region stays mounted while an object is
+              shown, so a change of mode or level is announced politely when the text appears. */}
+          <div
+            id="ir-jets-hint"
+            role="status"
+            aria-live="polite"
+            className="empty:hidden"
+            data-testid="ir-jets-hint"
+          >
+            {irHidesJets && <p className="text-sm text-neutral-200">{IR_JETS_HINT}</p>}
+          </div>
 
           {plan.type === 'comet' && (
             <div
