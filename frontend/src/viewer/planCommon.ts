@@ -7,6 +7,7 @@ import { isTagShown } from './honesty';
 import { planLighting } from './lighting';
 import { chooseMode, resolveModes, resolveTint } from './modes';
 import type { LegendEntry, MissingItem, PlanContext, RenderPlan, Rgb, Vec3 } from './planTypes';
+import { STILL_MOTION, TIER_OF_TAG } from './motion/motion';
 
 /** Half the length of the proper-motion line of a star, in scene units. A display value (artistic). */
 export const TRAIL_HALF_LENGTH = 2.5;
@@ -141,6 +142,7 @@ export class PlanBuilder {
       this.drawn.push({
         id,
         tag: layer.tag,
+        tier: layer.tier,
         description: layer.description,
         swatches: opts.swatches,
       });
@@ -270,7 +272,13 @@ export class PlanBuilder {
 
   /** Legend line for the plain body, for plans where no named layer covers it. */
   legendBody(description: string): void {
-    if (this.sizeTag) this.drawn.push({ id: 'body', tag: this.sizeTag, description });
+    if (this.sizeTag)
+      this.drawn.push({
+        id: 'body',
+        tag: this.sizeTag,
+        tier: TIER_OF_TAG[this.sizeTag],
+        description,
+      });
   }
 
   build(over: Partial<RenderPlan>): RenderPlan {
@@ -282,6 +290,7 @@ export class PlanBuilder {
       this.drawn.push({
         id: 'tint',
         tag: this.tint.tag,
+        tier: TIER_OF_TAG[this.tint.tag],
         description: info?.badge || 'Body colour',
       });
     }
@@ -323,6 +332,10 @@ export class PlanBuilder {
       scrub: null,
       relief: 'illustrative',
       shader: null,
+      motion: STILL_MOTION,
+      star: null,
+      jets: null,
+      pulsation: null,
       shape: null,
       ...over,
     };

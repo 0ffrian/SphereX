@@ -510,7 +510,10 @@ describe('brown dwarfs (R7.4)', () => {
   });
 
   it('draws the band texture only at + Artistic, and only in the visible view (B3)', () => {
-    const { card, params } = fixture('brown_dwarf');
+    // Without a stated winds speed-up the bands stay the baked texture (D-01); with one they are
+    // drawn as moving jets (issue #42, tested in motionPlans.test.ts).
+    const { card, params: withMotion } = fixture('brown_dwarf');
+    const params = { ...withMotion, dynamics: undefined };
     const at = (honesty: HonestyState, mode: 'visible' | 'spherex_ir') =>
       planRender(card, params, defaultContext({ honesty, mode }));
     expect(at('derived', 'visible').bodies[0]?.albedoUrl).toBeNull();
@@ -559,7 +562,10 @@ describe('stars (R7.5)', () => {
   });
 
   it('Mira brightness follows the light curve as you scrub, and flagged points are left out', () => {
-    const { card, params } = fixture('star_mira');
+    const { card, params: withClock } = fixture('star_mira');
+    // No pulsation speed-up: the radius follows the scrubbed point (with one it follows the clock,
+    // issue #42; see motionPlans.test.ts).
+    const params = { ...withClock, dynamics: undefined };
     card.lightcurve = [
       { t_mjd: 1, flux: 10, sigma: 1, lambda_um: 1, flags: 0 },
       { t_mjd: 2, flux: 2, sigma: 1, lambda_um: 1, flags: 0 },

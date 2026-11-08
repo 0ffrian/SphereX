@@ -284,7 +284,24 @@ export interface FieldSample {
  * (wrapping in u, clamped in v); band and storm ids are nearest, because ids must not blend.
  */
 export class FieldSampler {
+  /** Moving storms (issue #42, D-34): when set, the storm id is computed from them, not read from the t = 0 field. */
+  private storms: readonly Storm[] | null = null;
+
   constructor(private readonly field: FieldData) {}
+
+  /**
+   * Sets the storms at the current simulation time, from `flowModel.stormsAt`. The same list is
+   * given to the shader, so what the finger feels is what is drawn (touch matches sight, D-34).
+   * `null` goes back to the storm channel of the field (a still body).
+   */
+  setStorms(storms: readonly Storm[] | null): void {
+    this.storms = storms;
+  }
+
+  /** The storms set by `setStorms` (null = the field's own t = 0 storms), so touch reads what is drawn. */
+  get currentStorms(): readonly Storm[] | null {
+    return this.storms;
+  }
 
   sampleUV(u: number, v: number): FieldSample {
     const { width: W, height: H, a, b } = this.field;
@@ -305,10 +322,15 @@ export class FieldSampler {
     };
     const nx = x0 + (fx >= 0.5 ? 1 : 0);
     const ny = y0 + (fy >= 0.5 ? 1 : 0);
+    // Moving storms: the id comes from the storm list at the texel centre the static channel would
+    // have used, so a still list gives exactly the field's own id.
+    const storm = this.storms
+      ? stormIdAt(pixelDirection(col(nx), row(ny), W, H), this.storms)
+      : at(a, nx, ny, 2);
     return {
       height: bil(a, 0),
       band: at(a, nx, ny, 1),
-      storm: at(a, nx, ny, 2),
+      storm,
       ocean: bil(b, 0),
       ice: bil(b, 1),
       lava: bil(b, 2),

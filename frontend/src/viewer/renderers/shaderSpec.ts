@@ -3,7 +3,16 @@
 //
 // Honesty: every surface layer of these kinds is `artistic` (R7.7). Missing data refuses the layer:
 // it is not drawn and its id goes in `missing` (R1 principle 3). Nothing is invented.
-import type { ObjectCard, ObjectType, RenderParams, Tag } from '@/contract';
+import type { ObjectCard, ObjectType, RenderParams, Tag, Tier } from '@/contract';
+import {
+  bandCount,
+  flattening as spinFlattening,
+  mearthToKg,
+  spinRateRadS,
+} from '@/physics/gasGiants';
+import { OCEANS_REMOVED_ABOVE_K, POLAR_ICE_BELOW_K } from '@/physics/planets';
+import { R_JUP_M } from '@/physics/constants';
+import { STILL_MOTION, TIER_OF_TAG, weakestTag, type Motion } from '../motion/motion';
 import type { FieldParams } from '../fields/fieldGenerator';
 import { FIELD_TAG } from '../fields/fieldGenerator';
 import { sliderValue, type Overrides } from '../sliders';
@@ -57,9 +66,37 @@ export function isShaderKind(t: ObjectType): t is ShaderKind {
 // ASSUMPTION: defaults below are the mock-up's final-state slider values (artistic, not physical).
 const PLANET_DEFAULTS = {
   planet_rocky: { freq: 1.6, sea: 0, ice: 0, heat: 0, relief: 0.081, cloud: 0.2, atmo: 0.85 },
-  planet_water: { freq: 2, sea: 0.4, ice: 0.22, heat: 0, relief: 0.054, cloud: 0.7, atmo: 0.85 },
+  planet_water: { freq: 2, sea: 0.58, ice: 0.22, heat: 0, relief: 0.054, cloud: 0.7, atmo: 0.85 },
 } as const;
 const GAS_DEFAULTS = { bands: 12, turbulence: 0.5, storms: 5, rings: 0 } as const;
+
+/**
+ * A choice that came from a rule or an analogue, with where it came from (D-32, R3.4). The look of
+ * a generated surface is `artistic` (R7.7); this says what set a number inside it, so the legend
+ * and the "how it is made" text can name the tier of the rule. Never stronger than its inputs.
+ */
+export interface RuleChoice {
+  value: number;
+  tag: Tag;
+  tier: Tier;
+  formula?: string;
+  assumed?: Record<string, number | string>;
+  /** Plain-words source for the text. */
+  basis: string;
+}
+
+/** Jupiter, the analogue for gas-giant flattening and spin. [verify]: NASA Planetary Fact Sheet. */
+export const JUPITER_FLATTENING = 0.06487;
+export const JUPITER_SPIN_H = 9.925;
+/**
+ * Largest flattening drawn. The rule `f = 0.7 q` is a rule of thumb calibrated on Jupiter and
+ * Saturn (A7.2) and breaks down near break-up spin, so the drawn value is capped. A display limit,
+ * artistic, [verify].
+ */
+export const FLATTENING_MAX = 0.15;
+/** Bounds of the drawn band count (the `bands` slider range, sliders.ts). */
+export const BANDS_MIN = 3;
+export const BANDS_MAX = 24;
 
 export interface PlanetStyle {
   /** 0 = rocky brown, 1 = green / grey mix (mock-up uHue). */
@@ -68,6 +105,8 @@ export interface PlanetStyle {
   cloudCover: number;
   atmosphere: number;
   atmosphereColour: Rgb;
+  /** Teq thresholds of A7.1 that set ice and ocean (null: no teq_K on the card, defaults drawn). */
+  climate: RuleChoice | null;
 }
 
 export interface GasStyle {
@@ -77,6 +116,11 @@ export interface GasStyle {
   paletteTemperatureK: number;
   glow: number;
   rings: number;
+  /** Where the band count came from: the Rhines rule (A7.2), or null for a slider / the artist default. */
+  bandsRule: RuleChoice | null;
+  /** Flattening `f` of the drawn sphere (0 = round) and what set it. */
+  flattening: number;
+  flatteningRule: RuleChoice | null;
 }
 
 export interface ShaderSpec {
@@ -88,6 +132,8 @@ export interface ShaderSpec {
   tag: Extract<Tag, 'artistic'>;
   /** False when the layer was refused. */
   drawable: boolean;
+  /** Physical radius in metres (`RenderParams.scale_m`), for the rates that need it. */
+  scaleM: number | null;
   /** Refused layer ids plus the ids RenderParams already lists as missing. */
   missing: string[];
   field: FieldParams | null;
@@ -119,6 +165,7 @@ export function resolveShaderSpec(
   card: ObjectCard,
   params: RenderParams,
   overrides?: Overrides,
+  motion: Motion = STILL_MOTION,
 ): ShaderSpec {
   const kind = params.type;
   if (!isShaderKind(kind) || card.type !== kind) {
@@ -138,7 +185,14 @@ export function resolveShaderSpec(
   if (params.scale_m === null || !(params.scale_m > 0)) drawable = false;
   if (!drawable) missing.add(layerId);
 
-  const base = { kind, seed: params.seed, layerId, tag: FIELD_TAG, drawable } as const;
+  const base = {
+    kind,
+    seed: params.seed,
+    layerId,
+    tag: FIELD_TAG,
+    drawable,
+    scaleM: params.scale_m,
+  } as const;
   const out = (extra: Partial<ShaderSpec>): ShaderSpec => ({
     ...base,
     missing: [...missing],
@@ -155,6 +209,8 @@ export function resolveShaderSpec(
   if (kind === 'gas_giant') {
     const teq = cardValue(card, 'teq_K');
     const T = teq ?? DEFAULT_PALETTE_T_K;
+    const bandsRule = rhinesBands(motion, params.scale_m);
+    const flat = flatteningRule(motion, card, overrides);
     return out({
       field: {
         kind: 'gas',
@@ -163,7 +219,8 @@ export function resolveShaderSpec(
         seaLevel: 0,
         iceExtent: 0,
         heat: 0,
-        bands: sv('bands') ?? GAS_DEFAULTS.bands,
+        // A slider wins (D-27); then the Rhines rule from the spin and the jet speed; then the default.
+        bands: sv('bands') ?? bandsRule?.value ?? GAS_DEFAULTS.bands,
         turbulence: sv('turbulence') ?? GAS_DEFAULTS.turbulence,
         storms: sv('storms') ?? GAS_DEFAULTS.storms,
       },
@@ -173,11 +230,15 @@ export function resolveShaderSpec(
         paletteTemperatureK: T,
         glow: T > GLOW_ABOVE_K ? 0.3 : 0,
         rings: sv('rings') ?? GAS_DEFAULTS.rings,
+        bandsRule: sv('bands') === undefined ? bandsRule : null,
+        flattening: flat?.value ?? 0,
+        flatteningRule: flat,
       },
     });
   }
 
   const d = PLANET_DEFAULTS[kind];
+  const climate = climateFromTeq(card, d);
   // N9: lava cracks glow only when teq_K says the surface is hot (>= ~700 K, A7.1). No teq_K, no
   // glow. A slider override still wins: it is the visitor's own artistic choice (D-26).
   const heat = kind === 'planet_rocky' ? lavaHeatFromTeq(cardValue(card, 'teq_K')) : d.heat;
@@ -186,8 +247,8 @@ export function resolveShaderSpec(
       kind: 'terrain',
       seed: params.seed,
       freq: d.freq,
-      seaLevel: sv('sea_level') ?? d.sea,
-      iceExtent: sv('ice') ?? d.ice,
+      seaLevel: sv('sea_level') ?? climate.sea,
+      iceExtent: sv('ice') ?? climate.ice,
       heat: sv('lava_heat') ?? heat,
       bands: 0,
       turbulence: 0,
@@ -199,6 +260,115 @@ export function resolveShaderSpec(
       cloudCover: sv('cloud_cover') ?? d.cloud,
       atmosphere: sv('atmosphere') ?? d.atmo,
       atmosphereColour: kind === 'planet_water' ? ATMOSPHERE_WATER : ATMOSPHERE_ROCKY,
+      climate: climate.rule,
     },
   });
+}
+
+/**
+ * A7.2 Rhines band count, `N ~ sqrt(2 Omega R / U)`, from the spin and the jet speed (both from
+ * `dynamics`, each with its own tier) and the radius. `N` counts bands pole to pole; the field's
+ * `bands` is half of that (its phase runs 2 * bands half-periods), so the drawn value is `N / 2`,
+ * rounded and kept inside the slider range. The tag is the weakest of the inputs, never stronger
+ * than `derived` (an order of magnitude only, A7.2). Null when an input is missing: nothing is invented.
+ */
+export function rhinesBands(motion: Motion, scaleM: number | null): RuleChoice | null {
+  const spin = motion.rates.spin_period_h;
+  const wind = motion.rates.jet_speed_ms;
+  if (!spin || !wind || scaleM === null || !(scaleM > 0)) return null;
+  const omega = spinRateRadS(spin.value);
+  const n = omega === null ? null : bandCount(omega, scaleM, Math.abs(wind.value));
+  if (n === null || !Number.isFinite(n)) return null;
+  const tag = weakestTag(['derived', spin.tag, wind.tag]);
+  return {
+    value: Math.min(BANDS_MAX, Math.max(BANDS_MIN, Math.round(n / 2))),
+    tag,
+    tier: TIER_OF_TAG[tag],
+    formula:
+      'bands ~ sqrt(2 Omega R / U), Omega = 2 pi / P, R = the radius on the card (order of magnitude only)',
+    assumed:
+      tag === 'model_dependent' || tag === 'inferred_from_analog' || tag === 'artistic'
+        ? { spin_period_h: spin.value, jet_speed_ms: wind.value, radius_m: scaleM }
+        : undefined,
+    basis: `Rhines rule from the spin, the wind speed and the radius on the card: about ${Math.round(n)} bands`,
+  };
+}
+
+/**
+ * A7.2 flattening `f = 0.7 q`, `q = Omega^2 R^3 / (G M)`. The card has no mass, so the order is:
+ * a mass from the `mass_mearth` slider with the spin (the visitor's choice: `artistic`, the formula
+ * kept); the spin with Jupiter's mean density assumed, `f = f_J (P_J / P)^2` (tier 3 or weaker);
+ * Jupiter's flattening as an analogue when the spin is unknown (tier 4). Capped at `FLATTENING_MAX`.
+ */
+export function flatteningRule(
+  motion: Motion,
+  card: ObjectCard,
+  overrides: Overrides | undefined,
+): RuleChoice | null {
+  const spin = motion.rates.spin_period_h;
+  const cap = (f: number) => Math.min(FLATTENING_MAX, Math.max(0, f));
+  const mass = sliderValue(overrides, 'mass_mearth', 'gas_giant');
+  const radiusRj = cardValue(card, 'radius_rjup');
+  if (spin && mass !== undefined && radiusRj !== null) {
+    const omega = spinRateRadS(spin.value);
+    const f = omega === null ? null : spinFlattening(omega, radiusRj * R_JUP_M, mearthToKg(mass));
+    if (f !== null && Number.isFinite(f)) {
+      return {
+        value: cap(f),
+        tag: 'artistic',
+        tier: 5,
+        formula: 'f = 0.7 * q, q = Omega^2 R^3 / (G M)',
+        basis: `Flattening from the spin and the mass you set (${mass} Earth masses)`,
+      };
+    }
+  }
+  if (spin) {
+    const tag = weakestTag(['model_dependent', spin.tag]);
+    return {
+      value: cap(JUPITER_FLATTENING * (JUPITER_SPIN_H / spin.value) ** 2),
+      tag,
+      tier: TIER_OF_TAG[tag],
+      formula: 'f = f_J (P_J / P)^2, from f = 0.7 q with q proportional to Omega^2',
+      assumed: { mean_density: 'same as Jupiter', spin_period_h: spin.value },
+      basis: 'Flattening from the spin, with a Jupiter-like mean density assumed',
+    };
+  }
+  return {
+    value: JUPITER_FLATTENING,
+    tag: 'inferred_from_analog',
+    tier: 4,
+    basis: 'Flattening of Jupiter, used as a typical value because the spin is not known',
+  };
+}
+
+/**
+ * A7.1 thresholds on `teq_K`: below about 330 K a world gets polar ice, above about 450 K oceans
+ * are removed (the lava threshold is `lavaHeatFromTeq`). With no `teq_K` the artist defaults are
+ * drawn and the rule is null. The ice extent below the threshold "grows as temperature falls"
+ * (A7.1) but the A7.1 text gives no end of the ramp, so the default extent is kept there; the ramp
+ * end is [verify] and not invented.
+ */
+export function climateFromTeq(
+  card: ObjectCard,
+  d: { sea: number; ice: number },
+): { sea: number; ice: number; rule: RuleChoice | null } {
+  const teq = cardValue(card, 'teq_K');
+  const tag = card.teq_K?.tag;
+  if (teq === null || !tag) return { sea: d.sea, ice: d.ice, rule: null };
+  const sea = teq > OCEANS_REMOVED_ABOVE_K ? 0 : d.sea;
+  // Cold: polar ice (at least the water-world default extent: a rocky world's own default is none).
+  const coldIce = Math.max(d.ice, PLANET_DEFAULTS.planet_water.ice);
+  const ice = teq >= POLAR_ICE_BELOW_K ? 0 : coldIce;
+  const t = weakestTag(['derived', tag]);
+  return {
+    sea,
+    ice,
+    rule: {
+      value: teq,
+      tag: t,
+      tier: TIER_OF_TAG[t],
+      formula: `polar ice below ${POLAR_ICE_BELOW_K} K, no oceans above ${OCEANS_REMOVED_ABOVE_K} K`,
+      basis: `Ice and ocean from the equilibrium temperature, ${Math.round(teq)} K`,
+    },
+  };
 }

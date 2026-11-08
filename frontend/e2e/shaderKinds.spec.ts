@@ -91,6 +91,8 @@ for (const view of VIEWS) {
         const body = v.body;
         for (let i = 0; i < (rotateLeft ?? 0); i++) v.rotate('left');
         for (let i = 0; i < (rotateUp ?? 0); i++) v.rotate('up');
+        // Bodies move now (issue #42): freeze the clock at t = 0 so the reference picture is stable.
+        await (v as unknown as { freezeClock(s: number): Promise<void> }).freezeClock(0);
         return body ? { drawn: body.drawn, missing: body.missing } : null;
       },
       {
