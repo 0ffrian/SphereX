@@ -93,6 +93,10 @@ export function tierText(tier: number): string {
 /** Said (live region) when the governor lowers the render quality. */
 export const QUALITY_DROP_ANNOUNCEMENT = 'Lowered render quality to keep motion smooth';
 
+/** Said when a brown dwarf is in the infrared view, which is a plain disc, and the visible view moves. */
+export const IR_JETS_HINT =
+  'Switch to "Visible colour" to see the jets move. This motion is an artist\u2019s impression.';
+
 const PLACEHOLDER_LABEL = 'Viewer placeholder: no object loaded';
 
 const ROTATE_BUTTONS: { dir: 'left' | 'right' | 'up' | 'down'; label: string; glyph: string }[] = [
@@ -363,6 +367,14 @@ export function ViewerPanel() {
   const objectIsFixture = fixture || (card?.id.startsWith('fixture:') ?? false);
   // Read from the plan, not from the viewer, so it is never a frame behind (what the clock runs).
   const lapses = plan ? timeLapsesOf(plan) : [];
+  // The infrared view leaves the jets out only because their colours are the visible palette
+  // (`drawBaked`, reason 'mode'); a jets layer refused for missing data or honesty has another
+  // reason and gets no hint, since the visible view would not draw it either.
+  const irHidesJets =
+    plan?.mode === 'spherex_ir' &&
+    plan.bodies.length > 0 &&
+    plan.modes.some((m) => m.id === 'visible' && m.available) &&
+    plan.missing.some((m) => m.id === 'jets' && m.reason === 'mode');
   // One pause control for everything that moves (WCAG 2.2.2, R9). Under reduced motion the scene
   // starts paused and the button starts it.
   const motionPaused = (reducedMotion && !playAnyway) || spinPaused || idlePaused;
@@ -495,6 +507,7 @@ export function ViewerPanel() {
                   type="button"
                   className={`${buttonClass} ${pressedClass}`}
                   aria-pressed={plan.mode === m.id}
+                  aria-describedby={irHidesJets && m.id === 'visible' ? 'ir-jets-hint' : undefined}
                   disabled={!m.available}
                   title={
                     m.available ? m.badge : 'Not available for this object. See the list below.'
@@ -509,6 +522,20 @@ export function ViewerPanel() {
                   {plan.modes.find((m) => m.id === plan.mode)?.badge}
                 </span>
               )}
+            </div>
+          )}
+
+          {/* Sits under the mode buttons it refers to. The region stays mounted while an object is
+              shown, so a change of mode or level is announced politely when the text appears. */}
+          {plan.threeD && plan.modes.length > 0 && (
+            <div
+              id="ir-jets-hint"
+              role="status"
+              aria-live="polite"
+              className="empty:hidden"
+              data-testid="ir-jets-hint"
+            >
+              {irHidesJets && <p className="text-sm text-neutral-200">{IR_JETS_HINT}</p>}
             </div>
           )}
 

@@ -38,7 +38,7 @@ vi.mock('@/viewer/ViewerApp', async (importOriginal) => {
 });
 
 // Imported after the mock is registered (vi.mock is hoisted).
-import { ageFromLog, ViewerPanel } from './ViewerPanel';
+import { ageFromLog, IR_JETS_HINT, ViewerPanel } from './ViewerPanel';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -113,6 +113,73 @@ describe('ViewerPanel', () => {
     await mount();
     expect(container.querySelector('[data-testid="time-lapse-note"]')).toBeNull();
     expect(button('Pause motion')).toBeUndefined();
+  });
+
+  it('a brown dwarf in the infrared view hints that the visible view moves, and only then', async () => {
+    const { card, params } = fixture('brown_dwarf');
+    useAppStore.getState().setObject(card, params);
+    useAppStore.getState().setHonesty('artistic'); // the jets are an artist's layer (R7.4)
+    await mount();
+    const region = () => container.querySelector('[data-testid="ir-jets-hint"]');
+    // Opens in the infrared view.
+    expect(canvasLabel()).toContain('SPHEREx infrared');
+    expect(region()?.getAttribute('role')).toBe('status');
+    expect(region()?.getAttribute('aria-live')).toBe('polite');
+    expect(text('ir-jets-hint')).toBe(IR_JETS_HINT);
+    expect(button('Visible colour')?.getAttribute('aria-describedby')).toBe('ir-jets-hint');
+    expect(text('ir-jets-hint')).not.toMatch(/\b[RAQD]-?\d/);
+    // Visible view draws the jets: the region stays, the text goes.
+    await click('Visible colour');
+    expect(button('Visible colour')?.hasAttribute('aria-describedby')).toBe(false);
+    expect(region()).not.toBeNull();
+    expect(text('ir-jets-hint')).toBe('');
+    // Back to infrared: the hint returns. At the default level the visible view would not draw
+    // the jets either (the layer is hidden), so there is nothing to switch for.
+    await click('SPHEREx infrared');
+    expect(text('ir-jets-hint')).toBe(IR_JETS_HINT);
+    await click('+ Estimated');
+    expect(text('ir-jets-hint')).toBe('');
+    // Another type in the infrared view: no hint.
+    const other = fixture('asteroid_shape');
+    useAppStore.getState().setObject(other.card, other.params);
+    await act(async () => {});
+    await click('SPHEREx infrared');
+    expect(text('ir-jets-hint')).toBe('');
+  });
+
+  it('shows no hint when the brown dwarf jets are refused for missing methane depth', async () => {
+    const { card, params } = fixture('brown_dwarf');
+    const noDepth = { ...card, ch4_depth_33: undefined } as typeof card;
+    useAppStore.getState().setObject(noDepth, params);
+    useAppStore.getState().setHonesty('artistic');
+    await mount();
+    expect(canvasLabel()).toContain('SPHEREx infrared');
+    expect(text('ir-jets-hint')).toBe('');
+  });
+
+  it('shows no hint when the brown dwarf body is refused, since the visible view draws nothing', async () => {
+    const { card, params } = fixture('brown_dwarf');
+    const noSize = { ...card, radius_rjup: undefined } as typeof card;
+    useAppStore.getState().setObject(noSize, params);
+    useAppStore.getState().setHonesty('artistic');
+    await mount();
+    expect(text('ir-jets-hint')).toBe('');
+  });
+
+  it('shows no hint when the visible mode is unavailable, since there is nothing to switch to', async () => {
+    const { card, params } = fixture('brown_dwarf');
+    const noVisible = {
+      ...params,
+      view_modes: {
+        ...params.view_modes,
+        visible: { ...params.view_modes.visible, available: false },
+      },
+    } as typeof params;
+    useAppStore.getState().setObject(card, noVisible);
+    useAppStore.getState().setHonesty('artistic');
+    await mount();
+    expect(canvasLabel()).toContain('SPHEREx infrared');
+    expect(text('ir-jets-hint')).toBe('');
   });
 
   it('shows the placeholder when no object is loaded', async () => {
