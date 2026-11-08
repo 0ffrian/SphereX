@@ -29,6 +29,9 @@ export interface Frame {
   y: number;
   cutout_url: string;
   flags: string[];
+  /** Optional: size of the cutout PNG as served, pixels (cutouts differ, and edge ones are clipped). */
+  width?: number;
+  height?: number;
   /** Optional: object position at this frame's time, degrees. */
   ra?: number;
   dec?: number;
@@ -95,6 +98,125 @@ export interface SpectrumResponse {
 export interface ApiErrorBody {
   error: string;
   detail: string;
+}
+
+// ---- Sky background (feasibility prototype; not in D-16) ----------------------------------------
+// ASSUMPTION: shapes from the sky prototype brief (GET /v1/sky/index.json), built in parallel by the
+// backend. Not in D-16 or shared/schemas yet; see Q-87, Q-92 and Q-98.
+
+/** One equirectangular all-sky image: column x → RA = 360·(x+0.5)/W, row y → Dec = 90 − 180·(y+0.5)/H. */
+export interface SkyEquirect {
+  url: string;
+  width: number;
+  height: number;
+}
+
+/** HiPS tiles of the same survey (tile LOD on zoom is not built yet). */
+export interface SkyHips {
+  url: string;
+  max_order_local: number;
+  tile_width: number;
+  format: string;
+}
+
+export interface SkySurvey {
+  id: string;
+  title: string;
+  credit: string;
+  /** Provenance of the picture (D-02): a colour composite is `derived`, with its `formula`. */
+  tag: Tag;
+  formula: string | null;
+  assumption: string | null;
+  /** Only `icrs` is drawn. */
+  frame: string;
+  convention: string | null;
+  equirect: SkyEquirect[];
+  hips: SkyHips | null;
+}
+
+/** `GET /v1/sky/index.json`. An empty list means no sky image is installed. */
+export interface SkyIndexResponse {
+  surveys: SkySurvey[];
+}
+
+/** Provenance of one value (D-02): `derived` carries a formula, `model_dependent` an assumption. */
+export interface ValueProvenance {
+  tag: Tag;
+  formula?: string;
+  assumption?: string;
+  source?: string;
+}
+
+/**
+ * One position whose frame list is complete in the backend cache, so it loads at once.
+ * ASSUMPTION: shape of `GET /v1/sky/cached` (backend/app/api/sky.py, sky-view prototype, not in
+ * D-16 or shared/schemas; Q-92).
+ */
+export interface SkyCachedObject {
+  id: string;
+  /** The resolved name; null for a picked or typed position. */
+  name: string | null;
+  /** The text the resolver was given; searching it again is a cache hit. Null for positions. */
+  query: string | null;
+  /** Degrees (J2000, ICRS): the resolved position, or the one the coordinate id encodes. */
+  ra: number;
+  dec: number;
+  resolver: 'simbad' | 'sbdb' | 'coords';
+  /** Frames in the stored list. */
+  frames: number;
+  /** Tags of `ra` and `dec`, when the backend has them. */
+  provenance: Readonly<Record<string, ValueProvenance>>;
+}
+
+/** `GET /v1/sky/cached`. */
+export interface SkyCachedResponse {
+  objects: SkyCachedObject[];
+  data_release: string;
+}
+
+// ---- SPHEREx colour composite (not in D-16) -----------------------------------------------------
+// ASSUMPTION: shapes from the colour-view brief (7 Nov 2026), built in parallel by the backend:
+// `GET /v1/objects/{id}/composite` and the PNG at `image_url` (`…/composite.png`, may carry `?v=`).
+// Not in D-16 or shared/schemas yet (D-18); hand-written like the sky index. When `image_url` is
+// null the composite is refused and `missing` says why; the image fields may then be null.
+
+export type CompositeChannel = 'blue' | 'green' | 'red';
+
+/** One of the three frames in the composite. */
+export interface CompositeBand {
+  channel: CompositeChannel;
+  frame_id: string;
+  wavelength_um: number;
+  /** ISO-8601 UTC with `Z` (or an explicit offset). */
+  time: string;
+  /** Optional: width of the band, µm. */
+  bandwidth_um?: number;
+}
+
+/** `GET /v1/objects/{id}/composite` */
+export interface CompositeResponse {
+  id: string;
+  data_release: string;
+  /** 8-bit RGB PNG; null when the composite is refused (see `missing`). */
+  image_url: string | null;
+  width: number | null;
+  height: number | null;
+  /** Arcseconds per PNG pixel. */
+  scale_arcsec_px: number | null;
+  /** The picture is north up, east left. Always true for a composite that has an image. */
+  north_up: boolean;
+  /** 0-based PNG pixel of the object, origin top-left, y down; an integer is a pixel centre. */
+  x: number | null;
+  y: number | null;
+  /** Blue, green and red, each once, when there is an image; fewer (or none) when refused. */
+  bands: CompositeBand[];
+  /** A false-colour composite is `derived` (D-02, Q-27); its formula says how it is built. */
+  tag: 'derived';
+  /** Required when there is an image; may be null for a refused composite. */
+  formula: string | null;
+  /** Refusal reasons and notes, e.g. `composite:too_few_bands`. */
+  missing: string[];
+  cached_at: string | null;
 }
 
 // ---- M4 overlays (issue #12) -------------------------------------------------------------------

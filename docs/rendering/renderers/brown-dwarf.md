@@ -12,6 +12,6 @@
 - **Spin (`dynamics.spin_period_h`, R5.7):** measured when a period exists (tier 1); otherwise a typical field-dwarf period (tier 4, range **[verify]**). Never below the observed floor of about 1 h (shortest known 1.08 h, Tannock et al. 2021, arXiv:2103.01990; verified 7 Nov 2026). No measured period is known to us for eps Indi Ba/Bb **[verify]**.
 - **Emissive intensity:** normalised `flux_45um` (`measured`).
 - **Binary (Eps Indi Ba T1 + Bb T6):** two bodies on an illustrative mutual orbit, tagged `artistic`. Relative brightness from class (derived). Orbital period ~11 yr and separation **[verify before showing numbers]**.
-- **Moving jets (issue #42, Q-87):** with a stated `winds` speed-up the bands are drawn by the browser as counter-flowing jets with storms and spin flattening (`renderers/jetSurface.ts`), instead of the baked texture. Cloud cover follows the scrubbed light curve (tier 3).
+- **Moving jets (issue #42, Q-103):** with a stated `winds` speed-up the bands are drawn by the browser as counter-flowing jets with storms and spin flattening (`renderers/jetSurface.ts`), instead of the baked texture. Cloud cover follows the scrubbed light curve (tier 3).
 - **Haptics:** band source plus brightness pulse ([§8.5](../haptics/profiles.md#r85-per-type-haptic-profile)).
-- **Open visual finding (issue #42, Q-90):** the default SPHEREx IR view shows no motion, because the moving jets are drawn in the visible view only.
+- **Open visual finding (issue #42, Q-106):** the default SPHEREx IR view shows no motion, because the moving jets are drawn in the visible view only.

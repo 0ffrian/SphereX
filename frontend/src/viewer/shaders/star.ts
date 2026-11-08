@@ -122,7 +122,7 @@ export function buildStarMaterial(opts: StarShaderOptions): StarMaterial {
   let col: any = vec3(opts.tint[0], opts.tint[1], opts.tint[2]).mul(opts.emissive);
 
   // Limb darkening (R7.5, model_dependent).
-  // A crisp edge (R7.5, Q-90): the linear law plus a short steeper fall in the last few percent of
+  // A crisp edge (R7.5, Q-106): the linear law plus a short steeper fall in the last few percent of
   // the radius, so the limb reads as a dark rim instead of fading into the glow.
   if (opts.limbU !== null) {
     col = col.mul(float(1).sub(float(opts.limbU).mul(float(1).sub(mu))));

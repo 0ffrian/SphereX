@@ -202,4 +202,74 @@ describe('sky slice', () => {
     await store().skySearch({ q: 'R Dra', kind: 'name', origin: 'input' });
     expect(sky().linkProblems).toEqual([]);
   });
+
+  it('switches Raw | Colour, pauses for the composite and keeps the choice across searches', async () => {
+    await store().skySearch({ q: 'eps Ind B', kind: 'name', origin: 'input' });
+    store().skyPlay();
+    store().skySetColour({ on: true, view: 'tint' });
+    expect(sky().playing).toBe(true); // the tint plays like the raw frames
+    expect(sky().announcement).toMatch(/^Wavelength tint/);
+    store().skySetColour({ on: true, view: 'composite' });
+    expect(sky().playing).toBe(false);
+    expect(sky().announcement).toMatch(/^SPHEREx composite/);
+    store().skyPlay();
+    expect(sky().playing).toBe(false);
+    await store().skySearch({ q: 'RW Aur', kind: 'name', origin: 'input' });
+    expect(sky().colour).toEqual({ on: true, view: 'composite' });
+    store().skySetColour({ on: false, view: 'composite' });
+    store().skyPlay();
+    expect(sky().playing).toBe(true);
+  });
+
+  it('plays the frames in Measured only even with the composite asked for (D-21)', async () => {
+    await store().skySearch({ q: 'eps Ind B', kind: 'name', origin: 'input' });
+    store().setHonesty('measured');
+    store().skySetColour({ on: true, view: 'composite' });
+    expect(sky().announcement).toMatch(/Measured only/);
+    store().skyPlay();
+    expect(sky().playing).toBe(true);
+    // Back to + Estimated: the composite shows again, so playback stops.
+    store().setHonesty('derived');
+    expect(sky().playing).toBe(false);
+  });
+
+  it('loads the composite once per object and serves it from the cache', async () => {
+    let calls = 0;
+    setSkyApi({
+      ...fixtureApi,
+      composite: (id, signal) => {
+        calls++;
+        return fixtureApi.composite(id, signal);
+      },
+    });
+    await store().skySearch({ q: 'eps Ind B', kind: 'name', origin: 'input' });
+    await store().skyLoadComposite();
+    expect(sky().composite.status).toBe('ready');
+    expect(sky().composite.data?.bands).toHaveLength(3);
+    expect(sky().announcement).toMatch(/^Colour composite shown: blue/);
+    await store().skySearch({ q: 'eps Ind B', kind: 'name', origin: 'input' });
+    expect(sky().composite.status).toBe('idle');
+    await store().skyLoadComposite();
+    expect(sky().composite.status).toBe('ready');
+    expect(calls).toBe(1);
+  });
+
+  it('keeps a refused composite as ready with its reasons, and an error for retry', async () => {
+    await store().skySearch({ q: 'R Dra', kind: 'name', origin: 'input' });
+    await store().skyLoadComposite();
+    expect(sky().composite.data?.image_url).toBeNull();
+    expect(sky().announcement).toMatch(/^No colour composite: /);
+
+    await store().skySearch({ q: 'eps Ind B', kind: 'name', origin: 'input' });
+    setSkyApi({
+      ...fixtureApi,
+      composite: async () => {
+        throw new ApiError('server', 'Not cached; offline.', 503, 'offline_cache_miss');
+      },
+    });
+    await store().skySearch({ q: 'eps Ind B', kind: 'name', origin: 'input' });
+    await store().skyLoadComposite();
+    expect(sky().composite.status).toBe('error');
+    expect(sky().composite.error?.code).toBe('offline_cache_miss');
+  });
 });

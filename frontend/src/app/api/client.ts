@@ -1,22 +1,29 @@
 // M1 API client (D-16): resolve, frames and spectrum; M4 (issue #12): overlays and the combine
-// image. Cutouts and flag masks are plain <img> URLs taken from the reply as given. Every reply is
-// checked against the contract (validate.ts).
+// image; plus the sky index, the cached positions and the colour composite (not in D-16, see
+// types.ts). Cutouts and flag masks are plain <img> URLs taken from the reply as given. Every reply
+// is checked against the contract (validate.ts).
 import { API_BASE, API_TIMEOUT_MS, COMBINE_HEADER, FIXTURE_HEADER } from './config';
 import { ApiError } from './errors';
 import type {
   CombineInfo,
   CombineOp,
+  CompositeResponse,
   FramesResponse,
   OverlaysResponse,
   ResolveResponse,
+  SkyCachedResponse,
+  SkyIndexResponse,
   SpectrumResponse,
 } from './types';
 import {
   parseApiError,
   parseCombineInfo,
+  parseComposite,
   parseFrames,
   parseOverlays,
   parseResolve,
+  parseSkyCached,
+  parseSkyIndex,
   parseSpectrum,
 } from './validate';
 
@@ -38,6 +45,12 @@ export interface ApiClient {
   resolve(q: string, signal?: AbortSignal): Promise<ApiResult<ResolveResponse>>;
   frames(id: string, signal?: AbortSignal): Promise<ApiResult<FramesResponse>>;
   spectrum(id: string, signal?: AbortSignal): Promise<ApiResult<SpectrumResponse>>;
+  /** Sky background index (prototype, not in D-16): the all-sky images that are installed. */
+  skyIndex(signal?: AbortSignal): Promise<ApiResult<SkyIndexResponse>>;
+  /** SPHEREx colour composite of the object (not in D-16): one RGB picture from three frames. */
+  composite(id: string, signal?: AbortSignal): Promise<ApiResult<CompositeResponse>>;
+  /** Positions whose frame list is complete in the backend cache (not in D-16): load at once. */
+  skyCached(signal?: AbortSignal): Promise<ApiResult<SkyCachedResponse>>;
   /** `GET /v1/objects/{id}/overlays` (issue #12). */
   getOverlays(id: string, signal?: AbortSignal): Promise<ApiResult<OverlaysResponse>>;
   /** `GET /v1/objects/{id}/combine.png?op=&a=&b=` (issue #12). The caller owns the object URL. */
@@ -167,6 +180,9 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     resolve: (q, signal) => getJson(`/resolve?q=${encodeURIComponent(q)}`, parseResolve, signal),
     frames: (id, signal) => getJson(`${objectPath(id)}/frames`, parseFrames, signal),
     spectrum: (id, signal) => getJson(`${objectPath(id)}/spectrum`, parseSpectrum, signal),
+    skyIndex: (signal) => getJson('/sky/index.json', parseSkyIndex, signal),
+    skyCached: (signal) => getJson('/sky/cached', parseSkyCached, signal),
+    composite: (id, signal) => getJson(`${objectPath(id)}/composite`, parseComposite, signal),
     getOverlays: (id, signal) => getJson(`${objectPath(id)}/overlays`, parseOverlays, signal),
     getCombine: (id, op, a, b, signal) => {
       const query = new URLSearchParams({ op, a, b }).toString();

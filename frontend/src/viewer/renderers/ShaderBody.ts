@@ -222,7 +222,7 @@ function buildPlanet(
     return mix(b, a, cloudPhase.z);
   };
   // Over an ocean the reference (water_world.jpg) shows clouds as a minority, so the same cover
-  // slider draws fewer and softer-edged clouds there (Q-90; a drawing choice, the cover is unchanged).
+  // slider draws fewer and softer-edged clouds there (Q-106; a drawing choice, the cover is unchanged).
   const wetWorld = fp.seaLevel > 0;
   const cloudThr = float(
     wetWorld ? 0.9 - 0.34 * style.cloudCover : 0.88 - (0.88 - 0.36) * style.cloudCover,

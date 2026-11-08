@@ -54,10 +54,10 @@ describe('refusal wording', () => {
 
   it('words deferred cutouts with the count, and no "Try again"', () => {
     expect(one(['cutouts:deferred:7'])).toBe(
-      '7 more frames are not downloaded yet. Search again in a moment to load them.',
+      '7 frames are left out because they have not been downloaded yet. Fetch the rest of the frames above to include them.',
     );
     expect(one(['cutouts:deferred:1'])).toBe(
-      '1 more frame is not downloaded yet. Search again in a moment to load it.',
+      '1 frame is left out because it has not been downloaded yet. Fetch the rest of the frames above to include it.',
     );
   });
 
