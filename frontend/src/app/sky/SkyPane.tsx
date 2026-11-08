@@ -138,7 +138,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     },
     [],
   );
-  // D-32: the credit is always visible. Panels read its height (--sx-credit-h) to stay clear of it
+  // D-35: the credit is always visible. Panels read its height (--sx-credit-h) to stay clear of it
   // (desktop) or to keep their content above it (phone bottom sheet, where it sits on top).
   const creditRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -748,7 +748,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       )}
 
       {/* Provenance and credit of the picture (D-02, A11). */}
-      {/* Always on top and never covered by a panel (D-32; see --sx-credit-h above). */}
+      {/* Always on top and never covered by a panel (D-35; see --sx-credit-h above). */}
       <div ref={creditRef} className="sx-sky-credit" data-testid="sky-credit-box">
         {survey && (
           <p

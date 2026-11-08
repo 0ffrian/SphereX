@@ -8,6 +8,7 @@
     {
       "id": "surface",
       "tag": "artistic",
+      "tier": 5,
       "description": "Browser shader surface and shared CPU field (R7.7). Nothing about it is measured.",
       "requires": []
     }
@@ -43,6 +44,17 @@
     "data_tag": "artistic",
     "params": {
       "tau": 0.15
+    }
+  },
+  "dynamics": {
+    "spin_period_h": {
+      "value": 24.0,
+      "tag": "artistic",
+      "tier": 5,
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "speedup": {
+      "spin": 3600
     }
   },
   "alt_text": "Synthetic fixture. Rocky planet, 0.1 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",

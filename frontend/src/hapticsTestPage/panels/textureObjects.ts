@@ -94,7 +94,7 @@ export function syntheticObject(kind: BodyKind, choices: ObjectChoices): Synthet
     generator_version: 'test-page',
     seed: SEED,
     scale_m: 1e7,
-    layers: [{ id: layerId, tag: 'artistic', description: SRC, requires: [] }],
+    layers: [{ id: layerId, tag: 'artistic', tier: 5, description: SRC, requires: [] }],
     lighting: { mode: 'sun', sun_dir: [1, 0, 0] },
     view_modes: {
       visible: { available: false, badge: 'synthetic', rgb: null, source: 'class_palette' },

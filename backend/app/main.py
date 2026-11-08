@@ -3,18 +3,21 @@
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from app.api import composite, objects, overlays, resolve, sky, spectrum
 from app.context import make_context
 from app.core.card.assets import AssetStore
+from app.core.card.catalogue import SHAPE_URL_ROOT, load_shape_registry, mesh_file
 from app.core.card.service import ObjectPipeline
 from app.core.find.frames import FrameService
 from app.core.find.overlays import OverlayService
@@ -38,6 +41,9 @@ def _inside_git_worktree(path: Path) -> bool:
     except (OSError, subprocess.SubprocessError):
         return False
     return out.stdout.strip() == "true"
+
+
+_SHAPE_NAME = re.compile(r"[a-z0-9][a-z0-9._-]*\.glb")
 
 
 def create_app(
@@ -83,6 +89,22 @@ def create_app(
     app.include_router(composite.router)
     app.include_router(overlays.router)
     app.include_router(sky.router)
+
+    shapes_dir = s.shapes_dir
+
+    # Q-44 / Q-61: same-origin, read-only shape meshes. Only names that match the pattern and
+    # that the registry lists (lod0 / lod1) are served, so no path can leave the folder and no
+    # stray file is published.
+    @app.get("/data/shapes/{name}", include_in_schema=False)
+    def shape_mesh(name: str) -> FileResponse:
+        path = None
+        if _SHAPE_NAME.fullmatch(name):
+            listed = {u for m in load_shape_registry(shapes_dir).values() for u in (m.lod0, m.lod1)}
+            url = SHAPE_URL_ROOT + name
+            path = mesh_file(shapes_dir, url) if url in listed else None
+        if path is None:
+            raise HTTPException(status_code=404, detail="no such shape model")
+        return FileResponse(path, media_type="model/gltf-binary")
 
     @app.get("/v1/health", tags=["meta"])
     def health() -> dict[str, object]:

@@ -297,10 +297,17 @@ function keyedComet(): { card: ObjectCard; params: ReturnType<typeof fixture>['p
   const dust: Layer = {
     id: 'dust',
     tag: 'artistic',
+    tier: 5,
     description: 'Dust cloud (R7.3).',
     requires: [],
   };
-  const tail: Layer = { id: 'tail', tag: 'artistic', description: 'Tail.', requires: [] };
+  const tail: Layer = {
+    id: 'tail',
+    tag: 'artistic',
+    tier: 5,
+    description: 'Tail.',
+    requires: [],
+  };
   params.layers.push(dust, tail);
   return { card, params };
 }

@@ -1,7 +1,7 @@
 // Phone bottom sheet (390 px, touch): the first tap in the sheet right after a search lands where
 // it was aimed. The search help shows while the field has focus; it used to take a row in the
 // layout, so the tap that blurred the field hid it and moved the sheet by its height. Also: the
-// sheet sits on top of the sky credit (D-32) and Stop is in view without scrolling.
+// sheet sits on top of the sky credit (D-35) and Stop is in view without scrolling.
 import { expect, test } from '@playwright/test';
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });

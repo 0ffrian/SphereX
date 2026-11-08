@@ -352,7 +352,7 @@ test.describe('phone width (400 × 860, touch)', () => {
     await expect(panel).toBeVisible();
     const p = await panel.boundingBox();
     const v = await page.locator('.sx-view').boundingBox();
-    // Docked at the bottom, on top of the credit strip (D-32), which it never covers.
+    // Docked at the bottom, on top of the credit strip (D-35), which it never covers.
     const c = await page.getByTestId('sky-credit-box').boundingBox();
     expect(Math.abs(c!.y + c!.height - (v!.y + v!.height))).toBeLessThan(2);
     expect(Math.abs(p!.y + p!.height - c!.y)).toBeLessThan(2);

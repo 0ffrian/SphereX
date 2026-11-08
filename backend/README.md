@@ -21,6 +21,20 @@ From the repo root: `npm run backend:setup`, `backend:dev`, `backend:test`, `bac
 
 In development the frontend's Vite server proxies `/v1` to `http://localhost:8000`. At the event, one process serves the built frontend and the API from one origin (D-24, M5).
 
+## Shape models (A3.7, Q-61)
+
+`assets/shapes/` holds the shape-model GLBs (`<slug>.glb` at full detail, `<slug>.lod1.glb` at half the grid) and `registry.toml`. The app reads the registry to type an asteroid `asteroid_shape` and serves the meshes at `/data/shapes/<name>.glb`. Set `SX_SHAPES_DIR` to use another folder. To add or refresh a model, download the dataset by hand (the PDS host blocks scripts), then:
+
+```bash
+uv run python -m scripts.ingest_shape --zip ~/Downloads/gaskell.ast-eros.shape-model_V1_1.zip \
+  --member gaskell.ast-eros.shape-model_V1_1/data/quad/quad64q.tab --slug eros-gaskell \
+  --spkid 20000433 --name "433 Eros" --doi 10.26033/d0gq-9427 --licence CC0-1.0 \
+  --citation "Gaskell, R.W., Gaskell Eros Shape Model V1.1, urn:nasa:pds:gaskell.ast-eros.shape-model, NASA Planetary Data System." \
+  --frame "Eros body-fixed frame of the model, origin as given (not recentred); see PCK note eros_alex.tpc.txt"
+```
+
+Input is an ICQ `.tab` (`--zip` plus `--member`, or `--input`) or an OBJ (`--input`, `--convex` for DAMIT). Output is byte-identical for the same input. Meshes over 50,000 triangles with no exact reduction are refused.
+
 ## Endpoints (D-16)
 
 | Endpoint | Returns |
@@ -36,6 +50,7 @@ In development the frontend's Vite server proxies `/v1` to `http://localhost:800
 | `GET /v1/objects/{id}/overlays` | `{id, data_release, cached_at, catalogs[], aperture, flag_groups[], frames[], missing, provenance}`: Gaia DR3 and CatWISE2020 sources, per-frame markers in cutout pixels, aperture/annulus contamination, SIA footprint and cutout box. `missing` holds overlay codes only (`overlay:<cat>`, `overlay:<cat>:pending`, `overlay:<cat>:truncated`, `cutout:<id>`, `footprint:<id>`, `flags_mask:<id>`). A4.9, Q-50 |
 | `GET /v1/objects/{id}/flags/{frame_id}.png` | RGBA mask from the cutout's FLAGS extension, colour per flag group; 404 `flags_unavailable` without a usable mask. A4.9 |
 | `GET /v1/objects/{id}/combine.png?op=add\|sub&a=&b=` | 8-bit grey PNG of A ± B on A's grid; metadata (both wavelengths, unit, stretch, `tag: "derived"`, formula) in the `X-SX-Combine` JSON header. A4.9, Q-54 |
+| `GET /data/shapes/{name}.glb` | A registered shape-model mesh (glTF binary, `model/gltf-binary`), metres, glTF +Y up (Q-61). Only names listed in `assets/shapes/registry.toml` are served; anything else is 404 |
 | `GET /v1/health` | `{status, offline, data_release}` |
 | `GET /v1/sky/index.json` | Sky background prototype (beyond D-16, Q-87). `{surveys: [{id, title, credit, tag: "derived", formula, frame: "icrs", convention, equirect: [{url, width, height}], hips: {url, max_order_local, tile_width, format} \| null}]}`, only surveys on disk; `[]` when none |
 | `GET /v1/sky/cached` | Positions whose frame list is complete in the derived cache, so the sky can mark them "loads instantly" (beyond D-16, Q-98). `{objects: [{id, name, query, ra, dec, resolver, frames, provenance: {ra, dec}}], data_release, provenance: {frames: {tag: "derived", formula}}}`, sorted by id. Read only: it globs the `derived.frames/<release>/` meta files (one per object, never the cutouts), keeps a meta only when its digest equals the `frames_key` built now from the id it names (so another cutout size, radius, epoch or derivation version is skipped), and takes the position from the `derived.object` registry or the coordinate id. Not registered, moving, zero frames, corrupt or torn entries are left out. Frame counts are memoised per (entry, body SHA-256); each body is read and verified once per process. `name`/`query` are `null` for a position; `query` is the text the resolver was given, so searching it again is a cache hit |
@@ -96,7 +111,7 @@ uv run python -m scripts.sky_mirror --max-order 6 --max-mb 45000 --allow-unclona
 uv run python -m scripts.sky_bake --preview preview.jpg             # 4096x2048 (order >= 3) and 8192x4096 (order >= 4)
 ```
 
-- **Mirror:** `--max-mb` (10^6 bytes) is a hard cap on everything under `<cache>/sky/`, files already there included; a run that reaches it stops and exits 1. Files are written to a temp name and renamed, so a rerun skips what is there. Lowest orders first. At most 4 requests at a time with the `SX_HTTP_*` retries. Refuses with `SX_OFFLINE=1`. The 2MASS and AllWISE properties say `hips_status = public mirror unclonable`, so the script stops unless `--allow-unclonable` is given (licence settled by D-32; the exact credit line is **[verify]**). It writes `mirror.json` with the complete orders, which `/v1/sky/index.json` reads.
+- **Mirror:** `--max-mb` (10^6 bytes) is a hard cap on everything under `<cache>/sky/`, files already there included; a run that reaches it stops and exits 1. Files are written to a temp name and renamed, so a rerun skips what is there. Lowest orders first. At most 4 requests at a time with the `SX_HTTP_*` retries. Refuses with `SX_OFFLINE=1`. The 2MASS and AllWISE properties say `hips_status = public mirror unclonable`, so the script stops unless `--allow-unclonable` is given (licence settled by D-35; the exact credit line is **[verify]**). It writes `mirror.json` with the complete orders, which `/v1/sky/index.json` reads.
 - **Bake:** numpy HEALPix NESTED (`app/core/sky/healpix.py`), each tile box-averaged and sampled at the nearest parent pixel. In a decoded HiPS JPEG, row = `lx` and column = `ly` (the face coordinates of the nested sub-pixel); `tests/test_sky_landmarks.py` checks it on the real tiles and the bake (skipped when they are absent).
 - **Measured on 7 Nov 2026 (dev PC):** 2MASS orders 0-4 (4092 tiles plus properties and Allsky, 351 MB downloaded; 357 MB on disk with the two baked equirects) in 11 min at about 0.5 MB/s; the bake (both from order 4) took 41 s for 4096x2048 (1.1 MB) and 34 s for 8192x4096 (4.8 MB).
 

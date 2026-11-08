@@ -1,6 +1,6 @@
 # 02 Components
 
-The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12, D-15, D-16, D-18, D-19, D-20, D-22, D-25, D-28 and D-32 (sky-view prototype: Q-87 to Q-91; colour composite, colour views, progressive frames and cached markers: Q-92 to Q-95, Q-97 and Q-98), and A4.9 (overlays; on the frame grid: Q-102).
+The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12, D-15, D-16, D-18, D-19, D-20, D-22, D-25, D-28 and D-35 (sky-view prototype: Q-87 to Q-91; colour composite, colour views, progressive frames and cached markers: Q-92 to Q-95, Q-97 and Q-98), and A4.9 (overlays; on the frame grid: Q-102).
 
 ## Diagram 1: system and backend
 
@@ -23,7 +23,7 @@ flowchart LR
       CompGrid["grid.py: flag mask, TAN grid, resample, asinh stretch, RGB PNG"]
     end
     SkyTools["scripts.sky_mirror, scripts.sky_bake; core/sky: surveys, healpix, bake"]
-    SkyStore[("Sky mirror store {SX_CACHE_DIR}/sky/: HiPS tiles, mirror.json, equirect JPEGs (D-32); outside the D-25 cache")]
+    SkyStore[("Sky mirror store {SX_CACHE_DIR}/sky/: HiPS tiles, mirror.json, equirect JPEGs (D-35); outside the D-25 cache")]
     Adapters["Data adapters (proxy)"]
     DataCache[("Read-through disk cache (D-25): raw responses, spectra, cards, render params; SX_OFFLINE=1 never calls out")]
     subgraph Pipe["Pipeline"]
@@ -69,9 +69,14 @@ flowchart LR
     Gaia["Gaia DR3 TAP (IRSA first, then ESA)"]
     CatWISE["CatWISE2020 (IRSA TAP)"]
     SBDB["JPL SBDB phys-par"]
-    DAMIT["DAMIT shape.obj"]
-    Exo["NASA Exoplanet Archive (untested)"]
+    DAMIT["DAMIT (not called live: OBJ converter only, site was down)"]
+    Exo["NASA Exoplanet Archive (PSCompPars, tested)"]
     Gemini["Gemini image API"]
+  end
+
+  subgraph ShapesB["Shape models"]
+    Shapes["Static route /data/shapes"]
+    ShapeDir["backend/assets/shapes: registry.toml + GLBs (Q-61)"]
   end
 
   FEFlip -->|"GET /v1/resolve, /v1/objects/{id}/frames (again while cutouts are deferred, Q-97), /cutouts/{frame_id}.png"| API
@@ -117,13 +122,15 @@ flowchart LR
   Adapters <--> DataCache
   Adapters -->|"SIA?COLLECTION=spherex_qr2, cutouts"| IRSA
   Adapters -->|"name to RA/Dec"| Resolver
-  Adapters -->|"position per frame"| Horizons
+  Adapters -->|"position per frame, phase angle (quantity 24, observer SPHEREx), heliocentric vectors for sun_vector"| Horizons
   Adapters -->|"conesearch.php, -ep in JD"| SkyBoT
   Adapters -->|"sso_reflectance_spectrum; gaia_dr3_source cone, G #lt; 20"| Gaia
   Adapters -->|"catwise_2020 cone"| CatWISE
   Adapters -->|"sbdb.api?sstr=...&phys-par=1"| SBDB
-  Adapters -->|"shape.obj"| DAMIT
-  Adapters -.->|"planet columns (P2)"| Exo
+  Adapters -.->|"OBJ converter, no live call"| DAMIT
+  Adapters -->|"pscomppars by name, TAP sync"| Exo
+  API -->|"GET /data/shapes/{name}.glb"| Shapes
+  Shapes --> ShapeDir
   GemPaint -->|"hillshade + prompt (server-side key)"| Gemini
 
   Validate -.->|"validates cards against"| CardSchema
@@ -256,7 +263,7 @@ flowchart TB
 
 - Baked types (rendering doc types) fetch textures from the backend; shader kinds generate a field in the browser instead (D-01, D-12).
 - Endpoints follow D-16. Every endpoint is keyed by the object id that `resolve` returns; there is no separate flipbook endpoint. Responses served from the cache carry `cached_at` (D-25); for `/card` and `/render-params` it is the `X-SX-Cached-At` header, next to `X-SX-Asset-Status`, because the R3 shapes forbid extra fields (Q-39).
-- Sky-view prototype (Q-87 to Q-91): the `/v1/sky` endpoints are not keyed by an object id and are outside D-16 until Q-87 is settled. They serve only the local copy written by `scripts.sky_mirror` and `scripts.sky_bake` (D-32), never the network. A click on the sky becomes an `ra,dec` search with origin `sky` and then follows the usual resolve and frames path ([08](08-sequence-search-flipbook.md)). The flipbook panel and the transport bar read one playback session, so closing the panel does not stop playback.
+- Sky-view prototype (Q-87 to Q-91): the `/v1/sky` endpoints are not keyed by an object id and are outside D-16 until Q-87 is settled. They serve only the local copy written by `scripts.sky_mirror` and `scripts.sky_bake` (D-35), never the network. A click on the sky becomes an `ra,dec` search with origin `sky` and then follows the usual resolve and frames path ([08](08-sequence-search-flipbook.md)). The flipbook panel and the transport bar read one playback session, so closing the panel does not stop playback.
 - Colour composite (prototype, Q-92, Q-94): `GET /v1/objects/{id}/composite` and `/composite.png` are keyed by object id but are not in D-16 yet. `core/composite` runs Stage 1 once per request, takes Stage 2's verdict per frame, picks one frame per channel from one pass, resamples the three onto one north-up TAN grid and stretches each band; the result is stored as `derived.composite` (D-25). Sequence: [20](20-sequence-composite.md). `GET /v1/sky/cached` (Q-98) reads only `derived.frames` metas and the `derived.object` registry, never cutouts or upstream.
 - Flipbook additions (prototype): the colour views are false colour, tagged `derived` and hidden in Measured only (Q-93); the hash gains `colour=` (Q-95); progressive frames ask again while `cutouts:deferred:<n>` is listed, one request at a time (Q-97), and the spectrum, composite and overlays wait for the complete list. `frameGrid.ts` draws every frame of an object on one fixed grid. `frameSwap.ts` decodes the next frame in a hidden `<img>` slot and shows it only once decoded; captions and the transport readout follow the shown frame. Overlay markers and the flag mask use the shown frame's grid placement and follow the shown frame; they are not drawn on the composite (Q-102). The no-data caption of a clipped frame shows only while paused; one steady line covers the object (`noData.ts`, R9).
 - The overlays (A4.9) are drawn as their own backend component, because they are not a numbered pipeline stage: they read Stage 1's frames and cached cutouts and the Gaia and CatWISE2020 cones. Their endpoints are not yet in D-16 (Q-50).
