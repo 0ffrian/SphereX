@@ -13,6 +13,7 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api import composite, objects, overlays, resolve, sky, spectrum
 from app.context import make_context
@@ -22,6 +23,9 @@ from app.core.card.service import ObjectPipeline
 from app.core.find.frames import FrameService
 from app.core.find.overlays import OverlayService
 from app.core.find.resolver import load_aliases
+from app.core.measure.pool import MeasurePool
+from app.core.render.background import TextureBaker
+from app.core.warm import WarmCache, demo_queries
 from app.errors import install_catch_all, install_error_handlers
 from app.settings import Settings, get_settings
 
@@ -59,16 +63,39 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        warm: WarmCache | None = None
+        if s.prefetch_on_start:  # D-25 warm cache for the demo objects (issue #41)
+            queries = demo_queries(s.targets_file, s.prefetch_group_list)
+            warm = WarmCache(ctx, app.state.pipeline, app.state.aliases, queries)
+            warm.start()
+        app.state.warm = warm
         yield
+        if warm is not None:
+            warm.stop()
         app.state.overlays.close()  # stop the catalogue fetch pool (issue #12)
+        # Issue #41: no new jobs, queued downloads, measurements and bakes dropped.
+        app.state.pipeline.close()
+        app.state.frames.close()
+        app.state.measure_pool.close()
+        app.state.baker.close()
 
     app = FastAPI(title="Shift & Spectrum API", version="0.1.0", lifespan=lifespan)
     app.state.ctx = ctx
     app.state.frames = FrameService(ctx)
     app.state.overlays = OverlayService(app.state.frames)
+    app.state.measure_pool = MeasurePool(s.measure_workers)
+    textures = s.textures_path
+    textures.mkdir(parents=True, exist_ok=True)
+    app.state.baker = TextureBaker(textures, s.bake_workers)
     app.state.pipeline = ObjectPipeline(
-        app.state.frames, AssetStore(ctx.cache, s.assets_dir, s.data_release)
+        app.state.frames,
+        AssetStore(ctx.cache, s.assets_dir, s.data_release),
+        measure_pool=app.state.measure_pool,
+        baker=app.state.baker if s.bake_textures else None,
     )
+    # Issue #41: a capped web request (/frames, /spectrum, overlays) downloads no cutouts itself;
+    # it starts or joins the object's job, which downloads them in the shared bounded pool.
+    app.state.frames.on_request = app.state.pipeline.request_frames
     app.state.aliases = load_aliases(s.targets_file)
     # Order matters: the middleware added last is outermost. The catch-all goes in first so
     # that CORS wraps it and a 500 still carries CORS headers.
@@ -80,7 +107,13 @@ def create_app(
             allow_methods=["GET"],
             # Let the browser read the D-16 cached_at, the asset status (Q-39) and the
             # combine metadata (Q-50).
-            expose_headers=["X-SX-Cached-At", "X-SX-Asset-Status", "X-SX-Combine"],
+            expose_headers=[
+                "X-SX-Cached-At",
+                "X-SX-Asset-Status",
+                "X-SX-Combine",
+                "X-SX-Measuring",  # issue #41 first-stage answer (Q-111)
+                "X-SX-Progress",
+            ],
         )
     install_error_handlers(app)
     app.include_router(resolve.router)
@@ -89,6 +122,8 @@ def create_app(
     app.include_router(composite.router)
     app.include_router(overlays.router)
     app.include_router(sky.router)
+    # R6.7 / A5.4: the baked textures that RenderParams.textures point at (TEXTURE_URL_ROOT).
+    app.mount("/data/textures", StaticFiles(directory=textures), name="textures")
 
     shapes_dir = s.shapes_dir
 

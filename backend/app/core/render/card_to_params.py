@@ -88,6 +88,9 @@ TYPE_LABEL = {
     "nova": "Nova",
 }
 
+# Issue #41: prefix of a `missing` entry that is still being measured (first-stage answer).
+MEASURING_PREFIX = "measuring:"
+
 
 # --- seed -----------------------------------------------------------------------------------
 
@@ -206,9 +209,12 @@ def _lightcurve_ok(card: Mapping[str, Any]) -> bool:
 
 
 class _Plan:
-    def __init__(self) -> None:
+    def __init__(self, pending: frozenset[str] = frozenset()) -> None:
         self.layers: list[dict[str, Any]] = []
         self.missing: list[str] = []
+        # Issue #41: card fields still being measured. A refusal that needs one of them is
+        # listed as ``measuring:<id>``, not as missing: it will fill in, nothing is guessed.
+        self.pending = pending
 
     def layer(
         self,
@@ -246,10 +252,12 @@ class _Plan:
                 layer["assumed"] = assumed
             self.layers.append(layer)
         else:
-            self.refuse(layer_id)
+            self.refuse(layer_id, requires)
         return ok
 
-    def refuse(self, item: str) -> None:
+    def refuse(self, item: str, requires: list[str] | tuple[str, ...] = ()) -> None:
+        if self.pending.intersection(requires):
+            item = MEASURING_PREFIX + item
         if item not in self.missing:
             self.missing.append(item)
 
@@ -277,7 +285,7 @@ def _ir_mode(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any] | None:
         return None  # R5.2 defines the channels for asteroids, comets and brown dwarfs only
     rgb = _vec(card, "spherex_rgb", 3)
     if rgb is None:
-        plan.refuse("spherex_ir")
+        plan.refuse("spherex_ir", ["spherex_rgb"])
         return _off(IR_BADGE, "spherex_rgb", channels)
     tv = dict(_tv(card, "spherex_rgb") or {})
     tv["value"] = rgb
@@ -494,7 +502,7 @@ def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) 
             ["spectral_class"],
         )
     if not emissive:
-        plan.refuse("flux_pulse")
+        plan.refuse("flux_pulse", ["flux_45um"])
     return {
         "texture": "bands" if bands else "none",
         "texture_tag": "artistic",
@@ -551,7 +559,7 @@ def _star(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         ):
             data, data_tag = "heartbeat", "measured"
         else:
-            plan.refuse("heartbeat")
+            plan.refuse("heartbeat", ["lightcurve"])
         plan.layer(
             _has(card, "period_var_d"),
             "radius_pulsation",
@@ -573,7 +581,7 @@ def _star(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         ):
             data, data_tag = "dimming", "measured"
         else:
-            plan.refuse("dimming")
+            plan.refuse("dimming", ["lightcurve"])
     return {
         "texture": "none",
         "texture_tag": "artistic",
@@ -787,11 +795,15 @@ def card_to_params(
     seed: int | None = None,
     generator_version: str = GENERATOR_VERSION,
     extra_missing: tuple[str, ...] = (),
+    pending: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
     """RenderParams (R3.4) as a JSON-ready dict. ``seed`` defaults to ``seed_for(id, version)``.
 
     ``extra_missing`` carries refusals from earlier stages (for example stage 3's
     ``type:exoplanet_thresholds``) so the user sees them.
+
+    ``pending``: card fields still being measured (issue #41 first stage). Layers that need one
+    are listed as ``measuring:<id>`` in ``missing``.
     """
     object_id = str(card["id"])
     kind = str(card["type"])
@@ -799,7 +811,7 @@ def card_to_params(
         seed = seed_for(object_id, generator_version)
     if seed < 0:
         raise ValueError("seed must be an integer >= 0 (Q-35)")
-    plan = _Plan()
+    plan = _Plan(pending)
     bake = _bake(card, seed)
 
     if kind == "asteroid_shape":

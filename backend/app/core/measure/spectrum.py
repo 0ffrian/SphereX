@@ -18,6 +18,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+from collections.abc import Mapping
+from concurrent.futures import Future
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any
@@ -46,7 +49,10 @@ from app.core.measure.photometry import (
     Refusal,
     measure_frame,
 )
+from app.core.measure.pool import MeasurePool, Outcome
 from app.timefmt import iso_utc_z, parse_utc, utc_now
+
+log = logging.getLogger("shift_spectrum")
 
 SPECTRUM_SOURCE = "derived.spectrum"
 SATURATED = "saturated"
@@ -89,6 +95,17 @@ def provenance() -> dict[str, dict[str, str]]:
             "source": "midpoint of the IRSA SIA t_min/t_max exposure bounds (UTC)",
         },
     }
+
+
+@dataclass(frozen=True)
+class Premeasured:
+    """A frame measured while its cutout landed (issue #41). Used only if the cutout body
+    the spectrum reads has this SHA-256 and the frame record has this pixel position."""
+
+    body_sha256: str
+    x_fits0: float
+    y_fits0: float
+    future: Future[Outcome]
 
 
 @dataclass
@@ -154,16 +171,29 @@ def _point(f: FrameRecord, m: Measurement) -> tuple[dict[str, Any], dict[str, An
 
 
 class SpectrumService:
-    def __init__(self, frames: FrameService, cfg: MeasureConfig = DEFAULT_CONFIG) -> None:
+    def __init__(
+        self,
+        frames: FrameService,
+        cfg: MeasureConfig = DEFAULT_CONFIG,
+        pool: MeasurePool | None = None,
+    ) -> None:
         self.frames = frames
         self.ctx = frames.ctx
         self.cfg = cfg
+        self.pool = pool
 
     def get_spectrum(
-        self, obj: ResolvedObject, frames: FramesResult | None = None
+        self,
+        obj: ResolvedObject,
+        frames: FramesResult | None = None,
+        premeasured: Mapping[str, Premeasured] | None = None,
     ) -> SpectrumResult:
         """``frames``: Stage 1's result when the caller already has it (the composite), so the
-        frame list (and its live cutout budget) is not fetched a second time."""
+        frame list (and its live cutout budget) is not fetched a second time.
+
+        ``premeasured``: frames already sent to the photometry pool by the object job as their
+        cutouts landed (issue #41), by frame id. Frames are measured in the pool when one is set,
+        and the points are put in frame order afterwards, so finishing order never matters."""
         fr = frames if frames is not None else self.frames.get_frames(obj)
         release = self.ctx.settings.data_release
         complete = is_complete(fr.missing)
@@ -191,13 +221,30 @@ class SpectrumService:
         absent: set[str] = set()
         spectrum: list[dict[str, Any]] = []
         light: list[dict[str, Any]] = []
+        pending: dict[str, Future[Outcome] | Outcome] = {}
         for f in fr.frames:
             entry = self.ctx.cache.get(cutout_key(self.ctx, f))
             if entry is None:
                 refusals[f.frame_id] = CUTOUT
                 continue
-            shas[f.frame_id] = str(entry.meta["body_sha256"])
-            result = self._measure(entry.body, f)
+            sha = str(entry.meta["body_sha256"])
+            shas[f.frame_id] = sha
+            pre = (premeasured or {}).get(f.frame_id)
+            if pre is not None and (pre.body_sha256, pre.x_fits0, pre.y_fits0) == (
+                sha,
+                f.x_fits0,
+                f.y_fits0,
+            ):
+                pending[f.frame_id] = pre.future
+            elif self.pool is not None:
+                pending[f.frame_id] = self.pool.submit(entry.body, f.x_fits0, f.y_fits0, self.cfg)
+            else:
+                pending[f.frame_id] = self._measure(entry.body, f)  # one body in memory at a time
+        for f in fr.frames:
+            job = pending.get(f.frame_id)
+            if job is None:
+                continue
+            result = self._outcome(job, f, shas[f.frame_id])
             if isinstance(result, Refusal):
                 refusals[f.frame_id] = result.reason
                 continue
@@ -239,6 +286,19 @@ class SpectrumService:
                 if_changed=True,
             )
         return SpectrumResult(body, fr.cached_at, False, tuple(f.frame_id for f in fr.frames))
+
+    def _outcome(self, job: Future[Outcome] | Outcome, f: FrameRecord, sha: str) -> Outcome:
+        if not isinstance(job, Future):
+            return job
+        try:
+            return job.result()
+        except Exception as exc:  # a dead worker: measure the same bytes here instead
+            log.warning("photometry worker failed for %s, measuring in-thread: %s", f.frame_id, exc)
+            entry = self.ctx.cache.get(cutout_key(self.ctx, f))
+            if entry is None or entry.meta.get("body_sha256") != sha:
+                # Only the bytes whose SHA-256 goes into the key may be measured.
+                return Refusal(CUTOUT, "cutout changed or no longer cached")
+            return self._measure(entry.body, f)
 
     def _measure(self, body: bytes, f: FrameRecord) -> Measurement | Refusal:
         try:

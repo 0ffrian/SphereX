@@ -154,7 +154,11 @@ def prefetch_target(
                 print(f"  Horizons: phase {geom.phase_angle_deg:.2f} deg ({geom.observer})")
             except (CacheMissOffline, UpstreamUnavailable) as exc:
                 print(f"  Horizons geometry failed (card lighting refused): {exc}", flush=True)
-        rep.missing = FrameService(ctx).get_frames(obj, rebuild=True).missing
+        fs = FrameService(ctx)
+        try:
+            rep.missing = fs.get_frames(obj, rebuild=True).missing
+        finally:
+            fs.close()
         return rep
 
     search_ra, search_dec = position_at(obj, parse_utc(ctx.settings.search_epoch))
@@ -205,11 +209,14 @@ def prefetch_target(
 
     # Rebuild from the cache just filled (never the stored list), with no live-download cap.
     service = FrameService(ctx)
-    result = service.get_frames(obj, rebuild=True, unlimited_live=True)
-    rep.frames, rep.missing = len(result.frames), result.missing
-    # The false-colour composite (and the Stage 2 spectrum it reads) from the same frame list,
-    # so both are in the derived cache for SX_OFFLINE=1. A refusal is an answer, not a failure.
-    comp = CompositeService(service).get(obj, use_memo=True)
+    try:
+        result = service.get_frames(obj, rebuild=True, unlimited_live=True)
+        rep.frames, rep.missing = len(result.frames), result.missing
+        # The false-colour composite (and the Stage 2 spectrum it reads) from the same frame
+        # list, so both are in the derived cache for SX_OFFLINE=1. A refusal is an answer.
+        comp = CompositeService(service).get(obj, use_memo=True)
+    finally:
+        service.close()  # issue #41: each FrameService owns a download pool
     # The composite's own reasons first; a refusal for a cutout (cutout:<id>, ...) has none.
     refusals = [m for m in comp.body["missing"] if m.startswith("composite:")]
     why = ",".join((refusals or comp.body["missing"])[:4]) or "-"
