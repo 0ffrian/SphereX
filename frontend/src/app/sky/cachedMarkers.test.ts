@@ -84,6 +84,8 @@ describe('parseSkyCached', () => {
       'eps-indi-b',
       'r-dra',
       'synthetic-cached-spot',
+      // Issue #60: the searchable water planet with a 3D model (fixtures/targets.ts).
+      'aqua-prime',
     ]);
   });
 });

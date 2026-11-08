@@ -55,6 +55,11 @@ export interface FixtureTarget {
    * `cutouts:deferred:<n>`. The last stage must be `frameCount` (complete).
    */
   progressive?: readonly number[];
+  /**
+   * Issue #60: name of a shared 3D fixture (`shared/fixtures/cards/<body>.json` and
+   * `params/<body>.json`) that `/card` and `/render-params` serve for this target. Unset: no 3D model.
+   */
+  body?: string;
 }
 
 export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
@@ -165,6 +170,20 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     northUp: false,
     frameCount: 12,
     seed: 909,
+  },
+  {
+    // Issue #60: a searchable water planet for the build view. Name, position and frames are all
+    // synthetic; its card and render params are the shared planet_water fixture as it draws today.
+    id: 'aqua-prime',
+    name: 'Aqua Prime',
+    aliases: ['Aqua Prime', 'aqua-prime'],
+    ra: 38, // synthetic position, not a real object (near the cached spot at 45, -15)
+    dec: -12,
+    moving: false,
+    northUp: false,
+    frameCount: 12,
+    seed: 1010,
+    body: 'planet_water',
   },
   {
     id: 'synthetic-refused-mover',

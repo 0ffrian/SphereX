@@ -32,7 +32,9 @@ test('app loads: header, viewer canvas, renderer status, no console errors', asy
   test.info().annotations.push({ type: 'renderer-backend', description: backend ?? 'unknown' });
   console.log(`renderer backend in headless Chromium: ${backend}`);
 
-  // On-screen rotate buttons exist (WCAG 2.5.7) and work when a backend is up.
+  // On-screen rotate buttons exist (WCAG 2.5.7) and work when a backend is up. In the build pane
+  // (issue #60) they sit under Details, so the stage stays clear at first sight.
+  await viewer.getByTestId('viewer-details-toggle').click();
   const rotateLeft = viewer.getByRole('button', { name: 'Rotate left' });
   await expect(rotateLeft).toBeVisible();
   if (backend !== 'unavailable') {

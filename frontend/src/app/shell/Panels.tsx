@@ -1,11 +1,11 @@
 // The panel that the active tool opens: the object panel (object info, the flipbook cutout and the
-// spectrum, as one scrolling card) or the 3D viewer. 'sky' shows no panel.
+// spectrum, as one scrolling card). 'sky' shows no panel; the 3D viewer is the build pane
+// (app/build/BuildPane.tsx, issue #60), not a floating card.
 import { useEffect, useRef } from 'react';
 import { Flipbook } from '@/app/flipbook/Flipbook';
 import { formatCoords } from '@/app/format';
 import { SpectrumPanel } from '@/app/spectrum/SpectrumPanel';
-import { StatusLine } from '@/app/StatusLine';
-import { ViewerPanel } from '@/app/ViewerPanel';
+import { useSelection } from '@/app/build/selectedBody';
 import { useAppStore } from '@/state/store';
 import { PanelCard } from './PanelCard';
 import { useShellStore } from './shellStore';
@@ -13,7 +13,6 @@ import { useShellStore } from './shellStore';
 export function Panels() {
   const tool = useShellStore((s) => s.tool);
   if (tool === 'flipbook' || tool === 'spectrum') return <ObjectPanel />;
-  if (tool === 'viewer') return <ViewerCard />;
   return null;
 }
 
@@ -23,6 +22,7 @@ function ObjectPanel() {
   const closePanel = useShellStore((s) => s.closePanel);
   const sky = useAppStore((s) => s.sky);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const selection = useSelection();
 
   // The Spectrum tool scrolls to the spectrum section; the Flipbook tool to the top.
   useEffect(() => {
@@ -61,24 +61,19 @@ function ObjectPanel() {
       {tool === 'spectrum' && sky.status === 'ready' && nFrames === 0 && !sky.progress && (
         <p className="text-sm text-sx-mfg">There is no spectrum without frames.</p>
       )}
-    </PanelCard>
-  );
-}
-
-function ViewerCard() {
-  const closePanel = useShellStore((s) => s.closePanel);
-  return (
-    <PanelCard
-      title="3D viewer"
-      subtitle="Sky Sculptor: the loaded body in 3D"
-      icon="viewer"
-      wide
-      onClose={closePanel}
-      returnFocusTo={'[data-testid="tool-viewer"]'}
-      testId="viewer-card"
-    >
-      <ViewerPanel />
-      <StatusLine />
+      {selection && (
+        // Issue #60: the same "Build it" as the selected object's card, for a typed search.
+        <div className="flex">
+          <button
+            type="button"
+            className="sx-btn sx-btn-ghost"
+            onClick={() => useShellStore.getState().openBuild(true)}
+            data-testid="panel-build-it"
+          >
+            Build it in 3D
+          </button>
+        </div>
+      )}
     </PanelCard>
   );
 }

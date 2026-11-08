@@ -30,7 +30,7 @@ import type {
   SpectrumPoint,
   SpectrumResponse,
 } from './types';
-import { TAGS, type Tag } from '@/contract';
+import { OBJECT_TYPES, TAGS, type ObjectCard, type RenderParams, type Tag } from '@/contract';
 
 type Obj = Readonly<Record<string, unknown>>;
 
@@ -650,4 +650,39 @@ export function parseComposite(raw: unknown): CompositeResponse {
   if (northUp !== true) fail(`${p}.north_up`, 'a composite must be north up');
   if (bands.length !== CHANNELS.length) fail(`${p}.bands`, 'expected one band per channel');
   return out;
+}
+
+/**
+ * `GET /v1/objects/{id}/card` (D-16, R3.2). Issue #60 checks only what the build pane relies on
+ * (an id, a name, a type); the card's tagged values are read by the planner, which refuses any
+ * layer whose fields are missing (R1 principle 3), so nothing is defaulted here.
+ * ASSUMPTION: a shallow check is enough until the D-18 schemas are validated at runtime.
+ */
+export function parseObjectCard(raw: unknown): ObjectCard {
+  const p = 'card';
+  const o = obj(raw, p);
+  str(o, 'id', p);
+  str(o, 'name', p);
+  const type = str(o, 'type', p);
+  if (!(OBJECT_TYPES as readonly string[]).includes(type)) fail(`${p}.type`, 'unknown object type');
+  return raw as ObjectCard;
+}
+
+/** `GET /v1/objects/{id}/render-params` (D-16, R3.4); same shallow check as the card. */
+export function parseRenderParams(raw: unknown): RenderParams {
+  const p = 'render-params';
+  const o = obj(raw, p);
+  str(o, 'id', p);
+  const type = str(o, 'type', p);
+  if (!(OBJECT_TYPES as readonly string[]).includes(type)) fail(`${p}.type`, 'unknown object type');
+  num(o, 'seed', p);
+  const layers = arr(o, 'layers', p);
+  layers.forEach((l, i) => {
+    const lo = obj(l, `${p}.layers[${i}]`);
+    str(lo, 'id', `${p}.layers[${i}]`);
+    const tag = str(lo, 'tag', `${p}.layers[${i}]`);
+    if (!(TAGS as readonly string[]).includes(tag)) fail(`${p}.layers[${i}].tag`, 'unknown tag');
+  });
+  strList(o, 'missing', p);
+  return raw as RenderParams;
 }

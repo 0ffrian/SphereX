@@ -1,6 +1,7 @@
 // Left tool rail (mock-up `.rail.left`): icon buttons that open real tools only. Sky is the sky
 // view alone; Flipbook and Spectrum open the object panel at that section; 3D viewer opens the
-// existing ViewerPanel. Haptics are not wired into the app until M5, so there is no Haptics tool.
+// build pane (issue #60) with the current body already built. Haptics are not wired into the app
+// until M5, so there is no Haptics tool.
 import { useAppStore } from '@/state/store';
 import { Icon, type IconName } from './icons';
 import { useShellStore, type ToolId } from './shellStore';
@@ -12,19 +13,20 @@ const TOOLS: { id: ToolId; label: string; icon: IconName; hint: string }[] = [
   { id: 'viewer', label: '3D viewer', icon: 'viewer', hint: '3D view of a loaded body' },
 ];
 
+/** Opens a tool (also from the selected object's card: "See fingerprint" is the spectrum). */
+export function openTool(id: ToolId): void {
+  useShellStore.getState().setTool(id);
+  if (id === 'spectrum') {
+    const sky = useAppStore.getState().sky;
+    const hasFrames = sky.status === 'ready' && (sky.frames?.frames.length ?? 0) > 0;
+    if (hasFrames && sky.spectrum.status === 'idle') void useAppStore.getState().skyLoadSpectrum();
+  }
+}
+
 export function ToolRail() {
   const tool = useShellStore((s) => s.tool);
-  const setTool = useShellStore((s) => s.setTool);
-  const loadSpectrum = useAppStore((s) => s.skyLoadSpectrum);
-
-  const choose = (id: ToolId) => {
-    setTool(id);
-    if (id === 'spectrum') {
-      const sky = useAppStore.getState().sky;
-      const hasFrames = sky.status === 'ready' && (sky.frames?.frames.length ?? 0) > 0;
-      if (hasFrames && sky.spectrum.status === 'idle') void loadSpectrum();
-    }
-  };
+  const buildOpen = useShellStore((s) => s.build.open);
+  const choose = openTool;
 
   return (
     <nav aria-label="Tools" className="sx-rail">
@@ -34,7 +36,7 @@ export function ToolRail() {
             <button
               type="button"
               className="sx-tool"
-              aria-pressed={tool === t.id}
+              aria-pressed={t.id === 'viewer' ? buildOpen : tool === t.id && !buildOpen}
               aria-label={t.label}
               aria-description={t.hint}
               onClick={() => choose(t.id)}
