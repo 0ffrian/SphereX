@@ -1,6 +1,6 @@
 # 10 Sequence: View in 3D
 
-Opening the Sky Sculptor view: the frontend asks for `RenderParams`, the backend looks up the asset, bakes textures if they are not cached, and the viewer picks a renderer by `type`. Drawn from architecture spec §4.4, rendering doc §3.4, §4, §5, §6.7, §7, §7.7, and decisions D-01, D-05, D-12, D-21 and D-22.
+Opening the Sky Sculptor view: the frontend asks for `RenderParams`, the backend looks up the asset, queues a texture bake off the request path if they are not cached, and the viewer picks a renderer by `type`. Drawn from architecture spec §4.4, rendering doc §3.4, §4, §5, §6.7, §7, §7.7, and decisions D-01, D-05, D-12, D-21 and D-22, and Q-111 and Q-112 (issue #41: object job, background bake).
 
 ```mermaid
 sequenceDiagram
@@ -36,15 +36,17 @@ sequenceDiagram
       API->>C2P: card_to_params(ObjectCard)
       C2P-->>API: RenderParams: layers with tags, missing list
     end
+    Note over API,C2P: Without a saved asset the reply comes from the object's job: final within SX_FIRST_ANSWER_WAIT_S, else the newest intermediate RenderParams (measuring: items in missing) with X-SX-Measuring and X-SX-Progress (Q-111, diagram 09)
     alt rendering-doc type with procedural maps (D-01)
-      API->>TC: Textures for id, generator_version, seed?
-      opt not cached
-        API->>BK: Bake (see diagram 12)
-        BK->>TC: Write albedo.webp, height.png, height.bin, normal.png
-      end
+      API->>BK: The object job queues both sizes in a worker process (SX_BAKE_WORKERS=1, see diagram 12)#59; the reply does not wait (Q-112)
       API-->>V: RenderParams with texture URLs
-      V->>TC: GET textures (1024x512 mobile, 2048x1024 desktop)
-      TC-->>V: Maps
+      BK->>TC: Write albedo.webp, height.png, height.bin, normal.png (skipped if bake.json matches)
+      V->>TC: GET /data/textures/... (1024x512 mobile, 2048x1024 desktop)
+      alt bake landed
+        TC-->>V: Maps
+      else still baking
+        TC-->>V: 404 for the first seconds
+      end
     else rendering-doc type without maps (asteroid_shape, comet, stars)
       API-->>V: RenderParams (mesh from shape_source, or emission volumes and self-lit spheres built in the browser)
     else shader kind (planet_rocky, planet_water, gas_giant, nebula, nova)
@@ -76,4 +78,4 @@ sequenceDiagram
 - RenderParams responses served from the backend cache carry `cached_at` (D-25). As built (issue #5) it is the `X-SX-Cached-At` header, and the asset status is the `X-SX-Asset-Status` header (Q-39).
 - If the view is unchanged, the viewer does not render a new frame (D-05).
 - Compile-then-swap (issue #39): the new content is compiled through `RenderChain.compileAsync`, which sets the scene pass's half-float target and MRT on the renderer before `renderer.compileAsync`, because r187 keys pipelines on the render target and MRT. Without a chain (plain `renderer.render` fallback) it compiles with `renderer.compileAsync` directly. Lights, the spin process, camera framing and the settle burst apply at the swap, so the old object is never lit, spun or framed for the new one. A compile error is logged and the swap still happens. Motion and the settle burst follow R5.7 and D-34; see Q-66 in [decisions](../decisions.md).
-- As built (issue #5): the render-params endpoint names the R6.7 texture URLs (in the `2048x1024` size directory, Q-47) but does not call the baker or serve the files yet, so the bake branch above is still to build. The reply is checked with `jsonschema` before it is sent (Q-40); `candidate` still gets a RenderParams with no layers (Q-33).
+- As built (issue #5): the render-params endpoint names the R6.7 texture URLs (in the `2048x1024` size directory, Q-47) and, since issue #41 (Q-112), queues both sizes on `TextureBaker` in a worker process off the request path and serves them at `/data/textures`; the reply does not wait, so a texture URL answers 404 until its bake lands. How the viewer retries a 404 texture is not stated. The reply is checked with `jsonschema` before it is sent (Q-40); `candidate` still gets a RenderParams with no layers (Q-33).

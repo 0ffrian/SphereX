@@ -6,7 +6,8 @@
 
 ```
 backend/app/core/render/            (Atish)
-  card_to_params.py   # §6.2 rules + tags; pipeline stage 7 (A4.7), issue #5, built
+  card_to_params.py   # §6.2 rules + tags; pipeline stage 7 (A4.7), issue #5, built; measuring: refusals (Q-111)
+  background.py       # TextureBaker: R6.7 bakes off the request path, both sizes, worker process (issue #41, Q-112)
   blackbody.py        # §7.5 Teff -> display colour, issue #5
   noise.py craters.py height.py normals.py palette.py bake.py   # issue #6, built
   params.py           # §6.2 generator parameters (BakeParams, BakeRefusal); card_to_params adds the tags
@@ -16,6 +17,9 @@ backend/app/core/render/            (Atish)
 backend/app/core/classify/           (Atish)  # pipeline stage 3 (A4.3), issue #5: rules.py (R3.3, R12 #12 thresholds block)
 backend/app/core/card/               (Kevin)  # pipeline stages 4 and 5 (A4.4, A4.5), issue #5: catalogue.py, build.py,
                                               # assets.py (A5.4 store), validate.py (jsonschema, Q-40), service.py
+                                              # (ObjectPipeline: the object job, first/partial/final answers, issue #41)
+backend/app/core/jobs.py             (Kevin, proposed: Q-111)  # JobRegistry: one background job per object, progress (issue #41)
+backend/app/core/warm.py             (Kevin, proposed: Q-111)  # start-up warm cache for demo targets (D-25, issue #41)
 backend/assets/                               # A5.4 pre-baked assets, <type>/<id>.json (none yet)
 backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; objects.py: /frames, /cutouts, /card, /render-params (issue #5);
                                               # sky.py: /v1/sky/... (sky-view prototype, beyond D-16, Q-87;
@@ -33,7 +37,8 @@ backend/app/core/sky/                (no D-17 owner yet)  # sky-view prototype (
 backend/app/core/composite/          (no D-17 owner yet)  # SPHEREx false-colour composite (beyond D-16, Q-92, Q-94): config, select,
                                                          # grid, service; endpoint in app/api/composite.py; tag `derived` (Q-27)
 backend/app/core/measure/            (Moon)  # pipeline stage 2 (A4.2), issue #2: config, flags, aperture,
-                                                            # solid_angle, photometry, spectrum; endpoint in app/api/spectrum.py
+                                                            # solid_angle, photometry, spectrum; endpoint in app/api/spectrum.py;
+                                                            # pool.py: photometry worker processes (issue #41, Q-112)
 frontend/src/viewer/                 (Moon)
   ViewerApp.ts lighting.ts modes.ts honesty.ts scaleBar.ts altText.ts
   planTypes.ts planCommon.ts renderPlan.ts   # pure RenderPlan: types, shared helpers, planRender (no GPU)

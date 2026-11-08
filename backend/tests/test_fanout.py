@@ -745,3 +745,65 @@ def test_a_batch_only_final_still_says_measuring_frames(
         pipe.frames.close()
         pool.close()
     assert final is not None and "measuring:frames" in final.measuring
+
+
+# --- PR #58 review: star first stage, CORS ---------------------------------------------
+
+
+def test_first_stage_star_lightcurve_is_empty_and_its_layers_say_measuring(
+    world: World, fake: FakeIrsa
+) -> None:
+    """R3.2's lightcurve is a plain list: while measuring it is empty (never guessed), and the
+    layers and haptic source that need it are listed as measuring (Q-111)."""
+    mira = strip_cutouts(world, fake, "R Dra")
+    fake.gate.clear()
+    ctx = live_ctx(world, first_answer_wait_s=0.2)
+    pipe, pool = pipeline_for(ctx)
+    try:
+        first = pipe.run(mira)
+        assert first.card["type"] == "star_mira"
+        assert first.card["lightcurve"] == []
+        missing = first.params["missing"]
+        for item in ("measuring:spectrum", "measuring:brightness_curve", "measuring:heartbeat"):
+            assert item in missing
+        assert "heartbeat" not in missing and "brightness_curve" not in missing
+        assert set(first.measuring) == {m for m in missing if m.startswith("measuring:")}
+        fake.gate.set()
+        job = pipe.jobs.get(mira.id)
+        assert job is not None
+        final = job.wait_final(60)
+        assert final is not None and final.measuring == ()
+        assert not any(m.startswith("measuring:") for m in final.params["missing"])
+    finally:
+        fake.gate.set()
+        pipe.frames.close()
+        pool.close()
+
+
+def test_cors_exposes_the_progress_headers(world: World, fake: FakeIrsa) -> None:
+    fake.gate.clear()
+    origin = "http://localhost:5173"
+    settings = make_settings(
+        world.live_cache, offline=False, first_answer_wait_s=0.2, cors_origins=origin
+    )
+    with TestClient(create_app(settings, transport=httpx.MockTransport(no_network))) as client:
+        oid = client.get("/v1/resolve", params={"q": QUERY}).json()["id"]
+        r = client.get(f"/v1/objects/{oid}/card", headers={"Origin": origin})
+        fake.gate.set()
+    exposed = {h.strip().lower() for h in r.headers["access-control-expose-headers"].split(",")}
+    assert {"x-sx-measuring", "x-sx-progress"} <= exposed
+    assert "X-SX-Measuring" in r.headers
+
+
+def test_job_payload_matches_the_documented_model(world: World, fake: FakeIrsa) -> None:
+    from app.api.models import JobStatus
+
+    with live_app(world, first_answer_wait_s=0.0) as client:
+        oid = client.get("/v1/resolve", params={"q": QUERY}).json()["id"]
+        JobStatus.model_validate(client.get(f"/v1/objects/{oid}/job").json())  # idle
+        client.get(f"/v1/objects/{oid}/card")
+        with client.stream("GET", f"/v1/objects/{oid}/job/events") as r:
+            for line in r.iter_lines():
+                if line.startswith("data: "):
+                    JobStatus.model_validate(json.loads(line[6:]))
+        assert "JobStatus" in client.get("/openapi.json").text

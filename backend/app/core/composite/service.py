@@ -1,8 +1,9 @@
 """The composite for one object: frames -> Stage 2 verdicts -> band selection -> image -> cache.
 
-- Stage 1 (``FrameService.get_frames``) is called once per request, so a live backend downloads
-  at most ``SX_LIVE_CUTOUTS_PER_REQUEST`` cutouts, as for ``/frames``. Stage 2 and the composite
-  read only cutouts already in the cache.
+- Stage 1 (``FrameService.get_frames``) is called once per request. Inside the API it downloads
+  nothing itself: it starts or joins the object's job, which downloads the cutouts (issue #41,
+  Q-111), and lists the rest as deferred, as for ``/frames``. Stage 2 and the composite read only
+  cutouts already in the cache.
 - Stage 2 (``SpectrumService``, served from its own derived cache when it can) says which frames
   are usable: a frame it refused (``saturated``, ``aperture_flags`` ...) is never used.
 - The result (the response body and the PNG bytes) is a derived cache entry (D-25), keyed by the

@@ -1,6 +1,6 @@
 # 08 Sequence: search and flipbook
 
-A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache), D-28 (Rainbow Trails) and D-35 (sky tiles), and A4.9 (overlays, flag mask, combine). The sky-view prototype paths (sky pick, shared flipbook session, transport bar) follow Q-87 to Q-91; its cached markers, progressive frames and colour views follow Q-92, Q-93 and Q-95 to Q-99; overlays on the frame grid follow Q-102. How the backend builds the composite: [20](20-sequence-composite.md).
+A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache), D-28 (Rainbow Trails) and D-35 (sky tiles), and A4.9 (overlays, flag mask, combine). The sky-view prototype paths (sky pick, shared flipbook session, transport bar) follow Q-87 to Q-91; its cached markers, progressive frames and colour views follow Q-92, Q-93 and Q-95 to Q-99; overlays on the frame grid follow Q-102; downloads in the object's background job follow Q-111 and Q-112 (issue #41). How the backend builds the composite: [20](20-sequence-composite.md).
 
 ```mermaid
 sequenceDiagram
@@ -12,6 +12,7 @@ sequenceDiagram
   participant S as Flipbook session (session.tsx)
   participant FB as Flipbook
   participant API as Backend API
+  participant J as Object job (core/jobs.py, background)
   participant C as Read-through cache
   participant R as Name resolver (SBDB, SIMBAD)
   participant SIA as IRSA SIA (spherex_qr2)
@@ -79,10 +80,7 @@ sequenceDiagram
     API->>SIA: SIA?COLLECTION=spherex_qr2&POS=circle RA DEC RADIUS&MAXREC=N
     alt archive answers within the timeout and retries
       SIA-->>API: Frame list (time, detector, wavelength range)
-      API->>SIA: Small cutouts only, never whole frames, at most SX_LIVE_CUTOUTS_PER_REQUEST live per request
-      SIA-->>API: Cutouts: IMAGE, FLAGS, VARIANCE, WCS-WAVE
       API->>C: Store raw response, fetched_at, source URL
-      Note over API,C: Cutouts over the live budget are listed as cutouts:deferred:n, and the frame list is stored (derived.frames) only when complete
     else 504 or timeout (known IRSA problem)
       SIA-->>API: 504
       API->>C: Older cached entry?
@@ -99,6 +97,15 @@ sequenceDiagram
     HZ-->>API: Positions and known objects
     API-->>UI: M1 refuses: frames empty, missing frames:moving_object_search (Q-21)
   end
+  opt cutouts not yet in the cache and SX_OFFLINE is not set (Q-111 (5))
+    API->>J: on_request: start or join the object's job. The request downloads no cutout itself
+    API->>API: List the cutouts still to come as cutouts:deferred:n
+    Note over J,SIA: After this reply, in the background: small cutouts only, never whole frames, in one fair pool shared by every object, SX_CUTOUT_CONCURRENCY at a time (Q-112)
+    J->>SIA: Cutout requests
+    SIA-->>J: Cutouts: IMAGE, FLAGS, VARIANCE, WCS-WAVE
+    J->>C: Store raw response, fetched_at, source URL
+  end
+  Note over API,C: The frame list is stored (derived.frames) only when complete
   API-->>UI: frame_id, time, wavelength_um, x, y, cutout_url per frame, plus the stretch used and cached_at if from cache
   UI->>UI: Badges: wavelength and time Measured, display stretch Estimated (derived, tooltip gives its parameters)
   UI->>S: Frames in the store
@@ -106,7 +113,8 @@ sequenceDiagram
     UI->>UI: Show and play the frames so far, a progress box "Fetching SPHEREx frames … ready of found ready" and a Stop button
     loop until no cutouts:deferred, Stop, or a new search (one request at a time)
       UI->>API: GET /v1/objects/{id}/frames again (0.5 s after the last reply)
-      API-->>UI: The cached frames plus up to the live budget more
+      API->>J: on_request again: join the running job (a finished one is started again)
+      API-->>UI: A fast reply: the frames the job has cached by now, the rest still cutouts:deferred:n
       UI->>UI: Merge by frame_id in time order, the current frame and playback stay
       UI->>UI: Client timeout: still working, ask again. Server or network error: back off 2 s to 30 s, give up after 5 (error box, Try again)
     end
@@ -208,7 +216,7 @@ sequenceDiagram
 - Dev-only fixture path: `npm run dev:fixtures` (`vite --mode fixtures`) mounts a Vite dev-server plugin from `frontend/fixtures/` that answers `/v1` with synthetic data, and `npm run test:e2e` always uses it. Every reply carries `X-SX-Fixture: synthetic`. The UI then shows a page-wide "Fixture data" banner, "Fixture" badges instead of "Measured" (and instead of the stretch's Estimated badge) and a SYNTHETIC label on the image. `vite build` never runs the plugin, and `scripts/check-dist.js` fails the build if a fixture marker reaches `dist/` ([fixtures README](../../frontend/fixtures/README.md)). The Fixture badge is a fourth badge beside the 3 of D-02; it is a proposed dev-only exception, open as Q-32 in the decisions log.
 - `moving` means a solar-system body (Q-22). High proper-motion stars are not `moving`; their positions come from the SIMBAD proper motion, propagated to each frame time. The ephemeris-driven frame search for moving objects is not built in M1 (Q-21).
 - The SIA search and every cutout go through the cache. A cut-off SIA answer (`QUERY_STATUS=OVERFLOW`) adds `frames:truncated` to `missing`.
-- Progressive frames (sky-view prototype, 7 Nov 2026, Q-97; live budget Q-99): a live backend downloads at most `SX_LIVE_CUTOUTS_PER_REQUEST` cutouts per request, one after another (about 20 s each from IRSA), and lists the rest as `cutouts:deferred:<n>`. The flipbook shows the frames it has and asks again until none is deferred. Progress numbers: ready = frames listed; found = ready + `cutouts:deferred` + per-frame refusals. The spectrum and composite wait for the complete list, because each of those requests runs Stage 1 again (and its own live budget) and would measure a partial list; after Stop they can be made from what is there, with the deferred count in their `missing`. The bounded parallel download and a two-stage answer on the server are issue #41.
+- Progressive frames (sky-view prototype, 7 Nov 2026, Q-97; live budget Q-99): since issue #41 a `/frames` request downloads no cutout itself. It answers from the cache, lists the cutouts still to come as `cutouts:deferred:<n>` and calls `FrameService.on_request`, which starts or joins the object's background job; the job downloads them in one pool shared by every object, `SX_CUTOUT_CONCURRENCY` at a time and fair per frame list (Q-111 (5), Q-112). The flipbook shows the frames it has and asks again until none is deferred; each reply is fast and shows the job's progress. Progress numbers: ready = frames listed; found = ready + `cutouts:deferred` + per-frame refusals. The spectrum and composite wait for the complete list, because each of those requests runs Stage 1 again and would measure a partial list; after Stop they can be made from what is there, with the deferred count in their `missing`. `GET /v1/objects/{id}/job` and `/job/events` report the job's stage and frames done of total (Q-111 (4)); the flipbook does not read them yet.
 - Overlays (A4.9) load lazily on the first switch-on of any layer, not on every search, and never block the flipbook. A catalogue still being fetched after `overlay_wait_s` (75 s, below the frontend's 90 s timeout) is reported as `overlay:<cat>:pending`; its toggle stays enabled and "Try again" reloads the overlays, by which time the cone is usually cached. A cone that failed live is not retried for `catalog_failure_ttl_s`. Moving objects get `overlay:gaia` and `overlay:wise` (Q-21). The endpoints are not yet in D-16 (Q-50).
 - Overlays on the fixed frame grid (Q-102): a layer switched on while the frame list is still loading progressively waits ("Overlays load once all the frames are in") and the overlays are asked for once, when the list is complete; a reply made from a partial list (after Stop) is asked for again then. Markers (cutout pixels) and the flag mask get the shown frame's whole-pixel placement (`frameGrid.ts` `markersOnGrid`), so they stay on their sources and change with the picture, never with the requested frame; markers off the frame's own pixels (hatched no-data) are not drawn. They are not drawn on the colour composite, which has its own north-up grid; a note says so.
 - The flipbook shows the frames reply's `missing` grouped by reason, one plain line with a count each and the frame IDs behind a disclosure; unknown codes are shown as is (A11, issue #24).
