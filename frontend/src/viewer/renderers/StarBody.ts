@@ -124,13 +124,15 @@ export class StarBody {
     let period = 1;
     if (omega > 0) {
       period = spinPeriod / 2;
-      if (kOmega > 0) period = Math.min(period, MAX_MOTTLE_SHEAR / kOmega);
+      if (kOmega !== 0) period = Math.min(period, MAX_MOTTLE_SHEAR / Math.abs(kOmega));
     }
     const pair = omega > 0 ? phasePair(tSpin, period) : { a: 0, b: period / 2, w: 0 };
     const churn = (tau: number) => (spinPeriod > 0 ? (CHURN_PER_ROT * tau) / spinPeriod : 0);
 
-    const regions = regionsAt(seed, tSpots, rates);
-    const flares = this.star.flares ? flaresAt(seed, tFlares, tSpots, rates) : [];
+    const regions = regionsAt(seed, tSpots, rates, STAR_SURFACE, tSpin);
+    const flares = this.star.flares
+      ? flaresAt(seed, tFlares, tSpots, rates, STAR_SURFACE, tSpin)
+      : [];
     this.lastRegions = regions;
     this.lastFlares = flares;
     this.mat.update({
@@ -162,10 +164,7 @@ export class StarBody {
         size: r.size,
         rise,
         opacity: Math.min(1, quiet + 0.35 * intensity),
-        sway:
-          swayPeriod > 0
-            ? Math.sin((Math.PI * 2 * wrap(tSpots, swayPeriod)) / swayPeriod + slot)
-            : 0,
+        sway: swayPeriod > 0 ? (Math.PI * 2 * wrap(tSpots, swayPeriod)) / swayPeriod + slot : 0,
         glow: 1 + 0.7 * intensity,
       });
     });

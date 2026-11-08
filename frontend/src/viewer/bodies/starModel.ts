@@ -13,7 +13,7 @@
 // All angles are in radians, all times in simulation seconds of the process that owns them.
 
 import { hash3, mulberry32 } from '../fields/noise';
-import type { Motion } from '../motion/motion';
+import { cappedFlareSpeedup, type Motion } from '../motion/motion';
 
 export type V3 = [number, number, number];
 
@@ -53,7 +53,7 @@ export const STAR_SURFACE: StarSurfaceConfig = {
   decayStart: 0.62,
   pores: 3,
   followerParts: 2,
-  flareOnScreenS: 3.2,
+  flareOnScreenS: 4,
   maxFlares: 2,
   flareMinEnv: 0.35,
 };
@@ -147,7 +147,8 @@ function slotOffset(seed: number, slot: number, count: number): number {
  * The group in `slot` at spots-clock time `tSpots`. The birth place is re-rolled from the seed for
  * every cycle (so groups age, die and new ones appear), and the group is carried by differential
  * rotation relative to the body frame (which turns at the equatorial rate): its longitude grows by
- * k * Omega_eq * sin^2(lat) per sim second of age (the pole lags the equator).
+ * k * Omega_eq * sin^2(lat) per sim second (the pole lags the equator), counted on the spin clock
+ * `tSpin` when given, else from the group's age.
  */
 export function regionAt(
   seed: number,
@@ -155,6 +156,7 @@ export function regionAt(
   tSpots: number,
   rates: StarRates,
   c: StarSurfaceConfig = STAR_SURFACE,
+  tSpin?: number,
 ): RegionState {
   let cycle = 0;
   let f: number;
@@ -172,7 +174,9 @@ export function regionAt(
   const lon0 = h(3) * TWO_PI;
   const ageS = f * rates.lifetimeS;
   const sin = Math.sin(lat);
-  const lon = lon0 + rates.k * rates.omegaEq * sin * sin * ageS;
+  // One clock for differential rotation: the spin clock when the caller has it (the granulation
+  // shears on it too, so spots and cells shear together), else the group's own age.
+  const lon = lon0 + rates.k * rates.omegaEq * sin * sin * (tSpin ?? ageS);
   const env = lifeEnvelope(f, c);
   const size = c.groupRadius * (0.7 + 0.3 * h(4)) * Math.sqrt(env);
   const center = sphereDir(lat, lon);
@@ -212,9 +216,10 @@ export function regionsAt(
   tSpots: number,
   rates: StarRates,
   c: StarSurfaceConfig = STAR_SURFACE,
+  tSpin?: number,
 ): RegionState[] {
   const out: RegionState[] = [];
-  for (let s = 0; s < c.regionCount; s++) out.push(regionAt(seed, s, tSpots, rates, c));
+  for (let s = 0; s < c.regionCount; s++) out.push(regionAt(seed, s, tSpots, rates, c, tSpin));
   return out;
 }
 
@@ -234,19 +239,28 @@ export interface FlareState {
   size: number;
 }
 
-/** Brightness profile of one flare at age a of duration D: rises in 6% of D, decays exponentially. */
+/** Share of a flare's drawn time spent rising: 15% of 4 s is 0.6 s, slower than a flash (WCAG 2.3.1). */
+export const FLARE_RISE_FRACTION = 0.15;
+
+/** Brightness profile of one flare at age a of duration D: a soft rise, then an exponential decay. */
 export function flareProfile(a: number, duration: number): number {
   if (!(a >= 0) || !(a < duration)) return 0;
-  const rise = 0.06 * duration;
+  const rise = FLARE_RISE_FRACTION * duration;
   if (a < rise) return a / rise;
   return Math.exp(-(a - rise) / (0.28 * duration));
 }
 
+/** The onset of flare m is placed in this share of its interval, so two onsets are >= half an interval apart. */
+const FLARE_JITTER: readonly [number, number] = [0.25, 0.75];
+
 /**
  * The flares being drawn at flares-clock time `tFlares`. A seeded jittered schedule: one event in
- * every interval of 1/rate seconds, at a seeded point of it, so the mean rate is the rate. The same
- * seed, rate and t give the same list. The place is a seeded slot; a flare whose region has not
- * grown enough, or has been replaced since the event, is not drawn (flares happen at active regions).
+ * every interval of 1/rate seconds, in the middle half of it (so the mean rate is the rate and two
+ * onsets are never closer than half an interval). The same seed, rate and t give the same list. The
+ * place is a seeded slot; a flare whose region has not grown enough, or has been replaced since the
+ * event, is not drawn (flares happen at active regions). A new flare that starts while the one
+ * before it is still showing is skipped, never drawn over it (WCAG 2.3.1: no new sharp onsets while
+ * one is on screen); of the flares that overlap anyway the oldest are kept.
  */
 export function flaresAt(
   seed: number,
@@ -254,19 +268,41 @@ export function flaresAt(
   tSpots: number,
   rates: StarRates,
   c: StarSurfaceConfig = STAR_SURFACE,
+  tSpin?: number,
 ): FlareState[] {
   if (!(rates.flareRatePerS > 0) || !(rates.flareSpeedup > 0)) return [];
   const spacing = 1 / rates.flareRatePerS;
   const duration = c.flareOnScreenS * rates.flareSpeedup;
+  const startOf = (i: number) =>
+    (i + FLARE_JITTER[0] + (FLARE_JITTER[1] - FLARE_JITTER[0]) * hash3(i, 91, 0, seed)) * spacing;
+  // Onsets are at least `FLARE_JITTER` span apart, so a flare older than `back` onsets has ended.
+  const back = Math.ceil(duration / ((FLARE_JITTER[1] - FLARE_JITTER[0]) * spacing)) + 1;
+  // Flare m is skipped when `maxFlares` earlier ones are still showing at its start. Decided from
+  // the `back` onsets before it only, so it is the same answer at every t (no flicker).
+  const accepted = (m: number): boolean => {
+    const shown: number[] = [];
+    for (let j = Math.max(0, m - back); j <= m; j++) {
+      const sj = startOf(j);
+      const live = shown.filter((k) => sj - startOf(k) < duration).length;
+      if (live >= c.maxFlares) {
+        if (j === m) return false;
+        continue;
+      }
+      if (j === m) return true;
+      shown.push(j);
+    }
+    return false;
+  };
   const first = Math.floor((tFlares - duration) / spacing) - 1;
   const last = Math.floor(tFlares / spacing);
   const out: FlareState[] = [];
   for (let m = Math.max(first, 0); m <= last; m++) {
-    const start = (m + hash3(m, 91, 0, seed)) * spacing;
+    const start = startOf(m);
     const age = tFlares - start;
     if (age < 0 || age >= duration) continue;
+    if (!accepted(m)) continue;
     const slot = Math.floor(hash3(m, 92, 0, seed) * c.regionCount) % c.regionCount;
-    const r = regionAt(seed, slot, tSpots, rates, c);
+    const r = regionAt(seed, slot, tSpots, rates, c, tSpin);
     if (r.env < c.flareMinEnv) continue;
     const intensity = flareProfile(age, duration);
     const u = age / duration;
@@ -282,8 +318,8 @@ export function flaresAt(
       size: r.size,
     });
   }
-  // The newest flares win when more than `maxFlares` overlap.
-  out.sort((a, b) => a.age - b.age);
+  // The oldest flares stay when more than `maxFlares` overlap: a showing flare is never replaced.
+  out.sort((a, b) => b.age - a.age);
   return out.slice(0, c.maxFlares);
 }
 
@@ -298,6 +334,8 @@ export function flaresAt(
  */
 export interface LoopStrand {
   points: V3[];
+  /** Seeded phase of this strand's own sway, radians (strands do not move as one). */
+  phase: number;
 }
 
 /** Colatitude (from the dipole axis) of the footpoints: sets how tall the loop is for its width. */
@@ -347,7 +385,7 @@ export function loopStrands(
   );
   const out: LoopStrand[] = [];
   for (let j = 0; j < count; j++) {
-    const stretch = count === 1 ? 1 : 0.72 + 0.55 * rnd();
+    const stretch = count === 1 ? 1 : 0.5 + 0.9 * rnd();
     const base = dipoleLoopPoints(points, stretch);
     const yOff = count === 1 ? 0 : (rnd() - 0.5) * 0.7;
     const xJit = count === 1 ? 0 : (rnd() - 0.5) * 0.16;
@@ -355,6 +393,7 @@ export function loopStrands(
     const twistTurns = 1.5 + 2 * rnd();
     const phase = rnd() * TWO_PI;
     out.push({
+      phase,
       points: base.map(([x, , z], i): V3 => {
         const u = i / (points - 1);
         const env = Math.sin(Math.PI * u); // the twist vanishes at the footpoints
@@ -410,15 +449,18 @@ export const STILL_STAR_RATES: StarRates = {
 export function starRatesFrom(m: Motion): StarRates {
   const life = m.rates.spot_lifetime_d;
   const spin = m.rates.spin_period_h;
-  const spinOn = m.processes.some((p) => p.id === 'spin');
-  if (!life || !m.processes.some((p) => p.id === 'spots')) return STILL_STAR_RATES;
+  const spinOn = spin !== undefined && m.processes.some((p) => p.id === 'spin');
+  const spotsOn = life !== undefined && m.processes.some((p) => p.id === 'spots');
   const flare = m.rates.flare_rate_per_d;
   const flareProc = m.processes.find((p) => p.id === 'flares');
+  // The three processes are independent (a T Tauri star spins and flares with no spot lifetime): the
+  // groups stay put (frozen) only when the spots process itself is not animated.
   return {
-    lifetimeS: life.value * DAY_S,
-    omegaEq: spin && spinOn ? TWO_PI / (spin.value * HOUR_S) : 0,
-    k: spin && spinOn ? (m.rates.diff_rotation?.value ?? 0) : 0,
+    lifetimeS: spotsOn ? life.value * DAY_S : STILL_STAR_RATES.lifetimeS,
+    omegaEq: spinOn ? TWO_PI / (spin.value * HOUR_S) : 0,
+    k: spinOn ? (m.rates.diff_rotation?.value ?? 0) : 0,
     flareRatePerS: flare && flareProc ? flare.value / DAY_S : 0,
-    flareSpeedup: flareProc?.speedup ?? 0,
+    flareSpeedup: flare && flareProc ? cappedFlareSpeedup(flareProc.speedup, flare.value) : 0,
+    ...(spotsOn ? {} : { frozen: true }),
   };
 }

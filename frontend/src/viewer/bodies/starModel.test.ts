@@ -2,6 +2,7 @@
 // deterministic function of (seed, rates, t).
 import { describe, expect, it } from 'vitest';
 import {
+  FLARE_RISE_FRACTION,
   STAR_SURFACE,
   STILL_STAR_RATES,
   bendLoopPoint,
@@ -17,7 +18,7 @@ import {
   starRatesFrom,
   type StarRates,
 } from './starModel';
-import { resolveMotion } from '../motion/motion';
+import { MAX_FLARE_ONSETS_PER_REAL_S, cappedFlareSpeedup, resolveMotion } from '../motion/motion';
 import { fixture } from '../renderers/fixtures.testutil';
 
 const rates: StarRates = {
@@ -79,9 +80,39 @@ describe('regions', () => {
     expect(r.frozen).toBeUndefined();
     expect(r.lifetimeS).toBeCloseTo(30 * 86400);
     expect(r.k).toBe(0); // diff_rotation was refused, so the star turns rigidly
-    expect(starRatesFrom(resolveMotion(card, { ...params, dynamics: undefined }))).toBe(
+    expect(starRatesFrom(resolveMotion(card, { ...params, dynamics: undefined }))).toEqual(
       STILL_STAR_RATES,
     );
+  });
+
+  it('T Tauri spins and flares although it has no spot lifetime (independent processes)', () => {
+    const { card, params } = fixture('star_ttauri');
+    const m = resolveMotion(card, params);
+    expect(m.processes.map((p) => p.id)).toEqual(['spin', 'flares']);
+    const r = starRatesFrom(m);
+    expect(r.frozen).toBe(true); // the spots do not age ...
+    expect(r.omegaEq).toBeCloseTo((2 * Math.PI) / (96 * 3600), 12); // ... but the star turns
+    expect(r.flareRatePerS).toBeCloseTo(1 / 86400, 12);
+    expect(r.flareSpeedup).toBe(43000); // lowered from 86400 so flares stay under 0.5 per real second
+    // A flare is drawn at some time within the first minute of the flare clock.
+    let seen = 0;
+    for (let t = 0; t < 600 * r.flareSpeedup; t += r.flareSpeedup / 4) {
+      seen += flaresAt(8, t, 0, r).length > 0 ? 1 : 0;
+    }
+    expect(seen).toBeGreaterThan(0);
+  });
+
+  it('one clock for differential rotation: spots shear on the spin clock when it is given', () => {
+    const tSpots = 0.1 * rates.lifetimeS;
+    const base = regionAt(8, 0, tSpots, { ...rates, k: 0.3 }, undefined, 0);
+    const later = regionAt(8, 0, tSpots, { ...rates, k: 0.3 }, undefined, 3e5);
+    const same = regionAt(8, 0, tSpots, { ...rates, k: 0.3 }, undefined, 3e5);
+    expect(later.lon).not.toBe(base.lon);
+    expect(later).toEqual(same);
+    // A negative k (the pole turns faster) shears the other way.
+    const neg = regionAt(8, 0, tSpots, { ...rates, k: -0.3 }, undefined, 3e5);
+    const d = (a: number, b: number) => ((a - b + Math.PI * 3) % (2 * Math.PI)) - Math.PI;
+    expect(Math.sign(d(neg.lon, base.lon))).toBe(-Math.sign(d(later.lon, base.lon)));
   });
 });
 
@@ -108,12 +139,57 @@ describe('flares', () => {
     expect(events).toBeGreaterThan(n * 0.3);
   });
 
-  it('are bright after a fast rise, then fade; none when the rate is 0', () => {
+  it('rise over at least half a second of real time (WCAG 2.3.1), then fade; none when the rate is 0', () => {
+    expect(STAR_SURFACE.flareOnScreenS * FLARE_RISE_FRACTION).toBeGreaterThanOrEqual(0.5);
     expect(flareProfile(0, 100)).toBe(0);
-    expect(flareProfile(6, 100)).toBe(1);
+    expect(flareProfile(100 * FLARE_RISE_FRACTION, 100)).toBe(1);
     expect(flareProfile(60, 100)).toBeLessThan(0.3);
     expect(flareProfile(100, 100)).toBe(0);
     expect(flaresAt(8, 1e6, 1e6, { ...rates, flareRatePerS: 0 })).toEqual([]);
+  });
+
+  it('start at most 0.5 per real second, however large the speed-up (WCAG 2.3.1)', () => {
+    // An active star (20 flares a day) at the stated x86400 would be 20 onsets a second.
+    const ratePerD = 20;
+    const speed = cappedFlareSpeedup(86400, ratePerD);
+    expect((ratePerD / 86400) * speed).toBeLessThanOrEqual(MAX_FLARE_ONSETS_PER_REAL_S);
+    expect(speed).toBeGreaterThan(0.9 * ((MAX_FLARE_ONSETS_PER_REAL_S * 86400) / ratePerD) - 100);
+    expect(cappedFlareSpeedup(1000, 20)).toBe(1000); // a slower speed-up is shown as stated
+    const r: StarRates = { ...rates, flareRatePerS: ratePerD / 86400, flareSpeedup: speed };
+    // Real seconds -> flares-clock seconds is x speed. Collect the real onset times of 120 s.
+    const onsets = new Set<number>();
+    for (let real = 0; real < 120; real += 0.05) {
+      for (const f of flaresAt(8, real * speed, 1.3e6, { ...r, lifetimeS: 1e12 })) {
+        onsets.add(Math.round((real * speed - f.age) / speed / 0.001));
+      }
+    }
+    const times = [...onsets].map((x) => x * 0.001).sort((a, b) => a - b);
+    expect(times.length / 120).toBeLessThanOrEqual(MAX_FLARE_ONSETS_PER_REAL_S);
+    for (let i = 1; i < times.length; i++) {
+      // Two onsets are never closer than half an interval: at most about one a second.
+      expect(times[i]! - times[i - 1]!).toBeGreaterThanOrEqual(0.9);
+    }
+    for (const w of times) {
+      expect(times.filter((x) => x >= w && x < w + 1).length).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('a flare that is showing is never replaced by a new one', () => {
+    const spacing = 1 / rates.flareRatePerS;
+    const dur = STAR_SURFACE.flareOnScreenS * rates.flareSpeedup;
+    const start = (t: number, f: { age: number }) => Math.round(t - f.age);
+    const slow = { ...rates, lifetimeS: 1e12 };
+    let checked = 0;
+    for (let t = 0; t < 60 * spacing; t += spacing / 7) {
+      const now = flaresAt(8, t, 1.3e6, slow);
+      const soon = flaresAt(8, t + dur / 50, 1.3e6, slow);
+      for (const f of now) {
+        if (f.age + dur / 50 >= f.duration) continue; // it ends in between
+        checked++;
+        expect(soon.map((g) => start(t + dur / 50, g))).toContain(start(t, f));
+      }
+    }
+    expect(checked).toBeGreaterThan(10);
   });
 
   it('draw at most maxFlares and sit on an active region', () => {
@@ -158,5 +234,21 @@ describe('prominence loops', () => {
     expect(new Set(a.map((s) => s.points[20]![2].toFixed(4))).size).toBeGreaterThan(6);
     const one = loopStrands(8, 1, 1)[0]!;
     expect(one.points[20]![1]).toBeCloseTo(0, 9);
+  });
+
+  it('strands differ in height and in their own sway phase, so the bundle is not a stiff rod', () => {
+    const a = loopStrands(8, 1, 18);
+    const heights = a.map((s) => Math.max(...s.points.map((p) => p[2])));
+    expect(Math.max(...heights) / Math.min(...heights)).toBeGreaterThan(1.6);
+    expect(new Set(a.map((s) => s.phase.toFixed(3))).size).toBe(18);
+  });
+});
+
+describe('loop tubes taper', () => {
+  it('are thin at the footpoints and full at the top', async () => {
+    const { strandTaper } = await import('../shaders/loops');
+    expect(strandTaper(0)).toBeCloseTo(0.3, 9);
+    expect(strandTaper(0.5)).toBeCloseTo(1, 9);
+    expect(strandTaper(0.1)).toBeLessThan(strandTaper(0.3));
   });
 });

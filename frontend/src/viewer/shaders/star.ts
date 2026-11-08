@@ -82,8 +82,8 @@ const PENUMBRA_LO = 0.5;
 const PENUMBRA_HI = 0.88;
 /** Facula brightening and flare brightness, relative to the photosphere (artistic; flares are HDR). */
 const FACULA_AMP = 0.45;
-const FLARE_RIBBON = 0.9;
-const FLARE_KERNEL = 2.6;
+const FLARE_RIBBON = 0.6;
+const FLARE_KERNEL = 1.0; // WCAG 2.3.1: a flare is a soft brightening, not a flash
 /** Distance of each ribbon from the polarity line, as a fraction of the group size (artistic). */
 export const FLARE_RIBBON_OFFSET = 0.32;
 /** Hot white-orange of a flare (artistic). */
@@ -209,7 +209,9 @@ export function buildStarMaterial(opts: StarShaderOptions): StarMaterial {
       best = select(better, q, best);
       bestC = select(better, c, bestC);
     }
-    const east = normalize(cross(vec3(0, 1, 0), bestC));
+    // The reference axis is not the pole when the disc is at the pole (cross of parallel vectors is 0, NaN once normalised).
+    const ref = select(abs(bestC.y).greaterThan(0.99), vec3(1, 0, 0), vec3(0, 1, 0));
+    const east = normalize(cross(ref, bestC));
     const north = cross(bestC, east);
     const rel = p.sub(bestC);
     const ang = atan(dot(rel, north), dot(rel, east));
