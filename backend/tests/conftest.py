@@ -94,6 +94,9 @@ def make_settings(cache_dir: Path, **overrides: Any) -> Settings:
         "cutout_size_arcsec": FIXTURE_CUTOUT_SIZE_ARCSEC,
         "http_retries": 0,
         "cors_origins": "",
+        # Issue #41: measure in-thread and bake nothing in the background, unless a test asks.
+        "measure_workers": 0,
+        "bake_textures": False,
     }
     values.update(overrides)
     return Settings(**values)

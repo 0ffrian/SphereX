@@ -17,6 +17,7 @@ from app.adapters.exoplanet_archive import ref_text
 from app.core.card.catalogue import CatalogueData
 from app.core.classify import Classification, is_calculated
 from app.core.find.resolver import ResolvedObject
+from app.core.render.card_to_params import MEASURING_PREFIX
 from app.core.render.spherex_rgb import CHANNELS_BY_TYPE, spherex_rgb, window_median
 from app.core.render.spherex_rgb import formula as spherex_formula
 from app.timefmt import iso_utc_z, parse_utc
@@ -30,6 +31,11 @@ BROWN_DWARF_RADIUS_RJUP = 1.0
 BROWN_DWARF_RADIUS_ASSUMPTION = "brown dwarf radii are about 1 Jupiter radius (R7.4)"
 
 NO_SOURCE = "not available: no source in the pipeline yet"
+# Issue #41 two-stage answer: what a field filled from the SPHEREx spectrum says while the spectrum
+# is still being measured. The prefix is what the API and the UI test for.
+MEASURING = MEASURING_PREFIX + " the SPHEREx spectrum is still being measured"
+# Card fields filled from the spectrum (A4.5): spherex_rgb (R5.2), flux_45um (R7.4), lightcurve.
+SPECTRUM_FIELDS = frozenset({"spherex_rgb", "flux_45um", "lightcurve"})
 
 
 def _null(source: str, tag: str = "measured") -> dict[str, Any]:
@@ -79,12 +85,18 @@ def _spherex_source(spectrum: Mapping[str, Any] | None) -> str:
     return f"SPHEREx {release} (this tool, A4.2 spectrum)"
 
 
-def _spherex_rgb(kind: str, spectrum: Mapping[str, Any] | None) -> dict[str, Any] | None:
+def _no_spectrum(pending: bool) -> dict[str, Any]:
+    return _null(MEASURING if pending else "not available: no SPHEREx spectrum for this object")
+
+
+def _spherex_rgb(
+    kind: str, spectrum: Mapping[str, Any] | None, pending: bool = False
+) -> dict[str, Any] | None:
     channels = CHANNELS_BY_TYPE.get(kind)
     if channels is None:
         return None
     if spectrum is None:
-        return _null("not available: no SPHEREx spectrum for this object")
+        return _no_spectrum(pending)
     rgb = spherex_rgb(_points(spectrum), channels)
     if rgb is None:
         return _null(
@@ -95,9 +107,9 @@ def _spherex_rgb(kind: str, spectrum: Mapping[str, Any] | None) -> dict[str, Any
     return out
 
 
-def _flux_45um(spectrum: Mapping[str, Any] | None) -> dict[str, Any]:
+def _flux_45um(spectrum: Mapping[str, Any] | None, pending: bool = False) -> dict[str, Any]:
     if spectrum is None:
-        return _null("not available: no SPHEREx spectrum for this object")
+        return _no_spectrum(pending)
     value = window_median(_points(spectrum), FLUX_45UM_CENTRE)
     if value is None:
         return _null(f"{_spherex_source(spectrum)}: fewer than 2 unflagged points at 4.5 um")
@@ -237,7 +249,12 @@ def build_card(
     data: CatalogueData,
     cls: Classification,
     spectrum: Mapping[str, Any] | None,
+    *,
+    spectrum_pending: bool = False,
 ) -> dict[str, Any]:
+    """``spectrum_pending``: the first-stage card of issue #41. The spectrum is still being
+    measured, so the fields it fills (``SPECTRUM_FIELDS``) are null with a ``measuring:`` reason
+    instead of a refusal. They are never guessed."""
     kind = cls.type
     name = obj.name or obj.id
     planet = data.facts.exoplanet
@@ -280,7 +297,7 @@ def build_card(
             "assumption": BROWN_DWARF_RADIUS_ASSUMPTION,
         }
         card["spectral_class"] = _spectral_class(cls)
-        card["flux_45um"] = _flux_45um(spectrum)
+        card["flux_45um"] = _flux_45um(spectrum, spectrum_pending)
         card["ch4_depth_33"] = _null(NO_SOURCE + " (no CH4 band-depth rule in the specs)")
     elif kind in ("planet_rocky", "planet_water", "gas_giant"):
         _planet_fields(card, data.facts.exoplanet)
@@ -293,7 +310,7 @@ def build_card(
         if kind in ("star_mira", "star_ttauri"):
             card["lightcurve"] = _lightcurve(spectrum)
 
-    rgb = _spherex_rgb(kind, spectrum)
+    rgb = _spherex_rgb(kind, spectrum, spectrum_pending)
     if rgb is not None:
         card["spherex_rgb"] = rgb
     pm = _pm(obj)
