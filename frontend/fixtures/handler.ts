@@ -9,6 +9,9 @@
 // SX_LIVE_CUTOUTS_PER_REQUEST; a resolve of it starts again from the first part. The parts are
 // counted per browser session (a cookie the resolve sets), so parallel e2e tests do not share
 // them. And `/v1/sky/cached` lists the targets whose frames are "cached" (complete).
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type {
   ApiErrorBody,
   CombineOp,
@@ -70,6 +73,7 @@ export const FIXTURE_CACHED_IDS: readonly string[] = [
   'eps-indi-b',
   'r-dra',
   'synthetic-cached-spot',
+  'aqua-prime',
 ];
 
 function makeSkyCached(): SkyCachedResponse {
@@ -194,7 +198,27 @@ function resolveName(t: FixtureTarget): FixtureResponse {
 }
 
 const OBJECT_PATH =
-  /^\/v1\/objects\/([^/]+)\/(frames|spectrum|composite|composite\.png|overlays|combine\.png|(cutouts|flags)\/([^/]+)\.png)$/;
+  /^\/v1\/objects\/([^/]+)\/(frames|spectrum|card|render-params|composite|composite\.png|overlays|combine\.png|(cutouts|flags)\/([^/]+)\.png)$/;
+
+/**
+ * Issue #60: `/card` and `/render-params` answer only for a target that names a shared 3D fixture
+ * (`body` in targets.ts); the files are served as they are (shared/fixtures, D-18). Any other
+ * target has no 3D model: 404, like a backend that has none.
+ */
+function bodyReply(t: FixtureTarget, what: 'cards' | 'params'): FixtureResponse {
+  if (!t.body) return error(404, 'not_found', 'No 3D model for this object.');
+  // A path, not `new URL(template, import.meta.url)`: Vite would turn that into an asset glob.
+  const file = join(
+    dirname(fileURLToPath(import.meta.url)),
+    '..',
+    '..',
+    'shared',
+    'fixtures',
+    what,
+    `${t.body}.json`,
+  );
+  return json(200, JSON.parse(readFileSync(file, 'utf8')) as unknown);
+}
 
 function png(body: Uint8Array, extra: Record<string, string> = {}): FixtureResponse {
   return { status: 200, headers: { ...BASE_HEADERS, 'content-type': 'image/png', ...extra }, body };
@@ -238,6 +262,8 @@ export function handleFixtureRequest(
   if (!t) return error(404, 'not_found', 'Unknown object id.');
 
   if (m[2] === 'frames') return framesReply(t, session);
+  if (m[2] === 'card') return bodyReply(t, 'cards');
+  if (m[2] === 'render-params') return bodyReply(t, 'params');
   if (m[2] === 'spectrum') return json(200, makeSpectrum(t));
   if (m[2] === 'composite') return json(200, makeComposite(t));
   if (m[2] === 'composite.png') {

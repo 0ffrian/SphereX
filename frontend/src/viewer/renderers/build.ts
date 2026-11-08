@@ -56,6 +56,8 @@ import { floatTexture } from './fieldTexture';
 import { requestField } from '../fields/fieldClient';
 import type { FieldData, FieldParams } from '../fields/fieldGenerator';
 import { spinRateRadPerSimS, type SimTimeFn } from '../motion/motion';
+import { MouldRig } from '../mould/MouldRig';
+import type { MouldPose } from '../mould/mouldSteps';
 import { jetPalette } from './jetPalette';
 import { srgbToLinear } from './linearColour';
 
@@ -180,6 +182,11 @@ export interface BuiltScene {
   setJitterFrame(index: number): void;
   /** The quality level changed: volume steps and octaves, model level of detail, displacement. */
   setTier(tier: TierName): void;
+  /**
+   * Issue #60 build animation: poses the scene (scale, scaffold, morph, growth, shader knobs).
+   * Null restores exactly what was built.
+   */
+  setMould(pose: Readonly<MouldPose> | null): void;
   dispose(): void;
 }
 
@@ -303,6 +310,8 @@ export function buildScene(
   let screenPx: number | null = null;
   const lodRefresh: (() => void)[] = [];
   let shapeRadius: number | null = null;
+  const mouldSpheres: { mesh: Mesh; axes: [number, number, number] }[] = [];
+  const mouldHolders: (() => Object3D | null)[] = [];
   for (const [bodyIndex, body] of plan.bodies.entries()) {
     // A star with a moving surface (R7.5.1): spots, flares, loops, granulation and glow.
     if (plan.star && body.id === 'body') {
@@ -331,6 +340,8 @@ export function buildScene(
     mesh.scale.set(...body.axes);
     mesh.position.set(...body.position);
     group.add(mesh);
+    // A pulsing Mira poses its own scale every frame, so it is not stretched by the build animation.
+    if (!plan.pulsation) mouldSpheres.push({ mesh, axes: body.axes });
     if (plan.spin && !plan.jets) spinners.push(mesh);
     // A Mira that pulses with the clock (Q-65): a Mira has no star surface, so it is posed here.
     if (plan.pulsation) {
@@ -469,6 +480,7 @@ export function buildScene(
       const lods = lodUrls(body.meshUrl);
       const shape = plan.shape;
       let holder: Group | null = null;
+      mouldHolders.push(() => holder);
       let wanted: LodLevel = 0;
       let lod1Missing = false;
       let bakedFor: BufferGeometry[] = [];
@@ -631,6 +643,20 @@ export function buildScene(
   tierListeners.push((t) => volumes.forEach((v) => v.setTier(t)));
   const jitterFrame = (i: number) => volumes.forEach((v) => v.setJitterFrame(i));
 
+  const first = plan.bodies[0];
+  const rig = new MouldRig({
+    group,
+    spheres: mouldSpheres,
+    holders: mouldHolders,
+    volumes: volumes.map((v) => v.mesh),
+    wireAt: first
+      ? { position: first.position, radius: Math.max(...first.axes) }
+      : plan.shader && plan.type !== 'nebula' && plan.type !== 'nova'
+        ? { position: [0, 0, 0], radius: 1 }
+        : null,
+    shader: shaderBody,
+  });
+
   // Disc, dust screen, trail ---------------------------------------------------------------
   for (const disc of plan.discs) {
     const geometry = track(new RingGeometry(disc.innerRadius, disc.outerRadius, 96));
@@ -727,8 +753,15 @@ export function buildScene(
       for (const l of tierListeners) l(next);
       hooks.onChange();
     },
+    setMould(pose) {
+      if (disposed) return;
+      rig.apply(pose);
+      hooks.onChange();
+    },
     dispose() {
       disposed = true;
+      rig.restore();
+      rig.dispose();
       if (!sharedCache) cache.dispose();
       for (const d of disposables) d.dispose();
       disposables.length = 0;

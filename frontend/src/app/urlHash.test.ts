@@ -74,4 +74,15 @@ describe('URL hash (A10 hash routing)', () => {
   it('formats an empty state as no hash', () => {
     expect(formatHash({})).toBe('');
   });
+
+  it('carries the build pane as a bare `build` flag (issue #60, mock-up #build)', () => {
+    expect(formatHash({ build: true })).toBe('#build');
+    expect(formatHash({ ra: 1, dec: 2, name: 'Aqua Prime', build: true })).toBe(
+      '#ra=1.00000&dec=2.00000&name=Aqua+Prime&build',
+    );
+    expect(parseHash('#build')).toEqual({ build: true, problems: [] });
+    expect(parseHash('#ra=1&dec=2&build').build).toBe(true);
+    expect(parseHash('#ra=1&dec=2').build).toBeUndefined();
+    expect(hashToQuery(parseHash('#build'))).toBeNull();
+  });
 });

@@ -24,6 +24,9 @@ classDiagram
     +renderStats() RenderStats
     +freezeClock(simSeconds: number) Promise~void~
     +whenSettled() Promise~void~
+    +whenLoaded(timeoutMs) Promise~void~, issue #60: textures, meshes, generated field, compile
+    +setMould(pose: MouldPose or null) void, issue #60 build animation, null restores the normal render
+    +setTurn(x, y) void and setDragTurnsBody(on) void, issue #60: the body turns under a fixed light
     +timeLapses() id, label, speedup list via timeLapsesOf(plan), active processes only, Q-108
     one Pause motion / Play motion button in the panel whenever timeLapses is not empty, reduced motion starts in Play
     +setTouchMode(on: boolean) void

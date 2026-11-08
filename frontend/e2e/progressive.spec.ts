@@ -107,10 +107,13 @@ test('cached spots get their own markers, a target is marked once', async ({ pag
     const hook = (globalThis as unknown as { __sxSky: { setView(v: object): void } }).__sxSky;
     hook.setView({ ra: 45, dec: -15, fovDeg: 30 });
   });
-  const cached = page.getByTestId('sky-cached-marker');
-  // eps Ind B and R Dra are in the cached list but already have target markers.
-  await expect(cached).toHaveCount(1, { timeout: 15_000 });
-  await expect(cached).toHaveAttribute('data-object-id', 'synthetic-cached-spot');
+  // eps Ind B and R Dra are in the cached list but already have target markers; the spot and the
+  // Aqua Prime fixture (issue #60) are marked by the cached list only.
+  await expect(page.getByTestId('sky-cached-marker')).toHaveCount(2, { timeout: 15_000 });
+  const cached = page.locator(
+    '[data-testid="sky-cached-marker"][data-object-id="synthetic-cached-spot"]',
+  );
+  await expect(cached).toHaveCount(1);
   await expect(cached).toHaveAccessibleName(
     'RA 45.00000°, Dec −15.00000°: cached, 12 frames, loads instantly. Open it',
   );
