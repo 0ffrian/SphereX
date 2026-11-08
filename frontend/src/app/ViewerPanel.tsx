@@ -373,6 +373,7 @@ export function ViewerPanel() {
   const irHidesJets =
     plan?.mode === 'spherex_ir' &&
     plan.bodies.length > 0 &&
+    plan.modes.some((m) => m.id === 'visible' && m.available) &&
     plan.missing.some((m) => m.id === 'jets' && m.reason === 'mode');
   // One pause control for everything that moves (WCAG 2.2.2, R9). Under reduced motion the scene
   // starts paused and the button starts it.
@@ -526,15 +527,17 @@ export function ViewerPanel() {
 
           {/* Sits under the mode buttons it refers to. The region stays mounted while an object is
               shown, so a change of mode or level is announced politely when the text appears. */}
-          <div
-            id="ir-jets-hint"
-            role="status"
-            aria-live="polite"
-            className="empty:hidden"
-            data-testid="ir-jets-hint"
-          >
-            {irHidesJets && <p className="text-sm text-neutral-200">{IR_JETS_HINT}</p>}
-          </div>
+          {plan.threeD && plan.modes.length > 0 && (
+            <div
+              id="ir-jets-hint"
+              role="status"
+              aria-live="polite"
+              className="empty:hidden"
+              data-testid="ir-jets-hint"
+            >
+              {irHidesJets && <p className="text-sm text-neutral-200">{IR_JETS_HINT}</p>}
+            </div>
+          )}
 
           {plan.type === 'comet' && (
             <div
