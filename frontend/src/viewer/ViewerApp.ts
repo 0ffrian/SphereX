@@ -25,7 +25,7 @@ import type { PlanContext, RenderPlan, SpinPlan } from './planTypes';
 import { planRender } from './renderPlan';
 import type { BodyRenderer } from './renderers/bodyRenderer';
 import { AssetCache, buildScene, type BuildHooks, type BuiltScene } from './renderers/build';
-import { SimClock, type PauseReason } from './render/clock';
+import { SimClock, type ClockProcess, type PauseReason } from './render/clock';
 import type { Motion } from './motion/motion';
 import { RenderChain } from './render/pipeline';
 import {
@@ -122,7 +122,8 @@ export function sceneKey(plan: RenderPlan): string {
     plan.shader ? null : plan.spin,
     // What moves: rates and processes (R5.7). The star's layers, a brown dwarf's jets and a Mira's
     // pulsation change what is built; the cloud cover of a brown dwarf is applied in place.
-    plan.motion,
+    // `activeProcesses` follows the honesty state, which is applied in place (see `syncProcesses`).
+    { ...plan.motion, activeProcesses: undefined },
     plan.star,
     plan.jets ? { ...plan.jets, cover: 0 } : null,
     plan.pulsation,
@@ -242,6 +243,8 @@ export class ViewerApp {
   private spinBase = 0;
   /** WCAG 2.2.2: the user can pause auto-spin. */
   private spinPaused = false;
+  /** The user asked to play although the device asks for reduced motion. */
+  private motionOverride = false;
   private chain: RenderChain | null = null;
   private chainFailed = false;
   private tier: TierName;
@@ -423,7 +426,12 @@ export class ViewerApp {
       // Nothing that is built changed: only the lights, the honesty state or the labels did. A
       // generated body takes the new tags and light in place (no field is regenerated).
       this.built.update(plan);
-      if (this.built === this.onScreen) this.syncProcesses(plan.spin, this.built, plan.motion);
+      if (this.built === this.onScreen) {
+        this.syncProcesses(plan.spin, this.built, plan.motion);
+        // Pose again from the clock: a brown dwarf's cloud cover follows the light-curve scrub, which
+        // must show while the clock is paused too (reduced motion, user or idle pause).
+        this.applySpinAngle();
+      }
       if (this.built !== this.onScreen && this.pending) {
         // Still compiling: the new lights wait for the content they belong to.
         this.pending = { lights, plan };
@@ -550,14 +558,23 @@ export class ViewerApp {
     const keep = new Set<string>();
     if (built && spin && built.spinRate > 0) {
       this.spinBase = built.spinRate / spin.speedup;
-      this.clock.setProcess({ id: 'spin', label: 'Spin', speedup: spin.speedup });
+      const rate = motion?.processes.find((p) => p.id === 'spin');
+      this.clock.setProcess({
+        id: 'spin',
+        label: 'Spin',
+        speedup: spin.speedup,
+        ...(rate ? { tag: rate.tag, tier: rate.tier } : {}),
+      });
       keep.add('spin');
     } else {
       this.spinBase = 0;
     }
     if (built && motion) {
+      // Only processes that drive a drawn layer (D-21, D-34): a hidden layer has no note and does
+      // not keep the frame loop running.
       for (const p of motion.processes) {
         if (p.id === 'spin') continue; // the spin is the plan's (its speed-up may be lowered)
+        if (!motion.activeProcesses.includes(p.id)) continue;
         this.clock.setProcess({
           id: p.id,
           label: p.label,
@@ -601,7 +618,17 @@ export class ViewerApp {
     this.controls.saveState();
   }
 
-  /** Pause or resume auto-spin (WCAG 2.2.2). Survives rebuilds. */
+  /**
+   * Under reduced motion the scene starts paused (R9); the "Play motion" button is the user's
+   * choice to start it anyway (WCAG 2.2.2). Ends when the preference is switched off.
+   */
+  setMotionOverride(on: boolean): void {
+    if (this.disposed || on === this.motionOverride) return;
+    this.motionOverride = on;
+    this.setPause('reduced-motion', prefersReducedMotion() && !on);
+  }
+
+  /** Pause or resume all motion (WCAG 2.2.2). Survives rebuilds. */
   setSpinPaused(paused: boolean): void {
     if (this.disposed || paused === this.spinPaused) return;
     this.spinPaused = paused;
@@ -613,7 +640,7 @@ export class ViewerApp {
   }
 
   /** The processes that are time-lapses (each is shown with its speed-up). */
-  timeLapses(): { id: string; label: string; speedup: number; tier?: number }[] {
+  timeLapses(): ClockProcess[] {
     return this.clock.processes();
   }
 
@@ -912,7 +939,8 @@ export class ViewerApp {
     } catch (err) {
       this.dropChain(err);
     }
-    this.setPause('reduced-motion', reduced);
+    if (!reduced) this.motionOverride = false;
+    this.setPause('reduced-motion', reduced && !this.motionOverride);
     this.renderNow();
   };
 

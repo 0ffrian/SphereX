@@ -8,6 +8,7 @@ import {
   spectrumAnnouncement,
   spectrumCoverageMessage,
   spectrumEmptyMessage,
+  timeLapseText,
 } from './messages';
 import { FRAME_REASONS, groupMissing, summarizeSpectrum, WHOLE_RESULT_CODES } from './refusals';
 
@@ -311,5 +312,44 @@ describe('motion refusals (R3.4 dynamics)', () => {
     expect(describeRefusal({ id: 'mesh', reason: 'backend' })).toBe(
       'Shape model: not drawn. The data pipeline left it out.',
     );
+  });
+});
+
+describe('time-lapse and layer wording (D-32, D-34)', () => {
+  it('says where a rate comes from, uses thousands separators, keeps the tier number out', () => {
+    expect(timeLapseText({ id: 'spin', label: 'Spin', speedup: 1000, tag: 'measured' })).toBe(
+      'Spin: period measured; shown 1,000\u00d7 faster.',
+    );
+    expect(
+      timeLapseText({ id: 'flares', label: 'Flares', speedup: 43000, tag: 'inferred_from_analog' }),
+    ).toBe('Flares: rate taken from a typical value; shown 43,000\u00d7 faster.');
+    expect(timeLapseText({ id: 'winds', label: 'Winds', speedup: 3600 })).toBe(
+      'Winds: shown 3,600\u00d7 faster.',
+    );
+    expect(timeLapseText({ id: 'spin', label: 'Spin', speedup: 10, tag: 'measured' })).not.toMatch(
+      /tier/,
+    );
+  });
+
+  it('names every layer the viewer states itself, never its raw id', () => {
+    for (const id of [
+      'granulation',
+      'spots',
+      'faculae',
+      'flares',
+      'prominences',
+      'prominence_strands',
+      'glow',
+      'jets',
+      'storms',
+      'band_count',
+      'flattening',
+      'cloud_cover',
+      'clouds',
+      'climate',
+    ]) {
+      expect(layerName(id)).not.toMatch(/^Layer /);
+      expect(layerName(id)).not.toContain('_');
+    }
   });
 });
