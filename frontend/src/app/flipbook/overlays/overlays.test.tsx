@@ -372,6 +372,28 @@ describe('overlay components', () => {
     expect(q('contamination')).toBeNull();
   });
 
+  it('keeps the note’s space on a frame without one, so playback does not move the layout', () => {
+    const quiet = { ...ovFrame, frame_id: 'f2', contamination: [] };
+    const s = readySky({}, { ...data, frames: [ovFrame, quiet] });
+    act(() =>
+      root.render(<ContaminationNote view={overlayView(s.overlays, 'f2')!} fixture={false} />),
+    );
+    // The other frame's note is laid out but invisible (not read out); no line is current.
+    const cell = q('contamination-cell')!;
+    expect(cell.querySelectorAll('ul')).toHaveLength(1);
+    expect(cell.querySelector('ul')!.className).toContain('invisible');
+    expect(qa('contamination-line')).toHaveLength(0);
+    expect(q('badge-estimated')!.parentElement!.parentElement!.className).toContain('invisible');
+
+    act(() =>
+      root.render(<ContaminationNote view={overlayView(s.overlays, 'f1')!} fixture={false} />),
+    );
+    expect(cell.querySelector('ul')!.className).not.toContain('invisible');
+    expect(qa('contamination-line').map((l) => l.textContent)).toEqual(
+      contaminationLines(ovFrame.contamination, data),
+    );
+  });
+
   it('details: catalogue table and epoch, badges, marker list, refusals', () => {
     const s = readySky(
       { toggles: { gaia: true, wise: true, flags: false, fov: false } },
