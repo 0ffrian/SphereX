@@ -20,7 +20,7 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | File | Sections | Load this when… |
 |---|---|---|
 | [overview.md](overview.md) | A1–A2.1 | you need the scope, priority tiers (P0–P3, backlog), the system diagram or the design principles |
-| [data-sources.md](data-sources.md) | A3–A3.10 | you call or adapt SPHEREx/IRSA, Gaia, WISE, Horizons, SkyBoT, SBDB, DAMIT, Exoplanet Archive, SIMBAD or mission shape models |
+| [data-sources.md](data-sources.md) | A3–A3.11 | you call or adapt SPHEREx/IRSA, Gaia, WISE, Horizons, SkyBoT, SBDB, DAMIT, Exoplanet Archive, SIMBAD, mission shape models or the IRSA HiPS sky background |
 | [pipeline.md](pipeline.md) | A4–A4.9 | you build a backend stage: find the object, measure flux/spectrum, classify, asset lookup, ObjectCard, RenderParams; or the overlays, flag mask and combine endpoints |
 | [data-contract.md](data-contract.md) | A5–A5.4 | you touch generated contract code, ids/seeds, provenance tags and badges, slider overrides or the asset store |
 | [generators.md](generators.md) | A6–A6.3 | you work on baked or browser-shader generators, triplanar mapping, the Gemini layer or offline jobs |
@@ -53,6 +53,7 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | A3.8 | NASA Exoplanet Archive | [data-sources.md#a38-nasa-exoplanet-archive](data-sources.md#a38-nasa-exoplanet-archive) |
 | A3.9 | Not used for the base path | [data-sources.md#a39-not-used-for-the-base-path](data-sources.md#a39-not-used-for-the-base-path) |
 | A3.10 | Added for the object view | [data-sources.md#a310-added-for-the-object-view](data-sources.md#a310-added-for-the-object-view) |
+| A3.11 | Sky background (IRSA HiPS) | [data-sources.md#a311-sky-background-irsa-hips](data-sources.md#a311-sky-background-irsa-hips) |
 | A4 | Pipeline | [pipeline.md#a4-pipeline](pipeline.md#a4-pipeline) |
 | A4.1 | Stage 1: Find the object | [pipeline.md#a41-stage-1-find-the-object](pipeline.md#a41-stage-1-find-the-object) |
 | A4.2 | Stage 2: Measure brightness and spectrum | [pipeline.md#a42-stage-2-measure-brightness-and-spectrum](pipeline.md#a42-stage-2-measure-brightness-and-spectrum) |

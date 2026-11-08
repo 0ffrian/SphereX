@@ -4,6 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
+import { openViewer, viewerCanvas } from './viewer';
 
 const read = (dir: string, k: string) =>
   JSON.parse(
@@ -41,7 +42,7 @@ async function maxChannelDiff(page: Page, a: Buffer, b: Buffer): Promise<number>
 }
 
 async function draw(page: Page, kinds: string[]): Promise<Buffer> {
-  await page.goto('/');
+  await openViewer(page);
   const status = page.getByTestId('renderer-status');
   await expect(status).not.toHaveAttribute('data-status', 'starting', { timeout: 30_000 });
   test.skip((await status.getAttribute('data-status')) === 'unavailable', 'no 3D backend');
@@ -66,7 +67,27 @@ async function draw(page: Page, kinds: string[]): Promise<Buffer> {
       { card: read('cards', kind), params: read('params', kind) },
     );
   }
-  const box = (await page.locator('canvas[aria-label]').boundingBox())!;
+  // The frame governor (R5.7: one level down after 2 s of frames over 33 ms) can lower the tier
+  // while SwiftShader is slow. A frame drawn at Low is not a TAAU frame, and comparing it with a
+  // Medium one is not a determinism check, so pin Medium again and settle until it holds.
+  const tier = await page.evaluate(async () => {
+    const v = (
+      globalThis as unknown as {
+        __sxViewer: {
+          setQualityTier(t: string): void;
+          freezeClock(s: number): Promise<void>;
+          renderStats(): { tier: string };
+        };
+      }
+    ).__sxViewer;
+    for (let i = 0; i < 3 && v.renderStats().tier !== 'medium'; i++) {
+      v.setQualityTier('medium');
+      await v.freezeClock(0);
+    }
+    return v.renderStats().tier;
+  });
+  expect(tier, 'the governor kept lowering the quality level').toBe('medium');
+  const box = (await viewerCanvas(page).boundingBox())!;
   return page.screenshot({ clip: box, mask: [page.getByTestId('viewer-label')] });
 }
 
