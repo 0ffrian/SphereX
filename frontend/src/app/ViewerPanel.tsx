@@ -56,6 +56,9 @@ interface Choices {
   scrub: number;
 }
 
+/** Said (live region) when the governor lowers the render quality. */
+export const QUALITY_DROP_ANNOUNCEMENT = 'Lowered render quality to keep motion smooth';
+
 const PLACEHOLDER_LABEL = 'Viewer placeholder: no object loaded';
 
 const ROTATE_BUTTONS: { dir: 'left' | 'right' | 'up' | 'down'; label: string; glyph: string }[] = [
@@ -98,6 +101,13 @@ export function ViewerPanel() {
   const failed = failedState.key === objectKey ? failedState.ids : NO_FAILED;
   const reducedMotion = useReducedMotion();
   const [spinPaused, setSpinPaused] = useState(false);
+  // R5.7: a phone pauses the clock after a minute without input; said here, lifted by the button.
+  const [idlePaused, setIdlePaused] = useState(false);
+  useEffect(() => {
+    if (!viewer) return; // a new viewer starts not idle; the handler reports every change
+    viewer.setIdleChangeHandler?.(setIdlePaused);
+    return () => viewer.setIdleChangeHandler?.(null);
+  }, [viewer]);
   const [whyOpen, setWhyOpen] = useState(false);
   const whyId = useId();
   const fixture = useAppStore((s) => s.sky.fixture);
@@ -197,6 +207,18 @@ export function ViewerPanel() {
       viewer.setLoadFailedHandler(null);
     };
   }, [viewer, objectKey]);
+
+  // A tier drop from the frame-time governor is said in plain words and shown (R9, never silent).
+  const [qualityLowered, setQualityLowered] = useState(false);
+  useEffect(() => {
+    if (!viewer) return;
+    viewer.setQualityChangeHandler((e) => {
+      if (!e.auto) return;
+      setAnnouncement(QUALITY_DROP_ANNOUNCEMENT);
+      setQualityLowered(true);
+    });
+    return () => viewer.setQualityChangeHandler(null);
+  }, [viewer]);
 
   // The pause choice is the user's; the viewer keeps it across rebuilds.
   useEffect(() => {
@@ -488,20 +510,41 @@ export function ViewerPanel() {
                   ? '. Auto-spin is off because your device asks for reduced motion.'
                   : spinPaused
                     ? '. Auto-spin is paused.'
-                    : '.'}
+                    : idlePaused
+                      ? '. Auto-spin paused after a minute without input. Tap the view or press Resume spin.'
+                      : '.'}
               </p>
               {!reducedMotion && (
                 <button
                   type="button"
                   className={buttonClass}
-                  aria-pressed={spinPaused}
-                  onClick={() => setSpinPaused((p) => !p)}
+                  aria-pressed={spinPaused || idlePaused}
+                  onClick={() => {
+                    if (idlePaused && !spinPaused) viewer?.resumeFromIdle?.();
+                    else setSpinPaused((p) => !p);
+                  }}
                 >
-                  {spinPaused ? 'Resume spin' : 'Pause spin'}
+                  {spinPaused || idlePaused ? 'Resume spin' : 'Pause spin'}
                 </button>
               )}
             </div>
           )}
+
+          {qualityLowered && (
+            <p className="text-sm text-neutral-200" data-testid="quality-note">
+              {QUALITY_DROP_ANNOUNCEMENT}.
+            </p>
+          )}
+
+          {/* Every time-lapse states its speed-up (R5.7). The spin has its own note above. */}
+          {viewer
+            ?.timeLapses?.()
+            .filter((t) => t.id !== 'spin')
+            .map((t) => (
+              <p key={t.id} className="text-sm text-neutral-200" data-testid="time-lapse-note">
+                {t.label} sped up ×{t.speedup}.
+              </p>
+            ))}
 
           <section aria-labelledby="legend-heading" className="flex flex-col gap-1">
             <h3 id="legend-heading" className="text-sm font-medium text-neutral-200">

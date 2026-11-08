@@ -36,6 +36,7 @@ import {
   spinRateRadPerS,
 } from './renderers/build';
 import { Sprite } from 'three/webgpu';
+import { MAX_SPIN_REV_PER_S, SPIN_SPEEDUP, spinSpeedup } from './renderers/AsteroidMesh';
 import { COMPARISONS, formatLength, pickComparison, scaleBarFor } from './scaleBar';
 
 describe('honesty (R5.3, D-21)', () => {
@@ -305,6 +306,17 @@ describe('scene builder (no GPU)', () => {
     expect(spinRateRadPerS({ periodH: 1, speedup: 1 })).toBeCloseTo((2 * Math.PI) / 3600);
     expect(spinRateRadPerS({ periodH: 1, speedup: 1000 })).toBeCloseTo((2000 * Math.PI) / 3600);
     expect(spinRateRadPerS({ periodH: 0, speedup: 1000 })).toBe(0);
+  });
+
+  it('caps the drawn spin at 1 rev/s by lowering the shown speed-up (WCAG 2.3.1)', () => {
+    expect(spinSpeedup(5.27)).toBe(SPIN_SPEEDUP);
+    expect(spinSpeedup(0.2)).toBe(720);
+    expect(spinSpeedup(0.1)).toBe(360);
+    expect(spinSpeedup(0.0001)).toBe(0.36);
+    for (const h of [0.5, 0.25, 0.1, 0.03, 0.001]) {
+      const rev = spinRateRadPerS({ periodH: h, speedup: spinSpeedup(h) }) / (2 * Math.PI);
+      expect(rev).toBeLessThanOrEqual(MAX_SPIN_REV_PER_S);
+    }
   });
 
   it('shells and dust are instanced sprites, so their point size is honoured in r187 (N5)', () => {
