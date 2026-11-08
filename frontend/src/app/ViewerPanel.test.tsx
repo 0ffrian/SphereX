@@ -130,6 +130,7 @@ describe('ViewerPanel', () => {
     expect(text('ir-jets-hint')).not.toMatch(/\b[RAQD]-?\d/);
     // Visible view draws the jets: the region stays, the text goes.
     await click('Visible colour');
+    expect(button('Visible colour')?.hasAttribute('aria-describedby')).toBe(false);
     expect(region()).not.toBeNull();
     expect(text('ir-jets-hint')).toBe('');
     // Back to infrared: the hint returns. At the default level the visible view would not draw
@@ -162,6 +163,22 @@ describe('ViewerPanel', () => {
     useAppStore.getState().setObject(noSize, params);
     useAppStore.getState().setHonesty('artistic');
     await mount();
+    expect(text('ir-jets-hint')).toBe('');
+  });
+
+  it('shows no hint when the visible mode is unavailable, since there is nothing to switch to', async () => {
+    const { card, params } = fixture('brown_dwarf');
+    const noVisible = {
+      ...params,
+      view_modes: {
+        ...params.view_modes,
+        visible: { ...params.view_modes.visible, available: false },
+      },
+    } as typeof params;
+    useAppStore.getState().setObject(card, noVisible);
+    useAppStore.getState().setHonesty('artistic');
+    await mount();
+    expect(canvasLabel()).toContain('SPHEREx infrared');
     expect(text('ir-jets-hint')).toBe('');
   });
 
