@@ -3,7 +3,7 @@ import { Float32BufferAttribute, BufferGeometry } from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 import { bakeVertexAo } from './ShapeAo';
 import {
-  aoRayCount,
+  AO_RAYS,
   aoVisibility,
   chooseLod,
   hemisphereDirections,
@@ -11,10 +11,12 @@ import {
   lodUrls,
   lommelSeeliger,
   meanEdgeLength,
+  needsShapeMaterial,
   regolithMinFrequency,
   shadowSettings,
   SHAPE_TRIANGLE_BUDGET,
   unitScale,
+  bakedAoDrawn,
   type Vec3,
 } from './shapeModel';
 
@@ -152,9 +154,28 @@ describe('ambient occlusion sampling', () => {
     expect(v).toBeLessThan(0.7);
   });
 
-  it('uses fewer rays on the low quality level', () => {
-    expect(aoRayCount('low')).toBeLessThan(aoRayCount('medium'));
-    expect(aoRayCount('medium')).toBeLessThan(aoRayCount('high'));
+  it('uses one ray count for every quality level (the AO is cached on shared geometry)', () => {
+    expect(AO_RAYS).toBeGreaterThan(0);
+    expect(Number.isInteger(AO_RAYS)).toBe(true);
+  });
+
+  it('draws the baked AO only when the plan allows it (honesty filter)', () => {
+    // Estimated on: the plan asks for AO and the mesh has it.
+    expect(bakedAoDrawn(true, [true])).toBe(true);
+    // Back to Measured only: the cached mesh still has the attribute, but it must not be drawn.
+    expect(bakedAoDrawn(false, [true])).toBe(false);
+    expect(bakedAoDrawn(undefined, [true])).toBe(false);
+    // Plan asks for it but it is not baked yet (or only for some meshes): not drawn.
+    expect(bakedAoDrawn(true, [false])).toBe(false);
+    expect(bakedAoDrawn(true, [true, false])).toBe(false);
+    expect(bakedAoDrawn(true, [])).toBe(false);
+  });
+
+  it('needs the shape material only when something derived is drawn with it', () => {
+    expect(needsShapeMaterial({ lommelSeeliger: false, regolith: false }, false)).toBe(false);
+    expect(needsShapeMaterial({ lommelSeeliger: false, regolith: false }, true)).toBe(true);
+    expect(needsShapeMaterial({ lommelSeeliger: true, regolith: false }, false)).toBe(true);
+    expect(needsShapeMaterial({ lommelSeeliger: false, regolith: true }, false)).toBe(true);
   });
 
   it('bakes AO into a geometry: a covered floor is darker than an open one', async () => {

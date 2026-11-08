@@ -18,6 +18,8 @@ const fake = {
   showPlan: vi.fn((p: RenderPlan) => void shown.push(p)),
   clearObject: vi.fn(),
   setLoadFailedHandler: vi.fn(),
+  setMeshMeasuredHandler: vi.fn(),
+  setOverrides: vi.fn(),
   setSpinPaused: vi.fn(),
   setQualityChangeHandler: vi.fn(),
   timeLapses: vi.fn(() => [] as { id: string; label: string; speedup: number }[]),
@@ -324,5 +326,85 @@ describe('ViewerPanel', () => {
     const buttons = [...container.querySelectorAll('button')];
     expect(buttons.length).toBeGreaterThan(8);
     for (const b of buttons) expect(b.className).toMatch(/min-h-11/);
+  });
+});
+
+describe('ViewerPanel: remnant age slider (issue #43)', () => {
+  const setNova = () => {
+    const { card, params } = fixture('nova');
+    useAppStore.getState().setObject(card, params);
+  };
+  const slider = () => container.querySelector('input[type="range"]') as HTMLInputElement | null;
+
+  it('is hidden while the remnant is hidden, shown at + Artistic, with a name, value text and badge', async () => {
+    setNova();
+    await mount();
+    expect(slider()).toBeNull(); // + Estimated: the remnant is an artist's impression, not drawn
+    await click('+ Artistic');
+    const input = slider()!;
+    expect(input).not.toBeNull();
+    expect(input.className).toMatch(/min-h-11/);
+    expect(input.getAttribute('aria-valuetext')).toMatch(/years old$/);
+    const label = input.closest('label')!;
+    expect(label.textContent).toMatch(/Age of the remnant/);
+    expect(label.textContent).toMatch(/Default/); // the Artistic tag shows as the Default badge
+    expect(label.textContent).toMatch(/not a measurement/);
+  });
+
+  it('passes the age to the viewer, and a new object starts from the default', async () => {
+    setNova();
+    await mount();
+    await click('+ Artistic');
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+      set.call(slider()!, '5000');
+      slider()!.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(fake.setOverrides).toHaveBeenLastCalledWith({ age_yr: 5000 });
+    expect(slider()!.getAttribute('aria-valuetext')).toBe('5,000 years old');
+    const other = fixture('nova');
+    other.params.id = 'fixture:nova-2';
+    await act(async () => {
+      useAppStore.getState().setObject(other.card, other.params);
+    });
+    expect(fake.setOverrides).toHaveBeenLastCalledWith({});
+  });
+
+  it('is not offered for other types', async () => {
+    const { card, params } = fixture('nebula');
+    useAppStore.getState().setObject(card, params);
+    await mount();
+    await click('+ Artistic');
+    expect(slider()).toBeNull();
+  });
+});
+
+describe('ViewerPanel: one size for the bar, the label and the announcement (issue #43)', () => {
+  function eros() {
+    const { card, params } = fixture('asteroid_shape');
+    card.shape_source = { value: '/data/shapes/eros-gaskell.glb', tag: 'measured', source: 'test' };
+    useAppStore.getState().setObject(card, params);
+  }
+  const measured = async (radiusM: number) => {
+    const handler = fake.setMeshMeasuredHandler.mock.calls.at(-1)?.[0] as
+      ((m: { radiusM: number }) => void) | null | undefined;
+    await act(async () => handler!({ radiusM }));
+  };
+
+  it('the screen-reader label gives the size the scale bar shows, and the swap is announced', async () => {
+    eros();
+    await mount();
+    const cardSize = canvasLabel();
+    await measured(16_500);
+    expect(text('scale-bar')).toMatch(/33 km/);
+    expect(canvasLabel()).toMatch(/33 km across \(estimated\)/);
+    expect(canvasLabel()).not.toBe(cardSize);
+    // Measured only hides the model-dependent size: the card's size and its own tag are read out.
+    await click('Measured only');
+    expect(canvasLabel()).not.toMatch(/33 km/);
+    expect(text('viewer-announcer')).toMatch(/Measured only/);
+    // Back to + Estimated: the swap to the model's size is said.
+    await click('+ Estimated');
+    expect(text('viewer-announcer')).toMatch(/Size shown: 33 km across \(estimated\)/);
   });
 });

@@ -10,12 +10,13 @@ import type { RenderPlan, Rgb } from '../planTypes';
 const WHITE: Rgb = [1, 1, 1];
 
 /**
- * [verify] R7.2: `displacementScale = relief_amp` (fraction of the radius, R6.2). `RenderTextures`
- * has no field for it yet, so it is read if the backend adds one (ASSUMPTION: `textures.relief_amp`)
- * and is null today: the displacement layer is then refused, not guessed.
+ * R7.2: `displacementScale = relief_amp` (fraction of the radius, R6.2). `RenderTextures` declares
+ * `relief_amp` as an optional field (Q-103); the backend does not send it yet (Kevin), so it is
+ * null today and the displacement layer is refused as a server gap, not guessed. A value that is
+ * not a positive finite number is ignored.
  */
 export function reliefAmpOf(params: RenderParams): number | null {
-  const v = (params.textures as { relief_amp?: unknown } | undefined)?.relief_amp;
+  const v: unknown = params.textures?.relief_amp;
   return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
 }
 
@@ -40,11 +41,11 @@ export function planAsteroidProcedural(input: PlanInput): RenderPlan {
   const heightUrl = tex?.height ?? null;
   const displaceWanted = bodyOk && relief && heightUrl !== null;
   if (displaceWanted && reliefAmp === null) {
+    // A gap in what the server sends, not missing data about the object (plain words: messages.ts).
     b.reject({
       id: 'displacement',
-      reason: 'data',
-      fields: ['relief_amp'],
-      detail: 'The height of the relief is not known, so the surface is not displaced.',
+      reason: 'backend',
+      detail: 'The server does not send the relief height yet, so the surface is not displaced.',
     });
   }
   // A legend entry and a tag of its own; refused when the load failed or the honesty state hides

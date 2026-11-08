@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { TIER_ORDER, TIERS } from '../render/quality';
 import {
+  boxBasis,
   comaDensity,
   DUST_TAIL_BEND,
   dustTailCurve,
@@ -196,5 +197,34 @@ describe('comet tails (R7.3)', () => {
     expect(comaDensity(0.5, 0.05)).toBeCloseTo(0.01, 12);
     expect(comaDensity(1, 0.05) / comaDensity(0.5, 0.05)).toBeCloseTo(0.25, 12);
     expect(comaDensity(0, 0.05)).toBe(1);
+  });
+});
+
+describe('boxBasis (tail box orientation)', () => {
+  it.each([
+    [[1, 0, 0], null],
+    [[0, 1, 0], null], // a tail straight up: the default bend (+y) is parallel to it
+    [[0, -1, 0], null],
+    [
+      [0, 1, 0],
+      [0, 1, 0],
+    ],
+    [
+      [0.3, -0.8, 0.5],
+      [0.3, -0.8, 0.5],
+    ],
+  ] as [number[], number[] | null][])('is orthonormal for axis %j, bend %j', (axis, bend) => {
+    const [x, y, z] = boxBasis(axis, bend)!;
+    for (const v of [x, y, z]) {
+      expect(v.every(Number.isFinite)).toBe(true);
+      expect(Math.hypot(...v)).toBeCloseTo(1, 9);
+    }
+    expect(dot(x, y)).toBeCloseTo(0, 9);
+    expect(dot(x, z)).toBeCloseTo(0, 9);
+    expect(dot(y, z)).toBeCloseTo(0, 9);
+  });
+  it('keeps +x along the axis and refuses a zero axis', () => {
+    expect(boxBasis([0, 0, 2], null)![0]).toEqual([0, 0, 1]);
+    expect(boxBasis([0, 0, 0], null)).toBeNull();
   });
 });

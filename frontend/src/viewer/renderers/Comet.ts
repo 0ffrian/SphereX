@@ -6,7 +6,7 @@
 //   published result shows one, and the card holds no such field, so it is never drawn.
 //   Epoch toggle: Aug 2025 / Dec 2025.
 import type { CometEpoch, GasQ, ObjectCard } from '@/contract';
-import { isTagShown } from '../honesty';
+import { isTagShown, weakerOf } from '../honesty';
 import { isPresent, litBody, numberField, PlanBuilder, type PlanInput } from '../planCommon';
 import type { RenderPlan, ShellPlan, Vec3, VolumePlan } from '../planTypes';
 import { isLoadableMeshUrl, planShapeLayers } from './AsteroidMesh';
@@ -187,7 +187,13 @@ export function planComet(input: PlanInput): RenderPlan {
   const comaLayerTag = layer?.tag ?? 'artistic';
   if (shells.length > 0) {
     const coma = comaVolume(shells, comaLayerTag, params.seed);
-    if (coma) volumes.push(coma);
+    if (coma) {
+      volumes.push(coma);
+      // The streaks are noise added for looks (artistic) on top of the gas amounts (the layer's tag).
+      b.notes.push(
+        'Faint streaks in the coma are added for looks. The gas amounts are not changed.',
+      );
+    }
   }
   if (dust) volumes.push(dustConeVolume(dust, b.layers.get('dust')?.tag ?? 'artistic'));
   const sunKnown = b.lighting.source === 'phase_angle' || b.lighting.source === 'sun_dir';
@@ -210,13 +216,21 @@ export function planComet(input: PlanInput): RenderPlan {
         fields: ['phase_angle_deg'],
         detail: 'The Sun direction is not known.',
       });
+      continue;
+    }
+    const v = make();
+    if (!v) continue;
+    // The tail rests on the backend layer (that it exists) and on the viewer's own shape (a
+    // display value). It claims no more than the weaker of the two, so a dust tail whose bend is
+    // a display choice is never shown as better than that (D-02).
+    const tag = weakerOf(v.tag, b.layers.get(id)!.tag);
+    if (b.ready(id) && !isTagShown(b.ctx.honesty, tag)) {
+      b.reject({ id, reason: 'honesty', tag });
     } else if (b.draw(id)) {
-      const v = make();
-      if (v) {
-        // The tag is the backend layer's (D-02): it decides what the tail rests on.
-        volumes.push({ ...v, tag: b.layers.get(id)!.tag });
-        tailDrawn = true;
-      }
+      const entry = b.drawn.find((d) => d.id === id);
+      if (entry) entry.tag = tag;
+      volumes.push({ ...v, tag });
+      tailDrawn = true;
     }
   }
   // The R7.3 layer `tail` (published result) is still never drawn from a card without one.

@@ -19,7 +19,8 @@ classDiagram
     +showPlan(plan: RenderPlan) void
     +setSpinPaused(paused: boolean) void
     +setQualityTier(name: TierName) void
-    +setMeshMeasuredHandler(handler) void, called with radiusM when a shape model loads
+    +setMeshMeasuredHandler(handler) void, called with radiusM (half the longest box extent) when a shape model loads; ignored once the scene is no longer the current plan
+    +setOverrides(overrides) void, D-27 slider values (remnant age) for the body and the next build
     +renderStats() RenderStats
     +freezeClock(simSeconds: number) Promise~void~
     +whenSettled() Promise~void~
@@ -93,7 +94,7 @@ classDiagram
     +build(plan: RenderPlan, hooks, cache: AssetCache) three.js objects
     AssetCache keeps textures and meshes by URL across rebuilds
     plan.volumes (VolumePlan) become VolumeBody meshes, ray-marched emission-only (issue #43), tier listeners call setTier
-    shape-model asteroids get the ShapeMaterial from plan.shape; onMeshMeasured reports the model radius in metres
+    shape-model asteroids get the ShapeMaterial from plan.shape; onMeshMeasured reports half the longest box extent of the model in metres
   }
   class VolumeBody {
     <<volume/VolumeBody.ts>>
@@ -118,7 +119,7 @@ classDiagram
     requires diameter_km
     SphereGeometry 1, 256, 128 scaled by ellipsoid_axes
     baked albedo (visible mode only), normal, roughness maps
-    displacement by baked height map, refused while relief_amp unknown
+    displacement by baked height map, refused (reason backend) while textures.relief_amp is not sent
     displacement on desktop only
   }
   class Comet {
@@ -157,7 +158,7 @@ classDiagram
     TSL node materials on three r187
     reads field as 2 Float32 DataTextures via textureLoad
     finer noise is seen, not felt
-    nebula and nova are emission volumes (remnant: core glow, filaments, dust lanes), point sets only for haptics (Q-103)
+    nebula and nova are emission volumes (remnant: core glow, filaments, dust lanes), no point sets and no haptics (Q-103)
     refused layers go in missing
   }
   class FieldWorker {
@@ -246,7 +247,7 @@ classDiagram
 ## Notes
 
 - Render core (issue #39): `ViewerApp` draws through a `RenderChain` (`render/pipeline.ts`); if the chain cannot be built it falls back to plain `renderer.render`. New content is compiled with `RenderChain.compileAsync` before it is swapped in (diagram [10](10-sequence-view-3d.md)). The quality level (low, medium or high, `render/quality.ts`) sets bloom resolution, anti-aliasing (TAAU or SMAA), noise octaves and volume steps. `FrameGovernor` only lowers the quality level; `setQualityTier` picks one by hand. `SimClock` (`render/clock.ts`) holds one sim time per moving process (only the spin today) and the pause reasons shown in diagram [15](15-state-interaction.md). `renderStats`, `whenSettled` and `freezeClock` are test and tuning hooks; `timeLapses` lists each process with its shown speed-up. Motion and quality levels follow R5.7 and D-34; the implementation is Q-66 in [decisions](../decisions.md).
-- Shapes and volumes (issue #43): `RenderPlan.volumes` and `RenderPlan.shape` are new plan fields. `build.ts` makes a `VolumeBody` per volume and forwards `setTier` (via `BuiltScene.setTier`, called by `ViewerApp.setQualityTier`) so the ray-march step count follows the quality level. `buildLights` takes shadow settings (`shape/shapeModel.shadowSettings`) when `plan.shape.shadows` is set, and the renderer shadow map is enabled for it. `AsteroidMesh` reports the model radius through `onMeshMeasured` so the scale bar shows the real size. Volumes replace point sprites; the point sets remain only as haptic data (Q-103).
+- Shapes and volumes (issue #43): `RenderPlan.volumes` and `RenderPlan.shape` are new plan fields. `build.ts` makes a `VolumeBody` per volume and forwards `setTier` (via `BuiltScene.setTier`, called by `ViewerApp.setQualityTier`) so the ray-march step count follows the quality level. `buildLights` takes shadow settings (`shape/shapeModel.shadowSettings`) when `plan.shape.shadows` is set, and the renderer shadow map is enabled for it; `ViewerApp.setLights` disposes the shadow map of a light it replaces. The loaded model reports half of its longest box extent through `onMeshMeasured` (ignored if the scene is no longer current) so the scale bar and the screen-reader label (`canvasLabel(plan, shownSize)`) show the same real size. Volumes replace point sprites; the nebula and the nova make no point sets and have no haptics (Q-103). `ShaderBody` disposes each `VolumeHandle` (and its `Data3DTexture`) when it releases a surface. The remnant age slider in `ViewerPanel` calls `ViewerApp.setOverrides`.
 - `WorkerPool` (`render/workerPool.ts`) and the fan-out loader (`render/fanout.ts`, `loadBody`) exist and are tested, but nothing in the viewer calls them yet.
 
 - Plan layer (issue #7): `ViewerApp.setObject` calls `planRender` to get a pure `RenderPlan`, and `showPlan` passes it to `renderers/build.ts`, which makes the three.js objects. The per-type renderer files hold the plan functions. `BodyRenderer` above is the conceptual contract; in code it is the plan function plus `build.ts`.

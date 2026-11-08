@@ -27,12 +27,19 @@ import type { PlanContext, RenderPlan, ViewModeId } from '@/viewer/planTypes';
 import { defaultContext, planRender } from '@/viewer/renderPlan';
 import { COMET_EPOCHS, epochsWithQ, EPOCH_LABEL } from '@/viewer/renderers/Comet';
 import { scaleBarFor, shownSize } from '@/viewer/scaleBar';
+import { SLIDER_REGISTRY } from '@/viewer/sliders';
 import type { CometEpoch, ObjectCard, RenderParams } from '@/contract';
 import { ProvenanceBadge } from './Badge';
 import { describeRefusal, layerName } from './messages';
 import { buttonClass, pressedClass } from './ui';
 
 const NO_FAILED: readonly string[] = [];
+const AGE_SLIDER = SLIDER_REGISTRY.age_yr;
+
+/** "1,200 years", "10 years". */
+function formatYears(n: number): string {
+  return `${n.toLocaleString('en')} ${n === 1 ? 'year' : 'years'}`;
+}
 
 /** `prefers-reduced-motion`, kept current when the setting changes while the page is open. */
 function useReducedMotion(): boolean {
@@ -54,6 +61,8 @@ interface Choices {
   mode: ViewModeId | null;
   epoch: CometEpoch | null;
   scrub: number;
+  /** Remnant age from the slider, in years; null = the largest (the default shell). */
+  age: number | null;
 }
 
 /** Said (live region) when the governor lowers the render quality. */
@@ -83,10 +92,19 @@ export function ViewerPanel() {
   // Viewer choices that belong to this panel, not to the data. Keyed by object so that a new
   // object starts from its defaults (the comet opens on its latest epoch with gas data).
   const objectKey = params ? `${params.id}|${params.generator_version}|${params.seed}` : '';
-  const [stored, setChoices] = useState<Choices>({ key: '', mode: null, epoch: null, scrub: 0 });
+  const [stored, setChoices] = useState<Choices>({
+    key: '',
+    mode: null,
+    epoch: null,
+    scrub: 0,
+    age: null,
+  });
   const choices: Choices =
-    stored.key === objectKey ? stored : { key: objectKey, mode: null, epoch: null, scrub: 0 };
+    stored.key === objectKey
+      ? stored
+      : { key: objectKey, mode: null, epoch: null, scrub: 0, age: null };
   const modeChoice = choices.mode;
+  const ageChoice = choices.age;
   const scrubIndex = choices.scrub;
   const epochsWithData = useMemo(
     () => (card && params?.type === 'comet' ? epochsWithQ(card) : []),
@@ -124,10 +142,10 @@ export function ViewerPanel() {
   // Issue #43: a loaded shape model carries its own size in metres (glTF units, Q-61), which is the
   // measured size, so the scale bar shows it instead of the catalogue diameter (Eros at real size).
   const [meshSize, setMeshSize] = useState<{ key: string; radiusM: number } | null>(null);
+  const meshRadiusM = meshSize?.key === objectKey ? meshSize.radiusM : null;
   const size = useMemo(
-    () =>
-      plan ? shownSize(plan, meshSize?.key === objectKey ? meshSize.radiusM : null, honesty) : null,
-    [plan, meshSize, objectKey, honesty],
+    () => (plan ? shownSize(plan, meshRadiusM, honesty) : null),
+    [plan, meshRadiusM, honesty],
   );
   const bar = useMemo(() => (size ? scaleBarFor(size.radiusM, size.qualifier) : null), [size]);
 
@@ -177,7 +195,10 @@ export function ViewerPanel() {
           w.__sxViewer = created;
           // Plans and draws like the panel does, for a given honesty state.
           w.__sxShow = (c, p, honesty) => {
-            const shown = planRender(c, p, defaultContext({ honesty }));
+            // The epoch the panel itself opens on (a comet: its latest epoch with gas data), so a
+            // fixture card is drawn at its own epoch and not at the default one.
+            const epoch = epochsWithQ(c).at(-1) ?? defaultContext().epoch;
+            const shown = planRender(c, p, defaultContext({ honesty, epoch }));
             created.showPlan(shown);
             return shown;
           };
@@ -234,6 +255,12 @@ export function ViewerPanel() {
     return () => viewer.setQualityChangeHandler(null);
   }, [viewer]);
 
+  // The remnant age slider (D-27): moves the drawn shell without a rebuild, and is kept for the
+  // next build. Before the plan effect below, so a new object starts from its own value.
+  useEffect(() => {
+    viewer?.setOverrides?.(ageChoice === null ? {} : { age_yr: ageChoice });
+  }, [viewer, ageChoice]);
+
   // The pause choice is the user's; the viewer keeps it across rebuilds.
   useEffect(() => {
     viewer?.setSpinPaused(spinPaused);
@@ -245,8 +272,9 @@ export function ViewerPanel() {
       if (plan) viewer.showPlan(plan);
       else viewer.clearObject();
     }
-    canvasRef.current?.setAttribute('aria-label', canvasLabel(plan));
-  }, [viewer, plan]);
+    // The label reads the same size as the scale bar (the model's own size for a shape model).
+    canvasRef.current?.setAttribute('aria-label', canvasLabel(plan, size));
+  }, [viewer, plan, size]);
 
   const announce = useCallback((text: string) => setAnnouncement(text), []);
   const planWith = (patch: Partial<PlanContext>) =>
@@ -255,7 +283,12 @@ export function ViewerPanel() {
   const onHonesty = (state: HonestyState) => {
     setHonesty(state);
     const next = planWith({ honesty: state });
-    announce(next ? honestyAnnouncement(state, next) : HONESTY_LABEL[state]);
+    // The size can change with the level (a shape model's own size swaps with the card's): say so.
+    announce(
+      next
+        ? honestyAnnouncement(state, next, shownSize(next, meshRadiusM, state), size)
+        : HONESTY_LABEL[state],
+    );
   };
   const onMode = (mode: ViewModeId) => {
     setChoices({ ...choices, mode });
@@ -269,6 +302,11 @@ export function ViewerPanel() {
   };
   // Not announced here: the slider's own value text is read by screen readers when it moves.
   const onScrub = (i: number) => setChoices({ ...choices, scrub: i });
+  const onAge = (years: number) => setChoices({ ...choices, age: years });
+
+  // The age slider shows only while the remnant is drawn (it is an artist's impression).
+  const remnantShown = plan?.type === 'nova' && plan.drawn.some((l) => l.id === 'point_cloud');
+  const age = ageChoice ?? AGE_SLIDER.max;
 
   const nothingDrawn = plan && plan.threeD && !showsBody(plan) ? nothingDrawnReason(plan) : null;
   const defaultsShown = plan?.missing.filter((m) => m.defaultShown) ?? [];
@@ -463,6 +501,28 @@ export function ViewerPanel() {
                 {plan.scrub.flagged > 0
                   ? `; ${plan.scrub.flagged} flagged points are left out`
                   : ''}
+              </span>
+            </label>
+          )}
+
+          {remnantShown && (
+            <label className="flex flex-col gap-1 text-sm text-neutral-300">
+              <span className="flex flex-wrap items-center gap-2">
+                Age of the remnant: {formatYears(age)}
+                <ProvenanceBadge tag="artistic" fixture={objectIsFixture} />
+              </span>
+              <input
+                type="range"
+                min={AGE_SLIDER.min}
+                max={AGE_SLIDER.max}
+                step={AGE_SLIDER.step}
+                value={age}
+                className="min-h-11 w-full max-w-xl"
+                aria-valuetext={`${formatYears(age)} old`}
+                onChange={(e) => onAge(Number(e.target.value))}
+              />
+              <span className="text-xs text-neutral-400">
+                Your choice, not a measurement. The shell is drawn smaller when it is younger.
               </span>
             </label>
           )}

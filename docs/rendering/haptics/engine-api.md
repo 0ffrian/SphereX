@@ -91,7 +91,7 @@ Event sources (`sources/heightMap.ts`, `meshNormal.ts`, `field.ts`, `dataPulse.t
 - The mock-up's native and iOS bridges are dropped for the event (D-08). The `HapticDriver` interface keeps the door open.
 - The mock-up's `spherex:haptic` DOM event (a `CustomEvent` on `window` in `mockup/spherex-ui.html`) stays as a **debug hook**. It also drives an **on-screen pulse indicator**, so an audience watching the laptop can see what the phone feels.
 - Tick lengths follow [§8.3](platform-encoding.md#r83-encoding-web-driver-d-09): 8–25 ms with the calibrated `minMs`, not the mock-up's 6–22 ms.
-- Novae get the field pulse ([§8.5](profiles.md#r85-per-type-haptic-profile)), not the mock-up's refusal.
+- Novae and nebulae have no haptics since issue #43 (Q-103; they are drawn as volumes), as in the mock-up and unlike D-12; [§8.5](profiles.md#r85-per-type-haptic-profile).
 
 ```ts
 interface HapticProfile {

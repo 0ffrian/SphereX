@@ -47,6 +47,28 @@ const kinds = readdirSync(`${FIXTURES}cards`)
 const read = (dir: string, k: string) =>
   JSON.parse(readFileSync(`${FIXTURES}${dir}/${k}.json`, 'utf8')) as unknown;
 
+/**
+ * The comet fixture offers no tail layers (the backend offers them only with a published result),
+ * so its golden would show a nucleus and a coma only. The golden adds the two layers the viewer
+ * knows about, as the backend would send them, so that the tails are covered too. Deterministic:
+ * the same two layers every run. The epoch is the card's own (the panel's `__sxShow` path).
+ */
+function paramsFor(k: string): unknown {
+  const params = read('params', k) as { layers: unknown[] };
+  if (k !== 'comet') return params;
+  const layer = (id: string, tag: string, tier: number) => ({
+    id,
+    tag,
+    tier,
+    description: `${id} (golden: synthetic layer, as the backend would send it)`,
+    requires: [],
+  });
+  return {
+    ...params,
+    layers: [...params.layers, layer('ion_tail', 'derived', 2), layer('dust_tail', 'artistic', 5)],
+  };
+}
+
 /** Decode a PNG to luminance in a blank page (no dependencies in Node). */
 async function decode(page: Page, png: Buffer): Promise<Rgb> {
   // Plain string: the e2e tsconfig has no DOM lib, and this runs in the browser.
@@ -116,7 +138,7 @@ for (const kind of kinds) {
             bodyDrawn: v.body ? [...v.body.drawn] : null,
           };
         },
-        { card: read('cards', kind), params: read('params', kind), honesty },
+        { card: read('cards', kind), params: paramsFor(kind), honesty },
       );
 
       // The state draws only layers whose tag it shows (D-21), and a generated body draws only

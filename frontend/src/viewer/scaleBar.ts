@@ -13,7 +13,7 @@ export function isGltfUrl(url: string | null | undefined): boolean {
  */
 export const MODEL_SIZE_TAG: Tag = 'model_dependent';
 export const MODEL_SIZE_WHY =
-  'The size of the loaded shape model, measured across its widest part (metres, Q-61). The model is fitted to observations, so the size depends on it.';
+  'The size of the loaded shape model, measured across its widest part, in metres. The model is fitted to observations, so the size depends on it.';
 
 export interface ShownSize {
   radiusM: number | null;
