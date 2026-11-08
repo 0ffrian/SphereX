@@ -49,9 +49,9 @@ const plainVisible = (b: ShaderBody) =>
   (b as unknown as { plain: { visible: boolean } | null }).plain?.visible ?? false;
 
 describe('shader kinds through the plan path (B5)', () => {
-  it('starts at + Estimated: the artistic surface is hidden, the plain sphere stands in', async () => {
+  it('starts at + Estimated: the artistic planet surface is hidden, the plain sphere stands in', async () => {
     const { v } = makeViewer();
-    const f = fixture('gas_giant');
+    const f = fixture('planet_water');
     const plan = show(v, f.card, f.params);
     expect(plan.threeD).toBe(true);
     expect(plan.shader).toMatchObject({ surface: false, plain: true });
@@ -63,6 +63,26 @@ describe('shader kinds through the plan path (B5)', () => {
     expect(body.drawn).toEqual([]);
     expect(body.hidden).toEqual(['surface']);
     expect(plainVisible(body)).toBe(true);
+    v.dispose();
+  });
+
+  it('a gas giant at + Estimated shows its four estimated layers; the swirl waits for + Artistic (issue #62)', async () => {
+    const { v, fieldCalls } = makeViewer();
+    const f = fixture('gas_giant');
+    const plan = show(v, f.card, f.params);
+    expect(plan.shader).toMatchObject({ surface: true, plain: false });
+    const body = await built(v);
+    expect(body.drawn).toEqual(['bands', 'flattening', 'colour', 'storms']);
+    expect(body.hidden).toEqual(['turbulence']);
+    expect(plainVisible(body)).toBe(false);
+    // The toggle updates the same body in place: no new field.
+    show(v, f.card, f.params, 'artistic');
+    expect(v.body).toBe(body);
+    expect(body.drawn).toEqual(['bands', 'flattening', 'colour', 'storms', 'turbulence']);
+    show(v, f.card, f.params, 'measured');
+    expect(body.drawn).toEqual([]);
+    expect(plainVisible(body)).toBe(true);
+    expect(fieldCalls).toHaveLength(1);
     v.dispose();
   });
 

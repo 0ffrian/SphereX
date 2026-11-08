@@ -61,7 +61,7 @@ def fixture_files() -> dict[Path, bytes]:
     out: dict[Path, bytes] = {}
     for params_path in sorted((FIXTURES / "params").glob("*.json")):
         params = _load(params_path)
-        textures: dict[str, str] | None = params.get("textures")
+        textures: dict[str, Any] | None = params.get("textures")
         if not textures:
             continue
         card = _load(FIXTURES / "cards" / params_path.name)
@@ -78,6 +78,8 @@ def fixture_files() -> dict[Path, bytes]:
         for name in FILES:
             out[base / name] = baked[name]
         for url in textures.values():
+            if not isinstance(url, str):
+                continue  # relief_amp is a number (R7.2), not a file
             if url_to_relpath(url) not in out:
                 raise ValueError(f"{params_path.name}: {url} names no baked file")
     return out

@@ -25,7 +25,9 @@ describe('resolveShaderSpec', () => {
     const f = fixture('gas_giant');
     const spec = resolveShaderSpec(f.card, { ...f.params, scale_m: null });
     expect(spec.drawable).toBe(false);
-    expect(spec.missing).toContain('surface');
+    expect(spec.missing).toEqual(
+      expect.arrayContaining(['bands', 'flattening', 'colour', 'storms', 'turbulence']),
+    );
   });
 
   it('refuses the surface when the radius is unknown', () => {

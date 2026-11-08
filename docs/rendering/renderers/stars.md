@@ -9,9 +9,11 @@
 - **Limb darkening:** linear, I(μ) = 1 − 0.6·(1 − μ). Tag `model_dependent`.
 - **`star` (Barnard's Star):** red-dwarf sphere plus a **motion trail** across the background stars, drawn from `pm_mas_yr` over the SPHEREx epochs (`measured`).
 - **`star_mira` (R Dra, P ≈ 246 d):** brightness follows the measured light curve as you scrub. The radius pulsation (±10%) is `artistic`.
-- **`star_ttauri` (RW Aur):** star plus a tilted disc (`RingGeometry`, inclination 45–60°). A dust screen's opacity = clamp(1 − flux/median_flux, 0, 0.9) at the scrubbed time. The timing is `measured`; the screen geometry is `artistic`.
+- **`star_ttauri` (RW Aur):** star plus a **flared, lit disc** tilted 45–60° (issue #62, Q-118; see below). A dust screen's opacity = clamp(1 − flux/median_flux, 0, 0.9) at the scrubbed time. The timing is `measured`; the screen geometry is `artistic`.
 - **Saturation:** points with SPHEREx saturation FLAGS are excluded from brightness mapping and shown hatched on the light curve.
 - **Renderer:** the star renderer is three r187 TSL (`three/webgpu`, D-03). The `limb_darkening` rule above stays; the surface layers below multiply into it.
+
+**T Tauri disc (issue #62, Q-118; amends the earlier "tilted `RingGeometry`").** `renderers/ttauriDisc.ts` draws it with TSL nodes only (three r187): a closed, flared mesh (top and bottom surfaces whose half-thickness is `H_in (r / r_in)^p`, an inner wall that faces the star, an outer wall), radii 1.3 to 2.7 star radii, inclination 58° (the 45–60° range is kept), `H_in` 0.14, `p` 1.25. Look: radial brightness falloff `(r_in / r)^1.8` with a faded outer edge; a bright, warm inner rim; light from the star at the origin (wrap lighting, so the grazing top surface is not black); a darker midplane lane (the walls darken toward the midplane, and surfaces seen at a graze darken like a thick dust column). It is depth-tested against the opaque star and writes no depth, so the near half passes in front of the star's upper part and the far half goes behind its lower part. **Every number and colour is `artistic`** (layer `disc`, tier 5): no physical size, temperature or dust mass is claimed. The dust screen is unchanged: its timing is `measured`, its geometry `artistic`.
 
 ### R7.5.1 Star surface (what is drawn)
 

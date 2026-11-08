@@ -40,6 +40,8 @@ def test_committed_textures_match_the_baker() -> None:
 def test_every_fixture_texture_url_resolves(path: Path) -> None:
     params = json.loads(path.read_text(encoding="utf-8"))
     for key, url in params.get("textures", {}).items():
+        if not isinstance(url, str):
+            continue  # relief_amp is a number (R7.2), not a file
         file = bf.OUT_DIR / bf.url_to_relpath(url)
         assert file.is_file(), f"{path.name} {key}: {url}"
         if file.suffix in {".png", ".webp"}:

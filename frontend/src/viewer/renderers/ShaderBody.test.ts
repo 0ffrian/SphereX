@@ -19,14 +19,17 @@ const ctx: BodyContext = {
 };
 
 const KINDS = ['planet_rocky', 'planet_water', 'gas_giant', 'nebula', 'nova'] as const;
+/** Issue #62: a gas giant's surface is these five layers, not one `surface`. */
+const GAS = ['bands', 'flattening', 'colour', 'storms', 'turbulence'];
+const layersOf = (k: (typeof KINDS)[number]) =>
+  k === 'nebula' || k === 'nova' ? ['point_cloud'] : k === 'gas_giant' ? GAS : ['surface'];
 
 describe('ShaderBody', () => {
   for (const k of KINDS) {
     it(`builds ${k} from its fixture`, async () => {
       const f = fixture(k);
       const body = await ShaderBody.create(f.card, f.params, ctx);
-      const layer = k === 'nebula' || k === 'nova' ? 'point_cloud' : 'surface';
-      expect(body.drawn).toEqual([layer]);
+      expect(body.drawn).toEqual(layersOf(k));
       expect(body.hidden).toEqual([]);
       expect(body.object.children.length).toBeGreaterThan(0);
       expect(body.suggestedDistance).toBeGreaterThan(1);
@@ -45,8 +48,53 @@ describe('ShaderBody', () => {
     const f = fixture('gas_giant');
     const body = await ShaderBody.create(f.card, { ...f.params, scale_m: null }, ctx);
     expect(body.drawn).toEqual([]);
-    expect(body.missing).toContain('surface');
+    expect(body.missing).toEqual(expect.arrayContaining(GAS));
     expect(body.object.children.every((c) => !c.visible)).toBe(true);
+  });
+
+  it('gas giant: each layer follows its own tag (issue #62, D-21)', async () => {
+    const f = fixture('gas_giant');
+    const at = (visibleTags: BodyContext['visibleTags']) =>
+      ShaderBody.create(f.card, f.params, { ...ctx, visibleTags });
+    // Measured only: nothing of it is measured, so a plain sphere stands in.
+    const measured = await at(['measured']);
+    expect(measured.drawn).toEqual([]);
+    expect(measured.hidden).toEqual(GAS);
+    expect(measured.status.state).toBe('hidden');
+    // + Estimated: everything but the swirl look.
+    const est = await at(ESTIMATED_TAGS);
+    expect(est.drawn).toEqual(['bands', 'flattening', 'colour', 'storms']);
+    expect(est.hidden).toEqual(['turbulence']);
+    expect(est.status).toMatchObject({ state: 'drawn' });
+    expect([...est.status.tags].sort()).toEqual([
+      'derived',
+      'inferred_from_analog',
+      'model_dependent',
+    ]);
+    // + Artistic adds the turbulence, and its tag shows in the status.
+    est.setVisibleTags(ALL_TAGS);
+    expect(est.drawn).toEqual(GAS);
+    expect(est.status.tags).toContain('artistic');
+    // The plan's own switches (they carry the build holds) win over the tags.
+    est.setGasLayers({
+      bands: true,
+      flattening: false,
+      colour: false,
+      storms: false,
+      turbulence: false,
+    });
+    expect(est.drawn).toEqual(['bands']);
+    est.setGasLayers(null);
+    expect(est.drawn).toEqual(GAS);
+    for (const b of [measured, est]) b.dispose();
+  });
+
+  it('gas giant: a layer refused for missing data leaves the others drawn', async () => {
+    const f = fixture('gas_giant');
+    const body = await ShaderBody.create(f.card, { ...f.params, missing: ['storms'] }, ctx);
+    expect(body.drawn).toEqual(['bands', 'flattening', 'colour', 'turbulence']);
+    expect(body.missing).toContain('storms');
+    body.dispose();
   });
 
   it('hides artistic layers outside "+ Artistic" (D-21) and shows them again', async () => {
@@ -96,14 +144,13 @@ describe('ShaderBody', () => {
 
 describe('ShaderBody honesty and redraw (review B2, B3, N7)', () => {
   it('defaults to the D-21 "+ Estimated" start state: artistic layers are hidden', async () => {
-    for (const k of KINDS) {
+    for (const k of KINDS.filter((x) => x !== 'gas_giant')) {
       const f = fixture(k);
       const body = await ShaderBody.create(f.card, f.params, {
         fieldSource: async (p) => generateField(p, 64, 32),
       });
-      const layer = k === 'nebula' || k === 'nova' ? 'point_cloud' : 'surface';
       expect(body.drawn, k).toEqual([]);
-      expect(body.hidden, k).toEqual([layer]);
+      expect(body.hidden, k).toEqual(layersOf(k));
       expect(body.status.state).toBe('hidden');
       body.dispose();
     }
@@ -127,7 +174,7 @@ describe('ShaderBody honesty and redraw (review B2, B3, N7)', () => {
     expect(afterCreate).toBeGreaterThan(0);
     body.setVisibleTags(ESTIMATED_TAGS);
     expect(calls).toBe(afterCreate + 1);
-    expect(body.drawn).toEqual([]);
+    expect(body.drawn).toEqual(['bands', 'flattening', 'colour', 'storms']);
     body.setVisibleTags(ALL_TAGS);
     expect(calls).toBe(afterCreate + 2);
     await body.setOverrides({ storms: 2 });
@@ -339,7 +386,7 @@ describe('ShaderBody.start (the plan path builds without waiting)', () => {
       fieldSource: () => Promise.reject(new Error('no worker')),
       onFailed: (id) => failed.push(id),
     });
-    await vi.waitFor(() => expect(failed).toEqual(['surface']));
+    await vi.waitFor(() => expect(failed).toEqual(GAS));
     expect(body.object.children.some((c) => c.visible)).toBe(true);
     warn.mockRestore();
     body.dispose();

@@ -279,7 +279,7 @@ def test_textures_follow_d01_and_r67(object_type: str) -> None:
         return
     textures = params.get("textures", {})
     prefix = f"/data/textures/{params['id']}/{params['generator_version']}/{params['seed']}/"
-    assert all(url.startswith(prefix) for url in textures.values())
+    assert all(url.startswith(prefix) for url in textures.values() if isinstance(url, str))
     if params["haptics"]["texture"] == "height":
         assert "height_bin" in textures  # R8.4: the height-map source samples height.bin
 

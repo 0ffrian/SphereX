@@ -92,7 +92,7 @@ class RenderTextures(BaseModel):
     height_bin: str | None = None
     relief_amp: float | None = Field(
         None,
-        description="Peak relief as a fraction of the body radius (R6.2 relief_amp): the scale of the displacement by the baked height map (R7.2). Optional; the backend does not send it yet (Q-103).",
+        description="Peak relief as a fraction of the body radius (R6.2 relief_amp): the scale of the displacement by the baked height map (R7.2). Optional (Q-103); the backend sends it for `asteroid_procedural` (issue #62), tagged `artistic` through its `displacement` layer.",
         gt=0.0,
     )
 

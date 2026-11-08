@@ -6,6 +6,7 @@ import type { HonestyState } from './honesty';
 import type { LightingPlan } from './lighting';
 import type { Motion } from './motion/motion';
 import type { StarRates } from './bodies/starModel';
+import type { GasSwitches } from './renderers/shaderSpec';
 
 export type Rgb = [number, number, number];
 export type Vec3 = [number, number, number];
@@ -88,6 +89,16 @@ export interface BodyPlan {
   /** 0 = lit by the Sun light. Above 0 = self-luminous, colour times this value. */
   emissive: number;
   limbDarkening: boolean;
+  /**
+   * Linear limb-darkening coefficient `u` of a self-luminous body, `I(mu) = 1 - u (1 - mu)`. Unset:
+   * the star's R7.5 value when `limbDarkening` is on.
+   */
+  limbU?: number | null;
+  /**
+   * The baked albedo is drawn as brightness only, on the body's own colour (the infrared view of a
+   * brown dwarf, issue #62): the pattern is a look, the colour stays the SPHEREx average (R5.2).
+   */
+  albedoLuma?: boolean;
   roughness: number;
   meshUrl: string | null;
   albedoUrl: string | null;
@@ -129,6 +140,12 @@ export interface DiscPlan {
   innerRadius: number;
   outerRadius: number;
   inclinationDeg: number;
+  /**
+   * Flaring (issue #62, R7.5): the half-thickness of the disc is `heightAtInner` at the inner edge
+   * and grows as `(r / innerRadius) ^ flareExponent`. Scene units; artistic.
+   */
+  heightAtInner: number;
+  flareExponent: number;
 }
 
 export interface ScreenPlan {
@@ -208,6 +225,11 @@ export interface ShaderPlan {
   key: string;
   /** The generated surface (or point cloud) is shown at this honesty level. */
   surface: boolean;
+  /**
+   * Gas giants (issue #62): which of the five layers are drawn (honesty level, refusals and the
+   * build animation's holds applied). Null for every other kind; `surface` is true when any is on.
+   */
+  gas: GasSwitches | null;
   /** The plain grey sphere is shown: the surface is hidden and the size on the card is shown (Q-45). */
   plain: boolean;
   /** Camera distance that frames the body, in scene units (display value). */
@@ -253,6 +275,8 @@ export interface JetSurfacePlan {
   radiusM: number | null;
   /** Flattening from the spin (0 = round). */
   flattening: number;
+  /** Limb darkening coefficient of the self-lit surface (issue #62), or null for none. */
+  limbU?: number | null;
 }
 
 /** Mira pulsation drawn over time (R7.5, Q-65): the period is data, the amplitude is art. */
