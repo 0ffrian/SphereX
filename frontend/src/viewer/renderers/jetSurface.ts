@@ -25,6 +25,7 @@ import {
   abs,
   acos,
   atan,
+  cameraPosition,
   clamp,
   cos,
   cross,
@@ -32,12 +33,16 @@ import {
   exp,
   float,
   log,
+  max,
   mix,
   normalize,
+  normalWorld,
   positionLocal,
+  positionWorld,
   pow,
   sin,
   smoothstep,
+  sqrt,
   step,
   uniform,
   vec3,
@@ -49,7 +54,13 @@ import {
   type FieldParams,
   type FieldSampler,
 } from '../fields/fieldGenerator';
-import { peakAngularRate, stormsAt, type JetRates, type MovingStorm } from '../fields/flowModel';
+import {
+  MIN_COS_LAT,
+  peakAngularRate,
+  stormsAt,
+  type JetRates,
+  type MovingStorm,
+} from '../fields/flowModel';
 import { phasePair } from '../motion/phase';
 import type { SimTimeFn } from '../motion/motion';
 import { shaderSeedOffsets } from '../fields/noise';
@@ -79,7 +90,16 @@ export interface JetOptions {
   storms: number;
   /** Mesh segments. */
   segments?: [number, number];
+  /**
+   * Gas giants: the world-space direction to the sun (a TSL node). With it the lit side follows a
+   * Minnaert-style law (k = MINNAERT_K): a softer terminator and a slightly darker limb, because a
+   * gas giant has no solid surface to cast a hard shadow edge (airless rock keeps its sharp terminator).
+   */
+  sunWorld?: any;
 }
+
+/** Minnaert exponent for gas giants (artistic: 1 is a plain Lambert surface). */
+export const MINNAERT_K = 0.8;
 
 export interface JetFrame {
   storms: readonly MovingStorm[];
@@ -104,6 +124,17 @@ const rotY = (p: any, a: any) => {
   return vec3(p.x.mul(c).add(p.z.mul(s)), p.y, p.x.negate().mul(s).add(p.z.mul(c)));
 };
 
+/**
+ * Extra factor on top of the Lambert term `mu0`: Minnaert's `mu0^k mu^(k-1)` is `mu0 * mu0^(k-1) *
+ * mu^(k-1)`. The mu0 part (a soft terminator) is used as is, floored so it stays finite at the
+ * terminator; the view part is flipped to `mu^(1-k)` so that it darkens the limb (artistic).
+ */
+const minnaert = (sun: any) => {
+  const mu0 = max(dot(normalWorld, sun), 0.04);
+  const mu = max(abs(dot(normalWorld, normalize(cameraPosition.sub(positionWorld)))), 0.04);
+  return pow(mu0, MINNAERT_K - 1).mul(pow(mu, 1 - MINNAERT_K));
+};
+
 export function buildJetSurface(o: JetOptions): JetSurface {
   const so = shaderSeedOffsets(o.seed);
   const nStorm = Math.min(MAX_STORMS, Math.max(0, o.storms));
@@ -121,9 +152,13 @@ export function buildJetSurface(o: JetOptions): JetSurface {
   // storms (flowModel) flow the same way at every point.
   const profile = A.x.mul(2).sub(1);
 
+  const cosLat = max(sqrt(dir.x.mul(dir.x).add(dir.z.mul(dir.z))), MIN_COS_LAT);
+
   // Detail advected by the jets (two flow-map copies).
   const detail = (shear: any, evo: any) => {
-    const q = rotY(dir, shear.mul(profile));
+    // 1 / cos(lat), floored like the CPU's `invCosLat`: a wind of fixed speed turns a point near
+    // the pole faster, and the storms (flowModel) drift by the same factor, so they stay with their band.
+    const q = rotY(dir, shear.mul(profile).div(cosLat));
     return vnoise3(
       vec3(q.x.mul(7), q.y.mul(28), q.z.mul(7))
         .add(so.gasFine)
@@ -149,7 +184,10 @@ export function buildJetSurface(o: JetOptions): JetSurface {
     const ratio = dist.div(size);
     const spot = exp(pow(ratio, 2).negate());
     const ring = exp(pow(ratio.sub(STORM_RING_CENTRE).div(STORM_RING_WIDTH), 2).negate());
-    const east = normalize(cross(vec3(0, 1, 0), c));
+    // At a pole c is parallel to (0,1,0) and the cross product is 0 (normalize would be NaN): fall
+    // back to the x axis for the (arbitrary at the pole) local east.
+    const east0 = cross(vec3(0, 1, 0), c);
+    const east = normalize(mix(east0, vec3(0, 0, -1), step(dot(east0, east0), 1e-8)));
     const north = cross(c, east);
     const rel = dir.sub(c);
     const ang = atan(dot(rel, north), dot(rel, east));
@@ -187,7 +225,7 @@ export function buildJetSurface(o: JetOptions): JetSurface {
   } else {
     // Lit by the scene's DirectionalLight (N5 / R5.1); hot bodies add a self-glow term.
     const mat = new MeshStandardNodeMaterial();
-    mat.colorNode = col;
+    mat.colorNode = o.sunWorld ? col.mul(minnaert(o.sunWorld)) : col;
     mat.roughness = 1;
     mat.metalness = 0;
     mat.emissiveNode = o.emissive > 0 ? col.mul(o.emissive * 0.6) : vec3(0, 0, 0);
