@@ -93,6 +93,9 @@ export function tierText(tier: number): string {
 /** Said (live region) when the governor lowers the render quality. */
 export const QUALITY_DROP_ANNOUNCEMENT = 'Lowered render quality to keep motion smooth';
 
+/** Said when a brown dwarf is in the infrared view, which is a plain disc, and the visible view moves. */
+export const IR_JETS_HINT = 'Switch to the visible colour view to see the jets move.';
+
 const PLACEHOLDER_LABEL = 'Viewer placeholder: no object loaded';
 
 const ROTATE_BUTTONS: { dir: 'left' | 'right' | 'up' | 'down'; label: string; glyph: string }[] = [
@@ -363,6 +366,11 @@ export function ViewerPanel() {
   const objectIsFixture = fixture || (card?.id.startsWith('fixture:') ?? false);
   // Read from the plan, not from the viewer, so it is never a frame behind (what the clock runs).
   const lapses = plan ? timeLapsesOf(plan) : [];
+  // The infrared view leaves the jets out only because their colours are the visible palette
+  // (`drawBaked`, reason 'mode'); a jets layer refused for missing data or honesty has another
+  // reason and gets no hint, since the visible view would not draw it either.
+  const irHidesJets =
+    plan?.mode === 'spherex_ir' && plan.missing.some((m) => m.id === 'jets' && m.reason === 'mode');
   // One pause control for everything that moves (WCAG 2.2.2, R9). Under reduced motion the scene
   // starts paused and the button starts it.
   const motionPaused = (reducedMotion && !playAnyway) || spinPaused || idlePaused;
@@ -673,6 +681,11 @@ export function ViewerPanel() {
               {QUALITY_DROP_ANNOUNCEMENT}.
             </p>
           )}
+
+          {/* Always mounted, so a screen reader announces the text when it appears. */}
+          <div role="status" aria-live="polite" className="empty:hidden" data-testid="ir-jets-hint">
+            {irHidesJets && <p className="text-sm text-neutral-200">{IR_JETS_HINT}</p>}
+          </div>
 
           {/* Every time-lapse says where its rate comes from and its speed-up (R5.7, D-32). */}
           {lapses.map((t) => (
