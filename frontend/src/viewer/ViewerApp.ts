@@ -21,7 +21,7 @@ import {
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { ObjectCard, RenderParams } from '@/contract';
 import { buildLights, MAX_AMBIENT_INTENSITY } from './lighting';
-import { bodyScreenPx, shadowSettings } from './shape/shapeModel';
+import { bodyScreenPx, lodUrls, shadowSettings } from './shape/shapeModel';
 import type { PlanContext, RenderPlan, SpinPlan } from './planTypes';
 import type { Overrides } from './sliders';
 import { planRender } from './renderPlan';
@@ -29,6 +29,7 @@ import type { BodyRenderer } from './renderers/bodyRenderer';
 import { AssetCache, buildScene, type BuildHooks, type BuiltScene } from './renderers/build';
 import { SimClock, type ClockProcess, type PauseReason } from './render/clock';
 import type { Motion } from './motion/motion';
+import type { MouldPose } from './mould/mouldSteps';
 import { RenderChain } from './render/pipeline';
 import { noiseBakePending, whenNoiseIdle } from './volume/noiseVolume';
 import { onVolumeNoiseReady } from './volume/VolumeBody';
@@ -212,6 +213,10 @@ export function viewerKeyAction(
   }
 }
 
+/** Mock-up build view drag: radians per CSS pixel, and the tilt limit about x. UI values. */
+const TURN_PER_PX = 0.008;
+const TURN_X_LIMIT = 1.2;
+
 /** What counts as interaction for the R5.7 idle pause (a touch, a key, a wheel or trackpad). */
 const IDLE_EVENTS = ['pointerdown', 'keydown', 'wheel'] as const;
 
@@ -279,6 +284,12 @@ export class ViewerApp {
   private onMeshMeasured: ((m: { radiusM: number }) => void) | null = null;
   /** Tests only: field and point sources and slider overrides for the shader kinds. */
   private shaderOptions: BuildHooks['shader'];
+  /** Issue #60: the build animation's pose of what is on screen (null = the normal render). */
+  private mould: Readonly<MouldPose> | null = null;
+  /** Issue #60: the body's own turn (mock-up drag and auto-rotation), radians about x and y. */
+  private turn = { x: 0, y: 0 };
+  private dragTurns = false;
+  private turnDrag: { x: number; y: number; rx: number; ry: number; id: number } | null = null;
 
   setQualityChangeHandler(handler: ((e: QualityChange) => void) | null): void {
     this.onQualityChange = handler;
@@ -537,6 +548,8 @@ export class ViewerApp {
       this.scene.add(next.group);
       this.onScreen = next;
       this.placeholder.visible = false;
+      next.setMould(this.mould);
+      this.applyTurn();
       if (pending) {
         this.setLights(pending.lights);
         const { plan } = pending;
@@ -897,6 +910,35 @@ export class ViewerApp {
   }
 
   /**
+   * Issue #60: resolves when the plan on screen is fully loaded: its textures and meshes (a failed
+   * one counts as done, it is refused through the usual path), the generated surface of a shader
+   * kind, and the shader compile. The build animation starts only after this (never on a half-loaded
+   * body). Gives up after `timeoutMs` so a stuck load never blocks the view.
+   */
+  async whenLoaded(timeoutMs = 15_000): Promise<void> {
+    if (this.disposed) return;
+    const deadline = performance.now() + timeoutMs;
+    const plan = this.lastPlan;
+    const loads: Promise<unknown>[] = [];
+    for (const b of plan?.bodies ?? []) {
+      for (const url of [b.albedoUrl, b.normalUrl, b.heightUrl])
+        if (url) loads.push(this.assets.texture(url).catch(() => undefined));
+      if (b.meshUrl) loads.push(this.assets.mesh(lodUrls(b.meshUrl).lod0).catch(() => undefined));
+    }
+    const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+    await Promise.race([Promise.all(loads), sleep(timeoutMs)]);
+    while (!this.disposed && this.compiling && performance.now() < deadline) await this.compiling;
+    // A generated surface comes from the field worker a little after the build.
+    for (;;) {
+      const body = this.built?.body;
+      const waiting = body && body.status.state === 'drawn' && body.drawn.length === 0;
+      if (!waiting || this.disposed || performance.now() > deadline) break;
+      await sleep(30);
+    }
+    if (!this.disposed) await this.whenSettled();
+  }
+
+  /**
    * Test hook: pauses the clock (reason 'test'), puts every process at the given sim time, renders
    * the settle burst and resolves when it is done. The same card, seed and time give one picture.
    * The 'test' pause is never lifted: a frozen viewer stays frozen (tests and golden frames only).
@@ -975,10 +1017,100 @@ export class ViewerApp {
     zoomControls(this.controls, direction);
   }
 
-  /** R5.6 `R` key: back to the starting view. */
+  /** R5.6 `R` key: back to the starting view (and the body's own turn back to none). */
   resetView(): void {
     if (this.disposed) return;
     this.controls.reset();
+    this.setTurn(0, 0);
+  }
+
+  /**
+   * Issue #60 build animation: poses the scene on screen (scale, scaffold, morph, growth, shader
+   * knobs; mould/mouldSteps.ts). Null restores the normal render of the plan exactly. A scene that
+   * swaps in later gets the same pose.
+   */
+  setMould(pose: Readonly<MouldPose> | null): void {
+    if (this.disposed) return;
+    if (pose === null && this.mould === null) return;
+    this.mould = pose;
+    this.onScreen?.setMould(pose);
+    this.requestRender();
+  }
+
+  /**
+   * Issue #60 (mock-up build view): turns the body itself about x and y, under a fixed light. The
+   * camera does not move. (0, 0) is the normal pose.
+   */
+  setTurn(x: number, y: number): void {
+    if (this.disposed) return;
+    if (x === this.turn.x && y === this.turn.y) return;
+    this.turn = { x, y };
+    this.applyTurn();
+    this.requestRender();
+  }
+
+  getTurn(): { x: number; y: number } {
+    return { ...this.turn };
+  }
+
+  /** True while the user drags the body (the build view's auto-rotation waits meanwhile). */
+  isDraggingBody(): boolean {
+    return this.turnDrag !== null;
+  }
+
+  /**
+   * Issue #60: in the build view a drag turns the body (mock-up: .008 rad per pixel, x within
+   * ±1.2 rad) instead of orbiting the camera. Wheel and pinch zoom, keys and buttons are unchanged.
+   */
+  setDragTurnsBody(on: boolean): void {
+    if (this.disposed || on === this.dragTurns) return;
+    this.dragTurns = on;
+    this.controls.enableRotate = !on;
+    if (on) {
+      this.canvas.addEventListener('pointerdown', this.onTurnDown);
+      this.canvas.addEventListener('pointermove', this.onTurnMove);
+      this.canvas.addEventListener('pointerup', this.onTurnUp);
+      this.canvas.addEventListener('pointercancel', this.onTurnUp);
+    } else {
+      this.removeTurnListeners();
+    }
+  }
+
+  private removeTurnListeners(): void {
+    this.canvas.removeEventListener('pointerdown', this.onTurnDown);
+    this.canvas.removeEventListener('pointermove', this.onTurnMove);
+    this.canvas.removeEventListener('pointerup', this.onTurnUp);
+    this.canvas.removeEventListener('pointercancel', this.onTurnUp);
+    this.turnDrag = null;
+  }
+
+  private readonly onTurnDown = (e: PointerEvent): void => {
+    if (e.button !== 0 || !e.isPrimary) return;
+    this.turnDrag = {
+      x: e.clientX,
+      y: e.clientY,
+      rx: this.turn.x,
+      ry: this.turn.y,
+      id: e.pointerId,
+    };
+  };
+
+  private readonly onTurnMove = (e: PointerEvent): void => {
+    const d = this.turnDrag;
+    if (!d || e.pointerId !== d.id) return;
+    this.setTurn(
+      Math.max(-TURN_X_LIMIT, Math.min(TURN_X_LIMIT, d.rx + (e.clientY - d.y) * TURN_PER_PX)),
+      d.ry + (e.clientX - d.x) * TURN_PER_PX,
+    );
+  };
+
+  private readonly onTurnUp = (e: PointerEvent): void => {
+    if (this.turnDrag && e.pointerId === this.turnDrag.id) this.turnDrag = null;
+  };
+
+  private applyTurn(): void {
+    const g = this.onScreen?.group;
+    if (g) g.rotation.set(this.turn.x, this.turn.y, 0);
   }
 
   /** Coalesces any number of change events into one render on the next frame. */
@@ -1013,6 +1145,7 @@ export class ViewerApp {
     this.dprQuery?.removeEventListener('change', this.onPixelRatioChange);
     this.dprQuery = null;
     this.canvas.removeEventListener('keydown', this.onKeyDown);
+    this.removeTurnListeners();
     this.controls.removeEventListener('change', this.requestRender);
     this.controls.dispose();
     this.geometry.dispose();

@@ -30,6 +30,7 @@ Mermaid renders natively on GitHub, and in VS Code with a Mermaid extension (for
 | [18-activity-type-selection.md](18-activity-type-selection.md) | Activity | Type selection: SBDB, SIMBAD, Exoplanet Archive, sliders, candidate |
 | [19-activity-haptic-driver-select.md](19-activity-haptic-driver-select.md) | Activity | Choosing drivers at start-up (settings, platform defaults), calibration, the click that unlocks output, the `spherex:haptic` debug hook |
 | [20-sequence-composite.md](20-sequence-composite.md) | Sequence | The SPHEREx colour composite on the backend (prototype, Q-92): Stage 1 and 2, band and pass selection, alignment on one TAN grid, stretch, `derived.composite` cache, the PNG route |
+| [21-sequence-build-mould.md](21-sequence-build-mould.md) | Sequence | Select a body on the sky and Build it (issue #60, Q-113): the card, `/card` and `/render-params`, load first, stage plans with held layers, the pose (MouldRig), restore to the normal render |
 
 ## Conventions
 

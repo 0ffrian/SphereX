@@ -4,6 +4,7 @@
 // is checked against the contract (validate.ts).
 import { API_BASE, API_TIMEOUT_MS, COMBINE_HEADER, FIXTURE_HEADER } from './config';
 import { ApiError } from './errors';
+import type { ObjectCard, RenderParams } from '@/contract';
 import type {
   CombineInfo,
   CombineOp,
@@ -20,7 +21,9 @@ import {
   parseCombineInfo,
   parseComposite,
   parseFrames,
+  parseObjectCard,
   parseOverlays,
+  parseRenderParams,
   parseResolve,
   parseSkyCached,
   parseSkyIndex,
@@ -51,6 +54,10 @@ export interface ApiClient {
   composite(id: string, signal?: AbortSignal): Promise<ApiResult<CompositeResponse>>;
   /** Positions whose frame list is complete in the backend cache (not in D-16): load at once. */
   skyCached(signal?: AbortSignal): Promise<ApiResult<SkyCachedResponse>>;
+  /** `GET /v1/objects/{id}/card` (D-16): the ObjectCard of the 3D view (issue #60). */
+  card(id: string, signal?: AbortSignal): Promise<ApiResult<ObjectCard>>;
+  /** `GET /v1/objects/{id}/render-params` (D-16): what the 3D view may draw (issue #60). */
+  renderParams(id: string, signal?: AbortSignal): Promise<ApiResult<RenderParams>>;
   /** `GET /v1/objects/{id}/overlays` (issue #12). */
   getOverlays(id: string, signal?: AbortSignal): Promise<ApiResult<OverlaysResponse>>;
   /** `GET /v1/objects/{id}/combine.png?op=&a=&b=` (issue #12). The caller owns the object URL. */
@@ -183,6 +190,9 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     skyIndex: (signal) => getJson('/sky/index.json', parseSkyIndex, signal),
     skyCached: (signal) => getJson('/sky/cached', parseSkyCached, signal),
     composite: (id, signal) => getJson(`${objectPath(id)}/composite`, parseComposite, signal),
+    card: (id, signal) => getJson(`${objectPath(id)}/card`, parseObjectCard, signal),
+    renderParams: (id, signal) =>
+      getJson(`${objectPath(id)}/render-params`, parseRenderParams, signal),
     getOverlays: (id, signal) => getJson(`${objectPath(id)}/overlays`, parseOverlays, signal),
     getCombine: (id, op, a, b, signal) => {
       const query = new URLSearchParams({ op, a, b }).toString();

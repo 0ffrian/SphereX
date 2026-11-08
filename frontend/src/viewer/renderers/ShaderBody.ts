@@ -156,6 +156,27 @@ interface Runtime {
 
 // ---- planets -----------------------------------------------------------------------------------
 
+/**
+ * Issue #60 build animation knobs of a generated world, each 0..1. At 1 (the default, and the end
+ * of every build) each knob gives exactly the normal surface: the values are switched with
+ * `select`, never mixed, so no rounding changes the final frame.
+ */
+type FloatUniform = ReturnType<typeof makeFloatUniform>;
+function makeFloatUniform(v: number) {
+  return uniform(v);
+}
+export interface PlanetMouldUniforms {
+  terrain: FloatUniform;
+  sea: FloatUniform;
+  colour: FloatUniform;
+  clouds: FloatUniform;
+}
+
+/** Mock-up TERRA_FS: the land colour before the Colour step (a plain light grey; artistic). */
+const MOULD_GREY: Rgb = [0.66, 0.68, 0.72];
+/** Mock-up `uSea = .03 + (seaL - .03) * P`: the sea starts this low and rises to the real level. */
+const MOULD_SEA_START = 0.03;
+
 function buildPlanet(
   spec: ShaderSpec,
   field: FieldData,
@@ -163,6 +184,7 @@ function buildPlanet(
   textures: DataTexture[],
   motion: Motion,
   sunValue: Vector3,
+  mould: PlanetMouldUniforms,
 ): { group: Group; runtime: Runtime } {
   const fp = spec.field!;
   const style = spec.planet!;
@@ -190,11 +212,31 @@ function buildPlanet(
   const A = bilinear(texA, u, v);
   const B = bilinear(texB, u, v);
   const h = A.x;
-  const ocean = B.x;
-  const ice = B.y;
   const crack = B.z;
-  const seaL = float(Math.max(fp.seaLevel, 0));
-  const heat = float(fp.heat);
+  // Build animation (issue #60): the sea rises from a low level to the real one, then the field's
+  // own ocean mask takes over (knob = 1). A world without a sea keeps the field's mask throughout.
+  const hasSea = fp.seaLevel > 0;
+  const seaFull = mould.sea.greaterThanEqual(1);
+  const seaRising = float(MOULD_SEA_START).add(
+    float(Math.max(fp.seaLevel, 0) - MOULD_SEA_START).mul(mould.sea),
+  );
+  const seaOn = mould.sea.greaterThan(0.01);
+  const ocean: any = hasSea
+    ? seaFull.select(
+        B.x,
+        seaOn.select(
+          float(1).sub(smoothstep(seaRising.sub(0.006), seaRising.add(0.006), h)),
+          float(0),
+        ),
+      )
+    : B.x;
+  const seaL: any = hasSea
+    ? seaFull.select(float(fp.seaLevel), seaOn.select(seaRising, float(0)))
+    : float(0);
+  const colourFull = mould.colour.greaterThanEqual(1);
+  // The mock-up scales ice and heat with its colour knob.
+  const ice: any = colourFull.select(B.y, B.y.mul(mould.colour));
+  const heat: any = colourFull.select(float(fp.heat), float(fp.heat).mul(mould.colour));
 
   // Clouds: density at a direction, carried by the latitude winds and slowly re-forming. Two
   // flow-map copies (motion/phase.ts) so the shear is bounded. A pure function of the uniforms.
@@ -223,15 +265,21 @@ function buildPlanet(
   const cloudThr = float(
     wetWorld ? 0.9 - 0.34 * style.cloudCover : 0.88 - (0.88 - 0.36) * style.cloudCover,
   );
-  const cloudMask = (c: any) => smoothstep(cloudThr, cloudThr.add(wetWorld ? 0.12 : 0.16), c);
+  // Build animation: the cover grows from none (threshold above every density) to the real one.
+  const cloudsFull = mould.clouds.greaterThanEqual(1);
+  const thr: any = cloudsFull.select(cloudThr, mix(float(1.05), cloudThr, mould.clouds));
+  const cloudMask = (c: any) => smoothstep(thr, thr.add(wetWorld ? 0.12 : 0.16), c);
 
   const hh = clamp(h.sub(seaL).div(float(1).sub(seaL)), 0, 1);
-  const depth = fp.seaLevel > 0 ? clamp(seaL.sub(h).div(seaL).mul(3), 0, 1) : float(0);
+  const depth = hasSea
+    ? seaL.greaterThan(0).select(clamp(seaL.sub(h).div(max(seaL, 1e-6)).mul(3), 0, 1), float(0))
+    : float(0);
   const lowC = mix(rgb3(LAND_LOW), rgb3(LAND_LOW_GREEN), style.hue);
   const highC = mix(rgb3(LAND_HIGH), rgb3(LAND_HIGH_GREY), style.hue);
   // Sub-resolution colour variation (visual only).
   const vr = vnoise3(dir.mul(fp.freq * 3 * 4).add(5));
-  const landC = mix(lowC, highC, clamp(hh.mul(1.5).add(vr.sub(0.5).mul(0.6)), 0, 1));
+  const landReal = mix(lowC, highC, clamp(hh.mul(1.5).add(vr.sub(0.5).mul(0.6)), 0, 1));
+  const landC = colourFull.select(landReal, mix(rgb3(MOULD_GREY), landReal, mould.colour));
   const oceanC = mix(rgb3(OCEAN_SHALLOW), rgb3(OCEAN_DEEP), depth);
   let col: any = mix(landC, oceanC, ocean);
   col = mix(col, rgb3(ICE_COLOUR), ice);
@@ -260,7 +308,10 @@ function buildPlanet(
   const r2 = cross(n0, sx);
   const det = dot(sx, r1);
   const grad = sign(det).mul(r1.mul(dx).add(r2.mul(dy)));
-  let pv: any = grad.mul(style.relief).div(max(abs(det), 1e-6));
+  let pv: any = grad
+    .mul(style.relief)
+    .mul(mould.terrain)
+    .div(max(abs(det), 1e-6));
   pv = pv.mul(min(float(1), float(0.85).div(max(length(pv), 1e-5))));
   const bumped = normalize(n0.sub(pv));
 
@@ -294,7 +345,12 @@ function buildPlanet(
   if (style.cloudCover > 0.001) {
     const cm = new MeshStandardNodeMaterial();
     cm.colorNode = vec3(0.97, 0.97, 0.97);
-    cm.opacityNode = cloudMask(cloudAt(dir)).mul(wetWorld ? 0.85 : 0.92);
+    cm.opacityNode = cloudsFull.select(
+      cloudMask(cloudAt(dir)).mul(wetWorld ? 0.85 : 0.92),
+      cloudMask(cloudAt(dir))
+        .mul(wetWorld ? 0.85 : 0.92)
+        .mul(mould.clouds),
+    );
     cm.transparent = true;
     cm.depthWrite = false;
     cm.roughness = 1;
@@ -320,7 +376,11 @@ function buildPlanet(
     const phase = float(0.75).mul(float(1).add(cosG.mul(cosG)));
     const sunlit = smoothstep(-0.05, 0.45, dot(normalWorld, sunWorld));
     am.colorNode = rgb3(style.atmosphereColour);
-    am.opacityNode = clamp(dens.mul(phase).mul(sunlit).mul(style.atmosphere), 0, 1);
+    am.opacityNode = clamp(
+      dens.mul(phase).mul(sunlit).mul(style.atmosphere).mul(mould.clouds),
+      0,
+      1,
+    );
     am.transparent = true;
     am.depthWrite = false;
     am.blending = AdditiveBlending;
@@ -492,6 +552,13 @@ export class ShaderBody implements BodyRenderer {
   private motion: Motion;
   private readonly octaves: number;
   private readonly sun = uniform(new Vector3(...HEAD_ON));
+  /** Issue #60 build knobs (1 = the normal surface); shared by every rebuild of this body. */
+  private readonly mould: PlanetMouldUniforms = {
+    terrain: makeFloatUniform(1),
+    sea: makeFloatUniform(1),
+    colour: makeFloatUniform(1),
+    clouds: makeFloatUniform(1),
+  };
   private readonly fieldSource: NonNullable<BodyContext['fieldSource']>;
   private readonly onChange: (() => void) | undefined;
   private readonly onFailed: ((layerId: string) => void) | undefined;
@@ -605,6 +672,19 @@ export class ShaderBody implements BodyRenderer {
     frame.updateWorldMatrix(true, false);
     frame.worldToLocal(v);
     return [v.x, v.y, v.z];
+  }
+
+  /**
+   * Issue #60: build-animation knobs of a generated world (0..1 each; omitted = 1). Uniform writes
+   * only: nothing is rebuilt. All 1 is the normal surface.
+   */
+  setMould(k: Partial<Record<keyof PlanetMouldUniforms, number>> | null): void {
+    if (this.disposed) return;
+    for (const key of Object.keys(this.mould) as (keyof PlanetMouldUniforms)[]) {
+      const v = k?.[key];
+      this.mould[key].value = v === undefined ? 1 : Math.max(0, Math.min(1, v));
+    }
+    this.onChange?.();
   }
 
   setSunDirection(dir: Vec3): void {
@@ -779,6 +859,7 @@ export class ShaderBody implements BodyRenderer {
       textures,
       this.motion,
       this.sun.value,
+      this.mould,
     );
     return { group, frame: runtime.frame, textures, field, points: null, runtime, sampler };
   }

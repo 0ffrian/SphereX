@@ -217,11 +217,11 @@ test('clicking the centre on a known target opens its flipbook; a newer click wi
   await expect(page.getByTestId('frame-counter')).toHaveText('Frame 2 of 24');
 });
 
-test('target markers come from /v1/resolve and open the object', async ({ page }) => {
+test('target markers come from /v1/resolve and select the object', async ({ page }) => {
   await page.goto('/');
   await skyReady(page);
   await setView(page, { ra: 76.95653, dec: 30.40144, fovDeg: 30 });
-  const marker = page.getByRole('button', { name: 'RW Aurigae on the sky: open it' });
+  const marker = page.getByRole('button', { name: 'RW Aurigae on the sky: select it' });
   await expect(marker).toBeVisible({ timeout: 15_000 });
   // The marker sits on the target: at the view centre.
   const b = await canvasBox(page);
@@ -229,9 +229,14 @@ test('target markers come from /v1/resolve and open the object', async ({ page }
   expect(Math.abs(m!.x + 22 - (b.x + b.width / 2))).toBeLessThan(2);
   expect(Math.abs(m!.y + 22 - (b.y + b.height / 2))).toBeLessThan(2);
   await marker.click();
-  await expect(page.getByTestId('object-name')).toHaveText('RW Aurigae');
+  // Issue #60: a marker selects the object (brackets and the card) instead of opening the flipbook.
+  await expect(page.getByTestId('selected-name')).toHaveText('RW Aurigae');
   await expect(page.getByTestId('search-input')).toHaveValue('RW Aurigae');
   await expect(page.getByTestId('sky-selected')).toBeAttached();
+  await expect(page.getByTestId('object-panel')).toHaveCount(0);
+  // The fingerprint opens the object panel.
+  await page.getByRole('button', { name: 'See fingerprint' }).click();
+  await expect(page.getByTestId('object-name')).toHaveText('RW Aurigae');
 });
 
 test('keyboard: arrows pan, +/− zoom, Enter picks the centre; "/" focuses the search', async ({
