@@ -1,6 +1,6 @@
 # 04 Packages
 
-The repo and code layout as packages, with their dependencies and owners. Drawn from `CLAUDE.md` (layout), rendering doc §10 (file layout and owners) and decisions D-01, D-11, D-12, D-13, D-15, D-17, D-18 and D-35 (sky-view prototype: Q-87 to Q-91; colour composite, colour views, progressive frames and cached markers: Q-92, Q-93, Q-95, Q-97 and Q-98). Arrows mean "depends on" or "uses".
+The repo and code layout as packages, with their dependencies and owners. Drawn from `CLAUDE.md` (layout), rendering doc §10 (file layout and owners) and decisions D-01, D-11, D-12, D-13, D-15, D-17, D-18 and D-35 (sky-view prototype: Q-87 to Q-91; colour composite, colour views, progressive frames and cached markers: Q-92, Q-93, Q-95, Q-97 and Q-98; object jobs and worker pools: Q-111, Q-112). Arrows mean "depends on" or "uses".
 
 ```mermaid
 flowchart TB
@@ -13,9 +13,10 @@ flowchart TB
     Mockup["mockup/ : spherex-ui.html (three r128, not the app)"]
 
     subgraph Backend["backend/ (FastAPI, Python 3.12) : Kevin, Moon, Atish"]
-      BApi["app/api (Kevin) : D-16 endpoints, objects.py : /card, /render-params, texture URLs, sky.py : /v1/sky (prototype, Q-87, /v1/sky/cached, Q-98), composite.py : /composite, /composite.png (prototype, Q-92), overlays.py : /overlays, /flags, /combine.png (Q-50)"]
-      BPipe["app/core/find (stage 1, overlays, flagmask, combine, A4.9), app/adapters (gaia, wise = CatWISE2020, tap), app/cache, app/core/card (stages 4, 5) : Kevin, app/core/measure (stage 2) and physics : Moon, app/core/classify (stage 3) : Atish"]
-      BRender["app/core/render (Atish) : card_to_params, blackbody, params, noise, craters, height, normals, palette, bake, __main__, spherex_rgb, gemini_paint"]
+      BApi["app/api (Kevin) : D-16 endpoints, objects.py : /card, /render-params, texture URLs, /job, /job/events (Q-111), sky.py : /v1/sky (prototype, Q-87, /v1/sky/cached, Q-98), composite.py : /composite, /composite.png (prototype, Q-92), overlays.py : /overlays, /flags, /combine.png (Q-50)"]
+      BPipe["app/core/find (stage 1, overlays, flagmask, combine, A4.9), app/adapters (gaia, wise = CatWISE2020, tap), app/cache, app/core/card (stages 4, 5) : Kevin, app/core/measure (stage 2, pool.py MeasurePool, Q-112) and physics : Moon, app/core/classify (stage 3) : Atish"]
+      BRender["app/core/render (Atish) : card_to_params, blackbody, params, noise, craters, height, normals, palette, bake, __main__, spherex_rgb, gemini_paint, background (TextureBaker, Q-112)"]
+      BJobs["app/core/jobs.py (Job, JobRegistry), app/core/warm.py (WarmCache) : issue #41, owner proposed: Kevin (Q-111)"]
       BContract["app/contract : generated from shared/schemas (D-18) : follows the schemas owner"]
       BSky["app/core/sky : surveys, healpix, bake (HiPS to equirect), scripts/sky_mirror, sky_bake : prototype, no D-17 owner yet (Q-87, D-35)"]
       BComp["app/core/composite : config, select, grid, service (SPHEREx false colour) : prototype, no D-17 owner yet (Q-92, Q-94)"]
@@ -55,6 +56,9 @@ flowchart TB
   DocUML -.->|"illustrates"| DocSpecs
   BApi --> BPipe
   BApi --> BRender
+  BApi -->|"/job, /job/events, startup and shutdown"| BJobs
+  BPipe -->|"ObjectPipeline runs one Job per object"| BJobs
+  BJobs -->|"warm.py: resolve, ensure_job"| BPipe
   BPipe --> BRender
   BRender -->|"validates"| Schemas
   BApi -->|"Pydantic models"| BContract
@@ -130,6 +134,7 @@ flowchart TB
 | `frontend/fixtures`, `frontend/scripts`, `src/test`, `src/fixtures.test.ts`, `frontend/e2e` | Not named in D-17; dev and test tooling for the flipbook UI |
 | `frontend/src/viewer/fields` | Atish |
 | `frontend/src/haptics` (engine, `drivers`, `sources`, `ui`), `src/hapticsTestPage`, `haptics-test.html` | Atish (D-13, D-17) |
+| `backend/app/core/jobs.py`, `backend/app/core/warm.py` | Not named in D-17; Kevin proposed (Q-111 (7)), issue #41. `measure/pool.py` sits in Moon's `core/measure`, `render/background.py` in Atish's `core/render` |
 | `src/contract`, `backend/app/contract` | Generated (D-18); follows the owner of `shared/schemas` |
 
 - `viewer/fields`, `ShaderBody`, `sources/terrain` and `sources/flow` follow from D-01 and D-12. They are listed in rendering doc §10, but the `ShaderBody` and `fields/fieldWorker` file names stay **[verify]**.
@@ -141,5 +146,6 @@ flowchart TB
 - The physics layer and slider registry (issue #13) added `src/physics` (rendering doc §10, architecture spec §7). There is one slider registry, `src/viewer/sliders.ts` (drawn in the `VRend` box): `src/state/store.ts`, the shader kinds and `src/physics` all take `SliderKey` and `Overrides` from it (D-27). `shaderPalette` takes the lava threshold `LAVA_START_K` from `src/physics/constants.ts`, so the two agree. The backend half of stage 6 is not built (Q-60).
 - The overlays (M4, issue #12) added `backend/app/api/overlays.py`, `backend/app/core/find/overlays.py`, `flagmask.py` and `combine.py`, the `gaia`, `wise` and `tap` adapters, `src/app/flipbook/overlays/` and the `overlays` and `combine` parts of the `sky` slice (A4.9). D-17 gives the Gaia and WISE adapters to Kevin and the overlay UI to Moon.
 - The viewer render core (issue #39) added `viewer/render/` (the frame pipeline, quality levels, the sim clock, a worker pool and the fan-out loader) and `viewer/shaders/` (shared TSL helpers). `quality.ts` takes its octave counts from `shaders/noise.ts`; `fanout.ts` uses the asset cache from `renderers/build.ts` and the mesh-URL rule from `renderers/AsteroidMesh.ts`. `src/shaderlab` with `shaderlab.html` is a dev-only harness: Vite builds `index.html` only, so it never reaches `dist/`.
+- The pipeline fan-out (issue #41) added `backend/app/core/jobs.py` (one background job per object, its answers and progress), `core/warm.py` (the opt-in warm cache at start-up), `core/measure/pool.py` (photometry in `spawn` worker processes) and `core/render/background.py` (texture bakes in a worker process, served at `/data/textures`), plus the `/job` and `/job/events` routes in `api/objects.py` (Q-111, Q-112).
 - D-13: Atish owns the creative direction of haptics (what each body feels like, patterns, sound pairing). Engineering choices (drivers, timing, rate limits) stay with the implementer.
 - The shader generators move from the mock-up into ES modules; the mock-up is not ported in place (D-03).

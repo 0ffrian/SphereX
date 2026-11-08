@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends, Path
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from app.api.deps import get_ctx, get_frame_service, get_pipeline
-from app.api.models import ErrorResponse, Frame, FramesResponse, Provenance, Stretch
+from app.api.models import ErrorResponse, Frame, FramesResponse, JobStatus, Provenance, Stretch
 from app.context import Context
 from app.contract.object_card_schema import ObjectCard
 from app.contract.render_params_schema import RenderParams
@@ -233,7 +233,7 @@ def _idle(object_id: str) -> dict[str, Any]:
     return {"id": object_id, "state": "idle"}
 
 
-@router.get("/{object_id}/job", responses=ERRORS)
+@router.get("/{object_id}/job", responses={200: {"model": JobStatus}, **ERRORS})
 def get_job(
     object_id: ObjectId,
     ctx: Annotated[Context, Depends(get_ctx)],
