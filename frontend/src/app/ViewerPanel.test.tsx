@@ -38,7 +38,7 @@ vi.mock('@/viewer/ViewerApp', async (importOriginal) => {
 });
 
 // Imported after the mock is registered (vi.mock is hoisted).
-import { ageFromLog, ViewerPanel } from './ViewerPanel';
+import { ageFromLog, IR_JETS_HINT, ViewerPanel } from './ViewerPanel';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -125,7 +125,7 @@ describe('ViewerPanel', () => {
     expect(canvasLabel()).toContain('SPHEREx infrared');
     expect(region()?.getAttribute('role')).toBe('status');
     expect(region()?.getAttribute('aria-live')).toBe('polite');
-    expect(text('ir-jets-hint')).toBe('Switch to the visible colour view to see the jets move.');
+    expect(text('ir-jets-hint')).toBe(IR_JETS_HINT);
     expect(text('ir-jets-hint')).not.toMatch(/\b[RAQD]-?\d/);
     // Visible view draws the jets: the region stays, the text goes.
     await click('Visible colour');
@@ -134,7 +134,7 @@ describe('ViewerPanel', () => {
     // Back to infrared: the hint returns. At the default level the visible view would not draw
     // the jets either (the layer is hidden), so there is nothing to switch for.
     await click('SPHEREx infrared');
-    expect(text('ir-jets-hint')).toBe('Switch to the visible colour view to see the jets move.');
+    expect(text('ir-jets-hint')).toBe(IR_JETS_HINT);
     await click('+ Estimated');
     expect(text('ir-jets-hint')).toBe('');
     // Another type in the infrared view: no hint.
