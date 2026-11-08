@@ -20,8 +20,8 @@ import type {
 import { encodePngGray, encodePngRgba } from './png';
 import {
   backgroundStars,
-  CUTOUT_SIZE,
   cutoutPixels,
+  cutoutSize,
   FIXTURE_DATA_RELEASE,
   FIXTURE_FLUX_UNIT,
   FIXTURE_NEIGHBOURS,
@@ -68,12 +68,11 @@ function skyOf(t: FixtureTarget, dx: number, dy: number): SkyPoint {
 
 /** Inverse of starPixel: the north-up offset of a pixel in frame `g`. */
 function offsetOf(g: Geometry, px: number, py: number): { dx: number; dy: number } {
-  const c = (CUTOUT_SIZE - 1) / 2;
   const angle = ((g.northAngle ?? 0) * Math.PI) / 180;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
-  const ox = px - c;
-  const oy = py - c;
+  const ox = px - g.cx;
+  const oy = py - g.cy;
   return { dx: ox * cos + oy * sin, dy: -ox * sin + oy * cos };
 }
 
@@ -174,8 +173,8 @@ export function makeOverlays(t: FixtureTarget): OverlaysResponse {
     const contamination: Contamination[] = [];
     for (const s of sources) {
       const p = starPixel(g, s.star);
-      const inside =
-        p.x >= -0.5 && p.x < CUTOUT_SIZE - 0.5 && p.y >= -0.5 && p.y < CUTOUT_SIZE - 0.5;
+      // On this frame's own pixels (cutouts differ in size and some are clipped, synthetic.ts).
+      const inside = p.x >= -0.5 && p.x < g.w - 0.5 && p.y >= -0.5 && p.y < g.h - 0.5;
       const sep = Math.hypot(p.x - f.x, p.y - f.y);
       const zone =
         sep <= ap.radius_px
@@ -203,9 +202,9 @@ export function makeOverlays(t: FixtureTarget): OverlaysResponse {
     }
     const box = [
       [-0.5, -0.5],
-      [CUTOUT_SIZE - 0.5, -0.5],
-      [CUTOUT_SIZE - 0.5, CUTOUT_SIZE - 0.5],
-      [-0.5, CUTOUT_SIZE - 0.5],
+      [g.w - 0.5, -0.5],
+      [g.w - 0.5, g.h - 0.5],
+      [-0.5, g.h - 0.5],
     ].map(([px, py]) => {
       const o = offsetOf(g, px!, py!);
       return skyOf(t, o.dx, o.dy);
@@ -254,21 +253,21 @@ export function makeOverlays(t: FixtureTarget): OverlaysResponse {
   };
 }
 
-/** Synthetic RGBA flag mask of frame `i`, same size as the cutout. */
+/** Synthetic RGBA flag mask of frame `i`, same size as the cutout (w × h, cutoutSize). */
 export function renderFlags(t: FixtureTarget, i: number): Uint8Array {
-  const size = CUTOUT_SIZE;
+  const { w, h } = cutoutSize(t, i);
   const grey = cutoutPixels(t, i);
-  const rgba = new Uint8Array(size * size * 4);
+  const rgba = new Uint8Array(w * h * 4);
   const colour = (name: FlagGroup['group']) => FIXTURE_FLAG_GROUPS.find((g) => g.group === name)!;
   // Synthetic rules: very bright pixels "saturated", bright ones "source"; a few fixed "bad"
   // pixels; a short "artefact" streak in every fifth frame.
   const bad = mulberry32(t.seed + 4);
   const badPixels = new Set(
-    Array.from({ length: 4 }, () => Math.floor(bad() * size) * size + Math.floor(bad() * size)),
+    Array.from({ length: 4 }, () => Math.floor(bad() * h) * w + Math.floor(bad() * w)),
   );
-  for (let k = 0; k < size * size; k++) {
-    const x = k % size;
-    const y = Math.floor(k / size);
+  for (let k = 0; k < w * h; k++) {
+    const x = k % w;
+    const y = Math.floor(k / w);
     const v = grey[k]!;
     let group: FlagGroup['group'] | null = null;
     if (v > 200) group = 'saturation';
@@ -277,7 +276,7 @@ export function renderFlags(t: FixtureTarget, i: number): Uint8Array {
     else if (v > 90) group = 'source';
     if (group) rgba.set(colour(group).rgba, k * 4);
   }
-  return encodePngRgba(size, size, rgba);
+  return encodePngRgba(w, h, rgba);
 }
 
 export function combineInfo(t: FixtureTarget, op: CombineOp, a: number, b: number): CombineInfo {
@@ -307,5 +306,6 @@ export function renderCombine(t: FixtureTarget, op: CombineOp, a: number, b: num
     const v = op === 'add' ? (pa[k]! + pb[k]!) / 2 : (pa[k]! - pb[k]!) / 2 + 128;
     out[k] = Math.max(0, Math.min(255, Math.round(v)));
   }
-  return encodePngGray(CUTOUT_SIZE, CUTOUT_SIZE, out);
+  const { w, h } = cutoutSize(t, a);
+  return encodePngGray(w, h, out);
 }

@@ -10,14 +10,21 @@ export function sxFixtures(): Plugin {
     apply: 'serve',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        const reply = req.url ? handleFixtureRequest(req.method ?? 'GET', req.url) : null;
+        const reply = req.url
+          ? handleFixtureRequest(req.method ?? 'GET', req.url, { cookie: req.headers.cookie })
+          : null;
         if (!reply) {
           next();
           return;
         }
-        res.statusCode = reply.status;
-        for (const [k, v] of Object.entries(reply.headers)) res.setHeader(k, v);
-        res.end(req.method === 'HEAD' ? undefined : reply.body);
+        const send = () => {
+          res.statusCode = reply.status;
+          for (const [k, v] of Object.entries(reply.headers)) res.setHeader(k, v);
+          res.end(req.method === 'HEAD' ? undefined : reply.body);
+        };
+        // A progressive part waits, so the load can be watched (handler.ts PROGRESSIVE_DELAY_MS).
+        if (reply.delayMs) setTimeout(send, reply.delayMs);
+        else send();
       });
       server.config.logger.info('  [sx-fixtures] /v1 is served from SYNTHETIC fixtures', {
         timestamp: true,

@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from app.api import objects, overlays, resolve, spectrum
+from app.api import composite, objects, overlays, resolve, sky, spectrum
 from app.context import make_context
 from app.core.card.assets import AssetStore
 from app.core.card.catalogue import SHAPE_URL_ROOT, load_shape_registry, mesh_file
@@ -86,7 +86,9 @@ def create_app(
     app.include_router(resolve.router)
     app.include_router(objects.router)
     app.include_router(spectrum.router)
+    app.include_router(composite.router)
     app.include_router(overlays.router)
+    app.include_router(sky.router)
 
     shapes_dir = s.shapes_dir
 

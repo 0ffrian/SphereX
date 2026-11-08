@@ -21,6 +21,7 @@ import {
   GOLDEN_MIN_SSIM,
   SPACE_BACKGROUND_RGB,
 } from './golden';
+import { openViewer, viewerCanvas } from './viewer';
 import { scoreFrames, type Rgb } from './ssim';
 
 const EXCLUDED = new Set(['candidate']);
@@ -75,12 +76,12 @@ for (const kind of kinds) {
     });
     page.on('pageerror', (e) => errors.push(e.message));
 
-    await page.goto('/');
+    await openViewer(page);
     const status = page.getByTestId('renderer-status');
     await expect(status).not.toHaveAttribute('data-status', 'starting', { timeout: 30_000 });
     test.skip((await status.getAttribute('data-status')) === 'unavailable', 'no 3D backend');
     await page.waitForFunction(() => '__sxViewer' in globalThis && '__sxShow' in globalThis);
-    const canvas = page.locator('canvas[aria-label]');
+    const canvas = viewerCanvas(page);
     const decoder = await context.newPage();
     mkdirSync(GOLDEN_DIR, { recursive: true });
 
