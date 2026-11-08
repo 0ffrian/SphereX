@@ -12,6 +12,11 @@ const PATHS = {
   next: 'M5 5v14l11-7zM19 5v14',
   play: 'M6 3 20 12 6 21Z',
   pause: 'M6 4h4v16H6zM14 4h4v16h-4z',
+  // Issue #60 build pane tools (mock-up `#bpFeel`, `#bpReplay`, `#bpSeed`).
+  fingerprint:
+    'M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4 M14 13.12c0 2.38 0 6.38-1 8.88 M17.29 21.02c.12-.6.43-2.3.5-3.02 M2 12a10 10 0 0 1 18-6 M2 16h.01 M21.8 16c.2-2 .131-5.354 0-6 M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2 M8.65 22c.21-.66.45-1.32.57-2 M9 6.8a6 6 0 0 1 9 5.2v2',
+  replay: 'M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5',
+  shuffle: 'M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5',
 } as const;
 
 export type IconName = keyof typeof PATHS;

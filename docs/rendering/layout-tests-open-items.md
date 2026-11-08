@@ -52,6 +52,8 @@ frontend/src/viewer/                 (Moon)
   render/             # render core (issue #39): pipeline.ts (RenderChain: HDR pass, bloom, highlight clip, TAAU or SMAA),
                       # quality.ts (quality levels low/medium/high, FrameGovernor), clock.ts (SimClock, pause reasons),
                       # workerPool.ts (WorkerPool), fanout.ts (card and render-params fan-out loader, asset prefetch)
+  mould/              # build animation (issue #60, Q-113): mouldSteps.ts (pure: steps per type from the mock-up PLAN,
+                      # step -> plan layers, progress, pose), MouldRig.ts (applies and exactly undoes a pose on a built scene)
   shaders/            # TSL helpers on three r187 (issue #39): noise.ts (seeded fbm, ridged, domainWarp, animatedCells,
                       # OCTAVES per quality level), sphere.ts (latLon, tangentFrame, differential rotation); index.ts re-exports
   sky/                # sky view prototype (7 Nov 2026, not yet confirmed, Q-89, Q-90): SkyView.ts (inside-out sky
@@ -106,6 +108,9 @@ frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, St
                       # overlays/: markers, flag mask, field of view, overlay panel, combine panel (A4.9, issue #12)
   spectrum/           # SpectrumPanel, SVG SpectrumChart, scale (displays the A4.2 output)
   shell/              # prototype shell in the mock-up's layout: ToolRail, Transport, PanelCard + Panels, Readout, shortcuts
+  build/              # issue #60 (Q-113): SelectedCard (top-centre card: See fingerprint, Build it), BuildPane (split
+                      # view: title, Feel/Replay/New seed/Close, the one 3D view), MouldStrip (numbered steps),
+                      # useMould (load first, then mould: stage plans and poses), selectedBody (selection, /card + /render-params)
   sky/                # prototype sky pane: SkyPane (image, markers, click to pick → search), useTargetMarkers, readout feed,
                       # cachedMarkers.ts + useCachedMarkers.ts ("loads instantly" markers from /v1/sky/cached)
 frontend/src/test/                           # test-only helpers (fixtureFetch.ts, sharedFixtures.ts: loads shared/fixtures;

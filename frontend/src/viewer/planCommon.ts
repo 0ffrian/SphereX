@@ -5,9 +5,12 @@
 import type { CometEpoch, Layer, ObjectCard, RenderParams, Tag } from '@/contract';
 import { isTagShown } from './honesty';
 import { planLighting } from './lighting';
-import { chooseMode, resolveModes, resolveTint } from './modes';
+import { chooseMode, NEUTRAL_TINT, resolveModes, resolveTint } from './modes';
 import type { LegendEntry, MissingItem, PlanContext, RenderPlan, Rgb, Vec3 } from './planTypes';
 import { STILL_MOTION, TIER_OF_TAG } from './motion/motion';
+
+/** Pseudo layer id a moulding stage holds to show the body in plain grey (issue #60). */
+export const HOLD_TINT = 'tint';
 
 /** Half the length of the proper-motion line of a star, in scene units. A display value (artistic). */
 export const TRAIL_HALF_LENGTH = 2.5;
@@ -74,7 +77,10 @@ export class PlanBuilder {
     this.modeInfo = resolveModes(params);
     this.missing.push(...this.modeInfo.missing);
     this.mode = chooseMode(ctx.mode, params.type, this.modeInfo.modes, ctx.honesty);
-    this.tint = resolveTint(params, this.mode, ctx.honesty);
+    // Issue #60 moulding: a held `tint` shows the plain grey stand-in until the Colour step.
+    this.tint = ctx.hold?.includes(HOLD_TINT)
+      ? { rgb: NEUTRAL_TINT, tag: null, source: null }
+      : resolveTint(params, this.mode, ctx.honesty);
     this.lighting = planLighting(params, card);
     if (params.lighting.mode === 'sun' && this.lighting.source !== 'phase_angle') {
       // The body is lit anyway, from a display default, so the panel lists this as a default.
@@ -104,6 +110,14 @@ export class PlanBuilder {
     return this.layers.has(id);
   }
 
+  /**
+   * Issue #60: a layer held back by the build animation (`ctx.hold`). It is not drawn and not
+   * listed anywhere: the stage plan is a presentation step, the panel shows the full plan.
+   */
+  held(id: string): boolean {
+    return this.ctx.hold?.includes(id) === true;
+  }
+
   isDrawn(id: string): boolean {
     return this.evaluated.get(id) === true;
   }
@@ -124,6 +138,10 @@ export class PlanBuilder {
     if (cached !== undefined) return cached;
     const layer = this.layers.get(id);
     if (!layer) return false;
+    if (this.held(id)) {
+      this.evaluated.set(id, false);
+      return false;
+    }
     let ok = false;
     const fields = missingFields(this.card, layer.requires);
     if (this.params.missing.includes(id)) {
@@ -159,6 +177,10 @@ export class PlanBuilder {
   drawLocal(id: string, tag: Tag, description: string): boolean {
     const cached = this.evaluated.get(id);
     if (cached !== undefined) return cached;
+    if (this.held(id)) {
+      this.evaluated.set(id, false);
+      return false;
+    }
     let ok = false;
     if (this.ctx.failed.includes(id)) this.refuse({ id, reason: 'load' });
     else if (!isTagShown(this.ctx.honesty, tag)) this.refuse({ id, reason: 'honesty', tag });
@@ -175,6 +197,7 @@ export class PlanBuilder {
     const layer = this.layers.get(id);
     return (
       layer !== undefined &&
+      !this.held(id) &&
       !this.params.missing.includes(id) &&
       !this.ctx.failed.includes(id) &&
       missingFields(this.card, layer.requires).length === 0 &&

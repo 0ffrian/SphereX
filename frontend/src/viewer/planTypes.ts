@@ -328,4 +328,10 @@ export interface PlanContext {
   scrubIndex: number;
   /** Layer ids whose mesh or texture failed to load: refused with reason 'load'. */
   failed: readonly string[];
+  /**
+   * Issue #60 (build animation): layer ids held back for one moulding stage. A held layer is not
+   * drawn and not listed in `missing`; `tint` holds the colour (plain grey). Absent in every normal
+   * plan, so the last stage (nothing held) is exactly the normal plan.
+   */
+  hold?: readonly string[];
 }

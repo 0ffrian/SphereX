@@ -48,6 +48,7 @@ import {
   cachedMarkerQuery,
   cachedMarkersToShow,
 } from './cachedMarkers';
+import { useShellStore } from '@/app/shell/shellStore';
 import { useCachedMarkers } from './useCachedMarkers';
 import { useTargetMarkers, type TargetMarker } from './useTargetMarkers';
 
@@ -96,6 +97,9 @@ function deviceCaps(maxTextureSize: number) {
   const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
   return { maxTextureSize, coarsePointer: coarse, saveData: conn?.saveData === true };
 }
+
+/** Size of the square round a marker where a right-click or long press counts as on it (touch target). */
+const MARKER_HIT_PX = 44;
 
 export function SkyPane({ children }: { children?: ReactNode }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -356,7 +360,48 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     const q = pickQuery(p.ra, p.dec);
     const [ra, dec] = q.split(',').map(Number) as [number, number];
     setPicked({ ra, dec });
+    useShellStore.getState().cancelCard();
     void search({ q, kind: 'coords', origin: 'sky' });
+  };
+
+  /**
+   * Right-click, the ContextMenu key, Shift+F10 or a long press on a marker or on the green or amber
+   * brackets: select it if it is not selected yet and show its card (mock-up: right-click brings
+   * the card back). The browser's own menu is suppressed only where this acts. The brackets are
+   * not hit targets themselves (a tap or a drag on them must still pick and pan), so a press on the
+   * sky is tested against a 44 px square round each marker (the touch target size).
+   */
+  const onContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    // Panels, the card and the on-screen controls keep the browser's menu.
+    if (target.closest('.sx-island-wrap, .sx-panel, .sx-sky-ctrls, .sx-sky-credit, input')) return;
+    let key = target.closest<HTMLElement>('[data-marker-key]')?.dataset.markerKey ?? null;
+    if (key === null) {
+      let best = Infinity;
+      for (const m of markers.values()) {
+        if (!m.el || m.el.style.visibility === 'hidden') continue;
+        const r = m.el.getBoundingClientRect();
+        const dx = Math.abs(e.clientX - r.left);
+        const dy = Math.abs(e.clientY - r.top);
+        if (dx > MARKER_HIT_PX / 2 || dy > MARKER_HIT_PX / 2) continue;
+        const d = Math.hypot(dx, dy);
+        if (d < best) {
+          best = d;
+          key = m.key;
+        }
+      }
+    }
+    if (key === null) return;
+    e.preventDefault();
+    const shell = useShellStore.getState();
+    if (key.startsWith('t:')) {
+      const m = targets.markers.find((x) => `t:${x.name}` === key);
+      if (m && resolved?.id !== m.id) pickTarget(m);
+    } else if (key.startsWith('c:')) {
+      const c = cached.find((x) => `c:${x.id}` === key);
+      if (c && resolved?.id !== c.id) pickCached(c);
+    }
+    shell.requestCard();
   };
 
   const pickTarget = (m: TargetMarker) => {
@@ -603,6 +648,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       className="sx-sky-pane relative h-full w-full overflow-hidden"
       data-testid="sky-pane"
       data-sky-state={state.kind}
+      onContextMenu={onContextMenu}
     >
       {/* The canvas is prepended here by the effect above. */}
       <div
@@ -635,14 +681,16 @@ export function SkyPane({ children }: { children?: ReactNode }) {
           <li
             key={`t:${m.name}`}
             ref={registerMarker(`t:${m.name}`, m.ra, m.dec)}
+            data-marker-key={`t:${m.name}`}
             className="absolute top-0 left-0 will-change-transform"
           >
             <button
               type="button"
-              className="sx-marker pointer-events-auto"
+              className={`sx-marker pointer-events-auto ${resolved?.id === m.id ? 'is-selected' : ''}`}
               onClick={() => pickTarget(m)}
-              aria-label={`${m.name} on the sky: open it`}
+              aria-label={`${m.name} on the sky: select it`}
               data-testid="sky-marker"
+              data-target-id={m.id}
             >
               <span className="sx-marker-ring" aria-hidden="true" />
               <span className="sx-marker-label">{m.name}</span>
@@ -653,11 +701,12 @@ export function SkyPane({ children }: { children?: ReactNode }) {
           <li
             key={`c:${c.id}`}
             ref={registerMarker(`c:${c.id}`, c.ra, c.dec)}
+            data-marker-key={`c:${c.id}`}
             className="absolute top-0 left-0 will-change-transform"
           >
             <button
               type="button"
-              className="sx-marker sx-marker-cached pointer-events-auto"
+              className={`sx-marker sx-marker-cached pointer-events-auto ${resolved?.id === c.id ? 'is-selected' : ''}`}
               onClick={() => pickCached(c)}
               aria-label={cachedMarkerDescription(c)}
               title={`${cachedMarkerLabel(c)}: cached, loads instantly`}
@@ -678,12 +727,16 @@ export function SkyPane({ children }: { children?: ReactNode }) {
             className="absolute top-0 left-0 will-change-transform"
             data-testid="sky-selected"
           >
+            {/* Issue #60 (mock-up `showInfo`): green corner brackets round the object, its name beside. */}
             <span
               className="sx-marker sx-marker-selected"
               role="img"
               aria-label={`Selected: ${resolvedLabel}`}
             >
               <span className="sx-marker-ring" aria-hidden="true" />
+              <span className="sx-marker-label" aria-hidden="true" data-testid="sky-selected-name">
+                {resolvedLabel}
+              </span>
             </span>
           </li>
         )}

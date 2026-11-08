@@ -1,12 +1,16 @@
 // App shell in the mock-up's layout (mockup/spherex-ui.html): a full-viewport dark bezel with the
 // brand, fixture banner and RA/Dec readout on top, the tool rail on the left, the sky view as the
 // main pane, the transport bar bottom left and the search pill bottom right. The active tool opens
-// a floating panel (object info, flipbook, spectrum; or the 3D viewer) over the sky.
+// a floating panel (object info, flipbook, spectrum) over the sky.
+//
+// Issue #60: a marker click selects the object (brackets on the sky and the top-centre card with
+// See fingerprint / Build it). Build it splits the view: the sky moves to the left half and the
+// build pane on the right moulds the body. The rail's 3D viewer opens the same pane, built.
 //
 // DOM (and Tab) order: header, search, tools, sky (canvas, then the open panel, markers and sky
 // controls), transport. The live announcer stays global.
-import { useEffect } from 'react';
-import { useAppStore } from '@/state/store';
+import { useEffect, useState } from 'react';
+import { useAppStore, type SkyQuery } from '@/state/store';
 import { FlipbookSessionProvider } from './flipbook/session';
 import { FixtureBanner } from './FixtureBanner';
 import { LiveAnnouncer } from './LiveAnnouncer';
@@ -19,18 +23,35 @@ import { ToolRail } from './shell/ToolRail';
 import { Transport } from './shell/Transport';
 import { SkyPane } from './sky/SkyPane';
 import { useHashSync } from './useHashSync';
+import { BuildPane } from './build/BuildPane';
+import { SelectedCard } from './build/SelectedCard';
+import { useSelectedBodyLoader } from './build/selectedBody';
 
-/** A new search opens the object panel (unless it is already open at the spectrum). */
+/**
+ * A new search opens the object panel (unless it is already open at the spectrum). A marker click
+ * (a search by name from the sky) does not: it selects the object, and its card offers the
+ * fingerprint and the build (issue #60).
+ */
 function useOpenPanelOnSearch(): void {
   useEffect(() => {
-    const open = () => {
-      const { tool, setTool } = useShellStore.getState();
-      if (tool !== 'flipbook' && tool !== 'spectrum') setTool('flipbook');
+    const open = (q: SkyQuery) => {
+      const shell = useShellStore.getState();
+      // A typed search or a link starts without a card; a click on the sky is cleared where it is
+      // made (SkyPane), so a right-click that selects and asks for the card is not undone here.
+      if (q.origin !== 'sky') shell.cancelCard();
+      if (q.origin === 'sky' && q.kind === 'name') {
+        if (shell.tool === 'flipbook' || shell.tool === 'spectrum') shell.setTool('sky');
+        return;
+      }
+      // The build pane keeps the view while a link or Back changes the object under it.
+      if (shell.build.open) return;
+      if (shell.tool !== 'flipbook' && shell.tool !== 'spectrum') shell.setTool('flipbook');
     };
     // A search from a shared link may have started before this subscription.
-    if (useAppStore.getState().sky.query !== null) open();
+    const first = useAppStore.getState().sky.query;
+    if (first !== null) open(first);
     return useAppStore.subscribe((s, prev) => {
-      if (s.sky.query !== prev.sky.query && s.sky.query !== null) open();
+      if (s.sky.query !== prev.sky.query && s.sky.query !== null) open(s.sky.query);
     });
   }, []);
 }
@@ -59,14 +80,33 @@ function useSearchShortcut(): void {
   }, []);
 }
 
+/** True on a phone-width screen, where the build pane is a sheet over the whole sky (issue #60). */
+function usePhoneWidth(): boolean {
+  const query = '(max-width: 640px)';
+  const [phone, setPhone] = useState(() => window.matchMedia?.(query).matches ?? false);
+  useEffect(() => {
+    const mq = window.matchMedia?.(query);
+    if (!mq) return;
+    const on = () => setPhone(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return phone;
+}
+
 export function App() {
   useOpenPanelOnSearch();
   useHashSync();
   useSearchShortcut();
+  useSelectedBodyLoader();
+  const split = useShellStore((s) => s.build.open);
+  // Under the phone sheet the sky must not be reachable by Tab or a screen reader.
+  const phone = usePhoneWidth();
+  const skyHidden = split && phone;
   return (
     <FlipbookSessionProvider>
       <div className="sx-screen">
-        <div className="sx-bezel">
+        <div className="sx-bezel" data-split={split || undefined}>
           <header className="sx-top">
             <div className="sx-brand">
               <span className="sx-brand-mark" aria-hidden="true">
@@ -84,12 +124,17 @@ export function App() {
             <SearchBar />
           </div>
           <ToolRail />
-          <main className="sx-view" aria-label="Sky view">
-            <SkyPane>
-              <Panels />
-            </SkyPane>
+          <main className="sx-view" aria-label="Sky view" data-split={split || undefined}>
+            <div className="sx-sky-slot" inert={skyHidden || undefined}>
+              <SkyPane>
+                <SelectedCard />
+                <Panels />
+              </SkyPane>
+            </div>
+            {split && <BuildPane />}
           </main>
-          <div className="sx-transport-slot">
+          {/* The flipbook transport belongs to the flipbook: it steps aside in the split view. */}
+          <div className="sx-transport-slot" inert={split || undefined}>
             <Transport />
           </div>
         </div>
