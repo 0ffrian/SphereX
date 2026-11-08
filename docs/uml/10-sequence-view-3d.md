@@ -58,7 +58,7 @@ sequenceDiagram
     V->>RC: compileAsync(new group) into the scene pass's HDR target (and its MRT on TAAU)
     Note over V,RC: The old content (or the placeholder) stays on screen while the shaders compile. After 3 s (COMPILE_TIMEOUT_MS) the swap happens anyway. A newer plan drops this build.
     RC-->>V: Compiled, or failed (logged)#59; the 3 s timer in ViewerApp may end the wait first
-    V->>V: Swap in: remove and dispose the old group, add the new group, set its lights, register its spin process on the SimClock, frame the camera to plan.extent
+    V->>V: Swap in: remove and dispose the old group, add the new group, set its lights, register the plan's motion processes on the SimClock (spin and, since issue #42, the others from plan.motion; each removed when no longer planned), frame the camera to plan.extent
     V->>V: Lighting from planLighting (sun at phase angle, sun_dir or head-on, or self-lit)#59; the same direction goes to the scene sun and the body
     V->>RC: Settle burst: restartTemporal, then 32 frames on TAAU or 2 on SMAA
     V->>V: Set canvas aria-label from the plan (altText.ts#59; size with its tag, "at most" for an upper limit#59; a shader kind adds the artist's-impression note)

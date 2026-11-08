@@ -5,6 +5,8 @@ import type { CometEpoch, ObjectCard, RenderParams } from '@/contract';
 import { DEFAULT_HONESTY } from './honesty';
 import { NEUTRAL_TINT } from './modes';
 import { PlanBuilder, type PlanInput } from './planCommon';
+import { STILL_MOTION } from './motion/motion';
+import { finishMotion } from './motion/planMotion';
 import type { PlanContext, RenderPlan } from './planTypes';
 import { planAsteroidMesh } from './renderers/AsteroidMesh';
 import { planAsteroidProcedural } from './renderers/AsteroidProcedural';
@@ -39,6 +41,10 @@ function planNoBody(input: PlanInput, message: string): RenderPlan {
 }
 
 export function planRender(card: ObjectCard, params: RenderParams, ctx: PlanContext): RenderPlan {
+  return finishMotion(planRenderRaw(card, params, ctx));
+}
+
+function planRenderRaw(card: ObjectCard, params: RenderParams, ctx: PlanContext): RenderPlan {
   const input: PlanInput = { card, params, ctx };
   try {
     switch (params.type) {
@@ -111,6 +117,10 @@ export function planRender(card: ObjectCard, params: RenderParams, ctx: PlanCont
       scrub: null,
       relief: 'illustrative',
       shader: null,
+      motion: STILL_MOTION,
+      star: null,
+      jets: null,
+      pulsation: null,
       shape: null,
     };
   }

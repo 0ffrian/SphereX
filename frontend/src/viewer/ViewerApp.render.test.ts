@@ -363,3 +363,62 @@ describe('ViewerApp compile timeout through the chain', () => {
     v.dispose();
   });
 });
+
+describe('ViewerApp TAAU restart (determinism, settled frame)', () => {
+  it('draws nothing between loop frames, discards the first loop frame, then settles on one clean cycle', async () => {
+    const callbacks: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => callbacks.push(cb));
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+    const { v } = make();
+    const order: string[] = [];
+    (v as unknown as { chain: unknown }).chain = {
+      config: { aa: 'taau', settleFrames: 3 },
+      render: () => order.push('draw'),
+      restartTemporal: () => order.push('restart'),
+      jitterIndex: () => null,
+      dispose() {},
+    };
+    callbacks.length = 0;
+    (v as unknown as { restartSettle(): void }).restartSettle();
+    // A draw here could share a display frame with a loop draw and reuse its camera snapshot.
+    expect(order).toEqual(['restart']);
+    let settled = false;
+    void v.whenSettled().then(() => (settled = true));
+    let now = 0;
+    for (let i = 0; i < 20 && callbacks.length > 0; i++) callbacks.shift()!((now += 16.7));
+    await flush();
+    expect(order).toEqual(['restart', 'draw', 'restart', 'draw', 'draw', 'draw']);
+    expect(settled).toBe(true);
+    (v as unknown as { chain: unknown }).chain = null;
+    v.dispose();
+  });
+
+  it('a resize or tier change on TAAU primes the loop too: one draw, then the first loop frame is discarded', async () => {
+    for (const path of ['resize', 'applyTier'] as const) {
+      const callbacks: FrameRequestCallback[] = [];
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => callbacks.push(cb));
+      vi.stubGlobal('cancelAnimationFrame', () => {});
+      const { v } = make();
+      const order: string[] = [];
+      (v as unknown as { chain: unknown }).chain = {
+        config: { aa: 'taau', settleFrames: 3 },
+        render: () => order.push('draw'),
+        restartTemporal: () => order.push('restart'),
+        jitterIndex: () => null,
+        setTier() {},
+        dispose() {},
+      };
+      callbacks.length = 0;
+      const priv = v as unknown as { resize(): void; applyTier(n: string, a: boolean): void };
+      if (path === 'resize') priv.resize();
+      else priv.applyTier('high', false);
+      expect(order).toEqual(['restart', 'draw']);
+      let now = 0;
+      for (let i = 0; i < 20 && callbacks.length > 0; i++) callbacks.shift()!((now += 16.7));
+      await flush();
+      expect(order, path).toEqual(['restart', 'draw', 'draw', 'restart', 'draw', 'draw', 'draw']);
+      (v as unknown as { chain: unknown }).chain = null;
+      v.dispose();
+    }
+  });
+});

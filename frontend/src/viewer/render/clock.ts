@@ -3,6 +3,8 @@
 // motion, hidden tab, off-screen, phone idle) live in ViewerApp and only add or remove pause
 // reasons here.
 
+import type { Tag } from '@/contract';
+
 /** `idle`: a coarse-pointer device saw no interaction for `IDLE_PAUSE_MS` (R5.7). */
 export type PauseReason = 'reduced-motion' | 'hidden' | 'offscreen' | 'user' | 'idle' | 'test';
 
@@ -12,6 +14,9 @@ export interface ClockProcess {
   label: string;
   /** Time-lapse factor shown on screen ("×1000"). Display choice; always labelled. */
   speedup: number;
+  /** Tag and tier of the rates the process runs on (D-32), shown with the speed-up. */
+  tag?: Tag;
+  tier?: number;
 }
 
 /** Longest real step one tick may take, so a stalled tab does not make a jump (existing spin rule). */
@@ -35,7 +40,13 @@ export class SimClock {
   }
 
   processes(): ClockProcess[] {
-    return [...this.procs.values()].map(({ id, label, speedup }) => ({ id, label, speedup }));
+    return [...this.procs.values()].map(({ id, label, speedup, tag, tier }) => ({
+      id,
+      label,
+      speedup,
+      ...(tag ? { tag } : {}),
+      ...(tier ? { tier } : {}),
+    }));
   }
 
   simTime(id: string): number {

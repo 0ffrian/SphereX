@@ -21,8 +21,11 @@ const fake = {
   setMeshMeasuredHandler: vi.fn(),
   setOverrides: vi.fn(),
   setSpinPaused: vi.fn(),
+  setMotionOverride: vi.fn(),
   setQualityChangeHandler: vi.fn(),
-  timeLapses: vi.fn(() => [] as { id: string; label: string; speedup: number }[]),
+  setIdleChangeHandler: vi.fn(),
+  resumeFromIdle: vi.fn(),
+  timeLapses: vi.fn(() => []),
   rotate: vi.fn(),
   zoom: vi.fn(),
   resetView: vi.fn(),
@@ -87,13 +90,29 @@ describe('ViewerPanel', () => {
     expect(text('viewer-announcer')).toBe('Lowered render quality to keep motion smooth');
   });
 
-  it('shows the speed-up of a running time-lapse other than the spin', async () => {
-    fake.timeLapses.mockReturnValue([{ id: 'wind', label: 'Winds', speedup: 10000 }]);
-    const { card, params } = fixture('asteroid_procedural');
+  it('says where each time-lapse rate comes from, not that the speed-up was measured', async () => {
+    const { card, params } = fixture('star');
     useAppStore.getState().setObject(card, params);
+    useAppStore.getState().setHonesty('artistic');
     await mount();
-    expect(text('time-lapse-note')).toBe('Winds sped up ×10000.');
-    fake.timeLapses.mockReturnValue([]);
+    const notes = [...container.querySelectorAll('[data-testid="time-lapse-note"]')].map(
+      (e) => e.textContent,
+    );
+    expect(notes).toEqual([
+      'Spin: period taken from a typical value; shown 86,400\u00d7 faster.',
+      'Spot changes: lifetime worked out with a model; shown 86,400\u00d7 faster.',
+      'Flares: rate taken from a typical value; shown 86,400\u00d7 faster.',
+    ]);
+    expect(container.textContent).not.toMatch(/sped up/);
+  });
+
+  it('shows no note for a process whose layer is not drawn (Measured only)', async () => {
+    const { card, params } = fixture('star');
+    useAppStore.getState().setObject(card, params);
+    useAppStore.getState().setHonesty('measured');
+    await mount();
+    expect(container.querySelector('[data-testid="time-lapse-note"]')).toBeNull();
+    expect(button('Pause motion')).toBeUndefined();
   });
 
   it('shows the placeholder when no object is loaded', async () => {
@@ -272,17 +291,78 @@ describe('ViewerPanel', () => {
     expect(text('missing-list')).not.toContain('Sun direction');
   });
 
-  it('a spinning body has a pause control (WCAG 2.2.2) that tells the viewer', async () => {
-    const { card, params } = fixture('asteroid_shape');
-    card.shape_source = { value: '/meshes/bennu.glb', tag: 'measured', source: 'test' };
+  it('one pause control for all motion, shown whenever something is a time-lapse (WCAG 2.2.2)', async () => {
+    // A Mira (pulsation only) has no spin and still gets the control.
+    const { card, params } = fixture('star_mira');
+    useAppStore.getState().setObject(card, params);
+    useAppStore.getState().setHonesty('artistic');
+    await mount();
+    expect(button('Pause motion')?.hasAttribute('aria-pressed')).toBe(false);
+    expect(button('Pause spin')).toBeUndefined();
+    await click('Pause motion');
+    expect(fake.setSpinPaused).toHaveBeenLastCalledWith(true);
+    expect(text('motion-status')).toContain('Motion is paused');
+    await click('Play motion');
+    expect(fake.setSpinPaused).toHaveBeenLastCalledWith(false);
+  });
+
+  it('no time-lapse, no pause control', async () => {
+    const { card, params } = fixture('star_mira'); // the pulsation is hidden at the default level
     useAppStore.getState().setObject(card, params);
     await mount();
-    expect(button('Pause spin')?.getAttribute('aria-pressed')).toBe('false');
-    await click('Pause spin');
-    expect(fake.setSpinPaused).toHaveBeenLastCalledWith(true);
-    expect(text('spin-note')).toContain('Auto-spin is paused');
-    await click('Resume spin');
-    expect(fake.setSpinPaused).toHaveBeenLastCalledWith(false);
+    expect(button('Pause motion')).toBeUndefined();
+    expect(button('Play motion')).toBeUndefined();
+  });
+
+  it('under reduced motion the control stays and starts as Play motion (R9, WCAG 2.2.2)', async () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({
+      matches: q === '(prefers-reduced-motion: reduce)',
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    try {
+      const { card, params } = fixture('asteroid_shape');
+      card.shape_source = { value: '/meshes/bennu.glb', tag: 'measured', source: 'test' };
+      useAppStore.getState().setObject(card, params);
+      await mount();
+      expect(button('Play motion')?.hasAttribute('aria-pressed')).toBe(false);
+      expect(text('motion-status')).toContain('reduced motion');
+      await click('Play motion');
+      expect(fake.setMotionOverride).toHaveBeenLastCalledWith(true);
+      expect(button('Pause motion')).toBeDefined();
+      await click('Pause motion');
+      expect(fake.setMotionOverride).toHaveBeenLastCalledWith(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('reduced motion, Play motion, then an idle pause: the button and status show the pause', async () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({
+      matches: q === '(prefers-reduced-motion: reduce)',
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    try {
+      const { card, params } = fixture('asteroid_shape');
+      card.shape_source = { value: '/meshes/bennu.glb', tag: 'measured', source: 'test' };
+      useAppStore.getState().setObject(card, params);
+      await mount();
+      await click('Play motion');
+      expect(button('Pause motion')).toBeDefined();
+      expect(text('motion-status')).toContain('Motion is playing');
+      const idle = fake.setIdleChangeHandler.mock.calls.at(-1)?.[0] as (i: boolean) => void;
+      await act(async () => idle(true));
+      expect(button('Play motion')).toBeDefined();
+      expect(button('Pause motion')).toBeUndefined();
+      expect(text('motion-status')).toContain('paused after a minute');
+      await click('Play motion');
+      expect(fake.resumeFromIdle).toHaveBeenCalled();
+      // The reduced-motion override stays on (the user asked for motion).
+      expect(fake.setMotionOverride).toHaveBeenLastCalledWith(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('the light-curve slider is not announced a second time by the live region', async () => {

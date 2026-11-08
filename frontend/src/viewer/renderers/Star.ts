@@ -8,7 +8,10 @@
 import type { ObjectCard } from '@/contract';
 import { litBody, median, PlanBuilder, type PlanInput } from '../planCommon';
 import { NEUTRAL_TINT } from '../modes';
-import type { RenderPlan, ScrubPlan } from '../planTypes';
+import type { PulsationPlan, RenderPlan, ScrubPlan, StarSurfacePlan } from '../planTypes';
+import { processOf, resolveMotion, weakestTag } from '../motion/motion';
+import { listMotion, offerLayer, spinPlanOf, viewerLayer } from '../motion/planMotion';
+import { starRatesFrom } from '../bodies/starModel';
 
 export interface StarConfig {
   /**
@@ -72,6 +75,58 @@ export function screenOpacity(card: ObjectCard, index: number): number | null {
   return Math.min(MAX_SCREEN_OPACITY, Math.max(0, 1 - p.flux / med));
 }
 
+/**
+ * R7.5.1: the surface layers the viewer states for a star, each with the tier its own rule earns
+ * (D-32). The backend does not build them yet (stage 6, Q-60); a layer it offers under the same id
+ * wins. Tiers, and why:
+ *   granulation  5 artistic. The cell SIZE rule H ~ T/g needs the mass, and the constants (cell
+ *                scale, lifetime) and a typical mass by class are all [verify] (R7.5.2), so none is
+ *                used; the cells are drawn far larger than real ones so they can be seen anyway.
+ *   spots        4 inferred_from_analog. How many groups are alive at once is a typical value for
+ *                this kind of body, with the Sun as the analogue ([verify], R7.5.3); where they are
+ *                comes from a seeded rule. Tier 1 only from measured region data (none exists).
+ *   faculae      4, the same regions (R7.5.4); the contrast law is [verify].
+ *   flares       the weaker of the flare rate's own tier and 4 (the places are the analogue's).
+ *   prominences  4 for the placement along dipole field lines, 5 for the strand look (R7.5.5).
+ *   glow         5 artistic.
+ */
+export function starSurfaceLayers(flareRateTag: import('@/contract').Tag | null) {
+  const flareTag = weakestTag(flareRateTag ? [flareRateTag, 'inferred_from_analog'] : ['artistic']);
+  return [
+    viewerLayer(
+      'granulation',
+      'artistic',
+      'Convective cells and dark lanes, drawn far larger than real granules so they can be seen. How big real cells are depends on the star\u2019s mass and surface gravity, which are not checked yet, so the pattern is an artist look.',
+    ),
+    viewerLayer(
+      'spots',
+      'inferred_from_analog',
+      'A few sunspot groups alive at once, like the Sun: a leader, a broken-up follower and small pores, each with a dark centre and a streaky rim. How many, and where, is a typical value and a seeded rule, not a measurement.',
+    ),
+    viewerLayer(
+      'faculae',
+      'inferred_from_analog',
+      'Bright patches around the spot groups that brighten towards the edge of the disc.',
+    ),
+    viewerLayer(
+      'flares',
+      flareTag,
+      'Flares light two ribbons at a spot group on a seeded schedule at the flare rate. Each is drawn for a few seconds, and they start no more than about once every two seconds, so nothing flashes; the speed-up applies to the schedule.',
+    ),
+    viewerLayer(
+      'prominences',
+      'inferred_from_analog',
+      'Loops of plasma along magnetic field lines between the leader and the follower of each group, seen best at the edge of the disc; a flare lifts them.',
+    ),
+    viewerLayer(
+      'prominence_strands',
+      'artistic',
+      'The loops drawn as uneven, tapering strands (an artist look).',
+    ),
+    viewerLayer('glow', 'artistic', 'A soft glow around the edge of the star (an artist look).'),
+  ];
+}
+
 export function planStar(input: PlanInput, config: StarConfig = STAR_CONFIG): RenderPlan {
   const { card, params, ctx } = input;
   const b = new PlanBuilder(input);
@@ -85,18 +140,33 @@ export function planStar(input: PlanInput, config: StarConfig = STAR_CONFIG): Re
   const colour = b.draw('colour');
   const limb = b.draw('limb_darkening');
 
+  // Motion (R5.7, D-34): rates from `dynamics` by the tier chain, speed-ups as stated.
+  const motion = resolveMotion(card, params);
+  listMotion(b, motion);
+
   const scrubbed = type === 'star_mira' || type === 'star_ttauri';
   const scrub = scrubbed ? lightcurveScrub(card, ctx.scrubIndex) : null;
 
   let brightness = 1;
   let radiusScale = 1;
+  let pulsation: PulsationPlan | null = null;
   if (type === 'star_mira') {
     const curve = b.draw('brightness_curve');
     if (curve && scrub) brightness = Math.max(MIRA_MIN_BRIGHTNESS, scrub.brightness);
     else if (curve)
       b.notes.push('Every light-curve point is flagged, so brightness is not scaled.');
-    if (b.draw('radius_pulsation') && scrub) {
-      radiusScale = 1 - PULSATION_AMPLITUDE + 2 * PULSATION_AMPLITUDE * scrub.brightness;
+    if (b.draw('radius_pulsation')) {
+      // Q-65: the period is data (tier 1 or 2), the amplitude is art. With a stated pulsation
+      // speed-up the radius follows the clock; otherwise it follows the scrubbed light-curve point.
+      const proc = processOf(motion, 'pulsation');
+      const period = motion.rates.pulsation_period_d;
+      if (proc && period) {
+        // Start where the scrubbed brightness puts the radius, so the two agree at clock time 0.
+        const phase = scrub ? Math.asin(2 * Math.min(1, Math.max(0, scrub.brightness)) - 1) : 0;
+        pulsation = { periodD: period.value, amplitude: PULSATION_AMPLITUDE, phase };
+      } else if (scrub) {
+        radiusScale = 1 - PULSATION_AMPLITUDE + 2 * PULSATION_AMPLITUDE * scrub.brightness;
+      }
     }
   }
 
@@ -125,6 +195,37 @@ export function planStar(input: PlanInput, config: StarConfig = STAR_CONFIG): Re
       });
     } else if (b.draw('motion_trail') && pm && config.spherexBaselineYears !== null) {
       trails.push({ id: 'motion_trail', pm: [pm[0], pm[1]], years: config.spherexBaselineYears });
+    }
+  }
+
+  // R7.5.1 surface layers, for stars that have a surface to draw them on (not a Mira: a giant).
+  let star: StarSurfacePlan | null = null;
+  if (bodyOk && type !== 'star_mira') {
+    const flareRate = motion.rates.flare_rate_per_d;
+    for (const l of starSurfaceLayers(flareRate ? flareRate.tag : null)) offerLayer(b, l);
+    const flaresMoving = processOf(motion, 'flares') !== undefined;
+    if (b.has('flares') && !flaresMoving && motion.rates.flare_rate_per_d) {
+      b.notes.push('Flares are not drawn: no speed-up is stated for them.');
+    }
+    const granulation = b.draw('granulation');
+    const spots = b.draw('spots');
+    const faculae = b.draw('faculae');
+    const flares = flaresMoving && b.draw('flares');
+    const prominences = b.draw('prominences');
+    const strands = prominences && b.draw('prominence_strands');
+    const glow = b.draw('glow');
+    if (granulation || spots || faculae || flares || prominences || glow) {
+      star = {
+        seed: params.seed,
+        granulation,
+        spots,
+        faculae,
+        flares,
+        prominences,
+        strands,
+        glow,
+        rates: starRatesFrom(motion),
+      };
     }
   }
 
@@ -166,5 +267,9 @@ export function planStar(input: PlanInput, config: StarConfig = STAR_CONFIG): Re
     scrub: bodyOk ? scrub : null,
     tintUsed: colour,
     relief: 'illustrative',
+    motion,
+    spin: bodyOk && star ? spinPlanOf(motion) : null,
+    star: bodyOk ? star : null,
+    pulsation: bodyOk ? pulsation : null,
   });
 }

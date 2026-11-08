@@ -1,5 +1,6 @@
 // User-facing wording for API errors and refused (`missing`) items. Plain sentences, no codes in
 // the main line; the backend's own `detail` is shown underneath.
+import type { Tag } from '@/contract';
 import type { SkyError } from '@/state/store';
 import { badgeForTag, HONESTY_LABEL, stateThatShows } from '@/viewer/honesty';
 import type { MissingItem } from '@/viewer/planTypes';
@@ -387,6 +388,20 @@ const LAYER_NAME: Readonly<Record<string, string>> = {
   visible: 'Visible-colour view',
   spherex_ir: 'SPHEREx infrared view',
   teq_pulse: 'Temperature pulse',
+  granulation: 'Star surface cells',
+  spots: 'Sunspot groups',
+  faculae: 'Bright patches around spots',
+  flares: 'Flares',
+  prominences: 'Plasma loops',
+  prominence_strands: 'Strand look of the loops',
+  glow: 'Glow around the edge',
+  jets: 'Jets and bands',
+  storms: 'Storms',
+  band_count: 'Number of bands',
+  flattening: 'Flattening from the spin',
+  cloud_cover: 'Cloud cover from the light curve',
+  clouds: 'Clouds',
+  climate: 'Climate',
   reflectance: 'Realistic surface lighting',
   self_shadow: 'Shadows cast by the shape',
   baked_ao: 'Soft shading in dents',
@@ -405,6 +420,43 @@ const MOTION_NAME: Readonly<Record<string, string>> = {
   flare_rate_per_d: 'Flares',
   pulsation_period_d: 'Pulsation',
 };
+
+/** Where a motion rate comes from, by provenance tag, in words for a non-astronomer. */
+const RATE_SOURCE_WORDS: Readonly<Record<Tag, string>> = {
+  measured: 'measured',
+  derived: 'worked out from measurements',
+  model_dependent: 'worked out with a model',
+  inferred_from_analog: 'taken from a typical value',
+  artistic: 'chosen by the artist',
+};
+
+/** What each time-lapse runs on. */
+const RATE_NOUN: Readonly<Record<string, string>> = {
+  spin: 'period',
+  spots: 'lifetime',
+  flares: 'rate',
+  winds: 'wind speed',
+  clouds: 'wind speed',
+  pulsation: 'period',
+};
+
+/**
+ * One time-lapse in a sentence that says where the rate comes from, so the speed-up is not read as
+ * measured: "Spin: period measured; shown 1,000× faster." (D-32, D-34). The tier number lives in
+ * the layer's "How it is made".
+ */
+export function timeLapseText(t: {
+  id: string;
+  label: string;
+  speedup: number;
+  tag?: Tag;
+}): string {
+  const faster = `shown ${t.speedup.toLocaleString('en-US')}\u00d7 faster`;
+  const noun = RATE_NOUN[t.id];
+  return t.tag && noun
+    ? `${t.label}: ${noun} ${RATE_SOURCE_WORDS[t.tag]}; ${faster}.`
+    : `${t.label}: ${faster}.`;
+}
 
 const MOTION_PREFIX = 'dynamics:';
 

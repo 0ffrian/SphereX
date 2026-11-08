@@ -24,7 +24,8 @@ classDiagram
     +renderStats() RenderStats
     +freezeClock(simSeconds: number) Promise~void~
     +whenSettled() Promise~void~
-    +timeLapses() id, label, speedup list
+    +timeLapses() id, label, speedup list via timeLapsesOf(plan), active processes only, Q-108
+    one Pause motion / Play motion button in the panel whenever timeLapses is not empty, reduced motion starts in Play
     +setTouchMode(on: boolean) void
     +render() void
     frames the camera to plan.extent, rebuilds only when sceneKey changes
@@ -151,6 +152,16 @@ classDiagram
     Mira brightness follows light curve
     T Tauri disc and dust screen
     motion trail from pm_mas_yr
+    issue #42: StarBody draws spots, faculae, flares, loops, granulation, glow
+    from the CPU model bodies/starModel.ts (pure in seed, rates, t)
+  }
+  class MotionPlan {
+    <<issue #42, motion/motion.ts>>
+    resolveMotion: measured card field, dynamics, class value, else dynamics:key in missing
+    a process runs only with a stated speed-up and every rate it needs
+    SimClock processes carry their tag and tier
+    activeProcesses are the processes that drive a drawn layer, filled by finishMotion in planMotion.ts, the only ones registered (Q-108)
+    cappedFlareSpeedup keeps flare onsets at or below 0.5 per real second (Q-108)
   }
   class ShaderBody {
     <<planet_rocky, planet_water, gas_giant, nebula, nova>>
@@ -163,6 +174,8 @@ classDiagram
     finer noise is seen, not felt
     nebula and nova are emission volumes (remnant: core glow, filaments, dust lanes), no point sets and no haptics (Q-103)
     refused layers go in missing
+    issue #42: setTime(time) poses spin, jets, storms, clouds; jetSurface.ts shared with brown dwarfs
+    storms from fields/flowModel.ts go to the shader and to FieldSampler.setStorms (same t)
   }
   class FieldWorker {
     <<Web Worker, D-12>>
@@ -176,6 +189,8 @@ classDiagram
   class FieldSampler {
     <<fieldGenerator.ts>>
     bilinear height and masks, nearest ids
+    +setStorms(storms: Storm list or null) void, issue #42: the storm channel at the same t as the shader
+    +currentStorms: Storm list or null, read by FlowSource haptics (Q-105)
     sampleDirection and sampleUV
   }
   class Lighting {
@@ -249,7 +264,8 @@ classDiagram
 
 ## Notes
 
-- Render core (issue #39): `ViewerApp` draws through a `RenderChain` (`render/pipeline.ts`); if the chain cannot be built it falls back to plain `renderer.render`. New content is compiled with `RenderChain.compileAsync` before it is swapped in (diagram [10](10-sequence-view-3d.md)). The quality level (low, medium or high, `render/quality.ts`) sets bloom resolution, anti-aliasing (TAAU or SMAA), noise octaves and volume steps. `FrameGovernor` only lowers the quality level; `setQualityTier` picks one by hand. `SimClock` (`render/clock.ts`) holds one sim time per moving process (only the spin today) and the pause reasons shown in diagram [15](15-state-interaction.md). `renderStats`, `whenSettled` and `freezeClock` are test and tuning hooks; `timeLapses` lists each process with its shown speed-up. Motion and quality levels follow R5.7 and D-34; the implementation is Q-66 in [decisions](../decisions.md).
+- Render core (issue #39): `ViewerApp` draws through a `RenderChain` (`render/pipeline.ts`); if the chain cannot be built it falls back to plain `renderer.render`. New content is compiled with `RenderChain.compileAsync` before it is swapped in (diagram [10](10-sequence-view-3d.md)). The quality level (low, medium or high, `render/quality.ts`) sets bloom resolution, anti-aliasing (TAAU or SMAA), noise octaves and volume steps. `FrameGovernor` only lowers the quality level; `setQualityTier` picks one by hand. `SimClock` (`render/clock.ts`) holds one sim time per moving process (the spin, and since issue #42 the processes `motion/planMotion.ts` states for stars, gas giants, brown dwarfs and worlds, Q-104) and the pause reasons shown in diagram [15](15-state-interaction.md). `renderStats`, `whenSettled` and `freezeClock` are test and tuning hooks; `timeLapses` lists each process with its shown speed-up. Motion and quality levels follow R5.7 and D-34; the implementation is Q-66 in [decisions](../decisions.md).
+- Tier labels (issue #42): the viewer panel (`app/ViewerPanel.tsx`, `tierText`) writes every process speed-up and layer tier as "tier N of 5, <meaning>" (for example "tier 3 of 5, worked out with a typical value"), so the D-32 tier is said in words next to it.
 - Shapes and volumes (issue #43): `RenderPlan.volumes` and `RenderPlan.shape` are new plan fields. `build.ts` makes a `VolumeBody` per volume and forwards `setTier` (via `BuiltScene.setTier`, called by `ViewerApp.setQualityTier`) so the ray-march step count follows the quality level. `buildLights` takes shadow settings (`shape/shapeModel.shadowSettings`) when `plan.shape.shadows` is set, and the renderer shadow map is enabled for it; `ViewerApp.setLights` disposes the shadow map of a light it replaces. The loaded model reports half of its longest box extent through `onMeshMeasured` (ignored if the scene is no longer current) so the scale bar and the screen-reader label (`canvasLabel(plan, shownSize)`) show the same real size. Volumes replace point sprites; the nebula and the nova make no point sets and have no haptics (Q-103). `ShaderBody` disposes each `VolumeHandle` (and its `Data3DTexture`) when it releases a surface. The remnant age slider in `ViewerPanel` writes the store's D-02 `overrides.age_yr` (log-mapped input) and the panel passes the overrides to `ViewerApp.setOverrides`. `ViewerApp.draw` hands the TAAU frame index to `BuiltScene.setJitterFrame` and the body's on-screen size to `BuiltScene.setScreenPx` (160 px level of detail). `ViewerPanel` calls `showPlan` only when the plan changes; the canvas label follows the measured size in its own effect.
 - `WorkerPool` (`render/workerPool.ts`) and the fan-out loader (`render/fanout.ts`, `loadBody`) exist and are tested, but nothing in the viewer calls them yet.
 

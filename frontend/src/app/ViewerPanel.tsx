@@ -30,7 +30,8 @@ import { AT_AGE_MAX_PHRASE, scaleBarFor, shownSize } from '@/viewer/scaleBar';
 import { SLIDER_REGISTRY } from '@/viewer/sliders';
 import type { CometEpoch, ObjectCard, RenderParams } from '@/contract';
 import { ProvenanceBadge } from './Badge';
-import { describeRefusal, layerName } from './messages';
+import { timeLapsesOf } from '@/viewer/motion/planMotion';
+import { describeRefusal, layerName, timeLapseText } from './messages';
 import { buttonClass, pressedClass } from './ui';
 
 const NO_FAILED: readonly string[] = [];
@@ -74,6 +75,19 @@ interface Choices {
   mode: ViewModeId | null;
   epoch: CometEpoch | null;
   scrub: number;
+}
+
+/** What a provenance tier (D-32) means, in words for a non-astronomer. */
+const TIER_WORDS: Record<number, string> = {
+  1: 'measured',
+  2: 'worked out from measurements',
+  3: 'worked out with a typical value',
+  4: 'typical for this kind of object',
+  5: 'the artist\u2019s choice',
+};
+export function tierText(tier: number): string {
+  const words = TIER_WORDS[tier];
+  return words ? `tier ${tier} of 5, ${words}` : `tier ${tier} of 5`;
 }
 
 /** Said (live region) when the governor lowers the render quality. */
@@ -130,6 +144,14 @@ export function ViewerPanel() {
   const failed = failedState.key === objectKey ? failedState.ids : NO_FAILED;
   const reducedMotion = useReducedMotion();
   const [spinPaused, setSpinPaused] = useState(false);
+  // Under reduced motion the scene starts paused; this is the user's choice to play it anyway.
+  const [playAnyway, setPlayAnyway] = useState(false);
+  // The choice ends when the preference is switched off (adjusted while rendering, not in an effect).
+  const [prevReduced, setPrevReduced] = useState(reducedMotion);
+  if (prevReduced !== reducedMotion) {
+    setPrevReduced(reducedMotion);
+    if (!reducedMotion) setPlayAnyway(false);
+  }
   // R5.7: a phone pauses the clock after a minute without input; said here, lifted by the button.
   const [idlePaused, setIdlePaused] = useState(false);
   useEffect(() => {
@@ -211,15 +233,16 @@ export function ViewerPanel() {
               card: ObjectCard,
               params: RenderParams,
               honesty: HonestyState,
+              mode?: 'visible' | 'spherex_ir',
             ) => RenderPlan;
           };
           w.__sxViewer = created;
           // Plans and draws like the panel does, for a given honesty state.
-          w.__sxShow = (c, p, honesty) => {
+          w.__sxShow = (c, p, honesty, mode) => {
             // The epoch the panel itself opens on (a comet: its latest epoch with gas data), so a
             // fixture card is drawn at its own epoch and not at the default one.
             const epoch = epochsWithQ(c).at(-1) ?? defaultContext().epoch;
-            const shown = planRender(c, p, defaultContext({ honesty, epoch }));
+            const shown = planRender(c, p, defaultContext({ honesty, epoch, mode: mode ?? null }));
             created.showPlan(shown);
             return shown;
           };
@@ -286,6 +309,9 @@ export function ViewerPanel() {
   useEffect(() => {
     viewer?.setSpinPaused(spinPaused);
   }, [viewer, spinPaused]);
+  useEffect(() => {
+    viewer?.setMotionOverride?.(playAnyway);
+  }, [viewer, playAnyway]);
 
   // Draw the plan. Not keyed on the measured size: a size report for the same plan must not
   // re-run showPlan (it would reallocate the shadow map, rebuild lit pipelines and reset TAA).
@@ -335,6 +361,11 @@ export function ViewerPanel() {
   const notDrawn = plan?.missing.filter((m) => !m.defaultShown) ?? [];
   const disabled = viewer === null;
   const objectIsFixture = fixture || (card?.id.startsWith('fixture:') ?? false);
+  // Read from the plan, not from the viewer, so it is never a frame behind (what the clock runs).
+  const lapses = plan ? timeLapsesOf(plan) : [];
+  // One pause control for everything that moves (WCAG 2.2.2, R9). Under reduced motion the scene
+  // starts paused and the button starts it.
+  const motionPaused = (reducedMotion && !playAnyway) || spinPaused || idlePaused;
   const hiddenCount = plan?.missing.filter((m) => m.reason === 'honesty').length ?? 0;
 
   return (
@@ -608,31 +639,32 @@ export function ViewerPanel() {
             </figure>
           )}
 
-          {plan.spin && (
+          {lapses.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm text-neutral-200" data-testid="spin-note">
-                Spin sped up ×{plan.spin.speedup}
-                {reducedMotion
-                  ? '. Auto-spin is off because your device asks for reduced motion.'
+              <button
+                type="button"
+                className={buttonClass}
+                onClick={() => {
+                  if (motionPaused) {
+                    // Play: lift every pause that is on (reduced motion override, user, idle).
+                    if (reducedMotion && !playAnyway) setPlayAnyway(true);
+                    if (spinPaused) setSpinPaused(false);
+                    if (idlePaused) viewer?.resumeFromIdle?.();
+                  } else if (reducedMotion) setPlayAnyway(false);
+                  else setSpinPaused(true);
+                }}
+              >
+                {motionPaused ? 'Play motion' : 'Pause motion'}
+              </button>
+              <p className="text-sm text-neutral-200" data-testid="motion-status">
+                {reducedMotion && !playAnyway
+                  ? 'Motion is off because your device asks for reduced motion.'
                   : spinPaused
-                    ? '. Auto-spin is paused.'
+                    ? 'Motion is paused.'
                     : idlePaused
-                      ? '. Auto-spin paused after a minute without input. Tap the view or press Resume spin.'
-                      : '.'}
+                      ? 'Motion paused after a minute without input. Tap the view or press Play motion.'
+                      : 'Motion is playing.'}
               </p>
-              {!reducedMotion && (
-                <button
-                  type="button"
-                  className={buttonClass}
-                  aria-pressed={spinPaused || idlePaused}
-                  onClick={() => {
-                    if (idlePaused && !spinPaused) viewer?.resumeFromIdle?.();
-                    else setSpinPaused((p) => !p);
-                  }}
-                >
-                  {spinPaused || idlePaused ? 'Resume spin' : 'Pause spin'}
-                </button>
-              )}
             </div>
           )}
 
@@ -642,15 +674,12 @@ export function ViewerPanel() {
             </p>
           )}
 
-          {/* Every time-lapse states its speed-up (R5.7). The spin has its own note above. */}
-          {viewer
-            ?.timeLapses?.()
-            .filter((t) => t.id !== 'spin')
-            .map((t) => (
-              <p key={t.id} className="text-sm text-neutral-200" data-testid="time-lapse-note">
-                {t.label} sped up ×{t.speedup}.
-              </p>
-            ))}
+          {/* Every time-lapse says where its rate comes from and its speed-up (R5.7, D-32). */}
+          {lapses.map((t) => (
+            <p key={t.id} className="text-sm text-neutral-200" data-testid="time-lapse-note">
+              {timeLapseText(t)}
+            </p>
+          ))}
 
           <section aria-labelledby="legend-heading" className="flex flex-col gap-1">
             <h3 id="legend-heading" className="text-sm font-medium text-neutral-200">
@@ -671,6 +700,11 @@ export function ViewerPanel() {
                   >
                     <ProvenanceBadge tag={l.tag} fixture={objectIsFixture} />
                     <span>{layerName(l.id)}</span>
+                    {l.tier ? (
+                      <span className="text-xs text-neutral-400" data-testid="layer-tier">
+                        {tierText(l.tier)}
+                      </span>
+                    ) : null}
                     {l.swatches?.map((s) => (
                       <span
                         key={s.label}

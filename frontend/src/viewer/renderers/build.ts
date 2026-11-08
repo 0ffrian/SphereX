@@ -49,7 +49,15 @@ import { allowedTags } from '../honesty';
 import { isGltfUrl } from '../scaleBar';
 import type { BodyContext, BodyRenderer } from './bodyRenderer';
 import { ShaderBody } from './ShaderBody';
+import { StarBody } from './StarBody';
 import { LIMB_DARKENING_U } from './Star';
+import { buildJetSurface, makeJetRuntime } from './jetSurface';
+import { floatTexture } from './fieldTexture';
+import { requestField } from '../fields/fieldClient';
+import type { FieldData, FieldParams } from '../fields/fieldGenerator';
+import { spinRateRadPerSimS, type SimTimeFn } from '../motion/motion';
+import { jetPalette } from './jetPalette';
+import { srgbToLinear } from './linearColour';
 
 export interface BuildHooks {
   /** A mesh or texture failed to load: refuse the layer with this id. */
@@ -65,6 +73,8 @@ export interface BuildHooks {
   onMeshMeasured?(m: { radiusM: number }): void;
   /** Tests only: replaces the field and point workers, or sets slider overrides (D-27). */
   shader?: Pick<BodyContext, 'fieldSource' | 'overrides'>;
+  /** Noise octaves of the quality level (R5.7); bodies built from noise read it. Default: the low level's. */
+  octaves?: number;
 }
 
 /**
@@ -147,6 +157,14 @@ export interface BuiltScene {
   spinners: Object3D[];
   /** Spin rate in radians per second; 0 when nothing spins. */
   spinRate: number;
+  /**
+   * Poses everything that moves at the SimClock's times (issue #42, D-34): star spots and flares,
+   * jets, storms, clouds, pulsation. `time(id)` is the sim time of one process in sim seconds. A
+   * pure function of the time: the same time gives the same picture.
+   */
+  setTime(time: SimTimeFn): void;
+  /** True when what was built depends on the quality level's octave count (rebuilt when it changes). */
+  readonly usesQuality: boolean;
   /** The generated body of a shader kind (haptics read its field), else null. */
   body: BodyRenderer | null;
   /**
@@ -265,8 +283,14 @@ export function buildScene(
   const cache = sharedCache ?? new AssetCache();
   const group = new Group();
   const spinners: Object3D[] = [];
+  const animators: ((time: SimTimeFn) => void)[] = [];
+  const octaves = hooks.octaves ?? 4;
+  let usesQuality = false;
   const disposables: { dispose(): void }[] = [];
   let disposed = false;
+  let cover = plan.jets?.cover ?? 0;
+  let spinPlan = plan.spin;
+  let lastTime: SimTimeFn = () => 0;
   const track = <T extends { dispose(): void }>(x: T): T => {
     disposables.push(x);
     return x;
@@ -279,7 +303,27 @@ export function buildScene(
   let screenPx: number | null = null;
   const lodRefresh: (() => void)[] = [];
   let shapeRadius: number | null = null;
-  for (const body of plan.bodies) {
+  for (const [bodyIndex, body] of plan.bodies.entries()) {
+    // A star with a moving surface (R7.5.1): spots, flares, loops, granulation and glow.
+    if (plan.star && body.id === 'body') {
+      const star = track(
+        new StarBody(plan.star, {
+          tint: srgbToLinear(body.tint),
+          emissive: body.emissive,
+          limbU: body.limbDarkening ? LIMB_DARKENING_U : null,
+          octaves,
+          axes: body.axes,
+          segments: [128, 64],
+        }),
+      );
+      star.group.position.set(...body.position);
+      group.add(star.group);
+      usesQuality = true;
+      // The star turns itself (StarBody rotates its own frame by the spin clock), so it is not a
+      // `spinner`. A Mira has no star surface and is posed below.
+      animators.push((time) => star.setTime(time));
+      continue;
+    }
     const geometry = track(new SphereGeometry(1, body.segments[0], body.segments[1]));
     const material = track(bodyMaterial(body));
     const mesh = new Mesh(geometry, material);
@@ -287,7 +331,88 @@ export function buildScene(
     mesh.scale.set(...body.axes);
     mesh.position.set(...body.position);
     group.add(mesh);
-    if (plan.spin) spinners.push(mesh);
+    if (plan.spin && !plan.jets) spinners.push(mesh);
+    // A Mira that pulses with the clock (Q-65): a Mira has no star surface, so it is posed here.
+    if (plan.pulsation) {
+      const pulse = plan.pulsation;
+      animators.push((time) => {
+        const s =
+          1 +
+          pulse.amplitude *
+            Math.sin((2 * Math.PI * time('pulsation')) / (pulse.periodD * 86400) + pulse.phase);
+        mesh.scale.set(body.axes[0] * s, body.axes[1] * s, body.axes[2] * s);
+      });
+    }
+
+    // A brown dwarf with moving jets (R7.4, A7.2): the flat body stays until the field is ready,
+    // then the banded surface replaces it (never blank).
+    if (plan.jets) {
+      const jp = plan.jets;
+      const motion = plan.motion;
+      const fp: FieldParams = {
+        kind: 'gas',
+        seed: jp.seed + bodyIndex,
+        freq: 0,
+        seaLevel: 0,
+        iceExtent: 0,
+        heat: 0,
+        bands: jp.bands,
+        turbulence: jp.turbulence,
+        storms: jp.storms,
+      };
+      const source = hooks.shader?.fieldSource ?? requestField;
+      usesQuality = true;
+      void source(fp).then(
+        (field: FieldData) => {
+          if (disposed) return;
+          const tex = floatTexture(field.a, field.width, field.height);
+          const surface = buildJetSurface({
+            texA: tex,
+            bands: jp.bands,
+            seed: fp.seed,
+            turbulence: jp.turbulence,
+            palette: jetPalette(srgbToLinear(body.tint), jp.contrast),
+            octaves,
+            selfLit: true,
+            emissive: body.emissive,
+            clouds: jp.clouds,
+            storms: jp.storms,
+          });
+          surface.mesh.position.copy(mesh.position);
+          surface.mesh.scale.set(body.axes[0], body.axes[1] * (1 - jp.flattening), body.axes[2]);
+          track({
+            dispose() {
+              tex.dispose();
+              surface.mesh.geometry.dispose();
+              (surface.mesh.material as { dispose(): void }).dispose();
+            },
+          });
+          mesh.visible = false;
+          group.add(surface.mesh);
+          const jets =
+            jp.windMs !== null && jp.radiusM !== null
+              ? { windMs: jp.windMs, radiusM: jp.radiusM }
+              : null;
+          const winds = motion.processes.find((p) => p.id === 'winds');
+          const clouds = motion.processes.find((p) => p.id === 'clouds');
+          const run = makeJetRuntime({
+            surface,
+            fp,
+            jets,
+            spinRate: spinRateRadPerSimS(motion),
+            evolveRatio: winds && clouds ? clouds.speedup / winds.speedup : 0,
+            sampler: null,
+            cover: () => cover,
+          });
+          animators.push(run);
+          run(lastTime);
+          hooks.onChange();
+        },
+        () => {
+          if (!disposed) hooks.onLoadFailed('jets');
+        },
+      );
+    }
 
     // Textures (baked by the backend). A failed load leaves the flat tint and refuses the layer.
     // A texture the cache already holds is applied at once, so a rebuilt body never flashes flat.
@@ -490,8 +615,11 @@ export function buildScene(
       onFailed: (id) => {
         if (!disposed) hooks.onLoadFailed(id);
       },
+      motion: plan.motion,
+      octaves,
       ...hooks.shader,
     });
+    usesQuality = true;
     track(shaderBody);
     group.add(shaderBody.object);
   }
@@ -559,9 +687,25 @@ export function buildScene(
   return {
     group,
     spinners,
-    spinRate: spinRateRadPerS(plan.spin),
+    // The spin plan of the latest plan: a generated body keeps its field across honesty changes,
+    // and its spin (drawn only with the surface) follows the plan in place.
+    get spinRate() {
+      return spinRateRadPerS(spinPlan);
+    },
     body: shaderBody,
+    get usesQuality() {
+      return usesQuality;
+    },
+    setTime(time) {
+      if (disposed) return;
+      lastTime = time;
+      for (const a of animators) a(time);
+      shaderBody?.setTime(time);
+    },
     update(next) {
+      // A brown dwarf's cloud cover follows the scrub (R7.4); applied in place, no rebuild.
+      if (next.jets) cover = next.jets.cover;
+      spinPlan = next.spin;
       if (!shaderBody || disposed) return;
       if (next.lighting.direction) shaderBody.setSunDirection(next.lighting.direction);
       shaderBody.setVisibleTags(allowedTags(next.honesty));

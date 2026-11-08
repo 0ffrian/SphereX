@@ -24,11 +24,11 @@ This is **reduced, physically inspired physics**, not simulation. Each rule is a
 
 | Quantity | Rule | Status |
 |---|---|---|
-| Spin to band count | Rhines scale `L = pi * sqrt(U / beta)`, `beta = 2 Omega / R`. Number of bands about `sqrt(2 Omega R / U)`. For Jupiter (`Omega = 1.76e-4 /s`, `R = 7e7 m`, `U = 50 m/s`) this gives about 22. Order of magnitude only. | Built (app), with the Rhines length. Shown next to the artistic `bands` slider, which is what the shader draws (default 12); `band_count` does not drive the shader yet. The `zonal_wind_ms` slider feeds only this rule; the drawn wind comes from the band phase (`zonalWind`, `viewer/fields`) |
-| Flattening | `f = 0.7 * q`, `q = Omega^2 R^3 / (G M)`. Rule of thumb calibrated on Jupiter and Saturn. | Built (app); not yet linked to the shader |
+| Spin to band count | Rhines scale `L = pi * sqrt(U / beta)`, `beta = 2 Omega / R`. Number of bands about `sqrt(2 Omega R / U)`. For Jupiter (`Omega = 1.76e-4 /s`, `R = 7e7 m`, `U = 50 m/s`) this gives about 22. Order of magnitude only. | Built (app), with the Rhines length. Drives the shader (issue #42, Q-104) when the spin and the wind speed are known and the artistic `bands` slider is unset; the slider wins, else the default is 12. The `zonal_wind_ms` slider feeds only this rule; the drawn wind comes from the band phase (`zonalWind`, `viewer/fields`) |
+| Flattening | `f = 0.7 * q`, `q = Omega^2 R^3 / (G M)`. Rule of thumb calibrated on Jupiter and Saturn. | Built (app); drives the drawn silhouette (issue #42, Q-104): mass slider, else Jupiter-density scaling from the spin, else Jupiter's value. The Jupiter-density rule is **not valid for brown dwarfs** (13 to 80 Jupiter masses at about one Jupiter radius, so `f` is far smaller) and no mass source exists, so their flattening is refused (Q-109) |
 | Colour family | Chosen by temperature: pale cyan (about 60 K), blue (100), cream (130), gold (200), cobalt (600), dark (1,100), glowing (1,800). | Built |
 | Storm placement | Place storms where wind shear between neighbouring jets is anticyclonic, so spots sit between counter-flowing jets. | To build |
-| Storm drift | A storm moves at the zonal wind speed of its latitude. | Built in a basic form (bands shear) |
+| Storm drift | A storm moves at the zonal wind speed of its latitude. | Built (issue #42): `fields/flowModel.ts`, the same storms for the shader and the haptic sampler |
 | Storm size | About the Rossby deformation radius `L_d = N H / f`. Larger storms live longer. | To build |
 | Storm count | Rises with internal heat and temperature. | To build |
 

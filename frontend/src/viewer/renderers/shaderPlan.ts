@@ -10,6 +10,8 @@
 import { isTagShown } from '../honesty';
 import { missingFields, PlanBuilder, type PlanInput } from '../planCommon';
 import type { RenderPlan } from '../planTypes';
+import { processOf, resolveMotion, weakestTag } from '../motion/motion';
+import { listMotion, offerLayer, spinPlanOf, viewerLayer } from '../motion/planMotion';
 import {
   kindHasPlainSphere,
   resolveShaderSpec,
@@ -30,8 +32,11 @@ const NO_TOUCH_NOTE = {
 export function planShaderKind(input: PlanInput): RenderPlan {
   const b = new PlanBuilder(input);
   const { card, params, ctx } = input;
+  // What moves, by the tier chain (R5.7, D-32): spin, jets, storms, clouds.
+  const motion = resolveMotion(card, params);
+  listMotion(b, motion);
   // Throws only for a card and params of different kinds (a caller bug); planRender catches it.
-  const spec = resolveShaderSpec(card, params);
+  const spec = resolveShaderSpec(card, params, undefined, motion);
   const kind: ShaderKind = spec.kind;
   const sizeField = sizeFieldFor(kind);
   const hasPlain = kindHasPlainSphere(kind);
@@ -65,6 +70,92 @@ export function planShaderKind(input: PlanInput): RenderPlan {
     surface = b.draw(spec.layerId);
   }
 
+  // Sub-layers of the generated surface (issue #42): each says what set its numbers and with what
+  // tier. They exist only while the surface is drawn, so they follow its honesty state.
+  if (surface) {
+    const winds = processOf(motion, 'winds');
+    if (spec.gas) {
+      if (winds && motion.rates.jet_speed_ms) {
+        offerLayer(
+          b,
+          viewerLayer(
+            'jets',
+            weakestTag([winds.tag, 'artistic']),
+            'Counter-flowing jets: neighbouring bands blow opposite ways at up to the jet speed in the dynamics, and turbulence is strongest at the band edges. The band pattern itself is an artist look.',
+            {
+              formula:
+                'wind = peak jet speed * band profile (sign flips between bands); drift = wind / cos(latitude)',
+              assumed: {
+                jet_speed_ms: motion.rates.jet_speed_ms.value,
+                band_pattern: 'an artist look, not measured',
+              },
+            },
+          ),
+        );
+        b.draw('jets');
+        offerLayer(
+          b,
+          viewerLayer(
+            'storms',
+            'artistic',
+            'Storms sit between the jets, drift at the wind speed of their latitude and turn at about wind speed over their size. Where they are is a seeded look.',
+            {
+              formula:
+                'drift = wind speed at the storm latitude, turn rate ~ wind speed / storm size',
+            },
+          ),
+        );
+        b.draw('storms');
+      }
+      const rule = spec.gas.bandsRule;
+      if (rule) {
+        offerLayer(
+          b,
+          viewerLayer('band_count', rule.tag, rule.basis, {
+            formula: rule.formula,
+            assumed: rule.assumed,
+          }),
+        );
+        b.draw('band_count');
+      }
+      const flat = spec.gas.flatteningRule;
+      if (flat) {
+        offerLayer(
+          b,
+          viewerLayer('flattening', flat.tag, flat.basis, {
+            formula: flat.formula,
+            assumed: flat.assumed,
+          }),
+        );
+        b.draw('flattening');
+      }
+    }
+    if (spec.planet) {
+      if (winds && motion.rates.jet_speed_ms) {
+        offerLayer(
+          b,
+          viewerLayer(
+            'clouds',
+            'artistic',
+            "Clouds carried by winds that change with latitude and slowly re-form, with cloud shadows. The wind speed is the card's; the cloud shapes are an artist look.",
+          ),
+        );
+        b.draw('clouds');
+      }
+      const climate = spec.planet.climate;
+      if (climate) {
+        offerLayer(
+          b,
+          viewerLayer('climate', climate.tag, climate.basis, {
+            formula: climate.formula,
+            assumed: climate.assumed,
+          }),
+        );
+        b.draw('climate');
+      }
+    }
+  }
+
   const plain = hasPlain && spec.drawable && !surface && sizeShown;
   if (plain) {
     b.notes.push(PLAIN_SPHERE_NOTE);
@@ -93,6 +184,7 @@ export function planShaderKind(input: PlanInput): RenderPlan {
             spec.planet,
             spec.gas,
             spec.layerId,
+            motion,
           ]),
           surface,
           plain,
@@ -100,5 +192,7 @@ export function planShaderKind(input: PlanInput): RenderPlan {
         }
       : null,
     relief: 'illustrative',
+    motion,
+    spin: surface && spec.kind !== 'nebula' && spec.kind !== 'nova' ? spinPlanOf(motion) : null,
   });
 }

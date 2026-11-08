@@ -27,7 +27,8 @@ import type { Overrides } from './sliders';
 import { planRender } from './renderPlan';
 import type { BodyRenderer } from './renderers/bodyRenderer';
 import { AssetCache, buildScene, type BuildHooks, type BuiltScene } from './renderers/build';
-import { SimClock, type PauseReason } from './render/clock';
+import { SimClock, type ClockProcess, type PauseReason } from './render/clock';
+import type { Motion } from './motion/motion';
 import { RenderChain } from './render/pipeline';
 import { noiseBakePending, whenNoiseIdle } from './volume/noiseVolume';
 import { onVolumeNoiseReady } from './volume/VolumeBody';
@@ -39,6 +40,7 @@ import {
   capIntervalMs,
   FrameCap,
   qualityFromSearch,
+  TIERS,
   type TierName,
 } from './render/quality';
 
@@ -122,7 +124,15 @@ export function sceneKey(plan: RenderPlan): string {
     plan.dust,
     plan.volumes,
     plan.shape,
-    plan.spin,
+    // The shader kinds' spin is applied in place (a honesty toggle must not rebuild the field).
+    plan.shader ? null : plan.spin,
+    // What moves: rates and processes (R5.7). The star's layers, a brown dwarf's jets and a Mira's
+    // pulsation change what is built; the cloud cover of a brown dwarf is applied in place.
+    // `activeProcesses` follows the honesty state, which is applied in place (see `syncProcesses`).
+    { ...plan.motion, activeProcesses: undefined },
+    plan.star,
+    plan.jets ? { ...plan.jets, cover: 0 } : null,
+    plan.pulsation,
     // The shader kinds: what the body is built from. Honesty and light are not in it (they update
     // the body in place), so a toggle does not regenerate the field.
     plan.shader?.key ?? null,
@@ -226,6 +236,8 @@ export class ViewerApp {
   private onScreen: BuiltScene | null = null;
   private unsubscribeNoise: (() => void) | null = null;
   private compileToken = 0;
+  /** The plan last shown, so a quality-level change can rebuild it. */
+  private lastPlan: RenderPlan | null = null;
   private compiling: Promise<void> | null = null;
   /**
    * What goes on with `built` when it swaps in: its lights, spin and framing. Held back while it
@@ -238,6 +250,8 @@ export class ViewerApp {
   private spinBase = 0;
   /** WCAG 2.2.2: the user can pause auto-spin. */
   private spinPaused = false;
+  /** The user asked to play although the device asks for reduced motion. */
+  private motionOverride = false;
   private chain: RenderChain | null = null;
   private chainFailed = false;
   private tier: TierName;
@@ -247,6 +261,8 @@ export class ViewerApp {
   private drops = 0;
   private readonly frameTimes: number[] = [];
   private burstLeft = 0;
+  /** A TAAU restart waits for its first loop frame, which is drawn and discarded (see restartSettle). */
+  private primePending = false;
   private loopLast: number | null = null;
   /** R5.7 phone frame-rate cap; no cap on desktop or the medium and high levels. */
   private readonly cap = new FrameCap();
@@ -433,6 +449,7 @@ export class ViewerApp {
   /** Draws a plan made with `planRender` (the panel plans once and reuses the plan for its UI). */
   showPlan(plan: RenderPlan): void {
     if (this.disposed) return;
+    this.lastPlan = plan;
     // The new lights go on with the content they belong to: an old object still on screen while
     // the new one compiles is not lit from the new object's phase angle.
     const lights = buildLights(
@@ -444,6 +461,12 @@ export class ViewerApp {
       // Nothing that is built changed: only the lights, the honesty state or the labels did. A
       // generated body takes the new tags and light in place (no field is regenerated).
       this.built.update(plan);
+      if (this.built === this.onScreen) {
+        this.syncProcesses(plan.spin, this.built, plan.motion);
+        // Pose again from the clock: a brown dwarf's cloud cover follows the light-curve scrub, which
+        // must show while the clock is paused too (reduced motion, user or idle pause).
+        this.applySpinAngle();
+      }
       if (this.built !== this.onScreen && this.pending) {
         // Still compiling: the new lights wait for the content they belong to.
         this.pending = { lights, plan };
@@ -475,6 +498,7 @@ export class ViewerApp {
               if (buildToken === this.compileToken) this.onMeshMeasured?.(m);
             },
             shader: this.shaderOptions,
+            octaves: TIERS[this.tier].octaves,
           },
           this.assets,
         );
@@ -517,7 +541,7 @@ export class ViewerApp {
         this.setLights(pending.lights);
         const { plan } = pending;
         this.frame(plan.id, plan.extent, plan.shader?.distance ?? 0);
-        this.syncProcesses(plan.spin, next);
+        this.syncProcesses(plan.spin, next, plan.motion);
       }
       this.applySpinAngle();
       this.restartSettle();
@@ -566,15 +590,44 @@ export class ViewerApp {
     this.onScreen = null;
   }
 
-  /** Registers or removes the spin process on the clock. */
-  private syncProcesses(spin: SpinPlan | null, built: BuiltScene | null): void {
+  /**
+   * Registers the processes that move on the clock: the spin (shown with its own note) and the
+   * animated processes of the plan's motion (R5.7, D-34), each with the speed-up the card states
+   * and the tier of the rates it runs on. Processes of the last body that are no longer there are
+   * removed.
+   */
+  private syncProcesses(spin: SpinPlan | null, built: BuiltScene | null, motion?: Motion): void {
+    const keep = new Set<string>();
     if (built && spin && built.spinRate > 0) {
       this.spinBase = built.spinRate / spin.speedup;
-      this.clock.setProcess({ id: 'spin', label: 'Spin', speedup: spin.speedup });
+      const rate = motion?.processes.find((p) => p.id === 'spin');
+      this.clock.setProcess({
+        id: 'spin',
+        label: 'Spin',
+        speedup: spin.speedup,
+        ...(rate ? { tag: rate.tag, tier: rate.tier } : {}),
+      });
+      keep.add('spin');
     } else {
       this.spinBase = 0;
-      this.clock.removeProcess('spin');
     }
+    if (built && motion) {
+      // Only processes that drive a drawn layer (D-21, D-34): a hidden layer has no note and does
+      // not keep the frame loop running.
+      for (const p of motion.processes) {
+        if (p.id === 'spin') continue; // the spin is the plan's (its speed-up may be lowered)
+        if (!motion.activeProcesses.includes(p.id)) continue;
+        this.clock.setProcess({
+          id: p.id,
+          label: p.label,
+          speedup: p.speedup,
+          tag: p.tag,
+          tier: p.tier,
+        });
+        keep.add(p.id);
+      }
+    }
+    for (const p of this.clock.processes()) if (!keep.has(p.id)) this.clock.removeProcess(p.id);
     this.updateLoop();
   }
 
@@ -607,7 +660,17 @@ export class ViewerApp {
     this.controls.saveState();
   }
 
-  /** Pause or resume auto-spin (WCAG 2.2.2). Survives rebuilds. */
+  /**
+   * Under reduced motion the scene starts paused (R9); the "Play motion" button is the user's
+   * choice to start it anyway (WCAG 2.2.2). Ends when the preference is switched off.
+   */
+  setMotionOverride(on: boolean): void {
+    if (this.disposed || on === this.motionOverride) return;
+    this.motionOverride = on;
+    this.setPause('reduced-motion', prefersReducedMotion() && !on);
+  }
+
+  /** Pause or resume all motion (WCAG 2.2.2). Survives rebuilds. */
   setSpinPaused(paused: boolean): void {
     if (this.disposed || paused === this.spinPaused) return;
     this.spinPaused = paused;
@@ -619,7 +682,7 @@ export class ViewerApp {
   }
 
   /** The processes that are time-lapses (each is shown with its speed-up). */
-  timeLapses(): { id: string; label: string; speedup: number }[] {
+  timeLapses(): ClockProcess[] {
     return this.clock.processes();
   }
 
@@ -633,7 +696,11 @@ export class ViewerApp {
     if (!this.onScreen) return;
     const angle = this.spinBase * this.clock.simTime('spin');
     for (const o of this.onScreen.spinners) o.rotation.y = angle;
+    // Everything else that moves is posed from the same clock (D-34: one clock, a pure function of t).
+    this.onScreen.setTime(this.simTimeOf);
   }
+
+  private readonly simTimeOf = (id: string): number => this.clock.simTime(id);
 
   private clearBuilt(): void {
     this.compileToken++;
@@ -661,8 +728,43 @@ export class ViewerApp {
    * the history (`requestRender`), since that is what temporal AA is for while moving.
    */
   private restartSettle(): void {
-    this.chain?.restartTemporal();
+    const chain = this.chain;
+    chain?.restartTemporal();
+    if (chain?.config.aa === 'taau') {
+      // r187 keeps one snapshot of the camera per display frame (VelocityNode, and TAAUNode's own
+      // matrices): the first draw of a display frame stores it, a second draw in the same frame
+      // reuses it. Drawing here, between loop frames, may land in a display frame the loop already
+      // drew in, so the next frame reprojects the history from a stale camera. Where that happens
+      // depends on timing, and it shifted the settled frame by up to 53 levels. So nothing is drawn
+      // here: the loop draws one frame per display frame, the first of them (which still sees the
+      // old camera or content) is discarded and history restarts after it, and the 32 that follow
+      // are one clean jitter cycle. The canvas keeps the last frame meanwhile (no blank frame).
+      this.primePending = true;
+      this.burstLeft = Math.max(this.burstLeft, this.settleFrames() + 1);
+      this.schedule();
+      return;
+    }
     this.renderNow();
+  }
+
+  /**
+   * Tier change and resize: the pipeline's targets or size changed, so on TAAU the history is
+   * restarted and the first loop frame is discarded, exactly as in `restartSettle`, so the settled
+   * frame is a function of content and not of which display frame this ran in. The one draw here is
+   * kept only so a resize (which clears the canvas) leaves no blank frame; it is discarded the same
+   * way as the first loop frame. SMAA draws and settles as before.
+   */
+  private renderNowPrimed(): void {
+    const chain = this.chain;
+    if (chain?.config.aa !== 'taau') {
+      this.renderNow();
+      return;
+    }
+    chain.restartTemporal();
+    this.draw();
+    this.primePending = true;
+    this.burstLeft = Math.max(this.burstLeft, this.settleFrames() + 1);
+    this.schedule();
   }
 
   /** Draws now (no blank frame on resize) and starts a settle burst for temporal AA. */
@@ -718,6 +820,7 @@ export class ViewerApp {
       /* already broken */
     }
     this.chain = null;
+    this.primePending = false;
   }
 
   /** Builds the HDR pipeline and warms up the placeholder; a failure leaves plain rendering. */
@@ -759,7 +862,13 @@ export class ViewerApp {
     }
     if (auto) this.drops++;
     this.onQualityChange?.({ from, to: name, auto });
-    this.renderNow();
+    // A body built from noise has its octave count baked in: rebuild it at the new level.
+    if (this.built?.usesQuality && this.lastPlan) {
+      this.builtKey = '';
+      this.showPlan(this.lastPlan);
+      return;
+    }
+    this.renderNowPrimed();
   }
 
   /** Quality level, backend and frame-time percentiles of the continuous frames (tests, tuning). */
@@ -834,6 +943,10 @@ export class ViewerApp {
       if (drop) this.applyTier(drop.to, true);
     }
     this.loopLast = now;
+    if (this.primePending) {
+      this.primePending = false;
+      this.chain?.restartTemporal();
+    }
     if (this.burstLeft > 0) this.burstLeft--;
     if (this.burstLeft === 0) this.flushSettled();
     if (this.clock.running || this.burstLeft > 0) {
@@ -892,6 +1005,7 @@ export class ViewerApp {
     this.clearBuilt();
     this.chain?.dispose();
     this.chain = null;
+    this.primePending = false;
     this.assets.dispose();
     this.motionQuery?.removeEventListener?.('change', this.onMotionChange);
     this.motionQuery = null;
@@ -917,8 +1031,8 @@ export class ViewerApp {
     this.camera.updateProjectionMatrix();
     // Resizing the canvas clears its drawing buffer, and ResizeObserver callbacks run after this
     // frame's rAF callbacks, so a deferred render would leave one blank frame on screen. Render
-    // now instead (still only on change, R5.5).
-    this.renderNow();
+    // now instead (still only on change, R5.5); on TAAU the frame is primed (renderNowPrimed).
+    this.renderNowPrimed();
   }
 
   /**
@@ -941,7 +1055,8 @@ export class ViewerApp {
     } catch (err) {
       this.dropChain(err);
     }
-    this.setPause('reduced-motion', reduced);
+    if (!reduced) this.motionOverride = false;
+    this.setPause('reduced-motion', reduced && !this.motionOverride);
     this.renderNow();
   };
 
