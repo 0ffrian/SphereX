@@ -57,6 +57,20 @@ export function badgeForTag(tag: Tag): BadgeName {
   }
 }
 
+/** Tags from the strongest claim to the weakest. */
+const TAG_STRENGTH: readonly Tag[] = [
+  'measured',
+  'derived',
+  'model_dependent',
+  'inferred_from_analog',
+  'artistic',
+];
+
+/** The tag that claims less. A thing built from two parts is only as sure as its weaker part. */
+export function weakerOf(a: Tag, b: Tag): Tag {
+  return TAG_STRENGTH.indexOf(a) >= TAG_STRENGTH.indexOf(b) ? a : b;
+}
+
 /** The weakest honesty state that shows `tag` (what the user must switch to). */
 export function stateThatShows(tag: Tag): HonestyState {
   return HONESTY_STATES.find((s) => isTagShown(s, tag)) ?? 'artistic';

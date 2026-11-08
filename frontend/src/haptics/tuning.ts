@@ -264,7 +264,7 @@ export const FLOW_JET_MIN_WIND = 0;
 /** Ring gap: `ringGapAt(t)` at or above this is "in the gap" (its smoothstep edge). Engineering. */
 export const RING_GAP_THRESHOLD = 0.5;
 
-// ---------------------------------------------------------------- point density (nebula, nova; R8.4 item 4)
+// ---------------------------------------------------------------- point density (nova; R8.4 item 4)
 /** Radius (body units, cloud radius 1) of the disc around the finger's ray in which points are counted. CREATIVE placeholder — Atish to decide (D-13). */
 export const DENSITY_RADIUS = 0.08;
 /** rate = clamp(DENSITY_K · density ÷ uniform-disc density, FIELD_MIN_HZ, max). CREATIVE placeholder — Atish to decide (D-13). */

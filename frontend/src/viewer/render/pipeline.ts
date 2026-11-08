@@ -250,6 +250,17 @@ export class RenderChain {
     if (typeof node._jitterIndex === 'number') node._jitterIndex = 0;
   }
 
+  /**
+   * Index of the TAAU jitter offset of the next frame (0 right after `restartTemporal`), or null
+   * without TAAU or if the pinned r187 field is missing. Volumes shift their ray start with it so
+   * the per-pixel jitter averages over the cycle. Private field of r187 TAAUNode (guarded).
+   */
+  jitterIndex(): number | null {
+    if (this.cfg.aa !== 'taau') return null;
+    const node = this.owned[this.owned.length - 1] as unknown as { _jitterIndex?: number };
+    return typeof node?._jitterIndex === 'number' ? node._jitterIndex : null;
+  }
+
   private readonly size = new Vector2();
 
   private release(): void {

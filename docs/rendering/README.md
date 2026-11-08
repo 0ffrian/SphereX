@@ -20,7 +20,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | [renderers/brown-dwarf.md](renderers/brown-dwarf.md) | R7.4 | rendering `brown_dwarf` / `brown_dwarf_binary` |
 | [renderers/stars.md](renderers/stars.md) | R7.5, R7.5.1–R7.5.5 | rendering `star`, `star_mira`, `star_ttauri`, and the star surface (spots, flares) |
 | [renderers/candidate.md](renderers/candidate.md) | R7.6 | handling unknown moving sources (no 3D) |
-| [renderers/shader-kinds.md](renderers/shader-kinds.md) | R7.7 | planets, gas giants, nebulae, novae: the shared CPU field for haptics |
+| [renderers/shader-kinds.md](renderers/shader-kinds.md) | R7.7 | planets, gas giants (the shared CPU field for haptics), nebulae and novae (volumes, no haptics, Q-103) |
 | [haptics/platform-encoding.md](haptics/platform-encoding.md) | R8, R8.1–R8.3 | deciding what each platform can do, texture vs data haptics, vibration patterns and quantisation |
 | [haptics/sources.md](haptics/sources.md) | R8.4 | implementing a source: height-map, mesh-normal, field, terrain, flow |
 | [haptics/profiles.md](haptics/profiles.md) | R8.5, R8.6 | mapping an object type to its texture/data haptics, or doing spectrum haptics |

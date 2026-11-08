@@ -37,7 +37,7 @@
   "haptics": {
     "texture": "none",
     "texture_tag": "artistic",
-    "data": "field",
+    "data": "none",
     "data_tag": "artistic",
     "params": {}
   },

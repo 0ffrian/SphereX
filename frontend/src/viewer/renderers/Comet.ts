@@ -6,9 +6,11 @@
 //   published result shows one, and the card holds no such field, so it is never drawn.
 //   Epoch toggle: Aug 2025 / Dec 2025.
 import type { CometEpoch, GasQ, ObjectCard } from '@/contract';
-import { isTagShown } from '../honesty';
+import { isTagShown, weakerOf } from '../honesty';
 import { isPresent, litBody, numberField, PlanBuilder, type PlanInput } from '../planCommon';
-import type { RenderPlan, ShellPlan, Vec3 } from '../planTypes';
+import type { RenderPlan, ShellPlan, Vec3, VolumePlan } from '../planTypes';
+import { isLoadableMeshUrl, planShapeLayers } from './AsteroidMesh';
+import { comaVolume, dustConeVolume, dustTailVolume, ionTailVolume } from '../volume/volumeSpecs';
 
 export const COMET_EPOCHS: readonly CometEpoch[] = ['2025-08', '2025-12'];
 
@@ -178,15 +180,77 @@ export function planComet(input: PlanInput): RenderPlan {
     };
   }
 
-  // Tail: R7.3 allows one only if a published December result shows it. The card has no field
-  // for such a result, so a tail is never drawn.
+  // Tails (issue #43). R7.3 allows a tail only if a published December result shows one, so the
+  // tail layers exist only when the backend offers them (ion_tail, dust_tail). Both also need the
+  // Sun direction (phase angle or Sun vector); without it they are refused, not guessed.
+  const volumes: VolumePlan[] = [];
+  const comaLayerTag = layer?.tag ?? 'artistic';
+  if (shells.length > 0) {
+    const coma = comaVolume(shells, comaLayerTag, params.seed);
+    if (coma) {
+      volumes.push(coma);
+      // The streaks are noise added for looks (artistic) on top of the gas amounts (the layer's tag).
+      b.notes.push(
+        'Faint streaks in the coma are added for looks. The gas amounts are not changed.',
+      );
+    }
+  }
+  if (dust) volumes.push(dustConeVolume(dust, b.layers.get('dust')?.tag ?? 'artistic'));
+  const sunKnown = b.lighting.source === 'phase_angle' || b.lighting.source === 'sun_dir';
+  let tailDrawn = false;
+  for (const [id, make] of [
+    [
+      'ion_tail',
+      () => ionTailVolume(b.lighting.direction ?? [0, 0, 1], (params.seed * 8 + 5) >>> 0),
+    ],
+    [
+      'dust_tail',
+      () => dustTailVolume(b.lighting.direction ?? [0, 0, 1], (params.seed * 8 + 6) >>> 0),
+    ],
+  ] as const) {
+    if (!b.has(id)) continue;
+    if (!sunKnown) {
+      b.reject({
+        id,
+        reason: 'data',
+        fields: ['phase_angle_deg'],
+        detail: 'The Sun direction is not known.',
+      });
+      continue;
+    }
+    const v = make();
+    if (!v) continue;
+    // The tail rests on the backend layer (that it exists) and on the viewer's own shape (a
+    // display value). It claims no more than the weaker of the two, so a dust tail whose bend is
+    // a display choice is never shown as better than that (D-02).
+    // Only a phase angle fixes the Sun direction; the `sun_dir` hint is in an unspecified frame
+    // (lighting.ts), so a tail aimed by it alone is artistic.
+    const sunTag = b.lighting.source === 'phase_angle' ? v.tag : 'artistic';
+    const tag = weakerOf(weakerOf(v.tag, b.layers.get(id)!.tag), sunTag);
+    if (b.ready(id) && !isTagShown(b.ctx.honesty, tag)) {
+      b.reject({ id, reason: 'honesty', tag });
+    } else if (b.draw(id)) {
+      const entry = b.drawn.find((d) => d.id === id);
+      if (entry) entry.tag = tag;
+      volumes.push({ ...v, tag });
+      tailDrawn = true;
+    }
+  }
+  // The R7.3 layer `tail` (published result) is still never drawn from a card without one.
   if (b.has('tail')) {
     b.reject({ id: 'tail', reason: 'data', detail: 'No published tail result is on the card.' });
   }
-  b.notes.push('No tail is drawn: the card holds no published tail result.');
+  if (!tailDrawn) b.notes.push('No tail is drawn. The list of layers not drawn says why.');
+  else b.notes.push('Tails are not to scale. The ion tail points away from the Sun.');
+
+  // Nucleus from a shape model when one exists (67P): the same path as an asteroid shape (R7.1).
+  const nucleusUrl = card.shape_source?.value ?? null;
+  const meshDrawn = b.draw('mesh', { asset: isLoadableMeshUrl(nucleusUrl) ? nucleusUrl : null });
+  const shape = meshDrawn ? planShapeLayers(b) : null;
 
   const nucleus = litBody('nucleus', [nucleusScene, nucleusScene, nucleusScene], NUCLEUS_TINT, {
     segments: [32, 16],
+    meshUrl: meshDrawn ? nucleusUrl : null,
     // The nucleus is dark and lit like a solar-system body.
   });
   // The plan has a body even when the nucleus layer was refused: a point (R7.3), tinted dark.
@@ -194,6 +258,8 @@ export function planComet(input: PlanInput): RenderPlan {
     bodies: [nucleus],
     shells,
     dust,
+    volumes,
+    shape,
     epoch,
     epochs,
     sizeTag: sizeShown ? (nucleusTv?.tag ?? null) : null,

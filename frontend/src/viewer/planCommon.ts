@@ -151,6 +151,25 @@ export class PlanBuilder {
     return ok;
   }
 
+  /**
+   * A layer the viewer itself adds (shadows, baked AO, regolith, volumes): not offered by the
+   * backend, so it is decided here from its own tag and the honesty state. Records it as drawn, or
+   * as refused with reason `honesty`. A load failure (`ctx.failed`) refuses it with reason `load`.
+   */
+  drawLocal(id: string, tag: Tag, description: string): boolean {
+    const cached = this.evaluated.get(id);
+    if (cached !== undefined) return cached;
+    let ok = false;
+    if (this.ctx.failed.includes(id)) this.refuse({ id, reason: 'load' });
+    else if (!isTagShown(this.ctx.honesty, tag)) this.refuse({ id, reason: 'honesty', tag });
+    else {
+      ok = true;
+      this.drawn.push({ id, tag, description });
+    }
+    this.evaluated.set(id, ok);
+    return ok;
+  }
+
   /** True when layer `id` could be drawn: offered, not refused, data present, tag shown. */
   ready(id: string): boolean {
     const layer = this.layers.get(id);
@@ -292,6 +311,7 @@ export class PlanBuilder {
       screens: [],
       trails: [],
       dust: null,
+      volumes: [],
       drawn: this.drawn,
       missing: this.missing,
       notes: this.notes,
@@ -316,6 +336,7 @@ export class PlanBuilder {
       star: null,
       jets: null,
       pulsation: null,
+      shape: null,
       ...over,
     };
     plan.sizeWhy = sizeWhy;
@@ -342,6 +363,9 @@ export function sceneExtent(plan: RenderPlan): number {
   for (const s of plan.screens) e = Math.max(e, Math.hypot(s.radius, s.z));
   if (plan.trails.length > 0) e = Math.max(e, TRAIL_HALF_LENGTH);
   if (plan.dust) e = Math.max(e, 1);
+  for (const v of plan.volumes) {
+    e = Math.max(e, Math.hypot(...v.center) + Math.hypot(...v.halfExtent));
+  }
   return e;
 }
 
@@ -366,6 +390,8 @@ export function litBody(
     meshUrl: null,
     albedoUrl: null,
     normalUrl: null,
+    heightUrl: null,
+    displacementScale: null,
     ...extra,
   };
 }

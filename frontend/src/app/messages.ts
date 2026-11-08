@@ -361,7 +361,7 @@ export function spectrumAnnouncement(o: SpectrumOutcome, name: string): string {
 const LAYER_NAME: Readonly<Record<string, string>> = {
   body: 'Body',
   surface: 'Generated surface',
-  point_cloud: 'Generated cloud of points',
+  point_cloud: 'Generated glowing gas',
   mesh: 'Shape model',
   spin: 'Spin',
   material: 'Surface colour',
@@ -402,6 +402,13 @@ const LAYER_NAME: Readonly<Record<string, string>> = {
   cloud_cover: 'Cloud cover from the light curve',
   clouds: 'Clouds',
   climate: 'Climate',
+  reflectance: 'Realistic surface lighting',
+  self_shadow: 'Shadows cast by the shape',
+  baked_ao: 'Soft shading in dents',
+  regolith: 'Fine dust texture',
+  ion_tail: 'Gas tail',
+  dust_tail: 'Dust tail',
+  displacement: 'Raised and lowered surface',
 };
 
 /** Motion rates (R3.4 `dynamics`); a rate no tier can answer is refused as `dynamics:<key>`. */
@@ -478,6 +485,7 @@ const FIELD_NAME: Readonly<Record<string, string>> = {
   pm_mas_yr: 'the proper motion',
   period_var_d: 'the variability period',
   phase_angle_deg: 'the phase angle',
+  relief_amp: 'the relief height',
 };
 
 function fieldList(fields: readonly string[]): string {
@@ -503,9 +511,12 @@ export function describeRefusal(item: MissingItem): string {
         ? `${name}: not drawn. Missing data: ${fieldList(item.fields)}.`
         : `${name}: not drawn. ${item.detail ?? 'The data it needs is missing.'}`;
     case 'backend':
-      return item.id.startsWith(MOTION_PREFIX)
-        ? `${name}: not animated. No measured or typical value is known for it.`
-        : `${name}: not drawn. The data pipeline left it out.`;
+      if (item.id.startsWith(MOTION_PREFIX))
+        return `${name}: not animated. No measured or typical value is known for it.`;
+      // A gap in what the server sends, not missing data about the object.
+      if (item.id === 'displacement')
+        return `${name}: not drawn. The server does not send the relief height yet. This is a gap in the service, not missing data about this object.`;
+      return `${name}: not drawn. The data pipeline left it out.`;
     case 'load':
       return `${name}: not drawn. ${item.detail ?? 'Its file could not be loaded.'}`;
     case 'epoch': {

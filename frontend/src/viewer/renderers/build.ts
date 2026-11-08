@@ -3,37 +3,50 @@
 // asynchronously; the scene is complete (flat tint) before they arrive, and a failed load is
 // reported through `hooks.onLoadFailed(layerId)` so the plan can refuse that layer (never blank).
 import {
-  AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
   CircleGeometry,
   Color,
   DoubleSide,
   Group,
-  InstancedBufferAttribute,
   Line,
   LineBasicNodeMaterial,
   Mesh,
   MeshBasicNodeMaterial,
   MeshStandardNodeMaterial,
   Object3D,
-  PointsNodeMaterial,
+  RepeatWrapping,
   RingGeometry,
   Sphere,
   SphereGeometry,
-  Sprite,
   SRGBColorSpace,
   Texture,
   TextureLoader,
   Box3,
   Vector3,
 } from 'three/webgpu';
-import { float, instancedBufferAttribute, normalView, saturate, vec3 } from 'three/tsl';
+import { float, normalView, saturate, vec3 } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import type { BodyPlan, DustPlan, RenderPlan, Rgb, ShellPlan, SpinPlan } from '../planTypes';
+import type { TierName } from '../render/quality';
+import { displacementActive } from './AsteroidProcedural';
+import { ShapeMaterial } from '../shape/ShapeMaterial';
+import {
+  AO_RAYS,
+  chooseLod,
+  lodUrls,
+  meanEdgeLength,
+  needsShapeMaterial,
+  regolithMinFrequency,
+  bakedAoDrawn,
+  type LodLevel,
+} from '../shape/shapeModel';
+import { bakeVertexAo } from '../shape/ShapeAo';
+import { createVolume } from '../volume/VolumeBody';
 import { TRAIL_HALF_LENGTH } from '../planCommon';
 import { allowedTags } from '../honesty';
+import { isGltfUrl } from '../scaleBar';
 import type { BodyContext, BodyRenderer } from './bodyRenderer';
 import { ShaderBody } from './ShaderBody';
 import { StarBody } from './StarBody';
@@ -51,8 +64,15 @@ export interface BuildHooks {
   onLoadFailed(layerId: string): void;
   /** Something finished loading: draw again. */
   onChange(): void;
+  /** Quality level the scene is built for (volume steps, model LOD, AO rays). Default: medium. */
+  tier?: TierName;
+  /**
+   * A shape model loaded: half of its longest axis-aligned box extent in metres (glTF units are metres, Q-61), the
+   * measured size, so the scale bar can show the real size of the model (issue #43).
+   */
+  onMeshMeasured?(m: { radiusM: number }): void;
   /** Tests only: replaces the field and point workers, or sets slider overrides (D-27). */
-  shader?: Pick<BodyContext, 'fieldSource' | 'pointSource' | 'overrides'>;
+  shader?: Pick<BodyContext, 'fieldSource' | 'overrides'>;
   /** Noise octaves of the quality level (R5.7); bodies built from noise read it. Default: the low level's. */
   octaves?: number;
 }
@@ -152,14 +172,17 @@ export interface BuiltScene {
    * the body in place, so a toggle never regenerates the field. A no-op for the baked kinds.
    */
   update(plan: RenderPlan): void;
+  /** Half the largest axis of the shape-model body in scene units, or null without one. */
+  readonly shapeRadius: number | null;
+  /** The body's on-screen diameter in CSS pixels (the 160 px level-of-detail rule); null = unknown. */
+  setScreenPx(px: number | null): void;
+  /** The TAAU frame index of the next frame (see BodyRenderer.setJitterFrame). */
+  setJitterFrame(index: number): void;
+  /** The quality level changed: volume steps and octaves, model level of detail, displacement. */
+  setTier(tier: TierName): void;
   dispose(): void;
 }
 
-/** Opacity of a gas shell at full Q (display level, artistic). Scaled by Q. */
-const SHELL_MAX_OPACITY = 0.9;
-/** Point size in pixels. Honoured because shells are instanced sprites, not `Points` (r187). */
-const SHELL_POINT_SIZE = 2;
-const DUST_OPACITY = 0.35;
 const DISC_COLOR = 0x8a7a6a; // artistic
 
 /** Seeded PRNG (mulberry32). The same seed always gives the same stream. */
@@ -274,6 +297,12 @@ export function buildScene(
   };
 
   // Bodies --------------------------------------------------------------------------------
+  let tier: TierName = hooks.tier ?? 'medium';
+  const tierListeners: ((t: TierName) => void)[] = [];
+  // On-screen size of the shape model (the 160 px rule) and who re-chooses the level when it moves.
+  let screenPx: number | null = null;
+  const lodRefresh: (() => void)[] = [];
+  let shapeRadius: number | null = null;
   for (const [bodyIndex, body] of plan.bodies.entries()) {
     // A star with a moving surface (R7.5.1): spots, flares, loops, granulation and glow.
     if (plan.star && body.id === 'body') {
@@ -414,43 +443,160 @@ export function buildScene(
       load(body.normalUrl, 'relief', (t) => {
         material.normalMap = t;
       });
+      // R7.2: displacement by the baked height map, desktop only (the one height field also
+      // drives the normals above). The scale is relief_amp, a plan value ([verify]: R7.2).
+      const scale = body.displacementScale;
+      load(body.heightUrl, 'displacement', (t) => {
+        // The sphere's u = 0 and u = 1 vertices sample the same column: repeat, or the seam cracks.
+        if (t.wrapS !== RepeatWrapping) {
+          t.wrapS = RepeatWrapping;
+          t.needsUpdate = true;
+        }
+        material.displacementMap = t;
+        material.displacementScale = displacementActive(tier, scale) ? (scale ?? 0) : 0;
+      });
+      tierListeners.push((t) => {
+        if (material.displacementMap) {
+          material.displacementScale = displacementActive(t, scale) ? (scale ?? 0) : 0;
+        }
+      });
     }
 
-    // Real shape model (R7.1): replaces the placeholder sphere when it loads.
+    // Real shape model (R7.1): replaces the placeholder sphere when it loads. Two levels of detail
+    // (backend `<slug>.glb` and `<slug>.lod1.glb`); the quality level picks one.
     if (body.meshUrl) {
-      const url = body.meshUrl;
-      const swap = (cached: Object3D) => {
-        if (disposed) return;
+      shapeRadius = Math.max(shapeRadius ?? 0, ...body.axes);
+      const lods = lodUrls(body.meshUrl);
+      const shape = plan.shape;
+      let holder: Group | null = null;
+      let wanted: LodLevel = 0;
+      let lod1Missing = false;
+      let bakedFor: BufferGeometry[] = [];
+
+      const makeMaterial = (hasAo: boolean, edge: number | null) => {
+        if (!shape || !needsShapeMaterial(shape, hasAo)) {
+          return track(new MeshStandardNodeMaterial({ color: srgb(body.tint), roughness: 0.95 }));
+        }
+        const m = track(
+          new ShapeMaterial({
+            hasAo,
+            // Model units: the noise runs on the model's own coordinates (metres for the backend
+            // models), at the wavelength of two mean edges and finer (D-33, tier 5).
+            regolithFrequency: shape.regolith ? regolithMinFrequency(edge) : null,
+            lommelSeeliger: shape.lommelSeeliger,
+          }),
+        );
+        m.color = srgb(body.tint);
+        return m;
+      };
+
+      const apply = (cached: Object3D, lvl: LodLevel) => {
+        if (disposed || lvl !== wanted) return; // a newer level was asked for meanwhile
         // The cached model is shared between scenes: clone it, and leave its geometry to the cache.
         const root = cached.clone(true);
-        // Scale to the measured size: the bounding sphere becomes the unit sphere.
+        // Scale to the measured size: the bounding sphere becomes the unit sphere times the body's
+        // largest axis (1 for an asteroid, the nucleus radius for a comet).
         // ASSUMPTION (Q-43, [verify]): diameter_km is the diameter of the bounding sphere of the
         // model. Catalogue diameters are often volume-equivalent, which would make this too large.
         const box = new Box3().setFromObject(root);
         const sphere = box.getBoundingSphere(new Sphere());
-        const holder = new Group();
+        const next = new Group();
         root.position.sub(sphere.center);
-        holder.add(root);
-        if (sphere.radius > 0) holder.scale.setScalar(1 / sphere.radius);
-        holder.rotation.y = mesh.rotation.y; // keep the spin angle across the swap
-        const shared = track(
-          new MeshStandardNodeMaterial({ color: srgb(body.tint), roughness: 0.95 }),
-        );
+        next.add(root);
+        if (sphere.radius > 0) next.scale.setScalar(Math.max(...body.axes) / sphere.radius);
+        next.position.set(...body.position);
+        next.rotation.y = holder ? holder.rotation.y : mesh.rotation.y; // keep the spin angle
+        const geoms: BufferGeometry[] = [];
         root.traverse((o) => {
-          if (o instanceof Mesh) o.material = shared;
+          if (o instanceof Mesh) geoms.push(o.geometry as BufferGeometry);
         });
-        group.remove(mesh);
-        group.add(holder);
-        const i = spinners.indexOf(mesh);
-        if (i >= 0) spinners[i] = holder;
+        const first = geoms[0]?.getAttribute('position');
+        const edge =
+          first && 'array' in first && !('isInterleavedBufferAttribute' in first)
+            ? meanEdgeLength(first.array as ArrayLike<number>, geoms[0]!.index?.array ?? null)
+            : null;
+        // Honesty filter (D-21): the cached geometry may carry an AO baked while Estimated was on,
+        // so whether it is drawn follows the plan (`shape.ao`), never the attribute alone.
+        const hasAo = bakedAoDrawn(
+          shape?.ao,
+          geoms.map((g) => g.getAttribute('ao') !== undefined),
+        );
+        const shared = makeMaterial(hasAo, edge);
+        root.traverse((o) => {
+          if (o instanceof Mesh) {
+            o.material = shared;
+            o.castShadow = shape?.shadows === true;
+            o.receiveShadow = shape?.shadows === true;
+          }
+        });
+        if (holder) group.remove(holder);
+        else group.remove(mesh);
+        group.add(next);
+        const i = spinners.indexOf(holder ?? mesh);
+        if (i >= 0) spinners[i] = next;
+        holder = next;
+        // The measured size is the longest extent of the model, not the radius of the box's
+        // bounding sphere (that overstates an elongated body such as Eros by about 20%).
+        const longest = Math.max(
+          box.max.x - box.min.x,
+          box.max.y - box.min.y,
+          box.max.z - box.min.z,
+        );
+        // Only a glTF model is in metres (Q-61); an OBJ has no stated unit, so it is not reported.
+        if (longest > 0 && Number.isFinite(longest) && isGltfUrl(body.meshUrl))
+          hooks.onMeshMeasured?.({ radiusM: longest / 2 });
+
+        // Baked AO (derived): bake once per model in slices, then swap in the AO material.
+        if (shape?.ao === true && !hasAo && geoms.some((g, k) => g !== bakedFor[k])) {
+          bakedFor = geoms;
+          // One ray count for every tier: the AO is cached on the shared geometry, so it must not
+          // depend on which tier loaded the model first (determinism).
+          Promise.all(geoms.map((g) => bakeVertexAo(g, AO_RAYS, () => disposed))).then(
+            (done) => {
+              if (disposed || holder !== next || !done.every(Boolean)) return;
+              const withAo = makeMaterial(true, edge);
+              next.traverse((o) => {
+                if (o instanceof Mesh) o.material = withAo;
+              });
+              hooks.onChange();
+            },
+            () => undefined, // AO is optional: the model stays lit without it (never blank)
+          );
+        }
         hooks.onChange();
       };
-      const ready = cache.loadedMesh(url);
-      if (ready) swap(ready);
-      else
-        cache.mesh(url).then(swap, () => {
-          if (!disposed) hooks.onLoadFailed('mesh');
-        });
+
+      const show = (lvl: LodLevel) => {
+        wanted = lvl;
+        const url = lvl === 1 && lods.lod1 ? lods.lod1 : lods.lod0;
+        const ready = cache.loadedMesh(url);
+        if (ready) {
+          apply(ready, lvl);
+          return;
+        }
+        cache.mesh(url).then(
+          (m) => apply(m, lvl),
+          () => {
+            if (disposed) return;
+            // Remember a missing coarse file: the size can change every frame, and a failed load
+            // is not cached, so it would be requested (and the full model rebuilt) again each time.
+            if (lvl === 1) lod1Missing = true;
+            // A stale failure (the wanted level has moved on) must not refuse the mesh.
+            if (lvl !== wanted) return;
+            // The coarse file may be missing: fall back to full detail before refusing the layer.
+            if (lvl === 1) show(0);
+            else if (!holder) hooks.onLoadFailed('mesh');
+          },
+        );
+      };
+      const refresh = () => {
+        const want = chooseLod(tier, screenPx, lods.lod1 !== null && !lod1Missing, wanted);
+        // Also while the first model is still loading: a later change must not be lost.
+        if (want !== wanted) show(want);
+      };
+      show(chooseLod(tier, screenPx, lods.lod1 !== null && !lod1Missing));
+      tierListeners.push(refresh); // `tier` is already the new level when listeners run
+      lodRefresh.push(refresh);
     }
   }
 
@@ -462,6 +608,7 @@ export function buildScene(
     shaderBody = ShaderBody.start(plan.shader.card, plan.shader.params, {
       visibleTags: allowedTags(plan.honesty),
       lightDir: plan.lighting.direction ?? undefined,
+      tier,
       onChange: () => {
         if (!disposed) hooks.onChange();
       },
@@ -477,31 +624,12 @@ export function buildScene(
     group.add(shaderBody.object);
   }
 
-  // Gas shells and dust --------------------------------------------------------------------
-  // r187 note (PointsNodeMaterial doc comment): WebGPU draws `Points` at 1 px whatever the size,
-  // so a point cloud is one instanced `Sprite` whose positions come from an instanced attribute.
-  const addPoints = (positions: Float32Array, color: Color, opacity: number) => {
-    const material = track(
-      new PointsNodeMaterial({
-        color,
-        size: SHELL_POINT_SIZE,
-        sizeAttenuation: false,
-        transparent: true,
-        opacity,
-        blending: AdditiveBlending,
-        depthWrite: false,
-      }),
-    );
-    material.positionNode = instancedBufferAttribute(new InstancedBufferAttribute(positions, 3));
-    const cloud = new Sprite(material);
-    cloud.count = positions.length / 3;
-    cloud.frustumCulled = false; // the shared quad's bounds do not describe the instances
-    group.add(cloud);
-  };
-  for (const shell of plan.shells) {
-    addPoints(shellPositions(shell), new Color(shell.css), SHELL_MAX_OPACITY * shell.brightness);
-  }
-  if (plan.dust) addPoints(dustPositions(plan.dust), srgb(plan.dust.tint), DUST_OPACITY);
+  // Emission volumes (issue #43): comet coma, dust and tails. They replace the point sprites, so
+  // no dots are drawn; the plan's `shells` and `dust` stay as data for the haptics.
+  const volumes = plan.volumes.map((v) => track(createVolume(v, tier)));
+  for (const v of volumes) group.add(v.mesh);
+  tierListeners.push((t) => volumes.forEach((v) => v.setTier(t)));
+  const jitterFrame = (i: number) => volumes.forEach((v) => v.setJitterFrame(i));
 
   // Disc, dust screen, trail ---------------------------------------------------------------
   for (const disc of plan.discs) {
@@ -581,6 +709,23 @@ export function buildScene(
       if (!shaderBody || disposed) return;
       if (next.lighting.direction) shaderBody.setSunDirection(next.lighting.direction);
       shaderBody.setVisibleTags(allowedTags(next.honesty));
+    },
+    shapeRadius,
+    setScreenPx(px) {
+      if (disposed || px === screenPx) return;
+      screenPx = px;
+      for (const r of lodRefresh) r();
+    },
+    setJitterFrame(index) {
+      jitterFrame(index);
+      shaderBody?.setJitterFrame(index);
+    },
+    setTier(next) {
+      if (disposed || next === tier) return;
+      tier = next;
+      shaderBody?.setTier(next);
+      for (const l of tierListeners) l(next);
+      hooks.onChange();
     },
     dispose() {
       disposed = true;

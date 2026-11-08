@@ -127,7 +127,7 @@ export function planBrownDwarf(
       // Flattening needs a mass (f = 0.7 Omega^2 R^3 / (G M)). `flatteningRule` assumes Jupiter's
       // mean density, which is wrong for a brown dwarf (13 to 80 Jupiter masses at about one Jupiter
       // radius: f is 10 to 50 times smaller), and the card has no mass. So it is refused, not drawn
-      // from the display cap (Q-108, D-32).
+      // from the display cap (Q-109, D-32).
       const flattening = 0;
       b.refuse({
         id: 'flattening',

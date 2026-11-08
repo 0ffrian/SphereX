@@ -353,3 +353,18 @@ describe('time-lapse and layer wording (D-32, D-34)', () => {
     }
   });
 });
+
+describe('displacement refusal (issue #43)', () => {
+  it('names the layer in plain words and says it is a server gap, not missing data about the object', () => {
+    expect(layerName('displacement')).toBe('Raised and lowered surface');
+    const line = describeRefusal({ id: 'displacement', reason: 'backend' });
+    expect(line).toMatch(/server does not send the relief height yet/);
+    expect(line).toMatch(/not missing data about this object/);
+    expect(line).not.toMatch(/relief amp|Layer “/);
+  });
+  it('the layer names have no spec ids or jargon', () => {
+    for (const id of ['point_cloud', 'baked_ao', 'self_shadow', 'ion_tail', 'dust_tail']) {
+      expect(layerName(id), id).not.toMatch(/\b[AQR]\d|Layer “/);
+    }
+  });
+});
