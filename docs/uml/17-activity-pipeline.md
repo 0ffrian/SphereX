@@ -68,7 +68,8 @@ flowchart TD
 - Refusal examples: an asteroid card without `diameter_km` puts the mesh in `missing` with no crash (rendering doc §11); a comet without published `gas_Q` gets no gas shells (§7.3).
 - Saturated points are excluded from brightness mapping and shown hatched (rendering doc §7.5).
 - `candidate` has no 3D layers. As built (issue #5) the endpoint still returns a RenderParams for it, with `layers: []`, `scale_m: null` and `mesh` in `missing` (Q-33).
-- As built (issue #5) the render-params endpoint does not bake: it names the R6.7 texture URLs, and baking and serving them is still to do. Cards and render params are validated with `jsonschema` before they are sent (Q-40).
+- As built (issue #5) the render-params endpoint names the R6.7 texture URLs; since issue #41 (Q-112) the bake runs in a worker process off the request path, both sizes, and `/data/textures` serves the result. Cards and render params are validated with `jsonschema` before they are sent (Q-40).
+- As built (issue #41, Q-111): the stages are drawn in order, but the catalogue (stage 3 input), the Horizons lighting and stage 1 run at the same time inside one job per object, and stage 2 measures each frame as its cutout lands. If stage 2 is not done when the card can be built, a first-stage `ObjectCard` and `RenderParams` go out with the SPHEREx fields and layers marked `measuring:`; if frames remain after the first batch, a partial pair measured from it follows (`measuring:frames`), then the final pair. Only the final pair can be saved (stage 4).
 - The physics layer is "reduced, physically inspired" formulas (architecture spec §7); its outputs are tagged `derived`.
 - Every external call in this flow goes through the backend's read-through cache (D-25). With `SX_OFFLINE=1` a cache miss is refused, and the refused layer goes in `missing`.
 - Small-body names are numbered asteroids, provisional designations, comets and interstellar objects (D-19).

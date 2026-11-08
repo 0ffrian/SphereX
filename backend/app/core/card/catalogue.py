@@ -193,19 +193,41 @@ def gather(ctx: Context, obj: ResolvedObject) -> CatalogueData:
     return CatalogueData(CatalogueFacts(), missing=("catalogue",))
 
 
-def with_geometry(ctx: Context, data: CatalogueData, obj: ResolvedObject) -> CatalogueData:
-    """Add the Horizons phase angle and Sun vector for a moving SBDB object at its resolve
-    epoch (Q-62). A miss or outage leaves ``geometry`` empty with a reason; never raises."""
+@dataclass(frozen=True)
+class GeometryAnswer:
+    """What ``fetch_geometry`` found: the geometry, or the reason there is none."""
+
+    geometry: horizons.Geometry | None = None
+    served: tuple[Served, ...] = ()
+    reason: str | None = None
+
+
+def fetch_geometry(ctx: Context, obj: ResolvedObject) -> GeometryAnswer | None:
+    """The Horizons phase angle and Sun vector for a moving SBDB object at its resolve epoch
+    (Q-62); None when the object has none to ask for. Needs only the resolved object, so the
+    object job starts it in parallel with the catalogue (issue #41). Never raises."""
     if obj.resolver != "sbdb" or not obj.spkid or not obj.epoch:
-        return data
+        return None
     try:
         geom, served = horizons.geometry(ctx, obj.spkid, parse_utc(obj.epoch))
     except CacheMissOffline:
-        reason = "Horizons geometry not cached and offline"
+        return GeometryAnswer(reason="Horizons geometry not cached and offline")
     except UpstreamUnavailable:
-        reason = "Horizons geometry unavailable"
-    else:
-        return replace(data, geometry=geom, served=(*data.served, *served))
+        return GeometryAnswer(reason="Horizons geometry unavailable")
+    return GeometryAnswer(geom, tuple(served))
+
+
+def apply_geometry(data: CatalogueData, answer: GeometryAnswer | None) -> CatalogueData:
+    if answer is None:
+        return data
+    if answer.geometry is not None:
+        return replace(data, geometry=answer.geometry, served=(*data.served, *answer.served))
     # "lighting" in missing: the user sees the refusal, and the asset is not saved with null
     # lighting (service.py saves only when `missing` is empty), so a later run can fill it.
-    return replace(data, geometry_reason=reason, missing=(*data.missing, "lighting"))
+    return replace(data, geometry_reason=answer.reason, missing=(*data.missing, "lighting"))
+
+
+def with_geometry(ctx: Context, data: CatalogueData, obj: ResolvedObject) -> CatalogueData:
+    """Add the Horizons phase angle and Sun vector for a moving SBDB object at its resolve
+    epoch (Q-62). A miss or outage leaves ``geometry`` empty with a reason; never raises."""
+    return apply_geometry(data, fetch_geometry(ctx, obj))
