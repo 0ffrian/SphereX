@@ -33,6 +33,9 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | [plan.md](plan.md) | A13 | you need the day-by-day schedule |
 | [risks.md](risks.md) | A14 | you need the risk register and mitigations |
 | [glossary.md](glossary.md) | A15 | you meet an unfamiliar term |
+| [linker.md](linker.md) | A16–A16.7 | you work on the Band-Hop Linker (proposal, Q-113): purpose, scope, architecture, honesty rules, open items, tickets |
+| [linker-backend.md](linker-backend.md) | A17–A17.11 | you build the linker's field pipeline, its endpoints, schemas, cache or compute budget |
+| [linker-ui.md](linker-ui.md) | A18–A18.10 | you fold the linker into the sky view: tool, layers, transport, chain and atlas views, state, accessibility, tests |
 
 ## Section map
 
@@ -94,3 +97,34 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | A13 | Plan to 14 Nov | [plan.md#a13-plan-to-14-nov](plan.md#a13-plan-to-14-nov) |
 | A14 | Risks and open questions | [risks.md#a14-risks-and-open-questions](risks.md#a14-risks-and-open-questions) |
 | A15 | Glossary | [glossary.md#a15-glossary](glossary.md#a15-glossary) |
+| A16 | Band-Hop Linker | [linker.md#a16-band-hop-linker](linker.md#a16-band-hop-linker) |
+| A16.1 | Why and who | [linker.md#a161-why-and-who](linker.md#a161-why-and-who) |
+| A16.2 | Scope and non-goals | [linker.md#a162-scope-and-non-goals](linker.md#a162-scope-and-non-goals) |
+| A16.3 | Architecture | [linker.md#a163-architecture](linker.md#a163-architecture) |
+| A16.4 | Data flow | [linker.md#a164-data-flow](linker.md#a164-data-flow) |
+| A16.5 | Honesty rules | [linker.md#a165-honesty-rules](linker.md#a165-honesty-rules) |
+| A16.6 | Open items | [linker.md#a166-open-items](linker.md#a166-open-items) |
+| A16.7 | Tickets and plan | [linker.md#a167-tickets-and-plan](linker.md#a167-tickets-and-plan) |
+| A17 | Linker backend | [linker-backend.md#a17-linker-backend](linker-backend.md#a17-linker-backend) |
+| A17.1 | Field and frames (`field.py`) | [linker-backend.md#a171-field-and-frames-fieldpy](linker-backend.md#a171-field-and-frames-fieldpy) |
+| A17.2 | Detection (`extract.py`) | [linker-backend.md#a172-detection-extractpy](linker-backend.md#a172-detection-extractpy) |
+| A17.3 | Static removal (`static.py`) | [linker-backend.md#a173-static-removal-staticpy](linker-backend.md#a173-static-removal-staticpy) |
+| A17.4 | Linking (`link.py`) | [linker-backend.md#a174-linking-linkpy](linker-backend.md#a174-linking-linkpy) |
+| A17.5 | Known-object match (`match.py`) | [linker-backend.md#a175-known-object-match-matchpy](linker-backend.md#a175-known-object-match-matchpy) |
+| A17.6 | Injection, completeness and control (`inject.py`) | [linker-backend.md#a176-injection-completeness-and-control-injectpy](linker-backend.md#a176-injection-completeness-and-control-injectpy) |
+| A17.7 | Export (`export.py`) | [linker-backend.md#a177-export-exportpy](linker-backend.md#a177-export-exportpy) |
+| A17.8 | Endpoints (beyond D-16, Q-113) | [linker-backend.md#a178-endpoints-beyond-d-16-q-113](linker-backend.md#a178-endpoints-beyond-d-16-q-113) |
+| A17.9 | Schemas and fixtures | [linker-backend.md#a179-schemas-and-fixtures](linker-backend.md#a179-schemas-and-fixtures) |
+| A17.10 | Cache, offline and determinism | [linker-backend.md#a1710-cache-offline-and-determinism](linker-backend.md#a1710-cache-offline-and-determinism) |
+| A17.11 | Compute budget | [linker-backend.md#a1711-compute-budget](linker-backend.md#a1711-compute-budget) |
+| A18 | Linker in the sky view | [linker-ui.md#a18-linker-in-the-sky-view](linker-ui.md#a18-linker-in-the-sky-view) |
+| A18.1 | Shell and tool | [linker-ui.md#a181-shell-and-tool](linker-ui.md#a181-shell-and-tool) |
+| A18.2 | Sky layers (`frontend/src/app/sky/linker/LinkerLayer.tsx`) | [linker-ui.md#a182-sky-layers-frontendsrcappskylinkerlinkerlayertsx](linker-ui.md#a182-sky-layers-frontendsrcappskylinkerlinkerlayertsx) |
+| A18.3 | Time and transport | [linker-ui.md#a183-time-and-transport](linker-ui.md#a183-time-and-transport) |
+| A18.4 | Camera | [linker-ui.md#a184-camera](linker-ui.md#a184-camera) |
+| A18.5 | Chain view | [linker-ui.md#a185-chain-view](linker-ui.md#a185-chain-view) |
+| A18.6 | Atlas view | [linker-ui.md#a186-atlas-view](linker-ui.md#a186-atlas-view) |
+| A18.7 | State and API client | [linker-ui.md#a187-state-and-api-client](linker-ui.md#a187-state-and-api-client) |
+| A18.8 | Accessibility (R9) | [linker-ui.md#a188-accessibility-r9](linker-ui.md#a188-accessibility-r9) |
+| A18.9 | Performance and haptics | [linker-ui.md#a189-performance-and-haptics](linker-ui.md#a189-performance-and-haptics) |
+| A18.10 | Testing | [linker-ui.md#a1810-testing](linker-ui.md#a1810-testing) |

@@ -31,6 +31,7 @@ Mermaid renders natively on GitHub, and in VS Code with a Mermaid extension (for
 | [19-activity-haptic-driver-select.md](19-activity-haptic-driver-select.md) | Activity | Choosing drivers at start-up (settings, platform defaults), calibration, the click that unlocks output, the `spherex:haptic` debug hook |
 | [20-sequence-composite.md](20-sequence-composite.md) | Sequence | The SPHEREx colour composite on the backend (prototype, Q-92): Stage 1 and 2, band and pass selection, alignment on one TAN grid, stretch, `derived.composite` cache, the PNG route |
 | [21-sequence-build-mould.md](21-sequence-build-mould.md) | Sequence | Select a body on the sky and Build it (issue #60, Q-113): the card, `/card` and `/render-params`, load first, stage plans with held layers, the pose (MouldRig), restore to the normal render |
+| [21-linker.md](21-linker.md) | Component, Sequence (2) | The Band-Hop Linker (proposal, Q-113; A16 to A18): the offline field pipeline in `core/link/` and its reused adapters, the cached results and `/v1/link` routes, the precompute run with injections and the shuffled-time control, and the sky view's Linker tool, layers, transport and chain pick |
 
 ## Conventions
 
