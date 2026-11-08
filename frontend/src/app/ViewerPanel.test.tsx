@@ -350,6 +350,16 @@ describe('ViewerPanel: remnant age slider (issue #43)', () => {
     // The name is the plain phrase only; the value and the hint are not part of it.
     const name = document.getElementById(input.getAttribute('aria-labelledby')!)!;
     expect(name.textContent).toBe('Age of the remnant');
+    // A real label: a click on the name focuses the slider.
+    expect(name.tagName).toBe('LABEL');
+    expect(name.getAttribute('for')).toBe(input.id);
+    // The chosen age is on screen, outside the accessible name and hidden from screen readers.
+    const out = input.closest('div')!.querySelector('output')!;
+    expect(out.getAttribute('aria-hidden')).toBe('true');
+    expect(out.textContent).toBe('100,000 years');
+    expect(document.getElementById(input.getAttribute('aria-describedby')!)!.textContent).toMatch(
+      /when 100,000 years old/,
+    );
     const hint = document.getElementById(input.getAttribute('aria-describedby')!)!;
     expect(hint.textContent).toMatch(/not a measurement/);
     expect(input.closest('div')!.textContent).toMatch(/Default/); // the Artistic tag shows as Default
@@ -367,6 +377,7 @@ describe('ViewerPanel: remnant age slider (issue #43)', () => {
     expect(useAppStore.getState().overrides.age_yr).toBe(5000);
     expect(fake.setOverrides).toHaveBeenLastCalledWith({ age_yr: 5000 });
     expect(slider()!.getAttribute('aria-valuetext')).toBe('5,000 years old');
+    expect(slider()!.closest('div')!.querySelector('output')!.textContent).toBe('5,000 years');
     // The store's reset clears it too.
     await act(async () => useAppStore.getState().resetOverrides());
     expect(fake.setOverrides).toHaveBeenLastCalledWith({});
@@ -382,15 +393,27 @@ describe('ViewerPanel: remnant age slider (issue #43)', () => {
     expect(fake.setOverrides).toHaveBeenLastCalledWith({});
   });
 
-  it('says the size is the shell at the slider maximum, in the bar', async () => {
+  it('says the size is the shell when 100,000 years old, in the bar', async () => {
     setNova();
     await mount();
     await click('+ Artistic');
-    expect(text('scale-bar')).toMatch(/long at the slider maximum/);
+    expect(text('scale-bar')).toMatch(/long when 100,000 years old/);
+  });
+
+  it('the honesty announcement keeps the remnant qualifier on the size', async () => {
+    setNova();
+    await mount();
+    await click('+ Artistic');
+    await click('+ Estimated');
+    await click('+ Artistic');
+    const live = document.body.textContent ?? '';
+    expect(live).toMatch(/when 100,000 years old/);
   });
 
   it('ageFromLog maps the log position to rounded years inside the range', () => {
     expect(ageFromLog(1)).toBe(10);
+    expect(ageFromLog(1.01)).toBe(10); // whole years below 1,000, not "10.2"
+    expect(ageFromLog(2.5)).toBe(316);
     expect(ageFromLog(5)).toBe(100000);
     expect(ageFromLog(3.69897)).toBe(5000);
     expect(ageFromLog(0)).toBe(10);

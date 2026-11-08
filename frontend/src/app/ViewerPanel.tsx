@@ -26,7 +26,7 @@ import {
 import type { PlanContext, RenderPlan, ViewModeId } from '@/viewer/planTypes';
 import { defaultContext, planRender } from '@/viewer/renderPlan';
 import { COMET_EPOCHS, epochsWithQ, EPOCH_LABEL } from '@/viewer/renderers/Comet';
-import { scaleBarFor, shownSize } from '@/viewer/scaleBar';
+import { AT_AGE_MAX_PHRASE, scaleBarFor, shownSize } from '@/viewer/scaleBar';
 import { SLIDER_REGISTRY } from '@/viewer/sliders';
 import type { CometEpoch, ObjectCard, RenderParams } from '@/contract';
 import { ProvenanceBadge } from './Badge';
@@ -42,13 +42,16 @@ const AGE_LOG_MAX = Math.log10(AGE_SLIDER.max);
 const AGE_LOG_STEP = 0.01;
 /** Years from a slider position, rounded to 3 significant digits and kept inside the range. */
 export function ageFromLog(pos: number): number {
-  const years = Number(Math.pow(10, pos).toPrecision(3));
+  const raw = Math.pow(10, pos);
+  // Whole years below 1,000 ("10 years", not "10.2 years"); 3 significant digits above.
+  const years = raw < 1000 ? Math.round(raw) : Number(raw.toPrecision(3));
   return Math.min(AGE_SLIDER.max, Math.max(AGE_SLIDER.min, years));
 }
 
 /** "1,200 years", "10 years". */
 function formatYears(n: number): string {
-  return `${n.toLocaleString('en')} ${n === 1 ? 'year' : 'years'}`;
+  const w = n < 1000 ? Math.round(n) : n;
+  return `${w.toLocaleString('en')} ${w === 1 ? 'year' : 'years'}`;
 }
 
 /** `prefers-reduced-motion`, kept current when the setting changes while the page is open. */
@@ -152,13 +155,19 @@ export function ViewerPanel() {
   const [meshSize, setMeshSize] = useState<{ key: string; radiusM: number } | null>(null);
   const meshRadiusM = meshSize?.key === objectKey ? meshSize.radiusM : null;
   const remnantShown = plan?.type === 'nova' && plan.drawn.some((l) => l.id === 'point_cloud');
-  const size = useMemo(() => {
-    if (!plan) return null;
-    const s = shownSize(plan, meshRadiusM, honesty);
-    // The age slider shrinks the drawn shell (to 3%), so the card's size is the shell at the
-    // slider maximum: say so in the bar, the label and the announcements (Q-103).
-    return remnantShown ? { ...s, atSliderMax: true } : s;
-  }, [plan, meshRadiusM, honesty, remnantShown]);
+  // The age slider shrinks the drawn shell (to 3%), so the card's size is the shell at the
+  // slider maximum: say so in the bar, the label and the announcements (Q-103). Used for the
+  // plan on screen and for the plan an honesty toggle is about to show.
+  const sizeOf = (p: RenderPlan, state: HonestyState) => {
+    const s = shownSize(p, meshRadiusM, state);
+    const remnant = p.type === 'nova' && p.drawn.some((l) => l.id === 'point_cloud');
+    return remnant ? { ...s, atSliderMax: true } : s;
+  };
+  const size = useMemo(
+    () => (plan ? sizeOf(plan, honesty) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `sizeOf` only reads `meshRadiusM`
+    [plan, meshRadiusM, honesty],
+  );
   const bar = useMemo(() => (size ? scaleBarFor(size.radiusM, size.qualifier) : null), [size]);
 
   // Mount the renderer once.
@@ -301,9 +310,7 @@ export function ViewerPanel() {
     const next = planWith({ honesty: state });
     // The size can change with the level (a shape model's own size swaps with the card's): say so.
     announce(
-      next
-        ? honestyAnnouncement(state, next, shownSize(next, meshRadiusM, state), size)
-        : HONESTY_LABEL[state],
+      next ? honestyAnnouncement(state, next, sizeOf(next, state), size) : HONESTY_LABEL[state],
     );
   };
   const onMode = (mode: ViewModeId) => {
@@ -523,10 +530,16 @@ export function ViewerPanel() {
           {remnantShown && (
             <div className="flex flex-col gap-1 text-sm text-neutral-300">
               <span className="flex flex-wrap items-center gap-2">
-                <span id={`${whyId}-age`}>Age of the remnant</span>
+                <label htmlFor={`${whyId}-age-input`} id={`${whyId}-age`}>
+                  Age of the remnant
+                </label>
+                <output aria-hidden="true" className="tabular-nums text-neutral-100">
+                  {formatYears(age)}
+                </output>
                 <ProvenanceBadge tag="artistic" fixture={objectIsFixture} />
               </span>
               <input
+                id={`${whyId}-age-input`}
                 type="range"
                 min={AGE_LOG_MIN}
                 max={AGE_LOG_MAX}
@@ -540,7 +553,7 @@ export function ViewerPanel() {
               />
               <span id={`${whyId}-age-hint`} className="text-xs text-neutral-400">
                 Your choice, not a measurement. The shell is drawn smaller when it is younger, so
-                the size shown is the shell at the slider maximum.
+                the size shown is the shell{AT_AGE_MAX_PHRASE}.
               </span>
             </div>
           )}
@@ -559,7 +572,7 @@ export function ViewerPanel() {
               </div>
               <figcaption className="text-sm text-neutral-200">
                 {bar.headline}
-                {size?.atSliderMax && ' at the slider maximum'}
+                {size?.atSliderMax && AT_AGE_MAX_PHRASE}
                 {bar.qualifier === 'upper_limit' && ' (upper limit)'}
                 {size?.tag && (
                   <>

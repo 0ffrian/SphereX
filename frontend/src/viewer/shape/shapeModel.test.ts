@@ -15,6 +15,8 @@ import {
   meanEdgeLength,
   needsShapeMaterial,
   regolithMinFrequency,
+  REGOLITH_MAX_TILT,
+  tiltRegolithNormal,
   shadowSettings,
   SHAPE_TRIANGLE_BUDGET,
   unitScale,
@@ -332,5 +334,29 @@ describe('160 px level-of-detail rule wired to the screen size', () => {
     expect(chooseLod('high', mid, true, 1)).toBe(1);
     expect(chooseLod('high', mid, true, 0)).toBe(0);
     expect(chooseLod('high', LOD1_MAX_SCREEN_PX * LOD_HYSTERESIS, true, 1)).toBe(0);
+  });
+});
+
+describe('regolith tilt magnitude', () => {
+  // A stub view matrix: a rotation of 90 degrees about z (it must not change a vector's length).
+  const rotate = (v: readonly [number, number, number]): [number, number, number] => [
+    -v[1],
+    v[0],
+    v[2],
+  ];
+  it('never tilts the normal by more than REGOLITH_MAX_TILT, even at the worst noise', () => {
+    const n: Vec3 = [0, 0, 1];
+    for (const sx of [-1, 0, 1])
+      for (const sy of [-1, 0, 1])
+        for (const sz of [-1, 0, 1]) {
+          const r = tiltRegolithNormal(n, [sx, sy, sz], rotate);
+          const angle = Math.acos(Math.min(1, r[0] * n[0] + r[1] * n[1] + r[2] * n[2]));
+          expect(angle).toBeLessThanOrEqual(REGOLITH_MAX_TILT + 1e-6);
+        }
+  });
+  it('the worst case reaches the stated peak (the amplitude is kept, not normalised away)', () => {
+    const r = tiltRegolithNormal([0, 0, 1], [1, 1, 0], rotate);
+    const angle = Math.acos(r[2]);
+    expect(angle).toBeGreaterThan(REGOLITH_MAX_TILT * 0.5);
   });
 });

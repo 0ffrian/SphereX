@@ -123,6 +123,34 @@ export function meanEdgeLength(
 export const REGOLITH_MAX_TILT = 0.12;
 
 /**
+ * Per-axis amplitude of the three noise samples, so that the worst case (all three at +-1) still
+ * has a tilt vector of length `REGOLITH_MAX_TILT`.
+ */
+export const REGOLITH_TILT_PER_AXIS = REGOLITH_MAX_TILT / Math.sqrt(3);
+
+/**
+ * CPU mirror of the shader's regolith tilt: `normalize(n + tilt)`, where `tilt` keeps its own
+ * length (it must not be normalised). `n` is a unit vector; `noise` holds the three samples in
+ * [-1, 1], and `toView` maps the model-space tilt to view space (a rotation).
+ */
+export function tiltRegolithNormal(
+  n: readonly [number, number, number],
+  noise: readonly [number, number, number],
+  toView: (v: readonly [number, number, number]) => [number, number, number],
+): [number, number, number] {
+  const t = toView([
+    noise[0] * REGOLITH_TILT_PER_AXIS,
+    noise[1] * REGOLITH_TILT_PER_AXIS,
+    noise[2] * REGOLITH_TILT_PER_AXIS,
+  ]);
+  const x = n[0] + t[0];
+  const y = n[1] + t[1];
+  const z = n[2] + t[2];
+  const l = Math.hypot(x, y, z) || 1;
+  return [x / l, y / l, z / l];
+}
+
+/**
  * Spatial frequency (cycles per scene unit) above which regolith detail may be added: the finest
  * feature the mesh resolves has a wavelength of two edges (Nyquist), so detail is added only for
  * wavelengths shorter than that and never changes the silhouette (D-33). `edgeScene` is the mean

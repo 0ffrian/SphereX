@@ -356,4 +356,35 @@ describe('scene builder (no GPU)', () => {
     cache.dispose();
     expect(spy.disposed).toBe(1);
   });
+
+  it('a missing coarse model is requested once, and a stale failure does not refuse the mesh', async () => {
+    const { card, params } = fixture('asteroid_shape');
+    card.shape_source = { value: '/data/shapes/x.glb', tag: 'measured', source: 'test' };
+    const plan = planRender(card, params, defaultContext({ honesty: 'artistic' }));
+    const requested: string[] = [];
+    const cache = new AssetCache();
+    (cache as unknown as { mesh: (u: string) => Promise<never> }).mesh = (u) => {
+      requested.push(u);
+      return Promise.reject(new Error('missing'));
+    };
+    const failures: string[] = [];
+    const built = buildScene(
+      plan,
+      { onLoadFailed: (id) => failures.push(id), onChange: () => {}, tier: 'low' },
+      cache,
+    );
+    const settle = () => new Promise((r) => setTimeout(r, 0));
+    await settle();
+    // Low quality asks for the coarse file first; it fails, so the full file is tried once.
+    expect(requested).toEqual(['/data/shapes/x.lod1.glb', '/data/shapes/x.glb']);
+    expect(failures).toEqual(['mesh']);
+    // Size changes (every frame during a zoom) do not start the loop again.
+    for (const px of [40, 80, 120, 400, 60]) {
+      built.setScreenPx(px);
+      await settle();
+    }
+    expect(requested).toHaveLength(2);
+    expect(failures).toEqual(['mesh']);
+    built.dispose();
+  });
 });

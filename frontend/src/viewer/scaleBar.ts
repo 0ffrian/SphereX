@@ -1,6 +1,10 @@
 // R5.4 scale bar: the physical size plus one familiar comparison. Pure functions.
 import type { Tag } from '@/contract';
 import { isTagShown, type HonestyState } from './honesty';
+import { SLIDER_REGISTRY } from './sliders';
+
+/** " when 100,000 years old": the age the remnant's card size belongs to (the slider maximum). */
+export const AT_AGE_MAX_PHRASE = ` when ${SLIDER_REGISTRY.age_yr.max.toLocaleString('en')} years old`;
 
 /** glTF units are metres (Q-61); an OBJ model has no stated unit, so its size is not trusted. */
 export function isGltfUrl(url: string | null | undefined): boolean {
