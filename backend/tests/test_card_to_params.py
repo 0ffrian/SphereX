@@ -156,6 +156,24 @@ def test_missing_field_refuses_its_layer(kind: str, field: str, layer: str) -> N
     assert layer not in [x["id"] for x in p["layers"]]
 
 
+@pytest.mark.parametrize("kind", ["nebula", "nova"])
+def test_volume_kinds_have_no_haptics(kind: str) -> None:
+    """Q-103: drawn as volumes, so nothing is felt (what is felt must match what is drawn, D-34)."""
+    p = params_for(load(kind, "cards"))
+    assert p["haptics"]["texture"] == "none" and p["haptics"]["data"] == "none"
+    assert errors(p, "render-params.schema.json") == []
+
+
+def test_relief_amp_is_a_declared_optional_texture_field() -> None:
+    """Q-103: the viewer reads textures.relief_amp; the backend does not send it yet (Kevin)."""
+    p = params_for(load("asteroid_procedural", "cards"))
+    assert "relief_amp" not in p["textures"]
+    p["textures"]["relief_amp"] = 0.03
+    assert errors(p, "render-params.schema.json") == []
+    p["textures"]["relief_amp"] = 0
+    assert errors(p, "render-params.schema.json") != []
+
+
 def test_dependent_haptics_are_refused_with_their_layer() -> None:
     bd = load("brown_dwarf", "cards")
     bd["flux_45um"]["value"] = None

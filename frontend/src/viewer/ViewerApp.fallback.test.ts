@@ -15,6 +15,9 @@ vi.mock('./render/pipeline', async (orig) => {
       if (state.mode === 'ctor') throw new Error('pipeline build failed');
     }
     setTier() {}
+    jitterIndex() {
+      return null;
+    }
     render = chainRender;
     dispose() {}
   }

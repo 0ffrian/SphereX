@@ -375,6 +375,7 @@ describe('ViewerApp TAAU restart (determinism, settled frame)', () => {
       config: { aa: 'taau', settleFrames: 3 },
       render: () => order.push('draw'),
       restartTemporal: () => order.push('restart'),
+      jitterIndex: () => null,
       dispose() {},
     };
     callbacks.length = 0;
@@ -403,6 +404,7 @@ describe('ViewerApp TAAU restart (determinism, settled frame)', () => {
         config: { aa: 'taau', settleFrames: 3 },
         render: () => order.push('draw'),
         restartTemporal: () => order.push('restart'),
+        jitterIndex: () => null,
         setTier() {},
         dispose() {},
       };

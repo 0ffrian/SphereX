@@ -4,7 +4,7 @@
 //   with roughness 0.95 and no procedural detail. A mesh that cannot be loaded is a refused layer
 //   and the body falls back to a plain sphere with a flat tint (never blank).
 import { litBody, PlanBuilder, numberField, type PlanInput } from '../planCommon';
-import type { RenderPlan } from '../planTypes';
+import type { RenderPlan, ShapePlan } from '../planTypes';
 
 /**
  * Spin speed-up. R7.1 shows "×1000" as its example of the factor on screen; the exact factor is
@@ -50,6 +50,42 @@ export function isLoadableMeshUrl(value: string | null | undefined): value is st
   return MESH_EXTENSIONS.test(value);
 }
 
+/**
+ * Issue #43: how a loaded model is lit and detailed. Each part is its own layer with its tag, so
+ * the honesty toggle can hide it: shadows (derived when the Sun direction is on the card, else
+ * artistic) and AO come from the measured shape (derived),
+ * Lommel-Seeliger is a reflectance model (model_dependent), regolith is look only (artistic).
+ * Also used for a comet nucleus that has a shape model (67P).
+ */
+export function planShapeLayers(b: PlanBuilder): ShapePlan {
+  return {
+    lommelSeeliger: b.drawLocal(
+      'reflectance',
+      'model_dependent',
+      'Light scatters off the surface the way dark, airless rock does. This is a standard model, not a measurement of this body.',
+    ),
+    // The shadows follow the Sun direction. Derived only when that direction comes from the phase
+    // angle on the card; a default or hinted direction makes the shadows an illustration.
+    shadows: b.drawLocal(
+      'self_shadow',
+      b.lighting.source === 'phase_angle' ? 'derived' : 'artistic',
+      b.lighting.source === 'phase_angle'
+        ? 'Parts of the shape shade each other, worked out from the shape and the Sun direction.'
+        : 'Parts of the shape shade each other. The Sun direction is a default, so the shadows are an illustration.',
+    ),
+    ao: b.drawLocal(
+      'baked_ao',
+      'derived',
+      'Soft shading in dents and hollows, worked out from the shape: how much open sky each point can see.',
+    ),
+    regolith: b.drawLocal(
+      'regolith',
+      'artistic',
+      'Fine regolith texture below the resolution of the model, for looks only.',
+    ),
+  };
+}
+
 export function planAsteroidMesh(input: PlanInput): RenderPlan {
   const b = new PlanBuilder(input);
   const bodyOk = b.body('diameter_km');
@@ -67,7 +103,10 @@ export function planAsteroidMesh(input: PlanInput): RenderPlan {
     b.legendBody('Plain sphere at the size on the card.');
   }
 
+  const shape = useMesh ? planShapeLayers(b) : null;
+
   return b.build({
+    shape,
     bodies: bodyOk
       ? [
           litBody('body', [1, 1, 1], b.tint.rgb, {

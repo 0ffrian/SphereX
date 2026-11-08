@@ -1,4 +1,80 @@
 // R5.4 scale bar: the physical size plus one familiar comparison. Pure functions.
+import type { Tag } from '@/contract';
+import { isTagShown, type HonestyState } from './honesty';
+import { SLIDER_REGISTRY } from './sliders';
+
+/** " when 100,000 years old": the age the remnant's card size belongs to (the slider maximum). */
+export const AT_AGE_MAX_PHRASE = ` when ${SLIDER_REGISTRY.age_yr.max.toLocaleString('en')} years old`;
+
+/** glTF units are metres (Q-61); an OBJ model has no stated unit, so its size is not trusted. */
+export function isGltfUrl(url: string | null | undefined): boolean {
+  return typeof url === 'string' && /\.(glb|gltf)(\?.*)?$/i.test(url);
+}
+
+/**
+ * Tag of a size read off the loaded shape model. ASSUMPTION (Q-103): a shape model is fitted to
+ * observations, so its size depends on that model (`model_dependent`); it is never the card's tag.
+ */
+export const MODEL_SIZE_TAG: Tag = 'model_dependent';
+export const MODEL_SIZE_WHY =
+  'The longest extent of the loaded shape model (its units are metres). The model is fitted to observations, so the size depends on it.';
+
+export interface ShownSize {
+  radiusM: number | null;
+  tag: Tag | null;
+  why: string | null;
+  qualifier: 'upper_limit' | null;
+  /** True when the size comes from the loaded model, not from the card. */
+  fromModel: boolean;
+  /**
+   * True when the remnant age slider can draw the shell smaller than this size (Q-103): the size
+   * is then the shell at the slider maximum. Set by the caller, not by `shownSize`.
+   */
+  atSliderMax?: boolean;
+}
+
+/**
+ * Which size the scale bar shows, and the tag that goes with that size. The model's own size is
+ * used only for a glTF model (metres, Q-61) and only while its tag is shown; otherwise the card's
+ * size and the card's tag are used. The two are never mixed.
+ */
+export function shownSize(
+  plan: {
+    scaleM: number | null;
+    sizeTag: Tag | null;
+    sizeWhy: string | null;
+    sizeQualifier: 'upper_limit' | null;
+    bodies: readonly { meshUrl?: string | null }[];
+  },
+  modelRadiusM: number | null,
+  honesty: HonestyState,
+): ShownSize {
+  const usable =
+    modelRadiusM !== null &&
+    Number.isFinite(modelRadiusM) &&
+    modelRadiusM > 0 &&
+    plan.scaleM !== null && // the size is hidden by the honesty level: no bar from the model either
+    plan.bodies.some((b) => isGltfUrl(b.meshUrl)) &&
+    isTagShown(honesty, MODEL_SIZE_TAG);
+  // The card's `upper_limit` qualifier (R7.3) is about the card's size. A loaded model's own size
+  // is a fitted extent, not a bound, so it legitimately drops the qualifier and carries its own
+  // tag and why-text instead (Q-103). When the card size is shown, its qualifier is kept below.
+  if (usable)
+    return {
+      radiusM: modelRadiusM,
+      tag: MODEL_SIZE_TAG,
+      why: MODEL_SIZE_WHY,
+      qualifier: null,
+      fromModel: true,
+    };
+  return {
+    radiusM: plan.scaleM,
+    tag: plan.sizeTag,
+    why: plan.sizeWhy,
+    qualifier: plan.sizeQualifier,
+    fromModel: false,
+  };
+}
 
 export interface Comparison {
   id: string;
@@ -22,10 +98,10 @@ export const COMPARISONS: readonly Comparison[] = [
 ];
 
 export interface ScaleBar {
-  /** Diameter of the body in metres (2 x scale_m). */
+  /** Longest extent of the body in metres (2 x scale_m). */
   diameterM: number;
   diameterText: string;
-  /** "2 km across", or "at most 2 km across" for an upper limit. */
+  /** "2 km long", or "at most 2 km long" for an upper limit. */
   headline: string;
   qualifier: 'upper_limit' | null;
   comparison: { id: string; name: string; detail: string; lengthM: number; text: string };
@@ -83,7 +159,7 @@ export function scaleBarFor(
   return {
     diameterM,
     diameterText: formatLength(diameterM),
-    headline: `${qualifier === 'upper_limit' ? 'At most ' : ''}${formatLength(diameterM)} across`,
+    headline: `${qualifier === 'upper_limit' ? 'At most ' : ''}${formatLength(diameterM)} long`,
     qualifier,
     comparison: { id: c.id, name: c.name, detail: c.detail, lengthM: c.lengthM, text },
     bodyFraction: diameterM / longest,

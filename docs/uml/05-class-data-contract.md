@@ -168,6 +168,7 @@ classDiagram
     +normal: url
     +roughness: url, optional
     +height_bin: url, optional
+    +relief_amp: number above 0, optional (fraction of the radius; not sent yet, Q-103)
   }
   class Lighting {
     +mode: LightMode

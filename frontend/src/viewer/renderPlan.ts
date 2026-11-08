@@ -87,6 +87,7 @@ function planRenderRaw(card: ObjectCard, params: RenderParams, ctx: PlanContext)
       screens: [],
       trails: [],
       dust: null,
+      volumes: [],
       drawn: [],
       missing: [{ id: 'body', reason: 'data', detail: 'The data was not usable.' }],
       notes: [],
@@ -120,6 +121,7 @@ function planRenderRaw(card: ObjectCard, params: RenderParams, ctx: PlanContext)
       star: null,
       jets: null,
       pulsation: null,
+      shape: null,
     };
   }
 }

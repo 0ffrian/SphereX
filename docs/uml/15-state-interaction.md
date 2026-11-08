@@ -46,7 +46,7 @@ stateDiagram-v2
 
 ## Sim clock (motion)
 
-The `SimClock` (`frontend/src/viewer/render/clock.ts`) runs only while a process exists (the spin, and since issue #42 the star, jet, storm, cloud and pulsation processes that `resolveMotion` in `motion/motion.ts` states; Q-103). A process is registered only when it drives a drawn layer: `finishMotion` in `motion/planMotion.ts` fills `Motion.activeProcesses` and `ViewerApp` registers only that list, so a still scene does not run the frame loop (Q-107) and no pause reason is set. Each reason is added and removed on its own; the clock runs again only when the set is empty.
+The `SimClock` (`frontend/src/viewer/render/clock.ts`) runs only while a process exists (the spin, and since issue #42 the star, jet, storm, cloud and pulsation processes that `resolveMotion` in `motion/motion.ts` states; Q-104). A process is registered only when it drives a drawn layer: `finishMotion` in `motion/planMotion.ts` fills `Motion.activeProcesses` and `ViewerApp` registers only that list, so a still scene does not run the frame loop (Q-108) and no pause reason is set. Each reason is added and removed on its own; the clock runs again only when the set is empty.
 
 ```mermaid
 stateDiagram-v2
@@ -83,4 +83,4 @@ stateDiagram-v2
 - Whatever pauses the clock, a change (honesty, new plan, rotate, zoom) still renders one settle burst. How the viewer implements motion and quality levels is Q-66 in [decisions](../decisions.md).
 - Whether a `stop` event is sent on pointer up is not stated **[verify]**.
 - On iPhone, iPad and desktop, Feeling produces sound only (D-08, D-10).
-- Feeling works on every kind: nebulae and novae get the D-12 field pulse, not a refusal (D-20). Each emitted event also fires the `spherex:haptic` debug event, which drives the on-screen pulse indicator ([11-sequence-touch-haptics.md](11-sequence-touch-haptics.md)).
+- Feeling works on every kind except the nebula and the nova, which have no haptics (Q-103; it amends the D-12 and D-20 field pulse, Atish's acceptance pending). The 3D view says so in plain words ("Nebulae have no touch feedback"). Each emitted event also fires the `spherex:haptic` debug event, which drives the on-screen pulse indicator ([11-sequence-touch-haptics.md](11-sequence-touch-haptics.md)).
