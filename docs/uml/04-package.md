@@ -30,7 +30,7 @@ flowchart TB
       FContract["src/contract : generated from shared/schemas (D-18), assertTagged next to it : follows the schemas owner"]
       subgraph FViewer["src/viewer (Moon)"]
         VCore["ViewerApp, lighting, modes, honesty, scaleBar, altText"]
-        VRend["renderers/ : AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody [verify], bodyRenderer, shaderPlan, shaderSpec, shaderPalette, pointClouds, StarBody, jetSurface, jetPalette; sliders.ts"]
+        VRend["renderers/ : AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody [verify], bodyRenderer, shaderPlan, shaderSpec, shaderPalette, pointClouds, StarBody, jetSurface, jetPalette, linearColour (sRGB to linear, once); sliders.ts"]
         VSky["sky/ : SkyView, skyMath, surveys (prototype, Q-89, Q-90)"]
         VRender["render/ : pipeline (RenderChain), quality (quality levels, FrameGovernor), clock (SimClock), workerPool (WorkerPool), fanout (loadBody, asset prefetch)"]
         VShaders["shaders/ : TSL noise (fbm, ridged, domainWarp, animatedCells, OCTAVES) and sphere helpers (latLon, tangentFrame, differentialRotate), star and loops (issue #42)"]

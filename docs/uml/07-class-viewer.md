@@ -22,7 +22,8 @@ classDiagram
     +renderStats() RenderStats
     +freezeClock(simSeconds: number) Promise~void~
     +whenSettled() Promise~void~
-    +timeLapses() id, label, speedup list
+    +timeLapses() id, label, speedup list via timeLapsesOf(plan), active processes only, Q-107
+    one Pause motion / Play motion button in the panel whenever timeLapses is not empty, reduced motion starts in Play
     +setTouchMode(on: boolean) void
     +render() void
     frames the camera to plan.extent, rebuilds only when sceneKey changes
@@ -136,6 +137,8 @@ classDiagram
     resolveMotion: measured card field, dynamics, class value, else dynamics:key in missing
     a process runs only with a stated speed-up and every rate it needs
     SimClock processes carry their tag and tier
+    activeProcesses are the processes that drive a drawn layer, filled by finishMotion in planMotion.ts, the only ones registered (Q-107)
+    cappedFlareSpeedup keeps flare onsets at or below 0.5 per real second (Q-107)
   }
   class ShaderBody {
     <<planet_rocky, planet_water, gas_giant, nebula, nova>>
@@ -164,6 +167,7 @@ classDiagram
     <<fieldGenerator.ts>>
     bilinear height and masks, nearest ids
     +setStorms(storms: Storm list or null) void, issue #42: the storm channel at the same t as the shader
+    +currentStorms: Storm list or null, read by FlowSource haptics (Q-104)
     sampleDirection and sampleUV
   }
   class Lighting {
