@@ -4,12 +4,17 @@
 // same shapes and error bodies as the real backend. Every reply carries `X-SX-Fixture: synthetic`
 // so the UI labels the data as fixture data. Served by vitePlugin.ts under `vite --mode fixtures`.
 //
+// Issue #62: also the backend's same-origin files (Q-44). `/data/textures/{id}/{version}/{seed}/{file}`
+// reads the fixture textures that backend/scripts/bake_fixtures.py bakes into shared/fixtures/textures
+// with the real baker (R6.7 layout), and `/data/shapes/{name}.glb` reads the real shape models in
+// backend/assets/shapes (not copied). These two are real files, not synthetic replies.
+//
 // Two stateful bits, both SYNTHETIC: a progressive target (`progressive` in targets.ts) answers
 // `/frames` in parts, each later reply listing more frames, like a live backend with a small
 // SX_LIVE_CUTOUTS_PER_REQUEST; a resolve of it starts again from the first part. The parts are
 // counted per browser session (a cookie the resolve sets), so parallel e2e tests do not share
 // them. And `/v1/sky/cached` lists the targets whose frames are "cached" (complete).
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type {
@@ -232,7 +237,77 @@ function headerJson(data: unknown): string {
   );
 }
 
-/** Returns null for paths outside `/v1/`, so the dev server handles them as usual. */
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const TEXTURES_DIR = join(REPO_ROOT, 'shared', 'fixtures', 'textures');
+const SHAPES_DIR = join(REPO_ROOT, 'backend', 'assets', 'shapes');
+const TEXTURES_PREFIX = '/data/textures/';
+const SHAPES_PREFIX = '/data/shapes/';
+/** The four R6.7 files (backend `bake.FILES`) and their content types. */
+const TEXTURE_TYPES: Record<string, string> = {
+  'albedo.webp': 'image/webp',
+  'height.png': 'image/png',
+  'normal.png': 'image/png',
+  'height.bin': 'application/octet-stream',
+};
+const SHAPE_NAME = /^[A-Za-z0-9_-]+(?:\.lod1)?\.glb$/;
+
+/**
+ * One path segment as the baker names its directory (backend `bake._segment`, Python
+ * `quote(name, safe="")`): everything but `A-Z a-z 0-9 _ . - ~` percent-encoded, so the id
+ * `fixture:brown_dwarf` is the directory `fixture%3Abrown_dwarf`.
+ */
+export function bakerSegment(name: string): string {
+  return Array.from(new TextEncoder().encode(name), (b) => {
+    const ch = String.fromCharCode(b);
+    return /[A-Za-z0-9_.~-]/.test(ch) ? ch : `%${b.toString(16).toUpperCase().padStart(2, '0')}`;
+  }).join('');
+}
+
+function fileReply(path: string, contentType: string): FixtureResponse {
+  if (!existsSync(path) || !statSync(path).isFile()) {
+    return error(404, 'not_found', 'No such file.');
+  }
+  return {
+    status: 200,
+    headers: { ...BASE_HEADERS, 'content-type': contentType },
+    body: readFileSync(path),
+  };
+}
+
+/**
+ * `/data/textures/{id}/{version}/{seed}/{file}`: each segment is decoded once (as a server does)
+ * and given the baker's directory name, so `fixture:x` and `fixture%3Ax` reach the same files.
+ */
+function textureReply(pathname: string): FixtureResponse {
+  let parts: string[];
+  try {
+    parts = pathname.slice(TEXTURES_PREFIX.length).split('/').map(decodeURIComponent);
+  } catch {
+    return error(404, 'not_found', 'No such texture.');
+  }
+  const [id, version, seed, file] = parts;
+  const type = file === undefined ? undefined : TEXTURE_TYPES[file];
+  const unsafe = (p: string) => p === '' || p === '.' || p === '..';
+  if (parts.length !== 4 || !type || !/^\d+$/.test(seed!) || unsafe(id!) || unsafe(version!)) {
+    return error(404, 'not_found', 'No such texture.');
+  }
+  return fileReply(
+    join(TEXTURES_DIR, bakerSegment(id!), bakerSegment(version!), seed!, file!),
+    type,
+  );
+}
+
+/** `/data/shapes/{slug}[.lod1].glb`: the committed shape models, read in place. */
+function shapeReply(pathname: string): FixtureResponse {
+  const name = pathname.slice(SHAPES_PREFIX.length);
+  if (!SHAPE_NAME.test(name)) return error(404, 'not_found', 'No such shape model.');
+  return fileReply(join(SHAPES_DIR, name), 'model/gltf-binary');
+}
+
+/**
+ * Returns null for paths outside `/v1/` and `/data/{textures,shapes}/`, so the dev server handles
+ * them as usual.
+ */
 export function handleFixtureRequest(
   method: string,
   url: string,
@@ -240,8 +315,11 @@ export function handleFixtureRequest(
 ): FixtureResponse | null {
   const u = new URL(url, 'http://fixtures.invalid');
   const session = sessionOf(headers);
-  if (!u.pathname.startsWith('/v1/')) return null;
+  const data = u.pathname.startsWith(TEXTURES_PREFIX) || u.pathname.startsWith(SHAPES_PREFIX);
+  if (!data && !u.pathname.startsWith('/v1/')) return null;
   if (method !== 'GET' && method !== 'HEAD') return error(405, 'method_not_allowed', 'Only GET.');
+  if (u.pathname.startsWith(TEXTURES_PREFIX)) return textureReply(u.pathname);
+  if (u.pathname.startsWith(SHAPES_PREFIX)) return shapeReply(u.pathname);
 
   if (u.pathname === '/v1/resolve') return resolve(u.searchParams.get('q'), session);
   if (u.pathname === '/v1/sky/index.json') return json(200, makeSkyIndex());

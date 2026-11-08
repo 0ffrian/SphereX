@@ -177,6 +177,7 @@ describe('R11 refusal', () => {
 
   it('a shape_source that is not a mesh file address is a refused mesh and the body stays', () => {
     const { card, params } = fixture('asteroid_shape');
+    card.shape_source = { value: 'fixture://meshes/none.glb', tag: 'measured', source: 'test' };
     const plan = planRender(card, params, defaultContext());
     expect(missing(plan, 'mesh')?.reason).toBe('load');
     expect(plan.bodies).toHaveLength(1);

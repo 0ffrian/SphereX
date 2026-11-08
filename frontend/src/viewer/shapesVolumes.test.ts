@@ -91,7 +91,8 @@ describe('shape-model asteroid (R7.1, A7.4)', () => {
   });
 
   it('with no loadable mesh there is no shape plan: a plain sphere, nothing invented', () => {
-    const { card, params } = fixture('asteroid_shape'); // fixture:// address
+    const { card, params } = fixture('asteroid_shape');
+    card.shape_source = { value: 'fixture://meshes/none.glb', tag: 'measured', source: 'test' };
     const plan = planRender(card, params, defaultContext({ honesty: 'artistic' }));
     expect(plan.bodies[0]?.meshUrl).toBeNull();
     expect(plan.shape).toBeNull();

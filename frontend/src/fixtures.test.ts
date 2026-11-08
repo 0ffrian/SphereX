@@ -235,6 +235,88 @@ describe('synthetic fixtures', () => {
   });
 });
 
+describe('fixture /data files (issue #62)', () => {
+  const params = import.meta.glob<{ id: string; textures?: Record<string, string> }>(
+    '../../shared/fixtures/params/*.json',
+    { import: 'default', eager: true },
+  );
+  const cards = import.meta.glob<{ shape_source?: { value: string } }>(
+    '../../shared/fixtures/cards/*.json',
+    { import: 'default', eager: true },
+  );
+  const get = (url: string) => handleFixtureRequest('GET', url)!;
+  const bytes = (url: string) => get(url).body as Uint8Array;
+  const ascii = (b: Uint8Array, from: number, to: number) =>
+    String.fromCharCode(...b.subarray(from, to));
+  const TYPES: Record<string, string> = {
+    albedo: 'image/webp',
+    height: 'image/png',
+    normal: 'image/png',
+    height_bin: 'application/octet-stream',
+  };
+  const textured = Object.values(params).filter((p) => p.textures);
+
+  it('the baked fixtures are the three textured kinds', () => {
+    expect(textured.map((p) => p.id).sort()).toEqual([
+      'fixture:asteroid_procedural',
+      'fixture:brown_dwarf',
+      'fixture:brown_dwarf_binary',
+    ]);
+  });
+
+  it.each(textured.flatMap((p) => Object.entries(p.textures!).map(([k, u]) => [k, u])))(
+    '%s %s is served with its content type',
+    (key, url) => {
+      const r = get(url);
+      expect(r.status).toBe(200);
+      expect(r.headers['content-type']).toBe(TYPES[key]);
+      const b = bytes(url);
+      if (key === 'albedo') expect([ascii(b, 0, 4), ascii(b, 8, 12)]).toEqual(['RIFF', 'WEBP']);
+      if (key === 'height' || key === 'normal')
+        expect(Array.from(b.subarray(0, 8))).toEqual(Array.from(PNG_SIGNATURE));
+      if (key === 'height_bin') expect(b.length).toBe(2 * 512 * 256); // float16, W x H
+    },
+  );
+
+  it('an encoded id reaches the same files as a raw one', () => {
+    const raw = '/data/textures/fixture:brown_dwarf/fixture-0/4/height.png';
+    const enc = '/data/textures/fixture%3Abrown_dwarf/fixture-0/4/height.png';
+    expect(get(enc).status).toBe(200);
+    expect(bytes(enc)).toEqual(bytes(raw));
+  });
+
+  it('serves the shape models in place, both levels, as glTF binary', () => {
+    const src = Object.values(cards).flatMap((c) => (c.shape_source ? [c.shape_source.value] : []));
+    expect(src).toEqual(['/data/shapes/eros-gaskell.glb']);
+    for (const url of ['/data/shapes/eros-gaskell.glb', '/data/shapes/eros-gaskell.lod1.glb']) {
+      const r = get(url);
+      expect(r.status).toBe(200);
+      expect(r.headers['content-type']).toBe('model/gltf-binary');
+      expect(ascii(bytes(url), 0, 4)).toBe('glTF');
+    }
+  });
+
+  it.each([
+    '/data/textures/fixture:brown_dwarf/fixture-0/4/bake.json',
+    '/data/textures/fixture:brown_dwarf/fixture-0/99/albedo.webp',
+    '/data/textures/fixture:brown_dwarf/fixture-0/x/albedo.webp',
+    '/data/textures/fixture:brown_dwarf/%2E%2E/4/albedo.webp',
+    '/data/textures/fixture:brown_dwarf/fixture-0/4/%E0%A4%A.png',
+    '/data/shapes/registry.toml',
+    '/data/shapes/missing.glb',
+    '/data/shapes/..%2Fpyproject.glb',
+  ])('%s is a 404', (url) => {
+    expect(get(url).status).toBe(404);
+  });
+
+  it('other /data paths and writes are not answered as files', () => {
+    expect(handleFixtureRequest('GET', '/data/other/x.png')).toBeNull();
+    // URL parsing resolves an encoded `..` first, so this leaves /data/textures: not served here.
+    expect(handleFixtureRequest('GET', '/data/textures/%2E%2E/fixture-0/4/albedo.webp')).toBeNull();
+    expect(handleFixtureRequest('POST', '/data/shapes/eros-gaskell.glb')!.status).toBe(405);
+  });
+});
+
 /** Every module specifier in a source text: `from 'x'`, `import 'x'`, `import('x')`. */
 function importSpecifiers(text: string): string[] {
   const re = /\b(?:from|import)\s*\(?\s*(['"])([^'"\n]+)\1/g;
