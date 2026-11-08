@@ -35,7 +35,7 @@ Barnard's Star example **[verify]** (each tier needs checking):
 | Spin | 1 | rotation period 145 ± 15 d from activity indicators (Toledo-Padrón et al. 2019, MNRAS 488, 5145, arXiv:1812.06712), verified 7 Nov 2026. Tier 1 only once the card carries it as `rot_period_h` (3,480 h, R3.4) |
 | Glow, cell noise | 5 | art |
 
-> **Implementation (issue #42, Q-87):** `bodies/starModel.ts` (CPU model of groups, flares and loops, pure in seed, rates and t), `shaders/star.ts`, `shaders/loops.ts`, `renderers/StarBody.ts`. Tiers as in Q-87: spots, faculae, prominence placement and flares tier 4; granulation, strand look and glow tier 5.
+> **Implementation (issue #42, Q-103):** `bodies/starModel.ts` (CPU model of groups, flares and loops, pure in seed, rates and t), `shaders/star.ts`, `shaders/loops.ts`, `renderers/StarBody.ts`. Tiers as in Q-103: spots, faculae, prominence placement and flares tier 4; granulation, strand look and glow tier 5.
 
 ### R7.5.2 Photosphere and granulation
 
@@ -66,4 +66,4 @@ Barnard's Star example **[verify]** (each tier needs checking):
 - **Motion:** flares use `speedup.flares`; loops sway slowly with the clock.
 - **Mira:** pulsation uses `pulsation_period_d` (tier 1 or 2, from the light curve). The ±10% amplitude stays `artistic` (Q-65).
 - In Measured only, none of R7.5.3 to R7.5.5 is drawn unless its tier is 1.
-- **Open visual findings (issue #42, Q-90):** granulation contrast is too high, the limb is not crisp and the prominence loop shape is stiff.
+- **Open visual findings (issue #42, Q-106):** granulation contrast is too high, the limb is not crisp and the prominence loop shape is stiff.

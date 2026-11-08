@@ -46,7 +46,7 @@ stateDiagram-v2
 
 ## Sim clock (motion)
 
-The `SimClock` (`frontend/src/viewer/render/clock.ts`) runs only while a process exists (the spin, and since issue #42 the star, jet, storm, cloud and pulsation processes that `motion/planMotion.ts` states; Q-87) and no pause reason is set. Each reason is added and removed on its own; the clock runs again only when the set is empty.
+The `SimClock` (`frontend/src/viewer/render/clock.ts`) runs only while a process exists (the spin, and since issue #42 the star, jet, storm, cloud and pulsation processes that `motion/planMotion.ts` states; Q-103) and no pause reason is set. Each reason is added and removed on its own; the clock runs again only when the set is empty.
 
 ```mermaid
 stateDiagram-v2

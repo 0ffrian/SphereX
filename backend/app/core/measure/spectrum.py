@@ -159,8 +159,12 @@ class SpectrumService:
         self.ctx = frames.ctx
         self.cfg = cfg
 
-    def get_spectrum(self, obj: ResolvedObject) -> SpectrumResult:
-        fr = self.frames.get_frames(obj)
+    def get_spectrum(
+        self, obj: ResolvedObject, frames: FramesResult | None = None
+    ) -> SpectrumResult:
+        """``frames``: Stage 1's result when the caller already has it (the composite), so the
+        frame list (and its live cutout budget) is not fetched a second time."""
+        fr = frames if frames is not None else self.frames.get_frames(obj)
         release = self.ctx.settings.data_release
         complete = is_complete(fr.missing)
 
