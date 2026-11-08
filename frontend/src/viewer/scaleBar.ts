@@ -8,7 +8,7 @@ export function isGltfUrl(url: string | null | undefined): boolean {
 }
 
 /**
- * Tag of a size read off the loaded shape model. ASSUMPTION (Q-87): a shape model is fitted to
+ * Tag of a size read off the loaded shape model. ASSUMPTION (Q-103): a shape model is fitted to
  * observations, so its size depends on that model (`model_dependent`); it is never the card's tag.
  */
 export const MODEL_SIZE_TAG: Tag = 'model_dependent';

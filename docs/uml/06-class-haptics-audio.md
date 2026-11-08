@@ -206,7 +206,7 @@ classDiagram
   class FieldSources {
     <<sources/field.ts>>
     CometFieldSource: k Q over r, nucleus tick
-    PointDensitySource: nova (nebula has no haptics, Q-87)
+    PointDensitySource: nova (nebula has no haptics, Q-103)
   }
   class DataPulseSources {
     <<sources/dataPulse.ts>>

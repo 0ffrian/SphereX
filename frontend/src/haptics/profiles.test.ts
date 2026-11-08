@@ -98,7 +98,7 @@ const TABLE: Record<ObjectType, Expect> = {
   gas_giant: { texture: 'flow', data: 'teq_pulse', dataTag: 'measured', missing: [] },
   planet_water: { texture: 'terrain', data: 'teq_pulse', dataTag: 'derived', missing: [] },
   planet_rocky: { texture: 'terrain', data: null, missing: [] },
-  // User decision (Q-87): the nebula has no haptics.
+  // User decision (Q-103): the nebula has no haptics.
   nebula: { texture: null, data: null, missing: [] },
   nova: { texture: null, data: 'field', dataTag: 'artistic', missing: [] },
 };
@@ -410,7 +410,7 @@ describe('R11 honesty: haptics follow the D-21 filter (through the real engine)'
     expect(feel('nova', 'artistic').windows).toBeGreaterThan(0);
   });
 
-  it('the nebula has no haptics at all, even in + Artistic (Q-87)', () => {
+  it('the nebula has no haptics at all, even in + Artistic (Q-103)', () => {
     const b = build('nebula');
     expect(b.texture).toBeNull();
     expect(b.data).toBeNull();

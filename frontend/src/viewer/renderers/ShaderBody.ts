@@ -610,7 +610,7 @@ export class ShaderBody implements BodyRenderer {
     const textures: DataTexture[] = [];
     if (spec.kind === 'nebula' || spec.kind === 'nova') {
       // N8: the points are generated in the field worker. Only the nova keeps them, as data for
-      // its density haptics (D-12); the nebula has no haptics (Q-87), so none are made.
+      // its density haptics (D-12); the nebula has no haptics (Q-103), so none are made.
       const points = spec.kind === 'nova' ? await this.pointSource(spec.kind, spec.seed) : null;
       if (this.disposed || spec !== this.spec) return null;
       // Issue #43: drawn as an emission volume, not as dots.
