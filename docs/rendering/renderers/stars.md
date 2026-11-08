@@ -36,6 +36,8 @@ Barnard's Star example **[verify]** (each tier needs checking):
 | Glow, cell noise | 5 | art |
 
 > **Implementation (issue #42, Q-103):** `bodies/starModel.ts` (CPU model of groups, flares and loops, pure in seed, rates and t), `shaders/star.ts`, `shaders/loops.ts`, `renderers/StarBody.ts`. Tiers as in Q-103: spots, faculae, prominence placement and flares tier 4; granulation, strand look and glow tier 5.
+>
+> **Deliberate deviations from this spec (Q-103, Q-107):** (1) R7.5.1 lists granulation under "+ Estimated" and the Barnard's Star example gives its cell size tier 3. The code draws granulation at **tier 5** (artistic), because the cell-size rule needs a mass and its constants are **[verify]** (R7.5.2, Q-103 item 1). (2) R7.5.5 allows flares at tier 1 when the rate is measured. The code caps the flare layer at **tier 4** even then (the weaker of the rate's tier and 4), because the drawn schedule and shape are seeded, not observed (Q-103 item 1). Flare onsets are also capped at 0.5 per real second, with the lowered speed-up shown (Q-107 item 3). Either the spec follows the code or the code follows the spec once Moon decides.
 
 ### R7.5.2 Photosphere and granulation
 
@@ -66,4 +68,4 @@ Barnard's Star example **[verify]** (each tier needs checking):
 - **Motion:** flares use `speedup.flares`; loops sway slowly with the clock.
 - **Mira:** pulsation uses `pulsation_period_d` (tier 1 or 2, from the light curve). The ±10% amplitude stays `artistic` (Q-65).
 - In Measured only, none of R7.5.3 to R7.5.5 is drawn unless its tier is 1.
-- **Open visual findings (issue #42, Q-106):** granulation contrast is too high, the limb is not crisp and the prominence loop shape is stiff.
+- **Visual findings (issue #42, Q-106):** granulation contrast, the limb, the prominence strands (now tapered, uneven in height and phase) and the star colour (converted from sRGB once) were fixed after the review; whether they look right on a real GPU is still open.
