@@ -1,0 +1,160 @@
+{
+  "card": {
+    "albedo": {
+      "err": 0.002,
+      "source": "JPL SBDB albedo (Hergenrother, M.C., et al., Nat. Commun. 10, 1291 (2019))",
+      "tag": "measured",
+      "value": 0.044
+    },
+    "band_depth_3um": {
+      "source": "not available: no source in the pipeline yet (no band-depth rule in the specs)",
+      "tag": "measured",
+      "value": null
+    },
+    "diameter_km": {
+      "err": 0.0003,
+      "source": "JPL SBDB diameter (Daly, M.G., et al., Sci. Adv. 6, eabd3649 (2020))",
+      "tag": "measured",
+      "value": 0.48444
+    },
+    "gaia_rgb": {
+      "formula": "Gaia DR3 colours to RGB (not computed)",
+      "source": "not available: the Gaia adapter is not built (A3.2)",
+      "tag": "derived",
+      "value": null
+    },
+    "id": "sbdb-20101955",
+    "lightcurve_amp_mag": {
+      "source": "not available: JPL SBDB gives no light-curve amplitude",
+      "tag": "measured",
+      "value": null
+    },
+    "name": "101955 Bennu (1999 RQ36)",
+    "phase_angle_deg": {
+      "source": "JPL Horizons quantity 24 (Sun-Target-Observer), observer SPHEREx 500@-163182, at 2026-11-14T00:00:00.000Z",
+      "tag": "measured",
+      "value": 13.955
+    },
+    "rot_period_h": {
+      "err": 2e-06,
+      "source": "JPL SBDB rot_per (Hergenrother, M.C., et al., Nat. Commun. 10, 1291 (2019))",
+      "tag": "measured",
+      "value": 4.296061
+    },
+    "slope_075_25": {
+      "source": "not available: no source in the pipeline yet (no slope-fit rule in the specs)",
+      "tag": "measured",
+      "value": null
+    },
+    "spectral_class": {
+      "source": "JPL SBDB spec_B (SMASS taxonomy; Clark, B.E., et al., Icarus 216, 462-475 (2011))",
+      "tag": "measured",
+      "value": "B"
+    },
+    "spherex_rgb": {
+      "source": "not available: no SPHEREx spectrum for this object",
+      "tag": "measured",
+      "value": null
+    },
+    "sun_vector": {
+      "formula": "-r/|r|, r = heliocentric ICRF position from JPL Horizons VECTORS (CENTER 500@10) at 2026-11-14T00:00:00.000Z; frame ICRF (equatorial J2000), direction target to Sun",
+      "source": "JPL Horizons VECTORS, CENTER 500@10, at 2026-11-14T00:00:00.000Z",
+      "tag": "derived",
+      "value": [
+        0.10685473,
+        0.865828909,
+        0.488796857
+      ]
+    },
+    "type": "asteroid_procedural"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b2",
+  "render_params": {
+    "alt_text": "101955 Bennu (1999 RQ36), Asteroid, 0.484 km across (measured), no visible colour basis, viewed at 14 degrees. Surface relief: illustrative.",
+    "generator_version": "p1-b2",
+    "haptics": {
+      "data": "none",
+      "data_tag": "artistic",
+      "params": {
+        "tau": 0.15
+      },
+      "texture": "height",
+      "texture_tag": "artistic"
+    },
+    "id": "sbdb-20101955",
+    "layers": [
+      {
+        "description": "Procedural height field from the seed, style rubble (R6.2, R6.3).",
+        "id": "relief",
+        "requires": [
+          "diameter_km"
+        ],
+        "tag": "artistic",
+        "tier": 5
+      },
+      {
+        "description": "Surface pushed out by the height map, up to 0.04 of the radius (style rubble, R6.2, R7.2).",
+        "id": "displacement",
+        "requires": [
+          "diameter_km"
+        ],
+        "tag": "artistic",
+        "tier": 5
+      }
+    ],
+    "lighting": {
+      "mode": "sun",
+      "phase_angle_deg": 13.955,
+      "sun_dir": [
+        0.10685473,
+        0.865828909,
+        0.488796857
+      ]
+    },
+    "missing": [
+      "ellipsoid",
+      "albedo_map",
+      "visible",
+      "spherex_ir",
+      "spectrum"
+    ],
+    "scale_m": 242.22,
+    "seed": 1304859858,
+    "textures": {
+      "albedo": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/albedo.webp",
+      "height": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/height.png",
+      "height_bin": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/height.bin",
+      "normal": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/normal.png",
+      "relief_amp": 0.04
+    },
+    "type": "asteroid_procedural",
+    "view_modes": {
+      "spherex_ir": {
+        "available": false,
+        "badge": "SPHEREx infrared, whole-body average (false colour)",
+        "channels_um": [
+          3.0,
+          2.0,
+          1.0
+        ],
+        "rgb": null,
+        "source": "spherex_rgb"
+      },
+      "visible": {
+        "available": false,
+        "badge": "Estimated visible colour",
+        "rgb": null,
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 1304859858,
+  "textures": {
+    "albedo": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/albedo.webp",
+    "height": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/height.png",
+    "height_bin": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/height.bin",
+    "normal": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/normal.png",
+    "relief_amp": 0.04
+  }
+}

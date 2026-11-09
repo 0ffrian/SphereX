@@ -103,9 +103,14 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
   });
 
   it('shows a class label only when the row has one, and never a made-up one', () => {
-    expect(DEMO_TARGETS.every((t) => t.classLabel === null)).toBe(true);
+    // The labels are generated from the pre-built cards (bake_demo_pack.py), never hand-written:
+    // each shown label is the generated one, and a row with no card shows its name only.
     focus();
-    expect(host.querySelectorAll('[role="option"] .sx-suggest-label')).toHaveLength(0);
+    const shown = [...host.querySelectorAll('[role="option"]')].map(
+      (o) => o.querySelector('.sx-suggest-label')?.textContent ?? null,
+    );
+    expect(shown).toEqual(DEMO_TARGETS.map((t) => t.classLabel));
+    expect(DEMO_TARGETS.some((t) => t.classLabel !== null)).toBe(true);
   });
 
   it('filters on the name and aliases, ignoring case, apostrophes and spaces', () => {

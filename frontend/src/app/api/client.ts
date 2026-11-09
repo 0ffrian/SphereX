@@ -2,7 +2,13 @@
 // image; plus the sky index, the cached positions and the colour composite (not in D-16, see
 // types.ts). Cutouts and flag masks are plain <img> URLs taken from the reply as given. Every reply
 // is checked against the contract (validate.ts).
-import { API_BASE, API_TIMEOUT_MS, COMBINE_HEADER, FIXTURE_HEADER } from './config';
+import {
+  API_BASE,
+  API_TIMEOUT_MS,
+  ASSET_STATUS_HEADER,
+  COMBINE_HEADER,
+  FIXTURE_HEADER,
+} from './config';
 import { ApiError } from './errors';
 import type { ObjectCard, RenderParams } from '@/contract';
 import type {
@@ -36,6 +42,8 @@ export type FixtureKind = 'synthetic' | null;
 export interface ApiResult<T> {
   data: T;
   fixture: FixtureKind;
+  /** The `X-SX-Asset-Status` header ("saved", "generated" or "sketch"); null when not sent. */
+  assetStatus?: string | null;
 }
 
 /** A combined image: an object URL for the PNG (revoke it with revokeObjectUrl) and its header. */
@@ -153,7 +161,11 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
           res.status === 404 ? 'not_found' : res.status >= 500 ? 'server' : 'bad_request';
         throw new ApiError(kind, err?.detail || null, res.status, err?.error ?? null);
       }
-      return { data: await read(res, ifAborted), fixture };
+      return {
+        data: await read(res, ifAborted),
+        fixture,
+        assetStatus: res.headers.get(ASSET_STATUS_HEADER),
+      };
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener('abort', onOuterAbort);

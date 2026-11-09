@@ -1,0 +1,107 @@
+{
+  "card": {
+    "id": "simbad-name-barnard-s-star",
+    "name": "NAME Barnard's star",
+    "pm_mas_yr": {
+      "source": "SIMBAD NAME Barnard's star (pmra = mu_alpha * cos(delta), pmdec)",
+      "tag": "measured",
+      "value": [
+        -801.551,
+        10362.394
+      ]
+    },
+    "radius_rsun": {
+      "assumption": "FLAME radius from the GSP-Phot Teff and a model bolometric luminosity (Gaia DR3 radius_flame); a model value, not a measured radius, and it inherits GSP-Phot's weakness for cool stars",
+      "err": 0.0040999999999999925,
+      "source": "Gaia DR3 astrophysical_parameters radius_flame, source 4472832130942575872",
+      "tag": "model_dependent",
+      "value": 0.2022
+    },
+    "spectral_class": {
+      "source": "SIMBAD NAME Barnard's star sp_type",
+      "tag": "measured",
+      "value": "M4V"
+    },
+    "teff_K": {
+      "formula": "median of the non-null Teff values in SIMBAD mesFe_h; of two middle values, the one from the most recent bibcode (Q-152)",
+      "source": "SIMBAD mesFe_h: median of 55 published spectroscopic Teff values (3083 to 3530 K); the middle value is from 2022A&A...658A.194P",
+      "tag": "derived",
+      "value": 3243.0
+    },
+    "type": "star"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b2",
+  "render_params": {
+    "alt_text": "NAME Barnard's star, Star, 0.202 solar radii (model dependent), colour from Teff, self-luminous. Surface relief: illustrative.",
+    "generator_version": "p1-b2",
+    "haptics": {
+      "data": "motion",
+      "data_tag": "measured",
+      "params": {},
+      "texture": "none",
+      "texture_tag": "artistic"
+    },
+    "id": "simbad-name-barnard-s-star",
+    "layers": [
+      {
+        "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
+        "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)",
+        "id": "colour",
+        "requires": [
+          "teff_K"
+        ],
+        "tag": "derived",
+        "tier": 2
+      },
+      {
+        "assumed": {
+          "limb_darkening_u": 0.6
+        },
+        "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+        "formula": "I(mu) = 1 - u * (1 - mu), u = 0.6",
+        "id": "limb_darkening",
+        "requires": [],
+        "tag": "model_dependent",
+        "tier": 3
+      },
+      {
+        "description": "Motion trail from pm_mas_yr over the SPHEREx epochs (R7.5).",
+        "id": "motion_trail",
+        "requires": [
+          "pm_mas_yr"
+        ],
+        "tag": "measured",
+        "tier": 1
+      }
+    ],
+    "lighting": {
+      "mode": "self"
+    },
+    "missing": [
+      "spectrum"
+    ],
+    "scale_m": 140670540.0,
+    "seed": 3325399859,
+    "type": "star",
+    "view_modes": {
+      "visible": {
+        "available": true,
+        "badge": "Estimated visible colour",
+        "rgb": {
+          "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)",
+          "source": "teff_K = 3243 K",
+          "tag": "derived",
+          "value": [
+            1.0,
+            0.5304,
+            0.2041
+          ]
+        },
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 3325399859,
+  "textures": null
+}
