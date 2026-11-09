@@ -1,8 +1,8 @@
 # Area search: Discovery backend
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A17–A17.11 · **Overview:** [linker.md](linker.md) (A16) · **Sky UI:** [linker-ui.md](linker-ui.md) (A18)
+> **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A17–A17.11 · **Overview:** [linker.md](area-search.md) (A16) · **Sky UI:** [linker-ui.md](area-ui.md) (A18)
 
-Status: **agreed plan, not built** ([Q-146](../decisions/moving-objects.md)). Every threshold below is a starting value, written into the reply's `method` block the way Stage 2 reports its settings ([A4.2](pipeline.md#a42-stage-2-measure-brightness-and-spectrum)). Values marked **[verify]** wait on the Day 0 count (A16.7). Track's backend (path endpoint, frame list, export) is Kevin's under Q-140, Q-141 and Q-145 and is not repeated here.
+Status: **agreed plan, not built** ([Q-146](../../decisions/moving-objects.md)). Every threshold below is a starting value, written into the reply's `method` block the way Stage 2 reports its settings ([A4.2](../pipeline.md#a42-stage-2-measure-brightness-and-spectrum)). Values marked **[verify]** wait on the Day 0 count (A16.7). Track's backend (path endpoint, frame list, export) is Kevin's under Q-140, Q-141 and Q-145 and is not repeated here.
 
 ## A17 Discovery backend
 
@@ -11,7 +11,7 @@ An **area** pipeline in `backend/app/core/area/`, run offline by `backend/script
 ### A17.1 Area and frames (`frames.py`)
 
 - **Area:** `{area_id, ra, dec, width_deg, height_deg, data_release, visits}` from `scripts/targets.toml`, group `areas`. The demo area is centred on Eros's 20 to 21 Mar 2026 path (Q-137) and sized to hold it, about 1° **[verify]**.
-- **Frame search.** Reuse PR #53's frame search for a fixed position, run on a grid of points across the area (large SIA cones time out, [A3.1](data-sources.md#a31-spherex-irsa)); rows joined by observation id and detector. An overflowing cone is refused as `frames:truncated`.
+- **Frame search.** Reuse PR #53's frame search for a fixed position, run on a grid of points across the area (large SIA cones time out, [A3.1](../data-sources.md#a31-spherex-irsa)); rows joined by observation id and detector. An overflowing cone is refused as `frames:truncated`.
 - **Visits.** Frames are sorted by exposure midpoint and grouped into **visits**: exposures less than `visit_gap_h` apart (start 1 h **[verify]**). An area with fewer than 2 visits is refused for Discovery as `area:visits` (Known still works).
 - **Cutouts only, never whole frames** (D-25): one cutout per frame covering the area, through the shared cutout pool (Q-112) and the read-through cache.
 - **Output:** `AreaFrame{frame_id, obs_id, detector, visit, exposure, time, wcs, cutout_key}`, time order.
@@ -47,7 +47,7 @@ Simple and exhaustive, because an area holds few movers-to-be:
 
 ### A17.5 SkyBoT check (`match.py`)
 
-- **SkyBoT** cone search per visit epoch ([A3.5](data-sources.md#a35-imcce-skybot)) covering the area, cached. The same reply feeds the **Known objects** list (A18.5).
+- **SkyBoT** cone search per visit epoch ([A3.5](../data-sources.md#a35-imcce-skybot)) covering the area, cached. The same reply feeds the **Known objects** list (A18.5).
 - A track **matches** a known object if at least two thirds of its dots lie within `r_known = max(3 px, 3 σ_position)` of that object's SkyBoT position at the dot time. Ties go to the smallest median separation.
 - **Output:** `match{designation, number, v_mag, median_sep_px, source: "skybot"}` or `null`.
 - **Verdict:** `found_blind` (a track that matches), `unexplained` (a track that matches nothing), `possible` (not a track; A17.4).

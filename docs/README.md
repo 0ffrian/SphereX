@@ -54,7 +54,7 @@ Always load the decision index [decisions/README.md](decisions/README.md) first 
 | Labels and honesty in the UI | [architecture/honesty-policy.md](architecture/honesty-policy.md), [rendering/display-rules.md](rendering/display-rules.md) (R5.3, D-21) |
 | Tests | [architecture/testing.md](architecture/testing.md), [rendering/layout-tests-open-items.md](rendering/layout-tests-open-items.md), [rendering/reference/](rendering/reference/README.md) (reference frames, visual checklist, frame-time checks) |
 | Where code lives and who owns it | [rendering/layout-tests-open-items.md](rendering/layout-tests-open-items.md) (R10), [uml/04-package.md](uml/04-package.md), decisions D-17 |
-| Area search: draw a square, Known objects (Track) or Discovery, `/v1/areas` routes, sky layers and island cards | [architecture/linker.md](architecture/linker.md) (A16), [architecture/linker-backend.md](architecture/linker-backend.md) (A17), [architecture/linker-ui.md](architecture/linker-ui.md) (A18), [uml/22-area-search.md](uml/22-area-search.md), decisions Q-146, Q-131 and Q-148 |
+| Area search: draw a square, Known objects (Track) or Discovery, `/v1/areas` routes, sky layers and island cards | [architecture/linker.md](architecture/moving-objects/area-search.md) (A16), [architecture/linker-backend.md](architecture/moving-objects/area-backend.md) (A17), [architecture/linker-ui.md](architecture/moving-objects/area-ui.md) (A18), [uml/22-area-search.md](uml/22-area-search.md), decisions Q-146, Q-131 and Q-148 |
 | Plan, milestones, risks | [architecture/plan.md](architecture/plan.md), [architecture/risks.md](architecture/risks.md), decisions D-14, D-29 and D-30 |
 
 ## Editing rules

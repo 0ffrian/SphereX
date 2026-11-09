@@ -33,9 +33,9 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | [plan.md](plan.md) | A13 | you need the day-by-day schedule |
 | [risks.md](risks.md) | A14 | you need the risk register and mitigations |
 | [glossary.md](glossary.md) | A15 | you meet an unfamiliar term |
-| [linker.md](linker.md) | A16–A16.7 | you work on Area search (agreed plan, Q-146): draw a square, then Known objects (hand-off to Track, Q-131) or Discovery; scope, architecture, honesty rules, open items, tickets |
-| [linker-backend.md](linker-backend.md) | A17–A17.11 | you build the Discovery backend: area frames and visits, dots, glitches and stars, joining across visits, SkyBoT check, `/v1/areas` endpoints, schemas, cache |
-| [linker-ui.md](linker-ui.md) | A18–A18.10 | you build Area search in the sky view: drawing the square, Dots and Tracks layers, blink, island cards and minimise, hand-off to Track, state, tests |
+| [linker.md](moving-objects/area-search.md) | A16–A16.7 | you work on Area search (agreed plan, Q-146): draw a square, then Known objects (hand-off to Track, Q-131) or Discovery; scope, architecture, honesty rules, open items, tickets |
+| [linker-backend.md](moving-objects/area-backend.md) | A17–A17.11 | you build the Discovery backend: area frames and visits, dots, glitches and stars, joining across visits, SkyBoT check, `/v1/areas` endpoints, schemas, cache |
+| [linker-ui.md](moving-objects/area-ui.md) | A18–A18.10 | you build Area search in the sky view: drawing the square, Dots and Tracks layers, blink, island cards and minimise, hand-off to Track, state, tests |
 
 ## Section map
 
@@ -97,34 +97,34 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | A13 | Plan to 14 Nov | [plan.md#a13-plan-to-14-nov](plan.md#a13-plan-to-14-nov) |
 | A14 | Risks and open questions | [risks.md#a14-risks-and-open-questions](risks.md#a14-risks-and-open-questions) |
 | A15 | Glossary | [glossary.md#a15-glossary](glossary.md#a15-glossary) |
-| A16 | Area search | [linker.md#a16-area-search](linker.md#a16-area-search) |
-| A16.1 | Why and who | [linker.md#a161-why-and-who](linker.md#a161-why-and-who) |
-| A16.2 | Scope | [linker.md#a162-scope](linker.md#a162-scope) |
-| A16.3 | Architecture | [linker.md#a163-architecture](linker.md#a163-architecture) |
-| A16.4 | Data flow | [linker.md#a164-data-flow](linker.md#a164-data-flow) |
-| A16.5 | Honesty rules | [linker.md#a165-honesty-rules](linker.md#a165-honesty-rules) |
-| A16.6 | Open items | [linker.md#a166-open-items](linker.md#a166-open-items) |
-| A16.7 | Tickets and plan | [linker.md#a167-tickets-and-plan](linker.md#a167-tickets-and-plan) |
-| A17 | Discovery backend | [linker-backend.md#a17-discovery-backend](linker-backend.md#a17-discovery-backend) |
-| A17.1 | Area and frames (`frames.py`) | [linker-backend.md#a171-area-and-frames-framespy](linker-backend.md#a171-area-and-frames-framespy) |
-| A17.2 | Dots (`dots.py`) | [linker-backend.md#a172-dots-dotspy](linker-backend.md#a172-dots-dotspy) |
-| A17.3 | Glitches and stars (`clean.py`) | [linker-backend.md#a173-glitches-and-stars-cleanpy](linker-backend.md#a173-glitches-and-stars-cleanpy) |
-| A17.4 | Join across visits (`join.py`) | [linker-backend.md#a174-join-across-visits-joinpy](linker-backend.md#a174-join-across-visits-joinpy) |
-| A17.5 | SkyBoT check (`match.py`) | [linker-backend.md#a175-skybot-check-matchpy](linker-backend.md#a175-skybot-check-matchpy) |
-| A17.6 | Injection, completeness and control | [linker-backend.md#a176-injection-completeness-and-control](linker-backend.md#a176-injection-completeness-and-control) |
-| A17.7 | Export (`export.py`) | [linker-backend.md#a177-export-exportpy](linker-backend.md#a177-export-exportpy) |
-| A17.8 | Endpoints (beyond D-16) | [linker-backend.md#a178-endpoints-beyond-d-16](linker-backend.md#a178-endpoints-beyond-d-16) |
-| A17.9 | Schemas and fixtures | [linker-backend.md#a179-schemas-and-fixtures](linker-backend.md#a179-schemas-and-fixtures) |
-| A17.10 | Cache, offline and determinism | [linker-backend.md#a1710-cache-offline-and-determinism](linker-backend.md#a1710-cache-offline-and-determinism) |
-| A17.11 | Compute budget | [linker-backend.md#a1711-compute-budget](linker-backend.md#a1711-compute-budget) |
-| A18 | Area search in the sky view | [linker-ui.md#a18-area-search-in-the-sky-view](linker-ui.md#a18-area-search-in-the-sky-view) |
-| A18.1 | Tool and drawing | [linker-ui.md#a181-tool-and-drawing](linker-ui.md#a181-tool-and-drawing) |
-| A18.2 | Sky layers (`frontend/src/app/sky/area/AreaLayer.tsx`) | [linker-ui.md#a182-sky-layers-frontendsrcappskyareaarealayertsx](linker-ui.md#a182-sky-layers-frontendsrcappskyareaarealayertsx) |
-| A18.3 | Visits and blink | [linker-ui.md#a183-visits-and-blink](linker-ui.md#a183-visits-and-blink) |
-| A18.4 | Island cards and minimise | [linker-ui.md#a184-island-cards-and-minimise](linker-ui.md#a184-island-cards-and-minimise) |
-| A18.5 | Options and Known objects | [linker-ui.md#a185-options-and-known-objects](linker-ui.md#a185-options-and-known-objects) |
-| A18.6 | Discovery card | [linker-ui.md#a186-discovery-card](linker-ui.md#a186-discovery-card) |
-| A18.7 | Track card | [linker-ui.md#a187-track-card](linker-ui.md#a187-track-card) |
-| A18.8 | Hand-off to Track | [linker-ui.md#a188-hand-off-to-track](linker-ui.md#a188-hand-off-to-track) |
-| A18.9 | State, API client, accessibility, performance | [linker-ui.md#a189-state-api-client-accessibility-performance](linker-ui.md#a189-state-api-client-accessibility-performance) |
-| A18.10 | Testing | [linker-ui.md#a1810-testing](linker-ui.md#a1810-testing) |
+| A16 | Area search | [linker.md#a16-area-search](moving-objects/area-search.md#a16-area-search) |
+| A16.1 | Why and who | [linker.md#a161-why-and-who](moving-objects/area-search.md#a161-why-and-who) |
+| A16.2 | Scope | [linker.md#a162-scope](moving-objects/area-search.md#a162-scope) |
+| A16.3 | Architecture | [linker.md#a163-architecture](moving-objects/area-search.md#a163-architecture) |
+| A16.4 | Data flow | [linker.md#a164-data-flow](moving-objects/area-search.md#a164-data-flow) |
+| A16.5 | Honesty rules | [linker.md#a165-honesty-rules](moving-objects/area-search.md#a165-honesty-rules) |
+| A16.6 | Open items | [linker.md#a166-open-items](moving-objects/area-search.md#a166-open-items) |
+| A16.7 | Tickets and plan | [linker.md#a167-tickets-and-plan](moving-objects/area-search.md#a167-tickets-and-plan) |
+| A17 | Discovery backend | [linker-backend.md#a17-discovery-backend](moving-objects/area-backend.md#a17-discovery-backend) |
+| A17.1 | Area and frames (`frames.py`) | [linker-backend.md#a171-area-and-frames-framespy](moving-objects/area-backend.md#a171-area-and-frames-framespy) |
+| A17.2 | Dots (`dots.py`) | [linker-backend.md#a172-dots-dotspy](moving-objects/area-backend.md#a172-dots-dotspy) |
+| A17.3 | Glitches and stars (`clean.py`) | [linker-backend.md#a173-glitches-and-stars-cleanpy](moving-objects/area-backend.md#a173-glitches-and-stars-cleanpy) |
+| A17.4 | Join across visits (`join.py`) | [linker-backend.md#a174-join-across-visits-joinpy](moving-objects/area-backend.md#a174-join-across-visits-joinpy) |
+| A17.5 | SkyBoT check (`match.py`) | [linker-backend.md#a175-skybot-check-matchpy](moving-objects/area-backend.md#a175-skybot-check-matchpy) |
+| A17.6 | Injection, completeness and control | [linker-backend.md#a176-injection-completeness-and-control](moving-objects/area-backend.md#a176-injection-completeness-and-control) |
+| A17.7 | Export (`export.py`) | [linker-backend.md#a177-export-exportpy](moving-objects/area-backend.md#a177-export-exportpy) |
+| A17.8 | Endpoints (beyond D-16) | [linker-backend.md#a178-endpoints-beyond-d-16](moving-objects/area-backend.md#a178-endpoints-beyond-d-16) |
+| A17.9 | Schemas and fixtures | [linker-backend.md#a179-schemas-and-fixtures](moving-objects/area-backend.md#a179-schemas-and-fixtures) |
+| A17.10 | Cache, offline and determinism | [linker-backend.md#a1710-cache-offline-and-determinism](moving-objects/area-backend.md#a1710-cache-offline-and-determinism) |
+| A17.11 | Compute budget | [linker-backend.md#a1711-compute-budget](moving-objects/area-backend.md#a1711-compute-budget) |
+| A18 | Area search in the sky view | [linker-ui.md#a18-area-search-in-the-sky-view](moving-objects/area-ui.md#a18-area-search-in-the-sky-view) |
+| A18.1 | Tool and drawing | [linker-ui.md#a181-tool-and-drawing](moving-objects/area-ui.md#a181-tool-and-drawing) |
+| A18.2 | Sky layers (`frontend/src/app/sky/area/AreaLayer.tsx`) | [linker-ui.md#a182-sky-layers-frontendsrcappskyareaarealayertsx](moving-objects/area-ui.md#a182-sky-layers-frontendsrcappskyareaarealayertsx) |
+| A18.3 | Visits and blink | [linker-ui.md#a183-visits-and-blink](moving-objects/area-ui.md#a183-visits-and-blink) |
+| A18.4 | Island cards and minimise | [linker-ui.md#a184-island-cards-and-minimise](moving-objects/area-ui.md#a184-island-cards-and-minimise) |
+| A18.5 | Options and Known objects | [linker-ui.md#a185-options-and-known-objects](moving-objects/area-ui.md#a185-options-and-known-objects) |
+| A18.6 | Discovery card | [linker-ui.md#a186-discovery-card](moving-objects/area-ui.md#a186-discovery-card) |
+| A18.7 | Track card | [linker-ui.md#a187-track-card](moving-objects/area-ui.md#a187-track-card) |
+| A18.8 | Hand-off to Track | [linker-ui.md#a188-hand-off-to-track](moving-objects/area-ui.md#a188-hand-off-to-track) |
+| A18.9 | State, API client, accessibility, performance | [linker-ui.md#a189-state-api-client-accessibility-performance](moving-objects/area-ui.md#a189-state-api-client-accessibility-performance) |
+| A18.10 | Testing | [linker-ui.md#a1810-testing](moving-objects/area-ui.md#a1810-testing) |

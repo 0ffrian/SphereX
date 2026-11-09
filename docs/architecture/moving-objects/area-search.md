@@ -1,8 +1,8 @@
 # Area search: Known objects (Track) and Discovery
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A16–A16.7 · **Backend:** [linker-backend.md](linker-backend.md) (A17) · **Sky UI:** [linker-ui.md](linker-ui.md) (A18) · **Diagrams:** [uml/22-area-search.md](../uml/22-area-search.md)
+> **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A16–A16.7 · **Backend:** [linker-backend.md](area-backend.md) (A17) · **Sky UI:** [linker-ui.md](area-ui.md) (A18) · **Diagrams:** [uml/22-area-search.md](../../uml/22-area-search.md)
 
-Status: **agreed plan, not built** ([Q-146](../decisions/moving-objects.md), 9 Nov 2026). It replaces the first proposal of this fragment (the blind Band-Hop Linker with an injection atlas, Q-147), re-scoped after Atish's review (Q-131). The file keeps its name so links stay valid. Labels follow the architecture spec: **Tested**, **Documented**, **To build / Not confirmed**.
+Status: **agreed plan, not built** ([Q-146](../../decisions/moving-objects.md), 9 Nov 2026). It replaces the first proposal of this fragment (the blind Band-Hop Linker with an injection atlas, Q-147), re-scoped after Atish's review (Q-131). The file keeps its name so links stay valid. Labels follow the architecture spec: **Tested**, **Documented**, **To build / Not confirmed**.
 
 Clickable mock-ups: `mockup/spherex-ui.html` (Area search tool, key 5) and `mockup/chase-the-rock.html` (Track). Mock-ups are visual input only, never a spec (D-01).
 
@@ -23,7 +23,7 @@ In one sentence for the public: draw a square, then either follow a rock we alre
 | Public users | Follow a famous rock on real SPHEREx frames (Known), and watch the computer find one blind (Discovery). | To build |
 | Demo moment | Draw the square around 433 Eros on its 20 to 21 Mar 2026 frames (Q-137), run Discovery: it finds Eros without being told where it is, SkyBoT confirms it, and one click opens Track on the same rock. | To build |
 | Researchers (after the event) | The same tool with the full linker: a rate-grid linker over many visits, an injection-recovery completeness curve and ADES export (A16.7, phase 2). | Not in the event build |
-| Why "band-hop" | One SPHEREx frame covers a range of wavelengths across its field ([A3.1](data-sources.md#a31-spherex-irsa)), so each detection of a mover lands at a different wavelength. Track builds the spectrum from that; Discovery shows each dot in its wavelength colour. | Documented (instrument) |
+| Why "band-hop" | One SPHEREx frame covers a range of wavelengths across its field ([A3.1](../data-sources.md#a31-spherex-irsa)), so each detection of a mover lands at a different wavelength. Track builds the spectrum from that; Discovery shows each dot in its wavelength colour. | Documented (instrument) |
 
 ### A16.2 Scope
 
@@ -40,7 +40,7 @@ In one sentence for the public: draw a square, then either follow a rock we alre
 
 - **No discovery claim.** An unmatched track is "unexplained", never "an asteroid", "new" or "a discovery" (A16.5).
 - No computing in a web request. Discovery runs offline in a script; the API serves cached results (A17.8).
-- No change to the object pipeline (stages 1 to 7, [A4](pipeline.md#a4-pipeline)). Discovery is a separate **area** pipeline that reuses its adapters and helpers.
+- No change to the object pipeline (stages 1 to 7, [A4](../pipeline.md#a4-pipeline)). Discovery is a separate **area** pipeline that reuses its adapters and helpers.
 
 ### A16.3 Architecture
 
@@ -79,7 +79,7 @@ flowchart LR
 | Area tool, cards, layers, state | `frontend/src/app/sky/area/`, `frontend/src/app/shell/`, `frontend/src/state/store.ts` | Moon |
 | Track (path, frames, zoom, spectrum, sound) | per Q-131 to Q-145 | Atish |
 
-Reused, not rewritten: `adapters/irsa_sia.py`, `adapters/irsa_cutout.py`, `adapters/gaia.py`, `adapters/wise.py`, `adapters/skybot.py`, the cache, `core/find/wcs.py` (pixel to sky, `wavelength_at`), the Stage 2 flag reject list and background method ([A4.2](pipeline.md#a42-stage-2-measure-brightness-and-spectrum)), PR #53's moving-object frame search, `viewer/sky/skyMath.ts` (`raDecToScreen`), `app/flipbook/wavelengthColor.ts`, `app/shell/PanelCard.tsx`, Track's sky layer and export (Q-131, Q-145).
+Reused, not rewritten: `adapters/irsa_sia.py`, `adapters/irsa_cutout.py`, `adapters/gaia.py`, `adapters/wise.py`, `adapters/skybot.py`, the cache, `core/find/wcs.py` (pixel to sky, `wavelength_at`), the Stage 2 flag reject list and background method ([A4.2](../pipeline.md#a42-stage-2-measure-brightness-and-spectrum)), PR #53's moving-object frame search, `viewer/sky/skyMath.ts` (`raDecToScreen`), `app/flipbook/wavelengthColor.ts`, `app/shell/PanelCard.tsx`, Track's sky layer and export (Q-131, Q-145).
 
 ### A16.4 Data flow
 
@@ -124,7 +124,7 @@ Three tickets (D-29 "as few tickets as possible"), milestone **M4 Extras**, prio
 |---|---|---|
 | **D1 Discovery backend** | Kevin | Day 0 count on the Eros frames: visits, gap, exposures per visit, motion inside a visit, per-exposure S/N (recorded in A16.6 and Q-148) · area frames (A17.1) · dots (A17.2) · glitches and stars (A17.3, star list shared with Q-143) · join (A17.4) · SkyBoT (A17.5) · ECSV (A17.7) · API (A17.8) · determinism test (A17.10) |
 | **D2 Area tool UI** | Moon | Schemas and fixtures (A17.9) · Area tool and drawing (A18.1) · layers (A18.2) · blink (A18.3) · cards (A18.4 to A18.7) · hand-off to Track · minimise to the island (A18.4) · copy and badges · tests (A18.10) |
-| **D3 Integration** | Shared, M5 | Precompute the demo areas under `SX_OFFLINE=1` · e2e on the real cache (Eros found blind, then Track) · this spec and [uml/22](../uml/22-area-search.md) updated to "as built" |
+| **D3 Integration** | Shared, M5 | Precompute the demo areas under `SX_OFFLINE=1` · e2e on the real cache (Eros found blind, then Track) · this spec and [uml/22](../../uml/22-area-search.md) updated to "as built" |
 
 - **Order:** agree the JSON shapes (A17.8, A17.9) first, so D1 and D2 build in parallel against fixtures (D-29).
 - **Gate:** if Day 0 shows Eros is not found blind on its own frames, keep Known and Track, and show Discovery only as the five steps on the Eros area with its real counts, without claiming tracks. Never drop the "unexplained, not a discovery" wording.
