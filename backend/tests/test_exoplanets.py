@@ -33,7 +33,7 @@ CALC = "<a refstr=CALCULATED_VALUE href=/docs/pscp_calc.html target=_blank>Calcu
 
 @pytest.fixture
 def proposed(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The Q-63 values as proposed; live they stay None until Atish signs off (PR #45)."""
+    """The Q-63 values as proposed; live since Moon's sign-off (issue #68), so this pins them."""
     for k, v in PROPOSED_EXOPLANET_THRESHOLDS.items():
         monkeypatch.setitem(EXOPLANET_THRESHOLDS, k, v)
 
@@ -114,8 +114,15 @@ def test_water_curve_temperature_choice() -> None:
 # --- rule: every branch ----------------------------------------------------------------------
 
 
-def test_thresholds_unset_refuses_every_planet() -> None:
-    assert all(v is None for v in EXOPLANET_THRESHOLDS.values())
+def test_live_thresholds_are_the_signed_off_values() -> None:
+    # Issue #68 Part 0.1: Moon signed off Q-63; the live values are exactly the proposed ones.
+    assert EXOPLANET_THRESHOLDS == PROPOSED_EXOPLANET_THRESHOLDS
+
+
+def test_thresholds_unset_refuses_every_planet(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Withdrawing the values still refuses with a reason instead of guessing.
+    for k in EXOPLANET_THRESHOLDS:
+        monkeypatch.setitem(EXOPLANET_THRESHOLDS, k, None)
     assert kind(pl_rade=15.6) == (None, ("type:exoplanet_thresholds",))
     assert kind(pl_rade=0.92) == (None, ("type:exoplanet_thresholds",))
 
@@ -239,12 +246,17 @@ def test_fixture_planets_offline(client: TestClient, name: str, want: str) -> No
     assert "spectrum" in params["missing"]  # no SPHEREx frames recorded: null with a reason
 
 
-@pytest.mark.parametrize("name", [*PLANETS, "51 Peg b", "Proxima Cen b"])
-def test_fixture_planets_refused_until_thresholds_agreed(client: TestClient, name: str) -> None:
+LIVE_TYPES = {**PLANETS, "51 Peg b": "gas_giant", "Proxima Cen b": "candidate"}
+
+
+@pytest.mark.parametrize(("name", "want"), LIVE_TYPES.items())
+def test_fixture_planets_are_typed_live(client: TestClient, name: str, want: str) -> None:
+    """Issue #68 Part 0.1: the rule is on without the `proposed` fixture; each recorded planet
+    gets the class `targets.toml` documents, and none is refused for missing thresholds."""
     oid = resolve_id(client, name)
     params = client.get(f"/v1/objects/{oid}/render-params").json()
-    assert params["type"] == "candidate"
-    assert "type:exoplanet_thresholds" in params["missing"]
+    assert params["type"] == want
+    assert "type:exoplanet_thresholds" not in params["missing"]
 
 
 @pytest.mark.usefixtures("proposed")
