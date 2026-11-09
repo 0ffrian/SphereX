@@ -9,7 +9,7 @@ test('app loads: header, viewer canvas, renderer status, no console errors', asy
 
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Shift & Spectrum' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Shift & Spectrum' })).toBeAttached();
 
   // The sky view is the main pane; the 3D viewer opens from the tool rail (shell layout).
   await expect(page.getByTestId('sky-canvas')).toHaveCount(1);

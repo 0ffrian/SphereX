@@ -26,7 +26,7 @@ flowchart TB
     subgraph Frontend["frontend/ (Vite + TS + React) : owners per package"]
       FApp["src/app (React shell: App, ViewerPanel (tier text: tier N of 5 and its meaning, Q-106), StatusLine, FixtureBanner, LiveAnnouncer, Badge, StatusBoxes, urlHash + useHashSync, format, messages, refusals, RefusalList, ui), src/state (Zustand store with the sky slice) : Moon"]
       FFlip["src/app/api (M1 client, D-16, sky index, Q-87), src/app/search, src/app/flipbook (with Rainbow Trails, D-28, session.tsx shared playback, colourMode + ColourViews, Q-93, Q-95, progressive + FramesProgress, Q-97, frameGrid, overlays/, issue #12, drawn on the frame grid, Q-102), src/app/spectrum : Moon"]
-      FShell["src/app/shell (ToolRail, Transport, PanelCard, Panels, Readout, shellStore, shortcuts), src/app/sky (SkyPane, useTargetMarkers, cachedMarkers + useCachedMarkers (Q-98), readout, positionTags), src/app/Segmented : prototype, Moon provisional (Q-89)"]
+      FShell["src/app/island (Island, GridLoader, islandStore, islandText; Q-121), src/app/shell (ToolRail, Transport, PanelCard, Panels, Readout, shellStore, shortcuts), src/app/sky (SkyPane, useTargetMarkers, cachedMarkers + useCachedMarkers (Q-98), readout, positionTags), src/app/Segmented : prototype, Moon provisional (Q-89)"]
       FDev["fixtures/ (dev-only synthetic fixture server), scripts/ (check-dist), src/test (test helpers), src/fixtures.test.ts, e2e/ (Playwright) : dev and test only"]
       FPhysics["src/physics : A7 physics layer, derivePhysics, slider registry (D-26, D-27) : Moon"]
       FContract["src/contract : generated from shared/schemas (D-18), assertTagged next to it : follows the schemas owner"]

@@ -11,9 +11,17 @@
 //   smallest image, then a larger one on capable devices. With no image installed it shows a
 //   coordinate grid and says so; clicking still picks coordinates.
 // - No React re-render per pointer move: the readout and markers are written from refs.
-// - R9: keyboard pan/zoom on the canvas (arrows, +/−, R), Enter picks the centre, on-screen pan
-//   and zoom buttons (WCAG 2.5.7), aria-label and a text alternative.
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+// - R9: keyboard pan/zoom on the canvas (arrows, +/−, R), Enter picks the centre, aria-label and a
+//   text alternative. No on-screen pan and zoom buttons (Q-123).
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { EstimatedBadge, ProvenanceBadge } from '@/app/Badge';
 import type { SkyCachedObject, SkySurvey } from '@/app/api/types';
 import { isApiError } from '@/app/api/errors';
@@ -155,6 +163,19 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     ro.observe(credit);
     return () => ro.disconnect();
   }, []);
+  // The observer above tells the panel one frame after the credit changed height (a line more when
+  // cached spots come into view), so a sheet docked on top of it was a line off for that frame.
+  // Set it in the same commit as the credit's new content, so both move together (issue #66: the
+  // panel now opens from the island 0.7 s after the data, which is when this showed in a test).
+  useLayoutEffect(() => {
+    const host = hostRef.current;
+    const credit = creditRef.current;
+    if (!host || !credit) return;
+    // Only when it changed: a style write on every render would wake the panel's MutationObserver.
+    const h = `${Math.ceil(credit.offsetHeight)}px`;
+    if (host.style.getPropertyValue('--sx-credit-h') !== h)
+      host.style.setProperty('--sx-credit-h', h);
+  });
 
   // ---- Renderer ---------------------------------------------------------------------------------
   useEffect(() => {
@@ -374,7 +395,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
   const onContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     // Panels, the card and the on-screen controls keep the browser's menu.
-    if (target.closest('.sx-island-wrap, .sx-panel, .sx-sky-ctrls, .sx-sky-credit, input')) return;
+    if (target.closest('.sx-island-wrap, .sx-panel, .sx-sky-credit, input')) return;
     let key = target.closest<HTMLElement>('[data-marker-key]')?.dataset.markerKey ?? null;
     if (key === null) {
       let best = Infinity;
@@ -396,21 +417,34 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     const shell = useShellStore.getState();
     if (key.startsWith('t:')) {
       const m = targets.markers.find((x) => `t:${x.name}` === key);
-      if (m && resolved?.id !== m.id) pickTarget(m);
+      if (m && resolved?.id !== m.id) pickTarget(m, true);
     } else if (key.startsWith('c:')) {
       const c = cached.find((x) => `c:${x.id}` === key);
-      if (c && resolved?.id !== c.id) pickCached(c);
+      if (c && resolved?.id !== c.id) pickCached(c, true);
     }
     shell.requestCard();
   };
 
-  const pickTarget = (m: TargetMarker) => {
+  /**
+   * A left click on a marker opens the object, as the sky view always has (#49); a right-click or
+   * long press (`withCard`) selects it and shows its card instead (issue #64). Set before the
+   * search, which reads it (App `useOpenPanelOnSearch`).
+   */
+  const askForCard = (withCard: boolean) => {
+    const shell = useShellStore.getState();
+    if (withCard) shell.requestCard();
+    else shell.cancelCard();
+  };
+
+  const pickTarget = (m: TargetMarker, withCard = false) => {
     setPicked(null);
+    askForCard(withCard);
     void search({ q: m.name, kind: 'name', origin: 'sky' });
   };
 
-  const pickCached = (c: SkyCachedObject) => {
+  const pickCached = (c: SkyCachedObject, withCard = false) => {
     setPicked(null);
+    askForCard(withCard);
     void search(cachedMarkerQuery(c));
   };
 
@@ -609,30 +643,6 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
-  const nudge = (kind: 'in' | 'out' | 'left' | 'right' | 'up' | 'down' | 'reset') => {
-    const v = viewRef.current;
-    if (!v) return;
-    flyCancel.current?.();
-    const cam = v.getView();
-    const { width, height } = v.getSize();
-    const next =
-      kind === 'in'
-        ? zoomAt(cam, 1 / KEY_ZOOM_FACTOR, width, height)
-        : kind === 'out'
-          ? zoomAt(cam, KEY_ZOOM_FACTOR, width, height)
-          : kind === 'left'
-            ? panByFraction(cam, KEY_PAN_FRACTION, 0)
-            : kind === 'right'
-              ? panByFraction(cam, -KEY_PAN_FRACTION, 0)
-              : kind === 'up'
-                ? panByFraction(cam, 0, KEY_PAN_FRACTION)
-                : kind === 'down'
-                  ? panByFraction(cam, 0, -KEY_PAN_FRACTION)
-                  : DEFAULT_SKY_VIEW;
-    v.setView(next);
-    announceView(v.getView());
-  };
-
   const survey =
     state.kind === 'ready' || state.kind === 'loading' || state.kind === 'error'
       ? state.survey
@@ -661,6 +671,13 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_100%_at_50%_50%,transparent_55%,#000a_100%)]"
         aria-hidden="true"
       />
+      {/* Edges fade to dark where the header, rail and bars float over the sky (Q-124). */}
+      <div className="sx-sky-shade pointer-events-none absolute inset-0" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+        <i />
+      </div>
       <p id={descId} className="sr-only">
         Drag to look around, use the mouse wheel or pinch to zoom, and click or tap to pick a
         position: its coordinates go into the search. With the keyboard, the arrow keys pan, plus
@@ -688,7 +705,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
               type="button"
               className={`sx-marker pointer-events-auto ${resolved?.id === m.id ? 'is-selected' : ''}`}
               onClick={() => pickTarget(m)}
-              aria-label={`${m.name} on the sky: select it`}
+              aria-label={`${m.name} on the sky: open it`}
               data-testid="sky-marker"
               data-target-id={m.id}
             >
@@ -758,23 +775,10 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         )}
       </ul>
 
-      {/* On-screen pan and zoom (WCAG 2.5.7: an alternative to dragging). */}
-      {/* A column at the right; a row along the top on phones, clear of the bottom sheet. */}
-      <div role="group" aria-label="Sky view controls" className="sx-sky-ctrls">
-        <SkyButton label="Zoom in on the sky" onClick={() => nudge('in')} glyph="plus" />
-        <SkyButton label="Zoom out on the sky" onClick={() => nudge('out')} glyph="minus" />
-        <span className="sx-sky-ctrls-sep" aria-hidden="true" />
-        <SkyButton label="Pan up (north)" onClick={() => nudge('up')} glyph="up" />
-        <SkyButton label="Pan left (east)" onClick={() => nudge('left')} glyph="left" />
-        <SkyButton label="Pan right (west)" onClick={() => nudge('right')} glyph="right" />
-        <SkyButton label="Pan down (south)" onClick={() => nudge('down')} glyph="down" />
-        <SkyButton label="Reset the sky view" onClick={() => nudge('reset')} glyph="reset" />
-      </div>
-
       {/* Status of the sky image: never a blank pane. */}
       {state.kind !== 'ready' && (
         // Near the top and click-through, so the centre of the sky stays clickable.
-        <div className="pointer-events-none absolute inset-x-4 top-4 flex justify-center">
+        <div className="sx-sky-status pointer-events-none absolute inset-x-4 flex justify-center">
           <p
             className="max-w-md rounded-xl border border-sx-border bg-sx-card/90 px-4 py-3 text-center text-sm text-sx-fg shadow-lg"
             data-testid="sky-status"
@@ -862,39 +866,5 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         {viewSay}
       </p>
     </div>
-  );
-}
-
-const GLYPHS: Record<string, string> = {
-  plus: 'M12 5v14M5 12h14',
-  minus: 'M5 12h14',
-  up: 'm6 15 6-6 6 6',
-  down: 'm6 9 6 6 6-6',
-  left: 'm15 6-6 6 6 6',
-  right: 'm9 6 6 6-6 6',
-  reset: 'M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5',
-};
-
-function SkyButton({
-  label,
-  glyph,
-  onClick,
-}: {
-  label: string;
-  glyph: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="sx-sky-btn grid place-items-center rounded-lg border border-sx-border bg-sx-muted/90 text-sx-fg transition-colors hover:bg-sx-muted-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sx-green"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-    >
-      <svg viewBox="0 0 24 24" className="sx-ico size-4" aria-hidden="true">
-        <path d={GLYPHS[glyph]} />
-      </svg>
-    </button>
   );
 }

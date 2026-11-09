@@ -126,7 +126,7 @@ test('orientation from inside: north up, east (higher RA) to the LEFT', async ({
   const b = await canvasBox(page);
   const cx = b.x + b.width / 2;
   const cy = b.y + b.height / 2;
-  const d = 80;
+  const d = 120;
   const [centre, left, right, up, down] = await pixels(page, [
     [cx, cy],
     [cx - d, cy],
@@ -217,11 +217,11 @@ test('clicking the centre on a known target opens its flipbook; a newer click wi
   await expect(page.getByTestId('frame-counter')).toHaveText('Frame 2 of 24');
 });
 
-test('target markers come from /v1/resolve and select the object', async ({ page }) => {
+test('target markers come from /v1/resolve and open the object', async ({ page }) => {
   await page.goto('/');
   await skyReady(page);
   await setView(page, { ra: 76.95653, dec: 30.40144, fovDeg: 30 });
-  const marker = page.getByRole('button', { name: 'RW Aurigae on the sky: select it' });
+  const marker = page.getByRole('button', { name: 'RW Aurigae on the sky: open it' });
   await expect(marker).toBeVisible({ timeout: 15_000 });
   // The marker sits on the target: at the view centre.
   const b = await canvasBox(page);
@@ -229,14 +229,9 @@ test('target markers come from /v1/resolve and select the object', async ({ page
   expect(Math.abs(m!.x + 22 - (b.x + b.width / 2))).toBeLessThan(2);
   expect(Math.abs(m!.y + 22 - (b.y + b.height / 2))).toBeLessThan(2);
   await marker.click();
-  // Issue #60: a marker selects the object (brackets and the card) instead of opening the flipbook.
-  await expect(page.getByTestId('selected-name')).toHaveText('RW Aurigae');
+  await expect(page.getByTestId('object-name')).toHaveText('RW Aurigae');
   await expect(page.getByTestId('search-input')).toHaveValue('RW Aurigae');
   await expect(page.getByTestId('sky-selected')).toBeAttached();
-  await expect(page.getByTestId('object-panel')).toHaveCount(0);
-  // The fingerprint opens the object panel.
-  await page.getByRole('button', { name: 'See fingerprint' }).click();
-  await expect(page.getByTestId('object-name')).toHaveText('RW Aurigae');
 });
 
 test('keyboard: arrows pan, +/− zoom, Enter picks the centre; "/" focuses the search', async ({
@@ -253,18 +248,17 @@ test('keyboard: arrows pan, +/− zoom, Enter picks the centre; "/" focuses the 
   await expect(page.getByTestId('readout-dec')).toHaveText('+4.0000°');
   await page.keyboard.press('+');
   await expect(page.getByTestId('sky-readout')).toContainText('FOV 32°');
+  await page.keyboard.press('-');
+  await expect(page.getByTestId('sky-readout')).toContainText('FOV 40°');
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('search-input')).toHaveValue('104.000000,4.000000');
 
   // "/" from a button focuses the search; typed into the field it is just a character.
-  await page.getByRole('button', { name: 'Zoom in on the sky' }).focus();
+  await page.getByTestId('tool-flipbook').focus();
   await page.keyboard.press('/');
   await expect(page.getByTestId('search-input')).toBeFocused();
   await page.keyboard.type('a/b');
   await expect(page.getByTestId('search-input')).toHaveValue('a/b');
-  // On-screen buttons (WCAG 2.5.7).
-  await page.getByRole('button', { name: 'Zoom out on the sky' }).click();
-  await expect(page.getByTestId('sky-readout')).toContainText('FOV 40°');
 });
 
 test('tool rail opens real panels; Escape closes and returns focus', async ({ page }) => {
