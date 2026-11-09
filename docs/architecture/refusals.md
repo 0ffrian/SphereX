@@ -1,6 +1,6 @@
 # `missing` and refusal codes
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.12 · **Implements:** [D-25](../decisions/data-sources.md), [D-31](../decisions/data-sources.md), [D-32](../decisions/contract.md), [Q-38](../decisions/contract.md), [Q-111](../decisions/pipeline-jobs.md), [Q-139](../decisions/moving-objects.md), [Q-144](../decisions/moving-objects.md) · **Read with:** [endpoints.md](endpoints.md) (A4.11), [honesty-policy.md](honesty-policy.md) (A11)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.12 · **Implements:** [D-25](../decisions/data-sources.md), [D-31](../decisions/data-sources.md), [D-32](../decisions/contract-tags.md), [Q-38](../decisions/contract-tags.md), [Q-111](../decisions/pipeline-jobs.md), [Q-139](../decisions/moving-objects.md), [Q-144](../decisions/moving-objects.md) · **Read with:** [endpoints.md](endpoints.md) (A4.11), [honesty-policy.md](honesty-policy.md) (A11)
 
 ### A4.12 `missing` and refusal codes
 
@@ -70,7 +70,7 @@ The repaint status body's `missing` starts with `albedo_ai`, followed by the rea
 
 | Code | Spec | Status |
 |---|---|---|
-| `path:deferred`, `path:ephemeris`, `path:observer`, `path:not_cached`, `path:window` (`/path`); `extended_source:<frame_id>` (`/spectrum`); `imagery:<survey>`, `track:not_moving` (frontend) | A19.10 ([moving-objects/track-contract.md](moving-objects/track-contract.md)), which owns their meanings and whether each marks a result incomplete | to build (Track, Q-141, Q-144) |
-| `area:not_prepared` (a square outside the precomputed areas), `area:visits` (fewer than 2 visits), `stamp:<dot_id>` | [A16](moving-objects/area-search.md), [A17.1](moving-objects/area-backend.md) | to build (D1, D2) |
+| `path:deferred`, `path:ephemeris`, `path:observer`, `path:not_cached`, `path:window` (`/path`); `extended_source:<frame_id>` (`/spectrum`); `imagery:<survey>`, `track:not_moving` (frontend) | A19.10 ([moving-objects/track-contract.md](moving-objects/track-contract.md#a1910-refusal-codes)), which says whether each marks a result incomplete; the meanings of the `/path` codes are in A19.5 ([moving-objects/track.md](moving-objects/track.md#a195-path-endpoint)) | to build (Track, Q-141, Q-144) |
+| `area:not_prepared` (a square outside the precomputed areas), `area:visits` (fewer than 2 visits), `stars:<cat>:<visit>` (a visit's star cone failed), `skybot:<visit>` (a visit's SkyBoT cone failed), `horizons:<designation>` (a candidate's Horizons call failed), `stamp:<dot_id>` (stamp cutout not cached) | [A17.8](moving-objects/area-backend.md#a178-endpoints), which owns their meanings | to build (D1, D2) |
 
 **Frontend-only wording:** `spectrum:moving_object_search` has a line in `messages.ts` but the backend never emits it.

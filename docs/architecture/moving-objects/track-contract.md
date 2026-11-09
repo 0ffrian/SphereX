@@ -1,6 +1,6 @@
 # Track: export, codes, provenance, cache and contract
 
-> **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A19.9 to A19.15 · **Implements:** [Q-137](../../decisions/scope-process.md), [Q-135, Q-136, Q-141, Q-145](../../decisions/moving-objects.md), D-02, D-16, D-18, D-21 ([contract](../../decisions/contract.md)), D-25 ([data-sources](../../decisions/data-sources.md)) · **Read with:** [track.md](track.md) (A19 to A19.8), [track-ui.md](track-ui.md) (A20), [area-backend.md](area-backend.md) (A17.7)
+> **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A19.9 to A19.15 · **Implements:** [Q-137](../../decisions/scope-process.md), [Q-135, Q-136, Q-141, Q-145](../../decisions/moving-objects.md), D-16, D-18 ([contract](../../decisions/contract.md)), D-02, D-21 ([contract-tags](../../decisions/contract-tags.md)), D-25 ([data-sources](../../decisions/data-sources.md)) · **Read with:** [track.md](track.md) (A19 to A19.8), [track-ui.md](track-ui.md) (A20), [area-backend.md](area-backend.md) (A17.7)
 
 Status: **not built** (every section is **To build**). Owner: Kevin (**Proposed (Q-163)**). Sections A19.1 to A19.8 (scope, entry points, frames, positions, path endpoint, star list, photometry, extended sources) are in [track.md](track.md).
 
@@ -33,8 +33,8 @@ Wording for every code lives in `frontend/src/app/refusals.ts` and `messages.ts`
 | `frames:moving_window`, `frames:cone_cap:<n>`, `frames:cone_maxrec:<n>`, `frames:sparse_path:<n>`, `frames:outside_window:<n>`, `no_footprint:<frame_id>` | `/frames` (PR #53) | No |
 | `cutout:<id>`, `wavelength:<id>`, `outside_cutout:<id>`, `cutouts:deferred:<n>`; `aperture_flags:<id>`, `aperture_edge:<id>`, `saturated:<id>` and the rest of A4.2 | `/frames`, `/spectrum` | As A4.1, A4.2 |
 | `overlay:<cat>`, `overlay:<cat>:pending`, `overlay:<cat>:truncated`, `footprint:<id>`, `flags_mask:<id>` | `/overlays` (A4.9) | No |
-| **New:** `path:deferred` (poll), `path:ephemeris`, `path:observer` | `/path` | Yes |
-| **New:** `path:not_cached`, `path:window` | `/path` | No |
+| **New:** `path:deferred` (poll), `path:ephemeris`, `path:observer` (meanings in [A19.5](track.md#a195-path-endpoint)) | `/path` | Yes |
+| **New:** `path:not_cached`, `path:window` (A19.5) | `/path` | No |
 | **New:** `extended_source:<frame_id>`, `spectrum:extended_source` | `/spectrum` (A19.8) | No |
 | **New:** `imagery:<survey>` (A20.5), `track:not_moving` | frontend | |
 
@@ -52,7 +52,7 @@ PR #53's Q-21 text still says `frames:truncated` past the cone cap; its Q-124 an
 | SBDB facts in the header (class, rotation period, H) | as the ObjectCard tags them | [A4.5](../pipeline-card.md#a45-stage-5-objectcard) |
 | Sky backdrop and high-resolution imagery | per Q-88 (open) | A20.5 |
 | Spin slider and its lightcurve | `artistic` | Q-135; never exported or sonified |
-| Exposure tick sound; path voice | `measured`; `model_dependent` | Q-134, R8.9.2 |
+| Exposure tick sound; reference click; path voice | `measured`; `measured`; `model_dependent` | Q-134, Q-174, R8.9.2 |
 
 ### A19.12 Cache, offline and pre-fetch
 
@@ -88,4 +88,4 @@ Milestone M4 Extras, priority P1 because Track is the MVP demo (**Proposed (Q-16
 | CDS permission for an order-11 copy | Atish | Open (Q-136) |
 | Mask radius formula and catalogue limits | Kevin | **[verify]** on the Eros frames |
 | Size of the marker's interpolation error | Kevin | **[verify]** against TLIST |
-| `SX_MOVING_*` limits, path span cap, Horizons pacing | Kevin | **[verify]** (A3.1, A3.4) |
+| `SX_MOVING_*` limits, path span cap, Horizons pacing | Kevin | **[verify]** (PR #53 `backend/app/settings.py`; A3.1 gains them when PR #53 merges; A3.4) |

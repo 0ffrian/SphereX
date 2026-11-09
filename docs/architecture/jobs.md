@@ -1,6 +1,6 @@
 # Object job and fan-out
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.10 · **Implements:** [Q-111](../decisions/pipeline-jobs.md), [Q-112](../decisions/pipeline-jobs.md), [Q-97](../decisions/sky-shell.md), [Q-99](../decisions/pipeline-jobs.md), [D-25](../decisions/data-sources.md), [D-32](../decisions/contract.md) · **Read with:** [pipeline.md](pipeline.md) (A4), [endpoints.md](endpoints.md) (A4.11), [../../backend/README.md](../../backend/README.md#settings-sx_-environment-variables) (settings)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.10 · **Implements:** [Q-111](../decisions/pipeline-jobs.md), [Q-112](../decisions/pipeline-jobs.md), [Q-97](../decisions/sky-shell.md), [Q-99](../decisions/pipeline-jobs.md), [D-25](../decisions/data-sources.md), [D-32](../decisions/contract-tags.md) · **Read with:** [pipeline.md](pipeline.md) (A4), [endpoints.md](endpoints.md) (A4.11), [../../backend/README.md](../../backend/README.md#settings-sx_-environment-variables) (settings)
 
 ### A4.10 Object job and fan-out
 

@@ -1,6 +1,6 @@
 # Haptics: wiring checklist for the event build
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.8.1 · **Implements:** [D-20, Q-78, Q-133, Q-134](../../decisions/haptics-design.md), [D-21](../../decisions/contract.md), [Q-73, Q-83](../../decisions/haptics-built.md), [Q-132](../../decisions/platform-hosting.md), [Q-113](../../decisions/sky-shell.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8), [../display-rules.md](../display-rules.md) (R5.6 Feel mode), [../build-mould.md](../build-mould.md) (R5.8)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.8.1 · **Implements:** [D-20, Q-78](../../decisions/haptics-design.md), [Q-133, Q-134](../../decisions/haptics-sound.md), [D-21](../../decisions/contract-tags.md), [Q-73, Q-83](../../decisions/haptics-built.md), [Q-132](../../decisions/platform-hosting.md), [Q-113](../../decisions/shell-surfaces.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8), [../display-rules.md](../display-rules.md) (R5.6 Feel mode), [../build-mould.md](../build-mould.md) (R5.8)
 
 ### R8.8.1 Wiring checklist (M5)
 

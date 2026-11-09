@@ -1,6 +1,6 @@
 # R11.1 Reference frames
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R11.1 (a sub-page of [R11](../acceptance-tests.md): the render-core quality gates of issue #39) · **Implements:** [D-21](../../decisions/contract.md), [D-04](../../decisions/contract.md), [Q-69](../../decisions/rendering-motion.md) · **Read with:** [checklist.md](checklist.md) (R11.2), [frame-time.md](frame-time.md) (R11.3)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R11.1 (a sub-page of [R11](../acceptance-tests.md): the render-core quality gates of issue #39) · **Implements:** [D-21](../../decisions/contract-tags.md), [D-04](../../decisions/contract.md), [Q-69](../../decisions/rendering-motion.md) · **Read with:** [checklist.md](checklist.md) (R11.2), [frame-time.md](frame-time.md) (R11.3)
 
 These are the team's target previews ("the quality bar", issue #39). Every renderer is reviewed against them before it merges, with [checklist.md](checklist.md). Frame times are checked with [frame-time.md](frame-time.md). Golden-frame tests are a separate thing (below).
 

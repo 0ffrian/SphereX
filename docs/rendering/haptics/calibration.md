@@ -1,6 +1,6 @@
 # Haptics: calibration and settings
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.7 · **Implements:** [D-09, D-10](../../decisions/haptics-design.md), [Q-73, Q-74, Q-75](../../decisions/haptics-built.md), [Q-132](../../decisions/platform-hosting.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8), [platform-encoding.md](platform-encoding.md) (R8.3)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.7 · **Implements:** [D-09](../../decisions/haptics-design.md), [D-10](../../decisions/haptics-sound.md), [Q-73, Q-74, Q-75](../../decisions/haptics-built.md), [Q-132](../../decisions/platform-hosting.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8), [platform-encoding.md](platform-encoding.md) (R8.3)
 
 ### R8.7 Calibration and settings
 

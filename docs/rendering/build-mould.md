@@ -1,6 +1,6 @@
 # Build split view and moulding
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R5.8 · **Implements:** [Q-113, Q-120](../decisions/sky-shell.md), [D-21, Q-49](../decisions/contract.md), [D-34](../decisions/rendering-motion.md) · **Read with:** [display-rules.md](display-rules.md) (R5.3, R5.6, R5.7), [accessibility.md](accessibility.md) (R9), [sky-shell.md](../architecture/sky-shell.md) (A21, the shell around the pane)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R5.8 · **Implements:** [Q-113, Q-120](../decisions/shell-surfaces.md), [D-21](../decisions/contract-tags.md), [Q-49](../decisions/rendering-bodies.md), [D-34](../decisions/rendering-motion.md) · **Read with:** [display-rules.md](display-rules.md) (R5.3, R5.6, R5.7), [accessibility.md](accessibility.md) (R9), [sky-shell.md](../architecture/sky-shell.md) (A21, the shell around the pane)
 
 ### R5.8 Build split view and moulding
 

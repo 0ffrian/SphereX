@@ -1,6 +1,6 @@
 # Haptics: event sources
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.4 · **Implements:** [D-12, Q-17, Q-78, Q-79, Q-80, Q-81, Q-82, Q-133](../../decisions/haptics-design.md), [Q-71, Q-83, Q-84, Q-105](../../decisions/haptics-built.md), [Q-132](../../decisions/platform-hosting.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8), [audio-pairing.md](audio-pairing.md) (R8.9.1 body tone), [profiles.md](profiles.md) (R8.5)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.4 · **Implements:** [D-12, Q-17, Q-78, Q-79, Q-80, Q-81, Q-82](../../decisions/haptics-design.md), [Q-133](../../decisions/haptics-sound.md), [Q-71, Q-83, Q-84, Q-105](../../decisions/haptics-built.md), [Q-132](../../decisions/platform-hosting.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8), [audio-pairing.md](audio-pairing.md) (R8.9.1 body tone), [profiles.md](profiles.md) (R8.5)
 
 ### R8.4 Event sources
 

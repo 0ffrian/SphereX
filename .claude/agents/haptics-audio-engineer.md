@@ -19,7 +19,7 @@ You are the haptics and audio specialist for **Shift & Spectrum**. Your job is t
 
 ## Load first
 
-- `CLAUDE.md`, then load `docs/decisions/README.md` (the index) and the topic files named for the task in the routing table of `docs/README.md` (for this agent: `haptics-design.md`, `haptics-built.md` and `platform-hosting.md`): especially D-08, D-09, D-10, D-12, D-20, Q-11 (the mock-up's `SphereXHaptics` API differs from R8.8), Q-132, Q-133 and Q-134.
+- `CLAUDE.md`, then load `docs/decisions/README.md` (the index) and the topic files named for the task in the routing table of `docs/README.md` (for this agent: `haptics-design.md`, `haptics-sound.md`, `haptics-built.md` and `platform-hosting.md`): especially D-08, D-09, D-10, D-12, D-20, Q-11 (the mock-up's `SphereXHaptics` API differs from R8.8), Q-132, Q-133 and Q-134.
 - `docs/rendering/haptics/`:
   - `platform-encoding.md` (R8.1–8.3)
   - `sources.md` (R8.4)

@@ -1,6 +1,6 @@
 # Display levels and shared 3D view rules
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.7 · **Implements:** [D-05, Q-15, Q-64, Q-132](../decisions/platform-hosting.md), [D-21, D-23, Q-27, Q-36](../decisions/contract.md), [D-34, Q-66, Q-104](../decisions/rendering-motion.md), [D-28](../decisions/moving-objects.md), [Q-113](../decisions/sky-shell.md) · **Read with:** [build-mould.md](build-mould.md) (R5.8), [data-contract.md](data-contract.md) (R3.4), [accessibility.md](accessibility.md) (R9)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.7 · **Implements:** [D-05, Q-15, Q-64, Q-132](../decisions/platform-hosting.md), [D-21, Q-27](../decisions/contract-tags.md), [D-23, Q-36](../decisions/contract.md), [D-34, Q-66](../decisions/rendering-motion.md), [Q-104](../decisions/rendering-kinds.md), [D-28](../decisions/moving-objects.md), [Q-113](../decisions/shell-surfaces.md) · **Read with:** [build-mould.md](build-mould.md) (R5.8), [data-contract.md](data-contract.md) (R3.4), [accessibility.md](accessibility.md) (R9)
 
 ## R4. Display levels
 
@@ -18,7 +18,7 @@
 
 ### R5.1 Lighting
 
-- **Solar-system bodies:** a single `DirectionalLight` placed at `phase_angle_deg` from the view direction. Use Horizons quantity 24 (Sun–Target–Observer angle) with observer `500@-163182` at the observation epoch. A tiny ambient light (intensity ≤ 0.03) keeps the night side legible. Tag: `measured` (Q-62 item 4, still to confirm).
+- **Solar-system bodies:** a single `DirectionalLight` placed at `phase_angle_deg` from the view direction. Use Horizons quantity 24 (Sun–Target–Observer angle) with observer `500@-163182` at the observation epoch. A tiny ambient light (intensity ≤ 0.03) keeps the night side legible. Tag: `measured` (Q-62 item 4, still to confirm; conflict: [Q-181](../decisions/contract-tags.md)).
 - **Stars and brown dwarfs:** self-luminous (emissive). No external light.
 
 ### R5.2 View modes

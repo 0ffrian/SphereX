@@ -1,6 +1,6 @@
 # Haptics (sound at the event; vibration after)
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A9–A9.5 · **Implements:** [D-08, D-09, D-10, D-12, D-20, Q-133](../decisions/haptics-design.md), [Q-132](../decisions/platform-hosting.md), [D-21](../decisions/contract.md) · **Read with:** [rendering/README.md](../rendering/README.md) (R8), [sound-voice.md](sound-voice.md) (A8)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A9–A9.5 · **Implements:** [D-08, D-09, D-12, D-20](../decisions/haptics-design.md), [D-10, Q-133](../decisions/haptics-sound.md), [Q-132](../decisions/platform-hosting.md), [D-21](../decisions/contract-tags.md) · **Read with:** [rendering/README.md](../rendering/README.md) (R8), [sound-voice.md](sound-voice.md) (A8)
 
 ## A9 Haptics
 

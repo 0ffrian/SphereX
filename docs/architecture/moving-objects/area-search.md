@@ -97,7 +97,7 @@ Reused, not rewritten: `adapters/irsa_sia.py`, `adapters/irsa_cutout.py`, `adapt
 |---|---|---|---|
 | Dot pixel centroid, flux, error, flags | `measured` | Measured | Stage 2 aperture method at the centroid (A17.2). |
 | Dot wavelength and bandwidth | `measured` | Measured | `WCS-WAVE` lookup at a measured centroid, as Stage 1 tags frame wavelengths ([A4.1](../pipeline.md#a41-stage-1-find-the-object), PR #53's Q-124). |
-| Dot RA/Dec | `derived` | Estimated | Measured centroid through the frame WCS. |
+| Dot RA/Dec | `derived` | Estimated | Measured centroid through the frame WCS. The dots are still drawn in "Measured only" (A18.2), because the WCS placement adds no model, as the flipbook places frames; not yet decided, listed for Moon in Q-182. |
 | "Glitch", "star", "fixed" labels; tracklets; tracks | `derived` | Estimated | Rule and thresholds in `method` (A17.3, A17.4). |
 | Known-object positions and the match | `model_dependent` | Estimated | Assumption: "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of `fetched_at`, seen from SPHEREx (`500@-163182`)" (A17.5, Q-138). |
 | Wavelength colour on the sky | `derived` | Estimated | Hue = wavelength, as Rainbow Trails is built; the tag follows Q-27 (open). In "Measured only" dots are drawn in one colour. |
@@ -128,7 +128,7 @@ Facts measured on PR #53's recorded Eros fixtures (16 cutouts, `mockup/chase-the
 
 ### A16.7 Tickets and plan
 
-Three Area tickets (D-29 "as few tickets as possible"), milestone **M4 Extras**, priority P2. Track's tickets T1 to T4 are in [A19.14](track-contract.md#a1914-owners-tickets-and-tests) and [A20.15](track-ui.md#a2015-tests-and-tickets).
+Three Area tickets (D-29 "as few tickets as possible"): D1 and D2 in **M4 Extras**, D3 in **M5**, priority P2. Track's tickets T1 to T4 are in [A19.14](track-contract.md#a1914-owners-tickets-and-tests) and [A20.15](track-ui.md#a2015-tests-and-tickets).
 
 | Ticket | Owner | Checklist |
 |---|---|---|

@@ -4,7 +4,7 @@
 
 ## A10 Frontend and platform
 
-**The event build is desktop browser only** ([Q-132](../decisions/platform-hosting.md), decided 9 Nov 2026): it runs on Atish's Asus TUF A15 laptop, with no Android build and no `navigator.vibrate`. Phones and vibration come after the event. D-05, D-08 and D-24 still describe phones; their amendments are pending (Q-132).
+**The event build is desktop browser only** ([Q-132](../decisions/platform-hosting.md), decided 9 Nov 2026): it runs on Atish's Asus TUF A15 laptop, with no Android build and no `navigator.vibrate`. Phones and vibration come after the event. D-05, D-08 and D-24 carry Q-132 amendment lines; their original text still describes phones.
 
 | Area | Choice | Status | Note |
 |---|---|---|---|

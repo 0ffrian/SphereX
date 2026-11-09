@@ -54,7 +54,7 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
   | 400 | `bad_query` | `resolve`: a query that is neither a name nor a valid position |
   | 400 | `bad_request` | a request the route cannot use (bad parameters; `combine.png` with a non-MJy/sr cutout or no finite pixel) |
   | 403 | `forbidden` | admin route with a missing or wrong `X-SX-Admin-Token` |
-  | 404 | `not_found` | unknown object id or survey; a sky file not on disk; a refused composite PNG; admin routes while `SX_ADMIN_TOKEN` is unset |
+  | 404 | `not_found` | unknown object id or survey; a sky file not on disk; a refused composite PNG; admin routes while `SX_ADMIN_TOKEN` is unset; a name no resolver knows (`resolve`); a shape name not in the registry (`/data/shapes`) |
   | 404 | `frame_not_found` | a frame id the object's list does not hold |
   | 404 | `flags_unavailable` | a cutout with no usable FLAGS mask (permanent) |
   | 404 | `albedo_ai_unavailable` | no applied, current AI albedo |

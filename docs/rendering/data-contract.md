@@ -1,6 +1,6 @@
 # Data contract: TV, ObjectCard, RenderParams
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1, R3.2, R3.4 (R3.3 in [type-selection.md](type-selection.md)) · **Implements:** [D-02, D-04, D-16, D-18, D-23, D-32, Q-33, Q-35, Q-36](../decisions/contract.md), [D-01](../decisions/rendering-bodies.md), [D-12](../decisions/haptics-design.md) · **Read with:** [type-selection.md](type-selection.md) (R3.3), [surface-generation.md](surface-generation.md) (R6.2), [display-rules.md](display-rules.md) (R5.2, R5.7)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1, R3.2, R3.4 (R3.3 in [type-selection.md](type-selection.md)) · **Implements:** [D-02, D-32](../decisions/contract-tags.md), [D-04, D-16, D-18, D-23, Q-33, Q-35, Q-36](../decisions/contract.md), [D-01](../decisions/rendering-bodies.md), [D-12](../decisions/haptics-design.md) · **Read with:** [type-selection.md](type-selection.md) (R3.3), [surface-generation.md](surface-generation.md) (R6.2), [display-rules.md](display-rules.md) (R5.2, R5.7)
 
 ## R3. Data contract
 
@@ -134,7 +134,7 @@ type IRMode = VisibleMode;
 
 When a mode is not available, the reason goes in `missing` ([§5.2](display-rules.md#r52-view-modes)).
 
-**Tiers and dynamics.** The fallback chain itself is D-32 ([contract](../decisions/contract.md)) and R1 principle 3. Schema rules:
+**Tiers and dynamics.** The fallback chain itself is D-32 ([contract-tags](../decisions/contract-tags.md)) and R1 principle 3. Schema rules:
 - Tag and tier always agree: `measured` 1, `derived` 2, `model_dependent` 3, `inferred_from_analog` 4, `artistic` 5. The schema rejects a mismatch, on `Layer` and on `DynamicsValue`. `formula` is required for `derived` and `model_dependent`; `assumed` is required for `model_dependent` and lists only the inputs that were not measured, keyed by card field or rule input name.
 - A layer no rung answers goes in `missing` by its id; a rate goes in as `dynamics:<key>` (for example `dynamics:flare_rate_per_d`). A tier 1 rate is a measured card field in the same unit (`spin_period_h` from `rot_period_h`, `pulsation_period_d` from `period_var_d`).
 - `speedup` is the time-lapse factor shown on screen ([§5.7](display-rules.md#r57-motion-and-time-lapse)), a display choice, not a data value. The live backend omits `dynamics` until stage 6 exists (R5.7 says what the viewer does meanwhile).

@@ -1,6 +1,6 @@
 # Acceptance tests
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R11 · **Implements:** [D-21](../decisions/contract.md), [D-05, Q-132](../decisions/platform-hosting.md), [Q-69](../decisions/rendering-motion.md), [Q-113](../decisions/sky-shell.md), [Q-133](../decisions/haptics-design.md) · **Read with:** [reference/README.md](reference/README.md) (R11.1), [reference/checklist.md](reference/checklist.md) (R11.2), [reference/frame-time.md](reference/frame-time.md) (R11.3), [testing.md](../architecture/testing.md)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R11 · **Implements:** [D-21](../decisions/contract-tags.md), [D-05, Q-132](../decisions/platform-hosting.md), [Q-69](../decisions/rendering-motion.md), [Q-113](../decisions/shell-surfaces.md), [Q-133](../decisions/haptics-sound.md) · **Read with:** [reference/README.md](reference/README.md) (R11.1), [reference/checklist.md](reference/checklist.md) (R11.2), [reference/frame-time.md](reference/frame-time.md) (R11.3), [testing.md](../architecture/testing.md)
 
 ## R11. Acceptance tests
 

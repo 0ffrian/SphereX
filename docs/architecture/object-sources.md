@@ -1,6 +1,6 @@
 # Data sources: catalogues, shape models and sky
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A3.6–A3.11 · **Implements:** [D-07](../decisions/gemini.md), [D-19, D-25](../decisions/data-sources.md), [D-35, Q-87, Q-88](../decisions/sky-shell.md), [Q-61, Q-63](../decisions/pipeline-jobs.md), [Q-136](../decisions/moving-objects.md) · **Read with:** [data-sources.md](data-sources.md) (A3 intro, A3.1–A3.5), [pipeline-card.md](pipeline-card.md) (A4.3–A4.5)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A3.6–A3.11 · **Implements:** [D-07](../decisions/gemini.md), [D-19, D-25](../decisions/data-sources.md), [D-35, Q-87, Q-88](../decisions/sky-shell.md), [Q-61](../decisions/pipeline-jobs.md), [Q-63](../decisions/pipeline-stages.md), [Q-136](../decisions/moving-objects.md) · **Read with:** [data-sources.md](data-sources.md) (A3 intro, A3.1–A3.5), [pipeline-card.md](pipeline-card.md) (A4.3–A4.5)
 
 The second half of [A3](data-sources.md#a3-data-sources): the catalogues behind the ObjectCard, the shape models, the services not used for the base path and the all-sky background.
 

@@ -1,6 +1,6 @@
 # Risks and open questions
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A14–A14.1 · **Implements:** [D-14, D-29, Q-137](../decisions/scope-process.md), [D-19, D-25, D-31](../decisions/data-sources.md), [D-24, Q-132](../decisions/platform-hosting.md), [D-09, D-10](../decisions/haptics-design.md), [Q-136, Q-139, Q-141, Q-146](../decisions/moving-objects.md), [Q-112](../decisions/pipeline-jobs.md) · **Read with:** [plan.md](plan.md) (A13), [../decisions/README.md](../decisions/README.md)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A14–A14.1 · **Implements:** [D-14, D-29, Q-137](../decisions/scope-process.md), [D-19, D-25, D-31](../decisions/data-sources.md), [D-24, Q-132](../decisions/platform-hosting.md), [D-09](../decisions/haptics-design.md), [D-10](../decisions/haptics-sound.md), [Q-136, Q-139, Q-141, Q-146](../decisions/moving-objects.md), [Q-112](../decisions/pipeline-jobs.md) · **Read with:** [plan.md](plan.md) (A13), [../decisions/README.md](../decisions/README.md)
 
 ## A14 Risks and open questions
 
@@ -47,10 +47,11 @@ Every **[verify]** marker in the architecture fragments, with an owner, the tick
 | Revisit within about 0.8 days vs passes of 0.7 to 88 days (Q-148) | A3.1 | Kevin | D1 Day 0 | 10 Nov |
 | Polite IRSA concurrency (`SX_CUTOUT_CONCURRENCY=6`) | A4.10 | Kevin | Q-112, #15 | before the last pre-fetch (12 Nov) |
 | HiPS credit line per provider | A3.11, A11 | Atish | D-35, #15 | 13 Nov |
-| A15 GPU, browser and WebGPU (WebGL2 fallback on a real GPU) | A10, A10.1 | Atish | #16 | 13 Nov |
-| A15 sky depth (tile sizes per order) | A3.11 | Atish | Q-88 | 12 Nov |
+| A15 laptop GPU, browser and WebGPU (WebGL2 fallback on a real GPU) | A10, A10.1 | Atish | #16 | 13 Nov |
+| A15 laptop sky depth (tile sizes per order) | A3.11 | Atish | Q-88 | 12 Nov |
 | DR1 release date | A3.1 | Kevin | Q-137 | none (frozen on QR2) |
 | MOST positions SPHEREx-centred or geocentric | A4.1 | Kevin | Q-140, Track | before Track uses MOST |
+| SkyBoT largest cone radius and terms of use | A3.5 | Kevin | D1 | before D1 uses SkyBoT |
 | CDS permission for a partial high-resolution copy | A3.11 | Atish | Q-136 | before any copy |
 | SIMP 0136 variability; AB offsets for J, K, W1, W2 | A3.12 | Atish | D-31 | 13 Nov (caveat text) |
 | Exoplanet thresholds | A4.3, A3.8 | Atish | Q-63, PR #69 | before PR #69 merges |

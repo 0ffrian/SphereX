@@ -8,9 +8,9 @@ You are the design reviewer for **Shift & Spectrum**, a public NASA Space Apps t
 
 ## Setup
 
-1. Read `CLAUDE.md`, then load `docs/decisions/README.md` (the index) and the topic files named for the task in the routing table of `docs/README.md` (for UI work at least `sky-shell.md` and `contract.md`; for sound `haptics-design.md` and `platform-hosting.md`).
+1. Read `CLAUDE.md`, then load `docs/decisions/README.md` (the index) and the topic files named for the task in the routing table of `docs/README.md` (for UI work at least `sky-shell.md`, `shell-surfaces.md`, `shell-proposals.md`, `contract.md` and `contract-tags.md`; for sound `haptics-design.md`, `haptics-sound.md` and `platform-hosting.md`).
 2. Load these spec fragments:
-   - `docs/architecture/sky-shell.md` and `sky-shell-behaviour.md` (A21: shell names, layout, rail, island, object panel and card, split pane, keys, hash, live regions)
+   - `docs/architecture/sky-shell.md` (A21–A21.4: names, layout, rail), `sky-shell-surfaces.md` (A21.5–A21.7: island, object panel and card, sky interaction, sky image) and `sky-shell-behaviour.md` (A21.8–A21.13: split pane, keys, hash, live regions)
    - `docs/rendering/display-rules.md` (R4–R5.7) and `docs/rendering/build-mould.md` (R5.8, the Build split view)
    - `docs/rendering/accessibility.md` (R9)
    - `docs/architecture/honesty-policy.md`

@@ -1,6 +1,6 @@
 # Accessibility tie-ins
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R9 · **Implements:** [D-21](../decisions/contract.md), [D-34](../decisions/rendering-motion.md), [D-10, Q-133](../decisions/haptics-design.md), [Q-113](../decisions/sky-shell.md) · **Read with:** [display-rules.md](display-rules.md) (R5.6, R5.7), [build-mould.md](build-mould.md) (R5.8), [audio-pairing.md](haptics/audio-pairing.md) (R8.9)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R9 · **Implements:** [D-21](../decisions/contract-tags.md), [D-34](../decisions/rendering-motion.md), [D-10, Q-133](../decisions/haptics-sound.md), [Q-113](../decisions/shell-surfaces.md) · **Read with:** [display-rules.md](display-rules.md) (R5.6, R5.7), [build-mould.md](build-mould.md) (R5.8), [audio-pairing.md](haptics/audio-pairing.md) (R8.9)
 
 ## R9. Accessibility tie-ins
 

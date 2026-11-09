@@ -1,6 +1,6 @@
 # Physics layer
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A7–A7.5 · **Implements:** [D-12](../decisions/haptics-design.md), [D-26, Q-58, Q-59](../decisions/rendering-bodies.md), [D-27, D-32](../decisions/contract.md), [Q-60](../decisions/pipeline-jobs.md), [Q-104, Q-109](../decisions/rendering-motion.md) · **Read with:** [data-contract.md](data-contract.md) (A5.3 sliders), [pipeline-card.md](pipeline-card.md) (A4.6), [../rendering/renderers/shader-kinds.md](../rendering/renderers/shader-kinds.md) (R7.7)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A7–A7.5 · **Implements:** [D-12](../decisions/haptics-design.md), [D-26, Q-58, Q-59](../decisions/rendering-bodies.md), [D-27](../decisions/contract.md), [D-32](../decisions/contract-tags.md), [Q-60](../decisions/pipeline-stages.md), [Q-104, Q-109](../decisions/rendering-kinds.md) · **Read with:** [data-contract.md](data-contract.md) (A5.3 sliders), [pipeline-card.md](pipeline-card.md) (A4.6), [../rendering/renderers/shader-kinds.md](../rendering/renderers/shader-kinds.md) (R7.7)
 
 ## A7 Physics layer
 

@@ -1,6 +1,6 @@
 # Renderer: comet
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7.3 · **Implements:** [D-25](../../decisions/data-sources.md), [Q-42](../../decisions/contract.md), [Q-137](../../decisions/scope-process.md), [Q-17](../../decisions/haptics-design.md), [Q-103](../../decisions/rendering-motion.md) · **Read with:** [haptics/sources.md](../haptics/sources.md) (R8.4 field source), [display-rules.md](../display-rules.md) (R5.5 volumes)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7.3 · **Implements:** [D-25](../../decisions/data-sources.md), [Q-42](../../decisions/contract.md), [Q-137](../../decisions/scope-process.md), [Q-17](../../decisions/haptics-design.md), [Q-103](../../decisions/rendering-kinds.md) · **Read with:** [haptics/sources.md](../haptics/sources.md) (R8.4 field source), [display-rules.md](../display-rules.md) (R5.5 volumes)
 
 ### R7.3 `comet` (3I/ATLAS)
 

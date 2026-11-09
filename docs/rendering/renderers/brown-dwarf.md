@@ -1,6 +1,6 @@
 # Renderer: brown dwarfs
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7.4 · **Implements:** [D-01, Q-47](../../decisions/rendering-bodies.md), [D-32](../../decisions/contract.md), [Q-104, Q-107, Q-108, Q-109](../../decisions/rendering-motion.md), [Q-81, Q-82](../../decisions/haptics-design.md) · **Read with:** [surface-generation.md](../surface-generation.md) (R6.2 band bake), [haptics/profiles.md](../haptics/profiles.md) (R8.5)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7.4 · **Implements:** [D-01, Q-47](../../decisions/rendering-bodies.md), [D-32](../../decisions/contract-tags.md), [Q-104, Q-107, Q-109](../../decisions/rendering-kinds.md), [Q-108](../../decisions/rendering-motion.md), [Q-81, Q-82](../../decisions/haptics-design.md) · **Read with:** [surface-generation.md](../surface-generation.md) (R6.2 band bake), [haptics/profiles.md](../haptics/profiles.md) (R8.5)
 
 ### R7.4 `brown_dwarf` and `brown_dwarf_binary`
 

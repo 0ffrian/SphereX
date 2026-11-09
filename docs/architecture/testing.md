@@ -1,6 +1,6 @@
 # Testing
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A12 · **Implements:** [D-18, D-32](../decisions/contract.md), [D-25](../decisions/data-sources.md), [D-29](../decisions/scope-process.md), [Q-132](../decisions/platform-hosting.md), [Q-146](../decisions/moving-objects.md) · **Read with:** [../rendering/acceptance-tests.md](../rendering/acceptance-tests.md) (R11), [../rendering/reference/](../rendering/reference/README.md) (visual review and frame times), [plan.md](plan.md) (A13)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A12 · **Implements:** [D-18](../decisions/contract.md), [D-32](../decisions/contract-tags.md), [D-25](../decisions/data-sources.md), [D-29](../decisions/scope-process.md), [Q-132](../decisions/platform-hosting.md), [Q-146](../decisions/moving-objects.md) · **Read with:** [../rendering/acceptance-tests.md](../rendering/acceptance-tests.md) (R11), [../rendering/reference/](../rendering/reference/README.md) (visual review and frame times), [plan.md](plan.md) (A13)
 
 ## A12 Testing
 
@@ -12,7 +12,7 @@
 | Layer | Method | Where | CI | Status |
 |---|---|---|---|---|
 | Contract | Every ObjectCard and RenderParams (fixtures and live replies) validated against `shared/schemas/`; generated Pydantic models and `frontend/src/contract/` types must equal a fresh regeneration (D-18); D-32 tier rules checked on the fixtures | `backend/tests/test_contract_fixtures.py`, `scripts/generate_contract.py --check`, `npm run contract:check` | both | Built |
-| Backend stages | Unit and API tests per stage on recorded cache entries: adapters, resolver order, frames, photometry and units, spectrum targets, classify, exoplanet rule, card to params, shape models, Horizons geometry, overlays, composite, fan-out (shuffled delays), baker, Gemini paint, sky routes, HTTP retry, keys | `backend/tests/` (34 test modules) | backend | Built |
+| Backend stages | Unit and API tests per stage on recorded cache entries: adapters, resolver order, frames, photometry and units, spectrum targets, classify, exoplanet rule, card to params, shape models, Horizons geometry, overlays, composite, fan-out (shuffled delays), baker, Gemini paint, sky routes, HTTP retry, keys | `backend/tests/` (32 test modules) | backend | Built |
 | No network in tests | An autouse guard blocks every non-loopback socket and DNS lookup | `backend/tests/conftest.py`, `test_network_guard.py` | backend | Built |
 | Offline demo check | `scripts.smoke_offline --group test` and `--group demo`: every target answers with the network blocked under `SX_OFFLINE=1` | `backend/scripts/smoke_offline.py` (`npm run backend:smoke-offline`) | no (needs the full cache; run on the A15) | Built; not yet run on the A15 (#15) |
 | Data adapters | Recorded responses so tests do not hit IRSA. The cached responses double as these fixtures (D-25). Never hand-edit them; re-record with `scripts.record_fixtures` | `backend/tests/fixtures/cache/` | backend | Built |

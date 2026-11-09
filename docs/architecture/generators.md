@@ -1,6 +1,6 @@
 # Generators
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A6–A6.3 · **Implements:** [D-01, D-26, Q-47](../decisions/rendering-bodies.md), [Q-103, Q-104](../decisions/rendering-motion.md), [D-07, Q-29, Q-122](../decisions/gemini.md), [D-12](../decisions/haptics-design.md), [D-24](../decisions/platform-hosting.md), [D-25](../decisions/data-sources.md), [D-32](../decisions/contract.md) · **Read with:** [../rendering/surface-generation.md](../rendering/surface-generation.md) (R6), [../rendering/renderers/shader-kinds.md](../rendering/renderers/shader-kinds.md) (R7.7), [physics.md](physics.md) (A7)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A6–A6.3 · **Implements:** [D-01, D-26, Q-47](../decisions/rendering-bodies.md), [Q-103, Q-104](../decisions/rendering-kinds.md), [D-07, Q-29, Q-122](../decisions/gemini.md), [D-12](../decisions/haptics-design.md), [D-24](../decisions/platform-hosting.md), [D-25](../decisions/data-sources.md), [D-32](../decisions/contract-tags.md) · **Read with:** [../rendering/surface-generation.md](../rendering/surface-generation.md) (R6), [../rendering/renderers/shader-kinds.md](../rendering/renderers/shader-kinds.md) (R7.7), [physics.md](physics.md) (A7)
 
 ## A6 Generators
 
