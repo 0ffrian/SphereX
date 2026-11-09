@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import composite, objects, overlays, resolve, sky, spectrum
+from app.api import composite, gemini, objects, overlays, resolve, sky, spectrum
 from app.context import make_context
 from app.core.card.assets import AssetStore
 from app.core.card.catalogue import SHAPE_URL_ROOT, load_shape_registry, mesh_file
@@ -25,6 +25,7 @@ from app.core.find.overlays import OverlayService
 from app.core.find.resolver import load_aliases
 from app.core.measure.pool import MeasurePool
 from app.core.render.background import TextureBaker
+from app.core.render.gemini_paint import GeminiPainter, make_client
 from app.core.warm import WarmCache, demo_queries
 from app.errors import install_catch_all, install_error_handlers
 from app.settings import Settings, get_settings
@@ -97,6 +98,8 @@ def create_app(
     # it starts or joins the object's job, which downloads them in the shared bounded pool.
     app.state.frames.on_request = app.state.pipeline.request_frames
     app.state.aliases = load_aliases(s.targets_file)
+    # Gemini layer (issue #14): no key -> client None, the layer is off and the code colour shows.
+    app.state.gemini = GeminiPainter(s, ctx.cache, make_client(s, transport=transport))
     # Order matters: the middleware added last is outermost. The catch-all goes in first so
     # that CORS wraps it and a 500 still carries CORS headers.
     install_catch_all(app)
@@ -113,6 +116,7 @@ def create_app(
                 "X-SX-Combine",
                 "X-SX-Measuring",  # issue #41 first-stage answer (Q-111)
                 "X-SX-Progress",
+                "X-SX-Layer-Tag",  # the AI albedo's provenance tag (issue #14, Q-122)
             ],
         )
     install_error_handlers(app)
@@ -121,6 +125,7 @@ def create_app(
     app.include_router(spectrum.router)
     app.include_router(composite.router)
     app.include_router(overlays.router)
+    app.include_router(gemini.router)
     app.include_router(sky.router)
     # R6.7 / A5.4: the baked textures that RenderParams.textures point at (TEXTURE_URL_ROOT).
     app.mount("/data/textures", StaticFiles(directory=textures), name="textures")

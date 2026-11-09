@@ -11,10 +11,17 @@ from app.core.render.noise import F64
 
 
 def normals_from_height(h: F64, radius_m: float, strength: float = 1.0) -> NDArray[np.uint8]:
-    """Tangent-space normals, OpenGL convention (+X east/u, +Y north/up v, +Z out), as RGB8.
+    """Unit normals from ``normal_vectors``, encoded as RGB8 (rounded, R6.5)."""
+    n = normal_vectors(h, radius_m, strength)
+    return np.rint((n * 0.5 + 0.5) * 255).astype(np.uint8)
+
+
+def normal_vectors(h: F64, radius_m: float, strength: float = 1.0) -> F64:
+    """Tangent-space unit normals, OpenGL convention (+X east/u, +Y north/up v, +Z out), float64.
 
     ``h`` is in body-radius units, row 0 = north pole. Longitude wraps; the poles are padded.
-    The encoding rounds (R6.5), so a flat surface is (128, 128, 255). Non-finite heights would
+    Encoded by ``normals_from_height``, a flat surface is (128, 128, 255). Also the hillshade of
+    the Gemini repaint (R6.6), so one height field drives both. Non-finite heights would
     give zero-length normals, so they are rejected here as well as at the card.
     """
     if not np.all(np.isfinite(h)) or not math.isfinite(radius_m) or radius_m <= 0:
@@ -32,4 +39,4 @@ def normals_from_height(h: F64, radius_m: float, strength: float = 1.0) -> NDArr
     ny = +strength * dh_drow  # tangent-space +Y points north
     n = np.stack([nx, ny, np.ones_like(nx)], axis=-1)
     n /= np.linalg.norm(n, axis=-1, keepdims=True)
-    return np.rint((n * 0.5 + 0.5) * 255).astype(np.uint8)
+    return n

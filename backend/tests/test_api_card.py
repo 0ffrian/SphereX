@@ -20,7 +20,7 @@ from app.core.render.card_to_params import GENERATOR_VERSION
 from app.main import create_app
 from app.settings import Settings
 from tests.conftest import make_settings
-from tests.test_api import resolve_id
+from tests.helpers import resolve_id
 
 FIXTURES = Path(__file__).resolve().parents[2] / "shared" / "fixtures"
 TAGS = {"measured", "derived", "model_dependent", "inferred_from_analog", "artistic"}

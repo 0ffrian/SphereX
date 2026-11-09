@@ -18,7 +18,7 @@ from app.core.card.validate import errors
 from app.main import create_app
 from scripts import ingest_shape as ing
 from tests.conftest import make_settings
-from tests.test_api import resolve_id
+from tests.helpers import resolve_id
 
 SHAPES = Path(__file__).resolve().parents[1] / "assets" / "shapes"
 

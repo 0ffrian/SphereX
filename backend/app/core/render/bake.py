@@ -63,15 +63,23 @@ def _save(img: Image.Image, fmt: str, **kw: object) -> bytes:
     return buf.getvalue()
 
 
+def webp_rgb(rgb: NDArray[np.uint8]) -> bytes:
+    """Lossless WebP of an (H, W, 3) sRGB map. Equal maps give equal bytes."""
+    return _save(Image.fromarray(rgb, "RGB"), "WEBP", lossless=True, quality=100, method=4)
+
+
+def png_image(pixels: NDArray[np.uint8], mode: str) -> bytes:
+    """PNG with no timestamp (``mode`` "L" or "RGB"). Equal maps give equal bytes."""
+    return _save(Image.fromarray(pixels, mode), "PNG", compress_level=9)
+
+
 def encode(r: BakeResult) -> dict[str, bytes]:
     """File bytes. WebP is lossless and PNG has no timestamp, so equal maps give equal bytes."""
     return {
-        "albedo.webp": _save(
-            Image.fromarray(r.albedo, "RGB"), "WEBP", lossless=True, quality=100, method=4
-        ),
-        "height.png": _save(Image.fromarray(r.height_png, "L"), "PNG", compress_level=9),
+        "albedo.webp": webp_rgb(r.albedo),
+        "height.png": png_image(r.height_png, "L"),
         "height.bin": r.height.astype("<f2").tobytes(),  # float16 little-endian, W x H
-        "normal.png": _save(Image.fromarray(r.normal, "RGB"), "PNG", compress_level=9),
+        "normal.png": png_image(r.normal, "RGB"),
     }
 
 
