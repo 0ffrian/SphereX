@@ -58,7 +58,7 @@ export interface FramesResponse {
   stretch: Stretch;
   data_release: string;
   cached_at: string | null;
-  /** Refused layers or items, e.g. `frames:moving_object_search`. */
+  /** Refused layers or items, e.g. `frames:truncated` or `saturated:<frame_id>`. */
   missing: string[];
   provenance?: Readonly<Record<string, unknown>>;
 }

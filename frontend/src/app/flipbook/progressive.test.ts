@@ -18,6 +18,7 @@ import {
   POLL_NEXT_DELAY_MS,
   POLL_STALLED_CODE,
   pollFrames,
+  searchDeferredCount,
   type PollOptions,
 } from './progressive';
 
@@ -66,6 +67,7 @@ describe('deferred cutouts', () => {
       notUsable: 2,
       found: 9,
       truncated: true,
+      searching: false,
     });
     // A refusal of a frame that is shown (should not happen) is not counted twice.
     expect(framesCounts(reply([frame('a', 0)], ['cutout:a'])).found).toBe(1);
@@ -314,5 +316,16 @@ describe('pollFrames', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('moving-object path search still running', () => {
+  it('keeps polling while frames:search_deferred is listed, and counts it', () => {
+    expect(searchDeferredCount(['frames:search_deferred:5', 'cutouts:deferred:2'])).toBe(5);
+    expect(searchDeferredCount(['frames:search_deferred:x'])).toBe(0);
+    expect(hasDeferred(['frames:search_deferred:1'])).toBe(true);
+    expect(hasDeferred(['frames:cone_cap:4', 'frames:sparse_path:1'])).toBe(false);
+    expect(deferredCount(['frames:search_deferred:5'])).toBe(0);
+    expect(framesCounts(reply([], ['frames:search_deferred:5'])).searching).toBe(true);
   });
 });

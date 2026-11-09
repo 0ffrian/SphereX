@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Frame, SpectrumPoint } from '@/app/api/types';
-import { FRAME_REASONS, groupMissing, parseMissing, summarizeSpectrum } from './refusals';
+import {
+  countedCode,
+  FRAME_REASONS,
+  groupMissing,
+  parseMissing,
+  summarizeSpectrum,
+} from './refusals';
 
 // Test data only, not physical claims. Real backend frame IDs look like `2026W17_1B_0634_4_D3`.
 const ids = (prefix: string, n: number) =>
@@ -37,9 +43,9 @@ describe('parseMissing', () => {
   it('reads whole-result codes as notes', () => {
     for (const c of [
       'frames:truncated',
-      'frames:moving_object_search',
+      'frames:ephemeris',
+      'frames:moving_window',
       'spectrum:saturated',
-      'spectrum:moving_object_search',
     ]) {
       expect(parseMissing(c)).toEqual({ kind: 'note', code: c, known: true, count: 1 });
     }
@@ -195,7 +201,7 @@ describe('summarizeSpectrum', () => {
   });
 
   it('a refused mover: no frames, one note', () => {
-    const o = summarizeSpectrum([], ['frames:moving_object_search']);
+    const o = summarizeSpectrum([], ['frames:moving_window']);
     expect(o).toMatchObject({ points: 0, refused: 0, total: 0 });
     expect(o.groups).toHaveLength(1);
   });
@@ -204,5 +210,48 @@ describe('summarizeSpectrum', () => {
     expect(summarizeSpectrum([], ['saturated:a', 'cutouts:deferred:3']).incomplete).toBe(true);
     expect(summarizeSpectrum([], ['saturated:a', 'frames:truncated']).incomplete).toBe(true);
     expect(summarizeSpectrum([], ['saturated:a', 'cutouts:deferred:x']).incomplete).toBe(false);
+  });
+});
+
+describe('moving-object path search codes', () => {
+  it('reads counted codes as notes with their count', () => {
+    expect(parseMissing('frames:cone_cap:12')).toEqual({
+      kind: 'note',
+      code: 'frames:cone_cap:12',
+      known: true,
+      count: 12,
+    });
+    expect(countedCode('frames:search_deferred:4')).toEqual({
+      prefix: 'frames:search_deferred',
+      count: 4,
+    });
+    expect(countedCode('frames:cone_cap:x')).toBeNull();
+    expect(parseMissing('frames:cone_cap:x')).toMatchObject({ kind: 'note', known: false });
+  });
+
+  it('reads the per-frame codes as known frame refusals', () => {
+    expect(parseMissing('no_footprint:f1')).toEqual({
+      kind: 'frame',
+      reason: 'no_footprint',
+      frameId: 'f1',
+      known: true,
+    });
+    expect(parseMissing('ephemeris:f2')).toMatchObject({ kind: 'frame', known: true });
+  });
+
+  it('marks a capped, lossy or still running path search as incomplete', () => {
+    for (const c of [
+      'frames:search_deferred:2',
+      'frames:cone_cap:9',
+      'frames:cone_failed:1',
+      'frames:cone_maxrec:1',
+      'frames:sparse_path:3',
+      'frames:ephemeris',
+    ]) {
+      expect(summarizeSpectrum([], ['saturated:a', c]).incomplete, c).toBe(true);
+    }
+    expect(summarizeSpectrum([], ['saturated:a', 'frames:outside_window:291']).incomplete).toBe(
+      false,
+    );
   });
 });
