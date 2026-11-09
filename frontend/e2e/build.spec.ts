@@ -247,6 +247,7 @@ test('Build it: split view, steps run to done, Escape and Back close it', async 
 });
 
 test('reduced motion: Build it shows the built body at once', async ({ page }) => {
+  test.setTimeout(90_000); // a SwiftShader build: 31 s on a CI runner, over the 30 s default
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await selectAquaPrime(page);
   await page.getByTestId('build-it').click();
@@ -347,7 +348,7 @@ test('phone width: the sheet reaches the search bar and the sky under it is iner
   await selectAquaPrime(page);
   await page.getByTestId('build-it').click();
   const pane = page.getByTestId('build-pane');
-  await expect(pane).toBeVisible();
+  await expect(pane).toBeVisible({ timeout: 15_000 }); // the pane builds on a software GPU
   await expect(page.locator('.sx-sky-slot')).toHaveAttribute('inert', '');
   // The transport slot does not keep its space: the sheet ends just above the search bar.
   const sheet = (await pane.boundingBox())!;

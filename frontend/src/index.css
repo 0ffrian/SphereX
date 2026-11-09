@@ -817,8 +817,9 @@ body {
       left: 0;
       right: 0;
       width: 100%;
-      /* Same top edge as a sheet of 66 % that ran under the credit. */
-      max-height: calc(66% - var(--sx-credit-h, 0px));
+      /* Room for the sheet's controls (Stop) without scrolling when the text wraps more, as with
+         wider system fonts: a sheet of 72 % (it was 66 %) that stops at the credit. */
+      max-height: calc(72% - var(--sx-credit-h, 0px));
       border-radius: 20px 20px 0 0;
       border-bottom: 0;
     }
