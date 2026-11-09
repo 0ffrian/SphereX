@@ -1,17 +1,17 @@
-# Area search: Known objects (Track) and Discovery
+# Area search: Known objects and Discovery
 
-> **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A16–A16.7 · **Backend:** [linker-backend.md](area-backend.md) (A17) · **Sky UI:** [linker-ui.md](area-ui.md) (A18) · **Diagrams:** [uml/22-area-search.md](../../uml/22-area-search.md)
+> **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A16 to A16.7 · **Implements:** [Q-146](../../decisions/moving-objects.md), [Q-131](../../decisions/moving-objects.md), [Q-137](../../decisions/scope-process.md), [Q-132](../../decisions/platform-hosting.md) · **Read with:** [area-backend.md](area-backend.md) (A17), [area-ui.md](area-ui.md) (A18), [track.md](track.md) (A19), [track-ui.md](track-ui.md) (A20), [uml/22](../../uml/22-area-search.md)
 
-Status: **agreed plan, not built** ([Q-146](../../decisions/moving-objects.md), 9 Nov 2026). It replaces the first proposal of this fragment (the blind Band-Hop Linker with an injection atlas, Q-147), re-scoped after Atish's review (Q-131). The file keeps its name so links stay valid. Labels follow the architecture spec: **Tested**, **Documented**, **To build / Not confirmed**.
+Status: **agreed plan, not built** ([Q-146](../../decisions/moving-objects.md), 9 Nov 2026). It replaces the blind Band-Hop Linker with an injection atlas (Q-147), re-scoped after Atish's review (Q-131). Labels follow the architecture spec: **Tested**, **Documented**, **To build / Not confirmed**. Placeholders written as **Proposed (Q-NEW-MOV-n)** wait for a decision row; until then the rest of this fragment does not depend on them unless it says so.
 
-Clickable mock-ups: `mockup/spherex-ui.html` (Area search tool, key 5) and `mockup/chase-the-rock.html` (Track). Mock-ups are visual input only, never a spec (D-01).
+Clickable mock-ups: `mockup/spherex-ui.html` (Area search is mock-up tool 5; the app adds no number keys, Q-121) and `mockup/chase-the-rock.html` (Track). Mock-ups are visual input only, never a spec (D-01).
 
 ## A16 Area search
 
 The user draws a square on the sky. A card then offers two ways to search it:
 
-1. **Known objects.** Asteroids and comets already on file that crossed the square while SPHEREx looked (SkyBoT). Picking one opens **Track** (Atish, Q-131): its Horizons path from SPHEREx, the SPHEREx frames that caught it, a north-up zoom with stars masked and a spectrum built exposure by exposure.
-2. **Discovery.** Find the dots in the square's frames, drop one-exposure glitches, drop stars, join what moves between visits, then check the joined tracks against SkyBoT. A track that matches a known object reads "found blind = (designation)" and opens Track; one that matches nothing reads "unexplained track".
+1. **Known objects.** Asteroids and comets already on file that crossed the square while SPHEREx looked. SkyBoT lists them; their positions come from Horizons seen from SPHEREx (Q-138). **Track it** opens **Track** ([A19](track.md), [A20](track-ui.md)): the object's path, the SPHEREx frames that caught it, a north-up zoom with stars masked and a spectrum built exposure by exposure.
+2. **Discovery.** Find the dots in the square's frames, drop one-exposure glitches, drop stars and dots fixed in both visits, join what moves between visits, then check the joined tracks against known objects. A track that matches one reads "found blind = (designation)" and opens Track; one that matches nothing reads "unexplained track".
 
 In one sentence for the public: draw a square, then either follow a rock we already know, or let the computer look for dots that move and see whether anyone has named them.
 
@@ -20,25 +20,25 @@ In one sentence for the public: draw a square, then either follow a rock we alre
 | Item | Detail | Label |
 |---|---|---|
 | Gap | The SPHEREx Solar System Object Catalog tracks objects with **known** orbits and leaves unknown-object mining to "community researchers" (Lisse, Bauer and Kim 2024, [arXiv:2402.08705](https://arxiv.org/abs/2402.08705)). The pipeline does forced photometry at known positions (Akeson et al. 2025, [arXiv:2511.15823](https://arxiv.org/abs/2511.15823)). | Documented |
-| Public users | Follow a famous rock on real SPHEREx frames (Known), and watch the computer find one blind (Discovery). | To build |
-| Demo moment | Draw the square around 433 Eros on its 20 to 21 Mar 2026 frames (Q-137), run Discovery: it finds Eros without being told where it is, SkyBoT confirms it, and one click opens Track on the same rock. | To build |
-| Researchers (after the event) | The same tool with the full linker: a rate-grid linker over many visits, an injection-recovery completeness curve and ADES export (A16.7, phase 2). | Not in the event build |
+| Public users | Follow a famous rock on real SPHEREx frames (Known), and watch the computer pick out dots that move without being given any object's position (Discovery). | To build |
+| Demo moment | The Eros area of 20 to 21 Mar 2026 (Q-137). **We chose this area because Eros crosses it** (A17.1). Discovery is not given Eros's position: it finds the dots that move, and the known-object check then names one of them 433 Eros. One click opens Track on the same rock. | To build |
+| Researchers (after the event) | The full linker: a rate-grid linker over many visits, injection-recovery completeness and ADES export (phase 2, A16.2). | Not in the event build |
 | Why "band-hop" | One SPHEREx frame covers a range of wavelengths across its field ([A3.1](../data-sources.md#a31-spherex-irsa)), so each detection of a mover lands at a different wavelength. Track builds the spectrum from that; Discovery shows each dot in its wavelength colour. | Documented (instrument) |
 
 ### A16.2 Scope
 
 **Event build (by 14 Nov 2026):**
 
-- The **Area search** tool on the sky view: draw a square, the two-option card, the Known list, the Discovery card with its five steps, the Dots and Tracks layers, the blink between visits, the track card (A18).
-- **Track** for known objects, as Atish specifies it (Q-131, Q-134 to Q-145). This fragment does not respecify Track; it only hands off to it.
-- **Discovery backend** for precomputed areas (A17): frames, dot detection, glitch and star removal, joining across visits, SkyBoT check, an ECSV export of the tracks.
-- 1 to 3 **precomputed areas**, one of them the Eros area. Desktop browser only, on the A15 (Q-132).
+- The **Area search** tool on the sky view: draw a square, the Options card, the Known list, the Discovery card with its five steps, the Dots and Tracks layers, the blink between visits, the Result card (A18).
+- **Track** for known objects ([A19](track.md) data and backend, [A20](track-ui.md) screen). Track is the MVP (Q-131, Q-137); Area search hands off to it and does not respecify it.
+- **Discovery backend** for precomputed areas (A17): frames, dots, glitch and star removal, joining across visits, the known-object check, an ECSV export.
+- 1 to 3 **precomputed areas**, one of them the Eros area. Desktop browser only, on the A15 (Q-132). The demo data is frozen on QR2 (Q-137).
 
-**Phase 2 (after the event), kept here so the idea is not lost:** the rate-grid linker across many visits (THOR style), the SED smoothness score, injection-recovery completeness and the shuffled-time control, ADES export, live areas anywhere on the sky.
+**Phase 2 (after the event), kept so the idea is not lost:** the rate-grid linker across many visits (THOR style), the SED smoothness score, injection-recovery completeness and the shuffled-time control, ADES export, live areas anywhere on the sky.
 
 **Never:**
 
-- **No discovery claim.** An unmatched track is "unexplained", never "an asteroid", "new" or "a discovery" (A16.5).
+- **No discovery claim.** An unmatched track is "unexplained", never "an asteroid", "new" or "a discovery" (A16.5). No catch-rate claim until completeness exists.
 - No computing in a web request. Discovery runs offline in a script; the API serves cached results (A17.8).
 - No change to the object pipeline (stages 1 to 7, [A4](../pipeline.md#a4-pipeline)). Discovery is a separate **area** pipeline that reuses its adapters and helpers.
 
@@ -46,85 +46,95 @@ In one sentence for the public: draw a square, then either follow a rock we alre
 
 ```mermaid
 flowchart LR
-  subgraph Offline["Offline precompute (scripts/area_discovery.py)"]
-    F[Area and frames<br/>A17.1] --> D[Dots<br/>A17.2] --> G[Glitches and stars<br/>A17.3] --> J[Join across visits<br/>A17.4] --> M[SkyBoT check<br/>A17.5]
+  subgraph Offline["Offline precompute (backend/scripts/area_discovery.py)"]
+    F[Area frames and visits<br/>A17.1] --> D[Dots<br/>A17.2] --> G[Glitches, stars, fixed<br/>A17.3] --> J[Join across visits<br/>A17.4] --> M[Known-object check<br/>A17.5]
     M --> X[ECSV export<br/>A17.7]
   end
-  C[(Read-through cache<br/>D-25)]
+  C[(Read-through cache D-25<br/>raw replies + derived.area)]
   Offline <--> C
-  subgraph API["FastAPI, reads cache only"]
-    E["/v1/areas/..."]
-    K["/v1/objects/{id}/path (Q-141)"]
+  subgraph API["FastAPI, reads the cache only"]
+    E["/v1/areas/... A17.8"]
+    K["/v1/objects/{id}/path A19.5"]
   end
   C --> E
   C --> K
-  subgraph UI["Frontend sky view (Q-89)"]
+  subgraph UI["Frontend sky view"]
     T[Area search tool<br/>A18.1] --> Y[Dots and Tracks layers<br/>A18.2]
-    T --> KN[Known list A18.5]
+    T --> KN[Known card A18.5]
     T --> DC[Discovery card A18.6]
-    KN --> TR[Track view, Atish Q-131]
+    KN --> TR[Track pane A20]
     DC --> TR
   end
   E --> UI
   K --> TR
 ```
 
-| Part | Code (proposed) | Owner (D-17) |
+| Part | Code (proposed, **To build**) | Owner |
 |---|---|---|
-| Discovery pipeline | `backend/app/core/area/` (`frames.py`, `dots.py`, `clean.py`, `join.py`, `match.py`, `export.py`, `service.py`) | Kevin |
+| Discovery pipeline | `backend/app/core/area/` (`frames.py`, `dots.py`, `clean.py`, `join.py`, `match.py`, `service.py`) | Kevin (D-17) |
 | Precompute script | `backend/scripts/area_discovery.py` | Kevin |
-| API | `backend/app/api/areas.py`, models in `backend/app/api/models.py` | Kevin |
-| Star list for movers (shared with Track's masks, Q-143) | `core/find/overlays.py` extension | Kevin, Moon |
-| Schemas and fixtures | `shared/schemas/area-*.schema.json`, `shared/fixtures/area/` | Moon |
-| Area tool, cards, layers, state | `frontend/src/app/sky/area/`, `frontend/src/app/shell/`, `frontend/src/state/store.ts` | Moon |
-| Track (path, frames, zoom, spectrum, sound) | per Q-131 to Q-145 | Atish |
+| API | `backend/app/api/areas.py`, models generated from the schemas (D-18) | Kevin |
+| Star list for movers (shared by Track's masks and Discovery, Q-143) | `backend/app/core/find/overlays.py` extension ([A19.6](track.md#a196-star-list-for-movers)) | Kevin (Q-143) |
+| Shared ECSV writer | `backend/app/core/export/ecsv.py` ([A19.9](track-contract.md#a199-export)) | Kevin |
+| Schemas and fixtures | `shared/schemas/area-*.schema.json`, `shared/fixtures/area/` | Moon (D-17) |
+| Area tool, cards, layers, state | `frontend/src/app/sky/area/`, `frontend/src/app/shell/`, `frontend/src/state/store.ts` | Moon (D-17) |
+| Track backend | [A19](track.md) | Kevin, **Proposed (Q-NEW-MOV-6)** |
+| Track screen and sound | [A20](track-ui.md), `frontend/src/app/track/` | Atish (Q-131), **Proposed (Q-NEW-MOV-6)** as a D-17 amendment, since `app/` is Moon's |
 
-Reused, not rewritten: `adapters/irsa_sia.py`, `adapters/irsa_cutout.py`, `adapters/gaia.py`, `adapters/wise.py`, `adapters/skybot.py`, the cache, `core/find/wcs.py` (pixel to sky, `wavelength_at`), the Stage 2 flag reject list and background method ([A4.2](../pipeline.md#a42-stage-2-measure-brightness-and-spectrum)), PR #53's moving-object frame search, `viewer/sky/skyMath.ts` (`raDecToScreen`), `app/flipbook/wavelengthColor.ts`, `app/shell/PanelCard.tsx`, Track's sky layer and export (Q-131, Q-145).
+Reused, not rewritten: `adapters/irsa_sia.py`, `adapters/irsa_cutout.py`, `adapters/gaia.py`, `adapters/wise.py`, `adapters/skybot.py`, `adapters/horizons.py`, the cache, `core/find/wcs.py` (pixel to sky, `wavelength_at`), the Stage 2 aperture photometry and flag reject list ([A4.2](../pipeline.md#a42-stage-2-measure-brightness-and-spectrum)), Stage 1's fixed-position SIA cone ([A4.1](../pipeline.md#a41-stage-1-find-the-object)) with PR #53's `s_region` test, `viewer/sky/skyMath.ts` (`raDecToScreen`), `app/flipbook/wavelengthColor.ts`, `app/shell/PanelCard.tsx`, the shared ECSV writer and the star list (A19).
 
 ### A16.4 Data flow
 
-1. **Choose areas** (centre, size, data release QR2, the visits) in `backend/scripts/targets.toml`, group `areas`. One is the Eros area of 20 to 21 Mar 2026.
-2. **Precompute** with `python -m scripts.area_discovery --area <id>` while the internet is good. Every external call goes through the read-through cache. The script writes derived JSON for the area (A17.10).
-3. **Serve.** `/v1/areas/...` reads that JSON. Under `SX_OFFLINE=1` nothing reaches the network.
-4. **Draw a square.** The frontend finds the precomputed area that contains the square. A square outside every precomputed area is refused (`area:not_prepared`) and the card lists the prepared areas with a button to fly there.
-5. **Show.** Known reads the area's SkyBoT list; Discovery reads its dots and tracks and plays the five steps.
+1. **Choose areas** in `backend/targets.toml` ([A3.12](../targets.md)) as `[[area]]` tables: `id`, `ra`, `dec`, `width_deg`, `height_deg`, `data_release` (`spherex_qr2`), `windows` (UTC time spans to search). Visits are computed, not configured (A17.1). The Eros area is set from Eros's known path of 20 to 21 Mar 2026, sized to hold both visits' positions (A17.1). **To build** (the file has only `[[target]]` tables today).
+2. **Precompute** with `python -m scripts.area_discovery --area <id>` while the internet is good. Every external call goes through the read-through cache (D-25); results are stored as `derived.area` entries (A17.10). The same run pre-fetches Track for every Known object of the area, or lists the ones it skipped ([A19.12](track-contract.md#a1912-cache-offline-and-pre-fetch)).
+3. **Serve.** `/v1/areas/...` reads those entries. Under `SX_OFFLINE=1` nothing reaches the network.
+4. **Draw a square.** The frontend checks the `GET /v1/areas` index and picks the precomputed area that holds the square. None: refused in the frontend as `area:not_prepared`; the card lists the prepared areas with **Fly there** (A18.1).
+5. **Show.** Known reads the area's known list; Discovery reads its dots and tracks and replays the five steps.
 
 ### A16.5 Honesty rules
 
 | Output | Tag (A5.2) | Badge (D-02) | Notes |
 |---|---|---|---|
-| Dot pixel centroid, flux, error | `measured` | Measured | Same flux method as Stage 2. |
-| Dot RA/Dec, wavelength | `derived` | Estimated | Through the frame WCS and `WCS-WAVE`. |
-| "Glitch" and "star" labels on a dot | `derived` | Estimated | Rule shown (A17.3). |
-| A track (which dots belong together) | `derived` | Estimated | Rule and thresholds in `provenance`. |
-| SkyBoT match | `derived` | Estimated | Designation and separation shown. |
-| Wavelength colours on the sky | `artistic` | Default | A display choice. |
+| Dot pixel centroid, flux, error, flags | `measured` | Measured | Stage 2 aperture method at the centroid (A17.2). |
+| Dot wavelength and bandwidth | `measured` | Measured | `WCS-WAVE` lookup at a measured centroid, as Stage 1 tags frame wavelengths ([A4.1](../pipeline.md#a41-stage-1-find-the-object), PR #53's Q-124). |
+| Dot RA/Dec | `derived` | Estimated | Measured centroid through the frame WCS. |
+| "Glitch", "star", "fixed" labels; tracklets; tracks | `derived` | Estimated | Rule and thresholds in `method` (A17.3, A17.4). |
+| Known-object positions and the match | `model_dependent` | Estimated | Assumption: "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of `fetched_at`, seen from SPHEREx (`500@-163182`)" (A17.5, Q-138). |
+| Wavelength colour on the sky | `derived` | Estimated | Hue = wavelength, as Rainbow Trails is built; the tag follows Q-27 (open). In "Measured only" dots are drawn in one colour. |
 
-- **Wording.** "T1 · found blind = 433 Eros"; "T2 · unexplained track"; "T3 · possible · 1 visit". Never "asteroid", "new" or "discovery" for an unmatched track. The track card says what an unexplained track is: "a lead for follow-up, not a discovery".
-- **Refuse rather than invent.** An area with fewer than 2 visits: no tracks, `area:visits` in `missing`. A stamp whose cutout is not cached: `stamp:<dot_id>`.
+- **Wording.** "T1 · found blind = 433 Eros"; "T2 · unexplained track"; "T3 · possible · 1 visit". Never "asteroid", "new" or "discovery" for an unmatched track. The Result card says what an unexplained track is: "a lead for follow-up, not a discovery", and dates it: "matches nothing known to SkyBoT as of <date>".
+- **Checked, or not.** "Unexplained" needs a completed check. When the SkyBoT or Horizons call failed, the verdict is `unchecked` ("not checked against known objects"), with the reason in `missing` (A17.5).
+- **Honest demo line.** The area was chosen because Eros crossed it. The Result card for Eros says: "The search was not given Eros's position. We chose this area because Eros crossed it; the known-object check then named it." Never "found without being told where to look".
+- **Refuse rather than invent.** Fewer than 2 visits: no tracks, `area:visits` in `missing`. A stamp whose cutout is not cached: `stamp:<dot_id>`. Full code list in A17.8.
 - **Precomputed, said so.** The Discovery card shows when the search ran (`computed_at`). Its button reads "Look for movers"; the steps replay the precomputed result.
-- **Flagged frames stay visible** (Q-139): a frame kept with OUTLIER on the core is drawn hollow and flagged in the export.
+- **Flags stay visible.** A dot whose pixels carry `OUTLIER` is kept and its flag is shown in the Result card and the export (A17.2, **Proposed (Q-NEW-MOV-1)**). Dots on the sky are not drawn hollow for it, because Discovery cannot know a dot is a mover's core. Track's spectrum shows kept OUTLIER points hollow (Q-139, [A20.7](track-ui.md#a207-spectrum-hop-by-hop)).
 - **Fixtures.** Synthetic fixtures carry the dev-only Fixture badge and never reach a production build (Q-32).
 
-### A16.6 Open items
+### A16.6 Open items and measured facts
 
-| Item | Why it matters | Status |
+Facts measured on PR #53's recorded Eros fixtures (16 cutouts, `mockup/chase-the-rock.html` data):
+
+| Item | Value | Status |
 |---|---|---|
-| Visits per area and the gap between them | Joining needs at least 2 visits; the gap sets the search radius. A3.1 says about 0.8 days for one spot; a cache check reported 0.7 to 88 days. | **[verify]**, Q-148, Day 0 |
-| Per-exposure depth (5σ point source per band) | Sets how faint a dot can be and how many dots a frame has. Survey depths of 19.5 to 19.9 AB (Bock et al. 2025, [arXiv:2511.02985](https://arxiv.org/abs/2511.02985)) are not per-exposure. | **[verify]**, Day 0 |
-| Motion inside one visit | Eros's 4 exposures span about 7 minutes; at 0.5 deg/day that is about 1.5 px. It decides whether a visit alone shows the direction. | **[verify]** on the Eros frames |
-| Trailing | Smear starts near 0.53 deg/day and is significant near 1.2 deg/day (Lisse et al. 2024, appendix). | Documented |
-| IRSA MOST for the Known list | Faster than SkyBoT per epoch if its positions are SPHEREx-centred. | Kevin, Q-140 |
+| Visits, exposures, frames | 2 visits; 4 exposures per visit; each exposure on 2 detectors at once (D1 0.79 to 1.06 µm, D4 2.6 to 3.6 µm): 16 frames | Tested (Eros only) |
+| Visit length and gap | One visit spans 6.4 min (08:33:43 to 08:40:10 UTC); the two visits are 1.017 d (24.4 h) apart | Tested (Eros only); other areas **[verify]**, Q-148 |
+| Motion inside a visit | 16″ (2.6 px) from exposure 1 to 4: 0.99 deg/day at PA 80.6° | Tested (Eros) |
+| Motion between visits | 0.970° in 1.017 d: 0.954 deg/day at PA 105.7°. The two directions differ by 25° because of SPHEREx's orbital parallax (Q-134); A17.4 handles it | Tested (Eros) |
+| Sky position | Galactic l = 195.6°, b = −4.0°: a crowded field, so star masking is tested hard (A17.3) | Tested |
+| Per-exposure depth (5σ point source per band) | Survey depths of 19.5 to 19.9 AB (Bock et al. 2025, [arXiv:2511.02985](https://arxiv.org/abs/2511.02985)) are not per exposure | **[verify]**, Day 0 |
+| Visits and gap for the other demo areas | Joining needs 2 visits; the gap sets `rate_min` (A17.4). A3.1 says about 0.8 days for one spot; a cache check reported 0.7 to 88 days | **[verify]**, Q-148, Day 0 |
+| Trailing | Smear starts near 0.53 deg/day and is significant near 1.2 deg/day (Lisse et al. 2024, appendix) | Documented |
+| IRSA MOST for frame lists | One question, Q-125 (PR #53); Q-140 duplicates it | Open (Kevin), [A19.3](track.md#a193-frame-list) |
 
 ### A16.7 Tickets and plan
 
-Three tickets (D-29 "as few tickets as possible"), milestone **M4 Extras**, priority P2. Track has its own tickets (Atish, Q-131).
+Three Area tickets (D-29 "as few tickets as possible"), milestone **M4 Extras**, priority P2. Track's tickets T1 to T4 are in [A19.14](track-contract.md#a1914-owners-tickets-and-tests) and [A20.15](track-ui.md#a2015-tests-and-tickets).
 
 | Ticket | Owner | Checklist |
 |---|---|---|
-| **D1 Discovery backend** | Kevin | Day 0 count on the Eros frames: visits, gap, exposures per visit, motion inside a visit, per-exposure S/N (recorded in A16.6 and Q-148) · area frames (A17.1) · dots (A17.2) · glitches and stars (A17.3, star list shared with Q-143) · join (A17.4) · SkyBoT (A17.5) · ECSV (A17.7) · API (A17.8) · determinism test (A17.10) |
-| **D2 Area tool UI** | Moon | Schemas and fixtures (A17.9) · Area tool and drawing (A18.1) · layers (A18.2) · blink (A18.3) · cards (A18.4 to A18.7) · hand-off to Track · minimise to the island (A18.4) · copy and badges · tests (A18.10) |
-| **D3 Integration** | Shared, M5 | Precompute the demo areas under `SX_OFFLINE=1` · e2e on the real cache (Eros found blind, then Track) · this spec and [uml/22](../../uml/22-area-search.md) updated to "as built" |
+| **D1 Discovery backend** | Kevin | Day 0 count on the Eros frames and one other area: visits, gap, exposures per visit, motion inside a visit, per-exposure S/N, share of dots labelled star (recorded in A16.6 and Q-148) · `[[area]]` config · area frames (A17.1) · dots (A17.2) · glitches, stars, fixed (A17.3) · join with the parallax-aware test, and the Eros test that must give one `track` (A17.4) · known-object check (A17.5) · ECSV (A17.7) · API (A17.8) · determinism test (A17.10) |
+| **D2 Area tool UI** | Moon | Schemas and fixtures (A17.9) · Area tool and drawing (A18.1) · layers (A18.2) · visits and blink (A18.3) · cards (A18.4 to A18.7) · hand-off to Track (A18.8) · copy and badges · tests (A18.10) |
+| **D3 Integration** | Shared, M5 | Precompute the demo areas, then run under `SX_OFFLINE=1` · e2e on the real cache (Eros found blind, then Track) · this spec and [uml/22](../../uml/22-area-search.md) updated to "as built" |
 
 - **Order:** agree the JSON shapes (A17.8, A17.9) first, so D1 and D2 build in parallel against fixtures (D-29).
-- **Gate:** if Day 0 shows Eros is not found blind on its own frames, keep Known and Track, and show Discovery only as the five steps on the Eros area with its real counts, without claiming tracks. Never drop the "unexplained, not a discovery" wording.
+- **Gate:** if Day 0 shows Eros is not found blind on its own frames with the rules of A17, keep Known and Track, and show Discovery only as the five steps on the Eros area with its real counts, without claiming tracks. Never drop the "unexplained, not a discovery" wording.
