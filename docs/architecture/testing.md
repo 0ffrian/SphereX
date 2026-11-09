@@ -1,19 +1,32 @@
 # Testing
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A12 · **Implements:** D-18, D-25, D-29
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A12 · **Implements:** [D-18, D-32](../decisions/contract.md), [D-25](../decisions/data-sources.md), [D-29](../decisions/scope-process.md), [Q-132](../decisions/platform-hosting.md), [Q-146](../decisions/moving-objects.md) · **Read with:** [../rendering/acceptance-tests.md](../rendering/acceptance-tests.md) (R11), [../rendering/reference/](../rendering/reference/README.md) (visual review and frame times), [plan.md](plan.md) (A13)
 
 ## A12 Testing
 
-| Layer | Method |
-|---|---|
-| Physics functions | Unit tests with known values (Jupiter band count, Sedov radius, spin limit) |
-| Schema | Validate every ObjectCard and RenderParams against the JSON schemas in `shared/schemas/`. CI fails if the generated Pydantic models or `frontend/src/contract/` types differ from a fresh regeneration (D-18) |
-| Rendering acceptance | The tests in rendering doc §11: determinism (same SHA-256 per texture), seam, normals, honesty, refusal, performance, spectrum haptics, comet epochs |
-| Browser shaders | Same card and seed must give the same image. Reference screenshots of the five shader kinds, plus two extra views (a gas giant turned so its lit storms face the camera, and a cloudless water world tilted toward the pole), are committed in `frontend/e2e/__snapshots__/shaderKinds.spec.ts/` and compared by Playwright (`toHaveScreenshot`, status overlay masked, tolerance 0.2% of pixels, per-pixel threshold 0.05, and 0.01 for the gas-giant storm view). Changing the storm count, band turbulence, seed, sea level or ice extent is detected (checked by mutating each). They are drawn on the WebGL2 fallback (SwiftShader), not a real GPU; they were stable over repeated runs here, and are re-recorded with `--update-snapshots` after a deliberate look change. A unit test pins the GPU's field lookup to `FieldSampler` |
-| Golden frames | `frontend/e2e/golden.spec.ts` draws every fixture with a 3D view (not `candidate`) at Measured only, + Estimated and + Artistic and compares with `frontend/e2e/__goldens__/` by SSIM (`e2e/ssim.ts`, threshold `GOLDEN_MIN_SSIM` in `e2e/golden.ts`); `e2e/ssim.spec.ts` is the negative control. `SX_UPDATE_GOLDENS=1` rewrites them. Visual review and device frame times: [rendering/reference/](../rendering/reference/README.md) |
-| Haptics | No more than 40 events per second under fast drags. Silent no-op on iPhone, where the audio driver takes over. The calibration value persists. Both Android phones feel the faintest calibrated tick |
-| Audio pairing | Measure the offset between the sound and the vibration of the same event on both phones |
-| UI | Playwright with headless Chromium. Already used for the mock-up, checks console errors and clicks |
-| Data adapters | Recorded responses so tests do not hit IRSA. The cached responses of the read-through cache double as these fixtures (D-25). Never hand-edit them; re-record them with the pre-fetch script |
-| Milestones | M1–M4 each build against their own fixtures (recorded responses, sample cards and spectra), so they do not depend on each other (D-29) |
-| Hardware | Run the real app on the Zenbook and both phones and record frame rate |
+**CI** (GitHub Actions, on every push and PR that touches the folder or `shared/`):
+
+- `.github/workflows/backend.yml`, job "ruff, mypy, pytest (offline)": `scripts.generate_contract --check`, `ruff check`, `ruff format --check`, `mypy`, `pytest -q`, all with `SX_OFFLINE=1`.
+- `.github/workflows/frontend.yml`, job "typecheck, lint, test, build": `contract:check`, `typecheck`, `lint`, `format:check`, `test` (Vitest 5.1.0), `build`; job "playwright (chromium)": `test:e2e` (Playwright 1.64.1), report uploaded on failure.
+
+| Layer | Method | Where | CI | Status |
+|---|---|---|---|---|
+| Contract | Every ObjectCard and RenderParams (fixtures and live replies) validated against `shared/schemas/`; generated Pydantic models and `frontend/src/contract/` types must equal a fresh regeneration (D-18); D-32 tier rules checked on the fixtures | `backend/tests/test_contract_fixtures.py`, `scripts/generate_contract.py --check`, `npm run contract:check` | both | Built |
+| Backend stages | Unit and API tests per stage on recorded cache entries: adapters, resolver order, frames, photometry and units, spectrum targets, classify, exoplanet rule, card to params, shape models, Horizons geometry, overlays, composite, fan-out (shuffled delays), baker, Gemini paint, sky routes, HTTP retry, keys | `backend/tests/` (34 test modules) | backend | Built |
+| No network in tests | An autouse guard blocks every non-loopback socket and DNS lookup | `backend/tests/conftest.py`, `test_network_guard.py` | backend | Built |
+| Offline demo check | `scripts.smoke_offline --group test` and `--group demo`: every target answers with the network blocked under `SX_OFFLINE=1` | `backend/scripts/smoke_offline.py` (`npm run backend:smoke-offline`) | no (needs the full cache; run on the A15) | Built; not yet run on the A15 (#15) |
+| Data adapters | Recorded responses so tests do not hit IRSA. The cached responses double as these fixtures (D-25). Never hand-edit them; re-record with `scripts.record_fixtures` | `backend/tests/fixtures/cache/` | backend | Built |
+| Physics functions | Unit tests with known values (Jupiter band count, Sedov radius, spin limit, Teq) | `frontend/src/physics/physics.test.ts` | frontend | Built |
+| Frontend units | Refusal grouping and wording (incl. `backendReasons.test.ts` against the backend reasons), URL hash, badges, viewer plans, fields, haptics engine, calibration, audio graph, spectrum mapping | `frontend/src/**/*.test.ts(x)` | frontend | Built |
+| Determinism | Same card and seed give the same bytes: baker SHA-256 (`test_render_baker.py`), browser determinism (`e2e/determinism.spec.ts`) | both | both | Built |
+| Rendering acceptance | The tests of rendering doc R11: determinism, seam, normals, honesty, refusal, performance, spectrum haptics, comet epochs | [../rendering/acceptance-tests.md](../rendering/acceptance-tests.md) | partly | Partly built (see R11) |
+| Browser shaders | Reference screenshots of the five shader kinds plus two extra views, compared by Playwright (`toHaveScreenshot`, status overlay masked, tolerance 0.2 % of pixels, per-pixel threshold 0.05, and 0.01 for the gas-giant storm view). Changing the storm count, band turbulence, seed, sea level or ice extent is detected. Drawn on the WebGL2 fallback (SwiftShader), not a real GPU; re-recorded with `--update-snapshots` after a deliberate look change. A unit test pins the GPU's field lookup to `FieldSampler`. | `frontend/e2e/shaderKinds.spec.ts`, `shaderLibrary.spec.ts`, `__snapshots__/` | frontend e2e | Built |
+| Golden frames | Every fixture with a 3D view (not `candidate`) at Measured only, + Estimated and + Artistic, compared by SSIM (`GOLDEN_MIN_SSIM` in `e2e/golden.ts`); `ssim.spec.ts` is the negative control; `SX_UPDATE_GOLDENS=1` rewrites them | `frontend/e2e/golden.spec.ts`, `__goldens__/` | frontend e2e | Built |
+| App flows (e2e) | Sky view and marker click, flipbook, frame grid, progressive loading, colour views, overlays and overlay grid, Build it, island, phone sheet layout, smoke | `frontend/e2e/sky.spec.ts`, `flipbook.spec.ts`, `frameGrid.spec.ts`, `progressive.spec.ts`, `colour.spec.ts`, `overlays.spec.ts`, `overlayGrid.spec.ts`, `build.spec.ts`, `island.spec.ts`, `phoneSheet.spec.ts`, `smoke.spec.ts` | frontend e2e | Built; against the dev fixtures, not the real cache |
+| Sound (event) | The audio driver plays every event, rate-limited (no more than 40 events per second under fast drags); the body tone (Q-133) and the Track path sound (Q-134) follow their specs | `frontend/src/haptics/` | frontend | Driver built; tone and path sound to build (Atish) |
+| Track (A19) | Path, frame list, masks, spectrum hop by hop, export, labels; e2e on the recorded Eros fixtures | A19 ([moving-objects/track.md](moving-objects/track.md)) | to add | To build (Atish) |
+| Area search (A16 to A18) | Discovery determinism (A17.10), UI tests (A18.10), e2e on the real cache (D3) | [A18.10](moving-objects/area-ui.md) | to add | To build (D1 to D3) |
+| Hardware (event) | Run the real app on the Asus A15 from the offline cache, record frame times in Chrome (R5.5), check the sound output and the A15's GPU | #16 (to re-scope to the A15, Q-132) | no | To do (M5) |
+| Milestones | M1 to M4 each build against their own fixtures (recorded responses, sample cards and spectra), so they do not depend on each other (D-29) | | | Rule |
+
+**After the event** (Q-132): vibration on both Android phones (the faintest calibrated tick is felt, silent no-op on iPhone where audio takes over, the calibration value persists), the sound-to-vibration offset of the same event on both phones, and frame rates on the phones.

@@ -1,10 +1,16 @@
 # Data sources
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A3–A3.11 · **Implements:** D-07, D-19, D-25, D-31, D-35
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A3–A3.5 · **Implements:** [D-19, D-25, D-31](../decisions/data-sources.md), [Q-137](../decisions/scope-process.md), [Q-138, Q-141, Q-148](../decisions/moving-objects.md) · **Read with:** [object-sources.md](object-sources.md) (A3.6–A3.11), [targets.md](targets.md) (A3.12), [pipeline.md](pipeline.md) (A4.1, A4.2)
 
 ## A3 Data sources
 
-Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 unless noted.
+Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 unless noted. Every adapter is in `backend/app/adapters/` and every call goes through the D-25 read-through cache under the source name given (`SX_OFFLINE=1` never calls out). Base URLs and timeouts are settings ([backend/README.md](../../backend/README.md#settings-sx_-environment-variables)).
+
+| Sections | Sources | File |
+|---|---|---|
+| A3.1 to A3.5 | SPHEREx, Gaia, WISE, Horizons, SkyBoT (frames and positions) | this file |
+| A3.6 to A3.11 | SBDB, DAMIT, Exoplanet Archive, unused services, SIMBAD and shape models, sky background | [object-sources.md](object-sources.md) |
+| A3.12 | Test and demo targets, full-cache counts | [targets.md](targets.md) |
 
 ### A3.1 SPHEREx (IRSA)
 
@@ -15,7 +21,7 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 | Extensions used | `IMAGE` (MJy/sr), `FLAGS`, `VARIANCE`, `WCS-WAVE` |
 | Skipped | `PSF` (101 x 101 x 121, about 5 MB), `ZODI` unless background subtraction needs it |
 | Detectors | 6, covering 0.75 to 5.0 micron. One frame covers a range of wavelengths across its field. |
-| Revisit | Bands for one spot are captured within about 0.8 days. |
+| Revisit | Bands for one spot are captured within about 0.8 days. **[verify]** A cache check reported passes of 0.7 to 88 days ([Q-148](../decisions/moving-objects.md), Kevin; settled by the Day 0 count, A16.7). |
 | Search | Simple Image Access: `https://irsa.ipac.caltech.edu/SIA?COLLECTION=spherex_qr2&POS=circle+RA+DEC+RADIUS&MAXREC=N` |
 | Cutouts | Work through the same service. Use small cutouts, never whole frames. |
 | Storage path | `s3://nasa-irsa-spherex/qr2/level2/<week>/<obs>/<detector>/` |
@@ -24,6 +30,12 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 | Checked 5 Nov 2026 (backend, issue #1) | A tiny cone (`r = 0.001°`) answers in about 4 s. `MAXREC=2000` timed out at 120 s; `MAXREC=500` returned all 240 frames for Barnard's Star. `QUERY_STATUS=OVERFLOW` marks a cut-off answer. Cutouts: `access_url?center=<ra>,<dec>&size=<deg>` on the IBE URL, 10–30 s each. A cutout holds `IMAGE`, `FLAGS`, `VARIANCE`, `ZODI`, `PSF` (about 4.9 MB, not cached, Q-20) and `WCS-WAVE`. Times: `TIMESYS='UTC'`; the SIA `t_min`/`t_max` midpoint matches `DATE-AVG` to a few ms. Wavelength at a pixel: alternate WCS key `W` (`WAVE-TAB`, table in `WCS-WAVE`), read with the SIP keywords removed **[verify]**. FLAGS bit names are the `MP_<name> = <bit>` header keywords in QR2 (16 flags in pipeline 6.4 frames, 22 in 6.5.6); names and bits match the Explanatory Supplement (SSDC-DP-017 v2.0, Table 16). Later releases may use `MSKNnnnn`/`MSKDnnnn` keywords instead (IRSA tutorials draft PR #401, Q-31) **[verify on a QR3 or DR1 header]**. |
 | Saturation (checked 6 Nov 2026, issue #25) | A star that is too bright overflows the detector: its core pixels carry `OVERFLOW`, set when a pixel's charge passes a commandable threshold; the well depth is of order 1e5 e⁻ (Korngut et al. 2026, arXiv:2603.29835). Stage 2 refuses such frames as `saturated` (A4.2); the same reason also covers a dead core pixel (D-31), so the UI words it without a cause (A11). The saturation limit is about 11.7 to 9.7 AB mag depending on the band, with bands 5 and 6 more lenient, as quoted by Clark et al. 2026 (arXiv:2604.22983, Sect. IV.2) from "Table 16 of the SPHEREx Explanatory Supplement". The range and the value for each band are **[verify]** against the Supplement itself; in SSDC-DP-017 v2.0, Table 16 is the flag table (Q-31). Before launch, sources brighter than about 11 AB at 2 µm were expected to saturate (Crill et al. 2024, arXiv:2404.11017). The largest source current with no `OVERFLOW` is about 630 e⁻/s in bands 1–3 and 470 e⁻/s in bands 4–6 (Fazar et al. 2026, arXiv:2608.09862). For scale, the 5σ full-survey depth is 19.5–19.9 AB at 0.75–3.8 µm and 17.8–18.8 AB at 3.8–5.0 µm (Bock et al. 2026, ApJ, doi:10.3847/1538-4357/ae2be2). In this tool, Barnard's Star and R Dra saturate in every frame that is not refused for another reason, and RW Aur keeps only 15 measured points (0.74–1.09 µm); Epsilon Indi B and WISE 0855 measured cleanly (2 objects, not a limit). The demo objects are chosen fainter than the quoted limit (D-31). |
 | Not checked | Whether frames exist for 3I/ATLAS on its exact dates. |
+
+**For the event ([Q-137](../decisions/scope-process.md), decided):** the demo is frozen on QR2 (`SX_DATA_RELEASE=spherex_qr2`) with the local cache on the A15, and does not switch to DR1 before the event. DR1 is expected on 12 Nov 2026 per a draft IRSA tutorial PR **[verify]**; it renames collections and flag keywords, so Q-31 is deferred until after the event.
+
+**Moving objects:** PR #53 replaces the "Not checked" row above with its moving-object checks (path cones, rates, windows, 3I/ATLAS frames found in QR2). Until it merges: the 433 Eros frames of 20 to 21 Mar 2026 are checked on PR #53's recorded fixtures (16 frames), and 3I/ATLAS is stretch (Q-137). Frame list from IRSA MOST or path cones: Q-140.
+
+**Test and demo targets** (why each was picked, neighbours, full-cache counts): [A3.12](targets.md#a312-test-and-demo-targets).
 
 ### A3.2 Gaia DR3
 
@@ -34,7 +46,8 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 | Columns | wavelength, reflectance, reflectance error, flag |
 | Coverage | Visible light, 60,518 asteroids |
 | Use | Visible colour and class of known asteroids. SPHEREx starts at 0.75 micron, so it cannot give visible colour. |
-| Source catalogue (overlays, issue #12) | **Tested** 6 Nov 2026. A cone on the source table through TAP (sync, CSV): IRSA `gaia_dr3_source` first (a 0.05° cone answered in about 20 s), then the ESA archive `gaiadr3.gaia_source` (about 60 s; one attempt timed out at 90 s). Both serve the same columns: `source_id, ra, dec, ref_epoch, pmra, pmdec, parallax, phot_g_mean_mag`. Positions are ICRS at `ref_epoch` (J2016.0 in DR3), `pmra` is µα·cos δ in mas/yr. The cone keeps only `phot_g_mean_mag < 20`, brightest first, at most 5000 rows (`overlay:gaia:truncated` when capped). G < 20 is a display cut, not a physical value (Q-52). Mirrors are set by `SX_GAIA_TAP_MIRRORS`. Used by [A4.9](pipeline.md#a49-overlays-flag-mask-and-combine). |
+| Adapter | **To build** (Kevin, D-17) for the reflectance table: nothing fills `gaia_rgb` yet, so the card writes it as `null` with "the Gaia adapter is not built" ([A4.5](pipeline-card.md#a45-stage-5-objectcard)). The source-catalogue cone below is built (`backend/app/adapters/gaia.py`, cache source `gaia`). |
+| Source catalogue (overlays, issue #12) | **Tested** 6 Nov 2026. A cone on the source table through TAP (sync, CSV): IRSA `gaia_dr3_source` first (a 0.05° cone answered in about 20 s), then the ESA archive `gaiadr3.gaia_source` (about 60 s; one attempt timed out at 90 s). Both serve the same columns: `source_id, ra, dec, ref_epoch, pmra, pmdec, parallax, phot_g_mean_mag`. Positions are ICRS at `ref_epoch` (J2016.0 in DR3), `pmra` is µα·cos δ in mas/yr. The cone keeps only `phot_g_mean_mag < 20`, brightest first, at most 5000 rows (`overlay:gaia:truncated` when capped). G < 20 is a display cut, not a physical value (Q-52). Mirrors are set by `SX_GAIA_TAP_MIRRORS`. Used by [A4.9](overlays.md#a49-overlays-flag-mask-and-combine). |
 
 ### A3.3 WISE / NEOWISE
 
@@ -42,81 +55,29 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 |---|---|
 | Status | **Not confirmed** for diameter and albedo (IRSA TAP timed out twice). **Tested** 6 Nov 2026 for source positions (overlays, below). |
 | Use | Diameter and albedo. Take these through the JPL Small-Body Database for now. |
-| Source catalogue (overlays, issue #12) | "WISE/NEOWISE sources" are served from **CatWISE2020** (`catwise_2020` on IRSA TAP, sync, CSV), which combines WISE and NEOWISE epochs (Q-51). Checked live 6 Nov 2026 (`TAP_SCHEMA.columns`): `ra_pm`/`dec_pm` are positions at MJD 57170 from the PSF fit with motion; `pmra`/`pmdec` are apparent motions in arcsec/yr (relative, not absolute, noisy for faint sources); `w1mpro_pm` is the W1 profile-fit magnitude. A 0.03° cone answered in about 17 s. Columns: `source_name, ra_pm, dec_pm, pmra, pmdec, w1mpro_pm`; the cone is applied to `ra`/`dec`, brightest W1 first, at most 5000 rows (`overlay:wise:truncated`); a row without `ra_pm`/`dec_pm` is dropped. Whether `pmra` includes cos δ is **[verify]**. **CatWISE2020 has no rows within at least 3′ of R Draconis** (checked live 6 Nov 2026: a box and a cone both return 0, while AllWISE returns sources there), so that target shows no WISE markers (Q-51). AllWISE and the NEOWISE single-exposure table are not used. Used by [A4.9](pipeline.md#a49-overlays-flag-mask-and-combine). |
+| Source catalogue (overlays, issue #12) | "WISE/NEOWISE sources" are served from **CatWISE2020** (`catwise_2020` on IRSA TAP, sync, CSV), which combines WISE and NEOWISE epochs (Q-51). Checked live 6 Nov 2026 (`TAP_SCHEMA.columns`): `ra_pm`/`dec_pm` are positions at MJD 57170 from the PSF fit with motion; `pmra`/`pmdec` are apparent motions in arcsec/yr (relative, not absolute, noisy for faint sources); `w1mpro_pm` is the W1 profile-fit magnitude. A 0.03° cone answered in about 17 s. Columns: `source_name, ra_pm, dec_pm, pmra, pmdec, w1mpro_pm`; the cone is applied to `ra`/`dec`, brightest W1 first, at most 5000 rows (`overlay:wise:truncated`); a row without `ra_pm`/`dec_pm` is dropped. Whether `pmra` includes cos δ is **[verify]**. **CatWISE2020 has no rows within at least 3′ of R Draconis** (checked live 6 Nov 2026: a box and a cone both return 0, while AllWISE returns sources there), so that target shows no WISE markers (Q-51). AllWISE and the NEOWISE single-exposure table are not used. Used by [A4.9](overlays.md#a49-overlays-flag-mask-and-combine). |
 
 ### A3.4 JPL Horizons
 
 | Item | Detail |
 |---|---|
-| Status | **Tested**, 3I/ATLAS returned in 1.4 s. The backend uses `COMMAND='DES=<spkid>;'`, `TLIST_TYPE=JD`, `TIME_TYPE=UT` and the geocentre `500@399` **[verify against a SPHEREx-centred ephemeris]**. Positions are predictions, tagged `model_dependent`. |
+| Status | **Tested**, 3I/ATLAS returned in 1.4 s. The backend uses `COMMAND='DES=<spkid>;'`, `TLIST_TYPE=JD`, `TIME_TYPE=UT` and, for the `resolve` position, the geocentre `500@399` (see Observer). Positions are predictions, tagged `model_dependent`. |
 | Designation | 3I/ATLAS is `C/2025 N1` |
+| Observer ([Q-138](../decisions/moving-objects.md), decided 9 Nov 2026) | Everything drawn for a moving object (path, marker, ring, path segment in the zoom) uses Horizons **from SPHEREx**, `CENTER='500@-163182'`, computed at each frame's mid-time and never interpolated from an hourly table (that gives up to 6″ error on Eros). From low Earth orbit the geocentric parallax of a near-Earth asteroid can exceed a 6.15″ pixel. Horizons' SPHEREx ephemeris ends on 2026-12-07 (Q-62), so a later epoch uses the geocentre and says so in `source`. **Not built yet:** the adapter's only position call is the geocentric `CENTER = "500@399"` (`backend/app/adapters/horizons.py:23`), used by `resolve` at `SX_EPHEMERIS_EPOCH` (14 Nov 2026); PR #53 adds the SPHEREx-centred path and per-frame `TLIST`. In Track the resolve-epoch marker is hidden and the marker follows the time slider inside the SPHEREx windows ([Q-142](../decisions/moving-objects.md)). |
+| Terms ([Q-141](../decisions/moving-objects.md)) | JPL asks for one request at a time and a User-Agent. An over-limit reply comes back as HTTP 200 with a text message; it must be treated as a failed call and never cached as a success (D-25). Today `ephemeris()` parses each reply before it is cached, so an unparsable over-limit text is a failed call and is not stored; a one-at-a-time limit across the process is **to build** with the path endpoint (Q-141, Kevin). |
+| Adapter | `backend/app/adapters/horizons.py`, cache source `horizons`, base URL `SX_HORIZONS_URL` |
 | Use | Position over time for any moving object. Also the phase angle used for lighting (rendering doc §5.1). |
-| Lighting | **Tested 7 Nov 2026** (433 Eros). Observer ephemeris with `QUANTITIES='1,24'` and `CENTER='500@-163182'` (SPHEREx) adds the S-T-O phase angle; `EPHEM_TYPE=VECTORS`, `CENTER='500@10'`, `REF_PLANE=FRAME` gives the heliocentric ICRF vector, so the Sun direction is `-r/\|r\|`. Both are taken at the resolve epoch and the geocentre is the fallback if Horizons has no SPHEREx ephemeris (Q-62). Phase angle is tagged `measured` (R5.1), the Sun vector `derived`. |
+| Lighting | **Tested 7 Nov 2026** (433 Eros). Observer ephemeris with `QUANTITIES='1,24'` and `CENTER='500@-163182'` (SPHEREx) adds the S-T-O phase angle; `EPHEM_TYPE=VECTORS`, `CENTER='500@10'`, `REF_PLANE=FRAME` gives the heliocentric ICRF vector, so the Sun direction is `-r/\|r\|`. Both are taken at the resolve epoch and the geocentre is the fallback if Horizons has no SPHEREx ephemeris (Q-62). Phase angle is tagged `measured` (R5.1), the Sun vector `derived`. The path is tagged `model_dependent` (Q-134, Q-141) although both come from the same orbit solution; one rule for Horizons-derived tags is still to decide (Q-62 item 4). |
 
 ### A3.5 IMCCE SkyBoT
 
 | Item | Detail |
 |---|---|
-| Status | **Tested** |
-| Endpoint | `ssp.imcce.fr/webservices/skybot/api/conesearch.php` |
-| Gotcha | The epoch `-ep` must be a Julian day or `now`. A normal date returned an empty 204 answer. |
-| Use | All known objects in a field, with magnitude and motion. |
-
-### A3.6 JPL Small-Body Database
-
-| Item | Detail |
-|---|---|
-| Status | **Tested** |
-| Endpoint | `sbdb.api?sstr=<name>&phys-par=1` |
-| Attributes | `diameter`, `albedo`, `rot_per`, `spec_B`, `spec_T`, `GM` |
-| Note | Each value names its source. For Eros the size came from NEAR, not NEOWISE. |
-
-### A3.7 DAMIT
-
-| Item | Detail |
-|---|---|
-| Status | **Tested** earlier; on 7 Nov 2026 the site returned HTTP 503. The OBJ reader (`backend/scripts/ingest_shape.py`) is built and tested on a synthetic file, but no DAMIT model is registered. Licence and citation terms: [verify] DAMIT licence. |
-| File | `damit.cuni.cz/.../AsteroidModel/<id>/shape.obj` |
-| Example | One model: 89 KB, 1,022 vertices, 2,040 faces |
-| Limit | Shapes are convex, so they miss dips and hollows. Look up the model number from the browse page. |
-
-### A3.8 NASA Exoplanet Archive
-
-| Item | Detail |
-|---|---|
-| Status | **Tested** 2026-11-07, live and with recorded offline fixtures (`backend/app/adapters/exoplanet_archive.py`) |
-| Endpoint | `https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=<ADQL>&format=json` (`SX_EXOPLANET_TAP_URL`); table `pscomppars` (one composite row per planet); ADQL `lower()` works |
-| Columns | `pl_name`, `hostname`, `pl_rade`, `pl_radj`, `pl_bmasse`, `pl_bmassj` (each with `err1`/`err2`), `pl_bmassprov` (`Mass`, `Msini`, `Msin(i)/sin(i)`, `M-R relationship`), `pl_dens`, `pl_eqt`, `pl_orbsmax`, `pl_orbper`, `pl_orbeccen`, `st_teff`, `st_rad`, `st_mass`, `sy_dist`, and `pl_*_reflink` for the radius, mass, `pl_eqt` and `pl_orbsmax` |
-| Use | Values and type thresholds for `planet_rocky`, `planet_water` and `gas_giant` cards (rule: Q-63). Reached through SIMBAD otype `Pl`; names matched as in Q-63. No row is not an error: the type becomes `candidate` and `exoplanet_archive` goes in `missing`. |
-| Cache | D-25 source `exoplanet_archive`, key `pl_name` = the lower-case candidate names. |
-
-### A3.9 Not used for the base path
-
-| Item | Status | Role |
-|---|---|---|
-| Gemini image models | **Documented** (lists `gemini-nano-banana-2.1` and four others, up to 14 reference images, no mesh output) | Optional artistic layer (P3, D-07). Confirm the model name before coding. |
-| Gemini Live API | **Documented** (WebSocket, 16 kHz audio in, 24 kHz out, function calling, short-lived tokens for browsers, no session limit stated) | Voice control. Post-event backlog (B-02). |
-| Sound-effect services | **Not confirmed** | Post-event backlog (B-03). Procedural sound is the default. |
-| TRELLIS, Hunyuan3D, TripoSR | **Not confirmed** | Image-to-3D. Post-event backlog (B-04). |
-
-### A3.10 Added for the object view
-
-These sources come from the rendering doc. Neither has been called yet.
-
-| Item | Status | Use |
-|---|---|---|
-| SIMBAD | **Tested** 5 Nov 2026 through TAP (`ident.id = '<name>'`, JSON). The CDS host did not answer from the dev machine; the `simbad.harvard.edu` mirror did, so the backend tries both. `WISE 0855` is not a SIMBAD identifier (use `WISE J085510.83-071442.5`). Positions are ICRS epoch J2000; high proper-motion targets move tens of SPHEREx pixels by 2026. | Name resolution and object type, which sets stars and brown dwarfs (rendering doc §3.3). Resolver order with SBDB: D-19 ([section 4.1](pipeline.md#a41-stage-1-find-the-object)). |
-| NASA mission shape models | **Tested for Eros (7 Nov 2026)** | Gaskell Eros Shape Model V1.1, PDS4 bundle `urn:nasa:pds:gaskell.ast-eros.shape-model`, DOI 10.26033/d0gq-9427, licence CC0-1.0, ICQ files `data/quad/quad{64,128,256,512}q.tab` (km, body-fixed). The PDS Small Bodies Node host (sbnarchive.psi.edu) refuses scripted clients (403), so the zip is downloaded by hand and ingested from the local file: `uv run python -m scripts.ingest_shape` (see backend README). Eros is registered (Q-61); Bennu and Vesta are not. Real meshes (GLB) for `asteroid_shape`. Reduce offline to the mesh budget ([section 10.1](frontend-platform.md#a101-performance-budget-d-05)). |
-
-### A3.11 Sky background (IRSA HiPS)
-
-Added by the sky-view prototype (branch `feat/sky-view-prototype`, 7 Nov 2026). Not SPHEREx data: an all-sky picture behind the search, for context (Q-88).
-
-| Item | Detail |
-|---|---|
-| Status | **Tested** 7 Nov 2026 (mirror and bake run on the dev PC). The survey, its tag and the A15 depth are open (Q-88). |
-| Surveys | IRSA's 2MASS colour HiPS (`2mass_color`: R = Ks 2.16 µm, G = H 1.66 µm, B = J 1.23 µm, sqrt-stretched by CDS), used by the prototype; AllWISE colour (`allwise_color`: W4/W2/W1) registered as an alternative. Base URLs and credit lines are in `backend/app/core/sky/surveys.py`. |
-| Local copy | `scripts.sky_mirror` copies the tiles to `{SX_CACHE_DIR}/sky/<survey>/hips/` in IRSA's layout, lowest orders first, at most 4 requests at a time; `scripts.sky_bake` bakes equirectangular JPEGs next to them (4096×2048 and 8192×4096). Orders 0–4 on a dev machine: about 357 MB (D-35). See [backend/README.md](../../backend/README.md#sky-background-prototype). |
-| Never at request time | The copy is separate from the D-25 read-through cache. `/v1/sky/…` serves only files already on disk and never fetches upstream; `scripts.sky_mirror` refuses to run under `SX_OFFLINE=1` (Q-87). |
-| Licence | Both `properties` files say `hips_status = public mirror unclonable`. A local, non-redistributed copy is accepted for this project, with the survey credit always shown next to the sky and `--allow-unclonable` required to mirror (D-35). The exact credit line each provider asks for is **[verify]** (`surveys.py`). |
-| Budget | Under 1 GB on dev machines, up to 50 GB on the A15 (D-35). A15 depth: Q-88. |
+| Status | **Tested.** Adapter built (`backend/app/adapters/skybot.py`); today only `scripts/prefetch.py` calls it, and no API route does. Planned users: Known objects and the Discovery check of Area search ([A17.5](moving-objects/area-backend.md), Q-146) and neighbours in Track (A4.1 step 2). |
+| Endpoint | `SX_SKYBOT_URL`, default `https://ssp.imcce.fr/webservices/skybot/api/conesearch.php` |
+| Request | `-ep` (Julian day, 6 decimals), `-ra`, `-dec`, `-rd` (radius in degrees), `-mime=json`, `-output=object`, `-loc=500` (observer: geocentre), `-filter=0`, `-objFilter=111` (asteroids, planets and comets), `-from=ShiftSpectrum`. HTTP 200 and 204 are both answers; 204 means nothing in the cone. |
+| Fields read | `Name`, `Num`, `RA (hms)`, `DEC (dms)`, `VMag (mag)`, `Class`, kept as `SkybotBody(name, number, ra, dec, v_mag, sso_class)` in degrees. Not kept yet: the position error (`Err`) and the motion rates; ticket D1 adds them (A17.5). |
+| Cache | D-25 source `skybot`; key: normalised `ra`, `dec`, radius (6 decimals) and the JD epoch. Timeouts and retries: `SX_HTTP_*`. |
+| Gotcha | The epoch `-ep` must be a Julian day or `now`. A normal date returned an empty 204 answer. The largest cone radius the service accepts and its terms of use are **[verify]** (Kevin, D1). |
+| Use | All known objects in a field, with magnitude and class. |
+| Observer and Q-138 | SkyBoT positions are **geocentric** (`-loc=500`, `skybot.py:84`), while Q-138 makes everything drawn for a mover SPHEREx-centred. SkyBoT takes IAU observatory codes, and SPHEREx has none (Q-145). The size of the offset for a near-Earth asteroid is unmeasured and may be several pixels. **Proposed (Q-NEW-MOV-3, A17.5 in [moving-objects/area-backend.md](moving-objects/area-backend.md)):** SkyBoT only lists candidates, in a cone padded by `p_max` for the parallax; every position that is drawn or matched (Known objects, the A17.5 match, Track) is recomputed with Horizons `500@-163182` at each frame's mid-time ([A3.4](#a34-jpl-horizons)). **Not built yet:** `skybot.py:84` asks for the geocentre. |
