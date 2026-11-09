@@ -56,6 +56,9 @@ Input is an ICQ `.tab` (`--zip` plus `--member`, or `--input`) or an OBJ (`--inp
 | `GET /v1/objects/{id}/combine.png?op=add\|sub&a=&b=` | 8-bit grey PNG of A ± B on A's grid; metadata (both wavelengths, unit, stretch, `tag: "derived"`, formula) in the `X-SX-Combine` JSON header. A4.9, Q-54 |
 | `GET /data/shapes/{name}.glb` | A registered shape-model mesh (glTF binary, `model/gltf-binary`), metres, glTF +Y up (Q-61). Only names listed in `assets/shapes/registry.toml` are served; anything else is 404 |
 | `GET /v1/health` | `{status, offline, data_release}` |
+| `POST /v1/admin/objects/{id}/gemini-repaint[?refresh=true]` | Gemini artistic layer (beyond D-16, Q-122; A6.2). Admin only: `X-SX-Admin-Token` must equal `SX_ADMIN_TOKEN` (404 when unset, 403 when missing or wrong). Bakes if needed, asks Gemini, runs the D-07 edge check. Always 200 with `{id, status: "applied" \| "code", reason, detail, missing, model, edge_correlation, edge_correlation_min, cached_at, from_cache, checks, provenance}`, plus `label`, `size`, `layer` (D-32 `Layer`, tier 5) and `albedo_url` when applied. A first-stage card is refused (`measuring`) |
+| `GET /v1/objects/{id}/albedo-ai` | The same status body for the last applied repaint, checked against the bake the viewer shows; `stale` when the generator version, baker rules, seed or bake changed. Disk only |
+| `GET /v1/objects/{id}/albedo-ai.webp` | The checked AI albedo (`image/webp`, `X-SX-Layer-Tag: artistic`), or 404 `albedo_ai_unavailable` |
 | `GET /v1/sky/index.json` | Sky background prototype (beyond D-16, Q-87). `{surveys: [{id, title, credit, tag: "derived", formula, frame: "icrs", convention, equirect: [{url, width, height}], hips: {url, max_order_local, tile_width, format} \| null}]}`, only surveys on disk; `[]` when none |
 | `GET /v1/sky/cached` | Positions whose frame list is complete in the derived cache, so the sky can mark them "loads instantly" (beyond D-16, Q-98). `{objects: [{id, name, query, ra, dec, resolver, frames, provenance: {ra, dec}}], data_release, provenance: {frames: {tag: "derived", formula}}}`, sorted by id. Read only: it globs the `derived.frames/<release>/` meta files (one per object, never the cutouts), keeps a meta only when its digest equals the `frames_key` built now from the id it names (so another cutout size, radius, epoch or derivation version is skipped), and takes the position from the `derived.object` registry or the coordinate id. Not registered, moving, zero frames, corrupt or torn entries are left out. Frame counts are memoised per (entry, body SHA-256); each body is read and verified once per process. `name`/`query` are `null` for a position; `query` is the text the resolver was given, so searching it again is a cache hit |
 | `GET /v1/sky/{survey}/equirect_{W}x{H}.jpg` | Baked all-sky image: column x is RA = 360·(x+0.5)/W° (RA 0 at the left, increasing right), row y is Dec = 90 − 180·(y+0.5)/H° (north up), ICRS |
@@ -147,8 +150,17 @@ uv run python -m scripts.sky_bake --preview preview.jpg             # 4096x2048 
 | `SX_EPHEMERIS_EPOCH` | `2026-11-14T00:00:00Z` | The time used for a moving object's `resolve` position. |
 | `SX_SEARCH_EPOCH` | `2026-01-01T00:00:00Z` | The time used for a proper-motion star's SIA search cone. |
 | `SX_HTTP_*` | 10 s connect, 60 s read, 3 retries, 1 s backoff (doubles) | |
-| `SX_CORS_ORIGINS` | empty | Needed only when the frontend runs without the Vite proxy. CORS then exposes the `X-SX-Cached-At` and `X-SX-Asset-Status` headers (Q-39), `X-SX-Combine` (Q-50) and the issue #41 `X-SX-Measuring` and `X-SX-Progress` (Q-111) so the browser can read them. |
+| `SX_CORS_ORIGINS` | empty | Needed only when the frontend runs without the Vite proxy. CORS then exposes the `X-SX-Cached-At` and `X-SX-Asset-Status` headers (Q-39), `X-SX-Combine` (Q-50), the issue #41 `X-SX-Measuring` and `X-SX-Progress` (Q-111) and `X-SX-Layer-Tag` (Q-122) so the browser can read them. Only `GET` is allowed, so the admin repaint is for `curl`. |
 | `SX_ASSETS_DIR` | `backend/assets` | Pre-baked assets read by stage 4 (A5.4), `<type>/<id>.json` with the D-22 fields. |
+| `SX_TEXTURES_AI_DIR` | `<SX_CACHE_DIR>/textures-ai` | The Gemini AI albedo, its `gemini.json` and the per-object pointers (Q-122). Must be outside `SX_TEXTURES_DIR`, which is served as static files without the status checks; the API refuses to start otherwise. |
+| `SX_ADMIN_TOKEN` | unset | Admin endpoints (Gemini repaint) need it in the `X-SX-Admin-Token` header. Unset: they answer 404 (Q-122). |
+| `SX_GEMINI_API_KEY` | unset | Server-side only, never returned or logged (D-07). Unset: the Gemini layer is off and the code colour shows. |
+| `SX_GEMINI_MODEL` | `gemini-nano-banana-2.1` | **[verify]** R12 #3. |
+| `SX_GEMINI_API_URL` | `https://generativelanguage.googleapis.com/v1beta` | **[verify]** URL and request shape (R12 #3). |
+| `SX_GEMINI_ASPECT_RATIO` | empty | **[verify]** R12 #3. Empty: none requested; the output is resampled to 2:1 anyway. |
+| `SX_GEMINI_TIMEOUT_S` | `90` | ASSUMPTION: A6.2 says "a set time". Total budget for the call, retries and backoff included. The reply is streamed against that deadline and capped at 32 MiB. Only connection failures and HTTP 429/503 are retried, while budget is left; HTTP 500/502/504, a read error, a read or write timeout or a protocol error is not, so a request that may have reached Google is never sent twice. |
+| `SX_GEMINI_COOLDOWN_S` | `60` | ASSUMPTION (Q-122): after a live Gemini call for an object, no other live call for it for this long (reason `cooldown`). Cache hits are not affected. `0` turns it off. |
+| `SX_GEMINI_OFFLINE_CACHE` | `0` | Q-29: `1` shows a cached repaint under `SX_OFFLINE=1`; `0` keeps the layer off offline (D-24). |
 
 ## Cache (D-25)
 
