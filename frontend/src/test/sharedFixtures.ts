@@ -41,3 +41,24 @@ export function fixture(name: string): { card: ObjectCard; params: RenderParams 
   if (!card || !p) throw new Error(`no fixture named ${name}`);
   return { card: structuredClone(card), params: structuredClone(p) };
 }
+
+/**
+ * A copy of a fixture card with the issue #68 exoplanet fields (host star, orbit, mass) removed:
+ * the same planet as a solar-system body. The shared `planet_water` fixture now carries those
+ * fields, so it resolves a climate scenario, starlight and a locked pose. Tests of the unchanged
+ * solar-system path use this instead.
+ */
+export function withoutExoplanetFields<T extends { card: ObjectCard }>(f: T): T {
+  const card = f.card as unknown as Record<string, unknown>;
+  for (const k of [
+    'mass_mearth',
+    'orbit_au',
+    'orbital_period_d',
+    'host_teff_K',
+    'host_radius_rsun',
+    'host_mass_msun',
+    'host_age_gyr',
+  ])
+    delete card[k];
+  return f;
+}

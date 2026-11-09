@@ -6,11 +6,13 @@ import type { ObjectCard, RenderParams } from '@/contract';
 import { kepler186f, trappist1f } from '@/physics/exoplanetFixtures.testutil';
 import { starlightColour } from '@/physics/starlight';
 import { derivePhysics } from '@/physics';
-import { fixture } from '@/test/sharedFixtures';
+import { fixture, withoutExoplanetFields } from '@/test/sharedFixtures';
 import { DIRECTIONAL_INTENSITY, buildLights, planLighting } from './lighting';
 import { defaultContext, planRender } from './renderPlan';
 import { resolveShaderSpec } from './renderers/shaderSpec';
 import { fieldHash, generateField } from './fields/fieldGenerator';
+import { SCENARIO_LOOKS, lookLegend } from './looks/scenarioLooks';
+import { ATMOSPHERE_WATER } from './renderers/shaderPalette';
 
 function pair(
   card: ObjectCard,
@@ -61,7 +63,7 @@ describe('starlight (Part 2)', () => {
 
   it('leaves solar-system bodies and gas-free cards without the fields exactly as they were', () => {
     for (const k of ['planet_rocky', 'planet_water', 'gas_giant'] as const) {
-      const f = fixture(k);
+      const f = withoutExoplanetFields(fixture(k));
       const p = planRender(f.card, f.params, defaultContext({ honesty: 'artistic' }));
       expect(p.lighting.colour, k).toBeNull();
       expect(
@@ -138,7 +140,7 @@ describe('climate and pose (Part 3)', () => {
   });
 
   it('a card with a teq_K but none of the new fields keeps the rule unchanged', () => {
-    const f = fixture('planet_water');
+    const f = withoutExoplanetFields(fixture('planet_water'));
     const card = {
       ...f.card,
       teq_K: { value: 250, tag: 'derived', source: 't', formula: 'x' },
@@ -254,5 +256,61 @@ describe('eyeball planet at each honesty level (R5.3, Q-156)', () => {
     const b = resolveShaderSpec(card, params).field!;
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
     expect(fieldHash(generateField(a, 64, 32))).toBe(fieldHash(generateField(b, 64, 32)));
+  });
+});
+
+describe('scenario looks wired into the spec and plan (Part 4, Q-160)', () => {
+  const eyeball = () => pair(trappist1f());
+
+  it('a known scenario replaces PLANET_DEFAULTS with its look', () => {
+    const { card, params } = eyeball();
+    const spec = resolveShaderSpec(card, params);
+    const look = SCENARIO_LOOKS[spec.planet!.scenario!];
+    expect(spec.planet!.hue).toBe(look.surfaceHue);
+    expect(spec.planet!.relief).toBe(look.relief);
+    expect(spec.planet!.cloudCover).toBe(look.cloudCover);
+    expect(spec.planet!.atmosphere).toBe(look.atmosphereStrength);
+    expect(spec.planet!.atmosphereColour).toEqual(look.atmosphereColour);
+    expect(spec.field!.freq).toBe(look.freq);
+    expect(spec.planet!.look?.legend).toBe(lookLegend(spec.planet!.scenario!));
+    expect(spec.planet!.look?.presetLegend).toBeNull(); // PRESETS is empty
+  });
+
+  it('a slider still wins over the look (D-27)', () => {
+    const { card, params } = eyeball();
+    const spec = resolveShaderSpec(card, params, { relief: 0.11, cloud_cover: 0.33 });
+    expect(spec.planet!.relief).toBe(0.11);
+    expect(spec.planet!.cloudCover).toBe(0.33);
+    expect(spec.planet!.hue).toBe(SCENARIO_LOOKS[spec.planet!.scenario!].surfaceHue);
+  });
+
+  it('with no scenario the defaults are drawn and there is no look layer', () => {
+    const f = withoutExoplanetFields(fixture('planet_water'));
+    const spec = resolveShaderSpec(f.card, f.params);
+    expect(spec.planet!.scenario).toBeNull();
+    expect(spec.planet!.look).toBeNull();
+    expect(spec.planet!.hue).toBe(0.5);
+    expect(spec.planet!.atmosphereColour).toEqual(ATMOSPHERE_WATER);
+    const p = planRender(f.card, f.params, defaultContext({ honesty: 'artistic' }));
+    expect(drawn(p, 'look')).toBeUndefined();
+  });
+
+  it('the look layer is artistic: hidden at + Estimated, drawn with its legend at + Artistic', () => {
+    const { card, params } = eyeball();
+    const est = planRender(card, params, defaultContext({ honesty: 'derived' }));
+    expect(drawn(est, 'look')).toBeUndefined();
+    // The look is a part of the artistic surface, which is the layer listed as hidden.
+    expect(est.missing.find((m) => m.id === 'surface')).toMatchObject({ reason: 'honesty' });
+    const art = planRender(card, params, defaultContext({ honesty: 'artistic' }));
+    const l = drawn(art, 'look')!;
+    expect(l.tag).toBe('artistic');
+    expect(l.description).toBe(lookLegend('eyeball'));
+    expect(drawn(art, 'look_preset')).toBeUndefined();
+  });
+
+  it('gas giants are drawn exactly as before', () => {
+    const f = fixture('gas_giant');
+    const p = planRender(f.card, f.params, defaultContext({ honesty: 'artistic' }));
+    expect(drawn(p, 'look')).toBeUndefined();
   });
 });

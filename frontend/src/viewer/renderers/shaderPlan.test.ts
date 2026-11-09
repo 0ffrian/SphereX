@@ -5,7 +5,7 @@ import { buildAltText, canvasLabel, nothingDrawnReason } from '../altText';
 import { showsBody } from '../planCommon';
 import { defaultContext, planRender } from '../renderPlan';
 import { resolveMotion } from '../motion/motion';
-import { fixture } from './fixtures.testutil';
+import { fixture, withoutExoplanetFields } from './fixtures.testutil';
 import { resolveShaderSpec } from './shaderSpec';
 
 // A gas giant has five layers of its own (issue #62) and is covered by its own tests below.
@@ -14,7 +14,7 @@ const KINDS = ['planet_rocky', 'planet_water', 'nebula', 'nova'] as const;
 describe('planShaderKind', () => {
   it('at + Estimated: worlds show the plain sphere, clouds show nothing, all say why', () => {
     for (const k of KINDS) {
-      const { card, params } = fixture(k);
+      const { card, params } = withoutExoplanetFields(fixture(k));
       const plan = planRender(card, params, defaultContext());
       const layer = k === 'nebula' || k === 'nova' ? 'point_cloud' : 'surface';
       expect(plan.shader, k).toMatchObject({ surface: false, plain: layer === 'surface' });
@@ -28,6 +28,16 @@ describe('planShaderKind', () => {
       expect(showsBody(plan), k).toBe(layer === 'surface');
       expect(plan.bodies).toEqual([]);
     }
+  });
+
+  it('an exoplanet with a known scenario shows its climate pattern at + Estimated (Part 3, Part 6)', () => {
+    const { card, params } = fixture('planet_water');
+    const plan = planRender(card, params, defaultContext());
+    // The terrain look is artistic and hidden; the locked-planet climate pattern is not.
+    expect(plan.shader).toMatchObject({ surface: false, plain: false });
+    expect(plan.drawn.find((d) => d.id === 'climate')?.tag).not.toBe('artistic');
+    expect(plan.drawn.some((d) => d.id === 'look')).toBe(false);
+    expect(plan.missing.find((m) => m.id === 'surface')).toMatchObject({ reason: 'honesty' });
   });
 
   it('gas giant (issue #62): five layers, each at its own honesty level', () => {

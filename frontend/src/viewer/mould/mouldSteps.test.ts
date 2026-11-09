@@ -2,7 +2,7 @@
 // the normal plan (nothing held, every knob 1), no stage may draw a layer the plan does not draw,
 // and the timing is the mock-up's (STAGE_S per step, smoothstep).
 import { describe, expect, it } from 'vitest';
-import { FIXTURE_NAMES, fixture } from '@/test/sharedFixtures';
+import { FIXTURE_NAMES, fixture, withoutExoplanetFields } from '@/test/sharedFixtures';
 import { defaultContext, planRender } from '../renderPlan';
 import { stagePlan } from '@/app/build/useMould';
 import {
@@ -21,8 +21,9 @@ import {
 import type { HonestyState } from '../honesty';
 
 const HONESTY: HonestyState[] = ['measured', 'derived', 'artistic'];
-const planOf = (name: string, honesty: HonestyState) => {
-  const { card, params } = fixture(name);
+const planOf = (name: string, honesty: HonestyState, solarSystem = false) => {
+  const f = fixture(name);
+  const { card, params } = solarSystem ? withoutExoplanetFields(f) : f;
   const ctx = defaultContext({ honesty });
   return { card, params, ctx, plan: planRender(card, params, ctx) };
 };
@@ -74,8 +75,16 @@ describe('water planet (mock-up PLAN.water)', () => {
   });
 
   it('shows only the plain sphere step when the surface is hidden (+ Estimated)', () => {
-    const s = mouldScript(planOf('planet_water', 'derived').plan);
+    const s = mouldScript(planOf('planet_water', 'derived', true).plan);
     expect(s?.steps.map((x) => x.label) ?? []).toEqual(['Base mould']);
+  });
+
+  it('an eyeball exoplanet at + Estimated also builds the Colour step: its climate pattern is drawn', () => {
+    // Part 6: from + Estimated the climate pattern (derived/model_dependent) is shown on a smooth
+    // sphere, in the step that reveals ice and ocean.
+    const s = mouldScript(planOf('planet_water', 'derived').plan);
+    expect(s?.steps.map((x) => x.label)).toEqual(['Base mould', 'Colour']);
+    expect(s?.steps[1]?.reveals).toContain('climate');
   });
 });
 
