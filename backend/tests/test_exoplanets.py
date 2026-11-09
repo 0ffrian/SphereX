@@ -223,7 +223,7 @@ PLANETS = {
 }
 
 
-@pytest.mark.usefixtures("proposed")
+# Live values since issue #68 (no `proposed` fixture), so a drift from the proposed values fails here.
 @pytest.mark.parametrize(("name", "want"), PLANETS.items())
 def test_fixture_planets_offline(client: TestClient, name: str, want: str) -> None:
     oid = resolve_id(client, name)
@@ -247,6 +247,8 @@ def test_fixture_planets_offline(client: TestClient, name: str, want: str) -> No
 
 
 LIVE_TYPES = {**PLANETS, "51 Peg b": "gas_giant", "Proxima Cen b": "candidate"}
+# Why each live candidate is refused (Q-63): the reason stays listed, never a silent candidate.
+LIVE_REFUSALS = {"GJ 1214 b": "type:exoplanet_envelope", "Proxima Cen b": "type:exoplanet_radius"}
 
 
 @pytest.mark.parametrize(("name", "want"), LIVE_TYPES.items())
@@ -257,6 +259,35 @@ def test_fixture_planets_are_typed_live(client: TestClient, name: str, want: str
     params = client.get(f"/v1/objects/{oid}/render-params").json()
     assert params["type"] == want
     assert "type:exoplanet_thresholds" not in params["missing"]
+    if want == "candidate":
+        assert LIVE_REFUSALS[name] in params["missing"]
+
+
+# Issue #68 demo planets, with the archive's default values (pscomppars, read 9 Nov 2026 by the
+# astro-verifier; issue #68 comment). Not recorded fixtures: the rule alone on the live thresholds.
+DEMO_PLANETS = [
+    # TRAPPIST-1 f: R 1.045 (Agol+2021), M 1.039 (Mass).
+    (dict(pl_rade=1.045, pl_bmasse=1.039, pl_bmassprov="Mass", pl_eqt=217.7), "planet_rocky"),
+    # Kepler-186 f: R 1.17 (Torres+2015); the mass is an M-R estimate (CALCULATED_VALUE), unused.
+    (
+        dict(
+            pl_rade=1.17,
+            pl_bmasse=1.71,
+            pl_bmassprov="M-R relationship",
+            pl_bmasse_reflink=CALC,
+            pl_eqt=177.0,
+        ),
+        "planet_rocky",
+    ),
+    # HD 189733 b: R 12.67 (Stassun+2017), M 359.1 (Mass).
+    (dict(pl_rade=12.67, pl_bmasse=359.1, pl_bmassprov="Mass", pl_eqt=1209.0), "gas_giant"),
+]
+
+
+@pytest.mark.parametrize(("values", "want"), DEMO_PLANETS)
+def test_demo_planets_are_typed_on_the_live_rule(values: dict[str, Any], want: str) -> None:
+    t, missing = kind(**values)
+    assert (t, missing) == (want, ())
 
 
 @pytest.mark.usefixtures("proposed")
