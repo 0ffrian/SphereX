@@ -9,8 +9,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/state/store';
 import { useShellStore } from '@/app/shell/shellStore';
 import { useElapsedSeconds, SHOW_ELAPSED_AFTER_S } from '@/app/StatusBoxes';
-import { GridLoader } from './GridLoader';
-import { IDLE_LOOK, THINKING_LOOK } from './gridLoader';
+import GridLoader from './GridLoader';
+import { IDLE_LOOK, LOADER_BASE, THINKING_LOOK } from './loaderLooks';
 import { isThinking, thinkingRetry, thinkingSentence } from './islandText';
 import { useIslandStore } from './islandStore';
 
@@ -158,7 +158,7 @@ export function Island() {
           {/* Moves only while it thinks (a progress indicator). At rest it is lit and still: WCAG
               2.2.2 (nothing that starts by itself and moves for over 5 s), and no repaint of the
               page every frame for a decoration (issue #66, Q-121). */}
-          <GridLoader look={thinking ? THINKING_LOOK : IDLE_LOOK} animate={thinking && !reduced} />
+          <GridLoader {...LOADER_BASE} {...(thinking && !reduced ? THINKING_LOOK : IDLE_LOOK)} />
           {thinking && (
             <div className="sx-orb-label" role="status">
               <b>Thinking</b>

@@ -89,8 +89,9 @@ test('a search: Thinking, then the island grows into the panel; close sends it b
     'Searching the archive for SPHEREx frames at RA',
   );
   await expect(page.getByTestId('object-panel')).toHaveCount(0);
+  // The circle widens by a transition, so wait for it rather than read the first frame.
+  await expect.poll(async () => (await box(page, 'island')).width).toBeGreaterThan(idle.width);
   const pill = await box(page, 'island');
-  expect(pill.width).toBeGreaterThan(idle.width);
   expect(Math.abs(pill.y - idle.y)).toBeLessThan(1.5);
 
   // Done: the island moves to where the panel is, then the panel shows over it.
@@ -99,10 +100,16 @@ test('a search: Thinking, then the island grows into the panel; close sends it b
   await expect(panel).toBeVisible();
   await expect(island).toHaveAttribute('data-arrived', '');
   await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
-  const p = await box(page, 'object-panel');
-  const i = await box(page, 'island');
-  for (const k of ['x', 'y', 'width', 'height'] as const)
-    expect(Math.abs(i[k] - p[k])).toBeLessThan(2);
+  // The panel may still settle (a picture loads and it resizes), and the island follows it.
+  await expect
+    .poll(async () => {
+      const p = await box(page, 'object-panel');
+      const i = await box(page, 'island');
+      return Math.max(
+        ...(['x', 'y', 'width', 'height'] as const).map((k) => Math.abs(i[k] - p[k])),
+      );
+    })
+    .toBeLessThan(2);
   await expect(page.getByTestId('loading')).toHaveCount(0);
 
   // Close: the island goes back to the top centre and is the circle again.
