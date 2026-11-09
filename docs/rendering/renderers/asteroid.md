@@ -1,6 +1,6 @@
 # Renderers: asteroids
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7 (intro), R7.1, R7.2 · **Implements:** [D-01, D-33, Q-43, Q-103](../../decisions/rendering-bodies.md), [Q-61](../../decisions/pipeline-jobs.md), [D-32](../../decisions/contract.md), [Q-133](../../decisions/haptics-design.md) · **Read with:** [surface-generation.md](../surface-generation.md) (R6), [display-rules.md](../display-rules.md) (R5), [haptics/sources.md](../haptics/sources.md) (R8.4)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7 (intro), R7.1, R7.2 · **Implements:** [D-01, D-33, Q-43](../../decisions/rendering-bodies.md), [Q-103](../../decisions/rendering-kinds.md), [Q-61](../../decisions/pipeline-jobs.md), [D-32](../../decisions/contract-tags.md), [Q-133](../../decisions/haptics-sound.md) · **Read with:** [surface-generation.md](../surface-generation.md) (R6), [display-rules.md](../display-rules.md) (R5), [haptics/sources.md](../haptics/sources.md) (R8.4)
 
 ## R7. Per-type rendering specs
 

@@ -80,7 +80,7 @@ shared/     JSON schemas shared by backend and frontend      (Moon)
 
 Owners per area: decisions D-17.
 
-**Moving objects.** Track (one known object's path, frames, zoom and spectrum; the MVP is 433 Eros, Q-131, Q-137) and Area search (draw a square, then Known objects or Discovery, Q-146) are specified in A16–A20 in [docs/architecture/moving-objects/](docs/architecture/README.md#fragments); decisions in [moving-objects.md](docs/decisions/moving-objects.md).
+**Moving objects.** Track (one known object's path, frames, zoom and spectrum; the MVP is 433 Eros, Q-131, Q-137) and Area search (draw a square, then Known objects or Discovery, Q-146) are specified in A16–A20 in [docs/architecture/moving-objects/](docs/architecture/README.md#fragments); decisions in [moving-objects.md](docs/decisions/moving-objects.md) (agreed) and [moving-objects-review.md](docs/decisions/moving-objects-review.md) (proposed fixes, Moon's review list Q-182).
 - Q-146 is the plan; phase 2 (after the event, do not build now): the rate-grid linker, the SED score, injection-recovery completeness, the shuffled-time control, ADES, live areas anywhere (A16.2). No catch-rate claim; an unmatched track is never "an asteroid", "new" or "a discovery" (A16.5).
 - Mock-ups: `cd mockup && python3 -m http.server 8766`, open `http://127.0.0.1:8766/spherex-ui.html`, tool 5 for Area search (the Track pane loads `chase-the-rock.html`, whose data is real: PR #53's Eros fixtures and the 2MASS sky mirror).
 - Never port these mock-up approximations as values (full list in the A20 header; the real rules are A19):

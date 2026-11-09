@@ -1,6 +1,6 @@
 # Renderers: shader-generated kinds
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7.7 · **Implements:** [D-01, Q-45, Q-48, Q-49, Q-59](../../decisions/rendering-bodies.md), [D-04, D-21, Q-35](../../decisions/contract.md), [D-12, Q-133](../../decisions/haptics-design.md), [Q-103, Q-104, Q-107](../../decisions/rendering-motion.md), [Q-105](../../decisions/haptics-built.md) · **Read with:** [generators.md](../../architecture/generators.md) (A6, the look), [haptics/sources.md](../haptics/sources.md) (R8.4), [display-rules.md](../display-rules.md) (R5.5 volume budget)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7.7 · **Implements:** [D-01, Q-45, Q-48, Q-49, Q-59](../../decisions/rendering-bodies.md), [D-04, Q-35](../../decisions/contract.md), [D-21](../../decisions/contract-tags.md), [D-12](../../decisions/haptics-design.md), [Q-133](../../decisions/haptics-sound.md), [Q-103, Q-104, Q-107](../../decisions/rendering-kinds.md), [Q-105](../../decisions/haptics-built.md) · **Read with:** [generators.md](../../architecture/generators.md) (A6, the look), [haptics/sources.md](../haptics/sources.md) (R8.4), [display-rules.md](../display-rules.md) (R5.5 volume budget)
 
 ### R7.7 Shader-generated kinds: `planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova`
 

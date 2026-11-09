@@ -1,6 +1,6 @@
 # Type selection (backend)
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3.3 · **Implements:** [D-04](../decisions/contract.md), [D-12](../decisions/haptics-design.md), [Q-55, Q-61, Q-63](../decisions/pipeline-jobs.md) · **Read with:** [data-contract.md](data-contract.md) (R3.2 ObjectCard), [pipeline-card.md](../architecture/pipeline-card.md) (A4.3, stage 3)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3.3 · **Implements:** [D-04](../decisions/contract.md), [D-12](../decisions/haptics-design.md), [Q-55, Q-63](../decisions/pipeline-stages.md), [Q-61](../decisions/pipeline-jobs.md) · **Read with:** [data-contract.md](data-contract.md) (R3.2 ObjectCard), [pipeline-card.md](../architecture/pipeline-card.md) (A4.3, stage 3)
 
 ### R3.3 Type selection (backend)
 

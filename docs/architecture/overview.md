@@ -1,6 +1,6 @@
 # Overview
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A1–A2.1 · **Implements:** [D-02](../decisions/contract.md), [D-05, Q-132](../decisions/platform-hosting.md), [D-06, Q-137](../decisions/scope-process.md), [D-12](../decisions/haptics-design.md), [D-16](../decisions/contract.md), [D-25, D-31](../decisions/data-sources.md), [D-28, Q-131, Q-146](../decisions/moving-objects.md), [Q-89](../decisions/sky-shell.md) · **Read with:** [plan.md](plan.md) (A13 status), [../rendering/principles-stack.md](../rendering/principles-stack.md)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A1–A2.1 · **Implements:** [D-02](../decisions/contract-tags.md), [D-05, Q-132](../decisions/platform-hosting.md), [D-06, Q-137](../decisions/scope-process.md), [D-12](../decisions/haptics-design.md), [D-16](../decisions/contract.md), [D-25, D-31](../decisions/data-sources.md), [D-28, Q-131, Q-146](../decisions/moving-objects.md), [Q-89](../decisions/sky-shell.md) · **Read with:** [plan.md](plan.md) (A13 status), [../rendering/principles-stack.md](../rendering/principles-stack.md)
 
 ## A1 What we are building
 
@@ -9,7 +9,7 @@ A public web tool, shown at the event in a desktop browser on Atish's Asus TUF A
 - **Sky first.** The main view is an all-sky picture with clickable markers (Q-89, A21 in [sky-shell.md](sky-shell.md)). A user types a name or RA/Dec, or clicks a marker, and sees real SPHEREx images of that patch as a short video-like series: the **flipbook**, the base requirement of the challenge.
 - **What it is made of.** The object panel shows the spectrum measured on the fly, the light curve and the ObjectCard. **Build it** opens a split view where the 3D body is moulded beside the live sky (R5.8 in [../rendering/build-mould.md](../rendering/build-mould.md)); its look, sound and (after the event) touch are generated from the data.
 - **Known moving objects.** The **Track** tool follows a known asteroid or comet: its JPL Horizons path, the SPHEREx frames that caught it, a north-up zoom with stars masked, and a spectrum built exposure by exposure (A19, [moving-objects/track.md](moving-objects/track.md); Q-131). It is the MVP demo, on 433 Eros (Q-137). No blind discovery claims are made.
-- **Area search.** The user draws a square on the sky; an island card offers Known objects (opens Track) or Discovery, a replay of five steps from a precomputed result (A16, [moving-objects/area-search.md](moving-objects/area-search.md); Q-146).
+- **Area search.** The user draws a square on the sky; a feature card ([A21.5](sky-shell-surfaces.md#a215-overlay-surfaces-island-object-panel-object-card)) offers Known objects (opens Track) or Discovery, a replay of five steps from a precomputed result (A16, [moving-objects/area-search.md](moving-objects/area-search.md); Q-146).
 
 ### A1.1 Priority tiers
 

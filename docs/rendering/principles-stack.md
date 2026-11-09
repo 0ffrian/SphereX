@@ -1,6 +1,6 @@
 # Principles and pinned stack
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R0, R1, R2 · **Implements:** [D-01](../decisions/rendering-bodies.md), [D-03, D-24, Q-132](../decisions/platform-hosting.md), [D-06](../decisions/scope-process.md), [D-08, D-10, D-12](../decisions/haptics-design.md), [D-32](../decisions/contract.md) · **Read with:** [data-contract.md](data-contract.md) (R3), [../decisions/README.md](../decisions/README.md)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R0, R1, R2 · **Implements:** [D-01](../decisions/rendering-bodies.md), [D-03, D-24, Q-132](../decisions/platform-hosting.md), [D-06](../decisions/scope-process.md), [D-08, D-12](../decisions/haptics-design.md), [D-10](../decisions/haptics-sound.md), [D-32](../decisions/contract-tags.md) · **Read with:** [data-contract.md](data-contract.md) (R3), [../decisions/README.md](../decisions/README.md)
 
 ## R0. How to use this document
 
@@ -55,8 +55,8 @@
 | Layer | Package | Version | Notes |
 |---|---|---|---|
 | 3D | `three` | **0.187.0** (r187) | Use `three/webgpu` `WebGPURenderer`; it falls back to WebGL2 automatically **[verify on the A15]** (`chrome://gpu`); phones after the event (R12 #1) |
-| Raycast acceleration | `three-mesh-bvh` | pin at install | Only for real shape-model meshes (mesh haptics and the mesh body tone, R8.4) |
-| Build | Vite + TypeScript | pin at install | Record exact versions in `package.json` and lockfile |
+| Raycast acceleration | `three-mesh-bvh` | **0.9.18** | Only for real shape-model meshes (mesh haptics and the mesh body tone, R8.4) |
+| Build | Vite + TypeScript | **Vite 8.3.5, TypeScript 6.0.3** | Exact versions in `package.json` and the lockfile (full list: [frontend/README.md](../../frontend/README.md#pinned-versions)) |
 | Browser ML (optional) | `@huggingface/transformers` | pin at install | Only for the image-first path ([§6.6](surface-generation.md#r66-optional-paths)) |
 | Backend texture gen | Python 3.12, `numpy`, `scipy`, `opencv-python-headless`, `Pillow` | pin in `uv.lock` | CPU only; no GPU is needed. The event build runs locally on Atish's Asus TUF A15 (D-24, Q-132) |
 | Optional ML (laptop) | `transformers` + `depth-anything/Depth-Anything-V2-Small-hf` | pin in `uv.lock` | Apache-2.0. Only the Small size is permissively licensed |

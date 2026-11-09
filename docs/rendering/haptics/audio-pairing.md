@@ -1,6 +1,6 @@
 # Haptics: audio pairing
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.9, R8.9.1, R8.9.2 · **Implements:** [D-10, D-12, D-13, Q-70, Q-72, Q-133, Q-134](../../decisions/haptics-design.md), [Q-73, Q-84](../../decisions/haptics-built.md), [Q-132](../../decisions/platform-hosting.md), [D-21](../../decisions/contract.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8 tone stream), [sources.md](sources.md) (R8.4), [sound-voice.md](../../architecture/sound-voice.md) (A8)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.9, R8.9.1, R8.9.2 · **Implements:** [D-10, Q-70, Q-72, Q-133, Q-134](../../decisions/haptics-sound.md), [D-12, D-13](../../decisions/haptics-design.md), [Q-73, Q-84](../../decisions/haptics-built.md), [Q-132](../../decisions/platform-hosting.md), [D-21](../../decisions/contract-tags.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8 tone stream), [sources.md](sources.md) (R8.4), [sound-voice.md](../../architecture/sound-voice.md) (A8)
 
 ### R8.9 Audio pairing (D-10)
 
@@ -9,7 +9,7 @@ At the event the audio driver is the only output (Q-132). After the event it pla
 **Timing**
 
 - Web Audio. Every sound is scheduled on `AudioContext.currentTime` plus a small lookahead: `AUDIO_LOOKAHEAD_S` = 0.03 s, a placeholder in `tuning.ts`, tuned by ear on the A15 **[verify]** (R12 #35).
-- The `AudioContext` is created or resumed by a click that is a user activation: the "Turn on sound" button, the Feel toggle or the Listen button (Q-73). After the event, the same Touch-mode tap also unlocks vibration.
+- The `AudioContext` is created or resumed by a click that is a user activation: the "Turn on sound" button, the Feel toggle, the Listen button (Q-73) or Track's **Sound** toggle ([A20.9](../../architecture/moving-objects/track-ui.md#a209-sound)). After the event, the same Touch-mode tap also unlocks vibration.
 - Pulse trains are scheduled **sample-accurately** on the audio clock, not with timers.
 - *After the event:* the calibrated `avOffsetMs` ([§8.7](calibration.md#r87-calibration-and-settings)) aligns sound and vibration. If vibration is felt later than sound is heard, delay the audio by the offset; otherwise delay the vibration. At the event there is no vibration to align, so the offset is 0.
 
@@ -19,7 +19,7 @@ At the event the audio driver is the only output (Q-132). After the event it pla
 |---|---|
 | `strength` | Continuous gain (not quantised, unlike vibration), times the volume setting. An audible floor (`AUDIO_FLOOR_STRENGTH`) keeps strength 0 heard (Q-72) |
 | `pitch` | Frequency = 220 Hz × 2^(2.4 · pitch) (`pitch.ts`, placeholders, Q-70). **Spectrum, Listen sweep and Track:** pitch from λ over 0.75–5.0 µm (Q-70, Q-134). **Body interaction:** pitch = the normalised height under the pointer, continuous (R8.9.1, Q-133). **Gas giant bands:** pitch follows latitude |
-| `pan` | `StereoPannerNode`, from the pointer's x (Track: the object's drawn x) |
+| `pan` | `StereoPannerNode`, from the pointer's x (Track: the marker's x in the detail view, R8.9.2) |
 | `tag` | Timbre (below) |
 | `voice` | Refines the timbre within the tag's family: `tone`, `click`, `surf`, `chime` (Q-72) |
 
@@ -64,12 +64,12 @@ While the user interacts with a body, one continuous tone follows the height und
 
 #### R8.9.2 Track path sound (Q-134)
 
-"Hear the Shift": the Track tool's sound ([A19](../../architecture/moving-objects/track.md), [A20](../../architecture/moving-objects/track-ui.md)). It is sound only, at the event and after. It plays while Track replays a known object's exposures. Status: **not built yet**.
+"Hear the Shift": the Track tool's sound ([A19](../../architecture/moving-objects/track.md), [A20](../../architecture/moving-objects/track-ui.md)). It is sound only, at the event and after. It plays while Track replays a known object's exposures. A **frame** is one detector's image; an **exposure** is the frames taken at one midpoint (2 on Eros, D1 and D4 at once; [A20.3](../../architecture/moving-objects/track-ui.md#a203-time)). Status: **not built yet**.
 
-- **Exposure tick.** One tick per exposure, when the replay reaches that exposure. Tag = the exposure's tag (a SPHEREx cutout is `measured`, so the ticks are heard in Measured only). Pitch = the exposure's wavelength through the Q-70 mapping, the same mapping as the spectrum and the Listen sweep. Pan = the object's drawn x in the Track view (−1 left edge, +1 right edge). Voice `tone`, channel `data`.
-- **Path voice.** A soft continuous voice while the replay runs, in the Estimated timbre (the sustained column above). The path comes from JPL Horizons and is `model_dependent`, so the voice is silent in Measured only. Pan follows the drawn x of the path at the replay time. It uses the `path` tone of the stream (R8.8). Pitch and gain are fixed: **Proposed (Q-174)**, at pitch 0.5 and a strength well below the ticks.
+- **Exposure tick.** One tick per exposure, when the replay reaches that exposure. The tick sounds one note per frame of the exposure at the same time (a two-note tick on Eros), each pitched by its own frame's wavelength through the Q-70 mapping, the same mapping as the spectrum and the Listen sweep, and tagged as its frame (**Proposed (Q-174)**, reading Q-134's "per exposure" for 2 frames). A SPHEREx cutout is `measured`, so the ticks are heard in Measured only. Pan = the marker's x in the Track pane's **detail view** ([A20.5](../../architecture/moving-objects/track-ui.md#a205-detail-view-and-imagery); −1 left edge, +1 right edge; **Proposed (Q-174)**). Voice `tone`, channel `data`.
+- **Path voice.** A soft continuous voice while the replay runs, in the Estimated timbre (the sustained column above). The path comes from JPL Horizons and is `model_dependent`, so the voice is silent in Measured only. Pan follows the path's x in the detail view at the replay time. It uses the `path` tone of the stream (R8.8). Pitch and gain are fixed: **Proposed (Q-174)**, at pitch 0.5 and a strength well below the ticks.
 - **Reference click.** A quiet, regular click that gives the replay a steady tempo, with a visible mute button next to the replay controls. **Proposed (Q-174):** one click per hour of observation time on the replay's time axis, voice `click`, tagged `measured` (the exposure times are measured), so it plays in every state unless muted.
 - **Never the SPHEREx-centred rate.** Pitch and pan are never driven by the object's apparent rate of motion. Seen from SPHEREx that rate mostly carries the spacecraft's orbital parallax (about 100″ per hour swing for Eros on 20 Mar 2026). Pan follows the drawn position only.
-- **Direction never by pan alone.** A venue PA may be mono. The direction of travel is also given in text (the Track view's caption and a polite live region) and drawn on screen (R9).
+- **Direction never by pan alone.** A venue PA may be mono. The direction of travel is also given in text (the Track pane's direction caption, [A20.4](../../architecture/moving-objects/track-ui.md#a204-path-on-the-sky), and its polite announcement on a visit change, [A20.12](../../architecture/moving-objects/track-ui.md#a2012-accessibility-r9)) and drawn on screen (R9).
 - **Honesty (D-21).** The engine filter applies (R8.2): in Measured only the exposure ticks (and the reference click) remain and the path voice is silent.
 - **Wiring:** R8.8.1 item 11.

@@ -1,6 +1,6 @@
 # Haptics: engine API
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.8 · **Implements:** [D-08, D-09, D-10, D-20, Q-19, Q-72, Q-85, Q-133](../../decisions/haptics-design.md), [Q-71, Q-73](../../decisions/haptics-built.md), [Q-132](../../decisions/platform-hosting.md) · **Read with:** [platform-encoding.md](platform-encoding.md) (R8.1–R8.3), [audio-pairing.md](audio-pairing.md) (R8.9), [wiring.md](wiring.md) (R8.8.1), [data-contract.md](../data-contract.md) (R3.4 `HapticProfile`)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.8 · **Implements:** [D-08, D-09, D-20, Q-19, Q-85](../../decisions/haptics-design.md), [D-10, Q-72, Q-133](../../decisions/haptics-sound.md), [Q-71, Q-73](../../decisions/haptics-built.md), [Q-132](../../decisions/platform-hosting.md) · **Read with:** [platform-encoding.md](platform-encoding.md) (R8.1–R8.3), [audio-pairing.md](audio-pairing.md) (R8.9), [wiring.md](wiring.md) (R8.8.1), [data-contract.md](../data-contract.md) (R3.4 `HapticProfile`)
 
 ### R8.8 Engine API
 

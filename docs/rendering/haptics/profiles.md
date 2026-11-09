@@ -1,6 +1,6 @@
 # Haptics: per-type profiles and spectrum haptics
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.5, R8.6 · **Implements:** [D-12, D-20, Q-37, Q-78 to Q-82, Q-86, Q-133](../../decisions/haptics-design.md), [Q-76, Q-77, Q-83](../../decisions/haptics-built.md), [Q-103](../../decisions/rendering-motion.md), [D-21](../../decisions/contract.md) · **Read with:** [sources.md](sources.md) (R8.4), [audio-pairing.md](audio-pairing.md) (R8.9), [engine-api.md](engine-api.md) (R8.8)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.5, R8.6 · **Implements:** [D-12, D-20, Q-37, Q-78 to Q-82, Q-86](../../decisions/haptics-design.md), [Q-133](../../decisions/haptics-sound.md), [Q-76, Q-77, Q-83](../../decisions/haptics-built.md), [Q-103](../../decisions/rendering-kinds.md), [D-21](../../decisions/contract-tags.md) · **Read with:** [sources.md](sources.md) (R8.4), [audio-pairing.md](audio-pairing.md) (R8.9), [engine-api.md](engine-api.md) (R8.8)
 
 ### R8.5 Per-type haptic profile
 

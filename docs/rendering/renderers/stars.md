@@ -1,6 +1,6 @@
 # Renderer: stars
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7.5, R7.5.1–R7.5.5 · **Implements:** [D-03](../../decisions/platform-hosting.md), [D-21, D-32, Q-36, Q-110](../../decisions/contract.md), [D-34, Q-104, Q-107, Q-108](../../decisions/rendering-motion.md), [Q-45, Q-65](../../decisions/rendering-bodies.md), [Q-55](../../decisions/pipeline-jobs.md) · **Read with:** [data-contract.md](../data-contract.md) (R3.4 `dynamics`), [display-rules.md](../display-rules.md) (R5.7)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7.5, R7.5.1–R7.5.5 · **Implements:** [D-03](../../decisions/platform-hosting.md), [D-21, D-32, Q-110](../../decisions/contract-tags.md), [Q-36](../../decisions/contract.md), [D-34, Q-108](../../decisions/rendering-motion.md), [Q-104, Q-107](../../decisions/rendering-kinds.md), [Q-45, Q-65](../../decisions/rendering-bodies.md), [Q-55](../../decisions/pipeline-stages.md) · **Read with:** [data-contract.md](../data-contract.md) (R3.4 `dynamics`), [display-rules.md](../display-rules.md) (R5.7)
 
 ### R7.5 Stars: `star`, `star_mira`, `star_ttauri`
 

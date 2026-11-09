@@ -1,6 +1,6 @@
 # Open items [verify]
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R12 · **Implements:** [D-17](../decisions/scope-process.md), [Q-110](../decisions/contract.md), [Q-132](../decisions/platform-hosting.md) · **Read with:** [../decisions/README.md](../decisions/README.md), the fragment named in each row
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R12 · **Implements:** [D-17](../decisions/scope-process.md), [Q-110](../decisions/contract-tags.md), [Q-132](../decisions/platform-hosting.md) · **Read with:** [../decisions/README.md](../decisions/README.md), the fragment named in each row
 
 ## R12. Open items [verify]
 

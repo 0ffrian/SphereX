@@ -1,6 +1,6 @@
 # Data contract
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A5–A5.4 · **Implements:** [D-02, D-18, D-22, D-27, D-32, Q-35](../decisions/contract.md), [D-26](../decisions/rendering-bodies.md), [Q-57, Q-61](../decisions/pipeline-jobs.md) · **Read with:** [../rendering/data-contract.md](../rendering/data-contract.md) (R3), [../../shared/README.md](../../shared/README.md), [refusals.md](refusals.md) (A4.12)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A5–A5.4 · **Implements:** [D-02, D-32](../decisions/contract-tags.md), [D-18, D-22, D-27, Q-35](../decisions/contract.md), [D-26](../decisions/rendering-bodies.md), [Q-57, Q-61](../decisions/pipeline-jobs.md) · **Read with:** [../rendering/data-contract.md](../rendering/data-contract.md) (R3), [../../shared/README.md](../../shared/README.md), [refusals.md](refusals.md) (A4.12)
 
 ## A5 Data contract
 

@@ -1,6 +1,6 @@
 # Area search: in the sky view
 
-> **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A18 to A18.10 · **Implements:** [Q-146](../../decisions/moving-objects.md), [Q-120, Q-121, Q-123, Q-124](../../decisions/sky-shell.md), [Q-132](../../decisions/platform-hosting.md), D-21 ([contract](../../decisions/contract.md)) · **Read with:** [area-search.md](area-search.md) (A16), [area-backend.md](area-backend.md) (A17), [sky-shell.md](../sky-shell.md) (A21, with A21.8 to A21.13 in [sky-shell-behaviour.md](../sky-shell-behaviour.md)), [track-ui.md](track-ui.md) (A20)
+> **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A18 to A18.10 · **Implements:** [Q-146](../../decisions/moving-objects.md), [Q-120, Q-121, Q-123, Q-124](../../decisions/shell-surfaces.md), [Q-132](../../decisions/platform-hosting.md), D-21 ([contract-tags](../../decisions/contract-tags.md)) · **Read with:** [area-search.md](area-search.md) (A16), [area-backend.md](area-backend.md) (A17), [sky-shell.md](../sky-shell.md) (A21, with A21.8 to A21.13 in [sky-shell-behaviour.md](../sky-shell-behaviour.md)), [track-ui.md](track-ui.md) (A20)
 
 Status: **agreed plan, not built** ([Q-146](../../decisions/moving-objects.md)). Owner: Moon (ticket D2; `frontend/src/app/` and `state/` are Moon's, D-17). Area search uses the shell as [A21](../sky-shell.md) specifies it (layout, rail, surfaces, sky interaction, split pane, keys, hash) and changes nothing it already does for a searched object. Where A21 marks an extension point **To build (proposed, Q-150 to Q-157)**, Area search depends on it and names it; those placeholders are A21's, not this fragment's. Track's own screen is [A20](track-ui.md); this fragment only opens it.
 
@@ -16,6 +16,7 @@ Mock-up: `mockup/spherex-ui.html`, mock-up tool 5 (the app adds no number keys, 
 - Choosing the tool opens the **Area** card ("Drag a square over the part of the sky you want to search") and switches the sky's pointer mode to `draw` (A21.6, Q-154): crosshair cursor; a drag draws the square instead of panning; the wheel still zooms. Buttons: **Use a square in the middle** and, when there is one, **Keep the last square**.
 - The square is drawn in the accent colour (dashed while dragging, solid after) with its size in degrees above its top-left corner. A square under 30 CSS px on a side is refused with "Drag a bigger square".
 - On release the frontend picks the prepared area holding the square from the `GET /v1/areas` index (A16.4). None: the card says "This part of the sky is not prepared" (`area:not_prepared`) and lists the prepared areas with **Fly there**, which uses `skyFlyTo` (A21.6, Q-154) and respects reduced motion.
+- Releasing a valid square sets the pointer mode back to `pan`, so later clicks reach the layer hit-tests and the pick (A18.2); **Draw again** (A18.5) sets `draw` again.
 - Escape leaves drawing mode and keeps the square, at rank 3 of the Escape order in A21.10 (Q-150). The pointer mode returns to `pan`.
 
 ### A18.2 Sky layers (`frontend/src/app/sky/area/AreaLayer.tsx`)
@@ -39,7 +40,7 @@ Mock-up: `mockup/spherex-ui.html`, mock-up tool 5 (the app adds no number keys, 
 
 - **Surface.** Every Area card is a **feature card** of A21.5 (Q-152): it renders in the object card's slot (top centre, 340 px, z 25), shown only while `tool` is `area`, so it never meets the object card. A wider card needs a width token decided with it; the mock-up's 408 px is not used. Area cards never use the object panel.
 - **Header:** title, **Minimise** and ×. × ends the current card and returns to the previous Area card, or to the sky from the Area card; focus goes to the Area rail button (A21.5).
-- **Minimise** (Q-146 item 3; mechanism A21.5, Q-152, amending Q-121 item 2): the card hides and the island takes its `progress` mode, a pill that is a button named "Show <card title>" and keeps showing progress ("Discovery · Step 3 of 5 · Drop stars", then "3 movers found · 1 is 433 Eros"), so the whole square stays visible while the steps play. A click, Enter or Space restores the card as it is now and focuses its heading. The progress text changes no more than once per step.
+- **Minimise** (Q-146 item 3; mechanism A21.5, Q-152, amending Q-121 item 2): the card hides and the island takes its `progress` mode, a pill that is a button named "Show <card title>" and keeps showing progress ("Discovery · Step 3 of 5 · Drop stars", then "4 movers · 1 is 433 Eros"), so the whole square stays visible while the steps play. A click, Enter or Space restores the card as it is now and focuses its heading. The progress text changes no more than once per step.
 - Right-click keeps its Q-120 meaning (the object card for a marker); it never restores an Area card.
 - While the Track pane is open the Area card is hidden; **Back to the area** brings it back (A18.8).
 - Cards: Area (A18.1), Options (A18.5), Known (A18.5), Discovery (A18.6), Result (A18.7).

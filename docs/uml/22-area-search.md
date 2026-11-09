@@ -30,7 +30,7 @@ flowchart TB
   API["api/areas.py<br/>/v1/areas/..."]
   subgraph FE["frontend/src"]
     RAIL["app/shell ToolRail + railIcons<br/>ToolId area"]
-    CARDS["Area cards in the object panel surface<br/>Area, Options, Known, Discovery, Result"]
+    CARDS["Feature cards in the object card's slot (proposed Q-152)<br/>Area, Options, Known, Discovery, Result"]
     ISL["Island progress pill (proposed)"]
     LAYER["app/sky/area AreaLayer<br/>sky layer slot"]
     STORE["state/store.ts area slice"]
@@ -103,7 +103,7 @@ sequenceDiagram
 sequenceDiagram
   autonumber
   actor U as User
-  participant P as Area cards (object panel)
+  participant P as Area feature cards
   participant ST as Store (area slice)
   participant A as /v1/areas (reads the cache only)
   participant SP as SkyPane + AreaLayer
@@ -112,6 +112,7 @@ sequenceDiagram
   P-->>SP: pointer mode draw
   U->>SP: drag a square
   SP->>ST: square
+  SP-->>SP: pointer mode back to pan (proposed)
   ST->>A: GET /v1/areas (index)
   alt square outside every prepared area
     ST-->>P: area:not_prepared, list the areas with Fly there
@@ -131,7 +132,7 @@ sequenceDiagram
     ST->>A: GET dots, tracks
     ST-->>SP: Dots and Tracks layers, five steps one by one
     U->>P: Minimise (proposed island progress pill)
-    SP-->>U: T1 found blind = 433 Eros, T2 unexplained, T3 not checked, T4 possible
+    SP-->>U: T1 found blind = 433 Eros, T2 unexplained, T3 possible, T4 not checked
     U->>SP: click T1 (layer hit-test before the pick)
     SP->>P: Result card, hash atrack=T1
     U->>P: Open in Track

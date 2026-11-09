@@ -17,7 +17,7 @@ Implement `$ARGUMENTS` for Shift & Spectrum. Run the whole pipeline without aski
    - three.js or WebGL rendering: `game-developer`
    - React UI: `react-specialist`
    - Python pipeline or baker: `python-pro`
-   - API endpoints: `fastapi-developer` (only after Q-01 is settled) or `backend-developer`
+   - API endpoints: `fastapi-developer` (FastAPI, D-15) or `backend-developer`
 
    Independent sub-tasks may run in parallel, one agent each, on separate files.
 

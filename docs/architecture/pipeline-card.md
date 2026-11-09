@@ -1,6 +1,6 @@
 # Pipeline: classify to RenderParams
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.3–A4.8 · **Implements:** [D-04](../decisions/contract.md), [D-22](../decisions/contract.md), [D-32](../decisions/contract.md), [Q-55 to Q-63](../decisions/pipeline-jobs.md), [Q-35](../decisions/contract.md), [Q-39](../decisions/contract.md), [Q-47](../decisions/rendering-bodies.md) · **Read with:** [pipeline.md](pipeline.md) (A4 overview), [../rendering/data-contract.md](../rendering/data-contract.md) (R3), [refusals.md](refusals.md) (A4.12)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.3–A4.8 · **Implements:** [D-04](../decisions/contract.md), [D-22](../decisions/contract.md), [D-32](../decisions/contract-tags.md), [Q-55, Q-56, Q-60, Q-62, Q-63](../decisions/pipeline-stages.md), [Q-57, Q-61](../decisions/pipeline-jobs.md), [Q-58, Q-59](../decisions/rendering-bodies.md), [Q-35](../decisions/contract.md), [Q-39](../decisions/contract.md), [Q-47](../decisions/rendering-bodies.md) · **Read with:** [pipeline.md](pipeline.md) (A4 overview), [../rendering/data-contract.md](../rendering/data-contract.md) (R3), [refusals.md](refusals.md) (A4.12)
 
 Stages 3 to 7 of the pipeline ([A4](pipeline.md#a4-pipeline)). They run inside the object job ([A4.10](jobs.md#a410-object-job-and-fan-out)). Their routes are listed in [A4.11](endpoints.md#a411-endpoint-register) and their `missing` codes in [A4.12](refusals.md#a412-missing-and-refusal-codes).
 
@@ -19,8 +19,8 @@ Stages 3 to 7 of the pipeline ([A4](pipeline.md#a4-pipeline)). They run inside t
   | This doc | `planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova` |
 
   The old `dwarf` kind maps to `brown_dwarf`. The old `asteroid` kind maps to `asteroid_shape` or `asteroid_procedural`.
-- **Status:** Built (issue #5, `backend/app/core/classify/`). The class label is taken from the catalogue only (SIMBAD `sp_type`, SBDB `spec_B` then `spec_T`); its confidence is `catalogue` or `none`, and spectrum matching against reference types (step 2) is not built ([Q-55](../decisions/pipeline-jobs.md)). The SIMBAD otype mapping is Q-55 items 2 and 3.
-- **Exoplanet types ([Q-63](../decisions/pipeline-jobs.md), pending Atish):** the mass-and-radius rule is built as `PROPOSED_EXOPLANET_THRESHOLDS` in `backend/app/core/classify/rules.py`, with the Zeng et al. 2019 curves in `zeng2019.py`. It is **off**: the live `EXOPLANET_THRESHOLDS` holds `None`, so an archive planet becomes `candidate` with `type:exoplanet_thresholds` in `missing`. With the rule on, the other `type:exoplanet_*` codes of A4.12 apply. PR #69 (open, issue #68) turns it on.
+- **Status:** Built (issue #5, `backend/app/core/classify/`). The class label is taken from the catalogue only (SIMBAD `sp_type`, SBDB `spec_B` then `spec_T`); its confidence is `catalogue` or `none`, and spectrum matching against reference types (step 2) is not built ([Q-55](../decisions/pipeline-stages.md)). The SIMBAD otype mapping is Q-55 items 2 and 3.
+- **Exoplanet types ([Q-63](../decisions/pipeline-stages.md), pending Atish):** the mass-and-radius rule is built as `PROPOSED_EXOPLANET_THRESHOLDS` in `backend/app/core/classify/rules.py`, with the Zeng et al. 2019 curves in `zeng2019.py`. It is **off**: the live `EXOPLANET_THRESHOLDS` holds `None`, so an archive planet becomes `candidate` with `type:exoplanet_thresholds` in `missing`. With the rule on, the other `type:exoplanet_*` codes of A4.12 apply. PR #69 (open, issue #68) turns it on.
 
 ### A4.4 Stage 4: Check for a saved asset
 
@@ -70,7 +70,7 @@ The backend builds the **ObjectCard**: every known value for the object, each as
 
 Pure functions that turn measured values into `derived` values, each with its stated formula ([A7](physics.md#a7-physics-layer)). The backend fills them into the card. Only tier 2 (`derived`, every input measured) goes into the card. When an input is missing, the fallback to tiers 3–5 (D-32) happens in RenderParams `layers` and `dynamics`, never in the card, which keeps `value: null` ([rendering doc §3.4](../rendering/data-contract.md)). In the browser the same functions rerun on every slider change against the `overrides` ([A5.3](data-contract.md#a53-overrides)). The result is never written back to the card as truth.
 
-- **Status:** Built in the browser only (`frontend/src/physics/`, issue #13). The backend half is not built; where stage 6 runs, and so where the D-32 fallback lives, is [Q-60](../decisions/pipeline-jobs.md).
+- **Status:** Built in the browser only (`frontend/src/physics/`, issue #13). The backend half is not built; where stage 6 runs, and so where the D-32 fallback lives, is [Q-60](../decisions/pipeline-stages.md).
 - **Not built yet:** D-32 tier fallback in stage 6. The browser functions still refuse a missing input (`frontend/src/physics/tagging.ts`); they fall back a tier once stage 6 adopts D-32.
 
 ### A4.7 Stage 7: RenderParams

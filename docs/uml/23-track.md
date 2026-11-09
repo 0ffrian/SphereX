@@ -116,8 +116,8 @@ sequenceDiagram
   alt t at an exposure (or snapped within 4 px)
     TT-->>ST: exact TLIST position, frameIndex
     ST-->>Z: show that frame, ring, masks
-    ST-->>S: add the point (hollow if flagged)
-    ST-->>A: exposure tick (heard in Measured only too)
+    ST-->>S: add the exposure's points, one per frame (hollow if flagged)
+    ST-->>A: exposure tick, one note per frame (heard in Measured only too)
   else between exposures
     TT-->>ST: position interpolated from 10 min samples, error bound stated
   end

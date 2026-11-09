@@ -1,6 +1,6 @@
 # Track: the screen
 
-> **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A20 to A20.15 · **Implements:** [Q-131, Q-135, Q-136, Q-138, Q-139, Q-142, Q-144](../../decisions/moving-objects.md), [Q-134](../../decisions/haptics-design.md), [Q-132](../../decisions/platform-hosting.md), D-21 ([contract](../../decisions/contract.md)), D-35 ([sky-shell](../../decisions/sky-shell.md)) · **Read with:** [track.md](track.md) (A19), [track-contract.md](track-contract.md) (A19.9 to A19.15), [sky-shell.md](../sky-shell.md) (A21, with A21.8 to A21.13 in [sky-shell-behaviour.md](../sky-shell-behaviour.md)), [area-ui.md](area-ui.md) (A18), [audio-pairing.md](../../rendering/haptics/audio-pairing.md) (R8.9.2), [accessibility.md](../../rendering/accessibility.md) (R9), [uml/23](../../uml/23-track.md)
+> **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A20 to A20.15 · **Implements:** [Q-131, Q-135, Q-136, Q-138, Q-139, Q-142, Q-144](../../decisions/moving-objects.md), [Q-134](../../decisions/haptics-sound.md), [Q-132](../../decisions/platform-hosting.md), D-21 ([contract-tags](../../decisions/contract-tags.md)), D-35 ([sky-shell](../../decisions/sky-shell.md)) · **Read with:** [track.md](track.md) (A19), [track-contract.md](track-contract.md) (A19.9 to A19.15), [sky-shell.md](../sky-shell.md) (A21, with A21.8 to A21.13 in [sky-shell-behaviour.md](../sky-shell-behaviour.md)), [area-ui.md](area-ui.md) (A18), [audio-pairing.md](../../rendering/haptics/audio-pairing.md) (R8.9.2), [accessibility.md](../../rendering/accessibility.md) (R9), [uml/23](../../uml/23-track.md)
 
 Status: **agreed in parts, not built** (every section is **To build**). Owner: Atish (Q-131). The files live in `frontend/src/app/track/`, inside `frontend/src/app/`, which D-17 gives to Moon; Track's screen and sound are Atish's by **Proposed (Q-163)**, a D-17 amendment like Q-135's for the spin slider.
 
@@ -20,7 +20,7 @@ Status: **agreed in parts, not built** (every section is **To build**). Owner: A
 - Track is the `track` kind of the shell's **split pane** (A21.8, pane kinds proposed as Q-151): opened with `openPane({ kind: 'track', objectId, from })`, never `setTool`; the sky moves left and stays live, the pane takes the other side. It is not a rail tool and has no `ToolId` (**Proposed (Q-161)**, Atish's answer to A21.8's open point on a Track rail button).
 - **Width:** `--sx-split-w` for `track` is 50 %, as Build (**Proposed (Q-161)**; the mock-up's 62 % is not used). At 1920 px that leaves the pane about 940 px, enough for the detail view, zoom and spectrum stacked.
 - **Opened from** ([A19.2](track.md#a192-entry-points)): the Area Known card's **Track it**, a found-blind Result card's **Open in Track**, the object panel's **Track it** for a `moving = true` object, and a link with `track=<id>`.
-- **One occupant:** Track replaces Build in place and the reverse (A21.8). The hash holds `track=<id>` while it is open, with a history entry marked `{ sxPane: 'track' }` (A21.11, Q-153).
+- **One occupant:** Track replaces Build in place and the reverse (A21.8). The hash holds `track=<id>` while it is open, with a history entry marked `{ sxPane: 'track' }` (A21.8, Q-151 item 4; hash key A21.11, Q-153).
 - **Closed by** × in the pane header, Escape (rank 2 in A21.10, after a focused text field; Q-150), the browser's Back, and **Back to the area** (shown when `from` is an area; reopens the Area card the user came from). Focus returns by `from` as A21.8 sets it: the Area card's heading for `area`; the object's marker for `panel`; the sky canvas for `link`.
 - Desktop only (Q-132): the phone-width sheet of A21.8 is not designed for the event.
 
@@ -28,7 +28,7 @@ Status: **agreed in parts, not built** (every section is **To build**). Owner: A
 
 Top to bottom in the pane; the pane scrolls and the time bar stays at its bottom.
 
-1. **Header:** the object chip (number and name, class, and SBDB facts such as the rotation period, each with its badge as the ObjectCard tags it), **Back to the area** when relevant, ×.
+1. **Header:** the object chip (number and name, class, and SBDB facts such as the rotation period, each with its badge as the ObjectCard tags it), the direction caption (A20.4), **Back to the area** when relevant, ×.
 2. **Detail view** (A20.5): the path near the frames on a sharper backdrop.
 3. **Zoom** (A20.6): one SPHEREx frame at the current time.
 4. **Spectrum** (A20.7): built hop by hop, with the spin slider at "+ Artistic" (A20.8).
@@ -38,8 +38,9 @@ The honesty toggle is the app's global one (D-21); Track adds no second toggle. 
 
 ### A20.3 Time
 
+- **Frame and exposure.** A **frame** is one detector's image. An **exposure** is the frames taken at one midpoint: 2 on Eros, D1 and D4 at once ([A17.1](area-backend.md#a171-area-and-frames-framespy), A16.6). Eros has 4 exposures per visit, so its window holds 8 exposures and 16 frames. The slider steps and snaps per exposure; the spectrum, the zoom facts and the refusals count frames.
 - **Range:** the Track window (A19.3; Eros: 20 Mar 2026 00:00 to 22 Mar 2026 00:00 UTC).
-- **Exposure ticks** on the slider, one per frame, in the wavelength colour (`derived`, Q-27); a refused frame's tick is a grey cross.
+- **Exposure ticks** on the slider, one per exposure, made of one mark per frame (the marks share a time, so they are stacked), each in its frame's wavelength colour (`derived`, Q-27); a refused frame's mark is a grey cross.
 - **Play/pause:** inside a visit, 1 min of data per second (a 6.4 min visit takes about 6 s); the gap between visits is jumped with the note "Next visit, 24.4 h later". **Previous** and **next exposure** buttons. Releasing the slider within 4 px of a tick snaps to that exposure.
 - **Clock:** date and time UTC of the slider.
 - **Marker** (Q-142): the mover's marker on the sky and in the detail view follows the slider, from the 10-min samples between exposures and the exact TLIST at an exposure ([A19.4](track.md#a194-positions)). On the sky it is fed through the marker feed the Track layer registers (`{ key, ra, dec }`, A21.13), not through `sky.resolved`; the resolve-epoch marker for the object is hidden while Track is open.
@@ -50,6 +51,7 @@ The honesty toggle is the app's global one (D-21); Track adds no second toggle. 
 - Draws: the path so far (solid) and still to come (dashed), the marker, each frame's cutout box (`derived`) with the current one highlighted, and each frame's footprint (`measured`) when served (A19.3).
 - On open the camera fits the window's path inside the safe rectangle of the sky's half (A21.2) with `skyFlyTo({ box })` (A21.6, Q-154), at once under reduced motion.
 - **"Measured only"** hides the path, marker and cutout boxes, keeps the footprints, and shows "Path hidden: it comes from the Horizons orbit model (Estimated)."
+- **Direction caption** in the pane header, because R8.9.2 never gives the direction by pan alone: "Moving <compass direction> at <rate>°/day between visits (apparent, seen from SPHEREx)", the rate and direction between visits of A19.11 (`derived`; the rate inside a visit is not shown, Q-134). Shown from "+ Estimated"; with one visit it reads "Seen in one visit: no direction between visits".
 
 ### A20.5 Detail view and imagery
 
@@ -66,10 +68,10 @@ The honesty toggle is the app's global one (D-21); Track adds no second toggle. 
 
 ### A20.7 Spectrum, hop by hop
 
-- Wavelength (µm) against flux (µJy) with error bars. A point appears when the slider passes its exposure; the current point is ringed. A count reads "n of N exposures".
+- Wavelength (µm) against flux (µJy) with error bars, one point per frame (A20.3). An exposure's points appear when the slider passes it; the current exposure's points are ringed. A count reads "n of N frames".
 - **Flagged points are hollow** with the note naming the reason: "flagged OUTLIER" for `outlier_core` (Q-139). On Eros 13 of the 14 points are hollow **[verify]**.
 - **Refused frames** are listed under the plot with their reasons ("2 frames not measured: hardware flags NONFUNC, SUR_ERROR, TRANSIENT on the object"), never drawn.
-- **Caption:** "Each point is one exposure. Points mix wavelength with time: the two visits are a day apart and Eros spins every 5.27 h, so a dip is not automatically chemistry." The period comes from SBDB; without one the sentence drops it.
+- **Caption:** "Each point is one frame. Points mix wavelength with time: the two visits are a day apart and Eros spins every 5.27 h, so a dip is not automatically chemistry." The period comes from SBDB; without one the sentence drops it.
 - **3I/ATLAS** (stretch): the caption "aperture, not total flux; background taken from inside the coma" (A19.8).
 - Point colour is the wavelength colour (`derived`, Q-27 open); in "Measured only" one colour.
 
@@ -87,8 +89,8 @@ Track's path sound (Q-134: one tick per exposure, wavelength to pitch, drawn x t
 
 | D-21 state | Shown | Heard (R8.9.2) |
 |---|---|---|
-| **Measured only** | Zoom pixels, flagged-pixel mask, footprints, spectrum points in one colour, facts that are measured, refused-frame list | Exposure ticks |
-| **+ Estimated** (starting state) | Adds path, marker, ring, path segment, cutout boxes, star masks, contamination, wavelength colours, backdrop and imagery (per Q-88) | Adds the path voice |
+| **Measured only** | Zoom pixels, flagged-pixel mask, footprints, spectrum points in one colour, facts that are measured, refused-frame list | Exposure ticks; the reference click (`measured`, unless muted) |
+| **+ Estimated** (starting state) | Adds path, marker, ring, path segment, cutout boxes, star masks, contamination, wavelength colours, direction caption, backdrop and imagery (per Q-88) | Adds the path voice |
 | **+ Artistic** | Adds the spin slider and its series | Nothing more (spin is never sonified) |
 
 ### A20.11 States
@@ -103,11 +105,11 @@ Track's path sound (Q-134: one tick per exposure, wavelength to pitch, drawn x t
 
 ### A20.12 Accessibility (R9)
 
-- **Text alternatives:** the Track layer appends an id to the sky canvas's `aria-describedby` (A21.12) ("Path of 433 Eros, 20 to 21 Mar 2026, 16 frames, now at frame 5"); the zoom has alt text from its facts; the spectrum has **Show as table**.
+- **Text alternatives:** the Track layer appends an id to the sky canvas's `aria-describedby` (A21.12) ("Path of 433 Eros, 20 to 21 Mar 2026, 16 frames in 8 exposures, now at exposure 3"); the zoom has alt text from its facts; the spectrum has **Show as table**.
 - **Keys** only on Track's own controls (A21.10); no number keys (Q-121).
-- **Slider:** a native range input with `aria-valuetext` ("20 Mar 2026 08:35:10 UTC, exposure 2 of 8, visit 1"). Left and Right step to the previous or next exposure, Page Up and Page Down jump a visit, Home and End go to the ends.
+- **Slider:** a native range input with `aria-valuetext` ("20 Mar 2026 08:35:10 UTC, exposure 2 of 4, visit 1"). Left and Right step to the previous or next exposure, Page Up and Page Down jump a visit, Home and End go to the ends.
 - **Motion:** Play is a toggle with `aria-pressed`; under reduced motion it does not auto-play and the camera moves at once.
-- **Live region:** the clock is not live; a polite announcement through the shell's `announce(text)` (A21.12, Q-156) is made only when the exposure changes, at most once per second.
+- **Live region:** the clock is not live; a polite announcement through the shell's `announce(text)` (A21.12, Q-156) is made only when the exposure changes, at most once per second; on a change of visit it adds the direction caption (A20.4).
 - Colour is never the only cue (hollow points, labels, tick shapes); the sound has a visible mute; controls are at least 24 px.
 
 ### A20.13 State, API and files
@@ -131,7 +133,7 @@ Track's path sound (Q-134: one tick per exposure, wavelength to pitch, drawn x t
 
 | Layer | Tests |
 |---|---|
-| Unit | Interpolation between samples and the snap at exposures (`trackTime.ts`); slider and marker in sync; the hash `track=<id>`; Escape closes Track before anything else |
+| Unit | Interpolation between samples and the snap at exposures (`trackTime.ts`); slider and marker in sync; the hash `track=<id>`; Escape closes Track before any other surface (a focused text field keeps it, Q-150) |
 | Components | Eros fixture: 14 points, 13 hollow, 2 refused frames listed; "Measured only" hides the path and keeps the footprints; spin slider only at "+ Artistic" and absent from the export; every refusal code has wording; the imagery gate note |
 | e2e (Playwright) | On the Eros cache under `SX_OFFLINE=1`: Area search, Known, Track it, scrub, play, step, Back to the area; the object panel's Track it; Build then Track (one occupant) |
 | Review | `/sx-design-review` for honesty labels, R9 and copy |

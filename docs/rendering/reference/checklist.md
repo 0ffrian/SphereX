@@ -1,6 +1,6 @@
 # R11.2 Visual review checklist
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R11.2 (a sub-page of [R11](../acceptance-tests.md): render-core quality gates, issue #39) · **Implements:** [D-02, D-04, D-21](../../decisions/contract.md), [Q-109](../../decisions/rendering-motion.md) · **Read with:** [README.md](README.md) (R11.1)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R11.2 (a sub-page of [R11](../acceptance-tests.md): render-core quality gates, issue #39) · **Implements:** [D-02, D-21](../../decisions/contract-tags.md), [D-04](../../decisions/contract.md), [Q-109](../../decisions/rendering-kinds.md) · **Read with:** [README.md](README.md) (R11.1)
 
 A person and the `design-reviewer` agent run this against the [reference frames](README.md), using the seed, time and fixture convention in that README. Mark each line pass, fail or n/a, with a screenshot for every fail. A renderer does not merge with an open fail.
 

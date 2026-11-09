@@ -1,10 +1,10 @@
 # Glossary
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A15 · **Implements:** [D-02, D-21, D-32](../decisions/contract.md), [Q-132](../decisions/platform-hosting.md), [Q-131, Q-146](../decisions/moving-objects.md) · **Read with:** [sky-shell.md](sky-shell.md) (A21 Names table), [../rendering/README.md](../rendering/README.md)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A15 · **Implements:** [D-02, D-21, D-32](../decisions/contract-tags.md), [Q-132](../decisions/platform-hosting.md), [Q-131, Q-146](../decisions/moving-objects.md) · **Read with:** [sky-shell.md](sky-shell.md) (A21 Names table), [../rendering/README.md](../rendering/README.md)
 
 ## A15 Glossary
 
-One meaning per term. Where a word has two meanings, both are listed and the owning section is linked. **"A15" alone means this section; the laptop is always "the A15 laptop" or "the Asus A15 (laptop)".**
+One meaning per term. Where a word has two meanings, both are listed and the owning section is linked. **"A15" with no article means this section; "the A15", "the A15 laptop" or "the Asus A15 (laptop)" means the laptop.**
 
 **Sky, data and archives**
 
@@ -19,7 +19,7 @@ One meaning per term. Where a word has two meanings, both are listed and the own
 | QR2, QR3, DR1 | SPHEREx data releases: quick releases 2 and 3, and the first full data release (DR1). The event build is frozen on QR2 ([A3.1](data-sources.md#a31-spherex-irsa), Q-137). |
 | Frame | One SPHEREx Level-2 image: one detector, one exposure, 2040 × 2040 px ([A3.1](data-sources.md#a31-spherex-irsa)). |
 | Cutout | A small square cut from a frame around the target by IRSA's cutout service. The app never downloads whole frames ([A4.1](pipeline.md#a41-stage-1-find-the-object)). |
-| Exposure | One SPHEREx shot, about 114 s. It gives one frame per detector, all with the same midpoint. |
+| Exposure | One SPHEREx shot, about 114 s. It gives one frame per detector, all with the same midpoint. Track's slider steps per exposure; its spectrum has one point per frame ([A20.3](moving-objects/track-ui.md#a203-time)). |
 | Visit | Frames of one area or object taken less than `visit_gap_h` apart (start 1 h). Eros: 4 exposures × 2 detectors in 6.4 min, visits 24.4 h apart ([A17.1](moving-objects/area-backend.md#a171-area-and-frames-framespy)). |
 | Pass | All the exposures SPHEREx takes of one sky position over consecutive days; its length is an open question (Q-148). |
 | SPHEREx-centred | Positions computed as seen from SPHEREx (Horizons observer `500@-163182`), not from the Earth's centre ([A19.4](moving-objects/track.md#a194-positions), Q-138). |
@@ -82,7 +82,7 @@ One meaning per term. Where a word has two meanings, both are listed and the own
 | Search pill | The name search box ([A21.9](sky-shell-behaviour.md#a219-transport-session-search-pill)). |
 | Readout, credit | The text readout in the top bar (`Readout.tsx`, not a live region); the survey credit line on the sky ([A21.7](sky-shell-surfaces.md#a217-sky-image-credit-never-blank)). |
 | Markers, brackets | Object buttons on the sky, and the corner brackets round the selected one ([A21.6](sky-shell-surfaces.md#a216-sky-interaction)). |
-| Insets, safe rectangle | The space kept clear of the rail, island and transport, and the part of the sky not covered by them ([A21.2](sky-shell.md#a212-layout-insets-safe-rectangle-z-order)). |
+| Insets, safe rectangle | Insets: the space kept clear of the rail, the top bar, the bottom bar and a 16 px right margin (desktop only). Safe rectangle: the sky minus the insets, the credit and an open object panel or card ([A21.2](sky-shell.md#a212-layout-insets-safe-rectangle-z-order)). |
 | Flipbook | Plays an object's cutouts in time order, with a spectrum ([A4.1](pipeline.md#a41-stage-1-find-the-object), [R4](../rendering/display-rules.md#r4-display-levels)). |
 | Rainbow Trails | A flipbook view mode: dots coloured by wavelength, a `derived` false colour (D-28). |
 | Wavelength tint, composite | Flipbook colour views: each frame tinted by its wavelength, or one RGB picture from three frames; both `derived` ([R4](../rendering/display-rules.md#r4-display-levels), Q-93). |
@@ -95,7 +95,7 @@ One meaning per term. Where a word has two meanings, both are listed and the own
 | Event / after the event | The event build runs in a desktop browser on the A15 laptop with sound only; phones and vibration come after the event (Q-132). |
 | Haptics | Touch and sound feedback that encodes a surface or a value. At the event, sound only (Q-132); phone vibration after it ([R8](../rendering/haptics/platform-encoding.md#r8-haptics)). |
 | Texture / data haptics | Feedback from the surface under the pointer, or from a data value such as a spectrum ([R8.2](../rendering/haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui)). |
-| Feel mode | Desktop mode of the build pane: a mouse drag feels the body instead of turning it ([R5.6](../rendering/display-rules.md#r56-interaction)). |
+| Feel mode | Desktop mode of the build pane: a mouse drag feels the body instead of turning it ([R5.6](../rendering/display-rules.md#r56-interaction)); proposed (Q-173), not built. |
 | Touch mode | The phone mode (after the event): one finger feels, two fingers rotate ([R5.6](../rendering/display-rules.md#r56-interaction)). |
 | Body tone | One continuous tone that follows the height under the pointer while feeling a body ([R8.9.1](../rendering/haptics/audio-pairing.md#r891-body-tone-from-the-height-map-q-133), Q-133). |
 | Tone stream | The engine API for sustained sounds whose pitch, gain and pan change while they play; proposed ([R8.8](../rendering/haptics/engine-api.md#r88-engine-api)). |

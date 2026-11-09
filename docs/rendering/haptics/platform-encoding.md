@@ -1,6 +1,6 @@
 # Haptics: platform reality and encoding
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8, R8.1–R8.3 · **Implements:** [D-08, D-09, D-10, D-12, Q-133](../../decisions/haptics-design.md), [D-21](../../decisions/contract.md), [Q-132](../../decisions/platform-hosting.md), [Q-71](../../decisions/haptics-built.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8), [audio-pairing.md](audio-pairing.md) (R8.9)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8, R8.1–R8.3 · **Implements:** [D-08, D-09, D-12](../../decisions/haptics-design.md), [D-10, Q-133](../../decisions/haptics-sound.md), [D-21](../../decisions/contract-tags.md), [Q-132](../../decisions/platform-hosting.md), [Q-71](../../decisions/haptics-built.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8), [audio-pairing.md](audio-pairing.md) (R8.9)
 
 ## R8. Haptics
 
