@@ -130,6 +130,11 @@ class ObjectPipeline:
 
     # --- the job --------------------------------------------------------------------------
 
+    def saved(self, obj: ResolvedObject) -> ObjectResult | None:
+        """The saved or pre-baked asset ``run`` would answer with, from disk only; None when
+        there is none or it fails the contract (``run`` then rebuilds it)."""
+        return self._saved(obj)
+
     def _saved(self, obj: ResolvedObject) -> ObjectResult | None:
         found = self.assets.lookup(obj.id)
         if found is None:

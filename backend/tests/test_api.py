@@ -17,16 +17,10 @@ from app.core.find.resolver import ResolvedObject
 from app.core.find.wcs import wavelength_at
 from app.main import create_app
 from tests.conftest import make_settings
-from tests.helpers import entries
+from tests.helpers import entries, resolve_id
 
 ISO_Z = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$")
 TAGS = {"measured", "derived", "model_dependent", "inferred_from_analog", "artistic"}
-
-
-def resolve_id(client: TestClient, q: str) -> str:
-    r = client.get("/v1/resolve", params={"q": q})
-    assert r.status_code == 200, r.text
-    return str(r.json()["id"])
 
 
 def test_resolve_shape(client: TestClient) -> None:

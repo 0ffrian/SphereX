@@ -6,7 +6,16 @@ import json
 from pathlib import Path
 from typing import Any
 
+from fastapi.testclient import TestClient
+
 from tests.conftest import FIXTURE_CACHE
+
+
+def resolve_id(client: TestClient, q: str) -> str:
+    """``/v1/resolve`` for ``q``; the object id."""
+    r = client.get("/v1/resolve", params={"q": q})
+    assert r.status_code == 200, r.text
+    return str(r.json()["id"])
 
 
 def entries(source: str, root: Path = FIXTURE_CACHE) -> list[tuple[dict[str, Any], bytes]]:
