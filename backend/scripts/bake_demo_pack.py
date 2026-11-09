@@ -9,8 +9,10 @@ real pipeline on the D-25 cache, the way ``ObjectPipeline`` builds an object: re
 (classify, geometry, star data), the card, stage 7 (``card_to_params``) and the baker. It writes:
 
 - ``backend/assets/<type>/<id>.json``: the saved Asset (A5.4). ``AssetStore`` reads it first, so a
-  pack hit answers with ``X-SX-Asset-Status: saved``. ``created_at`` is the card's data release
-  date (``DATA_RELEASE_DATES``), so a rerun is byte-identical.
+  pack hit answers with ``X-SX-Asset-Status: saved``. ``created_at`` is the fixed ``PACK_EPOCH``
+  (not a release date), so a rerun is byte-identical. Each asset also holds ``asset_version`` and
+  ``inputs_sha256`` (Q-167): the store refuses an asset whose version differs, and ``--check``
+  fails when either differs from this code, with no cache needed.
 - ``backend/assets/textures/<id>/<generator_version>/<seed>/<W>x<H>/{albedo.webp, height.png,
   height.bin, normal.png}`` at the R5 mobile size (``PACK_SIZES``, Q-164), for the types with maps.
   The Asset's texture URLs point at ``/data/demo-textures`` (a read-only mount of that tree).
@@ -28,11 +30,17 @@ filled by running this script once online). For a row whose answers are not cach
 checkout has no cache), plain ``--check`` falls back to what the committed card alone gives
 (stage 7, the textures, the JSON and the TypeScript) and says so per row; ``--strict`` makes that
 a failure. Run ``--check --strict`` on a machine with the cache after any change to stage 3.
+
+Cache-free guards (``stale_inputs``, Q-167), run by every ``--check``: each committed asset's
+``asset_version`` equals ``ASSET_VERSION``; its ``inputs_sha256`` equals the hash of
+``literature.toml``, ``pm13_dwarf_teff.toml`` and the shape ``registry.toml``; and every literature
+registry field of the committed card equals what the registry gives now.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -44,7 +52,8 @@ from urllib.parse import quote
 
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context, make_context
-from app.core.card.assets import Asset, AssetStore
+from app.core.card import literature as lit
+from app.core.card.assets import ASSET_VERSION, Asset, AssetStore
 from app.core.card.catalogue import apply_geometry, fetch_geometry, gather, with_star_data
 from app.core.card.service import GEOMETRY_TYPES, ObjectPipeline
 from app.core.card.stars import STAR_TYPES
@@ -73,10 +82,25 @@ DEMO_TEXTURE_URL_ROOT = "/data/demo-textures"
 DESKTOP_SIZE, MOBILE_SIZE = SIZES
 PACK_SIZES = (MOBILE_SIZE,)
 
-# The card's data release date, for the fixed ``created_at`` (Q-164). ASSUMPTION: only the month
-# is known for QR2 (IRSA began distributing the reprocessed data in October 2025); the day is
-# set to the 1st. [verify] the exact QR2 release date at IRSA; changing it re-bakes the pack.
-DATA_RELEASE_DATES: dict[str, str] = {"spherex_qr2": "2025-10-01T00:00:00.000Z"}
+# The fixed ``created_at`` of every pack asset, so a rerun is byte-identical (Q-164). It is NOT a
+# data release date. IRSA's page (irsa.ipac.caltech.edu/Missions/spherex.html) says only "October
+# 2025: First reprocessed Quick Release Products (QR2) available at IRSA", with no day. Changing it
+# re-bakes the pack.
+PACK_EPOCH = "2025-10-01T00:00:00.000Z"
+
+
+def inputs_sha256(settings: Settings) -> str:
+    """Hash of the reviewed read-only inputs a pack asset depends on: the literature registry, the
+    Pecaut and Mamajek dwarf Teff table and the shape registry (Q-167). Each file's name is hashed
+    with its bytes; a missing file hashes as empty, so a deleted input changes the hash."""
+    h = hashlib.sha256()
+    for path in (
+        settings.literature_file,
+        settings.dwarf_teff_file,
+        settings.shapes_dir / "registry.toml",
+    ):
+        h.update(path.name.encode() + b"\0" + (_read(path) or b"") + b"\0")
+    return h.hexdigest()
 
 
 @dataclass(frozen=True)
@@ -174,10 +198,7 @@ def _to_pack_urls(textures: dict[str, Any] | None) -> dict[str, Any] | None:
     return out
 
 
-def _asset(card: dict[str, Any], params: dict[str, Any], release: str) -> Asset:
-    created = DATA_RELEASE_DATES.get(release)
-    if created is None:
-        raise ValueError(f"no release date for data release {release!r} (DATA_RELEASE_DATES)")
+def _asset(card: dict[str, Any], params: dict[str, Any], settings: Settings) -> Asset:
     params = dict(params)
     if "textures" in params:
         params["textures"] = _to_pack_urls(params["textures"])
@@ -187,16 +208,17 @@ def _asset(card: dict[str, Any], params: dict[str, Any], release: str) -> Asset:
         textures=params.get("textures"),
         generator_version=str(params["generator_version"]),
         seed=int(params["seed"]),
-        created_at=created,
+        created_at=PACK_EPOCH,
+        asset_version=ASSET_VERSION,
+        inputs_sha256=inputs_sha256(settings),
     )
 
 
 def build_row(
     ctx: Context, pipeline: ObjectPipeline, aliases: dict[str, str], row: SearchRow
 ) -> RowResult:
-    """Resolve, stage 3, card, stage 7: the answer a live build gives with no frames. The same
-    ``ObjectPipeline._assemble`` the API uses (ASSUMPTION: calling the private method keeps the
-    pack's card identical to a live card; it saves nothing because the spectrum is None)."""
+    """Resolve, stage 3, card, stage 7: the answer a live build gives with no frames, through the
+    same assembly the API uses (``ObjectPipeline.assemble_without_spectrum``)."""
     res = RowResult(row)
     try:
         obj = resolve(ctx, row.query, aliases).obj
@@ -210,14 +232,14 @@ def build_row(
         data = apply_geometry(data, fetch_geometry(ctx, obj))
     elif cls.type in STAR_TYPES:
         data = with_star_data(ctx, data, obj, cls.type)
-    result = pipeline._assemble(obj, data, cls, None, None, pending=False)
+    result = pipeline.assemble_without_spectrum(obj, data, cls)
     res.type = str(result.card["type"])
     res.missing = tuple(result.params.get("missing", ()))
-    res.asset = _asset(result.card, result.params, ctx.settings.data_release)
+    res.asset = _asset(result.card, result.params, ctx.settings)
     return res
 
 
-def rebuild_from_card(asset: Asset, release: str) -> Asset:
+def rebuild_from_card(asset: Asset, settings: Settings) -> Asset:
     """Stage 7 again from the committed card, for ``--check`` with no catalogue answers."""
     params = card_to_params(
         asset.card,
@@ -225,7 +247,7 @@ def rebuild_from_card(asset: Asset, release: str) -> Asset:
         generator_version=GENERATOR_VERSION,
         extra_missing=tuple(asset.render_params.get("missing", ())),
     )
-    return _asset(asset.card, params, release)
+    return _asset(asset.card, params, settings)
 
 
 # --- files ----------------------------------------------------------------------------------
@@ -412,10 +434,40 @@ def committed_row(
     return None
 
 
+def _literature_key(card: dict[str, Any]) -> str:
+    """The registry key of a card (``literature_key`` in catalogue.py): the SPK-ID for a small
+    body, the object id otherwise."""
+    cid = str(card["id"])
+    return cid.removeprefix("sbdb-") if cid.startswith("sbdb-") else cid
+
+
+def stale_inputs(asset: Asset, settings: Settings) -> list[str]:
+    """Cache-free reasons a committed asset is out of date (Q-167): empty when it is current."""
+    why: list[str] = []
+    name = asset_path(asset)
+    if asset.asset_version != ASSET_VERSION:
+        why.append(f"{name}: asset_version {asset.asset_version!r}, code is {ASSET_VERSION!r}")
+    if asset.inputs_sha256 != inputs_sha256(settings):
+        why.append(
+            f"{name}: inputs_sha256 differs (literature, dwarf Teff table or shape registry)"
+        )
+    registry = lit.load_literature(settings.literature_file, _literature_key(asset.card))
+    for field_name, row in registry.values.items():
+        tv = asset.card.get(field_name)
+        if not isinstance(tv, dict):
+            continue  # the type does not use the field
+        # The registry fills a null field, or a field it filled before; a catalogue value stays.
+        source = str(tv.get("source", ""))
+        filled = tv.get("value") is None or source.startswith("literature:")
+        if filled and tv != row.to_tv():
+            why.append(f"{name}: {field_name} differs from literature.toml")
+    return why
+
+
 def run_check(
     results: list[RowResult],
     names: dict[str, str],
-    release: str,
+    settings: Settings,
     assets_dir: Path,
     ts_path: Path,
     *,
@@ -425,11 +477,18 @@ def run_check(
     the committed card (stage 7 and the maps only)."""
     bad: list[str] = []
     final: list[RowResult] = []
+    for path in sorted(assets_dir.glob("*/*.json")):
+        try:
+            committed = Asset.from_json(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            continue
+        if committed is not None and committed.card.get("type") in names:
+            bad.extend(stale_inputs(committed, settings))
     for r in results:
         if r.asset is None and r.error.startswith(UNAVAILABLE) and not strict:
             old = committed_row(r.row, names, assets_dir, ts_path)
             if old is not None and old.asset is not None:
-                old.asset = rebuild_from_card(old.asset, release)
+                old.asset = rebuild_from_card(old.asset, settings)
                 old.from_card_only = True
                 print(f"[{r.row.name}] catalogues not cached: checked from the committed card")
                 final.append(old)
@@ -475,7 +534,7 @@ def main(
         ctx.http.close()
 
     if args.check:
-        return run_check(results, names, s.data_release, assets_dir, ts_path, strict=args.strict)
+        return run_check(results, names, s, assets_dir, ts_path, strict=args.strict)
 
     for r in results:
         status = r.error or f"{r.type}, label {r.class_label!r}, missing {list(r.missing)}"

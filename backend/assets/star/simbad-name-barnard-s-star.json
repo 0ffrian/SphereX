@@ -1,4 +1,5 @@
 {
+  "asset_version": "7",
   "card": {
     "id": "simbad-name-barnard-s-star",
     "name": "NAME Barnard's star",
@@ -13,7 +14,7 @@
     "radius_rsun": {
       "assumption": "FLAME radius from the GSP-Phot Teff and a model bolometric luminosity (Gaia DR3 radius_flame); a model value, not a measured radius, and it inherits GSP-Phot's weakness for cool stars",
       "err": 0.0040999999999999925,
-      "source": "Gaia DR3 astrophysical_parameters radius_flame, source 4472832130942575872",
+      "source": "Gaia DR3 astrophysical_parameters radius_flame, source 4472832130942575872, matched 0.00 arcsec from the SIMBAD position moved to 2016.0 by its proper motion",
       "tag": "model_dependent",
       "value": 0.2022
     },
@@ -32,6 +33,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b2",
+  "inputs_sha256": "5a9b0acd6b2222a6d48ebc28e956c659f6d435b6c9581ae25ecebb9c92e6f742",
   "render_params": {
     "alt_text": "NAME Barnard's star, Star, 0.202 solar radii (model dependent), colour from Teff, self-luminous. Surface relief: illustrative.",
     "generator_version": "p1-b2",

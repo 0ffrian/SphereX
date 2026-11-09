@@ -162,7 +162,8 @@ def teff_field(cat: StarCatalogue | None, kind: str, table: DwarfTable | None) -
             out: dict[str, Any] = {
                 "value": g.teff_gspphot_k,
                 "tag": "model_dependent",
-                "source": f"Gaia DR3 astrophysical_parameters teff_gspphot, source {g.source_id}",
+                "source": f"Gaia DR3 astrophysical_parameters teff_gspphot, source {g.source_id}"
+                f"{_match_note(cat)}",
                 "assumption": (
                     "GSP-Phot is a model fit to the Gaia BP/RP spectrum; its error against "
                     "literature values is typically 120 K (median absolute) and extinction "
@@ -203,6 +204,16 @@ def teff_field(cat: StarCatalogue | None, kind: str, table: DwarfTable | None) -
     return _null("not available: " + "; ".join(skipped), "measured")
 
 
+def _match_note(cat: StarCatalogue) -> str:
+    """How far the Gaia source sits from the SIMBAD position moved to the Gaia epoch (Q-152)."""
+    if cat.gaia_sep_arcsec is None:
+        return ""
+    return (
+        f", matched {cat.gaia_sep_arcsec:.2f} arcsec from the SIMBAD position "
+        "moved to 2016.0 by its proper motion"
+    )
+
+
 # --- radius_rsun -----------------------------------------------------------------------------
 
 
@@ -216,7 +227,8 @@ def radius_field(cat: StarCatalogue | None) -> dict[str, Any]:
         out: dict[str, Any] = {
             "value": r,
             "tag": "model_dependent",
-            "source": f"Gaia DR3 astrophysical_parameters radius_flame, source {g.source_id}",
+            "source": f"Gaia DR3 astrophysical_parameters radius_flame, source {g.source_id}"
+            f"{_match_note(cat)}",
             "assumption": (
                 "FLAME radius from the GSP-Phot Teff and a model bolometric luminosity (Gaia DR3 "
                 "radius_flame); a model value, not a measured radius, and it inherits GSP-Phot's "

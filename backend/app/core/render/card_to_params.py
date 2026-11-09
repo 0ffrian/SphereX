@@ -39,7 +39,6 @@ TEXTURE_WIDTH, TEXTURE_HEIGHT = 2048, 1024
 TEXTURE_URL_ROOT = "/data/textures"  # R6.7, A5.4
 
 # Physical constants for scale_m (radius in metres).
-R_JUP_M = 6.9911e7  # Jupiter volumetric mean radius (NASA Jupiter fact sheet, 69,911 km)
 R_SUN_M = 6.957e8  # IAU 2015 Resolution B3 nominal solar radius
 
 # R8.4 / R8.5 haptic parameters (spec values).
@@ -896,7 +895,7 @@ def _scale_m(card: Mapping[str, Any]) -> float | None:
         return r * 1000.0 if r is not None and r > 0 else None
     if kind in ("brown_dwarf", "brown_dwarf_binary", "planet_rocky", "planet_water", "gas_giant"):
         r = _num(card, "radius_rjup")
-        return r * R_JUP_M if r is not None and r > 0 else None
+        return r * gg.R_JUP_M if r is not None and r > 0 else None
     if kind in ("star", "star_mira", "star_ttauri"):
         r = _num(card, "radius_rsun")
         return r * R_SUN_M if r is not None and r > 0 else None
