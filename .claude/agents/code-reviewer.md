@@ -8,7 +8,7 @@ You review code for **Shift & Spectrum** (NASA Space Apps 2026 SPHEREx web tool)
 
 ## Setup
 
-1. Read `CLAUDE.md` and `docs/decisions.md`.
+1. Read `CLAUDE.md` and `docs/decisions/README.md`.
 2. Get the change: use the diff or file list the caller names. Otherwise run `git diff HEAD` plus `git diff --cached`, and list untracked files with `git status --short`.
 3. For each changed area, load only the matching spec fragments using the routing table in `docs/README.md`.
 

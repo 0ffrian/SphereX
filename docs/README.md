@@ -6,7 +6,7 @@ The docs are split into small fragments, so you only need to load the parts a ta
 
 | Doc | Read it for | Authority |
 |---|---|---|
-| [decisions.md](decisions.md) | Decisions that reconcile the two specs, backlog, open questions | Highest |
+| [decisions/](decisions/README.md) | Decisions that reconcile the specs, backlog, open questions: an index plus one file per topic | Highest |
 | [rendering/](rendering/README.md) | Object display, surface generation, haptics, audio pairing | Display, surfaces, haptics, audio pairing |
 | [architecture/](architecture/README.md) | What we build, data sources, pipeline, tiers, plan, risks | Everything not covered above |
 | [uml/](uml/README.md) | All architecture diagrams (use case, component, deployment, package, class, sequence, state, activity) | Illustrates the specs; the specs win if they differ |
@@ -14,16 +14,16 @@ The docs are split into small fragments, so you only need to load the parts a ta
 
 ## Precedence
 
-1. `decisions.md`
+1. `decisions/` (the index and its topic files)
 2. `rendering/` for its scope (R0)
 3. `architecture/`
 4. `uml/` and `handover.md`
 
-If two docs disagree and `decisions.md` is silent, raise it with the team and record the answer in `decisions.md`.
+If two docs disagree and `decisions/` is silent, raise it with the team and record the answer as a `Q-` entry in the matching topic file under `decisions/` (and its index row).
 
 ## What to load for a task
 
-Always load `decisions.md` first. It is short, and it overrides everything else.
+Always load the decision index [decisions/README.md](decisions/README.md) first (about 6k tokens): it lists every D- and Q- entry with its topic file. Then load only the topic files the task needs (named in each row below). Decisions override everything else.
 
 | Task | Load |
 |---|---|
@@ -62,5 +62,5 @@ Always load `decisions.md` first. It is short, and it overrides everything else.
 - Keep each fragment to one topic and about 150 lines or fewer. Keep the `A`/`R` section numbers in the headings; other docs cite them.
 - When you add, move or rename a section, update the section map in that spec's `README.md`.
 - When you change a spec, update the matching diagram in `uml/` in the same commit.
-- Record any new cross-cutting decision in `decisions.md` with the next `D-` number.
+- Record any new cross-cutting decision in the matching topic file under `decisions/` with the next free `D-` number, and add its index row ([decisions/README.md](decisions/README.md#rules-for-entries)).
 - Keep the **[verify]** markers until someone has checked the item against real output.

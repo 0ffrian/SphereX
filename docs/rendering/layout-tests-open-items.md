@@ -1,6 +1,6 @@
 # File layout, acceptance tests and open items
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R10, R11, R12 · **Implements:** D-11, D-17, D-18, D-21 ([decisions](../decisions.md))
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R10, R11, R12 · **Implements:** D-11, D-17, D-18, D-21 ([decisions](../decisions/README.md))
 
 ## R10. File layout and ownership
 
@@ -143,7 +143,7 @@ The sky-view prototype (branch `feat/sky-view-prototype`, 7 Nov 2026) added `app
 
 Later on the same branch (7 Nov 2026) it added `backend/app/core/composite/` and `backend/app/api/composite.py` (the colour composite, Q-92), `/v1/sky/cached` in `sky.py` (Q-98), and under `frontend/src/app/` the colour views (`flipbook/colourMode.ts`, `ColourViews.tsx`), progressive frames (`flipbook/progressive.ts`, `FramesProgress.tsx`, Q-97), the fixed frame grid (`flipbook/frameGrid.ts`), the cached markers (`sky/cachedMarkers.ts`, `useCachedMarkers.ts`) and `Segmented.tsx`. D-17 names no owner for `core/composite/` (its constants are a creative call for Atish, Q-94); `composite.py` sits in Kevin's `app/api/`; the frontend files fall under Moon's `app/` and are provisional until Moon confirms (Q-95, Q-97).
 
-`viewer/render/`, `viewer/shaders/`, `src/shaderlab/` and `shaderlab.html` were added by the viewer render core (issue #39). Motion and quality levels follow R5.7 and D-34; how the viewer implements them is [Q-66](../decisions.md). `shaderlab.html` is served by the dev server only; Vite builds `index.html` alone, so it never reaches `dist/`. D-17 names no owner for the harness.
+`viewer/render/`, `viewer/shaders/`, `src/shaderlab/` and `shaderlab.html` were added by the viewer render core (issue #39). Motion and quality levels follow R5.7 and D-34; how the viewer implements them is [Q-66](../decisions/rendering-motion.md). `shaderlab.html` is served by the dev server only; Vite builds `index.html` alone, so it never reaches `dist/`. D-17 names no owner for the harness.
 
 ---
 

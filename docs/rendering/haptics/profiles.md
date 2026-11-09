@@ -1,6 +1,6 @@
 # Haptics: per-type profiles and spectrum haptics
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.5, R8.6 · **Implements:** D-12, D-21 ([decisions](../../decisions.md)) · **Read with:** [engine-api.md](engine-api.md), [sources.md](sources.md)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.5, R8.6 · **Implements:** D-12, D-21 ([decisions](../../decisions/README.md)) · **Read with:** [engine-api.md](engine-api.md), [sources.md](sources.md)
 
 ### R8.5 Per-type haptic profile
 

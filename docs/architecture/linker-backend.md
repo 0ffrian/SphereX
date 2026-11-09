@@ -2,7 +2,7 @@
 
 > **Part of:** Architecture spec ([index](README.md)) · **Sections:** A17–A17.11 · **Overview:** [linker.md](linker.md) (A16) · **Sky UI:** [linker-ui.md](linker-ui.md) (A18)
 
-Status: **agreed plan, not built** ([Q-146](../decisions.md)). Every threshold below is a starting value, written into the reply's `method` block the way Stage 2 reports its settings ([A4.2](pipeline.md#a42-stage-2-measure-brightness-and-spectrum)). Values marked **[verify]** wait on the Day 0 count (A16.7). Track's backend (path endpoint, frame list, export) is Kevin's under Q-140, Q-141 and Q-145 and is not repeated here.
+Status: **agreed plan, not built** ([Q-146](../decisions/moving-objects.md)). Every threshold below is a starting value, written into the reply's `method` block the way Stage 2 reports its settings ([A4.2](pipeline.md#a42-stage-2-measure-brightness-and-spectrum)). Values marked **[verify]** wait on the Day 0 count (A16.7). Track's backend (path endpoint, frame list, export) is Kevin's under Q-140, Q-141 and Q-145 and is not repeated here.
 
 ## A17 Discovery backend
 

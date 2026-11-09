@@ -6,16 +6,16 @@ Project: **Shift & Spectrum**, a public web tool for NASA Space Apps 2026 (Port 
 
 | Doc | Authority |
 |---|---|
-| [docs/decisions.md](docs/decisions.md) | **Wins over every other doc** where it states a decision. |
+| [docs/decisions/](docs/decisions/README.md) | **Wins over every other doc** where it states a decision. Load the index (`README.md`, every D-/Q- entry with its file) first, then only the topic files the task needs. |
 | [docs/rendering/](docs/rendering/README.md) | Source of truth for how an object is **displayed**, how its **surface is generated**, how it **feels (haptics)** and how that **sounds (audio pairing)**. Sections `R0`–`R12`. |
 | [docs/architecture/](docs/architecture/README.md) | Source of truth for everything else: data sources, pipeline, tiers, plan, risks. Sections `A1`–`A18`. |
 | [docs/uml/](docs/uml/README.md) | Architecture diagrams (UML, Mermaid). Keep in sync when a spec changes. |
 | [docs/handover.md](docs/handover.md) | Background only (competition, data, early concepts). Not a spec. |
 | [mockup/](mockup/) | Visual input only, never a spec (D-01). `spherex-ui.html` is the app shell and the Area search tool (key 5); `chase-the-rock.html` is the Track tool (see Layout). |
 
-If two docs disagree and `decisions.md` is silent, follow the precedence (decisions > rendering > architecture), add a `Q-` entry to `decisions.md` describing the conflict, and continue. Never pick silently.
+If two docs disagree and `docs/decisions/` is silent, follow the precedence (decisions > rendering > architecture), add a `Q-` entry to the matching topic file in `docs/decisions/` (and its index row) describing the conflict, and continue. Never pick silently.
 
-**Load only what the task needs.** The specs are split into small fragments. Read `docs/decisions.md`, then use the "What to load for a task" table in [docs/README.md](docs/README.md) to pick fragments. "Rendering doc §8.4" means `R8.4` and "architecture spec §7.2" means `A7.2`; each spec's `README.md` has a section map from ID to file.
+**Load only what the task needs.** The specs are split into small fragments. Read `docs/decisions/README.md`, then use the "What to load for a task" table in [docs/README.md](docs/README.md) to pick fragments. "Rendering doc §8.4" means `R8.4` and "architecture spec §7.2" means `A7.2`; each spec's `README.md` has a section map from ID to file.
 
 ## Rules for code
 

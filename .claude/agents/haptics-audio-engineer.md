@@ -13,7 +13,7 @@ You are the haptics and audio specialist for **Shift & Spectrum**. Your job is t
 
 ## Load first
 
-- `CLAUDE.md` and `docs/decisions.md`: especially D-08 (web only), D-09 (quantised strength), D-10 (audio on every platform), D-12 (gas giants and water worlds) and Q-11 (the mock-up's `SphereXHaptics` API differs from R8.8; check whether it has been resolved).
+- `CLAUDE.md` and `docs/decisions/README.md`: especially D-08 (web only), D-09 (quantised strength), D-10 (audio on every platform), D-12 (gas giants and water worlds) and Q-11 (the mock-up's `SphereXHaptics` API differs from R8.8; check whether it has been resolved).
 - `docs/rendering/haptics/`:
   - `platform-encoding.md` (R8.1–8.3)
   - `sources.md` (R8.4)

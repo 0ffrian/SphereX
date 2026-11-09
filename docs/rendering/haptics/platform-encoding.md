@@ -1,6 +1,6 @@
 # Haptics: platform reality and encoding
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8, R8.1–R8.3 · **Implements:** D-08, D-09, D-21 ([decisions](../../decisions.md)) · **Read with:** [engine-api.md](engine-api.md)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8, R8.1–R8.3 · **Implements:** D-08, D-09, D-21 ([decisions](../../decisions/README.md)) · **Read with:** [engine-api.md](engine-api.md)
 
 ## R8. Haptics
 

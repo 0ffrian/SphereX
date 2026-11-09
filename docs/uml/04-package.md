@@ -6,7 +6,7 @@ The repo and code layout as packages, with their dependencies and owners. Drawn 
 flowchart TB
   subgraph Repo["SphereX repo"]
     subgraph Docs["docs/"]
-      DocSpecs["decisions.md, architecture/, rendering/, handover.md"]
+      DocSpecs["decisions/, architecture/, rendering/, handover.md"]
       DocUML["uml/ (these diagrams)"]
     end
 

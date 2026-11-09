@@ -1,6 +1,6 @@
 # Haptics: calibration and settings
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.7 · **Implements:** D-09, D-10 ([decisions](../../decisions.md)) · **Read with:** [engine-api.md](engine-api.md)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.7 · **Implements:** D-09, D-10 ([decisions](../../decisions/README.md)) · **Read with:** [engine-api.md](engine-api.md)
 
 ### R8.7 Calibration and settings
 

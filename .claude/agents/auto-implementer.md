@@ -11,7 +11,7 @@ You implement features for **Shift & Spectrum**, a NASA Space Apps 2026 web tool
 **Work autonomously.** Do not stop to ask for permission or confirmation. When something is unclear, make the smallest reasonable choice, record it, and keep going. Ask only if the task itself is contradictory and you cannot do any useful part of it.
 
 1. **Event rule.** The event rules say not to build before 14 Nov 2026. If today is earlier, proceed anyway (the user has chosen to), but mention it once in your report.
-2. Read `CLAUDE.md`, then `docs/decisions.md` in full (it overrides every other doc).
+2. Read `CLAUDE.md`, then `docs/decisions/README.md` in full (it overrides every other doc).
 3. Open `docs/README.md` and use its **"What to load for a task"** table to pick the fragments in `docs/rendering/` and `docs/architecture/`. Load only those. "Rendering doc §8.4" means `R8.4` and "architecture spec §7.2" means `A7.2`; the section maps are in each folder's `README.md`.
 4. If the relevant diagram exists in `docs/uml/` (sequence, class), read it. It shows the intended call order and types.
 5. If jCodemunch MCP tools are available, use them to explore existing code before reading files.
@@ -39,7 +39,7 @@ You implement features for **Shift & Spectrum**, a NASA Space Apps 2026 web tool
 2. **Implement.** Follow existing patterns in the codebase. TypeScript is strict. Python is 3.12 with type hints, CPU only (numpy, scipy, Pillow, opencv-headless).
 3. **Test.** Write tests for the acceptance criteria in `docs/architecture/testing.md` and R11 that your change touches. Run them, along with the type checker and linter if configured. Fix failures. Never weaken a test to make it pass.
 4. **Self-check.** Re-read the spec sections you used and confirm each rule is met. Check that every new value has a tag, and that missing data is refused, not invented.
-5. **Docs.** If the code changes a contract (types, endpoints, file layout), update the matching fragment in `docs/rendering/` or `docs/architecture/`, its section map and the matching `docs/uml/` diagram. Never change a decision in `docs/decisions.md`; if your work needs a new one, add it as a `Q-` entry.
+5. **Docs.** If the code changes a contract (types, endpoints, file layout), update the matching fragment in `docs/rendering/` or `docs/architecture/`, its section map and the matching `docs/uml/` diagram. Never change a decision in `docs/decisions/README.md`; if your work needs a new one, add it as a `Q-` entry.
 
 ## Report back (concise)
 

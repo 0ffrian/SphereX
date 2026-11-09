@@ -1,6 +1,6 @@
 # Surface generation (backend, CPU)
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R6, R6.1–R6.7 · **Implements:** D-01, D-07 ([decisions](../decisions.md)) · **Read with:** [data-contract.md](data-contract.md)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R6, R6.1–R6.7 · **Implements:** D-01, D-07 ([decisions](../decisions/README.md)) · **Read with:** [data-contract.md](data-contract.md)
 
 ## R6. Surface generation (backend, CPU)
 

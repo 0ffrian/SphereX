@@ -1,6 +1,6 @@
 # Data contract: TV, ObjectCard, RenderParams
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1–R3.4 · **Implements:** D-02, D-04, D-12, D-16, D-18, D-23 ([decisions](../decisions.md))
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1–R3.4 · **Implements:** D-02, D-04, D-12, D-16, D-18, D-23 ([decisions](../decisions/README.md))
 
 ## R3. Data contract
 

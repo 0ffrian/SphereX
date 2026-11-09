@@ -1,6 +1,6 @@
 # backend
 
-FastAPI on Python 3.12 ([D-15](../docs/decisions.md#d-15-backend-framework-fastapi-answers-q-01)). It holds the API, the data adapters and the read-through cache. The pipeline and the texture baker will join it. The event build runs locally on the team's Asus A15 (D-24). CPU only.
+FastAPI on Python 3.12 ([D-15](../docs/decisions/data-sources.md#d-15-backend-framework-fastapi-answers-q-01)). It holds the API, the data adapters and the read-through cache. The pipeline and the texture baker will join it. The event build runs locally on the team's Asus A15 (D-24). CPU only.
 
 ## Run
 

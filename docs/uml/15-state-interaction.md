@@ -80,7 +80,7 @@ stateDiagram-v2
 
 - Rotate buttons exist on screen in both modes (WCAG 2.5.7 alternative to dragging). All controls are ≥ 24×24 CSS px and keyboard reachable (rendering doc §9).
 - `prefers-reduced-motion` disables auto-spin (rendering doc §9): it is the `reduced-motion` pause reason above.
-- Whatever pauses the clock, a change (honesty, new plan, rotate, zoom) still renders one settle burst. How the viewer implements motion and quality levels is Q-66 in [decisions](../decisions.md).
+- Whatever pauses the clock, a change (honesty, new plan, rotate, zoom) still renders one settle burst. How the viewer implements motion and quality levels is Q-66 in [decisions](../decisions/README.md).
 - Whether a `stop` event is sent on pointer up is not stated **[verify]**.
 - On iPhone, iPad and desktop, Feeling produces sound only (D-08, D-10).
 - Feeling works on every kind except the nebula and the nova, which have no haptics (Q-103; it amends the D-12 and D-20 field pulse, Atish's acceptance pending). The 3D view says so in plain words ("Nebulae have no touch feedback"). Each emitted event also fires the `spherex:haptic` debug event, which drives the on-screen pulse indicator ([11-sequence-touch-haptics.md](11-sequence-touch-haptics.md)).

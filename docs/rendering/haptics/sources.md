@@ -1,6 +1,6 @@
 # Haptics: event sources
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.4 · **Implements:** D-12 ([decisions](../../decisions.md)) · **Read with:** [engine-api.md](engine-api.md)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.4 · **Implements:** D-12 ([decisions](../../decisions/README.md)) · **Read with:** [engine-api.md](engine-api.md)
 
 ### R8.4 Event sources
 
