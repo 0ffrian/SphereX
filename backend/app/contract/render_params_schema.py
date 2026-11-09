@@ -8,6 +8,34 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from . import object_card_schema
 
+type EmissiveScale = Annotated[
+    float,
+    Field(
+        ...,
+        description="This body's brightness relative to the brighter body, (Teff / Teff_max)^4 at equal radius. null = no Teff for this system: the body uses the system brightness.",
+        ge=0.0,
+        le=1.0,
+    ),
+]
+
+
+class Component(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    class_: str = Field(
+        ...,
+        alias="class",
+        description="This body's spectral class, one half of the card's spectral_class, such as T1V.",
+    )
+    tint: object_card_schema.Triple
+    tint_tag: object_card_schema.Tag
+    emissive_scale: EmissiveScale | None = Field(
+        ...,
+        description="This body's brightness relative to the brighter body, (Teff / Teff_max)^4 at equal radius. null = no Teff for this system: the body uses the system brightness.",
+    )
+    emissive_tag: object_card_schema.Tag
+
 
 class Layer(BaseModel):
     model_config = ConfigDict(
@@ -179,6 +207,12 @@ class RenderParams(BaseModel):
     )
     layers: list[Layer] = Field(..., description="Ordered, each with a tag.")
     textures: RenderTextures | None = None
+    components: list[Component] | None = Field(
+        None,
+        description="Per-body look of a brown_dwarf_binary, in the order of the card's spectral_class (A then B), when the class names two components (Q-154). Absent otherwise: both bodies then share the system look.",
+        max_length=2,
+        min_length=2,
+    )
     lighting: RenderLighting
     view_modes: ViewModes
     haptics: HapticProfile

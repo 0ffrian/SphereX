@@ -1,0 +1,16 @@
+{
+ "body_sha256": "4a22ed5d133950047436e8dddfc830fe1d92a48c9194e5ecb15970feeb666e57",
+ "body_size": 651,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-09T19:30:59.918Z",
+ "key": {
+  "query": {
+   "id": "simbad-eps-ind-b",
+   "v": "1"
+  },
+  "release": "-",
+  "source": "derived.object"
+ },
+ "status": 200,
+ "url": "derived:resolve"
+}

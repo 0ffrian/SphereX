@@ -148,6 +148,7 @@ classDiagram
     baked bands, contrast from ch4_depth_33
     emissive from flux_45um
     binary orbit is artistic
+    binary bodies take components (own class tint, brightness from Teff, Q-154)
   }
   class Star {
     <<star, star_mira, star_ttauri>>

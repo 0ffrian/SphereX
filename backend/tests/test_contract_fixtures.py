@@ -118,9 +118,11 @@ def test_fixture_pair_validates_and_agrees(object_type: str) -> None:
 def test_fixture_pair_round_trips_through_the_generated_models(object_type: str) -> None:
     # exclude_unset is the only dump that matches the schema: a plain dump adds null for every unset
     # field, and exclude_none drops the required `value: null` and `scale_m: null` (Q-40).
+    # by_alias: `components[].class` is `class_` in Python (a keyword) and `class` on the wire.
     card, params = CARDS[object_type], PARAMS[object_type]
-    assert ObjectCard.model_validate(card).model_dump(mode="json", exclude_unset=True) == card
-    assert RenderParams.model_validate(params).model_dump(mode="json", exclude_unset=True) == params
+    dump = {"mode": "json", "exclude_unset": True, "by_alias": True}
+    assert ObjectCard.model_validate(card).model_dump(**dump) == card
+    assert RenderParams.model_validate(params).model_dump(**dump) == params
 
 
 @pytest.mark.parametrize("case", INVALID, ids=[case["name"] for case in INVALID])
