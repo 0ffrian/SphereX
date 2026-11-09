@@ -165,11 +165,11 @@ describe('brown dwarf jets (R7.4, A7.2)', () => {
 });
 
 describe('brown dwarf limb darkening and the infrared band pattern (issue #62)', () => {
-  it('limb darkening is model_dependent: shown from + Estimated, with its assumption stated', () => {
+  it('limb darkening is inferred_from_analog (Q-119): shown from + Estimated, with its assumption stated', () => {
     for (const honesty of ['derived', 'artistic'] as const) {
       const p = at('brown_dwarf', honesty, 'spherex_ir');
       const limb = p.drawn.find((d) => d.id === 'limb_darkening');
-      expect(limb, honesty).toMatchObject({ tag: 'model_dependent', tier: 3 });
+      expect(limb, honesty).toMatchObject({ tag: 'inferred_from_analog', tier: 4 });
       expect(p.bodies[0]).toMatchObject({ limbDarkening: true, limbU: 0.6 });
     }
     // Measured only: nothing about the dwarf's limb is measured, so the disc is even.
@@ -215,8 +215,13 @@ describe('brown dwarf limb darkening and the infrared band pattern (issue #62)',
   it('the infrared legend says the stripes are not from SPHEREx (PR #63 review)', () => {
     const p = at('brown_dwarf', 'artistic', 'spherex_ir');
     expect(p.drawn.find((d) => d.id === 'bands')?.description).toContain('not from SPHEREx');
-    expect(p.notes).toContain(IR_STRIPES_NOTE);
-    expect(at('brown_dwarf', 'artistic', 'visible').notes).not.toContain(IR_STRIPES_NOTE);
+    // Said once (PR #63 approval nit): in the legend entry, not again in the notes.
+    expect(p.notes).not.toContain(IR_STRIPES_NOTE);
+    const visible = at('brown_dwarf', 'artistic', 'visible');
+    expect(visible.notes).not.toContain(IR_STRIPES_NOTE);
+    expect(visible.drawn.find((d) => d.id === 'bands')?.description ?? '').not.toContain(
+      'not from SPHEREx',
+    );
   });
 
   it('the limb-darkening text says 0.6 is a visible-band solar value used as a placeholder', () => {

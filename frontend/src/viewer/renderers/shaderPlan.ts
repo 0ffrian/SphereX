@@ -10,7 +10,7 @@
 //     size on the card is shown at this honesty level (Measured only: only when it is `measured`);
 //   - nebula and nova have no plain sphere, so nothing is drawn while the cloud is hidden;
 //   - missing data refuses the layer; nothing is invented (R1 principle 3).
-import type { Layer } from '@/contract';
+import type { Layer, RenderParams } from '@/contract';
 import { isTagShown } from '../honesty';
 import { sliderValue } from '../sliders';
 import { missingFields, PlanBuilder, type PlanInput } from '../planCommon';
@@ -20,7 +20,7 @@ import { listMotion, offerLayer, spinPlanOf, viewerLayer } from '../motion/planM
 import {
   GAS_DEFAULTS,
   GAS_LAYER_IDS,
-  GAS_HIDDEN_TEXT,
+  gasHiddenText,
   kindHasPlainSphere,
   NO_GAS_LAYERS,
   resolveShaderSpec,
@@ -36,9 +36,9 @@ export const PLAIN_SPHERE_NOTE =
   "Shown as a plain grey sphere at the size on the card. The surface is an artist's impression and is hidden at this level.";
 
 /** The plain-sphere note of a kind: a gas giant's parts are mostly Estimated, so it says which. */
-export function plainSphereNote(kind: ShaderKind): string {
+export function plainSphereNote(kind: ShaderKind, params: Pick<RenderParams, 'layers'>): string {
   return kind === 'gas_giant'
-    ? `Shown as a plain grey sphere at the size on the card. ${GAS_HIDDEN_TEXT}`
+    ? `Shown as a plain grey sphere at the size on the card. ${gasHiddenText(params)}`
     : PLAIN_SPHERE_NOTE;
 }
 
@@ -251,7 +251,7 @@ export function planShaderKind(input: PlanInput): RenderPlan {
 
   const plain = hasPlain && spec.drawable && !surface && sizeShown;
   if (plain) {
-    b.notes.push(plainSphereNote(spec.kind));
+    b.notes.push(plainSphereNote(spec.kind, params));
     b.legendBody('Plain grey sphere at the size on the card.');
   }
 

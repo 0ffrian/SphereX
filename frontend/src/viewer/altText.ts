@@ -5,7 +5,7 @@ import type { CometEpoch, ObjectType, Tag } from '@/contract';
 import { badgeForTag, HONESTY_LABEL, stateThatShows, type HonestyState } from './honesty';
 import { MODE_LABEL } from './modes';
 import { showsBody } from './planCommon';
-import { GAS_HIDDEN_TEXT, GAS_LAYER_IDS } from './renderers/shaderSpec';
+import { GAS_LAYER_IDS, gasHiddenText } from './renderers/shaderSpec';
 import type { RenderPlan, ViewModeId } from './planTypes';
 import { AT_AGE_MAX_PHRASE, formatLength, type ShownSize } from './scaleBar';
 
@@ -124,7 +124,7 @@ export function buildAltText(plan: RenderPlan, shown?: ShownSize | null): string
         : `${alt} This is an artist's impression, not a measured image.`
       : `${plan.name}, ${type}, ${sizeText(plan, shown)}. A plain grey sphere: ${
           plan.type === 'gas_giant'
-            ? GAS_HIDDEN_TEXT
+            ? gasHiddenText(plan.shader.params)
             : "the surface is an artist's impression and is hidden at this level."
         }`;
   }

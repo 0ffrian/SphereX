@@ -20,16 +20,15 @@
     },
     {
       "id": "limb_darkening",
-      "tag": "model_dependent",
-      "tier": 3,
+      "tag": "inferred_from_analog",
+      "tier": 4,
       "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu). The coefficient is the R7.5 visible-band solar value, used as a placeholder for an infrared view [verify]; no brown-dwarf coefficient is confirmed (R7.4).",
       "requires": [
         "radius_rjup"
       ],
       "formula": "I(mu) = 1 - u * (1 - mu), u = 0.6",
       "assumed": {
-        "limb_darkening_u": 0.6,
-        "radius_rjup": 1.0
+        "limb_darkening_u": 0.6
       }
     },
     {

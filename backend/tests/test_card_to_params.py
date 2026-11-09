@@ -310,12 +310,12 @@ def test_model_dependent_members_of_a_group_are_stated() -> None:
 
 
 @pytest.mark.parametrize("kind", ["brown_dwarf", "brown_dwarf_binary"])
-def test_brown_dwarf_limb_darkening_is_model_dependent_with_its_assumption(kind: str) -> None:
-    """Issue #62: a self-lit disc fades toward its limb. The coefficient is the star's (R7.5);
-    no brown-dwarf value is confirmed, so the layer is tier 3 and says what it assumed."""
+def test_brown_dwarf_limb_darkening_is_an_analogue_with_its_assumption(kind: str) -> None:
+    """Issue #62: a self-lit disc fades toward its limb. The coefficient is the star's visible-band
+    value (R7.5) used as an analogue, so the layer is tier 4 (Q-119) and says what it assumed."""
     p = params_for(load(kind, "cards"))
     layer = next(x for x in p["layers"] if x["id"] == "limb_darkening")
-    assert (layer["tag"], layer["tier"]) == ("model_dependent", 3)
+    assert (layer["tag"], layer["tier"]) == ("inferred_from_analog", 4)
     assert layer["formula"] == "I(mu) = 1 - u * (1 - mu), u = 0.6"
     assert layer["assumed"]["limb_darkening_u"] == 0.6  # the radius (R7.4) is listed too
     assert layer["requires"] == ["radius_rjup"]

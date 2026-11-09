@@ -19,18 +19,23 @@ import math
 R_JUP_M = 6.9911e7  # Jupiter volumetric mean radius (NASA Jupiter fact sheet)
 HOUR_S = 3600.0
 
-# [verify] Jupiter's sidereal rotation period, hours (NASA Planetary Fact Sheet, 9.9250 h). The
-# class-typical spin of a giant planet, used only when the card has no `rot_period_h`. With it the
+# Jupiter's rotation period (see JUPITER_SPIN_H, verified) used as the class-typical spin of a
+# giant planet, used only when the card has no `rot_period_h`. With it the
 # `bands` and `flattening` layers are "typical, no formula" values: `inferred_from_analog`, tier 4
 # (D-32, Q-119 option b). A hot Jupiter is tidally locked, so this is not its spin.
 TYPICAL_SPIN_H: float | None = 9.925
-# [verify] Jupiter's period P_J in the flattening rule `f = f_J (P_J / P)^2`. Separate from the
-# typical spin above, so that withdrawing the typical value does not refuse a measured spin.
+# Jupiter's period P_J in the flattening rule `f = f_J (P_J / P)^2`. Verified (PR #63 review, Q-119):
+# 9.92492 h, System III (NASA Jupiter Fact Sheet; IAU WGCCRE 2015, doi:10.1007/s10569-017-9805-5),
+# rounded. Separate from the typical spin above, so that withdrawing the typical value does not
+# refuse a measured spin. Q-110: a checked constant may sit at tier 3 as a named assumption.
 JUPITER_SPIN_H: float | None = 9.925
-# [verify] Peak zonal wind, m/s. A7.2 states 50 m/s as its Jupiter example. The card has no wind
-# field, so the Rhines rule always uses this typical value and says so in `assumed`.
+# [verify] Peak zonal wind, m/s. A7.2 states 50 m/s as its Jupiter example, but no source uses 50 m/s
+# in the Rhines estimate (Showman, Lewis & Fortney 2015, ApJ 801, 95 use U ~ 30 m/s with another
+# form of the Rhines length). The card has no wind field, so the Rhines rule always uses this
+# typical value and says so in `assumed`; unverified, it makes `bands` inferred_from_analog (Q-119).
 TYPICAL_ZONAL_WIND_MS: float | None = 50.0
-# [verify] Jupiter's flattening (NASA fact sheet, 0.06487), the analogue of the spin rule below.
+# Jupiter's flattening, the analogue of the spin rule below. Verified (Q-119): 1 - 66854/71492 from
+# the 1-bar equatorial and polar radii (NASA Jupiter Fact Sheet; IAU WGCCRE 2015).
 JUPITER_FLATTENING: float | None = 0.06487
 FLATTENING_COEFFICIENT = 0.7  # A7.2: f = 0.7 q, rule of thumb calibrated on Jupiter and Saturn
 

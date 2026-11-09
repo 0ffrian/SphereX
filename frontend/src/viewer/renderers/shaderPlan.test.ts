@@ -194,17 +194,58 @@ describe('planShaderKind', () => {
       return resolveShaderSpec(card, params, undefined, resolveMotion(card, params)).field!.bands;
     };
 
+    /** The fixture with the backend's `bands` and `flattening` layers set to `tag` (tier to match). */
+    const withBackendTags = (tag: 'model_dependent' | 'artistic') => {
+      const f = fixture('gas_giant');
+      for (const l of f.params.layers) {
+        if (l.id === 'bands' || l.id === 'flattening') {
+          l.tag = tag;
+          l.tier = tag === 'artistic' ? 5 : 3;
+        }
+      }
+      return f;
+    };
+
     it('takes the weaker tag and the rule that sets the value when dynamics differs from the card', () => {
-      const p = plan();
+      // The backend claims model_dependent; the card has no spin, and dynamics gives a 10 h spin
+      // at 100 m/s, both inferred_from_analog. The viewer draws from dynamics, so the legend must
+      // fall to the weaker tier 4 and quote the drawn count, not the backend's.
+      const { card, params } = withBackendTags('model_dependent');
+      const p = planRender(card, params, defaultContext());
       const bands = p.drawn.find((d) => d.id === 'bands')!;
       const flat = p.drawn.find((d) => d.id === 'flattening')!;
-      // The backend says model_dependent (typical spin); dynamics is a 10 h spin at 100 m/s,
-      // inferred_from_analog, and that is what is drawn.
       expect(bands.tag).toBe('inferred_from_analog');
       expect(flat.tag).toBe('inferred_from_analog');
       const shown = Number(/about (\d+) bands/.exec(bands.description)![1]);
       expect(shown).toBe(2 * drawnBands());
       expect(shown).not.toBe(22);
+    });
+
+    it('a measured spin with a tier-4 jet speed: flattening tier 3, bands tier 4 (Q-119)', () => {
+      const { card, params } = withBackendTags('model_dependent');
+      card.rot_period_h = {
+        value: 10,
+        tag: 'measured',
+        source: 'synthetic fixture: not a real measurement',
+      };
+      const p = planRender(card, params, defaultContext());
+      // The measured card spin wins over dynamics; Jupiter's constants are verified, so tier 3.
+      expect(p.drawn.find((d) => d.id === 'flattening')!.tag).toBe('model_dependent');
+      // The jet speed is tier 4 (dynamics, or the [verify] typical wind), so bands is tier 4 even
+      // though the backend claims tier 3.
+      expect(p.drawn.find((d) => d.id === 'bands')!.tag).toBe('inferred_from_analog');
+    });
+
+    it('never stronger than the backend: a weaker backend tag wins over a measured spin', () => {
+      const { card, params } = withBackendTags('artistic');
+      card.rot_period_h = {
+        value: 10,
+        tag: 'measured',
+        source: 'synthetic fixture: not a real measurement',
+      };
+      const p = planRender(card, params, defaultContext({ honesty: 'artistic' }));
+      expect(p.drawn.find((d) => d.id === 'bands')!.tag).toBe('artistic');
+      expect(p.drawn.find((d) => d.id === 'flattening')!.tag).toBe('artistic');
     });
 
     it('a slider override is artistic and says what it set', () => {

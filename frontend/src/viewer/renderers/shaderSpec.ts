@@ -77,11 +77,17 @@ export const NO_GAS_LAYERS: GasSwitches = {
 };
 
 /**
- * What a gas giant that is hidden at "Measured only" says (PR #63 review): the bands, flattening and
- * colour are Estimated (shown with + Estimated); the storms and swirls are the artist's (+ Artistic).
+ * What a gas giant that is hidden at "Measured only" says (PR #63 review): the bands and flattening
+ * are Estimated (shown with + Estimated); the storms and swirls are the artist's (+ Artistic). The
+ * colour is Estimated only when the backend's `colour` layer is (a `teq_K` on the card); with no
+ * temperature it is the artist's default and is said to be (PR #63 approval nit).
  */
-export const GAS_HIDDEN_TEXT =
-  "The bands, flattening and colour are estimated from rules and typical values and are hidden at this level; choose + Estimated to see them. The storms and swirls are an artist's impression, shown with + Artistic.";
+export function gasHiddenText(params: Pick<RenderParams, 'layers'>): string {
+  const colour = params.layers.find((l) => l.id === 'colour');
+  return colour && colour.tag !== 'artistic'
+    ? "The bands, flattening and colour are estimated from rules and typical values and are hidden at this level; choose + Estimated to see them. The storms and swirls are an artist's impression, shown with + Artistic."
+    : "The bands and flattening are estimated from rules and typical values and are hidden at this level; choose + Estimated to see them. The colour, storms and swirls are an artist's impression, shown with + Artistic.";
+}
 
 export function isShaderKind(t: ObjectType): t is ShaderKind {
   return (SHADER_KINDS as readonly string[]).includes(t);
@@ -96,10 +102,10 @@ export const GAS_DEFAULTS = { bands: 12, turbulence: 0.5, storms: 5, rings: 0 } 
 
 /**
  * Typical values of a giant planet that stand in for a spin or a jet speed the card does not have
- * (D-32 tier 3, always stated in `assumed`). Twins of `TYPICAL_SPIN_H`, `TYPICAL_ZONAL_WIND_MS`
- * in `backend/app/core/render/gas_giant.py`. Both [verify]: Jupiter's sidereal rotation period
- * (NASA Planetary Fact Sheet) and the 50 m/s that A7.2 uses as its Jupiter example. `null` would
- * refuse the rule (nothing invented).
+ * (D-32 tier 4, always stated in `assumed`). Twins of `TYPICAL_SPIN_H`, `TYPICAL_ZONAL_WIND_MS`
+ * in `backend/app/core/render/gas_giant.py`. The spin is Jupiter's (verified, see `JUPITER_SPIN_H`)
+ * used as a class-typical value; the wind is the 50 m/s that A7.2 uses as its Jupiter example and is
+ * [verify]: no source uses it in the Rhines estimate (Q-119). `null` would refuse the rule.
  */
 export const TYPICAL_GAS_SPIN_H: number | null = 9.925;
 export const TYPICAL_GAS_WIND_MS: number | null = 50;
@@ -119,7 +125,11 @@ export interface RuleChoice {
   basis: string;
 }
 
-/** Jupiter, the analogue for gas-giant flattening and spin. [verify]: NASA Planetary Fact Sheet. */
+/**
+ * Jupiter, the analogue for gas-giant flattening and spin. Verified (Q-119): 9.92492 h System III,
+ * rounded, and 1 - 66854/71492 from the 1-bar radii (NASA Jupiter Fact Sheet; IAU WGCCRE 2015,
+ * doi:10.1007/s10569-017-9805-5). Q-110: checked, so they may sit at tier 3 as named assumptions.
+ */
 export const JUPITER_FLATTENING = 0.06487;
 export const JUPITER_SPIN_H = 9.925;
 /**
@@ -334,7 +344,7 @@ export function resolveShaderSpec(
 /**
  * A typical value standing in for a missing rate, or null when it is [verify]. The typical spin is
  * "typical for this kind of body, no formula": `inferred_from_analog`, tier 4 (D-32, Q-119 b). The
- * typical wind is A7.2's own Jupiter example: `model_dependent`.
+ * typical wind is [verify] (Q-119, Q-110), so it is `inferred_from_analog` too.
  */
 function typicalRate(value: number | null, tag: Tag): { value: number; tag: Tag } | null {
   return value === null ? null : { value, tag };
@@ -349,10 +359,11 @@ function typicalRate(value: number | null, tag: Tag): { value: number; tag: Tag 
  */
 export function rhinesBands(motion: Motion, scaleM: number | null): RuleChoice | null {
   // A rate the card or `dynamics` does not give is the typical value of a giant planet (D-32 tier
-  // 3), stated in `assumed`; the backend's `bands` layer says the same (gas_giant.py).
+  // 4), stated in `assumed`; the backend's `bands` layer says the same (gas_giant.py).
   const spin =
     motion.rates.spin_period_h ?? typicalRate(TYPICAL_GAS_SPIN_H, 'inferred_from_analog');
-  const wind = motion.rates.jet_speed_ms ?? typicalRate(TYPICAL_GAS_WIND_MS, 'model_dependent');
+  const wind =
+    motion.rates.jet_speed_ms ?? typicalRate(TYPICAL_GAS_WIND_MS, 'inferred_from_analog');
   if (!spin || !wind || scaleM === null || !(scaleM > 0)) return null;
   const omega = spinRateRadS(spin.value);
   const n = omega === null ? null : bandCount(omega, scaleM, Math.abs(wind.value));
