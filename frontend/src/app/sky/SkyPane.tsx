@@ -668,6 +668,13 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_100%_at_50%_50%,transparent_55%,#000a_100%)]"
         aria-hidden="true"
       />
+      {/* Edges fade to dark where the header, rail and bars float over the sky (Q-123). */}
+      <div className="sx-sky-shade pointer-events-none absolute inset-0" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+        <i />
+      </div>
       <p id={descId} className="sr-only">
         Drag to look around, use the mouse wheel or pinch to zoom, and click or tap to pick a
         position: its coordinates go into the search. With the keyboard, the arrow keys pan, plus
@@ -768,7 +775,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       {/* Status of the sky image: never a blank pane. */}
       {state.kind !== 'ready' && (
         // Near the top and click-through, so the centre of the sky stays clickable.
-        <div className="pointer-events-none absolute inset-x-4 top-4 flex justify-center">
+        <div className="sx-sky-status pointer-events-none absolute inset-x-4 flex justify-center">
           <p
             className="max-w-md rounded-xl border border-sx-border bg-sx-card/90 px-4 py-3 text-center text-sm text-sx-fg shadow-lg"
             data-testid="sky-status"

@@ -83,38 +83,6 @@ body {
     padding: 8px 6px;
     min-width: 0;
   }
-  .sx-brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: none;
-  }
-  .sx-brand h1 {
-    font-size: 15px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-  .sx-brand small {
-    color: var(--color-sx-mfg);
-    font-weight: 500;
-    font-size: 12px;
-  }
-  .sx-brand-mark {
-    width: 22px;
-    height: 22px;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 2px;
-  }
-  .sx-brand-mark span {
-    background: var(--color-sx-green);
-    border-radius: 50%;
-    opacity: 0.3;
-  }
-  .sx-brand-mark span:nth-child(odd) {
-    opacity: 1;
-  }
-
   /* ---- the sky viewport (mock-up .view) ---- */
   .sx-view {
     grid-area: view;
@@ -740,10 +708,7 @@ body {
       gap: 6px 12px;
       padding: 8px 10px 0;
     }
-    .sx-brand small {
-      display: none;
-    }
-    /* Brand and readout share the first row; the fixture banner goes under them. */
+    /* The readout takes the first row; the fixture banner goes under it. */
     .sx-top > [data-testid='fixture-banner'] {
       order: 3;
       flex-basis: 100%;
@@ -970,7 +935,7 @@ body {
   .sx-orb-wrap:not([data-ready]) {
     transition: none;
   }
-  /* Phone: at rest there is no room for it in the header (brand and readout), so it is not shown;
+  /* Phone: at rest there is no room for it in the header (the readout), so it is not shown;
      it appears over the top of the sky while it thinks. */
   .sx-orb-wrap[data-compact][data-mode='idle'] {
     opacity: 0;
@@ -1560,5 +1525,120 @@ body {
   .sx-bp-show button {
     min-height: 44px;
     padding: 0 9px;
+  }
+}
+
+/* Issue #66 (Q-123), desktop: the sky fills the whole bezel. The header, rail, transport and search
+   float over it, and the edges fade to dark in a gradient (SkyPane's .sx-sky-shade) instead of solid
+   bars. Panels and the credit keep their old places through the inset variables. Phone width keeps
+   the stacked layout. */
+@layer components {
+  .sx-sky-status {
+    top: 16px;
+  }
+}
+@media (min-width: 641px) {
+  @layer components {
+    .sx-bezel {
+      --sx-in-t: var(--sx-top);
+      --sx-in-l: var(--sx-rail);
+      --sx-in-b: var(--sx-bot);
+      --sx-in-r: 16px;
+    }
+    .sx-view {
+      grid-area: 1 / 1 / -1 / -1;
+      border-radius: 0;
+      box-shadow: none;
+      background: #020204;
+    }
+    .sx-top,
+    .sx-rail,
+    .sx-search-slot,
+    .sx-transport-slot {
+      position: relative;
+      z-index: 2;
+    }
+    /* Four thin strips, not full-size gradients: a full-area layer over the canvas is blended on
+       every frame, and that is slow without a GPU. */
+    .sx-sky-shade i {
+      position: absolute;
+      display: block;
+    }
+    .sx-sky-shade i:nth-child(1) {
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: calc(var(--sx-rail) + 130px);
+      background: linear-gradient(
+        to right,
+        #050507f0 0,
+        #050507a8 calc(var(--sx-rail) * 0.9),
+        transparent
+      );
+    }
+    .sx-sky-shade i:nth-child(2) {
+      top: 0;
+      left: 0;
+      right: 0;
+      height: calc(var(--sx-top) + 100px);
+      background: linear-gradient(
+        to bottom,
+        #050507e6 0,
+        #050507a0 calc(var(--sx-top) * 0.8),
+        transparent
+      );
+    }
+    .sx-sky-shade i:nth-child(3) {
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: calc(var(--sx-bot) + 100px);
+      background: linear-gradient(
+        to top,
+        #050507e6 0,
+        #050507a0 calc(var(--sx-bot) * 0.8),
+        transparent
+      );
+    }
+    .sx-sky-shade i:nth-child(4) {
+      top: 0;
+      bottom: 0;
+      right: 0;
+      width: 90px;
+      background: linear-gradient(to left, #050507c4, transparent);
+    }
+    .sx-view[data-split] .sx-sky-shade i:nth-child(4) {
+      display: none;
+    }
+    .sx-panel {
+      top: calc(var(--sx-in-t) + 8px);
+      right: calc(var(--sx-in-r) + 52px);
+      max-height: calc(
+        100% - var(--sx-in-t) - var(--sx-in-b) - 16px - max(56px, var(--sx-credit-h, 0px) + 8px)
+      );
+    }
+    .sx-panel-wide {
+      left: calc(var(--sx-in-l) + 8px);
+      right: auto;
+      max-height: calc(100% - var(--sx-in-t) - var(--sx-in-b) - 24px - var(--sx-credit-h, 0px));
+    }
+    .sx-sky-credit {
+      left: calc(var(--sx-in-l) + 12px);
+      bottom: calc(var(--sx-in-b) + 8px);
+    }
+    .sx-island-wrap {
+      top: calc(var(--sx-in-t) + 8px);
+    }
+    .sx-sky-status {
+      top: calc(var(--sx-in-t) + 16px);
+    }
+    .sx-bp {
+      top: var(--sx-in-t);
+      bottom: var(--sx-in-b);
+      right: var(--sx-in-r);
+      width: calc(50% - var(--sx-in-r));
+      border-radius: 18px;
+      overflow: hidden;
+    }
   }
 }
