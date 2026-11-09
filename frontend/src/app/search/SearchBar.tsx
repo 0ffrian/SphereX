@@ -4,7 +4,15 @@
 // Focus stays in the input: ArrowUp and ArrowDown move `aria-activedescendant`, Enter picks the
 // highlighted row (without one, Enter searches the typed text through parseQuery), Escape closes
 // the list and keeps the text. The list is a shortcut, not a limit: any SIMBAD or SBDB name works.
-import { useEffect, useId, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react';
 import { Icon } from '@/app/shell/icons';
 import { useAppStore } from '@/state/store';
 import { parseQuery } from './parseQuery';
@@ -13,6 +21,9 @@ import { DEMO_TARGETS, filterTargets, type DemoTarget } from './demoTargets';
 export const NO_MATCH_HINT = 'No demo object matches. Press Enter to search the catalogues.';
 // parseQuery accepts both examples (a name, and RA, Dec in decimal degrees).
 export const CLOSING_HINT = 'Try "WISE 0855" or "269.452, 4.693"';
+
+/** A focus counts as the user's when Tab or "/" is held down (until its keyup), within this many ms. */
+const USER_FOCUS_WINDOW_MS = 1000;
 
 export function SearchBar() {
   const search = useAppStore((s) => s.skySearch);
@@ -27,6 +38,33 @@ export function SearchBar() {
   const helpId = useId();
   const problemId = useId();
   const linkProblemId = useId();
+  // The list opens on a focus the user made: a pointer press, Tab, or the "/" shortcut. A refocus by
+  // code (a card that returns focus here when it closes) must not pop the list open (WCAG 3.2.1).
+  const lastKey = useRef<{ key: string; at: number } | null>(null);
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      lastKey.current = { key: e.key, at: performance.now() };
+    };
+    const clear = () => {
+      lastKey.current = null;
+    };
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('keyup', clear, true);
+    window.addEventListener('blur', clear);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('keyup', clear, true);
+      window.removeEventListener('blur', clear);
+    };
+  }, []);
+  const userFocus = () => {
+    const k = lastKey.current;
+    return (
+      k !== null &&
+      (k.key === 'Tab' || k.key === '/') &&
+      performance.now() - k.at < USER_FOCUS_WINDOW_MS
+    );
+  };
 
   // A search started from a shared link shows its text in the field; clearing the link (Back to
   // the page without a hash) clears the field.
@@ -109,8 +147,9 @@ export function SearchBar() {
         active < 0 ? (step > 0 ? 0 : rows.length - 1) : (active + step + rows.length) % rows.length,
       );
     } else if (e.key === 'Enter') {
-      // Enter that confirms an IME composition must not pick a row.
-      if (e.nativeEvent.isComposing) return;
+      // Enter that confirms an IME composition must not pick a row (keyCode 229: browsers that
+      // report the composition's last key with `isComposing` already false).
+      if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
       const row = listShown ? rows[active] : undefined;
       if (row) {
         e.preventDefault();
@@ -143,7 +182,9 @@ export function SearchBar() {
           type="text"
           value={text}
           onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            if (userFocus()) setOpen(true);
+          }}
           onClick={() => setOpen(true)}
           onBlur={() => {
             setOpen(false);
@@ -215,7 +256,11 @@ export function SearchBar() {
                 >
                   <span className="sx-suggest-name">{row.name}</span>
                   {row.classLabel !== null && (
-                    <span className="sx-suggest-label">{row.classLabel}</span>
+                    <>
+                      {/* A separator for screen readers, which would run the two together. */}
+                      <span className="sr-only">, </span>
+                      <span className="sx-suggest-label">{row.classLabel}</span>
+                    </>
                   )}
                 </li>
               ))}

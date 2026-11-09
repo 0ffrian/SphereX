@@ -135,7 +135,6 @@ export function planComet(input: PlanInput): RenderPlan {
   // Nucleus: a dark sphere at the upper size limit; a point if the value is missing or hidden.
   // With a loadable shape model the value is that model's bounding-sphere radius, used for scaling
   // (Q-43, Q-162), so it is not called a limit.
-  const meshSized = isLoadableMeshUrl(card.shape_source?.value ?? null) && b.has('mesh');
   const nucleusKm = numberField(card, 'nucleus_radius_km_max');
   const comaKm = numberField(card, 'coma_radius_km');
   const nucleusDrawn = b.draw('nucleus');
@@ -147,6 +146,9 @@ export function planComet(input: PlanInput): RenderPlan {
     nucleusKm !== null &&
     nucleusTv !== undefined &&
     isTagShown(ctx.honesty, nucleusTv.tag);
+  // The size note says "upper limit" until the shape model is really drawn (below): a model that
+  // failed to load or is held leaves the old upper-limit wording and qualifier.
+  let sizeNote = -1;
   if (sizeShown) {
     if (comaKm !== null && comaKm > 0) {
       // Sized against the coma radius whether or not the gas shells are drawn, so the nucleus
@@ -161,11 +163,7 @@ export function planComet(input: PlanInput): RenderPlan {
       nucleusScene = NUCLEUS_ALONE_SCENE_RADIUS;
       b.notes.push('The nucleus is not drawn to scale: the coma size is not known.');
     }
-    b.notes.push(
-      meshSized
-        ? "The nucleus is scaled to its shape model's own bounding sphere, not to a measured radius."
-        : 'The nucleus size is an upper limit.',
-    );
+    sizeNote = b.notes.push('The nucleus size is an upper limit.') - 1;
   } else if (
     (nucleusDrawn && nucleusKm !== null) ||
     b.missing.find((m) => m.id === 'nucleus')?.reason === 'honesty'
@@ -256,6 +254,11 @@ export function planComet(input: PlanInput): RenderPlan {
   const nucleusUrl = card.shape_source?.value ?? null;
   const meshDrawn = b.draw('mesh', { asset: isLoadableMeshUrl(nucleusUrl) ? nucleusUrl : null });
   const shape = meshDrawn ? planShapeLayers(b) : null;
+  // Sized by a shape model that is drawn and loaded: its own bounding sphere, not a limit (Q-43, Q-162).
+  const meshSized = meshDrawn && isLoadableMeshUrl(nucleusUrl);
+  if (meshSized && sizeNote >= 0)
+    b.notes[sizeNote] =
+      "The nucleus is scaled to its shape model's own bounding sphere, not to a measured radius.";
 
   const nucleus = litBody('nucleus', [nucleusScene, nucleusScene, nucleusScene], NUCLEUS_TINT, {
     segments: [32, 16],

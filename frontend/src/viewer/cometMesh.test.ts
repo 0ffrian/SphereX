@@ -6,7 +6,7 @@ import { defaultContext, planRender } from './renderPlan';
 
 const MESH = '/data/shapes/c67p-shap5.glb';
 
-function cometPlan(withMesh: boolean) {
+function cometPlan(withMesh: boolean, failed: string[] = []) {
   const { card, params } = fixture('comet');
   card.epochs = ['2025-12'];
   if (withMesh) {
@@ -19,7 +19,11 @@ function cometPlan(withMesh: boolean) {
       requires: ['shape_source', 'nucleus_radius_km_max'],
     } as (typeof params.layers)[number]);
   }
-  return planRender(card, params, defaultContext({ honesty: 'artistic', epoch: '2025-12' }));
+  return planRender(
+    card,
+    params,
+    defaultContext({ honesty: 'artistic', epoch: '2025-12', failed }),
+  );
 }
 
 describe('comet nucleus from a registered mesh (R7.3, Q-162)', () => {
@@ -44,5 +48,14 @@ describe('comet nucleus from a registered mesh (R7.3, Q-162)', () => {
     const sphere = cometPlan(false);
     // The fixture comet carries a nucleus size; without a mesh it stays a limit (R7.3).
     if (sphere.sizeTag !== null) expect(sphere.sizeQualifier).toBe('upper_limit');
+  });
+
+  it('a mesh that failed to load keeps the upper-limit note and qualifier (issue #68 review)', () => {
+    const plan = cometPlan(true, ['mesh']);
+    expect(plan.bodies[0]?.meshUrl ?? null).toBeNull();
+    expect(plan.missing.find((m) => m.id === 'mesh')?.reason).toBe('load');
+    expect(plan.notes.join(' ')).toMatch(/upper limit/);
+    expect(plan.notes.join(' ')).not.toMatch(/bounding sphere/);
+    if (plan.sizeTag !== null) expect(plan.sizeQualifier).toBe('upper_limit');
   });
 });

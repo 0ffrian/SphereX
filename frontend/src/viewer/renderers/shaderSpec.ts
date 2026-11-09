@@ -11,7 +11,12 @@ import {
   spinRateRadS,
 } from '@/physics/gasGiants';
 import { OCEANS_REMOVED_ABOVE_K, POLAR_ICE_BELOW_K } from '@/physics/planets';
-import { deriveClimate, type ClimateDerivation, type Scenario } from '@/physics/climate';
+import {
+  deriveClimate,
+  lockRefused,
+  type ClimateDerivation,
+  type Scenario,
+} from '@/physics/climate';
 import { R_JUP_M } from '@/physics/constants';
 import { STILL_MOTION, TIER_OF_TAG, weakestTag, type Motion } from '../motion/motion';
 import type { FieldParams } from '../fields/fieldGenerator';
@@ -152,6 +157,28 @@ export interface PlanetLook {
   legend: string;
   /** `presetLegend` when a per-planet preset applied, else null. */
   presetLegend: string | null;
+}
+
+/**
+ * Climate-pattern key colours (issue #68 Part 3, Q-156), linear RGB. FIXED and plainly non-terrain:
+ * ground is neutral grey (linear value of 0x8a8a8a, the plain sphere), open water a blue-grey, ice a
+ * near-white with a slight blue tint. They say where the model puts water and ice, not what the
+ * surface looks like. Not measured colours.
+ */
+export const PATTERN_GROUND: Rgb = [0.254, 0.254, 0.254];
+export const PATTERN_WATER: Rgb = [0.12, 0.22, 0.34];
+export const PATTERN_ICE: Rgb = [0.82, 0.9, 0.98];
+
+/** A linear colour as a CSS hex string (sRGB transfer), for the legend swatches. */
+export function linearToCss(c: Rgb): string {
+  const to = (v: number) => {
+    const x = Math.min(1, Math.max(0, v));
+    const e = x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(x, 1 / 2.4) - 0.055;
+    return Math.round(e * 255)
+      .toString(16)
+      .padStart(2, '0');
+  };
+  return `#${to(c[0])}${to(c[1])}${to(c[2])}`;
 }
 
 export interface PlanetStyle {
@@ -342,7 +369,7 @@ export function resolveShaderSpec(
   }
 
   const d = PLANET_DEFAULTS[kind];
-  const baseClimate = climateFromTeq(card, d);
+  const baseClimate = climateFromTeq(card, d, kind);
   // Issue #68: only a card that carries the host-star fields (Track A) is tested for locking.
   const derived = isExoplanetCard(card) ? deriveClimate(card, kind) : null;
   const substellar = derived?.scenario === 'eyeball' || derived?.scenario === 'snowball';
@@ -382,7 +409,10 @@ export function resolveShaderSpec(
       scenario,
       look:
         scenarioLook && scenario
-          ? { legend: lookLegend(scenario), presetLegend: preset ? presetLegend(preset) : null }
+          ? {
+              legend: lookLegend(scenario, !(derived && lockRefused(derived))),
+              presetLegend: preset ? presetLegend(preset) : null,
+            }
           : null,
       patternTag: substellar ? (climate.rule?.tag ?? null) : null,
     },
@@ -406,16 +436,18 @@ function scenarioRule(
   if (!d || !base || !d.lock || !d.lock.ok) return base;
   const tag = weakestTag([base.tag, d.tag]);
   const lock = d.lock;
+  // The numbers behind the verdict go to the formula disclosure, not the legend line (Q-156).
   const lockText = `locking time ${lock.tLockGyr.toPrecision(3)} Gyr against an age of ${lock.ageGyr} Gyr`;
+  const formula = `${d.formula}; ${lockText}`;
   if (d.scenario === 'eyeball' && d.tssK !== null && d.iceAngleRad !== null) {
     const surface = kind === 'planet_water' ? 'open water' : 'bare ground';
     return {
       value: d.tssK,
       tag,
       tier: TIER_OF_TAG[tag],
-      formula: d.formula,
+      formula,
       assumed: d.assumed,
-      basis: `Eyeball: ${surface} within ${deg(d.iceAngleRad)}° of the star-facing point, ice beyond it and over the night side (${lockText}; ${Math.round(d.tssK)} K at the star-facing point; no heat spread, no greenhouse)`,
+      basis: `Eyeball: ${surface} within ${deg(d.iceAngleRad)}° of the star-facing point, ice beyond it and over the night side (${Math.round(d.tssK)} K at the star-facing point; no heat spread, no greenhouse)`,
     };
   }
   if (d.scenario === 'snowball' && d.tssK !== null) {
@@ -423,9 +455,9 @@ function scenarioRule(
       value: d.tssK,
       tag,
       tier: TIER_OF_TAG[tag],
-      formula: d.formula,
+      formula,
       assumed: d.assumed,
-      basis: `Snowball: ice over the whole surface${kind === 'planet_rocky' ? ', with a little high rock showing' : ''} (${lockText}; only ${Math.round(d.tssK)} K at the star-facing point; no heat spread, no greenhouse)`,
+      basis: `Snowball: ice over the whole surface${kind === 'planet_rocky' ? ', with a little high rock showing' : ''} (only ${Math.round(d.tssK)} K at the star-facing point; no heat spread, no greenhouse)`,
     };
   }
   if (d.scenario === 'temperate') {
@@ -433,9 +465,9 @@ function scenarioRule(
       ...base,
       tag,
       tier: TIER_OF_TAG[tag],
-      formula: `${base.formula}; locked if t_lock < age`,
+      formula: `${base.formula}; locked if t_lock < age; ${lockText}`,
       assumed: d.assumed,
-      basis: `${base.basis}. Not tidally locked (${lockText}), so the ice follows the equilibrium temperature`,
+      basis: `${base.basis}. Not tidally locked, so the ice follows the equilibrium temperature`,
     };
   }
   return base;
@@ -542,6 +574,7 @@ export function flatteningRule(
 export function climateFromTeq(
   card: ObjectCard,
   d: { sea: number; ice: number },
+  kind: 'planet_rocky' | 'planet_water' = 'planet_water',
 ): { sea: number; ice: number; rule: RuleChoice | null } {
   const teq = cardValue(card, 'teq_K');
   const tag = card.teq_K?.tag;
@@ -559,7 +592,7 @@ export function climateFromTeq(
       tag: t,
       tier: TIER_OF_TAG[t],
       formula: `polar ice below ${POLAR_ICE_BELOW_K} K, no oceans above ${OCEANS_REMOVED_ABOVE_K} K`,
-      basis: `Ice and ocean from the equilibrium temperature, ${Math.round(teq)} K`,
+      basis: `${kind === 'planet_rocky' ? 'Ice and bare ground' : 'Ice and ocean'} from the equilibrium temperature, ${Math.round(teq)} K`,
     },
   };
 }

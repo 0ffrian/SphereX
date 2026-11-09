@@ -35,7 +35,12 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
   const options = () => [...host.querySelectorAll('[role="option"]')];
   const names = () => options().map((o) => o.querySelector('.sx-suggest-name')!.textContent);
 
-  const focus = () => act(() => input().focus());
+  /** A focus the user made: Tab went down just before it. */
+  const focus = () =>
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
+      input().focus();
+    });
   const type = (value: string) =>
     act(() => {
       const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
@@ -95,11 +100,48 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
     ).toBe(true);
     // App.tsx's handler does exactly this to the field.
     act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: '/' }));
       input().focus();
       input().select();
     });
     expect(options()).toHaveLength(16);
     expect(document.activeElement).toBe(input());
+  });
+
+  it('does not open the list when code refocuses the field', () => {
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      input().focus();
+    });
+    expect(listbox()).toBeNull();
+    expect(input().getAttribute('aria-expanded')).toBe('false');
+    // A pointer press still opens it.
+    act(() => {
+      input().click();
+    });
+    expect(options()).toHaveLength(16);
+  });
+
+  it('Enter with keyCode 229 (an IME step) does not pick a row', () => {
+    focus();
+    key('ArrowDown');
+    act(() => {
+      input().dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Enter',
+          keyCode: 229,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+    expect(listbox()).not.toBeNull();
+  });
+
+  it('reads the name and the class label with a separator', () => {
+    focus();
+    const withLabel = options().find((o) => o.querySelector('.sx-suggest-label'))!;
+    expect(withLabel.textContent).toMatch(/, /);
   });
 
   it('shows a class label only when the row has one, and never a made-up one', () => {

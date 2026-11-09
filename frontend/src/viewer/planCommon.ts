@@ -99,7 +99,24 @@ export interface ExoplanetFacts {
   starlight: 'drawn' | 'honesty' | 'data' | null;
   /** The climate pattern is drawn (a locked planet's masks at + Estimated, or the terrain's). */
   climateShown: boolean;
+  /**
+   * False when the tidal-locking rule was refused (a needed value is missing). The scenario that
+   * depends on it (`temperate`) is then not named: the planet is not known to be unlocked. Default true.
+   */
+  lockTested?: boolean;
 }
+
+/** What the climate pattern of a locked planet shows, in plain words (no jargon). */
+export function patternWords(s: Scenario, kind: ExoplanetFacts['kind']): string {
+  if (s === 'snowball') return 'ice over the whole surface';
+  return kind === 'planet_water' ? 'open water and ice' : 'bare ground and ice';
+}
+
+/** The words for a smooth sphere lit by its host star (Q-157, Q-166): an estimate, not a grey ball. */
+export const STARLIT_SPHERE_WORDS =
+  'a smooth sphere lit in the colour of its host star (an estimate)';
+export const STARLIT_SPHERE_NOTE =
+  "Plain sphere, lit in the host star's colour (estimated). Surface hidden at this level.";
 
 /** The scenario in plain words (no jargon beyond the scenario's own name). */
 export function scenarioWords(s: Scenario, kind: ExoplanetFacts['kind']): string {
@@ -137,7 +154,12 @@ export function exoplanetSentences(f: ExoplanetFacts): string[] {
     );
   else if (f.starlight === 'data')
     out.push("The light is white because the host star's temperature is missing.");
-  if (f.scenario !== null) {
+  if (f.scenario === 'temperate' && f.lockTested === false) {
+    // The locking rule was refused: no scenario that depends on it is named (Q-155, Q-166).
+    out.push(
+      'Whether the planet is tidally locked could not be tested (a needed value is missing), so no climate scenario is named. Ice is drawn only where the equilibrium temperature is cold.',
+    );
+  } else if (f.scenario !== null) {
     const words = scenarioWords(f.scenario, f.kind);
     out.push(
       f.climateShown

@@ -12,6 +12,7 @@
 //   - missing data refuses the layer; nothing is invented (R1 principle 3).
 import type { Layer, RenderParams } from '@/contract';
 import { deriveLocking } from '@/physics/tides';
+import { deriveClimate, lockRefused } from '@/physics/climate';
 import { STARLIGHT_FORMULA } from '@/physics/starlight';
 import { isTagShown } from '../honesty';
 import { sliderValue } from '../sliders';
@@ -21,6 +22,7 @@ import {
   missingFields,
   numberField,
   PlanBuilder,
+  STARLIT_SPHERE_NOTE,
   type PlanInput,
 } from '../planCommon';
 import type { RenderPlan } from '../planTypes';
@@ -34,6 +36,10 @@ import {
   NO_GAS_LAYERS,
   resolveShaderSpec,
   shaderDistance,
+  linearToCss,
+  PATTERN_GROUND,
+  PATTERN_ICE,
+  PATTERN_WATER,
   sizeFieldFor,
   type GasLayerId,
   type GasSwitches,
@@ -44,11 +50,21 @@ import {
 export const PLAIN_SPHERE_NOTE =
   "Shown as a plain grey sphere at the size on the card. The surface is an artist's impression and is hidden at this level.";
 
-/** The plain-sphere note of a kind: a gas giant's parts are mostly Estimated, so it says which. */
-export function plainSphereNote(kind: ShaderKind, params: Pick<RenderParams, 'layers'>): string {
-  return kind === 'gas_giant'
-    ? `Shown as a plain grey sphere at the size on the card. ${gasHiddenText(params)}`
-    : PLAIN_SPHERE_NOTE;
+/**
+ * The plain-sphere note of a kind: a gas giant's parts are mostly Estimated, so it says which.
+ * `starlit`: the `starlight` layer is drawn, so the sphere is lit in the host star's colour and is
+ * not "grey" (Q-157, Q-166).
+ */
+export function plainSphereNote(
+  kind: ShaderKind,
+  params: Pick<RenderParams, 'layers'>,
+  starlit = false,
+): string {
+  if (kind === 'gas_giant')
+    return starlit
+      ? `Shown as a smooth sphere lit in the colour of its host star (an estimate), at the size on the card. ${gasHiddenText(params)}`
+      : `Shown as a plain grey sphere at the size on the card. ${gasHiddenText(params)}`;
+  return starlit ? STARLIT_SPHERE_NOTE : PLAIN_SPHERE_NOTE;
 }
 
 const NO_TOUCH_NOTE = {
@@ -273,6 +289,7 @@ export function planShaderKind(input: PlanInput): RenderPlan {
   // Drawn from "+ Estimated"; refused with the missing field when `host_teff_K` is absent; the light
   // is then white. Solar-system bodies carry none of the host fields and are left as they were.
   let lighting = b.lighting;
+  let starlit = false;
   if (lighting.colour !== null || (hasPlain && isExoplanetCard(card))) {
     const teff = lighting.colourTeffK ?? numberField(card, 'host_teff_K');
     const lit =
@@ -292,6 +309,11 @@ export function planShaderKind(input: PlanInput): RenderPlan {
       ),
       b.draw('starlight'));
     if (!lit) lighting = { ...lighting, colour: null, colourTag: null, colourTeffK: null };
+    else {
+      starlit = true;
+      // The sphere is lit in the star's colour, so "Colour is plain grey" no longer describes it.
+      b.colourIsDrawnByLayer();
+    }
   }
 
   // Issue #68 Part 3 (Q-156): with the artistic terrain hidden, a locked planet (eyeball or snowball)
@@ -307,7 +329,22 @@ export function planShaderKind(input: PlanInput): RenderPlan {
         assumed: patternClimate.assumed,
       }),
     );
-    pattern = b.draw('climate');
+    // The key colours are fixed (not terrain): name what they stand for.
+    const sc = spec.planet.scenario;
+    const open = spec.kind === 'planet_water' ? 'Open water' : 'Bare ground';
+    pattern = b.draw('climate', {
+      swatches: [
+        { label: 'Ice', css: linearToCss(PATTERN_ICE) },
+        ...(sc === 'eyeball'
+          ? [
+              {
+                label: open,
+                css: linearToCss(spec.kind === 'planet_water' ? PATTERN_WATER : PATTERN_GROUND),
+              },
+            ]
+          : []),
+      ],
+    });
   }
 
   // Issue #68 Part 3 (Q-155): a locking rule that was refused says why; nothing is invented.
@@ -317,6 +354,13 @@ export function planShaderKind(input: PlanInput): RenderPlan {
     if (!lock.ok && !params.missing.includes('tidal_locking'))
       b.refuse({ id: 'tidal_locking', reason: 'data', fields: lock.needs });
   }
+  const lockRefusedHere =
+    isExoplanetCard(card) && (spec.kind === 'planet_rocky' || spec.kind === 'planet_water')
+      ? (() => {
+          const d = deriveClimate(card, spec.kind);
+          return d !== null && lockRefused(d);
+        })()
+      : false;
   // Issue #68 Part 6 (Q-165): say what the light and the scenario are, and which level shows them.
   if ((spec.kind === 'planet_rocky' || spec.kind === 'planet_water') && isExoplanetCard(card)) {
     const refusal = b.missing.find((m) => m.id === 'starlight');
@@ -324,6 +368,7 @@ export function planShaderKind(input: PlanInput): RenderPlan {
       ...exoplanetSentences({
         kind: spec.kind,
         scenario: b.held('climate') ? null : (spec.planet?.scenario ?? null),
+        lockTested: !lockRefusedHere,
         teffK: lighting.colourTeffK,
         // A layer the build animation holds back is a presentation step, not a refusal: say nothing.
         starlight: b.isDrawn('starlight')
@@ -346,8 +391,8 @@ export function planShaderKind(input: PlanInput): RenderPlan {
 
   const plain = hasPlain && spec.drawable && !surface && !pattern && sizeShown;
   if (plain) {
-    b.notes.push(plainSphereNote(spec.kind, params));
-    b.legendBody('Plain grey sphere at the size on the card.');
+    b.notes.push(plainSphereNote(spec.kind, params, starlit));
+    b.legendBody(starlit ? STARLIT_SPHERE_NOTE : 'Plain grey sphere at the size on the card.');
   }
 
   // Q-103: the glowing volumes have no touch feedback. Said in plain words so that Touch mode on
