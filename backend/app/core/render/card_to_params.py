@@ -68,7 +68,10 @@ ASSUMED_C_OVER_B = 1.0  # R6.2: c = b
 ASSUMED_DENSITY_EXPONENT = 2.0  # R7.3: coma gas density falls as 1/r^2
 ASSUMED_LIMB_U = 0.6  # R7.5: linear limb darkening coefficient (stars)
 # Issue #62, PR #63 review: the brown dwarf coefficient is its own constant. R7.4 gives no confirmed
-# value, so the star's 0.6 stands in until it is checked. [verify] Set to None to refuse the layer.
+# value, so the star's visible-band 0.6 stands in as an analogue: the layer is inferred_from_analog
+# (Q-119). Near-IR models give about 0.25-0.29 at 3.6 and 4.5 um for cool atmospheres (Claret et
+# al. 2012, A&A 546, A14, extrapolated below 1500 K); the value is not changed yet (Atish).
+# [verify] Set to None to refuse the layer.
 BROWN_DWARF_LIMB_U: float | None = 0.6  # [verify]
 
 SHADER_KINDS = ("planet_rocky", "planet_water", "gas_giant", "nebula", "nova")
@@ -499,15 +502,15 @@ def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) 
         formula="radius = radius_rjup * R_Jup",
     )
     # Issue #62: a self-lit disc glows evenly to its edge without it. The coefficient is
-    # BROWN_DWARF_LIMB_U, the star's (R7.5) until a brown-dwarf value is confirmed [verify], so the
-    # layer is model_dependent. The 0.6 is a visible-band solar value used as a placeholder for an
+    # BROWN_DWARF_LIMB_U, the star's (R7.5) until a brown-dwarf value is confirmed [verify]: an
+    # analogue, so the layer is inferred_from_analog (Q-119). The 0.6 is a visible-band solar value used as a placeholder for an
     # infrared view. It sits on the body, so a refused body or an unset (None)
     # coefficient refuses it too.
     u = BROWN_DWARF_LIMB_U
     plan.layer(
         body_ok and u is not None,
         "limb_darkening",
-        "model_dependent",
+        "inferred_from_analog",
         f"Assumption: linear limb darkening, I(mu) = 1 - {u} * (1 - mu). The coefficient is the "
         "R7.5 visible-band solar value, used as a placeholder for an infrared view [verify]; no "
         "brown-dwarf coefficient is confirmed (R7.4).",
@@ -652,8 +655,8 @@ def _gas_giant_layers(card: Mapping[str, Any], plan: _Plan) -> None:
         spin_inputs["rot_period_h"] = gg.TYPICAL_SPIN_H
 
     # bands: the Rhines rule. The card has no wind speed, so the class-typical wind is always an
-    # input: the best tag is model_dependent (measured spin), with the wind in `assumed`. A missing
-    # spin makes it the typical one and the layer inferred_from_analog (tier 4).
+    # input. That wind is [verify] (no source uses 50 m/s here), so under Q-110 the layer is at best
+    # inferred_from_analog (tier 4), even with a measured spin (Q-119), with the wind in `assumed`.
     radius_m = (_num(card, "radius_rjup") or 0.0) * gg.R_JUP_M
     omega = gg.spin_rate_rad_s(spin_h) if spin_h is not None else None
     wind = gg.TYPICAL_ZONAL_WIND_MS
@@ -662,7 +665,7 @@ def _gas_giant_layers(card: Mapping[str, Any], plan: _Plan) -> None:
     plan.layer(
         _has(card, "radius_rjup") and n is not None,
         "bands",
-        _weakest("derived", spin_tag, _tag(card, "radius_rjup"), "model_dependent"),
+        _weakest("derived", spin_tag, _tag(card, "radius_rjup"), "inferred_from_analog"),
         f"Number of bands from the {'spin' if has_spin else 'typical spin of a giant planet'} and "
         f"the radius (Rhines scale, A7.2): about {round(n or 0)} from pole to pole. The jet speed "
         "is a typical value; the exact band pattern is a seeded look.",

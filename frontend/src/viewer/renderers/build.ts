@@ -28,7 +28,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import type { BodyPlan, DustPlan, RenderPlan, Rgb, ShellPlan, SpinPlan } from '../planTypes';
 import type { TierName } from '../render/quality';
-import { ASTEROID_ALBEDO_LIFT, displacementActive } from './AsteroidProcedural';
+import { displacementActive } from './AsteroidProcedural';
+import { displayLift, rgbLinearLuma } from './asteroidLift';
 import { ShapeMaterial } from '../shape/ShapeMaterial';
 import {
   AO_RAYS,
@@ -280,7 +281,8 @@ function selfLitColour(body: BodyPlan, map: Texture | null, mapMean: number | nu
     // A longitude offset of the shared map (body B of a binary, so the two are not clones): the
     // map is shared, so the offset is in the sampling, not on the texture.
     const off = body.albedoOffsetU ?? 0;
-    const t = off > 0 ? texture(map, fract(uv().add(vec2(off, 0)))) : texture(map);
+    // Wrap only u (PR #63 nit): fract on the whole vector also wrapped v and drew a 1-px seam at a pole.
+    const t = off > 0 ? texture(map, vec2(fract(uv().x.add(off)), uv().y)) : texture(map);
     if (body.albedoLuma) {
       const y = dot(t.rgb, vec3(0.2126, 0.7152, 0.0722));
       col = col.mul(y.div(mapMean ?? 1));
@@ -297,8 +299,14 @@ function selfLitColour(body: BodyPlan, map: Texture | null, mapMean: number | nu
   return col;
 }
 
+/** The body's colour, with the capped display lift when the plan asks for it (asteroids). */
+function liftedTint(body: BodyPlan): Color {
+  const c = srgb(body.tint);
+  return body.displayLift ? c.multiplyScalar(displayLift(rgbLinearLuma(body.tint))) : c;
+}
+
 function bodyMaterial(body: BodyPlan): MeshStandardNodeMaterial | MeshBasicNodeMaterial {
-  const tint = srgb(body.tint);
+  const tint = liftedTint(body);
   if (body.emissive <= 0) {
     return new MeshStandardNodeMaterial({ color: tint, roughness: body.roughness });
   }
@@ -480,8 +488,9 @@ export function buildScene(
     load(body.albedoUrl, albedoLayer(plan), (t) => {
       t.colorSpace = SRGBColorSpace;
       material.map = t;
-      if (material instanceof MeshStandardNodeMaterial && plan.type === 'asteroid_procedural')
-        material.color.setScalar(ASTEROID_ALBEDO_LIFT);
+      // Display lift (artistic), capped by the map's own mean brightness so a bright body does not clip.
+      if (material instanceof MeshStandardNodeMaterial && body.displayLift)
+        material.color.setScalar(displayLift(meanLuma(t.image)));
       if (material instanceof MeshBasicNodeMaterial && (limbOf(body) !== null || body.albedoLuma)) {
         // A self-lit body with limb darkening or a brightness-only map has a custom colour node.
         material.colorNode = selfLitColour(body, t, body.albedoLuma ? meanLuma(t.image) : null);
@@ -524,7 +533,7 @@ export function buildScene(
 
       const makeMaterial = (hasAo: boolean, edge: number | null) => {
         if (!shape || !needsShapeMaterial(shape, hasAo)) {
-          return track(new MeshStandardNodeMaterial({ color: srgb(body.tint), roughness: 0.95 }));
+          return track(new MeshStandardNodeMaterial({ color: liftedTint(body), roughness: 0.95 }));
         }
         const m = track(
           new ShapeMaterial({
@@ -535,7 +544,7 @@ export function buildScene(
             lommelSeeliger: shape.lommelSeeliger,
           }),
         );
-        m.color = srgb(body.tint);
+        m.color = liftedTint(body);
         return m;
       };
 

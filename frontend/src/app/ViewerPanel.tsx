@@ -311,7 +311,16 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             // The epoch the panel itself opens on (a comet: its latest epoch with gas data), so a
             // fixture card is drawn at its own epoch and not at the default one.
             const epoch = epochsWithQ(c).at(-1) ?? defaultContext().epoch;
-            const shown = planRender(c, p, defaultContext({ honesty, epoch, mode: mode ?? null }));
+            // The viewer's quality level, as the panel passes it (PR #63 nit), so a low-tier run
+            // lists the layers that level does not draw as refused (`quality`, Q-117).
+            const tier = created.renderStats?.().tier;
+            const qualityTier =
+              tier === 'high' || tier === 'medium' || tier === 'low' ? tier : undefined;
+            const shown = planRender(
+              c,
+              p,
+              defaultContext({ honesty, epoch, mode: mode ?? null, qualityTier }),
+            );
             created.showPlan(shown);
             return shown;
           };

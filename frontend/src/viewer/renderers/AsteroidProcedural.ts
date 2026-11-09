@@ -8,17 +8,15 @@
 import { ellipsoidAxes, litBody, numberField, PlanBuilder, type PlanInput } from '../planCommon';
 import type { RenderParams } from '@/contract';
 import type { RenderPlan, Rgb } from '../planTypes';
+import { noteDisplayLift } from './asteroidLift';
 
 const WHITE: Rgb = [1, 1, 1];
 
 /**
- * Display lift of the baked albedo map of a procedural asteroid (artistic, PR #63 review). The map is
- * a dark C-type grey (brightness 0.12 + 1.6 albedo, R6.2); at the common exposure the lit limb was
- * about 1.8:1 against the sky. The map is multiplied by this factor in the material so the lit limb
- * reads at 3:1 or more (WCAG non-text contrast). The albedo in the card and the map stay the derived
- * values; the plain Measured-only sphere is not lifted; the lift is not a measurement.
+ * Display lift of the baked albedo map (artistic): capped by the map's own mean brightness, see
+ * `asteroidLift.ts`. The plain Measured-only sphere is not lifted; the lift is not a measurement.
  */
-export const ASTEROID_ALBEDO_LIFT = 6;
+export { ASTEROID_ALBEDO_LIFT } from './asteroidLift';
 
 /**
  * R7.2: `displacementScale = relief_amp` (fraction of the radius, R6.2). `RenderTextures` declares
@@ -84,6 +82,9 @@ export function planAsteroidProcedural(input: PlanInput): RenderPlan {
           'Surface pushed in and out by the relief map. On phones it stays smooth and the relief shows as shading only.',
         ));
 
+  // The baked map is brightened for display (artistic, capped by its brightness): said so.
+  if (bodyOk && albedo) noteDisplayLift(b);
+
   const axes = ellipsoid ? ellipsoidAxes(numberField(input.card, 'lightcurve_amp_mag')) : undefined;
   if (bodyOk && !ellipsoid) {
     b.notes.push('Shown as a plain sphere: the ellipsoid shape is an estimate.');
@@ -97,6 +98,7 @@ export function planAsteroidProcedural(input: PlanInput): RenderPlan {
           litBody('body', axes ?? [1, 1, 1], albedo ? WHITE : b.tint.rgb, {
             segments: [256, 128],
             albedoUrl: albedo ? (tex?.albedo ?? null) : null,
+            displayLift: albedo,
             normalUrl: relief ? (tex?.normal ?? null) : null,
             heightUrl: displaceDrawn ? heightUrl : null,
             displacementScale: displaceDrawn ? reliefAmp : null,

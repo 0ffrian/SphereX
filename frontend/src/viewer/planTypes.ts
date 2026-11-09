@@ -107,6 +107,11 @@ export interface BodyPlan {
    * seeded one, so the two share a map but are not identical clones. A look (artistic).
    */
   albedoOffsetU?: number;
+  /**
+   * Asteroids: the colour is brightened for display, capped by the surface's own brightness
+   * (`asteroidLift.ts`, artistic). Off when absent.
+   */
+  displayLift?: boolean;
   roughness: number;
   meshUrl: string | null;
   albedoUrl: string | null;

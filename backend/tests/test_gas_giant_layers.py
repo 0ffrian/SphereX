@@ -71,8 +71,9 @@ def test_a_measured_spin_leaves_only_the_wind_assumed() -> None:
     c["rot_period_h"] = tv(10.0)
     ls = layers(c)
     assert ls["bands"]["requires"] == ["radius_rjup", "rot_period_h"]
-    # The card has no wind, so the best tag stays model_dependent, never derived.
-    assert ls["bands"]["tag"] == "model_dependent"
+    # The card has no wind and the typical wind is [verify] (Q-119, Q-110), so bands stays tier 4
+    # even with a measured spin; flattening uses only verified Jupiter constants: tier 3.
+    assert ls["bands"]["tag"] == "inferred_from_analog"
     assert ls["flattening"]["tag"] == "model_dependent"
     assert "typical spin" not in ls["bands"]["description"]
     assert ls["bands"]["assumed"] == {"zonal_wind_ms": 50.0}

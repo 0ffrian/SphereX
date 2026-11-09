@@ -29,8 +29,9 @@ export interface BrownDwarfConfig {
  * `limb_darkening` layer of the star). That is a visible-band solar value, used here as a
  * placeholder for an infrared view. No T-dwarf coefficient is confirmed here: published values
  * depend on the band and the model atmosphere (for example Claret et al. 2012 tabulate them for
- * cool dwarfs), so the layer is `model_dependent`, with this assumption in its `assumed` text,
- * never `measured` or `derived`. It makes a self-lit disc fade toward the limb instead of a flat
+ * cool dwarfs: about 0.25-0.29 at 3.6 and 4.5 um), so 0.6 is an analogue and the layer is
+ * `inferred_from_analog` (Q-119), with this assumption in its `assumed` text, never `measured` or
+ * `derived`. It makes a self-lit disc fade toward the limb instead of a flat
  * disc; a different `u` changes the depth of the fade, not the layer.
  */
 export const BROWN_DWARF_LIMB_U: number | null = 0.6;
@@ -115,7 +116,7 @@ export function planBrownDwarf(
   }
 
   // Limb darkening of the self-lit disc (issue #62): a disc that glows evenly to its edge looks
-  // flat. Linear law, coefficient assumed (see BROWN_DWARF_LIMB_U), so `model_dependent`.
+  // flat. Linear law, coefficient taken from an analogue (see BROWN_DWARF_LIMB_U), so `inferred_from_analog` (Q-119).
   let limbU: number | null = null;
   if (config.limbU === null) {
     if (bodyOk && b.has('limb_darkening')) {
@@ -131,7 +132,7 @@ export function planBrownDwarf(
       b,
       viewerLayer(
         'limb_darkening',
-        'model_dependent',
+        'inferred_from_analog',
         'The disc is fainter toward its edge, as a hot gas ball is: a standard linear law. The coefficient is the visible-band solar value, used as a placeholder for an infrared view; none is confirmed for this dwarf [verify].',
         {
           formula: 'I(mu) = 1 - u * (1 - mu)',
@@ -272,8 +273,10 @@ export function planBrownDwarf(
 
   if (irPattern) {
     const entry = b.drawn.find((d) => d.id === 'bands');
+    // Said once: in the legend entry when `bands` is listed, else as a note (PR #63 review nit: a
+    // screen reader read it twice).
     if (entry) entry.description = `${entry.description} ${IR_STRIPES_NOTE}`;
-    b.notes.push(IR_STRIPES_NOTE);
+    else b.notes.push(IR_STRIPES_NOTE);
   }
 
   // The baked map in colour (visible view), or as brightness on the SPHEREx colour (infrared view).
