@@ -126,8 +126,10 @@ classDiagram
     requires diameter_km
     SphereGeometry 1, 256, 128 scaled by ellipsoid_axes
     baked albedo (visible mode only), normal, roughness maps
-    displacement by baked height map, refused (reason backend) while textures.relief_amp is not sent
-    displacement on desktop only
+    displacement by baked height map, scale textures.relief_amp (artistic layer displacement, issue #62)
+    refused (reason backend) when relief_amp is not sent
+    displacement on the high and medium quality levels only (refused with reason quality on low, PlanContext.qualityTier)
+    albedo lift 0.42 over mean luma, clamped 1 to 6, from + Estimated, legend line display_lift (asteroidLift.ts, Q-117)
   }
   class Comet {
     <<comet>>
@@ -144,8 +146,9 @@ classDiagram
     <<brown_dwarf, brown_dwarf_binary>>
     requires spectral_class, flux_45um
     sphere about 1 Jupiter radius
-    baked bands, contrast from ch4_depth_33
-    emissive from flux_45um
+    baked bands, contrast from ch4_depth_33, in the IR view brightness only on the average colour (albedoLuma, Q-116)
+    limb_darkening layer, linear u 0.6 analogue, tier 4 (Q-116, Q-119)
+    emissive from flux_45um, refused (reason unverified) while flux45Reference is null
     binary orbit is artistic
   }
   class Star {
@@ -153,7 +156,7 @@ classDiagram
     requires teff_K, radius_rsun optional (no radius: unit sphere, no scale bar)
     blackbody colour, linear limb darkening
     Mira brightness follows light curve
-    T Tauri disc and dust screen
+    T Tauri disc (flared, lit, depth-tested, two fixed passes: back faces then front faces; ttauriDisc.ts, issue #62) and dust screen
     motion trail from pm_mas_yr
     issue #42: StarBody draws spots, faculae, flares, loops, granulation, glow
     from the CPU model bodies/starModel.ts (pure in seed, rates, t)
@@ -172,6 +175,8 @@ classDiagram
     visibleTags from allowedTags(plan.honesty), light from planLighting, onChange from BuildHooks
     plain sphere at once (never blank), surface swaps in when the field is ready
     plain sphere follows Q-45: only while the size on the card is shown
+    gas_giant (issue #62): five layers bands, flattening, colour, storms, turbulence, each its own switch
+    (plan.shader.gas, setGasLayers, JetLayers uniforms), bands, flattening, colour from + Estimated, storms and turbulence (artistic) from + Artistic (Q-115)
     TSL node materials on three r187
     reads field as 2 Float32 DataTextures via textureLoad
     finer noise is seen, not felt

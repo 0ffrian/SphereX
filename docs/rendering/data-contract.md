@@ -1,6 +1,6 @@
 # Data contract: TV, ObjectCard, RenderParams
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1, R3.2, R3.4 (R3.3 in [type-selection.md](type-selection.md)) · **Implements:** [D-02, D-32](../decisions/contract-tags.md), [D-04, D-16, D-18, D-23, Q-33, Q-35, Q-36](../decisions/contract.md), [D-01](../decisions/rendering-bodies.md), [D-12](../decisions/haptics-design.md) · **Read with:** [type-selection.md](type-selection.md) (R3.3), [surface-generation.md](surface-generation.md) (R6.2), [display-rules.md](display-rules.md) (R5.2, R5.7)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1, R3.2, R3.4 (R3.3 in [type-selection.md](type-selection.md)) · **Implements:** [D-02, D-32](../decisions/contract-tags.md), [D-04, D-16, D-18, D-23, Q-33, Q-35, Q-36](../decisions/contract.md), [D-01](../decisions/rendering-bodies.md), [Q-117](../decisions/rendering-layers.md), [D-12](../decisions/haptics-design.md) · **Read with:** [type-selection.md](type-selection.md) (R3.3), [surface-generation.md](surface-generation.md) (R6.2), [display-rules.md](display-rules.md) (R5.2, R5.7)
 
 ## R3. Data contract
 
@@ -84,7 +84,7 @@ interface RenderParams {
   id: string; type: ObjectType; generator_version: string; seed: number;   // seed: integer >= 0 (Q-35)
   scale_m: number | null;              // physical radius in metres; null = size unknown, body refused (Q-33)
   layers: Layer[];                     // ordered, each with a tag
-  // relief_amp: peak relief, fraction of the radius (R6.2); scales the displacement (R7.2). Optional, the backend does not send it yet (Q-103)
+  // relief_amp: peak relief, fraction of the radius (R6.2); scales the displacement (R7.2). Optional (Q-103); the backend sends it for `asteroid_procedural` (issue #62, Q-117), with an `artistic` `displacement` layer
   textures?: { albedo: string; height: string; normal: string; roughness?: string; height_bin?: string; relief_amp?: number };
   lighting: { mode: 'sun' | 'self'; sun_dir?: [number, number, number]; phase_angle_deg?: number };
                                        // sun_dir: today a copy of the card's ICRF sun_vector; the viewer reads it

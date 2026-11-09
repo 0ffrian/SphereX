@@ -1,6 +1,6 @@
 # Display levels and shared 3D view rules
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.7 · **Implements:** [D-05, Q-15, Q-64, Q-132](../decisions/platform-hosting.md), [D-21, Q-27](../decisions/contract-tags.md), [D-23, Q-36](../decisions/contract.md), [D-34, Q-66](../decisions/rendering-motion.md), [Q-104](../decisions/rendering-kinds.md), [D-28](../decisions/moving-objects.md), [Q-113](../decisions/shell-surfaces.md) · **Read with:** [build-mould.md](build-mould.md) (R5.8), [data-contract.md](data-contract.md) (R3.4), [accessibility.md](accessibility.md) (R9)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.7 · **Implements:** [D-05, Q-15, Q-64, Q-132](../decisions/platform-hosting.md), [D-21, Q-27](../decisions/contract-tags.md), [D-23, Q-36](../decisions/contract.md), [D-34, Q-66](../decisions/rendering-motion.md), [Q-104, Q-107](../decisions/rendering-kinds.md), [Q-115, Q-116, Q-117](../decisions/rendering-layers.md), [Q-119](../decisions/contract-tags.md), [D-28](../decisions/moving-objects.md), [Q-113](../decisions/shell-surfaces.md) · **Read with:** [build-mould.md](build-mould.md) (R5.8), [data-contract.md](data-contract.md) (R3.4), [accessibility.md](accessibility.md) (R9)
 
 ## R4. Display levels
 
@@ -19,6 +19,9 @@
 ### R5.1 Lighting
 
 - **Solar-system bodies:** a single `DirectionalLight` placed at `phase_angle_deg` from the view direction. Use Horizons quantity 24 (Sun–Target–Observer angle) with observer `500@-163182` at the observation epoch. A tiny ambient light (intensity ≤ 0.03) keeps the night side legible. Tag: `measured` (Q-62 item 4, still to confirm; conflict: [Q-181](../decisions/contract-tags.md)).
+  - **No phase angle (PR #63 review, Q-107 item 1):** the card's `sun_vector` is read as scene space with no frame conversion (Q-62), so it is a hint, not a measured phase. `planLighting` turns it toward the camera and up by `SUN_HINT_DISPLAY_TILT` (0, 0.45, 0.9) before it is normalised (about 51° of phase for `[1, 0, 0]`), so the terminator is a curved ellipse and not the straight line a Sun in the image plane gives. Tag `artistic`; not applied to a comet (its tail uses the same hint) and never to a given `phase_angle_deg`.
+  - **Gas giant terminator and night side (artistic):** the Minnaert factor's `mu0` is floored at `MINNAERT_MU0_FLOOR` 0.3, so the lit side fades with the light's own linear slope and not with the infinite slope of `mu0^0.8` at the terminator; the dark half keeps `GAS_NIGHT_FLOOR` 0.012 of the body's own colour as a faint floor so the limb stays readable (R9). Airless rock keeps a sharp terminator.
+  - **Asteroid albedo lift (artistic, Q-117 amended):** a dark C-type map read at about 1.8:1 against the sky, so the asteroid's colour is multiplied up in the material by `clamp(ASTEROID_LIFT_TARGET / mean linear luma, 1, ASTEROID_ALBEDO_LIFT)` (target 0.42, cap 6; `viewer/renderers/asteroidLift.ts`): a C-type map is lifted ×6 and its lit limb reads at 3:1 or more, while a bright E- or V-type surface is lifted little or not at all, so it never clips to flat white and is never darkened. The mean is the loaded map's for a procedural asteroid and the colour's for a shape-model asteroid (same rule). Applied at + Estimated and + Artistic, never at Measured only. The light stays at the common exposure and the card's albedo and the map are unchanged. The lift is stated: a `display_lift` legend line (`artistic`) from + Artistic, a note at + Estimated.
 - **Stars and brown dwarfs:** self-luminous (emissive). No external light.
 
 ### R5.2 View modes
@@ -30,7 +33,7 @@
   | `asteroid_shape`, `asteroid_procedural` | `gaia_rgb`, otherwise the class palette ([§6.4](surface-generation.md#r64-colour-no-ai-default)); brightness from `albedo` | `derived` / `inferred_from_analog` | `gaia_rgb` / `class_palette` |
   | `brown_dwarf`, `brown_dwarf_binary` | class palette T or Y ([§6.2](surface-generation.md#r62-card--generator-parameters-deterministic-rules)); no palette (L) → refused | `inferred_from_analog` | `class_palette` |
   | `star`, `star_mira`, `star_ttauri` | Teff blackbody colour (R7.5) | the weaker of `teff_K`'s tag and `derived` | `class_palette` (no `teff` value yet, Q-36) |
-  | shader kinds (R7.7) | neutral grey (0.5, 0.5, 0.5); badge "Default (artist's choice)" | `artistic` | `class_palette` (Q-36) |
+  | shader kinds (R7.7) | neutral grey (0.5, 0.5, 0.5); badge "Default (artist's choice)". A gas giant's own `colour` layer (palette family from `teq_K`, `derived`; `artistic` without it) is separate (Q-115) | `artistic` | `class_palette` (Q-36) |
   | `comet`, `candidate` | none: `visible` is refused and listed in `missing` | — | — |
 
 - **SPHEREx infrared (measured):** tint = `spherex_rgb`, computed by the backend from the object's own spectrum. **Q-27 is open:** Rainbow Trails and the wavelength tint (R4) are tagged `derived`, while this mode is `measured`; both stand until Q-27 is answered (Atish, Moon).
@@ -39,6 +42,7 @@
   - Stars and shader kinds have no IR mode: the `spherex_ir` key is omitted, which is not a refusal (`CHANNELS_BY_TYPE`, `card_to_params.py`).
   - Badge: "SPHEREx infrared, whole-body average (false colour)".
   - If fewer than 2 points fall in a channel window, the mode is disabled and listed in `missing`.
+  - The colour is the whole-body average only. A brown dwarf's baked band map (visible palette) is the one pattern drawn here, as **brightness only** on that average colour (its luma divided by its mean, Q-116). It is an `artistic` look, and the legend says the stripes are not from SPHEREx. Browser jets stay out of this view.
 - The fields of both modes are in [§3.4](data-contract.md#r34-renderparams-produced-by-the-backend-get-v1objectsidrender-params) (D-23).
 
 ### R5.3 Honesty toggle (3 states)
@@ -48,8 +52,8 @@ One state per badge (D-21):
 | State | Shows tags | Examples |
 |---|---|---|
 | Measured only | `measured` | Real mesh or a plain sphere at measured size, flat measured tint, measured lighting. The body is kept only when its size value is `measured`; the `ellipsoid` layer is `model_dependent`, so Measured only shows a sphere |
-| + Estimated (starting state) | adds `derived`, `model_dependent`, `inferred_from_analog` | Class palette, derived colours, brightness from Teff/flux |
-| + Artistic | adds `artistic` | Procedural relief, AI paint, band patterns, orbit drawings |
+| + Estimated (starting state) | adds `derived`, `model_dependent`, `inferred_from_analog` | Class palette, derived colours, brightness from Teff/flux; gas giant bands, flattening and colour (Q-115; the bands are `inferred_from_analog` while the typical wind is unverified, and the flattening is when the card has no spin, Q-119) |
+| + Artistic | adds `artistic` | Procedural relief, AI paint, baked band patterns (brown dwarf), gas giant storms and turbulence (seeded looks), orbit drawings |
 
 - The toggle starts at **+ Estimated**: everything shown on load is backed by data or a stated formula.
 - **Build exception (proposed, Q-113 item 7; Moon to confirm, with Q-49):** *Build it*, *Replay* and *New seed* raise the level to + Artistic when the plan has hidden layers, and say so. Rules in R5.8.

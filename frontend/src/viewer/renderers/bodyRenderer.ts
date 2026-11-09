@@ -9,6 +9,7 @@ import type { FieldData, FieldParams, FieldSampler, Vec3 } from '../fields/field
 import type { TierName } from '../render/quality';
 import type { PointSet } from './pointClouds';
 import type { Motion, SimTimeFn } from '../motion/motion';
+import type { GasSwitches } from './shaderSpec';
 
 export const ALL_TAGS: readonly Tag[] = [
   'measured',
@@ -57,6 +58,12 @@ export interface BodyContext {
   motion?: Motion;
   /** Noise octaves of the quality level (R5.7). Default 4 (the low level). */
   octaves?: number;
+  /**
+   * Gas giants (issue #62): which of the five layers the plan draws. The plan also applies the
+   * build animation's holds, which `visibleTags` cannot say. Default: each layer's own tag
+   * against `visibleTags`.
+   */
+  gasLayers?: GasSwitches;
 }
 
 export interface BodyRenderer {

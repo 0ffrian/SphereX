@@ -14,10 +14,10 @@ D-01 splits generators into backend-baked maps for the rendering-doc types and b
 | `asteroid_procedural` | **Baked** on the backend CPU: albedo, height and normal maps, displaced sphere | `backend/app/core/render/`; `renderers/AsteroidProcedural.ts` | [R6](../rendering/surface-generation.md), [R7.2](../rendering/renderers/asteroid.md) |
 | `comet` | Nucleus plus gas shells drawn as emission volumes; not baked | `renderers/Comet.ts`, `volume/` | [R7.3](../rendering/renderers/comet.md) |
 | `brown_dwarf`, `brown_dwarf_binary` | **Baked** banded texture; when winds are sped up the browser draws the jets (Q-104 item 7) | `renderers/BrownDwarf.ts`, `renderers/jetSurface.ts` | [R7.4](../rendering/renderers/brown-dwarf.md) |
-| `star`, `star_mira`, `star_ttauri` | Animated browser shader: colour from Teff, limb darkening, granulation, spots, flares; not baked | `shaders/star.ts`, `renderers/StarBody.ts`, `bodies/` | [R7.5](../rendering/renderers/stars.md) |
+| `star`, `star_mira`, `star_ttauri` | Animated browser shader: colour from Teff, limb darkening, granulation, spots, flares; not baked. T Tauri: a flared, lit disc (Q-118) | `shaders/star.ts`, `renderers/StarBody.ts`, `bodies/`, `renderers/ttauriDisc.ts` | [R7.5](../rendering/renderers/stars.md) |
 | `candidate` | No 3D body | none | [R7.6](../rendering/renderers/candidate.md) |
 | `planet_rocky`, `planet_water` | Browser shader `terra-planet`: fractal terrain with sea level, polar ice, lava cracks, cloud shell, atmosphere glow; triplanar | `renderers/ShaderBody.ts`, `renderers/shaderSpec.ts` | [R7.7](../rendering/renderers/shader-kinds.md) |
-| `gas_giant` | Browser shader `banded-giant`: bands warped by noise, counter-flowing jets, seeded storms, optional rings | same | [R7.7](../rendering/renderers/shader-kinds.md) |
+| `gas_giant` | Browser shader `banded-giant`: bands warped by noise, counter-flowing jets, seeded storms, optional rings; five tiered layers from the backend, each with its own switch (Q-115) | same | [R7.7](../rendering/renderers/shader-kinds.md) |
 | `nebula` | Emission volume `gas-cloud`, ray-marched through a baked 3D noise cube; additive glow plus dark dust; no points, no stars, no haptics (Q-103) | `volume/VolumeBody.ts` | [R7.7](../rendering/renderers/shader-kinds.md) |
 | `nova` | Volume shell `shell-remnant`: filaments, hot inner gas, core glow, expansion by age; no haptics (Q-103) | `volume/VolumeBody.ts` | [R7.7](../rendering/renderers/shader-kinds.md) |
 

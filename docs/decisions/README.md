@@ -12,13 +12,14 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 |---|---|---|
 | [scope-process.md](scope-process.md) | scope cuts, doc layout, owners, build dates, milestones, the post-event backlog, the demo object and data release, ID reservations | 6 D, 9 Q, 10 KB |
 | [contract.md](contract.md) | the data contract, object types, the endpoint list (D-16), schemas and generated types, saved assets, `overrides`, card and fixture shapes, cached replies | 6 D, 17 Q, 18 KB |
-| [contract-tags.md](contract-tags.md) | provenance tags and badges, the honesty toggle, tier fallback, the policy for unverified constants (Q-110), "which tag does X get" | 3 D, 11 Q, 15 KB |
+| [contract-tags.md](contract-tags.md) | provenance tags and badges, the honesty toggle, tier fallback, the policy for unverified constants (Q-110, Q-119), "which tag does X get" | 3 D, 12 Q, 18 KB |
 | [data-sources.md](data-sources.md) | the backend framework, external archives and adapters, name resolving, the read-through cache and offline mode, test targets, overlays and the composite backends | 4 D, 15 Q, 20 KB |
 | [pipeline-stages.md](pipeline-stages.md) | stages 3 to 7 as built, measurement choices, physics in stage 6, the Sun angle for SBDB bodies, the exoplanet adapter and type rule | 0 D, 5 Q, 13 KB |
 | [pipeline-jobs.md](pipeline-jobs.md) | shape models and their serving, where generated assets are saved, the live cutout budget, object jobs, fan-out and progress endpoints | 0 D, 6 Q, 14 KB |
-| [rendering-bodies.md](rendering-bodies.md) | where surfaces are generated, the baker, renderers per type, physics sliders, accuracy, golden images | 3 D, 9 Q, 14 KB |
+| [rendering-bodies.md](rendering-bodies.md) | where surfaces are generated, the baker, renderers per type, physics sliders, accuracy, golden images, the honest fixtures (Q-114) | 3 D, 10 Q, 17 KB |
 | [rendering-motion.md](rendering-motion.md) | motion, time-lapse, render-on-change, quality levels, tone mapping, golden frames, process gating and tier wording | 1 D, 5 Q, 9 KB |
-| [rendering-kinds.md](rendering-kinds.md) | shapes and volumes, animated sphere bodies, flattening, and the Q-107 visual findings and fix notes | 0 D, 4 Q, 14 KB |
+| [rendering-kinds.md](rendering-kinds.md) | shapes and volumes, animated sphere bodies, flattening, and the Q-107 visual findings and fix notes | 0 D, 4 Q, 15 KB |
+| [rendering-layers.md](rendering-layers.md) | the per-layer body fixes of issue #62 (PR #63): gas giant five tiered layers, brown dwarf limb and infrared bands, asteroid sphere and displacement, the flared T Tauri disc | 0 D, 4 Q, 11 KB |
 | [gemini.md](gemini.md) | the Gemini layer: scope, offline behaviour and its contract | 1 D, 2 Q, 7 KB |
 | [sky-shell.md](sky-shell.md) | the sky view, sky endpoints and sky tiles, the flipbook UI | 1 D, 10 Q, 12 KB |
 | [shell-surfaces.md](shell-surfaces.md) | the tool rail and the island, the object panel and card, the Build split view, the full-bleed layout | 0 D, 5 Q, 13 KB |
@@ -33,7 +34,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 ## Rules for entries
 
 - **IDs never change and are never reused.** A new decision is the next free `D-` number; a new question the next free `Q-` number. Before you pick one, check `origin/main` and the open PRs (they pick numbers too).
-- **Next free:** D-36 and Q-183 (9 Nov 2026; Q-150 to Q-182 were assigned on 9 Nov 2026 to the spec-pass proposals). Q-149 in the Track block is still unused. **Reserved:** Q-130 to Q-149 for the Track tool and Area search (Q-130). **Claimed by open PRs:** PR #63 holds Q-114 to Q-119; PR #53 proposes Q-124 (taken on main, to renumber) and Q-125. **Never used, do not reuse:** Q-46. **Never assigned:** Q-126 to Q-129 (skipped; no file or PR uses them; do not reuse).
+- **Next free:** D-36 and Q-183 (9 Nov 2026; Q-150 to Q-182 were assigned on 9 Nov 2026 to the spec-pass proposals). Q-149 in the Track block is still unused. **Reserved:** Q-130 to Q-149 for the Track tool and Area search (Q-130). **Claimed by open PRs:** PR #53 proposes Q-124 (taken on main, to renumber) and Q-125. **Never used, do not reuse:** Q-46. **Never assigned:** Q-126 to Q-129 (skipped; no file or PR uses them; do not reuse).
 - **One entry, one file.** Put a new entry in the topic file it belongs to and add its row to the index below in the same commit. An entry that changes another one says "amends D-xx" and the amended entry gets an "Amended by" line.
 - **Status words** (for new entries; older rows keep their wording): **Open**; **Open (built)** (code follows the proposal); **Proposed** (an owner must confirm); **Decided** (who and when); **Partly decided** (list what is open); **Superseded by** (the newer entry rules); **Deferred** (after the event). D- entries are **Accepted** unless marked otherwise.
 - **Spec text belongs in the specs.** A decision states the rule and cites the spec section that holds the detail; when a decision changes a rule, update that section in the same PR.
@@ -60,7 +61,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | D-14 | Build from 5 Nov | Approved Atish; Kevin, Moon pending | [scope-process](scope-process.md#d-14-build-from-5-nov-answers-q-10) |
 | D-15 | Backend framework FastAPI | Accepted | [data-sources](data-sources.md#d-15-backend-framework-fastapi-answers-q-01) |
 | D-16 | API endpoints | Accepted; 3 notes "not yet decided" (Q-50, Q-… | [contract](contract.md#d-16-api-endpoints-answers-q-06) |
-| D-17 | Owners | Accepted | [scope-process](scope-process.md#d-17-owners-answers-q-07-and-the-ownership-part-of-q-14) |
+| D-17 | Owners | Accepted (amended 9 Nov 2026, issue #68: Moon decides body rules) | [scope-process](scope-process.md#d-17-owners-answers-q-07-and-the-ownership-part-of-q-14) |
 | D-18 | Contract generated from shared/schemas | Accepted | [contract](contract.md#d-18-the-contract-is-generated-from-sharedschemas-answers-q-14) |
 | D-19 | Name resolver order | Accepted | [data-sources](data-sources.md#d-19-name-resolver-order-answers-q-05) |
 | D-20 | Haptics API | Accepted; Q-103 amendment pending Atish | [haptics-design](haptics-design.md#d-20-haptics-api-answers-q-11) |
@@ -133,14 +134,14 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-53 | Contamination 2 px self-match | Open (2 px) | [data-sources](data-sources.md) |
 | Q-54 | Add/subtract across wavelengths | Open (any pair, both wavelengths shown) | [data-sources](data-sources.md) |
 | Q-55 | Stage 3, 4, 5, 7 choices | Open (implemented as described) | [pipeline-stages](pipeline-stages.md) |
-| Q-56 | Exoplanet type thresholds | Implemented as Q-63 (thresholds off pending A… | [pipeline-stages](pipeline-stages.md) |
+| Q-56 | Exoplanet type thresholds | Decided via Q-63 (on since issue #68) | [pipeline-stages](pipeline-stages.md) |
 | Q-57 | Where generated assets are saved | Open (implemented as described) | [pipeline-jobs](pipeline-jobs.md) |
 | Q-58 | Physics sliders and slider tags | Open (implemented as described; (b) as `artis… | [rendering-bodies](rendering-bodies.md) |
 | Q-59 | Sedov radius on nova | Open (implemented as described) | [rendering-bodies](rendering-bodies.md) |
 | Q-60 | Physics in backend stage 6 | Open | [pipeline-stages](pipeline-stages.md) |
 | Q-61 | Shape model registry, LODs, units | Open (implemented as described; (4) is applie… | [pipeline-jobs](pipeline-jobs.md) |
 | Q-62 | Sun angle for SBDB bodies | Open (implemented as described) | [pipeline-stages](pipeline-stages.md) |
-| Q-63 | Exoplanet Archive adapter and rule | Pending Atish (rule off: thresholds `None`) | [pipeline-stages](pipeline-stages.md) |
+| Q-63 | Exoplanet Archive adapter and rule | Decided: signed off by Moon (9 Nov 2026, issue #68); rule on | [pipeline-stages](pipeline-stages.md) |
 | Q-64 | Frame-rate targets vs D-05 | Open (R5.7 written as 30 fps floor, 60 fps ta… | [platform-hosting](platform-hosting.md) |
 | Q-65 | Mira pulsation tier split | Open (R5.7 uses the split) | [rendering-bodies](rendering-bodies.md) |
 | Q-66 | Viewer motion and quality levels | Open (implemented as described) | [rendering-motion](rendering-motion.md) |
@@ -186,11 +187,17 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-106 | Tier wording in viewer panel | Open (implemented as described) | [rendering-motion](rendering-motion.md) |
 | Q-107 | Visual findings from #42 review | Mostly fixed (see below). Open: a check on a… | [rendering-kinds](rendering-kinds.md) |
 | Q-108 | Process gating and flare cap | Open (implemented as described) | [rendering-motion](rendering-motion.md) |
-| Q-109 | Brown-dwarf flattening refused | Proposed (implemented as described; Kevin to… | [rendering-kinds](rendering-kinds.md) |
-| Q-110 | Policy for [verify] constants | Proposed | [contract-tags](contract-tags.md) |
+| Q-109 | Brown-dwarf flattening refused | Proposed (Kevin to confirm); amended by Q-115 | [rendering-kinds](rendering-kinds.md) |
+| Q-110 | Policy for [verify] constants | Proposed; upheld by Atish (Q-119) | [contract-tags](contract-tags.md) |
 | Q-111 | Two-stage answer and object jobs | Open (implemented as described) | [pipeline-jobs](pipeline-jobs.md) |
 | Q-112 | Fan-out settings and defaults | Open (implemented as described) | [pipeline-jobs](pipeline-jobs.md) |
 | Q-113 | Select, Build it, split view (main, L579) | Proposed: pending Moon's confirmation (implem… | [shell-surfaces](shell-surfaces.md) |
+| Q-114 | Honest fixtures: baked textures, /data, Eros | Accepted by Atish (PR #63); implemented | [rendering-bodies](rendering-bodies.md) |
+| Q-115 | Gas giant: five tiered layers | Accepted by Atish (PR #63); implemented; amends Q-109 | [rendering-layers](rendering-layers.md) |
+| Q-116 | Brown dwarf limb darkening and IR bands | Accepted by Atish (PR #63); implemented | [rendering-layers](rendering-layers.md) |
+| Q-117 | Asteroid: measured sphere and displacement | Accepted by Atish (PR #63), item (4) replaced; implemented | [rendering-layers](rendering-layers.md) |
+| Q-118 | T Tauri disc flared and lit (R7.5) | Accepted by Atish (PR #63); implemented | [rendering-layers](rendering-layers.md) |
+| Q-119 | Conflict: Q-110 vs Q-115/Q-116 tier 3 | Decided (Q-110 stands); brown-dwarf `u` open | [contract-tags](contract-tags.md) |
 | Q-120 | Marker click opens object again | Decided | [shell-surfaces](shell-surfaces.md) |
 | Q-121 | Rail and island follow mock-up | Proposed: pending Moon's confirmation (implem… | [shell-surfaces](shell-surfaces.md) |
 | Q-122 | Gemini layer contract | Open (implemented as proposed) | [gemini](gemini.md) |

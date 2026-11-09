@@ -15,7 +15,7 @@ Pipeline stage 3 (`backend/app/core/classify/rules.py`, owner Atish, D-17) picks
    - any other star (any otype ending in `*`, plus `s*r`, `s*y`, `s*b`, `Y*O`) → `star`
    - candidates such as `BD?` and `Mi?` are not stars and become `candidate`
 4. NASA Exoplanet Archive match → `planet_rocky`, `planet_water` or `gas_giant`.
-   - Classification thresholds: **proposed** values in `PROPOSED_EXOPLANET_THRESHOLDS` in `rules.py` (Q-63: radius cuts, true mass, Zeng 2019 mass-radius curves), chosen by Moon on 7 Nov 2026. The live thresholds stay `None` (refuse: `candidate` with `type:exoplanet_thresholds`) until Atish (classify owner, D-17) confirms Q-63; all values stay **[verify]** ([R12 #12](open-items.md#r12-open-items-verify)). Archive values marked `CALCULATED_VALUE` are never used to classify (Q-63).
+   - Classification thresholds: **proposed** values in `PROPOSED_EXOPLANET_THRESHOLDS` in `rules.py` (Q-63: radius cuts, true mass, Zeng 2019 mass-radius curves), chosen by Moon on 7 Nov 2026. The live thresholds are these values since issue #68: Moon signed off Q-63 on 9 Nov 2026 after the values were checked against their sources (D-17 amended); a value set back to `None` refuses with `type:exoplanet_thresholds`. Open item: [R12 #12](open-items.md#r12-open-items-verify) (decided). Archive values marked `CALCULATED_VALUE` are never used to classify (Q-63).
    - The Exoplanet Archive service is tested ([A3.8](../architecture/object-sources.md)).
 5. `nebula` and `nova` come from user sliders only. They have no catalogue rule; they are slider-only showcase bodies, and every value is tagged `artistic` (D-12).
 6. Anything else → `candidate`.

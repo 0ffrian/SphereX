@@ -123,6 +123,9 @@ describe('framing (N17)', () => {
 describe('sceneKey (N6): changes that draw the same thing do not rebuild', () => {
   it('is equal when only the labels change, and different when the drawing does', () => {
     const { card, params } = fixture('asteroid_shape');
+    // No loadable mesh, so no tier 5 regolith: the honesty change only relabels (the fixture now
+    // names the real Eros model, issue #62).
+    card.shape_source = { value: 'fixture://meshes/none.glb', tag: 'measured', source: 'test' };
     const a = planRender(card, params, defaultContext({ mode: 'visible' }));
     const b = planRender(card, params, defaultContext({ mode: 'visible', honesty: 'artistic' }));
     expect(sceneKey(a)).toBe(sceneKey(b));

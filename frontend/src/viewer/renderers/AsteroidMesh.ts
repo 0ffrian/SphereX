@@ -5,6 +5,8 @@
 //   and the body falls back to a plain sphere with a flat tint (never blank).
 import { litBody, PlanBuilder, numberField, type PlanInput } from '../planCommon';
 import type { RenderPlan, ShapePlan } from '../planTypes';
+import { isTagShown } from '../honesty';
+import { noteDisplayLift } from './asteroidLift';
 
 /**
  * Spin speed-up. R7.1 shows "×1000" as its example of the factor on screen; the exact factor is
@@ -104,6 +106,11 @@ export function planAsteroidMesh(input: PlanInput): RenderPlan {
   }
 
   const shape = useMesh ? planShapeLayers(b) : null;
+  // The same display lift as the procedural asteroid (PR #63 approval follow-up 1), on the colour
+  // from data. Never at Measured only (an artistic display choice; the procedural asteroid's map is
+  // not drawn there either), nor on the grey stand-in.
+  const lift = bodyOk && b.tint.tag !== null && isTagShown(input.ctx.honesty, 'derived');
+  if (lift) noteDisplayLift(b);
 
   return b.build({
     shape,
@@ -112,6 +119,7 @@ export function planAsteroidMesh(input: PlanInput): RenderPlan {
           litBody('body', [1, 1, 1], b.tint.rgb, {
             meshUrl: useMesh ? url : null,
             segments: [64, 32],
+            displayLift: lift,
           }),
         ]
       : [],

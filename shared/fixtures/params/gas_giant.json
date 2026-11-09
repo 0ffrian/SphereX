@@ -6,10 +6,53 @@
   "scale_m": 69910000.0,
   "layers": [
     {
-      "id": "surface",
+      "id": "bands",
+      "tag": "inferred_from_analog",
+      "tier": 4,
+      "description": "Number of bands from the typical spin of a giant planet and the radius (Rhines scale, A7.2): about 22 from pole to pole. The jet speed is a typical value; the exact band pattern is a seeded look.",
+      "requires": [
+        "radius_rjup"
+      ],
+      "assumed": {
+        "rot_period_h": 9.925,
+        "zonal_wind_ms": 50.0
+      },
+      "formula": "bands ~ sqrt(2 Omega R / U), Omega = 2 pi / P (Rhines scale, order of magnitude only)"
+    },
+    {
+      "id": "flattening",
+      "tag": "inferred_from_analog",
+      "tier": 4,
+      "description": "Flattening of the poles from the typical spin of a giant planet, with the mean density of Jupiter assumed (A7.2).",
+      "requires": [],
+      "assumed": {
+        "rot_period_h": 9.925,
+        "mean_density": "same as Jupiter"
+      },
+      "formula": "f = f_J (P_J / P)^2, from f = 0.7 q with q proportional to Omega^2"
+    },
+    {
+      "id": "colour",
+      "tag": "derived",
+      "tier": 2,
+      "description": "Colour family chosen by the equilibrium temperature (A7.2).",
+      "requires": [
+        "teq_K"
+      ],
+      "formula": "palette family chosen by teq_K between the stops 60, 100, 130, 200, 600, 1100, 1800 K"
+    },
+    {
+      "id": "storms",
       "tag": "artistic",
       "tier": 5,
-      "description": "Browser shader surface and shared CPU field (R7.7). Nothing about it is measured.",
+      "description": "A few storms between the jets, as on the giant planets of the Solar System. How many and where is a seeded look; no measurement of this planet's storms is used.",
+      "requires": []
+    },
+    {
+      "id": "turbulence",
+      "tag": "artistic",
+      "tier": 5,
+      "description": "Swirling detail along the band edges. Look only.",
       "requires": []
     }
   ],
@@ -32,7 +75,7 @@
           0.5
         ],
         "tag": "artistic",
-        "source": "synthetic fixture: artist's default colour"
+        "source": "synthetic fixture: neutral stand-in swatch, the drawn palette is the colour layer"
       },
       "source": "class_palette"
     }
@@ -71,6 +114,6 @@
       "clouds": 3600
     }
   },
-  "alt_text": "Synthetic fixture. Gas giant, 1 Jupiter radius (measured), artist's colour, lit by its star. Surface relief: illustrative.",
+  "alt_text": "Synthetic fixture. Gas giant, 1 Jupiter radius (measured), colour family from the equilibrium temperature, lit by its star. Surface relief: illustrative.",
   "missing": []
 }

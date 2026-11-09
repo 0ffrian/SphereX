@@ -1,6 +1,6 @@
 # File layout and ownership
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R10 · **Implements:** [D-11, D-17](../decisions/scope-process.md), [D-18](../decisions/contract.md), [D-13](../decisions/haptics-design.md) · **Read with:** [layout-repo.md](layout-repo.md) (R10.1, the rest of the repo), [../uml/04-package.md](../uml/04-package.md)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R10 · **Implements:** [D-11, D-17](../decisions/scope-process.md), [D-18](../decisions/contract.md), [D-13](../decisions/haptics-design.md), [Q-114](../decisions/rendering-bodies.md), [Q-115 to Q-118](../decisions/rendering-layers.md) · **Read with:** [layout-repo.md](layout-repo.md) (R10.1, the rest of the repo), [../uml/04-package.md](../uml/04-package.md)
 
 ## R10. File layout and ownership
 
@@ -9,6 +9,7 @@ The paths this spec owns: the texture baker, the 3D viewer, haptics and sound, a
 ```
 backend/app/core/render/            (Atish)
   card_to_params.py   # §6.2 rules + tags; pipeline stage 7 (A4.7), issue #5, built; seed_for (R6.3, Q-35); measuring: refusals (Q-111)
+  gas_giant.py        # gas giant layer rules and typical constants: Rhines bands, flattening (§7.7, A7.2; issue #62, Q-115, Q-119)
   background.py       # TextureBaker: R6.7 bakes off the request path, both sizes, worker process (issue #41, Q-112)
   blackbody.py        # §7.5 Teff -> display colour, issue #5
   noise.py craters.py height.py normals.py palette.py bake.py   # issue #6, built; height.band_field and palette.BROWN_DWARF_PALETTE (R6.2)
@@ -16,6 +17,7 @@ backend/app/core/render/            (Atish)
   __main__.py         # python -m app.core.render <card.json> --seed N --out DIR
   gemini_paint.py     # R6.6, stretch, behind the admin token; issue #14, built (Q-122)
   spherex_rgb.py      # §5.2 channel extraction (CHANNELS_BY_TYPE), issue #5, built
+backend/scripts/bake_fixtures.py    (Atish)  # bakes shared/fixtures/textures/ with the real baker (§6.7, issue #62, Q-114); --check fails on drift
 frontend/src/viewer/                 (Moon)
   ViewerApp.ts lighting.ts modes.ts honesty.ts scaleBar.ts altText.ts sliders.ts
   planTypes.ts planCommon.ts renderPlan.ts   # pure RenderPlan: types, shared helpers, planRender (no GPU)
@@ -27,6 +29,9 @@ frontend/src/viewer/                 (Moon)
   renderers/StarBody.ts     # star surface (R7.5.1, issue #42)
   renderers/jetSurface.ts jetPalette.ts   # brown dwarf moving jets (R7.4, issue #42)
   renderers/linearColour.ts # sRGB <-> linear colour helpers
+  renderers/asteroidLift.ts # asteroid display lift, capped (R5.1, issue #62, Q-117)
+  renderers/ttauriDisc.ts   # flared, lit T Tauri disc (R7.5, issue #62, Q-118)
+  renderers/textureMean.ts  # mean luma of a loaded map: brown dwarf IR pattern (R5.2, Q-116), asteroid lift (Q-117)
   bodies/starModel.ts       # CPU model of star groups, flares and loops (R7.5, issue #42)
   volume/             # nebula, nova, coma, tails (issue #43): VolumeBody.ts, noiseVolume.ts (48³ cube), volumeMath.ts, volumeSpecs.ts
   shape/              # real shape models (R7.1, issue #43): shapeModel.ts (load, LOD), ShapeMaterial.ts (Lommel-Seeliger), ShapeAo.ts (baked AO)

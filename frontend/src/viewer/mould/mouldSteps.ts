@@ -114,7 +114,7 @@ const STEPS: Record<MouldKind, MouldStepDef[]> = {
     { label: 'Base mould', hint: 'A sphere of triangles', layers: ['body'], base: true },
     { label: 'Bands', hint: 'Winds in stripes', layers: ['bands', 'jets'], fadesWire: true },
     { label: 'Storms', hint: 'Seeded spots', layers: ['cloud_cover'] },
-    { label: 'Colour', hint: 'From temperature', layers: ['emissive', TINT] },
+    { label: 'Colour', hint: 'From temperature', layers: ['emissive', 'limb_darkening', TINT] },
   ],
   rocky: [
     { label: 'Base mould', hint: 'A sphere of triangles', layers: ['surface'], base: true },
@@ -141,13 +141,18 @@ const STEPS: Record<MouldKind, MouldStepDef[]> = {
     { label: 'Colour', hint: 'Land, sea and ice', layers: ['climate'], knobs: ['colour'] },
     { label: 'Clouds', hint: 'Clouds and sky', layers: ['clouds'], knobs: ['clouds'] },
   ],
+  // Issue #62: a gas giant's surface is five layers (bands, flattening, colour, storms,
+  // turbulence), each switched by the plan, so the steps reveal them one after another.
   gas: [
+    { label: 'Base mould', hint: 'A sphere of triangles', layers: ['body'], base: true },
     {
-      label: 'Base mould',
-      hint: 'A sphere of triangles',
-      layers: ['surface', 'band_count', 'flattening', 'jets', 'storms'],
-      base: true,
+      label: 'Bands',
+      hint: 'Winds in stripes, flattened by the spin',
+      layers: ['bands', 'flattening', 'jets', 'turbulence'],
+      fadesWire: true,
     },
+    { label: 'Storms', hint: 'Seeded spots', layers: ['storms', 'storm_drift'] },
+    { label: 'Colour', hint: 'From temperature', layers: ['colour'] },
   ],
   nebula: [{ label: 'Volume', hint: 'A ball of glowing gas', layers: ['point_cloud'], base: true }],
   nova: [

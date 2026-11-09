@@ -13,7 +13,8 @@ import { directionFromPhaseAngle } from './lighting';
 import { defaultContext, planRender } from './renderPlan';
 import { displacementActive, reliefAmpOf } from './renderers/AsteroidProcedural';
 import { ellipsoidAxes } from './planCommon';
-import type { PlanContext } from './planTypes';
+import type { MissingItem, PlanContext } from './planTypes';
+import { describeRefusal } from '../app/messages';
 import {
   cssToLinear,
   dustConeVolume,
@@ -91,7 +92,8 @@ describe('shape-model asteroid (R7.1, A7.4)', () => {
   });
 
   it('with no loadable mesh there is no shape plan: a plain sphere, nothing invented', () => {
-    const { card, params } = fixture('asteroid_shape'); // fixture:// address
+    const { card, params } = fixture('asteroid_shape');
+    card.shape_source = { value: 'fixture://meshes/none.glb', tag: 'measured', source: 'test' };
     const plan = planRender(card, params, defaultContext({ honesty: 'artistic' }));
     expect(plan.bodies[0]?.meshUrl).toBeNull();
     expect(plan.shape).toBeNull();
@@ -127,8 +129,48 @@ describe('asteroid without a model: ellipsoid and displacement (R7.2)', () => {
     expect(ellipsoidAxes(-1)).toEqual([1, 1, 1]);
   });
 
+  it('the fixture carries the relief amplitude and its artistic displacement layer (issue #62)', () => {
+    const { card, params } = fixture('asteroid_procedural');
+    expect(params.textures?.relief_amp).toBe(0.03);
+    expect(params.layers.find((l) => l.id === 'displacement')).toMatchObject({
+      tag: 'artistic',
+      tier: 5,
+    });
+    const plan = planRender(card, params, defaultContext({ honesty: 'artistic' }));
+    expect(plan.bodies[0]?.displacementScale).toBe(0.03);
+    // Not at + Estimated: the relief and its displacement are artistic looks.
+    const est = planRender(card, params, defaultContext({ honesty: 'derived' }));
+    expect(est.bodies[0]?.displacementScale ?? null).toBeNull();
+    expect(est.drawn.some((d) => d.id === 'displacement')).toBe(false);
+  });
+
+  it('on the low quality level displacement is refused with a reason, not listed (Q-117)', () => {
+    const { card, params } = fixture('asteroid_procedural');
+    const at = (qualityTier?: 'high' | 'medium' | 'low') =>
+      planRender(card, params, defaultContext({ honesty: 'artistic', qualityTier }));
+    for (const t of [undefined, 'high', 'medium'] as const) {
+      const p = at(t);
+      expect(p.drawn.some((d) => d.id === 'displacement')).toBe(true);
+      expect(p.bodies[0]?.displacementScale).toBe(0.03);
+    }
+    const low = at('low');
+    expect(low.drawn.some((d) => d.id === 'displacement')).toBe(false);
+    expect(low.bodies[0]?.displacementScale ?? null).toBeNull();
+    expect(low.bodies[0]?.heightUrl ?? null).toBeNull();
+    expect(missing(low, 'displacement')).toMatchObject({
+      reason: 'quality',
+      detail: 'phone tier: relief shows as shading only',
+    });
+    expect(describeRefusal(missing(low, 'displacement') as MissingItem)).toContain(
+      'phone tier: relief shows as shading only',
+    );
+    // The normal map still carries the relief.
+    expect(low.drawn.some((d) => d.id === 'relief')).toBe(true);
+  });
+
   it('refuses displacement while relief_amp is unknown (no value invented)', () => {
     const { card, params } = fixture('asteroid_procedural');
+    delete params.textures!.relief_amp;
     const plan = planRender(card, params, defaultContext({ honesty: 'artistic' }));
     expect(plan.bodies[0]?.displacementScale).toBeNull();
     expect(plan.bodies[0]?.heightUrl).toBeNull();
@@ -158,7 +200,7 @@ describe('asteroid without a model: ellipsoid and displacement (R7.2)', () => {
     expect(plan.bodies[0]?.displacementScale).toBe(0.03);
     expect(missing(plan, 'displacement')).toBeUndefined();
     // It has a legend entry and a tag of its own.
-    expect(drawnTag(plan, 'displacement')).toBe('derived');
+    expect(drawnTag(plan, 'displacement')).toBe('artistic');
   });
 
   it('refuses displacement when its load failed, and draws none in Measured only', () => {

@@ -2,18 +2,27 @@
 //   Requires diameter_km. Optional: lightcurve_amp_mag, colour, albedo.
 //   Sphere (256 x 128) scaled by the ellipsoid axes; albedo and normal maps are baked by the
 //   backend (R6) and only loaded here. Measured-only state: plain sphere with a flat tint.
-//   Displacement (desktop only) is not implemented: the normal map carries the relief.
+//   Displacement by the baked height map (R7.2, issue #62) runs on the high and medium quality
+//   levels (not the phone's low one); the normal map still carries the fine relief on top of it.
+//   `textures.relief_amp` and the `displacement` layer (`artistic`) come from the backend.
 import { ellipsoidAxes, litBody, numberField, PlanBuilder, type PlanInput } from '../planCommon';
 import type { RenderParams } from '@/contract';
 import type { RenderPlan, Rgb } from '../planTypes';
+import { noteDisplayLift } from './asteroidLift';
 
 const WHITE: Rgb = [1, 1, 1];
 
 /**
+ * Display lift of the baked albedo map (artistic): capped by the map's own mean brightness, see
+ * `asteroidLift.ts`. The plain Measured-only sphere is not lifted; the lift is not a measurement.
+ */
+export { ASTEROID_ALBEDO_LIFT } from './asteroidLift';
+
+/**
  * R7.2: `displacementScale = relief_amp` (fraction of the radius, R6.2). `RenderTextures` declares
- * `relief_amp` as an optional field (Q-103); the backend does not send it yet (Kevin), so it is
- * null today and the displacement layer is refused as a server gap, not guessed. A value that is
- * not a positive finite number is ignored.
+ * `relief_amp` as an optional field (Q-103); the backend sends it for this kind (issue #62). When
+ * it is absent the displacement layer is refused as a server gap, not guessed. A value that is not
+ * a positive finite number is ignored.
  */
 export function reliefAmpOf(params: RenderParams): number | null {
   const v: unknown = params.textures?.relief_amp;
@@ -25,10 +34,14 @@ export function displacementActive(tier: 'high' | 'medium' | 'low', scale: numbe
   return scale !== null && scale > 0 && tier !== 'low';
 }
 
+/** Why the displacement layer is refused on the low quality level (Q-117). */
+export const PHONE_TIER_REASON = 'phone tier: relief shows as shading only';
+
 export function planAsteroidProcedural(input: PlanInput): RenderPlan {
   const b = new PlanBuilder(input);
   const tex = input.params.textures;
   const bodyOk = b.body('diameter_km');
+  const tier = input.ctx.qualityTier ?? 'high';
 
   // R6.2: a/b = 10^(0.4 A), c = b (model_dependent). Hidden or refused: plain sphere.
   const ellipsoid = b.draw('ellipsoid');
@@ -48,16 +61,29 @@ export function planAsteroidProcedural(input: PlanInput): RenderPlan {
       detail: 'The server does not send the relief height yet, so the surface is not displaced.',
     });
   }
-  // A legend entry and a tag of its own; refused when the load failed or the honesty state hides
-  // `derived` (the scale is the baked relief amplitude, R6.2).
+  // A legend entry and a tag of its own. The backend offers the layer as `artistic` (the scale is
+  // the R6.2 style rule's peak relief, a look); params without it still get the viewer's own entry
+  // with the same tag. Refused when the load failed or the honesty state hides `artistic`.
+  // Q-117: on the low quality level the layer is not drawn, so it is refused with that reason
+  // rather than listed (the plan is rebuilt when the level changes).
+  const lowTier = displaceWanted && reliefAmp !== null && !displacementActive(tier, reliefAmp);
+  if (lowTier) {
+    b.reject({ id: 'displacement', reason: 'quality', detail: PHONE_TIER_REASON });
+  }
   const displaceDrawn =
     displaceWanted &&
     reliefAmp !== null &&
-    b.drawLocal(
-      'displacement',
-      'derived',
-      'Surface displaced by the baked height map (scale = relief amplitude).',
-    );
+    !lowTier &&
+    (b.has('displacement')
+      ? b.draw('displacement', { asset: heightUrl })
+      : b.drawLocal(
+          'displacement',
+          'artistic',
+          'Surface pushed in and out by the relief map. On phones it stays smooth and the relief shows as shading only.',
+        ));
+
+  // The baked map is brightened for display (artistic, capped by its brightness): said so.
+  if (bodyOk && albedo) noteDisplayLift(b);
 
   const axes = ellipsoid ? ellipsoidAxes(numberField(input.card, 'lightcurve_amp_mag')) : undefined;
   if (bodyOk && !ellipsoid) {
@@ -72,6 +98,7 @@ export function planAsteroidProcedural(input: PlanInput): RenderPlan {
           litBody('body', axes ?? [1, 1, 1], albedo ? WHITE : b.tint.rgb, {
             segments: [256, 128],
             albedoUrl: albedo ? (tex?.albedo ?? null) : null,
+            displayLift: albedo,
             normalUrl: relief ? (tex?.normal ?? null) : null,
             heightUrl: displaceDrawn ? heightUrl : null,
             displacementScale: displaceDrawn ? reliefAmp : null,

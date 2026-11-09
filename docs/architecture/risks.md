@@ -21,13 +21,13 @@ As of 9 Nov 2026. Status: **Open** (no mitigation in place), **Mitigated** (a mi
 | Warm start skips Eros | `SX_PREFETCH_GROUPS=demo` does not include 433 Eros (group `fixture`) | Proposed Q-177 ([A3.12](targets.md#a312-test-and-demo-targets)) | Kevin | Open |
 | A15 speed unmeasured | Demo may stutter; frame times exist only in headless Chromium | Measure on the A15 early (#16); lower point and triangle counts if needed (R5.5) | Atish | Open |
 | Sound never heard on the demo machine | Sound is the only non-visual channel at the event (Q-132) | Test on the A15 speakers; a venue PA may be mono, so direction is never carried by pan alone (Q-134) | Atish | Open |
-| Pending sign-offs | D-14 (Kevin, Moon), D-31 (Moon), D-33 and D-34 (team), Q-63 thresholds (Atish), Q-113 and Q-121 (Moon) are built but not confirmed | Confirm or amend before 13 Nov; record in `docs/decisions/` | Team | Open |
+| Pending sign-offs | D-14 (Kevin, Moon), D-31 (Moon), D-33 and D-34 (team), Q-113 and Q-121 (Moon) are built but not confirmed | Confirm or amend before 13 Nov; record in `docs/decisions/` | Team | Open |
 | SPHEREx search is slow and fails | The base tool depends on it | Read-through cache for every external call, filled by the pre-fetch script; the demo runs with `SX_OFFLINE=1` (D-25) | Kevin | Mitigated |
 | Venue internet fails | Live calls and the Gemini layer fail | The demo runs offline from the cache (D-25). The Gemini layer stays off and the code path shows (D-24) | Kevin | Mitigated |
 | SPHEREx saturates on bright targets | Barnard's Star and R Dra get no measured point and RW Aur only 15 (counts: [A4.2](pipeline.md#a42-stage-2-measure-brightness-and-spectrum)) | Keep the saturated frames as honest refusals; show spectra on the demo objects of [A3.12](targets.md#a312-test-and-demo-targets) (D-31) | Atish | Mitigated |
 | Building before 14 Nov | The event rules say not to build before the event | The team's call and risk (D-14) | Team | Accepted |
 | NEOWISE access unconfirmed | Diameter and albedo | Use SBDB values (A3.3) | Kevin | Mitigated |
-| Exoplanet Archive thresholds unverified | Planet cards | Rule built but off; the radius, mass and Zeng 2019 cut-offs stay **[verify]** until Atish signs off (Q-56, Q-63; PR #69) | Atish | Open |
+| Exoplanet Archive thresholds unverified | Planet cards | Adapter tested live 2026-11-07 (Q-63). The radius, mass and Zeng 2019 cut-offs are on since issue #68: Moon signed off Q-63 after a source check (1.5 and 6 R_E are project cuts based on the cited papers; the mass cut is as published). Residual risk: the radius and mass cuts disagree for 6-10 R_E planets (recorded in Q-63) | Moon | Mitigated |
 | SIMBAD's CDS host unreachable from the dev machine | Star and brown dwarf types | The backend tries CDS then the Harvard mirror (`SX_SIMBAD_TAP_URLS`, tested 5 Nov; A3.10) | Kevin | Mitigated |
 | CORS to science services unknown | The browser may be blocked | Backend proxy (A10) | Kevin | Mitigated |
 | Gemini model name may change | Code would break | Read from `SX_GEMINI_MODEL`; the name stays **[verify]** (A6.2) | Atish, Kevin | Mitigated |
@@ -54,7 +54,8 @@ Every **[verify]** marker in the architecture fragments, with an owner, the tick
 | SkyBoT largest cone radius and terms of use | A3.5 | Kevin | D1 | before D1 uses SkyBoT |
 | CDS permission for a partial high-resolution copy | A3.11 | Atish | Q-136 | before any copy |
 | SIMP 0136 variability; AB offsets for J, K, W1, W2 | A3.12 | Atish | D-31 | 13 Nov (caveat text) |
-| Exoplanet thresholds | A4.3, A3.8 | Atish | Q-63, PR #69 | before PR #69 merges |
+| Gas giant typical zonal wind 50 m/s (`TYPICAL_ZONAL_WIND_MS`, Rhines band count; Showman, Lewis & Fortney 2015 use about 30 m/s); `bands` stays tier 4 meanwhile (Q-119) | A7.2 | Moon | Q-115, R12 #42 | after the event |
+| Exoplanet thresholds (settled: Moon signed off Q-63 after a source check; 1.5 and 6 R_E stay noted as project cuts) | A4.3, A3.8 | Moon | Q-63, #68 (PR #69 merged) | done (9 Nov) |
 | Gemini model, aspect ratios, REST shape | A3.9, A6.2 | Atish, Kevin | Q-122, R12 #3 | only if the layer is shown |
 | Wavelength WCS `W` read with SIP removed | A3.1 | Kevin | #1 follow-up | after the event (Stage 2 cross-checked against `OMEGA_MEDIAN`) |
 | Saturation range and per-band values | A3.1, A3.12 | Atish | D-31 | after the event (refusals do not depend on it) |
