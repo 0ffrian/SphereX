@@ -19,6 +19,7 @@ from app.core.find.resolver import ResolvedObject, save_object
 from app.core.render.card_to_params import GENERATOR_VERSION
 from app.main import create_app
 from app.settings import Settings
+from scripts.bake_fixtures import DEMO_PLANET_SEEDS
 from tests.conftest import make_settings
 from tests.helpers import resolve_id
 
@@ -199,6 +200,8 @@ def prebaked(fixture_cache: Path, tmp_path: Path) -> tuple[Settings, list[tuple[
     ids = []
     for path in sorted((FIXTURES / "cards").glob("*.json")):
         kind = path.stem
+        if kind in DEMO_PLANET_SEEDS:  # extra planet_rocky fixtures, not an object type (Part 6)
+            continue
         oid = f"fixture-{kind}"
         (assets / kind).mkdir(parents=True)
         doc = fixture_asset(kind, oid)

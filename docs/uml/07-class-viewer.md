@@ -91,6 +91,7 @@ classDiagram
     +planRender(card, params, ctx: PlanContext) RenderPlan
     PlanContext: honesty, view mode, comet epoch, light-curve scrub, failed loads
     per-type plan functions in renderers/
+    exoplanetSentences(facts) the starlight and climate-scenario words shared by the notes and the alt text (Q-166)
     PlanBuilder.drawLocal(id, tag, description) adds a layer the plan decides itself (reflectance, self_shadow, baked_ao, regolith, ion_tail, dust_tail), honesty-filtered, else listed in missing
   }
   class PlanBuild {
@@ -231,6 +232,7 @@ classDiagram
   class AltText {
     <<altText.ts>>
     +buildAltText(plan: RenderPlan) string
+    planets with host-star fields add the starlight and scenario sentences (planCommon.exoplanetSentences, Q-166)
     built from the plan, not from RenderParams.alt_text
     updates canvas aria-label
     aria-live polite announcements

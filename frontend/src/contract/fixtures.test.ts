@@ -56,12 +56,41 @@ type Dyn = Record<string, { value: number; tag: string; tier: number; source: st
   speedup: Record<string, number>;
 };
 
+/**
+ * Issue #68 Part 6 (Q-165): the two demo exoplanets are extra `planet_rocky` fixtures with real
+ * archive values (not synthetic numbers), so they sit beside the one-per-type set. Their values
+ * are real, so they carry no `dynamics` (a spin is not on the card and is never invented).
+ */
+const DEMO_PLANETS = ['planet_kepler186f', 'planet_trappist1f'];
+
 describe('shared fixtures (D-04, D-18)', () => {
   const types = [...OBJECT_TYPES].sort();
 
-  it('have exactly one card and one params file per ObjectType', () => {
-    expect([...cards.keys()].sort()).toEqual(types);
-    expect([...params.keys()].sort()).toEqual(types);
+  it('have exactly one card and one params file per ObjectType, plus the demo planets', () => {
+    expect([...cards.keys()].sort()).toEqual([...types, ...DEMO_PLANETS].sort());
+    expect([...params.keys()].sort()).toEqual([...types, ...DEMO_PLANETS].sort());
+  });
+
+  it.each(DEMO_PLANETS)('%s: validates, is a rocky planet and names its real source', (name) => {
+    const card = cards.get(name)!;
+    const param = params.get(name)!;
+    for (const [schema, data] of [
+      ['object-card', card],
+      ['render-params', param],
+    ] as const) {
+      const validate = validators[schema]!;
+      expect(validate(data), ajv.errorsText(validate.errors)).toBe(true);
+    }
+    expect(card.type).toBe('planet_rocky');
+    expect(param.id).toBe(card.id);
+    expect(param.dynamics).toBeUndefined();
+    for (const v of taggedValues(card)) {
+      assertTagged(v, name);
+      expect(
+        String((v as { source?: string }).source ?? ''),
+        `${name}: ${JSON.stringify(v)}`,
+      ).toMatch(/^synthetic fixture: real (TRAPPIST-1 f|Kepler-186 f) value, /);
+    }
   });
 
   it('match the generated lists, which match the schema enums', () => {
