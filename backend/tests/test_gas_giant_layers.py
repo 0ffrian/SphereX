@@ -7,6 +7,7 @@ from __future__ import annotations
 import copy
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any
 
@@ -126,3 +127,19 @@ def test_twin_of_the_frontend_physics() -> None:
     assert gg.flattening_from_spin(9.925) == pytest.approx(0.06487)
     assert gg.flattening_from_spin(4.9625) == pytest.approx(0.06487 * 4)
     assert gg.spin_rate_rad_s(0) is None and gg.band_count(1e-4, 7e7, 0) is None
+
+
+def test_typical_constants_match_the_viewer_twins() -> None:
+    """PR #63 review: the backend and the viewer state the same typical values, so the legend
+    quotes what is drawn. Reads the TypeScript source, so drift in either file fails here."""
+    src = (FIXTURES.parents[1] / "frontend/src/viewer/renderers/shaderSpec.ts").read_text()
+
+    def ts(name: str) -> float | None:
+        m = re.search(rf"export const {name}(?:: number \| null)? = ([0-9.]+|null);", src)
+        assert m, f"{name} not found in shaderSpec.ts"
+        return None if m.group(1) == "null" else float(m.group(1))
+
+    assert ts("TYPICAL_GAS_SPIN_H") == gg.TYPICAL_SPIN_H
+    assert ts("TYPICAL_GAS_WIND_MS") == gg.TYPICAL_ZONAL_WIND_MS
+    assert ts("JUPITER_FLATTENING") == gg.JUPITER_FLATTENING
+    assert ts("JUPITER_SPIN_H") == gg.TYPICAL_SPIN_H  # P_J of the flattening rule

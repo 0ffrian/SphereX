@@ -3,6 +3,9 @@
 // the body keeps its own average colour and only the pattern shows. CPU, once per texture, on a
 // 64 x 32 downsample. Without a canvas (a test environment) it answers null and the pattern is
 // applied unnormalised (a gain of 1), never guessed.
+//
+// Display only: the canvas downsample is browser-dependent, so the mean is not byte-identical across
+// browsers. The determinism rule is about the baked textures (backend), which this does not touch.
 
 const W = 64;
 const H = 32;

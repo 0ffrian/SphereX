@@ -66,7 +66,10 @@ TIER_OF_TAG = {tag: rank + 1 for tag, rank in _RANK.items()}  # D-32: tier 1..5 
 # cited rules fix (R6.2, R7.3, R7.5); none is a measurement.
 ASSUMED_C_OVER_B = 1.0  # R6.2: c = b
 ASSUMED_DENSITY_EXPONENT = 2.0  # R7.3: coma gas density falls as 1/r^2
-ASSUMED_LIMB_U = 0.6  # R7.5: linear limb darkening coefficient
+ASSUMED_LIMB_U = 0.6  # R7.5: linear limb darkening coefficient (stars)
+# Issue #62, PR #63 review: the brown dwarf coefficient is its own constant. R7.4 gives no confirmed
+# value, so the star's 0.6 stands in until it is checked. [verify] Set to None to refuse the layer.
+BROWN_DWARF_LIMB_U: float | None = 0.6  # [verify]
 
 SHADER_KINDS = ("planet_rocky", "planet_water", "gas_giant", "nebula", "nova")
 SUN_LIT = ("asteroid_shape", "asteroid_procedural", "comet", "planet_rocky", "planet_water")
@@ -481,7 +484,7 @@ def _comet(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
 
 
 def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) -> dict[str, Any]:
-    plan.layer(
+    body_ok = plan.layer(
         _has(card, "radius_rjup"),
         "body",
         _tag(card, "radius_rjup"),
@@ -490,18 +493,21 @@ def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) 
         card=card,
         formula="radius = radius_rjup * R_Jup",
     )
-    # Issue #62: a self-lit disc glows evenly to its edge without it. The coefficient is the star's
-    # (R7.5): no brown-dwarf value is confirmed [verify], so the layer is model_dependent.
+    # Issue #62: a self-lit disc glows evenly to its edge without it. The coefficient is
+    # BROWN_DWARF_LIMB_U, the star's (R7.5) until a brown-dwarf value is confirmed [verify], so the
+    # layer is model_dependent. It sits on the body, so a refused body or an unset (None)
+    # coefficient refuses it too.
+    u = BROWN_DWARF_LIMB_U
     plan.layer(
-        True,
+        body_ok and u is not None,
         "limb_darkening",
         "model_dependent",
-        "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu), the star coefficient of "
+        f"Assumption: linear limb darkening, I(mu) = 1 - {u} * (1 - mu), the star coefficient of "
         "R7.5. No brown-dwarf coefficient is confirmed (R7.4).",
-        [],
+        ["radius_rjup"],
         card=card,
-        formula="I(mu) = 1 - u * (1 - mu), u = 0.6",
-        rule_inputs={"limb_darkening_u": ASSUMED_LIMB_U},
+        formula=f"I(mu) = 1 - u * (1 - mu), u = {u}",
+        rule_inputs={"limb_darkening_u": u} if u is not None else None,
     )
     emissive = plan.layer(
         _has(card, "flux_45um"),

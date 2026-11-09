@@ -85,7 +85,7 @@ const PLANET_DEFAULTS = {
   planet_rocky: { freq: 1.6, sea: 0, ice: 0, heat: 0, relief: 0.081, cloud: 0.2, atmo: 0.85 },
   planet_water: { freq: 2, sea: 0.58, ice: 0.22, heat: 0, relief: 0.054, cloud: 0.7, atmo: 0.85 },
 } as const;
-const GAS_DEFAULTS = { bands: 12, turbulence: 0.5, storms: 5, rings: 0 } as const;
+export const GAS_DEFAULTS = { bands: 12, turbulence: 0.5, storms: 5, rings: 0 } as const;
 
 /**
  * Typical values of a giant planet that stand in for a spin or a jet speed the card does not have
@@ -346,8 +346,9 @@ export function rhinesBands(motion: Motion, scaleM: number | null): RuleChoice |
   const n = omega === null ? null : bandCount(omega, scaleM, Math.abs(wind.value));
   if (n === null || !Number.isFinite(n)) return null;
   const tag = weakestTag(['derived', spin.tag, wind.tag]);
+  const value = Math.min(BANDS_MAX, Math.max(BANDS_MIN, Math.round(n / 2)));
   return {
-    value: Math.min(BANDS_MAX, Math.max(BANDS_MIN, Math.round(n / 2))),
+    value,
     tag,
     tier: TIER_OF_TAG[tag],
     formula:
@@ -356,7 +357,8 @@ export function rhinesBands(motion: Motion, scaleM: number | null): RuleChoice |
       tag === 'model_dependent' || tag === 'inferred_from_analog' || tag === 'artistic'
         ? { spin_period_h: spin.value, jet_speed_ms: wind.value, radius_m: scaleM }
         : undefined,
-    basis: `Rhines rule from the spin, the wind speed and the radius on the card: about ${Math.round(n)} bands`,
+    // The count shown is the one drawn: the field's `bands` runs pole to pole twice over.
+    basis: `Rhines rule from the spin, the wind speed and the radius on the card: about ${2 * value} bands from pole to pole`,
   };
 }
 
