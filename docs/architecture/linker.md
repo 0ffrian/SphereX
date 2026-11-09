@@ -1,8 +1,8 @@
 # Area search: Known objects (Track) and Discovery
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A16–A16.7 · **Backend:** [linker-backend.md](linker-backend.md) (A17) · **Sky UI:** [linker-ui.md](linker-ui.md) (A18) · **Diagrams:** [uml/21-linker.md](../uml/21-linker.md)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A16–A16.7 · **Backend:** [linker-backend.md](linker-backend.md) (A17) · **Sky UI:** [linker-ui.md](linker-ui.md) (A18) · **Diagrams:** [uml/22-area-search.md](../uml/22-area-search.md)
 
-Status: **agreed plan, not built** ([Q-146](../decisions.md), 9 Nov 2026). It replaces the first proposal of this fragment (the blind Band-Hop Linker with an injection atlas, Q-113), re-scoped after Atish's review (Q-131). The file keeps its name so links stay valid. Labels follow the architecture spec: **Tested**, **Documented**, **To build / Not confirmed**.
+Status: **agreed plan, not built** ([Q-146](../decisions.md), 9 Nov 2026). It replaces the first proposal of this fragment (the blind Band-Hop Linker with an injection atlas, Q-147), re-scoped after Atish's review (Q-131). The file keeps its name so links stay valid. Labels follow the architecture spec: **Tested**, **Documented**, **To build / Not confirmed**.
 
 Clickable mock-ups: `mockup/spherex-ui.html` (Area search tool, key 5) and `mockup/chase-the-rock.html` (Track). Mock-ups are visual input only, never a spec (D-01).
 
@@ -110,7 +110,7 @@ Reused, not rewritten: `adapters/irsa_sia.py`, `adapters/irsa_cutout.py`, `adapt
 
 | Item | Why it matters | Status |
 |---|---|---|
-| Visits per area and the gap between them | Joining needs at least 2 visits; the gap sets the search radius. A3.1 says about 0.8 days for one spot; a cache check reported 0.7 to 88 days. | **[verify]**, Q-114, Day 0 |
+| Visits per area and the gap between them | Joining needs at least 2 visits; the gap sets the search radius. A3.1 says about 0.8 days for one spot; a cache check reported 0.7 to 88 days. | **[verify]**, Q-148, Day 0 |
 | Per-exposure depth (5σ point source per band) | Sets how faint a dot can be and how many dots a frame has. Survey depths of 19.5 to 19.9 AB (Bock et al. 2025, [arXiv:2511.02985](https://arxiv.org/abs/2511.02985)) are not per-exposure. | **[verify]**, Day 0 |
 | Motion inside one visit | Eros's 4 exposures span about 7 minutes; at 0.5 deg/day that is about 1.5 px. It decides whether a visit alone shows the direction. | **[verify]** on the Eros frames |
 | Trailing | Smear starts near 0.53 deg/day and is significant near 1.2 deg/day (Lisse et al. 2024, appendix). | Documented |
@@ -122,9 +122,9 @@ Three tickets (D-29 "as few tickets as possible"), milestone **M4 Extras**, prio
 
 | Ticket | Owner | Checklist |
 |---|---|---|
-| **D1 Discovery backend** | Kevin | Day 0 count on the Eros frames: visits, gap, exposures per visit, motion inside a visit, per-exposure S/N (recorded in A16.6 and Q-114) · area frames (A17.1) · dots (A17.2) · glitches and stars (A17.3, star list shared with Q-143) · join (A17.4) · SkyBoT (A17.5) · ECSV (A17.7) · API (A17.8) · determinism test (A17.10) |
+| **D1 Discovery backend** | Kevin | Day 0 count on the Eros frames: visits, gap, exposures per visit, motion inside a visit, per-exposure S/N (recorded in A16.6 and Q-148) · area frames (A17.1) · dots (A17.2) · glitches and stars (A17.3, star list shared with Q-143) · join (A17.4) · SkyBoT (A17.5) · ECSV (A17.7) · API (A17.8) · determinism test (A17.10) |
 | **D2 Area tool UI** | Moon | Schemas and fixtures (A17.9) · Area tool and drawing (A18.1) · layers (A18.2) · blink (A18.3) · cards (A18.4 to A18.7) · hand-off to Track · minimise to the island (A18.4) · copy and badges · tests (A18.10) |
-| **D3 Integration** | Shared, M5 | Precompute the demo areas under `SX_OFFLINE=1` · e2e on the real cache (Eros found blind, then Track) · this spec and [uml/21](../uml/21-linker.md) updated to "as built" |
+| **D3 Integration** | Shared, M5 | Precompute the demo areas under `SX_OFFLINE=1` · e2e on the real cache (Eros found blind, then Track) · this spec and [uml/22](../uml/22-area-search.md) updated to "as built" |
 
 - **Order:** agree the JSON shapes (A17.8, A17.9) first, so D1 and D2 build in parallel against fixtures (D-29).
 - **Gate:** if Day 0 shows Eros is not found blind on its own frames, keep Known and Track, and show Discovery only as the five steps on the Eros area with its real counts, without claiming tracks. Never drop the "unexplained, not a discovery" wording.
