@@ -12,6 +12,8 @@ export function PanelCard({
   onClose,
   returnFocusTo,
   bodyRef,
+  rootRef,
+  pending = false,
   testId,
   children,
 }: {
@@ -23,6 +25,9 @@ export function PanelCard({
   /** CSS selector of the element that gets focus after Escape or the close button. */
   returnFocusTo: string;
   bodyRef?: Ref<HTMLDivElement>;
+  rootRef?: Ref<HTMLElement>;
+  /** The island is still on its way here (#66): the card is laid out, but not shown yet. */
+  pending?: boolean;
   testId: string;
   children: ReactNode;
 }) {
@@ -40,8 +45,12 @@ export function PanelCard({
   return (
     <section
       aria-labelledby={titleId}
+      ref={rootRef}
       className={`sx-panel ${wide ? 'sx-panel-wide' : ''}`}
       onKeyDown={onKeyDown}
+      data-island={pending ? 'pending' : undefined}
+      // Laid out, so the island knows its box, but transparent and out of reach until it arrives.
+      inert={pending || undefined}
       data-testid={testId}
     >
       <header className="sx-panel-head">

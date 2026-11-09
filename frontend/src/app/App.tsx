@@ -26,6 +26,7 @@ import { useHashSync } from './useHashSync';
 import { BuildPane } from './build/BuildPane';
 import { SelectedCard } from './build/SelectedCard';
 import { useSelectedBodyLoader } from './build/selectedBody';
+import { Island } from './island/Island';
 
 /**
  * A new search opens the object panel (unless it is already open at the spectrum), a marker click
@@ -134,6 +135,8 @@ export function App() {
           <div className="sx-transport-slot" inert={split || undefined}>
             <Transport />
           </div>
+          {/* Issue #66 (mock-up `.island-wrap`): the island, over everything in the bezel. */}
+          <Island />
         </div>
         <LiveAnnouncer />
       </div>

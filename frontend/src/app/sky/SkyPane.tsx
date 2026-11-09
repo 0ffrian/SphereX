@@ -13,7 +13,15 @@
 // - No React re-render per pointer move: the readout and markers are written from refs.
 // - R9: keyboard pan/zoom on the canvas (arrows, +/−, R), Enter picks the centre, on-screen pan
 //   and zoom buttons (WCAG 2.5.7), aria-label and a text alternative.
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { EstimatedBadge, ProvenanceBadge } from '@/app/Badge';
 import type { SkyCachedObject, SkySurvey } from '@/app/api/types';
 import { isApiError } from '@/app/api/errors';
@@ -155,6 +163,16 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     ro.observe(credit);
     return () => ro.disconnect();
   }, []);
+  // The observer above tells the panel one frame after the credit changed height (a line more when
+  // cached spots come into view), so a sheet docked on top of it was a line off for that frame.
+  // Set it in the same commit as the credit's new content, so both move together (issue #66: the
+  // panel now opens from the island 0.7 s after the data, which is when this showed in a test).
+  useLayoutEffect(() => {
+    const host = hostRef.current;
+    const credit = creditRef.current;
+    if (host && credit)
+      host.style.setProperty('--sx-credit-h', `${Math.ceil(credit.offsetHeight)}px`);
+  });
 
   // ---- Renderer ---------------------------------------------------------------------------------
   useEffect(() => {
