@@ -70,6 +70,43 @@ def test_alias_maps_short_name(fixture_cache: Path) -> None:
     assert resolve(ctx, "WISE 0855", aliases).obj.name == "WISEA J085510.74-071442.5"
 
 
+@pytest.mark.parametrize("alias", ["Oumuamua", "'Oumuamua", "1I", "oumuamua"])
+def test_oumuamua_aliases_resolve_to_1i(fixture_cache: Path, alias: str) -> None:
+    # Q-161: SIMBAD does not know "Oumuamua"; the alias sends SBDB the designation it does know.
+    ctx = make_context(make_settings(fixture_cache))
+    aliases = load_aliases(TARGETS_FILE)
+    assert aliases[alias.lower()] == "1I/2017 U1"
+    obj = resolve(ctx, alias, aliases).obj
+    assert obj.resolver == "sbdb" and obj.moving
+    assert obj.query == "1I/2017 U1"
+    assert obj.id == resolve(ctx, "1I/2017 U1", aliases).obj.id
+
+
+@pytest.mark.parametrize("alias", ["Comet 67P", "67P", "Churyumov", "Gerasimenko"])
+def test_67p_aliases_map_to_the_sbdb_designation(alias: str) -> None:
+    # Q-161: the alias map only. The recorded cache has no Horizons answer for 67P (see Q-161:
+    # Horizons needs a CAP modifier for comets with several apparitions), so no resolve here.
+    aliases = load_aliases(TARGETS_FILE)
+    assert aliases[alias.lower()] == "67P/Churyumov-Gerasimenko"
+
+
+def test_search_list_rows_have_a_demo_group_and_unique_aliases() -> None:
+    import tomllib
+
+    doc = tomllib.loads(TARGETS_FILE.read_text(encoding="utf-8"))
+    demo = {t["name"]: t for t in doc["target"] if t.get("group") == "demo"}
+    for name in [
+        "TRAPPIST-1 f", "Kepler-186 f", "Bennu", "'Oumuamua", "3I/ATLAS", "HD 189733 b",
+        "TRAPPIST-1 e", "K2-18 b", "Comet 67P", "Orion Nebula", "Crab Nebula",
+    ]:  # fmt: skip
+        assert name in demo, name
+    seen: dict[str, str] = {}
+    for t in doc["target"]:
+        for a in [t["name"], *t.get("aliases", [])]:
+            key = a.lower()
+            assert seen.setdefault(key, t["query"]) == t["query"], f"{a!r} maps to two queries"
+
+
 def test_small_body_is_moving_with_model_dependent_position(fixture_cache: Path) -> None:
     ctx = make_context(make_settings(fixture_cache))
     obj = resolve(ctx, "433 Eros", {}).obj
