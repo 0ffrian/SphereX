@@ -71,7 +71,7 @@ sequenceDiagram
   end
   API-->>UI: id, ra, dec, moving
   UI->>UI: Write #35;ra=…&dec=…[&name=…] to the URL hash (share link). A typed search or a sky pick adds a history entry, a link replaces it
-  UI->>UI: Loading: Searching the archive for SPHEREx frames at RA, Dec
+  UI->>UI: Island shows Thinking: Searching the archive for SPHEREx frames at RA, Dec (Q-121)
   UI->>API: GET /v1/objects/{id}/frames
   API->>C: Look up (source + data release + normalised query)
   alt cache hit
