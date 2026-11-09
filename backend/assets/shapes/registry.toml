@@ -3,6 +3,34 @@
 
 [[model]]
 axes = "glTF +Y up: glTF (x, y, z) = body-fixed (x, z, -y); glTF +Y is the body +Z pole"
+bbox_half_diagonal_km = 3.527
+citation = "R. Gaskell, L. Jorda, C. Capanna, S. Hviid and P. Gutierrez, SPC SHAP5 CARTESIAN PLATE MODEL FOR COMET 67P/C-G 50K PLATES, RO-C-MULTI-5-67P-SHAPE-V2.0:CG_SPC_SHAP5_050K_CART, NASA Planetary Data System and ESA Planetary Science Archive, 2017."
+convex = false
+doi = "10.26007/34vg-8s07"
+extents_km = [5.036, 3.27, 3.701]
+frame = "Cheops frame (CHEOPS_REF_FRAME_V1): body-fixed, +Z on the spin axis, +X set so that Cheops sits at longitude +142.35 deg; pole RA 69.57 +/- 0.35 deg, Dec +64.01 +/- 0.12 deg (J2000); pre-perihelion period 12.4041 +/- 0.0001 h (pre-perihelion only; later states are in SPICE RO/RL-E/M/A/C-SPICE-6-V1.0); origin as given (not recentred), the body centre is not exactly the centre of gravity (SHAP5_MODEL_INFO.ASC)"
+ingest_version = "2"
+licence = "Not stated in the product label; cited through the label's CITATION_DESC (dataset DOI 10.26007/34vg-8s07)"
+lod0 = "/data/shapes/c67p-shap5.glb"
+lod0_sha256 = "1064d1b3eb980c0622af2bd5cbc68dec17ac4b8afad6db4f8bd6bd1235bac414"
+lod1 = "/data/shapes/c67p-shap5.lod1.glb"
+lod1_sha256 = "bad879555c8caaf5e96d0884ba621b075f5b48d3f3a3e6811f8ee2aa02064367"
+lod1_source_member = "cg_spc_shap5_012k_cart.wrl"
+lod1_source_sha256 = "41c20eeb510502868c65148ad89aa3815ffd0c21ec4db0ca929142de1695885e"
+name = "67P/Churyumov-Gerasimenko"
+slug = "c67p-shap5"
+source_member = "cg_spc_shap5_050k_cart.wrl"
+source_sha256 = "3304263aaae23de3a82cdf13f754b3c075a57ccd1bdbe4c80117e01a02859a68"
+source_url = "https://pdssbn.astro.umd.edu/holdings/ro-c-multi-5-67p-shape-v2.0/data/triplate/spc_lam_psi/shap5/cg_spc_shap5_050k_cart.wrl"
+spkid = "1000012"
+triangles_lod0 = 49748
+triangles_lod1 = 11716
+units = "metres in the GLB (source km x 1000)"
+vertices_lod0 = 24876
+vertices_lod1 = 5860
+
+[[model]]
+axes = "glTF +Y up: glTF (x, y, z) = body-fixed (x, z, -y); glTF +Y is the body +Z pole"
 citation = "Gaskell, R.W., Gaskell Eros Shape Model V1.1, urn:nasa:pds:gaskell.ast-eros.shape-model, NASA Planetary Data System."
 convex = false
 doi = "10.26033/d0gq-9427"

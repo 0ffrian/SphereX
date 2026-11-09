@@ -37,6 +37,9 @@ class ShapeModel:
     doi: str
     licence: str
     convex: bool
+    # Half the diagonal of the mesh's bounding box, in km: the radius of the "bounding sphere" the
+    # viewer scales a mesh by (Q-43, Q-162). None for rows ingested before ingest_shape wrote it.
+    bbox_half_diagonal_km: float | None = None
 
     @property
     def source(self) -> str:
@@ -87,6 +90,9 @@ def _parse_shape_registry(path: Path) -> tuple[ShapeModel, ...]:
                 doi=str(r["doi"]),
                 licence=str(r["licence"]),
                 convex=bool(r["convex"]),
+                bbox_half_diagonal_km=(
+                    float(r["bbox_half_diagonal_km"]) if "bbox_half_diagonal_km" in r else None
+                ),
             )
             for r in rows
         )
