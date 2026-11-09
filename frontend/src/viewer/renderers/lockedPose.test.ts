@@ -33,6 +33,31 @@ const substellarWorld = (g: Object3D): Vector3 => {
 };
 const unit = (v: [number, number, number]): Vector3 => new Vector3(...v).normalize();
 
+describe('climate pattern at + Estimated', () => {
+  it('shows the pattern (not the artistic surface) with the estimated tags, and keeps the pose', async () => {
+    const light: [number, number, number] = [0.3, 0.4, 0.86];
+    const f = fixture('planet_rocky');
+    const card = trappist1f() as ObjectCard;
+    const b = await ShaderBody.create(
+      card,
+      { ...f.params, id: card.id, scale_m: 6.4e6 },
+      {
+        ...ctx,
+        visibleTags: ['measured', 'derived', 'model_dependent', 'inferred_from_analog'],
+        lightDir: light,
+      },
+    );
+    expect(b.drawn).toEqual(['climate']);
+    expect(b.hidden).toEqual(['surface']);
+    expect(substellarWorld(surfaceGroup(b)).distanceTo(unit(light))).toBeLessThan(1e-6);
+    b.setVisibleTags(['measured']);
+    expect(b.drawn).toEqual([]);
+    b.setVisibleTags(ALL_TAGS);
+    expect(b.drawn).toEqual(['surface']);
+    b.dispose();
+  });
+});
+
 describe('locked pose', () => {
   it('TRAPPIST-1 f: +X points at the light, whatever the clock says', async () => {
     const light: [number, number, number] = [0.3, 0.4, 0.86];

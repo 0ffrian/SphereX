@@ -130,6 +130,18 @@ const rgb3 = (c: Rgb) => vec3(c[0], c[1], c[2]);
 
 /** Neutral grey used for the plain sphere when no layer may be shown. Not a measured colour. */
 const PLAIN_COLOUR = 0x8a8a8a;
+
+/**
+ * Climate-pattern mode (issue #68 Part 3, Q-156): at + Estimated the artistic terrain is hidden and a
+ * locked planet shows only the ocean and ice masks of the field, on a smooth sphere, lit. These three
+ * colours are KEY colours for the masks (ground / open water / ice), fixed and plain: they say where
+ * the model puts water and ice, not what the surface looks like. Ground is the same neutral grey as
+ * the plain sphere (linear value of 0x8a8a8a); no relief, no clouds, no atmosphere, no lava, no
+ * terrain colouring, so nothing `artistic` is visible. Not measured colours.
+ */
+const PATTERN_GROUND: Rgb = [0.254, 0.254, 0.254];
+const PATTERN_WATER: Rgb = [0.07, 0.32, 0.45];
+const PATTERN_ICE: Rgb = [0.92, 0.95, 0.98];
 /**
  * Light direction until the viewer gives one. A body is lit from the plan's light (`planLighting`,
  * R5.1), which falls back to this head-on direction when the card has no phase angle or sun_dir.
@@ -195,7 +207,7 @@ function buildPlanet(
   sunValue: Vector3,
   mould: PlanetMouldUniforms,
   sunColour: any,
-): { group: Group; runtime: Runtime } {
+): { group: Group; runtime: Runtime; setPattern(on: boolean): void } {
   const fp = spec.field!;
   const style = spec.planet!;
   const texA = floatTexture(field.a, field.width, field.height);
@@ -216,6 +228,11 @@ function buildPlanet(
   const cloudPhase = uniform(new Vector3(0, 0, 0)); // shear A, shear B, weight of A
   const cloudEvo = uniform(new Vector3(0, 0, 0)); // evolve A, evolve B
   const sunLocal = uniform(new Vector3(0, 0, 1));
+  // 1 = climate-pattern mode (see PATTERN_GROUND); 0 = the normal surface.
+  const pattern = uniform(0);
+  const notPattern = float(1).sub(pattern);
+  // The cloud and atmosphere shells: off in pattern mode.
+  const overlays: Mesh[] = [];
 
   const dir = normalize(positionLocal);
   const { u, v } = fieldUV(dir);
@@ -322,7 +339,7 @@ function buildPlanet(
     .mul(style.relief)
     .mul(mould.terrain)
     .div(max(abs(det), 1e-6));
-  pv = pv.mul(min(float(1), float(0.85).div(max(length(pv), 1e-5))));
+  pv = pv.mul(min(float(1), float(0.85).div(max(length(pv), 1e-5)))).mul(notPattern);
   const bumped = normalize(n0.sub(pv));
 
   const lowH = float(1).sub(smoothstep(0, 0.5, hh));
@@ -339,17 +356,29 @@ function buildPlanet(
   const sunlitWorld = smoothstep(-0.1, 0.3, dot(normalWorld, sunWorld));
   const skyRefl =
     style.atmosphere > 0.001
-      ? rgb3(style.atmosphereColour).mul(sunColour).mul(fres).mul(wet).mul(sunlitWorld).mul(0.9)
+      ? rgb3(style.atmosphereColour)
+          .mul(sunColour)
+          .mul(fres)
+          .mul(wet)
+          .mul(sunlitWorld)
+          .mul(0.9)
+          .mul(notPattern)
       : vec3(0, 0, 0);
 
   const mat = new MeshStandardNodeMaterial();
-  mat.colorNode = col;
+  // The field's masks as flat key colours (PATTERN_*); the same masks the haptics sample.
+  const patternCol = mix(
+    mix(rgb3(PATTERN_GROUND), rgb3(PATTERN_WATER), B.x),
+    rgb3(PATTERN_ICE),
+    B.y,
+  );
+  mat.colorNode = mix(col, patternCol, pattern);
   mat.normalNode = bumped;
   mat.roughnessNode = mix(float(0.9), float(0.2), wet);
   mat.metalness = 0;
-  mat.emissiveNode = (fp.heat > 0 ? rgb3(LAVA_COLOUR).mul(lava).mul(heat) : vec3(0, 0, 0)).add(
-    skyRefl,
-  );
+  mat.emissiveNode = (
+    fp.heat > 0 ? rgb3(LAVA_COLOUR).mul(lava).mul(heat).mul(notPattern) : vec3(0, 0, 0)
+  ).add(skyRefl);
   group.add(new Mesh(geo, mat));
 
   if (style.cloudCover > 0.001) {
@@ -365,6 +394,7 @@ function buildPlanet(
     cm.depthWrite = false;
     cm.roughness = 1;
     const clouds = new Mesh(geo, cm);
+    overlays.push(clouds);
     clouds.scale.setScalar(CLOUD_SHELL);
     group.add(clouds);
   }
@@ -396,6 +426,7 @@ function buildPlanet(
     am.depthWrite = false;
     am.blending = AdditiveBlending;
     const atm = new Mesh(geo, am);
+    overlays.push(atm);
     atm.scale.setScalar(ATMO_SHELL);
     group.add(atm);
   }
@@ -431,7 +462,11 @@ function buildPlanet(
       sunLocal.value.copy(tmp);
     },
   };
-  return { group, runtime };
+  const setPattern = (on: boolean) => {
+    pattern.value = on ? 1 : 0;
+    for (const m of overlays) m.visible = !on;
+  };
+  return { group, runtime, setPattern };
 }
 
 // ---- gas giants --------------------------------------------------------------------------------
@@ -565,6 +600,8 @@ interface Built {
   volumes?: VolumeHandle[];
   /** Gas giants: applies the layer switches without a rebuild. */
   setGas?: (sw: GasSwitches) => void;
+  /** Planets: switches the climate-pattern mode (PATTERN_*) without a rebuild. */
+  setPattern?: (on: boolean) => void;
 }
 
 export class ShaderBody implements BodyRenderer {
@@ -583,6 +620,7 @@ export class ShaderBody implements BodyRenderer {
   private disposed = false;
   private runtime: Runtime | null = null;
   private setGas: ((sw: GasSwitches) => void) | null = null;
+  private setPattern: ((on: boolean) => void) | null = null;
   private gasOverride: GasSwitches | null;
   private time: SimTimeFn = () => 0;
   private motion: Motion;
@@ -676,12 +714,26 @@ export class ShaderBody implements BodyRenderer {
       const sw = this.gasSwitches();
       return GAS_LAYER_IDS.some((id) => sw[id]);
     }
-    return this.visibleTags.includes(tag);
+    return this.visibleTags.includes(tag) || this.patternShown();
+  }
+
+  /**
+   * Issue #68 Part 3 (Q-156): at a level that shows the climate layer's tag but not the artistic
+   * surface, a locked planet shows only the field's ocean and ice masks on a smooth sphere. The plan
+   * (`shaderPlan.ts`) decides the same from the same tags.
+   */
+  private patternShown(): boolean {
+    const { drawable, tag } = this.spec;
+    const pt = this.spec.planet?.patternTag ?? null;
+    return (
+      drawable && pt !== null && !this.visibleTags.includes(tag) && this.visibleTags.includes(pt)
+    );
   }
 
   get drawn(): readonly string[] {
     if (!this.surface?.visible) return [];
-    if (this.spec.kind !== 'gas_giant') return [this.spec.layerId];
+    if (this.spec.kind !== 'gas_giant')
+      return [this.patternShown() ? 'climate' : this.spec.layerId];
     const sw = this.gasSwitches();
     return GAS_LAYER_IDS.filter((id) => sw[id]);
   }
@@ -883,6 +935,7 @@ export class ShaderBody implements BodyRenderer {
   private applyVisibility(): void {
     const show = this.surfaceShown();
     if (this.surface) this.surface.visible = show;
+    this.setPattern?.(this.patternShown());
     this.setGas?.(this.gasSwitches());
     if (this.plain) this.plain.visible = this.plainShown();
   }
@@ -960,7 +1013,7 @@ export class ShaderBody implements BodyRenderer {
       );
       return { group, frame, textures, field, points: null, runtime, sampler, setGas };
     }
-    const { group, runtime } = buildPlanet(
+    const { group, runtime, setPattern } = buildPlanet(
       spec,
       field,
       this.sun,
@@ -970,7 +1023,16 @@ export class ShaderBody implements BodyRenderer {
       this.mould,
       this.sunColour,
     );
-    return { group, frame: runtime.frame, textures, field, points: null, runtime, sampler };
+    return {
+      group,
+      frame: runtime.frame,
+      textures,
+      field,
+      points: null,
+      runtime,
+      sampler,
+      setPattern,
+    };
   }
 
   /**
@@ -995,6 +1057,7 @@ export class ShaderBody implements BodyRenderer {
     this.points = built?.points ?? null;
     this.runtime = built?.runtime ?? null;
     this.setGas = built?.setGas ?? null;
+    this.setPattern = built?.setPattern ?? null;
     // A body built while the clock is running is posed at the current time at once.
     this.runtime?.update(this.time);
     this.volumes = built?.volumes ?? [];
