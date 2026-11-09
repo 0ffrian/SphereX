@@ -461,6 +461,20 @@ def _asteroid_procedural(
 
 
 def _comet(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
+    # Q-162: a registered nucleus mesh (67P) replaces the plain sphere. The layer exists only when
+    # the card names a shape model; a comet without one (3I/ATLAS) gets no "mesh" row at all. The
+    # mesh is scaled so its bounding sphere has the card's nucleus radius (Q-43), so without that
+    # size the layer is refused, never guessed.
+    if _has(card, "shape_source"):
+        plan.layer(
+            _has(card, "nucleus_radius_km_max"),
+            "mesh",
+            _weakest(_tag(card, "shape_source"), _tag(card, "nucleus_radius_km_max")),
+            "Nucleus drawn from the shape model, scaled to the nucleus radius on the card (R7.3).",
+            ["shape_source", "nucleus_radius_km_max"],
+            card=card,
+            formula="Shape model scaled to nucleus_radius_km_max",
+        )
     plan.layer(
         _has(card, "nucleus_radius_km_max"),
         "nucleus",
