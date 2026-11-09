@@ -43,8 +43,8 @@ aliases = []
 
 # Exoplanet fixtures (Q-63, A3.8): one per kind the rule gives, plus the envelope refusal, with
 # `frames = false` so only the SIMBAD and Exoplanet Archive answers are recorded (no SPHEREx
-# frames: the card then has a null spectrum with a reason). Classes under the proposed Q-63
-# rule (off until agreed: today every planet is candidate, type:exoplanet_thresholds):
+# frames: the card then has a null spectrum with a reason). Classes under the Q-63 rule, on
+# since issue #68 (Moon's sign-off, 9 Nov 2026; tests: test_exoplanets.py LIVE_TYPES):
 # TRAPPIST-1 e R 0.92 -> planet_rocky; K2-18 b R 2.37, M 8.92 -> planet_water;
 # HD 209458 b R 15.58 -> gas_giant; GJ 1214 b R 2.73, M 8.41 -> candidate (envelope).
 # Archive "Calculated Value" radii (refstr=CALCULATED_VALUE) are never used to classify:
