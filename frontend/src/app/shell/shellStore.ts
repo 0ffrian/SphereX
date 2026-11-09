@@ -34,8 +34,9 @@ export interface ShellState {
   body: BodyLoad;
   build: BuildState;
   /**
-   * The user asked for the card of a position (right-click on its brackets): a picked or typed
-   * position has no card of its own unless asked (a left click picks and opens the flipbook).
+   * The user asked for the card (right-click or long press on a marker or the brackets, issue #64).
+   * Nothing has a card unless asked: a left click picks or opens the object in the flipbook, and
+   * opening the object panel drops the request, so closing the panel shows the sky, not the card.
    */
   cardRequested: boolean;
   setTool(tool: ToolId): void;
@@ -60,6 +61,7 @@ export const useShellStore = create<ShellState>()((set) => ({
     set((s) => ({
       tool,
       focusSeq: s.focusSeq + 1,
+      cardRequested: tool === 'flipbook' || tool === 'spectrum' ? false : s.cardRequested,
       // The rail's 3D viewer is the build pane, with the body already built (no animation).
       build:
         tool === 'viewer'
