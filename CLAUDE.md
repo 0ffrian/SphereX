@@ -8,9 +8,10 @@ Project: **Shift & Spectrum**, a public web tool for NASA Space Apps 2026 (Port 
 |---|---|
 | [docs/decisions.md](docs/decisions.md) | **Wins over every other doc** where it states a decision. |
 | [docs/rendering/](docs/rendering/README.md) | Source of truth for how an object is **displayed**, how its **surface is generated**, how it **feels (haptics)** and how that **sounds (audio pairing)**. Sections `R0`–`R12`. |
-| [docs/architecture/](docs/architecture/README.md) | Source of truth for everything else: data sources, pipeline, tiers, plan, risks. Sections `A1`–`A15`. |
+| [docs/architecture/](docs/architecture/README.md) | Source of truth for everything else: data sources, pipeline, tiers, plan, risks. Sections `A1`–`A18`. |
 | [docs/uml/](docs/uml/README.md) | Architecture diagrams (UML, Mermaid). Keep in sync when a spec changes. |
 | [docs/handover.md](docs/handover.md) | Background only (competition, data, early concepts). Not a spec. |
+| [mockup/](mockup/) | Visual input only, never a spec (D-01). `spherex-ui.html` is the app shell; `chase-the-rock.html` is the Track tool (see Layout). |
 
 If two docs disagree and `decisions.md` is silent, follow the precedence (decisions > rendering > architecture), add a `Q-` entry to `decisions.md` describing the conflict, and continue. Never pick silently.
 
@@ -65,10 +66,18 @@ The team builds from 5 Nov 2026 (decisions D-14), setting aside the event rule a
 
 ```
 docs/       specs, decisions, UML
-mockup/     single-file HTML mock-up (three.js r128, not the app)
+mockup/     single-file HTML mock-ups, not the app
+  spherex-ui.html       app shell and tools (three.js r128)
+  chase-the-rock.html   Track tool: a known asteroid's path, its SPHEREx frames, a zoom with
+                        stars masked, and a spectrum built hop by hop (433 Eros, 20–21 Mar 2026)
 backend/    Python 3.12 API, pipeline, texture baker        (Kevin, Moon, Atish)
 frontend/   Vite + TypeScript + React app, viewer, haptics   (Moon; Atish for haptics and viewer/fields)
 shared/     JSON schemas shared by backend and frontend      (Moon)
 ```
 
 Owners per area: decisions D-17.
+
+**Track tool mock-up (`mockup/chase-the-rock.html`).** It shows the known-objects Track tool proposed for PR #59 (no blind discovery). Its data is real: 16 SPHEREx QR2 cutouts and the JPL Horizons path from SPHEREx (`500@-163182`), both from PR #53's recorded Eros fixtures, plus the local 2MASS sky mirror. Three things in it are mock-up approximations, not app output, so never port them as values:
+- Star masks are bright peaks found in each frame; the app places them from Gaia DR3 and CatWISE (A4.9).
+- Brightness uses Stage 2's radii (3 px aperture, 6–9 px ring) without its sub-pixel weights or clipping (A4.2).
+- `OUTLIER` on Eros's pixels is kept under a proposed rule for moving objects that is not yet decided; Stage 2 on main refuses those frames.
