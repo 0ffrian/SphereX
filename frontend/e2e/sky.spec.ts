@@ -252,14 +252,11 @@ test('keyboard: arrows pan, +/− zoom, Enter picks the centre; "/" focuses the 
   await expect(page.getByTestId('search-input')).toHaveValue('104.000000,4.000000');
 
   // "/" from a button focuses the search; typed into the field it is just a character.
-  await page.getByRole('button', { name: 'Zoom in on the sky' }).focus();
+  await page.getByTestId('tool-flipbook').focus();
   await page.keyboard.press('/');
   await expect(page.getByTestId('search-input')).toBeFocused();
   await page.keyboard.type('a/b');
   await expect(page.getByTestId('search-input')).toHaveValue('a/b');
-  // On-screen buttons (WCAG 2.5.7).
-  await page.getByRole('button', { name: 'Zoom out on the sky' }).click();
-  await expect(page.getByTestId('sky-readout')).toContainText('FOV 40°');
 });
 
 test('tool rail opens real panels; Escape closes and returns focus', async ({ page }) => {

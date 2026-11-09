@@ -535,27 +535,7 @@ body {
     padding: 1px 6px;
   }
 
-  /* ---- sky controls and credit (SkyPane) ---- */
-  .sx-sky-ctrls {
-    position: absolute;
-    top: 50%;
-    right: 8px;
-    transform: translateY(-50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-  }
-  .sx-sky-ctrls-sep {
-    margin: 4px 0;
-    width: 20px;
-    height: 1px;
-    background: var(--color-sx-border);
-  }
-  .sx-sky-btn {
-    width: 32px;
-    height: 32px;
-  }
+  /* ---- sky credit (SkyPane) ---- */
   /* The survey's provenance and credit (D-35: always shown next to the sky). Nearly opaque, so the
      small grey text keeps AA contrast over the brightest parts of the sky. */
   .sx-sky-credit {
@@ -853,20 +833,6 @@ body {
       background: none;
       padding: 0;
     }
-    /* Sky controls: a row along the top, so the bottom sheet never covers them (WCAG 2.5.7). */
-    .sx-sky-ctrls {
-      top: 8px;
-      right: auto;
-      left: 50%;
-      transform: translateX(-50%);
-      flex-direction: row;
-      gap: 2px;
-    }
-    .sx-sky-ctrls-sep {
-      margin: 0 4px;
-      width: 1px;
-      height: 20px;
-    }
     /* The credit becomes a full-width strip at the bottom of the sky; the bottom sheet docks on top
        of it (--sx-credit-h), so the credit never cuts across the sheet's text (D-35). */
     .sx-sky-credit {
@@ -896,8 +862,7 @@ body {
   /* ---- touch screens: 44 px targets (R9 asks for 24; touch needs more) ---- */
   @media (pointer: coarse) {
     .sx-btn-i,
-    .sx-panel-x,
-    .sx-sky-btn {
+    .sx-panel-x {
       width: 44px;
       height: 44px;
     }
@@ -1081,10 +1046,6 @@ body {
   }
   .sx-orb-in[data-mode='panel'] {
     opacity: 0;
-  }
-  .sx-grid-loader {
-    display: grid;
-    flex: none;
   }
   .sx-orb-label {
     display: flex;

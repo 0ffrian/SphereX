@@ -11,8 +11,8 @@
 //   smallest image, then a larger one on capable devices. With no image installed it shows a
 //   coordinate grid and says so; clicking still picks coordinates.
 // - No React re-render per pointer move: the readout and markers are written from refs.
-// - R9: keyboard pan/zoom on the canvas (arrows, +/−, R), Enter picks the centre, on-screen pan
-//   and zoom buttons (WCAG 2.5.7), aria-label and a text alternative.
+// - R9: keyboard pan/zoom on the canvas (arrows, +/−, R), Enter picks the centre, aria-label and a
+//   text alternative. No on-screen pan and zoom buttons (Q-122).
 import {
   useEffect,
   useId,
@@ -392,7 +392,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
   const onContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     // Panels, the card and the on-screen controls keep the browser's menu.
-    if (target.closest('.sx-island-wrap, .sx-panel, .sx-sky-ctrls, .sx-sky-credit, input')) return;
+    if (target.closest('.sx-island-wrap, .sx-panel, .sx-sky-credit, input')) return;
     let key = target.closest<HTMLElement>('[data-marker-key]')?.dataset.markerKey ?? null;
     if (key === null) {
       let best = Infinity;
@@ -640,30 +640,6 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
-  const nudge = (kind: 'in' | 'out' | 'left' | 'right' | 'up' | 'down' | 'reset') => {
-    const v = viewRef.current;
-    if (!v) return;
-    flyCancel.current?.();
-    const cam = v.getView();
-    const { width, height } = v.getSize();
-    const next =
-      kind === 'in'
-        ? zoomAt(cam, 1 / KEY_ZOOM_FACTOR, width, height)
-        : kind === 'out'
-          ? zoomAt(cam, KEY_ZOOM_FACTOR, width, height)
-          : kind === 'left'
-            ? panByFraction(cam, KEY_PAN_FRACTION, 0)
-            : kind === 'right'
-              ? panByFraction(cam, -KEY_PAN_FRACTION, 0)
-              : kind === 'up'
-                ? panByFraction(cam, 0, KEY_PAN_FRACTION)
-                : kind === 'down'
-                  ? panByFraction(cam, 0, -KEY_PAN_FRACTION)
-                  : DEFAULT_SKY_VIEW;
-    v.setView(next);
-    announceView(v.getView());
-  };
-
   const survey =
     state.kind === 'ready' || state.kind === 'loading' || state.kind === 'error'
       ? state.survey
@@ -789,19 +765,6 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         )}
       </ul>
 
-      {/* On-screen pan and zoom (WCAG 2.5.7: an alternative to dragging). */}
-      {/* A column at the right; a row along the top on phones, clear of the bottom sheet. */}
-      <div role="group" aria-label="Sky view controls" className="sx-sky-ctrls">
-        <SkyButton label="Zoom in on the sky" onClick={() => nudge('in')} glyph="plus" />
-        <SkyButton label="Zoom out on the sky" onClick={() => nudge('out')} glyph="minus" />
-        <span className="sx-sky-ctrls-sep" aria-hidden="true" />
-        <SkyButton label="Pan up (north)" onClick={() => nudge('up')} glyph="up" />
-        <SkyButton label="Pan left (east)" onClick={() => nudge('left')} glyph="left" />
-        <SkyButton label="Pan right (west)" onClick={() => nudge('right')} glyph="right" />
-        <SkyButton label="Pan down (south)" onClick={() => nudge('down')} glyph="down" />
-        <SkyButton label="Reset the sky view" onClick={() => nudge('reset')} glyph="reset" />
-      </div>
-
       {/* Status of the sky image: never a blank pane. */}
       {state.kind !== 'ready' && (
         // Near the top and click-through, so the centre of the sky stays clickable.
@@ -893,39 +856,5 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         {viewSay}
       </p>
     </div>
-  );
-}
-
-const GLYPHS: Record<string, string> = {
-  plus: 'M12 5v14M5 12h14',
-  minus: 'M5 12h14',
-  up: 'm6 15 6-6 6 6',
-  down: 'm6 9 6 6 6-6',
-  left: 'm15 6-6 6 6 6',
-  right: 'm9 6 6 6-6 6',
-  reset: 'M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5',
-};
-
-function SkyButton({
-  label,
-  glyph,
-  onClick,
-}: {
-  label: string;
-  glyph: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="sx-sky-btn grid place-items-center rounded-lg border border-sx-border bg-sx-muted/90 text-sx-fg transition-colors hover:bg-sx-muted-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sx-green"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-    >
-      <svg viewBox="0 0 24 24" className="sx-ico size-4" aria-hidden="true">
-        <path d={GLYPHS[glyph]} />
-      </svg>
-    </button>
   );
 }
