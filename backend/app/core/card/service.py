@@ -45,6 +45,7 @@ from app.core.card.build import SPECTRUM_FIELDS, build_card
 from app.core.card.catalogue import CatalogueData, apply_geometry, fetch_geometry, gather
 from app.core.card.validate import ContractViolation, check_card, check_params
 from app.core.classify import Classification, classify
+from app.core.find import moving
 from app.core.find.frames import DEFERRED, FrameEvent, FrameService, FramesResult, is_complete
 from app.core.find.resolver import ResolvedObject
 from app.core.jobs import Job, JobRegistry
@@ -180,7 +181,10 @@ class ObjectPipeline:
 
         frames = self._join_frames(f_frames)
         batch_only = False
-        if frames is not None and any(m.startswith(DEFERRED + ":") for m in frames.missing):
+        # Cutouts still to download, or (a moving object) a path search the first batch left to
+        # this full run: publish the partial answer, then fetch the rest.
+        still_to_come = (DEFERRED + ":", moving.SEARCH_DEFERRED + ":")
+        if frames is not None and any(m.startswith(still_to_come) for m in frames.missing):
             job.update(stage="spectrum")
             spectrum, spectrum_at = self._spectrum(obj, frames, premeasured)
             partial = self._assemble(

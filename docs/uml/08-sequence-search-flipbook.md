@@ -96,16 +96,16 @@ sequenceDiagram
     API->>HZ: Position at the resolve epoch, neighbours in field (SkyBoT -ep as JD), via the cache
     HZ-->>API: Positions and known objects
     alt every Horizons and SIA answer of the path search is cached, or SX_OFFLINE=1
-      API->>C: Path ephemeris per window (targets.toml moving_windows, else the release window), seen from SPHEREx (500@-163182), every SX_MOVING_EPHEM_STEP_MIN
+      API->>C: Path ephemeris per window (targets.toml moving_windows by spkid, else the release window), seen from SPHEREx (500@-163182), every SX_MOVING_EPHEM_STEP_MIN
       C-->>API: Positions
       loop each cone along the path, dt = clamp(R / rate, min, max), at most SX_MOVING_MAX_CONES spread over the path
         API->>C: SIA cone at the path position (radius R)
         C-->>API: Every frame over that spot
       end
       API->>API: Merge by frame_id#59; candidates: s_region holds the interpolated position, or is within the margin
-      API->>C: Exact positions at the candidate midpoints (TLIST, one per cone)
+      API->>C: Exact positions at the candidate midpoints (TLIST per planned cone, by nearest cone time)
       C-->>API: Positions (model_dependent)#59; keep a frame only when its s_region holds the exact one
-      API->>API: Cutout centred there, then sky to pixel via WCS#59; frames:cone_cap, frames:sparse_path, frames:truncated reported (issue #26, Q-21, Q-124)
+      API->>API: Cutout centred there, then sky to pixel via WCS#59; frames:cone_cap, frames:sparse_path, frames:cone_maxrec reported (issue #26, Q-21, Q-124)
     else a path answer is not cached (Q-111: the web request reads the cache only)
       API->>J: on_request: start or join the object's job#59; the reply lists frames:search_deferred:n
       Note over J,HZ: In the background, through the cache: Horizons path ephemeris, SIA cones (spaced by SX_MOVING_CONE_PACE_S across the process), TLIST positions#59; a call that failed live is not retried within SX_LIVE_FAILURE_TTL_S

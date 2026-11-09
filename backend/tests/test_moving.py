@@ -327,31 +327,144 @@ def test_pacer_spaces_calls_across_searches() -> None:
 
 
 def test_target_windows_replace_the_release_window(tmp_path: Path) -> None:
+    """Windows are matched by spkid, so every spelling of the name gets the same windows."""
     f = tmp_path / "targets.toml"
     f.write_text(
-        '[[target]]\nname = "X"\nquery = "3I"\ngroup = "moving"\n'
+        '[[target]]\nname = "X"\nquery = "3I"\ngroup = "moving"\nspkid = "1004083"\n'
         'moving_windows = [["2025-12-07T00:00:00Z", "2025-12-17T00:00:00Z"],'
         ' ["2025-07-31T00:00:00Z", "2025-08-18T00:00:00Z"]]\n'
-        '[[target]]\nname = "Bad"\nquery = "bad"\nmoving_windows = [["x", "y"]]\n',
+        '[[target]]\nname = "Bad"\nquery = "bad"\nspkid = "1"\nmoving_windows = [["x", "y"]]\n'
+        '[[target]]\nname = "No id"\nquery = "noid"\n'
+        'moving_windows = [["2025-07-31T00:00:00Z", "2025-08-18T00:00:00Z"]]\n',
         encoding="utf-8",
     )
     ctx = make_context(make_settings(tmp_path / "c", targets_file=f))
-    cfg = moving.MovingConfig.from_context(ctx, " 3i ")
+    cfg = moving.MovingConfig.from_context(ctx, "1004083")
     assert [w[0].month for w in cfg.windows] == [7, 12]  # sorted
-    default = moving.MovingConfig.from_context(ctx, "433 Eros")
+    default = moving.MovingConfig.from_context(ctx, "20000433")
     assert default.windows == (
         (datetime(2026, 3, 20, tzinfo=UTC), datetime(2026, 3, 21, 12, tzinfo=UTC)),
     )
-    assert moving.MovingConfig.from_context(ctx, "bad").windows == default.windows
+    assert moving.MovingConfig.from_context(ctx, "1").windows == default.windows
+    assert moving.MovingConfig.from_context(ctx, None).windows == default.windows
     assert cfg.key_fields()["m_windows"] != default.key_fields()["m_windows"]
 
 
 def test_repo_targets_give_3i_atlas_its_windows() -> None:
     ctx = make_context(make_settings(Path("unused"), targets_file=TARGETS_FILE))
-    cfg = moving.MovingConfig.from_context(ctx, "3I")
+    cfg = moving.MovingConfig.from_context(ctx, "1004083")
     assert len(cfg.windows) == 2
     assert cfg.windows[0][0] <= datetime(2025, 8, 1, tzinfo=UTC)
     assert cfg.windows[1][1] >= datetime(2025, 12, 16, tzinfo=UTC)
+
+
+def _eros_windows(tmp_path: Path, *windows: tuple[str, str]) -> Path:
+    f = tmp_path / "targets.toml"
+    rows = ", ".join(f'["{a}", "{b}"]' for a, b in windows)
+    f.write_text(
+        TARGETS_FILE.read_text(encoding="utf-8")
+        + f'\n[[target]]\nname = "Eros windows"\nquery = "eros-w"\ngroup = "x"\n'
+        f'spkid = "20000433"\nmoving_windows = [{rows}]\n',
+        encoding="utf-8",
+    )
+    return f
+
+
+FIXTURE_WINDOW = (FIXTURE_MOVING["moving_window_start"], FIXTURE_MOVING["moving_window_end"])
+
+
+def test_a_failed_window_keeps_the_windows_that_answered(fixture_cache: Path) -> None:
+    """The second window is not cached (offline): it is reported, the first is still searched."""
+    f = _eros_windows(
+        fixture_cache.parent, FIXTURE_WINDOW, ("2026-04-01T00:00:00Z", "2026-04-02T00:00:00Z")
+    )
+    svc, obj = eros_obj(fixture_cache, targets_file=f)
+    result = svc.get_frames(obj)
+    assert len(result.frames) == 16
+    assert result.missing[0] == "frames:ephemeris"
+    assert not is_complete(result.missing)
+
+
+def test_a_window_shorter_than_one_step_is_a_bad_window(fixture_cache: Path) -> None:
+    f = _eros_windows(fixture_cache.parent, ("2026-03-20T00:00:00Z", "2026-03-20T00:30:00Z"))
+    svc, obj = eros_obj(fixture_cache, targets_file=f)
+    assert svc.get_frames(obj).missing == ["frames:moving_window"]
+
+
+def test_cone_maxrec_is_reported_and_the_list_is_stored(
+    fixture_cache: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A mover's MAXREC hit is deterministic for the cached answer: its own code, and stored."""
+    real = irsa_sia.search
+
+    def capped(*a: Any, **k: Any) -> irsa_sia.SiaResult:
+        r = real(*a, **k)
+        return irsa_sia.SiaResult(rows=r.rows, truncated=True, served=r.served)
+
+    monkeypatch.setattr(irsa_sia, "search", capped)
+    svc, obj = eros_obj(fixture_cache)
+    result = svc.get_frames(obj)
+    assert "frames:cone_maxrec:2" in result.missing and "frames:truncated" not in result.missing
+    assert is_complete(result.missing)
+    assert list((fixture_cache / "v1").glob("derived.frames/*/*/*.json"))
+
+
+def test_capped_first_batch_reads_the_cache_only(fixture_cache: Path) -> None:
+    """The job's quick first batch (live_cap) is not held up by a live path search."""
+    _drop_moving_cones(fixture_cache)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"no live call expected: {request.url}")
+
+    _, obj = eros_obj(fixture_cache)
+    svc = FrameService(_online(fixture_cache, handler))
+    result = svc.get_frames(obj, live_cap=3)
+    assert "frames:search_deferred:2" in result.missing
+
+
+def test_tlist_groups_follow_planned_cones_not_answers(
+    fixture_cache: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With the first cone missing, the frames near the second cone keep their TLIST key."""
+    keys: list[str] = []
+    real = horizons.ephemeris
+
+    def spy(ctx: Any, spkid: str, times: list[datetime], **k: Any) -> Any:
+        keys.append(",".join(horizons.jd_list(times)))
+        return real(ctx, spkid, times, **k)
+
+    monkeypatch.setattr(horizons, "ephemeris", spy)
+    ctx = make_context(make_settings(fixture_cache))
+    full = moving.search_path(ctx, "20000433")
+    all_keys = set(keys)
+    cones = sorted(
+        (m["key"]["query"] for m, _ in entries("irsa_sia") if m["maxrec"] == 500),
+        key=lambda q: float(q["ra"]),
+    )
+    assert len(cones) == 2 and len(full.rows) == 16
+    keys.clear()
+    cache = ReadThroughCache(fixture_cache, offline=True)
+    first = min(  # the cone at the window start
+        cones, key=lambda q: abs(float(q["ra"]) - full.positions[full.rows[0].frame_id][0])
+    )
+    cache.delete(
+        irsa_sia.sia_key(
+            "spherex_qr2", float(first["ra"]), float(first["dec"]), float(first["radius"])
+        )
+    )
+    partial = moving.search_path(ctx, "20000433")
+    assert "frames:cone_failed:1" in partial.missing
+    assert set(keys) <= all_keys  # no TLIST key that was not asked for before
+    assert not any(m.startswith("ephemeris:") for m in partial.missing)
+
+
+def test_nearest_cone() -> None:
+    t0 = datetime(2026, 1, 1, tzinfo=UTC)
+    times = [t0, t0 + timedelta(hours=10), t0 + timedelta(hours=20)]
+    assert moving.nearest_cone(times, t0 - timedelta(hours=1)) == 0
+    assert moving.nearest_cone(times, t0 + timedelta(hours=5)) == 0  # tie: the earlier
+    assert moving.nearest_cone(times, t0 + timedelta(hours=6)) == 1
+    assert moving.nearest_cone(times, t0 + timedelta(hours=30)) == 2
 
 
 # --- geometry and step policy ---------------------------------------------------------------
