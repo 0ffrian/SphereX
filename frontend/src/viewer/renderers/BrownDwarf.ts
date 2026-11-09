@@ -264,11 +264,6 @@ export function planBrownDwarf(
     );
   if (binary && orbit && classes.length < 2)
     b.notes.push('The spectral class does not name two components, so one body is shown.');
-  if (twoBodies)
-    b.notes.push(
-      'Both bodies share the system colour and brightness: per-class values are not specified.',
-    );
-
   if (!bodyOk) b.dropDrawn();
 
   if (irPattern) {
@@ -285,14 +280,52 @@ export function planBrownDwarf(
     b.notes.push(
       "The two bodies share one band map; the second is turned by a seeded amount so they differ. That is the artist's look, not data.",
     );
-  const make = (id: string, x: number, radius: number, offsetU = 0): BodyPlan =>
+  // Q-154: each body's own colour (from its class) and brightness (from its published Teff), when
+  // the backend sent `components` and the layers pass the honesty state. The infrared view keeps the
+  // whole-body SPHEREx colour, and a drawn band map is the colour itself, so neither takes the
+  // per-class tint.
+  const comps = twoBodies ? (params.components ?? null) : null;
+  const flatTint = !(texturedBands && !irPattern);
+  const colourPerBody =
+    comps !== null && b.mode !== 'spherex_ir' && flatTint && b.draw('components');
+  const brightnessPerBody =
+    comps !== null &&
+    comps.every((c) => c.emissive_scale !== null) &&
+    b.draw('component_brightness');
+  if (twoBodies) {
+    const shared = [
+      colourPerBody ? null : 'colour',
+      brightnessPerBody ? null : 'brightness',
+    ].filter((s): s is string => s !== null);
+    if (shared.length === 2)
+      b.notes.push(
+        comps === null
+          ? 'Both bodies share the system colour and brightness: per-class values are not specified.'
+          : 'Both bodies share the system colour and brightness: the per-component values are not drawn in this view.',
+      );
+    else if (shared.length === 1) b.notes.push(`Both bodies share the system ${shared[0]}.`);
+  }
+  const make = (
+    id: string,
+    x: number,
+    radius: number,
+    offsetU = 0,
+    part: number | null = null,
+  ): BodyPlan =>
     litBody(
       id,
       [radius, radius, radius],
-      texturedBands && !irPattern ? ([1, 1, 1] as Rgb) : b.tint.rgb,
+      !flatTint
+        ? ([1, 1, 1] as Rgb)
+        : colourPerBody && comps !== null && part !== null
+          ? (comps[part]!.tint as Rgb)
+          : b.tint.rgb,
       {
         position: [x, 0, 0],
-        emissive,
+        emissive:
+          brightnessPerBody && comps !== null && part !== null
+            ? emissive * (comps[part]!.emissive_scale ?? 1)
+            : emissive,
         segments: [64, 32],
         albedoUrl: texturedBands ? (tex?.albedo ?? null) : null,
         albedoLuma: irPattern,
@@ -305,8 +338,8 @@ export function planBrownDwarf(
     ? []
     : twoBodies
       ? [
-          make('body_a', -BINARY_OFFSET, BINARY_BODY_RADIUS),
-          make('body_b', BINARY_OFFSET, BINARY_BODY_RADIUS, binaryMapOffset(params.seed)),
+          make('body_a', -BINARY_OFFSET, BINARY_BODY_RADIUS, 0, 0),
+          make('body_b', BINARY_OFFSET, BINARY_BODY_RADIUS, binaryMapOffset(params.seed), 1),
         ]
       : [make('body', 0, 1)];
 

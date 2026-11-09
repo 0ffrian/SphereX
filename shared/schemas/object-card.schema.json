@@ -76,6 +76,30 @@
     "teq_K": {
       "$ref": "#/definitions/TVNumber"
     },
+    "mass_mearth": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "orbit_au": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "orbital_period_d": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "host_teff_K": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "host_radius_rsun": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "host_mass_msun": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "host_age_gyr": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "component_teff_K": {
+      "$ref": "#/definitions/TVPair"
+    },
     "period_var_d": {
       "$ref": "#/definitions/TVNumber"
     },

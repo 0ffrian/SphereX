@@ -1,0 +1,20 @@
+{
+ "adql": "SELECT TOP 10 s.source_id, s.ra, s.dec, s.phot_g_mean_mag, a.teff_gspphot, a.teff_gspphot_lower, a.teff_gspphot_upper, a.radius_flame, a.radius_flame_lower, a.radius_flame_upper FROM gaia_dr3_source AS s LEFT OUTER JOIN gaia_dr3_astrophys_param AS a ON s.source_id = a.source_id WHERE 1=CONTAINS(POINT('ICRS',s.ra,s.dec),CIRCLE('ICRS',76.95656,30.40135,0.00083)) ORDER BY s.phot_g_mean_mag, s.source_id",
+ "body_sha256": "75d02f41711dc95e8b3ceafe4e59ab01a0a424a57b23f5fdef9cf0501ac815c5",
+ "body_size": 265,
+ "content_type": "text/csv",
+ "fetched_at": "2026-11-09T19:27:43.437Z",
+ "key": {
+  "query": {
+   "dec": "30.40135",
+   "ra": "76.95656",
+   "radius": "0.00083",
+   "what": "astrophysical_parameters"
+  },
+  "release": "gaia_dr3",
+  "source": "gaia"
+ },
+ "status": 200,
+ "table": "gaia_dr3_source",
+ "url": "https://irsa.ipac.caltech.edu/TAP/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=SELECT+TOP+10+s.source_id%2C+s.ra%2C+s.dec%2C+s.phot_g_mean_mag%2C+a.teff_gspphot%2C+a.teff_gspphot_lower%2C+a.teff_gspphot_upper%2C+a.radius_flame%2C+a.radius_flame_lower%2C+a.radius_flame_upper+FROM+gaia_dr3_source+AS+s+LEFT+OUTER+JOIN+gaia_dr3_astrophys_param+AS+a+ON+s.source_id+%3D+a.source_id+WHERE+1%3DCONTAINS%28POINT%28%27ICRS%27%2Cs.ra%2Cs.dec%29%2CCIRCLE%28%27ICRS%27%2C76.95656%2C30.40135%2C0.00083%29%29+ORDER+BY+s.phot_g_mean_mag%2C+s.source_id"
+}

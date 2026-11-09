@@ -16,7 +16,8 @@
       ],
       "formula": "a/b = 10^(0.4 * A), c = b",
       "assumed": {
-        "c_over_b": 1.0
+        "c_over_b": 1.0,
+        "c_axis": "c is not constrained by a light curve; c = b draws a cigar, and a disc fits the same data"
       }
     },
     {

@@ -75,7 +75,13 @@ def test_targets_return_valid_card_and_params_offline(
 def test_nothing_is_guessed_for_the_targets(client: TestClient) -> None:
     """Values with no source in the pipeline stay null, with the reason in `source`."""
     star = get_both(client, resolve_id(client, "Barnard's star"))[0].json()
-    assert star["teff_K"]["value"] is None and star["radius_rsun"]["value"] is None
+    # Issue #68 Part 8c (Q-152): Teff from SIMBAD mesFe_h, radius from Gaia FLAME. Neither is a
+    # guess, and each says where it came from.
+    assert star["teff_K"]["tag"] == "derived" and "mesFe_h" in star["teff_K"]["source"]
+    assert (
+        star["radius_rsun"]["tag"] == "model_dependent"
+        and "radius_flame" in (star["radius_rsun"]["source"])
+    )
     assert star["spectral_class"] == {
         "value": "M4V",
         "tag": "measured",

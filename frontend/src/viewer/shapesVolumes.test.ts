@@ -124,6 +124,11 @@ describe('asteroid without a model: ellipsoid and displacement (R7.2)', () => {
     const [a, b, c] = ellipsoidAxes(0.5);
     expect(a / b).toBeCloseTo(Math.pow(10, 0.4 * 0.5), 12);
     expect(c).toBe(b);
+    // No cap: 'Oumuamua's 2.5 mag (Meech et al. 2017) gives a/b = 10 exactly, a needle, c = b.
+    const [ua, ub, uc] = ellipsoidAxes(2.5);
+    expect(ua).toBe(1);
+    expect(ub).toBeCloseTo(0.1, 12);
+    expect(uc).toBe(ub);
     expect(ellipsoidAxes(0)).toEqual([1, 1, 1]);
     expect(ellipsoidAxes(null)).toEqual([1, 1, 1]);
     expect(ellipsoidAxes(-1)).toEqual([1, 1, 1]);

@@ -47,7 +47,7 @@ type ObjectType =
 interface ObjectCard {
   id: string; name: string; type: ObjectType;
   // geometry
-  diameter_km?: TV; radius_rjup?: TV; radius_rsun?: TV;
+  diameter_km?: TV; radius_rjup?: TV; radius_rsun?: TV;   // radius_rsun: Gaia FLAME → 'model_dependent', else null (Q-152)
   shape_source?: TV<string>;          // URL/DOI of mesh, or null
   rot_period_h?: TV; lightcurve_amp_mag?: TV;
   // appearance inputs
@@ -57,11 +57,20 @@ interface ObjectCard {
   band_depth_1um?: TV; band_depth_2um?: TV; band_depth_3um?: TV;
   slope_075_25?: TV;                  // spectral slope, %/µm
   ch4_depth_33?: TV; flux_45um?: TV;  // brown dwarfs
-  teff_K?: TV;
+  teff_K?: TV;                        // stars (Q-152): SIMBAD mesFe_h median → 'derived'; else Gaia GSP-Phot (> 4000 K only) →
+                                      // 'model_dependent'; else a main-sequence class table → 'inferred_from_analog'; else null
   teq_K?: TV;                         // planet equilibrium temperature (D-12): Exoplanet Archive pl_eqt → 'measured',
                                       // otherwise 'derived' (architecture spec §7.1). null → teq_pulse refused, listed in missing
+  // exoplanet orbit, mass and host star (issue #68, Q-150), from the Exoplanet Archive row (A3.8):
+  mass_mearth?: TV;                   // 'measured' only when pl_bmassprov = 'Mass'; 'Msini' is a lower limit (model_dependent);
+                                      // 'M-R relationship' (Chen & Kipping 2017) is model_dependent; 'Msin(i)/sin(i)' is derived
+  orbit_au?: TV; orbital_period_d?: TV;
+  host_teff_K?: TV; host_radius_rsun?: TV; host_mass_msun?: TV; host_age_gyr?: TV;
+                                      // a measured column cites its *_reflink; a CALCULATED_VALUE is never 'measured'; a missing
+                                      // value is null with the reason in `source`
+  component_teff_K?: TV<[number, number]>;  // brown_dwarf_binary only: Teff of body A then B (literature registry, Q-154)
   // variability
-  period_var_d?: TV;                  // Mira period
+  period_var_d?: TV;                  // Mira period: SIMBAD mesVar median over rows typed LPV or M → 'measured' (Q-152)
   lightcurve?: { t_mjd: number; flux: number; sigma: number; lambda_um: number; flags: number }[];
   // geometry of observation (solar-system bodies)
   phase_angle_deg?: TV; sun_vector?: TV<[number, number, number]>;   // sun_vector: unit vector target -> Sun,
@@ -101,6 +110,9 @@ interface RenderParams {
   layers: Layer[];                     // ordered, each with a tag
   // relief_amp: peak relief, fraction of the radius (R6.2); scales the displacement (R7.2). Optional (Q-103); the backend sends it for `asteroid_procedural` (issue #62, Q-117), with an `artistic` `displacement` layer
   textures?: { albedo: string; height: string; normal: string; roughness?: string; height_bin?: string; relief_amp?: number };
+  // brown_dwarf_binary only (issue #68, Q-154): the look of body A then body B, in the order of the card's spectral_class.
+  // Absent when the class does not name two components with a palette: both bodies then share the system look.
+  components?: [Component, Component];
   lighting: { mode: 'sun' | 'self'; sun_dir?: [number, number, number]; phase_angle_deg?: number };
                                        // sun_dir: today a copy of the card's ICRF sun_vector; the viewer reads it
                                        // as scene space. Frame conversion open (Q-62); phase_angle_deg wins
@@ -109,6 +121,13 @@ interface RenderParams {
   haptics: HapticProfile;              // §8
   alt_text: string;                    // §9
   missing: string[];                   // layers refused for missing data, shown to the user
+}
+interface Component {
+  class: string;                       // this body's class, one half of spectral_class, e.g. 'T1V'
+  tint: [number, number, number];      // linear RGB from this body's class through the single-brown-dwarf palette
+  tint_tag: Tag;                       // 'inferred_from_analog' (the palette is a placeholder, R6.4/Q-47)
+  emissive_scale: number | null;       // 0..1, (Teff / Teff_max)^4 at equal radius; null = no Teff, use the system brightness
+  emissive_tag: Tag;                   // the `component_brightness` layer's tag, or 'artistic' when emissive_scale is null
 }
 type Tier = 1 | 2 | 3 | 4 | 5;       // D-32: 1 measured, 2 derived, 3 model_dependent, 4 inferred_from_analog, 5 artistic
 interface Layer {

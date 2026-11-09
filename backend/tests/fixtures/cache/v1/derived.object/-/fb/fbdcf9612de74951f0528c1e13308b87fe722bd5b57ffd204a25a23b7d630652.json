@@ -1,0 +1,16 @@
+{
+ "body_sha256": "c7926883caf0f53d496b3f513b4fd5355e073c96995466a64f6af36e3ff21c56",
+ "body_size": 628,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-09T19:30:59.916Z",
+ "key": {
+  "query": {
+   "id": "simbad-v-rw-aur",
+   "v": "1"
+  },
+  "release": "-",
+  "source": "derived.object"
+ },
+ "status": 200,
+ "url": "derived:resolve"
+}

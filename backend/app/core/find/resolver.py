@@ -157,7 +157,9 @@ def _from_sbdb(
         # A Flamsteed star name ("61 Cyg") must not fall back to a numbered asteroid ("61").
         return None, [served], False
     epoch = parse_utc(ctx.settings.ephemeris_epoch)
-    points, served_h = horizons.ephemeris(ctx, hit.spkid, [epoch], refresh=refresh)
+    points, served_h = horizons.ephemeris(
+        ctx, hit.spkid, [epoch], comet=hit.is_comet, refresh=refresh
+    )
     if not points:
         raise UpstreamUnavailable(f"Horizons returned no position for {hit.spkid}")
     p = points[0]
