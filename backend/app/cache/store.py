@@ -88,7 +88,8 @@ def _replace_with_retry(src: str, dst: Path) -> None:
             time.sleep(0.01 * 2**attempt)
 
 
-def _atomic_write(path: Path, data: bytes) -> None:
+def atomic_write(path: Path, data: bytes) -> None:
+    """Write ``data`` through a temp file in the same directory and ``os.replace``."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name, suffix=".tmp")
     try:
@@ -173,8 +174,8 @@ class ReadThroughCache:
             "body_size": len(live.body),
             **live.extra,
         }
-        _atomic_write(body_path, live.body)
-        _atomic_write(meta_path, json.dumps(meta, indent=1, sort_keys=True).encode("utf-8"))
+        atomic_write(body_path, live.body)
+        atomic_write(meta_path, json.dumps(meta, indent=1, sort_keys=True).encode("utf-8"))
         return CacheEntry(key, live.body, meta)
 
     def delete(self, key: CacheKey) -> None:

@@ -10,9 +10,9 @@ from typing import Annotated, Literal, cast
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import Response
 
-from app.api.deps import get_ctx, get_frame_service
+from app.api.deps import get_ctx, get_frame_service, require_object
 from app.api.models import ErrorResponse, OverlaysResponse
-from app.api.objects import FrameId, ObjectId, _object
+from app.api.objects import FrameId, ObjectId
 from app.context import Context
 from app.core.find import combine, flagmask, wcs
 from app.core.find.cutouts import CutoutUnavailable, cutout_bytes
@@ -37,7 +37,7 @@ def get_overlay_service(request: Request) -> OverlayService:
 
 
 def _frame(service: FrameService, ctx: Context, object_id: str, frame_id: str) -> FrameRecord:
-    obj = _object(ctx, object_id)
+    obj = require_object(ctx, object_id)
     frame = service.find(obj, frame_id)
     if frame is None:
         raise ApiError(404, "frame_not_found", f"No frame '{frame_id}' for '{object_id}'.")
@@ -62,7 +62,7 @@ def get_overlays(
     ctx: Annotated[Context, Depends(get_ctx)],
     overlays: Annotated[OverlayService, Depends(get_overlay_service)],
 ) -> OverlaysResponse:
-    obj = _object(ctx, object_id)
+    obj = require_object(ctx, object_id)
     return OverlaysResponse.model_validate(overlays.get_overlays(obj).body)
 
 

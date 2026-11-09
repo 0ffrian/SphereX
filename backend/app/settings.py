@@ -6,10 +6,19 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
+
+
+def secret_text(value: SecretStr | None) -> str:
+    """A secret setting as plain text, surrounding whitespace removed ("" when unset or blank).
+
+    One rule for every secret (admin token, Gemini key): a trailing newline from a .env file
+    must not make a token unmatchable or a key look set.
+    """
+    return value.get_secret_value().strip() if value is not None else ""
 
 
 def default_cache_dir() -> Path:
@@ -119,9 +128,41 @@ class Settings(BaseSettings):
     # R6.7 baked textures, served at /data/textures. Outside git, next to the D-25 cache.
     textures_dir: Path | None = None
 
+    # Admin token for admin-only endpoints (R10: gemini_paint.py "behind the admin token").
+    # ASSUMPTION: unset disables every admin endpoint (404); a wrong token gets 403.
+    admin_token: SecretStr | None = None
+    # Gemini artistic layer (D-07, R6.6, A6.2). The key stays server-side: SecretStr, never
+    # returned or logged. Unset = the layer is off and the code colour shows.
+    gemini_api_key: SecretStr | None = None
+    # [verify] R12 #3: model name from R6.6. Listed as the primary image model on Google's
+    # image-generation docs page (checked 9 Nov 2026); not yet confirmed by a live call.
+    gemini_model: str = "gemini-nano-banana-2.1"
+    # [verify] R12 #3 / A3: REST base URL and request shape are not in the specs (see
+    # GeminiRestClient for what was checked against the docs).
+    gemini_api_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    # [verify] R12 #3: the docs name 1:1, 5:4, 16:9, 1:4, 4:1, 1:8 and 8:1 but not 2:1.
+    # Empty = ask for none; the output is resampled to 2:1 (R6.6 step 3) whatever comes back.
+    gemini_aspect_ratio: str = ""
+    # ASSUMPTION: A6.2 says "a set time" but gives no number.
+    gemini_timeout_s: float = 90.0
+    # ASSUMPTION (Q-122): after a live call for an object, no other live call for it within
+    # this many seconds (cost control: a rejected image is not cached). 0 turns it off.
+    gemini_cooldown_s: float = 60.0
+    # Q-122: the AI albedo, its gemini.json and the per-object pointers. Must be outside
+    # textures_dir, which is served as static files without the status checks. Unset means
+    # ``<cache_dir>/textures-ai``.
+    textures_ai_dir: Path | None = None
+    # Q-29 (open): may a cached repaint be shown under SX_OFFLINE=1? Default follows D-24
+    # ("the Gemini layer then stays off"); 1 serves cache hits offline per D-25.
+    gemini_offline_cache: bool = False
+
     @property
     def textures_path(self) -> Path:
         return self.textures_dir or (self.cache_dir / "textures")
+
+    @property
+    def textures_ai_path(self) -> Path:
+        return self.textures_ai_dir or (self.cache_dir / "textures-ai")
 
     @property
     def prefetch_group_list(self) -> list[str]:
