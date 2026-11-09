@@ -90,7 +90,7 @@ Targets, as amended by Q-132 (which answers Q-15):
 
 - **Default mode:** mouse drag or one finger rotates, wheel or pinch zooms. Keyboard: arrows rotate, +/− zoom, `R` resets. In the build pane, while a build runs, a drag turns the body instead (R5.8).
 - Rotate buttons must also exist on screen. WCAG 2.5.7 requires an alternative to dragging. This applies to every 3D view; the sky view's recorded exception (Q-123) is shell behaviour (A21, [sky-shell.md](../architecture/sky-shell.md)).
-- **Feel mode (desktop, the event; Q-113 item 5, Q-132, Q-133). Proposed (Q-NEW-REN-6):**
+- **Feel mode (desktop, the event; Q-113 item 5, Q-132, Q-133). Proposed (Q-173):**
   - The build pane's Feel toggle turns it on and off. Hovering plays nothing.
   - While Feel is on, a primary-button drag on the body plays the body tone (R8.9.1) for the point under the pointer and does not rotate: orbit controls are off while the button is down. The wheel still zooms.
   - The arrows and the on-screen rotate buttons still rotate. With the canvas focused, a held arrow key plays the tone for the surface point at the centre of the body's disc, so a keyboard user hears the relief pass under a fixed probe.

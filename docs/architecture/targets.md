@@ -14,7 +14,7 @@ Every target is listed in `backend/targets.toml` with a `group`; the pre-fetch s
 
 **The MVP demo is 433 Eros in the Track tool** on its 20 to 21 Mar 2026 SPHEREx frames ([Q-137](../decisions/scope-process.md)); 3I/ATLAS is stretch (its extended coma: Q-144). "Demo object" therefore means two things: the Track MVP (Eros) and the D-31 spectrum quick picks.
 
-- **Proposed (Q-NEW-ARCH-4):** move 433 Eros from `fixture` to `demo` in `targets.toml` (or run the event with `SX_PREFETCH_GROUPS=demo,fixture`), so the event's warm start and the pre-fetch cover the MVP object. Today `SX_PREFETCH_GROUPS=demo` skips it.
+- **Proposed (Q-177):** move 433 Eros from `fixture` to `demo` in `targets.toml` (or run the event with `SX_PREFETCH_GROUPS=demo,fixture`), so the event's warm start and the pre-fetch cover the MVP object. Today `SX_PREFETCH_GROUPS=demo` skips it.
 
 **How the D-31 demo objects were picked** (live screen of 8 candidates on QR2, 6 Nov 2026, the first ~32 frames of each object, 78 for SIMP 0136; the screen table is in PR #28):
 

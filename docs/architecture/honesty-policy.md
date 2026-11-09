@@ -31,7 +31,7 @@ Every rule below has a status: **Built** (in `frontend/src`), **To build** (with
 
 ### A11.1 Blind test (optional demo)
 
-Give the pipeline only the data a normal object would have, then show our result next to real spacecraft images, with a scorecard. Not scheduled for the event. **Proposed (Q-NEW-ARCH-7):** owner Atish; object 433 Eros, built as `asteroid_procedural` from its SBDB values with the registered Gaskell shape model withheld, compared with NEAR Shoemaker images (Bennu has no registered model; its shape is part of issue #68).
+Give the pipeline only the data a normal object would have, then show our result next to real spacecraft images, with a scorecard. Not scheduled for the event. **Proposed (Q-179):** owner Atish; object 433 Eros, built as `asteroid_procedural` from its SBDB values with the registered Gaskell shape model withheld, compared with NEAR Shoemaker images (Bennu has no registered model; its shape is part of issue #68).
 
 | Compare | Expectation |
 |---|---|

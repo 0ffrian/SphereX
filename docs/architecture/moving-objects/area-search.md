@@ -2,7 +2,7 @@
 
 > **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A16 to A16.7 · **Implements:** [Q-146](../../decisions/moving-objects.md), [Q-131](../../decisions/moving-objects.md), [Q-137](../../decisions/scope-process.md), [Q-132](../../decisions/platform-hosting.md) · **Read with:** [area-backend.md](area-backend.md) (A17), [area-ui.md](area-ui.md) (A18), [track.md](track.md) (A19), [track-ui.md](track-ui.md) (A20), [uml/22](../../uml/22-area-search.md)
 
-Status: **agreed plan, not built** ([Q-146](../../decisions/moving-objects.md), 9 Nov 2026). It replaces the blind Band-Hop Linker with an injection atlas (Q-147), re-scoped after Atish's review (Q-131). Labels follow the architecture spec: **Tested**, **Documented**, **To build / Not confirmed**. Placeholders written as **Proposed (Q-NEW-MOV-n)** wait for a decision row; until then the rest of this fragment does not depend on them unless it says so.
+Status: **agreed plan, not built** ([Q-146](../../decisions/moving-objects.md), 9 Nov 2026). It replaces the blind Band-Hop Linker with an injection atlas (Q-147), re-scoped after Atish's review (Q-131). Labels follow the architecture spec: **Tested**, **Documented**, **To build / Not confirmed**. Placeholders written as **Proposed (Q-158 to Q-167)** wait for a decision row; until then the rest of this fragment does not depend on them unless it says so.
 
 Clickable mock-ups: `mockup/spherex-ui.html` (Area search is mock-up tool 5; the app adds no number keys, Q-121) and `mockup/chase-the-rock.html` (Track). Mock-ups are visual input only, never a spec (D-01).
 
@@ -78,8 +78,8 @@ flowchart LR
 | Shared ECSV writer | `backend/app/core/export/ecsv.py` ([A19.9](track-contract.md#a199-export)) | Kevin |
 | Schemas and fixtures | `shared/schemas/area-*.schema.json`, `shared/fixtures/area/` | Moon (D-17) |
 | Area tool, cards, layers, state | `frontend/src/app/sky/area/`, `frontend/src/app/shell/`, `frontend/src/state/store.ts` | Moon (D-17) |
-| Track backend | [A19](track.md) | Kevin, **Proposed (Q-NEW-MOV-6)** |
-| Track screen and sound | [A20](track-ui.md), `frontend/src/app/track/` | Atish (Q-131), **Proposed (Q-NEW-MOV-6)** as a D-17 amendment, since `app/` is Moon's |
+| Track backend | [A19](track.md) | Kevin, **Proposed (Q-163)** |
+| Track screen and sound | [A20](track-ui.md), `frontend/src/app/track/` | Atish (Q-131), **Proposed (Q-163)** as a D-17 amendment, since `app/` is Moon's |
 
 Reused, not rewritten: `adapters/irsa_sia.py`, `adapters/irsa_cutout.py`, `adapters/gaia.py`, `adapters/wise.py`, `adapters/skybot.py`, `adapters/horizons.py`, the cache, `core/find/wcs.py` (pixel to sky, `wavelength_at`), the Stage 2 aperture photometry and flag reject list ([A4.2](../pipeline.md#a42-stage-2-measure-brightness-and-spectrum)), Stage 1's fixed-position SIA cone ([A4.1](../pipeline.md#a41-stage-1-find-the-object)) with PR #53's `s_region` test, `viewer/sky/skyMath.ts` (`raDecToScreen`), `app/flipbook/wavelengthColor.ts`, `app/shell/PanelCard.tsx`, the shared ECSV writer and the star list (A19).
 
@@ -107,7 +107,7 @@ Reused, not rewritten: `adapters/irsa_sia.py`, `adapters/irsa_cutout.py`, `adapt
 - **Honest demo line.** The area was chosen because Eros crossed it. The Result card for Eros says: "The search was not given Eros's position. We chose this area because Eros crossed it; the known-object check then named it." Never "found without being told where to look".
 - **Refuse rather than invent.** Fewer than 2 visits: no tracks, `area:visits` in `missing`. A stamp whose cutout is not cached: `stamp:<dot_id>`. Full code list in A17.8.
 - **Precomputed, said so.** The Discovery card shows when the search ran (`computed_at`). Its button reads "Look for movers"; the steps replay the precomputed result.
-- **Flags stay visible.** A dot whose pixels carry `OUTLIER` is kept and its flag is shown in the Result card and the export (A17.2, **Proposed (Q-NEW-MOV-1)**). Dots on the sky are not drawn hollow for it, because Discovery cannot know a dot is a mover's core. Track's spectrum shows kept OUTLIER points hollow (Q-139, [A20.7](track-ui.md#a207-spectrum-hop-by-hop)).
+- **Flags stay visible.** A dot whose pixels carry `OUTLIER` is kept and its flag is shown in the Result card and the export (A17.2, **Proposed (Q-158)**). Dots on the sky are not drawn hollow for it, because Discovery cannot know a dot is a mover's core. Track's spectrum shows kept OUTLIER points hollow (Q-139, [A20.7](track-ui.md#a207-spectrum-hop-by-hop)).
 - **Fixtures.** Synthetic fixtures carry the dev-only Fixture badge and never reach a production build (Q-32).
 
 ### A16.6 Open items and measured facts

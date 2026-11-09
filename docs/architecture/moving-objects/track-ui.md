@@ -2,7 +2,7 @@
 
 > **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A20 to A20.15 · **Implements:** [Q-131, Q-135, Q-136, Q-138, Q-139, Q-142, Q-144](../../decisions/moving-objects.md), [Q-134](../../decisions/haptics-design.md), [Q-132](../../decisions/platform-hosting.md), D-21 ([contract](../../decisions/contract.md)), D-35 ([sky-shell](../../decisions/sky-shell.md)) · **Read with:** [track.md](track.md) (A19), [track-contract.md](track-contract.md) (A19.9 to A19.15), [sky-shell.md](../sky-shell.md) (A21, with A21.8 to A21.13 in [sky-shell-behaviour.md](../sky-shell-behaviour.md)), [area-ui.md](area-ui.md) (A18), [audio-pairing.md](../../rendering/haptics/audio-pairing.md) (R8.9.2), [accessibility.md](../../rendering/accessibility.md) (R9), [uml/23](../../uml/23-track.md)
 
-Status: **agreed in parts, not built** (every section is **To build**). Owner: Atish (Q-131). The files live in `frontend/src/app/track/`, inside `frontend/src/app/`, which D-17 gives to Moon; Track's screen and sound are Atish's by **Proposed (Q-NEW-MOV-6)**, a D-17 amendment like Q-135's for the spin slider.
+Status: **agreed in parts, not built** (every section is **To build**). Owner: Atish (Q-131). The files live in `frontend/src/app/track/`, inside `frontend/src/app/`, which D-17 gives to Moon; Track's screen and sound are Atish's by **Proposed (Q-163)**, a D-17 amendment like Q-135's for the spin slider.
 
 **Mock-up approximations, never ported** (`mockup/chase-the-rock.html`, D-01):
 
@@ -17,11 +17,11 @@ Status: **agreed in parts, not built** (every section is **To build**). Owner: A
 
 ### A20.1 Where Track lives
 
-- Track is the `track` kind of the shell's **split pane** (A21.8, pane kinds proposed as Q-NEW-SHELL-2): opened with `openPane({ kind: 'track', objectId, from })`, never `setTool`; the sky moves left and stays live, the pane takes the other side. It is not a rail tool and has no `ToolId` (**Proposed (Q-NEW-MOV-4)**, Atish's answer to A21.8's open point on a Track rail button).
-- **Width:** `--sx-split-w` for `track` is 50 %, as Build (**Proposed (Q-NEW-MOV-4)**; the mock-up's 62 % is not used). At 1920 px that leaves the pane about 940 px, enough for the detail view, zoom and spectrum stacked.
+- Track is the `track` kind of the shell's **split pane** (A21.8, pane kinds proposed as Q-151): opened with `openPane({ kind: 'track', objectId, from })`, never `setTool`; the sky moves left and stays live, the pane takes the other side. It is not a rail tool and has no `ToolId` (**Proposed (Q-161)**, Atish's answer to A21.8's open point on a Track rail button).
+- **Width:** `--sx-split-w` for `track` is 50 %, as Build (**Proposed (Q-161)**; the mock-up's 62 % is not used). At 1920 px that leaves the pane about 940 px, enough for the detail view, zoom and spectrum stacked.
 - **Opened from** ([A19.2](track.md#a192-entry-points)): the Area Known card's **Track it**, a found-blind Result card's **Open in Track**, the object panel's **Track it** for a `moving = true` object, and a link with `track=<id>`.
-- **One occupant:** Track replaces Build in place and the reverse (A21.8). The hash holds `track=<id>` while it is open, with a history entry marked `{ sxPane: 'track' }` (A21.11, Q-NEW-SHELL-4).
-- **Closed by** × in the pane header, Escape (rank 2 in A21.10, after a focused text field; Q-NEW-SHELL-1), the browser's Back, and **Back to the area** (shown when `from` is an area; reopens the Area card the user came from). Focus returns by `from` as A21.8 sets it: the Area card's heading for `area`; the object's marker for `panel`; the sky canvas for `link`.
+- **One occupant:** Track replaces Build in place and the reverse (A21.8). The hash holds `track=<id>` while it is open, with a history entry marked `{ sxPane: 'track' }` (A21.11, Q-153).
+- **Closed by** × in the pane header, Escape (rank 2 in A21.10, after a focused text field; Q-150), the browser's Back, and **Back to the area** (shown when `from` is an area; reopens the Area card the user came from). Focus returns by `from` as A21.8 sets it: the Area card's heading for `area`; the object's marker for `panel`; the sky canvas for `link`.
 - Desktop only (Q-132): the phone-width sheet of A21.8 is not designed for the event.
 
 ### A20.2 Layout
@@ -46,9 +46,9 @@ The honesty toggle is the app's global one (D-21); Track adds no second toggle. 
 
 ### A20.4 Path on the sky
 
-- A **Track layer** (`frontend/src/app/track/TrackLayer.tsx`), one 2D canvas in the sky layer slot of A21.2 (Q-NEW-SHELL-5), `pointer-events: none`, drawn from the SkyPane render listener with `raDecToScreen`; RA wraps at 0/360; device pixel ratio capped at 1.5 (D-05). It follows the A21.13 sky-layer checklist and takes no clicks.
+- A **Track layer** (`frontend/src/app/track/TrackLayer.tsx`), one 2D canvas in the sky layer slot of A21.2 (Q-154), `pointer-events: none`, drawn from the SkyPane render listener with `raDecToScreen`; RA wraps at 0/360; device pixel ratio capped at 1.5 (D-05). It follows the A21.13 sky-layer checklist and takes no clicks.
 - Draws: the path so far (solid) and still to come (dashed), the marker, each frame's cutout box (`derived`) with the current one highlighted, and each frame's footprint (`measured`) when served (A19.3).
-- On open the camera fits the window's path inside the safe rectangle of the sky's half (A21.2) with `skyFlyTo({ box })` (A21.6, Q-NEW-SHELL-5), at once under reduced motion.
+- On open the camera fits the window's path inside the safe rectangle of the sky's half (A21.2) with `skyFlyTo({ box })` (A21.6, Q-154), at once under reduced motion.
 - **"Measured only"** hides the path, marker and cutout boxes, keeps the footprints, and shows "Path hidden: it comes from the Horizons orbit model (Estimated)."
 
 ### A20.5 Detail view and imagery
@@ -107,7 +107,7 @@ Track's path sound (Q-134: one tick per exposure, wavelength to pitch, drawn x t
 - **Keys** only on Track's own controls (A21.10); no number keys (Q-121).
 - **Slider:** a native range input with `aria-valuetext` ("20 Mar 2026 08:35:10 UTC, exposure 2 of 8, visit 1"). Left and Right step to the previous or next exposure, Page Up and Page Down jump a visit, Home and End go to the ends.
 - **Motion:** Play is a toggle with `aria-pressed`; under reduced motion it does not auto-play and the camera moves at once.
-- **Live region:** the clock is not live; a polite announcement through the shell's `announce(text)` (A21.12, Q-NEW-SHELL-7) is made only when the exposure changes, at most once per second.
+- **Live region:** the clock is not live; a polite announcement through the shell's `announce(text)` (A21.12, Q-156) is made only when the exposure changes, at most once per second.
 - Colour is never the only cue (hollow points, labels, tick shapes); the sound has a visible mute; controls are at least 24 px.
 
 ### A20.13 State, API and files
@@ -126,7 +126,7 @@ Track's path sound (Q-134: one tick per exposure, wavelength to pitch, drawn x t
 
 | Ticket | Owner | Milestone |
 |---|---|---|
-| **T2 Track screen** (A20.1 to A20.14) | Atish | M4 Extras, P1 (**Proposed (Q-NEW-MOV-10)**) |
+| **T2 Track screen** (A20.1 to A20.14) | Atish | M4 Extras, P1 (**Proposed (Q-167)**) |
 | **T3 Track sound** (R8.9.2, A20.9) | Atish | M3 (renamed "Sound", Q-132) |
 
 | Layer | Tests |
