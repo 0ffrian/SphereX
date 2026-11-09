@@ -66,6 +66,28 @@ def test_wrl_is_never_decimated() -> None:
         ing.build_levels(WRL0.read_bytes(), False, fmt="wrl")
 
 
+def test_wrl_lod1_must_be_lighter_and_the_same_body() -> None:
+    wrl0, wrl1 = WRL0.read_bytes(), WRL1.read_bytes()
+    with pytest.raises(ing.ShapeError, match="not fewer"):
+        ing.build_levels(wrl1, False, fmt="wrl", lod1_data=wrl0)  # LOD1 larger than LOD0
+    with pytest.raises(ing.ShapeError, match="not fewer"):
+        ing.build_levels(wrl0, False, fmt="wrl", lod1_data=wrl0)
+    far = wrl1.replace(b"2.00000000E+00", b"4.00000000E+00")  # a bigger, different body
+    with pytest.raises(ing.ShapeError, match="different body"):
+        ing.build_levels(wrl0, False, fmt="wrl", lod1_data=far)
+
+
+def test_lod1_input_is_refused_for_non_wrl() -> None:
+    with pytest.raises(ing.ShapeError, match="only for a WRL"):
+        ing.build_levels(b"v 0 0 0", False, fmt="obj", lod1_data=WRL1.read_bytes())
+
+
+def test_wrl_nan_coordinate_is_refused() -> None:
+    text = WRL0.read_text("ascii").replace("2.00000000E+00", "nan", 1)
+    with pytest.raises(ing.ShapeError, match="non-finite"):
+        ing.read_wrl(text)
+
+
 def mutate(old: str, new: str) -> str:
     text = WRL0.read_text("ascii")
     assert old in text
