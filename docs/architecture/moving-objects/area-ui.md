@@ -1,8 +1,8 @@
 # Area search: in the sky view
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A18–A18.10 · **Overview:** [linker.md](linker.md) (A16) · **Backend:** [linker-backend.md](linker-backend.md) (A17)
+> **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A18–A18.10 · **Overview:** [linker.md](area-search.md) (A16) · **Backend:** [linker-backend.md](area-backend.md) (A17)
 
-Status: **agreed plan, not built** ([Q-146](../decisions/moving-objects.md)). The sky view, shell and island are the sky-view prototype (Q-89) and the rail and island of the mock-up (#66). Area search adds to them; it changes nothing they already do for a searched object. Track's own screen is Atish's (Q-131); this fragment only opens it.
+Status: **agreed plan, not built** ([Q-146](../../decisions/moving-objects.md)). The sky view, shell and island are the sky-view prototype (Q-89) and the rail and island of the mock-up (#66). Area search adds to them; it changes nothing they already do for a searched object. Track's own screen is Atish's (Q-131); this fragment only opens it.
 
 Mock-up: `mockup/spherex-ui.html`, Area search tool (key 5). Serve the `mockup/` folder over http so the Track pane can load `chase-the-rock.html` next to it.
 
