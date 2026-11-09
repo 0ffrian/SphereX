@@ -361,6 +361,31 @@ def _star_fields(card: dict[str, Any], kind: str, data: CatalogueData) -> None:
         card["period_var_d"] = stars.period_field(data.star)
 
 
+def _comet_shape(card: dict[str, Any], data: CatalogueData) -> None:
+    """Q-162: a comet with a registered mesh (67P) gets ``shape_source`` as an asteroid does
+    and a ``nucleus_radius_km_max`` taken from the mesh itself. The viewer scales a mesh by its
+    bounding sphere (half the box diagonal, Q-43), so that is the radius the card must hold: it is
+    the model's own scaling radius, not a published limit, and a mean radius would draw 0.47 of the
+    size. A comet with no mesh gets neither field's change (3I/ATLAS is byte-identical); a registry
+    row without ``bbox_half_diagonal_km`` keeps the null size, so the mesh layer is refused."""
+    src = data.facts.shape_model
+    shape = data.shape
+    if not src or shape is None:
+        return
+    card["shape_source"] = _measured(src, shape.source)
+    if shape.bbox_half_diagonal_km is not None:
+        card["nucleus_radius_km_max"] = {
+            "value": shape.bbox_half_diagonal_km,
+            "tag": "derived",
+            "source": (
+                f"{shape.citation} DOI {shape.doi}: the shape model's own bounding-sphere radius "
+                "(half its bounding-box diagonal), used for scaling the mesh (Q-43). Not a "
+                "published nucleus radius or an upper limit."
+            ),
+            "formula": "0.5 * sqrt(dx^2 + dy^2 + dz^2) of the shape model's bounding box (km)",
+        }
+
+
 def build_card(
     obj: ResolvedObject,
     data: CatalogueData,
@@ -404,6 +429,7 @@ def build_card(
         # loaded, so they are null and the shells are refused.
         card["coma_radius_km"] = _null("not available: published values not loaded (R7.3)")
         card["nucleus_radius_km_max"] = _null("not available: published values not loaded (R7.3)")
+        _comet_shape(card, data)
         card["phase_angle_deg"] = _phase_angle(data)
         card["sun_vector"] = _sun_vector(data)
     elif kind in ("brown_dwarf", "brown_dwarf_binary"):

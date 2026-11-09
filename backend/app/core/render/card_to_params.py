@@ -987,7 +987,11 @@ def _alt_text(card: Mapping[str, Any], params: Mapping[str, Any]) -> str:
         size = sized("diameter_km", "km across")
     elif kind == "comet" and _has(card, "nucleus_radius_km_max"):
         r = _fmt(_num(card, "nucleus_radius_km_max") or 0)
-        size = f"nucleus at most {r} km in radius (upper limit)"
+        if _has(card, "shape_source"):
+            # Q-162: a shape model's own bounding-sphere radius is a scale, not a limit.
+            size = f"nucleus scaled to its shape model's bounding sphere, {r} km in radius"
+        else:
+            size = f"nucleus at most {r} km in radius (upper limit)"
     elif kind in (
         "brown_dwarf",
         "brown_dwarf_binary",
