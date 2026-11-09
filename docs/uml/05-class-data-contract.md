@@ -168,7 +168,7 @@ classDiagram
     +normal: url
     +roughness: url, optional
     +height_bin: url, optional
-    +relief_amp: number above 0, optional (fraction of the radius; not sent yet, Q-103)
+    +relief_amp: number above 0, optional (fraction of the radius; sent for asteroid_procedural since issue #62, Q-103, Q-117)
   }
   class Lighting {
     +mode: LightMode

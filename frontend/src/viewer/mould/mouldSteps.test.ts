@@ -156,6 +156,33 @@ describe('step → layer mapping per kind', () => {
     expect(poseAt(s, [1, 1]).scale).toBe(1);
   });
 
+  it('gas giant (issue #62): Bands, Storms, Colour reveal the five layers one after another', () => {
+    const { card, params, ctx, plan } = planOf('gas_giant', 'artistic');
+    const s = mouldScript(plan)!;
+    expect(s.kind).toBe('gas');
+    expect(s.steps.map((x) => x.label)).toEqual(['Base mould', 'Bands', 'Storms', 'Colour']);
+    const reveals = s.steps.map((x) => x.reveals);
+    expect(reveals[1]).toEqual(
+      expect.arrayContaining(['bands', 'flattening', 'turbulence', 'jets']),
+    );
+    expect(reveals[2]).toEqual(expect.arrayContaining(['storms', 'storm_drift']));
+    expect(reveals[3]).toEqual(['colour']);
+    // The stage plans switch the layers the body draws: bands first, storms next, colour last.
+    const on = (i: number) => stagePlan(card, params, ctx, plan, s, i).shader!.gas;
+    expect(on(0)).toMatchObject({ bands: false, storms: false, colour: false });
+    expect(on(1)).toMatchObject({ bands: true, flattening: true, storms: false, colour: false });
+    expect(on(2)).toMatchObject({ bands: true, storms: true, colour: false });
+    expect(on(3)).toMatchObject({ bands: true, storms: true, colour: true, turbulence: true });
+    // At + Estimated the swirl look is not drawn, so it is not in any step.
+    const est = mouldScript(planOf('gas_giant', 'derived').plan)!;
+    expect(est.steps.flatMap((x) => x.reveals)).not.toContain('turbulence');
+  });
+
+  it('brown dwarf: limb darkening is revealed with the colour', () => {
+    const s = mouldScript(planOf('brown_dwarf', 'artistic').plan)!;
+    expect(s.steps.find((x) => x.label === 'Colour')?.reveals).toContain('limb_darkening');
+  });
+
   it('candidate has nothing to build', () => {
     expect(mouldScript(planOf('candidate', 'artistic').plan)).toBeNull();
   });

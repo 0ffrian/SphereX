@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+from app.core.render import gas_giant as gg
 from app.core.render.bake import BAKER_RULES_VERSION, FILES, bake_dir
 from app.core.render.blackbody import FORMULA as TEFF_FORMULA
 from app.core.render.blackbody import teff_to_rgb
@@ -65,7 +66,13 @@ TIER_OF_TAG = {tag: rank + 1 for tag, rank in _RANK.items()}  # D-32: tier 1..5 
 # cited rules fix (R6.2, R7.3, R7.5); none is a measurement.
 ASSUMED_C_OVER_B = 1.0  # R6.2: c = b
 ASSUMED_DENSITY_EXPONENT = 2.0  # R7.3: coma gas density falls as 1/r^2
-ASSUMED_LIMB_U = 0.6  # R7.5: linear limb darkening coefficient
+ASSUMED_LIMB_U = 0.6  # R7.5: linear limb darkening coefficient (stars)
+# Issue #62, PR #63 review: the brown dwarf coefficient is its own constant. R7.4 gives no confirmed
+# value, so the star's visible-band 0.6 stands in as an analogue: the layer is inferred_from_analog
+# (Q-119). Near-IR models give about 0.25-0.29 at 3.6 and 4.5 um for cool atmospheres (Claret et
+# al. 2012, A&A 546, A14, extrapolated below 1500 K); the value is not changed yet (Atish).
+# [verify] Set to None to refuse the layer.
+BROWN_DWARF_LIMB_U: float | None = 0.6  # [verify]
 
 SHADER_KINDS = ("planet_rocky", "planet_water", "gas_giant", "nebula", "nova")
 SUN_LIT = ("asteroid_shape", "asteroid_procedural", "comet", "planet_rocky", "planet_water")
@@ -151,7 +158,9 @@ def _tag(card: Mapping[str, Any], key: str) -> str:
 
 
 def _assumed(
-    card: Mapping[str, Any], requires: list[str], rule_inputs: Mapping[str, float] | None = None
+    card: Mapping[str, Any],
+    requires: list[str],
+    rule_inputs: Mapping[str, float | str] | None = None,
 ) -> dict[str, float | str]:
     """Inputs that were not measured (D-32): the explicit rule inputs, then each required card
     field whose value is model_dependent, keyed by field name. A group of values such as
@@ -226,7 +235,7 @@ class _Plan:
         *,
         card: Mapping[str, Any] | None = None,
         formula: str | None = None,
-        rule_inputs: Mapping[str, float] | None = None,
+        rule_inputs: Mapping[str, float | str] | None = None,
     ) -> bool:
         """Add a layer, or refuse it. ``formula`` is required for any layer whose tag can come out
         derived or model_dependent; ``card`` is needed to state ``assumed`` (D-32)."""
@@ -250,6 +259,11 @@ class _Plan:
                         f"layer {layer_id}: model_dependent needs an assumed input (D-32)"
                     )
                 layer["assumed"] = assumed
+            elif tag == "inferred_from_analog" and rule_inputs:
+                # A typical value with the rule it feeds (Q-119 b): name what stood in (D-32).
+                layer["assumed"] = dict(rule_inputs)
+                if formula:
+                    layer["formula"] = formula
             self.layers.append(layer)
         else:
             self.refuse(layer_id, requires)
@@ -314,7 +328,7 @@ def _asteroid_colour(card: Mapping[str, Any]) -> tuple[dict[str, Any] | None, st
     return tv, "class_palette", "spectral_class"
 
 
-def _texture_urls(object_id: str, version: str, seed: int) -> dict[str, str]:
+def _texture_urls(object_id: str, version: str, seed: int) -> dict[str, Any]:
     """R6.7 path as a URL, with the Q-47 size directory. The path segments are the baker's
     directory names, quoted once more for the URL (``%`` -> ``%25``), so a server that decodes
     the URL lands on exactly the baked directory."""
@@ -421,6 +435,17 @@ def _asteroid_procedural(
         f"Procedural height field from the seed, style {bake.style} (R6.2, R6.3).",
         ["diameter_km"],
     )
+    # Issue #62, R7.2, Q-103: the viewer displaces the surface by the baked height map on the high
+    # tier, by `textures.relief_amp`. That scale is the R6.2 style rule's peak relief (a fraction
+    # of the radius), a look and not a measurement.
+    plan.layer(
+        bake.relief_amp > 0,
+        "displacement",
+        "artistic",
+        f"Surface pushed out by the height map, up to {bake.relief_amp:g} of the radius "
+        f"(style {bake.style}, R6.2, R7.2).",
+        ["diameter_km"],
+    )
     return {
         "texture": "height",
         "texture_tag": "artistic",
@@ -467,7 +492,7 @@ def _comet(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
 
 
 def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) -> dict[str, Any]:
-    plan.layer(
+    body_ok = plan.layer(
         _has(card, "radius_rjup"),
         "body",
         _tag(card, "radius_rjup"),
@@ -475,6 +500,24 @@ def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) 
         ["radius_rjup"],
         card=card,
         formula="radius = radius_rjup * R_Jup",
+    )
+    # Issue #62: a self-lit disc glows evenly to its edge without it. The coefficient is
+    # BROWN_DWARF_LIMB_U, the star's (R7.5) until a brown-dwarf value is confirmed [verify]: an
+    # analogue, so the layer is inferred_from_analog (Q-119). The 0.6 is a visible-band solar value used as a placeholder for an
+    # infrared view. It sits on the body, so a refused body or an unset (None)
+    # coefficient refuses it too.
+    u = BROWN_DWARF_LIMB_U
+    plan.layer(
+        body_ok and u is not None,
+        "limb_darkening",
+        "inferred_from_analog",
+        f"Assumption: linear limb darkening, I(mu) = 1 - {u} * (1 - mu). The coefficient is the "
+        "R7.5 visible-band solar value, used as a placeholder for an infrared view [verify]; no "
+        "brown-dwarf coefficient is confirmed (R7.4).",
+        ["radius_rjup"],
+        card=card,
+        formula=f"I(mu) = 1 - u * (1 - mu), u = {u}",
+        rule_inputs={"limb_darkening_u": u} if u is not None else None,
     )
     emissive = plan.layer(
         _has(card, "flux_45um"),
@@ -570,7 +613,14 @@ def _star(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
             formula="radius = 1 + 0.1 * pulsation phase",
         )
     elif kind == "star_ttauri":
-        plan.layer(True, "disc", "artistic", "Tilted disc (R7.5).", [])
+        plan.layer(
+            True,
+            "disc",
+            "artistic",
+            "A flared disc lit by the star, tilted 45 to 60 degrees (R7.5). Its shape and "
+            "brightness are artistic.",
+            [],
+        )
         if plan.layer(
             _lightcurve_ok(card),
             "dust_screen",
@@ -589,6 +639,94 @@ def _star(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         "data_tag": data_tag,
         "params": {},
     }
+
+
+def _gas_giant_layers(card: Mapping[str, Any], plan: _Plan) -> None:
+    """Issue #62, D-32: the gas giant's single `surface` layer, split along the tier chain so the
+    honesty toggle can show each part at its own level (D-21): `bands`, `flattening`, `colour`
+    and `storms` from "+ Estimated", `turbulence` from "+ Artistic". The viewer draws the numbers
+    (``frontend/src/physics/gasGiants.ts``); the tags here say what set them (``gas_giant.py``)."""
+    has_spin = _has(card, "rot_period_h")
+    # Q-119 option (b): the typical spin is "typical, no formula" = tier 4 (D-32).
+    spin_tag = _tag(card, "rot_period_h") if has_spin else "inferred_from_analog"
+    spin_h = _num(card, "rot_period_h") if has_spin else gg.TYPICAL_SPIN_H
+    spin_inputs: dict[str, float | str] = {}
+    if not has_spin and gg.TYPICAL_SPIN_H is not None:
+        spin_inputs["rot_period_h"] = gg.TYPICAL_SPIN_H
+
+    # bands: the Rhines rule. The card has no wind speed, so the class-typical wind is always an
+    # input. That wind is [verify] (no source uses 50 m/s here), so under Q-110 the layer is at best
+    # inferred_from_analog (tier 4), even with a measured spin (Q-119), with the wind in `assumed`.
+    radius_m = (_num(card, "radius_rjup") or 0.0) * gg.R_JUP_M
+    omega = gg.spin_rate_rad_s(spin_h) if spin_h is not None else None
+    wind = gg.TYPICAL_ZONAL_WIND_MS
+    n = gg.band_count(omega, radius_m, wind) if omega is not None and wind is not None else None
+    bands_requires = ["radius_rjup", *(["rot_period_h"] if has_spin else [])]
+    plan.layer(
+        _has(card, "radius_rjup") and n is not None,
+        "bands",
+        _weakest("derived", spin_tag, _tag(card, "radius_rjup"), "inferred_from_analog"),
+        f"Number of bands from the {'spin' if has_spin else 'typical spin of a giant planet'} and "
+        f"the radius (Rhines scale, A7.2): about {round(n or 0)} from pole to pole. The jet speed "
+        "is a typical value; the exact band pattern is a seeded look.",
+        bands_requires,
+        card=card,
+        formula=gg.BANDS_FORMULA,
+        rule_inputs={**spin_inputs, "zonal_wind_ms": wind or 0.0},
+    )
+
+    # flattening: f = 0.7 q needs the mass, which no card holds, so Jupiter's mean density is the
+    # stated assumption; a missing spin is the class-typical one, which is Jupiter's own period,
+    # so the value is Jupiter's: tier 4 (Q-119 option b).
+    flat_ok = spin_h is not None and gg.flattening_from_spin(spin_h) is not None
+    plan.layer(
+        flat_ok,
+        "flattening",
+        _weakest("model_dependent", spin_tag),
+        "Flattening of the poles from the "
+        f"{'spin' if has_spin else 'typical spin of a giant planet'}, with the mean density of "
+        "Jupiter assumed (A7.2).",
+        ["rot_period_h"] if has_spin else [],
+        card=card,
+        formula=gg.FLATTENING_FORMULA,
+        rule_inputs={**spin_inputs, "mean_density": "same as Jupiter"},
+    )
+
+    # colour: the palette family chosen by temperature (A7.2). No teq_K: the artist's default.
+    if _has(card, "teq_K"):
+        plan.layer(
+            True,
+            "colour",
+            _weakest("derived", _tag(card, "teq_K")),
+            "Colour family chosen by the equilibrium temperature (A7.2).",
+            ["teq_K"],
+            card=card,
+            formula=gg.COLOUR_FORMULA,
+        )
+    else:
+        plan.layer(
+            True,
+            "colour",
+            "artistic",
+            "The equilibrium temperature is unknown, so the colour is the artist's default.",
+            [],
+        )
+
+    plan.layer(
+        True,
+        "storms",
+        "artistic",
+        "A few storms between the jets, as on the giant planets of the Solar System. How many and "
+        "where is a seeded look; no measurement of this planet's storms is used.",
+        [],
+    )
+    plan.layer(
+        True,
+        "turbulence",
+        "artistic",
+        "Swirling detail along the band edges. Look only.",
+        [],
+    )
 
 
 def _shader_kind(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
@@ -611,13 +749,16 @@ def _shader_kind(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
             "data_tag": "artistic",
             "params": {},
         }
-    plan.layer(
-        True,
-        "surface",
-        "artistic",
-        "Browser shader surface and shared CPU field (R7.7). Nothing about it is measured.",
-        [],
-    )
+    if kind == "gas_giant":
+        _gas_giant_layers(card, plan)
+    else:
+        plan.layer(
+            True,
+            "surface",
+            "artistic",
+            "Browser shader surface and shared CPU field (R7.7). Nothing about it is measured.",
+            [],
+        )
     texture = "flow" if kind == "gas_giant" else "terrain"
     params: dict[str, float] = {} if kind == "gas_giant" else {"tau": TAU}
     if _has(card, "teq_K"):
@@ -686,7 +827,13 @@ def _visible(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
     kind = str(card.get("type"))
     if kind in SHADER_KINDS:
         # R7.7: shader colours are the artist's choice; neutral grey stands for "no data colour".
-        rgb = _rgb_tv([0.5, 0.5, 0.5], "artistic", "artist's neutral default (R7.7, D-02)")
+        source = "artist's neutral default (R7.7, D-02)"
+        if kind == "gas_giant" and any(
+            x["id"] == "colour" and x["tag"] != "artistic" for x in plan.layers
+        ):
+            # The palette is the `colour` layer; this flat swatch is only the neutral stand-in.
+            source = "neutral stand-in swatch (R7.7); the drawn palette is the colour layer (A7.2)"
+        rgb = _rgb_tv([0.5, 0.5, 0.5], "artistic", source)
         return {"available": True, "badge": ARTISTIC_BADGE, "rgb": rgb, "source": "class_palette"}
     if kind in ("asteroid_shape", "asteroid_procedural"):
         colour, source, _ = _asteroid_colour(card)
@@ -763,6 +910,10 @@ def _alt_text(card: Mapping[str, Any], params: Mapping[str, Any]) -> str:
     visible = params["view_modes"]["visible"]
     if not visible["available"]:
         colour = "no visible colour basis"
+    elif kind == "gas_giant" and any(
+        x["id"] == "colour" and x["tag"] != "artistic" for x in params["layers"]
+    ):
+        colour = "colour family from the equilibrium temperature"
     elif visible["rgb"]["tag"] == "artistic":
         colour = "artist's colour"
     elif kind in ("star", "star_mira", "star_ttauri"):
@@ -851,6 +1002,8 @@ def card_to_params(
     }
     if bake is not None and (kind != "asteroid_procedural" or "mesh" not in plan.missing):
         out["textures"] = _texture_urls(object_id, generator_version, seed)
+        if kind == "asteroid_procedural" and bake.relief_amp > 0:
+            out["textures"]["relief_amp"] = bake.relief_amp
     elif kind in BAKED_TYPES:
         plan.refuse("textures")
     out["lighting"] = _lighting(card)

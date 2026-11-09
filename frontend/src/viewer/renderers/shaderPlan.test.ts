@@ -4,9 +4,12 @@ import type { ObjectCard } from '@/contract';
 import { buildAltText, canvasLabel, nothingDrawnReason } from '../altText';
 import { showsBody } from '../planCommon';
 import { defaultContext, planRender } from '../renderPlan';
+import { resolveMotion } from '../motion/motion';
 import { fixture } from './fixtures.testutil';
+import { resolveShaderSpec } from './shaderSpec';
 
-const KINDS = ['planet_rocky', 'planet_water', 'gas_giant', 'nebula', 'nova'] as const;
+// A gas giant has five layers of its own (issue #62) and is covered by its own tests below.
+const KINDS = ['planet_rocky', 'planet_water', 'nebula', 'nova'] as const;
 
 describe('planShaderKind', () => {
   it('at + Estimated: worlds show the plain sphere, clouds show nothing, all say why', () => {
@@ -25,6 +28,64 @@ describe('planShaderKind', () => {
       expect(showsBody(plan), k).toBe(layer === 'surface');
       expect(plan.bodies).toEqual([]);
     }
+  });
+
+  it('gas giant (issue #62): five layers, each at its own honesty level', () => {
+    const { card, params } = fixture('gas_giant');
+    const at = (honesty: 'measured' | 'derived' | 'artistic') =>
+      planRender(card, params, defaultContext({ honesty }));
+    // + Estimated (the start): the surface follows the data; the seeded looks wait.
+    const est = at('derived');
+    expect(est.shader).toMatchObject({
+      surface: true,
+      plain: false,
+      gas: { bands: true, flattening: true, colour: true, storms: false, turbulence: false },
+    });
+    for (const id of ['storms', 'turbulence']) {
+      expect(est.missing.find((m) => m.id === id)).toMatchObject({
+        reason: 'honesty',
+        tag: 'artistic',
+      });
+    }
+    // The colour is drawn (derived), so the "plain grey" note would contradict the screen.
+    expect(est.notes.join(' ')).not.toMatch(/Colour is plain grey/);
+    expect(est.missing.some((m) => m.id === 'surface')).toBe(false);
+    expect(buildAltText(est)).toContain('generated model');
+    // + Artistic adds the storms and the turbulence.
+    expect(at('artistic').shader!.gas).toMatchObject({ storms: true, turbulence: true });
+    // Measured only: nothing about it is measured, so a plain sphere of the measured size.
+    const m = at('measured');
+    expect(m.shader).toMatchObject({ surface: false, plain: true });
+    expect(Object.values(m.shader!.gas!).some(Boolean)).toBe(false);
+    expect(showsBody(m)).toBe(true);
+    // The texts say what is Estimated (bands, flattening, colour) and what needs + Artistic.
+    const words = [m.notes.join(' '), buildAltText(m)];
+    for (const w of words) {
+      expect(w).toContain('choose + Estimated to see them');
+      expect(w).toContain('+ Artistic');
+      expect(w).not.toContain('choose + Artistic to see it');
+    }
+  });
+
+  it('gas giant: a refused layer leaves the others, and no radius refuses all of them', () => {
+    const { card, params } = fixture('gas_giant');
+    const one = planRender(
+      card,
+      { ...params, missing: ['colour'] },
+      defaultContext({ honesty: 'artistic' }),
+    );
+    expect(one.shader!.gas).toMatchObject({ colour: false, bands: true });
+    expect(one.missing.find((m) => m.id === 'colour')?.reason).toBe('backend');
+    const none = planRender(
+      card,
+      { ...params, scale_m: null },
+      defaultContext({ honesty: 'artistic' }),
+    );
+    expect(none.shader).toBeNull();
+    expect(none.missing.map((m) => m.id)).toEqual(
+      expect.arrayContaining(['bands', 'flattening', 'colour', 'storms', 'turbulence']),
+    );
+    expect(showsBody(none)).toBe(false);
   });
 
   it('a nebula or remnant says in plain words that it has no touch feedback (Q-103)', () => {
@@ -63,7 +124,7 @@ describe('planShaderKind', () => {
   });
 
   it('Q-45: the plain sphere at Measured only needs a measured size', () => {
-    const { card, params } = fixture('gas_giant');
+    const { card, params } = fixture('planet_rocky');
     const measured = planRender(card, params, defaultContext({ honesty: 'measured' }));
     expect(measured.shader!.plain).toBe(true);
     expect(measured.sizeTag).toBe('measured');
@@ -111,8 +172,109 @@ describe('planShaderKind', () => {
 
   it('light comes from planLighting: sun_dir here, none for the self-lit clouds', () => {
     const w = fixture('planet_water');
-    expect(planRender(w.card, w.params, defaultContext()).lighting.direction).toEqual([1, 0, 0]);
+    const plan = planRender(w.card, w.params, defaultContext()).lighting;
+    // sun_dir [1, 0, 0] turned toward the camera by the display tilt (lighting.ts, Q-107 item 1).
+    expect(plan.source).toBe('sun_dir');
+    expect(plan.direction![0]).toBeGreaterThan(0.5);
+    expect(plan.direction![2]).toBeGreaterThan(0.3);
     const n = fixture('nebula');
     expect(planRender(n.card, n.params, defaultContext()).lighting.direction).toBeNull();
+  });
+
+  describe('gas giant legend matches what is drawn (PR #63, D-32, Q-109)', () => {
+    const plan = (
+      over: Record<string, number> = {},
+      honesty: 'derived' | 'artistic' = 'derived',
+    ) => {
+      const { card, params } = fixture('gas_giant');
+      return planRender(card, params, defaultContext({ honesty, overrides: over }));
+    };
+    const drawnBands = () => {
+      const { card, params } = fixture('gas_giant');
+      return resolveShaderSpec(card, params, undefined, resolveMotion(card, params)).field!.bands;
+    };
+
+    /** The fixture with the backend's `bands` and `flattening` layers set to `tag` (tier to match). */
+    const withBackendTags = (tag: 'model_dependent' | 'artistic') => {
+      const f = fixture('gas_giant');
+      for (const l of f.params.layers) {
+        if (l.id === 'bands' || l.id === 'flattening') {
+          l.tag = tag;
+          l.tier = tag === 'artistic' ? 5 : 3;
+        }
+      }
+      return f;
+    };
+
+    it('takes the weaker tag and the rule that sets the value when dynamics differs from the card', () => {
+      // The backend claims model_dependent; the card has no spin, and dynamics gives a 10 h spin
+      // at 100 m/s, both inferred_from_analog. The viewer draws from dynamics, so the legend must
+      // fall to the weaker tier 4 and quote the drawn count, not the backend's.
+      const { card, params } = withBackendTags('model_dependent');
+      const p = planRender(card, params, defaultContext());
+      const bands = p.drawn.find((d) => d.id === 'bands')!;
+      const flat = p.drawn.find((d) => d.id === 'flattening')!;
+      expect(bands.tag).toBe('inferred_from_analog');
+      expect(flat.tag).toBe('inferred_from_analog');
+      const shown = Number(/about (\d+) bands/.exec(bands.description)![1]);
+      expect(shown).toBe(2 * drawnBands());
+      expect(shown).not.toBe(22);
+    });
+
+    it('a measured spin with a tier-4 jet speed: flattening tier 3, bands tier 4 (Q-119)', () => {
+      const { card, params } = withBackendTags('model_dependent');
+      card.rot_period_h = {
+        value: 10,
+        tag: 'measured',
+        source: 'synthetic fixture: not a real measurement',
+      };
+      const p = planRender(card, params, defaultContext());
+      // The measured card spin wins over dynamics; Jupiter's constants are verified, so tier 3.
+      expect(p.drawn.find((d) => d.id === 'flattening')!.tag).toBe('model_dependent');
+      // The jet speed is tier 4 (dynamics, or the [verify] typical wind), so bands is tier 4 even
+      // though the backend claims tier 3.
+      expect(p.drawn.find((d) => d.id === 'bands')!.tag).toBe('inferred_from_analog');
+    });
+
+    it('never stronger than the backend: a weaker backend tag wins over a measured spin', () => {
+      const { card, params } = withBackendTags('artistic');
+      card.rot_period_h = {
+        value: 10,
+        tag: 'measured',
+        source: 'synthetic fixture: not a real measurement',
+      };
+      const p = planRender(card, params, defaultContext({ honesty: 'artistic' }));
+      expect(p.drawn.find((d) => d.id === 'bands')!.tag).toBe('artistic');
+      expect(p.drawn.find((d) => d.id === 'flattening')!.tag).toBe('artistic');
+    });
+
+    it('a slider override is artistic and says what it set', () => {
+      const p = plan({ bands: 7, mass_mearth: 300 }, 'artistic');
+      const bands = p.drawn.find((d) => d.id === 'bands')!;
+      expect(bands.tag).toBe('artistic');
+      expect(bands.description).toContain('about 14 bands');
+      expect(p.drawn.find((d) => d.id === 'flattening')!.tag).toBe('artistic');
+      // At + Estimated an artistic layer is not shown, so it is refused for its honesty level.
+      const est = plan({ bands: 7 });
+      expect(est.missing.find((m) => m.id === 'bands')).toMatchObject({
+        reason: 'honesty',
+        tag: 'artistic',
+      });
+    });
+
+    it('a layer the backend did not send is refused with a reason, not dropped', () => {
+      const { card, params } = fixture('gas_giant');
+      const old = { ...params, layers: params.layers.filter((l) => l.id === 'turbulence') };
+      const p = planRender(card, old, defaultContext({ honesty: 'artistic' }));
+      for (const id of ['bands', 'flattening', 'colour', 'storms']) {
+        expect(
+          p.missing.find((m) => m.id === id),
+          id,
+        ).toMatchObject({ reason: 'backend' });
+      }
+      // Same when the body is not drawable at all.
+      const none = planRender(card, { ...old, scale_m: null }, defaultContext());
+      expect(none.missing.find((m) => m.id === 'bands')).toMatchObject({ reason: 'backend' });
+    });
   });
 });

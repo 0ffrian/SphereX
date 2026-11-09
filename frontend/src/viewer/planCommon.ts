@@ -9,6 +9,8 @@ import { chooseMode, NEUTRAL_TINT, resolveModes, resolveTint } from './modes';
 import type { LegendEntry, MissingItem, PlanContext, RenderPlan, Rgb, Vec3 } from './planTypes';
 import { STILL_MOTION, TIER_OF_TAG } from './motion/motion';
 
+const GREY_COLOUR_NOTE = 'Colour is plain grey: no colour data is shown at this honesty level.';
+
 /** Pseudo layer id a moulding stage holds to show the body in plain grey (issue #60). */
 export const HOLD_TINT = 'tint';
 
@@ -92,7 +94,7 @@ export class PlanBuilder {
       });
     }
     if (this.tint.tag === null && this.mode !== null) {
-      this.notes.push('Colour is plain grey: no colour data is shown at this honesty level.');
+      this.notes.push(GREY_COLOUR_NOTE);
     }
   }
 
@@ -104,6 +106,15 @@ export class PlanBuilder {
   }
   get ctx(): PlanContext {
     return this.input.ctx;
+  }
+
+  /**
+   * A named layer is the colour (the gas giant's `colour`), so the "plain grey" note, written
+   * before any layer is decided, no longer describes the screen: take it back.
+   */
+  colourIsDrawnByLayer(): void {
+    const i = this.notes.indexOf(GREY_COLOUR_NOTE);
+    if (i >= 0) this.notes.splice(i, 1);
   }
 
   has(id: string): boolean {
