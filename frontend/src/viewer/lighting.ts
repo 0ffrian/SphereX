@@ -4,7 +4,7 @@
 import { AmbientLight, DirectionalLight, type Object3D } from 'three/webgpu';
 import type { ObjectCard, RenderParams, Tag } from '@/contract';
 import type { ShadowSettings } from './shape/shapeModel';
-import { extraTv, readExtra } from '@/physics/cardFields';
+import { InputReader } from '@/physics/tagging';
 import { starlightColour } from '@/physics/starlight';
 import { weakestTag } from './motion/motion';
 
@@ -69,13 +69,14 @@ function starlightFor(
 ): Pick<LightingPlan, 'colour' | 'colourTag' | 'colourTeffK'> {
   const none = { colour: null, colourTag: null, colourTeffK: null };
   if (!card || !STARLIT_TYPES.has(params.type)) return none;
-  const teff = readExtra(card, 'host_teff_K');
-  if (teff === null) return none;
+  const host = new InputReader(card, {}).readCard('host_teff_K');
+  if (host === null) return none;
+  const teff = host.value;
   const colour = starlightColour(teff);
   if (colour === null) return none;
   return {
     colour,
-    colourTag: weakestTag(['derived', extraTv(card, 'host_teff_K')!.tag]),
+    colourTag: weakestTag(['derived', host.tag]),
     colourTeffK: teff,
   };
 }

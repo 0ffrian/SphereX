@@ -12,12 +12,12 @@ import {
 } from '@/physics/gasGiants';
 import { OCEANS_REMOVED_ABOVE_K, POLAR_ICE_BELOW_K } from '@/physics/planets';
 import { deriveClimate, type ClimateDerivation, type Scenario } from '@/physics/climate';
-import { isExoplanetCard, type PlanetCard } from '@/physics/cardFields';
 import { R_JUP_M } from '@/physics/constants';
 import { STILL_MOTION, TIER_OF_TAG, weakestTag, type Motion } from '../motion/motion';
 import type { FieldParams } from '../fields/fieldGenerator';
 import { FIELD_TAG } from '../fields/fieldGenerator';
 import { sliderValue, type Overrides } from '../sliders';
+import { isExoplanetCard } from '../planCommon';
 import {
   ATMOSPHERE_ROCKY,
   ATMOSPHERE_WATER,
@@ -328,7 +328,7 @@ export function resolveShaderSpec(
   const d = PLANET_DEFAULTS[kind];
   const baseClimate = climateFromTeq(card, d);
   // Issue #68: only a card that carries the host-star fields (Track A) is tested for locking.
-  const derived = isExoplanetCard(card) ? deriveClimate(card as PlanetCard, kind) : null;
+  const derived = isExoplanetCard(card) ? deriveClimate(card, kind) : null;
   const substellar = derived?.scenario === 'eyeball' || derived?.scenario === 'snowball';
   const climate = { ...baseClimate, rule: scenarioRule(baseClimate.rule, derived, kind) };
   // N9: lava cracks glow only when teq_K says the surface is hot (>= ~700 K, A7.1). No teq_K, no

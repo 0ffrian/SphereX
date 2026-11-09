@@ -9,10 +9,10 @@
 // against 4.0 Gyr, i.e. locked (eyeball, T_ss 281.8 K, theta_ice about 28 degrees); with this form
 // 4.17 Gyr, not locked. The prefactor and Q are the two choices Moon may overturn. The result is always at least
 // `model_dependent`: Q, k2 and the initial spin are assumptions (Q-119 a, Q-155).
-import type { Tag } from '@/contract';
+import type { ObjectCard, Tag } from '@/contract';
 import { weakestTag } from '@/viewer/motion/motion';
 import { AU_M, G, GM_EARTH, GM_SUN, HOUR_S, R_EARTH_M, R_JUP_M, YEAR_S } from './constants';
-import { extraTv, readExtra, type PlanetCard } from './cardFields';
+import { InputReader } from './tagging';
 import { rockyMassForRadius } from './zeng2019';
 
 // ---- Named constants ([verify]; `null` refuses the rule, Q-110, Q-119 a) --------------------------
@@ -88,10 +88,11 @@ export type LockResult =
  * `host_age_gyr` (else `AGE_FALLBACK_GYR`, assumed). Refused (with the names it lacked) when an input
  * is missing or a [verify] constant is `null`: nothing is invented.
  */
-export function deriveLocking(card: PlanetCard): LockResult {
+export function deriveLocking(card: ObjectCard): LockResult {
   const needs: string[] = [];
-  const orbit = readExtra(card, 'orbit_au');
-  const hostMass = readExtra(card, 'host_mass_msun');
+  const reader = new InputReader(card, {});
+  const orbit = reader.readCard('orbit_au')?.value ?? null;
+  const hostMass = reader.readCard('host_mass_msun')?.value ?? null;
   const radiusRj = card.radius_rjup?.value;
   const radiusRe =
     typeof radiusRj === 'number' && Number.isFinite(radiusRj) && radiusRj > 0
@@ -112,9 +113,10 @@ export function deriveLocking(card: PlanetCard): LockResult {
   };
   const tags: Tag[] = ['model_dependent'];
 
-  let massE = readExtra(card, 'mass_mearth');
+  const massIn = reader.readCard('mass_mearth');
+  let massE = massIn?.value ?? null;
   if (massE !== null) {
-    tags.push(extraTv(card, 'mass_mearth')!.tag);
+    tags.push(massIn!.tag);
   } else if (radiusRe !== null) {
     massE = rockyMassForRadius(radiusRe);
     if (massE === null) needs.push('mass_mearth');
@@ -124,9 +126,10 @@ export function deriveLocking(card: PlanetCard): LockResult {
     needs.push('mass_mearth');
   }
 
-  let ageGyr = readExtra(card, 'host_age_gyr');
+  const ageIn = reader.readCard('host_age_gyr');
+  let ageGyr = ageIn?.value ?? null;
   if (ageGyr !== null) {
-    tags.push(extraTv(card, 'host_age_gyr')!.tag);
+    tags.push(ageIn!.tag);
   } else if (AGE_FALLBACK_GYR !== null) {
     ageGyr = AGE_FALLBACK_GYR;
     assumed.host_age_gyr = `${AGE_FALLBACK_GYR} Gyr: a project choice, not a published floor`;
@@ -134,8 +137,8 @@ export function deriveLocking(card: PlanetCard): LockResult {
     needs.push('host_age_gyr');
   }
   for (const k of ['orbit_au', 'host_mass_msun'] as const) {
-    const tv = extraTv(card, k);
-    if (tv && readExtra(card, k) !== null) tags.push(tv.tag);
+    const input = reader.readCard(k);
+    if (input) tags.push(input.tag);
   }
   if (card.radius_rjup) tags.push(card.radius_rjup.tag);
 
