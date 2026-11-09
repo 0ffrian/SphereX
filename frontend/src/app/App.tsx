@@ -1,5 +1,5 @@
 // App shell in the mock-up's layout (mockup/spherex-ui.html): a full-viewport dark bezel with the
-// brand, fixture banner and RA/Dec readout on top, the tool rail on the left, the sky view as the
+// fixture banner and RA/Dec readout on top, the tool rail on the left, the sky view as the
 // main pane, the transport bar bottom left and the search pill bottom right. The active tool opens
 // a floating panel (object info, flipbook, spectrum) over the sky.
 //
@@ -26,11 +26,12 @@ import { useHashSync } from './useHashSync';
 import { BuildPane } from './build/BuildPane';
 import { SelectedCard } from './build/SelectedCard';
 import { useSelectedBodyLoader } from './build/selectedBody';
+import { Island } from './island/Island';
 
 /**
- * A new search opens the object panel (unless it is already open at the spectrum). A marker click
- * (a search by name from the sky) does not: it selects the object, and its card offers the
- * fingerprint and the build (issue #60).
+ * A new search opens the object panel (unless it is already open at the spectrum), a marker click
+ * included (#49). A right-click or long press on the sky asks for the selected object's card
+ * instead, which offers the fingerprint and the build (issues #60, #64).
  */
 function useOpenPanelOnSearch(): void {
   useEffect(() => {
@@ -39,10 +40,7 @@ function useOpenPanelOnSearch(): void {
       // A typed search or a link starts without a card; a click on the sky is cleared where it is
       // made (SkyPane), so a right-click that selects and asks for the card is not undone here.
       if (q.origin !== 'sky') shell.cancelCard();
-      if (q.origin === 'sky' && q.kind === 'name') {
-        if (shell.tool === 'flipbook' || shell.tool === 'spectrum') shell.setTool('sky');
-        return;
-      }
+      if (q.origin === 'sky' && shell.cardRequested) return;
       // The build pane keeps the view while a link or Back changes the object under it.
       if (shell.build.open) return;
       if (shell.tool !== 'flipbook' && shell.tool !== 'spectrum') shell.setTool('flipbook');
@@ -108,15 +106,8 @@ export function App() {
       <div className="sx-screen">
         <div className="sx-bezel" data-split={split || undefined}>
           <header className="sx-top">
-            <div className="sx-brand">
-              <span className="sx-brand-mark" aria-hidden="true">
-                {Array.from({ length: 9 }, (_, i) => (
-                  <span key={i} />
-                ))}
-              </span>
-              <h1>Shift &amp; Spectrum</h1>
-              <small>SPHEREx sky</small>
-            </div>
+            {/* The page heading stays for assistive technology; the brand is not drawn (Q-124). */}
+            <h1 className="sr-only">Shift &amp; Spectrum</h1>
             <FixtureBanner />
             <Readout />
           </header>
@@ -137,6 +128,8 @@ export function App() {
           <div className="sx-transport-slot" inert={split || undefined}>
             <Transport />
           </div>
+          {/* Issue #66 (mock-up `.island-wrap`): the island, over everything in the bezel. */}
+          <Island />
         </div>
         <LiveAnnouncer />
       </div>

@@ -1,6 +1,6 @@
 # 21 Sequence: select a body and Build it
 
-A marker click selects the object; *Build it* opens the split view and moulds the body through the mock-up's steps from the real plan. Drawn from issue #60 and Q-113 (decisions), rendering doc R4, R5.3, R5.7 and R9, decisions D-16, D-21 and D-34, and the mock-up (`showInfo`, `openBuild`, `PLAN`, `loop`).
+A left click on a marker opens the object panel (Q-120); a right-click or long press selects it and asks for the card; *Build it* opens the split view and moulds the body through the mock-up's steps from the real plan. Drawn from issue #60, Q-113 and Q-120 (decisions), rendering doc R4, R5.3, R5.7 and R9, decisions D-16, D-21 and D-34, and the mock-up (`showInfo`, `openBuild`, `PLAN`, `loop`).
 
 ```mermaid
 sequenceDiagram
@@ -16,8 +16,8 @@ sequenceDiagram
   participant V as ViewerApp
   participant RG as MouldRig (BuiltScene.setMould)
 
-  U->>S: Click a marker
-  S->>ST: skySearch(name, origin sky)
+  U->>S: Right-click or long press a marker (a left click opens the object panel instead)
+  S->>ST: skySearch(name, origin sky) with the card asked for
   ST->>API: GET /v1/resolve, then frames (as before)
   ST-->>S: resolved: brackets and the name on the sky
   ST-->>C: selection (no flipbook panel)
