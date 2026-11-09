@@ -6,7 +6,7 @@ import re
 
 from fastapi.testclient import TestClient
 
-from tests.test_api import resolve_id
+from tests.helpers import resolve_id
 
 ISO_Z = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$")
 TAGS = {"measured", "derived", "model_dependent", "inferred_from_analog", "artistic"}

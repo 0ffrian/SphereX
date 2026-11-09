@@ -123,9 +123,11 @@ def normals_from_height(h, radius_m, strength=1.0):
 
 1. Render a hillshade of the height map (equirectangular, no colour) and send it as the reference image together with a prompt built from RenderParams.
 2. Prompt: "Paint albedo only. Keep the exact equirectangular layout and every terrain feature in place. No lighting, no shadows, no stars, no text. Palette: <base_rgb as words>, <hydration/redness notes>."
-3. Model: `gemini-nano-banana-2.1` **[verify name and supported aspect ratios]**. Resample the output to 2:1.
+3. Model: `gemini-nano-banana-2.1` **[verify name and supported aspect ratios]** (listed in Google's docs on 9 Nov 2026; 2:1 not among the named ratios; see R12 #3). Resample the output to 2:1.
 4. **Alignment check:** compute the correlation between Sobel edges of the hillshade and of the output luminance. Below 0.3 → reject and keep the [§6.4](#r64-colour-no-ai-default) colour.
 5. Seam fix: `np.roll` by W/2, blend a 32 px band across the old seam, roll back.
+
+**Status (issue #14, 7 Nov 2026):** built server-side in `backend/app/core/render/gemini_paint.py` (routes in `backend/app/api/gemini.py`), behind the admin token. The code bake runs first and its colour loads first; the hillshade is taken from `height.bin`; the call goes through the D-25 cache. The AI files live outside the `/data/textures` static mount ([§6.7](#r67-output-and-caching)). Any failure keeps the [§6.4](#r64-colour-no-ai-default) colour and lists `albedo_ai` in `missing`. Endpoints, settings and reason codes: [A6.2](../architecture/generators.md#a62-optional-gemini-artistic-layer); the contract is not decided (Q-122). Step 3's model name and aspect ratios, and the REST request/response shape, are still **[verify]** (R12 #3).
 
 **Image-first (only for images not generated from a height map).**
 
@@ -141,3 +143,4 @@ def normals_from_height(h, radius_m, strength=1.0):
 - Backend writes `/data/textures/{id}/{generator_version}/{seed}/{width}x{height}/{albedo.webp, height.png, height.bin, normal.png}`. The size directory keeps two sizes of one object apart (Q-47).
 - Beside the four maps the baker writes `bake.json`: a hash of the generator parameters, the map size and the baker rules version (Q-47). A directory whose hash differs is rebaked, so a changed card or size is never served stale.
 - The cache key includes `generator_version`. Bump the version whenever any rule in [§6.2](#r62-card--generator-parameters-deterministic-rules)–6.5 changes.
+- The Gemini layer ([§6.6](#r66-optional-paths), issue #14, Q-122) writes `albedo_ai.webp` and then `gemini.json` (stamp: generator version, baker rules, seed, size, bake key, paint version; tag `artistic`, label "AI-made", model, prompt, edge correlation, hashes) **outside** this tree, under `SX_TEXTURES_AI_DIR` (default `<SX_CACHE_DIR>/textures-ai`), at the same relative path as the size directory. `SX_TEXTURES_DIR` (default `<SX_CACHE_DIR>/textures`, an assumption) is served at `/data/textures` as static files with no status check, so the AI files must never sit there; the backend refuses to start if they would. They are served only by `GET /v1/objects/{id}/albedo-ai.webp`, which answers only while the stamp matches the bake the viewer shows and `bake.json` still has the key the image was checked against (else `stale`). Only the 2048×1024 size is painted.

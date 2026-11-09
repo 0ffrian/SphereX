@@ -26,7 +26,7 @@ from app.core.classify.zeng2019 import (
     water_curve_for,
 )
 from app.core.render.card_to_params import card_to_params
-from tests.test_api import resolve_id
+from tests.helpers import resolve_id
 
 CALC = "<a refstr=CALCULATED_VALUE href=/docs/pscp_calc.html target=_blank>Calculated Value</a>"
 

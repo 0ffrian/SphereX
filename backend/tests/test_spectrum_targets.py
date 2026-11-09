@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 from app.core.find.cutouts import load_cutout_hdul
 from app.core.find.wcs import wavelength_at
 from app.core.measure.spectrum import ALL_SATURATED, STAGE2_REASONS
-from tests.test_api import resolve_id
+from tests.helpers import resolve_id
 
 MEASURED = ["Epsilon Indi B", "WISE 0855"]
 SATURATED = ["Barnard's star", "RW Aurigae", "R Draconis"]

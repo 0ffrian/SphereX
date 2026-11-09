@@ -119,7 +119,7 @@ The backend turns the ObjectCard into **RenderParams** with deterministic rules 
 
 | Stage | Output | Detail |
 |---|---|---|
-| 8 Build the look | colour, relief, clouds, storms | Rendering-doc types: maps baked on the backend. Other types: browser shaders. See [section 6](generators.md#a6-generators). Optional Gemini layer on top. |
+| 8 Build the look | colour, relief, clouds, storms | Rendering-doc types: maps baked on the backend. Other types: browser shaders. See [section 6](generators.md#a6-generators). Optional Gemini layer on top ([A6.2](generators.md#a62-optional-gemini-artistic-layer); its endpoints are not yet in D-16, Q-122). |
 | 9 Build the shape | geometry | DAMIT or NASA mesh for `asteroid_shape`. Otherwise a sphere or ellipsoid, or an emission volume (nebula, remnant, comet coma; issue #43). |
 | 10 Make the sound and touch | audio, haptics | Data sweep (spectrum to pitch), imagined drive, and haptics with paired audio (sections [8](sound-voice.md#a8-sound-and-voice) and [9](haptics.md#a9-haptics)). |
 
