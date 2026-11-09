@@ -16,7 +16,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | [display-rules.md](display-rules.md) | R4, R5, R5.1–R5.7 | working on the viewer: lighting, view modes, honesty toggle, scale bar, performance budget, interaction, motion and time-lapse |
 | [surface-generation.md](surface-generation.md) | R6, R6.1–R6.7 | baking height/normal/albedo maps: card→params rules, noise, craters, Sobel normals, Gemini/depth paths, caching |
 | [renderers/asteroid.md](renderers/asteroid.md) | R7 (intro), R7.1, R7.2 | rendering `asteroid_shape` or `asteroid_procedural` (also holds the R7 intro rule on refused layers) |
-| [renderers/comet.md](renderers/comet.md) | R7.3 | rendering 3I/ATLAS: nucleus, gas shells, dust, epoch toggle |
+| [renderers/comet.md](renderers/comet.md) | R7.3 | rendering `comet` (3I/ATLAS; 67P with a mesh nucleus): nucleus, gas shells, dust, epoch toggle |
 | [renderers/brown-dwarf.md](renderers/brown-dwarf.md) | R7.4 | rendering `brown_dwarf` / `brown_dwarf_binary` |
 | [renderers/stars.md](renderers/stars.md) | R7.5, R7.5.1–R7.5.5 | rendering `star`, `star_mira`, `star_ttauri`, and the star surface (spots, flares) |
 | [renderers/candidate.md](renderers/candidate.md) | R7.6 | handling unknown moving sources (no 3D) |
@@ -63,7 +63,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | R7 | Per-type rendering specs | [renderers/asteroid.md#r7-per-type-rendering-specs](renderers/asteroid.md#r7-per-type-rendering-specs) |
 | R7.1 | `asteroid_shape` (Bennu, Eros, Vesta, DAMIT objects) | [renderers/asteroid.md#r71-asteroid_shape-bennu-eros-vesta-damit-objects](renderers/asteroid.md#r71-asteroid_shape-bennu-eros-vesta-damit-objects) |
 | R7.2 | `asteroid_procedural` | [renderers/asteroid.md#r72-asteroid_procedural](renderers/asteroid.md#r72-asteroid_procedural) |
-| R7.3 | `comet` (3I/ATLAS) | [renderers/comet.md#r73-comet-3iatlas](renderers/comet.md#r73-comet-3iatlas) |
+| R7.3 | `comet` (3I/ATLAS; 67P with a mesh nucleus) | [renderers/comet.md#r73-comet-3iatlas](renderers/comet.md#r73-comet-3iatlas) |
 | R7.4 | `brown_dwarf` and `brown_dwarf_binary` | [renderers/brown-dwarf.md#r74-brown_dwarf-and-brown_dwarf_binary](renderers/brown-dwarf.md#r74-brown_dwarf-and-brown_dwarf_binary) |
 | R7.5 | Stars: `star`, `star_mira`, `star_ttauri` | [renderers/stars.md#r75-stars-star-star_mira-star_ttauri](renderers/stars.md#r75-stars-star-star_mira-star_ttauri) |
 | R7.5.1 | Star surface (what is drawn) | [renderers/stars.md#r751-star-surface-what-is-drawn](renderers/stars.md#r751-star-surface-what-is-drawn) |
