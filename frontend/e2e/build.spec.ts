@@ -85,6 +85,27 @@ test('a right-click selects: brackets, name and the card; no flipbook', async ({
   ).toBeFocused();
 });
 
+test('a long press (contextmenu from touch) asks for the card; a left click still opens', async ({
+  page,
+}) => {
+  await selectAquaPrime(page);
+  const card = page.getByTestId('selected-card');
+  await expect(card).toBeVisible();
+  const marker = page.locator('[data-testid="sky-cached-marker"][data-object-id="aqua-prime"]');
+  // After the earlier right-click, a left click opens the object panel and drops the card.
+  await marker.click();
+  await expect(page.getByTestId('object-panel')).toBeVisible();
+  await expect(card).toHaveCount(0);
+  await page
+    .getByTestId('object-panel')
+    .getByRole('button', { name: /^Close/ })
+    .click();
+  await expect(page.getByTestId('object-panel')).toHaveCount(0);
+  // A long press on a phone is the browser's contextmenu event on the marker.
+  await marker.dispatchEvent('contextmenu', { button: 2 });
+  await expect(card).toBeVisible();
+});
+
 test('x deselects, and right-clicking the same marker again brings the card back', async ({
   page,
 }) => {
