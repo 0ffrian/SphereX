@@ -64,7 +64,7 @@ Each stage has one job, takes defined inputs and returns defined outputs. Stages
   | This doc | `planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova` |
 
   The old `dwarf` kind maps to `brown_dwarf`. The old `asteroid` kind maps to `asteroid_shape` or `asteroid_procedural`.
-- **Status:** Built (issue #5, `backend/app/core/classify/`). The class label is taken from the catalogue only (SIMBAD `sp_type`, SBDB `spec_B` then `spec_T`); its confidence is `catalogue` or `none`, and spectrum matching against reference types (step 2) is not built (Q-55). Exoplanet types are refused while R12 #12 has no thresholds: the object falls through to `candidate` with `type:exoplanet_thresholds` in `missing` (Q-56).
+- **Status:** Built (issue #5, `backend/app/core/classify/`). The class label is taken from the catalogue only (SIMBAD `sp_type`, SBDB `spec_B` then `spec_T`); its confidence is `catalogue` or `none`, and spectrum matching against reference types (step 2) is not built (Q-55). Exoplanet types use the Q-63 thresholds, on since issue #68 (Moon's sign-off, 9 Nov 2026); a threshold set to `None` makes the object fall through to `candidate` with `type:exoplanet_thresholds` in `missing` (Q-56).
 
 ### A4.4 Stage 4: Check for a saved asset
 

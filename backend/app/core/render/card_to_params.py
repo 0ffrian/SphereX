@@ -503,9 +503,9 @@ def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) 
     )
     # Issue #62: a self-lit disc glows evenly to its edge without it. The coefficient is
     # BROWN_DWARF_LIMB_U, the star's (R7.5) until a brown-dwarf value is confirmed [verify]: an
-    # analogue, so the layer is inferred_from_analog (Q-119). The 0.6 is a visible-band solar value used as a placeholder for an
-    # infrared view. It sits on the body, so a refused body or an unset (None)
-    # coefficient refuses it too.
+    # analogue, so the layer is inferred_from_analog (Q-119). The 0.6 is a visible-band solar value
+    # used as a placeholder for an infrared view. It sits on the body, so a refused body or an
+    # unset (None) coefficient refuses it too.
     u = BROWN_DWARF_LIMB_U
     plan.layer(
         body_ok and u is not None,

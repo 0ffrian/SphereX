@@ -14,7 +14,7 @@
 | SPHEREx saturates on bright targets | Barnard's Star and R Dra get no measured point and RW Aur only 15 points at 0.74–1.09 µm; the rest are refused | Keep the saturated frames as honest refusals; the flipbook still works. Show the spectrum on demo objects fainter than the saturation limit, checked on the full pre-fetched cache (D-31, A3.1). |
 | Frames on 3I/ATLAS dates unchecked | The headline comet may have no data | Check early. Keep a known asteroid as fallback. |
 | NEOWISE access unconfirmed | Diameter and albedo | Use JPL values. |
-| Exoplanet Archive thresholds unverified | Planet cards | Adapter tested live 2026-11-07 (Q-63). The radius, mass and Zeng 2019 cut-offs stay **[verify]** until Atish confirms (Q-56). |
+| Exoplanet Archive thresholds unverified | Planet cards | Adapter tested live 2026-11-07 (Q-63). The radius, mass and Zeng 2019 cut-offs are on since issue #68: Moon signed off Q-63 after a source check (1.5 and 6 R_E are project cuts based on the cited papers; the mass cut is as published). Residual risk: the radius and mass cuts disagree for 6-10 R_E planets (recorded in Q-63). |
 | SIMBAD untested | Star and brown dwarf types | Test first. Resolver order: SBDB first for small-body names, SIMBAD first for the rest (D-19). |
 | CORS to science services unknown | Browser may be blocked | Use a backend proxy. |
 | Gemini model name may change | Code would break | Read it from config. Confirm before coding. |
