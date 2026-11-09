@@ -31,8 +31,9 @@ export function normalisePlanetName(name: string): string {
 /** Ships empty (Q-159). Entries need a verified credit and a reviewer. */
 export const PRESETS: Readonly<Record<string, LookPreset>> = {};
 
-/** True when the preset's look has only artistic keys with defined values. Runtime guard. */
-export function isArtisticOnly(look: object): boolean {
+/** True when the look is an object whose own keys are all artistic (allow-list). Runtime guard. */
+export function isArtisticOnly(look: unknown): boolean {
+  if (typeof look !== 'object' || look === null || Array.isArray(look)) return false;
   return Object.keys(look).every((k) => (LOOK_KEYS as readonly string[]).includes(k));
 }
 
@@ -45,13 +46,17 @@ export function lookupPreset(
   scenario: Scenario | null,
   table: Readonly<Record<string, LookPreset>> = PRESETS,
 ): Partial<ScenarioLook> | null {
-  const p = table[normalisePlanetName(plName)];
+  const name = normalisePlanetName(plName);
+  // Own keys only: "constructor" or "__proto__" must not reach Object.prototype members.
+  if (!Object.prototype.hasOwnProperty.call(table, name)) return null;
+  const p = table[name];
   if (!p) return null;
   if (p.scenario !== undefined && p.scenario !== scenario) return null;
   if (!isArtisticOnly(p.look)) return null;
   const out: Partial<ScenarioLook> = {};
   for (const k of LOOK_KEYS as readonly LookKey[]) {
-    if (p.look[k] !== undefined) (out as Record<string, unknown>)[k] = p.look[k];
+    if (Object.prototype.hasOwnProperty.call(p.look, k) && p.look[k] !== undefined)
+      (out as Record<string, unknown>)[k] = p.look[k];
   }
   return out;
 }

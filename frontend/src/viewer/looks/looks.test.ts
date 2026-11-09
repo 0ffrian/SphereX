@@ -53,6 +53,19 @@ describe('merge precedence', () => {
     expect(m.relief).toBe(0.1);
     expect(m.freq).toBe(base.freq);
   });
+  it('skips NaN and wrong types and clamps ranges', () => {
+    const m = mergeLook(
+      base,
+      { cloudCover: Number.NaN, freq: Infinity, relief: 9, cloudStyle: 'x' as never },
+      { atmosphereColour: [2, -1, 0.5], iceContrast: -3 },
+    );
+    expect(m.cloudCover).toBe(base.cloudCover);
+    expect(m.freq).toBe(base.freq);
+    expect(m.relief).toBe(0.25);
+    expect(m.cloudStyle).toBe(base.cloudStyle);
+    expect(m.atmosphereColour).toEqual([1, 0, 0.5]);
+    expect(m.iceContrast).toBe(0);
+  });
   it('does not mutate and skips undefined', () => {
     const before = structuredClone(base);
     const m = mergeLook(base, { freq: undefined }, { relief: undefined });
@@ -71,6 +84,12 @@ describe('presets', () => {
     expect(lookupPreset('TRAPPIST-1 f', 'eyeball', t)).toEqual({ cloudCover: 0.4 });
     expect(lookupPreset('trappist-1f', 'eyeball', t)).toEqual({ cloudCover: 0.4 });
     expect(lookupPreset('other', 'eyeball', t)).toBeNull();
+  });
+  it('ignores inherited keys and bad shapes', () => {
+    expect(lookupPreset('constructor', null, {})).toBeNull();
+    expect(lookupPreset('__proto__', null, {})).toBeNull();
+    const t = table('x', { look: null as unknown as object });
+    expect(lookupPreset('x', null, t)).toBeNull();
   });
   it('uses scenario only as a match guard', () => {
     const t = table('trappist-1f', { scenario: 'eyeball', look: { relief: 0.07 } });
@@ -107,6 +126,7 @@ describe('determinism', () => {
     expect(run()).toEqual(run());
   });
   it('gives byte-identical fields from look params', () => {
+    const hashes = new Set<string>();
     for (const s of SCENARIOS) {
       const l = SCENARIO_LOOKS[s];
       const p: FieldParams = {
@@ -125,6 +145,9 @@ describe('determinism', () => {
       expect(Buffer.from(a.a.buffer).equals(Buffer.from(b.a.buffer))).toBe(true);
       expect(Buffer.from(a.b.buffer).equals(Buffer.from(b.b.buffer))).toBe(true);
       expect(fieldHash(a)).toBe(fieldHash(b));
+      expect(a.a.some((v) => v !== 0)).toBe(true); // not an all-zero field
+      hashes.add(fieldHash(a));
     }
+    expect(hashes.size).toBeGreaterThan(1); // the look really changes the field
   });
 });

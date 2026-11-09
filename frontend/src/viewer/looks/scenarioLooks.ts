@@ -14,14 +14,14 @@ import {
 } from './types';
 import type { Tag, Tier } from '@/contract';
 
-export const SCENARIO_LOOKS: Readonly<Record<Scenario, ScenarioLook>> = {
+const LOOKS: Record<Scenario, ScenarioLook> = {
   // Molten, almost cloudless, dim red-orange glow, rugged crust.
   lava: {
     cloudCover: 0.05,
     cloudStyle: 'patchy',
     relief: 0.095,
     freq: 2.4,
-    surfaceHue: 15,
+    surfaceHue: 0,
     atmosphereStrength: 0.5,
     atmosphereColour: [1.0, 0.45, 0.2],
     iceContrast: 0,
@@ -32,7 +32,7 @@ export const SCENARIO_LOOKS: Readonly<Record<Scenario, ScenarioLook>> = {
     cloudStyle: 'patchy',
     relief: 0.081,
     freq: 1.6,
-    surfaceHue: 35,
+    surfaceHue: 0.1,
     atmosphereStrength: 0.55,
     atmosphereColour: [0.9, 0.7, 0.45],
     iceContrast: 0,
@@ -43,7 +43,7 @@ export const SCENARIO_LOOKS: Readonly<Record<Scenario, ScenarioLook>> = {
     cloudStyle: 'banded',
     relief: 0.06,
     freq: 1.8,
-    surfaceHue: 0,
+    surfaceHue: 0.3,
     atmosphereStrength: 0.8,
     atmosphereColour: [0.55, 0.7, 1.0],
     iceContrast: 0.7,
@@ -54,7 +54,7 @@ export const SCENARIO_LOOKS: Readonly<Record<Scenario, ScenarioLook>> = {
     cloudStyle: 'patchy',
     relief: 0.05,
     freq: 1.9,
-    surfaceHue: 205,
+    surfaceHue: 0.8,
     atmosphereStrength: 0.6,
     atmosphereColour: [0.75, 0.88, 1.0],
     iceContrast: 0.9,
@@ -65,12 +65,39 @@ export const SCENARIO_LOOKS: Readonly<Record<Scenario, ScenarioLook>> = {
     cloudStyle: 'patchy',
     relief: 0.054,
     freq: 2,
-    surfaceHue: 0,
+    surfaceHue: 0.3,
     atmosphereStrength: 0.85,
     atmosphereColour: [0.4, 0.62, 1.0],
     iceContrast: 0.4,
   },
 };
+
+for (const l of Object.values(LOOKS)) Object.freeze(l.atmosphereColour);
+for (const l of Object.values(LOOKS)) Object.freeze(l);
+export const SCENARIO_LOOKS: Readonly<Record<Scenario, ScenarioLook>> = Object.freeze(LOOKS);
+
+/** Allowed numeric range per key (display limits, artistic). A value outside is clamped. */
+const RANGE: Partial<Record<keyof ScenarioLook, readonly [number, number]>> = {
+  cloudCover: [0, 1],
+  relief: [0, 0.25],
+  freq: [0.1, 8],
+  surfaceHue: [0, 1],
+  atmosphereStrength: [0, 1],
+  iceContrast: [0, 1],
+};
+const clamp = (v: number, [lo, hi]: readonly [number, number]) => Math.min(hi, Math.max(lo, v));
+
+/** A safe value for a key, or undefined when it is not usable (wrong type, NaN, Infinity). */
+function safe(k: keyof ScenarioLook, v: unknown): ScenarioLook[keyof ScenarioLook] | undefined {
+  if (k === 'cloudStyle') return v === 'banded' || v === 'patchy' ? v : undefined;
+  if (k === 'atmosphereColour') {
+    if (!Array.isArray(v) || v.length !== 3) return undefined;
+    if (!v.every((c) => typeof c === 'number' && Number.isFinite(c))) return undefined;
+    return [clamp(v[0], [0, 1]), clamp(v[1], [0, 1]), clamp(v[2], [0, 1])] as const;
+  }
+  const r = RANGE[k];
+  return r && typeof v === 'number' && Number.isFinite(v) ? clamp(v, r) : undefined;
+}
 
 /** A partial set of artistic settings. Sliders are always one of these. */
 export type LookOverrides = Partial<ScenarioLook>;
@@ -82,7 +109,7 @@ export function lookForScenario(s: string | null | undefined): ScenarioLook | nu
 
 /**
  * Merge: scenario look, then preset, then sliders. Sliders win (D-27); a preset beats the
- * scenario look. Pure; the inputs are not changed and `undefined` values are skipped.
+ * scenario look. Pure; the inputs are not changed. `undefined`, non-finite and wrong-typed values are skipped and numbers are clamped to their range.
  */
 export function mergeLook(
   base: ScenarioLook,
@@ -93,7 +120,10 @@ export function mergeLook(
   for (const layer of [preset, sliders]) {
     if (!layer) continue;
     const o = out as unknown as Record<string, unknown>;
-    for (const k of LOOK_KEYS) if (layer[k] !== undefined) o[k] = layer[k];
+    for (const k of LOOK_KEYS) {
+      const v = safe(k, layer[k]); // NaN, Infinity, wrong types and unknown values are skipped
+      if (v !== undefined) o[k] = v;
+    }
   }
   return out;
 }

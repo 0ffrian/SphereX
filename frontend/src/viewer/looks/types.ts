@@ -34,7 +34,7 @@ export interface ScenarioLook {
   relief: number;
   /** Terrain noise frequency. */
   freq: number;
-  /** Surface hue shift in degrees, 0..360 (0 = the shader's own palette). ASSUMPTION: no hue slider exists yet. */
+  /** 0..1 surface hue, the same scale as `PlanetStyle.hue` (0 = rocky brown, 1 = green / grey mix). */
   surfaceHue: number;
   /** 0..1 atmosphere glow. */
   atmosphereStrength: number;
