@@ -316,17 +316,22 @@ def with_star_data(
     g: gaia.GaiaAstro | None = None
     sep: float | None = None
     gaia_reason = None
-    ra, dec = propagate(
-        hit.ra, hit.dec, hit.pmra_mas_yr, hit.pmdec_mas_yr, _GAIA_EPOCH, epoch_jyear=2000.0
-    )
-    try:
-        near, s = gaia.astro_near(ctx, ra, dec)
-        served.append(s)
-        g, sep = nearest(near, ra, dec)
-        if g is None:
-            gaia_reason = "no Gaia DR3 source within the match radius"
-    except (CacheMissOffline, UpstreamUnavailable) as exc:
-        gaia_reason = reason("Gaia DR3", exc)
+    if hit.pmra_mas_yr is None or hit.pmdec_mas_yr is None:
+        # Without a proper motion the J2000 position is up to arcseconds off at the Gaia epoch
+        # (2016.0), so a match could pick a neighbour. Refuse the tier rather than guess (Q-152).
+        gaia_reason = "SIMBAD gives no proper motion, so no safe Gaia DR3 match"
+    else:
+        ra, dec = propagate(
+            hit.ra, hit.dec, hit.pmra_mas_yr, hit.pmdec_mas_yr, _GAIA_EPOCH, epoch_jyear=2000.0
+        )
+        try:
+            near, s = gaia.astro_near(ctx, ra, dec)
+            served.append(s)
+            g, sep = nearest(near, ra, dec)
+            if g is None:
+                gaia_reason = "no Gaia DR3 source within the match radius"
+        except (CacheMissOffline, UpstreamUnavailable) as exc:
+            gaia_reason = reason("Gaia DR3", exc)
     cat = stars.StarCatalogue(
         teff_rows=tuple(teff_rows),
         teff_reason=teff_reason,

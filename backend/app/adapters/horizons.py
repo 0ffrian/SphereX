@@ -32,17 +32,24 @@ class EphemPoint:
     dec: float
 
 
-def command(spkid: str, comet: bool = False) -> str:
+def command(spkid: str, comet: bool = False, jd: str | None = None) -> str:
     """The Horizons ``COMMAND`` for a small body by SPK-ID.
 
     A comet that has been seen on several apparitions has one orbit record per apparition, so
     ``DES=<id>;`` alone answers with the small-body index table and no ephemeris (live 2026-11-09:
-    67P is SPK-ID 1000012 and has a dozen records). The ``CAP`` flag (closest apparition) picks
-    one record; Horizons' API documentation describes it under "unique comet selection". It also
-    works for a comet with a single record, but an asteroid has no apparitions and ``CAP`` finds
-    nothing there, so only comets get it (Q-62 amendment).
+    67P is SPK-ID 1000012 and has a dozen records). ``CAP`` picks one record. The Horizons system
+    manual (ssd.jpl.nasa.gov/horizons/manual.html, small-body lookup) says: ``CAP;`` "returns last
+    apparition before the current date", and ``CAP < JD#;`` "returns last apparition before the
+    specified Julian Day Number". Bare ``CAP`` therefore depends on the wall clock, so a comet's
+    command carries the whole Julian Day of the requested epoch (``CAP<2460982;``): the same epoch
+    always gives the same record and the same cache key. An asteroid has no apparitions and ``CAP``
+    finds nothing there, so only comets get it (Q-62 amendment, Q-151).
     """
-    return f"DES={spkid};CAP;" if comet else f"DES={spkid};"
+    if not comet:
+        return f"DES={spkid};"
+    if jd is None:
+        raise ValueError("a comet command needs the epoch's Julian Day for CAP<JD")
+    return f"DES={spkid};CAP<{int(float(jd))};"
 
 
 def jd_list(times: list[datetime]) -> list[str]:
@@ -51,7 +58,11 @@ def jd_list(times: list[datetime]) -> list[str]:
 
 def horizons_key(spkid: str, jds: list[str], comet: bool = False) -> CacheKey:
     return CacheKey.make(
-        SOURCE, None, command=command(spkid, comet), center=CENTER, tlist=",".join(jds)
+        SOURCE,
+        None,
+        command=command(spkid, comet, min(jds, default=None)),
+        center=CENTER,
+        tlist=",".join(jds),
     )
 
 
@@ -82,7 +93,7 @@ def ephemeris(
     def live() -> LiveResponse:
         params = {
             "format": "json",
-            "COMMAND": f"'{command(spkid, comet)}'",
+            "COMMAND": f"'{command(spkid, comet, min(jds))}'",
             "OBJ_DATA": "NO",
             "MAKE_EPHEM": "YES",
             "EPHEM_TYPE": "OBSERVER",
@@ -202,7 +213,7 @@ def sun_unit_vector(r: tuple[float, float, float]) -> tuple[tuple[float, float, 
 
 def phase_key(spkid: str, jd: str, center: str, comet: bool = False) -> CacheKey:
     return CacheKey.make(
-        SOURCE, None, command=command(spkid, comet), center=center, tlist=jd, quantities="1,24"
+        SOURCE, None, command=command(spkid, comet, jd), center=center, tlist=jd, quantities="1,24"
     )
 
 
@@ -210,7 +221,7 @@ def vectors_key(spkid: str, jd: str, comet: bool = False) -> CacheKey:
     return CacheKey.make(
         SOURCE,
         None,
-        command=command(spkid, comet),
+        command=command(spkid, comet, jd),
         center=SUN_CENTER,
         tlist=jd,
         ephem_type="VECTORS",
@@ -223,7 +234,7 @@ def _fetch_phase(
     def live() -> LiveResponse:
         params = {
             "format": "json",
-            "COMMAND": f"'{command(spkid, comet)}'",
+            "COMMAND": f"'{command(spkid, comet, jd)}'",
             "OBJ_DATA": "NO",
             "MAKE_EPHEM": "YES",
             "EPHEM_TYPE": "OBSERVER",
@@ -255,7 +266,7 @@ def _fetch_vectors(
     def live() -> LiveResponse:
         params = {
             "format": "json",
-            "COMMAND": f"'{command(spkid, comet)}'",
+            "COMMAND": f"'{command(spkid, comet, jd)}'",
             "OBJ_DATA": "NO",
             "MAKE_EPHEM": "YES",
             "EPHEM_TYPE": "VECTORS",

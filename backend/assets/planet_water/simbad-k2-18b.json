@@ -1,4 +1,5 @@
 {
+  "asset_version": "7",
   "card": {
     "host_age_gyr": {
       "source": "not available: the Exoplanet Archive has no st_age (host star age in Gyr)",
@@ -66,6 +67,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b2",
+  "inputs_sha256": "5a9b0acd6b2222a6d48ebc28e956c659f6d435b6c9581ae25ecebb9c92e6f742",
   "render_params": {
     "alt_text": "K2-18 b, Water planet, 0.211 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
     "generator_version": "p1-b2",
@@ -95,7 +97,7 @@
     "missing": [
       "spectrum"
     ],
-    "scale_m": 14781788.885639999,
+    "scale_m": 15116071.16208,
     "seed": 1336235897,
     "type": "planet_water",
     "view_modes": {

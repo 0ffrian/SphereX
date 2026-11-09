@@ -27,20 +27,28 @@ from app.core.render.card_to_params import GENERATOR_VERSION
 log = logging.getLogger("shift_spectrum")
 
 ASSET_SOURCE = "derived.asset"
-# Bump when stage 3, 5 or 7 rules change. 2: Layer.tier, formula and assumed (D-32, PR #44).
+# Bump when stage 3, 5 or 7 rules change. What each bump covers:
+# 2 (D-32, PR #44): Layer.tier, formula and assumed.
 # 3 (issue #40): stage 3 types Eros as asteroid_shape from the shape registry (Q-61) and runs the
-# exoplanet rule (Q-63); stage 5 fills phase_angle_deg and sun_vector from Horizons (Q-62).
+#   exoplanet rule (Q-63); stage 5 fills phase_angle_deg and sun_vector from Horizons (Q-62).
 # 4 (issue #62, Q-115..Q-117): stage 7 sends a different set of layers (gas giant bands, flattening,
-# colour, storms and turbulence instead of surface; brown dwarf limb_darkening; procedural asteroid
-# displacement and textures.relief_amp). CARD_TO_PARAMS_VERSION stays "1" so seeds are stable.
+#   colour, storms and turbulence instead of surface; brown dwarf limb_darkening; procedural
+#   asteroid displacement and textures.relief_amp). CARD_TO_PARAMS_VERSION stays "1" so seeds are
+#   stable.
 # 5 (issue #68 Part 0.1, Q-63): the exoplanet type rule is on, so archive planets are typed
-# planet_rocky, planet_water or gas_giant instead of candidate.
+#   planet_rocky, planet_water or gas_giant instead of candidate.
 # 6 (issue #68 Track A, Q-150..Q-154): the card gains mass, orbit and host-star fields; stars take
-# Teff, radius and Mira period from SIMBAD/Gaia/class table; 'Oumuamua takes literature values; the
-# binary brown dwarf's RenderParams gains `components`; the Horizons command for comets changed.
-ASSET_VERSION = "6"
+#   Teff, radius and Mira period from SIMBAD/Gaia/class table; 'Oumuamua takes literature values;
+#   the binary brown dwarf's RenderParams gains `components`; the Horizons command for comets
+#   changed.
+# 7 (issue #68 review fixes, Q-167): Jupiter's radius is the equatorial 71,492 km (scale_m of
+#   planets changes); the Horizons comet command is `CAP<JD` (Q-151); the Gaia match refuses a star
+#   with no SIMBAD proper motion and the card source text gives the match separation (Q-152);
+#   Eps Ind B's literature citation text changed (Q-153).
+ASSET_VERSION = "7"
 AssetStatus = Literal["saved", "generated", "sketch"]
 FIELDS = ("card", "render_params", "textures", "generator_version", "seed", "created_at")
+OPTIONAL_FIELDS = ("asset_version", "inputs_sha256")
 
 
 @dataclass(frozen=True)
@@ -51,13 +59,24 @@ class Asset:
     generator_version: str
     seed: int
     created_at: str  # ISO-8601 UTC with Z
+    # Pre-built pack only (Q-167): the ASSET_VERSION and the hash of the reviewed inputs
+    # (literature, dwarf Teff table, shape registry) the asset was baked with. Absent from
+    # generated assets.
+    asset_version: str | None = None
+    inputs_sha256: str | None = None
 
     def to_json(self) -> dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        for k in OPTIONAL_FIELDS:
+            if d[k] is None:
+                del d[k]
+        return d
 
     @classmethod
     def from_json(cls, d: Any) -> Asset | None:
-        if not isinstance(d, dict) or set(d) != set(FIELDS):
+        if not isinstance(d, dict) or not set(FIELDS) <= set(d) <= {*FIELDS, *OPTIONAL_FIELDS}:
+            return None
+        if any(d.get(k) is not None and not isinstance(d[k], str) for k in OPTIONAL_FIELDS):
             return None
         if not isinstance(d["card"], dict) or not isinstance(d["render_params"], dict):
             return None
@@ -101,6 +120,15 @@ class AssetStore:
                 asset = None
             if asset is None or not _matches(asset, object_id):
                 log.warning("ignoring unreadable pre-baked asset %s", path)
+                continue
+            if asset.asset_version != ASSET_VERSION:
+                # A pack baked with other rules must never be served as `saved` (Q-167).
+                log.warning(
+                    "ignoring stale pre-baked asset %s: asset_version %r, this code is %r",
+                    path,
+                    asset.asset_version,
+                    ASSET_VERSION,
+                )
                 continue
             return asset
         return None

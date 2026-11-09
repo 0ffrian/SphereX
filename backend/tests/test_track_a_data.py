@@ -183,7 +183,39 @@ def test_card_schema_accepts_every_new_field() -> None:
 
 
 def test_asset_version_is_bumped_for_the_new_fields() -> None:
-    assert int(ASSET_VERSION) >= 6
+    assert ASSET_VERSION == "7"
+
+
+def test_jupiter_radius_is_the_equatorial_one_defined_once() -> None:
+    from app.core.render import card_to_params as c2p
+    from app.core.render import gas_giant as gg
+
+    assert gg.R_JUP_M == 7.1492e7  # IAU 2015 nominal equatorial; the archive's R_Jup
+    assert not hasattr(c2p, "R_JUP_M")
+    card = {"id": "x", "type": "gas_giant", "radius_rjup": {"value": 1.0, "tag": "measured"}}
+    assert c2p._scale_m(card) == pytest.approx(7.1492e7)
+
+
+def test_gaia_tier_is_refused_without_a_simbad_proper_motion(ctx: Context) -> None:
+    import dataclasses
+
+    obj = resolve(ctx, "Barnard's star", load_aliases(TARGETS_FILE)).obj
+    data = gather(ctx, obj)
+    still = dataclasses.replace(
+        data.simbad_hit,
+        pmra_mas_yr=None,
+        pmdec_mas_yr=None,  # type: ignore[type-var]
+    )
+    out = with_star_data(ctx, dataclasses.replace(data, simbad_hit=still), obj, "star")
+    assert out.star is not None and out.star.gaia is None
+    assert "no proper motion" in (out.star.gaia_reason or "")
+
+
+def test_gaia_values_name_the_match_separation(ctx: Context) -> None:
+    card, _ = card_of(ctx, "Barnard's star")
+    assert card["radius_rsun"]["value"] == pytest.approx(0.2022)
+    assert "arcsec from the SIMBAD position" in card["radius_rsun"]["source"]
+    assert card["teff_K"]["source"].startswith("SIMBAD mesFe_h: median")
 
 
 # --- Part 8c: star Teff, radius and period --------------------------------------------------------
@@ -616,14 +648,20 @@ def test_a_single_brown_dwarf_has_no_components() -> None:
 
 
 def test_command_adds_cap_only_for_comets() -> None:
-    assert horizons.command("1000012", comet=True) == "DES=1000012;CAP;"
+    # CAP alone means "before the current date" (Horizons manual): the epoch makes it deterministic.
+    assert (
+        horizons.command("1000012", comet=True, jd="2461358.500000") == "DES=1000012;CAP<2461358;"
+    )
+    with pytest.raises(ValueError):
+        horizons.command("1000012", comet=True)
     assert horizons.command("20000433") == "DES=20000433;"
 
 
 def test_67p_resolves_and_gets_its_geometry_from_recorded_replies(ctx: Context) -> None:
     """Live on 9 Nov 2026 `DES=1000012;` answered with the small-body index table (a dozen
-    apparition records) and no ephemeris block; `DES=1000012;CAP;` answers (Horizons API docs,
-    "unique comet selection"). These are the recorded replies of the CAP calls."""
+    apparition records) and no ephemeris block; `DES=1000012;CAP<2461358;` answers (Horizons manual:
+    "returns last apparition before the specified Julian Day Number"). These are the recorded
+    replies of the CAP calls."""
     # No aliases: the replies were recorded for the query "67P". With targets.toml loaded, Track D's
     # alias sends "67P" to "67P/Churyumov-Gerasimenko", a different cache key (the alias is covered
     # by the search tests).
@@ -634,7 +672,7 @@ def test_67p_resolves_and_gets_its_geometry_from_recorded_replies(ctx: Context) 
     assert 0.0 <= answer.geometry.phase_angle_deg <= 180.0
     assert abs(sum(c * c for c in answer.geometry.sun_vector) - 1.0) < 1e-6
     keys = [s.entry.key.query for s in answer.served]  # type: ignore[attr-defined]
-    assert all(dict(q)["command"] == "DES=1000012;CAP;" for q in keys)
+    assert all(dict(q)["command"] == "DES=1000012;CAP<2461358;" for q in keys)
 
 
 def test_an_asteroid_never_gets_cap(ctx: Context) -> None:
