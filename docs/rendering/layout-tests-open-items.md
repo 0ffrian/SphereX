@@ -12,7 +12,7 @@ backend/app/core/render/            (Atish)
   noise.py craters.py height.py normals.py palette.py bake.py   # issue #6, built
   params.py           # §6.2 generator parameters (BakeParams, BakeRefusal); card_to_params adds the tags
   __main__.py         # python -m app.core.render <card.json> --seed N --out DIR
-  gemini_paint.py     # stretch, behind the admin token
+  gemini_paint.py     # R6.6, stretch, behind the admin token; issue #14, built (Q-122)
   spherex_rgb.py      # §5.2 channel extraction, issue #5, built
 backend/app/core/classify/           (Atish)  # pipeline stage 3 (A4.3), issue #5: rules.py (R3.3, R12 #12 thresholds block)
 backend/app/core/card/               (Kevin)  # pipeline stages 4 and 5 (A4.4, A4.5), issue #5: catalogue.py, build.py,
@@ -25,7 +25,9 @@ backend/app/api/                     (Kevin)  # D-16 endpoints; resolve.py; obje
                                               # sky.py: /v1/sky/... (sky-view prototype, beyond D-16, Q-87;
                                               # /v1/sky/cached reads the derived frames cache, Q-98);
                                               # composite.py: /composite, /composite.png (beyond D-16, Q-92);
-                                              # overlays.py: /overlays, /flags/{frame_id}.png, /combine.png (A4.9, Q-50)
+                                              # overlays.py: /overlays, /flags/{frame_id}.png, /combine.png (A4.9, Q-50);
+                                              # gemini.py: /admin/objects/{id}/gemini-repaint, /albedo-ai, /albedo-ai.webp (A6.2, Q-122);
+                                              # deps.py: require_admin (X-SX-Admin-Token, Q-122), require_object
 backend/app/adapters/                (Kevin)  # IRSA SIA + cutouts, SIMBAD, SBDB, Horizons, SkyBoT, Gaia and CatWISE2020 over TAP (A3), all through the cache
 backend/app/cache/                   (Kevin)  # D-25 read-through disk cache
 backend/app/core/find/               (Kevin)  # pipeline stage 1 (A4.1): resolver, proper motion, WCS, frames, cutout PNG;
@@ -170,7 +172,7 @@ Later on the same branch (7 Nov 2026) it added `backend/app/core/composite/` and
 
 1. Fallback behaviour of `WebGPURenderer` from `three/webgpu` (r187) on both phones; check via `chrome://gpu`.
 2. Normal map green-channel convention ([§6.5](surface-generation.md#r65-normals-from-height-sobel-equirectangular-aware)). Baker side verified numerically (6 Nov 2026); the viewer check (north-facing slopes brighten with light from the north) is still open.
-3. The Gemini image model name and its supported aspect ratios.
+3. The Gemini image model name and its supported aspect ratios. Also the REST request and response shape that `backend/app/core/render/gemini_paint.py` assumes (issue #14): base URL `SX_GEMINI_API_URL`, `models/{model}:generateContent` with the key in the `x-goog-api-key` header, `generationConfig.responseModalities` and `imageConfig.aspectRatio` (sent only when `SX_GEMINI_ASPECT_RATIO` is set), an `inlineData` image part in the first candidate, and which `finishReason` values mean a refusal. **Docs check (9 Nov 2026, no live call yet):** Google's image-generation page lists `gemini-nano-banana-2.1` as the primary image model, so the name exists; it names the aspect ratios 1:1, 5:4, 16:9, 1:4, 4:1, 1:8 and 8:1 but not 2:1; and its examples use the newer Interactions endpoint (`/v1beta/interactions`), while the `generateContent` + `imageConfig` shape used here appears in Firebase's `ImageConfig` reference. Still open until one live call with a key succeeds; a failed live call is logged as a warning naming the model.
 4. The 3I/ATLAS nucleus size limit and coma radius values, with exact citations.
 5. Eps Indi Ba/Bb orbit numbers; WISE 0855 class details.
 6. Barnard's Star Teff/radius, and the RW Aur disc inclination source.

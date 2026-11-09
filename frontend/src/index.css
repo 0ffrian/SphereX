@@ -1529,7 +1529,7 @@ body {
   }
 }
 
-/* Issue #66 (Q-123), desktop: the sky fills the whole bezel. The header, rail, transport and search
+/* Issue #66 (Q-124), desktop: the sky fills the whole bezel. The header, rail, transport and search
    float over it, and the edges fade to dark in a gradient (SkyPane's .sx-sky-shade) instead of solid
    bars. Panels and the credit keep their old places through the inset variables. Phone width keeps
    the stacked layout. */

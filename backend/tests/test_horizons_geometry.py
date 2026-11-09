@@ -19,7 +19,7 @@ from app.core.find.resolver import ResolvedObject
 from app.settings import Settings
 from app.timefmt import parse_utc
 from tests.conftest import make_settings
-from tests.test_api import resolve_id
+from tests.helpers import resolve_id
 
 EPOCH = parse_utc("2026-11-14T00:00:00Z")
 # Recorded live from JPL Horizons on 2026-11-07 (observer 500@-163182 and Sun-centred vectors).

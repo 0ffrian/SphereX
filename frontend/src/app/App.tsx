@@ -106,7 +106,7 @@ export function App() {
       <div className="sx-screen">
         <div className="sx-bezel" data-split={split || undefined}>
           <header className="sx-top">
-            {/* The page heading stays for assistive technology; the brand is not drawn (Q-123). */}
+            {/* The page heading stays for assistive technology; the brand is not drawn (Q-124). */}
             <h1 className="sr-only">Shift &amp; Spectrum</h1>
             <FixtureBanner />
             <Readout />
