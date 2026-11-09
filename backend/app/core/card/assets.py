@@ -30,10 +30,15 @@ ASSET_SOURCE = "derived.asset"
 # Bump when stage 3, 5 or 7 rules change. 2: Layer.tier, formula and assumed (D-32, PR #44).
 # 3 (issue #40): stage 3 types Eros as asteroid_shape from the shape registry (Q-61) and runs the
 # exoplanet rule (Q-63); stage 5 fills phase_angle_deg and sun_vector from Horizons (Q-62).
-# 5 (issue #26, Q-124): stage 1 finds frames for moving objects and stage 2 measures their
+# 4 (issue #62, Q-115..Q-117): stage 7 sends a different set of layers (gas giant bands, flattening,
+# colour, storms and turbulence instead of surface; brown dwarf limb_darkening; procedural asteroid
+# displacement and textures.relief_amp). CARD_TO_PARAMS_VERSION stays "1" so seeds are stable.
+# 5 (issue #68 Part 0.1, Q-63): the exoplanet type rule is on, so archive planets are typed
+# planet_rocky, planet_water or gas_giant instead of candidate.
+# 6 (issue #26, Q-125): stage 1 finds frames for moving objects and stage 2 measures their
 # spectrum; a card saved before had none (`frames:moving_object_search` was final). Stage 1 and 2
-# changes count too. ("4" is taken by PR #63; whichever merges second keeps the higher number.)
-ASSET_VERSION = "5"
+# changes count too.
+ASSET_VERSION = "6"
 AssetStatus = Literal["saved", "generated", "sketch"]
 FIELDS = ("card", "render_params", "textures", "generator_version", "seed", "created_at")
 

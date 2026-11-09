@@ -37,13 +37,23 @@
       "requires": [
         "diameter_km"
       ]
+    },
+    {
+      "id": "displacement",
+      "tag": "artistic",
+      "tier": 5,
+      "description": "Surface pushed out by the height map, up to 0.03 of the radius (style cratered, R6.2, R7.2).",
+      "requires": [
+        "diameter_km"
+      ]
     }
   ],
   "textures": {
     "albedo": "/data/textures/fixture:asteroid_procedural/fixture-0/2/albedo.webp",
     "height": "/data/textures/fixture:asteroid_procedural/fixture-0/2/height.png",
     "normal": "/data/textures/fixture:asteroid_procedural/fixture-0/2/normal.png",
-    "height_bin": "/data/textures/fixture:asteroid_procedural/fixture-0/2/height.bin"
+    "height_bin": "/data/textures/fixture:asteroid_procedural/fixture-0/2/height.bin",
+    "relief_amp": 0.03
   },
   "lighting": {
     "mode": "sun",

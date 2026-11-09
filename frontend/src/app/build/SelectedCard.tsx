@@ -1,8 +1,10 @@
 // Issue #60: the top-centre card of the selected object (mock-up island card, `showInfo`): its
 // name, its type, and two actions: "See fingerprint" (the object panel at the spectrum) and
 // "Build it" (the split view that moulds the body). × and Escape deselect the object: the card, the
-// brackets and the object in the link go, focus returns to its marker, and clicking the marker
-// again brings the card back. It sits in a polite live region, so it is announced when it appears.
+// brackets and the object in the link go, focus returns to its marker, and right-clicking the marker
+// again brings the card back. It shows only when asked for (right-click, long press, ContextMenu
+// key; issue #64): a left click on a marker opens the object, as the sky view does since #49. It
+// sits in a polite live region, so it is announced when it appears.
 import { useEffect, useId } from 'react';
 import { useAppStore } from '@/state/store';
 import { Icon } from '@/app/shell/icons';
@@ -51,7 +53,10 @@ export function SelectedCard() {
   const body = useShellStore((s) => s.body);
   const params = useAppStore((s) => s.params);
   const titleId = useId();
-  const show = (selection !== null || position !== null) && tool === 'sky' && !buildOpen;
+  // Only when asked for (right-click or long press, issue #64): a left click opens the object.
+  const requested = useShellStore((s) => s.cardRequested);
+  const show =
+    (selection !== null || position !== null) && requested && tool === 'sky' && !buildOpen;
   // A position has no marker to give focus back to: '' sends it to the sky canvas.
   const selectedId = selection?.id ?? (position !== null ? '' : null);
 

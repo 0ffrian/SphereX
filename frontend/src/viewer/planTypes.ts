@@ -6,6 +6,8 @@ import type { HonestyState } from './honesty';
 import type { LightingPlan } from './lighting';
 import type { Motion } from './motion/motion';
 import type { StarRates } from './bodies/starModel';
+import type { GasSwitches } from './renderers/shaderSpec';
+import type { Overrides } from './sliders';
 
 export type Rgb = [number, number, number];
 export type Vec3 = [number, number, number];
@@ -27,7 +29,9 @@ export type MissingReason =
   /** Not shown in the selected view mode (a baked texture is in visible-palette colour). */
   | 'mode'
   /** A reference value is still [verify]; nothing is invented in its place. */
-  | 'unverified';
+  | 'unverified'
+  /** Not drawn at the current quality level (the phone's low one), whatever the data says (Q-117). */
+  | 'quality';
 
 export interface MissingItem {
   id: string;
@@ -88,6 +92,26 @@ export interface BodyPlan {
   /** 0 = lit by the Sun light. Above 0 = self-luminous, colour times this value. */
   emissive: number;
   limbDarkening: boolean;
+  /**
+   * Linear limb-darkening coefficient `u` of a self-luminous body, `I(mu) = 1 - u (1 - mu)`. Unset:
+   * the star's R7.5 value when `limbDarkening` is on.
+   */
+  limbU?: number | null;
+  /**
+   * The baked albedo is drawn as brightness only, on the body's own colour (the infrared view of a
+   * brown dwarf, issue #62): the pattern is a look, the colour stays the SPHEREx average (R5.2).
+   */
+  albedoLuma?: boolean;
+  /**
+   * Longitude offset of the baked map, as a fraction of a turn (0..1). Body B of a binary gets a
+   * seeded one, so the two share a map but are not identical clones. A look (artistic).
+   */
+  albedoOffsetU?: number;
+  /**
+   * Asteroids: the colour is brightened for display, capped by the surface's own brightness
+   * (`asteroidLift.ts`, artistic). Off when absent.
+   */
+  displayLift?: boolean;
   roughness: number;
   meshUrl: string | null;
   albedoUrl: string | null;
@@ -129,6 +153,12 @@ export interface DiscPlan {
   innerRadius: number;
   outerRadius: number;
   inclinationDeg: number;
+  /**
+   * Flaring (issue #62, R7.5): the half-thickness of the disc is `heightAtInner` at the inner edge
+   * and grows as `(r / innerRadius) ^ flareExponent`. Scene units; artistic.
+   */
+  heightAtInner: number;
+  flareExponent: number;
 }
 
 export interface ScreenPlan {
@@ -208,6 +238,11 @@ export interface ShaderPlan {
   key: string;
   /** The generated surface (or point cloud) is shown at this honesty level. */
   surface: boolean;
+  /**
+   * Gas giants (issue #62): which of the five layers are drawn (honesty level, refusals and the
+   * build animation's holds applied). Null for every other kind; `surface` is true when any is on.
+   */
+  gas: GasSwitches | null;
   /** The plain grey sphere is shown: the surface is hidden and the size on the card is shown (Q-45). */
   plain: boolean;
   /** Camera distance that frames the body, in scene units (display value). */
@@ -253,6 +288,8 @@ export interface JetSurfacePlan {
   radiusM: number | null;
   /** Flattening from the spin (0 = round). */
   flattening: number;
+  /** Limb darkening coefficient of the self-lit surface (issue #62), or null for none. */
+  limbU?: number | null;
 }
 
 /** Mira pulsation drawn over time (R7.5, Q-65): the period is data, the amplitude is art. */
@@ -334,4 +371,14 @@ export interface PlanContext {
    * plan, so the last stage (nothing held) is exactly the normal plan.
    */
   hold?: readonly string[];
+  /**
+   * The viewer's quality level (R5.7). Absent: not the low one. On `low` the asteroid's
+   * displacement is not drawn, so the plan refuses it with a reason instead of listing it (Q-117).
+   */
+  qualityTier?: 'high' | 'medium' | 'low';
+  /**
+   * D-27 slider overrides. Only the gas giant legend reads them (a slider sets the drawn band
+   * count or flattening, so the legend names it `artistic`). Absent: no slider is set.
+   */
+  overrides?: Overrides;
 }

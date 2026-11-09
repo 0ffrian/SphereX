@@ -5,6 +5,7 @@ import type { CometEpoch, ObjectType, Tag } from '@/contract';
 import { badgeForTag, HONESTY_LABEL, stateThatShows, type HonestyState } from './honesty';
 import { MODE_LABEL } from './modes';
 import { showsBody } from './planCommon';
+import { GAS_LAYER_IDS, gasHiddenText } from './renderers/shaderSpec';
 import type { RenderPlan, ViewModeId } from './planTypes';
 import { AT_AGE_MAX_PHRASE, formatLength, type ShownSize } from './scaleBar';
 
@@ -78,11 +79,14 @@ function colourBasis(plan: RenderPlan): string {
 export function nothingDrawnReason(plan: RenderPlan): { text: string; needs: HonestyState | null } {
   // The generated kinds: the layer itself is an artist's impression (R7.7).
   const layer = plan.shader
-    ? plan.missing.find((m) => m.id === 'surface' || m.id === 'point_cloud')
+    ? plan.missing.find((m) => ['surface', 'point_cloud', ...GAS_LAYER_IDS].includes(m.id))
     : undefined;
   if (layer?.reason === 'honesty' && layer.tag) {
     return {
-      text: "It is an artist's impression, so it is hidden at this level.",
+      text:
+        layer.tag === 'artistic'
+          ? "It is an artist's impression, so it is hidden at this level."
+          : 'It is estimated from rules and typical values, so it is hidden at this level.',
       needs: stateThatShows(layer.tag),
     };
   }
@@ -115,8 +119,14 @@ export function buildAltText(plan: RenderPlan, shown?: ShownSize | null): string
     // The generated kinds: the backend's own description, and what the viewer is honest about (R5.3).
     const alt = sentence(plan.shader.params.alt_text.trim());
     return plan.shader.surface
-      ? `${alt} This is an artist's impression, not a measured image.`
-      : `${plan.name}, ${type}, ${sizeText(plan, shown)}. A plain grey sphere: the surface is an artist's impression and is hidden at this level.`;
+      ? plan.shader.gas
+        ? `${alt} This is a generated model, not a measured image.`
+        : `${alt} This is an artist's impression, not a measured image.`
+      : `${plan.name}, ${type}, ${sizeText(plan, shown)}. A plain grey sphere: ${
+          plan.type === 'gas_giant'
+            ? gasHiddenText(plan.shader.params)
+            : "the surface is an artist's impression and is hidden at this level."
+        }`;
   }
   const phase =
     plan.lighting.phaseAngleDeg !== null

@@ -64,6 +64,8 @@ test('Stop keeps the frames shown so far; Continue fetches the rest', async ({ p
   await page.goto('/');
   await search(page, 'Synthetic progressive');
   await expect(headline(page)).toContainText('4 of 31 ready');
+  // The island grows into the panel in 0.6 s (issue #66), well inside a part's 1.2 s.
+  await expect(page.getByTestId('island')).toHaveAttribute('data-arrived', '');
 
   const stop = page.getByTestId('frames-stop');
   await stop.focus();

@@ -2,15 +2,16 @@
 // view alone; Flipbook and Spectrum open the object panel at that section; 3D viewer opens the
 // build pane (issue #60) with the current body already built. Haptics are not wired into the app
 // until M5, so there is no Haptics tool.
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useAppStore } from '@/state/store';
-import { Icon, type IconName } from './icons';
+import { RailIcon } from './railIcons';
 import { useShellStore, type ToolId } from './shellStore';
 
-const TOOLS: { id: ToolId; label: string; icon: IconName; hint: string }[] = [
-  { id: 'sky', label: 'Sky', icon: 'sky', hint: 'The sky view alone' },
-  { id: 'flipbook', label: 'Flipbook', icon: 'flipbook', hint: 'SPHEREx frames of the object' },
-  { id: 'spectrum', label: 'Spectrum', icon: 'spectrum', hint: 'Spectrum of the object' },
-  { id: 'viewer', label: '3D viewer', icon: 'viewer', hint: '3D view of a loaded body' },
+const TOOLS: { id: ToolId; label: string; hint: string }[] = [
+  { id: 'sky', label: 'Sky', hint: 'The sky view alone' },
+  { id: 'flipbook', label: 'Flipbook', hint: 'SPHEREx frames of the object' },
+  { id: 'spectrum', label: 'Spectrum', hint: 'Spectrum of the object' },
+  { id: 'viewer', label: '3D viewer', hint: '3D view of a loaded body' },
 ];
 
 /** Opens a tool (also from the selected object's card: "See fingerprint" is the spectrum). */
@@ -27,29 +28,62 @@ export function ToolRail() {
   const tool = useShellStore((s) => s.tool);
   const buildOpen = useShellStore((s) => s.build.open);
   const choose = openTool;
+  const innerRef = useRef<HTMLDivElement>(null);
+  const hlRef = useRef<HTMLDivElement>(null);
+
+  // Mock-up `.hl` (animate-ui "highlight"): one pill that slides to the hovered tool, and back to
+  // the active one. It is placed by the tool's own box, so the phone tab bar works too.
+  const moveHl = (btn: HTMLElement | null) => {
+    const hl = hlRef.current;
+    if (!hl) return;
+    if (!btn) {
+      hl.style.opacity = '0';
+      return;
+    }
+    hl.style.opacity = '1';
+    hl.style.width = `${btn.offsetWidth}px`;
+    hl.style.height = `${btn.offsetHeight}px`;
+    hl.style.transform = `translate(${btn.offsetLeft}px, ${btn.offsetTop}px)`;
+  };
+  const active = () =>
+    innerRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]') ?? null;
+  useLayoutEffect(() => moveHl(active()), [tool, buildOpen]);
+  useEffect(() => {
+    const on = () => moveHl(active());
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
+  }, []);
 
   return (
     <nav aria-label="Tools" className="sx-rail">
-      <ul className="m-0 flex list-none gap-1 p-0 sm:flex-col">
-        {TOOLS.map((t) => (
-          <li key={t.id}>
-            <button
-              type="button"
-              className="sx-tool"
-              aria-pressed={t.id === 'viewer' ? buildOpen : tool === t.id && !buildOpen}
-              aria-label={t.label}
-              aria-description={t.hint}
-              onClick={() => choose(t.id)}
-              data-testid={`tool-${t.id}`}
-            >
-              <Icon name={t.icon} />
-              <span className="sx-tool-tip" aria-hidden="true">
-                {t.label}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      <div
+        className="sx-rail-inner"
+        ref={innerRef}
+        onPointerOver={(e) => moveHl((e.target as HTMLElement).closest<HTMLElement>('.sx-tool'))}
+        onPointerLeave={() => moveHl(active())}
+      >
+        <div className="sx-hl" ref={hlRef} aria-hidden="true" />
+        <ul className="m-0 flex list-none gap-1 p-0 sm:flex-col">
+          {TOOLS.map((t) => (
+            <li key={t.id}>
+              <button
+                type="button"
+                className="sx-tool"
+                aria-pressed={t.id === 'viewer' ? buildOpen : tool === t.id && !buildOpen}
+                aria-label={t.label}
+                aria-description={t.hint}
+                onClick={() => choose(t.id)}
+                data-testid={`tool-${t.id}`}
+              >
+                <RailIcon id={t.id} />
+                <span className="sx-tool-tip" aria-hidden="true">
+                  {t.label}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
       <span className="sx-rail-label" aria-hidden="true">
         TOOLS
       </span>

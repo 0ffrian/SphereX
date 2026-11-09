@@ -1,7 +1,7 @@
 // Floating panel card (mock-up "Flipbook — Barnard's Star" island card): a titled, closable,
 // non-modal region over the sky. Escape (from inside the card) closes it and returns focus to the
 // tool button that opens it. On phone width it is a bottom sheet (index.css).
-import { useId, type KeyboardEvent, type ReactNode, type Ref } from 'react';
+import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode, type Ref } from 'react';
 import { Icon, type IconName } from './icons';
 
 export function PanelCard({
@@ -12,6 +12,8 @@ export function PanelCard({
   onClose,
   returnFocusTo,
   bodyRef,
+  rootRef,
+  pending = false,
   testId,
   children,
 }: {
@@ -23,10 +25,22 @@ export function PanelCard({
   /** CSS selector of the element that gets focus after Escape or the close button. */
   returnFocusTo: string;
   bodyRef?: Ref<HTMLDivElement>;
+  rootRef?: Ref<HTMLElement>;
+  /** The island is still on its way here (#66): the card is laid out, but not shown yet. */
+  pending?: boolean;
   testId: string;
   children: ReactNode;
 }) {
   const titleId = useId();
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  // Focus lost to <body> (the button that started the search, such as Try again, was unmounted
+  // while the island thought): bring it to the card's title once the card can take it (R9, WCAG
+  // 2.4.3). Focus anywhere else, say the search box, is left alone.
+  useEffect(() => {
+    if (pending) return;
+    const a = document.activeElement;
+    if (!a || a === document.body) titleRef.current?.focus({ preventScroll: true });
+  }, [pending]);
   const close = () => {
     onClose();
     // After React has removed the card.
@@ -40,8 +54,12 @@ export function PanelCard({
   return (
     <section
       aria-labelledby={titleId}
+      ref={rootRef}
       className={`sx-panel ${wide ? 'sx-panel-wide' : ''}`}
       onKeyDown={onKeyDown}
+      data-island={pending ? 'pending' : undefined}
+      // Laid out, so the island knows its box, but transparent and out of reach until it arrives.
+      inert={pending || undefined}
       data-testid={testId}
     >
       <header className="sx-panel-head">
@@ -52,7 +70,9 @@ export function PanelCard({
           <Icon name={icon} />
         </span>
         <div className="min-w-0">
-          <h2 id={titleId}>{title}</h2>
+          <h2 id={titleId} ref={titleRef} tabIndex={-1}>
+            {title}
+          </h2>
           {subtitle && (
             // A long name is cut with an ellipsis; the tooltip has it in full.
             <p className="truncate" title={typeof subtitle === 'string' ? subtitle : undefined}>

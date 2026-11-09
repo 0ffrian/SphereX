@@ -209,9 +209,33 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const fixture = useAppStore((s) => s.sky.fixture);
   const [announcement, setAnnouncement] = useState('');
 
+  // The viewer's quality level (R5.7): the plan lists a layer that level does not draw as refused
+  // (Q-117). Read when the viewer appears, then kept by the quality-change handler below.
+  // A change reported by the viewer wins; until then the level it started on.
+  const [tierChange, setTierChange] = useState<{
+    viewer: ViewerApp;
+    tier: NonNullable<PlanContext['qualityTier']>;
+  } | null>(null);
+  const startTier = viewer?.renderStats?.().tier;
+  const qualityTier: PlanContext['qualityTier'] =
+    tierChange && tierChange.viewer === viewer
+      ? tierChange.tier
+      : startTier === 'high' || startTier === 'medium' || startTier === 'low'
+        ? startTier
+        : undefined;
+
   const ctx: PlanContext = useMemo(
-    () => defaultContext({ honesty, mode: modeChoice, epoch, scrubIndex, failed }),
-    [honesty, modeChoice, epoch, scrubIndex, failed],
+    () =>
+      defaultContext({
+        honesty,
+        mode: modeChoice,
+        epoch,
+        scrubIndex,
+        failed,
+        overrides,
+        qualityTier,
+      }),
+    [honesty, modeChoice, epoch, scrubIndex, failed, overrides, qualityTier],
   );
   const plan = useMemo(
     () => (card && params ? planRender(card, params, ctx) : null),
@@ -287,7 +311,16 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             // The epoch the panel itself opens on (a comet: its latest epoch with gas data), so a
             // fixture card is drawn at its own epoch and not at the default one.
             const epoch = epochsWithQ(c).at(-1) ?? defaultContext().epoch;
-            const shown = planRender(c, p, defaultContext({ honesty, epoch, mode: mode ?? null }));
+            // The viewer's quality level, as the panel passes it (PR #63 nit), so a low-tier run
+            // lists the layers that level does not draw as refused (`quality`, Q-117).
+            const tier = created.renderStats?.().tier;
+            const qualityTier =
+              tier === 'high' || tier === 'medium' || tier === 'low' ? tier : undefined;
+            const shown = planRender(
+              c,
+              p,
+              defaultContext({ honesty, epoch, mode: mode ?? null, qualityTier }),
+            );
             created.showPlan(shown);
             return shown;
           };
@@ -337,6 +370,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   useEffect(() => {
     if (!viewer) return;
     viewer.setQualityChangeHandler((e) => {
+      setTierChange({ viewer, tier: e.to });
       if (!e.auto) return;
       setAnnouncement(QUALITY_DROP_ANNOUNCEMENT);
       setQualityLowered(true);

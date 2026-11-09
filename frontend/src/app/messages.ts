@@ -417,7 +417,7 @@ const LAYER_NAME: Readonly<Record<string, string>> = {
   gas_shells: 'Gas shells',
   dust: 'Dust cloud',
   tail: 'Tail',
-  colour: 'Star colour',
+  colour: 'Colour from the temperature',
   limb_darkening: 'Limb darkening',
   motion_trail: 'Motion trail',
   brightness_curve: 'Brightness from the light curve',
@@ -439,8 +439,10 @@ const LAYER_NAME: Readonly<Record<string, string>> = {
   glow: 'Glow around the edge',
   jets: 'Jets and bands',
   storms: 'Storms',
+  storm_drift: 'Storm drift',
   band_count: 'Number of bands',
   flattening: 'Flattening from the spin',
+  turbulence: 'Swirling detail',
   cloud_cover: 'Cloud cover from the light curve',
   clouds: 'Clouds',
   climate: 'Climate',
@@ -567,6 +569,8 @@ export function describeRefusal(item: MissingItem): string {
     }
     case 'mode':
       return `${name}: not shown in this view. ${item.detail ?? ''}`.trim();
+    case 'quality':
+      return `${name}: not drawn at this quality level. ${item.detail ?? ''}`.trim();
     case 'unverified':
       return `${name}: not drawn yet. ${item.detail ?? 'A value it needs is still being checked.'}`;
   }
