@@ -1,10 +1,8 @@
 // Typed local fixtures for issue #68 Track B (not shared/fixtures: Track A owns the card fields and
 // their fixtures). Values are the NASA Exoplanet Archive `pscomppars` read of 9 Nov 2026 recorded in
-// the issue; the cards are test inputs, not new claims. REMOVE the `PlanetCard` type with
-// cardFields.ts when Track A merges.
-import type { Tag, TVNumber } from '@/contract';
+// the issue; the cards are test inputs, not new claims.
+import type { ObjectCard, Tag, TVNumber } from '@/contract';
 import { R_EARTH_M, R_JUP_M } from './constants';
-import type { PlanetCard } from './cardFields';
 
 const tv = (value: number | null, tag: Tag, source: string): TVNumber => {
   const out: TVNumber = { value, tag, source };
@@ -14,7 +12,7 @@ const tv = (value: number | null, tag: Tag, source: string): TVNumber => {
 };
 const rearthToRjup = (r: number): number => (r * R_EARTH_M) / R_JUP_M;
 
-export function trappist1f(): PlanetCard {
+export function trappist1f(): ObjectCard {
   const a = 'Agol et al. 2021';
   return {
     id: 'test:trappist-1-f',
@@ -32,7 +30,7 @@ export function trappist1f(): PlanetCard {
   };
 }
 
-export function kepler186f(): PlanetCard {
+export function kepler186f(): ObjectCard {
   const a = 'Torres et al. 2015';
   return {
     id: 'test:kepler-186-f',

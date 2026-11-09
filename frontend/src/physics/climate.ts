@@ -1,9 +1,9 @@
 // Issue #68 Part 3c, A7.1: the climate scenario of a rocky or water planet, by deterministic rules
 // (Q-156). `climateScenario` is the pure table (first match wins); `deriveClimate` feeds it from a
 // card and adds the provenance. No LLM, no Math.random, no Date.
-import type { Tag } from '@/contract';
+import type { ObjectCard, Tag } from '@/contract';
 import { weakestTag } from '@/viewer/motion/motion';
-import { extraTv, readExtra, type PlanetCard } from './cardFields';
+import { InputReader } from './tagging';
 import { LAVA_START_K } from './constants';
 import {
   OCEANS_REMOVED_ABOVE_K,
@@ -78,7 +78,7 @@ export interface ClimateDerivation extends ClimateOutcome {
  * `teq_K`, with the caveat in `assumed`. `lava` and `hot_dry` always use the card's `teq_K`.
  */
 export function deriveClimate(
-  card: PlanetCard,
+  card: ObjectCard,
   kind: ClimateInputs['kind'],
 ): ClimateDerivation | null {
   const teqTv = card.teq_K;
@@ -99,9 +99,13 @@ export function deriveClimate(
       Object.assign(assumed, lock.assumed);
       tags.push(lock.tag);
       if (lock.locked) {
-        const teff = readExtra(card, 'host_teff_K');
-        const rad = readExtra(card, 'host_radius_rsun');
-        const orbit = readExtra(card, 'orbit_au');
+        const reader = new InputReader(card, {});
+        const teffIn = reader.readCard('host_teff_K');
+        const radIn = reader.readCard('host_radius_rsun');
+        const orbitIn = reader.readCard('orbit_au');
+        const teff = teffIn?.value ?? null;
+        const rad = radIn?.value ?? null;
+        const orbit = orbitIn?.value ?? null;
         const recomputed =
           teff !== null && rad !== null && orbit !== null
             ? equilibriumTempK(teff, rad, orbit, 0)
@@ -109,8 +113,7 @@ export function deriveClimate(
         if (recomputed !== null) {
           teqMapK = recomputed;
           teqMapSource = 'zero_albedo_recomputed';
-          for (const k of ['host_teff_K', 'host_radius_rsun', 'orbit_au'] as const)
-            tags.push(extraTv(card, k)!.tag);
+          tags.push(teffIn!.tag, radIn!.tag, orbitIn!.tag);
         } else {
           teqMapK = teqCardK;
           teqMapSource = 'card_teq_K';

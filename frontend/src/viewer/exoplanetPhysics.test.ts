@@ -4,7 +4,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ObjectCard, RenderParams } from '@/contract';
 import { kepler186f, trappist1f } from '@/physics/exoplanetFixtures.testutil';
-import type { PlanetCard } from '@/physics/cardFields';
 import { starlightColour } from '@/physics/starlight';
 import { derivePhysics } from '@/physics';
 import { fixture } from '@/test/sharedFixtures';
@@ -14,7 +13,7 @@ import { resolveShaderSpec } from './renderers/shaderSpec';
 import { fieldHash, generateField } from './fields/fieldGenerator';
 
 function pair(
-  card: PlanetCard,
+  card: ObjectCard,
   kind: 'planet_rocky' | 'planet_water' | 'gas_giant' = 'planet_rocky',
 ) {
   const f = fixture(kind);
@@ -22,7 +21,7 @@ function pair(
   const c = { ...card, type: kind } as ObjectCard;
   return { card: c, params };
 }
-const plan = (card: PlanetCard, honesty: 'measured' | 'derived' | 'artistic' = 'artistic') => {
+const plan = (card: ObjectCard, honesty: 'measured' | 'derived' | 'artistic' = 'artistic') => {
   const p = pair(card);
   return planRender(p.card, p.params, defaultContext({ honesty }));
 };
@@ -201,9 +200,9 @@ describe('derivePlanet reads mass_mearth from the card (Part 1, Q-58 b)', () => 
     expect(r.values.density_g_cm3!.value as number).toBeCloseTo((5.51 * 2) / 1.045 ** 3, 2);
   });
   it('without a card mass or a slider the outputs are refused as before', () => {
-    const c = base() as PlanetCard;
+    const c = base();
     delete c.mass_mearth;
-    expect(derivePhysics(c as ObjectCard).missing).toContain('density_g_cm3');
+    expect(derivePhysics(c).missing).toContain('density_g_cm3');
   });
 });
 

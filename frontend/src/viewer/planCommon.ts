@@ -59,6 +59,27 @@ export function ellipsoidAxes(ampMag: number | null): Vec3 {
   return [1, b, b];
 }
 
+/** The host-star and orbit fields an exoplanet card carries (issue #68 Part 1). */
+const EXOPLANET_FIELDS = [
+  'mass_mearth',
+  'orbit_au',
+  'orbital_period_d',
+  'host_teff_K',
+  'host_radius_rsun',
+  'host_mass_msun',
+  'host_age_gyr',
+] as const satisfies readonly (keyof ObjectCard)[];
+
+/**
+ * True when the card carries any of the exoplanet fields, even as `value: null` with a reason. A
+ * solar-system body has none of them, so its layers are neither drawn nor listed as missing
+ * (solar-system bodies stay unchanged). ASSUMPTION: the pipeline writes a missing value as
+ * `value: null` (Part 1), not by omitting the key.
+ */
+export function isExoplanetCard(card: ObjectCard): boolean {
+  return EXOPLANET_FIELDS.some((k) => card[k] !== undefined);
+}
+
 export type SizeField = 'diameter_km' | 'radius_rjup' | 'radius_rsun' | 'nucleus_radius_km_max';
 
 export class PlanBuilder {

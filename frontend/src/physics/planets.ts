@@ -13,7 +13,6 @@ import {
   R_SUN_M,
 } from './constants';
 import type { Overrides } from '@/viewer/sliders';
-import { extraTv, readExtra } from './cardFields';
 import {
   asInput,
   inputAsValue,
@@ -207,16 +206,6 @@ export interface PlanetInputs {
   mass: PhysicsInput | null;
 }
 
-/** `mass_mearth` on the card as an input, or null. TEMPORARY: see cardFields.ts (Track A adds it to ObjectCard). */
-function cardMass(card: ObjectCard): PhysicsInput | null {
-  const value = readExtra(card, 'mass_mearth');
-  const tv = extraTv(card, 'mass_mearth');
-  if (value === null || !tv) return null;
-  const input: PhysicsInput = { name: 'mass_mearth', value, from: 'card', tag: tv.tag };
-  if (tv.assumption) input.assumption = tv.assumption;
-  return input;
-}
-
 /** Shared with gasGiants.ts; returns the resolved radius and mass so they are read once. */
 export function derivePlanetInto(
   card: ObjectCard,
@@ -226,7 +215,7 @@ export function derivePlanetInto(
   const teq = readTeq(r, out);
   const radius = r.read('radius_rjup', 'radius_rjup');
   // A slider wins (and is `artistic`, Q-58 b); else the card's `mass_mearth` with its own tag.
-  const mass = r.read('mass_mearth') ?? cardMass(card);
+  const mass = r.read('mass_mearth', 'mass_mearth');
 
   const body = need({ mass_mearth: mass, radius_rjup: radius });
   if (body.ok) {

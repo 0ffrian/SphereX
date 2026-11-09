@@ -11,12 +11,17 @@
 //   - nebula and nova have no plain sphere, so nothing is drawn while the cloud is hidden;
 //   - missing data refuses the layer; nothing is invented (R1 principle 3).
 import type { Layer, RenderParams } from '@/contract';
-import { isExoplanetCard, readExtra, type PlanetCard } from '@/physics/cardFields';
 import { deriveLocking } from '@/physics/tides';
 import { STARLIGHT_FORMULA } from '@/physics/starlight';
 import { isTagShown } from '../honesty';
 import { sliderValue } from '../sliders';
-import { missingFields, PlanBuilder, type PlanInput } from '../planCommon';
+import {
+  isExoplanetCard,
+  missingFields,
+  numberField,
+  PlanBuilder,
+  type PlanInput,
+} from '../planCommon';
 import type { RenderPlan } from '../planTypes';
 import { processOf, resolveMotion, TIER_OF_TAG, weakestTag } from '../motion/motion';
 import { listMotion, offerLayer, spinPlanOf, viewerLayer } from '../motion/planMotion';
@@ -257,7 +262,7 @@ export function planShaderKind(input: PlanInput): RenderPlan {
   // is then white. Solar-system bodies carry none of the host fields and are left as they were.
   let lighting = b.lighting;
   if (lighting.colour !== null || (hasPlain && isExoplanetCard(card))) {
-    const teff = lighting.colourTeffK ?? readExtra(card, 'host_teff_K');
+    const teff = lighting.colourTeffK ?? numberField(card, 'host_teff_K');
     const lit =
       spec.drawable &&
       (offerLayer(
@@ -296,7 +301,7 @@ export function planShaderKind(input: PlanInput): RenderPlan {
   // Issue #68 Part 3 (Q-155): a locking rule that was refused says why; nothing is invented.
   const scenario = spec.planet?.scenario ?? null;
   if (scenario === 'temperate' || scenario === 'eyeball' || scenario === 'snowball') {
-    const lock = deriveLocking(card as PlanetCard);
+    const lock = deriveLocking(card);
     if (!lock.ok && !params.missing.includes('tidal_locking'))
       b.refuse({ id: 'tidal_locking', reason: 'data', fields: lock.needs });
   }
