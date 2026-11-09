@@ -396,21 +396,34 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     const shell = useShellStore.getState();
     if (key.startsWith('t:')) {
       const m = targets.markers.find((x) => `t:${x.name}` === key);
-      if (m && resolved?.id !== m.id) pickTarget(m);
+      if (m && resolved?.id !== m.id) pickTarget(m, true);
     } else if (key.startsWith('c:')) {
       const c = cached.find((x) => `c:${x.id}` === key);
-      if (c && resolved?.id !== c.id) pickCached(c);
+      if (c && resolved?.id !== c.id) pickCached(c, true);
     }
     shell.requestCard();
   };
 
-  const pickTarget = (m: TargetMarker) => {
+  /**
+   * A left click on a marker opens the object, as the sky view always has (#49); a right-click or
+   * long press (`withCard`) selects it and shows its card instead (issue #64). Set before the
+   * search, which reads it (App `useOpenPanelOnSearch`).
+   */
+  const askForCard = (withCard: boolean) => {
+    const shell = useShellStore.getState();
+    if (withCard) shell.requestCard();
+    else shell.cancelCard();
+  };
+
+  const pickTarget = (m: TargetMarker, withCard = false) => {
     setPicked(null);
+    askForCard(withCard);
     void search({ q: m.name, kind: 'name', origin: 'sky' });
   };
 
-  const pickCached = (c: SkyCachedObject) => {
+  const pickCached = (c: SkyCachedObject, withCard = false) => {
     setPicked(null);
+    askForCard(withCard);
     void search(cachedMarkerQuery(c));
   };
 
@@ -688,7 +701,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
               type="button"
               className={`sx-marker pointer-events-auto ${resolved?.id === m.id ? 'is-selected' : ''}`}
               onClick={() => pickTarget(m)}
-              aria-label={`${m.name} on the sky: select it`}
+              aria-label={`${m.name} on the sky: open it`}
               data-testid="sky-marker"
               data-target-id={m.id}
             >

@@ -68,8 +68,6 @@ export interface Selection {
   id: string;
   name: string;
   moving: boolean;
-  /** The search came from the sky (a marker), not from typing. */
-  fromSky: boolean;
 }
 
 /** The selected object: the resolved search by name (a marker click or a typed name). */
@@ -81,7 +79,6 @@ export function useSelection(): Selection | null {
     id: resolved.id,
     name: resolved.name ?? query.q,
     moving: resolved.moving,
-    fromSky: query.origin === 'sky',
   };
 }
 
@@ -93,8 +90,8 @@ export function typeLabel(type: ObjectType | null | undefined): string | null {
 }
 
 /**
- * Keeps the body in step with the selection: a marker click loads it at once (so the card can
- * name its type); a typed search loads it only when the build pane opens. A new object drops the
+ * Keeps the body in step with the selection: it loads when the card is asked for (so the card can
+ * name its type) or when the build pane opens, not on every marker click (issue #64). A new object drops the
  * old body.
  */
 export function useSelectedBodyLoader(): void {
@@ -103,10 +100,10 @@ export function useSelectedBodyLoader(): void {
   // that failed for a transient reason (loadBodyFor ignores everything else).
   const resolved = useAppStore((s) => s.sky.resolved);
   const buildOpen = useShellStore((s) => s.build.open);
+  const cardShown = useShellStore((s) => s.cardRequested);
   const id = selection?.id ?? null;
-  const fromSky = selection?.fromSky ?? false;
   useEffect(() => {
     if (!id) return;
-    if (fromSky || buildOpen) loadBodyFor(id);
-  }, [id, fromSky, buildOpen, resolved]);
+    if (cardShown || buildOpen) loadBodyFor(id);
+  }, [id, cardShown, buildOpen, resolved]);
 }

@@ -28,9 +28,9 @@ import { SelectedCard } from './build/SelectedCard';
 import { useSelectedBodyLoader } from './build/selectedBody';
 
 /**
- * A new search opens the object panel (unless it is already open at the spectrum). A marker click
- * (a search by name from the sky) does not: it selects the object, and its card offers the
- * fingerprint and the build (issue #60).
+ * A new search opens the object panel (unless it is already open at the spectrum), a marker click
+ * included (#49). A right-click or long press on the sky asks for the selected object's card
+ * instead, which offers the fingerprint and the build (issues #60, #64).
  */
 function useOpenPanelOnSearch(): void {
   useEffect(() => {
@@ -39,10 +39,7 @@ function useOpenPanelOnSearch(): void {
       // A typed search or a link starts without a card; a click on the sky is cleared where it is
       // made (SkyPane), so a right-click that selects and asks for the card is not undone here.
       if (q.origin !== 'sky') shell.cancelCard();
-      if (q.origin === 'sky' && q.kind === 'name') {
-        if (shell.tool === 'flipbook' || shell.tool === 'spectrum') shell.setTool('sky');
-        return;
-      }
+      if (q.origin === 'sky' && shell.cardRequested) return;
       // The build pane keeps the view while a link or Back changes the object under it.
       if (shell.build.open) return;
       if (shell.tool !== 'flipbook' && shell.tool !== 'spectrum') shell.setTool('flipbook');

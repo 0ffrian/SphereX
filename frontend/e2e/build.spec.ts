@@ -1,4 +1,5 @@
 // Issue #60 on the SYNTHETIC fixtures: select a body on the sky (brackets and the top-centre card),
+// asked for with a right-click (issue #64: a left click opens the object, as the sky view does),
 // Build it (the split view moulds it step by step), and close it again (Escape, ×, Back). The
 // final frame of a build is the normal render of the same plan and seed: compared by SSIM with the
 // body opened from the rail's 3D viewer (built at once) at the same honesty level and pose.
@@ -14,7 +15,7 @@ async function skyReady(page: Page): Promise<void> {
   await page.waitForFunction(() => '__sxSky' in globalThis);
 }
 
-/** Looks at Aqua Prime and clicks its marker. */
+/** Looks at Aqua Prime and right-clicks its marker (selects it and shows its card). */
 async function selectAquaPrime(page: Page): Promise<void> {
   await page.goto('/');
   await skyReady(page);
@@ -27,7 +28,7 @@ async function selectAquaPrime(page: Page): Promise<void> {
   );
   const marker = page.locator('[data-testid="sky-cached-marker"][data-object-id="aqua-prime"]');
   await expect(marker).toBeVisible({ timeout: 15_000 });
-  await marker.click();
+  await marker.click({ button: 'right' });
 }
 
 async function setHonesty(page: Page, label: RegExp): Promise<void> {
@@ -37,7 +38,33 @@ async function setHonesty(page: Page, label: RegExp): Promise<void> {
     .click();
 }
 
-test('a marker selects: brackets, name and the card; no flipbook', async ({ page }) => {
+test('a left click on a marker opens it (#49); brackets, but no card', async ({ page }) => {
+  await page.goto('/');
+  await skyReady(page);
+  await page.evaluate(() =>
+    (globalThis as unknown as { __sxSky: { setView(v: object): void } }).__sxSky.setView({
+      ra: 38,
+      dec: -12,
+      fovDeg: 30,
+    }),
+  );
+  const marker = page.locator('[data-testid="sky-cached-marker"][data-object-id="aqua-prime"]');
+  await expect(marker).toBeVisible({ timeout: 15_000 });
+  await marker.click();
+  await expect(page.getByTestId('object-name')).toHaveText('Aqua Prime');
+  await expect(page.getByTestId('sky-selected-name')).toHaveText('Aqua Prime');
+  await expect(page.getByTestId('selected-card')).toHaveCount(0);
+  // Closing the panel shows the sky, not the card.
+  await page
+    .getByTestId('object-panel')
+    .getByRole('button', { name: /^Close/ })
+    .click();
+  await expect(page.getByTestId('object-panel')).toHaveCount(0);
+  await expect(page.getByTestId('sky-selected')).toBeAttached();
+  await expect(page.getByTestId('selected-card')).toHaveCount(0);
+});
+
+test('a right-click selects: brackets, name and the card; no flipbook', async ({ page }) => {
   await selectAquaPrime(page);
   await expect(page.getByTestId('sky-selected')).toBeAttached();
   await expect(page.getByTestId('sky-selected-name')).toHaveText('Aqua Prime');
@@ -47,7 +74,7 @@ test('a marker selects: brackets, name and the card; no flipbook', async ({ page
   await expect(card.getByRole('button', { name: 'See fingerprint' })).toBeVisible();
   await expect(card.getByRole('button', { name: 'Build it' })).toBeVisible();
   await expect(page.getByTestId('object-panel')).toHaveCount(0);
-  // Escape right after the click (focus is still on the marker) deselects: the card, the brackets
+  // Escape right after the right-click deselects: the card, the brackets
   // and the object in the link go, and focus stays on the marker.
   await page.keyboard.press('Escape');
   await expect(card).toHaveCount(0);
@@ -58,7 +85,9 @@ test('a marker selects: brackets, name and the card; no flipbook', async ({ page
   ).toBeFocused();
 });
 
-test('x deselects, and clicking the same marker again brings the card back', async ({ page }) => {
+test('x deselects, and right-clicking the same marker again brings the card back', async ({
+  page,
+}) => {
   await selectAquaPrime(page);
   const card = page.getByTestId('selected-card');
   await expect(card).toBeVisible();
@@ -67,7 +96,7 @@ test('x deselects, and clicking the same marker again brings the card back', asy
   await expect(page.getByTestId('sky-selected')).toHaveCount(0);
   const marker = page.locator('[data-testid="sky-cached-marker"][data-object-id="aqua-prime"]');
   await expect(marker).toBeFocused();
-  await marker.click();
+  await marker.click({ button: 'right' });
   await expect(card).toBeVisible();
   await expect(card.getByTestId('selected-name')).toHaveText('Aqua Prime');
   await expect(page.getByTestId('sky-selected')).toBeAttached();
@@ -240,7 +269,9 @@ test('a marker without a 3D model: the pane says so, nothing is drawn', async ({
       fovDeg: 30,
     }),
   );
-  await page.getByRole('button', { name: 'RW Aurigae on the sky: select it' }).click();
+  await page
+    .getByRole('button', { name: 'RW Aurigae on the sky: open it' })
+    .click({ button: 'right' });
   await page.getByTestId('build-it').click();
   await expect(page.getByTestId('build-message')).toContainText(
     'There is no 3D model of RW Aurigae to build.',
@@ -329,6 +360,8 @@ test('phone width: the sheet reaches the search bar and the sky under it is iner
 });
 
 test('Back returns focus to the marker; × leaves no extra Back step', async ({ page }) => {
+  // Two builds on SwiftShader: about 20 s alone on CI, over the 30 s default under load.
+  test.setTimeout(90_000);
   await selectAquaPrime(page);
   const marker = page.locator('[data-testid="sky-cached-marker"][data-object-id="aqua-prime"]');
   await page.getByTestId('build-it').click();
