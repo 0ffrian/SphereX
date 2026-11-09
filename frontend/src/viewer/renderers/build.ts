@@ -666,6 +666,7 @@ export function buildScene(
     shaderBody = ShaderBody.start(plan.shader.card, plan.shader.params, {
       visibleTags: allowedTags(plan.honesty),
       lightDir: plan.lighting.direction ?? undefined,
+      lightColour: plan.lighting.colour ?? undefined,
       tier,
       onChange: () => {
         if (!disposed) hooks.onChange();
@@ -773,6 +774,7 @@ export function buildScene(
       if (next.jets) cover = next.jets.cover;
       spinPlan = next.spin;
       if (!shaderBody || disposed) return;
+      shaderBody.setSunColour(next.lighting.colour);
       if (next.lighting.direction) shaderBody.setSunDirection(next.lighting.direction);
       shaderBody.setVisibleTags(allowedTags(next.honesty));
       // The plan's switches carry the honesty level and the build step's holds (issue #62).

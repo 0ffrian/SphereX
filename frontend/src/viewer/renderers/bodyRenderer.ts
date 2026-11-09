@@ -44,6 +44,8 @@ export interface BodyContext {
   visibleTags?: readonly Tag[];
   /** Unit vector toward the light, in world space. The viewer owns lighting; the body only uses it. */
   lightDir?: Vec3;
+  /** Colour of the star's light, linear sRGB at unit luminance (issue #68 Part 2); omitted: white. */
+  lightColour?: Vec3;
   /** Called after anything visible changed (tags, rebuild), so a render-on-change viewer redraws. */
   onChange?: () => void;
   /** The generated layer could not be built (the field failed): the plan refuses it with reason `load`. */

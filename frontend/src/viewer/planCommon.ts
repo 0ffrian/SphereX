@@ -388,7 +388,8 @@ export class PlanBuilder {
 /** True when the plan puts something on screen: a body, or a generated body with a part shown. */
 export function showsBody(plan: RenderPlan): boolean {
   return (
-    plan.bodies.length > 0 || (plan.shader !== null && (plan.shader.surface || plan.shader.plain))
+    plan.bodies.length > 0 ||
+    (plan.shader !== null && (plan.shader.surface || plan.shader.pattern || plan.shader.plain))
   );
 }
 

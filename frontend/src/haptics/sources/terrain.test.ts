@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { RecordingSink, sampleUV } from '@/test/hapticRecorder';
-import { FieldSampler, type FieldData } from '@/viewer/fields/fieldGenerator';
+import { RecordingSink, sampleAt, sampleUV } from '@/test/hapticRecorder';
+import {
+  FieldSampler,
+  fieldHash,
+  generateField,
+  type FieldData,
+  type FieldParams,
+} from '@/viewer/fields/fieldGenerator';
 import {
   ICE_TICK_SPACING_PX,
+  MASK_THRESHOLD,
   OCEAN_SWELL_HZ,
   OCEAN_SWELL_MAX_HZ,
   OCEAN_SWELL_MIN_HZ,
@@ -170,5 +177,88 @@ describe('TerrainSource: a relief tick and an ice tick in one sample (review m2)
     for (let c = 17; c <= 23; c += 0.25) src.move(sampleUV(uc(c), 0.5, { x: c * 32 }));
     const strong = sink.ticks().filter((t) => t.strength > STRENGTH_SOFT);
     expect(strong).toHaveLength(1);
+  });
+});
+
+describe('TerrainSource on a substellar (eyeball) field (issue #68 Part 3f)', () => {
+  // Bare rock, no sea: the ice edge is the only zone change along the path. iceAngleRad 0.9 is
+  // the TRAPPIST-1 f value.
+  const params: FieldParams = {
+    kind: 'terrain',
+    seed: 7,
+    freq: 2.5,
+    seaLevel: 0,
+    iceExtent: 0,
+    heat: 0,
+    substellar: true,
+    iceAngleRad: 0.9,
+    bands: 0,
+    turbulence: 0,
+    storms: 0,
+  };
+  const FW = 256;
+  const FH = 128;
+  const STEP_RAD = 0.005;
+  const PX_PER_STEP = 2;
+
+  /** Walks the equator from +X (the star-facing point) to 2 rad away, on the generated field. */
+  function walk(data: FieldData) {
+    const sampler = new FieldSampler(data);
+    const sink = new RecordingSink();
+    const src = new TerrainSource(sink, sampler, 'artistic');
+    const iceMask: number[] = [];
+    const eventAtStep: number[] = [];
+    const steps = Math.round(2 / STEP_RAD);
+    for (let i = 0; i <= steps; i++) {
+      const th = i * STEP_RAD;
+      const s = sampleAt([Math.cos(th), 0, Math.sin(th)], { x: i * PX_PER_STEP });
+      iceMask.push(sampler.sampleUV(s.u, s.v).ice);
+      const before = sink.events.length;
+      src.move(s);
+      eventAtStep.push(sink.events.length - before);
+    }
+    return { sink, iceMask, eventAtStep };
+  }
+
+  it('feels the ice edge where the generated ice mask says, and is deterministic', () => {
+    const data = generateField(params, FW, FH);
+    const { sink, iceMask, eventAtStep } = walk(data);
+
+    // The edge in the mask: the first step at or above the threshold.
+    const edge = iceMask.findIndex((m) => m >= MASK_THRESHOLD);
+    expect(edge).toBeGreaterThan(0); // the cap is open at +X, so ice starts later
+    // About 0.9 rad from +X, within the seeded wobble and soft edge (0.2 rad, artistic).
+    expect(edge * STEP_RAD).toBeGreaterThan(0.9 - 0.45);
+    expect(edge * STEP_RAD).toBeLessThan(0.9 + 0.45);
+    // Past the edge the mask stays ice for the rest of this path.
+    expect(iceMask.slice(edge).every((m) => m >= MASK_THRESHOLD)).toBe(true);
+
+    // Open cap: no ice-texture ticks at all. Ice: dense soft ticks, one per ICE_TICK_SPACING_PX.
+    const iceEvents = eventAtStep.slice(edge).reduce((a, n) => a + n, 0);
+    const capEvents = eventAtStep.slice(0, edge).reduce((a, n) => a + n, 0);
+    const expectedIce = Math.floor(
+      ((iceMask.length - 1 - edge) * PX_PER_STEP) / ICE_TICK_SPACING_PX,
+    );
+    expect(iceEvents).toBeGreaterThan(expectedIce * 0.8);
+    // The output changes at the edge: first soft tick lands within one spacing of it.
+    const firstSoft = sink.events.findIndex((e) => e.strength === STRENGTH_SOFT);
+    expect(firstSoft).toBeGreaterThanOrEqual(0);
+    let seen = 0;
+    let softStep = -1;
+    for (let i = 0; i < eventAtStep.length && softStep < 0; i++) {
+      seen += eventAtStep[i]!;
+      if (seen > firstSoft) softStep = i;
+    }
+    expect(softStep).toBeGreaterThanOrEqual(edge);
+    expect(softStep - edge).toBeLessThanOrEqual(Math.ceil(ICE_TICK_SPACING_PX / PX_PER_STEP) + 1);
+    // Density on ice is far above the cap's (relief ticks only).
+    expect(iceEvents / (iceMask.length - edge)).toBeGreaterThan(
+      4 * (capEvents / Math.max(1, edge)),
+    );
+
+    // Same seed, same field, same haptic output.
+    const again = generateField(params, FW, FH);
+    expect(fieldHash(again)).toBe(fieldHash(data));
+    expect(walk(again).sink.events).toEqual(sink.events);
   });
 });

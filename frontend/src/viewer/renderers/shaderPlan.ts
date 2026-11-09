@@ -11,6 +11,9 @@
 //   - nebula and nova have no plain sphere, so nothing is drawn while the cloud is hidden;
 //   - missing data refuses the layer; nothing is invented (R1 principle 3).
 import type { Layer, RenderParams } from '@/contract';
+import { isExoplanetCard, readExtra, type PlanetCard } from '@/physics/cardFields';
+import { deriveLocking } from '@/physics/tides';
+import { STARLIGHT_FORMULA } from '@/physics/starlight';
 import { isTagShown } from '../honesty';
 import { sliderValue } from '../sliders';
 import { missingFields, PlanBuilder, type PlanInput } from '../planCommon';
@@ -249,7 +252,62 @@ export function planShaderKind(input: PlanInput): RenderPlan {
     }
   }
 
-  const plain = hasPlain && spec.drawable && !surface && sizeShown;
+  // Issue #68 Part 2 (Q-157): the light takes the host star's colour, as the layer `starlight`.
+  // Drawn from "+ Estimated"; refused with the missing field when `host_teff_K` is absent; the light
+  // is then white. Solar-system bodies carry none of the host fields and are left as they were.
+  let lighting = b.lighting;
+  if (lighting.colour !== null || (hasPlain && isExoplanetCard(card))) {
+    const teff = lighting.colourTeffK ?? readExtra(card, 'host_teff_K');
+    const lit =
+      spec.drawable &&
+      (offerLayer(
+        b,
+        viewerLayer(
+          'starlight',
+          lighting.colourTag ?? 'derived',
+          `Light coloured like the host star (${teff === null ? 'temperature unknown' : `${Math.round(teff)} K`}). No white balance: a cool star really lights its planet orange-red.`,
+          {
+            requires: ['host_teff_K'],
+            formula: STARLIGHT_FORMULA,
+            assumed: { star_spectrum: 'a blackbody at the effective temperature' },
+          },
+        ),
+      ),
+      b.draw('starlight'));
+    if (!lit) lighting = { ...lighting, colour: null, colourTag: null, colourTeffK: null };
+  }
+
+  // Issue #68 Part 3 (Q-156): with the artistic terrain hidden, a locked planet (eyeball or snowball)
+  // still shows the field's ocean and ice masks on a smooth sphere, tagged by the climate layer's
+  // own tag (model_dependent, so from + Estimated). Hidden at Measured only: a plain sphere.
+  let pattern = false;
+  const patternClimate = spec.planet?.climate;
+  if (!surface && spec.drawable && spec.planet?.patternTag != null && patternClimate) {
+    offerLayer(
+      b,
+      viewerLayer('climate', patternClimate.tag, patternClimate.basis, {
+        formula: patternClimate.formula,
+        assumed: patternClimate.assumed,
+      }),
+    );
+    pattern = b.draw('climate');
+  }
+
+  // Issue #68 Part 3 (Q-155): a locking rule that was refused says why; nothing is invented.
+  const scenario = spec.planet?.scenario ?? null;
+  if (scenario === 'temperate' || scenario === 'eyeball' || scenario === 'snowball') {
+    const lock = deriveLocking(card as PlanetCard);
+    if (!lock.ok && !params.missing.includes('tidal_locking'))
+      b.refuse({ id: 'tidal_locking', reason: 'data', fields: lock.needs });
+  }
+  const lockedPose = (surface || pattern) && spec.field?.substellar === true;
+  if (lockedPose) {
+    b.notes.push(
+      'Modelled as tidally locked: one side always faces its star, so the planet does not turn against the light in this view.',
+    );
+  }
+
+  const plain = hasPlain && spec.drawable && !surface && !pattern && sizeShown;
   if (plain) {
     b.notes.push(plainSphereNote(spec.kind, params));
     b.legendBody('Plain grey sphere at the size on the card.');
@@ -264,7 +322,7 @@ export function planShaderKind(input: PlanInput): RenderPlan {
   return b.build({
     // The size is the only number on the card the viewer shows; it is not shown for a body that
     // is not on screen (A11: no unlabelled number).
-    sizeTag: sizeShown && (surface || plain) ? b.sizeTag : null,
+    sizeTag: sizeShown && (surface || pattern || plain) ? b.sizeTag : null,
     shader: spec.drawable
       ? {
           card,
@@ -280,6 +338,7 @@ export function planShaderKind(input: PlanInput): RenderPlan {
             motion,
           ]),
           surface,
+          pattern,
           gas,
           plain,
           distance: shaderDistance(spec),
@@ -287,6 +346,11 @@ export function planShaderKind(input: PlanInput): RenderPlan {
       : null,
     relief: 'illustrative',
     motion,
-    spin: surface && spec.kind !== 'nebula' && spec.kind !== 'nova' ? spinPlanOf(motion) : null,
+    lighting,
+    // A locked planet keeps its star-facing side toward the light: no spin against it (Part 3e).
+    spin:
+      surface && !lockedPose && spec.kind !== 'nebula' && spec.kind !== 'nova'
+        ? spinPlanOf(motion)
+        : null,
   });
 }

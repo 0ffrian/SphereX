@@ -11,6 +11,8 @@ import {
   spinRateRadS,
 } from '@/physics/gasGiants';
 import { OCEANS_REMOVED_ABOVE_K, POLAR_ICE_BELOW_K } from '@/physics/planets';
+import { deriveClimate, type ClimateDerivation, type Scenario } from '@/physics/climate';
+import { isExoplanetCard, type PlanetCard } from '@/physics/cardFields';
 import { R_JUP_M } from '@/physics/constants';
 import { STILL_MOTION, TIER_OF_TAG, weakestTag, type Motion } from '../motion/motion';
 import type { FieldParams } from '../fields/fieldGenerator';
@@ -151,6 +153,16 @@ export interface PlanetStyle {
   atmosphereColour: Rgb;
   /** Teq thresholds of A7.1 that set ice and ocean (null: no teq_K on the card, defaults drawn). */
   climate: RuleChoice | null;
+  /**
+   * Issue #68 Part 3: the climate scenario, or null when the card has no host-star fields or no
+   * `teq_K` (solar-system bodies and old cards: the polar-ice rule, unchanged).
+   */
+  scenario: Scenario | null;
+  /**
+   * Tag of the climate pattern (the ocean and ice masks of a locked planet) when it can be drawn on
+   * its own, without the artistic terrain: set for `eyeball` and `snowball`, else null.
+   */
+  patternTag: Tag | null;
 }
 
 export interface GasStyle {
@@ -314,7 +326,11 @@ export function resolveShaderSpec(
   }
 
   const d = PLANET_DEFAULTS[kind];
-  const climate = climateFromTeq(card, d);
+  const baseClimate = climateFromTeq(card, d);
+  // Issue #68: only a card that carries the host-star fields (Track A) is tested for locking.
+  const derived = isExoplanetCard(card) ? deriveClimate(card as PlanetCard, kind) : null;
+  const substellar = derived?.scenario === 'eyeball' || derived?.scenario === 'snowball';
+  const climate = { ...baseClimate, rule: scenarioRule(baseClimate.rule, derived, kind) };
   // N9: lava cracks glow only when teq_K says the surface is hot (>= ~700 K, A7.1). No teq_K, no
   // glow. A slider override still wins: it is the visitor's own artistic choice (D-26).
   const heat = kind === 'planet_rocky' ? lavaHeatFromTeq(cardValue(card, 'teq_K')) : d.heat;
@@ -326,6 +342,8 @@ export function resolveShaderSpec(
       seaLevel: sv('sea_level') ?? climate.sea,
       iceExtent: sv('ice') ?? climate.ice,
       heat: sv('lava_heat') ?? heat,
+      // Locked planet: ice and ocean by the angle from the star-facing point (fieldGenerator).
+      ...(substellar ? { substellar: true, iceAngleRad: derived!.iceAngleRad ?? 0 } : {}),
       bands: 0,
       turbulence: 0,
       storms: 0,
@@ -337,8 +355,62 @@ export function resolveShaderSpec(
       atmosphere: sv('atmosphere') ?? d.atmo,
       atmosphereColour: kind === 'planet_water' ? ATMOSPHERE_WATER : ATMOSPHERE_ROCKY,
       climate: climate.rule,
+      scenario: derived?.scenario ?? null,
+      patternTag: substellar ? (climate.rule?.tag ?? null) : null,
     },
   });
+}
+
+const deg = (rad: number): number => Math.round((rad * 180) / Math.PI);
+
+/**
+ * Issue #68 Part 3c (Q-156): what the `climate` layer says once the planet was tested for locking.
+ * Eyeball and snowball replace the polar-ice rule; a temperate planet keeps it but is weakened to
+ * the locking tag (the verdict "not locked" is itself model-dependent) and says so; lava and
+ * hot_dry, and a planet whose locking rule was refused, keep the rule as it was. Never stronger than
+ * its inputs and always `model_dependent` or weaker once the locking rule ran.
+ */
+function scenarioRule(
+  base: RuleChoice | null,
+  d: ClimateDerivation | null,
+  kind: 'planet_rocky' | 'planet_water',
+): RuleChoice | null {
+  if (!d || !base || !d.lock || !d.lock.ok) return base;
+  const tag = weakestTag([base.tag, d.tag]);
+  const lock = d.lock;
+  const lockText = `locking time ${lock.tLockGyr.toPrecision(3)} Gyr against an age of ${lock.ageGyr} Gyr`;
+  if (d.scenario === 'eyeball' && d.tssK !== null && d.iceAngleRad !== null) {
+    const surface = kind === 'planet_water' ? 'open water' : 'bare ground';
+    return {
+      value: d.tssK,
+      tag,
+      tier: TIER_OF_TAG[tag],
+      formula: d.formula,
+      assumed: d.assumed,
+      basis: `Eyeball: ${surface} within ${deg(d.iceAngleRad)}° of the star-facing point, ice beyond it and over the night side (${lockText}; ${Math.round(d.tssK)} K at the star-facing point; no heat spread, no greenhouse)`,
+    };
+  }
+  if (d.scenario === 'snowball' && d.tssK !== null) {
+    return {
+      value: d.tssK,
+      tag,
+      tier: TIER_OF_TAG[tag],
+      formula: d.formula,
+      assumed: d.assumed,
+      basis: `Snowball: ice over the whole surface${kind === 'planet_rocky' ? ', with a little high rock showing' : ''} (${lockText}; only ${Math.round(d.tssK)} K at the star-facing point; no heat spread, no greenhouse)`,
+    };
+  }
+  if (d.scenario === 'temperate') {
+    return {
+      ...base,
+      tag,
+      tier: TIER_OF_TAG[tag],
+      formula: `${base.formula}; locked if t_lock < age`,
+      assumed: d.assumed,
+      basis: `${base.basis}. Not tidally locked (${lockText}), so the ice follows the equilibrium temperature`,
+    };
+  }
+  return base;
 }
 
 /**

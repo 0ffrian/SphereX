@@ -4,6 +4,12 @@
 import { AmbientLight, DirectionalLight, type Object3D } from 'three/webgpu';
 import type { ObjectCard, RenderParams, Tag } from '@/contract';
 import type { ShadowSettings } from './shape/shapeModel';
+import { extraTv, readExtra } from '@/physics/cardFields';
+import { starlightColour } from '@/physics/starlight';
+import { weakestTag } from './motion/motion';
+
+/** Planet kinds whose light takes the colour of the host star (issue #68 Part 2). Solar-system bodies stay white. */
+const STARLIT_TYPES: ReadonlySet<string> = new Set(['planet_rocky', 'planet_water', 'gas_giant']);
 
 /**
  * R5.1: "A tiny ambient light (intensity ≤ 0.03) keeps the night side legible."
@@ -44,6 +50,34 @@ export interface LightingPlan {
   tag: Tag;
   source: 'phase_angle' | 'sun_dir' | 'view' | 'self';
   phaseAngleDeg: number | null;
+  /**
+   * Issue #68 Part 2: linear-sRGB colour of the Sun light, the blackbody colour of `host_teff_K` at
+   * unit luminance (no white balance: an M dwarf's light is orange-red). Null: white. The planner
+   * clears it when the `starlight` layer is hidden or refused.
+   */
+  colour: [number, number, number] | null;
+  /** Tag of `colour`: `derived`, or weaker when `host_teff_K` is. Null with no colour. */
+  colourTag: Tag | null;
+  /** The host temperature the colour came from, K. */
+  colourTeffK: number | null;
+}
+
+/** The light colour a planet card asks for, or none. Pure. */
+function starlightFor(
+  params: RenderParams,
+  card: ObjectCard | null | undefined,
+): Pick<LightingPlan, 'colour' | 'colourTag' | 'colourTeffK'> {
+  const none = { colour: null, colourTag: null, colourTeffK: null };
+  if (!card || !STARLIT_TYPES.has(params.type)) return none;
+  const teff = readExtra(card, 'host_teff_K');
+  if (teff === null) return none;
+  const colour = starlightColour(teff);
+  if (colour === null) return none;
+  return {
+    colour,
+    colourTag: weakestTag(['derived', extraTv(card, 'host_teff_K')!.tag]),
+    colourTeffK: teff,
+  };
 }
 
 /** Light direction for a Sun-Target-Observer angle: 0° = Sun behind the camera (full phase). */
@@ -69,6 +103,9 @@ export function planLighting(params: RenderParams, card?: ObjectCard | null): Li
       tag: 'artistic',
       source: 'self',
       phaseAngleDeg: null,
+      colour: null,
+      colourTag: null,
+      colourTeffK: null,
     };
   }
   const phase = params.lighting.phase_angle_deg;
@@ -82,6 +119,7 @@ export function planLighting(params: RenderParams, card?: ObjectCard | null): Li
       tag: card?.phase_angle_deg?.tag ?? 'artistic',
       source: 'phase_angle',
       phaseAngleDeg: phase,
+      ...starlightFor(params, card),
     };
   }
   // ASSUMPTION: with no phase angle, fall back to the Sun direction as given (its frame is not
@@ -101,6 +139,7 @@ export function planLighting(params: RenderParams, card?: ObjectCard | null): Li
     tag: 'artistic',
     source: sun ? 'sun_dir' : 'view',
     phaseAngleDeg: null,
+    ...starlightFor(params, card),
   };
 }
 
@@ -112,6 +151,8 @@ export function buildLights(plan: LightingPlan, shadow: ShadowSettings | null = 
   if (plan.mode === 'self' || plan.direction === null) return [];
   const [x, y, z] = plan.direction;
   const sun = new DirectionalLight(0xffffff, plan.intensity);
+  // Linear sRGB (the working colour space); unit luminance, so the exposure is unchanged.
+  if (plan.colour) sun.color.setRGB(plan.colour[0], plan.colour[1], plan.colour[2]);
   sun.position.set(x * LIGHT_DISTANCE, y * LIGHT_DISTANCE, z * LIGHT_DISTANCE);
   if (shadow) {
     sun.castShadow = true;
