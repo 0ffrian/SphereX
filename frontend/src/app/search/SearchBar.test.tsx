@@ -33,7 +33,7 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
   const input = () => host.querySelector<HTMLInputElement>('[data-testid="search-input"]')!;
   const listbox = () => host.querySelector('[role="listbox"]');
   const options = () => [...host.querySelectorAll('[role="option"]')];
-  const names = () => options().map((o) => o.querySelector('span')!.textContent);
+  const names = () => options().map((o) => o.querySelector('.sx-suggest-name')!.textContent);
 
   const focus = () => act(() => input().focus());
   const type = (value: string) =>
@@ -67,6 +67,21 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
     expect(input().getAttribute('aria-activedescendant')).toBeNull();
   });
 
+  it('announces the row count, or the no-match hint, only while the list is open', () => {
+    const status = () => host.querySelector('[role="status"]')!;
+    expect(status().getAttribute('aria-live')).toBe('polite');
+    expect(status().textContent).toBe('');
+    focus();
+    expect(status().textContent).toBe('16 demo objects. Use up and down arrows.');
+    type('oumuamua');
+    expect(status().textContent).toBe('1 demo object. Use up and down arrows.');
+    type('zzzzqq');
+    expect(status().textContent).toBe(NO_MATCH_HINT);
+    key('Escape');
+    expect(host.querySelector('[role="status"]')).not.toBeNull();
+    expect(status().textContent).toBe('');
+  });
+
   it('opens with the "/" shortcut, which focuses the field', () => {
     expect(
       isSearchShortcut({
@@ -90,7 +105,7 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
   it('shows a class label only when the row has one, and never a made-up one', () => {
     expect(DEMO_TARGETS.every((t) => t.classLabel === null)).toBe(true);
     focus();
-    expect(host.querySelectorAll('[role="option"] em')).toHaveLength(0);
+    expect(host.querySelectorAll('[role="option"] .sx-suggest-label')).toHaveLength(0);
   });
 
   it('filters on the name and aliases, ignoring case, apostrophes and spaces', () => {

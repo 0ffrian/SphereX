@@ -27,7 +27,6 @@ export function SearchBar() {
   const helpId = useId();
   const problemId = useId();
   const linkProblemId = useId();
-  const hintId = useId();
 
   // A search started from a shared link shows its text in the field; clearing the link (Back to
   // the page without a hash) clears the field.
@@ -52,7 +51,6 @@ export function SearchBar() {
 
   const describedBy = [
     problem ? problemId : null,
-    open ? hintId : null,
     linkProblems.length > 0 ? linkProblemId : null,
     helpId,
   ]
@@ -81,6 +79,11 @@ export function SearchBar() {
 
   const optionId = (i: number) => `${listId}-opt-${i}`;
   const listShown = open && rows.length > 0;
+  const announcement = !open
+    ? ''
+    : rows.length === 0
+      ? NO_MATCH_HINT
+      : `${rows.length} demo ${rows.length === 1 ? 'object' : 'objects'}. Use up and down arrows.`;
 
   const move = (to: number) => {
     setActive(to);
@@ -123,12 +126,14 @@ export function SearchBar() {
   };
 
   return (
-    <section
-      aria-label="Find an object"
-      className="group sx-search"
-      data-list-open={open ? 'true' : undefined}
-    >
-      <form role="search" onSubmit={onSubmit} className="sx-search-form" noValidate>
+    <div className="group sx-search" data-list-open={open ? 'true' : undefined}>
+      <form
+        role="search"
+        aria-label="Find an object"
+        onSubmit={onSubmit}
+        className="sx-search-form"
+        noValidate
+      >
         <label htmlFor={inputId} className="sr-only">
           Object name, or RA, Dec in degrees
         </label>
@@ -169,6 +174,11 @@ export function SearchBar() {
           <Icon name="search" className="size-4" />
         </button>
       </form>
+      {/* Always mounted, so a screen reader hears each change (WCAG 4.1.3). The text changes only
+          while the list is open. */}
+      <div role="status" aria-live="polite" className="sr-only" data-testid="search-status">
+        {announcement}
+      </div>
       <div className="sx-search-pop">
         {/* Help sits on top, so showing it never moves the chips under the pointer. */}
         <p
@@ -203,12 +213,14 @@ export function SearchBar() {
                   className="sx-suggest-row"
                   onClick={() => pick(row)}
                 >
-                  <span>{row.name}</span>
-                  {row.classLabel !== null && <em>{row.classLabel}</em>}
+                  <span className="sx-suggest-name">{row.name}</span>
+                  {row.classLabel !== null && (
+                    <span className="sx-suggest-label">{row.classLabel}</span>
+                  )}
                 </li>
               ))}
             </ul>
-            <div id={hintId}>
+            <div>
               {rows.length === 0 && <p className="sx-suggest-hint">{NO_MATCH_HINT}</p>}
               <p className="sx-suggest-hint">{CLOSING_HINT}</p>
             </div>
@@ -217,6 +229,7 @@ export function SearchBar() {
         {linkProblems.length > 0 && (
           <p
             id={linkProblemId}
+            role="alert"
             className="sx-search-note border-red-400/70 text-red-200"
             data-testid="link-problem"
           >
@@ -226,6 +239,7 @@ export function SearchBar() {
         {problem && (
           <p
             id={problemId}
+            role="alert"
             className="sx-search-note border-red-400/70 text-red-200"
             data-testid="search-problem"
           >
@@ -233,6 +247,6 @@ export function SearchBar() {
           </p>
         )}
       </div>
-    </section>
+    </div>
   );
 }

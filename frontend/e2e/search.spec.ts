@@ -33,6 +33,26 @@ test('picking "Barnard\'s Star" from the list flies there and opens the panel', 
   await expect(page.getByTestId('frame-counter')).toBeVisible();
 });
 
+test('desktop: the list is 380 px, right-aligned, and leaves the sky credit visible', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const input = page.getByTestId('search-input');
+  await input.focus();
+  await expect(page.getByTestId('search-list').getByRole('option')).toHaveCount(16);
+  const list = (await page.getByTestId('search-list').boundingBox())!;
+  expect(list.width).toBeLessThanOrEqual(381);
+  const pill = (await input.boundingBox())!;
+  expect(list.x + list.width).toBeLessThanOrEqual(pill.x + pill.width + 1);
+  const credit = await page.locator('.sx-sky-credit').first().boundingBox();
+  if (credit) {
+    const overlapX = list.x < credit.x + credit.width && list.x + list.width > credit.x;
+    const overlapY = list.y < credit.y + credit.height && list.y + list.height > credit.y;
+    expect(overlapX && overlapY).toBe(false);
+  }
+  await expect(page.getByRole('status')).toHaveText('16 demo objects. Use up and down arrows.');
+});
+
 test.describe('phone width (400 x 860, touch)', () => {
   test.use({ viewport: { width: 400, height: 860 }, hasTouch: true, isMobile: true });
 
@@ -46,6 +66,10 @@ test.describe('phone width (400 x 860, touch)', () => {
     await expect(page.getByTestId('search-list').getByRole('option')).toHaveCount(16);
     const after = await input.boundingBox();
     expect(after).toEqual(before);
+    expect(after!.height).toBeGreaterThanOrEqual(44);
+    const go = await page.getByRole('button', { name: 'Search' }).boundingBox();
+    expect(go!.width).toBeGreaterThanOrEqual(44);
+    expect(go!.height).toBeGreaterThanOrEqual(44);
     const list = await page.getByTestId('search-list').getByRole('listbox').boundingBox();
     expect(list!.y + list!.height).toBeLessThanOrEqual(after!.y + 1);
     const row = await page.getByTestId('search-list').getByRole('option').first().boundingBox();
