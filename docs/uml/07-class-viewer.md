@@ -92,6 +92,10 @@ classDiagram
     PlanContext: honesty, view mode, comet epoch, light-curve scrub, failed loads
     per-type plan functions in renderers/
     exoplanetSentences(facts) the starlight and climate-scenario words shared by the notes and the alt text (Q-166)
+    PlanBuilder.draw gains the exoplanet layers starlight, climate, look and look_preset (issue #68, Q-156 to Q-160): starlight and climate come from exoplanetSentences and the physics layer, look and look_preset are artistic and + Artistic only
+    physics/tides.ts (t_lock, Q-155) and physics/climate.ts (climateScenario, deriveClimate, Q-156): the field params gain substellar and iceAngleRad for a locked planet's eyeball or snowball pattern
+    looks/scenarioLooks.ts and looks/presets.ts (Q-160): shaderSpec merges the scenario look, then the per-planet preset (empty until Moon supplies reviewed entries), under the sliders
+    SearchBar (app/search, Q-161) is an ARIA combobox over demoTargets: opens on focus, / or typing, filters on name and aliases, a pick calls skySearch with kind name and origin input; see diagram 08
     PlanBuilder.drawLocal(id, tag, description) adds a layer the plan decides itself (reflectance, self_shadow, baked_ao, regolith, ion_tail, dust_tail), honesty-filtered, else listed in missing
   }
   class PlanBuild {
@@ -204,6 +208,8 @@ classDiagram
   class Lighting {
     <<lighting.ts>>
     +mode: sun or self
+    +colour: linear-sRGB light colour or null, +colourTag: Tag or null, +colourTeffK: number or null (issue #68, Q-157)
+    the colour is the blackbody of host_teff_K at unit luminance (physics/starlight.ts, twin of backend blackbody.py, Q-157); solar-system bodies stay white
     DirectionalLight at phase_angle_deg
     ambient intensity max 0.03
   }
