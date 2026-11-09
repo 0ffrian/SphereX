@@ -73,10 +73,10 @@ describe('RefusalList', () => {
   });
 
   it('has no lead line when there are only notes', () => {
-    render(['frames:moving_object_search']);
+    render(['frames:moving_window']);
     expect(host.querySelector('p')).toBeNull();
     expect(host.querySelector('ul')!.hasAttribute('aria-labelledby')).toBe(false);
-    expect(host.textContent).toContain('Frames for moving Solar System objects');
+    expect(host.textContent).toContain('The search period set up for this object');
   });
 
   it('renders the frame IDs only once the group is opened', () => {
