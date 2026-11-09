@@ -37,6 +37,7 @@ import {
   SphereGeometry,
   Vector3,
   Matrix4,
+  Quaternion,
 } from 'three/webgpu';
 import {
   abs,
@@ -75,6 +76,7 @@ import {
   RING_GAP_EDGES,
   RING_INNER,
   RING_OUTER,
+  SUBSTELLAR_DIRECTION,
   type FieldData,
   type Vec3,
 } from '../fields/fieldGenerator';
@@ -133,6 +135,8 @@ const PLAIN_COLOUR = 0x8a8a8a;
  * R5.1), which falls back to this head-on direction when the card has no phase angle or sun_dir.
  */
 const HEAD_ON: Vec3 = [0, 0, 1];
+/** The body-frame direction of the star-facing point of a locked planet (fieldGenerator SUBSTELLAR_DIRECTION). */
+const SUBSTELLAR_AXIS = new Vector3(...SUBSTELLAR_DIRECTION);
 // Mock-up final-state group scales (artistic).
 const NEBULA_SCALE = 1.35;
 const NOVA_SCALE = 0.925;
@@ -190,6 +194,7 @@ function buildPlanet(
   motion: Motion,
   sunValue: Vector3,
   mould: PlanetMouldUniforms,
+  sunColour: any,
 ): { group: Group; runtime: Runtime } {
   const fp = spec.field!;
   const style = spec.planet!;
@@ -334,7 +339,7 @@ function buildPlanet(
   const sunlitWorld = smoothstep(-0.1, 0.3, dot(normalWorld, sunWorld));
   const skyRefl =
     style.atmosphere > 0.001
-      ? rgb3(style.atmosphereColour).mul(fres).mul(wet).mul(sunlitWorld).mul(0.9)
+      ? rgb3(style.atmosphereColour).mul(sunColour).mul(fres).mul(wet).mul(sunlitWorld).mul(0.9)
       : vec3(0, 0, 0);
 
   const mat = new MeshStandardNodeMaterial();
@@ -380,7 +385,8 @@ function buildPlanet(
     const cosG = dot(sunWorld, view).negate();
     const phase = float(0.75).mul(float(1).add(cosG.mul(cosG)));
     const sunlit = smoothstep(-0.05, 0.45, dot(normalWorld, sunWorld));
-    am.colorNode = rgb3(style.atmosphereColour);
+    // The rim is sunlight scattered: it takes the colour of the star's light (issue #68 Part 2).
+    am.colorNode = rgb3(style.atmosphereColour).mul(sunColour);
     am.opacityNode = clamp(
       dens.mul(phase).mul(sunlit).mul(style.atmosphere).mul(mould.clouds),
       0,
@@ -397,10 +403,20 @@ function buildPlanet(
   const inv = new Matrix4();
   const tmp = new Vector3();
   const spinRate = spinRateRadPerSimS(motion);
+  // Issue #68 Part 3e: a locked planet is posed so its star-facing point (+X) points at the light and
+  // keeps facing it as the light moves. It rotates once per orbit, so with the light fixed it does
+  // not turn against it; only the clouds move. A pure function of the light direction.
+  const locked = fp.substellar === true;
+  const facing = new Quaternion();
   const runtime: Runtime = {
     frame: group,
     update(time) {
-      group.rotation.y = spinRate * time('spin');
+      if (locked) {
+        facing.setFromUnitVectors(SUBSTELLAR_AXIS, tmp.copy(sunValue).normalize());
+        group.quaternion.copy(facing);
+      } else {
+        group.rotation.y = spinRate * time('spin');
+      }
       if (animatedClouds && jets) {
         const t = time('winds');
         const pair = phasePair(t, MAX_CLOUD_SHEAR / peak);
@@ -572,6 +588,8 @@ export class ShaderBody implements BodyRenderer {
   private motion: Motion;
   private readonly octaves: number;
   private readonly sun = uniform(new Vector3(...HEAD_ON));
+  /** Colour of the star's light for the atmosphere rim and sky glint (white unless the plan sets it). */
+  private readonly sunColour = uniform(new Vector3(1, 1, 1));
   /** Issue #60 build knobs (1 = the normal surface); shared by every rebuild of this body. */
   private readonly mould: PlanetMouldUniforms = {
     terrain: makeFloatUniform(1),
@@ -599,6 +617,7 @@ export class ShaderBody implements BodyRenderer {
     this.tier = ctx.tier ?? 'medium';
     this.motion = ctx.motion ?? resolveMotion(card, params);
     this.spec = resolveShaderSpec(card, params, this.overrides, this.motion);
+    if (ctx.lightColour) this.setSunColour(ctx.lightColour);
     if (ctx.lightDir) this.setSunDirection(ctx.lightDir);
   }
 
@@ -758,6 +777,12 @@ export class ShaderBody implements BodyRenderer {
       this.mould[key].value = v === undefined ? 1 : Math.max(0, Math.min(1, v));
     }
     this.onChange?.();
+  }
+
+  /** Colour of the star's light (linear sRGB); null goes back to white. */
+  setSunColour(colour: Vec3 | null): void {
+    const [r, g, b] = colour ?? [1, 1, 1];
+    this.sunColour.value.set(r, g, b);
   }
 
   setSunDirection(dir: Vec3): void {
@@ -943,6 +968,7 @@ export class ShaderBody implements BodyRenderer {
       this.motion,
       this.sun.value,
       this.mould,
+      this.sunColour,
     );
     return { group, frame: runtime.frame, textures, field, points: null, runtime, sampler };
   }
