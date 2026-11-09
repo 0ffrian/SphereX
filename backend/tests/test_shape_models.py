@@ -159,10 +159,10 @@ def test_committed_registry_matches_files() -> None:
     for path in (eros.lod0, eros.lod1):
         doc, _ = ing.read_glb((SHAPES / Path(path).name).read_bytes())
         assert doc["accessors"][2]["count"] // 3 <= ing.TRIANGLE_BUDGET
-    raw = tomllib.loads((SHAPES / "registry.toml").read_text("utf-8"))["model"][0]
-    for level in ("lod0", "lod1"):  # the committed GLBs are the ones the registry describes
-        blob = (SHAPES / Path(raw[level]).name).read_bytes()
-        assert hashlib.sha256(blob).hexdigest() == raw[f"{level}_sha256"]
+    for raw in tomllib.loads((SHAPES / "registry.toml").read_text("utf-8"))["model"]:
+        for level in ("lod0", "lod1"):  # the committed GLBs are the ones the registry describes
+            blob = (SHAPES / Path(raw[level]).name).read_bytes()
+            assert hashlib.sha256(blob).hexdigest() == raw[f"{level}_sha256"], raw["slug"]
 
 
 def test_axes_are_gltf_y_up() -> None:
@@ -174,7 +174,8 @@ def test_axes_are_gltf_y_up() -> None:
 
 def test_eros_spin_axis_is_gltf_y() -> None:
     """The viewer spins about +Y (PR #45 review); Eros's short axis is its spin pole."""
-    raw = tomllib.loads((SHAPES / "registry.toml").read_text("utf-8"))["model"][0]
+    rows = tomllib.loads((SHAPES / "registry.toml").read_text("utf-8"))["model"]
+    raw = next(r for r in rows if r["slug"] == "eros-gaskell")
     assert raw["axes"] == ing.AXES_NOTE
     doc, _ = ing.read_glb((SHAPES / "eros-gaskell.glb").read_bytes())
     ext = np.subtract(doc["accessors"][0]["max"], doc["accessors"][0]["min"]) / 1000.0
