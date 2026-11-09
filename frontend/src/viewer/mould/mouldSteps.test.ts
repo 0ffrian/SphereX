@@ -84,7 +84,9 @@ describe('water planet (mock-up PLAN.water)', () => {
     // the first step after the base mould; the climate pattern (model_dependent) is shown on a
     // smooth sphere in the step that reveals ice and ocean.
     const s = mouldScript(planOf('planet_water', 'derived').plan);
-    expect(s?.steps.map((x) => x.label)).toEqual(['Base mould', 'Terrain', 'Colour']);
+    // Q-166: with no artistic surface drawn, the steps say what they reveal, not "Terrain"/"Colour".
+    expect(s?.steps.map((x) => x.label)).toEqual(['Base mould', 'Starlight', 'Climate']);
+    expect(s?.steps[1]?.hint).toBe('Light from the host star');
     expect(s?.steps[1]?.reveals).toEqual(['starlight']);
     expect(s?.steps[2]?.reveals).toContain('climate');
   });
@@ -102,13 +104,17 @@ describe.each(['planet_trappist1f', 'planet_kepler186f'])('%s (the demo exoplane
   it('+ Estimated: starlight comes in the first step after the base mould; the climate pattern follows only for a locked planet', () => {
     const s = mouldScript(planOf(name, 'derived').plan)!;
     expect(s.steps[0]!.label).toBe('Base mould');
-    expect(s.steps[1]!.label).toBe('Terrain');
+    expect(s.steps[1]!.label).toBe('Starlight');
     expect(s.steps[1]!.reveals).toContain('starlight');
     // TRAPPIST-1 f is locked (eyeball or snowball pattern on a smooth sphere). Kepler-186 f is not
     // locked at the Q-155 constants (a knife edge, Q-156), so it has no pattern to reveal here.
-    const colour = s.steps.find((x) => x.label === 'Colour');
-    if (name === 'planet_trappist1f') expect(colour?.reveals).toContain('climate');
-    else expect(colour).toBeUndefined();
+    const colour = s.steps.find((x) => x.label === 'Climate');
+    if (name === 'planet_trappist1f') {
+      expect(colour?.reveals).toContain('climate');
+      expect(colour?.hint).toMatch(
+        /^(Ice and bare ground|Ice over the whole surface) \(a model\)$/,
+      );
+    } else expect(colour).toBeUndefined();
   });
 
   it('+ Artistic: every step reveals a drawn layer or runs a knob; starlight is first', () => {

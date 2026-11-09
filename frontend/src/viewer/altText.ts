@@ -4,8 +4,14 @@
 import type { CometEpoch, ObjectType, Tag } from '@/contract';
 import { badgeForTag, HONESTY_LABEL, stateThatShows, type HonestyState } from './honesty';
 import { MODE_LABEL } from './modes';
-import { deriveClimate } from '@/physics/climate';
-import { exoplanetSentences, isExoplanetCard, showsBody } from './planCommon';
+import { deriveClimate, lockRefused } from '@/physics/climate';
+import {
+  exoplanetSentences,
+  isExoplanetCard,
+  patternWords,
+  showsBody,
+  STARLIT_SPHERE_WORDS,
+} from './planCommon';
 import { GAS_LAYER_IDS, gasHiddenText } from './renderers/shaderSpec';
 import type { RenderPlan, ViewModeId } from './planTypes';
 import { AT_AGE_MAX_PHRASE, formatLength, type ShownSize } from './scaleBar';
@@ -118,9 +124,11 @@ function exoplanetAlt(plan: RenderPlan): string {
   const { card } = plan.shader;
   if (!isExoplanetCard(card)) return '';
   const refusal = plan.missing.find((m) => m.id === 'starlight');
+  const climate = deriveClimate(card, plan.type);
   const sentences = exoplanetSentences({
     kind: plan.type,
-    scenario: deriveClimate(card, plan.type)?.scenario ?? null,
+    scenario: climate?.scenario ?? null,
+    lockTested: climate ? !lockRefused(climate) : true,
     teffK: plan.lighting.colourTeffK,
     starlight: plan.drawn.some((d) => d.id === 'starlight')
       ? 'drawn'
@@ -146,14 +154,23 @@ export function buildAltText(plan: RenderPlan, shown?: ShownSize | null): string
     // The generated kinds: the backend's own description, and what the viewer is honest about (R5.3).
     const alt = sentence(plan.shader.params.alt_text.trim());
     const exo = exoplanetAlt(plan);
+    const starlit = plan.drawn.some((d) => d.id === 'starlight');
     if (plan.shader.pattern && !plan.shader.surface) {
-      return `${plan.name}, ${type}, ${sizeText(plan, shown)}. A smooth sphere that shows only where the model puts water and ice on a tidally locked planet. It is a model, not a measured image.${exo}`;
+      const kind = plan.type === 'planet_water' ? 'planet_water' : 'planet_rocky';
+      const scenario = isExoplanetCard(plan.shader.card)
+        ? deriveClimate(plan.shader.card, kind)?.scenario
+        : undefined;
+      const what =
+        scenario === 'snowball'
+          ? `only the model's ice, over the whole surface of a tidally locked planet`
+          : `only where the model puts ${patternWords('eyeball', kind)} on a tidally locked planet`;
+      return `${plan.name}, ${type}, ${sizeText(plan, shown)}. A smooth sphere${starlit ? ' lit in the colour of its host star (an estimate)' : ''} that shows ${what}. It is a model, not a measured image.${exo}`;
     }
     return plan.shader.surface
       ? plan.shader.gas
         ? `${alt} This is a generated model, not a measured image.`
         : `${alt} This is an artist's impression, not a measured image.${exo}`
-      : `${plan.name}, ${type}, ${sizeText(plan, shown)}. A plain grey sphere: ${
+      : `${plan.name}, ${type}, ${sizeText(plan, shown)}. ${starlit ? `${STARLIT_SPHERE_WORDS[0]!.toUpperCase()}${STARLIT_SPHERE_WORDS.slice(1)}` : 'A plain grey sphere'}: ${
           plan.type === 'gas_giant'
             ? gasHiddenText(plan.shader.params)
             : "the surface is an artist's impression and is hidden at this level."

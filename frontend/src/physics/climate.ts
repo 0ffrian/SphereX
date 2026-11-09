@@ -23,7 +23,10 @@ export interface ClimateInputs {
   kind: 'planet_rocky' | 'planet_water';
   /** The card's `teq_K` (lava and hot_dry use it). */
   teqK: number;
-  /** Tidally locked, or null when the rule was refused (then the planet is treated as not locked). */
+  /**
+   * Tidally locked, or null when the rule was refused. The table then falls back to `temperate`'s
+   * polar-ice rule, but the planet is NOT known to be unlocked: see `lockRefused`.
+   */
   locked: boolean | null;
   /** Temperature at the star-facing point, K; null when it could not be computed. */
   tssK: number | null;
@@ -50,6 +53,14 @@ export function climateScenario(i: ClimateInputs): ClimateOutcome {
     return { scenario: 'snowball', iceAngleRad: null };
   }
   return { scenario: 'temperate', iceAngleRad: null };
+}
+
+/**
+ * True when the scenario is the `temperate` fallback only because the locking rule was refused (a
+ * needed value is missing). Words must then say the locking could not be tested, not "not locked".
+ */
+export function lockRefused(d: Pick<ClimateDerivation, 'scenario' | 'locked'>): boolean {
+  return d.scenario === 'temperate' && d.locked === null;
 }
 
 export const SCENARIO_FORMULA =

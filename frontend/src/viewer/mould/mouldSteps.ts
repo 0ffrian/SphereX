@@ -12,6 +12,8 @@
 //
 // Timing is the mock-up's: STAGE_S seconds per step, smoothstep easing, steps one after another.
 import type { ObjectType } from '@/contract';
+import { deriveClimate } from '@/physics/climate';
+import { isExoplanetCard, patternWords } from '../planCommon';
 import type { RenderPlan } from '../planTypes';
 
 /** Seconds per step (mock-up `STAGE_S`). UI pacing, not a physical value. */
@@ -217,6 +219,34 @@ function knobApplies(knob: MouldKnob, plan: RenderPlan): boolean {
 }
 
 /**
+ * Issue #68 (Q-166): while the artistic surface is not drawn (+ Estimated), the steps that reveal
+ * only the star's light and the climate pattern say so, not "Terrain" and "Colour" (the terrain and
+ * the artist's colouring are not on screen). With the surface drawn the artistic labels stay.
+ */
+function honestLabel(
+  def: MouldStepDef,
+  reveals: readonly string[],
+  plan: RenderPlan,
+): Partial<Pick<MouldStepDef, 'label' | 'hint'>> {
+  const sh = plan.shader;
+  if (!sh || sh.surface || (plan.type !== 'planet_rocky' && plan.type !== 'planet_water'))
+    return {};
+  if (reveals.includes('starlight') && reveals.length === 1)
+    return { label: 'Starlight', hint: 'Light from the host star' };
+  if (reveals.includes('climate') && def.layers.includes('climate')) {
+    const scenario = isExoplanetCard(sh.card) ? deriveClimate(sh.card, plan.type)?.scenario : null;
+    const words = patternWords(scenario === 'snowball' ? 'snowball' : 'eyeball', plan.type);
+    // patternWords for a rocky planet reads "bare ground and ice": the step says "Ice and bare ground".
+    const text =
+      plan.type === 'planet_rocky' && scenario !== 'snowball'
+        ? 'Ice and bare ground'
+        : `${words[0]!.toUpperCase()}${words.slice(1)}`;
+    return { label: 'Climate', hint: `${text} (a model)` };
+  }
+  return {};
+}
+
+/**
  * The steps for a plan: the mock-up steps of its kind, each with the drawn layers it reveals. A step
  * that reveals no drawn layer and runs no knob that applies is left out (it would claim to build
  * something that is not there). Drawn layers no step names are revealed by the last step, so the
@@ -234,7 +264,7 @@ export function mouldScript(plan: RenderPlan): MouldScript | null {
     for (const id of reveals) named.add(id);
     const knobs = (def.knobs ?? []).filter((k) => knobApplies(k, plan));
     if (!def.base && reveals.length === 0 && knobs.length === 0) continue;
-    steps.push({ ...def, knobs, reveals });
+    steps.push({ ...def, ...honestLabel(def, reveals, plan), knobs, reveals });
   }
   if (steps.length === 0) return null;
   const rest = [...drawn].filter((id) => !named.has(id));
