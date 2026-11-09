@@ -624,7 +624,10 @@ def test_67p_resolves_and_gets_its_geometry_from_recorded_replies(ctx: Context) 
     """Live on 9 Nov 2026 `DES=1000012;` answered with the small-body index table (a dozen
     apparition records) and no ephemeris block; `DES=1000012;CAP;` answers (Horizons API docs,
     "unique comet selection"). These are the recorded replies of the CAP calls."""
-    obj = resolve(ctx, "67P", load_aliases(TARGETS_FILE)).obj
+    # No aliases: the replies were recorded for the query "67P". With targets.toml loaded, Track D's
+    # alias sends "67P" to "67P/Churyumov-Gerasimenko", a different cache key (the alias is covered
+    # by the search tests).
+    obj = resolve(ctx, "67P", {}).obj
     assert obj.id == "sbdb-1000012" and obj.resolver == "sbdb" and obj.spkid == "1000012"
     answer = fetch_geometry(ctx, obj)
     assert answer is not None and answer.geometry is not None, answer
