@@ -6,7 +6,7 @@ import type { ObjectCard } from '@/contract';
 import { kepler186f, trappist1f } from '@/physics/exoplanetFixtures.testutil';
 import { generateField } from '../fields/fieldGenerator';
 import { ALL_TAGS, type BodyContext } from './bodyRenderer';
-import { ShaderBody } from './ShaderBody';
+import { ShaderBody, patternMode } from './ShaderBody';
 import { fixture } from './fixtures.testutil';
 
 const ctx: BodyContext = {
@@ -55,6 +55,15 @@ describe('climate pattern at + Estimated', () => {
     b.setVisibleTags(ALL_TAGS);
     expect(b.drawn).toEqual(['surface']);
     b.dispose();
+  });
+});
+
+describe('pattern mode reads the ice mask alone', () => {
+  it('snowball is uniform ice; the open cap is uniform water or ground', () => {
+    expect(patternMode('planet_rocky', 0)).toBe('ice');
+    expect(patternMode('planet_water', 0)).toBe('ice');
+    expect(patternMode('planet_water', 0.9)).toBe('water');
+    expect(patternMode('planet_rocky', 0.9)).toBe('ground');
   });
 });
 
