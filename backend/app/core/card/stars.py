@@ -49,6 +49,10 @@ MIRA_VARTYPES = frozenset({"LPV", "M"})
 NO_MIRA_TABLE = (
     "no verified Teff table exists for M giants or Miras (Q-152), so the class table is not used"
 )
+NO_TTAURI_TABLE = (
+    "no verified Teff table exists for pre-main-sequence stars (Q-152), so the class table is "
+    "not used"
+)
 _DWARF = re.compile(r"^([OBAFGKM])(\d(?:\.5)?)V$")
 
 
@@ -195,7 +199,7 @@ def teff_field(cat: StarCatalogue | None, kind: str, table: DwarfTable | None) -
                 "source": f"{table.source}: mean dwarf of spectral type {cls}",
             }
     else:
-        skipped.append(NO_MIRA_TABLE)
+        skipped.append(NO_TTAURI_TABLE if kind == "star_ttauri" else NO_MIRA_TABLE)
     return _null("not available: " + "; ".join(skipped), "measured")
 
 
