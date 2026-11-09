@@ -53,7 +53,9 @@ export function loadBodyFor(id: string): void {
         return;
       }
       useAppStore.getState().setObject(card.data, params.data);
-      useShellStore.getState().setBody({ status: 'ready', id });
+      useShellStore
+        .getState()
+        .setBody({ status: 'ready', id, prebuilt: params.assetStatus === 'saved' });
     },
     (e: unknown) => {
       if (controller.signal.aborted) return;
