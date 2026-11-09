@@ -12,5 +12,40 @@
     "tag": "derived",
     "source": "synthetic fixture: not a real measurement",
     "formula": "Teq = T_star * sqrt(R_star / (2a)) * (1 - A)^(1/4) (A7.1)"
+  },
+  "mass_mearth": {
+    "value": 8.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "orbit_au": {
+    "value": 0.15,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "orbital_period_d": {
+    "value": 33.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "host_teff_K": {
+    "value": 3500.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "host_radius_rsun": {
+    "value": 0.4,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "host_mass_msun": {
+    "value": 0.4,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
+  },
+  "host_age_gyr": {
+    "value": 5.0,
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement"
   }
 }

@@ -55,6 +55,15 @@
     "textures": {
       "$ref": "#/definitions/RenderTextures"
     },
+    "components": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Component"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "Per-body look of a brown_dwarf_binary, in the order of the card's spectral_class (A then B), when the class names two components (Q-154). Absent otherwise: both bodies then share the system look."
+    },
     "lighting": {
       "$ref": "#/definitions/RenderLighting"
     },
@@ -80,6 +89,47 @@
     }
   },
   "definitions": {
+    "Component": {
+      "title": "Component",
+      "description": "One body of a brown_dwarf_binary (R7.4, Q-154). tint is linear RGB from this body's own class through the single-brown-dwarf class palette.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "tint",
+        "tint_tag",
+        "emissive_scale",
+        "emissive_tag"
+      ],
+      "properties": {
+        "class": {
+          "type": "string",
+          "description": "This body's spectral class, one half of the card's spectral_class, such as T1V."
+        },
+        "tint": {
+          "$ref": "object-card.schema.json#/definitions/Triple"
+        },
+        "tint_tag": {
+          "$ref": "object-card.schema.json#/definitions/Tag"
+        },
+        "emissive_scale": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "This body's brightness relative to the brighter body, (Teff / Teff_max)^4 at equal radius. null = no Teff for this system: the body uses the system brightness."
+        },
+        "emissive_tag": {
+          "$ref": "object-card.schema.json#/definitions/Tag"
+        }
+      }
+    },
     "Layer": {
       "title": "Layer",
       "type": "object",

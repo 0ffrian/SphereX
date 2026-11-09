@@ -58,6 +58,34 @@
       "requires": [
         "spectral_class"
       ]
+    },
+    {
+      "id": "components",
+      "tag": "inferred_from_analog",
+      "tier": 4,
+      "description": "Each body is tinted by its own spectral class, through the same class palette as a single brown dwarf (R7.4).",
+      "requires": [
+        "spectral_class"
+      ],
+      "assumed": {
+        "class_a": "T1",
+        "class_b": "T6"
+      },
+      "formula": "tint = brown-dwarf class palette[first letter of the body's class]"
+    },
+    {
+      "id": "component_brightness",
+      "tag": "model_dependent",
+      "tier": 3,
+      "description": "Each body's brightness follows its published Teff, relative to the hotter body (R7.4).",
+      "requires": [
+        "component_teff_K"
+      ],
+      "formula": "emissive_scale = (Teff / Teff_max)^4, equal radii (Stefan-Boltzmann)",
+      "assumed": {
+        "radius_ratio": 1.0,
+        "component_teff_K": "1300, 1000"
+      }
     }
   ],
   "textures": {
@@ -66,6 +94,30 @@
     "normal": "/data/textures/fixture:brown_dwarf_binary/fixture-0/5/normal.png",
     "height_bin": "/data/textures/fixture:brown_dwarf_binary/fixture-0/5/height.bin"
   },
+  "components": [
+    {
+      "class": "T1",
+      "tint": [
+        0.5,
+        0.24,
+        0.14
+      ],
+      "tint_tag": "inferred_from_analog",
+      "emissive_scale": 1.0,
+      "emissive_tag": "model_dependent"
+    },
+    {
+      "class": "T6",
+      "tint": [
+        0.5,
+        0.24,
+        0.14
+      ],
+      "tint_tag": "inferred_from_analog",
+      "emissive_scale": 0.3501,
+      "emissive_tag": "model_dependent"
+    }
+  ],
   "lighting": {
     "mode": "self"
   },

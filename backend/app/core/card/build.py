@@ -14,6 +14,7 @@ from typing import Any
 
 from app.adapters import horizons
 from app.adapters.exoplanet_archive import ref_text
+from app.core.card import stars
 from app.core.card.catalogue import CatalogueData
 from app.core.classify import Classification, is_calculated
 from app.core.find.resolver import ResolvedObject
@@ -199,9 +200,93 @@ ARCHIVE_TEQ_FORMULA = (
 )
 
 
+def _archive_errs(row: Mapping[str, Any], column: str) -> float | None:
+    """Largest absolute archive uncertainty of ``column`` (``<column>err1`` and ``err2``)."""
+    errs = [abs(e) for e in (_finite(row.get(f"{column}err{i}")) for i in (1, 2)) if e]
+    return max(errs) if errs else None
+
+
+def _archive_value(row: Mapping[str, Any], column: str, label: str) -> dict[str, Any]:
+    """One archive column as a tagged value (Q-150). Measured values cite ``<column>_reflink``.
+    A ``CALCULATED_VALUE`` is never ``measured``: the archive computed it. Its method is
+    documented (pscp_calc.html) only for the radius, mass and Teq handled by name, so any other
+    calculated column is ``model_dependent`` and says so."""
+    x = _finite(row.get(column))
+    if x is None or x <= 0:
+        return _null(f"not available: the Exoplanet Archive has no {column} ({label})")
+    if is_calculated(row, column):
+        return {
+            "value": x,
+            "tag": "model_dependent",
+            "source": f"{ARCHIVE_CALC}, {column}",
+            "assumption": (
+                f"the archive calculated {column} itself (refstr CALCULATED_VALUE); its method "
+                "for this column is not documented here, so it is not a measurement"
+            ),
+        }
+    return _measured(
+        x,
+        f"NASA Exoplanet Archive PSCompPars {column} ({ref_text(row, column)})",
+        _archive_errs(row, column),
+    )
+
+
+ARCHIVE_MASS_MR_ASSUMPTION = (
+    "mass estimated from the planet's radius with the Chen & Kipping 2017 mass-radius relation "
+    "(archive pl_bmassprov = 'M-R relationship', pscp_calc.html); not a measured mass"
+)
+ARCHIVE_MSINI_ASSUMPTION = (
+    "minimum mass (M sin i) from radial velocity: the true mass is larger by 1/sin(i) and the "
+    "inclination is unknown, so this is a lower limit, not the planet's mass"
+)
+ARCHIVE_MSINI_FORMULA = (
+    "M = (M sin i) / sin i, with the inclination from the same reference (archive "
+    "pl_bmassprov = 'Msin(i)/sin(i)')"
+)
+
+
+def _mass_field(row: Mapping[str, Any]) -> dict[str, Any]:
+    """``mass_mearth`` from ``pl_bmasse``, tagged by ``pl_bmassprov`` (Q-150). Only a true
+    "Mass" is ``measured``. An unknown provenance is refused: the kind of mass is not known."""
+    x = _finite(row.get("pl_bmasse"))
+    if x is None or x <= 0:
+        return _null("not available: the Exoplanet Archive has no pl_bmasse")
+    prov = row.get("pl_bmassprov")
+    source = f"NASA Exoplanet Archive PSCompPars pl_bmasse ({ref_text(row, 'pl_bmasse')})"
+    err = _archive_errs(row, "pl_bmasse")
+    out: dict[str, Any]
+    if prov == "M-R relationship" or is_calculated(row, "pl_bmasse"):
+        out = {
+            "value": x,
+            "tag": "model_dependent",
+            "source": f"{ARCHIVE_CALC}, pl_bmasse",
+            "assumption": ARCHIVE_MASS_MR_ASSUMPTION,
+        }
+        err = None  # the archive reports no uncertainty for a calculated value
+    elif prov == "Mass":
+        out = _measured(x, source)
+    elif prov == "Msini":
+        out = {
+            "value": x,
+            "tag": "model_dependent",
+            "source": source,
+            "assumption": ARCHIVE_MSINI_ASSUMPTION,
+        }
+    elif prov == "Msin(i)/sin(i)":
+        out = {"value": x, "tag": "derived", "source": source, "formula": ARCHIVE_MSINI_FORMULA}
+    else:
+        return _null(
+            f"not available: pl_bmassprov is {prov!r}, so the kind of mass (true, minimum or "
+            "estimated) is not known"
+        )
+    if err is not None:
+        out["err"] = err
+    return out
+
+
 def _planet_fields(card: dict[str, Any], row: Mapping[str, Any] | None) -> None:
-    """R7.7 size and D-12 temperature from the Exoplanet Archive row (A3.8). Mass, orbit and host
-    star stay in the row: R12 #12 defines no card field for them (Q-63 proposes some).
+    """R7.7 size, D-12 temperature, and (Q-150) mass, orbit and host star from the Exoplanet
+    Archive row (A3.8).
 
     A value the archive calculated itself (``refstr=CALCULATED_VALUE``) is not ``measured``:
     the radius is ``model_dependent`` (a mass-radius relation) and Teq ``derived`` (Q-63)."""
@@ -242,6 +327,38 @@ def _planet_fields(card: dict[str, Any], row: Mapping[str, Any] | None) -> None:
             "source": "not available: pl_eqt is empty and no albedo is given to apply A7.1",
             "formula": "Teq = T_star * sqrt(R_star / (2a)) * (1 - A)^(1/4) (A7.1)",
         }
+    card["mass_mearth"] = _mass_field(row)
+    card["orbit_au"] = _archive_value(row, "pl_orbsmax", "semi-major axis in au")
+    card["orbital_period_d"] = _archive_value(row, "pl_orbper", "orbital period in days")
+    card["host_teff_K"] = _archive_value(row, "st_teff", "host star effective temperature in K")
+    card["host_radius_rsun"] = _archive_value(row, "st_rad", "host star radius in solar radii")
+    card["host_mass_msun"] = _archive_value(row, "st_mass", "host star mass in solar masses")
+    card["host_age_gyr"] = _archive_value(row, "st_age", "host star age in Gyr")
+
+
+def _literature_fill(card: dict[str, Any], data: CatalogueData) -> None:
+    """Q-153: a field the catalogues left null takes the literature registry's value, with the
+    registry's own tag and a ``literature:`` source. A field with a catalogue value is never
+    touched, and a field the type does not use is not added. A registry refusal replaces the
+    generic reason of a still-null field."""
+    for name, tv in list(card.items()):
+        if not isinstance(tv, dict) or tv.get("value", 0) is not None:
+            continue
+        filled = data.literature.tv(name)
+        if filled is not None:
+            card[name] = filled
+        elif name in data.literature.refusals:
+            card[name] = {**tv, "source": f"not available: {data.literature.refusals[name]}"}
+
+
+def _star_fields(card: dict[str, Any], kind: str, data: CatalogueData) -> None:
+    """``teff_K``, ``radius_rsun`` and (Mira) ``period_var_d`` by the Q-152 source order. A
+    literature radius (an interferometric one) goes before Gaia FLAME; every other literature
+    value waits for the generic fill, which runs only when this left the field null."""
+    card["teff_K"] = stars.teff_field(data.star, kind, data.dwarf_table)
+    card["radius_rsun"] = data.literature.tv("radius_rsun") or stars.radius_field(data.star)
+    if kind == "star_mira":
+        card["period_var_d"] = stars.period_field(data.star)
 
 
 def build_card(
@@ -299,16 +416,20 @@ def build_card(
         card["spectral_class"] = _spectral_class(cls)
         card["flux_45um"] = _flux_45um(spectrum, spectrum_pending)
         card["ch4_depth_33"] = _null(NO_SOURCE + " (no CH4 band-depth rule in the specs)")
+        if kind == "brown_dwarf_binary":
+            card["component_teff_K"] = _null(
+                "not available: no published Teff for the two components in the literature "
+                "registry (Q-154)"
+            )
     elif kind in ("planet_rocky", "planet_water", "gas_giant"):
         _planet_fields(card, data.facts.exoplanet)
     elif kind in ("star", "star_mira", "star_ttauri"):
         card["spectral_class"] = _spectral_class(cls)
-        card["teff_K"] = _null("not available: the SIMBAD query has no Teff column")
-        card["radius_rsun"] = _null(NO_SOURCE)
-        if kind == "star_mira":
-            card["period_var_d"] = _null("not available: the SIMBAD query has no period column")
+        _star_fields(card, kind, data)
         if kind in ("star_mira", "star_ttauri"):
             card["lightcurve"] = _lightcurve(spectrum)
+
+    _literature_fill(card, data)
 
     rgb = _spherex_rgb(kind, spectrum, spectrum_pending)
     if rgb is not None:

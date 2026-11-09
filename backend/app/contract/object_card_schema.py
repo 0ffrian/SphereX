@@ -176,6 +176,14 @@ class ObjectCard(BaseModel):
     flux_45um: TVNumber | None = None
     teff_K: TVNumber | None = None
     teq_K: TVNumber | None = None
+    mass_mearth: TVNumber | None = None
+    orbit_au: TVNumber | None = None
+    orbital_period_d: TVNumber | None = None
+    host_teff_K: TVNumber | None = None
+    host_radius_rsun: TVNumber | None = None
+    host_mass_msun: TVNumber | None = None
+    host_age_gyr: TVNumber | None = None
+    component_teff_K: TVPair | None = None
     period_var_d: TVNumber | None = None
     lightcurve: list[LightcurvePoint] | None = None
     phase_angle_deg: TVNumber | None = None
