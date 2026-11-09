@@ -6,7 +6,7 @@ import { BAKED_NAMES, FIXTURE_NAMES, fixture } from '@/test/sharedFixtures';
 import { HONESTY_STATES, isTagShown, type HonestyState } from './honesty';
 import { MAX_AMBIENT_INTENSITY } from './lighting';
 import { defaultContext, planRender, CANDIDATE_MESSAGE, UNSUPPORTED_MESSAGE } from './renderPlan';
-import { planBrownDwarf, EMISSIVE_FLOOR } from './renderers/BrownDwarf';
+import { BROWN_DWARF_CONFIG, planBrownDwarf, EMISSIVE_FLOOR } from './renderers/BrownDwarf';
 import { gasQForEpoch, GAS_STYLE, MAX_TOTAL_POINTS, planShells } from './renderers/Comet';
 import { lightcurveScrub, planStar, screenOpacity } from './renderers/Star';
 import type { PlanInput } from './planCommon';
@@ -104,13 +104,15 @@ describe('R11 honesty', () => {
     expect(ids(artistic.drawn)).toContain('relief');
     expect(artistic.bodies[0]?.normalUrl).toBe(params.textures?.normal);
 
-    // The fixture's diameter is `derived`, so Measured only draws no body (it would show an
-    // estimated size) and says so.
-    const measured = planRender(card, params, defaultContext({ honesty: 'measured' }));
+    // A `derived` diameter would show an estimated size, so Measured only draws no body and says so.
+    const derivedSize = { ...card, diameter_km: { ...card.diameter_km!, tag: 'derived' as const } };
+    derivedSize.diameter_km.formula = 'stands in for a size formula';
+    const measured = planRender(derivedSize, params, defaultContext({ honesty: 'measured' }));
     expect(measured.bodies).toEqual([]);
     expect(missing(measured, 'body')).toMatchObject({ reason: 'honesty', tag: 'derived' });
 
-    // With a measured diameter, Measured only is a plain sphere with a flat tint and no textures.
+    // With a measured diameter (issue #62: the fixture's own), Measured only is a plain sphere of
+    // that size with a flat tint and no textures, never a black or blank body.
     card.diameter_km = tv(2);
     const plain = planRender(card, params, defaultContext({ honesty: 'measured' }));
     expect(ids(plain.missing)).toEqual(
@@ -177,6 +179,7 @@ describe('R11 refusal', () => {
 
   it('a shape_source that is not a mesh file address is a refused mesh and the body stays', () => {
     const { card, params } = fixture('asteroid_shape');
+    card.shape_source = { value: 'fixture://meshes/none.glb', tag: 'measured', source: 'test' };
     const plan = planRender(card, params, defaultContext());
     expect(missing(plan, 'mesh')?.reason).toBe('load');
     expect(plan.bodies).toHaveLength(1);
@@ -502,10 +505,10 @@ describe('brown dwarfs (R7.4)', () => {
   it('with a reference value the glow follows the measured flux', () => {
     const { card, params } = fixture('brown_dwarf');
     const input: PlanInput = { card, params, ctx: defaultContext() };
-    const plan = planBrownDwarf(input, { flux45Reference: 1e12 });
+    const plan = planBrownDwarf(input, { ...BROWN_DWARF_CONFIG, flux45Reference: 1e12 });
     expect(ids(plan.drawn)).toContain('emissive');
     expect(plan.bodies[0]?.emissive).toBe(EMISSIVE_FLOOR);
-    const big = planBrownDwarf(input, { flux45Reference: 1e-12 });
+    const big = planBrownDwarf(input, { ...BROWN_DWARF_CONFIG, flux45Reference: 1e-12 });
     expect(big.bodies[0]?.emissive).toBe(1);
   });
 
@@ -521,10 +524,13 @@ describe('brown dwarfs (R7.4)', () => {
     expect(vis.bodies[0]?.albedoUrl).toBe(params.textures?.albedo);
     // The baked map holds the colour, so the tint is white and not applied a second time.
     expect(vis.bodies[0]?.tint).toEqual([1, 1, 1]);
-    // In the infrared view the visible-palette map is dropped, and the SPHEREx average shows.
+    // In the infrared view the visible-palette COLOURS are dropped and the SPHEREx average shows
+    // (R5.2); since issue #62 the map's brightness still draws the bands on that colour, so the
+    // default view is not a flat disc (Q-116).
     const ir = at('artistic', 'spherex_ir');
-    expect(ir.bodies[0]?.albedoUrl).toBeNull();
-    expect(missing(ir, 'bands')?.reason).toBe('mode');
+    expect(ir.bodies[0]?.albedoUrl).toBe(params.textures?.albedo);
+    expect(ir.bodies[0]?.albedoLuma).toBe(true);
+    expect(missing(ir, 'bands')).toBeUndefined();
     expect(ir.bodies[0]?.tint).toEqual(ir.tint.rgb);
   });
 

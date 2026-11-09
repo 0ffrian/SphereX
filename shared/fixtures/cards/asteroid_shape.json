@@ -1,27 +1,28 @@
 {
   "id": "fixture:asteroid_shape",
-  "name": "Synthetic fixture: asteroid with a shape model",
+  "name": "Synthetic fixture: asteroid with a shape model (433 Eros: real shape, size, albedo, class and spin)",
   "type": "asteroid_shape",
   "diameter_km": {
-    "value": 10.0,
+    "value": 16.84,
     "tag": "measured",
-    "source": "synthetic fixture: not a real measurement"
+    "source": "synthetic fixture: real 433 Eros value, JPL SBDB diameter (Yeomans et al. (2000) Science v.289, pp.2085-2088), as in the backend's recorded SBDB reply",
+    "err": 0.06
   },
   "shape_source": {
-    "value": "fixture://meshes/asteroid_shape.glb",
+    "value": "/data/shapes/eros-gaskell.glb",
     "tag": "measured",
-    "source": "synthetic fixture: this mesh does not exist"
+    "source": "synthetic fixture: real 433 Eros value, Gaskell, R.W., Gaskell Eros Shape Model V1.1, urn:nasa:pds:gaskell.ast-eros.shape-model, NASA PDS, DOI 10.26033/d0gq-9427, CC0-1.0 (backend/assets/shapes/registry.toml)"
   },
   "rot_period_h": {
-    "value": 5.0,
+    "value": 5.27,
     "tag": "measured",
-    "source": "synthetic fixture: not a real measurement"
+    "source": "synthetic fixture: real 433 Eros value, JPL SBDB rot_per (LCDB (Rev. 2023-October); Warner et al., 2009), as in the backend's recorded SBDB reply"
   },
   "albedo": {
-    "value": 0.2,
+    "value": 0.25,
     "tag": "measured",
-    "source": "synthetic fixture: not a real measurement",
-    "err": 0.05
+    "source": "synthetic fixture: real 433 Eros value, JPL SBDB albedo (Veverka et al. (2000) Science v.289, pp.2088-2097), as in the backend's recorded SBDB reply",
+    "err": 0.06
   },
   "gaia_rgb": {
     "value": [
@@ -45,7 +46,7 @@
   "spectral_class": {
     "value": "S",
     "tag": "measured",
-    "source": "synthetic fixture: not a real measurement"
+    "source": "synthetic fixture: real 433 Eros value, JPL SBDB spec_B (SMASS taxonomy; EAR-A-5-DDR-TAXONOMY-V4.0), as in the backend's recorded SBDB reply"
   },
   "phase_angle_deg": {
     "value": 30.0,
