@@ -61,17 +61,15 @@ describe('ShaderBody', () => {
     expect(measured.drawn).toEqual([]);
     expect(measured.hidden).toEqual(GAS);
     expect(measured.status.state).toBe('hidden');
-    // + Estimated: everything but the swirl look.
+    expect(measured.status.message).toContain('choose + Estimated to see them');
+    // + Estimated: bands, flattening and colour; the storms and the swirl are seeded looks.
     const est = await at(ESTIMATED_TAGS);
-    expect(est.drawn).toEqual(['bands', 'flattening', 'colour', 'storms']);
-    expect(est.hidden).toEqual(['turbulence']);
+    expect(est.drawn).toEqual(['bands', 'flattening', 'colour']);
+    expect(est.hidden).toEqual(['storms', 'turbulence']);
     expect(est.status).toMatchObject({ state: 'drawn' });
-    expect([...est.status.tags].sort()).toEqual([
-      'derived',
-      'inferred_from_analog',
-      'model_dependent',
-    ]);
-    // + Artistic adds the turbulence, and its tag shows in the status.
+    // The fixture has no spin on the card, so bands and flattening are tier 4 (Q-119 b).
+    expect([...est.status.tags].sort()).toEqual(['derived', 'inferred_from_analog']);
+    // + Artistic adds the storms and the turbulence, and their tag shows in the status.
     est.setVisibleTags(ALL_TAGS);
     expect(est.drawn).toEqual(GAS);
     expect(est.status.tags).toContain('artistic');
@@ -174,7 +172,7 @@ describe('ShaderBody honesty and redraw (review B2, B3, N7)', () => {
     expect(afterCreate).toBeGreaterThan(0);
     body.setVisibleTags(ESTIMATED_TAGS);
     expect(calls).toBe(afterCreate + 1);
-    expect(body.drawn).toEqual(['bands', 'flattening', 'colour', 'storms']);
+    expect(body.drawn).toEqual(['bands', 'flattening', 'colour']);
     body.setVisibleTags(ALL_TAGS);
     expect(calls).toBe(afterCreate + 2);
     await body.setOverrides({ storms: 2 });

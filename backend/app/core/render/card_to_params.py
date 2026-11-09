@@ -256,6 +256,11 @@ class _Plan:
                         f"layer {layer_id}: model_dependent needs an assumed input (D-32)"
                     )
                 layer["assumed"] = assumed
+            elif tag == "inferred_from_analog" and rule_inputs:
+                # A typical value with the rule it feeds (Q-119 b): name what stood in (D-32).
+                layer["assumed"] = dict(rule_inputs)
+                if formula:
+                    layer["formula"] = formula
             self.layers.append(layer)
         else:
             self.refuse(layer_id, requires)
@@ -495,15 +500,17 @@ def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) 
     )
     # Issue #62: a self-lit disc glows evenly to its edge without it. The coefficient is
     # BROWN_DWARF_LIMB_U, the star's (R7.5) until a brown-dwarf value is confirmed [verify], so the
-    # layer is model_dependent. It sits on the body, so a refused body or an unset (None)
+    # layer is model_dependent. The 0.6 is a visible-band solar value used as a placeholder for an
+    # infrared view. It sits on the body, so a refused body or an unset (None)
     # coefficient refuses it too.
     u = BROWN_DWARF_LIMB_U
     plan.layer(
         body_ok and u is not None,
         "limb_darkening",
         "model_dependent",
-        f"Assumption: linear limb darkening, I(mu) = 1 - {u} * (1 - mu), the star coefficient of "
-        "R7.5. No brown-dwarf coefficient is confirmed (R7.4).",
+        f"Assumption: linear limb darkening, I(mu) = 1 - {u} * (1 - mu). The coefficient is the "
+        "R7.5 visible-band solar value, used as a placeholder for an infrared view [verify]; no "
+        "brown-dwarf coefficient is confirmed (R7.4).",
         ["radius_rjup"],
         card=card,
         formula=f"I(mu) = 1 - u * (1 - mu), u = {u}",
@@ -637,14 +644,16 @@ def _gas_giant_layers(card: Mapping[str, Any], plan: _Plan) -> None:
     and `storms` from "+ Estimated", `turbulence` from "+ Artistic". The viewer draws the numbers
     (``frontend/src/physics/gasGiants.ts``); the tags here say what set them (``gas_giant.py``)."""
     has_spin = _has(card, "rot_period_h")
-    spin_tag = _tag(card, "rot_period_h") if has_spin else "model_dependent"
+    # Q-119 option (b): the typical spin is "typical, no formula" = tier 4 (D-32).
+    spin_tag = _tag(card, "rot_period_h") if has_spin else "inferred_from_analog"
     spin_h = _num(card, "rot_period_h") if has_spin else gg.TYPICAL_SPIN_H
     spin_inputs: dict[str, float | str] = {}
     if not has_spin and gg.TYPICAL_SPIN_H is not None:
         spin_inputs["rot_period_h"] = gg.TYPICAL_SPIN_H
 
     # bands: the Rhines rule. The card has no wind speed, so the class-typical wind is always an
-    # input: the best tag is model_dependent, with the wind (and a missing spin) in `assumed`.
+    # input: the best tag is model_dependent (measured spin), with the wind in `assumed`. A missing
+    # spin makes it the typical one and the layer inferred_from_analog (tier 4).
     radius_m = (_num(card, "radius_rjup") or 0.0) * gg.R_JUP_M
     omega = gg.spin_rate_rad_s(spin_h) if spin_h is not None else None
     wind = gg.TYPICAL_ZONAL_WIND_MS
@@ -654,9 +663,9 @@ def _gas_giant_layers(card: Mapping[str, Any], plan: _Plan) -> None:
         _has(card, "radius_rjup") and n is not None,
         "bands",
         _weakest("derived", spin_tag, _tag(card, "radius_rjup"), "model_dependent"),
-        f"Number of bands from the spin and the radius (Rhines scale, A7.2): about "
-        f"{round(n or 0)} from pole to pole. The jet speed is a typical value; the exact band "
-        "pattern is a seeded look.",
+        f"Number of bands from the {'spin' if has_spin else 'typical spin of a giant planet'} and "
+        f"the radius (Rhines scale, A7.2): about {round(n or 0)} from pole to pole. The jet speed "
+        "is a typical value; the exact band pattern is a seeded look.",
         bands_requires,
         card=card,
         formula=gg.BANDS_FORMULA,
@@ -664,13 +673,16 @@ def _gas_giant_layers(card: Mapping[str, Any], plan: _Plan) -> None:
     )
 
     # flattening: f = 0.7 q needs the mass, which no card holds, so Jupiter's mean density is the
-    # stated assumption; a missing spin is the class-typical one (same tag, longer `assumed`).
+    # stated assumption; a missing spin is the class-typical one, which is Jupiter's own period,
+    # so the value is Jupiter's: tier 4 (Q-119 option b).
     flat_ok = spin_h is not None and gg.flattening_from_spin(spin_h) is not None
     plan.layer(
         flat_ok,
         "flattening",
         _weakest("model_dependent", spin_tag),
-        "Flattening of the poles from the spin, with the mean density of Jupiter assumed (A7.2).",
+        "Flattening of the poles from the "
+        f"{'spin' if has_spin else 'typical spin of a giant planet'}, with the mean density of "
+        "Jupiter assumed (A7.2).",
         ["rot_period_h"] if has_spin else [],
         card=card,
         formula=gg.FLATTENING_FORMULA,
@@ -700,7 +712,7 @@ def _gas_giant_layers(card: Mapping[str, Any], plan: _Plan) -> None:
     plan.layer(
         True,
         "storms",
-        "inferred_from_analog",
+        "artistic",
         "A few storms between the jets, as on the giant planets of the Solar System. How many and "
         "where is a seeded look; no measurement of this planet's storms is used.",
         [],
@@ -812,7 +824,13 @@ def _visible(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
     kind = str(card.get("type"))
     if kind in SHADER_KINDS:
         # R7.7: shader colours are the artist's choice; neutral grey stands for "no data colour".
-        rgb = _rgb_tv([0.5, 0.5, 0.5], "artistic", "artist's neutral default (R7.7, D-02)")
+        source = "artist's neutral default (R7.7, D-02)"
+        if kind == "gas_giant" and any(
+            x["id"] == "colour" and x["tag"] != "artistic" for x in plan.layers
+        ):
+            # The palette is the `colour` layer; this flat swatch is only the neutral stand-in.
+            source = "neutral stand-in swatch (R7.7); the drawn palette is the colour layer (A7.2)"
+        rgb = _rgb_tv([0.5, 0.5, 0.5], "artistic", source)
         return {"available": True, "badge": ARTISTIC_BADGE, "rgb": rgb, "source": "class_palette"}
     if kind in ("asteroid_shape", "asteroid_procedural"):
         colour, source, _ = _asteroid_colour(card)
@@ -889,6 +907,10 @@ def _alt_text(card: Mapping[str, Any], params: Mapping[str, Any]) -> str:
     visible = params["view_modes"]["visible"]
     if not visible["available"]:
         colour = "no visible colour basis"
+    elif kind == "gas_giant" and any(
+        x["id"] == "colour" and x["tag"] != "artistic" for x in params["layers"]
+    ):
+        colour = "colour family from the equilibrium temperature"
     elif visible["rgb"]["tag"] == "artistic":
         colour = "artist's colour"
     elif kind in ("star", "star_mira", "star_ttauri"):

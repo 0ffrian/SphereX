@@ -11,7 +11,7 @@ import { stormsAt } from '../fields/flowModel';
 import { resolveMotion } from '../motion/motion';
 import { resolveShaderSpec, rhinesBands, flatteningRule, climateFromTeq } from './shaderSpec';
 import { sceneKey } from '../ViewerApp';
-import { BROWN_DWARF_CONFIG, planBrownDwarf } from './BrownDwarf';
+import { binaryMapOffset, BROWN_DWARF_CONFIG, IR_STRIPES_NOTE, planBrownDwarf } from './BrownDwarf';
 import type { HonestyState } from '../honesty';
 import type { RenderPlan } from '../planTypes';
 
@@ -212,6 +212,37 @@ describe('brown dwarf limb darkening and the infrared band pattern (issue #62)',
     expect(at('brown_dwarf', 'artistic', 'visible').bodies[0]!.albedoLuma).toBeFalsy();
   });
 
+  it('the infrared legend says the stripes are not from SPHEREx (PR #63 review)', () => {
+    const p = at('brown_dwarf', 'artistic', 'spherex_ir');
+    expect(p.drawn.find((d) => d.id === 'bands')?.description).toContain('not from SPHEREx');
+    expect(p.notes).toContain(IR_STRIPES_NOTE);
+    expect(at('brown_dwarf', 'artistic', 'visible').notes).not.toContain(IR_STRIPES_NOTE);
+  });
+
+  it('the limb-darkening text says 0.6 is a visible-band solar value used as a placeholder', () => {
+    const p = at('brown_dwarf', 'artistic', 'spherex_ir');
+    const l = p.drawn.find((d) => d.id === 'limb_darkening');
+    expect(l?.description).toMatch(/visible-band solar value/);
+    expect(l?.description).toMatch(/placeholder for an infrared view/);
+  });
+
+  it('the binary: body B shares the map but is turned by a seeded offset, A is not (artistic)', () => {
+    const p = at('brown_dwarf_binary', 'artistic', 'visible');
+    const [a, b] = p.bodies;
+    expect(a!.albedoOffsetU ?? 0).toBe(0);
+    expect(b!.albedoOffsetU).toBeGreaterThanOrEqual(0.25);
+    expect(b!.albedoOffsetU).toBeLessThan(0.75);
+    expect(a!.albedoUrl).toBe(b!.albedoUrl); // one shared map
+    // Deterministic from the seed, and different seeds give different offsets.
+    expect(at('brown_dwarf_binary', 'artistic', 'visible').bodies[1]!.albedoOffsetU).toBe(
+      b!.albedoOffsetU,
+    );
+    expect(binaryMapOffset(1)).toBe(binaryMapOffset(1));
+    expect(binaryMapOffset(1)).not.toBe(binaryMapOffset(2));
+    // A single dwarf has no offset.
+    expect(at('brown_dwarf', 'artistic', 'visible').bodies[0]!.albedoOffsetU).toBeUndefined();
+  });
+
   it('the band pattern is an artistic look: hidden at + Estimated, so the disc is even', () => {
     const p = at('brown_dwarf', 'derived', 'spherex_ir');
     expect(p.bodies[0]).toMatchObject({ albedoUrl: null });
@@ -246,18 +277,18 @@ describe('gas giants and worlds (A7.1, A7.2)', () => {
     expect(spec.field!.bands).toBe(8);
     // A slider wins (D-27).
     expect(resolveShaderSpec(card, params, { bands: 14 }, m).field!.bands).toBe(14);
-    // No spin or wind (issue #62): the typical spin and wind of a giant planet stand in (tier 3),
-    // stated in `assumed`; N = sqrt(2 Omega R / U) = 22 for Jupiter (A7.2), 11 in the field's units.
+    // No spin or wind (issue #62): the typical spin and wind of a giant planet stand in. The
+    // typical spin has no formula behind it, so tier 4 (Q-119 b), stated in `assumed`; N = sqrt(2 Omega R / U) = 22 for Jupiter (A7.2), 11 in the field's units.
     const none = resolveShaderSpec(card, { ...params, dynamics: undefined });
     expect(none.field!.bands).toBe(11);
     expect(none.gas!.bandsRule).toMatchObject({
-      tag: 'model_dependent',
-      tier: 3,
+      tag: 'inferred_from_analog',
+      tier: 4,
       assumed: { spin_period_h: 9.925, jet_speed_ms: 50 },
     });
   });
 
-  it('flattening follows the spin (tier 3 or weaker), else the typical spin (tier 3), capped', () => {
+  it('flattening follows the spin (tier 3 or weaker), else the typical spin (tier 4, Q-119 b), capped', () => {
     const { card, params } = fixture('gas_giant');
     const m = resolveMotion(card, params);
     const f = flatteningRule(m, card, undefined)!;
@@ -269,8 +300,8 @@ describe('gas giants and worlds (A7.1, A7.2)', () => {
       undefined,
     )!;
     expect(still).toMatchObject({
-      tier: 3,
-      tag: 'model_dependent',
+      tier: 4,
+      tag: 'inferred_from_analog',
       value: 0.06487,
       assumed: { spin_period_h: 9.925 },
     });
@@ -281,12 +312,12 @@ describe('gas giants and worlds (A7.1, A7.2)', () => {
     );
   });
 
-  it('shows bands, flattening, colour and storms from + Estimated, jets and turbulence at + Artistic only (issue #62)', () => {
+  it('shows bands, flattening and colour from + Estimated; storms, jets and turbulence at + Artistic only (issue #62)', () => {
     const est = at('gas_giant', 'derived');
-    expect(ids(est)).toEqual(['bands', 'flattening', 'colour', 'storms']);
+    expect(ids(est)).toEqual(['bands', 'flattening', 'colour']);
     expect(est.shader).toMatchObject({
       surface: true,
-      gas: { bands: true, flattening: true, colour: true, storms: true, turbulence: false },
+      gas: { bands: true, flattening: true, colour: true, storms: false, turbulence: false },
     });
     expect(ids(est)).not.toContain('jets');
     const p = at('gas_giant', 'artistic');
@@ -312,7 +343,7 @@ describe('gas giants and worlds (A7.1, A7.2)', () => {
       bands: 'inferred_from_analog',
       flattening: 'inferred_from_analog',
       colour: 'derived',
-      storms: 'inferred_from_analog',
+      storms: 'artistic',
       turbulence: 'artistic',
     });
   });

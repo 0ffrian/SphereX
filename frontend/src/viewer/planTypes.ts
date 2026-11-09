@@ -29,7 +29,9 @@ export type MissingReason =
   /** Not shown in the selected view mode (a baked texture is in visible-palette colour). */
   | 'mode'
   /** A reference value is still [verify]; nothing is invented in its place. */
-  | 'unverified';
+  | 'unverified'
+  /** Not drawn at the current quality level (the phone's low one), whatever the data says (Q-117). */
+  | 'quality';
 
 export interface MissingItem {
   id: string;
@@ -100,6 +102,11 @@ export interface BodyPlan {
    * brown dwarf, issue #62): the pattern is a look, the colour stays the SPHEREx average (R5.2).
    */
   albedoLuma?: boolean;
+  /**
+   * Longitude offset of the baked map, as a fraction of a turn (0..1). Body B of a binary gets a
+   * seeded one, so the two share a map but are not identical clones. A look (artistic).
+   */
+  albedoOffsetU?: number;
   roughness: number;
   meshUrl: string | null;
   albedoUrl: string | null;
@@ -359,6 +366,11 @@ export interface PlanContext {
    * plan, so the last stage (nothing held) is exactly the normal plan.
    */
   hold?: readonly string[];
+  /**
+   * The viewer's quality level (R5.7). Absent: not the low one. On `low` the asteroid's
+   * displacement is not drawn, so the plan refuses it with a reason instead of listing it (Q-117).
+   */
+  qualityTier?: 'high' | 'medium' | 'low';
   /**
    * D-27 slider overrides. Only the gas giant legend reads them (a slider sets the drawn band
    * count or flattening, so the legend names it `artistic`). Absent: no slider is set.

@@ -13,7 +13,8 @@ import { directionFromPhaseAngle } from './lighting';
 import { defaultContext, planRender } from './renderPlan';
 import { displacementActive, reliefAmpOf } from './renderers/AsteroidProcedural';
 import { ellipsoidAxes } from './planCommon';
-import type { PlanContext } from './planTypes';
+import type { MissingItem, PlanContext } from './planTypes';
+import { describeRefusal } from '../app/messages';
 import {
   cssToLinear,
   dustConeVolume,
@@ -141,6 +142,30 @@ describe('asteroid without a model: ellipsoid and displacement (R7.2)', () => {
     const est = planRender(card, params, defaultContext({ honesty: 'derived' }));
     expect(est.bodies[0]?.displacementScale ?? null).toBeNull();
     expect(est.drawn.some((d) => d.id === 'displacement')).toBe(false);
+  });
+
+  it('on the low quality level displacement is refused with a reason, not listed (Q-117)', () => {
+    const { card, params } = fixture('asteroid_procedural');
+    const at = (qualityTier?: 'high' | 'medium' | 'low') =>
+      planRender(card, params, defaultContext({ honesty: 'artistic', qualityTier }));
+    for (const t of [undefined, 'high', 'medium'] as const) {
+      const p = at(t);
+      expect(p.drawn.some((d) => d.id === 'displacement')).toBe(true);
+      expect(p.bodies[0]?.displacementScale).toBe(0.03);
+    }
+    const low = at('low');
+    expect(low.drawn.some((d) => d.id === 'displacement')).toBe(false);
+    expect(low.bodies[0]?.displacementScale ?? null).toBeNull();
+    expect(low.bodies[0]?.heightUrl ?? null).toBeNull();
+    expect(missing(low, 'displacement')).toMatchObject({
+      reason: 'quality',
+      detail: 'phone tier: relief shows as shading only',
+    });
+    expect(describeRefusal(missing(low, 'displacement') as MissingItem)).toContain(
+      'phone tier: relief shows as shading only',
+    );
+    // The normal map still carries the relief.
+    expect(low.drawn.some((d) => d.id === 'relief')).toBe(true);
   });
 
   it('refuses displacement while relief_amp is unknown (no value invented)', () => {

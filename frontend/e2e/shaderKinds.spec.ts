@@ -187,11 +187,12 @@ test('honesty default (gas giant, issue #62): + Estimated draws its estimated la
     },
     { card: read('cards', 'gas_giant'), params: read('params', 'gas_giant') },
   );
-  // Issue #62: a gas giant is five layers. + Estimated draws four, the artistic swirl waits for
-  // + Artistic, and Measured only draws none of them (a plain sphere of the measured radius).
-  const four = ['bands', 'flattening', 'colour', 'storms'];
-  const all = [...four, 'turbulence'];
-  expect(out.first).toEqual({ drawn: four, hidden: ['turbulence'] });
+  // Issue #62: a gas giant is five layers. + Estimated draws three; the storms and the swirl are
+  // seeded looks (artistic) and wait for + Artistic; Measured only draws none of them (a plain
+  // sphere of the measured radius).
+  const three = ['bands', 'flattening', 'colour'];
+  const all = [...three, 'storms', 'turbulence'];
+  expect(out.first).toEqual({ drawn: three, hidden: ['storms', 'turbulence'] });
   expect(out.measured).toEqual({ drawn: [], hidden: all });
   expect(out.shown).toEqual({ drawn: all, same: true });
   expect(out.again, 'field regenerated on an honesty toggle').toBe(0);

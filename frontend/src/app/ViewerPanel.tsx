@@ -209,9 +209,33 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const fixture = useAppStore((s) => s.sky.fixture);
   const [announcement, setAnnouncement] = useState('');
 
+  // The viewer's quality level (R5.7): the plan lists a layer that level does not draw as refused
+  // (Q-117). Read when the viewer appears, then kept by the quality-change handler below.
+  // A change reported by the viewer wins; until then the level it started on.
+  const [tierChange, setTierChange] = useState<{
+    viewer: ViewerApp;
+    tier: NonNullable<PlanContext['qualityTier']>;
+  } | null>(null);
+  const startTier = viewer?.renderStats?.().tier;
+  const qualityTier: PlanContext['qualityTier'] =
+    tierChange && tierChange.viewer === viewer
+      ? tierChange.tier
+      : startTier === 'high' || startTier === 'medium' || startTier === 'low'
+        ? startTier
+        : undefined;
+
   const ctx: PlanContext = useMemo(
-    () => defaultContext({ honesty, mode: modeChoice, epoch, scrubIndex, failed, overrides }),
-    [honesty, modeChoice, epoch, scrubIndex, failed, overrides],
+    () =>
+      defaultContext({
+        honesty,
+        mode: modeChoice,
+        epoch,
+        scrubIndex,
+        failed,
+        overrides,
+        qualityTier,
+      }),
+    [honesty, modeChoice, epoch, scrubIndex, failed, overrides, qualityTier],
   );
   const plan = useMemo(
     () => (card && params ? planRender(card, params, ctx) : null),
@@ -337,6 +361,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   useEffect(() => {
     if (!viewer) return;
     viewer.setQualityChangeHandler((e) => {
+      setTierChange({ viewer, tier: e.to });
       if (!e.auto) return;
       setAnnouncement(QUALITY_DROP_ANNOUNCEMENT);
       setQualityLowered(true);

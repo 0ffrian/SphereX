@@ -47,13 +47,15 @@ def test_surface_is_split_into_five_layers_in_order() -> None:
 def test_tags_without_a_spin_follow_the_tier_chain() -> None:
     ls = layers(card())  # teq_K measured, no rot_period_h
     assert {k: v["tag"] for k, v in ls.items()} == {
-        "bands": "model_dependent",
-        "flattening": "model_dependent",
+        "bands": "inferred_from_analog",
+        "flattening": "inferred_from_analog",
         "colour": "derived",
-        "storms": "inferred_from_analog",
+        "storms": "artistic",
         "turbulence": "artistic",
     }
-    # Tier 3 states the typical inputs it used (D-32); the missing spin is among them.
+    # Q-119 (b): a typical spin is a typical value with no measurement behind it, tier 4, and the
+    # layer names the typical value it used (D-32).
+    assert ls["bands"]["tier"] == 4 and ls["flattening"]["tier"] == 4
     assert ls["bands"]["assumed"] == {"rot_period_h": gg.TYPICAL_SPIN_H, "zonal_wind_ms": 50.0}
     assert ls["flattening"]["assumed"] == {
         "rot_period_h": gg.TYPICAL_SPIN_H,
@@ -61,6 +63,7 @@ def test_tags_without_a_spin_follow_the_tier_chain() -> None:
     }
     assert ls["bands"]["formula"] and ls["flattening"]["formula"] and ls["colour"]["formula"]
     assert "formula" not in ls["storms"] and "assumed" not in ls["storms"]
+    assert "typical spin" in ls["bands"]["description"]
 
 
 def test_a_measured_spin_leaves_only_the_wind_assumed() -> None:
@@ -70,6 +73,8 @@ def test_a_measured_spin_leaves_only_the_wind_assumed() -> None:
     assert ls["bands"]["requires"] == ["radius_rjup", "rot_period_h"]
     # The card has no wind, so the best tag stays model_dependent, never derived.
     assert ls["bands"]["tag"] == "model_dependent"
+    assert ls["flattening"]["tag"] == "model_dependent"
+    assert "typical spin" not in ls["bands"]["description"]
     assert ls["bands"]["assumed"] == {"zonal_wind_ms": 50.0}
     assert ls["flattening"]["assumed"] == {"mean_density": "same as Jupiter"}
 
@@ -113,6 +118,27 @@ def test_a_null_typical_value_refuses_the_layer(
     assert "bands" in card_to_params(card(), seed=1)["missing"]
 
 
+def test_withdrawing_the_typical_spin_keeps_a_measured_spin_flattening(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PR #63 review: Jupiter's period is its own constant, not the typical spin."""
+    monkeypatch.setattr(gg, "TYPICAL_SPIN_H", None)
+    c = card()
+    c["rot_period_h"] = tv(10.0)
+    p = card_to_params(c, seed=1)
+    assert "flattening" not in p["missing"]
+    monkeypatch.setattr(gg, "JUPITER_SPIN_H", None)
+    assert "flattening" in card_to_params(c, seed=1)["missing"]
+
+
+def test_alt_text_and_swatch_say_the_colour_is_drawn_from_teq() -> None:
+    p = card_to_params(card(), seed=1)
+    assert "equilibrium temperature" in p["alt_text"] and "artist's colour" not in p["alt_text"]
+    c = card()
+    del c["teq_K"]
+    assert "artist's colour" in card_to_params(c, seed=1)["alt_text"]
+
+
 def test_deterministic() -> None:
     a = json.dumps(card_to_params(card(), seed=3), sort_keys=True)
     assert a == json.dumps(card_to_params(card(), seed=3), sort_keys=True)
@@ -142,4 +168,4 @@ def test_typical_constants_match_the_viewer_twins() -> None:
     assert ts("TYPICAL_GAS_SPIN_H") == gg.TYPICAL_SPIN_H
     assert ts("TYPICAL_GAS_WIND_MS") == gg.TYPICAL_ZONAL_WIND_MS
     assert ts("JUPITER_FLATTENING") == gg.JUPITER_FLATTENING
-    assert ts("JUPITER_SPIN_H") == gg.TYPICAL_SPIN_H  # P_J of the flattening rule
+    assert ts("JUPITER_SPIN_H") == gg.JUPITER_SPIN_H  # P_J of the flattening rule
