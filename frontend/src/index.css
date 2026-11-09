@@ -470,37 +470,60 @@ body {
     font-size: 12.5px;
     line-height: 1.4;
   }
-  .sx-chips {
+  /* The demo list (issue #68, 7a; mock-up .suggest): a listbox above the pill. Rows are
+     role="option"; focus never leaves the input. */
+  .sx-suggest {
+    width: 100%;
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 6px;
-  }
-  .sx-chip {
-    min-height: 28px;
-    font-size: 12px;
-    padding: 3px 10px;
-    border-radius: 99px;
+    flex-direction: column;
+    border-radius: var(--radius-sx-md, 14px);
     border: 1px solid var(--color-sx-border);
-    color: var(--color-sx-fg);
-    background: #1a1a1ee6;
-    transition: background 0.2s;
+    background: #111114f5;
+    box-shadow: 0 20px 50px #000c;
+    padding: 6px;
+    overflow: hidden;
   }
-  .sx-chip:hover {
+  .sx-suggest-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    max-height: min(52vh, 24rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .sx-suggest-list[hidden] {
+    display: none;
+  }
+  .sx-suggest-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 36px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    color: var(--color-sx-fg);
+    cursor: pointer;
+  }
+  .sx-suggest-row em {
+    font: normal 11px var(--font-mono);
+    color: var(--color-sx-dim-text);
+    text-align: right;
+  }
+  .sx-suggest-row:hover,
+  .sx-suggest-row[data-active='true'] {
     background: var(--color-sx-muted-2);
   }
-  .sx-chip:focus-visible {
+  .sx-suggest-row[data-active='true'] {
     outline: 2px solid var(--color-sx-green);
-    outline-offset: 2px;
+    outline-offset: -2px;
   }
-  /* "Try:" floats over the sky image, so it gets its own dark backing for contrast. */
-  .sx-chips-lead {
+  .sx-suggest-hint {
+    margin: 0;
+    padding: 6px 10px 4px;
     font-size: 12px;
-    color: var(--color-sx-mfg);
-    background: #050507d9;
-    border-radius: 6px;
-    padding: 1px 6px;
+    color: var(--color-sx-dim-text);
   }
 
   /* ---- sky credit (SkyPane) ---- */
@@ -780,23 +803,22 @@ body {
       align-items: stretch;
       margin-bottom: 6px;
     }
-    /* The quick picks scroll sideways on purpose (one row keeps the sky tall). The fade at the right
-       edge shows there is more; Tab and swipe both reach every chip. */
-    .sx-chips {
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      justify-content: flex-start;
-      padding-bottom: 2px;
-      scroll-padding-inline: 28px;
-      mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    /* The demo list opens above the pill, out of the flow, so opening it never moves the pill. It
+       has its own max-height and scroll; rows are at least 44 px (R9). */
+    .sx-suggest {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 100%;
+      margin-bottom: 6px;
+      width: auto;
+      z-index: 30;
     }
-    .sx-chip {
-      white-space: nowrap;
+    .sx-suggest-list {
+      max-height: min(44vh, 22rem);
     }
-    .sx-chips-lead {
-      flex: none;
-      background: none;
-      padding: 0;
+    .sx-suggest-row {
+      min-height: 44px;
     }
     /* The credit becomes a full-width strip at the bottom of the sky; the bottom sheet docks on top
        of it (--sx-credit-h), so the credit never cuts across the sheet's text (D-35). */
@@ -843,10 +865,6 @@ body {
     }
     .sx-scrub input {
       height: 44px;
-    }
-    .sx-chip {
-      min-height: 44px;
-      padding: 3px 14px;
     }
     .sx-search-input {
       height: 48px;
@@ -1507,11 +1525,6 @@ body {
   }
 }
 
-/* Issue #60: the quick picks belong to the full sky; in the split view they would sit over the pane. */
-.sx-bezel[data-split] .sx-chips {
-  display: none;
-}
-
 /* Issue #60: the Show toggle stays one tap away but takes one slim row under the steps (the mock-up
    has no such row; the stage keeps the room). Unlayered so it beats the utility classes. */
 .sx-bp-show button {
@@ -1647,4 +1660,11 @@ body {
 /* The panel title takes focus (programmatically) when focus was lost while the island thought. */
 .sx-panel-head h2:focus {
   outline: none;
+}
+
+/* Issue #68: while the demo list is open it replaces the help line (the list's own hint says what
+   to type). The help stays in the page for screen readers (aria-describedby). Unlayered, so it wins
+   over Tailwind's `not-sr-only`. */
+.sx-search[data-list-open] .sx-search-pop > p:first-child {
+  display: none;
 }
