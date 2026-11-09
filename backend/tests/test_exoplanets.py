@@ -223,7 +223,7 @@ PLANETS = {
 }
 
 
-# Live values since issue #68 (no `proposed` fixture), so a drift from the proposed values fails here.
+# Live values since issue #68 (no `proposed` fixture): a drift from the proposed values fails.
 @pytest.mark.parametrize(("name", "want"), PLANETS.items())
 def test_fixture_planets_offline(client: TestClient, name: str, want: str) -> None:
     oid = resolve_id(client, name)
