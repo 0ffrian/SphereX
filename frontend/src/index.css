@@ -1588,6 +1588,11 @@ body {
       position: relative;
       z-index: 2;
     }
+    /* The open demo list is taller than the strip under the panel card (z 20), so it must sit above
+       the card or its rows cannot be pressed. The sky credit (z 25) stays above the list. */
+    .sx-search-slot:has(.sx-search[data-list-open='true']) {
+      z-index: 22;
+    }
     /* Four thin strips, not full-size gradients: a full-area layer over the canvas is blended on
        every frame, and that is slow without a GPU. */
     .sx-sky-shade i {
