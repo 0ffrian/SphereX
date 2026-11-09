@@ -1,12 +1,13 @@
 # 12 Sequence: texture bake and optional Gemini repaint
 
-How the backend bakes the maps for a rendering-doc type, and the optional Gemini repaint with its alignment check. Drawn from rendering doc §1 (determinism), §6.1–6.7 and §10, and decisions D-01, D-06, D-07, D-24 (Gemini off in the offline demo) and D-25 (read-through cache, `SX_OFFLINE`).
+How the backend bakes the maps for a rendering-doc type, and the optional Gemini repaint with its alignment check. Drawn from rendering doc §1 (determinism), §6.1–6.7 and §10, and decisions D-01, D-06, D-07, D-24 (Gemini off in the offline demo) and D-25 (read-through cache, `SX_OFFLINE`), and Q-112 (issue #41: the bake runs in a worker process off the request path).
 
 ```mermaid
 sequenceDiagram
   autonumber
   participant API as Backend API
   participant C2P as card_to_params.py
+  participant TB as TextureBaker (render/background.py)
   participant B as bake.py
   participant H as noise.py, craters.py, height.py
   participant N as normals.py
@@ -19,7 +20,9 @@ sequenceDiagram
 
   API->>C2P: card_to_params(ObjectCard)
   C2P-->>API: style, ellipsoid_axes, octaves, relief_amp, crater_count, boulder_density, base_rgb, brightness, hydration, redness, roughness (each tagged)
-  API->>B: Bake(params, seed = hash of id + generator_version)
+  API->>TB: submit(card, params) when params has textures (the object job, first-stage and final answers)
+  TB-->>API: Queued, the reply does not wait. A texture URL answers 404 until the bake lands (Q-112)
+  TB->>B: bake_to_cache in a spawn worker process (SX_BAKE_WORKERS=1), each R5 size: 2048x1024 and 1024x512 (seed = hash of id + generator_version)
   B->>H: fbm of 3D value noise on the unit sphere (equirectangular)
   B->>H: Craters (power-law radii, bounding box only), boulders (density by style)
   H-->>B: height = relief_amp x fbm + craters + boulders
@@ -28,7 +31,7 @@ sequenceDiagram
   B->>PA: base_rgb x brightness x small variation, hydration and redness rules
   PA-->>B: Albedo map
   B->>TC: Write albedo.webp, height.png, height.bin (float16), normal.png and bake.json (params hash) under id/generator_version/seed/WxH#59; skip if bake.json matches
-  B-->>API: Texture URLs
+  B-->>TB: Texture directory, served at /data/textures
 
   opt Gemini repaint (P3 stretch, behind admin token)
     A->>API: Request repaint for id
@@ -72,4 +75,4 @@ sequenceDiagram
 - The Gemini call goes through the backend's read-through cache like every external call (D-25). With `SX_OFFLINE=1` a miss is refused and the code colour stays (D-24). Whether a cached repaint is shown under `SX_OFFLINE=1` is Q-29.
 - Shader kinds are not baked here (D-01); their field is built in the browser ([10-sequence-view-3d.md](10-sequence-view-3d.md)).
 - Image-first (Depth Anything V2 Small) and Marigold paths are offline options, not drawn (rendering doc §6.6).
-- As built (issue #5): the seed is the first 4 bytes of SHA-256(`id` + newline + `generator_version`), and `generator_version` is `p<card_to_params version>-b<BAKER_RULES_VERSION>` (Q-35, an assumption). The render-params endpoint does not call the baker yet; `python -m app.core.render` bakes from a card file.
+- As built (issue #5): the seed is the first 4 bytes of SHA-256(`id` + newline + `generator_version`), and `generator_version` is `p<card_to_params version>-b<BAKER_RULES_VERSION>` (Q-35, an assumption). Since issue #41 (Q-112) the object job queues both sizes on `TextureBaker` (`SX_BAKE_TEXTURES=1`, `SX_BAKE_WORKERS=1`) and the API serves them from `SX_TEXTURES_DIR` (default `<SX_CACHE_DIR>/textures`) at `/data/textures`; the same bake already in flight is not queued twice. `python -m app.core.render` still bakes from a card file.

@@ -153,6 +153,33 @@ describe('FlowSource jets, storms and rings', () => {
     expect(rates.at(-1)!).toBeCloseTo(STORM_SWIRL_CENTRE_HZ, 0);
   });
 
+  it('a moving storm: the swirl rate rises towards the drawn centre, not the t = 0 one', () => {
+    const p: FieldParams = { ...GAS, storms: 1 };
+    const field = new FieldSampler(generateField(p, W, H));
+    const born = stormsFor(p.seed, 1)[0]!;
+    // Carry the storm 0.5 rad east along its latitude.
+    const lat = Math.asin(born.center[1]);
+    const lon = Math.atan2(born.center[2], born.center[0]) + 0.5;
+    const moved = {
+      ...born,
+      center: [Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon)] as [
+        number,
+        number,
+        number,
+      ],
+    };
+    field.setStorms([moved]);
+    const sink = new RecordingSink();
+    const src = new FlowSource(sink, field, p, 'artistic');
+    src.move(sampleAt(moved.center));
+    expect(sink.activeTrainId).toBe(STORM_TRAIN_ID);
+    expect(sink.current!.rateHz).toBeCloseTo(STORM_SWIRL_CENTRE_HZ, 0);
+    // The old birth point is outside the moved storm now: no swirl there.
+    const old = new RecordingSink();
+    new FlowSource(old, field, p, 'artistic').move(sampleAt(born.center));
+    expect(old.activeTrainId).not.toBe(STORM_TRAIN_ID);
+  });
+
   it('rings tick on entering each gap, only when the rings are drawn', () => {
     const field = new FieldSampler(generateField(GAS, 32, 16));
     const walk = (rings: number) => {

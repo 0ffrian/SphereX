@@ -1,7 +1,11 @@
 // A10 hash routing (optional challenge item): a shareable link with coordinates.
-// Format: #ra=<deg>&dec=<deg>[&name=<search text>][&frame=<frame_id>]
+// Format: #ra=<deg>&dec=<deg>[&name=<search text>][&frame=<frame_id>][&colour=tint|composite][&build]
+// `build` (issue #60, as the mock-up's `#build`) is there while the build pane is open; on its own
+// (`#build`) it is the 3D view with no object searched.
 // `name` is kept when the search was by name, so a link to a moving object reopens the same
-// object id rather than whatever sits at those coordinates.
+// object id rather than whatever sits at those coordinates. `colour` is the flipbook's colour view
+// (colourMode.ts); without it the flipbook shows the raw frames, so older links keep working.
+import { parseColourParam, type ColourView } from './flipbook/colourMode';
 import { validateCoords } from './search/parseQuery';
 
 export interface HashState {
@@ -9,6 +13,9 @@ export interface HashState {
   ra?: number;
   dec?: number;
   frame?: string;
+  colour?: ColourView;
+  /** The build pane is open (issue #60). */
+  build?: boolean;
 }
 
 export interface ParsedHash extends HashState {
@@ -40,6 +47,14 @@ export function parseHash(hash: string): ParsedHash {
 
   const frame = params.get('frame')?.trim();
   if (frame) out.frame = frame;
+
+  const colour = params.get('colour')?.trim();
+  if (colour) {
+    const view = parseColourParam(colour);
+    if (view) out.colour = view;
+    else out.problems.push(`Link colour view “${colour}” ignored; showing the raw frames.`);
+  }
+  if (params.has('build')) out.build = true;
   return out;
 }
 
@@ -51,8 +66,11 @@ export function formatHash(state: HashState): string {
   }
   if (state.name) params.set('name', state.name);
   if (state.frame) params.set('frame', state.frame);
+  if (state.colour) params.set('colour', state.colour);
   const s = params.toString();
-  return s === '' ? '' : `#${s}`;
+  // A bare `build` flag, written without "=" so the link reads as the mock-up's `#build`.
+  const all = state.build ? (s === '' ? 'build' : `${s}&build`) : s;
+  return all === '' ? '' : `#${all}`;
 }
 
 /** The search a hash asks for: the name when present, else the coordinates. */

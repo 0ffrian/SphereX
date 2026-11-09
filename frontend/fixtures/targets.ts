@@ -1,6 +1,8 @@
 // DEV/TEST FIXTURES ONLY. Never imported by app code (src/fixtures.test.ts enforces this).
-// The five A1.1 test targets plus two synthetic objects. Only the names and J2000 coordinates of
-// the real targets are meant to be real; everything the generators make from them is synthetic.
+// The five A1.1 test targets plus synthetic objects (two movers, a progressive object that loads
+// in parts and a cached spot for the sky's "loads instantly" markers). Only the names and J2000
+// coordinates of the real targets are meant to be real; everything the generators make from them
+// is synthetic.
 //
 // RA/Dec: ICRS, epoch J2000, from SIMBAD (checked 5 Nov 2026 against the backend's recorded SIMBAD
 // replies). Barnard's Star, eps Ind B and WISE 0855 move 2-4.6 arcmin from these positions by the
@@ -20,6 +22,11 @@ export interface FixtureTarget {
   northUp: boolean;
   frameCount: number;
   seed: number;
+  /**
+   * Frames clipped by a detector edge: the cutout lost rows above the object, so it is shorter
+   * and the object sits near its top (like the real 59×36 and 58×46 cutouts).
+   */
+  clippedFrames?: Readonly<Record<number, { width: number; height: number }>>;
   /** Frame indices whose cutout returns 404 (refusal path); refused as `cutout` in the spectrum. */
   brokenCutouts?: readonly number[];
   /**
@@ -40,6 +47,19 @@ export interface FixtureTarget {
   /** When set, the frames reply is empty and lists this in `missing` (backend M1 behaviour). */
   refuseFrames?: string;
   refuseSpectrum?: string;
+  /** When set, the colour composite is refused (`image_url: null`) with these in `missing`. */
+  refuseComposite?: readonly string[];
+  /**
+   * Progressive loading (like a live backend with a small SX_LIVE_CUTOUTS_PER_REQUEST): frames
+   * listed by the 1st, 2nd, … `/frames` reply since the last resolve; the rest are
+   * `cutouts:deferred:<n>`. The last stage must be `frameCount` (complete).
+   */
+  progressive?: readonly number[];
+  /**
+   * Issue #60: name of a shared 3D fixture (`shared/fixtures/cards/<body>.json` and
+   * `params/<body>.json`) that `/card` and `/render-params` serve for this target. Unset: no 3D model.
+   */
+  body?: string;
 }
 
 export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
@@ -53,6 +73,7 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     northUp: false,
     frameCount: 24,
     seed: 101,
+    clippedFrames: { 2: { width: 64, height: 40 } },
     // Shape of the 6 Nov full-cache run (synthetic): saturated in all but one frame.
     spectrumShape: { measured: [], refusals: { 11: 'aperture_flags' } },
   },
@@ -111,6 +132,8 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     // (synthetic shape).
     spectrumShape: { measured: [], refusals: { 21: 'aperture_edge', 22: 'aperture_edge' } },
     unlistedRefusals: { 24: 'outside_cutout' },
+    // Fixture-only path: a refused composite (synthetic reasons, not R Dra's real data).
+    refuseComposite: ['composite:red:saturated', 'composite:saturated', 'composite:too_few_bands'],
   },
   {
     id: 'synthetic-mover',
@@ -122,6 +145,45 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     northUp: true,
     frameCount: 16,
     seed: 606,
+    refuseComposite: ['composite:moving_object'],
+  },
+  {
+    id: 'synthetic-progressive',
+    name: 'Synthetic progressive (fixture)',
+    aliases: ['Synthetic progressive', 'synthetic-progressive'],
+    ra: 30, // synthetic position, not a real object
+    dec: 30,
+    moving: false,
+    northUp: false,
+    frameCount: 30,
+    seed: 808,
+    unlistedRefusals: { 30: 'outside_cutout' },
+    progressive: [4, 10, 18, 30],
+  },
+  {
+    id: 'synthetic-cached-spot',
+    name: 'Synthetic cached spot (fixture)',
+    aliases: ['Synthetic cached spot', 'synthetic-cached-spot'],
+    ra: 45, // synthetic position, not a real object
+    dec: -15,
+    moving: false,
+    northUp: false,
+    frameCount: 12,
+    seed: 909,
+  },
+  {
+    // Issue #60: a searchable water planet for the build view. Name, position and frames are all
+    // synthetic; its card and render params are the shared planet_water fixture as it draws today.
+    id: 'aqua-prime',
+    name: 'Aqua Prime',
+    aliases: ['Aqua Prime', 'aqua-prime'],
+    ra: 38, // synthetic position, not a real object (near the cached spot at 45, -15)
+    dec: -12,
+    moving: false,
+    northUp: false,
+    frameCount: 12,
+    seed: 1010,
+    body: 'planet_water',
   },
   {
     id: 'synthetic-refused-mover',
@@ -135,6 +197,7 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     seed: 707,
     refuseFrames: 'frames:moving_object_search',
     refuseSpectrum: 'spectrum:moving_object_search',
+    refuseComposite: ['composite:moving_object'],
   },
 ];
 

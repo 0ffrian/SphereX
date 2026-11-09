@@ -15,6 +15,7 @@ dependencies = [
     # Validates /card and /render-params replies against shared/schemas (Q-40, issue #5).
     "jsonschema==4.26.0",
     "referencing==0.37.0",  # imported directly by core/card/validate.py
+    "anyio==4.15.1",  # imported directly by api/objects.py (event streams, issue #41)
 ]
 
 [dependency-groups]

@@ -15,8 +15,70 @@ class Layer(BaseModel):
     )
     id: str
     tag: object_card_schema.Tag
+    tier: object_card_schema.Tier
     description: str
     requires: list[str]
+    formula: str | None = Field(
+        None, description="Required, non-blank, when tag is derived or model_dependent."
+    )
+    assumed: dict[str, float | str] | None = Field(
+        None,
+        description="Inputs that were not measured, keyed by card field or rule input name, with the value used. Required when tag is model_dependent.",
+        min_length=1,
+    )
+
+
+class DynamicsValue(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    value: float
+    tag: object_card_schema.Tag
+    tier: object_card_schema.Tier
+    source: str
+    formula: str | None = Field(
+        None, description="Required, non-blank, when tag is derived or model_dependent."
+    )
+    assumed: dict[str, float | str] | None = Field(
+        None,
+        description="Inputs that were not measured, keyed by card field or rule input name, with the value used. Required when tag is model_dependent.",
+        min_length=1,
+    )
+
+
+class PositiveDynamicsValue(DynamicsValue):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    value: float = Field(..., gt=0.0)
+
+
+class NonNegativeDynamicsValue(DynamicsValue):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    value: float = Field(..., ge=0.0)
+
+
+type Speedup = Annotated[float, Field(..., gt=0.0)]
+
+
+class Dynamics(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    spin_period_h: PositiveDynamicsValue | None = None
+    diff_rotation: DynamicsValue | None = None
+    jet_speed_ms: DynamicsValue | None = None
+    spot_lifetime_d: PositiveDynamicsValue | None = None
+    flare_rate_per_d: NonNegativeDynamicsValue | None = None
+    pulsation_period_d: PositiveDynamicsValue | None = None
+    speedup: dict[Literal["spin", "spots", "flares", "winds", "clouds", "pulsation"], Speedup] = (
+        Field(
+            ...,
+            description="Time-lapse factor shown on screen for each animated process (D-34). {} when nothing moves.",
+        )
+    )
 
 
 class RenderTextures(BaseModel):
@@ -28,6 +90,11 @@ class RenderTextures(BaseModel):
     normal: str
     roughness: str | None = None
     height_bin: str | None = None
+    relief_amp: float | None = Field(
+        None,
+        description="Peak relief as a fraction of the body radius (R6.2 relief_amp): the scale of the displacement by the baked height map (R7.2). Optional; the backend does not send it yet (Q-103).",
+        gt=0.0,
+    )
 
 
 class RenderLighting(BaseModel):
@@ -115,6 +182,7 @@ class RenderParams(BaseModel):
     lighting: RenderLighting
     view_modes: ViewModes
     haptics: HapticProfile
+    dynamics: Dynamics | None = None
     alt_text: str = Field(..., description="R9.")
     missing: list[str] = Field(
         ..., description="Layers refused for missing data, shown to the user."

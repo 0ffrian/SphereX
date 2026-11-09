@@ -52,11 +52,11 @@ def test_class_label_comes_from_the_catalogue_with_its_confidence() -> None:
     assert "spectral_class" in none.missing
 
 
-def test_exoplanet_thresholds_are_not_hard_coded() -> None:
-    """R3.3 step 4 / R12 #12: no cut-offs until agreed, so the type is refused, not picked."""
-    assert all(v is None for v in EXOPLANET_THRESHOLDS.values())
+def test_exoplanet_thresholds_refuse_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    """R12 #12: a threshold set to None refuses the rule instead of guessing."""
+    monkeypatch.setitem(EXOPLANET_THRESHOLDS, "rocky_max_radius_earth", None)
     row = {"pl_rade": 1.0, "pl_bmasse": 1.0, "pl_eqt": 300.0}
-    planet, missing = classify_exoplanet(row)
+    planet, missing, _ = classify_exoplanet(row)
     assert planet is None and missing == ("type:exoplanet_thresholds",)
     c = classify(CatalogueFacts(exoplanet=row))
     assert c.type == "candidate"

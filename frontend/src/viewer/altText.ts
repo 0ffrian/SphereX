@@ -6,7 +6,7 @@ import { badgeForTag, HONESTY_LABEL, stateThatShows, type HonestyState } from '.
 import { MODE_LABEL } from './modes';
 import { showsBody } from './planCommon';
 import type { RenderPlan, ViewModeId } from './planTypes';
-import { formatLength } from './scaleBar';
+import { AT_AGE_MAX_PHRASE, formatLength, type ShownSize } from './scaleBar';
 
 export const TYPE_NAME: Readonly<Record<ObjectType, string>> = {
   asteroid_shape: 'asteroid with a shape model',
@@ -35,14 +35,29 @@ export function tagWord(tag: Tag): string {
   return badgeForTag(tag).toLowerCase();
 }
 
-function sizeText(plan: RenderPlan): string {
-  if (plan.scaleM === null) return 'size unknown';
-  const d = formatLength(2 * plan.scaleM);
-  const tag = plan.sizeTag ? tagWord(plan.sizeTag) : null;
+/**
+ * The size that is on screen. `shown` is the scale bar's size (`shownSize`): for a loaded shape
+ * model it is the model's own size, not the card's, so a screen reader hears what the bar says.
+ * Without it the card's size is used.
+ */
+function sizeText(plan: RenderPlan, shown?: ShownSize | null): string {
+  const radiusM = shown ? shown.radiusM : plan.scaleM;
+  if (radiusM === null || radiusM === undefined) return 'size unknown';
+  const d = formatLength(2 * radiusM);
+  const tagOf = shown ? shown.tag : plan.sizeTag;
+  const tag = tagOf ? tagWord(tagOf) : null;
+  const qualifier = shown ? shown.qualifier : plan.sizeQualifier;
   // An upper limit is read out as a bound, never as a measurement (R7.3).
-  if (plan.sizeQualifier === 'upper_limit')
-    return `at most ${d} across (upper limit${tag ? `, ${tag}` : ''})`;
-  return tag ? `${d} across (${tag})` : `${d} across`;
+  // The remnant's age slider draws the shell smaller than its full size (Q-103).
+  const at = shown?.atSliderMax ? AT_AGE_MAX_PHRASE : '';
+  if (qualifier === 'upper_limit')
+    return `at most ${d} long${at} (upper limit${tag ? `, ${tag}` : ''})`;
+  return tag ? `${d} long${at} (${tag})` : `${d} long${at}`;
+}
+
+/** "Size shown: 33 km long (estimated)". Said when the honesty level changes which size shows. */
+export function sizeAnnouncement(plan: RenderPlan, shown: ShownSize): string {
+  return `Size shown: ${sizeText(plan, shown)}.`;
 }
 
 function colourBasis(plan: RenderPlan): string {
@@ -88,7 +103,7 @@ function sentence(text: string): string {
   return /[.!?]$/.test(text) ? text : `${text}.`;
 }
 
-export function buildAltText(plan: RenderPlan): string {
+export function buildAltText(plan: RenderPlan, shown?: ShownSize | null): string {
   const type = TYPE_NAME[plan.type];
   if (!plan.threeD) {
     return `${plan.name}, ${type}. ${sentence(plan.message ?? 'No 3D view.')}`;
@@ -101,7 +116,7 @@ export function buildAltText(plan: RenderPlan): string {
     const alt = sentence(plan.shader.params.alt_text.trim());
     return plan.shader.surface
       ? `${alt} This is an artist's impression, not a measured image.`
-      : `${plan.name}, ${type}, ${sizeText(plan)}. A plain grey sphere: the surface is an artist's impression and is hidden at this level.`;
+      : `${plan.name}, ${type}, ${sizeText(plan, shown)}. A plain grey sphere: the surface is an artist's impression and is hidden at this level.`;
   }
   const phase =
     plan.lighting.phaseAngleDeg !== null
@@ -109,7 +124,7 @@ export function buildAltText(plan: RenderPlan): string {
       : plan.lighting.mode === 'self'
         ? 'self-luminous, so no phase angle'
         : 'phase angle unknown';
-  const parts = [plan.name, type, sizeText(plan)];
+  const parts = [plan.name, type, sizeText(plan, shown)];
   if (plan.tintUsed) parts.push(colourBasis(plan));
   parts.push(phase);
   // Relief is named only where there is relief to describe: a shape model or a normal map.
@@ -118,12 +133,12 @@ export function buildAltText(plan: RenderPlan): string {
 }
 
 /** The canvas aria-label: the alt text plus how to use it. Updated whenever the plan changes. */
-export function canvasLabel(plan: RenderPlan | null): string {
+export function canvasLabel(plan: RenderPlan | null, shown?: ShownSize | null): string {
   const help = '3D view: drag or use the arrow keys to rotate, plus and minus to zoom, R to reset.';
   if (!plan) return `Viewer placeholder: no object loaded. ${help}`;
   // No help when there is no 3D view to operate.
-  if (!plan.threeD || !showsBody(plan)) return buildAltText(plan);
-  return `${buildAltText(plan)} ${help}`;
+  if (!plan.threeD || !showsBody(plan)) return buildAltText(plan, shown);
+  return `${buildAltText(plan, shown)} ${help}`;
 }
 
 function countPhrase(n: number, noun: string): string {
@@ -138,14 +153,31 @@ export function modeAnnouncement(mode: ViewModeId, plan: RenderPlan): string {
 export function epochAnnouncement(epoch: CometEpoch, plan: RenderPlan): string {
   const shells = plan.shells.map((s) => s.label).join(', ');
   const dust = plan.dust ? 'Dust is shown.' : 'No dust is shown.';
-  return `${EPOCH_NAME[epoch]}. ${shells ? `Gas shells: ${shells}.` : 'No gas shells for this epoch.'} ${dust} No tail is drawn.`;
+  // Built from what the plan draws: a tail volume exists only when its layer is drawn.
+  const tails = plan.volumes
+    .filter((v) => v.kind === 'ion_tail' || v.kind === 'dust_tail')
+    .map((v) => (v.kind === 'ion_tail' ? 'gas tail' : 'dust tail'));
+  const tail = tails.length > 0 ? `Tails drawn: ${tails.join(' and ')}.` : 'No tail is drawn.';
+  return `${EPOCH_NAME[epoch]}. ${shells ? `Gas shells: ${shells}.` : 'No gas shells for this epoch.'} ${dust} ${tail}`;
 }
 
-export function honestyAnnouncement(state: HonestyState, plan: RenderPlan): string {
+/**
+ * `shown` is the size the scale bar will show at the new level, and `previous` the one it shows
+ * now: when they differ (the shape model's own size swaps with the card's), the change is said.
+ */
+export function honestyAnnouncement(
+  state: HonestyState,
+  plan: RenderPlan,
+  shown?: ShownSize | null,
+  previous?: ShownSize | null,
+): string {
   const hidden = plan.missing.filter((m) => m.reason === 'honesty').length;
   const hiddenText =
     hidden === 0 ? 'Nothing is hidden.' : `${countPhrase(hidden, 'layer')} hidden.`;
-  return `${HONESTY_LABEL[state]}. ${countPhrase(plan.drawn.length, 'layer')} shown. ${hiddenText}`;
+  const sizeChanged =
+    shown && previous && (shown.radiusM !== previous.radiusM || shown.tag !== previous.tag);
+  const size = sizeChanged && shown.radiusM !== null ? ` ${sizeAnnouncement(plan, shown)}` : '';
+  return `${HONESTY_LABEL[state]}. ${countPhrase(plan.drawn.length, 'layer')} shown. ${hiddenText}${size}`;
 }
 
 /** Modified Julian Date as a UTC calendar date, "2025-12-14". MJD 40587 is 1970-01-01. */

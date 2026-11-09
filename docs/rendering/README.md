@@ -13,14 +13,14 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 |---|---|---|
 | [principles-stack.md](principles-stack.md) | R0, R1, R2 | starting any rendering/haptics task: scope, non-goals, the 6 principles, pinned package versions |
 | [data-contract.md](data-contract.md) | R3, R3.1–R3.4 | touching the card/render-params schema, provenance tags, view-mode fields or backend type selection (canonical TV / ObjectCard / RenderParams) |
-| [display-rules.md](display-rules.md) | R4, R5, R5.1–R5.6 | working on the viewer: lighting, view modes, honesty toggle, scale bar, performance budget, interaction |
+| [display-rules.md](display-rules.md) | R4, R5, R5.1–R5.7 | working on the viewer: lighting, view modes, honesty toggle, scale bar, performance budget, interaction, motion and time-lapse |
 | [surface-generation.md](surface-generation.md) | R6, R6.1–R6.7 | baking height/normal/albedo maps: card→params rules, noise, craters, Sobel normals, Gemini/depth paths, caching |
 | [renderers/asteroid.md](renderers/asteroid.md) | R7 (intro), R7.1, R7.2 | rendering `asteroid_shape` or `asteroid_procedural` (also holds the R7 intro rule on refused layers) |
 | [renderers/comet.md](renderers/comet.md) | R7.3 | rendering 3I/ATLAS: nucleus, gas shells, dust, epoch toggle |
 | [renderers/brown-dwarf.md](renderers/brown-dwarf.md) | R7.4 | rendering `brown_dwarf` / `brown_dwarf_binary` |
-| [renderers/stars.md](renderers/stars.md) | R7.5 | rendering `star`, `star_mira`, `star_ttauri` |
+| [renderers/stars.md](renderers/stars.md) | R7.5, R7.5.1–R7.5.5 | rendering `star`, `star_mira`, `star_ttauri`, and the star surface (spots, flares) |
 | [renderers/candidate.md](renderers/candidate.md) | R7.6 | handling unknown moving sources (no 3D) |
-| [renderers/shader-kinds.md](renderers/shader-kinds.md) | R7.7 | planets, gas giants, nebulae, novae: the shared CPU field for haptics |
+| [renderers/shader-kinds.md](renderers/shader-kinds.md) | R7.7 | planets, gas giants (the shared CPU field for haptics), nebulae and novae (volumes, no haptics, Q-103) |
 | [haptics/platform-encoding.md](haptics/platform-encoding.md) | R8, R8.1–R8.3 | deciding what each platform can do, texture vs data haptics, vibration patterns and quantisation |
 | [haptics/sources.md](haptics/sources.md) | R8.4 | implementing a source: height-map, mesh-normal, field, terrain, flow |
 | [haptics/profiles.md](haptics/profiles.md) | R8.5, R8.6 | mapping an object type to its texture/data haptics, or doing spectrum haptics |
@@ -29,6 +29,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | [haptics/audio-pairing.md](haptics/audio-pairing.md) | R8.9 | writing the audio driver: timing, mapping, timbre by tag, Bluetooth latency |
 | [accessibility.md](accessibility.md) | R9 | alt text, aria-live, control sizes, reduced motion |
 | [layout-tests-open-items.md](layout-tests-open-items.md) | R10, R11, R12 | finding where code lives / who owns it, writing tests, or checking unverified items |
+| [reference/README.md](reference/README.md) | R11 | the target reference frames, seed/time convention for comparing renders, golden frames; with [checklist](reference/checklist.md) (visual review) and [frame-time](reference/frame-time.md) (device checks) |
 
 ## Section map
 
@@ -50,6 +51,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | R5.4 | Scale bar | [display-rules.md#r54-scale-bar](display-rules.md#r54-scale-bar) |
 | R5.5 | Performance budget (D-05) | [display-rules.md#r55-performance-budget-d-05](display-rules.md#r55-performance-budget-d-05) |
 | R5.6 | Interaction | [display-rules.md#r56-interaction](display-rules.md#r56-interaction) |
+| R5.7 | Motion and time-lapse | [display-rules.md#r57-motion-and-time-lapse](display-rules.md#r57-motion-and-time-lapse) |
 | R6 | Surface generation (backend, CPU) | [surface-generation.md#r6-surface-generation-backend-cpu](surface-generation.md#r6-surface-generation-backend-cpu) |
 | R6.1 | Strategy: height first, colour second | [surface-generation.md#r61-strategy-height-first-colour-second](surface-generation.md#r61-strategy-height-first-colour-second) |
 | R6.2 | Card → generator parameters (deterministic rules) | [surface-generation.md#r62-card--generator-parameters-deterministic-rules](surface-generation.md#r62-card--generator-parameters-deterministic-rules) |
@@ -64,6 +66,11 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | R7.3 | `comet` (3I/ATLAS) | [renderers/comet.md#r73-comet-3iatlas](renderers/comet.md#r73-comet-3iatlas) |
 | R7.4 | `brown_dwarf` and `brown_dwarf_binary` | [renderers/brown-dwarf.md#r74-brown_dwarf-and-brown_dwarf_binary](renderers/brown-dwarf.md#r74-brown_dwarf-and-brown_dwarf_binary) |
 | R7.5 | Stars: `star`, `star_mira`, `star_ttauri` | [renderers/stars.md#r75-stars-star-star_mira-star_ttauri](renderers/stars.md#r75-stars-star-star_mira-star_ttauri) |
+| R7.5.1 | Star surface (what is drawn) | [renderers/stars.md#r751-star-surface-what-is-drawn](renderers/stars.md#r751-star-surface-what-is-drawn) |
+| R7.5.2 | Photosphere and granulation | [renderers/stars.md#r752-photosphere-and-granulation](renderers/stars.md#r752-photosphere-and-granulation) |
+| R7.5.3 | Spots | [renderers/stars.md#r753-spots](renderers/stars.md#r753-spots) |
+| R7.5.4 | Faculae | [renderers/stars.md#r754-faculae](renderers/stars.md#r754-faculae) |
+| R7.5.5 | Flares and prominences | [renderers/stars.md#r755-flares-and-prominences](renderers/stars.md#r755-flares-and-prominences) |
 | R7.6 | `candidate` | [renderers/candidate.md#r76-candidate](renderers/candidate.md#r76-candidate) |
 | R7.7 | Shader-generated kinds: `planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova` | [renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova](renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova) |
 | R8 | Haptics | [haptics/platform-encoding.md#r8-haptics](haptics/platform-encoding.md#r8-haptics) |

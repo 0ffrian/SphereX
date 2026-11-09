@@ -26,7 +26,10 @@ from app.core.render.params import BAKED_TYPES, BakeParams, BakeRefusal, params_
 from app.core.render.spherex_rgb import CHANNELS_BY_TYPE
 
 # Bump when a rule in this module changes. The baker's rules version is part of it, so the R6.7
-# texture path changes whenever either changes.
+# texture path changes whenever either changes. The seed is a hash of this version (Q-35), so a
+# bump also re-seeds every procedural body: bump only when a surface rule changes. Issue #38 added
+# Layer.tier, formula and assumed without changing any surface, so it bumped ASSET_VERSION
+# (saved replies) instead and kept this at "1".
 CARD_TO_PARAMS_VERSION = "1"
 GENERATOR_VERSION = f"p{CARD_TO_PARAMS_VERSION}-b{BAKER_RULES_VERSION}"
 
@@ -56,6 +59,14 @@ _RANK = {
     "artistic": 4,
 }
 
+TIER_OF_TAG = {tag: rank + 1 for tag, rank in _RANK.items()}  # D-32: tier 1..5 = the five tags
+
+# Rule inputs that are not on the card, stated as `assumed` (D-32). The values are the ones the
+# cited rules fix (R6.2, R7.3, R7.5); none is a measurement.
+ASSUMED_C_OVER_B = 1.0  # R6.2: c = b
+ASSUMED_DENSITY_EXPONENT = 2.0  # R7.3: coma gas density falls as 1/r^2
+ASSUMED_LIMB_U = 0.6  # R7.5: linear limb darkening coefficient
+
 SHADER_KINDS = ("planet_rocky", "planet_water", "gas_giant", "nebula", "nova")
 SUN_LIT = ("asteroid_shape", "asteroid_procedural", "comet", "planet_rocky", "planet_water")
 SUN_LIT_ALL = (*SUN_LIT, "gas_giant")
@@ -76,6 +87,9 @@ TYPE_LABEL = {
     "nebula": "Nebula",
     "nova": "Nova",
 }
+
+# Issue #41: prefix of a `missing` entry that is still being measured (first-stage answer).
+MEASURING_PREFIX = "measuring:"
 
 
 # --- seed -----------------------------------------------------------------------------------
@@ -136,6 +150,39 @@ def _tag(card: Mapping[str, Any], key: str) -> str:
     return str(tv["tag"]) if tv else "artistic"
 
 
+def _assumed(
+    card: Mapping[str, Any], requires: list[str], rule_inputs: Mapping[str, float] | None = None
+) -> dict[str, float | str]:
+    """Inputs that were not measured (D-32): the explicit rule inputs, then each required card
+    field whose value is model_dependent, keyed by field name. A group of values such as
+    ``gas_Q`` is walked member by member, in sorted order, keyed ``gas_Q.co2``. Deterministic
+    order."""
+    out: dict[str, float | str] = dict(rule_inputs or {})
+    for key in requires:
+        group = card.get(key)
+        if isinstance(group, Mapping) and "tag" not in group:
+            members = sorted(k for k, m in group.items() if isinstance(m, Mapping) and "tag" in m)
+            for member, used in _assumed(group, members).items():
+                out[f"{key}.{member}"] = used
+            continue
+        tv = _tv(card, key)
+        if tv is None or tv.get("tag") != "model_dependent":
+            continue
+        v = tv.get("value")
+        if isinstance(v, bool):
+            continue
+        if isinstance(v, numbers.Real) and math.isfinite(float(v)):
+            out[key] = float(v)
+        elif isinstance(v, str) and v.strip():
+            out[key] = v.strip()
+        elif isinstance(v, list | tuple) and v:
+            out[key] = ", ".join(f"{float(c):g}" for c in v)
+        elif isinstance(tv.get("assumption"), str) and tv["assumption"].strip():
+            # No usable value (null, NaN): state the card's own assumption instead (R3.1).
+            out[key] = tv["assumption"].strip()
+    return out
+
+
 def _weakest(*tags: str) -> str:
     return max(tags, key=lambda t: _RANK[t])
 
@@ -162,22 +209,55 @@ def _lightcurve_ok(card: Mapping[str, Any]) -> bool:
 
 
 class _Plan:
-    def __init__(self) -> None:
+    def __init__(self, pending: frozenset[str] = frozenset()) -> None:
         self.layers: list[dict[str, Any]] = []
         self.missing: list[str] = []
+        # Issue #41: card fields still being measured. A refusal that needs one of them is
+        # listed as ``measuring:<id>``, not as missing: it will fill in, nothing is guessed.
+        self.pending = pending
 
     def layer(
-        self, ok: bool, layer_id: str, tag: str, description: str, requires: list[str]
+        self,
+        ok: bool,
+        layer_id: str,
+        tag: str,
+        description: str,
+        requires: list[str],
+        *,
+        card: Mapping[str, Any] | None = None,
+        formula: str | None = None,
+        rule_inputs: Mapping[str, float] | None = None,
     ) -> bool:
+        """Add a layer, or refuse it. ``formula`` is required for any layer whose tag can come out
+        derived or model_dependent; ``card`` is needed to state ``assumed`` (D-32)."""
         if ok:
-            self.layers.append(
-                {"id": layer_id, "tag": tag, "description": description, "requires": requires}
-            )
+            layer: dict[str, Any] = {
+                "id": layer_id,
+                "tag": tag,
+                "tier": TIER_OF_TAG[tag],
+                "description": description,
+                "requires": requires,
+            }
+            if tag in ("derived", "model_dependent"):
+                if not formula:
+                    raise ValueError(f"layer {layer_id}: tag {tag} needs a formula (D-32)")
+                layer["formula"] = formula
+            if tag == "model_dependent":
+                assumed = _assumed(card or {}, requires, rule_inputs)
+                if not assumed:
+                    # Never label measured inputs as assumed: the rule must name what it assumed.
+                    raise ValueError(
+                        f"layer {layer_id}: model_dependent needs an assumed input (D-32)"
+                    )
+                layer["assumed"] = assumed
+            self.layers.append(layer)
         else:
-            self.refuse(layer_id)
+            self.refuse(layer_id, requires)
         return ok
 
-    def refuse(self, item: str) -> None:
+    def refuse(self, item: str, requires: list[str] | tuple[str, ...] = ()) -> None:
+        if self.pending.intersection(requires):
+            item = MEASURING_PREFIX + item
         if item not in self.missing:
             self.missing.append(item)
 
@@ -205,7 +285,7 @@ def _ir_mode(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any] | None:
         return None  # R5.2 defines the channels for asteroids, comets and brown dwarfs only
     rgb = _vec(card, "spherex_rgb", 3)
     if rgb is None:
-        plan.refuse("spherex_ir")
+        plan.refuse("spherex_ir", ["spherex_rgb"])
         return _off(IR_BADGE, "spherex_rgb", channels)
     tv = dict(_tv(card, "spherex_rgb") or {})
     tv["value"] = rgb
@@ -263,6 +343,8 @@ def _asteroid_shape(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         _weakest(_tag(card, "shape_source"), _tag(card, "diameter_km")),
         "Shape model scaled to the diameter on the card (R7.1).",
         ["shape_source", "diameter_km"],
+        card=card,
+        formula="Shape model scaled to diameter_km",
     )
     plan.layer(
         _has(card, "rot_period_h"),
@@ -270,6 +352,8 @@ def _asteroid_shape(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         _tag(card, "rot_period_h"),
         "Rotation sped up, with the factor shown on screen (R7.1).",
         ["rot_period_h"],
+        card=card,
+        formula="spin rate = 2 pi / rot_period_h",
     )
     rgb, _, field = _asteroid_colour(card)
     plan.layer(
@@ -278,6 +362,8 @@ def _asteroid_shape(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         _weakest(str(rgb["tag"]) if rgb else "artistic", _tag(card, "albedo"), "derived"),
         "Colour = base_rgb * brightness; display L = clamp(0.12 + 1.6 * albedo, 0.12, 0.8) (R6.2).",
         [field, "albedo"],
+        card=card,
+        formula="L = clamp(0.12 + 1.6 * albedo, 0.12, 0.8)",
     )
     return {
         "texture": "mesh" if mesh else "none",
@@ -303,6 +389,9 @@ def _asteroid_procedural(
         "model_dependent",
         "Assumption: a/b = 10^(0.4 * A), c = b, from the light-curve amplitude (R6.2).",
         ["diameter_km", "lightcurve_amp_mag"],
+        card=card,
+        formula="a/b = 10^(0.4 * A), c = b",
+        rule_inputs={"c_over_b": ASSUMED_C_OVER_B},
     )
     rgb, _, field = _asteroid_colour(card)
     assert bake is not None
@@ -322,6 +411,8 @@ def _asteroid_procedural(
         _weakest(str(rgb["tag"]) if rgb else "artistic", _tag(card, "albedo"), "derived"),
         f"{desc}; brightness = clamp(0.12 + 1.6 * albedo, 0.12, 0.8).",
         [field, "albedo"],
+        card=card,
+        formula="L = clamp(0.12 + 1.6 * albedo, 0.12, 0.8)",
     )
     plan.layer(
         True,
@@ -346,6 +437,8 @@ def _comet(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         _tag(card, "nucleus_radius_km_max"),
         "Dark sphere at the upper size limit (R7.3).",
         ["nucleus_radius_km_max"],
+        card=card,
+        formula="nucleus radius = nucleus_radius_km_max",
     )
     gas = card.get("gas_Q")
     has_q = isinstance(gas, Mapping) and any(_has(gas, k) for k in ("co2", "h2o", "co"))
@@ -358,6 +451,9 @@ def _comet(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         "Assumption: density falls as 1/r^2 out to the coma radius; Q itself is measured "
         "(R7.3, Q-38).",
         ["gas_Q", "coma_radius_km"],
+        card=card,
+        formula="n(r) proportional to Q / r^2 out to coma_radius_km",
+        rule_inputs={"density_exponent": ASSUMED_DENSITY_EXPONENT},
     )
     if not shells:
         plan.refuse("field")
@@ -377,6 +473,8 @@ def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) 
         _tag(card, "radius_rjup"),
         "Assumption: brown dwarf radii are about 1 Jupiter radius (R7.4).",
         ["radius_rjup"],
+        card=card,
+        formula="radius = radius_rjup * R_Jup",
     )
     emissive = plan.layer(
         _has(card, "flux_45um"),
@@ -384,6 +482,8 @@ def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) 
         _tag(card, "flux_45um"),
         "Emissive intensity from normalised flux_45um (R7.4).",
         ["flux_45um"],
+        card=card,
+        formula="intensity = normalised flux_45um",
     )
     bands = plan.layer(
         bake is not None and _has(card, "ch4_depth_33") and "bands" not in bake.missing,
@@ -402,7 +502,7 @@ def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) 
             ["spectral_class"],
         )
     if not emissive:
-        plan.refuse("flux_pulse")
+        plan.refuse("flux_pulse", ["flux_45um"])
     return {
         "texture": "bands" if bands else "none",
         "texture_tag": "artistic",
@@ -420,6 +520,8 @@ def _star(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         _weakest(_tag(card, "teff_K"), "derived"),
         "Teff to sRGB through a blackbody colour calculation (R7.5).",
         ["teff_K"],
+        card=card,
+        formula=TEFF_FORMULA,
     )
     plan.layer(
         True,
@@ -427,6 +529,9 @@ def _star(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         "model_dependent",
         "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
         [],
+        card=card,
+        formula="I(mu) = 1 - u * (1 - mu), u = 0.6",
+        rule_inputs={"limb_darkening_u": ASSUMED_LIMB_U},
     )
     data, data_tag = "none", "artistic"
     if kind == "star":
@@ -436,6 +541,8 @@ def _star(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
             _tag(card, "pm_mas_yr"),
             "Motion trail from pm_mas_yr over the SPHEREx epochs (R7.5).",
             ["pm_mas_yr"],
+            card=card,
+            formula="trail = pm_mas_yr * elapsed time",
         ):
             data, data_tag = "motion", _tag(card, "pm_mas_yr")
         else:
@@ -447,16 +554,20 @@ def _star(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
             "measured",
             "Brightness follows the measured light curve as you scrub (R7.5).",
             ["lightcurve"],
+            card=card,
+            formula="brightness = measured lightcurve flux",
         ):
             data, data_tag = "heartbeat", "measured"
         else:
-            plan.refuse("heartbeat")
+            plan.refuse("heartbeat", ["lightcurve"])
         plan.layer(
             _has(card, "period_var_d"),
             "radius_pulsation",
             "artistic",
             "Radius pulsation of 10 percent (R7.5).",
             ["period_var_d"],
+            card=card,
+            formula="radius = 1 + 0.1 * pulsation phase",
         )
     elif kind == "star_ttauri":
         plan.layer(True, "disc", "artistic", "Tilted disc (R7.5).", [])
@@ -470,7 +581,7 @@ def _star(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         ):
             data, data_tag = "dimming", "measured"
         else:
-            plan.refuse("dimming")
+            plan.refuse("dimming", ["lightcurve"])
     return {
         "texture": "none",
         "texture_tag": "artistic",
@@ -490,10 +601,13 @@ def _shader_kind(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
             "Point cloud from the sliders (R7.7).",
             ["diameter_km"],
         )
+        # Neither has haptics (Q-103): both are drawn as volumes, and what is felt must match what
+        # is drawn (D-34). Nebula: Moon's decision. Nova: until a CPU twin of the baked noise cube
+        # can be sampled; Atish's acceptance is pending (D-13, D-17).
         return {
             "texture": "none",
             "texture_tag": "artistic",
-            "data": "field",
+            "data": "none",
             "data_tag": "artistic",
             "params": {},
         }
@@ -681,11 +795,15 @@ def card_to_params(
     seed: int | None = None,
     generator_version: str = GENERATOR_VERSION,
     extra_missing: tuple[str, ...] = (),
+    pending: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
     """RenderParams (R3.4) as a JSON-ready dict. ``seed`` defaults to ``seed_for(id, version)``.
 
     ``extra_missing`` carries refusals from earlier stages (for example stage 3's
     ``type:exoplanet_thresholds``) so the user sees them.
+
+    ``pending``: card fields still being measured (issue #41 first stage). Layers that need one
+    are listed as ``measuring:<id>`` in ``missing``.
     """
     object_id = str(card["id"])
     kind = str(card["type"])
@@ -693,7 +811,7 @@ def card_to_params(
         seed = seed_for(object_id, generator_version)
     if seed < 0:
         raise ValueError("seed must be an integer >= 0 (Q-35)")
-    plan = _Plan()
+    plan = _Plan(pending)
     bake = _bake(card, seed)
 
     if kind == "asteroid_shape":

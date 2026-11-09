@@ -27,7 +27,13 @@ from app.core.render.card_to_params import GENERATOR_VERSION
 log = logging.getLogger("shift_spectrum")
 
 ASSET_SOURCE = "derived.asset"
-ASSET_VERSION = "1"  # bump when stage 3, 5 or 7 rules change
+# Bump when stage 3, 5 or 7 rules change. 2: Layer.tier, formula and assumed (D-32, PR #44).
+# 3 (issue #40): stage 3 types Eros as asteroid_shape from the shape registry (Q-61) and runs the
+# exoplanet rule (Q-63); stage 5 fills phase_angle_deg and sun_vector from Horizons (Q-62).
+# 5 (issue #26, Q-124): stage 1 finds frames for moving objects and stage 2 measures their
+# spectrum; a card saved before had none (`frames:moving_object_search` was final). Stage 1 and 2
+# changes count too. ("4" is taken by PR #63; whichever merges second keeps the higher number.)
+ASSET_VERSION = "5"
 AssetStatus = Literal["saved", "generated", "sketch"]
 FIELDS = ("card", "render_params", "textures", "generator_version", "seed", "created_at")
 

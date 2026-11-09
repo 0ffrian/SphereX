@@ -12,6 +12,7 @@ The settings-file schema of draft v1 is retired (D-02). The data contract is in 
 | `ObjectCard` | Rendering doc §3.2 | Backend, `GET /v1/objects/{id}/card` |
 | Type selection | Rendering doc §3.3 | Backend, stage 3 |
 | `RenderParams` | Rendering doc §3.4 | Backend, `GET /v1/objects/{id}/render-params` |
+| Shape-model mesh | Q-61, A3.7 | Backend, `GET /data/shapes/{name}.glb` (named by `shape_source`) |
 | JSON schemas | `shared/schemas/object-card.schema.json`, `render-params.schema.json` (rendering doc §10) | Shared by backend and frontend. Owner: D-17 |
 
 Do not copy the type definitions into this doc. Change them in the rendering doc.

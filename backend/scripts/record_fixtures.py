@@ -20,6 +20,8 @@ from pathlib import Path
 
 FIXTURE_CACHE = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "cache"
 FIXTURE_MAXREC = "3"
+# Groups recorded when no --only is given: group "moving" (long path searches) is left out.
+FIXTURE_GROUPS = ("test", "fixture", "demo")
 # Moving-object path search for the fixtures (issue #26). Not [verify] values: a deliberately
 # short window (2026-03-20 to 2026-03-21, where a live search on 7 Nov 2026 found SPHEREx frames
 # of 433 Eros), a tiny cone and a fixed 24 h step (min = max), so two cones and a small cache.
@@ -32,6 +34,9 @@ FIXTURE_MOVING: dict[str, str] = {
     "moving_max_step_h": "24",
     "moving_max_cones": "450",
     "moving_sia_maxrec": "500",
+    # Recorded before the candidate margin existed (PR #53): a margin would ask Horizons for
+    # TLIST times that are not in the fixtures.
+    "moving_footprint_margin_arcsec": "0",
 }
 
 
@@ -56,7 +61,8 @@ def main(argv: list[str] | None = None) -> int:
     from scripts import prefetch
 
     only = [a for name in args.only or [] for a in ("--only", name)]
-    code = prefetch.main(["--concurrency", "3", *only])
+    groups = [] if only else [a for g in FIXTURE_GROUPS for a in ("--group", g)]
+    code = prefetch.main(["--concurrency", "3", *only, *groups])
     purge_derived(FIXTURE_CACHE)
     print(f"fixture cache: {FIXTURE_CACHE} ({size_bytes(FIXTURE_CACHE) / 1e6:.2f} MB)")
     # Exit code 1 is expected: MAXREC=3 marks every SIA answer as truncated.

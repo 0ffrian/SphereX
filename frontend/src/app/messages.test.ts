@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  describeRefusal,
   describeRefusalGroup,
+  layerName,
   pluralFrames,
   refusalShortLabel,
   spectrumAnnouncement,
   spectrumCoverageMessage,
   spectrumEmptyMessage,
+  timeLapseText,
 } from './messages';
 import { FRAME_REASONS, groupMissing, summarizeSpectrum, WHOLE_RESULT_CODES } from './refusals';
 
@@ -52,10 +55,10 @@ describe('refusal wording', () => {
 
   it('words deferred cutouts with the count, and no "Try again"', () => {
     expect(one(['cutouts:deferred:7'])).toBe(
-      '7 more frames are not downloaded yet. Search again in a moment to load them.',
+      '7 frames are left out because they have not been downloaded yet. Fetch the rest of the frames above to include them.',
     );
     expect(one(['cutouts:deferred:1'])).toBe(
-      '1 more frame is not downloaded yet. Search again in a moment to load it.',
+      '1 frame is left out because it has not been downloaded yet. Fetch the rest of the frames above to include it.',
     );
   });
 
@@ -294,5 +297,74 @@ describe('spectrum coverage and announcement', () => {
   it('full: the announcement is unchanged', () => {
     const o = summarizeSpectrum([pt(1, true), pt(2)], []);
     expect(spectrumAnnouncement(o, 'X')).toBe('Spectrum loaded: 2 points, 1 flagged.');
+  });
+});
+
+describe('motion refusals (R3.4 dynamics)', () => {
+  it('names a refused rate in plain words, without the key', () => {
+    const line = describeRefusal({ id: 'dynamics:spin_period_h', reason: 'backend' });
+    expect(line).toBe('Spin (motion): not animated. No measured or typical value is known for it.');
+    expect(line).not.toContain('dynamics:');
+    expect(layerName('dynamics:flare_rate_per_d')).toBe('Flares (motion)');
+  });
+
+  it('keeps the layer wording for other backend refusals', () => {
+    expect(describeRefusal({ id: 'mesh', reason: 'backend' })).toBe(
+      'Shape model: not drawn. The data pipeline left it out.',
+    );
+  });
+});
+
+describe('time-lapse and layer wording (D-32, D-34)', () => {
+  it('says where a rate comes from, uses thousands separators, keeps the tier number out', () => {
+    expect(timeLapseText({ id: 'spin', label: 'Spin', speedup: 1000, tag: 'measured' })).toBe(
+      'Spin: period measured; shown 1,000\u00d7 faster.',
+    );
+    expect(
+      timeLapseText({ id: 'flares', label: 'Flares', speedup: 43000, tag: 'inferred_from_analog' }),
+    ).toBe('Flares: rate taken from a typical value; shown 43,000\u00d7 faster.');
+    expect(timeLapseText({ id: 'winds', label: 'Winds', speedup: 3600 })).toBe(
+      'Winds: shown 3,600\u00d7 faster.',
+    );
+    expect(timeLapseText({ id: 'spin', label: 'Spin', speedup: 10, tag: 'measured' })).not.toMatch(
+      /tier/,
+    );
+  });
+
+  it('names every layer the viewer states itself, never its raw id', () => {
+    for (const id of [
+      'granulation',
+      'spots',
+      'faculae',
+      'flares',
+      'prominences',
+      'prominence_strands',
+      'glow',
+      'jets',
+      'storms',
+      'band_count',
+      'flattening',
+      'cloud_cover',
+      'clouds',
+      'climate',
+    ]) {
+      expect(layerName(id)).not.toMatch(/^Layer /);
+      expect(layerName(id)).not.toContain('_');
+    }
+  });
+});
+
+describe('displacement refusal (issue #43)', () => {
+  it('names the layer in plain words and says it is a server gap, not missing data about the object', () => {
+    expect(layerName('displacement')).toBe('Raised and lowered surface');
+    const line = describeRefusal({ id: 'displacement', reason: 'backend' });
+    expect(line).toMatch(/server does not send the relief height yet/);
+    expect(line).toMatch(/not missing data about this object/);
+    expect(line).not.toMatch(/relief amp|Layer “/);
+  });
+  it('the layer names have no spec ids or jargon', () => {
+    for (const id of ['point_cloud', 'baked_ao', 'self_shadow', 'ion_tail', 'dust_tail']) {
+      expect(layerName(id), id).not.toMatch(/\b[AQR]\d|Layer “/);
+    }
   });
 });

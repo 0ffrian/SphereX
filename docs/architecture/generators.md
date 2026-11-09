@@ -12,7 +12,7 @@ Generators split by type (D-01). See the Surface Lab tab of the [mock-up](../../
 |---|---|---|
 | `asteroid_shape` | Rendering doc §7.1 | Real mesh, scaled to the measured diameter. No procedural detail by default. |
 | `asteroid_procedural` | Rendering doc §6, §7.2 | Baked height, normal, albedo and roughness maps. |
-| `comet` | Rendering doc §7.3 | Gas shells as point clouds, sized from published values. |
+| `comet` | Rendering doc §7.3 | Gas shells as emission volumes (issue #43; the plan's shell data is kept for the coma haptics), sized from published values. |
 | `brown_dwarf`, `brown_dwarf_binary` | Rendering doc §7.4 | Banded texture, contrast from the methane depth. |
 | `star`, `star_mira`, `star_ttauri` | Rendering doc §7.5 | Blackbody colour, limb darkening. |
 | `candidate` | Rendering doc §7.6 | No 3D body. |
@@ -23,8 +23,8 @@ Generators split by type (D-01). See the Surface Lab tab of the [mock-up](../../
 |---|---|---|---|
 | `planet_rocky`, `planet_water` | `terra-planet` | Fractal terrain on the sphere with a sea level, polar ice, lava cracks, cloud shell, atmosphere glow. | temperature, radius, ocean coverage, atmosphere, cloud cover, relief, continent size, land colour |
 | `gas_giant` | `banded-giant` | Latitude bands warped by noise, counter-flowing jets, seeded storms, haze, optional rings. | temperature, radius, flattening, bands, turbulence, storms, haze, rings |
-| `nebula` | `gas-cloud` | Point cloud sampled from filamentary 3D noise. Additive glow layer plus dark dust layer plus stars. | size, hydrogen, oxygen, dust, filaments, clumpiness, stars, brightness |
-| `nova` | `shell-remnant` | Point shell with filaments, hot inner gas, core glow, expansion by age. | age, hydrogen, oxygen, hot gas, lopsidedness, shell thickness, filaments, core glow |
+| `nebula` | `gas-cloud` | Emission volume ray-marched through a baked 3D noise cube (issue #43; no points, no stars and no haptics, Q-103). Additive glow layer plus dark dust layer. | size, hydrogen, oxygen, dust, filaments, clumpiness, brightness |
+| `nova` | `shell-remnant` | Volume shell with filaments, hot inner gas, core glow, expansion by age (issue #43; no points and no haptics, Q-103). | age, hydrogen, oxygen, hot gas, lopsidedness, shell thickness, filaments, core glow |
 
 Superseded mock-up generators:
 

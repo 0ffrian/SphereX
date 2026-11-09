@@ -98,8 +98,10 @@ const TABLE: Record<ObjectType, Expect> = {
   gas_giant: { texture: 'flow', data: 'teq_pulse', dataTag: 'measured', missing: [] },
   planet_water: { texture: 'terrain', data: 'teq_pulse', dataTag: 'derived', missing: [] },
   planet_rocky: { texture: 'terrain', data: null, missing: [] },
-  nebula: { texture: null, data: 'field', dataTag: 'artistic', missing: [] },
-  nova: { texture: null, data: 'field', dataTag: 'artistic', missing: [] },
+  // Q-103: the nebula (Moon's decision) and the nova (until a CPU twin of the noise cube can be
+  // sampled; Atish's acceptance pending) are drawn as volumes and have no haptics.
+  nebula: { texture: null, data: null, missing: [] },
+  nova: { texture: null, data: null, missing: [] },
 };
 
 describe('buildHaptics: every shared fixture (R8.5)', () => {
@@ -262,13 +264,6 @@ describe('buildHaptics refusals (refuse rather than invent)', () => {
     expect(ringed.rings).toBe(true);
     expect(shaderProbeOptions(body, ringed).rings).toBe(true);
   });
-
-  it('nebula without point sets refuses the field', () => {
-    const { card, params } = fixture('nebula');
-    expect(
-      buildHaptics(new RecordingSink(), params, card, null, { overrides: {} }).missing,
-    ).toEqual([MISSING.field]);
-  });
 });
 
 // ---------------------------------------------------------------- R11 honesty through the engine
@@ -404,10 +399,16 @@ describe('R11 honesty: haptics follow the D-21 filter (through the real engine)'
     expect(new Set(p.tags)).toEqual(new Set(['measured']));
   });
 
-  it('nebula and nova fields are artistic: silent below + Artistic', () => {
-    expect(feel('nebula', 'derived').tags).toEqual([]);
-    expect(feel('nebula', 'artistic').windows).toBeGreaterThan(0);
-  });
+  it.each(['nebula', 'nova'])(
+    'the %s has no haptics at all, even in + Artistic (Q-103)',
+    (kind) => {
+      const b = build(kind);
+      expect(b.texture).toBeNull();
+      expect(b.data).toBeNull();
+      expect(b.missing).toEqual([]);
+      expect(feel(kind, 'artistic').windows).toBe(0);
+    },
+  );
 });
 
 // ---------------------------------------------------------------- holding still
@@ -436,7 +437,6 @@ describe('R8.2 channel labels: texture events say texture, data events say data 
     'planet_rocky',
     'asteroid_procedural',
     'comet',
-    'nebula',
     'brown_dwarf_binary',
     'star_mira',
     'star_ttauri',

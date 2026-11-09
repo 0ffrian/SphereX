@@ -27,6 +27,19 @@ describe('planShaderKind', () => {
     }
   });
 
+  it('a nebula or remnant says in plain words that it has no touch feedback (Q-103)', () => {
+    for (const k of ['nebula', 'nova'] as const) {
+      const { card, params } = fixture(k);
+      for (const honesty of ['derived', 'artistic'] as const) {
+        const plan = planRender(card, params, defaultContext({ honesty }));
+        expect(plan.notes.join(' '), `${k} ${honesty}`).toMatch(/no touch feedback/);
+      }
+    }
+    const { card, params } = fixture('planet_rocky');
+    const plan = planRender(card, params, defaultContext({ honesty: 'artistic' }));
+    expect(plan.notes.join(' ')).not.toMatch(/touch feedback/);
+  });
+
   it('at + Artistic the layer is drawn and listed with its tag (the D-02 badge)', () => {
     for (const k of KINDS) {
       const { card, params } = fixture(k);

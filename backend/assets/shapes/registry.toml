@@ -1,0 +1,27 @@
+# Shape-model registry (A3.7, A3.10, Q-61). Written by scripts/ingest_shape.py; do not
+# edit by hand. Paths are same-origin (Q-44); `convex` is true for DAMIT inversions.
+
+[[model]]
+axes = "glTF +Y up: glTF (x, y, z) = body-fixed (x, z, -y); glTF +Y is the body +Z pole"
+citation = "Gaskell, R.W., Gaskell Eros Shape Model V1.1, urn:nasa:pds:gaskell.ast-eros.shape-model, NASA Planetary Data System."
+convex = false
+doi = "10.26033/d0gq-9427"
+extents_km = [32.658, 11.959, 16.883]
+frame = "Eros body-fixed frame of the model, rotated to glTF +Y up (see axes); origin as given (not recentred); pole and rotation in the bundle PCK note eros_alex.tpc.txt (Yeomans, Konopliv)"
+ingest_version = "2"
+licence = "CC0-1.0"
+lod0 = "/data/shapes/eros-gaskell.glb"
+lod0_sha256 = "71012ce61e3d3fd0ccecc3a79c09ff9ac7920c456690cdc157d41ba3f324d2c1"
+lod1 = "/data/shapes/eros-gaskell.lod1.glb"
+lod1_sha256 = "d7a3784633791c32fdccba0771231ab4a9229babd5869129feb88c4983ae484e"
+name = "433 Eros"
+slug = "eros-gaskell"
+source_member = "gaskell.ast-eros.shape-model_V1_1/data/quad/quad64q.tab"
+source_sha256 = "7dd885966346a783bed0a23a8182084df271478d012b557befa05c18c24af023"
+source_url = "https://doi.org/10.26033/d0gq-9427"
+spkid = "20000433"
+triangles_lod0 = 49152
+triangles_lod1 = 12288
+units = "metres in the GLB (source km x 1000)"
+vertices_lod0 = 24578
+vertices_lod1 = 6146
