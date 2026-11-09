@@ -170,8 +170,11 @@ export function SkyPane({ children }: { children?: ReactNode }) {
   useLayoutEffect(() => {
     const host = hostRef.current;
     const credit = creditRef.current;
-    if (host && credit)
-      host.style.setProperty('--sx-credit-h', `${Math.ceil(credit.offsetHeight)}px`);
+    if (!host || !credit) return;
+    // Only when it changed: a style write on every render would wake the panel's MutationObserver.
+    const h = `${Math.ceil(credit.offsetHeight)}px`;
+    if (host.style.getPropertyValue('--sx-credit-h') !== h)
+      host.style.setProperty('--sx-credit-h', h);
   });
 
   // ---- Renderer ---------------------------------------------------------------------------------

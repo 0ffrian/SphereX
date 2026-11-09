@@ -152,6 +152,21 @@ test('a failed search opens the panel too, so the error and Try again show', asy
   await expect(page.getByTestId('island')).toHaveAttribute('data-mode', 'idle');
 });
 
+test('Try again from the keyboard: focus lands on the panel title, not <body>', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await search(page, 'Nonexistent Object 12345');
+  await expect(page.getByTestId('island')).toHaveAttribute('data-arrived', '');
+  const retry = page.getByRole('button', { name: 'Try again' });
+  await retry.focus();
+  await expect(retry).toBeFocused();
+  await page.keyboard.press('Enter');
+  // The island thinks again (the panel unmounts, and with it the focused button), then returns.
+  await expect(page.getByTestId('island')).toHaveAttribute('data-arrived', '');
+  await expect(page.getByRole('heading', { name: 'Flipbook' })).toBeFocused();
+});
+
 test('phone width: no circle over the header text; Thinking shows over the sky, then the sheet opens', async ({
   page,
 }) => {

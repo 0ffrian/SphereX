@@ -1643,3 +1643,8 @@ body {
     }
   }
 }
+
+/* The panel title takes focus (programmatically) when focus was lost while the island thought. */
+.sx-panel-head h2:focus {
+  outline: none;
+}
