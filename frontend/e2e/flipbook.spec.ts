@@ -309,7 +309,9 @@ test('a slow reply shows the loading state', async ({ page }) => {
   });
   await page.goto('/');
   await search(page, 'RW Aur');
-  await expect(page.getByTestId('loading')).toContainText('Asking the archive for frames');
+  await expect(page.getByTestId('loading')).toContainText(
+    'Searching the archive for SPHEREx frames at RA 76.95653°, Dec +30.40144°',
+  );
   await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
   await expect(page.getByTestId('loading')).toHaveCount(0);
 });
@@ -349,6 +351,8 @@ test('Rainbow Trails: one dot per frame for a mover; disabled with a reason othe
 
 test('keyboard only: search, play and pause, open the spectrum', async ({ page }) => {
   await page.goto('/');
+  // A Tab pressed before the app has rendered lands on <body>; wait for the first control.
+  await expect(page.getByTestId('search-input')).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(page.getByTestId('search-input')).toBeFocused();
   await page.keyboard.type('RW Aur');

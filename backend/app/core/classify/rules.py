@@ -8,9 +8,12 @@ label), never a fitted number. The card has no confidence field (Q-55).
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal
+
+from app.core.classify.zeng2019 import EARTHLIKE_ROCKY, radius_on_curve, water_curve_for
 
 ObjectTypeName = Literal[
     "asteroid_shape",
@@ -31,20 +34,55 @@ ObjectTypeName = Literal[
 Confidence = Literal["catalogue", "none"]
 
 # --- R12 #12 [verify]: exoplanet type thresholds -------------------------------------------
-# R3.3 step 4 and R12 #12: "Do not hard-code values until they are agreed." The docs give no
-# columns and no cut-offs, so every entry is None and `classify_exoplanet` refuses (Q-56 lists
-# sourced candidates for the team). Patch the values here, in this one place, once agreed.
-EXOPLANET_THRESHOLDS: dict[str, float | None] = {
-    "rocky_max_radius_earth": None,  # planet_rocky below this pl_rade [verify]
-    "giant_min_radius_earth": None,  # gas_giant from this pl_rade [verify]
-    "giant_min_mass_jup": None,  # gas_giant by mass when pl_rade is missing [verify]
+# R3.3 step 4 and R12 #12 say not to hard-code values until they are agreed, and stage 3 belongs
+# to Atish (D-17). Until he signs off Q-63, every live threshold is None, so the rule refuses with
+# `type:exoplanet_thresholds` and the planet is `candidate`. The proposed values stay below with
+# their sources; turning the rule on is `EXOPLANET_THRESHOLDS = dict(PROPOSED_EXOPLANET_THRESHOLDS)`
+# plus an ASSET_VERSION bump. This block is the single place for the numbers; the mass-radius
+# tables sit in `zeng2019.py` (also [verify]). A None value refuses the rule that needs it.
+PROPOSED_EXOPLANET_THRESHOLDS: dict[str, float] = {
+    # planet_rocky below this pl_rade. Weiss & Marcy 2014 (arXiv:1312.0936); Fulton et al. 2017
+    # (arXiv:1703.10375, radius valley near 1.5-2 R_earth). [verify]
+    "rocky_max_radius_earth": 1.5,
+    # gas_giant from this pl_rade. Kopparapu et al. 2018 (arXiv:1802.09602). [verify]
+    "giant_min_radius_earth": 6.0,
+    # gas_giant by mass when pl_rade is missing: Chen & Kipping 2017 (arXiv:1603.08614),
+    # Neptunian/Jovian transition at 0.414 M_J. [verify]
+    "giant_min_mass_jup": 0.414,
+    # Earth masses per Jupiter mass (IAU 2015 nominal GM ratio, M_J / M_E = 317.83). [verify]
+    "earth_masses_per_jup": 317.83,
 }
-# planet_water has no catalogue observable yet (Q-56); there is no threshold for it.
+EXOPLANET_THRESHOLDS: dict[str, float | None] = dict.fromkeys(PROPOSED_EXOPLANET_THRESHOLDS)
+# PSCompPars fills gaps with its own estimates and marks them in `<column>_reflink` with
+# `refstr=CALCULATED_VALUE` (https://exoplanetarchive.ipac.caltech.edu/docs/pscp_calc.html):
+# a radius from the Chen & Kipping 2017 mass-radius relation (often from an Msini mass), a mass
+# from the radius, Teq = T_star * sqrt(R_star / a) * (1/4)^(1/4). A calculated radius or mass is
+# never used to classify (the same circularity as "M-R relationship"); on 2026-11-07, 1,540 rows
+# had a calculated pl_rade and 1,090 a calculated pl_eqt (PR #45 review).
+CALCULATED_REFSTR = "refstr=CALCULATED_VALUE"
+
+
+def is_calculated(row: Mapping[str, Any], column: str) -> bool:
+    """True when the archive computed ``column`` itself instead of taking it from a paper."""
+    link = row.get(f"{column}_reflink")
+    return isinstance(link, str) and CALCULATED_REFSTR in link
+
+
+# Archive `pl_bmassprov` values seen in PSCompPars on 2026-11-07: "Mass" (2491 rows), "Msini" (926),
+# "Msin(i)/sin(i)" (15), "M-R relationship" (3032). Only "Mass" is used as a mass; "Msini" is a
+# lower limit and "M-R relationship" is the archive's own estimate from the radius (circular).
+# "Msin(i)/sin(i)" is left out too (an inclination-corrected estimate): a conservative choice.
+TRUE_MASS_PROVENANCE = frozenset({"Mass"})
+# planet_water: R between the Zeng 2019 Earth-like rocky curve and the 100% H2O curve whose
+# tabulated temperature (300/500/700/1000 K) is nearest to pl_eqt, at the planet's mass; no
+# water planet when pl_eqt is missing or above 1000 K. A model result: the interior is not observed.
 # --------------------------------------------------------------------------------------------
 
 # SIMBAD object types (otype codes). R3.3 names the classes; these are SIMBAD's codes for them.
 SIMBAD_BROWN_DWARF = frozenset({"BD*"})
 SIMBAD_MIRA = frozenset({"Mi*"})
+# An extrasolar planet. `Pl?` (candidate) is a different code and is not matched (Q-63).
+SIMBAD_PLANET = frozenset({"Pl"})
 SIMBAD_TTAURI = frozenset({"TT*"})
 # ASSUMPTION: "any other star" = a SIMBAD otype ending in '*' (stars and their variable classes)
 # plus the supergiant and YSO codes that do not. Codes ending in '?' are candidates, not stars.
@@ -62,7 +100,7 @@ class CatalogueFacts:
     simbad_otype: str | None = None
     simbad_sp_type: str | None = None
     simbad_id: str | None = None
-    exoplanet: Mapping[str, Any] | None = None  # NASA Exoplanet Archive row (A3.8, not built)
+    exoplanet: Mapping[str, Any] | None = None  # NASA Exoplanet Archive row (A3.8)
     slider_kind: Literal["nebula", "nova"] | None = None  # R3.3 step 5: user sliders only
 
 
@@ -86,14 +124,67 @@ def _has_known_components(sp_type: str | None) -> bool:
     return sp_type is not None and "+" in sp_type
 
 
+def _num(row: Mapping[str, Any], key: str) -> float | None:
+    v = row.get(key)
+    if isinstance(v, bool) or not isinstance(v, int | float):
+        return None
+    x = float(v)
+    return x if math.isfinite(x) and x > 0 else None
+
+
 def classify_exoplanet(
     row: Mapping[str, Any],
-) -> tuple[ObjectTypeName | None, tuple[str, ...]]:
-    """R3.3 step 4. Refuses while the R12 #12 thresholds are not agreed (all None)."""
-    if any(v is None for v in EXOPLANET_THRESHOLDS.values()):
-        return None, ("type:exoplanet_thresholds",)
-    # Unreachable until the thresholds are agreed; the rule itself is also still to decide.
-    return None, ("type:exoplanet_rule",)
+) -> tuple[ObjectTypeName | None, tuple[str, ...], str]:
+    """R3.3 step 4 (Q-63): (type or None, refusal reasons, rule text). Central values only.
+
+    R = pl_rade unless the archive calculated it; M = pl_bmasse only when pl_bmassprov is a true
+    mass and the archive did not calculate it. Error bars are ignored.
+    """
+    t = EXOPLANET_THRESHOLDS
+    if any(v is None for v in t.values()):
+        return None, ("type:exoplanet_thresholds",), ""
+    rocky_max = t["rocky_max_radius_earth"]
+    giant_r = t["giant_min_radius_earth"]
+    giant_mj = t["giant_min_mass_jup"]
+    me_per_mj = t["earth_masses_per_jup"]
+    assert rocky_max is not None and giant_r is not None
+    assert giant_mj is not None and me_per_mj is not None
+
+    r = None if is_calculated(row, "pl_rade") else _num(row, "pl_rade")
+    true_mass = row.get("pl_bmassprov") in TRUE_MASS_PROVENANCE
+    m = _num(row, "pl_bmasse") if true_mass and not is_calculated(row, "pl_bmasse") else None
+    base = "R3.3.4 Exoplanet Archive"
+
+    if r is None:
+        if m is not None and m >= giant_mj * me_per_mj:
+            return "gas_giant", (), f"{base}: R missing, M>={giant_mj} M_J (Chen & Kipping 2017)"
+        return None, ("type:exoplanet_radius",), ""
+    if r >= giant_r:
+        return "gas_giant", (), f"{base}: R>={giant_r:g} R_earth (Kopparapu 2018)"
+    if r < rocky_max:
+        return "planet_rocky", (), f"{base}: R<{rocky_max:g} R_earth (Weiss & Marcy 2014)"
+    if m is None:
+        return None, ("type:exoplanet_mass",), ""
+    r_rock = radius_on_curve(EARTHLIKE_ROCKY, m)
+    if r_rock is None:
+        return None, ("type:exoplanet_mass_range",), ""
+    span = f"{rocky_max:g}<=R<{giant_r:g}"
+    if r <= r_rock:
+        return "planet_rocky", (), f"{base}: {span}, at or below Zeng 2019 Earth-like rocky curve"
+    water = water_curve_for(_num(row, "pl_eqt"))
+    if water is None:
+        return None, ("type:exoplanet_water_model_range",), ""
+    temp, curve = water
+    r_water = radius_on_curve(curve, m)
+    if r_water is None:
+        return None, ("type:exoplanet_mass_range",), ""
+    if r <= r_water:
+        return (
+            "planet_water",
+            (),
+            f"{base}: {span}, between Zeng 2019 rocky and 100% water ({temp:g} K) curves",
+        )
+    return None, ("type:exoplanet_envelope",), ""
 
 
 def classify(facts: CatalogueFacts) -> Classification:
@@ -145,9 +236,9 @@ def classify(facts: CatalogueFacts) -> Classification:
 
     refused: tuple[str, ...] = ()
     if facts.exoplanet is not None:
-        planet, refused = classify_exoplanet(facts.exoplanet)
+        planet, refused, rule = classify_exoplanet(facts.exoplanet)
         if planet is not None:
-            return Classification(planet, "R3.3.4 Exoplanet Archive")
+            return Classification(planet, rule)
 
     if facts.slider_kind is not None:
         return Classification(facts.slider_kind, "R3.3.5 user sliders")

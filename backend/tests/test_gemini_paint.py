@@ -7,6 +7,7 @@ called for real: the painter gets a fake client, and the REST client gets an htt
 from __future__ import annotations
 
 import base64
+import dataclasses
 import hashlib
 import io
 import json
@@ -22,7 +23,9 @@ from fastapi.testclient import TestClient
 from numpy.typing import NDArray
 from PIL import Image
 
-from app.cache.store import ReadThroughCache
+from app.cache.store import CacheMissOffline, ReadThroughCache, UpstreamUnavailable
+from app.core.card.service import ObjectResult
+from app.core.card.validate import PARAMS_SCHEMA, _validators
 from app.core.render import gemini_paint as gp
 from app.core.render.bake import bake, bake_dir, encode
 from app.core.render.card_to_params import GENERATOR_VERSION, seed_for
@@ -39,13 +42,20 @@ from app.core.render.params import params_from_card
 from app.main import create_app
 from app.settings import Settings
 from tests.conftest import make_settings
-from tests.test_api import resolve_id
+from tests.helpers import resolve_id
 
 CARDS = Path(__file__).parents[2] / "shared" / "fixtures" / "cards"
 W, H = 128, 64
 SECRET = "sk-test-DO-NOT-LEAK-1234567890"
 ADMIN = "admin-test-token"
 OID = "fixture:asteroid_procedural"
+
+
+def layer_errors(layer: dict[str, Any]) -> list[str]:
+    """Errors of ``layer`` against render-params.schema.json#/definitions/Layer (D-32)."""
+    v = _validators()[PARAMS_SCHEMA]
+    sub = v.evolve(schema={"$ref": f"{v.schema['$id']}#/definitions/Layer"})
+    return [e.message for e in sub.iter_errors(layer)]
 
 
 def card(name: str = "asteroid_procedural") -> dict[str, Any]:
@@ -92,6 +102,7 @@ def settings(tmp_path: Path, **kw: Any) -> Settings:
         "offline": False,
         "textures_dir": tmp_path / "textures",
         "gemini_api_key": SECRET,
+        "gemini_cooldown_s": 0.0,
     }
     values.update(kw)
     return make_settings(tmp_path / "cache", **values)
@@ -110,6 +121,12 @@ def code_dir(tmp_path: Path) -> Path:
     )
 
 
+def ai_dir(tmp_path: Path, oid: str = OID, seed: int | None = None) -> Path:
+    """The AI files' directory: the code bake's relative path under the AI root (Q-122)."""
+    s = seed_for(oid, GENERATOR_VERSION) if seed is None else seed
+    return bake_dir(tmp_path / "cache" / "textures-ai", oid, GENERATOR_VERSION, s, W, H)
+
+
 def assert_code_path(tmp_path: Path, outcome: gp.PaintOutcome, reason: str) -> None:
     assert not outcome.applied
     assert outcome.reason == reason
@@ -118,7 +135,9 @@ def assert_code_path(tmp_path: Path, outcome: gp.PaintOutcome, reason: str) -> N
     d = code_dir(tmp_path)
     if reason not in ("not_baked_type", "bake_refused"):
         assert (d / "albedo.webp").is_file()  # the code colour is on disk and loads first
-    assert not (d / AI_FILE).exists() and not (d / AI_META).exists()
+    a = ai_dir(tmp_path)
+    assert not (a / AI_FILE).exists() and not (a / AI_META).exists()
+    assert not (d / AI_FILE).exists()
 
 
 # --- success --------------------------------------------------------------------------------
@@ -133,16 +152,22 @@ def test_success_swaps_in_tagged_artistic(tmp_path: Path) -> None:
     d = code_dir(tmp_path)
     params = params_from_card(card(), seed_for(OID, GENERATOR_VERSION))
     code_expected = encode(bake(params, W, H))["albedo.webp"]
-    with Image.open(d / AI_FILE) as im:
+    a = ai_dir(tmp_path)
+    with Image.open(a / AI_FILE) as im:
         assert im.size == (W, H)  # resampled to 2:1
-    meta = json.loads((d / AI_META).read_text(encoding="utf-8"))
+    assert not (d / AI_FILE).exists()  # never under the served texture root (Q-122)
+    meta = json.loads((a / AI_META).read_text(encoding="utf-8"))
     assert meta["tag"] == "artistic" and meta["label"] == "AI-made"
     body = out.to_json("/v1/objects/x/albedo-ai.webp")
     assert body["status"] == "applied" and body["missing"] == []
-    assert body["layer"]["tag"] == "artistic" and body["layer"]["label"] == "AI-made"
+    assert body["label"] == "AI-made" and body["size"] == f"{W}x{H}"
+    assert body["layer"]["tag"] == "artistic" and body["layer"]["tier"] == 5
+    assert layer_errors(body["layer"]) == []  # a D-32 Layer
     assert body["provenance"]["albedo_ai"]["tag"] == "artistic"
-    assert body["provenance"]["edge_correlation"]["tag"] == "derived"
-    assert body["provenance"]["edge_correlation"]["formula"]
+    # A process check on the AI image, not a value about the object: no provenance tag.
+    assert "edge_correlation" not in body["provenance"]
+    check = body["checks"]["edge_correlation"]
+    assert check["kind"] == "process_check" and check["formula"] and check["min"] == 0.3
     # The code albedo is untouched by the repaint (separate optional layer).
     assert (d / "albedo.webp").read_bytes() == code_expected
     # Prompt is R6.6 step 2 verbatim plus a palette; the reference is the greyscale hillshade.
@@ -159,9 +184,9 @@ def test_repaint_is_deterministic_and_served_from_cache(tmp_path: Path) -> None:
     fake = FakeClient(faithful)
     p = painter(tmp_path, fake)
     first = p.repaint(OID, card())
-    a = (code_dir(tmp_path) / AI_FILE).read_bytes()
+    a = (ai_dir(tmp_path) / AI_FILE).read_bytes()
     second = p.repaint(OID, card())
-    b = (code_dir(tmp_path) / AI_FILE).read_bytes()
+    b = (ai_dir(tmp_path) / AI_FILE).read_bytes()
     assert first.applied and second.applied and second.from_cache
     assert len(fake.calls) == 1  # D-25: the second call is a cache hit
     assert a == b
@@ -169,7 +194,7 @@ def test_repaint_is_deterministic_and_served_from_cache(tmp_path: Path) -> None:
     other = painter(tmp_path / "again", FakeClient(faithful))
     assert other.repaint(OID, card()).applied
     again = bake_dir(
-        tmp_path / "again" / "textures",
+        tmp_path / "again" / "cache" / "textures-ai",
         OID,
         GENERATOR_VERSION,
         seed_for(OID, GENERATOR_VERSION),
@@ -359,6 +384,7 @@ def api(fixture_cache: Path, tmp_path: Path) -> Iterator[TestClient]:
     s = make_settings(
         fixture_cache,
         textures_dir=tmp_path / "textures",
+        textures_ai_dir=tmp_path / "textures-ai",
         admin_token=ADMIN,
         gemini_api_key=SECRET,
         gemini_offline_cache=True,  # offline fixtures; the painter below is online
@@ -369,10 +395,22 @@ def api(fixture_cache: Path, tmp_path: Path) -> Iterator[TestClient]:
 
 def use_painter(client: TestClient, tmp_path: Path, fake: FakeClient | None, **kw: Any) -> None:
     app_s = client.app.state.ctx.settings  # type: ignore[attr-defined]
-    s = app_s.model_copy(update={"offline": False, **kw})
+    s = app_s.model_copy(update={"offline": False, "gemini_cooldown_s": 0.0, **kw})
     client.app.state.gemini = GeminiPainter(  # type: ignore[attr-defined]
         s, ReadThroughCache(tmp_path / "gemini-cache", offline=s.offline), fake, width=W, height=H
     )
+
+    # No fixture object is a baked type since issue #40 typed Eros asteroid_shape (Q-61), so
+    # the pipeline answers with the asteroid_procedural fixture card under the resolved id.
+    def run(obj: Any) -> ObjectResult:
+        c = {**card(), "id": obj.id}
+        params = {
+            "seed": seed_for(obj.id, GENERATOR_VERSION),
+            "generator_version": GENERATOR_VERSION,
+        }
+        return ObjectResult(c, params, "generated", None, None)
+
+    client.app.state.pipeline.run = run  # type: ignore[attr-defined]
 
 
 def repaint(client: TestClient, oid: str, token: str | None = ADMIN) -> httpx.Response:
@@ -410,12 +448,8 @@ def test_api_swaps_in_on_success_and_never_shows_the_key(
     r = repaint(api, oid)
     body = r.json()
     assert body["status"] == "applied", body
-    assert body["layer"] == {
-        **body["layer"],
-        "id": "albedo_ai",
-        "tag": "artistic",
-        "label": "AI-made",
-    }
+    assert body["label"] == "AI-made"
+    assert body["layer"] == {**body["layer"], "id": "albedo_ai", "tag": "artistic", "tier": 5}
     img = api.get(body["albedo_url"])
     assert img.status_code == 200 and img.headers["content-type"] == "image/webp"
     with Image.open(io.BytesIO(img.content)) as im:
@@ -512,10 +546,13 @@ def test_repaint_uses_the_render_params_seed(tmp_path: Path) -> None:
     out = p.repaint("some-url-id", c, {"seed": 7, "generator_version": GENERATOR_VERSION})
     assert out.applied, out.detail
     d = bake_dir(tmp_path / "textures", c["id"], GENERATOR_VERSION, 7, W, H)
-    assert out.code_dir == d and (d / AI_FILE).is_file()
+    assert out.code_dir == d and (ai_dir(tmp_path, c["id"], 7) / AI_FILE).is_file()
     expected = encode(bake(params_from_card(c, 7), W, H))
     assert (d / "height.bin").read_bytes() == expected["height.bin"]
-    assert p.status("some-url-id").applied
+    rp = {"seed": 7, "generator_version": GENERATOR_VERSION}
+    assert p.status("some-url-id", rp).applied
+    # Without the asset's params the default seed is expected: another bake, so stale.
+    assert p.status("some-url-id").reason == "stale"
 
 
 def test_failed_refresh_is_reported_not_hidden(tmp_path: Path) -> None:
@@ -576,3 +613,224 @@ def test_connect_timeout_is_retried(tmp_path: Path) -> None:
 
 def test_hillshade_is_none_when_flat() -> None:
     assert gp.hillshade(np.zeros((8, 16)), 1000.0) is None
+
+
+# --- PR #48 review fixes (Q-122) --------------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", ["GENERATOR_VERSION", "BAKER_RULES_VERSION"])
+def test_status_is_stale_after_a_version_bump_without_rebake(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    """The old size directory and its bake.json stay self-consistent after a bump; the stamp
+    must still make the old repaint stale (D-07: never over a relief it was not checked on)."""
+    p = painter(tmp_path, FakeClient(faithful))
+    assert p.repaint(OID, card()).applied
+    monkeypatch.setattr(gp, name, "bumped")
+    st = p.status(OID)
+    assert not st.applied and st.reason == "stale"
+
+
+def test_status_is_stale_for_another_seed(tmp_path: Path) -> None:
+    p = painter(tmp_path, FakeClient(faithful))
+    assert p.repaint(OID, card()).applied
+    seed = seed_for(OID, GENERATOR_VERSION)
+    assert p.status(OID, {"seed": seed, "generator_version": GENERATOR_VERSION}).applied
+    assert p.status(OID, {"seed": seed + 1}).reason == "stale"
+
+
+def test_ai_root_inside_the_served_textures_is_refused(tmp_path: Path) -> None:
+    for inside in (tmp_path / "textures" / "ai", tmp_path / "textures"):
+        s = settings(tmp_path, textures_ai_dir=inside)
+        with pytest.raises(ValueError):
+            GeminiPainter(s, ReadThroughCache(s.cache_dir, offline=False), None)
+
+
+def test_truncated_height_and_bad_seed_keep_code(tmp_path: Path) -> None:
+    p = painter(tmp_path, FakeClient(faithful))
+    p.repaint(OID, card())
+    hb = code_dir(tmp_path) / "height.bin"
+    hb.write_bytes(hb.read_bytes()[:100])  # bake.json is still valid, so no rebake
+    out = p.repaint(OID, card())
+    assert not out.applied and out.reason == "bake_failed" and "albedo_ai" in out.missing
+    out = p.repaint(OID, card(), {"seed": -1, "generator_version": GENERATOR_VERSION})
+    assert not out.applied and out.reason == "bake_failed"
+
+
+def test_missing_fetched_at_is_null_not_none_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    p = painter(tmp_path, FakeClient(faithful))
+    assert p.repaint(OID, card()).applied
+    real = p._cache_get
+
+    def no_date(key: Any) -> Any:
+        entry = real(key)
+        assert entry is not None
+        meta = {k: v for k, v in entry.meta.items() if k != "fetched_at"}
+        return type(entry)(entry.key, entry.body, meta)
+
+    monkeypatch.setattr(p, "_cache_get", no_date)
+    out = p.repaint(OID, card())
+    assert out.applied and out.fetched_at is None
+    assert out.to_json("u")["cached_at"] is None
+    assert p.status(OID).to_json("u")["cached_at"] is None
+
+
+def test_cooldown_blocks_a_second_live_call(tmp_path: Path) -> None:
+    now = [0.0]
+    s = settings(tmp_path, gemini_cooldown_s=60.0)
+    fake = FakeClient(unrelated)
+    cache = ReadThroughCache(s.cache_dir, offline=False)
+    p = GeminiPainter(s, cache, fake, width=W, height=H, clock=lambda: now[0])
+    assert p.repaint(OID, card()).reason == "low_edge_correlation"
+    out = p.repaint(OID, card())
+    assert out.reason == "cooldown" and len(fake.calls) == 1
+    now[0] = 61.0
+    fake.make = faithful
+    assert p.repaint(OID, card()).applied and len(fake.calls) == 2
+    # A cache hit is never blocked; a refresh is a live call, so it is.
+    now[0] = 62.0
+    assert p.repaint(OID, card()).applied
+    assert p.repaint(OID, card(), refresh=True).reason == "cooldown"
+
+
+def test_offline_refresh_reports_the_refresh(tmp_path: Path) -> None:
+    assert painter(tmp_path, FakeClient(faithful)).repaint(OID, card()).applied
+    off = painter(tmp_path, FakeClient(faithful), offline=True, gemini_offline_cache=True)
+    out = off.repaint(OID, card(), refresh=True)
+    assert out.reason == "offline" and "refresh" in out.detail
+
+
+def test_no_key_still_uses_a_cached_repaint(tmp_path: Path) -> None:
+    assert painter(tmp_path, FakeClient(faithful)).repaint(OID, card()).applied
+    keyless = painter(tmp_path, None, gemini_api_key=None, gemini_model=FakeClient.model)
+    out = keyless.repaint(OID, card())
+    assert out.applied and out.from_cache
+    assert keyless.repaint(OID, card(), refresh=True).reason == "gemini_key_missing"
+
+
+def test_read_error_is_not_retried(tmp_path: Path) -> None:
+    """The request may have reached Google: one admin call is billed at most once."""
+    calls: list[httpx.Request] = []
+
+    def broken(req: httpx.Request) -> httpx.Response:
+        calls.append(req)
+        raise httpx.ReadError("reset", request=req)
+
+    s = settings(tmp_path, http_retries=3, http_backoff_s=0.0)
+    c = GeminiRestClient(s, transport=httpx.MockTransport(broken), sleep=lambda _: None)
+    with pytest.raises(GeminiError) as info:
+        c.generate("p", b"x")
+    assert info.value.reason == "gemini_unreachable" and len(calls) == 1
+
+
+def test_connect_error_is_retried(tmp_path: Path) -> None:
+    img = png_bytes(np.full((4, 8, 3), 9, dtype=np.uint8))
+    calls: list[httpx.Request] = []
+
+    def flaky(req: httpx.Request) -> httpx.Response:
+        calls.append(req)
+        if len(calls) == 1:
+            raise httpx.ConnectError("refused", request=req)
+        return httpx.Response(200, json=gemini_reply(img))
+
+    s = settings(tmp_path, http_retries=2, http_backoff_s=0.0)
+    c = GeminiRestClient(s, transport=httpx.MockTransport(flaky), sleep=lambda _: None)
+    assert c.generate("p", b"x").data == img and len(calls) == 2
+
+
+def test_reply_size_is_capped(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(gp, "MAX_REPLY_BYTES", 1000)
+    big = json.dumps(gemini_reply(b"\0" * 5000)).encode()
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=big)
+
+    c = GeminiRestClient(settings(tmp_path), transport=httpx.MockTransport(handler))
+    with pytest.raises(GeminiError) as info:
+        c.generate("p", b"x")
+    assert info.value.reason == "gemini_reply_too_large"
+
+
+def test_slow_reply_body_hits_the_total_deadline(tmp_path: Path) -> None:
+    now = [0.0]
+
+    def chunks() -> Iterator[bytes]:
+        for _ in range(10):
+            now[0] += 2.0  # each chunk takes 2 s; the budget is 5 s
+            yield b" " * 10
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=chunks())
+
+    s = settings(tmp_path, gemini_timeout_s=5.0)
+    c = GeminiRestClient(s, transport=httpx.MockTransport(handler), clock=lambda: now[0])
+    with pytest.raises(GeminiError) as info:
+        c.generate("p", b"x")
+    assert info.value.reason == "gemini_timeout" and now[0] <= 8.0
+
+
+def test_image_finish_reasons_are_refusals() -> None:
+    for finish in ("IMAGE_PROHIBITED_CONTENT", "IMAGE_RECITATION", "IMAGE_OTHER"):
+        reply = json.dumps({"candidates": [{"finishReason": finish}]}).encode()
+        with pytest.raises(GeminiError) as info:
+            gp.parse_response(reply)
+        assert info.value.reason == "gemini_refused"
+
+
+def test_api_ai_files_are_not_in_the_static_mount(api: TestClient, tmp_path: Path) -> None:
+    use_painter(api, tmp_path, FakeClient(faithful))
+    oid = resolve_id(api, "433 Eros")
+    body = repaint(api, oid).json()
+    assert body["status"] == "applied", body
+    ai = Path(api.app.state.gemini.ai_root)  # type: ignore[attr-defined]
+    files = [p for p in ai.rglob("*") if p.is_file()]
+    assert any(p.name == AI_FILE for p in files) and any(p.name == AI_META for p in files)
+    served = Path(api.app.state.ctx.settings.textures_path)  # type: ignore[attr-defined]
+    assert not any(served.rglob(AI_FILE)) and not any(served.rglob(AI_META))
+    for f in files:
+        rel = f.relative_to(ai).as_posix()
+        assert api.get(f"/data/textures/{rel}").status_code == 404
+
+
+def test_api_refuses_a_first_stage_card(
+    api: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = FakeClient(faithful)
+    use_painter(api, tmp_path, fake)
+    oid = resolve_id(api, "433 Eros")
+    pipeline = api.app.state.pipeline  # type: ignore[attr-defined]
+    real = pipeline.run
+
+    def first_stage(obj: Any) -> Any:
+        return dataclasses.replace(real(obj), measuring=("measuring:spectrum",))
+
+    monkeypatch.setattr(pipeline, "run", first_stage)
+    body = repaint(api, oid).json()
+    assert body["status"] == "code" and body["reason"] == "measuring"
+    assert body["missing"] == ["albedo_ai"] and fake.calls == []
+
+
+@pytest.mark.parametrize("error", [CacheMissOffline("x"), UpstreamUnavailable("x")])
+def test_api_card_unavailable_is_a_status_body(
+    api: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: Exception
+) -> None:
+    use_painter(api, tmp_path, FakeClient(faithful))
+    oid = resolve_id(api, "433 Eros")
+    pipeline = api.app.state.pipeline  # type: ignore[attr-defined]
+
+    def fail(obj: Any) -> Any:
+        raise error
+
+    monkeypatch.setattr(pipeline, "run", fail)
+    r = repaint(api, oid)
+    assert r.status_code == 200 and r.json()["reason"] == "card_unavailable"
+
+
+def test_cors_exposes_the_layer_tag(fixture_cache: Path, tmp_path: Path) -> None:
+    origin = "http://localhost:5173"
+    s = make_settings(fixture_cache, textures_dir=tmp_path / "t", cors_origins=origin)
+    with TestClient(create_app(s)) as c:
+        r = c.get("/v1/health", headers={"Origin": origin})
+        assert "x-sx-layer-tag" in r.headers["access-control-expose-headers"].lower()

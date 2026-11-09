@@ -146,3 +146,19 @@ class OverlaysResponse(BaseModel):
     frames: list[FrameOverlay]
     missing: list[str]
     provenance: dict[str, Provenance]
+
+
+class JobStatus(BaseModel):
+    """``GET /v1/objects/{id}/job`` and each ``/job/events`` event (issue #41, Q-111).
+    ``state`` is ``idle`` (no job; the other fields absent), ``running``, ``done`` or ``failed``."""
+
+    id: str
+    state: Literal["idle", "running", "done", "failed"]
+    stage: Literal["queued", "catalogue", "frames", "spectrum", "card", "done"] | None = None
+    frames_done: int | None = None
+    frames_total: int | None = None
+    answer: Literal["none", "first", "partial", "final"] | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
+    error: str | None = None
+    seq: int | None = None

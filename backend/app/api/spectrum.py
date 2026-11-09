@@ -11,12 +11,13 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel
 
-from app.api.deps import get_ctx, get_frame_service
+from app.api.deps import get_ctx, get_frame_service, get_measure_pool
 from app.api.models import ErrorResponse, Provenance
 from app.context import Context
 from app.core.find.frames import FrameService
 from app.core.find.ids import ID_RE
 from app.core.find.resolver import load_object
+from app.core.measure.pool import MeasurePool
 from app.core.measure.spectrum import SpectrumService
 from app.errors import ApiError
 from app.timefmt import iso_utc_z
@@ -73,10 +74,11 @@ def get_spectrum(
     object_id: ObjectId,
     ctx: Annotated[Context, Depends(get_ctx)],
     service: Annotated[FrameService, Depends(get_frame_service)],
+    pool: Annotated[MeasurePool | None, Depends(get_measure_pool)],
 ) -> SpectrumResponse:
     obj = load_object(ctx, object_id)
     if obj is None:
         raise ApiError(404, "not_found", f"Unknown object '{object_id}'. Call /v1/resolve first.")
-    result = SpectrumService(service).get_spectrum(obj)
+    result = SpectrumService(service, pool=pool).get_spectrum(obj)
     cached_at = iso_utc_z(result.cached_at) if result.cached_at else None
     return SpectrumResponse.model_validate({**result.body, "cached_at": cached_at})
