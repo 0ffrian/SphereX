@@ -27,8 +27,6 @@ In development the frontend's Vite server proxies `/v1` and `/data` (shape meshe
 
 `assets/shapes/` holds the shape-model GLBs (`<slug>.glb` at full detail, `<slug>.lod1.glb` at half the grid) and `registry.toml`. The app reads the registry to type an asteroid `asteroid_shape` and serves the meshes at `/data/shapes/<name>.glb`. Set `SX_SHAPES_DIR` to use another folder. To add or refresh a model, download the dataset by hand (the PDS host blocks scripts), then:
 
-`assets/literature.toml` is a reviewed, read-only table of cited values for objects the catalogues leave empty ('Oumuamua's size and light-curve amplitude, Epsilon Indi B's component temperatures). Stage 4 uses a row only where the catalogue value is null (A3.12, Q-153); `SX_LITERATURE_FILE` points elsewhere. `assets/pm13_dwarf_teff.toml` is the Pecaut & Mamajek main-sequence Teff table behind a star's third Teff source (Q-152); `SX_DWARF_TEFF_FILE` points elsewhere. Both are edited by hand, never by code.
-
 ```bash
 uv run python -m scripts.ingest_shape --zip ~/Downloads/gaskell.ast-eros.shape-model_V1_1.zip \
   --member gaskell.ast-eros.shape-model_V1_1/data/quad/quad64q.tab --slug eros-gaskell \
@@ -38,6 +36,10 @@ uv run python -m scripts.ingest_shape --zip ~/Downloads/gaskell.ast-eros.shape-m
 ```
 
 Input is an ICQ `.tab` (`--zip` plus `--member`, or `--input`) or an OBJ (`--input`, `--convex` for DAMIT). Output is byte-identical for the same input. Meshes over 50,000 triangles with no exact reduction are refused.
+
+`assets/literature.toml` is a reviewed, read-only table of cited values for objects the catalogues leave empty ('Oumuamua's size and light-curve amplitude, Epsilon Indi B's component temperatures). Stage 4 uses a row only where the catalogue value is null (A3.12, Q-153); `SX_LITERATURE_FILE` points elsewhere. `assets/pm13_dwarf_teff.toml` is the Pecaut & Mamajek main-sequence Teff table behind a star's third Teff source (Q-152); `SX_DWARF_TEFF_FILE` points elsewhere. Both are edited by hand, never by code.
+
+`assets/textures/` holds the demo pack's baked maps, served read-only at `/data/demo-textures` (`SX_DEMO_TEXTURES_DIR`, also under `SX_OFFLINE=1`, Q-164).
 
 ## Endpoints (D-16)
 
