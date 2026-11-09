@@ -1,93 +1,82 @@
-# Band-Hop Linker: in the sky view
+# Area search: in the sky view
 
 > **Part of:** Architecture spec ([index](README.md)) · **Sections:** A18–A18.10 · **Overview:** [linker.md](linker.md) (A16) · **Backend:** [linker-backend.md](linker-backend.md) (A17)
 
-Status: **proposal, not built** (Q-113). The sky view, shell and transport are the sky-view prototype (Q-89). The linker adds to them; it changes nothing they already do for a searched object.
+Status: **agreed plan, not built** ([Q-146](../decisions.md)). The sky view, shell and island are the sky-view prototype (Q-89) and the rail and island of the mock-up (#66). Area search adds to them; it changes nothing they already do for a searched object. Track's own screen is Atish's (Q-131); this fragment only opens it.
 
-## A18 Linker in the sky view
+Mock-up: `mockup/spherex-ui.html`, Area search tool (key 5). Serve the `mockup/` folder over http so the Track pane can load `chase-the-rock.html` next to it.
 
-**Principle: one sky.** The linker is folded into the sky as two **layers** (Detections, Chains), one **tool** in the left rail, and **cards** in the existing floating panel. Target markers, cached markers, the picked position, the survey credit and click-to-pick all keep working while the linker is open. A clickable prototype of this design is in the mock-up (`mockup/spherex-ui.html`, Linker tool, key 5) on a local branch; it is not part of this spec's PR.
+## A18 Area search in the sky view
 
-### A18.1 Shell and tool
+**Principle: one sky.** Area search is one **tool** in the left rail, a **square** drawn on the sky, two **layers** (Dots, Tracks), and **cards** in the island. Target markers, cached markers, the picked position and click-to-pick keep working outside the drawing step.
 
-- `ToolId` in `frontend/src/app/shell/shellStore.ts` gains `'linker'`. `ToolRail.tsx` gains a **Linker** button (chain icon in `icons.tsx`, hint "Linked moving objects in a field").
-- `Panels.tsx` renders `LinkerPanel` for `tool === 'linker'`, in a `PanelCard` like the object panel (a bottom sheet at ≤ 640 px). The panel has three views, one at a time:
+### A18.1 Tool and drawing
 
-| View | Contents |
-|---|---|
-| **Field** (default) | Field picker (the precomputed fields, `GET /v1/link/fields`), `computed_at`, the two layer switches, the **Show the linked chains** button, the chain list (one row per chain: id, hops, SED score, residual, match chip), **Open the completeness atlas** |
-| **Chain** (A18.5) | One chain's evidence |
-| **Atlas** (A18.6) | The completeness curve and its tiles |
+- `ToolId` in `frontend/src/app/shell/shellStore.ts` gains `'area'`. `ToolRail.tsx` gains an **Area search** button (square-with-dots icon in `icons.tsx`, hint "Draw a square, then follow known objects or look for movers").
+- Choosing the tool opens the **Area** card ("Drag a square over the part of the sky you want to search") and puts the sky in drawing mode: crosshair cursor; a drag draws the square instead of panning; the wheel still zooms. Buttons: **Use a square in the middle**, and **Keep the last square** when there is one.
+- The square is drawn in the accent colour (dashed while dragging, solid after) with its size in degrees above its top-left corner. A square under 30 CSS px on a side is refused with "Drag a bigger square".
+- On release the frontend finds the precomputed area holding the square (A16.4). None: the card says "This part of the sky is not prepared" and lists the prepared areas with **Fly there**. Escape or another tool leaves drawing mode and keeps the square.
 
-- Choosing another tool hides the panel; the layers stay on until switched off, so the chains can still be seen over the sky with the object panel open.
-- **Before the reveal**, the Chains layer is off and the list shows each chain greyed out with "waiting". The reveal switches the Chains layer on and fills the list one chain at a time (650 ms apart; at once under reduced motion). The rows are rendered from the start so the panel does not change height.
+### A18.2 Sky layers (`frontend/src/app/sky/area/AreaLayer.tsx`)
 
-### A18.2 Sky layers (`frontend/src/app/sky/linker/LinkerLayer.tsx`)
+- **One 2D canvas** inside `SkyPane`, above the SkyView WebGL canvas and below the DOM markers. `pointer-events: none` except for picking tracks.
+- **Drawn from the SkyPane render listener**, as the markers are: positions from `raDecToScreen` on every camera, visit or step change, written straight to the canvas with no React re-render. Device pixel ratio capped at 1.5 (D-05).
+- **Dots layer** (current visit only): before the stars step, star dots are white rings; after it, a faint cross. Glitches are rings in their wavelength colour until the glitch step, then hidden. Movers-to-be are rings in their wavelength colour (`wavelengthColor.ts`, `artistic`).
+- **Tracks layer** (after the join step): each tracklet as a short line through its exposures with a dot per exposure in its wavelength colour, and a dashed line joining the two visits. `found_blind` uses a short dash and the accent label; `unexplained` a long dash in amber; `possible` has no join line. Colour is never the only cue (R9). The selected track gets the four-corner bracket used for the selected object.
+- **Labels** at the last dot: "T1 · found blind = 433 Eros", "T2 · unexplained track", "T3 · possible · 1 visit" (A16.5). Clamped inside the pane; hidden when the view is wider than 30°.
+- **Picking.** With the Tracks layer on, a click within 20 CSS px of a track's dot opens its Track card (A18.7). Otherwise the click falls through to the existing pick.
+- **Text alternative** (`aria-describedby` on the sky canvas): "Area 1.05° by 0.63°, visit 2 of 2: 3 movers, 1 found blind as 433 Eros, 1 unexplained, 1 possible."
 
-- **One 2D canvas** inside `SkyPane`, stacked above the SkyView WebGL canvas and below the DOM markers and the credit. `pointer-events: none` except while the Chains layer is on (see picking).
-- **Drawn from the SkyPane render listener**, as the markers are: positions from `raDecToScreen` (`viewer/sky/skyMath.ts`) on every camera change or frame change, written straight to the canvas with no React re-render. The canvas follows the device pixel ratio capped at 1.5 (D-05).
-- **Detections layer** (current frame only): each orphan as a ring of radius 6 CSS px in the colour of its wavelength (`wavelengthColor.ts`, `artistic`). With chains shown, orphans that belong to no chain drop to 35 % opacity. Static detections are not drawn.
-- **Chains layer:** for each revealed chain, a dotted polyline through its hops with `time ≤` the current frame time, small dots at past hops, a filled dot with a white edge at the current hop, and a label at the last drawn hop (wording A16.5). Known chains use a solid line and unmatched chains a dashed line, so colour is never the only cue (R9). The selected chain is drawn in the accent colour with the four-corner bracket used for the selected object.
-- **Labels** are clamped inside the pane (measured text width), and hidden when the field of view is wider than 30° (they would overlap).
-- **Picking.** A click (pointer moved < 5 px, as now) first tests chains when the Chains layer is on: the nearest drawn hop or segment within 12 CSS px selects that chain and opens the Chain view. Otherwise the click falls through to the existing pick (coordinates search). Target and cached markers are DOM buttons above the canvas and keep priority.
-- **Text alternative** (`aria-describedby` on the sky canvas): "Field F1, frame 5 of 12, 1.30 µm: 87 detections, 4 linked chains, 2 match known objects."
+### A18.3 Visits and blink
 
-### A18.3 Time and transport
+- Discovery shows one **visit** at a time. **Blink the 2 visits** switches between them every 750 ms, the classic way to spot a mover by eye: stars stay put, movers jump. Under reduced motion the blink is off by default and the button steps one visit per press.
+- While Area search has the sky, the transport bar shows `visit v of V · date, time UTC` instead of the flipbook frame. The flipbook keeps its own index.
 
-- The transport bar (`app/shell/Transport.tsx`) drives the **field's** frames while the Linker tool is open and a field is loaded, and the object flipbook's frames otherwise. Each keeps its own index, so switching tools does not lose a place.
-- A linker playback session mirrors `flipbook/session.tsx` (timer, speed, "can play"), but it preloads nothing: the layers draw from JSON, and stamps load only in the Chain view.
-- The readout shows `day d of D · λ µm · frame k/N`, with `d` counted from the first frame of the pass. The wavelength shown is the frame's range midpoint; each detection carries its own wavelength.
-- The reveal jumps to the last frame so the whole tracks show; the user can then scrub back.
+### A18.4 Island cards and minimise
 
-### A18.4 Camera
+- Every Area card opens in the island (as the object card does) at 408 px wide; the island's **close** and **minimise** buttons work on all of them.
+- **Minimise** shrinks the card to the island pill, which keeps showing progress ("Discovery · Step 3 of 5 · Drop stars", then "3 movers found · 1 is 433 Eros"), so the whole square is visible while the steps play. A click on the pill, or a right-click, brings the card back as it is now.
+- Cards: Area (A18.1), Options (A18.5), Known (A18.5), Discovery (A18.6), Track card (A18.7).
 
-- Opening a field flies the camera (the existing fly, 700 ms) to the field centre with a field of view of 2.5 × the field diameter, at least 1°.
-- The fly puts the field's chains clear of the panel: the field centre goes at 70 % of the pane height on desktop (the card is top-centre in the mock-up layout) and at `PHONE_OBJECT_Y` on phones.
-- Selecting a chain from the list flies to that chain's last hop if it is off screen. Under reduced motion every fly is a jump.
+### A18.5 Options and Known objects
 
-### A18.5 Chain view
+- **Options card:** title "Area · w° × h°", subtitle "n SPHEREx frames in v visits · dates". Two large buttons: **Known objects** ("Follow asteroids and comets already on file that crossed this square") and **Discovery** ("Look for dots that move and match nothing on file"). **Draw again** under them.
+- **Known card:** one row per object from `/known` (A17.8): number and name, kind, frames and visits, and a chip **Track it** when `track_available`, else **Open** (the object card). **Track it** opens Track (A18.8).
 
-- **Header:** chain id; subtitle "matches a known object" or "matches nothing known".
-- **Chips:** `Known match: <designation>`, `Unmatched · candidate` or `Low confidence`; the dev-only Fixture badge when relevant.
-- **SED:** flux against wavelength, one point per hop coloured by wavelength with its error bar, the quadratic fit dashed, `sed_jump` hops ringed in amber with "SED jumps here". Built on the existing spectrum chart code in `app/spectrum/`.
-- **Stamp strip:** up to 8 stamps from `/stamps/{det_id}.png`, evenly spread in time, each with its wavelength under it. A missing stamp shows the refusal text, not a grey box.
-- **Facts** with badges (A16.5): hops and span in days, channels, rate and position angle, fit residual, SED score, known match and separation, verdict.
-- **Buttons:** for a known chain, **Open (designation)**, which runs the normal search for that designation; **Back to the field**; **Atlas**.
+### A18.6 Discovery card
 
-### A18.6 Atlas view
+- **Note** (amber, always shown while fixtures are in use; in the event build replaced by `computed_at`): what is demo and what is real.
+- **Five steps**, each a row with a check, a name and its count from `steps` (A17.8): Find dots · Drop one-exposure glitches · Drop stars (Gaia DR3, CatWISE) · Join what moves across visits · Check known objects (SkyBoT). **Look for movers** replays them one second apart (at once under reduced motion), turns both layers on, starts the blink and fits the camera so the square sits below the card. Afterwards the button reads **Run again**.
+- **Results list:** one row per track or possible, rendered from the start (greyed "waiting") so the card does not change height: id, "Moves across both visits" or "Seen in 1 visit", exposures, and a chip: `433 Eros` (green), `unexplained` (amber) or `possible`. A row opens the Track card.
+- The reveal announces "3 movers: 1 is 433 Eros, found blind; 1 unexplained; 1 seen in one visit" through `LiveAnnouncer`.
 
-- **Chart:** recovered fraction against injected magnitude; bins with Wilson bars, the logistic curve and its band, a dashed line at the 50 % magnitude. The region fainter than the measured per-exposure limit is shaded "below the limit, not counted"; with no measured limit there is no shading, and the refusal is listed.
-- **Conditions:** a switch for 0.3 mag rotation and a segmented control for the slow or fast rate band. They choose among the four precomputed curves (A17.6); nothing is computed in the browser.
-- **Tiles:** recall above the limit, 50 % magnitude, false links in the shuffled control (`n_chains / n_permutations`), median fit residual; each with its design target in small text, never as a result.
-- **Export:** links to `export.ecsv` and `export.ades.psv`, with the "not submittable" note next to the ADES link.
-- The atlas is a panel view, not a separate page; the sky stays visible next to it.
+### A18.7 Track card
 
-### A18.7 State and API client
+- Header: the track id; subtitle "Track · matches a known object" or "Track · matches nothing known". Chips: `Known: <designation>`, `Unexplained track` or `Possible · one visit`, plus the dev-only Fixture badge.
+- One sentence: found blind ("Found without being told where to look. SkyBoT then confirmed it is 433 Eros."), unexplained ("Moves steadily across both visits and matches nothing in SkyBoT. A lead for follow-up, not a discovery."), possible ("Moves within one visit only. It needs a second visit before it counts as a track.").
+- Facts with badges: visits, exposures, glitch check, star check, known object and separation, rate and direction.
+- Buttons: **Open in Track** (found blind only), **Back to Discovery**.
 
-- A `linker` slice in `frontend/src/state/store.ts`: `fields`, `fieldId`, `field`, `detections`, `chains`, `completeness` (each `idle | loading | ready | error`), `layers {detections, chains}`, `revealed[]`, `frameIndex`, `playing`, `selectedChain`, `view: 'field' | 'chain' | 'atlas'`.
-- API functions in `frontend/src/app/api/` for the routes of A17.8, validated at runtime in `validate.ts` against the generated contract types (D-18). A newer field choice aborts older requests, as `skySearch` does.
-- Loading order: field list, then field summary and chains, then detections for the current frame plus neighbours, then completeness when the Atlas view opens.
-- URL hash (`useHashSync`): `link=<field_id>` and `chain=<chain_id>`, so a chain can be shared.
-- Copy lives in `app/messages.ts`; refusals go through `refusals.ts` and `RefusalList.tsx`.
+### A18.8 Hand-off to Track
 
-### A18.8 Accessibility (R9)
+- **Open in Track** and **Track it** open Atish's Track view for that object (Q-131) in the split pane used by Build (the sky moves left, the pane takes the right side; about 62 % in the mock-up). The pane header has **Back to the area**, which closes Track and reopens the card the user came from, and a close button.
+- Track's path, frames, zoom, spectrum and sound are specified by Q-131 to Q-145, not here. The sky marker for the mover follows Track's time slider (Q-142).
 
-- Every chain is reachable without the canvas: the chain list rows are buttons, and each opens the Chain view and flies to the chain.
-- Layer switches are labelled checkboxes. The reveal announces "4 chains linked: 2 match known objects, 2 are unmatched candidates" through `LiveAnnouncer`.
-- Known and unmatched differ by line style and label, not colour alone. Wavelength colours use the existing palette and contrast rules.
-- Reduced motion: no staggered reveal, no fly animation, no pulsing bracket.
+### A18.9 State, API client, accessibility, performance
 
-### A18.9 Performance and haptics
-
-- D-05: at most a few thousand detections per frame and a few dozen chains are drawn, far under the 60k point budget. Only the current frame's detections are drawn.
-- D-34: the layer redraws on change only (camera, frame, layer switch, selection); a still sky runs no frame loop.
-- **Haptics (optional, Atish, M3, D-13):** while scrubbing with a chain selected, a short tick at each hop; on the SED, the Listen sweep of [A8](sound-voice.md#a8-sound-and-voice) over the hop fluxes. Not needed for the linker to work.
+- An `area` slice in `frontend/src/state/store.ts`: `areas`, `areaId`, `square`, `summary`, `known`, `dots`, `tracks` (each `idle | loading | ready | error`), `layers {dots, tracks}`, `step`, `visit`, `blink`, `selectedTrack`, `card`, `minimised`.
+- API functions in `frontend/src/app/api/` for A17.8, validated at runtime in `validate.ts` against the generated contract types (D-18). A newer square aborts older requests.
+- URL hash (`useHashSync`): `area=<area_id>` and `track=<track_id>`.
+- Copy in `app/messages.ts`; refusals through `refusals.ts` and `RefusalList.tsx`.
+- **Accessibility (R9):** every track is reachable without the canvas (the results rows are buttons); the square can be set without a drag (**Use a square in the middle**, then arrow keys move it and Shift + arrows resize it); layer switches are labelled checkboxes.
+- **Performance:** D-05 budget; only the current visit's dots are drawn. D-34: redraw on change only, except while the blink runs.
+- **Sound:** Track owns the sound for a known object (Q-134). Discovery adds none for the event build. Desktop only (Q-132).
 
 ### A18.10 Testing
 
 | Layer | Tests |
 |---|---|
-| Backend | Determinism (two runs, byte-identical outputs); static removal on recorded frames; linking recovers injected movers on synthetic frames; the shuffled control yields no chains on pure noise; known match against a recorded SkyBoT reply; ECSV and ADES writers; offline 404 for an absent field |
-| Frontend unit | Hit-testing and label clamping; RA wrap-around in the layer; the store slice (loading, abort, views); validation of every fixture |
-| Components | Linker panel views; the reveal with and without reduced motion; refusal display |
-| e2e (Playwright) | On fixtures: open Linker, reveal, click a track, open the atlas, follow a shared `link=` link. On the real cache (L3): the same flow under `SX_OFFLINE=1` |
+| Backend | Determinism (two runs, byte-identical outputs); glitch, star and fixed labels on recorded frames; joining recovers the 3 fixture movers and labels them track, track and possible; an ambiguous pair stays possible; SkyBoT match against a recorded reply; ECSV writer; offline 404 for an absent area |
+| Frontend unit | Square drawing and the minimum size; hit-testing and label clamping; RA wrap-around; the store slice (loading, abort, steps); validation of every fixture |
+| Components | Options, Known, Discovery and Track cards; the step replay with and without reduced motion; minimise and restore during the replay; refusal display |
+| e2e (Playwright) | On fixtures: draw a square, Discovery, run, minimise, restore, open T1, Open in Track, Back to the area; Known, Track it. On the real cache (D3): the same flow on the Eros area under `SX_OFFLINE=1` |
