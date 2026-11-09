@@ -172,7 +172,11 @@ describe('planShaderKind', () => {
 
   it('light comes from planLighting: sun_dir here, none for the self-lit clouds', () => {
     const w = fixture('planet_water');
-    expect(planRender(w.card, w.params, defaultContext()).lighting.direction).toEqual([1, 0, 0]);
+    const plan = planRender(w.card, w.params, defaultContext()).lighting;
+    // sun_dir [1, 0, 0] turned toward the camera by the display tilt (lighting.ts, Q-107 item 1).
+    expect(plan.source).toBe('sun_dir');
+    expect(plan.direction![0]).toBeGreaterThan(0.5);
+    expect(plan.direction![2]).toBeGreaterThan(0.3);
     const n = fixture('nebula');
     expect(planRender(n.card, n.params, defaultContext()).lighting.direction).toBeNull();
   });

@@ -154,7 +154,7 @@ classDiagram
     requires teff_K, radius_rsun optional (no radius: unit sphere, no scale bar)
     blackbody colour, linear limb darkening
     Mira brightness follows light curve
-    T Tauri disc (flared, lit, depth-tested: ttauriDisc.ts, issue #62) and dust screen
+    T Tauri disc (flared, lit, depth-tested, two fixed passes: back faces then front faces; ttauriDisc.ts, issue #62) and dust screen
     motion trail from pm_mas_yr
     issue #42: StarBody draws spots, faculae, flares, loops, granulation, glow
     from the CPU model bodies/starModel.ts (pure in seed, rates, t)
