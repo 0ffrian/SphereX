@@ -10,23 +10,23 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 
 | File | Holds | Size |
 |---|---|---|
-| [scope-process.md](scope-process.md) | scope cuts, doc layout, owners, build dates, milestones, the post-event backlog, the demo object and data release, ID reservations | 6 D, 5 Q, 6 KB |
-| [contract.md](contract.md) | the data contract, provenance tags and badges, the honesty toggle, tier fallback, the endpoint list (D-16), schemas and fixtures, "which tag does X get" | 9 D, 24 Q, 25 KB |
-| [data-sources.md](data-sources.md) | the backend framework, external archives and adapters, name resolving, the read-through cache and offline mode, test targets, overlays and the composite backends | 4 D, 15 Q, 19 KB |
-| [pipeline-jobs.md](pipeline-jobs.md) | stages 1 to 7 as built, measurement, catalogues and shape models, object jobs, fan-out and progress endpoints | 0 D, 11 Q, 24 KB |
-| [rendering-bodies.md](rendering-bodies.md) | where surfaces are generated, the baker, renderers per type, physics sliders, accuracy, golden images | 3 D, 9 Q, 13 KB |
-| [rendering-motion.md](rendering-motion.md) | motion, time-lapse, render-on-change, quality levels, volumes and the Q-107 fix notes | 1 D, 9 Q, 21 KB |
+| [scope-process.md](scope-process.md) | scope cuts, doc layout, owners, build dates, milestones, the post-event backlog, the demo object and data release, ID reservations | 6 D, 9 Q, 10 KB |
+| [contract.md](contract.md) | the data contract, provenance tags and badges, the honesty toggle, tier fallback, the endpoint list (D-16), schemas and fixtures, "which tag does X get" | 9 D, 28 Q, 32 KB |
+| [data-sources.md](data-sources.md) | the backend framework, external archives and adapters, name resolving, the read-through cache and offline mode, test targets, overlays and the composite backends | 4 D, 15 Q, 20 KB |
+| [pipeline-jobs.md](pipeline-jobs.md) | stages 1 to 7 as built, measurement, catalogues and shape models, object jobs, fan-out and progress endpoints | 0 D, 11 Q, 26 KB |
+| [rendering-bodies.md](rendering-bodies.md) | where surfaces are generated, the baker, renderers per type, physics sliders, accuracy, golden images | 3 D, 9 Q, 14 KB |
+| [rendering-motion.md](rendering-motion.md) | motion, time-lapse, render-on-change, quality levels, volumes and the Q-107 fix notes | 1 D, 9 Q, 22 KB |
 | [gemini.md](gemini.md) | the Gemini layer: scope, offline behaviour and its contract | 1 D, 2 Q, 7 KB |
-| [sky-shell.md](sky-shell.md) | the app shell, the sky view, the flipbook UI, the rail and the island, the Build split view, sky endpoints and sky tiles | 1 D, 15 Q, 22 KB |
-| [haptics-design.md](haptics-design.md) | haptics and audio design rules, creative ownership, the haptics API, body and path sound, pitch mapping | 6 D, 16 Q, 21 KB |
-| [haptics-built.md](haptics-built.md) | the haptic engine, calibration and source choices as built | 0 D, 9 Q, 18 KB |
-| [platform-hosting.md](platform-hosting.md) | the three.js pin, hardware and frame budgets, hosting, the demo machine and the event platform | 3 D, 4 Q, 3 KB |
-| [moving-objects.md](moving-objects.md) | Rainbow Trails, frames for moving objects, the Track tool, Area search and Discovery | 1 D, 17 Q, 13 KB |
+| [sky-shell.md](sky-shell.md) | the app shell, the sky view, the flipbook UI, the rail and the island, the Build split view, sky endpoints and sky tiles | 1 D, 24 Q, 37 KB |
+| [haptics-design.md](haptics-design.md) | haptics and audio design rules, creative ownership, the haptics API, body and path sound, pitch mapping | 6 D, 22 Q, 31 KB |
+| [haptics-built.md](haptics-built.md) | the haptic engine, calibration and source choices as built | 0 D, 9 Q, 20 KB |
+| [platform-hosting.md](platform-hosting.md) | the three.js pin, hardware and frame budgets, hosting, the demo machine and the event platform | 3 D, 5 Q, 6 KB |
+| [moving-objects.md](moving-objects.md) | Rainbow Trails, frames for moving objects, the Track tool, Area search and Discovery | 1 D, 26 Q, 32 KB |
 
 ## Rules for entries
 
 - **IDs never change and are never reused.** A new decision is the next free `D-` number; a new question the next free `Q-` number. Before you pick one, check `origin/main` and the open PRs (they pick numbers too).
-- **Next free:** D-36 and Q-150 (9 Nov 2026). **Reserved:** Q-130 to Q-149 for the Track tool and Area search (Q-130). **Claimed by open PRs:** PR #63 holds Q-114 to Q-119; PR #53 proposes Q-124 (taken on main, to renumber) and Q-125. **Never used, do not reuse:** Q-46.
+- **Next free:** D-36 and Q-183 (9 Nov 2026; Q-150 to Q-182 were assigned on 9 Nov 2026 to the spec-pass proposals). Q-149 in the Track block is still unused. **Reserved:** Q-130 to Q-149 for the Track tool and Area search (Q-130). **Claimed by open PRs:** PR #63 holds Q-114 to Q-119; PR #53 proposes Q-124 (taken on main, to renumber) and Q-125. **Never used, do not reuse:** Q-46.
 - **One entry, one file.** Put a new entry in the topic file it belongs to and add its row to the index below in the same commit. An entry that changes another one says "amends D-xx" and the amended entry gets an "Amended by" line.
 - **Status words** (for new entries; older rows keep their wording): **Open**; **Open (built)** (code follows the proposal); **Proposed** (an owner must confirm); **Decided** (who and when); **Partly decided** (list what is open); **Superseded by** (the newer entry rules); **Deferred** (after the event). D- entries are **Accepted** unless marked otherwise.
 - **Spec text belongs in the specs.** A decision states the rule and cites the spec section that holds the detail; when a decision changes a rule, update that section in the same PR.
@@ -180,7 +180,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-107 | Visual findings from #42 review | Mostly fixed (see below). Open: a check on a… | [rendering-motion](rendering-motion.md) |
 | Q-108 | Process gating and flare cap | Open (implemented as described) | [rendering-motion](rendering-motion.md) |
 | Q-109 | Brown-dwarf flattening refused | Proposed (implemented as described; Kevin to… | [rendering-motion](rendering-motion.md) |
-| Q-110 | Policy for [verify] constants | (no status cell) | [contract](contract.md) |
+| Q-110 | Policy for [verify] constants | Proposed | [contract](contract.md) |
 | Q-111 | Two-stage answer and object jobs | Open (implemented as described) | [pipeline-jobs](pipeline-jobs.md) |
 | Q-112 | Fan-out settings and defaults | Open (implemented as described) | [pipeline-jobs](pipeline-jobs.md) |
 | Q-113 | Select, Build it, split view (main, L579) | Proposed: pending Moon's confirmation (implem… | [sky-shell](sky-shell.md) |
@@ -208,4 +208,37 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-146 | Area search: Known and Discovery | Answered (Moon, 9 Nov 2026); accepted by Atis… | [moving-objects](moving-objects.md) |
 | Q-147 | Band-Hop Linker spec (first proposal) | Answered: re-scoped as Q-146 | [moving-objects](moving-objects.md) |
 | Q-148 | Pass length per sky position | Open | [moving-objects](moving-objects.md) |
+| Q-150 | One Escape owner for the shell | Proposed | [sky-shell](sky-shell.md) |
+| Q-151 | Pane kinds: Build and Track share split | Proposed | [sky-shell](sky-shell.md) |
+| Q-152 | Feature cards and island progress pill | Proposed | [sky-shell](sky-shell.md) |
+| Q-153 | Hash keys for tools and panes | Proposed | [sky-shell](sky-shell.md) |
+| Q-154 | Sky extension points for tool layers | Proposed | [sky-shell](sky-shell.md) |
+| Q-155 | Tools that own the sky; the transport | Proposed | [sky-shell](sky-shell.md) |
+| Q-156 | One announce path | Proposed | [sky-shell](sky-shell.md) |
+| Q-157 | Keyboard facts as built | Open (built) | [sky-shell](sky-shell.md) |
+| Q-158 | OUTLIER kept as a flag in Discovery | Proposed | [moving-objects](moving-objects.md) |
+| Q-159 | Parallax-aware pair test in Discovery | Proposed | [moving-objects](moving-objects.md) |
+| Q-160 | Known-object check: SkyBoT, Horizons, unchecked | Proposed | [moving-objects](moving-objects.md) |
+| Q-161 | Track is a split-pane kind, no tool | Proposed | [moving-objects](moving-objects.md) |
+| Q-162 | Discovery result card named Result card | Proposed | [moving-objects](moving-objects.md) |
+| Q-163 | Owners for Track and the star list | Proposed | [scope-process](scope-process.md) |
+| Q-164 | Eros Track window | Proposed | [moving-objects](moving-objects.md) |
+| Q-165 | Marker between exposures | Proposed | [moving-objects](moving-objects.md) |
+| Q-166 | Measurable coma-fills-aperture test | Proposed | [moving-objects](moving-objects.md) |
+| Q-167 | Track tickets and milestone | Proposed | [scope-process](scope-process.md) |
+| Q-168 | Mesh height for the body tone | Proposed | [haptics-design](haptics-design.md) |
+| Q-169 | Tone stream in the haptics API | Proposed | [haptics-design](haptics-design.md) |
+| Q-170 | Sustained-tone timbre by tag; body level | Proposed | [haptics-design](haptics-design.md) |
+| Q-171 | Body tone on bodies without height | Proposed | [haptics-design](haptics-design.md) |
+| Q-172 | Height ticks after the event | Proposed | [haptics-design](haptics-design.md) |
+| Q-173 | Desktop Feel mode in the build pane | Proposed | [sky-shell](sky-shell.md) |
+| Q-174 | Track path sound details | Proposed | [haptics-design](haptics-design.md) |
+| Q-175 | GET /v1/health beyond D-16 | Proposed | [contract](contract.md) |
+| Q-176 | UI wording for every missing code | Proposed | [contract](contract.md) |
+| Q-177 | MVP object in warm start and pre-fetch | Proposed | [scope-process](scope-process.md) |
+| Q-178 | Interim event serving until #15 | Proposed | [platform-hosting](platform-hosting.md) |
+| Q-179 | Blind test owner and object | Proposed | [scope-process](scope-process.md) |
+| Q-180 | Honesty start state vs Build it raise | Open | [contract](contract.md) |
+| Q-181 | One tag for Horizons-derived values | Open | [contract](contract.md) |
+| Q-182 | Review of the Area search fixes (9 Nov 2026) | Proposed | [moving-objects](moving-objects.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |

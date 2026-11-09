@@ -25,7 +25,7 @@ At the event the audio driver is the only output (Q-132). After the event it pla
 
 **Provenance by timbre**
 
-| Tag | Short sound | Sustained tone (body tone, path voice). **Proposed (Q-NEW-REN-3)** |
+| Tag | Short sound | Sustained tone (body tone, path voice). **Proposed (Q-170)** |
 |---|---|---|
 | `measured` | Clean sine blip (2 ms attack, 40 ms) | Clean sine |
 | `derived`, `model_dependent`, `inferred_from_analog` | Softer tone (sine, 12 ms attack, gain × 0.6) | Softer sine: gain × 0.6, through a low-pass filter |
@@ -51,14 +51,14 @@ At the event the audio driver is the only output (Q-132). After the event it pla
 
 While the user interacts with a body, one continuous tone follows the height under the pointer: low in grooves, higher on the surface and on peaks. This overrides the R8.4 height ticks and the Q-70 pitch for body interaction. Q-70 still holds for the spectrum, the Listen sweep and Track. Status: **not built yet**.
 
-- **Which bodies.** Every body with a height: `asteroid_procedural` (`height.bin`), `planet_rocky` and `planet_water` (the shared field's height, R7.7) and `asteroid_shape` (mesh height, R8.4, **Proposed (Q-NEW-REN-1)**). Bodies with no height have no tone: gas giants keep the flow cues, comets the field pulse, brown dwarfs and stars their data pulses, nebulae and novae nothing (**Proposed (Q-NEW-REN-4)**).
+- **Which bodies.** Every body with a height: `asteroid_procedural` (`height.bin`), `planet_rocky` and `planet_water` (the shared field's height, R7.7) and `asteroid_shape` (mesh height, R8.4, **Proposed (Q-168)**). Bodies with no height have no tone: gas giants keep the flow cues, comets the field pulse, brown dwarfs and stars their data pulses, nebulae and novae nothing (**Proposed (Q-171)**).
 - **Height sample.** The source's own sample (R8.4): the same height that draws the normals and the displacement (R1 principle 6). On a water world the ocean is flat at sea level, so the tone holds there.
 - **Pitch.** pitch = (h − h_min) / (h_max − h_min), where h_min and h_max are the lowest and highest heights of the whole body, computed once when the height loads. Frequency uses the R8.9 mapping. A flat body (h_max = h_min) has no tone.
-- **Gain.** strength = `BODY_TONE_STRENGTH` (a placeholder, proposed 0.6), times the user multiplier and volume; ×0.6 for hydrated asteroids (R8.4). Proposed with Q-NEW-REN-3.
+- **Gain.** strength = `BODY_TONE_STRENGTH` (a placeholder, proposed 0.6), times the user multiplier and volume; ×0.6 for hydrated asteroids (R8.4). Proposed with Q-170.
 - **Pan.** From the pointer's x on screen.
 - **Tag and timbre.** The height layer's tag: `artistic` for procedural relief and shader surfaces, `measured` for a real mesh. The timbre is the sustained column above.
 - **Honesty (D-21).** The engine filter applies (R8.2). An `artistic` tone is heard only from + Artistic; the build pane's raise makes it audible after *Build it* (R5.8). A mesh tone plays in every state.
-- **Life.** It starts when a Feel drag (or, after the event, a Touch-mode finger) lands on the body, and updates on every pointer move and on every rendered frame while the body turns under a still pointer. It stops on release, when the pointer leaves the body, when Feel is turned off, when the page hides, or when the honesty level hides its tag. It uses the `body` tone of the stream (R8.8, **Proposed (Q-NEW-REN-2)**).
+- **Life.** It starts when a Feel drag (or, after the event, a Touch-mode finger) lands on the body, and updates on every pointer move and on every rendered frame while the body turns under a still pointer. It stops on release, when the pointer leaves the body, when Feel is turned off, when the page hides, or when the honesty level hides its tag. It uses the `body` tone of the stream (R8.8, **Proposed (Q-169)**).
 - **Cues on top.** Coastline, ice and lava cues and the limb edge tick stay as short sounds over the tone; they mark edges, not height (R8.4).
 - **Test (R11).** The tone's pitch is monotone in the sampled height.
 
@@ -67,8 +67,8 @@ While the user interacts with a body, one continuous tone follows the height und
 "Hear the Shift": the Track tool's sound ([A19](../../architecture/moving-objects/track.md), [A20](../../architecture/moving-objects/track-ui.md)). It is sound only, at the event and after. It plays while Track replays a known object's exposures. Status: **not built yet**.
 
 - **Exposure tick.** One tick per exposure, when the replay reaches that exposure. Tag = the exposure's tag (a SPHEREx cutout is `measured`, so the ticks are heard in Measured only). Pitch = the exposure's wavelength through the Q-70 mapping, the same mapping as the spectrum and the Listen sweep. Pan = the object's drawn x in the Track view (−1 left edge, +1 right edge). Voice `tone`, channel `data`.
-- **Path voice.** A soft continuous voice while the replay runs, in the Estimated timbre (the sustained column above). The path comes from JPL Horizons and is `model_dependent`, so the voice is silent in Measured only. Pan follows the drawn x of the path at the replay time. It uses the `path` tone of the stream (R8.8). Pitch and gain are fixed: **Proposed (Q-NEW-REN-7)**, at pitch 0.5 and a strength well below the ticks.
-- **Reference click.** A quiet, regular click that gives the replay a steady tempo, with a visible mute button next to the replay controls. **Proposed (Q-NEW-REN-7):** one click per hour of observation time on the replay's time axis, voice `click`, tagged `measured` (the exposure times are measured), so it plays in every state unless muted.
+- **Path voice.** A soft continuous voice while the replay runs, in the Estimated timbre (the sustained column above). The path comes from JPL Horizons and is `model_dependent`, so the voice is silent in Measured only. Pan follows the drawn x of the path at the replay time. It uses the `path` tone of the stream (R8.8). Pitch and gain are fixed: **Proposed (Q-174)**, at pitch 0.5 and a strength well below the ticks.
+- **Reference click.** A quiet, regular click that gives the replay a steady tempo, with a visible mute button next to the replay controls. **Proposed (Q-174):** one click per hour of observation time on the replay's time axis, voice `click`, tagged `measured` (the exposure times are measured), so it plays in every state unless muted.
 - **Never the SPHEREx-centred rate.** Pitch and pan are never driven by the object's apparent rate of motion. Seen from SPHEREx that rate mostly carries the spacecraft's orbital parallax (about 100″ per hour swing for Eros on 20 Mar 2026). Pan follows the drawn position only.
 - **Direction never by pan alone.** A venue PA may be mono. The direction of travel is also given in text (the Track view's caption and a polite live region) and drawn on screen (R9).
 - **Honesty (D-21).** The engine filter applies (R8.2): in Measured only the exposure ticks (and the reference click) remain and the path voice is silent.

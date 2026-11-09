@@ -4,11 +4,11 @@
 
 ### R8.5 Per-type haptic profile
 
-"Texture" is the body interaction: at the event, the body tone (R8.9.1, Q-133) plus the cues named; after the event, the ticks named also vibrate (**Proposed (Q-NEW-REN-5)**).
+"Texture" is the body interaction: at the event, the body tone (R8.9.1, Q-133) plus the cues named; after the event, the ticks named also vibrate (**Proposed (Q-172)**).
 
 | Type | Texture haptics | Data haptics |
 |---|---|---|
-| `asteroid_shape` | Body tone from mesh height (`measured`, Q-NEW-REN-1); limb edge tick. After the event: mesh-normal ticks | — |
+| `asteroid_shape` | Body tone from mesh height (`measured`, Q-168); limb edge tick. After the event: mesh-normal ticks | — |
 | `asteroid_procedural` | Body tone from `height.bin` (`artistic`, heard from + Artistic). After the event: height ticks, dense and irregular for rubble; rim double-ticks and silent floors for cratered | — |
 | `comet` | Nucleus tick (no body tone: the nucleus has no height) | Field pulse rate ∝ Q/r per selected gas and epoch |
 | `brown_dwarf` | Soft tick at each band boundary, strength = band contrast (no body tone: flat height) | Holding still gives a steady pulse; rate ∝ normalised `flux_45um` (2–12 Hz) |
@@ -17,8 +17,8 @@
 | `star_ttauri` | — | Steady pulse that weakens and stutters (dropped beats ∝ dimming depth) as you scrub the 2025 dimming |
 | `star` | — | Ticks while tracing the motion trail; spacing ∝ distance moved per year |
 | `candidate` | — | In the flipbook: one tick per frame where it's detected |
-| `gas_giant` | No surface and no body tone (Q-NEW-REN-4), so the pointer hears the **flow**: a soft tick crossing each band boundary (strength = band contrast); inside a jet, a pulse train whose rate ∝ the zonal wind speed at that latitude; on a storm, a firm tick at its edge and a pulse rate that rises towards its centre (a "swirl"); dragging across rings gives a tick at each gap | Holding still gives a steady pulse (`teq_pulse`), rate ∝ normalised `Teq` (2–12 Hz), as for brown dwarfs. Tag follows `teq_K`: `measured` from `pl_eqt`, otherwise `derived` |
-| `planet_water` | Land: the body tone from the field height. Open ocean: the tone holds at sea level, with the surf sound and a near-silent slow swell (1–2 Hz, lowest level) (Q-NEW-REN-4); coastline: one firm tick; polar ice: dense, fine, soft ticks; clouds: not heard or felt (optional "feel clouds" toggle) | As for `gas_giant` (`Teq` pulse) |
+| `gas_giant` | No surface and no body tone (Q-171), so the pointer hears the **flow**: a soft tick crossing each band boundary (strength = band contrast); inside a jet, a pulse train whose rate ∝ the zonal wind speed at that latitude; on a storm, a firm tick at its edge and a pulse rate that rises towards its centre (a "swirl"); dragging across rings gives a tick at each gap | Holding still gives a steady pulse (`teq_pulse`), rate ∝ normalised `Teq` (2–12 Hz), as for brown dwarfs. Tag follows `teq_K`: `measured` from `pl_eqt`, otherwise `derived` |
+| `planet_water` | Land: the body tone from the field height. Open ocean: the tone holds at sea level, with the surf sound and a near-silent slow swell (1–2 Hz, lowest level) (Q-171); coastline: one firm tick; polar ice: dense, fine, soft ticks; clouds: not heard or felt (optional "feel clouds" toggle) | As for `gas_giant` (`Teq` pulse) |
 | `planet_rocky` | The body tone from the field height; lava cracks give a double tick on top | As for `gas_giant` |
 | `nebula` | None. The nebula has no haptics (user decision, Q-103) | — |
 | `nova` | None. The nova is drawn as a volume and has no haptics for now (Q-103; Atish's acceptance pending) | — |
