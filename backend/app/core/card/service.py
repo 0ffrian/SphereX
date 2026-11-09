@@ -293,6 +293,13 @@ class ObjectPipeline:
 
     # --- stages 5 and 7 -------------------------------------------------------------------
 
+    def assemble_without_spectrum(
+        self, obj: ResolvedObject, data: CatalogueData, cls: Classification
+    ) -> ObjectResult:
+        """Stage 5 and 7 with no frames: the card and params a live build gives for an object
+        that has no spectrum (used by ``scripts/bake_demo_pack.py``, Q-164)."""
+        return self._assemble(obj, data, cls, None, None, pending=False)
+
     def _assemble(
         self,
         obj: ResolvedObject,

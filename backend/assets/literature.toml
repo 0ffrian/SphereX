@@ -60,7 +60,8 @@ field = "slope_075_25"
 reason = "the only published slope (23 +/- 3 %/100 nm, Meech et al. 2017) is optical (g to Y, about 0.5 to 1.0 um), while this field covers 0.75 to 2.5 um and its unit is not settled (docs say %/um, code reads %/100 nm); no 0.75 to 2.5 um slope is published"
 
 # --- Epsilon Indi Ba and Bb (the card's spectral_class is T1V+T6V, A then B) ---------------------
-# Chen et al. 2022, AJ 163, 288. The table number is not recorded here [verify].
+# Chen et al. 2022, AJ 163, 288 (SM08 hybrid models). [verify] the table number in the paper: it
+# is not recorded, so the card's `table` names the model grid instead of a table (Q-153).
 
 [[value]]
 key = "simbad-eps-ind-b"
@@ -69,6 +70,6 @@ value = [1312.0, 972.0]
 err = [13.0, 13.0]
 tag = "model_dependent"
 citation = "Chen et al. 2022, AJ 163, 288"
-table = "table number not recorded [verify]"
+table = "SM08 hybrid models"
 note = "Epsilon Indi Ba then Bb, the order of the class T1V+T6V"
 assumption = "each Teff is a model-atmosphere fit result in the paper, not a direct measurement"
