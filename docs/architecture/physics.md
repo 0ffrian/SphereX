@@ -13,7 +13,7 @@ This is **reduced, physically inspired physics**, not simulation. Each rule is a
 | Quantity | Rule | Status |
 |---|---|---|
 | Equilibrium temperature | `Teq = T_star * sqrt(R_star / (2a)) * (1 - A)^(1/4)` | Built (app); from the star sliders, else the card's `teq_K` |
-| Bulk density | `rho = 5.51 * M / R^3` g/cm3 with M, R in Earth units | Built (app); mass from a slider only (the card has no mass) |
+| Bulk density | `rho = 5.51 * M / R^3` g/cm3 with M, R in Earth units | Built (app); mass from the `mass_mearth` slider (`artistic`, wins), else from the card's `mass_mearth` (Q-150; `measured` only for an archive true mass, `model_dependent` for a minimum mass or a mass-radius estimate; the app reads it in issue #68 Track B), else refused |
 | Surface gravity | `g = G M / R^2` | Built (app) |
 | Escape speed | `v_esc = sqrt(2 G M / R)` | Built (app) |
 | Atmosphere kept | Keep if `v_esc` is well above the gas thermal speed `sqrt(2 k T / m)` (rule of thumb: about 6 times) | Built (app) for H2, He, H2O, N2, CO2 with T = Teq, tagged `model_dependent` |

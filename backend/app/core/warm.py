@@ -24,7 +24,16 @@ from app.core.find.resolver import resolve
 log = logging.getLogger("shift_spectrum")
 
 
+def frames_wanted(target: dict[str, object]) -> bool:
+    """``frames = false`` in ``targets.toml`` marks a catalogue-only target (an exoplanet: no
+    SPHEREx spectrum is measured for it). Read exactly as ``scripts.prefetch`` reads it."""
+    return str(target.get("frames", True)).lower() != "false"
+
+
 def demo_queries(targets_file: Path, groups: list[str]) -> list[str]:
+    """The queries to warm: targets in ``groups`` that want frames. A ``frames = false`` target is
+    left out, because the object job downloads the frame list and cutouts for whatever it is given;
+    such a target's catalogue answers are two small calls, made when someone opens it."""
     try:
         doc = tomllib.loads(targets_file.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
@@ -33,7 +42,7 @@ def demo_queries(targets_file: Path, groups: list[str]) -> list[str]:
     return [
         str(t["query"])
         for t in doc.get("target", [])
-        if isinstance(t, dict) and t.get("group") in groups and "query" in t
+        if isinstance(t, dict) and t.get("group") in groups and "query" in t and frames_wanted(t)
     ]
 
 

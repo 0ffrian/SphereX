@@ -65,6 +65,11 @@ TIER_OF_TAG = {tag: rank + 1 for tag, rank in _RANK.items()}  # D-32: tier 1..5 
 # Rule inputs that are not on the card, stated as `assumed` (D-32). The values are the ones the
 # cited rules fix (R6.2, R7.3, R7.5); none is a measurement.
 ASSUMED_C_OVER_B = 1.0  # R6.2: c = b
+# Q-153: a light curve fixes a/b only. The shape of the third axis is a choice (c = b draws a
+# cigar; a disc fits the same curve), and 'Oumuamua's paper says c is unconstrained.
+ASSUMED_C_AXIS_NOTE = (
+    "c is not constrained by a light curve; c = b draws a cigar, and a disc fits the same data"
+)
 ASSUMED_DENSITY_EXPONENT = 2.0  # R7.3: coma gas density falls as 1/r^2
 ASSUMED_LIMB_U = 0.6  # R7.5: linear limb darkening coefficient (stars)
 # Issue #62, PR #63 review: the brown dwarf coefficient is its own constant. R7.4 gives no confirmed
@@ -405,7 +410,7 @@ def _asteroid_procedural(
         ["diameter_km", "lightcurve_amp_mag"],
         card=card,
         formula="a/b = 10^(0.4 * A), c = b",
-        rule_inputs={"c_over_b": ASSUMED_C_OVER_B},
+        rule_inputs={"c_over_b": ASSUMED_C_OVER_B, "c_axis": ASSUMED_C_AXIS_NOTE},
     )
     rgb, _, field = _asteroid_colour(card)
     assert bake is not None
@@ -555,16 +560,90 @@ def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) 
     }
 
 
+BINARY_RADIUS_RATIO = 1.0  # R7.4: both components are about one Jupiter radius
+
+
+def _binary_classes(card: Mapping[str, Any]) -> list[str]:
+    """ "T1V+T6V" -> ["T1V", "T6V"] (Q-34); the order is body A then body B."""
+    cls = _str(card, "spectral_class")
+    return [c.strip() for c in cls.split("+") if c.strip()] if cls else []
+
+
+def _component_teffs(card: Mapping[str, Any]) -> tuple[float, float] | None:
+    v = _vec(card, "component_teff_K", 2)
+    return (v[0], v[1]) if v is not None and min(v) > 0 else None
+
+
+def _components(card: Mapping[str, Any], plan: _Plan) -> list[dict[str, Any]] | None:
+    """Q-154: the per-body look of a brown dwarf binary, A then B.
+
+    Colour: each body's own class through the single-brown-dwarf palette (``inferred_from_analog``;
+    two classes with the same letter, such as T1 and T6, have the same palette colour). Brightness:
+    from the published component Teff on the card, ``(Teff / Teff_max)^4`` at equal radius
+    (R7.4), so the hotter body is 1. With no Teff the brightness is ``null`` and the viewer keeps
+    the system value. Returns None (both bodies share the system look) when the class does not
+    name two components with a palette."""
+    classes = _binary_classes(card)
+    letters = [c[:1].upper() for c in classes]
+    ok = len(classes) == 2 and all(x in BROWN_DWARF_PALETTE for x in letters)
+    if not plan.layer(
+        ok,
+        "components",
+        "inferred_from_analog",
+        "Each body is tinted by its own spectral class, through the same class palette as a "
+        "single brown dwarf (R7.4).",
+        ["spectral_class"],
+        card=card,
+        formula="tint = brown-dwarf class palette[first letter of the body's class]",
+        rule_inputs={"class_a": classes[0], "class_b": classes[1]} if ok else None,
+    ):
+        return None
+    teffs = _component_teffs(card)
+    tag = _weakest(_tag(card, "component_teff_K"), "model_dependent")
+    bright = plan.layer(
+        teffs is not None,
+        "component_brightness",
+        tag,
+        "Each body's brightness follows its published Teff, relative to the hotter body (R7.4).",
+        ["component_teff_K"],
+        card=card,
+        formula="emissive_scale = (Teff / Teff_max)^4, equal radii (Stefan-Boltzmann)",
+        rule_inputs={"radius_ratio": BINARY_RADIUS_RATIO},
+    )
+    scales: list[float | None] = [None, None]
+    if bright and teffs is not None:
+        top = max(teffs)
+        scales = [round((x / top) ** 4, 4) for x in teffs]
+    return [
+        {
+            "class": classes[i],
+            "tint": list(BROWN_DWARF_PALETTE[letters[i]][0]),
+            "tint_tag": "inferred_from_analog",
+            "emissive_scale": scales[i],
+            "emissive_tag": tag if bright else "artistic",
+        }
+        for i in range(2)
+    ]
+
+
 def _star(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
     kind = card.get("type")
+    teff_tag = _tag(card, "teff_K")
     plan.layer(
         _has(card, "teff_K") and teff_to_rgb(_num(card, "teff_K") or 0.0) is not None,
         "colour",
-        _weakest(_tag(card, "teff_K"), "derived"),
+        _weakest(teff_tag, "derived"),
         "Teff to sRGB through a blackbody colour calculation (R7.5).",
         ["teff_K"],
         card=card,
         formula=TEFF_FORMULA,
+        # Q-152: a Teff read off a class table is a typical value for the class (D-32): the class
+        # is the assumed input.
+        rule_inputs=(
+            {"spectral_class": _str(card, "spectral_class") or "unknown"}
+            if teff_tag == "inferred_from_analog"
+            else None
+        ),
     )
     plan.layer(
         True,
@@ -964,6 +1043,7 @@ def card_to_params(
         raise ValueError("seed must be an integer >= 0 (Q-35)")
     plan = _Plan(pending)
     bake = _bake(card, seed)
+    components: list[dict[str, Any]] | None = None
 
     if kind == "asteroid_shape":
         haptics = _asteroid_shape(card, plan)
@@ -973,6 +1053,8 @@ def card_to_params(
         haptics = _comet(card, plan)
     elif kind in ("brown_dwarf", "brown_dwarf_binary"):
         haptics = _brown_dwarf(card, plan, bake)
+        if kind == "brown_dwarf_binary":
+            components = _components(card, plan)
     elif kind in ("star", "star_mira", "star_ttauri"):
         haptics = _star(card, plan)
     elif kind in SHADER_KINDS:
@@ -1006,6 +1088,8 @@ def card_to_params(
             out["textures"]["relief_amp"] = bake.relief_amp
     elif kind in BAKED_TYPES:
         plan.refuse("textures")
+    if components is not None:
+        out["components"] = components
     out["lighting"] = _lighting(card)
     out["view_modes"] = view_modes
     out["haptics"] = haptics
@@ -1022,6 +1106,7 @@ def card_to_params(
         "scale_m",
         "layers",
         "textures",
+        "components",
         "lighting",
         "view_modes",
         "haptics",

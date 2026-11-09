@@ -45,7 +45,13 @@ export function numberField(card: ObjectCard, field: keyof ObjectCard): number |
   return typeof v?.value === 'number' && Number.isFinite(v.value) ? v.value : null;
 }
 
-/** R6.2: ellipsoid axes from the light-curve amplitude, a/b = 10^(0.4 A), c = b (model_dependent). Largest axis = 1. */
+/**
+ * R6.2: ellipsoid axes from the light-curve amplitude, a/b = 10^(0.4 A), c = b (model_dependent).
+ * Largest axis = 1. A light curve fixes a/b only: c is unconstrained, so c = b draws a cigar and a
+ * disc fits the same data (the backend's `ellipsoid` layer says so in `assumed.c_axis`, Q-153).
+ * There is no cap on the ratio: A = 2.5 mag (Meech et al. 2017, 'Oumuamua) gives a/b = 10, axes
+ * [1, 0.1, 0.1].
+ */
 export function ellipsoidAxes(ampMag: number | null): Vec3 {
   if (ampMag === null || ampMag < 0) return [1, 1, 1];
   const ratio = Math.pow(10, 0.4 * ampMag);

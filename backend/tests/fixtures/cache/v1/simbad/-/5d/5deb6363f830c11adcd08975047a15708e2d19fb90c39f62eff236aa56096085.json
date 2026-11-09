@@ -1,0 +1,16 @@
+{
+ "body_sha256": "3954eb521f5d14a228d9b91ef261b303c9490e4577e2f65e64d69884dd097de1",
+ "body_size": 264,
+ "content_type": "application/json;charset=UTF-8",
+ "fetched_at": "2026-11-09T19:27:22.855Z",
+ "key": {
+  "query": {
+   "ident": "R Dra",
+   "table": "mesFe_h"
+  },
+  "release": "-",
+  "source": "simbad"
+ },
+ "status": 200,
+ "url": "https://simbad.harvard.edu/simbad/sim-tap/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=json&QUERY=SELECT+mesFe_h.teff%2C+mesFe_h.bibcode+FROM+ident+JOIN+mesFe_h+ON+ident.oidref+%3D+mesFe_h.oidref+WHERE+ident.id+%3D+%27R+Dra%27+AND+mesFe_h.teff+IS+NOT+NULL"
+}

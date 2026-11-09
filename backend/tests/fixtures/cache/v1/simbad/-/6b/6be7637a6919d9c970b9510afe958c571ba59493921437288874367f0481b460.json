@@ -1,0 +1,16 @@
+{
+ "body_sha256": "d9d043030f1effd4a31b60c14756431bc9ec9eedec98733bb1df9b7509cabf41",
+ "body_size": 1858,
+ "content_type": "application/json;charset=UTF-8",
+ "fetched_at": "2026-11-09T19:27:13.710Z",
+ "key": {
+  "query": {
+   "ident": "Barnard's star",
+   "table": "mesFe_h"
+  },
+  "release": "-",
+  "source": "simbad"
+ },
+ "status": 200,
+ "url": "https://simbad.harvard.edu/simbad/sim-tap/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=json&QUERY=SELECT+mesFe_h.teff%2C+mesFe_h.bibcode+FROM+ident+JOIN+mesFe_h+ON+ident.oidref+%3D+mesFe_h.oidref+WHERE+ident.id+%3D+%27Barnard%27%27s+star%27+AND+mesFe_h.teff+IS+NOT+NULL"
+}

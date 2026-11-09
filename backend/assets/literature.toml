@@ -1,0 +1,74 @@
+# Literature registry (A3.11, Q-153): reviewed values for objects the catalogues leave empty.
+#
+# Read-only config, in the same spirit as shapes/registry.toml and targets.toml. No LLM and no code
+# writes it; every row is a person's reading of a cited source. Stage 4 uses a row only when the
+# catalogue value for that field is null, and never overrides a catalogue value.
+#
+# [[value]] fields
+#   key         SBDB SPK-ID for a small body; the card's object id for anything else (stars and
+#               brown dwarfs have no SPK-ID), for example "simbad-eps-ind-b"
+#   field       the ObjectCard field to fill
+#   value       a number, or a list of numbers for a pair field
+#   err         optional, a number or a list
+#   tag         measured | derived | model_dependent | inferred_from_analog | artistic
+#   citation    paper and, in `table`, the table or section (required)
+#   table       where in the paper the number is
+#   note        shown after the citation in the card's `source`
+#   formula     required when tag = "derived"
+#   assumption  required when tag = "model_dependent"
+# [[refusal]] key, field, reason: keeps a field refused and says why.
+#
+# The card's `source` for a row reads "literature: <citation>, <table> (backend/assets/literature.toml)".
+
+# --- 1I/'Oumuamua (SBDB SPK-ID 50788063): SBDB gives no size, albedo or light curve ------------
+# Meech et al. 2017, Nature 552, 378, doi:10.1038/nature25020 (author manuscript PMC8979573 and
+# the ESO-hosted draft agree on every number below; read 9 Nov 2026).
+
+[[value]]
+key = "50788063"
+field = "lightcurve_amp_mag"
+value = 2.5
+tag = "measured"
+citation = "Meech et al. 2017, Nature 552, 378"
+table = "Methods, 'Shape and size': light-curve range 2.5 mag (g = 22.15 brightest, 24.65 faintest)"
+note = "Axis ratio 10:1 or more; c is unconstrained, so cigar versus disc is open. The spin is tumbling (period 7.34 +/- 0.06 h, double-peaked assumption); not drawn"
+
+[[value]]
+key = "50788063"
+field = "diameter_km"
+value = 0.204
+err = 0.008
+tag = "model_dependent"
+citation = "Meech et al. 2017, Nature 552, 378"
+table = "Methods, 'Shape and size': mean radius 102 +/- 4 m at p = 0.04"
+note = "Diameter = 2 x 102 m. The paper calls linear dimensions from the magnitudes alone meaningless because a/c is unconstrained; the +/- is from the magnitudes only"
+assumption = "geometric albedo 0.04 is assumed, not measured (Meech et al. adopt it); the size follows from H_V = 22.4 and that albedo"
+
+[[value]]
+key = "50788063"
+field = "albedo"
+value = 0.04
+tag = "model_dependent"
+citation = "Meech et al. 2017, Nature 552, 378"
+table = "Methods, 'Shape and size': p = 0.04 adopted"
+note = "Assumed, not measured"
+assumption = "albedo 0.04 is an assumption adopted by the authors to convert H_V into a size; no measurement of the albedo exists"
+
+[[refusal]]
+key = "50788063"
+field = "slope_075_25"
+reason = "the only published slope (23 +/- 3 %/100 nm, Meech et al. 2017) is optical (g to Y, about 0.5 to 1.0 um), while this field covers 0.75 to 2.5 um and its unit is not settled (docs say %/um, code reads %/100 nm); no 0.75 to 2.5 um slope is published"
+
+# --- Epsilon Indi Ba and Bb (the card's spectral_class is T1V+T6V, A then B) ---------------------
+# Chen et al. 2022, AJ 163, 288. The table number is not recorded here [verify].
+
+[[value]]
+key = "simbad-eps-ind-b"
+field = "component_teff_K"
+value = [1312.0, 972.0]
+err = [13.0, 13.0]
+tag = "model_dependent"
+citation = "Chen et al. 2022, AJ 163, 288"
+table = "table number not recorded [verify]"
+note = "Epsilon Indi Ba then Bb, the order of the class T1V+T6V"
+assumption = "each Teff is a model-atmosphere fit result in the paper, not a direct measurement"

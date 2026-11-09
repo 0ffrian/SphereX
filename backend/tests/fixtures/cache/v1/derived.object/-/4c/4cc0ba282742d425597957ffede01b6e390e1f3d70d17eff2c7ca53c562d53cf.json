@@ -1,0 +1,16 @@
+{
+ "body_sha256": "23b9518f11111fc481d7ca2f16fffee77498c62e9d31a6b5b830195f58dd7305",
+ "body_size": 645,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-09T19:30:53.952Z",
+ "key": {
+  "query": {
+   "id": "simbad-kepler-186f",
+   "v": "1"
+  },
+  "release": "-",
+  "source": "derived.object"
+ },
+ "status": 200,
+ "url": "derived:resolve"
+}
