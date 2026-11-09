@@ -693,3 +693,47 @@ group = "test"
     assert demo_queries(f, ["demo", "test"]) == ["star q", "star q2", "other q"]
     assert demo_queries(tmp_path / "missing.toml", ["demo"]) == []
     assert frames_wanted({}) and not frames_wanted({"frames": False})
+
+
+# --- Q-162: the comet shape and nucleus radius from the registered mesh -------------------------
+
+
+def test_67p_card_gets_shape_source_and_the_mesh_bounding_radius(ctx: Context) -> None:
+    obj = resolve(ctx, "67P", {}).obj
+    data = gather(ctx, obj)
+    card = build_card(obj, data, classify(data.facts), None)
+    assert card["type"] == "comet"
+    src = card["shape_source"]
+    assert src["tag"] == "measured" and src["value"].startswith("/data/shapes/")
+    assert "10.26007/34vg-8s07" in src["source"]
+    nuc = card["nucleus_radius_km_max"]
+    assert nuc["value"] == pytest.approx(3.527) and nuc["tag"] == "derived"
+    assert "SHAP5" in nuc["source"] and "SHAP5".lower() not in nuc["formula"]
+    assert "bounding" in nuc["source"] and "scaling" in nuc["source"]
+    assert nuc["formula"]
+    assert errors(card, "object-card.schema.json") == []
+    # The mesh layer is offered, and the alt text does not call the scale a limit.
+    params = params_of(card)
+    assert any(layer["id"] == "mesh" for layer in params["layers"])
+    assert "upper limit" not in params["alt_text"]
+
+
+def test_a_comet_without_a_mesh_is_unchanged(ctx: Context) -> None:
+    """No recorded 3I/ATLAS replies exist, so take 67P's data and remove the registry row: the card
+    must then be what a mesh-less comet (3I/ATLAS) always got."""
+    import dataclasses
+
+    obj = resolve(ctx, "67P", {}).obj
+    data = gather(ctx, obj)
+    bare = dataclasses.replace(
+        data, shape=None, facts=dataclasses.replace(data.facts, shape_model=None)
+    )
+    card = build_card(obj, bare, classify(bare.facts), None)
+    assert card["type"] == "comet"
+    assert "shape_source" not in card
+    assert card["nucleus_radius_km_max"] == {
+        "value": None,
+        "tag": "measured",
+        "source": "not available: published values not loaded (R7.3)",
+    }
+    assert not any(layer["id"] == "mesh" for layer in params_of(card)["layers"])

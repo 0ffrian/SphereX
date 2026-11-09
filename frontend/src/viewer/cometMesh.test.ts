@@ -35,4 +35,14 @@ describe('comet nucleus from a registered mesh (R7.3, Q-162)', () => {
     expect(plan.bodies[0]?.meshUrl ?? null).toBeNull();
     expect(plan.missing.some((m) => m.id === 'mesh')).toBe(false);
   });
+
+  it('does not call a mesh nucleus size an upper limit; a sphere nucleus still does', () => {
+    const mesh = cometPlan(true);
+    expect(mesh.sizeQualifier).toBeNull();
+    expect(mesh.notes.join(' ')).not.toMatch(/upper limit/);
+    expect(mesh.notes.join(' ')).toMatch(/bounding sphere/);
+    const sphere = cometPlan(false);
+    // The fixture comet carries a nucleus size; without a mesh it stays a limit (R7.3).
+    if (sphere.sizeTag !== null) expect(sphere.sizeQualifier).toBe('upper_limit');
+  });
 });
