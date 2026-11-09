@@ -100,3 +100,49 @@ describe('locked pose', () => {
     b.dispose();
   });
 });
+
+describe("the plan's pattern switch (issue #68 review)", () => {
+  it('a held climate hides the pattern at + Estimated, and showing it again draws it', async () => {
+    const f = fixture('planet_rocky');
+    const card = trappist1f() as ObjectCard;
+    const b = await ShaderBody.create(
+      card,
+      { ...f.params, id: card.id, scale_m: 6.4e6 },
+      {
+        ...ctx,
+        visibleTags: ['measured', 'derived', 'model_dependent', 'inferred_from_analog'],
+        pattern: false,
+      },
+    );
+    expect(b.drawn).toEqual([]);
+    b.setPatternSwitch(true);
+    expect(b.drawn).toEqual(['climate']);
+    b.setPatternSwitch(false);
+    expect(b.drawn).toEqual([]);
+    b.setPatternSwitch(null); // no plan: the tags decide again
+    expect(b.drawn).toEqual(['climate']);
+    b.dispose();
+  });
+});
+
+describe('the substellar ice edge does not depend on the artist look freq', () => {
+  it('the substellar ice is the same for two freq values; the terrain still reads freq', async () => {
+    const { terrainAt } = await import('../fields/fieldGenerator');
+    const base = {
+      kind: 'terrain' as const,
+      seed: 5,
+      seaLevel: 0.3,
+      iceExtent: 0.5,
+      heat: 0,
+      bands: 0,
+      turbulence: 0,
+      storms: 0,
+    };
+    const d: [number, number, number] = [0.6, 0.48, 0.64];
+    const sub = (freq: number) =>
+      terrainAt(d, { ...base, freq, substellar: true, iceAngleRad: 0.9 }).ice;
+    expect(sub(1.9)).toBe(sub(3.1));
+    const polar = (freq: number) => terrainAt(d, { ...base, freq }).height;
+    expect(polar(1.9)).not.toBe(polar(3.1));
+  });
+});

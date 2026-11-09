@@ -128,7 +128,10 @@ export function mergeLook(
   return out;
 }
 
-export function lookLegend(s: Scenario): string {
+export function lookLegend(s: Scenario, lockTested = true): string {
+  // `temperate` is the fallback when the tidal-locking rule was refused: say only what is known.
+  if (s === 'temperate' && !lockTested)
+    return "Look: typical artist's depiction of a world with ice only where it is cold (whether it is tidally locked could not be tested)";
   return `Look: typical artist's depiction of a ${s.replace('_', ' ')} world`;
 }
 

@@ -258,11 +258,12 @@ export function planBrownDwarf(
   const orbit = binary ? b.draw('orbit') : false;
   const classes = binary ? binaryClasses(card.spectral_class?.value) : [];
   const twoBodies = binary && orbit && classes.length >= 2;
-  if (binary && !orbit)
+  // Said only when a body is drawn: at Measured only the size may be hidden and nothing is shown.
+  if (binary && !orbit && bodyOk)
     b.notes.push(
       'Only the first body is shown: where the second sits is part of the illustrative orbit.',
     );
-  if (binary && orbit && classes.length < 2)
+  if (binary && orbit && classes.length < 2 && bodyOk)
     b.notes.push('The spectral class does not name two components, so one body is shown.');
   if (!bodyOk) b.dropDrawn();
 

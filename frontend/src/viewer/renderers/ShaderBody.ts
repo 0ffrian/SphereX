@@ -122,6 +122,9 @@ import {
   sizeFieldFor,
   type GasSwitches,
   type ShaderSpec,
+  PATTERN_GROUND,
+  PATTERN_ICE,
+  PATTERN_WATER,
 } from './shaderSpec';
 import { bilinear, fieldUV, floatTexture, vnoise3 } from './fieldTexture';
 import { buildJetSurface, EVOLVE_PER_RAD, makeJetRuntime } from './jetSurface';
@@ -139,9 +142,6 @@ const PLAIN_COLOUR = 0x8a8a8a;
  * the plain sphere (linear value of 0x8a8a8a); no relief, no clouds, no atmosphere, no lava, no
  * terrain colouring, so nothing `artistic` is visible. Not measured colours.
  */
-const PATTERN_GROUND: Rgb = [0.254, 0.254, 0.254];
-const PATTERN_WATER: Rgb = [0.07, 0.32, 0.45];
-const PATTERN_ICE: Rgb = [0.92, 0.95, 0.98];
 /**
  * What the pattern draws from the ice mask alone (Q-156): uniform ice for a snowball (cap 0, the
  * field's bare high rock is artistic terrain and is not shown), else a uniform open cap (water for a
@@ -634,6 +634,10 @@ export class ShaderBody implements BodyRenderer {
   private setGas: ((sw: GasSwitches) => void) | null = null;
   private setPattern: ((on: boolean) => void) | null = null;
   private gasOverride: GasSwitches | null;
+  /** The light has the host star's colour (the plan's `starlight` layer), so the plain sphere is not grey. */
+  private starlit = false;
+  /** The plan's pattern switch; null = decide from the tags alone (a body started without a plan). */
+  private patternOverride: boolean | null;
   private time: SimTimeFn = () => 0;
   private motion: Motion;
   private readonly octaves: number;
@@ -664,6 +668,7 @@ export class ShaderBody implements BodyRenderer {
     this.onFailed = ctx.onFailed;
     this.octaves = ctx.octaves ?? 4;
     this.gasOverride = ctx.gasLayers ?? null;
+    this.patternOverride = ctx.pattern ?? null;
     this.tier = ctx.tier ?? 'medium';
     this.motion = ctx.motion ?? resolveMotion(card, params);
     this.spec = resolveShaderSpec(card, params, this.overrides, this.motion);
@@ -737,6 +742,9 @@ export class ShaderBody implements BodyRenderer {
   private patternShown(): boolean {
     const { drawable, tag } = this.spec;
     const pt = this.spec.planet?.patternTag ?? null;
+    // The plan's switch wins: it carries the build step's holds, which the tags alone cannot (a held
+    // `climate` must hide the pattern at + Estimated).
+    if (this.patternOverride !== null) return drawable && pt !== null && this.patternOverride;
     return (
       drawable && pt !== null && !this.visibleTags.includes(tag) && this.visibleTags.includes(pt)
     );
@@ -791,7 +799,7 @@ export class ShaderBody implements BodyRenderer {
         message: this.plainShown()
           ? this.spec.kind === 'gas_giant'
             ? `Showing a plain grey sphere at the size on the card. ${gasHiddenText(this.params)}`
-            : "Showing a plain grey sphere at the size on the card. The surface is an artist's impression and is hidden at this honesty level; choose + Artistic to see it."
+            : `Showing ${this.starlit ? 'a smooth sphere lit in the colour of its host star (an estimate)' : 'a plain grey sphere'} at the size on the card. The surface is an artist's impression and is hidden at this honesty level; choose + Artistic to see it.`
           : this.spec.kind === 'nebula' || this.spec.kind === 'nova'
             ? `Nothing is shown. This ${this.spec.kind === 'nova' ? 'explosion' : 'cloud'} is an artist's impression and is hidden at this honesty level; choose + Artistic to see it.`
             : "Nothing is shown. The surface is an artist's impression and the size is only an estimate, so both are hidden at this honesty level.",
@@ -845,6 +853,7 @@ export class ShaderBody implements BodyRenderer {
 
   /** Colour of the star's light (linear sRGB); null goes back to white. */
   setSunColour(colour: Vec3 | null): void {
+    this.starlit = colour !== null;
     const [r, g, b] = colour ?? [1, 1, 1];
     this.sunColour.value.set(r, g, b);
   }
@@ -880,6 +889,14 @@ export class ShaderBody implements BodyRenderer {
   setGasLayers(sw: GasSwitches | null): void {
     if (this.disposed) return;
     this.gasOverride = sw;
+    this.applyVisibility();
+    this.onChange?.();
+  }
+
+  /** Issue #68: the plan's climate-pattern switch changed (honesty or a build step): no rebuild. */
+  setPatternSwitch(on: boolean | null): void {
+    if (this.disposed) return;
+    this.patternOverride = on;
     this.applyVisibility();
     this.onChange?.();
   }

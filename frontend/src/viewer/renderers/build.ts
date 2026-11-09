@@ -677,6 +677,7 @@ export function buildScene(
       motion: plan.motion,
       octaves,
       gasLayers: plan.shader.gas ?? undefined,
+      pattern: plan.shader.pattern,
       ...hooks.shader,
     });
     usesQuality = true;
@@ -779,6 +780,7 @@ export function buildScene(
       shaderBody.setVisibleTags(allowedTags(next.honesty));
       // The plan's switches carry the honesty level and the build step's holds (issue #62).
       shaderBody.setGasLayers(next.shader?.gas ?? null);
+      shaderBody.setPatternSwitch(next.shader?.pattern ?? null);
     },
     shapeRadius,
     setScreenPx(px) {
