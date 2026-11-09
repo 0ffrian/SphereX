@@ -3,7 +3,8 @@
 // it `requires` is present on the card, (3) its tag passes the honesty state, and (4) its mesh or
 // texture did not fail to load. Otherwise it goes to `missing` with the reason. Never throws.
 import type { CometEpoch, Layer, ObjectCard, RenderParams, Tag } from '@/contract';
-import { isTagShown } from './honesty';
+import type { Scenario } from '@/physics/climate';
+import { HONESTY_LABEL, isTagShown, stateThatShows } from './honesty';
 import { planLighting } from './lighting';
 import { chooseMode, NEUTRAL_TINT, resolveModes, resolveTint } from './modes';
 import type { LegendEntry, MissingItem, PlanContext, RenderPlan, Rgb, Vec3 } from './planTypes';
@@ -78,6 +79,73 @@ const EXOPLANET_FIELDS = [
  */
 export function isExoplanetCard(card: ObjectCard): boolean {
   return EXOPLANET_FIELDS.some((k) => card[k] !== undefined);
+}
+
+/**
+ * What a planet's notes and alt text say about the star's light and the climate scenario (issue #68
+ * Part 6, Q-165). Pure text from facts the plan already decided, so the notes (written while the
+ * plan is built) and the alt text (written from the finished plan) say the same words. It never
+ * claims a measured surface: the scenario is a model (`model_dependent`), the light colour is
+ * `derived`, and a hidden layer says which level shows it (the Q-115 wording, "choose + Estimated to
+ * see ...").
+ */
+export interface ExoplanetFacts {
+  kind: 'planet_rocky' | 'planet_water';
+  /** `deriveClimate`'s scenario, or null when the card has no `teq_K` (then nothing is said). */
+  scenario: Scenario | null;
+  /** The host temperature the light colour comes from, K. */
+  teffK: number | null;
+  /** The `starlight` layer: drawn, hidden by the honesty level, refused for data, or not offered. */
+  starlight: 'drawn' | 'honesty' | 'data' | null;
+  /** The climate pattern is drawn (a locked planet's masks at + Estimated, or the terrain's). */
+  climateShown: boolean;
+}
+
+/** The scenario in plain words (no jargon beyond the scenario's own name). */
+export function scenarioWords(s: Scenario, kind: ExoplanetFacts['kind']): string {
+  const open = kind === 'planet_water' ? 'open water' : 'bare ground';
+  switch (s) {
+    case 'eyeball':
+      return `an eyeball world: tidally locked, with ${open} around the point facing the star and ice beyond`;
+    case 'snowball':
+      return 'a snowball world: tidally locked and frozen';
+    case 'temperate':
+      return 'a temperate world that is not tidally locked, with ice only where it is cold';
+    case 'hot_dry':
+      return 'a hot, dry world whose oceans are gone';
+    case 'lava':
+      return 'a lava world, hot enough to melt rock';
+  }
+}
+
+/** The level that shows the climate pattern of `s`: a locked planet's masks come with + Estimated. */
+function climateLevel(s: Scenario): string {
+  return HONESTY_LABEL[
+    s === 'eyeball' || s === 'snowball' ? stateThatShows('model_dependent') : 'artistic'
+  ];
+}
+
+export function exoplanetSentences(f: ExoplanetFacts): string[] {
+  const out: string[] = [];
+  if (f.starlight === 'drawn' && f.teffK !== null)
+    out.push(
+      `The light is coloured like its host star (${Math.round(f.teffK)} K): an estimate from the star's temperature, not a measured colour.`,
+    );
+  else if (f.starlight === 'honesty')
+    out.push(
+      `The light is white here; choose ${HONESTY_LABEL[stateThatShows('derived')]} to see it coloured like its host star.`,
+    );
+  else if (f.starlight === 'data')
+    out.push("The light is white because the host star's temperature is missing.");
+  if (f.scenario !== null) {
+    const words = scenarioWords(f.scenario, f.kind);
+    out.push(
+      f.climateShown
+        ? `The climate shown is a model scenario, ${words}. It is estimated from the star and the orbit, not a measured surface.`
+        : `The model's climate scenario (${words}) is hidden here; choose ${climateLevel(f.scenario)} to see it.`,
+    );
+  }
+  return out;
 }
 
 export type SizeField = 'diameter_km' | 'radius_rjup' | 'radius_rsun' | 'nucleus_radius_km_max';

@@ -117,28 +117,42 @@ const STEPS: Record<MouldKind, MouldStepDef[]> = {
     { label: 'Colour', hint: 'From temperature', layers: ['emissive', 'limb_darkening', TINT] },
   ],
   rocky: [
-    { label: 'Base mould', hint: 'A sphere of triangles', layers: ['surface'], base: true },
+    { label: 'Base mould', hint: 'A sphere of triangles', layers: ['surface', 'body'], base: true },
     {
+      // Issue #68 (Q-165): the host star's light colours the planet from the first step after the
+      // base mould, so every later step is seen under it. Only a planet with a host temperature has it.
       label: 'Terrain',
       hint: 'Mountains and plains',
-      layers: [],
+      layers: ['starlight'],
       knobs: ['terrain'],
       fadesWire: true,
     },
-    { label: 'Colour', hint: 'Rock and lava cracks', layers: ['climate'], knobs: ['colour'] },
+    {
+      // The climate pattern (ice, bare ground or lava) is what the colour step reveals; the scenario
+      // look and the planet's preset are the artist's way of colouring it (+ Artistic only).
+      label: 'Colour',
+      hint: 'Rock and lava cracks',
+      layers: ['climate', 'look', 'look_preset'],
+      knobs: ['colour'],
+    },
     { label: 'Air', hint: 'A thin haze', layers: ['clouds'], knobs: ['clouds'] },
   ],
   water: [
-    { label: 'Base mould', hint: 'A sphere of triangles', layers: ['surface'], base: true },
+    { label: 'Base mould', hint: 'A sphere of triangles', layers: ['surface', 'body'], base: true },
     {
       label: 'Terrain',
       hint: 'Land under the sea',
-      layers: [],
+      layers: ['starlight'],
       knobs: ['terrain'],
       fadesWire: true,
     },
     { label: 'Oceans', hint: 'Water rises', layers: [], knobs: ['sea'] },
-    { label: 'Colour', hint: 'Land, sea and ice', layers: ['climate'], knobs: ['colour'] },
+    {
+      label: 'Colour',
+      hint: 'Land, sea and ice',
+      layers: ['climate', 'look', 'look_preset'],
+      knobs: ['colour'],
+    },
     { label: 'Clouds', hint: 'Clouds and sky', layers: ['clouds'], knobs: ['clouds'] },
   ],
   // Issue #62: a gas giant's surface is five layers (bands, flattening, colour, storms,
