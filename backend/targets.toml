@@ -7,31 +7,31 @@
 name = "Barnard's Star"
 query = "Barnard's star"
 group = "test"
-aliases = []
+aliases = ["barnard", "barnards"]
 
 [[target]]
 name = "Epsilon Indi B"
 query = "eps Ind B"
 group = "test"
-aliases = []
+aliases = ["eps indi b", "epsilon indi"]
 
 [[target]]
 name = "WISE 0855"
 query = "WISE J085510.83-071442.5"
 group = "test"
-aliases = ["WISE 0855", "WISE 0855-0714"]
+aliases = ["WISE 0855", "WISE 0855-0714", "w0855"]
 
 [[target]]
 name = "RW Aurigae"
 query = "RW Aur"
 group = "test"
-aliases = []
+aliases = ["rw aur"]
 
 [[target]]
 name = "R Draconis"
 query = "R Dra"
 group = "test"
-aliases = []
+aliases = ["r dra"]
 
 # A moving object, so the SBDB + Horizons path and the moving-object refusal (Q-21) are
 # recorded and tested offline.
@@ -53,16 +53,16 @@ aliases = []
 [[target]]
 name = "TRAPPIST-1 e"
 query = "TRAPPIST-1 e"
-group = "fixture"
+group = "demo"  # also search row 12 (Q-161); frames = false keeps it out of the frame pre-fetch
 frames = false
-aliases = []
+aliases = ["TRAPPIST-1e"]
 
 [[target]]
 name = "K2-18 b"
 query = "K2-18 b"
-group = "fixture"
+group = "demo"  # also search row 13 (Q-161)
 frames = false
-aliases = []
+aliases = ["K2-18", "K218"]
 
 [[target]]
 name = "HD 209458 b"
@@ -110,3 +110,61 @@ name = "IRAS 04302+2247"
 query = "IRAS 04302+2247"
 group = "demo"
 aliases = ["IRAS 04302"]
+
+# Search list rows 6 to 16 (Q-161, issue #68). The search bar's order is in
+# frontend/src/app/search/demoTargets.ts; rows 12 and 13 are TRAPPIST-1 e and K2-18 b above.
+# Aliases are name mappings only (ASSUMPTION), never physical values.
+[[target]]
+name = "TRAPPIST-1 f"
+query = "TRAPPIST-1 f"
+group = "demo"
+aliases = ["TRAPPIST-1f", "TRAPPIST 1 f"]
+
+[[target]]
+name = "Kepler-186 f"
+query = "Kepler-186 f"
+group = "demo"
+aliases = ["Kepler-186f", "Kepler 186 f"]
+
+[[target]]
+name = "Bennu"
+query = "101955 Bennu"
+group = "demo"
+aliases = ["101955"]
+
+# SIMBAD does not know "Oumuamua"; SBDB knows "1I/2017 U1" (resolver gap found 9 Nov 2026).
+[[target]]
+name = "'Oumuamua"
+query = "1I/2017 U1"
+group = "demo"
+aliases = ["Oumuamua", "1I"]
+
+[[target]]
+name = "3I/ATLAS"
+query = "3I/ATLAS"
+group = "demo"
+aliases = ["3I", "ATLAS"]
+
+[[target]]
+name = "HD 189733 b"
+query = "HD 189733 b"
+group = "demo"
+aliases = ["HD 189733", "HD189733b", "HD 189733b"]
+
+[[target]]
+name = "Comet 67P"
+query = "67P/Churyumov-Gerasimenko"
+group = "demo"
+aliases = ["67P", "Churyumov", "Gerasimenko"]
+
+[[target]]
+name = "Orion Nebula"
+query = "M 42"
+group = "demo"
+aliases = ["Orion", "M42"]
+
+[[target]]
+name = "Crab Nebula"
+query = "M 1"
+group = "demo"
+aliases = ["Crab", "M1"]

@@ -5,7 +5,7 @@
 // The lookups wait until the page has settled (MARKER_RESOLVE_DELAY_MS, then an idle moment) and
 // until no search is in flight, so they never hold up the user's first search.
 import { useEffect, useState } from 'react';
-import { TEST_TARGETS } from '@/app/search/testTargets';
+import { TEST_TARGETS } from '@/app/search/demoTargets';
 import { getSkyApi, useAppStore } from '@/state/store';
 
 export interface TargetMarker {
