@@ -30,8 +30,20 @@ export const LIMB_DARKENING_U = 0.6;
 /** R7.5: radius pulsation of +-10% (artistic). */
 export const PULSATION_AMPLITUDE = 0.1;
 
-/** T Tauri disc geometry (R7.5: tilted RingGeometry, inclination 45-60°). All values artistic. */
-export const TTAURI_DISC = { innerRadius: 1.4, outerRadius: 2.6, inclinationDeg: 50 } as const;
+/**
+ * T Tauri disc geometry (R7.5, amended in issue #62: a flared, lit disc, tilted 45-60°). All
+ * values are artistic: the radii, the tilt, and the flaring (half-thickness 0.14 at the inner edge,
+ * growing as `r^1.25`, so the disc opens up with distance and its surface is lit at a graze). At 58°
+ * the near edge of the disc projects well inside the star's outline, so the near half passes in
+ * front of the star's upper part and the far half goes behind its lower part.
+ */
+export const TTAURI_DISC = {
+  innerRadius: 1.3,
+  outerRadius: 2.7,
+  inclinationDeg: 58,
+  heightAtInner: 0.14,
+  flareExponent: 1.25,
+} as const;
 /** T Tauri dust screen: radius and distance in front of the star, scene units (artistic). */
 export const TTAURI_SCREEN = { radius: 1.3, z: 1.6 } as const;
 /** R7.5: screen opacity = clamp(1 - flux/median_flux, 0, 0.9). */

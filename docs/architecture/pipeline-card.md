@@ -20,7 +20,7 @@ Stages 3 to 7 of the pipeline ([A4](pipeline.md#a4-pipeline)). They run inside t
 
   The old `dwarf` kind maps to `brown_dwarf`. The old `asteroid` kind maps to `asteroid_shape` or `asteroid_procedural`.
 - **Status:** Built (issue #5, `backend/app/core/classify/`). The class label is taken from the catalogue only (SIMBAD `sp_type`, SBDB `spec_B` then `spec_T`); its confidence is `catalogue` or `none`, and spectrum matching against reference types (step 2) is not built ([Q-55](../decisions/pipeline-stages.md)). The SIMBAD otype mapping is Q-55 items 2 and 3.
-- **Exoplanet types ([Q-63](../decisions/pipeline-stages.md), pending Atish):** the mass-and-radius rule is built as `PROPOSED_EXOPLANET_THRESHOLDS` in `backend/app/core/classify/rules.py`, with the Zeng et al. 2019 curves in `zeng2019.py`. It is **off**: the live `EXOPLANET_THRESHOLDS` holds `None`, so an archive planet becomes `candidate` with `type:exoplanet_thresholds` in `missing`. With the rule on, the other `type:exoplanet_*` codes of A4.12 apply. PR #69 (open, issue #68) turns it on.
+- **Exoplanet types ([Q-63](../decisions/pipeline-stages.md), decided):** the mass-and-radius rule is built as `PROPOSED_EXOPLANET_THRESHOLDS` in `backend/app/core/classify/rules.py`, with the Zeng et al. 2019 curves in `zeng2019.py`. Exoplanet types use the Q-63 thresholds, on since issue #68 (Moon's sign-off, 9 Nov 2026; PR #69): the live `EXOPLANET_THRESHOLDS` is `dict(PROPOSED_EXOPLANET_THRESHOLDS)`, `ASSET_VERSION` 5. A threshold set to `None` makes the object fall through to `candidate` with `type:exoplanet_thresholds` in `missing` (Q-56); the other `type:exoplanet_*` codes of A4.12 apply when the rule cannot place a planet.
 
 ### A4.4 Stage 4: Check for a saved asset
 
@@ -46,7 +46,7 @@ A sketch from SPHEREx only is often a `candidate`, which gets no 3D body (render
 
   | Constant | File | Value (9 Nov 2026) | Bump when |
   |---|---|---|---|
-  | `ASSET_VERSION` | `core/card/assets.py` | `3` | a stage 3 or 5 rule changes |
+  | `ASSET_VERSION` | `core/card/assets.py` | `5` (4: the issue #62 layers, Q-115 to Q-117; 5: the Q-63 thresholds on, issue #68) | a stage 3 or 5 rule changes, or stage 7 sends other layers without changing a seed |
   | `CARD_TO_PARAMS_VERSION` | `core/render/card_to_params.py` | `1` | a stage 7 rule changes the drawn body |
   | `BAKER_RULES_VERSION` | `core/render/bake.py` | `2` | an R6.2 to R6.5 rule changes |
   | `GENERATOR_VERSION` | `core/render/card_to_params.py` | `p1-b2` | follows the two above; it also seeds every body (A5.1) |
@@ -83,6 +83,7 @@ The backend turns the ObjectCard into **RenderParams** with deterministic rules 
   - Texture URLs follow R6.7 with the Q-47 size directory ([A5.4](data-contract.md#a54-asset-store)). The API queues the bake of both sizes off the request path ([A4.10](jobs.md#a410-object-job-and-fan-out)); a URL answers 404 until its bake lands.
   - `missing` holds the refused layer and haptic-source ids, the refusals of earlier stages (`catalogue`, `spectrum`, `lighting`, `exoplanet_archive`, `type:*`) and, while the spectrum is measured, `measuring:` entries. Every code is in [A4.12](refusals.md#a412-missing-and-refusal-codes).
   - `candidate` gets a RenderParams with no layers and `mesh` in `missing` (Q-33).
+  - Per-type layers added in issue #62: a gas giant gets five tiered layers `bands`, `flattening`, `colour`, `storms`, `turbulence` (`app/core/render/gas_giant.py`; Q-115, tiers per Q-119); a brown dwarf gets `limb_darkening` (Q-116); `asteroid_procedural` gets `textures.relief_amp` and an `artistic` `displacement` layer (Q-117). These bumped `ASSET_VERSION` (table in A4.4); `CARD_TO_PARAMS_VERSION` stays `1`, so seeds are stable.
   - Every layer carries `tier`, and `formula` and `assumed` where D-32 requires them. A `model_dependent` layer whose rule states nothing assumed is a code bug: stage 7 raises `ValueError` and `/render-params` answers 500 rather than label a measured input as assumed.
 - **Not built yet:** `dynamics` (D-32). Live RenderParams carry no `dynamics` block; only the shared fixtures do ([shared/README.md](../../shared/README.md)). It comes with stage 6 (Q-60). Until then the viewer states its own motion layers (Q-104).
 

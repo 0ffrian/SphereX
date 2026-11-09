@@ -17,9 +17,29 @@ export interface BrownDwarfConfig {
    * refused as "unverified" and the body glows at the default display level instead.
    */
   flux45Reference: number | null;
+  /**
+   * Linear limb-darkening coefficient of the self-lit disc (issue #62). null refuses the layer as
+   * "unverified" (nothing is invented).
+   */
+  limbU: number | null;
 }
 
-export const BROWN_DWARF_CONFIG: BrownDwarfConfig = { flux45Reference: null };
+/**
+ * ASSUMPTION [verify]: u = 0.6, the linear coefficient the spec gives for stars (R7.5, the
+ * `limb_darkening` layer of the star). That is a visible-band solar value, used here as a
+ * placeholder for an infrared view. No T-dwarf coefficient is confirmed here: published values
+ * depend on the band and the model atmosphere (for example Claret et al. 2012 tabulate them for
+ * cool dwarfs: about 0.25-0.29 at 3.6 and 4.5 um), so 0.6 is an analogue and the layer is
+ * `inferred_from_analog` (Q-119), with this assumption in its `assumed` text, never `measured` or
+ * `derived`. It makes a self-lit disc fade toward the limb instead of a flat
+ * disc; a different `u` changes the depth of the fade, not the layer.
+ */
+export const BROWN_DWARF_LIMB_U: number | null = 0.6;
+
+export const BROWN_DWARF_CONFIG: BrownDwarfConfig = {
+  flux45Reference: null,
+  limbU: BROWN_DWARF_LIMB_U,
+};
 
 /** Glow used when no verified normalisation exists. A display level, not data (artistic). */
 export const DEFAULT_EMISSIVE = 1;
@@ -36,6 +56,19 @@ export const DEFAULT_JET_BANDS = 10;
 /** Turbulence and storms of a brown dwarf's jets (artistic display values). */
 export const JET_TURBULENCE = 0.55;
 export const JET_STORMS = 3;
+
+/**
+ * Seeded longitude offset of body B's copy of the shared baked map, in turns, in [0.25, 0.75) so it
+ * is never close to A's. Deterministic from the seed (determinism rule); a look, `artistic`.
+ */
+export function binaryMapOffset(seed: number): number {
+  const h = Math.imul((seed ^ 0x9e3779b9) >>> 0, 2654435761) >>> 0;
+  return 0.25 + (h / 2 ** 32) * 0.5;
+}
+
+/** The infrared view's stripes come from the baked map, not from SPHEREx: said in the legend (PR #63). */
+export const IR_STRIPES_NOTE =
+  "The stripes are the artist's band map, drawn as brightness on the SPHEREx average colour. They are not from SPHEREx, which sees this dwarf as a single point.";
 
 export function emissiveIntensity(flux: number, reference: number): number {
   return Math.min(1, Math.max(EMISSIVE_FLOOR, flux / reference));
@@ -82,6 +115,38 @@ export function planBrownDwarf(
     b.draw('emissive');
   }
 
+  // Limb darkening of the self-lit disc (issue #62): a disc that glows evenly to its edge looks
+  // flat. Linear law, coefficient taken from an analogue (see BROWN_DWARF_LIMB_U), so `inferred_from_analog` (Q-119).
+  let limbU: number | null = null;
+  if (config.limbU === null) {
+    if (bodyOk && b.has('limb_darkening')) {
+      b.reject({
+        id: 'limb_darkening',
+        reason: 'unverified',
+        detail: 'The limb-darkening coefficient for this kind of brown dwarf is not confirmed yet.',
+        defaultShown: 'The disc is drawn evenly bright to its edge.',
+      });
+    }
+  } else {
+    offerLayer(
+      b,
+      viewerLayer(
+        'limb_darkening',
+        'inferred_from_analog',
+        'The disc is fainter toward its edge, as a hot gas ball is: a standard linear law. The coefficient is the visible-band solar value, used as a placeholder for an infrared view; none is confirmed for this dwarf [verify].',
+        {
+          formula: 'I(mu) = 1 - u * (1 - mu)',
+          assumed: {
+            limb_darkening_u: config.limbU,
+            basis:
+              'the R7.5 visible-band solar value, used as a placeholder for an infrared view; no brown-dwarf value is confirmed [verify]',
+          },
+        },
+      ),
+    );
+    if (bodyOk && b.draw('limb_darkening')) limbU = config.limbU;
+  }
+
   // Motion (R5.7, D-34). With a stated winds speed-up the bands are drawn by the browser as moving
   // jets (counter-flowing, turbulent edges, drifting storms): a baked texture cannot move that way.
   // Without it the baked bands are drawn as before. Both are `artistic` (R7.4), so both are hidden
@@ -93,6 +158,7 @@ export function planBrownDwarf(
   const jetsMode =
     winds !== undefined && bandsLayer !== undefined && !params.missing.includes('bands');
   let bands: boolean;
+  let irPattern = false;
   let jets: JetSurfacePlan | null = null;
   let scrub: RenderPlan['scrub'] = null;
   if (jetsMode) {
@@ -120,6 +186,10 @@ export function planBrownDwarf(
       bands = false;
     } else {
       bands = b.drawBaked('jets', 'procedural');
+      // In the infrared view the jets are refused (`mode`: Q-107 item 4), which used to leave a flat
+      // disc. The baked band map stands in as brightness only (issue #62, Q-116).
+      if (!bands && b.mode === 'spherex_ir')
+        irPattern = b.draw('bands', { asset: tex?.albedo ?? null });
     }
     if (bands && depth !== null) {
       const rule = rhinesBands(motion, params.scale_m);
@@ -143,6 +213,7 @@ export function planBrownDwarf(
         contrast: Math.min(0.8, Math.max(0.1, 2 * depth)),
         clouds: false,
         cover: 0,
+        limbU,
         windMs: wind ? wind.value : null,
         radiusM: params.scale_m,
         flattening,
@@ -174,7 +245,13 @@ export function planBrownDwarf(
       bands = false;
     }
   } else {
-    bands = b.drawBaked('bands', tex?.albedo);
+    if (b.mode === 'spherex_ir') {
+      // The baked map is in the visible palette, so the infrared view takes its brightness only.
+      bands = false;
+      irPattern = b.draw('bands', { asset: tex?.albedo ?? null });
+    } else {
+      bands = b.drawBaked('bands', tex?.albedo);
+    }
   }
 
   // Binary: two bodies on an illustrative orbit; without the orbit layer only the first is drawn.
@@ -194,20 +271,42 @@ export function planBrownDwarf(
 
   if (!bodyOk) b.dropDrawn();
 
-  const make = (id: string, x: number, radius: number): BodyPlan =>
-    litBody(id, [radius, radius, radius], texturedBands ? ([1, 1, 1] as Rgb) : b.tint.rgb, {
-      position: [x, 0, 0],
-      emissive,
-      segments: [64, 32],
-      albedoUrl: texturedBands ? (tex?.albedo ?? null) : null,
-    });
-  const texturedBands = bands && !jetsMode;
+  if (irPattern) {
+    const entry = b.drawn.find((d) => d.id === 'bands');
+    // Said once: in the legend entry when `bands` is listed, else as a note (PR #63 review nit: a
+    // screen reader read it twice).
+    if (entry) entry.description = `${entry.description} ${IR_STRIPES_NOTE}`;
+    else b.notes.push(IR_STRIPES_NOTE);
+  }
+
+  // The baked map in colour (visible view), or as brightness on the SPHEREx colour (infrared view).
+  const texturedBands = (bands && !jetsMode) || irPattern;
+  if (twoBodies && texturedBands)
+    b.notes.push(
+      "The two bodies share one band map; the second is turned by a seeded amount so they differ. That is the artist's look, not data.",
+    );
+  const make = (id: string, x: number, radius: number, offsetU = 0): BodyPlan =>
+    litBody(
+      id,
+      [radius, radius, radius],
+      texturedBands && !irPattern ? ([1, 1, 1] as Rgb) : b.tint.rgb,
+      {
+        position: [x, 0, 0],
+        emissive,
+        segments: [64, 32],
+        albedoUrl: texturedBands ? (tex?.albedo ?? null) : null,
+        albedoLuma: irPattern,
+        ...(texturedBands && offsetU > 0 ? { albedoOffsetU: offsetU } : {}),
+        limbDarkening: limbU !== null,
+        limbU,
+      },
+    );
   const bodies: BodyPlan[] = !bodyOk
     ? []
     : twoBodies
       ? [
           make('body_a', -BINARY_OFFSET, BINARY_BODY_RADIUS),
-          make('body_b', BINARY_OFFSET, BINARY_BODY_RADIUS),
+          make('body_b', BINARY_OFFSET, BINARY_BODY_RADIUS, binaryMapOffset(params.seed)),
         ]
       : [make('body', 0, 1)];
 

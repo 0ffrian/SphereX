@@ -3,7 +3,7 @@
   "type": "asteroid_shape",
   "generator_version": "fixture-0",
   "seed": 1,
-  "scale_m": 5000.0,
+  "scale_m": 8420.0,
   "layers": [
     {
       "id": "mesh",
@@ -90,15 +90,15 @@
   },
   "dynamics": {
     "spin_period_h": {
-      "value": 5.0,
+      "value": 5.27,
       "tag": "measured",
       "tier": 1,
-      "source": "synthetic fixture: not a real measurement"
+      "source": "synthetic fixture: real 433 Eros value, the card's rot_period_h (JPL SBDB rot_per)"
     },
     "speedup": {
       "spin": 1000
     }
   },
-  "alt_text": "Synthetic fixture. Asteroid, 10 km across (measured), colour from gaia_rgb, viewed at 30 degrees. Surface relief: measured.",
+  "alt_text": "Synthetic fixture. Asteroid 433 Eros (real shape model), 16.8 km across (measured), colour from gaia_rgb, viewed at 30 degrees. Surface relief: measured.",
   "missing": []
 }

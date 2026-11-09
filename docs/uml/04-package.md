@@ -15,7 +15,8 @@ flowchart TB
     subgraph Backend["backend/ (FastAPI, Python 3.12) : Kevin, Moon, Atish"]
       BApi["app/api (Kevin) : D-16 endpoints, objects.py : /card, /render-params, texture URLs, /job, /job/events (Q-111), sky.py : /v1/sky (prototype, Q-87, /v1/sky/cached, Q-98), composite.py : /composite, /composite.png (prototype, Q-92), overlays.py : /overlays, /flags, /combine.png (Q-50), gemini.py : /admin/.../gemini-repaint, /albedo-ai, /albedo-ai.webp (Q-122)"]
       BPipe["app/core/find (stage 1, overlays, flagmask, combine, A4.9), app/adapters (gaia, wise = CatWISE2020, tap), app/cache, app/core/card (stages 4, 5) : Kevin, app/core/measure (stage 2, pool.py MeasurePool, Q-112) and physics : Moon, app/core/classify (stage 3) : Atish"]
-      BRender["app/core/render (Atish) : card_to_params, blackbody, params, noise, craters, height, normals, palette, bake, __main__, spherex_rgb, gemini_paint, background (TextureBaker, Q-112)"]
+      BRender["app/core/render (Atish) : card_to_params, gas_giant, blackbody, params, noise, craters, height, normals, palette, bake, __main__, spherex_rgb, gemini_paint, background (TextureBaker, Q-112)"]
+      BScripts["backend/scripts/bake_fixtures.py (Atish, with the baker): bakes the shared fixture textures with the real baker (Q-114); --check fails on drift"]
       BJobs["app/core/jobs.py (Job, JobRegistry), app/core/warm.py (WarmCache) : issue #41, owner proposed: Kevin (Q-111)"]
       BContract["app/contract : generated from shared/schemas (D-18) : follows the schemas owner"]
       BSky["app/core/sky : surveys, healpix, bake (HiPS to equirect), scripts/sky_mirror, sky_bake : prototype, no D-17 owner yet (Q-87, D-35)"]
@@ -36,7 +37,7 @@ flowchart TB
       FContract["src/contract : generated from shared/schemas (D-18), assertTagged next to it : follows the schemas owner"]
       subgraph FViewer["src/viewer (Moon)"]
         VCore["ViewerApp, lighting, modes, honesty, scaleBar, altText"]
-        VRend["renderers/ : AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody, bodyRenderer, fieldTexture, shaderPlan, shaderSpec, shaderPalette, pointClouds, StarBody, jetSurface, jetPalette, linearColour (sRGB to linear, once), sliders.ts"]
+        VRend["renderers/ : AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody, bodyRenderer, fieldTexture, shaderPlan, shaderSpec, shaderPalette, pointClouds, StarBody, jetSurface, jetPalette, linearColour (sRGB to linear, once), asteroidLift (Q-117), ttauriDisc (Q-118), textureMean (Q-116, Q-117), sliders.ts"]
         VSky["sky/ : SkyView, skyMath, surveys (prototype, Q-89, Q-90)"]
         VRender["render/ : pipeline (RenderChain), quality (quality levels, FrameGovernor), clock (SimClock), workerPool (WorkerPool), fanout (loadBody, asset prefetch)"]
         VShaders["shaders/ : TSL noise (fbm, ridged, domainWarp, animatedCells, OCTAVES) and sphere helpers (latLon, tangentFrame, differentialRotate), star and loops (issue #42)"]
@@ -56,7 +57,7 @@ flowchart TB
       FHapticsTest["src/hapticsTestPage + haptics-test.html : dev-only test page, not a build input : Atish"]
     end
 
-    Schemas["shared/schemas : object-card.schema.json, render-params.schema.json, shared/fixtures : Moon"]
+    Schemas["shared/schemas : object-card.schema.json, render-params.schema.json, shared/fixtures (cards, params, baked textures) : Moon"]
   end
 
   DocUML -.->|"illustrates"| DocSpecs
@@ -66,6 +67,7 @@ flowchart TB
   BPipe -->|"ObjectPipeline runs one Job per object"| BJobs
   BJobs -->|"warm.py: resolve, ensure_job"| BPipe
   BPipe --> BRender
+  BScripts --> BRender
   BRender -->|"validates"| Schemas
   BApi -->|"Pydantic models"| BContract
   BContract -.->|"generated from (D-18)"| Schemas
@@ -102,7 +104,7 @@ flowchart TB
   BApi -->|"composite.py"| BComp
   BComp -->|"stage 1 frames, stage 2 verdicts"| BPipe
   FFlip -->|"HTTP /v1 (D-16), /composite beyond D-16 (Q-92)"| BApi
-  FDev -.->|"answers /v1 instead of the backend (npm run dev:fixtures)"| FFlip
+  FDev -.->|"answers /v1 and /data (textures, shapes) instead of the backend (npm run dev:fixtures)"| FFlip
   VCore --> VRend
   VCore -->|"RenderChain, SimClock, FrameGovernor"| VRender
   VRender -->|"OCTAVES"| VShaders
@@ -163,7 +165,7 @@ flowchart TB
 - The Build split view (issue #60, R5.8) added `app/build` and `viewer/mould`; the shell's names and files are in A21 ([sky-shell.md](../architecture/sky-shell.md#a211-status-and-sources)).
 - Issue #9 (6 Nov 2026) built the haptics core: the engine, both web drivers, the shared AudioContext, the settings store, calibration types, platform defaults, the λ→pitch and spectrum mappings, `tuning.ts` (every tuning value, D-13), the `ui/` pulse indicator and unlock button, and the dev-only test page. Issues #10 and #11 added the spectrum pad, calibration wizard and settings UI, `profiles.ts`, `probe.ts`, the texture and data sources and `sound/listenSweep.ts`. Imports from outside `src/haptics` are type-only or pure functions: `viewer/honesty.ts` (honesty filter), `viewer/fields/fieldGenerator.ts` (the shared field and its functions), `viewer/renderers/` (`Comet`, `Star`, `BrownDwarf`, `shaderSpec`, `pointClouds` plan helpers), `viewer/planCommon.ts`, `viewer/planTypes.ts`, `viewer/sliders.ts` (the `Overrides` type), `app/spectrum/scale.ts`, `app/api/types.ts` and `app/ui.ts` (button class). None of them creates GPU or browser state at import.
 - `src/contract`, `src/state` and `src/app` were added by the frontend scaffold (4 Nov 2026) and are listed in rendering doc §10. `src/contract/generated.ts` is generated from `shared/schemas` (D-18), as is `backend/app/contract/`; the hand-written scaffold types were replaced in issue #4.
-- The flipbook and spectrum view (M1, issue #3, 5 Nov 2026) added `src/app/api`, `src/app/search`, `src/app/flipbook`, `src/app/spectrum`, the `sky` slice in `src/state/store.ts`, `src/test`, `fixtures/` and `scripts/` (rendering doc §10). `fixtures/` is a Vite dev-server plugin used only by `npm run dev:fixtures` and the Playwright tests; `scripts/check-dist.js` fails the build if a fixture marker reaches `dist/`.
+- The flipbook and spectrum view (M1, issue #3, 5 Nov 2026) added `src/app/api`, `src/app/search`, `src/app/flipbook`, `src/app/spectrum`, the `sky` slice in `src/state/store.ts`, `src/test`, `fixtures/` and `scripts/` (rendering doc §10). `fixtures/` is a Vite dev-server plugin used only by `npm run dev:fixtures` and the Playwright tests; `scripts/check-dist.js` fails the build if a fixture marker reaches `dist/`. Since issue #62 (Q-114) it also serves `/data/textures/...` from `shared/fixtures/textures/` (baked by `backend/scripts/bake_fixtures.py`) and `/data/shapes/*.glb` from `backend/assets/shapes/`.
 - The sky-view prototype (branch `feat/sky-view-prototype`, 7 Nov 2026) added `app/shell`, `app/sky`, `viewer/sky`, `flipbook/session.tsx`, `backend/app/core/sky` and `backend/app/api/sky.py` (rendering doc §10). The sky index goes through the M1 client (`app/api/client.ts`); its types are hand-written in `app/api/types.ts` until a sky schema exists (Q-89). The tiles come from a local copy of IRSA's HiPS (architecture spec §3.11, D-35).
 - Later on the same branch (7 Nov 2026): `backend/app/core/composite` and `backend/app/api/composite.py` (the colour composite, Q-92; sequence in [20](20-sequence-composite.md)), `GET /v1/sky/cached` in `sky.py` (Q-98), and in the frontend the colour views (`colourMode`, `ColourViews`, Q-93, Q-95), progressive frames (`progressive`, `FramesProgress`, Q-97), the fixed frame grid (`frameGrid`), the cached markers (`cachedMarkers`, `useCachedMarkers`) and `Segmented`. The composite types are hand-written in `app/api/types.ts` until a schema exists (D-18, Q-95).
 - The physics layer and slider registry (issue #13) added `src/physics` (rendering doc §10, architecture spec §7). There is one slider registry, `src/viewer/sliders.ts` (drawn in the `VRend` box): `src/state/store.ts`, the shader kinds and `src/physics` all take `SliderKey` and `Overrides` from it (D-27). `shaderPalette` takes the lava threshold `LAVA_START_K` from `src/physics/constants.ts`, so the two agree. The backend half of stage 6 is not built (Q-60).

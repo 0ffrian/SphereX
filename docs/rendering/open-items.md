@@ -1,10 +1,10 @@
 # Open items [verify]
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R12 · **Implements:** [D-17](../decisions/scope-process.md), [Q-110](../decisions/contract-tags.md), [Q-132](../decisions/platform-hosting.md) · **Read with:** [../decisions/README.md](../decisions/README.md), the fragment named in each row
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R12 · **Implements:** [D-17](../decisions/scope-process.md), [Q-110, Q-119](../decisions/contract-tags.md), [Q-63](../decisions/pipeline-stages.md), [Q-132](../decisions/platform-hosting.md) · **Read with:** [../decisions/README.md](../decisions/README.md), the fragment named in each row
 
 ## R12. Open items [verify]
 
-Every **[verify]** marker in the rendering spec has one row here. Numbers 1–18 never change, because code cites "R12 #n"; new items are appended. **When:** "event" items are checked on the A15 before 14 Nov; "after" items wait for phones and vibration (Q-132). Owners follow D-17: Moon for the viewer, Kevin for card values, Atish for the baker, classify and haptics and sound. A constant still marked [verify] may be used only under the Q-110 policy (proposed).
+Every **[verify]** marker in the rendering spec has one row here. Numbers 1–18 never change, because code cites "R12 #n"; new items are appended. **When:** "event" items are checked on the A15 before 14 Nov; "after" items wait for phones and vibration (Q-132). Owners follow D-17: Moon for the viewer, Kevin for card values, Atish for the baker, classify and haptics and sound. A constant still marked [verify] may be used only under the Q-110 policy (proposed; upheld by Atish in Q-119): at tier 4 or 5, or at tier 3 once checked against a cited source.
 
 | # | Item | Fragment | Owner | When | Resolved by |
 |---|---|---|---|---|---|
@@ -19,7 +19,7 @@ Every **[verify]** marker in the rendering spec has one row here. Numbers 1–18
 | 9 | Chrome's pattern-length cap, believed about 99 entries | R8.3, R8.8 | Atish | after | a test on both phones |
 | 10 | `AudioContext.outputLatency` and the "high latency" threshold (`HIGH_OUTPUT_LATENCY_S` 0.1 s) | R8.9 | Atish | threshold: event (desktop Chrome on the A15); Android support: after | a reading with wired and Bluetooth output |
 | 11 | Whether battery saver suppresses vibration on both phones | R8.7 | Atish | after | a test on both phones |
-| 12 | Exoplanet type thresholds for `planet_rocky` / `planet_water` / `gas_giant` (`PROPOSED_EXOPLANET_THRESHOLDS`, off until confirmed) | R3.3 | Atish (Q-63) | event | Atish confirms Q-63 |
+| 12 | **Decided (Q-63, issue #68); the 1.5 and 6 R_E project cuts stay noted as such.** Exoplanet type thresholds for `planet_rocky` / `planet_water` / `gas_giant`: the Q-63 thresholds are in `rules.py` and **on** since issue #68 (Moon signed off on 9 Nov 2026, values checked against their sources) | R3.3 | Moon (decides, D-17 amended), Atish (code) | done (9 Nov) | Moon's sign-off of Q-63 (PR #69) |
 | 13 | Whether the pulse-width whisper (`[4, 4, 4, 4, 4]`) is felt as distinct on each phone | R8.3, R8.7 | Atish | after | calibration step 2 on both phones |
 | 14 | Gas giant jet pulse rate, clamp(k · \|zonal wind\| / max \|zonal wind\|, 2, 20) Hz (D-12). The channel packing is settled by D-12 | R8.4, R7.7 | Atish | by ear: event; by touch: after | Atish signs off the rate (D-13) |
 | 15 | Brown dwarf `flux_45um` normalisation reference (`BROWN_DWARF_CONFIG.flux45Reference`, null): without it `emissive` and `flux_pulse` are refused | R7.4, R8.5 | Moon | event | a cited reference flux |
@@ -48,5 +48,7 @@ Every **[verify]** marker in the rendering spec has one row here. Numbers 1–18
 | 38 | Star colour method: Planck × CIE 1931 2° in the Wyman, Sloan & Shirley 2013 fit (Q-55 item 9) | R7.5 | Atish | event | a check against a published Teff colour table |
 | 39 | Phone auto-pause after 60 s, and the 10% battery target in 15 minutes (D-34) | R5.7 | Moon | after | a test on both phones |
 | 40 | Visual findings and frame times on a real GPU (Q-107; Q-104 item 10) | R7.5, R7.7, R11.3 | Moon | event (the A15) | R11.3 results on the A15 |
+| 41 | Brown dwarf limb-darkening coefficient `BROWN_DWARF_LIMB_U` 0.6, the visible-band solar value used as an analogue (layer `limb_darkening` at tier 4; near-IR models give about 0.25–0.29 at 3.6 and 4.5 µm, Q-119) | R7.4 | Atish | event | Atish decides whether to adopt a near-IR value (Q-119) |
+| 42 | Gas giant typical zonal wind 50 m/s (`TYPICAL_ZONAL_WIND_MS`) in the Rhines band count; `bands` stays tier 4 until it is checked (Q-115, Q-119). Same item as A14.1 | R7.7 (A7.2) | Moon | after | a cited wind speed used in a Rhines estimate |
 
 **Removed (resolved):** the "name [verify]" markers on `viewer/renderers/ShaderBody.ts` and `viewer/fields/fieldWorker.ts` (both files exist), and the self-signed certificate step for phones (moot for the event, Q-132; R11.3 keeps the phone procedure for after the event).

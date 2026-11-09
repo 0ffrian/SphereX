@@ -149,11 +149,12 @@ describe('lighting (R5.1)', () => {
 describe('alt text and announcements (R9)', () => {
   it('follows the R9 template', () => {
     const { card, params } = fixture('asteroid_shape');
+    card.shape_source = { value: 'fixture://meshes/none.glb', tag: 'measured', source: 'test' }; // a plain sphere first
     const plan = planRender(card, params, defaultContext({ mode: 'visible' }));
     const alt = buildAltText(plan);
     expect(alt.startsWith(`${card.name}, asteroid with a shape model, `)).toBe(true);
     expect(alt).toContain('asteroid with a shape model');
-    expect(alt).toContain('10 km long (measured)');
+    expect(alt).toContain('16.8 km long (measured)');
     expect(alt).toContain('colour from Gaia (estimated)');
     expect(alt).toContain('viewed at 30°');
     // A plain sphere has no relief to describe.

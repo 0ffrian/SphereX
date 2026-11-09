@@ -39,7 +39,8 @@ frontend/src/app/                    (Moon)   # React shell (A10 hash routing, m
 frontend/src/test/                            # test-only helpers (fixtureFetch, sharedFixtures, fakeHaptics, fakeAudio, hapticRecorder)
 frontend/src/fixtures.test.ts                 # fixtures are deterministic, pass the API validators, never imported by app code
 frontend/e2e/                                 # Playwright tests against the fixture server (R11 lists the rendering gates)
-frontend/fixtures/                            # dev and test only: SYNTHETIC fixture server (`npm run dev:fixtures`); never in a build
+frontend/fixtures/                            # dev and test only: SYNTHETIC fixture server (`npm run dev:fixtures`); never in a build;
+                                              # also serves /data/textures (shared/fixtures/textures) and /data/shapes (Q-114)
 frontend/scripts/                             # check-dist.js: ends `npm run build`, fails if a fixture marker is in dist/
 ```
 

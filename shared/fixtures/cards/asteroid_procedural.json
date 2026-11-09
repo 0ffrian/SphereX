@@ -4,9 +4,8 @@
   "type": "asteroid_procedural",
   "diameter_km": {
     "value": 2.0,
-    "tag": "derived",
-    "source": "synthetic fixture: not a real measurement",
-    "formula": "stands in for the size formula of the real pipeline"
+    "tag": "measured",
+    "source": "synthetic fixture: not a real measurement (stands in for an SBDB diameter)"
   },
   "rot_period_h": {
     "value": 5.0,

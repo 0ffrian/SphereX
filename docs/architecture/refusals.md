@@ -41,9 +41,9 @@ Not a refusal: a point kept with dropped pixels is `flagged`, with `dropped_flag
 | `exoplanet_archive` | card, params | a SIMBAD `Pl` object with no Exoplanet Archive row; the type becomes `candidate` |
 | `lighting` | card, params | Horizons could not give the phase angle and Sun vector (Q-62); the asset is not saved |
 | `spectrum` | params | no measured spectrum for a layer that needs one |
-| `type:exoplanet_thresholds` | card, params | the Q-63 rule is off (thresholds `None`), so the planet is `candidate` |
-| `type:exoplanet_radius`, `type:exoplanet_mass`, `type:exoplanet_envelope`, `type:exoplanet_water_model_range`, `type:exoplanet_mass_range` | card, params | the Q-63 rule cannot place the planet (meanings in Q-63); only when the rule is on |
-| `<layer_id>` | params | a layer or haptic source no tier can answer, for example `mesh`, `textures`, `visible`, `spherex_ir`, `field`, `flux_pulse`, `teq_pulse`, `heartbeat`, `dimming`, `motion` (full set: `backend/app/core/render/card_to_params.py`; layer ids: R3.4) |
+| `type:exoplanet_thresholds` | card, params | a Q-63 threshold is set to `None` (withdrawn), so the planet is `candidate`. The rule is on since issue #68, so this is not emitted today |
+| `type:exoplanet_radius`, `type:exoplanet_mass`, `type:exoplanet_envelope`, `type:exoplanet_water_model_range`, `type:exoplanet_mass_range` | card, params | the Q-63 rule cannot place the planet (meanings in Q-63) |
+| `<layer_id>` | params | a layer or haptic source no tier can answer, for example `mesh`, `textures`, `visible`, `spherex_ir`, `field`, `flux_pulse`, `teq_pulse`, `heartbeat`, `dimming`, `motion`; since issue #62 also the gas giant's `bands`, `flattening`, `colour`, `storms`, `turbulence` (a `null` typical constant refuses its layer, Q-115) and the brown dwarf's `limb_darkening` (Q-116) (full set: `backend/app/core/render/card_to_params.py`; layer ids: R3.4). The viewer adds its own reasons for layers the backend did not send (`backend`) or that the quality level cannot draw (`quality`, the asteroid `displacement` on the phone tier, Q-117); those are viewer plan reasons (`MissingReason`, `viewer/planTypes.ts`), not backend codes |
 | `dynamics:<key>` | params | a D-32 rate no rung can answer. Fixtures only: live params carry no `dynamics` yet (A4.7) |
 | `measuring:spectrum`, `measuring:<layer>` | params | intermediate answer: waits for the spectrum (A4.10). In the card, the field's `source` starts `measuring:` instead |
 | `measuring:frames` | params | partial answer: more frames are coming (A4.10) |

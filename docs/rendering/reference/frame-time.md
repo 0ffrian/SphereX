@@ -20,7 +20,7 @@ The quality levels, the level each device starts on and their frame-rate targets
      __sxShow(await f("cards", name), await f("params", name), "artistic");
    await show("star"); // or gas_giant, brown_dwarf, planet_rocky, planet_water, nebula, nova, asteroid_shape, comet
    ```
-   This draws at `+ Artistic`, the heaviest honesty state. The fixtures' texture URLs (`/data/textures/…`) and the shape-model mesh (`fixture://…`) are not served here, the same as under `npm run dev:fixtures`. Baked bodies therefore draw their flat fallback and `asteroid_shape` a sphere. Measure those two against the real backend once it serves assets.
+   This draws at `+ Artistic`, the heaviest honesty state. The fixtures' texture URLs (`/data/textures/…`) and the Eros shape model (`/data/shapes/eros-gaskell.glb`) are not served here: `vite preview` does not run the fixtures plugin, which serves them under `npm run dev:fixtures` (issue #62, Q-114). Baked bodies therefore draw their flat fallback and `asteroid_shape` a sphere. Measure those two under `npm run dev:fixtures` or against the real backend.
 3. Leave the view at its default framing.
 4. Let it run 10 s untouched, then 20 s while rotating slowly with the pointer or touch.
 5. Read the stats in the console (on phones use remote debugging, `chrome://inspect`):
