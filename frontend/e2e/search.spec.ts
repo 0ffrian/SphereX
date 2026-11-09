@@ -19,7 +19,8 @@ test('picking "Barnard\'s Star" from the list flies there and opens the panel', 
 }) => {
   await page.goto('/');
   const input = page.getByTestId('search-input');
-  await input.focus();
+  // A pointer press is a user focus; programmatic .focus() deliberately does not open the list (WCAG 3.2.1).
+  await input.click();
   await expect(input).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByTestId('search-list').getByRole('option')).toHaveCount(16);
   await input.pressSequentially('barnard');
@@ -38,7 +39,7 @@ test('desktop: the list is 380 px, right-aligned, and leaves the sky credit visi
 }) => {
   await page.goto('/');
   const input = page.getByTestId('search-input');
-  await input.focus();
+  await input.click();
   await expect(page.getByTestId('search-list').getByRole('option')).toHaveCount(16);
   const list = (await page.getByTestId('search-list').boundingBox())!;
   expect(list.width).toBeLessThanOrEqual(381);
