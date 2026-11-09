@@ -47,6 +47,7 @@ One state per badge (D-21):
 | + Artistic | adds `artistic` | Procedural relief, AI paint, baked band patterns (brown dwarf), gas giant storms and turbulence (seeded looks), orbit drawings |
 
 - The toggle starts at **+ Estimated**: everything shown on load is backed by data or a stated formula.
+- **Demo exoplanets at each level (issue #68 Part 6, Q-165, Q-166):** Measured only is a plain grey sphere at the measured radius in white light (the starlight is `derived`); + Estimated adds the star-coloured light and, for a tidally locked planet, the climate pattern on a smooth sphere (the default terrain stays hidden: it is `artistic`); + Artistic adds the generated surface, the scenario look and the preset. The alt text and notes say which of these is shown and which level shows the rest.
 - Each visible layer shows a small tag chip in the legend.
 - The haptics use the same filter ([§8.2](haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui)). Only `measured` haptics stay in Measured only: `teq_pulse` stays there only when `teq_K` is `measured` (Exoplanet Archive `pl_eqt`); when it is `derived` it is silent there and plays from + Estimated. `artistic` texture haptics play only in + Artistic.
 

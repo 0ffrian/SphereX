@@ -37,8 +37,13 @@ OBJECT_TYPES: list[str] = CARD_SCHEMA["definitions"]["ObjectType"]["enum"]
 TAGS: list[str] = CARD_SCHEMA["definitions"]["Tag"]["enum"]
 TV_DEFINITIONS = ["TVNumber", "TVString", "TVRgb", "TVVec3", "TVPair"]
 
-CARDS = {p.stem: _load(p) for p in sorted((SHARED / "fixtures" / "cards").glob("*.json"))}
-PARAMS = {p.stem: _load(p) for p in sorted((SHARED / "fixtures" / "params").glob("*.json"))}
+# Issue #68 Part 6: two extra `planet_rocky` fixtures with real archive values sit beside the
+# one-per-type set; they are checked on their own below.
+DEMO_PLANETS = ["planet_kepler186f", "planet_trappist1f"]
+_ALL_CARDS = {p.stem: _load(p) for p in sorted((SHARED / "fixtures" / "cards").glob("*.json"))}
+_ALL_PARAMS = {p.stem: _load(p) for p in sorted((SHARED / "fixtures" / "params").glob("*.json"))}
+CARDS = {k: v for k, v in _ALL_CARDS.items() if k not in DEMO_PLANETS}
+PARAMS = {k: v for k, v in _ALL_PARAMS.items() if k not in DEMO_PLANETS}
 INVALID = _load(SHARED / "fixtures" / "invalid" / "cases.json")
 
 _REGISTRY: Registry[Any] = Registry().with_resources(
@@ -87,6 +92,26 @@ def test_schemas_are_valid_draft7() -> None:
 def test_one_card_and_one_params_fixture_per_object_type() -> None:
     assert sorted(CARDS) == sorted(OBJECT_TYPES)
     assert sorted(PARAMS) == sorted(OBJECT_TYPES)
+
+
+def test_demo_planets_are_extra_fixtures() -> None:
+    assert sorted(_ALL_CARDS) == sorted([*OBJECT_TYPES, *DEMO_PLANETS])
+    assert sorted(_ALL_PARAMS) == sorted([*OBJECT_TYPES, *DEMO_PLANETS])
+
+
+@pytest.mark.parametrize("name", DEMO_PLANETS)
+def test_demo_planet_pair_validates_and_round_trips(name: str) -> None:
+    card, params = _ALL_CARDS[name], _ALL_PARAMS[name]
+    VALIDATORS["object-card"].validate(card)
+    VALIDATORS["render-params"].validate(params)
+    assert card["type"] == params["type"] == "planet_rocky"
+    assert card["id"] == params["id"]
+    dump = {"mode": "json", "exclude_unset": True, "by_alias": True}
+    assert ObjectCard.model_validate(card).model_dump(**dump) == card
+    assert RenderParams.model_validate(params).model_dump(**dump) == params
+    # Every value is a real archive value and says so (the Q-114 pattern).
+    for tv in _tagged(card):
+        assert str(tv.get("source", "")).startswith("synthetic fixture: real ")
 
 
 def test_api_tag_literal_matches_the_schema() -> None:

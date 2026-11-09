@@ -16,6 +16,7 @@ import { STARLIGHT_FORMULA } from '@/physics/starlight';
 import { isTagShown } from '../honesty';
 import { sliderValue } from '../sliders';
 import {
+  exoplanetSentences,
   isExoplanetCard,
   missingFields,
   numberField,
@@ -315,6 +316,26 @@ export function planShaderKind(input: PlanInput): RenderPlan {
     const lock = deriveLocking(card);
     if (!lock.ok && !params.missing.includes('tidal_locking'))
       b.refuse({ id: 'tidal_locking', reason: 'data', fields: lock.needs });
+  }
+  // Issue #68 Part 6 (Q-165): say what the light and the scenario are, and which level shows them.
+  if ((spec.kind === 'planet_rocky' || spec.kind === 'planet_water') && isExoplanetCard(card)) {
+    const refusal = b.missing.find((m) => m.id === 'starlight');
+    b.notes.push(
+      ...exoplanetSentences({
+        kind: spec.kind,
+        scenario: b.held('climate') ? null : (spec.planet?.scenario ?? null),
+        teffK: lighting.colourTeffK,
+        // A layer the build animation holds back is a presentation step, not a refusal: say nothing.
+        starlight: b.isDrawn('starlight')
+          ? 'drawn'
+          : refusal?.reason === 'data'
+            ? 'data'
+            : refusal?.reason === 'honesty'
+              ? 'honesty'
+              : null,
+        climateShown: surface || pattern,
+      }),
+    );
   }
   const lockedPose = (surface || pattern) && spec.field?.substellar === true;
   if (lockedPose) {

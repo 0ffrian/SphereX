@@ -79,12 +79,47 @@ describe('water planet (mock-up PLAN.water)', () => {
     expect(s?.steps.map((x) => x.label) ?? []).toEqual(['Base mould']);
   });
 
-  it('an eyeball exoplanet at + Estimated also builds the Colour step: its climate pattern is drawn', () => {
-    // Part 6: from + Estimated the climate pattern (derived/model_dependent) is shown on a smooth
-    // sphere, in the step that reveals ice and ocean.
+  it('an exoplanet at + Estimated builds the starlight step and the climate pattern step', () => {
+    // Part 6 (Q-165): the starlight is `derived`, so it is shown from + Estimated and is revealed in
+    // the first step after the base mould; the climate pattern (model_dependent) is shown on a
+    // smooth sphere in the step that reveals ice and ocean.
     const s = mouldScript(planOf('planet_water', 'derived').plan);
-    expect(s?.steps.map((x) => x.label)).toEqual(['Base mould', 'Colour']);
-    expect(s?.steps[1]?.reveals).toContain('climate');
+    expect(s?.steps.map((x) => x.label)).toEqual(['Base mould', 'Terrain', 'Colour']);
+    expect(s?.steps[1]?.reveals).toEqual(['starlight']);
+    expect(s?.steps[2]?.reveals).toContain('climate');
+  });
+});
+
+describe.each(['planet_trappist1f', 'planet_kepler186f'])('%s (the demo exoplanets)', (name) => {
+  it('Measured only: a plain sphere, one step, no starlight', () => {
+    const p = planOf(name, 'measured').plan;
+    const s = mouldScript(p)!;
+    expect(s.steps.map((x) => x.label)).toEqual(['Base mould']);
+    expect(p.drawn.map((d) => d.id)).not.toContain('starlight');
+    expect(p.lighting.colour).toBeNull();
+  });
+
+  it('+ Estimated: starlight comes in the first step after the base mould; the climate pattern follows only for a locked planet', () => {
+    const s = mouldScript(planOf(name, 'derived').plan)!;
+    expect(s.steps[0]!.label).toBe('Base mould');
+    expect(s.steps[1]!.label).toBe('Terrain');
+    expect(s.steps[1]!.reveals).toContain('starlight');
+    // TRAPPIST-1 f is locked (eyeball or snowball pattern on a smooth sphere). Kepler-186 f is not
+    // locked at the Q-155 constants (a knife edge, Q-156), so it has no pattern to reveal here.
+    const colour = s.steps.find((x) => x.label === 'Colour');
+    if (name === 'planet_trappist1f') expect(colour?.reveals).toContain('climate');
+    else expect(colour).toBeUndefined();
+  });
+
+  it('+ Artistic: every step reveals a drawn layer or runs a knob; starlight is first', () => {
+    const { plan } = planOf(name, 'artistic');
+    const s = mouldScript(plan)!;
+    expect(s.kind).toBe('rocky');
+    expect(s.steps.map((x) => x.label)).toEqual(['Base mould', 'Terrain', 'Colour', 'Air']);
+    expect(s.steps[1]!.reveals).toContain('starlight');
+    expect(s.steps[2]!.reveals).toContain('climate');
+    for (const st of s.steps)
+      expect(st.reveals.length + (st.knobs?.length ?? 0)).toBeGreaterThan(0);
   });
 });
 
