@@ -29,6 +29,7 @@ from app.api.objects import ObjectId
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context
 from app.core.card.service import ObjectPipeline
+from app.core.find.resolver import ResolvedObject
 from app.core.render.gemini_paint import GeminiPainter, PaintOutcome
 from app.errors import ApiError
 
@@ -48,21 +49,27 @@ def _reply(outcome: PaintOutcome) -> JSONResponse:
     return JSONResponse(content=body, headers={"Cache-Control": "no-store"})
 
 
-def _shown_params(pipeline: ObjectPipeline, object_id: str) -> Mapping[str, Any] | None:
-    """RenderParams of the bake the viewer shows, from disk only: a saved or pre-baked asset's
-    (it carries its own seed), else None for the stage 7 defaults."""
+def _shown_params(pipeline: ObjectPipeline, obj: ResolvedObject) -> Mapping[str, Any] | None:
+    """RenderParams of the bake the viewer shows, from disk only: the saved or pre-baked asset
+    ``pipeline.run`` would answer with (same contract check, so the repaint and the status
+    agree on the seed), else None for the stage 7 defaults."""
     try:
-        found = pipeline.assets.lookup(object_id)
+        saved = pipeline.saved(obj)
     except (OSError, ValueError):
         return None
-    return found[0].render_params if found is not None else None
+    return saved.params if saved is not None else None
 
 
 def _status(
-    ctx: Context, pipeline: ObjectPipeline, painter: GeminiPainter, oid: str
+    ctx: Context,
+    pipeline: ObjectPipeline,
+    painter: GeminiPainter,
+    oid: str,
+    *,
+    with_bytes: bool = False,
 ) -> PaintOutcome:
-    require_object(ctx, oid)  # 404 for an unknown id
-    return painter.status(oid, _shown_params(pipeline, oid))
+    obj = require_object(ctx, oid)  # 404 for an unknown id
+    return painter.status(oid, _shown_params(pipeline, obj), with_bytes=with_bytes)
 
 
 @router.post(
@@ -118,7 +125,7 @@ def get_albedo(
     pipeline: Annotated[ObjectPipeline, Depends(get_pipeline)],
     painter: Annotated[GeminiPainter, Depends(get_gemini)],
 ) -> Response:
-    outcome = _status(ctx, pipeline, painter, object_id)
+    outcome = _status(ctx, pipeline, painter, object_id, with_bytes=True)
     if not outcome.applied or outcome.ai_bytes is None:
         raise ApiError(
             404, "albedo_ai_unavailable", f"No AI albedo ({outcome.reason}); the code colour shows."

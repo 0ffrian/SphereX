@@ -123,7 +123,7 @@ def normals_from_height(h, radius_m, strength=1.0):
 
 1. Render a hillshade of the height map (equirectangular, no colour) and send it as the reference image together with a prompt built from RenderParams.
 2. Prompt: "Paint albedo only. Keep the exact equirectangular layout and every terrain feature in place. No lighting, no shadows, no stars, no text. Palette: <base_rgb as words>, <hydration/redness notes>."
-3. Model: `gemini-nano-banana-2.1` **[verify name and supported aspect ratios]**. Resample the output to 2:1.
+3. Model: `gemini-nano-banana-2.1` **[verify name and supported aspect ratios]** (listed in Google's docs on 9 Nov 2026; 2:1 not among the named ratios; see R12 #3). Resample the output to 2:1.
 4. **Alignment check:** compute the correlation between Sobel edges of the hillshade and of the output luminance. Below 0.3 → reject and keep the [§6.4](#r64-colour-no-ai-default) colour.
 5. Seam fix: `np.roll` by W/2, blend a 32 px band across the old seam, roll back.
 

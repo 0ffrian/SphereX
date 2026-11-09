@@ -158,7 +158,7 @@ uv run python -m scripts.sky_bake --preview preview.jpg             # 4096x2048 
 | `SX_GEMINI_MODEL` | `gemini-nano-banana-2.1` | **[verify]** R12 #3. |
 | `SX_GEMINI_API_URL` | `https://generativelanguage.googleapis.com/v1beta` | **[verify]** URL and request shape (R12 #3). |
 | `SX_GEMINI_ASPECT_RATIO` | empty | **[verify]** R12 #3. Empty: none requested; the output is resampled to 2:1 anyway. |
-| `SX_GEMINI_TIMEOUT_S` | `90` | ASSUMPTION: A6.2 says "a set time". Total budget for the call, retries and backoff included. The reply is streamed against that deadline and capped at 32 MiB. Only connection failures are retried, while budget is left; a read error, a read or write timeout or a protocol error is not, so a request that may have reached Google is never sent twice. |
+| `SX_GEMINI_TIMEOUT_S` | `90` | ASSUMPTION: A6.2 says "a set time". Total budget for the call, retries and backoff included. The reply is streamed against that deadline and capped at 32 MiB. Only connection failures and HTTP 429/503 are retried, while budget is left; HTTP 500/502/504, a read error, a read or write timeout or a protocol error is not, so a request that may have reached Google is never sent twice. |
 | `SX_GEMINI_COOLDOWN_S` | `60` | ASSUMPTION (Q-122): after a live Gemini call for an object, no other live call for it for this long (reason `cooldown`). Cache hits are not affected. `0` turns it off. |
 | `SX_GEMINI_OFFLINE_CACHE` | `0` | Q-29: `1` shows a cached repaint under `SX_OFFLINE=1`; `0` keeps the layer off offline (D-24). |
 

@@ -49,9 +49,6 @@ ERRORS: dict[int | str, dict[str, object]] = {
 }
 
 
-_object = require_object
-
-
 def _provenance(obj: ResolvedObject, has_pm: bool) -> dict[str, Provenance]:
     if has_pm:
         pos = Provenance(
@@ -105,7 +102,7 @@ def get_frames(
     ctx: Annotated[Context, Depends(get_ctx)],
     service: Annotated[FrameService, Depends(get_frame_service)],
 ) -> FramesResponse:
-    obj = _object(ctx, object_id)
+    obj = require_object(ctx, object_id)
     result = service.get_frames(obj)
     frames = [
         Frame(
@@ -150,7 +147,7 @@ def get_cutout_png(
     ctx: Annotated[Context, Depends(get_ctx)],
     service: Annotated[FrameService, Depends(get_frame_service)],
 ) -> Response:
-    obj = _object(ctx, object_id)
+    obj = require_object(ctx, object_id)
     frame = service.find(obj, frame_id)
     if frame is None:
         raise ApiError(404, "frame_not_found", f"No frame '{frame_id}' for '{object_id}'.")
@@ -208,7 +205,7 @@ def get_card(
     ctx: Annotated[Context, Depends(get_ctx)],
     pipeline: Annotated[ObjectPipeline, Depends(get_pipeline)],
 ) -> JSONResponse:
-    result = pipeline.run(_object(ctx, object_id))
+    result = pipeline.run(require_object(ctx, object_id))
     return _contract_reply(result.card, result, pipeline)
 
 
@@ -222,7 +219,7 @@ def get_render_params(
     ctx: Annotated[Context, Depends(get_ctx)],
     pipeline: Annotated[ObjectPipeline, Depends(get_pipeline)],
 ) -> JSONResponse:
-    result = pipeline.run(_object(ctx, object_id))
+    result = pipeline.run(require_object(ctx, object_id))
     return _contract_reply(result.params, result, pipeline)
 
 
@@ -238,7 +235,7 @@ def get_job(
 ) -> JSONResponse:
     """The object's background job (Q-111): ``state`` running, done, failed, or idle when there is
     none (this route never starts one), its ``stage`` and frames n of N. No side effects."""
-    obj = _object(ctx, object_id)
+    obj = require_object(ctx, object_id)
     job = pipeline.jobs.get(obj.id)
     return JSONResponse(job.snapshot() if job is not None else _idle(obj.id))
 
@@ -255,7 +252,7 @@ def get_job_events(
 ) -> StreamingResponse:
     """Server-sent events: one ``data:`` line (the ``/job`` JSON) per change, ending after the
     job finishes. With no job, one ``idle`` event and the stream ends."""
-    obj = _object(ctx, object_id)
+    obj = require_object(ctx, object_id)
     job = pipeline.jobs.get(obj.id)
 
     async def events() -> AsyncIterator[str]:
