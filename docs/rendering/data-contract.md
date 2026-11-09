@@ -85,7 +85,7 @@ interface ObjectCard {
    - T Tauri → `star_ttauri`
    - any other star → `star`
 4. NASA Exoplanet Archive match → `planet_rocky`, `planet_water` or `gas_giant`.
-   - Classification thresholds: **proposed** values in `PROPOSED_EXOPLANET_THRESHOLDS` in `backend/app/core/classify/rules.py` (Q-63: radius cuts, true mass, Zeng 2019 mass-radius curves), chosen by Moon on 7 Nov 2026. The live thresholds stay `None` (refuse: `candidate` with `type:exoplanet_thresholds`) until Atish (classify owner, D-17) confirms Q-63; all values stay **[verify]**. Archive values marked `CALCULATED_VALUE` are never used to classify (Q-63). Open item, [§12](layout-tests-open-items.md#r12-open-items-verify).
+   - Classification thresholds: **proposed** values in `PROPOSED_EXOPLANET_THRESHOLDS` in `backend/app/core/classify/rules.py` (Q-63: radius cuts, true mass, Zeng 2019 mass-radius curves), chosen by Moon on 7 Nov 2026. The live thresholds are these values since issue #68: Moon signed off Q-63 on 9 Nov 2026 after the values were checked against their sources (D-17 amended); a value set back to `None` refuses with `type:exoplanet_thresholds`. Archive values marked `CALCULATED_VALUE` are never used to classify (Q-63). Open item, [§12](layout-tests-open-items.md#r12-open-items-verify).
    - The Exoplanet Archive service is tested ([architecture spec §3.8](../architecture/README.md)).
 5. `nebula` and `nova` come from user sliders only. They have no catalogue rule; they are slider-only showcase bodies, and every value is tagged `artistic` (D-12).
 6. Anything else → `candidate`.
@@ -99,7 +99,7 @@ interface RenderParams {
   id: string; type: ObjectType; generator_version: string; seed: number;   // seed: integer >= 0 (Q-35)
   scale_m: number | null;              // physical radius in metres; null = size unknown, body refused (Q-33)
   layers: Layer[];                     // ordered, each with a tag
-  // relief_amp: peak relief, fraction of the radius (R6.2); scales the displacement (R7.2). Optional, the backend does not send it yet (Q-103)
+  // relief_amp: peak relief, fraction of the radius (R6.2); scales the displacement (R7.2). Optional (Q-103); the backend sends it for `asteroid_procedural` (issue #62, Q-117), with an `artistic` `displacement` layer
   textures?: { albedo: string; height: string; normal: string; roughness?: string; height_bin?: string; relief_amp?: number };
   lighting: { mode: 'sun' | 'self'; sun_dir?: [number, number, number]; phase_angle_deg?: number };
                                        // sun_dir: today a copy of the card's ICRF sun_vector; the viewer reads it

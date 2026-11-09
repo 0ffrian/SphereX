@@ -359,6 +359,8 @@ test('keyboard only: search, play and pause, open the spectrum', async ({ page }
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
   await expect(page.getByTestId('play-pause')).toBeEnabled();
+  // The island has grown into the panel (issue #66): its controls can take focus.
+  await expect(page.getByTestId('island')).toHaveAttribute('data-arrived', '');
 
   const tabTo = async (testId: string) => {
     for (let k = 0; k < 30; k++) {
@@ -435,6 +437,8 @@ test('flipbook keys ignore Alt, Ctrl and Meta (review finding 5)', async ({ page
   const counter = page.getByTestId('frame-counter');
   await expect(counter).toHaveText('Frame 1 of 24');
   await expect(page.getByTestId('play-pause')).toBeEnabled();
+  // The island has grown into the panel (issue #66): its controls can take focus.
+  await expect(page.getByTestId('island')).toHaveAttribute('data-arrived', '');
   await page.getByTestId('frame-viewer').focus();
   await page.keyboard.press('Alt+ArrowRight');
   await page.keyboard.press('Control+k');
@@ -456,6 +460,8 @@ test('Space does not start play while Play is disabled (review finding 9)', asyn
   await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
   const play = page.getByTestId('play-pause');
   await expect(play).toBeDisabled();
+  // The island has grown into the panel (issue #66): its controls can take focus.
+  await expect(page.getByTestId('island')).toHaveAttribute('data-arrived', '');
   await page.getByTestId('frame-viewer').focus();
   // Record whether each keydown had its default prevented once it bubbled to window.
   await page.evaluate(() => {

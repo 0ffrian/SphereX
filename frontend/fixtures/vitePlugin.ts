@@ -1,4 +1,5 @@
-// DEV/TEST FIXTURES ONLY. Vite dev-server plugin that answers `/v1/*` from the synthetic fixtures.
+// DEV/TEST FIXTURES ONLY. Vite dev-server plugin that answers `/v1/*` from the synthetic fixtures,
+// and `/data/textures/*` and `/data/shapes/*` from the committed fixture textures and shape models.
 // `apply: 'serve'`: it never runs in `vite build` or `vite preview`. vite.config.ts adds it only
 // in `--mode fixtures` (npm run dev:fixtures), and then sets no proxy.
 import type { Plugin } from 'vite';
@@ -26,9 +27,12 @@ export function sxFixtures(): Plugin {
         if (reply.delayMs) setTimeout(send, reply.delayMs);
         else send();
       });
-      server.config.logger.info('  [sx-fixtures] /v1 is served from SYNTHETIC fixtures', {
-        timestamp: true,
-      });
+      server.config.logger.info(
+        '  [sx-fixtures] /v1 and /data are served from SYNTHETIC fixtures',
+        {
+          timestamp: true,
+        },
+      );
     },
   };
 }

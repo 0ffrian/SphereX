@@ -1,0 +1,60 @@
+"""Baked fixture textures (issue #62 part A): determinism and the URLs the fixtures name."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from PIL import Image
+
+from scripts import bake_fixtures as bf
+
+PARAMS = sorted((bf.FIXTURES / "params").glob("*.json"))
+
+
+def test_rebake_is_byte_identical(tmp_path: Path) -> None:
+    """Same card + seed -> same bytes, twice in a row and through the script's own writer."""
+    assert bf.fixture_files() == bf.fixture_files()
+    assert bf.main([], out_dir=tmp_path) == 0
+    first = {p: p.read_bytes() for p in sorted(tmp_path.rglob("*")) if p.is_file()}
+    assert bf.main([], out_dir=tmp_path) == 0
+    assert bf.main(["--check"], out_dir=tmp_path) == 0
+    assert {p: p.read_bytes() for p in sorted(tmp_path.rglob("*")) if p.is_file()} == first
+
+
+def test_check_reports_a_changed_file(tmp_path: Path) -> None:
+    assert bf.main([], out_dir=tmp_path) == 0
+    victim = next(tmp_path.rglob("height.bin"))
+    data = victim.read_bytes()
+    victim.write_bytes(bytes([data[0] ^ 0xFF]) + data[1:])
+    assert bf.main(["--check"], out_dir=tmp_path) == 1
+
+
+def test_committed_textures_match_the_baker() -> None:
+    """shared/fixtures/textures is what the script writes (rerun it after a baker change)."""
+    assert bf.main(["--check"]) == 0
+
+
+@pytest.mark.parametrize("path", PARAMS, ids=[p.stem for p in PARAMS])
+def test_every_fixture_texture_url_resolves(path: Path) -> None:
+    params = json.loads(path.read_text(encoding="utf-8"))
+    for key, url in params.get("textures", {}).items():
+        if not isinstance(url, str):
+            continue  # relief_amp is a number (R7.2), not a file
+        file = bf.OUT_DIR / bf.url_to_relpath(url)
+        assert file.is_file(), f"{path.name} {key}: {url}"
+        if file.suffix in {".png", ".webp"}:
+            with Image.open(file) as img:
+                assert img.size == (bf.FIXTURE_TEXTURE_WIDTH, bf.FIXTURE_TEXTURE_HEIGHT)
+        else:  # height.bin: float16, W x H (R6.7)
+            assert file.stat().st_size == 2 * bf.FIXTURE_TEXTURE_WIDTH * bf.FIXTURE_TEXTURE_HEIGHT
+
+
+def test_url_mapping_matches_the_baker_directory_names() -> None:
+    rel = bf.url_to_relpath("/data/textures/fixture:brown_dwarf/fixture-0/4/albedo.webp")
+    assert rel == Path("fixture%3Abrown_dwarf/fixture-0/4/albedo.webp")
+    encoded = bf.url_to_relpath("/data/textures/fixture%3Abrown_dwarf/fixture-0/4/albedo.webp")
+    assert encoded == rel
+    with pytest.raises(ValueError):
+        bf.url_to_relpath("/data/textures/a/b/not-a-seed/albedo.webp")

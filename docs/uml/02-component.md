@@ -175,7 +175,7 @@ flowchart TB
     Store["Store (Zustand): card, RenderParams, honesty state, overrides"]
     PulseInd["On-screen pulse indicator (D-20)"]
     Settings["Haptics + audio settings"]
-    Shell["Shell (prototype, Q-89): ToolRail, PanelCard, Readout, shortcuts"]
+    Shell["Shell (prototype, Q-89): ToolRail, PanelCard, Readout, shortcuts, Island (Q-121)"]
     SkyPane["SkyPane: sky image, markers, click to pick"]
     Transport["Transport bar"]
     Session["Flipbook session (session.tsx): cutout preload, playback timer, can play"]

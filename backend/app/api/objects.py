@@ -58,7 +58,7 @@ PIXEL_FORMULA = (
 def _provenance(obj: ResolvedObject, has_pm: bool) -> dict[str, Provenance]:
     pixel = Provenance(tag="derived", formula=PIXEL_FORMULA)
     if obj.moving:
-        # Issue #26 (Q-124): the per-frame position is the interpolated Horizons prediction, and
+        # Issue #26 (Q-125): the per-frame position is the interpolated Horizons prediction, and
         # the pixel is computed from it, so both carry the ephemeris assumption.
         basis = moving.position_basis()
         pos = Provenance(

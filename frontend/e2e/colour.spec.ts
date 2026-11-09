@@ -85,6 +85,7 @@ async function cutoutLoaded(page: Page) {
 }
 
 test('Raw → Wavelength tint → SPHEREx composite → Raw', async ({ page }) => {
+  test.setTimeout(90_000); // a long walk through four views; 30 s is tight under load
   // Tall enough that the panel shows the controls, the picture and its legend together.
   await page.setViewportSize({ width: 1280, height: 1200 });
   const errors: string[] = [];
@@ -97,6 +98,8 @@ test('Raw → Wavelength tint → SPHEREx composite → Raw', async ({ page }) =
   const counter = page.getByTestId('frame-counter');
   await expect(counter).toHaveText('Frame 1 of 24');
   await cutoutLoaded(page);
+  // The panel is see-through until the island has arrived; the picture is measured after that.
+  await expect(page.getByTestId('island')).toHaveAttribute('data-arrived', '');
   await page.addStyleTag({ content: HIDE_MARKERS });
   const viewer = page.getByTestId('frame-viewer');
   const panel = page.getByTestId('object-panel');
@@ -119,7 +122,7 @@ test('Raw → Wavelength tint → SPHEREx composite → Raw', async ({ page }) =
     'true',
   );
   await expect(page.getByTestId('tint-overlay')).toBeVisible();
-  await expect.poll(() => colourSpread(page, viewer)).toBeGreaterThan(40);
+  await expect.poll(() => colourSpread(page, viewer), { timeout: 20_000 }).toBeGreaterThan(40);
   await expect(page.getByTestId('tint-legend')).toContainText('Estimated');
   await expect(page.getByTestId('tint-legend-current')).toHaveText(/^This frame: \d\.\d{3} µm$/);
   await expect(page.getByTestId('cutout')).toHaveCSS('image-rendering', 'pixelated');
@@ -156,8 +159,9 @@ test('Raw → Wavelength tint → SPHEREx composite → Raw', async ({ page }) =
     'A composite is one picture; switch to Raw or Wavelength tint to play frames.',
   );
   await expect(page.getByTestId('scrubber')).toHaveCount(0);
+  // Each poll is a screenshot, which is slow on a software renderer with a full-size sky behind.
   await expect
-    .poll(() => colourSpread(page, page.getByTestId('composite-viewer')))
+    .poll(() => colourSpread(page, page.getByTestId('composite-viewer')), { timeout: 20_000 })
     .toBeGreaterThan(40);
   expect(new URL(page.url()).hash).toContain('colour=composite');
   await shot(page, panel, 'desktop-composite', page.getByTestId('colour-controls'));

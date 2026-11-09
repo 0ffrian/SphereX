@@ -39,6 +39,7 @@
 - `png.ts`: small grayscale and RGB PNG encoders (stored deflate, no zlib).
 - `sky.ts`: the synthetic all-sky image and the sky index.
 - `handler.ts`: answers `/v1/resolve`, `/frames`, `/cutouts/{frame_id}.png`, `/spectrum`, the colour composite (`/composite`, `/composite.png`) and `/v1/sky/cached` with the D-16 shapes and error bodies; keeps the progressive parts per session.
+- `handler.ts` also serves `/data/textures/...` from `shared/fixtures/textures/` and `/data/shapes/<slug>[.lod1].glb` from `backend/assets/shapes/` (issue #62). These are real files, not synthetic replies: the textures are the real baker's output for the synthetic fixture cards (`backend/scripts/bake_fixtures.py`), the shape model is the real Gaskell Eros model.
 - `vitePlugin.ts`: mounts the handler on the dev server.
 
 When the backend (#1, #2) records real responses, they can replace these for tests (D-25), but that is not wired up in M1.

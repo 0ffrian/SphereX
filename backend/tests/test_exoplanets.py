@@ -33,7 +33,7 @@ CALC = "<a refstr=CALCULATED_VALUE href=/docs/pscp_calc.html target=_blank>Calcu
 
 @pytest.fixture
 def proposed(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The Q-63 values as proposed; live they stay None until Atish signs off (PR #45)."""
+    """The Q-63 values as proposed; live since Moon's sign-off (issue #68), so this pins them."""
     for k, v in PROPOSED_EXOPLANET_THRESHOLDS.items():
         monkeypatch.setitem(EXOPLANET_THRESHOLDS, k, v)
 
@@ -114,8 +114,15 @@ def test_water_curve_temperature_choice() -> None:
 # --- rule: every branch ----------------------------------------------------------------------
 
 
-def test_thresholds_unset_refuses_every_planet() -> None:
-    assert all(v is None for v in EXOPLANET_THRESHOLDS.values())
+def test_live_thresholds_are_the_signed_off_values() -> None:
+    # Issue #68 Part 0.1: Moon signed off Q-63; the live values are exactly the proposed ones.
+    assert EXOPLANET_THRESHOLDS == PROPOSED_EXOPLANET_THRESHOLDS
+
+
+def test_thresholds_unset_refuses_every_planet(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Withdrawing the values still refuses with a reason instead of guessing.
+    for k in EXOPLANET_THRESHOLDS:
+        monkeypatch.setitem(EXOPLANET_THRESHOLDS, k, None)
     assert kind(pl_rade=15.6) == (None, ("type:exoplanet_thresholds",))
     assert kind(pl_rade=0.92) == (None, ("type:exoplanet_thresholds",))
 
@@ -216,7 +223,7 @@ PLANETS = {
 }
 
 
-@pytest.mark.usefixtures("proposed")
+# Live values since issue #68 (no `proposed` fixture): a drift from the proposed values fails.
 @pytest.mark.parametrize(("name", "want"), PLANETS.items())
 def test_fixture_planets_offline(client: TestClient, name: str, want: str) -> None:
     oid = resolve_id(client, name)
@@ -239,12 +246,48 @@ def test_fixture_planets_offline(client: TestClient, name: str, want: str) -> No
     assert "spectrum" in params["missing"]  # no SPHEREx frames recorded: null with a reason
 
 
-@pytest.mark.parametrize("name", [*PLANETS, "51 Peg b", "Proxima Cen b"])
-def test_fixture_planets_refused_until_thresholds_agreed(client: TestClient, name: str) -> None:
+LIVE_TYPES = {**PLANETS, "51 Peg b": "gas_giant", "Proxima Cen b": "candidate"}
+# Why each live candidate is refused (Q-63): the reason stays listed, never a silent candidate.
+LIVE_REFUSALS = {"GJ 1214 b": "type:exoplanet_envelope", "Proxima Cen b": "type:exoplanet_radius"}
+
+
+@pytest.mark.parametrize(("name", "want"), LIVE_TYPES.items())
+def test_fixture_planets_are_typed_live(client: TestClient, name: str, want: str) -> None:
+    """Issue #68 Part 0.1: the rule is on without the `proposed` fixture; each recorded planet
+    gets the class `targets.toml` documents, and none is refused for missing thresholds."""
     oid = resolve_id(client, name)
     params = client.get(f"/v1/objects/{oid}/render-params").json()
-    assert params["type"] == "candidate"
-    assert "type:exoplanet_thresholds" in params["missing"]
+    assert params["type"] == want
+    assert "type:exoplanet_thresholds" not in params["missing"]
+    if want == "candidate":
+        assert LIVE_REFUSALS[name] in params["missing"]
+
+
+# Issue #68 demo planets, with the archive's default values (pscomppars, read 9 Nov 2026 by the
+# astro-verifier; issue #68 comment). Not recorded fixtures: the rule alone on the live thresholds.
+DEMO_PLANETS = [
+    # TRAPPIST-1 f: R 1.045 (Agol+2021), M 1.039 (Mass).
+    (dict(pl_rade=1.045, pl_bmasse=1.039, pl_bmassprov="Mass", pl_eqt=217.7), "planet_rocky"),
+    # Kepler-186 f: R 1.17 (Torres+2015); the mass is an M-R estimate (CALCULATED_VALUE), unused.
+    (
+        dict(
+            pl_rade=1.17,
+            pl_bmasse=1.71,
+            pl_bmassprov="M-R relationship",
+            pl_bmasse_reflink=CALC,
+            pl_eqt=177.0,
+        ),
+        "planet_rocky",
+    ),
+    # HD 189733 b: R 12.67 (Stassun+2017), M 359.1 (Mass).
+    (dict(pl_rade=12.67, pl_bmasse=359.1, pl_bmassprov="Mass", pl_eqt=1209.0), "gas_giant"),
+]
+
+
+@pytest.mark.parametrize(("values", "want"), DEMO_PLANETS)
+def test_demo_planets_are_typed_on_the_live_rule(values: dict[str, Any], want: str) -> None:
+    t, missing = kind(**values)
+    assert (t, missing) == (want, ())
 
 
 @pytest.mark.usefixtures("proposed")

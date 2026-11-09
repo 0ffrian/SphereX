@@ -20,10 +20,13 @@ const plan = (
 const active = (p: ReturnType<typeof plan>) => p.motion.activeProcesses;
 
 describe('activeProcesses: only processes that drive a drawn layer', () => {
-  it('gas giant at the default honesty draws a plain sphere, so nothing moves', () => {
+  it('gas giant at the default honesty draws its estimated layers and spins, but its jets are artistic', () => {
     const p = plan('gas_giant');
     expect(p.motion.processes.length).toBeGreaterThan(0); // the card does animate them
-    expect(active(p)).toEqual([]);
+    expect(p.shader).toMatchObject({ surface: true });
+    // Issue #62: bands, flattening, colour and storms show from + Estimated, so the body turns; the
+    // jets and the storm drift are artistic looks and wait for + Artistic.
+    expect(active(p)).toEqual(['spin']);
   });
 
   it('gas giant at + Artistic runs spin, winds and cloud changes', () => {

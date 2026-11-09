@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 
 /** Seconds since `startedAt`, ticking once a second while it is set. */
-function useElapsedSeconds(startedAt: number | null): number {
+export function useElapsedSeconds(startedAt: number | null): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (startedAt === null) return;
@@ -13,7 +13,7 @@ function useElapsedSeconds(startedAt: number | null): number {
 }
 
 /** Show the elapsed time only after this long, so quick replies don't flash a counter. */
-const SHOW_ELAPSED_AFTER_S = 5;
+export const SHOW_ELAPSED_AFTER_S = 5;
 
 export function LoadingBox({ text, startedAt }: { text: string; startedAt: number | null }) {
   const seconds = useElapsedSeconds(startedAt);
