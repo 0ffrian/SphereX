@@ -40,9 +40,11 @@ export function SearchBar() {
         if (q?.origin === 'hash' || q?.origin === 'sky') {
           setText(q.q);
           setProblem(null);
+          setActive(-1);
         } else if (q === null) {
           setText('');
           setProblem(null);
+          setActive(-1);
         }
       }),
     [],
@@ -104,6 +106,8 @@ export function SearchBar() {
         active < 0 ? (step > 0 ? 0 : rows.length - 1) : (active + step + rows.length) % rows.length,
       );
     } else if (e.key === 'Enter') {
+      // Enter that confirms an IME composition must not pick a row.
+      if (e.nativeEvent.isComposing) return;
       const row = listShown ? rows[active] : undefined;
       if (row) {
         e.preventDefault();
@@ -143,9 +147,11 @@ export function SearchBar() {
           onKeyDown={onKeyDown}
           role="combobox"
           aria-expanded={listShown}
-          aria-controls={listId}
+          aria-controls={listShown ? listId : undefined}
           aria-autocomplete="list"
-          aria-activedescendant={listShown && active >= 0 ? optionId(active) : undefined}
+          aria-activedescendant={
+            listShown && active >= 0 && active < rows.length ? optionId(active) : undefined
+          }
           placeholder="Search a name or RA Dec"
           autoComplete="off"
           spellCheck={false}
@@ -172,7 +178,14 @@ export function SearchBar() {
           Decimal degrees only, for example 269.452, 4.693. Search by name for moving objects.
         </p>
         {open && (
-          <div className="sx-suggest" data-testid="search-list">
+          // A press anywhere in the list (a row, the scrollbar, the hint) must not blur the input,
+          // or the list would close before the click lands.
+          <div
+            className="sx-suggest"
+            data-testid="search-list"
+            onMouseDown={(e) => e.preventDefault()}
+            onPointerDown={(e) => e.preventDefault()}
+          >
             <ul
               id={listId}
               role="listbox"
@@ -188,8 +201,6 @@ export function SearchBar() {
                   aria-selected={i === active}
                   data-active={i === active ? 'true' : undefined}
                   className="sx-suggest-row"
-                  // Keeps focus in the input: a mouse or touch press must not blur it.
-                  onPointerDown={(e) => e.preventDefault()}
                   onClick={() => pick(row)}
                 >
                   <span>{row.name}</span>

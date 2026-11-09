@@ -26,10 +26,10 @@ export function searchErrorMessage(err: SkyError, query: string): string {
       if (err.code === 'frames_stalled')
         return 'The server stopped fetching more cutouts from the archive. Try again in a moment.';
       return err.status === 504
-        ? 'The archive is slow or not answering right now. Try again, or pick one of the test targets.'
+        ? 'The archive is slow or not answering right now. Try again, or pick an object from the list.'
         : 'The server had a problem or is not answering. Try again in a moment.';
     case 'timeout':
-      return `No answer after ${Math.round(API_TIMEOUT_MS / 1000)} seconds. The archive may be slow; try again, or pick one of the test targets.`;
+      return `No answer after ${Math.round(API_TIMEOUT_MS / 1000)} seconds. The archive may be slow; try again, or pick an object from the list.`;
     case 'network':
       return 'Can’t reach the server. Check that the backend is running.';
     case 'bad_response':
