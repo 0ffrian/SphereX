@@ -14,6 +14,18 @@ export const MAX_AMBIENT_INTENSITY = 0.03;
 /** Exposure of the Sun light. Display choice only, not a physical value (tag: artistic). */
 export const DIRECTIONAL_INTENSITY = 2;
 
+/**
+ * Display tilt (artistic, Q-107 item 1 fixed): the card's `sun_vector` is an ICRF vector that is read
+ * as scene space without a frame conversion (Q-62), so its angle to the camera is not a measured
+ * phase. A Sun exactly in the image plane (a 90 degree phase, as the fixtures' [1, 0, 0]) makes the
+ * terminator a straight line through the disc and half the body black. For a hint with no phase angle
+ * the direction is therefore turned toward the camera and up by this vector before it is normalised
+ * (about 51 degrees of phase for [1, 0, 0]), so the terminator is the curved ellipse of a gibbous
+ * body. Not applied to a comet, whose tail is aimed by the same hint (Comet.ts), and never to a
+ * phase angle that the card gives.
+ */
+export const SUN_HINT_DISPLAY_TILT: readonly [number, number, number] = [0, 0.45, 0.9];
+
 /** Distance of the light from the origin in scene units. A directional light only uses the direction. */
 const LIGHT_DISTANCE = 5;
 
@@ -75,7 +87,11 @@ export function planLighting(params: RenderParams, card?: ObjectCard | null): Li
   // ASSUMPTION: with no phase angle, fall back to the Sun direction as given (its frame is not
   // specified, so it is only used as a direction hint) and then to a head-on light. Both are
   // tagged `artistic` and the plan lists "lighting" as refused.
-  const sun = params.lighting.sun_dir ? unit(params.lighting.sun_dir) : null;
+  const hint = params.lighting.sun_dir ? unit(params.lighting.sun_dir) : null;
+  const sun =
+    hint && params.type !== 'comet'
+      ? unit(hint.map((x, i) => x + SUN_HINT_DISPLAY_TILT[i]!))
+      : hint;
   return {
     mode: 'sun',
     ambient: MAX_AMBIENT_INTENSITY,

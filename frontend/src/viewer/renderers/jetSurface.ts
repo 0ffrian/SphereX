@@ -104,6 +104,20 @@ export interface JetOptions {
 /** Minnaert exponent for gas giants (artistic: 1 is a plain Lambert surface). */
 export const MINNAERT_K = 0.8;
 
+/**
+ * Floor of the Minnaert `mu0` term (artistic). Below it the factor is constant, so the lit side fades
+ * out with the scene light's own linear Lambert slope. Without it `mu0^(k-1)` rises without limit at
+ * the terminator and the product `mu0^k` has an infinite slope there: a hard step (Q-107 item 1).
+ */
+export const MINNAERT_MU0_FLOOR = 0.3;
+
+/**
+ * Faint night-side floor of a gas giant, as a fraction of its own colour (artistic). It only keeps
+ * the dark half and the limb readable (R5.1 asks for a tiny ambient light); it is not light from
+ * any source and stays below the ambient cap's look.
+ */
+export const GAS_NIGHT_FLOOR = 0.012;
+
 export interface JetFrame {
   storms: readonly MovingStorm[];
   /** Streak shear angle of the two flow-map copies (rad at peak jet), weight of A, evolve offsets. */
@@ -162,7 +176,7 @@ const rotY = (p: any, a: any) => {
  * terminator; the view part is flipped to `mu^(1-k)` so that it darkens the limb (artistic).
  */
 const minnaert = (sun: any) => {
-  const mu0 = max(dot(normalWorld, sun), 0.04);
+  const mu0 = max(dot(normalWorld, sun), MINNAERT_MU0_FLOOR);
   const mu = max(abs(dot(normalWorld, normalize(cameraPosition.sub(positionWorld)))), 0.04);
   return pow(mu0, MINNAERT_K - 1).mul(pow(mu, 1 - MINNAERT_K));
 };
@@ -274,7 +288,8 @@ export function buildJetSurface(o: JetOptions): JetSurface {
     mat.colorNode = o.sunWorld ? col.mul(minnaert(o.sunWorld)) : col;
     mat.roughness = 1;
     mat.metalness = 0;
-    mat.emissiveNode = o.emissive > 0 ? col.mul(colourU.mul(o.emissive * 0.6)) : vec3(0, 0, 0);
+    const glow = o.emissive > 0 ? col.mul(colourU.mul(o.emissive * 0.6)) : vec3(0, 0, 0);
+    mat.emissiveNode = o.sunWorld ? glow.add(col.mul(GAS_NIGHT_FLOOR)) : glow;
     mesh = new Mesh(geo, mat);
   }
 

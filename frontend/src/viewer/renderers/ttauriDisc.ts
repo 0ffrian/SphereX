@@ -11,6 +11,12 @@
 //     darken as a thick dust column does;
 //   - depth: the disc is depth-tested against the opaque star and does not write depth, so the near
 //     half passes in front of the star and the far half is hidden behind it.
+//   - order (PR #63 review): a transparent mesh with no depth write blends its triangles in index
+//     order, so the internal overlap (the far wall seen through the near surface) was unsorted and the
+//     near side was almost opaque over the star. The disc is now two passes over one geometry: the
+//     back faces first (BackSide, renderOrder BACK_RENDER_ORDER: the far wall and the underside), then
+//     the front faces (FrontSide, renderOrder FRONT_RENDER_ORDER) at a lower opacity, so the star stays
+//     visible through the thin near rim. A fixed order, not a depth sort: deterministic for any view.
 // Everything about it (radii, tilt, flaring, colours, the falloff and rim constants) is `artistic`
 // (R7.5); no physical value is claimed. The geometry is built in the XY plane with Z as the
 // thickness, so the same `rotation.x = inclination` as before tilts it away from face-on.
@@ -19,7 +25,8 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
-  DoubleSide,
+  BackSide,
+  FrontSide,
   Mesh,
   MeshBasicNodeMaterial,
   SRGBColorSpace,
@@ -51,6 +58,12 @@ export const DISC_DUST_COLOUR = 0x8a7a6a;
 export const DISC_RIM_COLOUR = 0xffc785;
 /** Angular and radial resolution of the surfaces. */
 export const DISC_SEGMENTS = { around: 128, radial: 40, thickness: 10 } as const;
+
+/** Render order of the back-face pass (drawn first) and the front-face pass (artistic, fixed). */
+export const BACK_RENDER_ORDER = 1;
+export const FRONT_RENDER_ORDER = 2;
+/** Opacity of the near (front-face) pass relative to the far pass, so the star shows through (artistic). */
+export const FRONT_OPACITY_SCALE = 0.55;
 
 /** Half-thickness of the disc at radius `r`: `H_in (r / r_in)^p` (artistic). */
 export function discHalfHeight(disc: DiscPlan, r: number): number {
@@ -119,10 +132,12 @@ export function flaredDiscGeometry(disc: DiscPlan): BufferGeometry {
   return g;
 }
 
-/** The lit, flared disc as a mesh (not yet tilted: the caller sets `rotation.x`). */
+/**
+ * The lit, flared disc: the back-face mesh (returned, tilted by the plan) with the front-face mesh as
+ * its only child (same geometry, so it tilts with it). Both are transparent, depth-tested, no depth write.
+ */
 export function buildTTauriDisc(disc: DiscPlan): Mesh {
   const geometry = flaredDiscGeometry(disc);
-  const material = new MeshBasicNodeMaterial();
   const dust = new Color().setHex(DISC_DUST_COLOUR, SRGBColorSpace);
   const rim = new Color().setHex(DISC_RIM_COLOUR, SRGBColorSpace);
 
@@ -158,16 +173,26 @@ export function buildTTauriDisc(disc: DiscPlan): Mesh {
   col = col.mul(lane).mul(mix(float(1), graze, smoothstep(0.1, 0.5, rn)));
 
   const outerFade = float(1).sub(smoothstep(0.8, 1, rn));
-  material.colorNode = col;
-  material.opacityNode = clamp(falloff.mul(1.2).add(0.16), 0, 0.96).mul(outerFade);
-  material.transparent = true;
-  material.side = DoubleSide;
-  // Depth-tested against the opaque star (near half in front, far half hidden), no depth write.
-  material.depthTest = true;
-  material.depthWrite = false;
+  const opacity = clamp(falloff.mul(1.2).add(0.16), 0, 0.96).mul(outerFade);
+  const pass = (side: typeof BackSide | typeof FrontSide, scale: number) => {
+    const m = new MeshBasicNodeMaterial();
+    m.colorNode = col;
+    m.opacityNode = opacity.mul(scale);
+    m.transparent = true;
+    m.side = side;
+    // Depth-tested against the opaque star (near half in front, far half hidden), no depth write.
+    m.depthTest = true;
+    m.depthWrite = false;
+    return m;
+  };
 
-  const mesh = new Mesh(geometry, material);
+  const mesh = new Mesh(geometry, pass(BackSide, 1));
   mesh.name = 'disc';
+  mesh.renderOrder = BACK_RENDER_ORDER;
   mesh.rotation.x = (disc.inclinationDeg * Math.PI) / 180;
+  const front = new Mesh(geometry, pass(FrontSide, FRONT_OPACITY_SCALE));
+  front.name = 'disc-front';
+  front.renderOrder = FRONT_RENDER_ORDER;
+  mesh.add(front);
   return mesh;
 }

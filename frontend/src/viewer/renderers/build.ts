@@ -28,7 +28,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import type { BodyPlan, DustPlan, RenderPlan, Rgb, ShellPlan, SpinPlan } from '../planTypes';
 import type { TierName } from '../render/quality';
-import { displacementActive } from './AsteroidProcedural';
+import { ASTEROID_ALBEDO_LIFT, displacementActive } from './AsteroidProcedural';
 import { ShapeMaterial } from '../shape/ShapeMaterial';
 import {
   AO_RAYS,
@@ -480,6 +480,8 @@ export function buildScene(
     load(body.albedoUrl, albedoLayer(plan), (t) => {
       t.colorSpace = SRGBColorSpace;
       material.map = t;
+      if (material instanceof MeshStandardNodeMaterial && plan.type === 'asteroid_procedural')
+        material.color.setScalar(ASTEROID_ALBEDO_LIFT);
       if (material instanceof MeshBasicNodeMaterial && (limbOf(body) !== null || body.albedoLuma)) {
         // A self-lit body with limb darkening or a brightness-only map has a custom colour node.
         material.colorNode = selfLitColour(body, t, body.albedoLuma ? meanLuma(t.image) : null);
@@ -699,6 +701,7 @@ export function buildScene(
     const mesh = buildTTauriDisc(disc);
     track(mesh.geometry);
     track(mesh.material as { dispose(): void });
+    for (const c of mesh.children) track((c as Mesh).material as { dispose(): void });
     group.add(mesh);
   }
   for (const screen of plan.screens) {

@@ -28,6 +28,13 @@ import { scoreFrames, type Rgb } from './ssim';
 
 const EXCLUDED = new Set(['candidate']);
 const HONESTY = ['measured', 'derived', 'artistic'] as const;
+/**
+ * Extra states drawn at a quality tier other than the low one every golden runs at (PR #63 review):
+ * the asteroid's displacement by the baked height map is off on `low` (Q-117), so it needs a golden
+ * of its own at `medium`. The file is `<kind>.<honesty>.<tier>.png`.
+ */
+const TIER_STATES: Record<string, readonly { honesty: (typeof HONESTY)[number]; tier: string }[]> =
+  { asteroid_procedural: [{ honesty: 'artistic', tier: 'medium' }] };
 const SKIP_STATES: Record<string, readonly string[]> = {};
 /** D-21 / R5.3: the tags each honesty state may draw. */
 const SHOWN_TAGS: Record<(typeof HONESTY)[number], readonly string[]> = {
@@ -107,12 +114,16 @@ for (const kind of kinds) {
     const decoder = await context.newPage();
     mkdirSync(GOLDEN_DIR, { recursive: true });
 
-    for (const honesty of HONESTY) {
+    const states = [
+      ...HONESTY.map((honesty) => ({ honesty, tier: 'low' })),
+      ...(TIER_STATES[kind] ?? []),
+    ];
+    for (const { honesty, tier } of states) {
       if (SKIP_STATES[kind]?.includes(honesty)) continue;
       // Same fixture + seed + time must give the same golden. The render-core hooks pin the quality
       // tier and the clock; without them the viewer is only waited on until it stops changing.
       const hooks = await page.evaluate(
-        async ({ card, params, honesty }) => {
+        async ({ card, params, honesty, tier }) => {
           const g = globalThis as unknown as {
             __sxViewer: {
               setQualityTier?(t: string): void;
@@ -123,7 +134,7 @@ for (const kind of kinds) {
             __sxShow(c: unknown, p: unknown, h: string): { drawn: { id: string; tag: string }[] };
           };
           const v = g.__sxViewer;
-          v.setQualityTier?.('low');
+          v.setQualityTier?.(tier);
           const plan = g.__sxShow(card, params, honesty);
           for (let i = 0; i < 400 && !v.body; i++) await new Promise((r) => setTimeout(r, 25));
           // Generated surfaces and point clouds arrive from the worker a little later.
@@ -138,7 +149,7 @@ for (const kind of kinds) {
             bodyDrawn: v.body ? [...v.body.drawn] : null,
           };
         },
-        { card: read('cards', kind), params: paramsFor(kind), honesty },
+        { card: read('cards', kind), params: paramsFor(kind), honesty, tier },
       );
 
       // The state draws only layers whose tag it shows (D-21), and a generated body draws only
@@ -168,7 +179,7 @@ for (const kind of kinds) {
         }
       }
 
-      const name = `${kind}.${honesty}.png`;
+      const name = tier === 'low' ? `${kind}.${honesty}.png` : `${kind}.${honesty}.${tier}.png`;
       // Bottom-left corner: clear of the masked label, the scale bar and every fixture's body.
       const frame = await decode(decoder, shot);
       const at = ((frame.height - 4) * frame.width + 3) * 4;

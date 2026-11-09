@@ -18,6 +18,9 @@
 ### R5.1 Lighting
 
 - **Solar-system bodies:** a single `DirectionalLight` placed at `phase_angle_deg` from the view direction. Use Horizons quantity 24 (Sun–Target–Observer angle) with observer `500@-163182` at the observation epoch. A tiny ambient light (intensity ≤ 0.03) keeps the night side legible. Tag: `measured`.
+  - **No phase angle (PR #63 review, Q-107 item 1):** the card's `sun_vector` is read as scene space with no frame conversion (Q-62), so it is a hint, not a measured phase. `planLighting` turns it toward the camera and up by `SUN_HINT_DISPLAY_TILT` (0, 0.45, 0.9) before it is normalised (about 51° of phase for `[1, 0, 0]`), so the terminator is a curved ellipse and not the straight line a Sun in the image plane gives. Tag `artistic`; not applied to a comet (its tail uses the same hint) and never to a given `phase_angle_deg`.
+  - **Gas giant terminator and night side (artistic):** the Minnaert factor's `mu0` is floored at `MINNAERT_MU0_FLOOR` 0.3, so the lit side fades with the light's own linear slope and not with the infinite slope of `mu0^0.8` at the terminator; the dark half keeps `GAS_NIGHT_FLOOR` 0.012 of the body's own colour as a faint floor so the limb stays readable (R9). Airless rock keeps a sharp terminator.
+  - **Procedural asteroid albedo lift (artistic):** its baked albedo map is a dark C-type grey, so the map is multiplied by `ASTEROID_ALBEDO_LIFT` (6) in the material, so the lit limb reads at 3:1 or more against the sky at + Estimated and + Artistic. The light stays at the common exposure, the card's albedo and the map stay the `derived` values, and the Measured-only plain sphere is not lifted; only the display lift is an artist's choice.
 - **Stars and brown dwarfs:** self-luminous (emissive). No external light.
 
 ### R5.2 View modes

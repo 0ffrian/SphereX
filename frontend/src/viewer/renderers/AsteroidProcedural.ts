@@ -12,6 +12,15 @@ import type { RenderPlan, Rgb } from '../planTypes';
 const WHITE: Rgb = [1, 1, 1];
 
 /**
+ * Display lift of the baked albedo map of a procedural asteroid (artistic, PR #63 review). The map is
+ * a dark C-type grey (brightness 0.12 + 1.6 albedo, R6.2); at the common exposure the lit limb was
+ * about 1.8:1 against the sky. The map is multiplied by this factor in the material so the lit limb
+ * reads at 3:1 or more (WCAG non-text contrast). The albedo in the card and the map stay the derived
+ * values; the plain Measured-only sphere is not lifted; the lift is not a measurement.
+ */
+export const ASTEROID_ALBEDO_LIFT = 6;
+
+/**
  * R7.2: `displacementScale = relief_amp` (fraction of the radius, R6.2). `RenderTextures` declares
  * `relief_amp` as an optional field (Q-103); the backend sends it for this kind (issue #62). When
  * it is absent the displacement layer is refused as a server gap, not guessed. A value that is not

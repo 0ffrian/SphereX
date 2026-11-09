@@ -1,10 +1,18 @@
 // Issue #62, R7.5: the flared, lit T Tauri disc. Geometry and plan values (no GPU needed).
 import { describe, expect, it } from 'vitest';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
+import { BackSide, DoubleSide, FrontSide, Mesh, MeshBasicNodeMaterial } from 'three/webgpu';
 import { defaultContext, planRender } from '../renderPlan';
 import { fixture } from './fixtures.testutil';
 import { TTAURI_DISC } from './Star';
-import { buildTTauriDisc, discHalfHeight, DISC_SEGMENTS, flaredDiscGeometry } from './ttauriDisc';
+import {
+  BACK_RENDER_ORDER,
+  buildTTauriDisc,
+  discHalfHeight,
+  DISC_SEGMENTS,
+  FRONT_OPACITY_SCALE,
+  FRONT_RENDER_ORDER,
+  flaredDiscGeometry,
+} from './ttauriDisc';
 import { meanLuma } from './textureMean';
 
 const disc = { id: 'disc', ...TTAURI_DISC };
@@ -65,14 +73,36 @@ describe('flared disc mesh', () => {
   it('is tilted by the plan, blended, depth-tested and writes no depth (near half in front, far half behind the star)', () => {
     const mesh = buildTTauriDisc(disc);
     expect(mesh.rotation.x).toBeCloseTo((TTAURI_DISC.inclinationDeg * Math.PI) / 180, 12);
-    const m = mesh.material as MeshBasicNodeMaterial;
-    expect(m.transparent).toBe(true);
-    expect(m.depthTest).toBe(true);
-    expect(m.depthWrite).toBe(false);
-    expect(m.colorNode).toBeTruthy();
-    expect(m.opacityNode).toBeTruthy();
+    const front = mesh.children[0] as Mesh;
+    for (const m of [mesh.material, front.material] as MeshBasicNodeMaterial[]) {
+      expect(m.transparent).toBe(true);
+      expect(m.depthTest).toBe(true);
+      expect(m.depthWrite).toBe(false);
+      expect(m.colorNode).toBeTruthy();
+      expect(m.opacityNode).toBeTruthy();
+    }
     mesh.geometry.dispose();
-    m.dispose();
+    (mesh.material as MeshBasicNodeMaterial).dispose();
+    (front.material as MeshBasicNodeMaterial).dispose();
+  });
+
+  it('draws in two fixed passes: back faces first, then front faces at a lower opacity', () => {
+    const mesh = buildTTauriDisc(disc);
+    expect(mesh.children).toHaveLength(1);
+    const front = mesh.children[0] as Mesh;
+    expect((mesh.material as MeshBasicNodeMaterial).side).toBe(BackSide);
+    expect((front.material as MeshBasicNodeMaterial).side).toBe(FrontSide);
+    expect(mesh.renderOrder).toBe(BACK_RENDER_ORDER);
+    expect(front.renderOrder).toBe(FRONT_RENDER_ORDER);
+    expect(front.renderOrder).toBeGreaterThan(mesh.renderOrder);
+    expect(front.geometry).toBe(mesh.geometry);
+    expect(FRONT_OPACITY_SCALE).toBeGreaterThan(0);
+    expect(FRONT_OPACITY_SCALE).toBeLessThan(1);
+    // The two passes are separate materials (different side and opacity), never one DoubleSide mesh.
+    expect(front.material).not.toBe(mesh.material);
+    for (const m of [mesh.material, front.material] as MeshBasicNodeMaterial[])
+      expect(m.side).not.toBe(DoubleSide);
+    mesh.geometry.dispose();
   });
 });
 
