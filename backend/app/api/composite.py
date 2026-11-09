@@ -15,13 +15,12 @@ from fastapi import APIRouter, Depends, Path, Query
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from app.api.deps import get_ctx, get_frame_service
+from app.api.deps import get_ctx, get_frame_service, require_object
 from app.api.models import ErrorResponse
 from app.context import Context
 from app.core.composite.service import CompositeService, png_version
 from app.core.find.frames import FrameService
 from app.core.find.ids import ID_RE
-from app.core.find.resolver import ResolvedObject, load_object
 from app.errors import ApiError
 from app.timefmt import iso_utc_z
 
@@ -65,13 +64,6 @@ class CompositeResponse(BaseModel):
     epoch: str | None = None
 
 
-def _object(ctx: Context, object_id: str) -> ResolvedObject:
-    obj = load_object(ctx, object_id)
-    if obj is None:
-        raise ApiError(404, "not_found", f"Unknown object '{object_id}'. Call /v1/resolve first.")
-    return obj
-
-
 @router.get(
     "/{object_id}/composite",
     response_model=CompositeResponse,
@@ -83,7 +75,7 @@ def get_composite(
     ctx: Annotated[Context, Depends(get_ctx)],
     service: Annotated[FrameService, Depends(get_frame_service)],
 ) -> CompositeResponse:
-    result = CompositeService(service).get(_object(ctx, object_id))
+    result = CompositeService(service).get(require_object(ctx, object_id))
     cached_at = iso_utc_z(result.cached_at) if result.cached_at else None
     return CompositeResponse.model_validate({**result.body, "cached_at": cached_at})
 
@@ -102,7 +94,7 @@ def get_composite_png(
     """``v`` only makes a rebuilt image a new URL; the current image is always served. Only a
     ``v`` that names the bytes served may be cached by the browser, so a URL without ``v`` (or
     with an old one) never keeps a superseded image for a day."""
-    result = CompositeService(service).get(_object(ctx, object_id), use_memo=True)
+    result = CompositeService(service).get(require_object(ctx, object_id), use_memo=True)
     if result.png is None:
         why = ", ".join(result.body["missing"]) or "no composite"
         raise ApiError(404, "not_found", f"No composite for '{object_id}': {why}.")
