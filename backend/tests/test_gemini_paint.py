@@ -834,3 +834,126 @@ def test_cors_exposes_the_layer_tag(fixture_cache: Path, tmp_path: Path) -> None
     with TestClient(create_app(s)) as c:
         r = c.get("/v1/health", headers={"Origin": origin})
         assert "x-sx-layer-tag" in r.headers["access-control-expose-headers"].lower()
+
+
+# --- /code-review fixes ------------------------------------------------------------------------
+
+
+def test_failing_cache_entry_that_cannot_be_deleted_still_keeps_code(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    p = painter(tmp_path, FakeClient(faithful))
+    assert p.repaint(OID, card()).applied
+    monkeypatch.setattr(p, "_check", lambda data, shade: gp._Reject("bad_image", "corrupt"))
+
+    def locked(key: Any) -> None:
+        raise PermissionError("in use")
+
+    monkeypatch.setattr(p.cache, "delete", locked)
+    out = p.repaint(OID, card())  # a cache hit that fails the checks
+    assert not out.applied and out.reason == "bad_image"
+
+
+@pytest.mark.parametrize(("status", "calls"), [(500, 1), (502, 1), (504, 1), (503, 3), (429, 3)])
+def test_only_turned_away_replies_are_retried(tmp_path: Path, status: int, calls: int) -> None:
+    """500/502/504 may come after Google generated (and billed) the image: never retried."""
+    seen: list[httpx.Request] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(req)
+        return httpx.Response(status)
+
+    s = settings(tmp_path, http_retries=2, http_backoff_s=0.0)
+    c = GeminiRestClient(s, transport=httpx.MockTransport(handler), sleep=lambda _: None)
+    with pytest.raises(GeminiError) as info:
+        c.generate("p", b"x")
+    assert info.value.reason == f"gemini_http_{status}" and len(seen) == calls
+
+
+def test_api_status_ignores_a_saved_asset_the_pipeline_ignores(
+    api: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A contract-violating saved asset is rebuilt by the pipeline with the default seed; the
+    status must use that seed too, not the asset's, or every repaint would read stale."""
+    from app.core.card.assets import Asset
+
+    use_painter(api, tmp_path, FakeClient(faithful))
+    oid = resolve_id(api, "433 Eros")
+    bad = Asset(
+        card={"id": oid, "type": "asteroid_procedural"},  # fails check_card
+        render_params={"id": oid, "type": "asteroid_procedural", "seed": 7},
+        textures=None,
+        generator_version=GENERATOR_VERSION,
+        seed=7,
+        created_at="2026-11-09T00:00:00.000Z",
+    )
+    pipeline = api.app.state.pipeline  # type: ignore[attr-defined]
+    monkeypatch.setattr(pipeline.assets, "lookup", lambda _id: (bad, None))
+    assert repaint(api, oid).json()["status"] == "applied"
+    assert api.get(f"/v1/objects/{oid}/albedo-ai").json()["status"] == "applied"
+
+
+def test_json_status_does_not_reread_the_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    p = painter(tmp_path, FakeClient(faithful))
+    assert p.repaint(OID, card()).applied
+    reads: list[str] = []
+    real = Path.read_bytes
+
+    def counting(self: Path) -> bytes:
+        if self.name == AI_FILE:
+            reads.append(str(self))
+        return real(self)
+
+    monkeypatch.setattr(Path, "read_bytes", counting)
+    first = p.status(OID)
+    second = p.status(OID)
+    assert first.applied and second.applied and first.ai_bytes is None
+    assert len(reads) == 1  # the second poll used the memoised hash
+    full = p.status(OID, with_bytes=True)
+    assert full.applied and full.ai_bytes and len(reads) == 2
+    # A changed file is hashed again and no longer matches gemini.json.
+    f = ai_dir(tmp_path) / AI_FILE
+    f.write_bytes(real(f) + b"x")
+    assert p.status(OID).reason == "stale"
+
+
+def test_offline_refusal_does_no_bake(tmp_path: Path) -> None:
+    out = painter(tmp_path, FakeClient(faithful), offline=True).repaint(OID, card())
+    assert out.reason == "offline" and not code_dir(tmp_path).exists()
+    out = painter(tmp_path, None, gemini_api_key=None).repaint(OID, card(), refresh=True)
+    assert out.reason == "gemini_key_missing" and not code_dir(tmp_path).exists()
+
+
+def test_lock_and_cooldown_state_stay_bounded(tmp_path: Path) -> None:
+    now = [0.0]
+    s = settings(tmp_path, gemini_cooldown_s=60.0)
+    cache = ReadThroughCache(s.cache_dir, offline=False)
+    p = GeminiPainter(s, cache, None, width=W, height=H, clock=lambda: now[0])
+    assert len(p._locks) == gp.LOCK_STRIPES
+    assert p._lock_for("a") is p._lock_for("a")
+    for i in range(100):
+        p._note_call(f"obj-{i}")
+    now[0] = 61.0
+    p._note_call("late")
+    assert list(p._last_call) == ["late"]  # older than the cooldown: dropped
+
+
+def test_client_bug_is_logged_with_traceback(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.WARNING)
+    out = painter(tmp_path, FakeClient(TypeError("bug"))).repaint(OID, card())
+    assert out.reason == "gemini_unavailable"
+    assert any(r.exc_info and r.exc_info[0] is TypeError for r in caplog.records)
+
+
+def test_gemini_failure_is_logged_with_the_model(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.WARNING)
+    err = GeminiError("gemini_http_404", "the API refused the call")
+    painter(tmp_path, FakeClient(err)).repaint(OID, card())
+    assert "gemini_http_404" in caplog.text and FakeClient.model in caplog.text
+    assert SECRET not in caplog.text

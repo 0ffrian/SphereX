@@ -25,9 +25,11 @@ import colorsys
 import hashlib
 import io
 import json
+import logging
 import math
 import threading
 import time
+from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -38,7 +40,7 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
-from app.adapters.http import RETRY_STATUS, USER_AGENT, NetworkDisabled
+from app.adapters.http import USER_AGENT, NetworkDisabled
 from app.cache.keys import CacheKey
 from app.cache.store import CacheEntry, LiveResponse, ReadThroughCache, atomic_write
 from app.core.render.bake import (
@@ -61,6 +63,8 @@ from app.core.render.noise import F64
 from app.core.render.normals import normal_vectors
 from app.core.render.params import BAKED_TYPES, BakeParams, BakeRefusal, params_from_card
 from app.settings import Settings, secret_text
+
+log = logging.getLogger("shift_spectrum")
 
 # Bump when a rule in this module changes (prompt, hillshade, check, seam fix): it is part of the
 # cache key and of gemini.json, so an old repaint is not reused under new rules.
@@ -86,6 +90,14 @@ HILLSHADE_AZIMUTH_DEG = 315.0
 HILLSHADE_ALTITUDE_DEG = 45.0
 # ASSUMPTION: refuse decoded images above this many pixels (decompression-bomb guard).
 MAX_IMAGE_PIXELS = 4096 * 4096
+# HTTP statuses that mean the request was turned away before any work, so a retry cannot bill
+# twice: 429 (rate limit) and 503 (overloaded). 500, 502 and 504 may come after Google
+# generated (and billed) the image, so they are not retried (unlike app.adapters.http).
+GEMINI_RETRY_STATUS = frozenset({429, 503})
+# Lock stripes for one-repaint-per-object (bounded, see GeminiPainter).
+LOCK_STRIPES = 64
+# status(): at most this many memoised AI file hashes.
+HASH_MEMO_MAX = 1024
 # ASSUMPTION: refuse a reply body above this many bytes (a base64 2048x1024 image is a few MB).
 MAX_REPLY_BYTES = 32 * 1024 * 1024
 
@@ -289,8 +301,12 @@ class GeminiRestClient:
     [verify] R12 #3: the URL pattern ``{base}/models/{model}:generateContent``, the
     ``x-goog-api-key`` header, the request body (text + ``inline_data`` image part,
     ``generationConfig.responseModalities``, ``imageConfig.aspectRatio``) and the response
-    shape (``candidates[].content.parts[].inlineData``) are not in the specs and have not been
-    checked against the Gemini docs. Only this class depends on them.
+    shape (``candidates[].content.parts[].inlineData``) are not in the specs. Checked against
+    docs only on 9 Nov 2026: Google's image-generation page now shows the newer Interactions
+    endpoint (``/v1beta/interactions``), and this ``generateContent`` shape appears in Firebase's
+    ``ImageConfig`` reference and third-party docs. No live call has been made yet (needs a
+    key), so the marker stays until one has. Only this class depends on them; a failure is
+    logged as a warning naming the model (see ``GeminiPainter._call``).
     """
 
     def __init__(
@@ -382,7 +398,7 @@ class GeminiRestClient:
                         last = GeminiError(
                             f"gemini_http_{resp.status_code}", "the API refused the call"
                         )
-                        retry = resp.status_code in RETRY_STATUS
+                        retry = resp.status_code in GEMINI_RETRY_STATUS
                 except (httpx.ConnectTimeout, httpx.PoolTimeout) as exc:
                     # The request never left: capped at the connect timeout, so retry.
                     last = GeminiError(
@@ -522,8 +538,9 @@ class PaintOutcome:
             "missing": self.missing,
             "cached_at": self.fetched_at,
             "from_cache": self.from_cache,
-            # Q-122: a process check on the AI image, not a value about the object, so it has
-            # no provenance tag (the D-02 / D-32 tags describe the object).
+            # Q-122 item 7 records this as the one exception to "provenance on everything": a
+            # process check on the AI image, not a value about the object, so it has no D-02 /
+            # D-32 tag (those describe the object) and is kept out of ``provenance``.
             "checks": {
                 "edge_correlation": {
                     "kind": "process_check",
@@ -594,12 +611,18 @@ class GeminiPainter:
         self.height = height
         self._clock = clock
         # One repaint per object at a time (call, then image, meta and pointer writes), so two
-        # concurrent refreshes cannot interleave their writes. Different objects run in
-        # parallel. These are the painter's own locks: a slow call never holds a cache stripe.
-        self._locks: dict[str, threading.Lock] = {}
-        self._locks_guard = threading.Lock()
+        # concurrent refreshes cannot interleave their writes. A fixed stripe of locks keyed by
+        # the id's hash: bounded memory, and different objects usually run in parallel. These
+        # are the painter's own locks: a slow call never holds a cache stripe.
+        self._locks = tuple(threading.Lock() for _ in range(LOCK_STRIPES))
         # Per-object time of the last live call, for SX_GEMINI_COOLDOWN_S (cost control).
+        # Entries older than the cooldown are dropped on each new call, so it stays small.
         self._last_call: dict[str, float] = {}
+        self._last_call_guard = threading.Lock()
+        # status(): AI file (path, mtime_ns, size) -> SHA-256, so a JSON status poll does not
+        # read and hash the whole image each time. One entry per object, LRU-capped.
+        self._hashes: OrderedDict[str, tuple[int, int, str]] = OrderedDict()
+        self._hashes_guard = threading.Lock()
 
     @property
     def model(self) -> str:
@@ -610,8 +633,29 @@ class GeminiPainter:
         return self.settings.textures_ai_path
 
     def _lock_for(self, object_id: str) -> threading.Lock:
-        with self._locks_guard:
-            return self._locks.setdefault(object_id, threading.Lock())
+        digest = hashlib.sha256(object_id.encode("utf-8")).digest()
+        return self._locks[int.from_bytes(digest[:4], "big") % len(self._locks)]
+
+    def _file_sha256(self, path: Path) -> tuple[str, bytes | None]:
+        """SHA-256 of ``path``, memoised by (mtime_ns, size). Raises ``OSError``.
+
+        Returns the bytes too when they had to be read (a changed or unseen file).
+        """
+        st = path.stat()
+        name = str(path)
+        with self._hashes_guard:
+            hit = self._hashes.get(name)
+            if hit is not None and hit[:2] == (st.st_mtime_ns, st.st_size):
+                self._hashes.move_to_end(name)
+                return hit[2], None
+        data = path.read_bytes()
+        sha = hashlib.sha256(data).hexdigest()
+        with self._hashes_guard:
+            self._hashes[name] = (st.st_mtime_ns, st.st_size, sha)
+            self._hashes.move_to_end(name)
+            while len(self._hashes) > HASH_MEMO_MAX:
+                self._hashes.popitem(last=False)
+        return sha, data
 
     def refuse(self, object_id: str, reason: str, detail: str, **kw: Any) -> PaintOutcome:
         """The code-path outcome (``status: code``) with ``reason``. Never raises."""
@@ -670,11 +714,20 @@ class GeminiPainter:
 
     def _cooling(self, object_id: str) -> float:
         """Seconds before another live call for this object is allowed (0 = allowed now)."""
-        last = self._last_call.get(object_id)
+        with self._last_call_guard:
+            last = self._last_call.get(object_id)
         cooldown = self.settings.gemini_cooldown_s
         if last is None or cooldown <= 0:
             return 0.0
         return max(0.0, last + cooldown - self._clock())
+
+    def _note_call(self, object_id: str) -> None:
+        now = self._clock()
+        cutoff = now - max(0.0, self.settings.gemini_cooldown_s)
+        with self._last_call_guard:
+            for oid in [k for k, t in self._last_call.items() if t <= cutoff]:
+                del self._last_call[oid]
+            self._last_call[object_id] = now
 
     def _call(
         self, object_id: str, prompt: str, reference: bytes, shade: F64, key: CacheKey, out: Path
@@ -682,14 +735,27 @@ class GeminiPainter:
         """One live Gemini call. The image is checked first and cached only if it passes."""
         client = self.client
         assert client is not None
-        self._last_call[object_id] = self._clock()
+        self._note_call(object_id)
         try:
             img = client.generate(prompt, reference)
         except GeminiError as exc:
+            # [verify] R12 #3: a wrong model name or REST shape shows up here (404, 400, no
+            # image), so it is logged loudly rather than only returned to the admin.
+            log.warning(
+                "Gemini repaint of %s failed: %s (%s); model %s, check SX_GEMINI_MODEL and the "
+                "REST shape if this repeats",
+                object_id,
+                exc.reason,
+                exc.detail,
+                client.model,
+            )
             return self.refuse(object_id, exc.reason, exc.detail, code_dir=out)
         except NetworkDisabled:
             return self.refuse(object_id, "offline", "network disabled", code_dir=out)
-        except Exception as exc:  # any other failed call keeps the code colour
+        except Exception as exc:
+            # Never blank: a bug in the client still keeps the code colour, but with the
+            # traceback in the log so it is not mistaken for an outage.
+            log.exception("unexpected error in the Gemini client for %s", object_id)
             return self.refuse(object_id, "gemini_unavailable", type(exc).__name__, code_dir=out)
         checked = self._check(img.data, shade)
         if isinstance(checked, _Reject):  # not cached: the next call asks Gemini again
@@ -732,6 +798,16 @@ class GeminiPainter:
         p = self._params(object_id, card, t.seed)
         if isinstance(p, PaintOutcome):
             return p
+        # Cheap refusals first: they need no bake and no disk work. The viewer's code maps are
+        # baked by the object job (TextureBaker) whatever happens here.
+        if self._offline_blocked():
+            return self.refuse(
+                object_id, "offline", "SX_OFFLINE=1, the Gemini layer is off (D-24, Q-29)"
+            )
+        if refresh and self.settings.offline:
+            return self.refuse(object_id, "offline", "a refresh needs the network (SX_OFFLINE=1)")
+        if refresh and self.client is None:
+            return self.refuse(object_id, "gemini_key_missing", "no Gemini key on the server")
         root = self.settings.textures_path
         # Code path first: the deterministic maps are on disk before Gemini is asked.
         try:
@@ -740,22 +816,6 @@ class GeminiPainter:
             h = raw.astype(np.float64).reshape(self.height, self.width)
         except (OSError, ValueError) as exc:  # ValueError: a truncated height.bin
             return self.refuse(object_id, "bake_failed", type(exc).__name__)
-        # Cheap refusals before the hillshade.
-        if self._offline_blocked():
-            return self.refuse(
-                object_id,
-                "offline",
-                "SX_OFFLINE=1, the Gemini layer is off (D-24, Q-29)",
-                code_dir=out,
-            )
-        if refresh and self.settings.offline:
-            return self.refuse(
-                object_id, "offline", "a refresh needs the network (SX_OFFLINE=1)", code_dir=out
-            )
-        if refresh and self.client is None:
-            return self.refuse(
-                object_id, "gemini_key_missing", "no Gemini key on the server", code_dir=out
-            )
         try:
             shade = hillshade(h, p.radius_m)
         except ValueError as exc:
@@ -822,7 +882,12 @@ class GeminiPainter:
             assert entry is not None
             checked = self._check(entry.body, shade)
             if isinstance(checked, _Reject):
-                self.cache.delete(key)  # never keep an entry that fails the checks
+                try:
+                    self.cache.delete(key)  # never keep an entry that fails the checks
+                except OSError:
+                    # e.g. Windows: the body is open in another reader. Still refused; the
+                    # next call checks (and tries to delete) it again.
+                    log.warning("could not delete a failing Gemini cache entry", exc_info=True)
                 return self._reject(object_id, checked, out)
             rgb, corr = checked
         raw_at = entry.meta.get("fetched_at")
@@ -878,7 +943,11 @@ class GeminiPainter:
         )
 
     def status(
-        self, object_id: str, render_params: Mapping[str, Any] | None = None
+        self,
+        object_id: str,
+        render_params: Mapping[str, Any] | None = None,
+        *,
+        with_bytes: bool = False,
     ) -> PaintOutcome:
         """What the viewer should show now: no card build, no bake, no Gemini call.
 
@@ -887,6 +956,10 @@ class GeminiPainter:
         ``gemini.json`` name that bake (generator version, baker rules, seed, size) and the
         code ``bake.json`` still has the key the image was checked against. Anything else is
         ``stale`` (code colour), so an AI albedo never lies over a relief it was not checked on.
+
+        ``with_bytes`` (the image route): read the image and hash those exact bytes, which are
+        returned in ``ai_bytes``. Without it (the JSON route) the hash is memoised by the
+        file's mtime and size, so a status poll does not re-read the image.
         """
         try:
             ptr = json.loads(self._pointer(object_id).read_text(encoding="utf-8"))
@@ -915,7 +988,12 @@ class GeminiPainter:
         try:
             bake_meta = json.loads((code_out / META).read_text(encoding="utf-8"))
             meta = json.loads((ai_dir / AI_META).read_text(encoding="utf-8"))
-            data = (ai_dir / AI_FILE).read_bytes()
+            data: bytes | None = None  # the JSON route never sends the bytes
+            if with_bytes:
+                data = (ai_dir / AI_FILE).read_bytes()
+                sha = hashlib.sha256(data).hexdigest()
+            else:
+                sha, _ = self._file_sha256(ai_dir / AI_FILE)
         except (OSError, ValueError):
             return self.refuse(object_id, "stale", "the AI albedo or its bake is gone")
         valid = (
@@ -924,7 +1002,7 @@ class GeminiPainter:
             and all(meta.get(k) == v for k, v in expected.items())
             and bake_meta.get("key") == ptr.get("bake_key")
             and meta.get("bake_key") == ptr.get("bake_key")
-            and meta.get("albedo_sha256") == hashlib.sha256(data).hexdigest()
+            and meta.get("albedo_sha256") == sha
         )
         if not valid:
             return self.refuse(object_id, "stale", "the AI albedo is from another bake")

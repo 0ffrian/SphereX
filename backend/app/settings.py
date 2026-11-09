@@ -134,12 +134,14 @@ class Settings(BaseSettings):
     # Gemini artistic layer (D-07, R6.6, A6.2). The key stays server-side: SecretStr, never
     # returned or logged. Unset = the layer is off and the code colour shows.
     gemini_api_key: SecretStr | None = None
-    # [verify] R12 #3: model name from R6.6, not yet confirmed against the Gemini docs.
+    # [verify] R12 #3: model name from R6.6. Listed as the primary image model on Google's
+    # image-generation docs page (checked 9 Nov 2026); not yet confirmed by a live call.
     gemini_model: str = "gemini-nano-banana-2.1"
-    # [verify] R12 #3 / A3: REST base URL and request shape are not in the specs.
+    # [verify] R12 #3 / A3: REST base URL and request shape are not in the specs (see
+    # GeminiRestClient for what was checked against the docs).
     gemini_api_url: str = "https://generativelanguage.googleapis.com/v1beta"
-    # [verify] R12 #3: supported aspect ratios unknown. Empty = ask for none; the output is
-    # resampled to 2:1 (R6.6 step 3) whatever comes back.
+    # [verify] R12 #3: the docs name 1:1, 5:4, 16:9, 1:4, 4:1, 1:8 and 8:1 but not 2:1.
+    # Empty = ask for none; the output is resampled to 2:1 (R6.6 step 3) whatever comes back.
     gemini_aspect_ratio: str = ""
     # ASSUMPTION: A6.2 says "a set time" but gives no number.
     gemini_timeout_s: float = 90.0

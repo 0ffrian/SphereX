@@ -53,14 +53,14 @@ sequenceDiagram
       alt not a baked type, or the bake is refused or fails (bad seed, truncated height.bin)
         GP-->>API: code, reason not_baked_type, bake_refused or bake_failed
       else baked type
+        alt SX_OFFLINE=1 and SX_GEMINI_OFFLINE_CACHE=0 (default, D-24, Q-29)
+          GP-->>API: code, reason offline (no bake, no disk work)
+        else refresh=true with SX_OFFLINE=1, or with no SX_GEMINI_API_KEY
+          GP-->>API: code, reason offline or gemini_key_missing (no bake)
+        end
         GP->>B: bake_to_cache (code path first, skipped if bake.json matches)
         B->>TC: Code maps on disk
         GP->>TC: Read height.bin
-        alt SX_OFFLINE=1 and SX_GEMINI_OFFLINE_CACHE=0 (default, D-24, Q-29)
-          GP-->>API: code, reason offline
-        else refresh=true with SX_OFFLINE=1, or with no SX_GEMINI_API_KEY
-          GP-->>API: code, reason offline or gemini_key_missing
-        end
         GP->>GP: Hillshade of the height map (no colour)
         alt hillshade flat
           GP-->>API: code, reason flat_height
@@ -75,7 +75,7 @@ sequenceDiagram
           else cache miss within SX_GEMINI_COOLDOWN_S of the last live call for this object
             GP-->>API: code, reason cooldown
           else cache miss, online (no cache stripe held)
-            GP->>GM: generateContent with hillshade PNG + prompt "Paint albedo only..." (model, aspect ratio and REST shape [verify]), streamed against the SX_GEMINI_TIMEOUT_S deadline and a 32 MiB cap, only connection failures retried
+            GP->>GM: generateContent with hillshade PNG + prompt "Paint albedo only..." (model, aspect ratio and REST shape [verify]), streamed against the SX_GEMINI_TIMEOUT_S deadline and a 32 MiB cap, only connection failures and HTTP 429 or 503 retried
             alt timeout, HTTP error, refusal or no image
               GM-->>GP: No usable image
               GP-->>API: code, "Failed, using code" + reason (gemini_timeout, gemini_reply_too_large, gemini_unreachable, gemini_http_n, gemini_refused, gemini_no_image, gemini_bad_response, gemini_unavailable)#59; a failed refresh is reported, the old entry is not served
