@@ -44,6 +44,7 @@ export function MarkerLayer({
             overflow="visible"
             data-testid="marker"
             data-catalog={m.catalog}
+            data-id={m.id}
             data-shape={style.shape}
             data-left={left}
             data-top={top}

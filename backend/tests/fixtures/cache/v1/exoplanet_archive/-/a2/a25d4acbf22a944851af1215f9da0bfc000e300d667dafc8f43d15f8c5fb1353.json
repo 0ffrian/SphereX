@@ -1,0 +1,15 @@
+{
+ "body_sha256": "5e9e9e4220af831c876fbcc6ef3777c08df18250d56b110f9fed15bd18682e9a",
+ "body_size": 1312,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-06T20:31:34.067Z",
+ "key": {
+  "query": {
+   "pl_name": "k2-18 b|k2-18b"
+  },
+  "release": "-",
+  "source": "exoplanet_archive"
+ },
+ "status": 200,
+ "url": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=SELECT+pl_name%2C+hostname%2C+pl_rade%2C+pl_radeerr1%2C+pl_radeerr2%2C+pl_radj%2C+pl_radjerr1%2C+pl_radjerr2%2C+pl_bmasse%2C+pl_bmasseerr1%2C+pl_bmasseerr2%2C+pl_bmassj%2C+pl_bmassprov%2C+pl_dens%2C+pl_eqt%2C+pl_orbsmax%2C+pl_orbper%2C+pl_orbeccen%2C+st_teff%2C+st_rad%2C+st_mass%2C+sy_dist%2C+pl_rade_reflink%2C+pl_radj_reflink%2C+pl_bmasse_reflink%2C+pl_eqt_reflink%2C+pl_orbsmax_reflink+FROM+pscomppars+WHERE+lower%28pl_name%29+IN+%28%27k2-18+b%27%2C+%27k2-18b%27%29&format=json"
+}

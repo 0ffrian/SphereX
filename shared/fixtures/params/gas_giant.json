@@ -8,6 +8,7 @@
     {
       "id": "surface",
       "tag": "artistic",
+      "tier": 5,
       "description": "Browser shader surface and shared CPU field (R7.7). Nothing about it is measured.",
       "requires": []
     }
@@ -43,6 +44,31 @@
     "data_tag": "measured",
     "params": {
       "maxRateHz": 12.0
+    }
+  },
+  "dynamics": {
+    "spin_period_h": {
+      "value": 10.0,
+      "tag": "inferred_from_analog",
+      "tier": 4,
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "diff_rotation": {
+      "value": 0.05,
+      "tag": "inferred_from_analog",
+      "tier": 4,
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "jet_speed_ms": {
+      "value": 100.0,
+      "tag": "inferred_from_analog",
+      "tier": 4,
+      "source": "synthetic fixture: not a real measurement"
+    },
+    "speedup": {
+      "spin": 3600,
+      "winds": 3600,
+      "clouds": 3600
     }
   },
   "alt_text": "Synthetic fixture. Gas giant, 1 Jupiter radius (measured), artist's colour, lit by its star. Surface relief: illustrative.",

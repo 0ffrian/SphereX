@@ -55,7 +55,12 @@ export function overlayView(state: OverlaysState, frameId: string): OverlayView 
     wise: tagged('wise', t.wise && available('wise')),
     flags: tagged('flags', t.flags) && !data.missing.includes(`flags_mask:${frameId}`),
     fov: tagged('fov', t.fov),
-    contamination: tagged('contamination', (frame?.contamination.length ?? 0) > 0),
+    // Any frame, not only this one: the note keeps its space on frames without contamination,
+    // so stepping through the frames does not move the layout (R9; ContaminationNote).
+    contamination: tagged(
+      'contamination',
+      data.frames.some((f) => f.contamination.length > 0),
+    ),
   };
   return {
     data,

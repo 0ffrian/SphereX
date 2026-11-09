@@ -49,11 +49,41 @@ class Settings(BaseSettings):
     # Q-20: the PSF extension (about 5 MB per cutout) is not cached by default.
     cutout_keep_psf: bool = False
 
+    # Issue #41 fan-out. Live cutout downloads run in one pool shared by every object, at most
+    # this many at a time: the pre-fetch's default concurrency. [verify] the polite limit with
+    # IRSA (A3.1); 1 restores one-at-a-time downloads.
+    cutout_concurrency: int = 6
+    # Photometry worker processes (A4.2). 0 measures in the calling thread (tests, debugging).
+    # ASSUMPTION: 2 leaves cores for the API and the texture bake on the A15 (D-24; its core
+    # count is [verify]).
+    measure_workers: int = 2
+    # Texture bake worker processes (R6.7). 0 bakes in one background thread.
+    bake_workers: int = 1
+    # Bake the textures a reply points at, off the request path. Off: they are baked by
+    # `python -m app.core.render` only.
+    bake_textures: bool = True
+    # How long /card and /render-params wait for the refined answer before they return the
+    # first-stage answer (catalogue data, SPHEREx layers listed as `measuring:`). Engineering
+    # value, not a physical one. Offline (D-25) there is no first stage: the reply waits.
+    first_answer_wait_s: float = 2.0
+    # A finished object job is reused for this long, so the card and render-params requests of
+    # one page load share one run. After that a new run picks up what changed meanwhile.
+    job_ttl_s: float = 600.0
+    # At most this many object jobs download all their frames at once (the long part, after
+    # the first batch); the others wait in stage `queued` with their partial answer out.
+    # ASSUMPTION: 4 covers a demo with a few phones; 0 means no cap.
+    max_jobs: int = 4
+    # D-25 warm cache: at start-up, run the object job for every target in these groups of
+    # targets.toml in the background (comma-separated). Off by default: it reaches the network.
+    prefetch_on_start: bool = False
+    prefetch_groups: str = "demo"
+
     # Comma-separated, tried in order. The CDS host was unreachable from the dev machine.
     simbad_tap_urls: str = (
         "https://simbad.cds.unistra.fr/simbad/sim-tap/sync,"
         "https://simbad.harvard.edu/simbad/sim-tap/sync"
     )
+    exoplanet_tap_url: str = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"  # A3.8
     sbdb_url: str = "https://ssd-api.jpl.nasa.gov/sbdb.api"
     horizons_url: str = "https://ssd.jpl.nasa.gov/api/horizons.api"
     skybot_url: str = "https://ssp.imcce.fr/webservices/skybot/api/conesearch.php"
@@ -87,30 +117,46 @@ class Settings(BaseSettings):
     # covers every frame time in the cached QR2 SIA answers (2025-04-24 to 2026-05-14).
     moving_window_start: str = "2025-04-01T00:00:00Z"
     moving_window_end: str = "2026-06-01T00:00:00Z"
-    # [verify] Horizons sampling for the path (cone placement and the footprint check only;
-    # Stage 1 pixels use exact SPHEREx-centred positions at each frame midpoint).
-    moving_ephem_step_min: int = Field(default=60, gt=0)
+    # A target in targets.toml may list its own `moving_windows`, which replace this window.
+    # [verify] Horizons sampling for the path (cone placement and the candidate footprint check
+    # only; Stage 1 pixels use exact SPHEREx-centred positions at each frame midpoint). Well
+    # under the ~95 min SPHEREx orbit, so the parallax wobble is sampled, not aliased (PR #53).
+    moving_ephem_step_min: int = Field(default=10, gt=0)
     # [verify] Cone radius R (astro-verifier example: 0.1 deg). Larger cones timed out (A3.1).
     moving_cone_radius_deg: float = Field(default=0.1, gt=0)
     # [verify] Clamp for the rate-derived step between cones, in hours.
     moving_min_step_h: float = Field(default=1.0, gt=0)
     moving_max_step_h: float = Field(default=24.0, gt=0)
-    # [verify] Cap on cones per object; past it `frames:truncated` is reported, never dropped.
+    # [verify] Cap on cones per object; past it the cones are spread evenly over the path and
+    # `frames:cone_cap:<n>` is reported, never dropped silently.
     moving_max_cones: int = Field(default=450, gt=0)
     # [verify] MAXREC per cone: every frame over that spot in the whole release comes back.
     moving_sia_maxrec: int = Field(default=500, gt=0)
     # [verify] Seconds between two live SIA cones. 0 = sequential requests only (the HTTP client
     # already retries with exponential backoff); no published IRSA limit.
     moving_cone_pace_s: float = Field(default=0.0, ge=0)
-    # ASSUMPTION: live cones per web request; the rest are `cones:deferred:<n>`. The pre-fetch
-    # has no cap (like SX_LIVE_CUTOUTS_PER_REQUEST).
-    moving_live_cones_per_request: int = Field(default=4, ge=0)
+    # ASSUMPTION: a frame is a candidate when the interpolated path is inside its footprint or
+    # within this margin of its edge (the interpolation error, a few arcsec at a 10 min step);
+    # the exact Horizons position at the frame time then decides.
+    moving_footprint_margin_arcsec: float = Field(default=60.0, ge=0)
 
     cors_origins: str = ""
     # A5.4 pre-baked assets: `<assets_dir>/<type>/<id>.json`, read only (stage 4).
     # ASSUMPTION: A5.4 says "assets/<type>/<id>.json" in the repo; the backend's copy lives here.
     assets_dir: Path = BACKEND_DIR / "assets"
     targets_file: Path = BACKEND_DIR / "targets.toml"
+    # A3.7 / Q-61: shape-model GLBs and `registry.toml`, written by scripts/ingest_shape.py.
+    shapes_dir: Path = BACKEND_DIR / "assets" / "shapes"
+    # R6.7 baked textures, served at /data/textures. Outside git, next to the D-25 cache.
+    textures_dir: Path | None = None
+
+    @property
+    def textures_path(self) -> Path:
+        return self.textures_dir or (self.cache_dir / "textures")
+
+    @property
+    def prefetch_group_list(self) -> list[str]:
+        return [g.strip() for g in self.prefetch_groups.split(",") if g.strip()]
 
     @property
     def simbad_urls(self) -> list[str]:

@@ -14,7 +14,7 @@
 | SPHEREx saturates on bright targets | Barnard's Star and R Dra get no measured point and RW Aur only 15 points at 0.74–1.09 µm; the rest are refused | Keep the saturated frames as honest refusals; the flipbook still works. Show the spectrum on demo objects fainter than the saturation limit, checked on the full pre-fetched cache (D-31, A3.1). |
 | Frames on 3I/ATLAS dates unchecked | The headline comet may have no data | Check early. Keep a known asteroid as fallback. Checked 7 Nov 2026: 3I/ATLAS has QR2 frames on 2025-08-01 to 08-16 and 2025-12-08 to 12-15 (A3.1); 433 Eros is the recorded fallback (A4.1). |
 | NEOWISE access unconfirmed | Diameter and albedo | Use JPL values. |
-| Exoplanet Archive untested | Planet cards | Test first. |
+| Exoplanet Archive thresholds unverified | Planet cards | Adapter tested live 2026-11-07 (Q-63). The radius, mass and Zeng 2019 cut-offs stay **[verify]** until Atish confirms (Q-56). |
 | SIMBAD untested | Star and brown dwarf types | Test first. Resolver order: SBDB first for small-body names, SIMBAD first for the rest (D-19). |
 | CORS to science services unknown | Browser may be blocked | Use a backend proxy. |
 | Gemini model name may change | Code would break | Read it from config. Confirm before coding. |

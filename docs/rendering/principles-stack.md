@@ -17,7 +17,7 @@
   - the haptic engine and per-type haptic mappings
   - spectrum haptics
   - audio pairing: every haptic event also plays as sound ([§8.9](haptics/audio-pairing.md#r89-audio-pairing-d-10), D-10)
-  - haptics for the shader-generated kinds: gas giants, planets, nebulae and novae ([§7.7](renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova), [§8.4](haptics/sources.md#r84-event-sources), [§8.5](haptics/profiles.md#r85-per-type-haptic-profile); D-12)
+  - haptics for the shader-generated kinds: gas giants and planets (nebulae and novae are drawn as volumes and have none, Q-103) ([§7.7](renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova), [§8.4](haptics/sources.md#r84-event-sources), [§8.5](haptics/profiles.md#r85-per-type-haptic-profile); D-12)
   - the honesty layers
 - Out of scope (covered elsewhere): the SPHEREx data pipeline, the flipbook, and spectrum extraction. This document consumes their outputs.
 - The *look* of the shader-generated kinds is specified in [architecture spec §6](../architecture/README.md), not here (D-01).
@@ -42,7 +42,7 @@
    - `model_dependent`: needs an assumption, which is stated
    - `inferred_from_analog`: chosen by similarity to a known body
    - `artistic`: decorative and unconstrained by data
-3. **Refuse rather than invent.** If a required field is missing, that layer is not drawn. The UI says "not enough data for X".
+3. **Fall back a tier, don't invent (D-32).** When a layer or motion rate lacks its measured input, it falls to the next tier (formula, formula with a stated typical input, typical for its kind, art) and its tag says which tier answered. It is refused (not drawn, listed in `missing`, the UI says "not enough data for X") only when no tier can answer, and always for physical size and for ObjectCard values.
 4. **Whole-body honesty.** SPHEREx spectra are disc-integrated averages. They can set global surface properties, never spatial patterns.
 5. **Determinism.** The same ObjectCard plus the same seed must give byte-identical textures. Seed = hash of (object id + generator version).
 6. **One height map drives everything.** The same height field feeds the normal map, the displacement, the haptics and the surface sound. They must never disagree.

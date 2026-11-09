@@ -8,9 +8,10 @@ Run while the internet is good, then serve with ``SX_OFFLINE=1``:
 
 Resumable: entries already cached are skipped. Exit code 1 if any target is incomplete.
 
-Moving objects (issue #26): one Horizons ephemeris over ``SX_MOVING_WINDOW_START`` to
-``SX_MOVING_WINDOW_END``, then one SIA cone every ``SX_MOVING_CONE_STEP_H`` along the path (at
-most ``SX_MOVING_MAX_CONES``, spaced by ``SX_MOVING_CONE_PACE_S``), then the cutouts.
+Moving objects (issue #26): one Horizons ephemeris over the target's ``moving_windows`` (or
+``SX_MOVING_WINDOW_START`` to ``SX_MOVING_WINDOW_END``), then SIA cones along the path, the step
+``R / rate`` clamped to ``SX_MOVING_MIN_STEP_H``..``SX_MOVING_MAX_STEP_H`` (at most
+``SX_MOVING_MAX_CONES``, spaced by ``SX_MOVING_CONE_PACE_S``), then the cutouts.
 
 Catalogue overlays (issue #12): one Gaia DR3 and one CatWISE2020 cone per fixed target. A
 failed cone is reported (``overlays: FAILED``) but does not make the target incomplete or change
@@ -27,10 +28,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.adapters import irsa_cutout, irsa_sia, skybot
+from app.adapters import exoplanet_archive, horizons, irsa_cutout, irsa_sia, simbad, skybot
 from app.adapters.http import UpstreamError
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context, make_context
+from app.core.classify.rules import SIMBAD_PLANET
+from app.core.composite.service import CompositeService
 from app.core.find.frames import FrameService, frame_time, is_complete, position_at
 from app.core.find.overlays import CATALOGS, fetch_catalog, overlay_cone
 from app.core.find.resolver import ResolvedObject, load_aliases, resolve
@@ -48,6 +51,7 @@ class Report:
     cutout_failures: int = 0
     missing: list[str] = field(default_factory=list)
     error: str = ""
+    composite: str = "-"
     overlays: dict[str, str] = field(default_factory=dict)  # catalog -> "N sources" or error
     frames_skipped: bool = False
 
@@ -121,6 +125,22 @@ def prefetch_target(
     rep.object_id = obj.id
     print(f"  resolved {target['name']!r} -> {obj.id} ({obj.ra:.5f}, {obj.dec:+.5f})", flush=True)
 
+    simbad_name = obj.query or obj.name
+    if obj.resolver == "simbad" and simbad_name:
+        # A3.8: a SIMBAD planet (otype Pl) also needs its Exoplanet Archive row for the card.
+        try:
+            hit, _ = simbad.query(ctx, simbad_name)
+            if hit is not None and hit.otype in SIMBAD_PLANET:
+                row, _ = exoplanet_archive.query(
+                    ctx, (simbad_name, hit.main_id), refresh=args.refresh
+                )
+                print(f"  Exoplanet Archive: {'row ' + row['pl_name'] if row else 'no row'}")
+        except (CacheMissOffline, UpstreamUnavailable) as exc:
+            rep.error = f"Exoplanet Archive failed: {exc}"
+            return rep
+    if str(target.get("frames", True)).lower() == "false":
+        return rep  # `frames = false` in targets.toml: catalogue answers only (small fixtures)
+
     if obj.moving:
         # Record the neighbours in the field at the resolve epoch (A4.1 step 2, SkyBoT).
         when = parse_utc(ctx.settings.ephemeris_epoch)
@@ -135,11 +155,21 @@ def prefetch_target(
             # Movers have no catalogue cones (Q-50); skip the path search and its cutouts.
             rep.frames_skipped = True
             return rep
+        # Phase angle and Sun vector for the card (Q-62); the same two cached Horizons calls.
+        # Optional, like in the app: a failure is reported but the frames are still fetched.
+        if obj.spkid:
+            try:
+                geom, _ = horizons.geometry(ctx, obj.spkid, when, refresh=args.refresh)
+                print(f"  Horizons: phase {geom.phase_angle_deg:.2f} deg ({geom.observer})")
+            except (CacheMissOffline, UpstreamUnavailable) as exc:
+                print(f"  Horizons geometry failed (card lighting refused): {exc}", flush=True)
         # Issue #26: the path search (Horizons over the window, SIA cones along the path,
         # paced by SX_MOVING_CONE_PACE_S), then the cutouts, with no live caps.
-        result = FrameService(ctx).get_frames(
-            obj, refresh=args.refresh, rebuild=True, unlimited_live=True
-        )
+        fs = FrameService(ctx)
+        try:
+            result = fs.get_frames(obj, refresh=args.refresh, rebuild=True, unlimited_live=True)
+        finally:
+            fs.close()
         rep.frames, rep.missing = len(result.frames), result.missing
         print(f"  path search: {rep.frames} frames, missing={result.missing[:5]}", flush=True)
         return rep
@@ -191,8 +221,19 @@ def prefetch_target(
                 print(f"    cutouts {done}/{len(futures)}", flush=True)
 
     # Rebuild from the cache just filled (never the stored list), with no live-download cap.
-    result = FrameService(ctx).get_frames(obj, rebuild=True, unlimited_live=True)
-    rep.frames, rep.missing = len(result.frames), result.missing
+    service = FrameService(ctx)
+    try:
+        result = service.get_frames(obj, rebuild=True, unlimited_live=True)
+        rep.frames, rep.missing = len(result.frames), result.missing
+        # The false-colour composite (and the Stage 2 spectrum it reads) from the same frame
+        # list, so both are in the derived cache for SX_OFFLINE=1. A refusal is an answer.
+        comp = CompositeService(service).get(obj, use_memo=True)
+    finally:
+        service.close()  # issue #41: each FrameService owns a download pool
+    # The composite's own reasons first; a refusal for a cutout (cutout:<id>, ...) has none.
+    refusals = [m for m in comp.body["missing"] if m.startswith("composite:")]
+    why = ",".join((refusals or comp.body["missing"])[:4]) or "-"
+    rep.composite = "built" if comp.png is not None else "refused " + why
     return rep
 
 
@@ -238,6 +279,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"  {status} {r.name:<16} id={r.object_id or '-'} frames={r.frames} rows={r.rows} "
             f"cutout_failures={r.cutout_failures} missing={len(r.missing)} "
+            f"composite={r.composite} "
             f"{('error=' + r.error) if r.error else ''}"
         )
         if r.frames_skipped:
