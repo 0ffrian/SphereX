@@ -1,6 +1,6 @@
 # 02 Components
 
-The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12, D-15, D-16, D-18, D-19, D-20, D-22, D-25, D-28 and D-35 (sky-view prototype: Q-87 to Q-91; colour composite, colour views, progressive frames and cached markers: Q-92 to Q-95, Q-97 and Q-98), and A4.9 (overlays; on the frame grid: Q-102). Object jobs, the shared pools, the background bake and the warm cache follow Q-111 and Q-112 (issue #41).
+The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12, D-15, D-16, D-18, D-19, D-20, D-22, D-25, D-28 and D-35 (sky-view prototype: Q-87 to Q-91; colour composite, colour views, progressive frames and cached markers: Q-92 to Q-95, Q-97 and Q-98), and A4.9 (overlays; on the frame grid: Q-102). Object jobs, the shared pools, the background bake and the warm cache follow Q-111 and Q-112 (issue #41), and A6.2 (Gemini layer, Q-122).
 
 ## Diagram 1: system and backend
 
@@ -14,7 +14,7 @@ flowchart LR
   end
 
   subgraph BE["Backend (FastAPI on Python 3.12, D-15)"]
-    API["API (D-16): resolve, frames, cutouts, spectrum, card, render-params; overlays, flags PNG, combine PNG (A4.9, Q-50); job, job/events (beyond D-16, Q-111)"]
+    API["API (D-16): resolve, frames, cutouts, spectrum, card, render-params; overlays, flags PNG, combine PNG (A4.9, Q-50); job, job/events (beyond D-16, Q-111); admin gemini-repaint, albedo-ai, albedo-ai.webp (A6.2, Q-122)"]
     SkyAPI["/v1/sky router, api/sky.py (beyond D-16, Q-87; /v1/sky/cached, Q-98)"]
     CompAPI["api/composite.py: /v1/objects/{id}/composite, /composite.png (beyond D-16, Q-92)"]
     subgraph CompPkg["core/composite (prototype, no D-17 owner yet)"]
@@ -56,6 +56,7 @@ flowchart LR
       GemPaint["gemini_paint.py (P3, admin token)"]
     end
     TexCache[("/data/textures/{id}/{generator_version}/{seed}/")]
+    AiStore[("SX_TEXTURES_AI_DIR: albedo_ai.webp, gemini.json, pointers; not served as static files (Q-122)")]
     Prebaked[("backend/assets/{type}/{id}.json (SX_ASSETS_DIR), pre-baked assets")]
   end
 
@@ -131,7 +132,8 @@ flowchart LR
   C2P -->|"RenderParams"| API
   C2P -->|"baked types only (D-01)"| Baker
   Baker -->|"write maps"| TexCache
-  GemPaint -->|"AI albedo if corr >= 0.3"| TexCache
+  GemPaint -->|"reads height.bin, bake.json"| TexCache
+  GemPaint -->|"AI albedo if corr >= 0.3, stamped with the bake"| AiStore
 
   S1 & S2 & Catalogue & Ovl --> Adapters
   Adapters <--> DataCache
@@ -146,7 +148,9 @@ flowchart LR
   Adapters -->|"pscomppars by name, TAP sync"| Exo
   API -->|"GET /data/shapes/{name}.glb"| Shapes
   Shapes --> ShapeDir
-  GemPaint -->|"hillshade + prompt (server-side key)"| Gemini
+  API -->|"X-SX-Admin-Token (Q-122)"| GemPaint
+  GemPaint <--> DataCache
+  GemPaint -->|"hillshade + prompt (server-side key, through the cache)"| Gemini
 
   Validate -.->|"validates cards against"| CardSchema
   Validate -.->|"validates render params against"| RPSchema

@@ -12,7 +12,7 @@
 //   coordinate grid and says so; clicking still picks coordinates.
 // - No React re-render per pointer move: the readout and markers are written from refs.
 // - R9: keyboard pan/zoom on the canvas (arrows, +/−, R), Enter picks the centre, aria-label and a
-//   text alternative. No on-screen pan and zoom buttons (Q-122).
+//   text alternative. No on-screen pan and zoom buttons (Q-123).
 import {
   useEffect,
   useId,
@@ -668,7 +668,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_100%_at_50%_50%,transparent_55%,#000a_100%)]"
         aria-hidden="true"
       />
-      {/* Edges fade to dark where the header, rail and bars float over the sky (Q-123). */}
+      {/* Edges fade to dark where the header, rail and bars float over the sky (Q-124). */}
       <div className="sx-sky-shade pointer-events-none absolute inset-0" aria-hidden="true">
         <i />
         <i />
