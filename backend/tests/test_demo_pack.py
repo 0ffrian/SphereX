@@ -57,7 +57,7 @@ def test_every_search_row_has_a_committed_asset_that_passes_the_contract() -> No
         check_card(asset.card)
         check_params(asset.render_params)
         assert asset.card["id"] == asset.render_params["id"]
-        assert asset.created_at == bp.DATA_RELEASE_DATES["spherex_qr2"]
+        assert asset.created_at == bp.PACK_EPOCH
         # No frames and no spectrum in the pack (Q-164).
         assert "spectrum" in asset.render_params["missing"]
         assert asset.card.get("spectrum") is None
@@ -250,3 +250,81 @@ def test_api_answers_a_pack_row_as_saved(fixture_cache: Path) -> None:
         assert card.headers["X-SX-Asset-Status"] == params.headers["X-SX-Asset-Status"] == "saved"
         assert params.json()["textures"]["albedo"].startswith("/data/demo-textures/")
         assert c.get(params.json()["textures"]["albedo"]).status_code == 200
+
+
+# --- stale-pack guards (Q-167) ---------------------------------------------------------------
+
+
+def _copy_pack(tmp_path: Path) -> tuple[Path, Path]:
+    ts = tmp_path / "demoTargets.ts"
+    shutil.copy(bp.DEMO_TARGETS_TS, ts)
+    assets = tmp_path / "assets"
+    shutil.copytree(bp.ASSETS_DIR, assets)
+    return assets, ts
+
+
+def _edit_asset(assets: Path, ts_type: str, change: object) -> None:
+    path = next((assets / ts_type).glob("*.json"))
+    doc = json.loads(path.read_text("utf-8"))
+    change(doc)  # type: ignore[operator]
+    path.write_text(json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=False) + "\n", "utf-8")
+
+
+def test_every_committed_asset_carries_the_current_version_and_inputs_hash() -> None:
+    from app.core.card.assets import ASSET_VERSION
+
+    s = make_settings(Path("unused"))
+    for _, a in committed_assets():
+        assert a.asset_version == ASSET_VERSION
+        assert a.inputs_sha256 == bp.inputs_sha256(s)
+
+
+def test_check_fails_on_a_stale_asset_version_with_no_cache(tmp_path: Path) -> None:
+    assets, ts = _copy_pack(tmp_path)
+    _edit_asset(assets, "star", lambda d: d.update(asset_version="6"))
+    settings = make_settings(tmp_path / "empty-cache")
+    assert bp.main(["--check"], assets_dir=assets, ts_path=ts, settings=settings) == 1
+
+
+def test_check_fails_when_a_reviewed_input_changed(tmp_path: Path) -> None:
+    assets, ts = _copy_pack(tmp_path)
+    lit_file = tmp_path / "literature.toml"
+    lit_file.write_text(
+        bp.BACKEND_DIR.joinpath("assets/literature.toml").read_text("utf-8") + "\n#"
+    )
+    settings = make_settings(tmp_path / "empty-cache", literature_file=lit_file)
+    assert bp.inputs_sha256(settings) != bp.inputs_sha256(make_settings(tmp_path / "x"))
+    assert bp.main(["--check"], assets_dir=assets, ts_path=ts, settings=settings) == 1
+
+
+def test_check_fails_when_a_literature_field_of_the_card_drifted(tmp_path: Path) -> None:
+    assets, ts = _copy_pack(tmp_path)
+
+    def drift(d: dict) -> None:  # type: ignore[type-arg]
+        d["card"]["component_teff_K"]["value"] = [1.0, 2.0]
+
+    _edit_asset(assets, "brown_dwarf_binary", drift)
+    settings = make_settings(tmp_path / "empty-cache")
+    asset = Asset.from_json(
+        json.loads(next((assets / "brown_dwarf_binary").glob("*.json")).read_text("utf-8"))
+    )
+    assert asset is not None
+    assert any("component_teff_K" in m for m in bp.stale_inputs(asset, settings))
+    assert bp.main(["--check"], assets_dir=assets, ts_path=ts, settings=settings) == 1
+
+
+def test_store_refuses_a_pack_asset_of_another_version(
+    fixture_cache: Path, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    store, assets = _pack_store(tmp_path, fixture_cache)
+    path, asset = next((p, a) for p, a in committed_assets() if a.card["type"] == "star")
+    assert store.get(str(asset.card["id"])) is not None
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["asset_version"] = "1"
+    (assets / path.relative_to(bp.ASSETS_DIR)).write_text(json.dumps(doc), "utf-8")
+    with caplog.at_level(logging.WARNING, logger="shift_spectrum"):
+        assert store.get(str(asset.card["id"])) is None
+    assert any("stale pre-baked asset" in r.getMessage() for r in caplog.records)
+    del doc["asset_version"]  # an asset with no version at all is stale too
+    (assets / path.relative_to(bp.ASSETS_DIR)).write_text(json.dumps(doc), "utf-8")
+    assert store.get(str(asset.card["id"])) is None

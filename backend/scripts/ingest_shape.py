@@ -468,7 +468,7 @@ def ingest(args: argparse.Namespace) -> dict[str, Any]:
     if fmt == "auto":
         low = member.lower()
         fmt = "icq" if low.endswith(".tab") else "wrl" if low.endswith(".wrl") else "obj"
-    lod1_path = getattr(args, "lod1_input", None)
+    lod1_path: str | None = getattr(args, "lod1_input", None)
     lod1_data = Path(lod1_path).read_bytes() if lod1_path else None
     levels = build_levels(data, fmt == "icq", fmt=fmt, lod1_data=lod1_data)
     cite = f"{args.citation} DOI {args.doi}. Licence {args.licence}."
@@ -507,7 +507,7 @@ def ingest(args: argparse.Namespace) -> dict[str, Any]:
         "lod1_sha256": sha256(blobs[1]),
         "ingest_version": INGEST_VERSION,
     }
-    if lod1_data is not None:
+    if lod1_data is not None and lod1_path:
         # The second official product is hashed too, so both sources can be checked.
         entry["lod1_source_member"] = getattr(args, "lod1_member", "") or Path(lod1_path).name
         entry["lod1_source_sha256"] = sha256(lod1_data)

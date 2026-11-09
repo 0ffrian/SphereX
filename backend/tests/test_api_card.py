@@ -11,7 +11,7 @@ from urllib.parse import quote
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.card.assets import Asset, AssetStore
+from app.core.card.assets import ASSET_VERSION, Asset, AssetStore
 from app.core.card.service import ObjectPipeline
 from app.core.card.validate import errors
 from app.core.find.frames import FrameService
@@ -189,6 +189,7 @@ def fixture_asset(kind: str, object_id: str) -> dict[str, Any]:
         "generator_version": params["generator_version"],
         "seed": params["seed"],
         "created_at": "2026-11-06T00:00:00.000Z",
+        "asset_version": ASSET_VERSION,  # a pack asset of another version is refused (Q-167)
     }
 
 
