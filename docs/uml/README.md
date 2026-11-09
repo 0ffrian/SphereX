@@ -1,8 +1,8 @@
 # UML diagrams
 
-Architecture diagrams for **Shift & Spectrum**, written in Mermaid. They illustrate [decisions.md](../decisions.md), the [architecture spec](../architecture/README.md) (sections A…) and the [rendering & haptics spec](../rendering/README.md) (sections R…) as of 5 Nov 2026.
+Architecture diagrams for **Shift & Spectrum**, written in Mermaid. They illustrate [decisions/](../decisions/README.md), the [architecture spec](../architecture/README.md) (sections A…) and the [rendering & haptics spec](../rendering/README.md) (sections R…) as of 5 Nov 2026.
 
-> **The specs win.** If a diagram differs from a spec, the spec is right and the diagram is out of date. Precedence: `decisions.md`, then the rendering doc for its scope, then the architecture spec. Update the matching diagram in the same commit as any spec change.
+> **The specs win.** If a diagram differs from a spec, the spec is right and the diagram is out of date. Precedence: `decisions/`, then the rendering doc for its scope, then the architecture spec. Update the matching diagram in the same commit as any spec change.
 
 Mermaid renders natively on GitHub, and in VS Code with a Mermaid extension (for example "Markdown Preview Mermaid Support"). Items marked **[verify]** or pointing to an open Q- question are not settled in the specs.
 
@@ -36,5 +36,5 @@ Mermaid renders natively on GitHub, and in VS Code with a Mermaid extension (for
 ## Conventions
 
 - Dashed nodes or edges are post-event backlog items (B-01 to B-04) or stretch goals (P3). Class diagrams mark them with a stereotype such as `<<stub, B-01 post-event>>` instead, because Mermaid class diagrams cannot dash a single class.
-- Diagrams apply `decisions.md` where the specs still show older text: ObjectCard and RenderParams replace the settings file (D-02), three r187 (D-03), the union `ObjectType` (D-04), web-only haptics with quantised strength (D-08, D-09), audio paired on every platform (D-10) and the shared field for shader kinds (D-12).
+- Diagrams apply `decisions/` where the specs still show older text: ObjectCard and RenderParams replace the settings file (D-02), three r187 (D-03), the union `ObjectType` (D-04), web-only haptics with quantised strength (D-08, D-09), audio paired on every platform (D-10) and the shared field for shader kinds (D-12).
 - Each file has been checked with `@mermaid-js/mermaid-cli@11.4.2`.

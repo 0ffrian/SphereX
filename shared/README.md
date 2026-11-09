@@ -1,6 +1,6 @@
 # shared
 
-The data contract, shared by the backend and the frontend ([D-18](../docs/decisions.md#d-18-the-contract-is-generated-from-sharedschemas-answers-q-14)).
+The data contract, shared by the backend and the frontend ([D-18](../docs/decisions/contract.md#d-18-the-contract-is-generated-from-sharedschemas-answers-q-14)).
 
 ## Schemas
 
@@ -50,4 +50,4 @@ Tier and dynamics (D-32):
 - `assertTagged` checks card values only: a `DynamicsValue` is skipped, because its model_dependent rule is `assumed`, not `assumption`.
 - The live backend (stage 7) emits `tier`, `formula` and `assumed` on layers but no `dynamics` yet (stage 6, a later ticket); the field is optional.
 
-Tests: `backend/tests/test_contract_fixtures.py` and `frontend/src/contract/fixtures.test.ts`. Open contract questions: Q-33 to Q-42, Q-64 and Q-65 in the [decision log](../docs/decisions.md#open-questions). The frontend's own M1 fixtures stay in `frontend/fixtures/` (Q-30).
+Tests: `backend/tests/test_contract_fixtures.py` and `frontend/src/contract/fixtures.test.ts`. Open contract questions: Q-33 to Q-42, Q-64 and Q-65 in the [decision log](../docs/decisions/README.md). The frontend's own M1 fixtures stay in `frontend/fixtures/` (Q-30).

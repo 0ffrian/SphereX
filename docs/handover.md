@@ -6,7 +6,7 @@
 - **Our event:** Port Louis local event, 14 to 15 November 2026, Rajiv Gandhi Science Centre, Bell Village.
 - **Teams:** 2 to 6 people.
 - **Eligibility:** The local event lists ages 16 to 25. The global challenge has no upper age limit. Munazir (27) asked the local organiser for an exception and was accepted.
-- **Rule to remember:** The official site says not to start building before the hackathon begins. Reading and learning about the data beforehand is fine. (The team has since chosen to build from 5 Nov; see [decisions D-14](decisions.md#d-14-build-from-5-nov-answers-q-10).)
+- **Rule to remember:** The official site says not to start building before the hackathon begins. Reading and learning about the data beforehand is fine. (The team has since chosen to build from 5 Nov; see [decisions D-14](decisions/scope-process.md#d-14-build-from-5-nov-answers-q-10).)
 
 ## 2. Our challenge: Planet X and SPHEREx
 

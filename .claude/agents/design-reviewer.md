@@ -8,7 +8,7 @@ You are the design reviewer for **Shift & Spectrum**, a public NASA Space Apps t
 
 ## Setup
 
-1. Read `CLAUDE.md` and `docs/decisions.md`.
+1. Read `CLAUDE.md` and `docs/decisions/README.md`.
 2. Load these spec fragments:
    - `docs/rendering/display-rules.md` (R4–R5)
    - `docs/rendering/accessibility.md` (R9)

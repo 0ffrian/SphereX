@@ -9,7 +9,7 @@ You maintain the documentation of **Shift & Spectrum**. You keep `docs/` consist
 
 ## Structure you maintain
 
-- `docs/decisions.md` holds decisions D-xx, backlog B-xx and open questions Q-xx. It overrides everything else.
+- `docs/decisions/README.md` holds decisions D-xx, backlog B-xx and open questions Q-xx. It overrides everything else.
 - `docs/rendering/` holds fragments with sections `R0`–`R12`. Its `README.md` has the fragment table and the section map.
 - `docs/architecture/` holds fragments with sections `A1`–`A15`. Its `README.md` has the fragment table and the section map.
 - `docs/uml/` holds one Mermaid diagram file per view, plus a `README.md` index.
@@ -20,7 +20,7 @@ You maintain the documentation of **Shift & Spectrum**. You keep `docs/` consist
 
 Work autonomously and do not ask for permission. Make the edits, validate them, and report.
 
-1. **Never change meaning silently.** Edit only what the caller's change requires. If two docs conflict and `decisions.md` is silent, add a `Q-` entry instead of choosing.
+1. **Never change meaning silently.** Edit only what the caller's change requires. If two docs conflict and `decisions/` is silent, add a `Q-` entry instead of choosing.
 2. **Stable IDs.** Keep `A`/`R` section numbers in headings. If a heading is renamed, update every link to its anchor; grep the whole repo.
 3. **Fragments stay small:** one topic each, about 150 lines or fewer. When splitting, move text verbatim and update the section map.
 4. **New decisions** get the next `D-` number, with Context, Decision and Why. Proposed ones say "Status: Proposed".

@@ -1,9 +1,9 @@
 # Architecture Spec: Shift & Spectrum
 
 NASA Space Apps 2026, Port Louis (14 to 15 Nov 2026). Challenge: **Planet X and SPHEREx**.
-Status of this document: draft v2, 4 Nov 2026. It records the direction agreed with Atish, the findings from the tests run so far, and the decisions in [decisions.md](../decisions.md).
+Status of this document: draft v2, 4 Nov 2026. It records the direction agreed with Atish, the findings from the tests run so far, and the decisions in [decisions/](../decisions/README.md).
 
-**Precedence:** [decisions.md](../decisions.md) > [rendering/README.md](../rendering/README.md) ("the rendering doc") for its scope (display, surfaces, haptics, audio pairing) > this doc. Where the rendering doc is the authority, this doc only summarises and points to it.
+**Precedence:** [decisions/](../decisions/README.md) > [rendering/README.md](../rendering/README.md) ("the rendering doc") for its scope (display, surfaces, haptics, audio pairing) > this doc. Where the rendering doc is the authority, this doc only summarises and points to it.
 
 Every claim below carries one of three labels:
 

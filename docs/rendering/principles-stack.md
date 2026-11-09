@@ -1,6 +1,6 @@
 # Principles and pinned stack
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R0, R1, R2 · **Implements:** D-03, D-06, D-24 ([decisions](../decisions.md))
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R0, R1, R2 · **Implements:** D-03, D-06, D-24 ([decisions](../decisions/README.md))
 
 ## R0. How to use this document
 

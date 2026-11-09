@@ -1,6 +1,6 @@
 # Renderers: shader-generated kinds
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7.7 · **Implements:** D-01, D-04, D-12, D-21 ([decisions](../../decisions.md))
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7.7 · **Implements:** D-01, D-04, D-12, D-21 ([decisions](../../decisions/README.md))
 
 ### R7.7 Shader-generated kinds: `planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova`
 

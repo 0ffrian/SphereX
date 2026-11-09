@@ -1,6 +1,6 @@
 # Haptics: audio pairing
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.9 · **Implements:** D-10, D-12 ([decisions](../../decisions.md)) · **Read with:** [engine-api.md](engine-api.md)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.9 · **Implements:** D-10, D-12 ([decisions](../../decisions/README.md)) · **Read with:** [engine-api.md](engine-api.md)
 
 ### R8.9 Audio pairing (D-10)
 

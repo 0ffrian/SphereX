@@ -1,6 +1,6 @@
 # Renderers: asteroids
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7 (intro), R7.1, R7.2 · **Implements:** D-01 ([decisions](../../decisions.md)) · **Read with:** [surface-generation.md](../surface-generation.md)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7 (intro), R7.1, R7.2 · **Implements:** D-01 ([decisions](../../decisions/README.md)) · **Read with:** [surface-generation.md](../surface-generation.md)
 
 ## R7. Per-type rendering specs
 

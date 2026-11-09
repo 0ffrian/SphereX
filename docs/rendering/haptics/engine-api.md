@@ -1,6 +1,6 @@
 # Haptics: engine API
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.8 · **Implements:** D-08, D-09, D-10, D-20 ([decisions](../../decisions.md)) · **Read with:** [data-contract.md](../data-contract.md)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.8 · **Implements:** D-08, D-09, D-10, D-20 ([decisions](../../decisions/README.md)) · **Read with:** [data-contract.md](../data-contract.md)
 
 ### R8.8 Engine API
 

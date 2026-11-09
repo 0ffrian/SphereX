@@ -13,6 +13,6 @@ Sync the docs for: `$ARGUMENTS` (blank means a full consistency check). Don't as
    - every routing-table file exists
    - no stale file names remain
    - the diagrams in `docs/uml/` still match the class and type definitions in `docs/rendering/data-contract.md` and `docs/rendering/haptics/engine-api.md`
-   - `docs/decisions.md` has no orphaned `D-`/`Q-` references
+   - `docs/decisions/README.md` has no orphaned `D-`/`Q-` references
 2. If the change was in code, give the agent the diff (`git diff HEAD`) so it can find contract drift.
 3. Report the files changed, the decisions or questions added, the link-check count and problems, and the Mermaid validation result.
