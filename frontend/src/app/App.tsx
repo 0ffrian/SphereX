@@ -1,5 +1,5 @@
 // App shell in the mock-up's layout (mockup/spherex-ui.html): a full-viewport dark bezel with the
-// brand, fixture banner and RA/Dec readout on top, the tool rail on the left, the sky view as the
+// fixture banner and RA/Dec readout on top, the tool rail on the left, the sky view as the
 // main pane, the transport bar bottom left and the search pill bottom right. The active tool opens
 // a floating panel (object info, flipbook, spectrum) over the sky.
 //
@@ -106,15 +106,8 @@ export function App() {
       <div className="sx-screen">
         <div className="sx-bezel" data-split={split || undefined}>
           <header className="sx-top">
-            <div className="sx-brand">
-              <span className="sx-brand-mark" aria-hidden="true">
-                {Array.from({ length: 9 }, (_, i) => (
-                  <span key={i} />
-                ))}
-              </span>
-              <h1>Shift &amp; Spectrum</h1>
-              <small>SPHEREx sky</small>
-            </div>
+            {/* The page heading stays for assistive technology; the brand is not drawn (Q-123). */}
+            <h1 className="sr-only">Shift &amp; Spectrum</h1>
             <FixtureBanner />
             <Readout />
           </header>

@@ -126,7 +126,7 @@ test('orientation from inside: north up, east (higher RA) to the LEFT', async ({
   const b = await canvasBox(page);
   const cx = b.x + b.width / 2;
   const cy = b.y + b.height / 2;
-  const d = 80;
+  const d = 120;
   const [centre, left, right, up, down] = await pixels(page, [
     [cx, cy],
     [cx - d, cy],
@@ -248,6 +248,8 @@ test('keyboard: arrows pan, +/− zoom, Enter picks the centre; "/" focuses the 
   await expect(page.getByTestId('readout-dec')).toHaveText('+4.0000°');
   await page.keyboard.press('+');
   await expect(page.getByTestId('sky-readout')).toContainText('FOV 32°');
+  await page.keyboard.press('-');
+  await expect(page.getByTestId('sky-readout')).toContainText('FOV 40°');
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('search-input')).toHaveValue('104.000000,4.000000');
 

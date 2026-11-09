@@ -54,6 +54,18 @@ export function Island() {
     if (thinking) setTravels(true);
     else if (!panelTool) setTravels(false);
   }, [thinking, panelTool, setTravels]);
+  // While it thinks there is no panel to take an Escape, so the island takes it and leaves the tool
+  // (a key that was already handled, such as Escape in the search field, is left alone).
+  useEffect(() => {
+    if (!thinking) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (useShellStore.getState().tool === 'sky') return;
+      useShellStore.getState().closePanel();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [thinking]);
   const sentence = thinking ? thinkingSentence(sky) : null;
   const retry = thinking ? thinkingRetry(sky) : null;
   const seconds = useElapsedSeconds(thinking ? sky.startedAt : null);
@@ -158,7 +170,11 @@ export function Island() {
           {/* Moves only while it thinks (a progress indicator). At rest it is lit and still: WCAG
               2.2.2 (nothing that starts by itself and moves for over 5 s), and no repaint of the
               page every frame for a decoration (issue #66, Q-121). */}
-          <GridLoader {...LOADER_BASE} {...(thinking && !reduced ? THINKING_LOOK : IDLE_LOOK)} />
+          {/* smoothui's loader is an <output aria-label="Loading">, a live region: hidden here, because the
+              island is decorative at rest and "Thinking" below says it while it thinks. */}
+          <span aria-hidden="true" className="contents">
+            <GridLoader {...LOADER_BASE} {...(thinking && !reduced ? THINKING_LOOK : IDLE_LOOK)} />
+          </span>
           {thinking && (
             <div className="sx-orb-label" role="status">
               <b>Thinking</b>

@@ -172,3 +172,15 @@ test('phone width: no circle over the header text; Thinking shows over the sky, 
   await expect(page.getByTestId('object-panel')).toBeVisible({ timeout: 15_000 });
   await expect(island).toHaveAttribute('data-arrived', '');
 });
+
+test('Escape while it thinks leaves the tool; the loader is not announced', async ({ page }) => {
+  await slowFrames(page, 2000);
+  await page.goto('/');
+  // At rest the island says nothing to a screen reader (Q-121).
+  await expect(page.getByRole('status', { name: 'Loading' })).toHaveCount(0);
+  await search(page, 'Epsilon Indi B');
+  await expect(page.getByTestId('island')).toHaveAttribute('data-mode', 'thinking');
+  await expect(page.getByRole('status', { name: 'Loading' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('tool-sky')).toHaveAttribute('aria-pressed', 'true');
+});
