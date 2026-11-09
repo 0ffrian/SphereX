@@ -124,8 +124,10 @@ def read_wrl(text: str) -> tuple[Array, Array]:
     except ValueError as e:
         raise ShapeError(f"WRL file: non-numeric table entry ({e})") from None
     nv, nf = int(counts.group(1)), int(counts.group(2))
-    if v.size != 3 * nv or not np.isfinite(v).all():
+    if v.size != 3 * nv:
         raise ShapeError(f"WRL file: header says {nv} vertices, point table holds {v.size / 3:g}")
+    if not np.isfinite(v).all():
+        raise ShapeError("WRL file: non-finite vertex coordinate (NaN or inf)")
     if flat.size != 4 * nf or not (flat[3::4] == -1).all():
         raise ShapeError(
             f"WRL file: expected {nf} triangles ended by -1 ({4 * nf} entries), found {flat.size}"
@@ -401,6 +403,18 @@ def _finish(verts: Array, tris: Array, km_to_m: float, label: str) -> tuple[Arra
     return verts * km_to_m, tris, vertex_normals(verts, tris)
 
 
+def _check_lod1_matches(lod0: tuple[Array, Array], lod1: tuple[Array, Array]) -> None:
+    """Refuse a LOD1 file that is not a lighter product of the same body (no silent bypass)."""
+    v0, t0 = compact(*lod0)
+    v1, t1 = compact(*lod1)
+    if len(t1) >= len(t0):
+        raise ShapeError(f"LOD1 has {len(t1)} triangles, not fewer than LOD0's {len(t0)}")
+    lo0, hi0, lo1, hi1 = v0.min(axis=0), v0.max(axis=0), v1.min(axis=0), v1.max(axis=0)
+    diag = float(np.linalg.norm(hi0 - lo0))
+    if max(np.abs(lo1 - lo0).max(), np.abs(hi1 - hi0).max()) > 0.05 * diag:
+        raise ShapeError("LOD1 bounding box differs from LOD0 by more than 5%: a different body?")
+
+
 def build_levels(
     data: bytes,
     is_icq: bool,
@@ -415,6 +429,8 @@ def build_levels(
     ``lod1_data``, a second official product; without it the call refuses (no decimation).
     """
     kind = fmt or ("icq" if is_icq else "obj")
+    if lod1_data is not None and kind != "wrl":
+        raise ShapeError("--lod1-input is only for a WRL; ICQ and OBJ derive or reuse their LOD1")
     if kind == "icq":
         grid = read_icq(data.decode("ascii"))
         meshes = [icq_to_mesh(g) for g in (grid, downsample_icq(grid))]
@@ -425,6 +441,7 @@ def build_levels(
                 "lower-resolution product (never decimated here)"
             )
         meshes = [weld(*read_wrl(d.decode("ascii"))) for d in (data, lod1_data)]
+        _check_lod1_matches(meshes[0], meshes[1])
     else:
         v, f = read_obj(data.decode("utf-8"))
         meshes = [weld(v, f)]
