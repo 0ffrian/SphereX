@@ -66,6 +66,8 @@ export interface BodyContext {
    * against `visibleTags`.
    */
   gasLayers?: GasSwitches;
+  /** Issue #68: the plan's climate-pattern switch (carries the honesty level and the build step's holds). */
+  pattern?: boolean;
 }
 
 export interface BodyRenderer {

@@ -71,6 +71,12 @@ export const SUBSTELLAR_EDGE_RAD = 0.08;
 /** Peak wobble in radians (x0.5) of the ice edge, from the same seeded noise as the polar edge (artistic). */
 export const SUBSTELLAR_WOBBLE_RAD = 0.4;
 /**
+ * Noise frequency of the substellar ice edge (artistic sketch). Fixed, so that the artist's look
+ * `freq` (a terrain look, + Artistic only) does not change the edge shape drawn at + Estimated
+ * (Q-156). 4 = what the edge used at the temperate look's `freq` of 2.
+ */
+export const SUBSTELLAR_WOBBLE_FREQ = 4;
+/**
  * A snowball on bare rock: the highest ground shows through the ice (artistic). `hh` above
  * `SNOWBALL_ROCK_FROM` loses up to `SNOWBALL_ROCK_SHOW` of the ice. A planet with a sea is all ice.
  */
@@ -241,7 +247,8 @@ export function terrainAt(d: Vec3, p: FieldParams): TerrainSample {
       ),
     );
     const cap = Math.max(0, p.iceAngleRad ?? 0);
-    const wob = (fbm(sx * 2, sy * 2, sz * 2, 4, p.seed + 101) - 0.5) * SUBSTELLAR_WOBBLE_RAD;
+    const w = SUBSTELLAR_WOBBLE_FREQ;
+    const wob = (fbm(d[0] * w, d[1] * w, d[2] * w, 4, p.seed + 101) - 0.5) * SUBSTELLAR_WOBBLE_RAD;
     ice = cap > 0 ? smoothstep(cap - SUBSTELLAR_EDGE_RAD, cap + SUBSTELLAR_EDGE_RAD, ang + wob) : 1;
     if (!hasSea && cap <= 0) {
       ice = 1 - SNOWBALL_ROCK_SHOW * smoothstep(SNOWBALL_ROCK_FROM, SNOWBALL_ROCK_TO, hh);
