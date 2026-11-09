@@ -1,6 +1,6 @@
 # 02 Components
 
-The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12, D-15, D-16, D-18, D-19, D-20, D-22, D-25, D-28 and D-35 (sky-view prototype: Q-87 to Q-91; colour composite, colour views, progressive frames and cached markers: Q-92 to Q-95, Q-97 and Q-98), and A4.9 (overlays; on the frame grid: Q-102). Object jobs, the shared pools, the background bake and the warm cache follow Q-111 and Q-112 (issue #41), and A6.2 (Gemini layer, Q-122).
+The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Every route is listed once in the endpoint register [A4.11](../architecture/endpoints.md#a411-endpoint-register); the object job is [A4.10](../architecture/jobs.md#a410-object-job-and-fan-out); the shell is [A21](../architecture/sky-shell.md#a21-app-shell-and-sky-view); Track is A19 and A20, Area search A16 to A18 (their own diagrams: [23](23-track.md), [22](22-area-search.md)). Dashed nodes and edges are post-event, stretch or **to build** (Track, Area search, `/path`, `/v1/areas`). Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12, D-15, D-16, D-18, D-19, D-20, D-22, D-25, D-28 and D-35 (sky-view prototype: Q-87 to Q-91; colour composite, colour views, progressive frames and cached markers: Q-92 to Q-95, Q-97 and Q-98), and A4.9 (overlays; on the frame grid: Q-102). Object jobs, the shared pools, the background bake and the warm cache follow Q-111 and Q-112 (issue #41), and A6.2 (Gemini layer, Q-122).
 
 ## Diagram 1: system and backend
 
@@ -10,7 +10,10 @@ flowchart LR
     FEFlip["Flipbook"]
     FEPanel["Object panel"]
     FEViewer["Sky Sculptor viewer"]
-    FESky["Shell + SkyPane / SkyView (prototype, Q-89)"]
+    FESky["Shell + SkyPane / SkyView (A21, Q-89)"]
+    FEBuild["Build pane in the split pane (R5.8, A21.8)"]
+    FETrack["Track pane (A20, to build)"]
+    FEArea["Area search tool (A18, to build)"]
   end
 
   subgraph BE["Backend (FastAPI on Python 3.12, D-15)"]
@@ -55,6 +58,8 @@ flowchart LR
       TexBaker["TextureBaker, render/background.py: SX_BAKE_WORKERS spawn process, both R5 sizes, off the request path (Q-112)"]
       GemPaint["gemini_paint.py (P3, admin token)"]
     end
+    PathAPI["/v1/objects/{id}/path, /track.ecsv (A19.5, A19.9, to build, needs PR #53)"]
+    AreaAPI["/v1/areas, core/area (A17.8, to build)"]
     TexCache[("/data/textures/{id}/{generator_version}/{seed}/")]
     AiStore[("SX_TEXTURES_AI_DIR: albedo_ai.webp, gemini.json, pointers; not served as static files (Q-122)")]
     Prebaked[("backend/assets/{type}/{id}.json (SX_ASSETS_DIR), pre-baked assets")]
@@ -90,6 +95,14 @@ flowchart LR
   FEFlip -->|"GET /v1/objects/{id}/composite, /composite.png (colour view, Q-93)"| CompAPI
   FEPanel -->|"GET /v1/objects/{id}/spectrum, /card"| API
   FEViewer -->|"GET /v1/objects/{id}/render-params"| API
+  FEBuild -->|"GET /card, /render-params when the card is asked for or the pane opens (Q-120)"| API
+  FEBuild --> FEViewer
+  FETrack -.->|"GET frames, path (poll while path:deferred), track.ecsv"| PathAPI
+  FEArea -.->|"GET /v1/areas index and results"| AreaAPI
+  FEArea -.->|"Track it: open the Track pane"| FETrack
+  PathAPI -.->|"SPHEREx-centred ephemeris, through the cache"| Adapters
+  PathAPI -.-> Jobs
+  AreaAPI -.->|"derived.area, read only"| DataCache
   FEViewer -->|"texture URLs: albedo.webp, height.png, height.bin, normal.png"| TexCache
   FESky -->|"GET /v1/sky/index.json, equirect_{W}x{H}.jpg, /v1/sky/cached"| SkyAPI
   FESky -->|"GET /v1/resolve for the quick-pick markers"| API
@@ -157,7 +170,7 @@ flowchart LR
   FE -.->|"src/contract generated from (D-18)"| Shared
 
   classDef stretch stroke-dasharray: 5 5
-  class GemPaint,Exo stretch
+  class GemPaint,Exo,FETrack,FEArea,PathAPI,AreaAPI stretch
 ```
 
 ## Diagram 2: frontend
@@ -175,7 +188,8 @@ flowchart TB
     Store["Store (Zustand): card, RenderParams, honesty state, overrides"]
     PulseInd["On-screen pulse indicator (D-20)"]
     Settings["Haptics + audio settings"]
-    Shell["Shell (prototype, Q-89): ToolRail, PanelCard, Readout, shortcuts, Island (Q-121)"]
+    Shell["Shell (A21, Q-89): ToolRail + railIcons, shellStore, PanelCard, Readout, shortcuts, bezel insets (Q-124)"]
+    Island["Island, app/island (Q-121, Q-123): orb, Thinking pill, grid loader"]
     SkyPane["SkyPane: sky image, markers, click to pick"]
     Transport["Transport bar"]
     Session["Flipbook session (session.tsx): cutout preload, playback timer, can play"]
@@ -185,6 +199,16 @@ flowchart TB
     Progressive["progressive.ts + FramesProgress (Q-97): ask again while cutouts are deferred, merge, Stop / Continue"]
     CachedMarkers["useCachedMarkers + cachedMarkers (Q-98): lilac cached, loads instantly markers"]
   end
+
+  subgraph Build["app/build (issue #60, R5.8)"]
+    SelectedCard["SelectedCard: the object card"]
+    BodyLoader["selectedBody.ts: useSelectedBodyLoader"]
+    BuildPane["BuildPane: split pane, Feel, Replay, New seed, Close"]
+    Mould["useMould + MouldStrip"]
+  end
+
+  TrackPane["Track pane (A20, to build): time slider, zoom, spectrum hop by hop"]
+  AreaTool["Area search tool and sky layer (A18, to build)"]
 
   subgraph Viewer["Sky Sculptor viewer (three r187, three/webgpu)"]
     ViewerApp["ViewerApp"]
@@ -196,17 +220,20 @@ flowchart TB
     ShaderGen["Shader generators: terra-planet, banded-giant, gas-cloud, shell-remnant (triplanar)"]
     FieldWorker["Field worker (Web Worker): 512x256 field"]
     SkyView["SkyView + skyMath (viewer/sky): inside-out sky sphere, render on demand, camera ray to RA/Dec"]
+    MouldRig["viewer/mould: MouldRig, mouldSteps"]
+    BodiesEtc["viewer/bodies, volume, shape, motion"]
   end
 
   subgraph Haptics["haptics/"]
     Engine["HapticEngine: rate limit, fan-out"]
+    ListenSweep["sound/listenSweep.ts"]
     Calib["Calibration"]
     subgraph Sources["sources/"]
       SrcSurface["heightMap, meshNormal, terrain, flow"]
-      SrcData["field, spectrum, lightcurve"]
+      SrcData["field, dataPulse, spectrum, lightcurve"]
     end
     subgraph Drivers["drivers/"]
-      DVib["WebVibrateDriver"]
+      DVib["WebVibrateDriver (after the event, Q-132)"]
       DAud["AudioDriver (audio.ts)"]
       DTauri["TauriDriver stub (B-01, post-event)"]
     end
@@ -222,6 +249,21 @@ flowchart TB
   Shell --> Transport
   Shell -->|"panel card"| Flipbook
   Shell -->|"panel card"| Panel
+  Shell --> Island
+  Shell -->|"rail 3D viewer: built at once"| BuildPane
+  Shell -.->|"Area search tool"| AreaTool
+  AreaTool -.->|"sky layer slot"| SkyPane
+  AreaTool -.->|"Track it: openPane track"| TrackPane
+  TrackPane -.->|"Track layer, marker"| SkyPane
+  TrackPane -.->|"GET path, frames"| BackendAPI
+  SkyPane -->|"right-click: card asked for"| SelectedCard
+  SelectedCard -->|"Build it"| BuildPane
+  Store -->|"card asked for or pane open"| BodyLoader
+  BodyLoader -->|"GET card, render-params"| BackendAPI
+  BuildPane --> Mould
+  Mould -->|"showPlan, whenLoaded, setMould"| ViewerApp
+  ViewerApp --> MouldRig
+  ViewerApp --> BodiesEtc
   SkyPane --> SkyView
   SkyPane --> CachedMarkers
   CachedMarkers -->|"GET /v1/sky/cached"| BackendAPI
@@ -247,7 +289,7 @@ flowchart TB
   Panel -->|"GET spectrum, card"| BackendAPI
   ViewerApp -->|"GET render-params, textures"| BackendAPI
   Flipbook -->|"click ring: object id"| Panel
-  Panel -->|"View in 3D"| ViewerApp
+  Panel -->|"Build it in 3D"| BuildPane
   Panel --> Listen
   Store <--> Panel
   Store <--> ViewerApp
@@ -268,14 +310,15 @@ flowchart TB
   Engine -.->|"spherex:haptic debug event"| PulseInd
   DVib --> Vibrate
   DAud --> WebAudio
-  Listen --> WebAudio
+  Listen --> ListenSweep
+  ListenSweep --> WebAudio
   Calib <--> LS
   Settings <--> LS
   Calib --> DVib
   Calib --> DAud
 
   classDef post stroke-dasharray: 5 5
-  class DTauri post
+  class DTauri,DVib,TrackPane,AreaTool post
 ```
 
 ## Notes
@@ -291,5 +334,7 @@ flowchart TB
 - Issue #41 (Q-111, Q-112): `/card` and `/render-params` start or join one background job per object (`core/jobs.py`, `ObjectPipeline._job`). The catalogue, the Horizons geometry and the frame list start together; cutouts download in one shared pool and each is measured in a `MeasurePool` worker as it lands. A job publishes up to three answers (first stage `measuring:`, partial `measuring:frames`, final); only the final can be saved. `/frames`, `/spectrum`, the overlays and the composite download nothing in the request: `FrameService.on_request` starts or joins the job and the rest are listed as `cutouts:deferred:<n>`. `SX_MAX_JOBS` caps only the full download after the first batch (stage `queued`). `GET /v1/objects/{id}/job` and `/job/events` are beyond D-16 (Q-111 (4)).
 - The physics layer is drawn on the backend, feeding derived values into the card. The browser reruns the same functions on slider changes (architecture spec §4.6). As of issue #13 only the browser half exists (`frontend/src/physics/`); whether the backend ports it is Q-60. Baked types allow only colour, lighting and spin sliders; relief sliders exist only on the shader kinds (D-26).
 - The `spherex:haptic` DOM event is a debug hook that also drives the on-screen pulse indicator (D-20). Which module fires it is not stated; it is drawn from the engine.
-- `ShaderBody` and the `fields/` folder follow from D-01 and D-12 and are now listed in rendering doc §10. Their file names are **[verify]**.
-- The `terrain` and `flow` sources come from D-12. The brown dwarf `bands` source and the `flux_pulse`, `teq_pulse`, `motion` and `detections` data haptics have no source file named in §10 **[verify]**.
+- `ShaderBody` (`viewer/renderers/ShaderBody.ts`) and the `fields/` folder (`viewer/fields/fieldWorker.ts`) follow from D-01 and D-12; the file layout is [R10](../rendering/layout.md#r10-file-layout-and-ownership).
+- The `terrain` and `flow` sources come from D-12. The data haptics live in `sources/dataPulse.ts` and `sources/lightcurve.ts`; the brown dwarf `bands` source is refused (Q-82) and `detections` is refused (Q-86).
+- Build split view (issue #60, R5.8): the rail's 3D viewer, *Build it* on the object card and *Build it in 3D* in the object panel all open the one build pane (Q-120 item 4); the body loads in `useSelectedBodyLoader` when the card is asked for or the pane opens (Q-120 item 5). The shell's states: [24-state-shell.md](24-state-shell.md).
+- The `Shell` node places every surface inside the bezel insets of Q-124 (A21.2). At the event the A15 laptop plays sound only, so `WebVibrateDriver` is drawn dashed (Q-132).

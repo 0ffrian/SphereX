@@ -1,6 +1,6 @@
 # 17 Activity: pipeline stages 1–6 and RenderParams
 
-The backend pipeline from a name or RA/Dec to an `ObjectCard` and `RenderParams`, including every refusal branch (since D-32, a refusal only where no tier can answer). Drawn from architecture spec §4.1–4.6, rendering doc §1 (principles), §3, §5.2, §6.2, §7 and decisions D-01, D-02, D-04, D-19 and D-25. The old stage 5 "settings file" is replaced by the card builder (D-02).
+The backend pipeline from a name or RA/Dec to an `ObjectCard` and `RenderParams`, including every refusal branch (since D-32, a refusal only where no tier can answer). Drawn from architecture spec A4.1–A4.2 ([pipeline.md](../architecture/pipeline.md)), A4.3–A4.8 ([pipeline-card.md](../architecture/pipeline-card.md)), the object job A4.10 ([jobs.md](../architecture/jobs.md#a410-object-job-and-fan-out)) and the refusal codes A4.12 ([refusals.md](../architecture/refusals.md#a412-missing-and-refusal-codes)), rendering doc R1 (principles), R3, R3.3, R5.2, R6.2, R7 and decisions D-01, D-02, D-04, D-19 and D-25. Movers (Track, A19) take the moving-object branch of stage 1 and the Q-139 rule of stage 2, built by PR #53. The old stage 5 "settings file" is replaced by the card builder (D-02).
 
 ```mermaid
 flowchart TD

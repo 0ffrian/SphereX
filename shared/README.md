@@ -50,4 +50,4 @@ Tier and dynamics (D-32):
 - `assertTagged` checks card values only: a `DynamicsValue` is skipped, because its model_dependent rule is `assumed`, not `assumption`.
 - The live backend (stage 7) emits `tier`, `formula` and `assumed` on layers but no `dynamics` yet (stage 6, a later ticket); the field is optional.
 
-Tests: `backend/tests/test_contract_fixtures.py` and `frontend/src/contract/fixtures.test.ts`. Open contract questions: Q-33 to Q-42, Q-64 and Q-65 in the [decision log](../docs/decisions/README.md). The frontend's own M1 fixtures stay in `frontend/fixtures/` (Q-30).
+Tests: `backend/tests/test_contract_fixtures.py` and `frontend/src/contract/fixtures.test.ts`. Open contract questions: Q-33 to Q-42 in [decisions/contract.md](../docs/decisions/contract.md), Q-64 in [platform-hosting.md](../docs/decisions/platform-hosting.md) and Q-65 in [rendering-bodies.md](../docs/decisions/rendering-bodies.md) (index: [decisions/README.md](../docs/decisions/README.md)). The frontend's own M1 fixtures stay in `frontend/fixtures/` (Q-30).

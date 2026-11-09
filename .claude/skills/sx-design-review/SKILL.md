@@ -9,7 +9,7 @@ argument-hint: "[paths | mockup | PR number] [--fix]"
 Design-review `$ARGUMENTS`. Don't ask for permission.
 
 1. Work out the target:
-   - `mockup` → `mockup/spherex-ui.html`
+   - `mockup` → `mockup/spherex-ui.html` (and `mockup/chase-the-rock.html` for Track)
    - a PR number → its diff (`gh pr diff`)
    - paths → those files
    - nothing → the changed UI files in the working tree
@@ -17,5 +17,5 @@ Design-review `$ARGUMENTS`. Don't ask for permission.
    - `design-reviewer` with the target (and `--fix` if given)
    - `accessibility-tester` for a WCAG 2.2 AA pass on the same target
    - `ux-microcopy-reviewer` for labels, errors and empty states, written for a non-astronomer public audience
-3. If haptics or sound changed, also launch `haptics-audio-engineer` to check against R8 (rate limits, quantised levels, audio pairing, the honesty silence rule, Q-11).
-4. Merge the results into one list ranked by user impact. Note anything that needs a real-device check (Android Chrome haptics, phone layout).
+3. If haptics or sound changed, also launch `haptics-audio-engineer` to check against R8 (rate limits, quantised levels, audio pairing, the body tone R8.9.1 and Track path sound R8.9.2, the honesty silence rule, Q-11, Q-132 to Q-134).
+4. Merge the results into one list ranked by user impact. Note anything that needs a real-device check: the A15 laptop for the event (desktop Chrome, sound, Q-132); Android Chrome haptics and phone layout after the event.

@@ -7,9 +7,10 @@ The docs are split into small fragments, so you only need to load the parts a ta
 | Doc | Read it for | Authority |
 |---|---|---|
 | [decisions/](decisions/README.md) | Decisions that reconcile the specs, backlog, open questions: an index plus one file per topic | Highest |
-| [rendering/](rendering/README.md) | Object display, surface generation, haptics, audio pairing | Display, surfaces, haptics, audio pairing |
-| [architecture/](architecture/README.md) | What we build, data sources, pipeline, tiers, plan, risks | Everything not covered above |
+| [rendering/](rendering/README.md) | Object display, surface generation, haptics, audio pairing (R0–R12) | Display, surfaces, haptics, audio pairing |
+| [architecture/](architecture/README.md) | What we build, data sources, pipeline, endpoints, tiers, app shell, Track and Area search, plan, risks (A1–A21) | Everything not covered above |
 | [uml/](uml/README.md) | All architecture diagrams (use case, component, deployment, package, class, sequence, state, activity) | Illustrates the specs; the specs win if they differ |
+| [architecture/glossary.md](architecture/glossary.md) | Terms, one meaning each (A15) | Names |
 | [handover.md](handover.md) | The competition, the data, early concepts (Rainbow Trails) | Background only |
 
 ## Precedence
@@ -19,48 +20,104 @@ The docs are split into small fragments, so you only need to load the parts a ta
 3. `architecture/`
 4. `uml/` and `handover.md`
 
-If two docs disagree and `decisions/` is silent, raise it with the team and record the answer as a `Q-` entry in the matching topic file under `decisions/` (and its index row).
+If two docs disagree and `decisions/` is silent, follow the precedence above, add a `Q-` entry describing the conflict to the matching topic file under `decisions/` (and its index row), and continue. Never pick silently.
 
 ## What to load for a task
 
-Always load the decision index [decisions/README.md](decisions/README.md) first (about 6k tokens): it lists every D- and Q- entry with its topic file. Then load only the topic files the task needs (named in each row below). Decisions override everything else.
+1. Load the decision index [decisions/README.md](decisions/README.md). It lists every D- and Q- entry with its topic file.
+2. Find the task's row below. Load the **decision topic files** it names (the IDs in brackets are the entries that matter most), then the **spec fragments** it names, at the sections given. Each fragment's header line links the decisions it implements and the fragments to read with it.
+3. Load nothing else unless a loaded fragment sends you there.
 
-| Task | Load |
-|---|---|
-| Get oriented | [architecture/overview.md](architecture/overview.md), [rendering/principles-stack.md](rendering/principles-stack.md) |
-| Add or fix a data adapter (IRSA, Gaia, Horizons, SBDB…) | [architecture/data-sources.md](architecture/data-sources.md), [architecture/pipeline.md](architecture/pipeline.md), decisions D-19 (resolver order) and D-25 (cache) |
-| API endpoints (resolve, frames, cutouts, spectrum, card, render-params; composite, `/v1/sky/…` and `/v1/sky/cached` proposed) | [architecture/pipeline.md](architecture/pipeline.md), [rendering/data-contract.md](rendering/data-contract.md), [../backend/README.md](../backend/README.md#endpoints-d-16) ([composite](../backend/README.md#composite)), [uml/20-sequence-composite.md](uml/20-sequence-composite.md), decisions D-16 (and Q-39 for the card and render-params headers; open: Q-87 for the `/v1/sky` endpoints, Q-92 and Q-94 for the composite, Q-98 for `/v1/sky/cached`, Q-99 for the live budget) |
-| Pipeline: find, measure, classify, build the card | [architecture/pipeline.md](architecture/pipeline.md), [rendering/data-contract.md](rendering/data-contract.md), decisions Q-55 to Q-57 (stages 3 to 7 as built) |
-| Schemas: ObjectCard, RenderParams, tags, generated contract code, shared fixtures | [rendering/data-contract.md](rendering/data-contract.md), [architecture/data-contract.md](architecture/data-contract.md) (D-18), [../shared/README.md](../shared/README.md), [uml/05-class-data-contract.md](uml/05-class-data-contract.md), decisions D-32 (tiers, `formula`, `assumed`, `dynamics`) |
-| Motion, time-lapse, star surface, quality levels | [rendering/display-rules.md](rendering/display-rules.md) (R5.7), [rendering/renderers/stars.md](rendering/renderers/stars.md) (R7.5.1–R7.5.5), [rendering/data-contract.md](rendering/data-contract.md) (R3.4), decisions D-32 and D-34 |
-| Backend texture baker | [rendering/surface-generation.md](rendering/surface-generation.md), [rendering/data-contract.md](rendering/data-contract.md) |
-| Gemini artistic layer (AI albedo repaint, admin endpoints) | [architecture/generators.md](architecture/generators.md) (A6.2), [rendering/surface-generation.md](rendering/surface-generation.md) (R6.6, R6.7), [uml/12-sequence-bake-gemini.md](uml/12-sequence-bake-gemini.md), [uml/16-state-asset-lookup.md](uml/16-state-asset-lookup.md), [../backend/README.md](../backend/README.md), decisions D-07, D-24, D-25, Q-29 and Q-122 |
-| 3D viewer shell: lighting, modes, honesty, interaction | [rendering/display-rules.md](rendering/display-rules.md), [rendering/accessibility.md](rendering/accessibility.md) |
-| A renderer for one type | the matching file in [rendering/renderers/](rendering/README.md), plus [rendering/display-rules.md](rendering/display-rules.md) |
-| Planets, gas giants, nebulae, novae (browser shaders) | [architecture/generators.md](architecture/generators.md), [architecture/physics.md](architecture/physics.md), [rendering/renderers/shader-kinds.md](rendering/renderers/shader-kinds.md) |
-| Haptic engine and drivers | [rendering/haptics/engine-api.md](rendering/haptics/engine-api.md), [rendering/haptics/platform-encoding.md](rendering/haptics/platform-encoding.md) |
-| A haptic source for one type | [rendering/haptics/sources.md](rendering/haptics/sources.md), [rendering/haptics/profiles.md](rendering/haptics/profiles.md), [rendering/haptics/engine-api.md](rendering/haptics/engine-api.md) |
-| Spectrum haptics and the Listen sweep | [rendering/haptics/profiles.md](rendering/haptics/profiles.md), [rendering/haptics/audio-pairing.md](rendering/haptics/audio-pairing.md), [architecture/sound-voice.md](architecture/sound-voice.md) |
-| Audio driver | [rendering/haptics/audio-pairing.md](rendering/haptics/audio-pairing.md), [rendering/haptics/engine-api.md](rendering/haptics/engine-api.md) |
-| Calibration and settings | [rendering/haptics/calibration.md](rendering/haptics/calibration.md) |
-| Frontend setup, scripts, phone testing | [../frontend/README.md](../frontend/README.md), [architecture/frontend-platform.md](architecture/frontend-platform.md) |
-| Frontend setup, performance | [architecture/frontend-platform.md](architecture/frontend-platform.md), [rendering/display-rules.md](rendering/display-rules.md) (R5.5) |
-| Hosting on the A15, HTTPS, cache and offline demo mode | [architecture/frontend-platform.md](architecture/frontend-platform.md) (A10), [architecture/risks.md](architecture/risks.md), decisions D-24 and D-25 |
-| Sky view (all-sky background, picking) | [architecture/data-sources.md](architecture/data-sources.md) (A3.11), [architecture/pipeline.md](architecture/pipeline.md) (A4, sky endpoints), [architecture/frontend-platform.md](architecture/frontend-platform.md) (A10.1), [rendering/layout-tests-open-items.md](rendering/layout-tests-open-items.md) (R10), [../frontend/README.md](../frontend/README.md#shell-and-sky-view-prototype-7-nov-2026), [../backend/README.md](../backend/README.md#sky-background-prototype), [uml/08-sequence-search-flipbook.md](uml/08-sequence-search-flipbook.md), decisions D-35, Q-87 to Q-91 and Q-97 to Q-99 (progressive frames, cached markers, live budget) |
-| Flipbook and Rainbow Trails view mode | [architecture/overview.md](architecture/overview.md) (A1.1), [architecture/pipeline.md](architecture/pipeline.md) (A4.1), decisions D-28 |
-| Select a body, Build it, the split view and the moulding animation (issue #60) | [rendering/display-rules.md](rendering/display-rules.md) (R4, R5.3, R5.7), [rendering/accessibility.md](rendering/accessibility.md) (R9), [../frontend/README.md](../frontend/README.md#select-and-build-it-issue-60-q-113), [uml/21-sequence-build-mould.md](uml/21-sequence-build-mould.md), decisions D-21, D-34 and Q-113 |
-| Flipbook colour views (Raw ↔ Colour, wavelength tint, SPHEREx composite, `colour=` link) | [rendering/display-rules.md](rendering/display-rules.md) (R4), [architecture/honesty-policy.md](architecture/honesty-policy.md) (A11), [architecture/pipeline.md](architecture/pipeline.md) (A4.1), [../backend/README.md](../backend/README.md#composite), [../frontend/README.md](../frontend/README.md#flipbook-and-spectrum-m1-issue-3), [uml/08-sequence-search-flipbook.md](uml/08-sequence-search-flipbook.md), [uml/20-sequence-composite.md](uml/20-sequence-composite.md), decisions Q-27 and Q-93 to Q-95 |
-| Overlays (Gaia, WISE, contamination, flag mask, field of view) and combine frames | [architecture/pipeline.md](architecture/pipeline.md) (A4.9), [architecture/data-sources.md](architecture/data-sources.md) (A3.2, A3.3), [uml/08-sequence-search-flipbook.md](uml/08-sequence-search-flipbook.md), decisions D-16, Q-50 to Q-54 and Q-102 (overlays on the frame grid) |
-| Labels and honesty in the UI | [architecture/honesty-policy.md](architecture/honesty-policy.md), [rendering/display-rules.md](rendering/display-rules.md) (R5.3, D-21) |
-| Tests | [architecture/testing.md](architecture/testing.md), [rendering/layout-tests-open-items.md](rendering/layout-tests-open-items.md), [rendering/reference/](rendering/reference/README.md) (reference frames, visual checklist, frame-time checks) |
-| Where code lives and who owns it | [rendering/layout-tests-open-items.md](rendering/layout-tests-open-items.md) (R10), [uml/04-package.md](uml/04-package.md), decisions D-17 |
-| Area search: draw a square, Known objects (Track) or Discovery, `/v1/areas` routes, sky layers and island cards | [architecture/linker.md](architecture/moving-objects/area-search.md) (A16), [architecture/linker-backend.md](architecture/moving-objects/area-backend.md) (A17), [architecture/linker-ui.md](architecture/moving-objects/area-ui.md) (A18), [uml/22-area-search.md](uml/22-area-search.md), decisions Q-146, Q-131 and Q-148 |
-| Plan, milestones, risks | [architecture/plan.md](architecture/plan.md), [architecture/risks.md](architecture/risks.md), decisions D-14, D-29 and D-30 |
+Topic files, short names used below: [scope-process](decisions/scope-process.md) · [contract](decisions/contract.md) · [data-sources](decisions/data-sources.md) · [pipeline-jobs](decisions/pipeline-jobs.md) · [rendering-bodies](decisions/rendering-bodies.md) · [rendering-motion](decisions/rendering-motion.md) · [gemini](decisions/gemini.md) · [sky-shell](decisions/sky-shell.md) · [haptics-design](decisions/haptics-design.md) · [haptics-built](decisions/haptics-built.md) · [platform-hosting](decisions/platform-hosting.md) · [moving-objects](decisions/moving-objects.md).
+
+**Getting started**
+
+| Task | Decision topic files | Spec fragments (sections) |
+|---|---|---|
+| Get oriented | scope-process (D-06, Q-137), platform-hosting (Q-132) | [overview.md](architecture/overview.md) (A1–A2.1), [principles-stack.md](rendering/principles-stack.md) (R0–R2), [glossary.md](architecture/glossary.md) (A15) |
+| An unfamiliar term | none | [glossary.md](architecture/glossary.md) (A15) |
+| Port something from a mock-up | rendering-bodies (D-01), sky-shell (Q-89, Q-121) | the spec fragment for the feature (mock-ups are visual input only); for Track, the approximations listed in the header of [track-ui.md](architecture/moving-objects/track-ui.md) (A20) |
+| Edit a diagram | the topic file of the spec you changed | [uml/README.md](uml/README.md), then the diagram; the spec fragment it illustrates |
+| Record or change a decision | the topic file it belongs to | [decisions/README.md](decisions/README.md#rules-for-entries) (rules, next free IDs) |
+
+**Data and backend**
+
+| Task | Decision topic files | Spec fragments (sections) |
+|---|---|---|
+| A survey or ephemeris adapter (IRSA SPHEREx, Gaia, WISE, Horizons, SkyBoT) | data-sources (D-15, D-19, D-25, Q-20, Q-31), moving-objects (Q-138) | [data-sources.md](architecture/data-sources.md) (A3–A3.5), [pipeline.md](architecture/pipeline.md) (A4.1) |
+| An object-view source (SBDB, DAMIT, Exoplanet Archive, SIMBAD, shape models) | data-sources (D-19), pipeline-jobs (Q-44, Q-61, Q-62, Q-63), rendering-bodies (D-33) | [object-sources.md](architecture/object-sources.md) (A3.6–A3.10), [pipeline-card.md](architecture/pipeline-card.md) (A4.3, A4.5), [type-selection.md](rendering/type-selection.md) (R3.3) |
+| Test and demo targets (`targets.toml` groups, 433 Eros, saturation) | data-sources (D-31, Q-26), scope-process (Q-137) | [targets.md](architecture/targets.md) (A3.12), [jobs.md](architecture/jobs.md) (A4.10, warm start) |
+| Endpoints: add, change or call any route; error envelope, codes, `X-SX-*` headers | contract (D-16, Q-39), plus the topic file of the route's decision (listed in A4.11) | [endpoints.md](architecture/endpoints.md) (A4.11) first, then the fragment its row links; [data-contract.md](rendering/data-contract.md) (R3.2, R3.4); [backend/README.md](../backend/README.md#endpoints-d-16) for shapes and defaults |
+| Refusal codes: emit a `missing` code or write its UI wording | contract (D-32, Q-38) | [refusals.md](architecture/refusals.md) (A4.12), [data-contract.md](rendering/data-contract.md) (R3.4); wording in `frontend/src/app/messages.ts` |
+| Object jobs, staged answers, progress (`/job`, `/job/events`, `measuring:`) | pipeline-jobs (Q-99, Q-111, Q-112), sky-shell (Q-97) | [jobs.md](architecture/jobs.md) (A4.10), [endpoints.md](architecture/endpoints.md) (A4.11), [uml/09](uml/09-sequence-object-spectrum.md) |
+| Pipeline stages 1 and 2: find the object, frames, measure brightness and spectrum | data-sources (Q-20, Q-23, Q-24, Q-26, Q-31), moving-objects (Q-21, Q-139) | [pipeline.md](architecture/pipeline.md) (A4–A4.2), [data-sources.md](architecture/data-sources.md) (A3.1), [refusals.md](architecture/refusals.md) (A4.12), [uml/17](uml/17-activity-pipeline.md) |
+| Pipeline stages 3 to 10: classify, asset lookup, ObjectCard, physics, RenderParams | pipeline-jobs (Q-55 to Q-57, Q-60 to Q-63), contract (D-22, D-32) | [pipeline-card.md](architecture/pipeline-card.md) (A4.3–A4.8), [type-selection.md](rendering/type-selection.md) (R3.3), [data-contract.md](rendering/data-contract.md) (R3.2, R3.4), [refusals.md](architecture/refusals.md) (A4.12), [uml/18](uml/18-activity-type-selection.md) |
+| Moving-object frames and path (stage 1 for movers, PR #53) | moving-objects (Q-21, Q-22, Q-138 to Q-143) | [pipeline.md](architecture/pipeline.md) (A4.1, A4.2), [track.md](architecture/moving-objects/track.md) (A19.3–A19.5), [data-sources.md](architecture/data-sources.md) (A3.4, A3.5), [overlays.md](architecture/overlays.md) (A4.9) |
+| Overlays (Gaia, WISE, contamination), flag mask, combine frames | data-sources (Q-50 to Q-54, Q-96), sky-shell (Q-102), moving-objects (Q-143) | [overlays.md](architecture/overlays.md) (A4.9), [data-sources.md](architecture/data-sources.md) (A3.2, A3.3), [uml/08](uml/08-sequence-search-flipbook.md) |
+| Composite and the flipbook colour views (Raw, wavelength tint, SPHEREx composite, `colour=`) | data-sources (Q-92, Q-94), contract (Q-27, Q-93), sky-shell (Q-95) | [display-rules.md](rendering/display-rules.md) (R4), [honesty-policy.md](architecture/honesty-policy.md) (A11), [endpoints.md](architecture/endpoints.md) (A4.11), [backend/README.md](../backend/README.md#composite), [uml/20](uml/20-sequence-composite.md) |
+| Schemas: ObjectCard, RenderParams, tags, generated contract code, shared fixtures | contract (D-18, D-32, Q-30, Q-38) | [data-contract.md](rendering/data-contract.md) (R3, R3.1, R3.2, R3.4), [data-contract.md](architecture/data-contract.md) (A5–A5.4), [shared/README.md](../shared/README.md), [uml/05](uml/05-class-data-contract.md) |
+| Gemini artistic layer (AI albedo repaint, admin endpoints) | gemini (D-07, Q-29, Q-122), platform-hosting (D-24), data-sources (D-25) | [generators.md](architecture/generators.md) (A6.2), [surface-generation.md](rendering/surface-generation.md) (R6.6, R6.7), [endpoints.md](architecture/endpoints.md) (A4.11), [uml/12](uml/12-sequence-bake-gemini.md), [uml/16](uml/16-state-asset-lookup.md) |
+| Backend texture baker | rendering-bodies (D-01, Q-47, Q-48) | [surface-generation.md](rendering/surface-generation.md) (R6–R6.7), [data-contract.md](rendering/data-contract.md) (R3.4), [pipeline-card.md](architecture/pipeline-card.md) (A4.4 version constants) |
+
+**Bodies and the 3D view**
+
+| Task | Decision topic files | Spec fragments (sections) |
+|---|---|---|
+| 3D viewer: lighting, view modes, honesty, scale bar, interaction | contract (D-21, D-23), rendering-bodies (Q-45, Q-49) | [display-rules.md](rendering/display-rules.md) (R4–R5.6), [build-mould.md](rendering/build-mould.md) (R5.8), [accessibility.md](rendering/accessibility.md) (R9) |
+| A renderer for one type | rendering-bodies, rendering-motion (Q-103, Q-104) | the one file for the type: [asteroid.md](rendering/renderers/asteroid.md) (R7 intro, R7.1, R7.2), [comet.md](rendering/renderers/comet.md) (R7.3), [brown-dwarf.md](rendering/renderers/brown-dwarf.md) (R7.4), [stars.md](rendering/renderers/stars.md) (R7.5), [candidate.md](rendering/renderers/candidate.md) (R7.6), [shader-kinds.md](rendering/renderers/shader-kinds.md) (R7.7); plus [display-rules.md](rendering/display-rules.md) (R5) and, before merging, [checklist.md](rendering/reference/checklist.md) (R11.2) |
+| Planets, gas giants, nebulae, novae (browser shaders) | rendering-bodies (D-01, Q-48), rendering-motion (Q-103) | [generators.md](architecture/generators.md) (A6), [physics.md](architecture/physics.md) (A7), [shader-kinds.md](rendering/renderers/shader-kinds.md) (R7.7) |
+| Physics sliders and overrides | rendering-bodies (D-26, Q-58, Q-59), contract (D-27) | [physics.md](architecture/physics.md) (A7–A7.5), [data-contract.md](architecture/data-contract.md) (A5.3), [generators.md](architecture/generators.md) (A6) |
+| Motion, time-lapse, star surface, quality levels | rendering-motion (D-34, Q-66, Q-104, Q-108), contract (D-32) | [display-rules.md](rendering/display-rules.md) (R5.7), [stars.md](rendering/renderers/stars.md) (R7.5–R7.5.5), [data-contract.md](rendering/data-contract.md) (R3.4) |
+| Build split view and moulding (Build it, the build pane, New seed, Feel) | sky-shell (Q-113, Q-120, Q-121), contract (D-21), rendering-motion (D-34) | [build-mould.md](rendering/build-mould.md) (R5.8), [sky-shell-behaviour.md](architecture/sky-shell-behaviour.md) (A21.8), [display-rules.md](rendering/display-rules.md) (R5.3, R5.6), [accessibility.md](rendering/accessibility.md) (R9), [uml/21](uml/21-sequence-build-mould.md), [uml/24](uml/24-state-shell.md) |
+| Labels and honesty in the UI | contract (D-02, D-21, Q-27, Q-93) | [honesty-policy.md](architecture/honesty-policy.md) (A11), [display-rules.md](rendering/display-rules.md) (R5.3), [platform-encoding.md](rendering/haptics/platform-encoding.md) (R8.2) |
+
+**App shell and sky view**
+
+| Task | Decision topic files | Spec fragments (sections) |
+|---|---|---|
+| Sky view and app shell: layout, insets, z-order, phone width, sky interaction, sky image and credit | sky-shell (D-35, Q-87 to Q-90, Q-98, Q-120, Q-121, Q-123, Q-124), contract (Q-91) | [sky-shell.md](architecture/sky-shell.md) (A21–A21.4), [sky-shell-surfaces.md](architecture/sky-shell-surfaces.md) (A21.5–A21.7), [object-sources.md](architecture/object-sources.md) (A3.11), [accessibility.md](rendering/accessibility.md) (R9), [uml/24](uml/24-state-shell.md) |
+| Island, object panel, object card (and feature cards) | sky-shell (Q-120, Q-121, Q-123) | [sky-shell.md](architecture/sky-shell.md) (A21 Names table), [sky-shell-surfaces.md](architecture/sky-shell-surfaces.md) (A21.5), [sky-shell-behaviour.md](architecture/sky-shell-behaviour.md) (A21.10, A21.12), [uml/24](uml/24-state-shell.md) |
+| Split pane, transport, search pill, keys and Escape, URL hash, live regions | sky-shell (Q-95, Q-113, Q-120, Q-121) | [sky-shell-behaviour.md](architecture/sky-shell-behaviour.md) (A21.8–A21.12), [uml/08](uml/08-sequence-search-flipbook.md) (hash), [uml/24](uml/24-state-shell.md) |
+| Add a tool to the rail or a layer to the sky | sky-shell | [sky-shell-behaviour.md](architecture/sky-shell-behaviour.md) (A21.13), [sky-shell.md](architecture/sky-shell.md) (A21.4), [sky-shell-surfaces.md](architecture/sky-shell-surfaces.md) (A21.6) |
+| Flipbook and Rainbow Trails | moving-objects (D-28, Q-04), sky-shell (Q-97, Q-100, Q-101), contract (Q-28) | [overview.md](architecture/overview.md) (A1.1), [pipeline.md](architecture/pipeline.md) (A4.1), [display-rules.md](rendering/display-rules.md) (R4), [sky-shell-behaviour.md](architecture/sky-shell-behaviour.md) (A21.9), [uml/08](uml/08-sequence-search-flipbook.md) |
+
+**Sound and haptics** (at the event: sound only, on the A15 laptop, Q-132; vibration after the event)
+
+| Task | Decision topic files | Spec fragments (sections) |
+|---|---|---|
+| Body sound in Feel mode (the body tone) | haptics-design (D-12, Q-133), platform-hosting (Q-132) | [audio-pairing.md](rendering/haptics/audio-pairing.md) (R8.9.1), [sources.md](rendering/haptics/sources.md) (R8.4), [display-rules.md](rendering/display-rules.md) (R5.6), [engine-api.md](rendering/haptics/engine-api.md) (R8.8, tone stream), [build-mould.md](rendering/build-mould.md) (R5.8, Feel) |
+| Track path sound ("Hear the Shift") | haptics-design (Q-134), moving-objects (Q-131) | [audio-pairing.md](rendering/haptics/audio-pairing.md) (R8.9.2), [track-ui.md](architecture/moving-objects/track-ui.md) (A20.9), [sound-voice.md](architecture/sound-voice.md) (A8) |
+| Haptic engine and drivers | haptics-design (D-08, D-09, D-20, Q-19), haptics-built (Q-71, Q-73), platform-hosting (Q-132) | [haptics.md](architecture/haptics.md) (A9, the summary), [engine-api.md](rendering/haptics/engine-api.md) (R8.8), [wiring.md](rendering/haptics/wiring.md) (R8.8.1), [platform-encoding.md](rendering/haptics/platform-encoding.md) (R8–R8.3), [uml/06](uml/06-class-haptics-audio.md), [uml/19](uml/19-activity-haptic-driver-select.md) |
+| A haptic source for one type | haptics-design (D-12, Q-78 to Q-82, Q-133), haptics-built (Q-83, Q-105) | [sources.md](rendering/haptics/sources.md) (R8.4), [profiles.md](rendering/haptics/profiles.md) (R8.5), [engine-api.md](rendering/haptics/engine-api.md) (R8.8) |
+| Spectrum sound and the Listen sweep | haptics-design (Q-70, Q-72), haptics-built (Q-76) | [profiles.md](rendering/haptics/profiles.md) (R8.6), [audio-pairing.md](rendering/haptics/audio-pairing.md) (R8.9), [sound-voice.md](architecture/sound-voice.md) (A8) |
+| Audio driver | haptics-design (D-10, Q-70, Q-133, Q-134), platform-hosting (Q-132) | [audio-pairing.md](rendering/haptics/audio-pairing.md) (R8.9–R8.9.2), [engine-api.md](rendering/haptics/engine-api.md) (R8.8) |
+| Sound and haptics settings (event); vibration calibration (after the event) | haptics-built (Q-73 to Q-75), platform-hosting (Q-132) | [calibration.md](rendering/haptics/calibration.md) (R8.7), [uml/13](uml/13-sequence-calibration.md) |
+
+**Moving objects: Track and Area search** (Track is the MVP, Q-131, Q-137; Area search is Q-146)
+
+| Task | Decision topic files | Spec fragments (sections) |
+|---|---|---|
+| Track backend: frame list, `/path`, star list and photometry for movers, export, cache | moving-objects (Q-131, Q-138 to Q-145), scope-process (Q-137) | [track.md](architecture/moving-objects/track.md) (A19–A19.8), [track-contract.md](architecture/moving-objects/track-contract.md) (A19.9–A19.15), [pipeline.md](architecture/pipeline.md) (A4.1, A4.2), [overlays.md](architecture/overlays.md) (A4.9), [endpoints.md](architecture/endpoints.md) (A4.11), [refusals.md](architecture/refusals.md) (A4.12), [uml/23](uml/23-track.md) |
+| Track UI: the Track pane, time slider, path on the sky, zoom, spectrum hop by hop, spin slider | moving-objects (Q-131, Q-135, Q-136, Q-142, Q-144), sky-shell, haptics-design (Q-134) | [track-ui.md](architecture/moving-objects/track-ui.md) (A20–A20.15), [sky-shell-behaviour.md](architecture/sky-shell-behaviour.md) (A21.8, A21.10, A21.11, A21.13), [audio-pairing.md](rendering/haptics/audio-pairing.md) (R8.9.2), [accessibility.md](rendering/accessibility.md) (R9), [uml/23](uml/23-track.md) |
+| Area search UI: draw a square, layers, visits and blink, feature cards, Result card, hand-off to Track | moving-objects (Q-146), sky-shell (Q-120, Q-121, Q-123, Q-124) | [area-search.md](architecture/moving-objects/area-search.md) (A16–A16.7), [area-ui.md](architecture/moving-objects/area-ui.md) (A18–A18.10), [sky-shell.md](architecture/sky-shell.md) (A21.4), [sky-shell-surfaces.md](architecture/sky-shell-surfaces.md) (A21.5, A21.6), [sky-shell-behaviour.md](architecture/sky-shell-behaviour.md) (A21.13), [uml/22](uml/22-area-search.md) |
+| Discovery backend: area frames, dots, glitches and stars, join, known-object check, `/v1/areas` | moving-objects (Q-138, Q-139, Q-146, Q-148) | [area-search.md](architecture/moving-objects/area-search.md) (A16–A16.7), [area-backend.md](architecture/moving-objects/area-backend.md) (A17–A17.11), [track.md](architecture/moving-objects/track.md) (A19.5, A19.6), [track-contract.md](architecture/moving-objects/track-contract.md) (A19.9), [data-sources.md](architecture/data-sources.md) (A3.1, A3.4, A3.5), [uml/22](uml/22-area-search.md) |
+
+**Platform, tests and process**
+
+| Task | Decision topic files | Spec fragments (sections) |
+|---|---|---|
+| Frontend setup, scripts, performance budget | platform-hosting (D-03, D-05, Q-64, Q-132) | [frontend/README.md](../frontend/README.md#run-it), [frontend-platform.md](architecture/frontend-platform.md) (A10, A10.1), [display-rules.md](rendering/display-rules.md) (R5.5, R5.7), [frame-time.md](rendering/reference/frame-time.md) (R11.3) |
+| The event build on the A15 laptop: hosting, cache, offline, warm start | platform-hosting (D-24, Q-132), data-sources (D-25), sky-shell (D-35), scope-process (Q-137) | [frontend-platform.md](architecture/frontend-platform.md) (A10.2), [targets.md](architecture/targets.md) (A3.12), [jobs.md](architecture/jobs.md) (A4.10), [risks.md](architecture/risks.md) (A14, A14.1), [uml/03](uml/03-deployment.md) |
+| Tests | contract (D-18), rendering-motion (Q-69) | [testing.md](architecture/testing.md) (A12), [acceptance-tests.md](rendering/acceptance-tests.md) (R11), [reference/](rendering/reference/README.md) (R11.1–R11.3) |
+| Where code lives and who owns it | scope-process (D-11, D-17) | [layout.md](rendering/layout.md) (R10), [layout-repo.md](rendering/layout-repo.md) (R10.1), [uml/04](uml/04-package.md) |
+| [verify] items: check or resolve one | contract (Q-110) | [risks.md](architecture/risks.md) (A14.1, architecture register), [open-items.md](rendering/open-items.md) (R12, rendering register) |
+| Plan, milestones, risks | scope-process (D-14, D-29, D-30, Q-137), platform-hosting (Q-132), moving-objects (Q-146) | [plan.md](architecture/plan.md) (A13), [risks.md](architecture/risks.md) (A14) |
 
 ## Editing rules
 
-- Keep each fragment to one topic and about 150 lines or fewer. Keep the `A`/`R` section numbers in the headings; other docs cite them.
-- When you add, move or rename a section, update the section map in that spec's `README.md`.
+- Keep each fragment to one topic, about 150 lines and about 20 KB or fewer (indexes excepted). Keep the `A`/`R` section numbers in the headings; other docs cite them.
+- Every fragment starts with one header line: `> **Part of:** … · **Sections:** … · **Implements:** … · **Read with:** …`. The Sections value matches the file's headings; Implements links the decisions it implements to their topic files.
+- When you add, move or rename a section, update the section map in that spec's `README.md` and the row in the table above.
 - When you change a spec, update the matching diagram in `uml/` in the same commit.
-- Record any new cross-cutting decision in the matching topic file under `decisions/` with the next free `D-` number, and add its index row ([decisions/README.md](decisions/README.md#rules-for-entries)).
-- Keep the **[verify]** markers until someone has checked the item against real output.
+- Decisions live in `decisions/<topic>.md`. Record a new cross-cutting decision in the matching topic file with the next free `D-` or `Q-` number, and add its index row to [decisions/README.md](decisions/README.md#rules-for-entries) in the same commit.
+- Keep the **[verify]** markers until someone has checked the item against real output; list each one in A14.1 or R12. Using a [verify] constant at its tier follows Q-110 (proposed).

@@ -1,6 +1,6 @@
 # 19 Activity: choosing haptic drivers at start-up
 
-How the frontend decides which drivers the `HapticEngine` fans out to, and when calibration runs. Drawn from rendering doc §8.1, §8.7–8.8 and decisions D-08 (web only, no Tauri at the event), D-09 (calibration per device), D-10 (audio alongside vibration everywhere), D-20 (`sharpness`, no native or iOS bridges, `spherex:haptic` debug hook) and B-01.
+How the frontend decides which drivers the `HapticEngine` fans out to, and when calibration runs. Drawn from rendering doc §8.1, §8.7–8.8 and decisions D-08 (web only, no Tauri at the event), D-09 (calibration per device), D-10 (audio alongside vibration everywhere), D-20 (`sharpness`, no native or iOS bridges, `spherex:haptic` debug hook) and B-01. **At the event (Q-132)** the A15 laptop is a desktop: the platform default is sound only, `navigator.vibrate` does nothing, and calibration never runs, so the event path is AudioDriver only. The vibrate and calibration branches (dashed) apply after the event.
 
 ```mermaid
 flowchart TD
@@ -27,7 +27,7 @@ flowchart TD
   Tauri["TauriDriver (B-01, post-event, uses sharpness)"] -.-> Create
 
   classDef post stroke-dasharray: 5 5
-  class Tauri post
+  class Tauri,RunCal post
   classDef debug stroke-dasharray: 2 2
   class Debug debug
 ```

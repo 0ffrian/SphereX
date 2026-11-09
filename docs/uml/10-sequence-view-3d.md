@@ -1,12 +1,13 @@
-# 10 Sequence: View in 3D
+# 10 Sequence: open the 3D view (build pane)
 
-Opening the Sky Sculptor view: the frontend asks for `RenderParams`, the backend looks up the asset, queues a texture bake off the request path if they are not cached, and the viewer picks a renderer by `type`. Drawn from architecture spec §4.4, rendering doc §3.4, §4, §5, §6.7, §7, §7.7, and decisions D-01, D-05, D-12, D-21 and D-22, and Q-111 and Q-112 (issue #41: object job, background bake).
+Opening the Sky Sculptor view in the build pane of the split pane ([R5.8](../rendering/build-mould.md#r58-build-split-view-and-moulding), [A21.8](../architecture/sky-shell-behaviour.md#a218-split-pane)). There is one 3D view: *Build it* on the object card, *Build it in 3D* in the object panel and the rail's 3D viewer all open it (Q-120 item 4). This diagram draws the load with `animate` false (the rail, or the end state of a build); the moulding steps are [21](21-sequence-build-mould.md). Then: the frontend asks for `RenderParams`, the backend looks up the asset, queues a texture bake off the request path if they are not cached, and the viewer picks a renderer by `type`. Drawn from architecture spec §4.4, rendering doc §3.4, §4, §5, §6.7, §7, §7.7, and decisions D-01, D-05, D-12, D-21 and D-22, and Q-111 and Q-112 (issue #41: object job, background bake).
 
 ```mermaid
 sequenceDiagram
   autonumber
   actor U as User
-  participant P as Object panel
+  participant P as Object panel or object card
+  participant BP as BuildPane (split pane)
   participant V as ViewerApp
   participant API as Backend API
   participant AS as Asset lookup (stage 4)
@@ -21,8 +22,9 @@ sequenceDiagram
   alt type is candidate
     P-->>U: No button. "Not enough data for a 3D model: distance and albedo unknown"
   else type has a 3D view
-    U->>P: View in 3D
-    P->>V: Open viewer for id
+    U->>P: Build it in 3D (object panel), Build it (object card), or the rail 3D viewer
+    P->>BP: openBuild(animate): sky to the left half, pane on the right, #...&build
+    BP->>V: Load the body for id (useSelectedBodyLoader, Q-120 item 5)
     V->>API: GET /v1/objects/{id}/render-params
     API->>AS: Look up asset for id
     alt saved
