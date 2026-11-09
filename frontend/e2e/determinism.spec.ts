@@ -94,7 +94,7 @@ async function draw(page: Page, kinds: string[]): Promise<Buffer> {
 test('TAAU tier: the settled frame does not depend on what was shown before', async ({
   browser,
 }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000); // two renders on a software GPU: 2.0 min on a CI runner, so 120 s was tight
   const direct = await draw(await browser.newPage(), ['gas_giant']);
   const after = await draw(await browser.newPage(), ['planet_water', 'gas_giant']);
   const diff = await maxChannelDiff(await browser.newPage(), direct, after);

@@ -63,8 +63,17 @@ interface GridSamples {
  * Samples the viewer on every animation frame for `ms`. For the shown frame, every expected
  * marker inside the grid must be drawn at frame-place's left/top + (x + 0.5) source pixels, and
  * nothing else. A source string: the e2e TypeScript config has no DOM types.
+ *
+ * With `untilAllShown`, `ms` is a cap: sampling stops early once every frame has been on screen
+ * (and at least `minMs` has passed), so a slow CI runner gets more time instead of a failure.
  */
-function sampleMarkers(page: Page, expected: Marker[][], ms: number, stepAt = -1) {
+function sampleMarkers(
+  page: Page,
+  expected: Marker[][],
+  ms: number,
+  stepAt = -1,
+  { untilAllShown = false, minMs = 0 } = {},
+) {
   return page.evaluate(`new Promise((done) => {
     const expected = ${JSON.stringify(expected)};
     const grid = ${GRID};
@@ -72,6 +81,9 @@ function sampleMarkers(page: Page, expected: Marker[][], ms: number, stepAt = -1
     const q = (id) => document.querySelector('[data-testid="' + id + '"]');
     const start = performance.now();
     const end = start + ${ms};
+    const allShown = () =>
+      ${untilAllShown} && performance.now() - start >= ${minMs} &&
+      new Set(out.shown).size >= expected.length;
     let stepped = ${stepAt} < 0;
     const tick = () => {
       const now = performance.now();
@@ -118,7 +130,7 @@ function sampleMarkers(page: Page, expected: Marker[][], ms: number, stepAt = -1
           if (!out.firstWrong) out.firstWrong = 'frame ' + i + ': ' + bad;
         }
       }
-      if (now < end) requestAnimationFrame(tick);
+      if (now < end && !allShown()) requestAnimationFrame(tick);
       else done(out);
     };
     requestAnimationFrame(tick);
@@ -190,6 +202,7 @@ test('Gaia markers sit on their stars on every frame size, clipped frame include
 });
 
 test('markers follow the frame on screen during fast playback', async ({ page }) => {
+  test.setTimeout(60_000);
   await openBarnard(page);
   const expected = gaiaByFrame(await replies(page));
   await expect(page.getByTestId('preload-progress')).toHaveText(/^Cutouts loaded: 24 of 24$/);
@@ -199,11 +212,16 @@ test('markers follow the frame on screen during fast playback', async ({ page })
   const play = page.getByTestId('play-pause');
   await play.click();
   await expect(play).toHaveText('Pause');
-  const r = await sampleMarkers(page, expected, 4_000);
+  // At 8 fps a full loop of the 24 frames takes 3 s. Sample until every frame has been on screen
+  // (at least 4 s, at most 20 s): a slow or shared CI runner plays fewer frames per second, which
+  // is not what this test checks (it failed on main after #61 with 16 and 19 frames in a fixed 4 s;
+  // it had flaked the same way after #49 and #57).
+  const r = await sampleMarkers(page, expected, 20_000, -1, { untilAllShown: true, minMs: 4_000 });
   await play.click();
   expect(r.wrong, r.firstWrong ?? '').toBe(0);
   expect(r.stray).toBe(0);
-  expect(r.checked).toBeGreaterThan(50);
+  // Not vacuous: at least one checked sample per frame (a raw sample count depends on the runner).
+  expect(r.checked).toBeGreaterThanOrEqual(expected.length);
   // Every size was on screen, the clipped frame (2) included.
   expect(new Set(r.shown).size).toBeGreaterThanOrEqual(20);
   expect(r.shown).toContain(2);
