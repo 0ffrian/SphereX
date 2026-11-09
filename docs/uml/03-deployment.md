@@ -1,6 +1,6 @@
 # 03 Deployment
 
-Where each part runs at the event, and what talks to what. Drawn from architecture spec §3, §6.3, §9, §10 and §12, rendering doc §2, §5.5, §8.1, and decisions D-05, D-06, D-08, D-15, D-24 and D-25. Dashed nodes are post-event or optional.
+Where each part runs at the event, and what talks to what. Drawn from architecture spec §3, §6.3, §9, §10 and §12, rendering doc §2, §5.5, §8.1, and decisions D-05, D-06, D-08, D-15, D-24 and D-25, and Q-111 and Q-112 (issue #41: object jobs and worker processes). Dashed nodes are post-event or optional.
 
 ```mermaid
 flowchart LR
@@ -29,14 +29,19 @@ flowchart LR
       Bundle["Built frontend: Vite bundle"]
       PyAPI["FastAPI API (D-15, D-16)"]
     end
-    PipelineN["Pipeline + data adapters"]
+    PipelineN["Pipeline + data adapters: one background job per object, shared cutout pool SX_CUTOUT_CONCURRENCY (Q-111, Q-112)"]
+    MeasureW["Measure workers: 2 spawn processes (SX_MEASURE_WORKERS=2), photometry per cutout (Q-112)"]
+    BakeW["Bake worker: 1 spawn process (SX_BAKE_WORKERS=1), runs the texture baker off the request path (Q-112)"]
     BakerN["Texture baker: numpy, scipy, opencv-headless, Pillow (CPU only)"]
     GemN["gemini_paint (P3, admin token, off when offline)"]
     Cache[("Read-through cache (D-25): outside git, zipped backup")]
     Textures[("/data/textures")]
+    Shapes[("/data/shapes/{name}.glb from backend/assets/shapes")]
     PreFetch["Pre-fetch script (D-25): 5 test targets + every demo object"]
     PyAPI --- PipelineN
-    PyAPI --- BakerN
+    PipelineN --- MeasureW
+    PyAPI --- BakeW
+    BakeW --- BakerN
     PyAPI --- GemN
     PipelineN --- Cache
     BakerN --- Textures
@@ -56,9 +61,9 @@ flowchart LR
     Horizons["JPL Horizons"]
     SkyBoT["IMCCE SkyBoT"]
     SBDB["JPL SBDB"]
-    DAMIT["DAMIT"]
+    DAMIT["DAMIT (not called live: OBJ converter only, site was down)"]
     SIMBAD["SIMBAD"]
-    Exo["NASA Exoplanet Archive (untested)"]
+    Exo["NASA Exoplanet Archive (PSCompPars, tested)"]
     GeminiAPI["Gemini image API"]
   end
 
@@ -99,6 +104,6 @@ flowchart LR
 - HTTPS is needed because WebGPU needs a secure context. A local root certificate (e.g. `mkcert`) is installed on both Android phones; whether a clicked-through self-signed certificate is enough is **[verify]** (D-24).
 - Venue Wi-Fi may block device-to-device traffic, so the team brings a router or hotspot (D-24).
 - The demo runs with `SX_OFFLINE=1`: nothing touches the network, and the Gemini layer stays off so the code path shows (D-24, D-25). The pre-fetch script fills the cache while the internet is good. Cutouts only, never whole frames. Where the script runs is not stated; it is drawn on the A15 because the cache lives there.
-- The baker is CPU-only (rendering doc §2).
+- The baker is CPU-only (rendering doc §2). Since issue #41 it runs in a `spawn` worker process (`SX_BAKE_WORKERS=1`) queued by the API, and photometry runs in 2 more (`SX_MEASURE_WORKERS=2`), which leaves cores for the API on the A15 (ASSUMPTION in Q-112). With `SX_PREFETCH_ON_START=1` the API itself warms the cache for the demo targets at start-up (Q-112); overlays and composites still need the pre-fetch script.
 - There is no public URL after the event. A static hosted copy is a later, separate decision (D-24).
 - Whether the A15 also replaces the Zenbook as the demo screen is Q-15. Whether the team laptop for offline jobs is the A15 is not stated.

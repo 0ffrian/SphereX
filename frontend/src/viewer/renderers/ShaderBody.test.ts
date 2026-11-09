@@ -5,6 +5,8 @@ import { DataTexture, Texture } from 'three/webgpu';
 import { generateField } from '../fields/fieldGenerator';
 import { ALL_TAGS, ESTIMATED_TAGS } from './bodyRenderer';
 import { ShaderBody } from './ShaderBody';
+import { resolveShaderSpec } from './shaderSpec';
+import { resolveMotion } from '../motion/motion';
 import { fixture } from './fixtures.testutil';
 import type { BodyContext } from './bodyRenderer';
 
@@ -87,7 +89,7 @@ describe('ShaderBody', () => {
       },
     });
     await body.setOverrides({ sea_level: 0.55 });
-    expect(seen).toEqual([0.4, 0.55]);
+    expect(seen).toEqual([0.58, 0.55]);
     expect(body.drawn).toEqual(['surface']);
   });
 });
@@ -248,9 +250,9 @@ describe('ShaderBody field and point access for the haptic sources (review N1)',
       const f = fixture(k);
       const body = await ShaderBody.create(f.card, f.params, ctx);
       if (k === 'nebula' || k === 'nova') {
+        // Q-103: neither volume has haptics, so neither keeps a field or point sets.
         expect(body.field).toBeNull();
-        expect(body.pointSets).not.toBeNull();
-        expect(body.pointSets!['glow'] ?? body.pointSets!['shell']).toBeDefined();
+        expect(body.pointSets).toBeNull();
       } else {
         expect(body.field).not.toBeNull();
         expect(body.pointSets).toBeNull();
@@ -264,9 +266,13 @@ describe('ShaderBody field and point access for the haptic sources (review N1)',
     const g = fixture('gas_giant');
     const gas = await ShaderBody.create(g.card, g.params, ctx);
     // The tilt group is rotated 0.35 rad about z, so world +y sits 0.35 rad off the body axis.
+    // The surface frame also undoes the flattening (the polar axis is 1 - f of the equatorial), so
+    // a point is mapped onto the unit sphere the field is defined on.
+    const f = resolveShaderSpec(g.card, g.params, undefined, resolveMotion(g.card, g.params)).gas!
+      .flattening;
     const [x, y, z] = gas.worldToBody([0, 1, 0]);
     expect(x).toBeCloseTo(Math.sin(0.35), 6);
-    expect(y).toBeCloseTo(Math.cos(0.35), 6);
+    expect(y).toBeCloseTo(Math.cos(0.35) / (1 - f), 6);
     expect(z).toBeCloseTo(0, 9);
     const n = fixture('nebula');
     const neb = await ShaderBody.create(n.card, n.params, ctx);
@@ -277,19 +283,28 @@ describe('ShaderBody field and point access for the haptic sources (review N1)',
     const world = await ShaderBody.create(w.card, w.params, ctx);
     expect(world.worldToBody([0.3, 0.4, 0.5])).toEqual([0.3, 0.4, 0.5]);
   });
+});
 
-  it('generates nebula points through the point source (the worker path), not inline', async () => {
-    const n = fixture('nebula');
-    const asked: string[] = [];
-    const { generatePoints } = await import('./pointClouds');
-    await ShaderBody.create(n.card, n.params, {
-      visibleTags: ALL_TAGS,
-      pointSource: async (type, seed) => {
-        asked.push(`${type}:${seed}`);
-        return generatePoints(type, seed);
-      },
-    });
-    expect(asked).toEqual([`nebula:${n.params.seed}`]);
+describe('ShaderBody volumes free their GPU texture (review of #51)', () => {
+  const handles = (b: ShaderBody) => (b as unknown as { volumes: { dispose(): void }[] }).volumes;
+
+  it('dispose() disposes the volume (and so its Data3DTexture)', async () => {
+    const f = fixture('nebula');
+    const body = await ShaderBody.create(f.card, f.params, ctx);
+    const spies = handles(body).map((v) => vi.spyOn(v, 'dispose'));
+    expect(spies.length).toBeGreaterThan(0);
+    body.dispose();
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1);
+  });
+
+  it('a rebuild (a slider change) disposes the volume it replaces', async () => {
+    const f = fixture('nova');
+    const body = await ShaderBody.create(f.card, f.params, ctx);
+    const old = handles(body).map((v) => vi.spyOn(v, 'dispose'));
+    await body.setOverrides({ energy_e51: 2 });
+    for (const s of old) expect(s).toHaveBeenCalledTimes(1);
+    expect(handles(body)[0]).not.toBe(undefined);
+    body.dispose();
   });
 });
 

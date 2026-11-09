@@ -64,7 +64,8 @@ interface ObjectCard {
   period_var_d?: TV;                  // Mira period
   lightcurve?: { t_mjd: number; flux: number; sigma: number; lambda_um: number; flags: number }[];
   // geometry of observation (solar-system bodies)
-  phase_angle_deg?: TV; sun_vector?: TV<[number, number, number]>;
+  phase_angle_deg?: TV; sun_vector?: TV<[number, number, number]>;   // sun_vector: unit vector target -> Sun,
+                                      // ICRF equatorial J2000 (Horizons, Q-62)
   // comet
   gas_Q?: { co2?: TV; h2o?: TV; co?: TV };   // molecules/s, per epoch (the shape holds one epoch: Q-42)
   coma_radius_km?: TV; nucleus_radius_km_max?: TV;
@@ -84,8 +85,8 @@ interface ObjectCard {
    - T Tauri → `star_ttauri`
    - any other star → `star`
 4. NASA Exoplanet Archive match → `planet_rocky`, `planet_water` or `gas_giant`.
-   - Classification thresholds (which columns, which cut-offs): **[verify] / to decide**. Open item, [§12](layout-tests-open-items.md#r12-open-items-verify). Do not hard-code values until they are agreed.
-   - The Exoplanet Archive service itself is not yet confirmed ([architecture spec §3.8](../architecture/README.md)).
+   - Classification thresholds: **proposed** values in `PROPOSED_EXOPLANET_THRESHOLDS` in `backend/app/core/classify/rules.py` (Q-63: radius cuts, true mass, Zeng 2019 mass-radius curves), chosen by Moon on 7 Nov 2026. The live thresholds stay `None` (refuse: `candidate` with `type:exoplanet_thresholds`) until Atish (classify owner, D-17) confirms Q-63; all values stay **[verify]**. Archive values marked `CALCULATED_VALUE` are never used to classify (Q-63). Open item, [§12](layout-tests-open-items.md#r12-open-items-verify).
+   - The Exoplanet Archive service is tested ([architecture spec §3.8](../architecture/README.md)).
 5. `nebula` and `nova` come from user sliders only. They have no catalogue rule; they are slider-only showcase bodies, and every value is tagged `artistic` (D-12).
 6. Anything else → `candidate`.
 
@@ -98,14 +99,41 @@ interface RenderParams {
   id: string; type: ObjectType; generator_version: string; seed: number;   // seed: integer >= 0 (Q-35)
   scale_m: number | null;              // physical radius in metres; null = size unknown, body refused (Q-33)
   layers: Layer[];                     // ordered, each with a tag
-  textures?: { albedo: string; height: string; normal: string; roughness?: string; height_bin?: string };
+  // relief_amp: peak relief, fraction of the radius (R6.2); scales the displacement (R7.2). Optional, the backend does not send it yet (Q-103)
+  textures?: { albedo: string; height: string; normal: string; roughness?: string; height_bin?: string; relief_amp?: number };
   lighting: { mode: 'sun' | 'self'; sun_dir?: [number, number, number]; phase_angle_deg?: number };
+                                       // sun_dir: today a copy of the card's ICRF sun_vector; the viewer reads it
+                                       // as scene space. Frame conversion open (Q-62); phase_angle_deg wins
   view_modes: { visible: VisibleMode; spherex_ir?: IRMode };
+  dynamics?: Dynamics;                 // D-32, D-34. Absent until stage 6: the body stays still (except R7.1 spin)
   haptics: HapticProfile;              // §8
   alt_text: string;                    // §9
   missing: string[];                   // layers refused for missing data, shown to the user
 }
-interface Layer { id: string; tag: Tag; description: string; requires: string[] }
+type Tier = 1 | 2 | 3 | 4 | 5;       // D-32: 1 measured, 2 derived, 3 model_dependent, 4 inferred_from_analog, 5 artistic
+interface Layer {
+  id: string; tag: Tag; description: string; requires: string[];
+  tier: Tier;                          // required; fixed by tag (see below)
+  formula?: string;                    // required, non-blank, when tag is derived or model_dependent
+  assumed?: Record<string, number | string>; // required when model_dependent: the inputs that were not measured, with the value used
+}
+
+// D-32, D-34: motion rates. Same tier rules as Layer.
+interface DynamicsValue {
+  value: number;                       // never null: a rate no rung can answer is omitted and listed in missing
+  tag: Tag; tier: Tier; source: string;
+  formula?: string; assumed?: Record<string, number | string>;
+}
+interface Dynamics {
+  spin_period_h?: DynamicsValue;       // sidereal, hours, > 0 (equatorial for stars and giants)
+  diff_rotation?: DynamicsValue;       // k in Omega(phi) = Omega_eq (1 - k sin^2 phi)
+  jet_speed_ms?: DynamicsValue;        // peak zonal wind, m/s
+  spot_lifetime_d?: DynamicsValue;     // star spot group lifetime, days, > 0
+  flare_rate_per_d?: DynamicsValue;    // flares per day above the drawn threshold, >= 0
+  pulsation_period_d?: DynamicsValue;  // Mira, from the light curve, days, > 0
+  // required; keys spin, spots, flares, winds, clouds, pulsation; each value > 0; {} when nothing moves
+  speedup: { [process: string]: number };
+}
 
 // D-23: VisibleMode and IRMode use one shape
 interface VisibleMode {
@@ -119,3 +147,8 @@ type IRMode = VisibleMode;
 ```
 
 When a mode is not available, the reason goes in `missing` ([§5.2](display-rules.md#r52-view-modes)).
+
+**Tiers and dynamics (D-32, D-34).**
+- Tag and tier always agree: `measured` 1, `derived` 2, `model_dependent` 3, `inferred_from_analog` 4, `artistic` 5. The schema rejects a mismatch, on `Layer` and on `DynamicsValue`. `formula` is required for `derived` and `model_dependent`. `assumed` is required for `model_dependent` and lists only the inputs that were not measured, keyed by card field or rule input name.
+- A layer or rate falls down the chain and says which rung answered. When no rung answers, a layer goes in `missing` by its id and a rate as `dynamics:<key>` (for example `dynamics:flare_rate_per_d`). `scale_m` and card values are never filled by fallback. A tier 1 rate is the value of a measured card field in the same unit (`spin_period_h` from `rot_period_h`, `pulsation_period_d` from `period_var_d`) and wins over every other rung; a rate with no such field starts at tier 2.
+- `speedup` is the time-lapse factor shown on screen for each animated process ([§5.7](display-rules.md#r57-motion-and-time-lapse)). It is a display choice, not a data value. The live backend omits `dynamics` until stage 6 exists. Absent means no motion data: the body stays still, except the R7.1 asteroid spin.

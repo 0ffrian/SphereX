@@ -9,7 +9,6 @@ import type { HapticProfile, ObjectCard, ObjectType, RenderParams, Tag } from '@
 import type { BuildHapticsOptions, HapticBody, PlanBodyLike } from '@/haptics/profiles';
 import { HeightGrid } from '@/haptics/sources/heightMap';
 import { FieldSampler, generateField, type FieldData } from '@/viewer/fields/fieldGenerator';
-import { generateNebula, type PointSet } from '@/viewer/renderers/pointClouds';
 import { resolveShaderSpec } from '@/viewer/renderers/shaderSpec';
 import type { Overrides } from '@/viewer/sliders';
 
@@ -18,7 +17,7 @@ export const PAD_H = 128;
 const SEED = 1234;
 const SRC = 'synthetic test-page value, not a measurement';
 
-export type BodyKind = 'gas' | 'water' | 'rocky' | 'asteroid' | 'comet' | 'nebula';
+export type BodyKind = 'gas' | 'water' | 'rocky' | 'asteroid' | 'comet';
 
 export const BODY_LABEL: Readonly<Record<BodyKind, string>> = {
   gas: 'Gas giant with rings (flow, Teq pulse)',
@@ -26,7 +25,6 @@ export const BODY_LABEL: Readonly<Record<BodyKind, string>> = {
   rocky: 'Hot rocky world (terrain with lava cracks, Teq pulse)',
   asteroid: 'Procedural asteroid (height map)',
   comet: 'Comet coma (field)',
-  nebula: 'Nebula (point density)',
 };
 
 const TYPE: Readonly<Record<BodyKind, ObjectType>> = {
@@ -35,7 +33,6 @@ const TYPE: Readonly<Record<BodyKind, ObjectType>> = {
   rocky: 'planet_rocky',
   asteroid: 'asteroid_procedural',
   comet: 'comet',
-  nebula: 'nebula',
 };
 
 /** The haptic profiles the backend would send (R8.5, D-12). Texture tags are `artistic`. */
@@ -45,7 +42,6 @@ const PROFILE: Readonly<Record<BodyKind, Omit<HapticProfile, 'data_tag'>>> = {
   rocky: { texture: 'terrain', texture_tag: 'artistic', data: 'teq_pulse', params: { tau: 0.15 } },
   asteroid: { texture: 'height', texture_tag: 'artistic', data: 'none', params: { tau: 0.15 } },
   comet: { texture: 'none', texture_tag: 'artistic', data: 'field', params: { maxRateHz: 30 } },
-  nebula: { texture: 'none', texture_tag: 'artistic', data: 'field', params: {} },
 };
 
 export interface ObjectChoices {
@@ -63,9 +59,7 @@ export interface SyntheticObject {
   view: 'map' | 'face';
   /** Grey levels 0–1 of the pad image, per pad pixel (map view), or the face-on drawing data. */
   image:
-    | { kind: 'map'; value: (c: number, r: number) => number }
-    | { kind: 'points'; sets: PointSet[] }
-    | { kind: 'coma'; density: number };
+    { kind: 'map'; value: (c: number, r: number) => number } | { kind: 'coma'; density: number };
 }
 
 function tv(value: number, tag: Tag = 'measured') {
@@ -87,14 +81,13 @@ export function syntheticObject(kind: BodyKind, choices: ObjectChoices): Synthet
   const type = TYPE[kind];
   const p = PROFILE[kind];
   const card: ObjectCard = { id: `synthetic:${kind}`, name: `Synthetic ${kind}`, type };
-  const layerId = kind === 'nebula' ? 'point_cloud' : 'surface';
   const params = {
     id: card.id,
     type,
     generator_version: 'test-page',
     seed: SEED,
     scale_m: 1e7,
-    layers: [{ id: layerId, tag: 'artistic', description: SRC, requires: [] }],
+    layers: [{ id: 'surface', tag: 'artistic', tier: 5, description: SRC, requires: [] }],
     lighting: { mode: 'sun', sun_dir: [1, 0, 0] },
     view_modes: {
       visible: { available: false, badge: 'synthetic', rgb: null, source: 'class_palette' },
@@ -169,32 +162,19 @@ export function syntheticObject(kind: BodyKind, choices: ObjectChoices): Synthet
       image: { kind: 'map', value: (c, r) => grid.texel(c, r) },
     };
   }
-  if (kind === 'comet') {
-    // December denser than August (R8.4 item 3).
-    (card as { gas_Q: unknown }).gas_Q = {
-      '2025-08': { co2: tv(2.5e25), h2o: tv(1e25) },
-      '2025-12': { co2: tv(1e26), h2o: tv(5e25), co: tv(2e25) },
-    };
-    card.epochs = ['2025-08', '2025-12'];
-    const nucleus: PlanBodyLike[] = [{ id: 'nucleus', axes: [0.04, 0.04, 0.04] }];
-    return {
-      card,
-      params,
-      body: null,
-      options: { ...options, epoch: choices.epoch, gas: 'co2', planBodies: nucleus },
-      view: 'face',
-      image: { kind: 'coma', density: choices.epoch === '2025-12' ? 1 : 0.25 },
-    };
-  }
-  card.diameter_km = tv(1e9, 'artistic');
-  const points = generateNebula(SEED);
-  const sets = { glow: points.glow, dust: points.dust, stars: points.stars };
+  // The comet (the only kind left): December denser than August (R8.4 item 3).
+  (card as { gas_Q: unknown }).gas_Q = {
+    '2025-08': { co2: tv(2.5e25), h2o: tv(1e25) },
+    '2025-12': { co2: tv(1e26), h2o: tv(5e25), co: tv(2e25) },
+  };
+  card.epochs = ['2025-08', '2025-12'];
+  const nucleus: PlanBodyLike[] = [{ id: 'nucleus', axes: [0.04, 0.04, 0.04] }];
   return {
     card,
     params,
-    body: { field: null, pointSets: sets, worldToBody: (q) => q },
-    options,
+    body: null,
+    options: { ...options, epoch: choices.epoch, gas: 'co2', planBodies: nucleus },
     view: 'face',
-    image: { kind: 'points', sets: Object.values(sets) },
+    image: { kind: 'coma', density: choices.epoch === '2025-12' ? 1 : 0.25 },
   };
 }

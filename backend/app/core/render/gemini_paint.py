@@ -7,7 +7,10 @@ Order (UML 12):
 3. Gemini, server-side only, through the D-25 read-through cache.
 4. Resample to 2:1; Sobel-edge correlation with the hillshade; below 0.3 is rejected (D-07).
 5. Seam fix (roll W/2, blend a 32 px band, roll back), then ``albedo_ai.webp`` + ``gemini.json``
-   beside the code maps. Tag ``artistic``, label "AI-made".
+   in the AI root (``SX_TEXTURES_AI_DIR``), a mirror of the code bake's directory that is
+   **outside** the ``/data/textures`` static mount, so the AI files are only ever served through
+   the status-checked API (Q-122). Tag ``artistic``, label "AI-made". Only the desktop size
+   (2048x1024) is painted; the mobile 1024x512 bake keeps the code colour.
 
 Every failure (no key, offline, timeout, refusal, bad image, low correlation, refused bake) keeps
 the code colour and returns the reason; nothing here raises for those. The API key is only ever
@@ -38,11 +41,20 @@ from PIL import Image
 from app.adapters.http import RETRY_STATUS, USER_AGENT, NetworkDisabled
 from app.cache.keys import CacheKey
 from app.cache.store import CacheEntry, LiveResponse, ReadThroughCache, atomic_write
-from app.core.render.bake import META, bake_key, bake_to_cache, png_image, webp_rgb
+from app.core.render.bake import (
+    BAKER_RULES_VERSION,
+    META,
+    bake_dir,
+    bake_key,
+    bake_to_cache,
+    png_image,
+    webp_rgb,
+)
 from app.core.render.card_to_params import (
     GENERATOR_VERSION,
     TEXTURE_HEIGHT,
     TEXTURE_WIDTH,
+    TIER_OF_TAG,
     seed_for,
 )
 from app.core.render.noise import F64
@@ -60,19 +72,22 @@ LABEL = "AI-made"  # D-07, A6.2
 FAILED_TEXT = "Failed, using code"  # A6.2
 EDGE_CORRELATION_MIN = 0.3  # D-07 / R6.6 step 4
 SEAM_BAND_PX = 32  # R6.6 step 5
-# ASSUMPTION: where the AI albedo is written (UML 12 marks the path [verify]): beside the code
-# maps in the R6.7 size directory, so a rebake (new bake.json key) removes it with them.
+# ASSUMPTION (Q-122): the AI albedo is written to ``<AI root>/<R6.7 size directory>``, the same
+# relative path as the code maps but under ``SX_TEXTURES_AI_DIR``, which is never mounted as
+# static files. A rebake does not remove it; status() compares it with the bake on disk instead.
 AI_FILE = "albedo_ai.webp"
 AI_META = "gemini.json"
 # Per-object pointer to the last applied repaint, so the status and image endpoints need no card
-# build: ``<texture root>/.gemini/<sha256(object id)>.json``. ASSUMPTION (Q-87).
-POINTER_DIR = ".gemini"
+# build: ``<AI root>/pointers/<sha256(object id)>.json``. ASSUMPTION (Q-122).
+POINTER_DIR = "pointers"
 CACHE_SOURCE = "gemini"
 # Hillshade light (artistic, R6.6 gives none): from the north-west, 45 degrees up.
 HILLSHADE_AZIMUTH_DEG = 315.0
 HILLSHADE_ALTITUDE_DEG = 45.0
 # ASSUMPTION: refuse decoded images above this many pixels (decompression-bomb guard).
 MAX_IMAGE_PIXELS = 4096 * 4096
+# ASSUMPTION: refuse a reply body above this many bytes (a base64 2048x1024 image is a few MB).
+MAX_REPLY_BYTES = 32 * 1024 * 1024
 
 EDGE_FORMULA = (
     "Pearson correlation of Sobel gradient magnitudes (longitude wraps) of the hillshade and of "
@@ -87,7 +102,17 @@ PROMPT_BASE = (
 
 # Finish reasons that mean the model refused rather than failed. [verify] against the API docs.
 _REFUSAL_FINISH = frozenset(
-    {"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "IMAGE_SAFETY", "RECITATION"}
+    {
+        "SAFETY",
+        "PROHIBITED_CONTENT",
+        "BLOCKLIST",
+        "SPII",
+        "RECITATION",
+        "IMAGE_SAFETY",
+        "IMAGE_PROHIBITED_CONTENT",
+        "IMAGE_RECITATION",
+        "IMAGE_OTHER",
+    }
 )
 
 
@@ -346,29 +371,52 @@ class GeminiRestClient:
                     last = timed_out
                     break
                 timeout = httpx.Timeout(remaining, connect=min(s.http_connect_timeout_s, remaining))
+                retry = False
                 try:
-                    resp = client.post(self.endpoint, json=body, headers=headers, timeout=timeout)
+                    with client.stream(
+                        "POST", self.endpoint, json=body, headers=headers, timeout=timeout
+                    ) as resp:
+                        if resp.status_code == 200:
+                            return parse_response(self._read(resp, deadline, timed_out))
+                        # Do not read or echo the body: an error body could quote the request.
+                        last = GeminiError(
+                            f"gemini_http_{resp.status_code}", "the API refused the call"
+                        )
+                        retry = resp.status_code in RETRY_STATUS
                 except (httpx.ConnectTimeout, httpx.PoolTimeout) as exc:
-                    # Capped at the connect timeout, so budget is usually left: retry.
+                    # The request never left: capped at the connect timeout, so retry.
                     last = GeminiError(
                         "gemini_timeout", f"could not connect ({type(exc).__name__})"
                     )
+                    continue
+                except httpx.ConnectError as exc:
+                    last = GeminiError("gemini_unreachable", type(exc).__name__)
                     continue
                 except httpx.TimeoutException:
                     # A read or write timeout is set to the time left, so the budget is spent.
                     last = timed_out
                     break
                 except httpx.TransportError as exc:
-                    # The exception text never holds the key: it is sent as a header only.
+                    # The request may have reached Google (ReadError, RemoteProtocolError...):
+                    # never retried, so one admin call is billed at most once. The exception
+                    # text never holds the key: it is sent as a header only.
                     last = GeminiError("gemini_unreachable", type(exc).__name__)
-                    continue
-                if resp.status_code == 200:
-                    return parse_response(resp.content)
-                # Do not echo the body: an error body could quote the request.
-                last = GeminiError(f"gemini_http_{resp.status_code}", "the API refused the call")
-                if resp.status_code not in RETRY_STATUS:
+                    break
+                if not retry:
                     break
         raise last
+
+    def _read(self, resp: httpx.Response, deadline: float, timed_out: GeminiError) -> bytes:
+        """The reply body, streamed: the whole-call deadline and ``MAX_REPLY_BYTES`` are checked
+        between chunks (httpx's read timeout alone is per read and the size is unbounded)."""
+        buf = bytearray()
+        for chunk in resp.iter_bytes():
+            buf += chunk
+            if len(buf) > MAX_REPLY_BYTES:
+                raise GeminiError("gemini_reply_too_large", f"reply over {MAX_REPLY_BYTES} bytes")
+            if self._clock() > deadline:
+                raise timed_out
+        return bytes(buf)
 
 
 def parse_response(content: bytes) -> GeminiImage:
@@ -411,29 +459,31 @@ def parse_response(content: bytes) -> GeminiImage:
 
 @dataclass(frozen=True)
 class PaintTarget:
-    """The bake the viewer shows: the card plus the RenderParams ``seed`` and
+    """The bake the viewer shows: the card id plus the RenderParams ``seed`` and
     ``generator_version`` (R3.4). A saved or pre-baked asset carries its own seed, so the
     painter must use it, not one derived from the URL id."""
 
-    card: Mapping[str, Any]
+    bake_id: str
     seed: int
     generator_version: str
 
-    @property
-    def bake_id(self) -> str:
-        return str(self.card["id"])
-
     @classmethod
     def of(
-        cls, card: Mapping[str, Any], render_params: Mapping[str, Any] | None = None
+        cls, bake_id: str, render_params: Mapping[str, Any] | None = None, *, seed_id: str = ""
     ) -> PaintTarget:
+        """``render_params`` seed and version when they are usable, else the stage 7 defaults
+        (``GENERATOR_VERSION`` and ``seed_for(seed_id or bake_id)``), as the pipeline does."""
         rp = render_params or {}
         raw_version = rp.get("generator_version")
         version = raw_version if isinstance(raw_version, str) and raw_version else GENERATOR_VERSION
         seed = rp.get("seed")
         if not isinstance(seed, int) or isinstance(seed, bool):
-            seed = seed_for(str(card["id"]), version)
-        return cls(card, seed, version)
+            seed = seed_for(seed_id or bake_id, version)
+        return cls(bake_id, seed, version)
+
+    def rel_dir(self, width: int, height: int) -> Path:
+        """The R6.7 size directory, relative to a texture root (segments percent-encoded)."""
+        return bake_dir(Path(), self.bake_id, self.generator_version, self.seed, width, height)
 
 
 @dataclass(frozen=True)
@@ -450,6 +500,7 @@ class PaintOutcome:
     from_cache: bool = False
     ai_path: Path | None = None
     code_dir: Path | None = None
+    size: tuple[int, int] | None = None
     extra_missing: tuple[str, ...] = field(default_factory=tuple)
     # The verified AI albedo bytes (status only), so the image route serves what was checked.
     ai_bytes: bytes | None = field(default=None, repr=False, compare=False)
@@ -471,16 +522,28 @@ class PaintOutcome:
             "missing": self.missing,
             "cached_at": self.fetched_at,
             "from_cache": self.from_cache,
-            "provenance": {
-                "edge_correlation": {"tag": "derived", "formula": EDGE_FORMULA},
+            # Q-122: a process check on the AI image, not a value about the object, so it has
+            # no provenance tag (the D-02 / D-32 tags describe the object).
+            "checks": {
+                "edge_correlation": {
+                    "kind": "process_check",
+                    "about": "the AI image against a hillshade of the code height map",
+                    "formula": EDGE_FORMULA,
+                    "min": EDGE_CORRELATION_MIN,
+                }
             },
+            "provenance": {},
         }
         if self.applied:
             body["albedo_url"] = albedo_url
+            body["label"] = LABEL
+            if self.size is not None:
+                body["size"] = f"{self.size[0]}x{self.size[1]}"
+            # A D-32 ``Layer`` (render-params.schema.json#/definitions/Layer).
             body["layer"] = {
                 "id": LAYER_ID,
                 "tag": TAG,
-                "label": LABEL,
+                "tier": TIER_OF_TAG[TAG],
                 "description": (
                     f"Albedo repainted by {self.model} from a hillshade of the baked height map "
                     "(R6.6); relief, normals, haptics and sound still use the code height map."
@@ -501,8 +564,13 @@ class _Reject:
     edge_correlation: float | None = None
 
 
+def _is_inside(path: Path, root: Path) -> bool:
+    p, r = path.resolve(), root.resolve()
+    return p == r or p.is_relative_to(r)
+
+
 class GeminiPainter:
-    """Runs R6.6 for one object. ``client`` is None when no key is set (layer off)."""
+    """Runs R6.6 for one object. ``client`` is None when no key is set (no live call)."""
 
     def __init__(
         self,
@@ -512,21 +580,41 @@ class GeminiPainter:
         *,
         width: int = TEXTURE_WIDTH,
         height: int = TEXTURE_HEIGHT,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
+        # Q-122: the AI files must never sit under the /data/textures static mount, where they
+        # would be served with no status check (and under SX_OFFLINE=1, where D-24 turns the
+        # layer off).
+        if _is_inside(settings.textures_ai_path, settings.textures_path):
+            raise ValueError("SX_TEXTURES_AI_DIR must be outside the served SX_TEXTURES_DIR")
         self.settings = settings
         self.cache = cache
         self.client = client
         self.width = width
         self.height = height
-        # One Gemini call at a time (admin only, paid, slow). This is the painter's own lock, so
-        # a slow call never holds one of the cache's shared stripes.
-        self._call_lock = threading.Lock()
+        self._clock = clock
+        # One repaint per object at a time (call, then image, meta and pointer writes), so two
+        # concurrent refreshes cannot interleave their writes. Different objects run in
+        # parallel. These are the painter's own locks: a slow call never holds a cache stripe.
+        self._locks: dict[str, threading.Lock] = {}
+        self._locks_guard = threading.Lock()
+        # Per-object time of the last live call, for SX_GEMINI_COOLDOWN_S (cost control).
+        self._last_call: dict[str, float] = {}
 
     @property
     def model(self) -> str:
         return self.client.model if self.client is not None else self.settings.gemini_model
 
-    def _fail(self, object_id: str, reason: str, detail: str, **kw: Any) -> PaintOutcome:
+    @property
+    def ai_root(self) -> Path:
+        return self.settings.textures_ai_path
+
+    def _lock_for(self, object_id: str) -> threading.Lock:
+        with self._locks_guard:
+            return self._locks.setdefault(object_id, threading.Lock())
+
+    def refuse(self, object_id: str, reason: str, detail: str, **kw: Any) -> PaintOutcome:
+        """The code-path outcome (``status: code``) with ``reason``. Never raises."""
         return PaintOutcome(
             object_id, False, reason, f"{FAILED_TEXT}: {detail}", model=self.model, **kw
         )
@@ -534,21 +622,25 @@ class GeminiPainter:
     def _offline_blocked(self) -> bool:
         return self.settings.offline and not self.settings.gemini_offline_cache
 
-    def _params(self, object_id: str, t: PaintTarget) -> BakeParams | PaintOutcome:
-        if t.card.get("type") not in BAKED_TYPES:
-            return self._fail(
-                object_id, "not_baked_type", f"type {t.card.get('type')!r} has no baked albedo"
+    def _params(
+        self, object_id: str, card: Mapping[str, Any], seed: int
+    ) -> BakeParams | PaintOutcome:
+        if card.get("type") not in BAKED_TYPES:
+            return self.refuse(
+                object_id, "not_baked_type", f"type {card.get('type')!r} has no baked albedo"
             )
         try:
-            return params_from_card(t.card, t.seed)
+            return params_from_card(card, seed)
         except BakeRefusal as exc:
-            return self._fail(
+            return self.refuse(
                 object_id, "bake_refused", exc.reason, extra_missing=tuple(exc.missing)
             )
+        except (ValueError, TypeError, KeyError) as exc:  # e.g. a negative seed from an asset
+            return self.refuse(object_id, "bake_failed", type(exc).__name__)
 
     def _pointer(self, object_id: str) -> Path:
         name = hashlib.sha256(object_id.encode("utf-8")).hexdigest()
-        return self.settings.texture_root / POINTER_DIR / f"{name}.json"
+        return self.ai_root / POINTER_DIR / f"{name}.json"
 
     def _check(self, data: bytes, shade: F64) -> tuple[NDArray[np.uint8], float] | _Reject:
         """R6.6 steps 3 and 4: decode to the 2:1 grid, then the D-07 edge check."""
@@ -566,9 +658,23 @@ class GeminiPainter:
         return rgb, corr
 
     def _reject(self, object_id: str, r: _Reject, out: Path) -> PaintOutcome:
-        return self._fail(
+        return self.refuse(
             object_id, r.reason, r.detail, edge_correlation=r.edge_correlation, code_dir=out
         )
+
+    def _cache_get(self, key: CacheKey) -> CacheEntry | None:
+        try:
+            return self.cache.get(key)
+        except (OSError, ValueError):  # e.g. an entry deleted mid-read: treat it as a miss
+            return None
+
+    def _cooling(self, object_id: str) -> float:
+        """Seconds before another live call for this object is allowed (0 = allowed now)."""
+        last = self._last_call.get(object_id)
+        cooldown = self.settings.gemini_cooldown_s
+        if last is None or cooldown <= 0:
+            return 0.0
+        return max(0.0, last + cooldown - self._clock())
 
     def _call(
         self, object_id: str, prompt: str, reference: bytes, shade: F64, key: CacheKey, out: Path
@@ -576,14 +682,15 @@ class GeminiPainter:
         """One live Gemini call. The image is checked first and cached only if it passes."""
         client = self.client
         assert client is not None
+        self._last_call[object_id] = self._clock()
         try:
             img = client.generate(prompt, reference)
         except GeminiError as exc:
-            return self._fail(object_id, exc.reason, exc.detail, code_dir=out)
+            return self.refuse(object_id, exc.reason, exc.detail, code_dir=out)
         except NetworkDisabled:
-            return self._fail(object_id, "offline", "network disabled", code_dir=out)
+            return self.refuse(object_id, "offline", "network disabled", code_dir=out)
         except Exception as exc:  # any other failed call keeps the code colour
-            return self._fail(object_id, "gemini_unavailable", type(exc).__name__, code_dir=out)
+            return self.refuse(object_id, "gemini_unavailable", type(exc).__name__, code_dir=out)
         checked = self._check(img.data, shade)
         if isinstance(checked, _Reject):  # not cached: the next call asks Gemini again
             return self._reject(object_id, checked, out)
@@ -597,7 +704,7 @@ class GeminiPainter:
         try:
             entry = self.cache.put(key, live)
         except OSError as exc:
-            return self._fail(
+            return self.refuse(
                 object_id,
                 "write_failed",
                 type(exc).__name__,
@@ -619,63 +726,96 @@ class GeminiPainter:
         D-25 order, with one change: an image is stored in the cache only after it passes the
         checks, so a rejected image is never replayed. ``refresh`` skips the cache; if that
         live call fails, the failure is reported (the old entry is not served in its place).
+        Every failure returns the code-path outcome; nothing here raises.
         """
-        t = PaintTarget.of(card, render_params)
-        p = self._params(object_id, t)
+        t = PaintTarget.of(str(card.get("id", object_id)), render_params, seed_id=object_id)
+        p = self._params(object_id, card, t.seed)
         if isinstance(p, PaintOutcome):
             return p
-        root = self.settings.texture_root
+        root = self.settings.textures_path
         # Code path first: the deterministic maps are on disk before Gemini is asked.
         try:
             out = bake_to_cache(p, root, t.bake_id, t.generator_version, self.width, self.height)
             raw = np.frombuffer((out / "height.bin").read_bytes(), dtype="<f2")
-        except OSError as exc:
-            return self._fail(object_id, "bake_failed", type(exc).__name__)
-        h = raw.astype(np.float64).reshape(self.height, self.width)
-        shade = hillshade(h, p.radius_m)
-        if shade is None:
-            return self._fail(
-                object_id,
-                "flat_height",
-                "the height map is flat, nothing to align to",
-                code_dir=out,
-            )
-        if self.client is None:
-            return self._fail(
-                object_id, "gemini_key_missing", "no Gemini key on the server", code_dir=out
-            )
+            h = raw.astype(np.float64).reshape(self.height, self.width)
+        except (OSError, ValueError) as exc:  # ValueError: a truncated height.bin
+            return self.refuse(object_id, "bake_failed", type(exc).__name__)
+        # Cheap refusals before the hillshade.
         if self._offline_blocked():
-            return self._fail(
+            return self.refuse(
                 object_id,
                 "offline",
                 "SX_OFFLINE=1, the Gemini layer is off (D-24, Q-29)",
                 code_dir=out,
             )
-        model = self.client.model
+        if refresh and self.settings.offline:
+            return self.refuse(
+                object_id, "offline", "a refresh needs the network (SX_OFFLINE=1)", code_dir=out
+            )
+        if refresh and self.client is None:
+            return self.refuse(
+                object_id, "gemini_key_missing", "no Gemini key on the server", code_dir=out
+            )
+        try:
+            shade = hillshade(h, p.radius_m)
+        except ValueError as exc:
+            return self.refuse(object_id, "bake_failed", type(exc).__name__, code_dir=out)
+        if shade is None:
+            return self.refuse(
+                object_id,
+                "flat_height",
+                "the height map is flat, nothing to align to",
+                code_dir=out,
+            )
         reference = to_png_gray(shade)
         prompt = build_prompt(p)
+        # With no key, the model name from the settings still finds a cached repaint.
         key = CacheKey.make(
             CACHE_SOURCE,
             None,
-            model=model,
+            model=self.model,
             aspect=self.settings.gemini_aspect_ratio,
             paint=PAINT_VERSION,
             prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
             reference_sha256=hashlib.sha256(reference).hexdigest(),
         )
+        with self._lock_for(object_id):
+            return self._paint(object_id, t, p, out, shade, reference, prompt, key, refresh)
 
-        entry = None if refresh else self.cache.get(key)
-        if entry is None and self.settings.offline:
-            return self._fail(object_id, "offline", "not in the offline cache", code_dir=out)
+    def _paint(
+        self,
+        object_id: str,
+        t: PaintTarget,
+        p: BakeParams,
+        out: Path,
+        shade: F64,
+        reference: bytes,
+        prompt: str,
+        key: CacheKey,
+        refresh: bool,
+    ) -> PaintOutcome:
+        """Cache or live call, then the writes. Runs under the object's lock."""
+        entry = None if refresh else self._cache_get(key)
         fresh: tuple[CacheEntry, NDArray[np.uint8], float] | None = None
         if entry is None:
-            with self._call_lock:
-                entry = None if refresh else self.cache.get(key)  # another call may have won
-                if entry is None:
-                    called = self._call(object_id, prompt, reference, shade, key, out)
-                    if isinstance(called, PaintOutcome):
-                        return called
-                    fresh = called
+            if self.settings.offline:
+                return self.refuse(object_id, "offline", "not in the offline cache", code_dir=out)
+            if self.client is None:
+                return self.refuse(
+                    object_id, "gemini_key_missing", "no Gemini key on the server", code_dir=out
+                )
+            wait = self._cooling(object_id)
+            if wait > 0:
+                return self.refuse(
+                    object_id,
+                    "cooldown",
+                    f"another live call for this object is allowed in {math.ceil(wait)} s",
+                    code_dir=out,
+                )
+            called = self._call(object_id, prompt, reference, shade, key, out)
+            if isinstance(called, PaintOutcome):
+                return called
+            fresh = called
         if fresh is not None:
             entry, rgb, corr = fresh
         else:
@@ -685,20 +825,30 @@ class GeminiPainter:
                 self.cache.delete(key)  # never keep an entry that fails the checks
                 return self._reject(object_id, checked, out)
             rgb, corr = checked
-        fetched_at = str(entry.meta.get("fetched_at"))
+        raw_at = entry.meta.get("fetched_at")
+        fetched_at = raw_at if isinstance(raw_at, str) and raw_at else None
         common: dict[str, Any] = {
             "code_dir": out,
             "fetched_at": fetched_at,
             "from_cache": fresh is None,
         }
         data = webp_rgb(seam_fix(rgb))
-        current = bake_key(p, self.width, self.height)
-        meta = {
+        # The bake this image was checked against (Q-122): status() serves it only while the
+        # viewer's bake has the same stamp.
+        stamp: dict[str, Any] = {
             "paint_version": PAINT_VERSION,
-            "bake_key": current,
+            "bake_id": t.bake_id,
+            "generator_version": t.generator_version,
+            "rules": BAKER_RULES_VERSION,
+            "seed": t.seed,
+            "size": [self.width, self.height],
+            "bake_key": bake_key(p, self.width, self.height),
+        }
+        meta = {
+            **stamp,
             "tag": TAG,
             "label": LABEL,
-            "model": model,
+            "model": self.model,
             "prompt": prompt,
             "edge_correlation": corr,
             "reference_sha256": hashlib.sha256(reference).hexdigest(),
@@ -706,76 +856,98 @@ class GeminiPainter:
             "albedo_sha256": hashlib.sha256(data).hexdigest(),
             "fetched_at": fetched_at,
         }
-        pointer = {
-            "paint_version": PAINT_VERSION,
-            "dir": out.relative_to(root).as_posix(),
-            "bake_key": current,
-        }
+        ai_dir = self.ai_root / t.rel_dir(self.width, self.height)
         try:
             # Image, then meta, then the pointer (commit marker). If a later write fails, the
-            # hashes or keys no longer agree, so status() reports "stale" (code colour).
-            atomic_write(out / AI_FILE, data)
-            atomic_write(out / AI_META, json.dumps(meta, indent=1, sort_keys=True).encode())
-            atomic_write(self._pointer(object_id), json.dumps(pointer, sort_keys=True).encode())
+            # hashes or stamps no longer agree, so status() reports "stale" (code colour).
+            atomic_write(ai_dir / AI_FILE, data)
+            atomic_write(ai_dir / AI_META, json.dumps(meta, indent=1, sort_keys=True).encode())
+            atomic_write(self._pointer(object_id), json.dumps(stamp, sort_keys=True).encode())
         except OSError as exc:
-            return self._fail(
+            return self.refuse(
                 object_id, "write_failed", type(exc).__name__, edge_correlation=corr, **common
             )
         return PaintOutcome(
             object_id,
             True,
-            model=model,
+            model=self.model,
             edge_correlation=corr,
-            ai_path=out / AI_FILE,
+            ai_path=ai_dir / AI_FILE,
+            size=(self.width, self.height),
             **common,
         )
 
-    def status(self, object_id: str) -> PaintOutcome:
+    def status(
+        self, object_id: str, render_params: Mapping[str, Any] | None = None
+    ) -> PaintOutcome:
         """What the viewer should show now: no card build, no bake, no Gemini call.
 
-        Reads the pointer of the last applied repaint and checks it against the bake on disk:
-        a rebake (new ``bake.json`` key) or a torn write makes it ``stale``.
+        ``render_params`` are those of the bake the viewer shows (a saved asset's), else the
+        stage 7 defaults. The last applied repaint counts only when its pointer and
+        ``gemini.json`` name that bake (generator version, baker rules, seed, size) and the
+        code ``bake.json`` still has the key the image was checked against. Anything else is
+        ``stale`` (code colour), so an AI albedo never lies over a relief it was not checked on.
         """
-        root = self.settings.texture_root
         try:
             ptr = json.loads(self._pointer(object_id).read_text(encoding="utf-8"))
-            out = root / str(ptr["dir"])
-            if not out.resolve().is_relative_to(root.resolve()):
-                raise ValueError("pointer leaves the texture root")
-            bake_meta = json.loads((out / META).read_text(encoding="utf-8"))
-            meta = json.loads((out / AI_META).read_text(encoding="utf-8"))
-            data = (out / AI_FILE).read_bytes()
+            if not isinstance(ptr, dict):
+                raise ValueError("pointer is not an object")
+            bake_id = ptr["bake_id"]
+            if not isinstance(bake_id, str) or not bake_id:
+                raise ValueError("pointer has no bake id")
         except (OSError, ValueError, KeyError, TypeError):
-            return self._fail(object_id, "not_painted", "no AI albedo for this bake")
+            return self.refuse(object_id, "not_painted", "no AI albedo for this bake")
+        want = PaintTarget.of(bake_id, render_params, seed_id=object_id)
+        expected: dict[str, Any] = {
+            "paint_version": PAINT_VERSION,
+            "bake_id": want.bake_id,
+            "generator_version": want.generator_version,
+            "rules": BAKER_RULES_VERSION,
+            "seed": want.seed,
+            "size": [self.width, self.height],
+        }
+        if any(ptr.get(k) != v for k, v in expected.items()):
+            return self.refuse(object_id, "stale", "the AI albedo is from another bake")
+        # Paths come from the checked stamp (percent-encoded segments), never from the file.
+        rel = want.rel_dir(self.width, self.height)
+        code_out = self.settings.textures_path / rel
+        ai_dir = self.ai_root / rel
+        try:
+            bake_meta = json.loads((code_out / META).read_text(encoding="utf-8"))
+            meta = json.loads((ai_dir / AI_META).read_text(encoding="utf-8"))
+            data = (ai_dir / AI_FILE).read_bytes()
+        except (OSError, ValueError):
+            return self.refuse(object_id, "stale", "the AI albedo or its bake is gone")
         valid = (
             isinstance(bake_meta, dict)
             and isinstance(meta, dict)
-            and ptr.get("paint_version") == PAINT_VERSION
-            and meta.get("paint_version") == PAINT_VERSION
+            and all(meta.get(k) == v for k, v in expected.items())
             and bake_meta.get("key") == ptr.get("bake_key")
             and meta.get("bake_key") == ptr.get("bake_key")
             and meta.get("albedo_sha256") == hashlib.sha256(data).hexdigest()
         )
         if not valid:
-            return self._fail(object_id, "stale", "the AI albedo is from another bake")
+            return self.refuse(object_id, "stale", "the AI albedo is from another bake")
         corr = meta.get("edge_correlation")
         corr_f = float(corr) if isinstance(corr, (int, float)) else None
         if self._offline_blocked():
-            return self._fail(
+            return self.refuse(
                 object_id,
                 "offline",
                 "SX_OFFLINE=1, the Gemini layer is off (D-24, Q-29)",
                 edge_correlation=corr_f,
             )
+        raw_at = meta.get("fetched_at")
         return PaintOutcome(
             object_id,
             True,
             model=str(meta.get("model", "")),
             edge_correlation=corr_f,
-            fetched_at=meta.get("fetched_at"),
+            fetched_at=raw_at if isinstance(raw_at, str) and raw_at else None,
             from_cache=True,
-            ai_path=out / AI_FILE,
-            code_dir=out,
+            ai_path=ai_dir / AI_FILE,
+            code_dir=code_out,
+            size=(self.width, self.height),
             ai_bytes=data,
         )
 

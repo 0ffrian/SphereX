@@ -4,6 +4,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
+import { openViewer, viewerCanvas } from './viewer';
 
 // Honesty: the D-21 default (+ Estimated) hides artistic layers, so the render tests ask for
 // "+ Artistic". They draw through the panel's own path (planRender -> showPlan, window.__sxShow).
@@ -59,13 +60,13 @@ for (const view of VIEWS) {
     });
     page.on('pageerror', (e) => errors.push(e.message));
 
-    await page.goto('/');
+    await openViewer(page);
     const status = page.getByTestId('renderer-status');
     await expect(status).not.toHaveAttribute('data-status', 'starting', { timeout: 30_000 });
     test.skip((await status.getAttribute('data-status')) === 'unavailable', 'no 3D backend');
     await page.waitForFunction(() => '__sxViewer' in globalThis);
 
-    const canvas = page.locator('canvas[aria-label]');
+    const canvas = viewerCanvas(page);
     const before = await canvas.screenshot();
     const result = await page.evaluate(
       async ({ card, params, lightDir, overrides, rotateLeft, rotateUp }) => {
@@ -90,6 +91,8 @@ for (const view of VIEWS) {
         const body = v.body;
         for (let i = 0; i < (rotateLeft ?? 0); i++) v.rotate('left');
         for (let i = 0; i < (rotateUp ?? 0); i++) v.rotate('up');
+        // Bodies move now (issue #42): freeze the clock at t = 0 so the reference picture is stable.
+        await (v as unknown as { freezeClock(s: number): Promise<void> }).freezeClock(0);
         return body ? { drawn: body.drawn, missing: body.missing } : null;
       },
       {
@@ -103,8 +106,9 @@ for (const view of VIEWS) {
     );
     expect(result).not.toBeNull();
     expect(result!.drawn.length).toBe(1);
-    // The field and the nebula / nova points come from the Web Worker (D-12, N8). A worker that was
-    // created but failed would fall back to the main thread, so count what actually served.
+    // The field comes from the Web Worker (D-12, N8). A worker that was created but failed would
+    // fall back to the main thread, so count what actually served. The nebula and the nova are
+    // volumes with no field, no points and no haptics (Q-103), so nothing is served for them.
     const stats = await page.evaluate(
       () =>
         (globalThis as unknown as { __sxFieldStats?: { worker: number; main: number } })
@@ -112,7 +116,9 @@ for (const view of VIEWS) {
     );
     expect(stats, 'field stats hook (fixtures mode)').toBeDefined();
     expect(stats!.main, 'served on the main thread (worker fallback)').toBe(0);
-    expect(stats!.worker).toBeGreaterThan(0);
+    if (kind === 'nebula' || kind === 'nova')
+      expect(stats!.worker, `${kind} needs no worker`).toBe(0);
+    else expect(stats!.worker).toBeGreaterThan(0);
 
     await expect
       .poll(async () => !(await canvas.screenshot()).equals(before), { timeout: 20_000 })
@@ -145,7 +151,7 @@ test('honesty default: at + Estimated the artistic surface is hidden, a toggle s
   page,
 }) => {
   test.setTimeout(120_000);
-  await page.goto('/');
+  await openViewer(page);
   const status = page.getByTestId('renderer-status');
   await expect(status).not.toHaveAttribute('data-status', 'starting', { timeout: 30_000 });
   test.skip((await status.getAttribute('data-status')) === 'unavailable', 'no 3D backend');

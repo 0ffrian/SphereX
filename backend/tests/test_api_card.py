@@ -20,7 +20,7 @@ from app.core.render.card_to_params import GENERATOR_VERSION
 from app.main import create_app
 from app.settings import Settings
 from tests.conftest import make_settings
-from tests.test_api import resolve_id
+from tests.helpers import resolve_id
 
 FIXTURES = Path(__file__).resolve().parents[2] / "shared" / "fixtures"
 TAGS = {"measured", "derived", "model_dependent", "inferred_from_analog", "artistic"}
@@ -31,7 +31,7 @@ TARGETS = {
     "WISE 0855": "brown_dwarf",
     "RW Aurigae": "star_ttauri",
     "R Draconis": "star_mira",
-    "433 Eros": "asteroid_procedural",
+    "433 Eros": "asteroid_shape",
 }
 
 
@@ -115,6 +115,26 @@ def test_final_inputs_are_saved_and_served_as_saved(client: TestClient) -> None:
     for _ in range(2):
         r = client.get(f"/v1/objects/{star}/card")
         assert r.headers["X-SX-Asset-Status"] == "generated"
+
+
+def test_type_refusal_is_never_saved(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Eros's inputs are final, but a `type:*` refusal must not be frozen into a saved asset
+    (Q-63: the rule is still under review)."""
+    from dataclasses import replace
+
+    from app.core.card import service
+
+    real = service.classify
+
+    def refusing(facts: Any) -> Any:
+        cls = real(facts)
+        return replace(cls, missing=(*cls.missing, "type:exoplanet_thresholds"))
+
+    monkeypatch.setattr(service, "classify", refusing)
+    oid = resolve_id(client, "433 Eros")
+    for _ in range(2):
+        r = client.get(f"/v1/objects/{oid}/card")
+        assert r.headers["X-SX-Asset-Status"] == "generated"  # rebuilt, never `saved`
 
 
 def test_typed_coordinates_are_a_sketch_candidate(client: TestClient) -> None:

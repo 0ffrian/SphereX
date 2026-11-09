@@ -8,6 +8,7 @@
     {
       "id": "point_cloud",
       "tag": "artistic",
+      "tier": 5,
       "description": "Point cloud from the sliders (R7.7).",
       "requires": [
         "diameter_km"
@@ -36,9 +37,12 @@
   "haptics": {
     "texture": "none",
     "texture_tag": "artistic",
-    "data": "field",
+    "data": "none",
     "data_tag": "artistic",
     "params": {}
+  },
+  "dynamics": {
+    "speedup": {}
   },
   "alt_text": "Synthetic fixture. Nova, size from a slider (artistic), artist's colour, self-luminous. Surface relief: illustrative.",
   "missing": []

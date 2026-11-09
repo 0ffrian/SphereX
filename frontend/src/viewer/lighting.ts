@@ -3,6 +3,7 @@
 //   tiny ambient light (<= MAX_AMBIENT_INTENSITY). Stars and brown dwarfs: emissive, no light.
 import { AmbientLight, DirectionalLight, type Object3D } from 'three/webgpu';
 import type { ObjectCard, RenderParams, Tag } from '@/contract';
+import type { ShadowSettings } from './shape/shapeModel';
 
 /**
  * R5.1: "A tiny ambient light (intensity ≤ 0.03) keeps the night side legible."
@@ -87,11 +88,28 @@ export function planLighting(params: RenderParams, card?: ObjectCard | null): Li
   };
 }
 
-/** Builds the lights for a plan. Self-luminous bodies get none. */
-export function buildLights(plan: LightingPlan): Object3D[] {
+/**
+ * Builds the lights for a plan. Self-luminous bodies get none. With `shadow` the Sun light casts a
+ * shadow map (R7.1 self-shadowing of a shape model); the renderer's shadow map must be enabled.
+ */
+export function buildLights(plan: LightingPlan, shadow: ShadowSettings | null = null): Object3D[] {
   if (plan.mode === 'self' || plan.direction === null) return [];
   const [x, y, z] = plan.direction;
   const sun = new DirectionalLight(0xffffff, plan.intensity);
   sun.position.set(x * LIGHT_DISTANCE, y * LIGHT_DISTANCE, z * LIGHT_DISTANCE);
+  if (shadow) {
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(shadow.mapSize, shadow.mapSize);
+    const cam = sun.shadow.camera;
+    cam.left = -shadow.extent;
+    cam.right = shadow.extent;
+    cam.top = shadow.extent;
+    cam.bottom = -shadow.extent;
+    cam.near = LIGHT_DISTANCE - shadow.extent * 1.5;
+    cam.far = LIGHT_DISTANCE + shadow.extent * 1.5;
+    cam.updateProjectionMatrix();
+    sun.shadow.bias = shadow.bias;
+    sun.shadow.normalBias = shadow.normalBias;
+  }
   return [sun, new AmbientLight(0xffffff, Math.min(plan.ambient, MAX_AMBIENT_INTENSITY))];
 }

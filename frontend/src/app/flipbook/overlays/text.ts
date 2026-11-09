@@ -143,3 +143,7 @@ const STRETCH_TEXT: Readonly<Record<string, string>> = {
 export function stretchText(kind: string): string {
   return Object.hasOwn(STRETCH_TEXT, kind) ? STRETCH_TEXT[kind]! : `Display stretch: ${kind}.`;
 }
+
+/** A layer was switched on while the frame list still loads (store: overlays 'waiting'). */
+export const OVERLAYS_WAITING_TEXT =
+  'Overlays load once all the frames are in, so every frame gets its markers.';

@@ -121,7 +121,8 @@ export class FlowSource implements HapticSource {
         this.out.play('tick', STRENGTH_FIRM, s.pan, 'tone', pitch);
       }
       this.storm = f.storm;
-      const st = this.storms[f.storm - 1];
+      // The moving storms when the viewer set them (storm id i is entry i - 1 in both lists).
+      const st = (this.field.currentStorms ?? this.storms)[f.storm - 1];
       const ratio = st ? angularDistance(d, st.center) / st.size : STORM_EDGE_FACTOR;
       this.jet.stop();
       this.swirl.play(swirlRateHz(ratio), PLAIN_TICK_STRENGTH, s.pan, pitch);

@@ -58,11 +58,41 @@ class Settings(BaseSettings):
     # Q-20: the PSF extension (about 5 MB per cutout) is not cached by default.
     cutout_keep_psf: bool = False
 
+    # Issue #41 fan-out. Live cutout downloads run in one pool shared by every object, at most
+    # this many at a time: the pre-fetch's default concurrency. [verify] the polite limit with
+    # IRSA (A3.1); 1 restores one-at-a-time downloads.
+    cutout_concurrency: int = 6
+    # Photometry worker processes (A4.2). 0 measures in the calling thread (tests, debugging).
+    # ASSUMPTION: 2 leaves cores for the API and the texture bake on the A15 (D-24; its core
+    # count is [verify]).
+    measure_workers: int = 2
+    # Texture bake worker processes (R6.7). 0 bakes in one background thread.
+    bake_workers: int = 1
+    # Bake the textures a reply points at, off the request path. Off: they are baked by
+    # `python -m app.core.render` only.
+    bake_textures: bool = True
+    # How long /card and /render-params wait for the refined answer before they return the
+    # first-stage answer (catalogue data, SPHEREx layers listed as `measuring:`). Engineering
+    # value, not a physical one. Offline (D-25) there is no first stage: the reply waits.
+    first_answer_wait_s: float = 2.0
+    # A finished object job is reused for this long, so the card and render-params requests of
+    # one page load share one run. After that a new run picks up what changed meanwhile.
+    job_ttl_s: float = 600.0
+    # At most this many object jobs download all their frames at once (the long part, after
+    # the first batch); the others wait in stage `queued` with their partial answer out.
+    # ASSUMPTION: 4 covers a demo with a few phones; 0 means no cap.
+    max_jobs: int = 4
+    # D-25 warm cache: at start-up, run the object job for every target in these groups of
+    # targets.toml in the background (comma-separated). Off by default: it reaches the network.
+    prefetch_on_start: bool = False
+    prefetch_groups: str = "demo"
+
     # Comma-separated, tried in order. The CDS host was unreachable from the dev machine.
     simbad_tap_urls: str = (
         "https://simbad.cds.unistra.fr/simbad/sim-tap/sync,"
         "https://simbad.harvard.edu/simbad/sim-tap/sync"
     )
+    exoplanet_tap_url: str = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"  # A3.8
     sbdb_url: str = "https://ssd-api.jpl.nasa.gov/sbdb.api"
     horizons_url: str = "https://ssd.jpl.nasa.gov/api/horizons.api"
     skybot_url: str = "https://ssp.imcce.fr/webservices/skybot/api/conesearch.php"
@@ -93,8 +123,9 @@ class Settings(BaseSettings):
     # ASSUMPTION: A5.4 says "assets/<type>/<id>.json" in the repo; the backend's copy lives here.
     assets_dir: Path = BACKEND_DIR / "assets"
     targets_file: Path = BACKEND_DIR / "targets.toml"
-    # R6.7 baked textures. ASSUMPTION: unset means ``<cache_dir>/textures`` (beside the D-25
-    # cache's ``v1`` tree, outside git); nothing serves ``/data/textures`` yet.
+    # A3.7 / Q-61: shape-model GLBs and `registry.toml`, written by scripts/ingest_shape.py.
+    shapes_dir: Path = BACKEND_DIR / "assets" / "shapes"
+    # R6.7 baked textures, served at /data/textures. Outside git, next to the D-25 cache.
     textures_dir: Path | None = None
 
     # Admin token for admin-only endpoints (R10: gemini_paint.py "behind the admin token").
@@ -112,13 +143,28 @@ class Settings(BaseSettings):
     gemini_aspect_ratio: str = ""
     # ASSUMPTION: A6.2 says "a set time" but gives no number.
     gemini_timeout_s: float = 90.0
+    # ASSUMPTION (Q-122): after a live call for an object, no other live call for it within
+    # this many seconds (cost control: a rejected image is not cached). 0 turns it off.
+    gemini_cooldown_s: float = 60.0
+    # Q-122: the AI albedo, its gemini.json and the per-object pointers. Must be outside
+    # textures_dir, which is served as static files without the status checks. Unset means
+    # ``<cache_dir>/textures-ai``.
+    textures_ai_dir: Path | None = None
     # Q-29 (open): may a cached repaint be shown under SX_OFFLINE=1? Default follows D-24
     # ("the Gemini layer then stays off"); 1 serves cache hits offline per D-25.
     gemini_offline_cache: bool = False
 
     @property
-    def texture_root(self) -> Path:
-        return self.textures_dir if self.textures_dir is not None else self.cache_dir / "textures"
+    def textures_path(self) -> Path:
+        return self.textures_dir or (self.cache_dir / "textures")
+
+    @property
+    def textures_ai_path(self) -> Path:
+        return self.textures_ai_dir or (self.cache_dir / "textures-ai")
+
+    @property
+    def prefetch_group_list(self) -> list[str]:
+        return [g.strip() for g in self.prefetch_groups.split(",") if g.strip()]
 
     @property
     def simbad_urls(self) -> list[str]:

@@ -5,8 +5,12 @@
 import type { CometEpoch, Layer, ObjectCard, RenderParams, Tag } from '@/contract';
 import { isTagShown } from './honesty';
 import { planLighting } from './lighting';
-import { chooseMode, resolveModes, resolveTint } from './modes';
+import { chooseMode, NEUTRAL_TINT, resolveModes, resolveTint } from './modes';
 import type { LegendEntry, MissingItem, PlanContext, RenderPlan, Rgb, Vec3 } from './planTypes';
+import { STILL_MOTION, TIER_OF_TAG } from './motion/motion';
+
+/** Pseudo layer id a moulding stage holds to show the body in plain grey (issue #60). */
+export const HOLD_TINT = 'tint';
 
 /** Half the length of the proper-motion line of a star, in scene units. A display value (artistic). */
 export const TRAIL_HALF_LENGTH = 2.5;
@@ -73,7 +77,10 @@ export class PlanBuilder {
     this.modeInfo = resolveModes(params);
     this.missing.push(...this.modeInfo.missing);
     this.mode = chooseMode(ctx.mode, params.type, this.modeInfo.modes, ctx.honesty);
-    this.tint = resolveTint(params, this.mode, ctx.honesty);
+    // Issue #60 moulding: a held `tint` shows the plain grey stand-in until the Colour step.
+    this.tint = ctx.hold?.includes(HOLD_TINT)
+      ? { rgb: NEUTRAL_TINT, tag: null, source: null }
+      : resolveTint(params, this.mode, ctx.honesty);
     this.lighting = planLighting(params, card);
     if (params.lighting.mode === 'sun' && this.lighting.source !== 'phase_angle') {
       // The body is lit anyway, from a display default, so the panel lists this as a default.
@@ -103,6 +110,14 @@ export class PlanBuilder {
     return this.layers.has(id);
   }
 
+  /**
+   * Issue #60: a layer held back by the build animation (`ctx.hold`). It is not drawn and not
+   * listed anywhere: the stage plan is a presentation step, the panel shows the full plan.
+   */
+  held(id: string): boolean {
+    return this.ctx.hold?.includes(id) === true;
+  }
+
   isDrawn(id: string): boolean {
     return this.evaluated.get(id) === true;
   }
@@ -123,6 +138,10 @@ export class PlanBuilder {
     if (cached !== undefined) return cached;
     const layer = this.layers.get(id);
     if (!layer) return false;
+    if (this.held(id)) {
+      this.evaluated.set(id, false);
+      return false;
+    }
     let ok = false;
     const fields = missingFields(this.card, layer.requires);
     if (this.params.missing.includes(id)) {
@@ -141,9 +160,33 @@ export class PlanBuilder {
       this.drawn.push({
         id,
         tag: layer.tag,
+        tier: layer.tier,
         description: layer.description,
         swatches: opts.swatches,
       });
+    }
+    this.evaluated.set(id, ok);
+    return ok;
+  }
+
+  /**
+   * A layer the viewer itself adds (shadows, baked AO, regolith, volumes): not offered by the
+   * backend, so it is decided here from its own tag and the honesty state. Records it as drawn, or
+   * as refused with reason `honesty`. A load failure (`ctx.failed`) refuses it with reason `load`.
+   */
+  drawLocal(id: string, tag: Tag, description: string): boolean {
+    const cached = this.evaluated.get(id);
+    if (cached !== undefined) return cached;
+    if (this.held(id)) {
+      this.evaluated.set(id, false);
+      return false;
+    }
+    let ok = false;
+    if (this.ctx.failed.includes(id)) this.refuse({ id, reason: 'load' });
+    else if (!isTagShown(this.ctx.honesty, tag)) this.refuse({ id, reason: 'honesty', tag });
+    else {
+      ok = true;
+      this.drawn.push({ id, tag, description });
     }
     this.evaluated.set(id, ok);
     return ok;
@@ -154,6 +197,7 @@ export class PlanBuilder {
     const layer = this.layers.get(id);
     return (
       layer !== undefined &&
+      !this.held(id) &&
       !this.params.missing.includes(id) &&
       !this.ctx.failed.includes(id) &&
       missingFields(this.card, layer.requires).length === 0 &&
@@ -251,7 +295,13 @@ export class PlanBuilder {
 
   /** Legend line for the plain body, for plans where no named layer covers it. */
   legendBody(description: string): void {
-    if (this.sizeTag) this.drawn.push({ id: 'body', tag: this.sizeTag, description });
+    if (this.sizeTag)
+      this.drawn.push({
+        id: 'body',
+        tag: this.sizeTag,
+        tier: TIER_OF_TAG[this.sizeTag],
+        description,
+      });
   }
 
   build(over: Partial<RenderPlan>): RenderPlan {
@@ -263,6 +313,7 @@ export class PlanBuilder {
       this.drawn.push({
         id: 'tint',
         tag: this.tint.tag,
+        tier: TIER_OF_TAG[this.tint.tag],
         description: info?.badge || 'Body colour',
       });
     }
@@ -283,6 +334,7 @@ export class PlanBuilder {
       screens: [],
       trails: [],
       dust: null,
+      volumes: [],
       drawn: this.drawn,
       missing: this.missing,
       notes: this.notes,
@@ -303,6 +355,11 @@ export class PlanBuilder {
       scrub: null,
       relief: 'illustrative',
       shader: null,
+      motion: STILL_MOTION,
+      star: null,
+      jets: null,
+      pulsation: null,
+      shape: null,
       ...over,
     };
     plan.sizeWhy = sizeWhy;
@@ -329,6 +386,9 @@ export function sceneExtent(plan: RenderPlan): number {
   for (const s of plan.screens) e = Math.max(e, Math.hypot(s.radius, s.z));
   if (plan.trails.length > 0) e = Math.max(e, TRAIL_HALF_LENGTH);
   if (plan.dust) e = Math.max(e, 1);
+  for (const v of plan.volumes) {
+    e = Math.max(e, Math.hypot(...v.center) + Math.hypot(...v.halfExtent));
+  }
   return e;
 }
 
@@ -353,6 +413,8 @@ export function litBody(
     meshUrl: null,
     albedoUrl: null,
     normalUrl: null,
+    heightUrl: null,
+    displacementScale: null,
     ...extra,
   };
 }

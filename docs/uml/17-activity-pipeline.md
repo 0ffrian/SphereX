@@ -1,6 +1,6 @@
 # 17 Activity: pipeline stages 1–6 and RenderParams
 
-The backend pipeline from a name or RA/Dec to an `ObjectCard` and `RenderParams`, including every "refuse rather than invent" branch. Drawn from architecture spec §4.1–4.6, rendering doc §1 (principles), §3, §5.2, §6.2, §7 and decisions D-01, D-02, D-04, D-19 and D-25. The old stage 5 "settings file" is replaced by the card builder (D-02).
+The backend pipeline from a name or RA/Dec to an `ObjectCard` and `RenderParams`, including every refusal branch (since D-32, a refusal only where no tier can answer). Drawn from architecture spec §4.1–4.6, rendering doc §1 (principles), §3, §5.2, §6.2, §7 and decisions D-01, D-02, D-04, D-19 and D-25. The old stage 5 "settings file" is replaced by the card builder (D-02).
 
 ```mermaid
 flowchart TD
@@ -38,7 +38,9 @@ flowchart TD
   Card --> Field{"Value available from a source?"}
   Field -->|yes| Tagged["TV with value, tag, source, formula or assumption"]
   Field -->|no| NullV["value = null, never a guess"]
-  Tagged --> Physics["Stage 6: physics layer adds derived TVs with formula"]
+  Tagged --> Physics
+  Tagged -->|"comet or asteroid"| Light["Comets and asteroids: Horizons lighting, phase angle (measured) and sun_vector (derived), Q-62"]
+  Light --> Physics["Stage 6: physics layer adds derived TVs with formula"]
   NullV --> Physics
   Physics --> SpxCh{"At least 2 points in each spherex_rgb channel window?"}
   SpxCh -->|yes| SpxOK["spherex_rgb measured"]
@@ -62,10 +64,12 @@ flowchart TD
 
 ## Notes
 
+- D-32: stage 6 and `RenderParams` fall back a tier and label it before refusing; the refusal branch above is the last rung, and `scale_m` and card values never fall back. The diagram shows the refusal branch only.
 - Refusal examples: an asteroid card without `diameter_km` puts the mesh in `missing` with no crash (rendering doc §11); a comet without published `gas_Q` gets no gas shells (§7.3).
 - Saturated points are excluded from brightness mapping and shown hatched (rendering doc §7.5).
 - `candidate` has no 3D layers. As built (issue #5) the endpoint still returns a RenderParams for it, with `layers: []`, `scale_m: null` and `mesh` in `missing` (Q-33).
-- As built (issue #5) the render-params endpoint does not bake: it names the R6.7 texture URLs, and baking and serving them is still to do. Cards and render params are validated with `jsonschema` before they are sent (Q-40).
+- As built (issue #5) the render-params endpoint names the R6.7 texture URLs; since issue #41 (Q-112) the bake runs in a worker process off the request path, both sizes, and `/data/textures` serves the result. Cards and render params are validated with `jsonschema` before they are sent (Q-40).
+- As built (issue #41, Q-111): the stages are drawn in order, but the catalogue (stage 3 input), the Horizons lighting and stage 1 run at the same time inside one job per object, and stage 2 measures each frame as its cutout lands. If stage 2 is not done when the card can be built, a first-stage `ObjectCard` and `RenderParams` go out with the SPHEREx fields and layers marked `measuring:`; if frames remain after the first batch, a partial pair measured from it follows (`measuring:frames`), then the final pair. Only the final pair can be saved (stage 4).
 - The physics layer is "reduced, physically inspired" formulas (architecture spec §7); its outputs are tagged `derived`.
 - Every external call in this flow goes through the backend's read-through cache (D-25). With `SX_OFFLINE=1` a cache miss is refused, and the refused layer goes in `missing`.
 - Small-body names are numbered asteroids, provisional designations, comets and interstellar objects (D-19).

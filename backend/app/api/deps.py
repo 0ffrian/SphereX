@@ -10,6 +10,8 @@ from fastapi import Request
 from app.context import Context
 from app.core.card.service import ObjectPipeline
 from app.core.find.frames import FrameService
+from app.core.find.resolver import ResolvedObject, load_object
+from app.core.measure.pool import MeasurePool
 from app.core.render.gemini_paint import GeminiPainter
 from app.errors import ApiError
 from app.settings import secret_text
@@ -29,6 +31,14 @@ def get_aliases(request: Request) -> dict[str, str]:
 
 def get_pipeline(request: Request) -> ObjectPipeline:
     return cast(ObjectPipeline, request.app.state.pipeline)
+
+
+def require_object(ctx: Context, object_id: str) -> ResolvedObject:
+    """The resolved object for ``object_id``, or 404 when /v1/resolve has not seen it."""
+    obj = load_object(ctx, object_id)
+    if obj is None:
+        raise ApiError(404, "not_found", f"Unknown object '{object_id}'. Call /v1/resolve first.")
+    return obj
 
 
 ADMIN_HEADER = "X-SX-Admin-Token"
@@ -53,3 +63,7 @@ def require_admin(request: Request) -> None:
 
 def get_gemini(request: Request) -> GeminiPainter:
     return cast(GeminiPainter, request.app.state.gemini)
+
+
+def get_measure_pool(request: Request) -> MeasurePool | None:
+    return cast(MeasurePool | None, getattr(request.app.state, "measure_pool", None))
