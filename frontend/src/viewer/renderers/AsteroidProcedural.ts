@@ -27,10 +27,14 @@ export function displacementActive(tier: 'high' | 'medium' | 'low', scale: numbe
   return scale !== null && scale > 0 && tier !== 'low';
 }
 
+/** Why the displacement layer is refused on the low quality level (Q-117). */
+export const PHONE_TIER_REASON = 'phone tier: relief shows as shading only';
+
 export function planAsteroidProcedural(input: PlanInput): RenderPlan {
   const b = new PlanBuilder(input);
   const tex = input.params.textures;
   const bodyOk = b.body('diameter_km');
+  const tier = input.ctx.qualityTier ?? 'high';
 
   // R6.2: a/b = 10^(0.4 A), c = b (model_dependent). Hidden or refused: plain sphere.
   const ellipsoid = b.draw('ellipsoid');
@@ -53,9 +57,16 @@ export function planAsteroidProcedural(input: PlanInput): RenderPlan {
   // A legend entry and a tag of its own. The backend offers the layer as `artistic` (the scale is
   // the R6.2 style rule's peak relief, a look); params without it still get the viewer's own entry
   // with the same tag. Refused when the load failed or the honesty state hides `artistic`.
+  // Q-117: on the low quality level the layer is not drawn, so it is refused with that reason
+  // rather than listed (the plan is rebuilt when the level changes).
+  const lowTier = displaceWanted && reliefAmp !== null && !displacementActive(tier, reliefAmp);
+  if (lowTier) {
+    b.reject({ id: 'displacement', reason: 'quality', detail: PHONE_TIER_REASON });
+  }
   const displaceDrawn =
     displaceWanted &&
     reliefAmp !== null &&
+    !lowTier &&
     (b.has('displacement')
       ? b.draw('displacement', { asset: heightUrl })
       : b.drawLocal(

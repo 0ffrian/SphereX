@@ -7,8 +7,9 @@ The viewer computes the drawn numbers; this module gives the backend the same ar
 layer's tag, formula and ``assumed`` input describe what the viewer draws (D-32). Keep the two in
 step: ``tests/test_gas_giant_layers.py`` pins the numbers that both sides use.
 
-A gas giant card has no spin, wind or mass field a measurement fills in the common case, so the
-typical values below stand in for the missing input and are stated in ``assumed`` (tier 3).
+A gas giant card has no wind or mass field, so the typical wind and Jupiter's density are stated in
+``assumed`` (tier 3). A card with no spin gets the typical spin too: a typical value with no
+formula behind it, so the layers drop to tier 4 (D-32, Q-119 option b).
 """
 
 from __future__ import annotations
@@ -19,8 +20,13 @@ R_JUP_M = 6.9911e7  # Jupiter volumetric mean radius (NASA Jupiter fact sheet)
 HOUR_S = 3600.0
 
 # [verify] Jupiter's sidereal rotation period, hours (NASA Planetary Fact Sheet, 9.9250 h). The
-# class-typical spin of a giant planet, used only when the card has no `rot_period_h`.
+# class-typical spin of a giant planet, used only when the card has no `rot_period_h`. With it the
+# `bands` and `flattening` layers are "typical, no formula" values: `inferred_from_analog`, tier 4
+# (D-32, Q-119 option b). A hot Jupiter is tidally locked, so this is not its spin.
 TYPICAL_SPIN_H: float | None = 9.925
+# [verify] Jupiter's period P_J in the flattening rule `f = f_J (P_J / P)^2`. Separate from the
+# typical spin above, so that withdrawing the typical value does not refuse a measured spin.
+JUPITER_SPIN_H: float | None = 9.925
 # [verify] Peak zonal wind, m/s. A7.2 states 50 m/s as its Jupiter example. The card has no wind
 # field, so the Rhines rule always uses this typical value and says so in `assumed`.
 TYPICAL_ZONAL_WIND_MS: float | None = 50.0
@@ -55,8 +61,8 @@ def band_count(omega_rad_s: float, radius_m: float, wind_ms: float) -> float | N
 
 def flattening_from_spin(period_h: float) -> float | None:
     """Flattening with Jupiter's mean density assumed, `f = f_J (P_J / P)^2`."""
-    if TYPICAL_SPIN_H is None or JUPITER_FLATTENING is None:
+    if JUPITER_SPIN_H is None or JUPITER_FLATTENING is None:
         return None
     if not (period_h > 0) or not math.isfinite(period_h):
         return None
-    return JUPITER_FLATTENING * (TYPICAL_SPIN_H / period_h) ** 2
+    return JUPITER_FLATTENING * (JUPITER_SPIN_H / period_h) ** 2

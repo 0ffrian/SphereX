@@ -34,26 +34,37 @@ describe('planShaderKind', () => {
     const { card, params } = fixture('gas_giant');
     const at = (honesty: 'measured' | 'derived' | 'artistic') =>
       planRender(card, params, defaultContext({ honesty }));
-    // + Estimated (the start): the surface follows the data, only the swirl look waits.
+    // + Estimated (the start): the surface follows the data; the seeded looks wait.
     const est = at('derived');
     expect(est.shader).toMatchObject({
       surface: true,
       plain: false,
-      gas: { bands: true, flattening: true, colour: true, storms: true, turbulence: false },
+      gas: { bands: true, flattening: true, colour: true, storms: false, turbulence: false },
     });
-    expect(est.missing.find((m) => m.id === 'turbulence')).toMatchObject({
-      reason: 'honesty',
-      tag: 'artistic',
-    });
+    for (const id of ['storms', 'turbulence']) {
+      expect(est.missing.find((m) => m.id === id)).toMatchObject({
+        reason: 'honesty',
+        tag: 'artistic',
+      });
+    }
+    // The colour is drawn (derived), so the "plain grey" note would contradict the screen.
+    expect(est.notes.join(' ')).not.toMatch(/Colour is plain grey/);
     expect(est.missing.some((m) => m.id === 'surface')).toBe(false);
     expect(buildAltText(est)).toContain('generated model');
-    // + Artistic adds the turbulence.
-    expect(at('artistic').shader!.gas).toMatchObject({ turbulence: true });
+    // + Artistic adds the storms and the turbulence.
+    expect(at('artistic').shader!.gas).toMatchObject({ storms: true, turbulence: true });
     // Measured only: nothing about it is measured, so a plain sphere of the measured size.
     const m = at('measured');
     expect(m.shader).toMatchObject({ surface: false, plain: true });
     expect(Object.values(m.shader!.gas!).some(Boolean)).toBe(false);
     expect(showsBody(m)).toBe(true);
+    // The texts say what is Estimated (bands, flattening, colour) and what needs + Artistic.
+    const words = [m.notes.join(' '), buildAltText(m)];
+    for (const w of words) {
+      expect(w).toContain('choose + Estimated to see them');
+      expect(w).toContain('+ Artistic');
+      expect(w).not.toContain('choose + Artistic to see it');
+    }
   });
 
   it('gas giant: a refused layer leaves the others, and no radius refuses all of them', () => {

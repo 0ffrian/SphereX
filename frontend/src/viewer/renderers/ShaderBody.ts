@@ -112,6 +112,7 @@ import type { TierName } from '../render/quality';
 import { createVolume, type VolumeHandle } from '../volume/VolumeBody';
 import { nebulaVolume, remnantShell, remnantVolume } from '../volume/volumeSpecs';
 import {
+  GAS_HIDDEN_TEXT,
   GAS_LAYER_IDS,
   kindHasPlainSphere,
   resolveShaderSpec,
@@ -705,7 +706,9 @@ export class ShaderBody implements BodyRenderer {
       return {
         state: 'hidden',
         message: this.plainShown()
-          ? "Showing a plain grey sphere at the size on the card. The surface is an artist's impression and is hidden at this honesty level; choose + Artistic to see it."
+          ? this.spec.kind === 'gas_giant'
+            ? `Showing a plain grey sphere at the size on the card. ${GAS_HIDDEN_TEXT}`
+            : "Showing a plain grey sphere at the size on the card. The surface is an artist's impression and is hidden at this honesty level; choose + Artistic to see it."
           : this.spec.kind === 'nebula' || this.spec.kind === 'nova'
             ? `Nothing is shown. This ${this.spec.kind === 'nova' ? 'explosion' : 'cloud'} is an artist's impression and is hidden at this honesty level; choose + Artistic to see it.`
             : "Nothing is shown. The surface is an artist's impression and the size is only an estimate, so both are hidden at this honesty level.",

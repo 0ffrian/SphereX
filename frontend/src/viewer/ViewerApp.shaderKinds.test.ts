@@ -66,14 +66,14 @@ describe('shader kinds through the plan path (B5)', () => {
     v.dispose();
   });
 
-  it('a gas giant at + Estimated shows its four estimated layers; the swirl waits for + Artistic (issue #62)', async () => {
+  it('a gas giant at + Estimated shows its three estimated layers; the seeded looks wait for + Artistic (issue #62)', async () => {
     const { v, fieldCalls } = makeViewer();
     const f = fixture('gas_giant');
     const plan = show(v, f.card, f.params);
     expect(plan.shader).toMatchObject({ surface: true, plain: false });
     const body = await built(v);
-    expect(body.drawn).toEqual(['bands', 'flattening', 'colour', 'storms']);
-    expect(body.hidden).toEqual(['turbulence']);
+    expect(body.drawn).toEqual(['bands', 'flattening', 'colour']);
+    expect(body.hidden).toEqual(['storms', 'turbulence']);
     expect(plainVisible(body)).toBe(false);
     // The toggle updates the same body in place: no new field.
     show(v, f.card, f.params, 'artistic');

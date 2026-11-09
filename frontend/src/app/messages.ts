@@ -527,6 +527,8 @@ export function describeRefusal(item: MissingItem): string {
     }
     case 'mode':
       return `${name}: not shown in this view. ${item.detail ?? ''}`.trim();
+    case 'quality':
+      return `${name}: not drawn at this quality level. ${item.detail ?? ''}`.trim();
     case 'unverified':
       return `${name}: not drawn yet. ${item.detail ?? 'A value it needs is still being checked.'}`;
   }

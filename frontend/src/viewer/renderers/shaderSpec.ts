@@ -76,6 +76,13 @@ export const NO_GAS_LAYERS: GasSwitches = {
   turbulence: false,
 };
 
+/**
+ * What a gas giant that is hidden at "Measured only" says (PR #63 review): the bands, flattening and
+ * colour are Estimated (shown with + Estimated); the storms and swirls are the artist's (+ Artistic).
+ */
+export const GAS_HIDDEN_TEXT =
+  "The bands, flattening and colour are estimated from rules and typical values and are hidden at this level; choose + Estimated to see them. The storms and swirls are an artist's impression, shown with + Artistic.";
+
 export function isShaderKind(t: ObjectType): t is ShaderKind {
   return (SHADER_KINDS as readonly string[]).includes(t);
 }
@@ -324,9 +331,13 @@ export function resolveShaderSpec(
   });
 }
 
-/** A typical value standing in for a missing rate: `model_dependent`, or null when it is [verify]. */
-function typicalRate(value: number | null): { value: number; tag: Tag } | null {
-  return value === null ? null : { value, tag: 'model_dependent' };
+/**
+ * A typical value standing in for a missing rate, or null when it is [verify]. The typical spin is
+ * "typical for this kind of body, no formula": `inferred_from_analog`, tier 4 (D-32, Q-119 b). The
+ * typical wind is A7.2's own Jupiter example: `model_dependent`.
+ */
+function typicalRate(value: number | null, tag: Tag): { value: number; tag: Tag } | null {
+  return value === null ? null : { value, tag };
 }
 
 /**
@@ -339,8 +350,9 @@ function typicalRate(value: number | null): { value: number; tag: Tag } | null {
 export function rhinesBands(motion: Motion, scaleM: number | null): RuleChoice | null {
   // A rate the card or `dynamics` does not give is the typical value of a giant planet (D-32 tier
   // 3), stated in `assumed`; the backend's `bands` layer says the same (gas_giant.py).
-  const spin = motion.rates.spin_period_h ?? typicalRate(TYPICAL_GAS_SPIN_H);
-  const wind = motion.rates.jet_speed_ms ?? typicalRate(TYPICAL_GAS_WIND_MS);
+  const spin =
+    motion.rates.spin_period_h ?? typicalRate(TYPICAL_GAS_SPIN_H, 'inferred_from_analog');
+  const wind = motion.rates.jet_speed_ms ?? typicalRate(TYPICAL_GAS_WIND_MS, 'model_dependent');
   if (!spin || !wind || scaleM === null || !(scaleM > 0)) return null;
   const omega = spinRateRadS(spin.value);
   const n = omega === null ? null : bandCount(omega, scaleM, Math.abs(wind.value));
@@ -392,7 +404,7 @@ export function flatteningRule(
     }
   }
   // Without a spin the typical one stands in (the backend's `flattening` layer says the same).
-  const used = spin ?? typicalRate(TYPICAL_GAS_SPIN_H);
+  const used = spin ?? typicalRate(TYPICAL_GAS_SPIN_H, 'inferred_from_analog');
   if (used) {
     const tag = weakestTag(['model_dependent', used.tag]);
     return {

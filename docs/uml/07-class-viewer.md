@@ -128,7 +128,7 @@ classDiagram
     baked albedo (visible mode only), normal, roughness maps
     displacement by baked height map, scale textures.relief_amp (artistic layer displacement, issue #62)
     refused (reason backend) when relief_amp is not sent
-    displacement on the high and medium quality levels only
+    displacement on the high and medium quality levels only (refused with reason quality on low, PlanContext.qualityTier)
   }
   class Comet {
     <<comet>>

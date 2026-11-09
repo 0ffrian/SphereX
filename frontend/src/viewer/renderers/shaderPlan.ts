@@ -4,8 +4,8 @@
 // alt text work as for the baked kinds):
 //   - the surface layer of a planet, nebula or nova is `artistic` (R7.7), so it is hidden at
 //     "Measured only" and "+ Estimated"; a gas giant has five layers with their own tags (issue
-//     #62, D-32): bands, flattening, colour and storms follow the data and show from "+ Estimated",
-//     turbulence is `artistic` and shows with "+ Artistic";
+//     #62, D-32): bands, flattening and colour follow the data and show from "+ Estimated", storms
+//     and turbulence are `artistic` (seeded looks) and show with "+ Artistic";
 //   - Q-45 / R5.3: the plain grey sphere that stands in for a hidden surface is shown only when the
 //     size on the card is shown at this honesty level (Measured only: only when it is `measured`);
 //   - nebula and nova have no plain sphere, so nothing is drawn while the cloud is hidden;
@@ -20,6 +20,7 @@ import { listMotion, offerLayer, spinPlanOf, viewerLayer } from '../motion/planM
 import {
   GAS_DEFAULTS,
   GAS_LAYER_IDS,
+  GAS_HIDDEN_TEXT,
   kindHasPlainSphere,
   NO_GAS_LAYERS,
   resolveShaderSpec,
@@ -33,6 +34,13 @@ import {
 
 export const PLAIN_SPHERE_NOTE =
   "Shown as a plain grey sphere at the size on the card. The surface is an artist's impression and is hidden at this level.";
+
+/** The plain-sphere note of a kind: a gas giant's parts are mostly Estimated, so it says which. */
+export function plainSphereNote(kind: ShaderKind): string {
+  return kind === 'gas_giant'
+    ? `Shown as a plain grey sphere at the size on the card. ${GAS_HIDDEN_TEXT}`
+    : PLAIN_SPHERE_NOTE;
+}
 
 const NO_TOUCH_NOTE = {
   nebula:
@@ -166,6 +174,8 @@ export function planShaderKind(input: PlanInput): RenderPlan {
       on[id] = b.draw(id);
     }
     gas = on;
+    // The named `colour` layer is the colour, so the grey note no longer describes the screen.
+    if (on.colour) b.colourIsDrawnByLayer();
     surface = GAS_LAYER_IDS.some((id) => on[id]);
   } else {
     surface = b.draw(spec.layerId);
@@ -241,7 +251,7 @@ export function planShaderKind(input: PlanInput): RenderPlan {
 
   const plain = hasPlain && spec.drawable && !surface && sizeShown;
   if (plain) {
-    b.notes.push(PLAIN_SPHERE_NOTE);
+    b.notes.push(plainSphereNote(spec.kind));
     b.legendBody('Plain grey sphere at the size on the card.');
   }
 

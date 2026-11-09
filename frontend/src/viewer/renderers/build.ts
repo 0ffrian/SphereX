@@ -23,7 +23,7 @@ import {
   Box3,
   Vector3,
 } from 'three/webgpu';
-import { dot, float, normalView, saturate, texture, vec3 } from 'three/tsl';
+import { dot, float, fract, normalView, saturate, texture, uv, vec2, vec3 } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import type { BodyPlan, DustPlan, RenderPlan, Rgb, ShellPlan, SpinPlan } from '../planTypes';
@@ -277,7 +277,10 @@ function selfLitColour(body: BodyPlan, map: Texture | null, mapMean: number | nu
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TSL node graphs are untyped proxies
   let col: any = vec3(tint.r * body.emissive, tint.g * body.emissive, tint.b * body.emissive);
   if (map) {
-    const t = texture(map);
+    // A longitude offset of the shared map (body B of a binary, so the two are not clones): the
+    // map is shared, so the offset is in the sampling, not on the texture.
+    const off = body.albedoOffsetU ?? 0;
+    const t = off > 0 ? texture(map, fract(uv().add(vec2(off, 0)))) : texture(map);
     if (body.albedoLuma) {
       const y = dot(t.rgb, vec3(0.2126, 0.7152, 0.0722));
       col = col.mul(y.div(mapMean ?? 1));
