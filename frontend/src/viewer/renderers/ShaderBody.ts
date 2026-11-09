@@ -133,7 +133,7 @@ const PLAIN_COLOUR = 0x8a8a8a;
 
 /**
  * Climate-pattern mode (issue #68 Part 3, Q-156): at + Estimated the artistic terrain is hidden and a
- * locked planet shows only the ocean and ice masks of the field, on a smooth sphere, lit. These three
+ * locked planet shows only the ice mask of the field (uniform open cap, ice beyond; no terrain-noise coastline), on a smooth sphere, lit. These three
  * colours are KEY colours for the masks (ground / open water / ice), fixed and plain: they say where
  * the model puts water and ice, not what the surface looks like. Ground is the same neutral grey as
  * the plain sphere (linear value of 0x8a8a8a); no relief, no clouds, no atmosphere, no lava, no
@@ -142,6 +142,15 @@ const PLAIN_COLOUR = 0x8a8a8a;
 const PATTERN_GROUND: Rgb = [0.254, 0.254, 0.254];
 const PATTERN_WATER: Rgb = [0.07, 0.32, 0.45];
 const PATTERN_ICE: Rgb = [0.92, 0.95, 0.98];
+/**
+ * What the pattern draws from the ice mask alone (Q-156): uniform ice for a snowball (cap 0, the
+ * field's bare high rock is artistic terrain and is not shown), else a uniform open cap (water for a
+ * water world, ground for a rocky one) with ice beyond it. The ocean mask's noise coastline is never read.
+ */
+export function patternMode(kind: string, iceAngleRad: number): 'ice' | 'water' | 'ground' {
+  if (!(iceAngleRad > 0)) return 'ice';
+  return kind === 'planet_water' ? 'water' : 'ground';
+}
 /**
  * Light direction until the viewer gives one. A body is lit from the plan's light (`planLighting`,
  * R5.1), which falls back to this head-on direction when the card has no phase angle or sun_dir.
@@ -366,15 +375,18 @@ function buildPlanet(
       : vec3(0, 0, 0);
 
   const mat = new MeshStandardNodeMaterial();
-  // The field's masks as flat key colours (PATTERN_*); the same masks the haptics sample.
-  const patternCol = mix(
-    mix(rgb3(PATTERN_GROUND), rgb3(PATTERN_WATER), B.x),
-    rgb3(PATTERN_ICE),
-    B.y,
-  );
+  // Pattern mode draws from the ice mask alone: inside the open cap one uniform colour (water or
+  // ground by kind), ice outside it. The ocean mask and the snowball's bare high rock come from the
+  // artistic terrain noise, so neither is read here. The ice edge has the seeded wobble (Part 3d).
+  const pm = patternMode(spec.kind, fp.iceAngleRad ?? 0);
+  const patternCol =
+    pm === 'ice'
+      ? rgb3(PATTERN_ICE)
+      : mix(rgb3(pm === 'water' ? PATTERN_WATER : PATTERN_GROUND), rgb3(PATTERN_ICE), B.y);
   mat.colorNode = mix(col, patternCol, pattern);
   mat.normalNode = bumped;
-  mat.roughnessNode = mix(float(0.9), float(0.2), wet);
+  // Pattern mode: no glint, or the specular would trace the ocean mask's terrain-noise coastline.
+  mat.roughnessNode = mix(float(0.9), float(0.2), wet.mul(notPattern));
   mat.metalness = 0;
   mat.emissiveNode = (
     fp.heat > 0 ? rgb3(LAVA_COLOUR).mul(lava).mul(heat).mul(notPattern) : vec3(0, 0, 0)
