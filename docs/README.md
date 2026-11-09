@@ -54,7 +54,7 @@ Always load `decisions.md` first. It is short, and it overrides everything else.
 | Labels and honesty in the UI | [architecture/honesty-policy.md](architecture/honesty-policy.md), [rendering/display-rules.md](rendering/display-rules.md) (R5.3, D-21) |
 | Tests | [architecture/testing.md](architecture/testing.md), [rendering/layout-tests-open-items.md](rendering/layout-tests-open-items.md), [rendering/reference/](rendering/reference/README.md) (reference frames, visual checklist, frame-time checks) |
 | Where code lives and who owns it | [rendering/layout-tests-open-items.md](rendering/layout-tests-open-items.md) (R10), [uml/04-package.md](uml/04-package.md), decisions D-17 |
-| Band-Hop Linker: field pipeline, `/v1/link` routes, sky layers, chain and atlas views (proposal) | [architecture/linker.md](architecture/linker.md) (A16), [architecture/linker-backend.md](architecture/linker-backend.md) (A17), [architecture/linker-ui.md](architecture/linker-ui.md) (A18), [uml/21-linker.md](uml/21-linker.md), decisions Q-113 and Q-114 |
+| Area search: draw a square, Known objects (Track) or Discovery, `/v1/areas` routes, sky layers and island cards | [architecture/linker.md](architecture/linker.md) (A16), [architecture/linker-backend.md](architecture/linker-backend.md) (A17), [architecture/linker-ui.md](architecture/linker-ui.md) (A18), [uml/21-linker.md](uml/21-linker.md), decisions Q-113 and Q-114 |
 | Plan, milestones, risks | [architecture/plan.md](architecture/plan.md), [architecture/risks.md](architecture/risks.md), decisions D-14, D-29 and D-30 |
 
 ## Editing rules

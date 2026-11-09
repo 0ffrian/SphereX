@@ -11,7 +11,7 @@ Project: **Shift & Spectrum**, a public web tool for NASA Space Apps 2026 (Port 
 | [docs/architecture/](docs/architecture/README.md) | Source of truth for everything else: data sources, pipeline, tiers, plan, risks. Sections `A1`–`A18`. |
 | [docs/uml/](docs/uml/README.md) | Architecture diagrams (UML, Mermaid). Keep in sync when a spec changes. |
 | [docs/handover.md](docs/handover.md) | Background only (competition, data, early concepts). Not a spec. |
-| [mockup/](mockup/) | Visual input only, never a spec (D-01). `spherex-ui.html` is the app shell; `chase-the-rock.html` is the Track tool (see Layout). |
+| [mockup/](mockup/) | Visual input only, never a spec (D-01). `spherex-ui.html` is the app shell and the Area search tool (key 5); `chase-the-rock.html` is the Track tool (see Layout). |
 
 If two docs disagree and `decisions.md` is silent, follow the precedence (decisions > rendering > architecture), add a `Q-` entry to `decisions.md` describing the conflict, and continue. Never pick silently.
 
@@ -67,7 +67,8 @@ The team builds from 5 Nov 2026 (decisions D-14), setting aside the event rule a
 ```
 docs/       specs, decisions, UML
 mockup/     single-file HTML mock-ups, not the app
-  spherex-ui.html       app shell and tools (three.js r128)
+  spherex-ui.html       app shell and tools (three.js r128), incl. Area search (key 5), which
+                        opens chase-the-rock.html in its Track pane: serve mockup/ over http
   chase-the-rock.html   Track tool: a known asteroid's path, its SPHEREx frames, a zoom with
                         stars masked, and a spectrum built hop by hop (433 Eros, 20–21 Mar 2026)
 backend/    Python 3.12 API, pipeline, texture baker        (Kevin, Moon, Atish)
@@ -77,7 +78,14 @@ shared/     JSON schemas shared by backend and frontend      (Moon)
 
 Owners per area: decisions D-17.
 
-**Track tool mock-up (`mockup/chase-the-rock.html`).** It shows the known-objects Track tool proposed for PR #59 (no blind discovery). Its data is real: 16 SPHEREx QR2 cutouts and the JPL Horizons path from SPHEREx (`500@-163182`), both from PR #53's recorded Eros fixtures, plus the local 2MASS sky mirror. Three things in it are mock-up approximations, not app output, so never port them as values:
+**Track tool mock-up (`mockup/chase-the-rock.html`).** It shows the known-objects Track tool (Q-131). In the app it is opened from Area search (Q-146). Its data is real: 16 SPHEREx QR2 cutouts and the JPL Horizons path from SPHEREx (`500@-163182`), both from PR #53's recorded Eros fixtures, plus the local 2MASS sky mirror. Three things in it are mock-up approximations, not app output, so never port them as values:
 - Star masks are bright peaks found in each frame; the app places them from Gaia DR3 and CatWISE (A4.9).
 - Brightness uses Stage 2's radii (3 px aperture, 6–9 px ring) without its sub-pixel weights or clipping (A4.2).
-- `OUTLIER` on Eros's pixels is kept under a proposed rule for moving objects that is not yet decided; Stage 2 on main refuses those frames.
+- `OUTLIER` on Eros's pixels is kept under the moving-object rule of Q-139 (accepted 9 Nov 2026, flagged frames shown as flagged); Stage 2 on main still refuses those frames until it is built.
+
+**Current plan for moving objects: Area search (decisions Q-146, 9 Nov 2026). Follow it; it wins over older text in PR #59's history.**
+- One **Area search** tool: the user draws a square on the sky, then picks **Known objects** (SkyBoT list; **Track it** opens Track, Q-131) or **Discovery** (find dots, drop one-exposure glitches, drop stars, join what moves across visits, check SkyBoT). Spec: A16 to A18 ([linker.md](docs/architecture/linker.md), [linker-backend.md](docs/architecture/linker-backend.md), [linker-ui.md](docs/architecture/linker-ui.md)). Visual reference: `mockup/spherex-ui.html`, key 5.
+- Labels: "found blind = (designation)", "unexplained track", "possible". An unmatched track is never "an asteroid", "new" or "a discovery".
+- **Do not build before the event:** the rate-grid (THOR-style) linker, the SED smoothness score, injection-recovery completeness, the shuffled-time control, ADES, live areas outside the precomputed ones. They are phase 2. Make no catch-rate claim.
+- Owners: Track Atish; Discovery backend Kevin (D1, Day 0 count first); Area tool UI, schemas and fixtures Moon (D2); integration in M5 (D3).
+- **To see it:** `cd mockup && python3 -m http.server 8766`, open `http://127.0.0.1:8766/spherex-ui.html`, press 5, drag a square, try both options. Opening the file directly works, but the Track pane then shows chase-the-rock.html with its own header.

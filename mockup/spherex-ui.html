@@ -342,6 +342,35 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
 .rw .chip{font-size:10px;padding:1px 7px;flex:none}
 .row-btn.wrap{flex-wrap:wrap}
 
+/* ---------- area tool: draw a square on the sky, then Known objects (Track) or Discovery ---------- */
+.view.boxing #skyPane,.view.boxing #sky{cursor:crosshair}
+.view.tracking #skyPane{right:62%}
+#kpane{width:62%}
+#kpane iframe{flex:1;min-height:0;width:100%;border:0;background:#06060a;border-top:1px solid var(--border)}
+.kp-miss{display:none;padding:18px;color:var(--mfg);font-size:13px;line-height:1.5}
+#kpane.missing .kp-miss{display:block}#kpane.missing iframe{display:none}
+.lk-note{font-size:11.5px;color:var(--amber);background:#fbbf2410;border:1px solid #fbbf2433;border-radius:10px;padding:7px 11px;line-height:1.45;margin-top:10px}
+.lk-list{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.lk-row{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;text-align:left;padding:8px 11px;border-radius:11px;background:var(--card);box-shadow:inset 0 0 0 1px var(--border);color:var(--fg);font-size:12.5px;transition:box-shadow .25s,background .25s,opacity .3s}
+.lk-row b{font:600 12px var(--mono)}
+.lk-row small{color:var(--mfg);font-size:11.5px}
+.lk-row:hover{background:var(--muted)}
+.ar-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.ar-opt{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:12px;border-radius:14px;background:var(--card);box-shadow:inset 0 0 0 1px var(--border);color:var(--fg);transition:background .2s,box-shadow .2s,transform .35s var(--spring)}
+.ar-opt:hover{background:var(--muted);box-shadow:inset 0 0 0 1px #4ade8055;transform:translateY(-1px)}
+.ar-opt .ico{width:20px;height:20px;color:var(--green)}
+.ar-opt b{font-size:13.5px;font-weight:600}
+.ar-opt span{font-size:11.5px;color:var(--mfg);line-height:1.4}
+.ar-steps{list-style:none;display:flex;flex-direction:column;gap:5px;margin-top:12px;padding:0}
+.ar-steps li{display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:baseline;font-size:12.5px;color:var(--dim);transition:color .3s}
+.ar-steps li i{width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--border);display:inline-block;transform:translateY(2px);transition:background .3s,box-shadow .3s}
+.ar-steps li small{font:11px var(--mono);color:var(--dim)}
+.ar-steps li.on{color:var(--fg)}
+.ar-steps li.on i{background:var(--green);box-shadow:none}
+.ar-steps li.on small{color:var(--mfg)}
+.ar-steps li.now i{box-shadow:inset 0 0 0 1.5px var(--green)}
+.btn.sm[aria-pressed="true"]{box-shadow:inset 0 0 0 1px #4ade8088;color:var(--green)}
+
 /* ---------- Gemini island ---------- */
 .island-wrap{position:absolute;left:50%;top:4px;transform:translateX(-50%);z-index:40}
 .island{--edge:#222;max-width:300px;position:relative;height:52px;width:52px;border-radius:26px;background:#000;border:1px solid var(--edge);
@@ -444,6 +473,12 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
             <button type="button" class="btn ghost sm" id="tpHear" style="margin-left:auto"><span class="mgw" id="tpHearIc"><svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M4 2.5v11l9-5.5z"/></svg></span><span id="tpHearTx">Listen</span></button></div>
         </div>
       </aside>
+      <aside class="bpane" id="kpane" aria-label="Track" aria-hidden="true">
+        <div class="bp-head"><div><h3 id="kpTitle">433 Eros</h3><p>Track · real SPHEREx QR2 frames and JPL Horizons path, 20–21 Mar 2026</p></div>
+          <div class="bp-tools"><button class="btn ghost sm" id="kpBack" type="button" style="margin-right:6px">Back to the area</button><button class="x" id="kpClose" type="button" aria-label="Close Track"><svg class="ico ai ai-x" viewBox="0 0 24 24"><line class="v-line1" x1="6" y1="18" x2="18" y2="6"/><line class="v-line2" x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>
+        <iframe id="kFrame" title="Track view of 433 Eros"></iframe>
+        <div class="kp-miss">Track mock-up not found. Put <b>chase-the-rock.html</b> (Atish, PR #59) next to this file and serve the folder over http.</div>
+      </aside>
       <div class="toast" id="toast"></div>
     </main>
 
@@ -479,7 +514,7 @@ body.split .player{opacity:0;transform:translateY(14px);pointer-events:none}
         <div class="island-in">
           <div id="grid"></div>
           <div class="label"><b id="lbl"></b><span id="sub"></span></div>
-          <button class="x" id="xIsl" aria-label="Close" type="button"><svg class="ico ai ai-x" viewBox="0 0 24 24"><line class="v-line1" x1="6" y1="18" x2="18" y2="6"/><line class="v-line2" x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          <button class="x" id="minIsl" aria-label="Minimise" title="Minimise" type="button"><svg class="ico" viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button><button class="x" id="xIsl" aria-label="Close" type="button"><svg class="ico ai ai-x" viewBox="0 0 24 24"><line class="v-line1" x1="6" y1="18" x2="18" y2="6"/><line class="v-line2" x1="6" y1="6" x2="18" y2="18"/></svg></button>
         </div>
         <div class="island-body" id="islBody"></div>
       </div>
@@ -559,7 +594,7 @@ const island = (() => {
   const wrap = document.getElementById("islandWrap"), el = document.getElementById("island"),
         lbl = document.getElementById("lbl"), sub = document.getElementById("sub"), body = document.getElementById("islBody");
   const grid = GridLoader(document.getElementById("grid"), {size:28, gap:1, blur:1.4, rounded:true, ...STATES.idle});
-  let state = "idle", token = 0, live = false, card = false, last = null, clearT;
+  let state = "idle", token = 0, live = false, card = false, last = null, clearT, mini = null, miniText = "", miniBusy = false;
   function measure(){            // natural size of the pill for its current text (never wider than 300px, text is cut with …)
     const pw = el.style.width, ph = el.style.height;
     el.style.transition = "none"; el.style.width = "auto"; el.style.height = "auto";
@@ -581,7 +616,7 @@ const island = (() => {
   }
   /* The card: Odysseus grows into a panel (width + height spring), content fades in. */
   function openCard(c){
-    token++; card = true; last = c; clearTimeout(clearT);
+    token++; card = true; last = c; mini = null; if(!AR.running){ miniText = ""; miniBusy = false; } clearTimeout(clearT);
     const s = STATES.card; state = "card";
     grid.set({...s, size:28}); wrap.style.setProperty("--gc", s.glow); wrap.dataset.live = "true";
     lbl.textContent = c.title; sub.textContent = c.sub || ""; sub.style.display = c.sub ? "" : "none";
@@ -596,6 +631,7 @@ const island = (() => {
     if(c.after) c.after();
   }
   function closeCard(){
+    if(!card && mini){ mini = null; set("idle"); return true; }
     if(!card) return false; card = false; el.dataset.card = "false"; set("idle");
     clearT = setTimeout(() => { if(!card) body.innerHTML = ""; }, 700); return true;
   }
@@ -605,7 +641,22 @@ const island = (() => {
     for(const [n, t, sentence] of steps){ if(my !== token) return; set(n, sentence); await wait(t); }
     if(my === token){ if(done) done(); else set("idle"); }
   }
+  /* Minimise: the card shrinks to a pill that keeps showing progress; a click on the pill brings the card back. */
+  function showMini(){
+    const s = miniBusy ? STATES.thinking : STATES.card; state = "mini";
+    grid.set({...s, size:28}); wrap.style.setProperty("--gc", s.glow); wrap.dataset.live = "true";
+    lbl.textContent = mini.title; sub.textContent = miniText || "Click to open"; sub.style.display = "";
+    el.dataset.open = "true"; el.setAttribute("aria-label", "Odysseus: " + mini.title + ", minimised. Click to open");
+    const [w, h] = measure(); el.style.width = w + "px"; el.style.height = Math.max(52, h) + "px"; el.style.borderRadius = Math.min(Math.max(52, h)/2, 28) + "px";
+  }
+  function minimize(){
+    if(!card) return; const c = last; token++; card = false; el.dataset.card = "false";
+    clearT = setTimeout(() => { if(!card) body.innerHTML = ""; }, 700); mini = c; showMini();
+  }
+  function restore(){ const c = mini; mini = null; if(!c) return; c.reopen ? c.reopen() : openCard(c); }
+  function status(text, busy){ miniText = text; miniBusy = !!busy; if(mini && state === "mini") showMini(); }
   function toggleDemo(){
+    if(mini){ restore(); return; }
     if(card) return;
     if(state !== "idle"){ token++; set("idle"); return; }
     run([["listening",2600],["thinking",2200],
@@ -614,12 +665,13 @@ const island = (() => {
   el.addEventListener("click", toggleDemo);
   el.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleDemo(); } });
   // right-click Odysseus: bring the card back (or put it away)
-  el.addEventListener("contextmenu", e => { e.preventDefault();
+  document.getElementById("minIsl").addEventListener("click", e => { e.stopPropagation(); minimize(); });
+  el.addEventListener("contextmenu", e => { e.preventDefault(); if(mini){ restore(); return; }
     if(card){ api.onClose && api.onClose(); closeCard(); }
     else if(api.reopen) api.reopen(); });
   document.getElementById("xIsl").addEventListener("click", e => { e.stopPropagation(); api.onClose && api.onClose(); closeCard(); });
   set("idle");
-  const api = {set, run, openCard, closeCard, onClose:null, reopen:null, get state(){return state}, get card(){return card}};
+  const api = {set, run, openCard, closeCard, minimize, restore, status, onClose:null, reopen:null, get state(){return state}, get card(){return card}, get mini(){return !!mini}};
   return api;
 })();
 window.island = island;   // island.set("thinking") from the console
@@ -661,6 +713,9 @@ const wcol = w => w<1.1 ? "#f87171" : w<1.8 ? "#fb923c" : w<2.8 ? "#fbbf24" : w<
 const I = (d, extra="") => `<svg class="ico" viewBox="0 0 24 24">${d}${extra}</svg>`;
 /* icons from Animate UI (lucide shapes, animated on hover in CSS) */
 const AI = {"orbit": "<svg class=\"ico ai ai-orbit\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M20.341 6.484A10 10 0 0 1 10.266 21.85\"/><path class=\"v-path2\" d=\"M3.659 17.516A10 10 0 0 1 13.74 2.152\"/><circle class=\"v-circle1\" cx=\"12\" cy=\"12\" r=\"3\"/><circle class=\"v-circle2\" cx=\"19\" cy=\"5\" r=\"2\"/><circle class=\"v-circle3\" cx=\"5\" cy=\"19\" r=\"2\"/></svg>", "sparkles": "<svg class=\"ico ai ai-sparkles\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\"/><path class=\"v-plus\" d=\"M20 2v4 M22 4h-4\"/><circle class=\"v-circle\" cx=\"4\" cy=\"20\" r=\"2\"/></svg>", "volume-2": "<svg class=\"ico ai ai-volume-2\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M16 9a5 5 0 0 1 0 6\"/><path class=\"v-path2\" d=\"M19.364 18.364a9 9 0 0 0 0-12.728\"/><path class=\"v-path3\" d=\"M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z\"/></svg>", "activity": "<svg class=\"ico ai ai-activity\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\" pathLength=\"1\"/></svg>", "star": "<svg class=\"ico ai ai-star\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z\"/></svg>", "layers": "<svg class=\"ico ai ai-layers\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\"/><path class=\"v-path2\" d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\"/><path class=\"v-path3\" d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\"/></svg>", "fingerprint": "<svg class=\"ico ai ai-fingerprint\" viewBox=\"0 0 24 24\"><path class=\"v-path\" stroke=\"currentColor\" d=\"M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4 M14 13.12c0 2.38 0 6.38-1 8.88 M17.29 21.02c.12-.6.43-2.3.5-3.02 M2 12a10 10 0 0 1 18-6 M2 16h.01 M21.8 16c.2-2 .131-5.354 0-6 M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2 M8.65 22c.21-.66.45-1.32.57-2 M9 6.8a6 6 0 0 1 9 5.2v2\"/><path class=\"v-path1\" d=\"M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4\" pathLength=\"1\"/><path class=\"v-path2\" d=\"M14 13.12c0 2.38 0 6.38-1 8.88\" pathLength=\"1\"/><path class=\"v-path3\" d=\"M17.29 21.02c.12-.6.43-2.3.5-3.02\" pathLength=\"1\"/><path class=\"v-path4\" d=\"M2 12a10 10 0 0 1 18-6\" pathLength=\"1\"/><path class=\"v-path5\" d=\"M2 16h.01\" pathLength=\"1\"/><path class=\"v-path6\" d=\"M21.8 16c.2-2 .131-5.354 0-6\" pathLength=\"1\"/><path class=\"v-path7\" d=\"M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2\" pathLength=\"1\"/><path class=\"v-path8\" d=\"M8.65 22c.21-.66.45-1.32.57-2\" pathLength=\"1\"/><path class=\"v-path9\" d=\"M9 6.8a6 6 0 0 1 9 5.2v2\" pathLength=\"1\"/></svg>", "play": "<svg class=\"ico ai ai-play\" viewBox=\"0 0 24 24\"><polygon class=\"v-polygon\" points=\"6 3 20 12 6 21 6 3\"/></svg>", "pause": "<svg class=\"ico ai ai-pause\" viewBox=\"0 0 24 24\"><rect class=\"v-rect1\" x=\"14\" y=\"4\" width=\"4\" height=\"16\" rx=\"1\"/><rect class=\"v-rect2\" x=\"6\" y=\"4\" width=\"4\" height=\"16\" rx=\"1\"/></svg>", "rotate-ccw": "<svg class=\"ico ai ai-rotate-ccw\" viewBox=\"0 0 24 24\"><path class=\"v-path1\" d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path class=\"v-path2\" d=\"M3 3v5h5\"/></svg>", "search": "<svg class=\"ico ai ai-search\" viewBox=\"0 0 24 24\"><path class=\"v-path\" d=\"m21 21-4.34-4.34\"/><circle class=\"v-circle\" cx=\"11\" cy=\"11\" r=\"8\"/></svg>", "x": "<svg class=\"ico ai ai-x\" viewBox=\"0 0 24 24\"><line class=\"v-line1\" x1=\"6\" y1=\"18\" x2=\"18\" y2=\"6\"/><line class=\"v-line2\" x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"/></svg>", "comet": "<svg class=\"ico ai ai-comet\" viewBox=\"0 0 24 24\"><circle class=\"v-head\" cx=\"17\" cy=\"7\" r=\"3\"/><path class=\"v-t1\" pathLength=\"1\" d=\"M14.5 9.5L4 20\"/><path class=\"v-t2\" pathLength=\"1\" d=\"M13 12L6 21\"/><path class=\"v-t3\" pathLength=\"1\" d=\"M16 13l-5 8\"/></svg>", "reticle": "<svg class=\"ico ai ai-draw ai-reticle\" viewBox=\"0 0 24 24\"><circle pathLength=\"1\" cx=\"12\" cy=\"12\" r=\"7\"/><path pathLength=\"1\" d=\"M12 2v4M12 18v4M2 12h4M18 12h4\"/><circle pathLength=\"1\" cx=\"12\" cy=\"12\" r=\".8\"/></svg>", "ice": "<svg class=\"ico ai ai-draw ai-ice\" viewBox=\"0 0 24 24\"><path pathLength=\"1\" d=\"M12 2v20M3.3 7l17.4 10M3.3 17l17.4-10\"/><path pathLength=\"1\" d=\"M9.5 4L12 6.5 14.5 4M9.5 20L12 17.5l2.5 2.5\"/></svg>", "bars": "<svg class=\"ico ai ai-draw ai-bars\" viewBox=\"0 0 24 24\"><path pathLength=\"1\" d=\"M3 10v4M7 7v10M11 3v18M15 8v8M19 5v14\"/></svg>", "ringedstar": "<svg class=\"ico ai ai-draw ai-ringedstar\" viewBox=\"0 0 24 24\"><circle pathLength=\"1\" cx=\"12\" cy=\"12\" r=\"8\"/><circle pathLength=\"1\" cx=\"12\" cy=\"12\" r=\"1.8\"/></svg>", "hash": "<svg class=\"ico ai ai-draw ai-hash\" viewBox=\"0 0 24 24\"><path pathLength=\"1\" d=\"M4 9h16M4 15h16M9 4v16M15 4v16\"/></svg>", "pin": "<svg class=\"ico ai ai-draw ai-pin\" viewBox=\"0 0 24 24\"><path pathLength=\"1\" d=\"M12 21s7-6.2 7-11.5a7 7 0 10-14 0C5 14.8 12 21 12 21z\"/><circle pathLength=\"1\" cx=\"12\" cy=\"9.5\" r=\"2.5\"/></svg>", "warning": "<svg class=\"ico ai ai-draw ai-warning\" viewBox=\"0 0 24 24\"><path pathLength=\"1\" d=\"M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z\"/><path pathLength=\"1\" d=\"M12 9v4M12 17h.01\"/></svg>", "eye": "<svg class=\"ico ai ai-draw ai-eye\" viewBox=\"0 0 24 24\"><path pathLength=\"1\" d=\"M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z\"/><circle pathLength=\"1\" cx=\"12\" cy=\"12\" r=\"3\"/></svg>"};
+AI["box"] = '<svg class="ico ai ai-draw ai-box" viewBox="0 0 24 24"><rect pathLength="1" x="3.5" y="3.5" width="17" height="17" rx="2"/><circle pathLength="1" cx="9" cy="10" r="1.7"/><circle pathLength="1" cx="15" cy="14.5" r="1.7"/><path pathLength="1" d="M10.4 11.1l3.2 2.3"/></svg>';
+AI["dots"] = '<svg class="ico ai ai-draw ai-dots" viewBox="0 0 24 24"><circle pathLength="1" cx="6" cy="7" r="2.2"/><circle pathLength="1" cx="16" cy="6" r="2.2"/><circle pathLength="1" cx="10" cy="15" r="2.2"/><circle pathLength="1" cx="19" cy="17" r="2.2"/></svg>';
+AI["chains"] = '<svg class="ico ai ai-draw ai-chains" viewBox="0 0 24 24"><circle pathLength="1" cx="4.5" cy="17" r="1.8"/><circle pathLength="1" cx="10" cy="11" r="1.8"/><circle pathLength="1" cx="15" cy="12.5" r="1.8"/><circle pathLength="1" cx="20" cy="6" r="1.8"/><path pathLength="1" d="M5.7 15.7l3-3.4M11.7 11.4l1.9.5M16.3 11.4l2.4-3.8" stroke-dasharray="1"/></svg>';
 const TOOLS = [
   {id:"sky", name:"Sky", key:"1", ico:AI["reticle"],
     t:"Sky view", p:"Pan with drag, zoom with the wheel. Search for a name or coordinates at the top."},
@@ -669,7 +724,9 @@ const TOOLS = [
   {id:"listen", name:"Audio", key:"3", ico:AI["bars"],
     t:"Audio", p:"Turn the spectrum into sound. Higher pitch means brighter. Bells mark the gases and dips.", spec:true},
   {id:"haptics", name:"Haptics", key:"4", ico:AI["fingerprint"],
-    t:"Haptics", p:"Rub the surface of a body and feel it."}
+    t:"Haptics", p:"Rub the surface of a body and feel it."},
+  {id:"area", name:"Area search", key:"5", ico:AI["box"],
+    t:"Area search", p:"Draw a square on the sky. Follow known objects in it, or look for moving dots nobody has listed."}
 ];
 const SPEC_CARD = {id:"spec", t:"Fingerprint", p:"How bright it is at each colour of infrared light. Every material leaves its own pattern, so this tells you what it is made of.", spec:true};
 const LAYERS = [
@@ -677,7 +734,9 @@ const LAYERS = [
   {id:"wise", name:"WISE", ico:AI["layers"], on:false},
   {id:"grid", name:"Grid", ico:AI["hash"], on:false},
   {id:"labels", name:"Labels", ico:AI["pin"], on:true},
-  {id:"flags", name:"Contamination", ico:AI["warning"], on:false}
+  {id:"flags", name:"Contamination", ico:AI["warning"], on:false},
+  {id:"orph", name:"Dots", ico:AI["dots"], on:false},
+  {id:"chains", name:"Tracks", ico:AI["chains"], on:false}
 ];
 const layerOn = {}; LAYERS.forEach(l => layerOn[l.id] = l.on);
 let tool = "sky";
@@ -750,7 +809,7 @@ function bodyCoords(o){
   return [((ra0 - x*PX/3600/Math.cos(de0*Math.PI/180)) % 360 + 360) % 360, de0 - y*PX/3600];
 }
 function showInfo(t){
-  if(!t) return; lastCard = "body";
+  if(!t) return; lastCard = "body"; AR.selShow = false;
   const [ra, dec] = bodyCoords(t), comet = t.kind === "comet";
   island.openCard({title:t.n, sub:t.cls||"Unknown object",
     html:`<div class="row-btn wrap" style="margin-top:6px"><button class="btn" id="goFp">See fingerprint</button>${comet ? `<button class="btn ghost" id="goTail">See comet trail</button>` : ""}<button class="btn ghost" id="goBuild">Build it</button></div>`,
@@ -761,7 +820,7 @@ function showInfo(t){
       b.querySelector("#goBuild").onclick = () => openBuild(t);
     }});
 }
-island.onClose = () => { tool = "sky"; markTool("sky"); hint(); };
+island.onClose = () => { tool = "sky"; markTool("sky"); AR.selShow = false; arStopDraw(); hint(); };
 function openFlip(){ tool = "sky"; markTool("sky"); flipCard(); }
 island.reopen = () => { lastCard === "body" ? showInfo(sel || cur) : openFlip(); };
 const CHK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
@@ -799,7 +858,8 @@ function markTool(id){
 function selectTool(id){
   tool = id; markTool(id === "spec" ? "listen" : id);
   const t = TOOLS.find(x => x.id === id) || SPEC_CARD;
-  if(id !== "haptics" && B.building) closeBuild(); if(id !== "comet" && TR.open) closeTrail(); markTool(id === "spec" ? "listen" : id);
+  if(id !== "haptics" && B.building) closeBuild(); if(id !== "comet" && TR.open) closeTrail(); if(id !== "area"){ if(AR.track) closeTrack(); arStopDraw(); } markTool(id === "spec" ? "listen" : id);
+  if(id === "area"){ openAreaCard(); return; }
   if(id === "haptics"){ openHaptics(); return; }
   if(id === "sky"){ if(island.closeCard()) hint(); return; }
   if(id === "flip"){ flipCard(); return; }
@@ -890,6 +950,7 @@ function buildSky(t){
     {n:"Supernova remnant", kind:"nova", cls:"Supernova remnant (demo)", d:"~2 kpc", cat:"sketch", sp:.1, col:"#5eead4"}];
   for(let i = 0; i < MV.length; i++){ const slow = MV[i].kind === "nebula" || MV[i].kind === "nova" ? .1 : 1;
     movers.push({x:(r()-.5)*1100, y:(r()-.5)*1100, vx:(r()-.5)*40*slow, vy:(r()-.5)*40*slow, s:2+r()*1.5, ...MV[i]}); }
+  arReset();
 }
 function resize(){
   DPR = Math.min(devicePixelRatio||1, 2); const b = document.getElementById("skyPane").getBoundingClientRect();
@@ -957,6 +1018,7 @@ function draw(ts){
     if(layerOn.labels && cam.z > .5 && m !== T0){ ctx.fillStyle = "#a1a1aa"; ctx.font = "10px ui-monospace,monospace"; ctx.fillText(m.n, sx+9, sy-8); }
   }
 
+  arDraw();
   // the target (searched object) and the selected body
   if(cur){
     const [cx, cy] = toScreen(...targetPos(frame));
@@ -979,6 +1041,7 @@ function draw(ts){
   document.getElementById("scaleTxt").textContent = `${(80/cam.z*PX/60).toFixed(1)}′`;
   document.getElementById("hudBr").innerHTML = cur ? `${opts.subtract ? "subtracted · " : ""}${WAVES[frame].toFixed(2)} µm<br>${fmtDate(frame)} · frame ${frame+1}/12` : "";
   document.getElementById("hudTl").textContent = opts.band != null ? `${DETS[opts.band].n} · ${DETS[opts.band].lo.toFixed(2)}–${DETS[opts.band].hi.toFixed(2)} µm` : "";
+  if(AR.box && AR.step >= 0) document.getElementById("hudBr").innerHTML += `<br>area demo · visit ${AR.v + 1} of 2${AR.blink ? " · blinking" : ""}`;
 }
 function ring(x, y, r, col, dash){
   ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash(dash ? [3,3] : []);
@@ -993,7 +1056,7 @@ function drawGrid(){
 
 /* interaction: drag to pan, wheel to zoom (around the cursor) */
 let drag = null;
-view.addEventListener("pointerdown", e => { if(e.target.closest("#bpane,#tpane,#tCanvas")) return;
+view.addEventListener("pointerdown", e => { if(e.target.closest("#bpane,#tpane,#kpane,#tCanvas")) return; if(arDown(e)) return;
   drag = {x:e.clientX, y:e.clientY, cx:camT.x, cy:camT.y}; view.classList.add("drag"); view.setPointerCapture(e.pointerId); });
 view.addEventListener("pointermove", e => {
   const b = view.getBoundingClientRect(), [wx, wy] = toWorld(e.clientX - b.left, e.clientY - b.top);
@@ -1001,16 +1064,19 @@ view.addEventListener("pointermove", e => {
   const dec = de0 - wy*PX/3600, ra = ra0 - wx*PX/3600/Math.cos(de0*Math.PI/180);
   document.getElementById("coords").innerHTML =
     `<b>RA</b> ${((ra%360+360)%360).toFixed(4)}°  <b>Dec</b> ${dec.toFixed(4)}°<br><span>${(W/cam.z*PX/3600).toFixed(2)}° wide</span>`;
-  if(!drag && !e.target.closest("#bpane,#tpane,#tCanvas")) view.style.cursor = pick(e) ? "pointer" : "";
+  if(!drag && !e.target.closest("#bpane,#tpane,#kpane,#tCanvas")) view.style.cursor = pick(e) ? "pointer" : "";
+  if(arMove(e)) return;
   if(drag){ camT.x = drag.cx - (e.clientX - drag.x)/cam.z; camT.y = drag.cy - (e.clientY - drag.y)/cam.z; cam.x = camT.x; cam.y = camT.y; }
 });
-view.addEventListener("pointerup", () => { drag = null; view.classList.remove("drag"); });
-view.addEventListener("wheel", e => { e.preventDefault(); if(e.target.closest("#bpane,#tpane,#tCanvas")) return;
+view.addEventListener("pointerup", e => { if(arUp(e)) return; drag = null; view.classList.remove("drag"); });
+view.addEventListener("wheel", e => { e.preventDefault(); if(e.target.closest("#bpane,#tpane,#kpane,#tCanvas")) return;
   const b = view.getBoundingClientRect(), sx = e.clientX - b.left, sy = e.clientY - b.top;
   const [bx, by] = toWorld(sx, sy), z = Math.min(4, Math.max(.25, camT.z * Math.exp(-e.deltaY*.0015)));
   camT.z = z; cam.z = z; cam.x = bx - (sx - W/2)/z; cam.y = by - (sy - H/2)/z; camT.x = cam.x; camT.y = cam.y;
 }, {passive:false});
-view.addEventListener("click", e => { if(!cur || e.target.closest("#bpane,#tpane,#tCanvas")) return;
+view.addEventListener("click", e => { if(AR.justDrew){ AR.justDrew = false; return; }
+  if(!cur || e.target.closest("#bpane,#tpane,#kpane,#tCanvas")) return;
+  if(arPick(e)) return;
   const o = pick(e); if(o){ sel = o; const p = posOf(o, frame); camT.x = p[0]; camT.y = p[1]; showInfo(o); } });
 
 /* ============================================================
@@ -1536,7 +1602,7 @@ function loop(now){
   if(!B.done && t > B.n*STAGE_S + .3){ B.done = true; island.run([["done",1900]]); }
 }
 function openBuild(o, opt){
-  o = o || sel || cur; if(!o) return; B.quick = !!(opt && opt.feel);
+  o = o || sel || cur; if(!o) return; if(AR.track) closeTrack(); B.quick = !!(opt && opt.feel);
   island.closeCard(); startPlay(false); tool = "sky"; markTool("sky");
   B.obj = o; B.kind = o.kind || "star"; B.building = true; B.seed = 3 + Math.floor((o.ra || o.x || 1) * 13) % 40;
   document.body.classList.add("split"); $("view").classList.add("building"); bpane.classList.add("open"); bpane.setAttribute("aria-hidden", "false");
@@ -1688,7 +1754,7 @@ function drawTrailChart(){
 function openTrail(o){
   o = o || sel || cur; if(!o) return;
   if(TR.open && TR.grp){ TR.o = o; TR.ct = 0; $("tpTitle").textContent = o.n; trailBody(); return; }
-  if(B.building) closeBuild(); island.closeCard(); startPlay(false); tool = "comet"; markTool("comet");
+  if(AR.track) closeTrack(); if(B.building) closeBuild(); island.closeCard(); startPlay(false); tool = "comet"; markTool("comet");
   TR.o = o; TR.open = true; TR.ct = 0; $("tpTitle").textContent = o.n;
   document.body.classList.add("split"); $("view").classList.add("building", "trailing"); tpane.classList.add("open"); tpane.setAttribute("aria-hidden", "false");
   history.replaceState(null, "", "#comet-trail"); island.set("thinking");
@@ -1916,6 +1982,204 @@ function drawWave(now){
 function feelEnd(){ FG.down = false; FG.last = null; FG.acc = 0; FG.spd = 0; SFX.rubStop(); Haptics.stop(); bpRing.classList.remove("on"); }
 
 /* ============================================================
+   Area search (mock-up). Draw a square on the sky, then pick:
+   - Known objects: catalogued movers in the square (SkyBoT). 433 Eros opens Track, which is
+     Atish's mock-up (chase-the-rock.html: real SPHEREx QR2 frames and the Horizons path) in a side pane.
+   - Discovery: find dots, drop one-exposure glitches, drop stars, join what moves across the two
+     visits, then check SkyBoT. The dots, counts and sky positions here are generated; only Eros's
+     frames and path inside Track are real.
+   ============================================================ */
+const AR = {mode:"idle", box:null, start:null, justDrew:false, step:-1, running:false, v:0, blink:false, blinkT:null, timer:null,
+            sel:-1, selShow:false, track:false, from:"disc", stars:[], glitch:[], tracks:[]};
+const kpane = $("kpane"), kFrame = $("kFrame");
+const AR_STEPS = [
+  ["Find dots", "212 in 16 frames"],
+  ["Drop one-exposure glitches", "−58"],
+  ["Drop stars (Gaia DR3, CatWISE)", "−141"],
+  ["Join what moves across visits", "3 groups"],
+  ["Check known objects (SkyBoT)", "1 known"]];
+const stop = f => e => { e.stopPropagation(); f(e); };
+function arReset(){ clearInterval(AR.timer); arBlink(false); AR.box = null; AR.mode = "idle"; AR.step = -1; AR.running = false; AR.sel = -1; AR.selShow = false; view.classList.remove("boxing"); }
+function arStopDraw(){ if(AR.mode === "drawing"){ AR.mode = AR.box ? "set" : "idle"; AR.start = null; view.classList.remove("boxing"); } }
+function arNorm(a, b){ return {x0:Math.min(a[0], b[0]), y0:Math.min(a[1], b[1]), x1:Math.max(a[0], b[0]), y1:Math.max(a[1], b[1])}; }
+function arWorld(e){ const b = view.getBoundingClientRect(); return toWorld(e.clientX - b.left, e.clientY - b.top); }
+function arSize(){ const b = AR.box; return `${((b.x1 - b.x0)*PX/3600).toFixed(2)}° × ${((b.y1 - b.y0)*PX/3600).toFixed(2)}°`; }
+function arDown(e){ if(AR.mode !== "drawing" || e.target.closest(".island-wrap")) return false;
+  AR.start = arWorld(e); AR.box = arNorm(AR.start, AR.start); AR.step = -1; view.setPointerCapture(e.pointerId); return true; }
+function arMove(e){ if(AR.mode !== "drawing" || !AR.start) return false; AR.box = arNorm(AR.start, arWorld(e)); return true; }
+function arUp(){ if(AR.mode !== "drawing" || !AR.start) return false; AR.start = null; AR.justDrew = true; setTimeout(() => { AR.justDrew = false; }, 60);
+  const b = AR.box; if((b.x1 - b.x0)*cam.z < 30 || (b.y1 - b.y0)*cam.z < 30){ AR.box = null; toast("Drag a bigger square"); return true; }
+  arSet(); return true; }
+function arDefault(){ const [cx, cy] = toWorld(W/2, H*.66), hw = Math.min(W*.3, 230)/cam.z, hh = Math.min(H*.2, 140)/cam.z;
+  AR.box = {x0:cx - hw, y0:cy - hh, x1:cx + hw, y1:cy + hh}; arSet(); }
+function arSet(){ AR.mode = "set"; view.classList.remove("boxing"); clearInterval(AR.timer); AR.step = -1; AR.running = false; arBlink(false); arGen(); openBoxCard(); }
+function arBlink(on){ AR.blink = on; clearInterval(AR.blinkT); if(on) AR.blinkT = setInterval(() => { AR.v ^= 1; }, 750); else AR.v = 1;
+  const b = $("arBlink"); if(b) b.setAttribute("aria-pressed", String(on)); }
+function arGen(){
+  const b = AR.box, w = b.x1 - b.x0, h = b.y1 - b.y0, r = rng(4242), P = (u, v) => [b.x0 + u*w, b.y0 + v*h], U = () => .05 + r()*.9;
+  AR.stars = []; for(let i = 0; i < 30; i++) AR.stars.push({p:P(U(), U()), w:WAVES[r()*12 | 0]});
+  AR.glitch = []; for(let i = 0; i < 18; i++) AR.glitch.push({p:P(U(), U()), v:i % 2, w:WAVES[r()*12 | 0]});
+  const mk = (id, u, v, du, dv, visits, known, wl) => ({id, known, visits,
+    pts:visits.map((vi, k) => [0, 1, 2, 3].map(e => { const t = vi + e*.06; return {p:P(u + du*t, v + dv*t), w:wl[k*4 + e]}; }))});
+  AR.tracks = [mk("T1", .14, .74, .5, -.4, [0, 1], "433 Eros", [.82, .86, .91, .95, 1.38, 1.42, 1.47, 1.52]),
+               mk("T2", .72, .18, -.24, .36, [0, 1], null, [2.2, 2.3, 2.4, 2.5, 3.6, 3.7, 3.8, 3.9]),
+               mk("T3", .9, .86, -.12, -.06, [1], null, [4.4, 4.5, 4.6, 4.7])];
+}
+function arLabel(t){
+  if(t.visits.length < 2) return `${t.id} · possible · 1 visit`;
+  if(AR.step < 4) return `${t.id} · track`;
+  return t.known ? `${t.id} · found blind = ${t.known}` : `${t.id} · unexplained track`;
+}
+function arDraw(){
+  const b = AR.box; if(!b) return;
+  const [x0, y0] = toScreen(b.x0, b.y0), [x1, y1] = toScreen(b.x1, b.y1), drawing = AR.mode === "drawing";
+  ctx.fillStyle = "#4ade800b"; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+  ctx.strokeStyle = drawing ? "#4ade80aa" : "#4ade80"; ctx.lineWidth = 1.2; ctx.setLineDash(drawing ? [5, 4] : []);
+  ctx.strokeRect(x0, y0, x1 - x0, y1 - y0); ctx.setLineDash([]);
+  ctx.fillStyle = "#4ade80"; ctx.font = "500 11px ui-monospace,monospace"; ctx.fillText(arSize(), x0 + 1, y0 - 7);
+  if(AR.step < 0) return;
+  const O = layerOn.orph, C = layerOn.chains, v = AR.v, rr = 4.5 + Math.min(cam.z, 1.4)*2, joined = C && AR.step >= 3;
+  if(O){
+    if(AR.step < 1) AR.glitch.forEach(g => { if(g.v !== v) return; const [sx, sy] = toScreen(...g.p); ring(sx, sy, rr, wcol(g.w) + "dd", false); });
+    AR.stars.forEach(st => { const [sx, sy] = toScreen(...st.p);
+      if(AR.step < 2) ring(sx, sy, rr, "#e4e4e7bb", false);
+      else { ctx.strokeStyle = "#71717a66"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(sx - 3, sy - 3); ctx.lineTo(sx + 3, sy + 3); ctx.moveTo(sx + 3, sy - 3); ctx.lineTo(sx - 3, sy + 3); ctx.stroke(); } });
+  }
+  AR.tracks.forEach((t, i) => {
+    const on = AR.selShow && AR.sel === i, known = t.known && AR.step >= 4;
+    t.visits.forEach((vi, k) => { const pts = t.pts[k], now = vi === v;
+      if(!joined){ if(O && now) pts.forEach(q => { const [sx, sy] = toScreen(...q.p); ring(sx, sy, rr, wcol(q.w) + "ee", false); }); return; }
+      const sp = pts.map(q => toScreen(...q.p)); ctx.globalAlpha = now || !AR.blink ? 1 : .35;
+      ctx.strokeStyle = on ? "#4ade80" : "#e4e4e7"; ctx.lineWidth = 1.4; ctx.beginPath(); sp.forEach((p, n) => n ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
+      pts.forEach((q, n) => { ctx.fillStyle = wcol(q.w); ctx.beginPath(); ctx.arc(sp[n][0], sp[n][1], 3.4, 0, 6.28); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke(); });
+      ctx.globalAlpha = 1; });
+    if(!joined) return;
+    if(t.visits.length > 1){ const [ax, ay] = toScreen(...t.pts[0][3].p), [cx2, cy2] = toScreen(...t.pts[1][0].p);
+      ctx.strokeStyle = on ? "#4ade80" : known ? "#e4e4e7aa" : "#fbbf24aa"; ctx.lineWidth = 1.2; ctx.setLineDash(known ? [2, 5] : [7, 5]);
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(cx2, cy2); ctx.stroke(); ctx.setLineDash([]); }
+    const lp = t.pts[t.pts.length - 1][3].p, [lx, ly] = toScreen(...lp);
+    if(on){ const kk = 15 + Math.sin(tms/500)*1.5, L = 6; ctx.strokeStyle = "#4ade80"; ctx.lineWidth = 1.5;
+      for(const [dx, dy] of [[-1,-1],[1,-1],[1,1],[-1,1]]){ ctx.beginPath(); ctx.moveTo(lx + dx*kk, ly + dy*(kk-L)); ctx.lineTo(lx + dx*kk, ly + dy*kk); ctx.lineTo(lx + dx*(kk-L), ly + dy*kk); ctx.stroke(); } }
+    if(layerOn.labels){ const txt = arLabel(t); ctx.font = "500 11px ui-monospace,monospace"; ctx.fillStyle = on ? "#fafafa" : known ? "#4ade80" : "#a1a1aa";
+      ctx.fillText(txt, Math.max(8, Math.min(lx + 12, W - ctx.measureText(txt).width - 8)), ly - 10); }
+  });
+}
+function arPick(e){
+  if(!AR.box || AR.step < 3 || !layerOn.chains) return false;
+  const b = view.getBoundingClientRect(); let best = -1, bd = 20;
+  AR.tracks.forEach((t, i) => t.pts.flat().forEach(q => { const [sx, sy] = toScreen(...q.p);
+    const d = Math.hypot(e.clientX - b.left - sx, e.clientY - b.top - sy); if(d < bd){ bd = d; best = i; } }));
+  if(best < 0) return false; openTrackCard(best); return true;
+}
+function arRenderSteps(){
+  const el = $("arSteps"); if(!el) return;
+  el.innerHTML = AR_STEPS.map(([a, n], k) => `<li class="${k <= AR.step ? "on" : AR.running && k === AR.step + 1 ? "now" : ""}"><i></i><span>${a}</span><small>${k <= AR.step ? n : ""}</small></li>`).join("");
+}
+function arRenderList(){
+  const list = $("arList"); if(!list) return; list.innerHTML = "";
+  AR.tracks.forEach((t, i) => { const live = AR.step >= 3, one = t.visits.length < 2, b = document.createElement("button");
+    b.type = "button"; b.className = "lk-row"; b.disabled = !live; b.style.opacity = live ? 1 : .4;
+    const chip = !live ? "" : AR.step < 4 ? '<span class="chip">checking</span>' : t.known ? `<span class="chip g">${t.known}</span>` : one ? '<span class="chip">possible</span>' : '<span class="chip a">unexplained</span>';
+    b.innerHTML = live ? `<b>${t.id}</b><span>${one ? "Seen in 1 visit" : "Moves across both visits"}<br><small>${t.visits.length*4} exposures</small></span>${chip}`
+      : `<b>${t.id}</b><span><small>waiting</small></span><span></span>`;
+    if(live) b.onclick = stop(() => openTrackCard(i)); list.appendChild(b); });
+}
+function arFit(){
+  const b = AR.box, bw = b.x1 - b.x0, bh = b.y1 - b.y0;
+  camT.z = Math.min(4, Math.max(.25, Math.min(W*.8/bw, H*.42/bh)));
+  camT.x = (b.x0 + b.x1)/2; camT.y = (b.y0 + b.y1)/2 - (H*.7 - H/2)/camT.z;
+}
+function arRun(){
+  clearInterval(AR.timer); AR.step = -1; AR.running = true; AR.selShow = false;
+  startPlay(false); setLayer("orph", true); setLayer("chains", true); arBlink(true); arFit(); arRenderSteps(); arRenderList(); island.status("Starting · " + AR_STEPS[0][0], true);
+  AR.timer = setInterval(() => { AR.step++; arRenderSteps(); arRenderList();
+    const nx = AR_STEPS[AR.step + 1]; island.status(nx ? `Step ${AR.step + 2} of ${AR_STEPS.length} · ${nx[0]}` : "3 movers found · 1 is 433 Eros", !!nx);
+    if(AR.step >= AR_STEPS.length - 1){ clearInterval(AR.timer); AR.running = false; arRenderSteps();
+      toast("3 movers: T1 is 433 Eros, found blind · T2 unexplained · T3 seen once"); } }, 1000);
+}
+function openAreaCard(){
+  tool = "area"; markTool("area"); AR.mode = "drawing"; view.classList.add("boxing"); AR.selShow = false; lastCard = "area";
+  island.openCard({title:"Area search", sub:"Drag a square on the sky", width:380,
+    html:`<div class="grp"><p>Drag a square over the part of the sky you want to search. Then choose how to search it.</p></div>
+    <div class="row-btn wrap" style="margin-top:12px"><button class="btn ghost sm" id="arHere" type="button">Use a square in the middle</button>${AR.box ? '<button class="btn ghost sm" id="arKeep" type="button">Keep the last square</button>' : ""}</div>`,
+    bind:b => { b.querySelector("#arHere").onclick = stop(arDefault); const k = b.querySelector("#arKeep"); if(k) k.onclick = stop(arSet); }});
+}
+function openBoxCard(){
+  tool = "area"; markTool("area"); AR.selShow = false;
+  island.openCard({title:"Area · " + arSize(), sub:"16 SPHEREx frames in 2 visits · 20–21 Mar 2026 (demo area)", width:408, reopen:openBoxCard,
+    html:`<div class="ar-opts">
+      <button class="ar-opt" id="arKnown" type="button">${AI["orbit"]}<b>Known objects</b><span>Follow asteroids and comets already on file that crossed this square.</span></button>
+      <button class="ar-opt" id="arDisc" type="button">${AI["dots"]}<b>Discovery</b><span>Look for dots that move and match nothing on file.</span></button></div>
+      <div class="row-btn wrap" style="margin-top:10px"><button class="btn ghost sm" id="arRedraw" type="button">Draw again</button></div>`,
+    bind:b => { b.querySelector("#arKnown").onclick = stop(openKnownCard); b.querySelector("#arDisc").onclick = stop(openDiscoveryCard);
+      b.querySelector("#arRedraw").onclick = stop(openAreaCard); }});
+}
+function openKnownCard(){
+  AR.from = "known"; AR.selShow = false; const m = movers[0];
+  island.openCard({title:"Known objects", sub:"In this square · from SkyBoT", width:408, reopen:openKnownCard,
+    html:`<div class="lk-list">
+      <button class="lk-row" id="arEros" type="button"><b>433</b><span>Eros<br><small>asteroid · 16 frames in 2 visits · real SPHEREx data</small></span><span class="chip g">Track it</span></button>
+      ${m ? `<button class="lk-row" id="arA" type="button"><b>A</b><span>${m.n}<br><small>demo body · sketch data</small></span><span class="chip">Open</span></button>` : ""}</div>
+      <div class="row-btn wrap" style="margin-top:12px"><button class="btn ghost sm" id="arBack" type="button">Back</button></div>`,
+    bind:b => { b.querySelector("#arEros").onclick = stop(openTrack); const a = b.querySelector("#arA"); if(a) a.onclick = stop(() => { sel = m; showInfo(m); });
+      b.querySelector("#arBack").onclick = stop(openBoxCard); }});
+}
+function openDiscoveryCard(){
+  AR.from = "disc"; tool = "area"; markTool("area"); AR.selShow = false;
+  island.openCard({title:"Discovery", sub:"Area · " + arSize() + " · 2 visits", width:408, reopen:openDiscoveryCard,
+    html:`<div class="lk-note">Demo. Dots and counts are made up for this mock-up; only Eros's frames and path in Track are real. A track that matches nothing is "unexplained", never "a new asteroid".</div>
+      <ol class="ar-steps" id="arSteps"></ol>
+      <div class="row-btn wrap" style="margin-top:12px"><button class="btn sm" id="arRun" type="button">${AR.step >= 0 ? "Run again" : "Look for movers"}</button><button class="btn ghost sm" id="arBlink" type="button" aria-pressed="${AR.blink}">Blink the 2 visits</button><button class="btn ghost sm" id="arBack" type="button">Back</button></div>
+      <div class="lk-list" id="arList"></div>`,
+    bind:b => { b.querySelector("#arRun").onclick = stop(e => { e.currentTarget && (e.currentTarget.textContent = "Run again"); arRun(); });
+      b.querySelector("#arBlink").onclick = stop(() => arBlink(!AR.blink)); b.querySelector("#arBack").onclick = stop(() => { clearInterval(AR.timer); AR.running = false; openBoxCard(); });
+      arRenderSteps(); arRenderList(); }});
+}
+function openTrackCard(i){
+  const t = AR.tracks[i], one = t.visits.length < 2, known = t.known && AR.step >= 4;
+  AR.sel = i; AR.selShow = true; tool = "area"; markTool("area");
+  const chip = known ? `<span class="chip g">Known: ${t.known}</span>` : one ? '<span class="chip">Possible · one visit</span>' : '<span class="chip a">Unexplained track</span>';
+  const say = known ? "Found without being told where to look. SkyBoT then confirmed it is 433 Eros."
+    : one ? "Moves within one visit only. It needs a second visit before it counts as a track."
+    : "Moves steadily across both visits and matches nothing in SkyBoT. A lead for follow-up, not a discovery.";
+  island.openCard({reopen:() => openTrackCard(i), title:t.id, sub:known ? "Track · matches a known object" : "Track · matches nothing known", width:408,
+    html:`<div class="chips">${chip}<span class="chip">Demo</span></div>
+      <div class="grp"><p>${say}</p></div>
+      <dl class="kv"><dt>Visits</dt><dd>${t.visits.length} of 2</dd><dt>Exposures</dt><dd>${t.visits.length*4}</dd>
+        <dt>Glitch check</dt><dd>in 4 of 4 exposures per visit</dd><dt>Star check</dt><dd>no Gaia or CatWISE source</dd>
+        <dt>Known object</dt><dd>${known ? t.known : "none in SkyBoT"}</dd></dl>
+      <div class="row-btn wrap">${known ? '<button class="btn" id="arTrack" type="button">Open in Track</button>' : ""}<button class="btn ghost" id="arBackD" type="button">Back to discovery</button></div>`,
+    bind:b => { const k = b.querySelector("#arTrack"); if(k) k.onclick = stop(openTrack); b.querySelector("#arBackD").onclick = stop(openDiscoveryCard); }});
+}
+const EMBED = `body{padding:0!important;background:#06060a!important}
+.page{max-width:none!important;gap:0!important}
+.intro,.notes,.rail,.objchip{display:none!important}
+.app{grid-template-columns:minmax(0,1fr)!important;grid-template-areas:"top" "view" "transport"!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important}
+.top{justify-content:flex-end!important;padding:8px 12px!important}`;
+kFrame.addEventListener("load", () => {
+  try{ const d = kFrame.contentDocument; if(!d || !d.querySelector(".app")){ kpane.classList.add("missing"); return; }
+    kpane.classList.remove("missing"); const st = d.createElement("style"); st.textContent = EMBED; d.head.appendChild(st);
+    kFrame.contentWindow.dispatchEvent(new Event("resize"));
+  }catch(err){ /* opened from file://: the page shows as is, with its own header */ }
+});
+function openTrack(){
+  if(B.building) closeBuild(); if(TR.open) closeTrail(); island.closeCard(); startPlay(false); arBlink(false);
+  AR.track = true; tool = "area"; markTool("area");
+  document.body.classList.add("split"); $("view").classList.add("tracking"); kpane.classList.add("open"); kpane.setAttribute("aria-hidden", "false");
+  history.replaceState(null, "", "#track");
+  if(!kFrame.getAttribute("src")) kFrame.setAttribute("src", "chase-the-rock.html");
+  else try{ kFrame.contentWindow.dispatchEvent(new Event("resize")); }catch(err){}
+}
+function closeTrack(back){
+  if(!AR.track) return; AR.track = false;
+  document.body.classList.remove("split"); $("view").classList.remove("tracking"); kpane.classList.remove("open"); kpane.setAttribute("aria-hidden", "true");
+  history.replaceState(null, "", location.pathname + location.search);
+  if(back) (AR.from === "known" ? openKnownCard() : openDiscoveryCard()); else { tool = "sky"; markTool("sky"); }
+}
+$("kpClose").onclick = () => closeTrack(false);
+$("kpBack").onclick = e => { e.stopPropagation(); closeTrack(true); };
+
+/* ============================================================
    Keys
    ============================================================ */
 document.addEventListener("keydown", e => {
@@ -1924,7 +2188,7 @@ document.addEventListener("keydown", e => {
   if(e.key === " "){ e.preventDefault(); startPlay(!playing); return; }
   if(e.key === "ArrowRight"){ startPlay(false); setFrame(frame + 1); }
   if(e.key === "ArrowLeft"){ startPlay(false); setFrame(frame - 1); }
-  if(e.key === "Escape"){ if(TR.open){ closeTrail(); return; } if(B.building){ closeBuild(); return; } if(island.card){ island.onClose(); island.closeCard(); } }
+  if(e.key === "Escape"){ if(AR.track){ closeTrack(); return; } if(AR.mode === "drawing"){ arStopDraw(); } if(TR.open){ closeTrail(); return; } if(B.building){ closeBuild(); return; } if(island.card){ island.onClose(); island.closeCard(); } }
   const t = TOOLS.find(x => x.key === e.key); if(t) selectTool(t.id);
 });
 
