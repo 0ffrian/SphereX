@@ -10,12 +10,15 @@
 //     size on the card is shown at this honesty level (Measured only: only when it is `measured`);
 //   - nebula and nova have no plain sphere, so nothing is drawn while the cloud is hidden;
 //   - missing data refuses the layer; nothing is invented (R1 principle 3).
+import type { Layer } from '@/contract';
 import { isTagShown } from '../honesty';
+import { sliderValue } from '../sliders';
 import { missingFields, PlanBuilder, type PlanInput } from '../planCommon';
 import type { RenderPlan } from '../planTypes';
-import { processOf, resolveMotion, weakestTag } from '../motion/motion';
+import { processOf, resolveMotion, TIER_OF_TAG, weakestTag } from '../motion/motion';
 import { listMotion, offerLayer, spinPlanOf, viewerLayer } from '../motion/planMotion';
 import {
+  GAS_DEFAULTS,
   GAS_LAYER_IDS,
   kindHasPlainSphere,
   NO_GAS_LAYERS,
@@ -24,6 +27,7 @@ import {
   sizeFieldFor,
   type GasLayerId,
   type GasSwitches,
+  type RuleChoice,
   type ShaderKind,
 } from './shaderSpec';
 
@@ -35,6 +39,36 @@ const NO_TOUCH_NOTE = {
     'Nebulae have no touch feedback: they are drawn as glowing gas, so there is no surface to feel.',
   nova: 'Supernova remnants have no touch feedback: they are drawn as glowing gas, so there is no surface to feel.',
 } as const;
+
+/**
+ * Issue #62, D-32, Q-109, Q-115: what the legend says about the gas giant's `bands` and `flattening`
+ * is what is drawn. The backend's layer says what the card alone gives; the viewer draws from the
+ * motion rates (`dynamics`) and the sliders, which can be weaker. So the legend takes the weaker of
+ * the two tags, and the description, formula and assumption of the rule that sets the drawn value.
+ * The backend layer's `requires` stay, so its refusals work as before.
+ */
+function drawnAs(
+  layer: Layer,
+  rule: Pick<RuleChoice, 'tag' | 'formula' | 'assumed'> & { text: string },
+): Layer {
+  const tag = weakestTag([layer.tag, rule.tag]);
+  const needsAssumption = tag === 'model_dependent' || tag === 'inferred_from_analog';
+  const assumed =
+    rule.assumed ??
+    (needsAssumption
+      ? { limited_by: `the backend's tag for this layer (${layer.tag})` }
+      : undefined);
+  const formula = rule.formula ?? (tag === 'derived' ? layer.formula : undefined);
+  return {
+    id: layer.id,
+    tag,
+    tier: TIER_OF_TAG[tag],
+    description: rule.text,
+    requires: layer.requires,
+    ...(formula ? { formula } : {}),
+    ...(assumed ? { assumed } : {}),
+  };
+}
 
 export function planShaderKind(input: PlanInput): RenderPlan {
   const b = new PlanBuilder(input);
@@ -64,7 +98,6 @@ export function planShaderKind(input: PlanInput): RenderPlan {
     // Data first: say why, in the layer's own words, and draw nothing (no legend line).
     for (const id of spec.layerIds) {
       const layer = params.layers.find((l) => l.id === id);
-      if (!layer && spec.layerIds.length > 1) continue; // a gas layer the backend did not offer
       if (!layer || params.missing.includes(id)) {
         b.refuse({ id, reason: 'backend' });
       } else {
@@ -81,7 +114,57 @@ export function planShaderKind(input: PlanInput): RenderPlan {
     // Each gas layer is decided on its own: tag against the honesty level, data, refusals, holds.
     // A layer that is refused or hidden is off in the body too.
     const on: Record<GasLayerId, boolean> = { ...NO_GAS_LAYERS };
-    for (const id of GAS_LAYER_IDS) on[id] = b.draw(id);
+    // The legend's `bands` and `flattening` follow what is drawn (slider, then `dynamics`, then the
+    // default), so they are resolved with the sliders; the scene key above is not (a slider moves
+    // the body in place).
+    const drawnGas = resolveShaderSpec(card, params, ctx.overrides, motion).gas;
+    const bandsSlider = sliderValue(ctx.overrides, 'bands', 'gas_giant');
+    const bandsBackend = b.layers.get('bands');
+    if (bandsBackend && drawnGas) {
+      const rule = drawnGas.bandsRule;
+      b.layers.set(
+        'bands',
+        drawnAs(
+          bandsBackend,
+          bandsSlider !== undefined
+            ? {
+                tag: 'artistic',
+                text: `Band count set by the bands slider: about ${2 * bandsSlider} bands from pole to pole. Your choice, not data.`,
+              }
+            : rule
+              ? {
+                  ...rule,
+                  text: `${rule.basis}. The exact band pattern is a seeded look.`,
+                }
+              : {
+                  tag: 'artistic',
+                  text: `Not enough data for a band count, so the artist default is drawn: about ${2 * GAS_DEFAULTS.bands} bands from pole to pole.`,
+                },
+        ),
+      );
+    }
+    const flatBackend = b.layers.get('flattening');
+    if (flatBackend && drawnGas) {
+      const rule = drawnGas.flatteningRule;
+      b.layers.set(
+        'flattening',
+        drawnAs(
+          flatBackend,
+          rule
+            ? { ...rule, text: `${rule.basis}.` }
+            : {
+                tag: 'artistic',
+                text: 'Not enough data for a flattening, so the sphere is drawn round.',
+              },
+        ),
+      );
+    }
+    for (const id of GAS_LAYER_IDS) {
+      // A gas layer the backend did not offer (an older saved result, say) is refused with a
+      // reason, never dropped from the list.
+      if (!b.has(id)) b.refuse({ id, reason: 'backend' });
+      on[id] = b.draw(id);
+    }
     gas = on;
     surface = GAS_LAYER_IDS.some((id) => on[id]);
   } else {

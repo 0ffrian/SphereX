@@ -304,11 +304,13 @@ describe('gas giants and worlds (A7.1, A7.2)', () => {
     expect(ids(p)).not.toContain('surface');
     for (const d of p.drawn) expect(d.tier).toBeDefined();
     expect(p.spin).toEqual({ periodH: 10, speedup: 3600 });
-    // Each layer keeps the tag the backend gave it (the tier chain of D-32).
+    // Each layer keeps the tag the backend gave it (the tier chain of D-32), except bands and
+    // flattening, which take the weaker of it and the viewer rule that sets the drawn value (here
+    // the 10 h spin and 100 m/s of `dynamics`, inferred_from_analog).
     const tags = Object.fromEntries(p.drawn.map((d) => [d.id, d.tag]));
     expect(tags).toMatchObject({
-      bands: 'model_dependent',
-      flattening: 'model_dependent',
+      bands: 'inferred_from_analog',
+      flattening: 'inferred_from_analog',
       colour: 'derived',
       storms: 'inferred_from_analog',
       turbulence: 'artistic',

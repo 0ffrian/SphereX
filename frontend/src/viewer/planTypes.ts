@@ -7,6 +7,7 @@ import type { LightingPlan } from './lighting';
 import type { Motion } from './motion/motion';
 import type { StarRates } from './bodies/starModel';
 import type { GasSwitches } from './renderers/shaderSpec';
+import type { Overrides } from './sliders';
 
 export type Rgb = [number, number, number];
 export type Vec3 = [number, number, number];
@@ -358,4 +359,9 @@ export interface PlanContext {
    * plan, so the last stage (nothing held) is exactly the normal plan.
    */
   hold?: readonly string[];
+  /**
+   * D-27 slider overrides. Only the gas giant legend reads them (a slider sets the drawn band
+   * count or flattening, so the legend names it `artistic`). Absent: no slider is set.
+   */
+  overrides?: Overrides;
 }

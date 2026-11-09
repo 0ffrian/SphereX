@@ -210,8 +210,8 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const [announcement, setAnnouncement] = useState('');
 
   const ctx: PlanContext = useMemo(
-    () => defaultContext({ honesty, mode: modeChoice, epoch, scrubIndex, failed }),
-    [honesty, modeChoice, epoch, scrubIndex, failed],
+    () => defaultContext({ honesty, mode: modeChoice, epoch, scrubIndex, failed, overrides }),
+    [honesty, modeChoice, epoch, scrubIndex, failed, overrides],
   );
   const plan = useMemo(
     () => (card && params ? planRender(card, params, ctx) : null),

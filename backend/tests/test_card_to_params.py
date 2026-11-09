@@ -317,8 +317,32 @@ def test_brown_dwarf_limb_darkening_is_model_dependent_with_its_assumption(kind:
     layer = next(x for x in p["layers"] if x["id"] == "limb_darkening")
     assert (layer["tag"], layer["tier"]) == ("model_dependent", 3)
     assert layer["formula"] == "I(mu) = 1 - u * (1 - mu), u = 0.6"
-    assert layer["assumed"] == {"limb_darkening_u": 0.6}
-    assert layer["requires"] == []
+    assert layer["assumed"]["limb_darkening_u"] == 0.6  # the radius (R7.4) is listed too
+    assert layer["requires"] == ["radius_rjup"]
+
+
+def test_brown_dwarf_limb_darkening_follows_its_own_constant(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PR #63 review: the coefficient has its own [verify] constant, formatted into the text; None
+    refuses the layer; a refused body (no radius) refuses it too."""
+    import app.core.render.card_to_params as c2p
+
+    card = load("brown_dwarf", "cards")
+    monkeypatch.setattr(c2p, "BROWN_DWARF_LIMB_U", 0.45)
+    layer = next(x for x in params_for(card)["layers"] if x["id"] == "limb_darkening")
+    assert layer["formula"].endswith("u = 0.45")
+    assert "0.45" in layer["description"] and "0.6" not in layer["description"]
+    assert layer["assumed"]["limb_darkening_u"] == 0.45
+    monkeypatch.setattr(c2p, "BROWN_DWARF_LIMB_U", None)
+    p = params_for(card)
+    assert "limb_darkening" in p["missing"]
+    assert all(x["id"] != "limb_darkening" for x in p["layers"])
+    monkeypatch.setattr(c2p, "BROWN_DWARF_LIMB_U", 0.6)
+    no_radius = {k: v for k, v in card.items() if k != "radius_rjup"}
+    p = params_for(no_radius)
+    assert {"body", "limb_darkening"} <= set(p["missing"])
+    assert all(x["id"] not in ("body", "limb_darkening") for x in p["layers"])
 
 
 def test_ttauri_disc_stays_artistic() -> None:

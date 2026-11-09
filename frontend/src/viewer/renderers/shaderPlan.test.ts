@@ -4,7 +4,9 @@ import type { ObjectCard } from '@/contract';
 import { buildAltText, canvasLabel, nothingDrawnReason } from '../altText';
 import { showsBody } from '../planCommon';
 import { defaultContext, planRender } from '../renderPlan';
+import { resolveMotion } from '../motion/motion';
 import { fixture } from './fixtures.testutil';
+import { resolveShaderSpec } from './shaderSpec';
 
 // A gas giant has five layers of its own (issue #62) and is covered by its own tests below.
 const KINDS = ['planet_rocky', 'planet_water', 'nebula', 'nova'] as const;
@@ -162,5 +164,61 @@ describe('planShaderKind', () => {
     expect(planRender(w.card, w.params, defaultContext()).lighting.direction).toEqual([1, 0, 0]);
     const n = fixture('nebula');
     expect(planRender(n.card, n.params, defaultContext()).lighting.direction).toBeNull();
+  });
+
+  describe('gas giant legend matches what is drawn (PR #63, D-32, Q-109)', () => {
+    const plan = (
+      over: Record<string, number> = {},
+      honesty: 'derived' | 'artistic' = 'derived',
+    ) => {
+      const { card, params } = fixture('gas_giant');
+      return planRender(card, params, defaultContext({ honesty, overrides: over }));
+    };
+    const drawnBands = () => {
+      const { card, params } = fixture('gas_giant');
+      return resolveShaderSpec(card, params, undefined, resolveMotion(card, params)).field!.bands;
+    };
+
+    it('takes the weaker tag and the rule that sets the value when dynamics differs from the card', () => {
+      const p = plan();
+      const bands = p.drawn.find((d) => d.id === 'bands')!;
+      const flat = p.drawn.find((d) => d.id === 'flattening')!;
+      // The backend says model_dependent (typical spin); dynamics is a 10 h spin at 100 m/s,
+      // inferred_from_analog, and that is what is drawn.
+      expect(bands.tag).toBe('inferred_from_analog');
+      expect(flat.tag).toBe('inferred_from_analog');
+      const shown = Number(/about (\d+) bands/.exec(bands.description)![1]);
+      expect(shown).toBe(2 * drawnBands());
+      expect(shown).not.toBe(22);
+    });
+
+    it('a slider override is artistic and says what it set', () => {
+      const p = plan({ bands: 7, mass_mearth: 300 }, 'artistic');
+      const bands = p.drawn.find((d) => d.id === 'bands')!;
+      expect(bands.tag).toBe('artistic');
+      expect(bands.description).toContain('about 14 bands');
+      expect(p.drawn.find((d) => d.id === 'flattening')!.tag).toBe('artistic');
+      // At + Estimated an artistic layer is not shown, so it is refused for its honesty level.
+      const est = plan({ bands: 7 });
+      expect(est.missing.find((m) => m.id === 'bands')).toMatchObject({
+        reason: 'honesty',
+        tag: 'artistic',
+      });
+    });
+
+    it('a layer the backend did not send is refused with a reason, not dropped', () => {
+      const { card, params } = fixture('gas_giant');
+      const old = { ...params, layers: params.layers.filter((l) => l.id === 'turbulence') };
+      const p = planRender(card, old, defaultContext({ honesty: 'artistic' }));
+      for (const id of ['bands', 'flattening', 'colour', 'storms']) {
+        expect(
+          p.missing.find((m) => m.id === id),
+          id,
+        ).toMatchObject({ reason: 'backend' });
+      }
+      // Same when the body is not drawable at all.
+      const none = planRender(card, { ...old, scale_m: null }, defaultContext());
+      expect(none.missing.find((m) => m.id === 'bands')).toMatchObject({ reason: 'backend' });
+    });
   });
 });
