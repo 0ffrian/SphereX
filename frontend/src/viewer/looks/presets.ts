@@ -38,14 +38,14 @@ export function isArtisticOnly(look: unknown): boolean {
 }
 
 /**
- * Preset for a planet, or null. Null too when the `scenario` guard does not match, and when the
- * preset carries a non-artistic key (refused, never applied).
+ * The preset entry for a planet, or null. Null when the `scenario` guard does not match and when
+ * the preset carries a non-artistic key (refused, never applied).
  */
-export function lookupPreset(
+export function presetFor(
   plName: string,
   scenario: Scenario | null,
   table: Readonly<Record<string, LookPreset>> = PRESETS,
-): Partial<ScenarioLook> | null {
+): LookPreset | null {
   const name = normalisePlanetName(plName);
   // Own keys only: "constructor" or "__proto__" must not reach Object.prototype members.
   if (!Object.prototype.hasOwnProperty.call(table, name)) return null;
@@ -53,6 +53,17 @@ export function lookupPreset(
   if (!p) return null;
   if (p.scenario !== undefined && p.scenario !== scenario) return null;
   if (!isArtisticOnly(p.look)) return null;
+  return p;
+}
+
+/** The artistic settings of the planet's preset, or null (see `presetFor`). */
+export function lookupPreset(
+  plName: string,
+  scenario: Scenario | null,
+  table: Readonly<Record<string, LookPreset>> = PRESETS,
+): Partial<ScenarioLook> | null {
+  const p = presetFor(plName, scenario, table);
+  if (!p) return null;
   const out: Partial<ScenarioLook> = {};
   for (const k of LOOK_KEYS as readonly LookKey[]) {
     if (Object.prototype.hasOwnProperty.call(p.look, k) && p.look[k] !== undefined)

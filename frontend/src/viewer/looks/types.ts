@@ -1,13 +1,11 @@
 // Issue #68 Track C, R7.7, R5.3: the types of the scenario "looks". A look is a set of artistic
 // settings only. Nothing here is a physical value.
 import type { Tag, Tier } from '@/contract';
+import type { Scenario } from '@/physics/climate';
 
-/**
- * The climate scenario. ASSUMPTION: Track B owns the canonical union (`physics/climate.ts`); this
- * copy has exactly the same five members and is swapped for an import when the tracks merge.
- */
-export type Scenario = 'lava' | 'hot_dry' | 'eyeball' | 'snowball' | 'temperate';
+export type { Scenario };
 
+/** Every scenario, in the order of `climateScenario`. Typed so a new member forces an update. */
 export const SCENARIOS: readonly Scenario[] = [
   'lava',
   'hot_dry',

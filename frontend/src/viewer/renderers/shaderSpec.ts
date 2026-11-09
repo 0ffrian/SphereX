@@ -18,6 +18,8 @@ import type { FieldParams } from '../fields/fieldGenerator';
 import { FIELD_TAG } from '../fields/fieldGenerator';
 import { sliderValue, type Overrides } from '../sliders';
 import { isExoplanetCard } from '../planCommon';
+import { lookForScenario, lookLegend, mergeLook } from '../looks/scenarioLooks';
+import { presetFor, presetLegend } from '../looks/presets';
 import {
   ATMOSPHERE_ROCKY,
   ATMOSPHERE_WATER,
@@ -144,6 +146,14 @@ export const FLATTENING_MAX = 0.15;
 export const BANDS_MIN = 3;
 export const BANDS_MAX = 24;
 
+/** The legend lines of an applied scenario look (Q-160). */
+export interface PlanetLook {
+  /** `lookLegend`: "Look: typical artist's depiction of a <scenario> world". */
+  legend: string;
+  /** `presetLegend` when a per-planet preset applied, else null. */
+  presetLegend: string | null;
+}
+
 export interface PlanetStyle {
   /** 0 = rocky brown, 1 = green / grey mix (mock-up uHue). */
   hue: number;
@@ -158,6 +168,12 @@ export interface PlanetStyle {
    * `teq_K` (solar-system bodies and old cards: the polar-ice rule, unchanged).
    */
   scenario: Scenario | null;
+  /**
+   * Issue #68 Part 4/5 (Q-160): the scenario look (and preset) behind `hue`, `relief`,
+   * `cloudCover`, `atmosphere`, `atmosphereColour` and the field's `freq`, or null when no
+   * scenario is known (the `PLANET_DEFAULTS` are drawn). Always `artistic`, + Artistic only.
+   */
+  look: PlanetLook | null;
   /**
    * Tag of the climate pattern (the ocean and ice masks of a locked planet) when it can be drawn on
    * its own, without the artistic terrain: set for `eyeball` and `snowball`, else null.
@@ -334,11 +350,18 @@ export function resolveShaderSpec(
   // N9: lava cracks glow only when teq_K says the surface is hot (>= ~700 K, A7.1). No teq_K, no
   // glow. A slider override still wins: it is the visitor's own artistic choice (D-26).
   const heat = kind === 'planet_rocky' ? lavaHeatFromTeq(cardValue(card, 'teq_K')) : d.heat;
+  // Issue #68 Part 4/5 (Q-160): with a scenario known, its look (then the planet's preset) replaces
+  // PLANET_DEFAULTS; a slider still wins (D-27). `cloudStyle` and `iceContrast` are not drawn: the
+  // shader has no control for them. `card.name` is the archive `pl_name` (ASSUMPTION).
+  const scenario = derived?.scenario ?? null;
+  const scenarioLook = lookForScenario(scenario);
+  const preset = scenarioLook ? presetFor(card.name, scenario) : null;
+  const look = scenarioLook ? mergeLook(scenarioLook, preset?.look) : null;
   return out({
     field: {
       kind: 'terrain',
       seed: params.seed,
-      freq: d.freq,
+      freq: look?.freq ?? d.freq,
       seaLevel: sv('sea_level') ?? climate.sea,
       iceExtent: sv('ice') ?? climate.ice,
       heat: sv('lava_heat') ?? heat,
@@ -349,13 +372,18 @@ export function resolveShaderSpec(
       storms: 0,
     },
     planet: {
-      hue: kind === 'planet_water' ? 0.5 : 0.2,
-      relief: sv('relief') ?? d.relief,
-      cloudCover: sv('cloud_cover') ?? d.cloud,
-      atmosphere: sv('atmosphere') ?? d.atmo,
-      atmosphereColour: kind === 'planet_water' ? ATMOSPHERE_WATER : ATMOSPHERE_ROCKY,
+      hue: look?.surfaceHue ?? (kind === 'planet_water' ? 0.5 : 0.2),
+      relief: sv('relief') ?? look?.relief ?? d.relief,
+      cloudCover: sv('cloud_cover') ?? look?.cloudCover ?? d.cloud,
+      atmosphere: sv('atmosphere') ?? look?.atmosphereStrength ?? d.atmo,
+      atmosphereColour:
+        look?.atmosphereColour ?? (kind === 'planet_water' ? ATMOSPHERE_WATER : ATMOSPHERE_ROCKY),
       climate: climate.rule,
-      scenario: derived?.scenario ?? null,
+      scenario,
+      look:
+        scenarioLook && scenario
+          ? { legend: lookLegend(scenario), presetLegend: preset ? presetLegend(preset) : null }
+          : null,
       patternTag: substellar ? (climate.rule?.tag ?? null) : null,
     },
   });

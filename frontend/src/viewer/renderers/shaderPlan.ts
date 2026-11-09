@@ -243,6 +243,17 @@ export function planShaderKind(input: PlanInput): RenderPlan {
         );
         b.draw('clouds');
       }
+      // Issue #68 Part 4/5 (Q-160): the scenario look, and the planet's preset when one applied.
+      // `artistic`, so shown at + Artistic only (the generated surface is too).
+      const look = spec.planet.look;
+      if (look) {
+        offerLayer(b, viewerLayer('look', 'artistic', look.legend));
+        b.draw('look');
+        if (look.presetLegend) {
+          offerLayer(b, viewerLayer('look_preset', 'artistic', look.presetLegend));
+          b.draw('look_preset');
+        }
+      }
       const climate = spec.planet.climate;
       if (climate) {
         offerLayer(
