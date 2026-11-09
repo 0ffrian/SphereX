@@ -4,7 +4,8 @@
 import type { CometEpoch, ObjectType, Tag } from '@/contract';
 import { badgeForTag, HONESTY_LABEL, stateThatShows, type HonestyState } from './honesty';
 import { MODE_LABEL } from './modes';
-import { showsBody } from './planCommon';
+import { deriveClimate } from '@/physics/climate';
+import { exoplanetSentences, isExoplanetCard, showsBody } from './planCommon';
 import { GAS_LAYER_IDS, gasHiddenText } from './renderers/shaderSpec';
 import type { RenderPlan, ViewModeId } from './planTypes';
 import { AT_AGE_MAX_PHRASE, formatLength, type ShownSize } from './scaleBar';
@@ -107,6 +108,32 @@ function sentence(text: string): string {
   return /[.!?]$/.test(text) ? text : `${text}.`;
 }
 
+/**
+ * Issue #68 Part 6 (Q-165): what the alt text of a demo exoplanet says about the star's light and the
+ * climate scenario, from the finished plan: the same words as the plan's notes. Empty for a body that
+ * is not a planet with host-star fields, so solar-system alt text is unchanged.
+ */
+function exoplanetAlt(plan: RenderPlan): string {
+  if ((plan.type !== 'planet_rocky' && plan.type !== 'planet_water') || !plan.shader) return '';
+  const { card } = plan.shader;
+  if (!isExoplanetCard(card)) return '';
+  const refusal = plan.missing.find((m) => m.id === 'starlight');
+  const sentences = exoplanetSentences({
+    kind: plan.type,
+    scenario: deriveClimate(card, plan.type)?.scenario ?? null,
+    teffK: plan.lighting.colourTeffK,
+    starlight: plan.drawn.some((d) => d.id === 'starlight')
+      ? 'drawn'
+      : refusal?.reason === 'data'
+        ? 'data'
+        : refusal?.reason === 'honesty'
+          ? 'honesty'
+          : null,
+    climateShown: plan.shader.surface || plan.shader.pattern,
+  });
+  return sentences.length > 0 ? ` ${sentences.join(' ')}` : '';
+}
+
 export function buildAltText(plan: RenderPlan, shown?: ShownSize | null): string {
   const type = TYPE_NAME[plan.type];
   if (!plan.threeD) {
@@ -118,18 +145,19 @@ export function buildAltText(plan: RenderPlan, shown?: ShownSize | null): string
   if (plan.shader) {
     // The generated kinds: the backend's own description, and what the viewer is honest about (R5.3).
     const alt = sentence(plan.shader.params.alt_text.trim());
+    const exo = exoplanetAlt(plan);
     if (plan.shader.pattern && !plan.shader.surface) {
-      return `${plan.name}, ${type}, ${sizeText(plan, shown)}. A smooth sphere that shows only where the model puts water and ice on a tidally locked planet, lit by its star. It is a model, not a measured image.`;
+      return `${plan.name}, ${type}, ${sizeText(plan, shown)}. A smooth sphere that shows only where the model puts water and ice on a tidally locked planet. It is a model, not a measured image.${exo}`;
     }
     return plan.shader.surface
       ? plan.shader.gas
         ? `${alt} This is a generated model, not a measured image.`
-        : `${alt} This is an artist's impression, not a measured image.`
+        : `${alt} This is an artist's impression, not a measured image.${exo}`
       : `${plan.name}, ${type}, ${sizeText(plan, shown)}. A plain grey sphere: ${
           plan.type === 'gas_giant'
             ? gasHiddenText(plan.shader.params)
             : "the surface is an artist's impression and is hidden at this level."
-        }`;
+        }${exo}`;
   }
   const phase =
     plan.lighting.phaseAngleDeg !== null

@@ -86,6 +86,9 @@ describe('parseSkyCached', () => {
       'synthetic-cached-spot',
       // Issue #60: the searchable water planet with a 3D model (fixtures/targets.ts).
       'aqua-prime',
+      // Issue #68 Part 6: the two demo exoplanets with real archive values.
+      'trappist-1f',
+      'kepler-186f',
     ]);
   });
 });

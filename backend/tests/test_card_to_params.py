@@ -16,7 +16,10 @@ from app.core.render.card_to_params import GENERATOR_VERSION, card_to_params, se
 from app.core.render.spherex_rgb import CHANNELS_SMALL_BODY, spherex_rgb, window_median
 
 FIXTURES = Path(__file__).resolve().parents[2] / "shared" / "fixtures"
-TYPES = sorted(p.stem for p in (FIXTURES / "cards").glob("*.json"))
+# The demo exoplanets (issue #68 Part 6) are extra fixtures of type planet_rocky, named by planet;
+# test_bake_fixtures.py checks that their params are card_to_params of their card.
+DEMO_PLANETS = ("planet_kepler186f", "planet_trappist1f")
+TYPES = sorted(p.stem for p in (FIXTURES / "cards").glob("*.json") if p.stem not in DEMO_PLANETS)
 TAGS = {"measured", "derived", "model_dependent", "inferred_from_analog", "artistic"}
 
 

@@ -68,6 +68,7 @@ classDiagram
     +teq_K: TV, optional
     +mass_mearth, orbit_au, orbital_period_d: TV, optional
     +host_teff_K, host_radius_rsun, host_mass_msun, host_age_gyr: TV, optional
+    demo fixtures planet_trappist1f and planet_kepler186f hold real archive values, each source starting synthetic fixture: real planet value (Q-165)
     +component_teff_K: TV~pair~, optional
     +period_var_d: TV, optional
     +lightcurve: LightcurvePoint list, optional

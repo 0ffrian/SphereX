@@ -79,6 +79,8 @@ export const FIXTURE_CACHED_IDS: readonly string[] = [
   'r-dra',
   'synthetic-cached-spot',
   'aqua-prime',
+  'trappist-1f',
+  'kepler-186f',
 ];
 
 function makeSkyCached(): SkyCachedResponse {
