@@ -63,3 +63,33 @@ describe('loadBodyFor', () => {
     expect(calls()).toBe(1);
   });
 });
+
+describe('loadBodyFor and the asset status (Q-164)', () => {
+  function apiWithStatus(assetStatus: string | null) {
+    const f = fixture('planet_water');
+    return {
+      ...getSkyApi(),
+      card: vi.fn(async () => ({ data: f.card, fixture: null, assetStatus })),
+      renderParams: vi.fn(async () => ({ data: f.params, fixture: null, assetStatus })),
+    } as unknown as ApiClient;
+  }
+
+  it('marks a saved asset as prebuilt', async () => {
+    setSkyApi(apiWithStatus('saved'));
+    loadBodyFor('aqua');
+    await flush();
+    expect(useShellStore.getState().body).toMatchObject({ status: 'ready', prebuilt: true });
+  });
+
+  it('does not mark a generated asset or a reply with no status', async () => {
+    setSkyApi(apiWithStatus('generated'));
+    loadBodyFor('aqua');
+    await flush();
+    expect(useShellStore.getState().body).toMatchObject({ status: 'ready', prebuilt: false });
+    useShellStore.setState({ body: { status: 'idle' } });
+    setSkyApi(apiWithStatus(null));
+    loadBodyFor('aqua');
+    await flush();
+    expect(useShellStore.getState().body).toMatchObject({ status: 'ready', prebuilt: false });
+  });
+});

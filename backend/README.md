@@ -211,7 +211,7 @@ app/core/card/    (Kevin, Stages 4-5, A4.4-A4.5) catalogue, build, assets (A5.4 
 app/core/render/  (Atish, R10) texture baker; card_to_params (Stage 7, A4.7), blackbody, spherex_rgb
 app/core/sky/     sky background: survey registry and layout, HEALPix NESTED, HiPS -> equirect bake
 app/core/composite/ (no D-17 owner yet) SPHEREx false-colour composite: config, select, grid, service
-assets/           A5.4 pre-baked assets, <type>/<id>.json (SX_ASSETS_DIR; none yet)
-scripts/          prefetch, smoke_offline, backup_cache, record_fixtures, generate_contract, sky_mirror, sky_bake
+assets/           A5.4 pre-baked assets, <type>/<id>.json (SX_ASSETS_DIR); the demo pack (Q-164) and its maps in assets/textures/
+scripts/          prefetch, smoke_offline, backup_cache, record_fixtures, generate_contract, sky_mirror, sky_bake, bake_demo_pack (`--check`, `--strict`)
 tests/            pytest; tests/fixtures/cache holds the recorded cache entries
 ```

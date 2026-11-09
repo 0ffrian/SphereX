@@ -1,0 +1,210 @@
+{
+  "card": {
+    "ch4_depth_33": {
+      "source": "not available: no source in the pipeline yet (no CH4 band-depth rule in the specs)",
+      "tag": "measured",
+      "value": null
+    },
+    "component_teff_K": {
+      "assumption": "each Teff is a model-atmosphere fit result in the paper, not a direct measurement",
+      "err": [
+        13.0,
+        13.0
+      ],
+      "source": "literature: Chen et al. 2022, AJ 163, 288, table number not recorded [verify] (backend/assets/literature.toml). Epsilon Indi Ba then Bb, the order of the class T1V+T6V",
+      "tag": "model_dependent",
+      "value": [
+        1312.0,
+        972.0
+      ]
+    },
+    "flux_45um": {
+      "source": "not available: no SPHEREx spectrum for this object",
+      "tag": "measured",
+      "value": null
+    },
+    "id": "simbad-eps-ind-b",
+    "name": "* eps Ind B",
+    "pm_mas_yr": {
+      "source": "SIMBAD * eps Ind B (pmra = mu_alpha * cos(delta), pmdec)",
+      "tag": "measured",
+      "value": [
+        3981.977,
+        -2466.832
+      ]
+    },
+    "radius_rjup": {
+      "assumption": "brown dwarf radii are about 1 Jupiter radius (R7.4)",
+      "source": "R7.4 model assumption, not a measurement of this object",
+      "tag": "model_dependent",
+      "value": 1.0
+    },
+    "spectral_class": {
+      "source": "SIMBAD * eps Ind B sp_type",
+      "tag": "measured",
+      "value": "T1V+T6V"
+    },
+    "spherex_rgb": {
+      "source": "not available: no SPHEREx spectrum for this object",
+      "tag": "measured",
+      "value": null
+    },
+    "type": "brown_dwarf_binary"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b2",
+  "render_params": {
+    "alt_text": "* eps Ind B, Brown dwarf binary, 1 Jupiter radii (model dependent), colour from a class palette, self-luminous. Surface relief: illustrative.",
+    "components": [
+      {
+        "class": "T1V",
+        "emissive_scale": 1.0,
+        "emissive_tag": "model_dependent",
+        "tint": [
+          0.5,
+          0.24,
+          0.14
+        ],
+        "tint_tag": "inferred_from_analog"
+      },
+      {
+        "class": "T6V",
+        "emissive_scale": 0.3013,
+        "emissive_tag": "model_dependent",
+        "tint": [
+          0.5,
+          0.24,
+          0.14
+        ],
+        "tint_tag": "inferred_from_analog"
+      }
+    ],
+    "generator_version": "p1-b2",
+    "haptics": {
+      "data": "none",
+      "data_tag": "artistic",
+      "params": {},
+      "texture": "none",
+      "texture_tag": "artistic"
+    },
+    "id": "simbad-eps-ind-b",
+    "layers": [
+      {
+        "assumed": {
+          "radius_rjup": 1.0
+        },
+        "description": "Assumption: brown dwarf radii are about 1 Jupiter radius (R7.4).",
+        "formula": "radius = radius_rjup * R_Jup",
+        "id": "body",
+        "requires": [
+          "radius_rjup"
+        ],
+        "tag": "model_dependent",
+        "tier": 3
+      },
+      {
+        "assumed": {
+          "limb_darkening_u": 0.6
+        },
+        "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu). The coefficient is the R7.5 visible-band solar value, used as a placeholder for an infrared view [verify]; no brown-dwarf coefficient is confirmed (R7.4).",
+        "formula": "I(mu) = 1 - u * (1 - mu), u = 0.6",
+        "id": "limb_darkening",
+        "requires": [
+          "radius_rjup"
+        ],
+        "tag": "inferred_from_analog",
+        "tier": 4
+      },
+      {
+        "description": "Two bodies on an illustrative mutual orbit (R7.4). No orbit numbers are shown.",
+        "id": "orbit",
+        "requires": [
+          "spectral_class"
+        ],
+        "tag": "artistic",
+        "tier": 5
+      },
+      {
+        "assumed": {
+          "class_a": "T1V",
+          "class_b": "T6V"
+        },
+        "description": "Each body is tinted by its own spectral class, through the same class palette as a single brown dwarf (R7.4).",
+        "formula": "tint = brown-dwarf class palette[first letter of the body's class]",
+        "id": "components",
+        "requires": [
+          "spectral_class"
+        ],
+        "tag": "inferred_from_analog",
+        "tier": 4
+      },
+      {
+        "assumed": {
+          "component_teff_K": "1312, 972",
+          "radius_ratio": 1.0
+        },
+        "description": "Each body's brightness follows its published Teff, relative to the hotter body (R7.4).",
+        "formula": "emissive_scale = (Teff / Teff_max)^4, equal radii (Stefan-Boltzmann)",
+        "id": "component_brightness",
+        "requires": [
+          "component_teff_K"
+        ],
+        "tag": "model_dependent",
+        "tier": 3
+      }
+    ],
+    "lighting": {
+      "mode": "self"
+    },
+    "missing": [
+      "emissive",
+      "bands",
+      "flux_pulse",
+      "spherex_ir",
+      "spectrum"
+    ],
+    "scale_m": 69911000.0,
+    "seed": 761366209,
+    "textures": {
+      "albedo": "/data/demo-textures/simbad-eps-ind-b/p1-b2/761366209/1024x512/albedo.webp",
+      "height": "/data/demo-textures/simbad-eps-ind-b/p1-b2/761366209/1024x512/height.png",
+      "height_bin": "/data/demo-textures/simbad-eps-ind-b/p1-b2/761366209/1024x512/height.bin",
+      "normal": "/data/demo-textures/simbad-eps-ind-b/p1-b2/761366209/1024x512/normal.png"
+    },
+    "type": "brown_dwarf_binary",
+    "view_modes": {
+      "spherex_ir": {
+        "available": false,
+        "badge": "SPHEREx infrared, whole-body average (false colour)",
+        "channels_um": [
+          4.5,
+          3.3,
+          1.25
+        ],
+        "rgb": null,
+        "source": "spherex_rgb"
+      },
+      "visible": {
+        "available": true,
+        "badge": "Estimated visible colour",
+        "rgb": {
+          "source": "brown dwarf class palette T (R7.4, Q-47)",
+          "tag": "inferred_from_analog",
+          "value": [
+            0.5,
+            0.24,
+            0.14
+          ]
+        },
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 761366209,
+  "textures": {
+    "albedo": "/data/demo-textures/simbad-eps-ind-b/p1-b2/761366209/1024x512/albedo.webp",
+    "height": "/data/demo-textures/simbad-eps-ind-b/p1-b2/761366209/1024x512/height.png",
+    "height_bin": "/data/demo-textures/simbad-eps-ind-b/p1-b2/761366209/1024x512/height.bin",
+    "normal": "/data/demo-textures/simbad-eps-ind-b/p1-b2/761366209/1024x512/normal.png"
+  }
+}

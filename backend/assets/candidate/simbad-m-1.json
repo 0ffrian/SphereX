@@ -1,0 +1,43 @@
+{
+  "card": {
+    "id": "simbad-m-1",
+    "name": "M   1",
+    "type": "candidate"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b2",
+  "render_params": {
+    "alt_text": "M   1. Candidate. Not enough data for a 3D model: distance and albedo unknown.",
+    "generator_version": "p1-b2",
+    "haptics": {
+      "data": "detections",
+      "data_tag": "measured",
+      "params": {},
+      "texture": "none",
+      "texture_tag": "artistic"
+    },
+    "id": "simbad-m-1",
+    "layers": [],
+    "lighting": {
+      "mode": "self"
+    },
+    "missing": [
+      "mesh",
+      "visible",
+      "spectrum"
+    ],
+    "scale_m": null,
+    "seed": 3848739952,
+    "type": "candidate",
+    "view_modes": {
+      "visible": {
+        "available": false,
+        "badge": "Estimated visible colour",
+        "rgb": null,
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 3848739952,
+  "textures": null
+}

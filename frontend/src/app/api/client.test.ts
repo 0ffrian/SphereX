@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fixtureFetch } from '@/test/fixtureFetch';
+import { fixture } from '@/test/sharedFixtures';
 import { createApiClient } from './client';
 import { ApiError } from './errors';
 
@@ -12,6 +13,16 @@ const jsonResponse = (status: number, body: unknown, headers: Record<string, str
 describe('API client (D-16)', () => {
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('reads the X-SX-Asset-Status header (Q-39, Q-164)', async () => {
+    const params = fixture('planet_water').params;
+    const reply = (headers: Record<string, string>) =>
+      createApiClient({
+        fetchImpl: (async () => jsonResponse(200, params, headers)) as typeof fetch,
+      }).renderParams(params.id);
+    expect((await reply({ 'X-SX-Asset-Status': 'saved' })).assetStatus).toBe('saved');
+    expect((await reply({})).assetStatus).toBeNull();
   });
 
   it('builds encoded URLs under /v1', async () => {
