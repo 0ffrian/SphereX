@@ -349,7 +349,7 @@ describe('import guard', () => {
     ["export * from '../fixtures/targets';", true],
     ["import { useAppStore } from '@/state/store';", false],
     ["import type { Frame } from '@/app/api/types';", false],
-    ["import { TEST_TARGETS } from './testTargets';", false],
+    ["import { TEST_TARGETS } from './demoTargets';", false],
     ["import './index.css';", false],
   ])('%s → forbidden: %s', (text, forbidden) => {
     expect(importSpecifiers(text).some(isForbiddenImport)).toBe(forbidden);

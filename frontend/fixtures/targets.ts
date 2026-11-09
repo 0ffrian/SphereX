@@ -136,6 +136,19 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     refuseComposite: ['composite:red:saturated', 'composite:saturated', 'composite:too_few_bands'],
   },
   {
+    // Issue #68, 7d: a planet host named in the demo list. Name and J2000 position are real (SIMBAD
+    // "HD 189733 b", checked 9 Nov 2026); frames are synthetic. "HD 189733b" (no space) finds it.
+    id: 'hd-189733-b',
+    name: 'HD 189733 b',
+    aliases: ['HD 189733 b', 'HD 189733b', 'HD 189733'],
+    ra: 300.18214,
+    dec: 22.71085,
+    moving: false,
+    northUp: false,
+    frameCount: 12,
+    seed: 1111,
+  },
+  {
     id: 'synthetic-mover',
     name: 'Synthetic mover (fixture)',
     aliases: ['Synthetic mover', 'synthetic-mover'],

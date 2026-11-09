@@ -1,17 +1,28 @@
-// A4.1 input (UML 08 step 1): an object name or RA, Dec in decimal degrees, plus quick picks for
-// the five A1.1 test targets. Shown as the mock-up's search pill (bottom right); the quick picks,
-// the help and any problem float above it. "/" focuses the field (shell/shortcuts.ts).
-import { useEffect, useId, useState, type FormEvent } from 'react';
+// A4.1 input (UML 08 step 1): an object name or RA, Dec in decimal degrees, plus the demo list as
+// an ARIA combobox (issue #68, 7a; R9). Shown as the mock-up's search pill (bottom right); the
+// list, the help and any problem float above it. "/" focuses the field (shell/shortcuts.ts).
+// Focus stays in the input: ArrowUp and ArrowDown move `aria-activedescendant`, Enter picks the
+// highlighted row (without one, Enter searches the typed text through parseQuery), Escape closes
+// the list and keeps the text. The list is a shortcut, not a limit: any SIMBAD or SBDB name works.
+import { useEffect, useId, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Icon } from '@/app/shell/icons';
 import { useAppStore } from '@/state/store';
 import { parseQuery } from './parseQuery';
-import { TEST_TARGETS } from './testTargets';
+import { DEMO_TARGETS, filterTargets, type DemoTarget } from './demoTargets';
+
+export const NO_MATCH_HINT = 'No demo object matches. Press Enter to search the catalogues.';
+// parseQuery accepts both examples (a name, and RA, Dec in decimal degrees).
+export const CLOSING_HINT = 'Try "WISE 0855" or "269.452, 4.693"';
 
 export function SearchBar() {
   const search = useAppStore((s) => s.skySearch);
   const linkProblems = useAppStore((s) => s.sky.linkProblems);
   const [text, setText] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const rows = useMemo(() => filterTargets(DEMO_TARGETS, text), [text]);
+  const listId = useId();
   const inputId = useId();
   const helpId = useId();
   const problemId = useId();
@@ -28,9 +39,11 @@ export function SearchBar() {
         if (q?.origin === 'hash' || q?.origin === 'sky') {
           setText(q.q);
           setProblem(null);
+          setActive(-1);
         } else if (q === null) {
           setText('');
           setProblem(null);
+          setActive(-1);
         }
       }),
     [],
@@ -52,18 +65,75 @@ export function SearchBar() {
       return;
     }
     setProblem(null);
+    setOpen(false);
     void search({ q: parsed.q, kind: parsed.kind, origin: 'input' });
   };
 
-  const pick = (name: string) => {
-    setText(name);
+  const pick = (row: DemoTarget) => {
+    setText(row.name);
     setProblem(null);
-    void search({ q: name, kind: 'name', origin: 'input' });
+    setOpen(false);
+    setActive(-1);
+    void search({ q: row.name, kind: 'name', origin: 'input' });
+  };
+
+  const optionId = (i: number) => `${listId}-opt-${i}`;
+  const listShown = open && rows.length > 0;
+  const announcement = !open
+    ? ''
+    : rows.length === 0
+      ? NO_MATCH_HINT
+      : `${rows.length} demo ${rows.length === 1 ? 'object' : 'objects'}. Use up and down arrows.`;
+
+  const move = (to: number) => {
+    setActive(to);
+    document.getElementById(optionId(to))?.scrollIntoView?.({ block: 'nearest' });
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      if (!open) return;
+      e.preventDefault();
+      setOpen(false);
+      setActive(-1);
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (rows.length === 0) return;
+      e.preventDefault();
+      if (!open) {
+        setOpen(true);
+        setActive(e.key === 'ArrowDown' ? 0 : rows.length - 1);
+        return;
+      }
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      move(
+        active < 0 ? (step > 0 ? 0 : rows.length - 1) : (active + step + rows.length) % rows.length,
+      );
+    } else if (e.key === 'Enter') {
+      // Enter that confirms an IME composition must not pick a row.
+      if (e.nativeEvent.isComposing) return;
+      const row = listShown ? rows[active] : undefined;
+      if (row) {
+        e.preventDefault();
+        pick(row);
+      }
+    }
+  };
+
+  const onChange = (value: string) => {
+    setText(value);
+    setActive(-1);
+    setOpen(true);
   };
 
   return (
-    <section aria-label="Find an object" className="group sx-search">
-      <form role="search" onSubmit={onSubmit} className="sx-search-form" noValidate>
+    <div className="group sx-search" data-list-open={open ? 'true' : undefined}>
+      <form
+        role="search"
+        aria-label="Find an object"
+        onSubmit={onSubmit}
+        className="sx-search-form"
+        noValidate
+      >
         <label htmlFor={inputId} className="sr-only">
           Object name, or RA, Dec in degrees
         </label>
@@ -72,7 +142,21 @@ export function SearchBar() {
           id={inputId}
           type="text"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
+          onBlur={() => {
+            setOpen(false);
+            setActive(-1);
+          }}
+          onKeyDown={onKeyDown}
+          role="combobox"
+          aria-expanded={listShown}
+          aria-controls={listShown ? listId : undefined}
+          aria-autocomplete="list"
+          aria-activedescendant={
+            listShown && active >= 0 && active < rows.length ? optionId(active) : undefined
+          }
           placeholder="Search a name or RA Dec"
           autoComplete="off"
           spellCheck={false}
@@ -90,6 +174,11 @@ export function SearchBar() {
           <Icon name="search" className="size-4" />
         </button>
       </form>
+      {/* Always mounted, so a screen reader hears each change (WCAG 4.1.3). The text changes only
+          while the list is open. */}
+      <div role="status" aria-live="polite" className="sr-only" data-testid="search-status">
+        {announcement}
+      </div>
       <div className="sx-search-pop">
         {/* Help sits on top, so showing it never moves the chips under the pointer. */}
         <p
@@ -98,17 +187,49 @@ export function SearchBar() {
         >
           Decimal degrees only, for example 269.452, 4.693. Search by name for moving objects.
         </p>
-        <div role="group" aria-label="Test targets" className="sx-chips">
-          <span className="sx-chips-lead">Try:</span>
-          {TEST_TARGETS.map((name) => (
-            <button key={name} type="button" className="sx-chip" onClick={() => pick(name)}>
-              {name}
-            </button>
-          ))}
-        </div>
+        {open && (
+          // A press anywhere in the list (a row, the scrollbar, the hint) must not blur the input,
+          // or the list would close before the click lands.
+          <div
+            className="sx-suggest"
+            data-testid="search-list"
+            onMouseDown={(e) => e.preventDefault()}
+            onPointerDown={(e) => e.preventDefault()}
+          >
+            <ul
+              id={listId}
+              role="listbox"
+              aria-label="Demo objects"
+              className="sx-suggest-list"
+              hidden={rows.length === 0}
+            >
+              {rows.map((row, i) => (
+                <li
+                  key={row.name}
+                  id={optionId(i)}
+                  role="option"
+                  aria-selected={i === active}
+                  data-active={i === active ? 'true' : undefined}
+                  className="sx-suggest-row"
+                  onClick={() => pick(row)}
+                >
+                  <span className="sx-suggest-name">{row.name}</span>
+                  {row.classLabel !== null && (
+                    <span className="sx-suggest-label">{row.classLabel}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <div>
+              {rows.length === 0 && <p className="sx-suggest-hint">{NO_MATCH_HINT}</p>}
+              <p className="sx-suggest-hint">{CLOSING_HINT}</p>
+            </div>
+          </div>
+        )}
         {linkProblems.length > 0 && (
           <p
             id={linkProblemId}
+            role="alert"
             className="sx-search-note border-red-400/70 text-red-200"
             data-testid="link-problem"
           >
@@ -118,6 +239,7 @@ export function SearchBar() {
         {problem && (
           <p
             id={problemId}
+            role="alert"
             className="sx-search-note border-red-400/70 text-red-200"
             data-testid="search-problem"
           >
@@ -125,6 +247,6 @@ export function SearchBar() {
           </p>
         )}
       </div>
-    </section>
+    </div>
   );
 }

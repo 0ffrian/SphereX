@@ -98,7 +98,7 @@ frontend/src/app/                    (Moon)  # React shell: App, ViewerPanel, St
                                              # RefusalList (grouped refusals with frame IDs behind a disclosure),
                                              # ui.ts (shared class names), Segmented.tsx (radio-group segmented control)
   api/                # M1 API client (D-16): client, config, errors, validate; types.ts is hand-written until D-18 generation
-  search/             # SearchBar, parseQuery (name, or RA, Dec in decimal degrees), testTargets (the five A1.1 targets)
+  search/             # SearchBar, parseQuery (name, or RA, Dec in decimal degrees), demoTargets (the demo search list, Q-161)
   flipbook/           # Flipbook player, playback, keys, cutout preloading, RainbowTrails + wavelengthColor (D-28),
                       # session.tsx (preload + playback timer shared by the panel and the transport bar),
                       # progressive.ts + FramesProgress.tsx (frames that arrive in parts: merge, poll, Stop; Q-97),
