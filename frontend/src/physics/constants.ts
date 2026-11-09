@@ -16,6 +16,8 @@ export const R_JUP_M = 7.1492e7;
 export const R_EARTH_M = 6.3781e6;
 /** Nominal Earth GM, m^3/s^2 (IAU 2015 B3). Earth masses convert through GM, so G cancels. */
 export const GM_EARTH = 3.986004e14;
+/** Nominal Sun GM, m^3/s^2 (IAU 2015 B3). Solar masses convert through GM and G. */
+export const GM_SUN = 1.3271244e20;
 /** Nominal solar radius, m (IAU 2015 B3). */
 export const R_SUN_M = 6.957e8;
 /** Astronomical unit, m (IAU 2012 B2, exact). */

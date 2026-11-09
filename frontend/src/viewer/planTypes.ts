@@ -239,6 +239,11 @@ export interface ShaderPlan {
   /** The generated surface (or point cloud) is shown at this honesty level. */
   surface: boolean;
   /**
+   * Issue #68: the artistic surface is hidden but a locked planet's climate pattern (the field's
+   * ocean and ice masks on a smooth sphere) is shown, from the climate layer's own tag.
+   */
+  pattern: boolean;
+  /**
    * Gas giants (issue #62): which of the five layers are drawn (honesty level, refusals and the
    * build animation's holds applied). Null for every other kind; `surface` is true when any is on.
    */
