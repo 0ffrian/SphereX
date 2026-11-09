@@ -13,11 +13,12 @@ flowchart TB
     Mockup["mockup/ : spherex-ui.html (three r128, not the app)"]
 
     subgraph Backend["backend/ (FastAPI, Python 3.12) : Kevin, Moon, Atish"]
-      BApi["app/api (Kevin) : D-16 endpoints, objects.py : /card, /render-params, texture URLs, /job, /job/events (Q-111), sky.py : /v1/sky (prototype, Q-87, /v1/sky/cached, Q-98), composite.py : /composite, /composite.png (prototype, Q-92), overlays.py : /overlays, /flags, /combine.png (Q-50), gemini.py : /admin/.../gemini-repaint, /albedo-ai, /albedo-ai.webp (Q-122)"]
+      BApi["app/api (Kevin) : D-16 endpoints, app/main.py mounts /data/textures and the read-only /data/demo-textures (Q-164), objects.py : /card, /render-params, texture URLs, /job, /job/events (Q-111), sky.py : /v1/sky (prototype, Q-87, /v1/sky/cached, Q-98), composite.py : /composite, /composite.png (prototype, Q-92), overlays.py : /overlays, /flags, /combine.png (Q-50), gemini.py : /admin/.../gemini-repaint, /albedo-ai, /albedo-ai.webp (Q-122)"]
       BPipe["app/core/find (stage 1, overlays, flagmask, combine, A4.9), app/adapters (gaia, wise = CatWISE2020, tap), app/cache, app/core/card (stages 4, 5) : Kevin, app/core/measure (stage 2, pool.py MeasurePool, Q-112) and physics : Moon, app/core/classify (stage 3) : Atish"]
       BRender["app/core/render (Atish) : card_to_params, gas_giant, blackbody, params, noise, craters, height, normals, palette, bake, __main__, spherex_rgb, gemini_paint, background (TextureBaker, Q-112)"]
       BScripts["backend/scripts/bake_fixtures.py (Atish, with the baker): bakes the shared fixture textures with the real baker (Q-114); --check fails on drift"]
       BPack["backend/scripts/bake_demo_pack.py (Moon, Q-164): runs the pipeline per search row, writes assets/<type>/<id>.json, assets/textures/ (served read-only at /data/demo-textures, also offline) and frontend/src/app/search/demoTargets.ts; --check fails on drift"]
+      BAssets["backend/assets/ : shapes/ (registry.toml, GLBs), literature.toml (A3.12, Q-153), pm13_dwarf_teff.toml (Q-152), textures/ (demo pack maps, Q-164), <type>/*.json (demo pack assets)"]
       BJobs["app/core/jobs.py (Job, JobRegistry), app/core/warm.py (WarmCache) : issue #41, owner proposed: Kevin (Q-111)"]
       BContract["app/contract : generated from shared/schemas (D-18) : follows the schemas owner"]
       BSky["app/core/sky : surveys, healpix, bake (HiPS to equirect), scripts/sky_mirror, sky_bake : prototype, no D-17 owner yet (Q-87, D-35)"]
@@ -58,6 +59,7 @@ flowchart TB
   DocUML -.->|"illustrates"| DocSpecs
   BApi --> BPipe
   BApi --> BRender
+  BApi -->|"reads (read-only)"| BAssets
   BApi -->|"/job, /job/events, startup and shutdown"| BJobs
   BPipe -->|"ObjectPipeline runs one Job per object"| BJobs
   BJobs -->|"warm.py: resolve, ensure_job"| BPipe
