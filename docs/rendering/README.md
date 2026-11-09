@@ -2,7 +2,7 @@
 
 **Project:** Shift & Spectrum, NASA Space Apps 2026, challenge "Planet X and SPHEREx"
 **Audience:** the team (Atish, Kevin and Moon, who is also called Munazir) and Claude Code. This spec lives in `docs/rendering/` (this index plus the fragments below) and is referenced from `CLAUDE.md`.
-**Status:** amended to 9 Nov 2026 (Q-132: the event is desktop Chrome on the A15, sound only; Q-133 body tone; Q-134 Track path sound). Items marked **[verify]** must be checked against real output before relying on them; every one is listed in [R12](open-items.md). Proposals marked **Q-NEW-REN-n** wait for a decision entry.
+**Status:** amended to 9 Nov 2026 (Q-132: the event is desktop Chrome on the A15 laptop, sound only; Q-133 body tone; Q-134 Track path sound). Items marked **[verify]** must be checked against real output before relying on them; every one is listed in [R12](open-items.md). Proposals marked **Q-168 to Q-174** wait for a decision entry.
 **Precedence:** decisions in [decisions/](../decisions/README.md) override this doc. Decision IDs (D-xx), backlog IDs (B-xx) and question IDs (Q-xx) refer to that folder; its index names the topic file of each ID. Terms: [glossary](../architecture/glossary.md).
 
 The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into the fragments below. Section numbers are kept with an `R` prefix: "rendering doc §8.4" elsewhere means **R8.4** here. Load only the fragment a task needs.

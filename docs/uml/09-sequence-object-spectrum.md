@@ -1,6 +1,6 @@
 # 09 Sequence: click an object, get its spectrum and card
 
-Clicking a source in the flipbook runs pipeline stages 1–3 and type selection, builds the `ObjectCard`, and the object panel shows the spectrum, the badges and Listen. Drawn from architecture spec §4.1–4.3 and §8, rendering doc §3.2–3.3, §4 (display level 2), §5.2, §8.6, and decisions D-02, D-04, D-16 (endpoints), D-25 (cache) and D-31 (saturated targets, demo objects), and Q-111 and Q-112 (issue #41: the object job, its first, partial and final answers, the headers and the worker pools).
+Opening an object (a marker click opens the object panel, Q-120; or a click on a source in the flipbook) runs pipeline stages 1–3 and type selection, builds the `ObjectCard`, and the object panel shows the spectrum, the badges and Listen. Drawn from architecture spec §4.1–4.3 and §8, rendering doc §3.2–3.3, §4 (display level 2), §5.2, §8.6, and decisions D-02, D-04, D-16 (endpoints), D-25 (cache) and D-31 (saturated targets, demo objects), and Q-111 and Q-112 (the object job of [A4.10](../architecture/jobs.md#a410-object-job-and-fan-out), issue #41: the object job, its first, partial and final answers, the headers and the worker pools).
 
 ```mermaid
 sequenceDiagram
@@ -68,9 +68,9 @@ sequenceDiagram
   P->>P: Spectrum with sigma, light curve or motion
   P->>P: Card fields with 3 badges: Measured, Estimated, Default
   alt type is candidate
-    P->>P: No View in 3D, show "Not enough data for a 3D model"
+    P->>P: No Build it in 3D, show "Not enough data for a 3D model"
   else any other type
-    P->>P: Show View in 3D button
+    P->>P: Show the Build it in 3D button (opens the build pane, R5.8)
   end
   opt user presses Listen
     U->>P: Listen

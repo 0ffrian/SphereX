@@ -90,7 +90,7 @@ UI components come from **animate-ui** (A10), a shadcn-style copy-in registry. `
 
 ## Layout
 
-This follows [rendering doc R10](../docs/rendering/layout-tests-open-items.md#r10-file-layout-and-ownership). Three folders that R10 does not list are added: `contract/`, `state/` and `app/`.
+This follows [rendering doc R10](../docs/rendering/layout.md#r10-file-layout-and-ownership) (the rest of the repo: [R10.1](../docs/rendering/layout-repo.md#r101-rest-of-the-repository-interim)). Three folders that R10 does not list are added: `contract/`, `state/` and `app/`.
 
 ```
 src/
@@ -169,6 +169,8 @@ Tap "Turn on vibration and sound" first. Debug a phone with `chrome://inspect`. 
 
 ### Shell and sky view (prototype, 7 Nov 2026)
 
+The spec is [A21](../docs/architecture/sky-shell.md#a21-app-shell-and-sky-view) (layout, rail, island, object panel and card, sky interaction) and [A21.8–A21.13](../docs/architecture/sky-shell-behaviour.md#a218-split-pane) (split pane, keys and Escape, URL hash, live regions, adding a tool). Where this summary and A21 differ, A21 wins.
+
 - **Layout** (from `mockup/spherex-ui.html`, tokens in `src/index.css`): dark bezel; fixture banner and RA/Dec readout on top (no brand: the h1 is screen-reader only, Q-124); tool rail on the left (Sky, Flipbook, Spectrum, 3D viewer; no Haptics tool until M5) in the mock-up's icon style with a sliding highlight; the island at the top centre (issue #66, Q-121: a circle at rest, "Thinking" while an object is found, then it grows and moves into the panel, and back up on close; `src/app/island/`); the sky view as the main pane; transport bar bottom left; search pill bottom right with the quick picks above it. The Flipbook and Spectrum tools open a floating panel card (object info + flipbook + spectrum); the 3D viewer opens the build pane (below). At ≤ 640 px the rail becomes a row and the panel a bottom sheet.
 - **Sky image:** `GET /v1/sky/index.json` (not in D-16, Q-87). The smallest equirect loads first; a larger one replaces it on a device that can hold it (renderer max texture size), never above 4096 px on a coarse-pointer device or with Save-Data (`SKY_PHONE_MAX_WIDTH`). With no image installed, a coordinate grid and a note show; picking still works. The picture wears the Estimated badge with the index's formula and its credit line.
 - **Orientation:** seen from inside, north up, east (higher RA) to the left. `viewer/sky/skyMath.ts` documents the frame; unit tests check it against a real r187 camera and the sphere's UVs, and `e2e/sky.spec.ts` reads it back from the screen on the synthetic fixture sky (red = RA, green = Dec).
@@ -176,6 +178,8 @@ Tap "Turn on vibration and sound" first. Debug a phone with `chrome://inspect`. 
 - **Performance:** render on demand, pixel ratio ≤ 1.5 (D-05), mipmaps with anisotropy, image decode off the main thread (`ImageBitmapLoader`), texture swaps wait for the end of a drag, no React render per pointer move (readout and markers are written from refs). HiPS tile LOD is not built yet.
 
 ### Select and Build it (issue #60, Q-113)
+
+The spec is [R5.8](../docs/rendering/build-mould.md#r58-build-split-view-and-moulding) (the build pane and the moulding) and [A21.8](../docs/architecture/sky-shell-behaviour.md#a218-split-pane) (the split pane); the shell's states are drawn in [UML 24](../docs/uml/24-state-shell.md).
 
 - **Select:** a left click on a marker opens the object panel (Q-120), and green corner brackets and the name mark it on the sky. The top-centre card (a polite live region) comes only when asked for, with a right-click, a long press, the ContextMenu key or Shift+F10 on a marker or the brackets; right-click while the panel is open closes the panel and shows the card. The card shows its name, its type (from the render params once loaded, otherwise "Object on the sky") and two buttons, **See fingerprint** (the object panel at the spectrum) and **Build it**. × and Escape (from anywhere, also while the marker has focus) deselect: the card, the brackets and the object in the link go, focus stays on the marker, and clicking it again selects it again. A body that failed with a timeout or a network or server error is asked for again on the next Build it or marker click. Asking for the card again on the brackets or any marker brings it back, and the browser menu is suppressed there only; on a picked position without an object the card shows the coordinates, "No 3D model at this position" and a disabled Build it. A typed search still opens the object panel, which has **Build it in 3D**.
 - **Split view:** Build it moves the sky to the left half (still live: drag, zoom and markers work there) and opens the build pane on the right; the flipbook transport (made `inert`) and the quick picks step aside. At ≤ 640 px the pane is a full-height sheet. `&build` (or `#build` alone) is in the hash while it is open; opening pushes a history entry marked `{ sxBuild: true }` in `history.state`, so Back closes it; × and Escape go back over that entry (or replace it when the current entry is not the marked one), so no extra Back step is left. **New seed** is disabled for bodies with nothing generated from the seed (baked asteroids). Focus goes to the pane title on open and back to the marker (or the rail button) on close.

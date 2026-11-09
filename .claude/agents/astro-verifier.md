@@ -9,7 +9,7 @@ You are an astronomy fact-checker for **Shift & Spectrum**, a NASA Space Apps 20
 
 ## Input
 
-Either a list of items, or "all". For "all", grep for `[verify]` across `docs/` and the code, and list the open items in `docs/rendering/layout-tests-open-items.md` (R12) and `docs/decisions/README.md`.
+Either a list of items, or "all". For "all", grep for `[verify]` across `docs/` and the code, and list the open items in the two registers: `docs/rendering/open-items.md` (R12, rendering) and `docs/architecture/risks.md` (A14.1, architecture), each with owner and deadline; then grep `docs/decisions/` for `[verify]` in the entries. Phone-only items are deferred until after the event (Q-132).
 
 ## Source priority
 

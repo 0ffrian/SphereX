@@ -39,6 +39,8 @@ Input is an ICQ `.tab` (`--zip` plus `--member`, or `--input`) or an OBJ (`--inp
 
 ## Endpoints (D-16)
 
+This table holds the reply shapes. The register of every route (built and planned), its deciding entry and its spec is [A4.11](../docs/architecture/endpoints.md#a411-endpoint-register); refusal codes are [A4.12](../docs/architecture/refusals.md#a412-missing-and-refusal-codes); the object job is [A4.10](../docs/architecture/jobs.md#a410-object-job-and-fan-out).
+
 | Endpoint | Returns |
 |---|---|
 | `GET /v1/resolve?q=<name or "ra,dec">` | `{id, name, ra, dec, moving, resolver, cached_at}` plus optional `epoch`, `pm_ra_mas_yr`, `pm_dec_mas_yr` and `provenance` |

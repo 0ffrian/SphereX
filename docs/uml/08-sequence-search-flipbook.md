@@ -1,12 +1,12 @@
 # 08 Sequence: search and flipbook
 
-A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache), D-28 (Rainbow Trails) and D-35 (sky tiles), and A4.9 (overlays, flag mask, combine). The sky-view prototype paths (sky pick, shared flipbook session, transport bar) follow Q-87 to Q-91; its cached markers, progressive frames and colour views follow Q-92, Q-93 and Q-95 to Q-99; overlays on the frame grid follow Q-102; downloads in the object's background job follow Q-111 and Q-112 (issue #41). How the backend builds the composite: [20](20-sequence-composite.md).
+A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), the shell A21 (sky interaction A21.6, hash A21.11; shell states in [24](24-state-shell.md)), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache), D-28 (Rainbow Trails) and D-35 (sky tiles), and A4.9 (overlays, flag mask, combine). The sky-view prototype paths (sky pick, shared flipbook session, transport bar) follow Q-87 to Q-91; its cached markers, progressive frames and colour views follow Q-92, Q-93 and Q-95 to Q-99; overlays on the frame grid follow Q-102; downloads in the object's background job follow Q-111 and Q-112 (issue #41). How the backend builds the composite: [20](20-sequence-composite.md).
 
 ```mermaid
 sequenceDiagram
   autonumber
   actor U as User
-  participant SP as Sky pane (SkyPane + skyMath, prototype)
+  participant SP as Sky pane (SkyPane + skyMath, A21.6)
   participant UI as UI shell
   participant TB as Transport bar
   participant S as Flipbook session (session.tsx)
@@ -45,13 +45,13 @@ sequenceDiagram
     SP->>SP: RA/Dec from the camera ray (screenToRaDec), 6 decimals, tagged derived (Q-91)
     SP->>UI: Search ra,dec with origin sky (the search field shows the query)
   else user clicks a target marker on the sky
-    U->>SP: Click marker
-    SP->>UI: Search the target name with origin sky
+    U->>SP: Left click marker (Q-120 item 1, a right-click asks for the object card instead, diagram 24)
+    SP->>UI: Drop the card request, search the target name with origin sky, so the object panel opens
   else user clicks a cached marker (prototype)
     U->>SP: Click cached marker
     SP->>UI: Search its query (a name) or its id coordinates (5 decimals), origin sky
   else user opens a shared link or presses Back
-    U->>UI: URL hash #35;ra=…&dec=…[&name=…][&frame=…][&colour=…]
+    U->>UI: URL hash #35;ra=…&dec=…[&name=…][&frame=…][&colour=…][&build]
     UI->>UI: Parse the hash. Unusable parts are ignored, never guessed, shown under the search field and announced (live region)
     alt hash has a name or valid coordinates
       UI->>UI: Search the name if present, else the coordinates (frame= reopens that frame)
@@ -212,7 +212,7 @@ sequenceDiagram
 - Cached markers (prototype, Q-98): `GET /v1/sky/cached` reads only the derived cache and lists the positions whose frame list is complete. `app/sky/useCachedMarkers.ts` loads it and loads it again when a frame list has just become complete; `cachedMarkers.ts` skips a position already marked as a quick-pick target (same id, or within 2″) and turns a click into a search of its query or its id coordinates.
 - Flipbook session (`app/flipbook/session.tsx`): the cutout preload, the playback timer and "can play" live above the flipbook panel and the transport bar, which both read it. The viewer shows the requested frame only once its picture has decoded in a hidden `<img>` slot (`frameSwap.ts`, `useFrameSwap.ts`); until then it keeps the previous picture and caption. The timer never waits for a decode; a decode over 1 s stops holding the old picture, and only a real load error shows "Cutout unavailable". During playback the no-data caption of a clipped frame stays hidden; one steady line for the object says how many frames are hatched (`noData.ts`, R9). The flipbook's First and Last buttons are gone in the prototype; Home and End still work (Q-89).
 - Colour views (prototype, 7 Nov 2026): the flipbook's "Picture" switch (Raw | Colour) and "Colour view" switch (Wavelength tint | SPHEREx composite), radio groups in `app/flipbook/ColourViews.tsx`, rules in `colourMode.ts`. Both colour views are false colour, tagged `derived` (Estimated badge): the tint with "false colour: hue = wavelength" plus the stretch, the composite with the reply's `formula`. In "Measured only" both fall back to the grey frames with a note. The composite endpoint (`GET /v1/objects/{id}/composite`, `/composite.png`) is not in D-16 (Q-92); how the backend builds it is in [20](20-sequence-composite.md). Its codes (`composite:too_few_bands`, `composite:<channel>:<reason>`, `composite:moving_object` …) are worded in `app/messages.ts`. The `colour=` link parameter and the disabled transport bar: Q-95. Tagging questions: Q-27, Q-93.
-- URL hash (architecture spec §10, hash routing): `#ra=<deg>&dec=<deg>[&name=<search text>][&frame=<frame_id>][&colour=tint|composite]`; without `colour` the flipbook shows the raw frames, so older links keep working. `name` is kept for a name search, so a link to a moving object reopens the same object id. A link with a name searches the name, otherwise the coordinates. Going back to the page without a hash resets the search. Unusable parts (bad coordinates, or no name and no coordinates) are ignored, never guessed: they are shown under the search field and announced in the polite live region.
+- URL hash (owned by [A21.11](../architecture/sky-shell-behaviour.md#a2111-url-hash-and-history)): `#ra=<deg>&dec=<deg>[&name=<search text>][&frame=<frame_id>][&colour=tint|composite][&build]`, keys in that order; `build` is a bare flag that opens the build pane, and `#build` alone is the 3D view with no object. Proposed, not built (A21.11): `track=<object id>` for the Track pane, `area=<area_id>` and `atrack=<track_id>` for a Discovery track. Without `colour` the flipbook shows the raw frames, so older links keep working. `name` is kept for a name search, so a link to a moving object reopens the same object id. A link with a name searches the name, otherwise the coordinates. Going back to the page without a hash resets the search. Unusable parts (bad coordinates, or no name and no coordinates) are ignored, never guessed: they are shown under the search field and announced in the polite live region.
 - Dev-only fixture path: `npm run dev:fixtures` (`vite --mode fixtures`) mounts a Vite dev-server plugin from `frontend/fixtures/` that answers `/v1` with synthetic data, and `npm run test:e2e` always uses it. Every reply carries `X-SX-Fixture: synthetic`. The UI then shows a page-wide "Fixture data" banner, "Fixture" badges instead of "Measured" (and instead of the stretch's Estimated badge) and a SYNTHETIC label on the image. `vite build` never runs the plugin, and `scripts/check-dist.js` fails the build if a fixture marker reaches `dist/` ([fixtures README](../../frontend/fixtures/README.md)). The Fixture badge is a fourth badge beside the 3 of D-02; it is a proposed dev-only exception, open as Q-32 in the decisions log.
 - `moving` means a solar-system body (Q-22). High proper-motion stars are not `moving`; their positions come from the SIMBAD proper motion, propagated to each frame time. The ephemeris-driven frame search for moving objects is not built in M1 (Q-21).
 - The SIA search and every cutout go through the cache. A cut-off SIA answer (`QUERY_STATUS=OVERFLOW`) adds `frames:truncated` to `missing`.

@@ -1,6 +1,6 @@
-# 11 Sequence: Touch mode haptics
+# 11 Sequence: feeling a body (Feel mode at the event, Touch mode after)
 
-Feeling a surface with one finger in Touch mode, from the first tap to the vibration and the paired sound. Drawn from rendering doc §5.3, §5.6, §8.1–8.5, §8.8, and decisions D-08 (web only), D-09 (quantised strength), D-10 (audio on every platform), D-12 (shared field), D-20 (`sharpness`, debug hook) and D-21 (honesty filter). As built in issues #9 (engine) and #11 (probe, profiles, sources).
+Feeling a surface, from the first click to the sound (and, after the event, the vibration). **At the event (Q-132)** the A15 laptop runs desktop Feel mode: a mouse drag in the build pane feels the body, and the only output is sound: the **body tone**, one continuous tone that follows the height (Q-133, [R8.9.1](../rendering/haptics/audio-pairing.md#r891-body-tone-from-the-height-map-q-133)). **After the event**, Touch mode on phones adds `navigator.vibrate` and the per-sample height ticks. Drawn from rendering doc R5.3, R5.6, R8.1–R8.5, R8.8, R8.9.1, and decisions D-08, D-09, D-10, D-12, D-20, D-21, Q-132 and Q-133. Engine and sources as built in issues #9 and #11; Feel mode, the tone stream and the body tone are not built yet (R5.6, R8.8, R8.8.1).
 
 ```mermaid
 sequenceDiagram
@@ -16,11 +16,11 @@ sequenceDiagram
   participant AD as AudioDriver
   participant PI as Pulse indicator (debug)
 
-  U->>V: Click "Turn on haptics and sound" (Touch mode)
-  Note over V,AD: This click unlocks navigator.vibrate and creates or resumes the AudioContext (Q-73)
+  U->>V: Click Feel in the build pane (event, R5.6) or "Turn on haptics and sound" (Touch mode, after the event)
+  Note over V,AD: This click creates or resumes the AudioContext (Q-73), and on phones unlocks navigator.vibrate (after the event)
   V->>V: buildHaptics(engine, params, card, body, overrides) gives the texture and data sources, the rings flag and missing (R8.5)
-  V->>V: Orbit controls off while exactly one pointer is down
-  loop pointermove with one pointer
+  V->>V: Orbit controls off while feeling (mouse drag in Feel mode, one finger in Touch mode)
+  loop pointermove while feeling
     U->>V: pointermove
     V->>P: fromPointer(x, y, rect, camera)
     alt real shape model
@@ -39,8 +39,12 @@ sequenceDiagram
         D-->>S: Height, masks, band index, storm id
       end
       Note over S: Comet, cloud and binary sources use the projected distance, the ray or the body id instead
-      S->>S: Decide a tick, a double, a train or nothing (quiet)
-      S->>E: emit(event) or startTrain / updateTrain / stopTrain (no timers in sources, Q-71)
+      alt height map, terrain land or mesh height (the body tone, Q-133)
+        S->>E: updateTone(pitch from height, gain, pan) through the tone stream (proposed, R8.8, not built yet)
+      else other sources, and the height ticks (vibration, after the event)
+        S->>S: Decide a tick, a double, a train or nothing (quiet)
+        S->>E: emit(event) or startTrain / updateTrain / stopTrain (no timers in sources, Q-71)
+      end
     end
   end
   loop frame loop while the pointer is down
@@ -62,26 +66,30 @@ sequenceDiagram
     and
       E-)PI: spherex:haptic DOM event (D-20)
     end
-    alt Android Chrome (vibrate supported)
+    alt Android Chrome (vibrate supported, after the event)
       VD->>VD: navigator.vibrate(quantised ms, 3 or 4 levels, trains as 250 ms patterns)
-    else iPhone, iPad or desktop
+    else the A15 laptop at the event, iPhone, iPad or desktop
       VD->>VD: supported is false, no-op (audio only)
     end
     AD->>AD: Sound on currentTime + lookahead: gain, pitch, pan, timbre by tag and voice, shifted by the audio offset
+    opt body tone running
+      AD->>AD: One sustained tone: pitch low in grooves and higher on peaks, timbre by the height's tag (R8.9.1)
+    end
   end
   U->>V: Finger up, cancel or leave
   V->>T: release()
-  T->>E: stopTrain
-  U->>V: Second finger down
-  V->>V: Two pointers rotate and zoom, no haptics
+  T->>E: stopTrain and stopTone
+  U->>V: Second finger down (Touch mode) or Feel off
+  V->>V: Drag or two pointers rotate and zoom, no haptics
 ```
 
 ## Notes
 
-- Touch mode only exists on the 3D view. Spectrum haptics on the panel use the same engine ([09-sequence-object-spectrum.md](09-sequence-object-spectrum.md)). The light-curve pulses (Mira heartbeat, T Tauri dimming) are driven by the scrubber through `TouchHaptics.scrub`, not by the finger on the body.
+- **Q-133 supersedes the height ticks for body interaction:** at the event the height map, terrain land and mesh height drive the body tone, not ticks. The tick, double and train decisions remain for the other sources and for vibration after the event ([R8.4](../rendering/haptics/sources.md#r84-event-sources)). As built, `haptics/sources/heightMap.ts` and `terrain.ts` still emit clicks.
+- Feel mode (event) and Touch mode (after the event) exist only on the 3D view. Spectrum haptics on the panel use the same engine ([09-sequence-object-spectrum.md](09-sequence-object-spectrum.md)). The light-curve pulses (Mira heartbeat, T Tauri dimming) are driven by the scrubber through `TouchHaptics.scrub`, not by the finger on the body.
 - Rate limit: ≤ 40 events/s and ≥ 25 ms between ticks, doubles and heartbeats (rendering doc §8.3); a 250 ms train window counts as one event.
 - The honesty filter lives in the engine, not in the sources (D-21). Measured only plays only `measured` events: procedural relief and every texture haptic on shader kinds are silent; real meshes still tick; every data haptic not tagged `measured` is silent, so the `teq_pulse` plays only when `teq_K` is `measured` (rendering doc §8.2, §7.7). Texture events carry `texture_tag`; data events carry `data_tag`, except `teq_pulse` (`teq_K`'s tag) and the binary pulse (`spectral_class`'s tag, Q-81).
 - Holding still: `pointermove` does not fire while a finger is still, so the viewer's frame loop calls `poll` (Q-83). The shader kinds' sources read `BodyRenderer.field` and `pointSets`, which include the D-27 slider overrides.
 - `sharpness` is optional and ignored by the web driver (D-20).
-- The `spherex:haptic` event drives an on-screen pulse indicator, so an audience watching the laptop can see what the phone feels (D-20). The engine fires it after the honesty gate.
+- The `spherex:haptic` event drives an on-screen pulse indicator, so an audience can see what is felt or heard (D-20). The engine fires it after the honesty gate.
 - The audio offset follows rendering doc §8.9: a positive `avOffsetMs` (vibration felt later) delays the audio; otherwise the vibration is delayed.

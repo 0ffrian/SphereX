@@ -10,7 +10,7 @@ Implement `$ARGUMENTS` for Shift & Spectrum. Run the whole pipeline without aski
 
 ## Steps
 
-1. **Scope.** Restate the task in one line. Pick the spec fragments from the routing table in `docs/README.md`. If the task is large, split it into independent sub-tasks.
+1. **Scope.** Restate the task in one line. Pick the decision topic files and the spec fragments from the task's row in the routing table of `docs/README.md` (after the decisions index `docs/decisions/README.md`). If the task is large, split it into independent sub-tasks.
 
 2. **Implement.** Launch the `auto-implementer` agent with the task, the fragment list and any user constraints. Add a specialist agent alongside it when one clearly fits:
    - haptics or sound: `haptics-audio-engineer`
