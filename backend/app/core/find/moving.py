@@ -4,7 +4,8 @@ One cone cannot find a body that moves, so (issue #26):
 
 1. One Horizons ephemeris per search window (A3.4), seen from the SPHEREx spacecraft, through
    the cache (D-25). A target in ``targets.toml`` may list its own ``moving_windows`` (the spans
-   where SPHEREx saw it); any other object uses the whole release window. Each window is split
+   where SPHEREx saw it), matched by its ``spkid`` so every spelling of the name gets the same
+   windows; any other object uses the whole release window. Each window is split
    into several requests when it would pass the Horizons line limit. Windows are never joined,
    so no position is ever interpolated across the gap between two of them.
 2. A small SIA cone (radius R) at the ephemeris position along the path. The step between cones
@@ -17,9 +18,11 @@ One cone cannot find a body that moves, so (issue #26):
    exposure midpoint) lies inside the frame's footprint (``s_region``), or within
    ``moving_footprint_margin_arcsec`` of its edge (the interpolation error).
 4. The candidates' exact positions come from more Horizons calls: a SPHEREx-centred ``TLIST``
-   of the frame midpoints, one per cone (the frames that cone found first), so each request's
-   cache key depends only on that cone's answer. A candidate is kept only when that exact
-   position is inside the footprint. Stage 1 places the object pixel there (A4.1 step 3).
+   of the frame midpoints, one per planned cone (the candidates whose midpoint is nearest that
+   cone's time). The planned cone times follow from the path and the settings only, so a
+   request's cache key does not depend on which other cones answered. A candidate is kept only
+   when that exact position is inside the footprint. Stage 1 places the object pixel there
+   (A4.1 step 3).
 
 Downloads (Q-111): a web request answers from the cache only (``live=False``); every Horizons or
 SIA call it would need is counted in ``frames:search_deferred:<n>`` and the caller starts the
@@ -29,12 +32,14 @@ restart the job on every request. Live cones are spaced by one process-wide pace
 
 Nothing is dropped silently. Codes this module adds to ``missing``:
 
-- ``frames:ephemeris``: no ephemeris for the path (no SPK id, Horizons unavailable, empty).
-- ``frames:moving_window``: a configured window is empty (end not after start).
+- ``frames:ephemeris``: no ephemeris for the path, or for one of its windows (no SPK id,
+  Horizons unavailable, empty); the windows that did answer are still searched.
+- ``frames:moving_window``: a configured window is shorter than one ephemeris step.
 - ``frames:cone_cap:<n>``: the path needs more than ``moving_max_cones`` cones; the cap is
   spread evenly over the whole path and ``n`` cones were left out, so frames between the kept
   cones can be missed. Deterministic for the settings (in the key), so the list is stored.
-- ``frames:truncated``: a cone answer hit MAXREC.
+- ``frames:cone_maxrec:<n>``: ``n`` cone answers hit MAXREC (deterministic for the cached
+  answers, so the list is stored; a fixed object's own MAXREC code stays ``frames:truncated``).
 - ``frames:sparse_path:<n>``: at ``n`` cones the rate asked for a step below the minimum, so
   the cones there are further apart than ``R / rate`` and a frame between them can be missed.
 - ``frames:cone_failed:<n>``: ``n`` cones could not be fetched (not cached offline, or failed).
@@ -65,7 +70,7 @@ from typing import Literal
 from app.adapters import horizons, irsa_sia
 from app.adapters.horizons import EphemPoint
 from app.adapters.irsa_sia import SiaRow, frame_time
-from app.cache.keys import CacheKey, norm_float, norm_name
+from app.cache.keys import CacheKey, norm_float
 from app.cache.store import CacheMissOffline, Served, UpstreamUnavailable
 from app.context import Context
 from app.timefmt import parse_utc
@@ -74,7 +79,7 @@ log = logging.getLogger("shift_spectrum")
 
 EPHEMERIS = "frames:ephemeris"
 WINDOW = "frames:moving_window"
-TRUNCATED = "frames:truncated"
+CONE_MAXREC = "frames:cone_maxrec"
 CONE_CAP = "frames:cone_cap"
 SPARSE_PATH = "frames:sparse_path"
 CONE_FAILED = "frames:cone_failed"
@@ -84,8 +89,8 @@ NO_FOOTPRINT = "no_footprint"
 FRAME_EPHEMERIS = "ephemeris"
 
 # Codes that more data or a later run can change: a frame list with one of them is not stored.
-# The cone cap, MAXREC and the sparse path are deterministic for the cached answers and the
-# settings in the key, so they do not count (a retry would give the same list).
+# The cone cap, MAXREC (``frames:cone_maxrec``) and the sparse path are deterministic for the
+# cached answers and the settings in the key, so they do not count (a retry gives the same list).
 INCOMPLETE_PREFIXES = (
     EPHEMERIS,
     CONE_FAILED + ":",
@@ -116,8 +121,8 @@ Window = tuple[datetime, datetime]
 
 @lru_cache(maxsize=8)
 def _windows_in(path: str, mtime_ns: int) -> dict[str, tuple[Window, ...]]:
-    """``moving_windows`` per target query (lower case) from ``targets.toml``. A target whose
-    windows do not parse is logged and left out, so it falls back to the release window."""
+    """``moving_windows`` per ``spkid`` from ``targets.toml``. A target without an ``spkid`` or
+    whose windows do not parse is logged and left out, so it uses the release window."""
     del mtime_ns  # part of the memo key only: an edited file is read again
     doc = tomllib.loads(Path(path).read_text(encoding="utf-8"))
     out: dict[str, tuple[Window, ...]] = {}
@@ -125,25 +130,28 @@ def _windows_in(path: str, mtime_ns: int) -> dict[str, tuple[Window, ...]]:
         raw = t.get("moving_windows")
         if not raw:
             continue
+        spkid = str(t.get("spkid", "")).strip()
         try:
+            if not spkid:
+                raise ValueError("no spkid")
             wins = tuple(sorted((parse_utc(str(a)), parse_utc(str(b))) for a, b in raw))
         except (TypeError, ValueError):
             log.warning("targets.toml: ignoring bad moving_windows for %r", t.get("query"))
             continue
-        out[norm_name(str(t["query"])).lower()] = wins
+        out[spkid] = wins
     return out
 
 
-def target_windows(ctx: Context, query: str | None) -> tuple[Window, ...] | None:
+def target_windows(ctx: Context, spkid: str | None) -> tuple[Window, ...] | None:
     """The target's own search windows, or ``None`` (use the release window)."""
-    if not query:
+    if not spkid:
         return None
     f = ctx.settings.targets_file
     try:
         mtime = f.stat().st_mtime_ns
     except OSError:
         return None
-    return _windows_in(str(f), mtime).get(norm_name(query).lower())
+    return _windows_in(str(f), mtime).get(spkid.strip())
 
 
 @dataclass(frozen=True)
@@ -159,9 +167,9 @@ class MovingConfig:
     margin_arcsec: float
 
     @classmethod
-    def from_context(cls, ctx: Context, query: str | None = None) -> MovingConfig:
+    def from_context(cls, ctx: Context, spkid: str | None = None) -> MovingConfig:
         s = ctx.settings
-        windows = target_windows(ctx, query) or (
+        windows = target_windows(ctx, spkid) or (
             (parse_utc(s.moving_window_start), parse_utc(s.moving_window_end)),
         )
         return cls(
@@ -237,17 +245,17 @@ class Gate:
     failed: Callable[[str], bool] = lambda _digest: False
     mark_failed: Callable[[str], None] = lambda _digest: None
 
-    def decide(self, ctx: Context, key: CacheKey, refresh: bool) -> Literal["go", "defer", "fail"]:
-        """``go``: fetch (cached, offline, or live allowed); ``defer``: leave it to the job;
-        ``fail``: a live try failed recently, count it as failed without trying again."""
+    def decide(
+        self, ctx: Context, key: CacheKey, refresh: bool
+    ) -> Literal["cached", "live", "defer", "fail"]:
+        """One metadata read. ``cached``: served from the cache (always offline, where a miss
+        raises); ``live``: download it; ``defer``: leave it to the job; ``fail``: a live try
+        failed recently, count it as failed without trying again."""
         if ctx.cache.offline or (not refresh and ctx.cache.get_meta(key) is not None):
-            return "go"
+            return "cached"
         if self.failed(key.digest):
             return "fail"
-        return "go" if self.live else "defer"
-
-    def is_live(self, ctx: Context, key: CacheKey, refresh: bool) -> bool:
-        return not ctx.cache.offline and (refresh or ctx.cache.get_meta(key) is None)
+        return "live" if self.live else "defer"
 
 
 # --- geometry ------------------------------------------------------------------------------
@@ -420,43 +428,50 @@ def spread(times: list[datetime], cap: int) -> list[datetime]:
 
 def _ephemeris_tracks(
     ctx: Context, cfg: MovingConfig, spkid: str, refresh: bool, gate: Gate
-) -> tuple[list[Track], list[Served], int] | None:
-    """One track per window, or ``None`` when any part cannot be fetched. The int is the number
-    of requests deferred to the job (then the tracks are empty)."""
+) -> tuple[list[Track], list[Served], int, int]:
+    """One track per window that answered, the served entries, the number of requests deferred
+    to the job, and the number of windows with no usable ephemeris. A window is skipped (and
+    counted) when one of its chunks fails; the other windows are still searched."""
+    plan = [
+        [
+            (start, stop, horizons.range_key(spkid, start, stop, cfg.ephem_step_min))
+            for start, stop in chunks
+        ]
+        for chunks in range_chunks(cfg)
+    ]
+    verdicts = [[gate.decide(ctx, key, refresh) for _, _, key in chunks] for chunks in plan]
+    deferred = sum(v == "defer" for vs in verdicts for v in vs)
+    if deferred:
+        return [], [], deferred, 0
     tracks: list[Track] = []
     served: list[Served] = []
-    deferred = 0
-    plan = range_chunks(cfg)
-    for chunks in plan:
-        for start, stop in chunks:
-            key = horizons.range_key(spkid, start, stop, cfg.ephem_step_min)
-            verdict = gate.decide(ctx, key, refresh)
-            if verdict == "fail":
-                return None
-            if verdict == "defer":
-                deferred += 1
-    if deferred:
-        return [], [], deferred
-    for chunks in plan:
+    bad = 0
+    for chunks, vs in zip(plan, verdicts, strict=True):
+        if "fail" in vs:
+            bad += 1
+            continue
         points: list[EphemPoint] = []
-        for start, stop in chunks:
-            key = horizons.range_key(spkid, start, stop, cfg.ephem_step_min)
-            live = gate.is_live(ctx, key, refresh)
+        window_served: list[Served] = []
+        ok = True
+        for (start, stop, key), verdict in zip(chunks, vs, strict=True):
             try:
                 pts, srv = horizons.ephemeris_range(
                     ctx, spkid, start, stop, cfg.ephem_step_min, refresh=refresh
                 )
             except (CacheMissOffline, UpstreamUnavailable, ValueError):
-                if live:
+                if verdict == "live":
                     gate.mark_failed(key.digest)
-                return None
+                ok = False
+                break
             points.extend(pts)
-            served.append(srv)
-        track = Track(points)
-        if len(track) < 2:
-            return None
+            window_served.append(srv)
+        track = Track(points) if ok else None
+        if track is None or len(track) < 2:
+            bad += 1
+            continue
         tracks.append(track)
-    return tracks, served, 0
+        served.extend(window_served)
+    return tracks, served, 0, bad
 
 
 def exact_positions(
@@ -488,15 +503,14 @@ def exact_positions(
             deferred += 1
             continue
         pts: list[EphemPoint] = []
-        if verdict == "go":
-            live = gate.is_live(ctx, key, refresh)
+        if verdict != "fail":
             try:
                 pts, srv = horizons.ephemeris(
                     ctx, spkid, chunk, refresh=refresh, center=horizons.OBSERVER_SPHEREX
                 )
                 served.append(srv)
             except (CacheMissOffline, UpstreamUnavailable, ValueError):
-                if live:
+                if verdict == "live":
                     gate.mark_failed(key.digest)
                 pts = []
         if len(pts) != len(chunk) or any(
@@ -511,29 +525,40 @@ def exact_positions(
     return out, missing, served, deferred
 
 
+def nearest_cone(times: list[datetime], when: datetime) -> int:
+    """Index of the planned cone time nearest ``when`` (the earlier one on a tie)."""
+    i = bisect.bisect_left(times, when)
+    if i == 0:
+        return 0
+    if i == len(times):
+        return len(times) - 1
+    return i - 1 if when - times[i - 1] <= times[i] - when else i
+
+
 def search_path(
     ctx: Context,
     spkid: str | None,
     *,
-    query: str | None = None,
+    cfg: MovingConfig | None = None,
     refresh: bool = False,
     gate: Gate | None = None,
     pacer: Pacer = PACER,
 ) -> PathSearch:
-    """The path search for the object resolved from ``query`` (its ``targets.toml`` windows).
-    ``gate`` sets what may be downloaded (default: everything, the pre-fetch and the job)."""
+    """The path search. ``cfg`` is the configuration the caller keyed its result with (built
+    from the settings and the target's windows when not given); ``gate`` sets what may be
+    downloaded (default: everything, the pre-fetch and the job)."""
     gate = gate or Gate()
-    cfg = MovingConfig.from_context(ctx, query)
-    if any(stop <= start for start, stop in cfg.windows):
+    cfg = cfg or MovingConfig.from_context(ctx, spkid)
+    step = timedelta(minutes=cfg.ephem_step_min)
+    if any(stop - start < step for start, stop in cfg.windows):
         return PathSearch([], {}, [WINDOW])
     if not spkid:
         return PathSearch([], {}, [EPHEMERIS])
-    got = _ephemeris_tracks(ctx, cfg, spkid, refresh, gate)
-    if got is None:
-        return PathSearch([], {}, [EPHEMERIS])
-    tracks, served, deferred = got
+    tracks, served, deferred, bad_windows = _ephemeris_tracks(ctx, cfg, spkid, refresh, gate)
     if deferred:
         return PathSearch([], {}, [f"{SEARCH_DEFERRED}:{deferred}"], deferred=deferred)
+    if not tracks:
+        return PathSearch([], {}, [EPHEMERIS])
 
     missing: list[str] = []
     all_times: list[datetime] = []
@@ -546,11 +571,9 @@ def search_path(
     capped = len(all_times) - len(times)
 
     found: dict[str, SiaRow] = {}
-    first_cone: dict[str, int] = {}  # frame_id -> index of the cone that found it first
-    failed = searched = 0
-    truncated = False
+    failed = searched = maxrec_hits = 0
     release = ctx.settings.data_release
-    for index, t in enumerate(times):
+    for t in times:
         pos = track_at(tracks, t)
         if pos is None:  # not reached: cone_times stays inside its track
             continue
@@ -563,25 +586,22 @@ def search_path(
         if verdict == "fail":
             failed += 1
             continue
-        live = gate.is_live(ctx, key, refresh)
-        if live:
+        if verdict == "live":
             pacer.wait(cfg.pace_s)
         try:
             sia = irsa_sia.search(
                 ctx, ra, dec, refresh=refresh, maxrec=cfg.maxrec, radius_deg=cfg.cone_radius_deg
             )
         except (CacheMissOffline, UpstreamUnavailable):
-            if live:
+            if verdict == "live":
                 gate.mark_failed(key.digest)
             failed += 1
             continue
         searched += 1
         served.append(sia.served)
-        truncated = truncated or sia.truncated
+        maxrec_hits += sia.truncated
         for row in sia.rows:
-            if row.frame_id not in found:
-                found[row.frame_id] = row
-                first_cone[row.frame_id] = index
+            found.setdefault(row.frame_id, row)
 
     margin_deg = cfg.margin_arcsec / 3600.0
     candidates: list[SiaRow] = []
@@ -597,11 +617,15 @@ def search_path(
         if inside_footprint(at[0], at[1], row.s_region, margin_deg):
             candidates.append(row)
 
+    # One TLIST group per planned cone, by the nearest cone time: built in one pass, and the
+    # grouping depends only on the planned times, never on which cones answered.
+    groups: dict[int, list[SiaRow]] = {}
+    for r in candidates:
+        groups.setdefault(nearest_cone(times, frame_time(r)), []).append(r)
     positions: dict[str, tuple[float, float]] = {}
-    for index in sorted({first_cone[r.frame_id] for r in candidates}):
-        group = [r for r in candidates if first_cone[r.frame_id] == index]
+    for index in sorted(groups):
         exact, pos_missing, pos_served, pos_deferred = exact_positions(
-            ctx, spkid, group, refresh=refresh, gate=gate
+            ctx, spkid, groups[index], refresh=refresh, gate=gate
         )
         positions.update(exact)
         served.extend(pos_served)
@@ -618,8 +642,10 @@ def search_path(
     positions = {r.frame_id: positions[r.frame_id] for r in kept}
 
     head: list[str] = []
-    if truncated:
-        head.append(TRUNCATED)
+    if bad_windows:
+        head.append(EPHEMERIS)
+    if maxrec_hits:
+        head.append(f"{CONE_MAXREC}:{maxrec_hits}")
     if capped:
         head.append(f"{CONE_CAP}:{capped}")
     if sparse:

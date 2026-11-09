@@ -278,7 +278,7 @@ class FrameService:
     ) -> FramesResult:
         s = self.ctx.settings
         has_pm = obj.pm_ra_mas_yr is not None and obj.pm_dec_mas_yr is not None
-        cfg = moving.MovingConfig.from_context(self.ctx, obj.query) if obj.moving else None
+        cfg = moving.MovingConfig.from_context(self.ctx, obj.spkid) if obj.moving else None
         key = frames_key(self.ctx, obj.id, moving_cfg=cfg)
         if not (refresh or rebuild):
             entry = self.ctx.cache.get(key)
@@ -300,13 +300,15 @@ class FrameService:
         if obj.moving:
             # Q-21, issue #26: ephemeris-driven cones along the path; the object position at each
             # frame time is the exact Horizons prediction, never a guess. Under the handoff the
-            # web request reads only the cache (Q-111); the job runs the search live.
+            # web request reads only the cache (Q-111). The job's capped first batch does too, so
+            # its quick answer is not held up by a long live search; the job's full run (and the
+            # pre-fetch, or a caller with no job) runs the search live.
             gate = moving.Gate(
-                live=not handoff, failed=self._recently_failed, mark_failed=self._mark_failed
+                live=not handoff and live_cap is None,
+                failed=self._recently_failed,
+                mark_failed=self._mark_failed,
             )
-            path = moving.search_path(
-                self.ctx, obj.spkid, query=obj.query, refresh=refresh, gate=gate
-            )
+            path = moving.search_path(self.ctx, obj.spkid, cfg=cfg, refresh=refresh, gate=gate)
             served, missing, rows = list(path.served), list(path.missing), path.rows
             search_deferred = path.deferred
             path_pos = path.positions
