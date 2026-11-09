@@ -47,7 +47,9 @@ for (const tint of [false, true]) {
     const viewer = page.getByTestId('frame-viewer');
     await expect(viewer).toHaveAttribute('data-grid', '65');
 
-    // Focus first: it may scroll the panel, which is not a layout change.
+    // Focus first: it may scroll the panel, which is not a layout change. The island has grown
+    // into the panel (issue #66) before its controls can take focus.
+    await expect(page.getByTestId('island')).toHaveAttribute('data-arrived', '');
     await viewer.focus();
     const first = {
       viewer: await box(viewer),
