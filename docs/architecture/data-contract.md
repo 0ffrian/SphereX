@@ -56,6 +56,8 @@ A saved asset holds the ObjectCard, the RenderParams, the texture URLs, `generat
 | Generated | Browser IndexedDB | Files created during a session, and the user's `overrides` (D-22). |
 | Optional backend | Small service | Shared saves. Not needed for the demo. |
 
-As built (issue #5): the backend also stores generated assets, as `derived.asset` entries in the D-25 cache, and reads pre-baked ones from `backend/assets/<type>/<id>.json` (`SX_ASSETS_DIR`). Whether this table changes to match is Q-57.
+**Demo pack (issue #68, Q-164; answers Q-57 for pre-baked assets).** `backend/scripts/bake_demo_pack.py` writes the 16 search rows' assets to `backend/assets/<type>/<id>.json`, their maps to `backend/assets/textures/<id>/<generator_version>/<seed>/<W>x<H>/` (the R5 mobile size, 1024x512, to stay under the 15 MB budget) and the search list `frontend/src/app/search/demoTargets.ts`. The maps are served read-only at `/data/demo-textures` (`SX_DEMO_TEXTURES_DIR`, also under `SX_OFFLINE=1`), and the pack's texture URLs point there. A pack asset has no spectrum (`spectrum` is in `missing`); SPHEREx frames and spectra are never committed. `created_at` is fixed from the data release date, so a re-run is byte-identical. `bake_demo_pack --check` rebuilds in memory and fails on any differing byte (`--strict`: catalogues from the D-25 cache, no card-only fallback); CI runs it next to `bake_fixtures --check`.
+
+As built (issue #5): the backend also stores generated assets, as `derived.asset` entries in the D-25 cache, and reads pre-baked ones from `backend/assets/<type>/<id>.json` (`SX_ASSETS_DIR`). The pre-baked layer is filled by the demo pack above (Q-57).
 
 The read-through cache of external calls (D-25) is separate from the asset store. It lives on the A15, outside git, with a zipped backup.

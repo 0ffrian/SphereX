@@ -12,5 +12,8 @@ export const API_TIMEOUT_MS = 90_000;
 /** Response header the dev fixture server sets on every synthetic reply. */
 export const FIXTURE_HEADER = 'x-sx-fixture';
 
+/** Response header with the asset status (A4.4, Q-39): "saved", "generated" or "sketch". */
+export const ASSET_STATUS_HEADER = 'x-sx-asset-status';
+
 /** Response header of `combine.png` (issue #12): JSON describing the combination. */
 export const COMBINE_HEADER = 'x-sx-combine';

@@ -1,0 +1,121 @@
+{
+  "card": {
+    "host_age_gyr": {
+      "err": 0.6,
+      "source": "NASA Exoplanet Archive PSCompPars st_age (Torres et al. 2015)",
+      "tag": "measured",
+      "value": 4.0
+    },
+    "host_mass_msun": {
+      "err": 0.024,
+      "source": "NASA Exoplanet Archive PSCompPars st_mass (Torres et al. 2015)",
+      "tag": "measured",
+      "value": 0.544
+    },
+    "host_radius_rsun": {
+      "err": 0.023,
+      "source": "NASA Exoplanet Archive PSCompPars st_rad (Torres et al. 2015)",
+      "tag": "measured",
+      "value": 0.523
+    },
+    "host_teff_K": {
+      "err": 90.0,
+      "source": "NASA Exoplanet Archive PSCompPars st_teff (Torres et al. 2015)",
+      "tag": "measured",
+      "value": 3755.0
+    },
+    "id": "simbad-kepler-186f",
+    "mass_mearth": {
+      "assumption": "mass estimated from the planet's radius with the Chen & Kipping 2017 mass-radius relation (archive pl_bmassprov = 'M-R relationship', pscp_calc.html); not a measured mass",
+      "source": "NASA Exoplanet Archive PSCompPars calculated value (pscp_calc.html), pl_bmasse",
+      "tag": "model_dependent",
+      "value": 1.71
+    },
+    "name": "Kepler-186 f",
+    "orbit_au": {
+      "err": 0.171,
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbsmax (Torres et al. 2015)",
+      "tag": "measured",
+      "value": 0.432
+    },
+    "orbital_period_d": {
+      "err": 0.0013,
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbper (Torres et al. 2015)",
+      "tag": "measured",
+      "value": 129.9441
+    },
+    "pm_mas_yr": {
+      "source": "SIMBAD Kepler-186f (pmra = mu_alpha * cos(delta), pmdec)",
+      "tag": "measured",
+      "value": [
+        2.171,
+        -4.363
+      ]
+    },
+    "radius_rjup": {
+      "err": 0.007,
+      "source": "NASA Exoplanet Archive PSCompPars pl_radj (Torres et al. 2015)",
+      "tag": "measured",
+      "value": 0.104
+    },
+    "teq_K": {
+      "source": "NASA Exoplanet Archive PSCompPars pl_eqt (Q1-Q17 DR25 KOI Table)",
+      "tag": "measured",
+      "value": 177.0
+    },
+    "type": "planet_rocky"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b2",
+  "render_params": {
+    "alt_text": "Kepler-186 f, Rocky planet, 0.104 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
+    "generator_version": "p1-b2",
+    "haptics": {
+      "data": "teq_pulse",
+      "data_tag": "measured",
+      "params": {
+        "maxRateHz": 12.0,
+        "tau": 0.15
+      },
+      "texture": "terrain",
+      "texture_tag": "artistic"
+    },
+    "id": "simbad-kepler-186f",
+    "layers": [
+      {
+        "description": "Browser shader surface and shared CPU field (R7.7). Nothing about it is measured.",
+        "id": "surface",
+        "requires": [],
+        "tag": "artistic",
+        "tier": 5
+      }
+    ],
+    "lighting": {
+      "mode": "sun"
+    },
+    "missing": [
+      "spectrum"
+    ],
+    "scale_m": 7270744.0,
+    "seed": 2425994349,
+    "type": "planet_rocky",
+    "view_modes": {
+      "visible": {
+        "available": true,
+        "badge": "Default (artist's choice)",
+        "rgb": {
+          "source": "artist's neutral default (R7.7, D-02)",
+          "tag": "artistic",
+          "value": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 2425994349,
+  "textures": null
+}

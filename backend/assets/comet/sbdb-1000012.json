@@ -1,0 +1,120 @@
+{
+  "card": {
+    "coma_radius_km": {
+      "source": "not available: published values not loaded (R7.3)",
+      "tag": "measured",
+      "value": null
+    },
+    "id": "sbdb-1000012",
+    "name": "67P/Churyumov-Gerasimenko",
+    "nucleus_radius_km_max": {
+      "formula": "0.5 * sqrt(dx^2 + dy^2 + dz^2) of the shape model's bounding box (km)",
+      "source": "R. Gaskell, L. Jorda, C. Capanna, S. Hviid and P. Gutierrez, SPC SHAP5 CARTESIAN PLATE MODEL FOR COMET 67P/C-G 50K PLATES, RO-C-MULTI-5-67P-SHAPE-V2.0:CG_SPC_SHAP5_050K_CART, NASA Planetary Data System and ESA Planetary Science Archive, 2017. DOI 10.26007/34vg-8s07: the shape model's own bounding-sphere radius (half its bounding-box diagonal), used for scaling the mesh (Q-43). Not a published nucleus radius or an upper limit.",
+      "tag": "derived",
+      "value": 3.527
+    },
+    "phase_angle_deg": {
+      "source": "JPL Horizons quantity 24 (Sun-Target-Observer), observer SPHEREx 500@-163182, at 2026-11-14T00:00:00.000Z",
+      "tag": "measured",
+      "value": 7.3452
+    },
+    "shape_source": {
+      "source": "R. Gaskell, L. Jorda, C. Capanna, S. Hviid and P. Gutierrez, SPC SHAP5 CARTESIAN PLATE MODEL FOR COMET 67P/C-G 50K PLATES, RO-C-MULTI-5-67P-SHAPE-V2.0:CG_SPC_SHAP5_050K_CART, NASA Planetary Data System and ESA Planetary Science Archive, 2017. DOI 10.26007/34vg-8s07, licence Not stated in the product label; cited through the label's CITATION_DESC (dataset DOI 10.26007/34vg-8s07)",
+      "tag": "measured",
+      "value": "/data/shapes/c67p-shap5.glb"
+    },
+    "spherex_rgb": {
+      "source": "not available: no SPHEREx spectrum for this object",
+      "tag": "measured",
+      "value": null
+    },
+    "sun_vector": {
+      "formula": "-r/|r|, r = heliocentric ICRF position from JPL Horizons VECTORS (CENTER 500@10) at 2026-11-14T00:00:00.000Z; frame ICRF (equatorial J2000), direction target to Sun",
+      "source": "JPL Horizons VECTORS, CENTER 500@10, at 2026-11-14T00:00:00.000Z",
+      "tag": "derived",
+      "value": [
+        -0.04367068,
+        0.892853837,
+        0.44822416
+      ]
+    },
+    "type": "comet"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b2",
+  "render_params": {
+    "alt_text": "67P/Churyumov-Gerasimenko, Comet, nucleus scaled to its shape model's bounding sphere, 3.53 km in radius, no visible colour basis, viewed at 7.35 degrees. Surface relief: illustrative.",
+    "generator_version": "p1-b2",
+    "haptics": {
+      "data": "none",
+      "data_tag": "artistic",
+      "params": {},
+      "texture": "none",
+      "texture_tag": "artistic"
+    },
+    "id": "sbdb-1000012",
+    "layers": [
+      {
+        "description": "Nucleus drawn from the shape model, scaled to the nucleus radius on the card (R7.3).",
+        "formula": "Shape model scaled to nucleus_radius_km_max",
+        "id": "mesh",
+        "requires": [
+          "shape_source",
+          "nucleus_radius_km_max"
+        ],
+        "tag": "derived",
+        "tier": 2
+      },
+      {
+        "description": "Dark sphere at the upper size limit (R7.3).",
+        "formula": "nucleus radius = nucleus_radius_km_max",
+        "id": "nucleus",
+        "requires": [
+          "nucleus_radius_km_max"
+        ],
+        "tag": "derived",
+        "tier": 2
+      }
+    ],
+    "lighting": {
+      "mode": "sun",
+      "phase_angle_deg": 7.3452,
+      "sun_dir": [
+        -0.04367068,
+        0.892853837,
+        0.44822416
+      ]
+    },
+    "missing": [
+      "gas_shells",
+      "field",
+      "visible",
+      "spherex_ir",
+      "spectrum"
+    ],
+    "scale_m": 3527.0,
+    "seed": 2273381057,
+    "type": "comet",
+    "view_modes": {
+      "spherex_ir": {
+        "available": false,
+        "badge": "SPHEREx infrared, whole-body average (false colour)",
+        "channels_um": [
+          3.0,
+          2.0,
+          1.0
+        ],
+        "rgb": null,
+        "source": "spherex_rgb"
+      },
+      "visible": {
+        "available": false,
+        "badge": "Estimated visible colour",
+        "rgb": null,
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 2273381057,
+  "textures": null
+}

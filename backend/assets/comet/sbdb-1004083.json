@@ -1,0 +1,93 @@
+{
+  "card": {
+    "coma_radius_km": {
+      "source": "not available: published values not loaded (R7.3)",
+      "tag": "measured",
+      "value": null
+    },
+    "id": "sbdb-1004083",
+    "name": "C/2025 N1 (ATLAS)",
+    "nucleus_radius_km_max": {
+      "source": "not available: published values not loaded (R7.3)",
+      "tag": "measured",
+      "value": null
+    },
+    "phase_angle_deg": {
+      "source": "JPL Horizons quantity 24 (Sun-Target-Observer), observer SPHEREx 500@-163182, at 2026-11-14T00:00:00.000Z",
+      "tag": "measured",
+      "value": 3.4475
+    },
+    "spherex_rgb": {
+      "source": "not available: no SPHEREx spectrum for this object",
+      "tag": "measured",
+      "value": null
+    },
+    "sun_vector": {
+      "formula": "-r/|r|, r = heliocentric ICRF position from JPL Horizons VECTORS (CENTER 500@10) at 2026-11-14T00:00:00.000Z; frame ICRF (equatorial J2000), direction target to Sun",
+      "source": "JPL Horizons VECTORS, CENTER 500@10, at 2026-11-14T00:00:00.000Z",
+      "tag": "derived",
+      "value": [
+        0.203062752,
+        -0.918778566,
+        -0.338543151
+      ]
+    },
+    "type": "comet"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b2",
+  "render_params": {
+    "alt_text": "C/2025 N1 (ATLAS), Comet, size unknown, no visible colour basis, viewed at 3.45 degrees. Surface relief: illustrative.",
+    "generator_version": "p1-b2",
+    "haptics": {
+      "data": "none",
+      "data_tag": "artistic",
+      "params": {},
+      "texture": "none",
+      "texture_tag": "artistic"
+    },
+    "id": "sbdb-1004083",
+    "layers": [],
+    "lighting": {
+      "mode": "sun",
+      "phase_angle_deg": 3.4475,
+      "sun_dir": [
+        0.203062752,
+        -0.918778566,
+        -0.338543151
+      ]
+    },
+    "missing": [
+      "nucleus",
+      "gas_shells",
+      "field",
+      "visible",
+      "spherex_ir",
+      "spectrum"
+    ],
+    "scale_m": null,
+    "seed": 12322617,
+    "type": "comet",
+    "view_modes": {
+      "spherex_ir": {
+        "available": false,
+        "badge": "SPHEREx infrared, whole-body average (false colour)",
+        "channels_um": [
+          3.0,
+          2.0,
+          1.0
+        ],
+        "rgb": null,
+        "source": "spherex_rgb"
+      },
+      "visible": {
+        "available": false,
+        "badge": "Estimated visible colour",
+        "rgb": null,
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 12322617,
+  "textures": null
+}
