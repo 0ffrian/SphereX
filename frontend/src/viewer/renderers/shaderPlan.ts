@@ -277,6 +277,22 @@ export function planShaderKind(input: PlanInput): RenderPlan {
     if (!lit) lighting = { ...lighting, colour: null, colourTag: null, colourTeffK: null };
   }
 
+  // Issue #68 Part 3 (Q-156): with the artistic terrain hidden, a locked planet (eyeball or snowball)
+  // still shows the field's ocean and ice masks on a smooth sphere, tagged by the climate layer's
+  // own tag (model_dependent, so from + Estimated). Hidden at Measured only: a plain sphere.
+  let pattern = false;
+  const patternClimate = spec.planet?.climate;
+  if (!surface && spec.drawable && spec.planet?.patternTag != null && patternClimate) {
+    offerLayer(
+      b,
+      viewerLayer('climate', patternClimate.tag, patternClimate.basis, {
+        formula: patternClimate.formula,
+        assumed: patternClimate.assumed,
+      }),
+    );
+    pattern = b.draw('climate');
+  }
+
   // Issue #68 Part 3 (Q-155): a locking rule that was refused says why; nothing is invented.
   const scenario = spec.planet?.scenario ?? null;
   if (scenario === 'temperate' || scenario === 'eyeball' || scenario === 'snowball') {
@@ -284,14 +300,14 @@ export function planShaderKind(input: PlanInput): RenderPlan {
     if (!lock.ok && !params.missing.includes('tidal_locking'))
       b.refuse({ id: 'tidal_locking', reason: 'data', fields: lock.needs });
   }
-  const lockedPose = surface && spec.field?.substellar === true;
+  const lockedPose = (surface || pattern) && spec.field?.substellar === true;
   if (lockedPose) {
     b.notes.push(
       'Modelled as tidally locked: one side always faces its star, so the planet does not turn against the light in this view.',
     );
   }
 
-  const plain = hasPlain && spec.drawable && !surface && sizeShown;
+  const plain = hasPlain && spec.drawable && !surface && !pattern && sizeShown;
   if (plain) {
     b.notes.push(plainSphereNote(spec.kind, params));
     b.legendBody('Plain grey sphere at the size on the card.');
@@ -306,7 +322,7 @@ export function planShaderKind(input: PlanInput): RenderPlan {
   return b.build({
     // The size is the only number on the card the viewer shows; it is not shown for a body that
     // is not on screen (A11: no unlabelled number).
-    sizeTag: sizeShown && (surface || plain) ? b.sizeTag : null,
+    sizeTag: sizeShown && (surface || pattern || plain) ? b.sizeTag : null,
     shader: spec.drawable
       ? {
           card,
@@ -322,6 +338,7 @@ export function planShaderKind(input: PlanInput): RenderPlan {
             motion,
           ]),
           surface,
+          pattern,
           gas,
           plain,
           distance: shaderDistance(spec),

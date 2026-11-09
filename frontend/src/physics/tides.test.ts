@@ -63,6 +63,14 @@ describe('deriveLocking on the two demo planets', () => {
     expect(r.tLockGyr / r.ageGyr).toBeLessThan(1.05);
   });
 
+  it('with the Grundy et al. 2012 prefactor (16 pi / 15, pi / 3 lower) Kepler-186 f is about 3.99 Gyr, i.e. locked (Q-155)', () => {
+    const r = deriveLocking(kepler186f());
+    if (!r.ok) throw new Error('refused');
+    const quoted = r.tLockGyr * (3 / Math.PI);
+    expect(quoted).toBeGreaterThan(3.97);
+    expect(quoted).toBeLessThan(4.0);
+  });
+
   it('matches the formula written out by hand', () => {
     const c = trappist1f();
     const r = deriveLocking(c);

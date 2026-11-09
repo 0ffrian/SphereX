@@ -11,6 +11,7 @@ import { fixture } from '@/test/sharedFixtures';
 import { DIRECTIONAL_INTENSITY, buildLights, planLighting } from './lighting';
 import { defaultContext, planRender } from './renderPlan';
 import { resolveShaderSpec } from './renderers/shaderSpec';
+import { fieldHash, generateField } from './fields/fieldGenerator';
 
 function pair(
   card: PlanetCard,
@@ -203,5 +204,56 @@ describe('derivePlanet reads mass_mearth from the card (Part 1, Q-58 b)', () => 
     const c = base() as PlanetCard;
     delete c.mass_mearth;
     expect(derivePhysics(c as ObjectCard).missing).toContain('density_g_cm3');
+  });
+});
+
+describe('eyeball planet at each honesty level (R5.3, Q-156)', () => {
+  const at = (h: 'measured' | 'derived' | 'artistic') => plan(trappist1f(), h);
+
+  it('Measured only: a plain sphere in white light; climate and starlight are hidden', () => {
+    const p = at('measured');
+    expect(p.shader).toMatchObject({ surface: false, pattern: false, plain: true });
+    expect(p.lighting.colour).toBeNull();
+    expect(missing(p, 'climate')).toMatchObject({ reason: 'honesty' });
+    expect(missing(p, 'starlight')).toMatchObject({ reason: 'honesty' });
+    expect(missing(p, 'surface')).toMatchObject({ reason: 'honesty' });
+    expect(p.drawn.map((d) => d.id)).not.toContain('climate');
+  });
+
+  it('+ Estimated: starlight and the climate pattern on a smooth sphere, the artistic terrain hidden, no artistic layer drawn, the locked pose applies', () => {
+    const p = at('derived');
+    expect(p.shader).toMatchObject({ surface: false, pattern: true, plain: false });
+    expect(p.lighting.colour).not.toBeNull();
+    expect(drawn(p, 'climate')!.tag).toBe('model_dependent');
+    expect(drawn(p, 'starlight')).toBeDefined();
+    expect(missing(p, 'surface')).toMatchObject({ reason: 'honesty' });
+    expect(p.drawn.every((d) => d.tag !== 'artistic')).toBe(true);
+    expect(p.spin).toBeNull();
+    expect(p.notes.join(' ')).toContain('tidally locked');
+    expect(p.sizeTag).not.toBeNull();
+  });
+
+  it('+ Artistic: the full surface, the climate text and the starlight', () => {
+    const p = at('artistic');
+    expect(p.shader).toMatchObject({ surface: true, pattern: false, plain: false });
+    expect(drawn(p, 'surface')).toBeDefined();
+    expect(drawn(p, 'climate')).toBeDefined();
+    expect(drawn(p, 'starlight')).toBeDefined();
+  });
+
+  it('temperate, lava and hot_dry add nothing at + Estimated', () => {
+    const k = plan(kepler186f(), 'derived');
+    expect(k.shader).toMatchObject({ surface: false, pattern: false, plain: true });
+    const hot = trappist1f();
+    hot.teq_K = { value: 900, tag: 'measured', source: 't' };
+    expect(plan(hot, 'derived').shader).toMatchObject({ pattern: false, plain: true });
+  });
+
+  it('the field at + Estimated is the one field: deterministic bytes, same as the artistic level', () => {
+    const { card, params } = pair(trappist1f());
+    const a = resolveShaderSpec(card, params).field!;
+    const b = resolveShaderSpec(card, params).field!;
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    expect(fieldHash(generateField(a, 64, 32))).toBe(fieldHash(generateField(b, 64, 32)));
   });
 });

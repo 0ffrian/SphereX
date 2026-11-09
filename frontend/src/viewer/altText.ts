@@ -118,6 +118,9 @@ export function buildAltText(plan: RenderPlan, shown?: ShownSize | null): string
   if (plan.shader) {
     // The generated kinds: the backend's own description, and what the viewer is honest about (R5.3).
     const alt = sentence(plan.shader.params.alt_text.trim());
+    if (plan.shader.pattern && !plan.shader.surface) {
+      return `${plan.name}, ${type}, ${sizeText(plan, shown)}. A smooth sphere that shows only where the model puts water and ice on a tidally locked planet, lit by its star. It is a model, not a measured image.`;
+    }
     return plan.shader.surface
       ? plan.shader.gas
         ? `${alt} This is a generated model, not a measured image.`

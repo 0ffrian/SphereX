@@ -1,6 +1,13 @@
 // Issue #68 Part 3a, A7.1: tidal locking. `t_lock = omega a^6 I Q / (3 G M_star^2 k2 R^5)` with
 // `I = 0.4 m_p R^2` (Gladman et al. 1996, Icarus 122, 166, doi:10.1006/icar.1996.0117). The planet
-// is locked when `t_lock < age`. Pure and deterministic. The result is always at least
+// is locked when `t_lock < age`. Pure and deterministic.
+//
+// FORMULA STATUS (Q-155): the ticket's form is kept. It is NOT confirmed against Gladman 1996 (the
+// paper could not be read). The only citable quotation, Grundy et al. 2012 (arXiv:1204.3923, Eq. 1),
+// has the prefactor 16 pi / 15 = 3.351, while this form with I = 0.4 m R^2 gives 16 pi^2 / 45 = 3.509:
+// a factor pi / 3 (4.7%) higher. With the quoted prefactor Kepler-186 f computes about 3.99 Gyr
+// against 4.0 Gyr, i.e. locked (eyeball, T_ss 281.8 K, theta_ice about 28 degrees); with this form
+// 4.17 Gyr, not locked. The prefactor and Q are the two choices Moon may overturn. The result is always at least
 // `model_dependent`: Q, k2 and the initial spin are assumptions (Q-119 a, Q-155).
 import type { Tag } from '@/contract';
 import { weakestTag } from '@/viewer/motion/motion';
@@ -17,8 +24,7 @@ import { rockyMassForRadius } from './zeng2019';
  */
 export const TIDAL_K2: number | null = 0.3;
 /**
- * Tidal quality factor of a rocky planet, 100: the value Kasting et al. 1993 used, quoted in Barnes
- * 2017 (introduction). Barnes' own Q = 12 is the modern Earth's, dominated by ocean dissipation, and
+ * Tidal quality factor of a rocky planet, 100: Kasting et al. 1993 via Barnes 2017 (introduction; second-hand). Barnes' own Q = 12 is the modern Earth's, dominated by ocean dissipation, and
  * he calls it not necessarily representative; it is the LOWER bound (faster locking), kept in
  * `TIDAL_Q_LOWER_BOUND` for the comment and the sensitivity test only. [verify] Q is not measured
  * for any exoplanet.
@@ -26,8 +32,8 @@ export const TIDAL_K2: number | null = 0.3;
 export const TIDAL_Q: number | null = 100;
 export const TIDAL_Q_LOWER_BOUND = 12;
 /**
- * Initial spin period of the planet, 13.5 h (Kasting et al. 1993 for a 1 Earth-radius planet, via
- * Barnes 2017, p. 3; Barnes gives no single default of his own). [verify] An assumption.
+ * Initial spin period of the planet, 13.5 h (Kasting et al. 1993 via Barnes 2017, p. 3; second-hand;
+ * Barnes gives no single default of his own). [verify] An assumption.
  */
 export const INITIAL_SPIN_H: number | null = 13.5;
 /**

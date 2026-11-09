@@ -158,6 +158,11 @@ export interface PlanetStyle {
    * `teq_K` (solar-system bodies and old cards: the polar-ice rule, unchanged).
    */
   scenario: Scenario | null;
+  /**
+   * Tag of the climate pattern (the ocean and ice masks of a locked planet) when it can be drawn on
+   * its own, without the artistic terrain: set for `eyeball` and `snowball`, else null.
+   */
+  patternTag: Tag | null;
 }
 
 export interface GasStyle {
@@ -351,6 +356,7 @@ export function resolveShaderSpec(
       atmosphereColour: kind === 'planet_water' ? ATMOSPHERE_WATER : ATMOSPHERE_ROCKY,
       climate: climate.rule,
       scenario: derived?.scenario ?? null,
+      patternTag: substellar ? (climate.rule?.tag ?? null) : null,
     },
   });
 }
