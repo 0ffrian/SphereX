@@ -1,23 +1,17 @@
-# Frame-time checks
+# R11.3 Frame-time checks
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Section:** R11 · Frame-time gate for R5.7 ([display rules](../display-rules.md)) · **Implements:** D-05, Q-66
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R11.3 (a sub-page of [R11](../acceptance-tests.md): the frame-time gate for R5.7) · **Implements:** [D-05, Q-64, Q-132](../../decisions/platform-hosting.md), [Q-66](../../decisions/rendering-motion.md) · **Read with:** [display-rules.md](../display-rules.md) (R5.5, R5.7)
 
 A renderer that misses its quality level's target on the real devices does not merge. This is a manual procedure; the results table below is empty until someone measures.
 
 ## Targets (R5.7)
 
-| Quality level | Device class                                 | Target |
-| ------------- | -------------------------------------------- | ------ |
-| High          | Desktop GPU                                  | 60 fps |
-| Medium        | Zenbook 14X (Iris Xe), Asus A15 (integrated) | 60 fps |
-| Low           | Android phones (realme 14 Pro, Samsung)      | 30 fps |
-
-Device pixel ratio is capped at 1.5 (D-05). The frame-time governor drops one quality level when frames take more than 33 ms (`SLOW_FRAME_MS`, R5.7) for 2 s, and the viewer says so. On a phone (coarse pointer) the low quality level draws at most 30 fps; desktops draw at the display rate. A run where the governor fires on a device counts as a miss for the quality level it started on.
+The quality levels, the level each device starts on and their frame-rate targets are owned by [R5.7](../display-rules.md#r57-motion-and-time-lapse); this page holds only the measurement. The **event gate is the A15** (desktop Chrome, Q-132): it starts on Medium (60 fps target). The phone columns below are after the event. A run where the governor fires counts as a miss for the level it started on.
 
 ## Procedure (per device, per body type)
 
-1. Build and serve the production bundle in fixtures mode: `npm run perf:build`, then `npm run perf:preview`. `perf:build` also copies the fixture cards and render params into `dist-fixtures/fixtures/`. The preview listens on the LAN at port 4173.
-   - **Phones need a secure context for WebGPU.** Plain HTTP over the LAN runs the WebGL2 fallback, which is the wrong backend to measure. Either serve HTTPS (`VITE_HTTPS=1 npm run perf:preview`, a self-signed certificate: accept it once on the phone), or forward the port over USB (`chrome://inspect` → Port forwarding, 4173 → `localhost:4173`) and open `http://localhost:4173` on the phone. `localhost` counts as secure. Check that step 5 reports `backend: 'webgpu'`. This is the minified production build. Only the fixtures mode adds the `__sxViewer` and `__sxShow` hooks used below, so the plain `npm run build` and the hosted copy cannot be measured this way. Close other tabs and plug laptops in. On phones, turn battery saver off and keep the screen at normal brightness.
+1. Build and serve the production bundle in fixtures mode: `npm run perf:build`, then `npm run perf:preview`. `perf:build` also copies the fixture cards and render params into `dist-fixtures/fixtures/`. The preview listens on the LAN at port 4173. On the A15, open `http://localhost:4173` (localhost is a secure context).
+   - **Phones (after the event) need a secure context for WebGPU.** Plain HTTP over the LAN runs the WebGL2 fallback, which is the wrong backend to measure. Either serve HTTPS (`VITE_HTTPS=1 npm run perf:preview`, a self-signed certificate: accept it once on the phone), or forward the port over USB (`chrome://inspect` → Port forwarding, 4173 → `localhost:4173`) and open `http://localhost:4173` on the phone. `localhost` counts as secure. Check that step 5 reports `backend: 'webgpu'`. This is the minified production build. Only the fixtures mode adds the `__sxViewer` and `__sxShow` hooks used below, so the plain `npm run build` and the hosted copy cannot be measured this way. Close other tabs and plug laptops in. On phones, turn battery saver off and keep the screen at normal brightness.
 2. Open the app in Chrome and load the fixture for the body type from the console, so the data does not vary:
    ```js
    const f = (dir, name) =>
@@ -42,8 +36,10 @@ Device pixel ratio is capped at 1.5 (D-05). The frame-time governor drops one qu
 
 Do not fill in numbers that were not measured. Cell format: `p50 ms / p95 ms / quality level / drops`.
 
-| Body type               | Zenbook 14X | Asus A15   | realme 14 Pro | Samsung    |
-| ----------------------- | ----------- | ---------- | ------------- | ---------- |
+The A15 column is the event gate. The realme and Samsung columns are after the event. The Zenbook is no longer the demo machine (Q-132); keep its column only if someone measures it.
+
+| Body type               | Asus TUF A15 (event) | realme 14 Pro (after) | Samsung (after) | Zenbook 14X |
+| ----------------------- | -------------------- | --------------------- | --------------- | ----------- |
 | Star                    | to measure  | to measure | to measure    | to measure |
 | Gas giant / brown dwarf | to measure  | to measure | to measure    | to measure |
 | Rocky / water world     | to measure  | to measure | to measure    | to measure |

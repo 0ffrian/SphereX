@@ -1,0 +1,52 @@
+# Open items [verify]
+
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R12 · **Implements:** [D-17](../decisions/scope-process.md), [Q-110](../decisions/contract.md), [Q-132](../decisions/platform-hosting.md) · **Read with:** [../decisions/README.md](../decisions/README.md), the fragment named in each row
+
+## R12. Open items [verify]
+
+Every **[verify]** marker in the rendering spec has one row here. Numbers 1–18 never change, because code cites "R12 #n"; new items are appended. **When:** "event" items are checked on the A15 before 14 Nov; "after" items wait for phones and vibration (Q-132). Owners follow D-17: Moon for the viewer, Kevin for card values, Atish for the baker, classify and haptics and sound. A constant still marked [verify] may be used only under the Q-110 policy (proposed).
+
+| # | Item | Fragment | Owner | When | Resolved by |
+|---|---|---|---|---|---|
+| 1 | `WebGPURenderer` fallback to WebGL2 (r187), and which GPU Chrome uses for WebGPU on the A15 (`chrome://gpu`; RTX 3050 or integrated) | R2, R5.5 | Atish (A15), Moon | event; phones after | a `chrome://gpu` report from the A15 |
+| 2 | Normal map green channel in the viewer: north-facing slopes brighten with light from the north (baker side checked 6 Nov 2026) | R6.5 | Moon | event | a viewer screenshot with a north light (issue #7) |
+| 3 | Gemini image model name, aspect ratios, and the REST shape `gemini_paint.py` assumes: base URL `SX_GEMINI_API_URL`, `models/{model}:generateContent` with `x-goog-api-key`, `generationConfig.responseModalities`, `imageConfig.aspectRatio` (only when `SX_GEMINI_ASPECT_RATIO` is set), an `inlineData` part, refusal `finishReason`s. Docs check 9 Nov 2026: `gemini-nano-banana-2.1` exists; 2:1 is not a named ratio; the docs show the newer `/v1beta/interactions` endpoint | R6.6 | Atish, Kevin | event (stretch) | one live call with a key |
+| 4 | 3I/ATLAS nucleus size limit and coma radius, with exact citations | R7.3 | Kevin | after (3I/ATLAS is stretch, Q-137) | cited values in the card |
+| 5 | Eps Indi Ba/Bb orbit period (~11 yr) and separation; WISE 0855 class details | R7.4 | Moon | event | cited values; no numbers are shown until then |
+| 6 | Barnard's Star Teff and radius; RW Aur disc inclination source | R7.5 | Kevin | event | cited values in the card |
+| 7 | realme 14 Pro minimum perceptible pulse | R8.7 | Atish | after | calibration on the phone |
+| 8 | Any amplitude control for `navigator.vibrate` in Android Chrome (D-09) | R8.1, R8.3 | Atish | after | a test on both phones |
+| 9 | Chrome's pattern-length cap, believed about 99 entries | R8.3, R8.8 | Atish | after | a test on both phones |
+| 10 | `AudioContext.outputLatency` and the "high latency" threshold (`HIGH_OUTPUT_LATENCY_S` 0.1 s) | R8.9 | Atish | threshold: event (desktop Chrome on the A15); Android support: after | a reading with wired and Bluetooth output |
+| 11 | Whether battery saver suppresses vibration on both phones | R8.7 | Atish | after | a test on both phones |
+| 12 | Exoplanet type thresholds for `planet_rocky` / `planet_water` / `gas_giant` (`PROPOSED_EXOPLANET_THRESHOLDS`, off until confirmed) | R3.3 | Atish (Q-63) | event | Atish confirms Q-63 |
+| 13 | Whether the pulse-width whisper (`[4, 4, 4, 4, 4]`) is felt as distinct on each phone | R8.3, R8.7 | Atish | after | calibration step 2 on both phones |
+| 14 | Gas giant jet pulse rate, clamp(k · \|zonal wind\| / max \|zonal wind\|, 2, 20) Hz (D-12). The channel packing is settled by D-12 | R8.4, R7.7 | Atish | by ear: event; by touch: after | Atish signs off the rate (D-13) |
+| 15 | Brown dwarf `flux_45um` normalisation reference (`BROWN_DWARF_CONFIG.flux45Reference`, null): without it `emissive` and `flux_pulse` are refused | R7.4, R8.5 | Moon | event | a cited reference flux |
+| 16 | SPHEREx time span for the star proper-motion trail (`STAR_CONFIG.spherexBaselineYears`, null): without it `motion_trail` and the `motion` ticks are refused | R7.5, R8.5 | Moon | event | the span of the object's frames |
+| 17 | Which `FLAGS` bit means saturation in the SPHEREx light curve; until known, the viewer excludes any point with non-zero `flags` | R7.5 | Moon | event | the SPHEREx Explanatory Supplement |
+| 18 | Mauritius length in the scale bar (~65 km); not offered while `COMPARISONS` holds `null` | R5.4 | Moon | event | a cited length |
+| 19 | Shape model scaled so its bounding sphere equals `diameter_km` (Q-43; catalogue diameters are often volume-equivalent). Partly superseded: a loaded model's own size wins (Q-61) | R7.1 | Moon, Kevin | event | one rule on what `diameter_km` means (Q-43) |
+| 20 | The comet field pulse's single tag, and whether it plays in Measured only (Q-17) | R7.3, R8.4 | Atish | after (3I/ATLAS is stretch) | Atish answers Q-17 |
+| 21 | Brown dwarf cloud types for L (iron, silicate) and Y (water ice), and the Teff boundaries | R7.4 | Moon | event | a cited source |
+| 22 | Typical field brown dwarf spin period range (tier 4), and whether eps Indi Ba/Bb have a measured period | R7.4 | Moon | event | a cited range |
+| 23 | A `click` is the user activation that unlocks both audio and vibration on the phones (`pointerdown` and `touchstart` are not reliable for audio; Q-73) | R8.9 | Atish | after | a test on both phones |
+| 24 | Supernova remnant phase transition times (names on the age slider) | R7.7 | Moon (Q-103) | event | a cited source |
+| 25 | Lava glow ramp to full strength at 1500 K (artistic) | R7.7 | Moon | event | Moon signs off the look |
+| 26 | Barnard's Star example tiers (each row) | R7.5.1 | Moon (Q-104) | event | Moon decides Q-104 |
+| 27 | Granulation cell-size scaling constant and cell lifetime | R7.5.2 | Moon (Q-104) | event | a cited source |
+| 28 | Typical differential rotation k by class | R7.5.2 | Moon | event | a cited source |
+| 29 | Spot coverage and lifetime by class and activity | R7.5.3 | Moon | event | a cited source |
+| 30 | Faculae contrast law | R7.5.4 | Moon | event | a cited source |
+| 31 | Typical flare rate by class | R7.5.5 | Moon | event | a cited source |
+| 32 | Whether New seed should ask the backend for a new bake (Q-113 item 4) | R5.8 | Moon | event | Moon decides |
+| 33 | Audio–vibration offset threshold after calibration | R11 | Atish | after | measured offsets on both phones |
+| 34 | Calibration tap-along method (Q-75) | R8.7 | Atish | after | a test on both phones |
+| 35 | Audio lookahead (`AUDIO_LOOKAHEAD_S` 0.03 s) | R8.9 | Atish | event | tuned by ear on the A15 |
+| 36 | Every `tuning.ts` value marked [verify on phones] | R10 | Atish | after | tuning on both phones |
+| 37 | Field recompute at 4 Hz (D-34, Q-68) or storms sampled at t (Q-105, built) | R5.7 | Atish, Moon | event | Atish and Moon answer Q-105 |
+| 38 | Star colour method: Planck × CIE 1931 2° in the Wyman, Sloan & Shirley 2013 fit (Q-55 item 9) | R7.5 | Atish | event | a check against a published Teff colour table |
+| 39 | Phone auto-pause after 60 s, and the 10% battery target in 15 minutes (D-34) | R5.7 | Moon | after | a test on both phones |
+| 40 | Visual findings and frame times on a real GPU (Q-107; Q-104 item 10) | R7.5, R7.7, R11.3 | Moon | event (the A15) | R11.3 results on the A15 |
+
+**Removed (resolved):** the "name [verify]" markers on `viewer/renderers/ShaderBody.ts` and `viewer/fields/fieldWorker.ts` (both files exist), and the self-signed certificate step for phones (moot for the event, Q-132; R11.3 keeps the phone procedure for after the event).

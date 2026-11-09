@@ -1,16 +1,18 @@
 # Haptics: engine API
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.8 · **Implements:** D-08, D-09, D-10, D-20 ([decisions](../../decisions/README.md)) · **Read with:** [data-contract.md](../data-contract.md)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.8 · **Implements:** [D-08, D-09, D-10, D-20, Q-19, Q-72, Q-85, Q-133](../../decisions/haptics-design.md), [Q-71, Q-73](../../decisions/haptics-built.md), [Q-132](../../decisions/platform-hosting.md) · **Read with:** [platform-encoding.md](platform-encoding.md) (R8.1–R8.3), [audio-pairing.md](audio-pairing.md) (R8.9), [wiring.md](wiring.md) (R8.8.1), [data-contract.md](../data-contract.md) (R3.4 `HapticProfile`)
 
 ### R8.8 Engine API
 
+The types live in `frontend/src/contract/haptics.ts` (hand-written next to the generated contract, Q-19) and `haptics/haptics.ts` re-exports them. The engine is `haptics/haptics.ts`. The code below is the reference shape; at the event only the audio driver is in the engine (Q-132).
+
 ```ts
-// haptics/haptics.ts
+// contract/haptics.ts (types) and haptics/haptics.ts (engine)
 export type HapticKind = 'tick' | 'double' | 'heartbeat' | 'pulseTrain' | 'stop';
 export interface HapticEvent {
   kind: HapticKind; strength: number; rateHz?: number; tag: Tag;
-  pitch?: number;   // 0–1. Audio only. Spectrum: λ→pitch as in the Listen sweep; surfaces: height or latitude
-  pan?: number;     // −1 (left) to 1 (right). Audio only. From the finger's x on screen
+  pitch?: number;   // 0–1. Audio only. Spectrum, Listen, Track: λ (Q-70, Q-134); body tone: height (Q-133); gas giant bands: latitude
+  pan?: number;     // −1 (left) to 1 (right). Audio only. From the pointer's x on screen
   sharpness?: number; // Optional (D-20). The web driver ignores it; a future Tauri driver (B-01) uses it
 }
 
@@ -29,8 +31,8 @@ export class HapticEngine {
   stop() { for (const d of this.drivers) d.stop(); }
 }
 
-// haptics/drivers/webVibrate.ts
-const MAX_PATTERN = 99; // Chrome pattern-length cap, believed ~99 entries [verify]
+// haptics/drivers/webVibrate.ts (after the event, Q-132)
+const MAX_PATTERN = 99; // Chrome pattern-length cap, believed ~99 entries [verify] (R12 #9; after the event)
 
 export class WebVibrateDriver implements HapticDriver {
   supported = typeof navigator !== 'undefined' && 'vibrate' in navigator;
@@ -69,35 +71,34 @@ export class WebVibrateDriver implements HapticDriver {
 - **`channel` (Q-85).** An optional display hint, `channel?: 'texture' | 'data'` (R8.2), on `HapticEvent` and `TrainParams`. Drivers ignore it; the on-screen pulse indicator shows it with the event's D-02 badge.
 - **Audio output.** Every module's sound goes through one master bus per AudioContext, `getMasterBus(ctx)` in `audioGraph.ts` (gain → one limiter → destination), and the bell is the shared `playBell(ctx, dest, {freqHz, when, gain, …})`.
 - **Page lifecycle.** `bindEngine` also stops the engine when the page is hidden or unloaded (`bindPageLifecycle`), so a held train does not keep sounding in a background tab; settings saves are debounced and flushed when the page hides.
-- **Pulse indicator (D-20).** At most 3 flashes a second for every user (WCAG 2.3.1), and a steady glow while a train plays; it ignores a `spherex:haptic` detail that is not a well-formed `HapticEvent`.
-- **Unlock and "can vibrate" (Q-73).** `engine.unlock()` from a click; the unlock state is shared (`getUnlockState`, `subscribeUnlockState`, `engine.unlocked`). User-facing "can vibrate" is `deviceVibrates(vibrate.supported)` (`platform.ts`): `navigator.vibrate` also exists in desktop Chrome.
+- **Pulse indicator (D-20).** At most 3 flashes a second for every user (WCAG 2.3.1), and a steady glow while a train plays; it ignores a `spherex:haptic` detail that is not a well-formed `HapticEvent`. At the event it shows what is heard, not what a phone feels (Q-132).
+- **Unlock and "can vibrate" (Q-73).** `engine.unlock()` from a click; the unlock state is shared (`getUnlockState`, `subscribeUnlockState`, `engine.unlocked`). User-facing "can vibrate" is `deviceVibrates(vibrate.supported)` (`platform.ts`): `navigator.vibrate` also exists in desktop Chrome, which has no motor. On the A15 the button reads "Turn on sound".
 - All tuning values live in `haptics/tuning.ts` (D-13).
 
 Event sources (`sources/heightMap.ts`, `meshNormal.ts`, `field.ts`, `dataPulse.ts`, `terrain.ts`, `flow.ts`, `lightcurve.ts`) are built by `buildHaptics` in `profiles.ts` from the `HapticProfile` in RenderParams (R8.5) and driven by `TouchHaptics`; `sources/spectrum.ts` serves every object's spectrum (R8.6). They call `engine.emit` and the train API only. Drivers never know about objects.
 
-**M5 integration checklist** (issues #9–#11 are built against fixtures; nothing below is wired into the app yet):
-1. **One engine:** `createHaptics()` once; `bindEngine(outputs)` for the settings (R8.7); `applyStoredCalibration` at start-up (R8.7).
-2. **Honesty:** `bindHonesty(engine, get, subscribe)` (`haptics.ts`) from the store's honesty toggle (D-21), so the haptics follow the same filter as the layers.
-3. **Unlock and indicator:** a single `UnlockButton` with `canVibrate = deviceVibrates(vibrate.supported)`, whose click is the Touch-mode tap (Q-73); mount `PulseIndicator` (D-20).
-4. **Calibration:** decide when `CalibrationWizard` first runs (start-up or first entry to Touch mode); it runs only where `deviceVibrates` is true.
-5. **Touch mode (R5.6):** one pointer down turns orbit controls off; each `pointermove` goes through `TouchProbe` (`shaderProbeOptions(body, build)` for shader kinds, `planProbeBodies(plan.bodies)` for planned kinds) into `TouchHaptics.move`; the viewer's frame loop calls `TouchHaptics.poll(now)` while the pointer is down (Q-83); pointerup, pointercancel and pointerleave call `release`.
-6. **`buildHaptics` options:** `overrides` (required, the D-27 overrides the body was built with), `planBodies` (the comet nucleus), `heightGrid` (`loadHeightGrid(params.textures.height_bin)`), `epoch` and `gas` (the comet toggle and the gas selected on the spectrum), and `meshNormals: true` only once a `three-mesh-bvh` raycast fills `TouchSample.normal` (Q-78). Rebuild when the body, overrides, epoch or gas change; show `missing` with the other refusals.
-7. **Light curve:** the scrubber calls `TouchHaptics.scrub(index)` and `endScrub()`.
-8. **Spectrum:** mount `SpectrumHapticsPad` over `SpectrumChart` with the chart's `lambdaDomain`.
-9. **Listen tab:** from the Listen button's click, `const plan = planSweep(mapping, gasLinesForEpoch(card, epoch))`; when `plan` is null (no usable spectrum, or one wavelength) say there is nothing to play, otherwise `engine.unlock()` and then `sweep.play(plan, engine.honesty)` (as the test page's Texture panel does). Bind the sweep to the honesty toggle as well, `bindHonesty(sweep, get, subscribe)`, so `ListenSweep.setHonesty` stops a tone or chime the new state hides.
-10. **PR #33** changes `viewer/sliders.ts` (`Overrides` readonly; invalid overrides no longer clamped). `profiles.ts` passes `overrides` to `resolveShaderSpec`: re-run the `profiles` tests after #33 merges.
-
-**From the mock-up (D-20).** This discrete `HapticEvent` is the app API; it carries the `tag` that the honesty rule and the audio timbre need.
-- The mock-up's native and iOS bridges are dropped for the event (D-08). The `HapticDriver` interface keeps the door open.
-- The mock-up's `spherex:haptic` DOM event (a `CustomEvent` on `window` in `mockup/spherex-ui.html`) stays as a **debug hook**. It also drives an **on-screen pulse indicator**, so an audience watching the laptop can see what the phone feels.
-- Tick lengths follow [§8.3](platform-encoding.md#r83-encoding-web-driver-d-09): 8–25 ms with the calibrated `minMs`, not the mock-up's 6–22 ms.
-- Novae and nebulae have no haptics since issue #43 (Q-103; they are drawn as volumes), as in the mock-up and unlike D-12; [§8.5](profiles.md#r85-per-type-haptic-profile).
+**Tone stream (Q-133). Proposed (Q-NEW-REN-2).** The body tone (R8.9.1) and the Track path voice (R8.9.2) are sustained sounds whose pitch, gain and pan change while they play. Discrete events and trains cannot carry them, so the engine gets a tone stream next to the Q-71 trains:
 
 ```ts
-interface HapticProfile {
-  texture: 'height' | 'mesh' | 'bands' | 'terrain' | 'flow' | 'none'; texture_tag: Tag;
-  // 'terrain' = height + ocean and ice masks; 'flow' = bands, jets, storms (D-12)
-  data: 'field' | 'flux_pulse' | 'teq_pulse' | 'heartbeat' | 'dimming' | 'motion' | 'detections' | 'none'; data_tag: Tag;
-  params: Record<string, number>;   // e.g. tau, k, softness, maxRateHz
+export interface ToneParams {
+  pitch: number; strength: number; tag: Tag;   // pitch 0–1, mapped as R8.9; strength 0–1 → gain
+  pan?: number; voice?: HapticVoice; channel?: HapticChannel;
 }
+type ToneId = 'body' | 'path';
+// HapticEngine gains:
+startTone(id: ToneId, p: ToneParams): void;              // starts, or replaces, the tone `id`
+updateTone(id: ToneId, changes: Partial<ToneParams>): void;
+stopTone(id: ToneId): void;
+// A driver that can play tones implements ToneCapableDriver (the same three methods).
+// The vibrate driver does not: a tone is audio only.
 ```
+
+- **Gate:** the engine checks the strength and applies the honesty filter (R8.2) on `startTone` and on every `updateTone` that changes `tag`. A hidden tag stops the tone; it does not mute it. A honesty change stops any tone the new state hides.
+- **Rate:** updates are coalesced to at most one per animation frame. They change a playing sound and are not new events, so they do not count against the 40 events per second cap (R8.3).
+- **Shape:** fade in over `TONE_FADE_IN_S`, glide pitch, gain and pan with time constant `TONE_GLIDE_S`, fade out over `TONE_FADE_OUT_S` (placeholders in `tuning.ts`; proposed 0.03, 0.02 and 0.06 s). The strength multiplier (R8.7) applies once, as for events.
+- **Lifetime:** at most one tone per id. `stop()`, a hidden page (`bindPageLifecycle`) and the sound switch stop every tone. A tone and a train may play together (a data pulse starts when the pointer holds still).
+- **Not built yet:** `HapticKind` and the train API are the only outputs today (`frontend/src/contract/haptics.ts:8-35`).
+
+**From the mock-up (D-20).** The discrete `HapticEvent` is the app API. What was kept from the mock-up and what was dropped is recorded in [D-20](../../decisions/haptics-design.md). Tick lengths follow [§8.3](platform-encoding.md#r83-encoding-web-driver-d-09). Novae and nebulae have no haptics ([§8.5](profiles.md#r85-per-type-haptic-profile)).
+
+**`HapticProfile`** is part of RenderParams and is generated from `shared/schemas/` (D-18). Its definition is in [R3.4](../data-contract.md#r34-renderparams-produced-by-the-backend-get-v1objectsidrender-params). The wiring checklist for the event build is [R8.8.1](wiring.md).
