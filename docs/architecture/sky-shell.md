@@ -4,7 +4,7 @@
 
 ## A21 App shell and sky view
 
-The shell is the frame of the app: the bezel, the tool rail, the island, the sky view, the object panel, the object card, the split pane, the transport and the search pill. This fragment describes it **as built** on main (9 Nov 2026), precise enough to change or extend it without reading the code. Decisions win where they speak; where they disagree with each other or with the code, the latest decision's rule is stated and the clash is listed in [Open conflicts](sky-shell-behaviour.md#open-conflicts). Text marked **To build (proposed, Q-150 to Q-156)** is not decided and not built (Q-157 records built keyboard facts).
+The shell is the frame of the app: the bezel, the tool rail, the island, the sky view, the object panel, the object card, the split pane, the transport and the search pill. This fragment describes it **as built** on main (9 Nov 2026), precise enough to change or extend it without reading the code. Decisions win where they speak; where they disagree with each other or with the code, the latest decision's rule is stated and the clash is listed in [Open conflicts](sky-shell-behaviour.md#open-conflicts). Text marked **To build (proposed, Q-170 to Q-176)** is not decided and not built (Q-177 records built keyboard facts).
 
 Code paths are under `frontend/src/`. CSS is `index.css`. "Desktop" means wider than 640 px; "phone" means 640 px or less (A21.3).
 
@@ -46,7 +46,7 @@ Other names: **rail** (`app/shell/ToolRail.tsx`, `.sx-rail`), **transport** (`ap
 - **Full-bleed sky** ([Q-124](../decisions/shell-surfaces.md), desktop only): `.sx-view` spans the whole bezel (`grid-area: 1 / 1 / -1 / -1`, no radius). Header, rail, search slot and transport slot get `position: relative; z-index: 2` and float over the sky. The header has no brand, only the sr-only h1.
 - **Insets** (desktop only, set on `.sx-bezel`): `--sx-in-t: 60px`, `--sx-in-l: 64px`, `--sx-in-b: 64px`, `--sx-in-r: 16px`. The object panel, the credit, the object card, the sky status and the build pane are placed with them (A21.5, A21.7, A21.8). Markers, picking, the readout, the fly-to target and the camera centre do **not** use them: the camera centre is the centre of the sky slot (the bezel, or its left half in the split pane), and a marker can sit under a floating bar.
 - **Edge fades** (`.sx-sky-shade`, four `<i>` strips, `pointer-events: none`, `aria-hidden`): left strip `rail + 130px` wide (`#050507f0` to `#050507a8` at 0.9 × rail, then transparent), top strip `top + 100px`, bottom strip `bot + 100px`, right strip 90 px (hidden in the split pane). Plus a radial vignette (transparent to 55 %, `#000a` at the edge). Strips, not full-size gradients, so the blend stays cheap without a GPU.
-- **Safe rectangle.** The part of the sky that no bar, card or credit covers: left `--sx-in-l`, top `--sx-in-t`, right `--sx-in-r`, bottom `--sx-in-b` + `--sx-credit-h`, minus the box of an open object panel or card. On a phone every inset is 0 and the credit strip is at the bottom. Today only DOM overlays respect it. **To build (proposed, [Q-154](sky-shell-behaviour.md#open-conflicts)):** a helper `skySafeRect()` in `app/sky/` that returns this rectangle in canvas pixels; sky layers clamp labels to it, `skyFlyTo` (A21.6) centres on it, and markers outside it fade.
+- **Safe rectangle.** The part of the sky that no bar, card or credit covers: left `--sx-in-l`, top `--sx-in-t`, right `--sx-in-r`, bottom `--sx-in-b` + `--sx-credit-h`, minus the box of an open object panel or card. On a phone every inset is 0 and the credit strip is at the bottom. Today only DOM overlays respect it. **To build (proposed, [Q-174](sky-shell-behaviour.md#open-conflicts)):** a helper `skySafeRect()` in `app/sky/` that returns this rectangle in canvas pixels; sky layers clamp labels to it, `skyFlyTo` (A21.6) centres on it, and markers outside it fade.
 - **Z-order (desktop).** `.sx-sky-slot` and `.sx-sky-pane` set `container: … / inline-size`; layout containment makes each a stacking context, so every z-index inside the sky is local and the whole sky sits under the bars.
 
 | Level | Element | z | Notes |
@@ -58,7 +58,7 @@ Other names: **rail** (`app/shell/ToolRail.tsx`, `.sx-rail`), **transport** (`ap
 | Bezel | build pane `.sx-bp` | 6 | above the bars; it stops at the insets so it does not overlap them |
 | Bezel | island `.sx-orb-wrap` | 40 | above everything; takes no clicks |
 
-**Sky layer slot** (proposed, Q-154): a tool's sky layer (A18.2) is a child of SkyPane placed after `.sx-sky-shade` and before `{children}` (object card, object panel), at z auto, so it paints over the fades and under the markers, panel, card and credit.
+**Sky layer slot** (proposed, Q-174): a tool's sky layer (A18.2) is a child of SkyPane placed after `.sx-sky-shade` and before `{children}` (object card, object panel), at z auto, so it paints over the fades and under the markers, panel, card and credit.
 
 ### A21.3 Phone width (≤ 640 px)
 

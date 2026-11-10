@@ -52,7 +52,7 @@ These are the presentation rules of the one 3D view (Q-113, as amended by Q-120)
 
 **Feel**
 
-- The Feel toggle (Q-113 item 5) switches the pane to desktop Feel mode, specified in R5.6. While a build runs, a drag turns the body; Feel takes effect once the body is built (at once under reduced motion). **Proposed (Q-173).**
+- The Feel toggle (Q-113 item 5) switches the pane to desktop Feel mode, specified in R5.6. While a build runs, a drag turns the body; Feel takes effect once the body is built (at once under reduced motion). **Proposed (Q-193).**
 - **Not built yet:** the toggle only shows the note "Touch feedback arrives with the phone build." (`frontend/src/app/build/BuildPane.tsx:203-208`). Under Q-132 the event Feel is sound, so the note changes when Atish wires Feel (D-13, M5).
 
 **As built (issue #60).** `frontend/src/app/build/` (`BuildPane`, `SelectedCard`, `MouldStrip`, `useMould`, `selectedBody`), `frontend/src/viewer/mould/` (`mouldSteps.ts`, `MouldRig.ts`) and `ViewerApp.setDragTurnsBody`. Sequence diagram: [UML 21](../uml/21-sequence-build-mould.md). Q-113 is proposed, pending Moon's confirmation.

@@ -1,6 +1,6 @@
 # 22 Area search: components and sequences
 
-Area search of [A16](../architecture/moving-objects/area-search.md) (agreed plan, Q-146): a square drawn on the sky, then **Known objects** (hand-off to Track, [A19](../architecture/moving-objects/track.md) and [A20](../architecture/moving-objects/track-ui.md)) or **Discovery** (dots, glitches, stars and fixed dots removed, joined across visits with a parallax-aware test, checked against known objects). Three diagrams: components, the offline precompute, and the sky interaction. Drawn 9 Nov 2026 from A16 to A18 (backend [A17](../architecture/moving-objects/area-backend.md), sky UI [A18](../architecture/moving-objects/area-ui.md), shell [A21](../architecture/sky-shell.md)); nothing here is built yet. Items marked "proposed" wait on a decision (Q-158 to Q-167 in the spec).
+Area search of [A16](../architecture/moving-objects/area-search.md) (agreed plan, Q-146): a square drawn on the sky, then **Known objects** (hand-off to Track, [A19](../architecture/moving-objects/track.md) and [A20](../architecture/moving-objects/track-ui.md)) or **Discovery** (dots, glitches, stars and fixed dots removed, joined across visits with a parallax-aware test, checked against known objects). Three diagrams: components, the offline precompute, and the sky interaction. Drawn 9 Nov 2026 from A16 to A18 (backend [A17](../architecture/moving-objects/area-backend.md), sky UI [A18](../architecture/moving-objects/area-ui.md), shell [A21](../architecture/sky-shell.md)); nothing here is built yet. Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
 
 ## Components
 
@@ -34,7 +34,7 @@ flowchart TB
   API["api/areas.py<br/>/v1/areas/..."]
   subgraph FE["frontend/src"]
     RAIL["app/shell ToolRail + railIcons<br/>ToolId area"]
-    CARDS["Feature cards in the object card's slot (proposed Q-152)<br/>Area, Options, Known, Discovery, Result, Checks (gated)"]
+    CARDS["Feature cards in the object card's slot (proposed Q-172)<br/>Area, Options, Known, Discovery, Result, Checks (gated)"]
     ISL["Island progress pill (proposed)"]
     LAYER["app/sky/area AreaLayer<br/>sky layer slot"]
     STORE["state/store.ts area slice"]
@@ -104,7 +104,7 @@ sequenceDiagram
   M->>C: SkyBoT cone per visit (candidates only)
   M->>C: Horizons TLIST per candidate at every frame time, one request at a time
   M-->>S: verdicts found_blind, unexplained, unchecked, and the Known list
-  opt gated extras D4 to D7 (Q-183)
+  opt gated extras D4 to D7 (Q-203)
     S->>D: planted movers in memory (test mover, completeness grid)
     S->>J: shuffled-time runs, rate grid when 3 or more visits, spectrum score
     J-->>S: checks (planted and control results never enter tracks)

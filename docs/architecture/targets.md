@@ -14,8 +14,8 @@ Every target is listed in `backend/targets.toml` with a `group`; the pre-fetch s
 
 **The MVP demo is 433 Eros in the Track tool** on its 20 to 21 Mar 2026 SPHEREx frames ([Q-137](../decisions/scope-process.md)); 3I/ATLAS is stretch (its extended coma: Q-144). "Demo object" therefore means two things: the Track MVP (Eros) and the D-31 spectrum quick picks.
 
-- **Proposed (Q-177):** move 433 Eros from `fixture` to `demo` in `targets.toml` (or run the event with `SX_PREFETCH_GROUPS=demo,fixture`), so the event's warm start and the pre-fetch cover the MVP object. Today `SX_PREFETCH_GROUPS=demo` skips it.
-- **To build:** `[[area]]` tables for Area search (fields in [A16.4](moving-objects/area-search.md#a164-data-flow) and [A17.1](moving-objects/area-backend.md#a171-area-and-frames-framespy)) and `moving_windows` for 433 Eros (**Proposed (Q-164)**, [A19.3](moving-objects/track.md#a193-frame-list)).
+- **Proposed (Q-197):** move 433 Eros from `fixture` to `demo` in `targets.toml` (or run the event with `SX_PREFETCH_GROUPS=demo,fixture`), so the event's warm start and the pre-fetch cover the MVP object. Today `SX_PREFETCH_GROUPS=demo` skips it.
+- **To build:** `[[area]]` tables for Area search (fields in [A16.4](moving-objects/area-search.md#a164-data-flow) and [A17.1](moving-objects/area-backend.md#a171-area-and-frames-framespy)) and `moving_windows` for 433 Eros (**Proposed (Q-184)**, [A19.3](moving-objects/track.md#a193-frame-list)).
 
 **How the D-31 demo objects were picked** (live screen of 8 candidates on QR2, 6 Nov 2026, the first ~32 frames of each object, 78 for SIMP 0136; the screen table is in PR #28):
 
