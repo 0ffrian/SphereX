@@ -106,15 +106,31 @@ describe('KaTeX', () => {
   });
 });
 
-function mount(params: RenderParams, onClose = () => {}) {
+function mount(params: RenderParams, onClose = () => {}, inline = false) {
   const host = document.createElement('div');
   document.body.appendChild(host);
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const root = createRoot(host);
-  act(() => root.render(<ConfidencePopover params={params} onClose={onClose} />));
+  act(() =>
+    root.render(<ConfidencePopover params={params} onClose={onClose} inline={inline} />),
+  );
   return host;
 }
 const params = (c: C) => ({ confidence: c }) as unknown as RenderParams;
+
+describe('the inline popover (build pane, issue #71 stream U)', () => {
+  it('is a plain group inside the pane: no dialog, no backdrop, no Close button, same content', () => {
+    const host = mount(params(conf()), () => {}, true);
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    expect(host.querySelector('[data-testid="confidence-formula-backdrop"]')).toBeNull();
+    expect(host.querySelector('.sx-acc-close')).toBeNull();
+    const group = host.querySelector('[data-testid="confidence-formula"]')!;
+    expect(group.getAttribute('role')).toBe('group');
+    expect(group.getAttribute('aria-labelledby')).toBeTruthy();
+    expect(group.querySelector('[data-testid="formula-result"]')!.textContent).toBe('30%');
+    expect(group.querySelectorAll('.sx-acc-tbl tbody tr')).toHaveLength(3);
+  });
+});
 
 describe('the popover', () => {
   it('has the mock-up sections in order and the backend value', () => {

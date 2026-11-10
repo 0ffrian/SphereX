@@ -1135,6 +1135,17 @@ export class ViewerApp {
     this.requestRender();
   }
 
+  /**
+   * How far the view is zoomed in compared with the one the body opened with (1 = as opened, 1.5 =
+   * 150%). Read-only, for the build pane's zoom bar (issue #71 stream U); 1 when it cannot tell.
+   */
+  zoomRatio(): number {
+    if (this.disposed) return 1;
+    const now = this.camera.position.distanceTo(this.controls.target);
+    const start = this.controls.position0.distanceTo(this.controls.target0);
+    return now > 0 && start > 0 ? start / now : 1;
+  }
+
   /** R5.6 `R` key: back to the starting view (and the body's own turn back to none). */
   resetView(): void {
     if (this.disposed) return;

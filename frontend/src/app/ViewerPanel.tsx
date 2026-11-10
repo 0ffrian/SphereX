@@ -5,7 +5,7 @@
 // plain-words list of layers that are not drawn. Rotate/zoom buttons are the WCAG 2.5.7
 // alternative to dragging (R5.6). R9: canvas aria-label follows the view; a polite live region
 // announces mode, epoch and honesty changes.
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useAppStore } from '@/state/store';
 import { prefersReducedMotion, ViewerApp } from '@/viewer/ViewerApp';
 import { showsBody } from '@/viewer/planCommon';
@@ -40,6 +40,8 @@ import { ProvenanceBadge } from './Badge';
 import { EmissionsPanel } from './EmissionsPanel';
 import { EPOCH_JD, timeRange } from '@/physics/cometGas';
 import { ConfidenceChip, ConfidenceDetails } from './ConfidencePanel';
+import { FeelPanel, HearPanel } from './build/Senses';
+import GridLoader, { type GridLoaderProps } from './island/GridLoader';
 import { ConfidencePopover } from './ConfidencePopover';
 import { timeLapsesOf } from '@/viewer/motion/planMotion';
 import { describeRefusal, layerName, timeLapseText } from './messages';
@@ -132,6 +134,25 @@ export const QUALITY_DROP_ANNOUNCEMENT = 'Lowered render quality to keep motion 
 export const IR_JETS_HINT =
   'Switch to "Visible colour" to see the jets move. This motion is an artist\u2019s impression.';
 
+/** The mock-up's build loader sequence (`loading("bLoad")`). */
+const BUILD_LOADER_LOOK: GridLoaderProps = {
+  mode: 'sequence',
+  sequence: ['spiral-cw', 'ripple-out', 'plus-full', 'frame', 'ripple-in', 'spiral-ccw'],
+  speed: 'normal',
+};
+
+/** The id of the build pane's popover (the header buttons' `aria-controls`). */
+export const BUILD_POP_ID = 'bp-pop';
+const POP_LABEL: Record<PopId, string> = {
+  acc: 'Accuracy',
+  feel: 'Feel it',
+  hear: 'Hear it',
+  details: 'Details',
+};
+/** The mock-up's words for a kind it has no score for (`renderAcc`, no rows). */
+export const NO_SCORE_TEXT =
+  'No score is set for this kind of object. It has no measurement that could stand for a key measurement, so the viewer shows what it can and says what it leaves out.';
+
 const PLACEHOLDER_LABEL = 'Viewer placeholder: no object loaded';
 
 const ROTATE_BUTTONS: { dir: 'left' | 'right' | 'up' | 'down'; label: string; glyph: string }[] = [
@@ -141,8 +162,19 @@ const ROTATE_BUTTONS: { dir: 'left' | 'right' | 'up' | 'down'; label: string; gl
   { dir: 'right', label: 'Rotate right', glyph: '→' },
 ];
 
+/** Issue #71 stream U: the panels the build pane's header buttons open (mock-up `bpPop`, one at a time). */
+export type PopId = 'acc' | 'feel' | 'hear' | 'details';
+
 /** Issue #60: the panel inside the build pane (canvas fills the stage, controls behind Details). */
 export interface PaneOptions {
+  /** Which popover is open under the header buttons (null = none). */
+  pop?: PopId | null;
+  /** Closes (null) or switches the open popover (the Accuracy panel's own close, Escape). */
+  onPop?(pop: PopId | null): void;
+  /** The build actions (Replay, New seed, close-up toggle): the top of Details. */
+  actions?: ReactNode;
+  /** The honesty caption under the body (the level it is shown at); `extra` is added at its end. */
+  caption?(extra: ReactNode): ReactNode;
   /** Changes start a new build (open, Replay, New seed). */
   seq: number;
   animate: boolean;
@@ -248,7 +280,6 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
     return () => viewer.setIdleChangeHandler?.(null);
   }, [viewer]);
   const [whyOpen, setWhyOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [formulaOpen, setFormulaOpen] = useState(false);
   const detailsId = useId();
   const whyId = useId();
@@ -577,7 +608,8 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // it (`cuClose`). The viewer and plan go to a small store the pane reads. The toggle next to Feel
   // hides or shows it.
   const closeKind = pane ? closeUpKindOf(params?.type) : null;
-  const closeHidden = useCloseUpStore((s) => s.hidden);
+  // Hidden by the user, or held back until the build has shifted to the right half (stream U).
+  const closeHidden = useCloseUpStore((s) => s.hidden || s.held);
   const closeInfo = useCloseUpStore((s) => s.info);
   const shaderKey = plan?.shader?.key ?? '';
   const pubFixture = fixture || (card?.id.startsWith('fixture:') ?? false);
@@ -646,6 +678,52 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
       )}
     </div>
   ) : null;
+  // Issue #71 stream U: in the build pane the Accuracy, Feel, Hear it and Details panels share one
+  // popover under the header buttons, one at a time (mock-up `bpPop`). Outside the pane the details
+  // are plain content, as before.
+  const popRef = useRef<HTMLDivElement>(null);
+  const pop = pane?.pop ?? null;
+  useEffect(() => {
+    if (pop) popRef.current?.focus({ preventScroll: true });
+  }, [pop]);
+  const wrapPop = (details: ReactNode): ReactNode =>
+    pane ? (
+      <div
+        ref={popRef}
+        id={BUILD_POP_ID}
+        className="sx-bp-pop"
+        data-w={pop ?? ''}
+        hidden={pop === null}
+        tabIndex={-1}
+        role="group"
+        aria-label={pop ? POP_LABEL[pop] : 'Senses'}
+        data-testid="build-pop"
+      >
+        <section hidden={pop !== 'acc'} data-testid="build-pop-acc">
+          {pop === 'acc' &&
+            (params?.confidence ? (
+              <ConfidencePopover inline params={params} name={plan?.name} onClose={() => pane.onPop?.(null)} />
+            ) : (
+              <>
+                <div className="sx-pop-h">
+                  <b>Accuracy</b>
+                  <span>{plan?.name ?? ''}</span>
+                </div>
+                <p className="sx-acc-rules">{NO_SCORE_TEXT}</p>
+              </>
+            ))}
+        </section>
+        <section hidden={pop !== 'feel'} data-testid="build-pop-feel">
+          <FeelPanel />
+        </section>
+        <section hidden={pop !== 'hear'} data-testid="build-pop-hear">
+          <HearPanel active={pop === 'hear'} name={plan?.name} />
+        </section>
+        {details}
+      </div>
+    ) : (
+      details
+    );
   const loadingBody =
     pane &&
     (blocked || mould.phase === 'loading' || (viewer === null && rendererStatus !== 'unavailable'));
@@ -676,24 +754,38 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           data-testid="viewer-stage"
         >
           <div ref={hostRef} className="absolute inset-0" />
-          {params && plan?.threeD && (
+          {!pane && params && plan?.threeD && (
             <ConfidenceChip
               params={params}
               onOpen={() => setFormulaOpen(true)}
             />
           )}
-          {params && formulaOpen && (
+          {!pane && params && formulaOpen && (
             <ConfidencePopover params={params} name={plan?.name} onClose={() => setFormulaOpen(false)} />
           )}
           {loadingBody && (
             <div className="sx-bp-loading" data-testid="build-loading" role="status">
-              <span className="sx-spinner" aria-hidden="true" />
+              {/* The mock-up's `loading("bLoad")`: its grid loader, size 44, the long sequence. */}
+              <span aria-hidden="true">
+                <GridLoader
+                  color="green"
+                  rounded
+                  size={44}
+                  gap={2}
+                  blur={0.3}
+                  {...(reducedMotion ? { pattern: 'heartbeat', static: true } : BUILD_LOADER_LOOK)}
+                />
+              </span>
               <span>Loading the 3D view</span>
             </div>
           )}
           <p
             data-testid="viewer-label"
-            className="pointer-events-none absolute left-3 top-3 max-w-[85%] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300"
+            className={
+              pane
+                ? 'sr-only'
+                : 'pointer-events-none absolute left-3 top-3 max-w-[85%] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300'
+            }
           >
             {plan ? `${plan.name}${plan.threeD ? '' : ' (no 3D model)'}` : PLACEHOLDER_LABEL}
           </p>
@@ -715,7 +807,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                     nothingDrawn.needs
                       ? ` Switch to “${HONESTY_LABEL[nothingDrawn.needs]}” to see it.`
                       : ''
-                  } See the list below.`
+                  } ${pane ? 'Open Details for the list.' : 'See the list below.'}`
                 : ''}
             </p>
           )}
@@ -730,27 +822,37 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
       </div>
 
       {pane && <MouldStrip ref={stripRef} script={mould.script} phase={mould.phase} />}
-      {pane && (
-        <div className="sx-bp-show">
-          {honestyGroup}
+      {pane?.caption?.(
+        hiddenCount > 0 ? (
           <button
             type="button"
-            className={`${buttonClass} ml-auto`}
-            aria-expanded={detailsOpen}
-            aria-controls={detailsId}
-            onClick={() => setDetailsOpen((o) => !o)}
-            data-testid="viewer-details-toggle"
+            className="sx-tag-btn"
+            onClick={() => onHonesty('artistic')}
+            data-testid="build-show-hidden"
           >
-            {detailsOpen ? 'Hide details' : 'Details'}
+            {hiddenCount} hidden at this level. Show them
           </button>
-        </div>
+        ) : null,
       )}
+      {wrapPop(
       <div
         id={detailsId}
         className={pane ? 'sx-bp-details' : 'contents'}
-        hidden={pane ? !detailsOpen : undefined}
+        hidden={pane ? pane.pop !== 'details' : undefined}
+        data-testid={pane ? 'build-details-panel' : undefined}
       >
-        {params && <ConfidenceDetails params={params} />}
+        {pane && (
+          <>
+            <div className="sx-pop-h">
+              <b>Details</b>
+              <span>{plan?.name ?? ''}</span>
+            </div>
+            {pane.actions}
+          </>
+        )}
+        {params && (!pane || params.confidence?.gate.passed === false) && (
+          <ConfidenceDetails params={params} />
+        )}
         {plan?.threeD && (
           <p className="text-xs text-neutral-400" data-testid="impression-note">
             Artist&apos;s impression, drawn from the data listed under &ldquo;What is drawn&rdquo;.
@@ -803,7 +905,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
 
         {plan && (
           <>
-            {!pane && honestyGroup}
+            {honestyGroup}
 
             {plan.threeD && plan.modes.length > 0 && (
               <div
@@ -1234,6 +1336,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           </>
         )}
       </div>
+      )}
 
       <div aria-live="polite" aria-atomic="true" className="sr-only" data-testid="viewer-announcer">
         {announcement}
