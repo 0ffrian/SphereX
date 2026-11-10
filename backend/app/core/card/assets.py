@@ -45,7 +45,11 @@ ASSET_SOURCE = "derived.asset"
 #   planets changes); the Horizons comet command is `CAP<JD` (Q-151); the Gaia match refuses a star
 #   with no SIMBAD proper motion and the card source text gives the match separation (Q-152);
 #   Eps Ind B's literature citation text changed (Q-153).
-ASSET_VERSION = "7"
+# 8 (issue #68, Q-168): a planet below the giant cut takes radius_rjup from
+#   pl_rade x R_earth / R_Jup instead of the rounded pl_radj (Kepler-186 f becomes tidally locked
+#   in the frontend rule);
+#   Bennu is asteroid_shape from its registered mesh (Q-163).
+ASSET_VERSION = "8"
 AssetStatus = Literal["saved", "generated", "sketch"]
 FIELDS = ("card", "render_params", "textures", "generator_version", "seed", "created_at")
 OPTIONAL_FIELDS = ("asset_version", "inputs_sha256")
