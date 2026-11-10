@@ -129,6 +129,7 @@ class CatalogueData:
     literature: lit.Literature = lit.EMPTY  # Q-153: filled only where the catalogue is null
     star: stars.StarCatalogue | None = None  # Q-152: Teff, radius and period sources
     dwarf_table: stars.DwarfTable | None = None
+    track: dict[str, Any] | None = None  # Q-261: sampled Horizons path of a comet (curated asset)
 
 
 def _sbdb_phys(body: bytes) -> dict[str, dict[str, Any]]:
@@ -160,10 +161,37 @@ def literature_key(obj: ResolvedObject) -> str | None:
     return obj.spkid if obj.resolver == "sbdb" else obj.id
 
 
+def load_track(assets_dir: Path, obj: ResolvedObject) -> dict[str, Any] | None:
+    """Q-261: the curated Horizons path ``<assets_dir>/tracks/horizons-<spkid>.json`` of a comet,
+    or None. Read-only config like the literature registry; a missing or broken file gives None
+    (the tail layers are then refused), never an error."""
+    if obj.resolver != "sbdb" or not obj.spkid:
+        return None
+    path = assets_dir / "tracks" / f"horizons-{obj.spkid}.json"
+    try:
+        doc = json.loads(path.read_text("utf-8"))
+        rows = doc["rows"]
+        ok = (
+            isinstance(rows, list)
+            and len(rows) >= 2
+            and all(
+                isinstance(r, list)
+                and len(r) == 7
+                and all(isinstance(c, int | float) and math.isfinite(c) for c in r)
+                for r in rows
+            )
+        )
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return doc if ok else None
+
+
 def gather(ctx: Context, obj: ResolvedObject) -> CatalogueData:
     data = _gather(ctx, obj)
     return replace(
-        data, literature=lit.load_literature(ctx.settings.literature_file, literature_key(obj))
+        data,
+        literature=lit.load_literature(ctx.settings.literature_file, literature_key(obj)),
+        track=load_track(ctx.settings.assets_dir, obj),
     )
 
 
