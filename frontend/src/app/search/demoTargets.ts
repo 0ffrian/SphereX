@@ -135,6 +135,34 @@ export const DEMO_TARGETS: readonly DemoTarget[] = [
     id: 'simbad-m-1',
     classLabel: null,
   },
+  {
+    name: 'Procyon A',
+    aliases: ['procyon', 'alpha cma', 'alf cma'],
+    query: 'Procyon',
+    id: 'simbad-alf-cmi',
+    classLabel: 'star · F5IV-V+DQZ',
+  },
+  {
+    name: 'Epsilon Eridani',
+    aliases: ['eps eri', 'epsilon eri', 'eps eridani'],
+    query: 'eps Eri',
+    id: 'simbad-eps-eri',
+    classLabel: 'star · K2V',
+  },
+  {
+    name: 'TOI-700 d',
+    aliases: ['toi-700', 'toi700d', 'toi 700 d'],
+    query: 'TOI-700 d',
+    id: 'simbad-toi-700d',
+    classLabel: null,
+  },
+  {
+    name: 'WASP-39 b',
+    aliases: ['wasp-39', 'wasp39b', 'wasp 39 b'],
+    query: 'WASP-39 b',
+    id: 'simbad-wasp-39b',
+    classLabel: null,
+  },
 ];
 
 /** The five A1.1 targets (rows 1 to 5): the sky view marks these when they are cached. */

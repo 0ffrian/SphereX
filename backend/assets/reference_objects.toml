@@ -6,6 +6,8 @@
 #
 # Jupiter: https://nssdc.gsfc.nasa.gov/planetary/factsheet/jupiterfact.html
 # Saturn:  https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturnfact.html
+# Titan:   https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html (read 10 Nov 2026)
+#          Sun: https://nssdc.gsfc.nasa.gov/planetary/factsheet/sunfact.html (read 10 Nov 2026)
 
 [[object]]
 id = "ref-jupiter"
@@ -30,3 +32,26 @@ rot_period_h = 10.656        # System III
 semimajor_axis_1e6_km = 1432.041
 orbital_period_d = 10755.699
 teq_K = 81.0
+
+# Titan (issue #71 stream S, Q-280): a moon, drawn by the rocky-world path. Values from the Saturnian
+# Satellite Fact Sheet row "Titan (VI)": mass 1,345.5 x10^20 kg, radius 2,575 km, mean density
+# 1880 kg/m3, orbital period 15.945421 d with rotation "S" (synchronous: rotation = orbital period).
+# The world model wants the distance to the host star, so the orbit is Saturn's (Saturn fact sheet
+# semimajor axis, same as the Saturn row above); the host star is the Sun (Sun fact sheet: effective
+# temperature 5772 K, volumetric mean radius 695,700 km). Surface pressure (about 1.5 bar) and
+# surface temperature (about 94 K) are NOT on these sheets and the card has no field for them, so
+# they are not copied here (Q-280).
+[[object]]
+id = "ref-titan"
+name = "Titan"
+aliases = ["titan", "saturn vi"]
+type = "planet_rocky"
+source = "NASA Saturnian Satellite Fact Sheet, Titan (VI)"
+radius_km = 2575.0
+mass_1e20_kg = 1345.5
+density_kg_m3 = 1880.0
+moon_orbital_period_d = 15.945421   # around Saturn; synchronous, so also the rotation period
+host_source = "NASA Planetary Fact Sheets, Sun and Saturn"
+host_teff_K = 5772.0
+host_radius_km = 695700.0
+semimajor_axis_1e6_km = 1432.041    # Saturn's, from the Sun
