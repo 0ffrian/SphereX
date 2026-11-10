@@ -82,7 +82,25 @@ def titan_card(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def sun_card(row: dict[str, Any]) -> dict[str, Any]:
+    """A star from the Sun fact sheet (Q-294). Spectral class G2V is the Sun's standard class."""
+    url = "nssdc.gsfc.nasa.gov/planetary/factsheet/sunfact.html"
+    src = f"{row['source']} ({url})"
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "type": "star",
+        "radius_rsun": _tv(round(row["radius_km"] / R_SUN_KM, 4), f"{src}: volumetric mean radius"),
+        "teff_K": _tv(row["teff_K"], f"{src}: effective temperature"),
+        "rot_period_h": _tv(
+            row["rot_period_h"], f"{src}: sidereal rotation period, adopted at 16 deg latitude"
+        ),
+    }
+
+
 def card_of(row: dict[str, Any]) -> dict[str, Any]:
+    if row.get("type") == "star":
+        return sun_card(row)
     if row.get("type") == "planet_rocky":
         return titan_card(row)
     src = f"{row['source']} (nssdc.gsfc.nasa.gov/planetary/factsheet)"

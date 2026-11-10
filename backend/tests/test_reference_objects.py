@@ -78,3 +78,15 @@ def test_committed_assets_are_current() -> None:
         env={"PYTHONPATH": ".", "PATH": ""},
     )
     assert p.returncode == 0, p.stdout + p.stderr
+
+
+def test_sun_is_a_star_from_the_sun_fact_sheet(client: TestClient) -> None:
+    """Q-294: the Sun is a reference star: measured radius, Teff and rotation, each with its URL."""
+    r = client.get("/v1/resolve", params={"q": "Sun"})
+    assert r.status_code == 200 and r.json()["id"] == "ref-sun"
+    c = client.get("/v1/objects/ref-sun/card").json()
+    assert c["type"] == "star"
+    assert c["teff_K"]["value"] == 5772.0 and c["teff_K"]["tag"] == "measured"
+    assert c["radius_rsun"]["value"] == 1.0
+    assert c["rot_period_h"]["value"] == 609.12
+    assert "sunfact.html" in c["teff_K"]["source"]
