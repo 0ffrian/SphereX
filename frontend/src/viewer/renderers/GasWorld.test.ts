@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { WebGPURenderer } from 'three/webgpu';
 import { ALL_TAGS } from './bodyRenderer';
 import { GasWorld, classifyRing } from './GasWorld';
-import { gasWorldInput, withGasWorldMotion } from './gasWorldInput';
+import { gasWorldInput, withGasWorldLayerTags, withGasWorldMotion } from './gasWorldInput';
 import { fixture } from './fixtures.testutil';
 import { handleGasRequest, type GasHost } from '../fields/gasWorker';
 import type { GasSolver, GasFrame } from '../fields/gasClient';
@@ -45,6 +45,30 @@ async function inlineSolver(input: GasInput): Promise<GasSolver & { first: GasFr
 const until = async (f: () => boolean) => {
   for (let i = 0; i < 4000 && !f(); i++) await new Promise((r) => setTimeout(r, 5));
 };
+
+describe('withGasWorldLayerTags (Q-291)', () => {
+  it('storms and turbulence of a solved world carry the solver tags, so they show at + Estimated', () => {
+    const f = reference('ref-jupiter');
+    f.params.layers = ['storms', 'turbulence', 'colour'].map((id) => ({
+      id,
+      tag: 'artistic' as const,
+      tier: 3 as const,
+      description: 'x',
+      requires: [],
+    }));
+    const out = withGasWorldLayerTags(f.card, f.params);
+    const tag = (id: string) => out.layers.find((l) => l.id === id)!.tag;
+    expect(tag('storms')).toBe('inferred_from_analog');
+    expect(tag('turbulence')).toBe('model_dependent');
+    expect(tag('colour')).toBe('artistic');
+  });
+  it('leaves a giant that is not a solved world as it was', () => {
+    const f = reference('ref-jupiter');
+    delete (f.card as unknown as Record<string, unknown>).rot_period_h;
+    delete (f.params as unknown as Record<string, unknown>).dynamics;
+    expect(withGasWorldLayerTags(f.card, f.params)).toBe(f.params);
+  });
+});
 
 describe('gasWorldInput', () => {
   it('needs radius, mass, temperature and a spin; a missing one refuses', () => {

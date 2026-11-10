@@ -57,7 +57,7 @@ export function sizeFieldFor(kind: ShaderKind): 'radius_rjup' | 'diameter_km' {
 }
 
 // ASSUMPTION: camera distances frame each body; mock-up used 4.4 (worlds), 7.2 (gas), 5.4 / 5.
-const DISTANCE = { world: 4, gasNoRings: 4, gasRings: 7.2, nebula: 5.4, nova: 5 } as const;
+export const DISTANCE = { world: 4, gasNoRings: 4, gasRings: 7.2, nebula: 5.4, nova: 5 } as const;
 
 /** Camera distance that frames the body (display value). */
 export function shaderDistance(spec: Pick<ShaderSpec, 'kind' | 'gas'>): number {
