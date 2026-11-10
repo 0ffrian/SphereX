@@ -70,6 +70,8 @@ export interface ClimateDerivation extends ClimateOutcome {
   /** Locking verdict: null when the rule was not evaluated or was refused. */
   lock: LockResult | null;
   locked: boolean | null;
+  /** `t_lock` is close to the age, so the words must say the verdict is close to call (Q-155). */
+  lockNearThreshold: boolean;
   teqCardK: number;
   /** Full-redistribution Teq the temperature map used, K (null when the planet was not tested for locking). */
   teqMapK: number | null;
@@ -147,6 +149,7 @@ export function deriveClimate(
     ...out,
     lock,
     locked: lock?.ok ? lock.locked : null,
+    lockNearThreshold: lock?.ok ? lock.nearThreshold : false,
     teqCardK,
     teqMapK,
     teqMapSource,

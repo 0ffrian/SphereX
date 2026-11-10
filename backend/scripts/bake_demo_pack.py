@@ -522,6 +522,9 @@ def main(
     args = ap.parse_args(argv)
 
     s = settings or Settings()
+    if args.check:
+        # The check reads the cache only, so its result does not vary with what upstream says today.
+        s = s.model_copy(update={"offline": True})
     gaps = missing_from_targets_toml(s.targets_file)
     if gaps:
         print(f"not in targets.toml: {gaps}", file=sys.stderr)

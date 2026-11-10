@@ -104,6 +104,8 @@ export interface ExoplanetFacts {
    * depends on it (`temperate`) is then not named: the planet is not known to be unlocked. Default true.
    */
   lockTested?: boolean;
+  /** The locking verdict is within `LOCK_NEAR_FRACTION` of flipping: say so (Q-155). Default false. */
+  lockNearThreshold?: boolean;
 }
 
 /** What the climate pattern of a locked planet shows, in plain words (no jargon). */
@@ -142,6 +144,10 @@ function climateLevel(s: Scenario): string {
   ];
 }
 
+/** Said whenever the locking verdict is within `LOCK_NEAR_FRACTION` of flipping (Q-155, PR #70). */
+export const LOCK_NEAR_THRESHOLD_TEXT =
+  "Whether it is tidally locked is close to call: the estimated locking time is within 5% of the star's age, about as far apart as the published forms of the formula.";
+
 export function exoplanetSentences(f: ExoplanetFacts): string[] {
   const out: string[] = [];
   if (f.starlight === 'drawn' && f.teffK !== null)
@@ -166,6 +172,7 @@ export function exoplanetSentences(f: ExoplanetFacts): string[] {
         ? `The climate shown is a model scenario, ${words}. It is estimated from the star and the orbit, not a measured surface.`
         : `The model's climate scenario (${words}) is hidden here; choose ${climateLevel(f.scenario)} to see it.`,
     );
+    if (f.lockNearThreshold) out.push(LOCK_NEAR_THRESHOLD_TEXT);
   }
   return out;
 }

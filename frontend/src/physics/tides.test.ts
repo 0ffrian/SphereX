@@ -2,8 +2,10 @@
 // hard-coded anywhere (see the knife-edge test).
 import { describe, expect, it } from 'vitest';
 import { AU_M, G, GM_EARTH, GM_SUN, HOUR_S, R_EARTH_M } from './constants';
+import { exoplanetSentences } from '@/viewer/planCommon';
 import { kepler186f, trappist1f } from './exoplanetFixtures.testutil';
 import {
+  LOCK_NEAR_FRACTION,
   AGE_FALLBACK_GYR,
   INITIAL_SPIN_H,
   TIDAL_K2,
@@ -125,5 +127,38 @@ describe('deriveLocking: missing data, fallbacks and tags', () => {
 
   it('is deterministic', () => {
     expect(deriveLocking(kepler186f())).toEqual(deriveLocking(kepler186f()));
+  });
+});
+
+describe('a verdict close to the threshold says so (Q-155, PR #70 review)', () => {
+  it('flags Kepler-186 f, whose t_lock is 0.3% from its age, and leaves the verdict alone', () => {
+    const r = deriveLocking(kepler186f());
+    if (!r.ok) throw new Error('refused');
+    expect(r.locked).toBe(true);
+    expect(r.nearThreshold).toBe(true);
+  });
+
+  it('does not flag TRAPPIST-1 f, which is locked by orders of magnitude', () => {
+    const r = deriveLocking(trappist1f());
+    if (!r.ok) throw new Error('refused');
+    expect(r.nearThreshold).toBe(false);
+  });
+
+  it('the margin covers the gap between the published forms (pi G against 3 G)', () => {
+    expect(LOCK_NEAR_FRACTION).toBeGreaterThan(Math.PI / 3 - 1);
+  });
+
+  it('the climate sentences say it only when asked', () => {
+    const base = {
+      kind: 'planet_rocky',
+      scenario: 'eyeball',
+      teffK: null,
+      starlight: null,
+      climateShown: true,
+    } as const;
+    expect(exoplanetSentences({ ...base, lockNearThreshold: true }).join(' ')).toContain(
+      'close to call',
+    );
+    expect(exoplanetSentences(base).join(' ')).not.toContain('close to call');
   });
 });

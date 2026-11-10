@@ -354,13 +354,11 @@ export function planShaderKind(input: PlanInput): RenderPlan {
     if (!lock.ok && !params.missing.includes('tidal_locking'))
       b.refuse({ id: 'tidal_locking', reason: 'data', fields: lock.needs });
   }
-  const lockRefusedHere =
+  const climateHere =
     isExoplanetCard(card) && (spec.kind === 'planet_rocky' || spec.kind === 'planet_water')
-      ? (() => {
-          const d = deriveClimate(card, spec.kind);
-          return d !== null && lockRefused(d);
-        })()
-      : false;
+      ? deriveClimate(card, spec.kind)
+      : null;
+  const lockRefusedHere = climateHere !== null && lockRefused(climateHere);
   // Issue #68 Part 6 (Q-165): say what the light and the scenario are, and which level shows them.
   if ((spec.kind === 'planet_rocky' || spec.kind === 'planet_water') && isExoplanetCard(card)) {
     const refusal = b.missing.find((m) => m.id === 'starlight');
@@ -369,6 +367,7 @@ export function planShaderKind(input: PlanInput): RenderPlan {
         kind: spec.kind,
         scenario: b.held('climate') ? null : (spec.planet?.scenario ?? null),
         lockTested: !lockRefusedHere,
+        lockNearThreshold: climateHere?.lockNearThreshold ?? false,
         teffK: lighting.colourTeffK,
         // A layer the build animation holds back is a presentation step, not a refusal: say nothing.
         starlight: b.isDrawn('starlight')

@@ -46,6 +46,13 @@ export const AGE_FALLBACK_GYR: number | null = 1;
 /** `I = 0.4 m_p R^2`: the moment of inertia of a uniform sphere is 0.4; the real planet is more centrally condensed (Earth 0.33). */
 export const MOMENT_OF_INERTIA_FACTOR = 0.4;
 
+/**
+ * The verdict is "close to call" when `t_lock` is within this fraction of the age. 5% covers the gap
+ * between the two published quotations of the Gladman et al. 1996 formula, `pi G` (Grundy et al. 2012)
+ * and `3 G` (Thirouin et al. 2014): pi / 3 is 4.7% (Q-155). It changes only the words, never the verdict.
+ */
+export const LOCK_NEAR_FRACTION = 0.05;
+
 export const TIDES_FORMULA =
   't_lock = omega a^6 I Q / (pi G M_star^2 k2 R^5), I = 0.4 m_p R^2 (Gladman et al. 1996, as quoted by Grundy et al. 2012, Eq. 1); locked if t_lock < age';
 
@@ -74,6 +81,8 @@ export type LockResult =
   | {
       ok: true;
       locked: boolean;
+      /** `t_lock` is within `LOCK_NEAR_FRACTION` of the age: the words must not be flat. */
+      nearThreshold: boolean;
       tLockGyr: number;
       ageGyr: number;
       tag: Tag;
@@ -159,6 +168,7 @@ export function deriveLocking(card: ObjectCard): LockResult {
   return {
     ok: true,
     locked: tLockGyr < ageGyr,
+    nearThreshold: Math.abs(tLockGyr / ageGyr - 1) < LOCK_NEAR_FRACTION,
     tLockGyr,
     ageGyr,
     tag: weakestTag(tags),
