@@ -132,6 +132,24 @@ describe('the inline popover (build pane, issue #71 stream U)', () => {
   });
 });
 
+describe('Show level in the Accuracy panel', () => {
+  it('dims rows the level hides and leaves the score and points alone', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    const c = conf();
+    const first = c.inputs[0]!.tag;
+    act(() =>
+      createRoot(host).render(
+        <ConfidencePopover params={params(c)} onClose={() => {}} inline isShown={(t) => t !== first} />,
+      ),
+    );
+    expect(host.querySelectorAll('tr[data-dim="true"]').length).toBeGreaterThan(0);
+    expect(host.querySelector('[data-testid="formula-result"]')!.textContent).toBe('30%');
+    expect(host.textContent).toContain('the score does not move');
+  });
+});
+
 describe('the popover', () => {
   it('has the mock-up sections in order and the backend value', () => {
     const host = mount(params(conf()));

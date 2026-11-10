@@ -74,6 +74,10 @@ export function Island() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const inRef = useRef<HTMLDivElement>(null);
   const [bezelW, setBezelW] = useState(0);
+  const [bezelH, setBezelH] = useState(0);
+  // Issue #71 stream U (Q-298): while the build is open (desktop) it rests at the bottom right, as the mock-up's.
+  const buildOpen = useShellStore((s) => s.build.open);
+  const corner = buildOpen && !compact && bezelH > 0;
   const [top, setTop] = useState(TOP);
   const [ready, setReady] = useState(false);
   const [pill, setPill] = useState({ w: CIRCLE, h: CIRCLE });
@@ -85,6 +89,7 @@ export function Island() {
     if (!bezel) return;
     const measure = () => {
       setBezelW(bezel.clientWidth);
+      setBezelH(bezel.clientHeight);
       const view = bezel.querySelector('.sx-view');
       if (!compact || !view) return setTop(TOP);
       const v = view.getBoundingClientRect();
@@ -129,6 +134,22 @@ export function Island() {
 
   let box: { left: number; top: number; width: number; height: number; radius: number };
   if (panelBox) box = { ...panelBox, radius: 22 };
+  else if (corner && thinking)
+    box = {
+      left: bezelW - pill.w - 16,
+      top: bezelH - pill.h - 16,
+      width: pill.w,
+      height: pill.h,
+      radius: Math.min(pill.h / 2, 24),
+    };
+  else if (corner)
+    box = {
+      left: bezelW - CIRCLE - 16,
+      top: bezelH - CIRCLE - 16,
+      width: CIRCLE,
+      height: CIRCLE,
+      radius: CIRCLE / 2,
+    };
   else if (thinking)
     box = {
       left: (bezelW - pill.w) / 2,

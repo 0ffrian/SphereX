@@ -75,9 +75,9 @@ export function BuildPane() {
   const name = selection?.name ?? card?.name ?? null;
   const bodyHere = selection && body.status !== 'idle' && body.id === selection.id ? body : null;
   const type = typeLabel(params?.type);
-  // "Building X" while it is being built, "X" once it is built (or opened built).
-  const built = phase === 'done' || !build.animate;
-  const title = name ? (built ? name : `Building ${name}`) : '3D view';
+  // The mock-up's title (Q-298, amends Q-113): "Building X" for a build that is played, and it stays;
+  // the bare name when the body is shown built at once (`B.quick`).
+  const title = name ? (build.animate ? `Building ${name}` : name) : '3D view';
   const fixtureSky = useAppStore((s) => s.sky.fixture);
   const honesty = effectiveHonesty(useAppStore((s) => s.honesty));
   const levelTag =
