@@ -62,13 +62,16 @@ type Dyn = Record<string, { value: number; tag: string; tier: number; source: st
  * are real, so they carry no `dynamics` (a spin is not on the card and is never invented).
  */
 const DEMO_PLANETS = ['planet_kepler186f', 'planet_trappist1f'];
+/** Part 8a: the real Bennu model as an `asteroid_shape` fixture beside Eros (real values only). */
+const DEMO_ASTEROIDS = ['asteroid_shape_bennu'];
+const EXTRA = [...DEMO_PLANETS, ...DEMO_ASTEROIDS];
 
 describe('shared fixtures (D-04, D-18)', () => {
   const types = [...OBJECT_TYPES].sort();
 
   it('have exactly one card and one params file per ObjectType, plus the demo planets', () => {
-    expect([...cards.keys()].sort()).toEqual([...types, ...DEMO_PLANETS].sort());
-    expect([...params.keys()].sort()).toEqual([...types, ...DEMO_PLANETS].sort());
+    expect([...cards.keys()].sort()).toEqual([...types, ...EXTRA].sort());
+    expect([...params.keys()].sort()).toEqual([...types, ...EXTRA].sort());
   });
 
   it.each(DEMO_PLANETS)('%s: validates, is a rocky planet and names its real source', (name) => {

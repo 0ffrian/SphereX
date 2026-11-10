@@ -266,6 +266,7 @@ classDiagram
 ## Notes
 
 - The demo fixtures `planet_trappist1f` and `planet_kepler186f` hold real archive values, each `source` starting "synthetic fixture: real <planet> value, " (Q-165).
+- The demo fixture `asteroid_shape_bennu` (Part 8a, Q-163) is an extra `asteroid_shape` beside Eros: real Bennu values from the baked card, each `source` starting "synthetic fixture: real 101955 Bennu value, "; its params are `card_to_params` of the card (`bake_fixtures.py`), and its `shape_source` is the registered `/data/shapes/bennu-spo-v54.glb`.
 - `TV~T~` is one schema definition per payload in code (`TVNumber`, `TVString`, `TVRgb`, `TVVec3`, `TVPair`), because JSON Schema has no generics; `TV<T>` is a hand-written view of them in `frontend/src/contract/tags.ts`. Generated code: `backend/app/contract/`, `frontend/src/contract/generated.ts` (D-18).
 - `Layer.tier` and `DynamicsValue.tier` are fixed by the tag (1 measured, 2 derived, 3 model_dependent, 4 inferred_from_analog, 5 artistic). `formula` is required from tier 2 and `assumed` at tier 3 (D-32). A rate no rung answers is omitted and listed in `missing` as `dynamics:<key>`. `speedup` keys are `spin`, `spots`, `flares`, `winds`, `clouds`, `pulsation`.
 - `scale_m` is null when the size is unknown, for example on a `candidate` (Q-33).

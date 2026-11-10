@@ -112,6 +112,8 @@ const TABLE: Record<ObjectType, Expect> = {
 const DEMO_TABLE: Record<string, Expect> = {
   planet_trappist1f: { texture: 'terrain', data: 'teq_pulse', dataTag: 'measured', missing: [] },
   planet_kepler186f: { texture: 'terrain', data: 'teq_pulse', dataTag: 'measured', missing: [] },
+  // Part 8a: the real Bennu model, drawn like Eros (R8.5 `asteroid_shape` row).
+  asteroid_shape_bennu: { ...TABLE.asteroid_shape },
 };
 
 describe('buildHaptics: every shared fixture (R8.5)', () => {

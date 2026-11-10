@@ -287,6 +287,55 @@ def test_bennu_with_a_registry_row_is_asteroid_shape(tmp_path: Path) -> None:
     assert cls.type == "asteroid_shape" and cls.class_label == "B"
 
 
+def test_committed_bennu_mesh_matches_its_registry_row_and_the_published_size() -> None:
+    """Q-163 scale check on the committed SPOv54 mesh (volume 0.061633 km3, 490.06 +/- 0.16 m)."""
+    row = registry_row("bennu-spo-v54")
+    assert row["spkid"] == "20101955" and row["triangles_lod0"] == 49152
+    assert row["vertices_lod0"] == 24578 and row["triangles_lod1"] == row["triangles_lod0"]
+    for key, name in (
+        ("lod0_sha256", "bennu-spo-v54.glb"),
+        ("lod1_sha256", "bennu-spo-v54.lod1.glb"),
+    ):
+        assert hashlib.sha256((SHAPES / name).read_bytes()).hexdigest() == row[key]
+    doc, blob = ing.read_glb((SHAPES / "bennu-spo-v54.glb").read_bytes())
+    pos = positions((SHAPES / "bennu-spo-v54.glb").read_bytes()).astype(float)
+    idx = np.frombuffer(blob, "<u2", offset=doc["bufferViews"][2]["byteOffset"]).reshape(-1, 3)
+    assert len(pos) == 24578 and len(idx) == 49152 and int(idx.max()) == len(pos) - 1
+    volume_km3 = float(
+        np.einsum("ij,ij->i", pos[idx[:, 0]], np.cross(pos[idx[:, 1]], pos[idx[:, 2]])).sum()
+        / 6.0
+        / 1e9
+    )
+    assert volume_km3 == pytest.approx(0.061633, abs=2e-6)  # the OBJ header's volume
+    equiv_d_m = 2 * (3 * volume_km3 / (4 * np.pi)) ** (1 / 3) * 1000
+    assert equiv_d_m == pytest.approx(490.06, abs=0.16)  # Lauretta et al. 2019
+    ext = (pos.max(axis=0) - pos.min(axis=0)) / 1000.0
+    assert list(np.round(ext, 3)) == row["extents_km"]  # the OBJ header's Extent lines
+    # The bounding-sphere radius the viewer scales by (Q-43): the SBDB diameter 484.44 m would
+    # draw the mesh at about half size. Recorded in Q-163, not changed here.
+    assert float(np.linalg.norm(ext)) / 2 == pytest.approx(row["bbox_half_diagonal_km"], abs=2e-3)
+    assert (0.48444 / 2) / float(row["bbox_half_diagonal_km"]) == pytest.approx(0.521, abs=0.005)
+
+
+def test_bennu_card_takes_its_shape_source_from_the_real_registry(tmp_path: Path) -> None:
+    from app.core.card.build import build_card
+
+    ctx = make_context(make_settings(tmp_path / "cache", shapes_dir=SHAPES))
+    body = (FIXTURES / "shapes" / "sbdb_bennu.json").read_bytes()
+    ctx.cache.put(sbdb_key("Bennu"), LiveResponse(body, "recorded", 200, "application/json"))
+    obj = ResolvedObject(
+        id="o", name="Bennu", ra=0.0, dec=0.0, moving=True, resolver="sbdb",
+        spkid="20101955", query="Bennu",
+    )  # fmt: skip
+    data = gather(ctx, obj)
+    cls = classify(data.facts)
+    assert cls.type == "asteroid_shape"
+    card = build_card(obj, data, cls, None)
+    src = card["shape_source"]
+    assert src["value"] == "/data/shapes/bennu-spo-v54.glb" and src["tag"] == "measured"
+    assert "10.26033/pzcf-qs69" in src["source"] and "SPOv54" in src["source"]
+
+
 def test_bennu_without_a_row_or_with_the_naif_id_stays_procedural(tmp_path: Path) -> None:
     _, cls = facts_for(tmp_path / "a", "sbdb_bennu.json", "Bennu", "20101955", "2101955")
     assert cls.type == "asteroid_procedural"  # a row keyed 2101955 never matches SBDB's id

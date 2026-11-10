@@ -77,7 +77,7 @@ export const DEMO_TARGETS: readonly DemoTarget[] = [
     aliases: ['bennu', '101955'],
     query: '101955 Bennu',
     id: 'sbdb-20101955',
-    classLabel: 'asteroid · B',
+    classLabel: 'asteroid with a shape model · B',
   },
   {
     name: "'Oumuamua",
