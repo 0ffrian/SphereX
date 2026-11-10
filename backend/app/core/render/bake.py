@@ -7,9 +7,11 @@ import io
 import json
 import os
 import shutil
+import struct
 import tempfile
 import time
 import uuid
+import zlib
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from urllib.parse import quote
@@ -71,6 +73,87 @@ def webp_rgb(rgb: NDArray[np.uint8]) -> bytes:
 def png_image(pixels: NDArray[np.uint8], mode: str) -> bytes:
     """PNG with no timestamp (``mode`` "L" or "RGB"). Equal maps give equal bytes."""
     return _save(Image.fromarray(pixels, mode), "PNG", compress_level=9)
+
+
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
+def _png_chunks(data: bytes) -> list[tuple[bytes, bytes]]:
+    """Split a PNG into (type, body) chunks. Raises ValueError if it is not a whole, valid PNG."""
+    if data[:8] != _PNG_SIGNATURE:
+        raise ValueError("not a PNG")
+    i = 8
+    chunks: list[tuple[bytes, bytes]] = []
+    while True:
+        if i + 8 > len(data):
+            raise ValueError("short chunk header")
+        (length,) = struct.unpack(">I", data[i : i + 4])
+        kind = data[i + 4 : i + 8]
+        body = data[i + 8 : i + 8 + length]
+        crc_bytes = data[i + 8 + length : i + 12 + length]
+        if len(body) != length or len(crc_bytes) != 4:
+            raise ValueError("short chunk")
+        if struct.unpack(">I", crc_bytes)[0] != zlib.crc32(kind + body):
+            raise ValueError("bad CRC")
+        chunks.append((kind, body))
+        i += 12 + length
+        if kind == b"IEND":
+            break
+    if i != len(data):
+        raise ValueError("bytes after IEND")
+    return chunks
+
+
+def _png_layout(
+    chunks: list[tuple[bytes, bytes]],
+) -> tuple[list[tuple[bytes, bytes]], bytes] | None:
+    """Chunks with the one run of IDATs collapsed to a placeholder, and the joined IDAT data.
+
+    None unless the image data is a single run of consecutive IDAT chunks.
+    """
+    layout: list[tuple[bytes, bytes]] = []
+    data: list[bytes] = []
+    runs = 0
+    for kind, body in chunks:
+        if kind == b"IDAT":
+            data.append(body)
+            if not layout or layout[-1][0] != b"IDAT":
+                layout.append((b"IDAT", b""))
+                runs += 1
+        else:
+            layout.append((kind, body))
+    return (layout, b"".join(data)) if runs == 1 else None
+
+
+def _inflate_whole(data: bytes, limit: int | None = None) -> bytes | None:
+    """Inflate one whole zlib stream. None if it has trailing bytes, is cut or exceeds ``limit``."""
+    d = zlib.decompressobj()
+    raw = d.decompress(data, limit + 1 if limit is not None else 0)
+    if not d.eof or d.unused_data or (limit is not None and len(raw) > limit):
+        return None
+    return raw
+
+
+def same_png(a: bytes, b: bytes) -> bool:
+    """True if two PNGs differ at most in their deflate stream and IDAT split (Q-204).
+
+    ``a`` is the committed file and ``b`` the fresh one. The chunk sequences must be equal, every
+    chunk other than IDAT byte for byte and at the same place relative to the one run of IDATs.
+    All CRCs must be valid, nothing may follow IEND, each IDAT payload must be exactly one complete
+    zlib stream, and the inflated data (the filtered scanlines) must be equal. The fresh side is
+    inflated first and bounds the committed side, so a bomb in ``a`` cannot grow past ``b``.
+    """
+    if a == b:
+        return True
+    try:
+        la, lb = _png_layout(_png_chunks(a)), _png_layout(_png_chunks(b))
+        if la is None or lb is None or la[0] != lb[0]:
+            return False
+        raw_b = _inflate_whole(lb[1])
+        raw_a = None if raw_b is None else _inflate_whole(la[1], len(raw_b))
+    except (ValueError, struct.error, zlib.error):
+        return False
+    return raw_a is not None and raw_a == raw_b
 
 
 def encode(r: BakeResult) -> dict[str, bytes]:
