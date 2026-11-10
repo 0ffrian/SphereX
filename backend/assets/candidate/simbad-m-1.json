@@ -1,16 +1,16 @@
 {
-  "asset_version": "9",
+  "asset_version": "10",
   "card": {
     "id": "simbad-m-1",
     "name": "M   1",
     "type": "candidate"
   },
   "created_at": "2025-10-01T00:00:00.000Z",
-  "generator_version": "p1-b2",
+  "generator_version": "p1-b3",
   "inputs_sha256": "ffa059f36dc4327154473203418e2bf8acd3317bea275504d2c63a3c5b6b463a",
   "render_params": {
     "alt_text": "M   1. Candidate. Not enough data for a 3D model: distance and albedo unknown.",
-    "generator_version": "p1-b2",
+    "generator_version": "p1-b3",
     "haptics": {
       "data": "detections",
       "data_tag": "measured",
@@ -29,7 +29,7 @@
       "spectrum"
     ],
     "scale_m": null,
-    "seed": 3848739952,
+    "seed": 3487749786,
     "type": "candidate",
     "view_modes": {
       "visible": {
@@ -40,6 +40,6 @@
       }
     }
   },
-  "seed": 3848739952,
+  "seed": 3487749786,
   "textures": null
 }

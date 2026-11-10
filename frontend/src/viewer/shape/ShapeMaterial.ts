@@ -7,8 +7,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- TSL node graphs are built from untyped proxies */
 import { LightingModel, MeshStandardNodeMaterial, type PhysicalLightingModel } from 'three/webgpu';
 import {
+  acos,
   attribute,
   diffuseColor,
+  exp,
   float,
   length,
   mix,
@@ -21,11 +23,21 @@ import {
   transformNormalToView,
   vec3,
 } from 'three/tsl';
-import { AO_DIRECT_WEIGHT, REGOLITH_TILT_PER_AXIS } from './shapeModel';
+import {
+  AO_DIRECT_WEIGHT,
+  REGOLITH_TILT_PER_AXIS,
+  ROCK_LAMBERT_BLEND,
+  ROCK_PHASE_NORM,
+  ROCK_PHASE_SLOPE,
+  ROCK_PHASE_FLOOR,
+} from './shapeModel';
 
 /** A7.4 Lommel-Seeliger lighting: `2/pi * mu0 / (mu0 + mu)`, the CPU twin is `lommelSeeliger`. */
 class LommelSeeligerModel extends LightingModel {
-  constructor(private readonly aoDirect: any | null) {
+  constructor(
+    private readonly aoDirect: any | null,
+    private readonly rock: boolean = false,
+  ) {
     super();
   }
 
@@ -34,7 +46,20 @@ class LommelSeeligerModel extends LightingModel {
     const mu0 = saturate(normalView.dot(lightDirection));
     const mu = saturate(normalView.dot(positionViewDirection));
     const ls = mu0.div(mu0.add(mu).max(1e-4)).mul(2 / Math.PI);
-    let radiance: any = lightColor.mul(ls).mul(diffuseColor.rgb);
+    let brdf: any = ls;
+    if (this.rock) {
+      // Issue #71, Q-210: Lommel-Seeliger blended with Lambert (the CPU twin is `rockReflectance`),
+      // dimmed with phase angle. A look (artistic): the weights come from the approved prototype.
+      const alpha = acos(lightDirection.dot(positionViewDirection).clamp(-1, 1));
+      const phase = exp(alpha.mul(-ROCK_PHASE_SLOPE))
+        .add(ROCK_PHASE_FLOOR)
+        .mul(1 / ROCK_PHASE_NORM);
+      brdf = ls
+        .mul(1 - ROCK_LAMBERT_BLEND)
+        .add(mu0.mul(ROCK_LAMBERT_BLEND / Math.PI))
+        .mul(phase);
+    }
+    let radiance: any = lightColor.mul(brdf).mul(diffuseColor.rgb);
     if (this.aoDirect) radiance = radiance.mul(this.aoDirect);
     reflectedLight.directDiffuse.addAssign(radiance);
   }
@@ -56,6 +81,8 @@ export interface ShapeMaterialOptions {
    * null for none. Tier 5, artistic.
    */
   regolithFrequency: number | null;
+  /** Airless rock of a procedural body (issue #71): Lommel-Seeliger blend and a phase falloff. */
+  rock?: boolean;
 }
 
 /** Standard-node material with Lommel-Seeliger lighting, baked AO and optional regolith normals. */
@@ -95,6 +122,9 @@ export class ShapeMaterial extends MeshStandardNodeMaterial {
       ? mix(float(1), attribute('ao', 'float'), float(AO_DIRECT_WEIGHT))
       : null;
     // The base class types the model as physical; the builder only calls start/direct/indirect.
-    return new LommelSeeligerModel(ao) as unknown as PhysicalLightingModel;
+    return new LommelSeeligerModel(
+      ao,
+      this.shapeOptions.rock === true,
+    ) as unknown as PhysicalLightingModel;
   }
 }

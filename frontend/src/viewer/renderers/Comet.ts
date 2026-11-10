@@ -10,7 +10,7 @@
 import type { CometEpoch, GasQ, ObjectCard } from '@/contract';
 import { isTagShown, weakerOf } from '../honesty';
 import { isPresent, litBody, numberField, PlanBuilder, type PlanInput } from '../planCommon';
-import type { RenderPlan, ShellPlan, Vec3, VolumePlan } from '../planTypes';
+import type { RenderPlan, ShapePlan, ShellPlan, Vec3, VolumePlan } from '../planTypes';
 import { isLoadableMeshUrl, planShapeLayers } from './AsteroidMesh';
 import { comaVolume, dustConeVolume, dustTailVolume, ionTailVolume } from '../volume/volumeSpecs';
 
@@ -253,7 +253,30 @@ export function planComet(input: PlanInput): RenderPlan {
   // Nucleus from a shape model when one exists (67P): the same path as an asteroid shape (R7.1).
   const nucleusUrl = card.shape_source?.value ?? null;
   const meshDrawn = b.draw('mesh', { asset: isLoadableMeshUrl(nucleusUrl) ? nucleusUrl : null });
-  const shape = meshDrawn ? planShapeLayers(b) : null;
+  let shape: ShapePlan | null = meshDrawn ? planShapeLayers(b) : null;
+  // No shape model (issue #71, Q-210): a two-lobed, dark outline, drawn as an illustration, lit
+  // like airless rock. The lobes are `artistic`; the reflectance is a standard model.
+  const lobed =
+    !meshDrawn &&
+    nucleusDrawn &&
+    b.drawLocal(
+      'nucleus_shape',
+      'artistic',
+      'Two lobes joined at a neck, the common shape of a comet nucleus. No shape model exists for this nucleus, so the outline is an illustration.',
+    );
+  if (lobed) {
+    shape = {
+      lommelSeeliger: b.drawLocal(
+        'reflectance',
+        'model_dependent',
+        'Light scatters off the surface the way dark, airless rock does. This is a standard model, not a measurement of this body.',
+      ),
+      shadows: false,
+      ao: false,
+      regolith: false,
+      rock: true,
+    };
+  }
   // Sized by a shape model that is drawn and loaded: its own bounding sphere, not a limit (Q-43, Q-162).
   const meshSized = meshDrawn && isLoadableMeshUrl(nucleusUrl);
   if (meshSized && sizeNote >= 0)
@@ -261,8 +284,9 @@ export function planComet(input: PlanInput): RenderPlan {
       "The nucleus is scaled to its shape model's own bounding sphere, not to a measured radius.";
 
   const nucleus = litBody('nucleus', [nucleusScene, nucleusScene, nucleusScene], NUCLEUS_TINT, {
-    segments: [32, 16],
+    segments: lobed ? [64, 32] : [32, 16],
     meshUrl: meshDrawn ? nucleusUrl : null,
+    lobed,
     // The nucleus is dark and lit like a solar-system body.
   });
   // The plan has a body even when the nucleus layer was refused: a point (R7.3), tinted dark.
