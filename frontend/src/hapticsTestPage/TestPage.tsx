@@ -7,7 +7,7 @@ import { SpectrumPanel } from './panels/SpectrumPanel';
 import { TexturePanel } from './panels/TexturePanel';
 
 export function TestPage() {
-  const [haptics] = useState(() => createHaptics());
+  const [haptics] = useState(() => createHaptics({ vibrate: true }));
 
   useEffect(() => {
     const unbind = bindEngine(haptics);

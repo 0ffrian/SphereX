@@ -13,7 +13,7 @@ import {
 import { applyCalibration, levelsToVibrate, type Calibration } from './calibration';
 import { AudioDriver } from './drivers/audio';
 import { WebVibrateDriver } from './drivers/webVibrate';
-import { HapticEngine, type HapticOutputs } from './haptics';
+import { HapticEngine, createHaptics, type HapticOutputs } from './haptics';
 import { defaultOutputs, deviceVibrates } from './platform';
 import {
   SETTINGS_STORAGE_KEY,
@@ -21,6 +21,7 @@ import {
   defaultSettings,
   SAVE_DEBOUNCE_MS,
   bindPageLifecycle,
+  stopWhenHidden,
   ensureLoaded,
   flushHapticSettings,
   getHapticSettings,
@@ -272,6 +273,53 @@ describe('page lifecycle (P2)', () => {
     expect(stop).toHaveBeenCalledTimes(3);
     off();
     hidden.mockRestore();
+  });
+});
+
+describe('audio-only outputs and stopWhenHidden (Q-132, R8.8)', () => {
+  beforeEach(() => {
+    flushHapticSettings();
+    localStorage.clear();
+    resetStore();
+  });
+  afterEach(() => {
+    setAudioContextFactory(null);
+    vi.restoreAllMocks();
+    flushHapticSettings();
+    localStorage.clear();
+    resetStore();
+  });
+
+  it('bindEngine takes an engine without a vibrate driver and applies sound and volume', () => {
+    const ctx = new FakeAudioContext();
+    setAudioContextFactory(() => ctx.asAudioContext());
+    const o = createHaptics({ debugTarget: null });
+    const unbind = bindEngine(o);
+    expect(o.engine.activeDrivers).toEqual([o.audio]);
+    useHapticSettings.getState().update({ soundOn: false, volume: 0.3 });
+    expect(o.engine.activeDrivers).toEqual([]);
+    expect(o.audio.volume).toBeCloseTo(0.3);
+    useHapticSettings.getState().update({ soundOn: true });
+    expect(o.engine.activeDrivers).toEqual([o.audio]);
+    unbind();
+    o.engine.dispose();
+  });
+
+  it('stopWhenHidden stops on a hidden visibilitychange and on pagehide, not while visible or after unbind', () => {
+    const target = { stop: vi.fn() };
+    const off = stopWhenHidden(target);
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(target.stop).not.toHaveBeenCalled();
+    hidden.mockReturnValue(true);
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(target.stop).toHaveBeenCalledTimes(1);
+    window.dispatchEvent(new Event('pagehide'));
+    expect(target.stop).toHaveBeenCalledTimes(2);
+    off();
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('pagehide'));
+    expect(target.stop).toHaveBeenCalledTimes(2);
   });
 });
 
