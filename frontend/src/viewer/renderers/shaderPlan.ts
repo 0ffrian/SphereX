@@ -26,6 +26,7 @@ import {
   type PlanInput,
 } from '../planCommon';
 import type { RenderPlan } from '../planTypes';
+import { withGasWorldMotion } from './gasWorldInput';
 import { processOf, resolveMotion, TIER_OF_TAG, weakestTag } from '../motion/motion';
 import { listMotion, offerLayer, spinPlanOf, viewerLayer } from '../motion/planMotion';
 import {
@@ -107,7 +108,8 @@ export function planShaderKind(input: PlanInput): RenderPlan {
   const b = new PlanBuilder(input);
   const { card, params, ctx } = input;
   // What moves, by the tier chain (R5.7, D-32): spin, jets, storms, clouds.
-  const motion = resolveMotion(card, params);
+  // Issue #71: a solved gas world adds its `winds` clock process (pacing); else unchanged.
+  const motion = withGasWorldMotion(resolveMotion(card, params), card, params, ctx.overrides);
   listMotion(b, motion);
   // Throws only for a card and params of different kinds (a caller bug); planRender catches it.
   const spec = resolveShaderSpec(card, params, undefined, motion);

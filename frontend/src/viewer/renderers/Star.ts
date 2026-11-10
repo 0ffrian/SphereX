@@ -168,6 +168,11 @@ export function starSurfaceLayers(
       'artistic',
       'The loops drawn as uneven, tapering strands (an artist look).',
     ),
+    viewerLayer(
+      'plasma',
+      'model_dependent',
+      'Glowing arches along the magnetic field lines of each spot group, with plasma that evaporates up from white-hot footpoints, cools and rains back down. Flare energy is capped by the group\u2019s magnetic energy; whether a flare opens or stays closed comes from the decay index (open above 1.5). The arch shape follows a standard model; the wisps are an artist look. Loops are drawn three times larger in the enlarged view.',
+    ),
     viewerLayer('glow', 'artistic', 'A soft glow around the edge of the star (an artist look).'),
   ];
 }
@@ -303,7 +308,8 @@ export function planStar(input: PlanInput, config: StarConfig = STAR_CONFIG): Re
     const prominences = b.draw('prominences');
     const strands = prominences && b.draw('prominence_strands');
     const glow = b.draw('glow');
-    if (granulation || spots || faculae || flares || prominences || glow) {
+    const plasma = !!physics && physics.groups.length > 0 && flares && b.draw('plasma');
+    if (granulation || spots || faculae || flares || prominences || glow || plasma) {
       star = {
         seed: params.seed,
         granulation,
@@ -321,6 +327,7 @@ export function planStar(input: PlanInput, config: StarConfig = STAR_CONFIG): Re
         cellsAcross: cells.cells,
         granuleVisibility: physics ? granuleVisibility(cells.cells, half) : 1,
         cellsEnlarged: cells.artistic,
+        plasma,
       };
     }
   }

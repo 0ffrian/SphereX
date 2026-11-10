@@ -52,7 +52,7 @@ class ResolvedObject:
     ra: float
     dec: float
     moving: bool
-    resolver: str  # simbad | sbdb | coords
+    resolver: str  # simbad | sbdb | coords | reference
     epoch: str | None = None  # ISO-8601 UTC time of (ra, dec); J2000.0 for catalogue positions
     pm_ra_mas_yr: float | None = None
     pm_dec_mas_yr: float | None = None
@@ -203,6 +203,11 @@ def resolve(ctx: Context, q: str, aliases: dict[str, str], *, refresh: bool = Fa
     if coords is not None:
         return Resolution(_coords_object(*coords), None)
 
+    ref = reference_object(ctx, text)
+    if ref is not None:
+        save_object(ctx, ref, [])
+        return Resolution(ref, None)
+
     name = aliases.get(text.lower(), text)
     order = ["sbdb", "simbad"] if looks_like_small_body(name) else ["simbad", "sbdb"]
     flamsteed = is_flamsteed(name)
@@ -228,6 +233,39 @@ def resolve(ctx: Context, q: str, aliases: dict[str, str], *, refresh: bool = Fa
     if ambiguous:
         raise NotFound(f"Several small bodies match '{name}'. Give a fuller designation.")
     raise NotFound(f"No object called '{name}' in SIMBAD or the JPL Small-Body Database.")
+
+
+REFERENCE_PROVENANCE = {
+    "tag": "artistic",
+    "source": "reference object: a planet of the solar system, not a SPHEREx target, so it has no "
+    "place on the sky here (ra = dec = 0 is a placeholder)",
+}
+
+
+def reference_object(ctx: Context, text: str) -> ResolvedObject | None:
+    """Issue #71 stream E (Q-258): a reference object by name or id (``reference_objects.toml``)."""
+    path = ctx.settings.reference_file
+    if not path.is_file():
+        return None
+    key = norm_name(text).lower()
+    for row in tomllib.loads(path.read_text(encoding="utf-8")).get("object", []):
+        names = {
+            str(row["id"]).lower(),
+            str(row["name"]).lower(),
+            *(a.lower() for a in row.get("aliases", [])),
+        }
+        if key in names:
+            return ResolvedObject(
+                id=row["id"],
+                name=row["name"],
+                ra=0.0,
+                dec=0.0,
+                moving=False,
+                resolver="reference",
+                provenance={"ra": dict(REFERENCE_PROVENANCE), "dec": dict(REFERENCE_PROVENANCE)},
+                query=row["name"],
+            )
+    return None
 
 
 def save_object(ctx: Context, obj: ResolvedObject, sources: list[Served]) -> None:

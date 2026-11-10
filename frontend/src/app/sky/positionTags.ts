@@ -13,7 +13,7 @@ export const TYPED_FORMULA =
   'ra, dec = the coordinates typed in the query (user input, not an observation)';
 
 export function positionProvenance(
-  resolver: 'simbad' | 'sbdb' | 'coords',
+  resolver: 'simbad' | 'sbdb' | 'coords' | 'reference',
   pickedOnSky: boolean,
 ): { tag: Tag; tooltip: string } {
   if (resolver === 'simbad')
@@ -21,5 +21,7 @@ export function positionProvenance(
   if (resolver === 'sbdb') {
     return { tag: 'model_dependent', tooltip: 'Position computed from the JPL Horizons orbit' };
   }
+  if (resolver === 'reference')
+    return { tag: 'artistic', tooltip: 'A planet of the solar system, not a SPHEREx target: no place on the sky is claimed' };
   return { tag: 'derived', tooltip: pickedOnSky ? PICK_FORMULA : TYPED_FORMULA };
 }

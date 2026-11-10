@@ -296,6 +296,11 @@ export interface StarSurfacePlan {
   granuleVisibility: number;
   /** True when the cells are drawn larger than real (the layer is `artistic`). */
   cellsEnlarged: boolean;
+  /**
+   * Issue #71 stream G: flares and plasma drawn along the physical spot groups (StarPlasma). When on,
+   * the old region loops and shader flares are not drawn (this supersedes them).
+   */
+  plasma: boolean;
 }
 
 /**

@@ -800,6 +800,12 @@ export class ViewerApp {
   private draw(): void {
     this.frames++;
     this.updateScreenSize();
+    // A body with an off-screen pass of its own (the gas world's tracer) runs it before the frame.
+    try {
+      this.onScreen?.prepareFrame(this.renderer);
+    } catch (err) {
+      console.warn('[viewer] a body could not prepare its frame', err);
+    }
     if (this.chain) {
       try {
         // Volumes shift their per-pixel ray jitter by the TAAU frame index (same index after a
@@ -1057,6 +1063,30 @@ export class ViewerApp {
     this.camera.position.set(w[0] * d, w[1] * d, w[2] * d);
     this.controls.target.set(0, 0, 0);
     this.controls.update();
+    this.requestRender();
+  }
+
+  /** Issue #71 stream G: true when the star on screen draws flares and plasma. */
+  hasStarFlares(): boolean {
+    return !this.disposed && !!this.onScreen?.starFlares;
+  }
+
+  /** "Fire a big flare": a flare of about 3e31 erg at the biggest spot group now (capped to its E_max). */
+  fireFlare(): void {
+    if (this.disposed) return;
+    this.onScreen?.starFlares?.fire();
+    this.requestRender();
+  }
+
+  /** The "Latest flare" card text, or null when there is none yet. */
+  latestFlareText(): string | null {
+    return this.onScreen?.starFlares?.latestText() ?? null;
+  }
+
+  /** The "Field lines" toggle. */
+  setFieldLines(on: boolean): void {
+    if (this.disposed) return;
+    this.onScreen?.starFlares?.setLines(on);
     this.requestRender();
   }
 
