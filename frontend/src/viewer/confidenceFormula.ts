@@ -6,17 +6,7 @@ import type { Confidence } from './confidenceGate';
 export type ConfidenceInput = Confidence['inputs'][number];
 
 /** General formula, as in D-36. */
-export const GENERAL_LATEX = String.raw`C = \frac{\sum_i w_i c_i}{\sum_i w_i}`;
-
-/** The c-value table (Q-221), plain words. `model_dependent` and the assumed-input `derived` use
- *  the backend's placeholder 0.5 (both [verify] in confidence.py). */
-export const C_TABLE: readonly { source: string; c: string; why: string }[] = [
-  { source: 'Measured', c: '1', why: 'the value comes straight from an instrument or catalogue' },
-  { source: 'Derived from measured values', c: '1', why: 'a formula of measured values' },
-  { source: 'Derived with an assumed input', c: '0.5', why: 'a placeholder share' },
-  { source: 'Model dependent', c: '0.5', why: 'a model fit narrows the range part way' },
-  { source: 'Inferred from an analog, artistic or missing', c: '0', why: 'no data behind it' },
-];
+export const GENERAL_LATEX = String.raw`C=\dfrac{\sum_i w_i\,c_i}{\sum_i w_i}`;
 
 /** Largest allowed gap between the backend score and the sum of the rounded rows. The backend
  *  rounds each `c` to 4 decimals before sending, so the sum can differ by about 1e-4 per row. */
@@ -48,33 +38,104 @@ export function formulaTerms(c: Confidence): FormulaTerms {
   return { fromRows, shown: c.score, agrees, numerator, denominator };
 }
 
-/** This object's terms substituted into the general formula. The result is the backend's score. */
+/** Mock-up wording (mockup/spherex-ui.html, #popAcc). */
+export const C_TABLE_LINES: readonly string[] = [
+  'c = 1: satellite data, or physics from measured values',
+  'c = 0.5: model-dependent, or physics with an assumed input',
+  'c = 0: assumed from a similar object, drawn, or missing',
+];
+export const C_TABLE_LATEX = String.raw`\begin{array}{ll}c=1 & \text{measured, or physics from measured values}\\ c=\tfrac{1}{2} & \text{model-dependent, or physics with an assumed input}\\ c=0 & \text{assumed from a similar object, drawn, or missing}\end{array}`;
+
+export type Part = 'd' | 'p' | 'a';
+/** Q-267: the mock-up's three bar parts, mapped from the real tags. d = measured (Satellite data),
+ *  p = derived or model_dependent (Physics), a = inferred_from_analog, artistic, missing (Assumed). */
+export function partOf(tag: string): Part {
+  if (tag === 'measured') return 'd';
+  if (tag === 'derived' || tag === 'model_dependent') return 'p';
+  return 'a';
+}
+
+export const PART_INFO: Record<Part, { label: string; note: string }> = {
+  d: { label: 'Satellite data', note: 'measured by SPHEREx, Gaia and other archives' },
+  p: { label: 'Physics', note: 'worked out from the data with a formula' },
+  a: { label: 'Assumed', note: 'typical values, drawn detail, or missing' },
+};
+
+/** Share of the total weight in each part, 0..1, as the mock-up's bar. */
+export function partShares(c: Confidence): Record<Part, number> {
+  const total = c.inputs.reduce((s, i) => s + i.weight, 0);
+  const out: Record<Part, number> = { d: 0, p: 0, a: 0 };
+  if (total <= 0) {
+    out.a = 1;
+    return out;
+  }
+  for (const i of c.inputs) out[partOf(i.tag)] += i.weight / total;
+  return out;
+}
+
+/** The row chip: text and part (colour). A derived row with c below 1 has an assumed input. */
+export function tagChip(i: ConfidenceInput): { text: string; part: Part } {
+  switch (i.tag) {
+    case 'measured':
+      return { text: 'Satellite data', part: 'd' };
+    case 'derived':
+      return i.c < 1 ? { text: 'Physics, one input assumed', part: 'p' } : { text: 'Physics', part: 'p' };
+    case 'model_dependent':
+      return { text: 'Physics, from a model', part: 'p' };
+    case 'inferred_from_analog':
+      return { text: 'Assumed, from a similar object', part: 'a' };
+    case 'artistic':
+      return { text: 'Assumed, drawn', part: 'a' };
+    default:
+      return { text: 'Missing', part: 'a' };
+  }
+}
+
+/** Points one row adds, out of its weight (the mock-up's "Points" column). */
+export function rowPoints(i: ConfidenceInput): string {
+  return `${Math.round(i.c * i.weight * 10) / 10} / ${num(i.weight)}`;
+}
+
+function cTex(x: number): string {
+  return x === 1 ? '1' : x === 0.5 ? String.raw`\tfrac{1}{2}` : num(x);
+}
+function cTxt(x: number): string {
+  return num(x);
+}
+
+/** This object's numbers substituted, as in the mock-up. Terms with c = 0 fold into "+ 0". The
+ *  final value is the backend's score, never the sum of the rows (Q-266). */
 export function substitutionLatex(c: Confidence): string {
   const t = formulaTerms(c);
-  if (c.inputs.length === 0 || t.denominator <= 0) return `C = ${num(c.score)}`;
-  const top = c.inputs.map((i) => `${num(i.weight)} \\cdot ${num(i.c)}`).join(' + ');
-  const bottom = c.inputs.map((i) => num(i.weight)).join(' + ');
-  return `C = \\frac{${top}}{${bottom}} = \\frac{${num(t.numerator)}}{${num(t.denominator)}} \\approx ${num(c.score)}`;
-}
-
-/** The gate rule with the real threshold. */
-export function gateLatex(threshold: number): string {
-  return `C \\ge ${num(threshold)}`;
-}
-
-/** Plain-text twins, used when KaTeX throws (never blank). */
-export function generalPlain(): string {
-  return 'C = (sum of w_i x c_i) / (sum of w_i)';
+  if (c.inputs.length === 0 || t.denominator <= 0) return `C = ${two(c.score)}`;
+  const terms = c.inputs.filter((i) => i.c > 0);
+  const fold = terms.length < c.inputs.length ? '+0' : '';
+  const top = terms.map((i) => `${num(i.weight)}\\cdot ${cTex(i.c)}`).join('+') + fold;
+  return `C=\\dfrac{${top}}{${num(t.denominator)}}=\\dfrac{${num(round1(t.numerator))}}{${num(t.denominator)}}=${two(c.score)}`;
 }
 
 export function substitutionPlain(c: Confidence): string {
   const t = formulaTerms(c);
-  if (c.inputs.length === 0 || t.denominator <= 0) return `C = ${num(c.score)}`;
-  const top = c.inputs.map((i) => `${num(i.weight)} x ${num(i.c)}`).join(' + ');
-  const bottom = c.inputs.map((i) => num(i.weight)).join(' + ');
-  return `C = (${top}) / (${bottom}) = ${num(t.numerator)} / ${num(t.denominator)}, about ${num(c.score)}`;
+  if (c.inputs.length === 0 || t.denominator <= 0) return `C = ${two(c.score)}`;
+  const terms = c.inputs.filter((i) => i.c > 0);
+  const fold = terms.length < c.inputs.length ? ' + 0' : '';
+  const top = terms.map((i) => `${num(i.weight)}·${cTxt(i.c)}`).join(' + ') + fold;
+  return `C = (${top}) / ${num(t.denominator)} = ${num(round1(t.numerator))} / ${num(t.denominator)} = ${two(c.score)}`;
 }
 
+function round1(x: number): number {
+  return Math.round(x * 10) / 10;
+}
+function two(x: number): string {
+  return (Math.round(x * 100) / 100).toFixed(2);
+}
+
+export function gateLatex(threshold: number): string {
+  return `\\text{3D body shown}\\iff \\text{class known}\\ \\wedge\\ \\text{key measurement}\\ \\wedge\\ C\\ge ${num(threshold)}`;
+}
 export function gatePlain(threshold: number): string {
-  return `C is at least ${num(threshold)}`;
+  return `3D body shown only if: class known AND key measurement AND C ≥ ${num(threshold)}`;
+}
+export function generalPlain(): string {
+  return 'C = Σ wᵢ·cᵢ / Σ wᵢ';
 }

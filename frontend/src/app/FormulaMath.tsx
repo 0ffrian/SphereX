@@ -18,18 +18,31 @@ export function renderLatex(latex: string): string | null {
   }
 }
 
-export function FormulaMath({ latex, plain, testId }: { latex: string; plain: string; testId?: string }) {
+export function FormulaMath({
+  latex,
+  plain,
+  testId,
+}: {
+  latex: string;
+  plain: string | readonly string[];
+  testId?: string;
+}) {
   const html = renderLatex(latex);
   if (html === null) {
+    const lines = typeof plain === 'string' ? [plain] : plain;
     return (
-      <p className="font-mono text-neutral-100" data-testid={testId} data-fallback="true">
-        {plain}
-      </p>
+      <code className="sx-acc-eq" data-testid={testId} data-fallback="true">
+        {lines.map((l, k) => (
+          <span key={k} className="block">
+            {l}
+          </span>
+        ))}
+      </code>
     );
   }
   return (
     <div
-      className="overflow-x-auto text-neutral-100"
+      className="sx-acc-tex"
       data-testid={testId}
       // KaTeX output for a string built from numbers by confidenceFormula.ts; `trust: false`.
       dangerouslySetInnerHTML={{ __html: html }}
