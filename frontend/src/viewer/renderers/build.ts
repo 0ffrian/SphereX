@@ -49,6 +49,7 @@ import { isGltfUrl } from '../scaleBar';
 import type { BodyContext, BodyRenderer } from './bodyRenderer';
 import { ShaderBody } from './ShaderBody';
 import { StarBody } from './StarBody';
+import { flareText } from '@/physics/flares';
 import { LIMB_DARKENING_U } from './Star';
 import { buildJetSurface, makeJetRuntime } from './jetSurface';
 import { floatTexture } from './fieldTexture';
@@ -182,6 +183,12 @@ export interface BuiltScene {
    * now (the star turns), or null when this scene has no star surface. Used by the close-up camera.
    */
   starDirToWorld(dir: [number, number, number]): [number, number, number] | null;
+  /**
+   * Issue #71 stream G: the star's flares and plasma, or null without them. `fire` starts a big flare
+   * now; `latestText` is the plain-words "Latest flare" card (null before the first flare);
+   * `setLines` is the "Field lines" toggle.
+   */
+  readonly starFlares: StarFlareControls | null;
   /** The body's on-screen diameter in CSS pixels (the 160 px level-of-detail rule); null = unknown. */
   setScreenPx(px: number | null): void;
   /** The TAAU frame index of the next frame (see BodyRenderer.setJitterFrame). */
@@ -194,6 +201,15 @@ export interface BuiltScene {
    */
   setMould(pose: Readonly<MouldPose> | null): void;
   dispose(): void;
+}
+
+export interface StarFlareControls {
+  fire(): void;
+  latestText(): string | null;
+  setLines(on: boolean): void;
+  readonly linesOn: boolean;
+  /** Streaks drawn in the last frame (tests, performance readout). */
+  readonly streakCount: number;
 }
 
 /** Seeded PRNG (mulberry32). The same seed always gives the same stream. */
@@ -354,6 +370,7 @@ export function buildScene(
   const lodRefresh: (() => void)[] = [];
   let shapeRadius: number | null = null;
   let starSpin: Object3D | null = null;
+  let starFlares: StarFlareControls | null = null;
   const mouldSpheres: { mesh: Mesh; axes: [number, number, number] }[] = [];
   const mouldHolders: (() => Object3D | null)[] = [];
   for (const [bodyIndex, body] of plan.bodies.entries()) {
@@ -361,6 +378,7 @@ export function buildScene(
     if (plan.star && body.id === 'body') {
       const star = track(
         new StarBody(plan.star, {
+          tier,
           tint: srgbToLinear(body.tint),
           emissive: body.emissive,
           limbU: body.limbDarkening ? LIMB_DARKENING_U : null,
@@ -372,6 +390,33 @@ export function buildScene(
       star.group.position.set(...body.position);
       group.add(star.group);
       starSpin = star.spin;
+      const plasma = star.plasma;
+      if (plasma) {
+        const speed = plan.star.rates.flareSpeedup;
+        const now = () => (speed > 0 ? lastTime('flares') / speed : 0);
+        starFlares = {
+          fire() {
+            plasma.fire(now());
+            plasma.setTime(now());
+            hooks.onChange();
+          },
+          latestText() {
+            const e = plasma.latest(now());
+            return e ? flareText(e) : null;
+          },
+          setLines(on) {
+            plasma.setLines(on);
+            hooks.onChange();
+          },
+          get linesOn() {
+            return plasma.linesOn;
+          },
+          get streakCount() {
+            return plasma.streakCount;
+          },
+        };
+        tierListeners.push((t) => plasma.setTier(t));
+      }
       usesQuality = true;
       // The star turns itself (StarBody rotates its own frame by the spin clock), so it is not a
       // `spinner`. A Mira has no star surface and is posed below.
@@ -790,6 +835,9 @@ export function buildScene(
       shaderBody.setPatternSwitch(next.shader?.pattern ?? null);
     },
     shapeRadius,
+    get starFlares() {
+      return starFlares;
+    },
     starDirToWorld(dir) {
       if (!starSpin) return null;
       group.updateMatrixWorld(true);

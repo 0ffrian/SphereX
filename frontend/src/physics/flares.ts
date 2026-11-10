@@ -17,7 +17,7 @@
 // a(s) = -A cos(pi s), l(s) = L + sh cos(pi s), h(s) = H sin(pi s), s in 0..1.
 
 import { hash3 } from '@/viewer/fields/noise';
-import type { SpotGroup, StellarModel, Vec3 } from './stellar';
+import type { SpotGroup, Vec3 } from './stellar';
 
 // ---- constants -----------------------------------------------------------------------------------
 /** Field strength for the energy cap, gauss (issue #71; sunspot umbra 2000-3000 G, flare sites about 1000 G). [verify] */
@@ -307,9 +307,12 @@ export class StreakSink {
   readonly pos: Float32Array;
   readonly col: Float32Array;
   n = 0;
-  constructor(readonly cap: number) {
-    this.pos = new Float32Array(cap * 6);
-    this.col = new Float32Array(cap * 6);
+  /** Streaks accepted; may be lowered below the allocation (quality level). */
+  cap: number;
+  constructor(alloc: number) {
+    this.cap = alloc;
+    this.pos = new Float32Array(alloc * 6);
+    this.col = new Float32Array(alloc * 6);
   }
   reset(): void {
     this.n = 0;
