@@ -39,6 +39,7 @@ import type { CometEpoch, ObjectCard, RenderParams } from '@/contract';
 import { ProvenanceBadge } from './Badge';
 import { EmissionsPanel } from './EmissionsPanel';
 import { EPOCH_JD, timeRange } from '@/physics/cometGas';
+import { ConfidenceChip, ConfidenceDetails } from './ConfidencePanel';
 import { timeLapsesOf } from '@/viewer/motion/planMotion';
 import { describeRefusal, layerName, timeLapseText } from './messages';
 import { buttonClass, pressedClass } from './ui';
@@ -614,6 +615,15 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           data-testid="viewer-stage"
         >
           <div ref={hostRef} className="absolute inset-0" />
+          {params && plan?.threeD && (
+            <ConfidenceChip
+              params={params}
+              onOpen={() => {
+                setDetailsOpen(true);
+                document.getElementById(detailsId)?.scrollIntoView?.({ block: 'nearest' });
+              }}
+            />
+          )}
           {loadingBody && (
             <div className="sx-bp-loading" data-testid="build-loading" role="status">
               <span className="sx-spinner" aria-hidden="true" />
@@ -679,6 +689,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
         className={pane ? 'sx-bp-details' : 'contents'}
         hidden={pane ? !detailsOpen : undefined}
       >
+        {params && <ConfidenceDetails params={params} />}
         {plan?.threeD && (
           <p className="text-xs text-neutral-400" data-testid="impression-note">
             Artist&apos;s impression, drawn from the data listed under &ldquo;What is drawn&rdquo;.
