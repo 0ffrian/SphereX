@@ -548,7 +548,7 @@
     "type": "comet"
   },
   "created_at": "2025-10-01T00:00:00.000Z",
-  "generator_version": "p1-b2",
+  "generator_version": "p1-b3",
   "inputs_sha256": "4d30394754ce61b83ba21606cfe420fb28cc45912350a92d60845b8e46f385e2",
   "render_params": {
     "alt_text": "C/2025 N1 (ATLAS), Comet, nucleus at most 2.5 km in radius (upper limit), no visible colour basis, viewed at 3.45 degrees. Surface relief: illustrative.",
@@ -659,7 +659,7 @@
       "threshold": 0.25,
       "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
     },
-    "generator_version": "p1-b2",
+    "generator_version": "p1-b3",
     "haptics": {
       "data": "field",
       "data_tag": "model_dependent",
@@ -735,7 +735,7 @@
       "spectrum"
     ],
     "scale_m": 2500.0,
-    "seed": 12322617,
+    "seed": 599534172,
     "type": "comet",
     "view_modes": {
       "spherex_ir": {
@@ -757,6 +757,6 @@
       }
     }
   },
-  "seed": 12322617,
+  "seed": 599534172,
   "textures": null
 }

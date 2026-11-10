@@ -34,7 +34,7 @@
       "id": "relief",
       "tag": "artistic",
       "tier": 5,
-      "description": "Procedural height field from the seed, style cratered (R6.2, R6.3).",
+      "description": "Procedural height field from the seed: a rubble pile of rock and shattered rock; lumps from rock strength against gravity (h/R = 0.30), craters N(>D) ~ D^-2, boulders by structure. Rough and rocky is the default: only a shape model, radar roughness or thermal inertia could make it smoother, and the card has none. The density is an analog of a real body (1190 kg/m3), an assumption (R6.2, R6.3, D-36).",
       "requires": [
         "diameter_km"
       ]
@@ -43,7 +43,7 @@
       "id": "displacement",
       "tag": "artistic",
       "tier": 5,
-      "description": "Surface pushed out by the height map, up to 0.03 of the radius (style cratered, R6.2, R7.2).",
+      "description": "Surface pushed in and out by the height map, over a range of 1 of the radius (R6.2, R7.2, D-36).",
       "requires": [
         "diameter_km"
       ]
@@ -54,7 +54,7 @@
     "height": "/data/textures/fixture:asteroid_procedural/fixture-0/2/height.png",
     "normal": "/data/textures/fixture:asteroid_procedural/fixture-0/2/normal.png",
     "height_bin": "/data/textures/fixture:asteroid_procedural/fixture-0/2/height.bin",
-    "relief_amp": 0.03
+    "relief_amp": 1.0
   },
   "lighting": {
     "mode": "sun",

@@ -9,6 +9,7 @@ import { resolveShaderSpec } from './shaderSpec';
 import { resolveMotion } from '../motion/motion';
 import { fixture, withoutExoplanetFields } from './fixtures.testutil';
 import type { BodyContext } from './bodyRenderer';
+import { tinyWorldSource } from './worldFixtures.testutil';
 
 // Small field keeps jsdom tests fast; the real size is covered in fieldGenerator.test.ts.
 // Honesty: these tests show the artistic layers, so they pass ALL_TAGS explicitly (D-21 default
@@ -16,6 +17,7 @@ import type { BodyContext } from './bodyRenderer';
 const ctx: BodyContext = {
   visibleTags: ALL_TAGS,
   fieldSource: async (p) => generateField(p, 64, 32),
+  worldSource: tinyWorldSource,
 };
 
 const KINDS = ['planet_rocky', 'planet_water', 'gas_giant', 'nebula', 'nova'] as const;
@@ -126,7 +128,7 @@ describe('ShaderBody', () => {
   });
 
   it('rebuilds with new field-affecting overrides', async () => {
-    const f = fixture('planet_water');
+    const f = withoutExoplanetFields(fixture('planet_water'));
     const seen: number[] = [];
     const body = await ShaderBody.create(f.card, f.params, {
       visibleTags: ALL_TAGS,
@@ -181,7 +183,7 @@ describe('ShaderBody honesty and redraw (review B2, B3, N7)', () => {
   });
 
   it('never blanks during a slider rebuild: the old surface stays until the new one is ready', async () => {
-    const f = fixture('planet_water');
+    const f = withoutExoplanetFields(fixture('planet_water'));
     let release: (() => void) | undefined;
     let hold = false;
     const body = await ShaderBody.create(f.card, f.params, {
@@ -229,7 +231,7 @@ describe('ShaderBody honesty and redraw (review B2, B3, N7)', () => {
 describe('ShaderBody disposal and hidden copy (review NF-1, NF-8)', () => {
   it('frees the new surface when dispose lands between build and swap (any microtask delay)', async () => {
     for (let hops = 1; hops <= 6; hops++) {
-      const f = fixture('planet_water'); // 2 field textures per build
+      const f = withoutExoplanetFields(fixture('planet_water')); // legacy look, 2 field textures per build
       const disposed = vi.spyOn(DataTexture.prototype, 'dispose');
       const built = vi.spyOn(Texture.prototype, 'needsUpdate', 'set'); // once per floatTexture()
       let armed = false;
@@ -365,6 +367,11 @@ describe('ShaderBody.start (the plan path builds without waiting)', () => {
       fieldSource: async (p) => {
         await gate;
         return generateField(p, 64, 32);
+      },
+      // The fixture is an exoplanet, so the world model builds it; gate that too.
+      worldSource: async (p) => {
+        await gate;
+        return tinyWorldSource(p);
       },
     });
     // Never blank: a body is on screen before the field exists.
