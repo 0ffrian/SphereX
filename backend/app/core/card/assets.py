@@ -35,7 +35,10 @@ ASSET_SOURCE = "derived.asset"
 # displacement and textures.relief_amp). CARD_TO_PARAMS_VERSION stays "1" so seeds are stable.
 # 5 (issue #68 Part 0.1, Q-63): the exoplanet type rule is on, so archive planets are typed
 # planet_rocky, planet_water or gas_giant instead of candidate.
-ASSET_VERSION = "5"
+# 6 (issue #26, Q-125): stage 1 finds frames for moving objects and stage 2 measures their
+# spectrum; a card saved before had none (`frames:moving_object_search` was final). Stage 1 and 2
+# changes count too.
+ASSET_VERSION = "6"
 AssetStatus = Literal["saved", "generated", "sketch"]
 FIELDS = ("card", "render_params", "textures", "generator_version", "seed", "created_at")
 

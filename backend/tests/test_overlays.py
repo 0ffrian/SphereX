@@ -144,9 +144,16 @@ def test_subtract_frame_from_itself_is_mid_grey(client: TestClient) -> None:
 
 
 def test_moving_object_overlays_refused(client: TestClient) -> None:
-    body = _overlays(client, _oid(client, "433 Eros"))
-    assert body["frames"] == []
-    assert body["missing"] == ["overlay:gaia", "overlay:wise"]
+    """The catalogue cones are still refused for moving objects (Q-50). Since issue #26 the
+    frames exist, so each gets its flag mask and cutout box; the SIA footprint is not carried on
+    the frame record, so it is refused per frame, never invented."""
+    oid = _oid(client, "433 Eros")
+    body = _overlays(client, oid)
+    frames = client.get(f"/v1/objects/{oid}/frames").json()["frames"]
+    assert [f["frame_id"] for f in body["frames"]] == [f["frame_id"] for f in frames]
+    assert {"overlay:gaia", "overlay:wise"} <= set(body["missing"])
+    assert all(f["footprint"] is None and f["markers"] == [] for f in body["frames"])
+    assert all(f"footprint:{f['frame_id']}" in body["missing"] for f in frames)
     assert all(not c["available"] and c["sources"] == [] for c in body["catalogs"])
 
 

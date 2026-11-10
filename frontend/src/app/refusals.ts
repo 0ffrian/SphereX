@@ -2,10 +2,14 @@
 // "239 frames where the detector flagged …" instead of 239 raw codes. Logic only: the wording is
 // in messages.ts.
 //
-// Code formats the backend emits (backend/app/core/find/frames.py, backend/app/core/measure/):
+// Code formats the backend emits (backend/app/core/find/frames.py, find/moving.py,
+// backend/app/core/measure/):
 //   per frame      `<reason>:<frame_id>`, e.g. `saturated:2026W17_1B_0634_4_D3`
-//   whole result   `frames:truncated`, `frames:moving_object_search`, `spectrum:saturated`,
-//                  `cutouts:deferred:<n>`, and the colour composite's `composite:<reason>`
+//   whole result   `frames:truncated`, `frames:ephemeris`, `frames:moving_window`,
+//                  `spectrum:saturated`, the colour composite's `composite:<reason>`
+//   counted        `cutouts:deferred:<n>` and the moving-object path search's
+//                  `frames:<cone_cap|cone_maxrec|sparse_path|cone_failed|search_deferred|
+//                  outside_window>:<n>` (COUNTED_CODES)
 // Anything else is kept and shown as is, never dropped.
 import type { Frame, SpectrumPoint } from '@/app/api/types';
 
@@ -36,12 +40,56 @@ export type FrameReason = (typeof FRAME_REASONS)[number];
 export const OVERLAY_FRAME_REASONS = ['footprint', 'flags_mask'] as const;
 export type OverlayFrameReason = (typeof OVERLAY_FRAME_REASONS)[number];
 
+/**
+ * Per-frame codes of the moving-object path search (backend find/moving.py, issue #26):
+ * `no_footprint:<frame_id>` (the frame has no footprint to check the object against; not the
+ * overlays' `footprint`) and `ephemeris:<frame_id>` (no exact predicted position at that time).
+ */
+export const MOVING_FRAME_REASONS = ['no_footprint', 'ephemeris'] as const;
+export type MovingFrameReason = (typeof MOVING_FRAME_REASONS)[number];
+
+/**
+ * Counted whole-result codes, `<prefix>:<n>`. `cutouts:deferred` counts frames still to download;
+ * the `frames:*` ones come from the moving-object path search (backend find/moving.py).
+ */
+export const COUNTED_CODES = [
+  'cutouts:deferred',
+  'frames:cone_cap',
+  'frames:cone_maxrec',
+  'frames:sparse_path',
+  'frames:cone_failed',
+  'frames:search_deferred',
+  'frames:outside_window',
+] as const;
+export type CountedCode = (typeof COUNTED_CODES)[number];
+const COUNTED_RE = new RegExp(`^(${COUNTED_CODES.join('|')}):(\\d+)$`);
+
+/** The prefix and count of a counted code, or null. */
+export function countedCode(code: string): { prefix: CountedCode; count: number } | null {
+  const m = COUNTED_RE.exec(code);
+  return m ? { prefix: m[1] as CountedCode, count: Number(m[2]) } : null;
+}
+
+/**
+ * Codes after which more frames may exist than the list holds: the archive list was cut short,
+ * cutouts or the path search are still to come, or the path search skipped or lost part of it.
+ */
+const INCOMPLETE_COUNTED: ReadonlySet<CountedCode> = new Set([
+  'cutouts:deferred',
+  'frames:cone_cap',
+  'frames:cone_maxrec',
+  'frames:sparse_path',
+  'frames:cone_failed',
+  'frames:search_deferred',
+]);
+
 /** Whole-result codes with their own wording (no frame id). */
 export const WHOLE_RESULT_CODES = [
   'frames:truncated',
-  'frames:moving_object_search',
+  // Moving-object path search: no path ephemeris for (part of) the search, or a bad window.
+  'frames:ephemeris',
+  'frames:moving_window',
   'spectrum:saturated',
-  'spectrum:moving_object_search',
   'overlay:gaia',
   'overlay:wise',
   // The cone is still being fetched (backend overlay_wait_s); a later request will have it.
@@ -54,7 +102,6 @@ export const WHOLE_RESULT_CODES = [
 
 export const ALL_SATURATED = 'spectrum:saturated';
 const TRUNCATED = 'frames:truncated';
-const DEFERRED_RE = /^cutouts:deferred:(\d+)$/;
 /** Prefixes of whole-result codes; an unknown code under one of them is a note, not a frame. */
 const NAMESPACES: ReadonlySet<string> = new Set([
   'frames',
@@ -66,7 +113,11 @@ const NAMESPACES: ReadonlySet<string> = new Set([
   'provenance',
 ]);
 const REASON_RE = /^[a-z][a-z0-9_]*$/;
-const KNOWN_REASONS: ReadonlySet<string> = new Set([...FRAME_REASONS, ...OVERLAY_FRAME_REASONS]);
+const KNOWN_REASONS: ReadonlySet<string> = new Set([
+  ...FRAME_REASONS,
+  ...OVERLAY_FRAME_REASONS,
+  ...MOVING_FRAME_REASONS,
+]);
 const KNOWN_WHOLE: ReadonlySet<string> = new Set(WHOLE_RESULT_CODES);
 
 /**
@@ -103,8 +154,8 @@ export function parseMissing(code: string): ParsedMissing {
   if (KNOWN_WHOLE.has(code) || COMPOSITE_CODE_RE.test(code)) {
     return { kind: 'note', code, known: true, count: 1 };
   }
-  const deferred = DEFERRED_RE.exec(code);
-  if (deferred) return { kind: 'note', code, known: true, count: Number(deferred[1]) };
+  const counted = countedCode(code);
+  if (counted) return { kind: 'note', code, known: true, count: counted.count };
   const colon = code.indexOf(':');
   if (colon > 0) {
     const reason = code.slice(0, colon);
@@ -178,7 +229,8 @@ export interface SpectrumOutcome {
   saturated: number;
   /** Reason of the largest frame group, or null when no frame was refused. */
   largestReason: string | null;
-  /** `cutouts:deferred` or `frames:truncated`: more frames exist than were checked. */
+  /** `frames:truncated`, deferred cutouts or path search, or a capped or lossy path search:
+   * more frames may exist than were checked. */
   incomplete: boolean;
   /** Wavelength span of the measured points, µm. */
   measuredRange: readonly [number, number] | null;
@@ -231,7 +283,11 @@ export function summarizeSpectrum(
     total: points.length + refused,
     saturated,
     largestReason: frameGroups[0]?.reason ?? null,
-    incomplete: missing.some((c) => c === TRUNCATED || DEFERRED_RE.test(c)),
+    incomplete: missing.some((c) => {
+      if (c === TRUNCATED || c === 'frames:ephemeris') return true;
+      const counted = countedCode(c);
+      return counted !== null && counted.count > 0 && INCOMPLETE_COUNTED.has(counted.prefix);
+    }),
     measuredRange: span(points.map((p) => p.wavelength_um)),
     framesRange: frames ? span(frames.map((f) => f.wavelength_um)) : null,
     largestGap: widestGap(points.map((p) => p.wavelength_um)),

@@ -6,6 +6,7 @@ import io
 import math
 import warnings
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import numpy as np
@@ -14,6 +15,7 @@ from app.adapters.http import UpstreamError
 from app.cache.keys import CacheKey, norm_dec, norm_float, norm_ra
 from app.cache.store import CacheEntry, LiveResponse, Served
 from app.context import Context
+from app.timefmt import mjd_to_utc
 
 SOURCE = "irsa_sia"
 
@@ -31,6 +33,12 @@ class SiaRow:
     # Detector footprint from ``s_region`` (issue #12): (ra, dec) vertices in degrees, ICRS, the
     # closing repeat of the first vertex removed. ``None`` when absent or not a POLYGON.
     s_region: tuple[tuple[float, float], ...] | None = None
+
+
+def frame_time(row: SiaRow) -> datetime:
+    """The one time per frame: midpoint of the SIA exposure bounds (MJD, UTC like the FITS
+    ``TIMESYS``). Used for the position, the cutout centre, ``x``/``y`` and ``time``."""
+    return mjd_to_utc((row.t_min_mjd + row.t_max_mjd) / 2.0)
 
 
 @dataclass(frozen=True)
@@ -169,9 +177,12 @@ def search(
     refresh: bool = False,
     maxrec: int | None = None,
     read_timeout_s: float | None = None,
+    radius_deg: float | None = None,
 ) -> SiaResult:
+    """One tiny cone. ``radius_deg`` defaults to ``SX_SIA_RADIUS_DEG``; the moving-object path
+    search (issue #26) passes its own cone radius."""
     s = ctx.settings
-    key = sia_key(s.data_release, ra, dec, s.sia_radius_deg)
+    key = sia_key(s.data_release, ra, dec, s.sia_radius_deg if radius_deg is None else radius_deg)
     n = maxrec or s.sia_maxrec
     ra_t, dec_t, rad_t = dict(key.query)["ra"], dict(key.query)["dec"], dict(key.query)["radius"]
 
