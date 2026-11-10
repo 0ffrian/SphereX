@@ -51,6 +51,7 @@ import { buttonClass, pressedClass } from './ui';
 import { closeUpKindOf } from './CloseUpPane';
 import { useCloseUpStore } from './closeUpStore';
 import { StarFlarePanel } from './StarFlarePanel';
+import { RockStage } from './build/RockStage';
 import { MouldStrip, type StripHandle } from './build/MouldStrip';
 import { useMould, type MouldPhase } from './build/useMould';
 import { usesBrowserSeed } from '@/viewer/mould/mouldSteps';
@@ -756,6 +757,15 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           data-testid="viewer-stage"
         >
           <div ref={hostRef} className="absolute inset-0" />
+          {/* D-37: the prototype rock engine draws asteroids and comet nuclei over the viewer. */}
+          <RockStage
+            card={card}
+            params={params}
+            plan={plan}
+            honesty={honesty}
+            tint={plan?.tint.tag ? [...plan.tint.rgb] : null}
+            reducedMotion={reducedMotion}
+          />
           {!pane && params && plan?.threeD && (
             <ConfidenceChip
               params={params}

@@ -331,5 +331,9 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-296 | Zoom bar and tool dock in the build view | Decided in code | [shell-surfaces](shell-surfaces.md) |
 | Q-297 | Details: the controls and honesty lists the mock-up's build view has no place for | Decided in code | [shell-surfaces](shell-surfaces.md) |
 | Q-298 | Build view follow-ups: mock-up title, island bottom right, `BuildControls` slot, Show dims rows only, phone close-up caption | Decided (coordinator) | [shell-surfaces](shell-surfaces.md) |
+| Q-299 | Rock engine (prototype code, verbatim) draws asteroids and comet nuclei from + Estimated | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-299-to-q-302-stream-v3-rock-engine-issue-71-d-37) |
+| Q-300 | `cardToRock` adapter and the artifact's own bodies by id | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-299-to-q-302-stream-v3-rock-engine-issue-71-d-37) |
+| Q-301 | Shape models as a radial height map for the engine; jets | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-299-to-q-302-stream-v3-rock-engine-issue-71-d-37) |
+| Q-302 | Rock controls and notes in `BuildControls`; known differences | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-299-to-q-302-stream-v3-rock-engine-issue-71-d-37) |
 | Q-280 to Q-284 | Search list additions: Titan reference moon, four demo-pack rows, archive outage | Decided in code | [rendering-bodies](rendering-bodies.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |
