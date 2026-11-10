@@ -104,6 +104,15 @@ interface RenderParams {
                                        // sun_dir: today a copy of the card's ICRF sun_vector; the viewer reads it
                                        // as scene space. Frame conversion open (Q-62); phase_angle_deg wins
   view_modes: { visible: VisibleMode; spherex_ir?: IRMode };
+  // D-36, Q-220 to Q-222: the score and the 3D gate, set by stage 7. Absent for nebula and nova and in
+  // older saved assets. Not the probability the picture is correct; never changes a badge.
+  confidence?: { score: number; measured_share: number; estimated_share: number; assumed_share: number;  // 0..1
+                 threshold: number; band: 'mostly_data' | 'part_data' | 'mostly_assumed' | 'too_little';
+                 gate: { class_known: boolean; key_measurement: boolean; score_ok: boolean; passed: boolean };
+                 found: string; needed: string; raise: string | null;
+                 inputs: { id: string; label: string; weight: number; c: number; points: number;
+                           tag: Tag | 'missing'; fields: string[] }[];
+                 tag: 'derived'; formula: string; weights_note: string; note: string };
   dynamics?: Dynamics;                 // D-32, D-34. Absent until stage 6: the body stays still (except R7.1 spin)
   haptics: HapticProfile;              // §8
   alt_text: string;                    // §9
