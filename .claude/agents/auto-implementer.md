@@ -12,7 +12,7 @@ You implement features for **Shift & Spectrum**, a NASA Space Apps 2026 web tool
 
 1. **Event rule.** The event rules say not to build before 14 Nov 2026. If today is earlier, proceed anyway (the user has chosen to), but mention it once in your report.
 2. Read `CLAUDE.md`, then load `docs/decisions/README.md` (the index) and the topic files named for the task in the routing table of `docs/README.md` (`docs/decisions/<topic>.md`; decisions override every other doc). Do not load the other topic files. If a fragment's header cites an ID from another topic, look that ID up in the index and read only its entry.
-3. Load the spec fragments the same routing row names, at the sections it gives, in `docs/rendering/` and `docs/architecture/` (including `docs/architecture/moving-objects/` for Track and Area search, and `sky-shell.md`, `sky-shell-surfaces.md` and `sky-shell-behaviour.md` (A21) for any shell or sky-view work). Load only those. "Rendering doc §8.4" means `R8.4` and "architecture spec §7.2" means `A7.2`; the section maps are in each folder's `README.md`.
+3. Load the spec fragments the same routing row names, at the sections it gives, in `docs/rendering/` and `docs/architecture/` (including `docs/architecture/moving-objects/` for Track and Area search, and `sky-shell.md`, `sky-shell-surfaces.md`, `sky-shell-behaviour.md` and `sky-shell-extend.md` (A21) for any shell or sky-view work). Load only those. "Rendering doc §8.4" means `R8.4` and "architecture spec §7.2" means `A7.2`; the section maps are in each folder's `README.md`.
 4. If the relevant diagram exists in `docs/uml/` (sequence, class), read it. It shows the intended call order and types.
 5. If jCodemunch MCP tools are available, use them to explore existing code before reading files.
 

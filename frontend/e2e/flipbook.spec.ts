@@ -22,6 +22,22 @@ async function search(page: Page, text: string) {
 }
 
 /**
+ * Picks a demo target from the search list, as a user does: a pointer press opens the list (it does
+ * not open on programmatic focus, WCAG 3.2.1), then the row is clicked. The "Test targets" chips
+ * were replaced by this list (issue #68 Track D).
+ */
+async function pickTarget(page: Page, name: string) {
+  const input = page.getByTestId('search-input');
+  await input.click();
+  // After an earlier pick the field holds that name and the list is filtered by it: clear it.
+  await input.fill('');
+  await page
+    .getByTestId('search-list')
+    .getByRole('option', { name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })
+    .click();
+}
+
+/**
  * Spectrum shape per target, like the real backend on the full cache (issue #24): Barnard's Star
  * and R Draconis saturate (no points), RW Aurigae has a few short-wavelength points only.
  */
@@ -42,10 +58,7 @@ test.describe('the five A1.1 targets', () => {
 
       if (i === 0) await search(page, name);
       else {
-        await page
-          .getByRole('group', { name: 'Test targets' })
-          .getByRole('button', { name, exact: true })
-          .click();
+        await pickTarget(page, name);
       }
 
       await expect(page.getByTestId('fixture-banner')).toBeVisible();
@@ -254,10 +267,9 @@ test('a shared link with a name and frame opens on that frame', async ({ page })
 
 test('the back button returns to the previous object', async ({ page }) => {
   await page.goto('/');
-  const picks = page.getByRole('group', { name: 'Test targets' });
-  await picks.getByRole('button', { name: 'RW Aurigae' }).click();
+  await pickTarget(page, 'RW Aurigae');
   await expect(page.getByTestId('object-name')).toHaveText('RW Aurigae');
-  await picks.getByRole('button', { name: 'R Draconis' }).click();
+  await pickTarget(page, 'R Draconis');
   await expect(page.getByTestId('object-name')).toHaveText('R Draconis');
   await page.goBack();
   await expect(page.getByTestId('object-name')).toHaveText('RW Aurigae');
@@ -321,7 +333,7 @@ test('a refused moving object says why, with no frames', async ({ page }) => {
   await page.goto('/');
   await search(page, 'Synthetic refused mover');
   await expect(page.getByTestId('no-frames')).toContainText(
-    'Frames for moving Solar System objects are not searched yet',
+    'The predicted path of this object could not be loaded',
   );
   await expect(page.getByTestId('flipbook')).toHaveCount(0);
   expect(errors, errors.join('\n')).toEqual([]);
@@ -399,10 +411,7 @@ test('three numbers ask for decimal degrees', async ({ page }) => {
 
 test('Back to the page without a hash clears the object (review finding 2)', async ({ page }) => {
   await page.goto('/');
-  await page
-    .getByRole('group', { name: 'Test targets' })
-    .getByRole('button', { name: 'RW Aurigae' })
-    .click();
+  await pickTarget(page, 'RW Aurigae');
   await expect(page.getByTestId('object-name')).toHaveText('RW Aurigae');
   await page.goBack();
   await expect.poll(() => new URL(page.url()).hash).toBe('');

@@ -26,7 +26,7 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 |---|---|---|
 | [overview.md](overview.md) | A1–A2.1 | you need the scope (sky view, flipbook, Build it, Track, Area search), priority tiers and their status, the system diagram or the design principles |
 | [data-sources.md](data-sources.md) | A3–A3.5 | you call or adapt SPHEREx/IRSA, Gaia, WISE, Horizons or SkyBoT |
-| [object-sources.md](object-sources.md) | A3.6–A3.11 | you call or adapt SBDB, DAMIT, the Exoplanet Archive, SIMBAD, mission shape models or the IRSA HiPS sky background |
+| [object-sources.md](object-sources.md) | A3.6–A3.11, A3.13 | you call or adapt SBDB, DAMIT, the Exoplanet Archive, SIMBAD, mission shape models, the IRSA HiPS sky background or the literature registry |
 | [targets.md](targets.md) | A3.12 | you pick or change test, demo or fixture targets (433 Eros is the MVP, Q-137), or the warm-start groups |
 | [pipeline.md](pipeline.md) | A4–A4.2 | you build stage 1 (find the object, frames, moving objects) or stage 2 (brightness and spectrum) |
 | [pipeline-card.md](pipeline-card.md) | A4.3–A4.8 | you build stages 3 to 10: classify, asset lookup and version constants, ObjectCard, physics layer, RenderParams, generators |
@@ -45,15 +45,18 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | [plan.md](plan.md) | A13 | you need the status board per milestone, the remaining days and the Track and Area tickets |
 | [risks.md](risks.md) | A14–A14.1 | you need the risk register, or the register of open **[verify]** items with owner and deadline |
 | [glossary.md](glossary.md) | A15 | you meet an unfamiliar term |
-| [moving-objects/area-search.md](moving-objects/area-search.md) | A16–A16.8 | you work on Area search (Q-146): draw a square, then Known objects (hand-off to Track) or Discovery; scope, architecture, honesty rules, measured Eros facts, tickets D1 to D3, the four gated research checks D4 to D7 and why a reviewer wants them (A16.8) |
-| [moving-objects/area-backend.md](moving-objects/area-backend.md) | A17–A17.13 | you build the Discovery backend: area frames and visits, dots, glitches/stars/fixed dots, the parallax-aware join, the known-object check, planted movers, completeness and the control, the rate-grid linker, the spectrum score, `/v1/areas`, schemas, cache |
+| [moving-objects/area-search.md](moving-objects/area-search.md) | A16–A16.6 | you work on Area search (Q-146): draw a square, then Known objects (hand-off to Track) or Discovery; scope, architecture, data flow, honesty rules, open items and measured Eros facts |
+| [moving-objects/area-plan.md](moving-objects/area-plan.md) | A16.7–A16.8 | you need the Area search tickets D1 to D3, the Day 0 gate and plan, or the four gated research checks D4 to D7 and why a reviewer wants them (A16.8) |
+| [moving-objects/area-backend.md](moving-objects/area-backend.md) | A17–A17.7 | you build the Discovery backend: area frames and visits, dots, glitches/stars/fixed dots, the parallax-aware join, the known-object check, planted movers, completeness and the control, export |
+| [moving-objects/area-contract.md](moving-objects/area-contract.md) | A17.8–A17.13 | you build or call `/v1/areas`, its schemas and fixtures, cache, offline and determinism, the compute budget, the rate-grid linker or the spectrum score |
 | [moving-objects/area-ui.md](moving-objects/area-ui.md) | A18–A18.11 | you build Area search in the sky view: drawing, sky layers, visits and blink, feature cards and minimise, Result card, hand-off to Track, the Checks section, state, tests |
 | [moving-objects/track.md](moving-objects/track.md) | A19–A19.8 | you build Track data: scope, entry points, frame list, SPHEREx-centred positions, `/path`, star list and photometry for movers, extended sources |
 | [moving-objects/track-contract.md](moving-objects/track-contract.md) | A19.9–A19.15 | you build the Track export (ECSV), its refusal codes, provenance per value, cache and pre-fetch, contract, owners, tickets T1 to T4, tests |
 | [moving-objects/track-ui.md](moving-objects/track-ui.md) | A20–A20.15 | you build the Track screen in the split pane: time slider, path on the sky, detail view and imagery, zoom, spectrum hop by hop, spin slider, sound controls, honesty, states, R9, files, tests |
 | [sky-shell.md](sky-shell.md) | A21–A21.4 | you change the app shell: names of the surfaces, status and sources, layout, insets, z-order, phone width, the rail and `ToolId` |
 | [sky-shell-surfaces.md](sky-shell-surfaces.md) | A21.5–A21.7 | you change the island, object panel or object card, sky interaction (drag, wheel, keys, clicks, picking), or the sky image and credit |
-| [sky-shell-behaviour.md](sky-shell-behaviour.md) | A21.8–A21.13 | you change the split pane (Build, Track), transport, search pill, keys and Escape, URL hash and history, live regions, or add a tool or a sky layer |
+| [sky-shell-behaviour.md](sky-shell-behaviour.md) | A21.8–A21.12 | you change the split pane (Build, Track), transport, search pill (the demo search list), keys and Escape, URL hash and history, or live regions |
+| [sky-shell-extend.md](sky-shell-extend.md) | A21.13 | you add a tool or a sky layer, or need the open conflicts between the shell as built and the Track and Area search specs |
 
 ## Section map
 
@@ -76,6 +79,7 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | A3.10 | Added for the object view | [object-sources.md#a310-added-for-the-object-view](object-sources.md#a310-added-for-the-object-view) |
 | A3.11 | Sky background (IRSA HiPS) | [object-sources.md#a311-sky-background-irsa-hips](object-sources.md#a311-sky-background-irsa-hips) |
 | A3.12 | Test and demo targets | [targets.md#a312-test-and-demo-targets](targets.md#a312-test-and-demo-targets) |
+| A3.13 | Literature registry (`literature.toml`) | [object-sources.md#a313-literature-registry-literaturetoml](object-sources.md#a313-literature-registry-literaturetoml) |
 | A4 | Pipeline | [pipeline.md#a4-pipeline](pipeline.md#a4-pipeline) |
 | A4.1 | Stage 1: Find the object | [pipeline.md#a41-stage-1-find-the-object](pipeline.md#a41-stage-1-find-the-object) |
 | A4.2 | Stage 2: Measure brightness and spectrum | [pipeline.md#a42-stage-2-measure-brightness-and-spectrum](pipeline.md#a42-stage-2-measure-brightness-and-spectrum) |
@@ -128,8 +132,8 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | A16.4 | Data flow | [moving-objects/area-search.md#a164-data-flow](moving-objects/area-search.md#a164-data-flow) |
 | A16.5 | Honesty rules | [moving-objects/area-search.md#a165-honesty-rules](moving-objects/area-search.md#a165-honesty-rules) |
 | A16.6 | Open items and measured facts | [moving-objects/area-search.md#a166-open-items-and-measured-facts](moving-objects/area-search.md#a166-open-items-and-measured-facts) |
-| A16.7 | Tickets and plan | [moving-objects/area-search.md#a167-tickets-and-plan](moving-objects/area-search.md#a167-tickets-and-plan) |
-| A16.8 | Why these four checks, and what a reviewer gets | [moving-objects/area-search.md#a168-why-these-four-checks-and-what-a-reviewer-gets](moving-objects/area-search.md#a168-why-these-four-checks-and-what-a-reviewer-gets) |
+| A16.7 | Tickets and plan | [moving-objects/area-plan.md#a167-tickets-and-plan](moving-objects/area-plan.md#a167-tickets-and-plan) |
+| A16.8 | Why these four checks, and what a reviewer gets | [moving-objects/area-plan.md#a168-why-these-four-checks-and-what-a-reviewer-gets](moving-objects/area-plan.md#a168-why-these-four-checks-and-what-a-reviewer-gets) |
 | A17 | Discovery backend | [moving-objects/area-backend.md#a17-discovery-backend](moving-objects/area-backend.md#a17-discovery-backend) |
 | A17.1 | Area and frames (`frames.py`) | [moving-objects/area-backend.md#a171-area-and-frames-framespy](moving-objects/area-backend.md#a171-area-and-frames-framespy) |
 | A17.2 | Dots (`dots.py`) | [moving-objects/area-backend.md#a172-dots-dotspy](moving-objects/area-backend.md#a172-dots-dotspy) |
@@ -138,12 +142,12 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | A17.5 | Known-object check (`match.py`) | [moving-objects/area-backend.md#a175-known-object-check-matchpy](moving-objects/area-backend.md#a175-known-object-check-matchpy) |
 | A17.6 | Injection, completeness and control | [moving-objects/area-backend.md#a176-injection-completeness-and-control](moving-objects/area-backend.md#a176-injection-completeness-and-control) |
 | A17.7 | Export | [moving-objects/area-backend.md#a177-export](moving-objects/area-backend.md#a177-export) |
-| A17.8 | Endpoints | [moving-objects/area-backend.md#a178-endpoints](moving-objects/area-backend.md#a178-endpoints) |
-| A17.9 | Schemas and fixtures | [moving-objects/area-backend.md#a179-schemas-and-fixtures](moving-objects/area-backend.md#a179-schemas-and-fixtures) |
-| A17.10 | Cache, offline and determinism | [moving-objects/area-backend.md#a1710-cache-offline-and-determinism](moving-objects/area-backend.md#a1710-cache-offline-and-determinism) |
-| A17.11 | Compute budget | [moving-objects/area-backend.md#a1711-compute-budget](moving-objects/area-backend.md#a1711-compute-budget) |
-| A17.12 | Rate-grid linker (`rategrid.py`) | [moving-objects/area-backend.md#a1712-rate-grid-linker-rategridpy](moving-objects/area-backend.md#a1712-rate-grid-linker-rategridpy) |
-| A17.13 | Spectrum smoothness score (`sed.py`) | [moving-objects/area-backend.md#a1713-spectrum-smoothness-score-sedpy](moving-objects/area-backend.md#a1713-spectrum-smoothness-score-sedpy) |
+| A17.8 | Endpoints | [moving-objects/area-contract.md#a178-endpoints](moving-objects/area-contract.md#a178-endpoints) |
+| A17.9 | Schemas and fixtures | [moving-objects/area-contract.md#a179-schemas-and-fixtures](moving-objects/area-contract.md#a179-schemas-and-fixtures) |
+| A17.10 | Cache, offline and determinism | [moving-objects/area-contract.md#a1710-cache-offline-and-determinism](moving-objects/area-contract.md#a1710-cache-offline-and-determinism) |
+| A17.11 | Compute budget | [moving-objects/area-contract.md#a1711-compute-budget](moving-objects/area-contract.md#a1711-compute-budget) |
+| A17.12 | Rate-grid linker (`rategrid.py`) | [moving-objects/area-contract.md#a1712-rate-grid-linker-rategridpy](moving-objects/area-contract.md#a1712-rate-grid-linker-rategridpy) |
+| A17.13 | Spectrum smoothness score (`sed.py`) | [moving-objects/area-contract.md#a1713-spectrum-smoothness-score-sedpy](moving-objects/area-contract.md#a1713-spectrum-smoothness-score-sedpy) |
 | A18 | Area search in the sky view | [moving-objects/area-ui.md#a18-area-search-in-the-sky-view](moving-objects/area-ui.md#a18-area-search-in-the-sky-view) |
 | A18.1 | Tool and drawing | [moving-objects/area-ui.md#a181-tool-and-drawing](moving-objects/area-ui.md#a181-tool-and-drawing) |
 | A18.2 | Sky layers (`frontend/src/app/sky/area/AreaLayer.tsx`) | [moving-objects/area-ui.md#a182-sky-layers-frontendsrcappskyareaarealayertsx](moving-objects/area-ui.md#a182-sky-layers-frontendsrcappskyareaarealayertsx) |
@@ -201,4 +205,4 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | A21.10 | Keyboard and Escape | [sky-shell-behaviour.md#a2110-keyboard-and-escape](sky-shell-behaviour.md#a2110-keyboard-and-escape) |
 | A21.11 | URL hash and history | [sky-shell-behaviour.md#a2111-url-hash-and-history](sky-shell-behaviour.md#a2111-url-hash-and-history) |
 | A21.12 | Live regions and accessibility | [sky-shell-behaviour.md#a2112-live-regions-and-accessibility](sky-shell-behaviour.md#a2112-live-regions-and-accessibility) |
-| A21.13 | Adding a tool or a sky layer | [sky-shell-behaviour.md#a2113-adding-a-tool-or-a-sky-layer](sky-shell-behaviour.md#a2113-adding-a-tool-or-a-sky-layer) |
+| A21.13 | Adding a tool or a sky layer | [sky-shell-extend.md#a2113-adding-a-tool-or-a-sky-layer](sky-shell-extend.md#a2113-adding-a-tool-or-a-sky-layer) |

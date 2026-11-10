@@ -26,7 +26,7 @@ One meaning per term. Where a word has two meanings, both are listed and the own
 | MOST | IRSA's Moving Object Search Tool. Whether it replaces the cone search for movers is open ([A19.3](moving-objects/track.md#a193-frame-list)). |
 | DAMIT | Database of asteroid shape models built from brightness changes. |
 | Target group | The `group` of a target in `backend/targets.toml` (test, demo, fixture); pre-fetch and warm start fill the cache per group ([A3.12](targets.md#a312-test-and-demo-targets)). |
-| Demo object | Two meanings. (1) **The MVP demo object**: 433 Eros in Track (Q-137). (2) **The demo group**: the quick-pick targets of D-31 ([A3.12](targets.md#a312-test-and-demo-targets)). |
+| Demo object | Two meanings. (1) **The MVP demo object**: 433 Eros in Track (Q-137). (2) **The demo group**: the `demo` rows of `targets.toml`, the D-31 spectrum objects and the demo search list rows (Q-161) ([A3.12](targets.md#a312-test-and-demo-targets)). |
 
 **Values, tags and honesty**
 

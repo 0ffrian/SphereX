@@ -3,9 +3,12 @@
     uv run python -m scripts.ingest_shape --zip PATH --member NAME.tab --slug eros-gaskell \\
         --spkid 20000433 --name "433 Eros" --citation ... --doi ... --licence CC0-1.0
 
-Input is an ICQ file (Gaskell, PDS) or a Wavefront OBJ (DAMIT). Output is ``<slug>.glb`` (LOD0)
+Input is an ICQ file (Gaskell, PDS), a Wavefront OBJ (DAMIT, OSIRIS-REx) or a PDS3 plate model
+in a VRML ``.wrl`` file (Rosetta SPC SHAP5; ``--lod1-input`` names the official lower-resolution
+product used as LOD1, never a decimation of LOD0). Output is ``<slug>.glb`` (LOD0)
 and ``<slug>.lod1.glb`` (LOD1) in ``assets/shapes`` plus an entry in ``registry.toml``.
-No decimation: an ICQ grid is halved exactly (keep every second grid point); an OBJ is used as is.
+No decimation: an ICQ grid is halved exactly (keep every second grid point); an OBJ is used as is;
+a WRL takes its LOD1 from a second official file, or refuses.
 The output is byte-deterministic (no timestamps, sorted JSON keys, fixed padding).
 Units: km in, metres out (glTF). Axes: glTF is +Y up (glTF 2.0 spec 3.4), so the body-fixed
 frame is rotated -90 deg about X: glTF (x, y, z) = body (x, z, -y). The body +Z (the spin pole
@@ -29,7 +32,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-INGEST_VERSION = "2"  # 2: Z-up body frame rotated to glTF Y-up
+INGEST_VERSION = "2"  # 2: Z-up body frame rotated to glTF Y-up (a WRL row adds only fields)
 GENERATOR = f"Shift & Spectrum ingest_shape {INGEST_VERSION}"
 TRIANGLE_BUDGET = 50_000  # R5.5
 DEFAULT_OUT = Path(__file__).resolve().parent.parent / "assets" / "shapes"
@@ -91,6 +94,65 @@ def read_obj(text: str) -> tuple[Array, Array]:
     if f.min() < 0 or f.max() >= len(v):
         raise ShapeError("OBJ face index out of range")
     return v, f
+
+
+# PDS3 plate model in VRML 2.0 (Rosetta SPC SHAP5, PDSSBN_PLATE_SHAPE_DEF). The file is fixed
+# 82-byte records: a header, ``point [`` and one "x y z" row per vertex (km), ``] }``, then
+# ``coordIndex [`` and one "a b c -1" row per plate. The label (PLATE_TABLE) says the indices are
+# offsets from the first vertex row, so the base is 0; ``-1`` is the VRML end-of-face flag.
+_WRL_COUNTS = re.compile(r"#\s*Number of vertices and number of facets:\s*#\s*(\d+)\s+(\d+)")
+_WRL_POINT = re.compile(r"\bpoint\s*\[([^\]]*)\]")
+_WRL_INDEX = re.compile(r"\bcoordIndex\s*\[([^\]]*)\]")
+
+
+def read_wrl(text: str) -> tuple[Array, Array]:
+    """Return (vertices in km, triangles) from a PDS3 VRML plate model. Refuses, never repairs.
+
+    Checks: the header counts match the tables; every face is a triangle ended by ``-1``; indices
+    are 0-based and inside the vertex table (a 1-based file would reach ``len(v)`` and be refused).
+    """
+    counts = _WRL_COUNTS.search(text)
+    # VRML comments run from ``#`` to the end of the line; the count line sits inside ``point [``.
+    text = re.sub(r"#[^\n]*", "", text)
+    pts = _WRL_POINT.search(text)
+    idx = _WRL_INDEX.search(text)
+    if not (counts and pts and idx):
+        raise ShapeError("WRL file: no vertex count line, point table or coordIndex table")
+    try:
+        v = np.array(pts.group(1).split(), dtype=np.float64)
+        flat = np.array(idx.group(1).split(), dtype=np.int64)
+    except ValueError as e:
+        raise ShapeError(f"WRL file: non-numeric table entry ({e})") from None
+    nv, nf = int(counts.group(1)), int(counts.group(2))
+    if v.size != 3 * nv:
+        raise ShapeError(f"WRL file: header says {nv} vertices, point table holds {v.size / 3:g}")
+    if not np.isfinite(v).all():
+        raise ShapeError("WRL file: non-finite vertex coordinate (NaN or inf)")
+    if flat.size != 4 * nf or not (flat[3::4] == -1).all():
+        raise ShapeError(
+            f"WRL file: expected {nf} triangles ended by -1 ({4 * nf} entries), found {flat.size}"
+        )
+    tris = flat.reshape(-1, 4)[:, :3]
+    if tris.min() < 0 or tris.max() >= nv:
+        raise ShapeError(
+            f"WRL plate index outside 0..{nv - 1} (found {tris.min()}..{tris.max()}); the label "
+            "says 0-based offsets, so a 1-based or damaged file is refused"
+        )
+    return v.reshape(-1, 3), tris.copy()
+
+
+def compact(verts: Array, tris: Array) -> tuple[Array, Array]:
+    """Drop vertices no triangle uses (the OSIRIS-REx OBJ may list some), keeping order.
+
+    They would otherwise widen the GLB bounding box and carry zero normals. A no-op, returning the
+    inputs, when every vertex is used, so ICQ output is unchanged.
+    """
+    used = np.zeros(len(verts), dtype=bool)
+    used[tris.reshape(-1)] = True
+    if used.all():
+        return verts, tris
+    remap = np.cumsum(used) - 1
+    return verts[used], remap[tris]
 
 
 # --- mesh ------------------------------------------------------------------------------------
@@ -322,35 +384,69 @@ def sha256(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
 
 
+def _finish(verts: Array, tris: Array, km_to_m: float, label: str) -> tuple[Array, Array, Array]:
+    """Budget, closure and winding checks, then axes, units and normals for one level."""
+    verts, tris = compact(verts, tris)
+    if len(tris) > TRIANGLE_BUDGET:
+        raise ShapeError(
+            f"{label}: {len(tris)} triangles exceeds the {TRIANGLE_BUDGET} budget (R5.5) and no "
+            "exact reduction applies; use an official lower-resolution product"
+        )
+    open_edges, dup_dir = edge_check(tris)
+    if open_edges or dup_dir:
+        raise ShapeError(
+            f"{label}: mesh is not closed and consistently wound ({open_edges} open or "
+            f"non-manifold edges, {dup_dir} same-direction edges); refusing to ship it"
+        )
+    tris = orient_outward(verts, tris)
+    verts = verts @ Z_UP_TO_Y_UP.T
+    return verts * km_to_m, tris, vertex_normals(verts, tris)
+
+
+def _check_lod1_matches(lod0: tuple[Array, Array], lod1: tuple[Array, Array]) -> None:
+    """Refuse a LOD1 file that is not a lighter product of the same body (no silent bypass)."""
+    v0, t0 = compact(*lod0)
+    v1, t1 = compact(*lod1)
+    if len(t1) >= len(t0):
+        raise ShapeError(f"LOD1 has {len(t1)} triangles, not fewer than LOD0's {len(t0)}")
+    lo0, hi0, lo1, hi1 = v0.min(axis=0), v0.max(axis=0), v1.min(axis=0), v1.max(axis=0)
+    diag = float(np.linalg.norm(hi0 - lo0))
+    if max(np.abs(lo1 - lo0).max(), np.abs(hi1 - hi0).max()) > 0.05 * diag:
+        raise ShapeError("LOD1 bounding box differs from LOD0 by more than 5%: a different body?")
+
+
 def build_levels(
-    data: bytes, is_icq: bool, km_to_m: float = 1000.0
+    data: bytes,
+    is_icq: bool,
+    km_to_m: float = 1000.0,
+    *,
+    fmt: str | None = None,
+    lod1_data: bytes | None = None,
 ) -> list[tuple[Array, Array, Array]]:
-    """Return [(verts_m, tris, normals) for LOD0, LOD1] after the welding and winding checks."""
-    if is_icq:
+    """Return [(verts_m, tris, normals) for LOD0, LOD1] after the welding and winding checks.
+
+    ``fmt`` is "icq", "obj" or "wrl" (default: icq if ``is_icq`` else obj). A WRL takes LOD1 from
+    ``lod1_data``, a second official product; without it the call refuses (no decimation).
+    """
+    kind = fmt or ("icq" if is_icq else "obj")
+    if lod1_data is not None and kind != "wrl":
+        raise ShapeError("--lod1-input is only for a WRL; ICQ and OBJ derive or reuse their LOD1")
+    if kind == "icq":
         grid = read_icq(data.decode("ascii"))
-        grids = [grid, downsample_icq(grid)]
-        meshes = [icq_to_mesh(g) for g in grids]
+        meshes = [icq_to_mesh(g) for g in (grid, downsample_icq(grid))]
+    elif kind == "wrl":
+        if lod1_data is None:
+            raise ShapeError(
+                "a WRL plate model has no exact reduction: give --lod1-input with the official "
+                "lower-resolution product (never decimated here)"
+            )
+        meshes = [weld(*read_wrl(d.decode("ascii"))) for d in (data, lod1_data)]
+        _check_lod1_matches(meshes[0], meshes[1])
     else:
         v, f = read_obj(data.decode("utf-8"))
         meshes = [weld(v, f)]
         meshes.append(meshes[0])  # no exact reduction for an OBJ: LOD1 is the same mesh
-    out = []
-    for verts, tris in meshes:
-        if len(tris) > TRIANGLE_BUDGET:
-            raise ShapeError(
-                f"{len(tris)} triangles exceeds the {TRIANGLE_BUDGET} budget (R5.5) and no exact "
-                "reduction applies; reduce the model offline first"
-            )
-        open_edges, dup_dir = edge_check(tris)
-        if open_edges or dup_dir:
-            raise ShapeError(
-                f"mesh is not closed and consistently wound ({open_edges} open or non-manifold "
-                f"edges, {dup_dir} same-direction edges); refusing to ship it"
-            )
-        tris = orient_outward(verts, tris)
-        verts = verts @ Z_UP_TO_Y_UP.T
-        out.append((verts * km_to_m, tris, vertex_normals(verts, tris)))
-    return out
+    return [_finish(v, t, km_to_m, f"LOD{i}") for i, (v, t) in enumerate(meshes)]
 
 
 # The same rule as the /data/shapes route (app/main.py), so every registered mesh is servable and
@@ -367,9 +463,14 @@ def ingest(args: argparse.Namespace) -> dict[str, Any]:
         member = args.member
     else:
         data = Path(args.input).read_bytes()
-        member = Path(args.input).name
-    is_icq = member.lower().endswith(".tab") if args.format == "auto" else args.format == "icq"
-    levels = build_levels(data, is_icq)
+        member = getattr(args, "source_name", "") or Path(args.input).name
+    fmt = args.format
+    if fmt == "auto":
+        low = member.lower()
+        fmt = "icq" if low.endswith(".tab") else "wrl" if low.endswith(".wrl") else "obj"
+    lod1_path: str | None = getattr(args, "lod1_input", None)
+    lod1_data = Path(lod1_path).read_bytes() if lod1_path else None
+    levels = build_levels(data, fmt == "icq", fmt=fmt, lod1_data=lod1_data)
     cite = f"{args.citation} DOI {args.doi}. Licence {args.licence}."
     extras = {"doi": args.doi, "licence": args.licence, "spkid": args.spkid, "units": "m"}
     out_dir = Path(args.out_dir)
@@ -391,6 +492,8 @@ def ingest(args: argparse.Namespace) -> dict[str, Any]:
         "vertices_lod0": len(v0),
         "vertices_lod1": len(levels[1][0]),
         "extents_km": [round(float(x), 3) for x in ext_km],
+        # What the viewer scales by (Q-43): the Box3 bounding sphere is half the box diagonal.
+        "bbox_half_diagonal_km": round(float(np.linalg.norm(ext_km)) / 2.0, 3),
         "units": "metres in the GLB (source km x 1000)",
         "frame": args.frame,
         "axes": AXES_NOTE,
@@ -404,6 +507,10 @@ def ingest(args: argparse.Namespace) -> dict[str, Any]:
         "lod1_sha256": sha256(blobs[1]),
         "ingest_version": INGEST_VERSION,
     }
+    if lod1_data is not None and lod1_path:
+        # The second official product is hashed too, so both sources can be checked.
+        entry["lod1_source_member"] = getattr(args, "lod1_member", "") or Path(lod1_path).name
+        entry["lod1_source_sha256"] = sha256(lod1_data)
     if args.source_url:
         entry["source_url"] = args.source_url
     update_registry(out_dir / "registry.toml", entry)
@@ -412,10 +519,15 @@ def ingest(args: argparse.Namespace) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
-    p.add_argument("--input", help="local ICQ (.tab) or OBJ file")
+    p.add_argument("--input", help="local ICQ (.tab), OBJ or PDS3 VRML (.wrl) file")
     p.add_argument("--zip", help="zip archive holding the member")
     p.add_argument("--member", help="path of the file inside --zip")
-    p.add_argument("--format", choices=["auto", "icq", "obj"], default="auto")
+    p.add_argument("--lod1-input", help="WRL only: the official lower-resolution file for LOD1")
+    p.add_argument("--lod1-member", default="", help="name recorded for --lod1-input")
+    p.add_argument(
+        "--source-name", default="", help="name recorded for --input (default: its file)"
+    )
+    p.add_argument("--format", choices=["auto", "icq", "obj", "wrl"], default="auto")
     p.add_argument("--slug", required=True)
     p.add_argument(
         "--spkid",

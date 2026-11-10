@@ -49,7 +49,7 @@
 
 - M1 to M4 do not depend on each other. Each builds against its own fixtures (recorded responses, sample cards and spectra). Only M5 joins them. Each milestone holds as few tickets as possible.
 - Open questions and **[verify]** items sit inside the ticket that needs them.
-- **Amended by:** Q-132 (M3 is renamed "Sound") and Q-187 (proposed: M4 also holds Track tickets T1, T2 and T4, A19.14). Area tickets D1 and D2 are in M4 and D3 in M5 ([A16.7](../architecture/moving-objects/area-search.md#a167-tickets-and-plan)). Status board: [A13](../architecture/plan.md#a13-plan-to-14-nov).
+- **Amended by:** Q-132 (M3 is renamed "Sound") and Q-187 (proposed: M4 also holds Track tickets T1, T2 and T4, A19.14). Area tickets D1 and D2 are in M4 and D3 in M5 ([A16.7](../architecture/moving-objects/area-plan.md#a167-tickets-and-plan)). Status board: [A13](../architecture/plan.md#a13-plan-to-14-nov).
 
 ## D-30 Milestone owners and dependencies
 

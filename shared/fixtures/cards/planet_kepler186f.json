@@ -1,0 +1,58 @@
+{
+  "id": "fixture:planet_kepler186f",
+  "name": "Synthetic fixture: Kepler-186 f (real archive values)",
+  "type": "planet_rocky",
+  "radius_rjup": {
+    "value": 0.10438,
+    "tag": "measured",
+    "source": "synthetic fixture: real Kepler-186 f value, NASA Exoplanet Archive PSCompPars pl_rade (Torres et al. 2015, 2015ApJ...800...99T), 1.17 Earth radii converted to Jupiter radii (x 6378.1366 km / 71492 km)",
+    "err": 0.00714
+  },
+  "teq_K": {
+    "value": 177.0,
+    "tag": "measured",
+    "source": "synthetic fixture: real Kepler-186 f value, NASA Exoplanet Archive PSCompPars pl_eqt (Q1_Q17_DR25_KOI_TABLE; the Kepler KOI value, which assumes a Bond albedo of 0.3 and even day-night heat redistribution, not the zero-albedo Teq)"
+  },
+  "mass_mearth": {
+    "value": 1.71,
+    "tag": "model_dependent",
+    "source": "synthetic fixture: real Kepler-186 f value, NASA Exoplanet Archive PSCompPars calculated value (pscp_calc.html), pl_bmasse",
+    "assumption": "mass estimated from the planet's radius with the Chen & Kipping 2017 mass-radius relation (archive pl_bmassprov = 'M-R relationship', pscp_calc.html); not a measured mass"
+  },
+  "orbit_au": {
+    "value": 0.432,
+    "tag": "measured",
+    "source": "synthetic fixture: real Kepler-186 f value, NASA Exoplanet Archive PSCompPars pl_orbsmax (Torres et al. 2015, 2015ApJ...800...99T)",
+    "err": 0.171
+  },
+  "orbital_period_d": {
+    "value": 129.9441,
+    "tag": "measured",
+    "source": "synthetic fixture: real Kepler-186 f value, NASA Exoplanet Archive PSCompPars pl_orbper (Torres et al. 2015, 2015ApJ...800...99T)",
+    "err": 0.0013
+  },
+  "host_teff_K": {
+    "value": 3755.0,
+    "tag": "measured",
+    "source": "synthetic fixture: real Kepler-186 f value, NASA Exoplanet Archive PSCompPars st_teff (Torres et al. 2015, 2015ApJ...800...99T)",
+    "err": 90.0
+  },
+  "host_radius_rsun": {
+    "value": 0.523,
+    "tag": "measured",
+    "source": "synthetic fixture: real Kepler-186 f value, NASA Exoplanet Archive PSCompPars st_rad (Torres et al. 2015, 2015ApJ...800...99T)",
+    "err": 0.023
+  },
+  "host_mass_msun": {
+    "value": 0.544,
+    "tag": "measured",
+    "source": "synthetic fixture: real Kepler-186 f value, NASA Exoplanet Archive PSCompPars st_mass (Torres et al. 2015, 2015ApJ...800...99T)",
+    "err": 0.024
+  },
+  "host_age_gyr": {
+    "value": 4.0,
+    "tag": "measured",
+    "source": "synthetic fixture: real Kepler-186 f value, NASA Exoplanet Archive PSCompPars st_age (Torres et al. 2015, 2015ApJ...800...99T)",
+    "err": 0.6
+  }
+}

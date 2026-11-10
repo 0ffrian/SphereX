@@ -1,6 +1,6 @@
 # 17 Activity: pipeline stages 1–6 and RenderParams
 
-The backend pipeline from a name or RA/Dec to an `ObjectCard` and `RenderParams`, including every refusal branch (since D-32, a refusal only where no tier can answer). Drawn from architecture spec A4.1–A4.2 ([pipeline.md](../architecture/pipeline.md)), A4.3–A4.8 ([pipeline-card.md](../architecture/pipeline-card.md)), the object job A4.10 ([jobs.md](../architecture/jobs.md#a410-object-job-and-fan-out)) and the refusal codes A4.12 ([refusals.md](../architecture/refusals.md#a412-missing-and-refusal-codes)), rendering doc R1 (principles), R3, R3.3, R5.2, R6.2, R7 and decisions D-01, D-02, D-04, D-19 and D-25. Movers (Track, A19) take the moving-object branch of stage 1 and the Q-139 rule of stage 2, built by PR #53. The old stage 5 "settings file" is replaced by the card builder (D-02).
+The backend pipeline from a name or RA/Dec to an `ObjectCard` and `RenderParams`, including every refusal branch (since D-32, a refusal only where no tier can answer). Drawn from architecture spec A4.1–A4.2 ([pipeline.md](../architecture/pipeline.md)), A4.3–A4.8 ([pipeline-card.md](../architecture/pipeline-card.md)), the object job A4.10 ([jobs.md](../architecture/jobs.md#a410-object-job-and-fan-out)) and the refusal codes A4.12 ([refusals.md](../architecture/refusals.md#a412-missing-and-refusal-codes)), rendering doc R1 (principles), R3, R3.3, R5.2, R6.2, R7 and decisions D-01, D-02, D-04, D-19 and D-25. Movers (Track, A19) take the moving-object branch of stage 1, built by PR #53 (issue #26), and the Q-139 rule of stage 2 (to build, ticket T4). The old stage 5 "settings file" is replaced by the card builder (D-02).
 
 ```mermaid
 flowchart TD
@@ -16,7 +16,7 @@ flowchart TD
   Resolved -->|yes| HaveCoord
 
   HaveCoord --> Moving{"Moving object?"}
-  Moving -->|yes| Horizons["Position per frame from Horizons, neighbours from SkyBoT"]
+  Moving -->|yes| Horizons["Horizons path seen from SPHEREx, SIA cones along it, keep frames whose footprint holds the path, exact position per frame midpoint (model_dependent), neighbours from SkyBoT"]
   Moving -->|no| Static["Fixed RA/Dec (proper motion for stars)"]
   Horizons --> WCS["Sky to pixel per frame via WCS"]
   Static --> WCS
@@ -73,4 +73,5 @@ flowchart TD
 - The physics layer is "reduced, physically inspired" formulas (architecture spec §7); its outputs are tagged `derived`.
 - Every external call in this flow goes through the backend's read-through cache (D-25). With `SX_OFFLINE=1` a cache miss is refused, and the refused layer goes in `missing`.
 - Small-body names are numbered asteroids, provisional designations, comets and interstellar objects (D-19).
+- Moving objects (issue #26, A4.1): the frame search runs SIA cones along a SPHEREx-centred Horizons path; cone radius, step, cap and pacing are **[verify]** settings (Q-21). Positions and pixels are `model_dependent` (Q-125). A web request runs it from the cache only and starts the object job for the rest (Q-111). MOST as the primary search: Q-126.
 - As built (issue #5): the saved-asset check runs before stage 3, as in A4.4's pseudocode, so a saved asset skips classification. Stage 3 takes the class label from the catalogue only; spectrum matching and Gaia colours are not built (Q-55). Generated assets are saved only when their inputs are final (Q-57).

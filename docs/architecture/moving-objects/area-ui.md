@@ -105,7 +105,7 @@ The card for one Discovery result (called "Track card" before; renamed so "Track
 
 ### A18.11 Checks
 
-**Gated extras (Q-203), proposed.** Built only if its ticket passes the gate of [A16.7](area-search.md#a167-tickets-and-plan); until then the Discovery card has no Checks section and nothing is greyed out or promised. Not in the mock-up yet. Data: `GET /v1/areas/{area_id}/checks` ([A17.8](area-backend.md#a178-endpoints)).
+**Gated extras (Q-203), proposed.** Built only if its ticket passes the gate of [A16.7](area-plan.md#a167-tickets-and-plan); until then the Discovery card has no Checks section and nothing is greyed out or promised. Not in the mock-up yet. Data: `GET /v1/areas/{area_id}/checks` ([A17.8](area-contract.md#a178-endpoints)).
 
 - **Where.** A **Checks** disclosure at the foot of the Discovery card, closed until Discovery has run. Each part appears only if its data exists; a part that is missing says so ("Control not run") and its code goes to the refusal list, never an empty frame.
 - **Planted test mover (D4).** A switch **Include a planted test mover**, off by default, enabled after the first run. On: the planted path is drawn on the sky with a dashed outline and the label "Injected", and one row "Test · planted by us · recovered" (or "not recovered") joins the results under a divider headed "Planted, not real". The row opens a small card: "We planted this mover. The search was not told where, and it found it." (or "did not find it"). It is excluded from every count, from Known and from the export. Badge **Injected**: text plus an outline colour that is not the green, amber or grey of the real verdicts, so colour is never the only cue (R9).

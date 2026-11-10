@@ -2,6 +2,8 @@
 
 One composite row per planet (the archive's best-value set). Tested live on 2026-11-07 against
 ``https://exoplanetarchive.ipac.caltech.edu/TAP/sync`` with ``format=json``; ADQL ``lower()`` works.
+``st_age``, the ``*err1/2`` columns and the host-star ``*_reflink`` columns were checked on
+2026-11-09 (issue #68).
 Names are matched case-insensitively against a short candidate list (see ``name_candidates``).
 """
 
@@ -37,11 +39,24 @@ VALUE_COLUMNS = (
     "pl_dens",
     "pl_eqt",
     "pl_orbsmax",
+    "pl_orbsmaxerr1",
+    "pl_orbsmaxerr2",
     "pl_orbper",
+    "pl_orbpererr1",
+    "pl_orbpererr2",
     "pl_orbeccen",
     "st_teff",
+    "st_tefferr1",
+    "st_tefferr2",
     "st_rad",
+    "st_raderr1",
+    "st_raderr2",
     "st_mass",
+    "st_masserr1",
+    "st_masserr2",
+    "st_age",
+    "st_ageerr1",
+    "st_ageerr2",
     "sy_dist",
 )
 REF_COLUMNS = (
@@ -50,7 +65,15 @@ REF_COLUMNS = (
     "pl_bmasse_reflink",
     "pl_eqt_reflink",
     "pl_orbsmax_reflink",
+    "pl_orbper_reflink",
+    "st_teff_reflink",
+    "st_rad_reflink",
+    "st_mass_reflink",
+    "st_age_reflink",
 )
+# Part of the cache key, so a reply recorded with fewer columns is never served for a card that
+# needs st_age or the host-star references (issue #68, Q-150). Bump when COLUMNS changes.
+COLUMNS_VERSION = "2"
 COLUMNS = VALUE_COLUMNS + REF_COLUMNS
 _REF_TEXT = re.compile(r">([^<]+)</a>")
 _PLANET_LETTER = re.compile(r"^(.*\S)([b-z])$")
@@ -79,7 +102,9 @@ def name_candidates(*names: str | None) -> list[str]:
 
 
 def archive_key(candidates: Sequence[str]) -> CacheKey:
-    return CacheKey.make(SOURCE, None, pl_name="|".join(c.lower() for c in candidates))
+    return CacheKey.make(
+        SOURCE, None, pl_name="|".join(c.lower() for c in candidates), cols=COLUMNS_VERSION
+    )
 
 
 def adql(candidates: Sequence[str]) -> str:

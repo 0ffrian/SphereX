@@ -11,7 +11,7 @@ You maintain the documentation of **Shift & Spectrum**. You keep `docs/` consist
 
 - `docs/decisions/` holds decisions D-xx, backlog B-xx and open questions Q-xx: `README.md` is the index (one row per entry, with its topic file) and one file per topic holds the entries. It overrides everything else.
 - `docs/rendering/` holds fragments with sections `R0`–`R12` (R10 `layout.md`, R10.1 `layout-repo.md`, R11 `acceptance-tests.md` with R11.1–R11.3 in `reference/`, R12 `open-items.md`). Its `README.md` has the fragment table and the section map.
-- `docs/architecture/` holds fragments with sections `A1`–`A21` (A16–A20 in `moving-objects/`, A21 in `sky-shell.md`, `sky-shell-surfaces.md` and `sky-shell-behaviour.md`, glossary A15). Its `README.md` has the fragment table and the section map.
+- `docs/architecture/` holds fragments with sections `A1`–`A21` (A16–A20 in `moving-objects/`, A21 in `sky-shell.md`, `sky-shell-surfaces.md`, `sky-shell-behaviour.md` and `sky-shell-extend.md`, glossary A15). Its `README.md` has the fragment table and the section map.
 - `docs/uml/` holds one Mermaid diagram file per view, plus a `README.md` index.
 - `docs/README.md` holds the precedence list and the **"What to load for a task"** routing table: each row names the decision topic files and the fragments with section IDs.
 - `CLAUDE.md` holds the entry point and the rules.

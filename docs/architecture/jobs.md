@@ -51,4 +51,4 @@ Built in issue #41 (PR #58, 8 Nov 2026). The decisions are Q-111 (answers and en
 
 **Measured (issue #41, Q-111 item 6):** first answer 13.1 s cold for Barnard's Star (11.1 s of it the SIMBAD resolve); partial answer from the first 24 frames in 70 s; complete 240-frame answer in 458 s, limited by IRSA at about 20 s per cutout.
 
-**Moving objects:** the Track frame search and the path endpoint run inside this job (Q-141 proposal, [A19](moving-objects/track.md)). PR #53 adds `frames:search_deferred:<n>` for the path search.
+**Moving objects:** the Track frame search and the path endpoint run inside this job (Q-141 proposal, [A19](moving-objects/track.md)). The path search (PR #53, issue #26) lists the calls it leaves to the job as `frames:search_deferred:<n>` ([A4.1](pipeline.md#a41-stage-1-find-the-object)).

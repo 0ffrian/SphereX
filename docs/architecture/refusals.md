@@ -1,6 +1,6 @@
 # `missing` and refusal codes
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.12 · **Implements:** [D-25](../decisions/data-sources.md), [D-31](../decisions/data-sources.md), [D-32](../decisions/contract-tags.md), [Q-38](../decisions/contract-tags.md), [Q-111](../decisions/pipeline-jobs.md), [Q-139](../decisions/moving-objects.md), [Q-144](../decisions/moving-objects.md) · **Read with:** [endpoints.md](endpoints.md) (A4.11), [honesty-policy.md](honesty-policy.md) (A11)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.12 · **Implements:** [D-25](../decisions/data-sources.md), [D-31](../decisions/data-sources.md), [D-32](../decisions/contract-tags.md), [Q-38](../decisions/contract-tags.md), [Q-111](../decisions/pipeline-jobs.md), [Q-139](../decisions/moving-objects.md), [Q-144](../decisions/moving-objects.md), [Q-21, Q-125](../decisions/moving-frames.md) · **Read with:** [endpoints.md](endpoints.md) (A4.11), [honesty-policy.md](honesty-policy.md) (A11)
 
 ### A4.12 `missing` and refusal codes
 
@@ -20,7 +20,23 @@ A value the backend cannot compute is never guessed: the reply leaves it out (or
 | `cutout_stretch:<frame_id>` | the display stretch could not be computed for the cutout |
 | `frames:truncated` | the SIA answer hit `SX_SIA_MAXREC` (`QUERY_STATUS=OVERFLOW`); the list is incomplete and not stored |
 | `cutouts:deferred:<n>` | `n` cutouts are not downloaded yet; ask again (progressive loading, A4.10) |
-| `frames:moving_object_search` | a moving object: its frame search is not built on main (`backend/app/core/find/frames.py:48`). PR #53 replaces it with the path search and its own `frames:*`, `ephemeris:<frame_id>` and `no_footprint:<frame_id>` codes, listed in A19.10 ([moving-objects/track-contract.md](moving-objects/track-contract.md)) and in PR #53's A4.1 text. |
+
+Moving objects only: the path search of A4.1 (`backend/app/core/find/moving.py`, issue #26, [Q-125](../decisions/moving-frames.md)). The codes marked "incomplete" keep the list out of the cache (it is asked for again); the others are deterministic for the settings in the cache key, so a list with only those is stored. Which of them Track treats as incomplete: A19.10 ([moving-objects/track-contract.md](moving-objects/track-contract.md#a1910-refusal-codes)).
+
+| Code | Meaning |
+|---|---|
+| `frames:ephemeris` | no Horizons ephemeris for the path, or for one of its windows (no SPK id, Horizons unavailable, empty); the windows that did answer are still searched. Incomplete |
+| `frames:moving_window` | a configured search window is shorter than one ephemeris step, so it is not searched |
+| `frames:cone_cap:<n>` | the path needs more than `SX_MOVING_MAX_CONES` cones; the cap is spread evenly over the path and `n` cones were left out, so frames between the kept cones can be missed |
+| `frames:cone_maxrec:<n>` | `n` cone answers hit `SX_MOVING_SIA_MAXREC`. A fixed object's own cut-off answer stays `frames:truncated` |
+| `frames:sparse_path:<n>` | at `n` cones the rate asked for a step below `SX_MOVING_MIN_STEP_H`, so the cones there are further apart than R / rate and a frame between them can be missed |
+| `frames:cone_failed:<n>` | `n` cones could not be fetched (not cached offline, or failed live). Incomplete |
+| `frames:search_deferred:<n>` | `n` Horizons or SIA calls are left to the object's job (Q-111); ask again, as for `cutouts:deferred`. Incomplete |
+| `frames:outside_window:<n>` | `n` frames found by the cones have a midpoint outside the ephemeris windows, so the object's position there is unknown |
+| `no_footprint:<frame_id>` | the frame has no usable `s_region`, so it could not be checked against the path (not the overlays' `footprint:<frame_id>`) |
+| `ephemeris:<frame_id>` | the exact position at that frame's midpoint could not be fetched. Incomplete |
+
+`frames:moving_object_search` (M1: a mover's frames refused) is no longer emitted (issue #26, Q-21).
 
 #### Stage 2 (`/spectrum`, A4.2)
 
@@ -31,7 +47,7 @@ Per frame, `<reason>:<frame_id>`: `saturated` (core `OVERFLOW`, or a NaN core wi
 | `spectrum:saturated` | every listed frame was refused as `saturated` (D-31) |
 | `spectrum:extended_source` | **To build** ([Q-144](../decisions/moving-objects.md)): a comet whose coma fills the aperture; otherwise the aperture brightness is shown with "aperture, not total flux". Per-frame form `extended_source:<frame_id>`: A19.8 and A19.10 ([moving-objects/track-contract.md](moving-objects/track-contract.md)) |
 
-Not a refusal: a point kept with dropped pixels is `flagged`, with `dropped_flags` and `flag_reasons` (incl. `no_proper_motion`). For moving objects, `OUTLIER` on the core will be a flag, not a refusal: the point is `flagged` and `flag_reasons` gains `outlier_core` ([Q-139](../decisions/moving-objects.md), A19.7; to build, ticket T4).
+Not a refusal: a point kept with dropped pixels is `flagged`, with `dropped_flags` and `flag_reasons` (incl. `no_proper_motion`). For moving objects, `OUTLIER` on the core will be a flag, not a refusal: the point is `flagged` and `flag_reasons` gains `outlier_core` ([Q-139](../decisions/moving-objects.md), A19.7; to build, ticket T4). Until then the core `OUTLIER` refuses the frame as `aperture_flags` for movers too (15 of 16 Eros frames, A4.2).
 
 #### Card and RenderParams (A4.3 to A4.7)
 
@@ -52,10 +68,10 @@ Not a refusal: a point kept with dropped pixels is `flagged`, with `dropped_flag
 
 | Code | Meaning |
 |---|---|
-| `overlay:gaia`, `overlay:wise` | the catalogue cannot be served (failed cone, remembered `catalog_failure_ttl_s`), or the object moves (cones for movers: Q-143, to build) |
+| `overlay:gaia`, `overlay:wise` | the catalogue cannot be served (failed cone, remembered `catalog_failure_ttl_s`), or the object moves (cones for movers: Q-143, to build); a mover's frames still get flag masks and cutout boxes ([Q-125](../decisions/moving-frames.md)) |
 | `overlay:<cat>:pending` | the cone is still running after `overlay_wait_s`; a later request has it |
 | `overlay:<cat>:truncated` | the cone hit the 5000-row cap (brightest first) |
-| `footprint:<frame_id>` | no usable `s_region` for the frame |
+| `footprint:<frame_id>` | no usable `s_region` for the frame; for a mover, every frame, because its frame record does not carry `s_region` (Q-125; Track changes this, A19.3) |
 | `flags_mask:<frame_id>` | no FLAGS mask for the frame (`flags.png` answers 404 `flags_unavailable`) |
 
 #### Composite (`/composite`)
@@ -71,6 +87,4 @@ The repaint status body's `missing` starts with `albedo_ai`, followed by the rea
 | Code | Spec | Status |
 |---|---|---|
 | `path:deferred`, `path:ephemeris`, `path:observer`, `path:not_cached`, `path:window` (`/path`); `extended_source:<frame_id>` (`/spectrum`); `imagery:<survey>`, `track:not_moving` (frontend) | A19.10 ([moving-objects/track-contract.md](moving-objects/track-contract.md#a1910-refusal-codes)), which says whether each marks a result incomplete; the meanings of the `/path` codes are in A19.5 ([moving-objects/track.md](moving-objects/track.md#a195-path-endpoint)) | to build (Track, Q-141, Q-144) |
-| `area:not_prepared` (a square outside the precomputed areas), `area:visits` (fewer than 2 visits), `stars:<cat>:<visit>` (a visit's star cone failed), `skybot:<visit>` (a visit's SkyBoT cone failed), `horizons:<designation>` (a candidate's Horizons call failed), `stamp:<dot_id>` (stamp cutout not cached) | [A17.8](moving-objects/area-backend.md#a178-endpoints), which owns their meanings | to build (D1, D2) |
-
-**Frontend-only wording:** `spectrum:moving_object_search` has a line in `messages.ts` but the backend never emits it.
+| `area:not_prepared` (a square outside the precomputed areas), `area:visits` (fewer than 2 visits), `stars:<cat>:<visit>` (a visit's star cone failed), `skybot:<visit>` (a visit's SkyBoT cone failed), `horizons:<designation>` (a candidate's Horizons call failed), `stamp:<dot_id>` (stamp cutout not cached) | [A17.8](moving-objects/area-contract.md#a178-endpoints), which owns their meanings | to build (D1, D2) |

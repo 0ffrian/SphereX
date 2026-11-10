@@ -3,7 +3,7 @@
   "type": "planet_rocky",
   "generator_version": "fixture-0",
   "seed": 10,
-  "scale_m": 6991000.0,
+  "scale_m": 7149200.0,
   "layers": [
     {
       "id": "surface",

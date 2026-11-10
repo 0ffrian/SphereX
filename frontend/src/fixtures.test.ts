@@ -105,7 +105,7 @@ describe('synthetic fixtures', () => {
   it('the refused mover has no frames and says why', () => {
     const frames = parseFrames(json('/v1/objects/synthetic-refused-mover/frames').data);
     expect(frames.frames).toEqual([]);
-    expect(frames.missing).toEqual(['frames:moving_object_search']);
+    expect(frames.missing).toEqual(['frames:ephemeris']);
   });
 
   it('is deterministic: same target, same bytes', () => {
@@ -291,8 +291,12 @@ describe('fixture /data files (issue #62)', () => {
 
   it('serves the shape models in place, both levels, as glTF binary', () => {
     const src = Object.values(cards).flatMap((c) => (c.shape_source ? [c.shape_source.value] : []));
-    expect(src).toEqual(['/data/shapes/eros-gaskell.glb']);
-    for (const url of ['/data/shapes/eros-gaskell.glb', '/data/shapes/eros-gaskell.lod1.glb']) {
+    const models = ['eros-gaskell', 'bennu-spo-v54']; // Bennu: issue #68 Part 8a fixture
+    expect(src.sort()).toEqual(models.map((m) => `/data/shapes/${m}.glb`).sort());
+    for (const url of models.flatMap((m) => [
+      `/data/shapes/${m}.glb`,
+      `/data/shapes/${m}.lod1.glb`,
+    ])) {
       const r = get(url);
       expect(r.status).toBe(200);
       expect(r.headers['content-type']).toBe('model/gltf-binary');
@@ -349,7 +353,7 @@ describe('import guard', () => {
     ["export * from '../fixtures/targets';", true],
     ["import { useAppStore } from '@/state/store';", false],
     ["import type { Frame } from '@/app/api/types';", false],
-    ["import { TEST_TARGETS } from './testTargets';", false],
+    ["import { TEST_TARGETS } from './demoTargets';", false],
     ["import './index.css';", false],
   ])('%s → forbidden: %s', (text, forbidden) => {
     expect(importSpecifiers(text).some(isForbiddenImport)).toBe(forbidden);

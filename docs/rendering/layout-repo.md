@@ -30,9 +30,11 @@ backend/app/core/measure/            (Moon)   # pipeline stage 2 (A4.2), issue #
                                               # photometry, spectrum; endpoint in app/api/spectrum.py; pool.py (issue #41, Q-112)
 frontend/src/state/                  (Moon)   # Zustand store: card, params, honesty, overrides (A10, D-02); the `sky` slice
 frontend/src/physics/                (Moon)   # A7 physics layer (A4.6, issue #13): constants, tagging, planets, gasGiants,
-                                              # brownDwarfs, asteroids, snr, index (derivePhysics, selectPhysics)
+                                              # brownDwarfs, asteroids, snr, index (derivePhysics, selectPhysics);
+                                              # issue #68: tides, climate, starlight, zeng2019 (Q-155 to Q-157)
 frontend/src/app/                    (Moon)   # React shell (A10 hash routing, messages, refusals, Badge, Segmented, ViewerPanel)
-  api/ search/ flipbook/ spectrum/   # M1 (issue #3) and the flipbook additions (Q-93, Q-95, Q-97, Q-102)
+  api/ search/ flipbook/ spectrum/   # M1 (issue #3) and the flipbook additions (Q-93, Q-95, Q-97, Q-102);
+                                     # search/demoTargets.ts is the demo search list, generated (Q-161, Q-164)
   shell/ sky/                        # the shell and sky pane (A21; provisional, Q-89)
   build/                             # R5.8, listed in R10
   island/                            # the island and its loader (A21.5; Q-121, Q-123)

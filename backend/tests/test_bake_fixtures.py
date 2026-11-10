@@ -16,19 +16,33 @@ PARAMS = sorted((bf.FIXTURES / "params").glob("*.json"))
 def test_rebake_is_byte_identical(tmp_path: Path) -> None:
     """Same card + seed -> same bytes, twice in a row and through the script's own writer."""
     assert bf.fixture_files() == bf.fixture_files()
-    assert bf.main([], out_dir=tmp_path) == 0
+    assert bf.main([], out_dir=tmp_path, params_dir=tmp_path / "params") == 0
     first = {p: p.read_bytes() for p in sorted(tmp_path.rglob("*")) if p.is_file()}
-    assert bf.main([], out_dir=tmp_path) == 0
-    assert bf.main(["--check"], out_dir=tmp_path) == 0
+    assert bf.main([], out_dir=tmp_path, params_dir=tmp_path / "params") == 0
+    assert bf.main(["--check"], out_dir=tmp_path, params_dir=tmp_path / "params") == 0
     assert {p: p.read_bytes() for p in sorted(tmp_path.rglob("*")) if p.is_file()} == first
 
 
 def test_check_reports_a_changed_file(tmp_path: Path) -> None:
-    assert bf.main([], out_dir=tmp_path) == 0
+    assert bf.main([], out_dir=tmp_path, params_dir=tmp_path / "params") == 0
     victim = next(tmp_path.rglob("height.bin"))
     data = victim.read_bytes()
     victim.write_bytes(bytes([data[0] ^ 0xFF]) + data[1:])
-    assert bf.main(["--check"], out_dir=tmp_path) == 1
+    assert bf.main(["--check"], out_dir=tmp_path, params_dir=tmp_path / "params") == 1
+
+
+def test_demo_planet_params_are_baked_from_their_cards() -> None:
+    """Issue #68 Part 6: the demo params are `card_to_params` of the card (plus sun_dir)."""
+    for name, text in bf.demo_planet_params().items():
+        assert (bf.PARAMS_DIR / name).read_text(encoding="utf-8") == text
+        params = json.loads(text)
+        assert params["generator_version"] == bf.FIXTURE_GENERATOR_VERSION
+        if name.removesuffix(".json") in bf.DEMO_PLANET_SEEDS:
+            assert params["type"] == "planet_rocky"
+            assert "dynamics" not in params  # a spin is not on the card, so none is invented
+        else:  # Bennu (Part 8a): the real shape model, its real spin on the card
+            assert params["type"] == "asteroid_shape"
+            assert [x["id"] for x in params["layers"]] == ["mesh", "spin"]
 
 
 def test_committed_textures_match_the_baker() -> None:

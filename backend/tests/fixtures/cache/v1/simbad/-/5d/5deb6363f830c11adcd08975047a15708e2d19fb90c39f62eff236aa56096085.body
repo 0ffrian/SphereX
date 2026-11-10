@@ -1,0 +1,1 @@
+{"metadata":[{"name":"teff","description":"Effective Temperature","datatype":"INT","unit":"unit-degK","ucd":"phys.temperature.effective"},{"name":"bibcode","description":"measurement bibcode","datatype":"CHAR","arraysize":"19","ucd":"meta.bib.bibcode"}],"data":[]}

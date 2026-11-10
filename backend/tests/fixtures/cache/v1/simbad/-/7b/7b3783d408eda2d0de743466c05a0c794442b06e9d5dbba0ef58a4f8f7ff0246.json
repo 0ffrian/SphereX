@@ -1,0 +1,16 @@
+{
+ "body_sha256": "634fd5e6f65f2ce5c94e0d224df909c40bfe23ca3c1cf6e646591a4f1a02dd41",
+ "body_size": 292,
+ "content_type": "application/json;charset=UTF-8",
+ "fetched_at": "2026-11-09T19:27:34.935Z",
+ "key": {
+  "query": {
+   "ident": "RW Aur",
+   "table": "mesFe_h"
+  },
+  "release": "-",
+  "source": "simbad"
+ },
+ "status": 200,
+ "url": "https://simbad.harvard.edu/simbad/sim-tap/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=json&QUERY=SELECT+mesFe_h.teff%2C+mesFe_h.bibcode+FROM+ident+JOIN+mesFe_h+ON+ident.oidref+%3D+mesFe_h.oidref+WHERE+ident.id+%3D+%27RW+Aur%27+AND+mesFe_h.teff+IS+NOT+NULL"
+}

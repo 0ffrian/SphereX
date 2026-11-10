@@ -25,12 +25,12 @@ Status: **not built** (every section is **To build**). Owner: Kevin (**Proposed 
 
 ### A19.10 Refusal codes
 
-Wording for every code lives in `frontend/src/app/refusals.ts` and `messages.ts` (PR #53 tests that every backend code has wording). This table owns the Track codes; the register of every code is [A4.12](../refusals.md), which lists them as planned.
+Wording for every code lives in `frontend/src/app/refusals.ts` and `messages.ts` (`backendReasons.test.ts`, from PR #53, checks that every code in `moving.py` has wording). This table owns the Track codes; the register of every code, with its meaning, is [A4.12](../refusals.md#a412-missing-and-refusal-codes), which lists the new ones as planned.
 
 | Code | Where | Marks the result incomplete (not stored) |
 |---|---|---|
-| `frames:ephemeris`, `frames:cone_failed:<n>`, `frames:search_deferred:<n>` (poll), `ephemeris:<frame_id>` | `/frames` (PR #53) | Yes |
-| `frames:moving_window`, `frames:cone_cap:<n>`, `frames:cone_maxrec:<n>`, `frames:sparse_path:<n>`, `frames:outside_window:<n>`, `no_footprint:<frame_id>` | `/frames` (PR #53) | No |
+| `frames:ephemeris`, `frames:cone_failed:<n>`, `frames:search_deferred:<n>` (poll), `ephemeris:<frame_id>` | `/frames` (built, issue #26) | Yes |
+| `frames:moving_window`, `frames:cone_cap:<n>`, `frames:cone_maxrec:<n>`, `frames:sparse_path:<n>`, `frames:outside_window:<n>`, `no_footprint:<frame_id>` | `/frames` (built, issue #26) | No |
 | `cutout:<id>`, `wavelength:<id>`, `outside_cutout:<id>`, `cutouts:deferred:<n>`; `aperture_flags:<id>`, `aperture_edge:<id>`, `saturated:<id>` and the rest of A4.2 | `/frames`, `/spectrum` | As A4.1, A4.2 |
 | `overlay:<cat>`, `overlay:<cat>:pending`, `overlay:<cat>:truncated`, `footprint:<id>`, `flags_mask:<id>` | `/overlays` (A4.9) | No |
 | **New:** `path:deferred` (poll), `path:ephemeris`, `path:observer` (meanings in [A19.5](track.md#a195-path-endpoint)) | `/path` | Yes |
@@ -38,7 +38,7 @@ Wording for every code lives in `frontend/src/app/refusals.ts` and `messages.ts`
 | **New:** `extended_source:<frame_id>`, `spectrum:extended_source` | `/spectrum` (A19.8) | No |
 | **New:** `imagery:<survey>` (A20.5), `track:not_moving` | frontend | |
 
-PR #53's Q-21 text still says `frames:truncated` past the cone cap; its Q-124 and code use `frames:cone_cap:<n>`, and Track follows Q-124. A fixed object keeps `frames:truncated`.
+Q-21's text still says `frames:truncated` past the cone cap; PR #53's entry, merged as [Q-125](../../decisions/moving-frames.md), and the code use `frames:cone_cap:<n>`, and Track follows Q-125. A fixed object keeps `frames:truncated`.
 
 ### A19.11 Provenance per value
 
@@ -83,9 +83,9 @@ Milestone M4 Extras, priority P1 because Track is the MVP demo (**Proposed (Q-18
 
 | Item | Owner | Status |
 |---|---|---|
-| MOST against the cone search; MOST's observer | Kevin | Q-125 (Q-140 duplicate) **[verify]** |
+| MOST against the cone search; MOST's observer | Kevin | Q-126 (Q-140 asks the same) **[verify]** |
 | DR1 release date | Atish | **[verify]** (Q-137) |
 | CDS permission for an order-11 copy | Atish | Open (Q-136) |
 | Mask radius formula and catalogue limits | Kevin | **[verify]** on the Eros frames |
 | Size of the marker's interpolation error | Kevin | **[verify]** against TLIST |
-| `SX_MOVING_*` limits, path span cap, Horizons pacing | Kevin | **[verify]** (PR #53 `backend/app/settings.py`; A3.1 gains them when PR #53 merges; A3.4) |
+| `SX_MOVING_*` limits, path span cap, Horizons pacing | Kevin | **[verify]** (`backend/app/settings.py`; A3.1 "Moving objects" row; A3.4) |

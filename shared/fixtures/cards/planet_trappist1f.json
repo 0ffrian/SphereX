@@ -1,0 +1,59 @@
+{
+  "id": "fixture:planet_trappist1f",
+  "name": "Synthetic fixture: TRAPPIST-1 f (real archive values)",
+  "type": "planet_rocky",
+  "radius_rjup": {
+    "value": 0.09323,
+    "tag": "measured",
+    "source": "synthetic fixture: real TRAPPIST-1 f value, NASA Exoplanet Archive PSCompPars pl_rade (Agol et al. 2021, 2021PSJ.....2....1A), 1.045 Earth radii converted to Jupiter radii (x 6378.1366 km / 71492 km)",
+    "err": 0.00116
+  },
+  "teq_K": {
+    "value": 217.7,
+    "tag": "measured",
+    "source": "synthetic fixture: real TRAPPIST-1 f value, NASA Exoplanet Archive PSCompPars pl_eqt (Ducrot et al. 2020, 2020A&A...640A.112D)",
+    "err": 2.1
+  },
+  "mass_mearth": {
+    "value": 1.039,
+    "tag": "measured",
+    "source": "synthetic fixture: real TRAPPIST-1 f value, NASA Exoplanet Archive PSCompPars pl_bmasse (Agol et al. 2021, 2021PSJ.....2....1A)",
+    "err": 0.031
+  },
+  "orbit_au": {
+    "value": 0.03849,
+    "tag": "measured",
+    "source": "synthetic fixture: real TRAPPIST-1 f value, NASA Exoplanet Archive PSCompPars pl_orbsmax (Agol et al. 2021, 2021PSJ.....2....1A)",
+    "err": 0.00033
+  },
+  "orbital_period_d": {
+    "value": 9.20754,
+    "tag": "measured",
+    "source": "synthetic fixture: real TRAPPIST-1 f value, NASA Exoplanet Archive PSCompPars pl_orbper (Agol et al. 2021, 2021PSJ.....2....1A)",
+    "err": 3.2e-05
+  },
+  "host_teff_K": {
+    "value": 2566.0,
+    "tag": "measured",
+    "source": "synthetic fixture: real TRAPPIST-1 f value, NASA Exoplanet Archive PSCompPars st_teff (Agol et al. 2021, 2021PSJ.....2....1A)",
+    "err": 26.0
+  },
+  "host_radius_rsun": {
+    "value": 0.1192,
+    "tag": "measured",
+    "source": "synthetic fixture: real TRAPPIST-1 f value, NASA Exoplanet Archive PSCompPars st_rad (Agol et al. 2021, 2021PSJ.....2....1A)",
+    "err": 0.0013
+  },
+  "host_mass_msun": {
+    "value": 0.0898,
+    "tag": "measured",
+    "source": "synthetic fixture: real TRAPPIST-1 f value, NASA Exoplanet Archive PSCompPars st_mass (Agol et al. 2021, 2021PSJ.....2....1A)",
+    "err": 0.0023
+  },
+  "host_age_gyr": {
+    "value": 7.6,
+    "tag": "measured",
+    "source": "synthetic fixture: real TRAPPIST-1 f value, NASA Exoplanet Archive PSCompPars st_age (Piaulet-Ghorayeb et al. 2025, 2025ApJ...989..181P)",
+    "err": 2.2
+  }
+}

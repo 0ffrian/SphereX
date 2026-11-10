@@ -8,6 +8,11 @@ Run while the internet is good, then serve with ``SX_OFFLINE=1``:
 
 Resumable: entries already cached are skipped. Exit code 1 if any target is incomplete.
 
+Moving objects (issue #26): one Horizons ephemeris over the target's ``moving_windows`` (or
+``SX_MOVING_WINDOW_START`` to ``SX_MOVING_WINDOW_END``), then SIA cones along the path, the step
+``R / rate`` clamped to ``SX_MOVING_MIN_STEP_H``..``SX_MOVING_MAX_STEP_H`` (at most
+``SX_MOVING_MAX_CONES``, spaced by ``SX_MOVING_CONE_PACE_S``), then the cutouts.
+
 Catalogue overlays (issue #12): one Gaia DR3 and one CatWISE2020 cone per fixed target. A
 failed cone is reported (``overlays: FAILED``) but does not make the target incomplete or change
 the exit code: overlays are optional layers, and the frames and spectrum do not depend on them.
@@ -27,6 +32,9 @@ from app.adapters import exoplanet_archive, horizons, irsa_cutout, irsa_sia, sim
 from app.adapters.http import UpstreamError
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context, make_context
+from app.core.card.catalogue import gather, is_comet, with_star_data
+from app.core.card.stars import STAR_TYPES
+from app.core.classify import classify
 from app.core.classify.rules import SIMBAD_PLANET
 from app.core.composite.service import CompositeService
 from app.core.find.frames import FrameService, frame_time, is_complete, position_at
@@ -133,6 +141,13 @@ def prefetch_target(
         except (CacheMissOffline, UpstreamUnavailable) as exc:
             rep.error = f"Exoplanet Archive failed: {exc}"
             return rep
+    if obj.resolver == "simbad":
+        # Q-152: a star's Teff rows, Mira period and Gaia astrophysical parameters are cached too.
+        data = gather(ctx, obj)
+        kind = classify(data.facts).type
+        if kind in STAR_TYPES:
+            data = with_star_data(ctx, data, obj, kind)
+            print(f"  star catalogues: {'missing ' + str(data.missing) if data.missing else 'ok'}")
     if str(target.get("frames", True)).lower() == "false":
         return rep  # `frames = false` in targets.toml: catalogue answers only (small fixtures)
 
@@ -146,19 +161,29 @@ def prefetch_target(
         except (CacheMissOffline, UpstreamUnavailable) as exc:
             rep.error = f"SkyBoT failed: {exc}"
             return rep
+        if getattr(args, "overlays_only", False):
+            # Movers have no catalogue cones (Q-50); skip the path search and its cutouts.
+            rep.frames_skipped = True
+            return rep
         # Phase angle and Sun vector for the card (Q-62); the same two cached Horizons calls.
         # Optional, like in the app: a failure is reported but the frames are still fetched.
         if obj.spkid:
             try:
-                geom, _ = horizons.geometry(ctx, obj.spkid, when, refresh=args.refresh)
+                geom, _ = horizons.geometry(
+                    ctx, obj.spkid, when, comet=is_comet(ctx, obj), refresh=args.refresh
+                )
                 print(f"  Horizons: phase {geom.phase_angle_deg:.2f} deg ({geom.observer})")
             except (CacheMissOffline, UpstreamUnavailable) as exc:
                 print(f"  Horizons geometry failed (card lighting refused): {exc}", flush=True)
+        # Issue #26: the path search (Horizons over the window, SIA cones along the path,
+        # paced by SX_MOVING_CONE_PACE_S), then the cutouts, with no live caps.
         fs = FrameService(ctx)
         try:
-            rep.missing = fs.get_frames(obj, rebuild=True).missing
+            result = fs.get_frames(obj, refresh=args.refresh, rebuild=True, unlimited_live=True)
         finally:
             fs.close()
+        rep.frames, rep.missing = len(result.frames), result.missing
+        print(f"  path search: {rep.frames} frames, missing={result.missing[:5]}", flush=True)
         return rep
 
     search_ra, search_dec = position_at(obj, parse_utc(ctx.settings.search_epoch))

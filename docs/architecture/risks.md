@@ -10,8 +10,8 @@ As of 9 Nov 2026. Status: **Open** (no mitigation in place), **Mitigated** (a mi
 
 | Risk or question | Why it matters | Plan | Owner | Status |
 |---|---|---|---|---|
-| Track MVP depends on PR #53, Q-140 and Q-141 | Track (Q-137) has no frames for movers until PR #53 merges (changes requested); its path endpoint and frame source are open proposals; no Track issue is opened | Land PR #53 first; build Track on its recorded Eros fixtures; open the Track tickets T1 to T4 (A19.14, A20.15); fall back to the flipbook and spectrum demo objects | Atish (screen), Kevin (backend) | Open |
-| Mover rules decided but not built | Q-138 (SPHEREx-centred positions) and Q-139 (OUTLIER as a flag) are decided; the code still uses the geocentre and refuses 15 of 16 Eros frames | Build both with PR #53 or right after it ([A3.4](data-sources.md#a34-jpl-horizons), [A4.2](pipeline.md#a42-stage-2-measure-brightness-and-spectrum)) | Kevin (Q-138), Moon (Q-139) | Open |
+| Track MVP depends on Q-141 and Q-126/Q-140 | Track (Q-137) takes its frames from PR #53's path search (merged, issue #26); its path endpoint and frame source (MOST or path cones) are open proposals; no Track issue is opened | Build Track on PR #53's recorded Eros fixtures; open the Track tickets T1 to T4 (A19.14, A20.15); fall back to the flipbook and spectrum demo objects | Atish (screen), Kevin (backend) | Open |
+| Mover rule decided but not built | Q-139 (OUTLIER as a flag) is decided; Stage 2 still refuses `OUTLIER` on the core, so 15 of 16 Eros frames are refused. Q-138 (SPHEREx-centred positions) is built for the frame search (issue #26); SkyBoT is still geocentric (next row) | Build Q-139 (ticket T4, [A4.2](pipeline.md#a42-stage-2-measure-brightness-and-spectrum)) | Moon (Q-139) | Open |
 | SkyBoT positions are geocentric | Known objects and the Discovery match could be off by the LEO parallax | Proposed Q-180: SkyBoT lists candidates, positions come from Horizons seen from SPHEREx ([A3.5](data-sources.md#a35-imcce-skybot), A17.5) | Kevin | Open |
 | Area search Day 0 gate | Discovery may not find Eros blind | Gate of A16.7: keep Known objects and Track, show the five steps with real counts and no tracks | Kevin | Open |
 | DR1 expected on 12 Nov **[verify]** | DR1 renames collections and flag keywords | Freeze on QR2 with the local cache; no switch before the event (Q-137) | Kevin | Mitigated |
@@ -64,4 +64,4 @@ Every **[verify]** marker in the architecture fragments, with an owner, the tick
 | FLAGS keyword names on a QR3 or DR1 header | A3.1 | Kevin | Q-31 | after the event (frozen on QR2) |
 | Phone items: self-signed certificate, battery saver, vibration amplitude | A14 post-event, A9 | Atish | Q-132 | after the event |
 
-**Closed:** the Horizons geocentre marker of A3.4 is settled by Q-138 (SPHEREx-centred); the code change is listed as "Not built yet" there.
+**Closed:** the Horizons geocentre marker of A3.4 is settled by Q-138 (SPHEREx-centred); the frame search uses the SPHEREx observer since issue #26 (A3.4).

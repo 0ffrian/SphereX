@@ -9,10 +9,10 @@ Every target is listed in `backend/targets.toml` with a `group`; the pre-fetch s
 | Group | Targets | Role |
 |---|---|---|
 | `test` | Barnard's Star, Epsilon Indi B, WISE 0855, RW Aurigae, R Draconis | The challenge's five test targets (P0 flipbook). Barnard's Star and R Dra have no measured point and RW Aur keeps 15 (saturation, D-31); their flipbook still works and the refusals stay honest. |
-| `demo` | SIMP 0136, TWA 27, IRAS 04302+2247 | Spectrum demo objects that SPHEREx measures cleanly (D-31). Quick picks in the UI: issue #15 (M5). |
+| `demo` | SIMP 0136, TWA 27, IRAS 04302+2247; TRAPPIST-1 e and f, K2-18 b, Kepler-186 f, Bennu, 'Oumuamua, 3I/ATLAS, HD 189733 b, Comet 67P, Orion Nebula, Crab Nebula | The first three: spectrum demo objects that SPHEREx measures cleanly (D-31). The rest are rows of the demo search list (issue #68, Q-161), which also holds the five `test` targets: 16 rows in `frontend/src/app/search/demoTargets.ts`, built by `bake_demo_pack.py` (Q-164, A5.4). It replaced the planned quick picks. |
 | `fixture` | 433 Eros, TRAPPIST-1 e, K2-18 b, HD 209458 b, GJ 1214 b, 51 Peg b, Proxima Cen b | Recorded for tests (shape model, Sun angle, exoplanet rule). |
 
-**The MVP demo is 433 Eros in the Track tool** on its 20 to 21 Mar 2026 SPHEREx frames ([Q-137](../decisions/scope-process.md)); 3I/ATLAS is stretch (its extended coma: Q-144). "Demo object" therefore means two things: the Track MVP (Eros) and the D-31 spectrum quick picks.
+**The MVP demo is 433 Eros in the Track tool** on its 20 to 21 Mar 2026 SPHEREx frames ([Q-137](../decisions/scope-process.md)); 3I/ATLAS is stretch (its extended coma: Q-144). "Demo object" therefore means two things: the Track MVP (Eros) and the `demo` group (the D-31 spectrum objects and the search list).
 
 - **Proposed (Q-197):** move 433 Eros from `fixture` to `demo` in `targets.toml` (or run the event with `SX_PREFETCH_GROUPS=demo,fixture`), so the event's warm start and the pre-fetch cover the MVP object. Today `SX_PREFETCH_GROUPS=demo` skips it.
 - **To build:** `[[area]]` tables for Area search (fields in [A16.4](moving-objects/area-search.md#a164-data-flow) and [A17.1](moving-objects/area-backend.md#a171-area-and-frames-framespy)) and `moving_windows` for 433 Eros (**Proposed (Q-184)**, [A19.3](moving-objects/track.md#a193-frame-list)).

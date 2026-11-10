@@ -66,7 +66,7 @@ def test_sbdb_not_found_recorded() -> None:
 
 
 def test_horizons_parse_recorded() -> None:
-    meta, body = entries("horizons")[0]
+    meta, body = entry("horizons", tlist="2461358.500000")
     rows = horizons.parse(body)
     assert len(rows) == 1
     t, ra, dec = rows[0]
@@ -87,7 +87,9 @@ def test_skybot_204_is_empty() -> None:
 
 
 def test_sia_parse_recorded_rows_and_overflow() -> None:
-    for meta, body in entries("irsa_sia"):
+    fixed = [(m, b) for m, b in entries("irsa_sia") if m["maxrec"] == 3]
+    assert len(fixed) == 8  # one cone per fixed target; the moving cones are checked below
+    for meta, body in fixed:
         rows = irsa_sia.parse_rows(body)
         assert len(rows) == 3
         assert meta["maxrec"] == 3
@@ -106,7 +108,9 @@ def test_sia_key_has_no_maxrec() -> None:
 
 def test_recorded_cutouts_have_no_psf_and_keep_science_hdus() -> None:
     recorded = entries("irsa_cutout")
-    assert len(recorded) == 24  # 3 frames (MAXREC=3) x 8 fixed targets: 5 test + 3 demo (D-31)
+    # 3 frames (MAXREC=3) x 8 fixed targets (5 test + 3 demo, D-31) + 16 frames of 433 Eros along
+    # its path (issue #26)
+    assert len(recorded) == 24 + 16
     for meta, body in recorded:
         with fits.open(io.BytesIO(body)) as h:
             names = [hdu.name for hdu in h]

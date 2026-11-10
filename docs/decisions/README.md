@@ -28,8 +28,13 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [haptics-sound.md](haptics-sound.md) | audio pairing (D-10), spectrum pitch and voice hints, the body tone and the Track path sound | 1 D, 10 Q, 12 KB |
 | [haptics-built.md](haptics-built.md) | the haptic engine, calibration and source choices as built | 0 D, 9 Q, 20 KB |
 | [platform-hosting.md](platform-hosting.md) | the three.js pin, hardware and frame budgets, hosting, the demo machine and the event platform | 3 D, 5 Q, 6 KB |
-| [moving-objects.md](moving-objects.md) | Rainbow Trails, frames for moving objects, the Track tool, Area search and Discovery (agreed) | 1 D, 18 Q, 21 KB |
+| [moving-objects.md](moving-objects.md) | Rainbow Trails, the Track tool, Area search and Discovery (agreed) | 1 D, 16 Q, 20 KB |
 | [moving-objects-review.md](moving-objects-review.md) | proposed fixes to Area search and Track after the 9 Nov 2026 audit, and Moon's review list (Q-202) | 0 D, 9 Q, 14 KB |
+| [moving-frames.md](moving-frames.md) | frames for moving objects: the path cone search, its tags and refusals, MOST | 0 D, 4 Q, 7 KB |
+| [exoplanets.md](exoplanets.md) | the exoplanet card fields (mass, orbit, host star), radius from the archive, tidal locking, mass in the physics layer, and the two demo exoplanet fixtures | 0 D, 5 Q, 13 KB |
+| [exoplanet-looks.md](exoplanet-looks.md) | the climate scenarios and locked-planet temperature map, starlight colour, scenario looks and presets, and the exoplanet mould steps | 0 D, 5 Q, 14 KB |
+| [catalogue-values.md](catalogue-values.md) | name resolution for the demo exoplanets, star Teff, radius and Mira periods, the literature registry, binary brown dwarf components, the issue #68 backend fixes and the slope unit | 0 D, 6 Q, 11 KB |
+| [demo-pack.md](demo-pack.md) | the demo search list and aliases, the 67P and Bennu shape products, the WRL reader, and the pre-built demo pack | 0 D, 4 Q, 14 KB |
 
 ## Rules for entries
 
@@ -94,13 +99,13 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-12 | VisibleMode and IRMode fields | Answered: D-23 | [contract](contract.md) |
 | Q-13 | Type of overrides map | Answered: D-27 | [contract](contract.md) |
 | Q-14 | Contract source of truth | Answered: D-17, D-18 | [contract](contract.md) |
-| Q-15 | Does A15 replace Zenbook demo screen | Answered: Q-132 (the Asus TUF A15 is the demo… | [platform-hosting](platform-hosting.md) |
+| Q-15 | Does A15 replace Zenbook demo screen | Open (answered by Q-132, see note) | [platform-hosting](platform-hosting.md) |
 | Q-16 | Munazir confirms D-17 | Answered: Munazir is Moon (`MintHerbs`); D-17… | [scope-process](scope-process.md) |
 | Q-17 | Comet field pulse tag | Open | [haptics-design](haptics-design.md) |
 | Q-18 | View-mode rgb type | Answered: D-23 corrected to `TV<[number, numb… | [contract](contract.md) |
 | Q-19 | Where R8.8 frontend types live | Open | [haptics-design](haptics-design.md) |
 | Q-20 | Cutout cache strips PSF HDU | Open (implemented as proposed) | [data-sources](data-sources.md) |
-| Q-21 | Frames for moving objects | Open | [moving-objects](moving-objects.md) |
+| Q-21 | Frames for moving objects | Partly answered (built; limits [verify]) | [moving-frames](moving-frames.md) |
 | Q-22 | Meaning of moving in resolve | Open (implemented as proposed) | [moving-objects](moving-objects.md) |
 | Q-23 | No aperture correction in stage 2 | Open | [data-sources](data-sources.md) |
 | Q-24 | Light curve mixes wavelengths | Open | [data-sources](data-sources.md) |
@@ -128,7 +133,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-47 | Texture baker choices | Open (implemented as described) | [rendering-bodies](rendering-bodies.md) |
 | Q-48 | Shared field packing for gas giants | Open (implemented as described) | [rendering-bodies](rendering-bodies.md) |
 | Q-49 | Honesty start vs visible surface | Open (rule resolved with Q-45; start state op… | [rendering-bodies](rendering-bodies.md) |
-| Q-50 | Overlay, flags, combine endpoints | Open (implemented; docs updated in PR #32, aw… | [data-sources](data-sources.md) |
+| Q-50 | Overlay, flags, combine endpoints | Open (implemented; docs updated in PR #32… | [data-sources](data-sources.md) |
 | Q-51 | CatWISE2020 for WISE sources | Open (CatWISE2020 only) | [data-sources](data-sources.md) |
 | Q-52 | Gaia G < 20 cut | Open (G < 20) | [data-sources](data-sources.md) |
 | Q-53 | Contamination 2 px self-match | Open (2 px) | [data-sources](data-sources.md) |
@@ -188,7 +193,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-107 | Visual findings from #42 review | Mostly fixed (see below). Open: a check on a… | [rendering-kinds](rendering-kinds.md) |
 | Q-108 | Process gating and flare cap | Open (implemented as described) | [rendering-motion](rendering-motion.md) |
 | Q-109 | Brown-dwarf flattening refused | Proposed (Kevin to confirm); amended by Q-115 | [rendering-kinds](rendering-kinds.md) |
-| Q-110 | Policy for [verify] constants | Proposed; upheld by Atish (Q-119) | [contract-tags](contract-tags.md) |
+| Q-110 | Policy for [verify] constants | No status cell; upheld by Atish (Q-119) | [contract-tags](contract-tags.md) |
 | Q-111 | Two-stage answer and object jobs | Open (implemented as described) | [pipeline-jobs](pipeline-jobs.md) |
 | Q-112 | Fan-out settings and defaults | Open (implemented as described) | [pipeline-jobs](pipeline-jobs.md) |
 | Q-113 | Select, Build it, split view (main, L579) | Proposed: pending Moon's confirmation (implem… | [shell-surfaces](shell-surfaces.md) |
@@ -203,6 +208,8 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-122 | Gemini layer contract | Open (implemented as proposed) | [gemini](gemini.md) |
 | Q-123 | No sky pan/zoom buttons; grid loader | Decided (Moon asked for both) | [shell-surfaces](shell-surfaces.md) |
 | Q-124 | Sky fills bezel; edge fades | Decided (Moon asked for it) | [shell-surfaces](shell-surfaces.md) |
+| Q-125 | Moving frame search tags and refusals | Open (implemented as described) | [moving-frames](moving-frames.md) |
+| Q-126 | MOST as primary moving-object search | Open | [moving-frames](moving-frames.md) |
 | Q-130 | Reserved Track block Q-130 to Q-149 | Answered (Atish, 9 Nov 2026) | [scope-process](scope-process.md) |
 | Q-131 | Track scope: known objects only | Answered for scope (Atish, 9 Nov 2026); re-sc… | [moving-objects](moving-objects.md) |
 | Q-132 | Desktop-only event; A15 demo machine | Answered (Atish, 9 Nov 2026); open: M3 rename, issue #16 | [platform-hosting](platform-hosting.md) |
@@ -213,7 +220,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-137 | Demo object and data release | Answered (Atish, 9 Nov 2026) | [scope-process](scope-process.md) |
 | Q-138 | Positions are SPHEREx-centred | Answered (Atish, 9 Nov 2026) | [moving-objects](moving-objects.md) |
 | Q-139 | OUTLIER flags on mover core | Answered (Moon, 9 Nov 2026): accepted for mov… | [moving-objects](moving-objects.md) |
-| Q-140 | MOST or path cone search | Open | [moving-objects](moving-objects.md) |
+| Q-140 | MOST or path cone search | Open | [moving-frames](moving-frames.md) |
 | Q-141 | Path endpoint | Open | [moving-objects](moving-objects.md) |
 | Q-142 | Marker epoch for moving objects | Answered (Moon, 9 Nov 2026): accepted; in Tra… | [moving-objects](moving-objects.md) |
 | Q-143 | Star overlays for moving objects | Answered (Moon, 9 Nov 2026): accepted; Discov… | [moving-objects](moving-objects.md) |
@@ -222,6 +229,26 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-146 | Area search: Known and Discovery | Answered (Moon, 9 Nov 2026); accepted by Atis… | [moving-objects](moving-objects.md) |
 | Q-147 | Band-Hop Linker spec (first proposal) | Answered: re-scoped as Q-146 | [moving-objects](moving-objects.md) |
 | Q-148 | Pass length per sky position | Open | [moving-objects](moving-objects.md) |
+| Q-150 | Exoplanet card fields, ASSET_VERSION 6 | Proposed (needs a second team member) | [exoplanets](exoplanets.md) |
+| Q-151 | Demo exoplanet name resolution | Proposed (needs a second team member) | [catalogue-values](catalogue-values.md) |
+| Q-152 | Star Teff, radius and Mira period sources | Proposed (needs a second team member) | [catalogue-values](catalogue-values.md) |
+| Q-153 | Literature registry | Proposed (needs a second team member) | [catalogue-values](catalogue-values.md) |
+| Q-154 | Binary brown dwarf components | Proposed (needs a second team member) | [catalogue-values](catalogue-values.md) |
+| Q-155 | Tidal locking rule and constants | Decided (Moon, 10 Nov 2026); constants [verify] | [exoplanets](exoplanets.md) |
+| Q-156 | Climate scenarios, locked temperature map | Proposed (needs a second team member) | [exoplanet-looks](exoplanet-looks.md) |
+| Q-157 | Starlight colour | Proposed (needs a second team member) | [exoplanet-looks](exoplanet-looks.md) |
+| Q-158 | mass_mearth in the physics layer | Proposed (needs a second team member) | [exoplanets](exoplanets.md) |
+| Q-159 | Scenario looks and per-planet presets | Approved (Moon, 10 Nov 2026) | [exoplanet-looks](exoplanet-looks.md) |
+| Q-160 | Wiring scenario looks into the planet spec | Proposed (needs a second team member) | [exoplanet-looks](exoplanet-looks.md) |
+| Q-161 | Demo search list and aliases | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
+| Q-162 | 67P and Bennu shape products | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
+| Q-163 | WRL reader and Bennu shape model | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
+| Q-164 | Pre-built demo pack | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
+| Q-165 | The two demo exoplanet fixtures | Proposed (needs a second team member) | [exoplanets](exoplanets.md) |
+| Q-166 | Exoplanet mould steps, notes, alt text | Proposed (needs a second team member) | [exoplanet-looks](exoplanet-looks.md) |
+| Q-167 | Backend review fixes for issue #68 | Proposed (needs a second team member) | [catalogue-values](catalogue-values.md) |
+| Q-168 | Planet radius from pl_rade | Proposed (needs a second team member) | [exoplanets](exoplanets.md) |
+| Q-169 | Unit of slope_075_25 | Open | [catalogue-values](catalogue-values.md) |
 | Q-170 | One Escape owner for the shell | Proposed | [shell-proposals](shell-proposals.md) |
 | Q-171 | Pane kinds: Build and Track share split | Proposed | [shell-proposals](shell-proposals.md) |
 | Q-172 | Feature cards and island progress pill | Proposed | [shell-proposals](shell-proposals.md) |

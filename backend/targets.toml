@@ -7,39 +7,48 @@
 name = "Barnard's Star"
 query = "Barnard's star"
 group = "test"
-aliases = []
+aliases = ["barnard", "barnards"]
 
 [[target]]
 name = "Epsilon Indi B"
 query = "eps Ind B"
 group = "test"
-aliases = []
+aliases = ["eps indi b", "epsilon indi"]
 
 [[target]]
 name = "WISE 0855"
 query = "WISE J085510.83-071442.5"
 group = "test"
-aliases = ["WISE 0855", "WISE 0855-0714"]
+aliases = ["WISE 0855", "WISE 0855-0714", "w0855"]
 
 [[target]]
 name = "RW Aurigae"
 query = "RW Aur"
 group = "test"
-aliases = []
+aliases = ["rw aur"]
 
 [[target]]
 name = "R Draconis"
 query = "R Dra"
 group = "test"
-aliases = []
+aliases = ["r dra"]
 
-# A moving object, so the SBDB + Horizons path and the moving-object refusal (Q-21) are
-# recorded and tested offline.
+# A moving object, so the SBDB + Horizons path and the moving-object path search (issue #26,
+# Q-21) are recorded and tested offline.
 [[target]]
 name = "433 Eros"
 query = "433 Eros"
 group = "fixture"
 aliases = []
+
+# Moving targets with their own path-search windows (issue #26, PR #53): `moving_windows`
+# replaces SX_MOVING_WINDOW_START/END, so the cone cap covers only the spans where SPHEREx saw
+# the body. Matched by `spkid` (the SBDB id), so every spelling of the name gets the same windows.
+# 3I/ATLAS: SBDB answers "3I" with C/2025 N1 (ATLAS), spkid 1004083 (checked 9 Nov 2026). QR2
+# has its frames for 2025-08-01 to 08-16 and 2025-12-08 to 12-15 UTC (A3.1); each window is
+# padded by one day either side. Its row is with the demo targets below: one name, one query
+# (PR #70). Group "demo" is recorded by `scripts.record_fixtures`, so use --only to skip this long
+# path search.
 
 # Exoplanet fixtures (Q-63, A3.8): one per kind the rule gives, plus the envelope refusal, with
 # `frames = false` so only the SIMBAD and Exoplanet Archive answers are recorded (no SPHEREx
@@ -53,16 +62,16 @@ aliases = []
 [[target]]
 name = "TRAPPIST-1 e"
 query = "TRAPPIST-1 e"
-group = "fixture"
+group = "demo"  # also search row 12 (Q-161); frames = false keeps it out of the frame pre-fetch
 frames = false
-aliases = []
+aliases = ["TRAPPIST-1e"]
 
 [[target]]
 name = "K2-18 b"
 query = "K2-18 b"
-group = "fixture"
+group = "demo"  # also search row 13 (Q-161)
 frames = false
-aliases = []
+aliases = ["K2-18", "K218"]
 
 [[target]]
 name = "HD 209458 b"
@@ -110,3 +119,66 @@ name = "IRAS 04302+2247"
 query = "IRAS 04302+2247"
 group = "demo"
 aliases = ["IRAS 04302"]
+
+# Search list rows 6 to 16 (Q-161, issue #68). The search bar's order is in
+# frontend/src/app/search/demoTargets.ts; rows 12 and 13 are TRAPPIST-1 e and K2-18 b above.
+# Aliases are name mappings only (ASSUMPTION), never physical values.
+[[target]]
+name = "TRAPPIST-1 f"
+query = "TRAPPIST-1 f"
+group = "demo"
+aliases = ["TRAPPIST-1f", "TRAPPIST 1 f"]
+
+[[target]]
+name = "Kepler-186 f"
+query = "Kepler-186 f"
+group = "demo"
+aliases = ["Kepler-186f", "Kepler 186 f"]
+
+[[target]]
+name = "Bennu"
+query = "101955 Bennu"
+group = "demo"
+aliases = ["101955"]
+
+# SIMBAD does not know "Oumuamua"; SBDB knows "1I/2017 U1" (resolver gap found 9 Nov 2026).
+[[target]]
+name = "'Oumuamua"
+query = "1I/2017 U1"
+group = "demo"
+aliases = ["Oumuamua", "1I"]
+
+[[target]]
+name = "3I/ATLAS"
+query = "3I/ATLAS"
+group = "demo"
+aliases = ["3I", "ATLAS", "C/2025 N1"]
+spkid = "1004083"
+moving_windows = [
+  ["2025-07-31T00:00:00Z", "2025-08-18T00:00:00Z"],
+  ["2025-12-07T00:00:00Z", "2025-12-17T00:00:00Z"],
+]
+
+[[target]]
+name = "HD 189733 b"
+query = "HD 189733 b"
+group = "demo"
+aliases = ["HD 189733", "HD189733b", "HD 189733b"]
+
+[[target]]
+name = "Comet 67P"
+query = "67P/Churyumov-Gerasimenko"
+group = "demo"
+aliases = ["67P", "Churyumov", "Gerasimenko"]
+
+[[target]]
+name = "Orion Nebula"
+query = "M 42"
+group = "demo"
+aliases = ["Orion", "M42"]
+
+[[target]]
+name = "Crab Nebula"
+query = "M 1"
+group = "demo"
+aliases = ["Crab", "M1"]
