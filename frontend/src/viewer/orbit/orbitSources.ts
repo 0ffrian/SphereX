@@ -226,23 +226,27 @@ export interface RockyOrbitInput {
   palette?: Partial<FluidLook> | null;
 }
 
-/** What stream E's `GasWorld` is asked to expose (ASSUMPTION: names; E had no `orbitSources` yet). */
+/** What stream E's `GasWorld.orbitSources` (`GasOrbitSources`) exposes. */
 export interface GasOrbitInput {
   radiusKm?: number | null;
   seed?: number;
   scaleHeightKm?: number | null;
   haze?: number;
   hazeColour?: Rgb | null;
-  velocityTexture?: Texture | null;
-  bandTexture?: Texture | null;
-  /** The tracer swaps between two targets, so it is a function. */
-  tracerTexture?: (() => Texture | null) | null;
-  /** sRGB display colours, as GasWorld's palette. */
+  /** R/G winds, B vorticity, A storm code. */
+  velocity?: Texture | null;
+  /** 1 x 512: R brightness, G chromophore, B turbulence, A polar. */
+  bands?: Texture | null;
+  /** The tracer render target swaps after every pass: a texture (read the getter each frame) or a function. Null before the first pass. */
+  tracer?: Texture | (() => Texture | null) | null;
+  /** sRGB display colours. */
   palette?: GasPalette | null;
+  /** False while the planet is still forming (hidden settling): show the "forming" state. */
+  ready?: boolean;
 }
 
 export function isGasInput(x: unknown): x is GasOrbitInput {
-  return typeof x === 'object' && x !== null && ('velocityTexture' in x || 'bandTexture' in x || 'tracerTexture' in x);
+  return typeof x === 'object' && x !== null && ('velocity' in x || 'bands' in x || 'tracer' in x) && !('terrainTexture' in x);
 }
 
 export function isRockyInput(x: unknown): x is RockyOrbitInput {
@@ -300,9 +304,9 @@ export function rockyOrbitSources(input: RockyOrbitInput | null | undefined): Or
   const fluidId = input.fluid?.id ?? '';
   const baseLook = FLUID_LOOK[fluidId] ?? null;
   const look: FluidLook | null = baseLook
-    ? { ...baseLook, ...(input.palette ?? {}) }
+    ? ({ ...baseLook, ...(input.palette ?? {}) } as FluidLook)
     : input.palette && input.palette.liq && input.palette.ice && input.palette.cld && input.palette.land
-      ? { aw: [0.1, 0.1, 0.1], ...(input.palette as FluidLook) }
+      ? ({ aw: [0.1, 0.1, 0.1], ...input.palette } as FluidLook)
       : null;
   if (!look) {
     return refuse('rocky', 'The colours of the ground are not known, so the surface view cannot be drawn.');
@@ -344,14 +348,22 @@ export function rockyOrbitSources(input: RockyOrbitInput | null | undefined): Or
 }
 
 /** The orbit sources of a gas giant, with the layers that cannot be drawn. */
-export function gasOrbitSources(input: GasOrbitInput | null | undefined): OrbitResolved {
+export function gasOrbitSources(
+  input: GasOrbitInput | null | undefined,
+  /** Re-reads the live getter (the tracer swaps buffers each pass). */
+  live?: () => GasOrbitInput | null | undefined,
+): OrbitResolved {
   const missing = new Set<string>();
   if (!input) return refuse('gas', 'This object has no cloud deck to fly over yet.');
   if (!positive(input.radiusKm)) return refuse('gas', 'The planet radius is not known, so the surface view cannot be sized.');
-  if (!input.tracerTexture || !input.bandTexture || !input.palette) {
+  if (input.ready === false) return refuse('gas', 'The planet is still forming. The surface view opens when it has settled.');
+  if (!input.bands || !input.palette || input.tracer === undefined) {
     return refuse('gas', 'The flow of the clouds is not available, so the surface view cannot be drawn.');
   }
-  if (!input.velocityTexture) missing.add('orbit.eddies');
+  const asTex = (t: GasOrbitInput['tracer']): Texture | null => (typeof t === 'function' ? t() : (t ?? null));
+  const tracerFn: () => Texture | null =
+    typeof input.tracer === 'function' ? input.tracer : live ? () => asTex(live()?.tracer) : () => asTex(input.tracer);
+  if (!input.velocity) missing.add('orbit.eddies');
   const scaleHeight = positive(input.scaleHeightKm) ? input.scaleHeightKm : null;
   if (scaleHeight === null) missing.add('orbit.atmosphere');
   const p = input.palette;
@@ -364,9 +376,9 @@ export function gasOrbitSources(input: GasOrbitInput | null | undefined): OrbitR
     scaleHeightKm: scaleHeight,
     haze: finite(input.haze) ? input.haze : 0,
     hazeColour: rgbOrNull(input.hazeColour) ?? DEFAULT_HAZE_COLOUR,
-    velocity: input.velocityTexture ?? null,
-    bands: input.bandTexture,
-    tracer: input.tracerTexture,
+    velocity: input.velocity ?? null,
+    bands: input.bands,
+    tracer: tracerFn,
     gasPalette: { z: lin(p.z), b: lin(p.b), s: lin(p.s), d: lin(p.d), p: lin(p.p) },
   };
   return { sources, layers: statuses(missing, 'gas'), missing: [...missing], refusal: null };
@@ -381,8 +393,8 @@ function refuse(kind: OrbitKind, why: string): OrbitResolved {
  * What a built body exposes as `orbitSources` (any shape) to the orbit sources and the layer list.
  * Null input (no body, or a body that exposes nothing): the view is refused with a plain message.
  */
-export function resolveOrbitSources(exposed: unknown): OrbitResolved {
-  if (isGasInput(exposed)) return gasOrbitSources(exposed);
+export function resolveOrbitSources(exposed: unknown, live?: () => unknown): OrbitResolved {
+  if (isGasInput(exposed)) return gasOrbitSources(exposed, live as never);
   if (isRockyInput(exposed)) return rockyOrbitSources(exposed);
   return refuse('rocky', 'This object has no surface view.');
 }
