@@ -17,8 +17,10 @@ from app.adapters.exoplanet_archive import ref_text
 from app.core.card import stars
 from app.core.card.catalogue import CatalogueData
 from app.core.classify import Classification, is_calculated
+from app.core.classify.rules import EXOPLANET_THRESHOLDS
 from app.core.find.resolver import ResolvedObject
 from app.core.render.card_to_params import MEASURING_PREFIX
+from app.core.render.gas_giant import R_EARTH_M, R_JUP_M
 from app.core.render.spherex_rgb import CHANNELS_BY_TYPE, spherex_rgb, window_median
 from app.core.render.spherex_rgb import formula as spherex_formula
 from app.timefmt import iso_utc_z, parse_utc
@@ -284,6 +286,48 @@ def _mass_field(row: Mapping[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _planet_radius(row: Mapping[str, Any]) -> dict[str, Any]:
+    """``radius_rjup`` (Q-168). A planet below the giant cut (``giant_min_radius_earth``) takes the
+    archive's ``pl_rade`` converted with R_earth / R_Jup, because ``pl_radj`` is rounded to three
+    decimals and a small planet loses its precision there (Kepler-186 f: 0.104 against 0.10438).
+    Giants keep ``pl_radj``. A ``CALCULATED_VALUE`` is ``model_dependent``, never ``measured``."""
+    giant_min = EXOPLANET_THRESHOLDS["giant_min_radius_earth"]
+    rade = _finite(row.get("pl_rade"))
+    if giant_min is not None and rade is not None and 0 < rade < giant_min:
+        to_rjup = R_EARTH_M / R_JUP_M
+        value = rade * to_rjup
+        conv = "x R_earth / R_Jup (6378.1366 km / 71492 km)"
+        if is_calculated(row, "pl_rade"):
+            return {
+                "value": value,
+                "tag": "model_dependent",
+                "source": f"{ARCHIVE_CALC}, pl_rade {conv}",
+                "assumption": ARCHIVE_RADIUS_ASSUMPTION,
+            }
+        errs = [abs(e) for e in (_finite(row.get(k)) for k in ("pl_radeerr1", "pl_radeerr2")) if e]
+        return _measured(
+            value,
+            f"NASA Exoplanet Archive PSCompPars pl_rade {conv} ({ref_text(row, 'pl_rade')})",
+            max(errs) * to_rjup if errs else None,
+        )
+    radius = _finite(row.get("pl_radj"))
+    if radius is None or radius <= 0:
+        return _null("not available: the Exoplanet Archive has no pl_radj")
+    if is_calculated(row, "pl_radj"):
+        return {
+            "value": radius,
+            "tag": "model_dependent",
+            "source": f"{ARCHIVE_CALC}, pl_radj",
+            "assumption": ARCHIVE_RADIUS_ASSUMPTION,
+        }
+    errs = [abs(e) for e in (_finite(row.get(k)) for k in ("pl_radjerr1", "pl_radjerr2")) if e]
+    return _measured(
+        radius,
+        f"NASA Exoplanet Archive PSCompPars pl_radj ({ref_text(row, 'pl_radj')})",
+        max(errs) if errs else None,
+    )
+
+
 def _planet_fields(card: dict[str, Any], row: Mapping[str, Any] | None) -> None:
     """R7.7 size, D-12 temperature, and (Q-150) mass, orbit and host star from the Exoplanet
     Archive row (A3.8).
@@ -291,23 +335,7 @@ def _planet_fields(card: dict[str, Any], row: Mapping[str, Any] | None) -> None:
     A value the archive calculated itself (``refstr=CALCULATED_VALUE``) is not ``measured``:
     the radius is ``model_dependent`` (a mass-radius relation) and Teq ``derived`` (Q-63)."""
     row = row or {}
-    radius = _finite(row.get("pl_radj"))
-    if radius is None or radius <= 0:
-        card["radius_rjup"] = _null("not available: the Exoplanet Archive has no pl_radj")
-    elif is_calculated(row, "pl_radj"):
-        card["radius_rjup"] = {
-            "value": radius,
-            "tag": "model_dependent",
-            "source": f"{ARCHIVE_CALC}, pl_radj",
-            "assumption": ARCHIVE_RADIUS_ASSUMPTION,
-        }
-    else:
-        errs = [abs(e) for e in (_finite(row.get(k)) for k in ("pl_radjerr1", "pl_radjerr2")) if e]
-        card["radius_rjup"] = _measured(
-            radius,
-            f"NASA Exoplanet Archive PSCompPars pl_radj ({ref_text(row, 'pl_radj')})",
-            max(errs) if errs else None,
-        )
+    card["radius_rjup"] = _planet_radius(row)
     teq = _finite(row.get("pl_eqt"))
     if teq is not None and teq > 0 and is_calculated(row, "pl_eqt"):
         card["teq_K"] = {

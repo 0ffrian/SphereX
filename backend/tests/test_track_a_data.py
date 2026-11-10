@@ -182,8 +182,37 @@ def test_card_schema_accepts_every_new_field() -> None:
     assert errors(card, "object-card.schema.json") == []
 
 
+def test_a_small_planet_takes_pl_rade_not_the_rounded_pl_radj() -> None:
+    """Q-168: Kepler-186 f, 1.17 R_earth (Torres et al. 2015); pl_radj rounds to 0.104."""
+    from app.core.render.gas_giant import R_EARTH_M, R_JUP_M
+
+    r = planet_card(
+        row(pl_rade=1.17, pl_radeerr1=0.04, pl_radeerr2=-0.05, pl_radj=0.104, pl_radjerr1=0.9)
+    )["radius_rjup"]
+    assert r["value"] == pytest.approx(1.17 * 6378.1366 / 71492)
+    assert r["value"] == pytest.approx(0.10438, abs=5e-6) and r["tag"] == "measured"
+    assert r["err"] == pytest.approx(0.05 * R_EARTH_M / R_JUP_M)
+    assert "pl_rade" in r["source"] and "R_earth / R_Jup" in r["source"]
+
+
+def test_a_giant_keeps_pl_radj_unchanged() -> None:
+    r = planet_card(row(pl_rade=11.2, pl_radj=0.999, pl_radjerr1=0.01))["radius_rjup"]
+    assert r["value"] == 0.999 and r["err"] == 0.01 and "pl_radj" in r["source"]
+    assert planet_card(row(pl_rade=6.0, pl_radj=0.535))["radius_rjup"]["value"] == 0.535
+
+
+def test_a_calculated_pl_rade_is_model_dependent_not_measured() -> None:
+    r = planet_card(row(pl_rade=2.0, pl_rade_reflink=CALC))["radius_rjup"]
+    assert r["tag"] == "model_dependent" and r["assumption"] and "pl_rade" in r["source"]
+    assert r["value"] == pytest.approx(2.0 * 6378.1366 / 71492)
+
+
+def test_a_small_planet_without_pl_rade_falls_back_to_pl_radj() -> None:
+    assert planet_card(row())["radius_rjup"]["value"] == 0.1
+
+
 def test_asset_version_is_bumped_for_the_new_fields() -> None:
-    assert ASSET_VERSION == "7"
+    assert ASSET_VERSION == "8"
 
 
 def test_jupiter_radius_is_the_equatorial_one_defined_once() -> None:
