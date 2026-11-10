@@ -45,9 +45,9 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | [plan.md](plan.md) | A13 | you need the status board per milestone, the remaining days and the Track and Area tickets |
 | [risks.md](risks.md) | A14–A14.1 | you need the risk register, or the register of open **[verify]** items with owner and deadline |
 | [glossary.md](glossary.md) | A15 | you meet an unfamiliar term |
-| [moving-objects/area-search.md](moving-objects/area-search.md) | A16–A16.7 | you work on Area search (Q-146): draw a square, then Known objects (hand-off to Track) or Discovery; scope, architecture, honesty rules, measured Eros facts, tickets D1 to D3 |
-| [moving-objects/area-backend.md](moving-objects/area-backend.md) | A17–A17.11 | you build the Discovery backend: area frames and visits, dots, glitches/stars/fixed dots, the parallax-aware join, the known-object check, `/v1/areas`, schemas, cache |
-| [moving-objects/area-ui.md](moving-objects/area-ui.md) | A18–A18.10 | you build Area search in the sky view: drawing, sky layers, visits and blink, feature cards and minimise, Result card, hand-off to Track, state, tests |
+| [moving-objects/area-search.md](moving-objects/area-search.md) | A16–A16.8 | you work on Area search (Q-146): draw a square, then Known objects (hand-off to Track) or Discovery; scope, architecture, honesty rules, measured Eros facts, tickets D1 to D3, the four gated research checks D4 to D7 and why a reviewer wants them (A16.8) |
+| [moving-objects/area-backend.md](moving-objects/area-backend.md) | A17–A17.13 | you build the Discovery backend: area frames and visits, dots, glitches/stars/fixed dots, the parallax-aware join, the known-object check, planted movers, completeness and the control, the rate-grid linker, the spectrum score, `/v1/areas`, schemas, cache |
+| [moving-objects/area-ui.md](moving-objects/area-ui.md) | A18–A18.11 | you build Area search in the sky view: drawing, sky layers, visits and blink, feature cards and minimise, Result card, hand-off to Track, the Checks section, state, tests |
 | [moving-objects/track.md](moving-objects/track.md) | A19–A19.8 | you build Track data: scope, entry points, frame list, SPHEREx-centred positions, `/path`, star list and photometry for movers, extended sources |
 | [moving-objects/track-contract.md](moving-objects/track-contract.md) | A19.9–A19.15 | you build the Track export (ECSV), its refusal codes, provenance per value, cache and pre-fetch, contract, owners, tickets T1 to T4, tests |
 | [moving-objects/track-ui.md](moving-objects/track-ui.md) | A20–A20.15 | you build the Track screen in the split pane: time slider, path on the sky, detail view and imagery, zoom, spectrum hop by hop, spin slider, sound controls, honesty, states, R9, files, tests |
@@ -129,6 +129,7 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | A16.5 | Honesty rules | [moving-objects/area-search.md#a165-honesty-rules](moving-objects/area-search.md#a165-honesty-rules) |
 | A16.6 | Open items and measured facts | [moving-objects/area-search.md#a166-open-items-and-measured-facts](moving-objects/area-search.md#a166-open-items-and-measured-facts) |
 | A16.7 | Tickets and plan | [moving-objects/area-search.md#a167-tickets-and-plan](moving-objects/area-search.md#a167-tickets-and-plan) |
+| A16.8 | Why these four checks, and what a reviewer gets | [moving-objects/area-search.md#a168-why-these-four-checks-and-what-a-reviewer-gets](moving-objects/area-search.md#a168-why-these-four-checks-and-what-a-reviewer-gets) |
 | A17 | Discovery backend | [moving-objects/area-backend.md#a17-discovery-backend](moving-objects/area-backend.md#a17-discovery-backend) |
 | A17.1 | Area and frames (`frames.py`) | [moving-objects/area-backend.md#a171-area-and-frames-framespy](moving-objects/area-backend.md#a171-area-and-frames-framespy) |
 | A17.2 | Dots (`dots.py`) | [moving-objects/area-backend.md#a172-dots-dotspy](moving-objects/area-backend.md#a172-dots-dotspy) |
@@ -141,6 +142,8 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | A17.9 | Schemas and fixtures | [moving-objects/area-backend.md#a179-schemas-and-fixtures](moving-objects/area-backend.md#a179-schemas-and-fixtures) |
 | A17.10 | Cache, offline and determinism | [moving-objects/area-backend.md#a1710-cache-offline-and-determinism](moving-objects/area-backend.md#a1710-cache-offline-and-determinism) |
 | A17.11 | Compute budget | [moving-objects/area-backend.md#a1711-compute-budget](moving-objects/area-backend.md#a1711-compute-budget) |
+| A17.12 | Rate-grid linker (`rategrid.py`) | [moving-objects/area-backend.md#a1712-rate-grid-linker-rategridpy](moving-objects/area-backend.md#a1712-rate-grid-linker-rategridpy) |
+| A17.13 | Spectrum smoothness score (`sed.py`) | [moving-objects/area-backend.md#a1713-spectrum-smoothness-score-sedpy](moving-objects/area-backend.md#a1713-spectrum-smoothness-score-sedpy) |
 | A18 | Area search in the sky view | [moving-objects/area-ui.md#a18-area-search-in-the-sky-view](moving-objects/area-ui.md#a18-area-search-in-the-sky-view) |
 | A18.1 | Tool and drawing | [moving-objects/area-ui.md#a181-tool-and-drawing](moving-objects/area-ui.md#a181-tool-and-drawing) |
 | A18.2 | Sky layers (`frontend/src/app/sky/area/AreaLayer.tsx`) | [moving-objects/area-ui.md#a182-sky-layers-frontendsrcappskyareaarealayertsx](moving-objects/area-ui.md#a182-sky-layers-frontendsrcappskyareaarealayertsx) |
@@ -152,6 +155,7 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | A18.8 | Hand-off to Track | [moving-objects/area-ui.md#a188-hand-off-to-track](moving-objects/area-ui.md#a188-hand-off-to-track) |
 | A18.9 | State, API client, accessibility, performance | [moving-objects/area-ui.md#a189-state-api-client-accessibility-performance](moving-objects/area-ui.md#a189-state-api-client-accessibility-performance) |
 | A18.10 | Testing | [moving-objects/area-ui.md#a1810-testing](moving-objects/area-ui.md#a1810-testing) |
+| A18.11 | Checks | [moving-objects/area-ui.md#a1811-checks](moving-objects/area-ui.md#a1811-checks) |
 | A19 | Track | [moving-objects/track.md#a19-track](moving-objects/track.md#a19-track) |
 | A19.1 | Scope | [moving-objects/track.md#a191-scope](moving-objects/track.md#a191-scope) |
 | A19.2 | Entry points | [moving-objects/track.md#a192-entry-points](moving-objects/track.md#a192-entry-points) |

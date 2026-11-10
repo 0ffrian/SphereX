@@ -1,6 +1,6 @@
 # Area search: in the sky view
 
-> **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A18 to A18.10 · **Implements:** [Q-146](../../decisions/moving-objects.md), [Q-120, Q-121, Q-123, Q-124](../../decisions/shell-surfaces.md), [Q-132](../../decisions/platform-hosting.md), D-21 ([contract-tags](../../decisions/contract-tags.md)) · **Read with:** [area-search.md](area-search.md) (A16), [area-backend.md](area-backend.md) (A17), [sky-shell.md](../sky-shell.md) (A21, with A21.8 to A21.13 in [sky-shell-behaviour.md](../sky-shell-behaviour.md)), [track-ui.md](track-ui.md) (A20)
+> **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A18 to A18.11 · **Implements:** [Q-146](../../decisions/moving-objects.md), [Q-120, Q-121, Q-123, Q-124](../../decisions/shell-surfaces.md), [Q-132](../../decisions/platform-hosting.md), D-21 ([contract-tags](../../decisions/contract-tags.md)) · **Read with:** [area-search.md](area-search.md) (A16), [area-backend.md](area-backend.md) (A17), [sky-shell.md](../sky-shell.md) (A21, with A21.8 to A21.13 in [sky-shell-behaviour.md](../sky-shell-behaviour.md)), [track-ui.md](track-ui.md) (A20)
 
 Status: **agreed plan, not built** ([Q-146](../../decisions/moving-objects.md)). Owner: Moon (ticket D2; `frontend/src/app/` and `state/` are Moon's, D-17). Area search uses the shell as [A21](../sky-shell.md) specifies it (layout, rail, surfaces, sky interaction, split pane, keys, hash) and changes nothing it already does for a searched object. Where A21 marks an extension point **To build (proposed, Q-150 to Q-157)**, Area search depends on it and names it; those placeholders are A21's, not this fragment's. Track's own screen is [A20](track-ui.md); this fragment only opens it.
 
@@ -59,6 +59,7 @@ Mock-up: `mockup/spherex-ui.html`, mock-up tool 5 (the app adds no number keys, 
 - **Five steps**, each a row with a check, a name and its count from `steps` (A17.8): Find dots · Drop one-exposure glitches · Drop stars and fixed dots (Gaia DR3, CatWISE) · Join what moves across visits · Check known objects (SkyBoT, Horizons). **Look for movers** replays them one second apart (at once under reduced motion), turns both layers on and fits the camera so the square sits in the safe rectangle below the card (A21.2; `skyFlyTo`, A21.6, Q-154). Afterwards the button reads **Run again**. The blink stays off until the user presses it (A18.3).
 - **Results list:** one row per track or possible, rendered from the start (greyed "waiting") so the card does not change height: id, "Moves across both visits" or "Seen in 1 visit", frames, and a chip: `433 Eros` (green), `unexplained` (amber), `not checked` (grey) or `possible`. A row is a button that opens the Result card.
 - The reveal is announced through the shell's `announce(text)` action (A21.12, Q-156; today `LiveAnnouncer` reads only `sky.announcement`): "4 movers: 1 is 433 Eros, found blind; 1 unexplained; 1 not checked; 1 seen in one visit".
+- **Checks** (gated extras, Q-183): below the results list, a **Checks** section (A18.11) appears when the area has a `checks` entry; otherwise nothing is shown.
 
 ### A18.7 Result card
 
@@ -71,6 +72,7 @@ The card for one Discovery result (called "Track card" before; renamed so "Track
   - unchecked: "Moves across both visits. It could not be checked against known objects (<reason>)."
   - possible: "Moves within one visit only. It needs a second visit before it counts as a track."
 - Facts with badges: visits, frames, glitch check, star check, known object and separation (Estimated), apparent rate and direction between visits, labelled "apparent, seen from SPHEREx" (`derived`; the rate inside a visit is not shown, Q-134), and the dots with flags (`OUTLIER` named, Measured).
+- Gated extras (Q-183): a neutral chip `smooth spectrum`, `rough spectrum` or `too few points` with the flux-against-wavelength points (A17.13), and a line "Linked by: pairing (2 visits)" or "rate grid (n visits)" (A17.12). The chip is never a verdict colour and never changes the verdict sentence.
 - Buttons: **Open in Track** (found blind only), **Back to Discovery**.
 
 ### A18.8 Hand-off to Track
@@ -98,4 +100,16 @@ The card for one Discovery result (called "Track card" before; renamed so "Track
 | Frontend unit | Square drawing and the minimum size; the square's keys only while it has focus; hit-test order (marker before track); label clamping to the safe rectangle; RA wrap; the store slice (loading, abort, steps); hash read and write of `area` and `atrack`; validation of every fixture |
 | Components | Options, Known (Track it and Open), Discovery and Result cards; every verdict's sentence; the step replay with and without reduced motion; the blink toggle stops; minimise and restore during the replay; "Measured only" hides lines, labels and Known positions; refusal display |
 | e2e (Playwright) | On fixtures: choose the tool, draw a square, Discovery, run, minimise, restore, open T1, Open in Track, Back to the area; Known, Track it; Escape order (Track, then drawing, then the card). On the real cache (D3): the same flow on the Eros area under `SX_OFFLINE=1` |
+| Checks (gated, Q-183) | Component: the Checks section with and without a `checks` entry (hidden when `checks:not_run`); the Injected badge and divider; the planted row absent from every count; the grid as a labelled table with no single summary number; the spectrum chip. e2e: switch the planted mover on, run, see it recovered and unchanged real results |
 | Backend | In [A17](area-backend.md) and ticket D1: determinism; glitch, star and fixed labels on recorded frames; the Eros test (one `track`); the 4 fixture movers; an ambiguous pair stays possible; the match against recorded SkyBoT and Horizons replies; `unchecked` on a failed SkyBoT reply; ECSV; offline 404 |
+
+### A18.11 Checks
+
+**Gated extras (Q-183), proposed.** Built only if its ticket passes the gate of [A16.7](area-search.md#a167-tickets-and-plan); until then the Discovery card has no Checks section and nothing is greyed out or promised. Not in the mock-up yet. Data: `GET /v1/areas/{area_id}/checks` ([A17.8](area-backend.md#a178-endpoints)).
+
+- **Where.** A **Checks** disclosure at the foot of the Discovery card, closed until Discovery has run. Each part appears only if its data exists; a part that is missing says so ("Control not run") and its code goes to the refusal list, never an empty frame.
+- **Planted test mover (D4).** A switch **Include a planted test mover**, off by default, enabled after the first run. On: the planted path is drawn on the sky with a dashed outline and the label "Injected", and one row "Test · planted by us · recovered" (or "not recovered") joins the results under a divider headed "Planted, not real". The row opens a small card: "We planted this mover. The search was not told where, and it found it." (or "did not find it"). It is excluded from every count, from Known and from the export. Badge **Injected**: text plus an outline colour that is not the green, amber or grey of the real verdicts, so colour is never the only cue (R9).
+- **Completeness grid (D4).** A table, rows = rate bins (deg/day), columns = S/N bins. Each cell reads "k of n" and is shaded by the fraction, with its interval in the tooltip. Row and column headers are real table headers. Fixed caption: "How often the search found movers we planted in this square. It is not a catch rate for the real sky." Badge Estimated. No single summary number appears here, in an announcement or in the export.
+- **Control line (D5).** "Scrambled-time control: n false tracks in m runs" (Estimated); the seeds are in the details.
+- **Spectrum chip (D6)** and **Linked by (D7)** are part of the results rows and the Result card (A18.7).
+- **Announce.** Through `announce(text)` (A21.12, Q-156): "Checks: test mover recovered; 0 false tracks in 20 scrambled runs."

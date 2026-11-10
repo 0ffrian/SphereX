@@ -118,5 +118,7 @@ One meaning per term. Where a word has two meanings, both are listed and the own
 | Tracklet | Movers-to-be inside one visit that fall on a straight line in time ([A17.4](moving-objects/area-backend.md#a174-join-across-visits-joinpy)). |
 | Discovery track | Tracklets in different visits joined into one path (was "Track (Discovery)"). Labels per [A16.5](moving-objects/area-search.md#a165-honesty-rules): "found blind = (designation)" when the known-object check names it, "unexplained" when nothing matches (a lead, not a discovery), "not checked" when the check failed; a tracklet with no single partner is "possible". |
 | Result card | The card for one Discovery track (was "Track card") ([A18.7](moving-objects/area-ui.md#a187-result-card)). |
-| Completeness | The fraction of injected fake movers recovered, by magnitude. Phase 2, not in the event build ([A17.6](moving-objects/area-backend.md#a176-injection-completeness-and-control)). |
+| Completeness | The fraction of planted fake movers the search recovers, per brightness and speed, shown as a grid for the square tested and never as one number. A gated extra for the event (Q-183, [A17.6](moving-objects/area-backend.md#a176-injection-completeness-and-control)). |
+| Planted mover | A fake mover we add in memory to a square's real frames to test the search. Always badged Injected; never counted, never exported with real tracks ([A17.6](moving-objects/area-backend.md#a176-injection-completeness-and-control)). |
+| Shuffled-time control | The same search with the frame times permuted, to count the tracks it makes from chance alignment ([A17.6](moving-objects/area-backend.md#a176-injection-completeness-and-control)). |
 | ADES | The Minor Planet Center's format for reporting astrometry; phase 2. |
