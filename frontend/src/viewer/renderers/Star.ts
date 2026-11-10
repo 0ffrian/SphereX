@@ -130,18 +130,18 @@ export function starSurfaceLayers(
 ) {
   const flareTag = weakestTag(flareRateTag ? [flareRateTag, 'inferred_from_analog'] : ['artistic']);
   return [
-    physics && !physics.cellsEnlarged
+    physics
       ? viewerLayer(
           'granulation',
           'model_dependent',
-          'Convective cells and dark lanes at their modelled size: about eight pressure scale heights across, from the star\u2019s temperature, radius and mass. The pattern itself is not measured.',
+          physics.cellsEnlarged
+            ? 'Convective cells and dark lanes. The pattern follows the star\u2019s temperature, radius and mass; the cells are drawn larger than real ones so they can be seen (choose true scale for their real size). The pattern itself is not measured.'
+            : 'Convective cells and dark lanes at their modelled size: about eight pressure scale heights across, from the star\u2019s temperature, radius and mass. The pattern itself is not measured.',
         )
       : viewerLayer(
           'granulation',
           'artistic',
-          physics
-            ? 'Convective cells and dark lanes, drawn larger than real ones so they can be seen. The true size comes from the star\u2019s temperature, radius and mass; the enlarged pattern is an artist look.'
-            : 'Convective cells and dark lanes, drawn far larger than real granules so they can be seen. How big real cells are depends on the star\u2019s mass and surface gravity, which are not on the card, so the pattern is an artist look.',
+          'Convective cells and dark lanes, drawn far larger than real granules so they can be seen. How big real cells are depends on the star\u2019s mass and surface gravity, which are not on the card, so the pattern is an artist look.',
         ),
     viewerLayer(
       'spots',
@@ -253,7 +253,7 @@ export function planStar(input: PlanInput, config: StarConfig = STAR_CONFIG): Re
   if (bodyOk && type !== 'star_mira') {
     const flareRate = motion.rates.flare_rate_per_d;
     // Issue #71 stream C: the physics of the surface, when the card gives teff, radius and mass.
-    const colourView = ctx.starColour ?? 'observatory';
+    const colourView = ctx.starColour ?? 'true';
     const scale = ctx.starScale ?? 'enlarged';
     const teff = card.teff_K?.value;
     const radius = card.radius_rsun?.value;

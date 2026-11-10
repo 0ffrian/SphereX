@@ -116,14 +116,16 @@ describe('ViewerPanel', () => {
     expect(container.textContent).not.toMatch(/sped up/);
   });
 
-  it('a star opens in Observatory view; Close-up moves to Enhanced colour and the camera follows', async () => {
+  it('a star opens in True colour (Q-290); Close-up from Observatory moves to Enhanced colour and the camera follows', async () => {
     const { card, params } = fixture('star');
     useAppStore.getState().setObject(card, params);
     useAppStore.getState().setHonesty('artistic');
     await mount();
     const pressed = (n: string) => button(n)?.getAttribute('aria-pressed');
-    expect(pressed('Observatory view')).toBe('true');
+    expect(pressed('True colour')).toBe('true');
     expect(pressed('Whole star, larger detail')).toBe('true');
+    await click('Observatory view');
+    expect(pressed('Observatory view')).toBe('true');
     await click('Close-up');
     expect(pressed('Enhanced colour')).toBe('true');
     expect(pressed('Observatory view')).toBe('false');

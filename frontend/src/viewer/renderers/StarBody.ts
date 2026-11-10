@@ -27,6 +27,10 @@ import type { SimTimeFn } from '../motion/motion';
 import { buildStarMaterial, type StarMaterial } from '../shaders/star';
 import { buildLoopMesh, type LoopMesh } from '../shaders/loops';
 import { StarPlasma } from './StarPlasma';
+import { teffToRgbMax1 } from '@/physics/starlight';
+
+/** The dim lanes and the limb are about this much cooler than the disc centre (display value, as the prototype). */
+const COOL_FACTOR = 0.8;
 import type { TierName } from '../render/quality';
 
 /** Largest shear of the granulation before its flow-map resets, radians (artistic). */
@@ -89,6 +93,8 @@ export class StarBody {
       cellsAcross: star.cellsAcross,
       granuleVisibility: star.granuleVisibility,
       convection: star.physics ? star.physics.convection : 1,
+      teffK: star.physics?.teffK,
+      coolTint: star.physics ? (teffToRgbMax1(star.physics.teffK * COOL_FACTOR) ?? undefined) : undefined,
     });
     this.geometry = new SphereGeometry(1, o.segments[0], o.segments[1]);
     this.spin.add(new Mesh(this.geometry, this.mat.material));
