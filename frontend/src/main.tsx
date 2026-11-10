@@ -11,3 +11,8 @@ createRoot(root).render(
     <App />
   </StrictMode>,
 );
+
+// Dev only: the engine parity hook (parity/CONTRACT.md C), on ?parity=1. Never part of a production build.
+if (import.meta.env.DEV && new URLSearchParams(location.search).get('parity') === '1') {
+  void import('@/engine/parity/hook');
+}
