@@ -276,17 +276,20 @@ def test_rw_aur_teff_comes_from_simbad_not_the_dwarf_table(ctx: Context) -> None
     assert "colour" in {x["id"] for x in params_of(card)["layers"]}
 
 
-def test_r_dra_period_is_the_mira_median_and_teff_is_refused(ctx: Context) -> None:
+def test_r_dra_period_is_the_mira_median_and_teff_is_the_msc_model_value(ctx: Context) -> None:
     card, _ = card_of(ctx, "R Dra")
     period = card["period_var_d"]
     # A median of three published periods is a derivation, like the Teff median (Q-152).
     assert period["value"] == 247.0 and period["tag"] == "derived" and "formula" in period
     assert "median of 3" in period["source"] and "2020ApJS..247...44A" in period["source"]
-    assert card["teff_K"]["value"] is None and "Miras" in card["teff_K"]["source"]
+    # Only Gaia's Multiple Star Classifier answers for R Dra, as a model value (Q-220); no radius.
+    teff = card["teff_K"]
+    assert (teff["value"], teff["tag"]) == (3047.9, "model_dependent")
+    assert "teff_msc1" in teff["source"] and "unresolved binary" in teff["assumption"]
     assert card["radius_rsun"]["value"] is None
     params = params_of(card)
-    assert "radius_pulsation" in {x["id"] for x in params["layers"]}
-    assert {"colour", "visible"} <= set(params["missing"])
+    assert {"radius_pulsation", "colour"} <= {x["id"] for x in params["layers"]}
+    assert "colour" not in params["missing"]
 
 
 def test_simbad_rows_parse_recorded_replies() -> None:
@@ -426,6 +429,7 @@ def test_a_failed_star_query_keeps_the_card_unsaved_and_says_why(
         raise CacheMissOffline("x")
 
     monkeypatch.setattr(simbad, "teff_rows", boom)
+    monkeypatch.setattr(gaia, "astro_near", boom)  # Gaia answers R Dra's MSC Teff otherwise (Q-220)
     out = with_star_data(ctx, data, obj, "star_mira")
     assert "star_catalogue" in out.missing
     assert out.star is not None and out.star.teff_reason == "SIMBAD mesFe_h not cached and offline"

@@ -22,6 +22,7 @@ from app.core.render import gas_giant as gg
 from app.core.render.bake import BAKER_RULES_VERSION, FILES, bake_dir
 from app.core.render.blackbody import FORMULA as TEFF_FORMULA
 from app.core.render.blackbody import teff_to_rgb
+from app.core.render.confidence import confidence_block
 from app.core.render.palette import ASTEROID_PALETTE, BROWN_DWARF_PALETTE
 from app.core.render.params import BAKED_TYPES, BakeParams, BakeRefusal, params_from_card
 from app.core.render.spherex_rgb import CHANNELS_BY_TYPE
@@ -1113,6 +1114,9 @@ def card_to_params(
     for m in extra_missing:
         plan.refuse(m)
     out["missing"] = plan.missing
+    conf = confidence_block(card)
+    if conf is not None:
+        out["confidence"] = conf  # Q-220: the score and the 3D gate; the viewer applies the gate
     out["alt_text"] = _alt_text(card, out)
     # Fixed key order (R3.4) so serialised bytes are stable.
     order = (
@@ -1127,6 +1131,7 @@ def card_to_params(
         "lighting",
         "view_modes",
         "haptics",
+        "confidence",
         "alt_text",
         "missing",
     )

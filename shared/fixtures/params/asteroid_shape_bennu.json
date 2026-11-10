@@ -60,6 +60,96 @@
     "data_tag": "artistic",
     "params": {}
   },
+  "confidence": {
+    "score": 0.8407,
+    "measured_share": 0.8407,
+    "estimated_share": 0.0,
+    "assumed_share": 0.1593,
+    "threshold": 0.25,
+    "band": "mostly_data",
+    "gate": {
+      "class_known": true,
+      "key_measurement": true,
+      "score_ok": true,
+      "passed": true
+    },
+    "found": "Data for: Shape, size, spin, albedo or spectral class.",
+    "needed": "",
+    "raise": "A better measurement of: surface colour map.",
+    "inputs": [
+      {
+        "id": "shape",
+        "label": "Shape",
+        "weight": 40,
+        "c": 1.0,
+        "tag": "measured",
+        "points": 40.0,
+        "fields": [
+          "shape_source"
+        ]
+      },
+      {
+        "id": "size",
+        "label": "Size",
+        "weight": 15,
+        "c": 0.9988,
+        "tag": "measured",
+        "points": 14.9814,
+        "fields": [
+          "diameter_km"
+        ]
+      },
+      {
+        "id": "spin",
+        "label": "Spin",
+        "weight": 10,
+        "c": 1.0,
+        "tag": "measured",
+        "points": 10.0,
+        "fields": [
+          "rot_period_h"
+        ]
+      },
+      {
+        "id": "albedo",
+        "label": "Albedo",
+        "weight": 10,
+        "c": 0.9091,
+        "tag": "measured",
+        "points": 9.0909,
+        "fields": [
+          "albedo"
+        ]
+      },
+      {
+        "id": "spectral_class",
+        "label": "Spectral class",
+        "weight": 10,
+        "c": 1.0,
+        "tag": "measured",
+        "points": 10.0,
+        "fields": [
+          "spectral_class"
+        ]
+      },
+      {
+        "id": "colour_map",
+        "label": "Surface colour map",
+        "weight": 15,
+        "c": 0.0,
+        "tag": "missing",
+        "points": 0.0,
+        "fields": [
+          "gaia_rgb",
+          "spherex_rgb"
+        ]
+      }
+    ],
+    "tag": "derived",
+    "formula": "C = sum(w_i c_i) / sum(w_i): c is 1 for a measured value or a formula of measured values, a placeholder share for a model-dependent one, and 0 for an assumed, artistic or missing one; the w_i are placeholder weights (D-36, Q-221)",
+    "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36).",
+    "note": "This is how much of the picture rests on data. It is not the probability that the picture is correct."
+  },
   "alt_text": "Synthetic fixture: asteroid with a shape model (101955 Bennu: real shape, size, albedo, class and spin), Asteroid, 0.484 km across (measured), no visible colour basis, viewed at 14 degrees. Surface relief: measured.",
   "missing": [
     "material",
