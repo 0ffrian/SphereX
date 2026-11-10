@@ -465,7 +465,12 @@ export class ViewerApp {
     // the new one compiles is not lit from the new object's phase angle.
     const lights = buildLights(
       plan.lighting,
-      plan.shape?.shadows ? shadowSettings(this.tier) : null,
+      plan.shape?.shadows
+        ? {
+            ...shadowSettings(this.tier),
+            extent: plan.shape.shadowExtent ?? shadowSettings(this.tier).extent,
+          }
+        : null,
     );
     const key = sceneKey(plan);
     if (this.built && key === this.builtKey) {

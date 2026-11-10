@@ -11,13 +11,21 @@ import math
 import numpy as np
 
 from app.core.render.noise import F64
+from app.core.render.params import (
+    CRATER_DEPTH_PER_R,
+    CRATER_R_MAX,
+    CRATER_R_MIN,
+)
 
-# CREATIVE constants (artistic): the spec fixes the profile but not the size range.
-CRATER_R_MIN = 0.02  # angular radius, radians
-CRATER_R_MAX = 0.20
-BOULDER_SIGMA = 0.012  # radians
-BOULDER_AMP = 0.006  # fraction of the body radius
-BOULDERS_PER_UNIT_DENSITY = 300
+# CREATIVE constants (artistic): sizes of boulders, in mean radii (issue #71, Q-210).
+BOULDER_SIGMA_MIN, BOULDER_SIGMA_SPAN = 0.008, 0.014
+BOULDER_AMP_PER_SIGMA = 0.7  # height / sigma
+BOULDERS_PER_UNIT_DENSITY = 600
+MAX_CRATERS = 1500
+N_WAVES = 26
+CRATER_REACH = 2.4  # a crater's profile is felt out to this many of its radii
+# Erosion: a newer crater wears the relief of older ones inside its bowl (crater layer ONLY).
+ERODE_CENTRE, ERODE_RIM = 0.45, 1.0
 
 
 class _Grid:
@@ -69,42 +77,122 @@ def _angular_distance(d: F64, centre: F64) -> F64:
     return np.asarray(2.0 * np.arcsin(np.clip(chord / 2.0, 0.0, 1.0)))
 
 
-def craters(height: int, width: int, seed: int, count: int) -> tuple[F64, F64]:
-    """Crater height (radius units) and floor mask in [0, 1], both (H, W)."""
+def ellipsoid_axes(ratio: float) -> F64:
+    """Semi-axes (a, b, c) with a/b = ratio, c = b (R6.2), scaled so a*b*c = 1 (mean radius 1)."""
+    ax = np.array([1.0, 1.0 / ratio, 1.0 / ratio])
+    return np.asarray(ax * float(np.prod(ax)) ** (-1.0 / 3.0))
+
+
+def surface_points(dirs: F64, axes: F64) -> F64:
+    """Points of the ellipsoid in the direction of every pixel: distances between them are real
+    distances on the body, so a crater of radius r is round on an elongated body."""
+    return np.asarray(dirs * axes)
+
+
+def shape_layer(dirs: F64, seed: int, lump: float) -> F64:
+    """Overall shape: 26 low-order sine waves with amplitude k^-1.5, rms = 0.45 lump.
+
+    Fraction of the local radius. Independent of the craters and of every later layer, so crater
+    erosion can never touch it (issue #71: multiplying the total height gave needle spikes).
+    """
+    if lump <= 0:
+        return np.zeros(dirs.shape[:2], dtype=np.float64)
+    rng = np.random.Generator(np.random.PCG64(np.random.SeedSequence([seed, 3])))
+    z = rng.uniform(-1.0, 1.0, N_WAVES)
+    an = rng.uniform(0.0, 2 * np.pi, N_WAVES)
+    k = 1.3 + 7.5 * rng.random(N_WAVES) ** 1.4
+    phase = rng.uniform(0.0, 2 * np.pi, N_WAVES)
+    c2 = np.sqrt(1 - z * z)
+    axis = np.stack([c2 * np.cos(an), z, c2 * np.sin(an)], axis=1)  # (n, 3)
+    amp = k**-1.5
+    norm = lump * 0.45 / math.sqrt(float(np.sum(amp * amp)) / 2.0)
+    out = np.zeros(dirs.shape[:2], dtype=np.float64)
+    for n in range(N_WAVES):
+        out += amp[n] * np.sin(k[n] * (dirs @ axis[n]) + phase[n])
+    return out * norm
+
+
+def _patch(
+    grid: _Grid, pos: F64, axes: F64, theta: float, phi: float, reach: float
+) -> tuple[tuple[np.ndarray, np.ndarray], F64, F64]:
+    """Index, 3D distances (mean-radius units) and local radius of pixels within ``reach``."""
+    cdir = _direction(theta, phi)
+    cpos = cdir * axes
+    chord = min(2.0, reach / float(axes.min()))
+    rho = min(math.pi, 2.0 * math.asin(chord / 2.0) * 1.05 + 0.02)
+    rows, cols, _ = grid.patch(theta, phi, rho)
+    ix = np.ix_(rows, cols)
+    p = pos[ix]
+    dist = np.sqrt(np.sum((p - cpos) ** 2, axis=-1))
+    return ix, dist, np.asarray(np.sqrt(np.sum(p * p, axis=-1)))
+
+
+def crater_radii(seed: int, coverage: float) -> tuple[F64, F64, F64, F64]:
+    """Crater radii (mean radii, largest first), centres (theta, phi) and freshness.
+
+    N(>D) ~ D^-2 (Pareto, exponent 2) from CRATER_R_MIN, capped at CRATER_R_MAX, until
+    sum(r^2) reaches 4 x coverage or MAX_CRATERS (saturation). Deterministic in (seed, coverage).
+    """
+    empty = np.zeros(0)
+    if coverage <= 0:
+        return empty, empty, empty, empty
+    rng = np.random.Generator(np.random.PCG64(np.random.SeedSequence([seed, 1])))
+    u = rng.random(MAX_CRATERS)
+    r = np.minimum(CRATER_R_MAX, CRATER_R_MIN * (1.0 - u * 0.985) ** -0.5)
+    theta, phi = _centres(rng, MAX_CRATERS)
+    deg = 0.35 + 0.65 * rng.random(MAX_CRATERS)
+    n = int(np.searchsorted(np.cumsum(r * r), coverage * 4.0)) + 1
+    n = min(n, MAX_CRATERS)
+    order = np.argsort(-r[:n], kind="stable")
+    return r[:n][order], theta[:n][order], phi[:n][order], deg[:n][order]
+
+
+def craters(
+    height: int, width: int, seed: int, coverage: float, axes: F64, dirs: F64
+) -> tuple[F64, F64]:
+    """Crater relief (fraction of the local radius) and floor mask in [0, 1], both (H, W).
+
+    Profile (d = distance / crater radius): bowl ``-depth (1 - d^2) + 0.2 depth d^4`` inside,
+    ``0.2 depth d^-5`` outside, out to 2.4 radii. Each new crater wears the relief already
+    inside its bowl by 0.45 + 0.55 d. That erosion acts on this layer only (issue #71).
+    """
     h = np.zeros((height, width), dtype=np.float64)
     floor = np.zeros((height, width), dtype=np.float64)
-    if count <= 0:
+    radii, theta, phi, deg = crater_radii(seed, coverage)
+    if len(radii) == 0:
         return h, floor
-    rng = np.random.Generator(np.random.PCG64(np.random.SeedSequence([seed, 1])))
-    radii = np.minimum(CRATER_R_MIN * (1.0 - rng.random(count)) ** -0.5, CRATER_R_MAX)
-    theta_c, phi_c = _centres(rng, count)
+    pos = surface_points(dirs, axes)
     grid = _Grid(height, width)
-    for r, tc, pc in zip(radii, theta_c, phi_c, strict=True):
-        rows, cols, d = grid.patch(float(tc), float(pc), 1.6 * float(r))
-        x = _angular_distance(d, _direction(float(tc), float(pc))) / r
-        depth = 0.2 * r
-        bowl = x < 1.0
-        rim = (x >= 1.0) & (x < 1.6)
-        prof = np.zeros_like(x)
-        prof[bowl] = -depth * (1.0 - x[bowl] ** 2)
-        prof[rim] = 0.25 * depth * np.exp(-(((x[rim] - 1.0) / 0.18) ** 2))
-        ix = np.ix_(rows, cols)
-        h[ix] += prof
-        floor[ix] = np.maximum(floor[ix], np.where(bowl, 1.0 - x**2, 0.0))
+    for rc, tc, pc, dg in zip(radii, theta, phi, deg, strict=True):
+        ix, dist, rl = _patch(grid, pos, axes, float(tc), float(pc), CRATER_REACH * float(rc))
+        d = dist / rc
+        near = d < CRATER_REACH
+        depth = CRATER_DEPTH_PER_R * rc * dg
+        d_safe = np.where(near, np.maximum(d, 1e-9), 1.0)
+        prof = np.where(
+            d_safe < 1.0,
+            -depth * (1.0 - d_safe**2) + 0.2 * depth * d_safe**4,
+            0.2 * depth * d_safe**-5,
+        )
+        old = h[ix]
+        erode = np.where(d < 1.0, ERODE_CENTRE + (ERODE_RIM - ERODE_CENTRE) * d, 1.0)
+        h[ix] = np.where(near, old * erode + prof / rl, old)
+        floor[ix] = np.maximum(floor[ix], np.where(d < 1.0, 1.0 - d**2, 0.0))
     return h, floor
 
 
-def boulders(height: int, width: int, seed: int, density: float) -> F64:
-    """Small positive Gaussian bumps (radius units)."""
+def boulders(height: int, width: int, seed: int, density: float, axes: F64, dirs: F64) -> F64:
+    """Small positive Gaussian bumps (fraction of the local radius), round on the ellipsoid."""
     h = np.zeros((height, width), dtype=np.float64)
     count = round(density * BOULDERS_PER_UNIT_DENSITY)
     if count <= 0:
         return h
     rng = np.random.Generator(np.random.PCG64(np.random.SeedSequence([seed, 2])))
     theta_c, phi_c = _centres(rng, count)
+    sig = BOULDER_SIGMA_MIN + BOULDER_SIGMA_SPAN * rng.random(count) ** 2
+    pos = surface_points(dirs, axes)
     grid = _Grid(height, width)
-    for tc, pc in zip(theta_c, phi_c, strict=True):
-        rows, cols, d = grid.patch(float(tc), float(pc), 3 * BOULDER_SIGMA)
-        a = _angular_distance(d, _direction(float(tc), float(pc)))
-        h[np.ix_(rows, cols)] += BOULDER_AMP * np.exp(-((a / BOULDER_SIGMA) ** 2))
+    for tc, pc, s in zip(theta_c, phi_c, sig, strict=True):
+        ix, dist, rl = _patch(grid, pos, axes, float(tc), float(pc), 3.0 * float(s))
+        h[ix] += BOULDER_AMP_PER_SIGMA * s * np.exp(-((dist / s) ** 2)) / rl
     return h

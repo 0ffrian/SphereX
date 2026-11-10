@@ -119,6 +119,8 @@ export interface BodyPlan {
   /** Baked height map (R6.3) and the displacement it drives, in units of the radius; null = none. */
   heightUrl: string | null;
   displacementScale: number | null;
+  /** Comet nucleus with no shape model: a two-lobed outline (issue #71, artistic). */
+  lobed?: boolean;
 }
 
 /**
@@ -134,6 +136,14 @@ export interface ShapePlan {
   ao: boolean;
   /** Fine regolith normals below the model's resolution (tier 5, artistic). */
   regolith: boolean;
+  /**
+   * A procedural rock (issue #71): the surface is a baked height field, not a mesh. Lit with the
+   * rock blend of Lommel-Seeliger and Lambert, a phase falloff, and shadows from the displaced
+   * body. Absent for a shape model.
+   */
+  rock?: boolean;
+  /** Half-width of the shadow camera in scene units (default: the shape-model value). */
+  shadowExtent?: number;
 }
 
 export interface ShellPlan {

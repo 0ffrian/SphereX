@@ -173,6 +173,27 @@ export function lommelSeeliger(mu0: number, mu: number): number {
   return ((2 / Math.PI) * mu0) / (mu0 + mu);
 }
 
+/**
+ * Airless rock of a procedural asteroid or nucleus (issue #71, Q-210). Artistic weights taken from
+ * the approved prototype (`ROCK_FS`): half Lommel-Seeliger, half Lambert (`1.15 : 0.62` at normal
+ * incidence is a Lambert share of 0.52), and a falloff with phase angle `exp(-0.9 a) + 0.32`,
+ * divided by its value at opposition so that a full-phase body keeps the same exposure.
+ */
+export const ROCK_LAMBERT_BLEND = 0.52;
+export const ROCK_PHASE_SLOPE = 0.9;
+export const ROCK_PHASE_FLOOR = 0.32;
+export const ROCK_PHASE_NORM = 1 + ROCK_PHASE_FLOOR;
+
+/** CPU twin of the rock shading in `ShapeMaterial`: radiance factor for `mu0`, `mu`, phase `alpha`. */
+export function rockReflectance(mu0: number, mu: number, alpha: number): number {
+  if (!(mu0 > 0) || !(mu > 0)) return 0;
+  const phase = (Math.exp(-ROCK_PHASE_SLOPE * alpha) + ROCK_PHASE_FLOOR) / ROCK_PHASE_NORM;
+  return (
+    ((1 - ROCK_LAMBERT_BLEND) * lommelSeeliger(mu0, mu) + (ROCK_LAMBERT_BLEND * mu0) / Math.PI) *
+    phase
+  );
+}
+
 // ---- baked ambient occlusion -------------------------------------------------------------------
 
 /**

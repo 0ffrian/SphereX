@@ -42,6 +42,7 @@ import {
   type LodLevel,
 } from '../shape/shapeModel';
 import { bakeVertexAo } from '../shape/ShapeAo';
+import { lobeSphere } from '../shape/rockShape';
 import { createVolume } from '../volume/VolumeBody';
 import { TRAIL_HALF_LENGTH } from '../planCommon';
 import { allowedTags } from '../honesty';
@@ -305,6 +306,28 @@ function liftedTint(body: BodyPlan): Color {
   return body.displayLift ? c.multiplyScalar(displayLift(rgbLinearLuma(body.tint))) : c;
 }
 
+/** Airless rock (issue #71, Q-210): `ShapeMaterial` with the rock lighting; `lommel` off = standard. */
+function rockMaterial(body: BodyPlan, lommel: boolean): MeshStandardNodeMaterial {
+  if (!lommel) return new MeshStandardNodeMaterial({ color: liftedTint(body), roughness: 0.95 });
+  const m = new ShapeMaterial({
+    hasAo: false,
+    regolithFrequency: null,
+    lommelSeeliger: true,
+    rock: true,
+  });
+  m.color = liftedTint(body);
+  return m;
+}
+
+/**
+ * The height map holds `0.5 + h / scale` (R6.7, issue #71): shift the displacement by half the
+ * scale so a value of 0.5 leaves the surface where it is.
+ */
+function displacementOf(tier: TierName, scale: number | null): { scale: number; bias: number } {
+  const on = displacementActive(tier, scale) ? (scale ?? 0) : 0;
+  return { scale: on, bias: -on / 2 };
+}
+
 function bodyMaterial(body: BodyPlan): MeshStandardNodeMaterial | MeshBasicNodeMaterial {
   const tint = liftedTint(body);
   if (body.emissive <= 0) {
@@ -372,9 +395,21 @@ export function buildScene(
       continue;
     }
     const geometry = track(new SphereGeometry(1, body.segments[0], body.segments[1]));
-    const material = track(bodyMaterial(body));
+    if (body.lobed) {
+      lobeSphere(geometry.getAttribute('position'));
+      geometry.computeVertexNormals();
+    }
+    // A procedural rock (issue #71) is lit with the rock blend and casts and receives shadows.
+    const rock = plan.shape?.rock === true && body.emissive <= 0 && !body.meshUrl;
+    const material = track(
+      rock && plan.shape ? rockMaterial(body, plan.shape.lommelSeeliger) : bodyMaterial(body),
+    );
     const mesh = new Mesh(geometry, material);
     mesh.name = body.id;
+    if (rock && plan.shape?.shadows) {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+    }
     mesh.scale.set(...body.axes);
     mesh.position.set(...body.position);
     group.add(mesh);
@@ -510,11 +545,15 @@ export function buildScene(
           t.needsUpdate = true;
         }
         material.displacementMap = t;
-        material.displacementScale = displacementActive(tier, scale) ? (scale ?? 0) : 0;
+        const d = displacementOf(tier, scale);
+        material.displacementScale = d.scale;
+        material.displacementBias = d.bias;
       });
       tierListeners.push((t) => {
         if (material.displacementMap) {
-          material.displacementScale = displacementActive(t, scale) ? (scale ?? 0) : 0;
+          const d = displacementOf(t, scale);
+          material.displacementScale = d.scale;
+          material.displacementBias = d.bias;
         }
       });
     }
