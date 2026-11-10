@@ -1,6 +1,6 @@
 # 18 Activity: type selection
 
-How the backend chooses the `ObjectType` that picks the renderer and haptic profile. Drawn from rendering doc §3.3 (now including the Exoplanet Archive and slider branches) and decisions D-01 and D-04. Thresholds that are not yet agreed are marked **[verify]**.
+How the backend chooses the `ObjectType` that picks the renderer and haptic profile. Drawn from rendering doc §3.3 (now including the Exoplanet Archive and slider branches) and decisions D-01 and D-04. The exoplanet thresholds are on since issue #68 (Q-63, signed off by Moon); they keep their **[verify]** marks because the 1.5 and 6 R_E cuts are project cuts based on the cited papers, not published class boundaries.
 
 ```mermaid
 flowchart TD

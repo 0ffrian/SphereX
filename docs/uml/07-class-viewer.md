@@ -134,6 +134,7 @@ classDiagram
     displacement by baked height map, scale textures.relief_amp (artistic layer displacement, issue #62)
     refused (reason backend) when relief_amp is not sent
     displacement on the high and medium quality levels only (refused with reason quality on low, PlanContext.qualityTier)
+    albedo lift 0.42 over mean luma, clamped 1 to 6, from + Estimated, legend line display_lift (asteroidLift.ts, Q-117)
   }
   class Comet {
     <<comet>>
@@ -150,8 +151,9 @@ classDiagram
     <<brown_dwarf, brown_dwarf_binary>>
     requires spectral_class, flux_45um
     sphere about 1 Jupiter radius
-    baked bands, contrast from ch4_depth_33
-    emissive from flux_45um
+    baked bands, contrast from ch4_depth_33, in the IR view brightness only on the average colour (albedoLuma, Q-116)
+    limb_darkening layer, linear u 0.6 analogue, tier 4 (Q-116, Q-119)
+    emissive from flux_45um, refused (reason unverified) while flux45Reference is null
     binary orbit is artistic
     binary bodies take components (own class tint, brightness from Teff, Q-154)
   }
@@ -180,7 +182,7 @@ classDiagram
     plain sphere at once (never blank), surface swaps in when the field is ready
     plain sphere follows Q-45: only while the size on the card is shown
     gas_giant (issue #62): five layers bands, flattening, colour, storms, turbulence, each its own switch
-    (plan.shader.gas, setGasLayers, JetLayers uniforms), shown from + Estimated except turbulence (artistic)
+    (plan.shader.gas, setGasLayers, JetLayers uniforms), bands, flattening, colour from + Estimated, storms and turbulence (artistic) from + Artistic (Q-115)
     TSL node materials on three r187
     reads field as 2 Float32 DataTextures via textureLoad
     finer noise is seen, not felt
@@ -279,7 +281,7 @@ classDiagram
 
 ## Notes
 
-- Render core (issue #39): `ViewerApp` draws through a `RenderChain` (`render/pipeline.ts`); if the chain cannot be built it falls back to plain `renderer.render`. New content is compiled with `RenderChain.compileAsync` before it is swapped in (diagram [10](10-sequence-view-3d.md)). The quality level (low, medium or high, `render/quality.ts`) sets bloom resolution, anti-aliasing (TAAU or SMAA), noise octaves and volume steps. `FrameGovernor` only lowers the quality level; `setQualityTier` picks one by hand. `SimClock` (`render/clock.ts`) holds one sim time per moving process (the spin, and since issue #42 the processes `motion/planMotion.ts` states for stars, gas giants, brown dwarfs and worlds, Q-104) and the pause reasons shown in diagram [15](15-state-interaction.md). `renderStats`, `whenSettled` and `freezeClock` are test and tuning hooks; `timeLapses` lists each process with its shown speed-up. Motion and quality levels follow R5.7 and D-34; the implementation is Q-66 in [decisions](../decisions.md).
+- Render core (issue #39): `ViewerApp` draws through a `RenderChain` (`render/pipeline.ts`); if the chain cannot be built it falls back to plain `renderer.render`. New content is compiled with `RenderChain.compileAsync` before it is swapped in (diagram [10](10-sequence-view-3d.md)). The quality level (low, medium or high, `render/quality.ts`) sets bloom resolution, anti-aliasing (TAAU or SMAA), noise octaves and volume steps. `FrameGovernor` only lowers the quality level; `setQualityTier` picks one by hand. `SimClock` (`render/clock.ts`) holds one sim time per moving process (the spin, and since issue #42 the processes `motion/planMotion.ts` states for stars, gas giants, brown dwarfs and worlds, Q-104) and the pause reasons shown in diagram [15](15-state-interaction.md). `renderStats`, `whenSettled` and `freezeClock` are test and tuning hooks; `timeLapses` lists each process with its shown speed-up. Motion and quality levels follow R5.7 and D-34; the implementation is Q-66 in [decisions](../decisions/README.md).
 - Tier labels (issue #42): the viewer panel (`app/ViewerPanel.tsx`, `tierText`) writes every process speed-up and layer tier as "tier N of 5, <meaning>" (for example "tier 3 of 5, worked out with a typical value"), so the D-32 tier is said in words next to it.
 - Shapes and volumes (issue #43): `RenderPlan.volumes` and `RenderPlan.shape` are new plan fields. `build.ts` makes a `VolumeBody` per volume and forwards `setTier` (via `BuiltScene.setTier`, called by `ViewerApp.setQualityTier`) so the ray-march step count follows the quality level. `buildLights` takes shadow settings (`shape/shapeModel.shadowSettings`) when `plan.shape.shadows` is set, and the renderer shadow map is enabled for it; `ViewerApp.setLights` disposes the shadow map of a light it replaces. The loaded model reports half of its longest box extent through `onMeshMeasured` (ignored if the scene is no longer current) so the scale bar and the screen-reader label (`canvasLabel(plan, shownSize)`) show the same real size. Volumes replace point sprites; the nebula and the nova make no point sets and have no haptics (Q-103). `ShaderBody` disposes each `VolumeHandle` (and its `Data3DTexture`) when it releases a surface. The remnant age slider in `ViewerPanel` writes the store's D-02 `overrides.age_yr` (log-mapped input) and the panel passes the overrides to `ViewerApp.setOverrides`. `ViewerApp.draw` hands the TAAU frame index to `BuiltScene.setJitterFrame` and the body's on-screen size to `BuiltScene.setScreenPx` (160 px level of detail). `ViewerPanel` calls `showPlan` only when the plan changes; the canvas label follows the measured size in its own effect.
 - `WorkerPool` (`render/workerPool.ts`) and the fan-out loader (`render/fanout.ts`, `loadBody`) exist and are tested, but nothing in the viewer calls them yet.
@@ -287,8 +289,8 @@ classDiagram
 - Plan layer (issue #7): `ViewerApp.setObject` calls `planRender` to get a pure `RenderPlan`, and `showPlan` passes it to `renderers/build.ts`, which makes the three.js objects. The per-type renderer files hold the plan functions. `BodyRenderer` above is the conceptual contract; in code it is the plan function plus `build.ts`.
 
 - `candidate` has no renderer. The panel shows "Not enough data for a 3D model: distance and albedo unknown" (rendering doc §7.6).
-- The five baked renderers use backend textures (rendering doc §6); `ShaderBody` uses the shader generators from the mock-up, ported to ES modules (D-01, D-03). `ShaderBody` is listed in rendering doc §10 (name **[verify]**). The shader kinds use the same entry point as the baked kinds: `renderers/shaderPlan.ts` (pure) plans them with `PlanBuilder` (legend, missing, notes, Q-45 plain sphere), `renderers/build.ts` creates the `ShaderBody` from `plan.shader`, and `BuiltScene.update(plan)` applies a new honesty state or light to it in place, so a toggle never regenerates the field (Q-49). `bodyRenderer.ts` holds the `BodyRenderer` contract. There is no per-type registry and no `ViewerApp.setBody`.
+- The five baked renderers use backend textures (rendering doc §6); `ShaderBody` uses the shader generators from the mock-up, ported to ES modules (D-01, D-03). `ShaderBody` is `viewer/renderers/ShaderBody.ts` (R10). The shader kinds use the same entry point as the baked kinds: `renderers/shaderPlan.ts` (pure) plans them with `PlanBuilder` (legend, missing, notes, Q-45 plain sphere), `renderers/build.ts` creates the `ShaderBody` from `plan.shader`, and `BuiltScene.update(plan)` applies a new honesty state or light to it in place, so a toggle never regenerates the field (Q-49). `bodyRenderer.ts` holds the `BodyRenderer` contract. There is no per-type registry and no `ViewerApp.setBody`.
 - Mesh budget: D-05 sets ≤ 50k triangles, tighter than the 300k in older text; D-05 wins.
 - Pixel ratio is `min(devicePixelRatio, 1.5)`, and the scene renders only when the view changes (D-05).
 - If a required card field is missing, the renderer does not draw that layer and it is listed in `RenderParams.missing`.
-- Honesty states follow the badges (D-21): Measured only shows `measured`; + Estimated adds `derived`, `model_dependent` and `inferred_from_analog`; + Artistic adds `artistic`. The enum names are illustrative **[verify]**.
+- Honesty states follow the badges (D-21): Measured only shows `measured`; + Estimated adds `derived`, `model_dependent` and `inferred_from_analog`; + Artistic adds `artistic`. As built: `HONESTY_STATES = ['measured', 'derived', 'artistic']` in `viewer/honesty.ts`, starting at `'derived'` (+ Estimated).

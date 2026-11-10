@@ -1,6 +1,6 @@
 # Data contract: TV, ObjectCard, RenderParams
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1–R3.4 · **Implements:** D-02, D-04, D-12, D-16, D-18, D-23 ([decisions](../decisions.md))
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1, R3.2, R3.4 (R3.3 in [type-selection.md](type-selection.md)) · **Implements:** [D-02, D-32](../decisions/contract-tags.md), [D-04, D-16, D-18, D-23, Q-33, Q-35, Q-36](../decisions/contract.md), [D-01](../decisions/rendering-bodies.md), [Q-117](../decisions/rendering-layers.md), [D-12](../decisions/haptics-design.md) · **Read with:** [type-selection.md](type-selection.md) (R3.3), [surface-generation.md](surface-generation.md) (R6.2), [display-rules.md](display-rules.md) (R5.2, R5.7)
 
 ## R3. Data contract
 
@@ -29,7 +29,7 @@ JSON Schema has no generics, so the schema has one definition per payload: `TVNu
 type ObjectType =
   | 'asteroid_shape'        // has a real shape model (DAMIT / NASA mission)
   | 'asteroid_procedural'   // known small body, no shape model
-  | 'comet'                 // 3I/ATLAS for the demo
+  | 'comet'                 // 3I/ATLAS (stretch; the MVP demo is 433 Eros, Q-137)
   | 'brown_dwarf'
   | 'brown_dwarf_binary'    // Eps Indi Ba + Bb
   | 'star_mira'             // R Dra
@@ -83,21 +83,6 @@ interface ObjectCard {
   pm_mas_yr?: TV<[number, number]>;
 }
 ```
-
-### R3.3 Type selection (backend)
-
-1. JPL SBDB says comet → `comet`.
-2. JPL SBDB says asteroid → `asteroid_shape` if a DAMIT or NASA model exists, otherwise `asteroid_procedural`.
-3. SIMBAD object type:
-   - brown dwarf → `brown_dwarf`, or `brown_dwarf_binary` if the system has known components
-   - Mira variable → `star_mira`
-   - T Tauri → `star_ttauri`
-   - any other star → `star`
-4. NASA Exoplanet Archive match → `planet_rocky`, `planet_water` or `gas_giant`.
-   - Classification thresholds: **proposed** values in `PROPOSED_EXOPLANET_THRESHOLDS` in `backend/app/core/classify/rules.py` (Q-63: radius cuts, true mass, Zeng 2019 mass-radius curves), chosen by Moon on 7 Nov 2026. The live thresholds are these values since issue #68: Moon signed off Q-63 on 9 Nov 2026 after the values were checked against their sources (D-17 amended); a value set back to `None` refuses with `type:exoplanet_thresholds`. Archive values marked `CALCULATED_VALUE` are never used to classify (Q-63). Open item, [§12](layout-tests-open-items.md#r12-open-items-verify).
-   - The Exoplanet Archive service is tested ([architecture spec §3.8](../architecture/README.md)).
-5. `nebula` and `nova` come from user sliders only. They have no catalogue rule; they are slider-only showcase bodies, and every value is tagged `artistic` (D-12).
-6. Anything else → `candidate`.
 
 ### R3.4 RenderParams (produced by the backend: `GET /v1/objects/{id}/render-params`)
 
@@ -159,7 +144,8 @@ interface VisibleMode {
   available: boolean;
   badge: string;
   rgb: TV<[number, number, number]> | null;             // same type as gaia_rgb / spherex_rgb; TV carries the tag
-  source: 'gaia_rgb' | 'class_palette' | 'spherex_rgb';
+  source: 'gaia_rgb' | 'class_palette' | 'spherex_rgb';  // stars (Teff colour) and shader kinds (artist's grey)
+                                                        // also send 'class_palette' until Q-36 adds values (R5.2)
   channels_um?: [number, number, number];               // IRMode only (§5.2)
 }
 type IRMode = VisibleMode;
@@ -167,7 +153,21 @@ type IRMode = VisibleMode;
 
 When a mode is not available, the reason goes in `missing` ([§5.2](display-rules.md#r52-view-modes)).
 
-**Tiers and dynamics (D-32, D-34).**
-- Tag and tier always agree: `measured` 1, `derived` 2, `model_dependent` 3, `inferred_from_analog` 4, `artistic` 5. The schema rejects a mismatch, on `Layer` and on `DynamicsValue`. `formula` is required for `derived` and `model_dependent`. `assumed` is required for `model_dependent` and lists only the inputs that were not measured, keyed by card field or rule input name.
-- A layer or rate falls down the chain and says which rung answered. When no rung answers, a layer goes in `missing` by its id and a rate as `dynamics:<key>` (for example `dynamics:flare_rate_per_d`). `scale_m` and card values are never filled by fallback. A tier 1 rate is the value of a measured card field in the same unit (`spin_period_h` from `rot_period_h`, `pulsation_period_d` from `period_var_d`) and wins over every other rung; a rate with no such field starts at tier 2.
-- `speedup` is the time-lapse factor shown on screen for each animated process ([§5.7](display-rules.md#r57-motion-and-time-lapse)). It is a display choice, not a data value. The live backend omits `dynamics` until stage 6 exists. Absent means no motion data: the body stays still, except the R7.1 asteroid spin.
+**Tiers and dynamics.** The fallback chain itself is D-32 ([contract-tags](../decisions/contract-tags.md)) and R1 principle 3. Schema rules:
+- Tag and tier always agree: `measured` 1, `derived` 2, `model_dependent` 3, `inferred_from_analog` 4, `artistic` 5. The schema rejects a mismatch, on `Layer` and on `DynamicsValue`. `formula` is required for `derived` and `model_dependent`; `assumed` is required for `model_dependent` and lists only the inputs that were not measured, keyed by card field or rule input name.
+- A layer no rung answers goes in `missing` by its id; a rate goes in as `dynamics:<key>` (for example `dynamics:flare_rate_per_d`). A tier 1 rate is a measured card field in the same unit (`spin_period_h` from `rot_period_h`, `pulsation_period_d` from `period_var_d`).
+- `speedup` is the time-lapse factor shown on screen ([§5.7](display-rules.md#r57-motion-and-time-lapse)), a display choice, not a data value. The live backend omits `dynamics` until stage 6 exists (R5.7 says what the viewer does meanwhile).
+
+**HapticProfile (R8.5).** Generated from `shared/schemas/render-params.schema.json` (D-18) and re-exported by `frontend/src/contract/haptics.ts`. The runtime types of R8.8 (`HapticEvent`, `HapticDriver`) stay hand-written next to it (Q-19).
+
+```ts
+interface HapticProfile {
+  texture: 'height' | 'mesh' | 'bands' | 'terrain' | 'flow' | 'none'; texture_tag: Tag;
+  // 'terrain' = height + ocean, ice and lava masks; 'flow' = bands, jets, storms (D-12)
+  data: 'field' | 'flux_pulse' | 'teq_pulse' | 'heartbeat' | 'dimming' | 'motion' | 'detections' | 'none'; data_tag: Tag;
+  params: Record<string, number>;   // e.g. tau, k, softness, maxRateHz
+}
+```
+
+- `texture_tag` and `data_tag` are required even when the channel is `none`; the fixtures then use `artistic`, the tag that claims least (Q-37).
+- The body tone (R8.9.1) needs no new profile value: it follows `texture` (`height`, `mesh`, `terrain`) and `texture_tag`.

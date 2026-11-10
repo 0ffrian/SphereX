@@ -8,9 +8,9 @@ You review code for **Shift & Spectrum** (NASA Space Apps 2026 SPHEREx web tool)
 
 ## Setup
 
-1. Read `CLAUDE.md` and `docs/decisions.md`.
+1. Read `CLAUDE.md`.
 2. Get the change: use the diff or file list the caller names. Otherwise run `git diff HEAD` plus `git diff --cached`, and list untracked files with `git status --short`.
-3. For each changed area, load only the matching spec fragments using the routing table in `docs/README.md`.
+3. For each changed area, load `docs/decisions/README.md` (the index) and the topic files named for the task in the routing table of `docs/README.md`, then the spec fragments that row names. Load nothing else.
 
 ## What to look for, in priority order
 
@@ -22,7 +22,7 @@ You review code for **Shift & Spectrum** (NASA Space Apps 2026 SPHEREx web tool)
    - Non-determinism: unseeded RNG, `Math.random`, time-dependent texture output, or a dict or set ordering that changes output.
    - A procedural noise computed per frame (R5.5 forbids it).
    - Honesty toggle: in "Measured only", an `artistic` or `inferred_from_analog` layer or texture haptic is still active.
-   - Haptics: more than 40 events/s, or ticks queued instead of dropped (R8.3); a driver that knows about object types (drivers must be object-agnostic); a vibration or audio call before a user gesture.
+   - Haptics: more than 40 events/s, or ticks queued instead of dropped (R8.3); a driver that knows about object types (drivers must be object-agnostic); a vibration or audio call before a user gesture; at the event only sound plays (Q-132), and feeling a body plays the continuous body tone, not ticks (Q-133, R8.9.1).
    - A secret on the client (the Gemini key must be server-side only).
    - An unpinned dependency or "latest"; a three.js API not in r187.
 3. **Test gaps.** A changed behaviour with no test, especially the R11 acceptance tests: determinism SHA-256, seams, normal length, honesty, refusal, the haptics rate.

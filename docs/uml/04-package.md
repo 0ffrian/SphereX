@@ -1,16 +1,16 @@
 # 04 Packages
 
-The repo and code layout as packages, with their dependencies and owners. Drawn from `CLAUDE.md` (layout), rendering doc §10 (file layout and owners) and decisions D-01, D-11, D-12, D-13, D-15, D-17, D-18 and D-35 (sky-view prototype: Q-87 to Q-91; colour composite, colour views, progressive frames and cached markers: Q-92, Q-93, Q-95, Q-97 and Q-98; object jobs and worker pools: Q-111, Q-112). Arrows mean "depends on" or "uses".
+The repo and code layout as packages, with their dependencies and owners. Drawn from `CLAUDE.md` (layout), rendering doc R10 ([layout.md](../rendering/layout.md#r10-file-layout-and-ownership)) and R10.1 ([layout-repo.md](../rendering/layout-repo.md#r101-rest-of-the-repository-interim)), the shell spec A21, the Track and Area search specs A16 to A20 and decisions D-01, D-11, D-12, D-13, D-15, D-17, D-18 and D-35 (sky-view prototype: Q-87 to Q-91; colour composite, colour views, progressive frames and cached markers: Q-92, Q-93, Q-95, Q-97 and Q-98; object jobs and worker pools: Q-111, Q-112). Arrows mean "depends on" or "uses".
 
 ```mermaid
 flowchart TB
   subgraph Repo["SphereX repo"]
     subgraph Docs["docs/"]
-      DocSpecs["decisions.md, architecture/, rendering/, handover.md"]
+      DocSpecs["decisions/ (index + topic files), architecture/ (incl. moving-objects/), rendering/, handover.md"]
       DocUML["uml/ (these diagrams)"]
     end
 
-    Mockup["mockup/ : spherex-ui.html (three r128, not the app)"]
+    Mockup["mockup/ : spherex-ui.html (three r128), chase-the-rock.html (Track) : not the app"]
 
     subgraph Backend["backend/ (FastAPI, Python 3.12) : Kevin, Moon, Atish"]
       BApi["app/api (Kevin) : D-16 endpoints, app/main.py mounts /data/textures and the read-only /data/demo-textures (Q-164), objects.py : /card, /render-params, texture URLs, /job, /job/events (Q-111), sky.py : /v1/sky (prototype, Q-87, /v1/sky/cached, Q-98), composite.py : /composite, /composite.png (prototype, Q-92), overlays.py : /overlays, /flags, /combine.png (Q-50), gemini.py : /admin/.../gemini-repaint, /albedo-ai, /albedo-ai.webp (Q-122)"]
@@ -18,28 +18,34 @@ flowchart TB
       BRender["app/core/render (Atish) : card_to_params, gas_giant, blackbody, params, noise, craters, height, normals, palette, bake, __main__, spherex_rgb, gemini_paint, background (TextureBaker, Q-112)"]
       BScripts["backend/scripts/bake_fixtures.py (Atish, with the baker): bakes the shared fixture textures with the real baker (Q-114); --check fails on drift"]
       BPack["backend/scripts/bake_demo_pack.py (Moon, Q-164): runs the pipeline per search row, writes assets/<type>/<id>.json, assets/textures/ (served read-only at /data/demo-textures, also offline) and frontend/src/app/search/demoTargets.ts; --check fails on drift"]
-      BAssets["backend/assets/ : shapes/ (registry.toml, GLBs), literature.toml (A3.12, Q-153), pm13_dwarf_teff.toml (Q-152), textures/ (demo pack maps, Q-164), <type>/*.json (demo pack assets)"]
+      BAssets["backend/assets/ : shapes/ (registry.toml, GLBs), literature.toml (A3.13, Q-153), pm13_dwarf_teff.toml (Q-152), textures/ (demo pack maps, Q-164), <type>/*.json (demo pack assets)"]
       BJobs["app/core/jobs.py (Job, JobRegistry), app/core/warm.py (WarmCache) : issue #41, owner proposed: Kevin (Q-111)"]
       BContract["app/contract : generated from shared/schemas (D-18) : follows the schemas owner"]
       BSky["app/core/sky : surveys, healpix, bake (HiPS to equirect), scripts/sky_mirror, sky_bake : prototype, no D-17 owner yet (Q-87, D-35)"]
       BComp["app/core/composite : config, select, grid, service (SPHEREx false colour) : prototype, no D-17 owner yet (Q-92, Q-94)"]
+      BTrack["/path, /track.ecsv, track writer (A19, to build, on PR #53's path search) : Kevin"]
+      BArea["app/core/area : frames, dots, clean, join, match, export ; /v1/areas (A17, to build) : Kevin"]
     end
 
     subgraph Frontend["frontend/ (Vite + TS + React) : owners per package"]
       FApp["src/app (React shell: App, ViewerPanel (tier text: tier N of 5 and its meaning, Q-106), StatusLine, FixtureBanner, LiveAnnouncer, Badge, StatusBoxes, urlHash + useHashSync, format, messages, refusals, RefusalList, ui), src/state (Zustand store with the sky slice) : Moon"]
       FFlip["src/app/api (M1 client, D-16, sky index, Q-87), src/app/search, src/app/flipbook (with Rainbow Trails, D-28, session.tsx shared playback, colourMode + ColourViews, Q-93, Q-95, progressive + FramesProgress, Q-97, frameGrid, overlays/, issue #12, drawn on the frame grid, Q-102), src/app/spectrum : Moon"]
-      FShell["src/app/island (Island, GridLoader, islandStore, islandText; Q-121), src/app/shell (ToolRail, Transport, PanelCard, Panels, Readout, shellStore, shortcuts), src/app/sky (SkyPane, useTargetMarkers, cachedMarkers + useCachedMarkers (Q-98), readout, positionTags), src/app/Segmented : prototype, Moon provisional (Q-89)"]
+      FShell["src/app/island (Island, GridLoader, islandStore, islandText, loaderLooks; Q-121, Q-123), src/app/shell (ToolRail, railIcons, icons, Transport, PanelCard, Panels, Readout, shellStore, shortcuts), src/app/sky (SkyPane, useTargetMarkers, cachedMarkers + useCachedMarkers (Q-98), readout, positionTags), src/app/Segmented : A21, Moon"]
+      FBuild["src/app/build (BuildPane, SelectedCard, MouldStrip, useMould, selectedBody, focus) : issue #60, R5.8, Moon"]
+      FTrack["src/app/track (Track pane, A20.13, to build) : Atish, proposed"]
+      FArea["src/app/sky/area (Area search tool and layer, A18, to build) : Moon"]
       FDev["fixtures/ (dev-only synthetic fixture server), scripts/ (check-dist), src/test (test helpers), src/fixtures.test.ts, e2e/ (Playwright) : dev and test only"]
       FPhysics["src/physics : A7 physics layer, derivePhysics, slider registry (D-26, D-27) : Moon"]
       FContract["src/contract : generated from shared/schemas (D-18), assertTagged next to it : follows the schemas owner"]
       subgraph FViewer["src/viewer (Moon)"]
         VCore["ViewerApp, lighting, modes, honesty, scaleBar, altText"]
-        VRend["renderers/ : AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody [verify], bodyRenderer, shaderPlan, shaderSpec, shaderPalette, pointClouds, StarBody, jetSurface, jetPalette, linearColour (sRGB to linear, once), sliders.ts"]
+        VRend["renderers/ : AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody, bodyRenderer, fieldTexture, shaderPlan, shaderSpec, shaderPalette, pointClouds, StarBody, jetSurface, jetPalette, linearColour (sRGB to linear, once), asteroidLift (Q-117), ttauriDisc (Q-118), textureMean (Q-116, Q-117), sliders.ts"]
         VSky["sky/ : SkyView, skyMath, surveys (prototype, Q-89, Q-90)"]
         VRender["render/ : pipeline (RenderChain), quality (quality levels, FrameGovernor), clock (SimClock), workerPool (WorkerPool), fanout (loadBody, asset prefetch)"]
         VShaders["shaders/ : TSL noise (fbm, ridged, domainWarp, animatedCells, OCTAVES) and sphere helpers (latLon, tangentFrame, differentialRotate), star and loops (issue #42)"]
         VMotion["motion/ : motion (resolveMotion, D-32 chain), planMotion, phase, bodies/ : starModel (CPU star surface model, pure in seed, rates, t) : issue #42"]
-        VFields["fields/ : fieldGenerator, flowModel (storms, issue #42), noise, fieldWorker, fieldClient (D-12) : Atish (D-17), shader generators (D-01) : Moon [verify path]"]
+        VFields["fields/ : fieldGenerator, flowModel (storms, issue #42), noise, fieldWorker, fieldClient (D-12) : Atish (D-17), shader generators (D-01) : Moon"]
+        VMould["mould/ : MouldRig, mouldSteps (R5.8) ; volume/, shape/ (Q-103)"]
       end
       subgraph FHaptics["src/haptics : Atish (D-13, D-17)"]
         HCore["haptics.ts (engine), audioContext, audioGraph, settings, calibration, platform, pitch, spectrumMapping, tuning"]
@@ -83,7 +89,19 @@ flowchart TB
   FApp -->|"App renders the shell"| FShell
   FShell -->|"search origin sky, session, panels"| FFlip
   FShell -->|"sky view, picking maths"| VSky
-  FShell -->|"ViewerApp in the 3D panel"| VCore
+  FShell -->|"split pane, rail 3D viewer"| FBuild
+  FBuild -->|"ViewerApp in the build pane, setMould"| VCore
+  VCore --> VMould
+  FBuild -->|"GET card, render-params"| FFlip
+  FShell -.->|"pane kind track (A21.8, proposed)"| FTrack
+  FShell -.->|"tool area, sky layer slot (A21.13)"| FArea
+  FArea -.->|"Track it"| FTrack
+  FTrack -.->|"HTTP /path, track.ecsv"| BApi
+  FArea -.->|"HTTP /v1/areas"| BApi
+  BApi -.-> BTrack
+  BApi -.-> BArea
+  BTrack -.->|"stage 1 frames, stage 2 for movers"| BPipe
+  BArea -.->|"adapters, cache"| BPipe
   FFlip -->|"HTTP /v1/sky (Q-87)"| BApi
   BApi -->|"sky.py serves the local copy"| BSky
   BApi -->|"composite.py"| BComp
@@ -119,6 +137,9 @@ flowchart TB
   VCore -->|"types"| Schemas
   HSources -->|"HapticProfile type"| Schemas
   VFields -.->|"generators ported from"| Mockup
+
+  classDef todo stroke-dasharray: 5 5
+  class BTrack,BArea,FTrack,FArea todo
 ```
 
 ## Notes
@@ -142,7 +163,9 @@ flowchart TB
 | `backend/app/core/jobs.py`, `backend/app/core/warm.py` | Not named in D-17; Kevin proposed (Q-111 (7)), issue #41. `measure/pool.py` sits in Moon's `core/measure`, `render/background.py` in Atish's `core/render` |
 | `src/contract`, `backend/app/contract` | Generated (D-18); follows the owner of `shared/schemas` |
 
-- `viewer/fields`, `ShaderBody`, `sources/terrain` and `sources/flow` follow from D-01 and D-12. They are listed in rendering doc §10, but the `ShaderBody` and `fields/fieldWorker` file names stay **[verify]**.
+- `viewer/fields`, `ShaderBody`, `sources/terrain` and `sources/flow` follow from D-01 and D-12 and are listed in R10 (`viewer/renderers/ShaderBody.ts`, `viewer/fields/fieldWorker.ts`).
+- Dashed boxes are **to build**: Track (A19, A20; backend Kevin, screen Atish, per A19.14) and Area search (A16 to A18). Their file names follow A18.9 and A20.13 and may change when built.
+- The Build split view (issue #60, R5.8) added `app/build` and `viewer/mould`; the shell's names and files are in A21 ([sky-shell.md](../architecture/sky-shell.md#a211-status-and-sources)).
 - Issue #9 (6 Nov 2026) built the haptics core: the engine, both web drivers, the shared AudioContext, the settings store, calibration types, platform defaults, the λ→pitch and spectrum mappings, `tuning.ts` (every tuning value, D-13), the `ui/` pulse indicator and unlock button, and the dev-only test page. Issues #10 and #11 added the spectrum pad, calibration wizard and settings UI, `profiles.ts`, `probe.ts`, the texture and data sources and `sound/listenSweep.ts`. Imports from outside `src/haptics` are type-only or pure functions: `viewer/honesty.ts` (honesty filter), `viewer/fields/fieldGenerator.ts` (the shared field and its functions), `viewer/renderers/` (`Comet`, `Star`, `BrownDwarf`, `shaderSpec`, `pointClouds` plan helpers), `viewer/planCommon.ts`, `viewer/planTypes.ts`, `viewer/sliders.ts` (the `Overrides` type), `app/spectrum/scale.ts`, `app/api/types.ts` and `app/ui.ts` (button class). None of them creates GPU or browser state at import.
 - `src/contract`, `src/state` and `src/app` were added by the frontend scaffold (4 Nov 2026) and are listed in rendering doc §10. `src/contract/generated.ts` is generated from `shared/schemas` (D-18), as is `backend/app/contract/`; the hand-written scaffold types were replaced in issue #4.
 - The flipbook and spectrum view (M1, issue #3, 5 Nov 2026) added `src/app/api`, `src/app/search`, `src/app/flipbook`, `src/app/spectrum`, the `sky` slice in `src/state/store.ts`, `src/test`, `fixtures/` and `scripts/` (rendering doc §10). `fixtures/` is a Vite dev-server plugin used only by `npm run dev:fixtures` and the Playwright tests; `scripts/check-dist.js` fails the build if a fixture marker reaches `dist/`. Since issue #62 (Q-114) it also serves `/data/textures/...` from `shared/fixtures/textures/` (baked by `backend/scripts/bake_fixtures.py`) and `/data/shapes/*.glb` from `backend/assets/shapes/`.

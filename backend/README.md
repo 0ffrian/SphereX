@@ -1,6 +1,6 @@
 # backend
 
-FastAPI on Python 3.12 ([D-15](../docs/decisions.md#d-15-backend-framework-fastapi-answers-q-01)). It holds the API, the data adapters and the read-through cache. The pipeline and the texture baker will join it. The event build runs locally on the team's Asus A15 (D-24). CPU only.
+FastAPI on Python 3.12 ([D-15](../docs/decisions/data-sources.md#d-15-backend-framework-fastapi-answers-q-01)). It holds the API, the data adapters and the read-through cache. The pipeline and the texture baker will join it. The event build runs locally on the team's Asus A15 (D-24). CPU only.
 
 ## Run
 
@@ -37,11 +37,13 @@ uv run python -m scripts.ingest_shape --zip ~/Downloads/gaskell.ast-eros.shape-m
 
 Input is an ICQ `.tab` (`--zip` plus `--member`, or `--input`) or an OBJ (`--input`, `--convex` for DAMIT). Output is byte-identical for the same input. Meshes over 50,000 triangles with no exact reduction are refused.
 
-`assets/literature.toml` is a reviewed, read-only table of cited values for objects the catalogues leave empty ('Oumuamua's size and light-curve amplitude, Epsilon Indi B's component temperatures). Stage 4 uses a row only where the catalogue value is null (A3.12, Q-153); `SX_LITERATURE_FILE` points elsewhere. `assets/pm13_dwarf_teff.toml` is the Pecaut & Mamajek main-sequence Teff table behind a star's third Teff source (Q-152); `SX_DWARF_TEFF_FILE` points elsewhere. Both are edited by hand, never by code.
+`assets/literature.toml` is a reviewed, read-only table of cited values for objects the catalogues leave empty ('Oumuamua's size and light-curve amplitude, Epsilon Indi B's component temperatures). Stage 4 uses a row only where the catalogue value is null (A3.13, Q-153); `SX_LITERATURE_FILE` points elsewhere. `assets/pm13_dwarf_teff.toml` is the Pecaut & Mamajek main-sequence Teff table behind a star's third Teff source (Q-152); `SX_DWARF_TEFF_FILE` points elsewhere. Both are edited by hand, never by code.
 
 `assets/textures/` holds the demo pack's baked maps, served read-only at `/data/demo-textures` (`SX_DEMO_TEXTURES_DIR`, also under `SX_OFFLINE=1`, Q-164).
 
 ## Endpoints (D-16)
+
+This table holds the reply shapes. The register of every route (built and planned), its deciding entry and its spec is [A4.11](../docs/architecture/endpoints.md#a411-endpoint-register); refusal codes are [A4.12](../docs/architecture/refusals.md#a412-missing-and-refusal-codes); the object job is [A4.10](../docs/architecture/jobs.md#a410-object-job-and-fan-out).
 
 | Endpoint | Returns |
 |---|---|
