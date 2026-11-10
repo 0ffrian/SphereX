@@ -16,7 +16,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [data-sources.md](data-sources.md) | the backend framework, external archives and adapters, name resolving, the read-through cache and offline mode, test targets, overlays and the composite backends | 4 D, 15 Q, 20 KB |
 | [pipeline-stages.md](pipeline-stages.md) | stages 3 to 7 as built, measurement choices, physics in stage 6, the Sun angle for SBDB bodies, the exoplanet adapter and type rule | 0 D, 5 Q, 13 KB |
 | [pipeline-jobs.md](pipeline-jobs.md) | shape models and their serving, where generated assets are saved, the live cutout budget, object jobs, fan-out and progress endpoints | 0 D, 6 Q, 14 KB |
-| [rendering-bodies.md](rendering-bodies.md) | where surfaces are generated, the baker, renderers per type, physics sliders, accuracy, golden images, the honest fixtures (Q-114) | 4 D, 23 Q, 30 KB |
+| [rendering-bodies.md](rendering-bodies.md) | where surfaces are generated, the baker, renderers per type, physics sliders, accuracy, golden images, the honest fixtures (Q-114) | 4 D, 29 Q, 41 KB |
 | [rendering-motion.md](rendering-motion.md) | motion, time-lapse, render-on-change, quality levels, tone mapping, golden frames, process gating and tier wording | 1 D, 5 Q, 9 KB |
 | [rendering-kinds.md](rendering-kinds.md) | shapes and volumes, animated sphere bodies, flattening, and the Q-107 visual findings and fix notes | 0 D, 8 Q, 19 KB |
 | [rendering-layers.md](rendering-layers.md) | the per-layer body fixes of issue #62 (PR #63): gas giant five tiered layers, brown dwarf limb and infrared bands, asteroid sphere and displacement, the flared T Tauri disc | 0 D, 4 Q, 11 KB |
@@ -300,8 +300,24 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-241 | Fluid table and constants (stream D) | Open (built) | [rendering-bodies](rendering-bodies.md) |
 | Q-242 | Plate tectonics terrain (stream D) | Open (built) | [rendering-bodies](rendering-bodies.md) |
 | Q-243 | Sliders and worker for stream D | Open (built) | [rendering-bodies](rendering-bodies.md) |
+| Q-250 | Gas solver and stability | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-251 | Which giants run as a solved world | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-252 | Observed band and ring values [verify] | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-253 | Gas world tags | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-254 | Gas pacing and determinism | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-255 | Pre-formed gas planet | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-256 | Gas tracer on the GPU | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-257 | Gas haptics from the solved flow | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-258 | Reference objects (Jupiter, Saturn) | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-259 | Locked giants and pacing control | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
 | Q-260 | 3I/ATLAS gas rates by epoch, coma and nucleus (resolves the shape of Q-42) | Decided in code (Moon to confirm) | [rendering-kinds](rendering-kinds.md) |
 | Q-261 | Comet path on the card (`orbit_track`, Horizons) | Decided in code | [rendering-kinds](rendering-kinds.md) |
 | Q-262 | Emissions view and time between the epochs | Decided in code | [rendering-kinds](rendering-kinds.md) |
 | Q-263 | Modelled comet tail (amends R7.3) | Decided in code | [rendering-kinds](rendering-kinds.md) |
+| Q-266 | Confidence formula shown with KaTeX | Decided in code | [rendering-bodies](rendering-bodies.md) |
+| Q-267 | Accuracy popover follows the mock-up; tag-to-part mapping | Decided in code | [rendering-bodies](rendering-bodies.md) |
+| Q-270 | Flare physics, energy cap, decay index and schedule | Decided in code ([verify] constants) | [rendering-bodies](rendering-bodies.md) |
+| Q-271 | Plasma as additive line streaks, budgets | Decided in code (look unchecked) | [rendering-bodies](rendering-bodies.md) |
+| Q-272 | Plasma in the plan, view rules, controls, reduced motion | Decided in code | [rendering-bodies](rendering-bodies.md) |
+| Q-273 | Close-up flare view | Decided in code | [rendering-bodies](rendering-bodies.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |

@@ -75,6 +75,8 @@ Barnard's Star example **[verify]** (each tier needs checking, R12 #26):
 
 ### R7.5.5 Flares and prominences
 
+> **Issue #71 stream G (D-36, Q-270 to Q-273):** when the star has physics and spot groups, flares and loops are drawn by `StarPlasma` from `physics/flares.ts` along the physical spot groups (energy cap, decay-index open or closed, plasma streaks, Field lines toggle, Latest flare card, close-up flare view) and replace the region loops and shader flares described below.
+
 - **Flares:** a flare lights two ribbons in an active region and lifts a twisted arch of plasma strands off the limb that rises and fades. Rate by `flare_rate_per_d`: typical rate by class **[verify]** (R12 #31). Constants marked [verify] are used only under the Q-110 policy (proposed). Tier 4 from a class rate, tier 1 only when measured. Times come from a seeded schedule, so the same card, seed and t give the same flare.
 - **Prominences:** loops that follow dipole field lines between a region's leader and follower spots. Tier 5 for the strand look, tier 4 for the placement.
 - **Motion:** flares use `speedup.flares`; loops sway slowly with the clock.

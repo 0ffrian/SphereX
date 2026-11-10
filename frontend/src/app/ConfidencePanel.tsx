@@ -20,7 +20,7 @@ function Bar({ c }: { c: Confidence }) {
   );
 }
 
-/** Chip on the stage. A button that opens Details; 44px touch target. */
+/** Chip on the stage. A button that opens the formula dialog (Q-266); 44px touch target. */
 export function ConfidenceChip({ params, onOpen }: { params: RenderParams; onOpen: () => void }) {
   const c = params.confidence;
   if (!c || !c.gate.passed) return null;
@@ -30,7 +30,7 @@ export function ConfidenceChip({ params, onOpen }: { params: RenderParams; onOpe
       onClick={onOpen}
       className="absolute bottom-3 left-3 z-10 flex min-h-11 min-w-44 flex-col justify-center gap-1 rounded bg-neutral-900/90 px-3 py-1 text-left text-xs text-neutral-100 focus-visible:outline-2 focus-visible:outline-sky-400"
       data-testid="confidence-chip"
-      aria-label={`Data confidence ${percent(c.score)} percent. ${BAND_WORDS[c.band]}. Show the breakdown.`}
+      aria-label={`Data confidence ${percent(c.score)} percent. ${BAND_WORDS[c.band]}. Show how it is worked out.`}
     >
       <span>
         Data confidence <b>{percent(c.score)}%</b>

@@ -22,6 +22,7 @@ import {
   TextureLoader,
   Box3,
   Vector3,
+  type WebGPURenderer,
 } from 'three/webgpu';
 import { dot, float, fract, normalView, saturate, texture, uv, vec2, vec3 } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -49,7 +50,9 @@ import { allowedTags } from '../honesty';
 import { isGltfUrl } from '../scaleBar';
 import type { BodyContext, BodyRenderer } from './bodyRenderer';
 import { ShaderBody } from './ShaderBody';
+import { GasWorld } from './GasWorld';
 import { StarBody } from './StarBody';
+import { flareText } from '@/physics/flares';
 import { LIMB_DARKENING_U } from './Star';
 import { buildJetSurface, makeJetRuntime } from './jetSurface';
 import { floatTexture } from './fieldTexture';
@@ -183,8 +186,16 @@ export interface BuiltScene {
    * now (the star turns), or null when this scene has no star surface. Used by the close-up camera.
    */
   starDirToWorld(dir: [number, number, number]): [number, number, number] | null;
+  /**
+   * Issue #71 stream G: the star's flares and plasma, or null without them. `fire` starts a big flare
+   * now; `latestText` is the plain-words "Latest flare" card (null before the first flare);
+   * `setLines` is the "Field lines" toggle.
+   */
+  readonly starFlares: StarFlareControls | null;
   /** The body's on-screen diameter in CSS pixels (the 160 px level-of-detail rule); null = unknown. */
   setScreenPx(px: number | null): void;
+  /** Issue #71: before each draw, hands the renderer to a body that runs its own off-screen pass. */
+  prepareFrame(renderer: WebGPURenderer): void;
   /** The TAAU frame index of the next frame (see BodyRenderer.setJitterFrame). */
   setJitterFrame(index: number): void;
   /** The quality level changed: volume steps and octaves, model level of detail, displacement. */
@@ -195,6 +206,15 @@ export interface BuiltScene {
    */
   setMould(pose: Readonly<MouldPose> | null): void;
   dispose(): void;
+}
+
+export interface StarFlareControls {
+  fire(): void;
+  latestText(): string | null;
+  setLines(on: boolean): void;
+  readonly linesOn: boolean;
+  /** Streaks drawn in the last frame (tests, performance readout). */
+  readonly streakCount: number;
 }
 
 /** Seeded PRNG (mulberry32). The same seed always gives the same stream. */
@@ -377,6 +397,7 @@ export function buildScene(
   const lodRefresh: (() => void)[] = [];
   let shapeRadius: number | null = null;
   let starSpin: Object3D | null = null;
+  let starFlares: StarFlareControls | null = null;
   const mouldSpheres: { mesh: Mesh; axes: [number, number, number] }[] = [];
   const mouldHolders: (() => Object3D | null)[] = [];
   for (const [bodyIndex, body] of plan.bodies.entries()) {
@@ -384,6 +405,7 @@ export function buildScene(
     if (plan.star && body.id === 'body') {
       const star = track(
         new StarBody(plan.star, {
+          tier,
           tint: srgbToLinear(body.tint),
           emissive: body.emissive,
           limbU: body.limbDarkening ? LIMB_DARKENING_U : null,
@@ -395,6 +417,33 @@ export function buildScene(
       star.group.position.set(...body.position);
       group.add(star.group);
       starSpin = star.spin;
+      const plasma = star.plasma;
+      if (plasma) {
+        const speed = plan.star.rates.flareSpeedup;
+        const now = () => (speed > 0 ? lastTime('flares') / speed : 0);
+        starFlares = {
+          fire() {
+            plasma.fire(now());
+            plasma.setTime(now());
+            hooks.onChange();
+          },
+          latestText() {
+            const e = plasma.latest(now());
+            return e ? flareText(e) : null;
+          },
+          setLines(on) {
+            plasma.setLines(on);
+            hooks.onChange();
+          },
+          get linesOn() {
+            return plasma.linesOn;
+          },
+          get streakCount() {
+            return plasma.streakCount;
+          },
+        };
+        tierListeners.push((t) => plasma.setTier(t));
+      }
       usesQuality = true;
       // The star turns itself (StarBody rotates its own frame by the spin clock), so it is not a
       // `spinner`. A Mira has no star surface and is posed below.
@@ -707,9 +756,9 @@ export function buildScene(
   // Shader kinds (D-01) --------------------------------------------------------------------
   // The plan says what is shown; the body builds its surface from the shared CPU field and keeps
   // a plain sphere meanwhile (never blank). Honesty and light are applied by `update`.
-  let shaderBody: ShaderBody | null = null;
+  let shaderBody: ShaderBody | GasWorld | null = null;
   if (plan.shader) {
-    shaderBody = ShaderBody.start(plan.shader.card, plan.shader.params, {
+    const shaderCtx: BodyContext = {
       visibleTags: allowedTags(plan.honesty),
       lightDir: plan.lighting.direction ?? undefined,
       lightColour: plan.lighting.colour ?? undefined,
@@ -725,7 +774,11 @@ export function buildScene(
       gasLayers: plan.shader.gas ?? undefined,
       pattern: plan.shader.pattern,
       ...hooks.shader,
-    });
+    };
+    // Issue #71: a gas giant with the data for it runs as a solved world; else the plain shader path.
+    shaderBody =
+      GasWorld.start(plan.shader.card, plan.shader.params, shaderCtx) ??
+      ShaderBody.start(plan.shader.card, plan.shader.params, shaderCtx);
     usesQuality = true;
     track(shaderBody);
     group.add(shaderBody.object);
@@ -829,6 +882,9 @@ export function buildScene(
       shaderBody.setPatternSwitch(next.shader?.pattern ?? null);
     },
     shapeRadius,
+    get starFlares() {
+      return starFlares;
+    },
     starDirToWorld(dir) {
       if (!starSpin) return null;
       group.updateMatrixWorld(true);
@@ -841,6 +897,9 @@ export function buildScene(
       if (disposed || px === screenPx) return;
       screenPx = px;
       for (const r of lodRefresh) r();
+    },
+    prepareFrame(renderer) {
+      if (!disposed) (shaderBody as BodyRenderer | null)?.prepareFrame?.(renderer);
     },
     setJitterFrame(index) {
       jitterFrame(index);

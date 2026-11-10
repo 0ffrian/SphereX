@@ -30,6 +30,9 @@ const fake = {
   zoom: vi.fn(),
   resetView: vi.fn(),
   setStarCloseUp: vi.fn(),
+  latestFlareText: vi.fn(() => null),
+  fireFlare: vi.fn(),
+  setFieldLines: vi.fn(),
   dispose: vi.fn(),
 };
 
