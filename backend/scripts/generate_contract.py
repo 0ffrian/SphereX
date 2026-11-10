@@ -4,7 +4,8 @@
     uv run python -m scripts.generate_contract --check   # exit 1 if they differ (CI)
 
 The output is byte-stable: the header has no timestamp and no path, and ruff formats it here with
-this project's settings, so regenerating reproduces the committed bytes.
+this project's settings, and LF on every platform, so regenerating reproduces the
+committed bytes.
 """
 
 from __future__ import annotations
@@ -27,6 +28,15 @@ HEADER = "# GENERATED from shared/schemas/ by scripts/generate_contract.py (D-18
 def _run(*args: str) -> None:
     env = {**os.environ, "RUFF_NO_CACHE": "true"}
     subprocess.run([sys.executable, "-m", *args], cwd=BACKEND_DIR, env=env, check=True)
+
+
+def _to_lf(out_dir: Path) -> None:
+    """The generator writes CRLF on Windows and ruff keeps it; the committed files are LF."""
+    for path in out_dir.glob("*.py"):
+        data = path.read_bytes()
+        fixed = data.replace(b"\r\n", b"\n")
+        if fixed != data:
+            path.write_bytes(fixed)
 
 
 def generate(out_dir: Path) -> None:
@@ -52,6 +62,7 @@ def generate(out_dir: Path) -> None:
     # E501 is ignored for app/contract/ in pyproject.toml; that glob does not match the temp dir.
     _run("ruff", "check", "--config", config, "--ignore", "E501", "--fix", "--quiet", str(out_dir))
     _run("ruff", "format", "--config", config, "--quiet", str(out_dir))
+    _to_lf(out_dir)
 
 
 def _names(directory: Path) -> set[str]:
