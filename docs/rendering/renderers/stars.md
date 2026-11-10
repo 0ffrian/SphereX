@@ -56,6 +56,7 @@ Barnard's Star example **[verify]** (each tier needs checking, R12 #26):
 - **Rule:** cell size scales with the pressure scale height, H ∝ T/g, so a dwarf has finer cells than a giant. The scaling constant and the cell lifetime: **[verify]** (R12 #27). Tier 3 when mass or radius is assumed (state it in `assumed`), tier 2 when both are measured.
 - **Motion:** cells churn with the clock; no `dynamics` key, the rate follows cell size. Tag follows the layer.
 - Differential rotation uses `diff_rotation` (k) and `spin_period_h`: Ω(φ) = Ω_eq (1 − k sin²φ), the equator turns faster. Typical k by class: **[verify]** (R12 #28).
+- **Physics (issue #71 stream C, D-36, Q-230 to Q-235):** `physics/stellar.ts` computes g = GM/R², H = kT/(μ m_H g) with μ = 1.3, cell size L = 8H and cells per radius R/L (`model_dependent`). Convection fades out between 6500 and 8200 K (placeholder, **[verify]**): a hot star is smooth, a giant shows a few huge cells. It needs the stellar mass, which the card does not carry yet (Q-230): without it the pattern is the artistic look. Scale choices: `enlarged` (cells capped at 30 per radius, `artistic`), `true` (`model_dependent`; cells under a few pixels average out) and `close`. Colour views: `true`, `enhanced` (hue deepened) and `observatory` (false-colour EUV, `artistic`).
 
 ### R7.5.3 Spots
 
@@ -63,6 +64,7 @@ Barnard's Star example **[verify]** (each tier needs checking, R12 #26):
 - **Inputs:** active regions passed in as data (positions, sizes, ages, from stage 6) when they exist; `spot_lifetime_d`, `spin_period_h`, `diff_rotation`.
 - **Rule:** with no region data, place groups from a fixed rule seeded by the card seed, at the typical coverage for class and activity (**[verify]** coverage and lifetime by class, R12 #29). Tier 4. With measured region data, tier 1.
 - **Motion:** spots grow, fade and are carried by differential rotation. Driven by `spot_lifetime_d` and `speedup.spots`.
+- **Physics (issue #71 stream C):** with mass and rotation period, Ro = P_rot/τ_c (Wright et al. 2011 fit, **[verify]**), ⟨B⟩ from Reiners et al. 2022 (199 G Ro^-1.26 for Ro ≥ 0.13, 2050 G Ro^-0.11 below), coverage from a Sun-anchored placeholder scaling (`inferred_from_analog`, **[verify]**), lognormal group areas, a butterfly latitude belt and Joy's-law tilt (follower poleward). The number of groups drawn is set by the coverage (at most 12, 4 on the `low` tier) and replaces the fixed four. `SpotGroup` (centre, polarity axis, separation, area) on `RenderPlan.star.physics` is the interface for the flare stream (Q-233). A giant or a hot star has no spots.
 
 ### R7.5.4 Faculae
 
