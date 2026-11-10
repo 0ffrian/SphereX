@@ -29,7 +29,7 @@
   - The cached responses double as the recorded test fixtures (architecture spec §12). The responses used under `SX_OFFLINE=1` are therefore test fixtures: never hand-edit them. To change one, re-record it with the pre-fetch script.
   - Responses served from cache carry `cached_at`, so the UI can show the data's date.
 - **Optional:** the phones may keep the last loaded object in browser storage to survive a short Wi-Fi drop.
-- **Status note (9 Nov 2026):** exceptions to "the raw response" and the fallback, each to confirm with its row: Q-20 (the cutout's PSF HDU is stripped), Q-122 item 10 (the Gemini image is stored decoded and only after its checks; a failed refresh does not fall back), Q-141 (a Horizons over-limit 200 text is never cached). "Every demo object" in the pre-fetch includes 433 Eros (Q-137, Q-177).
+- **Status note (9 Nov 2026):** exceptions to "the raw response" and the fallback, each to confirm with its row: Q-20 (the cutout's PSF HDU is stripped), Q-122 item 10 (the Gemini image is stored decoded and only after its checks; a failed refresh does not fall back), Q-141 (a Horizons over-limit 200 text is never cached). "Every demo object" in the pre-fetch includes 433 Eros (Q-137, Q-197).
 
 ## D-31 Saturated test targets stay as refusals; demo objects added (answers Q-26)
 
@@ -69,7 +69,7 @@
 - **Saturation limit:** about 11.7 to 9.7 AB mag depending on the band, as quoted by Clark et al. 2026; the range and the per-band values are **[verify]** ([A3.1](../architecture/data-sources.md#a31-spherex-irsa), Saturation row). SIMP 0136 and TWA 27 are at least 2 mag fainter than 11.7 AB in 2MASS J and K and WISE W1 and W2. IRAS 04302+2247 is closer: 1.9 mag in K (13.56 AB; an E-quality 2MASS magnitude), 1.4 mag in W1 (13.06 AB, brighter than Epsilon Indi B's 13.42 AB) and 1.1 mag in W2 (12.81 AB). Its margin rests on its own full-cache result (no saturated source in any frame), not on an object measured before. AB = Vega + 0.894 (J), 1.840 (K) from the 2MASS zero points (Cohen et al. 2003, AJ 126, 1090) and + 2.699 (W1), 3.339 (W2) from the WISE All-Sky Explanatory Supplement Sect. 4.4.h **[verify]**. Epsilon Indi B and WISE 0855 measured cleanly in this tool (2 objects, not a limit).
 - **Out of scope:** demo quick picks in the UI go to M5 (issue #15).
 - **Approval:** Atish, 6 Nov 2026. Moon was asked to confirm in PR #28; pending, will be recorded here.
-- **Spec:** [A3.12](../architecture/targets.md#a312-test-and-demo-targets) (evidence: selection screen, neighbours, saturation margins, AB offsets); full-cache counts: [A4.2](../architecture/pipeline.md#a42-stage-2-measure-brightness-and-spectrum) status. "Demo objects" here are the spectrum quick picks; the Track MVP object is 433 Eros (Q-137, Q-177).
+- **Spec:** [A3.12](../architecture/targets.md#a312-test-and-demo-targets) (evidence: selection screen, neighbours, saturation margins, AB offsets); full-cache counts: [A4.2](../architecture/pipeline.md#a42-stage-2-measure-brightness-and-spectrum) status. "Demo objects" here are the spectrum quick picks; the Track MVP object is 433 Eros (Q-137, Q-197).
 
 ## Questions
 

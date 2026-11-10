@@ -95,7 +95,7 @@ One meaning per term. Where a word has two meanings, both are listed and the own
 | Event / after the event | The event build runs in a desktop browser on the A15 laptop with sound only; phones and vibration come after the event (Q-132). |
 | Haptics | Touch and sound feedback that encodes a surface or a value. At the event, sound only (Q-132); phone vibration after it ([R8](../rendering/haptics/platform-encoding.md#r8-haptics)). |
 | Texture / data haptics | Feedback from the surface under the pointer, or from a data value such as a spectrum ([R8.2](../rendering/haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui)). |
-| Feel mode | Desktop mode of the build pane: a mouse drag feels the body instead of turning it ([R5.6](../rendering/display-rules.md#r56-interaction)); proposed (Q-173), not built. |
+| Feel mode | Desktop mode of the build pane: a mouse drag feels the body instead of turning it ([R5.6](../rendering/display-rules.md#r56-interaction)); proposed (Q-193), not built. |
 | Touch mode | The phone mode (after the event): one finger feels, two fingers rotate ([R5.6](../rendering/display-rules.md#r56-interaction)). |
 | Body tone | One continuous tone that follows the height under the pointer while feeling a body ([R8.9.1](../rendering/haptics/audio-pairing.md#r891-body-tone-from-the-height-map-q-133), Q-133). |
 | Tone stream | The engine API for sustained sounds whose pitch, gain and pan change while they play; proposed ([R8.8](../rendering/haptics/engine-api.md#r88-engine-api)). |
@@ -118,7 +118,7 @@ One meaning per term. Where a word has two meanings, both are listed and the own
 | Tracklet | Movers-to-be inside one visit that fall on a straight line in time ([A17.4](moving-objects/area-backend.md#a174-join-across-visits-joinpy)). |
 | Discovery track | Tracklets in different visits joined into one path (was "Track (Discovery)"). Labels per [A16.5](moving-objects/area-search.md#a165-honesty-rules): "found blind = (designation)" when the known-object check names it, "unexplained" when nothing matches (a lead, not a discovery), "not checked" when the check failed; a tracklet with no single partner is "possible". |
 | Result card | The card for one Discovery track (was "Track card") ([A18.7](moving-objects/area-ui.md#a187-result-card)). |
-| Completeness | The fraction of planted fake movers the search recovers, per brightness and speed, shown as a grid for the square tested and never as one number. A gated extra for the event (Q-183, [A17.6](moving-objects/area-backend.md#a176-injection-completeness-and-control)). |
+| Completeness | The fraction of planted fake movers the search recovers, per brightness and speed, shown as a grid for the square tested and never as one number. A gated extra for the event (Q-203, [A17.6](moving-objects/area-backend.md#a176-injection-completeness-and-control)). |
 | Planted mover | A fake mover we add in memory to a square's real frames to test the search. Always badged Injected; never counted, never exported with real tracks ([A17.6](moving-objects/area-backend.md#a176-injection-completeness-and-control)). |
 | Shuffled-time control | The same search with the frame times permuted, to count the tracks it makes from chance alignment ([A17.6](moving-objects/area-backend.md#a176-injection-completeness-and-control)). |
 | ADES | The Minor Planet Center's format for reporting astrometry; phase 2. |

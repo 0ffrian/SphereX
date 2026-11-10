@@ -90,6 +90,6 @@ stateDiagram-v2
 - **Left click vs right-click** (Q-120): a left click on a marker drops the card request and searches the name, so the object panel opens; a right-click, long press or the ContextMenu key asks for the object card. A search with the build pane open changes nothing but the object under the pane (A21.4).
 - **Hash** (A21.11): the build pane writes `build` (pushed with the `sxBuild` mark; Back closes it). Proposed: `track=<object id>` for the Track pane with an `{ sxPane }` mark, and `area=` / `atrack=` for Area search; only one pane key is ever written.
 - **Escape** (A21.10): as built each surface has its own handler; one Escape owner with a fixed order (pane first) is proposed.
-- **Pane kinds** (A21.8, proposed): `pane: null | build | track` with `from` deciding the focus return; the Track pane is 50 % wide, as Build, and has no rail tool (proposed, Q-161).
+- **Pane kinds** (A21.8, proposed): `pane: null | build | track` with `from` deciding the focus return; the Track pane is 50 % wide, as Build, and has no rail tool (proposed, Q-181).
 - The sky stays live in the left half while a pane is open. At phone width (A21.3) a pane is a full-height sheet and the island is hidden.
 - The 3D view's own states (building, default, Feel, Touch) are in [15-state-interaction.md](15-state-interaction.md); the Build sequence is [21-sequence-build-mould.md](21-sequence-build-mould.md); Track and Area search sequences are [23-track.md](23-track.md) and [22-area-search.md](22-area-search.md).

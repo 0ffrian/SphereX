@@ -2,7 +2,7 @@
 
 > **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A19.9 to A19.15 · **Implements:** [Q-137](../../decisions/scope-process.md), [Q-135, Q-136, Q-141, Q-145](../../decisions/moving-objects.md), D-16, D-18 ([contract](../../decisions/contract.md)), D-02, D-21 ([contract-tags](../../decisions/contract-tags.md)), D-25 ([data-sources](../../decisions/data-sources.md)) · **Read with:** [track.md](track.md) (A19 to A19.8), [track-ui.md](track-ui.md) (A20), [area-backend.md](area-backend.md) (A17.7)
 
-Status: **not built** (every section is **To build**). Owner: Kevin (**Proposed (Q-163)**). Sections A19.1 to A19.8 (scope, entry points, frames, positions, path endpoint, star list, photometry, extended sources) are in [track.md](track.md).
+Status: **not built** (every section is **To build**). Owner: Kevin (**Proposed (Q-183)**). Sections A19.1 to A19.8 (scope, entry points, frames, positions, path endpoint, star list, photometry, extended sources) are in [track.md](track.md).
 
 ## A19 Track (continued)
 
@@ -52,13 +52,13 @@ PR #53's Q-21 text still says `frames:truncated` past the cone cap; its Q-124 an
 | SBDB facts in the header (class, rotation period, H) | as the ObjectCard tags them | [A4.5](../pipeline-card.md#a45-stage-5-objectcard) |
 | Sky backdrop and high-resolution imagery | per Q-88 (open) | A20.5 |
 | Spin slider and its lightcurve | `artistic` | Q-135; never exported or sonified |
-| Exposure tick sound; reference click; path voice | `measured`; `measured`; `model_dependent` | Q-134, Q-174, R8.9.2 |
+| Exposure tick sound; reference click; path voice | `measured`; `measured`; `model_dependent` | Q-134, Q-194, R8.9.2 |
 
 ### A19.12 Cache, offline and pre-fetch
 
 - **Raw answers** (D-25): Horizons range ephemerides, TLISTs and vectors; SIA cones; cutouts; Gaia TAP and CatWISE cones. Never hand-edited; re-recorded with the pre-fetch script.
 - **`derived.path`** key: `derived.path` + data release + `{spkid, observer, step_min, windows, PATH_VERSION}`. Frames and spectrum keep their A4.1 and A4.2 entries.
-- **Pre-fetch for the demo** (Q-137): `scripts.prefetch` for the group that holds Eros (`fixture` today; moving it to `demo` is Q-177 in [A3.12](../targets.md)) fetches Eros's frames, path, overlays with star lists, cutouts and spectrum **with production settings** and `SX_OFFLINE=0`, then the run is checked under `SX_OFFLINE=1`. PR #53's fixtures used a deliberately sparse 24 h step, so their keys do not serve production settings.
+- **Pre-fetch for the demo** (Q-137): `scripts.prefetch` for the group that holds Eros (`fixture` today; moving it to `demo` is Q-197 in [A3.12](../targets.md)) fetches Eros's frames, path, overlays with star lists, cutouts and spectrum **with production settings** and `SX_OFFLINE=0`, then the run is checked under `SX_OFFLINE=1`. PR #53's fixtures used a deliberately sparse 24 h step, so their keys do not serve production settings.
 - **Area search** pre-fetches Track for every Known object of each prepared area, or lists the ones it skipped. `track_available` is true when the frame list, path and spectrum of that id are final in the cache.
 - **Imagery:** the order-11 HiPS copy around the demo path waits for CDS permission (Q-136, D-35) **[verify]**; until then the detail view uses the 2MASS mirror (A20.5).
 
@@ -77,7 +77,7 @@ PR #53's Q-21 text still says `frames:truncated` past the cone cap; its Q-124 an
 | OUTLIER-core rule in Stage 2 (A4.2) | Moon | **T4** |
 | Track screen; Track sound | Atish | T2, T3 ([A20.15](track-ui.md#a2015-tests-and-tickets)) |
 
-Milestone M4 Extras, priority P1 because Track is the MVP demo (**Proposed (Q-167)**). Tests (backend, offline on recorded answers): the path from the recorded Horizons replies; an over-limit 200 text answer is not cached; the interpolated marker against the TLIST positions within the stated bound; the Horizons gate never runs two calls at once; Eros gives 14 of 16 points, 13 flagged `outlier_core` **[verify]**; the star list's radii and the near-track filter; the ECSV round trip (tags in the metadata, refusal rows kept, no spin columns); `path:deferred` then a final path.
+Milestone M4 Extras, priority P1 because Track is the MVP demo (**Proposed (Q-187)**). Tests (backend, offline on recorded answers): the path from the recorded Horizons replies; an over-limit 200 text answer is not cached; the interpolated marker against the TLIST positions within the stated bound; the Horizons gate never runs two calls at once; Eros gives 14 of 16 points, 13 flagged `outlier_core` **[verify]**; the star list's radii and the near-track filter; the ECSV round trip (tags in the metadata, refusal rows kept, no spin columns); `path:deferred` then a final path.
 
 ### A19.15 Open items
 

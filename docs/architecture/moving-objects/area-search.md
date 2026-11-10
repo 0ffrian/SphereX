@@ -2,7 +2,7 @@
 
 > **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A16 to A16.8 · **Implements:** [Q-146](../../decisions/moving-objects.md), [Q-131](../../decisions/moving-objects.md), [Q-137](../../decisions/scope-process.md), [Q-132](../../decisions/platform-hosting.md) · **Read with:** [area-backend.md](area-backend.md) (A17), [area-ui.md](area-ui.md) (A18), [track.md](track.md) (A19), [track-ui.md](track-ui.md) (A20), [uml/22](../../uml/22-area-search.md)
 
-Status: **agreed plan, not built** ([Q-146](../../decisions/moving-objects.md), 9 Nov 2026). It replaces the blind Band-Hop Linker with an injection atlas (Q-147), re-scoped after Atish's review (Q-131). [Q-183](../../decisions/moving-objects.md) (10 Nov 2026) adds four gated research checks (A16.2, A16.7, A16.8). Labels follow the architecture spec: **Tested**, **Documented**, **To build / Not confirmed**. Placeholders written as **Proposed (Q-158 to Q-167)** wait for a decision row; until then the rest of this fragment does not depend on them unless it says so.
+Status: **agreed plan, not built** ([Q-146](../../decisions/moving-objects.md), 9 Nov 2026). It replaces the blind Band-Hop Linker with an injection atlas (Q-147), re-scoped after Atish's review (Q-131). [Q-203](../../decisions/moving-objects.md) (10 Nov 2026) adds four gated research checks (A16.2, A16.7, A16.8). Labels follow the architecture spec: **Tested**, **Documented**, **To build / Not confirmed**. Placeholders written as **Proposed (Q-178 to Q-187)** wait for a decision row; until then the rest of this fragment does not depend on them unless it says so.
 
 Clickable mock-ups: `mockup/spherex-ui.html` (Area search is mock-up tool 5; the app adds no number keys, Q-121) and `mockup/chase-the-rock.html` (Track). Mock-ups are visual input only, never a spec (D-01).
 
@@ -22,7 +22,7 @@ In one sentence for the public: draw a square, then either follow a rock we alre
 | Gap | The SPHEREx Solar System Object Catalog tracks objects with **known** orbits and leaves unknown-object mining to "community researchers" (Lisse, Bauer and Kim 2024, [arXiv:2402.08705](https://arxiv.org/abs/2402.08705)). The pipeline does forced photometry at known positions (Akeson et al. 2025, [arXiv:2511.15823](https://arxiv.org/abs/2511.15823)). | Documented |
 | Public users | Follow a famous rock on real SPHEREx frames (Known), and watch the computer pick out dots that move without being given any object's position (Discovery). | To build |
 | Demo moment | The Eros area of 20 to 21 Mar 2026 (Q-137). **We chose this area because Eros crosses it** (A17.1). Discovery is not given Eros's position: it finds the dots that move, and the known-object check then names one of them 433 Eros. One click opens Track on the same rock. | To build |
-| Researchers | Four checks that make a lead usable: how often the search finds planted movers, how many false tracks it makes on scrambled data, whether a track's spectrum looks like one body, and a linker that uses 3 or more visits (A16.8, Q-183). After the event: ADES export and live areas anywhere (phase 2). | Checks: gated extras (A16.7); the rest not in the event build |
+| Researchers | Four checks that make a lead usable: how often the search finds planted movers, how many false tracks it makes on scrambled data, whether a track's spectrum looks like one body, and a linker that uses 3 or more visits (A16.8, Q-203). After the event: ADES export and live areas anywhere (phase 2). | Checks: gated extras (A16.7); the rest not in the event build |
 | Why "band-hop" | One SPHEREx frame covers a range of wavelengths across its field ([A3.1](../data-sources.md#a31-spherex-irsa)), so each detection of a mover lands at a different wavelength. Track builds the spectrum from that; Discovery shows each dot in its wavelength colour. | Documented (instrument) |
 
 ### A16.2 Scope
@@ -34,7 +34,7 @@ In one sentence for the public: draw a square, then either follow a rock we alre
 - **Discovery backend** for precomputed areas (A17): frames, dots, glitch and star removal, joining across visits, the known-object check, an ECSV export.
 - 1 to 3 **precomputed areas**, one of them the Eros area. Desktop browser only, on the A15 (Q-132). The demo data is frozen on QR2 (Q-137).
 
-**Event build, gated extras ([Q-183](../../decisions/moving-objects.md), A16.7, A16.8):** four research checks, each its own ticket, built only after the core demo works and cut if not finished and tested by 13 Nov:
+**Event build, gated extras ([Q-203](../../decisions/moving-objects.md), A16.7, A16.8):** four research checks, each its own ticket, built only after the core demo works and cut if not finished and tested by 13 Nov:
 
 - **Completeness and a planted test mover** (A17.6, A18.11): how often the search finds movers we plant in this square's real frames, shown as a grid per brightness and speed.
 - **Shuffled-time control** (A17.6): the same search on frames with permuted times, to count the tracks it makes from chance alignment.
@@ -80,15 +80,15 @@ flowchart LR
 | Part | Code (proposed, **To build**) | Owner |
 |---|---|---|
 | Discovery pipeline | `backend/app/core/area/` (`frames.py`, `dots.py`, `clean.py`, `join.py`, `match.py`, `service.py`) | Kevin (D-17) |
-| Checks: planted movers and completeness, shuffled-time control, spectrum score, rate-grid linker (gated extras, Q-183) | `backend/app/core/area/` (`inject.py`, `control.py`, `sed.py`, `rategrid.py`) | Kevin |
+| Checks: planted movers and completeness, shuffled-time control, spectrum score, rate-grid linker (gated extras, Q-203) | `backend/app/core/area/` (`inject.py`, `control.py`, `sed.py`, `rategrid.py`) | Kevin |
 | Precompute script | `backend/scripts/area_discovery.py` | Kevin |
 | API | `backend/app/api/areas.py`, models generated from the schemas (D-18) | Kevin |
 | Star list for movers (shared by Track's masks and Discovery, Q-143) | `backend/app/core/find/overlays.py` extension ([A19.6](track.md#a196-star-list-for-movers)) | Kevin (Q-143) |
 | Shared ECSV writer | `backend/app/core/export/ecsv.py` ([A19.9](track-contract.md#a199-export)) | Kevin |
 | Schemas and fixtures | `shared/schemas/area-*.schema.json`, `shared/fixtures/area/` | Moon (D-17) |
 | Area tool, cards, layers, state | `frontend/src/app/sky/area/`, `frontend/src/app/shell/`, `frontend/src/state/store.ts` | Moon (D-17) |
-| Track backend | [A19](track.md) | Kevin, **Proposed (Q-163)** |
-| Track screen and sound | [A20](track-ui.md), `frontend/src/app/track/` | Atish (Q-131), **Proposed (Q-163)** as a D-17 amendment, since `app/` is Moon's |
+| Track backend | [A19](track.md) | Kevin, **Proposed (Q-183)** |
+| Track screen and sound | [A20](track-ui.md), `frontend/src/app/track/` | Atish (Q-131), **Proposed (Q-183)** as a D-17 amendment, since `app/` is Moon's |
 
 Reused, not rewritten: `adapters/irsa_sia.py`, `adapters/irsa_cutout.py`, `adapters/gaia.py`, `adapters/wise.py`, `adapters/skybot.py`, `adapters/horizons.py`, the cache, `core/find/wcs.py` (pixel to sky, `wavelength_at`), the Stage 2 aperture photometry and flag reject list ([A4.2](../pipeline.md#a42-stage-2-measure-brightness-and-spectrum)), Stage 1's fixed-position SIA cone ([A4.1](../pipeline.md#a41-stage-1-find-the-object)) with PR #53's `s_region` test, `viewer/sky/skyMath.ts` (`raDecToScreen`), `app/flipbook/wavelengthColor.ts`, `app/shell/PanelCard.tsx`, the shared ECSV writer and the star list (A19).
 
@@ -106,7 +106,7 @@ Reused, not rewritten: `adapters/irsa_sia.py`, `adapters/irsa_cutout.py`, `adapt
 |---|---|---|---|
 | Dot pixel centroid, flux, error, flags | `measured` | Measured | Stage 2 aperture method at the centroid (A17.2). |
 | Dot wavelength and bandwidth | `measured` | Measured | `WCS-WAVE` lookup at a measured centroid, as Stage 1 tags frame wavelengths ([A4.1](../pipeline.md#a41-stage-1-find-the-object), PR #53's Q-124). |
-| Dot RA/Dec | `derived` | Estimated | Measured centroid through the frame WCS. The dots are still drawn in "Measured only" (A18.2), because the WCS placement adds no model, as the flipbook places frames; not yet decided, listed for Moon in Q-182. |
+| Dot RA/Dec | `derived` | Estimated | Measured centroid through the frame WCS. The dots are still drawn in "Measured only" (A18.2), because the WCS placement adds no model, as the flipbook places frames; not yet decided, listed for Moon in Q-202. |
 | "Glitch", "star", "fixed" labels; tracklets; tracks | `derived` | Estimated | Rule and thresholds in `method` (A17.3, A17.4). |
 | Known-object positions and the match | `model_dependent` | Estimated | Assumption: "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of `fetched_at`, seen from SPHEREx (`500@-163182`)" (A17.5, Q-138). |
 | Planted test mover and the completeness grid | `model_dependent` | Estimated | Assumption in `provenance`: "synthetic point sources added in memory to this area's recorded cutouts; PSF and distance model in `method.checks`". Every planted source carries the **Injected** badge (A17.6). |
@@ -121,7 +121,7 @@ Reused, not rewritten: `adapters/irsa_sia.py`, `adapters/irsa_cutout.py`, `adapt
 - **Honest demo line.** The area was chosen because Eros crossed it. The Result card for Eros says: "The search was not given Eros's position. We chose this area because Eros crossed it; the known-object check then named it." Never "found without being told where to look".
 - **Refuse rather than invent.** Fewer than 2 visits: no tracks, `area:visits` in `missing`. A stamp whose cutout is not cached: `stamp:<dot_id>`. Full code list in A17.8.
 - **Precomputed, said so.** The Discovery card shows when the search ran (`computed_at`). Its button reads "Look for movers"; the steps replay the precomputed result.
-- **Flags stay visible.** A dot whose pixels carry `OUTLIER` is kept and its flag is shown in the Result card and the export (A17.2, **Proposed (Q-158)**). Dots on the sky are not drawn hollow for it, because Discovery cannot know a dot is a mover's core. Track's spectrum shows kept OUTLIER points hollow (Q-139, [A20.7](track-ui.md#a207-spectrum-hop-by-hop)).
+- **Flags stay visible.** A dot whose pixels carry `OUTLIER` is kept and its flag is shown in the Result card and the export (A17.2, **Proposed (Q-178)**). Dots on the sky are not drawn hollow for it, because Discovery cannot know a dot is a mover's core. Track's spectrum shows kept OUTLIER points hollow (Q-139, [A20.7](track-ui.md#a207-spectrum-hop-by-hop)).
 - **Fixtures.** Synthetic fixtures carry the dev-only Fixture badge and never reach a production build (Q-32).
 
 ### A16.6 Open items and measured facts
@@ -145,7 +145,7 @@ Facts measured on PR #53's recorded Eros fixtures (16 cutouts, `mockup/chase-the
 
 ### A16.7 Tickets and plan
 
-Three core Area tickets (D-29 "as few tickets as possible"): D1 and D2 in **M4 Extras**, D3 in **M5**, priority P2. Four **gated extras** (D4 to D7, [Q-183](../../decisions/moving-objects.md)) in **M4 Extras**, priority P3, behind the gate below. Track's tickets T1 to T4 are in [A19.14](track-contract.md#a1914-owners-tickets-and-tests) and [A20.15](track-ui.md#a2015-tests-and-tickets).
+Three core Area tickets (D-29 "as few tickets as possible"): D1 and D2 in **M4 Extras**, D3 in **M5**, priority P2. Four **gated extras** (D4 to D7, [Q-203](../../decisions/moving-objects.md)) in **M4 Extras**, priority P3, behind the gate below. Track's tickets T1 to T4 are in [A19.14](track-contract.md#a1914-owners-tickets-and-tests) and [A20.15](track-ui.md#a2015-tests-and-tickets).
 
 | Ticket | Owner | Checklist |
 |---|---|---|
@@ -157,13 +157,13 @@ Three core Area tickets (D-29 "as few tickets as possible"): D1 and D2 in **M4 E
 | **D6 Spectrum smoothness score** | Kevin (backend), Atish (check on Eros) | `sed.py` (A17.13) · thresholds tuned on Eros and on the control's chains · the chip on result rows and the Result card (A18.7, A18.11) · tests |
 | **D7 Rate-grid linker** | Kevin | `rategrid.py` for 3 or more visits (A17.12) · a synthetic multi-visit area (A17.9) · a real area with 3 or more visits if Day 0 finds one · the Result card's "Linked by" line · test that on 2 visits it does not run and the pair rule is used |
 
-- **Extras gate (Q-183):** the core demo (draw a square, Discovery on Eros, Result card, Open in Track) works on fixtures by **12 Nov**. D4 to D7 start after it; D5 and D6 only need the dots and tracks fixture, so they may start earlier. An extra that is not finished and tested by **13 Nov** is cut: its Checks part is hidden, not shown half done, and the demo does not mention it. Cheapest first if time is short: D5, the D4 test mover, the D4 grid, D6, D7.
+- **Extras gate (Q-203):** the core demo (draw a square, Discovery on Eros, Result card, Open in Track) works on fixtures by **12 Nov**. D4 to D7 start after it; D5 and D6 only need the dots and tracks fixture, so they may start earlier. An extra that is not finished and tested by **13 Nov** is cut: its Checks part is hidden, not shown half done, and the demo does not mention it. Cheapest first if time is short: D5, the D4 test mover, the D4 grid, D6, D7.
 - **Order:** agree the JSON shapes (A17.8, A17.9) first, so D1 and D2 build in parallel against fixtures (D-29).
 - **Gate:** if Day 0 shows Eros is not found blind on its own frames with the rules of A17, keep Known and Track, and show Discovery only as the five steps on the Eros area with its real counts, without claiming tracks. Never drop the "unexplained, not a discovery" wording.
 
 ### A16.8 Why these four checks, and what a reviewer gets
 
-Q-146 cut these four to keep the event build small; [Q-183](../../decisions/moving-objects.md) adds them back as gated extras. The reason is not decoration. Discovery's output is a list of **leads**, and a lead means little until three questions have numbers: how often the search finds a real mover (sensitivity), how often it reports a mover that is not there (false alarms), and whether a lead is one body or unrelated things that happen to line up.
+Q-146 cut these four to keep the event build small; [Q-203](../../decisions/moving-objects.md) adds them back as gated extras. The reason is not decoration. Discovery's output is a list of **leads**, and a lead means little until three questions have numbers: how often the search finds a real mover (sensitivity), how often it reports a mover that is not there (false alarms), and whether a lead is one body or unrelated things that happen to line up.
 
 | Check | The question it answers | What a reviewer sees | Why it matters | Ticket |
 |---|---|---|---|---|

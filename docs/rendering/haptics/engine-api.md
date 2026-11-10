@@ -77,7 +77,7 @@ export class WebVibrateDriver implements HapticDriver {
 
 Event sources (`sources/heightMap.ts`, `meshNormal.ts`, `field.ts`, `dataPulse.ts`, `terrain.ts`, `flow.ts`, `lightcurve.ts`) are built by `buildHaptics` in `profiles.ts` from the `HapticProfile` in RenderParams (R8.5) and driven by `TouchHaptics`; `sources/spectrum.ts` serves every object's spectrum (R8.6). They call `engine.emit` and the train API only. Drivers never know about objects.
 
-**Tone stream (Q-133). Proposed (Q-169).** The body tone (R8.9.1) and the Track path voice (R8.9.2) are sustained sounds whose pitch, gain and pan change while they play. Discrete events and trains cannot carry them, so the engine gets a tone stream next to the Q-71 trains:
+**Tone stream (Q-133). Proposed (Q-189).** The body tone (R8.9.1) and the Track path voice (R8.9.2) are sustained sounds whose pitch, gain and pan change while they play. Discrete events and trains cannot carry them, so the engine gets a tone stream next to the Q-71 trains:
 
 ```ts
 export interface ToneParams {

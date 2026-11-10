@@ -6,7 +6,7 @@
 
 A source turns a pointer sample (or a scrub step) into engine calls. It owns no timers and never checks the honesty state (R8.2). The pointer comes from desktop Feel mode at the event, or Touch mode after the event (R5.6).
 
-**Body tone first (Q-133).** On every body with a height, the interaction sound is one continuous tone whose pitch follows the height under the pointer: low in grooves, higher on the surface and peaks. The tone's rules are [R8.9.1](audio-pairing.md#r891-body-tone-from-the-height-map-q-133). The sources below supply its height sample and add the cues that are not height. The discrete height ticks below are the post-event vibration encoding only; the audio driver does not sound them (**Proposed (Q-172)**).
+**Body tone first (Q-133).** On every body with a height, the interaction sound is one continuous tone whose pitch follows the height under the pointer: low in grooves, higher on the surface and peaks. The tone's rules are [R8.9.1](audio-pairing.md#r891-body-tone-from-the-height-map-q-133). The sources below supply its height sample and add the cues that are not height. The discrete height ticks below are the post-event vibration encoding only; the audio driver does not sound them (**Proposed (Q-192)**).
 
 **Height-map source** (`asteroid_procedural`):
 
@@ -18,7 +18,7 @@ A source turns a pointer sample (or a scrub step) into engine calls. It owns no 
 **Mesh source** (`asteroid_shape`, real shape models such as 433 Eros):
 
 1. Raycast the mesh with `three-mesh-bvh`.
-2. **Mesh height for the body tone. Proposed (Q-168):** height = the distance from the model's centre to the hit point minus the radius of the model's reference ellipsoid in that direction. The reference ellipsoid has the half-extents of the model's bounding box in the model frame. Pitch 0 and 1 are the lowest and highest heights over all vertices, computed once per model. The tone carries the mesh's tag (`measured`, as the mesh-normal ticks do in R8.2), so it plays in every honesty state. The reference surface only sets where the pitch scale starts; it adds no value that is not in the mesh.
+2. **Mesh height for the body tone. Proposed (Q-188):** height = the distance from the model's centre to the hit point minus the radius of the model's reference ellipsoid in that direction. The reference ellipsoid has the half-extents of the model's bounding box in the model frame. Pitch 0 and 1 are the lowest and highest heights over all vertices, computed once per model. The tone carries the mesh's tag (`measured`, as the mesh-normal ticks do in R8.2), so it plays in every honesty state. The reference surface only sets where the pitch scale starts; it adds no value that is not in the mesh.
 3. *After the event (vibration):* when the angle between consecutive face normals exceeds 12°, emit a tick with strength = clamp(angle/40°, 0, 1).
 4. When the pointer slides off the limb, emit one firm "edge" tick and stop the tone.
 
@@ -32,14 +32,14 @@ A source turns a pointer sample (or a scrub step) into engine calls. It owns no 
 
 1. Intersect the ray with the analytic sphere, as for the height-map source. Sample the shared field ([§7.7](../renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova)) bilinearly.
 2. **Land:** the body tone follows the field height (Q-133). After the event, height ticks add vibration (same rule as the height-map source).
-3. **Open ocean:** the height is flat at sea level, so the tone holds its sea-level pitch; the surf sound and the near-silent slow swell (a 1–2 Hz train at the lowest level) mark the water. **Proposed (Q-171).**
+3. **Open ocean:** the height is flat at sea level, so the tone holds its sea-level pitch; the surf sound and the near-silent slow swell (a 1–2 Hz train at the lowest level) mark the water. **Proposed (Q-191).**
 4. **Coastline:** one firm tick when the ocean mask changes between consecutive samples.
 5. **Polar ice:** dense, fine, soft ticks.
 6. **Lava cracks** (`planet_rocky`): double tick, from the field's lava-crack mask (texture B, channel B; D-12).
 7. **Clouds:** not heard or felt. An optional "feel clouds" toggle may add them.
-8. Items 4 to 6 are one-shots on top of the tone: they mark mask edges, not height (**Proposed (Q-171)**).
+8. Items 4 to 6 are one-shots on top of the tone: they mark mask edges, not height (**Proposed (Q-191)**).
 
-**Flow source** (`gas_giant`; D-12). There is no surface (Q-48), so there is no body tone; the pointer hears the flow (**Proposed (Q-171)**). Tag `artistic`.
+**Flow source** (`gas_giant`; D-12). There is no surface (Q-48), so there is no body tone; the pointer hears the flow (**Proposed (Q-191)**). Tag `artistic`.
 
 1. Sample band index and storm id from the shared field ([§7.7](../renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova)).
 2. **Band boundary:** a soft tick each time the band index changes, voice `tone`, pitch from latitude. Strength: the soft tick (Q-79).

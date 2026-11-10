@@ -32,7 +32,7 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
 | `GET /v1/sky/{survey}/hips/properties`, `…/hips/Norder3/Allsky.jpg`, `…/hips/Norder{k}/Dir{d}/Npix{n}.jpg` | mirrored HiPS files | Q-87 (open) | [A3.11](object-sources.md#a311-sky-background-irsa-hips) |
 | `GET /data/textures/{id}/{generator_version}/{seed}/{W}x{H}/<file>` | baked texture files (static mount) | R6.7, Q-47, Q-112 | [A5.4](data-contract.md#a54-asset-store), [A4.10](jobs.md#a410-object-job-and-fan-out) |
 | `GET /data/shapes/{name}.glb` | a registered shape-model mesh | Q-44, Q-61 | [A3.10](object-sources.md#a310-added-for-the-object-view), [A5](data-contract.md#a5-data-contract) |
-| `GET /v1/health` | `{status, offline, data_release}` | **Proposed (Q-175)** | [A10.2](frontend-platform.md#a102-running-the-event-build) |
+| `GET /v1/health` | `{status, offline, data_release}` | **Proposed (Q-195)** | [A10.2](frontend-platform.md#a102-running-the-event-build) |
 
 **Planned** (not built; proposals in open decisions):
 

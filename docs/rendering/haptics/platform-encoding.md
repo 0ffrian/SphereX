@@ -53,4 +53,4 @@ A change of state stops at once any sound the new state hides (a train, a tone, 
 - **Pattern length:** Chrome caps the pattern array, believed at about 99 entries **[verify]** (R12 #9). Keep patterns short; the 250 ms train windows keep each call short.
 - **Rate limit:** at most 40 events per second, with ≥25 ms between ticks; drop extra events rather than queue them. This applies to the audio driver at the event too.
 - **Roughness:** irregular spacing, with ±30% jitter from a seeded RNG.
-- **Continuous tone:** vibration cannot carry the body tone. After the event the vibrate driver plays the R8.4 height ticks instead (**Proposed (Q-172)**).
+- **Continuous tone:** vibration cannot carry the body tone. After the event the vibrate driver plays the R8.4 height ticks instead (**Proposed (Q-192)**).
