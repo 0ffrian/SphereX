@@ -1,7 +1,7 @@
 // Contract of a generated body (the shader kinds, D-01). The plan (`shaderPlan.ts`) decides what is
 // shown; `buildScene` makes the body from the plan; the viewer keeps it across plans that change
 // only the honesty state or the light. Types here are plain data; no GPU is needed to import them.
-import type { Object3D } from 'three/webgpu';
+import type { Object3D, WebGPURenderer } from 'three/webgpu';
 import type { Tag } from '@/contract';
 import { allowedTags, DEFAULT_HONESTY } from '../honesty';
 import type { Overrides } from '../sliders';
@@ -105,6 +105,11 @@ export interface BodyRenderer {
   setTier?(tier: TierName): void;
   /** The TAAU frame index of the frame about to be drawn (volumes shift their jitter by it). */
   setJitterFrame?(index: number): void;
+  /**
+   * Issue #71: called before each draw with the renderer, for bodies that run an off-screen pass of
+   * their own (the gas world's tracer). Optional: most bodies draw with the scene alone.
+   */
+  prepareFrame?(renderer: WebGPURenderer): void;
   setSunDirection(dir: Vec3): void;
   /** Poses the body at the SimClock's times (D-34). Optional: still bodies have nothing to pose. */
   setTime?(time: SimTimeFn): void;

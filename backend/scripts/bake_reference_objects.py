@@ -1,0 +1,88 @@
+"""Bake the reference-object assets (issue #71 stream E, Q-258): Jupiter and Saturn only.
+
+    uv run python -m scripts.bake_reference_objects          # write assets/reference/ref-*.json
+    uv run python -m scripts.bake_reference_objects --check  # exit 1 if a committed byte differs
+
+Adds new assets only; the rest of the demo pack is untouched (re-baked once at integration).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import tomllib
+from typing import Any
+
+from app.core.card.assets import Asset
+from app.core.render.card_to_params import GENERATOR_VERSION, card_to_params
+from app.settings import BACKEND_DIR, Settings
+from scripts.bake_demo_pack import ASSETS_DIR, _asset, asset_path
+
+M_EARTH_1E24_KG = 5.9722  # NASA Planetary Fact Sheet, Earth mass
+R_JUP_KM = 71492.0  # IAU 2015 B3 nominal equatorial radius, the card's radius_rjup unit
+KM_PER_AU = 149_597_870.7  # IAU 2012 B2, exact
+
+
+def _tv(
+    value: float, source: str, tag: str = "measured", formula: str | None = None
+) -> dict[str, Any]:
+    out: dict[str, Any] = {"value": value, "tag": tag, "source": source}
+    if formula:
+        out["formula"] = formula
+    return out
+
+
+def card_of(row: dict[str, Any]) -> dict[str, Any]:
+    src = f"{row['source']} (nssdc.gsfc.nasa.gov/planetary/factsheet)"
+    conv = " converted to the card's unit"
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "type": "gas_giant",
+        "radius_rjup": _tv(
+            round(row["radius_km"] / R_JUP_KM, 5), f"{src}: equatorial radius at 1 bar{conv}"
+        ),
+        "mass_mearth": _tv(round(row["mass_1e24_kg"] / M_EARTH_1E24_KG, 3), f"{src}: mass{conv}"),
+        "rot_period_h": _tv(row["rot_period_h"], f"{src}: sidereal rotation period, System III"),
+        "orbit_au": _tv(
+            round(row["semimajor_axis_1e6_km"] * 1e6 / KM_PER_AU, 4), f"{src}: semimajor axis{conv}"
+        ),
+        "orbital_period_d": _tv(row["orbital_period_d"], f"{src}: sidereal orbit period"),
+        "teq_K": _tv(row["teq_K"], f"{src}: blackbody temperature"),
+    }
+
+
+def build(settings: Settings) -> list[Asset]:
+    doc = tomllib.loads(
+        (BACKEND_DIR / "assets" / "reference_objects.toml").read_text(encoding="utf-8")
+    )
+    out: list[Asset] = []
+    for row in doc["object"]:
+        card = card_of(row)
+        params = card_to_params(card, generator_version=GENERATOR_VERSION)
+        out.append(_asset(card, params, settings))
+    return out
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--check", action="store_true")
+    args = ap.parse_args()
+    bad = 0
+    for asset in build(Settings()):
+        path = ASSETS_DIR / "reference" / asset_path(asset).name
+        text = json.dumps(asset.to_json(), indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+        if args.check:
+            if not path.is_file() or path.read_text(encoding="utf-8") != text:
+                print(f"differs: {path}")
+                bad += 1
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+            print(f"wrote {path}")
+    return 1 if bad else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
