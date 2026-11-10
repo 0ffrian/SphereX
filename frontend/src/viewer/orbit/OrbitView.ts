@@ -115,6 +115,7 @@ export class OrbitView {
   constructor(sources: OrbitSources) {
     this.sources = sources;
     const gas = sources.kind === 'gas';
+    if (gas && !(sources.tracer?.() ?? null)) throw new Error('The cloud tracer is not ready yet');
     this.state = { lon: 0, lat: 0.3, head: 0.6, pitch: -0.16, altKm: ENTRY_ALT_KM[sources.kind] };
     this.shader = buildOrbitShader(
       {
@@ -174,6 +175,10 @@ export class OrbitView {
 
   pinch(scale: number): void {
     if (scale > 0) this.setAltitude(this.state.altKm / scale);
+  }
+
+  setFlying(on: boolean): void {
+    this.flying = on;
   }
 
   /** Returns true when the key was a surface-view key. */

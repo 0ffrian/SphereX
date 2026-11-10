@@ -44,6 +44,8 @@ import { ConfidencePopover } from './ConfidencePopover';
 import { timeLapsesOf } from '@/viewer/motion/planMotion';
 import { describeRefusal, layerName, timeLapseText } from './messages';
 import { buttonClass, pressedClass } from './ui';
+import { CloseUpPane, closeUpButtonLabel, closeUpKindOf } from './CloseUpPane';
+import type { CloseUpInfo } from '@/viewer/ViewerApp';
 import { StarFlarePanel } from './StarFlarePanel';
 import { MouldStrip, type StripHandle } from './build/MouldStrip';
 import { useMould, type MouldPhase } from './build/useMould';
@@ -174,6 +176,9 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [viewer, setViewer] = useState<ViewerApp | null>(null);
+  // The close-up pane (issue #71 stream H): the Surface view and its kin, opened by a toggle.
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closeInfo, setCloseInfo] = useState<CloseUpInfo | null>(null);
   const setRendererStatus = useAppStore((s) => s.setRendererStatus);
   const rendererStatus = useAppStore((s) => s.rendererStatus);
   const blocked = pane?.blocked === true;
@@ -570,6 +575,29 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const defaultsShown = plan?.missing.filter((m) => m.defaultShown) ?? [];
   const notDrawn = plan?.missing.filter((m) => !m.defaultShown) ?? [];
   const disabled = viewer === null;
+  const closeKind = closeUpKindOf(params?.type);
+  const shaderKey = plan?.shader?.key ?? '';
+  // Open or close the pane in the viewer; the viewer reports back (a refusal, a layout change).
+  useEffect(() => {
+    if (!viewer) return;
+    viewer.setCloseUpHandler(setCloseInfo);
+    return () => viewer.setCloseUpHandler(null);
+  }, [viewer]);
+  useEffect(() => {
+    if (!viewer) return;
+    if (!closeOpen || !closeKind) {
+      viewer.closeUpOff(false);
+      return;
+    }
+    viewer.openCloseUp(closeKind === 'body', closeKind === 'star'); // reports back through the handler
+    return () => viewer.closeUpOff(true);
+  }, [viewer, closeOpen, closeKind, objectKey, shaderKey]);
+  // A gas giant that is still forming opens when it has settled.
+  useEffect(() => {
+    if (!viewer || !closeOpen || !closeInfo?.refusal || !/forming/.test(closeInfo.refusal)) return;
+    const id = window.setTimeout(() => viewer.openCloseUp(false, false), 1000);
+    return () => window.clearTimeout(id);
+  }, [viewer, closeOpen, closeInfo]);
   const objectIsFixture = fixture || (card?.id.startsWith('fixture:') ?? false);
   // Read from the plan, not from the viewer, so it is never a frame behind (what the clock runs).
   const lapses = plan ? timeLapsesOf(plan) : [];
@@ -635,6 +663,14 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           data-testid="viewer-stage"
         >
           <div ref={hostRef} className="absolute inset-0" />
+          <CloseUpPane
+            viewer={viewer}
+            kind={closeKind}
+            open={closeOpen && closeInfo?.mode !== null}
+            info={closeInfo}
+            reducedMotion={reducedMotion}
+            fixture={objectIsFixture}
+          />
           {params && plan?.threeD && (
             <ConfidenceChip
               params={params}
@@ -758,6 +794,18 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           >
             Reset view
           </button>
+          {closeKind && plan?.threeD && (
+            <button
+              type="button"
+              className={`${buttonClass} ${pressedClass}`}
+              aria-pressed={closeOpen}
+              disabled={disabled}
+              onClick={() => setCloseOpen((o) => !o)}
+              data-testid="closeup-toggle"
+            >
+              {closeUpButtonLabel(closeKind)}
+            </button>
+          )}
         </div>
 
         {plan && (

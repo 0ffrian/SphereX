@@ -240,7 +240,7 @@ export interface GasOrbitInput {
   /** The tracer render target swaps after every pass: a texture (read the getter each frame) or a function. Null before the first pass. */
   tracer?: Texture | (() => Texture | null) | null;
   /** sRGB display colours. */
-  palette?: GasPalette | null;
+  palette?: Readonly<Record<'z' | 'b' | 's' | 'd' | 'p', readonly number[]>> | null;
   /** False while the planet is still forming (hidden settling): show the "forming" state. */
   ready?: boolean;
 }
@@ -367,7 +367,7 @@ export function gasOrbitSources(
   const scaleHeight = positive(input.scaleHeightKm) ? input.scaleHeightKm : null;
   if (scaleHeight === null) missing.add('orbit.atmosphere');
   const p = input.palette;
-  const lin = (c: Rgb): Rgb => srgbToLinear([c[0], c[1], c[2]]);
+  const lin = (c: readonly number[]): Rgb => srgbToLinear([c[0]!, c[1]!, c[2]!]);
   const sources: OrbitSources = {
     ...EMPTY,
     kind: 'gas',

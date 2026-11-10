@@ -1930,3 +1930,98 @@ body {
   border-style: dashed;
   color: #a1a1aa;
 }
+
+/* Issue #71 stream H: the close-up pane, the app's version of the mock-up's #cuPane (left half of
+   the split, 50% wide, fades and slides in over 0.7 s / 1 s; the globe takes the right half). The
+   picture itself is drawn into the viewer canvas; this layer holds the caption, the controls and
+   the input. On a narrow screen it stacks on top (the mock-up's split is side by side). */
+.sx-cu {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  z-index: 5;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(-36px) scale(0.985);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 1s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s 0.8s;
+}
+.sx-cu.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.1s,
+    transform 1s cubic-bezier(0.22, 1, 0.36, 1) 0.1s;
+}
+.sx-cu.stack {
+  width: 100%;
+  bottom: 50%;
+  transform: translateY(-36px) scale(0.985);
+}
+.sx-cu.stack.open {
+  transform: none;
+}
+.sx-cu::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent 80%, #0008 100%);
+}
+.sx-cu.stack::after {
+  background: linear-gradient(180deg, transparent 80%, #0008 100%);
+}
+.sx-cu-tag {
+  position: absolute;
+  left: 16px;
+  bottom: 88px;
+  z-index: 2;
+  max-width: calc(100% - 32px);
+  font: 11px var(--font-mono);
+  color: #c1c9cd;
+  background: #242729cc;
+  border: 1px solid #323a3e;
+  border-radius: 10px;
+  padding: 6px 10px;
+  line-height: 1.4;
+}
+.sx-cu-controls {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font: 12px var(--font-mono);
+  color: #c1c9cd;
+  background: #242729cc;
+  border: 1px solid #323a3e;
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+.sx-cu-focus {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.sx-cu-focus:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: -4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sx-cu,
+  .sx-cu.open {
+    transition: none;
+  }
+}
