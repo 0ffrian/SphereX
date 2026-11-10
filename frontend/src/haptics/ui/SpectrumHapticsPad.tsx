@@ -18,12 +18,13 @@ import type { SpectrumResponse } from '@/app/api/types';
 import { ProvenanceBadge } from '@/app/Badge';
 import type { Tag } from '@/contract';
 import { HONESTY_LABEL, badgeForTag, isTagShown, type HonestyState } from '@/viewer/honesty';
-import type { HapticOutputs } from '../haptics';
+import type { SoundOutputs } from '../haptics';
 import { SpectrumHapticSource, spectrumXToLambda, type SpectrumStep } from '../sources/spectrum';
 import { PITCH_RISES_WITH_WAVELENGTH, SPECTRUM_QUIET_THRESHOLD } from '../tuning';
 
 export interface SpectrumHapticsPadProps {
-  haptics: HapticOutputs;
+  /** Only the engine is used (the pad has no vibrate or audio calls of its own). */
+  haptics: Pick<SoundOutputs, 'engine'>;
   /** The spectrum response's points and tag (`measured` today; any tag is gated by honesty). */
   spectrum: Pick<SpectrumResponse, 'spectrum'> & { tag: SpectrumResponse['tag'] | Tag };
   /** What the spectrum is of, for the label ("WISE 0855-0714"). */
