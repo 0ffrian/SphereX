@@ -132,7 +132,7 @@ import { requestWorld } from '../fields/worldClient';
 import { resolveWorld } from '../fields/worldInputs';
 import { worldReadouts, type WorldReadout } from '@/physics/climateBudget';
 import { isExoplanetCard } from '../planCommon';
-import { buildRockyWorld } from './RockyWorld';
+import { buildRockyWorld, type OrbitSources } from './RockyWorld';
 
 const rgb3 = (c: Rgb) => vec3(c[0], c[1], c[2]);
 
@@ -659,6 +659,7 @@ export class ShaderBody implements BodyRenderer {
   private readonly fieldSource: NonNullable<BodyContext['fieldSource']>;
   private readonly worldSource: NonNullable<BodyContext['worldSource']>;
   /** Issue #71 stream D: the readouts and assumptions of the rocky-world model drawn now, else null. */
+  private orbit: OrbitSources | null = null;
   private worldInfo: { readouts: WorldReadout[]; assumptions: string[]; low: boolean } | null = null;
   private readonly onChange: (() => void) | undefined;
   private readonly onFailed: ((layerId: string) => void) | undefined;
@@ -1089,6 +1090,7 @@ export class ShaderBody implements BodyRenderer {
    */
   private async buildRocky(spec: ShaderSpec, textures: DataTexture[]): Promise<Built | null | undefined> {
     this.worldInfo = null;
+    this.orbit = null;
     if (spec.kind !== 'planet_rocky' && spec.kind !== 'planet_water') return undefined;
     if (!spec.planet || !isExoplanetCard(this.card)) return undefined;
     const low = this.tier === 'low';
@@ -1120,6 +1122,7 @@ export class ShaderBody implements BodyRenderer {
       low,
       textures,
     });
+    this.orbit = built.orbitSources;
     this.worldInfo = {
       readouts: worldReadouts(world.model, res.sources, world.climate.stats),
       assumptions: res.assumptions,
@@ -1135,6 +1138,11 @@ export class ShaderBody implements BodyRenderer {
       sampler: new FieldSampler(world.field),
       setPattern: built.setPattern,
     };
+  }
+
+  /** Stream H: the textures and scalars of the drawn rocky world, else null. */
+  get orbitSources(): OrbitSources | null {
+    return this.orbit;
   }
 
   /** Issue #71 stream D: the numbers of the drawn world with their tags and assumptions, else null. */

@@ -75,7 +75,7 @@ export interface BuildHooks {
    */
   onMeshMeasured?(m: { radiusM: number }): void;
   /** Tests only: replaces the field and point workers, or sets slider overrides (D-27). */
-  shader?: Pick<BodyContext, 'fieldSource' | 'overrides'>;
+  shader?: Pick<BodyContext, 'fieldSource' | 'worldSource' | 'overrides'>;
   /** Noise octaves of the quality level (R5.7); bodies built from noise read it. Default: the low level's. */
   octaves?: number;
 }

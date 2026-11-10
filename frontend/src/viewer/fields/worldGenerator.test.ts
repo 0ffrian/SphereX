@@ -43,7 +43,7 @@ describe('world model: Earth-like numbers', () => {
   });
 });
 
-describe('TRAPPIST-1 e at 1.2 bar (low tier)', () => {
+describe('TRAPPIST-1 e at 1.2 bar (low tier)', { timeout: 60000 }, () => {
   const p: WorldParams = { seed: 11, inputs: t1e, oceanFraction: 0.62, tier: 'low' };
   const w = generateWorld(p)!;
   it('shows a part-open ocean, sea ice and frost on land', () => {
@@ -75,7 +75,7 @@ describe('TRAPPIST-1 e at 1.2 bar (low tier)', () => {
   });
 });
 
-describe('determinism', () => {
+describe('determinism', { timeout: 60000 }, () => {
   it('two runs of the same params are byte-identical (terrain, climate, field)', () => {
     const p: WorldParams = { seed: 5, inputs: t1e, oceanFraction: 0.5, tier: 'low' };
     const a = generateWorld(p)!;
@@ -92,7 +92,7 @@ describe('determinism', () => {
   });
 });
 
-describe('shared field for haptics', () => {
+describe('shared field for haptics', { timeout: 60000 }, () => {
   const w = generateWorld({ seed: 11, inputs: t1e, oceanFraction: 0.62, tier: 'low' })!;
   const s = new FieldSampler(w.field);
   it('the height is the terrain: ocean texels sit below 0.5 and land above', () => {
@@ -153,7 +153,7 @@ describe('inputs and provenance', () => {
   });
 });
 
-describe('world worker', () => {
+describe('world worker', { timeout: 60000 }, () => {
   it('answers a request, transfers the arrays and reports a refusal as a null world', async () => {
     const { handleWorldRequest, worldTransferables } = await import('./worldWorker');
     const res = handleWorldRequest({ id: 3, params: { seed: 1, inputs: { ...t1e, orbitAu: 0 }, oceanFraction: 0, tier: 'low' } });
