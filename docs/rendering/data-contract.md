@@ -76,7 +76,9 @@ interface ObjectCard {
   phase_angle_deg?: TV; sun_vector?: TV<[number, number, number]>;   // sun_vector: unit vector target -> Sun,
                                       // ICRF equatorial J2000 (Horizons, Q-62)
   // comet
-  gas_Q?: { co2?: TV; h2o?: TV; co?: TV };   // molecules/s, per epoch (the shape holds one epoch: Q-42)
+  gas_Q?: { co2?: TV; h2o?: TV; co?: TV }    // molecules/s; this flat shape holds one epoch (Q-42)
+        | { '2025-08'?: {co2?: TV; h2o?: TV; co?: TV}; '2025-12'?: {...} };   // or keyed by epoch (Q-260)
+  orbit_track?: TV<number[][]>;      // rows [JD TDB, x, y, z au, vx, vy, vz au/day], Horizons, heliocentric ICRF (Q-261)
   coma_radius_km?: TV; nucleus_radius_km_max?: TV;
   epochs?: ('2025-08' | '2025-12')[];
   // motion
