@@ -126,7 +126,37 @@ export interface RockyOptions {
   textures: DataTexture[];
 }
 
+/**
+ * What an orbit or surface camera (stream H) reads to match the orbital view. The textures are the
+ * ones the shader samples; the scalars are the model's numbers. Same world UV as above
+ * (u = atan2(z, x) / 2pi + 0.5, v = asin(y) / pi + 0.5, row 0 = south).
+ */
+export interface OrbitSources {
+  /** RGBA float: R height (model km, sea level 0), G plate-boundary signal. */
+  terrainTexture: DataTexture;
+  /** RGBA float: R temperature K, G sea-ice thickness, B frost amount, A relative humidity (wetness). */
+  climateTexture: DataTexture;
+  /** CPU copies of the same grids, for sampling without the GPU. */
+  terrain: { W: number; H: number; data: Float32Array };
+  climate: { nx: number; ny: number; out: Float32Array };
+  radiusKm: number | null;
+  /** Dry lapse rate, K per km. */
+  lapseKPerKm: number;
+  fluid: { id: string; tripleK: number; boilK: number | null };
+  cloudCover: number;
+  /** Optical depth of the air (greenhouse), and haze 0..1. */
+  tau: number;
+  haze: number;
+  seed: number;
+  hasOcean: boolean;
+  /** Not built: no separate hydrology raster or cloud tracer texture exists; clouds come from humidity (climateTexture.a) and noise. */
+  hydrologyTexture: null;
+  cloudTracerTexture: null;
+}
+
 export interface RockyBuilt {
+  /** Textures and scalars for the orbit camera (stream H). */
+  readonly orbitSources: OrbitSources;
   group: Group;
   runtime: { frame: Object3D; update(time: SimTimeFn): void };
   setPattern(on: boolean): void;
@@ -389,5 +419,21 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
     pattern.value = on ? 1 : 0;
     for (const mesh of overlays) mesh.visible = !on;
   };
-  return { group, runtime, setPattern };
+  const orbitSources: OrbitSources = {
+    terrainTexture: terrTex,
+    climateTexture: climTex,
+    terrain: { W: world.terrain.W, H: world.terrain.H, data: world.terrain.data },
+    climate: { nx: world.climate.nx, ny: world.climate.ny, out: world.climate.out },
+    radiusKm: o.scaleM ? o.scaleM / 1000 : null,
+    lapseKPerKm: m.gamK,
+    fluid: { id: F.id, tripleK: F.Tt, boilK: m.Tb },
+    cloudCover: cov,
+    tau: m.tau,
+    haze: m.haze,
+    seed: o.seed,
+    hasOcean: world.hasOcean,
+    hydrologyTexture: null,
+    cloudTracerTexture: null,
+  };
+  return { group, runtime, setPattern, orbitSources };
 }

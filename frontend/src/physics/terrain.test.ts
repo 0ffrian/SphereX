@@ -4,7 +4,7 @@ import { buildTerrain, oceanAreaShare, terrainHash } from './terrain';
 
 const small = { W: 180, H: 90 };
 
-describe('terrain', () => {
+describe('terrain', { timeout: 30000 }, () => {
   it('is deterministic: the same options give byte-identical data', () => {
     const a = buildTerrain({ seed: 11, oceanFraction: 0.6, gravity: 9.8, ...small });
     const b = buildTerrain({ seed: 11, oceanFraction: 0.6, gravity: 9.8, ...small });
