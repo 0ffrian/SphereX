@@ -96,7 +96,7 @@ interface Choices {
   mode: ViewModeId | null;
   epoch: CometEpoch | null;
   scrub: number;
-  /** Issue #71 stream C: a star's colour view and scale; null = the default (observatory, enlarged). */
+  /** Issue #71 stream C: a star's colour view and scale; null = the default (true colour, enlarged; Q-290). */
   starColour?: StarColourView | null;
   starScale?: StarScale | null;
 }
@@ -569,7 +569,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   };
   // Issue #71 stream C: colour view and scale of a star. Cells do not show in the Observatory view,
   // so choosing Close-up from it moves to Enhanced colour (and the reverse leaves Close-up).
-  const starColour: StarColourView = plan?.star?.colourView ?? 'observatory';
+  const starColour: StarColourView = plan?.star?.colourView ?? 'true';
   const starScale: StarScale = plan?.star?.scale ?? 'enlarged';
   const setStarView = (colour: StarColourView, scale: StarScale) => {
     let c = colour;

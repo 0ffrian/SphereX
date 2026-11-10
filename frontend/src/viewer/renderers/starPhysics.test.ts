@@ -83,10 +83,10 @@ describe('star surface physics in the plan', () => {
     expect(phys.coverage).toBeGreaterThan(0);
   });
 
-  it('enlarged cells are artistic; true-scale cells are model_dependent; the tier follows', () => {
+  it('cells with a physical size are model_dependent at every scale (Q-293); the tier follows', () => {
     const big = plan({ starScale: 'enlarged' });
     expect(big.star!.cellsEnlarged).toBe(true);
-    expect(tier(big, 'granulation')).toBe(5);
+    expect(tier(big, 'granulation')).toBe(3);
     const real = plan({ starScale: 'true' });
     expect(real.star!.cellsEnlarged).toBe(false);
     expect(tier(real, 'granulation')).toBe(3);
@@ -95,9 +95,9 @@ describe('star surface physics in the plan', () => {
     expect(plan({ starScale: 'close' }).star!.granuleVisibility).toBeGreaterThan(0.9);
   });
 
-  it('views default to observatory and enlarged, and false colour is named as an artist look', () => {
+  it('views default to true colour (Q-290) and enlarged, and false colour is named as an artist look', () => {
     const p = plan();
-    expect(p.star!.colourView).toBe('observatory');
+    expect(p.star!.colourView).toBe('true');
     expect(p.star!.scale).toBe('enlarged');
     expect(plan({ starColour: 'observatory' }).notes.join(' ')).toMatch(/false-colour/);
   });
