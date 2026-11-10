@@ -16,7 +16,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [data-sources.md](data-sources.md) | the backend framework, external archives and adapters, name resolving, the read-through cache and offline mode, test targets, overlays and the composite backends | 4 D, 15 Q, 20 KB |
 | [pipeline-stages.md](pipeline-stages.md) | stages 3 to 7 as built, measurement choices, physics in stage 6, the Sun angle for SBDB bodies, the exoplanet adapter and type rule | 0 D, 5 Q, 13 KB |
 | [pipeline-jobs.md](pipeline-jobs.md) | shape models and their serving, where generated assets are saved, the live cutout budget, object jobs, fan-out and progress endpoints | 0 D, 6 Q, 14 KB |
-| [rendering-bodies.md](rendering-bodies.md) | where surfaces are generated, the baker, renderers per type, physics sliders, accuracy, golden images, the honest fixtures (Q-114) | 4 D, 20 Q, 27 KB |
+| [rendering-bodies.md](rendering-bodies.md) | where surfaces are generated, the baker, renderers per type, physics sliders, accuracy, golden images, the honest fixtures (Q-114) | 4 D, 23 Q, 30 KB |
 | [rendering-motion.md](rendering-motion.md) | motion, time-lapse, render-on-change, quality levels, tone mapping, golden frames, process gating and tier wording | 1 D, 5 Q, 9 KB |
 | [rendering-kinds.md](rendering-kinds.md) | shapes and volumes, animated sphere bodies, flattening, and the Q-107 visual findings and fix notes | 0 D, 8 Q, 19 KB |
 | [rendering-layers.md](rendering-layers.md) | the per-layer body fixes of issue #62 (PR #63): gas giant five tiered layers, brown dwarf limb and infrared bands, asteroid sphere and displacement, the flared T Tauri disc | 0 D, 4 Q, 11 KB |
@@ -109,6 +109,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-21 | Frames for moving objects | Partly answered (built; limits [verify]) | [moving-frames](moving-frames.md) |
 | Q-22 | Meaning of moving in resolve | Open (implemented as proposed) | [moving-objects](moving-objects.md) |
 | Q-23 | No aperture correction in stage 2 | Open | [data-sources](data-sources.md) |
+| Q-24 | Light curve mixes wavelengths | Open | [data-sources](data-sources.md) |
 | Q-25 | Tag of typed coordinates | Open (implemented as described) | [contract-tags](contract-tags.md) |
 | Q-26 | SPHEREx saturates on three targets | Answered: D-31 (Moon's confirmation pending).… | [data-sources](data-sources.md) |
 | Q-27 | Tag of false-colour encodings | Open (Rainbow Trails implemented as `derived`) | [contract-tags](contract-tags.md) |
@@ -283,6 +284,9 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-201 | One tag for Horizons-derived values | Open | [contract-tags](contract-tags.md) |
 | Q-202 | Review of the Area search fixes (9 Nov 2026) | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-203 | Four research checks join the event build as gated extras | Decided (Moon, 10 Nov 2026); owners and thresholds Proposed | [moving-objects](moving-objects.md) |
+| Q-210 | Asteroid and nucleus physics: strength, craters, lighting, lobed nucleus | Open (built) | [rendering-bodies](rendering-bodies.md) |
+| Q-211 | Height field layers, erosion on craters only, seam test | Open (built) | [rendering-bodies](rendering-bodies.md) |
+| Q-212 | Rough by default, smooth only on data | Open (built) | [rendering-bodies](rendering-bodies.md) |
 | Q-220 | Gaia teff_msc1 as a star Teff source | Proposed | [catalogue-values](catalogue-values.md) |
 | Q-221 | Data confidence score | Proposed | [pipeline-stages](pipeline-stages.md) |
 | Q-222 | The 3D gate and its calibration | Proposed | [pipeline-stages](pipeline-stages.md) |
@@ -292,7 +296,6 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-233 | Spot-group interface for stream G | Open (implemented) | [rendering-bodies](rendering-bodies.md) |
 | Q-234 | Joy's law sign and butterfly latitudes | Open (implemented) | [rendering-bodies](rendering-bodies.md) |
 | Q-235 | Star colour views, scales and defaults | Decided (Observatory default) | [rendering-bodies](rendering-bodies.md) |
-| Q-24 | Light curve mixes wavelengths | Open | [data-sources](data-sources.md) |
 | Q-240 | Rocky and water world model (issue #71 stream D) | Open (built) | [rendering-bodies](rendering-bodies.md) |
 | Q-241 | Fluid table and constants (stream D) | Open (built) | [rendering-bodies](rendering-bodies.md) |
 | Q-242 | Plate tectonics terrain (stream D) | Open (built) | [rendering-bodies](rendering-bodies.md) |
