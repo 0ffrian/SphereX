@@ -31,7 +31,14 @@ async function selectAquaPrime(page: Page): Promise<void> {
   await marker.click({ button: 'right' });
 }
 
+/** Opens the build pane's Details panel (the honesty level, view controls, Replay) if it is shut. */
+async function openDetails(page: Page): Promise<void> {
+  const button = page.getByTestId('build-details');
+  if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click();
+}
+
 async function setHonesty(page: Page, label: RegExp): Promise<void> {
+  await openDetails(page);
   await page
     .getByRole('group', { name: 'Honesty level' })
     .getByRole('button', { name: label })
@@ -239,14 +246,16 @@ test('Build it: split view, steps run to done, Escape and Back close it', async 
   await expect(page.getByTestId('build-title')).toHaveText('Building Aqua Prime');
   await expect(page.getByTestId('build-title')).toBeFocused();
   expect(new URL(page.url()).hash).toContain('build');
-  // The sky keeps the left half and stays live; the transport steps aside.
+  // The pane fills the view while it builds and slides to the right half after (mock-up
+  // `setShifted`); the sky stays under it at full width; the transport steps aside.
   const view = (await page.locator('main.sx-view').boundingBox())!;
   await expect
-    .poll(async () => (await page.getByTestId('sky-pane').boundingBox())!.width)
+    .poll(async () => (await pane.boundingBox())!.width, { timeout: 120_000 })
     .toBeLessThan(view.width * 0.55);
   await expect(page.locator('.sx-transport-slot')).toHaveAttribute('inert', '');
   // The generated surface is an artist's impression: + Artistic shows it, Replay builds it.
   await setHonesty(page, /Artistic/);
+  await openDetails(page);
   await page.getByTestId('build-replay').click();
   await expect(pane).toHaveAttribute('data-phase', 'building', { timeout: 60_000 });
   const steps = page.getByTestId('build-step');
@@ -309,6 +318,7 @@ test('Build it from a fresh load raises the level and builds all five steps (wat
   const group = page.getByRole('group', { name: 'Honesty level' });
   await page.getByTestId('build-it').click();
   const pane = page.getByTestId('build-pane');
+  await openDetails(page);
   // The default level is + Estimated, which hides the artistic world: the build raises it, says so.
   await expect(group.getByRole('button', { name: /Artistic/ })).toHaveAttribute(
     'aria-pressed',
@@ -345,6 +355,7 @@ test('the level changed mid-build ends the build on the new plan', async ({ page
   await page.getByTestId('build-it').click();
   const pane = page.getByTestId('build-pane');
   await expect(pane).toHaveAttribute('data-phase', 'building', { timeout: 60_000 });
+  await openDetails(page);
   await page
     .getByRole('group', { name: 'Honesty level' })
     .getByRole('button', { name: /Measured only/ })
@@ -459,6 +470,7 @@ test('the last frame of a build is the normal render of the same plan and seed',
   const pane = page.getByTestId('build-pane');
   await expect(pane).toHaveAttribute('data-phase', /building|done/, { timeout: 60_000 });
   await setHonesty(page, /Artistic/);
+  await openDetails(page);
   await page.getByTestId('build-replay').click();
   await expect(pane).toHaveAttribute('data-phase', 'done', { timeout: 90_000 });
   await page.mouse.move(0, 0);

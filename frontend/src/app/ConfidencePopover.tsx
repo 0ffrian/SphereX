@@ -40,6 +40,7 @@ export function ConfidencePopover({
   params,
   name,
   keyLabels,
+  inline = false,
   onClose,
 }: {
   params: RenderParams;
@@ -47,6 +48,12 @@ export function ConfidencePopover({
   name?: string;
   /** Plain words for the key measurements, from the backend's `needed` text when it has one. */
   keyLabels?: string;
+  /**
+   * Issue #71 stream U: the mock-up's `#popAcc` lives inside the build pane's popover (one sense at
+   * a time, `.bp-pop`), not in a modal dialog: no backdrop, no focus trap, no Close button (the
+   * Accuracy button, Escape and the pane's own popover close it).
+   */
+  inline?: boolean;
   onClose: () => void;
 }) {
   const c = params.confidence;
@@ -54,10 +61,11 @@ export function ConfidencePopover({
   const titleId = useId();
 
   useEffect(() => {
+    if (inline) return;
     const opener = document.activeElement as HTMLElement | null;
     ref.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
     return () => opener?.focus?.();
-  }, []);
+  }, [inline]);
 
   useEffect(() => {
     if (!c) return;
@@ -94,24 +102,16 @@ export function ConfidencePopover({
     }
   };
 
-  return (
+  const body = (
     <>
-      <div className="sx-acc-backdrop" onClick={onClose} data-testid="confidence-formula-backdrop" />
-      <div
-        ref={ref}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        onKeyDown={onKeyDown}
-        className="sx-acc-pop"
-        data-testid="confidence-formula"
-      >
         <div className="sx-pop-h">
           <b id={titleId}>Accuracy</b>
           <span>{name ?? ''}</span>
-          <button type="button" className="sx-acc-close" onClick={onClose}>
-            Close
-          </button>
+          {!inline && (
+            <button type="button" className="sx-acc-close" onClick={onClose}>
+              Close
+            </button>
+          )}
         </div>
 
         <div className="sx-acc-top">
@@ -186,6 +186,34 @@ export function ConfidencePopover({
           </tbody>
         </table>
         <p className="sx-acc-rules sx-acc-last">{c.weights_note}</p>
+    </>
+  );
+  if (inline) {
+    return (
+      <div
+        ref={ref}
+        role="group"
+        aria-labelledby={titleId}
+        className="sx-acc-inline"
+        data-testid="confidence-formula"
+      >
+        {body}
+      </div>
+    );
+  }
+  return (
+    <>
+      <div className="sx-acc-backdrop" onClick={onClose} data-testid="confidence-formula-backdrop" />
+      <div
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onKeyDown={onKeyDown}
+        className="sx-acc-pop"
+        data-testid="confidence-formula"
+      >
+        {body}
       </div>
     </>
   );
