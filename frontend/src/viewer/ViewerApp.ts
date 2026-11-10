@@ -10,12 +10,16 @@ import {
   AmbientLight,
   Color,
   DirectionalLight,
+  Matrix4,
   Mesh,
   MeshStandardNodeMaterial,
   type Object3D,
   PerspectiveCamera,
+  Raycaster,
   Scene,
   SphereGeometry,
+  Vector2,
+  Vector3,
   WebGPURenderer,
 } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -33,6 +37,9 @@ import type { MouldPose } from './mould/mouldSteps';
 import { RenderChain } from './render/pipeline';
 import { noiseBakePending, whenNoiseIdle } from './volume/noiseVolume';
 import { onVolumeNoiseReady } from './volume/VolumeBody';
+import { CLOUD_TIME_PER_SIM_S, OrbitView, renderScaleFor } from './orbit/OrbitView';
+import { resolveOrbitSources, type OrbitResolved } from './orbit/orbitSources';
+import { pickPlace, type Vec3 } from './orbit/orbitMath';
 import {
   FEED_GAP_MS,
   FrameGovernor,
@@ -220,6 +227,25 @@ const TURN_X_LIMIT = 1.2;
 /** What counts as interaction for the R5.7 idle pause (a touch, a key, a wheel or trackpad). */
 const IDLE_EVENTS = ['pointerdown', 'keydown', 'wheel'] as const;
 
+export interface CloseUpInfo {
+  /** What the pane shows: the orbit view, the body from close, or nothing (refused). */
+  mode: 'orbit' | 'body' | 'text' | null;
+  resolved: OrbitResolved | null;
+  layout: 'side' | 'stack';
+  refusal: string | null;
+}
+
+interface CloseState {
+  mode: 'orbit' | 'body' | 'text' | null;
+  view: OrbitView | null;
+  resolved: OrbitResolved | null;
+  layout: 'side' | 'stack';
+  /** Tween 0..1 (the mock-up's 1 s open) and its target. */
+  t: number;
+  target: number;
+  last: number;
+}
+
 export class ViewerApp {
   readonly backend: RendererBackend;
 
@@ -287,6 +313,12 @@ export class ViewerApp {
   /** Issue #60: the build animation's pose of what is on screen (null = the normal render). */
   private mould: Readonly<MouldPose> | null = null;
   /** Issue #60: the body's own turn (mock-up drag and auto-rotation), radians about x and y. */
+  // ---- the close-up pane (issue #71 stream H): the app's version of the mock-up's #cuPane ----
+  private close: CloseState = { mode: null, view: null, resolved: null, layout: 'side', t: 0, target: 0, last: 0 };
+  private readonly closeCamera = new PerspectiveCamera(40, 1, 0.01, 100);
+  private globeShift = { x: 0, y: 0, k: 1 };
+  private onCloseChange: ((info: CloseUpInfo) => void) | null = null;
+
   private turn = { x: 0, y: 0 };
   private dragTurns = false;
   private turnDrag: { x: number; y: number; rx: number; ry: number; id: number } | null = null;
@@ -351,6 +383,20 @@ export class ViewerApp {
     this.scene.background = new Color(SPACE_BACKGROUND);
     this.camera = new PerspectiveCamera(40, 1, 0.1, 100);
     this.camera.position.set(0, 0, 4);
+    // The close-up pane moves the globe into its half: a shift and scale applied on top of the
+    // projection (not `setViewOffset`, which temporal anti-aliasing owns for its jitter).
+    const baseProjection = this.camera.updateProjectionMatrix.bind(this.camera);
+    this.camera.updateProjectionMatrix = () => {
+      baseProjection();
+      const g = this.globeShift;
+      if (g.x === 0 && g.y === 0 && g.k === 1) return;
+      const e = this.camera.projectionMatrix.elements;
+      e[0] = e[0]! * g.k;
+      e[5] = e[5]! * g.k;
+      e[8] = e[8]! - g.x;
+      e[9] = e[9]! - g.y;
+      this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
+    };
 
     // Placeholder body: a plain unit sphere. Not an object; tag 'artistic' (no data drawn).
     this.geometry = new SphereGeometry(1, 64, 32);
@@ -818,13 +864,17 @@ export class ViewerApp {
         // restart, so a settled frame is deterministic).
         const jitter = this.chain.jitterIndex();
         if (jitter !== null) this.onScreen?.setJitterFrame(jitter);
+        this.layoutGlobe();
         this.chain.render();
+        this.drawClose();
         return;
       } catch (err) {
         this.dropChain(err);
       }
     }
+    this.layoutGlobe();
     this.renderer.render(this.scene, this.camera);
+    this.drawClose();
   }
 
   /** The 160 px level-of-detail rule: tell the shape model how big it is on screen now. */
@@ -991,6 +1041,7 @@ export class ViewerApp {
       this.clock.tick();
       this.applySpinAngle();
     }
+    this.stepClose(now);
     this.draw();
     // Frame time is only meaningful between consecutive frames of one continuous run. A longer
     // gap (a hidden tab, a stalled main thread) is not a frame time and would skew p95.
@@ -1008,7 +1059,7 @@ export class ViewerApp {
     }
     if (this.burstLeft > 0) this.burstLeft--;
     if (this.burstLeft === 0) this.flushSettled();
-    if (this.clock.running || this.burstLeft > 0) {
+    if (this.clock.running || this.burstLeft > 0 || this.closeBusy()) {
       this.schedule();
     } else {
       this.loopLast = null;
@@ -1199,6 +1250,226 @@ export class ViewerApp {
     this.schedule();
   };
 
+  // ---- the close-up pane --------------------------------------------------------------------
+
+  setCloseUpHandler(handler: ((info: CloseUpInfo) => void) | null): void {
+    this.onCloseChange = handler;
+  }
+
+  /** The surface view (orbit view) while the pane shows it, for the pane's controls. */
+  get orbitView(): OrbitView | null {
+    return this.close.mode === 'orbit' ? this.close.view : null;
+  }
+
+  closeUpInfo(): CloseUpInfo {
+    return { mode: this.close.mode, resolved: this.close.resolved, layout: this.close.layout, refusal: this.close.resolved?.refusal ?? null };
+  }
+
+  /**
+   * Opens the pane. A rocky or gas body that exposes `orbitSources` gets the orbit view; a body
+   * with none (an asteroid, a comet) gets itself seen from close to its surface when `bodyFallback`
+   * is set. A refusal (still forming, missing radius) is reported, never a blank pane.
+   */
+  openCloseUp(bodyFallback: boolean, textOnly = false): CloseUpInfo {
+    if (this.disposed) return this.closeUpInfo();
+    this.closeUpOff(false);
+    const body = this.body as unknown as { orbitSources?: unknown } | null;
+    const live = () => (body as { orbitSources?: unknown } | null)?.orbitSources;
+    const exposed = body ? live() : undefined;
+    const w = this.canvas.clientWidth;
+    this.close.layout = w > 0 && w < 640 ? 'stack' : 'side';
+    this.close.target = 1;
+    this.close.last = 0;
+    if (exposed !== undefined && exposed !== null) {
+      const resolved = resolveOrbitSources(exposed, live);
+      this.close.resolved = resolved;
+      if (resolved.sources) {
+        try {
+          const view = new OrbitView(resolved.sources);
+          const m = this.sunInBody();
+          view.enter(m.sun);
+          this.close.view = view;
+          this.close.mode = 'orbit';
+        } catch (err) {
+          console.warn('[viewer] could not start the surface view', err);
+          this.close.resolved = { ...resolved, sources: null, refusal: 'The surface view could not start in this browser.' };
+        }
+      }
+    } else if (bodyFallback && this.onScreen) {
+      this.close.mode = 'body';
+    }
+    // A kind with no picture here yet (a star) still takes the half, with a caption: never a blank pane.
+    if (this.close.mode === null && (textOnly || this.close.resolved?.refusal)) this.close.mode = 'text';
+    if (this.close.mode === null) this.close.target = 0;
+    if (prefersReducedMotion()) this.close.t = this.close.target;
+    this.notifyClose();
+    this.requestRender();
+    return this.closeUpInfo();
+  }
+
+  /** Closes the pane (fades out, then the view is dropped). `now` drops it at once. */
+  closeUpOff(now: boolean): void {
+    const c = this.close;
+    if (c.mode === null && c.view === null) return;
+    c.target = 0;
+    if (now || prefersReducedMotion() || c.t === 0) {
+      c.view?.dispose();
+      this.close = { mode: null, view: null, resolved: null, layout: c.layout, t: 0, target: 0, last: 0 };
+      this.globeShift = { x: 0, y: 0, k: 1 };
+      if (!this.disposed) {
+        this.camera.updateProjectionMatrix();
+        this.notifyClose();
+        this.requestRender();
+      }
+      return;
+    }
+    c.view?.setFlying(false);
+    this.requestRender();
+  }
+
+  private notifyClose(): void {
+    this.onCloseChange?.(this.closeUpInfo());
+  }
+
+  private closeBusy(): boolean {
+    const c = this.close;
+    if (c.mode === null) return false;
+    return c.t !== c.target || (c.view?.flying === true && !prefersReducedMotion());
+  }
+
+  /** Pane tween (mock-up: 1 s, ease-out) and "Fly forward". Real time only moves the camera and the fade, never the image of a given state. */
+  private stepClose(now: number): void {
+    const c = this.close;
+    if (c.mode === null) return;
+    const dt = c.last ? Math.min((now - c.last) / 1000, 0.1) : 0;
+    c.last = now;
+    if (c.t !== c.target) {
+      const step = dt / 1.0;
+      c.t = c.target > c.t ? Math.min(c.target, c.t + step) : Math.max(c.target, c.t - step);
+      if (c.t === 0 && c.target === 0) {
+        this.closeUpOff(true);
+        return;
+      }
+    }
+    if (c.view && !prefersReducedMotion()) c.view.advance(dt);
+  }
+
+  private eased(): number {
+    return 1 - Math.pow(1 - this.close.t, 4);
+  }
+
+  private closeRects(): { pane: { x: number; y: number; w: number; h: number }; globe: { x: number; y: number; w: number; h: number } } {
+    const W = this.canvas.clientWidth;
+    const H = this.canvas.clientHeight;
+    return this.close.layout === 'side'
+      ? { pane: { x: 0, y: 0, w: W / 2, h: H }, globe: { x: 0.5, y: 0, w: 0.5, h: 1 } }
+      : { pane: { x: 0, y: 0, w: W, h: H / 2 }, globe: { x: 0, y: 0.5, w: 1, h: 0.5 } };
+  }
+
+  /** The globe moves into the other half, like the mock-up's shifted #bpane. */
+  private layoutGlobe(): void {
+    const c = this.close;
+    let next = { x: 0, y: 0, k: 1 };
+    if (c.mode !== null) {
+      const g = this.closeRects().globe;
+      const aspect = this.camera.aspect;
+      const kFull = Math.min(1, Math.min(g.h, g.w * aspect) / Math.min(1, aspect));
+      const e = this.eased();
+      next = {
+        x: (2 * (g.x + g.w / 2) - 1) * e,
+        y: (1 - 2 * (g.y + g.h / 2)) * e,
+        k: 1 + (kFull - 1) * e,
+      };
+    }
+    const cur = this.globeShift;
+    if (next.x !== cur.x || next.y !== cur.y || next.k !== cur.k) {
+      this.globeShift = next;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
+  /** The star's direction (body frame) and colour for the orbit pass. */
+  private sunInBody(): { sun: Vec3; colour: Vec3 } {
+    const light = this.lights.find((l): l is DirectionalLight => l instanceof DirectionalLight);
+    const frame = this.onScreen?.group ?? null;
+    const dir = new Vector3(0, 0, 1);
+    if (light) dir.copy(light.position).sub(light.target.position).normalize();
+    if (frame) {
+      frame.updateWorldMatrix(true, false);
+      dir.transformDirection(new Matrix4().copy(frame.matrixWorld).invert());
+    }
+    const c = light ? light.color : { r: 1, g: 1, b: 1 };
+    const m = Math.max(c.r, c.g, c.b, 1e-6);
+    return { sun: [dir.x, dir.y, dir.z], colour: [c.r / m, c.g / m, c.b / m] };
+  }
+
+  private drawClose(): void {
+    const c = this.close;
+    if (c.mode === null) return;
+    const { pane } = this.closeRects();
+    const pr = this.renderer.getPixelRatio();
+    const r = this.renderer;
+    if (c.mode === 'orbit' && c.view) {
+      const { sun, colour } = this.sunInBody();
+      const kind = c.view.kind;
+      c.view.light = {
+        sunDir: sun,
+        starColour: colour,
+        timeSec: this.clock.simTime(kind === 'gas' ? 'winds' : 'clouds') * CLOUD_TIME_PER_SIM_S,
+        cloudsOn: true,
+      };
+      c.view.fade = this.eased();
+      c.view.renderScale = renderScaleFor(this.tier === 'low');
+      c.view.render(r, pane, pr);
+      r.setViewport(0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
+      if (c.view.failed) {
+        const failed: OrbitResolved = { ...(c.resolved as OrbitResolved), sources: null, refusal: 'The surface view could not start in this browser.' };
+        this.closeUpOff(true);
+        this.close.resolved = failed;
+        this.notifyClose();
+      }
+    } else if (c.mode === 'body') {
+      // The same body from near its surface (the mock-up's cuDraw): a second camera, 0.36 of the distance.
+      const cam = this.closeCamera;
+      const tgt = this.controls.target;
+      cam.position.copy(this.camera.position).sub(tgt).multiplyScalar(0.36).add(tgt);
+      if (cam.position.distanceTo(tgt) < 1.1) cam.position.sub(tgt).setLength(1.1).add(tgt);
+      cam.aspect = pane.w / Math.max(1, pane.h);
+      cam.lookAt(tgt);
+      cam.updateProjectionMatrix();
+      cam.updateMatrixWorld();
+      const prev = { clear: r.autoClear, color: r.autoClearColor, bg: this.scene.background };
+      r.autoClear = true;
+      r.autoClearColor = false;
+      this.scene.background = null;
+      try {
+        r.setViewport(pane.x, pane.y, pane.w, pane.h);
+        r.render(this.scene, cam);
+      } finally {
+        r.autoClear = prev.clear;
+        r.autoClearColor = prev.color;
+        this.scene.background = prev.bg;
+        r.setViewport(0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
+      }
+    }
+  }
+
+  /** The place on the globe under a screen point, or null (clicks on the globe move the surface view). */
+  pickGlobe(clientX: number, clientY: number): { lon: number; lat: number } | null {
+    const frame = this.onScreen?.group;
+    if (!frame || this.disposed) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    const ndc = new Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -(((clientY - rect.top) / rect.height) * 2 - 1));
+    const ray = new Raycaster();
+    ray.setFromCamera(ndc, this.camera);
+    frame.updateWorldMatrix(true, false);
+    const inv = new Matrix4().copy(frame.matrixWorld).invert();
+    const o = ray.ray.origin.clone().applyMatrix4(inv);
+    const d = ray.ray.direction.clone().transformDirection(inv);
+    return pickPlace([o.x, o.y, o.z], [d.x, d.y, d.z]);
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -1213,6 +1484,7 @@ export class ViewerApp {
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.unsubscribeNoise?.();
     this.unsubscribeNoise = null;
+    this.closeUpOff(true);
     this.clearBuilt();
     this.chain?.dispose();
     this.chain = null;
