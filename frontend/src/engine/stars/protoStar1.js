@@ -4,6 +4,8 @@
 // Source: .claude/worktrees/sculptor-reference/sculptor-preview-next.html, lines 357-662 (Planck colour, star shader FS, star model, tauC, drawStar).
 // Not yet imported by the app: it still needs the TypeScript host (DOM removed, `cardToStar`). Do not edit here;
 // re-run the slicing instead so the body stays byte-identical to the prototype.
+// @verbatim L357-L662
+// @rename m.best=>(CLOSE_AT||m.best)
 /* ---------- Planck spectrum to colour ---------- */
 function g(l, m, s1, s2) { var s = l < m ? s1 : s2, t = (l - m) / s; return Math.exp(-0.5 * t * t); }
 function planckRGB(T) {
@@ -302,7 +304,7 @@ function drawStar() {
   if (ST.view === 'big') freq = Math.min(m.cells, BIG);
   if (ST.view === 'close') {
     half = Math.min(1.28, 15 / m.cells);
-    var b = m.best || [0.26, 0.5];
+    var b = (CLOSE_AT||m.best) || [0.26, 0.5];
     var c = Math.cos(b[0]), L = [c * Math.sin(b[1]), Math.sin(b[0]), c * Math.cos(b[1])];
     tilt = -Math.asin(L[1]); rot = Math.atan2(L[0], L[2]);
   }
@@ -310,3 +312,4 @@ function drawStar() {
   drawOverlay(rot, tilt, half);
 }
 
+// @end-verbatim

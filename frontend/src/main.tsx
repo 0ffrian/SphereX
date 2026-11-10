@@ -11,3 +11,7 @@ createRoot(root).render(
     <App />
   </StrictMode>,
 );
+
+// Parity harness (issue #71, parity/CONTRACT.md C): dev only, behind ?parity=1.
+if (import.meta.env.DEV && new URLSearchParams(location.search).has('parity'))
+  void import('@/engine/stars/parityHook').then((m) => m.installParityHook());
