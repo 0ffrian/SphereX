@@ -60,7 +60,7 @@ def horizons_key(spkid: str, jds: list[str], comet: bool = False) -> CacheKey:
     return CacheKey.make(
         SOURCE,
         None,
-        command=command(spkid, comet, min(jds, default=None)),
+        command=command(spkid, comet, min(jds, key=float, default=None)),
         center=CENTER,
         tlist=",".join(jds),
     )
@@ -88,12 +88,17 @@ def ephemeris(
     ctx: Context, spkid: str, times: list[datetime], *, comet: bool = False, refresh: bool = False
 ) -> tuple[list[EphemPoint], Served]:
     jds = jd_list(times)
+    if not jds:
+        raise UpstreamError("no epochs requested: Horizons needs at least one time")
+    # A comet's record is chosen by CAP<JD of the earliest requested epoch (Q-151, Q-167): the
+    # whole list is computed from the apparition before that epoch. Epochs across a later
+    # perihelion would still use that record; accepted for the demo's single-epoch use.
     key = horizons_key(spkid, jds, comet)
 
     def live() -> LiveResponse:
         params = {
             "format": "json",
-            "COMMAND": f"'{command(spkid, comet, min(jds))}'",
+            "COMMAND": f"'{command(spkid, comet, min(jds, key=float))}'",
             "OBJ_DATA": "NO",
             "MAKE_EPHEM": "YES",
             "EPHEM_TYPE": "OBSERVER",
