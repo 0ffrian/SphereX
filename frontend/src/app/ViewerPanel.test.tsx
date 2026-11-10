@@ -29,6 +29,7 @@ const fake = {
   rotate: vi.fn(),
   zoom: vi.fn(),
   resetView: vi.fn(),
+  setStarCloseUp: vi.fn(),
   dispose: vi.fn(),
 };
 
@@ -104,6 +105,28 @@ describe('ViewerPanel', () => {
       'Flares: rate taken from a typical value; shown 86,400\u00d7 faster.',
     ]);
     expect(container.textContent).not.toMatch(/sped up/);
+  });
+
+  it('a star opens in Observatory view; Close-up moves to Enhanced colour and the camera follows', async () => {
+    const { card, params } = fixture('star');
+    useAppStore.getState().setObject(card, params);
+    useAppStore.getState().setHonesty('artistic');
+    await mount();
+    const pressed = (n: string) => button(n)?.getAttribute('aria-pressed');
+    expect(pressed('Observatory view')).toBe('true');
+    expect(pressed('Whole star, larger detail')).toBe('true');
+    await click('Close-up');
+    expect(pressed('Enhanced colour')).toBe('true');
+    expect(pressed('Observatory view')).toBe('false');
+    expect(fake.setStarCloseUp).toHaveBeenLastCalledWith(
+      expect.objectContaining({ halfWidth: expect.any(Number) }),
+    );
+    expect(text('viewer-announcer')).toMatch(/Enhanced colour.*Close-up/);
+    await click('Whole star, true scale');
+    expect(fake.setStarCloseUp).toHaveBeenLastCalledWith(null);
+    expect(container.querySelector('[data-testid="star-readouts"]')?.textContent).toMatch(
+      /Surface gravity/,
+    );
   });
 
   it('shows no note for a process whose layer is not drawn (Measured only)', async () => {

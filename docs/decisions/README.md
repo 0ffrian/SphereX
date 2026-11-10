@@ -284,4 +284,10 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-201 | One tag for Horizons-derived values | Open | [contract-tags](contract-tags.md) |
 | Q-202 | Review of the Area search fixes (9 Nov 2026) | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-203 | Four research checks join the event build as gated extras | Decided (Moon, 10 Nov 2026); owners and thresholds Proposed | [moving-objects](moving-objects.md) |
+| Q-230 | Star mass missing: physics refused by default | Open (refused by default) | [rendering-bodies](rendering-bodies.md) |
+| Q-231 | Star physics constants and which are [verify] | Open (to verify) | [rendering-bodies](rendering-bodies.md) |
+| Q-232 | Spot coverage placeholder scaling | Open (placeholder) | [rendering-bodies](rendering-bodies.md) |
+| Q-233 | Spot-group interface for stream G | Open (implemented) | [rendering-bodies](rendering-bodies.md) |
+| Q-234 | Joy's law sign and butterfly latitudes | Open (implemented) | [rendering-bodies](rendering-bodies.md) |
+| Q-235 | Star colour views, scales and defaults | Open (UI not wired) | [rendering-bodies](rendering-bodies.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |

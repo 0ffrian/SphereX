@@ -26,6 +26,13 @@ import {
 import type { PlanContext, RenderPlan, ViewModeId } from '@/viewer/planTypes';
 import { defaultContext, planRender } from '@/viewer/renderPlan';
 import { COMET_EPOCHS, epochsWithQ, EPOCH_LABEL } from '@/viewer/renderers/Comet';
+import {
+  closeUpTarget,
+  starCaption,
+  starReadouts,
+  type StarColourView,
+  type StarScale,
+} from '@/physics/stellar';
 import { AT_AGE_MAX_PHRASE, scaleBarFor, shownSize } from '@/viewer/scaleBar';
 import { SLIDER_REGISTRY } from '@/viewer/sliders';
 import type { CometEpoch, ObjectCard, RenderParams } from '@/contract';
@@ -78,6 +85,9 @@ interface Choices {
   mode: ViewModeId | null;
   epoch: CometEpoch | null;
   scrub: number;
+  /** Issue #71 stream C: a star's colour view and scale; null = the default (observatory, enlarged). */
+  starColour?: StarColourView | null;
+  starScale?: StarScale | null;
 }
 
 /** What a provenance tier (D-32) means, in words for a non-astronomer. */
@@ -92,6 +102,17 @@ export function tierText(tier: number): string {
   const words = TIER_WORDS[tier];
   return words ? `tier ${tier} of 5, ${words}` : `tier ${tier} of 5`;
 }
+
+const STAR_COLOUR_LABEL: Record<StarColourView, string> = {
+  observatory: 'Observatory view',
+  enhanced: 'Enhanced colour',
+  true: 'True colour',
+};
+const STAR_SCALE_LABEL: Record<StarScale, string> = {
+  enlarged: 'Whole star, larger detail',
+  true: 'Whole star, true scale',
+  close: 'Close-up',
+};
 
 /** Said when a build starts and the level goes up so the whole body can be built (issue #60). */
 export const LEVEL_RAISED_ANNOUNCEMENT =
@@ -234,8 +255,20 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
         failed,
         overrides,
         qualityTier,
+        starColour: choices.starColour ?? undefined,
+        starScale: choices.starScale ?? undefined,
       }),
-    [honesty, modeChoice, epoch, scrubIndex, failed, overrides, qualityTier],
+    [
+      honesty,
+      modeChoice,
+      epoch,
+      scrubIndex,
+      failed,
+      overrides,
+      qualityTier,
+      choices.starColour,
+      choices.starScale,
+    ],
   );
   const plan = useMemo(
     () => (card && params ? planRender(card, params, ctx) : null),
@@ -473,6 +506,28 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
     setChoices({ ...choices, epoch: e });
     const next = planWith({ epoch: e });
     if (next) announce(epochAnnouncement(e, next));
+  };
+  // Issue #71 stream C: colour view and scale of a star. Cells do not show in the Observatory view,
+  // so choosing Close-up from it moves to Enhanced colour (and the reverse leaves Close-up).
+  const starColour: StarColourView = plan?.star?.colourView ?? 'observatory';
+  const starScale: StarScale = plan?.star?.scale ?? 'enlarged';
+  const setStarView = (colour: StarColourView, scale: StarScale) => {
+    let c = colour;
+    const sc = scale;
+    let moved = '';
+    if (sc === 'close' && c === 'observatory') {
+      c = 'enhanced';
+      moved =
+        ' Colour changed to Enhanced colour, because cells do not show in the Observatory view.';
+    }
+    setChoices({ ...choices, starColour: c, starScale: sc });
+    const next = planWith({ starColour: c, starScale: sc });
+    if (sc === 'close' && next?.star?.physics)
+      viewer?.setStarCloseUp(closeUpTarget(next.star.physics));
+    else if (starScale === 'close') viewer?.setStarCloseUp(null);
+    announce(
+      `${STAR_COLOUR_LABEL[c]}, ${STAR_SCALE_LABEL[sc]}.${moved} ${next?.star?.physics ? starCaption(next.star.physics, sc) : ''}`.trim(),
+    );
   };
   // Not announced here: the slider's own value text is read by screen readers when it moves.
   const onScrub = (i: number) => setChoices({ ...choices, scrub: i });
@@ -728,6 +783,81 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                   </button>
                 ))}
               </div>
+            )}
+
+            {plan.star && (
+              <div className="flex flex-col gap-2" data-testid="star-views">
+                <div
+                  role="group"
+                  aria-label="Star colour view"
+                  className="flex flex-wrap items-center gap-2"
+                >
+                  <span className="text-sm text-neutral-300">Star colour:</span>
+                  {(Object.keys(STAR_COLOUR_LABEL) as StarColourView[]).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={`${buttonClass} ${pressedClass}`}
+                      aria-pressed={starColour === c}
+                      onClick={() =>
+                        setStarView(
+                          c,
+                          c === 'observatory' && starScale === 'close' ? 'enlarged' : starScale,
+                        )
+                      }
+                    >
+                      {STAR_COLOUR_LABEL[c]}
+                    </button>
+                  ))}
+                </div>
+                <div
+                  role="group"
+                  aria-label="Star scale"
+                  className="flex flex-wrap items-center gap-2"
+                >
+                  <span className="text-sm text-neutral-300">Scale:</span>
+                  {(Object.keys(STAR_SCALE_LABEL) as StarScale[]).map((sc) => (
+                    <button
+                      key={sc}
+                      type="button"
+                      className={`${buttonClass} ${pressedClass}`}
+                      aria-pressed={starScale === sc}
+                      disabled={sc === 'close' && !plan.star?.physics}
+                      title={
+                        sc === 'close' && !plan.star?.physics
+                          ? 'Needs the star\u2019s temperature.'
+                          : undefined
+                      }
+                      onClick={() => setStarView(starColour, sc)}
+                    >
+                      {STAR_SCALE_LABEL[sc]}
+                    </button>
+                  ))}
+                </div>
+                {plan.star.physics && (
+                  <p className="text-sm text-neutral-200" data-testid="star-caption">
+                    {starCaption(plan.star.physics, starScale)}
+                    {starColour === 'observatory' &&
+                      ' This is false colour (ultraviolet, as solar observatories show it), not the star\u2019s real colour.'}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {plan.star?.physics && (
+              <dl
+                className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
+                data-testid="star-readouts"
+              >
+                {starReadouts(plan.star.physics).map((r) => (
+                  <div key={r.label} className="contents">
+                    <dt className="text-neutral-300">{r.label}</dt>
+                    <dd className="text-neutral-100">
+                      {r.value} {r.tag && <ProvenanceBadge tag={r.tag} fixture={objectIsFixture} />}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             )}
 
             {plan.scrub && (

@@ -40,6 +40,7 @@ import {
 import { seedOffset } from './noise';
 import type { FlareState, RegionState, StarSurfaceConfig } from '../bodies/starModel';
 import { STAR_SURFACE, discsPerRegion } from '../bodies/starModel';
+import type { StarColourView } from '@/physics/stellar';
 
 export interface StarShaderOptions {
   /** Teff colour (derived), already the plan's tint. */
@@ -57,6 +58,13 @@ export interface StarShaderOptions {
   faculae: boolean;
   flares: boolean;
   cfg?: StarSurfaceConfig;
+  /** Colour view (D-36): true = the Teff colour; enhanced = deepened hue; observatory = false-colour EUV. */
+  colourView?: StarColourView;
+  /** Cells across one radius to draw (default CELLS_ACROSS) and their visibility 0..1 (default 1). */
+  cellsAcross?: number;
+  granuleVisibility?: number;
+  /** Share of the surface with convection, 0..1 (hot stars are smooth). Default 1. */
+  convection?: number;
 }
 
 /** One frame of what the shader draws: the CPU's answer for time t. */
@@ -132,7 +140,12 @@ export function buildStarMaterial(opts: StarShaderOptions): StarMaterial {
   // Granulation ---------------------------------------------------------------------------------
   // Two scales of warped cells (so no regular tiling or round polka dots show), dark lanes between
   // the cells, churning with the clock and sheared by differential rotation. Artistic (R7.5.2).
-  if (opts.granulation) {
+  const conv = opts.convection ?? 1;
+  const cellsAcross = opts.cellsAcross ?? CELLS_ACROSS;
+  const visible = (opts.granuleVisibility ?? 1) * conv;
+  // Observatory view: the photosphere is replaced by the false-colour atmosphere below.
+  const observatory = opts.colourView === 'observatory';
+  if (opts.granulation && !observatory && visible > 0.002) {
     const cellsAt = (shear: any, churn: any, freq: number, off: number) => {
       const q = rotY(p, shear.mul(sin2lat)).mul(freq);
       // Domain warp so the cells are irregular and do not line up on the lattice.
@@ -152,8 +165,8 @@ export function buildStarMaterial(opts: StarShaderOptions): StarMaterial {
       mix(cellsAt(phaseU.y, phaseU.w, freq, off), cellsAt(phaseU.x, phaseU.z, freq, off), weightU);
     // Bright cells, thin dark lanes: the lane is where the distance to the nearest centre is large.
     const lane = (c: any) => smoothstep(0.4, 1.0, c);
-    const big = lane(layer(CELLS_ACROSS * 0.9, 0));
-    const small = lane(layer(CELLS_ACROSS * 2.2, 11.5));
+    const big = lane(layer(cellsAcross * 0.9, 0));
+    const small = lane(layer(cellsAcross * 2.2, 11.5));
     const grain = float(0.5).sub(big.mul(0.45).add(small.mul(0.55)));
     // Large-scale mottling (supergranule scale), steady between flow-map resets.
     let mottle: any = float(0);
@@ -178,9 +191,70 @@ export function buildStarMaterial(opts: StarShaderOptions): StarMaterial {
     }
     col = col.mul(
       float(1)
-        .add(grain.mul(2 * GRAIN_AMP))
-        .add(mottle.mul(MOTTLE_AMP)),
+        .add(grain.mul(2 * GRAIN_AMP * visible))
+        .add(mottle.mul(MOTTLE_AMP * conv)),
     );
+  }
+
+  // Observatory view (D-36): false-colour extreme ultraviolet in the style of solar observatories
+  // (SDO). Fibrils from warped ridged noise on a hue built from the star's colour; the cells are
+  // gone because this layer shows the hot atmosphere. All colours are display choices (artistic).
+  if (observatory) {
+    const hue = hueOf(opts.tint);
+    const mid = hue.map((x) => Math.pow(x, 1.6));
+    const hot = [Math.pow(hue[0]!, 0.35), Math.pow(hue[1]!, 0.45), Math.pow(hue[2]!, 1.4)];
+    const oct = Math.max(2, Math.min(4, opts.octaves));
+    const n01 = (q: any) => mx_noise_float(q.add(seedV)).mul(0.5).add(0.5);
+    const fbmN = (q0: any) => {
+      let q = q0;
+      let a = 0.5;
+      let sum: any = float(0);
+      let norm = 0;
+      for (let i = 0; i < oct; i++) {
+        sum = sum.add(n01(q).mul(a));
+        norm += a;
+        q = q.mul(2.03).add(vec3(7.1, 3.3, 1.7));
+        a *= 0.5;
+      }
+      return sum.div(norm);
+    };
+    const ridgedN = (q0: any) => {
+      let q = q0;
+      let a = 0.5;
+      let sum: any = float(0);
+      let norm = 0;
+      for (let i = 0; i < oct; i++) {
+        sum = sum.add(
+          float(1)
+            .sub(abs(n01(q).mul(2).sub(1)))
+            .mul(a),
+        );
+        norm += a;
+        q = q.mul(2.1).add(vec3(3.1, 9.3, 4.7));
+        a *= 0.5;
+      }
+      return sum.div(norm);
+    };
+    const sp = p.mul(OBS_FREQ).add(vec3(0, phaseU.z.mul(0.2), 0));
+    const wr = vec3(
+      mx_noise_float(sp.mul(0.8).add(seedV)),
+      mx_noise_float(sp.mul(0.8).add(9).add(seedV)),
+      mx_noise_float(sp.mul(0.8).add(21).add(seedV)),
+    ).mul(0.5);
+    const v1 = fbmN(sp.add(wr.mul(2.2)));
+    const v2 = ridgedN(sp.mul(2.6).add(wr.mul(3.4)));
+    const dk = float(1).sub(smoothstep(0.34, 0.56, fbmN(sp.mul(1.35).add(wr.mul(1.4)).add(40))));
+    const v3 = ridgedN(sp.mul(7).add(wr.mul(5)));
+    let v: any = v1.mul(0.6).add(pow(v2, 2.4).mul(0.34)).add(v3.mul(v3).mul(0.16)).sub(dk.mul(0.3));
+    v = mix(float(0.5), v, float(0.15 + 0.85 * conv));
+    let o: any = mix(
+      vec3(mid[0]! * 0.16 + 0.012, mid[1]! * 0.16 + 0.002, mid[2]! * 0.16),
+      vec3(mid[0]! * 1.15, mid[1]! * 1.15, mid[2]! * 1.15),
+      smoothstep(0.12, 0.55, v),
+    );
+    o = mix(o, vec3(hot[0]! * 1.5, hot[1]! * 1.5, hot[2]! * 1.5), smoothstep(0.55, 0.95, v));
+    o = mix(o, vec3(2.2, 2.2, 2.2), smoothstep(1.05, 1.6, v));
+    col = o.mul(float(0.82).add(pow(float(1).sub(mu), 2.4).mul(0.7))).mul(opts.emissive);
   }
 
   // Faculae ---------------------------------------------------------------------------------------
@@ -260,6 +334,18 @@ export function buildStarMaterial(opts: StarShaderOptions): StarMaterial {
     col = col.add(vec3(FLARE_COLOUR[0], FLARE_COLOUR[1], FLARE_COLOUR[2]).mul(emis));
   }
 
+  if (observatory) {
+    // Soft shoulder so the HDR flare and bright fibrils do not clip (prototype: 1 - exp(-1.25 c)).
+    col = vec3(1, 1, 1).sub(exp(col.mul(-1.25)));
+  } else if (opts.colourView === 'enhanced') {
+    // Enhanced: the star's hue deepened (hue^3), brightness kept (prototype `sat` ramp).
+    const sat = hueOf(opts.tint, 3);
+    const lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+    col = vec3(sat[0]!, sat[1]!, sat[2]!)
+      .mul(smoothstep(0.0, 0.95, lum).mul(1.2))
+      .add(vec3(1, 1, 1).mul(smoothstep(0.74, 1.15, lum).mul(0.42)));
+  }
+
   const material = new MeshBasicNodeMaterial();
   material.colorNode = col;
 
@@ -287,6 +373,16 @@ export function buildStarMaterial(opts: StarShaderOptions): StarMaterial {
     }
   };
   return { material, update };
+}
+
+/** Observatory fibril frequency across the sphere (artistic). */
+const OBS_FREQ = 5;
+
+/** The star's colour raised to `power` and normalised to its brightest channel (hue only). */
+function hueOf(tint: readonly [number, number, number], power = 10): number[] {
+  const h = tint.map((x) => Math.pow(Math.max(x, 0), power));
+  const m = Math.max(h[0]!, h[1]!, h[2]!) || 1;
+  return h.map((x) => x / m);
 }
 
 /** max(x, 1e-4): a zero-radius (absent) disc divides to a huge value and so never wins or glows. */
