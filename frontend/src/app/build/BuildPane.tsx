@@ -5,6 +5,8 @@
 // opens and back to the object's marker (or the rail button) when it closes. Escape and Back close.
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { ViewerPanel } from '@/app/ViewerPanel';
+import { CloseUpPane, closeUpButtonLabel, closeUpKindOf } from '@/app/CloseUpPane';
+import { useCloseUpStore } from '@/app/closeUpStore';
 import { StatusLine } from '@/app/StatusLine';
 import { Icon } from '@/app/shell/icons';
 import { isEditableTarget } from '@/app/shell/shortcuts';
@@ -35,6 +37,8 @@ export function BuildPane() {
   const [phase, setPhase] = useState<MouldPhase>('idle');
   const [say, setSay] = useState('');
   const [feel, setFeel] = useState(false);
+  const closeKind = closeUpKindOf(params?.type);
+  const closeHidden = useCloseUpStore((s) => s.hidden);
   const [usesSeed, setUsesSeed] = useState(true);
   const spinRef = useRef<SVGSVGElement>(null);
   const sayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -121,6 +125,9 @@ export function BuildPane() {
   const NO_SEED_TEXT = "This body's surface is baked, so a new seed would look the same";
 
   return (
+    <>
+      {/* The close-up fills the left half over the sky, as the mock-up's #cuPane (Q-275). */}
+      <CloseUpPane />
     <aside
       className="sx-bp"
       aria-labelledby={titleId}
@@ -167,6 +174,18 @@ export function BuildPane() {
             <Icon name="fingerprint" className="size-4" />
             <span>Feel</span>
           </button>
+          {closeKind && canBuild && (
+            <button
+              type="button"
+              className="sx-bp-tool sx-bp-feel"
+              aria-pressed={!closeHidden}
+              title={closeHidden ? 'Show the close-up on the left' : 'Hide the close-up on the left'}
+              onClick={() => useCloseUpStore.getState().setHidden(!closeHidden)}
+              data-testid="build-closeup"
+            >
+              <span>{closeUpButtonLabel(closeKind)}</span>
+            </button>
+          )}
           <button
             type="button"
             className="sx-bp-tool"
@@ -247,5 +266,6 @@ export function BuildPane() {
         {say}
       </p>
     </aside>
+    </>
   );
 }

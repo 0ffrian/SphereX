@@ -1931,10 +1931,12 @@ body {
   color: #a1a1aa;
 }
 
-/* Issue #71 stream H: the close-up pane, the app's version of the mock-up's #cuPane (left half of
-   the split, 50% wide, fades and slides in over 0.7 s / 1 s; the globe takes the right half). The
-   picture itself is drawn into the viewer canvas; this layer holds the caption, the controls and
-   the input. On a narrow screen it stacks on top (the mock-up's split is side by side). */
+/* Issue #71 stream H: the close-up pane, the app's version of the mock-up's #cuPane: the LEFT half of
+   the app, over the sky, while the build pane keeps the globe on the right. Same numbers as the
+   mock-up: 50% wide, black, fades over 0.7 s and slides over 1 s with --ease (0.1 s delay on open),
+   an 80% to 100% dark gradient on the edge by the build pane, and the .cu-tag caption. The picture is
+   painted into the canvas; this layer holds the caption, the controls and the input. On a phone it
+   stacks above the build pane (top 45%). */
 .sx-cu {
   position: absolute;
   left: 0;
@@ -1942,6 +1944,7 @@ body {
   bottom: 0;
   width: 50%;
   z-index: 5;
+  background: #000;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -1960,13 +1963,12 @@ body {
     opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.1s,
     transform 1s cubic-bezier(0.22, 1, 0.36, 1) 0.1s;
 }
-.sx-cu.stack {
+.sx-cu-canvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  bottom: 50%;
-  transform: translateY(-36px) scale(0.985);
-}
-.sx-cu.stack.open {
-  transform: none;
+  height: 100%;
+  display: block;
 }
 .sx-cu::after {
   content: '';
@@ -1975,15 +1977,12 @@ body {
   pointer-events: none;
   background: linear-gradient(90deg, transparent 80%, #0008 100%);
 }
-.sx-cu.stack::after {
-  background: linear-gradient(180deg, transparent 80%, #0008 100%);
-}
 .sx-cu-tag {
   position: absolute;
-  left: 16px;
+  left: 68px;
   bottom: 88px;
   z-index: 2;
-  max-width: calc(100% - 32px);
+  max-width: calc(100% - 84px);
   font: 11px var(--font-mono);
   color: #c1c9cd;
   background: #242729cc;
@@ -1994,7 +1993,7 @@ body {
 }
 .sx-cu-controls {
   position: absolute;
-  left: 16px;
+  left: 68px;
   right: 16px;
   bottom: 16px;
   z-index: 2;
@@ -2019,9 +2018,45 @@ body {
   outline: 2px solid #38bdf8;
   outline-offset: -4px;
 }
+@media (max-width: 640px) {
+  .sx-cu {
+    width: 100%;
+    top: 84px;
+    bottom: auto;
+    height: 36%;
+    transform: translateY(-36px) scale(0.985);
+  }
+  .sx-cu.open {
+    transform: none;
+  }
+  .sx-cu::after {
+    background: linear-gradient(180deg, transparent 80%, #0008 100%);
+  }
+  .sx-cu-tag,
+  .sx-cu-controls {
+    left: 8px;
+    right: 8px;
+    max-width: none;
+  }
+  .sx-cu-tag {
+    bottom: 76px;
+  }
+  .sx-view:has(.sx-cu.open) .sx-bp {
+    top: calc(84px + 36%);
+  }
+}
+/* Like the mock-up's `body.split .hud.sc{display:none}`: the sky's credit strip steps aside. */
+.sx-view:has(.sx-cu.open) .sx-sky-credit {
+  display: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .sx-cu,
   .sx-cu.open {
     transition: none;
   }
+}
+
+/* The rail sits over the close-up pane (z 5), as the mock-up's rail sits over its #cuPane. */
+.sx-rail {
+  z-index: 8;
 }
