@@ -1066,6 +1066,30 @@ export class ViewerApp {
     this.requestRender();
   }
 
+  /** Issue #71 stream G: true when the star on screen draws flares and plasma. */
+  hasStarFlares(): boolean {
+    return !this.disposed && !!this.onScreen?.starFlares;
+  }
+
+  /** "Fire a big flare": a flare of about 3e31 erg at the biggest spot group now (capped to its E_max). */
+  fireFlare(): void {
+    if (this.disposed) return;
+    this.onScreen?.starFlares?.fire();
+    this.requestRender();
+  }
+
+  /** The "Latest flare" card text, or null when there is none yet. */
+  latestFlareText(): string | null {
+    return this.onScreen?.starFlares?.latestText() ?? null;
+  }
+
+  /** The "Field lines" toggle. */
+  setFieldLines(on: boolean): void {
+    if (this.disposed) return;
+    this.onScreen?.starFlares?.setLines(on);
+    this.requestRender();
+  }
+
   /** R5.6 `R` key: back to the starting view (and the body's own turn back to none). */
   resetView(): void {
     if (this.disposed) return;
