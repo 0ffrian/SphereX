@@ -161,6 +161,20 @@ describe('world worker', { timeout: 60000 }, () => {
     expect(worldTransferables(res)).toEqual([]);
     const ok = handleWorldRequest({ id: 4, params: { seed: 1, inputs: t1e, oceanFraction: 0.5, tier: 'low' } });
     expect('world' in ok && ok.world).toBeTruthy();
-    expect(worldTransferables(ok).length).toBe(4);
+    expect(worldTransferables(ok).length).toBeGreaterThanOrEqual(5);
+  });
+});
+
+describe('hydrology in the world', { timeout: 60000 }, () => {
+  const p: WorldParams = { seed: 11, inputs: earth, oceanFraction: 0.6, tier: 'low' };
+  it('the tier sets the raster size and two runs are identical', () => {
+    const a = generateWorld(p)!;
+    const b = generateWorld(p)!;
+    expect(a.hydrology).toBeTruthy();
+    expect(a.hydrology!.RW).toBe(1024);
+    expect(Buffer.from(a.hydrology!.img).equals(Buffer.from(b.hydrology!.img))).toBe(true);
+  });
+  it('a dry world has no hydrology', () => {
+    expect(generateWorld({ ...p, oceanFraction: 0 })!.hydrology).toBeNull();
   });
 });

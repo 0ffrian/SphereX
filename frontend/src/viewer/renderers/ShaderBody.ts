@@ -621,6 +621,13 @@ interface Built {
   setPattern?: (on: boolean) => void;
 }
 
+/** What the body keeps of a built rocky world: its GPU pass. */
+interface BodyRocky {
+  stepGpu(r: unknown, t: SimTimeFn): boolean;
+  setOnTracerStep(f: (() => void) | null): void;
+  dispose(): void;
+}
+
 export class ShaderBody implements BodyRenderer {
   readonly object = new Group();
   private surface: Group | null = null;
@@ -660,6 +667,8 @@ export class ShaderBody implements BodyRenderer {
   private readonly worldSource: NonNullable<BodyContext['worldSource']>;
   /** Issue #71 stream D: the readouts and assumptions of the rocky-world model drawn now, else null. */
   private orbit: OrbitSources | null = null;
+  private pendingRocky: BodyRocky | null = null;
+  private rocky: BodyRocky | null = null;
   private worldInfo: { readouts: WorldReadout[]; assumptions: string[]; low: boolean } | null = null;
   private readonly onChange: (() => void) | undefined;
   private readonly onFailed: ((layerId: string) => void) | undefined;
@@ -949,6 +958,10 @@ export class ShaderBody implements BodyRenderer {
     if (this.disposed) return;
     this.disposed = true;
     this.release(this.surface, this.textures, this.volumes);
+    this.rocky?.dispose();
+    this.rocky = null;
+    this.pendingRocky?.dispose();
+    this.pendingRocky = null;
     this.surface = null;
     this.textures = [];
     this.sampler = null;
@@ -1123,8 +1136,11 @@ export class ShaderBody implements BodyRenderer {
       textures,
     });
     this.orbit = built.orbitSources;
+    built.setOnTracerStep(() => this.onChange?.());
+    this.pendingRocky?.dispose();
+    this.pendingRocky = built;
     this.worldInfo = {
-      readouts: worldReadouts(world.model, res.sources, world.climate.stats),
+      readouts: worldReadouts(world.model, res.sources, world.climate.stats, world.hydrology?.stats ?? null),
       assumptions: res.assumptions,
       low,
     };
@@ -1138,6 +1154,14 @@ export class ShaderBody implements BodyRenderer {
       sampler: new FieldSampler(world.field),
       setPattern: built.setPattern,
     };
+  }
+
+  /**
+   * Issue #71 stream D (Q-245): steps the rocky world's cloud tracer on the viewer's renderer, up to
+   * the clock's step. Called by the viewer before each frame; false (and no work) for any other body.
+   */
+  stepGpu(renderer: unknown): boolean {
+    return this.rocky ? this.rocky.stepGpu(renderer, this.time) : false;
   }
 
   /** Stream H: the textures and scalars of the drawn rocky world, else null. */
@@ -1160,8 +1184,13 @@ export class ShaderBody implements BodyRenderer {
     if (this.disposed || spec !== this.spec) {
       // NF-1: disposed or superseded after build() resolved; free what it made, it was never added.
       if (built) this.release(built.group, built.textures, built.volumes);
+      this.pendingRocky?.dispose();
+      this.pendingRocky = null;
       return;
     }
+    const oldRocky = this.rocky;
+    this.rocky = this.pendingRocky;
+    this.pendingRocky = null;
     const oldGroup = this.surface;
     const oldTextures = this.textures;
     const oldVolumes = this.volumes;
@@ -1178,6 +1207,7 @@ export class ShaderBody implements BodyRenderer {
     this.volumes = built?.volumes ?? [];
     if (built) this.object.add(built.group);
     this.release(oldGroup, oldTextures, oldVolumes);
+    oldRocky?.dispose();
     this.ensurePlain();
     this.applyVisibility();
     this.onChange?.();

@@ -82,6 +82,9 @@ export interface WorldModel {
   sun: Rgb3;
   haze: number;
   hazeC: Rgb3;
+  /** Rotation rate, rad/s, and the Rhines jet count sqrt(2 Om R / U) clamped to 2..22 (Rhines 1975, J. Fluid Mech. 69, 417). */
+  Om: number;
+  jets: number;
   /** Day-night heat redistribution efficiency 0..1 and the wind speed, m/s (scales cloud drift). */
   eps: number;
   U: number;
@@ -152,7 +155,7 @@ export function worldModel(i: WorldInputs): WorldModel | null {
   const hazeC: Rgb3 = runaway ? [0.92, 0.9, 0.86] : [0.74, 0.46, 0.16];
   return {
     fluid: F, S, Teq, Ts, tau, gv, H, gamK: (gam * 1000) as number, airless, Pa,
-    canLiquid: Tb !== null, Tb, state, Tc, zc, runaway, cov, sky, sun, haze, hazeC, eps, U,
+    canLiquid: Tb !== null, Tb, Om, jets: Math.max(2, Math.round(clamp(Math.sqrt((2 * Om * i.radiusM) / U), 1, 22))), state, Tc, zc, runaway, cov, sky, sun, haze, hazeC, eps, U,
     visFrac: visFraction(i.starTeffK), locked: i.locked, insolation: S,
   };
 }
@@ -195,6 +198,10 @@ export class ClimateBudget {
   private readonly h: Float32Array;
   private readonly s: Float32Array;
   private readonly q: Float32Array;
+  /** Running mean of precipitation per cell (relative units), for the river model. */
+  private readonly rainEma: Float32Array;
+  /** Rain 0..1 relative to 60% of the wettest cell; the hydrology reads it. Row 0 = south. */
+  readonly rain: Float32Array;
   private readonly land: Uint8Array;
   private readonly elev: Float32Array;
   /** Smoothed output: T, ice thickness, frost, relative humidity. Length nx*ny*4, row 0 = south. */
@@ -215,6 +222,8 @@ export class ClimateBudget {
     this.h = new Float32Array(n);
     this.s = new Float32Array(n);
     this.q = new Float32Array(n);
+    this.rainEma = new Float32Array(n);
+    this.rain = new Float32Array(n);
     this.land = new Uint8Array(n);
     this.elev = new Float32Array(n);
     this.out = new Float32Array(n * BUDGET_CHANNELS);
@@ -366,6 +375,7 @@ export class ClimateBudget {
             const nq = qn * (ae * (q[ke]! + q[kw]!) + an * q[kn]! + as * q[ks]!);
             const sq = qn * (2 * ae + an + as);
             q[k] = Math.max(0, (qk + (E - P) * dt + nq * dt * 0.2) / (1 + sq * dt * 0.2));
+            this.rainEma[k] = this.rainEma[k]! + (P - this.rainEma[k]!) * 0.02;
           }
         }
       }
@@ -393,6 +403,10 @@ export class ClimateBudget {
       }
       this.stepCount++;
     }
+    let rmx = 0;
+    for (const r of this.rainEma) if (r > rmx) rmx = r;
+    const rden = Math.max(rmx * 0.6, 1e-6);
+    for (let i = 0; i < this.rain.length; i++) this.rain[i] = this.rainEma[i]! / rden;
     this.writeOutput(qRef, psat, air);
     this.computeStats();
   }
@@ -464,7 +478,7 @@ export class ClimateBudget {
   /** FNV-1a over the state arrays: the determinism check. */
   hash(): string {
     let hh = 0x811c9dc5;
-    for (const arr of [this.T, this.h, this.s, this.q]) {
+    for (const arr of [this.T, this.h, this.s, this.q, this.rainEma]) {
       const bytes = new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
       for (let i = 0; i < bytes.length; i++) hh = Math.imul(hh ^ bytes[i]!, 0x01000193) >>> 0;
     }
@@ -519,7 +533,12 @@ export function weakest(tags: readonly WorldTag[]): WorldTag {
  * `artistic` with "(your setting)" (Q-58). Pressure and surface fluid are assumptions for any
  * exoplanet, so an unset one is `model_dependent` with the assumption stated.
  */
-export function worldReadouts(m: WorldModel, src: WorldInputSources, stats: BudgetStats | null): WorldReadout[] {
+export function worldReadouts(
+  m: WorldModel,
+  src: WorldInputSources,
+  stats: BudgetStats | null,
+  hydro: { rivers: number; lakes: number; salt: number } | null = null,
+): WorldReadout[] {
   const moved = (keys: readonly string[]) => keys.filter((k) => src.sliders.includes(k));
   /** The weakest of the base tags, and `artistic` when any slider in `keys` fed the value (Q-58). */
   const tagOf = (base: readonly WorldTag[], keys: readonly string[]): WorldTag =>
@@ -574,6 +593,17 @@ export function worldReadouts(m: WorldModel, src: WorldInputSources, stats: Budg
     out.push({
       id: 'frost', label: 'Land under frost', value: Math.round(stats.frost * 100), unit: '%',
       tag: 'model_dependent', assumption: 'energy-balance model with moisture transport',
+    });
+  }
+  if (hydro) {
+    out.push({
+      id: 'rivers', label: 'Rivers drawn', value: hydro.rivers, unit: '',
+      tag: 'model_dependent',
+      assumption: 'drainage on the model terrain, runoff from the model rain (Budyko curve); the land roughness that steers it is artistic',
+    });
+    out.push({
+      id: 'lakes', label: 'Lakes and salt flats', value: `${hydro.lakes} lakes, ${hydro.salt} salt flats`, unit: '',
+      tag: 'model_dependent', assumption: 'closed basins at least 30 m deep and 3 cells wide; lake or salt flat from inflow against evaporation',
     });
   }
   return out;
