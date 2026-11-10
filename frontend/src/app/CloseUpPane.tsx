@@ -7,12 +7,15 @@
 // The picture is drawn into the viewer canvas; this layer has the honesty caption (.sx-cu-tag, the
 // mock-up's .cu-tag), the controls and the input. Keyboard: arrows or W A S D move and turn, + and -
 // change the height, Page Up and Page Down tilt. Reduced motion: no automatic flying.
-import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import type { ViewerApp, CloseUpInfo } from '@/viewer/ViewerApp';
 import { ORBIT_NOTE } from '@/viewer/orbit/orbitSources';
 import { altRange } from '@/viewer/orbit/orbitMath';
 import { ProvenanceBadge } from './Badge';
 import { buttonClass, pressedClass } from './ui';
+import { StarCloseUp } from './StarCloseUp';
+import { STAR_CLOSEUP_TAG, useStarCloseUp } from './starCloseUp';
+import type { RenderPlan } from '@/viewer/planTypes';
 
 export type CloseUpKind = 'orbit' | 'star' | 'body';
 
@@ -41,17 +44,9 @@ export function closeUpButtonLabel(kind: CloseUpKind | null): string {
   return kind === 'orbit' ? 'Surface view' : 'Side close-up';
 }
 
-/** Typed mount point for stream G's flare close-up; null until that component lands. */
-export type StarCloseUpComponent = (props: { viewer: ViewerApp | null }) => ReactNode;
-export const STAR_CLOSE_UP: { component: StarCloseUpComponent | null } = { component: null };
-
 /** The mock-up's caption for each kind (its `.cu-tag` wording: "Close-up · what · honesty"). */
-export function closeUpCaption(kind: CloseUpKind, info: CloseUpInfo | null, gas: boolean): string {
-  if (kind === 'star') {
-    return STAR_CLOSE_UP.component
-      ? "Close-up · a flare on the star's surface · illustrative (Default), not a measurement"
-      : 'Close-up · not available yet for stars';
-  }
+export function closeUpCaption(kind: CloseUpKind, info: CloseUpInfo | null, gas: boolean, starOk = false): string {
+  if (kind === 'star') return starOk ? STAR_CLOSEUP_TAG : 'Close-up · not available for this star (no surface model)';
   if (kind === 'body') return 'Close-up · the same body seen from near its surface · generated (Default)';
   if (info?.refusal) return `Close-up · ${info.refusal}`;
   return gas
@@ -64,6 +59,7 @@ export function CloseUpPane({
   kind,
   open,
   info,
+  plan,
   reducedMotion,
   fixture,
 }: {
@@ -71,9 +67,12 @@ export function CloseUpPane({
   kind: CloseUpKind | null;
   open: boolean;
   info: CloseUpInfo | null;
+  plan: RenderPlan | null;
   reducedMotion: boolean;
   fixture: boolean;
 }) {
+  // The flare shown is the default (open, class X): the viewer does not expose the latest flare's energy yet.
+  const starProps = useStarCloseUp(kind === 'star' ? plan : null, null);
   const [, bump] = useReducer((n: number) => n + 1, 0);
   const [about, setAbout] = useState(false);
   const focusRef = useRef<HTMLDivElement>(null);
@@ -133,8 +132,7 @@ export function CloseUpPane({
   }, [viewer, view, open]);
 
   if (!kind) return null;
-  const caption = closeUpCaption(kind, info, gas);
-  const StarMount = kind === 'star' ? STAR_CLOSE_UP.component : null;
+  const caption = closeUpCaption(kind, info, gas, starProps !== null);
   const [lo, hi] = view ? altRange(view.kind) : [0, 1];
   const alt = view?.state.altKm ?? 0;
 
@@ -193,7 +191,11 @@ export function CloseUpPane({
           onKeyDown={onKeyDown}
         />
       )}
-      {StarMount && <StarMount viewer={viewer} />}
+      {kind === 'star' && starProps && open && (
+        <div className="absolute inset-0 bg-black" data-testid="star-closeup">
+          <StarCloseUp {...starProps} className="absolute inset-0" />
+        </div>
+      )}
       <span className="sx-cu-tag" data-testid="closeup-caption">
         {caption}
       </span>
