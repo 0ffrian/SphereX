@@ -105,7 +105,7 @@ describe('synthetic fixtures', () => {
   it('the refused mover has no frames and says why', () => {
     const frames = parseFrames(json('/v1/objects/synthetic-refused-mover/frames').data);
     expect(frames.frames).toEqual([]);
-    expect(frames.missing).toEqual(['frames:moving_object_search']);
+    expect(frames.missing).toEqual(['frames:ephemeris']);
   });
 
   it('is deterministic: same target, same bytes', () => {

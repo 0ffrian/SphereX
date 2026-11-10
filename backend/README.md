@@ -83,7 +83,7 @@ Errors are `{"error": code, "detail": sentence}`. The codes are:
 - `epoch` in `resolve` is ISO-8601 UTC: `2000-01-01T11:58:55.816Z` (J2000.0) for SIMBAD positions, `SX_EPHEMERIS_EPOCH` for moving objects, absent for typed coordinates.
 - Typed coordinates are tagged `derived` (user input, Q-25).
 - A Flamsteed name (`61 Cyg`, `51 Pegasi`) goes to SIMBAD first. Its SBDB fallback is accepted only when the asteroid's name is the query (`849 Ara`), so a star name never resolves to a numbered asteroid.
-- Moving objects (solar-system bodies, Q-22) get `frames: []` and `missing: ["frames:moving_object_search"]` in M1 (Q-21).
+- Moving objects (solar-system bodies, Q-22) get their frames from the path search (issue #26, A4.1): SIA cones along the SPHEREx-centred Horizons path, merged and kept when the footprint holds the object at the frame midpoint. `ra`/`dec` and `x`/`y` are `model_dependent` (Q-125). A target may list its own `moving_windows` in `targets.toml`, matched by `spkid` (3I/ATLAS does). A web request, and the job's capped first batch, run the search from the cache only; the job's full run downloads the rest (Q-111). Extra `missing` codes: `frames:ephemeris`, `frames:moving_window`, `frames:cone_cap:<n>` (cones left out by the cap, spread over the path), `frames:sparse_path:<n>`, `frames:cone_failed:<n>`, `frames:search_deferred:<n>`, `frames:outside_window:<n>`, `no_footprint:<id>`, `ephemeris:<id>`; `frames:cone_maxrec:<n>` when cones hit MAXREC. The list is stored unless it has `frames:ephemeris`, `frames:cone_failed`, `frames:search_deferred` or `ephemeris:`.
 
 ## Composite
 
@@ -149,6 +149,14 @@ uv run python -m scripts.sky_bake --preview preview.jpg             # 4096x2048 
 | `SX_SIMBAD_TAP_URLS` | CDS, then the Harvard mirror | Comma-separated and tried in order. |
 | `SX_EPHEMERIS_EPOCH` | `2026-11-14T00:00:00Z` | The time used for a moving object's `resolve` position. |
 | `SX_SEARCH_EPOCH` | `2026-01-01T00:00:00Z` | The time used for a proper-motion star's SIA search cone. |
+| `SX_MOVING_WINDOW_START`, `SX_MOVING_WINDOW_END` | `2025-04-01T00:00:00Z`, `2026-06-01T00:00:00Z` | **[verify]** The data release window for the moving-object path search (not published; covers every cached QR2 frame time). |
+| `SX_MOVING_EPHEM_STEP_MIN` | `10` | **[verify]** Horizons sampling of the path (cone placement and candidate footprint check; pixels use exact per-frame positions). Well under the ~95 min SPHEREx orbit. |
+| `SX_MOVING_CONE_RADIUS_DEG` | `0.1` | **[verify]** Cone radius R along the path. |
+| `SX_MOVING_MIN_STEP_H`, `SX_MOVING_MAX_STEP_H` | `1`, `24` | **[verify]** Clamp for the step dt = R / rate between cones. |
+| `SX_MOVING_MAX_CONES` | `450` | **[verify]** Cones per object; past it the cones are spread evenly over the path and `frames:cone_cap:<n>` is reported. |
+| `SX_MOVING_SIA_MAXREC` | `500` | **[verify]** MAXREC per path cone. |
+| `SX_MOVING_CONE_PACE_S` | `0` | **[verify]** Seconds between live path cones (IRSA publishes no rate limit; requests are sequential and 5xx/504 are retried with backoff). |
+| `SX_MOVING_FOOTPRINT_MARGIN_ARCSEC` | `60` | ASSUMPTION. A frame is a candidate when the interpolated path is within this margin of its footprint; the exact position then decides. |
 | `SX_HTTP_*` | 10 s connect, 60 s read, 3 retries, 1 s backoff (doubles) | |
 | `SX_CORS_ORIGINS` | empty | Needed only when the frontend runs without the Vite proxy. CORS then exposes the `X-SX-Cached-At` and `X-SX-Asset-Status` headers (Q-39), `X-SX-Combine` (Q-50), the issue #41 `X-SX-Measuring` and `X-SX-Progress` (Q-111) and `X-SX-Layer-Tag` (Q-122) so the browser can read them. Only `GET` is allowed, so the admin repaint is for `curl`. |
 | `SX_ASSETS_DIR` | `backend/assets` | Pre-baked assets read by stage 4 (A5.4), `<type>/<id>.json` with the D-22 fields. |

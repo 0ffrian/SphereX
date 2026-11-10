@@ -100,7 +100,7 @@ def test_replies_are_deterministic(client: TestClient) -> None:
 
 
 def test_final_inputs_are_saved_and_served_as_saved(client: TestClient) -> None:
-    """Stage 4: Eros's inputs are final (moving object, no frame search to truncate), so the
+    """Stage 4: Eros's inputs are final (its fixture path search is complete, issue #26), so the
     first call saves the asset and the next one is `saved` with identical content."""
     oid = resolve_id(client, "433 Eros")
     first = client.get(f"/v1/objects/{oid}/card")

@@ -9,7 +9,7 @@
 import type { ApiResult } from '@/app/api/client';
 import { ApiError, isApiError, type ApiErrorKind } from '@/app/api/errors';
 import type { Frame, FramesResponse } from '@/app/api/types';
-import { parseMissing } from '@/app/refusals';
+import { countedCode, parseMissing } from '@/app/refusals';
 
 // ASSUMPTION: UI pacing and politeness, not physical values. Engineering choices for issue #41's
 // interim: one request in flight per object, a short pause between parts, exponential backoff
@@ -41,6 +41,7 @@ export const PROGRESS_ANNOUNCE_MIN_MS = 15_000;
 
 const TRUNCATED = 'frames:truncated';
 const DEFERRED_PREFIX = 'cutouts:deferred:';
+const SEARCH_PREFIX = 'frames:search_deferred:';
 const RETRYABLE: ReadonlySet<ApiErrorKind> = new Set(['server', 'network']);
 
 /** Total of the `cutouts:deferred:<n>` codes in `missing`; 0 when there are none. */
@@ -54,9 +55,23 @@ export function deferredCount(missing: readonly string[]): number {
   return n;
 }
 
-/** True while the backend still has cutouts it did not download for this list. */
+/**
+ * `frames:search_deferred:<n>`: archive calls the moving-object path search still has to make in
+ * the object's job (backend find/moving.py, Q-111); 0 when there are none.
+ */
+export function searchDeferredCount(missing: readonly string[]): number {
+  let n = 0;
+  for (const code of new Set(missing)) {
+    if (!code.startsWith(SEARCH_PREFIX)) continue;
+    const c = countedCode(code);
+    if (c) n += c.count;
+  }
+  return n;
+}
+
+/** True while the backend still has cutouts to download or a path search to finish. */
 export function hasDeferred(missing: readonly string[]): boolean {
-  return deferredCount(missing) > 0;
+  return deferredCount(missing) > 0 || searchDeferredCount(missing) > 0;
 }
 
 /** What the progress line counts, all from the latest reply merged with the frames shown. */
@@ -71,6 +86,8 @@ export interface FramesCounts {
   found: number;
   /** The archive sent a shortened list (`frames:truncated`), so more frames may exist. */
   truncated: boolean;
+  /** A moving object's path search is still running (`frames:search_deferred:<n>`). */
+  searching: boolean;
 }
 
 export function framesCounts(frames: FramesResponse): FramesCounts {
@@ -88,6 +105,7 @@ export function framesCounts(frames: FramesResponse): FramesCounts {
     notUsable: refused.size,
     found: ready + toDownload + refused.size,
     truncated: frames.missing.includes(TRUNCATED),
+    searching: searchDeferredCount(frames.missing) > 0,
   };
 }
 
@@ -255,7 +273,9 @@ export async function pollFrames(o: PollOptions): Promise<PollOutcome> {
     errors = 0;
     timeouts = 0;
     if (!o.onReply(res)) return { kind: 'done' };
-    const progress = `${res.data.frames.length}:${deferredCount(res.data.missing)}`;
+    // The path search's remaining calls count as progress too: they fall as the job caches them.
+    const m = res.data.missing;
+    const progress = `${res.data.frames.length}:${deferredCount(m)}:${searchDeferredCount(m)}`;
     if (progress === lastProgress) {
       stalls += 1;
       if (stalls > POLL_MAX_STALLS) {
