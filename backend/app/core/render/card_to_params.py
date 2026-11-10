@@ -459,6 +459,44 @@ def _asteroid_procedural(
     }
 
 
+# Q-263: assumed grain sizes of the modelled dust tail, as radiation-pressure ratios beta
+# (a = 570, 114, 28, 5.7 um at rho = 1 g/cm3, Qpr = 1). A display choice, not a measurement.
+DUST_TAIL_BETAS = "0.001, 0.005, 0.02, 0.1"
+DUST_GRAIN_DENSITY = 1.0
+
+_COMET_EPOCHS = ("2025-08", "2025-12")
+
+
+def _gas_epochs(gas: object) -> list[str]:
+    """Epochs a gas_Q keyed by epoch (Q-260) has at least one usable value for."""
+    if not isinstance(gas, Mapping):
+        return []
+    return [
+        e
+        for e in _COMET_EPOCHS
+        if isinstance(gas.get(e), Mapping) and any(_has(gas[e], k) for k in ("co2", "h2o", "co"))
+    ]
+
+
+def _has_track(card: Mapping[str, Any]) -> bool:
+    """Q-261: ``orbit_track`` holds at least two usable rows of seven finite numbers."""
+    tv = _tv(card, "orbit_track")
+    rows = tv.get("value") if tv else None
+    return (
+        isinstance(rows, list)
+        and len(rows) >= 2
+        and all(
+            isinstance(r, list | tuple)
+            and len(r) == 7
+            and all(
+                isinstance(c, numbers.Real) and not isinstance(c, bool) and math.isfinite(float(c))
+                for c in r
+            )
+            for r in rows
+        )
+    )
+
+
 def _comet(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
     # Q-162: a registered nucleus mesh (67P) replaces the plain sphere. The layer exists only when
     # the card names a shape model; a comet without one (3I/ATLAS) gets no "mesh" row at all. The
@@ -484,11 +522,15 @@ def _comet(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         formula="nucleus radius = nucleus_radius_km_max",
     )
     gas = card.get("gas_Q")
-    has_q = isinstance(gas, Mapping) and any(_has(gas, k) for k in ("co2", "h2o", "co"))
+    has_q = _gas_epochs(gas) or (
+        isinstance(gas, Mapping) and any(_has(gas, k) for k in ("co2", "h2o", "co"))
+    )
     epochs = card.get("epochs")
-    one_epoch = isinstance(epochs, list) and len(epochs) == 1  # Q-42
+    # Q-42: the R3.2 shape holds one epoch's values, so it needs exactly one listed epoch. A card
+    # keyed by epoch (Q-260) carries its own epochs and needs no such rule.
+    one_epoch = bool(_gas_epochs(gas)) or (isinstance(epochs, list) and len(epochs) == 1)
     shells = plan.layer(
-        has_q and one_epoch and _has(card, "coma_radius_km"),
+        bool(has_q) and one_epoch and _has(card, "coma_radius_km"),
         "gas_shells",
         "model_dependent",
         "Assumption: density falls as 1/r^2 out to the coma radius; Q itself is measured "
@@ -500,6 +542,15 @@ def _comet(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
     )
     if not shells:
         plan.refuse("field")
+    # Q-261, Q-263: modelled tails. Both need the sampled Horizons path (the real Sun direction and
+    # the comet's velocity); without it they are refused, never aimed by a guess.
+    # A card without an `orbit_track` member (every fixture comet, 67P) has no tail rows at all, as
+    # a comet without `shape_source` has no `mesh` row; one with the member but no usable path
+    # lists the tails in `missing`.
+    track = _has_track(card)
+    wants_tails = "orbit_track" in card
+    if wants_tails:
+        _tail_layers(card, plan, track)
     return {
         "texture": "none",
         "texture_tag": "artistic",
@@ -507,6 +558,38 @@ def _comet(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         "data_tag": "model_dependent" if shells else "artistic",  # Q-17: the safer tag
         "params": {"maxRateHz": FIELD_MAX_RATE_HZ} if shells else {},
     }
+
+
+def _tail_layers(card: Mapping[str, Any], plan: _Plan, track: bool) -> None:
+    """Q-261, Q-263: the two modelled tail layers, from the sampled Horizons path."""
+    plan.layer(
+        track,
+        "ion_tail",
+        "derived",
+        "Ion tail along the anti-Sun direction (R7.3, Q-263). Its length and width are display "
+        "values and the tail is not to scale.",
+        ["orbit_track"],
+        card=card,
+        formula="tail direction = -(unit heliocentric position of the comet), from JPL Horizons "
+        "VECTORS at the shown time",
+    )
+    plan.layer(
+        track,
+        "dust_tail",
+        "model_dependent",
+        "Modelled dust tail: grains of assumed size released with the comet's velocity and pushed "
+        "by sunlight (Finson-Probstein, Q-263). SPHEREx saw no anti-solar dust tail, so this "
+        "shows what small grains would do, not what was seen.",
+        ["orbit_track"],
+        card=card,
+        formula="grain path under (1 - beta) GM_sun / r^2 from its release, compared with the "
+        "comet's own path from Horizons; beta = 5.7e-5 Qpr / (rho a) (Burns et al. 1979)",
+        rule_inputs={
+            "beta_values": DUST_TAIL_BETAS,
+            "grain_density_g_cm3": DUST_GRAIN_DENSITY,
+            "emission_start": "first SPHEREx epoch (earlier activity unknown)",
+        },
+    )
 
 
 def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) -> dict[str, Any]:

@@ -382,6 +382,12 @@ export interface PlanContext {
   /** Requested mode; the plan falls back to the type's default if it is unavailable. */
   mode: ViewModeId | null;
   epoch: CometEpoch;
+  /**
+   * Issue #71 F (Q-262): a time between the two SPHEREx epochs, as a Julian date. Set by the
+   * emissions view; the gas rates and the modelled tail are taken at this time. Absent: the epoch's
+   * own centre time.
+   */
+  cometJd?: number | null;
   /** Index into the card's light curve (Mira, T Tauri). */
   scrubIndex: number;
   /** Layer ids whose mesh or texture failed to load: refused with reason 'load'. */
