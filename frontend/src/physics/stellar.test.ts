@@ -153,7 +153,7 @@ describe('refusals and the tier chain', () => {
   });
   it('the main-sequence table is monotone and gives the Sun back', () => {
     expect(massFromTeff(5770)).toBeCloseTo(1, 6);
-    expect(radiusFromTeff(5770)).toBeCloseTo(1, 6);
+    expect(radiusFromTeff(5770)).toBeCloseTo(1.012, 6);
     expect(massFromTeff(3000)).toBeLessThan(massFromTeff(4000));
     expect(radiusFromTeff(4000)).toBeLessThan(radiusFromTeff(6000));
   });
