@@ -19,42 +19,14 @@
 // time give the same image.
 /* eslint-disable @typescript-eslint/no-explicit-any -- TSL node graphs are built from untyped proxies */
 import { Vector2, Vector3, type DataTexture, type Texture } from 'three/webgpu';
-import {
-  Break,
-  Fn,
-  If,
-  Loop,
-  abs,
-  asin,
-  atan,
-  clamp,
-  cos,
-  cross,
-  dot,
-  exp,
-  float,
-  floor,
-  fract,
-  length,
-  max,
-  min,
-  mix,
-  normalize,
-  pow,
-  select,
-  sin,
-  smoothstep,
-  sqrt,
-  step,
-  texture,
-  uniform,
-  uv,
-  vec2,
-  vec3,
-  vec4,
-} from 'three/tsl';
+import * as TSL from 'three/tsl';
 import { bilinear } from '../renderers/fieldTexture';
 import type { OrbitKind } from './orbitMath';
+
+// The TSL helpers are used as untyped proxies (the typings reject mixed scalar and vector maths).
+const {
+  Break, Fn, If, Loop, abs, asin, atan, clamp, cos, cross, dot, exp, float, floor, fract, length, max, min, mix, normalize, pow, select, sin, smoothstep, sqrt, step, texture, uniform, uv, vec2, vec3, vec4,
+} = TSL as any;
 
 const PI = Math.PI;
 const TAU = Math.PI * 2;
@@ -120,6 +92,8 @@ export function createOrbitUniforms() {
     uClouds: f1(),
     uHV: f1(),
     uMX: f1(),
+    /** 0..1: the pane fades in from black like the mock-up's close-up (display only). */
+    uFade: uniform(1),
   };
 }
 export type OrbitUniforms = ReturnType<typeof createOrbitUniforms>;
@@ -722,7 +696,7 @@ export function buildOrbitShader(cfg: OrbitShaderConfig, U: OrbitUniforms): Orbi
 
     const at = atmo(ro, rd, select(hit.greaterThan(0), hit, float(1e9)));
     col.assign(col.mul(exp(uEXT.mul(at.w).negate())).add(at.xyz));
-    return vec4(float(1).sub(exp(col.mul(-1.5))), 1);
+    return vec4(float(1).sub(exp(col.mul(-1.5))).mul(U.uFade), 1);
   })();
 
   return { fragment, tracerBase };
