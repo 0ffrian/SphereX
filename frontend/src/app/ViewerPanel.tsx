@@ -51,6 +51,7 @@ import { buttonClass, pressedClass } from './ui';
 import { closeUpKindOf } from './CloseUpPane';
 import { useCloseUpStore } from './closeUpStore';
 import { StarFlarePanel } from './StarFlarePanel';
+import { StarGlobeStage, useEngineStar } from './StarEngineStage';
 import { MouldStrip, type StripHandle } from './build/MouldStrip';
 import { useMould, type MouldPhase } from './build/useMould';
 import { usesBrowserSeed } from '@/viewer/mould/mouldSteps';
@@ -216,6 +217,9 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const storeCard = useAppStore((s) => s.card);
   const storeParams = useAppStore((s) => s.params);
   const card = blocked ? null : storeCard;
+  // Issue #71 stream X (D-37): the prototype's star engine draws star cards in the build pane; null keeps the TSL path.
+  const engineStarCard = useEngineStar();
+  const [engineFailed, setEngineFailed] = useState(false);
   const storedParams = blocked ? null : storeParams;
   const seedOffset = pane?.seedOffset ?? 0;
   // "New seed" (issue #60): the same params with another seed; the same card + seed always give
@@ -610,14 +614,15 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // it (`cuClose`). The viewer and plan go to a small store the pane reads. The toggle next to Feel
   // hides or shows it.
   const closeKind = pane ? closeUpKindOf(params?.type) : null;
+  const engineStar = pane && !engineFailed && honesty !== 'measured' && plan?.threeD && card && !blocked ? engineStarCard : null;
   // Hidden by the user, or held back until the build has shifted to the right half (stream U).
   const closeHidden = useCloseUpStore((s) => s.hidden || s.held);
   const closeInfo = useCloseUpStore((s) => s.info);
   const shaderKey = plan?.shader?.key ?? '';
   const pubFixture = fixture || (card?.id.startsWith('fixture:') ?? false);
   useEffect(() => {
-    useCloseUpStore.getState().publish({ viewer, plan, type: params?.type ?? null, fixture: pubFixture, reducedMotion });
-  }, [viewer, plan, params?.type, reducedMotion, pubFixture]);
+    useCloseUpStore.getState().publish({ viewer, plan, type: params?.type ?? null, fixture: pubFixture, reducedMotion, engineStar });
+  }, [viewer, plan, params?.type, reducedMotion, pubFixture, engineStar]);
   useEffect(() => () => useCloseUpStore.getState().reset(), []);
   useEffect(() => {
     if (!viewer) return;
@@ -636,9 +641,14 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
       closeKind === 'orbit' && !artisticShown
         ? "Close-up · the surface from orbit is an artist's impression: choose + Artistic to see it"
         : null;
+    // A star the engine draws has its own close-up in the pane (the flare close-up), so the viewer's is off.
+    if (closeKind === 'star' && engineStar) {
+      viewer.closeUpOff(true);
+      return;
+    }
     viewer.openCloseUp(closeKind === 'body', closeKind === 'star', gate);
     return () => viewer.closeUpOff(true);
-  }, [viewer, pane, closeKind, closeHidden, blocked, plan?.threeD, objectKey, shaderKey, artisticShown]);
+  }, [viewer, pane, closeKind, closeHidden, blocked, plan?.threeD, objectKey, shaderKey, artisticShown, engineStar]);
   // A gas giant that is still forming opens when it has settled.
   useEffect(() => {
     if (!viewer || !closeInfo?.refusal || !/forming/.test(closeInfo.refusal) || closeHidden) return;
@@ -756,6 +766,9 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           data-testid="viewer-stage"
         >
           <div ref={hostRef} className="absolute inset-0" />
+          {engineStar && (
+            <StarGlobeStage key={engineStar.preset.id} star={engineStar} onFail={() => setEngineFailed(true)} />
+          )}
           {!pane && params && plan?.threeD && (
             <ConfidenceChip
               params={params}
@@ -981,7 +994,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
               </div>
             )}
 
-            {plan.star && (
+            {plan.star && !engineStar && (
               <div className="flex flex-col gap-2" data-testid="star-views">
                 <div
                   role="group"
@@ -1047,7 +1060,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
               </div>
             )}
 
-            {plan.star?.physics && (
+            {plan.star?.physics && !engineStar && (
               <dl
                 className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
                 data-testid="star-readouts"

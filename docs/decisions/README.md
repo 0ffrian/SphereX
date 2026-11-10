@@ -335,4 +335,5 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-290 to Q-293 | Gas giant and star parity: True colour default, solved gas world and star cells shown at + Estimated | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
 | Q-307 | The Sun as a reference star (`ref-sun`, NASA Sun Fact Sheet) | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
 | Q-308 | D-37 engine status: prototype star and flare code sliced into engine/stars | Open (being built) | [rendering-bodies](rendering-bodies.md) |
+| Q-309 to Q-312 | Star engine hosted (D-37): StarEngine, cardToStar and artifact presets, the globe pick and close-up target, mass assumption | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |

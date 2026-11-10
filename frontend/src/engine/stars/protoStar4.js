@@ -4,6 +4,7 @@
 // Source: .claude/worktrees/sculptor-reference/sculptor-preview-next.html, lines 1029-1211 (flare close-up and light-curve chart).
 // Not yet imported by the app: it still needs the TypeScript host (DOM removed, `cardToStar`). Do not edit here;
 // re-run the slicing instead so the body stays byte-identical to the prototype.
+// @verbatim L1029-L1211
 /* ---------- flare ---------- */
 var FL = { kind: 'open', cls: 'x', t: 0.36, playing: !reduced };
 var CLS = { c: 0.55, m: 0.8, x: 1 };
@@ -187,3 +188,4 @@ drawStar(); drawFlareStar(); drawFlare();
 addEventListener('resize', function () { drawStar(); drawFlareStar(); drawFlare(); });
 requestAnimationFrame(frame);
 
+// @end-verbatim
