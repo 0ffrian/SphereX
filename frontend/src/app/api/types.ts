@@ -12,7 +12,7 @@ export interface ResolveResponse {
   /** Degrees (J2000). */
   dec: number;
   moving: boolean;
-  resolver: 'simbad' | 'sbdb' | 'coords';
+  resolver: 'simbad' | 'sbdb' | 'coords' | 'reference';
   /** ISO-8601 with `Z` or an offset; set when the reply came from the backend cache (D-25). */
   cached_at: string | null;
 }
@@ -161,7 +161,7 @@ export interface SkyCachedObject {
   /** Degrees (J2000, ICRS): the resolved position, or the one the coordinate id encodes. */
   ra: number;
   dec: number;
-  resolver: 'simbad' | 'sbdb' | 'coords';
+  resolver: 'simbad' | 'sbdb' | 'coords' | 'reference';
   /** Frames in the stored list. */
   frames: number;
   /** Tags of `ra` and `dec`, when the backend has them. */

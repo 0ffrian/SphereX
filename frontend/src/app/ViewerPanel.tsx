@@ -132,6 +132,18 @@ export interface PaneOptions {
   onViewer?(viewer: ViewerApp | null): void;
 }
 
+/** Issue #71 stream E: the two speeds of a simulated gas world (the slider `gas_pacing`: 0 or 1). */
+export const GAS_PACING_CHOICES = [
+  { value: 0, label: '5 minutes per second' },
+  { value: 1, label: '1 day per second' },
+] as const;
+
+export function gasPacingStatus(value: 0 | 1): string {
+  return value === 1
+    ? 'One second here is one Earth day. The view stays above the turning planet, so you can watch storms drift.'
+    : 'One second here is 5 minutes, so the planet turns slowly and its clouds barely change.';
+}
+
 export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -476,6 +488,11 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   };
   // Not announced here: the slider's own value text is read by screen readers when it moves.
   const onScrub = (i: number) => setChoices({ ...choices, scrub: i });
+  const gasPacing = overrides.gas_pacing === 1 ? 1 : 0;
+  const onGasPacing = (value: 0 | 1) => {
+    setOverride('gas_pacing', value);
+    announce(gasPacingStatus(value));
+  };
   const onAge = (pos: number) => setOverride('age_yr', ageFromLog(pos));
 
   // The age slider shows only while the remnant is drawn (it is an artist's impression).
@@ -858,6 +875,28 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                       : idlePaused
                         ? 'Motion paused after a minute without input. Tap the view or press Play motion.'
                         : 'Motion is playing.'}
+                </p>
+              </div>
+            )}
+
+            {/* Issue #71 stream E: pacing of a simulated gas world; shown only for one. */}
+            {plan.type === 'gas_giant' && lapses.some((t) => t.id === 'winds') && (
+              <div className="flex flex-col gap-1" data-testid="gas-pacing">
+                <div role="group" aria-label="Time speed of the winds" className="flex flex-wrap gap-2">
+                  {GAS_PACING_CHOICES.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      className={buttonClass}
+                      aria-pressed={gasPacing === c.value}
+                      onClick={() => onGasPacing(c.value)}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-sm text-neutral-200" data-testid="gas-pacing-status">
+                  {gasPacingStatus(gasPacing)}
                 </p>
               </div>
             )}

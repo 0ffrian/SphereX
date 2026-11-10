@@ -87,6 +87,7 @@ import {
   gasModel,
   gasProfile,
   ringAt,
+  secondsPerStep,
   ringTexture,
   spinAngle,
   stepsFor,
@@ -294,6 +295,21 @@ interface Tracer {
 }
 
 // ---- the body ----------------------------------------------------------------------------------
+
+export interface GasOrbitSources {
+  velocity: Texture;
+  /** Null before the first pass. */
+  tracer: Texture | null;
+  bands: Texture;
+  noise: Texture;
+  radiusKm: number;
+  scaleHeightKm: number;
+  seed: number;
+  /** Linear-light-ready sRGB colours: zone, belt, storm, dark, polar. */
+  palette: Readonly<{ z: readonly number[]; b: readonly number[]; s: readonly number[]; d: readonly number[]; p: readonly number[] }>;
+  /** The planet has settled and the tracer works. */
+  ready: boolean;
+}
 
 export interface GasWorldDeps {
   /** Replaces the worker-backed solver (tests). */
@@ -640,6 +656,27 @@ export class GasWorld implements BodyRenderer {
     this.object.clear();
   }
 
+  /**
+   * What an orbit camera (stream H) reads to draw the same planet from close: the textures are live
+   * (the tracer swaps after every pass, so read this getter each frame, do not keep the object).
+   * `velocity` is the solver's field (RGBA half float, GAS_NX x GAS_NY: R and G winds, B vorticity,
+   * A storm code), `tracer` the colour tracer (R brightness, G chromophore, B noise, A storm), `bands`
+   * the 1 x 512 band profile (R brightness, G chromophore, B turbulence, A polar).
+   */
+  get orbitSources(): GasOrbitSources {
+    return {
+      velocity: this.velTex,
+      tracer: this.tracer ? this.tracer.rt[this.tracer.cur].texture : null,
+      bands: this.bandTex,
+      noise: this.noiseTex,
+      radiusKm: this.model.radiusM / 1000,
+      scaleHeightKm: this.model.scaleHeightM / 1000,
+      seed: this.input.seed,
+      palette: this.palette,
+      ready: this.phase === 'ready' && !this.tracerFailed,
+    };
+  }
+
   // ---- pacing --------------------------------------------------------------------------------
 
   /** Planet seconds per real second: the clock's winds speed-up, else the default. */
@@ -708,7 +745,13 @@ export class GasWorld implements BodyRenderer {
     const target = GAS_SETTLE_STEPS + Math.floor(stepsFor(this.model, elapsed) / GROUP_STEPS) * GROUP_STEPS;
     if (target <= this.stepsDone) return;
     this.pumping = true;
-    const behind = (target - this.stepsDone) / GROUP_STEPS;
+    let behind = (target - this.stepsDone) / GROUP_STEPS;
+    if (behind > MAX_BACKLOG_GROUPS) {
+      // Far behind (a slow frame, a hidden tab): drop the excess by moving the time origin, so a
+      // later pause really stops the world instead of paying the backlog off.
+      this.t0 = (this.t0 ?? 0) + (behind - MAX_BACKLOG_GROUPS) * GROUP_STEPS * secondsPerStep(this.model);
+      behind = MAX_BACKLOG_GROUPS;
+    }
     const groups = Math.min(behind, MAX_BACKLOG_GROUPS);
     (async () => {
       for (let g = 0; g < groups && !this.disposed; g++) {
