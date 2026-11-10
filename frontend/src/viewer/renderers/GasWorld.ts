@@ -50,12 +50,10 @@ import {
   clamp,
   cross,
   dot,
-  exp,
   float,
   floor,
   length,
   max,
-  min,
   mix,
   mx_fractal_noise_float,
   normalWorld,
@@ -79,8 +77,6 @@ import {
   GAS_NX,
   GAS_NY,
   GAS_SETTLE_STEPS,
-  PACE_DAY_S_PER_S,
-  PACE_SLOW_S_PER_S,
   RING_TEX_INNER,
   RING_TEX_OUTER,
   RING_TEX_SIZE,
@@ -100,6 +96,7 @@ import {
   type ReferenceGasId,
 } from '@/physics/gasDynamics';
 import { R_JUP_M } from '@/physics/constants';
+import { gasPacing, gasWorldInput } from './gasWorldInput';
 import { ESTIMATED_TAGS } from './bodyRenderer';
 import type { BodyRenderer, BodyContext, BodyStatus } from './bodyRenderer';
 import {
@@ -113,47 +110,27 @@ import { startGasSolver, type GasFrame, type GasSolver } from '../fields/gasClie
 import { GAS_LAYER_IDS, resolveShaderSpec, shaderDistance, type GasSwitches, type ShaderSpec } from './shaderSpec';
 import { resolveMotion, type Motion, type SimTimeFn } from '../motion/motion';
 import type { Overrides } from '../sliders';
-import { sliderValue } from '../sliders';
 import type { TierName } from '../render/quality';
 import { srgbToLinear } from './linearColour';
 import type { PointSet } from './pointClouds';
 
 // ---- what the card gives -----------------------------------------------------------------------
 
-/**
- * Card ids of the reference gas giants (decisions Q-251). ASSUMPTION: the backend registry
- * (`backend/assets/reference_objects.toml`) names them `ref-jupiter` and `ref-saturn`.
- */
-export const REFERENCE_IDS: Readonly<Record<string, ReferenceGasId>> = {
-  'ref-jupiter': 'jup',
-  'ref-saturn': 'sat',
-};
-
-/**
- * Per-reference values that are not on a card: internal-heat temperature, mean molecular weight, and
- * the viewing pose of the prototype (display values, `artistic`). [verify] Tint: Jupiter radiates
- * about 1.67 times what it absorbs (Li et al. 2018), so Tint = Teq (1.67 - 1)^(1/4) = 99 K; Saturn's
- * excess (about 1.8 to 2.5 in the literature) gives about 77 K at the low end. Both feed only the
- * cloud-top temperature, so scale height and storm size, not the band positions.
- */
-const REFERENCE: Record<ReferenceGasId, { tintK: number; mu: number; tilt: number; roll: number; light: Vec3; palette: Palette }> = {
+const REFERENCE: Record<ReferenceGasId, { tilt: number; roll: number; light: Vec3; palette: Palette }> = {
   jup: {
-    tintK: 99,
-    mu: 2.3,
     tilt: 0.054,
     roll: 0,
     light: [-0.2, 0.12, 0.97],
     palette: { z: [0.93, 0.89, 0.76], b: [0.56, 0.29, 0.12], s: [0.78, 0.3, 0.13], d: [0.3, 0.2, 0.15], p: [0.45, 0.5, 0.53] },
   },
   sat: {
-    tintK: 77,
-    mu: 2.1,
     tilt: -0.36,
     roll: -0.55,
     light: [-0.42, 0.34, 0.84],
     palette: { z: [0.93, 0.8, 0.5], b: [0.72, 0.54, 0.27], s: [0.9, 0.86, 0.72], d: [0.5, 0.4, 0.25], p: [0.62, 0.56, 0.42] },
   },
 };
+/** View pose and palette are display values (`artistic`): the prototype's. */
 
 type Rgb = readonly [number, number, number];
 interface Palette {
@@ -173,48 +150,6 @@ const REGIME_PALETTE: Record<GasRegime, Palette> = {
   'Silicate haze, dark blue': { z: [0.2, 0.34, 0.72], b: [0.08, 0.15, 0.42], s: [0.78, 0.86, 1], d: [0.04, 0.08, 0.22], p: [0.12, 0.18, 0.36] },
   'Silicate clouds, glowing': { z: [0.92, 0.72, 0.55], b: [0.56, 0.28, 0.16], s: [1, 0.86, 0.66], d: [0.3, 0.14, 0.08], p: [0.45, 0.3, 0.22] },
 };
-
-/** A giant this close in is probably tidally locked: its spin is not a free value, so it stays on the plain path. */
-const LOCKED_BELOW_PERIOD_D = 30;
-/** Typical mean molecular weight of a hydrogen-helium atmosphere, g/mol (solar composition is about 2.3). [verify] */
-const MU_HYDROGEN_HELIUM = 2.3;
-
-function numberOf(card: ObjectCard, field: string): number | null {
-  const v = (card as unknown as Record<string, { value?: unknown } | undefined>)[field];
-  return typeof v?.value === 'number' && Number.isFinite(v.value) ? v.value : null;
-}
-
-/**
- * The solver input for a card, or null when a value it needs is missing (refuse, never invent): the
- * plain ShaderBody then draws the old way. A giant needs its radius, mass, equilibrium temperature
- * and a spin period (the card's measured `rot_period_h`, else the `dynamics` spin the backend states).
- * A giant whose orbit is shorter than 30 days is left to the plain path (probably locked: the
- * locked-case flow of the prototype is not built).
- */
-export function gasWorldInput(card: ObjectCard, params: RenderParams): GasInput | null {
-  if (card.type !== 'gas_giant' || params.type !== 'gas_giant') return null;
-  const reference = REFERENCE_IDS[card.id] ?? null;
-  const radiusRj = numberOf(card, 'radius_rjup');
-  const massEarth = numberOf(card, 'mass_mearth');
-  const teqK = numberOf(card, 'teq_K');
-  const dyn = (params.dynamics as { spin_period_h?: { value?: unknown } } | undefined)?.spin_period_h;
-  const dynSpin = typeof dyn?.value === 'number' && Number.isFinite(dyn.value) ? dyn.value : null;
-  const rotPeriodH = numberOf(card, 'rot_period_h') ?? dynSpin;
-  if (radiusRj === null || massEarth === null || teqK === null || rotPeriodH === null) return null;
-  const orbit = numberOf(card, 'orbital_period_d');
-  if (!reference && orbit !== null && orbit < LOCKED_BELOW_PERIOD_D) return null;
-  const input: GasInput = {
-    reference,
-    radiusRj,
-    massEarth,
-    rotPeriodH,
-    teqK,
-    tintK: reference ? REFERENCE[reference].tintK : null,
-    mu: reference ? REFERENCE[reference].mu : MU_HYDROGEN_HELIUM,
-    seed: params.seed,
-  };
-  return gasModel(input) ? input : null;
-}
 
 // ---- sizes and constants -----------------------------------------------------------------------
 
@@ -303,17 +238,17 @@ function noiseTexture(seed: number): DataTexture {
 /** Catmull-Rom filtered read (5 bilinear taps) of a tracer texture; `res` is its size as a vec2 node. */
 function catmullRom(taps: TapSet, uvIn: any, res: any): any {
   const p = uvIn.mul(res);
-  const ip = floor(p.sub(0.5)).toVar();
-  const f = p.sub(0.5).sub(ip).toVar();
-  const w0 = f.mul(float(-0.5).add(f.mul(float(1).sub(f.mul(0.5)))));
-  const w1 = float(1).add(f.mul(f).mul(float(-2.5).add(f.mul(1.5))));
-  const w2 = f.mul(float(0.5).add(f.mul(float(2).sub(f.mul(1.5)))));
-  const w3 = f.mul(f).mul(float(-0.5).add(f.mul(0.5)));
-  const w12 = w1.add(w2).toVar();
-  const o = w2.div(w12);
-  const t0 = ip.sub(0.5).div(res);
-  const t3 = ip.add(2.5).div(res);
-  const t12 = ip.add(o).add(0.5).div(res);
+  const ip: any = floor(p.sub(0.5)).toVar();
+  const f: any = p.sub(0.5).sub(ip).toVar();
+  const w0: any = f.mul(float(-0.5).add(f.mul(float(1).sub(f.mul(0.5)))));
+  const w1: any = float(1).add(f.mul(f).mul(float(-2.5).add(f.mul(1.5))));
+  const w2: any = f.mul(float(0.5).add(f.mul(float(2).sub(f.mul(1.5)))));
+  const w3: any = f.mul(f).mul(float(-0.5).add(f.mul(0.5)));
+  const w12: any = w1.add(w2).toVar();
+  const o: any = w2.div(w12);
+  const t0: any = ip.sub(0.5).div(res);
+  const t3: any = ip.add(2.5).div(res);
+  const t12: any = ip.add(o).add(0.5).div(res);
   const c = taps
     .tap(vec2(t12.x, t0.y))
     .mul(w12.x.mul(w0.y))
@@ -404,7 +339,7 @@ export class GasWorld implements BodyRenderer {
   private readonly sun = new Vector3(0, 0, 1);
 
   private constructor(
-    private readonly card: ObjectCard,
+    card: ObjectCard,
     private readonly params: RenderParams,
     input: GasInput,
     ctx: BodyContext,
@@ -428,8 +363,11 @@ export class GasWorld implements BodyRenderer {
 
     this.noiseTex = noiseTexture(input.seed);
     fillHalf(this.bandTex, this.profile.tex);
-    this.prevTaps = new TapSet(this.noiseTex);
-    this.displayTaps = new TapSet(this.noiseTex);
+    // The taps start on render-target textures (their shader code differs from a data texture's).
+    const t0 = makeTracerTarget(...TRACER_SIZE[this.tier]);
+    this.prevTaps = new TapSet(t0.texture);
+    this.displayTaps = new TapSet(t0.texture);
+    this.tracer = { rt: [t0, makeTracerTarget(...TRACER_SIZE[this.tier])], cur: 0, size: TRACER_SIZE[this.tier] };
     this.ringTex = input.reference === 'sat' ? this.buildRingTexture() : null;
 
     this.tilt.rotation.x = ref?.tilt ?? 0.12;
@@ -441,7 +379,7 @@ export class GasWorld implements BodyRenderer {
     this.spinMesh.scale.y = 1 - this.model.flattening;
     this.spinMesh.visible = false; // hidden until the flow has settled (D-36: already formed)
     this.tilt.add(this.spinMesh);
-    this.ringMesh = this.ringTex ? this.buildRings(this.ringTex) : null;
+    this.ringMesh = this.ringTex ? this.buildRings() : null;
     if (this.ringMesh) {
       this.ringMesh.visible = false;
       this.tilt.add(this.ringMesh);
@@ -579,11 +517,11 @@ export class GasWorld implements BodyRenderer {
     this.onChange?.();
   }
   /** Not used by a gas giant. */
-  setPatternSwitch(_on: boolean | null): void {}
-  setMould(_k: unknown): void {
+  setPatternSwitch(): void {}
+  setMould(): void {
     this.onChange?.();
   }
-  setJitterFrame(_i: number): void {}
+  setJitterFrame(): void {}
 
   setVisibleTags(tags: readonly Tag[]): void {
     if (this.disposed) return;
@@ -677,8 +615,7 @@ export class GasWorld implements BodyRenderer {
 
   /** Planet seconds per real second: the clock's winds speed-up, else the default. */
   pacing(): number {
-    const v = sliderValue(this.overrides, 'gas_pacing', 'gas_giant');
-    return v === 1 ? PACE_DAY_S_PER_S : PACE_SLOW_S_PER_S;
+    return gasPacing(this.overrides);
   }
 
   /** Steps taken so far (a multiple of GROUP_STEPS), for tests and the panel. */
@@ -704,17 +641,18 @@ export class GasWorld implements BodyRenderer {
     await this.needRenderer();
     if (this.disposed) return;
     this.lastField = solver.first.field;
+    this.placed = solver.first.storms;
     this.initTracer(solver.first.field);
     while (this.stepsDone < GAS_SETTLE_STEPS && !this.disposed) {
       const frame = await solver.advance(GROUP_STEPS);
       if (this.disposed) return;
       this.stepsDone = frame.steps;
+      this.placed = frame.storms;
       this.feed(frame.field);
     }
     if (this.disposed) return;
     this.phase = 'ready';
-    this.spinMesh.visible = true;
-    if (this.ringMesh) this.ringMesh.visible = true;
+    this.applySwitches();
     this.updatePlaced();
     this.setTime(this.time);
     this.onChange?.();
@@ -742,16 +680,13 @@ export class GasWorld implements BodyRenderer {
     if (target <= this.stepsDone) return;
     this.pumping = true;
     const behind = (target - this.stepsDone) / GROUP_STEPS;
-    if (behind > MAX_BACKLOG_GROUPS) {
-      // The tab was away: move the clock origin so the world does not run thousands of steps at once.
-      this.t0 = (this.t0 ?? 0) + (behind - MAX_BACKLOG_GROUPS) * GROUP_STEPS * (stepsFor(this.model, 1e9) ? 0 : 0);
-    }
     const groups = Math.min(behind, MAX_BACKLOG_GROUPS);
     (async () => {
       for (let g = 0; g < groups && !this.disposed; g++) {
         const frame = await solver.advance(GROUP_STEPS);
         if (this.disposed) return;
         this.stepsDone = frame.steps;
+        this.placed = frame.storms;
         this.feed(frame.field);
       }
     })()
@@ -782,7 +717,7 @@ export class GasWorld implements BodyRenderer {
     const tr = clamp(bd.r.sub(v2.z.mul(0.08)), 0, 1).add(max(mask, 0).mul(0.42)).sub(max(mask.negate(), 0).mul(0.3));
     const tg = mix(mix(bd.g, 0.05, max(mask, 0).mul(0.95)), 0.95, max(mask.negate(), 0).mul(0.8));
     const first = vec4(tr, tg, nz, clamp(v.a.sub(2), 0, 1).mul(this.uStormsOn));
-    const s = clamp(catmullRom(this.prevTaps, b, res), 0, 1.2);
+    const s: any = clamp(catmullRom(this.prevTaps, b, res), 0, 1.2);
     const rate = clamp(this.uDt.mul(1.4), 0, 1);
     const next = vec4(
       mix(s.r, tr, rate),
@@ -803,6 +738,7 @@ export class GasWorld implements BodyRenderer {
     const t: Tracer = { rt: [makeTracerTarget(w, h), makeTracerTarget(w, h)], cur: 0, size: [w, h] };
     this.tracer = t;
     this.prevTaps.set(t.rt[0].texture);
+    this.displayTaps.set(t.rt[0].texture);
     return t;
   }
 
@@ -838,6 +774,11 @@ export class GasWorld implements BodyRenderer {
       // Never blank: without the tracer the planet is drawn from the band table alone.
       this.tracerFailed = true;
       this.uTracerOn.value = 0;
+      try {
+        if (this.rendererState) RendererUtils.restoreRendererState(renderer, this.rendererState as any);
+      } catch {
+        /* nothing more to restore */
+      }
       console.warn('[viewer] gas tracer pass failed; drawing the bands without flow', err);
     }
   }
@@ -950,7 +891,7 @@ export class GasWorld implements BodyRenderer {
 
   /** Ring lookup: (radius in planet radii) -> RG (opacity, brightness). */
   private ringTexNode(r: any): any {
-    return texture(this.ringTex!, vec2(r.sub(RING_TEX_INNER).div(RING_TEX_OUTER - RING_TEX_INNER), 0.5));
+    return (texture as any)(this.ringTex!, vec2(r.sub(RING_TEX_INNER).div(RING_TEX_OUTER - RING_TEX_INNER), 0.5));
   }
 
   private buildRingTexture(): DataTexture {
@@ -964,8 +905,7 @@ export class GasWorld implements BodyRenderer {
     return t;
   }
 
-  private buildRings(tex: DataTexture): Mesh {
-    void tex;
+  private buildRings(): Mesh {
     const material = new MeshBasicNodeMaterial();
     const x = positionLocal.x;
     const y = positionLocal.y;
@@ -1029,33 +969,8 @@ export class GasWorld implements BodyRenderer {
   }
 
   private updatePlaced(): void {
-    // The placed storms are those of the settled world plus the drift since; they are recomputed from
-    // the solver's own table at the step count taken.
-    this.placed = this.placedAt(this.stepsDone);
     this.sampler.setStorms(this.storms());
   }
-
-  private placedAt(steps: number): PlacedStorm[] {
-    const t = steps * 0.0032;
-    const prof = this.profile;
-    const N = 128;
-    const dp = Math.PI / N;
-    const drift = (s: { lat: number; lon: number }) => {
-      const jr = Math.min(N - 1, Math.max(0, Math.round((s.lat + Math.PI / 2) / dp - 0.5)));
-      const lat = -Math.PI / 2 + (jr + 0.5) * dp;
-      return s.lon + (this.jetRate(lat)) * t;
-    };
-    return [
-      ...prof.big.map((s): PlacedStorm => ({ lat: s.lat, lon: drift(s), r: s.r, kind: s.red ? 4 : 1 })),
-      ...prof.small.map((s): PlacedStorm => ({ lat: s.lat, lon: drift(s), r: s.r, kind: s.type })),
-    ];
-  }
-
-  /** Angular rate of the deep-jet drift at a latitude, in solver units (same scaling as the solver). */
-  private jetRate(lat: number): number {
-    return this.profile.u(lat) * this.jetScale / Math.max(Math.cos(lat), 0.1);
-  }
-  private jetScale = 0;
 
   private buildSampler(): FieldSampler {
     const W = 512;
@@ -1090,4 +1005,4 @@ export function classifyRing(r: number): 'none' | 'ring' | 'gap' {
   return ringAt(r).opacity < 0.15 ? 'gap' : 'ring';
 }
 
-export { SATURN_RADIUS_KM, R_JUP_M };
+export { SATURN_RADIUS_KM, R_JUP_M, gasWorldInput };

@@ -1,6 +1,6 @@
 // Issue #71 stream E: main-thread side of the gas solver worker. Never blank: if Workers are
 // unavailable (or the worker fails) the same solver runs on the main thread, a few steps per call.
-import type { GasInput } from '@/physics/gasDynamics';
+import type { GasInput, PlacedStorm } from '@/physics/gasDynamics';
 import { handleGasRequest, type GasHost, type GasRequest, type GasResponse } from './gasWorker';
 
 export interface GasFrame {
@@ -8,6 +8,8 @@ export interface GasFrame {
   steps: number;
   /** Velocity field for the tracer pass, GAS_NX x GAS_NY RGBA floats. */
   field: Float32Array;
+  /** Where the storms are at this step (the picture and the haptics read the same list). */
+  storms: PlacedStorm[];
 }
 
 export interface GasSolver {
@@ -38,7 +40,7 @@ export async function startGasSolver(input: GasInput): Promise<GasSolver & { fir
   let id = 1;
   let queue: Promise<unknown> = Promise.resolve();
   return {
-    first: { steps: 0, field: init.field },
+    first: { steps: 0, field: init.field, storms: init.storms },
     threaded: false,
     advance(steps) {
       const run = queue.then(async () => {
@@ -46,7 +48,7 @@ export async function startGasSolver(input: GasInput): Promise<GasSolver & { fir
         await new Promise<void>((r) => setTimeout(r, 0));
         const res = handleGasRequest(state, { id: id++, kind: 'advance', steps });
         if (!res.ok) throw new Error(res.error);
-        return { steps: res.steps, field: res.field };
+        return { steps: res.steps, field: res.field, storms: res.storms };
       });
       queue = run.catch(() => undefined);
       return run;
@@ -98,12 +100,12 @@ async function tryWorker(input: GasInput): Promise<(GasSolver & { first: GasFram
     throw new Error(init.error);
   }
   return {
-    first: { steps: 0, field: init.field },
+    first: { steps: 0, field: init.field, storms: init.storms },
     threaded: true,
     async advance(steps) {
       const res = await call({ id: nextId++, kind: 'advance', steps });
       if (!res.ok) throw new Error(res.error);
-      return { steps: res.steps, field: res.field };
+      return { steps: res.steps, field: res.field, storms: res.storms };
     },
     dispose() {
       dead = true;

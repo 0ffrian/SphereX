@@ -9,13 +9,14 @@ import {
   type GasInput,
   type GasModel,
   type GasSim,
+  type PlacedStorm,
 } from '@/physics/gasDynamics';
 
 export type GasRequest =
   | { id: number; kind: 'init'; input: GasInput }
   | { id: number; kind: 'advance'; steps: number };
 export type GasResponse =
-  | { id: number; ok: true; steps: number; field: Float32Array }
+  | { id: number; ok: true; steps: number; field: Float32Array; storms: PlacedStorm[] }
   | { id: number; ok: false; error: string };
 
 export interface GasHost {
@@ -39,12 +40,12 @@ export function handleGasRequest(
     if (req.kind === 'init') {
       state.host = initGasHost(req.input);
       if (!state.host) return { id: req.id, ok: false, error: 'the gas model has a missing input' };
-      return { id: req.id, ok: true, steps: 0, field: state.host.sim.exportField(true).slice() };
+      return { id: req.id, ok: true, steps: 0, field: state.host.sim.exportField(true).slice(), storms: state.host.sim.placedStorms() };
     }
     const host = state.host;
     if (!host) return { id: req.id, ok: false, error: 'not initialised' };
     for (let i = 0; i < req.steps; i++) host.sim.step();
-    return { id: req.id, ok: true, steps: host.sim.steps, field: host.sim.exportField().slice() };
+    return { id: req.id, ok: true, steps: host.sim.steps, field: host.sim.exportField().slice(), storms: host.sim.placedStorms() };
   } catch (err) {
     return { id: req.id, ok: false, error: err instanceof Error ? err.message : String(err) };
   }
