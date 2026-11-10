@@ -178,39 +178,41 @@ export interface SpotGroup {
 }
 
 /**
- * Typical main-sequence (dwarf) rows: [Teff K, mass Msun, radius Rsun], hottest first. Mirrors the
- * mean dwarf sequence of Pecaut and Mamajek 2013 (ApJS 208, 9, Table 5, online version 2022.04.16;
- * the Teff column is the one in `backend/assets/pm13_dwarf_teff.toml`). The mass and radius columns
- * were typed from memory, rounded: [verify] every number against the table before relying on them.
- * Used only to fill a missing mass or radius for the surface physics (D-32 tier chain, tag
- * `model_dependent`); never for the scale bar or a size label (Q-33). Dwarfs only: a pre-main-
- * sequence star (T Tauri) is larger and cooler for its mass, so the assumption says so.
+ * Typical main-sequence (dwarf) rows, columns [Teff K, mass Msun, radius Rsun], hottest first.
+ * Source: E. Mamajek, "A Modern Mean Dwarf Stellar Color and Effective Temperature Sequence"
+ * (EEM_dwarf_UBVIJHK_colors_Teff.txt, version 2022.04.16,
+ * https://www.pas.rochester.edu/~emamajek/EEM_dwarf_UBVIJHK_colors_Teff.txt; Pecaut and Mamajek
+ * 2013, ApJS 208, 9). The source calls the adopted mean masses tentative. Used only to fill a
+ * missing mass or radius for the surface physics (D-32 tier chain, tag `model_dependent`); never
+ * for the scale bar or a size label (Q-33). Dwarfs only: a pre-main-sequence star (T Tauri) is
+ * larger and cooler for its mass, so the assumption says so.
  */
 export const MS_TABLE: readonly (readonly [number, number, number])[] = [
-  [31400, 17.5, 7.4], // B0V
-  [20600, 9.0, 5.0], // B2V
-  [15700, 5.9, 3.9], // B5V
-  [12300, 3.8, 3.0], // B8V
-  [9700, 2.18, 2.19], // A0V
-  [8080, 1.86, 1.7], // A5V
-  [7220, 1.61, 1.62], // F0V
-  [6510, 1.33, 1.4], // F5V
-  [5920, 1.06, 1.1], // G0V
-  [5770, 1.0, 1.0], // G2V
-  [5660, 0.98, 0.95], // G5V
-  [5280, 0.88, 0.85], // K0V
-  [5040, 0.82, 0.78], // K2V
-  [4410, 0.7, 0.72], // K5V
-  [4070, 0.63, 0.65], // K7V
-  [3850, 0.57, 0.59], // M0V
-  [3660, 0.5, 0.5], // M1V
-  [3560, 0.44, 0.44], // M2V
-  [3430, 0.37, 0.36], // M3V
-  [3210, 0.23, 0.27], // M4V
+  [31400, 17.7, 7.16], // B0V
+  [20600, 7.3, 4.06], // B2V
+  [15700, 4.7, 2.77], // B5V
+  [12300, 3.38, 2.86], // B8V
+  [9700, 2.18, 2.193], // A0V
+  [8100, 1.88, 1.785], // A5V
+  [7220, 1.61, 1.728], // F0V
+  [6550, 1.33, 1.473], // F5V
+  [5930, 1.06, 1.1], // G0V
+  [5770, 1.0, 1.012], // G2V
+  [5660, 0.98, 0.977], // G5V
+  [5270, 0.88, 0.813], // K0V
+  [5100, 0.82, 0.783], // K2V
+  [4440, 0.7, 0.701], // K5V
+  [4100, 0.64, 0.63], // K7V
+  [3850, 0.57, 0.588], // M0V
+  [3660, 0.5, 0.501], // M1V
+  [3560, 0.44, 0.446], // M2V
+  [3430, 0.37, 0.361], // M3V
+  [3210, 0.23, 0.274], // M4V
   [3060, 0.162, 0.196], // M5V
   [2810, 0.102, 0.137], // M6V
   [2680, 0.09, 0.12], // M7V
-  [2570, 0.085, 0.11], // M8V
+  [2570, 0.085, 0.114], // M8V
+  [2380, 0.079, 0.102], // M9V
 ];
 
 /** Log-log interpolation of column `y` against column `x` of MS_TABLE; clamps at the ends. */
@@ -451,7 +453,7 @@ export function stellarModel(input: StellarInput): { model: StellarModel } | Ste
   if (!ok(input.teffK)) return { model: null, missing: ['teff_K'] };
   const teffK = input.teffK;
   const assumed: StellarModel['assumed'] = {};
-  const PM13 = 'a typical main-sequence star (Pecaut and Mamajek 2013, [verify])';
+  const PM13 = 'a typical main-sequence star (Mamajek mean dwarf sequence, 2022.04.16)';
   let radiusRsun: number;
   if (ok(input.radiusRsun)) radiusRsun = input.radiusRsun;
   else {
@@ -548,13 +550,13 @@ export function stellarModel(input: StellarInput): { model: StellarModel } | Ste
     tags.mass = {
       tag: 'model_dependent',
       assumption: assumed.mass,
-      cite: 'Pecaut and Mamajek 2013 [verify]',
+      cite: 'Mamajek EEM_dwarf table, version 2022.04.16',
     };
   if (assumed.radius)
     tags.radius = {
       tag: 'model_dependent',
       assumption: assumed.radius,
-      cite: 'Pecaut and Mamajek 2013 [verify]',
+      cite: 'Mamajek EEM_dwarf table, version 2022.04.16',
     };
 
   return {
