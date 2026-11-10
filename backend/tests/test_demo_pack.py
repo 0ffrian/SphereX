@@ -6,15 +6,18 @@ catalogue half of the check (``--strict``) needs the D-25 cache and runs on the 
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 import shutil
+import zlib
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from app.cache.store import ReadThroughCache
 from app.core.card.assets import Asset, AssetStore
@@ -26,6 +29,7 @@ from app.main import create_app
 from app.settings import Settings
 from scripts import bake_demo_pack as bp
 from tests.conftest import make_settings
+from tests.helpers import png_join, png_redeflate, png_split
 
 PACK_BUDGET_BYTES = 15 * 1024 * 1024  # 7c: at most 15 MB for the whole pack
 NAMES = bp.type_names()
@@ -93,8 +97,11 @@ def test_texture_urls_point_at_the_demo_mount_and_exist() -> None:
     assert n >= 4
 
 
-def test_rebake_is_byte_identical_and_check_passes(tmp_path: Path) -> None:
-    """Same committed pack, rebuilt from its cards: every byte equal (``--check``, card only)."""
+def test_rebake_matches_and_check_passes(tmp_path: Path) -> None:
+    """Same committed pack, rebuilt from its cards (``--check``, card only).
+
+    Equal byte for byte, except that a PNG map may differ in its deflate stream (Q-204).
+    """
     settings = make_settings(tmp_path / "empty-cache")
     ts = tmp_path / "demoTargets.ts"
     shutil.copy(bp.DEMO_TARGETS_TS, ts)
@@ -115,6 +122,69 @@ def test_check_reports_a_changed_byte(tmp_path: Path) -> None:
     victim = next(assets.rglob("height.bin"))
     data = victim.read_bytes()
     victim.write_bytes(bytes([data[0] ^ 0xFF]) + data[1:])
+    assert bp.main(["--check"], assets_dir=assets, ts_path=ts, settings=settings) == 1
+
+
+def _pack_copy(tmp_path: Path) -> tuple[Settings, Path, Path]:
+    settings = make_settings(tmp_path / "empty-cache")
+    ts = tmp_path / "demoTargets.ts"
+    shutil.copy(bp.DEMO_TARGETS_TS, ts)
+    assets = tmp_path / "assets"
+    shutil.copytree(bp.ASSETS_DIR, assets)
+    return settings, ts, assets
+
+
+def _a_png(assets: Path, name: str) -> Path:
+    """A pack PNG that is not 'Oumuamua's (those differ in bytes on some machines, Q-204)."""
+    return next(p for p in sorted(assets.rglob(name)) if "sbdb-50788063" not in p.parts)
+
+
+def test_check_accepts_a_png_with_another_deflate_stream(tmp_path: Path) -> None:
+    """Q-204: the same chunks and image data pass, so the check holds on another machine."""
+    settings, ts, assets = _pack_copy(tmp_path)
+    victim = _a_png(assets, "height.png")
+    data = victim.read_bytes()
+    other = png_redeflate(data, level=1, parts=2)
+    assert other != data
+    victim.write_bytes(other)
+    assert bp.main(["--check"], assets_dir=assets, ts_path=ts, settings=settings) == 0
+
+
+def test_check_reports_a_changed_png_pixel(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    settings, ts, assets = _pack_copy(tmp_path)
+    victim = _a_png(assets, "normal.png")
+    chunks = png_split(victim.read_bytes())
+    raw = bytearray(zlib.decompress(b"".join(b for k, b in chunks if k == b"IDAT")))
+    raw[len(raw) // 2] ^= 1
+    head = [c for c in chunks if c[0] not in (b"IDAT", b"IEND")]
+    victim.write_bytes(png_join([*head, (b"IDAT", zlib.compress(bytes(raw), 9)), (b"IEND", b"")]))
+    assert bp.main(["--check"], assets_dir=assets, ts_path=ts, settings=settings) == 1
+    err = capsys.readouterr().err
+    assert "differs:" in err and "normal.png" in err
+
+
+def test_check_reports_a_corrupt_png(tmp_path: Path) -> None:
+    settings, ts, assets = _pack_copy(tmp_path)
+    victim = _a_png(assets, "height.png")
+    victim.write_bytes(victim.read_bytes()[:100])
+    assert bp.main(["--check"], assets_dir=assets, ts_path=ts, settings=settings) == 1
+
+
+def test_check_keeps_webp_byte_exact(tmp_path: Path) -> None:
+    """WebP is not a PNG: a lossless re-save with equal pixels but other bytes still fails."""
+    settings, ts, assets = _pack_copy(tmp_path)
+    # Largest albedo, picked the same way on every OS: rglob order is the filesystem's,
+    # and a tiny flat albedo can re-save to the very same bytes.
+    victim = max(sorted(assets.rglob("albedo.webp")), key=lambda p: p.stat().st_size)
+    data = victim.read_bytes()
+    with Image.open(io.BytesIO(data)) as img:
+        img.load()
+        out = io.BytesIO()
+        img.save(out, "WEBP", lossless=True, quality=100, method=6)
+    assert out.getvalue() != data
+    victim.write_bytes(out.getvalue())
     assert bp.main(["--check"], assets_dir=assets, ts_path=ts, settings=settings) == 1
 
 
