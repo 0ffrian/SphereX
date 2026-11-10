@@ -29,7 +29,7 @@ from app.core.find.resolver import ResolvedObject, load_object
 from app.main import create_app
 from app.settings import Settings
 from app.timefmt import parse_utc, utc_to_jd
-from scripts.record_fixtures import FIXTURE_MOVING
+from scripts.fixture_settings import FIXTURE_MOVING
 from tests.conftest import FIXTURE_CUTOUT_SIZE_ARCSEC, TARGETS_FILE, make_settings
 from tests.helpers import entries, entry
 

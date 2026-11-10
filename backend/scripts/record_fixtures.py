@@ -6,7 +6,7 @@
 Uses SX_SIA_MAXREC=3 (3 frames per target, so the SIA answer is marked truncated) and the
 default cutout size. The moving target (433 Eros, issue #26) is searched along its path over the
 short ``FIXTURE_MOVING`` window (two tiny cones, full MAXREC per cone), so its frames, cutouts and
-spectrum are recorded too; the tests use the same settings (``tests/conftest.py``).
+spectrum are recorded too. The tests import the same settings from ``scripts/fixture_settings.py``.
 Derived entries (``derived.*``) are removed afterwards so the tests run the real
 SIA -> cutout -> WCS path. Nothing is hand-written: the fixtures are cache entries (D-25).
 """
@@ -18,26 +18,12 @@ import os
 import shutil
 from pathlib import Path
 
+from scripts.fixture_settings import FIXTURE_MOVING
+
 FIXTURE_CACHE = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "cache"
 FIXTURE_MAXREC = "3"
 # Groups recorded when no --only is given: group "moving" (long path searches) is left out.
 FIXTURE_GROUPS = ("test", "fixture", "demo")
-# Moving-object path search for the fixtures (issue #26). Not [verify] values: a deliberately
-# short window (2026-03-20 to 2026-03-21, where a live search on 7 Nov 2026 found SPHEREx frames
-# of 433 Eros), a tiny cone and a fixed 24 h step (min = max), so two cones and a small cache.
-FIXTURE_MOVING: dict[str, str] = {
-    "moving_window_start": "2026-03-20T00:00:00Z",
-    "moving_window_end": "2026-03-21T12:00:00Z",
-    "moving_ephem_step_min": "60",
-    "moving_cone_radius_deg": "0.001",
-    "moving_min_step_h": "24",
-    "moving_max_step_h": "24",
-    "moving_max_cones": "450",
-    "moving_sia_maxrec": "500",
-    # Recorded before the candidate margin existed (PR #53): a margin would ask Horizons for
-    # TLIST times that are not in the fixtures.
-    "moving_footprint_margin_arcsec": "0",
-}
 
 
 def purge_derived(root: Path) -> None:

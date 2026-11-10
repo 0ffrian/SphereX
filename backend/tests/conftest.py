@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 from app.settings import BACKEND_DIR, Settings
-from scripts.record_fixtures import FIXTURE_MOVING
+from scripts.fixture_settings import FIXTURE_MOVING
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FIXTURE_CACHE = FIXTURES / "cache"
