@@ -53,6 +53,23 @@ def test_values_match_the_nasa_fact_sheet(client: TestClient) -> None:
     assert c["rot_period_h"]["value"] == 9.925
 
 
+def test_titan_is_a_rocky_world_from_the_satellite_sheet(client: TestClient) -> None:
+    """Q-280: Titan is a moon on the rocky-world path; the host is the Sun, the orbit is Saturn's."""
+    r = client.get("/v1/resolve", params={"q": "Titan"})
+    assert r.status_code == 200 and r.json()["id"] == "ref-titan"
+    c = client.get("/v1/objects/ref-titan/card").json()
+    assert c["type"] == "planet_rocky"
+    assert c["radius_rjup"]["value"] == pytest.approx(2575 / 71492, abs=1e-5)
+    assert c["mass_mearth"]["value"] == pytest.approx(0.02253, abs=1e-5)
+    assert c["host_teff_K"]["value"] == 5772.0
+    assert c["orbit_au"]["value"] == pytest.approx(9.5726, abs=1e-4)
+    assert c["rot_period_h"]["tag"] == "derived" and c["rot_period_h"]["formula"]
+    for f in ("radius_rjup", "mass_mearth", "host_teff_K", "host_radius_rsun", "orbit_au"):
+        assert c[f]["tag"] == "measured" and "nssdc.gsfc.nasa.gov" in c[f]["source"]
+    assert "teq_K" not in c  # not on the sheets: refused, not invented (Q-280)
+    assert client.get("/v1/objects/ref-titan/frames").json()["frames"] == []
+
+
 def test_committed_assets_are_current() -> None:
     p = subprocess.run(
         [sys.executable, "-m", "scripts.bake_reference_objects", "--check"],
