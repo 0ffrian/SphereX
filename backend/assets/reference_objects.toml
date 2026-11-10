@@ -38,9 +38,14 @@ teq_K = 81.0
 # 1880 kg/m3, orbital period 15.945421 d with rotation "S" (synchronous: rotation = orbital period).
 # The world model wants the distance to the host star, so the orbit is Saturn's (Saturn fact sheet
 # semimajor axis, same as the Saturn row above); the host star is the Sun (Sun fact sheet: effective
-# temperature 5772 K, volumetric mean radius 695,700 km). Surface pressure (about 1.5 bar) and
-# surface temperature (about 94 K) are NOT on these sheets and the card has no field for them, so
-# they are not copied here (Q-280).
+# temperature 5772 K, volumetric mean radius 695,700 km). Surface pressure and temperature are NOT
+# on those sheets (the NASA fact sheet URL for Titan alone returns 404); they come from the Huygens
+# Atmospheric Structure Instrument, as quoted in NASA's NTRS chapter "Titan's Atmospheric Structure,
+# Composition, Haze, and Dynamics" (Vuitton, Lavvas, Nixon, Teanby; ntrs.nasa.gov/citations/20240013879,
+# read 10 Nov 2026): "surface temperature of 93.7 K and a surface pressure of 1.467 bar at the
+# landing site (Fulchignoni et al., 2005)" (Nature 438, 785). The surface liquid is methane-rich
+# (ethane too) lakes and seas seen by Cassini radar (Stofan et al. 2007, Nature 445, 61; Brown et
+# al. 2008, Nature 454, 607) [verify: those two papers were not fetched in this session].
 [[object]]
 id = "ref-titan"
 name = "Titan"
@@ -54,4 +59,7 @@ moon_orbital_period_d = 15.945421   # around Saturn; synchronous, so also the ro
 host_source = "NASA Planetary Fact Sheets, Sun and Saturn"
 host_teff_K = 5772.0
 host_radius_km = 695700.0
+surface_pressure_bar = 1.467        # Huygens HASI at the landing site (Fulchignoni et al. 2005)
+surface_temperature_K = 93.7        # same
+surface_fluid = "methane"           # Cassini radar lakes and seas (Stofan et al. 2007)
 semimajor_axis_1e6_km = 1432.041    # Saturn's, from the Sun
