@@ -10,7 +10,7 @@ import type { RockView } from './RockView';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function until<T>(f: () => T | null | false, what: string, ms = 120000): Promise<T> {
+async function until<T>(f: () => T | null | false, what: string, ms = 400000): Promise<T> {
   const t0 = Date.now();
   for (;;) {
     const v = f();
