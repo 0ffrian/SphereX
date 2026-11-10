@@ -216,6 +216,9 @@ class ObjectCard(BaseModel):
     host_radius_rsun: TVNumber | None = None
     host_mass_msun: TVNumber | None = None
     host_age_gyr: TVNumber | None = None
+    surface_pressure_bar: TVNumber | None = None
+    surface_temperature_K: TVNumber | None = None
+    surface_fluid: TVString | None = None
     component_teff_K: TVPair | None = None
     period_var_d: TVNumber | None = None
     lightcurve: list[LightcurvePoint] | None = None

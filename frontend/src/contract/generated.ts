@@ -262,6 +262,9 @@ export interface ObjectCard {
   host_radius_rsun?: TVNumber;
   host_mass_msun?: TVNumber;
   host_age_gyr?: TVNumber;
+  surface_pressure_bar?: TVNumber;
+  surface_temperature_K?: TVNumber;
+  surface_fluid?: TVString;
   component_teff_K?: TVPair;
   period_var_d?: TVNumber;
   lightcurve?: LightcurvePoint[];

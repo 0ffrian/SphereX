@@ -33,7 +33,20 @@ def _tv(
     return out
 
 
+HUYGENS = (
+    "Huygens Atmospheric Structure Instrument at the landing site, Fulchignoni et al. 2005, "
+    "Nature 438, 785, as quoted by NASA NTRS 20240013879 (Vuitton et al., Titan's Atmospheric "
+    "Structure, Composition, Haze, and Dynamics)"
+)
+CASSINI_LAKES = (
+    "liquid methane (with ethane) lakes and seas seen by Cassini radar: Stofan et al. 2007, "
+    "Nature 445, 61; Brown et al. 2008, Nature 454, 607 [verify: not fetched]"
+)
 R_SUN_KM = 695700.0  # IAU 2015 B3 nominal solar radius (the Sun fact sheet's 695,700 km)
+
+
+def _tv_str(value: str, source: str) -> dict[str, Any]:
+    return {"value": value, "tag": "measured", "source": source}
 
 
 def titan_card(row: dict[str, Any]) -> dict[str, Any]:
@@ -59,6 +72,9 @@ def titan_card(row: dict[str, Any]) -> dict[str, Any]:
             round(row["semimajor_axis_1e6_km"] * 1e6 / KM_PER_AU, 4),
             f"{host}: Saturn's semimajor axis, the distance from the Sun{conv}",
         ),
+        "surface_pressure_bar": _tv(row["surface_pressure_bar"], HUYGENS),
+        "surface_temperature_K": _tv(row["surface_temperature_K"], HUYGENS),
+        "surface_fluid": _tv_str(row["surface_fluid"], CASSINI_LAKES),
         "host_teff_K": _tv(row["host_teff_K"], f"{host}: Sun effective temperature"),
         "host_radius_rsun": _tv(
             round(row["host_radius_km"] / R_SUN_KM, 4), f"{host}: Sun volumetric mean radius{conv}"

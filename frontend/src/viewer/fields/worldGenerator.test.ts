@@ -178,3 +178,39 @@ describe('hydrology in the world', { timeout: 60000 }, () => {
     expect(generateWorld({ ...p, oceanFraction: 0 })!.hydrology).toBeNull();
   });
 });
+
+describe('Titan from its card (Q-285)', { timeout: 60000 }, () => {
+  // The committed reference asset, read as the card the viewer gets.
+  const titan = async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    // vitest runs from frontend/
+    const raw = JSON.parse(
+      readFileSync(resolve(process.cwd(), '../backend/assets/reference/ref-titan.json'), 'utf8'),
+    ) as { card: import('@/contract').ObjectCard };
+    return raw.card;
+  };
+  it('takes methane and 1.467 bar from the card with the card tags, and a slider still wins as artistic', async () => {
+    const card = await titan();
+    const r = resolveWorld(card, 'planet_rocky', 1, {}, 'low');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.params.inputs.fluid).toBe('methane');
+    expect(r.params.inputs.pressureBar).toBe(1.467);
+    expect(r.sources.fluid).toBe('measured');
+    expect(r.sources.pressure).toBe('measured');
+    expect(r.assumptions.join(' ')).not.toMatch(/surface pressure 1 bar/);
+    const s = resolveWorld(card, 'planet_rocky', 1, { surface_fluid: 0, surface_pressure_bar: 2 }, 'low');
+    expect(s.ok && s.params.inputs.fluid).toBe('water');
+    expect(s.ok && s.sources.fluid).toBe('artistic');
+  });
+  it('its surface comes out cold, methane-condensing and hazy, near the measured 93.7 K', async () => {
+    const r = resolveWorld(await titan(), 'planet_rocky', 1, {}, 'low');
+    if (!r.ok) throw new Error('refused');
+    const m = worldModel(r.params.inputs)!;
+    expect(m.fluid.id).toBe('methane');
+    expect(Math.abs(m.Ts - 93.7)).toBeLessThan(10);
+    expect(m.state).toBe('liquid');
+    expect(m.haze).toBeGreaterThan(0.5);
+  });
+});
