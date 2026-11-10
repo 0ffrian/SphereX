@@ -25,7 +25,7 @@ from app.core.render.normals import normals_from_height
 from app.core.render.params import BakeParams
 
 # R6.7: bump whenever a rule in R6.2 to R6.5 changes, so cached maps are not reused.
-BAKER_RULES_VERSION = "2"
+BAKER_RULES_VERSION = "3"  # 3: issue #71 physics-based asteroid shape, craters, height.png scale
 
 FILES = ("albedo.webp", "height.png", "height.bin", "normal.png")
 
@@ -34,7 +34,7 @@ FILES = ("albedo.webp", "height.png", "height.bin", "normal.png")
 class BakeResult:
     albedo: NDArray[np.uint8]  # (H, W, 3) sRGB
     height: F64  # (H, W), fraction of the radius
-    height_png: NDArray[np.uint8]  # (H, W), min-max scaled for display
+    height_png: NDArray[np.uint8]  # (H, W): asteroids 0.5 + h / relief_amp, else min-max
     normal: NDArray[np.uint8]  # (H, W, 3)
     missing: tuple[str, ...]
 
@@ -50,7 +50,12 @@ def bake(p: BakeParams, width: int = 2048, height: int = 1024) -> BakeResult:
         h = heights.bands_height(dirs)
         albedo = palette.bands_albedo(p, heights.band_field(dirs, p.seed))
     lo, hi = float(h.min()), float(h.max())
-    if hi - lo < 1e-12:
+    if p.kind == "asteroid" and p.relief_amp > 0:
+        # Fixed scale (R6.7, issue #71): 0.5 + h / relief_amp, so the viewer's displacement scale
+        # relief_amp reproduces h. Values beyond the design range are clipped (display only;
+        # height.bin keeps the exact field).
+        png = np.rint(np.clip(0.5 + h / p.relief_amp, 0.0, 1.0) * 255).astype(np.uint8)
+    elif hi - lo < 1e-12:
         png = np.full(h.shape, 128, dtype=np.uint8)
     else:
         png = np.rint((h - lo) / (hi - lo) * 255).astype(np.uint8)

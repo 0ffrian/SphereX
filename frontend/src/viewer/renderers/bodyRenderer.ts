@@ -6,6 +6,7 @@ import type { Tag } from '@/contract';
 import { allowedTags, DEFAULT_HONESTY } from '../honesty';
 import type { Overrides } from '../sliders';
 import type { FieldData, FieldParams, FieldSampler, Vec3 } from '../fields/fieldGenerator';
+import type { WorldData, WorldParams } from '../fields/worldGenerator';
 import type { TierName } from '../render/quality';
 import type { PointSet } from './pointClouds';
 import type { Motion, SimTimeFn } from '../motion/motion';
@@ -56,6 +57,8 @@ export interface BodyContext {
   tier?: TierName;
   /** Replaces the field Web Worker (tests). Default: `requestField`. */
   fieldSource?: (params: FieldParams) => Promise<FieldData>;
+  /** Replaces the world Web Worker of the rocky planets (tests; issue #71 stream D). Default: `requestWorld`. */
+  worldSource?: (params: WorldParams) => Promise<WorldData | null>;
   /** Motion rates and processes the plan resolved (motion/motion.ts). Default: resolved from the card and params. */
   motion?: Motion;
   /** Noise octaves of the quality level (R5.7). Default 4 (the low level). */

@@ -67,7 +67,7 @@
     "type": "gas_giant"
   },
   "created_at": "2025-10-01T00:00:00.000Z",
-  "generator_version": "p1-b2",
+  "generator_version": "p1-b3",
   "inputs_sha256": "4d30394754ce61b83ba21606cfe420fb28cc45912350a92d60845b8e46f385e2",
   "render_params": {
     "alt_text": "HD 189733 b, Gas giant, 1.13 Jupiter radii (measured), colour family from the equilibrium temperature, lit by its star. Surface relief: illustrative.",
@@ -177,7 +177,7 @@
       "threshold": 0.25,
       "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
     },
-    "generator_version": "p1-b2",
+    "generator_version": "p1-b3",
     "haptics": {
       "data": "teq_pulse",
       "data_tag": "measured",
@@ -247,7 +247,7 @@
       "spectrum"
     ],
     "scale_m": 80785959.99999999,
-    "seed": 3852659574,
+    "seed": 1017558725,
     "type": "gas_giant",
     "view_modes": {
       "visible": {
@@ -266,6 +266,6 @@
       }
     }
   },
-  "seed": 3852659574,
+  "seed": 1017558725,
   "textures": null
 }
