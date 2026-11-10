@@ -57,9 +57,12 @@ describe('gasWorldInput', () => {
     const h = reference('ref-jupiter', { mass_mearth: { value: null, tag: 'measured', source: 'x' } });
     expect(gasWorldInput(h.card, h.params)).toBeNull();
   });
-  it('a short-orbit giant (probably locked) stays on the plain path', () => {
-    const f = reference('other', { orbital_period_d: { value: 2.2, tag: 'measured', source: 'x' } });
-    expect(gasWorldInput(f.card, f.params)).toBeNull();
+  it('a short-orbit giant with no measured spin is taken as locked: spin = orbital period', () => {
+    const f = reference('other', { orbital_period_d: { value: 2.2, tag: 'measured', source: 'x' }, teq_K: { value: 1209, tag: 'measured', source: 'x' } });
+    delete (f.card as unknown as Record<string, unknown>).rot_period_h;
+    const input = gasWorldInput(f.card, f.params)!;
+    expect(input.locked).toBe(true);
+    expect(input.rotPeriodH).toBeCloseTo(2.2 * 24, 6);
   });
   it('the winds process runs at 5 minutes per second by default and one day per second on request', () => {
     const f = reference('ref-jupiter');

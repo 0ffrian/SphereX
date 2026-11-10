@@ -25,7 +25,7 @@ const REFERENCE_HEAT: Record<ReferenceGasId, { tintK: number; mu: number }> = {
   sat: { tintK: 77, mu: 2.1 },
 };
 
-/** A giant whose orbit is shorter than this is probably tidally locked: it stays on the plain path (Q-251). */
+/** A giant with no measured spin and an orbit shorter than this is taken as tidally locked (Q-251, ASSUMPTION). */
 const LOCKED_BELOW_PERIOD_D = 30;
 /** Mean molecular weight of a hydrogen-helium atmosphere, g/mol (solar composition about 2.3). [verify] */
 const MU_HYDROGEN_HELIUM = 2.3;
@@ -47,10 +47,13 @@ export function gasWorldInput(card: ObjectCard, params: RenderParams): GasInput 
   const teqK = numberOf(card, 'teq_K');
   const dyn = (params.dynamics as { spin_period_h?: { value?: unknown } } | undefined)?.spin_period_h;
   const dynSpin = typeof dyn?.value === 'number' && Number.isFinite(dyn.value) ? dyn.value : null;
-  const rotPeriodH = numberOf(card, 'rot_period_h') ?? dynSpin;
-  if (radiusRj === null || massEarth === null || teqK === null || rotPeriodH === null) return null;
+  const measuredSpin = numberOf(card, 'rot_period_h');
   const orbit = numberOf(card, 'orbital_period_d');
-  if (!reference && orbit !== null && orbit < LOCKED_BELOW_PERIOD_D) return null;
+  // ASSUMPTION (Q-251): a giant with no measured spin and an orbit under 30 days is tidally locked,
+  // so its spin is its orbital period. `model_dependent`, never `measured`.
+  const locked = !reference && measuredSpin === null && orbit !== null && orbit < LOCKED_BELOW_PERIOD_D;
+  const rotPeriodH = locked ? orbit * 24 : (measuredSpin ?? dynSpin);
+  if (radiusRj === null || massEarth === null || teqK === null || rotPeriodH === null) return null;
   const heat = reference ? REFERENCE_HEAT[reference] : null;
   const input: GasInput = {
     reference,
@@ -61,6 +64,7 @@ export function gasWorldInput(card: ObjectCard, params: RenderParams): GasInput 
     tintK: heat?.tintK ?? null,
     mu: heat?.mu ?? MU_HYDROGEN_HELIUM,
     seed: params.seed,
+    locked,
   };
   return gasModel(input) ? input : null;
 }

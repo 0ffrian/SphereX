@@ -52,6 +52,7 @@ import {
   dot,
   float,
   floor,
+  log,
   length,
   max,
   mix,
@@ -77,6 +78,7 @@ import {
   GAS_NX,
   GAS_NY,
   GAS_SETTLE_STEPS,
+  GLOW_ABOVE_K,
   RING_TEX_INNER,
   RING_TEX_OUTER,
   RING_TEX_SIZE,
@@ -112,6 +114,7 @@ import { resolveMotion, type Motion, type SimTimeFn } from '../motion/motion';
 import type { Overrides } from '../sliders';
 import type { TierName } from '../render/quality';
 import { srgbToLinear } from './linearColour';
+import { teffToRgbMax1 } from '@/physics/starlight';
 import type { PointSet } from './pointClouds';
 
 // ---- what the card gives -----------------------------------------------------------------------
@@ -163,6 +166,29 @@ const NOISE_H = 256;
 const TAU = Math.PI * 2;
 
 const SETTLE_MESSAGE = 'Letting the winds settle, so the planet appears already formed.';
+
+/** The glow colour table spans these temperatures (log scale), K. */
+const GLOW_LUT_MIN_K = 600;
+const GLOW_LUT_MAX_K = 6000;
+
+/** Blackbody colour (linear, brightest channel 1) by log temperature, for the glow of a hot giant. */
+function buildGlowTexture(): DataTexture {
+  const n = 128;
+  const src = new Float32Array(n * 4);
+  for (let i = 0; i < n; i++) {
+    const t = Math.exp(Math.log(GLOW_LUT_MIN_K) + (i / (n - 1)) * (Math.log(GLOW_LUT_MAX_K) - Math.log(GLOW_LUT_MIN_K)));
+    const c = teffToRgbMax1(t) ?? [1, 0.3, 0.1];
+    src.set([c[0], c[1], c[2], 1], i * 4);
+  }
+  const tex = new DataTexture(new Uint16Array(n * 4), n, 1, RGBAFormat, HalfFloatType);
+  tex.minFilter = LinearFilter;
+  tex.magFilter = LinearFilter;
+  tex.wrapS = ClampToEdgeWrapping;
+  tex.wrapT = ClampToEdgeWrapping;
+  tex.generateMipmaps = false;
+  fillHalf(tex, src);
+  return tex;
+}
 
 // ---- GPU pieces --------------------------------------------------------------------------------
 
@@ -320,6 +346,7 @@ export class GasWorld implements BodyRenderer {
   private readonly bandTex = halfTexture(1, 512, ClampToEdgeWrapping, ClampToEdgeWrapping);
   private readonly noiseTex: DataTexture;
   private readonly ringTex: DataTexture | null;
+  private readonly glowTex: DataTexture | null;
   private readonly prevTaps: TapSet;
   private readonly displayTaps: TapSet;
 
@@ -369,6 +396,7 @@ export class GasWorld implements BodyRenderer {
     this.displayTaps = new TapSet(t0.texture);
     this.tracer = { rt: [t0, makeTracerTarget(...TRACER_SIZE[this.tier])], cur: 0, size: TRACER_SIZE[this.tier] };
     this.ringTex = input.reference === 'sat' ? this.buildRingTexture() : null;
+    this.glowTex = this.model.tDayK > GLOW_ABOVE_K ? buildGlowTexture() : null;
 
     this.tilt.rotation.x = ref?.tilt ?? 0.12;
     this.tilt.rotation.z = ref?.roll ?? 0;
@@ -603,6 +631,7 @@ export class GasWorld implements BodyRenderer {
     this.bandTex.dispose();
     this.noiseTex.dispose();
     this.ringTex?.dispose();
+    this.glowTex?.dispose();
     for (const m of [this.spinMesh, this.ringMesh]) {
       if (!m) continue;
       m.geometry.dispose();
@@ -876,6 +905,15 @@ export class GasWorld implements BodyRenderer {
       .mul(float(0.26).add(pow(nl, 0.8).mul(0.74)))
       .mul(float(0.3).add(pow(mu, 0.7).mul(0.7)))
       .mul(0.76);
+    if (this.glowTex) {
+      // A hot giant glows by its own heat, strongest on the night side where the sky is dark. The
+      // day-night temperature follows the light smoothly (no step at the terminator).
+      const Tg = mix(float(this.model.tNightK), float(this.model.tDayK), smoothstep(-0.2, 0.25, ns));
+      const lutU = log(clamp(Tg, GLOW_LUT_MIN_K, GLOW_LUT_MAX_K)).sub(Math.log(GLOW_LUT_MIN_K)).div(Math.log(GLOW_LUT_MAX_K) - Math.log(GLOW_LUT_MIN_K));
+      const lutC = (texture as any)(this.glowTex, vec2(lutU, 0.5)).rgb;
+      const nt = smoothstep(0.25, -0.2, ns);
+      col = col.add(lutC.mul(pow(Tg.div(1900), 6)).mul(smoothstep(GLOW_ABOVE_K, GLOW_ABOVE_K + 50, Tg)).mul(mix(float(0.35), float(1), nt)));
+    }
     if (this.input.reference === 'sat') {
       // Rings cast a shadow on the planet: follow the light from this point to the ring plane (y = 0).
       const ly = this.uLight.y;

@@ -5,6 +5,7 @@ import {
   GAS_NY,
   GAS_NODES,
   GAS_SETTLE_STEPS,
+  GLOW_ABOVE_K,
   PACE_DAY_S_PER_S,
   PACE_SLOW_S_PER_S,
   RING_TEX_SIZE,
@@ -140,7 +141,7 @@ describe('profile and storms', () => {
 
 describe('Saturn rings', () => {
   it('ring edges convert to the published Saturn-radius values', () => {
-    // C ring inner 74,658 km = 1.239 R_S, B outer 117,580 km = 1.951 R_S, A inner 2.027 R_S.
+    // NASA ring table: C inner 1.239, B outer 1.950, A inner 2.030 Saturn radii.
     expect(ringAt(1.3).opacity).toBeLessThan(0.2); // C ring is thin
     expect(ringAt(1.7).opacity).toBeGreaterThan(0.8); // B ring is dense
     expect(ringAt(1.99).opacity).toBeLessThan(0.1); // Cassini Division
@@ -149,7 +150,7 @@ describe('Saturn rings', () => {
     expect(ringAt(1.05).opacity).toBe(0);
   });
   it('the Encke Gap is empty', () => {
-    expect(ringAt(133589 / SATURN_RADIUS_KM).opacity).toBe(0);
+    expect(ringAt(133410 / SATURN_RADIUS_KM).opacity).toBe(0);
     expect(ringAt(2.15).opacity).toBeGreaterThan(0.5);
   });
   it('the ring texture is deterministic and well formed', () => {
@@ -272,5 +273,32 @@ describe('placed storms', () => {
     const g1 = later.find((s) => s.kind === 4)!;
     expect(g1.lat).toBe(g0.lat);
     expect(g1.lon).not.toBe(g0.lon);
+  });
+});
+
+describe('tidally locked hot giant (HD 189733 b: P = 2.21857567 d, Teq 1209 K)', () => {
+  const HD: GasInput = { reference: null, radiusRj: 1.13, massEarth: 359.1479, rotPeriodH: 2.21857567 * 24, teqK: 1209, tintK: null, mu: 2.3, seed: 53, locked: true };
+  const m = gasModel(HD)!;
+  it('is hot on the day side and cooler on the night side, with the glow only above 850 K', () => {
+    expect(m.locked).toBe(true);
+    expect(m.tDayK).toBeGreaterThan(m.tNightK);
+    expect(m.tDayK).toBeGreaterThan(1209);
+    expect(m.tNightK).toBeLessThan(1209);
+    expect(m.tDayK).toBeGreaterThan(GLOW_ABOVE_K);
+    // A cold giant has no glow.
+    expect(gasModel({ ...JUP })!.tDayK).toBeLessThan(GLOW_ABOVE_K);
+  });
+  it('does not turn the view and carries one broad equatorial jet', () => {
+    expect(spinAngle(m, 1e6, PACE_SLOW_S_PER_S)).toBe(0);
+    const p = gasProfile(m, HD);
+    expect(Math.abs(p.u(0))).toBeGreaterThan(0.9);
+    expect(Math.abs(p.u(1.0))).toBeLessThan(0.5);
+  });
+  it('the solver runs finite and deterministic', () => {
+    const a = createGasSim(m, HD.seed, gasProfile(m, HD));
+    const b = createGasSim(m, HD.seed, gasProfile(m, HD));
+    for (let i = 0; i < 60; i++) { a.step(); b.step(); }
+    expect(Array.from(a.exportField())).toEqual(Array.from(b.exportField()));
+    expect(Number.isFinite(a.maxAbsVorticity())).toBe(true);
   });
 });
