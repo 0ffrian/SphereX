@@ -7,11 +7,14 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import io
 import json
 import math
 import sys
 import threading
 import time
+import tracemalloc
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -29,8 +32,10 @@ from app.core.render import (
     params_from_card,
     texture_dir,
 )
+from app.core.render.bake import same_png, webp_rgb
 from app.core.render.noise import sphere_dirs
 from app.core.render.normals import normals_from_height
+from tests.helpers import png_gray, png_join, png_redeflate, png_split, png_with_chunk
 
 CARDS = Path(__file__).parents[2] / "shared" / "fixtures" / "cards"
 W, H = 256, 128
@@ -595,3 +600,152 @@ def test_unusable_gaia_rgb_is_listed_so_the_colour_is_not_called_derived() -> No
     }
     p = params_from_card(c, 1)
     assert "gaia_rgb" in p.missing and p.base_rgb == (0.26, 0.25, 0.24)
+
+
+# --- same_png: the cross-machine PNG compare (Q-204) ---------------------------------------------
+
+
+def _map_pixels() -> bytes:
+    """A compressible 64x32 map, so that other deflate settings give other bytes."""
+    return bytes(((x // 3) + y * 5) % 17 * 9 for y in range(32) for x in range(64))
+
+
+def _pillow_png(pixels: bytes, size: tuple[int, int] = (64, 32), level: int = 9) -> bytes:
+    buf = io.BytesIO()
+    Image.frombytes("L", size, pixels).save(buf, "PNG", compress_level=level)
+    return buf.getvalue()
+
+
+def _base_png() -> bytes:
+    return png_gray(64, 32, [0] * 32, _map_pixels())
+
+
+def test_same_png_accepts_another_deflate_stream_and_idat_split() -> None:
+    a = _base_png()
+    b = png_redeflate(a, level=1, parts=3)
+    assert a != b
+    assert same_png(a, b) and same_png(b, a) and same_png(a, a)
+
+
+def test_same_png_accepts_a_pillow_resave_at_another_level() -> None:
+    a, b = _pillow_png(_map_pixels(), level=9), _pillow_png(_map_pixels(), level=1)
+    assert a != b
+    assert same_png(a, b)
+
+
+def test_same_png_rejects_a_changed_pixel() -> None:
+    px = bytearray(_map_pixels())
+    px[100] ^= 1
+    assert not same_png(_pillow_png(_map_pixels()), _pillow_png(bytes(px)))
+
+
+def test_same_png_rejects_a_different_filter_byte() -> None:
+    # The same pixels with row 3 stored with the Sub filter: stricter than a pixel compare.
+    a = png_gray(64, 32, [0] * 32, _map_pixels())
+    b = png_gray(64, 32, [0, 0, 0, 1, *([0] * 28)], _map_pixels())
+    assert a != b
+    assert not same_png(a, b)
+
+
+def test_same_png_rejects_a_different_size_with_the_same_raw_bytes() -> None:
+    assert not same_png(_pillow_png(_map_pixels(), (64, 32)), _pillow_png(_map_pixels(), (32, 64)))
+
+
+def test_same_png_rejects_a_palette_image_with_the_same_grey_values() -> None:
+    img = Image.frombytes("L", (64, 32), _map_pixels())
+    pal = img.convert("P")
+    pal.putpalette([v for i in range(256) for v in (i, i, i)])
+    buf = io.BytesIO()
+    pal.save(buf, "PNG", compress_level=9)
+    assert not same_png(_pillow_png(_map_pixels()), buf.getvalue())
+
+
+@pytest.mark.parametrize(
+    ("kind", "body", "before"),
+    [
+        (b"tEXt", b"k\x00v", b"IEND"),  # text after the image data
+        (b"tIME", bytes(7), b"IDAT"),  # a timestamp
+        (b"prVt", b"private", b"IDAT"),  # a private ancillary chunk
+    ],
+)
+def test_same_png_rejects_an_extra_chunk(kind: bytes, body: bytes, before: bytes) -> None:
+    a = _base_png()
+    b = png_with_chunk(a, kind, body, before)
+    assert a != b
+    assert not same_png(a, b) and not same_png(b, a)
+
+
+def test_same_png_rejects_a_bad_crc() -> None:
+    a = _base_png()
+    idat_crc_at = a.index(b"IDAT") + 4 + len(png_split(a)[1][1])
+    b = a[:idat_crc_at] + bytes([a[idat_crc_at] ^ 1]) + a[idat_crc_at + 1 :]
+    assert not same_png(a, b)
+    assert not same_png(b, png_redeflate(a))
+
+
+def test_same_png_rejects_trailing_bytes_truncation_and_non_png() -> None:
+    a = _base_png()
+    assert not same_png(a, a + b"x")
+    assert not same_png(a, a[: len(a) // 2])
+    assert not same_png(png_redeflate(a), png_redeflate(a)[:-5])
+    assert not same_png(a, webp_rgb(np.zeros((32, 64, 3), np.uint8)))
+    assert not same_png(a, b"")
+
+
+def _with_idats(
+    png: bytes, idats: list[bytes], others: list[tuple[int, tuple[bytes, bytes]]]
+) -> bytes:
+    """``png`` rebuilt with the given IDAT payloads; ``others`` are (index, chunk) to insert."""
+    chunks = [c for c in png_split(png) if c[0] not in (b"IDAT", b"IEND")]
+    chunks += [(b"IDAT", d) for d in idats]
+    for at, chunk in others:
+        chunks.insert(at, chunk)
+    return png_join([*chunks, (b"IEND", b"")])
+
+
+def _idat_data(png: bytes) -> bytes:
+    return b"".join(b for k, b in png_split(png) if k == b"IDAT")
+
+
+def test_same_png_rejects_trailing_data_inside_idat() -> None:
+    a = _base_png()
+    hidden = _with_idats(a, [_idat_data(a) + b"hidden payload"], [])
+    assert not same_png(hidden, a) and not same_png(a, hidden)
+
+
+def test_same_png_rejects_a_chunk_moved_across_idat() -> None:
+    a = _base_png()
+    before = png_with_chunk(a, b"tEXt", b"k\x00v", b"IDAT")
+    after = png_with_chunk(a, b"tEXt", b"k\x00v", b"IEND")
+    assert before != after
+    assert not same_png(before, after)
+
+
+def test_same_png_rejects_idats_that_are_not_consecutive() -> None:
+    a = png_with_chunk(_base_png(), b"tEXt", b"k\x00v", b"IEND")  # IHDR IDAT tEXt IEND
+    data = _idat_data(a)
+    half = len(data) // 2
+    gap = (b"tEXt", b"k\x00v")
+    broken = png_join(
+        [
+            *[c for c in png_split(a) if c[0] == b"IHDR"],
+            (b"IDAT", data[:half]),
+            gap,
+            (b"IDAT", data[half:]),
+            (b"IEND", b""),
+        ]
+    )
+    assert not same_png(a, broken) and not same_png(broken, a)
+
+
+def test_same_png_bounds_the_committed_side_by_the_fresh_side() -> None:
+    fresh = _base_png()
+    bomb = zlib.compress(bytes(200_000_000), 9)  # 200 MB of zeros in about 200 KB
+    committed = _with_idats(fresh, [bomb], [])
+    tracemalloc.start()
+    try:
+        assert not same_png(committed, fresh)
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    assert peak < 50_000_000

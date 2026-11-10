@@ -32,14 +32,14 @@ from app.adapters import exoplanet_archive, horizons, irsa_cutout, irsa_sia, sim
 from app.adapters.http import UpstreamError
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context, make_context
-from app.core.card.catalogue import gather, is_comet, with_star_data
+from app.core.card.catalogue import gather, with_star_data
 from app.core.card.stars import STAR_TYPES
 from app.core.classify import classify
 from app.core.classify.rules import SIMBAD_PLANET
 from app.core.composite.service import CompositeService
 from app.core.find.frames import FrameService, frame_time, is_complete, position_at
 from app.core.find.overlays import CATALOGS, fetch_catalog, overlay_cone
-from app.core.find.resolver import ResolvedObject, load_aliases, resolve
+from app.core.find.resolver import ResolvedObject, is_comet, load_aliases, resolve
 from app.settings import Settings
 from app.timefmt import parse_utc
 
