@@ -237,7 +237,7 @@ def resolve(ctx: Context, q: str, aliases: dict[str, str], *, refresh: bool = Fa
 
 REFERENCE_PROVENANCE = {
     "tag": "artistic",
-    "source": "reference object: a planet of the solar system, not a SPHEREx target, so it has no "
+    "source": "reference object: a body of the solar system, not a SPHEREx target, so it has no "
     "place on the sky here (ra = dec = 0 is a placeholder)",
 }
 
