@@ -314,6 +314,8 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-261 | Comet path on the card (`orbit_track`, Horizons) | Decided in code | [rendering-kinds](rendering-kinds.md) |
 | Q-262 | Emissions view and time between the epochs | Decided in code | [rendering-kinds](rendering-kinds.md) |
 | Q-263 | Modelled comet tail (amends R7.3) | Decided in code | [rendering-kinds](rendering-kinds.md) |
+| Q-266 | Confidence formula shown with KaTeX | Decided in code | [rendering-bodies](rendering-bodies.md) |
+| Q-267 | Accuracy popover follows the mock-up; tag-to-part mapping | Decided in code | [rendering-bodies](rendering-bodies.md) |
 | Q-270 | Flare physics, energy cap, decay index and schedule | Decided in code ([verify] constants) | [rendering-bodies](rendering-bodies.md) |
 | Q-271 | Plasma as additive line streaks, budgets | Decided in code (look unchecked) | [rendering-bodies](rendering-bodies.md) |
 | Q-272 | Plasma in the plan, view rules, controls, reduced motion | Decided in code | [rendering-bodies](rendering-bodies.md) |
