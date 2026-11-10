@@ -28,8 +28,8 @@ async function loadStar(search: string): Promise<void> {
   set.call(input, search);
   input.dispatchEvent(new Event('input', { bubbles: true }));
   await sleep(1800);
-  for (const type of ['keydown', 'keyup'])
-    input.dispatchEvent(new KeyboardEvent(type, { key: 'Enter', code: 'Enter', bubbles: true }));
+  // Enter in the box submits its form (the browser's implicit submission).
+  input.form?.requestSubmit();
   await sleep(2500);
   const rail = document.querySelector('nav[aria-label="Tools"]');
   const btn = [...(rail?.querySelectorAll('button') ?? [])].find((b) => b.getAttribute('aria-label') === '3D viewer');
