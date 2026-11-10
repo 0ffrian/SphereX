@@ -40,7 +40,7 @@ import { ProvenanceBadge } from './Badge';
 import { EmissionsPanel } from './EmissionsPanel';
 import { EPOCH_JD, timeRange } from '@/physics/cometGas';
 import { ConfidenceChip, ConfidenceDetails } from './ConfidencePanel';
-import { ConfidenceFormulaDialog } from './ConfidenceFormulaDialog';
+import { ConfidencePopover } from './ConfidencePopover';
 import { timeLapsesOf } from '@/viewer/motion/planMotion';
 import { describeRefusal, layerName, timeLapseText } from './messages';
 import { buttonClass, pressedClass } from './ui';
@@ -624,7 +624,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             />
           )}
           {params && formulaOpen && (
-            <ConfidenceFormulaDialog params={params} onClose={() => setFormulaOpen(false)} />
+            <ConfidencePopover params={params} name={plan?.name} onClose={() => setFormulaOpen(false)} />
           )}
           {loadingBody && (
             <div className="sx-bp-loading" data-testid="build-loading" role="status">
