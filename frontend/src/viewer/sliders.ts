@@ -154,6 +154,19 @@ export const SLIDER_REGISTRY = {
     spec: ARTISTIC,
   },
 
+  // Issue #71 stream E: pacing of a solved gas world. 0 = 5 minutes of planet time per second (the
+  // default, slow like the real planet), 1 = one Earth day per second (storms visibly drift).
+  gas_pacing: {
+    key: 'gas_pacing',
+    min: 0,
+    max: 1,
+    step: 1,
+    unit: '',
+    appliesTo: ['gas_giant'],
+    group: 'spin',
+    spec: 'D-36 (pacing of the simulated winds; a display choice)',
+  },
+
   // ---- A7.1 planets (shader kinds). ---------------------------------------------------------
   teq_K: {
     key: 'teq_K',

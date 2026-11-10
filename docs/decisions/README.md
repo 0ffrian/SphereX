@@ -134,6 +134,16 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-47 | Texture baker choices | Open (implemented as described) | [rendering-bodies](rendering-bodies.md) |
 | Q-48 | Shared field packing for gas giants | Open (implemented as described) | [rendering-bodies](rendering-bodies.md) |
 | Q-49 | Honesty start vs visible surface | Open (rule resolved with Q-45; start state op… | [rendering-bodies](rendering-bodies.md) |
+| Q-250 | Gas solver and stability | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-251 | Which giants run as a solved world | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-252 | Observed band and ring values [verify] | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-253 | Gas world tags | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-254 | Gas pacing and determinism | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-255 | Pre-formed gas planet | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-256 | Gas tracer on the GPU | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-257 | Gas haptics from the solved flow | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-258 | Reference objects (Jupiter, Saturn) | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-259 | Locked giants and pacing control | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
 | Q-50 | Overlay, flags, combine endpoints | Open (implemented; docs updated in PR #32… | [data-sources](data-sources.md) |
 | Q-51 | CatWISE2020 for WISE sources | Open (CatWISE2020 only) | [data-sources](data-sources.md) |
 | Q-52 | Gaia G < 20 cut | Open (G < 20) | [data-sources](data-sources.md) |

@@ -800,6 +800,12 @@ export class ViewerApp {
   private draw(): void {
     this.frames++;
     this.updateScreenSize();
+    // A body with an off-screen pass of its own (the gas world's tracer) runs it before the frame.
+    try {
+      this.onScreen?.prepareFrame(this.renderer);
+    } catch (err) {
+      console.warn('[viewer] a body could not prepare its frame', err);
+    }
     if (this.chain) {
       try {
         // Volumes shift their per-pixel ray jitter by the TAAU frame index (same index after a
