@@ -10,6 +10,7 @@ import json
 import logging
 import shutil
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
 import pytest
@@ -22,6 +23,7 @@ from app.core.card.validate import check_card, check_params
 from app.core.find.frames import FrameService
 from app.core.find.resolver import ResolvedObject
 from app.main import create_app
+from app.settings import Settings
 from scripts import bake_demo_pack as bp
 from tests.conftest import make_settings
 
@@ -328,3 +330,20 @@ def test_store_refuses_a_pack_asset_of_another_version(
     del doc["asset_version"]  # an asset with no version at all is stale too
     (assets / path.relative_to(bp.ASSETS_DIR)).write_text(json.dumps(doc), "utf-8")
     assert store.get(str(asset.card["id"])) is None
+
+
+def test_check_runs_offline_so_its_result_does_not_depend_on_upstream(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR #70 review: `--check` must never fall through to a live call."""
+    seen: list[bool] = []
+
+    def stop(settings: Settings) -> Any:
+        seen.append(settings.offline)
+        raise SystemExit(0)
+
+    monkeypatch.setattr(bp, "make_context", stop)
+    monkeypatch.setattr(bp, "missing_from_targets_toml", lambda _p: [])
+    with pytest.raises(SystemExit):
+        bp.main(["--check"], settings=Settings(cache_dir=tmp_path, offline=False))
+    assert seen == [True]

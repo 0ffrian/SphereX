@@ -212,7 +212,7 @@ def test_a_small_planet_without_pl_rade_falls_back_to_pl_radj() -> None:
 
 
 def test_asset_version_is_bumped_for_the_new_fields() -> None:
-    assert ASSET_VERSION == "8"
+    assert ASSET_VERSION == "9"
 
 
 def test_jupiter_radius_is_the_equatorial_one_defined_once() -> None:
@@ -279,7 +279,8 @@ def test_rw_aur_teff_comes_from_simbad_not_the_dwarf_table(ctx: Context) -> None
 def test_r_dra_period_is_the_mira_median_and_teff_is_refused(ctx: Context) -> None:
     card, _ = card_of(ctx, "R Dra")
     period = card["period_var_d"]
-    assert period["value"] == 247.0 and period["tag"] == "measured"
+    # A median of three published periods is a derivation, like the Teff median (Q-152).
+    assert period["value"] == 247.0 and period["tag"] == "derived" and "formula" in period
     assert "median of 3" in period["source"] and "2020ApJS..247...44A" in period["source"]
     assert card["teff_K"]["value"] is None and "Miras" in card["teff_K"]["source"]
     assert card["radius_rsun"]["value"] is None

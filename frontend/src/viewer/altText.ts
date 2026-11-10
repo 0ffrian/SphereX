@@ -129,6 +129,7 @@ function exoplanetAlt(plan: RenderPlan): string {
     kind: plan.type,
     scenario: climate?.scenario ?? null,
     lockTested: climate ? !lockRefused(climate) : true,
+    lockNearThreshold: climate?.lockNearThreshold ?? false,
     teffK: plan.lighting.colourTeffK,
     starlight: plan.drawn.some((d) => d.id === 'starlight')
       ? 'drawn'
@@ -157,13 +158,16 @@ export function buildAltText(plan: RenderPlan, shown?: ShownSize | null): string
     const starlit = plan.drawn.some((d) => d.id === 'starlight');
     if (plan.shader.pattern && !plan.shader.surface) {
       const kind = plan.type === 'planet_water' ? 'planet_water' : 'planet_rocky';
-      const scenario = isExoplanetCard(plan.shader.card)
-        ? deriveClimate(plan.shader.card, kind)?.scenario
-        : undefined;
+      const climate = isExoplanetCard(plan.shader.card)
+        ? deriveClimate(plan.shader.card, kind)
+        : null;
+      const planet = climate?.lockNearThreshold
+        ? 'a planet modelled as tidally locked, close to the threshold'
+        : 'a tidally locked planet';
       const what =
-        scenario === 'snowball'
-          ? `only the model's ice, over the whole surface of a tidally locked planet`
-          : `only where the model puts ${patternWords('eyeball', kind)} on a tidally locked planet`;
+        climate?.scenario === 'snowball'
+          ? `only the model's ice, over the whole surface of ${planet}`
+          : `only where the model puts ${patternWords('eyeball', kind)} on ${planet}`;
       return `${plan.name}, ${type}, ${sizeText(plan, shown)}. A smooth sphere${starlit ? ' lit in the colour of its host star (an estimate)' : ''} that shows ${what}. It is a model, not a measured image.${exo}`;
     }
     return plan.shader.surface

@@ -1,12 +1,13 @@
 {
-  "asset_version": "8",
+  "asset_version": "9",
   "card": {
     "id": "simbad-v-r-dra",
     "lightcurve": [],
     "name": "V* R Dra",
     "period_var_d": {
+      "formula": "median of the mesVar periods typed LPV or M; of two middle values, the one from the most recent bibcode (Q-152)",
       "source": "SIMBAD mesVar: median of 3 periods typed LPV or M (246 to 247.207 d); the middle value is from 2020ApJS..247...44A",
-      "tag": "measured",
+      "tag": "derived",
       "value": 247.0
     },
     "pm_mas_yr": {

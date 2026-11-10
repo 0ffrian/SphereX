@@ -260,7 +260,7 @@ def period_field(cat: StarCatalogue | None) -> dict[str, Any]:
     rows = [r for r in (cat.var_rows if cat else ()) if (r.vartyp or "") in MIRA_VARTYPES]
     if rows:
         row, n, lo, hi = median_pick(rows, lambda r: r.period_d, lambda r: r.bibcode)
-        return {
+        out: dict[str, Any] = {
             "value": row.period_d,
             "tag": "measured",
             "source": (
@@ -268,6 +268,15 @@ def period_field(cat: StarCatalogue | None) -> dict[str, Any]:
                 f"the middle value is from {row.bibcode}"
             ),
         }
+        if n > 1:
+            # Picked from several published values, like the Teff median above (Q-152): the choice
+            # is a derivation. One row is that paper's measurement.
+            out["tag"] = "derived"
+            out["formula"] = (
+                "median of the mesVar periods typed LPV or M; of two middle values, the one "
+                "from the most recent bibcode (Q-152)"
+            )
+        return out
     if cat is not None and cat.var_reason:
         why = cat.var_reason
     elif cat is not None and cat.var_rows:
