@@ -260,10 +260,22 @@ export class WorldEngine {
     }
   }
 
-  /** Finish the spin-up exactly as the artifact's test page does: W.gl.tick until done, no redraw in between. */
-  spinUp(dt = 1 / 60): void {
+  /**
+   * Finish the spin-up as the artifact's test page does: W.gl.tick until done, no redraw in between.
+   * The prototype gives each tick a 14 ms wall-clock budget, so how many cloud steps a spin-up takes depends on machine
+   * speed. With `virtualClock` performance.now() advances 1 ms per call during the spin-up, which makes the step count
+   * identical on every machine (used by the parity hook; the artifact's driver must do the same to be comparable).
+   */
+  spinUp(dt = 1 / 60, virtualClock = false): void {
     const W = this.core.W;
-    for (let g = 0; W.spinup > 0 && g < 100000; g++) W.gl.tick(W.m, false, dt);
+    const real = performance.now.bind(performance);
+    let t = 0;
+    if (virtualClock) performance.now = () => (t += 1);
+    try {
+      for (let g = 0; W.spinup > 0 && g < 100000; g++) W.gl.tick(W.m, false, dt);
+    } finally {
+      performance.now = real;
+    }
   }
 
   /** Run page-loop ticks (with redraws) until the spin-up is done. */

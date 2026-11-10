@@ -13,6 +13,9 @@ interface ParityCase {
   fly?: number;
 }
 
+// The artifact's render scale drops when frames are slow; parity pins it (the declared @rename in core.js).
+(window as unknown as Record<string, unknown>).__sxPin = true;
+
 let engine: WorldEngine | null = null;
 let canvas: HTMLCanvasElement | null = null;
 
@@ -51,8 +54,10 @@ async function load(c: ParityCase): Promise<void> {
   engine = new WorldEngine(canvas, { preserveDrawingBuffer: true });
   engine.playing = false;
   engine.setPreset(preset);
-  engine.spinUp();
+  engine.spinUp(1 / 60, true);
   if (c.fly) {
+    // The fly camera aims from the globe's last drawn view (W.view); a user always sees the globe first.
+    engine.draw();
     engine.setFly(true);
     engine.fly.alt = c.fly;
   }
@@ -67,10 +72,13 @@ function capture(size: number): string {
   const g = out.getContext('2d')!;
   g.fillStyle = '#000';
   g.fillRect(0, 0, size, size);
-  const w = canvas.width,
-    h = canvas.height,
-    s = Math.min(w, h);
-  g.drawImage(canvas, (w - s) / 2, (h - s) / 2, s, s, 0, 0, size, size);
+  // Fly cases compare the orbit view only: the left region [0, gx] of the split canvas (the artifact's world.region()).
+  const v = engine.flying ? engine.view() : null;
+  const x0 = 0;
+  const w = v ? v.gx : canvas.width;
+  const h = canvas.height;
+  const s = Math.min(w, h);
+  g.drawImage(canvas, x0 + (w - s) / 2, (h - s) / 2, s, s, 0, 0, size, size);
   return out.toDataURL('image/png');
 }
 

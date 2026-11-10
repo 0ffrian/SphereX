@@ -231,6 +231,7 @@ function ebStats(m) {
 /* ---------- gas giants: quasi-geostrophic vorticity on the sphere, jets and storms emerge and interact ---------- */
 // @end-verbatim
 // @verbatim L2123-L2216
+// @rename (ema=>(!window.__sxPin&&ema
 var OCEANF = { rivers: 0.5, earth: 0.71, t1e: 0.62, t1f: 0.7, k186: 0.55, k218: 1, tit: 0.18, lava: 0 };
 function WorldGL(canvas) {
   var gl = canvas.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance' });
@@ -271,7 +272,7 @@ function WorldGL(canvas) {
     gl.drawArrays(gl.TRIANGLES, 0, 3); var t = ga; ga = gb; gb = t;
   };
   this.draw = function (m) {
-    var now = performance.now(); if (last) { ema = ema * 0.92 + (now - last) * 0.08; if (ema > 42 && scale > 0.45) { scale *= 0.94; ema = 30; } else if (ema < 19 && scale < 1) scale = Math.min(1, scale * 1.01); } last = now;
+    var now = performance.now(); if (last) { ema = ema * 0.92 + (now - last) * 0.08; if (!window.__sxPin&&ema > 42 && scale > 0.45) { scale *= 0.94; ema = 30; } else if (!window.__sxPin&&ema < 19 && scale < 1) scale = Math.min(1, scale * 1.01); } last = now;
     var d = Math.min(devicePixelRatio || 1, 1.5) * scale, w = Math.round(canvas.clientWidth * d), h = Math.round(canvas.clientHeight * d); if (!w || !h) return;
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
     var locked = W.p.locked, F = m.F, spin = (locked ? 0 : W.spin) + (m.gas ? 0 : W.yaw), tilt0 = W.p.axis != null ? W.p.axis : 0.12, Lr = (function () { function rxv(v, a) { var c = Math.cos(a), s = Math.sin(a); return [v[0], v[1] * c - v[2] * s, v[1] * s + v[2] * c]; } function ryv(v, a) { var c = Math.cos(a), s = Math.sin(a); return [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c]; } return rxv(ryv(rxv(L, tilt0), -W.yaw), -(tilt0 + W.pitch)); })();

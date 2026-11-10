@@ -12,6 +12,7 @@ const h = Number(q.get('h') ?? 475);
 canvas.style.width = w + 'px';
 canvas.style.height = h + 'px';
 const w2 = window as unknown as Record<string, unknown>;
+w2.__sxPin = true;
 // Draw and read the drawing buffer in the same task (a WebGL canvas is blank after the task ends), for exact comparison.
 w2.__png = (): string => {
   (w2.__engine as WorldEngine).draw();
@@ -47,6 +48,12 @@ async function main(): Promise<void> {
   const engine = new WorldEngine(canvas, { preserveDrawingBuffer: true });
   w2.__engine = engine;
   engine.playing = false;
+  // ?pre=<preset>: load and settle another world first, as the prototype's page always starts on 'rivers'.
+  const pre = q.get('pre');
+  if (pre) {
+    engine.setPreset(pre);
+    engine.spinUp(1 / 60, true);
+  }
   const presetId = q.get('preset');
   const cardId = q.get('card');
   if (presetId) {
@@ -73,7 +80,7 @@ async function main(): Promise<void> {
     w2.__done = 'idle';
     return;
   }
-  engine.spinUp();
+  engine.spinUp(1 / 60, true);
   // The prototype's settle also runs the next hydro refresh tick only while playing; paused it does not (parity).
   if (q.get('fly') === '1') {
     engine.setFly(true);
