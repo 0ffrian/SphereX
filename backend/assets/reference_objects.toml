@@ -63,3 +63,18 @@ surface_pressure_bar = 1.467        # Huygens HASI at the landing site (Fulchign
 surface_temperature_K = 93.7        # same
 surface_fluid = "methane"           # Cassini radar lakes and seas (Stofan et al. 2007)
 semimajor_axis_1e6_km = 1432.041    # Saturn's, from the Sun
+
+# The Sun (issue #71, Q-294): a star, drawn by the star path. NASA Sun Fact Sheet
+# (https://nssdc.gsfc.nasa.gov/planetary/factsheet/sunfact.html, read 11 Nov 2026): volumetric mean
+# radius 695,700 km, mass 1,988,400 x 10^24 kg, effective temperature 5772 K, sidereal rotation
+# period 609.12 hours (the adopted period at 16 degrees latitude; it varies with latitude).
+[[object]]
+id = "ref-sun"
+name = "Sun"
+aliases = ["sun", "sol", "the sun"]
+type = "star"
+source = "NASA Sun Fact Sheet"
+radius_km = 695700.0
+mass_1e24_kg = 1988400.0
+teff_K = 5772.0
+rot_period_h = 609.12
