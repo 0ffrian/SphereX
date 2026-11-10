@@ -43,6 +43,7 @@ import { ConfidenceChip, ConfidenceDetails } from './ConfidencePanel';
 import { timeLapsesOf } from '@/viewer/motion/planMotion';
 import { describeRefusal, layerName, timeLapseText } from './messages';
 import { buttonClass, pressedClass } from './ui';
+import { StarFlarePanel } from './StarFlarePanel';
 import { MouldStrip, type StripHandle } from './build/MouldStrip';
 import { useMould, type MouldPhase } from './build/useMould';
 import { usesBrowserSeed } from '@/viewer/mould/mouldSteps';
@@ -887,6 +888,13 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                     {starColour === 'observatory' &&
                       ' This is false colour (ultraviolet, as solar observatories show it), not the star\u2019s real colour.'}
                   </p>
+                )}
+                {plan.star.plasma && (
+                  <StarFlarePanel
+                    viewer={viewer}
+                    paused={motionPaused}
+                    fixture={objectIsFixture}
+                  />
                 )}
               </div>
             )}
