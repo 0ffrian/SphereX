@@ -8,8 +8,11 @@ import { API_TIMEOUT_MS } from './api/config';
 import type { CompositeResponse } from './api/types';
 import { formatWavelength } from './format';
 import {
+  countedCode,
   groupCompositeMissing,
+  type CountedCode,
   type FrameReason,
+  type MovingFrameReason,
   type OverlayFrameReason,
   type RefusalGroup,
   type SpectrumOutcome,
@@ -80,8 +83,16 @@ function pluralPoints(n: number): string {
 
 /** Each frame reason: the list line (after the count) and a short label for the ID list. */
 const FRAME_TEXT: Readonly<
-  Record<FrameReason | OverlayFrameReason, { line: string; short: string }>
+  Record<FrameReason | OverlayFrameReason | MovingFrameReason, { line: string; short: string }>
 > = {
+  no_footprint: {
+    line: 'with no outline on the sky on record, so they can’t be checked for this moving object.',
+    short: 'no outline on the sky',
+  },
+  ephemeris: {
+    line: 'where the object’s predicted position at that time could not be loaded.',
+    short: 'no predicted position',
+  },
   footprint: {
     line: 'with no detector footprint on record, so the field of view can’t be drawn.',
     short: 'no detector footprint',
@@ -136,6 +147,32 @@ const FRAME_TEXT: Readonly<
   },
 };
 
+/** "1 search", "12 searches" */
+function pluralSearches(n: number): string {
+  return n === 1 ? '1 archive search' : `${n} archive searches`;
+}
+
+/**
+ * Counted codes (refusals.ts COUNTED_CODES) other than `cutouts:deferred`, which
+ * describeRefusalGroup words itself. The `frames:*` ones come from the moving-object path search.
+ */
+const COUNTED_TEXT: Readonly<
+  Record<Exclude<CountedCode, 'cutouts:deferred'>, (n: number) => string>
+> = {
+  'frames:search_deferred': () =>
+    'The archive is still being searched along this object’s path. Frames appear here as they are found.',
+  'frames:cone_cap': (n) =>
+    `The path is too long to search at every point: ${n === 1 ? '1 point was' : `${n} points were`} skipped, so some frames may be missing.`,
+  'frames:cone_maxrec': (n) =>
+    `${pluralSearches(n)} along the path hit the archive’s size limit, so some frames may be missing.`,
+  'frames:sparse_path': (n) =>
+    `The object moves fast, so at ${n === 1 ? '1 point' : `${n} points`} along its path the searches are further apart than it moves; some frames may be missing.`,
+  'frames:cone_failed': (n) =>
+    `${pluralSearches(n)} along the path failed, so some frames may be missing. Try again later.`,
+  'frames:outside_window': (n) =>
+    `${n === 1 ? '1 frame was' : `${n} frames were`} taken outside the time this object’s path is known for, so ${n === 1 ? 'it is' : 'they are'} not used.`,
+};
+
 /**
  * Whole-result codes. `cutouts:deferred:<n>` is worded in describeRefusalGroup.
  * `spectrum:saturated` is listed only when no frame group is saturated (refusals.ts), which the
@@ -143,11 +180,12 @@ const FRAME_TEXT: Readonly<
  */
 const NOTE_TEXT: Readonly<Record<string, string>> = {
   'frames:truncated': 'The archive sent a shortened list, so some frames may be missing.',
-  'frames:moving_object_search':
-    'Frames for moving Solar System objects are not searched yet, so there are no frames to show.',
+  'frames:ephemeris':
+    'The predicted path of this object could not be loaded for all or part of the search, so some or all of its frames are missing. Try again later.',
+  'frames:moving_window':
+    'The search period set up for this object is too short, so its frames were not searched.',
   'spectrum:saturated':
     'The detector flagged the object’s centre as saturated or unusable in every frame found, so this tool can’t measure a spectrum.',
-  'spectrum:moving_object_search': 'Spectra for moving Solar System objects are not measured yet.',
   // Colour composite (refusals.ts COMPOSITE_WHOLE_REASONS). `saturated` is cause-neutral (A11).
   'composite:too_few_bands':
     'There are not enough usable frames near the three colour wavelengths to make a composite.',
@@ -210,6 +248,10 @@ export function describeRefusalGroup(g: RefusalGroup): string {
     return g.count === 1
       ? '1 frame is left out because it has not been downloaded yet. Fetch the rest of the frames above to include it.'
       : `${g.count} frames are left out because they have not been downloaded yet. Fetch the rest of the frames above to include them.`;
+  }
+  const counted = g.known ? countedCode(g.reason) : null;
+  if (counted && counted.prefix !== 'cutouts:deferred') {
+    return COUNTED_TEXT[counted.prefix](counted.count);
   }
   if (Object.hasOwn(NOTE_TEXT, g.reason)) return NOTE_TEXT[g.reason]!;
   return compositeChannelText(g.reason) ?? `Not available: ${g.reason}`;

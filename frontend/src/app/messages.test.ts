@@ -170,7 +170,7 @@ describe('spectrum empty state', () => {
   });
 
   it('no frames at all', () => {
-    const o = summarizeSpectrum([], ['spectrum:moving_object_search']);
+    const o = summarizeSpectrum([], ['frames:moving_window']);
     expect(spectrumEmptyMessage(o)).toBe(
       'There is no spectrum: no frames of this object were available to measure.',
     );
@@ -370,5 +370,15 @@ describe('displacement refusal (issue #43)', () => {
     for (const id of ['point_cloud', 'baked_ao', 'self_shadow', 'ion_tail', 'dust_tail']) {
       expect(layerName(id), id).not.toMatch(/\b[AQR]\d|Layer “/);
     }
+  });
+});
+
+describe('moving-object path search wording', () => {
+  it('words the counted codes with their count', () => {
+    expect(one(['frames:cone_cap:1'])).toContain('1 point was skipped');
+    expect(one(['frames:cone_cap:12'])).toContain('12 points were skipped');
+    expect(one(['frames:cone_failed:1'])).toContain('1 archive search along the path failed');
+    expect(one(['frames:outside_window:291'])).toContain('291 frames were taken outside');
+    expect(one(['frames:search_deferred:3'])).toContain('still being searched');
   });
 });

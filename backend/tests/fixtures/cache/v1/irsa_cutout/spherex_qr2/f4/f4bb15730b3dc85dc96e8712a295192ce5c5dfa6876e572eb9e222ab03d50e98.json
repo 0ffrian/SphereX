@@ -1,0 +1,23 @@
+{
+ "body_sha256": "cb8ded7867187d15cfc569b443284e7955f1a259c851dca8f09d6d027c9728a7",
+ "body_size": 126720,
+ "content_type": "application/fits",
+ "dropped_hdus": [
+  "PSF"
+ ],
+ "fetched_at": "2026-11-07T15:48:52.146Z",
+ "key": {
+  "query": {
+   "dec": "13.29614",
+   "frame_id": "2026W12_2A_0341_2_D4",
+   "ra": "91.70984",
+   "size_arcsec": "360.0"
+  },
+  "release": "spherex_qr2",
+  "source": "irsa_cutout"
+ },
+ "original_sha256": "c3e4f2a3294ee6ea9e84813ae6da826e3c4fdc20ea38c7d75fa046354afa5b7c",
+ "original_size": 5109120,
+ "status": 200,
+ "url": "https://irsa.ipac.caltech.edu/ibe/data/spherex/qr2/level2/2026W12_2A/l2b-v24-2026-083/4/level2_2026W12_2A_0341_2D4_spx_l2b-v24-2026-083.fits?center=91.70984%2C13.29614&size=0.100000"
+}

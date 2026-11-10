@@ -49,7 +49,11 @@ ASSET_SOURCE = "derived.asset"
 #   pl_rade x R_earth / R_Jup instead of the rounded pl_radj (Kepler-186 f becomes tidally locked
 #   in the frontend rule);
 #   Bennu is asteroid_shape from its registered mesh (Q-163).
-ASSET_VERSION = "8"
+# 9 (issue #26, Q-125, merged after 8; PR #70 review): stage 1 finds frames for moving objects and
+#   stage 2 measures their spectrum (a card saved before had none: `frames:moving_object_search`
+#   was final); the comet path search uses `CAP<JD` (Q-167); a Mira period that is a median of
+#   several SIMBAD rows is `derived` (Q-152). Stage 1 and 2 changes count too.
+ASSET_VERSION = "9"
 AssetStatus = Literal["saved", "generated", "sketch"]
 FIELDS = ("card", "render_params", "textures", "generator_version", "seed", "created_at")
 OPTIONAL_FIELDS = ("asset_version", "inputs_sha256")

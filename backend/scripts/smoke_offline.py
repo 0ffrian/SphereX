@@ -4,7 +4,7 @@ every cutout PNG with SX_OFFLINE=1 and all non-loopback network blocked.
     uv run python -m scripts.smoke_offline [--group test]
 
 Exit code 1 if any target has no frames, a cutout fails, or `missing` lists anything other
-than the moving-object refusal (Q-21).
+than a per-frame geometric refusal. A moving object may honestly have no frames.
 """
 
 from __future__ import annotations

@@ -333,7 +333,7 @@ test('a refused moving object says why, with no frames', async ({ page }) => {
   await page.goto('/');
   await search(page, 'Synthetic refused mover');
   await expect(page.getByTestId('no-frames')).toContainText(
-    'Frames for moving Solar System objects are not searched yet',
+    'The predicted path of this object could not be loaded',
   );
   await expect(page.getByTestId('flipbook')).toHaveCount(0);
   expect(errors, errors.join('\n')).toEqual([]);

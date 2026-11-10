@@ -71,6 +71,19 @@ class ResolvedObject:
         return cls(**d)
 
 
+def is_comet(ctx: Context, obj: ResolvedObject) -> bool:
+    """Whether SBDB calls the object a comet. Resolve already asked, so this is a cache hit; a
+    miss means "not a comet", which is what an asteroid and an unknown object both need."""
+    name = obj.query or obj.name
+    if not name:
+        return False
+    try:
+        answer, _ = sbdb.query(ctx, name)
+    except (CacheMissOffline, UpstreamUnavailable):
+        return False
+    return answer.hit is not None and answer.hit.is_comet
+
+
 @dataclass(frozen=True)
 class Resolution:
     obj: ResolvedObject

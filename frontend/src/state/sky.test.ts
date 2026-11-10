@@ -51,7 +51,7 @@ describe('sky slice', () => {
     await store().skySearch({ q: 'Synthetic refused mover', kind: 'name', origin: 'input' });
     expect(sky().status).toBe('ready');
     expect(sky().frames?.frames).toEqual([]);
-    expect(sky().frames?.missing).toEqual(['frames:moving_object_search']);
+    expect(sky().frames?.missing).toEqual(['frames:ephemeris']);
     store().skyPlay();
     expect(sky().playing).toBe(false);
   });
