@@ -1,6 +1,6 @@
 # 06 Haptics and audio (classes)
 
-The haptics engine, its drivers, the calibration store and the event sources. Drawn from rendering doc §8.3–8.8 and §10, and decisions D-08 (web only), D-09 (quantised strength), D-10 (audio on every platform, `pitch` and `pan`), D-12 (`terrain` and `flow` sources, shared field), D-20 (`sharpness`, `spherex:haptic` debug hook) and B-01 (Tauri, post-event). The engine fans out every event to all active drivers.
+The haptics engine, its drivers, the calibration store and the event sources. Drawn from rendering doc §8.3–8.8 and §10, and decisions D-08 (web only), D-09 (quantised strength), D-10 (audio on every platform, `pitch` and `pan`), D-12 (`terrain` and `flow` sources, shared field), D-20 (`sharpness`, `spherex:haptic` debug hook), B-01 (Tauri, post-event), **Q-132** (at the event the A15 laptop plays sound only: the AudioDriver is the one active driver, `WebVibrateDriver` is after the event) and **Q-133** (the height map, terrain land and mesh height drive one continuous body tone, [R8.9.1](../rendering/haptics/audio-pairing.md#r891-body-tone-from-the-height-map-q-133), not ticks). The engine fans out every event to all active drivers. The tone stream (`ToneParams`, `ToneCapableDriver`) is proposed in [R8.8](../rendering/haptics/engine-api.md#r88-engine-api) and not built yet.
 
 ## Diagram 1: engine, drivers, settings and calibration
 
@@ -47,8 +47,18 @@ classDiagram
     honesty gate, then rate cap 40 per s and 25 ms ticks
     phase-continuous train scheduler, Q-71
   }
+  class ToneParams {
+    <<proposed, R8.8 tone stream>>
+    +pitch, gain, pan, tag, voice
+  }
+  class ToneCapableDriver {
+    <<proposed, R8.8 tone stream>>
+    +startTone(p: ToneParams) void
+    +updateTone(p: ToneParams) void
+    +stopTone() void
+  }
   class WebVibrateDriver {
-    <<drivers/webVibrate.ts>>
+    <<drivers/webVibrate.ts, after the event, Q-132>>
     +supported: navigator.vibrate exists
     +setLevels(levels) boolean
     +setDelayMs(ms) void
@@ -118,6 +128,9 @@ classDiagram
   HapticEngine ..> HapticEvent : gates, caps, multiplies
   WebVibrateDriver ..|> TrainCapableDriver
   AudioDriver ..|> TrainCapableDriver
+  AudioDriver ..|> ToneCapableDriver : proposed
+  ToneCapableDriver ..> ToneParams : body tone, Track path voice
+  HapticEngine ..> ToneParams : startTone, updateTone, stopTone, proposed
   TauriDriver ..|> HapticDriver
   AudioDriver --> SharedAudioContext : schedules on currentTime
   AudioDriver --> AudioGraph : master bus, bell
@@ -186,7 +199,8 @@ classDiagram
   class HeightMapSource {
     <<sources/heightMap.ts>>
     float16 height.bin decoded by hand, bilinear
-    R8.4 peak rule, hydrated x0.6
+    event: drives the body tone, Q-133, not built yet
+    after the event: R8.4 ticks for vibration
     crater rims refused, Q-78
   }
   class MeshNormalSource {
@@ -196,7 +210,8 @@ classDiagram
   }
   class TerrainSource {
     <<sources/terrain.ts, D-12>>
-    land relief, coastline with hysteresis
+    land relief feeds the body tone, Q-133
+    coastline with hysteresis
     ocean swell, ice over land and sea, lava double
   }
   class FlowSource {
@@ -288,7 +303,8 @@ classDiagram
 - The Listen sweep is a sound, not a `HapticEvent`: it does not go through the engine, so it applies the honesty filter itself (tone by the spectrum's tag, each chime by its Q's tag) and uses the shared master bus and its limiter.
 - The engine applies, in order: the honesty gate (D-21; `stop` is exempt), the R8.3 rate cap (≥ 25 ms between `tick`, `double` and `heartbeat`; at most 40 events in any 1 s window, a train window counting as one; `stop` exempt; extra events dropped, never queued), then the strength multiplier (R8.7). Only then does it fan out and fire `spherex:haptic` (D-20), even when no driver is active.
 - Pulse trains belong to the engine (Q-71): sources call `startTrain` / `updateTrain` / `stopTrain` and own no timers. The engine keeps each train's phase and sends explicit pulse times per 250 ms window (`TrainWindow` also carries `atMs`, `trainSeq` and `channel`), so 1–2 Hz swells play at their rate; a late timer never moves the grid. One train at a time. A one-shot cancels the vibration pattern; the engine re-sends the cancelled pulses to vibration only (`resentCount`) once it ends. Stopping a train calls each driver's `stopTrain()`, which cancels train output only, never a playing one-shot. The vibration delay of the R8.9 offset is a timer per pattern (Q-73).
-- `WebVibrateDriver` maps `strength` to 3–4 equal bins (D-09). Its `supported` is false on iPhone, iPad and desktop, so it is a silent no-op there.
+- `WebVibrateDriver` maps `strength` to 3–4 equal bins (D-09). Its `supported` is false on iPhone, iPad and desktop, so it is a silent no-op there, including on the A15 laptop at the event (Q-132).
+- **Body tone (Q-133):** while feeling a body, the height map, terrain land and mesh height (mesh height is proposed for Eros) set the pitch of one sustained tone through the tone stream; the per-sample height ticks are the vibration path after the event ([R8.4](../rendering/haptics/sources.md#r84-event-sources), [R8.9.1](../rendering/haptics/audio-pairing.md#r891-body-tone-from-the-height-map-q-133)). As built, the sources still emit clicks. Band, data-pulse and light-curve sources are as in R8.4.
 - `AudioDriver` timbre (R8.9, Q-72): clean tone for `measured`, softer tone for the Estimated tags, a 4 ms noise grain for `artistic`. `voice` refines it: `surf` low-passed noise and `tone` a band-passed grain for `artistic`; `chime` a bell for the other tags. `artistic` never becomes a tone and the other tags never become noise.
 - Settings and calibration each persist under one `localStorage` key. `Calibration` types and `applyCalibration` were pinned in #9; #10 built the maths, the persistence (validated on load) and the wizard, `ui/CalibrationWizard.tsx` (diagram 13). Offset rule (R8.9): a positive `avOffsetMs` delays the audio, a negative one the vibration.
 - Drivers never know about objects; only `buildHaptics` reads `HapticProfile`. `sharpness` is ignored by the web driver (D-20).

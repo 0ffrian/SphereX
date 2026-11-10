@@ -1,6 +1,6 @@
-# Visual review checklist
+# R11.2 Visual review checklist
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Section:** R11 · Render-core quality gates (issue #39) · **Implements:** D-02, D-21
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R11.2 (a sub-page of [R11](../acceptance-tests.md): render-core quality gates, issue #39) · **Implements:** [D-02, D-21](../../decisions/contract-tags.md), [D-04](../../decisions/contract.md), [Q-109](../../decisions/rendering-kinds.md) · **Read with:** [README.md](README.md) (R11.1)
 
 A person and the `design-reviewer` agent run this against the [reference frames](README.md), using the seed, time and fixture convention in that README. Mark each line pass, fail or n/a, with a screenshot for every fail. A renderer does not merge with an open fail.
 
@@ -11,7 +11,7 @@ A person and the `design-reviewer` agent run this against the [reference frames]
 - [ ] No banding in smooth gradients (limb, glow, sky, terminator).
 - [ ] No seams (longitude wrap, poles, tile edges).
 - [ ] No flicker over 10 s at fixed seed and time; no shimmer under slow rotation.
-- [ ] Silhouette is the shape the card says (axis ratio, flattening), not a plain circle by default.
+- [ ] Silhouette is the shape the card says (axis ratio, flattening), not a plain circle by default, unless the card holds no axis ratio (the nova outline, R7.7) or the flattening is refused (brown dwarfs, Q-109).
 - [ ] Looks at least as good as its reference frame in the same lighting.
 
 **Star** ([star.jpg](star.jpg))
@@ -34,7 +34,7 @@ A person and the `design-reviewer` agent run this against the [reference frames]
 
 **Gas giant, brown dwarf, hot Jupiter** ([gas_giant.jpg](gas_giant.jpg), [hot_jupiter.jpg](hot_jupiter.jpg))
 
-- [ ] Bands run along latitude with sheared edges; storms are inside bands; flattened limb.
+- [ ] Bands run along latitude with sheared edges; storms are inside bands; flattened limb (not for brown dwarfs: flattening is refused and they are drawn round, Q-109).
 - [ ] Hot Jupiter: no rings unless the card has them.
 
 **Rocky and water worlds** ([water_world.jpg](water_world.jpg), [cold_rocky.jpg](cold_rocky.jpg))
@@ -42,9 +42,7 @@ A person and the `design-reviewer` agent run this against the [reference frames]
 - [ ] Ice at the poles when the equilibrium temperature says so; no lava on a cold world.
 - [ ] Ocean glint on the lit side; atmosphere rim only where the card has an atmosphere.
 
-**Neutron star** ([neutron_star.jpg](neutron_star.jpg))
-
-- [ ] Hot surface, dipole field lines and beams are separate readable layers.
+**Neutron star**: n/a. It is a concept frame only; D-04 has no neutron-star `ObjectType`, so no renderer merges against it.
 
 ## 2. Accuracy checks (gate 4)
 

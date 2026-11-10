@@ -66,7 +66,7 @@ sequenceDiagram
           GP-->>API: code, reason flat_height
         else ask Gemini (per-object lock: call and writes, other objects in parallel)
           GP->>DC: Look up model + aspect + paint version + prompt hash + hillshade hash (refresh=true skips a hit)
-          alt cache hit (offline only if SX_GEMINI_OFFLINE_CACHE=1, Q-29; also with no key)
+          alt cache hit (offline only if SX_GEMINI_OFFLINE_CACHE=1, Q-29, also with no key)
             DC-->>GP: Cached image bytes (already checked when stored)
           else cache miss with SX_OFFLINE=1
             GP-->>API: code, reason offline (no network call)
