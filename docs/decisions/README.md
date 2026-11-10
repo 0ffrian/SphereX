@@ -300,6 +300,8 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-241 | Fluid table and constants (stream D) | Open (built) | [rendering-bodies](rendering-bodies.md) |
 | Q-242 | Plate tectonics terrain (stream D) | Open (built) | [rendering-bodies](rendering-bodies.md) |
 | Q-243 | Sliders and worker for stream D | Open (built) | [rendering-bodies](rendering-bodies.md) |
+| Q-244 | Rivers and lakes (stream D round 2) | Open (built) | [rendering-bodies](rendering-bodies.md) |
+| Q-245 | Cloud tracer (stream D round 2) | Open (built, GPU unchecked) | [rendering-bodies](rendering-bodies.md) |
 | Q-260 | 3I/ATLAS gas rates by epoch, coma and nucleus (resolves the shape of Q-42) | Decided in code (Moon to confirm) | [rendering-kinds](rendering-kinds.md) |
 | Q-261 | Comet path on the card (`orbit_track`, Horizons) | Decided in code | [rendering-kinds](rendering-kinds.md) |
 | Q-262 | Emissions view and time between the epochs | Decided in code | [rendering-kinds](rendering-kinds.md) |
