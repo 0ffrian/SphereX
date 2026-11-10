@@ -8,10 +8,12 @@ import { generateField } from '../fields/fieldGenerator';
 import { ALL_TAGS, type BodyContext } from './bodyRenderer';
 import { ShaderBody, patternMode } from './ShaderBody';
 import { fixture } from './fixtures.testutil';
+import { tinyWorldSource } from './worldFixtures.testutil';
 
 const ctx: BodyContext = {
   visibleTags: ALL_TAGS,
   fieldSource: async (p) => generateField(p, 64, 32),
+  worldSource: tinyWorldSource,
 };
 
 async function body(card: ObjectCard, light: [number, number, number]) {
