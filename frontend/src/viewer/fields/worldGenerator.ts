@@ -17,6 +17,7 @@ import {
   type WorldModel,
 } from '@/physics/climateBudget';
 import { buildTerrain, terrainFromData } from '@/physics/terrain';
+import { hydroRaster, routeTerrain, type HydroRaster } from '@/physics/hydrology';
 import { FIELD_HEIGHT, FIELD_WIDTH, pixelDirection, type FieldData } from './fieldGenerator';
 
 /** Quality of the heavy part: `low` is the phone tier (a quarter of the terrain cells, half the steps). */
@@ -33,7 +34,9 @@ export interface WorldParams {
 export interface WorldData {
   model: WorldModel;
   terrain: { W: number; H: number; data: Float32Array; plates: number };
-  climate: { nx: number; ny: number; out: Float32Array; stats: BudgetStats | null; hash: string };
+  climate: { nx: number; ny: number; out: Float32Array; rain: Float32Array; stats: BudgetStats | null; hash: string };
+  /** Rivers, lakes, salt flats, plumes (physics/hydrology.ts); null when the world has no ocean basin or no air. */
+  hydrology: HydroRaster | null;
   /** The shared field (D-12): R height 0..1 (sea level 0.5), ocean, ice and lava masks in B. */
   field: FieldData;
   /** An ocean basin exists (the assumed ocean share is above 0 and the world has air). */
@@ -46,8 +49,8 @@ export interface WorldData {
 export const HEIGHT_SPAN_KM = 20;
 
 const GRID = {
-  full: { tw: 720, th: 360, nx: 180, ny: 90 },
-  low: { tw: 360, th: 180, nx: 90, ny: 45 },
+  full: { tw: 720, th: 360, nx: 180, ny: 90, rw: 2048, rh: 1024 },
+  low: { tw: 360, th: 180, nx: 90, ny: 45, rw: 1024, rh: 512 },
 } as const;
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -63,6 +66,9 @@ export interface WorldSize {
   th: number;
   nx: number;
   ny: number;
+  /** Hydrology raster size. */
+  rw: number;
+  rh: number;
   steps: number;
 }
 export const WORLD_SIZES: Readonly<Record<WorldTier, WorldSize>> = {
@@ -77,6 +83,24 @@ export function generateWorld(p: WorldParams, size: WorldSize = WORLD_SIZES[p.ti
   const terr = buildTerrain({ seed: p.seed, oceanFraction: p.oceanFraction, gravity: model.gv, W: g.tw, H: g.th });
   const budget = new ClimateBudget(model, { nx: g.nx, ny: g.ny, oceanFraction: p.oceanFraction }, (lon, lat) => terr.heightAt(lon, lat));
   budget.step(size.steps, SETTLE_DT);
+
+  // Rivers and lakes on the final terrain, from the budget's rain (Q-244). Only a world with an ocean
+  // basin and air has any; the tier sets the raster size.
+  let hydrology: HydroRaster | null = null;
+  if (p.oceanFraction > 0 && !model.airless) {
+    const t = { W: terr.W, H: terr.H, data: terr.data, seed: p.seed };
+    const rt = routeTerrain(t);
+    const T = new Float32Array(budget.nx * budget.ny);
+    for (let i = 0; i < T.length; i++) T[i] = budget.out[i * BUDGET_CHANNELS]!;
+    hydrology = hydroRaster(
+      t,
+      { radiusM: p.inputs.radiusM, fluid: model.fluid, lapseKPerKm: model.gamK, isWater: p.inputs.fluid === 'water' },
+      { nx: budget.nx, ny: budget.ny, T, rain: budget.rain },
+      rt,
+      g.rw,
+      g.rh,
+    );
+  }
 
   // Shared field, row 0 = north pole (R6.1): look the terrain and the budget up by direction.
   const a = new Float32Array(FIELD_WIDTH * FIELD_HEIGHT * 4);
@@ -113,8 +137,9 @@ export function generateWorld(p: WorldParams, size: WorldSize = WORLD_SIZES[p.ti
   return {
     model,
     terrain: { W: terr.W, H: terr.H, data: terr.data, plates: terr.plates },
-    climate: { nx, ny, out, stats: budget.stats, hash: budget.hash() },
+    climate: { nx, ny, out, rain: budget.rain, stats: budget.stats, hash: budget.hash() },
     field: { width: FIELD_WIDTH, height: FIELD_HEIGHT, a, b },
+    hydrology,
     hasOcean: hasBasin,
     tier: p.tier,
   };

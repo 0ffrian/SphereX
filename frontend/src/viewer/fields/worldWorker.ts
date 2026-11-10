@@ -28,6 +28,8 @@ export function worldTransferables(res: WorldResponse): ArrayBuffer[] {
       w.climate.out.buffer,
       w.field.a.buffer,
       w.field.b.buffer,
+      w.climate.rain.buffer,
+      ...(w.hydrology ? [w.hydrology.img.buffer] : []),
     ] as ArrayBuffer[]),
   ];
 }
