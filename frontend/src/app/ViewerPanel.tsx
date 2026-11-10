@@ -40,6 +40,7 @@ import { ProvenanceBadge } from './Badge';
 import { EmissionsPanel } from './EmissionsPanel';
 import { EPOCH_JD, timeRange } from '@/physics/cometGas';
 import { ConfidenceChip, ConfidenceDetails } from './ConfidencePanel';
+import { ConfidencePopover } from './ConfidencePopover';
 import { timeLapsesOf } from '@/viewer/motion/planMotion';
 import { describeRefusal, layerName, timeLapseText } from './messages';
 import { buttonClass, pressedClass } from './ui';
@@ -246,6 +247,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   }, [viewer]);
   const [whyOpen, setWhyOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [formulaOpen, setFormulaOpen] = useState(false);
   const detailsId = useId();
   const whyId = useId();
   const fixture = useAppStore((s) => s.sky.fixture);
@@ -636,11 +638,11 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           {params && plan?.threeD && (
             <ConfidenceChip
               params={params}
-              onOpen={() => {
-                setDetailsOpen(true);
-                document.getElementById(detailsId)?.scrollIntoView?.({ block: 'nearest' });
-              }}
+              onOpen={() => setFormulaOpen(true)}
             />
+          )}
+          {params && formulaOpen && (
+            <ConfidencePopover params={params} name={plan?.name} onClose={() => setFormulaOpen(false)} />
           )}
           {loadingBody && (
             <div className="sx-bp-loading" data-testid="build-loading" role="status">
