@@ -23,7 +23,7 @@ from app.core.card import stars
 from app.core.classify import CatalogueFacts
 from app.core.classify.rules import SIMBAD_PLANET
 from app.core.find.propagate import propagate
-from app.core.find.resolver import ResolvedObject
+from app.core.find.resolver import ResolvedObject, is_comet
 from app.timefmt import parse_utc
 
 log = logging.getLogger("shift_spectrum")
@@ -225,19 +225,6 @@ class GeometryAnswer:
     geometry: horizons.Geometry | None = None
     served: tuple[Served, ...] = ()
     reason: str | None = None
-
-
-def is_comet(ctx: Context, obj: ResolvedObject) -> bool:
-    """Whether SBDB calls the object a comet. Resolve already asked, so this is a cache hit; a
-    miss means "not a comet", which is what an asteroid and an unknown object both need."""
-    name = obj.query or obj.name
-    if not name:
-        return False
-    try:
-        answer, _ = sbdb.query(ctx, name)
-    except (CacheMissOffline, UpstreamUnavailable):
-        return False
-    return answer.hit is not None and answer.hit.is_comet
 
 
 def fetch_geometry(ctx: Context, obj: ResolvedObject) -> GeometryAnswer | None:

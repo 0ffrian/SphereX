@@ -1,4 +1,4 @@
-"""``GET /v1/objects/{id}/spectrum``: the brief's shape, errors and the moving-object refusal."""
+"""``GET /v1/objects/{id}/spectrum``: the brief's shape, errors and a moving object."""
 
 from __future__ import annotations
 
@@ -54,11 +54,17 @@ def test_unknown_object_is_404(client: TestClient) -> None:
     assert r.json()["error"] == "not_found" and r.json()["detail"]
 
 
-def test_moving_object_is_refused_not_invented(client: TestClient) -> None:
+def test_moving_object_spectrum_runs_on_the_path_frames(client: TestClient) -> None:
+    """Issue #26: Stage 2 measures the frames the path search found; every frame is a point or
+    a named refusal, never a guess."""
     oid = resolve_id(client, "433 Eros")
+    frames = client.get(f"/v1/objects/{oid}/frames").json()["frames"]
     r = client.get(f"/v1/objects/{oid}/spectrum")
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["spectrum"] == [] and body["light_curve"] == []
-    assert "frames:moving_object_search" in body["missing"]
+    assert "frames:moving_object_search" not in body["missing"]
+    assert body["spectrum"] and body["tag"] == "measured"
+    points = {p["frame_id"] for p in body["spectrum"]}
+    refused = {m.rsplit(":", 1)[1] for m in body["missing"] if m.count(":") == 1}
+    assert points | refused >= {f["frame_id"] for f in frames}
     assert "spectrum:saturated" not in body["missing"]

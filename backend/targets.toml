@@ -33,13 +33,30 @@ query = "R Dra"
 group = "test"
 aliases = ["r dra"]
 
-# A moving object, so the SBDB + Horizons path and the moving-object refusal (Q-21) are
-# recorded and tested offline.
+# A moving object, so the SBDB + Horizons path and the moving-object path search (issue #26,
+# Q-21) are recorded and tested offline.
 [[target]]
 name = "433 Eros"
 query = "433 Eros"
 group = "fixture"
 aliases = []
+
+# Moving targets with their own path-search windows (issue #26, PR #53): `moving_windows`
+# replaces SX_MOVING_WINDOW_START/END, so the cone cap covers only the spans where SPHEREx saw
+# the body. Matched by `spkid` (the SBDB id), so every spelling of the name gets the same windows. Not recorded as fixtures (`scripts.record_fixtures` skips group "moving").
+# 3I/ATLAS: SBDB answers "3I" with C/2025 N1 (ATLAS), spkid 1004083 (checked 9 Nov 2026). QR2
+# has its frames for 2025-08-01 to 08-16 and 2025-12-08 to 12-15 UTC (A3.1); each window is
+# padded by one day either side.
+[[target]]
+name = "3I/ATLAS"
+query = "3I"
+group = "moving"
+aliases = ["3I/ATLAS", "C/2025 N1"]
+spkid = "1004083"
+moving_windows = [
+  ["2025-07-31T00:00:00Z", "2025-08-18T00:00:00Z"],
+  ["2025-12-07T00:00:00Z", "2025-12-17T00:00:00Z"],
+]
 
 # Exoplanet fixtures (Q-63, A3.8): one per kind the rule gives, plus the envelope refusal, with
 # `frames = false` so only the SIMBAD and Exoplanet Archive answers are recorded (no SPHEREx

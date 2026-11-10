@@ -236,8 +236,10 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     northUp: false,
     frameCount: 0,
     seed: 707,
-    refuseFrames: 'frames:moving_object_search',
-    refuseSpectrum: 'spectrum:moving_object_search',
+    // What the backend sends for a mover with no path ephemeris (find/moving.py); the
+    // spectrum passes Stage 1's `missing` through.
+    refuseFrames: 'frames:ephemeris',
+    refuseSpectrum: 'frames:ephemeris',
     refuseComposite: ['composite:moving_object'],
   },
 ];
