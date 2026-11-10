@@ -139,7 +139,7 @@ class LightcurvePoint(BaseModel):
     flags: float
 
 
-class GasQ(BaseModel):
+class GasQEpoch(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -149,6 +149,39 @@ class GasQ(BaseModel):
 
 
 type CometEpoch = Annotated[Literal["2025-08", "2025-12"], Field(..., title="CometEpoch")]
+
+
+type ValueItem = Annotated[list[float], Field(..., max_length=7, min_length=7)]
+
+
+type Value = Annotated[
+    list[ValueItem],
+    Field(..., description="null = unknown, never a guess.", min_length=2),
+]
+
+
+class TVTrack(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    value: Value | None = Field(..., description="null = unknown, never a guess.")
+    tag: Tag
+    source: str
+    formula: str | None = Field(None, description="Required, non-blank, when tag is derived.")
+    assumption: str | None = Field(
+        None, description="Required, non-blank, when tag is model_dependent."
+    )
+
+
+class GasQ(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    co2: TVNumber | None = None
+    h2o: TVNumber | None = None
+    co: TVNumber | None = None
+    field_2025_08: GasQEpoch | None = Field(None, alias="2025-08")
+    field_2025_12: GasQEpoch | None = Field(None, alias="2025-12")
 
 
 class ObjectCard(BaseModel):
@@ -192,4 +225,5 @@ class ObjectCard(BaseModel):
     coma_radius_km: TVNumber | None = None
     nucleus_radius_km_max: TVNumber | None = None
     epochs: list[CometEpoch] | None = None
+    orbit_track: TVTrack | None = None
     pm_mas_yr: TVPair | None = None

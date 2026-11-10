@@ -130,6 +130,9 @@
         "$ref": "#/definitions/CometEpoch"
       }
     },
+    "orbit_track": {
+      "$ref": "#/definitions/TVTrack"
+    },
     "pm_mas_yr": {
       "$ref": "#/definitions/TVPair"
     }
@@ -710,7 +713,30 @@
     },
     "GasQ": {
       "title": "GasQ",
-      "description": "Gas production rates, molecules/s. One value per molecule; R3.2's 'per epoch' does not fit this shape (Q-42).",
+      "description": "Gas production rates, molecules/s. Either one value per molecule (the R3.2 shape, valid for one epoch), or keyed by epoch ('2025-08', '2025-12'), each holding one value per molecule (the Q-42 proposal, read by the comet renderer, Q-260). An epoch with no measurement is left out, never guessed.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "co2": {
+          "$ref": "#/definitions/TVNumber"
+        },
+        "h2o": {
+          "$ref": "#/definitions/TVNumber"
+        },
+        "co": {
+          "$ref": "#/definitions/TVNumber"
+        },
+        "2025-08": {
+          "$ref": "#/definitions/GasQEpoch"
+        },
+        "2025-12": {
+          "$ref": "#/definitions/GasQEpoch"
+        }
+      }
+    },
+    "GasQEpoch": {
+      "title": "GasQEpoch",
+      "description": "Gas production rates at one SPHEREx epoch, molecules/s (Q-260).",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -731,6 +757,101 @@
       "enum": [
         "2025-08",
         "2025-12"
+      ]
+    },
+    "TVTrack": {
+      "title": "TVTrack",
+      "description": "Tagged value (R3.1) holding a sampled path: rows of [JD TDB, x, y, z (au), vx, vy, vz (au/day)], heliocentric ICRF (Q-261).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "tag",
+        "source"
+      ],
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "array",
+                "minItems": 7,
+                "maxItems": 7,
+                "items": {
+                  "type": "number"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "null = unknown, never a guess."
+        },
+        "tag": {
+          "$ref": "#/definitions/Tag"
+        },
+        "source": {
+          "type": "string"
+        },
+        "formula": {
+          "type": "string",
+          "description": "Required, non-blank, when tag is derived."
+        },
+        "assumption": {
+          "type": "string",
+          "description": "Required, non-blank, when tag is model_dependent."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "derived"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "formula"
+            ],
+            "properties": {
+              "formula": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "const": "model_dependent"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "assumption"
+            ],
+            "properties": {
+              "assumption": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          }
+        }
       ]
     }
   }
