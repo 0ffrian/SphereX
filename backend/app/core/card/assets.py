@@ -53,7 +53,7 @@ ASSET_SOURCE = "derived.asset"
 #   stage 2 measures their spectrum (a card saved before had none: `frames:moving_object_search`
 #   was final); the comet path search uses `CAP<JD` (Q-167); a Mira period that is a median of
 #   several SIMBAD rows is `derived` (Q-152). Stage 1 and 2 changes count too.
-ASSET_VERSION = "9"
+ASSET_VERSION = "10"
 AssetStatus = Literal["saved", "generated", "sketch"]
 FIELDS = ("card", "render_params", "textures", "generator_version", "seed", "created_at")
 OPTIONAL_FIELDS = ("asset_version", "inputs_sha256")
