@@ -1,10 +1,9 @@
 // Issue #71 stream G: the star's flare controls. "Field lines" toggle, "Fire a big flare", the
-// "Latest flare" card in plain words, and the way into the close-up flare view. The card is a
+// "Latest flare" card in plain words. The close-up is `StarCloseUp`, mounted by the split-pane host. The card is a
 // polite live region and only changes when a new flare starts (at most once per 1.4 s).
 import { useEffect, useState } from 'react';
 import type { ViewerApp } from '@/viewer/ViewerApp';
 import { buttonClass, pressedClass } from './ui';
-import { FlareCloseUp } from './FlareCloseUp';
 import { ProvenanceBadge } from './Badge';
 
 export function StarFlarePanel({
@@ -19,7 +18,6 @@ export function StarFlarePanel({
 }) {
   const [lines, setLines] = useState(true);
   const [text, setText] = useState<string | null>(null);
-  const [closeUp, setCloseUp] = useState(false);
 
   useEffect(() => {
     if (!viewer) return;
@@ -55,21 +53,12 @@ export function StarFlarePanel({
         >
           Fire a big flare
         </button>
-        <button
-          type="button"
-          className={`${buttonClass} ${pressedClass}`}
-          aria-pressed={closeUp}
-          onClick={() => setCloseUp(!closeUp)}
-        >
-          Flare close-up
-        </button>
       </div>
       <p className="text-sm text-neutral-200" data-testid="latest-flare" aria-live="polite">
         <span className="font-medium text-neutral-100">Latest flare: </span>
         {text ?? 'None yet. A flare starts at a spot group on a seeded schedule.'}{' '}
         <ProvenanceBadge tag="inferred_from_analog" fixture={fixture} />
       </p>
-      {closeUp && <FlareCloseUp />}
     </div>
   );
 }
