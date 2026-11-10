@@ -25,7 +25,7 @@ describe('tidal constants', () => {
   });
 });
 
-describe('lockingTimeS (Gladman et al. 1996 as in the issue)', () => {
+describe('lockingTimeS (Gladman et al. 1996 as quoted by Grundy et al. 2012, Eq. 1: 16 pi / 15)', () => {
   it('scales as a^6 and 1/M_star^2', () => {
     const base = lockingTimeS(1e-4, 1e10, 6e24, 6.4e6, 2e30, 100, 0.3)!;
     expect(lockingTimeS(1e-4, 2e10, 6e24, 6.4e6, 2e30, 100, 0.3)! / base).toBeCloseTo(64, 8);
@@ -38,37 +38,32 @@ describe('lockingTimeS (Gladman et al. 1996 as in the issue)', () => {
 });
 
 describe('deriveLocking on the two demo planets', () => {
-  it('TRAPPIST-1 f: t_lock about 6.5e-5 Gyr, locked (the issue table, Q = 100)', () => {
+  it('TRAPPIST-1 f: t_lock about 6.2e-5 Gyr, locked (Q = 100)', () => {
     const r = deriveLocking(trappist1f());
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.tLockGyr).toBeGreaterThan(6.4e-5);
-    expect(r.tLockGyr).toBeLessThan(6.7e-5);
+    expect(r.tLockGyr).toBeGreaterThan(6.1e-5);
+    expect(r.tLockGyr).toBeLessThan(6.4e-5);
     expect(r.ageGyr).toBe(7.6);
     expect(r.locked).toBe(true);
     expect(r.tag).toBe('model_dependent');
     expect(r.assumed).toMatchObject({ tidal_Q: 100, tidal_k2: 0.3, initial_spin_h: 13.5 });
   });
 
-  it('Kepler-186 f: t_lock about 4.17 Gyr against 4.0 Gyr, so not locked. KNIFE EDGE: this follows from Q = 100 only', () => {
+  it('Kepler-186 f: t_lock about 3.99 Gyr against 4.0 Gyr, so locked. KNIFE EDGE (0.3%): follows from the constants only', () => {
     const r = deriveLocking(kepler186f());
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.tLockGyr).toBeGreaterThan(4.1);
-    expect(r.tLockGyr).toBeLessThan(4.25);
-    expect(r.locked).toBe(false);
-    // The same planet at the lower-bound Q = 12 is locked: t_lock scales linearly with Q.
+    expect(r.tLockGyr).toBeGreaterThan(3.97);
+    expect(r.tLockGyr).toBeLessThan(4.0);
+    expect(r.locked).toBe(true);
+    // Nothing is hard-coded: the ticket's older prefactor (3 instead of pi in the denominator,
+    // pi / 3 higher) gives 4.17 Gyr, i.e. not locked.
+    expect(r.tLockGyr * (Math.PI / 3)).toBeGreaterThan(r.ageGyr);
+    // A 0.4% smaller age, or a 0.4% larger Q, would flip the verdict.
+    expect(r.tLockGyr / r.ageGyr).toBeGreaterThan(0.99);
+    // At the lower-bound Q = 12 it is locked with a wide margin: t_lock scales linearly with Q.
     expect(r.tLockGyr * (TIDAL_Q_LOWER_BOUND / TIDAL_Q!)).toBeLessThan(r.ageGyr);
-    // A 4% younger age or a 4% smaller t_lock would flip the verdict.
-    expect(r.tLockGyr / r.ageGyr).toBeLessThan(1.05);
-  });
-
-  it('with the Grundy et al. 2012 prefactor (16 pi / 15, pi / 3 lower) Kepler-186 f is about 3.99 Gyr, i.e. locked (Q-155)', () => {
-    const r = deriveLocking(kepler186f());
-    if (!r.ok) throw new Error('refused');
-    const quoted = r.tLockGyr * (3 / Math.PI);
-    expect(quoted).toBeGreaterThan(3.97);
-    expect(quoted).toBeLessThan(4.0);
   });
 
   it('matches the formula written out by hand', () => {
@@ -80,7 +75,7 @@ describe('deriveLocking on the two demo planets', () => {
     const mp = (1.039 * GM_EARTH) / G;
     const R = c.radius_rjup!.value! * 7.1492e7;
     const Ms = (0.0898 * GM_SUN) / G;
-    const t = (omega * a ** 6 * 0.4 * mp * R ** 2 * 100) / (3 * G * Ms ** 2 * 0.3 * R ** 5);
+    const t = (omega * a ** 6 * 0.4 * mp * R ** 2 * 100) / (Math.PI * G * Ms ** 2 * 0.3 * R ** 5);
     expect(r.tLockGyr).toBeCloseTo(t / GYR_S, 10);
     expect(R / R_EARTH_M).toBeCloseTo(1.045, 3);
   });

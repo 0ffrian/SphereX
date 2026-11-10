@@ -1,14 +1,14 @@
-// Issue #68 Part 3a, A7.1: tidal locking. `t_lock = omega a^6 I Q / (3 G M_star^2 k2 R^5)` with
-// `I = 0.4 m_p R^2` (Gladman et al. 1996, Icarus 122, 166, doi:10.1006/icar.1996.0117). The planet
-// is locked when `t_lock < age`. Pure and deterministic.
+// Issue #68 Part 3a, A7.1: tidal locking. `t_lock = omega a^6 I Q / (pi G M_star^2 k2 R^5)` with
+// `I = 0.4 m_p R^2` (Gladman et al. 1996, Icarus 122, 166, doi:10.1006/icar.1996.0117, as quoted by
+// Grundy et al. 2012, arXiv:1204.3923, Eq. 1). The planet is locked when `t_lock < age`. Pure and
+// deterministic.
 //
-// FORMULA STATUS (Q-155): the ticket's form is kept. It is NOT confirmed against Gladman 1996 (the
-// paper could not be read). The only citable quotation, Grundy et al. 2012 (arXiv:1204.3923, Eq. 1),
-// has the prefactor 16 pi / 15 = 3.351, while this form with I = 0.4 m R^2 gives 16 pi^2 / 45 = 3.509:
-// a factor pi / 3 (4.7%) higher. With the quoted prefactor Kepler-186 f computes about 3.99 Gyr
-// against 4.0 Gyr, i.e. locked (eyeball, T_ss 281.8 K, theta_ice about 28 degrees); with this form
-// 4.17 Gyr, not locked. The prefactor and Q are the two choices Moon may overturn. The result is always at least
-// `model_dependent`: Q, k2 and the initial spin are assumptions (Q-119 a, Q-155).
+// FORMULA STATUS (Q-155, ruling of Moon, 10 Nov 2026): Gladman et al. 1996 itself could NOT be read
+// (ADS and the PDF returned 403). The only citable quotation is Grundy et al. 2012, Eq. 1, with the
+// prefactor 16 pi / 15 = 3.351. With I = 0.4 m R^2 the denominator pi G M^2 k2 R^5 reproduces it
+// (the ticket's 3 G ... gave 16 pi^2 / 45 = 3.509, 4.7% higher). With it Kepler-186 f computes about
+// 3.99 Gyr against 4.0 Gyr: locked (a knife edge, 0.3%). Q stays 100 ([verify]). The result is always
+// at least `model_dependent`: Q, k2 and the initial spin are assumptions (Q-119 a, Q-155).
 import type { ObjectCard, Tag } from '@/contract';
 import { weakestTag } from '@/viewer/motion/motion';
 import { AU_M, G, GM_EARTH, GM_SUN, HOUR_S, R_EARTH_M, R_JUP_M, YEAR_S } from './constants';
@@ -47,7 +47,7 @@ export const AGE_FALLBACK_GYR: number | null = 1;
 export const MOMENT_OF_INERTIA_FACTOR = 0.4;
 
 export const TIDES_FORMULA =
-  't_lock = omega a^6 I Q / (3 G M_star^2 k2 R^5), I = 0.4 m_p R^2 (Gladman et al. 1996); locked if t_lock < age';
+  't_lock = omega a^6 I Q / (pi G M_star^2 k2 R^5), I = 0.4 m_p R^2 (Gladman et al. 1996, as quoted by Grundy et al. 2012, Eq. 1); locked if t_lock < age';
 
 /** Plain-number form. Units: ω rad/s, a m, planet mass kg, radius m, star mass kg. Returns seconds. */
 export function lockingTimeS(
@@ -65,7 +65,8 @@ export function lockingTimeS(
   if (!ok) return null;
   const inertia = MOMENT_OF_INERTIA_FACTOR * planetMassKg * radiusM ** 2;
   return (
-    (omegaRadS * semiMajorM ** 6 * inertia * q) / (3 * G * starMassKg ** 2 * k2 * radiusM ** 5)
+    (omegaRadS * semiMajorM ** 6 * inertia * q) /
+    (Math.PI * G * starMassKg ** 2 * k2 * radiusM ** 5)
   );
 }
 

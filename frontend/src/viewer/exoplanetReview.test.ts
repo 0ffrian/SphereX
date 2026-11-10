@@ -17,8 +17,10 @@ const planOf = (name: string, honesty: HonestyState, edit?: (c: ObjectCard) => v
 };
 
 describe('a starlit sphere is not called grey', () => {
-  it('Kepler-186 f at + Estimated: legend, note and alt text say it is lit in the star colour', () => {
-    const { plan, alt, notes } = planOf('planet_kepler186f', 'derived');
+  it('a plain sphere (Kepler-186 f with a 3 Gyr star, so unlocked) at + Estimated: legend, note and alt text say it is lit in the star colour', () => {
+    const { plan, alt, notes } = planOf('planet_kepler186f', 'derived', (c) => {
+      c.host_age_gyr = { value: 3, tag: 'measured', source: 'test: younger than t_lock' };
+    });
     expect(plan.drawn.map((d) => d.id)).toContain('starlight');
     expect(notes).not.toMatch(/plain grey/i);
     expect(alt).not.toMatch(/plain grey/i);
@@ -79,7 +81,9 @@ describe('a refused locking rule is not "not tidally locked"', () => {
   });
 
   it('a tested, unlocked planet is still called temperate', () => {
-    const { alt } = planOf('planet_kepler186f', 'derived');
+    const { alt } = planOf('planet_kepler186f', 'derived', (c) => {
+      c.host_age_gyr = { value: 3, tag: 'measured', source: 'test: younger than t_lock' };
+    });
     expect(alt).toContain('temperate world that is not tidally locked');
   });
 });
