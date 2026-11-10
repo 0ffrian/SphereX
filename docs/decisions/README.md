@@ -332,5 +332,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-297 | Details: the controls and honesty lists the mock-up's build view has no place for | Decided in code | [shell-surfaces](shell-surfaces.md) |
 | Q-298 | Build view follow-ups: mock-up title, island bottom right, `BuildControls` slot, Show dims rows only, phone close-up caption | Decided (coordinator) | [shell-surfaces](shell-surfaces.md) |
 | Q-280 to Q-284 | Search list additions: Titan reference moon, four demo-pack rows, archive outage | Decided in code | [rendering-bodies](rendering-bodies.md) |
-| Q-290 to Q-295 | Gas giant and star parity: True colour default, solved gas world and star cells shown at + Estimated, Sun reference star, engine slices | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
+| Q-290 to Q-293 | Gas giant and star parity: True colour default, solved gas world and star cells shown at + Estimated | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
+| Q-307 | The Sun as a reference star (`ref-sun`, NASA Sun Fact Sheet) | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
+| Q-308 | D-37 engine status: prototype star and flare code sliced into engine/stars | Open (being built) | [rendering-bodies](rendering-bodies.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |
