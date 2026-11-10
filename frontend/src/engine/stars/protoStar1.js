@@ -5,7 +5,7 @@
 // Not yet imported by the app: it still needs the TypeScript host (DOM removed, `cardToStar`). Do not edit here;
 // re-run the slicing instead so the body stays byte-identical to the prototype.
 // @verbatim L357-L662
-// @rename m.best=>(CLOSE_AT||m.best)
+// @rename m.best=>(CLOSE_AT||m.best) (ema=>(!window.__sxPin&&ema
 /* ---------- Planck spectrum to colour ---------- */
 function g(l, m, s1, s2) { var s = l < m ? s1 : s2, t = (l - m) / s; return Math.exp(-0.5 * t * t); }
 function planckRGB(T) {
@@ -185,7 +185,7 @@ function StarGL(canvas) {
   var scale = 1, ema = 16, last = 0;
   this.draw = function (o) {
     var now = performance.now();
-    if (last) { ema = ema * 0.92 + (now - last) * 0.08; if (ema > 42 && scale > 0.42) { scale *= 0.93; ema = 30; } else if (ema < 19 && scale < 1) { scale = Math.min(1, scale * 1.01); } }
+    if (last) { ema = ema * 0.92 + (now - last) * 0.08; if (!window.__sxPin&&ema > 42 && scale > 0.42) { scale *= 0.93; ema = 30; } else if (!window.__sxPin&&ema < 19 && scale < 1) { scale = Math.min(1, scale * 1.01); } }
     last = now;
     var w = Math.round(canvas.clientWidth * Math.min(devicePixelRatio || 1, 1.5) * scale), h = Math.round(canvas.clientHeight * Math.min(devicePixelRatio || 1, 1.5) * scale);
     if (!w || !h) return;
