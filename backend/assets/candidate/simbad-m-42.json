@@ -10,6 +10,28 @@
   "inputs_sha256": "ffa059f36dc4327154473203418e2bf8acd3317bea275504d2c63a3c5b6b463a",
   "render_params": {
     "alt_text": "M  42. Candidate. Not enough data for a 3D model: distance and albedo unknown.",
+    "confidence": {
+      "assumed_share": 1.0,
+      "band": "too_little",
+      "estimated_share": 0.0,
+      "formula": "No class is known, so no weights apply and the score is 0 (Q-222)",
+      "found": "Its name and position.",
+      "gate": {
+        "class_known": false,
+        "key_measurement": false,
+        "passed": false,
+        "score_ok": false
+      },
+      "inputs": [],
+      "measured_share": 0.0,
+      "needed": "A rule that identifies the kind of object, then a measurement of its size or gas.",
+      "note": "This is how much of the picture rests on data. It is not the probability that the picture is correct.",
+      "raise": null,
+      "score": 0.0,
+      "tag": "derived",
+      "threshold": 0.25,
+      "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
+    },
     "generator_version": "p1-b2",
     "haptics": {
       "data": "detections",

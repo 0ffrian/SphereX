@@ -47,6 +47,113 @@
       "maxRateHz": 12.0
     }
   },
+  "confidence": {
+    "score": 0.5844,
+    "measured_share": 0.5844,
+    "estimated_share": 0.0,
+    "assumed_share": 0.4156,
+    "threshold": 0.25,
+    "band": "part_data",
+    "gate": {
+      "class_known": true,
+      "key_measurement": true,
+      "score_ok": true,
+      "passed": true
+    },
+    "found": "Data for: Radius, mass, orbit and tides, temperature or host star.",
+    "needed": "",
+    "raise": "A better measurement of: mass.",
+    "inputs": [
+      {
+        "id": "radius",
+        "label": "Radius",
+        "weight": 15,
+        "c": 0.9751,
+        "tag": "measured",
+        "points": 14.6267,
+        "fields": [
+          "radius_rjup"
+        ]
+      },
+      {
+        "id": "mass",
+        "label": "Mass",
+        "weight": 10,
+        "c": 0.9403,
+        "tag": "measured",
+        "points": 9.4033,
+        "fields": [
+          "mass_mearth"
+        ]
+      },
+      {
+        "id": "orbit",
+        "label": "Orbit and tides",
+        "weight": 10,
+        "c": 0.9914,
+        "tag": "measured",
+        "points": 9.9142,
+        "fields": [
+          "orbit_au",
+          "orbital_period_d"
+        ]
+      },
+      {
+        "id": "temperature",
+        "label": "Temperature",
+        "weight": 15,
+        "c": 0.9807,
+        "tag": "measured",
+        "points": 14.7106,
+        "fields": [
+          "teq_K"
+        ]
+      },
+      {
+        "id": "host_star",
+        "label": "Host star",
+        "weight": 10,
+        "c": 0.979,
+        "tag": "measured",
+        "points": 9.7896,
+        "fields": [
+          "host_teff_K",
+          "host_radius_rsun"
+        ]
+      },
+      {
+        "id": "fluid",
+        "label": "Surface fluid and pressure",
+        "weight": 15,
+        "c": 0.0,
+        "tag": "inferred_from_analog",
+        "points": 0.0,
+        "fields": []
+      },
+      {
+        "id": "terrain",
+        "label": "Plates and terrain",
+        "weight": 15,
+        "c": 0.0,
+        "tag": "artistic",
+        "points": 0.0,
+        "fields": []
+      },
+      {
+        "id": "clouds",
+        "label": "Clouds and ice",
+        "weight": 10,
+        "c": 0.0,
+        "tag": "artistic",
+        "points": 0.0,
+        "fields": []
+      }
+    ],
+    "tag": "derived",
+    "formula": "C = sum(w_i c_i) / sum(w_i): c is 1 for a measured value or a formula of measured values, a placeholder share for a model-dependent one, and 0 for an assumed, artistic or missing one; the w_i are placeholder weights (D-36, Q-221)",
+    "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36).",
+    "note": "This is how much of the picture rests on data. It is not the probability that the picture is correct."
+  },
   "alt_text": "Synthetic fixture: TRAPPIST-1 f (real archive values), Rocky planet, 0.0932 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
   "missing": []
 }

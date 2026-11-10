@@ -284,4 +284,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-201 | One tag for Horizons-derived values | Open | [contract-tags](contract-tags.md) |
 | Q-202 | Review of the Area search fixes (9 Nov 2026) | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-203 | Four research checks join the event build as gated extras | Decided (Moon, 10 Nov 2026); owners and thresholds Proposed | [moving-objects](moving-objects.md) |
+| Q-220 | Gaia teff_msc1 as a star Teff source | Proposed | [catalogue-values](catalogue-values.md) |
+| Q-221 | Data confidence score | Proposed | [pipeline-stages](pipeline-stages.md) |
+| Q-222 | The 3D gate and its calibration | Proposed | [pipeline-stages](pipeline-stages.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |
