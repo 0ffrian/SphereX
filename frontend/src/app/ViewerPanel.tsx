@@ -877,6 +877,8 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                   </div>
                 ))}
               </dl>
+            )}
+
             {plan.type === 'comet' && emissionsRange && (
               <button
                 type="button"
