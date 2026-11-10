@@ -82,12 +82,12 @@ export type ReferenceGasId = 'jup' | 'sat';
 // ---- Saturn's rings ----------------------------------------------------------------------------
 
 /**
- * Saturn's main rings in units of Saturn's equatorial radius (60,268 km): inner and outer edge, and
- * a plain-words name. Edges from the NASA / JPL Saturn ring table, as recalled:
- *   D 66,900-74,510 km, C 74,658-92,000, B 92,000-117,580, Cassini Division 117,580-122,170,
- *   A 122,170-136,775 (Encke gap at 133,589), F ring core 140,180.
- * [verify] Not re-checked against the primary table in this session. `measured` in kind (observed
- * ring edges); the ring grain, shading and brightness are `artistic`.
+ * Saturn's main rings in km from Saturn's centre. Radii: NASA Planetary Fact Sheet, "Saturn's Rings"
+ * (https://nssdc.gsfc.nasa.gov/planetary/factsheet/satringfact.html, read 10 Nov 2026): D 66,900 to
+ * 74,510; C 74,658 to 91,975; B 91,975 to 117,507; A 122,340 to 136,780; F ring 139,826; Encke Gap
+ * 133,410; Saturn equatorial radius 60,268 km (planet fact sheet). The Cassini Division is the gap
+ * between the B outer and A inner edges. `measured`. Opacity and brightness are `artistic`; the
+ * F ring is drawn as a thin line (width is an artistic choice) and the Encke Gap width is too.
  */
 export const SATURN_RADIUS_KM = 60268;
 export const SATURN_RINGS: readonly {
@@ -95,20 +95,20 @@ export const SATURN_RINGS: readonly {
   name: string;
   innerKm: number;
   outerKm: number;
-  /** Optical depth class, drawn opacity (artistic). */
+  /** Drawn opacity (artistic). */
   opacity: number;
   brightness: number;
 }[] = [
   { id: 'D', name: 'D ring', innerKm: 66900, outerKm: 74510, opacity: 0.03, brightness: 0.3 },
-  { id: 'C', name: 'C ring', innerKm: 74658, outerKm: 92000, opacity: 0.08, brightness: 0.3 },
-  { id: 'B', name: 'B ring', innerKm: 92000, outerKm: 117580, opacity: 0.92, brightness: 0.86 },
-  { id: 'Cassini', name: 'Cassini Division', innerKm: 117580, outerKm: 122170, opacity: 0.05, brightness: 0.4 },
-  { id: 'A', name: 'A ring', innerKm: 122170, outerKm: 136775, opacity: 0.62, brightness: 0.76 },
-  { id: 'F', name: 'F ring', innerKm: 140170, outerKm: 140190, opacity: 0.2, brightness: 0.6 },
+  { id: 'C', name: 'C ring', innerKm: 74658, outerKm: 91975, opacity: 0.08, brightness: 0.3 },
+  { id: 'B', name: 'B ring', innerKm: 91975, outerKm: 117507, opacity: 0.92, brightness: 0.86 },
+  { id: 'Cassini', name: 'Cassini Division', innerKm: 117507, outerKm: 122340, opacity: 0.05, brightness: 0.4 },
+  { id: 'A', name: 'A ring', innerKm: 122340, outerKm: 136780, opacity: 0.62, brightness: 0.76 },
+  { id: 'F', name: 'F ring', innerKm: 139816, outerKm: 139836, opacity: 0.2, brightness: 0.6 },
 ];
-/** Encke Gap centre, km (inside the A ring). [verify] */
-export const ENCKE_GAP_KM = 133589;
-/** Half-width of the Encke Gap as drawn, km (artistic width; the gap itself is ~325 km wide). [verify] */
+/** Encke Gap, km (NASA ring table). */
+export const ENCKE_GAP_KM = 133410;
+/** Half-width of the Encke Gap as drawn, km (artistic; the table gives no width). */
 export const ENCKE_HALF_WIDTH_KM = 160;
 /** The ring texture spans these radii, in Saturn radii. */
 export const RING_TEX_INNER = 1.1;
@@ -137,7 +137,7 @@ export function ringTexture(seed = 9): Float32Array {
     const base = ringAt(rr);
     let br = base.brightness;
     // The B ring has fine radial structure (artistic grain).
-    if (rr >= 1.527 && rr < 1.951) br = 0.86 + 0.14 * Math.sin(rr * 90) * Math.sin(rr * 37);
+    if (rr >= 1.526 && rr < 1.95) br = 0.86 + 0.14 * Math.sin(rr * 90) * Math.sin(rr * 37);
     const fine = 0.86 + 0.28 * r();
     out[i * 4] = clamp(base.opacity * fine, 0, 1);
     out[i * 4 + 1] = clamp(br * (0.9 + 0.2 * r()), 0, 1);
@@ -165,6 +165,12 @@ export interface GasInput {
   mu: number;
   /** Seed for storm placement and births. */
   seed: number;
+  /**
+   * Tidally locked: the spin equals the orbit (`rotPeriodH` is then the orbital period), one hot
+   * day side faces the star, and the flow is one superrotating equatorial jet (prototype).
+   * ASSUMPTION: set by the caller from a short orbit (see `gasWorldInput`), not measured.
+   */
+  locked?: boolean;
 }
 
 export interface GasModel {
@@ -193,7 +199,23 @@ export interface GasModel {
   rhinesM: number;
   /** Colour regime by Teq (Sudarsky-style, display only). */
   regime: GasRegime;
+  /** Tidally locked flow (one superrotating jet, day-night contrast). */
+  locked: boolean;
+  /** How much of the day-night contrast survives the winds, 0.02..1 (1 = none carried away). */
+  eps: number;
+  /** Hottest (day side) and coldest (night side) temperature for a locked giant, K; the Teq otherwise. */
+  tDayK: number;
+  tNightK: number;
 }
+
+/**
+ * Night-side glow: a hot giant glows by its own heat only above this temperature. The prototype's
+ * shader threshold (850 K); `[verify]` it is a display threshold, not a measured value.
+ */
+export const GLOW_ABOVE_K = 850;
+/** Day-side and night-side factors of a locked giant's temperature at full contrast (prototype 1.3 and 0.55). */
+const LOCKED_DAY_FACTOR = 1.3;
+const LOCKED_NIGHT_FACTOR = 0.55;
 
 export type GasRegime =
   | 'Methane-rich air, blue'
@@ -245,11 +267,14 @@ export function gasModel(input: GasInput): GasModel | null {
   const H = (rSpecific * tCloud) / gravity;
   // Wind speed: iterate eps (how much the day-night contrast survives) and U (thermal wind).
   const tRad = (cp * RADIATIVE_REF_PA) / (gravity * 4 * SIGMA_SB * Math.pow(tCloud, 3));
+  const locked = input.locked === true;
   let U = 100;
+  let eps = 1;
   for (let i = 0; i < 6; i++) {
-    const tAdv = Math.min(radiusM / U, 1 / omega);
-    const eps = clamp(tAdv / (tAdv + tRad), 0.02, 1);
-    const dT = Math.max(10, eps * 0.6 * tCloud);
+    // A locked giant has no spin to turn the flow: only advection across the planet moves heat.
+    const tAdv = Math.min(radiusM / U, locked ? 1e13 : 1 / omega);
+    eps = clamp(tAdv / (tAdv + tRad), 0.02, 1);
+    const dT = locked ? eps * 0.6 * tCloud : Math.max(10, eps * 0.6 * tCloud);
     U = Math.max(1, WIND_COEFFICIENT * Math.sqrt(rSpecific * dT));
   }
   const n = Math.sqrt((2 * omega * radiusM) / U);
@@ -278,6 +303,10 @@ export function gasModel(input: GasInput): GasModel | null {
     rossby,
     rhinesM: rhines,
     regime: gasRegime(teqK),
+    locked,
+    eps,
+    tDayK: locked ? teqK * (1 + (LOCKED_DAY_FACTOR - 1) * eps) : teqK,
+    tNightK: locked ? teqK * (1 - (1 - LOCKED_NIGHT_FACTOR) * eps) : teqK,
   };
 }
 
@@ -383,7 +412,8 @@ export function gasProfile(model: GasModel, input: GasInput): GasProfile {
     let zmx = 0;
     for (let i = 0; i < N; i++) {
       const e0 = sstep(1.5, 1.15, Math.abs(la[i]!));
-      u[i] = e0 * Math.cos(js * la[i]!);
+      // Locked: one broad eastward equatorial jet over weak mid-latitude jets (prototype).
+      u[i] = e0 * (model.locked ? 0.2 * Math.cos(js * la[i]!) + 1.2 * Math.exp((-la[i]! * la[i]!) / 0.16) : Math.cos(js * la[i]!));
     }
     for (let i = 1; i < N - 1; i++) {
       zv[i] = -(cs[i + 1]! * u[i + 1]! - cs[i - 1]! * u[i - 1]!) / (2 * dp * cs[i]!);
@@ -954,6 +984,8 @@ export function stepsFor(model: GasModel, simSeconds: number): number {
 
 /** Spin angle (rad) for `simSeconds` of planet time while the view turns with the planet; 0 when it co-rotates. */
 export function spinAngle(model: GasModel, simSeconds: number, secondsPerSecond: number): number {
+  // A locked giant keeps one face to its star: the view does not turn.
+  if (model.locked) return 0;
   return secondsPerSecond < PACE_SPIN_LIMIT_S_PER_S ? simSeconds * model.omega : 0;
 }
 
@@ -1010,7 +1042,7 @@ export function gasLayerTags(reference: ReferenceGasId | null): GasLayerTag[] {
     out.push({
       id: 'rings',
       tag: 'measured',
-      source: 'Saturn ring edges in Saturn radii [verify: radii not yet cited]',
+      source: 'NASA Planetary Fact Sheet, Saturn rings table (ring edges in km)',
     });
   }
   return out;
