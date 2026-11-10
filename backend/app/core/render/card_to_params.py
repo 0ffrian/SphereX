@@ -395,6 +395,18 @@ def _asteroid_shape(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
     }
 
 
+_STRUCTURE_WORDS = {
+    "solid": "solid rock (spinning past the rubble limit, or tiny)",
+    "rubble": "a rubble pile of rock and shattered rock",
+    "fractured": "fractured rock under regolith",
+}
+_ROUGHNESS_WORDS = {
+    "rocky": "Rough and rocky is the default: only a shape model, radar roughness or thermal "
+    "inertia could make it smoother, and the card has none.",
+    "smooth": "Smoother, because the card's data says so.",
+}
+
+
 def _asteroid_procedural(
     card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None
 ) -> dict[str, Any]:
@@ -437,7 +449,12 @@ def _asteroid_procedural(
         True,
         "relief",
         "artistic",
-        f"Procedural height field from the seed, style {bake.style} (R6.2, R6.3).",
+        "Procedural height field from the seed: "
+        f"{_STRUCTURE_WORDS[bake.structure]}; lumps from rock "
+        f"strength against gravity (h/R = {bake.lump:.2f}), craters N(>D) ~ D^-2, boulders "
+        f"by structure. {_ROUGHNESS_WORDS[bake.roughness]} The density is "
+        f"{'an analog of a real body' if bake.density_source != 'generic' else 'a generic value'}"
+        f" ({bake.density_kg_m3:g} kg/m3), an assumption (R6.2, R6.3, D-36).",
         ["diameter_km"],
     )
     # Issue #62, R7.2, Q-103: the viewer displaces the surface by the baked height map on the high
@@ -447,8 +464,8 @@ def _asteroid_procedural(
         bake.relief_amp > 0,
         "displacement",
         "artistic",
-        f"Surface pushed out by the height map, up to {bake.relief_amp:g} of the radius "
-        f"(style {bake.style}, R6.2, R7.2).",
+        f"Surface pushed in and out by the height map, over a range of {bake.relief_amp:g} of the "
+        f"radius (R6.2, R7.2, D-36).",
         ["diameter_km"],
     )
     return {

@@ -75,7 +75,7 @@ def test_seam_and_normal_length(name: str, c: dict[str, Any], seed: int) -> None
     if name.startswith("brown_dwarf"):
         assert np.all(h == 0)  # flat: no relief is measured or invented
     else:
-        assert seam_ratio(h) < 1.1
+        assert seam_ratio(h) < 1.5  # 1.1 for the whole-map form; a real seam gives > 10
     # The albedo must be seamless too: column 0 against W-1 is no worse than a neighbour pair.
     a = r.albedo.astype(float)
     assert np.abs(a[:, 0] - a[:, -1]).mean() <= np.abs(np.diff(a, axis=1)).mean() * 1.5 + 0.5
@@ -85,14 +85,22 @@ def test_seam_and_normal_length(name: str, c: dict[str, Any], seed: int) -> None
     assert np.all(r.normal[..., 2] >= 127)  # tangent-space +Z never points into the surface
 
 
-def seam_ratio(h: np.ndarray) -> float:
-    """Mean |col 0 - col W-1| over the mean |neighbour difference| (about 1 when seamless).
+def seam_ratio(h: np.ndarray, window: int = 8) -> float:
+    """Mean |col 0 - col W-1| over the mean |neighbour difference| within ``window`` columns of
+    the seam (about 1 when seamless).
 
     R11 compares the seam's mean with the *median* neighbour difference. Heavy-tailed relief
     (crater rims) puts the mean of any column pair above the median, so a seamless map can fail
-    that. Mean against mean is the like-for-like form (Q-47).
+    that. Mean against mean is the like-for-like form (Q-47). Issue #71 (Q-211): the neighbours
+    are the ones next to the seam, not the whole map, because the new height field is dominated
+    by a few smooth waves whose slope along a parallel varies by a factor of about 2 with
+    longitude (a smooth field is not a seam).
     """
-    return float(np.abs(h[:, 0] - h[:, -1]).mean() / np.abs(np.diff(h, axis=1)).mean())
+    wrapped = np.roll(h, window, axis=1)  # the seam now sits between columns window-1 and window
+    d = np.abs(np.diff(wrapped[:, : 2 * window], axis=1))
+    seam = d[:, window - 1].mean()
+    others = np.delete(d, window - 1, axis=1).mean()
+    return float(seam / others)
 
 
 def test_seam_check_detects_a_real_seam() -> None:
@@ -129,23 +137,17 @@ def test_seeds_past_32_bits_do_not_overflow_and_all_bits_count() -> None:
 
 
 def test_style_rules_match_r62() -> None:
+    """Issue #71 (Q-210): the style now only sets the fine-detail noise; shape, craters and
+    boulders come from physics (see test_rock_physics.py)."""
     expected = {
-        0.99: ("rubble", 7, 6.0, 0.04, 40, 1.0),
-        1.0: ("cratered", 6, 3.0, 0.03, 250, 0.2),
-        50.0: ("cratered", 6, 3.0, 0.03, 250, 0.2),
-        50.1: ("large_cratered", 6, 2.0, 0.02, 500, 0.05),
+        0.99: ("rubble", 7, 6.0),
+        1.0: ("cratered", 6, 3.0),
+        50.0: ("cratered", 6, 3.0),
+        50.1: ("large_cratered", 6, 2.0),
     }
     for d, want in expected.items():
         p = params_from_card(asteroid_card(d), 1)
-        got = (
-            p.style,
-            p.noise_octaves,
-            p.noise_freq,
-            p.relief_amp,
-            p.crater_count,
-            p.boulder_density,
-        )
-        assert got == want, d
+        assert (p.style, p.noise_octaves, p.noise_freq) == want, d
         assert p.radius_m == pytest.approx(d * 500)
 
 
@@ -509,11 +511,11 @@ def test_windows_aliasing_ids_are_escaped(tmp_path: Path) -> None:
 # ---- golden hashes (N6) ------------------------------------------------------------------
 
 GOLDEN: dict[str, dict[str, str]] = {
-    "asteroid_procedural": {
-        "albedo.webp": "7beee5f1eb6d2bdcc772606d40e12a3ca5152192f3ae24a93a22e99aee7f1f21",
-        "height.png": "b0365eb54d1ed776d466f1099cda8a374ad3fe084e38bff003d24af29138ea95",
-        "height.bin": "d5931f6840e8ff905440c01f4c3429ab8682e8dc818a283ec050d44832f61cd0",
-        "normal.png": "3cf9e731035e0eac4c4a7c5f460ab0cea3b2c959b077500584a6f853123c029c",
+    "asteroid_procedural": {  # regenerated for issue #71 (BAKER_RULES_VERSION 3)
+        "albedo.webp": "30398d894f58c9ca8080d689f1e7b4ed595e8e6cc7fccec48b51c2f7c1bf6de0",
+        "height.png": "62f0f3503e8a9af94e80d1898dfd50155e791fe9ac629e7587a2c1eda4161808",
+        "height.bin": "b3f7caafe5619e893c0b52a99bddb693b2786583bf3ae812fe22e4af3650824e",
+        "normal.png": "1e84fc0ec8dedd673f077f97ceff11f51f04ced82c55906f0fd79f1924a263f9",
     },
     "brown_dwarf": {
         "albedo.webp": "e6f9fc0f3d6c472460ac1045df2361a4834af91a10bbd8de0086cd964e021274",

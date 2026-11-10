@@ -67,7 +67,7 @@
     "type": "planet_rocky"
   },
   "created_at": "2025-10-01T00:00:00.000Z",
-  "generator_version": "p1-b2",
+  "generator_version": "p1-b3",
   "inputs_sha256": "4d30394754ce61b83ba21606cfe420fb28cc45912350a92d60845b8e46f385e2",
   "render_params": {
     "alt_text": "TRAPPIST-1 e, Rocky planet, 0.0821 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
@@ -178,7 +178,7 @@
       "threshold": 0.25,
       "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
     },
-    "generator_version": "p1-b2",
+    "generator_version": "p1-b3",
     "haptics": {
       "data": "teq_pulse",
       "data_tag": "measured",
@@ -206,7 +206,7 @@
       "spectrum"
     ],
     "scale_m": 5867885.671999999,
-    "seed": 2841421291,
+    "seed": 29828211,
     "type": "planet_rocky",
     "view_modes": {
       "visible": {
@@ -225,6 +225,6 @@
       }
     }
   },
-  "seed": 2841421291,
+  "seed": 29828211,
   "textures": null
 }

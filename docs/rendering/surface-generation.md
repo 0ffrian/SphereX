@@ -24,10 +24,13 @@ dir_z =  np.sin(phi) * np.sin(theta)
 |---|---|---|
 | `style` | D < 1 km → `rubble` (Bennu/Ryugu-like); 1–50 km → `cratered`; > 50 km → `large_cratered` (Vesta-like) | inferred_from_analog |
 | `ellipsoid_axes` | from `lightcurve_amp_mag` A: a/b = 10^(0.4·A); c = b. If A is missing → sphere | model_dependent |
-| `noise_octaves`, `noise_freq` | rubble: 7, 6.0; cratered: 6, 3.0; large: 6, 2.0 | artistic |
-| `relief_amp` (fraction of radius) | rubble 0.04, cratered 0.03, large 0.02 | inferred_from_analog |
-| `crater_count` | rubble 40, cratered 250, large 500 | artistic |
-| `boulder_density` | rubble 1.0, cratered 0.2, large 0.05 | inferred_from_analog |
+| `noise_octaves`, `noise_freq` (fine detail layer only, since D-36) | rubble: 7, 6.0; cratered: 6, 3.0; large: 6, 2.0 | artistic |
+| `lump` = h/R (D-36, Q-210) | `clamp(Y / (ρ g R), 0.03, 0.3)`, `g = (4/3)πGρR`, `Y` = 1e6 Pa **[verify]**, ρ by class analog (C: 1190, S: 2670 kg/m³, else 1500 **[verify]**) | model_dependent (assumed ρ, Y) |
+| `structure` | `solid` if the spin period is below `sqrt(3π/(Gρ))` or D < 0.15 km; `rubble` below 40 km; else `fractured` | model_dependent |
+| `roughness` | `rocky` always, until a card field carries radar roughness or thermal inertia (Q-212); `smooth` is switched on in code only | inferred_from_analog |
+| `crater_coverage` | `0.05 + 0.27·age/100` with age 70 (artistic default; smooth: 0.012) | artistic |
+| `boulder_density` | by structure: solid 0.45, rubble 1.0, fractured 0.25; 0 when smooth | artistic |
+| `relief_amp` (fraction of radius) | peak-to-peak design range of the height field; the displacement scale (R7.2) and the scale of `height.png` | artistic |
 | `base_rgb` | `gaia_rgb` if present (derived), else the class palette ([§6.4](#r64-colour-no-ai-default)) | derived / inferred |
 | `brightness` | display L = clamp(0.12 + 1.6·albedo, 0.12, 0.8) | derived (display mapping) |
 | `hydration` | `band_depth_3um` > 0.05 → darker by 15%, contrast ×0.7 | derived (stretch feature) |
@@ -79,18 +82,16 @@ def fbm(dirs, seed, octaves, freq, lacunarity=2.0, gain=0.5):
 **Seed.** `seed_for` (`backend/app/core/render/card_to_params.py`) makes the seed: SHA-256 of `id + "
 " + generator_version` in UTF-8, first 4 bytes big-endian, so a 32-bit integer ≥ 0. This is an `ASSUMPTION` until Q-35 is answered. The baker hashes the seed again with SHA-256 to a 32-bit value for the noise (every bit of the integer counts) and gives the integer itself to the crater and boulder generator. The shader field uses the low 32 bits ([§7.7](renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova)).
 
-**Craters.** Radii follow a power law, r = r_min·(1−U)^(−1/2), truncated at r_max. Centres are uniform on the sphere. Profile as a function of x = angular distance / crater angular radius:
+**Layers (D-36, Q-211).** The height is the sum of four layers, added at the end, all in fractions of the local radius:
 
-- bowl: x < 1 → −d·(1 − x²), with d = 0.2·r
-- rim: 1 ≤ x < 1.6 → +0.25·d·exp(−((x−1)/0.18)²)
+1. `shape`: 26 sine waves with amplitude k^-1.5 (k from 1.3 to 8.8), rms = 0.45·`lump`. Independent of every other layer.
+2. `craters`: radii r = r_min·(1−0.985U)^(−1/2) (N(>D) ∝ D⁻²), r_min 0.014, r_max 0.38 (mean radii), drawn until Σr² reaches 4 × `crater_coverage` or 1500 (saturation). Profile with d = distance / r: bowl `−depth(1−d²) + 0.2·depth·d⁴` for d < 1, rim `0.2·depth·d⁻⁵` out to d = 2.4; depth = 0.42·r·freshness (0.35 to 1). Distances are 3D distances between points of the ellipsoid (a/b = 10^(0.4A), c = b), so craters are round on an elongated body. **Erosion** (a newer crater wears older relief inside its bowl by 0.45 + 0.55d) acts on this layer only; it never multiplies the shape.
+3. `fine`: `fine_amp`·normalise(fbm), `fine_amp` 0.012 (0.003 smooth).
+4. `boulders`: Gaussian bumps (σ 0.008 to 0.022, height 0.7σ), count 600 × `boulder_density`, round on the ellipsoid.
 
-Only evaluate pixels inside each crater's lat/lon bounding box. Otherwise 500 craters × 2M pixels is far too slow.
+Only evaluate pixels inside each feature's bounding box. `height = shape + craters + fine + boulders`. Store it as:
 
-**Boulders (rubble style only).** Small positive Gaussian bumps at density `boulder_density`.
-
-`height = relief_amp · normalise(fbm) + craters + boulders`, in units of the body's radius. Store it as:
-
-- `height.png`: 8-bit, for display and fallback haptics
+- `height.png`: 8-bit, for display and fallback haptics. Asteroids: `0.5 + h / relief_amp`, clipped (fixed scale, so the viewer's displacement `relief_amp`, bias `−relief_amp/2`, reproduces h). Other kinds: min-max scaled
 - `height.bin`: `float16` little-endian, W×H, used by the haptics and the body tone (R8.9.1) for precision
 
 ### R6.4 Colour (no AI, default)
