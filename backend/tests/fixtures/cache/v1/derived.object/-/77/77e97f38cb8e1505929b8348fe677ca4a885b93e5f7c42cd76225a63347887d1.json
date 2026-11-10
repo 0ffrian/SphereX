@@ -1,0 +1,16 @@
+{
+ "body_sha256": "f9536b227723ed5fdcf12c80ea97d0a93197c21f30db735de298ea0a30f54725",
+ "body_size": 703,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-09T19:30:59.911Z",
+ "key": {
+  "query": {
+   "id": "simbad-name-barnard-s-star",
+   "v": "1"
+  },
+  "release": "-",
+  "source": "derived.object"
+ },
+ "status": 200,
+ "url": "derived:resolve"
+}

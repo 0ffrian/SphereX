@@ -149,12 +149,14 @@ def test_bad_query_is_400(client: TestClient) -> None:
     assert r.status_code == 400 and r.json()["error"] == "bad_query"
 
 
-def test_moving_object_frames_are_refused(client: TestClient) -> None:
+def test_moving_object_frames_come_from_the_path_search(client: TestClient) -> None:
+    """Issue #26 (Q-21): a moving object's frames come from the ephemeris-driven cone search,
+    not a refusal. Details are in tests/test_moving.py."""
     body = client.get("/v1/resolve", params={"q": "433 Eros"}).json()
     assert body["moving"] is True and body["resolver"] == "sbdb"
     assert body["provenance"]["ra"]["tag"] == "model_dependent"
     frames = client.get(f"/v1/objects/{body['id']}/frames").json()
-    assert frames["frames"] == [] and frames["missing"] == ["frames:moving_object_search"]
+    assert frames["frames"] and "frames:moving_object_search" not in frames["missing"]
 
 
 def test_missing_cutout_is_listed_not_invented(fixture_cache: Path) -> None:

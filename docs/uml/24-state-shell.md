@@ -51,7 +51,7 @@ stateDiagram-v2
   end note
 
   note left of BuildPane
-    Steps aside: transport, quick picks,
+    Steps aside: transport,
     right edge fade, object panel, object card.
     Focus on close: rail 3D viewer button,
     else the object's marker, else the sky.

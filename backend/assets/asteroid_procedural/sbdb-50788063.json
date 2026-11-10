@@ -1,0 +1,177 @@
+{
+  "asset_version": "9",
+  "card": {
+    "albedo": {
+      "assumption": "albedo 0.04 is an assumption adopted by the authors to convert H_V into a size; no measurement of the albedo exists",
+      "source": "literature: Meech et al. 2017, Nature 552, 378, Methods, 'Shape and size': p = 0.04 adopted (backend/assets/literature.toml). Assumed, not measured",
+      "tag": "model_dependent",
+      "value": 0.04
+    },
+    "band_depth_3um": {
+      "source": "not available: no source in the pipeline yet (no band-depth rule in the specs)",
+      "tag": "measured",
+      "value": null
+    },
+    "diameter_km": {
+      "assumption": "geometric albedo 0.04 is assumed, not measured (Meech et al. adopt it); the size follows from H_V = 22.4 and that albedo",
+      "err": 0.008,
+      "source": "literature: Meech et al. 2017, Nature 552, 378, Methods, 'Shape and size': mean radius 102 +/- 4 m at p = 0.04 (backend/assets/literature.toml). Diameter = 2 x 102 m. The paper calls linear dimensions from the magnitudes alone meaningless because a/c is unconstrained; the +/- is from the magnitudes only",
+      "tag": "model_dependent",
+      "value": 0.204
+    },
+    "gaia_rgb": {
+      "formula": "Gaia DR3 colours to RGB (not computed)",
+      "source": "not available: the Gaia adapter is not built (A3.2)",
+      "tag": "derived",
+      "value": null
+    },
+    "id": "sbdb-50788063",
+    "lightcurve_amp_mag": {
+      "source": "literature: Meech et al. 2017, Nature 552, 378, Methods, 'Shape and size': light-curve range 2.5 mag (g = 22.15 brightest, 24.65 faintest) (backend/assets/literature.toml). Axis ratio 10:1 or more; c is unconstrained, so cigar versus disc is open. The spin is tumbling (period 7.34 +/- 0.06 h, double-peaked assumption); not drawn",
+      "tag": "measured",
+      "value": 2.5
+    },
+    "name": "'Oumuamua (A/2017 U1)",
+    "phase_angle_deg": {
+      "source": "JPL Horizons quantity 24 (Sun-Target-Observer), observer SPHEREx 500@-163182, at 2026-11-14T00:00:00.000Z",
+      "tag": "measured",
+      "value": 0.755
+    },
+    "rot_period_h": {
+      "source": "JPL SBDB rot_per (LCDB (Rev. 2023-October); Warner et al., 2009)",
+      "tag": "measured",
+      "value": 7.937
+    },
+    "slope_075_25": {
+      "source": "not available: the only published slope (23 +/- 3 %/100 nm, Meech et al. 2017) is optical (g to Y, about 0.5 to 1.0 um), while this field covers 0.75 to 2.5 um and its unit is not settled (docs say %/um, code reads %/100 nm); no 0.75 to 2.5 um slope is published",
+      "tag": "measured",
+      "value": null
+    },
+    "spectral_class": {
+      "source": "not available: no catalogue class; spectrum matching is not built (A4.3)",
+      "tag": "measured",
+      "value": null
+    },
+    "spherex_rgb": {
+      "source": "not available: no SPHEREx spectrum for this object",
+      "tag": "measured",
+      "value": null
+    },
+    "sun_vector": {
+      "formula": "-r/|r|, r = heliocentric ICRF position from JPL Horizons VECTORS (CENTER 500@10) at 2026-11-14T00:00:00.000Z; frame ICRF (equatorial J2000), direction target to Sun",
+      "source": "JPL Horizons VECTORS, CENTER 500@10, at 2026-11-14T00:00:00.000Z",
+      "tag": "derived",
+      "value": [
+        -0.911113003,
+        0.020704064,
+        -0.411636293
+      ]
+    },
+    "type": "asteroid_procedural"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b2",
+  "inputs_sha256": "ffa059f36dc4327154473203418e2bf8acd3317bea275504d2c63a3c5b6b463a",
+  "render_params": {
+    "alt_text": "'Oumuamua (A/2017 U1), Asteroid, 0.204 km across (model dependent), no visible colour basis, viewed at 0.755 degrees. Surface relief: illustrative.",
+    "generator_version": "p1-b2",
+    "haptics": {
+      "data": "none",
+      "data_tag": "artistic",
+      "params": {
+        "tau": 0.15
+      },
+      "texture": "height",
+      "texture_tag": "artistic"
+    },
+    "id": "sbdb-50788063",
+    "layers": [
+      {
+        "assumed": {
+          "c_axis": "c is not constrained by a light curve; c = b draws a cigar, and a disc fits the same data",
+          "c_over_b": 1.0,
+          "diameter_km": 0.204
+        },
+        "description": "Assumption: a/b = 10^(0.4 * A), c = b, from the light-curve amplitude (R6.2).",
+        "formula": "a/b = 10^(0.4 * A), c = b",
+        "id": "ellipsoid",
+        "requires": [
+          "diameter_km",
+          "lightcurve_amp_mag"
+        ],
+        "tag": "model_dependent",
+        "tier": 3
+      },
+      {
+        "description": "Procedural height field from the seed, style rubble (R6.2, R6.3).",
+        "id": "relief",
+        "requires": [
+          "diameter_km"
+        ],
+        "tag": "artistic",
+        "tier": 5
+      },
+      {
+        "description": "Surface pushed out by the height map, up to 0.04 of the radius (style rubble, R6.2, R7.2).",
+        "id": "displacement",
+        "requires": [
+          "diameter_km"
+        ],
+        "tag": "artistic",
+        "tier": 5
+      }
+    ],
+    "lighting": {
+      "mode": "sun",
+      "phase_angle_deg": 0.755,
+      "sun_dir": [
+        -0.911113003,
+        0.020704064,
+        -0.411636293
+      ]
+    },
+    "missing": [
+      "albedo_map",
+      "visible",
+      "spherex_ir",
+      "spectrum"
+    ],
+    "scale_m": 102.0,
+    "seed": 990686978,
+    "textures": {
+      "albedo": "/data/demo-textures/sbdb-50788063/p1-b2/990686978/1024x512/albedo.webp",
+      "height": "/data/demo-textures/sbdb-50788063/p1-b2/990686978/1024x512/height.png",
+      "height_bin": "/data/demo-textures/sbdb-50788063/p1-b2/990686978/1024x512/height.bin",
+      "normal": "/data/demo-textures/sbdb-50788063/p1-b2/990686978/1024x512/normal.png",
+      "relief_amp": 0.04
+    },
+    "type": "asteroid_procedural",
+    "view_modes": {
+      "spherex_ir": {
+        "available": false,
+        "badge": "SPHEREx infrared, whole-body average (false colour)",
+        "channels_um": [
+          3.0,
+          2.0,
+          1.0
+        ],
+        "rgb": null,
+        "source": "spherex_rgb"
+      },
+      "visible": {
+        "available": false,
+        "badge": "Estimated visible colour",
+        "rgb": null,
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 990686978,
+  "textures": {
+    "albedo": "/data/demo-textures/sbdb-50788063/p1-b2/990686978/1024x512/albedo.webp",
+    "height": "/data/demo-textures/sbdb-50788063/p1-b2/990686978/1024x512/height.png",
+    "height_bin": "/data/demo-textures/sbdb-50788063/p1-b2/990686978/1024x512/height.bin",
+    "normal": "/data/demo-textures/sbdb-50788063/p1-b2/990686978/1024x512/normal.png",
+    "relief_amp": 0.04
+  }
+}

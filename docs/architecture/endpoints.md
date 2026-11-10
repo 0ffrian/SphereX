@@ -1,12 +1,12 @@
 # Endpoint register
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.11 · **Implements:** [D-16](../decisions/contract.md), [D-25](../decisions/data-sources.md), [Q-39](../decisions/contract.md), [Q-50](../decisions/data-sources.md), [Q-87](../decisions/sky-shell.md), [Q-92](../decisions/data-sources.md), [Q-98](../decisions/sky-shell.md), [Q-111](../decisions/pipeline-jobs.md), [Q-122](../decisions/gemini.md), [Q-141](../decisions/moving-objects.md), [Q-145](../decisions/moving-objects.md), [Q-146](../decisions/moving-objects.md) · **Read with:** [refusals.md](refusals.md) (A4.12), [../../backend/README.md](../../backend/README.md#endpoints-d-16) (response shapes)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.11 · **Implements:** [D-16](../decisions/contract.md), [D-25](../decisions/data-sources.md), [Q-39](../decisions/contract.md), [Q-50](../decisions/data-sources.md), [Q-87](../decisions/sky-shell.md), [Q-92](../decisions/data-sources.md), [Q-98](../decisions/sky-shell.md), [Q-111](../decisions/pipeline-jobs.md), [Q-122](../decisions/gemini.md), [Q-141](../decisions/moving-objects.md), [Q-145](../decisions/moving-objects.md), [Q-146](../decisions/moving-objects.md), [Q-164](../decisions/demo-pack.md), [Q-195](../decisions/contract.md) · **Read with:** [refusals.md](refusals.md) (A4.12), [../../backend/README.md](../../backend/README.md#endpoints-d-16) (response shapes)
 
 ### A4.11 Endpoint register
 
 Every HTTP route the backend serves or is planned to serve, in one list. D-16 decides six routes; the others are "beyond D-16" until the decision named in the row is answered. Each row links the section that specifies the route. **Response shapes** (every field) are owned by [backend/README.md](../../backend/README.md#endpoints-d-16), which is kept in step with `backend/app/api/models.py`; specs describe behaviour and link there instead of copying shapes.
 
-**Built** (`backend/app/main.py` mounts these routers and paths, 9 Nov 2026):
+**Built** (`backend/app/main.py` mounts these routers and paths, 10 Nov 2026):
 
 | Route | Purpose | Decision | Spec |
 |---|---|---|---|
@@ -31,16 +31,17 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
 | `GET /v1/sky/{survey}/equirect_{W}x{H}.jpg` | baked all-sky image | Q-87 (open) | [A3.11](object-sources.md#a311-sky-background-irsa-hips) |
 | `GET /v1/sky/{survey}/hips/properties`, `…/hips/Norder3/Allsky.jpg`, `…/hips/Norder{k}/Dir{d}/Npix{n}.jpg` | mirrored HiPS files | Q-87 (open) | [A3.11](object-sources.md#a311-sky-background-irsa-hips) |
 | `GET /data/textures/{id}/{generator_version}/{seed}/{W}x{H}/<file>` | baked texture files (static mount) | R6.7, Q-47, Q-112 | [A5.4](data-contract.md#a54-asset-store), [A4.10](jobs.md#a410-object-job-and-fan-out) |
+| `GET /data/demo-textures/{id}/{generator_version}/{seed}/{W}x{H}/<file>` | the pre-built demo pack's maps (static mount of `SX_DEMO_TEXTURES_DIR`, read only, mounted under `SX_OFFLINE=1` too; only when the folder exists) | Q-164 (proposed) | [A5.4](data-contract.md#a54-asset-store) |
 | `GET /data/shapes/{name}.glb` | a registered shape-model mesh | Q-44, Q-61 | [A3.10](object-sources.md#a310-added-for-the-object-view), [A5](data-contract.md#a5-data-contract) |
-| `GET /v1/health` | `{status, offline, data_release}` | **Proposed (Q-195)** | [A10.2](frontend-platform.md#a102-running-the-event-build) |
+| `GET /v1/health` | `{status, offline, data_release}`; built (`main.py`), beyond D-16 | Q-195 (proposed) | [A10.2](frontend-platform.md#a102-running-the-event-build) |
 
 **Planned** (not built; proposals in open decisions):
 
 | Route | Purpose | Decision | Spec |
 |---|---|---|---|
-| `GET /v1/objects/{id}/path[?start=&end=]` | the Horizons path seen from SPHEREx, cache only, filled by the object job | Q-141 (open, Kevin) | A19.5 ([moving-objects/track.md](moving-objects/track.md)); schema A19.13 |
+| `GET /v1/objects/{id}/path[?start=&end=]` | the Horizons path seen from SPHEREx, cache only, filled by the object job; planned errors 400 `path_span_too_long`, 404 `not_moving` | Q-141 (open, Kevin) | A19.5 ([moving-objects/track.md](moving-objects/track.md#a195-path-endpoint)); schema A19.13 |
 | `GET /v1/objects/{id}/track.ecsv` | Track export (shared ECSV writer with Area search) | Q-145 (open, Kevin) | A19.9 ([moving-objects/track-contract.md](moving-objects/track-contract.md)) |
-| `/v1/areas/...` (list, one area, known objects, dots, tracks, stamps, export) | Area search | Q-146 item 6 | A17.8 ([moving-objects/area-backend.md](moving-objects/area-backend.md)) owns the route list |
+| `/v1/areas/...` (list, one area, known objects, dots, tracks, stamps, export) | Area search | Q-146 item 6 | A17.8 ([moving-objects/area-contract.md](moving-objects/area-contract.md#a178-endpoints)) owns the route list |
 
 **Rules shared by every route.**
 
@@ -58,6 +59,8 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
   | 404 | `frame_not_found` | a frame id the object's list does not hold |
   | 404 | `flags_unavailable` | a cutout with no usable FLAGS mask (permanent) |
   | 404 | `albedo_ai_unavailable` | no applied, current AI albedo |
+  | 400 | `path_span_too_long` | **planned** (A19.5): `/path` with a `start`–`end` span over the cap |
+  | 404 | `not_moving` | **planned** (A19.5): `/path` for an id with `moving = false` |
   | 503 | `offline_cache_miss` | `SX_OFFLINE=1` and the call is not in the cache (D-25) |
   | 503 | `upstream_unavailable` | an external service failed after retries and no older cache entry exists |
   | 503 | `cutout_unavailable` | a cutout that cannot be fetched or read |
@@ -77,3 +80,4 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
 
 - **Request header:** `X-SX-Admin-Token` on admin routes (A6.2).
 - **Static caching:** flags and combine PNGs `Cache-Control: public, max-age=86400`; mirrored sky files `immutable`.
+- **Static mounts** (`/data/textures`, `/data/demo-textures`): FastAPI `StaticFiles`, no directory listing, no path outside the root.

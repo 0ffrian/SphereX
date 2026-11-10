@@ -14,6 +14,7 @@ import { ProvenanceBadge } from '@/app/Badge';
 import { effectiveHonesty, HONESTY_LABEL } from '@/viewer/honesty';
 import type { MouldPhase } from './useMould';
 import { focusAfterBuildClose } from './focus';
+import { PREBUILT_NOTE } from '@/app/messages';
 import { loadBodyFor, typeLabel, useSelection } from './selectedBody';
 
 /** Closes the pane (× and Escape; the hash follows, see useHashSync) and returns focus. */
@@ -134,6 +135,11 @@ export function BuildPane() {
           </h2>
           <p data-testid="build-subtitle" className="flex flex-wrap items-center gap-2">
             {subtitle && <span>{subtitle}</span>}
+            {bodyHere?.status === 'ready' && bodyHere.prebuilt && (
+              <span className="text-xs text-sx-mfg" data-testid="build-prebuilt">
+                {PREBUILT_NOTE}
+              </span>
+            )}
             {name && (
               // The level the body is shown at (D-02, D-21), visible without opening Details.
               <span className="inline-flex items-center gap-1" data-testid="build-level">

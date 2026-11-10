@@ -9,7 +9,8 @@ export type ToolId = 'sky' | 'flipbook' | 'spectrum' | 'viewer';
 export type BodyLoad =
   | { status: 'idle' }
   | { status: 'loading'; id: string }
-  | { status: 'ready'; id: string }
+  /** `prebuilt`: the backend answered with a saved asset (a pre-built or earlier build). */
+  | { status: 'ready'; id: string; prebuilt?: boolean }
   /**
    * No 3D model: the backend has no card or render params for this object (nothing invented).
    * `transient` is true for a timeout or a network or server error (asking again may work), false

@@ -1,0 +1,16 @@
+{
+ "body_sha256": "75c4daf1f381c0c9e859ed36e00e1f99e79f0b867779ee2b6eba2ece02a6cef0",
+ "body_size": 569,
+ "content_type": "application/json;charset=UTF-8",
+ "fetched_at": "2026-11-09T19:27:23.128Z",
+ "key": {
+  "query": {
+   "ident": "R Dra",
+   "table": "mesVar"
+  },
+  "release": "-",
+  "source": "simbad"
+ },
+ "status": 200,
+ "url": "https://simbad.harvard.edu/simbad/sim-tap/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=json&QUERY=SELECT+mesVar.period%2C+mesVar.vartyp%2C+mesVar.magtyp%2C+mesVar.bibcode+FROM+ident+JOIN+mesVar+ON+ident.oidref+%3D+mesVar.oidref+WHERE+ident.id+%3D+%27R+Dra%27+AND+mesVar.period+IS+NOT+NULL"
+}

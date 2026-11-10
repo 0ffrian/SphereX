@@ -1,0 +1,138 @@
+{
+  "asset_version": "9",
+  "card": {
+    "ch4_depth_33": {
+      "source": "not available: no source in the pipeline yet (no CH4 band-depth rule in the specs)",
+      "tag": "measured",
+      "value": null
+    },
+    "flux_45um": {
+      "source": "not available: no SPHEREx spectrum for this object",
+      "tag": "measured",
+      "value": null
+    },
+    "id": "simbad-wisea-j085510-74-071442-5",
+    "name": "WISEA J085510.74-071442.5",
+    "pm_mas_yr": {
+      "source": "SIMBAD WISEA J085510.74-071442.5 (pmra = mu_alpha * cos(delta), pmdec)",
+      "tag": "measured",
+      "value": [
+        -8123.7,
+        673.2
+      ]
+    },
+    "radius_rjup": {
+      "assumption": "brown dwarf radii are about 1 Jupiter radius (R7.4)",
+      "source": "R7.4 model assumption, not a measurement of this object",
+      "tag": "model_dependent",
+      "value": 1.0
+    },
+    "spectral_class": {
+      "source": "SIMBAD WISEA J085510.74-071442.5 sp_type",
+      "tag": "measured",
+      "value": "Y2"
+    },
+    "spherex_rgb": {
+      "source": "not available: no SPHEREx spectrum for this object",
+      "tag": "measured",
+      "value": null
+    },
+    "type": "brown_dwarf"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b2",
+  "inputs_sha256": "ffa059f36dc4327154473203418e2bf8acd3317bea275504d2c63a3c5b6b463a",
+  "render_params": {
+    "alt_text": "WISEA J085510.74-071442.5, Brown dwarf, 1 Jupiter radii (model dependent), colour from a class palette, self-luminous. Surface relief: illustrative.",
+    "generator_version": "p1-b2",
+    "haptics": {
+      "data": "none",
+      "data_tag": "artistic",
+      "params": {},
+      "texture": "none",
+      "texture_tag": "artistic"
+    },
+    "id": "simbad-wisea-j085510-74-071442-5",
+    "layers": [
+      {
+        "assumed": {
+          "radius_rjup": 1.0
+        },
+        "description": "Assumption: brown dwarf radii are about 1 Jupiter radius (R7.4).",
+        "formula": "radius = radius_rjup * R_Jup",
+        "id": "body",
+        "requires": [
+          "radius_rjup"
+        ],
+        "tag": "model_dependent",
+        "tier": 3
+      },
+      {
+        "assumed": {
+          "limb_darkening_u": 0.6
+        },
+        "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu). The coefficient is the R7.5 visible-band solar value, used as a placeholder for an infrared view [verify]; no brown-dwarf coefficient is confirmed (R7.4).",
+        "formula": "I(mu) = 1 - u * (1 - mu), u = 0.6",
+        "id": "limb_darkening",
+        "requires": [
+          "radius_rjup"
+        ],
+        "tag": "inferred_from_analog",
+        "tier": 4
+      }
+    ],
+    "lighting": {
+      "mode": "self"
+    },
+    "missing": [
+      "emissive",
+      "bands",
+      "flux_pulse",
+      "spherex_ir",
+      "spectrum"
+    ],
+    "scale_m": 71492000.0,
+    "seed": 3127749788,
+    "textures": {
+      "albedo": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b2/3127749788/1024x512/albedo.webp",
+      "height": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b2/3127749788/1024x512/height.png",
+      "height_bin": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b2/3127749788/1024x512/height.bin",
+      "normal": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b2/3127749788/1024x512/normal.png"
+    },
+    "type": "brown_dwarf",
+    "view_modes": {
+      "spherex_ir": {
+        "available": false,
+        "badge": "SPHEREx infrared, whole-body average (false colour)",
+        "channels_um": [
+          4.5,
+          3.3,
+          1.25
+        ],
+        "rgb": null,
+        "source": "spherex_rgb"
+      },
+      "visible": {
+        "available": true,
+        "badge": "Estimated visible colour",
+        "rgb": {
+          "source": "brown dwarf class palette Y (R7.4, Q-47)",
+          "tag": "inferred_from_analog",
+          "value": [
+            0.3,
+            0.26,
+            0.36
+          ]
+        },
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 3127749788,
+  "textures": {
+    "albedo": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b2/3127749788/1024x512/albedo.webp",
+    "height": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b2/3127749788/1024x512/height.png",
+    "height_bin": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b2/3127749788/1024x512/height.bin",
+    "normal": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b2/3127749788/1024x512/normal.png"
+  }
+}

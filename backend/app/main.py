@@ -129,6 +129,14 @@ def create_app(
     app.include_router(sky.router)
     # R6.7 / A5.4: the baked textures that RenderParams.textures point at (TEXTURE_URL_ROOT).
     app.mount("/data/textures", StaticFiles(directory=textures), name="textures")
+    # Q-164: the pre-built demo pack's maps (committed, read only). Same StaticFiles rules as
+    # above (no directory listing, no path outside the root); mounted offline too.
+    if s.demo_textures_dir.is_dir():
+        app.mount(
+            "/data/demo-textures",
+            StaticFiles(directory=s.demo_textures_dir),
+            name="demo-textures",
+        )
 
     shapes_dir = s.shapes_dir
 

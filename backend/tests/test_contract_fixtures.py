@@ -37,8 +37,15 @@ OBJECT_TYPES: list[str] = CARD_SCHEMA["definitions"]["ObjectType"]["enum"]
 TAGS: list[str] = CARD_SCHEMA["definitions"]["Tag"]["enum"]
 TV_DEFINITIONS = ["TVNumber", "TVString", "TVRgb", "TVVec3", "TVPair"]
 
-CARDS = {p.stem: _load(p) for p in sorted((SHARED / "fixtures" / "cards").glob("*.json"))}
-PARAMS = {p.stem: _load(p) for p in sorted((SHARED / "fixtures" / "params").glob("*.json"))}
+# Issue #68 Part 6: two extra `planet_rocky` fixtures with real archive values sit beside the
+# one-per-type set; they are checked on their own below.
+DEMO_PLANETS = ["planet_kepler186f", "planet_trappist1f"]
+DEMO_ASTEROIDS = ["asteroid_shape_bennu"]  # Part 8a: the real Bennu model beside Eros
+EXTRA = [*DEMO_PLANETS, *DEMO_ASTEROIDS]
+_ALL_CARDS = {p.stem: _load(p) for p in sorted((SHARED / "fixtures" / "cards").glob("*.json"))}
+_ALL_PARAMS = {p.stem: _load(p) for p in sorted((SHARED / "fixtures" / "params").glob("*.json"))}
+CARDS = {k: v for k, v in _ALL_CARDS.items() if k not in EXTRA}
+PARAMS = {k: v for k, v in _ALL_PARAMS.items() if k not in EXTRA}
 INVALID = _load(SHARED / "fixtures" / "invalid" / "cases.json")
 
 _REGISTRY: Registry[Any] = Registry().with_resources(
@@ -89,6 +96,37 @@ def test_one_card_and_one_params_fixture_per_object_type() -> None:
     assert sorted(PARAMS) == sorted(OBJECT_TYPES)
 
 
+def test_demo_planets_are_extra_fixtures() -> None:
+    assert sorted(_ALL_CARDS) == sorted([*OBJECT_TYPES, *EXTRA])
+    assert sorted(_ALL_PARAMS) == sorted([*OBJECT_TYPES, *EXTRA])
+
+
+def test_bennu_fixture_pair_validates_and_names_its_real_source() -> None:
+    card, params = _ALL_CARDS["asteroid_shape_bennu"], _ALL_PARAMS["asteroid_shape_bennu"]
+    VALIDATORS["object-card"].validate(card)
+    VALIDATORS["render-params"].validate(params)
+    assert card["type"] == params["type"] == "asteroid_shape"
+    assert card["id"] == params["id"]
+    assert card["shape_source"]["value"] == "/data/shapes/bennu-spo-v54.glb"
+    for tv in _tagged(card):
+        assert str(tv.get("source", "")).startswith("synthetic fixture: real 101955 Bennu value, ")
+
+
+@pytest.mark.parametrize("name", DEMO_PLANETS)
+def test_demo_planet_pair_validates_and_round_trips(name: str) -> None:
+    card, params = _ALL_CARDS[name], _ALL_PARAMS[name]
+    VALIDATORS["object-card"].validate(card)
+    VALIDATORS["render-params"].validate(params)
+    assert card["type"] == params["type"] == "planet_rocky"
+    assert card["id"] == params["id"]
+    dump = {"mode": "json", "exclude_unset": True, "by_alias": True}
+    assert ObjectCard.model_validate(card).model_dump(**dump) == card
+    assert RenderParams.model_validate(params).model_dump(**dump) == params
+    # Every value is a real archive value and says so (the Q-114 pattern).
+    for tv in _tagged(card):
+        assert str(tv.get("source", "")).startswith("synthetic fixture: real ")
+
+
 def test_api_tag_literal_matches_the_schema() -> None:
     assert list(get_args(ApiTag)) == TAGS
 
@@ -118,9 +156,11 @@ def test_fixture_pair_validates_and_agrees(object_type: str) -> None:
 def test_fixture_pair_round_trips_through_the_generated_models(object_type: str) -> None:
     # exclude_unset is the only dump that matches the schema: a plain dump adds null for every unset
     # field, and exclude_none drops the required `value: null` and `scale_m: null` (Q-40).
+    # by_alias: `components[].class` is `class_` in Python (a keyword) and `class` on the wire.
     card, params = CARDS[object_type], PARAMS[object_type]
-    assert ObjectCard.model_validate(card).model_dump(mode="json", exclude_unset=True) == card
-    assert RenderParams.model_validate(params).model_dump(mode="json", exclude_unset=True) == params
+    dump = {"mode": "json", "exclude_unset": True, "by_alias": True}
+    assert ObjectCard.model_validate(card).model_dump(**dump) == card
+    assert RenderParams.model_validate(params).model_dump(**dump) == params
 
 
 @pytest.mark.parametrize("case", INVALID, ids=[case["name"] for case in INVALID])

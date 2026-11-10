@@ -71,6 +71,19 @@ class ResolvedObject:
         return cls(**d)
 
 
+def is_comet(ctx: Context, obj: ResolvedObject) -> bool:
+    """Whether SBDB calls the object a comet. Resolve already asked, so this is a cache hit; a
+    miss means "not a comet", which is what an asteroid and an unknown object both need."""
+    name = obj.query or obj.name
+    if not name:
+        return False
+    try:
+        answer, _ = sbdb.query(ctx, name)
+    except (CacheMissOffline, UpstreamUnavailable):
+        return False
+    return answer.hit is not None and answer.hit.is_comet
+
+
 @dataclass(frozen=True)
 class Resolution:
     obj: ResolvedObject
@@ -157,7 +170,9 @@ def _from_sbdb(
         # A Flamsteed star name ("61 Cyg") must not fall back to a numbered asteroid ("61").
         return None, [served], False
     epoch = parse_utc(ctx.settings.ephemeris_epoch)
-    points, served_h = horizons.ephemeris(ctx, hit.spkid, [epoch], refresh=refresh)
+    points, served_h = horizons.ephemeris(
+        ctx, hit.spkid, [epoch], comet=hit.is_comet, refresh=refresh
+    )
     if not points:
         raise UpstreamUnavailable(f"Horizons returned no position for {hit.spkid}")
     p = points[0]

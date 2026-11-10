@@ -58,7 +58,7 @@ flowchart LR
       TexBaker["TextureBaker, render/background.py: SX_BAKE_WORKERS spawn process, both R5 sizes, off the request path (Q-112)"]
       GemPaint["gemini_paint.py (P3, admin token)"]
     end
-    PathAPI["/v1/objects/{id}/path, /track.ecsv (A19.5, A19.9, to build, needs PR #53)"]
+    PathAPI["/v1/objects/{id}/path, /track.ecsv (A19.5, A19.9, to build, on PR #53's path search)"]
     AreaAPI["/v1/areas, core/area (A17.8, to build)"]
     TexCache[("/data/textures/{id}/{generator_version}/{seed}/")]
     AiStore[("SX_TEXTURES_AI_DIR: albedo_ai.webp, gemini.json, pointers; not served as static files (Q-122)")]
@@ -105,7 +105,7 @@ flowchart LR
   AreaAPI -.->|"derived.area, read only"| DataCache
   FEViewer -->|"texture URLs: albedo.webp, height.png, height.bin, normal.png"| TexCache
   FESky -->|"GET /v1/sky/index.json, equirect_{W}x{H}.jpg, /v1/sky/cached"| SkyAPI
-  FESky -->|"GET /v1/resolve for the quick-pick markers"| API
+  FESky -->|"GET /v1/resolve for the five test-target markers"| API
   FESky -->|"pick: search ra,dec, origin sky"| FEFlip
   SkyAPI -->|"read only, never upstream"| SkyStore
   SkyAPI -->|"/v1/sky/cached: derived.frames metas, derived.object (read only)"| DataCache
@@ -152,7 +152,7 @@ flowchart LR
   Adapters <--> DataCache
   Adapters -->|"SIA?COLLECTION=spherex_qr2, cutouts"| IRSA
   Adapters -->|"name to RA/Dec"| Resolver
-  Adapters -->|"position per frame, phase angle (quantity 24, observer SPHEREx), heliocentric vectors for sun_vector"| Horizons
+  Adapters -->|"path ephemeris and position per frame (seen from SPHEREx), phase angle (quantity 24, observer SPHEREx), heliocentric vectors for sun_vector"| Horizons
   Adapters -->|"conesearch.php, -ep in JD"| SkyBoT
   Adapters -->|"sso_reflectance_spectrum; gaia_dr3_source cone, G #lt; 20"| Gaia
   Adapters -->|"catwise_2020 cone"| CatWISE

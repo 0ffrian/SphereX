@@ -37,6 +37,10 @@ uv run python -m scripts.ingest_shape --zip ~/Downloads/gaskell.ast-eros.shape-m
 
 Input is an ICQ `.tab` (`--zip` plus `--member`, or `--input`) or an OBJ (`--input`, `--convex` for DAMIT). Output is byte-identical for the same input. Meshes over 50,000 triangles with no exact reduction are refused.
 
+`assets/literature.toml` is a reviewed, read-only table of cited values for objects the catalogues leave empty ('Oumuamua's size and light-curve amplitude, Epsilon Indi B's component temperatures). Stage 4 uses a row only where the catalogue value is null (A3.13, Q-153); `SX_LITERATURE_FILE` points elsewhere. `assets/pm13_dwarf_teff.toml` is the Pecaut & Mamajek main-sequence Teff table behind a star's third Teff source (Q-152); `SX_DWARF_TEFF_FILE` points elsewhere. Both are edited by hand, never by code.
+
+`assets/textures/` holds the demo pack's baked maps, served read-only at `/data/demo-textures` (`SX_DEMO_TEXTURES_DIR`, also under `SX_OFFLINE=1`, Q-164).
+
 ## Endpoints (D-16)
 
 This table holds the reply shapes. The register of every route (built and planned), its deciding entry and its spec is [A4.11](../docs/architecture/endpoints.md#a411-endpoint-register); refusal codes are [A4.12](../docs/architecture/refusals.md#a412-missing-and-refusal-codes); the object job is [A4.10](../docs/architecture/jobs.md#a410-object-job-and-fan-out).
@@ -85,7 +89,7 @@ Errors are `{"error": code, "detail": sentence}`. The codes are:
 - `epoch` in `resolve` is ISO-8601 UTC: `2000-01-01T11:58:55.816Z` (J2000.0) for SIMBAD positions, `SX_EPHEMERIS_EPOCH` for moving objects, absent for typed coordinates.
 - Typed coordinates are tagged `derived` (user input, Q-25).
 - A Flamsteed name (`61 Cyg`, `51 Pegasi`) goes to SIMBAD first. Its SBDB fallback is accepted only when the asteroid's name is the query (`849 Ara`), so a star name never resolves to a numbered asteroid.
-- Moving objects (solar-system bodies, Q-22) get `frames: []` and `missing: ["frames:moving_object_search"]` in M1 (Q-21).
+- Moving objects (solar-system bodies, Q-22) get their frames from the path search (issue #26, A4.1): SIA cones along the SPHEREx-centred Horizons path, merged and kept when the footprint holds the object at the frame midpoint. `ra`/`dec` and `x`/`y` are `model_dependent` (Q-125). A target may list its own `moving_windows` in `targets.toml`, matched by `spkid` (3I/ATLAS does). A web request, and the job's capped first batch, run the search from the cache only; the job's full run downloads the rest (Q-111). Extra `missing` codes: `frames:ephemeris`, `frames:moving_window`, `frames:cone_cap:<n>` (cones left out by the cap, spread over the path), `frames:sparse_path:<n>`, `frames:cone_failed:<n>`, `frames:search_deferred:<n>`, `frames:outside_window:<n>`, `no_footprint:<id>`, `ephemeris:<id>`; `frames:cone_maxrec:<n>` when cones hit MAXREC. The list is stored unless it has `frames:ephemeris`, `frames:cone_failed`, `frames:search_deferred` or `ephemeris:`.
 
 ## Composite
 
@@ -151,6 +155,14 @@ uv run python -m scripts.sky_bake --preview preview.jpg             # 4096x2048 
 | `SX_SIMBAD_TAP_URLS` | CDS, then the Harvard mirror | Comma-separated and tried in order. |
 | `SX_EPHEMERIS_EPOCH` | `2026-11-14T00:00:00Z` | The time used for a moving object's `resolve` position. |
 | `SX_SEARCH_EPOCH` | `2026-01-01T00:00:00Z` | The time used for a proper-motion star's SIA search cone. |
+| `SX_MOVING_WINDOW_START`, `SX_MOVING_WINDOW_END` | `2025-04-01T00:00:00Z`, `2026-06-01T00:00:00Z` | **[verify]** The data release window for the moving-object path search (not published; covers every cached QR2 frame time). |
+| `SX_MOVING_EPHEM_STEP_MIN` | `10` | **[verify]** Horizons sampling of the path (cone placement and candidate footprint check; pixels use exact per-frame positions). Well under the ~95 min SPHEREx orbit. |
+| `SX_MOVING_CONE_RADIUS_DEG` | `0.1` | **[verify]** Cone radius R along the path. |
+| `SX_MOVING_MIN_STEP_H`, `SX_MOVING_MAX_STEP_H` | `1`, `24` | **[verify]** Clamp for the step dt = R / rate between cones. |
+| `SX_MOVING_MAX_CONES` | `450` | **[verify]** Cones per object; past it the cones are spread evenly over the path and `frames:cone_cap:<n>` is reported. |
+| `SX_MOVING_SIA_MAXREC` | `500` | **[verify]** MAXREC per path cone. |
+| `SX_MOVING_CONE_PACE_S` | `0` | **[verify]** Seconds between live path cones (IRSA publishes no rate limit; requests are sequential and 5xx/504 are retried with backoff). |
+| `SX_MOVING_FOOTPRINT_MARGIN_ARCSEC` | `60` | ASSUMPTION. A frame is a candidate when the interpolated path is within this margin of its footprint; the exact position then decides. |
 | `SX_HTTP_*` | 10 s connect, 60 s read, 3 retries, 1 s backoff (doubles) | |
 | `SX_CORS_ORIGINS` | empty | Needed only when the frontend runs without the Vite proxy. CORS then exposes the `X-SX-Cached-At` and `X-SX-Asset-Status` headers (Q-39), `X-SX-Combine` (Q-50), the issue #41 `X-SX-Measuring` and `X-SX-Progress` (Q-111) and `X-SX-Layer-Tag` (Q-122) so the browser can read them. Only `GET` is allowed, so the admin repaint is for `curl`. |
 | `SX_ASSETS_DIR` | `backend/assets` | Pre-baked assets read by stage 4 (A5.4), `<type>/<id>.json` with the D-22 fields. |
@@ -211,7 +223,7 @@ app/core/card/    (Kevin, Stages 4-5, A4.4-A4.5) catalogue, build, assets (A5.4 
 app/core/render/  (Atish, R10) texture baker; card_to_params (Stage 7, A4.7), blackbody, spherex_rgb
 app/core/sky/     sky background: survey registry and layout, HEALPix NESTED, HiPS -> equirect bake
 app/core/composite/ (no D-17 owner yet) SPHEREx false-colour composite: config, select, grid, service
-assets/           A5.4 pre-baked assets, <type>/<id>.json (SX_ASSETS_DIR; none yet)
-scripts/          prefetch, smoke_offline, backup_cache, record_fixtures, generate_contract, sky_mirror, sky_bake
+assets/           A5.4 pre-baked assets, <type>/<id>.json (SX_ASSETS_DIR); the demo pack (Q-164) and its maps in assets/textures/
+scripts/          prefetch, smoke_offline, backup_cache, record_fixtures, generate_contract, sky_mirror, sky_bake, bake_demo_pack (`--check`, `--strict`)
 tests/            pytest; tests/fixtures/cache holds the recorded cache entries
 ```

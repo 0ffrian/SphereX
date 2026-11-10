@@ -10,7 +10,7 @@ These are the presentation rules of the one 3D view (Q-113, as amended by Q-120)
 
 - There is one 3D view. The old floating viewer card is gone.
 - Ways in (Q-120 item 4): *Build it* on the object card, *Build it in 3D* in the object panel, and the rail's 3D viewer. The rail opens the body already built, with no moulding. A left click on a sky marker opens the object panel, not the pane (Q-120 item 1).
-- *Build it* splits the view. The sky moves to the left half and stays live. The build pane takes the right half. At phone width (640 px or less) the pane is a full-height sheet over the sky. The flipbook transport and the quick picks step aside while the pane is open.
+- *Build it* splits the view. The sky moves to the left half and stays live. The build pane takes the right half. At phone width (640 px or less) the pane is a full-height sheet over the sky. The flipbook transport steps aside while the pane is open.
 - The link holds `#…&build` while the pane is open. Back, Escape and the × button close it.
 - The pane header holds the title, the honesty level with its D-02 badge, the Show control, and the tools: Feel, Replay, New seed, Close. A numbered strip shows the moulding steps.
 - The body comes from `/card` and `/render-params` (D-16) when the card is asked for or the pane opens, not on every marker click (Q-120 item 5).

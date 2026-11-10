@@ -1,0 +1,98 @@
+{
+  "asset_version": "9",
+  "card": {
+    "id": "simbad-v-r-dra",
+    "lightcurve": [],
+    "name": "V* R Dra",
+    "period_var_d": {
+      "formula": "median of the mesVar periods typed LPV or M; of two middle values, the one from the most recent bibcode (Q-152)",
+      "source": "SIMBAD mesVar: median of 3 periods typed LPV or M (246 to 247.207 d); the middle value is from 2020ApJS..247...44A",
+      "tag": "derived",
+      "value": 247.0
+    },
+    "pm_mas_yr": {
+      "source": "SIMBAD V* R Dra (pmra = mu_alpha * cos(delta), pmdec)",
+      "tag": "measured",
+      "value": [
+        -20.643,
+        6.149
+      ]
+    },
+    "radius_rsun": {
+      "source": "not available: Gaia DR3 has no FLAME radius for this star; no interferometric radius is in the literature registry, and a spectral-class table is never used for a radius (Q-152)",
+      "tag": "measured",
+      "value": null
+    },
+    "spectral_class": {
+      "source": "SIMBAD V* R Dra sp_type",
+      "tag": "measured",
+      "value": "M4.5-6+e"
+    },
+    "teff_K": {
+      "source": "not available: SIMBAD mesFe_h has no Teff for this object; Gaia DR3 has no GSP-Phot Teff for this star; no verified Teff table exists for M giants or Miras (Q-152), so the class table is not used",
+      "tag": "measured",
+      "value": null
+    },
+    "type": "star_mira"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b2",
+  "inputs_sha256": "ffa059f36dc4327154473203418e2bf8acd3317bea275504d2c63a3c5b6b463a",
+  "render_params": {
+    "alt_text": "V* R Dra, Mira variable, size unknown, no visible colour basis, self-luminous. Surface relief: illustrative.",
+    "generator_version": "p1-b2",
+    "haptics": {
+      "data": "none",
+      "data_tag": "artistic",
+      "params": {},
+      "texture": "none",
+      "texture_tag": "artistic"
+    },
+    "id": "simbad-v-r-dra",
+    "layers": [
+      {
+        "assumed": {
+          "limb_darkening_u": 0.6
+        },
+        "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+        "formula": "I(mu) = 1 - u * (1 - mu), u = 0.6",
+        "id": "limb_darkening",
+        "requires": [],
+        "tag": "model_dependent",
+        "tier": 3
+      },
+      {
+        "description": "Radius pulsation of 10 percent (R7.5).",
+        "id": "radius_pulsation",
+        "requires": [
+          "period_var_d"
+        ],
+        "tag": "artistic",
+        "tier": 5
+      }
+    ],
+    "lighting": {
+      "mode": "self"
+    },
+    "missing": [
+      "colour",
+      "brightness_curve",
+      "heartbeat",
+      "visible",
+      "spectrum"
+    ],
+    "scale_m": null,
+    "seed": 3149821941,
+    "type": "star_mira",
+    "view_modes": {
+      "visible": {
+        "available": false,
+        "badge": "Estimated visible colour",
+        "rgb": null,
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 3149821941,
+  "textures": null
+}

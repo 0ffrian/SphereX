@@ -178,3 +178,9 @@ def test_eros_card_and_params(client: TestClient) -> None:
     assert math.isclose(math.hypot(*sun["value"]), 1.0, abs_tol=1e-6)
     params = client.get(f"/v1/objects/{oid}/render-params").json()
     assert params["lighting"]["phase_angle_deg"] == EROS_PHASE_DEG
+
+
+def test_ephemeris_with_no_epochs_is_an_upstream_error(tmp_path: Path) -> None:
+    ctx = make_context(make_settings(tmp_path, offline=True))
+    with pytest.raises(horizons.UpstreamError, match="no epochs"):
+        horizons.ephemeris(ctx, "1000012", [], comet=True)
