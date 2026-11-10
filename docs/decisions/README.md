@@ -322,4 +322,5 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-271 | Plasma as additive line streaks, budgets | Decided in code (look unchecked) | [rendering-bodies](rendering-bodies.md) |
 | Q-272 | Plasma in the plan, view rules, controls, reduced motion | Decided in code | [rendering-bodies](rendering-bodies.md) |
 | Q-273 | Star close-up component for the split pane | Decided in code | [rendering-bodies](rendering-bodies.md) |
+| Q-280 to Q-284 | Search list additions: Titan reference moon, four demo-pack rows, archive outage | Decided in code | [rendering-bodies](rendering-bodies.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |
