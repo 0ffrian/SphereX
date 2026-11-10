@@ -322,4 +322,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-271 | Plasma as additive line streaks, budgets | Decided in code (look unchecked) | [rendering-bodies](rendering-bodies.md) |
 | Q-272 | Plasma in the plan, view rules, controls, reduced motion | Decided in code | [rendering-bodies](rendering-bodies.md) |
 | Q-273 | Star close-up component for the split pane | Decided in code | [rendering-bodies](rendering-bodies.md) |
+| Q-274 | Surface view (orbit view): TSL port, draws into the viewer canvas, tags, performance (render on change, quarter scale while interacting, adaptive levels, pixel ratio 1.25) | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
+| Q-275 | Close-up pane, the app's #cuPane (left 50%, mock-up captions, every kind) | Decided in code | [rendering-bodies](rendering-bodies.md) |
+| Q-276 | Surface view inputs, entry and the fields asked of D and E | Decided in code | [rendering-bodies](rendering-bodies.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |

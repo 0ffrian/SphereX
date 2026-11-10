@@ -18,6 +18,22 @@ describe('rocky adapter', () => {
     expect(r.missing).not.toContain('orbit.height');
     expect(r.layers.find((l) => l.id === 'orbit.hydrology')!.drawn).toBe(false);
   });
+  it("with D round 2: hydrology, live cloud tracer and the air are drawn", () => {
+    const first = tex();
+    const second = tex();
+    const d: Record<string, unknown> = {
+      ...rocky(), hydrologyTexture: tex(), scaleHeightKm: 8.4, pressureBar: 1.2, hazeColour: [0.7, 0.5, 0.2],
+      surfaceTempK: 288, palette: { liq: [0, 0, 1], ice: [1, 1, 1], cld: [1, 1, 1], land: [0.3, 0.2, 0.1] },
+      get cloudTracerTexture() { return cur; },
+    };
+    let cur = first;
+    const r = rockyOrbitSources(d as never);
+    expect(r.missing).toEqual([]);
+    expect(r.sources!.cloudBase!()).toBe(first);
+    cur = second;
+    expect(r.sources!.cloudBase!()).toBe(second);
+    expect(r.sources!.look!.liq).toEqual([0, 0, 1]);
+  });
   it('refuses without a radius or heights, never throws', () => {
     expect(rockyOrbitSources({ ...rocky(), radiusKm: null }).sources).toBeNull();
     expect(rockyOrbitSources({ ...rocky(), terrainTexture: null }).refusal).toMatch(/height map/);
