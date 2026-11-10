@@ -86,13 +86,25 @@ export function resolveWorld(
   if (albedoIn) albedoTag = asWorld(albedoIn.tag);
   else assumptions.push(`Bond albedo ${DEFAULT_BOND_ALBEDO} assumed (Earth's)`);
 
+  // Surface pressure and fluid: a slider is the visitor's setting (`artistic`); else the card's own
+  // value with its own tag (Titan: Huygens and Cassini, issue #71 Q-285); else the Earth-like
+  // assumption (`model_dependent`).
   const pressureSet = sliderValue(overrides, 'surface_pressure_bar', kind);
-  if (pressureSet === undefined)
+  const cardP = card.surface_pressure_bar;
+  const cardPValue =
+    pressureSet === undefined && typeof cardP?.value === 'number' && cardP.value > 0 ? cardP.value : null;
+  if (pressureSet === undefined && cardPValue === null)
     assumptions.push(`surface pressure ${DEFAULT_PRESSURE_BAR} bar assumed (not measured for any exoplanet)`);
   const fluidIdx = sliderValue(overrides, 'surface_fluid', kind);
+  const cardFluidName = card.surface_fluid?.value;
+  const cardFluid = FLUID_ORDER.find((id) => id === cardFluidName);
+  const cardFluidUsed = fluidIdx === undefined && cardFluid !== undefined ? cardFluid : null;
   const fluid: FluidId =
-    fluidIdx !== undefined ? (FLUID_ORDER[Math.round(fluidIdx)] ?? DEFAULT_FLUID) : DEFAULT_FLUID;
-  if (fluidIdx === undefined) assumptions.push('surface fluid is water, assumed (not measured for any exoplanet)');
+    fluidIdx !== undefined
+      ? (FLUID_ORDER[Math.round(fluidIdx)] ?? DEFAULT_FLUID)
+      : (cardFluidUsed ?? DEFAULT_FLUID);
+  if (fluidIdx === undefined && cardFluidUsed === null)
+    assumptions.push('surface fluid is water, assumed (not measured for any exoplanet)');
 
   // Locked or not: the tidal rule of the physics layer (Q-155). A refused rule is "not known to be locked".
   const lock = deriveLocking(card);
@@ -115,7 +127,7 @@ export function resolveWorld(
     radiusM,
     massKg: massE * M_EARTH_KG,
     bondAlbedo: albedoIn?.value ?? DEFAULT_BOND_ALBEDO,
-    pressureBar: pressureSet ?? DEFAULT_PRESSURE_BAR,
+    pressureBar: pressureSet ?? cardPValue ?? DEFAULT_PRESSURE_BAR,
     fluid,
     locked,
     rotPeriodD,
@@ -135,8 +147,8 @@ export function resolveWorld(
       orbit: asWorld(orbit.tag),
       planet: weakestOf([asWorld(radiusRj.tag), massTag]),
       albedo: albedoTag,
-      pressure: pressureSet === undefined ? 'model_dependent' : 'artistic',
-      fluid: fluidIdx === undefined ? 'model_dependent' : 'artistic',
+      pressure: pressureSet !== undefined ? 'artistic' : cardPValue !== null ? asWorld(cardP!.tag) : 'model_dependent',
+      fluid: fluidIdx !== undefined ? 'artistic' : cardFluidUsed !== null ? asWorld(card.surface_fluid!.tag) : 'model_dependent',
       sliders,
     },
     assumptions,
