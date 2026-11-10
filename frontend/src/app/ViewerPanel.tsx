@@ -21,6 +21,7 @@ import {
   effectiveHonesty,
   HONESTY_LABEL,
   HONESTY_STATES,
+  isTagShown,
   type HonestyState,
 } from '@/viewer/honesty';
 import type { PlanContext, RenderPlan, ViewModeId } from '@/viewer/planTypes';
@@ -41,6 +42,7 @@ import { EmissionsPanel } from './EmissionsPanel';
 import { EPOCH_JD, timeRange } from '@/physics/cometGas';
 import { ConfidenceChip, ConfidenceDetails } from './ConfidencePanel';
 import { FeelPanel, HearPanel } from './build/Senses';
+import { BuildControls } from './build/BuildControls';
 import GridLoader, { type GridLoaderProps } from './island/GridLoader';
 import { ConfidencePopover } from './ConfidencePopover';
 import { timeLapsesOf } from '@/viewer/motion/planMotion';
@@ -702,7 +704,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
         <section hidden={pop !== 'acc'} data-testid="build-pop-acc">
           {pop === 'acc' &&
             (params?.confidence ? (
-              <ConfidencePopover inline params={params} name={plan?.name} onClose={() => pane.onPop?.(null)} />
+              <ConfidencePopover inline isShown={(t) => t === 'missing' || isTagShown(honesty, t)} params={params} name={plan?.name} onClose={() => pane.onPop?.(null)} />
             ) : (
               <>
                 <div className="sx-pop-h">
@@ -903,6 +905,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           </button>
         </div>
 
+        {pane && <BuildControls />}
         {plan && (
           <>
             {honestyGroup}

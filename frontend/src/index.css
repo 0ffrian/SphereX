@@ -2385,8 +2385,10 @@ body {
     right: 8px;
     max-width: none;
   }
+  /* The caption goes to the top of the strip so it never lies over the controls (issue #71 stream U). */
   .sx-cu-tag {
-    bottom: 76px;
+    bottom: auto;
+    top: 8px;
   }
   .sx-view:has(.sx-cu.open) .sx-bp {
     top: calc(84px + 36%);
@@ -2442,4 +2444,94 @@ body {
     animation: none;
     transition: none;
   }
+}
+
+/* Issue #71 stream U (Q-298): the BuildControls region in Details. */
+.sx-bctl {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sx-bctl-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid #323a3e;
+  padding-top: 10px;
+}
+.sx-bctl-group h3 {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+}
+.sx-ctl {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sx-ctl-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.sx-ctl-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #c1c9cd;
+}
+.sx-ctl-val {
+  margin-left: auto;
+  font: 12px var(--font-mono);
+  color: #fff;
+}
+.sx-ctl-row .sx-ctl-val + * {
+  margin-left: 0;
+}
+.sx-ctl-range {
+  width: 100%;
+  min-height: 32px;
+  accent-color: var(--color-sx-green);
+}
+.sx-ctl-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sx-ctl-btn {
+  background: var(--color-sx-muted);
+  color: var(--color-sx-fg);
+  box-shadow: inset 0 0 0 1px var(--color-sx-border);
+}
+.sx-ctl-btn[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 1px #4ade8088;
+  color: var(--color-sx-green);
+}
+.sx-ctl-why {
+  font-size: 11px;
+  color: #9aa4a9;
+}
+.sx-bctl-note summary {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 12px;
+  color: #c1c9cd;
+}
+.sx-bctl-note p {
+  font-size: 11.5px;
+  color: #9aa4a9;
+  margin: 0 0 6px;
+}
+@media (pointer: coarse) {
+  .sx-ctl-range,
+  .sx-bctl-note summary {
+    min-height: 44px;
+  }
+}
+
+.sx-acc-dim td {
+  opacity: 0.45;
 }
