@@ -34,6 +34,21 @@
       "tag": "derived",
       "value": 382.69
     },
+    "surface_fluid": {
+      "source": "liquid methane (with ethane) lakes and seas seen by Cassini radar: Stofan et al. 2007, Nature 445, 61; Brown et al. 2008, Nature 454, 607 [verify: not fetched]",
+      "tag": "measured",
+      "value": "methane"
+    },
+    "surface_pressure_bar": {
+      "source": "Huygens Atmospheric Structure Instrument at the landing site, Fulchignoni et al. 2005, Nature 438, 785, as quoted by NASA NTRS 20240013879 (Vuitton et al., Titan's Atmospheric Structure, Composition, Haze, and Dynamics)",
+      "tag": "measured",
+      "value": 1.467
+    },
+    "surface_temperature_K": {
+      "source": "Huygens Atmospheric Structure Instrument at the landing site, Fulchignoni et al. 2005, Nature 438, 785, as quoted by NASA NTRS 20240013879 (Vuitton et al., Titan's Atmospheric Structure, Composition, Haze, and Dynamics)",
+      "tag": "measured",
+      "value": 93.7
+    },
     "type": "planet_rocky"
   },
   "created_at": "2025-10-01T00:00:00.000Z",

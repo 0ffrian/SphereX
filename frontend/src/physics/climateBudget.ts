@@ -566,14 +566,14 @@ export function worldReadouts(
     id: 'ts', label: 'Average surface temperature', value: Math.round(stats?.mean ?? m.Ts), unit: 'K',
     tag: tagOf(['model_dependent', src.pressure], ['surface_pressure_bar', ...starKeys, 'bond_albedo']),
     assumption: assume(
-      `grey greenhouse, optical depth ${m.tau.toFixed(2)} (${GREENHOUSE_TAU_PER_BAR} per bar, calibrated to Earth); surface pressure ${src.pressure === 'measured' ? 'measured' : 'assumed'}`,
+      `grey greenhouse, optical depth ${m.tau.toFixed(2)} (${GREENHOUSE_TAU_PER_BAR} per bar, calibrated to Earth); surface pressure ${src.pressure === 'measured' ? 'measured' : src.pressure === 'artistic' ? 'set by you' : 'assumed'}`,
       ['surface_pressure_bar'],
     ),
   });
   out.push({
     id: 'fluid_state', label: `${m.fluid.label} at the surface`, value: m.state, unit: '',
     tag: tagOf(['model_dependent', src.fluid, src.pressure], ['surface_fluid', 'surface_pressure_bar']),
-    assumption: assume('surface fluid and pressure are assumed for any exoplanet; phase from Clausius-Clapeyron', ['surface_fluid', 'surface_pressure_bar']),
+    assumption: assume(src.fluid === 'measured' && src.pressure === 'measured' ? 'surface fluid and pressure from the card; phase from Clausius-Clapeyron' : 'surface fluid and pressure are assumed for any exoplanet; phase from Clausius-Clapeyron', ['surface_fluid', 'surface_pressure_bar']),
   });
   out.push({
     id: 'scale_height', label: 'Scale height', value: Math.round(m.H / 100) / 10, unit: 'km',

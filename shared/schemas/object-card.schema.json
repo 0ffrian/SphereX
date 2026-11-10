@@ -97,6 +97,15 @@
     "host_age_gyr": {
       "$ref": "#/definitions/TVNumber"
     },
+    "surface_pressure_bar": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "surface_temperature_K": {
+      "$ref": "#/definitions/TVNumber"
+    },
+    "surface_fluid": {
+      "$ref": "#/definitions/TVString"
+    },
     "component_teff_K": {
       "$ref": "#/definitions/TVPair"
     },
