@@ -15,6 +15,10 @@ flowchart TB
     CLN["clean.py<br/>glitches, fixed, stars per tracklet"]
     JON["join.py<br/>tracklets, pairs, parallax-aware test, mutual best"]
     MAT["match.py<br/>SkyBoT candidates, Horizons positions from SPHEREx"]
+    INJ["inject.py (gated D4)<br/>planted movers in memory, test mover, completeness grid"]
+    CTL["control.py (gated D5)<br/>shuffled-time runs"]
+    SED["sed.py (gated D6)<br/>smoothness label per track"]
+    RGL["rategrid.py (gated D7)<br/>3 or more visits"]
   end
   subgraph Reused["Reused or shared modules"]
     SIA["adapters/irsa_sia.py + PR 53 footprint helper and pacer"]
@@ -30,7 +34,7 @@ flowchart TB
   API["api/areas.py<br/>/v1/areas/..."]
   subgraph FE["frontend/src"]
     RAIL["app/shell ToolRail + railIcons<br/>ToolId area"]
-    CARDS["Feature cards in the object card's slot (proposed Q-152)<br/>Area, Options, Known, Discovery, Result"]
+    CARDS["Feature cards in the object card's slot (proposed Q-152)<br/>Area, Options, Known, Discovery, Result, Checks (gated)"]
     ISL["Island progress pill (proposed)"]
     LAYER["app/sky/area AreaLayer<br/>sky layer slot"]
     STORE["state/store.ts area slice"]
@@ -39,6 +43,14 @@ flowchart TB
   end
   SVC --> FRM --> DOT --> CLN --> JON --> MAT
   SVC --> ECSV
+  SVC -.-> INJ
+  SVC -.-> CTL
+  SVC -.-> SED
+  SVC -.-> RGL
+  INJ --> DOT
+  CTL --> JON
+  RGL --> CLN
+  SED --> MAT
   FRM --> SIA
   FRM --> CUT
   DOT --> WCS
@@ -92,8 +104,13 @@ sequenceDiagram
   M->>C: SkyBoT cone per visit (candidates only)
   M->>C: Horizons TLIST per candidate at every frame time, one request at a time
   M-->>S: verdicts found_blind, unexplained, unchecked, and the Known list
+  opt gated extras D4 to D7 (Q-183)
+    S->>D: planted movers in memory (test mover, completeness grid)
+    S->>J: shuffled-time runs, rate grid when 3 or more visits, spectrum score
+    J-->>S: checks (planted and control results never enter tracks)
+  end
   S->>C: pre-fetch Track for every Known object (or list it as skipped)
-  S->>C: write derived.area entries (summary, known, dots, tracks, export)
+  S->>C: write derived.area entries (summary, known, dots, tracks, checks, export)
   Note over S,C: Same cache + settings give byte-identical entries (A17.10)
 ```
 

@@ -28,13 +28,13 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [haptics-sound.md](haptics-sound.md) | audio pairing (D-10), spectrum pitch and voice hints, the body tone and the Track path sound | 1 D, 10 Q, 12 KB |
 | [haptics-built.md](haptics-built.md) | the haptic engine, calibration and source choices as built | 0 D, 9 Q, 20 KB |
 | [platform-hosting.md](platform-hosting.md) | the three.js pin, hardware and frame budgets, hosting, the demo machine and the event platform | 3 D, 5 Q, 6 KB |
-| [moving-objects.md](moving-objects.md) | Rainbow Trails, frames for moving objects, the Track tool, Area search and Discovery (agreed) | 1 D, 17 Q, 18 KB |
+| [moving-objects.md](moving-objects.md) | Rainbow Trails, frames for moving objects, the Track tool, Area search and Discovery (agreed) | 1 D, 18 Q, 21 KB |
 | [moving-objects-review.md](moving-objects-review.md) | proposed fixes to Area search and Track after the 9 Nov 2026 audit, and Moon's review list (Q-182) | 0 D, 9 Q, 14 KB |
 
 ## Rules for entries
 
 - **IDs never change and are never reused.** A new decision is the next free `D-` number; a new question the next free `Q-` number. Before you pick one, check `origin/main` and the open PRs (they pick numbers too).
-- **Next free:** D-36 and Q-183 (9 Nov 2026; Q-150 to Q-182 were assigned on 9 Nov 2026 to the spec-pass proposals). Q-149 in the Track block is still unused. **Reserved:** Q-130 to Q-149 for the Track tool and Area search (Q-130). **Claimed by open PRs:** PR #53 proposes Q-124 (taken on main, to renumber) and Q-125. **Never used, do not reuse:** Q-46. **Never assigned:** Q-126 to Q-129 (skipped; no file or PR uses them; do not reuse).
+- **Next free:** D-36 and Q-184 (10 Nov 2026; Q-183 went to the four research checks, Q-150 to Q-182 were assigned on 9 Nov 2026 to the spec-pass proposals). Q-149 in the Track block is still unused. **Reserved:** Q-130 to Q-149 for the Track tool and Area search (Q-130). **Claimed by open PRs:** PR #53 proposes Q-124 (taken on main, to renumber) and Q-125. **Never used, do not reuse:** Q-46. **Never assigned:** Q-126 to Q-129 (skipped; no file or PR uses them; do not reuse).
 - **One entry, one file.** Put a new entry in the topic file it belongs to and add its row to the index below in the same commit. An entry that changes another one says "amends D-xx" and the amended entry gets an "Amended by" line.
 - **Status words** (for new entries; older rows keep their wording): **Open**; **Open (built)** (code follows the proposal); **Proposed** (an owner must confirm); **Decided** (who and when); **Partly decided** (list what is open); **Superseded by** (the newer entry rules); **Deferred** (after the event). D- entries are **Accepted** unless marked otherwise.
 - **Spec text belongs in the specs.** A decision states the rule and cites the spec section that holds the detail; when a decision changes a rule, update that section in the same PR.
@@ -255,4 +255,5 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-180 | Honesty start state vs Build it raise | Open | [contract-tags](contract-tags.md) |
 | Q-181 | One tag for Horizons-derived values | Open | [contract-tags](contract-tags.md) |
 | Q-182 | Review of the Area search fixes (9 Nov 2026) | Proposed | [moving-objects-review](moving-objects-review.md) |
+| Q-183 | Four research checks join the event build as gated extras | Decided (Moon, 10 Nov 2026); owners and thresholds Proposed | [moving-objects](moving-objects.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |
