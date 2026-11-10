@@ -177,6 +177,11 @@ export interface BuiltScene {
   update(plan: RenderPlan): void;
   /** Half the largest axis of the shape-model body in scene units, or null without one. */
   readonly shapeRadius: number | null;
+  /**
+   * Issue #71 stream C: a unit direction in the star's body frame as a unit direction in the scene
+   * now (the star turns), or null when this scene has no star surface. Used by the close-up camera.
+   */
+  starDirToWorld(dir: [number, number, number]): [number, number, number] | null;
   /** The body's on-screen diameter in CSS pixels (the 160 px level-of-detail rule); null = unknown. */
   setScreenPx(px: number | null): void;
   /** The TAAU frame index of the next frame (see BodyRenderer.setJitterFrame). */
@@ -348,6 +353,7 @@ export function buildScene(
   let screenPx: number | null = null;
   const lodRefresh: (() => void)[] = [];
   let shapeRadius: number | null = null;
+  let starSpin: Object3D | null = null;
   const mouldSpheres: { mesh: Mesh; axes: [number, number, number] }[] = [];
   const mouldHolders: (() => Object3D | null)[] = [];
   for (const [bodyIndex, body] of plan.bodies.entries()) {
@@ -365,6 +371,7 @@ export function buildScene(
       );
       star.group.position.set(...body.position);
       group.add(star.group);
+      starSpin = star.spin;
       usesQuality = true;
       // The star turns itself (StarBody rotates its own frame by the spin clock), so it is not a
       // `spinner`. A Mira has no star surface and is posed below.
@@ -783,6 +790,14 @@ export function buildScene(
       shaderBody.setPatternSwitch(next.shader?.pattern ?? null);
     },
     shapeRadius,
+    starDirToWorld(dir) {
+      if (!starSpin) return null;
+      group.updateMatrixWorld(true);
+      const v = new Vector3(dir[0], dir[1], dir[2]);
+      starSpin.localToWorld(v);
+      v.sub(starSpin.getWorldPosition(new Vector3())).normalize();
+      return [v.x, v.y, v.z];
+    },
     setScreenPx(px) {
       if (disposed || px === screenPx) return;
       screenPx = px;

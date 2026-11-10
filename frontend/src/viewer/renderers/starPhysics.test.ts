@@ -19,17 +19,58 @@ const plan = (ctx: Parameters<typeof defaultContext>[0] = {}, cfg = config) => {
 const tier = (p: ReturnType<typeof plan>, id: string) => p.drawn.find((d) => d.id === id)?.tier;
 
 describe('star surface physics in the plan', () => {
-  it('without a mass the physics is refused, the look is the placeholder, and it says why', () => {
+  it('a card with no Teff refuses the physics, with a note', () => {
+    const { card, params } = fixture('star');
+    const noTeff = { ...card, teff_K: undefined };
+    const p = planStar(
+      { card: noTeff, params, ctx: defaultContext({ honesty: 'artistic' }) },
+      STAR_CONFIG,
+    );
+    expect(p.star?.physics ?? null).toBeNull();
+  });
+
+  it("Barnard's Star (Teff and radius, no mass, no rotation) gets physics with assumed mass and rotation", () => {
+    const { card, params } = fixture('star');
+    const barnard = {
+      ...card,
+      teff_K: { ...card.teff_K!, value: 3243 },
+      radius_rsun: { ...card.radius_rsun!, value: 0.2022 },
+    };
     const p = planStar(
       {
-        ...(({ card, params }) => ({ card, params }))(fixture('star')),
+        card: barnard,
+        params: { ...params, dynamics: undefined },
         ctx: defaultContext({ honesty: 'artistic' }),
       },
       STAR_CONFIG,
     );
-    expect(p.star?.physics).toBeNull();
-    expect(p.star?.config).toBeNull();
-    expect(p.notes.join(' ')).toMatch(/no stellar mass/);
+    const m = p.star!.physics!;
+    expect(m.assumed.mass).toMatch(/from the radius/);
+    expect(m.assumed.rotation).toMatch(/Rossby/);
+    expect(m.assumed.radius).toBeUndefined();
+    expect(m.tags.field!.tag).toBe('inferred_from_analog');
+    expect(m.fieldG).toBeGreaterThan(0);
+    expect(p.notes.join(' ')).toMatch(/assumes: .*mass.*rotation/);
+    console.log('barnard', m.massMsun, m.fieldG, m.coverage, m.groups.length, m.nGroupsReal);
+  });
+
+  it('RW Aur (Teff only) takes mass and radius for the physics from Teff, and the size shown is not changed', () => {
+    const { card, params } = fixture('star');
+    const rw = { ...card, teff_K: { ...card.teff_K!, value: 3885 }, radius_rsun: undefined };
+    const p = planStar(
+      {
+        card: rw,
+        params: { ...params, dynamics: undefined },
+        ctx: defaultContext({ honesty: 'artistic' }),
+      },
+      STAR_CONFIG,
+    );
+    const m = p.star!.physics!;
+    expect(m.assumed.radius).toBeDefined();
+    expect(m.assumed.mass).toMatch(/temperature/);
+    expect(p.scaleM).toBeNull();
+    expect(p.sizeTag).toBeNull();
+    console.log('rwaur', m.massMsun, m.fieldG, m.coverage, m.groups.length, m.nGroupsReal);
   });
 
   it('with a mass the groups come from the physics and replace the fixed four', () => {
@@ -54,9 +95,9 @@ describe('star surface physics in the plan', () => {
     expect(plan({ starScale: 'close' }).star!.granuleVisibility).toBeGreaterThan(0.9);
   });
 
-  it('views default to true colour and enlarged, and false colour is named as an artist look', () => {
+  it('views default to observatory and enlarged, and false colour is named as an artist look', () => {
     const p = plan();
-    expect(p.star!.colourView).toBe('true');
+    expect(p.star!.colourView).toBe('observatory');
     expect(p.star!.scale).toBe('enlarged');
     expect(plan({ starColour: 'observatory' }).notes.join(' ')).toMatch(/false-colour/);
   });

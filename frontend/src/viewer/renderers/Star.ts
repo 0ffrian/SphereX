@@ -248,26 +248,34 @@ export function planStar(input: PlanInput, config: StarConfig = STAR_CONFIG): Re
   if (bodyOk && type !== 'star_mira') {
     const flareRate = motion.rates.flare_rate_per_d;
     // Issue #71 stream C: the physics of the surface, when the card gives teff, radius and mass.
-    const colourView = ctx.starColour ?? 'true';
+    const colourView = ctx.starColour ?? 'observatory';
     const scale = ctx.starScale ?? 'enlarged';
     const teff = card.teff_K?.value;
     const radius = card.radius_rsun?.value;
     const mass = config.massMsun?.(card) ?? null;
     const spinH = motion.rates.spin_period_h;
     let physics: StellarModel | null = null;
-    if (typeof teff === 'number' && typeof radius === 'number' && mass) {
+    if (typeof teff === 'number') {
       const r = stellarModel({
         teffK: teff,
-        radiusRsun: radius,
-        massMsun: mass.value,
+        radiusRsun: typeof radius === 'number' ? radius : null,
+        massMsun: mass ? mass.value : null,
         rotationPeriodD: spinH ? spinH.value / 24 : null,
         seed: params.seed,
         maxGroups: ctx.qualityTier === 'low' ? LOW_TIER_MAX_GROUPS : MAX_GROUPS_DRAWN,
       });
       physics = r.model;
+      if (!r.model && r.notes) b.notes.push(...r.notes);
+      if (physics) {
+        const a = Object.values(physics.assumed);
+        if (a.length)
+          b.notes.push(
+            `The surface physics assumes: ${a.join('; ')}. These are typical values, not measurements; the card is unchanged.`,
+          );
+      }
     } else {
       b.notes.push(
-        'Cell size, magnetic field and spots are not computed: the card has no stellar mass. The surface is a typical look.',
+        'Cell size, magnetic field and spots are not computed: the card has no effective temperature. The surface is a typical look.',
       );
     }
     const cells = physics ? cellsForScale(physics, scale) : { cells: 30, artistic: true };

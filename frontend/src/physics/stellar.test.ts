@@ -16,6 +16,9 @@ import {
   meanFieldG,
   starCaption,
   starReadouts,
+  massFromTeff,
+  radiusFromTeff,
+  sunRossby,
   stellarModel,
   type StellarInput,
   type StellarModel,
@@ -112,24 +115,47 @@ describe('other stars', () => {
   });
 });
 
-describe('refusals', () => {
-  it('missing mass, radius or Teff refuses and lists the field', () => {
-    expect(stellarModel({ ...SUN, massMsun: null })).toEqual({
+describe('refusals and the tier chain', () => {
+  it('only a missing Teff refuses', () => {
+    expect(stellarModel({ ...SUN, teffK: 0 })).toEqual({ model: null, missing: ['teff_K'] });
+    expect(stellarModel({ ...SUN, teffK: NaN })).toMatchObject({ missing: ['teff_K'] });
+  });
+  it('a card with everything assumes nothing', () => {
+    expect(model(SUN).assumed).toEqual({});
+  });
+  it('a missing mass comes from the radius, else from Teff, tagged model_dependent', () => {
+    const fromR = model({ ...SUN, massMsun: null, radiusRsun: 0.2022, teffK: 3243 });
+    expect(fromR.massMsun).toBeGreaterThan(0.15);
+    expect(fromR.massMsun).toBeLessThan(0.19);
+    expect(fromR.assumed.mass).toMatch(/from the radius/);
+    expect(fromR.radiusRsun).toBe(0.2022);
+    expect(fromR.tags.mass!.tag).toBe('model_dependent');
+    expect(fromR.tags.mass!.assumption).toMatch(/radius/);
+    const fromT = model({ ...SUN, massMsun: null, radiusRsun: null, teffK: 3885 });
+    expect(fromT.assumed.mass).toMatch(/from the temperature/);
+    expect(fromT.assumed.radius).toMatch(/not for the size shown/);
+    expect(fromT.tags.radius!.tag).toBe('model_dependent');
+    expect(fromT.tags.gravity!.tag).toBe('model_dependent');
+  });
+  it('a giant radius gets no assumed mass', () => {
+    expect(stellarModel({ ...SUN, massMsun: null, radiusRsun: 300 })).toMatchObject({
       model: null,
       missing: ['mass_msun'],
     });
-    expect(stellarModel({ ...SUN, radiusRsun: NaN })).toMatchObject({ missing: ['radius_rsun'] });
-    expect(stellarModel({ ...SUN, teffK: 0, massMsun: -1 })).toMatchObject({
-      missing: ['teff_K', 'mass_msun'],
-    });
   });
-  it('a missing rotation period keeps the cells and refuses the field and spots', () => {
+  it('a missing rotation assumes the Sun\u2019s Rossby number and tags it inferred_from_analog', () => {
     const m = model({ ...SUN, rotationPeriodD: null });
-    expect(m.cellSizeKm).toBeGreaterThan(0);
-    expect(m.fieldG).toBeNull();
-    expect(m.rossby).toBeNull();
-    expect(m.groups).toEqual([]);
-    expect(m.notes.join(' ')).toMatch(/rotation period/);
+    expect(m.rossby).toBeCloseTo(sunRossby(), 9);
+    expect(m.assumed.rotation).toMatch(/Rossby/);
+    expect(m.tags.rossby!.tag).toBe('inferred_from_analog');
+    expect(m.tags.field!.tag).toBe('inferred_from_analog');
+    expect(m.groups.length).toBeGreaterThan(0);
+  });
+  it('the main-sequence table is monotone and gives the Sun back', () => {
+    expect(massFromTeff(5770)).toBeCloseTo(1, 6);
+    expect(radiusFromTeff(5770)).toBeCloseTo(1, 6);
+    expect(massFromTeff(3000)).toBeLessThan(massFromTeff(4000));
+    expect(radiusFromTeff(4000)).toBeLessThan(radiusFromTeff(6000));
   });
 });
 
