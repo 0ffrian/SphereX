@@ -153,8 +153,8 @@ def test_mixed_refusals_are_not_all_saturated(
 
 
 def test_no_frames_is_not_saturated(ctx: Context, monkeypatch: pytest.MonkeyPatch) -> None:
-    body = service(ctx, [], {}, ["frames:moving_object_search"]).get_spectrum(OBJ).body
-    assert body["missing"] == ["frames:moving_object_search"] and body["spectrum"] == []
+    body = service(ctx, [], {}, ["frames:ephemeris"]).get_spectrum(OBJ).body
+    assert body["missing"] == ["frames:ephemeris"] and body["spectrum"] == []
 
 
 def test_deterministic_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
