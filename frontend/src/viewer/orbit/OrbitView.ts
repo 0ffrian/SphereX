@@ -13,7 +13,7 @@ import {
   RenderTarget,
   type WebGPURenderer,
 } from 'three/webgpu';
-import { texture, uv } from 'three/tsl';
+import { texture, uniform, uv, vec4 } from 'three/tsl';
 import {
   ENTRY_ALT_KM,
   HEIGHT_EXAGGERATION,
@@ -48,6 +48,62 @@ export const CLOUD_TIME_PER_SIM_S = 0.02;
 /** Render scale of the pass: half on mobile and the low quality level. */
 export function renderScaleFor(lowQuality: boolean): number {
   return lowQuality ? 0.5 : 1;
+}
+
+/** The pass never renders above this pixel ratio (Moon: lag). */
+export const ORBIT_MAX_PIXEL_RATIO = 1.25;
+/** Render scale while the user drags, scrolls or flies; it refines to the level's own scale when input stops. */
+export const INTERACT_SCALE = 0.25;
+/** How long after the last input the view counts as interacting, ms. */
+export const INTERACT_MS = 220;
+
+export interface OrbitQuality {
+  /** Share of the full size the pass is drawn at. */
+  scale: number;
+  march: number;
+  shadow: number;
+  atmo: number;
+  trace: number;
+}
+/** Levels 0 (best) to 3. While interacting the pass uses `INTERACTING`. */
+export const QUALITY_LEVELS: readonly OrbitQuality[] = [
+  { scale: 1, march: 360, shadow: 36, atmo: 16, trace: 10 },
+  { scale: 0.75, march: 240, shadow: 24, atmo: 12, trace: 7 },
+  { scale: 0.5, march: 160, shadow: 16, atmo: 8, trace: 5 },
+  { scale: 0.35, march: 100, shadow: 10, atmo: 6, trace: 3 },
+];
+export const INTERACTING: OrbitQuality = { scale: INTERACT_SCALE, march: 120, shadow: 12, atmo: 8, trace: 4 };
+/** Frame time above this steps the level down; below FAST_MS for FAST_FRAMES frames steps it back up. */
+export const SLOW_MS = 20;
+export const FAST_MS = 12;
+export const FAST_FRAMES = 40;
+export const LEVEL_GAP_MS = 600;
+
+/**
+ * Adaptive quality with hysteresis: a smoothed frame time over SLOW_MS lowers the level (at most one
+ * step per LEVEL_GAP_MS); FAST_FRAMES quick frames in a row raise it again. Pure and testable.
+ */
+export class QualityGovernor {
+  level = 0;
+  private ema = 0;
+  private fast = 0;
+  private lastChange = -Infinity;
+  feed(ms: number, now: number): void {
+    this.ema = this.ema === 0 ? ms : this.ema * 0.8 + ms * 0.2;
+    if (this.ema > SLOW_MS && this.level < QUALITY_LEVELS.length - 1 && now - this.lastChange >= LEVEL_GAP_MS) {
+      this.level++;
+      this.lastChange = now;
+      this.fast = 0;
+    } else if (ms < FAST_MS) {
+      this.fast++;
+      if (this.fast >= FAST_FRAMES && this.level > 0 && now - this.lastChange >= LEVEL_GAP_MS) {
+        this.level--;
+        this.lastChange = now;
+        this.fast = 0;
+        this.ema = 0;
+      }
+    } else this.fast = 0;
+  }
 }
 
 const DEFAULT_LIGHT: OrbitLight = { sunDir: [0, 0, 1], starColour: [1, 1, 1], timeSec: 0, cloudsOn: true };
@@ -104,13 +160,20 @@ export class OrbitView {
   flying = false;
   renderScale = 1;
   failed = false;
+  /** Adaptive quality, fed by the owner with real frame times (affects animated frames only). */
+  readonly governor = new QualityGovernor();
+  private lastInput = -Infinity;
+  private lastSig = '';
+  private drawn = false;
+  /** Passes actually rendered (tests, the performance readout). */
+  passes = 0;
 
   private readonly U = createOrbitUniforms();
   private readonly shader: OrbitShader;
   private readonly material: NodeMaterial;
   private readonly quad: QuadMesh;
   private rt: RenderTarget | null = null;
-  private blit: { material: NodeMaterial; quad: QuadMesh; node: any } | null = null;
+  private blit: { material: NodeMaterial; quad: QuadMesh; node: any; fade: any } | null = null;
 
   constructor(sources: OrbitSources) {
     this.sources = sources;
@@ -123,7 +186,7 @@ export class OrbitView {
         height: sources.height,
         climate: sources.climate,
         hydrology: sources.hydrology,
-        cloudBase: sources.cloudBase,
+        cloudBase: sources.cloudBase?.() ?? null,
         clouds: !gas && sources.cloudCover !== null && (sources.cloudBase !== null || sources.climate !== null),
         ocean: sources.hasOcean && sources.climate !== null,
         snow: sources.lapseKPerKm !== null && sources.climate !== null,
@@ -150,6 +213,7 @@ export class OrbitView {
   }
 
   setAltitudeSlider(v: number): void {
+    this.markInput();
     this.state = { ...this.state, altKm: sliderToAlt(this.kind, v) };
   }
 
@@ -165,15 +229,27 @@ export class OrbitView {
     this.state = peak ?? aimDefault(sun, viewDir, this.kind, alt);
   }
 
+  /** Marks input so the next frames render coarse and refine when it stops. */
+  markInput(now = performance.now()): void {
+    this.lastInput = now;
+  }
+
+  isInteracting(now = performance.now()): boolean {
+    return now - this.lastInput < INTERACT_MS;
+  }
+
   drag(dx: number, dy: number): void {
+    this.markInput();
     this.state = applyDrag(this.state, dx, dy);
   }
 
   wheel(deltaY: number): void {
+    this.markInput();
     this.state = { ...this.state, altKm: wheelAlt(this.kind, this.state.altKm, deltaY) };
   }
 
   pinch(scale: number): void {
+    this.markInput();
     if (scale > 0) this.setAltitude(this.state.altKm / scale);
   }
 
@@ -185,6 +261,7 @@ export class OrbitView {
   key(k: string): boolean {
     const a = flyKeyAction(k, this.state.altKm);
     if (!a) return false;
+    this.markInput();
     this.state = applyFlyKey(this.state, a, this.kind, this.sources.radiusKm);
     return true;
   }
@@ -208,36 +285,59 @@ export class OrbitView {
     return HEIGHT_EXAGGERATION[this.kind];
   }
 
+  /** The quality this frame uses. Settled frames (nothing moving) always use level 0: the same image every time. */
+  qualityFor(now: number, animating: boolean): OrbitQuality {
+    if (this.isInteracting(now) || this.flying) return INTERACTING;
+    const base = QUALITY_LEVELS[animating ? this.governor.level : 0]!;
+    return { ...base, scale: Math.min(base.scale, this.renderScale) };
+  }
+
   /**
-   * Draws into `rect` (logical px, top-left origin) of the renderer's canvas. Never throws: a
-   * failure marks the view failed and the owner falls back to the globe alone.
+   * Draws into `rect` (logical px, top-left origin) of the renderer's canvas. The pass renders into
+   * an offscreen target only when something changed (camera, light, time, tracer, size, quality);
+   * otherwise the last image is blitted. Never throws: a failure marks the view failed and the owner
+   * falls back to the globe alone.
    */
-  render(renderer: WebGPURenderer, rect: Rect, pixelRatio: number): void {
+  render(renderer: WebGPURenderer, rect: Rect, pixelRatio: number, ctx: { now?: number; animating?: boolean } = {}): void {
     if (this.failed) return;
     try {
-      const scale = this.renderScale;
-      const w = Math.max(1, Math.round(rect.w * pixelRatio * scale));
-      const h = Math.max(1, Math.round(rect.h * pixelRatio * scale));
-      setUniforms(this.U, this.uniformValues({ w, h }));
-      this.U.uFade.value = this.fade;
+      const now = ctx.now ?? performance.now();
+      const q = this.qualityFor(now, ctx.animating ?? false);
+      const pr = Math.min(pixelRatio, ORBIT_MAX_PIXEL_RATIO);
+      const w = Math.max(1, Math.round(rect.w * pr * q.scale));
+      const h = Math.max(1, Math.round(rect.h * pr * q.scale));
+      const values = this.uniformValues({ w, h });
       const live = this.sources.tracer?.() ?? null;
-      if (live && this.shader.tracerBase) this.shader.tracerBase.value = live;
+      const cb = this.sources.cloudBase?.() ?? null;
+      const sig = `${JSON.stringify(values)}|${this.fade}|${q.march},${q.shadow},${q.atmo},${q.trace}|${live?.uuid ?? ''}|${cb?.uuid ?? ''}`;
+      const rt = this.ensureTarget(w, h);
+      if (sig !== this.lastSig || !this.drawn) {
+        setUniforms(this.U, values);
+        this.U.uFade.value = 1;
+        this.U.uMarch.value = q.march;
+        this.U.uShadow.value = q.shadow;
+        this.U.uAtmo.value = q.atmo;
+        this.U.uTrace.value = q.trace;
+        if (live && this.shader.tracerBase) this.shader.tracerBase.value = live;
+        if (cb && this.shader.cloudBase) this.shader.cloudBase.value = cb;
+        const prevTarget = renderer.getRenderTarget();
+        renderer.setRenderTarget(rt);
+        try {
+          this.quad.render(renderer);
+        } finally {
+          renderer.setRenderTarget(prevTarget);
+        }
+        this.lastSig = sig;
+        this.drawn = true;
+        this.passes++;
+      }
       const prevClear = renderer.autoClear;
       renderer.autoClear = false;
       try {
-        if (scale >= 1) {
-          renderer.setViewport(rect.x, rect.y, rect.w, rect.h);
-          this.quad.render(renderer);
-        } else {
-          const rt = this.ensureTarget(w, h);
-          const prevTarget = renderer.getRenderTarget();
-          renderer.setRenderTarget(rt);
-          this.quad.render(renderer);
-          renderer.setRenderTarget(prevTarget);
-          renderer.setViewport(rect.x, rect.y, rect.w, rect.h);
-          this.ensureBlit(rt);
-          this.blit!.quad.render(renderer);
-        }
+        renderer.setViewport(rect.x, rect.y, rect.w, rect.h);
+        this.ensureBlit(rt);
+        this.blit!.fade.value = this.fade;
+        this.blit!.quad.render(renderer);
       } finally {
         renderer.autoClear = prevClear;
       }
@@ -245,6 +345,11 @@ export class OrbitView {
       this.failed = true;
       console.warn('[viewer] the surface view failed; showing the globe alone', err);
     }
+  }
+
+  /** True while the pane needs more frames: input just happened (it refines after), or it is flying. */
+  needsFrames(now = performance.now()): boolean {
+    return this.flying || this.isInteracting(now) || now - this.lastInput < INTERACT_MS + 40;
   }
 
   private ensureTarget(w: number, h: number): RenderTarget {
@@ -265,11 +370,12 @@ export class OrbitView {
   private ensureBlit(rt: RenderTarget): void {
     if (this.blit) return;
     const node = texture(rt.texture, uv());
+    const fade = uniform(1);
     const material = new NodeMaterial();
     material.name = 'OrbitBlit';
-    material.fragmentNode = node;
+    material.fragmentNode = vec4(node.rgb.mul(fade), 1);
     material.toneMapped = false;
-    this.blit = { material, quad: new QuadMesh(material), node };
+    this.blit = { material, quad: new QuadMesh(material), node, fade };
   }
 
   dispose(): void {

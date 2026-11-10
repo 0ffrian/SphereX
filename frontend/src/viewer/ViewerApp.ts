@@ -1334,7 +1334,7 @@ export class ViewerApp {
   private closeBusy(): boolean {
     const c = this.close;
     if (c.mode === null) return false;
-    return c.t !== c.target || (c.view?.flying === true && !prefersReducedMotion());
+    return c.t !== c.target || (c.view?.needsFrames() === true && !(prefersReducedMotion() && !c.view.isInteracting()));
   }
 
   /** Pane tween (mock-up: 1 s, ease-out) and "Fly forward". Real time only moves the camera and the fade, never the image of a given state. */
@@ -1350,6 +1350,9 @@ export class ViewerApp {
         this.closeUpOff(true);
         return;
       }
+    }
+    if (c.view && dt > 0 && (this.clock.running || c.view.flying || c.view.isInteracting(now))) {
+      c.view.governor.feed(dt * 1000, now);
     }
     if (c.view && !prefersReducedMotion()) c.view.advance(dt);
   }
@@ -1420,7 +1423,7 @@ export class ViewerApp {
       };
       c.view.fade = this.eased();
       c.view.renderScale = renderScaleFor(this.tier === 'low');
-      c.view.render(r, pane, pr);
+      c.view.render(r, pane, pr, { now: performance.now(), animating: this.clock.running });
       r.setViewport(0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
       if (c.view.failed) {
         const failed: OrbitResolved = { ...(c.resolved as OrbitResolved), sources: null, refusal: 'The surface view could not start in this browser.' };

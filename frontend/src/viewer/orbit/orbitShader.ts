@@ -38,7 +38,7 @@ export interface OrbitShaderConfig {
   climate: DataTexture | null;
   hydrology: DataTexture | null;
   /** Rocky cloud base: the tracer, or the climate humidity when there is none. */
-  cloudBase: DataTexture | null;
+  cloudBase: Texture | null;
   clouds: boolean;
   ocean: boolean;
   snow: boolean;
@@ -92,6 +92,11 @@ export function createOrbitUniforms() {
     uClouds: f1(),
     uHV: f1(),
     uMX: f1(),
+    /** Step limits the adaptive quality lowers: march, shadow, atmosphere and gas back-trace steps. */
+    uMarch: uniform(360),
+    uShadow: uniform(36),
+    uAtmo: uniform(16),
+    uTrace: uniform(10),
     /** 0..1: the pane fades in from black like the mock-up's close-up (display only). */
     uFade: uniform(1),
   };
@@ -244,6 +249,8 @@ const efbm = shaderFn('efbm', 'float', [['p0', 'vec3']], ([p0]) => {
 
 export interface OrbitShader {
   fragment: any;
+  /** The rocky cloud tracer node (its `.value` is swapped each frame), or null. */
+  cloudBase: any | null;
   /** The base texture node of the gas tracer (its `.value` is swapped each frame), or null. */
   tracerBase: any | null;
 }
@@ -261,6 +268,7 @@ export function buildOrbitShader(cfg: OrbitShaderConfig, U: OrbitUniforms): Orbi
   const velBase = cfg.velocity ? texture(cfg.velocity) : null;
   const bandBase = cfg.bands ? texture(cfg.bands) : null;
   const tracerBase = cfg.tracer ? texture(cfg.tracer) : null;
+  const cloudBaseNode = cfg.cloudBase ? texture(cfg.cloudBase) : null;
   // `.level(0)`: explicit-LOD samples are legal in non-uniform control flow.
   const vel = (uvn: any) => velBase!.sample(uvn).level(0);
   const band = (v_: any) => bandBase!.sample(vec2(0.5, v_)).level(0);
@@ -284,10 +292,13 @@ export function buildOrbitShader(cfg: OrbitShaderConfig, U: OrbitUniforms): Orbi
     const t0 = max(rs.x, 0).toVar();
     const t1 = min(rs.y, tmax).toVar();
     If(uTau.add(uHz).greaterThan(0.001).and(rs.y.greaterThan(0)).and(t1.greaterThan(t0)), () => {
-      const dt = t1.sub(t0).div(16).toVar();
+      const dt = t1.sub(t0).div(U.uAtmo).toVar();
       const od = float(0).toVar();
       const L = vec3(0).toVar();
       Loop(16, ({ i }: any) => {
+        If(i.toFloat().greaterThanEqual(U.uAtmo), () => {
+          Break();
+        });
         const p = ro.add(rd.mul(t0.add(i.toFloat().add(0.5).mul(dt))));
         const r = length(p);
         const dn = exp(max(r.sub(1), 0).mul(uRkm).div(uHV).negate());
@@ -357,7 +368,7 @@ export function buildOrbitShader(cfg: OrbitShaderConfig, U: OrbitUniforms): Orbi
     const cuv = uvOf(normalize(d.add(w.mul(0.035))));
     // The tracer when the renderer has one, else the humidity of the climate budget (R = cover, G = offset).
     const cl = cfg.cloudBase
-      ? bilinear(cfg.cloudBase, cuv.x, cuv.y).rg
+      ? cloudBaseNode.sample(cuv).level(0).rg
       : cfg.climate
         ? vec2(climateAt(cuv).a, 0.5)
         : vec2(0, 0.5);
@@ -394,7 +405,10 @@ export function buildOrbitShader(cfg: OrbitShaderConfig, U: OrbitUniforms): Orbi
     If(dot(n, uLb).greaterThan(0), () => {
       const s2 = p0.add(d.mul(2e-6)).toVar();
       const st = float(6e-6).toVar();
-      Loop(36, () => {
+      Loop(36, ({ i }: any) => {
+        If(i.toFloat().greaterThanEqual(U.uShadow), () => {
+          Break();
+        });
         s2.addAssign(uLb.mul(st));
         const rq = length(s2);
         const gq = rq.sub(surfR(s2.div(rq)));
@@ -517,7 +531,8 @@ export function buildOrbitShader(cfg: OrbitShaderConfig, U: OrbitUniforms): Orbi
         const skyR = uStar
           .mul(uSCR.mul(uHV).mul(3).add(uSCM.mul(uHazeC).mul(uHV).mul(2)).add(0.02))
           .mul(smoothstep(-0.2, 0.3, mud));
-        const water = w
+        const wp = cfg.hydrology ? mix(w, uLand.mul(0.9), hy.b.mul(0.6)) : w;
+        const water = wp
           .mul(uStar.mul(sT).mul(max(mud, 0)).mul(cs).add(amb))
           .add(skyR.mul(fr))
           .add(uStar.mul(sT).mul(spec).mul(sh).mul(cs).mul(smoothstep(-0.05, 0.15, mud)))
@@ -549,7 +564,10 @@ export function buildOrbitShader(cfg: OrbitShaderConfig, U: OrbitUniforms): Orbi
     const X = vec2(dot(d, uCA), dot(d, uCB)).div(max(dot(d, uC0), 0.05)).toVar();
     const tb = band(uvd.y).b.toVar();
     if (velBase) {
-      Loop(10, () => {
+      Loop(10, ({ i }: any) => {
+        If(i.toFloat().greaterThanEqual(U.uTrace), () => {
+          Break();
+        });
         const dd = normalize(uC0.add(uCA.mul(X.x)).add(uCB.mul(X.y)));
         const v = vel(uvOf(dd));
         const E_ = normalize(cross(vec3(0, 1, 0), dd));
@@ -620,7 +638,10 @@ export function buildOrbitShader(cfg: OrbitShaderConfig, U: OrbitUniforms): Orbi
       const rs = rsph(ro, rd, top).toVar();
       If(rs.y.greaterThan(0), () => {
         const t = max(rs.x, 0).toVar();
-        Loop(360, () => {
+        Loop(360, ({ i }: any) => {
+          If(i.toFloat().greaterThanEqual(U.uMarch), () => {
+            Break();
+          });
           const p = ro.add(rd.mul(t));
           const r = length(p);
           const g = r.sub(surfR(p.div(r)));
@@ -699,5 +720,5 @@ export function buildOrbitShader(cfg: OrbitShaderConfig, U: OrbitUniforms): Orbi
     return vec4(float(1).sub(exp(col.mul(-1.5))).mul(U.uFade), 1);
   })();
 
-  return { fragment, tracerBase };
+  return { fragment, tracerBase, cloudBase: cloudBaseNode };
 }

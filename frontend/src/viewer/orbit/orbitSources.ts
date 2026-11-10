@@ -83,10 +83,10 @@ export interface OrbitSources {
   heightGrid: HeightGrid | null;
   /** Float RGBA, R = temperature K, G = sea-ice thickness, B = frost, A = relative humidity. */
   climate: DataTexture | null;
-  /** Float RGBA, R = river, G = salt flat, A = lake ice (ASSUMPTION: not yet built by stream D). Null refuses rivers, lakes and salt. */
+  /** RGBA8 (stream D): R = river or lake water, G = salt flat, B = sediment plume, A = frozen. Null (no ocean basin or no air) refuses rivers, lakes, salt. */
   hydrology: DataTexture | null;
-  /** Cloud base field, R = base cover, G = offset (rocky tracer; null: clouds follow the climate humidity). */
-  cloudBase: DataTexture | null;
+  /** Live cloud tracer, R = cloud amount, G = detail (D's render target, read each frame; null: clouds follow the climate humidity). */
+  cloudBase: (() => Texture | null) | null;
   cloudCover: number | null;
   hasOcean: boolean;
   /** Environmental lapse rate, K per km (already 0.66 of the dry rate). Null refuses snow from temperature. */
@@ -217,13 +217,14 @@ export interface RockyOrbitInput {
   hasOcean?: boolean;
   haze?: number;
   hydrologyTexture?: TexLike | null;
-  cloudTracerTexture?: TexLike | null;
+  /** A getter on D's object: the latest render-target texture. */
+  cloudTracerTexture?: Texture | null;
   // Asked of stream D (ASSUMPTION: names). Without them the atmosphere layer is refused.
   scaleHeightKm?: number | null;
   pressureBar?: number | null;
   hazeColour?: Rgb | null;
   surfaceTempK?: number | null;
-  palette?: Partial<FluidLook> | null;
+  palette?: Partial<Record<'liq' | 'ice' | 'cld' | 'land' | 'aw', readonly number[]>> | null;
 }
 
 /** What stream E's `GasWorld.orbitSources` (`GasOrbitSources`) exposes. */
@@ -319,7 +320,7 @@ export function rockyOrbitSources(input: RockyOrbitInput | null | undefined): Or
   const scaleHeight = positive(input.scaleHeightKm) ? input.scaleHeightKm : null;
   const pressure = positive(input.pressureBar) ? input.pressureBar : null;
   if (scaleHeight === null || pressure === null) missing.add('orbit.atmosphere');
-  const cloudBase = input.cloudTracerTexture ?? null;
+  const cloudBase: (() => Texture | null) | null = input.cloudTracerTexture ? () => input.cloudTracerTexture ?? null : null;
   const cover = finite(input.cloudCover) ? input.cloudCover : null;
   if (cover === null || (!cloudBase && !climate)) missing.add('orbit.clouds');
   const t = input.terrain;
