@@ -49,7 +49,7 @@ export function gasWorldInput(card: ObjectCard, params: RenderParams): GasInput 
   const dynSpin = typeof dyn?.value === 'number' && Number.isFinite(dyn.value) ? dyn.value : null;
   const measuredSpin = numberOf(card, 'rot_period_h');
   const orbit = numberOf(card, 'orbital_period_d');
-  // ASSUMPTION (Q-251): a giant with no measured spin and an orbit under 30 days is tidally locked,
+  // ASSUMPTION (Q-251, Q-259): a giant with no measured spin and an orbit under 30 days is tidally locked,
   // so its spin is its orbital period. `model_dependent`, never `measured`.
   const locked = !reference && measuredSpin === null && orbit !== null && orbit < LOCKED_BELOW_PERIOD_D;
   const rotPeriodH = locked ? orbit * 24 : (measuredSpin ?? dynSpin);

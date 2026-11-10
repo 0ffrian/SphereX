@@ -31,7 +31,7 @@ class ResolveResponse(BaseModel):
     ra: float
     dec: float
     moving: bool
-    resolver: Literal["simbad", "sbdb", "coords"]
+    resolver: Literal["simbad", "sbdb", "coords", "reference"]
     cached_at: str | None
     # Optional additions
     # ISO-8601 UTC time the position refers to: 2000-01-01T11:58:55.816Z (J2000.0) for SIMBAD

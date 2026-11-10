@@ -244,6 +244,9 @@ class FrameService:
         - ``on_frame``: called in this thread as each frame of a list being built is finished
           (not for a stored or memoised list). Its errors are logged, never raised.
         """
+        if obj.resolver == "reference":
+            # Issue #71 (Q-258): a solar-system reference body is not a SPHEREx target.
+            return FramesResult(obj.id, [], ["reference:not_a_spherex_target"], None, False)
         if use_memo and not (refresh or rebuild):
             with self._memo_lock:
                 memo = self._memo.get(obj.id)

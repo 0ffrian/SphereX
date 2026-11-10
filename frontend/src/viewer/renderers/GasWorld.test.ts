@@ -125,6 +125,17 @@ describe('GasWorld', () => {
     world.dispose();
   }, 60_000);
 
+  it('exposes orbitSources for the orbit camera', async () => {
+    const f = reference('ref-jupiter');
+    const world = GasWorld.start(f.card, f.params, { visibleTags: ALL_TAGS }, { solver: inlineSolver })!;
+    const o = world.orbitSources;
+    expect(o.radiusKm).toBeCloseTo(71492, 0);
+    expect(o.scaleHeightKm).toBeGreaterThan(15);
+    expect(o.velocity && o.bands && o.noise).toBeTruthy();
+    expect(o.ready).toBe(false);
+    world.dispose();
+  });
+
   it('Saturn has rings, felt with measured radii', async () => {
     const f = reference('ref-saturn', { radius_rjup: { value: 0.843, tag: 'measured', source: 't' }, mass_mearth: { value: 95.16, tag: 'measured', source: 't' }, teq_K: { value: 81.1, tag: 'measured', source: 't' }, rot_period_h: { value: 10.656, tag: 'measured', source: 't' } });
     const world = GasWorld.start(f.card, f.params, { visibleTags: ALL_TAGS }, { solver: inlineSolver })!;
@@ -143,4 +154,43 @@ describe('GasWorld', () => {
     delete (f.params as unknown as Record<string, unknown>).dynamics;
     expect(GasWorld.start(f.card, f.params)).toBeNull();
   });
+});
+
+describe('GasWorld and the clock', () => {
+  it('a paused or reduced-motion clock stops the world; playing moves it', async () => {
+    const { SimClock } = await import('../render/clock');
+    let now = 0;
+    const clock = new SimClock(() => now);
+    clock.setProcess({ id: 'winds', label: 'Winds', speedup: 86400 });
+    const f = reference('ref-jupiter');
+    const world = GasWorld.start(f.card, f.params, { visibleTags: ALL_TAGS }, { solver: inlineSolver })!;
+    world.prepareFrame({} as unknown as WebGPURenderer);
+    await until(() => world.ready);
+    const frame = (ms: number) => {
+      now += ms;
+      clock.tick();
+      world.setTime((id) => clock.simTime(id));
+    };
+    frame(0);
+    for (let i = 0; i < 10; i++) frame(100);
+    await until(() => !world.ready || world.steps > 420);
+    const moved = world.steps;
+    expect(moved).toBeGreaterThan(420);
+    for (const reason of ['user', 'reduced-motion'] as const) {
+      // Let the steps already asked for finish: wait until the count is still for a moment.
+      for (let last = -1, same = 0; same < 6; ) {
+        await new Promise((r) => setTimeout(r, 100));
+        frame(0); // the viewer calls setTime every frame, so the world catches up to the clock
+        same = world.steps === last ? same + 1 : 0;
+        last = world.steps;
+      }
+      clock.pause(reason);
+      const before = world.steps;
+      for (let i = 0; i < 10; i++) frame(100);
+      await new Promise((r) => setTimeout(r, 200));
+      expect(world.steps).toBe(before);
+      clock.resume(reason);
+    }
+    world.dispose();
+  }, 60_000);
 });

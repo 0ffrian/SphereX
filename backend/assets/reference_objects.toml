@@ -1,0 +1,32 @@
+# Reference objects (issue #71 stream E, Q-258): solar-system bodies that are not SPHEREx targets.
+# Curated read-only config, like literature.toml. Every number is copied from the NASA Goddard
+# Planetary Fact Sheets (read 10 Nov 2026) in the units the sheet uses; scripts/bake_reference_objects.py
+# converts units. They have no sky position or frames: the resolver gives them ra = dec = 0 tagged
+# `artistic` ("not a place on the sky"), and the frame and spectrum services answer with no frames.
+#
+# Jupiter: https://nssdc.gsfc.nasa.gov/planetary/factsheet/jupiterfact.html
+# Saturn:  https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturnfact.html
+
+[[object]]
+id = "ref-jupiter"
+name = "Jupiter"
+aliases = ["jupiter", "jove"]
+source = "NASA Planetary Fact Sheet, Jupiter"
+radius_km = 71492.0          # equatorial radius at 1 bar
+mass_1e24_kg = 1898.13
+rot_period_h = 9.9250        # sidereal, System III
+semimajor_axis_1e6_km = 778.479
+orbital_period_d = 4332.589
+teq_K = 109.9                # "blackbody temperature" of the fact sheet
+
+[[object]]
+id = "ref-saturn"
+name = "Saturn"
+aliases = ["saturn"]
+source = "NASA Planetary Fact Sheet, Saturn"
+radius_km = 60268.0
+mass_1e24_kg = 568.32
+rot_period_h = 10.656        # System III
+semimajor_axis_1e6_km = 1432.041
+orbital_period_d = 10755.699
+teq_K = 81.0
