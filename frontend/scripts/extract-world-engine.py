@@ -82,7 +82,7 @@ var reduced = false;
 """)
 core.append(sl(1662, 1726))                 # ORB, applySpin, W, slider constants, psatFn, worldModel
 core.append(sl(1861, 2008))                 # hydroRaster, EB
-core.append(sl(2123, 2216))       # WorldGL
+core.append(sl(2123, 2216, [('(ema', '(!window.__sxPin&&ema')]))       # WorldGL
 core.append(sl(2217, 2246))                 # fly camera, flyMove, globePick, GS
 core.append(sl(2248, 2248))                 # km
 # worldUi: rows and caption captured as data instead of written into the DOM
