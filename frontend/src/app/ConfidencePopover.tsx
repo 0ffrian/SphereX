@@ -20,6 +20,7 @@ import {
   substitutionLatex,
   substitutionPlain,
   tagChip,
+  type ConfidenceInput,
   type Part,
 } from '@/viewer/confidenceFormula';
 import { FormulaMath } from './FormulaMath';
@@ -41,6 +42,7 @@ export function ConfidencePopover({
   name,
   keyLabels,
   inline = false,
+  isShown,
   onClose,
 }: {
   params: RenderParams;
@@ -54,6 +56,11 @@ export function ConfidencePopover({
    * Accuracy button, Escape and the pane's own popover close it).
    */
   inline?: boolean;
+  /**
+   * The Show level (D-21): rows whose tag it hides are dimmed and said so. The score and the points
+   * never change with it; they come from the backend (PARITY_CHECKLIST section 8).
+   */
+  isShown?: (tag: ConfidenceInput['tag']) => boolean;
   onClose: () => void;
 }) {
   const c = params.confidence;
@@ -173,9 +180,13 @@ export function ConfidencePopover({
           <tbody>
             {c.inputs.map((i) => {
               const chip = tagChip(i);
+              const dim = isShown ? !isShown(i.tag) : false;
               return (
-                <tr key={i.id}>
-                  <td>{i.label}</td>
+                <tr key={i.id} className={dim ? 'sx-acc-dim' : undefined} data-dim={dim || undefined}>
+                  <td>
+                    {i.label}
+                    {dim && <span className="sr-only"> (hidden at this Show level; still counted)</span>}
+                  </td>
                   <td>
                     <span className={`sx-acc-tag ${chip.part}`}>{chip.text}</span>
                   </td>
@@ -185,6 +196,16 @@ export function ConfidencePopover({
             })}
           </tbody>
         </table>
+        {isShown && c.inputs.some((i) => !isShown(i.tag)) && (
+          <p className="sx-acc-rules">
+            Dimmed rows are hidden by the Show level. They still count: the score does not move with it.
+          </p>
+        )}
+        {!c.gate.passed && (
+          <p className="sx-acc-rules" data-testid="formula-below">
+            <b>Why there is no 3D model.</b> Found: {c.found} Needed: {c.needed}
+          </p>
+        )}
         <p className="sx-acc-rules sx-acc-last">{c.weights_note}</p>
     </>
   );

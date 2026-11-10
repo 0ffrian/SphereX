@@ -337,8 +337,8 @@ test('Build it from a fresh load raises the level and builds all five steps (wat
   });
   await expect(pane).toHaveAttribute('data-phase', 'done', { timeout: 90_000 });
   for (const st of await steps.all()) await expect(st).toHaveAttribute('data-state', 'done');
-  // Built: the title drops "Building", the announcer says Built.
-  await expect(page.getByTestId('build-title')).toHaveText('Aqua Prime');
+  // Built: the title keeps "Building" (the mock-up's, Q-298); the announcer says Built.
+  await expect(page.getByTestId('build-title')).toHaveText('Building Aqua Prime');
   await expect(page.getByTestId('build-announcer')).toHaveText('Built Aqua Prime');
   // The user can drop back at any time.
   await group.getByRole('button', { name: /Measured only/ }).click();
