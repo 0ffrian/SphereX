@@ -30,6 +30,8 @@ import { AT_AGE_MAX_PHRASE, scaleBarFor, shownSize } from '@/viewer/scaleBar';
 import { SLIDER_REGISTRY } from '@/viewer/sliders';
 import type { CometEpoch, ObjectCard, RenderParams } from '@/contract';
 import { ProvenanceBadge } from './Badge';
+import { EmissionsPanel } from './EmissionsPanel';
+import { EPOCH_JD, timeRange } from '@/physics/cometGas';
 import { timeLapsesOf } from '@/viewer/motion/planMotion';
 import { describeRefusal, layerName, timeLapseText } from './messages';
 import { buttonClass, pressedClass } from './ui';
@@ -179,6 +181,11 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
     [card, params],
   );
   const epoch: CometEpoch = choices.epoch ?? epochsWithData.at(-1) ?? defaultContext().epoch;
+  // Issue #71 F: the emissions view (comets with gas in both epochs) and its time. A new object closes it.
+  const [emissions, setEmissions] = useState<{ key: string; jd: number } | null>(null);
+  const emissionsRange = card && params?.type === 'comet' ? timeRange(card) : null;
+  const emissionsJd =
+    emissions && emissions.key === objectKey && emissionsRange ? emissions.jd : null;
   // Layers whose mesh or texture failed to load, per object. Keyed so a new object starts clean.
   const [failedState, setFailedState] = useState<{ key: string; ids: string[] }>({
     key: '',
@@ -230,12 +237,13 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
         honesty,
         mode: modeChoice,
         epoch,
+        cometJd: emissionsJd,
         scrubIndex,
         failed,
         overrides,
         qualityTier,
       }),
-    [honesty, modeChoice, epoch, scrubIndex, failed, overrides, qualityTier],
+    [honesty, modeChoice, epoch, emissionsJd, scrubIndex, failed, overrides, qualityTier],
   );
   const plan = useMemo(
     () => (card && params ? planRender(card, params, ctx) : null),
@@ -532,56 +540,66 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
       <h2 id="viewer-heading" className={pane ? 'sr-only' : 'text-lg font-medium'}>
         3D view
       </h2>
-      <div
-        className={
-          pane
-            ? 'sx-bp-stage'
-            : 'relative aspect-square w-full max-w-xl overflow-hidden rounded-lg border border-neutral-800 bg-black sm:aspect-[4/3]'
-        }
-        data-testid="viewer-stage"
-      >
-        <div ref={hostRef} className="absolute inset-0" />
-        {loadingBody && (
-          <div className="sx-bp-loading" data-testid="build-loading" role="status">
-            <span className="sx-spinner" aria-hidden="true" />
-            <span>Loading the 3D view</span>
-          </div>
+      <div className={emissionsJd !== null ? 'flex flex-col gap-3 lg:flex-row' : 'contents'}>
+        {card && emissionsJd !== null && (
+          <EmissionsPanel
+            card={card}
+            jd={emissionsJd}
+            onJd={(jd) => setEmissions({ key: objectKey, jd })}
+            fixture={objectIsFixture}
+          />
         )}
-        <p
-          data-testid="viewer-label"
-          className="pointer-events-none absolute left-3 top-3 max-w-[85%] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300"
+        <div
+          className={
+            pane
+              ? 'sx-bp-stage'
+              : 'relative aspect-square w-full max-w-xl overflow-hidden rounded-lg border border-neutral-800 bg-black sm:aspect-[4/3]'
+          }
+          data-testid="viewer-stage"
         >
-          {plan ? `${plan.name}${plan.threeD ? '' : ' (no 3D model)'}` : PLACEHOLDER_LABEL}
-        </p>
-        {plan && !plan.threeD && plan.message && (
+          <div ref={hostRef} className="absolute inset-0" />
+          {loadingBody && (
+            <div className="sx-bp-loading" data-testid="build-loading" role="status">
+              <span className="sx-spinner" aria-hidden="true" />
+              <span>Loading the 3D view</span>
+            </div>
+          )}
           <p
-            className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 rounded bg-neutral-900/90 px-3 py-2 text-center text-sm text-neutral-100"
-            data-testid="viewer-message"
+            data-testid="viewer-label"
+            className="pointer-events-none absolute left-3 top-3 max-w-[85%] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300"
           >
-            {plan.message}
+            {plan ? `${plan.name}${plan.threeD ? '' : ' (no 3D model)'}` : PLACEHOLDER_LABEL}
           </p>
-        )}
-        {plan && plan.threeD && !showsBody(plan) && (
-          <p
-            className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 rounded bg-neutral-900/90 px-3 py-2 text-center text-sm text-neutral-100"
-            data-testid="viewer-nothing"
-          >
-            {nothingDrawn
-              ? `Nothing is drawn. ${nothingDrawn.text}${
-                  nothingDrawn.needs
-                    ? ` Switch to “${HONESTY_LABEL[nothingDrawn.needs]}” to see it.`
-                    : ''
-                } See the list below.`
-              : ''}
-          </p>
-        )}
-        {rendererStatus === 'unavailable' && (
-          // Not a live region: the status line already announces this change.
-          <p className="absolute inset-x-3 bottom-3 rounded bg-neutral-900/90 px-3 py-2 text-sm text-neutral-100">
-            The 3D view can&rsquo;t start in this browser. Try the latest Chrome, Edge or Firefox,
-            and check that hardware acceleration is turned on.
-          </p>
-        )}
+          {plan && !plan.threeD && plan.message && (
+            <p
+              className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 rounded bg-neutral-900/90 px-3 py-2 text-center text-sm text-neutral-100"
+              data-testid="viewer-message"
+            >
+              {plan.message}
+            </p>
+          )}
+          {plan && plan.threeD && !showsBody(plan) && (
+            <p
+              className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 rounded bg-neutral-900/90 px-3 py-2 text-center text-sm text-neutral-100"
+              data-testid="viewer-nothing"
+            >
+              {nothingDrawn
+                ? `Nothing is drawn. ${nothingDrawn.text}${
+                    nothingDrawn.needs
+                      ? ` Switch to “${HONESTY_LABEL[nothingDrawn.needs]}” to see it.`
+                      : ''
+                  } See the list below.`
+                : ''}
+            </p>
+          )}
+          {rendererStatus === 'unavailable' && (
+            // Not a live region: the status line already announces this change.
+            <p className="absolute inset-x-3 bottom-3 rounded bg-neutral-900/90 px-3 py-2 text-sm text-neutral-100">
+              The 3D view can&rsquo;t start in this browser. Try the latest Chrome, Edge or Firefox,
+              and check that hardware acceleration is turned on.
+            </p>
+          )}
+        </div>
       </div>
 
       {pane && <MouldStrip ref={stripRef} script={mould.script} phase={mould.phase} />}
@@ -728,6 +746,22 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                   </button>
                 ))}
               </div>
+            )}
+
+            {plan.type === 'comet' && emissionsRange && (
+              <button
+                type="button"
+                className={`${buttonClass} ${pressedClass} self-start`}
+                aria-pressed={emissionsJd !== null}
+                onClick={() =>
+                  setEmissions(
+                    emissionsJd === null ? { key: objectKey, jd: EPOCH_JD[epoch] } : null,
+                  )
+                }
+                data-testid="emissions-toggle"
+              >
+                View emissions
+              </button>
             )}
 
             {plan.scrub && (
