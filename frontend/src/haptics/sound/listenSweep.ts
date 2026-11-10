@@ -18,7 +18,7 @@ import { gasQForEpoch } from '@/viewer/renderers/Comet';
 import { getAudioContext } from '../audioContext';
 import { getMasterBus, playBell } from '../audioGraph';
 import { pitchToHz, wavelengthToPitch } from '../pitch';
-import { getHapticSettings, useHapticSettings } from '../settings';
+import { getHapticSettings, stopWhenHidden, useHapticSettings } from '../settings';
 import type { SpectrumMapping, SpectrumSample } from '../spectrumMapping';
 import {
   AUDIO_LOOKAHEAD_S,
@@ -168,11 +168,25 @@ const SETTINGS: SweepSettings = {
   subscribe: (fn) => useHapticSettings.subscribe(fn),
 };
 
+/** What the sweep reads from the page lifecycle: a hidden page stops it and blocks a start. */
+export interface PageVisibility {
+  isHidden(): boolean;
+  /** Called when the page is hidden or unloaded; returns the unsubscribe function. */
+  onHidden(fn: () => void): () => void;
+}
+
+export const DOCUMENT_PAGE: PageVisibility = {
+  isHidden: () => typeof document !== 'undefined' && document.hidden,
+  onHidden: (fn) => stopWhenHidden({ stop: fn }),
+};
+
 export interface ListenSweepOptions {
   /** Default: the shared context, once unlocked. */
   context?: () => AudioContext | null;
   /** Default: the haptics settings store: its volume (followed live) and its sound switch. */
   settings?: SweepSettings;
+  /** Default: `document.hidden`, `visibilitychange` and `pagehide`. A hidden page stops the sweep (R8.8). */
+  page?: PageVisibility;
 }
 
 interface Voice {
@@ -206,10 +220,12 @@ function release(v: Voice, cancel: boolean): void {
 export class ListenSweep {
   private readonly getContext: () => AudioContext | null;
   private readonly settings: SweepSettings;
+  private readonly page: PageVisibility;
   private readonly live = new Set<Voice>();
   /** This sweep's volume gain into the master bus (freed when the last voice ends). */
   private volumeGain: GainNode | null = null;
   private unsubscribe: (() => void) | null = null;
+  private unhook: (() => void) | null = null;
   private startAt = 0;
   private duration = 0;
   private active = false;
@@ -222,6 +238,7 @@ export class ListenSweep {
   constructor(options: ListenSweepOptions = {}) {
     this.getContext = options.context ?? getAudioContext;
     this.settings = options.settings ?? SETTINGS;
+    this.page = options.page ?? DOCUMENT_PAGE;
   }
 
   get playing(): boolean {
@@ -243,10 +260,11 @@ export class ListenSweep {
    * Schedule the sweep under the honesty state `honesty` (D-21): the tone plays only when the
    * spectrum's tag is shown, and each chime only when its Q's tag is. Returns false (and plays
    * nothing) when sound is switched off, there is no running AudioContext (call `engine.unlock()`
-   * from the click first), or the honesty state hides everything.
+   * from the click first), the page is hidden, or the honesty state hides everything.
    */
   play(plan: SweepPlan, honesty: HonestyState): boolean {
     this.stop();
+    if (this.page.isHidden()) return false;
     const st0 = this.settings.get();
     if (!st0.soundOn) return false;
     const toneShown = isTagShown(honesty, plan.tag);
@@ -330,6 +348,9 @@ export class ListenSweep {
       this.volumeGain?.gain.setTargetAtTime(clampVolume(s.volume), ctx.currentTime, 0.02);
     });
 
+    // A hidden page stops the sweep (R8.8 page lifecycle); the hook lives as long as the sweep.
+    this.unhook = this.page.onHidden(() => this.stop());
+
     this.startAt = base;
     this.duration = plan.durationS;
     this.active = true;
@@ -411,6 +432,8 @@ export class ListenSweep {
   private ended(): void {
     this.unsubscribe?.();
     this.unsubscribe = null;
+    this.unhook?.();
+    this.unhook = null;
     if (!this.active) return;
     this.active = false;
     this.onEnd?.();

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   FakeAudioContext,
   FakeCompressor,
@@ -32,6 +32,7 @@ import {
   planSweep,
   sweepPanAt,
   type GasLine,
+  type PageVisibility,
 } from './listenSweep';
 
 /** 1–5 µm, flat at 1 with an absorption dip to 0.05 around 3 µm. */
@@ -422,5 +423,114 @@ describe('planSweep limits (security review)', () => {
     const p = planSweep(mapping)!;
     expect(p.steps.every((st) => Number.isFinite(st.level))).toBe(true);
     expect(p.steps.filter((st) => st.lambdaUm > 1.5).every((st) => st.quiet)).toBe(true);
+  });
+});
+
+describe('ListenSweep and the page lifecycle (R8.8)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const plan = () => planSweep(buildSpectrumMapping(dipSpectrum()), [H2O])!;
+
+  /** An injected page: `hide()` hides it and fires the hooks; `hooks` counts live subscriptions. */
+  function fakePage() {
+    let hidden = false;
+    const fns = new Set<() => void>();
+    const page: PageVisibility & {
+      hide(): void;
+      readonly hooks: number;
+      unsubscribed: number;
+    } = {
+      isHidden: () => hidden,
+      onHidden(fn) {
+        fns.add(fn);
+        return () => {
+          fns.delete(fn);
+          page.unsubscribed++;
+        };
+      },
+      hide() {
+        hidden = true;
+        for (const fn of [...fns]) fn();
+      },
+      get hooks() {
+        return fns.size;
+      },
+      unsubscribed: 0,
+    };
+    return page;
+  }
+
+  it('an injected page going hidden stops the sweep and frees every node, onEnd once', () => {
+    const ctx = new FakeAudioContext();
+    const page = fakePage();
+    const sweep = new ListenSweep({
+      context: () => ctx.asAudioContext(),
+      settings: fakeSettings(),
+      page,
+    });
+    let ended = 0;
+    sweep.onEnd = () => ended++;
+    expect(page.hooks).toBe(0); // no listener before play
+    expect(sweep.play(plan(), 'derived')).toBe(true);
+    expect(page.hooks).toBe(1);
+    page.hide();
+    expect(sweep.playing).toBe(false);
+    expect(sweep.liveVoices).toBe(0);
+    expect(ended).toBe(1);
+    expect(freed(ctx)).toBe(true);
+    expect(page.hooks).toBe(0);
+  });
+
+  it('play() returns false on a hidden page and schedules nothing', () => {
+    const ctx = new FakeAudioContext();
+    const page = fakePage();
+    page.hide();
+    const sweep = new ListenSweep({
+      context: () => ctx.asAudioContext(),
+      settings: fakeSettings(),
+      page,
+    });
+    expect(sweep.play(plan(), 'derived')).toBe(false);
+    expect(ctx.sources()).toHaveLength(0);
+    expect(page.hooks).toBe(0);
+  });
+
+  it('removes its page hook when the sweep ends (natural end included)', () => {
+    const ctx = new FakeAudioContext();
+    const page = fakePage();
+    const sweep = new ListenSweep({
+      context: () => ctx.asAudioContext(),
+      settings: fakeSettings(),
+      page,
+    });
+    sweep.play(plan(), 'derived');
+    expect(page.unsubscribed).toBe(0);
+    for (const s of ctx.sources()) s.end();
+    expect(sweep.playing).toBe(false);
+    expect(page.unsubscribed).toBe(1);
+    expect(page.hooks).toBe(0);
+  });
+
+  it('the default document path: hidden stops it, pagehide stops it, visible does not', () => {
+    const ctx = new FakeAudioContext();
+    const sweep = new ListenSweep({
+      context: () => ctx.asAudioContext(),
+      settings: fakeSettings(),
+    });
+    expect(sweep.play(plan(), 'derived')).toBe(true);
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(sweep.playing).toBe(true); // a visible change keeps it playing
+    hidden.mockReturnValue(true);
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(sweep.playing).toBe(false);
+    expect(sweep.liveVoices).toBe(0);
+    // Refuses to start while hidden.
+    expect(sweep.play(plan(), 'derived')).toBe(false);
+    hidden.mockReturnValue(false);
+    expect(sweep.play(plan(), 'derived')).toBe(true);
+    window.dispatchEvent(new Event('pagehide'));
+    expect(sweep.playing).toBe(false);
+    expect(sweep.liveVoices).toBe(0);
   });
 });
