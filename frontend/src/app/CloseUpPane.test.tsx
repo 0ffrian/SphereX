@@ -11,7 +11,8 @@ describe('close-up pane', () => {
   });
   it('captions follow the mock-up wording and never go blank', () => {
     for (const k of ['orbit', 'star', 'body'] as const) expect(closeUpCaption(k, null, false)).toMatch(/^Close-up · /);
-    expect(closeUpCaption('star', null, false)).toMatch(/not available yet/);
+    expect(closeUpCaption('star', null, false)).toMatch(/not available/);
+    expect(closeUpCaption('star', null, false, true)).toMatch(/flare/);
     expect(closeUpCaption('orbit', { mode: 'text', resolved: null, layout: 'side', refusal: 'The planet is still forming.' }, true)).toMatch(/still forming/);
   });
   it('the button reads in plain words', () => {

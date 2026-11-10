@@ -158,6 +158,19 @@ export interface OrbitSources {
   readonly cloudTracerTexture: Texture | null;
   /** The tracer's node, for a shader that samples it (its value follows each step). */
   cloudTracerNode: any;
+  /**
+   * Stream H: what the Surface view's air needs. Atmosphere scale height, km (H = R_s T / g from the
+   * world model, `derived`), and surface pressure, bar (the world's pressure setting, tagged as the
+   * slider's tag). Null for an airless world. The visible optical depth is NOT `tau` (thermal);
+   * the orbit view derives it from the pressure.
+   */
+  scaleHeightKm: number | null;
+  pressureBar: number | null;
+  /** Haze colour (linear, artistic) and the mean surface temperature, K (model). */
+  hazeColour: readonly [number, number, number];
+  surfaceTempK: number;
+  /** Fluid colours (linear, artistic): liquid, ice, cloud and bare land. */
+  palette: { liq: readonly number[]; ice: readonly number[]; cld: readonly number[]; land: readonly number[] };
 }
 
 export interface RockyBuilt {
@@ -451,6 +464,11 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
       return tracerTex.texture;
     },
     cloudTracerNode: tracerTex.node,
+    scaleHeightKm: m.airless ? null : m.H / 1000,
+    pressureBar: m.airless ? null : m.Pa / 1e5,
+    hazeColour: m.hazeC,
+    surfaceTempK: m.Ts,
+    palette: { liq: F.liq, ice: F.ice, cld: F.cld, land: F.land },
   };
   return {
     group,

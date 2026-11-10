@@ -668,6 +668,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             kind={closeKind}
             open={closeOpen && closeInfo?.mode !== null}
             info={closeInfo}
+            plan={plan}
             reducedMotion={reducedMotion}
             fixture={objectIsFixture}
           />
