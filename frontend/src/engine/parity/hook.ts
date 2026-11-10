@@ -41,14 +41,15 @@ async function load(c: ParityCase): Promise<void> {
   }
   engine?.dispose();
   canvas?.remove();
-  // Same aspect as the artifact's stage: 16:10 for the globe, 2.1:1 with the fly view.
+  // Exactly the artifact's stage size in the parity run (1200x900 viewport, DPR 1): 704x439 for the
+  // globe, 1150x547 with the fly view. A different size resamples differently and shows up as noise.
   canvas = document.createElement('canvas');
-  const w = c.fly ? 1050 : 960;
+  const w = c.fly ? 1150 : 704;
   canvas.style.cssText =
     'position:fixed;left:0;top:0;z-index:-1;width:' +
     w +
     'px;height:' +
-    (c.fly ? 500 : 600) +
+    (c.fly ? 547 : 439) +
     'px;';
   document.body.appendChild(canvas);
   engine = new WorldEngine(canvas, { preserveDrawingBuffer: true });
