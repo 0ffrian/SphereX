@@ -93,17 +93,25 @@ describe('deriveClimate on the two demo planets', () => {
     expect(d.assumed.tidal_Q).toBe(100);
   });
 
-  it('Kepler-186 f: not locked at the constants, so temperate (knife edge, 4.17 vs 4.0 Gyr)', () => {
+  it('Kepler-186 f: locked at the constants (KNIFE EDGE, 3.99 vs 4.0 Gyr), so an eyeball with T_ss 282 K', () => {
     const d = deriveClimate(kepler186f(), 'planet_rocky')!;
-    expect(d.locked).toBe(false);
-    expect(d.scenario).toBe('temperate');
-    expect(d.tssK).toBeNull();
+    expect(d.locked).toBe(true);
+    expect(d.scenario).toBe('eyeball');
+    expect(d.tssK!).toBeCloseTo(281.8, 0);
     expect(d.tag).toBe('model_dependent');
   });
 
-  it('Kepler-186 f IF it were locked: the recomputed 199 K gives T_ss 282 K and an eyeball, where the archive 177 K would give 250 K and a snowball', () => {
+  it('Kepler-186 f with a younger star (3 Gyr) is not locked, so temperate with no T_ss', () => {
     const c = kepler186f();
-    c.host_age_gyr = { value: 8, tag: 'measured', source: 'test: older than t_lock' };
+    c.host_age_gyr = { value: 3, tag: 'measured', source: 'test: younger than t_lock' };
+    const d = deriveClimate(c, 'planet_rocky')!;
+    expect(d.locked).toBe(false);
+    expect(d.scenario).toBe('temperate');
+    expect(d.tssK).toBeNull();
+  });
+
+  it('Kepler-186 f: the recomputed 199 K gives T_ss 282 K and an eyeball, where the archive 177 K would give 250 K and a snowball', () => {
+    const c = kepler186f();
     const d = deriveClimate(c, 'planet_rocky')!;
     expect(d.locked).toBe(true);
     expect(d.teqMapK!).toBeCloseTo(199.2, 0);

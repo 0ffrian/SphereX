@@ -90,8 +90,21 @@ describe('locked pose', () => {
     c.dispose();
   });
 
-  it('Kepler-186 f (not locked) still spins with the clock', async () => {
-    const b = await body(kepler186f() as ObjectCard, [0, 0.45, 0.9]);
+  it('Kepler-186 f is locked too (KNIFE EDGE, Q-155): +X points at the light, whatever the clock says', async () => {
+    const light: [number, number, number] = [0.3, 0.4, 0.86];
+    const b = await body(kepler186f() as ObjectCard, light);
+    const g = surfaceGroup(b);
+    for (const t of [0, 3600, 1e7]) {
+      b.setTime((id) => (id === 'spin' ? t : 0));
+      expect(substellarWorld(g).distanceTo(unit(light))).toBeLessThan(1e-6);
+    }
+    b.dispose();
+  });
+
+  it('an unlocked planet (Kepler-186 f with a 3 Gyr star) still spins with the clock', async () => {
+    const young = kepler186f();
+    young.host_age_gyr = { value: 3, tag: 'measured', source: 'test: younger than t_lock' };
+    const b = await body(young as ObjectCard, [0, 0.45, 0.9]);
     const g = surfaceGroup(b);
     b.setTime((id) => (id === 'spin' ? 0 : 0));
     const y0 = g.rotation.y;

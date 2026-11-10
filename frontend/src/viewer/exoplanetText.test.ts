@@ -1,13 +1,15 @@
 // Issue #68 Part 6 (Q-165): what the alt text and notes of the two demo exoplanets say about the
 // star's light and the climate scenario, at each honesty level. Never a measured surface.
 import { describe, expect, it } from 'vitest';
+import type { ObjectCard } from '@/contract';
 import { fixture } from '@/test/sharedFixtures';
 import { buildAltText } from './altText';
 import type { HonestyState } from './honesty';
 import { defaultContext, planRender } from './renderPlan';
 
-const at = (name: string, honesty: HonestyState) => {
+const at = (name: string, honesty: HonestyState, edit?: (c: ObjectCard) => void) => {
   const { card, params } = fixture(name);
+  edit?.(card);
   const plan = planRender(card, params, defaultContext({ honesty }));
   return { plan, alt: buildAltText(plan), notes: plan.notes.join(' ') };
 };
@@ -51,9 +53,16 @@ describe('the scenario each demo planet shows', () => {
     expect(alt).toContain('an eyeball world: tidally locked');
   });
 
-  it('Kepler-186 f is temperate at + Estimated: a plain sphere in star-coloured light', () => {
-    // A knife edge (Q-156): t_lock is about 4.17 Gyr against an age of 4.0 Gyr at the Q-155 constants.
+  it('Kepler-186 f is a locked eyeball at + Estimated (KNIFE EDGE, Q-155: t_lock 3.99 Gyr against 4.0 Gyr)', () => {
     const { alt, plan } = at('planet_kepler186f', 'derived');
+    expect(plan.drawn.map((d) => d.id)).toEqual(['starlight', 'climate']);
+    expect(alt).toContain('an eyeball world: tidally locked');
+  });
+
+  it('a Kepler-186 f with a 3 Gyr star is temperate at + Estimated: a plain sphere in star-coloured light', () => {
+    const { alt, plan } = at('planet_kepler186f', 'derived', (c) => {
+      c.host_age_gyr = { value: 3, tag: 'measured', source: 'test: younger than t_lock' };
+    });
     expect(plan.drawn.map((d) => d.id)).toEqual(['starlight', 'body']);
     expect(alt).toContain('a temperate world that is not tidally locked');
     expect(alt).toContain('choose + Artistic to see it');

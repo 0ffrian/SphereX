@@ -126,8 +126,20 @@ describe('climate and pose (Part 3)', () => {
     expect(resolveShaderSpec(p.card, p.params).field!.seaLevel).toBeGreaterThan(0);
   });
 
-  it('Kepler-186 f: temperate, polar rule as before, still spinning, weakened to model_dependent', () => {
+  it('Kepler-186 f: locked (knife edge, 3.99 vs 4.0 Gyr), an eyeball, not spinning, model_dependent', () => {
     const { card, params } = pair(kepler186f());
+    const spec = resolveShaderSpec(card, params);
+    expect(spec.planet!.scenario).toBe('eyeball');
+    expect(spec.field!.substellar).toBeDefined();
+    const p = planRender(card, params, defaultContext({ honesty: 'artistic' }));
+    expect(drawn(p, 'climate')!.tag).toBe('model_dependent');
+    expect(p.spin).toBeNull();
+  });
+
+  it('a Kepler-186 f with a 3 Gyr star: temperate, polar rule as before, still spinning, weakened to model_dependent', () => {
+    const young = kepler186f();
+    young.host_age_gyr = { value: 3, tag: 'measured', source: 'test: younger than t_lock' };
+    const { card, params } = pair(young);
     const spec = resolveShaderSpec(card, params);
     expect(spec.planet!.scenario).toBe('temperate');
     expect(spec.field!.substellar).toBeUndefined();
@@ -243,7 +255,9 @@ describe('eyeball planet at each honesty level (R5.3, Q-156)', () => {
   });
 
   it('temperate, lava and hot_dry add nothing at + Estimated', () => {
-    const k = plan(kepler186f(), 'derived');
+    const young = kepler186f();
+    young.host_age_gyr = { value: 3, tag: 'measured', source: 'test: younger than t_lock' };
+    const k = plan(young, 'derived');
     expect(k.shader).toMatchObject({ surface: false, pattern: false, plain: true });
     const hot = trappist1f();
     hot.teq_K = { value: 900, tag: 'measured', source: 't' };
