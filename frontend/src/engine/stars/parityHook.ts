@@ -8,7 +8,7 @@ const W = window as unknown as Win;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let loaded: string | null = null;
 
-async function until<T>(f: () => T | null | undefined | false, ms = 180000): Promise<T> {
+async function until<T>(f: () => T | null | undefined | false, ms = 500000): Promise<T> {
   const t0 = Date.now();
   for (;;) {
     const v = f();
