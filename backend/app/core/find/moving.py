@@ -427,14 +427,14 @@ def spread(times: list[datetime], cap: int) -> list[datetime]:
 
 
 def _ephemeris_tracks(
-    ctx: Context, cfg: MovingConfig, spkid: str, refresh: bool, gate: Gate
+    ctx: Context, cfg: MovingConfig, spkid: str, refresh: bool, gate: Gate, comet: bool = False
 ) -> tuple[list[Track], list[Served], int, int]:
     """One track per window that answered, the served entries, the number of requests deferred
     to the job, and the number of windows with no usable ephemeris. A window is skipped (and
     counted) when one of its chunks fails; the other windows are still searched."""
     plan = [
         [
-            (start, stop, horizons.range_key(spkid, start, stop, cfg.ephem_step_min))
+            (start, stop, horizons.range_key(spkid, start, stop, cfg.ephem_step_min, comet=comet))
             for start, stop in chunks
         ]
         for chunks in range_chunks(cfg)
@@ -456,7 +456,7 @@ def _ephemeris_tracks(
         for (start, stop, key), verdict in zip(chunks, vs, strict=True):
             try:
                 pts, srv = horizons.ephemeris_range(
-                    ctx, spkid, start, stop, cfg.ephem_step_min, refresh=refresh
+                    ctx, spkid, start, stop, cfg.ephem_step_min, comet=comet, refresh=refresh
                 )
             except (CacheMissOffline, UpstreamUnavailable, ValueError):
                 if verdict == "live":
@@ -479,6 +479,7 @@ def exact_positions(
     spkid: str,
     rows: list[SiaRow],
     *,
+    comet: bool = False,
     refresh: bool = False,
     gate: Gate | None = None,
 ) -> tuple[dict[str, tuple[float, float]], list[str], list[Served], int]:
@@ -497,7 +498,9 @@ def exact_positions(
     deferred = 0
     for i in range(0, len(times), TLIST_CHUNK):
         chunk = times[i : i + TLIST_CHUNK]
-        key = horizons.horizons_key(spkid, horizons.jd_list(chunk), horizons.OBSERVER_SPHEREX)
+        key = horizons.horizons_key(
+            spkid, horizons.jd_list(chunk), comet=comet, center=horizons.OBSERVER_SPHEREX
+        )
         verdict = gate.decide(ctx, key, refresh)
         if verdict == "defer":
             deferred += 1
@@ -506,7 +509,12 @@ def exact_positions(
         if verdict != "fail":
             try:
                 pts, srv = horizons.ephemeris(
-                    ctx, spkid, chunk, refresh=refresh, center=horizons.OBSERVER_SPHEREX
+                    ctx,
+                    spkid,
+                    chunk,
+                    comet=comet,
+                    refresh=refresh,
+                    center=horizons.OBSERVER_SPHEREX,
                 )
                 served.append(srv)
             except (CacheMissOffline, UpstreamUnavailable, ValueError):
@@ -539,6 +547,7 @@ def search_path(
     ctx: Context,
     spkid: str | None,
     *,
+    comet: bool = False,
     cfg: MovingConfig | None = None,
     refresh: bool = False,
     gate: Gate | None = None,
@@ -554,7 +563,7 @@ def search_path(
         return PathSearch([], {}, [WINDOW])
     if not spkid:
         return PathSearch([], {}, [EPHEMERIS])
-    tracks, served, deferred, bad_windows = _ephemeris_tracks(ctx, cfg, spkid, refresh, gate)
+    tracks, served, deferred, bad_windows = _ephemeris_tracks(ctx, cfg, spkid, refresh, gate, comet)
     if deferred:
         return PathSearch([], {}, [f"{SEARCH_DEFERRED}:{deferred}"], deferred=deferred)
     if not tracks:
@@ -625,7 +634,7 @@ def search_path(
     positions: dict[str, tuple[float, float]] = {}
     for index in sorted(groups):
         exact, pos_missing, pos_served, pos_deferred = exact_positions(
-            ctx, spkid, groups[index], refresh=refresh, gate=gate
+            ctx, spkid, groups[index], comet=comet, refresh=refresh, gate=gate
         )
         positions.update(exact)
         served.extend(pos_served)

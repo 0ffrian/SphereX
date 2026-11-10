@@ -1,0 +1,108 @@
+{
+  "asset_version": "9",
+  "card": {
+    "id": "simbad-v-rw-aur",
+    "lightcurve": [],
+    "name": "V* RW Aur",
+    "pm_mas_yr": {
+      "source": "SIMBAD V* RW Aur (pmra = mu_alpha * cos(delta), pmdec)",
+      "tag": "measured",
+      "value": [
+        7.23,
+        -20.33
+      ]
+    },
+    "radius_rsun": {
+      "source": "not available: Gaia DR3 has no FLAME radius for this star; no interferometric radius is in the literature registry, and a spectral-class table is never used for a radius (Q-152)",
+      "tag": "measured",
+      "value": null
+    },
+    "spectral_class": {
+      "source": "SIMBAD V* RW Aur sp_type",
+      "tag": "measured",
+      "value": "K1/5e+K5e"
+    },
+    "teff_K": {
+      "formula": "median of the non-null Teff values in SIMBAD mesFe_h; of two middle values, the one from the most recent bibcode (Q-152)",
+      "source": "SIMBAD mesFe_h: median of 1 published spectroscopic Teff values (3885 to 3885 K); the middle value is from 2021ApJ...921...53L",
+      "tag": "derived",
+      "value": 3885.0
+    },
+    "type": "star_ttauri"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b2",
+  "inputs_sha256": "ffa059f36dc4327154473203418e2bf8acd3317bea275504d2c63a3c5b6b463a",
+  "render_params": {
+    "alt_text": "V* RW Aur, T Tauri star, size unknown, colour from Teff, self-luminous. Surface relief: illustrative.",
+    "generator_version": "p1-b2",
+    "haptics": {
+      "data": "none",
+      "data_tag": "artistic",
+      "params": {},
+      "texture": "none",
+      "texture_tag": "artistic"
+    },
+    "id": "simbad-v-rw-aur",
+    "layers": [
+      {
+        "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
+        "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)",
+        "id": "colour",
+        "requires": [
+          "teff_K"
+        ],
+        "tag": "derived",
+        "tier": 2
+      },
+      {
+        "assumed": {
+          "limb_darkening_u": 0.6
+        },
+        "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+        "formula": "I(mu) = 1 - u * (1 - mu), u = 0.6",
+        "id": "limb_darkening",
+        "requires": [],
+        "tag": "model_dependent",
+        "tier": 3
+      },
+      {
+        "description": "A flared disc lit by the star, tilted 45 to 60 degrees (R7.5). Its shape and brightness are artistic.",
+        "id": "disc",
+        "requires": [],
+        "tag": "artistic",
+        "tier": 5
+      }
+    ],
+    "lighting": {
+      "mode": "self"
+    },
+    "missing": [
+      "dust_screen",
+      "dimming",
+      "spectrum"
+    ],
+    "scale_m": null,
+    "seed": 1370476600,
+    "type": "star_ttauri",
+    "view_modes": {
+      "visible": {
+        "available": true,
+        "badge": "Estimated visible colour",
+        "rgb": {
+          "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)",
+          "source": "teff_K = 3885 K",
+          "tag": "derived",
+          "value": [
+            1.0,
+            0.641,
+            0.3508
+          ]
+        },
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 1370476600,
+  "textures": null
+}

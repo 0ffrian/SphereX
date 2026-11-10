@@ -92,6 +92,44 @@ export function keepsGas(escapeMs: number, thermalMs: number): boolean {
   return escapeMs >= ATMOSPHERE_RETENTION_FACTOR * thermalMs;
 }
 
+// ---- Locked-planet temperature map (issue #68 Part 3b; Q-156) -----------------------------------
+
+/**
+ * Water freezes at 273 K (the figure in the issue's scenario table; 273.15 K exactly). Used for the
+ * ice line of a tidally locked planet.
+ */
+export const WATER_FREEZES_K = 273;
+/** No heat redistribution on the dayside: the sub-stellar point is sqrt(2) hotter than the full-redistribution Teq. */
+export const SUBSTELLAR_FACTOR = Math.SQRT2;
+export const SUBSTELLAR_FORMULA =
+  'T_ss = sqrt(2) * Teq (no heat spread); T(theta) = T_ss * cos(theta)^(1/4) at angle theta from the star-facing point; night side below any threshold';
+/** The assumptions behind the locked-planet map; named in every layer that uses it. */
+export const SUBSTELLAR_ASSUMED = {
+  albedo: 'zero (the same as the archive Teq)',
+  heat_redistribution: 'none',
+  greenhouse: 'none',
+} as const;
+
+/** `T_ss = sqrt(2) Teq`, K; null for a Teq that is not above 0 K. */
+export function substellarTempK(teqFullK: number): number | null {
+  return positive(teqFullK) ? SUBSTELLAR_FACTOR * teqFullK : null;
+}
+
+/** `T(theta) = T_ss cos(theta)^(1/4)` for theta in [0, pi/2]; 0 K on the night side (theta >= pi/2). */
+export function tempAtAngleK(tssK: number, thetaRad: number): number {
+  const c = Math.cos(thetaRad);
+  return c > 0 ? tssK * Math.pow(c, 0.25) : 0;
+}
+
+/**
+ * Angle from the star-facing point out to where the surface falls to the freezing point:
+ * `theta_ice = acos((273 / T_ss)^4)`. Null when `T_ss <= 273 K` (nowhere is above freezing).
+ */
+export function iceAngleRad(tssK: number): number | null {
+  if (!positive(tssK) || tssK <= WATER_FREEZES_K) return null;
+  return Math.acos(Math.pow(WATER_FREEZES_K / tssK, 4));
+}
+
 export const rjupToRearth = (rjup: number): number => (rjup * R_JUP_M) / R_EARTH_M;
 
 // ---- Family function --------------------------------------------------------------------------
@@ -176,7 +214,8 @@ export function derivePlanetInto(
 ): PlanetInputs {
   const teq = readTeq(r, out);
   const radius = r.read('radius_rjup', 'radius_rjup');
-  const mass = r.read('mass_mearth');
+  // A slider wins (and is `artistic`, Q-58 b); else the card's `mass_mearth` with its own tag.
+  const mass = r.read('mass_mearth', 'mass_mearth');
 
   const body = need({ mass_mearth: mass, radius_rjup: radius });
   if (body.ok) {

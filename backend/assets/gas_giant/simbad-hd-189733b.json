@@ -1,0 +1,165 @@
+{
+  "asset_version": "9",
+  "card": {
+    "host_age_gyr": {
+      "err": 4.9,
+      "source": "NASA Exoplanet Archive PSCompPars st_age (Southworth 2010)",
+      "tag": "measured",
+      "value": 1.4
+    },
+    "host_mass_msun": {
+      "err": 0.08,
+      "source": "NASA Exoplanet Archive PSCompPars st_mass (Stassun et al. 2017)",
+      "tag": "measured",
+      "value": 0.79
+    },
+    "host_radius_rsun": {
+      "err": 0.01,
+      "source": "NASA Exoplanet Archive PSCompPars st_rad (Stassun et al. 2017)",
+      "tag": "measured",
+      "value": 0.75
+    },
+    "host_teff_K": {
+      "err": 16.0,
+      "source": "NASA Exoplanet Archive PSCompPars st_teff (Stassun et al. 2017)",
+      "tag": "measured",
+      "value": 5052.0
+    },
+    "id": "simbad-hd-189733b",
+    "mass_mearth": {
+      "err": 25.4264,
+      "source": "NASA Exoplanet Archive PSCompPars pl_bmasse (Stassun et al. 2017)",
+      "tag": "measured",
+      "value": 359.1479
+    },
+    "name": "HD 189733 b",
+    "orbit_au": {
+      "err": 0.00036,
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbsmax (Rosenthal et al. 2021)",
+      "tag": "measured",
+      "value": 0.03126
+    },
+    "orbital_period_d": {
+      "err": 1.5e-07,
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbper (Stassun et al. 2017)",
+      "tag": "measured",
+      "value": 2.21857567
+    },
+    "pm_mas_yr": {
+      "source": "SIMBAD HD 189733b (pmra = mu_alpha * cos(delta), pmdec)",
+      "tag": "measured",
+      "value": [
+        -3.208,
+        -250.323
+      ]
+    },
+    "radius_rjup": {
+      "err": 0.01,
+      "source": "NASA Exoplanet Archive PSCompPars pl_radj (Stassun et al. 2017)",
+      "tag": "measured",
+      "value": 1.13
+    },
+    "teq_K": {
+      "source": "NASA Exoplanet Archive PSCompPars pl_eqt (Addison et al. 2019)",
+      "tag": "measured",
+      "value": 1209.0
+    },
+    "type": "gas_giant"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b2",
+  "inputs_sha256": "ffa059f36dc4327154473203418e2bf8acd3317bea275504d2c63a3c5b6b463a",
+  "render_params": {
+    "alt_text": "HD 189733 b, Gas giant, 1.13 Jupiter radii (measured), colour family from the equilibrium temperature, lit by its star. Surface relief: illustrative.",
+    "generator_version": "p1-b2",
+    "haptics": {
+      "data": "teq_pulse",
+      "data_tag": "measured",
+      "params": {
+        "maxRateHz": 12.0
+      },
+      "texture": "flow",
+      "texture_tag": "artistic"
+    },
+    "id": "simbad-hd-189733b",
+    "layers": [
+      {
+        "assumed": {
+          "rot_period_h": 9.925,
+          "zonal_wind_ms": 50.0
+        },
+        "description": "Number of bands from the typical spin of a giant planet and the radius (Rhines scale, A7.2): about 24 from pole to pole. The jet speed is a typical value; the exact band pattern is a seeded look.",
+        "formula": "bands ~ sqrt(2 Omega R / U), Omega = 2 pi / P (Rhines scale, order of magnitude only)",
+        "id": "bands",
+        "requires": [
+          "radius_rjup"
+        ],
+        "tag": "inferred_from_analog",
+        "tier": 4
+      },
+      {
+        "assumed": {
+          "mean_density": "same as Jupiter",
+          "rot_period_h": 9.925
+        },
+        "description": "Flattening of the poles from the typical spin of a giant planet, with the mean density of Jupiter assumed (A7.2).",
+        "formula": "f = f_J (P_J / P)^2, from f = 0.7 q with q proportional to Omega^2",
+        "id": "flattening",
+        "requires": [],
+        "tag": "inferred_from_analog",
+        "tier": 4
+      },
+      {
+        "description": "Colour family chosen by the equilibrium temperature (A7.2).",
+        "formula": "palette family chosen by teq_K between the stops 60, 100, 130, 200, 600, 1100, 1800 K",
+        "id": "colour",
+        "requires": [
+          "teq_K"
+        ],
+        "tag": "derived",
+        "tier": 2
+      },
+      {
+        "description": "A few storms between the jets, as on the giant planets of the Solar System. How many and where is a seeded look; no measurement of this planet's storms is used.",
+        "id": "storms",
+        "requires": [],
+        "tag": "artistic",
+        "tier": 5
+      },
+      {
+        "description": "Swirling detail along the band edges. Look only.",
+        "id": "turbulence",
+        "requires": [],
+        "tag": "artistic",
+        "tier": 5
+      }
+    ],
+    "lighting": {
+      "mode": "sun"
+    },
+    "missing": [
+      "spectrum"
+    ],
+    "scale_m": 80785959.99999999,
+    "seed": 3852659574,
+    "type": "gas_giant",
+    "view_modes": {
+      "visible": {
+        "available": true,
+        "badge": "Default (artist's choice)",
+        "rgb": {
+          "source": "neutral stand-in swatch (R7.7); the drawn palette is the colour layer (A7.2)",
+          "tag": "artistic",
+          "value": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 3852659574,
+  "textures": null
+}

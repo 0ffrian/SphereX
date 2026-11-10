@@ -6,3 +6,10 @@ backend/app/contract/*.py text eol=lf
 frontend/src/contract/generated.ts text eol=lf
 # Baked fixture textures (scripts/bake_fixtures.py) are binary and byte-exact (determinism rule).
 shared/fixtures/textures/** -text
+backend/assets/textures/** binary
+# bake_demo_pack --check hashes and compares these bytes (Q-164, Q-167), so they stay LF everywhere.
+backend/targets.toml text eol=lf
+backend/assets/*.toml text eol=lf
+backend/assets/shapes/registry.toml text eol=lf
+backend/assets/*/*.json text eol=lf
+frontend/src/app/search/demoTargets.ts text eol=lf

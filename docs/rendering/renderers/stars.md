@@ -6,6 +6,13 @@
 
 - **Requires:** `teff_K`. Optional: `radius_rsun`, `lightcurve`, `period_var_d`. Without `radius_rsun` the star is a unit sphere with no scale bar ("size unknown"); colour and limb darkening are kept (Q-45).
 - **Colour:** Teff → sRGB through a blackbody lookup table (e.g., Mitchell Charity's CIE 1931 2° D65 table). Tag `derived`.
+- **Where `teff_K`, `radius_rsun` and `period_var_d` come from (issue #68 Part 8c, Q-152).** First source that answers wins; a source that cannot be used is skipped with its reason in the null value's `source`, never replaced by a guess.
+  1. **`teff_K`:** SIMBAD `mesFe_h`, the median of the non-null published Teff rows (of two middle values, the one from the more recent bibcode), tag `derived`. Barnard's Star: 3243 K from 55 values (3083 to 3530 K); RW Aur: 3885 K.
+  2. Gaia DR3 GSP-Phot `teff_gspphot`, `model_dependent`, **skipped at or below 4000 K** (cool-star molecular absorption, Gaia DR3 docs Sec 11.4.4).
+  3. Pecaut & Mamajek 2013 Table 5 mean dwarf Teff for the SIMBAD type (`backend/assets/pm13_dwarf_teff.toml`), `inferred_from_analog`, with the class in the `colour` layer's `assumed`. **Main-sequence (V) types of `star` only.** No Teff table is verified for M giants, Miras or pre-main-sequence stars, so **R Dra's Teff is refused** (and `colour`, `visible` with it).
+  4. **`radius_rsun`:** a literature-registry interferometric radius (none yet), else Gaia FLAME `radius_flame` (`model_dependent`; Barnard's Star 0.2022 R☉), else refused. A class table never gives a radius. R Dra and RW Aur have no Gaia values, so their radius is refused (unit sphere, no scale bar).
+  5. **`period_var_d`** (Mira): SIMBAD `mesVar` median over rows typed `LPV` or `M` only, `measured` (R Dra: 247 d from 3 rows). Rows of other types (Barnard's `ROT`) are ignored.
+  Barnard's Star and R Dra saturate in SPHEREx (D-31), which affects their spectrum, not this colour: it comes from Teff.
 - **Limb darkening:** linear, I(μ) = 1 − 0.6·(1 − μ). Tag `model_dependent`.
 - **`star` (Barnard's Star):** red-dwarf sphere plus a **motion trail** across the background stars, drawn from `pm_mas_yr` over the SPHEREx epochs (`measured`).
 - **`star_mira` (R Dra, P ≈ 246 d):** brightness follows the measured light curve as you scrub. The radius pulsation (±10%) is `artistic`.

@@ -76,7 +76,9 @@ export const SLIDER_REGISTRY = {
     unit: '',
     appliesTo: PLANETS,
     group: 'relief',
-    spec: ARTISTIC,
+    // No viewer slider panel exists yet, so the reason is in the help text (Q-160): on a tidally
+    // locked planet the ice edge comes from the locking model, not from this slider.
+    spec: `${ARTISTIC}; no effect on an eyeball or snowball planet, whose ice edge follows the star-facing point`,
   },
   // The default comes from the A7.1 lava threshold on the card's teq_K (shaderPalette.ts).
   lava_heat: {

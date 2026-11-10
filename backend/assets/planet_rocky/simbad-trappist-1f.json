@@ -1,0 +1,123 @@
+{
+  "asset_version": "9",
+  "card": {
+    "host_age_gyr": {
+      "err": 2.2,
+      "source": "NASA Exoplanet Archive PSCompPars st_age (Piaulet-Ghorayeb et al. 2025)",
+      "tag": "measured",
+      "value": 7.6
+    },
+    "host_mass_msun": {
+      "err": 0.0023,
+      "source": "NASA Exoplanet Archive PSCompPars st_mass (Agol et al. 2021)",
+      "tag": "measured",
+      "value": 0.0898
+    },
+    "host_radius_rsun": {
+      "err": 0.0013,
+      "source": "NASA Exoplanet Archive PSCompPars st_rad (Agol et al. 2021)",
+      "tag": "measured",
+      "value": 0.1192
+    },
+    "host_teff_K": {
+      "err": 26.0,
+      "source": "NASA Exoplanet Archive PSCompPars st_teff (Agol et al. 2021)",
+      "tag": "measured",
+      "value": 2566.0
+    },
+    "id": "simbad-trappist-1f",
+    "mass_mearth": {
+      "err": 0.031,
+      "source": "NASA Exoplanet Archive PSCompPars pl_bmasse (Agol et al. 2021)",
+      "tag": "measured",
+      "value": 1.039
+    },
+    "name": "TRAPPIST-1 f",
+    "orbit_au": {
+      "err": 0.00033,
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbsmax (Agol et al. 2021)",
+      "tag": "measured",
+      "value": 0.03849
+    },
+    "orbital_period_d": {
+      "err": 3.2e-05,
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbper (Agol et al. 2021)",
+      "tag": "measured",
+      "value": 9.20754
+    },
+    "pm_mas_yr": {
+      "source": "SIMBAD TRAPPIST-1f (pmra = mu_alpha * cos(delta), pmdec)",
+      "tag": "measured",
+      "value": [
+        930.788,
+        -479.038
+      ]
+    },
+    "radius_rjup": {
+      "err": 0.0011597909668214625,
+      "source": "NASA Exoplanet Archive PSCompPars pl_rade x R_earth / R_Jup (6378.1366 km / 71492 km) (Agol et al. 2021)",
+      "tag": "measured",
+      "value": 0.09322935079449447
+    },
+    "teq_K": {
+      "source": "NASA Exoplanet Archive PSCompPars pl_eqt (Ducrot et al. 2020)",
+      "tag": "measured",
+      "value": 217.7
+    },
+    "type": "planet_rocky"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b2",
+  "inputs_sha256": "ffa059f36dc4327154473203418e2bf8acd3317bea275504d2c63a3c5b6b463a",
+  "render_params": {
+    "alt_text": "TRAPPIST-1 f, Rocky planet, 0.0932 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
+    "generator_version": "p1-b2",
+    "haptics": {
+      "data": "teq_pulse",
+      "data_tag": "measured",
+      "params": {
+        "maxRateHz": 12.0,
+        "tau": 0.15
+      },
+      "texture": "terrain",
+      "texture_tag": "artistic"
+    },
+    "id": "simbad-trappist-1f",
+    "layers": [
+      {
+        "description": "Browser shader surface and shared CPU field (R7.7). Nothing about it is measured.",
+        "id": "surface",
+        "requires": [],
+        "tag": "artistic",
+        "tier": 5
+      }
+    ],
+    "lighting": {
+      "mode": "sun"
+    },
+    "missing": [
+      "spectrum"
+    ],
+    "scale_m": 6665152.746999999,
+    "seed": 3983055633,
+    "type": "planet_rocky",
+    "view_modes": {
+      "visible": {
+        "available": true,
+        "badge": "Default (artist's choice)",
+        "rgb": {
+          "source": "artist's neutral default (R7.7, D-02)",
+          "tag": "artistic",
+          "value": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 3983055633,
+  "textures": null
+}

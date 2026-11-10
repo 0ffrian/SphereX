@@ -37,6 +37,10 @@ uv run python -m scripts.ingest_shape --zip ~/Downloads/gaskell.ast-eros.shape-m
 
 Input is an ICQ `.tab` (`--zip` plus `--member`, or `--input`) or an OBJ (`--input`, `--convex` for DAMIT). Output is byte-identical for the same input. Meshes over 50,000 triangles with no exact reduction are refused.
 
+`assets/literature.toml` is a reviewed, read-only table of cited values for objects the catalogues leave empty ('Oumuamua's size and light-curve amplitude, Epsilon Indi B's component temperatures). Stage 4 uses a row only where the catalogue value is null (A3.12, Q-153); `SX_LITERATURE_FILE` points elsewhere. `assets/pm13_dwarf_teff.toml` is the Pecaut & Mamajek main-sequence Teff table behind a star's third Teff source (Q-152); `SX_DWARF_TEFF_FILE` points elsewhere. Both are edited by hand, never by code.
+
+`assets/textures/` holds the demo pack's baked maps, served read-only at `/data/demo-textures` (`SX_DEMO_TEXTURES_DIR`, also under `SX_OFFLINE=1`, Q-164).
+
 ## Endpoints (D-16)
 
 | Endpoint | Returns |
@@ -217,7 +221,7 @@ app/core/card/    (Kevin, Stages 4-5, A4.4-A4.5) catalogue, build, assets (A5.4 
 app/core/render/  (Atish, R10) texture baker; card_to_params (Stage 7, A4.7), blackbody, spherex_rgb
 app/core/sky/     sky background: survey registry and layout, HEALPix NESTED, HiPS -> equirect bake
 app/core/composite/ (no D-17 owner yet) SPHEREx false-colour composite: config, select, grid, service
-assets/           A5.4 pre-baked assets, <type>/<id>.json (SX_ASSETS_DIR; none yet)
-scripts/          prefetch, smoke_offline, backup_cache, record_fixtures, generate_contract, sky_mirror, sky_bake
+assets/           A5.4 pre-baked assets, <type>/<id>.json (SX_ASSETS_DIR); the demo pack (Q-164) and its maps in assets/textures/
+scripts/          prefetch, smoke_offline, backup_cache, record_fixtures, generate_contract, sky_mirror, sky_bake, bake_demo_pack (`--check`, `--strict`)
 tests/            pytest; tests/fixtures/cache holds the recorded cache entries
 ```

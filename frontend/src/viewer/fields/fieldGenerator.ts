@@ -34,6 +34,17 @@ export interface FieldParams {
   iceExtent: number;
   /** terrain: lava cracks on/off strength 0..1; 0 gives an all-zero lava mask. */
   heat: number;
+  /**
+   * terrain, issue #68 Part 3d: a tidally locked planet. Ice and ocean follow the angle from the
+   * body-fixed star-facing point (`SUBSTELLAR_DIRECTION`, +X, longitude 0), not the latitude, and
+   * `iceExtent` is ignored. Absent or false: the polar-ice rule, byte-identical to before.
+   */
+  substellar?: boolean;
+  /**
+   * terrain, substellar only: radius in radians of the open (ice-free) cap around the star-facing
+   * point. 0 gives ice everywhere (a snowball); outside the cap is ice, so the whole night side is ice.
+   */
+  iceAngleRad?: number;
   /** gas: band count (mock-up uBands). */
   bands: number;
   /** gas: band warp strength (mock-up uTurb). */
@@ -52,6 +63,26 @@ export interface FieldData {
 }
 
 export type Vec3 = readonly [number, number, number];
+
+/** The star-facing direction in the body frame (issue #68 Part 3d): +X, longitude 0. */
+export const SUBSTELLAR_DIRECTION: Vec3 = [1, 0, 0];
+/** Half-width in radians of the soft edge of the ice cap (artistic). */
+export const SUBSTELLAR_EDGE_RAD = 0.08;
+/** Peak wobble in radians (x0.5) of the ice edge, from the same seeded noise as the polar edge (artistic). */
+export const SUBSTELLAR_WOBBLE_RAD = 0.4;
+/**
+ * Noise frequency of the substellar ice edge (artistic sketch). Fixed, so that the artist's look
+ * `freq` (a terrain look, + Artistic only) does not change the edge shape drawn at + Estimated
+ * (Q-156). 4 = what the edge used at the temperate look's `freq` of 2.
+ */
+export const SUBSTELLAR_WOBBLE_FREQ = 4;
+/**
+ * A snowball on bare rock: the highest ground shows through the ice (artistic). `hh` above
+ * `SNOWBALL_ROCK_FROM` loses up to `SNOWBALL_ROCK_SHOW` of the ice. A planet with a sea is all ice.
+ */
+export const SNOWBALL_ROCK_FROM = 0.75;
+export const SNOWBALL_ROCK_TO = 0.9;
+export const SNOWBALL_ROCK_SHOW = 0.7;
 
 /** R6.1: row r in [0,H), col c in [0,W). Matches three.js SphereGeometry; row 0 is north. */
 export function pixelDirection(c: number, r: number, width: number, height: number): Vec3 {
@@ -202,7 +233,27 @@ export function terrainAt(d: Vec3, p: FieldParams): TerrainSample {
   const hh = clamp01((e - seaL) / (1 - seaL));
 
   let ice = 0;
-  if (p.iceExtent > 0.001) {
+  if (p.substellar) {
+    // Angle from the star-facing point; ice outside the open cap, with a seeded irregular edge.
+    const ang = Math.acos(
+      Math.max(
+        -1,
+        Math.min(
+          1,
+          d[0] * SUBSTELLAR_DIRECTION[0] +
+            d[1] * SUBSTELLAR_DIRECTION[1] +
+            d[2] * SUBSTELLAR_DIRECTION[2],
+        ),
+      ),
+    );
+    const cap = Math.max(0, p.iceAngleRad ?? 0);
+    const w = SUBSTELLAR_WOBBLE_FREQ;
+    const wob = (fbm(d[0] * w, d[1] * w, d[2] * w, 4, p.seed + 101) - 0.5) * SUBSTELLAR_WOBBLE_RAD;
+    ice = cap > 0 ? smoothstep(cap - SUBSTELLAR_EDGE_RAD, cap + SUBSTELLAR_EDGE_RAD, ang + wob) : 1;
+    if (!hasSea && cap <= 0) {
+      ice = 1 - SNOWBALL_ROCK_SHOW * smoothstep(SNOWBALL_ROCK_FROM, SNOWBALL_ROCK_TO, hh);
+    }
+  } else if (p.iceExtent > 0.001) {
     const edge = 1.08 + (0.45 - 1.08) * p.iceExtent;
     const lat = Math.abs(d[1]);
     const wob = (fbm(sx * 2, sy * 2, sz * 2, 4, p.seed + 101) - 0.5) * 0.35;

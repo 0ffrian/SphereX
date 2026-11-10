@@ -156,8 +156,15 @@ class Settings(BaseSettings):
     targets_file: Path = BACKEND_DIR / "targets.toml"
     # A3.7 / Q-61: shape-model GLBs and `registry.toml`, written by scripts/ingest_shape.py.
     shapes_dir: Path = BACKEND_DIR / "assets" / "shapes"
+    # A3.11 / Q-153: reviewed literature values for fields a catalogue leaves empty, and the
+    # Pecaut & Mamajek dwarf Teff table (Q-152). Read only.
+    literature_file: Path = BACKEND_DIR / "assets" / "literature.toml"
+    dwarf_teff_file: Path = BACKEND_DIR / "assets" / "pm13_dwarf_teff.toml"
     # R6.7 baked textures, served at /data/textures. Outside git, next to the D-25 cache.
     textures_dir: Path | None = None
+    # Q-164 (issue #68, 7c): the committed maps of the pre-built demo pack, served read-only at
+    # /data/demo-textures, also under SX_OFFLINE=1. Written by scripts/bake_demo_pack.py.
+    demo_textures_dir: Path = BACKEND_DIR / "assets" / "textures"
 
     # Admin token for admin-only endpoints (R10: gemini_paint.py "behind the admin token").
     # ASSUMPTION: unset disables every admin endpoint (404); a wrong token gets 403.

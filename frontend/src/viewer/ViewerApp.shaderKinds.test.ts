@@ -8,7 +8,7 @@ import type { ObjectCard, RenderParams } from '@/contract';
 import { generateField, type FieldParams } from './fields/fieldGenerator';
 import type { HonestyState } from './honesty';
 import { defaultContext, planRender } from './renderPlan';
-import { fixture } from './renderers/fixtures.testutil';
+import { fixture, withoutExoplanetFields } from './renderers/fixtures.testutil';
 import type { ShaderBody } from './renderers/ShaderBody';
 import { ViewerApp } from './ViewerApp';
 
@@ -51,7 +51,9 @@ const plainVisible = (b: ShaderBody) =>
 describe('shader kinds through the plan path (B5)', () => {
   it('starts at + Estimated: the artistic planet surface is hidden, the plain sphere stands in', async () => {
     const { v } = makeViewer();
-    const f = fixture('planet_water');
+    // The planet as a solar-system body: with the exoplanet fields the climate pattern is drawn
+    // at + Estimated instead (issue #68 Part 3), tested in shaderPlan.test.ts.
+    const f = withoutExoplanetFields(fixture('planet_water'));
     const plan = show(v, f.card, f.params);
     expect(plan.threeD).toBe(true);
     expect(plan.shader).toMatchObject({ surface: false, plain: true });

@@ -31,5 +31,14 @@
     ],
     "tag": "measured",
     "source": "synthetic fixture: not a real measurement"
+  },
+  "component_teff_K": {
+    "value": [
+      1300.0,
+      1000.0
+    ],
+    "tag": "model_dependent",
+    "source": "synthetic fixture: not a real measurement",
+    "assumption": "synthetic fixture: component temperatures are a model fit"
   }
 }

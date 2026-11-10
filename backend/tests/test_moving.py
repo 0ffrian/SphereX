@@ -617,3 +617,43 @@ def test_prefetch_overlays_only_skips_the_path_search(
     args = argparse.Namespace(refresh=False, overlays_only=True)
     rep = prefetch.prefetch_target(ctx, {"name": "433 Eros", "query": "433 Eros"}, {}, args)
     assert rep.error == "" and rep.frames_skipped
+
+
+# --- PR #70 review: comets through the path search (Q-151, Q-167) ------------------------------
+
+
+def test_a_comet_range_key_carries_cap_and_keeps_the_spherex_centre() -> None:
+    start, stop = datetime(2025, 8, 1, tzinfo=UTC), datetime(2025, 8, 2, tzinfo=UTC)
+    comet = dict(horizons.range_key("1000012", start, stop, 10, comet=True).query)
+    assert comet["command"] == "DES=1000012;CAP<2460888;"
+    assert comet["center"] == horizons.OBSERVER_SPHEREX
+    asteroid = dict(horizons.range_key("20000433", start, stop, 10).query)
+    assert asteroid["command"] == "DES=20000433;"
+    assert asteroid["center"] == horizons.OBSERVER_SPHEREX
+
+
+def test_the_observer_centre_can_never_land_in_the_comet_flag() -> None:
+    """Positional `center` was how `moving.py` called this on main; it must not bind to `comet`."""
+    with pytest.raises(TypeError):
+        horizons.horizons_key("20000433", ["2460888.5"], horizons.OBSERVER_SPHEREX)  # type: ignore[misc]
+    key = dict(
+        horizons.horizons_key("20000433", ["2460888.5"], center=horizons.OBSERVER_SPHEREX).query
+    )
+    assert key["command"] == "DES=20000433;" and key["center"] == horizons.OBSERVER_SPHEREX
+
+
+def test_search_path_passes_comet_to_the_range_ephemeris(
+    fixture_cache: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _online(fixture_cache, lambda _r: httpx.Response(504))
+    seen: list[bool] = []
+
+    def fake_range(*_a: object, comet: bool = False, **_k: object) -> None:
+        seen.append(comet)
+        raise ValueError("stop here")
+
+    monkeypatch.setattr(moving.Gate, "decide", lambda *_a: "live")
+    monkeypatch.setattr(horizons, "ephemeris_range", fake_range)
+    moving.search_path(ctx, "1000012", comet=True)
+    moving.search_path(ctx, "20000433")
+    assert True in seen and False in seen

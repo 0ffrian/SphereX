@@ -3,7 +3,8 @@
 // it `requires` is present on the card, (3) its tag passes the honesty state, and (4) its mesh or
 // texture did not fail to load. Otherwise it goes to `missing` with the reason. Never throws.
 import type { CometEpoch, Layer, ObjectCard, RenderParams, Tag } from '@/contract';
-import { isTagShown } from './honesty';
+import type { Scenario } from '@/physics/climate';
+import { HONESTY_LABEL, isTagShown, stateThatShows } from './honesty';
 import { planLighting } from './lighting';
 import { chooseMode, NEUTRAL_TINT, resolveModes, resolveTint } from './modes';
 import type { LegendEntry, MissingItem, PlanContext, RenderPlan, Rgb, Vec3 } from './planTypes';
@@ -45,12 +46,135 @@ export function numberField(card: ObjectCard, field: keyof ObjectCard): number |
   return typeof v?.value === 'number' && Number.isFinite(v.value) ? v.value : null;
 }
 
-/** R6.2: ellipsoid axes from the light-curve amplitude, a/b = 10^(0.4 A), c = b (model_dependent). Largest axis = 1. */
+/**
+ * R6.2: ellipsoid axes from the light-curve amplitude, a/b = 10^(0.4 A), c = b (model_dependent).
+ * Largest axis = 1. A light curve fixes a/b only: c is unconstrained, so c = b draws a cigar and a
+ * disc fits the same data (the backend's `ellipsoid` layer says so in `assumed.c_axis`, Q-153).
+ * There is no cap on the ratio: A = 2.5 mag (Meech et al. 2017, 'Oumuamua) gives a/b = 10, axes
+ * [1, 0.1, 0.1].
+ */
 export function ellipsoidAxes(ampMag: number | null): Vec3 {
   if (ampMag === null || ampMag < 0) return [1, 1, 1];
   const ratio = Math.pow(10, 0.4 * ampMag);
   const b = 1 / ratio;
   return [1, b, b];
+}
+
+/** The host-star and orbit fields an exoplanet card carries (issue #68 Part 1). */
+const EXOPLANET_FIELDS = [
+  'mass_mearth',
+  'orbit_au',
+  'orbital_period_d',
+  'host_teff_K',
+  'host_radius_rsun',
+  'host_mass_msun',
+  'host_age_gyr',
+] as const satisfies readonly (keyof ObjectCard)[];
+
+/**
+ * True when the card carries any of the exoplanet fields, even as `value: null` with a reason. A
+ * solar-system body has none of them, so its layers are neither drawn nor listed as missing
+ * (solar-system bodies stay unchanged). ASSUMPTION: the pipeline writes a missing value as
+ * `value: null` (Part 1), not by omitting the key.
+ */
+export function isExoplanetCard(card: ObjectCard): boolean {
+  return EXOPLANET_FIELDS.some((k) => card[k] !== undefined);
+}
+
+/**
+ * What a planet's notes and alt text say about the star's light and the climate scenario (issue #68
+ * Part 6, Q-165). Pure text from facts the plan already decided, so the notes (written while the
+ * plan is built) and the alt text (written from the finished plan) say the same words. It never
+ * claims a measured surface: the scenario is a model (`model_dependent`), the light colour is
+ * `derived`, and a hidden layer says which level shows it (the Q-115 wording, "choose + Estimated to
+ * see ...").
+ */
+export interface ExoplanetFacts {
+  kind: 'planet_rocky' | 'planet_water';
+  /** `deriveClimate`'s scenario, or null when the card has no `teq_K` (then nothing is said). */
+  scenario: Scenario | null;
+  /** The host temperature the light colour comes from, K. */
+  teffK: number | null;
+  /** The `starlight` layer: drawn, hidden by the honesty level, refused for data, or not offered. */
+  starlight: 'drawn' | 'honesty' | 'data' | null;
+  /** The climate pattern is drawn (a locked planet's masks at + Estimated, or the terrain's). */
+  climateShown: boolean;
+  /**
+   * False when the tidal-locking rule was refused (a needed value is missing). The scenario that
+   * depends on it (`temperate`) is then not named: the planet is not known to be unlocked. Default true.
+   */
+  lockTested?: boolean;
+  /** The locking verdict is within `LOCK_NEAR_FRACTION` of flipping: say so (Q-155). Default false. */
+  lockNearThreshold?: boolean;
+}
+
+/** What the climate pattern of a locked planet shows, in plain words (no jargon). */
+export function patternWords(s: Scenario, kind: ExoplanetFacts['kind']): string {
+  if (s === 'snowball') return 'ice over the whole surface';
+  return kind === 'planet_water' ? 'open water and ice' : 'bare ground and ice';
+}
+
+/** The words for a smooth sphere lit by its host star (Q-157, Q-166): an estimate, not a grey ball. */
+export const STARLIT_SPHERE_WORDS =
+  'a smooth sphere lit in the colour of its host star (an estimate)';
+export const STARLIT_SPHERE_NOTE =
+  "Plain sphere, lit in the host star's colour (estimated). Surface hidden at this level.";
+
+/** The scenario in plain words (no jargon beyond the scenario's own name). */
+export function scenarioWords(s: Scenario, kind: ExoplanetFacts['kind']): string {
+  const open = kind === 'planet_water' ? 'open water' : 'bare ground';
+  switch (s) {
+    case 'eyeball':
+      return `an eyeball world: tidally locked, with ${open} around the point facing the star and ice beyond`;
+    case 'snowball':
+      return 'a snowball world: tidally locked and frozen';
+    case 'temperate':
+      return 'a temperate world that is not tidally locked, with ice only where it is cold';
+    case 'hot_dry':
+      return 'a hot, dry world whose oceans are gone';
+    case 'lava':
+      return 'a lava world, hot enough to melt rock';
+  }
+}
+
+/** The level that shows the climate pattern of `s`: a locked planet's masks come with + Estimated. */
+function climateLevel(s: Scenario): string {
+  return HONESTY_LABEL[
+    s === 'eyeball' || s === 'snowball' ? stateThatShows('model_dependent') : 'artistic'
+  ];
+}
+
+/** Said whenever the locking verdict is within `LOCK_NEAR_FRACTION` of flipping (Q-155, PR #70). */
+export const LOCK_NEAR_THRESHOLD_TEXT =
+  "Whether it is tidally locked is close to call: the estimated locking time is within 5% of the star's age, about as far apart as the published forms of the formula.";
+
+export function exoplanetSentences(f: ExoplanetFacts): string[] {
+  const out: string[] = [];
+  if (f.starlight === 'drawn' && f.teffK !== null)
+    out.push(
+      `The light is coloured like its host star (${Math.round(f.teffK)} K): an estimate from the star's temperature, not a measured colour.`,
+    );
+  else if (f.starlight === 'honesty')
+    out.push(
+      `The light is white here; choose ${HONESTY_LABEL[stateThatShows('derived')]} to see it coloured like its host star.`,
+    );
+  else if (f.starlight === 'data')
+    out.push("The light is white because the host star's temperature is missing.");
+  if (f.scenario === 'temperate' && f.lockTested === false) {
+    // The locking rule was refused: no scenario that depends on it is named (Q-155, Q-166).
+    out.push(
+      'Whether the planet is tidally locked could not be tested (a needed value is missing), so no climate scenario is named. Ice is drawn only where the equilibrium temperature is cold.',
+    );
+  } else if (f.scenario !== null) {
+    const words = scenarioWords(f.scenario, f.kind);
+    out.push(
+      f.climateShown
+        ? `The climate shown is a model scenario, ${words}. It is estimated from the star and the orbit, not a measured surface.`
+        : `The model's climate scenario (${words}) is hidden here; choose ${climateLevel(f.scenario)} to see it.`,
+    );
+    if (f.lockNearThreshold) out.push(LOCK_NEAR_THRESHOLD_TEXT);
+  }
+  return out;
 }
 
 export type SizeField = 'diameter_km' | 'radius_rjup' | 'radius_rsun' | 'nucleus_radius_km_max';
@@ -382,7 +506,8 @@ export class PlanBuilder {
 /** True when the plan puts something on screen: a body, or a generated body with a part shown. */
 export function showsBody(plan: RenderPlan): boolean {
   return (
-    plan.bodies.length > 0 || (plan.shader !== null && (plan.shader.surface || plan.shader.plain))
+    plan.bodies.length > 0 ||
+    (plan.shader !== null && (plan.shader.surface || plan.shader.pattern || plan.shader.plain))
   );
 }
 

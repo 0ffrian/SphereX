@@ -2,7 +2,7 @@
 // the normal plan (nothing held, every knob 1), no stage may draw a layer the plan does not draw,
 // and the timing is the mock-up's (STAGE_S per step, smoothstep).
 import { describe, expect, it } from 'vitest';
-import { FIXTURE_NAMES, fixture } from '@/test/sharedFixtures';
+import { FIXTURE_NAMES, fixture, withoutExoplanetFields } from '@/test/sharedFixtures';
 import { defaultContext, planRender } from '../renderPlan';
 import { stagePlan } from '@/app/build/useMould';
 import {
@@ -21,8 +21,9 @@ import {
 import type { HonestyState } from '../honesty';
 
 const HONESTY: HonestyState[] = ['measured', 'derived', 'artistic'];
-const planOf = (name: string, honesty: HonestyState) => {
-  const { card, params } = fixture(name);
+const planOf = (name: string, honesty: HonestyState, solarSystem = false) => {
+  const f = fixture(name);
+  const { card, params } = solarSystem ? withoutExoplanetFields(f) : f;
   const ctx = defaultContext({ honesty });
   return { card, params, ctx, plan: planRender(card, params, ctx) };
 };
@@ -74,8 +75,53 @@ describe('water planet (mock-up PLAN.water)', () => {
   });
 
   it('shows only the plain sphere step when the surface is hidden (+ Estimated)', () => {
-    const s = mouldScript(planOf('planet_water', 'derived').plan);
+    const s = mouldScript(planOf('planet_water', 'derived', true).plan);
     expect(s?.steps.map((x) => x.label) ?? []).toEqual(['Base mould']);
+  });
+
+  it('an exoplanet at + Estimated builds the starlight step and the climate pattern step', () => {
+    // Part 6 (Q-165): the starlight is `derived`, so it is shown from + Estimated and is revealed in
+    // the first step after the base mould; the climate pattern (model_dependent) is shown on a
+    // smooth sphere in the step that reveals ice and ocean.
+    const s = mouldScript(planOf('planet_water', 'derived').plan);
+    // Q-166: with no artistic surface drawn, the steps say what they reveal, not "Terrain"/"Colour".
+    expect(s?.steps.map((x) => x.label)).toEqual(['Base mould', 'Starlight', 'Climate']);
+    expect(s?.steps[1]?.hint).toBe('Light from the host star');
+    expect(s?.steps[1]?.reveals).toEqual(['starlight']);
+    expect(s?.steps[2]?.reveals).toContain('climate');
+  });
+});
+
+describe.each(['planet_trappist1f', 'planet_kepler186f'])('%s (the demo exoplanets)', (name) => {
+  it('Measured only: a plain sphere, one step, no starlight', () => {
+    const p = planOf(name, 'measured').plan;
+    const s = mouldScript(p)!;
+    expect(s.steps.map((x) => x.label)).toEqual(['Base mould']);
+    expect(p.drawn.map((d) => d.id)).not.toContain('starlight');
+    expect(p.lighting.colour).toBeNull();
+  });
+
+  it('+ Estimated: starlight comes in the first step after the base mould; the climate pattern follows (both are locked)', () => {
+    const s = mouldScript(planOf(name, 'derived').plan)!;
+    expect(s.steps[0]!.label).toBe('Base mould');
+    expect(s.steps[1]!.label).toBe('Starlight');
+    expect(s.steps[1]!.reveals).toContain('starlight');
+    // Both are locked (eyeball or snowball pattern on a smooth sphere). Kepler-186 f is locked by a
+    // knife edge (Q-155: 3.99 against 4.0 Gyr), which follows from the constants, not from the test.
+    const colour = s.steps.find((x) => x.label === 'Climate');
+    expect(colour?.reveals).toContain('climate');
+    expect(colour?.hint).toMatch(/^(Ice and bare ground|Ice over the whole surface) \(a model\)$/);
+  });
+
+  it('+ Artistic: every step reveals a drawn layer or runs a knob; starlight is first', () => {
+    const { plan } = planOf(name, 'artistic');
+    const s = mouldScript(plan)!;
+    expect(s.kind).toBe('rocky');
+    expect(s.steps.map((x) => x.label)).toEqual(['Base mould', 'Terrain', 'Colour', 'Air']);
+    expect(s.steps[1]!.reveals).toContain('starlight');
+    expect(s.steps[2]!.reveals).toContain('climate');
+    for (const st of s.steps)
+      expect(st.reveals.length + (st.knobs?.length ?? 0)).toBeGreaterThan(0);
   });
 });
 

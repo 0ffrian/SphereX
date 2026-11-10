@@ -1,0 +1,48 @@
+{
+  "id": "fixture:asteroid_shape_bennu",
+  "name": "Synthetic fixture: asteroid with a shape model (101955 Bennu: real shape, size, albedo, class and spin)",
+  "type": "asteroid_shape",
+  "diameter_km": {
+    "err": 0.0003,
+    "source": "synthetic fixture: real 101955 Bennu value, JPL SBDB diameter (Daly, M.G., et al., Sci. Adv. 6, eabd3649 (2020))",
+    "tag": "measured",
+    "value": 0.48444
+  },
+  "shape_source": {
+    "source": "synthetic fixture: real 101955 Bennu value, Daly, M., Barnouin, O., Espiritu, R., Lauretta, D. (2026). OSIRIS-REx Altimetry Working Group Shape Model Bundle V1.0, urn:nasa:pds:orex.altimetry::1.0 (SPOv54), NASA Planetary Data System. DOI 10.26033/pzcf-qs69, licence CC0-1.0",
+    "tag": "measured",
+    "value": "/data/shapes/bennu-spo-v54.glb"
+  },
+  "rot_period_h": {
+    "err": 2e-06,
+    "source": "synthetic fixture: real 101955 Bennu value, JPL SBDB rot_per (Hergenrother, M.C., et al., Nat. Commun. 10, 1291 (2019))",
+    "tag": "measured",
+    "value": 4.296061
+  },
+  "albedo": {
+    "err": 0.002,
+    "source": "synthetic fixture: real 101955 Bennu value, JPL SBDB albedo (Hergenrother, M.C., et al., Nat. Commun. 10, 1291 (2019))",
+    "tag": "measured",
+    "value": 0.044
+  },
+  "spectral_class": {
+    "source": "synthetic fixture: real 101955 Bennu value, JPL SBDB spec_B (SMASS taxonomy; Clark, B.E., et al., Icarus 216, 462-475 (2011))",
+    "tag": "measured",
+    "value": "B"
+  },
+  "phase_angle_deg": {
+    "source": "synthetic fixture: real 101955 Bennu value, JPL Horizons quantity 24 (Sun-Target-Observer), observer SPHEREx 500@-163182, at 2026-11-14T00:00:00.000Z",
+    "tag": "measured",
+    "value": 13.955
+  },
+  "sun_vector": {
+    "formula": "-r/|r|, r = heliocentric ICRF position from JPL Horizons VECTORS (CENTER 500@10) at 2026-11-14T00:00:00.000Z; frame ICRF (equatorial J2000), direction target to Sun",
+    "source": "synthetic fixture: real 101955 Bennu value, JPL Horizons VECTORS, CENTER 500@10, at 2026-11-14T00:00:00.000Z",
+    "tag": "derived",
+    "value": [
+      0.10685473,
+      0.865828909,
+      0.488796857
+    ]
+  }
+}

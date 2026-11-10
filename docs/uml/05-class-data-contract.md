@@ -66,6 +66,9 @@ classDiagram
     +flux_45um: TV, optional
     +teff_K: TV, optional
     +teq_K: TV, optional
+    +mass_mearth, orbit_au, orbital_period_d: TV, optional
+    +host_teff_K, host_radius_rsun, host_mass_msun, host_age_gyr: TV, optional
+    +component_teff_K: TV~pair~, optional
     +period_var_d: TV, optional
     +lightcurve: LightcurvePoint list, optional
     +phase_angle_deg: TV, optional
@@ -130,6 +133,7 @@ classDiagram
     +layers: Layer list
     +dynamics: Dynamics, optional
     +textures: Textures, optional
+    +components: Component list of 2, optional
     +lighting: Lighting
     +view_modes: ViewModes
     +haptics: HapticProfile
@@ -226,6 +230,14 @@ classDiagram
     teq_pulse
     none
   }
+  class Component {
+    +class: string
+    +tint: rgb
+    +tint_tag: Tag
+    +emissive_scale: number or null
+    +emissive_tag: Tag
+  }
+  RenderParams "1" o-- "0..2" Component
   class ObjectCard {
     <<see diagram 1>>
   }
@@ -253,11 +265,14 @@ classDiagram
 
 ## Notes
 
+- The demo fixtures `planet_trappist1f` and `planet_kepler186f` hold real archive values, each `source` starting "synthetic fixture: real <planet> value, " (Q-165).
+- The demo fixture `asteroid_shape_bennu` (Part 8a, Q-163) is an extra `asteroid_shape` beside Eros: real Bennu values from the baked card, each `source` starting "synthetic fixture: real 101955 Bennu value, "; its params are `card_to_params` of the card (`bake_fixtures.py`), and its `shape_source` is the registered `/data/shapes/bennu-spo-v54.glb`.
 - `TV~T~` is one schema definition per payload in code (`TVNumber`, `TVString`, `TVRgb`, `TVVec3`, `TVPair`), because JSON Schema has no generics; `TV<T>` is a hand-written view of them in `frontend/src/contract/tags.ts`. Generated code: `backend/app/contract/`, `frontend/src/contract/generated.ts` (D-18).
 - `Layer.tier` and `DynamicsValue.tier` are fixed by the tag (1 measured, 2 derived, 3 model_dependent, 4 inferred_from_analog, 5 artistic). `formula` is required from tier 2 and `assumed` at tier 3 (D-32). A rate no rung answers is omitted and listed in `missing` as `dynamics:<key>`. `speedup` keys are `spin`, `spots`, `flares`, `winds`, `clouds`, `pulsation`.
 - `scale_m` is null when the size is unknown, for example on a `candidate` (Q-33).
 - `Textures` and `Lighting` are named `RenderTextures` and `RenderLighting` in the schema and the generated code. The schema has no `IRMode` definition: `spherex_ir` refers to `VisibleMode`, and `IRMode` is a type alias in `frontend/src/contract/index.ts` (D-23).
 - `rgb` and `vec3` stand for `[number, number, number]`; `pair` stands for `[number, number]`. They are written in words because Mermaid class members cannot hold brackets reliably.
+- Issue #68: the card gains the exoplanet orbit, mass and host-star fields and `component_teff_K` (Q-150, Q-154); `components` holds the two bodies' class tint and relative brightness of a `brown_dwarf_binary` (Q-154) and is absent when the class does not name two components.
 - `textures` is present only for the baked types (D-01). Shader kinds (`planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova`) get their field from the browser worker, so it is absent **[verify]**.
 - `terrain`, `flow`, `teq_pulse` and the ObjectCard field `teq_K` are added by D-12 (Accepted). `teq_K` is in the rendering doc R3.2 listing: `measured` from Exoplanet Archive `pl_eqt`, otherwise `derived`. `teq_pulse` is refused and listed in `missing` when `teq_K` is null.
 - `VisibleMode` and `IRMode` share one shape (D-23); `channels_um` is set on `IRMode` only. Their `rgb` field, drawn as `TV~rgb~ or null`, is `TV<[number, number, number]> | null`, the same type as `gaia_rgb` and `spherex_rgb` (D-23, Q-18). When a mode is not available, the reason goes in `missing`.

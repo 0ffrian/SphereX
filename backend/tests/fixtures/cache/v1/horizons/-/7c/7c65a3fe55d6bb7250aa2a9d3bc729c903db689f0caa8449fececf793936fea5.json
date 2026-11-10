@@ -1,0 +1,18 @@
+{
+ "body_sha256": "e88e2cd9eeef6050eabda686a0b0699957cbc4a7b45dc44f7b47790318983910",
+ "body_size": 7285,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-09T19:27:46.965Z",
+ "key": {
+  "query": {
+   "center": "500@-163182",
+   "command": "DES=50788063;",
+   "quantities": "1,24",
+   "tlist": "2461358.500000"
+  },
+  "release": "-",
+  "source": "horizons"
+ },
+ "status": 200,
+ "url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27DES%3D50788063%3B%27&OBJ_DATA=NO&MAKE_EPHEM=YES&EPHEM_TYPE=OBSERVER&CENTER=%27500%40-163182%27&TLIST_TYPE=JD&TIME_TYPE=UT&TLIST=%272461358.500000%27&QUANTITIES=%271%2C24%27&ANG_FORMAT=DEG&CSV_FORMAT=YES&EXTRA_PREC=YES"
+}

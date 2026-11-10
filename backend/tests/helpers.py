@@ -27,7 +27,13 @@ def entries(source: str, root: Path = FIXTURE_CACHE) -> list[tuple[dict[str, Any
 
 
 def entry(source: str, **query: str) -> tuple[dict[str, Any], bytes]:
-    for meta, body in entries(source):
+    """The recorded entry whose key query is exactly ``query``; failing that, the first that
+    contains it (a key with extra parts, such as the SIMBAD ``table`` of issue #68)."""
+    found = entries(source)
+    for meta, body in found:
+        if meta["key"]["query"] == query:
+            return meta, body
+    for meta, body in found:
         q = meta["key"]["query"]
         if all(q.get(k) == v for k, v in query.items()):
             return meta, body

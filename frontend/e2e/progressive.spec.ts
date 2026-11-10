@@ -110,8 +110,14 @@ test('cached spots get their own markers, a target is marked once', async ({ pag
     hook.setView({ ra: 45, dec: -15, fovDeg: 30 });
   });
   // eps Ind B and R Dra are in the cached list but already have target markers; the spot and the
-  // Aqua Prime fixture (issue #60) are marked by the cached list only.
-  await expect(page.getByTestId('sky-cached-marker')).toHaveCount(2, { timeout: 15_000 });
+  // Aqua Prime fixture (issue #60) are marked by the cached list only, and so are the two demo
+  // exoplanets that are not among the five A1.1 targets (TRAPPIST-1 f, Kepler-186 f; Track G).
+  await expect(page.getByTestId('sky-cached-marker')).toHaveCount(4, { timeout: 15_000 });
+  await expect(
+    page
+      .locator('[data-testid="sky-cached-marker"]')
+      .evaluateAll((els) => els.map((e) => e.getAttribute('data-object-id')).sort()),
+  ).resolves.toEqual(['aqua-prime', 'kepler-186f', 'synthetic-cached-spot', 'trappist-1f']);
   const cached = page.locator(
     '[data-testid="sky-cached-marker"][data-object-id="synthetic-cached-spot"]',
   );

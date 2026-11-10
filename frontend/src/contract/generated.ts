@@ -96,6 +96,26 @@ export type TVRgb = {
  */
 export type Triple = [number, number, number];
 /**
+ * Tagged value (R3.1) holding a pair of numbers.
+ */
+export type TVPair = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: Pair | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
  * Tagged value (R3.1) holding a 3-vector.
  */
 export type TVVec3 = {
@@ -116,26 +136,6 @@ export type TVVec3 = {
   assumption?: string;
 };
 export type CometEpoch = '2025-08' | '2025-12';
-/**
- * Tagged value (R3.1) holding a pair of numbers.
- */
-export type TVPair = {
-  /**
-   * null = unknown, never a guess.
-   */
-  value: Pair | null;
-  err?: number | Pair;
-  tag: Tag;
-  source: string;
-  /**
-   * Required, non-blank, when tag is derived.
-   */
-  formula?: string;
-  /**
-   * Required, non-blank, when tag is model_dependent.
-   */
-  assumption?: string;
-};
 export type Layer = {
   id: string;
   tag: Tag;
@@ -230,6 +230,14 @@ export interface ObjectCard {
   flux_45um?: TVNumber;
   teff_K?: TVNumber;
   teq_K?: TVNumber;
+  mass_mearth?: TVNumber;
+  orbit_au?: TVNumber;
+  orbital_period_d?: TVNumber;
+  host_teff_K?: TVNumber;
+  host_radius_rsun?: TVNumber;
+  host_mass_msun?: TVNumber;
+  host_age_gyr?: TVNumber;
+  component_teff_K?: TVPair;
   period_var_d?: TVNumber;
   lightcurve?: LightcurvePoint[];
   phase_angle_deg?: TVNumber;
@@ -275,6 +283,13 @@ export interface RenderParams {
    */
   layers: Layer[];
   textures?: RenderTextures;
+  /**
+   * Per-body look of a brown_dwarf_binary, in the order of the card's spectral_class (A then B), when the class names two components (Q-154). Absent otherwise: both bodies then share the system look.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  components?: [Component, Component];
   lighting: RenderLighting;
   view_modes: ViewModes;
   haptics: HapticProfile;
@@ -298,6 +313,22 @@ export interface RenderTextures {
    * Peak relief as a fraction of the body radius (R6.2 relief_amp): the scale of the displacement by the baked height map (R7.2). Optional (Q-103); the backend sends it for `asteroid_procedural` (issue #62), tagged `artistic` through its `displacement` layer.
    */
   relief_amp?: number;
+}
+/**
+ * One body of a brown_dwarf_binary (R7.4, Q-154). tint is linear RGB from this body's own class through the single-brown-dwarf class palette.
+ */
+export interface Component {
+  /**
+   * This body's spectral class, one half of the card's spectral_class, such as T1V.
+   */
+  class: string;
+  tint: Triple;
+  tint_tag: Tag;
+  /**
+   * This body's brightness relative to the brighter body, (Teff / Teff_max)^4 at equal radius. null = no Teff for this system: the body uses the system brightness.
+   */
+  emissive_scale: number | null;
+  emissive_tag: Tag;
 }
 export interface RenderLighting {
   mode: 'sun' | 'self';

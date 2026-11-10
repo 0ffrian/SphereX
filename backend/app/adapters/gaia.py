@@ -122,3 +122,112 @@ def cone(
     sources = parse(served.entry.body)
     table = str(served.entry.meta.get("table") or DEFAULT_TABLE)
     return GaiaCone(sources, len(sources) >= MAX_ROWS, table, served)
+
+
+# --- astrophysical parameters of one star (issue #68 Part 8c, Q-152) ---------------------------
+# IRSA serves the table as ``gaia_dr3_astrophys_param`` (not ``astrophysical_parameters``); the ESA
+# archive as ``gaiadr3.astrophysical_parameters``. Both join ``gaia_source`` on ``source_id``
+# (checked 2026-11-09). Each mirror's source table maps to its own astrophysical table.
+ASTRO_TABLE = {
+    "gaia_dr3_source": "gaia_dr3_astrophys_param",
+    "gaiadr3.gaia_source": "gaiadr3.astrophysical_parameters",
+}
+# ASSUMPTION: match radius. Gaia DR3 positions are at J2016.0, so the SIMBAD position is first
+# moved there with the SIMBAD proper motion; the nearest source within this radius is taken.
+STAR_MATCH_RADIUS_ARCSEC = 3.0
+STAR_MAX_ROWS = 10
+ASTRO_COLUMNS = (
+    "source_id",
+    "ra",
+    "dec",
+    "phot_g_mean_mag",
+    "teff_gspphot",
+    "teff_gspphot_lower",
+    "teff_gspphot_upper",
+    "radius_flame",
+    "radius_flame_lower",
+    "radius_flame_upper",
+)
+
+
+@dataclass(frozen=True)
+class GaiaAstro:
+    source_id: str
+    ra: float
+    dec: float
+    g_mag: float | None
+    teff_gspphot_k: float | None
+    teff_gspphot_lower_k: float | None
+    teff_gspphot_upper_k: float | None
+    radius_flame_rsun: float | None
+    radius_flame_lower_rsun: float | None
+    radius_flame_upper_rsun: float | None
+
+
+def astro_key(ra: float, dec: float) -> CacheKey:
+    return CacheKey.make(
+        SOURCE,
+        RELEASE,
+        what="astrophysical_parameters",
+        ra=norm_ra(ra),
+        dec=norm_dec(dec),
+        radius=norm_float(STAR_MATCH_RADIUS_ARCSEC / 3600.0, 5),
+    )
+
+
+def parse_astro(body: bytes) -> list[GaiaAstro]:
+    out: list[GaiaAstro] = []
+    for r in tap.read_csv(body, ASTRO_COLUMNS):
+        out.append(
+            GaiaAstro(
+                source_id=r["source_id"],
+                ra=float(r["ra"]),
+                dec=float(r["dec"]),
+                g_mag=tap.opt_float(r["phot_g_mean_mag"]),
+                teff_gspphot_k=tap.opt_float(r["teff_gspphot"]),
+                teff_gspphot_lower_k=tap.opt_float(r["teff_gspphot_lower"]),
+                teff_gspphot_upper_k=tap.opt_float(r["teff_gspphot_upper"]),
+                radius_flame_rsun=tap.opt_float(r["radius_flame"]),
+                radius_flame_lower_rsun=tap.opt_float(r["radius_flame_lower"]),
+                radius_flame_upper_rsun=tap.opt_float(r["radius_flame_upper"]),
+            )
+        )
+    return out
+
+
+def astro_adql(source_table: str, ra: str, dec: str, radius_deg: str) -> str:
+    astro = ASTRO_TABLE[source_table]
+    cols = ", ".join(
+        f"s.{c}" if c in ("source_id", "ra", "dec", "phot_g_mean_mag") else f"a.{c}"
+        for c in ASTRO_COLUMNS
+    )
+    return (
+        f"SELECT TOP {STAR_MAX_ROWS} {cols} FROM {source_table} AS s "
+        f"LEFT OUTER JOIN {astro} AS a ON s.source_id = a.source_id "
+        f"WHERE 1=CONTAINS(POINT('ICRS',s.ra,s.dec),CIRCLE('ICRS',{ra},{dec},{radius_deg})) "
+        "ORDER BY s.phot_g_mean_mag, s.source_id"
+    )
+
+
+def astro_near(
+    ctx: Context, ra: float, dec: float, *, refresh: bool = False
+) -> tuple[list[GaiaAstro], Served]:
+    """Gaia DR3 sources (with their GSP-Phot and FLAME values) within ``STAR_MATCH_RADIUS_ARCSEC``
+    of an ICRS position at epoch J2016.0, through the cache. Raises ``CacheMissOffline`` /
+    ``UpstreamUnavailable``."""
+    key = astro_key(ra, dec)
+    q = dict(key.query)
+    mirrors = [(url, table) for url, table in ctx.settings.gaia_mirrors if table in ASTRO_TABLE]
+
+    def live() -> LiveResponse:
+        return tap.query_csv(
+            ctx,
+            mirrors,
+            lambda table: astro_adql(table, q["ra"], q["dec"], q["radius"]),
+            ASTRO_COLUMNS,
+            read_timeout_s=ctx.settings.catalog_read_timeout_s,
+            parse=parse_astro,
+        )
+
+    served = ctx.cache.fetch(key, live, refresh=refresh)
+    return parse_astro(served.entry.body), served

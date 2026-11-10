@@ -45,12 +45,40 @@ class EphemPoint:
     dec: float
 
 
+def command(spkid: str, comet: bool = False, jd: str | None = None) -> str:
+    """The Horizons ``COMMAND`` for a small body by SPK-ID.
+
+    A comet that has been seen on several apparitions has one orbit record per apparition, so
+    ``DES=<id>;`` alone answers with the small-body index table and no ephemeris (live 2026-11-09:
+    67P is SPK-ID 1000012 and has a dozen records). ``CAP`` picks one record. The Horizons system
+    manual (ssd.jpl.nasa.gov/horizons/manual.html, small-body lookup) says: ``CAP;`` "returns last
+    apparition before the current date", and ``CAP < JD#;`` "returns last apparition before the
+    specified Julian Day Number". Bare ``CAP`` therefore depends on the wall clock, so a comet's
+    command carries the whole Julian Day of the requested epoch (``CAP<2460982;``): the same epoch
+    always gives the same record and the same cache key. An asteroid has no apparitions and ``CAP``
+    finds nothing there, so only comets get it (Q-62 amendment, Q-151).
+    """
+    if not comet:
+        return f"DES={spkid};"
+    if jd is None:
+        raise ValueError("a comet command needs the epoch's Julian Day for CAP<JD")
+    return f"DES={spkid};CAP<{int(float(jd))};"
+
+
 def jd_list(times: list[datetime]) -> list[str]:
     return [f"{utc_to_jd(t):.6f}" for t in times]
 
 
-def horizons_key(spkid: str, jds: list[str], center: str = CENTER) -> CacheKey:
-    return CacheKey.make(SOURCE, None, command=f"DES={spkid};", center=center, tlist=",".join(jds))
+def horizons_key(
+    spkid: str, jds: list[str], *, comet: bool = False, center: str = CENTER
+) -> CacheKey:
+    return CacheKey.make(
+        SOURCE,
+        None,
+        command=command(spkid, comet, min(jds, key=float, default=None)),
+        center=center,
+        tlist=",".join(jds),
+    )
 
 
 def parse(body: bytes) -> list[tuple[str, float, float]]:
@@ -76,16 +104,22 @@ def ephemeris(
     spkid: str,
     times: list[datetime],
     *,
+    comet: bool = False,
     refresh: bool = False,
     center: str = CENTER,
 ) -> tuple[list[EphemPoint], Served]:
     jds = jd_list(times)
-    key = horizons_key(spkid, jds, center)
+    if not jds:
+        raise UpstreamError("no epochs requested: Horizons needs at least one time")
+    # A comet's record is chosen by CAP<JD of the earliest requested epoch (Q-151, Q-167): the
+    # whole list is computed from the apparition before that epoch. Epochs across a later
+    # perihelion would still use that record; accepted for the demo's single-epoch use.
+    key = horizons_key(spkid, jds, comet=comet, center=center)
 
     def live() -> LiveResponse:
         params = {
             "format": "json",
-            "COMMAND": f"'DES={spkid};'",
+            "COMMAND": f"'{command(spkid, comet, min(jds, key=float))}'",
             "OBJ_DATA": "NO",
             "MAKE_EPHEM": "YES",
             "EPHEM_TYPE": "OBSERVER",
@@ -203,25 +237,30 @@ def sun_unit_vector(r: tuple[float, float, float]) -> tuple[tuple[float, float, 
     return (-r[0] / norm, -r[1] / norm, -r[2] / norm), norm
 
 
-def phase_key(spkid: str, jd: str, center: str) -> CacheKey:
+def phase_key(spkid: str, jd: str, center: str, comet: bool = False) -> CacheKey:
     return CacheKey.make(
-        SOURCE, None, command=f"DES={spkid};", center=center, tlist=jd, quantities="1,24"
+        SOURCE, None, command=command(spkid, comet, jd), center=center, tlist=jd, quantities="1,24"
     )
 
 
-def vectors_key(spkid: str, jd: str) -> CacheKey:
+def vectors_key(spkid: str, jd: str, comet: bool = False) -> CacheKey:
     return CacheKey.make(
-        SOURCE, None, command=f"DES={spkid};", center=SUN_CENTER, tlist=jd, ephem_type="VECTORS"
+        SOURCE,
+        None,
+        command=command(spkid, comet, jd),
+        center=SUN_CENTER,
+        tlist=jd,
+        ephem_type="VECTORS",
     )
 
 
 def _fetch_phase(
-    ctx: Context, spkid: str, jd: str, center: str, refresh: bool
+    ctx: Context, spkid: str, jd: str, center: str, refresh: bool, comet: bool
 ) -> tuple[float, Served]:
     def live() -> LiveResponse:
         params = {
             "format": "json",
-            "COMMAND": f"'DES={spkid};'",
+            "COMMAND": f"'{command(spkid, comet, jd)}'",
             "OBJ_DATA": "NO",
             "MAKE_EPHEM": "YES",
             "EPHEM_TYPE": "OBSERVER",
@@ -243,17 +282,17 @@ def _fetch_phase(
             raise UpstreamError(str(exc)) from exc
         return resp
 
-    served = ctx.cache.fetch(phase_key(spkid, jd, center), live, refresh=refresh)
+    served = ctx.cache.fetch(phase_key(spkid, jd, center, comet), live, refresh=refresh)
     return parse_phase_angle(served.entry.body), served
 
 
 def _fetch_vectors(
-    ctx: Context, spkid: str, jd: str, refresh: bool
+    ctx: Context, spkid: str, jd: str, refresh: bool, comet: bool
 ) -> tuple[tuple[float, float, float], Served]:
     def live() -> LiveResponse:
         params = {
             "format": "json",
-            "COMMAND": f"'DES={spkid};'",
+            "COMMAND": f"'{command(spkid, comet, jd)}'",
             "OBJ_DATA": "NO",
             "MAKE_EPHEM": "YES",
             "EPHEM_TYPE": "VECTORS",
@@ -272,12 +311,12 @@ def _fetch_vectors(
             raise UpstreamError(str(exc)) from exc
         return resp
 
-    served = ctx.cache.fetch(vectors_key(spkid, jd), live, refresh=refresh)
+    served = ctx.cache.fetch(vectors_key(spkid, jd, comet), live, refresh=refresh)
     return parse_vectors(served.entry.body), served
 
 
 def geometry(
-    ctx: Context, spkid: str, time: datetime, *, refresh: bool = False
+    ctx: Context, spkid: str, time: datetime, *, comet: bool = False, refresh: bool = False
 ) -> tuple[Geometry, list[Served]]:
     """Phase angle (observer SPHEREx, else geocentre) and Sun direction at ``time``.
 
@@ -293,16 +332,16 @@ def geometry(
     jd = f"{utc_to_jd(time):.6f}"
     observer = OBSERVER_SPHEREX
     try:
-        phase, served_p = _fetch_phase(ctx, spkid, jd, observer, refresh)
+        phase, served_p = _fetch_phase(ctx, spkid, jd, observer, refresh, comet)
     except CacheMissOffline:
         observer = GEOCENTRE
-        phase, served_p = _fetch_phase(ctx, spkid, jd, observer, refresh)
+        phase, served_p = _fetch_phase(ctx, spkid, jd, observer, refresh, comet)
     except UpstreamUnavailable as exc:
         if not isinstance(exc.__cause__, NoEphemeris):
             raise
         observer = GEOCENTRE
-        phase, served_p = _fetch_phase(ctx, spkid, jd, observer, refresh)
-    r, served_v = _fetch_vectors(ctx, spkid, jd, refresh)
+        phase, served_p = _fetch_phase(ctx, spkid, jd, observer, refresh, comet)
+    r, served_v = _fetch_vectors(ctx, spkid, jd, refresh, comet)
     unit, norm = sun_unit_vector(r)
     return Geometry(phase, unit, norm, time, observer), [served_p, served_v]
 
@@ -313,12 +352,18 @@ RANGE_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 def range_key(
-    spkid: str, start: datetime, stop: datetime, step_min: int, center: str = OBSERVER_SPHEREX
+    spkid: str,
+    start: datetime,
+    stop: datetime,
+    step_min: int,
+    *,
+    comet: bool = False,
+    center: str = OBSERVER_SPHEREX,
 ) -> CacheKey:
     return CacheKey.make(
         SOURCE,
         None,
-        command=f"DES={spkid};",
+        command=command(spkid, comet, f"{utc_to_jd(start):.6f}"),
         center=center,
         start=start.astimezone(UTC).strftime(RANGE_TIME_FORMAT),
         stop=stop.astimezone(UTC).strftime(RANGE_TIME_FORMAT),
@@ -333,6 +378,7 @@ def ephemeris_range(
     stop: datetime,
     step_min: int,
     *,
+    comet: bool = False,
     refresh: bool = False,
     center: str = OBSERVER_SPHEREX,
 ) -> tuple[list[EphemPoint], Served]:
@@ -340,15 +386,16 @@ def ephemeris_range(
     (the caller keeps a call under ``MAX_LINES`` samples).
 
     Same target, quantities and precision as ``ephemeris``; ``TIME_DIGITS=FRACSEC`` keeps the
-    time column in the ``%Y-%b-%d %H:%M:%S.%f`` form the parser reads.
+    time column in the ``%Y-%b-%d %H:%M:%S.%f`` form the parser reads. A comet's record is chosen
+    by ``CAP<JD`` of ``start`` (Q-151, Q-167); ``DES=`` alone answers with the apparition table.
     """
-    key = range_key(spkid, start, stop, step_min, center)
+    key = range_key(spkid, start, stop, step_min, comet=comet, center=center)
     q = dict(key.query)
 
     def live() -> LiveResponse:
         params = {
             "format": "json",
-            "COMMAND": f"'DES={spkid};'",
+            "COMMAND": f"'{q['command']}'",
             "OBJ_DATA": "NO",
             "MAKE_EPHEM": "YES",
             "EPHEM_TYPE": "OBSERVER",
