@@ -89,6 +89,32 @@ classDiagram
   class TauriDriver {
     <<stub, B-01 post-event>>
   }
+  class SoundOutputs {
+    <<haptics.ts, Q-132>>
+    +engine: HapticEngine
+    +audio: AudioDriver
+    HapticOutputs adds vibrate: WebVibrateDriver
+  }
+  class AppSound {
+    <<appSound.ts, #76>>
+    +outputs: SoundOutputs, canVibrate false
+    +unlock(), setMuted, setVolume, setStrengthMultiplier
+    +listen(reply, lines) ListenOutcome, stopListen
+    +spectrumSource(reply, options) with required seed
+    +getStatus(), subscribe(), bind(honesty)
+    bind: settings, page lifecycle, honesty for engine and sweep
+  }
+  class SoundProvider {
+    <<SoundProvider.tsx, #76>>
+    mounted once in App, no UI
+    +useSound(), useSoundStatus()
+  }
+  class ListenSweep {
+    <<sound/listenSweep.ts>>
+    +play(plan, honesty) boolean
+    +stop(), setHonesty(state)
+    stops on a hidden page, refuses to start on one
+  }
   class HapticSettings {
     <<settings.ts, own Zustand store>>
     +hapticsOn, soundOn, showChannelLabels
@@ -144,6 +170,14 @@ classDiagram
   UnlockButton --> HapticEngine : unlock
   UnlockButton ..> SharedAudioContext : unlock state
   UnlockButton ..> Platform : deviceVibrates
+  AppSound --> HapticEngine : audio-only engine
+  AppSound --> ListenSweep : Listen
+  AppSound ..> HapticSettings : bindEngine, setters
+  AppSound --> SoundOutputs : outputs
+  SoundProvider --> AppSound : one per app
+  SoundOutputs --> HapticEngine
+  SoundOutputs --> AudioDriver
+  note for SoundOutputs "createHaptics() is audio-only by default (Q-132). createHaptics with vibrate true adds the WebVibrateDriver, for the dev page and after the event."
 ```
 
 ## Diagram 2: profiles, probe and touch sources

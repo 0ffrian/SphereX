@@ -8,7 +8,7 @@ Every **[verify]** marker in the rendering spec has one row here. Numbers 1–18
 
 | # | Item | Fragment | Owner | When | Resolved by |
 |---|---|---|---|---|---|
-| 1 | `WebGPURenderer` fallback to WebGL2 (r187), and which GPU Chrome uses for WebGPU on the A15 (`chrome://gpu`; RTX 3050 or integrated) | R2, R5.5 | Atish (A15), Moon | event; phones after | a `chrome://gpu` report from the A15 |
+| 1 | `WebGPURenderer` fallback to WebGL2 (r187), and which GPU Chrome uses for WebGPU on the A15 (`chrome://gpu`; RTX 3050 or integrated) | R2, R5.5 | Atish (A15), Moon | event; phones after | a `chrome://gpu` report from the A15 and the `gpu-probe.html` report ([R11.4](reference/a15-checks.md)) |
 | 2 | Normal map green channel in the viewer: north-facing slopes brighten with light from the north (baker side checked 6 Nov 2026) | R6.5 | Moon | event | a viewer screenshot with a north light (issue #7) |
 | 3 | Gemini image model name, aspect ratios, and the REST shape `gemini_paint.py` assumes: base URL `SX_GEMINI_API_URL`, `models/{model}:generateContent` with `x-goog-api-key`, `generationConfig.responseModalities`, `imageConfig.aspectRatio` (only when `SX_GEMINI_ASPECT_RATIO` is set), an `inlineData` part, refusal `finishReason`s. Docs check 9 Nov 2026: `gemini-nano-banana-2.1` exists; 2:1 is not a named ratio; the docs show the newer `/v1beta/interactions` endpoint | R6.6 | Atish, Kevin | event (stretch) | one live call with a key |
 | 4 | 3I/ATLAS nucleus size limit and coma radius, with exact citations | R7.3 | Kevin | after (3I/ATLAS is stretch, Q-137) | cited values in the card |
