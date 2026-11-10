@@ -53,3 +53,29 @@ triangles_lod1 = 12288
 units = "metres in the GLB (source km x 1000)"
 vertices_lod0 = 24578
 vertices_lod1 = 6146
+
+[[model]]
+axes = "glTF +Y up: glTF (x, y, z) = body-fixed (x, z, -y); glTF +Y is the body +Z pole"
+bbox_half_diagonal_km = 0.465
+citation = "Daly, M., Barnouin, O., Espiritu, R., Lauretta, D. (2026). OSIRIS-REx Altimetry Working Group Shape Model Bundle V1.0, urn:nasa:pds:orex.altimetry::1.0 (SPOv54), NASA Planetary Data System."
+convex = false
+doi = "10.26033/pzcf-qs69"
+extents_km = [0.568, 0.495, 0.543]
+frame = "Bennu body-fixed frame of the model (no named frame in the label): origin at the centre of mass (OBJ header centroid within 1.4 m of it), +Z the spin axis (positive pole; the axis of largest moment of inertia in the OBJ header); +X and +Y are body-fixed and about 7 deg from the principal axes listed in the OBJ header, not equal to them; pole RA 85.65 deg, Dec -60.17 deg and period 4.296056 h from Lauretta et al. 2019, not from this product; km in the OBJ"
+ingest_version = "2"
+licence = "CC0-1.0"
+lod0 = "/data/shapes/bennu-spo-v54.glb"
+lod0_sha256 = "03f19c337c3aa157069c16b40bbff334134785f076c16f1241ff1cc4393e422e"
+lod1 = "/data/shapes/bennu-spo-v54.lod1.glb"
+lod1_sha256 = "03f19c337c3aa157069c16b40bbff334134785f076c16f1241ff1cc4393e422e"
+name = "101955 Bennu"
+slug = "bennu-spo-v54"
+source_member = "g_06320mm_spo_obj_0000n00000_v054.obj"
+source_sha256 = "705d03b390ecb619083168e2e3a27f9a471398ace8bf542d5a431031c06567a6"
+source_url = "https://doi.org/10.26033/pzcf-qs69"
+spkid = "20101955"
+triangles_lod0 = 49152
+triangles_lod1 = 49152
+units = "metres in the GLB (source km x 1000)"
+vertices_lod0 = 24578
+vertices_lod1 = 24578

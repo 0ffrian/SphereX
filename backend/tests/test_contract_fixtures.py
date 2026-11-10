@@ -40,10 +40,12 @@ TV_DEFINITIONS = ["TVNumber", "TVString", "TVRgb", "TVVec3", "TVPair"]
 # Issue #68 Part 6: two extra `planet_rocky` fixtures with real archive values sit beside the
 # one-per-type set; they are checked on their own below.
 DEMO_PLANETS = ["planet_kepler186f", "planet_trappist1f"]
+DEMO_ASTEROIDS = ["asteroid_shape_bennu"]  # Part 8a: the real Bennu model beside Eros
+EXTRA = [*DEMO_PLANETS, *DEMO_ASTEROIDS]
 _ALL_CARDS = {p.stem: _load(p) for p in sorted((SHARED / "fixtures" / "cards").glob("*.json"))}
 _ALL_PARAMS = {p.stem: _load(p) for p in sorted((SHARED / "fixtures" / "params").glob("*.json"))}
-CARDS = {k: v for k, v in _ALL_CARDS.items() if k not in DEMO_PLANETS}
-PARAMS = {k: v for k, v in _ALL_PARAMS.items() if k not in DEMO_PLANETS}
+CARDS = {k: v for k, v in _ALL_CARDS.items() if k not in EXTRA}
+PARAMS = {k: v for k, v in _ALL_PARAMS.items() if k not in EXTRA}
 INVALID = _load(SHARED / "fixtures" / "invalid" / "cases.json")
 
 _REGISTRY: Registry[Any] = Registry().with_resources(
@@ -95,8 +97,19 @@ def test_one_card_and_one_params_fixture_per_object_type() -> None:
 
 
 def test_demo_planets_are_extra_fixtures() -> None:
-    assert sorted(_ALL_CARDS) == sorted([*OBJECT_TYPES, *DEMO_PLANETS])
-    assert sorted(_ALL_PARAMS) == sorted([*OBJECT_TYPES, *DEMO_PLANETS])
+    assert sorted(_ALL_CARDS) == sorted([*OBJECT_TYPES, *EXTRA])
+    assert sorted(_ALL_PARAMS) == sorted([*OBJECT_TYPES, *EXTRA])
+
+
+def test_bennu_fixture_pair_validates_and_names_its_real_source() -> None:
+    card, params = _ALL_CARDS["asteroid_shape_bennu"], _ALL_PARAMS["asteroid_shape_bennu"]
+    VALIDATORS["object-card"].validate(card)
+    VALIDATORS["render-params"].validate(params)
+    assert card["type"] == params["type"] == "asteroid_shape"
+    assert card["id"] == params["id"]
+    assert card["shape_source"]["value"] == "/data/shapes/bennu-spo-v54.glb"
+    for tv in _tagged(card):
+        assert str(tv.get("source", "")).startswith("synthetic fixture: real 101955 Bennu value, ")
 
 
 @pytest.mark.parametrize("name", DEMO_PLANETS)

@@ -1,5 +1,5 @@
 {
-  "asset_version": "7",
+  "asset_version": "8",
   "card": {
     "albedo": {
       "err": 0.002,
@@ -42,6 +42,11 @@
       "tag": "measured",
       "value": 4.296061
     },
+    "shape_source": {
+      "source": "Daly, M., Barnouin, O., Espiritu, R., Lauretta, D. (2026). OSIRIS-REx Altimetry Working Group Shape Model Bundle V1.0, urn:nasa:pds:orex.altimetry::1.0 (SPOv54), NASA Planetary Data System. DOI 10.26033/pzcf-qs69, licence CC0-1.0",
+      "tag": "measured",
+      "value": "/data/shapes/bennu-spo-v54.glb"
+    },
     "slope_075_25": {
       "source": "not available: no source in the pipeline yet (no slope-fit rule in the specs)",
       "tag": "measured",
@@ -67,42 +72,41 @@
         0.488796857
       ]
     },
-    "type": "asteroid_procedural"
+    "type": "asteroid_shape"
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b2",
-  "inputs_sha256": "5a9b0acd6b2222a6d48ebc28e956c659f6d435b6c9581ae25ecebb9c92e6f742",
+  "inputs_sha256": "ffa059f36dc4327154473203418e2bf8acd3317bea275504d2c63a3c5b6b463a",
   "render_params": {
-    "alt_text": "101955 Bennu (1999 RQ36), Asteroid, 0.484 km across (measured), no visible colour basis, viewed at 14 degrees. Surface relief: illustrative.",
+    "alt_text": "101955 Bennu (1999 RQ36), Asteroid, 0.484 km across (measured), no visible colour basis, viewed at 14 degrees. Surface relief: measured.",
     "generator_version": "p1-b2",
     "haptics": {
       "data": "none",
       "data_tag": "artistic",
-      "params": {
-        "tau": 0.15
-      },
-      "texture": "height",
-      "texture_tag": "artistic"
+      "params": {},
+      "texture": "mesh",
+      "texture_tag": "measured"
     },
     "id": "sbdb-20101955",
     "layers": [
       {
-        "description": "Procedural height field from the seed, style rubble (R6.2, R6.3).",
-        "id": "relief",
+        "description": "Shape model scaled to the diameter on the card (R7.1).",
+        "id": "mesh",
         "requires": [
+          "shape_source",
           "diameter_km"
         ],
-        "tag": "artistic",
-        "tier": 5
+        "tag": "measured",
+        "tier": 1
       },
       {
-        "description": "Surface pushed out by the height map, up to 0.04 of the radius (style rubble, R6.2, R7.2).",
-        "id": "displacement",
+        "description": "Rotation sped up, with the factor shown on screen (R7.1).",
+        "id": "spin",
         "requires": [
-          "diameter_km"
+          "rot_period_h"
         ],
-        "tag": "artistic",
-        "tier": 5
+        "tag": "measured",
+        "tier": 1
       }
     ],
     "lighting": {
@@ -115,22 +119,14 @@
       ]
     },
     "missing": [
-      "ellipsoid",
-      "albedo_map",
+      "material",
       "visible",
       "spherex_ir",
       "spectrum"
     ],
     "scale_m": 242.22,
     "seed": 1304859858,
-    "textures": {
-      "albedo": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/albedo.webp",
-      "height": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/height.png",
-      "height_bin": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/height.bin",
-      "normal": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/normal.png",
-      "relief_amp": 0.04
-    },
-    "type": "asteroid_procedural",
+    "type": "asteroid_shape",
     "view_modes": {
       "spherex_ir": {
         "available": false,
@@ -152,11 +148,5 @@
     }
   },
   "seed": 1304859858,
-  "textures": {
-    "albedo": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/albedo.webp",
-    "height": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/height.png",
-    "height_bin": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/height.bin",
-    "normal": "/data/demo-textures/sbdb-20101955/p1-b2/1304859858/1024x512/normal.png",
-    "relief_amp": 0.04
-  }
+  "textures": null
 }

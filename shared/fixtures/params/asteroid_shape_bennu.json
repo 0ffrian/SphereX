@@ -1,0 +1,69 @@
+{
+  "id": "fixture:asteroid_shape_bennu",
+  "type": "asteroid_shape",
+  "generator_version": "fixture-0",
+  "seed": 23,
+  "scale_m": 242.22,
+  "layers": [
+    {
+      "id": "mesh",
+      "tag": "measured",
+      "tier": 1,
+      "description": "Shape model scaled to the diameter on the card (R7.1).",
+      "requires": [
+        "shape_source",
+        "diameter_km"
+      ]
+    },
+    {
+      "id": "spin",
+      "tag": "measured",
+      "tier": 1,
+      "description": "Rotation sped up, with the factor shown on screen (R7.1).",
+      "requires": [
+        "rot_period_h"
+      ]
+    }
+  ],
+  "lighting": {
+    "mode": "sun",
+    "sun_dir": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "phase_angle_deg": 13.955
+  },
+  "view_modes": {
+    "visible": {
+      "available": false,
+      "badge": "Estimated visible colour",
+      "rgb": null,
+      "source": "class_palette"
+    },
+    "spherex_ir": {
+      "available": false,
+      "badge": "SPHEREx infrared, whole-body average (false colour)",
+      "rgb": null,
+      "source": "spherex_rgb",
+      "channels_um": [
+        3.0,
+        2.0,
+        1.0
+      ]
+    }
+  },
+  "haptics": {
+    "texture": "mesh",
+    "texture_tag": "measured",
+    "data": "none",
+    "data_tag": "artistic",
+    "params": {}
+  },
+  "alt_text": "Synthetic fixture: asteroid with a shape model (101955 Bennu: real shape, size, albedo, class and spin), Asteroid, 0.484 km across (measured), no visible colour basis, viewed at 14 degrees. Surface relief: measured.",
+  "missing": [
+    "material",
+    "visible",
+    "spherex_ir"
+  ]
+}
