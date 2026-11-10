@@ -175,7 +175,9 @@ def test_check_reports_a_corrupt_png(tmp_path: Path) -> None:
 def test_check_keeps_webp_byte_exact(tmp_path: Path) -> None:
     """WebP is not a PNG: a lossless re-save with equal pixels but other bytes still fails."""
     settings, ts, assets = _pack_copy(tmp_path)
-    victim = next(assets.rglob("albedo.webp"))
+    # Largest albedo, picked the same way on every OS: rglob order is the filesystem's,
+    # and a tiny flat albedo can re-save to the very same bytes.
+    victim = max(sorted(assets.rglob("albedo.webp")), key=lambda p: p.stat().st_size)
     data = victim.read_bytes()
     with Image.open(io.BytesIO(data)) as img:
         img.load()

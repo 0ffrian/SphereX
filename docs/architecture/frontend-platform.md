@@ -28,10 +28,10 @@
 
 The budget (frame rate, pixel ratio, mesh, points, textures, displacement, shader cost, quality levels) is owned by [R5.5 and R5.7](../rendering/display-rules.md). D-05 still has the old "render only on change" row; [D-34](../decisions/rendering-motion.md) (pending team confirmation) amends it to also render every frame while a simulation clock runs, and R5.5 follows D-34; Q-64 asks whether R5.7's 60 fps targets replace it. This section keeps only the targets and what has been measured.
 
-- **Event target:** Atish's Asus TUF A15 laptop, desktop browser (Q-132, answers Q-15). Its GPU and browser version are **[verify]** (Atish, with #15); the D-05 budgets are kept until that is measured. The Intel Iris Xe (Zenbook 14X) named in D-05 is no longer the demo machine.
+- **Event target:** Atish's Asus TUF A15 laptop, desktop browser (Q-132, answers Q-15). Its GPU and browser version are **[verify]** (Atish, with #15; the probe report and machine record land in [R11.4](../rendering/reference/a15-checks.md)); the D-05 budgets are kept until that is measured. The Intel Iris Xe (Zenbook 14X) named in D-05 is no longer the demo machine.
 - **After the event:** the realme 14 Pro and a Samsung phone, Android 16 with Chrome, for vibration (D-05, D-08).
 - **Sky texture:** 4096×2048 first, 8192×4096 where the GPU allows (Q-90, A21).
-- **Measured so far:** frame times only in headless Chromium with software rendering (`frontend/e2e`); not on the A15 (Q-107, [rendering/reference/frame-time.md](../rendering/reference/frame-time.md)). Measuring on the A15 is part of #16.
+- **Measured so far:** frame times only in headless Chromium with software rendering (`frontend/e2e`); not on the A15 (Q-107, [rendering/reference/frame-time.md](../rendering/reference/frame-time.md)). Measuring on the A15 is part of #16; results go in [R11.3](../rendering/reference/frame-time.md), run in the order of [R11.4](../rendering/reference/a15-checks.md).
 
 ### A10.2 Running the event build
 

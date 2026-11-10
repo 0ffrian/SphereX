@@ -57,6 +57,8 @@ flowchart TB
       end
       FShaderlab["src/shaderlab + shaderlab.html : dev-only shader harness, not a build input, not in dist/ : no owner named in D-17"]
       FHapticsTest["src/hapticsTestPage + haptics-test.html : dev-only test page, not a build input : Atish"]
+      FGpuProbe["src/gpuProbe + gpu-probe.html : dev-only GPU probe (R11.4), not a build input : Atish"]
+      FPerf["src/perf : adapter report, frame stats, __sxPerf recorder; fixtures build only (R11.4) : Atish"]
     end
 
     Schemas["shared/schemas : object-card.schema.json, render-params.schema.json, shared/fixtures (cards, params, baked textures) : Moon"]

@@ -27,6 +27,7 @@ import { BuildPane } from './build/BuildPane';
 import { SelectedCard } from './build/SelectedCard';
 import { useSelectedBodyLoader } from './build/selectedBody';
 import { Island } from './island/Island';
+import { SoundProvider } from '@/haptics/SoundProvider';
 
 /**
  * A new search opens the object panel (unless it is already open at the spectrum), a marker click
@@ -102,37 +103,39 @@ export function App() {
   const phone = usePhoneWidth();
   const skyHidden = split && phone;
   return (
-    <FlipbookSessionProvider>
-      <div className="sx-screen">
-        <div className="sx-bezel" data-split={split || undefined}>
-          <header className="sx-top">
-            {/* The page heading stays for assistive technology; the brand is not drawn (Q-124). */}
-            <h1 className="sr-only">Shift &amp; Spectrum</h1>
-            <FixtureBanner />
-            <Readout />
-          </header>
-          <div className="sx-search-slot">
-            <SearchBar />
-          </div>
-          <ToolRail />
-          <main className="sx-view" aria-label="Sky view" data-split={split || undefined}>
-            <div className="sx-sky-slot" inert={skyHidden || undefined}>
-              <SkyPane>
-                <SelectedCard />
-                <Panels />
-              </SkyPane>
+    <SoundProvider>
+      <FlipbookSessionProvider>
+        <div className="sx-screen">
+          <div className="sx-bezel" data-split={split || undefined}>
+            <header className="sx-top">
+              {/* The page heading stays for assistive technology; the brand is not drawn (Q-124). */}
+              <h1 className="sr-only">Shift &amp; Spectrum</h1>
+              <FixtureBanner />
+              <Readout />
+            </header>
+            <div className="sx-search-slot">
+              <SearchBar />
             </div>
-            {split && <BuildPane />}
-          </main>
-          {/* The flipbook transport belongs to the flipbook: it steps aside in the split view. */}
-          <div className="sx-transport-slot" inert={split || undefined}>
-            <Transport />
+            <ToolRail />
+            <main className="sx-view" aria-label="Sky view" data-split={split || undefined}>
+              <div className="sx-sky-slot" inert={skyHidden || undefined}>
+                <SkyPane>
+                  <SelectedCard />
+                  <Panels />
+                </SkyPane>
+              </div>
+              {split && <BuildPane />}
+            </main>
+            {/* The flipbook transport belongs to the flipbook: it steps aside in the split view. */}
+            <div className="sx-transport-slot" inert={split || undefined}>
+              <Transport />
+            </div>
+            {/* Issue #66 (mock-up `.island-wrap`): the island, over everything in the bezel. */}
+            <Island />
           </div>
-          {/* Issue #66 (mock-up `.island-wrap`): the island, over everything in the bezel. */}
-          <Island />
+          <LiveAnnouncer />
         </div>
-        <LiveAnnouncer />
-      </div>
-    </FlipbookSessionProvider>
+      </FlipbookSessionProvider>
+    </SoundProvider>
   );
 }

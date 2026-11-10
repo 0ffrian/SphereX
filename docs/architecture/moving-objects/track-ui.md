@@ -39,7 +39,7 @@ The honesty toggle is the app's global one (D-21); Track adds no second toggle. 
 ### A20.3 Time
 
 - **Frame and exposure.** A **frame** is one detector's image. An **exposure** is the frames taken at one midpoint: 2 on Eros, D1 and D4 at once ([A17.1](area-backend.md#a171-area-and-frames-framespy), A16.6). Eros has 4 exposures per visit, so its window holds 8 exposures and 16 frames. The slider steps and snaps per exposure; the spectrum, the zoom facts and the refusals count frames.
-- **Range:** the Track window (A19.3; Eros: 20 Mar 2026 00:00 to 22 Mar 2026 00:00 UTC).
+- **Range:** the Track window (A19.3; Eros: 20 Mar 2026 00:00 to 21 Mar 2026 12:00 UTC, Proposed (Q-184)).
 - **Exposure ticks** on the slider, one per exposure, made of one mark per frame (the marks share a time, so they are stacked), each in its frame's wavelength colour (`derived`, Q-27); a refused frame's mark is a grey cross.
 - **Play/pause:** inside a visit, 1 min of data per second (a 6.4 min visit takes about 6 s); the gap between visits is jumped with the note "Next visit, 24.4 h later". **Previous** and **next exposure** buttons. Releasing the slider within 4 px of a tick snaps to that exposure.
 - **Clock:** date and time UTC of the slider.
