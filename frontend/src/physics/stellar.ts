@@ -177,12 +177,76 @@ export interface SpotGroup {
   pores: { centre: Vec3; radiusRad: number }[];
 }
 
+/**
+ * Typical main-sequence (dwarf) rows: [Teff K, mass Msun, radius Rsun], hottest first. Mirrors the
+ * mean dwarf sequence of Pecaut and Mamajek 2013 (ApJS 208, 9, Table 5, online version 2022.04.16;
+ * the Teff column is the one in `backend/assets/pm13_dwarf_teff.toml`). The mass and radius columns
+ * were typed from memory, rounded: [verify] every number against the table before relying on them.
+ * Used only to fill a missing mass or radius for the surface physics (D-32 tier chain, tag
+ * `model_dependent`); never for the scale bar or a size label (Q-33). Dwarfs only: a pre-main-
+ * sequence star (T Tauri) is larger and cooler for its mass, so the assumption says so.
+ */
+export const MS_TABLE: readonly (readonly [number, number, number])[] = [
+  [31400, 17.5, 7.4], // B0V
+  [20600, 9.0, 5.0], // B2V
+  [15700, 5.9, 3.9], // B5V
+  [12300, 3.8, 3.0], // B8V
+  [9700, 2.18, 2.19], // A0V
+  [8080, 1.86, 1.7], // A5V
+  [7220, 1.61, 1.62], // F0V
+  [6510, 1.33, 1.4], // F5V
+  [5920, 1.06, 1.1], // G0V
+  [5770, 1.0, 1.0], // G2V
+  [5660, 0.98, 0.95], // G5V
+  [5280, 0.88, 0.85], // K0V
+  [5040, 0.82, 0.78], // K2V
+  [4410, 0.7, 0.72], // K5V
+  [4070, 0.63, 0.65], // K7V
+  [3850, 0.57, 0.59], // M0V
+  [3660, 0.5, 0.5], // M1V
+  [3560, 0.44, 0.44], // M2V
+  [3430, 0.37, 0.36], // M3V
+  [3210, 0.23, 0.27], // M4V
+  [3060, 0.162, 0.196], // M5V
+  [2810, 0.102, 0.137], // M6V
+  [2680, 0.09, 0.12], // M7V
+  [2570, 0.085, 0.11], // M8V
+];
+
+/** Log-log interpolation of column `y` against column `x` of MS_TABLE; clamps at the ends. */
+function msInterp(x: number, xi: 0 | 1 | 2, yi: 0 | 1 | 2): number {
+  const rows = [...MS_TABLE].sort((a, b) => a[xi] - b[xi]);
+  if (x <= rows[0]![xi]) return rows[0]![yi];
+  const last = rows[rows.length - 1]!;
+  if (x >= last[xi]) return last[yi];
+  for (let i = 1; i < rows.length; i++) {
+    const a = rows[i - 1]!;
+    const b = rows[i]!;
+    if (x <= b[xi]) {
+      const t = Math.log(x / a[xi]) / Math.log(b[xi] / a[xi]);
+      return a[yi] * Math.pow(b[yi] / a[yi], t);
+    }
+  }
+  return last[yi];
+}
+export const massFromTeff = (teffK: number): number => msInterp(teffK, 0, 1);
+export const radiusFromTeff = (teffK: number): number => msInterp(teffK, 0, 2);
+/** Mass from a radius by the main-sequence relation; null when the radius is outside the dwarf range (a giant). */
+export function massFromRadius(radiusRsun: number): number | null {
+  const radii = MS_TABLE.map((r) => r[2]);
+  if (radiusRsun > Math.max(...radii) * 1.5 || radiusRsun < Math.min(...radii) / 1.5) return null;
+  return msInterp(radiusRsun, 2, 1);
+}
+/** The Sun's Rossby number: assumed for a star with no rotation period (inferred_from_analog). */
+export const sunRossby = (): number => SUN_ROTATION_DAYS / convectiveTurnoverDays(1);
+
 export interface StellarInput {
   teffK: number;
-  radiusRsun: number;
-  /** Not on the card yet (ASSUMPTION: no mass field for stars); null refuses the physics. */
+  /** Radius from the card, or null: then it is taken from Teff for the surface physics only. */
+  radiusRsun: number | null;
+  /** Mass from the card or literature, or null: then from the radius, else from Teff (main sequence). */
   massMsun: number | null;
-  /** Rotation period in days; null refuses the field and spots. */
+  /** Rotation period in days, or null: then the Sun's Rossby number is assumed. */
   rotationPeriodD: number | null;
   seed: number;
   /** Caps the drawn groups (the `low` quality tier uses fewer). Default MAX_GROUPS_DRAWN. */
@@ -215,6 +279,11 @@ export interface StellarModel {
   cyclePhase: number;
   /** Centre latitude of the group belt now, radians. */
   beltLatRad: number;
+  /**
+   * Inputs that were filled in by the tier chain (D-32), in plain words, with what they came from.
+   * Empty when the card gave all three. The card itself is never written.
+   */
+  assumed: { mass?: string; radius?: string; rotation?: string };
   /** Tags of every value above. */
   tags: Readonly<Record<string, StellarTag>>;
   /** Reasons a quantity was not computed (plain words). */
@@ -224,6 +293,7 @@ export interface StellarModel {
 export interface StellarRefusal {
   model: null;
   missing: string[];
+  notes?: string[];
 }
 
 const TAGS: Record<string, StellarTag> = {
@@ -375,16 +445,41 @@ export function buildSpotGroups(
  * it) and refuses the field and spots, with a note.
  */
 export function stellarModel(input: StellarInput): { model: StellarModel } | StellarRefusal {
-  const missing: string[] = [];
   const ok = (x: number | null | undefined): x is number =>
     typeof x === 'number' && Number.isFinite(x) && x > 0;
-  if (!ok(input.teffK)) missing.push('teff_K');
-  if (!ok(input.radiusRsun)) missing.push('radius_rsun');
-  if (!ok(input.massMsun)) missing.push('mass_msun');
-  if (missing.length) return { model: null, missing };
+  // Only Teff is required: everything else falls down the tier chain (D-32).
+  if (!ok(input.teffK)) return { model: null, missing: ['teff_K'] };
   const teffK = input.teffK;
-  const radiusRsun = input.radiusRsun;
-  const massMsun = input.massMsun as number;
+  const assumed: StellarModel['assumed'] = {};
+  const PM13 = 'a typical main-sequence star (Pecaut and Mamajek 2013, [verify])';
+  let radiusRsun: number;
+  if (ok(input.radiusRsun)) radiusRsun = input.radiusRsun;
+  else {
+    radiusRsun = radiusFromTeff(teffK);
+    assumed.radius = `radius ${radiusRsun.toFixed(2)} Rsun from the temperature of ${PM13}, used only for the surface physics, not for the size shown`;
+  }
+  let massMsun: number;
+  if (ok(input.massMsun)) massMsun = input.massMsun;
+  else if (ok(input.radiusRsun)) {
+    const m = massFromRadius(input.radiusRsun);
+    if (m === null)
+      return {
+        model: null,
+        missing: ['mass_msun'],
+        notes: ['The radius is outside the dwarf range, so no mass is assumed for a giant.'],
+      };
+    massMsun = m;
+    assumed.mass = `mass ${massMsun.toFixed(2)} Msun from the radius of ${PM13}`;
+  } else {
+    massMsun = massFromTeff(teffK);
+    assumed.mass = `mass ${massMsun.toFixed(2)} Msun from the temperature of ${PM13}`;
+  }
+  let rotationPeriodD: number;
+  if (ok(input.rotationPeriodD)) rotationPeriodD = input.rotationPeriodD;
+  else {
+    rotationPeriodD = sunRossby() * convectiveTurnoverDays(massMsun);
+    assumed.rotation = `rotation period ${rotationPeriodD.toFixed(1)} days: the Sun's Rossby number (${sunRossby().toFixed(2)}) assumed, so the field and spots are a Sun-like guess`;
+  }
 
   const g = (GM_SUN * massMsun) / Math.pow(R_SUN_M * radiusRsun, 2);
   const logg = Math.log10(g * 100);
@@ -418,12 +513,8 @@ export function stellarModel(input: StellarInput): { model: StellarModel } | Ste
     notes.push(
       'The magnetic-field fit covers dwarf stars only, so no field and no spots are drawn for a giant.',
     );
-  } else if (!ok(input.rotationPeriodD)) {
-    notes.push(
-      'The rotation period is not known, so the Rossby number, field and spots are not computed.',
-    );
   } else {
-    rossby = input.rotationPeriodD / convectiveTurnoverDays(massMsun);
+    rossby = rotationPeriodD / convectiveTurnoverDays(massMsun);
     fieldG = meanFieldG(rossby);
     coverage =
       Math.min(COVERAGE_MAX, SUN_COVERAGE * Math.pow(fieldG / sunFieldG(), COVERAGE_EXPONENT)) *
@@ -439,12 +530,36 @@ export function stellarModel(input: StellarInput): { model: StellarModel } | Ste
     nReal = built.nReal;
     tags.rossby = TAGS.rossby!;
     tags.field = TAGS.field!;
+    if (assumed.rotation) {
+      const a = `${assumed.rotation}`;
+      tags.rossby = { ...TAGS.rossby!, tag: 'inferred_from_analog', assumption: a };
+      tags.field = { ...TAGS.field!, tag: 'inferred_from_analog', assumption: a };
+    }
     tags.coverage = TAGS.coverage!;
     tags.groups = TAGS.groups!;
   }
 
+  // A mass or radius from the table weakens everything built on gravity to model_dependent.
+  if (assumed.mass || assumed.radius) {
+    const a = [assumed.mass, assumed.radius].filter(Boolean).join('; ');
+    tags.gravity = { ...TAGS.gravity!, tag: 'model_dependent', assumption: a };
+  }
+  if (assumed.mass)
+    tags.mass = {
+      tag: 'model_dependent',
+      assumption: assumed.mass,
+      cite: 'Pecaut and Mamajek 2013 [verify]',
+    };
+  if (assumed.radius)
+    tags.radius = {
+      tag: 'model_dependent',
+      assumption: assumed.radius,
+      cite: 'Pecaut and Mamajek 2013 [verify]',
+    };
+
   return {
     model: {
+      assumed,
       teffK,
       radiusRsun,
       massMsun,

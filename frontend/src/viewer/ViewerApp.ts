@@ -1017,6 +1017,44 @@ export class ViewerApp {
     zoomControls(this.controls, direction);
   }
 
+  private closeUpPaused = false;
+
+  /**
+   * Issue #71 stream C: the star close-up. Moves the camera to look straight down at a spot of the
+   * star's surface (latitude and longitude in the body frame), at a distance that makes the window
+   * `halfWidth` star radii wide, and holds the spin still so the spot stays in view. Null returns
+   * to the framed view and lifts only a pause this call made. No effect without a star surface.
+   */
+  setStarCloseUp(t: { latRad: number; lonRad: number; halfWidth: number } | null): void {
+    if (this.disposed) return;
+    if (t === null) {
+      this.controls.minDistance = 1.5;
+      this.controls.reset();
+      if (this.closeUpPaused) this.setSpinPaused(false);
+      this.closeUpPaused = false;
+      this.requestRender();
+      return;
+    }
+    const local: [number, number, number] = [
+      Math.cos(t.latRad) * Math.cos(t.lonRad),
+      Math.sin(t.latRad),
+      Math.cos(t.latRad) * Math.sin(t.lonRad),
+    ];
+    if (!this.spinPaused) {
+      this.setSpinPaused(true);
+      this.closeUpPaused = true;
+    }
+    const w = this.onScreen?.starDirToWorld(local);
+    if (!w) return;
+    // Vertical field of view is 40 degrees: half the window at the surface is (d - 1) tan 20 deg.
+    const d = 1 + t.halfWidth / Math.tan((20 * Math.PI) / 180);
+    this.controls.minDistance = Math.min(1.5, d);
+    this.camera.position.set(w[0] * d, w[1] * d, w[2] * d);
+    this.controls.target.set(0, 0, 0);
+    this.controls.update();
+    this.requestRender();
+  }
+
   /** R5.6 `R` key: back to the starting view (and the body's own turn back to none). */
   resetView(): void {
     if (this.disposed) return;
