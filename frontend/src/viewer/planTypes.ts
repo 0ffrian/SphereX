@@ -5,7 +5,8 @@ import type { CometEpoch, ObjectCard, ObjectType, RenderParams, Tag } from '@/co
 import type { HonestyState } from './honesty';
 import type { LightingPlan } from './lighting';
 import type { Motion } from './motion/motion';
-import type { StarRates } from './bodies/starModel';
+import type { StarRates, StarSurfaceConfig } from './bodies/starModel';
+import type { StarColourView, StarScale, StellarModel } from '@/physics/stellar';
 import type { GasSwitches } from './renderers/shaderSpec';
 import type { Overrides } from './sliders';
 
@@ -270,6 +271,21 @@ export interface StarSurfacePlan {
   strands: boolean;
   glow: boolean;
   rates: StarRates;
+  /**
+   * Issue #71 stream C: the physical surface model (cells, field, spot groups) and the config that
+   * draws it, or null when the card lacks mass (placeholder look, `STAR_SURFACE`). Stream G reads
+   * `physics.groups` for the flare sites.
+   */
+  physics: StellarModel | null;
+  config: StarSurfaceConfig | null;
+  /** Colour view and whole-star scale (D-36); also set from `PlanContext`. */
+  colourView: StarColourView;
+  scale: StarScale;
+  /** Share of cells visible at this scale (0..1) and the cells across one radius drawn. */
+  cellsAcross: number;
+  granuleVisibility: number;
+  /** True when the cells are drawn larger than real (the layer is `artistic`). */
+  cellsEnlarged: boolean;
 }
 
 /**
@@ -381,6 +397,9 @@ export interface PlanContext {
    * displacement is not drawn, so the plan refuses it with a reason instead of listing it (Q-117).
    */
   qualityTier?: 'high' | 'medium' | 'low';
+  /** Issue #71 stream C: colour view of a star (default `true`) and its whole-star scale (default `enlarged`). */
+  starColour?: StarColourView;
+  starScale?: StarScale;
   /**
    * D-27 slider overrides. Only the gas giant legend reads them (a slider sets the drawn band
    * count or flattening, so the legend names it `artistic`). Absent: no slider is set.

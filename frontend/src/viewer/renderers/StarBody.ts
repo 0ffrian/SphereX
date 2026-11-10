@@ -18,6 +18,7 @@ import {
   regionsAt,
   smooth01,
   STAR_SURFACE,
+  type StarSurfaceConfig,
   type FlareState,
   type RegionState,
 } from '../bodies/starModel';
@@ -52,6 +53,7 @@ export class StarBody {
   readonly group = new Group();
   /** The rotating frame: sphere, loops and glow turn together. */
   readonly spin = new Group();
+  private readonly cfg: StarSurfaceConfig;
   private readonly mat: StarMaterial;
   private readonly loops: LoopMesh[] = [];
   private readonly geometry: SphereGeometry;
@@ -64,6 +66,7 @@ export class StarBody {
     private readonly star: StarSurfacePlan,
     o: StarBodyOptions,
   ) {
+    this.cfg = star.config ?? STAR_SURFACE;
     this.group.scale.set(o.axes[0], o.axes[1], o.axes[2]);
     this.group.add(this.spin);
     this.mat = buildStarMaterial({
@@ -76,12 +79,17 @@ export class StarBody {
       spots: star.spots,
       faculae: star.faculae,
       flares: star.flares,
+      cfg: this.cfg,
+      colourView: star.colourView,
+      cellsAcross: star.cellsAcross,
+      granuleVisibility: star.granuleVisibility,
+      convection: star.physics ? star.physics.convection : 1,
     });
     this.geometry = new SphereGeometry(1, o.segments[0], o.segments[1]);
     this.spin.add(new Mesh(this.geometry, this.mat.material));
 
     if (star.prominences) {
-      for (let s = 0; s < STAR_SURFACE.regionCount; s++) {
+      for (let s = 0; s < this.cfg.regionCount; s++) {
         const loop = buildLoopMesh(star.seed, s, star.strands ? STRANDS_FULL : STRANDS_PLAIN);
         this.loops.push(loop);
         this.spin.add(loop.mesh);
@@ -129,10 +137,8 @@ export class StarBody {
     const pair = omega > 0 ? phasePair(tSpin, period) : { a: 0, b: period / 2, w: 0 };
     const churn = (tau: number) => (spinPeriod > 0 ? (CHURN_PER_ROT * tau) / spinPeriod : 0);
 
-    const regions = regionsAt(seed, tSpots, rates, STAR_SURFACE, tSpin);
-    const flares = this.star.flares
-      ? flaresAt(seed, tFlares, tSpots, rates, STAR_SURFACE, tSpin)
-      : [];
+    const regions = regionsAt(seed, tSpots, rates, this.cfg, tSpin);
+    const flares = this.star.flares ? flaresAt(seed, tFlares, tSpots, rates, this.cfg, tSpin) : [];
     this.lastRegions = regions;
     this.lastFlares = flares;
     this.mat.update({
