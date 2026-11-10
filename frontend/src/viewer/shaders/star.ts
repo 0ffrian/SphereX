@@ -65,7 +65,20 @@ export interface StarShaderOptions {
   granuleVisibility?: number;
   /** Share of the surface with convection, 0..1 (hot stars are smooth). Default 1. */
   convection?: number;
+  /**
+   * True colour only (Q-290): the colour of the same star 20% cooler (Planck, derived), which the dim
+   * cell lanes take on, as in the prototype where brightness follows temperature.
+   */
+  coolTint?: readonly [number, number, number];
+  /** True colour only: the effective temperature, for the intensity law I = (T/Teff)^beta, beta = 26180/Teff. */
+  teffK?: number;
 }
+
+/** True colour exposure: the prototype draws the disc centre at 0.64 of the Planck colour (display value). */
+export const TRUE_COLOUR_EXPOSURE = 0.64;
+/** Temperature swing of the cells (0.24 peak to peak, as the prototype) and of the mottling, true colour (display values). */
+const TRUE_DT_GRAIN = 0.24;
+const TRUE_DT_MOTTLE = 0.04;
 
 /** One frame of what the shader draws: the CPU's answer for time t. */
 export interface StarFrame {
@@ -127,14 +140,23 @@ export function buildStarMaterial(opts: StarShaderOptions): StarMaterial {
   const p = normalize(positionLocal);
   const mu = saturate(normalView.z);
   const sin2lat = p.y.mul(p.y);
-  let col: any = vec3(opts.tint[0], opts.tint[1], opts.tint[2]).mul(opts.emissive);
+  const trueView = opts.colourView === 'true';
+  const exposure = trueView ? TRUE_COLOUR_EXPOSURE : 1;
+  let col: any = vec3(opts.tint[0], opts.tint[1], opts.tint[2]).mul(opts.emissive).mul(exposure);
+  // True colour (prototype): cells are temperature variations dT, so a bright cell is also whiter and
+  // a dark lane cooler and redder. The brightness follows I = (1 + dT)^beta.
+  let dT: any = float(0);
+  let limbI: any = float(1);
 
   // Limb darkening (R7.5, model_dependent).
   // A crisp edge (R7.5, Q-107): the linear law plus a short steeper fall in the last few percent of
   // the radius, so the limb reads as a dark rim instead of fading into the glow.
   if (opts.limbU !== null) {
-    col = col.mul(float(1).sub(float(opts.limbU).mul(float(1).sub(mu))));
-    col = col.mul(mix(float(0.3), float(1), smoothstep(0.0, 0.3, mu)));
+    const limb = float(1)
+      .sub(float(opts.limbU).mul(float(1).sub(mu)))
+      .mul(mix(float(0.3), float(1), smoothstep(0.0, 0.3, mu)));
+    col = col.mul(limb);
+    limbI = limb;
   }
 
   // Granulation ---------------------------------------------------------------------------------
@@ -189,11 +211,23 @@ export function buildStarMaterial(opts: StarShaderOptions): StarMaterial {
       }
       mottle = mottle.div(norm);
     }
-    col = col.mul(
-      float(1)
-        .add(grain.mul(2 * GRAIN_AMP * visible))
-        .add(mottle.mul(MOTTLE_AMP * conv)),
-    );
+    const gran = float(1)
+      .add(grain.mul(2 * GRAIN_AMP * visible))
+      .add(mottle.mul(MOTTLE_AMP * conv));
+    if (trueView && opts.coolTint && opts.teffK) {
+      dT = grain.mul(TRUE_DT_GRAIN * visible).add(mottle.mul(TRUE_DT_MOTTLE * conv));
+    } else {
+      col = col.mul(gran);
+    }
+  }
+  if (trueView && opts.coolTint && opts.teffK) {
+    const beta = Math.min(9, Math.max(1, 26180 / opts.teffK));
+    const t1 = float(1).add(dT);
+    const q = t1.mul(pow(limbI, 1 / beta));
+    const k = saturate(q.sub(0.8).div(0.2));
+    const cool = vec3(opts.coolTint[0], opts.coolTint[1], opts.coolTint[2]);
+    const hot = vec3(opts.tint[0], opts.tint[1], opts.tint[2]);
+    col = mix(cool, hot, k).mul(opts.emissive).mul(exposure).mul(pow(t1, beta)).mul(limbI);
   }
 
   // Observatory view (D-36): false-colour extreme ultraviolet in the style of solar observatories

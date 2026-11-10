@@ -26,7 +26,7 @@ import {
   type PlanInput,
 } from '../planCommon';
 import type { RenderPlan } from '../planTypes';
-import { withGasWorldMotion } from './gasWorldInput';
+import { gasWorldInput, withGasWorldLayerTags, withGasWorldMotion } from './gasWorldInput';
 import { processOf, resolveMotion, TIER_OF_TAG, weakestTag } from '../motion/motion';
 import { listMotion, offerLayer, spinPlanOf, viewerLayer } from '../motion/planMotion';
 import {
@@ -35,6 +35,7 @@ import {
   gasHiddenText,
   kindHasPlainSphere,
   NO_GAS_LAYERS,
+  DISTANCE,
   resolveShaderSpec,
   shaderDistance,
   linearToCss,
@@ -104,7 +105,9 @@ function drawnAs(
   };
 }
 
-export function planShaderKind(input: PlanInput): RenderPlan {
+export function planShaderKind(rawInput: PlanInput): RenderPlan {
+  // Issue #71 (Q-291): a solved gas world's storms and turbulence carry the solver's tags.
+  const input: PlanInput = { ...rawInput, params: withGasWorldLayerTags(rawInput.card, rawInput.params) };
   const b = new PlanBuilder(input);
   const { card, params, ctx } = input;
   // What moves, by the tier chain (R5.7, D-32): spin, jets, storms, clouds.
@@ -424,7 +427,9 @@ export function planShaderKind(input: PlanInput): RenderPlan {
           pattern,
           gas,
           plain,
-          distance: shaderDistance(spec),
+          // Issue #71: Saturn's measured rings (GasWorld) are wider than the sphere, so the camera backs off.
+          distance:
+            gasWorldInput(card, params)?.reference === 'sat' ? DISTANCE.gasRings : shaderDistance(spec),
         }
       : null,
     relief: 'illustrative',

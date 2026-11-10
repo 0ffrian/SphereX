@@ -54,7 +54,7 @@ describe('plasma on the star', () => {
     const t = plan({ starColour: 'true' });
     expect(t.star?.plasma).toBe(true);
     expect(body(t).plasma!.group.visible).toBe(false);
-    const p = plan();
+    const p = plan({ starColour: 'enhanced' });
     const b = body(p);
     expect(b.plasma!.group.visible).toBe(true);
     b.plasma!.setLines(false);

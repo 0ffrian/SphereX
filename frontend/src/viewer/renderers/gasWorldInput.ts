@@ -1,8 +1,8 @@
 // Issue #71 stream E: which gas giants run as a solved world, and with what input. Pure (no three.js)
 // so the plan can use it. A missing value refuses the world and the plain ShaderBody draws (never blank).
 import type { ObjectCard, RenderParams } from '@/contract';
-import { gasModel, PACE_DAY_S_PER_S, PACE_SLOW_S_PER_S, type GasInput, type ReferenceGasId } from '@/physics/gasDynamics';
-import { STILL_MOTION, type Motion, type ProcessPlan } from '../motion/motion';
+import { gasLayerTags, gasModel, PACE_DAY_S_PER_S, PACE_SLOW_S_PER_S, type GasInput, type ReferenceGasId } from '@/physics/gasDynamics';
+import { STILL_MOTION, TIER_OF_TAG, type Motion, type ProcessPlan } from '../motion/motion';
 import { sliderValue, type Overrides } from '../sliders';
 
 /**
@@ -97,5 +97,38 @@ export function withGasWorldMotion(
   return {
     ...(motion ?? STILL_MOTION),
     processes: [...motion.processes.filter((p) => p.id !== 'winds'), winds],
+  };
+}
+
+/**
+ * Issue #71 (Q-291, Moon to confirm): the storms and the turbulence of a solved gas world are the
+ * result of the solver (flow) and of the named storms of the planet, so they carry those tags
+ * (`gasLayerTags`), not the backend's `artistic` for a seeded look. They then show from
+ * "+ Estimated", each with its own tag; "Measured only" still hides them. Colour is unchanged.
+ * Returns the params unchanged when the giant does not run as a solved world.
+ */
+export function withGasWorldLayerTags(card: ObjectCard, params: RenderParams): RenderParams {
+  const input = gasWorldInput(card, params);
+  if (!input) return params;
+  const tags = gasLayerTags(input.reference);
+  const pick = (id: string) => tags.find((t) => t.id === id);
+  const of: Record<string, ReturnType<typeof pick>> = { storms: pick('storms'), turbulence: pick('flow') };
+  return {
+    ...params,
+    layers: params.layers.map((l) => {
+      const t = of[l.id];
+      if (!t || l.tag !== 'artistic') return l;
+      const basis = t.assumption ?? t.source;
+      return {
+        ...l,
+        tag: t.tag,
+        tier: TIER_OF_TAG[t.tag],
+        description:
+          l.id === 'storms'
+            ? `Named storms placed where they are observed, or from the deformation radius. ${basis}. Their exact shape is a simulation.`
+            : `Turbulence of the solved winds. ${basis}. A simulation, not a photograph.`,
+        assumed: { basis: t.assumption ?? t.source },
+      };
+    }),
   };
 }
