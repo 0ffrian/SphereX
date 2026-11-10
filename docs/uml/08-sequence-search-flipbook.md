@@ -214,6 +214,13 @@ sequenceDiagram
       end
     end
   end
+  opt "Build it" on a demo-pack row (Q-164, issue #68)
+    UI->>API: GET /v1/objects/{id}/card and /render-params
+    API->>API: AssetStore reads backend/assets/TYPE/ID.json first (no catalogue call, no frames job)
+    API-->>UI: Saved asset, header X-SX-Asset-Status: saved, texture URLs under /data/demo-textures
+    UI->>API: GET /data/demo-textures/ID/VERSION/SEED/1024x512/FILE (read-only static files, also under SX_OFFLINE=1)
+    UI->>UI: Build pane shows "Built ahead of time from the same data"
+  end
 ```
 
 ## Notes
@@ -221,7 +228,9 @@ sequenceDiagram
 - Endpoints follow D-16. Every endpoint is keyed by the object id that `resolve` returns. There is no separate flipbook endpoint: the flipbook plays the frame list in order.
 - Small-body names are numbered asteroids (`433 Eros`), provisional designations (`2024 AB`), comets (`C/…`) and interstellar objects (`3I/ATLAS`) (D-19).
 - Cache order (D-25): cache, then a live call with a timeout and retries with backoff, then an older cached entry, then refuse. There is no expiry for the event. A refused layer goes in `missing`.
-- All five test targets (Barnard's Star, Epsilon Indi B, WISE 0855, RW Aurigae, R Draconis) and the demo objects are pre-fetched, so the demo runs with `SX_OFFLINE=1` and always hits the cache (D-25).
+- The targets in `backend/targets.toml` (groups `test`, `demo` and `fixture`; a `frames = false` target is catalogue answers only) are pre-fetched by `scripts.prefetch` (all groups unless `--group` narrows it), so the demo runs with `SX_OFFLINE=1` and always hits the cache (D-25). The API's start-up warm-up (`SX_PREFETCH_ON_START`, `core/warm.py`) covers only the groups in `SX_PREFETCH_GROUPS` (default `demo`) and skips `frames = false` targets.
+- Search combobox (issue #68, Q-161; `app/search/SearchBar.tsx`, R9): the list over `demoTargets` opens on focus, on "/" (`shell/shortcuts.ts`) or on typing. It filters on the name and the aliases (`filterTargets`, ignoring case and punctuation). Up and Down move `aria-activedescendant`, Enter on a highlighted row picks it, Escape closes the list and keeps the text. A pick calls `skySearch({q: name, kind: 'name', origin: 'input'})`. With no match the list says "No demo object matches. Press Enter to search the catalogues."; Enter then submits the typed text through `parseQuery` (a name or RA, Dec), so any SIMBAD or SBDB name still works.
+- The demo pack (Q-164): the 16 rows of the search list are built ahead of time by `backend/scripts/bake_demo_pack.py` from the same pipeline and committed (cards, render params and 1024x512 maps; no frames, no spectrum). The class labels in the list come from those cards. A row's frames still come from the D-25 cache, so the flipbook needs `scripts.prefetch` (or the cache backup) for a stage demo; "Build it" does not.
 - A `candidate` source gets one haptic tick per frame where it is detected (rendering doc §8.5). That path is not drawn here.
 - Rainbow Trails is built after basic playback works (D-28). As built in M1 (issue #3), the dot colour is a false colour, hue = wavelength, tagged `derived` with that formula, so it wears the Estimated badge. In "Measured only" (D-21) the dots are drawn in one colour. The mode is offered only for a `moving` object whose frames share a north-up grid. The frame search for real movers is built (issue #26, Q-21); whether its frames meet that grid condition is not checked yet. The M1 UI has no honesty toggle yet, so the monochrome state is not reachable from the page. Tagging question: Q-27.
 - Sky pick (prototype, Q-89, Q-91): a click that moved under 5 px is a pick. The position under the pointer is computed analytically from the camera ray (`viewer/sky/skyMath.ts`), written as `ra,dec` with 6 decimals and searched with origin `sky`; from there it is an ordinary RA/Dec search. The picked position is user input, tagged `derived` (Estimated badge). The `/v1/sky` endpoints are open as Q-87 and serve only the local copy of the survey tiles (D-35).

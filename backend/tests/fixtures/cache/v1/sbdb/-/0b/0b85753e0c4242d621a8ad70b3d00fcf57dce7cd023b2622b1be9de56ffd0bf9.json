@@ -1,0 +1,16 @@
+{
+ "body_sha256": "acb2dfad5d41c91dcf9ce37ab381cef1f9fa422b9fcfe4ca6378e06b5f769a5f",
+ "body_size": 4417,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-09T18:47:09.676Z",
+ "key": {
+  "query": {
+   "phys_par": "1",
+   "sstr": "1I/2017 U1"
+  },
+  "release": "-",
+  "source": "sbdb"
+ },
+ "status": 200,
+ "url": "https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=1I%2F2017+U1&phys-par=1"
+}

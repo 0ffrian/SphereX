@@ -3,6 +3,34 @@
 
 [[model]]
 axes = "glTF +Y up: glTF (x, y, z) = body-fixed (x, z, -y); glTF +Y is the body +Z pole"
+bbox_half_diagonal_km = 3.527
+citation = "R. Gaskell, L. Jorda, C. Capanna, S. Hviid and P. Gutierrez, SPC SHAP5 CARTESIAN PLATE MODEL FOR COMET 67P/C-G 50K PLATES, RO-C-MULTI-5-67P-SHAPE-V2.0:CG_SPC_SHAP5_050K_CART, NASA Planetary Data System and ESA Planetary Science Archive, 2017."
+convex = false
+doi = "10.26007/34vg-8s07"
+extents_km = [5.036, 3.27, 3.701]
+frame = "Cheops frame (CHEOPS_REF_FRAME_V1): body-fixed, +Z on the spin axis, +X set so that Cheops sits at longitude +142.35 deg; pole RA 69.57 +/- 0.35 deg, Dec +64.01 +/- 0.12 deg (J2000); pre-perihelion period 12.4041 +/- 0.0001 h (pre-perihelion only; later states are in SPICE RO/RL-E/M/A/C-SPICE-6-V1.0); origin as given (not recentred), the body centre is not exactly the centre of gravity (SHAP5_MODEL_INFO.ASC)"
+ingest_version = "2"
+licence = "Not stated in the product label; cited through the label's CITATION_DESC (dataset DOI 10.26007/34vg-8s07)"
+lod0 = "/data/shapes/c67p-shap5.glb"
+lod0_sha256 = "1064d1b3eb980c0622af2bd5cbc68dec17ac4b8afad6db4f8bd6bd1235bac414"
+lod1 = "/data/shapes/c67p-shap5.lod1.glb"
+lod1_sha256 = "bad879555c8caaf5e96d0884ba621b075f5b48d3f3a3e6811f8ee2aa02064367"
+lod1_source_member = "cg_spc_shap5_012k_cart.wrl"
+lod1_source_sha256 = "41c20eeb510502868c65148ad89aa3815ffd0c21ec4db0ca929142de1695885e"
+name = "67P/Churyumov-Gerasimenko"
+slug = "c67p-shap5"
+source_member = "cg_spc_shap5_050k_cart.wrl"
+source_sha256 = "3304263aaae23de3a82cdf13f754b3c075a57ccd1bdbe4c80117e01a02859a68"
+source_url = "https://pdssbn.astro.umd.edu/holdings/ro-c-multi-5-67p-shape-v2.0/data/triplate/spc_lam_psi/shap5/cg_spc_shap5_050k_cart.wrl"
+spkid = "1000012"
+triangles_lod0 = 49748
+triangles_lod1 = 11716
+units = "metres in the GLB (source km x 1000)"
+vertices_lod0 = 24876
+vertices_lod1 = 5860
+
+[[model]]
+axes = "glTF +Y up: glTF (x, y, z) = body-fixed (x, z, -y); glTF +Y is the body +Z pole"
 citation = "Gaskell, R.W., Gaskell Eros Shape Model V1.1, urn:nasa:pds:gaskell.ast-eros.shape-model, NASA Planetary Data System."
 convex = false
 doi = "10.26033/d0gq-9427"
@@ -25,3 +53,29 @@ triangles_lod1 = 12288
 units = "metres in the GLB (source km x 1000)"
 vertices_lod0 = 24578
 vertices_lod1 = 6146
+
+[[model]]
+axes = "glTF +Y up: glTF (x, y, z) = body-fixed (x, z, -y); glTF +Y is the body +Z pole"
+bbox_half_diagonal_km = 0.465
+citation = "Daly, M., Barnouin, O., Espiritu, R., Lauretta, D. (2026). OSIRIS-REx Altimetry Working Group Shape Model Bundle V1.0, urn:nasa:pds:orex.altimetry::1.0 (SPOv54), NASA Planetary Data System."
+convex = false
+doi = "10.26033/pzcf-qs69"
+extents_km = [0.568, 0.495, 0.543]
+frame = "Bennu body-fixed frame of the model (no named frame in the label): origin at the centre of mass (OBJ header centroid within 1.4 m of it), +Z the spin axis (positive pole; the axis of largest moment of inertia in the OBJ header); +X and +Y are body-fixed and about 7 deg from the principal axes listed in the OBJ header, not equal to them; pole RA 85.65 deg, Dec -60.17 deg and period 4.296056 h from Lauretta et al. 2019, not from this product; km in the OBJ"
+ingest_version = "2"
+licence = "CC0-1.0"
+lod0 = "/data/shapes/bennu-spo-v54.glb"
+lod0_sha256 = "03f19c337c3aa157069c16b40bbff334134785f076c16f1241ff1cc4393e422e"
+lod1 = "/data/shapes/bennu-spo-v54.lod1.glb"
+lod1_sha256 = "03f19c337c3aa157069c16b40bbff334134785f076c16f1241ff1cc4393e422e"
+name = "101955 Bennu"
+slug = "bennu-spo-v54"
+source_member = "g_06320mm_spo_obj_0000n00000_v054.obj"
+source_sha256 = "705d03b390ecb619083168e2e3a27f9a471398ace8bf542d5a431031c06567a6"
+source_url = "https://doi.org/10.26033/pzcf-qs69"
+spkid = "20101955"
+triangles_lod0 = 49152
+triangles_lod1 = 49152
+units = "metres in the GLB (source km x 1000)"
+vertices_lod0 = 24578
+vertices_lod1 = 24578

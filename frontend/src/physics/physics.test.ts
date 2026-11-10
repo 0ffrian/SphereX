@@ -258,7 +258,10 @@ describe('A7.1 planets', () => {
   });
 
   it('refuses mass-based values when no mass is set (the card has no mass field)', () => {
-    const res = derivePhysics(fixture('planet_water'), {});
+    // The shared planet_water fixture now carries a mass (issue #68 Part 1): take it off.
+    const card = { ...fixture('planet_water') };
+    delete card.mass_mearth;
+    const res = derivePhysics(card, {});
     expect(res.missing).toEqual(
       expect.arrayContaining(['density_g_cm3', 'gravity_m_s2', 'escape_speed_km_s', 'keeps_H2']),
     );

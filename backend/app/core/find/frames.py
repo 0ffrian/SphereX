@@ -44,7 +44,7 @@ from app.cache.store import (
 from app.context import Context
 from app.core.find import moving, png, wcs
 from app.core.find.propagate import propagate
-from app.core.find.resolver import ResolvedObject
+from app.core.find.resolver import ResolvedObject, is_comet
 from app.core.find.version import DERIVATION_VERSION
 from app.timefmt import iso_utc_z, parse_utc
 
@@ -308,7 +308,14 @@ class FrameService:
                 failed=self._recently_failed,
                 mark_failed=self._mark_failed,
             )
-            path = moving.search_path(self.ctx, obj.spkid, cfg=cfg, refresh=refresh, gate=gate)
+            path = moving.search_path(
+                self.ctx,
+                obj.spkid,
+                comet=is_comet(self.ctx, obj),
+                cfg=cfg,
+                refresh=refresh,
+                gate=gate,
+            )
             served, missing, rows = list(path.served), list(path.missing), path.rows
             search_deferred = path.deferred
             path_pos = path.positions

@@ -42,7 +42,14 @@ from typing import Any
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.core.card.assets import Asset, AssetStatus, AssetStore
 from app.core.card.build import SPECTRUM_FIELDS, build_card
-from app.core.card.catalogue import CatalogueData, apply_geometry, fetch_geometry, gather
+from app.core.card.catalogue import (
+    CatalogueData,
+    apply_geometry,
+    fetch_geometry,
+    gather,
+    with_star_data,
+)
+from app.core.card.stars import STAR_TYPES
 from app.core.card.validate import ContractViolation, check_card, check_params
 from app.core.classify import Classification, classify
 from app.core.find import moving
@@ -175,6 +182,8 @@ class ObjectPipeline:
             cls = classify(data.facts)
             if cls.type in GEOMETRY_TYPES:
                 data = apply_geometry(data, f_geom.result())
+            elif cls.type in STAR_TYPES:
+                data = with_star_data(self.ctx, data, obj, cls.type)
         finally:
             fan.shutdown(wait=False)
 
@@ -287,6 +296,13 @@ class ObjectPipeline:
             self.baker.submit(result.card, result.params)
 
     # --- stages 5 and 7 -------------------------------------------------------------------
+
+    def assemble_without_spectrum(
+        self, obj: ResolvedObject, data: CatalogueData, cls: Classification
+    ) -> ObjectResult:
+        """Stage 5 and 7 with no frames: the card and params a live build gives for an object
+        that has no spectrum (used by ``scripts/bake_demo_pack.py``, Q-164)."""
+        return self._assemble(obj, data, cls, None, None, pending=False)
 
     def _assemble(
         self,

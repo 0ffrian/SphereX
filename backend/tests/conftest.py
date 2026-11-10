@@ -98,6 +98,9 @@ def make_settings(cache_dir: Path, **overrides: Any) -> Settings:
         # Issue #41: measure in-thread and bake nothing in the background, unless a test asks.
         "measure_workers": 0,
         "bake_textures": False,
+        # Q-164: the committed demo pack would answer Barnard's Star, WISE 0855 and the other
+        # rows as saved assets. Tests build live unless one asks for the pack (assets_dir=...).
+        "assets_dir": cache_dir / "no-prebaked-assets",
         # The moving-object path search the fixtures were recorded with (issue #26).
         **FIXTURE_MOVING,
     }

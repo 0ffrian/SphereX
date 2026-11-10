@@ -19,6 +19,11 @@ class SbdbHit:
     shortname: str
     kind: str  # an, au, cn, cu (asteroid/comet, numbered/unnumbered)
 
+    @property
+    def is_comet(self) -> bool:
+        """Horizons needs the ``CAP`` flag for a comet (``horizons.command``)."""
+        return self.kind.startswith("c")
+
 
 @dataclass(frozen=True)
 class SbdbAnswer:

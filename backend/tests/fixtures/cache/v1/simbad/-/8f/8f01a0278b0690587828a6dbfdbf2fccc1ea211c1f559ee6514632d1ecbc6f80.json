@@ -1,0 +1,15 @@
+{
+ "body_sha256": "ffe9324fe51627a0e1c4000fda72409415b51cfd9ddf3afff15483a723995dd6",
+ "body_size": 1480,
+ "content_type": "application/json;charset=UTF-8",
+ "fetched_at": "2026-11-09T19:26:57.624Z",
+ "key": {
+  "query": {
+   "ident": "TRAPPIST-1f"
+  },
+  "release": "-",
+  "source": "simbad"
+ },
+ "status": 200,
+ "url": "https://simbad.harvard.edu/simbad/sim-tap/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=json&QUERY=SELECT+basic.main_id%2C+basic.ra%2C+basic.dec%2C+basic.pmra%2C+basic.pmdec%2C+basic.plx_value%2C+basic.otype%2C+basic.sp_type+FROM+ident+JOIN+basic+ON+ident.oidref+%3D+basic.oid+WHERE+ident.id+%3D+%27TRAPPIST-1f%27"
+}

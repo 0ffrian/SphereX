@@ -1,0 +1,61 @@
+// Issue #68, Q-162: a comet whose card names a registered shape model (67P) draws its nucleus from
+// the mesh; the coma stays. Pure plan test: no GPU.
+import { describe, expect, it } from 'vitest';
+import { fixture } from '@/test/sharedFixtures';
+import { defaultContext, planRender } from './renderPlan';
+
+const MESH = '/data/shapes/c67p-shap5.glb';
+
+function cometPlan(withMesh: boolean, failed: string[] = []) {
+  const { card, params } = fixture('comet');
+  card.epochs = ['2025-12'];
+  if (withMesh) {
+    card.shape_source = { value: MESH, tag: 'measured', source: 'SPC SHAP5 (Q-162 test)' };
+    params.layers.push({
+      id: 'mesh',
+      tag: 'measured',
+      tier: 1,
+      description: 'Nucleus drawn from the shape model (R7.3).',
+      requires: ['shape_source', 'nucleus_radius_km_max'],
+    } as (typeof params.layers)[number]);
+  }
+  return planRender(
+    card,
+    params,
+    defaultContext({ honesty: 'artistic', epoch: '2025-12', failed }),
+  );
+}
+
+describe('comet nucleus from a registered mesh (R7.3, Q-162)', () => {
+  it('uses the mesh for the nucleus and keeps the coma', () => {
+    const plan = cometPlan(true);
+    expect(plan.bodies[0]?.meshUrl).toBe(MESH);
+    expect(plan.drawn.some((d) => d.id === 'mesh')).toBe(true);
+    expect(plan.volumes.length).toBeGreaterThan(0);
+  });
+
+  it('a comet without a shape model keeps the plain sphere', () => {
+    const plan = cometPlan(false);
+    expect(plan.bodies[0]?.meshUrl ?? null).toBeNull();
+    expect(plan.missing.some((m) => m.id === 'mesh')).toBe(false);
+  });
+
+  it('does not call a mesh nucleus size an upper limit; a sphere nucleus still does', () => {
+    const mesh = cometPlan(true);
+    expect(mesh.sizeQualifier).toBeNull();
+    expect(mesh.notes.join(' ')).not.toMatch(/upper limit/);
+    expect(mesh.notes.join(' ')).toMatch(/bounding sphere/);
+    const sphere = cometPlan(false);
+    // The fixture comet carries a nucleus size; without a mesh it stays a limit (R7.3).
+    if (sphere.sizeTag !== null) expect(sphere.sizeQualifier).toBe('upper_limit');
+  });
+
+  it('a mesh that failed to load keeps the upper-limit note and qualifier (issue #68 review)', () => {
+    const plan = cometPlan(true, ['mesh']);
+    expect(plan.bodies[0]?.meshUrl ?? null).toBeNull();
+    expect(plan.missing.find((m) => m.id === 'mesh')?.reason).toBe('load');
+    expect(plan.notes.join(' ')).toMatch(/upper limit/);
+    expect(plan.notes.join(' ')).not.toMatch(/bounding sphere/);
+    if (plan.sizeTag !== null) expect(plan.sizeQualifier).toBe('upper_limit');
+  });
+});

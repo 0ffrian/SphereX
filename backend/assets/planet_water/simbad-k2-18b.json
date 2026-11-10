@@ -1,0 +1,122 @@
+{
+  "asset_version": "9",
+  "card": {
+    "host_age_gyr": {
+      "source": "not available: the Exoplanet Archive has no st_age (host star age in Gyr)",
+      "tag": "measured",
+      "value": null
+    },
+    "host_mass_msun": {
+      "err": 0.047,
+      "source": "NASA Exoplanet Archive PSCompPars st_mass (Sarkis et al. 2018)",
+      "tag": "measured",
+      "value": 0.359
+    },
+    "host_radius_rsun": {
+      "err": 0.038,
+      "source": "NASA Exoplanet Archive PSCompPars st_rad (Sarkis et al. 2018)",
+      "tag": "measured",
+      "value": 0.411
+    },
+    "host_teff_K": {
+      "err": 39.0,
+      "source": "NASA Exoplanet Archive PSCompPars st_teff (Sarkis et al. 2018)",
+      "tag": "measured",
+      "value": 3457.0
+    },
+    "id": "simbad-k2-18b",
+    "mass_mearth": {
+      "err": 1.7,
+      "source": "NASA Exoplanet Archive PSCompPars pl_bmasse (Sarkis et al. 2018)",
+      "tag": "measured",
+      "value": 8.92
+    },
+    "name": "K2-18 b",
+    "orbit_au": {
+      "err": 0.0065,
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbsmax (Sarkis et al. 2018)",
+      "tag": "measured",
+      "value": 0.1429
+    },
+    "orbital_period_d": {
+      "err": 0.0001,
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbper (Sarkis et al. 2018)",
+      "tag": "measured",
+      "value": 32.939623
+    },
+    "pm_mas_yr": {
+      "source": "SIMBAD K2-18b (pmra = mu_alpha * cos(delta), pmdec)",
+      "tag": "measured",
+      "value": [
+        -80.479,
+        -133.007
+      ]
+    },
+    "radius_rjup": {
+      "err": 0.019627231746209364,
+      "source": "NASA Exoplanet Archive PSCompPars pl_rade x R_earth / R_Jup (6378.1366 km / 71492 km) (Sarkis et al. 2018)",
+      "tag": "measured",
+      "value": 0.21143881472052817
+    },
+    "teq_K": {
+      "source": "NASA Exoplanet Archive PSCompPars pl_eqt (Sarkis et al. 2018)",
+      "tag": "measured",
+      "value": 284.0
+    },
+    "type": "planet_water"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b2",
+  "inputs_sha256": "ffa059f36dc4327154473203418e2bf8acd3317bea275504d2c63a3c5b6b463a",
+  "render_params": {
+    "alt_text": "K2-18 b, Water planet, 0.211 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
+    "generator_version": "p1-b2",
+    "haptics": {
+      "data": "teq_pulse",
+      "data_tag": "measured",
+      "params": {
+        "maxRateHz": 12.0,
+        "tau": 0.15
+      },
+      "texture": "terrain",
+      "texture_tag": "artistic"
+    },
+    "id": "simbad-k2-18b",
+    "layers": [
+      {
+        "description": "Browser shader surface and shared CPU field (R7.7). Nothing about it is measured.",
+        "id": "surface",
+        "requires": [],
+        "tag": "artistic",
+        "tier": 5
+      }
+    ],
+    "lighting": {
+      "mode": "sun"
+    },
+    "missing": [
+      "spectrum"
+    ],
+    "scale_m": 15116183.742,
+    "seed": 1336235897,
+    "type": "planet_water",
+    "view_modes": {
+      "visible": {
+        "available": true,
+        "badge": "Default (artist's choice)",
+        "rgb": {
+          "source": "artist's neutral default (R7.7, D-02)",
+          "tag": "artistic",
+          "value": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 1336235897,
+  "textures": null
+}

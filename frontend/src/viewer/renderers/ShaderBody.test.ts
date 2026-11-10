@@ -7,7 +7,7 @@ import { ALL_TAGS, ESTIMATED_TAGS } from './bodyRenderer';
 import { ShaderBody } from './ShaderBody';
 import { resolveShaderSpec } from './shaderSpec';
 import { resolveMotion } from '../motion/motion';
-import { fixture } from './fixtures.testutil';
+import { fixture, withoutExoplanetFields } from './fixtures.testutil';
 import type { BodyContext } from './bodyRenderer';
 
 // Small field keeps jsdom tests fast; the real size is covered in fieldGenerator.test.ts.
@@ -96,7 +96,8 @@ describe('ShaderBody', () => {
   });
 
   it('hides artistic layers outside "+ Artistic" (D-21) and shows them again', async () => {
-    const f = fixture('planet_water');
+    // A solar-system body: an exoplanet card also draws its climate pattern from + Estimated.
+    const f = withoutExoplanetFields(fixture('planet_water'));
     const body = await ShaderBody.create(f.card, f.params, {
       ...ctx,
       visibleTags: ['measured', 'derived', 'model_dependent', 'inferred_from_analog'],
@@ -143,7 +144,7 @@ describe('ShaderBody', () => {
 describe('ShaderBody honesty and redraw (review B2, B3, N7)', () => {
   it('defaults to the D-21 "+ Estimated" start state: artistic layers are hidden', async () => {
     for (const k of KINDS.filter((x) => x !== 'gas_giant')) {
-      const f = fixture(k);
+      const f = withoutExoplanetFields(fixture(k));
       const body = await ShaderBody.create(f.card, f.params, {
         fieldSource: async (p) => generateField(p, 64, 32),
       });
@@ -205,7 +206,7 @@ describe('ShaderBody honesty and redraw (review B2, B3, N7)', () => {
   });
 
   it('reports a plain-words status with tags for drawn, hidden and refused (N7)', async () => {
-    const f = fixture('planet_water');
+    const f = withoutExoplanetFields(fixture('planet_water'));
     const drawn = await ShaderBody.create(f.card, f.params, ctx);
     expect(drawn.status.state).toBe('drawn');
     expect(drawn.status.tags).toEqual(['artistic']);
@@ -323,8 +324,9 @@ describe('ShaderBody field and point access for the haptic sources (review N1)',
     const neb = await ShaderBody.create(n.card, n.params, ctx);
     const p = neb.worldToBody([1.35, 0, 0]);
     expect(p[0]).toBeCloseTo(1, 6);
-    // A planet has no tilt: identity.
-    const w = fixture('planet_water');
+    // A planet has no tilt: identity (a solar-system body; a locked exoplanet is posed to face its
+    // star, Part 3e, so its frame is not the world frame).
+    const w = withoutExoplanetFields(fixture('planet_water'));
     const world = await ShaderBody.create(w.card, w.params, ctx);
     expect(world.worldToBody([0.3, 0.4, 0.5])).toEqual([0.3, 0.4, 0.5]);
   });

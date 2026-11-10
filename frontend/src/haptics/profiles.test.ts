@@ -104,13 +104,27 @@ const TABLE: Record<ObjectType, Expect> = {
   nova: { texture: null, data: null, missing: [] },
 };
 
+/**
+ * Issue #68 Part 6: the two demo exoplanets (real archive values) are extra planet_rocky fixtures,
+ * not object types; their R8.5 rows are their own. Both have a measured `teq_K`, so the heat pulse
+ * has data, and no `dynamics`, so nothing moves.
+ */
+const DEMO_TABLE: Record<string, Expect> = {
+  planet_trappist1f: { texture: 'terrain', data: 'teq_pulse', dataTag: 'measured', missing: [] },
+  planet_kepler186f: { texture: 'terrain', data: 'teq_pulse', dataTag: 'measured', missing: [] },
+  // Part 8a: the real Bennu model, drawn like Eros (R8.5 `asteroid_shape` row).
+  asteroid_shape_bennu: { ...TABLE.asteroid_shape },
+};
+
 describe('buildHaptics: every shared fixture (R8.5)', () => {
-  it('covers all 14 object types', () => {
-    expect(FIXTURE_NAMES.sort()).toEqual(Object.keys(TABLE).sort());
+  it('covers all 14 object types and the demo planets', () => {
+    expect([...FIXTURE_NAMES].sort()).toEqual(
+      [...Object.keys(TABLE), ...Object.keys(DEMO_TABLE)].sort(),
+    );
   });
 
   it.each(FIXTURE_NAMES)('%s', (name) => {
-    const want = TABLE[name as ObjectType];
+    const want = DEMO_TABLE[name] ?? TABLE[name as ObjectType];
     const got = build(name);
     expect(got.texture?.id ?? null).toBe(want.texture);
     expect(got.data?.id ?? null).toBe(want.data);

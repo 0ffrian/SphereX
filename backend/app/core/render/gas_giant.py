@@ -16,7 +16,14 @@ from __future__ import annotations
 
 import math
 
-R_JUP_M = 6.9911e7  # Jupiter volumetric mean radius (NASA Jupiter fact sheet)
+# Jupiter's equatorial radius, 71,492 km: the IAU 2015 Resolution B3 nominal value, and the unit of
+# the Exoplanet Archive's radius columns (it converts with 11.209 R_earth per R_Jup, equatorial
+# radii). Not the volumetric mean 69,911 km. Defined once here; card_to_params imports it (Q-167).
+R_JUP_M = 7.1492e7
+# Earth's equatorial radius, 6378.1366 km (IERS Conventions 2010). Used only to convert the
+# archive's `pl_rade` for small planets to R_Jup (Q-168). [verify] against the archive's own
+# conversion (it states 11.209 R_earth per R_Jup, which gives 6377.9 km).
+R_EARTH_M = 6.3781366e6
 HOUR_S = 3600.0
 
 # Jupiter's rotation period (see JUPITER_SPIN_H, verified) used as the class-typical spin of a

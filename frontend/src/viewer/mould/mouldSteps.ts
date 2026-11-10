@@ -12,6 +12,8 @@
 //
 // Timing is the mock-up's: STAGE_S seconds per step, smoothstep easing, steps one after another.
 import type { ObjectType } from '@/contract';
+import { deriveClimate } from '@/physics/climate';
+import { isExoplanetCard, patternWords } from '../planCommon';
 import type { RenderPlan } from '../planTypes';
 
 /** Seconds per step (mock-up `STAGE_S`). UI pacing, not a physical value. */
@@ -117,28 +119,42 @@ const STEPS: Record<MouldKind, MouldStepDef[]> = {
     { label: 'Colour', hint: 'From temperature', layers: ['emissive', 'limb_darkening', TINT] },
   ],
   rocky: [
-    { label: 'Base mould', hint: 'A sphere of triangles', layers: ['surface'], base: true },
+    { label: 'Base mould', hint: 'A sphere of triangles', layers: ['surface', 'body'], base: true },
     {
+      // Issue #68 (Q-165): the host star's light colours the planet from the first step after the
+      // base mould, so every later step is seen under it. Only a planet with a host temperature has it.
       label: 'Terrain',
       hint: 'Mountains and plains',
-      layers: [],
+      layers: ['starlight'],
       knobs: ['terrain'],
       fadesWire: true,
     },
-    { label: 'Colour', hint: 'Rock and lava cracks', layers: ['climate'], knobs: ['colour'] },
+    {
+      // The climate pattern (ice, bare ground or lava) is what the colour step reveals; the scenario
+      // look and the planet's preset are the artist's way of colouring it (+ Artistic only).
+      label: 'Colour',
+      hint: 'Rock and lava cracks',
+      layers: ['climate', 'look', 'look_preset'],
+      knobs: ['colour'],
+    },
     { label: 'Air', hint: 'A thin haze', layers: ['clouds'], knobs: ['clouds'] },
   ],
   water: [
-    { label: 'Base mould', hint: 'A sphere of triangles', layers: ['surface'], base: true },
+    { label: 'Base mould', hint: 'A sphere of triangles', layers: ['surface', 'body'], base: true },
     {
       label: 'Terrain',
       hint: 'Land under the sea',
-      layers: [],
+      layers: ['starlight'],
       knobs: ['terrain'],
       fadesWire: true,
     },
     { label: 'Oceans', hint: 'Water rises', layers: [], knobs: ['sea'] },
-    { label: 'Colour', hint: 'Land, sea and ice', layers: ['climate'], knobs: ['colour'] },
+    {
+      label: 'Colour',
+      hint: 'Land, sea and ice',
+      layers: ['climate', 'look', 'look_preset'],
+      knobs: ['colour'],
+    },
     { label: 'Clouds', hint: 'Clouds and sky', layers: ['clouds'], knobs: ['clouds'] },
   ],
   // Issue #62: a gas giant's surface is five layers (bands, flattening, colour, storms,
@@ -203,6 +219,34 @@ function knobApplies(knob: MouldKnob, plan: RenderPlan): boolean {
 }
 
 /**
+ * Issue #68 (Q-166): while the artistic surface is not drawn (+ Estimated), the steps that reveal
+ * only the star's light and the climate pattern say so, not "Terrain" and "Colour" (the terrain and
+ * the artist's colouring are not on screen). With the surface drawn the artistic labels stay.
+ */
+function honestLabel(
+  def: MouldStepDef,
+  reveals: readonly string[],
+  plan: RenderPlan,
+): Partial<Pick<MouldStepDef, 'label' | 'hint'>> {
+  const sh = plan.shader;
+  if (!sh || sh.surface || (plan.type !== 'planet_rocky' && plan.type !== 'planet_water'))
+    return {};
+  if (reveals.includes('starlight') && reveals.length === 1)
+    return { label: 'Starlight', hint: 'Light from the host star' };
+  if (reveals.includes('climate') && def.layers.includes('climate')) {
+    const scenario = isExoplanetCard(sh.card) ? deriveClimate(sh.card, plan.type)?.scenario : null;
+    const words = patternWords(scenario === 'snowball' ? 'snowball' : 'eyeball', plan.type);
+    // patternWords for a rocky planet reads "bare ground and ice": the step says "Ice and bare ground".
+    const text =
+      plan.type === 'planet_rocky' && scenario !== 'snowball'
+        ? 'Ice and bare ground'
+        : `${words[0]!.toUpperCase()}${words.slice(1)}`;
+    return { label: 'Climate', hint: `${text} (a model)` };
+  }
+  return {};
+}
+
+/**
  * The steps for a plan: the mock-up steps of its kind, each with the drawn layers it reveals. A step
  * that reveals no drawn layer and runs no knob that applies is left out (it would claim to build
  * something that is not there). Drawn layers no step names are revealed by the last step, so the
@@ -220,7 +264,7 @@ export function mouldScript(plan: RenderPlan): MouldScript | null {
     for (const id of reveals) named.add(id);
     const knobs = (def.knobs ?? []).filter((k) => knobApplies(k, plan));
     if (!def.base && reveals.length === 0 && knobs.length === 0) continue;
-    steps.push({ ...def, knobs, reveals });
+    steps.push({ ...def, ...honestLabel(def, reveals, plan), knobs, reveals });
   }
   if (steps.length === 0) return null;
   const rest = [...drawn].filter((id) => !named.has(id));

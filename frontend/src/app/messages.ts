@@ -18,6 +18,10 @@ import {
   type SpectrumOutcome,
 } from './refusals';
 
+/** Q-164: shown for a body the backend answered from a saved asset (a pre-built demo-pack row).
+ * It says how the body was made, nothing about how fresh the data is. */
+export const PREBUILT_NOTE = 'Built ahead of time from the same data';
+
 export function searchErrorMessage(err: SkyError, query: string): string {
   switch (err.kind) {
     case 'not_found':
@@ -29,10 +33,10 @@ export function searchErrorMessage(err: SkyError, query: string): string {
       if (err.code === 'frames_stalled')
         return 'The server stopped fetching more cutouts from the archive. Try again in a moment.';
       return err.status === 504
-        ? 'The archive is slow or not answering right now. Try again, or pick one of the test targets.'
+        ? 'The archive is slow or not answering right now. Try again, or pick an object from the list.'
         : 'The server had a problem or is not answering. Try again in a moment.';
     case 'timeout':
-      return `No answer after ${Math.round(API_TIMEOUT_MS / 1000)} seconds. The archive may be slow; try again, or pick one of the test targets.`;
+      return `No answer after ${Math.round(API_TIMEOUT_MS / 1000)} seconds. The archive may be slow; try again, or pick an object from the list.`;
     case 'network':
       return 'Can’t reach the server. Check that the backend is running.';
     case 'bad_response':

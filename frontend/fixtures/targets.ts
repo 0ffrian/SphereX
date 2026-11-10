@@ -136,6 +136,19 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     refuseComposite: ['composite:red:saturated', 'composite:saturated', 'composite:too_few_bands'],
   },
   {
+    // Issue #68, 7d: a planet host named in the demo list. Name and J2000 position are real (SIMBAD
+    // "HD 189733 b", checked 9 Nov 2026); frames are synthetic. "HD 189733b" (no space) finds it.
+    id: 'hd-189733-b',
+    name: 'HD 189733 b',
+    aliases: ['HD 189733 b', 'HD 189733b', 'HD 189733'],
+    ra: 300.18214,
+    dec: 22.71085,
+    moving: false,
+    northUp: false,
+    frameCount: 12,
+    seed: 1111,
+  },
+  {
     id: 'synthetic-mover',
     name: 'Synthetic mover (fixture)',
     aliases: ['Synthetic mover', 'synthetic-mover'],
@@ -184,6 +197,34 @@ export const FIXTURE_TARGETS: readonly FixtureTarget[] = [
     frameCount: 12,
     seed: 1010,
     body: 'planet_water',
+  },
+  {
+    // Issue #68 Part 6 (Q-165): the two demo exoplanets, as searchable fixtures for the build view.
+    // The position is the real SIMBAD one (backend recorded reply, 9 Nov 2026); the frames are
+    // synthetic. The card and render params are the shared `planet_trappist1f` fixture: real
+    // archive values, each source marked "synthetic fixture: real TRAPPIST-1 f value, ...".
+    id: 'trappist-1f',
+    name: 'TRAPPIST-1 f',
+    aliases: ['TRAPPIST-1 f', 'TRAPPIST-1f', 'TRAPPIST 1 f'],
+    ra: 346.62237,
+    dec: -5.0414,
+    moving: false,
+    northUp: false,
+    frameCount: 12,
+    seed: 1111,
+    body: 'planet_trappist1f',
+  },
+  {
+    id: 'kepler-186f',
+    name: 'Kepler-186 f',
+    aliases: ['Kepler-186 f', 'Kepler-186f', 'Kepler 186 f'],
+    ra: 298.65272, // SIMBAD, backend recorded reply
+    dec: 43.95501,
+    moving: false,
+    northUp: false,
+    frameCount: 12,
+    seed: 1212,
+    body: 'planet_kepler186f',
   },
   {
     id: 'synthetic-refused-mover',
