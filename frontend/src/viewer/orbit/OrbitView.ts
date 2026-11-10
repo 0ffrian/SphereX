@@ -6,14 +6,14 @@
 // and blits it (mobile and the low quality level).
 /* eslint-disable @typescript-eslint/no-explicit-any -- TSL node graphs are built from untyped proxies */
 import {
-  HalfFloatType,
+  SRGBColorSpace,
+  UnsignedByteType,
   LinearFilter,
   NodeMaterial,
   QuadMesh,
   RenderTarget,
   type WebGPURenderer,
 } from 'three/webgpu';
-import { texture, uniform, uv, vec4 } from 'three/tsl';
 import {
   ENTRY_ALT_KM,
   HEIGHT_EXAGGERATION,
@@ -173,7 +173,6 @@ export class OrbitView {
   private readonly material: NodeMaterial;
   private readonly quad: QuadMesh;
   private rt: RenderTarget | null = null;
-  private blit: { material: NodeMaterial; quad: QuadMesh; node: any; fade: any } | null = null;
 
   constructor(sources: OrbitSources) {
     this.sources = sources;
@@ -293,57 +292,56 @@ export class OrbitView {
   }
 
   /**
-   * Draws into `rect` (logical px, top-left origin) of the renderer's canvas. The pass renders into
-   * an offscreen target only when something changed (camera, light, time, tracer, size, quality);
-   * otherwise the last image is blitted. Never throws: a failure marks the view failed and the owner
-   * falls back to the globe alone.
+   * Renders the pass into an offscreen 8-bit sRGB target of `size` (logical px) times the pixel
+   * ratio (capped) and the quality scale, only when something changed (camera, light, time, tracer,
+   * size or quality); otherwise the last image stands. The owner reads the target back and paints it
+   * into the pane canvas. Returns null when the view has failed (the owner falls back to the globe).
    */
-  render(renderer: WebGPURenderer, rect: Rect, pixelRatio: number, ctx: { now?: number; animating?: boolean } = {}): void {
-    if (this.failed) return;
+  render(
+    renderer: WebGPURenderer,
+    size: { w: number; h: number },
+    pixelRatio: number,
+    ctx: { now?: number; animating?: boolean } = {},
+  ): { rt: RenderTarget; changed: boolean } | null {
+    if (this.failed) return null;
     try {
       const now = ctx.now ?? performance.now();
       const q = this.qualityFor(now, ctx.animating ?? false);
       const pr = Math.min(pixelRatio, ORBIT_MAX_PIXEL_RATIO);
-      const w = Math.max(1, Math.round(rect.w * pr * q.scale));
-      const h = Math.max(1, Math.round(rect.h * pr * q.scale));
+      const w = Math.max(1, Math.round(size.w * pr * q.scale));
+      const h = Math.max(1, Math.round(size.h * pr * q.scale));
       const values = this.uniformValues({ w, h });
       const live = this.sources.tracer?.() ?? null;
       const cb = this.sources.cloudBase?.() ?? null;
-      const sig = `${JSON.stringify(values)}|${this.fade}|${q.march},${q.shadow},${q.atmo},${q.trace}|${live?.uuid ?? ''}|${cb?.uuid ?? ''}`;
+      const sig = `${JSON.stringify(values)}|${q.march},${q.shadow},${q.atmo},${q.trace}|${live?.uuid ?? ''}|${cb?.uuid ?? ''}`;
       const rt = this.ensureTarget(w, h);
-      if (sig !== this.lastSig || !this.drawn) {
-        setUniforms(this.U, values);
-        this.U.uFade.value = 1;
-        this.U.uMarch.value = q.march;
-        this.U.uShadow.value = q.shadow;
-        this.U.uAtmo.value = q.atmo;
-        this.U.uTrace.value = q.trace;
-        if (live && this.shader.tracerBase) this.shader.tracerBase.value = live;
-        if (cb && this.shader.cloudBase) this.shader.cloudBase.value = cb;
-        const prevTarget = renderer.getRenderTarget();
-        renderer.setRenderTarget(rt);
-        try {
-          this.quad.render(renderer);
-        } finally {
-          renderer.setRenderTarget(prevTarget);
-        }
-        this.lastSig = sig;
-        this.drawn = true;
-        this.passes++;
-      }
+      if (sig === this.lastSig && this.drawn) return { rt, changed: false };
+      setUniforms(this.U, values);
+      this.U.uFade.value = 1;
+      this.U.uMarch.value = q.march;
+      this.U.uShadow.value = q.shadow;
+      this.U.uAtmo.value = q.atmo;
+      this.U.uTrace.value = q.trace;
+      if (live && this.shader.tracerBase) this.shader.tracerBase.value = live;
+      if (cb && this.shader.cloudBase) this.shader.cloudBase.value = cb;
+      const prevTarget = renderer.getRenderTarget();
       const prevClear = renderer.autoClear;
       renderer.autoClear = false;
+      renderer.setRenderTarget(rt);
       try {
-        renderer.setViewport(rect.x, rect.y, rect.w, rect.h);
-        this.ensureBlit(rt);
-        this.blit!.fade.value = this.fade;
-        this.blit!.quad.render(renderer);
+        this.quad.render(renderer);
       } finally {
+        renderer.setRenderTarget(prevTarget);
         renderer.autoClear = prevClear;
       }
+      this.lastSig = sig;
+      this.drawn = true;
+      this.passes++;
+      return { rt, changed: true };
     } catch (err) {
       this.failed = true;
       console.warn('[viewer] the surface view failed; showing the globe alone', err);
+      return null;
     }
   }
 
@@ -355,7 +353,8 @@ export class OrbitView {
   private ensureTarget(w: number, h: number): RenderTarget {
     if (!this.rt) {
       this.rt = new RenderTarget(w, h, {
-        type: HalfFloatType,
+        type: UnsignedByteType,
+        colorSpace: SRGBColorSpace,
         depthBuffer: false,
         minFilter: LinearFilter,
         magFilter: LinearFilter,
@@ -367,22 +366,9 @@ export class OrbitView {
     return this.rt;
   }
 
-  private ensureBlit(rt: RenderTarget): void {
-    if (this.blit) return;
-    const node = texture(rt.texture, uv());
-    const fade = uniform(1);
-    const material = new NodeMaterial();
-    material.name = 'OrbitBlit';
-    material.fragmentNode = vec4(node.rgb.mul(fade), 1);
-    material.toneMapped = false;
-    this.blit = { material, quad: new QuadMesh(material), node, fade };
-  }
-
   dispose(): void {
     this.material.dispose();
     this.rt?.dispose();
-    this.blit?.material.dispose();
     this.rt = null;
-    this.blit = null;
   }
 }

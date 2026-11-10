@@ -1,21 +1,22 @@
 // Issue #71 stream H (D-36, Q-274 to Q-276): the close-up pane, the app's version of the mock-up's
-// #cuPane. It opens on the left half of the stage (on top when narrow), the globe moves into the
-// other half (ViewerApp does that), and it serves every kind as the mock-up does:
+// #cuPane. It fills the LEFT half of the app over the sky (on top, 45% high, on a phone) while the
+// globe stays in the build pane on the right, and it serves every kind as the mock-up does:
 //   rocky and gas giants: the Surface view (orbit view, src/viewer/orbit);
 //   stars: the flare close-up (stream G's `StarCloseUp`; until it lands, a plain caption);
 //   asteroids and comets: the same body from near its surface.
-// The picture is drawn into the viewer canvas; this layer has the honesty caption (.sx-cu-tag, the
+// The picture is rendered by the viewer's renderer and painted into this pane's own canvas (the
+// mock-up's cuDraw does the same); this layer has the honesty caption (.sx-cu-tag, the
 // mock-up's .cu-tag), the controls and the input. Keyboard: arrows or W A S D move and turn, + and -
 // change the height, Page Up and Page Down tilt. Reduced motion: no automatic flying.
 import { useEffect, useReducer, useRef, useState } from 'react';
-import type { ViewerApp, CloseUpInfo } from '@/viewer/ViewerApp';
+import type { CloseUpInfo } from '@/viewer/ViewerApp';
+import { useCloseUpStore } from './closeUpStore';
 import { ORBIT_NOTE } from '@/viewer/orbit/orbitSources';
 import { altRange } from '@/viewer/orbit/orbitMath';
 import { ProvenanceBadge } from './Badge';
 import { buttonClass, pressedClass } from './ui';
 import { StarCloseUp } from './StarCloseUp';
 import { STAR_CLOSEUP_TAG, useStarCloseUp } from './starCloseUp';
-import type { RenderPlan } from '@/viewer/planTypes';
 
 export type CloseUpKind = 'orbit' | 'star' | 'body';
 
@@ -41,7 +42,7 @@ export function closeUpKindOf(type: string | null | undefined): CloseUpKind | nu
 }
 
 export function closeUpButtonLabel(kind: CloseUpKind | null): string {
-  return kind === 'orbit' ? 'Surface view' : 'Side close-up';
+  return kind === 'orbit' ? 'Surface view' : 'Close-up view';
 }
 
 /** The mock-up's caption for each kind (its `.cu-tag` wording: "Close-up · what · honesty"). */
@@ -54,38 +55,43 @@ export function closeUpCaption(kind: CloseUpKind, info: CloseUpInfo | null, gas:
     : 'Close-up · from orbit, click the globe to look at a place · generated from physics (Default), not a photograph';
 }
 
-export function CloseUpPane({
-  viewer,
-  kind,
-  open,
-  info,
-  plan,
-  reducedMotion,
-  fixture,
-}: {
-  viewer: ViewerApp | null;
-  kind: CloseUpKind | null;
-  open: boolean;
-  info: CloseUpInfo | null;
-  plan: RenderPlan | null;
-  reducedMotion: boolean;
-  fixture: boolean;
-}) {
-  // The flare shown is the default (open, class X): the viewer does not expose the latest flare's energy yet.
-  const starProps = useStarCloseUp(kind === 'star' ? plan : null, null);
+export function CloseUpPane() {
+  const viewer = useCloseUpStore((s) => s.viewer);
+  const plan = useCloseUpStore((s) => s.plan);
+  const type = useCloseUpStore((s) => s.type);
+  const info = useCloseUpStore((s) => s.info);
+  const hidden = useCloseUpStore((s) => s.hidden);
+  const reducedMotion = useCloseUpStore((s) => s.reducedMotion);
+  const fixture = useCloseUpStore((s) => s.fixture);
+  const kind = closeUpKindOf(type);
+  const open = !hidden && kind !== null && info !== null && info.mode !== null;
   const [, bump] = useReducer((n: number) => n + 1, 0);
   const [about, setAbout] = useState(false);
   const focusRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const view = viewer?.orbitView ?? null;
   const gas = view?.kind === 'gas';
-  const stack = info?.layout === 'stack';
+  const starProps = useStarCloseUp(kind === 'star' ? plan : null, null);
   const drag = useRef<{ pts: Map<number, { x: number; y: number }>; pinch: number | null }>({
     pts: new Map(),
     pinch: null,
   });
 
+  // The pane's canvas receives the picture (orbit view and body close-up).
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!viewer || !c) return;
+    viewer.setCloseUpCanvas(c);
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => viewer.requestCloseRender());
+    ro?.observe(c);
+    return () => {
+      ro?.disconnect();
+      viewer.setCloseUpCanvas(null);
+    };
+  }, [viewer, kind]);
+
   const changed = () => {
-    viewer?.requestRender();
+    viewer?.requestCloseRender();
     bump();
   };
 
@@ -96,14 +102,14 @@ export function CloseUpPane({
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       view.wheel(e.deltaY);
-      changed();
+      viewer?.requestCloseRender();
+      bump();
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `changed` only reads `viewer`
   }, [view, viewer]);
 
-  // A click on the globe (the other half) moves the surface view to that place.
+  // A click on the globe (in the build pane on the right) moves the surface view to that place.
   useEffect(() => {
     if (!viewer || !view || !open) return;
     const canvas = document.querySelector<HTMLCanvasElement>('[data-testid="viewer-stage"] canvas');
@@ -119,7 +125,8 @@ export function CloseUpPane({
       const place = viewer.pickGlobe(e.clientX, e.clientY);
       if (place) {
         view.goTo(place);
-        changed();
+        viewer.requestCloseRender();
+        bump();
       }
     };
     canvas.addEventListener('pointerdown', onDown);
@@ -128,7 +135,6 @@ export function CloseUpPane({
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointerup', onUp);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `changed` only reads `viewer`
   }, [viewer, view, open]);
 
   if (!kind) return null;
@@ -171,11 +177,12 @@ export function CloseUpPane({
 
   return (
     <div
-      className={`sx-cu${open ? ' open' : ''}${stack ? ' stack' : ''}`}
+      className={`sx-cu${open ? ' open' : ''}`}
       aria-hidden={open ? undefined : true}
       data-testid="closeup-pane"
       data-kind={kind}
     >
+      <canvas ref={canvasRef} className="sx-cu-canvas" aria-hidden="true" />
       {view && (
         <div
           ref={focusRef}
