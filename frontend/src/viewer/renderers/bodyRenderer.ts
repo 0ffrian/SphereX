@@ -105,6 +105,8 @@ export interface BodyRenderer {
   setTier?(tier: TierName): void;
   /** The TAAU frame index of the frame about to be drawn (volumes shift their jitter by it). */
   setJitterFrame?(index: number): void;
+  /** Steps a GPU pass the body owns (a rocky world's cloud tracer) before the frame is drawn; true when it changed. Optional. */
+  stepGpu?(renderer: unknown): boolean;
   setSunDirection(dir: Vec3): void;
   /** Poses the body at the SimClock's times (D-34). Optional: still bodies have nothing to pose. */
   setTime?(time: SimTimeFn): void;

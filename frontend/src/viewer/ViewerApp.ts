@@ -800,6 +800,12 @@ export class ViewerApp {
   private draw(): void {
     this.frames++;
     this.updateScreenSize();
+    // A rocky world's cloud tracer is a GPU pass: step it to the clock before the frame (stream D, Q-245).
+    try {
+      this.onScreen?.body?.stepGpu?.(this.renderer);
+    } catch (err) {
+      console.warn('[viewer] the cloud tracer failed; clouds stay as they are', err);
+    }
     if (this.chain) {
       try {
         // Volumes shift their per-pixel ray jitter by the TAAU frame index (same index after a

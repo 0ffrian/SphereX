@@ -21,6 +21,10 @@ import {
   AdditiveBlending,
   DataTexture,
   Group,
+  LinearFilter,
+  RepeatWrapping,
+  RGBAFormat,
+  UnsignedByteType,
   Matrix4,
   Mesh,
   MeshBasicNodeMaterial,
@@ -35,7 +39,6 @@ import {
   atan,
   cameraPosition,
   clamp,
-  cos,
   cross,
   dFdx,
   dFdy,
@@ -54,21 +57,20 @@ import {
   positionWorld,
   pow,
   sign,
-  sin,
   smoothstep,
   sqrt,
   uniform,
+  texture,
+  vec2,
   vec3,
 } from 'three/tsl';
-import type { Object3D } from 'three/webgpu';
+import type { Object3D, Texture } from 'three/webgpu';
 import { SUBSTELLAR_DIRECTION } from '../fields/fieldGenerator';
-import { peakAngularRate, MIN_COS_LAT, type JetRates } from '../fields/flowModel';
 import { shaderSeedOffsets } from '../fields/noise';
 import type { WorldData } from '../fields/worldGenerator';
-import { phasePair } from '../motion/phase';
-import { processOf, spinRateRadPerSimS, type Motion, type SimTimeFn } from '../motion/motion';
+import { spinRateRadPerSimS, type Motion, type SimTimeFn } from '../motion/motion';
 import { bilinear, floatTexture, vnoise3 } from './fieldTexture';
-import { EVOLVE_PER_RAD } from './jetSurface';
+import { CloudTracer } from './CloudTracer';
 import { LAVA_COLOUR } from './shaderPalette';
 import { PATTERN_GROUND, PATTERN_ICE, PATTERN_WATER } from './shaderSpec';
 
@@ -81,14 +83,6 @@ export const RELIEF_KM = 6;
 const CLOUD_SHELL = 1.012;
 const ATMO_SHELL = 1.04;
 const ATMO_SCALE_HEIGHT = 0.03;
-/** Largest cloud shear before the flow-map resets, radians (artistic). */
-const MAX_CLOUD_SHEAR = 0.9;
-
-const rotY = (p: any, a: any) => {
-  const c = cos(a);
-  const s = sin(a);
-  return vec3(p.x.mul(c).add(p.z.mul(s)), p.y, p.x.negate().mul(s).add(p.z.mul(c)));
-};
 
 /** World UV of a body-frame direction (row 0 = south). */
 function worldUV(dir: any) {
@@ -149,12 +143,28 @@ export interface OrbitSources {
   haze: number;
   seed: number;
   hasOcean: boolean;
-  /** Not built: no separate hydrology raster or cloud tracer texture exists; clouds come from humidity (climateTexture.a) and noise. */
-  hydrologyTexture: null;
-  cloudTracerTexture: null;
+  /**
+   * RGBA8 hydrology raster (R river or lake water, G salt flat, B sediment plume, A frozen); null
+   * when the world has no ocean basin or no air. Same world UV. `model_dependent` (roughness `artistic`).
+   */
+  hydrologyTexture: DataTexture | null;
+  /** The raster's CPU copy and counts, for the camera and the readouts. */
+  hydrology: { img: Uint8Array; RW: number; RH: number; stats: { rivers: number; bigQ: number; lakes: number; salt: number; mouths: number } } | null;
+  /**
+   * The cloud tracer (R cloud amount, G detail), a half-float render target on the world UV that
+   * follows the winds. Read it through this getter: the texture changes after each step. Null
+   * only if the tracer could not be created.
+   */
+  readonly cloudTracerTexture: Texture | null;
+  /** The tracer's node, for a shader that samples it (its value follows each step). */
+  cloudTracerNode: any;
 }
 
 export interface RockyBuilt {
+  /** Runs the cloud tracer up to the clock's step (needs the renderer); true when it changed. */
+  stepGpu(renderer: unknown, time: SimTimeFn): boolean;
+  setOnTracerStep(fn: (() => void) | null): void;
+  dispose(): void;
   /** Textures and scalars for the orbit camera (stream H). */
   readonly orbitSources: OrbitSources;
   group: Group;
@@ -179,6 +189,17 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
   const F = m.fluid;
   const terrTex = floatTexture(terrainRGBA(world.terrain.data), world.terrain.W, world.terrain.H);
   const climTex = floatTexture(world.climate.out, world.climate.nx, world.climate.ny);
+  let hydroTex: DataTexture | null = null;
+  if (world.hydrology) {
+    const hy = world.hydrology;
+    hydroTex = new DataTexture(hy.img, hy.RW, hy.RH, RGBAFormat, UnsignedByteType);
+    hydroTex.magFilter = LinearFilter;
+    hydroTex.minFilter = LinearFilter;
+    hydroTex.wrapS = RepeatWrapping;
+    hydroTex.generateMipmaps = false;
+    hydroTex.needsUpdate = true;
+    o.textures.push(hydroTex);
+  }
   o.textures.push(terrTex, climTex);
   const group = new Group();
   const geo = new SphereGeometry(1, o.low ? 96 : 128, o.low ? 72 : 96);
@@ -189,9 +210,6 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
   const pattern = uniform(0);
   const notPattern = float(1).sub(pattern);
   const plates = uniform(o.showPlates ? 1 : 0);
-  const cloudPhase = uniform(new Vector3(0, 0, 0));
-  const cloudEvo = uniform(new Vector3(0, 0, 0));
-  const seedOff = vec3(0, 0, shaderSeedOffsets(o.seed).cloud);
   const noiseOff = vec3(0, 0, shaderSeedOffsets(o.seed).cloud + 0.5);
 
   const dir = normalize(positionLocal);
@@ -200,7 +218,6 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
   const T0 = C.x;
   const hi = max(C.y, 0);
   const sn = max(C.z, 0);
-  const rh = C.w;
 
   // The one height field with fine detail added below the grid's resolution (seen, not felt).
   const T = bilinear(terrTex, u, v);
@@ -231,6 +248,15 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
   );
   fa = smoothstep(0, 1, fa.mul(fn.mul(0.7).add(0.7)));
   ld = mix(ld, rgb3(F.ice).mul(fn.mul(0.2).add(0.92)), fa);
+  // Rivers and lakes (the Water layer, `model_dependent`): water where the routing puts it, pale
+  // salt flats in dry closed basins, ice where it is frozen. Sampled on the same world UV.
+  const hyd: any = hydroTex ? texture(hydroTex, vec2(u, v)) : null;
+  if (hyd) {
+    const riverC = mix(rgb3(F.liq).mul(2.6).add(vec3(0.01, 0.03, 0.04)), rgb3(F.liq), 0.35);
+    ld = mix(ld, vec3(0.86, 0.84, 0.79), hyd.y.mul(0.9));
+    ld = mix(ld, riverC, hyd.x.mul(float(1).sub(hyd.w)));
+    ld = mix(ld, rgb3(F.ice), hyd.w.mul(hyd.x.max(hyd.y)));
+  }
 
   // Ocean: open water to pack ice through floes; thickness sets how much of the cell is ice.
   const tb = m.Tb ?? 0;
@@ -247,7 +273,9 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
   const ice = smoothstep(th.sub(0.1), th.add(0.1), fl);
   const iceC = rgb3(F.ice).mul(vnoise3(dir.mul(70), 3).mul(0.28).add(0.82));
   const seabed = rgb3(landBase).mul(0.55).mul(fn.mul(0.6).add(0.7));
-  const oc = mix(mix(seabed, water, ocean), iceC, ice.mul(ocean));
+  let oc: any = mix(mix(seabed, water, ocean), iceC, ice.mul(ocean));
+  // Sediment plume off big river mouths (hydrology B), a muddy tint in the shallow water.
+  if (hyd) oc = mix(oc, rgb3(F.land).mul(0.9).add(vec3(0.03, 0.02, 0)), hyd.z.mul(0.65).mul(float(1).sub(ice)));
   // The coast is a smoothstep of the height, never a step; a world with no basin is all land.
   const landW: any = seaOn ? smoothstep(-0.07, 0.07, el) : float(1);
   let col: any = mix(oc, ld, landW);
@@ -260,33 +288,22 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
   const colourFull = mould.colour.greaterThanEqual(1);
   col = colourFull.select(col, mix(rgb3([0.66, 0.68, 0.72]), col, mould.colour));
 
-  // Clouds: humidity from the budget (rh) thresholded with fractal noise, carried by latitude winds.
+  // Clouds: the cloud tracer (CloudTracer.ts), a render target carried by the winds and fed by the
+  // climate's humidity. Its R is the cloud amount, G a detail field. Until the renderer has stepped
+  // it, nothing is drawn (never an error). `cloudAt` takes a body-frame direction.
   const cov = o.cloudCover ?? m.cov;
-  const animated = (() => {
-    const winds = processOf(o.motion, 'winds');
-    const rate = o.motion.rates.jet_speed_ms;
-    return winds && rate && o.scaleM ? { windMs: rate.value, radiusM: o.scaleM } : null;
-  })();
-  const jets: JetRates | null = animated;
-  const peak = jets ? Math.abs(peakAngularRate(jets)) : 0;
-  const animatedClouds = jets !== null && peak > 0;
-  const tracer = (d: any, evo: any) => {
-    const p = d.mul(4.5).add(seedOff).add(vec3(0, 0, evo));
-    return clamp(
-      smoothstep(0.55, 1.05, rh).mul(0.85).add(vnoise3(p, 4).sub(0.5).mul(1.3)),
-      0,
-      1,
-    );
-  };
+  const tracerTex = new CloudTracer({
+    climate: climTex,
+    windMs: m.U,
+    jets: m.jets,
+    locked: m.locked,
+    seed: o.seed,
+    low: o.low,
+  });
   const cloudAt = (d: any) => {
-    if (!animatedClouds) return tracer(d, 0);
-    const lat = asin(clamp(d.y, -1, 1));
-    const pl = cos(lat.mul(3)).div(max(cos(lat), MIN_COS_LAT));
-    return mix(
-      tracer(rotY(d, cloudPhase.y.mul(pl)), cloudEvo.y),
-      tracer(rotY(d, cloudPhase.x.mul(pl)), cloudEvo.x),
-      cloudPhase.z,
-    );
+    const { u: cu, v: cv } = worldUV(d);
+    const t = tracerTex.node.sample(vec2(cu, cv));
+    return clamp(t.x.add(t.y.sub(0.5).mul(0.32)), 0, 1);
   };
   const cth = float(1 - Math.min(1, Math.max(0, cov)));
   const cloudMask = (c: any) => smoothstep(cth, cth.add(0.26), c);
@@ -403,12 +420,6 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
       } else {
         group.rotation.y = spinRate * time('spin');
       }
-      if (animatedClouds && jets) {
-        const pair = phasePair(time('winds'), MAX_CLOUD_SHEAR / peak);
-        const rate = peakAngularRate(jets);
-        cloudPhase.value.set(rate * pair.a, rate * pair.b, pair.w);
-        cloudEvo.value.set(EVOLVE_PER_RAD * peak * pair.a, EVOLVE_PER_RAD * peak * pair.b, 0);
-      }
       group.updateWorldMatrix(true, false);
       inv.copy(group.matrixWorld).invert();
       tmp.copy(o.sunValue).transformDirection(inv);
@@ -432,8 +443,24 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
     haze: m.haze,
     seed: o.seed,
     hasOcean: world.hasOcean,
-    hydrologyTexture: null,
-    cloudTracerTexture: null,
+    hydrologyTexture: hydroTex,
+    hydrology: world.hydrology
+      ? { img: world.hydrology.img, RW: world.hydrology.RW, RH: world.hydrology.RH, stats: world.hydrology.stats }
+      : null,
+    get cloudTracerTexture() {
+      return tracerTex.texture;
+    },
+    cloudTracerNode: tracerTex.node,
   };
-  return { group, runtime, setPattern, orbitSources };
+  return {
+    group,
+    runtime,
+    setPattern,
+    orbitSources,
+    stepGpu: (renderer, time) => tracerTex.advance(renderer, time('winds')),
+    setOnTracerStep: (fn) => {
+      tracerTex.onStep = fn;
+    },
+    dispose: () => tracerTex.dispose(),
+  };
 }

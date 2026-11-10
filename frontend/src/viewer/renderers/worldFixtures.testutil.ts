@@ -3,7 +3,7 @@
 import { generateWorld, type WorldSize } from '../fields/worldGenerator';
 import type { BodyContext } from './bodyRenderer';
 
-const TINY: WorldSize = { tw: 90, th: 45, nx: 36, ny: 18, steps: 12 };
+const TINY: WorldSize = { tw: 90, th: 45, nx: 36, ny: 18, rw: 128, rh: 64, steps: 12 };
 
 export const tinyWorldSource: NonNullable<BodyContext['worldSource']> = (p) =>
   Promise.resolve(generateWorld(p, TINY));
