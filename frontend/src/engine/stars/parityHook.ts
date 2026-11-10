@@ -51,6 +51,8 @@ function sized<T>(e: StarEngine, w: number, h: number, f: () => T): T {
 }
 
 export function installParityHook(): void {
+  // Adaptive quality is pinned in parity runs, as in the artifact's test page (production is unchanged).
+  (window as unknown as { __sxPin?: boolean }).__sxPin = true;
   let current: StarEngine | null = null;
   let kind: 'star' | 'flare' = 'star';
   const api = {

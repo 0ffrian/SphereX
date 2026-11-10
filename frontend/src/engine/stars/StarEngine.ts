@@ -196,7 +196,7 @@ return {
   pFlare: function (kind, cls, t) { FL.playing = false; FL.kind = kind; FL.cls = cls; FL.t = t; flareUi(); },
   setAt: function (t) { CLOSE_AT = t; },
   at: function () { return CLOSE_AT || MODEL.best || [0.26, 0.5]; },
-  pReset: function () { ST.time = 3; OV.clock = 0; ST.playing = false; FL.playing = false; }
+  pReset: function () { ST.playing = false; FL.playing = false; ST.time = 3; OV.clock = 0; OV.ev = []; OV.next = 0; OV.r = rng(1); OV.shown = null; OV.loops = []; PL.q = 1; }
 };`;
 
 export class StarEngine {
