@@ -32,7 +32,7 @@ export interface Fluid {
   Tb: number;
   /** Molar enthalpy of vaporisation (sublimation for CO2), J/mol [verify]. */
   L: number;
-  /** Mixing ratio of the fluid's vapour at the cloud base, mass fraction (artistic). */
+  /** Mixing ratio of the fluid's vapour at the cloud base, mass fraction (artistic; water 0.01 puts Earth's cloud base near 1 km, the prototype's 0.02 put it at the ground, Q-241). */
   q: number;
   /** Colours of the liquid, ice, cloud and bare land under this fluid, linear (artistic). */
   liq: readonly [number, number, number];
@@ -43,7 +43,7 @@ export interface Fluid {
 
 /** The five fluids of the prototype, in the order the `surface_fluid` slider indexes them. */
 export const FLUIDS: Readonly<Record<FluidId, Fluid>> = {
-  water: { id: 'water', label: 'Water', Tt: 273.16, Pt: 611.7, Tb: 373.15, L: 40650, q: 0.02, liq: [0.012, 0.05, 0.13], ice: [0.82, 0.88, 0.96], cld: [1, 1, 1], land: [0.34, 0.27, 0.2] },
+  water: { id: 'water', label: 'Water', Tt: 273.16, Pt: 611.7, Tb: 373.15, L: 40650, q: 0.01, liq: [0.012, 0.05, 0.13], ice: [0.82, 0.88, 0.96], cld: [1, 1, 1], land: [0.34, 0.27, 0.2] },
   methane: { id: 'methane', label: 'Methane', Tt: 90.69, Pt: 11700, Tb: 111.67, L: 8190, q: 0.05, liq: [0.03, 0.022, 0.014], ice: [0.72, 0.68, 0.58], cld: [0.95, 0.9, 0.76], land: [0.3, 0.18, 0.09] },
   ammonia: { id: 'ammonia', label: 'Ammonia', Tt: 195.4, Pt: 6060, Tb: 239.8, L: 23350, q: 0.02, liq: [0.06, 0.09, 0.13], ice: [0.9, 0.9, 0.84], cld: [1, 0.96, 0.84], land: [0.33, 0.29, 0.25] },
   nitrogen: { id: 'nitrogen', label: 'Nitrogen', Tt: 63.15, Pt: 12500, Tb: 77.36, L: 5570, q: 0.05, liq: [0.05, 0.06, 0.09], ice: [0.88, 0.82, 0.74], cld: [0.9, 0.9, 0.93], land: [0.36, 0.3, 0.26] },

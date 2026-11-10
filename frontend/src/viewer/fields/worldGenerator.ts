@@ -57,13 +57,26 @@ const smooth = (a: number, b: number, x: number): number => {
 };
 
 /** Null when the analytic model cannot be computed (an input is not usable): the caller refuses the layer. */
-export function generateWorld(p: WorldParams): WorldData | null {
+/** Grid sizes and settle steps; the tiers' own, or smaller ones for tests that only need a world to exist. */
+export interface WorldSize {
+  tw: number;
+  th: number;
+  nx: number;
+  ny: number;
+  steps: number;
+}
+export const WORLD_SIZES: Readonly<Record<WorldTier, WorldSize>> = {
+  full: { ...GRID.full, steps: SETTLE_STEPS.full },
+  low: { ...GRID.low, steps: SETTLE_STEPS.low },
+};
+
+export function generateWorld(p: WorldParams, size: WorldSize = WORLD_SIZES[p.tier]): WorldData | null {
   const model = worldModel(p.inputs);
   if (!model) return null;
-  const g = GRID[p.tier];
+  const g = size;
   const terr = buildTerrain({ seed: p.seed, oceanFraction: p.oceanFraction, gravity: model.gv, W: g.tw, H: g.th });
   const budget = new ClimateBudget(model, { nx: g.nx, ny: g.ny, oceanFraction: p.oceanFraction }, (lon, lat) => terr.heightAt(lon, lat));
-  budget.step(SETTLE_STEPS[p.tier], SETTLE_DT);
+  budget.step(size.steps, SETTLE_DT);
 
   // Shared field, row 0 = north pole (R6.1): look the terrain and the budget up by direction.
   const a = new Float32Array(FIELD_WIDTH * FIELD_HEIGHT * 4);
