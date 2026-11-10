@@ -42,7 +42,7 @@ describe('fluids', () => {
 
   it('water on Earth condenses a few km up', () => {
     const Tc = cloudBaseK(FLUIDS.water, 288, ATM_PA)!;
-    expect(Tc).toBeLessThan(288);
+    expect(Tc).toBeLessThan(286);
     expect(Tc).toBeGreaterThan(240);
   });
 
