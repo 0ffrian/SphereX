@@ -325,4 +325,5 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-274 | Surface view (orbit view): TSL port, draws into the viewer canvas, tags, performance (render on change, quarter scale while interacting, adaptive levels, pixel ratio 1.25) | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
 | Q-275 | Close-up pane, the app's #cuPane (left 50%, mock-up captions, every kind) | Decided in code | [rendering-bodies](rendering-bodies.md) |
 | Q-276 | Surface view inputs, entry and the fields asked of D and E | Decided in code | [rendering-bodies](rendering-bodies.md) |
+| Q-280 to Q-284 | Search list additions: Titan reference moon, four demo-pack rows, archive outage | Decided in code | [rendering-bodies](rendering-bodies.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |

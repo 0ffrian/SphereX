@@ -1,0 +1,201 @@
+{
+  "asset_version": "10",
+  "card": {
+    "id": "simbad-alf-cmi",
+    "name": "* alf CMi",
+    "pm_mas_yr": {
+      "source": "SIMBAD * alf CMi (pmra = mu_alpha * cos(delta), pmdec)",
+      "tag": "measured",
+      "value": [
+        -714.59,
+        -1036.8
+      ]
+    },
+    "radius_rsun": {
+      "source": "not available: no Gaia DR3 source within the match radius; no interferometric radius is in the literature registry, and a spectral-class table is never used for a radius (Q-152)",
+      "tag": "measured",
+      "value": null
+    },
+    "spectral_class": {
+      "source": "SIMBAD * alf CMi sp_type",
+      "tag": "measured",
+      "value": "F5IV-V+DQZ"
+    },
+    "teff_K": {
+      "formula": "median of the non-null Teff values in SIMBAD mesFe_h; of two middle values, the one from the most recent bibcode (Q-152)",
+      "source": "SIMBAD mesFe_h: median of 136 published spectroscopic Teff values (5860 to 7590 K); the middle value is from 2023A&A...676A.129H",
+      "tag": "derived",
+      "value": 6589.0
+    },
+    "type": "star"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b3",
+  "inputs_sha256": "4d30394754ce61b83ba21606cfe420fb28cc45912350a92d60845b8e46f385e2",
+  "render_params": {
+    "alt_text": "* alf CMi, Star, size unknown, colour from Teff, self-luminous. Surface relief: illustrative.",
+    "confidence": {
+      "assumed_share": 0.5,
+      "band": "part_data",
+      "estimated_share": 0.35,
+      "formula": "C = sum(w_i c_i) / sum(w_i): c is 1 for a measured value or a formula of measured values, a placeholder share for a model-dependent one, and 0 for an assumed, artistic or missing one; the w_i are placeholder weights (D-36, Q-221)",
+      "found": "Data for: Temperature and colour, spectral class or motion on the sky.",
+      "gate": {
+        "class_known": true,
+        "key_measurement": true,
+        "passed": true,
+        "score_ok": true
+      },
+      "inputs": [
+        {
+          "c": 1.0,
+          "fields": [
+            "teff_K"
+          ],
+          "id": "temperature",
+          "label": "Temperature and colour",
+          "points": 30.0,
+          "tag": "derived",
+          "weight": 30
+        },
+        {
+          "c": 0.0,
+          "fields": [
+            "radius_rsun"
+          ],
+          "id": "radius",
+          "label": "Radius",
+          "points": 0.0,
+          "tag": "missing",
+          "weight": 20
+        },
+        {
+          "c": 0.5,
+          "fields": [],
+          "id": "limb",
+          "label": "Edge darkening",
+          "points": 5.0,
+          "tag": "model_dependent",
+          "weight": 10
+        },
+        {
+          "c": 1.0,
+          "fields": [
+            "spectral_class"
+          ],
+          "id": "spectral_class",
+          "label": "Spectral class",
+          "points": 10.0,
+          "tag": "measured",
+          "weight": 10
+        },
+        {
+          "c": 1.0,
+          "fields": [
+            "pm_mas_yr"
+          ],
+          "id": "motion",
+          "label": "Motion on the sky",
+          "points": 5.0,
+          "tag": "measured",
+          "weight": 5
+        },
+        {
+          "c": 0.0,
+          "fields": [],
+          "id": "cells",
+          "label": "Boiling cells",
+          "points": 0.0,
+          "tag": "artistic",
+          "weight": 15
+        },
+        {
+          "c": 0.0,
+          "fields": [],
+          "id": "spots",
+          "label": "Spots",
+          "points": 0.0,
+          "tag": "inferred_from_analog",
+          "weight": 10
+        }
+      ],
+      "measured_share": 0.15,
+      "needed": "",
+      "note": "This is how much of the picture rests on data. It is not the probability that the picture is correct.",
+      "raise": "A better measurement of: radius.",
+      "score": 0.5,
+      "tag": "derived",
+      "threshold": 0.25,
+      "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
+    },
+    "generator_version": "p1-b3",
+    "haptics": {
+      "data": "motion",
+      "data_tag": "measured",
+      "params": {},
+      "texture": "none",
+      "texture_tag": "artistic"
+    },
+    "id": "simbad-alf-cmi",
+    "layers": [
+      {
+        "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
+        "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)",
+        "id": "colour",
+        "requires": [
+          "teff_K"
+        ],
+        "tag": "derived",
+        "tier": 2
+      },
+      {
+        "assumed": {
+          "limb_darkening_u": 0.6
+        },
+        "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+        "formula": "I(mu) = 1 - u * (1 - mu), u = 0.6",
+        "id": "limb_darkening",
+        "requires": [],
+        "tag": "model_dependent",
+        "tier": 3
+      },
+      {
+        "description": "Motion trail from pm_mas_yr over the SPHEREx epochs (R7.5).",
+        "id": "motion_trail",
+        "requires": [
+          "pm_mas_yr"
+        ],
+        "tag": "measured",
+        "tier": 1
+      }
+    ],
+    "lighting": {
+      "mode": "self"
+    },
+    "missing": [
+      "spectrum"
+    ],
+    "scale_m": null,
+    "seed": 1780666277,
+    "type": "star",
+    "view_modes": {
+      "visible": {
+        "available": true,
+        "badge": "Estimated visible colour",
+        "rgb": {
+          "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)",
+          "source": "teff_K = 6589 K",
+          "tag": "derived",
+          "value": [
+            0.9878,
+            0.9399,
+            1.0
+          ]
+        },
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 1780666277,
+  "textures": null
+}
