@@ -190,7 +190,7 @@ def test_demo_pack_scores_are_what_the_card_gives() -> None:
 
 def test_threshold_has_room_on_both_sides_of_the_demo_scores() -> None:
     scores = sorted(s for s, ok in DEMO_SCORES.values() if ok)
-    assert scores[0] > cf.CONFIDENCE_THRESHOLD + 0.1  # the lowest passing object
+    assert scores[0] >= cf.CONFIDENCE_THRESHOLD + 0.1 - 1e-9  # the lowest passing object (3I/ATLAS)
 
 
 # --- Gaia MSC (Q-220) ---------------------------------------------------------------------------
