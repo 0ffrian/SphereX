@@ -4,7 +4,8 @@
 // touches no browser storage. Corrupt or missing storage gives the defaults.
 import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
-import type { HapticOutputs } from './haptics';
+import type { WebVibrateDriver } from './drivers/webVibrate';
+import type { SoundOutputs } from './haptics';
 import { clamp01 } from './pitch';
 import { defaultOutputs, type OutputDefaults } from './platform';
 import { DEFAULT_VOLUME, STRENGTH_MULTIPLIER_MAX, STRENGTH_MULTIPLIER_MIN } from './tuning';
@@ -189,8 +190,12 @@ export function ensureLoaded(): void {
 }
 
 /** Push settings into the engine and drivers. */
-export function applySettings(outputs: HapticOutputs, s: HapticSettings): void {
-  outputs.engine.setDriverEnabled(outputs.vibrate, s.hapticsOn);
+export function applySettings(
+  outputs: SoundOutputs & { vibrate?: WebVibrateDriver },
+  s: HapticSettings,
+): void {
+  // The event engine has no vibrate driver (Q-132); one is present only after the event.
+  if (outputs.vibrate) outputs.engine.setDriverEnabled(outputs.vibrate, s.hapticsOn);
   outputs.engine.setDriverEnabled(outputs.audio, s.soundOn);
   outputs.audio.setVolume(s.volume);
   outputs.engine.setStrengthMultiplier(s.strengthMultiplier);
@@ -200,7 +205,7 @@ export function applySettings(outputs: HapticOutputs, s: HapticSettings): void {
  * Keep an engine in step with the settings: loads them, applies them now and on every change.
  * Returns the unsubscribe function.
  */
-export function bindEngine(outputs: HapticOutputs): () => void {
+export function bindEngine(outputs: SoundOutputs & { vibrate?: WebVibrateDriver }): () => void {
   ensureLoaded();
   applySettings(outputs, useHapticSettings.getState());
   const unsubscribe = useHapticSettings.subscribe((s) => applySettings(outputs, s));
@@ -216,12 +221,20 @@ export function bindEngine(outputs: HapticOutputs): () => void {
  * unloaded: a held train would otherwise keep sounding on throttled timers. `bindEngine` calls
  * this. Returns the function that removes the listeners.
  */
-export function bindPageLifecycle(outputs: Pick<HapticOutputs, 'engine'>): () => void {
+export function bindPageLifecycle(outputs: Pick<SoundOutputs, 'engine'>): () => void {
+  return stopWhenHidden(outputs.engine);
+}
+
+/**
+ * Call `target.stop()` when the page is hidden (`visibilitychange` with `document.hidden`) or
+ * unloaded (`pagehide`). Returns the function that removes the listeners. A no-op without a DOM.
+ */
+export function stopWhenHidden(target: { stop(): void }): () => void {
   if (typeof window === 'undefined' || typeof document === 'undefined') return () => undefined;
   const onVisibility = () => {
-    if (document.hidden) outputs.engine.stop();
+    if (document.hidden) target.stop();
   };
-  const onPageHide = () => outputs.engine.stop();
+  const onPageHide = () => target.stop();
   document.addEventListener('visibilitychange', onVisibility);
   window.addEventListener('pagehide', onPageHide);
   return () => {
