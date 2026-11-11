@@ -33,9 +33,17 @@ Never blank: the fallback is always the path that draws first.
 
 - the spin-up runs under a wall-clock budget (14 ms, Q-306), so how far the clouds and gas flow have developed differs between runs and between the globe and fly instances (Q-313);
 - the render scale adapts to frame time (pinned only for parity runs, `window.__sxPin`);
-- the star engine uses the prototype's fixed seeds, not the card seed.
+- the star engine's flares and plasma use the prototype's fixed seeds; its surface and spots take a seed from the card id (below).
 
 The byte-identical rule still holds for the baked textures (`bake_demo_pack --check`, `bake_fixtures --check`, `bake_reference_objects --check`), the card and RenderParams, and the three.js path.
+
+**Seeds and repeating patterns (issue #93 phase 2).** The same card still gives the same picture. A card object's seed is a 32-bit avalanche hash (`frontend/src/engine/seed.ts`: the card id for worlds and stars, the card seed for rocks) and `seedVec` of it, three integers in [0, 256) that the shaders add to their noise coordinates as a vec3 (`seed3` on a world or rock preset, `so` on a star preset). The prototype's presets have none and keep their integer seed along (1, 1, 1), so `?parity=1` and `?preset=` draw as before (checked pixel-identical: `scripts/engine-bench/patterns.html?what=presets`). With it:
+
+- worlds: every seeded noise layer, the layers that had no seed (sea-ice tint, convective clouds, waves, fly-view sea ice, slope rock, river relief), and a card giant's tracer noise, now taken from the sphere direction instead of one texture tiled 4 x 3 (the three.js fallback, `GasWorld.ts`, does the same);
+- stars: granulation, supergranulation and the filters (`uSO`) and the spot RNG (`rng(1729 ^ seed)`);
+- rocks: the noise offset, the shape and crater RNG (the full hash), per-crater ellipticity, rim height and rim wave, and 0 to 2 boulders a cell (artistic).
+
+The fly view lays its gullies and the gas giant's small-scale detail on planet-fixed cube faces (blended at the seams) instead of the plane under the camera, fades noise octaves over two octaves of pixel footprint, and reads the height and climate grids with a cubic B-spline in shading (the ray march and the shadows keep the bilinear read; the full cubic cost 14 % of a fly frame). The haptics and sound read the same B-spline (`engine/worlds/fieldSampler.ts`). Not changed: the CPU terrain hash and the octave lacunarity (backend change and re-bake, after the event), and Saturn's ring texture (only the Saturn preset draws rings).
 
 **Copied code and deviations (Q-303, Q-335).** Copied blocks sit between `// @verbatim Lstart-Lend` and `// @end-verbatim`. Reviewed fixes are marked `// @deviation (#89 review N)` or `// @deviation (#93 N)` with `@rename` pairs or a split block, and say why; the world extractor carries the #93 ones. The extractors (`frontend/scripts/extract-world-engine.py`, `extract-rock-engine.py`) take the prototype path as an argument or `SX_PREVIEW_HTML`. The world extractor refuses to overwrite a file holding `@deviation` unless `--force`; the rock extractor applies its PATCHES. **Open (Moon):** the prototype HTML and the parity harness (`parity/verbatim_check.py`, `parity/run.cjs`) are not in the repo, so the parity claims cannot be reproduced from a checkout.
 
