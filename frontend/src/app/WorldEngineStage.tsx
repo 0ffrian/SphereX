@@ -5,6 +5,7 @@
 // readouts and the "How each part is worked out" notes go to the build pane's Details through `useBuildControls`.
 // A card `cardToWorld` refuses, a browser without WebGL 2, or "Measured only" keeps the old three.js path (the hosts
 // call `onFail`, or are not mounted at all, see `useEngineWorld`).
+import { useMouldLive } from './build/mouldLive';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { Tag } from '@/contract';
 import { useAppStore } from '@/state/store';
@@ -210,13 +211,17 @@ function useWorldEngine(role: Role, world: CardToWorldOk, onFail: (() => void) |
 
 /** "Forming the planet…": drawn over the canvas until the spin-up has finished, so a half-formed world is never shown. */
 function Forming({ gas }: { gas: boolean }) {
+  // The build pane's MouldAnimation draws over this cover (and says the same words); the cover stays
+  // so a half-formed world is never shown, and the words stay as the accessible status.
+  useEffect(() => {
+    useMouldLive.getState().setForming(true);
+    return () => useMouldLive.getState().setForming(false);
+  }, []);
   return (
-    <div
-      className="absolute inset-0 z-[2] grid place-content-center bg-black text-center text-xs text-neutral-300"
-      role="status"
-      data-testid="world-forming"
-    >
-      {gas ? 'Forming the atmosphere' : 'Forming the planet…'}
+    <div className="absolute inset-0 z-[2] bg-black" data-testid="world-forming">
+      <span className="sr-only" role="status">
+        {gas ? 'Forming the atmosphere' : 'Forming the planet…'}
+      </span>
     </div>
   );
 }
