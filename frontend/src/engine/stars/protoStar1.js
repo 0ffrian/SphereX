@@ -1,31 +1,86 @@
 /* eslint-disable */
 // @ts-nocheck
-// Issue #71, D-37: the approved prototype's star and flare engine, extracted MECHANICALLY and unchanged.
+// Issue #71, D-37: the approved prototype's star and flare engine, extracted MECHANICALLY and unchanged except for the
+// @rename pairs declared below (two hooks for the app, and the deviations listed under them).
 // Source: .claude/worktrees/sculptor-reference/sculptor-preview-next.html, lines 357-662 (Planck colour, star shader FS, star model, tauC, drawStar).
 // Not yet imported by the app: it still needs the TypeScript host (DOM removed, `cardToStar`). Do not edit here;
 // re-run the slicing instead so the body stays byte-identical to the prototype.
+// Deliberate deviations from the prototype (PR #89 review, Atish's call), declared as the last four @rename pairs:
+//  1. Limb darkening: the prototype's T^4 ~ 0.4 + 0.6 mu pinned the disc centre at Teff (the star drawn as if at
+//     0.946 Teff). Now the Eddington approximation T^4 = 3/4 Teff^4 (mu + 2/3), so T = Teff at mu = 2/3 and the
+//     centre is 1.25^(1/4) = 1.0574 Teff; the brightness pow(tl/uTeff, beta) is divided by 1.0574^beta so the
+//     centre intensity is unchanged. model_dependent (grey-atmosphere approximation).
+//  2. Spot temperature: the prototype's umbra was a fixed 0.68 Teff, which over-darkens M-dwarf spots. Now the
+//     umbra is cooler than the surface by dT = clamp(350 + 0.6 (Teff - 3300), 200, 2000) K, a linear fit to the
+//     trend in Berdyugina 2005 (Living Rev. Sol. Phys. 2, 8, fig. 7): about 2,000 K at G0, a few hundred K at
+//     M4. The Sun's umbra stays at 3,939 K (was 3,925 K). The penumbra keeps the prototype's share of the
+//     umbra's deficit (0.885 + 0.05 fil on the Sun = 1 - dT/Teff (0.36 - 0.16 fil)). inferred_from_analog;
+//     the fit coefficients are [verify].
+//  3. X10 flare readout: the prototype's "about every 300 f_sun/f days" is 2.5 to 3 times too frequent for the
+//     Sun (GOES since 1976: about one flare >= X10 per 800 to 1,000 days). Now 900 f_sun/f days. inferred_from_analog.
+// Not changed but labelled: the granulation contrast (+-12 % in temperature, `(gran-.5)*.24`) is 2 to 3 times the
+// observed one, exaggerated so the cells show at this scale: artistic.
 // @verbatim L358-L663
-// @rename m.best=>(CLOSE_AT||m.best) (ema=>(!window.__sxPin&&ema
+// @rename m.best=>(CLOSE_AT||m.best) (ema=>(!window.__sxPin&&ema pow(.4+.6*mu,.25)=>pow(.75*mu+.5,.25) pow(tl/uTeff,uBeta)=>pow(tl/uTeff/1.0574,uBeta) tt=mix(1.,.885+.05*fil,mpn);tt=mix(tt,.68,um);=>tt=mix(1.,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff*(.36-.16*fil),mpn);tt=mix(tt,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff,um); m.f;=>m.f*3;
 /* ---------- Planck spectrum to colour ---------- */
-function g(l, m, s1, s2) { var s = l < m ? s1 : s2, t = (l - m) / s; return Math.exp(-0.5 * t * t); }
+function g(l, m, s1, s2) {
+  var s = l < m ? s1 : s2,
+    t = (l - m) / s;
+  return Math.exp(-0.5 * t * t);
+}
 function planckRGB(T) {
-  var X = 0, Y = 0, Z = 0, l;
+  var X = 0,
+    Y = 0,
+    Z = 0,
+    l;
   for (l = 380; l <= 780; l += 5) {
-    var m = l * 1e-9, B = 1 / (Math.pow(m, 5) * (Math.exp(0.014388 / (m * T)) - 1));
-    X += B * (1.056 * g(l, 599.8, 37.9, 31.0) + 0.362 * g(l, 442.0, 16.0, 26.7) - 0.065 * g(l, 501.1, 20.4, 26.2));
+    var m = l * 1e-9,
+      B = 1 / (Math.pow(m, 5) * (Math.exp(0.014388 / (m * T)) - 1));
+    X +=
+      B *
+      (1.056 * g(l, 599.8, 37.9, 31.0) +
+        0.362 * g(l, 442.0, 16.0, 26.7) -
+        0.065 * g(l, 501.1, 20.4, 26.2));
     Y += B * (0.821 * g(l, 568.8, 46.9, 40.5) + 0.286 * g(l, 530.9, 16.3, 31.1));
     Z += B * (1.217 * g(l, 437.0, 11.8, 36.0) + 0.681 * g(l, 459.0, 26.0, 13.8));
   }
-  var r = 3.2406 * X - 1.5372 * Y - 0.4986 * Z, gg = -0.9689 * X + 1.8758 * Y + 0.0415 * Z, b = 0.0557 * X - 0.2040 * Y + 1.0570 * Z;
-  r = Math.max(r, 0); gg = Math.max(gg, 0); b = Math.max(b, 0);
-  var mx = Math.max(r, gg, b); return [r / mx, gg / mx, b / mx];
+  var r = 3.2406 * X - 1.5372 * Y - 0.4986 * Z,
+    gg = -0.9689 * X + 1.8758 * Y + 0.0415 * Z,
+    b = 0.0557 * X - 0.204 * Y + 1.057 * Z;
+  r = Math.max(r, 0);
+  gg = Math.max(gg, 0);
+  b = Math.max(b, 0);
+  var mx = Math.max(r, gg, b);
+  return [r / mx, gg / mx, b / mx];
 }
-var LUT_MIN = Math.log(1200), LUT_MAX = Math.log(60000), LUT = new Uint8Array(512 * 4);
-(function () { for (var i = 0; i < 512; i++) { var c = planckRGB(Math.exp(lerp(LUT_MIN, LUT_MAX, i / 511))); LUT[i * 4] = c[0] * 255; LUT[i * 4 + 1] = c[1] * 255; LUT[i * 4 + 2] = c[2] * 255; LUT[i * 4 + 3] = 255; } })();
-function hex(c) { return '#' + c.map(function (x) { return Math.round(255 * Math.pow(x, 1 / 2.2)).toString(16).padStart(2, '0'); }).join(''); }
+var LUT_MIN = Math.log(1200),
+  LUT_MAX = Math.log(60000),
+  LUT = new Uint8Array(512 * 4);
+(function () {
+  for (var i = 0; i < 512; i++) {
+    var c = planckRGB(Math.exp(lerp(LUT_MIN, LUT_MAX, i / 511)));
+    LUT[i * 4] = c[0] * 255;
+    LUT[i * 4 + 1] = c[1] * 255;
+    LUT[i * 4 + 2] = c[2] * 255;
+    LUT[i * 4 + 3] = 255;
+  }
+})();
+function hex(c) {
+  return (
+    '#' +
+    c
+      .map(function (x) {
+        return Math.round(255 * Math.pow(x, 1 / 2.2))
+          .toString(16)
+          .padStart(2, '0');
+      })
+      .join('')
+  );
+}
 
 /* ---------- star shader ---------- */
-var VS = '#version 300 es\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0.,1.);}';
+var VS =
+  '#version 300 es\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0.,1.);}';
 var FS = `#version 300 es
 precision highp float;
 uniform vec2 uRes,uOff;
@@ -100,7 +155,7 @@ void main(){
    float fil=vn(vec3(cos(th)*21.,sin(th)*21.,x*2.+float(i)));
    float mpn=1.-smoothstep(.86,1.06,x);
    float um=1.-smoothstep(.36,.46,x);
-   float tt=mix(1.,.885+.05*fil,mpn);tt=mix(tt,.68,um);
+   float tt=mix(1.,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff*(.36-.16*fil),mpn);tt=mix(tt,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff,um);
    tf=min(tf,tt);mp=max(mp,mpn);
    fac=max(fac,exp(-pow(max(x-1.,0.)/1.25,2.)));
   }
@@ -124,8 +179,8 @@ void main(){
    float conv=uConv*(1.-mp);
    float dT=conv*((gran-.5)*.24*vis+(meso-.5)*.07*mvis)+uConv*(sup-.55)*.02;
    dT+=fac*(.012+.05*pow(1.-mu,1.6));
-   float tl=uTeff*tf*(1.+dT)*pow(.4+.6*mu,.25);
-   float I=pow(tl/uTeff,uBeta);
+   float tl=uTeff*tf*(1.+dT)*pow(.75*mu+.5,.25);
+   float I=pow(tl/uTeff/1.0574,uBeta);
    col=lut(tl)*I*.64;
    if(uFilter>1.5){
     float L=dot(col,vec3(.2126,.7152,.0722));
@@ -170,31 +225,89 @@ void main(){
 }`;
 
 function StarGL(canvas) {
-  var gl = canvas.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance' });
+  var gl = canvas.getContext('webgl2', {
+    antialias: false,
+    alpha: false,
+    powerPreference: 'high-performance',
+  });
   if (!gl) throw new Error('no webgl2');
-  function sh(type, src) { var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
-  var p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(p);
+  function sh(type, src) {
+    var s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  var p = gl.createProgram();
+  gl.attachShader(p, sh(gl.VERTEX_SHADER, VS));
+  gl.attachShader(p, sh(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(p);
   if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
-  gl.useProgram(p); gl.bindVertexArray(gl.createVertexArray());
-  var tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.useProgram(p);
+  gl.bindVertexArray(gl.createVertexArray());
+  var tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 512, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, LUT);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  var U = {}; ['uRes', 'uOff', 'uTime', 'uTeff', 'uFreq', 'uConv', 'uHalf', 'uRot', 'uTilt', 'uBeta', 'uFilter', 'uSpots', 'uN', 'uLut'].forEach(function (n) { U[n] = gl.getUniformLocation(p, n); });
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  var U = {};
+  [
+    'uRes',
+    'uOff',
+    'uTime',
+    'uTeff',
+    'uFreq',
+    'uConv',
+    'uHalf',
+    'uRot',
+    'uTilt',
+    'uBeta',
+    'uFilter',
+    'uSpots',
+    'uN',
+    'uLut',
+  ].forEach(function (n) {
+    U[n] = gl.getUniformLocation(p, n);
+  });
   gl.uniform1i(U.uLut, 0);
-  var scale = 1, ema = 16, last = 0;
+  var scale = 1,
+    ema = 16,
+    last = 0;
   this.draw = function (o) {
     var now = performance.now();
-    if (last) { ema = ema * 0.92 + (now - last) * 0.08; if (!window.__sxPin&&ema > 42 && scale > 0.42) { scale *= 0.93; ema = 30; } else if (!window.__sxPin&&ema < 19 && scale < 1) { scale = Math.min(1, scale * 1.01); } }
+    if (last) {
+      ema = ema * 0.92 + (now - last) * 0.08;
+      if (!window.__sxPin && ema > 42 && scale > 0.42) {
+        scale *= 0.93;
+        ema = 30;
+      } else if (!window.__sxPin && ema < 19 && scale < 1) {
+        scale = Math.min(1, scale * 1.01);
+      }
+    }
     last = now;
-    var w = Math.round(canvas.clientWidth * Math.min(devicePixelRatio || 1, 1.5) * scale), h = Math.round(canvas.clientHeight * Math.min(devicePixelRatio || 1, 1.5) * scale);
+    var w = Math.round(canvas.clientWidth * Math.min(devicePixelRatio || 1, 1.5) * scale),
+      h = Math.round(canvas.clientHeight * Math.min(devicePixelRatio || 1, 1.5) * scale);
     if (!w || !h) return;
-    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
     gl.viewport(0, 0, w, h);
-    gl.uniform2f(U.uRes, w, h); gl.uniform2f(U.uOff, o.off[0], o.off[1]);
-    gl.uniform1f(U.uTime, o.time); gl.uniform1f(U.uTeff, o.T); gl.uniform1f(U.uFreq, o.freq); gl.uniform1f(U.uConv, o.conv);
-    gl.uniform1f(U.uHalf, o.half); gl.uniform1f(U.uRot, o.rot); gl.uniform1f(U.uTilt, o.tilt); gl.uniform1f(U.uBeta, clamp(26180 / o.T, 1, 9));
-    gl.uniform1f(U.uFilter, o.filter); gl.uniform4fv(U.uSpots, o.spots); gl.uniform1i(U.uN, o.n);
+    gl.uniform2f(U.uRes, w, h);
+    gl.uniform2f(U.uOff, o.off[0], o.off[1]);
+    gl.uniform1f(U.uTime, o.time);
+    gl.uniform1f(U.uTeff, o.T);
+    gl.uniform1f(U.uFreq, o.freq);
+    gl.uniform1f(U.uConv, o.conv);
+    gl.uniform1f(U.uHalf, o.half);
+    gl.uniform1f(U.uRot, o.rot);
+    gl.uniform1f(U.uTilt, o.tilt);
+    gl.uniform1f(U.uBeta, clamp(26180 / o.T, 1, 9));
+    gl.uniform1f(U.uFilter, o.filter);
+    gl.uniform4fv(U.uSpots, o.spots);
+    gl.uniform1i(U.uN, o.n);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
 }
@@ -207,108 +320,280 @@ var PRESETS = [
   { id: 'g', label: 'Sun', T: 5772, R: 1, M: 1, P: 25.4, dwarf: true },
   { id: 'f', label: 'Yellow-white', T: 6500, R: 1.3, M: 1.25, P: 8, dwarf: true },
   { id: 'a', label: 'White star', T: 8500, R: 1.8, M: 2.0, P: 1.5, dwarf: true },
-  { id: 'b', label: 'Blue star', T: 22000, R: 4.5, M: 9, P: 1.5, dwarf: true }
+  { id: 'b', label: 'Blue star', T: 22000, R: 4.5, M: 9, P: 1.5, dwarf: true },
 ];
 var ST = { p: PRESETS[3], view: 'big', filter: 3, P: 25.4, playing: !reduced, time: 3 };
-var BIG = 30, FILTER_NAME = { 0: 'True colour', 1: 'Hydrogen-alpha', 2: 'Enhanced colour', 3: 'Observatory view' };
-var ROT_MIN = Math.log(0.3), ROT_MAX = Math.log(600);
-var B_SUN = 199 * Math.pow(25.4 / Math.pow(10, 1.16), -1.26), F_SUN = 0.0015, MEAN_A = 7.5e-5 * Math.exp(0.5);
-function tauC(M) { var l = Math.log10(M); return Math.pow(10, 1.16 - 1.49 * l - 0.54 * l * l); }
+var BIG = 30,
+  FILTER_NAME = {
+    0: 'True colour',
+    1: 'Hydrogen-alpha',
+    2: 'Enhanced colour',
+    3: 'Observatory view',
+  };
+var ROT_MIN = Math.log(0.3),
+  ROT_MAX = Math.log(600);
+var B_SUN = 199 * Math.pow(25.4 / Math.pow(10, 1.16), -1.26),
+  F_SUN = 0.0015,
+  MEAN_A = 7.5e-5 * Math.exp(0.5);
+function tauC(M) {
+  var l = Math.log10(M);
+  return Math.pow(10, 1.16 - 1.49 * l - 0.54 * l * l);
+}
 function model() {
-  var p = ST.p, conv = 1 - smooth(6500, 8200, p.T), g0 = 274 * p.M / (p.R * p.R);
-  var Hkm = 8254 * p.T / (1.3 * g0) / 1000, L = 8 * Hkm, Rkm = p.R * 696000, cells = Rkm / L;
-  var Ro = null, B = null, f = 0;
+  var p = ST.p,
+    conv = 1 - smooth(6500, 8200, p.T),
+    g0 = (274 * p.M) / (p.R * p.R);
+  var Hkm = (8254 * p.T) / (1.3 * g0) / 1000,
+    L = 8 * Hkm,
+    Rkm = p.R * 696000,
+    cells = Rkm / L;
+  var Ro = null,
+    B = null,
+    f = 0;
   if (p.dwarf && conv > 0.05) {
     Ro = ST.P / tauC(p.M);
     B = Ro < 0.13 ? 2050 * Math.pow(Ro, -0.11) : 199 * Math.pow(Ro, -1.26);
     f = Math.min(0.25, F_SUN * Math.pow(B / B_SUN, 1.6)) * conv;
   }
-  var nReal = f / MEAN_A, nG = Math.min(12, Math.round(nReal)), k = nG ? f / (nG * MEAN_A) : 1;
-  var r = rng(1729), sp = new Float32Array(48 * 4), n = 0, best = null, bestA = 0, groups = [];
+  var nReal = f / MEAN_A,
+    nG = Math.min(12, Math.round(nReal)),
+    k = nG ? f / (nG * MEAN_A) : 1;
+  var r = rng(1729),
+    sp = new Float32Array(48 * 4),
+    n = 0,
+    best = null,
+    bestA = 0,
+    groups = [];
   var latC = 15 + 45 * Math.min(1, f / 0.2);
-  function box() { return Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(6.2832 * r()); }
-  function put(lat, lon, area) { var th = Math.min(0.5, 2 * Math.sqrt(area)); var c = Math.cos(lat); sp[n * 4] = c * Math.sin(lon); sp[n * 4 + 1] = Math.sin(lat); sp[n * 4 + 2] = c * Math.cos(lon); sp[n * 4 + 3] = th; n++; return th; }
+  function box() {
+    return Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(6.2832 * r());
+  }
+  function put(lat, lon, area) {
+    var th = Math.min(0.5, 2 * Math.sqrt(area));
+    var c = Math.cos(lat);
+    sp[n * 4] = c * Math.sin(lon);
+    sp[n * 4 + 1] = Math.sin(lat);
+    sp[n * 4 + 2] = c * Math.cos(lon);
+    sp[n * 4 + 3] = th;
+    n++;
+    return th;
+  }
   for (var i = 0; i < nG; i++) {
-    r(); var a = 7.5e-5 * Math.exp(box()) * k, hemi = i % 2 ? -1 : 1, la =(latC + 6 * box()) * Math.PI / 180, lon = (i < 3 ? 0.2 + i * 1.1 - 1.1 : r() * 6.2832);
-    la = clamp(la, 3 * Math.PI / 180, 1.3);
-    var tilt = 32 * Math.sin(la) * Math.PI / 180, sep = 8 * Math.sqrt(a) + 0.015, lat = hemi * la;
-    var dLat = hemi * Math.sin(tilt) * sep / 2, dLon = Math.cos(tilt) * sep / 2 / Math.cos(la);
-    var i0 = n; put(lat - dLat, lon + dLon, a * 0.55); put(lat + dLat, lon - dLon, a * 0.30);
-    var lv = [sp[i0 * 4], sp[i0 * 4 + 1], sp[i0 * 4 + 2]], fv = [sp[i0 * 4 + 4], sp[i0 * 4 + 5], sp[i0 * 4 + 6]];
-    var cv = norm([lv[0] + fv[0], lv[1] + fv[1], lv[2] + fv[2]]), es = norm([lv[0] - fv[0], lv[1] - fv[1], lv[2] - fv[2]]);
-    groups.push({ c: cv, es: es, en: [cv[1] * es[2] - cv[2] * es[1], cv[2] * es[0] - cv[0] * es[2], cv[0] * es[1] - cv[1] * es[0]], sep: Math.acos(clamp(lv[0] * fv[0] + lv[1] * fv[1] + lv[2] * fv[2], -1, 1)), area: a });
+    r();
+    var a = 7.5e-5 * Math.exp(box()) * k,
+      hemi = i % 2 ? -1 : 1,
+      la = ((latC + 6 * box()) * Math.PI) / 180,
+      lon = i < 3 ? 0.2 + i * 1.1 - 1.1 : r() * 6.2832;
+    la = clamp(la, (3 * Math.PI) / 180, 1.3);
+    var tilt = (32 * Math.sin(la) * Math.PI) / 180,
+      sep = 8 * Math.sqrt(a) + 0.015,
+      lat = hemi * la;
+    var dLat = (hemi * Math.sin(tilt) * sep) / 2,
+      dLon = (Math.cos(tilt) * sep) / 2 / Math.cos(la);
+    var i0 = n;
+    put(lat - dLat, lon + dLon, a * 0.55);
+    put(lat + dLat, lon - dLon, a * 0.3);
+    var lv = [sp[i0 * 4], sp[i0 * 4 + 1], sp[i0 * 4 + 2]],
+      fv = [sp[i0 * 4 + 4], sp[i0 * 4 + 5], sp[i0 * 4 + 6]];
+    var cv = norm([lv[0] + fv[0], lv[1] + fv[1], lv[2] + fv[2]]),
+      es = norm([lv[0] - fv[0], lv[1] - fv[1], lv[2] - fv[2]]);
+    groups.push({
+      c: cv,
+      es: es,
+      en: [
+        cv[1] * es[2] - cv[2] * es[1],
+        cv[2] * es[0] - cv[0] * es[2],
+        cv[0] * es[1] - cv[1] * es[0],
+      ],
+      sep: Math.acos(clamp(lv[0] * fv[0] + lv[1] * fv[1] + lv[2] * fv[2], -1, 1)),
+      area: a,
+    });
     put(lat + dLat * 0.2 + 0.6 * sep * (r() - 0.5), lon - 0.4 * dLon, a * 0.075);
     put(lat - 0.5 * dLat + 0.6 * sep * (r() - 0.5), lon + 0.1 * dLon, a * 0.075);
-    if (a > bestA) { bestA = a; best = [lat, lon]; }
+    if (a > bestA) {
+      bestA = a;
+      best = [lat, lon];
+    }
   }
-  return { conv: conv, g: g0, Hkm: Hkm, L: L, cells: cells, Ro: Ro, B: B, f: f, nReal: nReal, nG: nG, sp: sp, n: n, best: best, groups: groups };
+  return {
+    conv: conv,
+    g: g0,
+    Hkm: Hkm,
+    L: L,
+    cells: cells,
+    Ro: Ro,
+    B: B,
+    f: f,
+    nReal: nReal,
+    nG: nG,
+    sp: sp,
+    n: n,
+    best: best,
+    groups: groups,
+  };
 }
-function norm(v) { var l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; }
+function norm(v) {
+  var l = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / l, v[1] / l, v[2] / l];
+}
 var MODEL = null;
-function fmt(x, d) { return x.toLocaleString('en', { maximumFractionDigits: d == null ? 0 : d }); }
+function fmt(x, d) {
+  return x.toLocaleString('en', { maximumFractionDigits: d == null ? 0 : d });
+}
 function readouts() {
-  var p = ST.p, m = MODEL, c = planckRGB(p.T);
+  var p = ST.p,
+    m = MODEL,
+    c = planckRGB(p.T);
   var rows = [
     ['Surface temperature', fmt(p.T) + ' K'],
-    ['Colour from the spectrum', '<span class="swatch" style="background:' + hex(c) + '"></span>' + hex(c)],
-    ['Brightest wavelength', fmt(2898 / p.T * 1000) + ' nm'],
-    ['Surface gravity', fmt(m.g, m.g < 1 ? 3 : 0) + ' m/s²']
+    [
+      'Colour from the spectrum',
+      '<span class="swatch" style="background:' + hex(c) + '"></span>' + hex(c),
+    ],
+    ['Brightest wavelength', fmt((2898 / p.T) * 1000) + ' nm'],
+    ['Surface gravity', fmt(m.g, m.g < 1 ? 3 : 0) + ' m/s²'],
   ];
   if (m.conv > 0.05) {
-    rows.push(['Size of one cell', m.L > 1e5 ? fmt(m.L / 1e6, 0) + ' million km' : fmt(m.L, 0) + ' km']);
+    rows.push([
+      'Size of one cell',
+      m.L > 1e5 ? fmt(m.L / 1e6, 0) + ' million km' : fmt(m.L, 0) + ' km',
+    ]);
     rows.push(['Cells per star radius', fmt(m.cells)]);
   } else rows.push(['Boiling cells', 'None: no outer convection']);
   if (m.Ro != null) {
     rows.push(['Rossby number', fmt(m.Ro, 2)]);
     rows.push(['Average magnetic field', fmt(m.B) + ' G']);
     rows.push(['Surface covered by spots', fmt(m.f * 100, 2) + '%']);
-    rows.push(['Spot groups' + (m.nReal > 12 ? ' (12 largest drawn)' : ''), fmt(Math.round(m.nReal))]);
-    var d = 300 * F_SUN / m.f; rows.push(['X10 flare, about every', d >= 2 ? fmt(d) + ' days' : fmt(d * 24, 0) + ' hours']);
+    rows.push([
+      'Spot groups' + (m.nReal > 12 ? ' (12 largest drawn)' : ''),
+      fmt(Math.round(m.nReal)),
+    ]);
+    var d = ((300 * F_SUN) / m.f) * 3;
+    rows.push(['X10 flare, about every', d >= 2 ? fmt(d) + ' days' : fmt(d * 24, 0) + ' hours']);
   } else rows.push(['Magnetic field', p.dwarf ? 'No surface dynamo' : 'Fit covers dwarfs only']);
-  $('#star-read').innerHTML = rows.map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('');
+  $('#star-read').innerHTML = rows
+    .map(function (r) {
+      return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>';
+    })
+    .join('');
   var live = p.dwarf && m.conv > 0.05;
   $('#rot').disabled = !live;
-  $('#rot-v').textContent = live ? (ST.P < 2 ? fmt(ST.P, 1) : fmt(ST.P)) + ' days' : 'not used for this star';
-  $('#rot').value = Math.round((Math.log(ST.P) - ROT_MIN) / (ROT_MAX - ROT_MIN) * 1000);
+  $('#rot-v').textContent = live
+    ? (ST.P < 2 ? fmt(ST.P, 1) : fmt(ST.P)) + ' days'
+    : 'not used for this star';
+  $('#rot').value = Math.round(((Math.log(ST.P) - ROT_MIN) / (ROT_MAX - ROT_MIN)) * 1000);
 }
 function caption() {
-  var m = MODEL, p = ST.p, t;
-  if (m.conv < 0.05) t = 'Stars this hot have almost no convection near the surface, so there are no boiling cells and no sunspots. The smooth look is the correct one.';
-  else if (ST.view === 'true') t = m.cells > 150 ? 'True scale. Real cells are smaller than a pixel at this distance, which is why a whole star looks smooth in visible light.' : 'True scale. Low gravity makes the cells enormous, so a giant shows only a handful at once.';
-  else if (ST.view === 'big') t = m.cells > BIG ? 'Cells drawn ' + fmt(m.cells / BIG) + ' times larger than life so the boiling reads at this distance. The app would label this layer Default (artistic).' : 'Cells at true scale. Low gravity makes them this large.';
-  else t = 'Close-up at true scale, with contrast raised the way processed solar images are. One cell is about ' + (m.L > 1e5 ? fmt(m.L / 1e6) + ' million km' : fmt(m.L) + ' km') + ' across and lasts minutes on the Sun. Motion is sped up.';
+  var m = MODEL,
+    p = ST.p,
+    t;
+  if (m.conv < 0.05)
+    t =
+      'Stars this hot have almost no convection near the surface, so there are no boiling cells and no sunspots. The smooth look is the correct one.';
+  else if (ST.view === 'true')
+    t =
+      m.cells > 150
+        ? 'True scale. Real cells are smaller than a pixel at this distance, which is why a whole star looks smooth in visible light.'
+        : 'True scale. Low gravity makes the cells enormous, so a giant shows only a handful at once.';
+  else if (ST.view === 'big')
+    t =
+      m.cells > BIG
+        ? 'Cells drawn ' +
+          fmt(m.cells / BIG) +
+          ' times larger than life so the boiling reads at this distance. The app would label this layer Default (artistic).'
+        : 'Cells at true scale. Low gravity makes them this large.';
+  else
+    t =
+      'Close-up at true scale, with contrast raised the way processed solar images are. One cell is about ' +
+      (m.L > 1e5 ? fmt(m.L / 1e6) + ' million km' : fmt(m.L) + ' km') +
+      ' across and lasts minutes on the Sun. Motion is sped up.';
   if (ST.filter === 3 && m.conv >= 0.05) t = '';
-  if (ST.filter === 3) t += ' False-colour extreme ultraviolet, the kind of view NASA’s SDO spacecraft shows. It reveals the hot atmosphere, so loops and flares stand out.';
-  if (ST.filter === 2) t += ' Enhanced colour deepens the star’s real hue so differences between stars are easy to see. The swatch on the right is its true colour.';
-  if (ST.filter === 0 && m.groups.length) t += ' Loops and most flares are too faint to see against the disc in true colour, so they are hidden here.';
-  if (ST.filter !== 0 && ST.view !== 'close' && m.groups.length) t += (ST.view === 'big' ? ' Loops are drawn 3 times larger so they read at this distance.' : ' Loops are at true scale.') + ' The flare schedule is sped up: one second is about 29 hours. Flare arches are turned by up to 75° so you see them side-on.';
+  if (ST.filter === 3)
+    t +=
+      ' False-colour extreme ultraviolet, the kind of view NASA’s SDO spacecraft shows. It reveals the hot atmosphere, so loops and flares stand out.';
+  if (ST.filter === 2)
+    t +=
+      ' Enhanced colour deepens the star’s real hue so differences between stars are easy to see. The swatch on the right is its true colour.';
+  if (ST.filter === 0 && m.groups.length)
+    t +=
+      ' Loops and most flares are too faint to see against the disc in true colour, so they are hidden here.';
+  if (ST.filter !== 0 && ST.view !== 'close' && m.groups.length)
+    t +=
+      (ST.view === 'big'
+        ? ' Loops are drawn 3 times larger so they read at this distance.'
+        : ' Loops are at true scale.') +
+      ' The flare schedule is sped up: one second is about 29 hours. Flare arches are turned by up to 75° so you see them side-on.';
   $('#star-cap').textContent = t.trim();
   $('#star-tag').textContent = p.label + ' · ' + FILTER_NAME[ST.filter];
 }
 function pills(host, items, cur, on) {
   host.innerHTML = '';
   items.forEach(function (it) {
-    var b = document.createElement('button'); b.type = 'button'; b.className = 'b'; b.textContent = it.label; b.dataset.id = it.id;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'b';
+    b.textContent = it.label;
+    b.dataset.id = it.id;
     b.setAttribute('aria-pressed', String(it.id === cur));
-    b.addEventListener('click', function () { [].forEach.call(host.children, function (c) { c.setAttribute('aria-pressed', String(c === b)); }); on(it); });
+    b.addEventListener('click', function () {
+      [].forEach.call(host.children, function (c) {
+        c.setAttribute('aria-pressed', String(c === b));
+      });
+      on(it);
+    });
     host.appendChild(b);
   });
 }
-var starGL = null, flareGL = null, starErr = false;
-try { starGL = new StarGL($('#star-c')); } catch (e) { starErr = true; console.error(e); }
-try { flareGL = new StarGL($('#flare-c')); } catch (e) { console.error(e); }
-if (starErr) { var d = document.createElement('div'); d.className = 'fail'; d.textContent = 'This browser could not start WebGL 2, so the live star cannot be shown.'; $('#star-stage').appendChild(d); }
+var starGL = null,
+  flareGL = null,
+  starErr = false;
+try {
+  starGL = new StarGL($('#star-c'));
+} catch (e) {
+  starErr = true;
+  console.error(e);
+}
+try {
+  flareGL = new StarGL($('#flare-c'));
+} catch (e) {
+  console.error(e);
+}
+if (starErr) {
+  var d = document.createElement('div');
+  d.className = 'fail';
+  d.textContent = 'This browser could not start WebGL 2, so the live star cannot be shown.';
+  $('#star-stage').appendChild(d);
+}
 function drawStar() {
   if (!starGL) return;
-  var m = MODEL, half = 1.28, off = [0, 0], rot = 0.55 + ST.time * 0.012, tilt = 0.12, freq = m.cells;
+  var m = MODEL,
+    half = 1.28,
+    off = [0, 0],
+    rot = 0.55 + ST.time * 0.012,
+    tilt = 0.12,
+    freq = m.cells;
   if (ST.view === 'big') freq = Math.min(m.cells, BIG);
   if (ST.view === 'close') {
     half = Math.min(1.28, 15 / m.cells);
-    var b = (CLOSE_AT||m.best) || [0.26, 0.5];
-    var c = Math.cos(b[0]), L = [c * Math.sin(b[1]), Math.sin(b[0]), c * Math.cos(b[1])];
-    tilt = -Math.asin(L[1]); rot = Math.atan2(L[0], L[2]);
+    var b = CLOSE_AT || m.best || [0.26, 0.5];
+    var c = Math.cos(b[0]),
+      L = [c * Math.sin(b[1]), Math.sin(b[0]), c * Math.cos(b[1])];
+    tilt = -Math.asin(L[1]);
+    rot = Math.atan2(L[0], L[2]);
   }
-  starGL.draw({ off: off, time: ST.time, T: ST.p.T, freq: freq, conv: m.conv, half: half, rot: rot, tilt: tilt, filter: ST.filter, spots: m.sp, n: m.n });
+  starGL.draw({
+    off: off,
+    time: ST.time,
+    T: ST.p.T,
+    freq: freq,
+    conv: m.conv,
+    half: half,
+    rot: rot,
+    tilt: tilt,
+    filter: ST.filter,
+    spots: m.sp,
+    n: m.n,
+  });
   drawOverlay(rot, tilt, half);
 }
 

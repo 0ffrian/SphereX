@@ -9,7 +9,10 @@ export const worldStats = { worker: 0, main: 0 };
 
 let worker: Worker | null = null;
 let nextId = 1;
-const pending = new Map<number, { resolve: (r: WorldResponse) => void; reject: (e: Error) => void }>();
+const pending = new Map<
+  number,
+  { resolve: (r: WorldResponse) => void; reject: (e: Error) => void }
+>();
 
 function getWorker(): Worker | null {
   if (worker) return worker;

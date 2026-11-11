@@ -4,8 +4,32 @@
 import type { DemoTarget } from './demoTargets';
 
 export const REFERENCE_TARGETS: readonly DemoTarget[] = [
-  { name: 'Jupiter', aliases: ['jupiter', 'jove'], query: 'Jupiter', id: 'ref-jupiter', classLabel: 'gas giant · reference planet' },
-  { name: 'Saturn', aliases: ['saturn', 'rings'], query: 'Saturn', id: 'ref-saturn', classLabel: 'gas giant · reference planet' },
-  { name: 'Titan', aliases: ['titan', 'saturn vi', 'moon of saturn'], query: 'Titan', id: 'ref-titan', classLabel: 'rocky world · moon of Saturn' },
-  { name: 'Sun', aliases: ['sun', 'sol', 'the sun'], query: 'Sun', id: 'ref-sun', classLabel: 'star · our Sun' },
+  {
+    name: 'Jupiter',
+    aliases: ['jupiter', 'jove'],
+    query: 'Jupiter',
+    id: 'ref-jupiter',
+    classLabel: 'gas giant · reference planet',
+  },
+  {
+    name: 'Saturn',
+    aliases: ['saturn', 'rings'],
+    query: 'Saturn',
+    id: 'ref-saturn',
+    classLabel: 'gas giant · reference planet',
+  },
+  {
+    name: 'Titan',
+    aliases: ['titan', 'saturn vi', 'moon of saturn'],
+    query: 'Titan',
+    id: 'ref-titan',
+    classLabel: 'rocky world · moon of Saturn',
+  },
+  {
+    name: 'Sun',
+    aliases: ['sun', 'sol', 'the sun'],
+    query: 'Sun',
+    id: 'ref-sun',
+    classLabel: 'star · our Sun',
+  },
 ];

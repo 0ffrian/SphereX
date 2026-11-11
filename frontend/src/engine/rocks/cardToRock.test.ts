@@ -56,6 +56,7 @@ describe('cardToRock', () => {
     const c = card({ diameter_km: tv(3), rot_period_h: tv(4) });
     expect(cardToRock(c, { seed: 77 })).toEqual(cardToRock(c, { seed: 77 }));
     expect(rockSeed(2518080627)).toBeLessThan(97);
+    expect(rockSeed(2518080627)).toBe(rockSeed(2518080627));
     expect(classFamily('Cb')).toBe('C');
     expect(classFamily('X')).toBeNull();
   });
@@ -102,5 +103,44 @@ describe('radialHeights', () => {
     const plain = cardToRock(card({ diameter_km: tv(2) }), { seed: 1 });
     if ('refused' in plain) throw new Error('refused');
     expect(plain.mismatches).toEqual([]);
+  });
+});
+
+describe('review fixes (#71)', () => {
+  it('Bennu-class density is 1,190 kg/m3 (Lauretta et al. 2019)', () => {
+    const r = cardToRock(card({ diameter_km: tv(0.49), spectral_class: tv('B') }), { seed: 1 });
+    if ('refused' in r) throw new Error('refused');
+    expect(r.preset.rho).toBe(1190);
+    expect(r.inputs.density.value).toBe('1,190 kg/m³');
+  });
+  it("a preset body's badges show the drawn values and say what the card has", () => {
+    // 'Oumuamua: no class on the card, so the card-side analog is 1,500; the preset draws 2,000.
+    const r = cardToRock(card({ id: 'sbdb-50788063', diameter_km: tv(0.5) }), { seed: 1 });
+    if ('refused' in r) throw new Error('refused');
+    expect(r.preset.rho).toBe(2000);
+    expect(r.inputs.density.value).toBe('2,000 kg/m³');
+    expect(r.inputs.density.tag).toBe('artistic');
+    expect(r.inputs.density.why).toMatch(/the card says 1,500 kg\/m³/);
+    expect(r.inputs.size.why).toMatch(/the card says 500 m/);
+  });
+  it('folds the seed into a small float range with few collisions', () => {
+    const seen = new Set<number>();
+    for (let s = 0; s < 5000; s++) {
+      const v = rockSeed(s * 2654435761);
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThan(97);
+      seen.add(v);
+    }
+    expect(seen.size).toBeGreaterThan(4950); // the old `% 97` gave at most 97
+    // The artifact's own bodies keep their integer seeds (the parity look).
+    const eros = cardToRock(card({ id: 'sbdb-20000433', diameter_km: tv(16.8) }), { seed: 123 });
+    if ('refused' in eros) throw new Error('refused');
+    expect(eros.preset.seed).toBe(29);
+  });
+  it('tags the lighting model artistic', () => {
+    const r = cardToRock(card({ diameter_km: tv(2) }), { seed: 1 });
+    if ('refused' in r) throw new Error('refused');
+    expect(r.inputs.light.tag).toBe('artistic');
+    expect(r.inputs.light.why).toMatch(/no brightening at opposition/);
   });
 });

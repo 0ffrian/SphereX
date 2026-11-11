@@ -13,8 +13,7 @@ import {
 } from '@/physics/gasDynamics';
 
 export type GasRequest =
-  | { id: number; kind: 'init'; input: GasInput }
-  | { id: number; kind: 'advance'; steps: number };
+  { id: number; kind: 'init'; input: GasInput } | { id: number; kind: 'advance'; steps: number };
 export type GasResponse =
   | { id: number; ok: true; steps: number; field: Float32Array; storms: PlacedStorm[] }
   | { id: number; ok: false; error: string };
@@ -32,20 +31,29 @@ export function initGasHost(input: GasInput): GasHost | null {
 }
 
 /** The worker's whole job without the messaging, so it can be tested. `host` is replaced by `init`. */
-export function handleGasRequest(
-  state: { host: GasHost | null },
-  req: GasRequest,
-): GasResponse {
+export function handleGasRequest(state: { host: GasHost | null }, req: GasRequest): GasResponse {
   try {
     if (req.kind === 'init') {
       state.host = initGasHost(req.input);
       if (!state.host) return { id: req.id, ok: false, error: 'the gas model has a missing input' };
-      return { id: req.id, ok: true, steps: 0, field: state.host.sim.exportField(true).slice(), storms: state.host.sim.placedStorms() };
+      return {
+        id: req.id,
+        ok: true,
+        steps: 0,
+        field: state.host.sim.exportField(true).slice(),
+        storms: state.host.sim.placedStorms(),
+      };
     }
     const host = state.host;
     if (!host) return { id: req.id, ok: false, error: 'not initialised' };
     for (let i = 0; i < req.steps; i++) host.sim.step();
-    return { id: req.id, ok: true, steps: host.sim.steps, field: host.sim.exportField().slice(), storms: host.sim.placedStorms() };
+    return {
+      id: req.id,
+      ok: true,
+      steps: host.sim.steps,
+      field: host.sim.exportField().slice(),
+      storms: host.sim.placedStorms(),
+    };
   } catch (err) {
     return { id: req.id, ok: false, error: err instanceof Error ? err.message : String(err) };
   }

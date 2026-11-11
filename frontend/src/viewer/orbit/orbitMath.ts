@@ -213,7 +213,12 @@ export function flyKeyAction(key: string, altKm: number): FlyKeyAction | null {
   }
 }
 
-export function applyFlyKey(s: FlyState, a: FlyKeyAction, kind: OrbitKind, radiusKm: number): FlyState {
+export function applyFlyKey(
+  s: FlyState,
+  a: FlyKeyAction,
+  kind: OrbitKind,
+  radiusKm: number,
+): FlyState {
   switch (a.type) {
     case 'move':
       return flyMove(s, a.km, 0, radiusKm);
@@ -272,7 +277,12 @@ export const PEAK_SUN_SIN: readonly [number, number] = [0.42, 0.87];
  * Prototype `flyAimPeak`: from orbit, look at the highest sunlit land from about 1.4 heights back.
  * Null when there is no land high enough (an ocean world, or no height grid).
  */
-export function aimAtPeak(g: HeightGrid | null, sun: SunDir, altKm: number, radiusKm: number): FlyState | null {
+export function aimAtPeak(
+  g: HeightGrid | null,
+  sun: SunDir,
+  altKm: number,
+  radiusKm: number,
+): FlyState | null {
   if (!g) return null;
   let best = -1e9;
   let bi = 0;

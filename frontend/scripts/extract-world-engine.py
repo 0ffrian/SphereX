@@ -1,16 +1,26 @@
 #!/usr/bin/env python3
 """Extract the approved prototype's world engine (D-37) verbatim into frontend/src/engine/worlds/.
 
-Usage: python3 extract-world-engine.py [SRC_HTML] [OUT_DIR]
+Usage: python3 extract-world-engine.py SRC_HTML [OUT_DIR] [--force]
+       (or set SX_PREVIEW_HTML instead of passing SRC_HTML)
 The source is sculptor-preview-next.html (sculptor-reference worktree). Every slice is a 1-based
 inclusive line range copied byte for byte. The only edits are the named substitutions in SUBS
-(references to prototype globals/DOM, plus four timing knobs). Re-run to regenerate; do not hand-edit the output.
+(references to prototype globals/DOM, plus four timing knobs).
+
+PR #89 review: the committed engine files now carry reviewed physics fixes, marked `// @deviation`
+(with `@rename` pairs or split `@verbatim` blocks) that this script does not reproduce. It refuses to
+overwrite a file holding a `@deviation` unless --force is given; port those deviations into SUBS (or
+into the prototype) before regenerating, or the fixes are lost.
 """
 import sys, os, re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SRC = sys.argv[1] if len(sys.argv) > 1 else '/home/moon/Desktop/Projects/SphereX/.claude/worktrees/sculptor-reference/sculptor-preview-next.html'
-OUT = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, '..', 'src', 'engine', 'worlds')
+FORCE = '--force' in sys.argv
+ARGS = [a for a in sys.argv[1:] if a != '--force']
+SRC = ARGS[0] if ARGS else os.environ.get('SX_PREVIEW_HTML')
+if not SRC:
+    raise SystemExit('usage: extract-world-engine.py SRC_HTML [OUT_DIR] [--force] (or set SX_PREVIEW_HTML)')
+OUT = ARGS[1] if len(ARGS) > 1 else os.path.join(HERE, '..', 'src', 'engine', 'worlds')
 L = open(SRC, encoding='utf-8').read().split('\n')
 SRC_NAME = 'sculptor-preview-next.html'
 
@@ -41,7 +51,13 @@ HELPERS_NAMES = 'clamp, lerp, sstep, fmt, rng, g, planck, planckRGB, LMIN, LMAX,
 
 
 def w(name, text):
-    with open(os.path.join(OUT, name), 'w', encoding='utf-8') as f:
+    path = os.path.join(OUT, name)
+    if not FORCE and os.path.exists(path):
+        with open(path, encoding='utf-8') as f:
+            if '@deviation' in f.read():
+                raise SystemExit('%s holds reviewed @deviation fixes (PR #89) that this script would drop; '
+                                 'port them into SUBS first, or pass --force' % path)
+    with open(path, 'w', encoding='utf-8') as f:
         f.write(text)
 
 

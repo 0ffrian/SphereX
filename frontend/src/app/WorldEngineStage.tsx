@@ -14,7 +14,12 @@ import { worldEngineSupported } from '@/engine/worlds/support';
 import type { FluidKey, SpinMode } from '@/engine/worlds/types';
 import { ProvenanceBadge } from './Badge';
 import { useCloseUpStore } from './closeUpStore';
-import { useBuildControls, type BuildControl, type BuildControlsSpec, type BuildNote } from './build/BuildControls';
+import {
+  useBuildControls,
+  type BuildControl,
+  type BuildControlsSpec,
+  type BuildNote,
+} from './build/BuildControls';
 import { buttonClass, pressedClass } from './ui';
 import { drawReady, useWorldStore } from './worldStore';
 import { FLY_NOTE, WORLD_HONESTY, WORLD_NOTE_LINES } from './worldNotes.generated';
@@ -35,7 +40,8 @@ const ORB = [Math.log(0.25), Math.log(5)] as const;
 const PS = [Math.log(0.002), Math.log(100)] as const;
 const toSlider = (v: number, r: readonly [number, number]): number =>
   Math.max(0, Math.min(1000, Math.round(((Math.log(v) - r[0]) / (r[1] - r[0])) * 1000)));
-const fromSlider = (s: number, r: readonly [number, number]): number => Math.exp(r[0] + (r[1] - r[0]) * (s / 1000));
+const fromSlider = (s: number, r: readonly [number, number]): number =>
+  Math.exp(r[0] + (r[1] - r[0]) * (s / 1000));
 
 const fmt = (x: number, d = 0): string => x.toLocaleString('en', { maximumFractionDigits: d });
 
@@ -60,7 +66,9 @@ export { WORLD_NOTE_LINES, WORLD_HONESTY, FLY_NOTE };
 
 /** Notes for the Details panel: the prototype's list plus what `cardToWorld` filled in or changed. */
 export function worldNotes(world: CardToWorldOk): BuildNote[] {
-  const notes: BuildNote[] = [{ title: 'How each part is worked out', lines: WORLD_NOTE_LINES, placeholder: WORLD_HONESTY }];
+  const notes: BuildNote[] = [
+    { title: 'How each part is worked out', lines: WORLD_NOTE_LINES, placeholder: WORLD_HONESTY },
+  ];
   if (world.assumptions.length || world.mismatches.length || world.missing.length) {
     const lines = world.assumptions.map((a) => `${a.field} = ${String(a.value)}: ${a.note}.`);
     for (const m of world.mismatches) lines.push(`Differs from the artifact: ${m}.`);
@@ -68,14 +76,18 @@ export function worldNotes(world: CardToWorldOk): BuildNote[] {
     notes.push({
       title: 'Filled in, not measured',
       lines,
-      placeholder: 'Each of these is an assumption of the model (Estimated or Default), not a measurement of this world.',
+      placeholder:
+        'Each of these is an assumption of the model (Estimated or Default), not a measurement of this world.',
     });
   }
   return notes;
 }
 
 function reducedMotion(): boolean {
-  return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  return (
+    typeof window !== 'undefined' &&
+    !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  );
 }
 
 type Role = 'globe' | 'fly';
@@ -128,7 +140,8 @@ function useWorldEngine(role: Role, world: CardToWorldOk, onFail: (() => void) |
     };
     canvas.addEventListener('webglcontextlost', onLost);
     // Dev only: the verification scripts (issue #71) read and drive the engines through these.
-    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>)[`__sxWorld_${role}`] = e;
+    if (import.meta.env.DEV)
+      (window as unknown as Record<string, unknown>)[`__sxWorld_${role}`] = e;
 
     // The world holds still while it forms (so the turn angle, and with it where the Sun is, stays what the
     // artifact has when its user presses Surface view) and starts moving when it has settled.
@@ -183,7 +196,8 @@ function useWorldEngine(role: Role, world: CardToWorldOk, onFail: (() => void) |
       wasForming = forming;
     }, 400);
     return () => {
-      if (import.meta.env.DEV) (window as unknown as Record<string, unknown>)[`__sxWorld_${role}`] = null;
+      if (import.meta.env.DEV)
+        (window as unknown as Record<string, unknown>)[`__sxWorld_${role}`] = null;
       dead = true;
       canvas.removeEventListener('webglcontextlost', onLost);
       cancelAnimationFrame(raf);
@@ -232,7 +246,10 @@ const TECT_OPTIONS = [
   { value: 'plates', label: 'Moving plates' },
   { value: 'lid', label: 'Stagnant lid' },
 ];
-const LAYER_OPTIONS = ['Surface', 'Plates', 'Rainfall', 'Currents', 'Water'].map((label, i) => ({ value: String(i), label }));
+const LAYER_OPTIONS = ['Surface', 'Plates', 'Rainfall', 'Currents', 'Water'].map((label, i) => ({
+  value: String(i),
+  label,
+}));
 const TIME_OPTIONS = [
   { value: '300', label: '5 minutes per second' },
   { value: '86400', label: '1 day per second' },
@@ -252,18 +269,33 @@ export function worldControls(
   const t = world.tags;
   const gas = s.gas;
   const controls: BuildControl[] = [
-    { id: 'what', kind: 'readout', label: 'What you are seeing', value: r.caption, tag: 'model_dependent' },
+    {
+      id: 'what',
+      kind: 'readout',
+      label: 'What you are seeing',
+      value: r.caption,
+      tag: 'model_dependent',
+    },
     { id: 'tag', kind: 'readout', label: 'Now showing', value: r.tag, tag: 'model_dependent' },
     {
       id: 'fluid',
       kind: 'choice',
       label: 'Surface fluid',
       value: s.fluid,
-      options: (Object.keys(WORLD_FLUIDS) as FluidKey[]).map((k) => ({ value: k, label: FLUID_LABEL(k) })),
+      options: (Object.keys(WORLD_FLUIDS) as FluidKey[]).map((k) => ({
+        value: k,
+        label: FLUID_LABEL(k),
+      })),
       tag: t.fluid ?? 'model_dependent',
       onChange: (v) => apply({ fluid: v as FluidKey }),
     },
-    { id: 'pause', kind: 'toggle', label: 'Pause', pressed: !playing, onChange: (p) => setPlaying(!p) },
+    {
+      id: 'pause',
+      kind: 'toggle',
+      label: 'Pause',
+      pressed: !playing,
+      onChange: (p) => setPlaying(!p),
+    },
   ];
   if (gas) {
     controls.push({
@@ -344,7 +376,9 @@ export function worldControls(
         valueText: `${fmt(s.obl * 57.2958, 1)}°`,
         tag: 'model_dependent',
         disabled: s.locked,
-        why: s.locked ? 'Not used: a locked planet keeps one face to its star.' : 'Not on the card; upright unless you tilt it.',
+        why: s.locked
+          ? 'Not used: a locked planet keeps one face to its star.'
+          : 'Not on the card; upright unless you tilt it.',
         onChange: (v) => apply({ obl: v / 57.2958 }),
       },
       {
@@ -402,8 +436,19 @@ export function worldControls(
       onChange: (v) => apply({ Ps: fromSlider(v, PS) }),
     },
   );
+  // Jupiter and Saturn carry measured peak winds and flattening (cardToWorld: tags.Umeas / tags.fMeas).
+  const measuredReadout: Record<string, Tag | undefined> = {
+    'Wind speed': world.tags.Umeas,
+    'Flattened by spin': world.tags.fMeas,
+  };
   for (const [label, value] of r.rows)
-    controls.push({ id: `r-${label}`, kind: 'readout', label, value, tag: READOUT_TAG[label] ?? 'model_dependent' });
+    controls.push({
+      id: `r-${label}`,
+      kind: 'readout',
+      label,
+      value,
+      tag: measuredReadout[label] ?? READOUT_TAG[label] ?? 'model_dependent',
+    });
   if (world.assumptions.length)
     controls.push({
       id: 'assumed',
@@ -435,7 +480,8 @@ export function WorldGlobeStage({ world, onFail }: { world: CardToWorldOk; onFai
   // Looked up each render on purpose: the engine is the single source of truth for every value.
   const state = engine?.state();
   const spec = useMemo(
-    () => (engine ? worldControls(world, engine, engine.state(), playing, apply, setPlaying) : null),
+    () =>
+      engine ? worldControls(world, engine, engine.state(), playing, apply, setPlaying) : null,
     // `rev` stands for "something the engine changed"; the clock bumps it while the world moves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [engine, world, playing, apply, setPlaying, rev, clock, bump],
@@ -482,11 +528,18 @@ export function WorldGlobeStage({ world, onFail }: { world: CardToWorldOk; onFai
     const key = (e: KeyboardEvent) => {
       if (useWorldStore.getState().fly || !canTurn()) return;
       const s = engine.state();
-      const d: Record<string, [number, number]> = { ArrowLeft: [-0.1, 0], ArrowRight: [0.1, 0], ArrowUp: [0, -0.1], ArrowDown: [0, 0.1] };
+      const d: Record<string, [number, number]> = {
+        ArrowLeft: [-0.1, 0],
+        ArrowRight: [0.1, 0],
+        ArrowUp: [0, -0.1],
+        ArrowDown: [0, 0.1],
+      };
       const mv = d[e.key];
       if (!mv) return;
       e.preventDefault();
-      useWorldStore.getState().apply({ yaw: s.yaw + mv[0], pitch: Math.max(-1.4, Math.min(1.4, s.pitch + mv[1])) });
+      useWorldStore
+        .getState()
+        .apply({ yaw: s.yaw + mv[0], pitch: Math.max(-1.4, Math.min(1.4, s.pitch + mv[1])) });
     };
     canvas.addEventListener('pointerdown', down);
     canvas.addEventListener('pointermove', move);
@@ -495,7 +548,10 @@ export function WorldGlobeStage({ world, onFail }: { world: CardToWorldOk; onFai
     canvas.addEventListener('keydown', key);
     canvas.tabIndex = 0;
     canvas.setAttribute('role', 'application');
-    canvas.setAttribute('aria-label', `${world.preset.label}, simulated planet. Click a place to look at it in the close-up on the left.`);
+    canvas.setAttribute(
+      'aria-label',
+      `${world.preset.label}, simulated planet. Click a place to look at it in the close-up on the left.`,
+    );
     return () => {
       canvas.removeEventListener('pointerdown', down);
       canvas.removeEventListener('pointermove', move);
@@ -593,7 +649,10 @@ export function WorldFlyStage({
     const move = (e: PointerEvent) => {
       if (!drag) return;
       engine.fly.head += (e.clientX - drag[0]) * 0.005;
-      engine.fly.pitch = Math.max(-1.2, Math.min(0.6, engine.fly.pitch - (e.clientY - drag[1]) * 0.004));
+      engine.fly.pitch = Math.max(
+        -1.2,
+        Math.min(0.6, engine.fly.pitch - (e.clientY - drag[1]) * 0.004),
+      );
       drag = [e.clientX, e.clientY];
       draw();
     };
@@ -642,11 +701,20 @@ export function WorldFlyStage({
   const alt = engine && entered ? engine.fly.alt : 0;
   const forming = !!engine && engine.spinup > 0;
   return (
-    <div className="absolute inset-0 z-[1] overflow-hidden bg-black" data-testid="world-engine-fly" data-failed={failed ? '1' : '0'}>
+    <div
+      className="absolute inset-0 z-[1] overflow-hidden bg-black"
+      data-testid="world-engine-fly"
+      data-failed={failed ? '1' : '0'}
+    >
       <div ref={hostRef} className="absolute inset-0" />
       {forming && <Forming gas={gas} />}
       {engine && entered && (
-        <div className="sx-cu-controls" role="group" aria-label="Surface view controls" style={{ zIndex: 3 }}>
+        <div
+          className="sx-cu-controls"
+          role="group"
+          aria-label="Surface view controls"
+          style={{ zIndex: 3 }}
+        >
           <label htmlFor="world-alt" className="flex-1 basis-40">
             {gas ? 'Height above the clouds' : 'Height above the ground'}:{' '}
             <span data-testid="world-alt-label">{`${fmt(alt, alt < 10 ? 1 : 0)} km`}</span>
@@ -679,7 +747,12 @@ export function WorldFlyStage({
           >
             Fly forward
           </button>
-          <button type="button" className={buttonClass} aria-expanded={about} onClick={() => setAbout((a) => !a)}>
+          <button
+            type="button"
+            className={buttonClass}
+            aria-expanded={about}
+            onClick={() => setAbout((a) => !a)}
+          >
             What is drawn
           </button>
         </div>
@@ -693,11 +766,17 @@ export function WorldFlyStage({
           <ul className="flex flex-col gap-1">
             <li className="flex flex-wrap items-center gap-2">
               <ProvenanceBadge tag="model_dependent" />
-              <span>Terrain, climate, rivers, clouds and winds: the world engine&rsquo;s model, run from this object&rsquo;s numbers.</span>
+              <span>
+                Terrain, climate, rivers, clouds and winds: the world engine&rsquo;s model, run from
+                this object&rsquo;s numbers.
+              </span>
             </li>
             <li className="flex flex-wrap items-center gap-2">
               <ProvenanceBadge tag="artistic" />
-              <span>Detail finer than the terrain grid, and the heights, clouds and air drawn {gas ? '2' : '3'} times taller than real.</span>
+              <span>
+                Detail finer than the terrain grid, and the heights, clouds and air drawn{' '}
+                {gas ? '2' : '3'} times taller than real.
+              </span>
             </li>
           </ul>
         </div>

@@ -70,11 +70,7 @@ export interface ReadoutControl extends Base {
   value: string;
 }
 export type BuildControl =
-  | SliderControl
-  | ToggleControl
-  | ChoiceControl
-  | ButtonControl
-  | ReadoutControl;
+  SliderControl | ToggleControl | ChoiceControl | ButtonControl | ReadoutControl;
 
 /** A "How each part is worked out" block: formulas in words, and the honesty line that goes with them. */
 export interface BuildNote {

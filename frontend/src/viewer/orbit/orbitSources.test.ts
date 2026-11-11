@@ -1,12 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { DataTexture, FloatType, RGBAFormat } from 'three/webgpu';
-import { ENV_LAPSE_FACTOR, gasOrbitSources, resolveOrbitSources, rockyOrbitSources, ORBIT_LAYERS } from './orbitSources';
+import {
+  ENV_LAPSE_FACTOR,
+  gasOrbitSources,
+  resolveOrbitSources,
+  rockyOrbitSources,
+  ORBIT_LAYERS,
+} from './orbitSources';
 
 const tex = () => new DataTexture(new Float32Array(16), 2, 2, RGBAFormat, FloatType);
 const rocky = () => ({
-  terrainTexture: tex(), climateTexture: tex(), terrain: { W: 2, H: 2, data: new Float32Array(8) },
-  radiusKm: 6371, lapseKPerKm: 9.8, fluid: { id: 'water', tripleK: 273.16, boilK: 373.15 }, cloudCover: 0.4,
-  seed: 11, hasOcean: true, haze: 0, hydrologyTexture: null, cloudTracerTexture: null,
+  terrainTexture: tex(),
+  climateTexture: tex(),
+  terrain: { W: 2, H: 2, data: new Float32Array(8) },
+  radiusKm: 6371,
+  lapseKPerKm: 9.8,
+  fluid: { id: 'water', tripleK: 273.16, boilK: 373.15 },
+  cloudCover: 0.4,
+  seed: 11,
+  hasOcean: true,
+  haze: 0,
+  hydrologyTexture: null,
+  cloudTracerTexture: null,
 });
 
 describe('rocky adapter', () => {
@@ -18,13 +33,20 @@ describe('rocky adapter', () => {
     expect(r.missing).not.toContain('orbit.height');
     expect(r.layers.find((l) => l.id === 'orbit.hydrology')!.drawn).toBe(false);
   });
-  it("with D round 2: hydrology, live cloud tracer and the air are drawn", () => {
+  it('with D round 2: hydrology, live cloud tracer and the air are drawn', () => {
     const first = tex();
     const second = tex();
     const d: Record<string, unknown> = {
-      ...rocky(), hydrologyTexture: tex(), scaleHeightKm: 8.4, pressureBar: 1.2, hazeColour: [0.7, 0.5, 0.2],
-      surfaceTempK: 288, palette: { liq: [0, 0, 1], ice: [1, 1, 1], cld: [1, 1, 1], land: [0.3, 0.2, 0.1] },
-      get cloudTracerTexture() { return cur; },
+      ...rocky(),
+      hydrologyTexture: tex(),
+      scaleHeightKm: 8.4,
+      pressureBar: 1.2,
+      hazeColour: [0.7, 0.5, 0.2],
+      surfaceTempK: 288,
+      palette: { liq: [0, 0, 1], ice: [1, 1, 1], cld: [1, 1, 1], land: [0.3, 0.2, 0.1] },
+      get cloudTracerTexture() {
+        return cur;
+      },
     };
     let cur = first;
     const r = rockyOrbitSources(d as never);
@@ -41,8 +63,12 @@ describe('rocky adapter', () => {
     expect(resolveOrbitSources(undefined).sources).toBeNull();
   });
   it('an atmosphere needs both scale height and pressure', () => {
-    expect(rockyOrbitSources({ ...rocky(), scaleHeightKm: 8, pressureBar: 1 }).missing).not.toContain('orbit.atmosphere');
-    expect(rockyOrbitSources({ ...rocky(), scaleHeightKm: 8 }).missing).toContain('orbit.atmosphere');
+    expect(
+      rockyOrbitSources({ ...rocky(), scaleHeightKm: 8, pressureBar: 1 }).missing,
+    ).not.toContain('orbit.atmosphere');
+    expect(rockyOrbitSources({ ...rocky(), scaleHeightKm: 8 }).missing).toContain(
+      'orbit.atmosphere',
+    );
   });
   it('no climate: no snow, no ocean', () => {
     const r = rockyOrbitSources({ ...rocky(), climateTexture: null });
@@ -53,8 +79,22 @@ describe('rocky adapter', () => {
 
 describe('gas adapter', () => {
   const gas = (over = {}) => ({
-    velocity: tex(), tracer: tex(), bands: tex(), noise: tex(), radiusKm: 69911, scaleHeightKm: 27, seed: 67,
-    palette: { z: [0.9, 0.8, 0.7], b: [0.5, 0.3, 0.1], s: [0.8, 0.3, 0.1], d: [0.3, 0.2, 0.1], p: [0.4, 0.5, 0.5] }, ready: true, ...over,
+    velocity: tex(),
+    tracer: tex(),
+    bands: tex(),
+    noise: tex(),
+    radiusKm: 69911,
+    scaleHeightKm: 27,
+    seed: 67,
+    palette: {
+      z: [0.9, 0.8, 0.7],
+      b: [0.5, 0.3, 0.1],
+      s: [0.8, 0.3, 0.1],
+      d: [0.3, 0.2, 0.1],
+      p: [0.4, 0.5, 0.5],
+    },
+    ready: true,
+    ...over,
   });
   it("maps E's getter and reads the live tracer each time", () => {
     const first = tex();

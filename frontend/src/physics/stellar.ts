@@ -108,7 +108,10 @@ export const MAX_GROUPS_DRAWN = 12;
 export const BELT_BASE_DEG = 15;
 export const BELT_GROWTH_DEG = 45;
 export const BELT_COVERAGE_FULL = 0.2;
-/** Belt swings from (1 + SWING/2) to (1 - SWING/2) of its centre over a cycle (Sun: about 30 to 8 deg). */
+/**
+ * Belt swings from (1 + SWING/2) to (1 - SWING/2) of its centre over a cycle. Sun, at its coverage:
+ * about 22 to 8.4 deg around a 15.3 deg centre (the observed butterfly starts nearer 30 deg).
+ */
 export const BUTTERFLY_SWING = 0.9;
 export const BELT_SPREAD_DEG = 6;
 export const BELT_MIN_RAD = (3 * Math.PI) / 180;

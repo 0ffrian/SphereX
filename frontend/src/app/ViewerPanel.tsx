@@ -629,30 +629,56 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // it (`cuClose`). The viewer and plan go to a small store the pane reads. The toggle next to Feel
   // hides or shows it.
   const closeKind = pane ? closeUpKindOf(params?.type) : null;
+  // The prototype engines (star, world, rock) draw a generated surface: they mount only at "+ Artistic"
+  // (Atish's call on the PR #89 review). At "Measured only" and "+ Estimated" the three.js path draws.
+  const enginesShown = honesty === 'artistic';
   const engineStar =
-    pane && honesty !== 'measured' && plan?.threeD && card && !blocked && engineStarCard && starFailedId !== engineKey(card.id, engineStarCard.preset.id)
+    pane &&
+    enginesShown &&
+    plan?.threeD &&
+    card &&
+    !blocked &&
+    engineStarCard &&
+    starFailedId !== engineKey(card.id, engineStarCard.preset.id)
       ? engineStarCard
       : null;
   const engineWorld =
-    pane && honesty !== 'measured' && plan?.threeD && card && !blocked && engineWorldCard && worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
+    pane &&
+    enginesShown &&
+    plan?.threeD &&
+    card &&
+    !blocked &&
+    engineWorldCard &&
+    worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
       ? engineWorldCard
       : null;
   // D-37: while an engine draws the body the three.js viewer builds and draws nothing under it.
-  const engineOwns = engineStar !== null || engineWorld !== null || rockOwns;
+  const engineOwns = engineStar !== null || engineWorld !== null || (enginesShown && rockOwns);
   useEffect(() => {
     viewer?.setEngineOwned?.(engineOwns);
   }, [viewer, engineOwns]);
   const tintTag = plan?.tint.tag ?? null;
   const tintKey = plan?.tint.rgb.join(',') ?? '';
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- tintKey stands for the rgb values
-  const rockTint = useMemo<[number, number, number] | null>(() => (tintTag && plan ? [plan.tint.rgb[0]!, plan.tint.rgb[1]!, plan.tint.rgb[2]!] : null), [tintTag, tintKey]);
+  const rockTint = useMemo<[number, number, number] | null>(
+    () => (tintTag && plan ? [plan.tint.rgb[0]!, plan.tint.rgb[1]!, plan.tint.rgb[2]!] : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tintKey stands for the rgb values
+    [tintTag, tintKey],
+  );
   // Hidden by the user, or held back until the build has shifted to the right half (stream U).
   const closeHidden = useCloseUpStore((s) => s.hidden || s.held);
   const closeInfo = useCloseUpStore((s) => s.info);
   const shaderKey = plan?.shader?.key ?? '';
   const pubFixture = fixture || (card?.id.startsWith('fixture:') ?? false);
   useEffect(() => {
-    useCloseUpStore.getState().publish({ viewer, plan, type: params?.type ?? null, fixture: pubFixture, reducedMotion, engineStar, engineWorld });
+    useCloseUpStore.getState().publish({
+      viewer,
+      plan,
+      type: params?.type ?? null,
+      fixture: pubFixture,
+      reducedMotion,
+      engineStar,
+      engineWorld,
+    });
   }, [viewer, plan, params?.type, reducedMotion, pubFixture, engineStar, engineWorld]);
   useEffect(() => () => useCloseUpStore.getState().reset(), []);
   useEffect(() => {
@@ -684,7 +710,19 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
     }
     viewer.openCloseUp(closeKind === 'body', closeKind === 'star', gate);
     return () => viewer.closeUpOff(true);
-  }, [viewer, pane, closeKind, closeHidden, blocked, plan?.threeD, objectKey, shaderKey, artisticShown, engineStar, engineWorld]);
+  }, [
+    viewer,
+    pane,
+    closeKind,
+    closeHidden,
+    blocked,
+    plan?.threeD,
+    objectKey,
+    shaderKey,
+    artisticShown,
+    engineStar,
+    engineWorld,
+  ]);
   // A gas giant that is still forming opens when it has settled.
   useEffect(() => {
     if (!viewer || !closeInfo?.refusal || !/forming/.test(closeInfo.refusal) || closeHidden) return;
@@ -750,7 +788,13 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
         <section hidden={pop !== 'acc'} data-testid="build-pop-acc">
           {pop === 'acc' &&
             (params?.confidence ? (
-              <ConfidencePopover inline isShown={(t) => t === 'missing' || isTagShown(honesty, t)} params={params} name={plan?.name} onClose={() => pane.onPop?.(null)} />
+              <ConfidencePopover
+                inline
+                isShown={(t) => t === 'missing' || isTagShown(honesty, t)}
+                params={params}
+                name={plan?.name}
+                onClose={() => pane.onPop?.(null)}
+              />
             ) : (
               <>
                 <div className="sx-pop-h">
@@ -802,34 +846,46 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           data-testid="viewer-stage"
         >
           <div ref={hostRef} className="absolute inset-0" />
-          {/* D-37: the prototype rock engine draws asteroids and comet nuclei over the viewer. */}
-          <RockStage
-            card={card}
-            params={params}
-            plan={plan}
-            honesty={honesty}
-            tint={rockTint}
-            reducedMotion={reducedMotion}
-            onEngine={setRockOwns}
-          />
+          {/* D-37: the prototype rock engine draws asteroids and comet nuclei over the viewer, at "+ Artistic"
+              only; unmounting it hands the body back to the viewer (its cleanup reports onEngine(false)). */}
+          {enginesShown && (
+            <RockStage
+              card={card}
+              params={params}
+              plan={plan}
+              honesty={honesty}
+              tint={rockTint}
+              reducedMotion={reducedMotion}
+              onEngine={setRockOwns}
+            />
+          )}
           {engineStar && (
-            <StarGlobeStage key={engineStar.preset.id} star={engineStar} onFail={() => useWorldStore.getState().failStar(engineKey(card?.id, engineStar.preset.id))} />
+            <StarGlobeStage
+              key={engineStar.preset.id}
+              star={engineStar}
+              onFail={() =>
+                useWorldStore.getState().failStar(engineKey(card?.id, engineStar.preset.id))
+              }
+            />
           )}
           {engineWorld && (
             <WorldGlobeStage
               key={engineWorld.preset.id}
               world={engineWorld}
-              onFail={() => useWorldStore.getState().fail(engineKey(card?.id, engineWorld.preset.id))}
+              onFail={() =>
+                useWorldStore.getState().fail(engineKey(card?.id, engineWorld.preset.id))
+              }
             />
           )}
           {!pane && params && plan?.threeD && (
-            <ConfidenceChip
-              params={params}
-              onOpen={() => setFormulaOpen(true)}
-            />
+            <ConfidenceChip params={params} onOpen={() => setFormulaOpen(true)} />
           )}
           {!pane && params && formulaOpen && (
-            <ConfidencePopover params={params} name={plan?.name} onClose={() => setFormulaOpen(false)} />
+            <ConfidencePopover
+              params={params}
+              name={plan?.name}
+              onClose={() => setFormulaOpen(false)}
+            />
           )}
           {loadingBody && (
             <div className="sx-bp-loading" data-testid="build-loading" role="status">
@@ -903,510 +959,521 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
         ) : null,
       )}
       {wrapPop(
-      <div
-        id={detailsId}
-        className={pane ? 'sx-bp-details' : 'contents'}
-        hidden={pane ? pane.pop !== 'details' : undefined}
-        data-testid={pane ? 'build-details-panel' : undefined}
-      >
-        {pane && (
-          <>
-            <div className="sx-pop-h">
-              <b>Details</b>
-              <span>{plan?.name ?? ''}</span>
-            </div>
-            {pane.actions}
-          </>
-        )}
-        {params && (!pane || params.confidence?.gate.passed === false) && (
-          <ConfidenceDetails params={params} />
-        )}
-        {plan?.threeD && (
-          <p className="text-xs text-neutral-400" data-testid="impression-note">
-            Artist&apos;s impression, drawn from the data listed under &ldquo;What is drawn&rdquo;.
-          </p>
-        )}
+        <div
+          id={detailsId}
+          className={pane ? 'sx-bp-details' : 'contents'}
+          hidden={pane ? pane.pop !== 'details' : undefined}
+          data-testid={pane ? 'build-details-panel' : undefined}
+        >
+          {pane && (
+            <>
+              <div className="sx-pop-h">
+                <b>Details</b>
+                <span>{plan?.name ?? ''}</span>
+              </div>
+              {pane.actions}
+            </>
+          )}
+          {params && (!pane || params.confidence?.gate.passed === false) && (
+            <ConfidenceDetails params={params} />
+          )}
+          {plan?.threeD && (
+            <p className="text-xs text-neutral-400" data-testid="impression-note">
+              Artist&apos;s impression, drawn from the data listed under &ldquo;What is
+              drawn&rdquo;.
+            </p>
+          )}
 
-        <div role="group" aria-label="View controls" className="flex flex-wrap gap-2">
-          {ROTATE_BUTTONS.map(({ dir, label, glyph }) => (
+          <div role="group" aria-label="View controls" className="flex flex-wrap gap-2">
+            {ROTATE_BUTTONS.map(({ dir, label, glyph }) => (
+              <button
+                key={dir}
+                type="button"
+                className={buttonClass}
+                aria-label={viewOff(label, vc.rotateOff)}
+                title={vc.rotateOff ?? label}
+                disabled={vc.rotateOff !== null}
+                onClick={() => vc.rotate(dir)}
+              >
+                <span aria-hidden="true">{glyph}</span>
+              </button>
+            ))}
             <button
-              key={dir}
               type="button"
               className={buttonClass}
-              aria-label={viewOff(label, vc.rotateOff)}
-              title={vc.rotateOff ?? label}
-              disabled={vc.rotateOff !== null}
-              onClick={() => vc.rotate(dir)}
+              aria-label={viewOff('Zoom in', vc.zoomOff)}
+              title={vc.zoomOff ?? 'Zoom in'}
+              disabled={vc.zoomOff !== null}
+              onClick={() => vc.zoom('in')}
             >
-              <span aria-hidden="true">{glyph}</span>
+              <span aria-hidden="true">+</span>
             </button>
-          ))}
-          <button
-            type="button"
-            className={buttonClass}
-            aria-label={viewOff('Zoom in', vc.zoomOff)}
-            title={vc.zoomOff ?? 'Zoom in'}
-            disabled={vc.zoomOff !== null}
-            onClick={() => vc.zoom('in')}
-          >
-            <span aria-hidden="true">+</span>
-          </button>
-          <button
-            type="button"
-            className={buttonClass}
-            aria-label={viewOff('Zoom out', vc.zoomOff)}
-            title={vc.zoomOff ?? 'Zoom out'}
-            disabled={vc.zoomOff !== null}
-            onClick={() => vc.zoom('out')}
-          >
-            <span aria-hidden="true">−</span>
-          </button>
-          <button
-            type="button"
-            className={buttonClass}
-            aria-label={viewOff('Reset view', vc.resetOff)}
-            title={vc.resetOff ?? undefined}
-            disabled={vc.resetOff !== null}
-            onClick={() => vc.reset()}
-          >
-            Reset view
-          </button>
-        </div>
+            <button
+              type="button"
+              className={buttonClass}
+              aria-label={viewOff('Zoom out', vc.zoomOff)}
+              title={vc.zoomOff ?? 'Zoom out'}
+              disabled={vc.zoomOff !== null}
+              onClick={() => vc.zoom('out')}
+            >
+              <span aria-hidden="true">−</span>
+            </button>
+            <button
+              type="button"
+              className={buttonClass}
+              aria-label={viewOff('Reset view', vc.resetOff)}
+              title={vc.resetOff ?? undefined}
+              disabled={vc.resetOff !== null}
+              onClick={() => vc.reset()}
+            >
+              Reset view
+            </button>
+          </div>
 
-        {pane && <BuildControls />}
-        {plan && (
-          <>
-            {honestyGroup}
+          {pane && <BuildControls />}
+          {plan && (
+            <>
+              {honestyGroup}
 
-            {plan.threeD && plan.modes.length > 0 && (
-              <div
-                role="group"
-                aria-label="View mode"
-                className="flex flex-wrap items-center gap-2"
-              >
-                <span className="text-sm text-neutral-300">Colour:</span>
-                {plan.modes.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className={`${buttonClass} ${pressedClass}`}
-                    aria-pressed={plan.mode === m.id}
-                    aria-describedby={
-                      irHidesJets && m.id === 'visible' ? 'ir-jets-hint' : undefined
-                    }
-                    disabled={!m.available}
-                    title={
-                      m.available ? m.badge : 'Not available for this object. See the list below.'
-                    }
-                    onClick={() => onMode(m.id)}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-                {plan.mode && (
-                  <span className="text-xs text-neutral-400">
-                    {plan.modes.find((m) => m.id === plan.mode)?.badge}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Sits under the mode buttons it refers to. The region stays mounted while an object is
-              shown, so a change of mode or level is announced politely when the text appears. */}
-            {plan.threeD && plan.modes.length > 0 && (
-              <div
-                id="ir-jets-hint"
-                role="status"
-                aria-live="polite"
-                className="empty:hidden"
-                data-testid="ir-jets-hint"
-              >
-                {irHidesJets && <p className="text-sm text-neutral-200">{IR_JETS_HINT}</p>}
-              </div>
-            )}
-
-            {plan.type === 'comet' && (
-              <div
-                role="group"
-                aria-label="Comet epoch"
-                className="flex flex-wrap items-center gap-2"
-              >
-                <span className="text-sm text-neutral-300">Epoch:</span>
-                {COMET_EPOCHS.map((e) => (
-                  <button
-                    key={e}
-                    type="button"
-                    className={`${buttonClass} ${pressedClass}`}
-                    aria-pressed={epoch === e}
-                    onClick={() => onEpoch(e)}
-                  >
-                    {EPOCH_LABEL[e]}
-                    {!plan.epochs.includes(e) && (
-                      <span className="ml-1 text-xs text-neutral-400">(no gas data)</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {plan.star && !engineStar && (
-              <div className="flex flex-col gap-2" data-testid="star-views">
+              {plan.threeD && plan.modes.length > 0 && (
                 <div
                   role="group"
-                  aria-label="Star colour view"
+                  aria-label="View mode"
                   className="flex flex-wrap items-center gap-2"
                 >
-                  <span className="text-sm text-neutral-300">Star colour:</span>
-                  {(Object.keys(STAR_COLOUR_LABEL) as StarColourView[]).map((c) => (
+                  <span className="text-sm text-neutral-300">Colour:</span>
+                  {plan.modes.map((m) => (
                     <button
-                      key={c}
+                      key={m.id}
                       type="button"
                       className={`${buttonClass} ${pressedClass}`}
-                      aria-pressed={starColour === c}
-                      onClick={() =>
-                        setStarView(
-                          c,
-                          c === 'observatory' && starScale === 'close' ? 'enlarged' : starScale,
-                        )
+                      aria-pressed={plan.mode === m.id}
+                      aria-describedby={
+                        irHidesJets && m.id === 'visible' ? 'ir-jets-hint' : undefined
                       }
-                    >
-                      {STAR_COLOUR_LABEL[c]}
-                    </button>
-                  ))}
-                </div>
-                <div
-                  role="group"
-                  aria-label="Star scale"
-                  className="flex flex-wrap items-center gap-2"
-                >
-                  <span className="text-sm text-neutral-300">Scale:</span>
-                  {(Object.keys(STAR_SCALE_LABEL) as StarScale[]).map((sc) => (
-                    <button
-                      key={sc}
-                      type="button"
-                      className={`${buttonClass} ${pressedClass}`}
-                      aria-pressed={starScale === sc}
-                      disabled={sc === 'close' && !plan.star?.physics}
+                      disabled={!m.available}
                       title={
-                        sc === 'close' && !plan.star?.physics
-                          ? 'Needs the star\u2019s temperature.'
-                          : undefined
+                        m.available ? m.badge : 'Not available for this object. See the list below.'
                       }
-                      onClick={() => setStarView(starColour, sc)}
+                      onClick={() => onMode(m.id)}
                     >
-                      {STAR_SCALE_LABEL[sc]}
+                      {m.label}
+                    </button>
+                  ))}
+                  {plan.mode && (
+                    <span className="text-xs text-neutral-400">
+                      {plan.modes.find((m) => m.id === plan.mode)?.badge}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Sits under the mode buttons it refers to. The region stays mounted while an object is
+              shown, so a change of mode or level is announced politely when the text appears. */}
+              {plan.threeD && plan.modes.length > 0 && (
+                <div
+                  id="ir-jets-hint"
+                  role="status"
+                  aria-live="polite"
+                  className="empty:hidden"
+                  data-testid="ir-jets-hint"
+                >
+                  {irHidesJets && <p className="text-sm text-neutral-200">{IR_JETS_HINT}</p>}
+                </div>
+              )}
+
+              {plan.type === 'comet' && (
+                <div
+                  role="group"
+                  aria-label="Comet epoch"
+                  className="flex flex-wrap items-center gap-2"
+                >
+                  <span className="text-sm text-neutral-300">Epoch:</span>
+                  {COMET_EPOCHS.map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      className={`${buttonClass} ${pressedClass}`}
+                      aria-pressed={epoch === e}
+                      onClick={() => onEpoch(e)}
+                    >
+                      {EPOCH_LABEL[e]}
+                      {!plan.epochs.includes(e) && (
+                        <span className="ml-1 text-xs text-neutral-400">(no gas data)</span>
+                      )}
                     </button>
                   ))}
                 </div>
-                {plan.star.physics && (
-                  <p className="text-sm text-neutral-200" data-testid="star-caption">
-                    {starCaption(plan.star.physics, starScale)}
-                    {starColour === 'observatory' &&
-                      ' This is false colour (ultraviolet, as solar observatories show it), not the star\u2019s real colour.'}
-                  </p>
-                )}
-                {plan.star.plasma && (
-                  <StarFlarePanel
-                    viewer={viewer}
-                    paused={motionPaused}
-                    fixture={objectIsFixture}
-                  />
-                )}
-              </div>
-            )}
+              )}
 
-            {plan.star?.physics && !engineStar && (
-              <dl
-                className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
-                data-testid="star-readouts"
-              >
-                {starReadouts(plan.star.physics).map((r) => (
-                  <div key={r.label} className="contents">
-                    <dt className="text-neutral-300">{r.label}</dt>
-                    <dd className="text-neutral-100">
-                      {r.value} {r.tag && <ProvenanceBadge tag={r.tag} fixture={objectIsFixture} />}
-                    </dd>
+              {plan.star && !engineStar && (
+                <div className="flex flex-col gap-2" data-testid="star-views">
+                  <div
+                    role="group"
+                    aria-label="Star colour view"
+                    className="flex flex-wrap items-center gap-2"
+                  >
+                    <span className="text-sm text-neutral-300">Star colour:</span>
+                    {(Object.keys(STAR_COLOUR_LABEL) as StarColourView[]).map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        className={`${buttonClass} ${pressedClass}`}
+                        aria-pressed={starColour === c}
+                        onClick={() =>
+                          setStarView(
+                            c,
+                            c === 'observatory' && starScale === 'close' ? 'enlarged' : starScale,
+                          )
+                        }
+                      >
+                        {STAR_COLOUR_LABEL[c]}
+                      </button>
+                    ))}
                   </div>
-                ))}
-              </dl>
-            )}
-
-            {plan.type === 'comet' && emissionsRange && (
-              <button
-                type="button"
-                className={`${buttonClass} ${pressedClass} self-start`}
-                aria-pressed={emissionsJd !== null}
-                onClick={() =>
-                  setEmissions(
-                    emissionsJd === null ? { key: objectKey, jd: EPOCH_JD[epoch] } : null,
-                  )
-                }
-                data-testid="emissions-toggle"
-              >
-                View emissions
-              </button>
-            )}
-
-            {plan.scrub && (
-              <label className="flex flex-col gap-1 text-sm text-neutral-300">
-                Light curve: point {plan.scrub.index + 1} of {plan.scrub.count}
-                <input
-                  type="range"
-                  min={0}
-                  max={Math.max(0, plan.scrub.count - 1)}
-                  value={plan.scrub.index}
-                  className="min-h-11 w-full max-w-xl"
-                  aria-valuetext={`Point ${plan.scrub.index + 1} of ${plan.scrub.count}, ${formatMjdDate(plan.scrub.tMjd)}, brightness ${Math.round(plan.scrub.brightness * 100)}% of the maximum`}
-                  onChange={(e) => onScrub(Number(e.target.value))}
-                />
-                <span className="text-xs text-neutral-400">
-                  {formatMjdDate(plan.scrub.tMjd)}, brightness{' '}
-                  {Math.round(plan.scrub.brightness * 100)}% of the maximum
-                  {plan.scrub.flagged > 0
-                    ? `; ${plan.scrub.flagged} flagged points are left out`
-                    : ''}
-                </span>
-              </label>
-            )}
-
-            {remnantShown && (
-              <div className="flex flex-col gap-1 text-sm text-neutral-300">
-                <span className="flex flex-wrap items-center gap-2">
-                  <label htmlFor={`${whyId}-age-input`} id={`${whyId}-age`}>
-                    Age of the remnant
-                  </label>
-                  <output aria-hidden="true" className="tabular-nums text-neutral-100">
-                    {formatYears(age)}
-                  </output>
-                  <ProvenanceBadge tag="artistic" fixture={objectIsFixture} />
-                </span>
-                <input
-                  id={`${whyId}-age-input`}
-                  type="range"
-                  min={AGE_LOG_MIN}
-                  max={AGE_LOG_MAX}
-                  step={AGE_LOG_STEP}
-                  value={Math.log10(age)}
-                  className="min-h-11 w-full max-w-xl"
-                  aria-labelledby={`${whyId}-age`}
-                  aria-describedby={`${whyId}-age-hint`}
-                  aria-valuetext={`${formatYears(age)} old`}
-                  onChange={(e) => onAge(Number(e.target.value))}
-                />
-                <span id={`${whyId}-age-hint`} className="text-xs text-neutral-400">
-                  Your choice, not a measurement. The shell is drawn smaller when it is younger, so
-                  the size shown is the shell{AT_AGE_MAX_PHRASE}.
-                </span>
-              </div>
-            )}
-
-            {bar && (
-              <figure className="flex max-w-xl flex-col gap-1" data-testid="scale-bar">
-                <div className="flex flex-col gap-1" aria-hidden="true">
                   <div
-                    className="h-1.5 rounded bg-sky-400"
-                    style={{ width: `${bar.bodyFraction * 100}%` }}
-                  />
-                  <div
-                    className="h-1.5 rounded bg-neutral-400"
-                    style={{ width: `${bar.comparisonFraction * 100}%` }}
-                  />
-                </div>
-                <figcaption className="text-sm text-neutral-200">
-                  {bar.headline}
-                  {size?.atSliderMax && AT_AGE_MAX_PHRASE}
-                  {bar.qualifier === 'upper_limit' && ' (upper limit)'}
-                  {size?.tag && (
-                    <>
-                      {' '}
-                      <ProvenanceBadge
-                        tag={size.tag}
-                        tooltip={size.why ?? undefined}
-                        srText
-                        fixture={objectIsFixture}
-                      />
-                    </>
+                    role="group"
+                    aria-label="Star scale"
+                    className="flex flex-wrap items-center gap-2"
+                  >
+                    <span className="text-sm text-neutral-300">Scale:</span>
+                    {(Object.keys(STAR_SCALE_LABEL) as StarScale[]).map((sc) => (
+                      <button
+                        key={sc}
+                        type="button"
+                        className={`${buttonClass} ${pressedClass}`}
+                        aria-pressed={starScale === sc}
+                        disabled={sc === 'close' && !plan.star?.physics}
+                        title={
+                          sc === 'close' && !plan.star?.physics
+                            ? 'Needs the star\u2019s temperature.'
+                            : undefined
+                        }
+                        onClick={() => setStarView(starColour, sc)}
+                      >
+                        {STAR_SCALE_LABEL[sc]}
+                      </button>
+                    ))}
+                  </div>
+                  {plan.star.physics && (
+                    <p className="text-sm text-neutral-200" data-testid="star-caption">
+                      {starCaption(plan.star.physics, starScale)}
+                      {starColour === 'observatory' &&
+                        ' This is false colour (ultraviolet, as solar observatories show it), not the star\u2019s real colour.'}
+                    </p>
                   )}
-                  , {bar.comparison.text}.
-                </figcaption>
-                {size?.why && (
-                  <div className="flex flex-col items-start gap-1">
-                    <button
-                      type="button"
-                      className={buttonClass}
-                      aria-expanded={whyOpen}
-                      aria-controls={whyId}
-                      onClick={() => setWhyOpen((o) => !o)}
-                    >
-                      Why this size?
-                    </button>
-                    {whyOpen && (
-                      <p id={whyId} className="text-sm text-neutral-300" data-testid="size-why">
-                        {size.why}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </figure>
-            )}
+                  {plan.star.plasma && (
+                    <StarFlarePanel
+                      viewer={viewer}
+                      paused={motionPaused}
+                      fixture={objectIsFixture}
+                    />
+                  )}
+                </div>
+              )}
 
-            {lapses.length > 0 && !engineWorld && (
-              <div className="flex flex-wrap items-center gap-2">
+              {plan.star?.physics && !engineStar && (
+                <dl
+                  className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
+                  data-testid="star-readouts"
+                >
+                  {starReadouts(plan.star.physics).map((r) => (
+                    <div key={r.label} className="contents">
+                      <dt className="text-neutral-300">{r.label}</dt>
+                      <dd className="text-neutral-100">
+                        {r.value}{' '}
+                        {r.tag && <ProvenanceBadge tag={r.tag} fixture={objectIsFixture} />}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+
+              {plan.type === 'comet' && emissionsRange && (
                 <button
                   type="button"
-                  className={buttonClass}
-                  onClick={() => {
-                    if (motionPaused) {
-                      // Play: lift every pause that is on (reduced motion override, user, idle).
-                      if (reducedMotion && !playAnyway) setPlayAnyway(true);
-                      if (spinPaused) setSpinPaused(false);
-                      if (idlePaused) viewer?.resumeFromIdle?.();
-                    } else if (reducedMotion) setPlayAnyway(false);
-                    else setSpinPaused(true);
-                  }}
+                  className={`${buttonClass} ${pressedClass} self-start`}
+                  aria-pressed={emissionsJd !== null}
+                  onClick={() =>
+                    setEmissions(
+                      emissionsJd === null ? { key: objectKey, jd: EPOCH_JD[epoch] } : null,
+                    )
+                  }
+                  data-testid="emissions-toggle"
                 >
-                  {motionPaused ? 'Play motion' : 'Pause motion'}
+                  View emissions
                 </button>
-                <p className="text-sm text-neutral-200" data-testid="motion-status">
-                  {reducedMotion && !playAnyway
-                    ? 'Motion is off because your device asks for reduced motion.'
-                    : spinPaused
-                      ? 'Motion is paused.'
-                      : idlePaused
-                        ? 'Motion paused after a minute without input. Tap the view or press Play motion.'
-                        : 'Motion is playing.'}
-                </p>
-              </div>
-            )}
+              )}
 
-            {/* Issue #71 stream E: pacing of a simulated gas world; shown only for one. */}
-            {plan.type === 'gas_giant' && !engineWorld && lapses.some((t) => t.id === 'winds') && (
-              <div className="flex flex-col gap-1" data-testid="gas-pacing">
-                <div role="group" aria-label="Time speed of the winds" className="flex flex-wrap gap-2">
-                  {GAS_PACING_CHOICES.map((c) => (
-                    <button
-                      key={c.value}
-                      type="button"
-                      className={buttonClass}
-                      aria-pressed={gasPacing === c.value}
-                      onClick={() => onGasPacing(c.value)}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
+              {plan.scrub && (
+                <label className="flex flex-col gap-1 text-sm text-neutral-300">
+                  Light curve: point {plan.scrub.index + 1} of {plan.scrub.count}
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(0, plan.scrub.count - 1)}
+                    value={plan.scrub.index}
+                    className="min-h-11 w-full max-w-xl"
+                    aria-valuetext={`Point ${plan.scrub.index + 1} of ${plan.scrub.count}, ${formatMjdDate(plan.scrub.tMjd)}, brightness ${Math.round(plan.scrub.brightness * 100)}% of the maximum`}
+                    onChange={(e) => onScrub(Number(e.target.value))}
+                  />
+                  <span className="text-xs text-neutral-400">
+                    {formatMjdDate(plan.scrub.tMjd)}, brightness{' '}
+                    {Math.round(plan.scrub.brightness * 100)}% of the maximum
+                    {plan.scrub.flagged > 0
+                      ? `; ${plan.scrub.flagged} flagged points are left out`
+                      : ''}
+                  </span>
+                </label>
+              )}
+
+              {remnantShown && (
+                <div className="flex flex-col gap-1 text-sm text-neutral-300">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <label htmlFor={`${whyId}-age-input`} id={`${whyId}-age`}>
+                      Age of the remnant
+                    </label>
+                    <output aria-hidden="true" className="tabular-nums text-neutral-100">
+                      {formatYears(age)}
+                    </output>
+                    <ProvenanceBadge tag="artistic" fixture={objectIsFixture} />
+                  </span>
+                  <input
+                    id={`${whyId}-age-input`}
+                    type="range"
+                    min={AGE_LOG_MIN}
+                    max={AGE_LOG_MAX}
+                    step={AGE_LOG_STEP}
+                    value={Math.log10(age)}
+                    className="min-h-11 w-full max-w-xl"
+                    aria-labelledby={`${whyId}-age`}
+                    aria-describedby={`${whyId}-age-hint`}
+                    aria-valuetext={`${formatYears(age)} old`}
+                    onChange={(e) => onAge(Number(e.target.value))}
+                  />
+                  <span id={`${whyId}-age-hint`} className="text-xs text-neutral-400">
+                    Your choice, not a measurement. The shell is drawn smaller when it is younger,
+                    so the size shown is the shell{AT_AGE_MAX_PHRASE}.
+                  </span>
                 </div>
-                <p className="text-sm text-neutral-200" data-testid="gas-pacing-status">
-                  {gasPacingStatus(gasPacing)}
-                </p>
-              </div>
-            )}
+              )}
 
-            {qualityLowered && (
-              <p className="text-sm text-neutral-200" data-testid="quality-note">
-                {QUALITY_DROP_ANNOUNCEMENT}.
-              </p>
-            )}
-
-            {/* Every time-lapse says where its rate comes from and its speed-up (R5.7, D-32). */}
-            {lapses.map((t) => (
-              <p key={t.id} className="text-sm text-neutral-200" data-testid="time-lapse-note">
-                {timeLapseText(t)}
-              </p>
-            ))}
-
-            <section aria-labelledby="legend-heading" className="flex flex-col gap-1">
-              <h3 id="legend-heading" className="text-sm font-medium text-neutral-200">
-                What is drawn
-              </h3>
-              <p className="text-xs text-neutral-400">
-                Measured: from observations. Estimated: worked out from data with a stated method.
-                Default: the artist&rsquo;s choice.
-              </p>
-              {plan.drawn.length === 0 ? (
-                <p className="text-sm text-neutral-400">Nothing yet.</p>
-              ) : (
-                <ul className="flex flex-col gap-1" data-testid="legend">
-                  {plan.drawn.map((l) => (
-                    <li
-                      key={l.id}
-                      className="flex flex-wrap items-center gap-2 text-sm text-neutral-200"
-                    >
-                      <ProvenanceBadge tag={l.tag} fixture={objectIsFixture} />
-                      <span>{layerName(l.id)}</span>
-                      {l.tier ? (
-                        <span className="text-xs text-neutral-400" data-testid="layer-tier">
-                          {tierText(l.tier)}
-                        </span>
-                      ) : null}
-                      {l.swatches?.map((s) => (
-                        <span
-                          key={s.label}
-                          className="inline-flex items-center gap-1 text-xs text-neutral-300"
-                        >
-                          <span
-                            aria-hidden="true"
-                            className="inline-block h-3 w-3 rounded-sm border border-neutral-500"
-                            style={{ backgroundColor: s.css }}
-                          />
-                          {s.label}
-                        </span>
-                      ))}
-                      {l.description && (
-                        <details className="w-full text-xs text-neutral-300">
-                          <summary className="min-h-11 cursor-pointer py-2 focus-visible:outline-2 focus-visible:outline-sky-400">
-                            How it is made
-                          </summary>
-                          <p className="pb-1">{l.description}</p>
-                        </details>
+              {bar && (
+                <figure className="flex max-w-xl flex-col gap-1" data-testid="scale-bar">
+                  <div className="flex flex-col gap-1" aria-hidden="true">
+                    <div
+                      className="h-1.5 rounded bg-sky-400"
+                      style={{ width: `${bar.bodyFraction * 100}%` }}
+                    />
+                    <div
+                      className="h-1.5 rounded bg-neutral-400"
+                      style={{ width: `${bar.comparisonFraction * 100}%` }}
+                    />
+                  </div>
+                  <figcaption className="text-sm text-neutral-200">
+                    {bar.headline}
+                    {size?.atSliderMax && AT_AGE_MAX_PHRASE}
+                    {bar.qualifier === 'upper_limit' && ' (upper limit)'}
+                    {size?.tag && (
+                      <>
+                        {' '}
+                        <ProvenanceBadge
+                          tag={size.tag}
+                          tooltip={size.why ?? undefined}
+                          srText
+                          fixture={objectIsFixture}
+                        />
+                      </>
+                    )}
+                    , {bar.comparison.text}.
+                  </figcaption>
+                  {size?.why && (
+                    <div className="flex flex-col items-start gap-1">
+                      <button
+                        type="button"
+                        className={buttonClass}
+                        aria-expanded={whyOpen}
+                        aria-controls={whyId}
+                        onClick={() => setWhyOpen((o) => !o)}
+                      >
+                        Why this size?
+                      </button>
+                      {whyOpen && (
+                        <p id={whyId} className="text-sm text-neutral-300" data-testid="size-why">
+                          {size.why}
+                        </p>
                       )}
-                    </li>
+                    </div>
+                  )}
+                </figure>
+              )}
+
+              {lapses.length > 0 && !engineWorld && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className={buttonClass}
+                    onClick={() => {
+                      if (motionPaused) {
+                        // Play: lift every pause that is on (reduced motion override, user, idle).
+                        if (reducedMotion && !playAnyway) setPlayAnyway(true);
+                        if (spinPaused) setSpinPaused(false);
+                        if (idlePaused) viewer?.resumeFromIdle?.();
+                      } else if (reducedMotion) setPlayAnyway(false);
+                      else setSpinPaused(true);
+                    }}
+                  >
+                    {motionPaused ? 'Play motion' : 'Pause motion'}
+                  </button>
+                  <p className="text-sm text-neutral-200" data-testid="motion-status">
+                    {reducedMotion && !playAnyway
+                      ? 'Motion is off because your device asks for reduced motion.'
+                      : spinPaused
+                        ? 'Motion is paused.'
+                        : idlePaused
+                          ? 'Motion paused after a minute without input. Tap the view or press Play motion.'
+                          : 'Motion is playing.'}
+                  </p>
+                </div>
+              )}
+
+              {/* Issue #71 stream E: pacing of a simulated gas world; shown only for one. */}
+              {plan.type === 'gas_giant' &&
+                !engineWorld &&
+                lapses.some((t) => t.id === 'winds') && (
+                  <div className="flex flex-col gap-1" data-testid="gas-pacing">
+                    <div
+                      role="group"
+                      aria-label="Time speed of the winds"
+                      className="flex flex-wrap gap-2"
+                    >
+                      {GAS_PACING_CHOICES.map((c) => (
+                        <button
+                          key={c.value}
+                          type="button"
+                          className={buttonClass}
+                          aria-pressed={gasPacing === c.value}
+                          onClick={() => onGasPacing(c.value)}
+                        >
+                          {c.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-sm text-neutral-200" data-testid="gas-pacing-status">
+                      {gasPacingStatus(gasPacing)}
+                    </p>
+                  </div>
+                )}
+
+              {qualityLowered && (
+                <p className="text-sm text-neutral-200" data-testid="quality-note">
+                  {QUALITY_DROP_ANNOUNCEMENT}.
+                </p>
+              )}
+
+              {/* Every time-lapse says where its rate comes from and its speed-up (R5.7, D-32). */}
+              {lapses.map((t) => (
+                <p key={t.id} className="text-sm text-neutral-200" data-testid="time-lapse-note">
+                  {timeLapseText(t)}
+                </p>
+              ))}
+
+              <section aria-labelledby="legend-heading" className="flex flex-col gap-1">
+                <h3 id="legend-heading" className="text-sm font-medium text-neutral-200">
+                  What is drawn
+                </h3>
+                <p className="text-xs text-neutral-400">
+                  Measured: from observations. Estimated: worked out from data with a stated method.
+                  Default: the artist&rsquo;s choice.
+                </p>
+                {plan.drawn.length === 0 ? (
+                  <p className="text-sm text-neutral-400">Nothing yet.</p>
+                ) : (
+                  <ul className="flex flex-col gap-1" data-testid="legend">
+                    {plan.drawn.map((l) => (
+                      <li
+                        key={l.id}
+                        className="flex flex-wrap items-center gap-2 text-sm text-neutral-200"
+                      >
+                        <ProvenanceBadge tag={l.tag} fixture={objectIsFixture} />
+                        <span>{layerName(l.id)}</span>
+                        {l.tier ? (
+                          <span className="text-xs text-neutral-400" data-testid="layer-tier">
+                            {tierText(l.tier)}
+                          </span>
+                        ) : null}
+                        {l.swatches?.map((s) => (
+                          <span
+                            key={s.label}
+                            className="inline-flex items-center gap-1 text-xs text-neutral-300"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="inline-block h-3 w-3 rounded-sm border border-neutral-500"
+                              style={{ backgroundColor: s.css }}
+                            />
+                            {s.label}
+                          </span>
+                        ))}
+                        {l.description && (
+                          <details className="w-full text-xs text-neutral-300">
+                            <summary className="min-h-11 cursor-pointer py-2 focus-visible:outline-2 focus-visible:outline-sky-400">
+                              How it is made
+                            </summary>
+                            <p className="pb-1">{l.description}</p>
+                          </details>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              {defaultsShown.length > 0 && (
+                <section aria-labelledby="defaults-heading" className="flex flex-col gap-1">
+                  <h3 id="defaults-heading" className="text-sm font-medium text-neutral-200">
+                    Shown as a default
+                  </h3>
+                  <ul
+                    className="flex flex-col gap-1 text-sm text-neutral-300"
+                    data-testid="default-list"
+                  >
+                    {defaultsShown.map((m) => (
+                      <li key={m.id} className="flex flex-wrap items-center gap-2">
+                        <ProvenanceBadge tag="artistic" />
+                        <span>{describeRefusal(m)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {notDrawn.length > 0 && (
+                <section aria-labelledby="missing-heading" className="flex flex-col gap-1">
+                  <h3 id="missing-heading" className="text-sm font-medium text-neutral-200">
+                    Not drawn
+                  </h3>
+                  <ul
+                    className="list-disc pl-5 text-sm text-neutral-300"
+                    data-testid="missing-list"
+                  >
+                    {notDrawn.map((m) => (
+                      <li key={m.id}>{describeRefusal(m)}</li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {plan.notes.length > 0 && (
+                <ul className="list-disc pl-5 text-xs text-neutral-400" data-testid="notes">
+                  {plan.notes.map((n) => (
+                    <li key={n}>{n}</li>
                   ))}
                 </ul>
               )}
-            </section>
-
-            {defaultsShown.length > 0 && (
-              <section aria-labelledby="defaults-heading" className="flex flex-col gap-1">
-                <h3 id="defaults-heading" className="text-sm font-medium text-neutral-200">
-                  Shown as a default
-                </h3>
-                <ul
-                  className="flex flex-col gap-1 text-sm text-neutral-300"
-                  data-testid="default-list"
-                >
-                  {defaultsShown.map((m) => (
-                    <li key={m.id} className="flex flex-wrap items-center gap-2">
-                      <ProvenanceBadge tag="artistic" />
-                      <span>{describeRefusal(m)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {notDrawn.length > 0 && (
-              <section aria-labelledby="missing-heading" className="flex flex-col gap-1">
-                <h3 id="missing-heading" className="text-sm font-medium text-neutral-200">
-                  Not drawn
-                </h3>
-                <ul className="list-disc pl-5 text-sm text-neutral-300" data-testid="missing-list">
-                  {notDrawn.map((m) => (
-                    <li key={m.id}>{describeRefusal(m)}</li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {plan.notes.length > 0 && (
-              <ul className="list-disc pl-5 text-xs text-neutral-400" data-testid="notes">
-                {plan.notes.map((n) => (
-                  <li key={n}>{n}</li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-      </div>
+            </>
+          )}
+        </div>,
       )}
 
       <div aria-live="polite" aria-atomic="true" className="sr-only" data-testid="viewer-announcer">

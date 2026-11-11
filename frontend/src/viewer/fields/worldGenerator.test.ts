@@ -8,13 +8,30 @@ import { resolveWorld } from './worldInputs';
 import { FieldSampler } from './fieldGenerator';
 
 const earth: WorldInputs = {
-  starTeffK: 5772, starRadiusRsun: 1, orbitAu: 1, radiusM: 6.371e6, massKg: 5.972e24,
-  bondAlbedo: 0.3, pressureBar: 1, fluid: 'water', locked: false, rotPeriodD: 1, molarMass: 29,
+  starTeffK: 5772,
+  starRadiusRsun: 1,
+  orbitAu: 1,
+  radiusM: 6.371e6,
+  massKg: 5.972e24,
+  bondAlbedo: 0.3,
+  pressureBar: 1,
+  fluid: 'water',
+  locked: false,
+  rotPeriodD: 1,
+  molarMass: 29,
 };
 const t1e: WorldInputs = {
-  starTeffK: 2566, starRadiusRsun: 0.1192, orbitAu: 0.02925, radiusM: 0.92 * 6.378e6,
-  massKg: 0.692 * 5.972e24, bondAlbedo: 0.3, pressureBar: 1.2, fluid: 'water', locked: true,
-  rotPeriodD: 6.1, molarMass: 29,
+  starTeffK: 2566,
+  starRadiusRsun: 0.1192,
+  orbitAu: 0.02925,
+  radiusM: 0.92 * 6.378e6,
+  massKg: 0.692 * 5.972e24,
+  bondAlbedo: 0.3,
+  pressureBar: 1.2,
+  fluid: 'water',
+  locked: true,
+  rotPeriodD: 6.1,
+  molarMass: 29,
 };
 
 describe('world model: Earth-like numbers', () => {
@@ -81,7 +98,9 @@ describe('determinism', { timeout: 60000 }, () => {
     const a = generateWorld(p)!;
     const b = generateWorld(p)!;
     expect(a.climate.hash).toBe(b.climate.hash);
-    expect(Buffer.from(a.terrain.data.buffer).equals(Buffer.from(b.terrain.data.buffer))).toBe(true);
+    expect(Buffer.from(a.terrain.data.buffer).equals(Buffer.from(b.terrain.data.buffer))).toBe(
+      true,
+    );
     expect(Buffer.from(a.field.a.buffer).equals(Buffer.from(b.field.a.buffer))).toBe(true);
     expect(Buffer.from(a.field.b.buffer).equals(Buffer.from(b.field.b.buffer))).toBe(true);
   });
@@ -133,11 +152,18 @@ describe('inputs and provenance', () => {
     expect(rows.find((x) => x.id === 'fluid_state')!.tag).toBe('model_dependent');
     for (const row of rows) {
       if (row.tag === 'derived') expect(row.formula).toBeTruthy();
-      if (row.tag === 'model_dependent' || row.tag === 'artistic') expect(row.assumption).toBeTruthy();
+      if (row.tag === 'model_dependent' || row.tag === 'artistic')
+        expect(row.assumption).toBeTruthy();
     }
   });
   it('a slider value is artistic "(your setting)" (Q-58)', () => {
-    const r = resolveWorld(trappist1f(), 'planet_rocky', 1, { surface_pressure_bar: 3, surface_fluid: 1 }, 'low');
+    const r = resolveWorld(
+      trappist1f(),
+      'planet_rocky',
+      1,
+      { surface_pressure_bar: 3, surface_fluid: 1 },
+      'low',
+    );
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.params.inputs.pressureBar).toBe(3);
@@ -156,10 +182,16 @@ describe('inputs and provenance', () => {
 describe('world worker', { timeout: 60000 }, () => {
   it('answers a request, transfers the arrays and reports a refusal as a null world', async () => {
     const { handleWorldRequest, worldTransferables } = await import('./worldWorker');
-    const res = handleWorldRequest({ id: 3, params: { seed: 1, inputs: { ...t1e, orbitAu: 0 }, oceanFraction: 0, tier: 'low' } });
+    const res = handleWorldRequest({
+      id: 3,
+      params: { seed: 1, inputs: { ...t1e, orbitAu: 0 }, oceanFraction: 0, tier: 'low' },
+    });
     expect(res).toEqual({ id: 3, world: null });
     expect(worldTransferables(res)).toEqual([]);
-    const ok = handleWorldRequest({ id: 4, params: { seed: 1, inputs: t1e, oceanFraction: 0.5, tier: 'low' } });
+    const ok = handleWorldRequest({
+      id: 4,
+      params: { seed: 1, inputs: t1e, oceanFraction: 0.5, tier: 'low' },
+    });
     expect('world' in ok && ok.world).toBeTruthy();
     expect(worldTransferables(ok).length).toBeGreaterThanOrEqual(5);
   });
@@ -200,7 +232,13 @@ describe('Titan from its card (Q-285)', { timeout: 60000 }, () => {
     expect(r.sources.fluid).toBe('measured');
     expect(r.sources.pressure).toBe('measured');
     expect(r.assumptions.join(' ')).not.toMatch(/surface pressure 1 bar/);
-    const s = resolveWorld(card, 'planet_rocky', 1, { surface_fluid: 0, surface_pressure_bar: 2 }, 'low');
+    const s = resolveWorld(
+      card,
+      'planet_rocky',
+      1,
+      { surface_fluid: 0, surface_pressure_bar: 2 },
+      'low',
+    );
     expect(s.ok && s.params.inputs.fluid).toBe('water');
     expect(s.ok && s.sources.fluid).toBe('artistic');
   });

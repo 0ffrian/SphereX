@@ -12,8 +12,15 @@ export const GM_SUN_AU3_DAY2 = 2.959122082855911e-4;
 /** One astronomical unit in km (IAU 2012 B2, exact). */
 export const AU_KM = 149_597_870.7;
 
-/** Radiation-pressure ratios of the assumed grains: 570, 114, 28 and 5.7 micrometres at rho = 1 g/cm3. */
+/**
+ * Radiation-pressure ratios of the assumed grains: 570, 114, 28.5 and 5.7 micrometres in radius
+ * for rho = 1 g/cm3 and Qpr = 1 (betaOfGrain). Compact grains (rho 2 to 3 g/cm3) of the same beta
+ * are 2 to 3 times smaller. `model_dependent`.
+ */
 export const DUST_BETAS: readonly number[] = [0.001, 0.005, 0.02, 0.1];
+/** The plain-words caveat of the beta-to-size mapping, for the tail note. */
+export const GRAIN_SIZE_ASSUMPTION =
+  'The dust tail assumes four grain sizes, 570, 114, 28.5 and 5.7 µm in radius. These sizes assume porous grains (density 1 g/cm³) that take up all the sunlight that falls on them (Qpr = 1); compact grains (2 to 3 g/cm³) feel the same push at sizes 2 to 3 times smaller.';
 /** beta = 5.7e-5 Qpr / (rho a) with a in cm and rho in g/cm3 (Burns, Lamy and Soter 1979). */
 export function betaOfGrain(radiusUm: number, densityGcm3 = 1, qpr = 1): number {
   return (5.7e-5 * qpr) / (densityGcm3 * radiusUm * 1e-4);
@@ -156,7 +163,8 @@ export interface TailOptions {
  * Finson-Probstein grains at `jd`. Release times are spread evenly between `startJd` and `jd`
  * (with a seeded jitter inside each slot); each grain is integrated with a leapfrog step under
  * (1 - beta) GM / r^2 from the comet's position and velocity at its release, then compared with
- * the comet's own position at `jd`. No ejection speed (Finson-Probstein's syndyne/synchrone
+ * a beta = 0 grain released and integrated the same way (differential: the two-body step's drift
+ * from the Horizons path cancels). No ejection speed (Finson-Probstein's syndyne/synchrone
  * approximation). Returns [] before `startJd` or outside the sampled range.
  */
 export function dustGrains(
@@ -177,27 +185,51 @@ export function dustGrains(
       const t0 = opts.startJd + ((i + rnd()) / opts.perBeta) * span;
       const s0 = stateAt(rows, Math.min(t0, jd));
       if (!s0) continue;
-      let r: V3 = s0.r;
-      let v: V3 = s0.v;
       const n = Math.max(1, Math.ceil((jd - t0) / dt0));
       const dt = (jd - t0) / n;
-      const acc = (p: V3): V3 => {
-        const d = norm(p);
-        return scale(p, (-(1 - beta) * GM_SUN_AU3_DAY2) / (d * d * d));
-      };
-      // Kick-drift-kick leapfrog.
-      let a = acc(r);
-      for (let k = 0; k < n; k++) {
-        v = add(v, scale(a, dt / 2));
-        r = add(r, scale(v, dt));
-        a = acc(r);
-        v = add(v, scale(a, dt / 2));
-      }
-      const off = scale(toScene(frame, sub(r, now.r)), AU_KM);
+      // Differential: a beta = 0 grain released with the grain, integrated the same way, stands in
+      // for the comet. Horizons' path carries planetary perturbations and non-gravitational forces
+      // that the two-body step does not, so a beta = 0 grain drifts thousands of km from it over
+      // weeks; that common drift cancels in the difference, leaving only radiation pressure.
+      const r = leapfrog(s0, beta, n, dt);
+      const ref = leapfrog(s0, 0, n, dt);
+      const off = scale(toScene(frame, sub(r, ref)), AU_KM);
       out.push({ offsetKm: off, beta, ageDays: jd - t0 });
     }
   }
   return out;
+}
+
+/** Position after `n` kick-drift-kick leapfrog steps of `dt` days under (1 - beta) GM / r^2. */
+function leapfrog(s0: State, beta: number, n: number, dt: number): V3 {
+  let r: V3 = s0.r;
+  let v: V3 = s0.v;
+  const acc = (p: V3): V3 => {
+    const d = norm(p);
+    return scale(p, (-(1 - beta) * GM_SUN_AU3_DAY2) / (d * d * d));
+  };
+  let a = acc(r);
+  for (let k = 0; k < n; k++) {
+    v = add(v, scale(a, dt / 2));
+    r = add(r, scale(v, dt));
+    a = acc(r);
+    v = add(v, scale(a, dt / 2));
+  }
+  return r;
+}
+
+/** The comet's own two-body drift from the Horizons path: a beta = 0 grain released at `t0`, km, at `jd` (diagnostics and tests). */
+export function referenceDriftKm(
+  rows: readonly Row[],
+  t0: number,
+  jd: number,
+  stepDays = 0.5,
+): number | null {
+  const s0 = stateAt(rows, t0);
+  const now = stateAt(rows, jd);
+  if (!s0 || !now || !(jd > t0)) return null;
+  const n = Math.max(1, Math.ceil((jd - t0) / stepDays));
+  return norm(sub(leapfrog(s0, 0, n, (jd - t0) / n), now.r)) * AU_KM;
 }
 
 export interface TailSummary {

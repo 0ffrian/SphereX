@@ -25,11 +25,18 @@ interface View {
 export interface RockStats {
   gravity: number;
   escape: number;
+  /** Relief the generated field may hold, fraction of the radius. Describes the generated field only. */
   lump: number;
+  /** Craters in the generated field. Describes the generated field only. */
   craters: number;
   limit: number;
   kind: string;
   fast: boolean;
+  /**
+   * A shape model replaced the generated lumps and craters (Bennu, 67P): `lump` and `craters` then
+   * describe a field that is not drawn, so a readout must hide or relabel them.
+   */
+  shapeModel: boolean;
 }
 
 let supportedCache: boolean | null = null;
@@ -205,6 +212,7 @@ export class RockView {
       limit: m.limit,
       kind: m.kind,
       fast: m.fast,
+      shapeModel: mesh !== null,
     });
   }
 

@@ -116,10 +116,10 @@ const NOTE_STAR: BuildNote = {
   title: 'How each part of the star is worked out',
   lines: [
     'Colour: Planck’s law through the human colour-matching curves.',
-    'Boiling cells: size is about 8 pressure scale heights, H = kT / (μ m_H g). Each cell is born, grows, splits and fades.',
-    'Edge darkening: T⁴ ∝ 0.4 + 0.6μ, so the edge goes darker and redder.',
+    'Boiling cells: size is about 8 pressure scale heights, H = kT / (μ m_H g). Each cell is born, grows, splits and fades. Their contrast (±12 % in temperature) is exaggerated for looks, two to three times what is observed.',
+    'Edge darkening: the Eddington approximation, T⁴ = ¾ Teff⁴ (μ + ⅔), so the edge goes darker and redder; the centre is about 6 % hotter than Teff.',
     'Magnetic field: Reiners et al. 2022, ⟨B⟩ = 199 G · Ro^−1.26, flattening to 2050 G · Ro^−0.11 for Ro below 0.13. It was fitted on M dwarfs, so using it for other stars is a model.',
-    'Spots: field sets the spotted area. Sizes are lognormal, and leader and follower tilt by Joy’s law.',
+    'Spots: field sets the spotted area. Sizes are lognormal, and leader and follower tilt by Joy’s law. The spot belt stays at one latitude: it does not drift through a cycle. A spot is cooler than the surface by an amount that shrinks for cooler stars (Berdyugina 2005): about 1,800 K on the Sun, a few hundred K on a red dwarf.',
     'Flares: each starts at a real spot group. Its energy comes from a power law, capped by the magnetic energy that group can store, E_max = 0.1 · (B²/8π) · A^(3/2).',
     'Plasma: the field is far stronger than the gas pressure (β = 8πp / B² ≪ 1), so plasma can only flow along field lines. Heated plasma surges up from the feet, cools, and drains back as rain. The fine wisps are added for looks.',
     'Open or closed: for two opposite poles a distance 2a apart, n = 3h² / (a² + h²). The flare erupts if its rope climbs past h = a, where n reaches 1.5.',
@@ -130,7 +130,8 @@ const NOTE_STAR: BuildNote = {
 const NOTE_FLARE: BuildNote = {
   title: 'How the star would decide',
   lines: [
-    'Where: a potential-field model built from that star’s spots finds the boundary between opposite polarities with the most stored energy.',
+    'This close-up is always a Sun-like star (5,772 K) with one fixed pair of spots, whichever star is chosen: it shows how a flare works, not this star’s own flare.',
+    'Where: the largest flares start above the boundary between a spot group’s opposite polarities. Here a typical event is replayed on a Sun-like star.',
     'Open or closed: if the field above weakens quickly with height, the rope escapes. The test is the decay index n = −d ln B / d ln h, with a threshold near 1.5. Studies put it between about 1.3 and 1.9.',
     'How often: flare energies follow a power law, dN/dE ∝ E^−α, scaled by spot area.',
   ],
@@ -253,13 +254,45 @@ export class StarEngine {
       createElement: (t: string) => document.createElement(t),
       querySelectorAll: (sel: string) => (sel === '.lines-b' ? [this.lines] : []),
     };
-    const quiet = { error: () => {}, warn: () => {}, log: () => {} };
+    // The slices' own `console.log` chatter is dropped; errors and warnings reach the real console so a
+    // failure inside the prototype code (a shader that will not compile, a missing element) is never silent.
+    const quiet = {
+      error: (...a: unknown[]) => console.error('[star engine]', ...a),
+      warn: (...a: unknown[]) => console.warn('[star engine]', ...a),
+      log: () => {},
+    };
+    // CSP: `new Function` needs 'unsafe-eval' in script-src. The slices stay plain script (byte-identical
+    // to the prototype) and are scoped per instance here; turning them into a module closure (as
+    // engine/worlds/core.js's createCore does) would need a generated wrapper file and is left for later.
     const make = new Function(
-      '$', 'rng', 'lerp', 'smooth', 'clamp', 'reduced', 'console', 'document',
-      'requestAnimationFrame', 'addEventListener', 'MODE', 'LINES_BTN',
+      '$',
+      'rng',
+      'lerp',
+      'smooth',
+      'clamp',
+      'reduced',
+      'console',
+      'document',
+      'requestAnimationFrame',
+      'addEventListener',
+      'MODE',
+      'LINES_BTN',
       SRC + SUFFIX,
     ) as (...a: unknown[]) => Inside;
-    this.inside = make($, rng, lerp, smooth, clamp, reduced, quiet, doc, () => 0, () => {}, opts.mode, this.lines);
+    this.inside = make(
+      $,
+      rng,
+      lerp,
+      smooth,
+      clamp,
+      reduced,
+      quiet,
+      doc,
+      () => 0,
+      () => {},
+      opts.mode,
+      this.lines,
+    );
     const light = opts.light ?? 0;
     if (light !== 3) this.inside.setLight(light);
   }
@@ -317,7 +350,11 @@ export class StarEngine {
   /** Rotation period: the slider position 0..1000, its text, and whether the star uses it. */
   rotation(): { position: number; text: string; used: boolean } {
     const r = this.el('#rot');
-    return { position: Number(r.value) || 0, text: this.el('#rot-v').textContent, used: !r.disabled };
+    return {
+      position: Number(r.value) || 0,
+      text: this.el('#rot-v').textContent,
+      used: !r.disabled,
+    };
   }
   setRotationPosition(v: number): void {
     this.el('#rot').fire('input', { target: { value: v } });
@@ -398,7 +435,13 @@ export class StarEngine {
     return this.canvases;
   }
   /** Parity harness (dev only): the artifact test page's reset, view, step and flare, in its order. */
-  parity(c: { view?: StarScaleView; filter?: number; fire?: boolean; steps?: number; flare?: [FlareKind, FlareClass, number] }): void {
+  parity(c: {
+    view?: StarScaleView;
+    filter?: number;
+    fire?: boolean;
+    steps?: number;
+    flare?: [FlareKind, FlareClass, number];
+  }): void {
     const i = this.inside;
     i.pReset();
     if (this.mode === 'globe') {

@@ -32,7 +32,12 @@ import {
   type FlyState,
   type Vec3,
 } from './orbitMath';
-import { buildOrbitShader, createOrbitUniforms, type OrbitShader, type OrbitUniforms } from './orbitShader';
+import {
+  buildOrbitShader,
+  createOrbitUniforms,
+  type OrbitShader,
+  type OrbitUniforms,
+} from './orbitShader';
 import type { OrbitSources } from './orbitSources';
 import { orbitUniformValues, type OrbitLight, type OrbitUniformValues } from './orbitUniforms';
 
@@ -72,7 +77,13 @@ export const QUALITY_LEVELS: readonly OrbitQuality[] = [
   { scale: 0.5, march: 160, shadow: 16, atmo: 8, trace: 5 },
   { scale: 0.35, march: 100, shadow: 10, atmo: 6, trace: 3 },
 ];
-export const INTERACTING: OrbitQuality = { scale: INTERACT_SCALE, march: 120, shadow: 12, atmo: 8, trace: 4 };
+export const INTERACTING: OrbitQuality = {
+  scale: INTERACT_SCALE,
+  march: 120,
+  shadow: 12,
+  atmo: 8,
+  trace: 4,
+};
 /** Frame time above this steps the level down; below FAST_MS for FAST_FRAMES frames steps it back up. */
 export const SLOW_MS = 20;
 export const FAST_MS = 12;
@@ -90,7 +101,11 @@ export class QualityGovernor {
   private lastChange = -Infinity;
   feed(ms: number, now: number): void {
     this.ema = this.ema === 0 ? ms : this.ema * 0.8 + ms * 0.2;
-    if (this.ema > SLOW_MS && this.level < QUALITY_LEVELS.length - 1 && now - this.lastChange >= LEVEL_GAP_MS) {
+    if (
+      this.ema > SLOW_MS &&
+      this.level < QUALITY_LEVELS.length - 1 &&
+      now - this.lastChange >= LEVEL_GAP_MS
+    ) {
       this.level++;
       this.lastChange = now;
       this.fast = 0;
@@ -106,7 +121,12 @@ export class QualityGovernor {
   }
 }
 
-const DEFAULT_LIGHT: OrbitLight = { sunDir: [0, 0, 1], starColour: [1, 1, 1], timeSec: 0, cloudsOn: true };
+const DEFAULT_LIGHT: OrbitLight = {
+  sunDir: [0, 0, 1],
+  starColour: [1, 1, 1],
+  timeSec: 0,
+  cloudsOn: true,
+};
 
 function setUniforms(U: OrbitUniforms, v: OrbitUniformValues): void {
   U.uR.value.set(v.size[0], v.size[1]);
@@ -186,7 +206,10 @@ export class OrbitView {
         climate: sources.climate,
         hydrology: sources.hydrology,
         cloudBase: sources.cloudBase?.() ?? null,
-        clouds: !gas && sources.cloudCover !== null && (sources.cloudBase !== null || sources.climate !== null),
+        clouds:
+          !gas &&
+          sources.cloudCover !== null &&
+          (sources.cloudBase !== null || sources.climate !== null),
         ocean: sources.hasOcean && sources.climate !== null,
         snow: sources.lapseKPerKm !== null && sources.climate !== null,
         velocity: sources.velocity,
@@ -224,7 +247,9 @@ export class OrbitView {
   enter(sun: Vec3, viewDir: Vec3 = [0, 0, 1]): void {
     const alt = ENTRY_ALT_KM[this.kind];
     const peak =
-      this.kind === 'rocky' ? aimAtPeak(this.sources.heightGrid, sun, alt, this.sources.radiusKm) : null;
+      this.kind === 'rocky'
+        ? aimAtPeak(this.sources.heightGrid, sun, alt, this.sources.radiusKm)
+        : null;
     this.state = peak ?? aimDefault(sun, viewDir, this.kind, alt);
   }
 
@@ -272,7 +297,12 @@ export class OrbitView {
   /** Moves forward for `dt` real seconds while "Fly forward" is on. */
   advance(dt: number): void {
     if (!this.flying) return;
-    this.state = flyMove(this.state, flyForwardSpeedKmS(this.state.altKm) * dt, 0, this.sources.radiusKm);
+    this.state = flyMove(
+      this.state,
+      flyForwardSpeedKmS(this.state.altKm) * dt,
+      0,
+      this.sources.radiusKm,
+    );
   }
 
   /** The numbers the shader will read for a frame (pure; also used by tests). */

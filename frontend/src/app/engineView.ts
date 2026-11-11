@@ -47,7 +47,9 @@ export function resolveViewControls(src: {
         const g = globe();
         if (!g) return;
         const z = g.state().zoom * (dir === 'in' ? 1.25 : 0.8);
-        useWorldStore.getState().apply({ zoom: Math.max(WORLD_ZOOM[0], Math.min(WORLD_ZOOM[1], z)) });
+        useWorldStore
+          .getState()
+          .apply({ zoom: Math.max(WORLD_ZOOM[0], Math.min(WORLD_ZOOM[1], z)) });
       },
       rotate: (dir) => {
         const g = globe();
@@ -56,7 +58,10 @@ export function resolveViewControls(src: {
         const k = STEP / s.zoom;
         useWorldStore.getState().apply({
           yaw: s.yaw + (dir === 'left' ? -k : dir === 'right' ? k : 0),
-          pitch: Math.max(-1.4, Math.min(1.4, s.pitch + (dir === 'up' ? -k : dir === 'down' ? k : 0))),
+          pitch: Math.max(
+            -1.4,
+            Math.min(1.4, s.pitch + (dir === 'up' ? -k : dir === 'down' ? k : 0)),
+          ),
         });
       },
       reset: () => useWorldStore.getState().apply({ zoom: 1, yaw: 0, pitch: 0 }),
@@ -64,8 +69,18 @@ export function resolveViewControls(src: {
     };
   }
   if (src.engineStar) {
-    const why = 'The star view has no zoom or turning here: use its View choices (whole star, close-up).';
-    return { kind: 'star', zoomOff: why, rotateOff: why, resetOff: why, zoom: NOTHING, rotate: NOTHING, reset: NOTHING, ratio: () => 1 };
+    const why =
+      'The star view has no zoom or turning here: use its View choices (whole star, close-up).';
+    return {
+      kind: 'star',
+      zoomOff: why,
+      rotateOff: why,
+      resetOff: why,
+      zoom: NOTHING,
+      rotate: NOTHING,
+      reset: NOTHING,
+      ratio: () => 1,
+    };
   }
   if (src.rockKind && src.rockView) {
     const v = src.rockView;
@@ -103,7 +118,10 @@ export function useViewControls(): ViewControls {
   const rockView = useRockStore((s) => s.view);
   const rockKind = type === 'asteroid_procedural' || type === 'asteroid_shape' || type === 'comet';
   const globe = useWorldStore((s) => s.globe);
-  // `globe` is a dependency: the world controls are off until its engine exists.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemo(() => resolveViewControls({ viewer, engineWorld, engineStar, rockView, rockKind }), [viewer, engineWorld, engineStar, rockView, rockKind, globe]);
+  return useMemo(
+    () => resolveViewControls({ viewer, engineWorld, engineStar, rockView, rockKind }),
+    // `globe` is a dependency: the world controls are off until its engine exists.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [viewer, engineWorld, engineStar, rockView, rockKind, globe],
+  );
 }

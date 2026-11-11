@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { altToSlider, sliderToAlt, worldNotes, WORLD_HONESTY, WORLD_NOTE_LINES } from './WorldEngineStage';
+import {
+  altToSlider,
+  sliderToAlt,
+  worldNotes,
+  WORLD_HONESTY,
+  WORLD_NOTE_LINES,
+} from './WorldEngineStage';
 import { useWorldStore } from './worldStore';
 import { cardToWorld } from '@/engine/worlds/cardToWorld';
 import type { ObjectCard } from '@/contract';

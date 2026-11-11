@@ -3,7 +3,13 @@
 // gas giants: GAS_NODES, gasProfile, GasSim
 // Verbatim source lines: 2149-2261
 import { clamp, lerp, sstep, fmt, rng, g, planck, planckRGB, LMIN, LMAX, LUT, compile, unis, FULL } from './helpers.js';
+// @deviation (#89 review 7, 8) the renames below:
+//   Great Red Spot r 0.105 -> 0.083 planet radii and aspect 1.38 -> 1.49: about 11,000 x 16,350 km (Simon et al. 2024,
+//   PSJ 5, 223); the old values drew it near its size of decades ago.
+//   Cyclones (type 2) spin the other way: the stamped swirl is -sgn(lat) for anticyclones (the GRS, white ovals,
+//   Oval BA) and must be +sgn(lat) for cyclones, so it is multiplied by -1 for type 2.
 // @verbatim L2148-L2261
+// @rename 0.105,=>0.083, 1.38,=>1.49, 0.05;=>0.05*(s.type===2?-1:1);
 /* Band tables by latitude: degrees, brightness, brown chromophore, roughness. Belts and zones as observed. */
 var GAS_NODES = {
   jup: [[-90, .5, .35, .1], [-60, .58, .34, .25], [-52, .66, .22, .3], [-47, .58, .33, .3], [-43, .72, .12, .25], [-38, .6, .35, .3], [-34, .76, .1, .2], [-30, .55, .45, .35], [-26, .85, .08, .2], [-20, .88, .1, .3], [-18, .45, .72, .75], [-12, .42, .8, .9], [-8, .5, .65, .7], [-6, .88, .08, .35], [0, .92, .06, .3], [5, .88, .1, .4], [7.5, .44, .78, .75], [12, .4, .85, .85], [17, .45, .72, .6], [19, .87, .1, .2], [23, .84, .1, .2], [25, .5, .55, .4], [30, .55, .5, .35], [32, .78, .1, .2], [36, .6, .32, .3], [40, .72, .15, .25], [46, .6, .3, .3], [52, .64, .25, .25], [60, .56, .33, .2], [90, .5, .35, .1]],
@@ -35,7 +41,7 @@ function gasProfile(m, p) {
   if (!zones.length) zones = [-0.5, 0.5];
   function ovals(n, lat, r0, type) { for (var q = 0; q < n; q++) small.push({ lat: lat + (r() - 0.5) * 0.02, lon: r() * 6.2832 - Math.PI, r: r0 * (0.8 + 0.4 * r()), ar: 1.2, type: type }); }
   if (p.id === 'jup') {
-    big.push({ lat: -22 * Math.PI / 180, lon: 0.75, r: 0.105, ar: 1.38, str: 2.6, red: 1 });
+    big.push({ lat: -22 * Math.PI / 180, lon: 0.75, r: 0.083, ar: 1.49, str: 2.6, red: 1 });
     for (i = 0; i < 8; i++) small.push({ lat: -41 * Math.PI / 180, lon: -2.2 + i * 0.42 + (r() - 0.5) * 0.08, r: 0.021, ar: 1.2, type: 1 });
     small.push({ lat: -33 * Math.PI / 180, lon: 2.4, r: 0.04, ar: 1.25, type: 3 });   // Oval BA, reddish since 2005-06
     ovals(3, 14 * Math.PI / 180, 0.024, 2); ovals(5, -14 * Math.PI / 180, 0.013, 1); ovals(3, 20 * Math.PI / 180, 0.015, 1); ovals(4, 41 * Math.PI / 180, 0.016, 1);
@@ -106,7 +112,7 @@ function GasSim(m, seed, R0, prof) {
     for (j = 0; j < NY; j++) { var row = j * NX, jn = Math.min(j + 1, NY - 1), js = Math.max(j - 1, 0), sg = Math.sign(lat[j]) || 1; for (i = 0; i < NX; i++) { var ie = (i + 1) % NX, iw = (i + NX - 1) % NX, k0 = (row + i) * 4; out[k0] = clamp(-(psi[jn * NX + i] - psi[js * NX + i]) / (2 * dp) / Math.max(cs[j], 0.1), -6, 6); out[k0 + 1] = clamp((psi[row + ie] - psi[row + iw]) / (2 * dl * Math.max(cs[j], 0.1)), -3, 3); out[k0 + 2] = clamp((q[row + i] + psi[row + i] * ldi) * sg / Z0, -3, 3); out[k0 + 3] = 0; } }
     function stamp(s, lon, val, swirl) {
       var j0 = Math.max(0, Math.floor((s.lat - 2.6 * s.r + Math.PI / 2) / dp)), j1 = Math.min(NY - 1, Math.ceil((s.lat + 2.6 * s.r + Math.PI / 2) / dp)), cl0 = Math.max(Math.cos(s.lat), 0.1), ci = Math.round((lon + Math.PI) / dl), wi = Math.ceil(2.6 * s.r * s.ar / (cl0 * dl));
-      for (var j2 = j0; j2 <= j1; j2++) for (var ii = ci - wi; ii <= ci + wi; ii++) { var iw = ((ii % NX) + NX) % NX, k0 = (j2 * NX + iw) * 4, dx = (ii - ci) * dl * cl0 / s.ar, dy = lat[j2] - s.lat, g0 = Math.exp(-(dx * dx + dy * dy) / (s.r * s.r)); out[k0 + 3] += val * g0; if (swirl) { var sv = -Math.sign(s.lat) * 0.9 * g0 / s.r * 0.05; out[k0] += -dy * sv / Math.max(cs[j2], 0.1) * 12; out[k0 + 1] += dx * sv * 12; } }
+      for (var j2 = j0; j2 <= j1; j2++) for (var ii = ci - wi; ii <= ci + wi; ii++) { var iw = ((ii % NX) + NX) % NX, k0 = (j2 * NX + iw) * 4, dx = (ii - ci) * dl * cl0 / s.ar, dy = lat[j2] - s.lat, g0 = Math.exp(-(dx * dx + dy * dy) / (s.r * s.r)); out[k0 + 3] += val * g0; if (swirl) { var sv = -Math.sign(s.lat) * 0.9 * g0 / s.r * 0.05*(s.type===2?-1:1); out[k0] += -dy * sv / Math.max(cs[j2], 0.1) * 12; out[k0 + 1] += dx * sv * 12; } }
     }
     prof.small.forEach(function (s) { var jr = clamp(Math.round((s.lat + Math.PI / 2) / dp - 0.5), 0, NY - 1); stamp(s, s.lon + ut[jr] / Math.max(cs[jr], 0.1) * t, s.type === 2 ? -1 : 1, true); });
     prof.big.forEach(function (s) { var jr = clamp(Math.round((s.lat + Math.PI / 2) / dp - 0.5), 0, NY - 1), lon = s.lon + ut[jr] / Math.max(cs[jr], 0.1) * t; if (!s.red) { stamp(s, lon, 1, true); return; }

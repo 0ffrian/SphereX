@@ -40,7 +40,12 @@ import type { MouldPose } from './mould/mouldSteps';
 import { RenderChain } from './render/pipeline';
 import { noiseBakePending, whenNoiseIdle } from './volume/noiseVolume';
 import { onVolumeNoiseReady } from './volume/VolumeBody';
-import { CLOUD_TIME_PER_SIM_S, ORBIT_MAX_PIXEL_RATIO as ORBIT_MAX_PR, OrbitView, renderScaleFor } from './orbit/OrbitView';
+import {
+  CLOUD_TIME_PER_SIM_S,
+  ORBIT_MAX_PIXEL_RATIO as ORBIT_MAX_PR,
+  OrbitView,
+  renderScaleFor,
+} from './orbit/OrbitView';
 import { resolveOrbitSources, type OrbitResolved } from './orbit/orbitSources';
 import { pickPlace, type Vec3 } from './orbit/orbitMath';
 import {
@@ -315,7 +320,14 @@ export class ViewerApp {
   private mould: Readonly<MouldPose> | null = null;
   /** Issue #60: the body's own turn (mock-up drag and auto-rotation), radians about x and y. */
   // ---- the close-up pane (issue #71 stream H): the app's version of the mock-up's #cuPane ----
-  private close: CloseState = { mode: null, view: null, resolved: null, last: 0, reading: false, dirty: false };
+  private close: CloseState = {
+    mode: null,
+    view: null,
+    resolved: null,
+    last: 0,
+    reading: false,
+    dirty: false,
+  };
   private closeCanvas: HTMLCanvasElement | null = null;
   private closeRt: RenderTarget | null = null;
   /** True while a D-37 engine (world, star, rock) draws the body: this viewer builds, steps and draws nothing. */
@@ -1323,7 +1335,11 @@ export class ViewerApp {
   }
 
   closeUpInfo(): CloseUpInfo {
-    return { mode: this.close.mode, resolved: this.close.resolved, refusal: this.close.resolved?.refusal ?? null };
+    return {
+      mode: this.close.mode,
+      resolved: this.close.resolved,
+      refusal: this.close.resolved?.refusal ?? null,
+    };
   }
 
   /**
@@ -1332,7 +1348,11 @@ export class ViewerApp {
    * is set. `textOnly` (a star) or a refusal (still forming, missing radius) or `blockedReason` (the
    * level hides artist's impressions) shows a caption only: never a blank pane.
    */
-  openCloseUp(bodyFallback: boolean, textOnly = false, blockedReason: string | null = null): CloseUpInfo {
+  openCloseUp(
+    bodyFallback: boolean,
+    textOnly = false,
+    blockedReason: string | null = null,
+  ): CloseUpInfo {
     if (this.disposed) return this.closeUpInfo();
     this.closeUpOff(true, true);
     const body = this.body as unknown as { orbitSources?: unknown } | null;
@@ -1353,13 +1373,18 @@ export class ViewerApp {
           this.close.mode = 'orbit';
         } catch (err) {
           console.warn('[viewer] could not start the surface view', err);
-          this.close.resolved = { ...resolved, sources: null, refusal: 'The surface view could not start in this browser.' };
+          this.close.resolved = {
+            ...resolved,
+            sources: null,
+            refusal: 'The surface view could not start in this browser.',
+          };
         }
       }
     } else if (bodyFallback && this.onScreen) {
       this.close.mode = 'body';
     }
-    if (this.close.mode === null && (textOnly || this.close.resolved?.refusal)) this.close.mode = 'text';
+    if (this.close.mode === null && (textOnly || this.close.resolved?.refusal))
+      this.close.mode = 'text';
     this.notifyClose();
     this.requestCloseRender();
     return this.closeUpInfo();
@@ -1449,9 +1474,16 @@ export class ViewerApp {
         cloudsOn: true,
       };
       c.view.renderScale = renderScaleFor(this.tier === 'low');
-      const out = c.view.render(r, { w: cw, h: ch }, pr, { now: performance.now(), animating: this.clock.running });
+      const out = c.view.render(r, { w: cw, h: ch }, pr, {
+        now: performance.now(),
+        animating: this.clock.running,
+      });
       if (!out) {
-        const failed: OrbitResolved = { ...(c.resolved as OrbitResolved), sources: null, refusal: 'The surface view could not start in this browser.' };
+        const failed: OrbitResolved = {
+          ...(c.resolved as OrbitResolved),
+          sources: null,
+          refusal: 'The surface view could not start in this browser.',
+        };
         this.closeUpOff(true);
         this.close.mode = 'text';
         this.close.resolved = failed;
@@ -1473,7 +1505,11 @@ export class ViewerApp {
       cam.updateProjectionMatrix();
       cam.updateMatrixWorld();
       if (!this.closeRt) {
-        this.closeRt = new RenderTarget(w, h, { type: UnsignedByteType, colorSpace: SRGBColorSpace, depthBuffer: true });
+        this.closeRt = new RenderTarget(w, h, {
+          type: UnsignedByteType,
+          colorSpace: SRGBColorSpace,
+          depthBuffer: true,
+        });
       } else if (this.closeRt.width !== w || this.closeRt.height !== h) this.closeRt.setSize(w, h);
       const prev = r.getRenderTarget();
       r.setRenderTarget(this.closeRt);
@@ -1497,9 +1533,17 @@ export class ViewerApp {
     const w = rt.width;
     const h = rt.height;
     const webgl = this.backend === 'webgl2';
-    void (this.renderer as unknown as {
-      readRenderTargetPixelsAsync(rt: RenderTarget, x: number, y: number, w: number, h: number): Promise<ArrayLike<number>>;
-    })
+    void (
+      this.renderer as unknown as {
+        readRenderTargetPixelsAsync(
+          rt: RenderTarget,
+          x: number,
+          y: number,
+          w: number,
+          h: number,
+        ): Promise<ArrayLike<number>>;
+      }
+    )
       .readRenderTargetPixelsAsync(rt, 0, 0, w, h)
       .then((data) => {
         const canvas = this.closeCanvas;
@@ -1543,7 +1587,10 @@ export class ViewerApp {
     if (!frame || this.disposed) return null;
     const rect = this.canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
-    const ndc = new Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -(((clientY - rect.top) / rect.height) * 2 - 1));
+    const ndc = new Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -(((clientY - rect.top) / rect.height) * 2 - 1),
+    );
     const ray = new Raycaster();
     ray.setFromCamera(ndc, this.camera);
     frame.updateWorldMatrix(true, false);

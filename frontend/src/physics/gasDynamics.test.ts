@@ -5,7 +5,10 @@ import {
   GAS_NY,
   GAS_NODES,
   GAS_SETTLE_STEPS,
+  ENCKE_GAP_KM,
   GLOW_ABOVE_K,
+  MEASURED_FLATTENING,
+  MEASURED_PEAK_WIND_MS,
   PACE_DAY_S_PER_S,
   PACE_SLOW_S_PER_S,
   RING_TEX_SIZE,
@@ -16,7 +19,10 @@ import {
   gasProfile,
   gasRegime,
   ringAt,
+  ringRegionAt,
   ringTexture,
+  RING_TEX_INNER,
+  RING_TEX_OUTER,
   rhinesWidthM,
   scaleHeightM,
   secondsPerStep,
@@ -26,7 +32,7 @@ import {
 } from './gasDynamics';
 
 // Jupiter: NASA Planetary Fact Sheet (equatorial 1 bar radius 71,492 km, mass 317.83 Earth masses,
-// rotation 9.9250 h, equilibrium temperature 110 K), internal heat 1.67x absorbed (Li et al. 2018).
+// rotation 9.9250 h, equilibrium temperature 110 K), internal heat 1.67x absorbed (Hanel et al. 1981).
 const JUP: GasInput = {
   reference: 'jup',
   radiusRj: 1,
@@ -57,9 +63,26 @@ describe('gas model against known answers', () => {
   it('Jupiter spin rate is 2 pi / 9.925 h', () => {
     expect(m.omega).toBeCloseTo((2 * Math.PI) / (9.925 * 3600), 12);
   });
-  it('Jupiter flattening from 0.7 q is within 8% of the observed 0.065', () => {
-    expect(m.flattening).toBeGreaterThan(0.06);
-    expect(m.flattening).toBeLessThan(0.07);
+  it('the reference giants use their measured flattening and peak jet speed (#89 review 5, 6)', () => {
+    const s = gasModel(SAT)!;
+    expect(m.flattening).toBe(MEASURED_FLATTENING.jup);
+    expect(s.flattening).toBe(MEASURED_FLATTENING.sat);
+    expect(m.flatteningTag).toBe('measured');
+    expect(m.windMs).toBe(MEASURED_PEAK_WIND_MS.jup);
+    expect(s.windMs).toBe(MEASURED_PEAK_WIND_MS.sat);
+    expect(s.windTag).toBe('measured');
+    // Saturn's faster jets give fewer, broader Rhines bands than Jupiter's (the solver's jet count).
+    expect(s.jets).toBeLessThan(m.jets);
+  });
+  it('another giant keeps the 0.7 q flattening and the thermal-wind estimate, tagged model_dependent', () => {
+    const o = gasModel({ ...JUP, reference: null })!;
+    // 0.7 q for Jupiter's numbers is 0.0625: within 4% of the measured 0.06487.
+    expect(o.flattening).toBeGreaterThan(0.06);
+    expect(o.flattening).toBeLessThan(0.07);
+    expect(o.flatteningTag).toBe('model_dependent');
+    // A cool giant that is not locked sits on the 10 K floor: U = 0.6 sqrt(8314.46 / 2.3 * 10) = 114 m/s.
+    expect(o.windMs).toBeCloseTo(0.6 * Math.sqrt((8314.462618 / 2.3) * 10), 6);
+    expect(o.windTag).toBe('model_dependent');
   });
   it('Jupiter jet speed is of the order of 100 m/s and the scale height tens of km', () => {
     expect(m.windMs).toBeGreaterThan(50);
@@ -149,9 +172,23 @@ describe('Saturn rings', () => {
     expect(ringAt(2.5).opacity).toBe(0);
     expect(ringAt(1.05).opacity).toBe(0);
   });
-  it('the Encke Gap is empty', () => {
-    expect(ringAt(133410 / SATURN_RADIUS_KM).opacity).toBe(0);
+  it('the Encke Gap is empty (centre 133,584 km = 2.2165 R_S)', () => {
+    expect(ENCKE_GAP_KM / SATURN_RADIUS_KM).toBeCloseTo(2.2165, 3);
+    expect(ringAt(ENCKE_GAP_KM / SATURN_RADIUS_KM).opacity).toBe(0);
+    expect(ringRegionAt(ENCKE_GAP_KM / SATURN_RADIUS_KM)).toBe('Encke');
     expect(ringAt(2.15).opacity).toBeGreaterThan(0.5);
+  });
+  it('the F ring (140,180 to 140,240 km) is drawn at least one texture column wide', () => {
+    const tex = ringTexture();
+    const col = (km: number) =>
+      Math.round(
+        ((km / SATURN_RADIUS_KM - RING_TEX_INNER) / (RING_TEX_OUTER - RING_TEX_INNER)) *
+          (RING_TEX_SIZE - 1),
+      );
+    expect(tex[col(140210) * 4]!).toBeGreaterThan(0.1);
+    // ... and only there: the columns either side are empty space.
+    expect(tex[(col(140210) - 2) * 4]!).toBe(0);
+    expect(tex[(col(140210) + 2) * 4]!).toBe(0);
   });
   it('the ring texture is deterministic and well formed', () => {
     const a = ringTexture();
@@ -214,6 +251,25 @@ describe('solver', () => {
     expect(Math.abs(p2 - p1) / p1).toBeLessThan(0.2);
   }, 60_000);
 
+  it('Saturn with its measured jet speed (7 Rhines jets, a slower solver spin) stays finite and keeps its jets', () => {
+    const s = build(SAT);
+    for (let i = 0; i < GAS_SETTLE_STEPS; i++) s.step();
+    const settled = s.zonalMeanFlow();
+    for (let i = 0; i < 1000; i++) s.step();
+    const later = s.zonalMeanFlow();
+    expect(Number.isFinite(s.maxAbsVorticity())).toBe(true);
+    for (const v of s.exportField()) expect(Number.isFinite(v)).toBe(true);
+    let num = 0;
+    let d1 = 0;
+    let d2 = 0;
+    for (let j = 8; j < GAS_NY - 8; j++) {
+      num += settled[j]! * later[j]!;
+      d1 += settled[j]! ** 2;
+      d2 += later[j]! ** 2;
+    }
+    expect(num / Math.sqrt(d1 * d2)).toBeGreaterThan(0.95);
+  }, 60_000);
+
   it('the exported field has the grid the tracer pass reads', () => {
     const s = build(SAT);
     s.step();
@@ -231,6 +287,13 @@ describe('pacing', () => {
     // One day per second: tens of steps per second, so storms visibly drift.
     expect(PACE_DAY_S_PER_S / per).toBeGreaterThan(5);
     expect(PACE_DAY_S_PER_S / per).toBeLessThan(200);
+  });
+  it('Saturn with its measured 450 m/s jet: still under one step per real second at the slow pace, about 200 at one day', () => {
+    const s = gasModel(SAT)!;
+    const per = secondsPerStep(s);
+    expect(PACE_SLOW_S_PER_S / per).toBeLessThan(1);
+    expect(PACE_DAY_S_PER_S / per).toBeGreaterThan(150);
+    expect(PACE_DAY_S_PER_S / per).toBeLessThan(250);
   });
   it('steps are a pure function of planet time', () => {
     expect(stepsFor(m, 0)).toBe(0);
@@ -260,6 +323,26 @@ describe('tags (D-02)', () => {
   });
 });
 
+describe('storm spin (#89 review 8)', () => {
+  it('a cyclone (type 2) turns the other way from an anticyclone (type 1) at the same place', () => {
+    const m = gasModel(JUP)!;
+    const base = gasProfile(m, JUP);
+    const lat = (30 * Math.PI) / 180;
+    const one = (type: 1 | 2) => {
+      const prof = { ...base, big: [], small: [{ lat, lon: 0, r: 0.06, ar: 1, type }] };
+      return createGasSim(m, JUP.seed, prof).exportField();
+    };
+    const a = one(1);
+    const c = one(2);
+    // Eastward wind (channel 0) just north of the centre: an anticyclone in the north turns clockwise (eastward on
+    // its north side), a cyclone anticlockwise (westward there).
+    const j = Math.round((lat + 0.04 + Math.PI / 2) / (Math.PI / GAS_NY) - 0.5);
+    const i = Math.round(Math.PI / ((2 * Math.PI) / GAS_NX));
+    const k = (j * GAS_NX + i) * 4;
+    expect(a[k]! - c[k]!).toBeGreaterThan(0);
+  });
+});
+
 describe('placed storms', () => {
   it('storms are carried by the deep jets: the Great Red Spot moves, a stationary list does not change at step 0', () => {
     const m = gasModel(JUP)!;
@@ -277,7 +360,17 @@ describe('placed storms', () => {
 });
 
 describe('tidally locked hot giant (HD 189733 b: P = 2.21857567 d, Teq 1209 K)', () => {
-  const HD: GasInput = { reference: null, radiusRj: 1.13, massEarth: 359.1479, rotPeriodH: 2.21857567 * 24, teqK: 1209, tintK: null, mu: 2.3, seed: 53, locked: true };
+  const HD: GasInput = {
+    reference: null,
+    radiusRj: 1.13,
+    massEarth: 359.1479,
+    rotPeriodH: 2.21857567 * 24,
+    teqK: 1209,
+    tintK: null,
+    mu: 2.3,
+    seed: 53,
+    locked: true,
+  };
   const m = gasModel(HD)!;
   it('is hot on the day side and cooler on the night side, with the glow only above 850 K', () => {
     expect(m.locked).toBe(true);
@@ -297,7 +390,10 @@ describe('tidally locked hot giant (HD 189733 b: P = 2.21857567 d, Teq 1209 K)',
   it('the solver runs finite and deterministic', () => {
     const a = createGasSim(m, HD.seed, gasProfile(m, HD));
     const b = createGasSim(m, HD.seed, gasProfile(m, HD));
-    for (let i = 0; i < 60; i++) { a.step(); b.step(); }
+    for (let i = 0; i < 60; i++) {
+      a.step();
+      b.step();
+    }
     expect(Array.from(a.exportField())).toEqual(Array.from(b.exportField()));
     expect(Number.isFinite(a.maxAbsVorticity())).toBe(true);
   });

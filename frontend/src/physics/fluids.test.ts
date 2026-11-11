@@ -33,6 +33,17 @@ describe('fluids', () => {
     expect(boilingPointK(FLUIDS.co2, ATM_PA)).toBeNull();
   });
 
+  it('CO2 has a liquid range above its triple point (#89 review 2): the line starts at the triple point, ends at the critical point', () => {
+    // Known answer: CO2's saturation temperature at 10 bar is about 233 K (NIST); the fit from the triple point gives 234.8 K.
+    const t10 = boilingPointK(FLUIDS.co2, 10e5)!;
+    expect(t10).toBeGreaterThan(231);
+    expect(t10).toBeLessThan(237);
+    expect(boilingPointK(FLUIDS.co2, FLUIDS.co2.Pt * 1.0001)!).toBeCloseTo(FLUIDS.co2.Tt, 1);
+    expect(boilingPointK(FLUIDS.co2, 100e5)).toBe(304.13);
+    expect(fluidState(FLUIDS.co2, 240, 20e5, false)).toBe('liquid');
+    expect(fluidState(FLUIDS.co2, 240, 5e5, false)).toBe('vapour');
+  });
+
   it('phase: Earth is liquid, Mars-like air is frozen, an airless hot rock is vapour', () => {
     expect(fluidState(FLUIDS.water, 288, ATM_PA, false)).toBe('liquid');
     expect(fluidState(FLUIDS.water, 210, 600, false)).toBe('frozen');

@@ -68,7 +68,10 @@ async function tryWorker(input: GasInput): Promise<(GasSolver & { first: GasFram
     return null;
   }
   let nextId = 1;
-  const pending = new Map<number, { resolve: (r: GasResponse) => void; reject: (e: Error) => void }>();
+  const pending = new Map<
+    number,
+    { resolve: (r: GasResponse) => void; reject: (e: Error) => void }
+  >();
   let dead = false;
   worker.onmessage = (e: MessageEvent<GasResponse>) => {
     const entry = pending.get(e.data.id);
