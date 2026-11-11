@@ -14,8 +14,9 @@ P3 writes **no** ``derived.area`` entry: P7 adds the stored, served entries (and
 stages). ``--day0`` writes the Day 0 count (A16.6, Q-148, Q-401) as JSON.
 
 Exit codes, so an overnight run that failed can be detected and the Area tool switched off
-(Moon, 11 Nov 2026; Q-205): 0 done; 1 incomplete (a cone failed: nothing may be stored);
-2 unknown area or bad arguments.
+(Moon, 11 Nov 2026; Q-205, Q-400 (12)): 0 done; 1 not storable (a cone or a cutout download
+failed, a cone hit MAXREC, no usable cutout, or no dots); 2 unknown area or bad arguments, or an
+area of another data release.
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ from app.context import Context, make_context
 from app.core.area import day0
 from app.core.area.config import DEFAULT_AREA_CONFIG, AreaConfig, load_areas
 from app.core.area.dots import run_dots
-from app.core.area.frames import assemble, live_fetch, search_cones
+from app.core.area.frames import find_frames
 from app.core.area.records import AreaFrames, FrameDots
 from app.core.find import moving
 from app.settings import Settings
@@ -45,47 +46,39 @@ EXIT_DONE, EXIT_INCOMPLETE, EXIT_USAGE = 0, 1, 2
 def run_frames(
     ctx: Context, area_id: str, cfg: AreaConfig, refresh: bool
 ) -> tuple[AreaFrames, dict[str, bytes]]:
+    """``find_frames`` (cones, then cutouts and coverage), with one log line per stage."""
     spec = load_areas(ctx)[area_id]
     t0 = time.perf_counter()
-    cones = search_cones(ctx, spec, cfg, refresh=refresh)
-    cone_s = time.perf_counter() - t0
-    head = [f"frames:cone_maxrec:{cones.maxrec_hits}"] if cones.maxrec_hits else []
+    frames, bodies = find_frames(ctx, spec, cfg, refresh=refresh)
+    st = frames.stats
     print(
-        f"[frames] {len(cones.logs)} cones in {cone_s:.1f} s: {len(cones.rows)} frames, "
-        f"{cones.maxrec_hits} at MAXREC, {cones.failed} failed"
+        f"[frames] {frames.n_cones} cones in {st.get('cone_seconds', 0.0):.1f} s: "
+        f"{len(frames.frames)} frames"
     )
-    if cones.failed:
-        frames = AreaFrames(
-            spec=spec,
-            frames=(),
-            coverage=(),
-            missing=tuple(sorted({*head, f"frames:cone_failed:{cones.failed}"})),
-            complete=False,
-            n_cones=len(cones.logs),
-            input_digests=tuple(sorted(cones.digests)),
-            cones=tuple(cones.logs),
-            stats={"cone_seconds": cone_s},
+    if frames.frames:
+        print(
+            f"[cutouts] {len(bodies)} of {len(frames.frames)} usable, "
+            f"{st.get('cutout_bytes', 0) / 1e6:.1f} MB in {st.get('cutout_seconds', 0.0):.1f} s "
+            f"({st.get('cutout_fetch_failed', 0)} downloads failed)"
         )
-        return frames, {}
-    t0 = time.perf_counter()
-    frames, bodies = assemble(
-        spec,
-        cones.rows,
-        live_fetch(ctx, refresh=refresh),
-        cfg,
-        workers=ctx.settings.cutout_concurrency,
-        head_missing=head,
-        sia_digests=cones.digests,
-        n_cones=len(cones.logs),
-        cones=cones.logs,
-    )
-    frames.stats["cone_seconds"] = cone_s
-    print(
-        f"[cutouts] {len(bodies)} of {len(frames.frames)} cutouts, "
-        f"{frames.stats['cutout_bytes'] / 1e6:.1f} MB in {time.perf_counter() - t0:.1f} s; "
-        f"missing {list(frames.missing)}"
-    )
+    print(f"[frames] missing {list(frames.missing)} ({time.perf_counter() - t0:.1f} s)")
     return frames, bodies
+
+
+def failures(
+    frames: AreaFrames, bodies: dict[str, bytes], dots: list[FrameDots] | None
+) -> list[str]:
+    """Why a run must not be stored (exit 1, Q-400 (12)); empty when it may be."""
+    out: list[str] = []
+    if not frames.complete:
+        out.append("incomplete: " + ", ".join(frames.missing))
+    if any(m.startswith("frames:cone_maxrec:") for m in frames.missing):
+        out.append("a cone hit MAXREC, so frames inside the windows may be missing")
+    if not bodies:
+        out.append("no usable cutout")
+    if dots is not None and not any(fd.dots for fd in dots):
+        out.append("no dots")
+    return out
 
 
 def object_positions(ctx: Context, spkid: str) -> dict[str, tuple[float, float]] | None:
@@ -117,7 +110,11 @@ def main(argv: list[str] | None = None, *, settings: Settings | None = None) -> 
         print(f"unknown area {args.area!r}; known: {sorted(load_areas(ctx))}", file=sys.stderr)
         return EXIT_USAGE
     cfg = DEFAULT_AREA_CONFIG
-    frames, bodies = run_frames(ctx, args.area, cfg, args.refresh)
+    try:
+        frames, bodies = run_frames(ctx, args.area, cfg, args.refresh)
+    except ValueError as exc:  # the area is for another data release
+        print(str(exc), file=sys.stderr)
+        return EXIT_USAGE
     per_frame: list[FrameDots] | None = None
     if frames.complete and "dots" in steps:
         t0 = time.perf_counter()
@@ -130,8 +127,9 @@ def main(argv: list[str] | None = None, *, settings: Settings | None = None) -> 
         args.day0.parent.mkdir(parents=True, exist_ok=True)
         args.day0.write_text(json.dumps(rep, indent=1, sort_keys=True), encoding="utf-8")
         print(f"[day0] written to {args.day0}")
-    if not frames.complete:
-        print(f"INCOMPLETE: {list(frames.missing)}; nothing may be stored", file=sys.stderr)
+    problems = failures(frames, bodies, per_frame)
+    if problems:
+        print("INCOMPLETE: " + "; ".join(problems) + "; nothing may be stored", file=sys.stderr)
         return EXIT_INCOMPLETE
     print("DONE")
     return EXIT_DONE

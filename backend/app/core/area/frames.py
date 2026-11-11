@@ -26,7 +26,7 @@ import math
 import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 import numpy as np
@@ -59,9 +59,13 @@ log = logging.getLogger("shift_spectrum")
 AREA_VISITS = "area:visits"
 CONE_MAXREC = "frames:cone_maxrec"
 CONE_FAILED = "frames:cone_failed"
+# A cutout download that failed (not cached offline, or upstream down): like a failed cone, the
+# result is incomplete and never stored (Q-400 (12)). A body that arrived but is unusable stays
+# ``cutout:<frame_id>`` (a refusal of that frame, stored).
+CUTOUT_FAILED = "frames:cutout_failed"
 NO_FOOTPRINT = "no_footprint"
 CUTOUT = "cutout"
-REQUIRED_HDUS = ("IMAGE", "FLAGS", "VARIANCE")
+REQUIRED_HDUS = ("IMAGE", "FLAGS", "VARIANCE", "WCS-WAVE")
 
 
 # --- 1. cones ------------------------------------------------------------------------------
@@ -227,6 +231,7 @@ class CutoutResult:
     body: bytes | None
     seconds: float
     error: str | None = None
+    failed: bool = False  # the download itself failed (not an unusable body)
 
 
 def usable_cutout(body: bytes) -> bool:
@@ -254,7 +259,7 @@ def fetch_cutouts(
         try:
             key, body = fetch(rows[i], plan)
         except (CacheMissOffline, UpstreamUnavailable, UpstreamError, OSError) as exc:
-            return CutoutResult(None, None, time.perf_counter() - t0, str(exc))
+            return CutoutResult(None, None, time.perf_counter() - t0, str(exc), failed=True)
         if not usable_cutout(body):
             return CutoutResult(key, None, time.perf_counter() - t0, "unreadable or no IMAGE")
         return CutoutResult(key, body, time.perf_counter() - t0)
@@ -419,6 +424,7 @@ def assemble(
     stats = {
         "cutout_seconds": cut_s,
         "cutout_seconds_each": [c.seconds for c in cuts],
+        "cutout_fetch_failed": sum(c.failed for c in cuts),
         "cutout_bytes": sum(len(b) for b in bodies.values()),
         "coverage_seconds": time.perf_counter() - t1,
     }
@@ -447,7 +453,9 @@ def find_frames(
     fetch: CutoutFetch | None = None,
 ) -> tuple[AreaFrames, dict[str, bytes]]:
     """A17.1 end to end. A failed cone stops the step before any cutout: the result is
-    incomplete (``complete=False``, ``frames:cone_failed:<n>``) and is never stored."""
+    incomplete (``complete=False``, ``frames:cone_failed:<n>``) and is never stored. A failed
+    cutout download makes it incomplete too (``frames:cutout_failed:<n>``, Q-400 (12)); an
+    unusable body is only ``cutout:<frame_id>``."""
     if spec.data_release != ctx.settings.data_release:
         raise ValueError(
             f"area {spec.id} is for {spec.data_release}, "
@@ -484,4 +492,11 @@ def find_frames(
         cones=cones.logs,
     )
     result.stats["cone_seconds"] = cone_s
+    failed = int(result.stats["cutout_fetch_failed"])
+    if failed:
+        result = replace(
+            result,
+            complete=False,
+            missing=tuple(sorted({*result.missing, f"{CUTOUT_FAILED}:{failed}"})),
+        )
     return result, bodies

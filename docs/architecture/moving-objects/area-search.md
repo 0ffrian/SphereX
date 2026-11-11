@@ -136,7 +136,7 @@ Facts measured on PR #53's recorded Eros fixtures (16 cutouts, `mockup/chase-the
 | Motion between visits | 0.970° in 1.017 d: 0.954 deg/day at PA 105.7°. The two directions differ by 25° because of SPHEREx's orbital parallax (Q-134); A17.4 handles it | Tested (Eros) |
 | Sky position | Galactic l = 195.6°, b = −4.0°: a crowded field, so star masking is tested hard (A17.3) | Tested |
 | Per-exposure depth (5σ point source per band) | Survey depths of 19.5 to 19.9 AB (Bock et al. 2025, [arXiv:2511.02985](https://arxiv.org/abs/2511.02985)) are not per exposure | **[verify]**, Day 0 |
-| Dot density and run times (offline, recorded Eros cutouts) | About 6 400 kept dots per deg² per frame (about 76 000 for the Eros area, an upper bound); mesh std 1.8 × sqrt(VARIANCE); Eros found in 14 of 16 frames; Stage 2 13 to 21 ms a dot | Measured offline ([Q-401](../../decisions/moving-objects.md)); live **[verify]** |
+| Dot density and run times (offline, recorded Eros cutouts) | About 6 400 kept dots per deg² per frame (about 76 000 for the Eros area, an estimate extrapolated from 0.1° cutouts); mesh std 1.8 × sqrt(VARIANCE); Eros found in 14 of 16 frames; Stage 2 13 to 21 ms a dot | Measured offline ([Q-401](../../decisions/moving-objects.md)); live **[verify]** |
 | Visits and gap for the other demo areas | Joining needs 2 visits; the gap sets `rate_min` (A17.4). A3.1 says about 0.8 days for one spot; a cache check reported 0.7 to 88 days | **[verify]**, Q-148, Day 0 |
 | Trailing | Smear starts near 0.53 deg/day and is significant near 1.2 deg/day (Lisse et al. 2024, appendix) | Documented |
 | IRSA MOST for frame lists | One question, Q-126 (PR #53's entry); Q-140 asks the same | Open (Kevin), [A19.3](track.md#a193-frame-list) |

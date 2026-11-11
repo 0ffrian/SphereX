@@ -17,6 +17,12 @@ from tests.area_recorded import EROS_AREA, recorded_cutouts, recorded_sia
 from tests.conftest import make_settings
 from tests.helpers import entries
 
+# The grid cones all answer with the recorded cone 1 (visit 1 and the 0340_1 exposure of
+# visit 2): 10 frames, 8 recorded cutouts, 0340_1's two frames unusable.
+N_FRAMES = 10
+N_USABLE = 8
+MISSING = ["cutout:2026W12_2A_0340_1_D1", "cutout:2026W12_2A_0340_1_D4"]
+
 
 def _derived_area(cache: Path) -> list[Path]:
     return list((cache / "v1").glob("derived.area*"))
@@ -41,6 +47,29 @@ def test_failed_cones_exit_1_and_store_nothing(
     assert _derived_area(tmp_path / "cache") == []
 
 
+def _cones_only(cache: Path) -> None:
+    ctx = make_context(make_settings(cache))
+    _, cone_body = next(
+        (m, b) for m, b in entries("irsa_sia") if m["key"]["query"]["ra"] == "90.40961"
+    )
+    for ra, dec in cone_grid(AreaBox.of(EROS_AREA), 0.25):
+        key = irsa_sia.sia_key("spherex_qr2", ra, dec, 0.001)
+        ctx.cache.put(key, LiveResponse(cone_body, "https://x", 200, "text/xml", {"maxrec": 500}))
+
+
+def test_cones_without_cutouts_exit_1_and_store_nothing(tmp_path: Path) -> None:
+    """Cones cached, cutouts not (offline): every download fails, so the run is incomplete."""
+    cache = tmp_path / "cache"
+    _cones_only(cache)
+    out = tmp_path / "day0.json"
+    s = make_settings(cache)
+    assert area_discovery.main(["--area", "eros-2026-03", "--day0", str(out)], settings=s) == 1
+    rep = json.loads(out.read_text("utf-8"))
+    assert rep["complete"] is False and rep["cutouts"]["n_usable"] == 0
+    assert any(m.startswith("frames:cutout_failed:") for m in rep["missing"])
+    assert _derived_area(cache) == []
+
+
 def test_full_offline_run_with_day0(fixture_cache: Path) -> None:
     """The recorded Eros data placed under the area's own cache keys (grid cones answer with
     the recorded cone; each frame's planned cutout is its recorded 0.1 deg cutout)."""
@@ -58,10 +87,12 @@ def test_full_offline_run_with_day0(fixture_cache: Path) -> None:
     box = AreaBox.of(EROS_AREA)
     for r in kept:
         plan = plan_cutout(box, r)
-        if plan is None or r.frame_id not in cuts:
-            continue
+        assert plan is not None
         key = irsa_cutout.key_for(ctx, r, plan.ra, plan.dec, plan.size_arcsec)
-        ctx.cache.put(key, LiveResponse(cuts[r.frame_id][1], "https://x", 200, "application/fits"))
+        # A frame without a recorded cutout (0340_1) gets a body that is not FITS: it arrived
+        # but is unusable, so the run stays complete with cutout:<frame_id>.
+        body = cuts[r.frame_id][1] if r.frame_id in cuts else b"not FITS"
+        ctx.cache.put(key, LiveResponse(body, "https://x", 200, "application/fits"))
     out = fixture_cache.parent / "day0.json"
     code = area_discovery.main(
         ["--area", "eros-2026-03", "--day0", str(out), "--day0-object", "20000433"], settings=s
@@ -69,7 +100,9 @@ def test_full_offline_run_with_day0(fixture_cache: Path) -> None:
     assert code == 0
     rep = json.loads(out.read_text("utf-8"))
     assert rep["complete"] is True and rep["cones"]["n"] == 15
-    assert rep["dots"]["n"] > 0 and rep["cutouts"]["n_usable"] >= 8
+    assert rep["frames"]["n"] == N_FRAMES and rep["cutouts"]["n_usable"] == N_USABLE
+    assert rep["missing"] == MISSING
+    assert rep["dots"]["n"] > 0
     obj = rep["object"]
     assert obj["frames_found"] <= obj["frames_predicted"]
     assert _derived_area(fixture_cache) == []
