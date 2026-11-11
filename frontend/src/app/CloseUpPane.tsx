@@ -17,13 +17,12 @@ import { ProvenanceBadge } from './Badge';
 import { buttonClass, pressedClass } from './ui';
 import { StarCloseUp } from './StarCloseUp';
 import { RockCloseUp } from './RockCloseUp';
-import { StarFlareStage, StarSurfaceCloseUp } from './StarEngineStage';
+import { StarFlareStage } from './StarEngineStage';
 import { STAR_CLOSEUP_TAG, useStarCloseUp } from './starCloseUp';
 import { WorldFlyStage } from './WorldEngineStage';
 import { engineKey, useWorldStore } from './worldStore';
 import { useAppStore } from '@/state/store';
 import { useRockStore } from './rockStore';
-import { useStarTarget } from './starTargetStore';
 
 export type CloseUpKind = 'orbit' | 'star' | 'body';
 
@@ -80,7 +79,6 @@ export function CloseUpPane() {
   const starFailedId = useWorldStore((s) => s.starFailedId);
   // A failure belongs to the card and preset it happened on: the next object is tried afresh.
   const cardId = useAppStore((s) => s.card?.id);
-  const left = useStarTarget((s) => s.left);
   const kind = closeUpKindOf(type);
   // Issue #71 stream X (D-37): a star the prototype's engine draws opens with the build, with the flare close-up.
   const engine = kind === 'star' && engineStar && starFailedId !== engineKey(cardId, engineStar.preset.id) ? engineStar : null;
@@ -230,11 +228,8 @@ export function CloseUpPane() {
           onFail={() => useWorldStore.getState().fail(engineKey(cardId, world.preset.id))}
         />
       )}
-      {engine && open && left === 'flare' && (
+      {engine && open && (
         <StarFlareStage key={engine.preset.id} star={engine} onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))} />
-      )}
-      {engine && open && left === 'surface' && (
-        <StarSurfaceCloseUp key={engine.preset.id} star={engine} onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))} />
       )}
       {kind === 'star' && !engine && starProps && open && (
         <div className="absolute inset-0 bg-black" data-testid="star-closeup">
