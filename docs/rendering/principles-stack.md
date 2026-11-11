@@ -45,7 +45,7 @@
    - `artistic`: decorative and unconstrained by data
 3. **Fall back a tier, don't invent (D-32).** When a layer or motion rate lacks its measured input, it falls to the next tier (formula, formula with a stated typical input, typical for its kind, art) and its tag says which tier answered. It is refused (not drawn, listed in `missing`, the UI says "not enough data for X") only when no tier can answer, and always for physical size and for ObjectCard values.
 4. **Whole-body honesty.** SPHEREx spectra are disc-integrated averages. They can set global surface properties, never spatial patterns.
-5. **Determinism.** The same ObjectCard plus the same seed must give byte-identical textures. Seed = hash of (object id + generator version); the hash is in [§6.3](surface-generation.md#r63-height-field).
+5. **Determinism.** The same ObjectCard plus the same seed must give byte-identical textures (on one machine; committed PNG maps checked across machines: Q-204). Seed = hash of (object id + generator version); the hash is in [§6.3](surface-generation.md#r63-height-field).
 6. **One height map drives everything.** The same height field feeds the normal map, the displacement, the haptics and the surface sound, including the body tone (R8.9.1). They must never disagree.
 
 ---

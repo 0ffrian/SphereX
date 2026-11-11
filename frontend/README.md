@@ -130,6 +130,8 @@ src/
     sound/                listenSweep (A8 Listen sweep)
     ui/                   PulseIndicator, UnlockButton, SpectrumHapticsPad, CalibrationWizard, HapticsSettings
   hapticsTestPage/  dev-only haptics test page (/haptics-test.html on the dev server; not built)
+  gpuProbe/         dev-only GPU probe (/gpu-probe.html on the dev server; not built)
+  perf/             adapter report, frame stats and the `__sxPerf` recorder (fixtures build only)
 e2e/              Playwright smoke test and flipbook flow (fixtures mode)
 fixtures/         SYNTHETIC dev/test fixtures and their Vite dev plugin (see fixtures/README.md)
 scripts/          check-dist.js (post-build check)
@@ -146,6 +148,10 @@ Modules that are not built yet (now only the Tauri driver) export a single `*_PL
 - **Texture** (issue #11): a feel pad per synthetic body (gas giant, water world, rocky world, procedural asteroid, comet coma, nebula), built through `buildHaptics` with its refusals listed, and the Listen sweep.
 
 Tap "Turn on vibration and sound" first. Debug a phone with `chrome://inspect`. The page is not a build input, so `vite build` never includes it.
+
+### GPU probe page
+
+`npm run dev`, then open `/gpu-probe.html`. It lists the WebGPU adapters Chrome offers three.js (default, low-power, high-performance), three's own backend and the WebGL2 renderer string, and has a "Copy report" button. It is dev only: not a build input, and `scripts/check-dist.js` fails the build if the page or its marker reaches `dist/`. The A15 runbook is [R11.4](../docs/rendering/reference/a15-checks.md). In the fixtures build (`npm run perf:build`), `__sxPerf.record(20)` records frame times for R11.3.
 
 ### Viewer smoke scene
 

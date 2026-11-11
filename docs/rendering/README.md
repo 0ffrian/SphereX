@@ -37,6 +37,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | [reference/README.md](reference/README.md) | R11.1 | the target reference frames, the seed/time convention for comparing renders, golden frames |
 | [reference/checklist.md](reference/checklist.md) | R11.2 | the visual review a renderer must pass before it merges |
 | [reference/frame-time.md](reference/frame-time.md) | R11.3 | measuring frame times on the A15 (and the phones after the event) |
+| [reference/a15-checks.md](reference/a15-checks.md) | R11.4 | the one-sitting runbook for the A15: machine record, GPU probe, frame times, bloom, device lost |
 | [open-items.md](open-items.md) | R12 | checking any **[verify]** item: owner, event or after, what resolves it |
 
 ## Section map
@@ -102,4 +103,5 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | R11.1 | Reference frames | [reference/README.md#r111-reference-frames](reference/README.md#r111-reference-frames) |
 | R11.2 | Visual review checklist | [reference/checklist.md#r112-visual-review-checklist](reference/checklist.md#r112-visual-review-checklist) |
 | R11.3 | Frame-time checks | [reference/frame-time.md#r113-frame-time-checks](reference/frame-time.md#r113-frame-time-checks) |
+| R11.4 | A15 event-machine checks | [reference/a15-checks.md#r114-a15-event-machine-checks](reference/a15-checks.md#r114-a15-event-machine-checks) |
 | R12 | Open items [verify] | [open-items.md#r12-open-items-verify](open-items.md#r12-open-items-verify) |

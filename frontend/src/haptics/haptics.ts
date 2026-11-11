@@ -624,22 +624,38 @@ export class HapticEngine {
   }
 }
 
-/** The engine with its two web drivers (D-08, D-10). Settings and calibration apply to these. */
-export interface HapticOutputs {
+/** The engine with the audio driver: all the event app has (Q-132, R8.8.1 item 1). */
+export interface SoundOutputs {
   readonly engine: HapticEngine;
-  readonly vibrate: WebVibrateDriver;
   readonly audio: AudioDriver;
 }
 
+/** The engine with its two web drivers (D-08, D-10). Settings and calibration apply to these. */
+export interface HapticOutputs extends SoundOutputs {
+  readonly vibrate: WebVibrateDriver;
+}
+
 /**
- * Build the engine with a WebVibrateDriver and an AudioDriver. Creates no AudioContext (that waits
- * for `engine.unlock()` in a click). Wire the settings with `bindEngine` (settings.ts).
+ * Build the engine with an AudioDriver only (Q-132: the event build is sound only; R8.8.1 item 1;
+ * R11 Sound). No WebVibrateDriver is constructed. `{ vibrate: true }` is the explicit opt-in for
+ * after the event and for the dev page (`haptics-test.html`): it adds a WebVibrateDriver in front
+ * of the audio driver (D-08, D-10). Creates no AudioContext (that waits for `engine.unlock()` in a
+ * click). Wire the settings with `bindEngine` (settings.ts).
  */
-export function createHaptics(options: HapticEngineOptions = {}): HapticOutputs {
-  const vibrate = new WebVibrateDriver({ timers: options.timers });
+export function createHaptics(options?: HapticEngineOptions & { vibrate?: false }): SoundOutputs;
+export function createHaptics(options: HapticEngineOptions & { vibrate: true }): HapticOutputs;
+export function createHaptics(
+  options: HapticEngineOptions & { vibrate?: boolean } = {},
+): SoundOutputs | HapticOutputs {
+  const { vibrate: withVibrate, ...engineOptions } = options;
   const audio = new AudioDriver();
-  const engine = new HapticEngine([vibrate, audio], options);
-  return { engine, vibrate, audio };
+  if (withVibrate === true) {
+    const vibrate = new WebVibrateDriver({ timers: engineOptions.timers });
+    const engine = new HapticEngine([vibrate, audio], engineOptions);
+    return { engine, vibrate, audio };
+  }
+  const engine = new HapticEngine([audio], engineOptions);
+  return { engine, audio };
 }
 
 /**
