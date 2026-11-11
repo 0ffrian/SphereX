@@ -136,6 +136,31 @@ export type TVVec3 = {
   assumption?: string;
 };
 export type CometEpoch = '2025-08' | '2025-12';
+/**
+ * Tagged value (R3.1) holding a sampled path: rows of [JD TDB, x, y, z (au), vx, vy, vz (au/day)], heliocentric ICRF (Q-261).
+ */
+export type TVTrack = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value:
+    | [
+        [number, number, number, number, number, number, number],
+        [number, number, number, number, number, number, number],
+        ...[number, number, number, number, number, number, number][],
+      ]
+    | null;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
 export type Layer = {
   id: string;
   tag: Tag;
@@ -316,6 +341,9 @@ export interface ObjectCard {
   host_radius_rsun?: TVNumber;
   host_mass_msun?: TVNumber;
   host_age_gyr?: TVNumber;
+  surface_pressure_bar?: TVNumber;
+  surface_temperature_K?: TVNumber;
+  surface_fluid?: TVString;
   component_teff_K?: TVPair;
   period_var_d?: TVNumber;
   lightcurve?: LightcurvePoint[];
@@ -325,6 +353,7 @@ export interface ObjectCard {
   coma_radius_km?: TVNumber;
   nucleus_radius_km_max?: TVNumber;
   epochs?: CometEpoch[];
+  orbit_track?: TVTrack;
   pm_mas_yr?: TVPair;
 }
 export interface LightcurvePoint {
@@ -335,9 +364,19 @@ export interface LightcurvePoint {
   flags: number;
 }
 /**
- * Gas production rates, molecules/s. One value per molecule; R3.2's 'per epoch' does not fit this shape (Q-42).
+ * Gas production rates, molecules/s. Either one value per molecule (the R3.2 shape, valid for one epoch), or keyed by epoch ('2025-08', '2025-12'), each holding one value per molecule (the Q-42 proposal, read by the comet renderer, Q-260). An epoch with no measurement is left out, never guessed.
  */
 export interface GasQ {
+  co2?: TVNumber;
+  h2o?: TVNumber;
+  co?: TVNumber;
+  '2025-08'?: GasQEpoch;
+  '2025-12'?: GasQEpoch;
+}
+/**
+ * Gas production rates at one SPHEREx epoch, molecules/s (Q-260).
+ */
+export interface GasQEpoch {
   co2?: TVNumber;
   h2o?: TVNumber;
   co?: TVNumber;
@@ -373,6 +412,7 @@ export interface RenderParams {
   view_modes: ViewModes;
   haptics: HapticProfile;
   dynamics?: Dynamics;
+  confidence?: Confidence;
   /**
    * R9.
    */
@@ -459,6 +499,94 @@ export interface Dynamics {
   speedup: {
     [k: string]: number;
   };
+}
+/**
+ * How much of the picture rests on data, and the 3D gate (D-36, Q-220 to Q-222). C = sum(w c) / sum(w). It is not the probability that the picture is correct and it does not change a provenance tag. Absent for nebula and nova (no key measurement is defined for them).
+ */
+export interface Confidence {
+  /**
+   * C, 0 to 1.
+   */
+  score: number;
+  /**
+   * Part of the score from measured values.
+   */
+  measured_share: number;
+  /**
+   * Part of the score from derived and model-dependent values.
+   */
+  estimated_share: number;
+  /**
+   * The rest: assumed, artistic or missing.
+   */
+  assumed_share: number;
+  /**
+   * Minimum C for a 3D body. Starts at 0.25 (D-36).
+   */
+  threshold: number;
+  band: 'mostly_data' | 'part_data' | 'mostly_assumed' | 'too_little';
+  gate: {
+    class_known: boolean;
+    key_measurement: boolean;
+    score_ok: boolean;
+    /**
+     * All three. When false the viewer draws no 3D body and shows found and needed.
+     */
+    passed: boolean;
+  };
+  /**
+   * Plain words: what the card has.
+   */
+  found: string;
+  /**
+   * Plain words: what is missing for a 3D body. Empty when the gate passed.
+   */
+  needed: string;
+  /**
+   * What would raise the score most.
+   */
+  raise: string | null;
+  inputs: ConfidenceInput[];
+  /**
+   * The score is a formula of the card (D-02).
+   */
+  tag: 'derived';
+  formula: string;
+  /**
+   * States that the weights are placeholders.
+   */
+  weights_note: string;
+  /**
+   * States that this is not the probability the picture is correct.
+   */
+  note: string;
+}
+/**
+ * One quantity in the score.
+ */
+export interface ConfidenceInput {
+  id: string;
+  label: string;
+  /**
+   * Placeholder weight; the weights of one type sum to 100.
+   */
+  weight: number;
+  /**
+   * How far the data narrows the class range.
+   */
+  c: number;
+  /**
+   * The tag of the value that fed it, or missing.
+   */
+  tag: 'measured' | 'derived' | 'model_dependent' | 'inferred_from_analog' | 'artistic' | 'missing';
+  /**
+   * This input's part of C, in percentage points.
+   */
+  points: number;
+  /**
+   * Card fields that fed it (or could).
+   */
+  fields: string[];
 }
 /**
  * GET /v1/areas (A17.8): the prepared areas. Also holds the definitions the other area schemas share.

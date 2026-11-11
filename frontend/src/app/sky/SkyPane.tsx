@@ -48,7 +48,7 @@ import {
   type SkyCamera,
 } from '@/viewer/sky/skyMath';
 import { pickSurvey, planSkyLoad } from '@/viewer/sky/surveys';
-import { PICK_FORMULA } from './positionTags';
+import { hasSkyPosition, PICK_FORMULA } from './positionTags';
 import { publishReadout } from './readout';
 import {
   cachedMarkerDescription,
@@ -346,7 +346,9 @@ export function SkyPane({ children }: { children?: ReactNode }) {
   // On a phone the panel is a bottom sheet over the lower part of the sky, so the object is put
   // in the upper part instead (PHONE_OBJECT_Y of the height from the top).
   useEffect(() => {
-    if (!view || !resolved) return;
+    // A reference object (Jupiter, the Sun...) has no place on the sky: ra = dec = 0 is a
+    // placeholder (Q-258), so the sky stays where it is.
+    if (!view || !resolved || !hasSkyPosition(resolved)) return;
     const cam = view.getView();
     const sheet = typeof window.matchMedia === 'function' && window.matchMedia(PHONE_QUERY).matches;
     const fovDeg = Math.min(cam.fovDeg, FLY_FOV_DEG);
@@ -650,7 +652,11 @@ export function SkyPane({ children }: { children?: ReactNode }) {
   const resolvedLabel = resolved ? (resolved.name ?? formatCoords(resolved.ra, resolved.dec)) : '';
   const showPicked =
     picked !== null &&
-    !(resolved && separationDeg(resolved.ra, resolved.dec, picked.ra, picked.dec) < 1 / 3600);
+    !(
+      resolved &&
+      hasSkyPosition(resolved) &&
+      separationDeg(resolved.ra, resolved.dec, picked.ra, picked.dec) < 1 / 3600
+    );
 
   return (
     <div
@@ -737,7 +743,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
             </button>
           </li>
         ))}
-        {resolved && (
+        {resolved && hasSkyPosition(resolved) && (
           <li
             key={`sel:${resolved.id}`}
             ref={registerMarker(`sel:${resolved.id}`, resolved.ra, resolved.dec)}

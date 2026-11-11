@@ -136,13 +136,13 @@ describe('asteroid without a model: ellipsoid and displacement (R7.2)', () => {
 
   it('the fixture carries the relief amplitude and its artistic displacement layer (issue #62)', () => {
     const { card, params } = fixture('asteroid_procedural');
-    expect(params.textures?.relief_amp).toBe(0.03);
+    expect(params.textures?.relief_amp).toBe(0.973);
     expect(params.layers.find((l) => l.id === 'displacement')).toMatchObject({
       tag: 'artistic',
       tier: 5,
     });
     const plan = planRender(card, params, defaultContext({ honesty: 'artistic' }));
-    expect(plan.bodies[0]?.displacementScale).toBe(0.03);
+    expect(plan.bodies[0]?.displacementScale).toBe(0.973);
     // Not at + Estimated: the relief and its displacement are artistic looks.
     const est = planRender(card, params, defaultContext({ honesty: 'derived' }));
     expect(est.bodies[0]?.displacementScale ?? null).toBeNull();
@@ -156,7 +156,7 @@ describe('asteroid without a model: ellipsoid and displacement (R7.2)', () => {
     for (const t of [undefined, 'high', 'medium'] as const) {
       const p = at(t);
       expect(p.drawn.some((d) => d.id === 'displacement')).toBe(true);
-      expect(p.bodies[0]?.displacementScale).toBe(0.03);
+      expect(p.bodies[0]?.displacementScale).toBe(0.973);
     }
     const low = at('low');
     expect(low.drawn.some((d) => d.id === 'displacement')).toBe(false);

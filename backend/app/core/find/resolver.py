@@ -52,7 +52,7 @@ class ResolvedObject:
     ra: float
     dec: float
     moving: bool
-    resolver: str  # simbad | sbdb | coords
+    resolver: str  # simbad | sbdb | coords | reference
     epoch: str | None = None  # ISO-8601 UTC time of (ra, dec); J2000.0 for catalogue positions
     pm_ra_mas_yr: float | None = None
     pm_dec_mas_yr: float | None = None
@@ -203,6 +203,11 @@ def resolve(ctx: Context, q: str, aliases: dict[str, str], *, refresh: bool = Fa
     if coords is not None:
         return Resolution(_coords_object(*coords), None)
 
+    ref = reference_object(ctx, text)
+    if ref is not None:
+        save_object(ctx, ref, [])
+        return Resolution(ref, None)
+
     name = aliases.get(text.lower(), text)
     order = ["sbdb", "simbad"] if looks_like_small_body(name) else ["simbad", "sbdb"]
     flamsteed = is_flamsteed(name)
@@ -228,6 +233,55 @@ def resolve(ctx: Context, q: str, aliases: dict[str, str], *, refresh: bool = Fa
     if ambiguous:
         raise NotFound(f"Several small bodies match '{name}'. Give a fuller designation.")
     raise NotFound(f"No object called '{name}' in SIMBAD or the JPL Small-Body Database.")
+
+
+REFERENCE_PROVENANCE = {
+    "tag": "artistic",
+    "source": "reference object: a body of the solar system, not a SPHEREx target, so it has no "
+    "place on the sky here (ra = dec = 0 is a placeholder)",
+}
+
+
+# path -> ((mtime_ns, size), {lower-case name or alias or id: (id, name)}). The file is curated by
+# hand, so the parse is reused until its stat changes (the same pattern as the literature registry).
+_REFERENCE_INDEX: dict[Path, tuple[tuple[int, int], dict[str, tuple[str, str]]]] = {}
+
+
+def _reference_index(path: Path) -> dict[str, tuple[str, str]]:
+    """The names of ``reference_objects.toml``, parsed once per file version; empty when missing."""
+    try:
+        st = path.stat()
+    except OSError:
+        return {}
+    stamp = (st.st_mtime_ns, st.st_size)
+    hit = _REFERENCE_INDEX.get(path)
+    if hit is not None and hit[0] == stamp:
+        return hit[1]
+    index: dict[str, tuple[str, str]] = {}
+    for row in tomllib.loads(path.read_text(encoding="utf-8")).get("object", []):
+        entry = (str(row["id"]), str(row["name"]))
+        for n in (row["id"], row["name"], *row.get("aliases", [])):
+            index.setdefault(str(n).lower(), entry)
+    _REFERENCE_INDEX[path] = (stamp, index)
+    return index
+
+
+def reference_object(ctx: Context, text: str) -> ResolvedObject | None:
+    """Issue #71 stream E (Q-258): a reference object by name or id (``reference_objects.toml``)."""
+    hit = _reference_index(ctx.settings.reference_file).get(norm_name(text).lower())
+    if hit is None:
+        return None
+    ref_id, name = hit
+    return ResolvedObject(
+        id=ref_id,
+        name=name,
+        ra=0.0,
+        dec=0.0,
+        moving=False,
+        resolver="reference",
+        provenance={"ra": dict(REFERENCE_PROVENANCE), "dec": dict(REFERENCE_PROVENANCE)},
+        query=name,
+    )
 
 
 def save_object(ctx: Context, obj: ResolvedObject, sources: list[Served]) -> None:

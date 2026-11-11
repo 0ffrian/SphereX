@@ -76,10 +76,14 @@ export interface Selection {
 export function useSelection(): Selection | null {
   const resolved = useAppStore((s) => s.sky.resolved);
   const query = useAppStore((s) => s.sky.query);
+  // The card's name is the display name ("55 Cnc e"); the resolver's is the catalogue's ("* rho01 Cnc e").
+  const cardName = useAppStore((s) =>
+    resolved && s.card?.id === resolved.id ? s.card.name : null,
+  );
   if (!resolved || !query || query.kind !== 'name') return null;
   return {
     id: resolved.id,
-    name: resolved.name ?? query.q,
+    name: cardName || resolved.name || query.q,
     moving: resolved.moving,
   };
 }

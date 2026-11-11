@@ -1,6 +1,6 @@
 # Open items [verify]
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R12 · **Implements:** [D-17](../decisions/scope-process.md), [Q-110, Q-119](../decisions/contract-tags.md), [Q-63](../decisions/pipeline-stages.md), [Q-132](../decisions/platform-hosting.md) · **Read with:** [../decisions/README.md](../decisions/README.md), the fragment named in each row
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R12 · **Implements:** [D-17](../decisions/scope-process.md), [Q-110, Q-119](../decisions/contract-tags.md), [Q-63](../decisions/pipeline-stages.md), [Q-132](../decisions/platform-hosting.md), [D-37](../decisions/rendering-engines.md), [Q-326](../decisions/rendering-bodies.md), [Q-329 to Q-331](../decisions/rendering-engines-review.md), [Q-333](../decisions/rendering-kinds.md), [Q-336](../decisions/catalogue-values.md) · **Read with:** [../decisions/README.md](../decisions/README.md), the fragment named in each row
 
 ## R12. Open items [verify]
 
@@ -50,5 +50,13 @@ Every **[verify]** marker in the rendering spec has one row here. Numbers 1–18
 | 40 | Visual findings and frame times on a real GPU (Q-107; Q-104 item 10) | R7.5, R7.7, R11.3 | Moon | event (the A15) | R11.3 results on the A15 |
 | 41 | Brown dwarf limb-darkening coefficient `BROWN_DWARF_LIMB_U` 0.6, the visible-band solar value used as an analogue (layer `limb_darkening` at tier 4; near-IR models give about 0.25–0.29 at 3.6 and 4.5 µm, Q-119) | R7.4 | Atish | event | Atish decides whether to adopt a near-IR value (Q-119) |
 | 42 | Gas giant typical zonal wind 50 m/s (`TYPICAL_ZONAL_WIND_MS`) in the Rhines band count; `bands` stays tier 4 until it is checked (Q-115, Q-119). Same item as A14.1 | R7.7 (A7.2) | Moon | after | a cited wind speed used in a Rhines estimate |
+| 43 | Frame rate of the D-37 engines on the A15: the rock engine, and a planet with both world-engine instances (globe and fly view), against ≥30 fps while rotating at + Artistic (D-05) | R5.9, R5.5, R11 | Atish (A15), Moon | event (before 14 Nov) | R11.3 results on the A15 |
+| 44 | Rubble-pile relief: the 35° angle of repose at asteroid gravity, and the 40 km rubble cut (`RUBBLE_BELOW_KM`, the prototype's, no source) (Q-326) | R6.2 | Atish | event | a cited low-gravity repose angle and a source for the cut, or the cut labelled as a choice |
+| 45 | Star engine spot temperature fit dT = clamp(350 + 0.6 (Teff − 3300), 200, 2000) K against Berdyugina 2005, fig. 7 (Q-329) | R7.5 | Moon | event | a check against the review's figure |
+| 46 | CO₂ enthalpy of vaporisation near the triple point, about 15.3 kJ/mol (NIST Chemistry WebBook) (Q-330) | R7.7 | Moon | event | the NIST page |
+| 47 | Saturn's F ring (140,180 to 140,240 km) and Encke Gap (centre 133,584 km) from the PDS Ring-Moon Systems Node table; the measured peak jets of Jupiter (about 150 m/s) and Saturn (about 450 m/s) (Q-331) | R7.7 | Moon | event | the PDS table and the cited wind papers |
+| 48 | Millibar rock-vapour atmospheres of lava worlds (Schaefer and Fegley 2009; Ito et al. 2015), the ground for the lava-world rule (Q-330) | R7.7 | Moon | event | the two papers |
+| 49 | Procyon A's radius 2.048 ± 0.025 R☉: the exact table in Kervella et al. 2004, A&A 413, 251 (Q-336) | R7.5 | Kevin | event | the paper's table |
+| 50 | Haser constants for water: v = 0.85 r_h^−0.5 km/s (Cochran and Schleicher 1993) and τ = 8.3 × 10⁴ s × r_h² (Huebner, Keady and Lyon 1992) (Q-333) | R7.3 | Moon | event | the two papers |
 
 **Removed (resolved):** the "name [verify]" markers on `viewer/renderers/ShaderBody.ts` and `viewer/fields/fieldWorker.ts` (both files exist), and the self-signed certificate step for phones (moot for the event, Q-132; R11.3 keeps the phone procedure for after the event).
