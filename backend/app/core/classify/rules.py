@@ -190,6 +190,22 @@ def classify_exoplanet(
     return None, ("type:exoplanet_envelope",), ""
 
 
+# Q-317: reviewed type overrides for exoplanets the R3.3.4 rules refuse (no invented rule: a person
+# read the source, and the row is used only when the rules gave NO type, never to change one).
+# Key: the archive's ``pl_name``. Value: (type, why). 55 Cnc e: R 1.875 R_earth and M 7.99 M_earth
+# (Bourrier et al. 2018, A&A 619, A1, the archive's default row) sit 8% above the Zeng 2019
+# Earth-like curve, and pl_eqt 1958 K is above the hottest water table (1000 K), so the rules
+# refuse (``type:exoplanet_water_model_range``). Archive density 6.66 g/cm3 is rock-like, and the
+# planet is a known hot rocky super-Earth (lava world). [verify] against the paper's text.
+REVIEWED_EXOPLANET_TYPES: dict[str, tuple[ObjectTypeName, str]] = {
+    "55 Cnc e": (
+        "planet_rocky",
+        "reviewed override: R and M above the Earth-like curve, Teq above the water tables; "
+        "archive density 6.66 g/cm3, Bourrier et al. 2018 (A&A 619, A1)",
+    ),
+}
+
+
 def classify(facts: CatalogueFacts) -> Classification:
     """R3.3 in order: SBDB, SIMBAD, Exoplanet Archive, sliders, else candidate."""
     kind = (facts.sbdb_kind or "").lower()
@@ -242,6 +258,15 @@ def classify(facts: CatalogueFacts) -> Classification:
         planet, refused, rule = classify_exoplanet(facts.exoplanet)
         if planet is not None:
             return Classification(planet, rule)
+        reviewed = REVIEWED_EXOPLANET_TYPES.get(str(facts.exoplanet.get("pl_name")))
+        # Q-324: the review covers one refusal only (Teq above the water tables) and needs R and M.
+        if (
+            reviewed is not None
+            and "type:exoplanet_water_model_range" in refused
+            and _num(facts.exoplanet, "pl_rade") is not None
+            and _num(facts.exoplanet, "pl_bmasse") is not None
+        ):
+            return Classification(reviewed[0], f"R3.3.4 {reviewed[1]}")
 
     if facts.slider_kind is not None:
         return Classification(facts.slider_kind, "R3.3.5 user sliders")

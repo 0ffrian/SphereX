@@ -100,7 +100,7 @@ function optBool(o: Obj, key: string, path: string): boolean | undefined {
   return o[key] === undefined || o[key] === null ? undefined : bool(o, key, path);
 }
 
-const RESOLVERS = ['simbad', 'sbdb', 'coords'] as const;
+const RESOLVERS = ['simbad', 'sbdb', 'coords', 'reference'] as const;
 
 export function parseResolve(raw: unknown): ResolveResponse {
   const p = 'resolve';

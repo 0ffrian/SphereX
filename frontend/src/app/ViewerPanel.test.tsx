@@ -19,6 +19,12 @@ const fake = {
   clearObject: vi.fn(),
   setLoadFailedHandler: vi.fn(),
   setMeshMeasuredHandler: vi.fn(),
+  setCloseUpHandler: vi.fn(),
+  openCloseUp: vi.fn(),
+  closeUpOff: vi.fn(),
+  requestRender: vi.fn(),
+  pickGlobe: vi.fn(),
+  orbitView: null,
   setOverrides: vi.fn(),
   setSpinPaused: vi.fn(),
   setMotionOverride: vi.fn(),
@@ -29,12 +35,38 @@ const fake = {
   rotate: vi.fn(),
   zoom: vi.fn(),
   resetView: vi.fn(),
+  setStarCloseUp: vi.fn(),
+  latestFlareText: vi.fn(() => null),
+  fireFlare: vi.fn(),
+  setFieldLines: vi.fn(),
+  setEngineOwned: vi.fn(),
   dispose: vi.fn(),
 };
 
+// The star engine needs WebGL 2 (absent in jsdom): a test can hand the panel a star the engine "draws".
+const engine = vi.hoisted(() => ({ star: null as unknown, pane: false }));
+vi.mock('./StarEngineStage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./StarEngineStage')>();
+  return {
+    ...actual,
+    useEngineStar: () => engine.star,
+    StarGlobeStage: () => <div data-testid="star-engine-stub" />,
+  };
+});
+
 vi.mock('@/viewer/ViewerApp', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/viewer/ViewerApp')>();
-  return { ...actual, ViewerApp: { create: vi.fn(async () => fake) } };
+  // In the build pane the panel calls many more viewer methods: a test that mounts it there asks for a
+  // fake that answers every other method with a no-op (never `then`: the fake is awaited).
+  const noop = new Map<string, () => void>();
+  const paneFake = () =>
+    new Proxy(fake, {
+      get: (t, k) =>
+        k in t || typeof k !== 'string' || !/^set[A-Z]/.test(k)
+          ? (t as Record<string | symbol, unknown>)[k]
+          : (noop.get(k) ?? noop.set(k, () => {}).get(k)),
+    });
+  return { ...actual, ViewerApp: { create: vi.fn(async () => (engine.pane ? paneFake() : fake)) } };
 });
 
 // Imported after the mock is registered (vi.mock is hoisted).
@@ -67,6 +99,8 @@ beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   useAppStore.setState(initialAppData);
   shown.length = 0;
+  engine.star = null;
+  engine.pane = false;
   Object.values(fake).forEach((f) => typeof f === 'function' && 'mockClear' in f && f.mockClear());
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -79,6 +113,31 @@ afterEach(async () => {
 });
 
 describe('ViewerPanel', () => {
+  it('mounts the prototype engines only at + Artistic; below it the three.js viewer draws (PR #89 review)', async () => {
+    const { card, params } = fixture('star');
+    engine.pane = true;
+    engine.star = {
+      preset: { id: card.id, label: card.name, T: 5772, R: 1, M: 1, P: 25.4, dwarf: true },
+    };
+    useAppStore.getState().setObject(card, params);
+    const stub = () => container.querySelector('[data-testid="star-engine-stub"]');
+    const pane = { seq: 0, animate: false, seedOffset: 0 };
+    useAppStore.getState().setHonesty('derived');
+    await act(async () => {
+      root.render(<ViewerPanel pane={pane} />);
+    });
+    await act(async () => {});
+    expect(stub()).toBeNull();
+    expect(fake.setEngineOwned).not.toHaveBeenCalledWith(true);
+    expect(fake.setEngineOwned).toHaveBeenLastCalledWith(false);
+    await act(async () => useAppStore.getState().setHonesty('artistic'));
+    expect(stub()).not.toBeNull();
+    expect(fake.setEngineOwned).toHaveBeenLastCalledWith(true);
+    await act(async () => useAppStore.getState().setHonesty('measured'));
+    expect(stub()).toBeNull();
+    expect(fake.setEngineOwned).toHaveBeenLastCalledWith(false);
+  });
+
   it('announces a governor tier drop in plain words, but not a manual tier change', async () => {
     await mount();
     const handler = fake.setQualityChangeHandler.mock.calls.at(-1)?.[0] as
@@ -104,6 +163,30 @@ describe('ViewerPanel', () => {
       'Flares: rate taken from a typical value; shown 86,400\u00d7 faster.',
     ]);
     expect(container.textContent).not.toMatch(/sped up/);
+  });
+
+  it('a star opens in True colour (Q-290); Close-up from Observatory moves to Enhanced colour and the camera follows', async () => {
+    const { card, params } = fixture('star');
+    useAppStore.getState().setObject(card, params);
+    useAppStore.getState().setHonesty('artistic');
+    await mount();
+    const pressed = (n: string) => button(n)?.getAttribute('aria-pressed');
+    expect(pressed('True colour')).toBe('true');
+    expect(pressed('Whole star, larger detail')).toBe('true');
+    await click('Observatory view');
+    expect(pressed('Observatory view')).toBe('true');
+    await click('Close-up');
+    expect(pressed('Enhanced colour')).toBe('true');
+    expect(pressed('Observatory view')).toBe('false');
+    expect(fake.setStarCloseUp).toHaveBeenLastCalledWith(
+      expect.objectContaining({ halfWidth: expect.any(Number) }),
+    );
+    expect(text('viewer-announcer')).toMatch(/Enhanced colour.*Close-up/);
+    await click('Whole star, true scale');
+    expect(fake.setStarCloseUp).toHaveBeenLastCalledWith(null);
+    expect(container.querySelector('[data-testid="star-readouts"]')?.textContent).toMatch(
+      /Surface gravity/,
+    );
   });
 
   it('shows no note for a process whose layer is not drawn (Measured only)', async () => {

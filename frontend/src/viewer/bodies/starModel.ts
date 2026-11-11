@@ -13,6 +13,12 @@
 // All angles are in radians, all times in simulation seconds of the process that owns them.
 
 import { hash3, mulberry32 } from '../fields/noise';
+import {
+  AREA_SPLIT,
+  discRadiusFromArea,
+  type SpotGroup,
+  type StellarModel,
+} from '@/physics/stellar';
 import { cappedFlareSpeedup, type Motion } from '../motion/motion';
 
 export type V3 = [number, number, number];
@@ -42,6 +48,12 @@ export interface StarSurfaceConfig {
   maxFlares: number;
   /** A flare needs its region to be at least this grown (0..1), else it is skipped (artistic). */
   flareMinEnv: number;
+  /**
+   * Issue #71 stream C: the physical groups (`physics/stellar.ts`). When set, `regionCount` is their
+   * count and slot i is `groups[i]` (area, latitude, Joy tilt and separation from the physics, not
+   * from the artistic fields above). Absent: the placeholder look above (no mass on the card).
+   */
+  groups?: readonly SpotGroup[];
 }
 
 export const STAR_SURFACE: StarSurfaceConfig = {
@@ -57,6 +69,23 @@ export const STAR_SURFACE: StarSurfaceConfig = {
   maxFlares: 2,
   flareMinEnv: 0.35,
 };
+
+/**
+ * Config for a star whose spots come from the physics: `regionCount` is the number of drawn groups
+ * (replaces the fixed 4), each group is two follower parts and two pores around its leader.
+ */
+export function configFromModel(
+  model: StellarModel,
+  base: StarSurfaceConfig = STAR_SURFACE,
+): StarSurfaceConfig {
+  return {
+    ...base,
+    regionCount: model.groups.length,
+    followerParts: 2,
+    pores: 2,
+    groups: model.groups,
+  };
+}
 
 /** Discs a group is made of: `1 + followerParts + pores`. The shader loops over this many per region. */
 export const discsPerRegion = (c: StarSurfaceConfig = STAR_SURFACE): number =>
@@ -169,27 +198,61 @@ export function regionAt(
     f = x - cycle;
   }
   const h = (i: number) => hash3(slot * 131 + i, cycle, i, seed);
-  const hemi = h(1) < 0.5 ? -1 : 1;
-  const lat = hemi * (c.latBand[0] + h(2) * (c.latBand[1] - c.latBand[0]));
-  const lon0 = h(3) * TWO_PI;
+  const phys = c.groups?.[slot];
+  const hemi = phys ? phys.hemisphere : h(1) < 0.5 ? -1 : 1;
+  const lat = phys ? phys.latRad : hemi * (c.latBand[0] + h(2) * (c.latBand[1] - c.latBand[0]));
+  // Physical groups keep their place in the first life; a later life is born at a new longitude.
+  const lon0 = phys ? phys.lonRad + (cycle > 0 ? h(3) * TWO_PI : 0) : h(3) * TWO_PI;
   const ageS = f * rates.lifetimeS;
   const sin = Math.sin(lat);
   // One clock for differential rotation: the spin clock when the caller has it (the granulation
   // shears on it too, so spots and cells shear together), else the group's own age.
   const lon = lon0 + rates.k * rates.omegaEq * sin * sin * (tSpin ?? ageS);
   const env = lifeEnvelope(f, c);
-  const size = c.groupRadius * (0.7 + 0.3 * h(4)) * Math.sqrt(env);
+  // Physical: half the leader-follower separation is 0.55 size, so the loops (which use it) land on
+  // the spots.
+  const size = phys
+    ? (phys.separationRad / 2 / 0.55) * Math.sqrt(env)
+    : c.groupRadius * (0.7 + 0.3 * h(4)) * Math.sqrt(env);
   const center = sphereDir(lat, lon);
   const { east, north } = tangents(lat, lon);
   // The leader runs ahead in the direction of rotation, which is towards decreasing longitude, so
   // the axis (leader to follower) points east. Tilted towards the equator by Joy's law (artistic).
-  const tilt = -hemi * c.tiltPerLat * Math.abs(lat);
+  // Physical: Joy's law, the follower poleward (+tilt turns east towards the hemisphere's pole).
+  const tilt = phys ? phys.tiltRad : -hemi * c.tiltPerLat * Math.abs(lat);
   const axis = norm(add(scale(east, Math.cos(tilt)), scale(north, Math.sin(tilt))));
   const perp = cross(center, axis); // along the polarity line
   const sep = 0.55 * size;
 
   const place = (u: number, v: number): V3 =>
     norm(add(center, add(scale(axis, u), scale(perp, v))));
+  if (phys) {
+    // Radii from the group's area (the split of AREA_SPLIT), shrinking with the life envelope.
+    const a = phys.areaFraction * env;
+    const physDiscs: SpotDisc[] = [
+      { center: place(-sep, 0), radius: discRadiusFromArea(a * AREA_SPLIT.leader), kind: 'leader' },
+      {
+        center: place(sep * (0.9 + 0.5 * h(10)), size * 0.1),
+        radius: discRadiusFromArea(a * AREA_SPLIT.follower * (2 / 3)),
+        kind: 'follower',
+      },
+      {
+        center: place(sep * (0.9 + 0.5 * h(11)), -size * 0.1),
+        radius: discRadiusFromArea(a * AREA_SPLIT.follower * (1 / 3)),
+        kind: 'follower',
+      },
+    ];
+    for (let i = 0; i < c.pores; i++) {
+      const ang = h(20 + i) * TWO_PI;
+      const r = size * (0.7 + 0.5 * h(25 + i));
+      physDiscs.push({
+        center: place(Math.cos(ang) * r, Math.sin(ang) * r),
+        radius: discRadiusFromArea(a * AREA_SPLIT.pore),
+        kind: 'pore',
+      });
+    }
+    return { slot, cycle, center, lat, lon, env, size, axis, north: perp, sep, discs: physDiscs };
+  }
   const discs: SpotDisc[] = [{ center: place(-sep, 0), radius: 0.52 * size, kind: 'leader' }];
   for (let i = 0; i < c.followerParts; i++) {
     const side = i === 0 ? 1 : -1;
@@ -270,7 +333,7 @@ export function flaresAt(
   c: StarSurfaceConfig = STAR_SURFACE,
   tSpin?: number,
 ): FlareState[] {
-  if (!(rates.flareRatePerS > 0) || !(rates.flareSpeedup > 0)) return [];
+  if (!(rates.flareRatePerS > 0) || !(rates.flareSpeedup > 0) || c.regionCount < 1) return [];
   const spacing = 1 / rates.flareRatePerS;
   const duration = c.flareOnScreenS * rates.flareSpeedup;
   const startOf = (i: number) =>

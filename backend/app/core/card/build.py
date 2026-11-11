@@ -389,6 +389,39 @@ def _star_fields(card: dict[str, Any], kind: str, data: CatalogueData) -> None:
         card["period_var_d"] = stars.period_field(data.star)
 
 
+COMET_EPOCHS = ("2025-08", "2025-12")
+COMET_GASES = ("co2", "h2o", "co")
+
+
+def _comet_gas(card: dict[str, Any], data: CatalogueData) -> None:
+    """Q-42, Q-260: ``gas_Q`` keyed by epoch from the literature registry rows
+    ``gas_Q.<epoch>.<gas>``, plus ``epochs`` (the epochs that have any gas) and the sampled
+    Horizons path ``orbit_track`` (Q-261). A comet with no rows keeps today's card: no ``gas_Q``,
+    no ``epochs``, no track. An epoch whose paper gives no confirmed value for a gas leaves that
+    gas out; nothing is guessed."""
+    keyed: dict[str, dict[str, Any]] = {}
+    for epoch in COMET_EPOCHS:
+        per_gas = {
+            g: tv
+            for g in COMET_GASES
+            if (tv := data.literature.tv(f"gas_Q.{epoch}.{g}")) is not None
+        }
+        if per_gas:
+            keyed[epoch] = per_gas
+    if keyed:
+        card["gas_Q"] = keyed
+        card["epochs"] = [e for e in COMET_EPOCHS if e in keyed]
+    track = data.track
+    if track is not None:
+        card["orbit_track"] = {
+            "value": [[float(c) for c in r] for r in track["rows"]],
+            "tag": "derived",
+            "source": f"{track.get('source', 'JPL Horizons VECTORS')} (backend/assets/tracks)",
+            "formula": "heliocentric ICRF position and velocity of the target, from the JPL "
+            "Horizons orbit solution, sampled every 3 days; the viewer interpolates (Q-261)",
+        }
+
+
 def _comet_shape(card: dict[str, Any], data: CatalogueData) -> None:
     """Q-162: a comet with a registered mesh (67P) gets ``shape_source`` as an asteroid does
     and a ``nucleus_radius_km_max`` taken from the mesh itself. The viewer scales a mesh by its
@@ -457,6 +490,7 @@ def build_card(
         # loaded, so they are null and the shells are refused.
         card["coma_radius_km"] = _null("not available: published values not loaded (R7.3)")
         card["nucleus_radius_km_max"] = _null("not available: published values not loaded (R7.3)")
+        _comet_gas(card, data)
         _comet_shape(card, data)
         card["phase_angle_deg"] = _phase_angle(data)
         card["sun_vector"] = _sun_vector(data)

@@ -15,6 +15,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | [data-contract.md](data-contract.md) | R3, R3.1, R3.2, R3.4 | touching the card/render-params schema, provenance tags, view-mode fields, `HapticProfile` (canonical TV / ObjectCard / RenderParams) |
 | [type-selection.md](type-selection.md) | R3.3 | backend type selection (stage 3): SBDB, SIMBAD otypes, exoplanet thresholds |
 | [display-rules.md](display-rules.md) | R4, R5, R5.1–R5.7 | working on the viewer: display levels, lighting, view modes, honesty toggle, scale bar, performance budget and event target, interaction (Feel and Touch modes), motion, quality levels |
+| [engines.md](engines.md) | R5.9 | the D-37 prototype engines (world, star, rock) on raw WebGL2: when they draw (+ Artistic only), the three.js fallback, the determinism exemption, copied code and deviations, the unmeasured A15 frame rate |
 | [build-mould.md](build-mould.md) | R5.8 | the Build split view, the moulding steps, New seed and honesty while building |
 | [surface-generation.md](surface-generation.md) | R6, R6.1–R6.7 | baking height/normal/albedo maps (asteroids and brown dwarf bands): card→params rules, seed, noise, craters, Sobel normals, Gemini/depth paths, caching |
 | [renderers/asteroid.md](renderers/asteroid.md) | R7 (intro), R7.1, R7.2 | rendering `asteroid_shape` (433 Eros, the demo body) or `asteroid_procedural` (also holds the R7 intro rule on refused layers) |
@@ -62,6 +63,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | R5.6 | Interaction | [display-rules.md#r56-interaction](display-rules.md#r56-interaction) |
 | R5.7 | Motion and time-lapse | [display-rules.md#r57-motion-and-time-lapse](display-rules.md#r57-motion-and-time-lapse) |
 | R5.8 | Build split view and moulding | [build-mould.md#r58-build-split-view-and-moulding](build-mould.md#r58-build-split-view-and-moulding) |
+| R5.9 | Prototype engines (D-37) | [engines.md#r59-prototype-engines-d-37](engines.md#r59-prototype-engines-d-37) |
 | R6 | Surface generation (backend, CPU) | [surface-generation.md#r6-surface-generation-backend-cpu](surface-generation.md#r6-surface-generation-backend-cpu) |
 | R6.1 | Strategy: height first, colour second | [surface-generation.md#r61-strategy-height-first-colour-second](surface-generation.md#r61-strategy-height-first-colour-second) |
 | R6.2 | Card → generator parameters (deterministic rules) | [surface-generation.md#r62-card--generator-parameters-deterministic-rules](surface-generation.md#r62-card--generator-parameters-deterministic-rules) |

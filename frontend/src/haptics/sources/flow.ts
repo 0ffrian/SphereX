@@ -130,7 +130,8 @@ export class FlowSource implements HapticSource {
     }
     this.storm = 0;
     this.swirl.stop();
-    const wind = zonalWind(d, this.params);
+    // A solved gas world (issue #71) answers with its own jets; else the artistic band model.
+    const wind = this.field.flow ? this.field.flow.wind(d) : zonalWind(d, this.params);
     if (Math.abs(wind) >= FLOW_JET_MIN_WIND && wind !== 0) {
       this.jet.play(jetRateHz(wind, this.k), PLAIN_TICK_STRENGTH, s.pan, pitch);
     } else {
@@ -140,12 +141,14 @@ export class FlowSource implements HapticSource {
 
   /** Ring-gap ticks. Returns whether the finger is on the ring (so the planet is not felt). */
   private ringMove(s: TouchSample): boolean {
+    const solved = this.field.flow?.ring ?? null;
     const t = ringT(s.ringRadius);
-    if (!(t >= 0 && t <= 1)) {
+    const kind = solved ? solved.classify(s.ringRadius) : null;
+    if (solved ? kind === 'none' : !(t >= 0 && t <= 1)) {
       this.inGap = false;
       return false;
     }
-    const gap = ringGapAt(t) >= RING_GAP_THRESHOLD;
+    const gap = solved ? kind === 'gap' : ringGapAt(t) >= RING_GAP_THRESHOLD;
     if (gap && !this.inGap) this.out.play('tick', PLAIN_TICK_STRENGTH, s.pan, 'tone');
     this.inGap = gap;
     return true;

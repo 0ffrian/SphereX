@@ -182,3 +182,33 @@ name = "Crab Nebula"
 query = "M 1"
 group = "demo"
 aliases = ["Crab", "M1"]
+
+[[target]]
+name = "Procyon A"
+query = "Procyon"
+group = "demo"
+aliases = ["procyon", "alpha cmi", "alf cmi"]
+
+[[target]]
+name = "Epsilon Eridani"
+query = "eps Eri"
+group = "demo"
+aliases = ["eps eri", "epsilon eri", "eps eridani"]
+
+[[target]]
+name = "TOI-700 d"
+query = "TOI-700 d"
+group = "demo"
+aliases = ["TOI-700", "TOI700d", "TOI 700 d"]
+
+[[target]]
+name = "WASP-39 b"
+query = "WASP-39 b"
+group = "demo"
+aliases = ["WASP-39", "WASP39b", "WASP 39 b"]
+
+[[target]]
+name = "55 Cancri e"
+query = "55 Cnc e"
+group = "demo"
+aliases = ["55 Cnc e", "55 Cancri e", "55cnce", "cancri e"]

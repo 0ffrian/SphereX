@@ -6,6 +6,7 @@
 
 - **Decision:** The app uses **three r187** through `three/webgpu` (`WebGPURenderer`, WebGL2 fallback **[verify]**). The mock-up stays on r128 and is not ported in place.
 - **Why:** r187 is the pinned version in the rendering doc. Generators move from the mock-up into ES modules anyway.
+- **Amended by:** D-37 (acknowledged by Atish, 11 Nov 2026): the D-37 engines (the approved prototype's JavaScript and GLSL on raw WebGL2: world, star and rock) run alongside three.js r187 TSL, which remains the viewer and the fallback path ([R5.9](../rendering/engines.md#r59-prototype-engines-d-37)). The A15 frame-rate check of the rock engine and the two world-engine instances (globe and fly view) is still to be measured before the event (D-05, R5.5, R11; R12 #43).
 
 ## D-05 Target hardware and budgets
 

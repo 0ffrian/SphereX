@@ -1089,8 +1089,9 @@ body {
     container: skyslot / inline-size;
     transition: right 0.75s cubic-bezier(0.34, 1.2, 0.64, 1);
   }
+  /* The sky stays full width under the build pane, as the mock-up's `body.bsplit .view.building #skyPane`. */
   .sx-view[data-split] .sx-sky-slot {
-    right: 50%;
+    right: 0;
   }
   .sx-transport-slot > * {
     transition:
@@ -1219,32 +1220,47 @@ body {
     background: var(--color-sx-muted-2);
   }
 
-  /* Build pane, right half (mock-up .bpane). */
+  /* Build view (mock-up #bpane, .bp-head, .bp-pop, .bp-steps; issue #71 stream U, Q-294). While the
+     body is built the pane fills the view over the dimmed sky; `data-shifted` slides it to the right
+     half, where the close-up (.sx-cu) has opened on the left. */
   .sx-bp {
     position: absolute;
     top: 0;
     right: 0;
     bottom: 0;
-    width: 50%;
+    width: 100%;
     z-index: 6;
     display: flex;
     flex-direction: column;
     min-height: 0;
-    background: linear-gradient(180deg, #06060a, #0b0b11);
-    border-left: 1px solid var(--color-sx-border);
-    animation: sx-bp-in 0.75s cubic-bezier(0.34, 1.2, 0.64, 1);
+    background-color: #03030788;
+    background-image: radial-gradient(70% 60% at 50% 45%, #1b1b2c66 0%, transparent 72%);
+    animation: sx-bp-in 0.45s;
+    transition:
+      width 1s var(--sx-ease),
+      background-color 0.9s var(--sx-ease);
+  }
+  .sx-bp[data-shifted] {
+    width: 50%;
+    background-color: #05050a;
   }
   @keyframes sx-bp-in {
     from {
       opacity: 0;
-      transform: translateX(48px);
     }
   }
   .sx-bp-head {
+    position: relative;
+    z-index: 2;
     display: flex;
     justify-content: space-between;
     gap: 10px;
-    padding: 16px 18px 4px;
+    padding: 24px 28px 4px;
+    pointer-events: none;
+  }
+  .sx-bp-head button,
+  .sx-bp-tools {
+    pointer-events: auto;
   }
   .sx-bp-head h2 {
     font-size: 16px;
@@ -1283,7 +1299,8 @@ body {
   .sx-bp-tool:focus-visible {
     outline: 2px solid var(--color-sx-green);
   }
-  .sx-bp-feel {
+  /* Accuracy, Feel, Hear it, Details: an icon and a word (mock-up `#bpAcc`, `#bpFeel`, `#bpHear`). */
+  .sx-bp-text {
     width: auto;
     padding: 0 11px 0 9px;
     display: inline-flex;
@@ -1304,30 +1321,24 @@ body {
     background: var(--color-sx-border);
     margin: 7px 4px;
   }
-  .sx-bp-note,
   .sx-bp-msg {
-    margin: 4px 18px 0;
-    font-size: 12.5px;
-    color: var(--color-sx-mfg);
-  }
-  .sx-bp-msg {
-    flex: 1;
+    position: absolute;
+    inset: 0;
     display: grid;
     place-items: center;
     text-align: center;
     padding: 24px;
     font-size: 13px;
+    color: var(--color-sx-mfg);
   }
   .sx-bp-body {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
+    position: absolute;
+    inset: 0;
   }
   .sx-bp-stage {
-    position: relative;
-    flex: 1;
-    min-height: 180px;
+    position: absolute;
+    inset: 0;
+    min-height: 0;
     cursor: grab;
     touch-action: none;
   }
@@ -1340,55 +1351,213 @@ body {
     display: grid;
     place-content: center;
     justify-items: center;
-    gap: 10px;
+    gap: 14px;
+    pointer-events: none;
     color: var(--color-sx-mfg);
-    font-size: 13px;
-    background: #05060a;
-  }
-  .sx-spinner {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    border: 2px solid #ffffff22;
-    border-top-color: var(--color-sx-green);
-    animation: sx-spin 0.9s linear infinite;
-  }
-  @keyframes sx-spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-  .sx-bp-show {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    padding: 0 18px 12px;
-  }
-  .sx-bp-details {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    max-height: 40%;
-    overflow-y: auto;
-    padding: 0 18px 14px;
-  }
-  .sx-bp-details[hidden] {
-    display: none;
+    font-size: 12.5px;
+    text-align: center;
   }
   .sx-bp-status {
     padding: 0 18px 8px;
     font-size: 11px;
     color: var(--color-sx-dim-text);
   }
+  /* The honesty caption (mock-up `.cu-tag`): above the steps while it builds, above the dock after. */
+  .sx-bp-tag {
+    position: absolute;
+    left: 28px;
+    bottom: 150px;
+    z-index: 2;
+    max-width: calc(100% - 56px);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    font: 11px/1.4 var(--font-mono);
+    color: #c1c9cd;
+    background: #242729cc;
+    border: 1px solid #323a3e;
+    border-radius: 10px;
+    padding: 6px 10px;
+    transition: bottom 0.8s var(--sx-spring);
+  }
+  .sx-bp[data-shifted] .sx-bp-tag {
+    bottom: 88px;
+  }
+  .sx-tag-btn {
+    min-height: 24px;
+    padding: 0 8px;
+    border-radius: 6px;
+    background: #1c1f21;
+    box-shadow: inset 0 0 0 1px #323a3e;
+    color: var(--color-sx-fg);
+    font: inherit;
+  }
+  .sx-tag-btn:hover {
+    background: #2f3538;
+  }
+  .sx-tag-btn:focus-visible {
+    outline: 2px solid var(--color-sx-green);
+    outline-offset: 2px;
+  }
 
-  /* Step strip (mock-up .bp-steps). */
+  /* One panel under the header buttons at a time (mock-up `.bp-pop`). */
+  .sx-bp-pop {
+    position: absolute;
+    z-index: 3;
+    top: 72px;
+    right: 24px;
+    width: min(340px, calc(100% - 48px));
+    max-height: calc(100% - 160px);
+    overflow-y: auto;
+    background: #242729;
+    border: 1px solid #323a3e;
+    border-radius: 18px;
+    padding: 14px 16px 16px;
+    box-shadow: 0 18px 50px #000b;
+    transform-origin: top right;
+    animation: sx-pop-in 0.45s var(--sx-spring);
+    color: #c1c9cd;
+    font-size: 12.5px;
+    line-height: 1.5;
+    outline: none;
+  }
+  .sx-bp-pop[data-w='acc'],
+  .sx-bp-pop[data-w='details'] {
+    width: min(400px, calc(100% - 48px));
+  }
+  .sx-bp-pop[hidden],
+  .sx-bp-pop section[hidden] {
+    display: none;
+  }
+  @keyframes sx-pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.92);
+    }
+  }
+  .sx-bp-pop p {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #c1c9cd;
+    margin-bottom: 12px;
+  }
+  .sx-bp-pop .sx-pop-h span {
+    flex: none;
+    margin-left: auto;
+    color: #9aa4a9;
+  }
+  .sx-bp-pop .sx-acc-rules {
+    font-size: 11.5px;
+    color: #9aa4a9;
+  }
+  .sx-pop-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+  }
+  .sx-pop-note {
+    font-size: 11px;
+    line-height: 1.35;
+    color: #9aa4a9;
+  }
+  .sx-bw-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+    font-size: 12.5px;
+    color: var(--color-sx-mfg);
+  }
+  .sx-bw-head b {
+    font: 600 13px var(--font-mono);
+    color: var(--color-sx-fg);
+  }
+  .sx-hear-canvas {
+    display: block;
+    width: 100%;
+    height: 96px;
+    border-radius: 12px;
+    background: #1c1f21;
+    box-shadow: inset 0 0 0 1px #323a3e;
+  }
+  .sx-btn-sm {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 32px;
+    padding: 0 13px;
+    border-radius: 10px;
+    background: var(--color-sx-fg);
+    color: #09090b;
+    font-size: 12px;
+    font-weight: 500;
+    transition:
+      transform 0.25s var(--sx-spring),
+      opacity 0.2s;
+  }
+  .sx-btn-sm:active {
+    transform: scale(0.95);
+  }
+  .sx-btn-sm:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .sx-btn-sm:focus-visible {
+    outline: 2px solid var(--color-sx-green);
+    outline-offset: 2px;
+  }
+  .sx-bp-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .sx-bp-actions .sx-btn-sm {
+    background: var(--color-sx-muted);
+    color: var(--color-sx-fg);
+    box-shadow: inset 0 0 0 1px var(--color-sx-border);
+  }
+  .sx-bp-actions .sx-btn-sm[aria-pressed='true'] {
+    box-shadow: inset 0 0 0 1px #4ade8088;
+    color: var(--color-sx-green);
+  }
+  .sx-bp-details {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .sx-bp-details[hidden] {
+    display: none;
+  }
+
+  /* Step strip (mock-up `#bpane .bp-steps`): under the body while it builds, gone once shifted. */
   .sx-bp-steps {
+    position: absolute;
+    left: 50%;
+    bottom: 104px;
+    z-index: 2;
+    width: min(720px, calc(100% - 56px));
+    transform: translateX(-50%);
     display: flex;
     gap: 6px;
-    padding: 2px 18px 14px;
+    padding: 0;
     list-style: none;
     margin: 0;
+    transition:
+      opacity 0.5s,
+      transform 0.8s var(--sx-spring),
+      visibility 0s;
+  }
+  .sx-bp[data-shifted] .sx-bp-steps {
+    opacity: 0;
+    transform: translate(-50%, 18px);
+    pointer-events: none;
+    visibility: hidden;
+    transition:
+      opacity 0.5s,
+      transform 0.8s var(--sx-spring),
+      visibility 0s 0.8s;
   }
   .sx-bp-steps li {
     position: relative;
@@ -1489,46 +1658,233 @@ body {
     stroke-dashoffset: 0;
   }
 
+  /* The zoom bar and the tool dock (mock-up `.fl`, `.zoom`, `.dock`): panels at the bottom of the
+     screen, drawn only while the build is open and only on a desktop width. */
+  .sx-fl {
+    position: absolute;
+    z-index: 20;
+    bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 56px;
+    border-radius: 18px;
+    background: #242729;
+    border: 1px solid #323a3e;
+    box-shadow: 0 10px 28px #0007;
+    color: #c1c9cd;
+  }
+  .sx-zoom {
+    left: 16px;
+    padding: 0 14px 0 8px;
+  }
+  .sx-btn-i {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    transition:
+      transform 0.25s var(--sx-spring),
+      background 0.2s;
+  }
+  .sx-btn-i:enabled:hover,
+  .sx-zval:enabled:hover,
+  .sx-dtool:enabled:hover {
+    background: #2f3538;
+    color: #fff;
+  }
+  .sx-btn-i:active {
+    transform: scale(0.88);
+  }
+  .sx-zval {
+    min-width: 54px;
+    height: 32px;
+    border-radius: 10px;
+    font: 12px var(--font-mono);
+    color: #c1c9cd;
+  }
+  .sx-btn-i:disabled,
+  .sx-zval:disabled,
+  .sx-dtool:disabled {
+    opacity: 0.4;
+  }
+  .sx-btn-i:focus-visible,
+  .sx-zval:focus-visible,
+  .sx-dtool:focus-visible {
+    outline: 2px solid var(--color-sx-green);
+    outline-offset: 2px;
+  }
+  .sx-dock {
+    left: 50%;
+    transform: translateX(-50%);
+    height: 58px;
+    padding: 0 9px;
+    gap: 6px;
+    border-radius: 22px;
+  }
+  .sx-vsep {
+    display: block;
+    flex: none;
+    width: 1px;
+    height: 24px;
+    background: #323a3e;
+    margin: 0 5px;
+  }
+  .sx-dtool {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    color: #c1c9cd;
+    transition:
+      background 0.2s,
+      transform 0.25s var(--sx-spring);
+  }
+  .sx-dtool:active {
+    transform: scale(0.9);
+  }
+  .sx-dtool[data-active='true'] {
+    color: #fff;
+  }
+  .sx-dtool[data-active='true']::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    right: 15px;
+    bottom: -7px;
+    height: 3px;
+    border-radius: 3px;
+    background: var(--color-sx-green);
+  }
+  .sx-dtool[aria-pressed='true'] {
+    color: var(--color-sx-green);
+    background: #2f3538;
+  }
+
+  /* Desktop, while the build is open: the rail and the RA/Dec readout step aside (the mock-up's
+     build view has neither) and the search pill shows only when the dock's search button, "/" or Tab
+     brings focus to it. The sky stays full width under the pane (`body.bsplit .view.building #skyPane`). */
+  @media (min-width: 641px) {
+    .sx-rail {
+      transition:
+        opacity 0.35s,
+        visibility 0s;
+    }
+    .sx-bezel[data-split] .sx-rail {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition:
+        opacity 0.35s,
+        visibility 0s 0.35s;
+    }
+    [data-testid='sky-readout'] {
+      transition: opacity 0.35s;
+    }
+    .sx-bezel[data-split] [data-testid='sky-readout'] {
+      opacity: 0;
+    }
+    .sx-bezel[data-split] .sx-search-slot:not(:focus-within) {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .sx-bezel[data-split] .sx-search-slot:focus-within {
+      z-index: 30;
+    }
+  }
+
   @media (pointer: coarse) {
     .sx-bp-tool {
       min-width: 44px;
       min-height: 44px;
     }
-    .sx-btn {
+    .sx-btn,
+    .sx-btn-sm {
       height: 44px;
     }
+    .sx-btn-i {
+      width: 44px;
+      height: 44px;
+    }
+    .sx-zval {
+      height: 44px;
+    }
+    .sx-tag-btn {
+      min-height: 44px;
+    }
   }
-  /* Phone: the pane is a full-height sheet over the sky; the sky keeps its full width under it. */
+  /* Phone: the pane is a full-height sheet over the sky (the sky keeps its full width under it); the
+     zoom bar and the dock are not drawn, the tab bar stays. */
   @media (max-width: 640px) {
-    .sx-view[data-split] .sx-sky-slot {
-      right: 0;
+    .sx-fl {
+      display: none;
     }
     .sx-bp {
-      width: 100%;
-      border-left: 0;
-      animation-name: sx-bp-up;
+      transition: none;
     }
-    @keyframes sx-bp-up {
-      from {
-        opacity: 0;
-        transform: translateY(48px);
-      }
+    .sx-bp[data-shifted] {
+      width: 100%;
+    }
+    /* The title row, then the buttons across the full width (a phone has no room for both). */
+    .sx-bp-head {
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px 8px 0 16px;
+    }
+    .sx-bp-tools {
+      width: 100%;
+      justify-content: space-between;
+    }
+    .sx-bp-tools .sx-bp-text {
+      flex: 1 1 auto;
+      justify-content: center;
     }
     .sx-bp-tool {
       min-width: 44px;
       min-height: 44px;
     }
-    .sx-bp-tool:not(.sx-bp-feel) {
+    .sx-bp-tool:not(.sx-bp-text) {
       width: 44px;
       height: 44px;
     }
+    .sx-bp-text {
+      margin-right: 0;
+      padding: 0 6px;
+      gap: 4px;
+      font-size: 12px;
+    }
+    .sx-bp-sep {
+      display: none;
+    }
+    /* The body sits under the two header rows, not behind the buttons. */
+    .sx-bp-stage {
+      top: 108px;
+    }
+    .sx-bp-pop {
+      right: 8px;
+      top: 112px;
+      width: calc(100% - 16px) !important;
+      max-height: calc(100% - 124px);
+    }
     .sx-bp-steps {
-      padding: 2px 10px 10px;
+      bottom: 12px;
+      width: calc(100% - 20px);
       gap: 4px;
     }
     .sx-bp-steps li {
       padding: 0 7px;
       gap: 5px;
+    }
+    .sx-bp-tag {
+      left: 12px;
+      bottom: 62px;
+      max-width: calc(100% - 24px);
+    }
+    .sx-bp[data-shifted] .sx-bp-tag {
+      bottom: 12px;
     }
   }
 }
@@ -1538,23 +1894,6 @@ body {
 @media (max-width: 640px) {
   .sx-bezel[data-split] .sx-transport-slot {
     display: none;
-  }
-}
-
-/* Issue #60: the Show toggle stays one tap away but takes one slim row under the steps (the mock-up
-   has no such row; the stage keeps the room). Unlayered so it beats the utility classes. */
-.sx-bp-show button {
-  min-height: 32px;
-  padding: 0 10px;
-  font-size: 12.5px;
-}
-.sx-bp-show [role='group'] {
-  gap: 6px;
-}
-@media (pointer: coarse) {
-  .sx-bp-show button {
-    min-height: 44px;
-    padding: 0 9px;
   }
 }
 
@@ -1667,14 +2006,7 @@ body {
     .sx-sky-status {
       top: calc(var(--sx-in-t) + 16px);
     }
-    .sx-bp {
-      top: var(--sx-in-t);
-      bottom: var(--sx-in-b);
-      right: var(--sx-in-r);
-      width: calc(50% - var(--sx-in-r));
-      border-radius: 18px;
-      overflow: hidden;
-    }
+    /* The build pane fills the view like the mock-up's #bpane (stream U); it no longer floats as a card. */
   }
 }
 
@@ -1703,4 +2035,511 @@ body {
   .sx-suggest-row[data-active='true'] .sx-suggest-label {
     color: HighlightText;
   }
+}
+
+/* Q-267: the Accuracy popover (mock-up #popAcc, .acc-*). Anchored above the chip; a bottom sheet
+   on Touch. */
+.sx-acc-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+}
+.sx-acc-pop {
+  position: absolute;
+  z-index: 20;
+  left: 12px;
+  bottom: 60px;
+  width: min(400px, calc(100% - 24px));
+  max-height: calc(100% - 72px);
+  overflow-y: auto;
+  background: var(--color-sx-card);
+  border: 1px solid var(--color-sx-border);
+  border-radius: 18px;
+  padding: 14px 16px 16px;
+  box-shadow: 0 18px 50px #000b;
+  color: var(--color-sx-mfg);
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: left;
+}
+@media (pointer: coarse) {
+  .sx-acc-backdrop {
+    background: #0008;
+  }
+  .sx-acc-pop {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: 85vh;
+    border-radius: 18px 18px 0 0;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+}
+.sx-pop-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.sx-pop-h b {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+.sx-pop-h span {
+  font-size: 11.5px;
+  color: var(--color-sx-dim-text);
+  flex: 1;
+}
+.sx-acc-close {
+  min-height: 44px;
+  min-width: 44px;
+  margin: -8px -8px 0 0;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--color-sx-fg);
+}
+.sx-acc-close:focus-visible {
+  outline: 2px solid var(--color-sx-blue);
+}
+.sx-acc-top {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 2px 0 10px;
+}
+.sx-acc-top .n {
+  font: 600 34px/1 var(--font-sans, system-ui);
+  letter-spacing: -0.02em;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.sx-acc-bar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #1c1f21;
+  margin-bottom: 10px;
+}
+.sx-acc-bar i {
+  display: block;
+  height: 100%;
+  min-width: 0;
+}
+.sx-acc-key {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 6px 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.sx-acc-key b {
+  font:
+    600 12.5px ui-monospace,
+    monospace;
+  color: #fff;
+  text-align: right;
+}
+.sx-acc-key small {
+  display: block;
+  font-size: 11px;
+  color: var(--color-sx-dim-text);
+}
+.sx-acc-sw {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+.sx-acc-eq {
+  display: block;
+  font:
+    12.5px/1.5 ui-monospace,
+    monospace;
+  background: #1c1f21;
+  border: 1px solid var(--color-sx-border);
+  border-radius: 10px;
+  padding: 9px 11px;
+  color: #e5e7e8;
+  margin-bottom: 6px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.sx-acc-tex {
+  margin: 0 0 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  background: #1c1f21;
+  border: 1px solid var(--color-sx-border);
+  border-radius: 10px;
+  padding: 6px 10px;
+  color: #e5e7e8;
+}
+.sx-acc-tex .katex {
+  font-size: 1.05em;
+}
+.sx-acc-tex .katex-display {
+  margin: 0.3em 0;
+}
+.sx-acc-gate {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: 12px;
+  color: #c9d1d5;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sx-acc-gv {
+  display: inline-block;
+  min-width: 26px;
+  font:
+    500 10.5px ui-monospace,
+    monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 4px;
+}
+.sx-acc-gv.ok {
+  color: #4ade80;
+}
+.sx-acc-gv.no {
+  color: #f87171;
+}
+.sx-acc-rules {
+  font-size: 11.5px;
+  color: var(--color-sx-dim-text);
+  margin: 0 0 12px;
+}
+.sx-acc-last {
+  margin: 10px 0 0;
+}
+.sx-acc-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.sx-acc-tbl th {
+  text-align: left;
+  font:
+    500 10.5px ui-monospace,
+    monospace;
+  color: var(--color-sx-dim-text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0 8px 5px 0;
+}
+.sx-acc-tbl td {
+  padding: 5px 8px 5px 0;
+  border-top: 1px solid var(--color-sx-border);
+  color: #e5e7e8;
+}
+.sx-acc-tbl th:last-child,
+.sx-acc-tbl td:last-child {
+  text-align: right;
+  padding-right: 0;
+  font-family: ui-monospace, monospace;
+  white-space: nowrap;
+}
+.sx-acc-tag {
+  display: inline-block;
+  border: 1px solid;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.sx-acc-tag.d {
+  border-color: #34d399;
+  color: #6ee7b7;
+}
+.sx-acc-tag.p {
+  border-color: #38bdf8;
+  color: #7dd3fc;
+}
+.sx-acc-tag.a {
+  border-color: #71717a;
+  border-style: dashed;
+  color: #a1a1aa;
+}
+
+/* Issue #71 stream H: the close-up pane, the app's version of the mock-up's #cuPane: the LEFT half of
+   the app, over the sky, while the build pane keeps the globe on the right. Same numbers as the
+   mock-up: 50% wide, black, fades over 0.7 s and slides over 1 s with --ease (0.1 s delay on open),
+   an 80% to 100% dark gradient on the edge by the build pane, and the .cu-tag caption. The picture is
+   painted into the canvas; this layer holds the caption, the controls and the input. On a phone it
+   stacks above the build pane (top 45%). */
+.sx-cu {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  z-index: 5;
+  background: #000;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(-36px) scale(0.985);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 1s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s 0.8s;
+}
+.sx-cu.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.1s,
+    transform 1s cubic-bezier(0.22, 1, 0.36, 1) 0.1s;
+}
+.sx-cu-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.sx-cu::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent 80%, #0008 100%);
+}
+.sx-cu-tag {
+  position: absolute;
+  left: 68px;
+  bottom: 88px;
+  z-index: 2;
+  max-width: calc(100% - 84px);
+  font: 11px var(--font-mono);
+  color: #c1c9cd;
+  background: #242729cc;
+  border: 1px solid #323a3e;
+  border-radius: 10px;
+  padding: 6px 10px;
+  line-height: 1.4;
+}
+.sx-cu-controls {
+  position: absolute;
+  left: 68px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font: 12px var(--font-mono);
+  color: #c1c9cd;
+  background: #242729cc;
+  border: 1px solid #323a3e;
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+.sx-cu-focus {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.sx-cu-focus:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: -4px;
+}
+/* Desktop: the zoom bar and the dock take the bottom row (16 to 74 px), so the close-up's caption and
+   controls sit above it, and the rail they used to clear is not there while the build is open. */
+@media (min-width: 641px) {
+  .sx-cu-tag,
+  .sx-cu-controls {
+    left: 16px;
+  }
+  .sx-cu-controls {
+    bottom: 88px;
+  }
+  .sx-cu-tag {
+    max-width: calc(100% - 32px);
+    bottom: 148px;
+  }
+}
+@media (max-width: 640px) {
+  .sx-cu {
+    width: 100%;
+    top: 84px;
+    bottom: auto;
+    height: 36%;
+    transform: translateY(-36px) scale(0.985);
+  }
+  .sx-cu.open {
+    transform: none;
+  }
+  .sx-cu::after {
+    background: linear-gradient(180deg, transparent 80%, #0008 100%);
+  }
+  .sx-cu-tag,
+  .sx-cu-controls {
+    left: 8px;
+    right: 8px;
+    max-width: none;
+  }
+  /* The caption goes to the top of the strip so it never lies over the controls (issue #71 stream U). */
+  .sx-cu-tag {
+    bottom: auto;
+    top: 8px;
+  }
+  .sx-view:has(.sx-cu.open) .sx-bp {
+    top: calc(84px + 36%);
+  }
+}
+/* Like the mock-up's `body.split .hud.sc{display:none}`: the sky's credit strip steps aside. */
+.sx-view:has(.sx-cu.open) .sx-sky-credit {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sx-cu,
+  .sx-cu.open {
+    transition: none;
+  }
+}
+
+/* The rail sits over the close-up pane (z 5), as the mock-up's rail sits over its #cuPane. */
+.sx-rail {
+  z-index: 8;
+}
+
+/* Issue #71 stream U: the buttons in the Details panel are the mock-up's small size (the Tailwind
+   button class is 44 px high). Unlayered so it beats the utilities; a touch screen keeps 44 px. */
+.sx-bp-details button {
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+.sx-bp-details [role='group'] {
+  gap: 6px;
+}
+@media (pointer: coarse) {
+  .sx-bp-details button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Reduced motion: the pane does not slide, fade or pop; it simply is where it ends up. The build
+   itself is not animated either (useMould shows the built body at once). */
+@media (prefers-reduced-motion: reduce) {
+  .sx-bp,
+  .sx-bp[data-shifted],
+  .sx-bp-pop,
+  .sx-bp-steps,
+  .sx-bp[data-shifted] .sx-bp-steps,
+  .sx-bp-tag,
+  .sx-fl,
+  .sx-btn-i,
+  .sx-dtool,
+  .sx-btn-sm {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Issue #71 stream U (Q-298): the BuildControls region in Details. */
+.sx-bctl {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sx-bctl-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid #323a3e;
+  padding-top: 10px;
+}
+.sx-bctl-group h3 {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+}
+.sx-ctl {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sx-ctl-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.sx-ctl-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #c1c9cd;
+}
+.sx-ctl-val {
+  margin-left: auto;
+  font: 12px var(--font-mono);
+  color: #fff;
+}
+.sx-ctl-row .sx-ctl-val + * {
+  margin-left: 0;
+}
+.sx-ctl-range {
+  width: 100%;
+  min-height: 32px;
+  accent-color: var(--color-sx-green);
+}
+.sx-ctl-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sx-ctl-btn {
+  background: var(--color-sx-muted);
+  color: var(--color-sx-fg);
+  box-shadow: inset 0 0 0 1px var(--color-sx-border);
+}
+.sx-ctl-btn[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 1px #4ade8088;
+  color: var(--color-sx-green);
+}
+.sx-ctl-why {
+  font-size: 11px;
+  color: #9aa4a9;
+}
+.sx-bctl-note summary {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 12px;
+  color: #c1c9cd;
+}
+.sx-bctl-note p {
+  font-size: 11.5px;
+  color: #9aa4a9;
+  margin: 0 0 6px;
+}
+@media (pointer: coarse) {
+  .sx-ctl-range,
+  .sx-bctl-note summary {
+    min-height: 44px;
+  }
+}
+
+.sx-acc-dim td {
+  opacity: 0.45;
 }

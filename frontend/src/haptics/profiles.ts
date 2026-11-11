@@ -212,7 +212,8 @@ export function buildHaptics(
       if (field && spec?.field?.kind === 'gas') {
         const flow = new FlowSource(engine, field, spec.field, tt, {
           k: num('k'),
-          rings: spec.gas?.rings ?? 0,
+          // A solved gas world (issue #71) says itself whether it has rings.
+          rings: field.flow ? (field.flow.ring ? 1 : 0) : (spec.gas?.rings ?? 0),
         });
         rings = flow.feelsRings;
         texture = flow;

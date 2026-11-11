@@ -1,6 +1,6 @@
 # 07 Sky Sculptor viewer (classes)
 
-The 3D viewer: the app class, the renderer chosen by `type`, and the helpers for lighting, view modes, honesty, scale and alt text. Drawn from rendering doc §4, §5, §7, §9, §10 and decisions D-01 (baked types vs shader kinds), D-03 (three r187), D-05 (budgets), D-12 (shared field worker) and D-21 (honesty states). Method names are illustrative where the spec gives only file names **[verify]**.
+The 3D viewer: the app class, the renderer chosen by `type`, and the helpers for lighting, view modes, honesty, scale and alt text. Drawn from rendering doc §4, §5, §7, §9, §10 and decisions D-01 (baked types vs shader kinds), D-03 (three r187), D-05 (budgets), D-12 (shared field worker) and D-21 (honesty states). Diagram 2 adds the D-37 engines, which draw generated bodies at + Artistic only (Q-287) on their own WebGL2 canvases, with this viewer as the fallback ([R5.9](../rendering/engines.md#r59-prototype-engines-d-37)). Method names are illustrative where the spec gives only file names **[verify]**.
 
 ```mermaid
 classDiagram
@@ -30,6 +30,7 @@ classDiagram
     +timeLapses() id, label, speedup list via timeLapsesOf(plan), active processes only, Q-108
     one Pause motion / Play motion button in the panel whenever timeLapses is not empty, reduced motion starts in Play
     +setTouchMode(on: boolean) void
+    +setEngineOwned(owned: boolean) void, D-37: builds and draws nothing while an engine draws the body
     +render() void
     frames the camera to plan.extent, rebuilds only when sceneKey changes
   }
@@ -279,8 +280,72 @@ classDiagram
   FieldSampler --> FieldWorker : reads its arrays
 ```
 
+## Diagram 2: the D-37 engines and their hosts
+
+```mermaid
+classDiagram
+  direction LR
+  class ViewerPanel {
+    <<app/ViewerPanel.tsx>>
+    +honesty: HonestyState
+    enginesShown = honesty is artistic, Q-287
+    engineStar, engineWorld: the adapter result when shown and not failed for this object
+  }
+  class EngineStage {
+    <<WorldGlobeStage, WorldFlyStage, StarEngineStage, RockStage, RockCloseUp>>
+    own canvas, raw WebGL2
+    +onFail() falls back to three.js, keyed per object
+    context lost falls back, no black canvas
+  }
+  class WorldEngine {
+    <<engine/worlds/WorldEngine.ts>>
+    createCore(canvas), the prototype's code with declared deviations
+    +setOverrides(o) void
+    +setFly(on) void
+    +spinUp() void, wall-clock budget, not byte-identical
+    +cpuFields() terrain, climate, rain, land mask
+  }
+  class StarEngine {
+    <<engine/stars/StarEngine.ts>>
+    four prototype slices run through new Function, needs unsafe-eval
+    mode: globe or flare or surface close-up
+  }
+  class RockView {
+    <<engine/rocks/RockView.ts>>
+    wraps source.ts: rebuild, drag, loop, jets
+    releases its WebGL contexts on detach
+  }
+  class CardToWorld {
+    <<cardToWorld.ts>>
+    +cardToWorld(card, overrides) preset, tags, assumptions, missing, mismatches
+    preset value keeps the card tag within 0.5 percent
+  }
+  class CardToStar {
+    <<cardToStar.ts>>
+    +cardToStar(card) preset, teff, rotation, assumed
+    only ref-sun maps to a prototype preset
+  }
+  class CardToRock {
+    <<cardToRock.ts>>
+    +cardToRock(card) preset, seed hashed into 0 to 97
+  }
+  class ViewerApp {
+    <<see diagram 1>>
+  }
+  ViewerPanel --> EngineStage : mounts only at + Artistic
+  ViewerPanel ..> ViewerApp : setEngineOwned while an engine draws
+  EngineStage --> WorldEngine : planets, gas giants, two instances
+  EngineStage --> StarEngine : stars with a Teff
+  EngineStage --> RockView : asteroids, comet nuclei
+  WorldEngine ..> CardToWorld : preset from the card
+  StarEngine ..> CardToStar : preset from the card
+  RockView ..> CardToRock : preset from the card
+  EngineStage ..> ViewerApp : fallback when refused, failed, context lost or no WebGL2
+```
+
 ## Notes
 
+- D-37 engines (diagram 2): at + Artistic, a card the adapter accepts is drawn by the prototype's own engine on its own WebGL2 canvas, and `ViewerApp.setEngineOwned(true)` makes the three.js viewer build and draw nothing under it. At + Estimated and Measured only (Q-287), and when the adapter refuses the card, the engine fails or loses its context, or WebGL2 is missing, the three.js renderers of diagram 1 draw (`GasWorld`, `RockyWorld`, the orbit view, `ShaderBody`, `Star`, the asteroid and comet renderers). Engine frames are exempt from the byte-identical rule (R5.9). Review fixes: Q-329 to Q-331, Q-334, Q-335.
 - Render core (issue #39): `ViewerApp` draws through a `RenderChain` (`render/pipeline.ts`); if the chain cannot be built it falls back to plain `renderer.render`. New content is compiled with `RenderChain.compileAsync` before it is swapped in (diagram [10](10-sequence-view-3d.md)). The quality level (low, medium or high, `render/quality.ts`) sets bloom resolution, anti-aliasing (TAAU or SMAA), noise octaves and volume steps. `FrameGovernor` only lowers the quality level; `setQualityTier` picks one by hand. `SimClock` (`render/clock.ts`) holds one sim time per moving process (the spin, and since issue #42 the processes `motion/planMotion.ts` states for stars, gas giants, brown dwarfs and worlds, Q-104) and the pause reasons shown in diagram [15](15-state-interaction.md). `renderStats`, `whenSettled` and `freezeClock` are test and tuning hooks; `timeLapses` lists each process with its shown speed-up. Motion and quality levels follow R5.7 and D-34; the implementation is Q-66 in [decisions](../decisions/README.md).
 - Tier labels (issue #42): the viewer panel (`app/ViewerPanel.tsx`, `tierText`) writes every process speed-up and layer tier as "tier N of 5, <meaning>" (for example "tier 3 of 5, worked out with a typical value"), so the D-32 tier is said in words next to it.
 - Shapes and volumes (issue #43): `RenderPlan.volumes` and `RenderPlan.shape` are new plan fields. `build.ts` makes a `VolumeBody` per volume and forwards `setTier` (via `BuiltScene.setTier`, called by `ViewerApp.setQualityTier`) so the ray-march step count follows the quality level. `buildLights` takes shadow settings (`shape/shapeModel.shadowSettings`) when `plan.shape.shadows` is set, and the renderer shadow map is enabled for it; `ViewerApp.setLights` disposes the shadow map of a light it replaces. The loaded model reports half of its longest box extent through `onMeshMeasured` (ignored if the scene is no longer current) so the scale bar and the screen-reader label (`canvasLabel(plan, shownSize)`) show the same real size. Volumes replace point sprites; the nebula and the nova make no point sets and have no haptics (Q-103). `ShaderBody` disposes each `VolumeHandle` (and its `Data3DTexture`) when it releases a surface. The remnant age slider in `ViewerPanel` writes the store's D-02 `overrides.age_yr` (log-mapped input) and the panel passes the overrides to `ViewerApp.setOverrides`. `ViewerApp.draw` hands the TAAU frame index to `BuiltScene.setJitterFrame` and the body's on-screen size to `BuiltScene.setScreenPx` (160 px level of detail). `ViewerPanel` calls `showPlan` only when the plan changes; the canvas label follows the measured size in its own effect.
@@ -293,4 +358,4 @@ classDiagram
 - Mesh budget: D-05 sets ≤ 50k triangles, tighter than the 300k in older text; D-05 wins.
 - Pixel ratio is `min(devicePixelRatio, 1.5)`, and the scene renders only when the view changes (D-05).
 - If a required card field is missing, the renderer does not draw that layer and it is listed in `RenderParams.missing`.
-- Honesty states follow the badges (D-21): Measured only shows `measured`; + Estimated adds `derived`, `model_dependent` and `inferred_from_analog`; + Artistic adds `artistic`. As built: `HONESTY_STATES = ['measured', 'derived', 'artistic']` in `viewer/honesty.ts`, starting at `'derived'` (+ Estimated).
+- Honesty states follow the badges (D-21): Measured only shows `measured`; + Estimated adds `derived`, `model_dependent` and `inferred_from_analog`; + Artistic adds `artistic` and is the only state at which the D-37 engines draw (Q-287). As built: `HONESTY_STATES = ['measured', 'derived', 'artistic']` in `viewer/honesty.ts`, starting at `'derived'` (+ Estimated).

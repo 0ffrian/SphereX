@@ -160,6 +160,7 @@ class Settings(BaseSettings):
     # Pecaut & Mamajek dwarf Teff table (Q-152). Read only.
     literature_file: Path = BACKEND_DIR / "assets" / "literature.toml"
     dwarf_teff_file: Path = BACKEND_DIR / "assets" / "pm13_dwarf_teff.toml"
+    reference_file: Path = BACKEND_DIR / "assets" / "reference_objects.toml"  # Q-258
     # R6.7 baked textures, served at /data/textures. Outside git, next to the D-25 cache.
     textures_dir: Path | None = None
     # Q-164 (issue #68, 7c): the committed maps of the pre-built demo pack, served read-only at

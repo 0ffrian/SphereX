@@ -22,6 +22,7 @@ import {
   TextureLoader,
   Box3,
   Vector3,
+  type WebGPURenderer,
 } from 'three/webgpu';
 import { dot, float, fract, normalView, saturate, texture, uv, vec2, vec3 } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -42,13 +43,16 @@ import {
   type LodLevel,
 } from '../shape/shapeModel';
 import { bakeVertexAo } from '../shape/ShapeAo';
+import { lobeSphere } from '../shape/rockShape';
 import { createVolume } from '../volume/VolumeBody';
 import { TRAIL_HALF_LENGTH } from '../planCommon';
 import { allowedTags } from '../honesty';
 import { isGltfUrl } from '../scaleBar';
 import type { BodyContext, BodyRenderer } from './bodyRenderer';
 import { ShaderBody } from './ShaderBody';
+import { GasWorld } from './GasWorld';
 import { StarBody } from './StarBody';
+import { flareText } from '@/physics/flares';
 import { LIMB_DARKENING_U } from './Star';
 import { buildJetSurface, makeJetRuntime } from './jetSurface';
 import { floatTexture } from './fieldTexture';
@@ -75,7 +79,7 @@ export interface BuildHooks {
    */
   onMeshMeasured?(m: { radiusM: number }): void;
   /** Tests only: replaces the field and point workers, or sets slider overrides (D-27). */
-  shader?: Pick<BodyContext, 'fieldSource' | 'overrides'>;
+  shader?: Pick<BodyContext, 'fieldSource' | 'worldSource' | 'overrides'>;
   /** Noise octaves of the quality level (R5.7); bodies built from noise read it. Default: the low level's. */
   octaves?: number;
 }
@@ -177,8 +181,21 @@ export interface BuiltScene {
   update(plan: RenderPlan): void;
   /** Half the largest axis of the shape-model body in scene units, or null without one. */
   readonly shapeRadius: number | null;
+  /**
+   * Issue #71 stream C: a unit direction in the star's body frame as a unit direction in the scene
+   * now (the star turns), or null when this scene has no star surface. Used by the close-up camera.
+   */
+  starDirToWorld(dir: [number, number, number]): [number, number, number] | null;
+  /**
+   * Issue #71 stream G: the star's flares and plasma, or null without them. `fire` starts a big flare
+   * now; `latestText` is the plain-words "Latest flare" card (null before the first flare);
+   * `setLines` is the "Field lines" toggle.
+   */
+  readonly starFlares: StarFlareControls | null;
   /** The body's on-screen diameter in CSS pixels (the 160 px level-of-detail rule); null = unknown. */
   setScreenPx(px: number | null): void;
+  /** Issue #71: before each draw, hands the renderer to a body that runs its own off-screen pass. */
+  prepareFrame(renderer: WebGPURenderer): void;
   /** The TAAU frame index of the next frame (see BodyRenderer.setJitterFrame). */
   setJitterFrame(index: number): void;
   /** The quality level changed: volume steps and octaves, model level of detail, displacement. */
@@ -189,6 +206,15 @@ export interface BuiltScene {
    */
   setMould(pose: Readonly<MouldPose> | null): void;
   dispose(): void;
+}
+
+export interface StarFlareControls {
+  fire(): void;
+  latestText(): string | null;
+  setLines(on: boolean): void;
+  readonly linesOn: boolean;
+  /** Streaks drawn in the last frame (tests, performance readout). */
+  readonly streakCount: number;
 }
 
 /** Seeded PRNG (mulberry32). The same seed always gives the same stream. */
@@ -305,6 +331,28 @@ function liftedTint(body: BodyPlan): Color {
   return body.displayLift ? c.multiplyScalar(displayLift(rgbLinearLuma(body.tint))) : c;
 }
 
+/** Airless rock (issue #71, Q-210): `ShapeMaterial` with the rock lighting; `lommel` off = standard. */
+function rockMaterial(body: BodyPlan, lommel: boolean): MeshStandardNodeMaterial {
+  if (!lommel) return new MeshStandardNodeMaterial({ color: liftedTint(body), roughness: 0.95 });
+  const m = new ShapeMaterial({
+    hasAo: false,
+    regolithFrequency: null,
+    lommelSeeliger: true,
+    rock: true,
+  });
+  m.color = liftedTint(body);
+  return m;
+}
+
+/**
+ * The height map holds `0.5 + h / scale` (R6.7, issue #71): shift the displacement by half the
+ * scale so a value of 0.5 leaves the surface where it is.
+ */
+function displacementOf(tier: TierName, scale: number | null): { scale: number; bias: number } {
+  const on = displacementActive(tier, scale) ? (scale ?? 0) : 0;
+  return { scale: on, bias: -on / 2 };
+}
+
 function bodyMaterial(body: BodyPlan): MeshStandardNodeMaterial | MeshBasicNodeMaterial {
   const tint = liftedTint(body);
   if (body.emissive <= 0) {
@@ -348,6 +396,8 @@ export function buildScene(
   let screenPx: number | null = null;
   const lodRefresh: (() => void)[] = [];
   let shapeRadius: number | null = null;
+  let starSpin: Object3D | null = null;
+  let starFlares: StarFlareControls | null = null;
   const mouldSpheres: { mesh: Mesh; axes: [number, number, number] }[] = [];
   const mouldHolders: (() => Object3D | null)[] = [];
   for (const [bodyIndex, body] of plan.bodies.entries()) {
@@ -355,6 +405,7 @@ export function buildScene(
     if (plan.star && body.id === 'body') {
       const star = track(
         new StarBody(plan.star, {
+          tier,
           tint: srgbToLinear(body.tint),
           emissive: body.emissive,
           limbU: body.limbDarkening ? LIMB_DARKENING_U : null,
@@ -365,6 +416,34 @@ export function buildScene(
       );
       star.group.position.set(...body.position);
       group.add(star.group);
+      starSpin = star.spin;
+      const plasma = star.plasma;
+      if (plasma) {
+        const speed = plan.star.rates.flareSpeedup;
+        const now = () => (speed > 0 ? lastTime('flares') / speed : 0);
+        starFlares = {
+          fire() {
+            plasma.fire(now());
+            plasma.setTime(now());
+            hooks.onChange();
+          },
+          latestText() {
+            const e = plasma.latest(now());
+            return e ? flareText(e) : null;
+          },
+          setLines(on) {
+            plasma.setLines(on);
+            hooks.onChange();
+          },
+          get linesOn() {
+            return plasma.linesOn;
+          },
+          get streakCount() {
+            return plasma.streakCount;
+          },
+        };
+        tierListeners.push((t) => plasma.setTier(t));
+      }
       usesQuality = true;
       // The star turns itself (StarBody rotates its own frame by the spin clock), so it is not a
       // `spinner`. A Mira has no star surface and is posed below.
@@ -372,9 +451,21 @@ export function buildScene(
       continue;
     }
     const geometry = track(new SphereGeometry(1, body.segments[0], body.segments[1]));
-    const material = track(bodyMaterial(body));
+    if (body.lobed) {
+      lobeSphere(geometry.getAttribute('position'));
+      geometry.computeVertexNormals();
+    }
+    // A procedural rock (issue #71) is lit with the rock blend and casts and receives shadows.
+    const rock = plan.shape?.rock === true && body.emissive <= 0 && !body.meshUrl;
+    const material = track(
+      rock && plan.shape ? rockMaterial(body, plan.shape.lommelSeeliger) : bodyMaterial(body),
+    );
     const mesh = new Mesh(geometry, material);
     mesh.name = body.id;
+    if (rock && plan.shape?.shadows) {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+    }
     mesh.scale.set(...body.axes);
     mesh.position.set(...body.position);
     group.add(mesh);
@@ -510,11 +601,15 @@ export function buildScene(
           t.needsUpdate = true;
         }
         material.displacementMap = t;
-        material.displacementScale = displacementActive(tier, scale) ? (scale ?? 0) : 0;
+        const d = displacementOf(tier, scale);
+        material.displacementScale = d.scale;
+        material.displacementBias = d.bias;
       });
       tierListeners.push((t) => {
         if (material.displacementMap) {
-          material.displacementScale = displacementActive(t, scale) ? (scale ?? 0) : 0;
+          const d = displacementOf(t, scale);
+          material.displacementScale = d.scale;
+          material.displacementBias = d.bias;
         }
       });
     }
@@ -661,9 +756,9 @@ export function buildScene(
   // Shader kinds (D-01) --------------------------------------------------------------------
   // The plan says what is shown; the body builds its surface from the shared CPU field and keeps
   // a plain sphere meanwhile (never blank). Honesty and light are applied by `update`.
-  let shaderBody: ShaderBody | null = null;
+  let shaderBody: ShaderBody | GasWorld | null = null;
   if (plan.shader) {
-    shaderBody = ShaderBody.start(plan.shader.card, plan.shader.params, {
+    const shaderCtx: BodyContext = {
       visibleTags: allowedTags(plan.honesty),
       lightDir: plan.lighting.direction ?? undefined,
       lightColour: plan.lighting.colour ?? undefined,
@@ -679,7 +774,11 @@ export function buildScene(
       gasLayers: plan.shader.gas ?? undefined,
       pattern: plan.shader.pattern,
       ...hooks.shader,
-    });
+    };
+    // Issue #71: a gas giant with the data for it runs as a solved world; else the plain shader path.
+    shaderBody =
+      GasWorld.start(plan.shader.card, plan.shader.params, shaderCtx) ??
+      ShaderBody.start(plan.shader.card, plan.shader.params, shaderCtx);
     usesQuality = true;
     track(shaderBody);
     group.add(shaderBody.object);
@@ -783,10 +882,24 @@ export function buildScene(
       shaderBody.setPatternSwitch(next.shader?.pattern ?? null);
     },
     shapeRadius,
+    get starFlares() {
+      return starFlares;
+    },
+    starDirToWorld(dir) {
+      if (!starSpin) return null;
+      group.updateMatrixWorld(true);
+      const v = new Vector3(dir[0], dir[1], dir[2]);
+      starSpin.localToWorld(v);
+      v.sub(starSpin.getWorldPosition(new Vector3())).normalize();
+      return [v.x, v.y, v.z];
+    },
     setScreenPx(px) {
       if (disposed || px === screenPx) return;
       screenPx = px;
       for (const r of lodRefresh) r();
+    },
+    prepareFrame(renderer) {
+      if (!disposed) (shaderBody as BodyRenderer | null)?.prepareFrame?.(renderer);
     },
     setJitterFrame(index) {
       jitterFrame(index);

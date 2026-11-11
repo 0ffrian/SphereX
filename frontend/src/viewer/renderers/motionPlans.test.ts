@@ -33,17 +33,18 @@ describe('star surface (R7.5.1)', () => {
   it('+ Estimated draws tier 4 layers but not the artistic ones', () => {
     const p = at('star', 'derived');
     expect(ids(p)).toEqual(expect.arrayContaining(['spots', 'faculae', 'flares', 'prominences']));
-    expect(ids(p)).not.toContain('granulation');
+    // Q-293: cells with a modelled size are model_dependent, so they show from + Estimated.
+    expect(ids(p)).toContain('granulation');
     expect(ids(p)).not.toContain('prominence_strands');
     expect(ids(p)).not.toContain('glow');
-    expect(p.star).toMatchObject({ spots: true, flares: true, strands: false, granulation: false });
+    expect(p.star).toMatchObject({ spots: true, flares: true, strands: false, granulation: true });
     expect(tierOf(p, 'spots')).toBe(4);
   });
 
-  it('+ Artistic adds granulation, strands and glow, each with its tier', () => {
+  it('+ Artistic adds strands and glow, each with its tier (granulation is model_dependent, Q-293)', () => {
     const p = at('star', 'artistic');
     expect(p.star).toMatchObject({ granulation: true, strands: true, glow: true });
-    expect(tierOf(p, 'granulation')).toBe(5);
+    expect(tierOf(p, 'granulation')).toBe(3);
     expect(tierOf(p, 'prominence_strands')).toBe(5);
   });
 
