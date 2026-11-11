@@ -1,6 +1,6 @@
 # Pipeline: classify to RenderParams
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.3–A4.8 · **Implements:** [D-04](../decisions/contract.md), [D-22](../decisions/contract.md), [D-32](../decisions/contract-tags.md), [Q-55, Q-56, Q-60, Q-62, Q-63](../decisions/pipeline-stages.md), [Q-57, Q-61](../decisions/pipeline-jobs.md), [Q-58, Q-59](../decisions/rendering-bodies.md), [Q-35](../decisions/contract.md), [Q-39](../decisions/contract.md), [Q-47](../decisions/rendering-bodies.md) · **Read with:** [pipeline.md](pipeline.md) (A4 overview), [../rendering/data-contract.md](../rendering/data-contract.md) (R3), [refusals.md](refusals.md) (A4.12)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.3–A4.8 · **Implements:** [D-04](../decisions/contract.md), [D-22](../decisions/contract.md), [D-32](../decisions/contract-tags.md), [Q-55, Q-56, Q-60, Q-62, Q-63, Q-221, Q-222, Q-327](../decisions/pipeline-stages.md), [Q-326](../decisions/rendering-bodies.md), [Q-57, Q-61](../decisions/pipeline-jobs.md), [Q-58, Q-59](../decisions/rendering-bodies.md), [Q-35](../decisions/contract.md), [Q-39](../decisions/contract.md), [Q-47](../decisions/rendering-bodies.md) · **Read with:** [pipeline.md](pipeline.md) (A4 overview), [../rendering/data-contract.md](../rendering/data-contract.md) (R3), [refusals.md](refusals.md) (A4.12)
 
 Stages 3 to 7 of the pipeline ([A4](pipeline.md#a4-pipeline)). They run inside the object job ([A4.10](jobs.md#a410-object-job-and-fan-out)). Their routes are listed in [A4.11](endpoints.md#a411-endpoint-register) and their `missing` codes in [A4.12](refusals.md#a412-missing-and-refusal-codes).
 
@@ -44,12 +44,12 @@ A sketch from SPHEREx only is often a `candidate`, which gets no 3D body (render
 - The status is sent as the `X-SX-Asset-Status` response header (Q-39, [A4.11](endpoints.md#a411-endpoint-register)).
 - **Version constants** (this list is the one place for their values; bump the one whose rule changed):
 
-  | Constant | File | Value (9 Nov 2026) | Bump when |
+  | Constant | File | Value (11 Nov 2026) | Bump when |
   |---|---|---|---|
-  | `ASSET_VERSION` | `core/card/assets.py` | `5` (4: the issue #62 layers, Q-115 to Q-117; 5: the Q-63 thresholds on, issue #68) | a stage 3 or 5 rule changes, or stage 7 sends other layers without changing a seed |
+  | `ASSET_VERSION` | `core/card/assets.py` | `11` (4: the issue #62 layers, Q-115 to Q-117; 5: the Q-63 thresholds on, issue #68; 10: issue #71; 11: the PR #89 crater, relief and Procyon fixes, Q-326, Q-336) | a stage 3 or 5 rule changes, or stage 7 sends other layers without changing a seed |
   | `CARD_TO_PARAMS_VERSION` | `core/render/card_to_params.py` | `1` | a stage 7 rule changes the drawn body |
-  | `BAKER_RULES_VERSION` | `core/render/bake.py` | `2` | an R6.2 to R6.5 rule changes |
-  | `GENERATOR_VERSION` | `core/render/card_to_params.py` | `p1-b2` | follows the two above; it also seeds every body (A5.1) |
+  | `BAKER_RULES_VERSION` | `core/render/bake.py` | `4` (3: issue #71 asteroid physics, Q-210; 4: crater depth and rubble relief, Q-326) | an R6.2 to R6.5 rule changes |
+  | `GENERATOR_VERSION` | `core/render/card_to_params.py` | `p1-b4` | follows the two above; it also seeds every body (A5.1) |
   | `MEASURE_VERSION` | `core/measure/config.py` | `measure-1` | a stage 2 rule changes (Q-139 will bump it) |
   | `DERIVATION_VERSION` | `core/find/version.py` | `1` | a stage 1 rule changes |
   | `COMPOSITE_VERSION` | `core/composite/config.py` | `composite-1` | a composite rule changes |
@@ -85,7 +85,7 @@ The backend turns the ObjectCard into **RenderParams** with deterministic rules 
   - `candidate` gets a RenderParams with no layers and `mesh` in `missing` (Q-33).
   - Per-type layers added in issue #62: a gas giant gets five tiered layers `bands`, `flattening`, `colour`, `storms`, `turbulence` (`app/core/render/gas_giant.py`; Q-115, tiers per Q-119); a brown dwarf gets `limb_darkening` (Q-116); `asteroid_procedural` gets `textures.relief_amp` and an `artistic` `displacement` layer (Q-117). These bumped `ASSET_VERSION` (table in A4.4); `CARD_TO_PARAMS_VERSION` stays `1`, so seeds are stable.
   - Every layer carries `tier`, and `formula` and `assumed` where D-32 requires them. A `model_dependent` layer whose rule states nothing assumed is a code bug: stage 7 raises `ValueError` and `/render-params` answers 500 rather than label a measured input as assumed.
-- **Data confidence and the 3D gate (issue #71 stream B, D-36, Q-220 to Q-222):** `card_to_params` adds `confidence` from `backend/app/core/render/confidence.py` (`C = sum(w c) / sum(w)`; per-type placeholder weight tables; gate = known class, one key measurement, `C >= 0.25`). The viewer applies the gate (`viewer/confidenceGate.ts`): a failed gate draws no 3D body and shows found and needed. The sweep that will replace the weights is `backend/scripts/confidence_sweep.py`.
+- **Data confidence and the 3D gate (issue #71 stream B, D-36, Q-220 to Q-222):** `card_to_params` adds `confidence` from `backend/app/core/render/confidence.py` (`C = sum(w c) / sum(w)`; per-type placeholder weight tables; gate = known class, one key measurement whose tag is not `inferred_from_analog` or `artistic`, `C >= 0.25`; the rocky table credits measured `surface_temperature_K`, `surface_fluid` and `surface_pressure_bar`, Q-327; 25 demo and reference scores are pinned in `test_confidence.py`, Q-222). The viewer applies the gate (`viewer/confidenceGate.ts`): a failed gate draws no 3D body and shows found and needed. The sweep that will replace the weights is `backend/scripts/confidence_sweep.py`; it counts RenderParams values only, so it cannot calibrate the mass, orbit and host-star weights, which change the picture in the browser engines (Q-327).
 - **Not built yet:** `dynamics` (D-32). Live RenderParams carry no `dynamics` block; only the shared fixtures do ([shared/README.md](../../shared/README.md)). It comes with stage 6 (Q-60). Until then the viewer states its own motion layers (Q-104).
 
 ### A4.8 Stages 8 to 10: Generators
