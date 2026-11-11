@@ -276,8 +276,9 @@ class OverlayService:
         self._fetches: dict[FetchKey, Future[CatalogFetch]] = {}
         self._failed: dict[FetchKey, float] = {}
         self._pool = ThreadPoolExecutor(max_workers=2 * len(CATALOGS), thread_name_prefix="sx-cat")
-        # Issue #95: a mover's visit cones run on their own pool, so a fixed object's cones
-        # never queue behind them.
+        # Issue #95: a mover's visit cones run on their own pool (two workers, shared by both
+        # catalogues; submitted visit by visit), so a fixed object's cones never queue behind
+        # them.
         self._star_pool = ThreadPoolExecutor(
             max_workers=len(CATALOGS), thread_name_prefix="sx-star"
         )
@@ -416,23 +417,25 @@ class OverlayService:
         elif any(m.startswith(_DEFERRED_PREFIXES) for m in fr.missing):
             refusal = ":pending"
 
-        # Start every cone of every visit before awaiting any (one shared deadline).
+        # Start every cone of every visit before awaiting any (one shared deadline). The
+        # sx-star pool has two workers, shared by both catalogues; cones are submitted visit by
+        # visit (Gaia, CatWISE, next visit), so neither catalogue waits behind all of the other's.
         futures: dict[tuple[Catalog, int], Future[CatalogFetch] | str | None] = {}
-        for cat in CATALOGS:
-            started = 0
-            for v in visits:
+        started: dict[Catalog, int] = dict.fromkeys(CATALOGS, 0)
+        for v in visits:
+            for cat in CATALOGS:
                 opts = stars.fetch_options(cat, v.cone)
                 live = not (
                     ctx.cache.offline
                     or ctx.cache.get_meta(stars.cone_key(cat, v.cone)) is not None
                     or self._is_fetching(cat, v.cone, opts)
                 )
-                if live and started >= stars.MAX_LIVE_VISIT_CONES:
+                if live and started[cat] >= stars.MAX_LIVE_VISIT_CONES:
                     futures[(cat, v.visit)] = PENDING
                     continue
                 new = self._catalog_future(cat, v.cone, opts, pool=self._star_pool)
                 # A cone inside its failure TTL starts nothing, so it does not use the budget.
-                started += int(live and new is not None)
+                started[cat] += int(live and new is not None)
                 futures[(cat, v.visit)] = new
         deadline = time.monotonic() + ctx.settings.overlay_wait_s
 
