@@ -1631,5 +1631,426 @@
       "alt_text": "Synthetic fixture. Star, 1 solar radius (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
       "missing": []
     }
+  },
+  {
+    "name": "area index with RA 360",
+    "schema": "area-index",
+    "expect": {
+      "path": "/areas/0/ra",
+      "keyword": "exclusiveMaximum"
+    },
+    "instance": {
+      "areas": [
+        {
+          "area_id": "fixture:area-main",
+          "ra": 360.0,
+          "dec": 10.0,
+          "width_deg": 1.0,
+          "height_deg": 0.6,
+          "data_release": "synthetic_fixture",
+          "n_frames": 16,
+          "n_visits": 2,
+          "computed_at": "2026-11-10T12:00:00.000Z",
+          "cached_at": "2026-11-10T12:00:00.000Z"
+        }
+      ],
+      "cached_at": "2026-11-10T12:00:00.000Z",
+      "computed_at": "2026-11-10T12:00:00.000Z",
+      "missing": [],
+      "provenance": {
+        "areas": {
+          "tag": "derived",
+          "source": "synthetic fixture: made-up index",
+          "formula": "the prepared derived.area entries whose params_hash matches the running code and settings (A17.10); n_frames and n_visits counted from each summary"
+        }
+      }
+    }
+  },
+  {
+    "name": "area summary time without Z",
+    "schema": "area-summary",
+    "expect": {
+      "path": "/cached_at",
+      "keyword": "pattern"
+    },
+    "instance": {
+      "area_id": "fixture:area-main",
+      "ra": 150.0,
+      "dec": 10.0,
+      "width_deg": 1.0,
+      "height_deg": 0.6,
+      "data_release": "synthetic_fixture",
+      "n_frames": 16,
+      "n_visits": 2,
+      "computed_at": "2026-11-10T12:00:00.000Z",
+      "cached_at": "2026-11-10T12:00:00+00:00",
+      "frames": [
+        {
+          "frame_id": "fixture-area-main-v1e1-D1",
+          "detector": 1,
+          "visit": 1,
+          "exposure": 1,
+          "time": "2026-01-15T03:00:00.000Z",
+          "wavelength_min_um": 0.75,
+          "wavelength_max_um": 1.11,
+          "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.2523970 9.7001875 150.2523970 10.2998125 149.4926040 10.2998125"
+        }
+      ],
+      "coverage": [
+        {
+          "visit": 1,
+          "polygon": [
+            [
+              149.492604,
+              9.7001875
+            ],
+            [
+              150.252397,
+              9.7001875
+            ],
+            [
+              150.252397,
+              10.2998125
+            ],
+            [
+              149.492604,
+              10.2998125
+            ]
+          ]
+        }
+      ],
+      "steps": {
+        "n_dots": 570,
+        "n_glitches": 18,
+        "n_stars": 480,
+        "n_fixed": 16,
+        "n_static_one_visit": 1,
+        "n_tracks": 3,
+        "n_possible": 1,
+        "n_found_blind": 1,
+        "n_unexplained": 1,
+        "n_unchecked": 1
+      },
+      "method": {
+        "settings": {
+          "k_detect": 5.0
+        }
+      },
+      "missing": [],
+      "provenance": {
+        "frames": {
+          "tag": "measured",
+          "source": "synthetic fixture: made-up frame list, not SPHEREx data"
+        },
+        "coverage": {
+          "tag": "derived",
+          "source": "synthetic fixture: made-up footprints",
+          "formula": "per visit, the union of its frames' s_region clipped to the area (A17.1)"
+        },
+        "steps": {
+          "tag": "derived",
+          "source": "synthetic fixture: counts of the fixture's own dots and tracks",
+          "formula": "labels counted in /dots, statuses and verdicts counted in /tracks (A17.3 to A17.5)"
+        }
+      }
+    }
+  },
+  {
+    "name": "area known object of an unknown kind",
+    "schema": "area-known",
+    "expect": {
+      "path": "/known/0/kind",
+      "keyword": "enum"
+    },
+    "instance": {
+      "known": [
+        {
+          "designation": "Synthetic fixture C1",
+          "number": null,
+          "object_id": null,
+          "kind": "planet",
+          "v_mag": 21.5,
+          "n_frames": 1,
+          "n_visits": 1,
+          "positions": [
+            {
+              "frame_id": "fixture-area-main-v1e1-D1",
+              "time": "2026-01-15T03:00:00.000Z",
+              "ra": 150.1517851,
+              "dec": 10.2639375
+            }
+          ],
+          "track_available": false
+        }
+      ],
+      "skybot": [
+        {
+          "visit": 1,
+          "fetched_at": "2026-11-10T11:57:00.000Z"
+        },
+        {
+          "visit": 2,
+          "fetched_at": "2026-11-10T11:57:30.000Z"
+        }
+      ],
+      "cached_at": "2026-11-10T12:00:00.000Z",
+      "computed_at": "2026-11-10T12:00:00.000Z",
+      "missing": [],
+      "provenance": {
+        "positions": {
+          "tag": "model_dependent",
+          "source": "synthetic fixture: made-up positions of made-up objects",
+          "assumption": "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of fetched_at, seen from SPHEREx (500@-163182)"
+        },
+        "skybot": {
+          "tag": "measured",
+          "source": "synthetic fixture: made-up answer dates"
+        }
+      }
+    }
+  },
+  {
+    "name": "area dot numbered from 0",
+    "schema": "area-dots",
+    "expect": {
+      "path": "/visits/0/dots/0/dot_id",
+      "keyword": "pattern"
+    },
+    "instance": {
+      "visits": [
+        {
+          "visit": 1,
+          "dots": [
+            {
+              "dot_id": "fixture-area-main-v1e1-D1:0",
+              "frame_id": "fixture-area-main-v1e1-D1",
+              "detector": 1,
+              "exposure": 1,
+              "time": "2026-01-15T03:00:00.000Z",
+              "x": 211.42,
+              "y": 22.1,
+              "ra": 149.8593516,
+              "dec": 9.7379417,
+              "flux_uJy": 630.0,
+              "flux_err": 8.3,
+              "snr": 75.9,
+              "wavelength_um": 0.8801,
+              "bandwidth_um": 0.0215,
+              "flags": [],
+              "label": "star"
+            }
+          ]
+        }
+      ],
+      "cached_at": "2026-11-10T12:00:00.000Z",
+      "computed_at": "2026-11-10T12:00:00.000Z",
+      "missing": [],
+      "provenance": {
+        "position": {
+          "tag": "derived",
+          "source": "synthetic fixture: made-up centroids",
+          "formula": "RA/Dec = the measured centroid (x, y) through the frame WCS (A17.2); here a linear tangent-plane map"
+        },
+        "photometry": {
+          "tag": "measured",
+          "source": "synthetic fixture: made-up x, y, flux, error, S/N, flags"
+        },
+        "wavelength": {
+          "tag": "measured",
+          "source": "synthetic fixture: made-up wavelengths"
+        },
+        "label": {
+          "tag": "derived",
+          "source": "synthetic fixture: labels set by the fixture generator",
+          "formula": "glitch, fixed and star rules of A17.3 with the thresholds in method.settings"
+        }
+      }
+    }
+  },
+  {
+    "name": "area track called a discovery",
+    "schema": "area-tracks",
+    "expect": {
+      "path": "/tracks/0/verdict",
+      "keyword": "enum"
+    },
+    "instance": {
+      "tracks": [
+        {
+          "track_id": "T2",
+          "visits": [
+            1,
+            2
+          ],
+          "tracklets": [
+            {
+              "visit": 1,
+              "dot_ids": [
+                "fixture-area-main-v1e1-D1:9",
+                "fixture-area-main-v1e1-D4:10",
+                "fixture-area-main-v1e2-D1:9",
+                "fixture-area-main-v1e2-D4:9",
+                "fixture-area-main-v1e3-D1:9",
+                "fixture-area-main-v1e3-D4:11",
+                "fixture-area-main-v1e4-D1:9",
+                "fixture-area-main-v1e4-D4:9"
+              ],
+              "v_in_deg_day": 0.3024,
+              "pa_in_deg": 101.96,
+              "rms_px": 0.12
+            },
+            {
+              "visit": 2,
+              "dot_ids": [
+                "fixture-area-main-v2e1-D1:7",
+                "fixture-area-main-v2e1-D4:8",
+                "fixture-area-main-v2e2-D1:7",
+                "fixture-area-main-v2e2-D4:7",
+                "fixture-area-main-v2e3-D1:7",
+                "fixture-area-main-v2e3-D4:7",
+                "fixture-area-main-v2e4-D1:7",
+                "fixture-area-main-v2e4-D4:8"
+              ],
+              "v_in_deg_day": 0.3024,
+              "pa_in_deg": 101.96,
+              "rms_px": 0.12
+            }
+          ],
+          "rate_deg_day": 0.3117,
+          "pa_deg": 99.46,
+          "u_inv_au": 0.62,
+          "status": "track",
+          "reason": null,
+          "verdict": "discovery",
+          "match": null,
+          "linker": "pairs",
+          "unchecked_by": [],
+          "sed": {
+            "label": "rough",
+            "chi2_red": 7.8,
+            "n_dots": 16,
+            "sigma_floor": 0.15
+          }
+        }
+      ],
+      "skybot": [
+        {
+          "visit": 1,
+          "fetched_at": "2026-11-10T11:57:00.000Z"
+        },
+        {
+          "visit": 2,
+          "fetched_at": "2026-11-10T11:57:30.000Z"
+        }
+      ],
+      "cached_at": "2026-11-10T12:00:00.000Z",
+      "computed_at": "2026-11-10T12:00:00.000Z",
+      "missing": [],
+      "provenance": {
+        "tracks": {
+          "tag": "derived",
+          "source": "synthetic fixture: made-up tracks",
+          "formula": "tracklets and visit pairs of A17.4 (A17.12 for rate_grid) with the thresholds in method.settings"
+        },
+        "match": {
+          "tag": "model_dependent",
+          "source": "synthetic fixture: made-up known objects",
+          "assumption": "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of fetched_at, seen from SPHEREx (500@-163182)"
+        },
+        "sed": {
+          "tag": "derived",
+          "source": "synthetic fixture: made-up scores",
+          "formula": "weighted degree-2 fit of ln F against ln wavelength, chi2_red against sed_chi2_max (A17.13)"
+        }
+      }
+    }
+  },
+  {
+    "name": "area checks with a single catch rate",
+    "schema": "area-checks",
+    "expect": {
+      "path": "/completeness",
+      "keyword": "additionalProperties",
+      "detail": "catch_rate"
+    },
+    "instance": {
+      "completeness": {
+        "snr_bins": [
+          {
+            "min": 5.0,
+            "max": null
+          }
+        ],
+        "rate_bins": [
+          {
+            "min": 0.02,
+            "max": null
+          }
+        ],
+        "cells": [
+          {
+            "snr_bin": 0,
+            "rate_bin": 0,
+            "n": 50,
+            "k": 25,
+            "frac": 0.5,
+            "wilson95": [
+              0.3664,
+              0.6336
+            ]
+          }
+        ],
+        "catch_rate": 0.5
+      },
+      "method": {
+        "settings": {
+          "k_detect": 5.0
+        }
+      },
+      "cached_at": "2026-11-10T12:00:00.000Z",
+      "computed_at": "2026-11-10T12:00:00.000Z",
+      "missing": [],
+      "provenance": {}
+    }
+  },
+  {
+    "name": "area provenance tagged artistic",
+    "schema": "area-tracks",
+    "expect": {
+      "path": "/provenance/sed/tag",
+      "keyword": "enum"
+    },
+    "instance": {
+      "tracks": [],
+      "skybot": [
+        {
+          "visit": 1,
+          "fetched_at": "2026-11-10T11:57:00.000Z"
+        },
+        {
+          "visit": 2,
+          "fetched_at": "2026-11-10T11:57:30.000Z"
+        }
+      ],
+      "cached_at": "2026-11-10T12:00:00.000Z",
+      "computed_at": "2026-11-10T12:00:00.000Z",
+      "missing": [],
+      "provenance": {
+        "tracks": {
+          "tag": "derived",
+          "source": "synthetic fixture: made-up tracks",
+          "formula": "tracklets and visit pairs of A17.4 (A17.12 for rate_grid) with the thresholds in method.settings"
+        },
+        "match": {
+          "tag": "model_dependent",
+          "source": "synthetic fixture: made-up known objects",
+          "assumption": "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of fetched_at, seen from SPHEREx (500@-163182)"
+        },
+        "sed": {
+          "tag": "artistic",
+          "source": "synthetic fixture: not a real value"
+        }
+      }
+    }
   }
 ]
