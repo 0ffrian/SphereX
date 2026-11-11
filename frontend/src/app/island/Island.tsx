@@ -47,7 +47,8 @@ export function Island() {
 
   // Only a panel that opens after the island thought is travelled to; one opened from the rail
   // with nothing loading just shows, and the island stays at the top.
-  const inPanel = panelBox !== null && travels;
+  const areaMiniOn = useAreaStore((s) => s.minimised);
+  const inPanel = panelBox !== null && travels && !areaMiniOn;
   const thinking = panelBox === null && isThinking(sky.status);
   // While the sky view moves, the island shows "Updating" for a moment (a cue only; nothing loads).
   const [moving, setMoving] = useState(false);
@@ -74,17 +75,20 @@ export function Island() {
     if (areaMini !== null) miniRef.current?.focus({ preventScroll: true });
   }, [areaMini]);
   const areaOn = areaSay !== null || areaMini !== null;
-  // While an area card is open the island steps aside (it would sit over the card's corner).
-  const areaCardOpen = useShellStore((s) => s.tool === 'area') && !areaOn;
-  const updating = !thinking && !areaOn && !areaCardOpen && moving && panelBox === null;
+  const updating = !thinking && !areaOn && moving && panelBox === null;
+  // The island travels into the area card once an area is set (after its Searching / found state),
+  // exactly as it does into the object panel; drawing an area is not a trip.
+  const areaTool = useShellStore((s) => s.tool === 'area');
+  const areaStaged = useAreaStore((s) => s.stage === 'set');
+  const areaSet = areaTool && areaStaged;
   const pillOn = thinking || updating || areaOn;
   const panelTool = useShellStore((s) => s.tool === 'flipbook' || s.tool === 'spectrum');
   useEffect(() => {
     // Thinking starts a trip. It ends when the panel is closed, or when the search ended with no
     // panel to go to (a right-click card): a later panel from the rail has nothing to travel for.
-    if (thinking) setTravels(true);
+    if (thinking || areaSet) setTravels(true);
     else if (!panelTool) setTravels(false);
-  }, [thinking, panelTool, setTravels]);
+  }, [thinking, areaSet, panelTool, setTravels]);
   // While it thinks there is no panel to take an Escape, so the island takes it and leaves the tool
   // (a key that was already handled, such as Escape in the search field, is left alone).
   useEffect(() => {
@@ -163,7 +167,7 @@ export function Island() {
   }, [inPanel, arrived, reduced, setArrived]);
 
   let box: { left: number; top: number; width: number; height: number; radius: number };
-  if (panelBox) box = { ...panelBox, radius: 10 };
+  if (panelBox && !areaMiniOn) box = { ...panelBox, radius: 10 };
   else if (corner && pillOn)
     box = {
       left: bezelW - pill.w - 16,
@@ -213,7 +217,6 @@ export function Island() {
         width: box.width,
         height: box.height,
         visibility: bezelW > 0 ? undefined : 'hidden',
-        opacity: areaCardOpen && !pillOn ? 0 : undefined,
       }}
     >
       <div className="sx-orb-glow" aria-hidden="true" data-on={mode !== 'panel' ? '' : undefined} />

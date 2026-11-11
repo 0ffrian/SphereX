@@ -1,9 +1,9 @@
-// State of the square tools (Known objects and Discovery, the dock's two buttons): the square drawn
-// on the sky, which flow started it and where that flow is. The square is kept in sky coordinates
+// State of the area tools (Known objects and Discovery, the dock's two buttons): the rectangle drawn
+// on the sky (any aspect), which flow started it and where that flow is. It is kept in sky coordinates
 // (two opposite corners), so it stays on the same patch of sky while the view moves.
 //
 // The area search backend is not built (Q-205 pending): the results come from app/area/areaService.ts,
-// a dummy that is marked `demo: true`. Nothing here is a real search of the square.
+// a dummy that is marked `demo: true`. Nothing here is a real search of the area.
 import { create } from 'zustand';
 import {
   discoverIn,
@@ -24,10 +24,11 @@ export interface AreaBox {
   /** Top-left and bottom-right corners when drawn. */
   a: SkyCorner;
   b: SkyCorner;
-  /** Angular width of the square in degrees, from the sky view's own projection. */
+  /** Angular width and height of the rectangle in degrees, from the sky view's own projection. */
   widthDeg: number;
+  heightDeg: number;
 }
-/** The square being dragged, in sky-pane pixels. */
+/** The rectangle being dragged, in sky-pane pixels. */
 export interface AreaDrag {
   x0: number;
   y0: number;
@@ -54,10 +55,10 @@ export interface AreaSay {
 export interface AreaState {
   /** Which dock tool started this (the dock highlight follows it). */
   flow: AreaFlow;
-  /** drawing: waiting for a drag; set: a square exists. */
+  /** drawing: waiting for a drag; set: an area exists. */
   stage: 'drawing' | 'set';
   box: AreaBox | null;
-  /** The last square, kept for "Keep the last square" after redrawing or reopening. */
+  /** The last area, kept for "Keep the last area" after redrawing or reopening. */
   last: AreaBox | null;
   drag: AreaDrag | null;
   screen: AreaScreen;
@@ -80,12 +81,12 @@ export interface AreaState {
   /** Detector 0..5 filter, null for all. */
   det: number | null;
   ov: ErosOverlays;
-  /** Bumped when the sky should fly to fit the whole square (and on a refit). */
+  /** Bumped when the sky should fly to fit the whole area (and on a refit). */
   fitSeq: number;
   /** Dock: start a flow (also from another flow): drawing mode, nothing searched yet. */
   startFlow(flow: AreaFlow): void;
   setDrag(drag: AreaDrag | null): void;
-  /** The square is set: Known starts the island's search, Discovery opens its steps. */
+  /** The area is set: Known starts the island's search, Discovery opens its steps. */
   setBox(box: AreaBox): void;
   redraw(): void;
   openList(): void;
@@ -97,7 +98,7 @@ export interface AreaState {
   setPlaying(on: boolean): void;
   setDet(det: number | null): void;
   toggleOv(k: keyof ErosOverlays): void;
-  /** Leaving the tool: back to the start, keeping the last square. */
+  /** Leaving the tool: back to the start, keeping the last area. */
   reset(): void;
 }
 
@@ -164,7 +165,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
   const runKnown = (box: AreaBox) => {
     clearTimers();
     const mine = token;
-    set({ ...FRESH, stage: 'set', box, last: box, screen: 'search', say: { kind: 'searching', text: 'Known objects in this square' } });
+    set({ ...FRESH, stage: 'set', box, last: box, screen: 'search', say: { kind: 'searching', text: 'Known objects in this area' } });
     const answer = knownObjectsIn(box);
     timers.push(
       setTimeout(() => {
@@ -175,7 +176,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
           set({
             say: {
               kind: 'found',
-              text: n === 0 ? 'No known objects in this square' : `${n} known object${n === 1 ? '' : 's'}: ${names}`,
+              text: n === 0 ? 'No known objects in this area' : `${n} known object${n === 1 ? '' : 's'}: ${names}`,
             },
           });
           timers.push(
@@ -280,10 +281,22 @@ export function demoPlayerOn(s: Pick<AreaState, 'screen' | 'sel' | 'eros'>): boo
   return s.eros !== null && (s.screen === 'eros' || (s.screen === 'mover' && s.sel === 0));
 }
 
-/** "3.2°" or "42′" (arcminutes under one degree). */
-export function formatAreaSize(widthDeg: number): string {
-  if (widthDeg >= 1) return `${widthDeg.toFixed(widthDeg >= 10 ? 0 : 1)}°`;
-  const arcmin = widthDeg * 60;
+/** One length: "3.2°", "42′" (arcminutes under one degree) or "30″". */
+export function formatAreaSize(deg: number): string {
+  if (deg >= 1) return `${deg.toFixed(deg >= 10 ? 0 : 1)}°`;
+  const arcmin = deg * 60;
   if (arcmin >= 1) return `${arcmin.toFixed(arcmin >= 10 ? 0 : 1)}′`;
   return `${(arcmin * 60).toFixed(0)}″`;
+}
+
+/** "1.27° × 0.77°", or "42′ × 18′" once the larger side is under one degree. */
+export function formatAreaDims(box: Pick<AreaBox, 'widthDeg' | 'heightDeg'>): string {
+  const big = Math.max(box.widthDeg, box.heightDeg);
+  const one = (d: number): string => {
+    if (big >= 1) return `${d.toFixed(big >= 10 ? 1 : 2)}°`;
+    const m = d * 60;
+    if (big * 60 >= 1) return `${m.toFixed(big * 60 >= 10 ? 0 : 1)}′`;
+    return `${(m * 60).toFixed(0)}″`;
+  };
+  return `${one(box.widthDeg)} × ${one(box.heightDeg)}`;
 }

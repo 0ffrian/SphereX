@@ -4793,3 +4793,16 @@ body {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* Discovery steps: the current step's smoothui loader (19 px) in an 18 px slot; pending = muted ring. */
+.sx-ar-steps li[data-state='now'] i {
+  width: 19px;
+  height: 19px;
+  margin-left: -0.5px;
+  background: none;
+}
+.sx-ar-wait {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

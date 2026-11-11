@@ -29,7 +29,7 @@ export function registerAreaView(
   setFlyCancel = flyCancel ?? null;
 }
 
-/** The square with the given pixel corners, as a sky box and its angular width. */
+/** The rectangle with the given pixel corners, as a sky box and its angular width and height. */
 export function boxFromPixels(d: AreaDrag): AreaBox | null {
   if (!access) return null;
   const cam = access.getView();
@@ -39,31 +39,31 @@ export function boxFromPixels(d: AreaDrag): AreaBox | null {
   const ym = (d.y0 + d.y1) / 2;
   const l = screenToRaDec(cam, d.x0, ym, width, height, { ra: 0, dec: 0 });
   const r = screenToRaDec(cam, d.x1, ym, width, height, { ra: 0, dec: 0 });
+  const xm = (d.x0 + d.x1) / 2;
+  const t = screenToRaDec(cam, xm, d.y0, width, height, { ra: 0, dec: 0 });
+  const u = screenToRaDec(cam, xm, d.y1, width, height, { ra: 0, dec: 0 });
   const widthDeg = separationDeg(l.ra, l.dec, r.ra, r.dec);
-  if (!(widthDeg > 0)) return null;
-  return { a: { ra: a.ra, dec: a.dec }, b: { ra: b.ra, dec: b.dec }, widthDeg };
+  const heightDeg = separationDeg(t.ra, t.dec, u.ra, u.dec);
+  if (!(widthDeg > 0) || !(heightDeg > 0)) return null;
+  return { a: { ra: a.ra, dec: a.dec }, b: { ra: b.ra, dec: b.dec }, widthDeg, heightDeg };
 }
 
-/** A drag turned into a square: the side is the longer of the two sides, in the drag's direction. */
-export function squareOf(x0: number, y0: number, x1: number, y1: number): AreaDrag {
-  const side = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
-  return { x0, y0, x1: x0 + (x1 >= x0 ? side : -side), y1: y0 + (y1 >= y0 ? side : -side) };
+/** A drag turned into a free rectangle: from where it started to the pointer, any aspect. */
+export function rectOf(x0: number, y0: number, x1: number, y1: number): AreaDrag {
+  return { x0, y0, x1, y1 };
 }
 
-/** "Use a square in the middle": about a third of the shorter side, centred in the view. */
-export function centreSquare(): AreaBox | null {
+/** The Enter shortcut: a wide default box (about half by a third of the shorter side's span), centred. */
+export function centreRect(): AreaBox | null {
   if (!access) return null;
   const { width, height } = access.getSize();
-  const half = Math.min(width, height) * 0.17;
-  return boxFromPixels({
-    x0: width / 2 - half,
-    y0: height / 2 - half,
-    x1: width / 2 + half,
-    y1: height / 2 + half,
-  });
+  const m = Math.min(width, height);
+  const hw = m * 0.3;
+  const hh = m * 0.18;
+  return boxFromPixels({ x0: width / 2 - hw, y0: height / 2 - hh, x1: width / 2 + hw, y1: height / 2 + hh });
 }
 
-/** The set square's screen corners now (it follows the view), or null when a corner is behind. */
+/** The set area's screen corners now (it follows the view), or null when a corner is behind. */
 export function boxToPixels(box: AreaBox): AreaDrag | null {
   if (!access) return null;
   const cam = access.getView();
@@ -74,7 +74,7 @@ export function boxToPixels(box: AreaBox): AreaDrag | null {
   return { x0: a.x, y0: a.y, x1: b.x, y1: b.y };
 }
 
-/** The free rectangle of the sky pane in its own pixels, where the whole square should sit. */
+/** The free rectangle of the sky pane in its own pixels, where the whole area should sit. */
 export interface SafeRect {
   l: number;
   t: number;
@@ -85,7 +85,7 @@ export interface SafeRect {
 const MARGIN = 20;
 
 /**
- * Free area for the square: below the top-left player, above the dock and the zoom card, left of the
+ * Free area for the rectangle: below the top-left player, above the dock and the zoom card, left of the
  * card (mock-up `knSafe`), with a 20 px margin. Read from the DOM, so it follows the layout.
  */
 export function safeRect(): SafeRect | null {
@@ -105,14 +105,14 @@ export function safeRect(): SafeRect | null {
   const dock = rect('.sx-dock');
   const zoom = rect('.sx-zoom-slot > *');
   const card = rect('.sx-panel');
-  // 12 more at the top for the size label over the square.
+  // 12 more at the top for the size label over the rectangle.
   const top = (player ? player.b : 0) + MARGIN + 12;
   const bottom = Math.min(dock ? dock.t : height, zoom ? zoom.t : height, height) - MARGIN;
   const right = (card ? card.l : width - 408 - 16) - MARGIN;
   return { l: MARGIN, t: top, r: right, b: bottom };
 }
 
-/** The camera that puts the WHOLE square in the safe rectangle, centred, by its limiting side. */
+/** The camera that puts the WHOLE rectangle in the safe rectangle, centred, by its limiting dimension. */
 export function fitCamera(box: AreaBox, safe: SafeRect): SkyCamera | null {
   if (!access) return null;
   const { width, height } = access.getSize();
@@ -120,11 +120,11 @@ export function fitCamera(box: AreaBox, safe: SafeRect): SkyCamera | null {
   const ah = Math.max(80, safe.b - safe.t);
   const sx = safe.l + aw / 2;
   const sy = safe.t + ah / 2;
-  // Square centre and sides in degrees (the box corners are opposite corners).
+  // Rectangle centre and sides in degrees (the box corners are opposite corners).
   const ra = wrapRa(box.a.ra + deltaRa(box.b.ra, box.a.ra) / 2);
   const dec = (box.a.dec + box.b.dec) / 2;
   const wDeg = box.widthDeg;
-  const hDeg = Math.abs(box.b.dec - box.a.dec) || wDeg;
+  const hDeg = box.heightDeg;
   // Pixels per degree at a field of view: (height / 2) / tan(fov / 2), per radian, small angles.
   const side = Math.min(aw / wDeg, ah / hDeg); // wanted pixels per degree
   const tanHalf = height / 2 / (side * (180 / Math.PI));
@@ -134,7 +134,7 @@ export function fitCamera(box: AreaBox, safe: SafeRect): SkyCamera | null {
     fovDeg: clampFov((2 * Math.atan(tanHalf) * 180) / Math.PI),
   };
   // Put the square's centre on the safe rectangle's centre (look past it by the offset), then
-  // correct the field of view from the square's real projected size; repeat a few times.
+  // correct the field of view from the rectangle's real projected size; repeat a few times.
   for (let i = 0; i < 8; i++) {
     const a = raDecToScreen(cam, box.a.ra, box.a.dec, width, height);
     const b = raDecToScreen(cam, box.b.ra, box.b.dec, width, height);
