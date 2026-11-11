@@ -529,6 +529,9 @@ export function WorldGlobeStage({ world, onFail }: { world: CardToWorldOk; onFai
   );
 }
 
+// Moon (11 Nov 2026): no on-render control bars. Height follows scroll, pinch and the zoom bar; the
+// layer list lives in Details. Kept behind this flag so the controls can come back.
+const SHOW_FLY_BAR = false as boolean;
 /** The prototype's surface (fly) view with its altitude slider and Fly forward, in the left pane. */
 export function WorldFlyStage({
   world,
@@ -653,7 +656,7 @@ export function WorldFlyStage({
     <div className="absolute inset-0 z-[1] overflow-hidden bg-black" data-testid="world-engine-fly" data-failed={failed ? '1' : '0'}>
       <div ref={hostRef} className="absolute inset-0" />
       {forming && <Forming gas={gas} />}
-      {engine && entered && (
+      {SHOW_FLY_BAR && engine && entered && (
         <div className="sx-cu-controls" role="group" aria-label="Surface view controls" style={{ zIndex: 3 }}>
           <label htmlFor="world-alt" className="flex-1 basis-40">
             {gas ? 'Height above the clouds' : 'Height above the ground'}:{' '}
@@ -692,7 +695,7 @@ export function WorldFlyStage({
           </button>
         </div>
       )}
-      {engine && about && (
+      {SHOW_FLY_BAR && engine && about && (
         <div
           className="absolute inset-x-4 bottom-36 z-[3] max-h-[45%] overflow-auto rounded-lg border border-[#323a3e] bg-[#242729f2] p-3 text-xs text-neutral-200"
           data-testid="world-layers"
