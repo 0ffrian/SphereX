@@ -181,14 +181,18 @@ def test_spread_keeps_first_and_last_and_is_even() -> None:
 
 
 def test_uncached_ephemeris_offline_is_refused(fixture_cache: Path) -> None:
-    svc, obj = eros_obj(fixture_cache, moving_window_end="2026-03-22T00:00:00Z")
+    # Eros's own `moving_windows` (targets.toml, Q-184) replace the settings window, so the
+    # uncached 20-22 Mar window is given the same way.
+    f = _eros_windows(fixture_cache.parent, (FIXTURE_WINDOW[0], "2026-03-22T00:00:00Z"))
+    svc, obj = eros_obj(fixture_cache, targets_file=f)
     result = svc.get_frames(obj)
     assert result.frames == [] and result.missing == ["frames:ephemeris"]
     assert not is_complete(result.missing)
 
 
 def test_empty_window_and_missing_spkid_are_refused(fixture_cache: Path) -> None:
-    svc, obj = eros_obj(fixture_cache, moving_window_end=FIXTURE_MOVING["moving_window_start"])
+    f = _eros_windows(fixture_cache.parent, (FIXTURE_WINDOW[0], FIXTURE_WINDOW[0]))
+    svc, obj = eros_obj(fixture_cache, targets_file=f)
     assert svc.get_frames(obj).missing == ["frames:moving_window"]
     ctx = make_context(make_settings(fixture_cache))
     no_spk = ResolvedObject("sbdb-x", None, 1.0, 2.0, True, "sbdb")
@@ -245,8 +249,9 @@ def test_web_request_with_nothing_cached_defers_the_ephemeris(fixture_cache: Pat
     def handler(request: httpx.Request) -> httpx.Response:
         raise AssertionError(f"no live call expected: {request.url}")
 
-    _, obj = eros_obj(fixture_cache, moving_window_end="2026-03-22T00:00:00Z")
-    svc = FrameService(_online(fixture_cache, handler, moving_window_end="2026-03-22T00:00:00Z"))
+    f = _eros_windows(fixture_cache.parent, (FIXTURE_WINDOW[0], "2026-03-22T00:00:00Z"))
+    _, obj = eros_obj(fixture_cache, targets_file=f)
+    svc = FrameService(_online(fixture_cache, handler, targets_file=f))
     started: list[str] = []
     svc.on_request = lambda o: started.append(o.id)
     result = svc.get_frames(obj)
@@ -356,6 +361,20 @@ def test_repo_targets_give_3i_atlas_its_windows() -> None:
     assert len(cfg.windows) == 2
     assert cfg.windows[0][0] <= datetime(2025, 8, 1, tzinfo=UTC)
     assert cfg.windows[1][1] >= datetime(2025, 12, 16, tzinfo=UTC)
+
+
+FIXTURE_WINDOW_FIELDS = ("moving_window_start", "moving_window_end")
+
+
+def test_repo_targets_give_eros_the_demo_window() -> None:
+    """Q-184 (amended, #73): the 16 demo frames' window, matched by SBDB's spkid for Eros."""
+    # The production release window, so only targets.toml can give the 20-21 Mar window.
+    release = {k: Settings.model_fields[k].default for k in FIXTURE_WINDOW_FIELDS}
+    ctx = make_context(make_settings(Path("unused"), targets_file=TARGETS_FILE, **release))
+    cfg = moving.MovingConfig.from_context(ctx, "20000433")
+    assert cfg.windows == (
+        (datetime(2026, 3, 20, tzinfo=UTC), datetime(2026, 3, 21, 12, tzinfo=UTC)),
+    )
 
 
 def _eros_windows(tmp_path: Path, *windows: tuple[str, str]) -> Path:
