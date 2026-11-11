@@ -8,8 +8,9 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { Tag } from '@/contract';
 import { useAppStore } from '@/state/store';
-import { nudge } from '@/engine/stars/starPick';
+import { nudge, projectSurface, globeRot, GLOBE_HALF, GLOBE_TILT } from '@/engine/stars/starPick';
 import { placeText, useStarTarget } from './starTargetStore';
+import { useStarChart } from './starChartStore';
 import { useBuildControls, type BuildControl, type BuildControlsSpec } from './build/BuildControls';
 import { cardToStar, type StarFromCard } from '@/engine/stars/cardToStar';
 import {
@@ -253,16 +254,56 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
   }
   useBuildControls('star-surface', spec);
 
-  // Click a place: the left close-up moves there (the planets' globePick). Limb and space do nothing.
-  const down = useRef<{ x: number; y: number } | null>(null);
+  // Drag turns the star (yaw, by the engine's own clock `ST.time`, which sets its rotation: rot = 0.55 + time * 0.012).
+  // A click (moved under 5 px) picks the place under the pointer; the left close-up moves there (the planets' globePick).
+  const down = useRef<{ x: number; y: number; time: number; moved: boolean } | null>(null);
+  const marker = useRef<HTMLSpanElement>(null);
+  const clock = (): { time: number } | null => {
+    const st = (engine?.state as { ST?: { time: number } } | undefined)?.ST;
+    return st && typeof st.time === 'number' ? st : null;
+  };
+  const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = down.current;
+    const st = clock();
+    if (!d || !engine || !st || engine.scale === 'close') return;
+    if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) <= 5) return;
+    d.moved = true;
+    const b = e.currentTarget.getBoundingClientRect();
+    const discPx = b.height / (2 * GLOBE_HALF); // pixels per star radius
+    // Dragging right brings the surface to the right: the facing longitude (rot) goes down.
+    st.time = d.time - ((e.clientX - d.x) / discPx) / 0.012;
+    engine.draw();
+  };
   const onUp = (e: React.PointerEvent<HTMLDivElement>) => {
     const d = down.current;
     down.current = null;
-    if (!d || !engine || engine.scale === 'close' || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5) return;
+    if (!d || d.moved || !engine || engine.scale === 'close') return;
     const b = e.currentTarget.getBoundingClientRect();
     const p = engine.pick((e.clientX - b.left) / b.width, (e.clientY - b.top) / b.height);
     if (p) useStarTarget.getState().pick(p);
   };
+  // The marker for the picked place follows the star's turn; it hides on the far side.
+  const picked = useStarTarget((s) => s.target);
+  useEffect(() => {
+    const el = marker.current;
+    if (!el || !engine) return;
+    let raf = 0;
+    const place = () => {
+      const st = clock();
+      const c = engine.layers[0];
+      if (picked && st && c && c.clientHeight && engine.scale !== 'close') {
+        const q = projectSurface(picked, globeRot(st.time), GLOBE_TILT);
+        const aspect = c.clientWidth / c.clientHeight;
+        el.style.display = q.visible ? 'block' : 'none';
+        el.style.left = `${((q.x / (aspect * GLOBE_HALF) + 1) / 2) * 100}%`;
+        el.style.top = `${((1 - q.y / GLOBE_HALF) / 2) * 100}%`;
+      } else el.style.display = 'none';
+      raf = requestAnimationFrame(place);
+    };
+    raf = requestAnimationFrame(place);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, picked]);
   const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!engine) return;
     const step = (5 * Math.PI) / 180;
@@ -281,28 +322,36 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
 
   return (
     <div
-      ref={hostRef}
       className="absolute inset-0 bg-black"
+      style={{ touchAction: 'none', cursor: 'grab' }}
       tabIndex={0}
       role="application"
-      aria-label="Star globe. Click a place, or press the arrow keys, to look at that place in the close-up on the left."
+      aria-label="Star globe. Drag to turn the star. Click a place, or press the arrow keys, to look at that place in the close-up on the left."
       onPointerDown={(e) => {
-        down.current = { x: e.clientX, y: e.clientY };
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        down.current = { x: e.clientX, y: e.clientY, time: clock()?.time ?? 0, moved: false };
       }}
+      onPointerMove={onMove}
       onPointerUp={onUp}
+      onPointerCancel={() => {
+        down.current = null;
+      }}
       onKeyDown={onKey}
       data-testid="star-engine-globe"
       data-star={star.preset.label}
       data-preset={JSON.stringify(star.preset)}
-    />
+    >
+      <div ref={hostRef} className="absolute inset-0" />
+      <span
+        ref={marker}
+        aria-hidden="true"
+        data-testid="star-pick-marker"
+        className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.6)]"
+        style={{ display: 'none' }}
+      />
+    </div>
   );
 }
-
-// The chart of the prototype (its CH box and viewBox), drawn as SVG.
-const CH = { x0: 44, x1: 512, y0: 124, y1: 12 };
-const cx = (t: number) => CH.x0 + (CH.x1 - CH.x0) * t;
-const cy = (v: number) => CH.y0 + (CH.y1 - CH.y0) * v;
-const path = (a: number[]) => a.map((v, i) => `${i ? 'L' : 'M'}${cx(i / 240).toFixed(1)} ${cy(v).toFixed(1)}`).join('');
 
 /** The prototype's flare close-up with its light-curve chart, in the left pane. */
 export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: () => void }) {
@@ -391,67 +440,27 @@ export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: 
   }
   useBuildControls('star-flare', spec);
 
-  const scrub = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (!engine) return;
-    const b = e.currentTarget.getBoundingClientRect();
-    const px = ((e.clientX - b.left) / b.width) * 524;
-    engine.setFlareTime((px - CH.x0) / (CH.x1 - CH.x0));
-    bump();
-  };
+  // The light curve goes to the Details pane (StarEngineDetails), not over the picture.
+  const flareT = flare?.t;
+  useEffect(() => {
+    if (!engine || !chart || flareT === undefined) return;
+    useStarChart.getState().set({
+      soft: chart.soft,
+      hard: chart.hard,
+      t: flareT,
+      setTime: (t) => {
+        engine.setFlareTime(t);
+        bump();
+      },
+    });
+    // `chart` is a new object each read; the curves change only with the flare kind and class.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, flareT, flare?.kind, flare?.cls]);
+  useEffect(() => () => useStarChart.getState().set(null), []);
 
   return (
     <div className="absolute inset-0 bg-black" data-testid="star-engine-flare">
       <div ref={hostRef} className="absolute inset-0" />
-      {flare && (
-        <span className="pointer-events-none absolute left-4 top-12 max-w-[calc(100%-2rem)] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300" data-testid="flare-tag">
-          {flare.tag}
-        </span>
-      )}
-      {chart && flare && (
-        <div className="absolute inset-x-3 bottom-[8.75rem] z-[2] rounded-lg border border-neutral-700 bg-neutral-900/85 p-2" data-testid="flare-chart">
-          <div className="mb-1 flex flex-wrap items-center gap-3 text-xs text-neutral-300">
-            <span>Flare brightness over 60 minutes</span>
-            <span className="text-[#c98a08]">Soft X-rays (hot loops)</span>
-            <span className="text-[#2f9bd4]">Hard X-rays (fast electrons)</span>
-          </div>
-          <svg
-            viewBox="0 0 524 164"
-            role="img"
-            aria-label="Example flare light curve. Hard X-rays peak in short bursts during the rise of the soft X-rays, which then fade slowly. Tap or drag to move the time."
-            className="block max-h-24 w-full touch-none"
-            onPointerDown={(e) => {
-              e.currentTarget.setPointerCapture(e.pointerId);
-              scrub(e);
-            }}
-            onPointerMove={(e) => e.buttons && scrub(e)}
-          >
-            <title>Example flare brightness over 60 minutes</title>
-            {[0, 0.5, 1].map((v) => (
-              <g key={v}>
-                <line x1={CH.x0} x2={CH.x1} y1={cy(v)} y2={cy(v)} stroke="#2a2a30" />
-                <text x={CH.x0 - 8} y={cy(v) + 4} textAnchor="end" fill="#a1a1aa" fontSize="11" fontFamily="monospace">
-                  {v}
-                </text>
-              </g>
-            ))}
-            {[0, 15, 30, 45, 60].map((m) => (
-              <text key={m} x={cx(m / 60)} y={CH.y0 + 18} textAnchor="middle" fill="#a1a1aa" fontSize="11" fontFamily="monospace">
-                {m}
-              </text>
-            ))}
-            <text x={CH.x1} y={CH.y0 + 34} textAnchor="end" fill="#a1a1aa" fontSize="11">
-              minutes
-            </text>
-            <path d={path(chart.hard)} fill="none" stroke="#2f9bd4" strokeWidth="2" strokeLinejoin="round" />
-            <path d={path(chart.soft)} fill="none" stroke="#c98a08" strokeWidth="2" strokeLinejoin="round" />
-            <line x1={cx(flare.t)} x2={cx(flare.t)} y1={CH.y1} y2={CH.y0} stroke="#fafafa" strokeWidth="1.5" />
-            <circle cx={cx(flare.t)} cy={cy(chart.soft[Math.round(flare.t * 240)] ?? 0)} r="4.5" fill="#c98a08" stroke="#111114" strokeWidth="2" />
-          </svg>
-          <p className="mt-1 text-xs text-neutral-400">
-            Example curve. Hard X-rays follow the rate of change of soft X-rays (the Neupert effect).
-          </p>
-        </div>
-      )}
     </div>
   );
 }

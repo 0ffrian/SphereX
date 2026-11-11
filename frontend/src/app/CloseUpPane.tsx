@@ -18,17 +18,11 @@ import { buttonClass, pressedClass } from './ui';
 import { StarCloseUp } from './StarCloseUp';
 import { RockCloseUp } from './RockCloseUp';
 import { StarFlareStage, StarSurfaceCloseUp } from './StarEngineStage';
-import { placeText, useStarTarget } from './starTargetStore';
 import { STAR_CLOSEUP_TAG, useStarCloseUp } from './starCloseUp';
-import { WorldFlyStage, worldCaption } from './WorldEngineStage';
+import { WorldFlyStage } from './WorldEngineStage';
 import { engineKey, useWorldStore } from './worldStore';
-import { FLY_NOTE } from './worldNotes.generated';
 import { useAppStore } from '@/state/store';
 import { useRockStore } from './rockStore';
-
-/** The mock-up's cuTag for the flare close-up, true to the prototype: a Sun-like flare, not this star's own. */
-const ENGINE_CAPTION =
-  'Close-up · a flare at the edge of a Sun-like star, hydrogen-alpha with hot loops · illustrative (Default), not a measurement of this star';
 
 export type CloseUpKind = 'orbit' | 'star' | 'body';
 
@@ -83,7 +77,6 @@ export function CloseUpPane() {
   // A failure belongs to the card and preset it happened on: the next object is tried afresh.
   const cardId = useAppStore((s) => s.card?.id);
   const left = useStarTarget((s) => s.left);
-  const starTarget = useStarTarget((s) => s.target);
   const kind = closeUpKindOf(type);
   // Issue #71 stream X (D-37): a star the prototype's engine draws opens with the build, with the flare close-up.
   const engine = kind === 'star' && engineStar && starFailedId !== engineKey(cardId, engineStar.preset.id) ? engineStar : null;
@@ -165,13 +158,6 @@ export function CloseUpPane() {
   }, [viewer, view, open, world]);
 
   if (!kind) return null;
-  const caption = world
-    ? worldCaption(world.preset.type === 'gas')
-    : engine
-    ? left === 'surface'
-      ? `Close-up · the star\u2019s surface at ${placeText(starTarget)} · generated (Default), not a photograph`
-      : ENGINE_CAPTION
-    : closeUpCaption(kind, info, gas, starProps !== null);
   const [lo, hi] = view ? altRange(view.kind) : [0, 1];
   const alt = view?.state.altKm ?? 0;
 
@@ -246,34 +232,11 @@ export function CloseUpPane() {
       {engine && open && left === 'surface' && (
         <StarSurfaceCloseUp key={engine.preset.id} star={engine} onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))} />
       )}
-      {engine && open && (
-        <div className="absolute right-3 top-3 z-[3] flex flex-wrap items-center gap-2" role="group" aria-label="Star close-up">
-          <button type="button" className={`${buttonClass} ${pressedClass}`} aria-pressed={left === 'flare'} onClick={() => useStarTarget.getState().show('flare')}>
-            Flare close-up
-          </button>
-          <button type="button" className={`${buttonClass} ${pressedClass}`} aria-pressed={left === 'surface'} onClick={() => useStarTarget.getState().show('surface')}>
-            Surface close-up
-          </button>
-          {left === 'surface' && (
-            <button type="button" className={buttonClass} disabled={starTarget === null} onClick={() => useStarTarget.getState().home()}>
-              Back to the active region
-            </button>
-          )}
-        </div>
-      )}
       {kind === 'star' && !engine && starProps && open && (
         <div className="absolute inset-0 bg-black" data-testid="star-closeup">
           <StarCloseUp {...starProps} className="absolute inset-0" />
         </div>
       )}
-      <span className="sx-cu-tag" data-testid="closeup-caption">
-        {caption}
-        {world && open && (
-          <span className="mt-1 block text-[#c1c9cd]" data-testid="fly-note">
-            {FLY_NOTE}
-          </span>
-        )}
-      </span>
       {view && !world && (
         <div className="sx-cu-controls" role="group" aria-label="Surface view controls">
           <label htmlFor="orbit-alt" className="flex-1 basis-40">

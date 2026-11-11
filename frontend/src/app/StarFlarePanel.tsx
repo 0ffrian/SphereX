@@ -6,6 +6,8 @@ import { lightCurves, STAGES, STAGE_TEXT, stageIndex } from '@/physics/flares';
 import type { ViewerApp } from '@/viewer/ViewerApp';
 import { Row, Rows, SwitchRow, ToggleGroup } from './PanelControls';
 import { ProvenanceBadge } from './Badge';
+import { useStarTarget } from './starTargetStore';
+import { useStarChart } from './starChartStore';
 
 export function StarFlarePanel({
   viewer,
@@ -132,6 +134,97 @@ export function StarFlarePanel({
       </div>
         </Row>
       </Rows>
+    </div>
+  );
+}
+
+// The engine's flare light curve (moved here from over the close-up): soft and hard X-rays over 60
+// minutes with the time marker. Drawn from `useStarChart`, which the flare close-up publishes.
+const CH = { x0: 44, x1: 512, y0: 124, y1: 12 };
+const cx = (t: number) => CH.x0 + (CH.x1 - CH.x0) * t;
+const cy = (v: number) => CH.y0 + (CH.y1 - CH.y0) * v;
+const pathOf = (a: number[]) => a.map((v, i) => `${i ? 'L' : 'M'}${cx(i / 240).toFixed(1)} ${cy(v).toFixed(1)}`).join('');
+const SOFT = '#c98a08';
+const HARD = '#2f9bd4';
+
+/** Details for a star the engine draws: the close-up choice, and the flare chart inside "About this flare". */
+export function StarEngineDetails({ fixture, flareView = true }: { fixture?: boolean; flareView?: boolean }) {
+  const left = useStarTarget((s) => s.left);
+  const chart = useStarChart((s) => s.chart);
+  const scrub = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!chart) return;
+    const b = e.currentTarget.getBoundingClientRect();
+    const px = ((e.clientX - b.left) / b.width) * 524;
+    chart.setTime((px - CH.x0) / (CH.x1 - CH.x0));
+  };
+  return (
+    <div className="flex flex-col gap-3" data-testid="star-engine-details">
+      <ToggleGroup
+        label="Close-up"
+        value={left}
+        options={[
+          { value: 'flare', label: 'Flare' },
+          { value: 'surface', label: 'Surface' },
+        ]}
+        onChange={(v) => useStarTarget.getState().show(v)}
+        testId="star-closeup-toggle"
+      />
+      {left === 'surface' && (
+        <button type="button" className="sx-btn-outline" onClick={() => useStarTarget.getState().home()} disabled={useStarTarget.getState().target === null}>
+          Back to the active region
+        </button>
+      )}
+      {flareView && chart && (
+        <Rows>
+          <Row title="About this flare" defaultOpen>
+            <div className="flex flex-col gap-2" data-testid="flare-chart">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--muted)' }}>
+                <span>Flare brightness over 60 minutes</span>
+                <span style={{ color: SOFT }}>Soft X-rays (hot loops)</span>
+                <span style={{ color: HARD }}>Hard X-rays (fast electrons)</span>
+              </div>
+              <svg
+                viewBox="0 0 524 164"
+                role="img"
+                aria-label="Example flare light curve. Hard X-rays peak in short bursts during the rise of the soft X-rays, which then fade slowly. Tap or drag to move the time."
+                className="sx-chart block touch-none"
+                style={{ border: '1px solid var(--line)' }}
+                onPointerDown={(e) => {
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  scrub(e);
+                }}
+                onPointerMove={(e) => e.buttons && scrub(e)}
+              >
+                <title>Example flare brightness over 60 minutes</title>
+                {[0, 0.5, 1].map((v) => (
+                  <g key={v}>
+                    <line x1={CH.x0} x2={CH.x1} y1={cy(v)} y2={cy(v)} stroke="var(--line)" />
+                    <text x={CH.x0 - 8} y={cy(v) + 4} textAnchor="end" fill="var(--muted)" fontSize="11">
+                      {v}
+                    </text>
+                  </g>
+                ))}
+                {[0, 15, 30, 45, 60].map((m) => (
+                  <text key={m} x={cx(m / 60)} y={CH.y0 + 18} textAnchor="middle" fill="var(--muted)" fontSize="11">
+                    {m}
+                  </text>
+                ))}
+                <text x={CH.x1} y={CH.y0 + 34} textAnchor="end" fill="var(--muted)" fontSize="11">
+                  minutes
+                </text>
+                <path d={pathOf(chart.hard)} fill="none" stroke={HARD} strokeWidth="2" strokeLinejoin="round" />
+                <path d={pathOf(chart.soft)} fill="none" stroke={SOFT} strokeWidth="2" strokeLinejoin="round" />
+                <line x1={cx(chart.t)} x2={cx(chart.t)} y1={CH.y1} y2={CH.y0} stroke="var(--on-ac)" strokeWidth="1.5" />
+                <circle cx={cx(chart.t)} cy={cy(chart.soft[Math.round(chart.t * 240)] ?? 0)} r="4.5" fill={SOFT} stroke="var(--s2)" strokeWidth="2" />
+              </svg>
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                Example curve. Hard X-rays follow the rate of change of soft X-rays (the Neupert effect).{' '}
+                <ProvenanceBadge tag="inferred_from_analog" fixture={fixture} />
+              </p>
+            </div>
+          </Row>
+        </Rows>
+      )}
     </div>
   );
 }
