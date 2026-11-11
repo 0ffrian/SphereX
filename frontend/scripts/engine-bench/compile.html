@@ -1,0 +1,54 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Engine bench: shader compile</title>
+<!--
+  Cold compile time of one world-engine program (issue #93). Served by the Vite dev server from frontend/
+  (http://<host>/scripts/engine-bench/compile.html?fs=fly&v=cur). Run each page in a fresh browser profile
+  (run.js does) or the GPU program cache answers instead of the driver.
+  fs = fly | world | adv | gas;  v = cur (as shipped) | unrolled (constant loop bounds, as before #93 1.1)
+  base = module folder of the world engine (default /src/engine/worlds/)
+-->
+<script type="module">
+  const out = {};
+  window.__out = out;
+  try {
+    const Q = new URLSearchParams(location.search);
+    const base = Q.get('base') || '/src/engine/worlds/';
+    const S = await import(base + 'shaders.js');
+    const H = await import(base + 'helpers.js');
+    const which = { fly: S.FLY_FS, world: S.WORLD_FS, adv: S.ADV_FS, gas: S.GAS_FS }[
+      Q.get('fs') || 'fly'
+    ];
+    const v = Q.get('v') || 'cur';
+    // Undo the #93 1.1 loop-bound change: the source as the prototype wrote it.
+    const src =
+      v === 'unrolled' ? which.replace('\nuniform int uZ0;', '').replace(/\+uZ0;/g, ';') : which;
+    const gl = document.createElement('canvas').getContext('webgl2');
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    out.renderer = dbg
+      ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)
+      : gl.getParameter(gl.RENDERER);
+    out.parallelExt = !!gl.getExtension('KHR_parallel_shader_compile');
+    out.fs = Q.get('fs') || 'fly';
+    out.v = v;
+    out.loops = (src.match(/\+uZ0;/g) || []).length;
+    const t0 = performance.now();
+    const p = gl.createProgram();
+    const mk = (t, s) => {
+      const o = gl.createShader(t);
+      gl.shaderSource(o, s);
+      gl.compileShader(o);
+      gl.attachShader(p, o);
+      return o;
+    };
+    mk(gl.VERTEX_SHADER, H.FULL);
+    const f = mk(gl.FRAGMENT_SHADER, src);
+    gl.linkProgram(p);
+    const ok = gl.getProgramParameter(p, gl.LINK_STATUS);
+    out.compile_ms = +(performance.now() - t0).toFixed(0);
+    if (!ok) out.err = gl.getShaderInfoLog(f) || gl.getProgramInfoLog(p);
+  } catch (e) {
+    out.err = String(e && e.stack ? e.stack : e);
+  }
+  out.done = true;
+</script>

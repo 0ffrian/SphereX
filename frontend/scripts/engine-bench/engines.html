@@ -1,0 +1,82 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Engine bench: star and rock compile</title>
+<!--
+  Issue #93 1.9: cold compile time of the star engine (globe and close-up modes) and the rock engine. The WebGL calls
+  are wrapped so each program's time runs from its first compileShader to the return of its LINK_STATUS read (the
+  moment the main thread stops waiting). Cold cache: a fresh profile per run (run.js).
+  which = star-globe | star-closeup | rock
+-->
+<body style="margin: 0; background: #000">
+  <div id="host" style="position: relative; width: 800px; height: 500px"></div>
+  <script type="module">
+    const out = { programs: [] };
+    window.__out = out;
+    const P = WebGL2RenderingContext.prototype;
+    const sh = new WeakMap(),
+      pr = new WeakMap();
+    const wrap = (name, f) => {
+      const o = P[name];
+      P[name] = function (...a) {
+        return f.call(this, o, a);
+      };
+    };
+    wrap('shaderSource', function (o, a) {
+      sh.set(a[0], { len: a[1].length, t: 0 });
+      return o.apply(this, a);
+    });
+    wrap('compileShader', function (o, a) {
+      const s = sh.get(a[0]);
+      if (s) s.t = performance.now();
+      return o.apply(this, a);
+    });
+    wrap('attachShader', function (o, a) {
+      const r = pr.get(a[0]) || { sh: [] };
+      r.sh.push(sh.get(a[1]));
+      pr.set(a[0], r);
+      return o.apply(this, a);
+    });
+    wrap('getProgramParameter', function (o, a) {
+      const v = o.apply(this, a);
+      const r = pr.get(a[0]);
+      if (r && !r.done && a[1] === this.LINK_STATUS) {
+        r.done = true;
+        const t0 = Math.min(...r.sh.map((s) => (s && s.t) || performance.now()));
+        out.programs.push({
+          src_chars: r.sh.map((s) => (s ? s.len : 0)),
+          ms: +(performance.now() - t0).toFixed(1),
+          ok: !!v,
+        });
+      }
+      return v;
+    });
+    try {
+      const which = new URLSearchParams(location.search).get('which') || 'star-globe';
+      out.which = which;
+      const host = document.getElementById('host');
+      const t0 = performance.now();
+      if (which.startsWith('star')) {
+        const { StarEngine } = await import('/src/engine/stars/StarEngine.ts');
+        const { PROTOTYPE_PRESETS } = await import('/src/engine/stars/cardToStar.ts');
+        const e = new StarEngine(host, {
+          mode: which === 'star-globe' ? 'globe' : 'closeup',
+          reducedMotion: true,
+        });
+        e.setStar(PROTOTYPE_PRESETS.k);
+        out.ready = e.ready;
+      } else if (which === 'rock') {
+        const { RockView } = await import('/src/engine/rocks/RockView.ts');
+        const c = document.createElement('canvas');
+        c.style.cssText = 'width:800px;height:500px;display:block';
+        host.appendChild(c);
+        new RockView(true).attach(c);
+      } else
+        throw new Error('which: star-globe | star-closeup | rock (world shaders: compile.html)');
+      out.total_ms = +(performance.now() - t0).toFixed(0);
+      out.slowest_ms = Math.max(0, ...out.programs.map((p) => p.ms));
+    } catch (e) {
+      out.err = String(e && e.stack ? e.stack : e);
+    }
+    out.done = true;
+  </script>
+</body>
