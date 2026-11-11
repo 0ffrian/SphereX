@@ -41,7 +41,7 @@ import { ProvenanceBadge } from './Badge';
 import { EmissionsPanel } from './EmissionsPanel';
 import { EPOCH_JD, timeRange } from '@/physics/cometGas';
 import { ConfidenceChip, ConfidenceDetails } from './ConfidencePanel';
-import { FeelPanel, HearPanel } from './build/Senses';
+import { HearPanel } from './build/HearPanel';
 import { BuildControls, BuildKeyNumbers, BuildSummaryRows } from './build/BuildControls';
 import GridLoader, { type GridLoaderProps } from './island/GridLoader';
 import { ConfidencePopover } from './ConfidencePopover';
@@ -170,7 +170,7 @@ const BUILD_LOADER_LOOK: GridLoaderProps = {
 export const BUILD_POP_ID = 'bp-pop';
 const POP_LABEL: Record<PopId, string> = {
   acc: 'Accuracy',
-  feel: 'Feel it',
+  feel: 'Feel it', // kept so the PopId type still maps; the Feel UI is not shown (Atish removes haptics)
   hear: 'Hear it',
   details: 'Details',
 };
@@ -761,9 +761,6 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                 <p className="sx-acc-rules">{NO_SCORE_TEXT}</p>
               </>
             ))}
-        </section>
-        <section hidden={pop !== 'feel'} data-testid="build-pop-feel">
-          <FeelPanel />
         </section>
         <section hidden={pop !== 'hear'} data-testid="build-pop-hear">
           <HearPanel active={pop === 'hear'} name={displayName(plan?.name)} />
