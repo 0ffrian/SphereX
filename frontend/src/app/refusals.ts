@@ -295,6 +295,46 @@ export function summarizeSpectrum(
   };
 }
 
+// ---- Area search (A18; issue #96) ------------------------------------------------------------
+// Kept apart from parseMissing so the flipbook's grouping is unchanged (Moon: hooks only add).
+
+/** Area codes with their own wording (Q-208 (13)): frontend codes of the Area card. */
+export const AREA_WHOLE_CODES = ['area:not_prepared', 'area:visits'] as const;
+const AREA_KNOWN: ReadonlySet<string> = new Set(AREA_WHOLE_CODES);
+/**
+ * Prefixes of the Area replies' codes (A17.8): `horizons:<designation>`, `skybot:<visit>`,
+ * `stamp:<dot_id>`, `rate_grid:visits`, `checks:*`, and the frontend's `area:*`. They are notes
+ * about the area, never frame refusals; an unworded one is shown as is.
+ */
+const AREA_NAMESPACES: ReadonlySet<string> = new Set([
+  'area',
+  'horizons',
+  'skybot',
+  'stamp',
+  'rate_grid',
+  'checks',
+]);
+
+/** Groups an Area reply's `missing`: area notes first, then anything else as groupMissing does. */
+export function groupAreaMissing(codes: readonly string[]): RefusalGroup[] {
+  const notes: RefusalGroup[] = [];
+  const rest: string[] = [];
+  for (const code of new Set(codes)) {
+    const colon = code.indexOf(':');
+    if (colon > 0 && AREA_NAMESPACES.has(code.slice(0, colon))) {
+      notes.push({
+        key: `note:${code}`,
+        kind: 'note',
+        reason: code,
+        known: AREA_KNOWN.has(code),
+        count: 1,
+        frameIds: [],
+      });
+    } else rest.push(code);
+  }
+  return [...notes, ...groupMissing(rest)];
+}
+
 /**
  * The composite's `missing`, grouped like the frames'. A nearer frame the backend skipped
  * (`composite:<channel>:skipped:<reason>:<frame_id>`) joins the frame group of its reason.
