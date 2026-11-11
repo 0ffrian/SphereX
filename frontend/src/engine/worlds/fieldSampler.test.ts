@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WorldFieldSampler, bspline } from './fieldSampler';
+import { WorldFieldSampler, bspline, catmullRom } from './fieldSampler';
 import type { CpuFields } from './WorldEngine';
 
 // A 8 x 4 terrain: elevation 2 km in column 3, row 2, else -1 km (sea); a 4 x 2 climate grid, left half land.
@@ -33,9 +33,13 @@ describe('WorldFieldSampler', () => {
     const lon = (3.5 / 8 - 0.5) * 2 * Math.PI;
     const lat = (2.5 / 4 - 0.5) * Math.PI;
     const a = s.sampleLonLat(lon, lat);
-    // #93 2.7: the cubic B-spline the fly view uses. At the centre of a lone 2 km texel among -1 km ones it gives
-    // 2 (2/3)^2 - (1 - (2/3)^2) = 1/3 (a B-spline smooths; it does not pass through the texel values).
-    expect(a.elevationKm).toBeCloseTo(1 / 3, 5);
+    // #93 regression fix: the Catmull-Rom cubic the fly view uses for heights passes through the texel values, so the
+    // centre of a lone 2 km texel among -1 km ones reads 2 km (the phase-2 B-spline read 1/3 km: the peak flattened).
+    expect(a.elevationKm).toBeCloseTo(2, 5);
+    // between texel centres it stays within the neighbours' range plus the cubic's small overshoot
+    const half = s.sampleLonLat(lon + Math.PI / 8, lat).elevationKm!;
+    expect(half).toBeGreaterThan(-1.3);
+    expect(half).toBeLessThan(2);
     expect(a.land).toBe(true);
     // between the cooler row (250..253) and the warmer one (300..303), nearer the cooler row it sits in
     expect(a.temperatureK!).toBeGreaterThan(250);
@@ -68,6 +72,23 @@ describe('WorldFieldSampler', () => {
     const left = (f(3) - f(3 - e)) / e;
     const right = (f(3 + e) - f(3)) / e;
     expect(Math.abs(left - right)).toBeLessThan(1e-2);
+  });
+  it('heights: Catmull-Rom keeps peaks and ramps, with no slope break at texel lines (#93 regression fix)', () => {
+    const W = 16;
+    const H = 8;
+    const data = new Float32Array(W * H);
+    const lat = (y: number) => ((y + 0.5) / H - 0.5) * Math.PI;
+    const lon = (x: number) => ((x + 0.5) / W - 0.5) * 2 * Math.PI;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) data[y * W + x] = 0.5 * y;
+    expect(catmullRom(data, 1, W, H, 0.3, lat(3.3))).toBeCloseTo(0.5 * 3.3, 6);
+    // a ridge one texel wide: every texel on it reads its full height (the B-spline read 2/3 of it)
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) data[y * W + x] = x === 5 ? 3 : 0;
+    expect(catmullRom(data, 1, W, H, lon(5), lat(2))).toBeCloseTo(3, 6);
+    expect(bspline(data, 1, W, H, lon(5), lat(2))).toBeCloseTo(2, 6);
+    // C1: the slope is the same on both sides of a texel line
+    const f = (x: number) => catmullRom(data, 1, W, H, lon(x), lat(2));
+    const e = 1e-4;
+    expect(Math.abs((f(4) - f(4 - e)) / e - (f(4 + e) - f(4)) / e)).toBeLessThan(1e-2);
   });
   it('wraps in longitude', () => {
     const s = new WorldFieldSampler(fields());

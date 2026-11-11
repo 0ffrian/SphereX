@@ -423,9 +423,15 @@ WORLD_FS = noUnroll(WORLD_FS); FLY_FS = noUnroll(FLY_FS);
 //  2.6       FLY_FS lod(): an octave faded out over a factor 2.4 of pixel footprint, so detail popped in at its own
 //            distance; it now fades on log2(FP f) over two octaves (full below 0.15 cycles per pixel, gone at 0.62).
 //  2.7       FLY_FS: the 720 x 360 height grid (55.6 km a texel on an Earth-size world) and the climate grids are read
-//            with a cubic B-spline from 4 bilinear taps (Sigg and Hadwiger 2005, GPU Gems 2 ch. 20) instead of plain
-//            bilinear, so slope no longer breaks on every texel line; the coastline warp gains a low-frequency term of
-//            about 1.2 texels (artistic). viewer haptics read the same filter (engine/worlds/fieldSampler.ts).
+//            with a cubic instead of plain bilinear, so slope no longer breaks on every texel line. The climate grids use a cubic B-spline from 4
+//            bilinear taps (Sigg and Hadwiger 2005, GPU Gems 2 ch. 20). The height grid uses a Catmull-Rom cubic from 9
+//            bilinear taps (#93 regression fix): the B-spline only approximates, so a one-texel peak read a third of its
+//            height and ranges one or two texels wide were flattened; Catmull-Rom passes through every texel value, so
+//            the shaded heights and normals keep the relief of the bilinear surface the ray march hits. viewer haptics
+//            read the same filters (engine/worlds/fieldSampler.ts). Phase 2 also gave the coastline warp a
+//            low-frequency term of about 1.5 texels; it moved the drawn heights up to 80 km (Earth size) away from
+//            every other grid (climate, rivers, the CPU terrain the camera aims with and the haptics read), so peaks
+//            drew as basins and lakes. The regression fix drops it: the warp is the prototype's two fine octaves.
 function patterns() {
   function rep(src, a, b, n) {
     var k = src.split(a).length - 1;
@@ -468,26 +474,37 @@ function patterns() {
     ' vec2 h0=(i-.5+w1/g0)/sz,h1=(i+1.5+w3/g1)/sz;\n' +
     ' return g0.y*(g0.x*texture(t,h0)+g1.x*texture(t,vec2(h1.x,h0.y)))+g1.y*(g0.x*texture(t,vec2(h0.x,h1.y))+g1.x*texture(t,h1));}\n' +
     'float rsph(');
-  // The cubic read costs 4 taps where bilinear costs 1, and hKm runs at every march and shadow step (about 30 % on the
-  // fly frame when used there). So the march and the shadow steps keep the bilinear read (HQ false) and only the
-  // shading reads (the normal, the shaded height and the climate) are cubic: slope, snow and colour no longer break
-  // on the texel lines; the hit point and the shadow follow the bilinear surface, at most a fraction of the relief off.
+  // #93 regression fix: the height grid is read with this interpolating cubic instead (see 2.7 above).
+  F = rep(F, 'float rsph(', '/* Catmull-Rom cubic from 9 bilinear taps (the middle two of each 4 merged into one): interpolating, so it\n' +
+    '   passes through every texel value; wraps in longitude, clamps at the poles */\n' +
+    'vec4 crs(sampler2D t,vec2 uv){vec2 sz=vec2(textureSize(t,0)),p=uv*sz-.5,i=floor(p),f=p-i;\n' +
+    ' vec2 w0=f*(-.5+f*(1.-.5*f)),w1=1.+f*f*(-2.5+1.5*f),w2=f*(.5+f*(2.-1.5*f)),w3=f*f*(-.5+.5*f),w12=w1+w2;\n' +
+    ' vec2 t0=(i-.5)/sz,t3=(i+2.5)/sz,tm=(i+.5+w2/w12)/sz;\n' +
+    ' return (texture(t,t0)*w0.x+texture(t,vec2(tm.x,t0.y))*w12.x+texture(t,vec2(t3.x,t0.y))*w3.x)*w0.y\n' +
+    '  +(texture(t,vec2(t0.x,tm.y))*w0.x+texture(t,tm)*w12.x+texture(t,vec2(t3.x,tm.y))*w3.x)*w12.y\n' +
+    '  +(texture(t,vec2(t0.x,t3.y))*w0.x+texture(t,vec2(tm.x,t3.y))*w12.x+texture(t,t3)*w3.x)*w3.y;}\n' +
+    'float rsph(');
+  // The cubic read costs 9 taps (heights) or 4 (climate) where bilinear costs 1, and hKm runs at every march and shadow
+  // step. So the march and the shadow steps keep the bilinear read (HQ false) and only the shading reads (the normal,
+  // the shaded height and the climate) are cubic: slope, snow and colour no longer break on the texel lines. The
+  // Catmull-Rom heights equal the bilinear ones on every texel, so the hit point and the shadow, which follow the
+  // bilinear surface, stay within a small part of a texel's relief of the shaded surface.
   F = rep(F, 'float FP,HV,MX;', 'bool HQ=false;float FP,HV,MX;');
-  // The coastline warp: the two fine octaves as before (0.46 and 0.14 texel) plus a low-frequency one of about 1.5
-  // texels; each octave is one vector value noise (vn3, the three channels of h33) instead of three scalar ones, so the
-  // three octaves cost about what the prototype's two did (hKm runs at every march step).
+  // The coastline warp: the two fine octaves as before (0.46 and 0.14 texel), each one vector value noise (vn3, the
+  // three channels of h33) instead of three scalar ones, so they cost less (hKm runs at every march step). The
+  // low-frequency octave phase 2 added is gone (#93 regression fix, see 2.7 above).
   F = rep(F, 'float rsph(', 'vec3 vn3(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);\n' +
     ' return mix(mix(mix(h33(i),h33(i+vec3(1,0,0)),f.x),mix(h33(i+vec3(0,1,0)),h33(i+vec3(1,1,0)),f.x),f.y),\n' +
     ' mix(mix(h33(i+vec3(0,0,1)),h33(i+vec3(1,0,1)),f.x),mix(h33(i+vec3(0,1,1)),h33(i+vec3(1,1,1)),f.x),f.y),f.z);}\n' +
     'float rsph(');
   F = rep(F, 'vec2 uv=uvOf(normalize(d+(vec3(vn(wq),vn(wq+7.3),vn(wq+3.1))-.5)*.008+(vec3(vn(wq*4.),vn(wq*4.+7.3),vn(wq*4.+3.1))-.5)*.0025));float e=texture(uHt,uv).r,',
-    'vec2 uv=uvOf(normalize(d+(vn3(wq)-.5)*.008+(vn3(wq*4.)-.5)*.0025+(vn3(wq*.2+11.)-.5)*.026));float e=HQ?bsp(uHt,uv).r:texture(uHt,uv).r,');
+    'vec2 uv=uvOf(normalize(d+(vn3(wq)-.5)*.008+(vn3(wq*4.)-.5)*.0025));float e=HQ?crs(uHt,uv).r:texture(uHt,uv).r,');
   F = rep(F, 'vec3 d=normalize(p);vec2 uv=uvOf(d);float mud=dot(d,uLb);', 'HQ=true;vec3 d=normalize(p);vec2 uv=uvOf(d);float mud=dot(d,uLb);');
   F = rep(F, '   float sh=1.;\n', '   HQ=false;float sh=1.;\n');
   // the shadow ray starts on the bilinear surface it marches against (from the cubic p0 it would start inside it)
   F = rep(F, 'vec3 s2=p0+d*2e-6;', 'vec3 s2=d*surfR(d)+d*2e-6;');
   F = rep(F, 'vec4 E=texture(uEb,uv),hy=texture(uHy,uv);', 'HQ=true;vec4 E=texture(uEb,uv),hy=texture(uHy,uv);');
-  F = rep(F, 'vec4 E=texture(uEb,uv),hy=texture(uHy,uv);float e=texture(uHt,uv).r,', 'vec4 E=bsp(uEb,uv),hy=texture(uHy,uv);float e=bsp(uHt,uv).r,');
+  F = rep(F, 'vec4 E=texture(uEb,uv),hy=texture(uHy,uv);float e=texture(uHt,uv).r,', 'vec4 E=bsp(uEb,uv),hy=texture(uHy,uv);float e=crs(uHt,uv).r,');
   F = rep(F, 'float wet=clamp(texture(uEb2,uv).r,0.,1.);', 'float wet=clamp(bsp(uEb2,uv).r,0.,1.);');
   F = rep(F, 'h33(vec3(ip+o,uSeed))', 'h33(vec3(ip+o,GZ)+uSeed3)');
   F = between(F, 'vec2 X=vec2(dot(d,CA),dot(d,CB))/max(dot(d,C0),.05);', 'vec3 n=normalize(d-(CA*gx+CB*gy)/ex2*.0008*(.5+br));',

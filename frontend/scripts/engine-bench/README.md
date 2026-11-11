@@ -41,6 +41,13 @@ Issue #93 phase 2 (repeating patterns):
   pair of frames, 32 x 32 ground tiles are matched within +-8 px. A planet-fixed texture moves rigidly and matches
   well (`mean`, `p10` of the best matches); keep `step` so the ground moves fewer than 8 px a frame.
 
+Issue #93 regression fix (mountain heights):
+
+- `relief.html?id=t1f&alts=3,40,400&base=/.bench-ref/<copy>/&ref=/.bench-ref/<other>/`: one preset on the globe and in
+  the fly view at several altitudes from the same camera, per engine copy. Reports `relief`, the standard deviation of
+  the luminance's high-pass part, and keeps each picture as a PNG data URL in `__out.png` for the driver to save. The
+  metric is dominated by fine detail; compare the pictures for the mountains themselves.
+
 Examples:
 
 ```sh

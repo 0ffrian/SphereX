@@ -1,0 +1,131 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Engine bench: relief</title>
+<!--
+  Issue #93 regression fix (mountain heights): one prototype preset drawn on the globe and in the fly view at several
+  altitudes, by the engine as shipped (base) and, with ref, by a second copy of the engine (a module folder, see
+  README.md), from the same camera. For each picture it reports `relief`, the standard deviation of the luminance's
+  high-pass part (shading contrast from the relief: a flattened field shows less), and keeps the picture as a PNG data
+  URL in __out.png[tag] so the driver can save it.
+  Query: id (preset, t1f), alts (fly altitudes in km, comma-separated, 3,40,400), w, h (CSS size, 960 x 540),
+  base, ref (module folders), yaw (globe turn, radians, 0).
+-->
+<body style="margin: 0; background: #000">
+  <script type="module">
+    const out = { png: {} };
+    window.__out = out;
+    const Q = new URLSearchParams(location.search);
+    const id = Q.get('id') || 't1f',
+      alts = (Q.get('alts') || '3,40,400').split(',').map(Number),
+      Wd = +(Q.get('w') || 960),
+      Hd = +(Q.get('h') || 540),
+      yaw = +(Q.get('yaw') || 0);
+    const realNow = performance.now.bind(performance);
+    let fake = null;
+    performance.now = () => (fake === null ? realNow() : (fake.t += fake.inc));
+
+    function relief(buf, w, h) {
+      const L = new Float32Array(w * h);
+      for (let i = 0; i < w * h; i++)
+        L[i] = 0.2126 * buf[i * 4] + 0.7152 * buf[i * 4 + 1] + 0.0722 * buf[i * 4 + 2];
+      // high-pass: minus a 9 x 9 box mean (summed-area table)
+      const S = new Float64Array((w + 1) * (h + 1));
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++)
+          S[(y + 1) * (w + 1) + x + 1] =
+            L[y * w + x] + S[y * (w + 1) + x + 1] + S[(y + 1) * (w + 1) + x] - S[y * (w + 1) + x];
+      let s = 0,
+        ss = 0,
+        n = 0;
+      const r = 4;
+      for (let y = r; y < h - r; y++)
+        for (let x = r; x < w - r; x++) {
+          const x0 = x - r,
+            x1 = x + r + 1,
+            y0 = y - r,
+            y1 = y + r + 1;
+          const m =
+            (S[y1 * (w + 1) + x1] -
+              S[y0 * (w + 1) + x1] -
+              S[y1 * (w + 1) + x0] +
+              S[y0 * (w + 1) + x0]) /
+            ((2 * r + 1) * (2 * r + 1));
+          const d = L[y * w + x] - m;
+          s += d;
+          ss += d * d;
+          n++;
+        }
+      return +Math.sqrt(ss / n - (s / n) * (s / n)).toFixed(3);
+    }
+    function png(buf, w, h) {
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const x = c.getContext('2d'),
+        im = x.createImageData(w, h);
+      for (let y = 0; y < h; y++)
+        im.data.set(buf.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
+      x.putImageData(im, 0, 0);
+      return c.toDataURL('image/png');
+    }
+
+    async function run(base, tag) {
+      const { createCore } = await import(base + 'core.js');
+      const { WP } = await import(base + 'presets.js');
+      const r = {};
+      for (const role of ['globe', 'fly']) {
+        const canvas = document.createElement('canvas');
+        canvas.style.cssText = `width:${Wd}px;height:${Hd}px;display:block`;
+        document.body.appendChild(canvas);
+        window.__sxPin = true;
+        const c = createCore(canvas, { role }),
+          gl = canvas.getContext('webgl2'),
+          W = c.W;
+        fake = { t: 0, inc: 1 };
+        c.setPreset(WP.find((q) => q.id === id));
+        while (W.spinup > 0) W.gl.tick(W.m, false, 1 / 60);
+        fake = null;
+        W.yaw = yaw;
+        W.gl.draw(W.m);
+        if (role === 'globe') {
+          const v = W.view,
+            img = new Uint8Array(v.w * v.h * 4);
+          gl.readPixels(0, 0, v.w, v.h, gl.RGBA, gl.UNSIGNED_BYTE, img);
+          r.globe = relief(img, v.w, v.h);
+          out.png[tag + '_globe'] = png(img, v.w, v.h);
+        } else {
+          W.fly = true;
+          if (!c.flyAimPeak()) c.flyAimDefault();
+          const aim = { lon: W.flyLon, lat: W.flyLat, head: W.flyHead, pitch: W.flyPitch };
+          for (const alt of alts) {
+            Object.assign(W, {
+              flyLon: aim.lon,
+              flyLat: aim.lat,
+              flyHead: aim.head,
+              flyPitch: aim.pitch,
+            });
+            W.flyAlt = W.m.gas ? Math.max(alt, 50) : alt;
+            W.gl.draw(W.m);
+            const v = W.view,
+              img = new Uint8Array(v.gx * v.h * 4);
+            gl.readPixels(0, 0, v.gx, v.h, gl.RGBA, gl.UNSIGNED_BYTE, img);
+            r['fly_' + alt] = relief(img, v.gx, v.h);
+            out.png[tag + '_fly_' + alt] = png(img, v.gx, v.h);
+          }
+        }
+        canvas.getContext('webgl2').getExtension('WEBGL_lose_context')?.loseContext();
+        canvas.remove();
+      }
+      out[tag] = r;
+    }
+
+    try {
+      await run(Q.get('base') || '/src/engine/worlds/', 'cur');
+      const ref = Q.get('ref');
+      if (ref) await run(ref, 'ref');
+    } catch (e) {
+      out.err = String(e && e.stack ? e.stack : e);
+    }
+    out.done = true;
+  </script>
+</body>
