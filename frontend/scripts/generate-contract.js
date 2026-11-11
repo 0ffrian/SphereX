@@ -15,16 +15,35 @@ const BANNER =
   '// GENERATED from shared/schemas/ by scripts/generate-contract.js (D-18). Do not edit.\n' +
   '// Hand-written helpers sit next to this file; import from "@/contract".\n';
 
-// One root that refers to both schemas, so the definitions they share are emitted once.
+// One root that refers to every schema, so the definitions they share are emitted once. The area
+// schemas (A17.9) keep their shared definitions in area-index.schema.json; `areaError` names the
+// error body so that it is emitted too.
 const ROOT = {
   title: 'ContractSchemas',
-  description: 'Bundle root: exists only so that both schemas compile into this one file.',
+  description: 'Bundle root: exists only so that every schema compiles into this one file.',
   type: 'object',
   additionalProperties: false,
-  required: ['card', 'params'],
+  required: [
+    'card',
+    'params',
+    'areaIndex',
+    'areaSummary',
+    'areaKnown',
+    'areaDots',
+    'areaTracks',
+    'areaChecks',
+    'areaError',
+  ],
   properties: {
     card: { $ref: 'object-card.schema.json' },
     params: { $ref: 'render-params.schema.json' },
+    areaIndex: { $ref: 'area-index.schema.json' },
+    areaSummary: { $ref: 'area-summary.schema.json' },
+    areaKnown: { $ref: 'area-known.schema.json' },
+    areaDots: { $ref: 'area-dots.schema.json' },
+    areaTracks: { $ref: 'area-tracks.schema.json' },
+    areaChecks: { $ref: 'area-checks.schema.json' },
+    areaError: { $ref: 'area-index.schema.json#/definitions/AreaError' },
   },
 };
 
@@ -36,12 +55,17 @@ async function generate() {
     format: false,
   });
   const card = JSON.parse(readFileSync(`${schemasDir}object-card.schema.json`, 'utf8'));
+  const area = JSON.parse(readFileSync(`${schemasDir}area-index.schema.json`, 'utf8'));
   const list = (name, type, values) =>
     `\nexport const ${name}: readonly ${type}[] = ${JSON.stringify(values)};\n`;
   const code =
     types +
     list('TAGS', 'Tag', card.definitions.Tag.enum) +
-    list('OBJECT_TYPES', 'ObjectType', card.definitions.ObjectType.enum);
+    list('OBJECT_TYPES', 'ObjectType', card.definitions.ObjectType.enum) +
+    list('AREA_DOT_LABELS', 'AreaDotLabel', area.definitions.AreaDotLabel.enum) +
+    list('AREA_VERDICTS', 'AreaVerdict', area.definitions.AreaVerdict.enum) +
+    list('AREA_SED_LABELS', 'AreaSedLabel', area.definitions.AreaSedLabel.enum) +
+    list('AREA_LINKERS', 'AreaLinker', area.definitions.AreaLinker.enum);
   const config = await prettier.resolveConfig(outFile);
   return prettier.format(code, { ...config, parser: 'typescript' });
 }

@@ -1,0 +1,35 @@
+{
+  "known": [],
+  "skybot": [
+    {
+      "visit": 1,
+      "fetched_at": "2026-11-10T12:02:00.000Z"
+    },
+    {
+      "visit": 2,
+      "fetched_at": "2026-11-10T12:02:30.000Z"
+    },
+    {
+      "visit": 3,
+      "fetched_at": "2026-11-10T12:03:00.000Z"
+    },
+    {
+      "visit": 4,
+      "fetched_at": "2026-11-10T12:03:30.000Z"
+    }
+  ],
+  "cached_at": "2026-11-10T12:05:00.000Z",
+  "computed_at": "2026-11-10T12:05:00.000Z",
+  "missing": [],
+  "provenance": {
+    "positions": {
+      "tag": "model_dependent",
+      "source": "synthetic fixture: made-up positions of made-up objects",
+      "assumption": "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of fetched_at, seen from SPHEREx (500@-163182)"
+    },
+    "skybot": {
+      "tag": "measured",
+      "source": "synthetic fixture: made-up answer dates"
+    }
+  }
+}

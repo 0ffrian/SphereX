@@ -31,7 +31,7 @@ flowchart TB
     ECSV["core/export/ecsv.py shared writer (A19.9)"]
   end
   CACHE[("Read-through cache D-25<br/>raw replies + derived.area entries")]
-  API["api/areas.py<br/>/v1/areas/..."]
+  API["api/areas.py<br/>/v1/areas/... incl. /checks (gated)"]
   subgraph FE["frontend/src"]
     RAIL["app/shell ToolRail + railIcons<br/>ToolId area"]
     CARDS["Feature cards in the object card's slot (proposed Q-172)<br/>Area, Options, Known, Discovery, Result, Checks (gated)"]
