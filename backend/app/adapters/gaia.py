@@ -147,6 +147,14 @@ ASTRO_COLUMNS = (
     "radius_flame",
     "radius_flame_lower",
     "radius_flame_upper",
+    # FLAME luminosity (L_sun) and mass (M_sun), with their 16th and 84th percentiles in
+    # ``_lower`` / ``_upper`` (Gaia DR3 astrophysical_parameters datamodel). Issue #93 B.
+    "lum_flame",
+    "lum_flame_lower",
+    "lum_flame_upper",
+    "mass_flame",
+    "mass_flame_lower",
+    "mass_flame_upper",
     # Multiple Star Classifier (MSC): the Teff of the primary when the source is modelled as an
     # unresolved binary. ``_lower`` / ``_upper`` are the 16th and 84th percentiles (Gaia DR3
     # astrophysical_parameters datamodel). Issue #71 stream B, Q-220.
@@ -171,6 +179,12 @@ class GaiaAstro:
     teff_msc1_k: float | None = None
     teff_msc1_lower_k: float | None = None
     teff_msc1_upper_k: float | None = None
+    lum_flame_lsun: float | None = None
+    lum_flame_lower_lsun: float | None = None
+    lum_flame_upper_lsun: float | None = None
+    mass_flame_msun: float | None = None
+    mass_flame_lower_msun: float | None = None
+    mass_flame_upper_msun: float | None = None
 
 
 def astro_key(ra: float, dec: float) -> CacheKey:
@@ -178,7 +192,10 @@ def astro_key(ra: float, dec: float) -> CacheKey:
         SOURCE,
         RELEASE,
         what="astrophysical_parameters",
-        cols="msc1",  # the column set changed (Q-220): an older cached body has no teff_msc1
+        # The column set changed (Q-220: teff_msc1; issue #93 B: lum_flame, mass_flame), so an
+        # older cached body is never read for it. Changing this re-keys every star: re-warm the
+        # A15 cache (A10).
+        cols="msc1-flame2",
         ra=norm_ra(ra),
         dec=norm_dec(dec),
         radius=norm_float(STAR_MATCH_RADIUS_ARCSEC / 3600.0, 5),
@@ -203,6 +220,12 @@ def parse_astro(body: bytes) -> list[GaiaAstro]:
                 teff_msc1_k=tap.opt_float(r["teff_msc1"]),
                 teff_msc1_lower_k=tap.opt_float(r["teff_msc1_lower"]),
                 teff_msc1_upper_k=tap.opt_float(r["teff_msc1_upper"]),
+                lum_flame_lsun=tap.opt_float(r["lum_flame"]),
+                lum_flame_lower_lsun=tap.opt_float(r["lum_flame_lower"]),
+                lum_flame_upper_lsun=tap.opt_float(r["lum_flame_upper"]),
+                mass_flame_msun=tap.opt_float(r["mass_flame"]),
+                mass_flame_lower_msun=tap.opt_float(r["mass_flame_lower"]),
+                mass_flame_upper_msun=tap.opt_float(r["mass_flame_upper"]),
             )
         )
     return out
@@ -225,9 +248,9 @@ def astro_adql(source_table: str, ra: str, dec: str, radius_deg: str) -> str:
 def astro_near(
     ctx: Context, ra: float, dec: float, *, refresh: bool = False
 ) -> tuple[list[GaiaAstro], Served]:
-    """Gaia DR3 sources (with their GSP-Phot, FLAME and MSC values) within
-    ``STAR_MATCH_RADIUS_ARCSEC`` of an ICRS position at epoch J2016.0, through the cache. Raises
-    ``CacheMissOffline`` / ``UpstreamUnavailable``."""
+    """Gaia DR3 sources (with their GSP-Phot, FLAME radius, luminosity and mass, and MSC values)
+    within ``STAR_MATCH_RADIUS_ARCSEC`` of an ICRS position at epoch J2016.0, through the cache.
+    Raises ``CacheMissOffline`` / ``UpstreamUnavailable``."""
     key = astro_key(ra, dec)
     q = dict(key.query)
     mirrors = [(url, table) for url, table in ctx.settings.gaia_mirrors if table in ASTRO_TABLE]

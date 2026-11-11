@@ -45,6 +45,11 @@ VALUE_COLUMNS = (
     "pl_orbpererr1",
     "pl_orbpererr2",
     "pl_orbeccen",
+    "pl_orbeccenerr1",
+    "pl_orbeccenerr2",
+    "pl_insol",
+    "pl_insolerr1",
+    "pl_insolerr2",
     "st_teff",
     "st_tefferr1",
     "st_tefferr2",
@@ -57,6 +62,9 @@ VALUE_COLUMNS = (
     "st_age",
     "st_ageerr1",
     "st_ageerr2",
+    "st_lum",
+    "st_lumerr1",
+    "st_lumerr2",
     "sy_dist",
 )
 REF_COLUMNS = (
@@ -66,14 +74,19 @@ REF_COLUMNS = (
     "pl_eqt_reflink",
     "pl_orbsmax_reflink",
     "pl_orbper_reflink",
+    "pl_orbeccen_reflink",
+    "pl_insol_reflink",
     "st_teff_reflink",
     "st_rad_reflink",
     "st_mass_reflink",
     "st_age_reflink",
+    "st_lum_reflink",
 )
 # Part of the cache key, so a reply recorded with fewer columns is never served for a card that
 # needs st_age or the host-star references (issue #68, Q-150). Bump when COLUMNS changes.
-COLUMNS_VERSION = "2"
+# 3 (issue #93 section 5 A-B): the eccentricity errors and reference, pl_insol and st_lum (checked
+# live against pscomppars on 2026-11-11: every column answers).
+COLUMNS_VERSION = "3"
 COLUMNS = VALUE_COLUMNS + REF_COLUMNS
 _REF_TEXT = re.compile(r">([^<]+)</a>")
 _PLANET_LETTER = re.compile(r"^(.*\S)([b-z])$")
