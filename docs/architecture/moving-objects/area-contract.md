@@ -6,6 +6,8 @@ The second half of the Discovery backend ([A17](area-backend.md#a17-discovery-ba
 
 ### A17.8 Endpoints
 
+Payload shapes as built: `shared/schemas/area-*.schema.json`; gap choices in [Q-208](../../decisions/moving-objects.md) (Proposed).
+
 Beyond D-16, which keys every endpoint on one object id; Q-146 (6) answered the `/v1/areas` routes and a D-16 note is pending. The endpoint register is [A4.11](../endpoints.md); refusal codes are also in [A4.12](../refusals.md).
 
 | Endpoint | Returns |
@@ -20,10 +22,12 @@ Beyond D-16, which keys every endpoint on one object id; Q-146 (6) answered the 
 | `GET /v1/areas/{area_id}/export.ecsv` | The file of A17.7 |
 
 - Every JSON reply carries `cached_at`, `computed_at`, `missing` and `provenance`. Times are ISO-8601 UTC with `Z`; every RA is in [0, 360).
-- **`missing` codes:** `checks:not_run` (the area was prepared without D4 to D7; the Checks section is hidden, A18.11), `rate_grid:visits` (fewer than 3 visits; pairs used, A17.12), `area:visits` (fewer than 2 visits; Discovery refused, A17.1), `frames:cone_maxrec:<n>`, `no_footprint:<frame_id>`, `cutout:<frame_id>`, `stars:<cat>:<visit>` (that visit's Gaia DR3 or CatWISE2020 cone failed; the star step used the other catalogue, A17.3), `skybot:<visit>` (that visit's SkyBoT cone failed; its tracks are `unchecked`, A17.5), `horizons:<designation>` (a candidate's Horizons call failed; the tracks it could match are `unchecked`, A17.5), `stamp:<dot_id>` (the stamp's cutout is not cached). A square outside every prepared area is `area:not_prepared`, decided in the frontend from the index; the wording lives in `refusals.ts`. The register of every code is [A4.12](../refusals.md).
+- **`missing` codes:** `checks:not_run` (the area was prepared without D4 to D7; the Checks section is hidden, A18.11; it covers only the area-level checks in `/checks`, while D6 `sed` and D7 `linker` are reported per track in `/tracks`, [Q-208](../../decisions/moving-objects.md) (25)), `checks:d4_not_run` and `checks:d5_not_run` (only that ticket did not run: D4 drops the test mover and the grid, D5 the control; [Q-208](../../decisions/moving-objects.md) (12)), `rate_grid:visits` (fewer than 3 visits; pairs used, A17.12), `area:visits` (fewer than 2 visits; Discovery refused, A17.1), `frames:cone_maxrec:<n>`, `no_footprint:<frame_id>`, `cutout:<frame_id>`, `stars:<cat>:<visit>` (that visit's Gaia DR3 or CatWISE2020 cone failed; the star step used the other catalogue, A17.3), `skybot:<visit>` (that visit's SkyBoT cone failed; its tracks are `unchecked`, A17.5), `horizons:<designation>` (a candidate's Horizons call failed; the tracks it could match are `unchecked`, A17.5), `stamp:<dot_id>` (the stamp's cutout is not cached). A square outside every prepared area is `area:not_prepared`, decided in the frontend from the index; the wording lives in `refusals.ts`. The register of every code is [A4.12](../refusals.md).
 - **Errors:** 404 `area_not_found` (unknown id or not prepared with the running code), 404 `dot_not_found`, 503 `stamp_unavailable` (cutout not cached).
 
 ### A17.9 Schemas and fixtures
+
+Payload shapes as built: `shared/schemas/area-*.schema.json`; gap choices in [Q-208](../../decisions/moving-objects.md) (Proposed).
 
 - `shared/schemas/area-index.schema.json`, `area-summary.schema.json`, `area-known.schema.json`, `area-dots.schema.json`, `area-tracks.schema.json`, `area-checks.schema.json` (gated, Q-203); generated code in `backend/app/contract/` and `frontend/src/contract/` (D-18). Owner Moon (D-17).
 - `shared/fixtures/area/`: a synthetic area (2 visits × 4 exposures × 2 detectors; about 30 stars, 18 glitches; 4 movers: one `found_blind`, one `unexplained`, one `unchecked`, one `possible` with `one_visit`), plus a `checks` sample (a recovered test mover, a grid, a control of 0 in 20) and, for D7, a synthetic area of 4 visits in `shared/fixtures/area/multivisit/`, all with the Fixture badge and served by the dev fixture server with `X-SX-Fixture: synthetic` (Q-32). The frontend builds against it before the backend exists (D-29).

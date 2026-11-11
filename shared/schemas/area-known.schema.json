@@ -1,0 +1,167 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "area-known.schema.json",
+  "title": "AreaKnown",
+  "description": "GET /v1/areas/{area_id}/known (A17.8, A17.5): known objects in the area, positions seen from SPHEREx.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "known",
+    "skybot",
+    "cached_at",
+    "computed_at",
+    "missing",
+    "provenance"
+  ],
+  "properties": {
+    "known": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/AreaKnownObject"
+      }
+    },
+    "skybot": {
+      "type": "array",
+      "items": {
+        "$ref": "area-index.schema.json#/definitions/AreaSkybotAnswer"
+      }
+    },
+    "cached_at": {
+      "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+    },
+    "computed_at": {
+      "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+    },
+    "missing": {
+      "type": "array",
+      "items": {
+        "$ref": "area-index.schema.json#/definitions/AreaMissingCode"
+      }
+    },
+    "provenance": {
+      "$ref": "#/definitions/AreaKnownProvenance"
+    }
+  },
+  "definitions": {
+    "AreaKnownObject": {
+      "title": "AreaKnownObject",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "designation",
+        "number",
+        "object_id",
+        "kind",
+        "v_mag",
+        "n_frames",
+        "n_visits",
+        "positions",
+        "track_available"
+      ],
+      "properties": {
+        "designation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "object_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "asteroid",
+            "comet"
+          ]
+        },
+        "v_mag": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "n_frames": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "n_visits": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "positions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AreaKnownPosition"
+          }
+        },
+        "track_available": {
+          "type": "boolean"
+        }
+      }
+    },
+    "AreaKnownPosition": {
+      "title": "AreaKnownPosition",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame_id",
+        "time",
+        "ra",
+        "dec"
+      ],
+      "properties": {
+        "frame_id": {
+          "$ref": "area-index.schema.json#/definitions/AreaFrameId"
+        },
+        "time": {
+          "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+        },
+        "ra": {
+          "$ref": "area-index.schema.json#/definitions/AreaRa"
+        },
+        "dec": {
+          "$ref": "area-index.schema.json#/definitions/AreaDec"
+        }
+      }
+    },
+    "AreaKnownProvenance": {
+      "title": "AreaKnownProvenance",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "positions",
+        "skybot"
+      ],
+      "properties": {
+        "positions": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "skybot": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        }
+      }
+    }
+  }
+}

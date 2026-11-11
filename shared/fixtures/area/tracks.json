@@ -1,0 +1,249 @@
+{
+  "tracks": [
+    {
+      "track_id": "T1",
+      "visits": [
+        1,
+        2
+      ],
+      "tracklets": [
+        {
+          "visit": 1,
+          "dot_ids": [
+            "fixture-area-main-v1e1-D1:5",
+            "fixture-area-main-v1e1-D4:5",
+            "fixture-area-main-v1e2-D1:5",
+            "fixture-area-main-v1e2-D4:5",
+            "fixture-area-main-v1e3-D1:5",
+            "fixture-area-main-v1e3-D4:5",
+            "fixture-area-main-v1e4-D1:5",
+            "fixture-area-main-v1e4-D4:5"
+          ],
+          "v_in_deg_day": 0.4851,
+          "pa_in_deg": 84.65,
+          "rms_px": 0.12
+        },
+        {
+          "visit": 2,
+          "dot_ids": [
+            "fixture-area-main-v2e1-D1:8",
+            "fixture-area-main-v2e1-D4:9",
+            "fixture-area-main-v2e2-D1:8",
+            "fixture-area-main-v2e2-D4:8",
+            "fixture-area-main-v2e3-D1:8",
+            "fixture-area-main-v2e3-D4:8",
+            "fixture-area-main-v2e4-D1:8",
+            "fixture-area-main-v2e4-D4:9"
+          ],
+          "v_in_deg_day": 0.4851,
+          "pa_in_deg": 84.65,
+          "rms_px": 0.12
+        }
+      ],
+      "rate_deg_day": 0.5001,
+      "pa_deg": 82.15,
+      "u_inv_au": 0.62,
+      "status": "track",
+      "reason": null,
+      "verdict": "found_blind",
+      "match": {
+        "designation": "Synthetic fixture A1",
+        "number": null,
+        "object_id": "synthetic-mover",
+        "v_mag": 18.4,
+        "median_sep_px": 0.42,
+        "fetched_at": "2026-11-10T11:57:00.000Z"
+      },
+      "linker": "pairs",
+      "unchecked_by": [],
+      "sed": {
+        "label": "smooth",
+        "chi2_red": 1.2,
+        "n_dots": 16,
+        "sigma_floor": 0.15
+      }
+    },
+    {
+      "track_id": "T2",
+      "visits": [
+        1,
+        2
+      ],
+      "tracklets": [
+        {
+          "visit": 1,
+          "dot_ids": [
+            "fixture-area-main-v1e1-D1:9",
+            "fixture-area-main-v1e1-D4:10",
+            "fixture-area-main-v1e2-D1:9",
+            "fixture-area-main-v1e2-D4:9",
+            "fixture-area-main-v1e3-D1:9",
+            "fixture-area-main-v1e3-D4:11",
+            "fixture-area-main-v1e4-D1:9",
+            "fixture-area-main-v1e4-D4:9"
+          ],
+          "v_in_deg_day": 0.3024,
+          "pa_in_deg": 101.96,
+          "rms_px": 0.12
+        },
+        {
+          "visit": 2,
+          "dot_ids": [
+            "fixture-area-main-v2e1-D1:7",
+            "fixture-area-main-v2e1-D4:8",
+            "fixture-area-main-v2e2-D1:7",
+            "fixture-area-main-v2e2-D4:7",
+            "fixture-area-main-v2e3-D1:7",
+            "fixture-area-main-v2e3-D4:7",
+            "fixture-area-main-v2e4-D1:7",
+            "fixture-area-main-v2e4-D4:8"
+          ],
+          "v_in_deg_day": 0.3024,
+          "pa_in_deg": 101.96,
+          "rms_px": 0.12
+        }
+      ],
+      "rate_deg_day": 0.3117,
+      "pa_deg": 99.46,
+      "u_inv_au": 0.62,
+      "status": "track",
+      "reason": null,
+      "verdict": "unexplained",
+      "match": null,
+      "linker": "pairs",
+      "unchecked_by": [],
+      "sed": {
+        "label": "rough",
+        "chi2_red": 7.8,
+        "n_dots": 16,
+        "sigma_floor": 0.15
+      }
+    },
+    {
+      "track_id": "T3",
+      "visits": [
+        1,
+        2
+      ],
+      "tracklets": [
+        {
+          "visit": 1,
+          "dot_ids": [
+            "fixture-area-main-v1e1-D1:25",
+            "fixture-area-main-v1e1-D4:26",
+            "fixture-area-main-v1e2-D1:25",
+            "fixture-area-main-v1e2-D4:25",
+            "fixture-area-main-v1e3-D1:26",
+            "fixture-area-main-v1e3-D4:26",
+            "fixture-area-main-v1e4-D1:25",
+            "fixture-area-main-v1e4-D4:26"
+          ],
+          "v_in_deg_day": 0.2677,
+          "pa_in_deg": 294.3,
+          "rms_px": 0.12
+        },
+        {
+          "visit": 2,
+          "dot_ids": [
+            "fixture-area-main-v2e1-D1:30",
+            "fixture-area-main-v2e1-D4:33",
+            "fixture-area-main-v2e2-D1:30",
+            "fixture-area-main-v2e2-D4:31",
+            "fixture-area-main-v2e3-D1:31",
+            "fixture-area-main-v2e3-D4:31",
+            "fixture-area-main-v2e4-D1:31",
+            "fixture-area-main-v2e4-D4:35"
+          ],
+          "v_in_deg_day": 0.2677,
+          "pa_in_deg": 294.3,
+          "rms_px": 0.12
+        }
+      ],
+      "rate_deg_day": 0.276,
+      "pa_deg": 291.8,
+      "u_inv_au": 0.62,
+      "status": "track",
+      "reason": null,
+      "verdict": "unchecked",
+      "match": null,
+      "linker": "pairs",
+      "unchecked_by": [
+        "horizons:Synthetic fixture A2"
+      ],
+      "sed": {
+        "label": "smooth",
+        "chi2_red": 1.9,
+        "n_dots": 16,
+        "sigma_floor": 0.15
+      }
+    },
+    {
+      "track_id": "T4",
+      "visits": [
+        2
+      ],
+      "tracklets": [
+        {
+          "visit": 2,
+          "dot_ids": [
+            "fixture-area-main-v2e1-D4:18",
+            "fixture-area-main-v2e2-D4:17",
+            "fixture-area-main-v2e3-D4:18",
+            "fixture-area-main-v2e4-D4:22"
+          ],
+          "v_in_deg_day": 0.6471,
+          "pa_in_deg": 42.31,
+          "rms_px": 0.12
+        }
+      ],
+      "rate_deg_day": null,
+      "pa_deg": null,
+      "u_inv_au": null,
+      "status": "possible",
+      "reason": "one_visit",
+      "verdict": "possible",
+      "match": null,
+      "linker": "pairs",
+      "unchecked_by": [],
+      "sed": {
+        "label": "too_few",
+        "chi2_red": null,
+        "n_dots": 4,
+        "sigma_floor": 0.15
+      }
+    }
+  ],
+  "skybot": [
+    {
+      "visit": 1,
+      "fetched_at": "2026-11-10T11:57:00.000Z"
+    },
+    {
+      "visit": 2,
+      "fetched_at": "2026-11-10T11:57:30.000Z"
+    }
+  ],
+  "cached_at": "2026-11-10T12:00:00.000Z",
+  "computed_at": "2026-11-10T12:00:00.000Z",
+  "missing": [
+    "horizons:Synthetic fixture A2",
+    "rate_grid:visits"
+  ],
+  "provenance": {
+    "tracks": {
+      "tag": "derived",
+      "source": "synthetic fixture: made-up tracks",
+      "formula": "tracklets and visit pairs of A17.4 (A17.12 for rate_grid) with the thresholds in method.settings"
+    },
+    "match": {
+      "tag": "model_dependent",
+      "source": "synthetic fixture: made-up known objects",
+      "assumption": "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of fetched_at, seen from SPHEREx (500@-163182)"
+    },
+    "sed": {
+      "tag": "derived",
+      "source": "synthetic fixture: made-up scores",
+      "formula": "weighted degree-2 fit of ln F against ln wavelength, chi2_red against sed_chi2_max (A17.13)"
+    }
+  }
+}
