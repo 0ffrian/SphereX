@@ -13,6 +13,7 @@
 // - No React re-render per pointer move: the readout and markers are written from refs.
 // - R9: keyboard pan/zoom on the canvas (arrows, +/−, R), Enter picks the centre, aria-label and a
 //   text alternative. No on-screen pan and zoom buttons (Q-123).
+import { publishMotion } from './skyMotion';
 import { displayName } from '@/app/displayName';
 import {
   useEffect,
@@ -532,9 +533,14 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       const r = canvas.getBoundingClientRect();
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     };
+    let lastCam: { ra: number; dec: number; fovDeg: number } | null = null;
     const sendReadout = () => {
       readoutFrame = null;
       const cam = view.getView();
+      if (lastCam === null || cam.ra !== lastCam.ra || cam.dec !== lastCam.dec || cam.fovDeg !== lastCam.fovDeg) {
+        if (lastCam !== null) publishMotion();
+        lastCam = { ra: cam.ra, dec: cam.dec, fovDeg: cam.fovDeg };
+      }
       if (hover) {
         const { width, height } = view.getSize();
         const p = screenToRaDec(cam, hover.x, hover.y, width, height, PICK_SCRATCH);
