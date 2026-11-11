@@ -602,7 +602,7 @@ def _summary(spec: Spec, steps: dict[str, int], missing: list[str]) -> dict[str,
             }
         )
     return {
-        **_index_entry(spec),
+        **{k: v for k, v in _index_entry(spec).items() if k not in {"computed_at", "cached_at"}},
         "frames": frames,
         "coverage": coverage,
         "steps": steps,

@@ -7,8 +7,6 @@
   "data_release": "synthetic_fixture",
   "n_frames": 16,
   "n_visits": 4,
-  "computed_at": "2026-11-10T12:05:00.000Z",
-  "cached_at": "2026-11-10T12:05:00.000Z",
   "frames": [
     {
       "frame_id": "fixture-area-multivisit-v1e1-D2",
@@ -295,6 +293,8 @@
       "sed_chi2_max": 3.0
     }
   },
+  "cached_at": "2026-11-10T12:05:00.000Z",
+  "computed_at": "2026-11-10T12:05:00.000Z",
   "missing": [
     "checks:not_run"
   ],
