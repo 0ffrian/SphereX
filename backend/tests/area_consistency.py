@@ -6,6 +6,12 @@ list, the checks. They take plain reply dicts, so the fixture tests (``test_area
 and later the pipeline (P3) and API (P7) tests can run the same rules on their own output.
 
 Each function raises ``AssertionError`` with a message on the first broken rule.
+
+``check_area(..., strict=True)`` adds two rules that hold for the synthetic fixtures but depend
+on thresholds a real run may tune (P3/D1): a found-blind track has at least two thirds of its dots
+within 3 px of the matched object (A17.5 step 3, ``r_known`` at its floor), and the mover dots
+left outside every track, grouped per visit and detector, span less than ``min_motion_px``
+(a dropped static one-visit tracklet, A17.4). Without ``strict`` only the contract-level rules run.
 """
 
 from __future__ import annotations
@@ -13,6 +19,8 @@ from __future__ import annotations
 import math
 from collections import Counter
 from typing import Any
+
+from app.timefmt import parse_utc
 
 PIXEL_DEG = 6.15 / 3600.0
 WILSON_Z = 1.959964
@@ -80,6 +88,9 @@ def check_missing_lists(*replies: Reply) -> None:
     for reply in replies:
         missing = reply["missing"]
         _check(missing == sorted(set(missing)), f"missing not sorted and unique: {missing}")
+        # Python's jsonschema lets a pattern's `$` match before a trailing newline (ajv and
+        # pydantic do not), so a stray "\n" or space is refused here (Q-208).
+        _check(all(m == m.strip() for m in missing), f"missing code with whitespace: {missing}")
 
 
 def check_provenance_rules(*replies: Reply) -> None:
@@ -157,14 +168,15 @@ def check_dots(summary: Reply, dots: Reply) -> None:
         )
         peaks = [(math.floor(d["y"] + 0.5), math.floor(d["x"] + 0.5)) for d in group]
         _check(peaks == sorted(peaks), f"{frame_id}: dots not numbered by row, then column")
-    # Stars and fixed dots are where every visit can see them (A17.3 tests need both visits).
+    # A fixed dot was seen at the same place in another visit (A17.3), so every visit covers it.
+    # Stars come from the catalogue match and need no second visit (Q-208).
     for d in all_dots(dots):
-        if d["label"] in {"star", "fixed"}:
+        if d["label"] == "fixed":
             for v, polygon in coverage.items():
                 _check(inside(polygon, d["ra"], d["dec"]), f"{d['dot_id']}: not in visit {v}")
 
 
-def check_steps(summary: Reply, dots: Reply, tracks: Reply) -> None:
+def check_steps(summary: Reply, dots: Reply, tracks: Reply, *, strict: bool = False) -> None:
     steps = summary["steps"]
     labels = Counter(d["label"] for d in all_dots(dots))
     status = Counter(t["status"] for t in tracks["tracks"])
@@ -184,10 +196,10 @@ def check_steps(summary: Reply, dots: Reply, tracks: Reply) -> None:
         _check(steps[key] == value, f"steps.{key} = {steps[key]}, counted {value}")
     in_tracks = {i for t in tracks["tracks"] for tl in t["tracklets"] for i in tl["dot_ids"]}
     loose = [d for d in all_dots(dots) if d["label"] == "mover" and d["dot_id"] not in in_tracks]
-    _check(
-        bool(loose) == (steps["n_static_one_visit"] > 0),
-        "mover dots outside every track exist exactly when a static tracklet was dropped",
-    )
+    if steps["n_static_one_visit"] > 0:
+        _check(bool(loose), "a static tracklet was dropped, but every mover dot is in a track")
+    if not strict:
+        return
     # A static one-visit tracklet moves less than min_motion_px (A17.4).
     limit = float(summary["method"]["settings"].get("min_motion_px", 1.0))
     groups: dict[tuple[int, int], list[dict[str, Any]]] = {}
@@ -204,7 +216,9 @@ def _span_px(group: list[dict[str, Any]]) -> float:
     )
 
 
-def check_tracks(summary: Reply, dots: Reply, tracks: Reply, known: Reply) -> None:
+def check_tracks(
+    summary: Reply, dots: Reply, tracks: Reply, known: Reply, *, strict: bool = False
+) -> None:
     frames = {f["frame_id"]: f for f in summary["frames"]}
     frame_index = {fid: i for i, fid in enumerate(frames)}
     by_id = {d["dot_id"]: d for d in all_dots(dots)}
@@ -249,7 +263,7 @@ def check_tracks(summary: Reply, dots: Reply, tracks: Reply, known: Reply) -> No
                 track_dots.append(d)
         _check_verdict(t, track_dots, coverage, missing, skybot, designations)
         _check_sed(t, track_dots, settings)
-        _check_match(t, track_dots, known)
+        _check_match(t, track_dots, known, strict=strict)
     if n_visits < 3:
         _check(
             all(t["linker"] == "pairs" for t in tracks["tracks"]),
@@ -275,6 +289,10 @@ def _check_verdict(
         _check(reason is not None, f"{tid}: a possible names its reason")
         _check(verdict == "possible", f"{tid}: a possible's verdict is possible")
         _check(t["match"] is None, f"{tid}: a possible has no match")
+    if reason in {"one_visit", "no_partner"}:
+        # No partner, so no between-visit rate, direction or distance (Q-208).
+        for key in ("rate_deg_day", "pa_deg", "u_inv_au"):
+            _check(t[key] is None, f"{tid}: {reason} possible with {key}")
     if reason == "one_visit":
         _check(len(t["visits"]) == 1, f"{tid}: one_visit spans one visit")
         others = [v for v in coverage if v not in t["visits"]]
@@ -306,7 +324,10 @@ def _check_sed(t: dict[str, Any], track_dots: list[dict[str, Any]], settings: Re
         return
     tid = t["track_id"]
     label, chi2 = sed["label"], sed["chi2_red"]
-    _check((chi2 is None) == (label in {"too_few", "not_informative"}), f"{tid}: sed chi2_red")
+    if label == "too_few":
+        _check(chi2 is None, f"{tid}: too_few with a chi2_red")
+    if label in {"smooth", "rough"}:
+        _check(chi2 is not None, f"{tid}: {label} without chi2_red")
     if "sed_sigma_floor" in settings:
         _check(sed["sigma_floor"] == settings["sed_sigma_floor"], f"{tid}: sed sigma_floor")
     used = [d for d in track_dots if d["snr"] >= float(settings.get("sed_snr_min", 3.0))]
@@ -319,8 +340,10 @@ def _check_sed(t: dict[str, Any], track_dots: list[dict[str, Any]], settings: Re
         _check((label == "smooth") == smooth, f"{tid}: smooth iff chi2_red <= sed_chi2_max")
 
 
-def _check_match(t: dict[str, Any], track_dots: list[dict[str, Any]], known: Reply) -> None:
-    """A17.5 step 3: two thirds of the dots within r_known of the object at the dot's frame."""
+def _check_match(
+    t: dict[str, Any], track_dots: list[dict[str, Any]], known: Reply, *, strict: bool
+) -> None:
+    """The match names a listed object; with ``strict``, A17.5 step 3 at r_known = 3 px."""
     match = t["match"]
     if match is None:
         return
@@ -336,7 +359,8 @@ def _check_match(t: dict[str, Any], track_dots: list[dict[str, Any]], known: Rep
         s = sep_px(d["ra"], d["dec"], p["ra"], p["dec"])
         seps.append(s)
         near += s <= r_known
-    _check(3 * near >= 2 * len(track_dots), f"{t['track_id']}: fewer than 2/3 dots near the match")
+    if strict:
+        _check(3 * near >= 2 * len(track_dots), f"{t['track_id']}: under 2/3 near the match")
     seps.sort()
     median = (seps[(len(seps) - 1) // 2] + seps[len(seps) // 2]) / 2
     _check(abs(median - match["median_sep_px"]) <= 0.01, f"{t['track_id']}: median_sep_px")
@@ -402,10 +426,14 @@ def check_checks(summary: Reply, dots: Reply, checks: Reply) -> None:
     _check(len(runs) == control["n_runs"] == method["n_control_runs"], "control run count")
     _check(abs(control["mean"] - sum(runs) / len(runs)) <= 1e-9, "control mean")
     _check(control["max"] == max(runs), "control max")
-    frames = {f["frame_id"] for f in summary["frames"]}
+    frames = {f["frame_id"]: f for f in summary["frames"]}
     real = all_dots(dots)
     for p in checks["test_mover"]["dots"]:
-        _check(p["frame_id"] in frames, "planted dot at an unknown frame")
+        f = frames.get(p["frame_id"])
+        _check(f is not None, "planted dot at an unknown frame")
+        assert f is not None
+        for key in ("detector", "exposure", "time"):
+            _check(p[key] == f[key], f"planted dot: {key} differs from its frame")
         for d in real:
             if d["frame_id"] == p["frame_id"]:
                 _check(
@@ -423,13 +451,23 @@ def check_area(
     tracks: Reply,
     checks: Reply,
     index_entry: Reply | None = None,
+    *,
+    strict: bool = False,
 ) -> None:
-    """Every rule above, for one area's five replies (and its index entry, if given)."""
+    """Every rule above, for one area's five replies (and its index entry, if given).
+
+    ``strict`` adds the fixture-only threshold rules described in the module docstring.
+    """
     replies = (summary, known, dots, tracks, checks)
     check_missing_lists(*replies)
     check_provenance_rules(*replies)
-    for reply in replies:
+    for reply in (known, dots, tracks):
         _check(reply["computed_at"] == summary["computed_at"], "replies of one run differ")
+    # The gated checks may run later, as their own offline run (Q-208).
+    _check(
+        parse_utc(checks["computed_at"]) >= parse_utc(summary["computed_at"]),
+        "checks computed before the area they check",
+    )
     union = sorted({m for r in (known, dots, tracks, checks) for m in r["missing"]})
     _check(summary["missing"] == union, "summary.missing != union of the other replies'")
     _check(
@@ -440,7 +478,7 @@ def check_area(
         _check("rate_grid:visits" in tracks["missing"], "fewer than 3 visits: rate_grid:visits")
     check_summary(summary, index_entry)
     check_dots(summary, dots)
-    check_steps(summary, dots, tracks)
+    check_steps(summary, dots, tracks, strict=strict)
     check_known(summary, known)
-    check_tracks(summary, dots, tracks, known)
+    check_tracks(summary, dots, tracks, known, strict=strict)
     check_checks(summary, dots, checks)

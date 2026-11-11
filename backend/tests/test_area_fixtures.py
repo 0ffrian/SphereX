@@ -18,7 +18,7 @@ import pytest
 
 from app.settings import BACKEND_DIR
 from scripts import area_fixtures
-from tests.area_consistency import all_dots, check_area
+from tests.area_consistency import all_dots, check_area, sep_px
 
 AREA = BACKEND_DIR.parent / "shared" / "fixtures" / "area"
 REPLIES = ("summary", "known", "dots", "tracks", "checks")
@@ -42,7 +42,7 @@ def _entry(area_id: str) -> dict[str, Any]:
 
 
 def _run(area: dict[str, Any], entry: dict[str, Any] | None = None) -> None:
-    check_area(*(area[name] for name in REPLIES), index_entry=entry)
+    check_area(*(area[name] for name in REPLIES), index_entry=entry, strict=True)
 
 
 def test_index_lists_both_fixture_areas_in_order() -> None:
@@ -168,6 +168,25 @@ MUTATIONS: dict[str, Mutation] = {
     ),
     "derived without formula": lambda a: a["summary"]["provenance"]["steps"].pop("formula"),
     "rate grid on two visits": lambda a: _t(a, "T2").__setitem__("linker", "rate_grid"),
+    "too_few with a chi2_red": lambda a: _t(a, "T4")["sed"].__setitem__("chi2_red", 1.0),
+    "one_visit possible with a rate": lambda a: _t(a, "T4").__setitem__("rate_deg_day", 0.3),
+    "one_visit possible with a distance": lambda a: _t(a, "T4").__setitem__("u_inv_au", 0.5),
+    "known from another run": lambda a: a["known"].__setitem__(
+        "computed_at", "2026-11-10T12:30:00.000Z"
+    ),
+    "checks before the area": lambda a: a["checks"].__setitem__(
+        "computed_at", "2026-11-10T11:00:00.000Z"
+    ),
+    "planted dot on another detector": lambda a: a["checks"]["test_mover"]["dots"][0].__setitem__(
+        "detector", 2
+    ),
+    "planted dot at another time": lambda a: a["checks"]["test_mover"]["dots"][0].__setitem__(
+        "time", "2026-01-15T03:00:01.000Z"
+    ),
+    "missing code with a trailing newline": lambda a: [
+        r.__setitem__("missing", [m + "\n" if m == "rate_grid:visits" else m for m in r["missing"]])
+        for r in (a["summary"], a["tracks"], a["checks"])
+    ],
 }
 
 
@@ -177,6 +196,59 @@ def test_consistency_rules_catch(name: str) -> None:
     MUTATIONS[name](area)
     with pytest.raises(AssertionError):
         _run(area, _entry("fixture:area-main"))
+
+
+def test_checks_may_run_later_than_the_area() -> None:
+    area = copy.deepcopy(_area("fixture:area-main"))
+    area["checks"]["computed_at"] = "2026-11-10T13:00:00.000Z"
+    _run(area, _entry("fixture:area-main"))
+
+
+def test_static_rule_is_one_way() -> None:
+    """n_static_one_visit > 0 needs loose mover dots; loose dots alone are not an error."""
+    area = copy.deepcopy(_area("fixture:area-multivisit"))
+    area["summary"]["steps"]["n_static_one_visit"] = 1
+    with pytest.raises(AssertionError):
+        _run(area, _entry("fixture:area-multivisit"))
+    main = copy.deepcopy(_area("fixture:area-main"))
+    main["summary"]["steps"]["n_static_one_visit"] = 0
+    _run(main, _entry("fixture:area-main"))
+
+
+@pytest.mark.parametrize("what", ["match", "static"])
+def test_strict_adds_the_threshold_rules(what: str) -> None:
+    area = copy.deepcopy(_area("fixture:area-main"))
+    if what == "match":
+        # The known object drifts 10 px from T1: still a valid reply, but not A17.5 at 3 px.
+        a1 = next(k for k in area["known"]["known"] if k["designation"].endswith("A1"))
+        for p in a1["positions"]:
+            p["dec"] = round(p["dec"] + 10 * 6.15 / 3600, 7)
+        t1 = _t(area, "T1")["match"]
+        seps = sorted(_sep_to(area, a1))
+        t1["median_sep_px"] = round((seps[7] + seps[8]) / 2, 2)
+    else:
+        # A loose mover dot far from the others: the dropped tracklet now "moves".
+        loose = _loose(area)
+        loose[0]["ra"] = round(loose[0]["ra"] + 5 * 6.15 / 3600, 7)
+    replies = [area[name] for name in REPLIES]
+    check_area(*replies, index_entry=_entry("fixture:area-main"))
+    with pytest.raises(AssertionError):
+        check_area(*replies, index_entry=_entry("fixture:area-main"), strict=True)
+
+
+def _sep_to(area: dict[str, Any], obj: dict[str, Any]) -> list[float]:
+    at = {p["frame_id"]: p for p in obj["positions"]}
+    ids = {i for tl in _t(area, "T1")["tracklets"] for i in tl["dot_ids"]}
+    return [
+        sep_px(d["ra"], d["dec"], at[d["frame_id"]]["ra"], at[d["frame_id"]]["dec"])
+        for d in all_dots(area["dots"])
+        if d["dot_id"] in ids
+    ]
+
+
+def _loose(area: dict[str, Any]) -> list[dict[str, Any]]:
+    ids = {i for t in area["tracks"]["tracks"] for tl in t["tracklets"] for i in tl["dot_ids"]}
+    return [d for d in all_dots(area["dots"]) if d["label"] == "mover" and d["dot_id"] not in ids]
 
 
 # Fixture honesty: nothing here may be mistaken for a real result (CLAUDE.md, A16.5, Q-32).

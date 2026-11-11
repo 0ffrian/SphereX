@@ -1974,17 +1974,68 @@
       "detail": "catch_rate"
     },
     "instance": {
+      "test_mover": {
+        "ra": 149.8395414,
+        "dec": 9.7343542,
+        "rate_deg_day": 0.2949,
+        "pa_deg": 79.99,
+        "snr": 8.0,
+        "dots": [
+          {
+            "frame_id": "fixture-area-main-v1e1-D1",
+            "detector": 1,
+            "exposure": 1,
+            "time": "2026-01-15T03:00:00.000Z",
+            "x": 200.0,
+            "y": 20.0,
+            "ra": 149.8395414,
+            "dec": 9.7343542,
+            "flux_uJy": 24.0,
+            "flux_err": 3.0,
+            "snr": 8.0,
+            "wavelength_um": 0.8731,
+            "bandwidth_um": 0.0213,
+            "flags": []
+          }
+        ],
+        "recovered": true,
+        "reason": null
+      },
       "completeness": {
         "snr_bins": [
           {
             "min": 5.0,
+            "max": 8.0
+          },
+          {
+            "min": 8.0,
+            "max": 12.0
+          },
+          {
+            "min": 12.0,
+            "max": 20.0
+          },
+          {
+            "min": 20.0,
             "max": null
           }
         ],
         "rate_bins": [
           {
             "min": 0.02,
-            "max": null
+            "max": 0.1
+          },
+          {
+            "min": 0.1,
+            "max": 0.3
+          },
+          {
+            "min": 0.3,
+            "max": 0.6
+          },
+          {
+            "min": 0.6,
+            "max": 1.2
           }
         ],
         "cells": [
@@ -1992,25 +2043,116 @@
             "snr_bin": 0,
             "rate_bin": 0,
             "n": 50,
-            "k": 25,
-            "frac": 0.5,
+            "k": 22,
+            "frac": 0.44,
             "wilson95": [
-              0.3664,
-              0.6336
+              0.3116,
+              0.5769
             ]
           }
         ],
         "catch_rate": 0.5
       },
+      "linker": "pairs",
       "method": {
         "settings": {
           "k_detect": 5.0
+        },
+        "checks": {
+          "seeds": [
+            1
+          ],
+          "n_per_cell": 50,
+          "snr_bins": [
+            {
+              "min": 5.0,
+              "max": 8.0
+            },
+            {
+              "min": 8.0,
+              "max": 12.0
+            },
+            {
+              "min": 12.0,
+              "max": 20.0
+            },
+            {
+              "min": 20.0,
+              "max": null
+            }
+          ],
+          "rate_bins": [
+            {
+              "min": 0.02,
+              "max": 0.1
+            },
+            {
+              "min": 0.1,
+              "max": 0.3
+            },
+            {
+              "min": 0.3,
+              "max": 0.6
+            },
+            {
+              "min": 0.6,
+              "max": 1.2
+            }
+          ],
+          "n_control_runs": 20,
+          "psf": "synthetic fixture: Gaussian, width measured on isolated stars of the area",
+          "distance_model": "synthetic fixture: u = 1/distance with distance 1.5 AU"
         }
       },
       "cached_at": "2026-11-10T12:00:00.000Z",
       "computed_at": "2026-11-10T12:00:00.000Z",
-      "missing": [],
-      "provenance": {}
+      "missing": [
+        "rate_grid:visits"
+      ],
+      "provenance": {
+        "test_mover": {
+          "tag": "model_dependent",
+          "source": "synthetic fixture: made-up planted mover",
+          "assumption": "synthetic point sources added in memory to this area's recorded cutouts; PSF and distance model in method.checks"
+        },
+        "completeness": {
+          "tag": "model_dependent",
+          "source": "synthetic fixture: made-up grid",
+          "assumption": "synthetic point sources added in memory to this area's recorded cutouts; PSF and distance model in method.checks"
+        },
+        "control": {
+          "tag": "derived",
+          "source": "synthetic fixture: made-up control",
+          "formula": "tracks found on the same frames with the mid-times permuted at random; seeds in method.checks (A17.6)"
+        }
+      },
+      "control": {
+        "n_runs": 20,
+        "tracks_per_run": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "mean": 0.0,
+        "max": 0
+      }
     }
   },
   {
@@ -2049,6 +2191,258 @@
         "sed": {
           "tag": "artistic",
           "source": "synthetic fixture: not a real value"
+        }
+      }
+    }
+  },
+  {
+    "name": "area checks run halfway",
+    "schema": "area-checks",
+    "dropped_by_models": true,
+    "expect": {
+      "path": "",
+      "keyword": "required",
+      "detail": "control"
+    },
+    "instance": {
+      "test_mover": {
+        "ra": 149.8395414,
+        "dec": 9.7343542,
+        "rate_deg_day": 0.2949,
+        "pa_deg": 79.99,
+        "snr": 8.0,
+        "dots": [
+          {
+            "frame_id": "fixture-area-main-v1e1-D1",
+            "detector": 1,
+            "exposure": 1,
+            "time": "2026-01-15T03:00:00.000Z",
+            "x": 200.0,
+            "y": 20.0,
+            "ra": 149.8395414,
+            "dec": 9.7343542,
+            "flux_uJy": 24.0,
+            "flux_err": 3.0,
+            "snr": 8.0,
+            "wavelength_um": 0.8731,
+            "bandwidth_um": 0.0213,
+            "flags": []
+          }
+        ],
+        "recovered": true,
+        "reason": null
+      },
+      "completeness": {
+        "snr_bins": [
+          {
+            "min": 5.0,
+            "max": 8.0
+          },
+          {
+            "min": 8.0,
+            "max": 12.0
+          },
+          {
+            "min": 12.0,
+            "max": 20.0
+          },
+          {
+            "min": 20.0,
+            "max": null
+          }
+        ],
+        "rate_bins": [
+          {
+            "min": 0.02,
+            "max": 0.1
+          },
+          {
+            "min": 0.1,
+            "max": 0.3
+          },
+          {
+            "min": 0.3,
+            "max": 0.6
+          },
+          {
+            "min": 0.6,
+            "max": 1.2
+          }
+        ],
+        "cells": [
+          {
+            "snr_bin": 0,
+            "rate_bin": 0,
+            "n": 50,
+            "k": 22,
+            "frac": 0.44,
+            "wilson95": [
+              0.3116,
+              0.5769
+            ]
+          }
+        ]
+      },
+      "linker": "pairs",
+      "method": {
+        "settings": {
+          "k_detect": 5.0
+        },
+        "checks": {
+          "seeds": [
+            1
+          ],
+          "n_per_cell": 50,
+          "snr_bins": [
+            {
+              "min": 5.0,
+              "max": 8.0
+            },
+            {
+              "min": 8.0,
+              "max": 12.0
+            },
+            {
+              "min": 12.0,
+              "max": 20.0
+            },
+            {
+              "min": 20.0,
+              "max": null
+            }
+          ],
+          "rate_bins": [
+            {
+              "min": 0.02,
+              "max": 0.1
+            },
+            {
+              "min": 0.1,
+              "max": 0.3
+            },
+            {
+              "min": 0.3,
+              "max": 0.6
+            },
+            {
+              "min": 0.6,
+              "max": 1.2
+            }
+          ],
+          "n_control_runs": 20,
+          "psf": "synthetic fixture: Gaussian, width measured on isolated stars of the area",
+          "distance_model": "synthetic fixture: u = 1/distance with distance 1.5 AU"
+        }
+      },
+      "cached_at": "2026-11-10T12:00:00.000Z",
+      "computed_at": "2026-11-10T12:00:00.000Z",
+      "missing": [
+        "rate_grid:visits"
+      ],
+      "provenance": {
+        "test_mover": {
+          "tag": "model_dependent",
+          "source": "synthetic fixture: made-up planted mover",
+          "assumption": "synthetic point sources added in memory to this area's recorded cutouts; PSF and distance model in method.checks"
+        },
+        "completeness": {
+          "tag": "model_dependent",
+          "source": "synthetic fixture: made-up grid",
+          "assumption": "synthetic point sources added in memory to this area's recorded cutouts; PSF and distance model in method.checks"
+        },
+        "control": {
+          "tag": "derived",
+          "source": "synthetic fixture: made-up control",
+          "formula": "tracks found on the same frames with the mid-times permuted at random; seeds in method.checks (A17.6)"
+        }
+      }
+    }
+  },
+  {
+    "name": "area summary steps derived without a formula",
+    "schema": "area-summary",
+    "expect": {
+      "path": "/provenance/steps",
+      "keyword": "required",
+      "detail": "formula"
+    },
+    "instance": {
+      "area_id": "fixture:area-main",
+      "ra": 150.0,
+      "dec": 10.0,
+      "width_deg": 1.0,
+      "height_deg": 0.6,
+      "data_release": "synthetic_fixture",
+      "n_frames": 16,
+      "n_visits": 2,
+      "frames": [
+        {
+          "frame_id": "fixture-area-main-v1e1-D1",
+          "detector": 1,
+          "visit": 1,
+          "exposure": 1,
+          "time": "2026-01-15T03:00:00.000Z",
+          "wavelength_min_um": 0.75,
+          "wavelength_max_um": 1.11,
+          "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.2523970 9.7001875 150.2523970 10.2998125 149.4926040 10.2998125"
+        }
+      ],
+      "coverage": [
+        {
+          "visit": 1,
+          "polygon": [
+            [
+              149.492604,
+              9.7001875
+            ],
+            [
+              150.252397,
+              9.7001875
+            ],
+            [
+              150.252397,
+              10.2998125
+            ],
+            [
+              149.492604,
+              10.2998125
+            ]
+          ]
+        }
+      ],
+      "steps": {
+        "n_dots": 570,
+        "n_glitches": 18,
+        "n_stars": 480,
+        "n_fixed": 16,
+        "n_static_one_visit": 1,
+        "n_tracks": 3,
+        "n_possible": 1,
+        "n_found_blind": 1,
+        "n_unexplained": 1,
+        "n_unchecked": 1
+      },
+      "method": {
+        "settings": {
+          "k_detect": 5.0
+        }
+      },
+      "cached_at": "2026-11-10T12:00:00.000Z",
+      "computed_at": "2026-11-10T12:00:00.000Z",
+      "missing": [],
+      "provenance": {
+        "frames": {
+          "tag": "measured",
+          "source": "synthetic fixture: made-up frame list, not SPHEREx data"
+        },
+        "coverage": {
+          "tag": "derived",
+          "source": "synthetic fixture: made-up footprints",
+          "formula": "per visit, the union of its frames' s_region clipped to the area (A17.1)"
+        },
+        "steps": {
+          "tag": "derived",
+          "source": "synthetic fixture: counts of the fixture's own dots and tracks"
         }
       }
     }

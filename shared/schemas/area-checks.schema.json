@@ -304,5 +304,38 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "missing"
+        ],
+        "properties": {
+          "missing": {
+            "type": "array",
+            "contains": {
+              "const": "checks:not_run"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "test_mover": false,
+          "completeness": false,
+          "control": false,
+          "linker": false
+        }
+      },
+      "else": {
+        "required": [
+          "test_mover",
+          "completeness",
+          "control",
+          "linker"
+        ]
+      }
+    }
+  ]
 }

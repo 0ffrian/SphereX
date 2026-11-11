@@ -692,7 +692,8 @@ def main_area() -> tuple[dict[str, Any], dict[str, str]]:
     a2 = Mover("A2", 300.0, 250.0, -150.0, 60.0, v1, {1: 50.0, 4: 70.0})
     red = Mover("R1", 500.0, 200.0, 250.0, 300.0, v2, {4: 36.0})
     static = Mover("S1", 80.0, 300.0, 40.0, 30.0, v1, {1: 28.0})
-    c1 = Mover("C1", 380.0, 330.0, 200.0, 0.0, v1, {})
+    # Leaves the area before visit 2 (x ~ 634 > nx), so /known lists visit 1 only (A17.5 step 4).
+    c1 = Mover("C1", 380.0, 330.0, 250.0, 0.0, v1, {})
     movers = [a1, t2, a2, red, static]
     mover_frames = {"A1": frames, "U1": frames, "A2": frames, "R1": v2_d4, "S1": v1_d1}
     dots, by_mover = _build(spec, movers, mover_frames, n_stars=30, n_glitches=18, fixed=True)
@@ -907,7 +908,7 @@ def multivisit_area() -> tuple[dict[str, Any], dict[str, str]]:
         seed=921,
     )
     spec.build_frames()
-    faint = Mover("F1", 60.0, 80.0, 70.0, 50.0, v1, {2: 18.0, 3: 21.0})
+    faint = Mover("F1", 60.0, 80.0, 70.0, 50.0, v1, {2: 22.0, 3: 24.0})
     dots, by_mover = _build(
         spec, [faint], {"F1": spec.frames}, n_stars=8, n_glitches=4, fixed=False
     )
