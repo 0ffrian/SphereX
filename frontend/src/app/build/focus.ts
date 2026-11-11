@@ -1,6 +1,7 @@
 // Issue #60: where focus goes when the selection card or the build pane closes. A plain module (no
 // component), so the hash hook and the components can both use it.
 import { useAppStore } from '@/state/store';
+import { useShellStore } from '@/app/shell/shellStore';
 
 /** Focuses the selected object's marker (after the card or the pane closes); else the sky canvas. */
 export function focusSelectedMarker(id: string | null): void {
@@ -27,4 +28,11 @@ export function focusAfterBuildClose(tool: string): void {
       document.querySelector<HTMLElement>('[data-testid="tool-viewer"]')?.focus(),
     );
   } else focusSelectedMarker(sky.resolved.id);
+}
+
+/** Closes the build pane (x, Escape and the dock's Sky button; the hash follows, see useHashSync) and returns focus. */
+export function closeBuildPane(): void {
+  const { tool } = useShellStore.getState();
+  useShellStore.getState().closeBuild();
+  focusAfterBuildClose(tool);
 }

@@ -5,7 +5,8 @@ import type { CometEpoch, ObjectCard, ObjectType, RenderParams, Tag } from '@/co
 import type { HonestyState } from './honesty';
 import type { LightingPlan } from './lighting';
 import type { Motion } from './motion/motion';
-import type { StarRates } from './bodies/starModel';
+import type { StarRates, StarSurfaceConfig } from './bodies/starModel';
+import type { StarColourView, StarScale, StellarModel } from '@/physics/stellar';
 import type { GasSwitches } from './renderers/shaderSpec';
 import type { Overrides } from './sliders';
 
@@ -119,6 +120,8 @@ export interface BodyPlan {
   /** Baked height map (R6.3) and the displacement it drives, in units of the radius; null = none. */
   heightUrl: string | null;
   displacementScale: number | null;
+  /** Comet nucleus with no shape model: a two-lobed outline (issue #71, artistic). */
+  lobed?: boolean;
 }
 
 /**
@@ -134,6 +137,14 @@ export interface ShapePlan {
   ao: boolean;
   /** Fine regolith normals below the model's resolution (tier 5, artistic). */
   regolith: boolean;
+  /**
+   * A procedural rock (issue #71): the surface is a baked height field, not a mesh. Lit with the
+   * rock blend of Lommel-Seeliger and Lambert, a phase falloff, and shadows from the displaced
+   * body. Absent for a shape model.
+   */
+  rock?: boolean;
+  /** Half-width of the shadow camera in scene units (default: the shape-model value). */
+  shadowExtent?: number;
 }
 
 export interface ShellPlan {
@@ -270,6 +281,26 @@ export interface StarSurfacePlan {
   strands: boolean;
   glow: boolean;
   rates: StarRates;
+  /**
+   * Issue #71 stream C: the physical surface model (cells, field, spot groups) and the config that
+   * draws it, or null when the card lacks mass (placeholder look, `STAR_SURFACE`). Stream G reads
+   * `physics.groups` for the flare sites.
+   */
+  physics: StellarModel | null;
+  config: StarSurfaceConfig | null;
+  /** Colour view and whole-star scale (D-36); also set from `PlanContext`. */
+  colourView: StarColourView;
+  scale: StarScale;
+  /** Share of cells visible at this scale (0..1) and the cells across one radius drawn. */
+  cellsAcross: number;
+  granuleVisibility: number;
+  /** True when the cells are drawn larger than real (the layer is `artistic`). */
+  cellsEnlarged: boolean;
+  /**
+   * Issue #71 stream G: flares and plasma drawn along the physical spot groups (StarPlasma). When on,
+   * the old region loops and shader flares are not drawn (this supersedes them).
+   */
+  plasma: boolean;
 }
 
 /**
@@ -366,6 +397,12 @@ export interface PlanContext {
   /** Requested mode; the plan falls back to the type's default if it is unavailable. */
   mode: ViewModeId | null;
   epoch: CometEpoch;
+  /**
+   * Issue #71 F (Q-262): a time between the two SPHEREx epochs, as a Julian date. Set by the
+   * emissions view; the gas rates and the modelled tail are taken at this time. Absent: the epoch's
+   * own centre time.
+   */
+  cometJd?: number | null;
   /** Index into the card's light curve (Mira, T Tauri). */
   scrubIndex: number;
   /** Layer ids whose mesh or texture failed to load: refused with reason 'load'. */
@@ -381,6 +418,9 @@ export interface PlanContext {
    * displacement is not drawn, so the plan refuses it with a reason instead of listing it (Q-117).
    */
   qualityTier?: 'high' | 'medium' | 'low';
+  /** Issue #71 stream C: colour view of a star (default `true`) and its whole-star scale (default `enlarged`). */
+  starColour?: StarColourView;
+  starScale?: StarScale;
   /**
    * D-27 slider overrides. Only the gas giant legend reads them (a slider sets the drawn band
    * count or flattening, so the legend names it `artistic`). Absent: no slider is set.

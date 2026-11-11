@@ -128,6 +128,11 @@ import {
 } from './shaderSpec';
 import { bilinear, fieldUV, floatTexture, vnoise3 } from './fieldTexture';
 import { buildJetSurface, EVOLVE_PER_RAD, makeJetRuntime } from './jetSurface';
+import { requestWorld } from '../fields/worldClient';
+import { resolveWorld } from '../fields/worldInputs';
+import { worldReadouts, type WorldReadout } from '@/physics/climateBudget';
+import { isExoplanetCard } from '../planCommon';
+import { buildRockyWorld, type OrbitSources } from './RockyWorld';
 
 const rgb3 = (c: Rgb) => vec3(c[0], c[1], c[2]);
 
@@ -616,6 +621,13 @@ interface Built {
   setPattern?: (on: boolean) => void;
 }
 
+/** What the body keeps of a built rocky world: its GPU pass. */
+interface BodyRocky {
+  stepGpu(r: unknown, t: SimTimeFn): boolean;
+  setOnTracerStep(f: (() => void) | null): void;
+  dispose(): void;
+}
+
 export class ShaderBody implements BodyRenderer {
   readonly object = new Group();
   private surface: Group | null = null;
@@ -652,6 +664,12 @@ export class ShaderBody implements BodyRenderer {
     clouds: makeFloatUniform(1),
   };
   private readonly fieldSource: NonNullable<BodyContext['fieldSource']>;
+  private readonly worldSource: NonNullable<BodyContext['worldSource']>;
+  /** Issue #71 stream D: the readouts and assumptions of the rocky-world model drawn now, else null. */
+  private orbit: OrbitSources | null = null;
+  private pendingRocky: BodyRocky | null = null;
+  private rocky: BodyRocky | null = null;
+  private worldInfo: { readouts: WorldReadout[]; assumptions: string[]; low: boolean } | null = null;
   private readonly onChange: (() => void) | undefined;
   private readonly onFailed: ((layerId: string) => void) | undefined;
 
@@ -664,6 +682,7 @@ export class ShaderBody implements BodyRenderer {
     this.visibleTags = ctx.visibleTags ?? ESTIMATED_TAGS;
     this.overrides = ctx.overrides ?? {};
     this.fieldSource = ctx.fieldSource ?? requestField;
+    this.worldSource = ctx.worldSource ?? requestWorld;
     this.onChange = ctx.onChange;
     this.onFailed = ctx.onFailed;
     this.octaves = ctx.octaves ?? 4;
@@ -876,8 +895,13 @@ export class ShaderBody implements BodyRenderer {
 
   setTier(tier: TierName): void {
     if (this.disposed || tier === this.tier) return;
+    const wasLow = this.tier === 'low';
     this.tier = tier;
     for (const v of this.volumes) v.setTier(tier);
+    // A rocky world is built for the phone tier or the full one: a change between them rebuilds it.
+    if (this.worldInfo && wasLow !== (tier === 'low')) {
+      this.rebuild().catch((err: unknown) => console.warn('[viewer] could not rebuild the world', err));
+    }
     this.onChange?.();
   }
 
@@ -934,6 +958,10 @@ export class ShaderBody implements BodyRenderer {
     if (this.disposed) return;
     this.disposed = true;
     this.release(this.surface, this.textures, this.volumes);
+    this.rocky?.dispose();
+    this.rocky = null;
+    this.pendingRocky?.dispose();
+    this.pendingRocky = null;
     this.surface = null;
     this.textures = [];
     this.sampler = null;
@@ -1026,6 +1054,8 @@ export class ShaderBody implements BodyRenderer {
         volumes: [volume],
       };
     }
+    const rocky = await this.buildRocky(spec, textures);
+    if (rocky !== undefined) return rocky;
     const field = await this.fieldSource(spec.field!);
     if (this.disposed || spec !== this.spec) return null;
     const sampler = new FieldSampler(field);
@@ -1065,6 +1095,86 @@ export class ShaderBody implements BodyRenderer {
   }
 
   /**
+   * Issue #71 stream D (D-36, Q-243): a rocky or water exoplanet with a known star and orbit is drawn
+   * from the plate-tectonics terrain and the heat / ice / water budget (RockyWorld.ts). Returns
+   * `undefined` when it does not apply (not an exoplanet card, an input missing, or the worker
+   * failed): the older planet look is then built, so the body is never blank. Returns null when this
+   * build was superseded or the body was disposed.
+   */
+  private async buildRocky(spec: ShaderSpec, textures: DataTexture[]): Promise<Built | null | undefined> {
+    this.worldInfo = null;
+    this.orbit = null;
+    if (spec.kind !== 'planet_rocky' && spec.kind !== 'planet_water') return undefined;
+    if (!spec.planet || !isExoplanetCard(this.card)) return undefined;
+    const low = this.tier === 'low';
+    const res = resolveWorld(this.card, spec.kind, spec.seed, this.overrides, low ? 'low' : 'full');
+    if (!res.ok) return undefined;
+    let world;
+    try {
+      world = await this.worldSource(res.params);
+    } catch (err) {
+      console.warn('[viewer] the rocky-world model failed; using the older planet look', err);
+      return undefined;
+    }
+    if (this.disposed || spec !== this.spec) return null;
+    if (!world) return undefined;
+    const built = buildRockyWorld({
+      world,
+      kind: spec.kind,
+      seed: spec.seed,
+      motion: this.motion,
+      scaleM: spec.scaleM,
+      sunWorld: this.sun,
+      sunValue: this.sun.value,
+      sunColour: this.sunColour,
+      mould: this.mould,
+      relief: spec.planet.relief,
+      cloudCover: sliderValue(this.overrides, 'cloud_cover', spec.kind),
+      atmosphere: sliderValue(this.overrides, 'atmosphere', spec.kind),
+      showPlates: res.showPlates,
+      low,
+      textures,
+    });
+    this.orbit = built.orbitSources;
+    built.setOnTracerStep(() => this.onChange?.());
+    this.pendingRocky?.dispose();
+    this.pendingRocky = built;
+    this.worldInfo = {
+      readouts: worldReadouts(world.model, res.sources, world.climate.stats, world.hydrology?.stats ?? null),
+      assumptions: res.assumptions,
+      low,
+    };
+    return {
+      group: built.group,
+      frame: built.runtime.frame,
+      textures,
+      field: world.field,
+      points: null,
+      runtime: built.runtime,
+      sampler: new FieldSampler(world.field),
+      setPattern: built.setPattern,
+    };
+  }
+
+  /**
+   * Issue #71 stream D (Q-245): steps the rocky world's cloud tracer on the viewer's renderer, up to
+   * the clock's step. Called by the viewer before each frame; false (and no work) for any other body.
+   */
+  stepGpu(renderer: unknown): boolean {
+    return this.rocky ? this.rocky.stepGpu(renderer, this.time) : false;
+  }
+
+  /** Stream H: the textures and scalars of the drawn rocky world, else null. */
+  get orbitSources(): OrbitSources | null {
+    return this.orbit;
+  }
+
+  /** Issue #71 stream D: the numbers of the drawn world with their tags and assumptions, else null. */
+  get world(): { readouts: readonly WorldReadout[]; assumptions: readonly string[]; low: boolean } | null {
+    return this.worldInfo;
+  }
+
+  /**
    * B3: builds the new surface first, then swaps it in and frees the old one, so the viewer never
    * shows an empty body while the field is being generated. A superseded rebuild changes nothing.
    */
@@ -1074,8 +1184,13 @@ export class ShaderBody implements BodyRenderer {
     if (this.disposed || spec !== this.spec) {
       // NF-1: disposed or superseded after build() resolved; free what it made, it was never added.
       if (built) this.release(built.group, built.textures, built.volumes);
+      this.pendingRocky?.dispose();
+      this.pendingRocky = null;
       return;
     }
+    const oldRocky = this.rocky;
+    this.rocky = this.pendingRocky;
+    this.pendingRocky = null;
     const oldGroup = this.surface;
     const oldTextures = this.textures;
     const oldVolumes = this.volumes;
@@ -1092,6 +1207,7 @@ export class ShaderBody implements BodyRenderer {
     this.volumes = built?.volumes ?? [];
     if (built) this.object.add(built.group);
     this.release(oldGroup, oldTextures, oldVolumes);
+    oldRocky?.dispose();
     this.ensurePlain();
     this.applyVisibility();
     this.onChange?.();

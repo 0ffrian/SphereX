@@ -288,12 +288,11 @@ svg{display:block}
 .tp-sw{display:flex;gap:22px;align-items:center}
 .btn.sm{height:32px;font-size:12px;padding:0 13px;gap:7px;display:inline-flex;align-items:center}
 .btn.sm svg{width:12px;height:12px}
-.bp-tools #bpFeel{width:auto;padding:0 11px 0 9px;display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;margin-right:4px}
+.bp-tools #bpAcc svg{width:15px;height:15px}
+.bp-tools #bpAcc,.bp-tools #bpFeel,.bp-tools #bpHear{width:auto;padding:0 11px 0 9px;display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;margin-right:4px}
+.bp-tools #bpHear svg{width:15px;height:15px}
 .bp-tools .x.on,.bp-tools .x.on:hover{background:#4ade8026;color:var(--green)}
 .bp-stage{touch-action:none}
-.bp-wave{display:none;padding:0 18px 20px}
-.bpane.feeling .bp-steps{display:none}
-.bpane.feeling .bp-wave{display:block}
 .bw-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:12.5px;color:var(--mfg)}
 .bw-head b{font:600 13px var(--mono);color:var(--fg);font-variant-numeric:tabular-nums}
 #bwCanvas{display:block;width:100%;height:124px;border-radius:14px;background:var(--card);box-shadow:inset 0 0 0 1px var(--border)}
@@ -355,6 +354,54 @@ body.split .player{opacity:0;transform:translateY(-14px);pointer-events:none}
 .rw .chip{font-size:10px;padding:1px 7px;flex:none}
 .row-btn.wrap{flex-wrap:wrap}
 
+/* ---------- build split: close-up on the left half, the turning object on the right ---------- */
+#cuPane{position:absolute;left:0;top:0;bottom:0;width:50%;z-index:5;background:#000;opacity:0;visibility:hidden;pointer-events:none;transform:translateX(-36px) scale(.985);transition:opacity .7s var(--ease),transform 1s var(--ease),visibility 0s .8s}
+#cuPane.open{opacity:1;visibility:visible;transform:none;transition:opacity .7s var(--ease) .1s,transform 1s var(--ease) .1s}
+#cuPane iframe,#cuPane canvas{position:absolute;inset:0;width:100%;height:100%;border:0;display:none}
+#cuPane[data-mode="frame"] iframe,#cuPane[data-mode="canvas"] canvas{display:block}
+body.split .hud.sc{display:none}
+/* Build: the shape pops out of the crosshair over the dimmed sky, morphs in the middle of the screen with its loader timeline; then the pane slides to the right half and the close-up opens on the left. */
+#bpane{top:0;bottom:0;right:0;width:100%;border:0;border-radius:0;box-shadow:none;transform:none;
+  background-color:#03030788;background-image:radial-gradient(70% 60% at 50% 45%,#1b1b2c66 0%,transparent 72%);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  transition:opacity .45s,width 1s var(--ease),background-color .9s var(--ease)}
+#bpane.shifted{width:50%;background-color:#05050a}
+#bpane .bp-stage{position:absolute;inset:0;min-height:0}
+#bpane .bp-head{position:relative;z-index:2;padding:24px 28px 4px;pointer-events:none}
+#bpane .bp-head .bp-tools,#bpane .bp-head button{pointer-events:auto}
+#bpane .bp-steps,#bpane .bp-wave{z-index:2}
+body.bsplit .hud{opacity:0;transition:opacity .35s}
+#bpane .bp-steps{position:absolute;left:50%;bottom:104px;width:min(720px,calc(100% - 56px));padding:0;transform:translateX(-50%);
+  transition:opacity .5s,transform .8s var(--spring)}
+#bpane.shifted .bp-steps{opacity:0;transform:translate(-50%,18px);pointer-events:none}
+/* the Feel and Hear it popover: one panel under the buttons, one sense at a time */
+.bp-pop{position:absolute;z-index:3;top:72px;right:24px;width:min(340px,calc(100% - 48px));background:var(--panel);border:1px solid var(--panel-line);border-radius:18px;padding:14px 16px 16px;box-shadow:0 18px 50px #000b;transform-origin:top right;animation:popIn .45s var(--spring)}
+.bp-pop[data-w="acc"]{width:min(400px,calc(100% - 48px));max-height:calc(100% - 160px);overflow-y:auto}
+.bp-pop[hidden],.bp-pop section[hidden]{display:none}
+.acc-top{display:flex;align-items:baseline;gap:10px;margin:2px 0 10px}.acc-top .n{font:600 34px/1 var(--font);letter-spacing:-.02em;color:#fff;font-variant-numeric:tabular-nums}.acc-top span{font-size:12.5px;color:var(--panel-fg)}
+.acc-bar{display:flex;gap:2px;height:10px;border-radius:5px;overflow:hidden;background:#1c1f21;margin-bottom:10px}.acc-bar i{display:block;height:100%;min-width:0;transition:flex-basis .7s var(--ease)}
+.acc-key{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:12.5px;color:var(--panel-fg);margin-bottom:12px}.acc-key b{font:600 12.5px var(--mono);color:#fff;text-align:right}.acc-key small{display:block;font-size:11px;color:#9aa4a9}
+.acc-sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+.acc-eq{display:block;font:12.5px/1.5 var(--mono);background:#1c1f21;border:1px solid var(--panel-line);border-radius:10px;padding:9px 11px;color:#e5e7e8;margin-bottom:6px;overflow-x:auto;white-space:nowrap}
+.acc-tex{margin:0 0 6px;overflow-x:auto;overflow-y:hidden;max-width:100%}.acc-tex.math-on{background:#1c1f21;border:1px solid var(--panel-line);border-radius:10px;padding:6px 10px;color:#e5e7e8}.acc-tex .katex{font-size:.92em}.acc-tex .katex-display{margin:.3em 0}
+.acc-gate{list-style:none;margin:0 0 8px;padding:0;font-size:12px;color:#c9d1d5;display:flex;flex-direction:column;gap:3px}.acc-gv{display:inline-block;min-width:26px;font:500 10.5px var(--mono);text-transform:uppercase;letter-spacing:.04em;margin-right:4px}.acc-gv.ok{color:#4ade80}.acc-gv.no{color:#f87171}
+.acc-rules{font-size:11.5px!important;color:#9aa4a9!important;margin-bottom:12px!important}
+.acc-tbl{width:100%;border-collapse:collapse;font-size:12.5px}.acc-tbl th{text-align:left;font:500 10.5px var(--mono);color:#9aa4a9;text-transform:uppercase;letter-spacing:.05em;padding:0 8px 5px 0}.acc-tbl td{padding:5px 8px 5px 0;border-top:1px solid var(--panel-line);color:#e5e7e8}
+.acc-tbl th:last-child,.acc-tbl td:last-child{text-align:right;padding-right:0;font-family:var(--mono);white-space:nowrap}
+.acc-tag{display:inline-block;border:1px solid;border-radius:4px;padding:1px 6px;font-size:11.5px;white-space:nowrap}
+.acc-tag.d{border-color:#34d399;color:#6ee7b7}.acc-tag.p{border-color:#38bdf8;color:#7dd3fc}.acc-tag.a{border-color:#71717a;border-style:dashed;color:#a1a1aa}
+@keyframes popIn{from{opacity:0;transform:translateY(-8px) scale(.92)}}
+.pop-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px}
+.pop-h b{font-size:14px;font-weight:600;color:#fff}.pop-h span{font-size:11.5px;color:#9aa4a9}
+.bp-pop p{font-size:12.5px;line-height:1.5;color:var(--panel-fg);margin-bottom:12px}
+.pop-row{display:flex;align-items:center;gap:12px;margin-top:10px}.pop-note{font-size:11px;line-height:1.35;color:#9aa4a9}
+#hearCanvas{display:block;width:100%;height:96px;border-radius:12px;background:#1c1f21;box-shadow:inset 0 0 0 1px var(--panel-line)}
+#bwCanvas{background:#1c1f21!important;box-shadow:inset 0 0 0 1px var(--panel-line)!important}
+body.bsplit .topr{opacity:0;transform:translateY(-14px);pointer-events:none}
+.topr{transition:opacity .35s,transform .6s var(--spring)}
+body.bsplit .view.building #skyPane{right:0}
+#cuPane::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,transparent 80%,#0008 100%)}
+.cu-tag{position:absolute;left:var(--gap);bottom:88px;z-index:2;max-width:calc(100% - 2*var(--gap));font:11px var(--mono);color:var(--panel-fg);background:#242729cc;border:1px solid var(--panel-line);border-radius:10px;padding:6px 10px;line-height:1.4}
 /* ---------- area tool: draw a square on the sky, then Known objects (Track) or Discovery ---------- */
 .view.boxing #skyPane,.view.boxing #sky{cursor:crosshair}
 .view.tracking #skyPane{right:62%}
@@ -477,20 +524,34 @@ body.split .player{opacity:0;transform:translateY(-14px);pointer-events:none}
     <main class="view" id="view">
       <div id="skyPane"><canvas id="sky"></canvas><div class="gload" id="tLoad"><div id="tLoadG"></div><span>Loading the 3D view</span></div><canvas id="tCanvas" aria-label="3D comet with its gas clouds and tails. Drag to turn it."></canvas></div>
       <div class="vignette"></div>
+      <div id="cuPane" aria-hidden="true"><iframe id="cuFrame" title="Close-up of the object" tabindex="-1"></iframe><canvas id="cuCanvas"></canvas><span class="cu-tag" id="cuTag"></span></div>
       <div class="hud tl" id="hudTl"></div>
       <div class="hud br" id="hudBr"></div>
 
       <aside class="bpane" id="bpane" aria-label="Procedural build" aria-hidden="true">
         <div class="bp-head"><div><h3 id="bpTitle"></h3><p id="bpSub"></p></div>
           <div class="bp-tools">
-            <button class="x" id="bpFeel" type="button" title="Feel the surface" aria-label="Feel the surface" aria-pressed="false"><svg class="ico ai ai-fingerprint" viewBox="0 0 24 24"><path class="v-path" stroke="currentColor" d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4 M14 13.12c0 2.38 0 6.38-1 8.88 M17.29 21.02c.12-.6.43-2.3.5-3.02 M2 12a10 10 0 0 1 18-6 M2 16h.01 M21.8 16c.2-2 .131-5.354 0-6 M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2 M8.65 22c.21-.66.45-1.32.57-2 M9 6.8a6 6 0 0 1 9 5.2v2"/><path class="v-path1" d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" pathLength="1"/><path class="v-path2" d="M14 13.12c0 2.38 0 6.38-1 8.88" pathLength="1"/><path class="v-path3" d="M17.29 21.02c.12-.6.43-2.3.5-3.02" pathLength="1"/><path class="v-path4" d="M2 12a10 10 0 0 1 18-6" pathLength="1"/><path class="v-path5" d="M2 16h.01" pathLength="1"/><path class="v-path6" d="M21.8 16c.2-2 .131-5.354 0-6" pathLength="1"/><path class="v-path7" d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" pathLength="1"/><path class="v-path8" d="M8.65 22c.21-.66.45-1.32.57-2" pathLength="1"/><path class="v-path9" d="M9 6.8a6 6 0 0 1 9 5.2v2" pathLength="1"/></svg><span>Feel</span></button>
-            <button class="x" id="bpReplay" type="button" title="Replay" aria-label="Replay the build"><svg class="ico ai ai-rotate-ccw" viewBox="0 0 24 24"><path class="v-path1" d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path class="v-path2" d="M3 3v5h5"/></svg></button>
-            <button class="x" id="bpSeed" type="button" title="New seed" aria-label="Build a different one"><svg class="ico" viewBox="0 0 24 24"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
+            <button class="x" id="bpAcc" type="button" title="Accuracy" aria-label="Accuracy" aria-pressed="false" aria-expanded="false" aria-controls="bpPop"><svg class="ico" viewBox="0 0 24 24"><path d="M3.3 17a10 10 0 1 1 17.4 0"/><path d="M12 14l4-5"/><circle cx="12" cy="14" r="1.2"/></svg><span>Accuracy</span></button>
+            <button class="x" id="bpFeel" type="button" title="Feel the surface" aria-label="Feel the surface" aria-pressed="false" aria-expanded="false" aria-controls="bpPop"><svg class="ico ai ai-fingerprint" viewBox="0 0 24 24"><path class="v-path" stroke="currentColor" d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4 M14 13.12c0 2.38 0 6.38-1 8.88 M17.29 21.02c.12-.6.43-2.3.5-3.02 M2 12a10 10 0 0 1 18-6 M2 16h.01 M21.8 16c.2-2 .131-5.354 0-6 M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2 M8.65 22c.21-.66.45-1.32.57-2 M9 6.8a6 6 0 0 1 9 5.2v2"/><path class="v-path1" d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" pathLength="1"/><path class="v-path2" d="M14 13.12c0 2.38 0 6.38-1 8.88" pathLength="1"/><path class="v-path3" d="M17.29 21.02c.12-.6.43-2.3.5-3.02" pathLength="1"/><path class="v-path4" d="M2 12a10 10 0 0 1 18-6" pathLength="1"/><path class="v-path5" d="M2 16h.01" pathLength="1"/><path class="v-path6" d="M21.8 16c.2-2 .131-5.354 0-6" pathLength="1"/><path class="v-path7" d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" pathLength="1"/><path class="v-path8" d="M8.65 22c.21-.66.45-1.32.57-2" pathLength="1"/><path class="v-path9" d="M9 6.8a6 6 0 0 1 9 5.2v2" pathLength="1"/></svg><span>Feel</span></button>
+            <button class="x" id="bpHear" type="button" title="Hear it" aria-label="Hear it" aria-pressed="false" aria-expanded="false" aria-controls="bpPop"><svg class="ico" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg><span>Hear it</span></button>
             <i class="sep"></i>
             <button class="x" id="bpClose" type="button" aria-label="Close build view"><svg class="ico ai ai-x" viewBox="0 0 24 24"><line class="v-line1" x1="6" y1="18" x2="18" y2="6"/><line class="v-line2" x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>
         <div class="bp-stage" id="bpStage"><canvas id="bpCanvas"></canvas><i id="bpRing"></i><div class="bp-msg" id="bpMsg" hidden></div><div class="gload" id="bLoad"><div id="bLoadG"></div><span>Loading the 3D view</span></div></div>
         <ol class="bp-steps" id="bpSteps"></ol>
-        <div class="bp-wave"><div class="bw-head"><span>Vibration</span><b id="bwHz">0 Hz</b></div><canvas id="bwCanvas"></canvas></div>
+        <div class="bp-pop" id="bpPop" hidden role="group" aria-label="Senses">
+          <section id="popAcc" hidden></section>
+          <section id="popFeel" hidden>
+            <div class="pop-h"><b>Feel it</b><span>Drag over the object</span></div>
+            <p>Bumps buzz and smooth ground stays quiet. On a phone it vibrates. Here you also hear it.</p>
+            <div class="bw-head"><span>Vibration</span><b id="bwHz">0 Hz</b></div><canvas id="bwCanvas"></canvas>
+          </section>
+          <section id="popHear" hidden>
+            <div class="pop-h"><b>Hear it</b><span>Brightness becomes pitch</span></div>
+            <p>A sweep across the object's infrared fingerprint, 0.75 to 5 µm. Higher pitch is brighter. Bells mark gases and dips.</p>
+            <canvas id="hearCanvas"></canvas>
+            <div class="pop-row"><button class="btn sm" id="hearGo" type="button">Play</button><span class="pop-note">Example spectrum for the demo, not a measurement.</span></div>
+          </section>
+        </div>
       </aside>
       <aside class="bpane" id="tpane" aria-label="Comet trail" aria-hidden="true">
         <div class="bp-head"><div><h3 id="tpTitle"></h3><p>Comet trail</p></div>
@@ -1636,7 +1697,7 @@ function fillBuildUI(){
   $("bpTitle").textContent = "Building " + o.n; $("bpSub").textContent = o.cls || KIND_NAME[B.kind];
   $("bpSteps").innerHTML = plan.map((p, i) => `<li><span class="dot"><b>${i+1}</b><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="lb">${p[0]}</span><span class="bar"></span></li>`).join("");
 }
-function replay(){ B.t0 = performance.now(); B.done = false; B.last = B.t0; island.set("building"); }
+function replay(){ B.t0 = performance.now(); B.done = false; B.last = B.t0; clearTimeout(B.shiftT); setShifted(false); island.set("building"); }
 function loop(now){
   if(!B.building || !B.body) return; B.raf = requestAnimationFrame(loop);
   const t = (now - B.t0)/1000, dt = Math.min(.05, (now - B.last)/1000); B.last = now;
@@ -1644,35 +1705,74 @@ function loop(now){
   B.body.apply(P, t);
   if(!B.drag) B.rot.y += dt*.28;
   B.body.root.rotation.set(B.rot.x, B.rot.y, 0);
+  if(CU.mode === "canvas"){ const z0 = B.camera.position.z; B.camera.position.z = z0*.36; B.renderer.render(B.scene, B.camera); B.camera.position.z = z0; cuDraw(); }
   B.renderer.render(B.scene, B.camera); feelStep(now); if(FG.on) drawWave(now);
   const lis = $("bpSteps").children;
   for(let i = 0; i < lis.length; i++){ const p = P[i]; lis[i].classList.toggle("done", p >= 1); lis[i].classList.toggle("active", p > 0 && p < 1); lis[i].lastChild.style.transform = `scaleX(${p})`; }
-  if(!B.done && t > B.n*STAGE_S + .3){ B.done = true; island.run([["done",1900]]); }
+  if(!B.done && t > B.n*STAGE_S + .3){ B.done = true; island.run([["done",1900]]); clearTimeout(B.shiftT); B.shiftT = setTimeout(() => { if(B.building) setShifted(true); }, 650); }
+}
+/* The close-up (left half of the build split): stars get the flare close-up page (closeup-star.html) and planets and gas giants get the orbit camera page (closeup-orbit.html), both extracted from the realism preview; every other kind gets the same 3D body from a camera close to its surface. */
+const CU = {pane:$("cuPane"), frame:$("cuFrame"), canvas:$("cuCanvas"), tag:$("cuTag"), mode:null, orbit:false};
+const ORBIT_BY_NAME = {"Jupiter":"jup", "Saturn":"sat", "TRAPPIST-1 e":"t1e", "TRAPPIST-1 f":"t1f", "K2-18 b":"k218", "HD 189733 b":"hd", "Earth":"earth", "Kepler-186 f":"k186"};
+const ORBIT_BY_KIND = {rocky:"rivers", water:"earth", gas:"jup"};   // a generic demo world gets the nearest example world
+function orbitUrl(o, kind){ const id = ORBIT_BY_NAME[o.n] || ORBIT_BY_KIND[kind]; return id ? "closeup-orbit.html?preset=" + id : null; }
+function cuOpen(o, kind){
+  const ou = orbitUrl(o, kind); CU.orbit = !!ou && kind !== "star";
+  CU.mode = kind === "star" || CU.orbit ? "frame" : "canvas"; CU.pane.dataset.mode = CU.mode;
+  if(kind === "star"){ const u = "closeup-star.html?T=" + (o.T || 5772); if(CU.frame.getAttribute("src") !== u) CU.frame.src = u; CU.tag.textContent = "Close-up · a flare on the star's surface · illustrative (Default), not a measurement"; }
+  else if(CU.orbit){ if(CU.frame.getAttribute("src") !== ou) CU.frame.src = ou; CU.tag.textContent = "Close-up · from orbit, click the globe to look at a place · generated (Default)"; }
+  else { CU.frame.removeAttribute("src"); CU.tag.textContent = "Close-up · the same body seen from near its surface · generated (Default)"; }
+}
+/* Click the globe on the right while the orbit close-up is open: send that place (radians) to the orbit page. */
+(function(){
+  const el = bpCanvas.parentElement; let down = null;
+  el.addEventListener("pointerdown", e => { down = {x:e.clientX, y:e.clientY}; });
+  el.addEventListener("pointerup", e => {
+    const d0 = down; down = null; if(!d0 || FG.on || !CU.orbit || CU.mode !== "frame" || !B.body || !B.camera || !window.THREE) return;
+    if(Math.hypot(e.clientX - d0.x, e.clientY - d0.y) > 5) return;
+    const r = bpCanvas.getBoundingClientRect(); if(!r.width || !r.height) return;
+    const rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2((e.clientX - r.left)/r.width*2 - 1, -((e.clientY - r.top)/r.height*2 - 1)), B.camera);
+    B.body.root.updateMatrixWorld(true);
+    const hit = rc.intersectObject(B.body.root, true).map(h => B.body.root.worldToLocal(h.point.clone())).find(v => v.length() > .2 && v.length() < 1.3); if(!hit) return;
+    hit.normalize(); const w = CU.frame.contentWindow; if(w) w.postMessage({type:"orbit-goto", lat:Math.asin(Math.max(-1, Math.min(1, hit.y))), lon:Math.atan2(hit.z, hit.x)}, "*");
+  });
+})();
+function setShifted(on){ bpane.classList.toggle("shifted", on); if(on && CU.mode){ CU.pane.classList.add("open"); CU.pane.setAttribute("aria-hidden", "false"); } else { CU.pane.classList.remove("open"); CU.pane.setAttribute("aria-hidden", "true"); } }
+function popFromCross(){
+  if(!B.obj || !bpStage.animate) return; const r = bpStage.getBoundingClientRect(); if(!r.width) return;
+  let dx = 0, dy = 0; try{ const p = posOf(B.obj, frame), [gx, gy] = toScreen(p[0], p[1]); if(isFinite(gx) && isFinite(gy)){ dx = gx - (r.left + r.width/2); dy = gy - (r.top + r.height/2); } }catch(e){}
+  bpStage.animate([{transform:`translate(${dx}px,${dy}px) scale(.03)`, opacity:0},{opacity:1, offset:.25},{transform:"none", opacity:1}], {duration:1250, easing:"cubic-bezier(.34,1.28,.64,1)"});
+}
+function cuClose(){ CU.pane.classList.remove("open"); CU.pane.setAttribute("aria-hidden", "true"); CU.mode = null; CU.frame.removeAttribute("src"); }
+function cuDraw(){
+  const c = CU.canvas, dpr = Math.min(devicePixelRatio || 1, 2), w = Math.round(c.clientWidth*dpr), h = Math.round(c.clientHeight*dpr); if(!w || !h) return;
+  if(c.width !== w || c.height !== h){ c.width = w; c.height = h; }
+  const g = c.getContext("2d"), src = B.renderer.domElement, sw = src.width, sh = src.height; if(!sw || !sh) return;
+  g.fillStyle = "#000"; g.fillRect(0, 0, w, h);
+  const k = Math.max(w/sw, h/sh), dw = sw*k, dh = sh*k; g.drawImage(src, (w - dw)/2, (h - dh)/2, dw, dh);
 }
 function openBuild(o, opt){
   o = o || sel || cur; if(!o) return; if(AR.track) closeTrack(); B.quick = !!(opt && opt.feel);
   island.closeCard(); startPlay(false); tool = "sky"; markTool("sky");
   B.obj = o; B.kind = o.kind || "star"; B.building = true; B.seed = 3 + Math.floor((o.ra || o.x || 1) * 13) % 40;
-  document.body.classList.add("split"); $("view").classList.add("building"); bpane.classList.add("open"); bpane.setAttribute("aria-hidden", "false");
+  document.body.classList.add("split", "bsplit"); $("view").classList.add("building"); setShifted(false); bpane.classList.add("open"); bpane.setAttribute("aria-hidden", "false");
   history.replaceState(null, "", "#build"); camT.z = Math.max(camT.z, 1.5); fillBuildUI(); if(B.quick) $("bpTitle").textContent = o.n; island.set(B.quick ? "idle" : "building");
-  loading("bLoad", true);
+  loading("bLoad", true); cuOpen(o, B.kind);
   ensureThree(ok => {
     if(!ok){ loading("bLoad", false); bpMsg.hidden = false; bpMsg.textContent = "The 3D build needs the three.js script from the internet, and it could not load."; return; }
     try{ initGL(); }catch(err){ loading("bLoad", false); bpMsg.hidden = false; bpMsg.textContent = "The 3D build needs WebGL, which this browser could not start."; return; }
     if(!B.building) return;
-    loading("bLoad", false); bpMsg.hidden = true; sizeGL(); setBody(); replay();
-    if(B.quick){ B.t0 = performance.now() - 1e5; B.done = true; island.set("idle"); if(!FG.on) bpFeel.onclick(); }
+    loading("bLoad", false); bpMsg.hidden = true; sizeGL(); setBody(); replay(); if(!B.quick) requestAnimationFrame(popFromCross);
+    if(B.quick){ B.t0 = performance.now() - 1e5; B.done = true; island.set("idle"); setShifted(true); if(!FG.on) bpFeel.onclick(); }
     cancelAnimationFrame(B.raf); B.raf = requestAnimationFrame(loop);
   });
 }
 function closeBuild(){
-  if(!B.building) return; loading("bLoad", false); if(FG.on) bpFeel.onclick(); feelEnd(); SFX.stop(); B.building = false; cancelAnimationFrame(B.raf);
-  document.body.classList.remove("split"); $("view").classList.remove("building"); bpane.classList.remove("open"); bpane.setAttribute("aria-hidden", "true");
+  if(!B.building) return; loading("bLoad", false); setPop(null); feelEnd(); SFX.stop(); B.building = false; cancelAnimationFrame(B.raf);
+  document.body.classList.remove("split", "bsplit"); $("view").classList.remove("building"); clearTimeout(B.shiftT); bpane.classList.remove("open", "shifted"); bpane.setAttribute("aria-hidden", "true"); cuClose();
   history.replaceState(null, "", location.pathname + location.search); island.run([["idle",1]]); tool = "sky"; markTool("sky");
 }
 $("bpClose").onclick = closeBuild;
-$("bpReplay").onclick = () => { replay(); const ic = $("bpReplay").querySelector("svg"); if(ic && ic.animate) ic.animate([{rotate:"0deg"},{rotate:"-360deg"}], {duration:650, easing:"cubic-bezier(.34,1.2,.64,1)"}); };
-$("bpSeed").onclick = () => { B.seed = Math.floor(Math.random()*90) + 1; if(B.renderer){ setBody(); replay(); } };
 bpCanvas.parentElement.addEventListener("pointerdown", e => { if(FG.on){ const r = bpCanvas.getBoundingClientRect(); FG.down = true; FG.x = e.clientX - r.left; FG.y = e.clientY - r.top; FG.t = performance.now(); FG.last = null; SFX.rubStart(); e.currentTarget.setPointerCapture(e.pointerId); return; }
   B.drag = {x:e.clientX, y:e.clientY, rx:B.rot.x, ry:B.rot.y}; e.currentTarget.setPointerCapture(e.pointerId); });
 bpCanvas.parentElement.addEventListener("pointermove", e => { if(FG.on){ const r = bpCanvas.getBoundingClientRect(); FG.x = e.clientX - r.left; FG.y = e.clientY - r.top; if(!FG.down){ bpRing.style.transform = `translate(${FG.x}px,${FG.y}px)`; bpRing.classList.add("on"); } return; } if(!B.drag) return; B.rot.y = B.drag.ry + (e.clientX - B.drag.x)*.008; B.rot.x = Math.max(-1.2, Math.min(1.2, B.drag.rx + (e.clientY - B.drag.y)*.008)); });
@@ -1997,10 +2097,125 @@ function feelStep(now){
     Haptics.tick({type:"tick", intensity:Math.min(1, .25 + rough*.9), sharpness:sharp, duration:Math.round(8 + 14*(1 - sharp)), material:ocean ? "ocean" : mat, body:B.kind});
     bpRing.classList.add("tick"); requestAnimationFrame(() => requestAnimationFrame(() => bpRing.classList.remove("tick"))); }
 }
-bpFeel.onclick = () => {
-  FG.on = !FG.on; bpane.classList.toggle("feeling", FG.on); bpFeel.classList.toggle("on", FG.on); bpFeel.setAttribute("aria-pressed", String(FG.on)); bpStage.classList.toggle("feel", FG.on);
-  if(!FG.on){ bpRing.classList.remove("on"); SFX.rubStop(); Haptics.stop(); } else toast("Drag over the body to feel it");
+function feelSet(on){
+  FG.on = on; bpane.classList.toggle("feeling", on); bpFeel.classList.toggle("on", on); bpFeel.setAttribute("aria-pressed", String(on)); bpStage.classList.toggle("feel", on);
+  if(!on){ bpRing.classList.remove("on"); SFX.rubStop(); Haptics.stop(); }
+}
+/* One sense at a time: Feel or Hear it opens its panel under the buttons; the same button, Escape or the close button puts it away. */
+const bpHear = $("bpHear"), bpAcc = $("bpAcc"), bpPop = $("bpPop"), HR = {raf:0};
+/* Accuracy: how much of the picture rests on satellite data, on physics worked out from it, or on assumptions. The rows and weights mirror the app's backend table (backend/app/core/render/confidence.py, D-36): C = sum(w_i c_i) / sum(w_i), c = 1 measured or physics from measured values, 0.5 for model-dependent or physics with an assumed input, 0 for assumed, drawn or missing. The weights are placeholders until a sensitivity sweep exists. Nebulae and novae have no score. */
+const ACC_THRESHOLD = .25;
+const ACC_KIND = {
+  star:[["Temperature and colour","derived",30],["Radius","model_dependent",20],["Edge darkening","model_dependent",10],["Spectral class","measured",10],["Motion on the sky","measured",5],["Boiling cells","artistic",15],["Spots","inferred_from_analog",10]],
+  dwarf:[["Spectral class","measured",25],["Temperature","derived",20],["Radius","model_dependent",15],["Methane band depth","measured",15],["Colour","derived",5],["Motion on the sky","measured",5],["Cloud bands","artistic",15]],
+  asteroid:[["Shape","measured",40],["Size","measured",15],["Spin","measured",10],["Albedo","measured",10],["Spectral class","measured",10],["Surface colour map","missing",15]],
+  comet:[["Sun direction","derived",10],["Phase angle","derived",5],["Gas amounts","measured",25],["Coma size","model_dependent",10],["Nucleus size","model_dependent",10],["Nucleus shape","inferred_from_analog",15],["Tail","missing",5],["Nucleus surface","artistic",20]],
+  rocky:[["Radius","measured",15],["Mass","measured",10],["Orbit and tides","measured",10],["Temperature","derived_assumed",15],["Host star","measured",10],["Surface fluid and pressure","inferred_from_analog",15],["Plates and terrain","artistic",15],["Clouds and ice","artistic",10]],
+  gas:[["Radius","measured",15],["Mass","measured",5],["Orbit and tides","measured",10],["Temperature","measured",15],["Colour","derived",10],["Band structure","inferred_from_analog",20],["Storms","artistic",15],["Turbulence","artistic",10]]
 };
+ACC_KIND.water = ACC_KIND.rocky;
+const ACC_OBJ = {
+  "R Draconis":[["Spectral class","measured",15],["Pulsation period","derived",15],["Motion on the sky","measured",5],["Temperature and colour","missing",25],["Radius","missing",15],["Edge darkening","model_dependent",5],["Pulsation size","artistic",5],["Surface","artistic",15]]
+};
+/* The key measurement for the gate: any one of these rows must have data (not missing). */
+const ACC_KEY = {
+  star:["Temperature and colour","Radius","Spectral class"], dwarf:["Spectral class"], asteroid:["Shape"], comet:["Gas amounts","Coma size","Nucleus size","Nucleus shape"],
+  rocky:["Radius","Mass"], water:["Radius","Mass"], gas:["Radius","Mass"], "R Draconis":["Temperature and colour","Radius","Spectral class","Pulsation period"]
+};
+const ACC_CAT = {measured:"d", derived:"p", derived_assumed:"p", model_dependent:"p"}, ACC_C = {measured:1, derived:1, derived_assumed:.5, model_dependent:.5};
+const ACC_TAG = {measured:["Satellite data","d"], derived:["Physics","p"], derived_assumed:["Physics, one input assumed","p"], model_dependent:["Physics, from a model","p"], inferred_from_analog:["Assumed, from a similar object","a"], artistic:["Assumed, drawn","a"], missing:["Missing","a"]};
+/* KaTeX 0.16.11 from cdnjs, loaded the first time the popover opens. If it cannot load, the plain-text lines stay (never blank). */
+const KX = {state:"idle", cbs:[]};
+function ensureKatex(cb){
+  if(window.katex) return cb(true);
+  if(KX.state === "failed") return cb(false);
+  KX.cbs.push(cb); if(KX.state === "loading") return; KX.state = "loading";
+  const done = ok => { KX.state = ok ? "ready" : "failed"; KX.cbs.splice(0).forEach(f => f(ok)); };
+  const lk = document.createElement("link"); lk.rel = "stylesheet"; lk.href = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.css"; lk.integrity = "sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+"; lk.crossOrigin = "anonymous"; document.head.appendChild(lk);
+  const sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js"; sc.integrity = "sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg"; sc.crossOrigin = "anonymous";
+  sc.onload = () => done(!!window.katex); sc.onerror = () => done(false); document.head.appendChild(sc);
+}
+function accMath(){
+  document.querySelectorAll("#popAcc [data-tex]").forEach(el => {
+    try{ window.katex.render(el.dataset.tex, el, {displayMode:el.dataset.display === "1", throwOnError:false, output:"htmlAndMathml"}); el.classList.add("math-on"); }catch(e){}
+  });
+}
+function renderAcc(){
+  const o = B.obj || {}, rows = ACC_OBJ[o.n] || ACC_KIND[B.kind], keyLabels = ACC_KEY[ACC_OBJ[o.n] ? o.n : B.kind];
+  if(!rows){
+    $("popAcc").innerHTML = `<div class="pop-h"><b>Accuracy</b><span>${o.n || ""}</span></div><p class="acc-rules" style="margin:0!important">No score is set for this kind of object. It has no measurement that could stand for a key measurement, so the viewer shows what it can and says what it leaves out.</p>`;
+    return;
+  }
+  const W = rows.reduce((a, r) => a + r[2], 0), share = {d:0, p:0, a:0}; let sum = 0;
+  rows.forEach(r => { share[ACC_CAT[r[1]] || "a"] += r[2]; sum += (ACC_C[r[1]] || 0)*r[2]; });
+  const Cf = sum/W, C = Math.round(Cf*100), pct = k => Math.round(share[k]/W*100);
+  const keyOk = rows.some(r => keyLabels.includes(r[0]) && r[1] !== "missing"), scoreOk = Cf + 1e-9 >= ACC_THRESHOLD, pass = keyOk && scoreOk;
+  const band = Cf >= .75 ? "Mostly data" : Cf >= .5 ? "Part data, part assumed" : Cf >= ACC_THRESHOLD ? "Mostly assumed" : "Too little data";
+  const col = {d:"#4ade80", p:"#38bdf8", a:"#52525b"};
+  const fmtN = x => String(Math.round(x*10)/10), terms = rows.filter(r => (ACC_C[r[1]] || 0) > 0);
+  const cTex = {1:"1", .5:"\\tfrac{1}{2}"}, term = r => `${r[2]}\\cdot ${cTex[ACC_C[r[1]]]}`;
+  const subTex = `\\begin{array}{l}C=\\dfrac{${terms.map(term).join("+")}${terms.length < rows.length ? "+0" : ""}}{${W}}\\\\ \\phantom{C}=\\dfrac{${fmtN(sum)}}{${W}}=${(Math.round(Cf*100)/100).toFixed(2)}\\end{array}`;
+  const subTxt = `C = (${terms.map(r => r[2] + "·" + (ACC_C[r[1]] === 1 ? "1" : "0.5")).join(" + ")}${terms.length < rows.length ? " + 0" : ""}) / ${W} = ${fmtN(sum)} / ${W} = ${(Math.round(Cf*100)/100).toFixed(2)}`;
+  const gateTex = `\\begin{array}{l}\\text{3D body shown}\\iff\\\\ \\text{class known}\\wedge\\text{key measurement}\\wedge C\\ge ${ACC_THRESHOLD}\\end{array}`;
+  const tbl = `\\begin{array}{ll}c=1 & \\text{measured, or physics from measured values}\\\\ c=\\tfrac{1}{2} & \\text{model-dependent, or physics with an assumed input}\\\\ c=0 & \\text{assumed from a similar object, drawn, or missing}\\end{array}`;
+  const at = t => t.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  const yes = (v, t) => `<span class="acc-gv ${v ? "ok" : "no"}">${v ? "Yes" : "No"}</span> ${t}`;
+  $("popAcc").innerHTML = `<div class="pop-h"><b>Accuracy</b><span>${o.n || ""}</span></div>
+    <div class="acc-top"><span class="n">${C}%</span><span>${band}</span></div>
+    <div class="acc-bar" role="img" aria-label="Satellite data ${pct("d")} percent, physics ${pct("p")} percent, assumed ${pct("a")} percent">${["d","p","a"].map(k => `<i style="flex:${share[k]} 1 0;background:${col[k]}"></i>`).join("")}</div>
+    <div class="acc-key">
+      <span class="acc-sw" style="background:${col.d}"></span><span>Satellite data<small>measured by SPHEREx, Gaia and other archives</small></span><b>${pct("d")}%</b>
+      <span class="acc-sw" style="background:${col.p}"></span><span>Physics<small>worked out from the data with a formula</small></span><b>${pct("p")}%</b>
+      <span class="acc-sw" style="background:${col.a}"></span><span>Assumed<small>typical values, drawn detail, or missing</small></span><b>${pct("a")}%</b></div>
+    <div class="acc-math">
+      <div class="acc-tex" data-display="1" data-tex="C=\\dfrac{\\sum_i w_i\\,c_i}{\\sum_i w_i}">C = Σ wᵢ·cᵢ / Σ wᵢ</div>
+      <p class="acc-rules">w is how much a quantity changes the picture. c is how far the data narrows the range of this kind of object.</p>
+      <div class="acc-tex" data-display="1" data-tex="${at(tbl)}"><code class="acc-eq">c = 1: satellite data, or physics from measured values<br>c = 0.5: model-dependent, or physics with an assumed input<br>c = 0: assumed from a similar object, drawn, or missing</code></div>
+      <div class="acc-tex" data-display="1" data-tex="${at(subTex)}"><code class="acc-eq">${subTxt}</code></div>
+      <p class="acc-rules" style="margin-bottom:6px!important">Terms with c = 0 add nothing, so they are folded into the final + 0.</p>
+      <div class="acc-tex" data-display="1" data-tex="${at(gateTex)}"><code class="acc-eq">3D body shown only if: class known AND key measurement AND C ≥ ${ACC_THRESHOLD}</code></div>
+      <ul class="acc-gate"><li>${yes(true, "The kind of object is known.")}</li><li>${yes(keyOk, "At least one key measurement: " + keyLabels.join(", ").toLowerCase() + ".")}</li><li>${yes(scoreOk, "Score of at least " + Math.round(ACC_THRESHOLD*100) + "% (now " + C + "%).")}</li></ul>
+      <p class="acc-rules" style="margin-bottom:10px!important"><b>${pass ? "The 3D body is drawn." : "The 3D body is not drawn."}</b> This is how much of the picture rests on data. It is not the probability that the picture is correct.</p>
+    </div>
+    <table class="acc-tbl"><thead><tr><th>Quantity</th><th>Source</th><th>Points</th></tr></thead><tbody>${rows.map(r => { const t = ACC_TAG[r[1]]; return `<tr><td>${r[0]}</td><td><span class="acc-tag ${t[1]}">${t[0]}</span></td><td>${Math.round((ACC_C[r[1]] || 0)*r[2]*10)/10} / ${r[2]}</td></tr>`; }).join("")}</tbody></table>
+    <p class="acc-rules" style="margin:10px 0 0!important">Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them.</p>`;
+  ensureKatex(ok => { if(ok && bpPop.dataset.w === "acc") accMath(); });
+}
+function setPop(w){
+  feelSet(w === "feel");
+  if(w !== "hear"){ if(SFX.playing()) SFX.stop(); cancelAnimationFrame(HR.raf); }
+  bpPop.hidden = !w; bpPop.dataset.w = w || ""; $("popAcc").hidden = w !== "acc"; $("popFeel").hidden = w !== "feel"; $("popHear").hidden = w !== "hear";
+  bpAcc.classList.toggle("on", w === "acc"); bpAcc.setAttribute("aria-pressed", String(w === "acc")); bpAcc.setAttribute("aria-expanded", String(w === "acc"));
+  if(w === "acc") renderAcc();
+  bpHear.classList.toggle("on", w === "hear"); bpHear.setAttribute("aria-pressed", String(w === "hear")); bpHear.setAttribute("aria-expanded", String(w === "hear"));
+  bpFeel.setAttribute("aria-expanded", String(w === "feel"));
+  if(w === "hear") hearGo(true);
+}
+bpFeel.onclick = () => setPop(FG.on ? null : "feel");
+bpHear.onclick = () => setPop(bpHear.classList.contains("on") ? null : "hear");
+bpAcc.onclick = () => setPop(bpAcc.classList.contains("on") ? null : "acc");
+function drawHear(prog){
+  const c = $("hearCanvas"), w = c.clientWidth, h = c.clientHeight; if(!w || !h) return;
+  const dpr = Math.min(devicePixelRatio||1, 2); if(c.width !== Math.round(w*dpr) || c.height !== Math.round(h*dpr)){ c.width = Math.round(w*dpr); c.height = Math.round(h*dpr); }
+  const g = c.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
+  const {F, marks} = specFor(B.kind || "star"), X = wl => 8 + (wl - .75)/4.25*(w - 16), Y = v => h - 18 - Math.max(0, Math.min(1, v))*(h - 36);
+  g.strokeStyle = "#4ade80"; g.lineWidth = 1.8; g.lineJoin = "round"; g.beginPath();
+  for(let i = 0; i <= 120; i++){ const wl = .75 + i/120*4.25; g.lineTo(X(wl), Y(F(wl) + .012*Math.sin(i*1.9))); } g.stroke();
+  g.fillStyle = "#9aa4a9"; g.font = "10px ui-monospace,monospace"; g.textAlign = "left"; g.fillText("0.75 µm", 8, h - 5); g.textAlign = "right"; g.fillText("5 µm", w - 8, h - 5);
+  g.textAlign = "left"; g.fillStyle = "#fbbf24"; for(const [wl, t] of marks){ g.fillRect(X(wl) - .5, Y(F(wl)) - 6, 1, 5); g.fillText(t, Math.min(w - 40, X(wl) - 10), Y(F(wl)) - 9); }
+  if(prog != null){ const px = X(.75 + prog*4.25); g.strokeStyle = "#fafafa99"; g.lineWidth = 1; g.beginPath(); g.moveTo(px, 6); g.lineTo(px, h - 18); g.stroke();
+    g.fillStyle = "#fff"; g.beginPath(); g.arc(px, Y(F(.75 + prog*4.25)), 3.5, 0, 6.3); g.fill(); }
+}
+function hearGo(start){
+  const btn = $("hearGo");
+  if(SFX.playing() && !start){ SFX.stop(); btn.textContent = "Play"; cancelAnimationFrame(HR.raf); drawHear(); return; }
+  const k = B.kind || "star", {F, marks} = specFor(k), low = ["dwarf","asteroid","rocky","water","gas"].includes(k);
+  const bells = marks.map(([wl], i) => ({x:wl, f:low ? 196*(1 + .25*i) : 523*Math.pow(1.26, i), amp:.7}));
+  if(!SFX.sweep(F, .75, 5, bells, 6, () => { btn.textContent = "Play again"; cancelAnimationFrame(HR.raf); drawHear(); })){ btn.textContent = "No sound here"; drawHear(); return; }
+  btn.textContent = "Stop"; cancelAnimationFrame(HR.raf);
+  (function tick(){ const p = SFX.progress(); if(p === null){ drawHear(); return; } drawHear(p); HR.raf = requestAnimationFrame(tick); })();
+}
+$("hearGo").onclick = () => hearGo(false);
 /* the vibration as it would be felt: a wave whose height is the strength and whose speed is the pitch (60 to 250 Hz) */
 const WV = {amp:0, f:100, tf:100, target:0, spike:0, last:0, ph:0, hist:[], now:0};
 window.addEventListener("spherex:haptic", e => { const d = e.detail; if(!d) return; WV.now = performance.now();
@@ -2237,7 +2452,7 @@ document.addEventListener("keydown", e => {
   if(e.key === " "){ e.preventDefault(); startPlay(!playing); return; }
   if(e.key === "ArrowRight"){ startPlay(false); setFrame(frame + 1); }
   if(e.key === "ArrowLeft"){ startPlay(false); setFrame(frame - 1); }
-  if(e.key === "Escape"){ if(AR.track){ closeTrack(); return; } if(AR.mode === "drawing"){ arStopDraw(); } if(TR.open){ closeTrail(); return; } if(B.building){ closeBuild(); return; } if(island.card){ island.onClose(); island.closeCard(); } }
+  if(e.key === "Escape"){ if(AR.track){ closeTrack(); return; } if(AR.mode === "drawing"){ arStopDraw(); } if(TR.open){ closeTrail(); return; } if(B.building){ if(!bpPop.hidden){ setPop(null); return; } closeBuild(); return; } if(island.card){ island.onClose(); island.closeCard(); } }
   const t = TOOLS.find(x => x.key === e.key); if(t) selectTool(t.id);
 });
 

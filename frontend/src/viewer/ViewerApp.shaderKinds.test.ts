@@ -2,6 +2,7 @@
 // honesty state, one light direction, the Q-45 plain-sphere rule, and no field regeneration on an
 // honesty toggle (PR #31 B5). Runs without a GPU: the renderer is a stub (ViewerApp only calls
 // setPixelRatio, setClearColor, setSize, render and dispose).
+import { tinyWorldSource } from './renderers/worldFixtures.testutil';
 import { describe, expect, it, vi } from 'vitest';
 import type { DirectionalLight, WebGPURenderer } from 'three/webgpu';
 import type { ObjectCard, RenderParams } from '@/contract';
@@ -12,7 +13,7 @@ import { fixture, withoutExoplanetFields } from './renderers/fixtures.testutil';
 import type { ShaderBody } from './renderers/ShaderBody';
 import { ViewerApp } from './ViewerApp';
 
-function makeViewer(): { v: ViewerApp; fieldCalls: FieldParams[] } {
+function makeViewer(): { v: ViewerApp; fieldCalls: FieldParams[]; worldCalls: unknown[] } {
   const stub = {
     backend: {},
     setPixelRatio() {},
@@ -24,13 +25,18 @@ function makeViewer(): { v: ViewerApp; fieldCalls: FieldParams[] } {
   const Ctor = ViewerApp as unknown as new (c: HTMLCanvasElement, r: WebGPURenderer) => ViewerApp;
   const v = new Ctor(document.createElement('canvas'), stub);
   const fieldCalls: FieldParams[] = [];
+  const worldCalls: unknown[] = [];
   v.setShaderOptions({
     fieldSource: async (p) => {
       fieldCalls.push(p);
       return generateField(p, 64, 32);
     },
+    worldSource: (p) => {
+      worldCalls.push(p);
+      return tinyWorldSource(p);
+    },
   });
-  return { v, fieldCalls };
+  return { v, fieldCalls, worldCalls };
 }
 
 function show(v: ViewerApp, card: ObjectCard, params: RenderParams, honesty?: HonestyState) {
@@ -88,9 +94,25 @@ describe('shader kinds through the plan path (B5)', () => {
     v.dispose();
   });
 
+  it('an exoplanet is drawn from the world model, and an honesty toggle does not rebuild it (issue #71 D)', async () => {
+    const { v, fieldCalls, worldCalls } = makeViewer();
+    const f = fixture('planet_water');
+    show(v, f.card, f.params);
+    const body = await built(v);
+    expect(worldCalls).toHaveLength(1);
+    expect(fieldCalls).toHaveLength(0);
+    expect(body.world?.readouts.length).toBeGreaterThan(3);
+    show(v, f.card, f.params, 'artistic');
+    show(v, f.card, f.params, 'measured');
+    show(v, f.card, f.params, 'artistic');
+    expect(v.body).toBe(body);
+    expect(worldCalls).toHaveLength(1);
+    v.dispose();
+  });
+
   it('an honesty toggle updates the body in place and does not regenerate the field', async () => {
     const { v, fieldCalls } = makeViewer();
-    const f = fixture('planet_water');
+    const f = withoutExoplanetFields(fixture('planet_water')); // the older planet look; the world model has its own test below
     show(v, f.card, f.params);
     const body = await built(v);
     expect(fieldCalls).toHaveLength(1);

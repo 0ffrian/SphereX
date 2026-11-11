@@ -1,17 +1,529 @@
 {
-  "asset_version": "9",
+  "asset_version": "10",
   "card": {
     "coma_radius_km": {
-      "source": "not available: published values not loaded (R7.3)",
+      "source": "literature: Lisse et al. 2026, ApJ 1000 L52 (arXiv:2512.07318v3), Abstract: CO2 coma extending out to at least 4.2 x 10^5 km (backend/assets/literature.toml). A lower limit, not a measured edge. Read from the August CO2 profile; the December paper gives about 3 arcmin radius without a km value",
       "tag": "measured",
-      "value": null
+      "value": 420000.0
+    },
+    "epochs": [
+      "2025-08",
+      "2025-12"
+    ],
+    "gas_Q": {
+      "2025-08": {
+        "co": {
+          "err": 2.5e+25,
+          "source": "literature: Lisse et al. 2026, ApJ 1000 L52 (arXiv:2512.07318v3, 9 Feb 2026), Abstract and Sect. 4.2: gas production rate (1 sigma 25 %) (backend/assets/literature.toml). Observed 1-15 Aug 2025 at r_h about 3.2 au. Tentative detection at 4.6-4.8 um; the authors call it marginal",
+          "tag": "measured",
+          "value": 1e+26
+        },
+        "co2": {
+          "err": 1.6e+26,
+          "source": "literature: Lisse et al. 2026, ApJ 1000 L52 (arXiv:2512.07318v3, 9 Feb 2026), Abstract and Sect. 4.2: gas production rate (1 sigma 10 %) (backend/assets/literature.toml). Observed 1-15 Aug 2025 at r_h about 3.2 au. 12CO2 at 4.25-4.27 um",
+          "tag": "measured",
+          "value": 1.6e+27
+        },
+        "h2o": {
+          "err": 6.4e+25,
+          "source": "literature: Lisse et al. 2026, ApJ 1000 L52 (arXiv:2512.07318v3, 9 Feb 2026), Abstract and Sect. 4.2: gas production rate (1 sigma 20 %) (backend/assets/literature.toml). Observed 1-15 Aug 2025 at r_h about 3.2 au. Robust detection at 2.7-2.8 um",
+          "tag": "measured",
+          "value": 3.2e+26
+        }
+      },
+      "2025-12": {
+        "co": {
+          "err": 1.5e+27,
+          "source": "literature: Lisse et al. 2026, arXiv:2601.06759v2 (29 Jan 2026), preliminary analysis, Sect. 2 'Spectral Results': gas production rate (1 sigma) (backend/assets/literature.toml). Observed 8-15 Dec 2025 at r_h 2.0-2.2 au. Version 2 only: version 1 of the preprint gave Q(H2O) about 6 x 10^27, so no value from it is used. Quoted as 7.6 +/- 1.5 x 10^27; about 80 times the August flux",
+          "tag": "measured",
+          "value": 7.6e+27
+        },
+        "co2": {
+          "err": 4.5e+26,
+          "source": "literature: Lisse et al. 2026, arXiv:2601.06759v2 (29 Jan 2026), preliminary analysis, Sect. 2 'Spectral Results': gas production rate (1 sigma) (backend/assets/literature.toml). Observed 8-15 Dec 2025 at r_h 2.0-2.2 au. Version 2 only: version 1 of the preprint gave Q(H2O) about 6 x 10^27, so no value from it is used. Quoted as 3.0 +/- 0.45 x 10^27",
+          "tag": "measured",
+          "value": 3e+27
+        },
+        "h2o": {
+          "err": 2.8e+27,
+          "source": "literature: Lisse et al. 2026, arXiv:2601.06759v2 (29 Jan 2026), preliminary analysis, Sect. 2 'Spectral Results': gas production rate (1 sigma) (backend/assets/literature.toml). Observed 8-15 Dec 2025 at r_h 2.0-2.2 au. Version 2 only: version 1 of the preprint gave Q(H2O) about 6 x 10^27, so no value from it is used. Quoted as 1.4 +/- 0.28 x 10^28; the H2O feature is about 40 times its August strength",
+          "tag": "measured",
+          "value": 1.4e+28
+        }
+      }
     },
     "id": "sbdb-1004083",
     "name": "C/2025 N1 (ATLAS)",
     "nucleus_radius_km_max": {
-      "source": "not available: published values not loaded (R7.3)",
+      "source": "literature: Lisse et al. 2026, ApJ 1000 L52 (arXiv:2512.07318v3), quoting Jewitt et al. 2025, Abstract and Sect. 4.6: nucleus radius < 2.5 km (backend/assets/literature.toml). An upper limit that Lisse et al. take from Jewitt et al. 2025; the nucleus has never been resolved",
       "tag": "measured",
-      "value": null
+      "value": 2.5
+    },
+    "orbit_track": {
+      "formula": "heliocentric ICRF position and velocity of the target, from the JPL Horizons orbit solution, sampled every 3 days; the viewer interpolates (Q-261)",
+      "source": "JPL Horizons API (ssd.jpl.nasa.gov/api/horizons.api), VECTORS, COMMAND DES=1004083, CENTER 500@10 (Sun), REF_SYSTEM ICRF, REF_PLANE FRAME, STEP 3 d, 2025-08-01 to 2025-12-31 TDB, OUT_UNITS AU-D, VEC_TABLE 2; queried 10 Nov 2026 (orbit solution JPL#55) (backend/assets/tracks)",
+      "tag": "derived",
+      "value": [
+        [
+          2460888.5,
+          -0.154748152998,
+          -3.289077446259,
+          -1.161076148997,
+          -0.013856433922,
+          0.030980495182,
+          0.011787071574
+        ],
+        [
+          2460891.5,
+          -0.196312024639,
+          -3.196031150532,
+          -1.125677963302,
+          -0.01385260905,
+          0.031051027888,
+          0.011811941967
+        ],
+        [
+          2460894.5,
+          -0.237862479779,
+          -3.102767167777,
+          -1.090203108871,
+          -0.013847455588,
+          0.031125672685,
+          0.011838200959
+        ],
+        [
+          2460897.5,
+          -0.279395209738,
+          -3.009272671915,
+          -1.054647263661,
+          -0.013840752431,
+          0.031204761007,
+          0.011865954132
+        ],
+        [
+          2460900.5,
+          -0.320905186906,
+          -2.915533797309,
+          -1.019005775877,
+          -0.01383224031,
+          0.031288654852,
+          0.011895315816
+        ],
+        [
+          2460903.5,
+          -0.362386539852,
+          -2.82153554356,
+          -0.983273637059,
+          -0.013821614653,
+          0.031377749112,
+          0.011926409522
+        ],
+        [
+          2460906.5,
+          -0.403832405008,
+          -2.727261673481,
+          -0.947445454049,
+          -0.013808517054,
+          0.031472473761,
+          0.011959368242
+        ],
+        [
+          2460909.5,
+          -0.445234750354,
+          -2.632694604999,
+          -0.911515420338,
+          -0.013792525104,
+          0.03157329568,
+          0.011994334542
+        ],
+        [
+          2460912.5,
+          -0.486584165774,
+          -2.537815298424,
+          -0.875477287605,
+          -0.013773140291,
+          0.031680719858,
+          0.012031460322
+        ],
+        [
+          2460915.5,
+          -0.527869613869,
+          -2.442603141593,
+          -0.839324338672,
+          -0.013749773684,
+          0.031795289526,
+          0.012070906075
+        ],
+        [
+          2460918.5,
+          -0.569078134081,
+          -2.34703583697,
+          -0.80304936374,
+          -0.013721729059,
+          0.031917584594,
+          0.012112839399
+        ],
+        [
+          2460921.5,
+          -0.610194491882,
+          -2.251089296944,
+          -0.76664464259,
+          -0.013688183105,
+          0.0320482176,
+          0.012157432439
+        ],
+        [
+          2460924.5,
+          -0.651200763887,
+          -2.154737556336,
+          -0.730101936523,
+          -0.013648162468,
+          0.032187826078,
+          0.012204857892
+        ],
+        [
+          2460927.5,
+          -0.692075849332,
+          -2.057952714943,
+          -0.693412495088,
+          -0.013600517649,
+          0.032337059881,
+          0.01225528304
+        ],
+        [
+          2460930.5,
+          -0.732794898954,
+          -1.960704928096,
+          -0.656567084485,
+          -0.013543894148,
+          0.032496561462,
+          0.012308861131
+        ],
+        [
+          2460933.5,
+          -0.77332865427,
+          -1.862962470174,
+          -0.619556046889,
+          -0.013476701814,
+          0.032666936469,
+          0.012365719228
+        ],
+        [
+          2460936.5,
+          -0.813642694516,
+          -1.764691904794,
+          -0.582369402821,
+          -0.013397084357,
+          0.032848711442,
+          0.01242594147
+        ],
+        [
+          2460939.5,
+          -0.853696596394,
+          -1.665858405959,
+          -0.544997012057,
+          -0.013302892457,
+          0.033042274815,
+          0.012489546596
+        ],
+        [
+          2460942.5,
+          -0.893443025316,
+          -1.566426286275,
+          -0.507428812017,
+          -0.013191666151,
+          0.033247797196,
+          0.012556458587
+        ],
+        [
+          2460945.5,
+          -0.932826798126,
+          -1.466359800062,
+          -0.469655155652,
+          -0.013060635164,
+          0.033465127331,
+          0.012626469597
+        ],
+        [
+          2460948.5,
+          -0.971783988584,
+          -1.365624297692,
+          -0.431667272458,
+          -0.012906749423,
+          0.033693661908,
+          0.012699194974
+        ],
+        [
+          2460951.5,
+          -1.010241188818,
+          -1.264187809128,
+          -0.393457875241,
+          -0.012726755531,
+          0.033932189745,
+          0.012774021575
+        ],
+        [
+          2460954.5,
+          -1.048115098766,
+          -1.162023128894,
+          -0.355021921692,
+          -0.01251734434,
+          0.034178716748,
+          0.012850058819
+        ],
+        [
+          2460957.5,
+          -1.085312689248,
+          -1.059110404686,
+          -0.316357512687,
+          -0.012275383571,
+          0.03443031172,
+          0.012926093598
+        ],
+        [
+          2460960.5,
+          -1.12173218422,
+          -0.95544014946,
+          -0.277466920212,
+          -0.011998237374,
+          0.034682978378,
+          0.013000556711
+        ],
+        [
+          2460963.5,
+          -1.157265168144,
+          -0.851016530435,
+          -0.238357644847,
+          -0.011684192648,
+          0.034931615197,
+          0.013071537987
+        ],
+        [
+          2460966.5,
+          -1.19180006896,
+          -0.745860556723,
+          -0.199043353149,
+          -0.011332939396,
+          0.035170130051,
+          0.013136853521
+        ],
+        [
+          2460969.5,
+          -1.225227075124,
+          -0.640012637354,
+          -0.159544513215,
+          -0.010946030805,
+          0.03539175186,
+          0.013194181606
+        ],
+        [
+          2460972.5,
+          -1.257444265121,
+          -0.533533880626,
+          -0.119888516014,
+          -0.010527210241,
+          0.035589556423,
+          0.013241267788
+        ],
+        [
+          2460975.5,
+          -1.288364358042,
+          -0.426505542065,
+          -0.080109104002,
+          -0.010082478403,
+          0.035757161109,
+          0.013276175614
+        ],
+        [
+          2460978.5,
+          -1.317921152459,
+          -0.319026274288,
+          -0.040245035439,
+          -0.009619808939,
+          0.035889470514,
+          0.013297535985
+        ],
+        [
+          2460981.5,
+          -1.346074564881,
+          -0.211207270019,
+          -0.00033807727,
+          -0.009148507625,
+          0.035983306099,
+          0.013304735471
+        ],
+        [
+          2460984.5,
+          -1.372813330685,
+          -0.103165895549,
+          0.039569408953,
+          -0.008678321154,
+          0.036037760721,
+          0.013297992888
+        ],
+        [
+          2460987.5,
+          -1.39815488795,
+          0.004981205704,
+          0.079436913153,
+          -0.008218485724,
+          0.036054191543,
+          0.013278303939
+        ],
+        [
+          2460990.5,
+          -1.42214257832,
+          0.113124458499,
+          0.119227877794,
+          -0.00777692118,
+          0.03603587218,
+          0.013247272741
+        ],
+        [
+          2460993.5,
+          -1.444840843532,
+          0.221166282054,
+          0.158911182913,
+          -0.007359717013,
+          0.03598741908,
+          0.013206879249
+        ],
+        [
+          2460996.5,
+          -1.466329385688,
+          0.329024150854,
+          0.198461910118,
+          -0.006970954045,
+          0.035914147173,
+          0.013159240204
+        ],
+        [
+          2460999.5,
+          -1.486697243248,
+          0.43663179032,
+          0.237861438633,
+          -0.006612812719,
+          0.035821489156,
+          0.013106408632
+        ],
+        [
+          2461002.5,
+          -1.50603750018,
+          0.543938833068,
+          0.277097029077,
+          -0.006285868693,
+          0.035714558104,
+          0.013050234732
+        ],
+        [
+          2461005.5,
+          -1.52444302948,
+          0.650909411767,
+          0.316161086575,
+          -0.005989470656,
+          0.035597875551,
+          0.012992290173
+        ],
+        [
+          2461008.5,
+          -1.542003386817,
+          0.757520164401,
+          0.355050278815,
+          -0.005722118261,
+          0.035475246324,
+          0.012933844581
+        ],
+        [
+          2461011.5,
+          -1.558802772309,
+          0.863758037662,
+          0.393764641646,
+          -0.005481790687,
+          0.035349742227,
+          0.012875877987
+        ],
+        [
+          2461014.5,
+          -1.574918875286,
+          0.969618153815,
+          0.432306756314,
+          -0.005266205232,
+          0.035223754375,
+          0.012819113804
+        ],
+        [
+          2461017.5,
+          -1.590422386945,
+          1.075101894685,
+          0.470681041029,
+          -0.00507300494,
+          0.035099080857,
+          0.012764060443
+        ],
+        [
+          2461020.5,
+          -1.605376980475,
+          1.18021527097,
+          0.508893170013,
+          -0.004899884649,
+          0.034977026166,
+          0.012711053684
+        ],
+        [
+          2461023.5,
+          -1.619839593242,
+          1.284967588415,
+          0.546949614934,
+          -0.004744668574,
+          0.034858497917,
+          0.012660295392
+        ],
+        [
+          2461026.5,
+          -1.633860885471,
+          1.389370389951,
+          0.584857294305,
+          -0.004605352417,
+          0.034744093295,
+          0.012611886603
+        ],
+        [
+          2461029.5,
+          -1.647485786091,
+          1.493436637637,
+          0.622623313003,
+          -0.004480121006,
+          0.034634172259,
+          0.012565854535
+        ],
+        [
+          2461032.5,
+          -1.660754065832,
+          1.597180093853,
+          0.660254774162,
+          -0.004367350039,
+          0.034528917279,
+          0.012522173928
+        ],
+        [
+          2461035.5,
+          -1.673700899757,
+          1.70061486286,
+          0.697758647495,
+          -0.004265598171,
+          0.034428380779,
+          0.01248078347
+        ],
+        [
+          2461038.5,
+          -1.686357397196,
+          1.80375505843,
+          0.735141680629,
+          -0.004173593778,
+          0.034332522049,
+          0.012441598188
+        ]
+      ]
     },
     "phase_angle_deg": {
       "source": "JPL Horizons quantity 24 (Sun-Target-Observer), observer SPHEREx 500@-163182, at 2026-11-14T00:00:00.000Z",
@@ -36,20 +548,178 @@
     "type": "comet"
   },
   "created_at": "2025-10-01T00:00:00.000Z",
-  "generator_version": "p1-b2",
-  "inputs_sha256": "ffa059f36dc4327154473203418e2bf8acd3317bea275504d2c63a3c5b6b463a",
+  "generator_version": "p1-b3",
+  "inputs_sha256": "4d30394754ce61b83ba21606cfe420fb28cc45912350a92d60845b8e46f385e2",
   "render_params": {
-    "alt_text": "C/2025 N1 (ATLAS), Comet, size unknown, no visible colour basis, viewed at 3.45 degrees. Surface relief: illustrative.",
-    "generator_version": "p1-b2",
+    "alt_text": "C/2025 N1 (ATLAS), Comet, nucleus at most 2.5 km in radius (upper limit), no visible colour basis, viewed at 3.45 degrees. Surface relief: illustrative.",
+    "confidence": {
+      "assumed_share": 0.4829,
+      "band": "part_data",
+      "estimated_share": 0.1,
+      "formula": "C = sum(w_i c_i) / sum(w_i): c is 1 for a measured value or a formula of measured values, a placeholder share for a model-dependent one, and 0 for an assumed, artistic or missing one; the w_i are placeholder weights (D-36, Q-221)",
+      "found": "Data for: Sun direction, phase angle, gas amounts, coma size and nucleus size.",
+      "gate": {
+        "class_known": true,
+        "key_measurement": true,
+        "passed": true,
+        "score_ok": true
+      },
+      "inputs": [
+        {
+          "c": 1.0,
+          "fields": [
+            "sun_vector"
+          ],
+          "id": "sun_direction",
+          "label": "Sun direction",
+          "points": 10.0,
+          "tag": "derived",
+          "weight": 10
+        },
+        {
+          "c": 1.0,
+          "fields": [
+            "phase_angle_deg"
+          ],
+          "id": "phase_angle",
+          "label": "Phase angle",
+          "points": 5.0,
+          "tag": "measured",
+          "weight": 5
+        },
+        {
+          "c": 0.6684,
+          "fields": [
+            "gas_Q"
+          ],
+          "id": "gas",
+          "label": "Gas amounts",
+          "points": 16.7105,
+          "tag": "measured",
+          "weight": 25
+        },
+        {
+          "c": 1.0,
+          "fields": [
+            "coma_radius_km"
+          ],
+          "id": "coma",
+          "label": "Coma size",
+          "points": 10.0,
+          "tag": "measured",
+          "weight": 10
+        },
+        {
+          "c": 1.0,
+          "fields": [
+            "nucleus_radius_km_max"
+          ],
+          "id": "nucleus_size",
+          "label": "Nucleus size",
+          "points": 10.0,
+          "tag": "measured",
+          "weight": 10
+        },
+        {
+          "c": 0.0,
+          "fields": [
+            "shape_source"
+          ],
+          "id": "nucleus_shape",
+          "label": "Nucleus shape",
+          "points": 0.0,
+          "tag": "missing",
+          "weight": 15
+        },
+        {
+          "c": 0.0,
+          "fields": [],
+          "id": "tail",
+          "label": "Tail",
+          "points": 0.0,
+          "tag": "missing",
+          "weight": 5
+        },
+        {
+          "c": 0.0,
+          "fields": [],
+          "id": "nucleus_surface",
+          "label": "Nucleus surface",
+          "points": 0.0,
+          "tag": "artistic",
+          "weight": 20
+        }
+      ],
+      "measured_share": 0.4171,
+      "needed": "",
+      "note": "This is how much of the picture rests on data. It is not the probability that the picture is correct.",
+      "raise": "A better measurement of: nucleus shape.",
+      "score": 0.5171,
+      "tag": "derived",
+      "threshold": 0.25,
+      "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
+    },
+    "generator_version": "p1-b3",
     "haptics": {
-      "data": "none",
-      "data_tag": "artistic",
-      "params": {},
+      "data": "field",
+      "data_tag": "model_dependent",
+      "params": {
+        "maxRateHz": 30.0
+      },
       "texture": "none",
       "texture_tag": "artistic"
     },
     "id": "sbdb-1004083",
-    "layers": [],
+    "layers": [
+      {
+        "description": "Dark sphere at the upper size limit (R7.3).",
+        "id": "nucleus",
+        "requires": [
+          "nucleus_radius_km_max"
+        ],
+        "tag": "measured",
+        "tier": 1
+      },
+      {
+        "assumed": {
+          "density_exponent": 2.0
+        },
+        "description": "Assumption: density falls as 1/r^2 out to the coma radius; Q itself is measured (R7.3, Q-38).",
+        "formula": "n(r) proportional to Q / r^2 out to coma_radius_km",
+        "id": "gas_shells",
+        "requires": [
+          "gas_Q",
+          "coma_radius_km"
+        ],
+        "tag": "model_dependent",
+        "tier": 3
+      },
+      {
+        "description": "Ion tail along the anti-Sun direction (R7.3, Q-263). Its length and width are display values and the tail is not to scale.",
+        "formula": "tail direction = -(unit heliocentric position of the comet), from JPL Horizons VECTORS at the shown time",
+        "id": "ion_tail",
+        "requires": [
+          "orbit_track"
+        ],
+        "tag": "derived",
+        "tier": 2
+      },
+      {
+        "assumed": {
+          "beta_values": "0.001, 0.005, 0.02, 0.1",
+          "emission_start": "first SPHEREx epoch (earlier activity unknown)",
+          "grain_density_g_cm3": 1.0
+        },
+        "description": "Modelled dust tail: grains of assumed size released with the comet's velocity and pushed by sunlight (Finson-Probstein, Q-263). SPHEREx saw no anti-solar dust tail, so this shows what small grains would do, not what was seen.",
+        "formula": "grain path under (1 - beta) GM_sun / r^2 from its release, compared with the comet's own path from Horizons; beta = 5.7e-5 Qpr / (rho a) (Burns et al. 1979)",
+        "id": "dust_tail",
+        "requires": [
+          "orbit_track"
+        ],
+        "tag": "model_dependent",
+        "tier": 3
+      }
+    ],
     "lighting": {
       "mode": "sun",
       "phase_angle_deg": 3.4475,
@@ -60,15 +730,12 @@
       ]
     },
     "missing": [
-      "nucleus",
-      "gas_shells",
-      "field",
       "visible",
       "spherex_ir",
       "spectrum"
     ],
-    "scale_m": null,
-    "seed": 12322617,
+    "scale_m": 2500.0,
+    "seed": 599534172,
     "type": "comet",
     "view_modes": {
       "spherex_ir": {
@@ -90,6 +757,6 @@
       }
     }
   },
-  "seed": 12322617,
+  "seed": 599534172,
   "textures": null
 }

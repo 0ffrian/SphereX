@@ -10,12 +10,19 @@ import {
   AmbientLight,
   Color,
   DirectionalLight,
+  Matrix4,
   Mesh,
   MeshStandardNodeMaterial,
   type Object3D,
   PerspectiveCamera,
+  Raycaster,
+  RenderTarget,
+  SRGBColorSpace,
+  UnsignedByteType,
   Scene,
   SphereGeometry,
+  Vector2,
+  Vector3,
   WebGPURenderer,
 } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -33,6 +40,9 @@ import type { MouldPose } from './mould/mouldSteps';
 import { RenderChain } from './render/pipeline';
 import { noiseBakePending, whenNoiseIdle } from './volume/noiseVolume';
 import { onVolumeNoiseReady } from './volume/VolumeBody';
+import { CLOUD_TIME_PER_SIM_S, ORBIT_MAX_PIXEL_RATIO as ORBIT_MAX_PR, OrbitView, renderScaleFor } from './orbit/OrbitView';
+import { resolveOrbitSources, type OrbitResolved } from './orbit/orbitSources';
+import { pickPlace, type Vec3 } from './orbit/orbitMath';
 import {
   FEED_GAP_MS,
   FrameGovernor,
@@ -220,6 +230,23 @@ const TURN_X_LIMIT = 1.2;
 /** What counts as interaction for the R5.7 idle pause (a touch, a key, a wheel or trackpad). */
 const IDLE_EVENTS = ['pointerdown', 'keydown', 'wheel'] as const;
 
+export interface CloseUpInfo {
+  /** What the pane shows: the orbit view, the body from close, a caption only, or nothing. */
+  mode: 'orbit' | 'body' | 'text' | null;
+  resolved: OrbitResolved | null;
+  refusal: string | null;
+}
+
+interface CloseState {
+  mode: 'orbit' | 'body' | 'text' | null;
+  view: OrbitView | null;
+  resolved: OrbitResolved | null;
+  last: number;
+  /** A read-back of the close-up image is in flight, and another frame came meanwhile. */
+  reading: boolean;
+  dirty: boolean;
+}
+
 export class ViewerApp {
   readonly backend: RendererBackend;
 
@@ -287,6 +314,17 @@ export class ViewerApp {
   /** Issue #60: the build animation's pose of what is on screen (null = the normal render). */
   private mould: Readonly<MouldPose> | null = null;
   /** Issue #60: the body's own turn (mock-up drag and auto-rotation), radians about x and y. */
+  // ---- the close-up pane (issue #71 stream H): the app's version of the mock-up's #cuPane ----
+  private close: CloseState = { mode: null, view: null, resolved: null, last: 0, reading: false, dirty: false };
+  private closeCanvas: HTMLCanvasElement | null = null;
+  private closeRt: RenderTarget | null = null;
+  /** True while a D-37 engine (world, star, rock) draws the body: this viewer builds, steps and draws nothing. */
+  private engineOwned = false;
+  private closeTmp: HTMLCanvasElement | null = null;
+  private closeRaf: number | null = null;
+  private readonly closeCamera = new PerspectiveCamera(40, 1, 0.01, 100);
+  private onCloseChange: ((info: CloseUpInfo) => void) | null = null;
+
   private turn = { x: 0, y: 0 };
   private dragTurns = false;
   private turnDrag: { x: number; y: number; rx: number; ry: number; id: number } | null = null;
@@ -457,6 +495,49 @@ export class ViewerApp {
     return this.built?.body ?? null;
   }
 
+  /**
+   * A D-37 engine (world, star or rock) draws the body on its own canvas: while it does, this viewer
+   * builds no body, runs no solver, tracer or governor and stops its frame loop. Turning it off (the
+   * engine failed, or "Measured only" unmounted it) builds the last plan again and draws as before.
+   */
+  setEngineOwned(owned: boolean): void {
+    if (this.disposed || owned === this.engineOwned) return;
+    this.engineOwned = owned;
+    if (owned) {
+      this.clearBuilt();
+      this.placeholder.visible = false;
+      this.syncProcesses(null, null);
+      this.closeUpOff(true);
+      this.releaseCloseRt();
+      this.cancelLoop();
+      this.flushSettled();
+    } else if (this.lastPlan) {
+      this.showPlan(this.lastPlan);
+    } else {
+      this.placeholder.visible = true;
+      this.restartSettle();
+    }
+  }
+
+  get isEngineOwned(): boolean {
+    return this.engineOwned;
+  }
+
+  private cancelLoop(): void {
+    if (this.frameRequest !== null) cancelAnimationFrame(this.frameRequest);
+    this.frameRequest = null;
+    this.loopLast = null;
+    this.burstLeft = 0;
+    this.primePending = false;
+    this.cap.reset();
+    this.governor.reset();
+  }
+
+  private releaseCloseRt(): void {
+    this.closeRt?.dispose();
+    this.closeRt = null;
+  }
+
   /** Draws a plan made with `planRender` (the panel plans once and reuses the plan for its UI). */
   showPlan(plan: RenderPlan): void {
     if (this.disposed) return;
@@ -465,7 +546,12 @@ export class ViewerApp {
     // the new one compiles is not lit from the new object's phase angle.
     const lights = buildLights(
       plan.lighting,
-      plan.shape?.shadows ? shadowSettings(this.tier) : null,
+      plan.shape?.shadows
+        ? {
+            ...shadowSettings(this.tier),
+            extent: plan.shape.shadowExtent ?? shadowSettings(this.tier).extent,
+          }
+        : null,
     );
     const key = sceneKey(plan);
     if (this.built && key === this.builtKey) {
@@ -497,7 +583,7 @@ export class ViewerApp {
     // A mesh that finishes loading in a scene that is no longer the current plan must not report its
     // size: the panel would attach it to the new object (Bennu's size on a cached Eros).
     const buildToken = this.compileToken;
-    if (plan.threeD && (plan.bodies.length > 0 || plan.shader !== null)) {
+    if (!this.engineOwned && plan.threeD && (plan.bodies.length > 0 || plan.shader !== null)) {
       try {
         next = buildScene(
           plan,
@@ -793,8 +879,22 @@ export class ViewerApp {
 
   /** One frame: through the pipeline, or plain if the pipeline is missing or failed. */
   private draw(): void {
+    if (this.engineOwned) return;
     this.frames++;
     this.updateScreenSize();
+    // A body with an off-screen pass of its own (the gas world's tracer) runs it before the frame.
+    try {
+      this.onScreen?.prepareFrame(this.renderer);
+    } catch (err) {
+      console.warn('[viewer] a body could not prepare its frame', err);
+    }
+    // A rocky world's cloud tracer is a GPU pass: step it to the clock before the frame (stream D, Q-245).
+    try {
+      this.onScreen?.body?.stepGpu?.(this.renderer);
+    } catch (err) {
+      console.warn('[viewer] the cloud tracer failed; clouds stay as they are', err);
+    }
+    let rendered = false;
     if (this.chain) {
       try {
         // Volumes shift their per-pixel ray jitter by the TAAU frame index (same index after a
@@ -802,12 +902,18 @@ export class ViewerApp {
         const jitter = this.chain.jitterIndex();
         if (jitter !== null) this.onScreen?.setJitterFrame(jitter);
         this.chain.render();
-        return;
+        rendered = true;
       } catch (err) {
         this.dropChain(err);
       }
     }
-    this.renderer.render(this.scene, this.camera);
+    if (!rendered) this.renderer.render(this.scene, this.camera);
+    // Outside the chain's try: a close-up error must not drop the post chain.
+    try {
+      this.drawClose();
+    } catch (err) {
+      console.warn('[viewer] the close-up failed', err);
+    }
   }
 
   /** The 160 px level-of-detail rule: tell the shape model how big it is on screen now. */
@@ -958,13 +1064,13 @@ export class ViewerApp {
   }
 
   private schedule(): void {
-    if (this.disposed || this.frameRequest !== null) return;
+    if (this.disposed || this.engineOwned || this.frameRequest !== null) return;
     this.frameRequest = requestAnimationFrame(this.tick);
   }
 
   private readonly tick = (now: number): void => {
     this.frameRequest = null;
-    if (this.disposed) return;
+    if (this.disposed || this.engineOwned) return;
     // R5.7 phone frame-rate cap (30 fps on the low quality level): skip this display frame.
     if (!this.cap.shouldDraw(now)) {
       this.schedule();
@@ -974,6 +1080,7 @@ export class ViewerApp {
       this.clock.tick();
       this.applySpinAngle();
     }
+    this.stepClose(now);
     this.draw();
     // Frame time is only meaningful between consecutive frames of one continuous run. A longer
     // gap (a hidden tab, a stalled main thread) is not a frame time and would skew p95.
@@ -991,7 +1098,7 @@ export class ViewerApp {
     }
     if (this.burstLeft > 0) this.burstLeft--;
     if (this.burstLeft === 0) this.flushSettled();
-    if (this.clock.running || this.burstLeft > 0) {
+    if (this.clock.running || this.burstLeft > 0 || this.closeBusy()) {
       this.schedule();
     } else {
       this.loopLast = null;
@@ -1015,6 +1122,79 @@ export class ViewerApp {
   zoom(direction: ZoomDirection): void {
     if (this.disposed) return;
     zoomControls(this.controls, direction);
+  }
+
+  private closeUpPaused = false;
+
+  /**
+   * Issue #71 stream C: the star close-up. Moves the camera to look straight down at a spot of the
+   * star's surface (latitude and longitude in the body frame), at a distance that makes the window
+   * `halfWidth` star radii wide, and holds the spin still so the spot stays in view. Null returns
+   * to the framed view and lifts only a pause this call made. No effect without a star surface.
+   */
+  setStarCloseUp(t: { latRad: number; lonRad: number; halfWidth: number } | null): void {
+    if (this.disposed) return;
+    if (t === null) {
+      this.controls.minDistance = 1.5;
+      this.controls.reset();
+      if (this.closeUpPaused) this.setSpinPaused(false);
+      this.closeUpPaused = false;
+      this.requestRender();
+      return;
+    }
+    const local: [number, number, number] = [
+      Math.cos(t.latRad) * Math.cos(t.lonRad),
+      Math.sin(t.latRad),
+      Math.cos(t.latRad) * Math.sin(t.lonRad),
+    ];
+    if (!this.spinPaused) {
+      this.setSpinPaused(true);
+      this.closeUpPaused = true;
+    }
+    const w = this.onScreen?.starDirToWorld(local);
+    if (!w) return;
+    // Vertical field of view is 40 degrees: half the window at the surface is (d - 1) tan 20 deg.
+    const d = 1 + t.halfWidth / Math.tan((20 * Math.PI) / 180);
+    this.controls.minDistance = Math.min(1.5, d);
+    this.camera.position.set(w[0] * d, w[1] * d, w[2] * d);
+    this.controls.target.set(0, 0, 0);
+    this.controls.update();
+    this.requestRender();
+  }
+
+  /** Issue #71 stream G: true when the star on screen draws flares and plasma. */
+  hasStarFlares(): boolean {
+    return !this.disposed && !!this.onScreen?.starFlares;
+  }
+
+  /** "Fire a big flare": a flare of about 3e31 erg at the biggest spot group now (capped to its E_max). */
+  fireFlare(): void {
+    if (this.disposed) return;
+    this.onScreen?.starFlares?.fire();
+    this.requestRender();
+  }
+
+  /** The "Latest flare" card text, or null when there is none yet. */
+  latestFlareText(): string | null {
+    return this.onScreen?.starFlares?.latestText() ?? null;
+  }
+
+  /** The "Field lines" toggle. */
+  setFieldLines(on: boolean): void {
+    if (this.disposed) return;
+    this.onScreen?.starFlares?.setLines(on);
+    this.requestRender();
+  }
+
+  /**
+   * How far the view is zoomed in compared with the one the body opened with (1 = as opened, 1.5 =
+   * 150%). Read-only, for the build pane's zoom bar (issue #71 stream U); 1 when it cannot tell.
+   */
+  zoomRatio(): number {
+    if (this.disposed) return 1;
+    const now = this.camera.position.distanceTo(this.controls.target);
+    const start = this.controls.position0.distanceTo(this.controls.target0);
+    return now > 0 && start > 0 ? start / now : 1;
   }
 
   /** R5.6 `R` key: back to the starting view (and the body's own turn back to none). */
@@ -1120,6 +1300,259 @@ export class ViewerApp {
     this.schedule();
   };
 
+  // ---- the close-up pane --------------------------------------------------------------------
+  // The app's version of the mock-up's #cuPane: the left half of the app, over the sky, with the
+  // globe staying in the build pane on the right. The picture is rendered by THIS renderer into an
+  // offscreen 8-bit target (WebGL2 allows one context per canvas, and the gas tracer's render target
+  // belongs to this renderer), read back, and painted into the pane's own 2D canvas. Only when the
+  // picture changed, and at a quarter scale while the user is moving it.
+
+  /** The pane's 2D canvas (the React pane gives it; null detaches). */
+  setCloseUpCanvas(canvas: HTMLCanvasElement | null): void {
+    this.closeCanvas = canvas;
+    if (canvas) this.requestCloseRender();
+  }
+
+  setCloseUpHandler(handler: ((info: CloseUpInfo) => void) | null): void {
+    this.onCloseChange = handler;
+  }
+
+  /** The surface view (orbit view) while the pane shows it, for the pane's controls. */
+  get orbitView(): OrbitView | null {
+    return this.close.mode === 'orbit' ? this.close.view : null;
+  }
+
+  closeUpInfo(): CloseUpInfo {
+    return { mode: this.close.mode, resolved: this.close.resolved, refusal: this.close.resolved?.refusal ?? null };
+  }
+
+  /**
+   * Opens the pane. A rocky or gas body that exposes `orbitSources` gets the orbit view; a body
+   * with none (an asteroid, a comet) gets itself seen from close to its surface when `bodyFallback`
+   * is set. `textOnly` (a star) or a refusal (still forming, missing radius) or `blockedReason` (the
+   * level hides artist's impressions) shows a caption only: never a blank pane.
+   */
+  openCloseUp(bodyFallback: boolean, textOnly = false, blockedReason: string | null = null): CloseUpInfo {
+    if (this.disposed) return this.closeUpInfo();
+    this.closeUpOff(true, true);
+    const body = this.body as unknown as { orbitSources?: unknown } | null;
+    const live = () => (body as { orbitSources?: unknown } | null)?.orbitSources;
+    const exposed = body ? live() : undefined;
+    this.close.last = 0;
+    if (blockedReason) {
+      this.close.mode = 'text';
+      this.close.resolved = { sources: null, layers: [], missing: [], refusal: blockedReason };
+    } else if (exposed !== undefined && exposed !== null) {
+      const resolved = resolveOrbitSources(exposed, live);
+      this.close.resolved = resolved;
+      if (resolved.sources) {
+        try {
+          const view = new OrbitView(resolved.sources);
+          view.enter(this.sunInBody().sun);
+          this.close.view = view;
+          this.close.mode = 'orbit';
+        } catch (err) {
+          console.warn('[viewer] could not start the surface view', err);
+          this.close.resolved = { ...resolved, sources: null, refusal: 'The surface view could not start in this browser.' };
+        }
+      }
+    } else if (bodyFallback && this.onScreen) {
+      this.close.mode = 'body';
+    }
+    if (this.close.mode === null && (textOnly || this.close.resolved?.refusal)) this.close.mode = 'text';
+    this.notifyClose();
+    this.requestCloseRender();
+    return this.closeUpInfo();
+  }
+
+  /** Closes the pane and drops the view. `keepCanvas` leaves the last picture (the CSS fade-out shows it). */
+  closeUpOff(_unused = true, keepNotify = false): void {
+    void _unused;
+    const c = this.close;
+    if (c.mode === null && c.view === null) return;
+    c.view?.dispose();
+    if (c.mode === 'body') this.releaseCloseRt();
+    this.close = { mode: null, view: null, resolved: null, last: 0, reading: false, dirty: false };
+    if (this.closeRaf !== null) cancelAnimationFrame(this.closeRaf);
+    this.closeRaf = null;
+    if (!this.disposed && !keepNotify) this.notifyClose();
+  }
+
+  private notifyClose(): void {
+    this.onCloseChange?.(this.closeUpInfo());
+  }
+
+  /** Frames the pane needs on its own (flying, or refining after input), beyond the globe's. */
+  private closeBusy(): boolean {
+    const v = this.close.view;
+    return v !== null && v.needsFrames() && !(prefersReducedMotion() && !v.isInteracting());
+  }
+
+  /** Fly forward and adaptive quality. */
+  private stepClose(now: number): void {
+    const c = this.close;
+    if (c.mode === null) return;
+    const dt = c.last ? Math.min((now - c.last) / 1000, 0.1) : 0;
+    c.last = now;
+    if (c.view && dt > 0 && (this.clock.running || c.view.flying || c.view.isInteracting(now))) {
+      c.view.governor.feed(dt * 1000, now);
+    }
+    if (c.view && !prefersReducedMotion()) c.view.advance(dt);
+  }
+
+  /**
+   * Redraws only the pane (an input moved the camera): no globe frame. Coalesced to one per display
+   * frame; keeps going while it needs refining.
+   */
+  readonly requestCloseRender = (): void => {
+    if (this.disposed || this.closeRaf !== null || this.close.mode === null) return;
+    this.closeRaf = requestAnimationFrame((now) => {
+      this.closeRaf = null;
+      if (this.disposed) return;
+      this.stepClose(now);
+      this.drawClose();
+      if (this.closeBusy()) this.requestCloseRender();
+    });
+  };
+
+  /** The star's direction (body frame) and colour for the orbit pass. */
+  private sunInBody(): { sun: Vec3; colour: Vec3 } {
+    const light = this.lights.find((l): l is DirectionalLight => l instanceof DirectionalLight);
+    const frame = this.onScreen?.group ?? null;
+    const dir = new Vector3(0, 0, 1);
+    if (light) dir.copy(light.position).sub(light.target.position).normalize();
+    if (frame) {
+      frame.updateWorldMatrix(true, false);
+      dir.transformDirection(new Matrix4().copy(frame.matrixWorld).invert());
+    }
+    const c = light ? light.color : { r: 1, g: 1, b: 1 };
+    const m = Math.max(c.r, c.g, c.b, 1e-6);
+    return { sun: [dir.x, dir.y, dir.z], colour: [c.r / m, c.g / m, c.b / m] };
+  }
+
+  private drawClose(): void {
+    const c = this.close;
+    const canvas = this.closeCanvas;
+    if (c.mode === null || c.mode === 'text' || !canvas) return;
+    const cw = canvas.clientWidth;
+    const ch = canvas.clientHeight;
+    if (!cw || !ch) return;
+    const r = this.renderer;
+    const pr = window.devicePixelRatio || 1;
+    if (c.mode === 'orbit' && c.view) {
+      const { sun, colour } = this.sunInBody();
+      const kind = c.view.kind;
+      c.view.light = {
+        sunDir: sun,
+        starColour: colour,
+        timeSec: this.clock.simTime(kind === 'gas' ? 'winds' : 'clouds') * CLOUD_TIME_PER_SIM_S,
+        cloudsOn: true,
+      };
+      c.view.renderScale = renderScaleFor(this.tier === 'low');
+      const out = c.view.render(r, { w: cw, h: ch }, pr, { now: performance.now(), animating: this.clock.running });
+      if (!out) {
+        const failed: OrbitResolved = { ...(c.resolved as OrbitResolved), sources: null, refusal: 'The surface view could not start in this browser.' };
+        this.closeUpOff(true);
+        this.close.mode = 'text';
+        this.close.resolved = failed;
+        this.notifyClose();
+        return;
+      }
+      if (out.changed) this.paintClose(out.rt);
+    } else if (c.mode === 'body') {
+      // The same body from near its surface (the mock-up's cuDraw): a second camera, 0.36 of the distance.
+      const cam = this.closeCamera;
+      const tgt = this.controls.target;
+      cam.position.copy(this.camera.position).sub(tgt).multiplyScalar(0.36).add(tgt);
+      if (cam.position.distanceTo(tgt) < 1.1) cam.position.sub(tgt).setLength(1.1).add(tgt);
+      const k = Math.min(1, 800 / Math.max(cw, ch)) * Math.min(pr, ORBIT_MAX_PR);
+      const w = Math.max(2, Math.round(cw * k));
+      const h = Math.max(2, Math.round(ch * k));
+      cam.aspect = w / h;
+      cam.lookAt(tgt);
+      cam.updateProjectionMatrix();
+      cam.updateMatrixWorld();
+      if (!this.closeRt) {
+        this.closeRt = new RenderTarget(w, h, { type: UnsignedByteType, colorSpace: SRGBColorSpace, depthBuffer: true });
+      } else if (this.closeRt.width !== w || this.closeRt.height !== h) this.closeRt.setSize(w, h);
+      const prev = r.getRenderTarget();
+      r.setRenderTarget(this.closeRt);
+      try {
+        r.render(this.scene, cam);
+      } finally {
+        r.setRenderTarget(prev);
+      }
+      this.paintClose(this.closeRt);
+    }
+  }
+
+  /** Reads the target back and paints it into the pane canvas (one read at a time; the newest wins). */
+  private paintClose(rt: RenderTarget): void {
+    const c = this.close;
+    if (c.reading) {
+      c.dirty = true;
+      return;
+    }
+    c.reading = true;
+    const w = rt.width;
+    const h = rt.height;
+    const webgl = this.backend === 'webgl2';
+    void (this.renderer as unknown as {
+      readRenderTargetPixelsAsync(rt: RenderTarget, x: number, y: number, w: number, h: number): Promise<ArrayLike<number>>;
+    })
+      .readRenderTargetPixelsAsync(rt, 0, 0, w, h)
+      .then((data) => {
+        const canvas = this.closeCanvas;
+        if (this.disposed || !canvas) return;
+        const bytes = new Uint8ClampedArray(w * h * 4);
+        const row = w * 4;
+        // WebGL reads bottom row first, WebGPU top row first.
+        for (let y = 0; y < h; y++) {
+          const src = (webgl ? h - 1 - y : y) * row;
+          for (let x = 0; x < row; x++) bytes[y * row + x] = data[src + x] as number;
+          for (let x = 3; x < row; x += 4) bytes[y * row + x] = 255;
+        }
+        const tmp = (this.closeTmp ??= document.createElement('canvas'));
+        tmp.width = w;
+        tmp.height = h;
+        tmp.getContext('2d')!.putImageData(new ImageData(bytes, w, h), 0, 0);
+        const pr = Math.min(window.devicePixelRatio || 1, 2);
+        const tw = Math.max(1, Math.round(canvas.clientWidth * pr));
+        const th = Math.max(1, Math.round(canvas.clientHeight * pr));
+        if (canvas.width !== tw || canvas.height !== th) {
+          canvas.width = tw;
+          canvas.height = th;
+        }
+        const g = canvas.getContext('2d')!;
+        g.imageSmoothingEnabled = true;
+        g.drawImage(tmp, 0, 0, tw, th);
+      })
+      .catch((err) => console.warn('[viewer] could not read the close-up back', err))
+      .finally(() => {
+        c.reading = false;
+        if (c.dirty) {
+          c.dirty = false;
+          this.requestCloseRender();
+        }
+      });
+  }
+
+  /** The place on the globe under a screen point, or null (clicks on the globe move the surface view). */
+  pickGlobe(clientX: number, clientY: number): { lon: number; lat: number } | null {
+    const frame = this.onScreen?.group;
+    if (!frame || this.disposed) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    const ndc = new Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -(((clientY - rect.top) / rect.height) * 2 - 1));
+    const ray = new Raycaster();
+    ray.setFromCamera(ndc, this.camera);
+    frame.updateWorldMatrix(true, false);
+    const inv = new Matrix4().copy(frame.matrixWorld).invert();
+    const o = ray.ray.origin.clone().applyMatrix4(inv);
+    const d = ray.ray.direction.clone().transformDirection(inv);
+    return pickPlace([o.x, o.y, o.z], [d.x, d.y, d.z]);
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -1134,6 +1567,8 @@ export class ViewerApp {
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.unsubscribeNoise?.();
     this.unsubscribeNoise = null;
+    this.closeUpOff(true);
+    this.releaseCloseRt();
     this.clearBuilt();
     this.chain?.dispose();
     this.chain = null;

@@ -17,6 +17,7 @@ import { Icon } from '@/app/shell/icons';
 import { useAppStore } from '@/state/store';
 import { parseQuery } from './parseQuery';
 import { DEMO_TARGETS, filterTargets, type DemoTarget } from './demoTargets';
+import { REFERENCE_TARGETS } from './referenceTargets';
 
 export const NO_MATCH_HINT = 'No demo object matches. Press Enter to search the catalogues.';
 // parseQuery accepts both examples (a name, and RA, Dec in decimal degrees).
@@ -32,7 +33,7 @@ export function SearchBar() {
   const [problem, setProblem] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
-  const rows = useMemo(() => filterTargets(DEMO_TARGETS, text), [text]);
+  const rows = useMemo(() => filterTargets([...DEMO_TARGETS, ...REFERENCE_TARGETS], text), [text]);
   const listId = useId();
   const inputId = useId();
   const helpId = useId();
