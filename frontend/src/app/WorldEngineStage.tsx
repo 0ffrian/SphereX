@@ -128,21 +128,22 @@ function useWorldEngine(role: Role, world: CardToWorldOk, onFail: (() => void) |
     }
     const st = useWorldStore.getState();
     if (role === 'globe') {
-      e.playing = !reducedMotion();
       st.load(world);
       st.setGlobe(e);
-      st.setPlaying(e.playing);
+      useWorldStore.setState({ playing: !reducedMotion() });
     } else {
       // The close-up opens in the state the globe is in: same controls, same turn angle, same clock.
       if (st.world?.preset.id === world.preset.id) e.setOverrides(st.applied);
-      e.playing = st.playing;
-      if (st.globe) e.syncSpin(st.globe);
       st.setFly(e);
     }
     setEngine(e);
     // Dev only: the verification scripts (issue #71) read and drive the engines through these.
     if (import.meta.env.DEV) (window as unknown as Record<string, unknown>)[`__sxWorld_${role}`] = e;
 
+    // The world holds still while it forms (so the turn angle, and with it where the Sun is, stays what the
+    // artifact has when its user presses Surface view) and starts moving when it has settled.
+    e.playing = false;
+    let released = false;
     let dead = false;
     let raf = 0;
     let shown = true;
@@ -151,6 +152,12 @@ function useWorldEngine(role: Role, world: CardToWorldOk, onFail: (() => void) |
       if (dead) return;
       const dt = (now - last) / 1000;
       last = now;
+      if (!released && e.spinup === 0) {
+        released = true;
+        const g = useWorldStore.getState();
+        if (role === 'fly' && g.globe) e.syncSpin(g.globe);
+        e.playing = g.playing;
+      }
       if (shown && !document.hidden) e.tick(dt);
       raf = requestAnimationFrame(frame);
     };
@@ -171,8 +178,11 @@ function useWorldEngine(role: Role, world: CardToWorldOk, onFail: (() => void) |
           });
     ro?.observe(canvas);
     // React reads the readouts a few times a second while the world moves or forms, and not at all when it is paused and settled.
+    let wasForming = true;
     const id = window.setInterval(() => {
-      if (shown && (e.playing || e.spinup > 0)) bump();
+      const forming = e.spinup > 0;
+      if (shown && (e.playing || forming || wasForming)) bump();
+      wasForming = forming;
     }, 400);
     return () => {
       if (import.meta.env.DEV) (window as unknown as Record<string, unknown>)[`__sxWorld_${role}`] = null;
@@ -525,6 +535,7 @@ export function WorldFlyStage({
   const { hostRef, engine, bump, failed } = useWorldEngine('fly', world, onFail);
   const target = useWorldStore((s) => s.target);
   const [entered, setEntered] = useState(false);
+  const settled = !!engine && engine.spinup === 0;
   const [about, setAbout] = useState(false);
   const [, redo] = useReducer((n: number) => n + 1, 0);
 
@@ -535,7 +546,7 @@ export function WorldFlyStage({
     if (!engine || !canvas) return;
     let done = false;
     const enter = () => {
-      if (done) return;
+      if (done || engine.spinup > 0) return;
       engine.draw();
       if (!engine.view()) return;
       engine.setFly(true);
@@ -548,7 +559,7 @@ export function WorldFlyStage({
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(enter);
     ro?.observe(canvas);
     return () => ro?.disconnect();
-  }, [engine, hostRef, bump]);
+  }, [engine, hostRef, bump, settled]);
 
   // A click on the globe (build pane): go there.
   useEffect(() => {
