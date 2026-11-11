@@ -10,6 +10,9 @@
 //   0.014 / sqrt(0.015) = 0.114; a rubble pile's lump is slope-limited (35 deg repose, 3 sigma of
 //   the shape layer's rms slope 0.7837 per unit lump) instead of strength-limited. The d^-5 ejecta
 //   falloff is artistic (McGetchin et al. 1973 measure about r^-3).
+//   Issue #93 2.8: a card body (seed3, seedHash from cardToRock) gets a vec3 noise offset, its full 32-bit seed for
+//   the crater RNG, per-crater ellipticity, rim height and rim wave, and 0 to 2 boulders a cell; the artifact's own
+//   bodies have neither field and draw exactly as before.
 //   1268-1268  clamp          (shared helper)
 //   1273-1273  rng            (shared helper)
 //   1292-1297  compile, unis  (shared helpers)
@@ -59,7 +62,7 @@ function rockModel() {
   return { rad: rad, gv: gv, ratio: ratio, lump: lump, limit: limit, fast: fast, kind: kind, cov: cov, bld: bld, ax: ax, escape: Math.sqrt(2 * gv * rad) };
 }
 function buildRock(m) {
-  var p = R.p, TW = 1024, TH = 512, data = new Float32Array(TW * TH * 2), base = new Float32Array(TW * TH), px = new Float32Array(TW * TH * 3), r = rng(p.seed * 31 + 7), rf = radialFn(m.ax, p.comet), i, j, ext = 0, W2 = [];
+  var p = R.p, TW = 1024, TH = 512, data = new Float32Array(TW * TH * 2), base = new Float32Array(TW * TH), px = new Float32Array(TW * TH * 3), r = rng(p.seedHash != null ? p.seedHash : p.seed * 31 + 7), rf = radialFn(m.ax, p.comet), i, j, ext = 0, W2 = [];
   var w0 = 0; for (i = 0; i < 26; i++) { var z = r() * 2 - 1, an = r() * 6.2832, c2 = Math.sqrt(1 - z * z), kk = 1.3 + 7.5 * Math.pow(r(), 1.4), amp = Math.pow(kk, -1.5); w0 += amp * amp; W2.push([c2 * Math.cos(an), z, c2 * Math.sin(an), kk, r() * 6.2832, amp]); }
   var norm = m.lump * 0.45 / Math.sqrt(w0 / 2);
   for (j = 0; j < TH; j++) { var la = ((j + 0.5) / TH - 0.5) * Math.PI, cl = Math.cos(la), sl = Math.sin(la); for (i = 0; i < TW; i++) {
@@ -70,15 +73,21 @@ function buildRock(m) {
   var rmin = 0.014, rmax = 0.014 / Math.sqrt(0.015), area = 0, target = m.cov * 4, count = 0;
   var cr = []; while (area < target && count < 1500) { var rc = Math.min(rmax, rmin * Math.pow(1 - r() * 0.985, -0.5)); cr.push(rc); area += rc * rc; count++; }
   cr.sort(function (a, b) { return b - a; });
+  var cvr = p.seedHash != null ? rng(p.seedHash ^ 0x5bd1e995) : null;
   cr.forEach(function (rc) {
     var z = r() * 2 - 1, an = r() * 6.2832, c2 = Math.sqrt(1 - z * z), dx = c2 * Math.cos(an), dy = z, dz = c2 * Math.sin(an), rs = rf(dx, dy, dz), cx = dx * rs, cy = dy * rs, cz = dz * rs, deg = 0.35 + 0.65 * r(), depth = 0.33 * rc * deg, reach = 2.4 * rc;
+    var el = 1, rimK = 1, rph = 0, rk = 0, e1 = null, e2 = null;
+    if (cvr) { el = 1 + 0.35 * Math.pow(cvr(), 3); rimK = 0.6 + 0.8 * cvr(); rph = cvr() * 6.2832; rk = 2 + Math.floor(cvr() * 4); var ang = cvr() * 3.1416, up = Math.abs(dy) < 0.9 ? [0, 1, 0] : [1, 0, 0], a1 = [up[1] * dz - up[2] * dy, up[2] * dx - up[0] * dz, up[0] * dy - up[1] * dx], al = Math.hypot(a1[0], a1[1], a1[2]); a1 = [a1[0] / al, a1[1] / al, a1[2] / al]; var b1 = [dy * a1[2] - dz * a1[1], dz * a1[0] - dx * a1[2], dx * a1[1] - dy * a1[0]], ca = Math.cos(ang), sa = Math.sin(ang); e1 = [a1[0] * ca + b1[0] * sa, a1[1] * ca + b1[1] * sa, a1[2] * ca + b1[2] * sa]; e2 = [b1[0] * ca - a1[0] * sa, b1[1] * ca - a1[1] * sa, b1[2] * ca - a1[2] * sa]; reach *= el; }
     var la0 = Math.asin(dy), lo0 = Math.atan2(dz, dx), th = Math.min(Math.PI, reach / rs * 1.08), j0 = Math.max(0, Math.floor(((la0 - th) / Math.PI + 0.5) * TH)), j1 = Math.min(TH - 1, Math.ceil(((la0 + th) / Math.PI + 0.5) * TH));
     var dLo = Math.abs(la0) + th >= 1.5 ? Math.PI : Math.min(Math.PI, Math.asin(Math.min(1, Math.sin(th) / Math.cos(la0))) * 1.1);
     for (var jj = j0; jj <= j1; jj++) {
       var i0 = Math.floor(((lo0 - dLo) / 6.2832 + 0.5) * TW), i1 = Math.min(i0 + TW - 1, Math.ceil(((lo0 + dLo) / 6.2832 + 0.5) * TW));
       for (var ii = i0; ii <= i1; ii++) {
-        var iw = ((ii % TW) + TW) % TW, ix = jj * TW + iw, dpx = px[ix * 3] - cx, dpy = px[ix * 3 + 1] - cy, dpz = px[ix * 3 + 2] - cz, d = Math.sqrt(dpx * dpx + dpy * dpy + dpz * dpz) / rc; if (d > 2.4) continue;
+        var iw = ((ii % TW) + TW) % TW, ix = jj * TW + iw, dpx = px[ix * 3] - cx, dpy = px[ix * 3 + 1] - cy, dpz = px[ix * 3 + 2] - cz, d = Math.sqrt(dpx * dpx + dpy * dpy + dpz * dpz) / rc, q1 = 0, q2 = 0;
+        if (cvr) { q1 = dpx * e1[0] + dpy * e1[1] + dpz * e1[2]; q2 = dpx * e2[0] + dpy * e2[1] + dpz * e2[2]; var q3 = dpx * dx + dpy * dy + dpz * dz; d = Math.sqrt(q1 * q1 / (el * el) + q2 * q2 * el * el + q3 * q3) / rc; }
+        if (d > 2.4) continue;
         var prof = d < 1 ? -depth * (1 - d * d) + 0.2 * depth * d * d * d * d : 0.2 * depth * Math.pow(d, -5);
+        if (cvr) { var rimA = rimK * (1 + 0.25 * Math.sin(rk * Math.atan2(q2, q1) + rph)); prof = d < 1 ? -depth * (1 - d * d) + 0.2 * rimA * depth * d * d * d * d : 0.2 * rimA * depth * Math.pow(d, -5); }
         var pr2 = Math.sqrt(px[ix * 3] * px[ix * 3] + px[ix * 3 + 1] * px[ix * 3 + 1] + px[ix * 3 + 2] * px[ix * 3 + 2]);
         if (d < 1) data[ix * 2] *= 0.45 + 0.55 * d;
         data[ix * 2] += prof / pr2;
@@ -96,14 +105,14 @@ void main(){float lo=(aUv.x-.5)*6.2831853,la=(aUv.y-.5)*3.14159265,c=cos(la);vec
  vec3 p=uM*(d*rad(d)*(1.+texture(uH,aUv).r));gl_Position=vec4(p.x*uScale/uAsp,p.y*uScale,-p.z*uScale*.3+.0,1.);}`;
 var ROCK_FS = `#version 300 es
 precision highp float;
-in vec3 vD;uniform sampler2D uH;uniform vec3 uAx,uLo,uVo,uTint;uniform float uComet,uFine,uBld,uBright,uScale,uSeed;out vec4 O;
+in vec3 vD;uniform sampler2D uH;uniform vec3 uAx,uLo,uVo,uTint;uniform float uComet,uFine,uBld,uBright,uScale,uSeed,uBldV;uniform vec3 uSeed3;out vec4 O;
 ${NOISE}
 float rad(vec3 d){float r=1./sqrt(dot(d/uAx,d/uAx));if(uComet>.5)r*=.72+.62*d.x*d.x+.1*d.x;return r;}
 vec2 uvOf(vec3 d){return vec2(atan(d.z,d.x)/6.2831853+.5,asin(clamp(d.y,-1.,1.))/3.14159265+.5);}
 float boulders(vec3 p){vec3 ip=floor(p),fp=fract(p);float m=0.;
- for(int k=-1;k<=1;k++)for(int j=-1;j<=1;j++)for(int i=-1;i<=1;i++){vec3 g=vec3(i,j,k),h=h33(ip+g);float s=.16+.42*h.x*h.x,d=length(g+h-fp)/s;if(d<1.&&h.y>.34)m=max(m,(1.-d*d)*s);}
+ for(int k=-1;k<=1;k++)for(int j=-1;j<=1;j++)for(int i=-1;i<=1;i++){vec3 g=vec3(i,j,k),h=h33(ip+g);float s=.16+.42*h.x*h.x,d=length(g+h-fp)/s;if(d<1.&&h.y>.34)m=max(m,(1.-d*d)*s);if(uBldV>.5&&h.z>.62){vec3 h2=h33(ip+g+vec3(41.3,17.9,29.1));float s2=.12+.3*h2.x*h2.x,d2=length(g+h2-fp)/s2;if(d2<1.)m=max(m,(1.-d2*d2)*s2);}}
  return m;}
-float hf(vec3 d){vec3 p=d*rad(d)+uSeed;float h=texture(uH,uvOf(d)).r;
+float hf(vec3 d){vec3 p=d*rad(d)+uSeed3;float h=texture(uH,uvOf(d)).r;
  h+=uFine*((ridge(p*5.,4)-.55)*.05+(fbm(p*26.,3)-.5)*.018);
  if(uBld>.01)h+=uBld*(boulders(p*17.)*.055+boulders(p*43.)*.018);
  return h;}
@@ -115,7 +124,7 @@ void main(){
  float mu0=dot(n,uLo),mu=max(dot(n,uVo),.02),sh=1.;
  if(mu0>0.){vec3 q=p0+n*.016;float st=.03;for(int i=0;i<26;i++){q+=uLo*st;vec3 dq=normalize(q);float s=rad(dq)*(1.+texture(uH,uvOf(dq)).r),o=s-length(q);if(o>.012){sh=0.;break;}sh=min(sh,1.-smoothstep(-.012,.002,o)*.6);st*=1.11;}}
  else sh=0.;
- vec2 uv=uvOf(d);float fresh=texture(uH,uv).g,pat=fbm(p0*3.+uSeed,4),grain=fbm(p0*44.+uSeed,3);
+ vec2 uv=uvOf(d);float fresh=texture(uH,uv).g,pat=fbm(p0*3.+uSeed3,4),grain=fbm(p0*44.+uSeed3,3);
  vec3 alb=uTint*(.58+.8*pat)*(.8+.42*grain);alb=mix(alb,alb*1.5+.05,clamp(fresh,0.,1.)*(1.-uComet*.75));
  alb*=uBright;
  float alpha=acos(clamp(dot(uLo,uVo),-1.,1.));
@@ -158,7 +167,7 @@ function RockGL(canvas) {
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(u.uH, 0);
     gl.uniformMatrix3fv(u.uM, false, new Float32Array([M[0], M[3], M[6], M[1], M[4], M[7], M[2], M[5], M[8]]));
     gl.uniform1f(u.uScale, sc); gl.uniform1f(u.uAsp, asp); gl.uniform3fv(u.uAx, m.ax); gl.uniform1f(u.uComet, R.p.comet ? 1 : 0); gl.uniform3fv(u.uLo, Lo); gl.uniform3fv(u.uVo, Vo); gl.uniform3fv(u.uTint, R.p.tint);
-    gl.uniform1f(u.uFine, R.mode === 'smooth' ? 0.25 : 1); gl.uniform1f(u.uBld, m.bld); gl.uniform1f(u.uBright, clamp(0.12 + 1.6 * R.p.A, 0.12, 0.8) * 3.6); gl.uniform1f(u.uSeed, R.p.seed);
+    gl.uniform1f(u.uFine, R.mode === 'smooth' ? 0.25 : 1); gl.uniform1f(u.uBld, m.bld); gl.uniform1f(u.uBright, clamp(0.12 + 1.6 * R.p.A, 0.12, 0.8) * 3.6); gl.uniform1f(u.uSeed, R.p.seed); gl.uniform3fv(u.uSeed3, R.p.seed3 || [R.p.seed, R.p.seed, R.p.seed]); gl.uniform1f(u.uBldV, R.p.seed3 ? 1 : 0);
     gl.drawElements(gl.TRIANGLES, idx.length, gl.UNSIGNED_INT, 0);
     if (R.p.comet) {
       var rf = radialFn(m.ax, true), t = R.clock, N = reduced ? 2400 : 4000, k2 = 0, n2;
