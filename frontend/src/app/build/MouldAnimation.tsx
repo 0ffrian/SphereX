@@ -4,8 +4,8 @@
 // engine spinning up, the plan loading): the sphere of triangles (wireframe), then the kind's steps
 // (shape, relief, terrain, bands, storms, oceans, colour, clouds, rings, tails ...) with the mock-up's
 // stage curve and 0.28 rad/s turn. In the generating wait its stage follows the build strip's real
-// progress; for a body that is ready at once (baked, cached) it plays the same thing sped up to about
-// 1.4 s (once per object per session) and drives the strip itself. When the body is ready the mould
+// progress; for a body that is ready at once (baked, cached) it plays the same thing paced so the show lasts
+// at least 5 s in all (MIN_SHOW_MS), for every body, cached ones included, and drives the strip itself. When the body is ready the mould
 // finishes its stage quickly, then fades out (350 ms) as the real render shows.
 // Decorative (aria-hidden); the caption text is the accessible status. Reduced motion: no animation,
 // one still frame of the finished mould while it waits, and an instant hand-over.
@@ -18,9 +18,10 @@ import { useMouldLive } from './mouldLive';
 /** UI pacing, not physical values. */
 export const MOULD_SIZE_PX = 520;
 export const CACHED_SHOW_MS = 1400;
+/** Moon (12 Nov 2026): every build shows the mould for at least this long, cached bodies included. */
+export const MIN_SHOW_MS = 5000;
 export const FINISH_MS = 600;
 export const HAND_OVER_MS = 350;
-const SEEN_DELAY_MS = 150;
 /** The mock-up's `STAGE_S` and the rotation speed of the body while it is built. */
 export const STAGE_S = 2.3;
 const TURN_RAD_PER_S = 0.28;
@@ -245,33 +246,21 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
       if (cur === 'on') return;
       clear();
       startedAt.current = now;
-      const wasSeen = seen.has(id);
       setSt('on');
-      // A body seen before this session shows no show: only a wait that lasts is drawn.
-      setVisible(!wasSeen || reduced);
-      if (wasSeen && !reduced) timers.current.push(setTimeout(() => setVisible(true), SEEN_DELAY_MS));
+      // Always drawn, also for a body seen before (at least MIN_SHOW_MS in all).
+      setVisible(true);
       return;
     }
     if (cur !== 'on') return;
     clear();
     const elapsed = now - startedAt.current;
     if (reduced) return leave();
-    if (seen.has(id) && elapsed < SEEN_DELAY_MS) {
-      setSt('off');
-      return;
-    }
-    if (elapsed < CACHED_SHOW_MS && !seen.has(id)) {
-      const ms = Math.max(450, CACHED_SHOW_MS - elapsed);
-      setRushMs(ms);
-      setSt('rush');
-      timers.current.push(setTimeout(leave, ms));
-      return;
-    }
-    if (seen.has(id)) return leave();
-    // A long wait: the mould finishes its stage quickly, then fades.
-    setRushMs(FINISH_MS);
+    // The mould plays its remaining stages over whatever is left of MIN_SHOW_MS (a cached body that
+    // was ready at once gets the whole 5 s show); a long real wait just finishes its stage quickly.
+    const ms = Math.max(FINISH_MS, MIN_SHOW_MS - elapsed);
+    setRushMs(ms);
     setSt('rush');
-    timers.current.push(setTimeout(leave, FINISH_MS));
+    timers.current.push(setTimeout(leave, ms));
   }, [active, id, reduced]);
 
   if (stage === 'off') return null;
