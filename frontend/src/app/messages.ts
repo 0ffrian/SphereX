@@ -22,6 +22,9 @@ import {
  * It says how the body was made, nothing about how fresh the data is. */
 export const PREBUILT_NOTE = 'Built ahead of time from the same data';
 
+/** Issue #71 (D-37): shown when an engine draws the body (worlds, stars, rocks): it is made live, not baked. */
+export const ENGINE_NOTE = 'Generated live from physics by the same code as the approved preview';
+
 export function searchErrorMessage(err: SkyError, query: string): string {
   switch (err.kind) {
     case 'not_found':

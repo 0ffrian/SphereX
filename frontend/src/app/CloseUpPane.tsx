@@ -22,6 +22,7 @@ import { placeText, useStarTarget } from './starTargetStore';
 import { STAR_CLOSEUP_TAG, useStarCloseUp } from './starCloseUp';
 import { WorldFlyStage, worldCaption } from './WorldEngineStage';
 import { useWorldStore } from './worldStore';
+import { useRockStore } from './rockStore';
 
 /** The mock-up's cuTag for the flare close-up, true to the prototype: a Sun-like flare, not this star's own. */
 const ENGINE_CAPTION =
@@ -84,7 +85,9 @@ export function CloseUpPane() {
   const engine = kind === 'star' && engineStar && !engineFailed ? engineStar : null;
   // Issue #71 stream Y (D-37): a planet the prototype's world engine draws opens with the build, with its fly view.
   const world = kind === 'orbit' && engineWorld && worldFailedId !== engineWorld.preset.id ? engineWorld : null;
-  const open = !hidden && kind !== null && (engine || world ? !held : info !== null && info.mode !== null);
+  // Issue #71 (D-37): an asteroid or comet the rock engine draws opens with the build; its picture is the engine's, not the viewer's.
+  const rockEngine = useRockStore((s) => s.view) !== null && kind === 'body';
+  const open = !hidden && kind !== null && (engine || world || rockEngine ? !held : info !== null && info.mode !== null);
   const [, bump] = useReducer((n: number) => n + 1, 0);
   const [about, setAbout] = useState(false);
   const focusRef = useRef<HTMLDivElement>(null);
