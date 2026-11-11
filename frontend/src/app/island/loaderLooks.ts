@@ -1,8 +1,9 @@
 // What the island's smoothui GridLoader shows (issue #66): the props for each state.
 import type { GridLoaderProps } from './GridLoader';
 
-/** At rest: the heartbeat plus-shape, lit and still (WCAG 2.2.2: nothing moves on its own). */
-export const IDLE_LOOK: GridLoaderProps = { pattern: 'heartbeat', static: true };
+// Moon (11 Nov 2026): at rest it pulses softly, as smoothui's pulse mode (opacity .4 to 1, slow).
+// Reduced motion keeps it lit and still (GridLoader's own useReducedMotion). Amends Q-121 item 2.
+export const IDLE_LOOK: GridLoaderProps = { pattern: 'heartbeat', mode: 'pulse', speed: 'slow' };
 
 /**
  * The three state pills (smoothui's demo pills, exact props): one word per state.
