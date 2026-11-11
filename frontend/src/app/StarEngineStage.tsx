@@ -78,10 +78,16 @@ function useStarEngine(mode: StarMode, star: StarFromCard, redrawMs: number, slo
       setFailed(true);
       return;
     }
+    let dead = false;
     setEngine(e);
+    // A lost GL context leaves a black canvas: report it so the TSL path draws instead (not while we release it ourselves).
+    const onLost = (ev: Event) => {
+      ev.preventDefault();
+      if (!dead) setFailed(true);
+    };
+    for (const c of e.layers) c.addEventListener('webglcontextlost', onLost);
     // Dev only: the parity scripts (issue #71) pause and seek the engine through this.
     if (import.meta.env.DEV) (window as unknown as Record<string, unknown>)[`__sxStar_${slot}`] = e;
-    let dead = false;
     let raf = 0;
     let shown = true;
     let last = performance.now();
@@ -108,6 +114,7 @@ function useStarEngine(mode: StarMode, star: StarFromCard, redrawMs: number, slo
     return () => {
       if (import.meta.env.DEV) (window as unknown as Record<string, unknown>)[`__sxStar_${slot}`] = null;
       dead = true;
+      for (const c of e.layers) c.removeEventListener('webglcontextlost', onLost);
       cancelAnimationFrame(raf);
       window.clearInterval(id);
       io?.disconnect();
