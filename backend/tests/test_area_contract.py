@@ -140,6 +140,9 @@ def test_provenance_objects_are_closed() -> None:
     ("code", "ok"),
     [
         ("checks:not_run", True),
+        ("checks:d4_not_run", True),
+        ("checks:d5_not_run", True),
+        ("checks:d6_not_run", False),
         ("rate_grid:visits", True),
         ("area:visits", True),
         ("frames:cone_maxrec:3", True),
@@ -224,3 +227,17 @@ def test_checks_are_all_or_nothing_in_the_schema() -> None:
     for part in ("test_mover", "completeness", "control", "linker"):
         assert not validator.is_valid({k: v for k, v in ran.items() if k != part}), part
         assert not validator.is_valid({**not_run, part: ran[part]}), part
+
+
+def test_checks_parts_follow_their_ticket_codes() -> None:
+    """A18.11: D4 without D5 is a valid reply; a part without its data needs its code."""
+    validator = _validator("checks")
+    ran = _load(AREA / "checks.json")
+    d4_only = {k: v for k, v in ran.items() if k != "control"}
+    d4_only["missing"] = sorted([*ran["missing"], "checks:d5_not_run"])
+    assert validator.is_valid(d4_only)
+    d5_only = {k: v for k, v in ran.items() if k not in {"test_mover", "completeness"}}
+    d5_only["missing"] = sorted([*ran["missing"], "checks:d4_not_run"])
+    assert validator.is_valid(d5_only)
+    assert not validator.is_valid({**d4_only, "control": ran["control"]})
+    assert not validator.is_valid({k: v for k, v in ran.items() if k != "linker"})

@@ -33,7 +33,7 @@ Per cutout, using the cached `IMAGE`, `FLAGS`, `VARIANCE` and `WCS-WAVE`:
 3. **Detect** local maxima above `k_detect · sqrt(VARIANCE)` over the mesh background (start `k_detect = 5`), minimum separation 3 px. Peak finding and first-moment centroids in NumPy (pinned 2.5.4), so no new dependency; if D1 adds photutils it is pinned exactly in `backend/pyproject.toml`.
 4. **Measure** each dot at its centroid with Stage 2's aperture photometry (3 px aperture with sub-pixel weights, 6 to 9 px annulus, flux in µJy, the same error formula), reusing `backend/app/core/measure/`. `σ_c` from the centroid's first-moment error (formula in `method`). Wavelength and bandwidth from `wcs.wavelength_at` at the centroid. RA/Dec through the WCS.
 
-- **Output:** `Dot{dot_id, frame_id, detector, visit, exposure, time, x, y, sigma_c_px, ra, dec, flux_uJy, flux_err, snr, wavelength_um, bandwidth_um, flags[]}`. `dot_id` is `<frame_id>:<n>` with `n` in order of the peak pixel's row, then column, so ids are stable. Tags: centroid, flux, error, flags, wavelength and bandwidth `measured`; RA/Dec `derived` (A16.5).
+- **Output:** `Dot{dot_id, frame_id, detector, visit, exposure, time, x, y, sigma_c_px, ra, dec, flux_uJy, flux_err, snr, wavelength_um, bandwidth_um, flags[]}`. `dot_id` is `<frame_id>:<n>` with `n` in order of the peak pixel's row, then column, so ids are stable. As served, `n` follows the rounded centroid row, then column, because the peak pixel is not in the reply ([Q-208](../../decisions/moving-objects.md) (14)). Tags: centroid, flux, error, flags, wavelength and bandwidth `measured`; RA/Dec `derived` (A16.5).
 
 ### A17.3 Glitches, stars and fixed dots (`clean.py`)
 

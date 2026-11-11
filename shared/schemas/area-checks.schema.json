@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "area-checks.schema.json",
   "title": "AreaChecks",
-  "description": "GET /v1/areas/{area_id}/checks (A17.8, A17.6; gated, Q-203). All parts present, or none and checks:not_run in missing.",
+  "description": "GET /v1/areas/{area_id}/checks (A17.8, A17.6; gated, Q-203). Each part appears only if it ran (A18.11): checks:d4_not_run drops test_mover and completeness, checks:d5_not_run drops control, checks:not_run drops every part and the linker (Q-208 (12)).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -330,10 +330,93 @@
       },
       "else": {
         "required": [
-          "test_mover",
-          "completeness",
-          "control",
           "linker"
+        ]
+      }
+    },
+    {
+      "if": {
+        "anyOf": [
+          {
+            "required": [
+              "missing"
+            ],
+            "properties": {
+              "missing": {
+                "type": "array",
+                "contains": {
+                  "const": "checks:d4_not_run"
+                }
+              }
+            }
+          },
+          {
+            "required": [
+              "missing"
+            ],
+            "properties": {
+              "missing": {
+                "type": "array",
+                "contains": {
+                  "const": "checks:not_run"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "test_mover": false,
+          "completeness": false
+        }
+      },
+      "else": {
+        "required": [
+          "test_mover",
+          "completeness"
+        ]
+      }
+    },
+    {
+      "if": {
+        "anyOf": [
+          {
+            "required": [
+              "missing"
+            ],
+            "properties": {
+              "missing": {
+                "type": "array",
+                "contains": {
+                  "const": "checks:d5_not_run"
+                }
+              }
+            }
+          },
+          {
+            "required": [
+              "missing"
+            ],
+            "properties": {
+              "missing": {
+                "type": "array",
+                "contains": {
+                  "const": "checks:not_run"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "control": false
+        }
+      },
+      "else": {
+        "required": [
+          "control"
         ]
       }
     }

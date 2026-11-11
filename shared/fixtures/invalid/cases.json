@@ -2196,7 +2196,7 @@
     }
   },
   {
-    "name": "area checks run halfway",
+    "name": "area checks without the control and without checks:d5_not_run",
     "schema": "area-checks",
     "dropped_by_models": true,
     "expect": {

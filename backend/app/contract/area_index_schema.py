@@ -59,7 +59,7 @@ type AreaDotId = Annotated[
     str,
     Field(
         ...,
-        description="<frame_id>:<n>, n from 1 in order of the peak pixel's row, then column (A17.2).",
+        description="<frame_id>:<n>, n from 1 by the rounded centroid row, then column (Q-208 (14)).",
         pattern="^[A-Za-z0-9][A-Za-z0-9_.-]*:[1-9][0-9]*$",
         title="AreaDotId",
     ),
@@ -83,7 +83,7 @@ type AreaMissingCode = Annotated[
     Field(
         ...,
         description="A refusal code of A17.8 (register: A4.12).",
-        pattern="^(checks:not_run|rate_grid:visits|area:visits|frames:cone_maxrec:[1-9][0-9]*|no_footprint:[A-Za-z0-9][A-Za-z0-9_.-]*|cutout:[A-Za-z0-9][A-Za-z0-9_.-]*|stars:(gaia|wise):[1-9][0-9]*|skybot:[1-9][0-9]*|horizons:.+|stamp:[A-Za-z0-9][A-Za-z0-9_.-]*:[1-9][0-9]*)$",
+        pattern="^(checks:not_run|checks:d4_not_run|checks:d5_not_run|rate_grid:visits|area:visits|frames:cone_maxrec:[1-9][0-9]*|no_footprint:[A-Za-z0-9][A-Za-z0-9_.-]*|cutout:[A-Za-z0-9][A-Za-z0-9_.-]*|stars:(gaia|wise):[1-9][0-9]*|skybot:[1-9][0-9]*|horizons:.+|stamp:[A-Za-z0-9][A-Za-z0-9_.-]*:[1-9][0-9]*)$",
         title="AreaMissingCode",
     ),
 ]
