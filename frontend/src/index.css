@@ -1298,7 +1298,7 @@ body {
   }
   .sx-bp-head {
     position: relative;
-    z-index: 2;
+    z-index: 5; /* above the mould cover (.sx-mould), so the header and its close button stay usable */
     display: flex;
     justify-content: space-between;
     gap: 10px;
@@ -4320,12 +4320,15 @@ body {
   background-color: transparent;
 }
 .sx-mould-art {
-  display: grid;
-  justify-items: center;
-  gap: 6px;
+  position: absolute;
+  inset: 0;
   transition:
     opacity 350ms var(--ease),
     transform 350ms var(--ease);
+}
+.sx-mould-host {
+  position: absolute;
+  inset: 0;
 }
 .sx-mould[data-leaving] .sx-mould-art {
   opacity: 0;
@@ -4805,4 +4808,14 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Build view open: the sky's RA/Dec card sat over the build pane's close button and took its clicks.
+   It describes the sky, which the build view covers, so it steps aside while the pane is open. */
+.sx-bezel[data-split] .sx-coords-wrap {
+  visibility: hidden;
+  pointer-events: none;
+}
+.sx-bezel[data-split] .sx-top {
+  pointer-events: none;
 }

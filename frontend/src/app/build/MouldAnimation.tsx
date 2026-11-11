@@ -77,7 +77,8 @@ export function MouldAnimation({ kind, inputs, seed = 7, steps, rush = false, ru
     const canvas = document.createElement('canvas');
     canvas.setAttribute('aria-hidden', 'true');
     canvas.dataset.testid = 'mould-canvas';
-    canvas.style.cssText = `display:block;width:${MOULD_SIZE_PX}px;height:${MOULD_SIZE_PX}px`;
+    // Fills the stage (not a fixed square): halos and glows fade out instead of being cut at a box edge.
+    canvas.style.cssText = 'display:block;width:100%;height:100%';
     host.appendChild(canvas);
     let renderer: THREE.WebGLRenderer;
     try {
@@ -89,9 +90,20 @@ export function MouldAnimation({ kind, inputs, seed = 7, steps, rush = false, ru
     initShared();
     renderer.setClearColor(0x000000, 0);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(MOULD_SIZE_PX, MOULD_SIZE_PX, false);
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 60);
+    const fitSize = () => {
+      const w = host.clientWidth || MOULD_SIZE_PX;
+      const h = host.clientHeight || MOULD_SIZE_PX;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      // The body takes about 45% of the stage height (0.68 zoom), clear of the header and the step chips.
+      camera.zoom = 0.68 * (Math.min(1, w / h) || 1);
+      camera.updateProjectionMatrix();
+    };
+    fitSize();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fitSize) : null;
+    ro?.observe(host);
     camera.position.set(0, 0, CAMERA_Z[kind] ?? 4.4);
     const o = {
       kind,
@@ -163,6 +175,7 @@ export function MouldAnimation({ kind, inputs, seed = 7, steps, rush = false, ru
     return () => {
       stopped = true;
       stop();
+      ro?.disconnect();
       document.removeEventListener('visibilitychange', onVis);
       useMouldLive.getState().setOverride(null);
       body.root.traverse((m: THREE.Object3D & { geometry?: THREE.BufferGeometry; material?: THREE.Material }) => {
@@ -180,7 +193,7 @@ export function MouldAnimation({ kind, inputs, seed = 7, steps, rush = false, ru
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, seed, reduced]);
 
-  return <div ref={ref} aria-hidden="true" style={{ width: MOULD_SIZE_PX, height: MOULD_SIZE_PX }} />;
+  return <div ref={ref} aria-hidden="true" className="sx-mould-host" />;
 }
 
 export interface MouldOverlayProps {
@@ -277,7 +290,6 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
       </span>
       <div className="sx-mould-art" aria-hidden="true" style={{ opacity: visible ? undefined : 0 }}>
         {kind && <MouldAnimation kind={kind} steps={steps} inputs={inputs} seed={seed} rush={stage === 'rush' || leaving} rushMs={rushMs} reduced={reduced} />}
-        <p className="sx-mould-cap">{caption}</p>
       </div>
     </div>
   );
