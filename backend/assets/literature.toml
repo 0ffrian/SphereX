@@ -173,3 +173,152 @@ tag = "measured"
 citation = "Lisse et al. 2026, ApJ 1000 L52 (arXiv:2512.07318v3), quoting Jewitt et al. 2025"
 table = "Abstract and Sect. 4.6: nucleus radius < 2.5 km"
 note = "An upper limit that Lisse et al. take from Jewitt et al. 2025; the nucleus has never been resolved"
+
+# The SOHO/SWAN water point of 3I/ATLAS (Combi et al. 2026, ApJL 998, L17; Q-333) stays in the
+# frontend (cometGas.ts RATE_ANCHORS_BY_CARD): gas_Q is keyed by the SPHEREx epochs only
+# (CometEpoch is the closed enum 2025-08 | 2025-12), and the point needs a date, a window and r_h
+# that a tagged value cannot hold (issue #93 section 5 C).
+
+# --- Star rotation periods (issue #93 section 5 C) ---------------------------------------------
+# Without a row the frontend borrows the Sun's Rossby number. The card field is in hours, so each
+# period in days is multiplied by 24 (value and err); the note gives the paper's number. Read
+# 11 Nov 2026 from the arXiv text.
+# Epsilon Eridani: the 11.68 d of Donahue, Saar & Baliunas 1996 (ApJ 466, 384) is quoted by
+# Petit et al. 2021 but could not be read in Donahue's own table (ADS scan unreadable here), so the
+# TESS value Petit et al. measured, with its uncertainty, is used instead.
+
+[[value]]
+key = "simbad-eps-eri"
+field = "rot_period_h"
+value = 278.88
+err = 3.6
+tag = "measured"
+citation = "Petit et al. 2021, A&A 648, A55 (arXiv:2101.02643)"
+table = "Sect. 8 'Brightness fluctuations': Gaussian-process fit to the TESS light curve, 0.2 d bins"
+note = "11.62 +/- 0.15 d (x 24 h). With 0.05 d bins the same fit gives 11.56 +/- 0.19 d; the Ca II H&K period of Donahue et al. 1996 is 11.68 d (as quoted by Petit et al.)"
+
+[[value]]
+key = "simbad-name-barnard-s-star"
+field = "rot_period_h"
+value = 3480.0
+err = 360.0
+tag = "measured"
+citation = "Toledo-Padron et al. 2019, MNRAS 488, 5145 (arXiv:1812.06712)"
+table = "Abstract: 'the rotation period of the star is 145 +/- 15 days'"
+note = "145 +/- 15 d (x 24 h), from the periodograms of spectroscopic activity indicators"
+
+[[value]]
+key = "simbad-trappist-1"
+field = "rot_period_h"
+value = 79.2
+err = 3.36
+tag = "measured"
+citation = "Luger et al. 2017, Nature Astronomy 1, 0129 (arXiv:1703.04166)"
+table = "Methods, 'Stellar variability': 'The rotation period is determined to be 3.30 +/- 0.14 d'"
+note = "3.30 +/- 0.14 d (x 24 h), K2 Campaign 12 photometry. Vida et al. 2017 (ApJ 841, 124) give 3.295 +/- 0.003 d from the same campaign"
+
+# --- Star flare rates (issue #93 section 5 C) ---------------------------------------------------
+# flare_rate_per_d has no common threshold: each row states its band and its detection limit.
+
+[[value]]
+key = "simbad-trappist-1"
+field = "flare_rate_per_d"
+value = 0.26
+tag = "measured"
+citation = "Luger et al. 2017, Nature Astronomy 1, 0129 (arXiv:1703.04166)"
+table = "Methods, 'Stellar variability': '19 flare events, corresponding to an average rate of 0.26 d-1'"
+note = "Kepler (K2) band, Campaign 12. The threshold is a detection limit, not an energy: a peak at least 1 % above the normalised continuum in two consecutive points. Vida et al. 2017 find 42 flares (1.26e30 to 1.24e33 erg, Kepler band) in the same campaign but give no rate per day"
+
+[[refusal]]
+key = "simbad-eps-eri"
+field = "flare_rate_per_d"
+reason = "no published flare rate per day was confirmed: the star is in neither the Guenther et al. 2020 TESS catalogue (AJ 159, 60; sectors 1-2) nor the Medina et al. 2020 sample (ApJ 905, 107)"
+
+[[refusal]]
+key = "simbad-name-barnard-s-star"
+field = "flare_rate_per_d"
+reason = "no published flare rate per day was confirmed: the star is in neither the Guenther et al. 2020 TESS catalogue (AJ 159, 60; sectors 1-2) nor the Medina et al. 2020 sample (ApJ 905, 107)"
+
+# --- Hot planets: eclipse and phase-curve brightness temperatures (issue #93 section 5 C) -------
+# A brightness temperature depends on the band, so every row names it. Hotspot offsets are
+# degrees east of the substellar point (positive = east).
+
+[[value]]
+key = "simbad-hd-189733b"
+field = "dayside_temp_K"
+value = 1192.0
+err = 9.0
+tag = "measured"
+citation = "Knutson et al. 2012, ApJ 754, 22 (arXiv:1206.6887)"
+table = "Sect. IV.2: dayside brightness temperature from the 4.5 um secondary eclipse depth"
+note = "Spitzer IRAC 4.5 um. At 3.6 um the same paper gives 1328 +/- 11 K"
+
+[[value]]
+key = "simbad-hd-189733b"
+field = "nightside_temp_K"
+value = 928.0
+err = 33.0
+tag = "measured"
+citation = "Knutson et al. 2012, ApJ 754, 22 (arXiv:1206.6887)"
+table = "Sect. IV.2.1: nightside brightness temperature (eclipse depth minus phase-curve amplitude) at 4.5 um"
+note = "Spitzer IRAC 4.5 um. At 3.6 um the same paper gives 825 +/- 54 K. Night/day 0.78 at 4.5 um"
+
+[[value]]
+key = "simbad-hd-189733b"
+field = "hotspot_offset_deg"
+value = 33.7
+err = 2.5
+tag = "measured"
+citation = "Bell et al. 2021, MNRAS 504, 3316 (arXiv:2010.00687)"
+table = "Table 4, HD 189733b, preferred model Poly5: offset +33.7 (+2.5 / -2.2) deg east"
+note = "Spitzer IRAC 4.5 um reanalysis; err is the larger side of +2.5 / -2.2. Knutson et al. 2012 give the peak time in hours only"
+
+[[value]]
+key = "simbad-wasp-39b"
+field = "dayside_temp_K"
+value = 1055.0
+err = 65.0
+tag = "measured"
+citation = "Kammer et al. 2015, ApJ 810, 118 (arXiv:1508.00902)"
+table = "Table 3: 4.5 um secondary eclipse, brightness temperature 1055 (+60 / -65) K"
+note = "Spitzer IRAC 4.5 um, one eclipse; err is the larger side of +60 / -65; the brightness temperature uses a PHOENIX stellar model. At 3.6 um: 1213 (+58 / -62) K"
+
+[[refusal]]
+key = "simbad-wasp-39b"
+field = "nightside_temp_K"
+reason = "no published full-orbit phase curve of WASP-39 b (Spitzer or JWST) was found; the JWST Early Release Science observations are transits and eclipses"
+
+[[refusal]]
+key = "simbad-wasp-39b"
+field = "hotspot_offset_deg"
+reason = "no published full-orbit phase curve of WASP-39 b (Spitzer or JWST) was found, so no hotspot offset is measured"
+
+[[value]]
+key = "simbad-rho01-cnc-e"
+field = "dayside_temp_K"
+value = 2700.0
+err = 270.0
+tag = "measured"
+citation = "Demory et al. 2016, Nature 532, 207 (arXiv:1604.05725)"
+table = "Abstract: warmest hemisphere (centred on the hot spot) 2700 +/- 270 K at 4.5 um"
+note = "Spitzer IRAC 4.5 um phase curve. This is the hemisphere centred on the hot spot, 41 deg east of the substellar point, not the substellar day side. The JWST eclipses of Hu et al. 2024 (Nature 630, 609) were not read in full, so they are not used"
+
+[[value]]
+key = "simbad-rho01-cnc-e"
+field = "nightside_temp_K"
+value = 1380.0
+err = 400.0
+tag = "measured"
+citation = "Demory et al. 2016, Nature 532, 207 (arXiv:1604.05725)"
+table = "Abstract: nightside brightness temperature 1380 +/- 400 K"
+note = "Spitzer IRAC 4.5 um phase curve"
+
+[[value]]
+key = "simbad-rho01-cnc-e"
+field = "hotspot_offset_deg"
+value = 41.0
+err = 12.0
+tag = "measured"
+citation = "Demory et al. 2016, Nature 532, 207 (arXiv:1604.05725)"
+table = "Abstract: hot spot 41 +/- 12 degrees east of the substellar point"
+note = "Spitzer IRAC 4.5 um phase curve"
