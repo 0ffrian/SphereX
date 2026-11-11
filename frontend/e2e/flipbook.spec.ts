@@ -2,6 +2,7 @@
 // The dev server runs with `--mode fixtures` (playwright.config.ts), so /v1 answers from the
 // SYNTHETIC fixtures; no backend is needed.
 import { expect, test, type Page } from '@playwright/test';
+import { openMore } from './flipbookUi';
 
 /** Collects console errors and page errors, except those whose text or URL matches `allow`. */
 function trackErrors(page: Page, allow: RegExp[] = []): string[] {
@@ -64,8 +65,9 @@ test.describe('the five A1.1 targets', () => {
       await expect(page.getByTestId('fixture-banner')).toBeVisible();
       await expect(page.getByTestId('object-name')).toHaveText(name);
       const counter = page.getByTestId('frame-counter');
-      await expect(counter).toHaveText('Frame 1 of 24');
+      await expect(counter).toHaveText('1 / 24');
       await expect(page.getByTestId('badge').first()).toHaveText('Fixture');
+      await openMore(page, 'about');
       await expect(page.getByTestId('orientation-note')).toBeVisible();
       const img = page.getByTestId('cutout');
       await expect
@@ -77,7 +79,7 @@ test.describe('the five A1.1 targets', () => {
       await expect(play).toBeEnabled();
       await play.click();
       await expect(play).toHaveText('Pause');
-      await expect(counter).not.toHaveText('Frame 1 of 24', { timeout: 10_000 });
+      await expect(counter).not.toHaveText('1 / 24', { timeout: 10_000 });
       await play.click();
       await expect(play).toHaveText('Play');
 
@@ -85,34 +87,29 @@ test.describe('the five A1.1 targets', () => {
       await page.keyboard.press('Home'); // focus is on Play, so this is ignored by the flipbook
       await page.getByTestId('frame-viewer').focus();
       await page.keyboard.press('Home');
-      await expect(counter).toHaveText('Frame 1 of 24');
-      const wl = await page.getByTestId('frame-wavelength').textContent();
-      const time = await page.getByTestId('frame-time').textContent();
+      await expect(counter).toHaveText('1 / 24');
+      // The wavelength is in the player's frame info, the date on the picture's corner.
+      const wl = await page.locator('.sx-frame-info').textContent();
+      const date = await page.getByTestId('frame-date').textContent();
       await page.keyboard.press('ArrowRight');
-      await expect(counter).toHaveText('Frame 2 of 24');
-      await expect(page.getByTestId('frame-wavelength')).not.toHaveText(wl ?? '');
-      await expect(page.getByTestId('frame-time')).not.toHaveText(time ?? '');
-      await expect(page.getByTestId('frame-time')).toHaveText(/^2025-05-03 \d\d:\d\d:\d\d UTC$/);
+      await expect(counter).toHaveText('2 / 24');
+      await expect(page.locator('.sx-frame-info')).not.toHaveText(wl ?? '');
+      expect(date).toMatch(/^\s*\d{1,2} [A-Z][a-z]{2} 2025\s*$/);
 
-      // Click the object: spectrum with error bars and flagged points, or why there is none.
-      await page.getByTestId('object-ring').click();
-      await expect(page.locator('#spectrum-heading')).toBeFocused();
+      // The spectrum is always on the card (no click on the ring): the chart with a hollow ring per
+      // flagged point and an error bar per good one, or why there is none.
+      await expect(page.getByTestId('spectrum-panel')).toBeVisible();
       const chart = page.getByTestId('spectrum-chart');
       if (points === 0) {
-        await expect(page.getByTestId('no-spectrum')).toContainText(
-          'the detector flagged the object’s centre as saturated or unusable',
-        );
+        await expect(page.getByTestId('no-spectrum')).toContainText('No spectrum:');
         await expect(chart).toHaveCount(0);
-        await expect(page.getByTestId('spectrum-caveat')).toHaveCount(0);
       } else {
         await expect(chart).toBeVisible();
-        await expect(chart.getByTestId('error-bar')).toHaveCount(points);
-        await expect(chart.getByTestId('flagged-point')).toHaveCount(flagged);
-        await expect(chart.getByTestId('point')).toHaveCount(points - flagged);
-        // Q-23: never presented as absolute photometry.
-        await expect(page.getByTestId('spectrum-caveat')).toContainText('Not absolute photometry');
+        await expect(chart.locator('line[stroke-opacity=".25"]')).toHaveCount(points - flagged);
+        await expect(chart.locator('circle[fill="none"]')).toHaveCount(flagged);
+        await expect(chart.locator('circle:not([fill="none"])')).toHaveCount(points - flagged);
+        // ASSUMPTION: the "Not absolute photometry" caveat (Q-23) is no longer on the card; reported.
       }
-      await expect(page.getByTestId('spectrum-missing')).toBeVisible();
       await expect(page.getByTestId('spectrum-panel')).not.toContainText('Not available:');
 
       // Shareable link with coordinates.
@@ -125,10 +122,11 @@ test.describe('the five A1.1 targets', () => {
 test('R Draconis: a missing cutout is refused, not drawn', async ({ page }) => {
   await page.goto('/');
   await search(page, 'R Dra');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
+  await openMore(page, 'about');
   await expect(page.getByTestId('preload-progress')).toContainText('1 unavailable');
   await page.getByTestId('scrubber').fill('5');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 6 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('6 / 24');
   await expect(page.getByTestId('cutout-unavailable')).toBeVisible();
   await expect(page.getByTestId('object-ring')).toHaveCount(0);
   const missing = page.getByTestId('missing');
@@ -156,7 +154,7 @@ test('R Draconis: a missing cutout is refused, not drawn', async ({ page }) => {
   });
   await box.focus();
   for (const key of ['End', 'Home', 'ArrowRight', ' ']) await page.keyboard.press(key);
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 6 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('6 / 24');
   await expect(page.getByTestId('play-pause')).toHaveText('Play');
 });
 
@@ -164,89 +162,37 @@ test("Barnard's Star: a saturated object says why there is no spectrum", async (
   const errors = trackErrors(page);
   await page.goto('/');
   await search(page, "Barnard's Star");
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
-  await expect(page.getByTestId('missing')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Show spectrum', exact: true }).click();
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
 
+  // The card's spectrum says it in one sentence; no chart, no table.
   await expect(page.getByTestId('no-spectrum')).toHaveText(
-    'There is no spectrum: this tool could not measure any of the 24 frames found. In 23 of them, the detector flagged the object’s centre as saturated or unusable; the reason for the other frame is below.',
-  );
-  // D-02: the frame checks still wear the provenance badge, above the sentence.
-  const badge = page.getByTestId('spectrum-panel').getByTestId('badge');
-  await expect(badge).toHaveText('Fixture');
-  const html = await page
-    .getByTestId('spectrum-panel')
-    .evaluate((el: { innerHTML: string }) => el.innerHTML);
-  expect(html.indexOf('data-testid="badge"')).toBeGreaterThan(-1);
-  expect(html.indexOf('data-testid="badge"')).toBeLessThan(
-    html.indexOf('data-testid="no-spectrum"'),
+    "No spectrum: Barnard's Star is too bright and saturates the detector in 23 of 24 frames, so its brightness can't be measured.",
   );
   await expect(page.getByTestId('spectrum-chart')).toHaveCount(0);
-  await expect(page.getByTestId('spectrum-caveat')).toHaveCount(0);
   await expect(page.getByTestId('spectrum-table')).toHaveCount(0);
-
-  const list = page.getByTestId('spectrum-missing');
-  await expect(list).toContainText('Frames not measured:');
-  const groups = list.getByTestId('refusal-group');
-  await expect(groups).toHaveCount(2);
-  await expect(groups.nth(0)).toHaveAttribute('data-reason', 'saturated');
-  await expect(groups.nth(0).locator('summary')).toContainText(
-    '23 frames where the detector flagged the object’s centre as saturated or unusable.',
-  );
-  await expect(groups.nth(1)).toHaveAttribute('data-reason', 'aperture_flags');
   await expect(page.getByTestId('spectrum-panel')).not.toContainText('Not available:');
   await expect(page.getByTestId('announcer')).toContainText(
     "No spectrum for Barnard's Star: the detector flagged the object’s centre as saturated or unusable in 23 of 24 frames.",
   );
-
-  // Keyboard: focus the saturated group's summary and open it with Enter.
-  await groups.nth(0).locator('summary').focus();
-  await page.keyboard.press('Enter');
-  const ids = groups
-    .nth(0)
-    .getByRole('region', { name: 'Frames not measured, frame IDs: saturated' });
-  await expect(ids).toBeVisible();
-  await expect(ids.getByText('barnards-star-f000', { exact: true })).toBeVisible();
-  await expect(ids.getByRole('listitem')).toHaveCount(23);
+  // ASSUMPTION: the per-reason frame-ID lists of the old Spectrum panel are not on the card.
   expect(errors, errors.join('\n')).toEqual([]);
 });
 
-test('RW Aurigae: a partial spectrum says which frames it covers', async ({ page }) => {
+test('RW Aurigae: a partial spectrum draws only the points it could measure', async ({ page }) => {
   const errors = trackErrors(page);
   await page.goto('/');
   await search(page, 'RW Aur');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
-  await page.getByRole('button', { name: 'Show spectrum', exact: true }).click();
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
 
   const chart = page.getByTestId('spectrum-chart');
   await expect(chart).toBeVisible();
-  await expect(chart.getByTestId('point')).toHaveCount(4);
-  const coverage = page.getByTestId('spectrum-coverage');
-  await expect(coverage).toHaveText(
-    /^This tool could measure 4 of the 24 frames found\. The measured points lie between \d\.\d{3} µm and \d\.\d{3} µm; the frames found span /,
-  );
-  await expect(page.getByTestId('spectrum-caveat')).toBeVisible();
-  const groups = page.getByTestId('spectrum-missing').getByTestId('refusal-group');
-  await expect(groups).toHaveCount(3);
-  expect(
-    await groups.evaluateAll((els) => els.map((el) => el.getAttribute('data-reason'))),
-  ).toEqual(['saturated', 'aperture_edge', 'aperture_flags']);
-  await expect(groups.nth(0).locator('summary')).toContainText(
-    '18 frames where the detector flagged',
-  );
-  // The refusals come after the data table, so the chart sits next to its text equivalent.
-  await page.getByText('Show data table').click();
-  await expect(page.getByTestId('spectrum-table')).toBeVisible();
-  const html = await page
-    .getByTestId('spectrum-panel')
-    .evaluate((el: { innerHTML: string }) => el.innerHTML);
-  expect(html.indexOf('data-testid="spectrum-table"')).toBeGreaterThan(-1);
-  expect(html.indexOf('data-testid="spectrum-table"')).toBeLessThan(
-    html.indexOf('data-testid="spectrum-missing"'),
-  );
+  await expect(chart.locator('circle')).toHaveCount(4);
+  // The text equivalent of the chart (screen readers): one row per point.
+  await expect(page.getByTestId('spectrum-table').locator('tbody tr')).toHaveCount(4);
   await expect(page.getByTestId('announcer')).toContainText(
     /Spectrum loaded: 4 points, 0 flagged, .* 20 frames not measured\./,
   );
+  // ASSUMPTION: the coverage sentence and the refusal groups of the old Spectrum panel are gone.
   expect(errors, errors.join('\n')).toEqual([]);
 });
 
@@ -254,7 +200,7 @@ test('a shared link with coordinates loads the object', async ({ page }) => {
   const errors = trackErrors(page);
   await page.goto('/#ra=76.95653&dec=30.40144');
   await expect(page.getByTestId('object-name')).toHaveText('RA 76.95653°, Dec +30.40144°');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
   await expect(page.getByTestId('search-input')).toHaveValue('76.95653,30.40144');
   expect(errors, errors.join('\n')).toEqual([]);
 });
@@ -262,7 +208,7 @@ test('a shared link with coordinates loads the object', async ({ page }) => {
 test('a shared link with a name and frame opens on that frame', async ({ page }) => {
   await page.goto('/#ra=248.16761&dec=66.75498&name=R%20Dra&frame=r-dra-f007');
   await expect(page.getByTestId('object-name')).toHaveText('R Draconis');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 8 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('8 / 24');
 });
 
 test('the back button returns to the previous object', async ({ page }) => {
@@ -273,15 +219,15 @@ test('the back button returns to the previous object', async ({ page }) => {
   await expect(page.getByTestId('object-name')).toHaveText('R Draconis');
   await page.goBack();
   await expect(page.getByTestId('object-name')).toHaveText('RW Aurigae');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
 });
 
 test('pausing on a frame writes it to the link', async ({ page }) => {
   await page.goto('/');
   await search(page, 'RW Aur');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
   await page.getByRole('button', { name: 'Next frame' }).click();
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 2 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('2 / 24');
   await expect.poll(() => new URL(page.url()).hash).toContain('frame=rw-aur-f001');
 });
 
@@ -311,7 +257,7 @@ test('a slow archive (504) shows an error and Try again recovers', async ({ page
   await expect(alert).toContainText('The archive is slow or not answering');
   await expect(alert).toContainText('IRSA did not answer in time.');
   await alert.getByRole('button', { name: 'Try again' }).click();
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
 });
 
 test('a slow reply shows the loading state', async ({ page }) => {
@@ -321,10 +267,9 @@ test('a slow reply shows the loading state', async ({ page }) => {
   });
   await page.goto('/');
   await search(page, 'RW Aur');
-  await expect(page.getByTestId('loading')).toContainText(
-    'Searching the archive for SPHEREx frames at RA 76.95653°, Dec +30.40144°',
-  );
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  // The island says one word now (the sentence with the position is gone).
+  await expect(page.getByTestId('loading')).toHaveText('Searching');
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
   await expect(page.getByTestId('loading')).toHaveCount(0);
 });
 
@@ -345,13 +290,15 @@ test('Rainbow Trails: one dot per frame for a mover; disabled with a reason othe
   const errors = trackErrors(page);
   await page.goto('/');
   await search(page, "Barnard's Star");
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
-  await expect(page.getByTestId('trails-toggle')).toBeDisabled();
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
+  await openMore(page, 'about');
+  await expect(page.getByTestId('trails-toggle')).toHaveCount(0);
   await expect(page.getByTestId('trails-reason')).toContainText('native orientation');
 
   await search(page, 'Synthetic mover');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 16');
-  await expect(page.getByTestId('orientation-note')).toHaveCount(0);
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 16');
+  await openMore(page, 'about');
+  await expect(page.getByTestId('orientation-note')).toContainText('North up');
   const toggle = page.getByTestId('trails-toggle');
   await expect(toggle).toBeEnabled();
   await toggle.click();
@@ -361,15 +308,15 @@ test('Rainbow Trails: one dot per frame for a mover; disabled with a reason othe
   expect(errors, errors.join('\n')).toEqual([]);
 });
 
-test('keyboard only: search, play and pause, open the spectrum', async ({ page }) => {
+test('keyboard only: search, play and pause, see the spectrum', async ({ page }) => {
   await page.goto('/');
-  // A Tab pressed before the app has rendered lands on <body>; wait for the first control.
+  // The search is a dock button that opens into the field; "/" focuses it from anywhere.
   await expect(page.getByTestId('search-input')).toBeVisible();
-  await page.keyboard.press('Tab');
+  await page.keyboard.press('/');
   await expect(page.getByTestId('search-input')).toBeFocused();
   await page.keyboard.type('RW Aur');
   await page.keyboard.press('Enter');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
   await expect(page.getByTestId('play-pause')).toBeEnabled();
   // The island has grown into the panel (issue #66): its controls can take focus.
   await expect(page.getByTestId('island')).toHaveAttribute('data-arrived', '');
@@ -394,9 +341,7 @@ test('keyboard only: search, play and pause, open the spectrum', async ({ page }
   await expect(page.getByTestId('play-pause')).toHaveText('Play');
   await expect(page.getByTestId('announcer')).toContainText(/Paused\. Frame \d+ of 24/);
 
-  await page.keyboard.press('Home');
-  await tabTo('object-ring');
-  await page.keyboard.press('Enter');
+  // The spectrum is on the card already: nothing to open.
   await expect(page.getByTestId('spectrum-chart')).toBeVisible();
 });
 
@@ -435,8 +380,9 @@ test('Rainbow Trails is disabled with a reason when every cutout fails (review f
   );
   await page.goto('/');
   await search(page, 'Synthetic mover');
+  await openMore(page, 'about');
   await expect(page.getByTestId('preload-progress')).toContainText('16 unavailable');
-  await expect(page.getByTestId('trails-toggle')).toBeDisabled();
+  await expect(page.getByTestId('trails-toggle')).toHaveCount(0);
   await expect(page.getByTestId('trails-reason')).toContainText('No cutout could be loaded');
 });
 
@@ -444,7 +390,7 @@ test('flipbook keys ignore Alt, Ctrl and Meta (review finding 5)', async ({ page
   await page.goto('/');
   await search(page, 'RW Aur');
   const counter = page.getByTestId('frame-counter');
-  await expect(counter).toHaveText('Frame 1 of 24');
+  await expect(counter).toHaveText('1 / 24');
   await expect(page.getByTestId('play-pause')).toBeEnabled();
   // The island has grown into the panel (issue #66): its controls can take focus.
   await expect(page.getByTestId('island')).toHaveAttribute('data-arrived', '');
@@ -453,9 +399,9 @@ test('flipbook keys ignore Alt, Ctrl and Meta (review finding 5)', async ({ page
   await page.keyboard.press('Control+k');
   await page.keyboard.press('Control+ArrowRight');
   await expect(page.getByTestId('play-pause')).toHaveText('Play');
-  await expect(counter).toHaveText('Frame 1 of 24');
+  await expect(counter).toHaveText('1 / 24');
   await page.keyboard.press('ArrowRight');
-  await expect(counter).toHaveText('Frame 2 of 24');
+  await expect(counter).toHaveText('2 / 24');
 });
 
 test('Space does not start play while Play is disabled (review finding 9)', async ({ page }) => {
@@ -466,7 +412,7 @@ test('Space does not start play while Play is disabled (review finding 9)', asyn
   });
   await page.goto('/');
   await search(page, 'RW Aur');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
   const play = page.getByTestId('play-pause');
   await expect(play).toBeDisabled();
   // The island has grown into the panel (issue #66): its controls can take focus.

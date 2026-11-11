@@ -81,9 +81,14 @@ export interface AtmosphereHandle {
 }
 
 /** Brown noise through a low-pass set by pressure; gusts by the wind level; a faint howl tied to the sound speed. */
+/** The spectrum sweep that is sounding, if any: starting the wind ends it (one sound at a time). */
+let liveSpectrum: SpectrumHandle | null = null;
+
 export function startAtmosphere(m: AtmosphereModel): AtmosphereHandle | null {
   const b = getBus();
   if (!b) return null;
+  liveSpectrum?.stop();
+  liveSpectrum = null;
   const { ctx, master } = b;
   const src = ctx.createBufferSource();
   src.buffer = noiseBuffer(ctx);
@@ -192,15 +197,19 @@ export function startSpectrum(values: readonly (number | null)[], from: number):
   o1.stop(now + rest + 0.05);
   o2.stop(now + rest + 0.05);
   let alive = true;
-  return {
+  let stoppedAt: number | null = null;
+  const handle: SpectrumHandle = {
     position: () => {
-      const e = (ctx.currentTime - now) / rest;
+      const e = ((stoppedAt ?? ctx.currentTime) - now) / rest;
       const p = Math.min(1, pos + (1 - pos) * Math.max(0, e));
-      return { pos: p, done: p >= 1 };
+      // Stopped from outside (the wind started): report done so the panel's play state ends.
+      return { pos: p, done: p >= 1 || !alive };
     },
     stop: () => {
       if (!alive) return;
       alive = false;
+      stoppedAt = ctx.currentTime;
+      if (liveSpectrum === handle) liveSpectrum = null;
       try {
         o1.stop();
         o2.stop();
@@ -212,4 +221,6 @@ export function startSpectrum(values: readonly (number | null)[], from: number):
       g.disconnect();
     },
   };
+  liveSpectrum = handle;
+  return handle;
 }

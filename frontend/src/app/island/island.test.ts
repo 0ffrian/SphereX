@@ -13,9 +13,10 @@ describe('grid loader looks', () => {
       for (const row of m) expect(row.every((c) => c === 0 || c === 1)).toBe(true);
     }
   });
-  it('at rest it is the still heartbeat; thinking steps through four known patterns', () => {
+  it('at rest it pulses slowly (Q-407); searching steps through a known pattern', () => {
     expect(IDLE_LOOK.pattern).toBe('heartbeat');
-    expect(IDLE_LOOK.static).toBe(true);
+    expect(IDLE_LOOK.mode).toBe('pulse');
+    expect(IDLE_LOOK.speed).toBe('idle');
     expect(SEARCHING_LOOK.pattern).toBe('sparkle');
     expect(typeof SEARCHING_LOOK.pattern === 'string' && SEARCHING_LOOK.pattern in PATTERNS).toBe(true);
   });

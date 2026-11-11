@@ -176,6 +176,12 @@ export function ConfidencePopover({
             testId="formula-substituted"
           />
           <p>Terms with c = 0 add nothing, so they are folded into the final + 0.</p>
+          {!formulaTerms(c).agrees && (
+            <p className="sx-acc-rules" role="note" data-testid="formula-disagree">
+              <b>These rows do not add up to the score.</b> The rows give{' '}
+              {percent(formulaTerms(c).fromRows ?? 0)}%, the backend sent {score}%. The backend value is shown.
+            </p>
+          )}
         </Row>
         <Row title="When it is shown in 3D" count={`${gateYes} of 3`}>
           <FormulaMath latex={gateLatex(c.threshold)} plain={gatePlain(c.threshold)} testId="formula-gate" />

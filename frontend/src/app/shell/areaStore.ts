@@ -176,7 +176,9 @@ export const useAreaStore = create<AreaState>()((set, get) => {
           set({
             say: {
               kind: 'found',
-              text: n === 0 ? 'No known objects in this area' : `${n} known object${n === 1 ? '' : 's'}: ${names}`,
+              text:
+                (n === 0 ? 'No known objects in this area' : `${n} known object${n === 1 ? '' : 's'}: ${names}`) +
+                (res.demo ? ' (demo)' : ''),
             },
           });
           timers.push(
@@ -262,12 +264,12 @@ export const useAreaStore = create<AreaState>()((set, get) => {
 
 /** What the island's pill calls the open card while it is minimised. */
 export function areaMiniTitle(s: Pick<AreaState, 'screen' | 'sel' | 'disc'>): string {
-  if (s.screen === 'eros') return '433 Eros';
+  if (s.screen === 'eros') return '433 Eros (demo)';
   if (s.screen === 'mover') {
     const m = s.disc?.movers[s.sel];
-    return m ? (m.known ? `${m.id} · ${m.known}` : m.id) : 'Discovery';
+    return m ? `${m.known ? `${m.id} · ${m.known}` : m.id} (demo)` : 'Discovery';
   }
-  return s.screen === 'list' ? 'Known objects' : 'Discovery';
+  return s.screen === 'list' ? 'Known objects (demo)' : 'Discovery (demo)';
 }
 
 /** The Eros exposure on show, or null. */

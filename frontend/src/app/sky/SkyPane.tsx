@@ -64,7 +64,7 @@ import { useShellStore } from '@/app/shell/shellStore';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { AreaOverlay } from './AreaOverlay';
 import { AreaTrackLayer } from '@/app/area/AreaTrackLayer';
-import { boxFromPixels, registerAreaView, rectOf } from './areaDraw';
+import { boxFromPixels, centreRect, registerAreaView, rectOf } from './areaDraw';
 import { useCachedMarkers } from './useCachedMarkers';
 import { useTargetMarkers, type TargetMarker } from './useTargetMarkers';
 
@@ -276,8 +276,6 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       },
     });
     return () => registerSkyZoom(null);
-    // announceView only touches a ref and a state setter.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
   // ---- Index and image ---------------------------------------------------------------------------
@@ -629,7 +627,11 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         const p = local(e);
         const d = rectOf(drawing.x, drawing.y, p.x, p.y);
         drawing = null;
-        const box = e.type === 'pointerup' && Math.abs(d.x1 - d.x0) >= 12 && Math.abs(d.y1 - d.y0) >= 12 ? boxFromPixels(d) : null;
+        // The tool may have been left mid-drag (Escape): then nothing is set and no search starts.
+        const box =
+          areaDrawing() && e.type === 'pointerup' && Math.abs(d.x1 - d.x0) >= 12 && Math.abs(d.y1 - d.y0) >= 12
+            ? boxFromPixels(d)
+            : null;
         if (box) useAreaStore.getState().setBox(box);
         else useAreaStore.getState().setDrag(null);
         return;
@@ -693,6 +695,12 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         case 'Enter':
         case ' ':
           e.preventDefault();
+          // Known objects / Discovery: Enter sets an area in the middle (the keyboard way to draw one).
+          if (areaDrawing()) {
+            const mid = centreRect();
+            if (mid) useAreaStore.getState().setBox(mid);
+            return;
+          }
           pickAt(width / 2, height / 2);
           return;
         default:
