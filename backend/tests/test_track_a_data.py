@@ -212,7 +212,7 @@ def test_a_small_planet_without_pl_rade_falls_back_to_pl_radj() -> None:
 
 
 def test_asset_version_is_bumped_for_the_new_fields() -> None:
-    assert ASSET_VERSION == "11"
+    assert ASSET_VERSION == "12"
 
 
 def test_jupiter_radius_is_the_equatorial_one_defined_once() -> None:

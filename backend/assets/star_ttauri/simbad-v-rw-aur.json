@@ -1,8 +1,23 @@
 {
-  "asset_version": "11",
+  "asset_version": "12",
   "card": {
+    "flare_rate_per_d": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no flare rate for this star",
+      "tag": "measured",
+      "value": null
+    },
     "id": "simbad-v-rw-aur",
     "lightcurve": [],
+    "lum_lsun": {
+      "source": "not available: Gaia DR3 has no FLAME lum_flame for this star",
+      "tag": "measured",
+      "value": null
+    },
+    "mass_msun": {
+      "source": "not available: Gaia DR3 has no FLAME mass_flame for this star",
+      "tag": "measured",
+      "value": null
+    },
     "name": "V* RW Aur",
     "pm_mas_yr": {
       "source": "SIMBAD V* RW Aur (pmra = mu_alpha * cos(delta), pmdec)",
@@ -14,6 +29,11 @@
     },
     "radius_rsun": {
       "source": "not available: Gaia DR3 has no FLAME radius for this star; no interferometric radius is in the literature registry, and a spectral-class table is never used for a radius (Q-152)",
+      "tag": "measured",
+      "value": null
+    },
+    "rot_period_h": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no rotation period for this star",
       "tag": "measured",
       "value": null
     },
@@ -32,7 +52,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
+  "inputs_sha256": "eb40dd02945cf37be8fa91ab3ed6ad7e13d745c6ccbb5d17ae2e8c929dfdc9e9",
   "render_params": {
     "alt_text": "V* RW Aur, T Tauri star, size unknown, colour from Teff, self-luminous. Surface relief: illustrative.",
     "confidence": {

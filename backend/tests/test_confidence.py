@@ -229,7 +229,7 @@ def astro(**kw: Any) -> GaiaAstro:
 
 
 def test_the_adapter_reads_the_msc_columns() -> None:
-    row = "1648328016354496384,248.1,66.7,6.37,,,,,,,3047.9,3000.0,3367.8"
+    row = "1648328016354496384,248.1,66.7,6.37,,,,,,,,,,,,,3047.9,3000.0,3367.8"
     (g,) = gaia.parse_astro(f"{MSC_HEADER}\n{row}\n".encode())
     assert (g.teff_msc1_k, g.teff_msc1_lower_k, g.teff_msc1_upper_k) == (3047.9, 3000.0, 3367.8)
     assert g.teff_gspphot_k is None

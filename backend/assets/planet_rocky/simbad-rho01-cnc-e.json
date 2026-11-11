@@ -1,11 +1,23 @@
 {
-  "asset_version": "11",
+  "asset_version": "12",
   "card": {
+    "dayside_temp_K": {
+      "err": 270.0,
+      "source": "literature: Demory et al. 2016, Nature 532, 207 (arXiv:1604.05725), Abstract: warmest hemisphere (centred on the hot spot) 2700 +/- 270 K at 4.5 um (backend/assets/literature.toml). Spitzer IRAC 4.5 um phase curve. This is the hemisphere centred on the hot spot, 41 deg east of the substellar point, not the substellar day side. The JWST eclipses of Hu et al. 2024 (Nature 630, 609) were not read in full, so they are not used",
+      "tag": "measured",
+      "value": 2700.0
+    },
     "host_age_gyr": {
       "err": 2.5,
       "source": "NASA Exoplanet Archive PSCompPars st_age (Marcy et al. 2002)",
       "tag": "measured",
       "value": 5.5
+    },
+    "host_lum_lsun": {
+      "err": 0.018554134153673685,
+      "source": "NASA Exoplanet Archive PSCompPars st_lum, log10 L/L_sun converted as 10^st_lum (Knapp et al. 2020)",
+      "tag": "measured",
+      "value": 0.6354040812391201
     },
     "host_mass_msun": {
       "err": 0.015,
@@ -25,7 +37,19 @@
       "tag": "measured",
       "value": 5172.0
     },
+    "hotspot_offset_deg": {
+      "err": 12.0,
+      "source": "literature: Demory et al. 2016, Nature 532, 207 (arXiv:1604.05725), Abstract: hot spot 41 +/- 12 degrees east of the substellar point (backend/assets/literature.toml). Spitzer IRAC 4.5 um phase curve",
+      "tag": "measured",
+      "value": 41.0
+    },
     "id": "simbad-rho01-cnc-e",
+    "insolation_searth": {
+      "formula": "S / S_earth = (L_star / L_sun) / (a / au)^2, the flux at the planet computed by the reference from its host luminosity and orbit; not a direct measurement",
+      "source": "NASA Exoplanet Archive PSCompPars pl_insol (ExoFOP)",
+      "tag": "derived",
+      "value": 2657.8322
+    },
     "mass_mearth": {
       "err": 0.33,
       "source": "NASA Exoplanet Archive PSCompPars pl_bmasse (Bourrier et al. 2018)",
@@ -33,11 +57,23 @@
       "value": 7.99
     },
     "name": "55 Cnc e",
+    "nightside_temp_K": {
+      "err": 400.0,
+      "source": "literature: Demory et al. 2016, Nature 532, 207 (arXiv:1604.05725), Abstract: nightside brightness temperature 1380 +/- 400 K (backend/assets/literature.toml). Spitzer IRAC 4.5 um phase curve",
+      "tag": "measured",
+      "value": 1380.0
+    },
     "orbit_au": {
       "err": 5e-05,
       "source": "NASA Exoplanet Archive PSCompPars pl_orbsmax (Bourrier et al. 2018)",
       "tag": "measured",
       "value": 0.01544
+    },
+    "orbit_ecc": {
+      "err": 0.03,
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbeccen (Bourrier et al. 2018)",
+      "tag": "measured",
+      "value": 0.05
     },
     "orbital_period_d": {
       "err": 1.4e-06,
@@ -68,7 +104,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
+  "inputs_sha256": "eb40dd02945cf37be8fa91ab3ed6ad7e13d745c6ccbb5d17ae2e8c929dfdc9e9",
   "render_params": {
     "alt_text": "55 Cnc e, Rocky planet, 0.167 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
     "confidence": {

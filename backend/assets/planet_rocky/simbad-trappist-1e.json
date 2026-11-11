@@ -1,11 +1,22 @@
 {
-  "asset_version": "11",
+  "asset_version": "12",
   "card": {
+    "dayside_temp_K": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no eclipse or phase-curve value for this planet",
+      "tag": "measured",
+      "value": null
+    },
     "host_age_gyr": {
       "err": 2.2,
       "source": "NASA Exoplanet Archive PSCompPars st_age (Piaulet-Ghorayeb et al. 2025)",
       "tag": "measured",
       "value": 7.6
+    },
+    "host_lum_lsun": {
+      "err": 1.8999030927549596e-05,
+      "source": "NASA Exoplanet Archive PSCompPars st_lum, log10 L/L_sun converted as 10^st_lum (Agol et al. 2021)",
+      "tag": "measured",
+      "value": 0.0005530061994883787
     },
     "host_mass_msun": {
       "err": 0.0023,
@@ -25,7 +36,19 @@
       "tag": "measured",
       "value": 2566.0
     },
+    "hotspot_offset_deg": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no eclipse or phase-curve value for this planet",
+      "tag": "measured",
+      "value": null
+    },
     "id": "simbad-trappist-1e",
+    "insolation_searth": {
+      "err": 0.025,
+      "formula": "S / S_earth = (L_star / L_sun) / (a / au)^2, the flux at the planet computed by the reference from its host luminosity and orbit; not a direct measurement",
+      "source": "NASA Exoplanet Archive PSCompPars pl_insol (Agol et al. 2021)",
+      "tag": "derived",
+      "value": 0.646
+    },
     "mass_mearth": {
       "err": 0.022,
       "source": "NASA Exoplanet Archive PSCompPars pl_bmasse (Agol et al. 2021)",
@@ -33,11 +56,22 @@
       "value": 0.692
     },
     "name": "TRAPPIST-1 e",
+    "nightside_temp_K": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no eclipse or phase-curve value for this planet",
+      "tag": "measured",
+      "value": null
+    },
     "orbit_au": {
       "err": 0.0025,
       "source": "NASA Exoplanet Archive PSCompPars pl_orbsmax (Agol et al. 2021)",
       "tag": "measured",
       "value": 0.02925
+    },
+    "orbit_ecc": {
+      "err": 0.00058,
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbeccen (Grimm et al. 2018)",
+      "tag": "measured",
+      "value": 0.0051
     },
     "orbital_period_d": {
       "err": 3.5e-05,
@@ -68,7 +102,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
+  "inputs_sha256": "eb40dd02945cf37be8fa91ab3ed6ad7e13d745c6ccbb5d17ae2e8c929dfdc9e9",
   "render_params": {
     "alt_text": "TRAPPIST-1 e, Rocky planet, 0.0821 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
     "confidence": {

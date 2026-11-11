@@ -25,6 +25,20 @@ export interface CardToWorldOk {
   mismatches: string[];
   /** Set when the object is one of the artifact's presets (the prototype preset id). */
   artifact?: string;
+  /**
+   * Eclipse and phase-curve values from the card (issue #93 C), shown as readouts next to the engine's own day and
+   * night numbers. The engine does not take them as inputs yet (its day-night contrast is its own model).
+   */
+  measured: MeasuredReadout[];
+}
+
+/** One card value shown as it is, with its tag and source (never fed to the engine). */
+export interface MeasuredReadout {
+  field: 'dayside_temp_K' | 'nightside_temp_K' | 'hotspot_offset_deg';
+  label: string;
+  value: string;
+  tag: Tag;
+  source: string;
 }
 export interface CardToWorldRefused {
   ok: false;
@@ -102,6 +116,82 @@ function setMeasuredGiant(
 /** The engine's equilibrium temperature at zero albedo, K: T_star sqrt(R_star / 2a) (worldModel). */
 function teqZeroAlbedo(Ts: number, Rs: number, a: number): number {
   return Ts * Math.sqrt((Rs * RSUN_AU) / (2 * a));
+}
+
+const TIER: Record<Tag, number> = {
+  measured: 1,
+  derived: 2,
+  model_dependent: 3,
+  inferred_from_analog: 4,
+  artistic: 5,
+};
+/** `derived`, or weaker when an input is weaker (D-32: a result is never stronger than its inputs). */
+function derivedFrom(...tags: (Tag | undefined)[]): Tag {
+  let t: Tag = 'derived';
+  for (const x of tags) if (x && TIER[x] > TIER[t]) t = x;
+  return t;
+}
+
+/**
+ * Issue #93 B: the engine uses R_star only for the starlight (worldModel: S = sigma T^4 (R_star / a)^2, Teq from the
+ * same), so a measured host luminosity enters as the radius that gives it at the card's T_star:
+ * R = sqrt(L / L_sun) (5772 K / T_star)^2 (L = 4 pi R^2 sigma T^4, nominal solar Teff 5772 K). Else the card's
+ * insolation with its orbit, L = S a^2 (S in Earth units, a in AU). Else null: R_star and T_star as before.
+ */
+function starlightRadius(
+  card: ObjectCard,
+  Ts: number,
+  a: number,
+): { Rs: number; tag: Tag; note: string } | null {
+  const k = Math.pow(SUN.Ts / Ts, 2);
+  const L = num(card.host_lum_lsun);
+  if (L !== null && L > 0)
+    return {
+      Rs: Math.sqrt(L) * k,
+      tag: derivedFrom(card.host_lum_lsun!.tag, card.host_teff_K?.tag),
+      note:
+        "starlight from the card's host luminosity " +
+        L.toPrecision(4) +
+        ' L_sun (' +
+        card.host_lum_lsun!.tag +
+        '): R_star = sqrt(L) (5772 K / T_star)^2, so the engine, which reads R_star only for the starlight, gives that luminosity',
+    };
+  const S = num(card.insolation_searth);
+  if (S !== null && S > 0)
+    return {
+      Rs: Math.sqrt(S * a * a) * k,
+      tag: derivedFrom(card.insolation_searth!.tag, card.orbit_au?.tag, card.host_teff_K?.tag),
+      note:
+        "starlight from the card's insolation " +
+        S.toPrecision(4) +
+        ' S_earth (' +
+        card.insolation_searth!.tag +
+        '): L = S a^2, R_star = sqrt(L) (5772 K / T_star)^2, so the engine, which reads R_star only for the starlight, gives that flux',
+    };
+  return null;
+}
+
+const MEASURED_LABEL: Record<MeasuredReadout['field'], string> = {
+  dayside_temp_K: 'Day side, measured',
+  nightside_temp_K: 'Night side, measured',
+  hotspot_offset_deg: 'Hottest point, measured',
+};
+
+/** The card's eclipse and phase-curve values (issue #93 C), as readouts. A null value is not shown. */
+export function measuredReadouts(card: ObjectCard): MeasuredReadout[] {
+  const out: MeasuredReadout[] = [];
+  for (const field of Object.keys(MEASURED_LABEL) as MeasuredReadout['field'][]) {
+    const tv = card[field];
+    const v = num(tv);
+    if (!tv || v === null) continue;
+    const err = typeof tv.err === 'number' ? ' ± ' + String(+tv.err.toPrecision(3)) : '';
+    const value =
+      field === 'hotspot_offset_deg'
+        ? String(Math.abs(v)) + err + '° ' + (v >= 0 ? 'east' : 'west') + ' of noon'
+        : String(Math.round(v)) + err + ' K';
+    out.push({ field, label: MEASURED_LABEL[field], value, tag: tv.tag, source: tv.source });
+  }
+  return out;
 }
 
 function cardToWorldGeneric(card: ObjectCard, overrides: EngineOverrides): CardToWorld {
@@ -239,6 +329,17 @@ function cardToWorldGeneric(card: ObjectCard, overrides: EngineOverrides): CardT
   tags.Rj = card.radius_rjup!.tag;
   tags.Me = card.mass_mearth!.tag;
   tags.a = card.orbit_au!.tag;
+  const starlight = starlightRadius(card, Ts, a);
+  if (starlight) {
+    Rs = starlight.Rs;
+    tags.Rs = starlight.tag;
+    assumptions.push({
+      field: 'Rs',
+      value: Number(Rs.toFixed(4)),
+      tag: starlight.tag,
+      note: starlight.note,
+    });
+  }
   tags.type = 'derived';
   tags.id = 'derived';
   tags.label = 'derived';
@@ -452,11 +553,15 @@ function cardToWorldGeneric(card: ObjectCard, overrides: EngineOverrides): CardT
       'flattening from the spin, f = 0.7 Omega^2 R^3 / (G M), an estimate (it gives Saturn 0.108 against the measured 0.098)',
     );
   }
-  // Orbit extras (the prototype's ORB table): host mass, eccentricity and obliquity are not on the card.
-  preset.ob = { Ms: Ms ?? 1, e: 0, obl: 0 };
+  // Orbit extras (the prototype's ORB table): host mass and eccentricity from the card when it has them (issue #93 A);
+  // the obliquity is never on the card. The engine's setPreset reads ob.e into W.ecc (seasons, tides, mean flux).
+  const ecc = num(card.orbit_ecc);
+  const eccOk = ecc !== null && ecc >= 0 && ecc < 1;
+  preset.ob = { Ms: Ms ?? 1, e: eccOk ? ecc : 0, obl: 0 };
   if (Ms === null)
     assume('ob.Ms', 1, 'no host mass on the card; 1 M_sun, as the prototype defaults for tides');
-  assume('ob.e', 0, 'eccentricity is not on the card; circular, as the prototype defaults');
+  if (eccOk) tags['ob.e'] = card.orbit_ecc!.tag;
+  else assume('ob.e', 0, 'eccentricity is not on the card; circular, as the prototype defaults');
   assume('ob.obl', 0, 'obliquity is not on the card; upright, as the prototype defaults');
 
   if (refGiant) {
@@ -481,6 +586,7 @@ function cardToWorldGeneric(card: ObjectCard, overrides: EngineOverrides): CardT
     assumptions,
     missing: [],
     mismatches: [],
+    measured: measuredReadouts(card),
   };
 }
 
@@ -639,5 +745,6 @@ export function cardToWorld(card: ObjectCard, overrides: EngineOverrides = {}): 
     missing: [],
     mismatches,
     artifact: pid,
+    measured: measuredReadouts(card),
   };
 }

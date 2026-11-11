@@ -1,11 +1,23 @@
 {
-  "asset_version": "11",
+  "asset_version": "12",
   "card": {
+    "dayside_temp_K": {
+      "err": 9.0,
+      "source": "literature: Knutson et al. 2012, ApJ 754, 22 (arXiv:1206.6887), Sect. IV.2: dayside brightness temperature from the 4.5 um secondary eclipse depth (backend/assets/literature.toml). Spitzer IRAC 4.5 um. At 3.6 um the same paper gives 1328 +/- 11 K",
+      "tag": "measured",
+      "value": 1192.0
+    },
     "host_age_gyr": {
       "err": 4.9,
       "source": "NASA Exoplanet Archive PSCompPars st_age (Southworth 2010)",
       "tag": "measured",
       "value": 1.4
+    },
+    "host_lum_lsun": {
+      "err": 0.014616264432136317,
+      "source": "NASA Exoplanet Archive PSCompPars st_lum, log10 L/L_sun converted as 10^st_lum (Barstow et al. 2017)",
+      "tag": "measured",
+      "value": 0.34578806550508956
     },
     "host_mass_msun": {
       "err": 0.08,
@@ -25,7 +37,20 @@
       "tag": "measured",
       "value": 5052.0
     },
+    "hotspot_offset_deg": {
+      "err": 2.5,
+      "source": "literature: Bell et al. 2021, MNRAS 504, 3316 (arXiv:2010.00687), Table 4, HD 189733b, preferred model Poly5: offset +33.7 (+2.5 / -2.2) deg east (backend/assets/literature.toml). Spitzer IRAC 4.5 um reanalysis; err is the larger side of +2.5 / -2.2. Knutson et al. 2012 give the peak time in hours only",
+      "tag": "measured",
+      "value": 33.7
+    },
     "id": "simbad-hd-189733b",
+    "insolation_searth": {
+      "err": 13.0,
+      "formula": "S / S_earth = (L_star / L_sun) / (a / au)^2, the flux at the planet computed by the reference from its host luminosity and orbit; not a direct measurement",
+      "source": "NASA Exoplanet Archive PSCompPars pl_insol (Addison et al. 2019)",
+      "tag": "derived",
+      "value": 356.0
+    },
     "mass_mearth": {
       "err": 25.4264,
       "source": "NASA Exoplanet Archive PSCompPars pl_bmasse (Stassun et al. 2017)",
@@ -33,11 +58,23 @@
       "value": 359.1479
     },
     "name": "HD 189733 b",
+    "nightside_temp_K": {
+      "err": 33.0,
+      "source": "literature: Knutson et al. 2012, ApJ 754, 22 (arXiv:1206.6887), Sect. IV.2.1: nightside brightness temperature (eclipse depth minus phase-curve amplitude) at 4.5 um (backend/assets/literature.toml). Spitzer IRAC 4.5 um. At 3.6 um the same paper gives 825 +/- 54 K. Night/day 0.78 at 4.5 um",
+      "tag": "measured",
+      "value": 928.0
+    },
     "orbit_au": {
       "err": 0.00036,
       "source": "NASA Exoplanet Archive PSCompPars pl_orbsmax (Rosenthal et al. 2021)",
       "tag": "measured",
       "value": 0.03126
+    },
+    "orbit_ecc": {
+      "assumption": "the reference gives e = 0 with no uncertainty, which means the orbit was fixed to a circle in its fit; read as an assumed circular orbit, not a measured eccentricity",
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbeccen (Stassun et al. 2017)",
+      "tag": "model_dependent",
+      "value": 0.0
     },
     "orbital_period_d": {
       "err": 1.5e-07,
@@ -68,7 +105,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
+  "inputs_sha256": "eb40dd02945cf37be8fa91ab3ed6ad7e13d745c6ccbb5d17ae2e8c929dfdc9e9",
   "render_params": {
     "alt_text": "HD 189733 b, Gas giant, 1.13 Jupiter radii (measured), colour family from the equilibrium temperature, lit by its star. Surface relief: illustrative.",
     "confidence": {

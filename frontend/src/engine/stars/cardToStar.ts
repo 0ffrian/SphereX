@@ -52,6 +52,8 @@ export interface StarFromCard {
   teff: StarValue;
   radius: StarValue;
   mass: StarValue;
+  /** Luminosity, solar luminosities (for the turnover time; the engine preset does not take it). */
+  luminosity: StarValue;
   rotation: StarValue;
   spectralClass: string | null;
   /** Inputs the tier chain filled in, in plain words. */
@@ -72,6 +74,16 @@ const positive = (x: number | null | undefined): x is number =>
 const TYPICAL = 'a typical main-sequence star (Mamajek mean dwarf sequence)';
 /** The prototype's red giant preset: 1 solar mass. A giant has no main-sequence mass to read off. */
 const GIANT_MASS_MSUN = 1;
+/** Nominal solar effective temperature, K (IAU 2015 B3), for L = R^2 (T / T_sun)^4. */
+const T_SUN_K = 5772;
+const TAG_RANK: Record<Tag, number> = {
+  measured: 1,
+  derived: 2,
+  model_dependent: 3,
+  inferred_from_analog: 4,
+  artistic: 5,
+};
+const weakerOf = (a: Tag, b: Tag): Tag => (TAG_RANK[a] >= TAG_RANK[b] ? a : b);
 
 /**
  * The one star the artifact has a preset for by name: the Sun (sculptor-preview-next.html, PRESETS row
@@ -137,9 +149,13 @@ export function cardToStar(card: ObjectCard | null | undefined): StarFromCard | 
     assumed.push(`radius ${v.toFixed(2)} Rsun from the temperature of ${TYPICAL}`);
   }
 
-  // The cards carry no stellar mass: from the radius when it is a dwarf's, else from the temperature.
+  // The card's mass (Gaia FLAME, issue #93 B) when it has one; else from the radius when it is a dwarf's, else from
+  // the temperature.
   let mass: StarValue;
-  if (r && positive(r.value)) {
+  const mc = card.mass_msun;
+  if (mc && positive(mc.value))
+    mass = { value: mc.value, tag: mc.tag, note: `from the card (${mc.source})` };
+  else if (r && positive(r.value)) {
     const m = massFromRadius(r.value);
     if (m !== null) {
       mass = { value: m, tag: 'model_dependent', note: `from the radius of ${TYPICAL}` };
@@ -171,6 +187,19 @@ export function cardToStar(card: ObjectCard | null | undefined): StarFromCard | 
     };
     assumed.push(`rotation period ${v.toFixed(1)} days: the Sun's Rossby number assumed`);
   }
+
+  // Issue #93 B: luminosity for the turnover time. The card's (Gaia FLAME) when it has one, else Stefan-Boltzmann from
+  // the radius and temperature above, L = R^2 (T / 5772 K)^4, no stronger than its inputs (D-32).
+  let luminosity: StarValue;
+  const lc = card.lum_lsun;
+  if (lc && positive(lc.value))
+    luminosity = { value: lc.value, tag: lc.tag, note: `from the card (${lc.source})` };
+  else
+    luminosity = {
+      value: radius.value * radius.value * Math.pow(teff.value / T_SUN_K, 4),
+      tag: weakerOf('derived', weakerOf(radius.tag, teff.tag)),
+      note: 'L = R^2 (T / 5772 K)^4 from the radius and temperature (Stefan-Boltzmann)',
+    };
 
   const g = (GM_SUN * mass.value) / Math.pow(R_SUN_M * radius.value, 2);
   const dwarf = Math.log10(g * 100) >= GIANT_LOGG_MAX;
@@ -209,6 +238,7 @@ export function cardToStar(card: ObjectCard | null | undefined): StarFromCard | 
     teff,
     radius,
     mass,
+    luminosity,
     rotation,
     spectralClass: typeof spectralClass === 'string' ? spectralClass : null,
     assumed,

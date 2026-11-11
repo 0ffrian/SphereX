@@ -34,6 +34,7 @@ BROWN_DWARF_RADIUS_RJUP = 1.0
 BROWN_DWARF_RADIUS_ASSUMPTION = "brown dwarf radii are about 1 Jupiter radius (R7.4)"
 
 NO_SOURCE = "not available: no source in the pipeline yet"
+NO_LITERATURE = "not available: the literature registry (backend/assets/literature.toml) has no"
 # Issue #41 two-stage answer: what a field filled from the SPHEREx spectrum says while the spectrum
 # is still being measured. The prefix is what the API and the UI test for.
 MEASURING = MEASURING_PREFIX + " the SPHEREx spectrum is still being measured"
@@ -364,6 +365,96 @@ def _planet_fields(card: dict[str, Any], row: Mapping[str, Any] | None) -> None:
     card["host_age_gyr"] = _archive_value(row, "st_age", "host star age in Gyr")
 
 
+# Issue #93 A-B: eccentricity, insolation and host luminosity. Kept apart from _planet_fields so
+# the Teq rules there change independently.
+ARCHIVE_ECC_ZERO_ASSUMPTION = (
+    "the reference gives e = 0 with no uncertainty, which means the orbit was fixed to a circle "
+    "in its fit; read as an assumed circular orbit, not a measured eccentricity"
+)
+ARCHIVE_INSOL_FORMULA = (
+    "S / S_earth = (L_star / L_sun) / (a / au)^2, the flux at the planet computed by the "
+    "reference from its host luminosity and orbit; not a direct measurement"
+)
+
+
+def _eccentricity(row: Mapping[str, Any]) -> dict[str, Any]:
+    """``orbit_ecc`` from ``pl_orbeccen``. Zero is a valid value, unlike the other archive columns.
+    ASSUMPTION: an exact 0 with no uncertainty is a fit with e fixed at 0 (a circular orbit
+    assumed), so it is ``model_dependent``, not ``measured``."""
+    x = _finite(row.get("pl_orbeccen"))
+    if x is None or not 0 <= x < 1:
+        return _null("not available: the Exoplanet Archive has no pl_orbeccen (eccentricity)")
+    source = f"NASA Exoplanet Archive PSCompPars pl_orbeccen ({ref_text(row, 'pl_orbeccen')})"
+    if is_calculated(row, "pl_orbeccen"):
+        return {
+            "value": x,
+            "tag": "model_dependent",
+            "source": f"{ARCHIVE_CALC}, pl_orbeccen",
+            "assumption": "the archive calculated pl_orbeccen itself (refstr CALCULATED_VALUE); "
+            "its method for this column is not documented here, so it is not a measurement",
+        }
+    err = _archive_errs(row, "pl_orbeccen")
+    if x == 0 and err is None:
+        return {
+            "value": 0.0,
+            "tag": "model_dependent",
+            "source": source,
+            "assumption": ARCHIVE_ECC_ZERO_ASSUMPTION,
+        }
+    return _measured(x, source, err)
+
+
+def _insolation(row: Mapping[str, Any]) -> dict[str, Any]:
+    """``insolation_searth`` from ``pl_insol``: the reference computed it from L and a, so it is
+    ``derived`` with that formula; an archive-calculated value is ``model_dependent``."""
+    out = _archive_value(row, "pl_insol", "insolation in Earth units")
+    if out["value"] is not None and out["tag"] == "measured":
+        out["tag"] = "derived"
+        out["formula"] = ARCHIVE_INSOL_FORMULA
+    return out
+
+
+def _host_luminosity(row: Mapping[str, Any]) -> dict[str, Any]:
+    """``host_lum_lsun`` = 10^``st_lum`` (the archive gives log10 L/L_sun, which may be negative).
+    The unit change keeps the tag; ``err`` is the larger side of the converted 1-sigma range."""
+    lg = _finite(row.get("st_lum"))
+    if lg is None:
+        return _null("not available: the Exoplanet Archive has no st_lum (host luminosity)")
+    value = 10.0**lg
+    if is_calculated(row, "st_lum"):
+        return {
+            "value": value,
+            "tag": "model_dependent",
+            "source": f"{ARCHIVE_CALC}, st_lum (log10 L/L_sun), as 10^st_lum",
+            "assumption": "the archive calculated st_lum itself (refstr CALCULATED_VALUE); its "
+            "method for this column is not documented here, so it is not a measurement",
+        }
+    errs = [
+        abs(10.0 ** (lg + e) - value)
+        for e in (_finite(row.get(f"st_lumerr{i}")) for i in (1, 2))
+        if e is not None and e != 0
+    ]
+    return _measured(
+        value,
+        f"NASA Exoplanet Archive PSCompPars st_lum, log10 L/L_sun converted as 10^st_lum "
+        f"({ref_text(row, 'st_lum')})",
+        max(errs) if errs else None,
+    )
+
+
+# Issue #93 C: brightness temperatures and hotspot offset come only from the literature registry.
+PHASE_CURVE_FIELDS = ("dayside_temp_K", "nightside_temp_K", "hotspot_offset_deg")
+
+
+def _planet_extras(card: dict[str, Any], row: Mapping[str, Any] | None) -> None:
+    row = row or {}
+    card["orbit_ecc"] = _eccentricity(row)
+    card["insolation_searth"] = _insolation(row)
+    card["host_lum_lsun"] = _host_luminosity(row)
+    for name in PHASE_CURVE_FIELDS:
+        card[name] = _null(NO_LITERATURE + " eclipse or phase-curve value for this planet")
+
+
 def _literature_fill(card: dict[str, Any], data: CatalogueData) -> None:
     """Q-153: a field the catalogues left null takes the literature registry's value, with the
     registry's own tag and a ``literature:`` source. A field with a catalogue value is never
@@ -387,6 +478,14 @@ def _star_fields(card: dict[str, Any], kind: str, data: CatalogueData) -> None:
     card["radius_rsun"] = data.literature.tv("radius_rsun") or stars.radius_field(data.star)
     if kind == "star_mira":
         card["period_var_d"] = stars.period_field(data.star)
+    # Issue #93 B: FLAME luminosity and mass (model_dependent), for the turnover time and the mass.
+    card["lum_lsun"] = stars.luminosity_field(data.star)
+    card["mass_msun"] = stars.mass_field(data.star)
+    if kind in ("star", "star_ttauri"):
+        # Issue #93 C: no catalogue in the pipeline gives a star's rotation period or flare rate;
+        # the literature registry fills them for the stars it has a row for (_literature_fill).
+        card["rot_period_h"] = _null(NO_LITERATURE + " rotation period for this star")
+        card["flare_rate_per_d"] = _null(NO_LITERATURE + " flare rate for this star")
 
 
 COMET_EPOCHS = ("2025-08", "2025-12")
@@ -511,6 +610,7 @@ def build_card(
             )
     elif kind in ("planet_rocky", "planet_water", "gas_giant"):
         _planet_fields(card, data.facts.exoplanet)
+        _planet_extras(card, data.facts.exoplanet)
     elif kind in ("star", "star_mira", "star_ttauri"):
         card["spectral_class"] = _spectral_class(cls)
         _star_fields(card, kind, data)
