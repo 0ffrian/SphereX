@@ -1,7 +1,7 @@
 // What the wind sound follows in the close-up: the place being looked at on a world the engine draws.
-// Place: the fly camera's foot point (and its altitude) while the close-up flies, else the last globe click
+// Place: the fly camera's foot point while the close-up flies (you stand on the ground there), else the last globe click
 // (worldStore.target). Signals read from the engine's CPU fields (WorldEngine.cpuFields, WorldFieldSampler):
-//   elevation (km, terrain) + fly altitude -> local pressure P exp(-h / H), H = R T / (M g)   [derived]
+//   terrain elevation (km) -> local pressure P exp(-h / H), H = R T / (M g)   [derived]
 //   surface temperature at the cell        -> sound speed, as the card's T plus the cell's departure from the
 //                                              engine's mean (the card's measured T stays the anchor) [model_dependent]
 // Not wired: local wind. The engine's u/v grid is ocean-current flow normalised to its own maximum and is 0 on
@@ -41,11 +41,9 @@ export function sampleLocal(m: AtmosphereModel): LocalSignals | null {
   if (!eng) return null;
   let lon: number;
   let lat: number;
-  let altKm = 0;
   if (ws.fly && ws.fly.flying) {
     lon = ws.fly.fly.lon;
     lat = ws.fly.fly.lat;
-    altKm = ws.fly.fly.alt;
   } else if (ws.target) {
     lon = ws.target.lon;
     lat = ws.target.lat;
@@ -55,8 +53,9 @@ export function sampleLocal(m: AtmosphereModel): LocalSignals | null {
   const s = c.sampler.sampleLonLat(lon, lat);
   const parts: string[] = [];
   let P = m.P;
-  const hKm = (s.elevationKm ?? 0) + (Number.isFinite(altKm) ? altKm : 0);
-  if (s.elevationKm !== null || altKm > 0) {
+  // You stand on the ground under the camera: only the terrain height counts, not the fly altitude.
+  const hKm = s.elevationKm ?? 0;
+  if (s.elevationKm !== null) {
     const H = (GAS_CONSTANT * m.T) / (GASES[m.gas].M * m.gMs2); // scale height, m (derived)
     P = m.P * Math.exp((-Math.max(0, hKm) * 1000) / H);
     parts.push(`height ${hKm.toFixed(1)} km`);
