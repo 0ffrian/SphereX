@@ -7,7 +7,7 @@ import type { FieldSample } from '@/viewer/fields/fieldGenerator';
 import type { CpuFields } from './WorldEngine';
 
 export interface WorldSample {
-  /** Ground height above the sea floor reference, km (terrain grid, cubic B-spline as the fly view). Null if no terrain. */
+  /** Ground height above the sea floor reference, km (terrain grid, Catmull-Rom cubic as the fly view). Null if no terrain. */
   elevationKm: number | null;
   /** Surface temperature, K (climate grid, cubic B-spline as the fly view). Null while the climate is not ready. */
   temperatureK: number | null;
@@ -31,13 +31,51 @@ function bw(f: number): [number, number, number, number] {
   ];
 }
 
+/** Catmull-Rom weights (the interpolating cubic) for the 4 texels around a sample, fraction f in [0, 1). */
+function cw(f: number): [number, number, number, number] {
+  return [
+    f * (-0.5 + f * (1 - 0.5 * f)),
+    1 + f * f * (-2.5 + 1.5 * f),
+    f * (0.5 + f * (2 - 1.5 * f)),
+    f * f * (-0.5 + 0.5 * f),
+  ];
+}
+
 /**
- * Issue #93 2.7: a lon-lat grid read with the cubic B-spline the fly view uses (shaders.js bsp(): Sigg and Hadwiger
- * 2005), wrapping in longitude and clamping at the poles, so what the haptics and sound read matches the picture. The
- * GPU builds the same weights from 4 bilinear taps; this sums the 16 texels directly (equal up to the GPU's filtering
- * precision). `stride` is the number of channels per cell (channel 0 is read).
+ * Issue #93 2.7: a lon-lat grid read with the cubic B-spline the fly view uses for the climate grids (shaders.js bsp():
+ * Sigg and Hadwiger 2005), wrapping in longitude and clamping at the poles, so what the haptics and sound read matches
+ * the picture. The GPU builds the same weights from 4 bilinear taps; this sums the 16 texels directly (equal up to the
+ * GPU's filtering precision). `stride` is the number of channels per cell (channel 0 is read).
  */
 export function bspline(
+  data: ArrayLike<number>,
+  stride: number,
+  W: number,
+  H: number,
+  lon: number,
+  lat: number,
+): number {
+  return cubic(bw, data, stride, W, H, lon, lat);
+}
+
+/**
+ * The Catmull-Rom cubic the fly view uses for the height grid (shaders.js crs(), #93 regression fix): it passes through
+ * every texel value, so a peak keeps its height (the B-spline read a one-texel peak at a third of it). Same wrapping,
+ * clamping and `stride` as `bspline`; the GPU merges the middle taps into 9 bilinear reads, this sums the 16 texels.
+ */
+export function catmullRom(
+  data: ArrayLike<number>,
+  stride: number,
+  W: number,
+  H: number,
+  lon: number,
+  lat: number,
+): number {
+  return cubic(cw, data, stride, W, H, lon, lat);
+}
+
+function cubic(
+  weights: (f: number) => [number, number, number, number],
   data: ArrayLike<number>,
   stride: number,
   W: number,
@@ -49,8 +87,8 @@ export function bspline(
   const py = (lat / Math.PI + 0.5) * H - 0.5;
   const x0 = Math.floor(px);
   const y0 = Math.floor(py);
-  const wx = bw(px - x0);
-  const wy = bw(py - y0);
+  const wx = weights(px - x0);
+  const wy = weights(py - y0);
   let s = 0;
   for (let b = 0; b < 4; b++) {
     const y = Math.max(0, Math.min(H - 1, y0 - 1 + b));
@@ -87,7 +125,7 @@ export class WorldFieldSampler {
   private elevation(lon: number, lat: number): number | null {
     const t = this.f.terrain;
     if (!t) return null;
-    return bspline(t.data, 2, t.W, t.H, lon, lat);
+    return catmullRom(t.data, 2, t.W, t.H, lon, lat);
   }
 
   private climate(lon: number, lat: number): Pick<WorldSample, 'temperatureK' | 'rain' | 'land'> {
