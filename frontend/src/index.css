@@ -3450,27 +3450,21 @@ body {
     font-variant-numeric: tabular-nums;
     text-shadow: 0 1px 2px #000;
   }
-  .sx-player {
-    background: color-mix(in srgb, var(--s1) 92%, transparent);
+  /* The survey credit is a popover behind the info button next to the zoom card (D-35). */
+  .sx-sky-credit {
+    background: color-mix(in srgb, var(--s1) 96%, transparent);
     border: 1px solid var(--line);
     border-radius: 10px;
-    box-shadow: none;
-  }
-  .sx-btn-i {
-    border-radius: 8px;
-  }
-  .sx-frame-info {
     font: inherit;
     font-size: 12px;
-    font-variant-numeric: tabular-nums;
-  }
-  .sx-sky-credit {
-    background: color-mix(in srgb, var(--bg) 78%, transparent);
-    border-radius: 6px;
-    font: inherit;
-    font-size: 11px;
-    line-height: 16px;
+    line-height: 18px;
     color: var(--muted);
+    padding: 10px 12px;
+    gap: 6px;
+    pointer-events: auto;
+  }
+  .sx-sky-credit[hidden] {
+    display: none;
   }
   .sx-credit-line {
     display: flex;
@@ -3481,6 +3475,27 @@ body {
   }
   .sx-credit-text {
     flex: 1 1 100%;
+  }
+  .sx-credit-btn {
+    position: absolute;
+    z-index: 26;
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--s1) 92%, transparent);
+    border: 1px solid var(--line);
+  }
+  .sx-credit-btn:hover,
+  .sx-credit-btn[aria-expanded='true'] {
+    background: var(--s2);
+    color: var(--fg);
+  }
+  .sx-credit-btn:focus-visible {
+    outline: 2px solid var(--color-sx-green);
+    outline-offset: 2px;
   }
   /* The object / flipbook card and the selected object's card take the mock-up's island place. */
   .sx-panel,
@@ -3530,10 +3545,6 @@ body {
       padding: 0;
       max-width: calc(100% - 32px - min(26rem, 40%) - 16px);
     }
-    .sx-scrub {
-      flex: 1 1 140px;
-      max-width: 180px;
-    }
     .sx-bezel[data-split] .sx-coords-wrap {
       opacity: 0;
     }
@@ -3561,41 +3572,16 @@ body {
       top: auto;
       bottom: 88px;
     }
-    /* Quiet survey credit above the zoom card: one muted line (the full text on hover or focus,
-       and in the tooltip). D-35 keeps it always on screen. */
+    /* The info button sits right of the zoom card; its popover opens above them. */
+    .sx-credit-btn {
+      left: 174px;
+      bottom: 24px;
+    }
     .sx-sky-credit {
       left: 16px;
       bottom: 76px;
-      max-width: min(52rem, calc(100% - 32px));
-      padding: 3px 8px;
-    }
-    .sx-sky-pane:has(.sx-panel) .sx-sky-credit {
-      max-width: min(52rem, calc(100% - 32px - 456px));
-    }
-    .sx-credit-line {
-      flex-wrap: nowrap;
-    }
-    .sx-credit-line > :not(.sx-credit-text) {
-      flex: none;
-    }
-    .sx-credit-text {
-      flex: 0 1 auto;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .sx-credit-line:hover,
-    .sx-credit-line:focus-within {
-      flex-wrap: wrap;
-    }
-    .sx-credit-line:hover .sx-credit-text,
-    .sx-credit-line:focus-within .sx-credit-text {
-      flex-basis: 100%;
-      white-space: normal;
-    }
-    .sx-sky-credit .sx-hide-s {
-      display: none;
+      width: max-content;
+      max-width: min(30rem, calc(100% - 32px));
     }
     .sx-zoom {
       height: 48px;
@@ -3841,6 +3827,20 @@ body {
     .sx-sdock .sx-search-input:focus {
       border-color: var(--accent);
       box-shadow: none;
+    }
+    .sx-credit-btn {
+      left: 8px;
+      bottom: 8px;
+    }
+    .sx-sky-credit {
+      left: 8px;
+      right: 8px;
+      bottom: 48px;
+      max-width: none;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: color-mix(in srgb, var(--s1) 96%, transparent);
+      padding: 10px 12px;
     }
     .sx-island-wrap {
       top: auto;

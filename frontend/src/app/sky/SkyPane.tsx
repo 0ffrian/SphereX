@@ -26,6 +26,7 @@ import { EstimatedBadge, ProvenanceBadge } from '@/app/Badge';
 import type { SkyCachedObject, SkySurvey } from '@/app/api/types';
 import { isApiError } from '@/app/api/errors';
 import { formatCoords } from '@/app/format';
+import { Icon } from '@/app/shell/icons';
 import { getSkyApi, useAppStore } from '@/state/store';
 import { prefersReducedMotion, type RendererBackend } from '@/viewer/ViewerApp';
 import { SkyView } from '@/viewer/sky/SkyView';
@@ -154,6 +155,29 @@ export function SkyPane({ children }: { children?: ReactNode }) {
   // D-35: the credit is always visible. Panels read its height (--sx-credit-h) to stay clear of it
   // (desktop) or to keep their content above it (phone bottom sheet, where it sits on top).
   const creditRef = useRef<HTMLDivElement>(null);
+  const creditBtnRef = useRef<HTMLButtonElement>(null);
+  const creditId = useId();
+  const [creditOpen, setCreditOpen] = useState(false);
+  // Escape or a press outside the popover and its button closes it.
+  useEffect(() => {
+    if (!creditOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      setCreditOpen(false);
+      creditBtnRef.current?.focus();
+    };
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (creditRef.current?.contains(t) || creditBtnRef.current?.contains(t)) return;
+      setCreditOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('pointerdown', onDown, true);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', onDown, true);
+    };
+  }, [creditOpen]);
   useEffect(() => {
     const host = hostRef.current;
     const credit = creditRef.current;
@@ -417,7 +441,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
   const onContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     // Panels, the card and the on-screen controls keep the browser's menu.
-    if (target.closest('.sx-island-wrap, .sx-panel, .sx-sky-credit, input')) return;
+    if (target.closest('.sx-island-wrap, .sx-panel, .sx-sky-credit, .sx-credit-btn, input')) return;
     let key = target.closest<HTMLElement>('[data-marker-key]')?.dataset.markerKey ?? null;
     if (key === null) {
       let best = Infinity;
@@ -828,7 +852,28 @@ export function SkyPane({ children }: { children?: ReactNode }) {
 
       {/* Provenance and credit of the picture (D-02, A11). */}
       {/* Always on top and never covered by a panel (D-35; see --sx-credit-h above). */}
-      <div ref={creditRef} className="sx-sky-credit" data-testid="sky-credit-box">
+      <button
+        type="button"
+        ref={creditBtnRef}
+        className="sx-credit-btn"
+        aria-label="About this sky image"
+        aria-expanded={creditOpen}
+        aria-controls={creditId}
+        title="About this sky image"
+        onClick={() => setCreditOpen((o) => !o)}
+        data-testid="sky-credit-button"
+      >
+        <Icon name="info" className="size-4" />
+      </button>
+      <div
+        ref={creditRef}
+        id={creditId}
+        className="sx-sky-credit"
+        data-testid="sky-credit-box"
+        role="region"
+        aria-label="About this sky image"
+        hidden={!creditOpen}
+      >
         {survey && (
           <p
             className="sx-credit-line pointer-events-auto"
