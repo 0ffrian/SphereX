@@ -6,7 +6,7 @@
 // setFly(true) the left 60% of the canvas is the fly view and the right 40% is the globe; with fly off the
 // globe fills the canvas. `view()` returns the pixel rectangles so a host can overlay or crop them
 // (or run two WorldEngine instances on two canvases, each with its own context, if it wants separate panes).
-import { createCore, type Core } from './core.js';
+import { createCore, type Core, type CoreGL } from './core.js';
 import { WP, FLUIDS } from './presets.js';
 import type {
   EngineOptions,
@@ -78,6 +78,9 @@ export class WorldEngine {
   private core: Core;
   private canvas: HTMLCanvasElement;
   private tickN = 0;
+  private isReady = false;
+  private readyP: Promise<void> | null = null;
+  private disposed = false;
   /** Live fly-camera state. Assigning a field takes effect at the next draw(). */
   readonly fly: FlyState;
 
@@ -92,7 +95,8 @@ export class WorldEngine {
         alpha: false,
         powerPreference: 'high-performance',
       });
-    this.core = createCore(canvas);
+    // Issue #93: the shaders are submitted here and compile in the background (see whenReady).
+    this.core = createCore(canvas, { role: opts.role ?? 'both' });
     const W = this.core.W;
     this.fly = {
       get alt() {
@@ -132,6 +136,43 @@ export class WorldEngine {
         W.flyAuto = v;
       },
     };
+  }
+
+  /**
+   * True once the shaders are compiled and linked. Never waits for the driver (KHR_parallel_shader_compile; without
+   * the extension it links at once, which waits as the prototype did). Throws the compile or link log.
+   */
+  pollReady(): boolean {
+    if (!this.isReady) this.isReady = (this.core.W.gl as CoreGL).poll();
+    return this.isReady;
+  }
+
+  /**
+   * Resolves when the shaders are linked, checking every 16 ms so the page keeps running meanwhile (issue #93: the fly
+   * shader took about 60 s on a cold ANGLE D3D11 cache). Rejects with the compile or link log. A host that loads a
+   * world before this resolves still works: the first step or draw links the programs, waiting for the driver.
+   */
+  whenReady(): Promise<void> {
+    if (!this.readyP)
+      this.readyP = new Promise<void>((resolve, reject) => {
+        const check = () => {
+          if (this.disposed)
+            return reject(new Error('world engine disposed before its shaders were ready'));
+          try {
+            if (this.pollReady()) resolve();
+            else setTimeout(check, 16);
+          } catch (err) {
+            reject(err instanceof Error ? err : new Error(String(err)));
+          }
+        };
+        check();
+      });
+    return this.readyP;
+  }
+
+  /** Programs this instance has submitted: 3 for a 'globe' engine (no fly shader), 4 otherwise. */
+  programCount(): number {
+    return (this.core.W.gl as CoreGL).programs();
   }
 
   /** Load a world: a preset object, or the id of one of the prototype's example presets. Rebuilds terrain and spin-up. */
@@ -279,8 +320,9 @@ export class WorldEngine {
 
   /**
    * One page-loop frame of the prototype (dt seconds, capped like the prototype at 0.06): auto-flight, the
-   * simulation tick, the spin advance, the redraw (a gas giant is not drawn while it spins up) and the
-   * readout refresh every 20 ticks. The host calls this from requestAnimationFrame while the canvas is visible.
+   * simulation tick, the spin advance, the redraw and the readout refresh every 20 ticks. No world is drawn while it
+   * spins up: the prototype skipped only gas giants, but the app covers every world with the opaque "Forming" overlay
+   * then, so the frames were never seen (issue #93). The host calls this from requestAnimationFrame while the canvas is visible.
    */
   tick(dt: number): void {
     const c = this.core,
@@ -295,8 +337,7 @@ export class WorldEngine {
       W.gl.tick(W.m, W.playing, dt);
       if (W.playing)
         W.spin += W.m.gas ? (W.timeSec < 1000 ? dt * W.timeSec * W.m.Om : 0) : dt * 0.09;
-      const bld = W.m.gas && W.spinup > 0;
-      if (!bld) W.gl.draw(W.m);
+      if (W.spinup === 0) W.gl.draw(W.m);
       if (this.tickN++ % 20 === 0) c.worldUi();
     }
   }
@@ -420,6 +461,7 @@ export class WorldEngine {
 
   /** Release the GL context. */
   dispose(): void {
+    this.disposed = true;
     const gl = this.canvas.getContext('webgl2');
     gl?.getExtension('WEBGL_lose_context')?.loseContext();
   }

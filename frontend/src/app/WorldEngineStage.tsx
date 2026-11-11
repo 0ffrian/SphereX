@@ -113,90 +113,109 @@ function useWorldEngine(role: Role, world: CardToWorldOk, onFail: (() => void) |
       'position:absolute;left:0;top:0;height:100%;display:block;touch-action:none;outline:none;width:' +
       (role === 'fly' ? '166.6667%' : '100%');
     host.appendChild(canvas);
-    let e: WorldEngine;
-    try {
-      e = new WorldEngine(canvas);
-      e.setPreset(world.preset);
-    } catch (err) {
+    let dead = false;
+    const fail = (err: unknown) => {
+      if (dead) return;
       console.warn('[world engine] could not start', err);
       canvas.remove();
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- the engine can only be tried once mounted
       setFailed(true);
+    };
+    let e: WorldEngine;
+    try {
+      // Issue #93: the globe engine never compiles the fly shader; the fly engine skips the hidden globe.
+      e = new WorldEngine(canvas, { role });
+    } catch (err) {
+      fail(err);
       return;
     }
-    const st = useWorldStore.getState();
-    if (role === 'globe') {
-      st.load(world);
-      st.setGlobe(e);
-      useWorldStore.setState({ playing: !reducedMotion() });
-    } else {
-      // The close-up opens in the state the globe is in: same controls, same turn angle, same clock.
-      if (st.world?.preset.id === world.preset.id) e.setOverrides(st.applied);
-      st.setFly(e);
-    }
-    setEngine(e);
     // A lost GL context leaves a black canvas: report it so the old path draws instead (not while we release it ourselves).
     const onLost = (ev: Event) => {
       ev.preventDefault();
       if (!dead) setFailed(true);
     };
     canvas.addEventListener('webglcontextlost', onLost);
-    // Dev only: the verification scripts (issue #71) read and drive the engines through these.
-    if (import.meta.env.DEV)
-      (window as unknown as Record<string, unknown>)[`__sxWorld_${role}`] = e;
-
-    // The world holds still while it forms (so the turn angle, and with it where the Sun is, stays what the
-    // artifact has when its user presses Surface view) and starts moving when it has settled.
-    e.playing = false;
-    let released = false;
-    let dead = false;
     let raf = 0;
-    let shown = true;
-    let last = performance.now();
-    const frame = (now: number) => {
+    let io: IntersectionObserver | null = null;
+    let ro: ResizeObserver | null = null;
+    let id = 0;
+    // The shaders compile in the background while "Forming…" shows (issue #93: the fly shader took about 60 s on a
+    // cold ANGLE D3D11 cache and froze the page); the world is built once they are linked. A compile or link error
+    // takes the old three.js path, as a failed start always did.
+    const start = () => {
       if (dead) return;
-      const dt = (now - last) / 1000;
-      last = now;
-      if (!released && e.spinup === 0) {
-        released = true;
-        const g = useWorldStore.getState();
-        if (role === 'fly' && g.globe) e.syncSpin(g.globe);
-        e.playing = g.playing;
+      try {
+        e.setPreset(world.preset);
+      } catch (err) {
+        fail(err);
+        return;
       }
-      if (shown && !document.hidden) e.tick(dt);
+      const st = useWorldStore.getState();
+      if (role === 'globe') {
+        st.load(world);
+        st.setGlobe(e);
+        useWorldStore.setState({ playing: !reducedMotion() });
+      } else {
+        // The close-up opens in the state the globe is in: same controls, same turn angle, same clock.
+        if (st.world?.preset.id === world.preset.id) e.setOverrides(st.applied);
+        st.setFly(e);
+      }
+      setEngine(e);
+      // Dev only: the verification scripts (issue #71) read and drive the engines through these.
+      if (import.meta.env.DEV)
+        (window as unknown as Record<string, unknown>)[`__sxWorld_${role}`] = e;
+
+      // The world holds still while it forms (so the turn angle, and with it where the Sun is, stays what the
+      // artifact has when its user presses Surface view) and starts moving when it has settled.
+      e.playing = false;
+      let released = false;
+      let shown = true;
+      let last = performance.now();
+      const frame = (now: number) => {
+        if (dead) return;
+        const dt = (now - last) / 1000;
+        last = now;
+        if (!released && e.spinup === 0) {
+          released = true;
+          const g = useWorldStore.getState();
+          if (role === 'fly' && g.globe) e.syncSpin(g.globe);
+          e.playing = g.playing;
+        }
+        if (shown && !document.hidden) e.tick(dt);
+        raf = requestAnimationFrame(frame);
+      };
       raf = requestAnimationFrame(frame);
-    };
-    raf = requestAnimationFrame(frame);
-    const io =
-      typeof IntersectionObserver === 'undefined'
-        ? null
-        : new IntersectionObserver((es) => {
-            for (const x of es) {
-              const was = shown;
-              shown = x.isIntersecting;
-              // The fly pane was hidden while the globe turned: catch up to its phase when it shows again.
-              if (role === 'fly' && shown && !was && released) {
-                const g = useWorldStore.getState().globe;
-                if (g) e.syncSpin(g);
+      io =
+        typeof IntersectionObserver === 'undefined'
+          ? null
+          : new IntersectionObserver((es) => {
+              for (const x of es) {
+                const was = shown;
+                shown = x.isIntersecting;
+                // The fly pane was hidden while the globe turned: catch up to its phase when it shows again.
+                if (role === 'fly' && shown && !was && released) {
+                  const g = useWorldStore.getState().globe;
+                  if (g) e.syncSpin(g);
+                }
               }
-            }
-          });
-    io?.observe(host);
-    // A new size is a new picture; nothing else redraws a paused world.
-    const ro =
-      typeof ResizeObserver === 'undefined'
-        ? null
-        : new ResizeObserver(() => {
-            if (drawReady(e)) e.draw();
-          });
-    ro?.observe(canvas);
-    // React reads the readouts a few times a second while the world moves or forms, and not at all when it is paused and settled.
-    let wasForming = true;
-    const id = window.setInterval(() => {
-      const forming = e.spinup > 0;
-      if (shown && (e.playing || forming || wasForming)) bump();
-      wasForming = forming;
-    }, 400);
+            });
+      io?.observe(host);
+      // A new size is a new picture; nothing else redraws a paused world.
+      ro =
+        typeof ResizeObserver === 'undefined'
+          ? null
+          : new ResizeObserver(() => {
+              if (drawReady(e)) e.draw();
+            });
+      ro?.observe(canvas);
+      // React reads the readouts a few times a second while the world moves or forms, and not at all when it is paused and settled.
+      let wasForming = true;
+      id = window.setInterval(() => {
+        const forming = e.spinup > 0;
+        if (shown && (e.playing || forming || wasForming)) bump();
+        wasForming = forming;
+      }, 400);
+    };
+    e.whenReady().then(start, fail);
     return () => {
       if (import.meta.env.DEV)
         (window as unknown as Record<string, unknown>)[`__sxWorld_${role}`] = null;
@@ -571,7 +590,8 @@ export function WorldGlobeStage({ world, onFail }: { world: CardToWorldOk; onFai
     };
   }, [engine, hostRef, world.preset.label]);
 
-  const forming = !!engine && engine.spinup > 0;
+  // Issue #93: "Forming…" also covers the shader compile, before there is an engine to show.
+  const forming = !failed && (!engine || engine.spinup > 0);
   return (
     <div
       ref={hostRef}
@@ -582,7 +602,7 @@ export function WorldGlobeStage({ world, onFail }: { world: CardToWorldOk; onFai
       data-failed={failed ? '1' : '0'}
       data-spinup={engine ? engine.spinup : ''}
     >
-      {forming && <Forming gas={!!state?.gas} />}
+      {forming && <Forming gas={state ? state.gas : world.preset.type === 'gas'} />}
     </div>
   );
 }
@@ -707,10 +727,10 @@ export function WorldFlyStage({
     };
   }, [engine, entered, hostRef]);
 
-  const gas = engine?.state().gas ?? false;
+  const gas = engine ? engine.state().gas : world.preset.type === 'gas';
   const range = engine ? engine.altRange() : ([1, 2] as [number, number]);
   const alt = engine && entered ? engine.fly.alt : 0;
-  const forming = !!engine && engine.spinup > 0;
+  const forming = !failed && (!engine || engine.spinup > 0);
   return (
     <div
       className="absolute inset-0 z-[1] overflow-hidden bg-black"
