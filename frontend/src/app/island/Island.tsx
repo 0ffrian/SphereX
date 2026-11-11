@@ -75,9 +75,9 @@ export function Island() {
   const inRef = useRef<HTMLDivElement>(null);
   const [bezelW, setBezelW] = useState(0);
   const [bezelH, setBezelH] = useState(0);
-  // Issue #71 stream U (Q-298): while the build is open (desktop) it rests at the bottom right, as the mock-up's.
-  const buildOpen = useShellStore((s) => s.build.open);
-  const corner = buildOpen && !compact && bezelH > 0;
+  // Mock-up floating layout: on a desktop width it rests at the bottom right (the cards float there
+  // too, and it travels into the panel's box from there). A phone keeps it over the top of the sky.
+  const corner = !compact && bezelH > 0;
   const [top, setTop] = useState(TOP);
   const [ready, setReady] = useState(false);
   const [pill, setPill] = useState({ w: CIRCLE, h: CIRCLE });
@@ -133,7 +133,7 @@ export function Island() {
   }, [inPanel, arrived, reduced, setArrived]);
 
   let box: { left: number; top: number; width: number; height: number; radius: number };
-  if (panelBox) box = { ...panelBox, radius: 22 };
+  if (panelBox) box = { ...panelBox, radius: 10 };
   else if (corner && thinking)
     box = {
       left: bezelW - pill.w - 16,
