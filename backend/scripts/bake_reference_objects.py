@@ -83,7 +83,7 @@ def titan_card(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def sun_card(row: dict[str, Any]) -> dict[str, Any]:
-    """A star from the Sun fact sheet (Q-294). Spectral class G2V is the Sun's standard class."""
+    """A star from the Sun fact sheet (Q-307). Spectral class G2V is the Sun's standard class."""
     url = "nssdc.gsfc.nasa.gov/planetary/factsheet/sunfact.html"
     src = f"{row['source']} ({url})"
     return {
