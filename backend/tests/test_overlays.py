@@ -9,9 +9,12 @@ from __future__ import annotations
 import csv
 import io
 import json
+import math
+import shutil
 import threading
 import time
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -25,9 +28,12 @@ from PIL import Image
 from app.adapters import gaia, tap, wise
 from app.adapters.http import UpstreamError
 from app.adapters.irsa_sia import parse_s_region
+from app.api.deps import require_object
 from app.cache.store import UpstreamUnavailable
-from app.core.find import combine, flagmask
+from app.context import make_context
+from app.core.find import combine, flagmask, stars
 from app.core.find import overlays as overlays_mod
+from app.core.find.frames import FrameRecord, FrameService, FramesResult
 from app.core.find.overlays import (
     TARGET_MATCH_PX,
     angular_sep_arcsec,
@@ -35,7 +41,7 @@ from app.core.find.overlays import (
     wrap_ra,
 )
 from app.main import create_app
-from tests.conftest import make_settings
+from tests.conftest import FIXTURE_CUTOUT_SIZE_ARCSEC, make_settings
 
 TARGETS = ["Barnard's star", "Epsilon Indi B", "WISE 0855", "RW Aurigae", "R Draconis"]
 TAGS = {"measured", "derived", "model_dependent", "inferred_from_analog", "artistic"}
@@ -143,18 +149,294 @@ def test_subtract_frame_from_itself_is_mid_grey(client: TestClient) -> None:
     assert finite.any() and (px[finite] == combine.MID_GREY).all()
 
 
-def test_moving_object_overlays_refused(client: TestClient) -> None:
-    """The catalogue cones are still refused for moving objects (Q-50). Since issue #26 the
-    frames exist, so each gets its flag mask and cutout box; the SIA footprint is not carried on
-    the frame record, so it is refused per frame, never invented."""
-    oid = _oid(client, "433 Eros")
-    body = _overlays(client, oid)
-    frames = client.get(f"/v1/objects/{oid}/frames").json()["frames"]
+def _no_star_cones(cache: Path) -> None:
+    """Drop every recorded Gaia and CatWISE cone from a test cache copy."""
+    for d in ("gaia", "wise"):
+        shutil.rmtree(cache / "v1" / d, ignore_errors=True)
+
+
+def test_moving_object_overlays_refused_without_cones(fixture_cache: Path) -> None:
+    """Offline with no Gaia or CatWISE cone cached, a mover's catalogues are refused, never
+    invented (A19.6). Since issue #26 the frames exist, so each gets its flag mask and cutout
+    box; the SIA footprint is not carried on the frame record, so it is refused per frame."""
+    _no_star_cones(fixture_cache)
+    with TestClient(create_app(make_settings(fixture_cache))) as c:
+        oid = _oid(c, "433 Eros")
+        body = _overlays(c, oid)
+        frames = c.get(f"/v1/objects/{oid}/frames").json()["frames"]
     assert [f["frame_id"] for f in body["frames"]] == [f["frame_id"] for f in frames]
     assert {"overlay:gaia", "overlay:wise"} <= set(body["missing"])
     assert all(f["footprint"] is None and f["markers"] == [] for f in body["frames"])
+    assert all(f["masks"] == [] for f in body["frames"])
     assert all(f"footprint:{f['frame_id']}" in body["missing"] for f in frames)
     assert all(not c["available"] and c["sources"] == [] for c in body["catalogs"])
+
+
+# --- Movers with synthetic cones on the recorded Eros frames (issue #95) ------------------------
+
+PX_ARCSEC = 6.15  # SPHEREx pixel, only to place synthetic stars clearly inside or outside 8 px
+
+
+def _eros(client: TestClient) -> tuple[str, list[stars.TrackVisit]]:
+    oid = _oid(client, "433 Eros")
+    obj = require_object(client.app.state.ctx, oid)  # type: ignore[attr-defined]
+    fr = client.app.state.frames.get_frames(obj, use_memo=True)  # type: ignore[attr-defined]
+    return oid, stars.mover_visits(fr.frames, FIXTURE_CUTOUT_SIZE_ARCSEC)
+
+
+def _synthetic_fetch(
+    visits: list[stars.TrackVisit],
+    calls: list[tuple[str, int, dict[str, Any]]],
+    fail: set[tuple[str, int]] | None = None,
+) -> Any:
+    """A fake ``fetch_catalog``: per visit cone, stars placed around the visit's first predicted
+    position. Gaia: ``G<v>-on`` on the track (G 12, r 4 px), ``G<v>-far`` 120" north (inside the
+    cutout, far from the track). CatWISE: the same on-track star 1" away (W1 8: merged, r 5 px)
+    and a CatWISE-only source 20" east (W1 10, r 3 px)."""
+    by_ra = {round(v.cone.ra, 9): v for v in visits}
+
+    def fetch(ctx: Any, cat: Any, cone: Any, **kw: Any) -> Any:
+        v = by_ra[round(cone.ra, 9)]
+        calls.append((cat, v.visit, kw))
+        if fail and (cat, v.visit) in fail:
+            raise UpstreamUnavailable("IRSA down")
+        f0 = v.frames[0]
+        cosd = math.cos(math.radians(f0.dec))
+        if cat == "gaia":
+            rows = [
+                (f"G{v.visit}-on", f0.ra, f0.dec, 12.0),
+                (f"G{v.visit}-far", f0.ra, f0.dec + 120 / 3600, 13.0),
+            ]
+            epoch = gaia.DR3_EPOCH_JYEAR
+        else:
+            rows = [
+                (f"W{v.visit}-on", f0.ra, f0.dec + 1 / 3600, 8.0),
+                (f"W{v.visit}-only", f0.ra + 20 / 3600 / cosd, f0.dec, 10.0),
+            ]
+            epoch = wise.EPOCH_JYEAR
+        tbl = overlays_mod.CatalogTable(
+            cat,
+            [r[0] for r in rows],
+            np.array([r[1] for r in rows]),
+            np.array([r[2] for r in rows]),
+            np.full(len(rows), np.nan),
+            np.full(len(rows), np.nan),
+            np.full(len(rows), epoch),
+            [r[3] for r in rows],
+        )
+        return tbl, "synthetic", False, SimpleNamespace(entry=None, from_cache=False)
+
+    return fetch
+
+
+def test_mover_overlays_with_synthetic_cones(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    oid, visits = _eros(client)
+    calls: list[tuple[str, int, dict[str, Any]]] = []
+    monkeypatch.setattr(overlays_mod, "fetch_catalog", _synthetic_fetch(visits, calls))
+    body = _overlays(client, oid)
+
+    assert sorted((c, v) for c, v, _ in calls) == [
+        ("gaia", 1),
+        ("gaia", 2),
+        ("wise", 1),
+        ("wise", 2),
+    ]
+    assert all(kw == ({"w1_lt": 16.5} if c == "wise" else {}) for c, _, kw in calls)
+    cats = {c["catalog"]: c for c in body["catalogs"]}
+    assert all(c["available"] for c in cats.values())
+    assert cats["gaia"]["mag_limit"] == 20.0 and cats["wise"]["mag_limit"] == 16.5
+    assert [s["id"] for s in cats["gaia"]["sources"]] == ["G1-on", "G2-on", "G1-far", "G2-far"]
+    assert not any(m.startswith("overlay:") for m in body["missing"])
+    assert len(body["frames"]) == 16
+
+    visit_of = {fid: v.visit for v in visits for fid in v.frame_ids}
+    for fo in body["frames"]:
+        n = visit_of[fo["frame_id"]]
+        marker_ids = {m["id"] for m in fo["markers"]}
+        # Each frame uses only its own visit's cones.
+        assert marker_ids == {f"G{n}-on", f"G{n}-far", f"W{n}-on", f"W{n}-only"}
+        masks = {m["id"]: m for m in fo["masks"]}
+        assert set(masks) == {f"G{n}-on", f"W{n}-only"}  # far star not near the track
+        assert masks[f"G{n}-on"]["catalog"] == "gaia" and masks[f"G{n}-on"]["r_px"] == 5.0
+        assert masks[f"W{n}-only"]["catalog"] == "wise" and masks[f"W{n}-only"]["r_px"] == 3.0
+        assert all(2.0 <= m["r_px"] <= 10.0 for m in fo["masks"])
+        assert set(masks) <= marker_ids
+        on = next(m for m in fo["markers"] if m["id"] == f"G{n}-on")
+        assert (masks[f"G{n}-on"]["x"], masks[f"G{n}-on"]["y"]) == (on["x"], on["y"])
+    # No self-match for movers: the star on the first frame's predicted pixel is contamination.
+    first = next(fo for fo in body["frames"] if fo["frame_id"] == visits[0].frames[0].frame_id)
+    zones = {c["id"]: c["zone"] for c in first["contamination"]}
+    assert zones[f"G{visits[0].visit}-on"] == "aperture"
+
+    prov = body["provenance"]
+    assert prov["masks"]["tag"] == "derived" and "[verify]" in prov["masks"]["formula"]
+    assert "no self-match for movers" in prov["contamination"]["formula"]
+    assert all(f"footprint:{fid}" in body["missing"] for fid in visit_of)  # still #74's
+
+    # Deterministic: a rebuilt reply is identical, byte for byte.
+    client.app.state.overlays._memo.clear()  # type: ignore[attr-defined]
+    again = client.get(f"/v1/objects/{oid}/overlays")
+    assert json.dumps(again.json(), sort_keys=True) == json.dumps(body, sort_keys=True)
+
+
+def test_mover_catalogue_is_all_or_nothing_across_visits(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    oid, visits = _eros(client)
+    calls: list[tuple[str, int, dict[str, Any]]] = []
+    fail = {("gaia", 2)}
+    monkeypatch.setattr(overlays_mod, "fetch_catalog", _synthetic_fetch(visits, calls, fail))
+    body = _overlays(client, oid)
+    cats = {c["catalog"]: c for c in body["catalogs"]}
+    assert not cats["gaia"]["available"] and cats["gaia"]["sources"] == []
+    assert cats["wise"]["available"]
+    assert "overlay:gaia" in body["missing"]
+    for fo in body["frames"]:
+        assert all(m["catalog"] == "wise" for m in fo["markers"] + fo["masks"])
+    service = client.app.state.overlays  # type: ignore[attr-defined]
+    assert oid not in service._memo  # an incomplete reply is never memoised
+
+    # The failure is remembered for catalog_failure_ttl_s; once it has passed, the next request
+    # fetches again and succeeds.
+    service._failed.clear()
+    fail.clear()
+    body = _overlays(client, oid)
+    assert all(c["available"] for c in body["catalogs"])
+    assert not any(m.startswith("overlay:") for m in body["missing"])
+    assert oid in service._memo
+
+
+@pytest.mark.parametrize(
+    ("frames_missing", "code"),
+    [
+        (["cutouts:deferred:3"], "overlay:gaia:pending"),
+        (["frames:search_deferred:2"], "overlay:gaia:pending"),
+        (["frames:cone_failed:1"], "overlay:gaia"),
+        (["ephemeris:2026W12_2A_0158_1_D1"], "overlay:gaia"),
+    ],
+)
+def test_mover_frames_incomplete(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, frames_missing: list[str], code: str
+) -> None:
+    """Cones are built only from a complete frame list; ``:pending`` only while frames are still
+    deferred to the object's job, else refused. Never memoised."""
+    oid, _ = _eros(client)
+    frames = client.app.state.frames  # type: ignore[attr-defined]
+    real = frames.get_frames
+
+    def incomplete(obj: Any, **kw: Any) -> Any:
+        fr = real(obj, **kw)
+        return FramesResult(fr.object_id, fr.frames, [*fr.missing, *frames_missing], None)
+
+    calls: list[Any] = []
+    monkeypatch.setattr(frames, "get_frames", incomplete)
+    monkeypatch.setattr(overlays_mod, "fetch_catalog", lambda *a, **k: calls.append(a))
+    body = _overlays(client, oid)
+    assert calls == []
+    assert code in body["missing"] and code.replace("gaia", "wise") in body["missing"]
+    assert all(f["masks"] == [] and f["markers"] == [] for f in body["frames"])
+    assert oid not in client.app.state.overlays._memo  # type: ignore[attr-defined]
+
+
+def _synthetic_visits(n: int) -> list[FrameRecord]:
+    out = []
+    for k in range(n):
+        out.append(
+            FrameRecord(
+                frame_id=f"V{k:02d}_D1",
+                time="2026-03-20T00:00:00Z",
+                wavelength_um=1.0,
+                bandwidth_um=0.01,
+                x=31.0,
+                y=31.0,
+                x_fits0=31.0,
+                y_fits0=31.0,
+                width=63,
+                height=63,
+                ra=10.0 + k,
+                dec=0.0,
+                flags=[],
+                detector=1,
+                north_angle_deg=0.0,
+                mirrored=False,
+                em_min_um=0.99,
+                em_max_um=1.01,
+                access_url="https://example.invalid/cutout",
+                t_min_mjd=61119.0 + k,
+                t_max_mjd=61119.0 + k + 0.001,
+            )
+        )
+    return out
+
+
+def test_mover_live_cones_are_capped_per_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """20 visits, nothing cached, online: at most MAX_LIVE_VISIT_CONES new cones per catalogue
+    per request; the rest wait (``:pending``) for a later request."""
+    ctx = make_context(make_settings(tmp_path / "cache", offline=False))
+    frames = FrameService(ctx)
+    fr = FramesResult("sbdb-x", _synthetic_visits(20), [], None)
+    monkeypatch.setattr(frames, "get_frames", lambda obj, **kw: fr)
+    calls: list[tuple[str, float]] = []
+
+    def fetch(ctx: Any, cat: Any, cone: Any, **kw: Any) -> Any:
+        calls.append((cat, cone.ra))
+        raise UpstreamUnavailable("not cached; counted only")
+
+    monkeypatch.setattr(overlays_mod, "fetch_catalog", fetch)
+    service = overlays_mod.OverlayService(frames)
+    try:
+        obj: Any = SimpleNamespace(id="sbdb-x", moving=True)
+        body = service.get_overlays(obj).body
+    finally:
+        service.close()
+        frames.close()
+    cap = stars.MAX_LIVE_VISIT_CONES
+    assert sum(c == "gaia" for c, _ in calls) == cap and sum(c == "wise" for c, _ in calls) == cap
+    assert "overlay:gaia" in body["missing"]  # the started ones failed; failure wins
+
+
+def test_fixed_target_overlays_have_empty_masks(client: TestClient) -> None:
+    body = _overlays(client, _oid(client, "WISE 0855"))
+    assert all(f["masks"] == [] for f in body["frames"])
+    assert {c["catalog"]: c["mag_limit"] for c in body["catalogs"]} == {"gaia": 20.0, "wise": None}
+    assert set(body["provenance"]) == {
+        "catalog_positions",
+        "catalog_mags",
+        "markers",
+        "contamination",
+        "masks",
+        "footprint",
+        "cutout_box",
+        "flags_mask",
+        "flag_colours",
+    }
+    assert "taken as the target" in body["provenance"]["contamination"]["formula"]
+
+
+def test_frame_markers_self_match_switch() -> None:
+    hdul = _image_hdul(np.zeros((9, 9)))
+    when = datetime(2026, 3, 20, tzinfo=UTC)
+    # The object at the reference pixel (FITS 2, 2 -> PNG x 2, y 6); one star exactly on it.
+    frame: Any = SimpleNamespace(x=2.0, y=6.0)
+    tbl = overlays_mod.CatalogTable(
+        "gaia",
+        ["on"],
+        np.array([10.0]),
+        np.array([20.0]),
+        np.array([np.nan]),
+        np.array([np.nan]),
+        np.array([2016.0]),
+        [12.0],
+    )
+    cfg = overlays_mod.DEFAULT_CONFIG
+    markers, cont = overlays_mod.frame_markers(hdul, frame, when, [tbl], cfg)
+    assert [m["id"] for m in markers] == ["on"] and cont == []  # Q-53: the target itself
+    markers, cont = overlays_mod.frame_markers(hdul, frame, when, [tbl], cfg, self_match=False)
+    assert [(c["id"], c["zone"], c["sep_px"]) for c in cont] == [("on", "aperture", 0.0)]
 
 
 def test_overlay_errors(client: TestClient) -> None:
