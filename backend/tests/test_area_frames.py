@@ -18,7 +18,7 @@ import pytest
 from app.adapters import irsa_cutout, irsa_sia
 from app.adapters.irsa_sia import SiaRow, frame_time
 from app.cache.keys import CacheKey
-from app.cache.store import LiveResponse
+from app.cache.store import CacheMissOffline, LiveResponse
 from app.context import make_context
 from app.core.area import config as area_config
 from app.core.area import frames as area_frames
@@ -312,12 +312,29 @@ def test_find_frames_counts_truncated_cones_and_keeps_their_rows(tmp_path: Path)
         next(b for m, b in entries("irsa_sia") if m["key"]["query"]["ra"] == "90.40961")
     )
     ctx, _ = _cone_cache(tmp_path, {0: len(rows) - 1, 7: 1})
-    result, bodies = area_frames.find_frames(ctx, EROS_AREA, fetch=recorded_fetch)  # type: ignore[arg-type]
+
+    def fetch(row: SiaRow, plan: area_frames.CutoutPlan) -> tuple[str, bytes]:
+        try:
+            return recorded_fetch(row, plan)
+        except CacheMissOffline:
+            return "k", b"not FITS"  # arrived but unusable: cutout:<id>, still complete
+
+    result, bodies = area_frames.find_frames(ctx, EROS_AREA, fetch=fetch)  # type: ignore[arg-type]
     assert result.complete and result.n_cones == 15
     assert "frames:cone_maxrec:2" in result.missing
     assert len(result.frames) > 0 and len(bodies) > 0
     for code in result.missing:
         jsonschema.validate(code, MISSING_CODE)
+
+
+def test_failed_cutout_downloads_make_the_result_incomplete(tmp_path: Path) -> None:
+    """Q-400 (12): a cutout that could not be downloaded is not a refusal of that frame; the run
+    is incomplete and never stored (an unusable body stays ``cutout:<frame_id>``)."""
+    ctx, _ = _cone_cache(tmp_path, {})
+    result, bodies = area_frames.find_frames(ctx, EROS_AREA, fetch=recorded_fetch)  # type: ignore[arg-type]
+    assert not result.complete
+    assert "frames:cutout_failed:2" in result.missing and len(bodies) > 0
+    assert result.stats["cutout_fetch_failed"] == 2
 
 
 def test_failed_cones_make_the_result_incomplete_before_any_cutout(tmp_path: Path) -> None:

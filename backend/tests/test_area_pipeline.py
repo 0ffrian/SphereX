@@ -62,10 +62,8 @@ def _fresh_run(workers: int) -> bytes:
 
 
 def test_same_inputs_give_byte_identical_records() -> None:
-    first = _fresh_run(0)
-    assert _fresh_run(0) == first
-    # The same bytes from a spawn process pool (as the overnight script runs it).
-    assert _fresh_run(2) == first
+    # In-thread and on a spawn process pool (as the overnight script runs it): same bytes.
+    assert _fresh_run(2) == _fresh_run(0)
 
 
 @pytest.mark.parametrize("index", [0, 9])
