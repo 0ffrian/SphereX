@@ -246,11 +246,15 @@ def test_asset_store_layers(fixture_cache: Path, tmp_path: Path) -> None:
     store.put(Asset(**doc))
     got = store.get("x-1")
     assert got is not None and got.card == doc["card"] and got.seed == doc["seed"]
-    # A pre-baked file wins over a generated one.
+    # A generated asset (final inputs, measured spectrum) wins over a pre-baked one (issue #75).
     pre = fixture_asset("star", "x-1")
     pre["seed"] = 99
     (assets / "star" / "x-1.json").write_text(json.dumps(pre), "utf-8")
-    assert store.get("x-1").seed == 99  # type: ignore[union-attr]
+    assert store.get("x-1").seed == doc["seed"]  # type: ignore[union-attr]
+    # The pre-baked file answers when nothing was generated.
+    (assets / "star" / "x-2.json").write_text(json.dumps(fixture_asset("star", "x-2")), "utf-8")
+    found = store.lookup("x-2")
+    assert found is not None and found[1] is None  # pre-baked: no cache time
     # Wrong shape (D-22 fields) is not an asset.
     assert Asset.from_json({"card": {}}) is None
 

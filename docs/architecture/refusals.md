@@ -57,6 +57,7 @@ Not a refusal: a point kept with dropped pixels is `flagged`, with `dropped_flag
 | `catalogue` | card, params | no catalogue answered for the object (SIMBAD or SBDB) |
 | `exoplanet_archive` | card, params | a SIMBAD `Pl` object with no Exoplanet Archive row; the type becomes `candidate` |
 | `lighting` | card, params | Horizons could not give the phase angle and Sun vector (Q-62); the asset is not saved |
+| `star_catalogue` | params | a star's SIMBAD `mesFe_h`, SIMBAD `mesVar` (`star_mira` only) or Gaia DR3 astrophysical-parameter call was not cached offline or failed ([Q-152](../decisions/catalogue-values.md)); the other calls still count, the card field's `source` says which call failed, and the asset is not saved. A refused Gaia match (no proper motion, nothing within the radius) is not this code |
 | `spectrum` | params | no measured spectrum for a layer that needs one |
 | `type:exoplanet_thresholds` | card, params | a Q-63 threshold is set to `None` (withdrawn), so the planet is `candidate`. The rule is on since issue #68, so this is not emitted today |
 | `type:exoplanet_radius`, `type:exoplanet_mass`, `type:exoplanet_envelope`, `type:exoplanet_water_model_range`, `type:exoplanet_mass_range` | card, params | the Q-63 rule cannot place the planet (meanings in Q-63) |
@@ -77,7 +78,7 @@ Not a refusal: a point kept with dropped pixels is `flagged`, with `dropped_flag
 
 #### Composite (`/composite`)
 
-Owner of the rules: [backend/README.md#composite](../../backend/README.md#composite) (Q-92, Q-94). Refusals: `composite:moving_object`, `composite:<channel>:no_frame`, `composite:<channel>:saturated`, `composite:<channel>:no_usable_frame`, `composite:too_few_bands`, `composite:saturated`, `composite:no_common_pass`, `composite:<channel>:stretch`, `composite:pixel_scale`, `cutout:<id>`. Notes on a built image: `composite:<channel>:skipped:<reason>:<frame_id>`, `composite:no_proper_motion`, `composite:flags_unmasked:<id>`; `frames:truncated` and `cutouts:deferred:<n>` pass through. `<channel>` is `blue`, `green` or `red`.
+Owner of the rules: [backend/README.md#composite](../../backend/README.md#composite) (Q-92, Q-94). Refusals: `composite:moving_object`, `composite:<channel>:no_frame`, `composite:<channel>:saturated`, `composite:<channel>:no_usable_frame`, `composite:too_few_bands`, `composite:saturated`, `composite:no_common_pass`, `composite:<channel>:stretch`, `composite:pixel_scale`, `cutout:<id>`, `cutout_unreadable:<id>` (the cached FITS of a chosen frame cannot be opened or has no `IMAGE` extension). Notes on a built image: `composite:<channel>:skipped:<reason>:<frame_id>`, `composite:no_proper_motion`, `composite:flags_unmasked:<id>`; `frames:truncated` and `cutouts:deferred:<n>` pass through. `<channel>` is `blue`, `green` or `red`.
 
 #### Gemini layer and baker (A6.2)
 
