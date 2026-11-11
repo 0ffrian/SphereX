@@ -10,6 +10,7 @@
 // the picture; they are not drawn on the colour composite (its own grid).
 // Keyboard (R9): Space or K play/pause, ←/→ step, Home/End first/last, while focus is in the
 // flipbook but not on a button or form field (those keep their own keys).
+import { displayName } from '@/app/displayName';
 import { useCallback, useLayoutEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import type { FramesResponse, ResolveResponse } from '@/app/api/types';
 import { DataBadge, EstimatedBadge, ProvenanceBadge } from '@/app/Badge';
@@ -126,7 +127,7 @@ export function Flipbook() {
 }
 
 function objectName(resolved: ResolveResponse): string {
-  return resolved.name ?? formatCoords(resolved.ra, resolved.dec);
+  return displayName(resolved.name) || formatCoords(resolved.ra, resolved.dec);
 }
 
 function ObjectHeader({

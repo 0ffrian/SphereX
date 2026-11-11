@@ -1,6 +1,7 @@
 // The panel that the active tool opens: the object panel (object info, the flipbook cutout and the
 // spectrum, as one scrolling card). 'sky' shows no panel; the 3D viewer is the build pane
 // (app/build/BuildPane.tsx, issue #60), not a floating card.
+import { displayName } from '@/app/displayName';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { Flipbook } from '@/app/flipbook/Flipbook';
 import { formatCoords } from '@/app/format';
@@ -83,7 +84,7 @@ function ObjectPanel() {
 
   const r = sky.resolved;
   const subtitle = r
-    ? (r.name ?? formatCoords(r.ra, r.dec))
+    ? (displayName(r.name) || formatCoords(r.ra, r.dec))
     : sky.query
       ? `Looking up ${sky.query.q}`
       : 'No object yet';
