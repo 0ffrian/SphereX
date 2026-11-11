@@ -174,6 +174,8 @@ def test_missing_code_pattern(code: str, ok: bool) -> None:
         ("2026-11-10T12:00:00+00:00", False),
         ("2026-11-10T12:00:00", False),
         ("2026-11-10 12:00:00Z", False),
+        ("2026-99-99T99:99:99Z", False),
+        ("2026-02-30T12:00:00Z", True),  # day range only; calendar validity is not checked
     ],
 )
 def test_time_pattern(value: str, ok: bool) -> None:
@@ -212,3 +214,13 @@ def test_settings_keep_integers_and_floats_apart() -> None:
     assert type(settings["k_detect"]) is float
     assert type(settings["area_version"]) is str
     assert not _def_validator("AreaSettings").is_valid({"flag": True})
+
+
+def test_checks_are_all_or_nothing_in_the_schema() -> None:
+    validator = _validator("checks")
+    ran = _load(AREA / "checks.json")
+    not_run = _load(AREA / "multivisit" / "checks.json")
+    assert validator.is_valid(ran) and validator.is_valid(not_run)
+    for part in ("test_mover", "completeness", "control", "linker"):
+        assert not validator.is_valid({k: v for k, v in ran.items() if k != part}), part
+        assert not validator.is_valid({**not_run, part: ran[part]}), part

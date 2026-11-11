@@ -209,7 +209,8 @@ def test_invalid_case_is_rejected_for_its_stated_reason(case: dict[str, Any]) ->
 def test_generated_models_enforce_all_but_the_provenance_rules(case: dict[str, Any]) -> None:
     """Pydantic drops the R3.1 if/then rules, so it alone cannot guard a live reply (Q-40)."""
     model = MODELS[case["schema"]]
-    if _is_provenance_rule(case):
+    # `dropped_by_models`: another schema-only rule (the area checks' all-or-nothing if/then).
+    if _is_provenance_rule(case) or case.get("dropped_by_models", False):
         model.model_validate(case["instance"])
     else:
         with pytest.raises(ValidationError):
