@@ -544,8 +544,36 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
       setAnnouncement(LEVEL_RAISED_ANNOUNCEMENT);
     }
   }, [waitForLevel, plan, paneSeq, honesty, setHonesty]);
+  // The prototype engines (star, world, rock) draw a generated surface: they mount only at "+ Artistic"
+  // (Atish's call on the PR #89 review). At "Measured only" and "+ Estimated" the three.js path draws.
+  const enginesShown = honesty === 'artistic';
+  const engineStar =
+    pane &&
+    enginesShown &&
+    plan?.threeD &&
+    card &&
+    !blocked &&
+    engineStarCard &&
+    starFailedId !== engineKey(card.id, engineStarCard.preset.id)
+      ? engineStarCard
+      : null;
+  const engineWorld =
+    pane &&
+    enginesShown &&
+    plan?.threeD &&
+    card &&
+    !blocked &&
+    engineWorldCard &&
+    worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
+      ? engineWorldCard
+      : null;
+  // Issue #93: the build steps wait for a world engine to compile and form the planet (`hold`). The key of the
+  // world it formed; the engine reports it through WorldGlobeStage's onFormed. A failed engine unmounts (the
+  // three.js path draws), so it holds nothing.
+  const [formedKey, setFormedKey] = useState<string | null>(null);
   const mould = useMould({
     wait: waitForLevel,
+    hold: engineWorld !== null && formedKey !== engineKey(card?.id, engineWorld.preset.id),
     viewer: inPane ? viewer : null,
     card,
     params,
@@ -629,29 +657,6 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // it (`cuClose`). The viewer and plan go to a small store the pane reads. The toggle next to Feel
   // hides or shows it.
   const closeKind = pane ? closeUpKindOf(params?.type) : null;
-  // The prototype engines (star, world, rock) draw a generated surface: they mount only at "+ Artistic"
-  // (Atish's call on the PR #89 review). At "Measured only" and "+ Estimated" the three.js path draws.
-  const enginesShown = honesty === 'artistic';
-  const engineStar =
-    pane &&
-    enginesShown &&
-    plan?.threeD &&
-    card &&
-    !blocked &&
-    engineStarCard &&
-    starFailedId !== engineKey(card.id, engineStarCard.preset.id)
-      ? engineStarCard
-      : null;
-  const engineWorld =
-    pane &&
-    enginesShown &&
-    plan?.threeD &&
-    card &&
-    !blocked &&
-    engineWorldCard &&
-    worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
-      ? engineWorldCard
-      : null;
   // D-37: while an engine draws the body the three.js viewer builds and draws nothing under it.
   const engineOwns = engineStar !== null || engineWorld !== null || (enginesShown && rockOwns);
   useEffect(() => {
@@ -875,6 +880,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
               onFail={() =>
                 useWorldStore.getState().fail(engineKey(card?.id, engineWorld.preset.id))
               }
+              onFormed={() => setFormedKey(engineKey(card?.id, engineWorld.preset.id))}
             />
           )}
           {!pane && params && plan?.threeD && (
