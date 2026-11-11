@@ -25,10 +25,11 @@
 // keyboard path, a 44 px target on touch, and an optional provenance `tag` shown as its badge (D-02).
 // A control that cannot work yet is passed with `disabled: true` and a `why` sentence: it is shown, off,
 // with the reason in its name, never hidden and never faked.
-import { useEffect, useId } from 'react';
+import { useEffect, useId, type ReactNode } from 'react';
 import { create } from 'zustand';
 import type { Tag } from '@/contract';
 import { ProvenanceBadge } from '@/app/Badge';
+import { Row } from '@/app/PanelControls';
 
 interface Base {
   id: string;
@@ -68,6 +69,12 @@ export interface ButtonControl extends Base {
 export interface ReadoutControl extends Base {
   kind: 'readout';
   value: string;
+  /**
+   * Where the Details pane shows it. 'key': the always-visible grid of key numbers. 'latest': the
+   * one-line "Latest flare" summary (its value is the long sentence, shown under "About this flare").
+   * 'assumed': a bullet in "Assumed values". Default: a row in "All numbers".
+   */
+  slot?: 'key' | 'latest' | 'assumed';
 }
 export type BuildControl =
   | SliderControl
@@ -218,10 +225,10 @@ function Control({ c }: { c: BuildControl }) {
   }
 }
 
-/** The region itself: rendered by the build pane's Details panel; nothing shows until something registers. */
+/** The region itself: the interactive controls, rendered by the build pane's Details panel; nothing shows until something registers. */
 export function BuildControls() {
   const specs = useBuildControlsStore((s) => s.specs);
-  const owners = Object.keys(specs);
+  const owners = Object.keys(specs).filter((o) => specs[o]!.controls.some((c) => c.kind !== 'readout'));
   if (owners.length === 0) return null;
   return (
     <div className="sx-bctl" data-testid="build-controls">
@@ -229,22 +236,125 @@ export function BuildControls() {
         const spec = specs[o]!;
         return (
           <section key={o} className="sx-bctl-group" aria-label={spec.title} data-owner={o}>
-            <h3>{spec.title}</h3>
-            {spec.controls.map((c) => (
-              <Control key={c.id} c={c} />
-            ))}
-            {spec.notes?.map((n) => (
-              <details key={n.title} className="sx-bctl-note">
-                <summary>{n.title}</summary>
-                {n.lines.map((l) => (
-                  <p key={l}>{l}</p>
-                ))}
-                {n.placeholder && <p className="sx-acc-rules">{n.placeholder}</p>}
-              </details>
-            ))}
+            {spec.controls
+              .filter((c) => c.kind !== 'readout')
+              .map((c) => (
+                <Control key={c.id} c={c} />
+              ))}
           </section>
         );
       })}
     </div>
+  );
+}
+
+function readoutsOf(specs: Record<string, BuildControlsSpec>): ReadoutControl[] {
+  return Object.values(specs).flatMap((s) => s.controls.filter((c): c is ReadoutControl => c.kind === 'readout'));
+}
+
+/** Notes that are explanations of method are not shown; the rest become "Assumed values" lines. */
+const isMethodNote = (title: string): boolean => /^How /.test(title);
+
+/** The "Latest flare" line and the compact key-number grid: a few numbers, no prose. */
+export function BuildKeyNumbers({ fixture }: { fixture?: boolean }) {
+  const specs = useBuildControlsStore((s) => s.specs);
+  const all = readoutsOf(specs);
+  const latest = all.find((r) => r.slot === 'latest');
+  const keys = all.filter((r) => r.slot === 'key');
+  if (!latest && keys.length === 0) return null;
+  const text = latest?.value ?? null;
+  const cls = text?.match(/Class (\w+\.?\d*)/)?.[1] ?? null;
+  const outcome = text ? (/stays closed/.test(text) ? 'stayed closed' : /erupt/.test(text) ? 'erupted' : null) : null;
+  return (
+    <>
+      {latest && (
+        <div className="sx-flare" data-testid="latest-flare" aria-live="polite">
+          {cls ? (
+            <span>
+              Latest flare: <b>{cls}{outcome ? `, ${outcome}` : ''}</b>
+            </span>
+          ) : (
+            <span>{text}</span>
+          )}
+          {latest.tag && <ProvenanceBadge tag={latest.tag} fixture={fixture} variant="tag" />}
+        </div>
+      )}
+      {keys.length > 0 && (
+        <dl
+          className="m-0 grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 text-[13px]"
+          data-testid="key-numbers"
+        >
+          {keys.map((r) => (
+            <div key={r.id} className="contents">
+              <dt style={{ color: 'var(--muted)' }}>{r.label}</dt>
+              <dd className="m-0 flex items-center justify-end gap-2 tabular-nums">
+                {r.value}
+                {r.tag && <ProvenanceBadge tag={r.tag} fixture={fixture} variant="tag" />}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </>
+  );
+}
+
+/**
+ * The closed rows under the key numbers, to sit inside the pane's `<Rows>`: "About this flare" (the sentence, then
+ * `flareChart`), "All numbers" and "Assumed values" (the build notes and `extraAssumed`, as short lines).
+ */
+export function BuildSummaryRows({
+  extraAssumed = [],
+  flareChart,
+  fixture,
+}: {
+  extraAssumed?: string[];
+  flareChart?: ReactNode;
+  fixture?: boolean;
+}) {
+  const specs = useBuildControlsStore((s) => s.specs);
+  const all = readoutsOf(specs);
+  const latest = all.find((r) => r.slot === 'latest');
+  const rest = all.filter((r) => !r.slot);
+  const lines = [
+    ...all.filter((r) => r.slot === 'assumed').map((r) => `${r.label}: ${r.value}`),
+    ...Object.values(specs).flatMap((s) =>
+      (s.notes ?? []).filter((n) => !isMethodNote(n.title)).flatMap((n) => n.lines),
+    ),
+    ...extraAssumed,
+  ];
+  return (
+    <>
+      {(latest || flareChart) && (
+        <Row title="About this flare" defaultOpen>
+          {latest && <p className="text-sm">{latest.value}</p>}
+          {flareChart}
+        </Row>
+      )}
+      {rest.length > 0 && (
+        <Row title="All numbers" count={rest.length} testId="all-numbers-row">
+          <dl className="m-0 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 text-[13px]">
+            {rest.map((r) => (
+              <div key={r.id} className="contents">
+                <dt style={{ color: 'var(--muted)' }}>{r.label}</dt>
+                <dd className="m-0 flex items-center justify-end gap-2 text-right tabular-nums">
+                  {r.value}
+                  {r.tag && <ProvenanceBadge tag={r.tag} fixture={fixture} variant="tag" />}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </Row>
+      )}
+      {lines.length > 0 && (
+        <Row title="Assumed values" count={lines.length} testId="assumed-row">
+          <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[13px]" style={{ color: 'var(--muted)' }}>
+            {lines.map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+        </Row>
+      )}
+    </>
   );
 }
