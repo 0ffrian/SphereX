@@ -45,3 +45,13 @@ export const LOADER_BASE: GridLoaderProps = {
   gap: 1,
   className: 'flex-none',
 };
+
+/** While the sky view moves (pan or zoom): the island's "Updating" pill. A presentation cue. */
+export const UPDATING_LOOK: GridLoaderProps = {
+  pattern: 'frame',
+  mode: 'stagger',
+  color: 'green',
+  blur: 1,
+  gap: 1,
+  size: 'sm',
+};

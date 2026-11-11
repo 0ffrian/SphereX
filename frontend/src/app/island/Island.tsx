@@ -10,7 +10,8 @@ import { useAppStore } from '@/state/store';
 import { useShellStore } from '@/app/shell/shellStore';
 import { useElapsedSeconds } from '@/app/StatusBoxes';
 import GridLoader from './GridLoader';
-import { IDLE_LOOK, LOADER_BASE, SEARCHING_LOOK } from './loaderLooks';
+import { IDLE_LOOK, LOADER_BASE, SEARCHING_LOOK, UPDATING_LOOK } from './loaderLooks';
+import { subscribeMotion } from '@/app/sky/skyMotion';
 import { isThinking } from './islandText';
 import { useIslandStore } from './islandStore';
 
@@ -47,6 +48,22 @@ export function Island() {
   // with nothing loading just shows, and the island stays at the top.
   const inPanel = panelBox !== null && travels;
   const thinking = panelBox === null && isThinking(sky.status);
+  // While the sky view moves, the island shows "Updating" for a moment (a cue only; nothing loads).
+  const [moving, setMoving] = useState(false);
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const off = subscribeMotion(() => {
+      setMoving(true);
+      clearTimeout(t);
+      t = setTimeout(() => setMoving(false), 900);
+    });
+    return () => {
+      off();
+      clearTimeout(t);
+    };
+  }, []);
+  const updating = !thinking && moving && panelBox === null;
+  const pillOn = thinking || updating;
   const panelTool = useShellStore((s) => s.tool === 'flipbook' || s.tool === 'spectrum');
   useEffect(() => {
     // Thinking starts a trip. It ends when the panel is closed, or when the search ended with no
@@ -116,9 +133,9 @@ export function Island() {
 
   // The pill's natural size for its text (the inner box sizes to its content, at most 340 px).
   useLayoutEffect(() => {
-    if (!thinking || !inRef.current) return;
+    if (!pillOn || !inRef.current) return;
     setPill({ w: inRef.current.offsetWidth, h: inRef.current.offsetHeight });
-  }, [thinking, word]);
+  }, [pillOn, word, updating]);
 
   // The panel shows once the island has got there.
   useEffect(() => {
@@ -133,7 +150,7 @@ export function Island() {
 
   let box: { left: number; top: number; width: number; height: number; radius: number };
   if (panelBox) box = { ...panelBox, radius: 10 };
-  else if (corner && thinking)
+  else if (corner && pillOn)
     box = {
       left: bezelW - pill.w - 16,
       top: bezelH - pill.h - 16,
@@ -149,7 +166,7 @@ export function Island() {
       height: CIRCLE,
       radius: CIRCLE / 2,
     };
-  else if (thinking)
+  else if (pillOn)
     box = {
       left: (bezelW - pill.w) / 2,
       top,
@@ -166,7 +183,7 @@ export function Island() {
       radius: CIRCLE / 2,
     };
 
-  const mode = inPanel ? 'panel' : thinking ? 'thinking' : 'idle';
+  const mode = inPanel ? 'panel' : pillOn ? 'thinking' : 'idle';
   return (
     <div
       ref={wrapRef}
@@ -194,6 +211,8 @@ export function Island() {
           <span aria-hidden="true" className="contents">
             {thinking ? (
               <GridLoader {...SEARCHING_LOOK} className="flex-none" />
+            ) : updating && !reduced ? (
+              <GridLoader {...UPDATING_LOOK} className="flex-none" />
             ) : (
               <GridLoader {...LOADER_BASE} {...IDLE_LOOK} />
             )}
@@ -201,6 +220,12 @@ export function Island() {
           {thinking && (
             <span className="sx-orb-word" role="status" data-testid="loading">
               {word}
+            </span>
+          )}
+          {/* A visual cue while the view moves; not announced (nothing is loading). */}
+          {updating && (
+            <span className="sx-orb-word" aria-hidden="true" data-testid="island-updating">
+              Updating
             </span>
           )}
         </div>
