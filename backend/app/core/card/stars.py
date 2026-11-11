@@ -53,7 +53,9 @@ GAIA_DOCS_NOTE = (
 MSC_ASSUMPTION = (
     "Gaia's Multiple Star Classifier fits the BP/RP spectrum with an unresolved binary model and "
     "reports the primary's Teff: this assumes the source is a binary, which has not been "
-    "established for this star. The spectrum is a mean over the 34 months of Gaia DR3 "
+    "established for this star. For cool stars (below about 3500 K) molecular absorption "
+    "(TiO, VO) dominates the BP/RP spectrum and the fit can be biased. The spectrum is a mean "
+    "over the 34 months of Gaia DR3 "
     "observations{mira}, and the 16th to 84th percentile range is the only uncertainty given"
 )
 MSC_MIRA_NOTE = (
