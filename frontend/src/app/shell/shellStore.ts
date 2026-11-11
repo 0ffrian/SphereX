@@ -1,6 +1,6 @@
 // Shell UI state: which tool of the left rail is open, the selected body's card (issue #60) and
 // the build pane (issue #60). 'sky' is the sky view alone (no panel); 'flipbook' and 'spectrum'
-// open the object panel at that section; 'area' is the Discovery tool (draw a square on the sky); 'viewer' is the build pane opened from the rail.
+// open the object panel at that section; 'area' is the Discovery tool (draw an area on the sky); 'viewer' is the build pane opened from the rail.
 import { create } from 'zustand';
 
 export type ToolId = 'sky' | 'flipbook' | 'spectrum' | 'viewer' | 'area';

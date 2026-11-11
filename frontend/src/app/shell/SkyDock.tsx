@@ -17,13 +17,13 @@ const TOOLS: { id: 'known' | 'area'; flow: AreaFlow; label: string; hint: string
     id: 'known',
     flow: 'known',
     label: 'Known objects',
-    hint: 'Draw a square on the sky and follow the asteroids and comets on file in it',
+    hint: 'Draw an area on the sky and follow the asteroids and comets on file in it',
   },
   {
     id: 'area',
     flow: 'discovery',
     label: 'Discovery',
-    hint: 'Draw a square on the sky and look for dots that move and match nothing on file',
+    hint: 'Draw an area on the sky and look for dots that move and match nothing on file',
   },
 ];
 

@@ -1,5 +1,5 @@
 // Known objects: the right-side card after the island's search (mock-up `openKnownCard`).
-// DEMO DATA (areaService.knownObjectsIn): the same one object for any square.
+// DEMO DATA (areaService.knownObjectsIn): the same one object for any area.
 import { PanelCard } from '@/app/shell/PanelCard';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
@@ -11,7 +11,7 @@ export function KnownList() {
   return (
     <PanelCard
       title="Known objects"
-      subtitle="In this square"
+      subtitle="In this area"
       icon="area"
       onClose={closePanel}
       returnFocusTo='[data-testid="tool-known"]'

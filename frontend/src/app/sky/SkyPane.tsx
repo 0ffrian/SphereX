@@ -64,7 +64,7 @@ import { useShellStore } from '@/app/shell/shellStore';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { AreaOverlay } from './AreaOverlay';
 import { AreaTrackLayer } from '@/app/area/AreaTrackLayer';
-import { boxFromPixels, registerAreaView, squareOf } from './areaDraw';
+import { boxFromPixels, registerAreaView, rectOf } from './areaDraw';
 import { useCachedMarkers } from './useCachedMarkers';
 import { useTargetMarkers, type TargetMarker } from './useTargetMarkers';
 
@@ -524,7 +524,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     let pinchMid = { x: 0, y: 0 };
     let hover: { x: number; y: number } | null = null;
     let readoutFrame: number | null = null;
-    // Discovery tool: a drag draws a square instead of panning.
+    // Discovery tool: a drag draws a rectangle instead of panning.
     registerAreaView(view, (c) => {
       flyCancel.current?.();
       flyCancel.current = c;
@@ -591,7 +591,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     const onMove = (e: PointerEvent) => {
       const p = local(e);
       if (drawing && drawing.id === e.pointerId) {
-        useAreaStore.getState().setDrag(squareOf(drawing.x, drawing.y, p.x, p.y));
+        useAreaStore.getState().setDrag(rectOf(drawing.x, drawing.y, p.x, p.y));
         return;
       }
       const prev = pointers.get(e.pointerId);
@@ -625,9 +625,9 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     const onUp = (e: PointerEvent) => {
       if (drawing && drawing.id === e.pointerId) {
         const p = local(e);
-        const d = squareOf(drawing.x, drawing.y, p.x, p.y);
+        const d = rectOf(drawing.x, drawing.y, p.x, p.y);
         drawing = null;
-        const box = e.type === 'pointerup' && Math.abs(d.x1 - d.x0) >= 12 ? boxFromPixels(d) : null;
+        const box = e.type === 'pointerup' && Math.abs(d.x1 - d.x0) >= 12 && Math.abs(d.y1 - d.y0) >= 12 ? boxFromPixels(d) : null;
         if (box) useAreaStore.getState().setBox(box);
         else useAreaStore.getState().setDrag(null);
         return;

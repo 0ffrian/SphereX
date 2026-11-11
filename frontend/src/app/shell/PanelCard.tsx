@@ -2,6 +2,7 @@
 // non-modal region over the sky. Escape (from inside the card) closes it and returns focus to the
 // tool button that opens it. On phone width it is a bottom sheet (index.css).
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode, type Ref } from 'react';
+import { useIslandStore } from '@/app/island/islandStore';
 import { Icon, type IconName } from './icons';
 
 export function PanelCard({
@@ -38,6 +39,10 @@ export function PanelCard({
   testId: string;
   children: ReactNode | ((close: () => void) => ReactNode);
 }) {
+  // The area cards (Known objects, Discovery) are travelled to by the island like the object panel:
+  // laid out and measured at once, shown once it has arrived (AreaCard reports the box).
+  const islandPending = useIslandStore((s) => testId === 'area-card' && s.travels && !s.arrived);
+  pending = pending || islandPending;
   const titleId = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
   const rootEl = useRef<HTMLElement | null>(null);

@@ -3,21 +3,19 @@
 // found. The dots and movers draw inside the square on the sky (AreaTrackLayer). DEMO DATA: the
 // steps, counts and movers come from areaService.discoverIn and are not a search of the square.
 import GridLoader from '@/app/island/GridLoader';
+import { FETCHING_LOOK, SEARCHING_LOOK } from '@/app/island/loaderLooks';
 import { PanelCard } from '@/app/shell/PanelCard';
-import { formatAreaSize, useAreaStore } from '@/app/shell/areaStore';
+import { formatAreaDims, useAreaStore } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
 import { DemoTag } from './DemoTag';
 import { ErosCard, MoverDemoCard } from './ErosCard';
 
-const STEP_LOADER = {
-  size: 14,
-  gap: 1,
-  rounded: true,
-  color: 'green',
-  mode: 'pulse',
-  pattern: 'plus-hollow',
-  speed: 'fast',
-} as const;
+/** smoothui's demo looks (loaderLooks.ts) at the row's size; the current step shows one of them. */
+const ROW_SIZE = 19;
+const SEARCH_ROW = { ...SEARCHING_LOOK, size: ROW_SIZE };
+const THINK_ROW = { ...FETCHING_LOOK, size: ROW_SIZE };
+const stepLook = (label: string) =>
+  label.startsWith('Drop') ? THINK_ROW : SEARCH_ROW;
 
 export function DiscoveryCard() {
   const disc = useAreaStore((s) => s.disc);
@@ -39,7 +37,7 @@ export function DiscoveryCard() {
   return (
     <PanelCard
       title="Discovery"
-      subtitle={box ? `Area · ${formatAreaSize(box.widthDeg)}` : 'Area'}
+      subtitle={box ? `Area · ${formatAreaDims(box)}` : 'Area'}
       icon="area"
       onClose={closePanel}
       returnFocusTo='[data-testid="tool-area"]'
@@ -51,7 +49,12 @@ export function DiscoveryCard() {
       <p className="sr-only" role="status" aria-live="polite">
         {announce}
       </p>
-      {total === 0 && <p className="fb-muted">Loading the demo…</p>}
+      {total === 0 && (
+        <div className="fb-muted sx-ar-wait">
+          <GridLoader {...SEARCH_ROW} />
+          Loading the demo…
+        </div>
+      )}
       <ol className="sx-ar-steps" data-testid="disc-steps">
         {steps.map((s, k) => {
           const on = k <= step;
@@ -60,7 +63,7 @@ export function DiscoveryCard() {
             <li key={s.label} data-state={on ? 'on' : now ? 'now' : undefined}>
               <i aria-hidden="true">
                 {now ? (
-                  <GridLoader {...STEP_LOADER} />
+                  <GridLoader {...stepLook(s.label)} />
                 ) : (
                   <svg viewBox="0 0 24 24">
                     <path d="M5 12.5l4.5 4.5L19 7.5" />
