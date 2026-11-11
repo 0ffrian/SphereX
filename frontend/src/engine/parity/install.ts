@@ -1,12 +1,19 @@
 // Issue #71, parity/CONTRACT.md C: one `window.__sxEngine` for the three engines (worlds, stars and flares, rocks),
 // routed by the case's `kind`. Dev only, on ?parity=1; never part of a production build.
+import '@/engine/parity/hook'; // sets __sxEngine for kind 'world'
+import { installParityHook as installStarParity } from '@/engine/stars/parityHook';
 import { installRockParity } from '@/engine/rocks/parity';
 
-export async function installParity(): Promise<void> {
+// The harness polls for `window.__sxEngine.parity` and takes the first thing it finds. The world hook
+// sets it when its module runs, so every hook is imported statically (the whole graph runs in one task,
+// with no await between the world hook and the router) instead of one dynamic import after another,
+// which left a gap where the harness got the world-only hook and rock cases failed with "this host only
+// runs world cases".
+
+export function installParity(): void {
   const w = window as any;
-  await import('@/engine/parity/hook'); // sets __sxEngine for kind 'world'
   const world = w.__sxEngine;
-  (await import('@/engine/stars/parityHook')).installParityHook(); // replaces it with kind 'star' / 'flare'
+  installStarParity(); // replaces it with kind 'star' / 'flare'
   const star = w.__sxEngine;
   let cur: any = world;
   w.__sxEngine = {
