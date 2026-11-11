@@ -139,7 +139,7 @@
           "id": "colour",
           "label": "Colour",
           "points": 5.0,
-          "tag": "derived",
+          "tag": "model_dependent",
           "weight": 10
         },
         {
