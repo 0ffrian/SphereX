@@ -10,7 +10,8 @@ import {
   beltLatitude,
   cellsForScale,
   convectionFraction,
-  convectiveTurnoverDays,
+  luminosityLsun,
+  turnoverTimeDays,
   discRadiusFromArea,
   granuleVisibility,
   meanFieldG,
@@ -51,10 +52,11 @@ describe('the Sun', () => {
     expect(m.cellsPerRadius).toBeGreaterThan(500);
   });
   it('Rossby number, field and coverage', () => {
-    expect(convectiveTurnoverDays(1)).toBeCloseTo(Math.pow(10, 1.16), 6); // log tau_c = 1.16 at 1 Msun
-    expect(m.rossby).toBeCloseTo(25.4 / 14.45, 1);
-    expect(m.fieldG).toBeGreaterThan(80); // a few tens of gauss to ~100 G for the Sun
-    expect(m.fieldG).toBeLessThan(120);
+    // #93 3.4: Reiners et al. 2022 define tau_c = 12.3 d (L/Lsun)^-1/2; the Sun (L = 1) has 12.3 d.
+    expect(turnoverTimeDays(1, 5772)).toBeCloseTo(12.3, 9);
+    expect(m.rossby).toBeCloseTo(25.4 / 12.3, 6);
+    expect(m.fieldG).toBeGreaterThan(70); // 199 Ro^-1.26 at Ro 2.07: about 80 G
+    expect(m.fieldG).toBeLessThan(90);
     expect(m.coverage).toBeCloseTo(SUN_COVERAGE, 6); // the anchor
     expect(m.nGroupsReal).toBeCloseTo(SUN_COVERAGE / GROUP_AREA_MEAN, 6);
   });
@@ -65,6 +67,21 @@ describe('the Sun', () => {
     }
     expect(m.tags.coverage!.tag).toBe('inferred_from_analog');
     expect(m.tags.coverage!.assumption).toMatch(/PLACEHOLDER/);
+  });
+});
+
+describe('#93 3.4 turnover time (Reiners et al. 2022)', () => {
+  it('Barnard’s Star (0.1867 Rsun, 3195 K; about 0.0035 Lsun) has tau_c near 208 d', () => {
+    // Known answer (issue #93): 208 d with the Reiners law against 101 d with the Wright et al. 2011 mass fit.
+    const L = luminosityLsun(0.1867, 3195);
+    expect(L).toBeGreaterThan(0.003);
+    expect(L).toBeLessThan(0.0037);
+    const tau = turnoverTimeDays(0.1867, 3195);
+    expect(tau).toBeGreaterThan(200);
+    expect(tau).toBeLessThan(216);
+  });
+  it('scales as L^-1/2', () => {
+    expect(turnoverTimeDays(2, 5772) / turnoverTimeDays(1, 5772)).toBeCloseTo(0.5, 9);
   });
 });
 

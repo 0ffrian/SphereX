@@ -5,7 +5,7 @@
 // Source: .claude/worktrees/sculptor-reference/sculptor-preview-next.html, lines 357-662 (Planck colour, star shader FS, star model, tauC, drawStar).
 // Not yet imported by the app: it still needs the TypeScript host (DOM removed, `cardToStar`). Do not edit here;
 // re-run the slicing instead so the body stays byte-identical to the prototype.
-// Deliberate deviations from the prototype (PR #89 review, Atish's call), declared as the last four @rename pairs:
+// Deliberate deviations from the prototype (PR #89 review, Atish's call), declared as the last @rename pairs (four from PR #89, three from #93):
 //  1. Limb darkening: the prototype's T^4 ~ 0.4 + 0.6 mu pinned the disc centre at Teff (the star drawn as if at
 //     0.946 Teff). Now the Eddington approximation T^4 = 3/4 Teff^4 (mu + 2/3), so T = Teff at mu = 2/3 and the
 //     centre is 1.25^(1/4) = 1.0574 Teff; the brightness pow(tl/uTeff, beta) is divided by 1.0574^beta so the
@@ -18,10 +18,17 @@
 //     the fit coefficients are [verify].
 //  3. X10 flare readout: the prototype's "about every 300 f_sun/f days" is 2.5 to 3 times too frequent for the
 //     Sun (GOES since 1976: about one flare >= X10 per 800 to 1,000 days). Now 900 f_sun/f days. inferred_from_analog.
+//  4. (#93 3.4) Convective turnover time: the prototype's tauC(M) is the Wright et al. 2011 mass fit, but the field
+//     law it feeds (199 Ro^-1.26, 2050 Ro^-0.11) is Reiners et al. 2022 (A&A 662, A41), whose Rossby number uses
+//     tau = 12.3 d (L/Lsun)^-1/2. tauC now takes the star (tauC(p.M) => tauC(p)) and returns 12.3 / sqrt(L), with
+//     L = R^2 (T / 5772 K)^4 (Stefan-Boltzmann, IAU 2015 B3 nominal solar Teff); the old body is left unreachable.
+//     The solar anchor B_SUN uses the same tau (12.3 d, so Ro_sun = 25.4 / 12.3 = 2.07, field 80 G; was 1.76 and
+//     98 G); spot coverage is relative to B_SUN, so the Sun's coverage is unchanged. Barnard's Star (about
+//     0.0035 Lsun): tau about 208 d (was 101 d). Same law as physics/stellar.ts turnoverTimeDays. model_dependent.
 // Not changed but labelled: the granulation contrast (+-12 % in temperature, `(gran-.5)*.24`) is 2 to 3 times the
 // observed one, exaggerated so the cells show at this scale: artistic.
 // @verbatim L358-L663
-// @rename m.best=>(CLOSE_AT||m.best) (ema=>(!window.__sxPin&&ema pow(.4+.6*mu,.25)=>pow(.75*mu+.5,.25) pow(tl/uTeff,uBeta)=>pow(tl/uTeff/1.0574,uBeta) tt=mix(1.,.885+.05*fil,mpn);tt=mix(tt,.68,um);=>tt=mix(1.,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff*(.36-.16*fil),mpn);tt=mix(tt,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff,um); m.f;=>m.f*3;
+// @rename m.best=>(CLOSE_AT||m.best) (ema=>(!window.__sxPin&&ema pow(.4+.6*mu,.25)=>pow(.75*mu+.5,.25) pow(tl/uTeff,uBeta)=>pow(tl/uTeff/1.0574,uBeta) tt=mix(1.,.885+.05*fil,mpn);tt=mix(tt,.68,um);=>tt=mix(1.,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff*(.36-.16*fil),mpn);tt=mix(tt,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff,um); m.f;=>m.f*3; tauC(p.M)=>tauC(p) Math.log10(M);=>0;return(12.3/Math.sqrt(M.R*M.R*Math.pow(M.T/5772,4))); 1.16),=>1.16)*Math.pow(10,1.16)/12.3,
 /* ---------- Planck spectrum to colour ---------- */
 function g(l, m, s1, s2) {
   var s = l < m ? s1 : s2,
@@ -332,11 +339,11 @@ var BIG = 30,
   };
 var ROT_MIN = Math.log(0.3),
   ROT_MAX = Math.log(600);
-var B_SUN = 199 * Math.pow(25.4 / Math.pow(10, 1.16), -1.26),
+var B_SUN = 199 * Math.pow(25.4 / Math.pow(10, 1.16)*Math.pow(10,1.16)/12.3, -1.26),
   F_SUN = 0.0015,
   MEAN_A = 7.5e-5 * Math.exp(0.5);
 function tauC(M) {
-  var l = Math.log10(M);
+  var l = 0;return(12.3/Math.sqrt(M.R*M.R*Math.pow(M.T/5772,4)));
   return Math.pow(10, 1.16 - 1.49 * l - 0.54 * l * l);
 }
 function model() {
@@ -351,7 +358,7 @@ function model() {
     B = null,
     f = 0;
   if (p.dwarf && conv > 0.05) {
-    Ro = ST.P / tauC(p.M);
+    Ro = ST.P / tauC(p);
     B = Ro < 0.13 ? 2050 * Math.pow(Ro, -0.11) : 199 * Math.pow(Ro, -1.26);
     f = Math.min(0.25, F_SUN * Math.pow(B / B_SUN, 1.6)) * conv;
   }

@@ -155,8 +155,7 @@ const MK_TOP_K = 373.15;
  * measurements). The engine's core.js psatMK is the same function.
  */
 export function psatWater(T: number): number {
-  if (T < 273.16)
-    return Math.exp(9.550426 - 5723.265 / T + 3.53068 * Math.log(T) - 0.00728332 * T);
+  if (T < 273.16) return Math.exp(9.550426 - 5723.265 / T + 3.53068 * Math.log(T) - 0.00728332 * T);
   const t = Math.min(T, MK_TOP_K);
   const p = Math.exp(
     54.842763 -
@@ -166,9 +165,7 @@ export function psatWater(T: number): number {
       Math.tanh(0.0415 * (t - 218.8)) *
         (53.878 - 1331.22 / t - 9.44523 * Math.log(t) + 0.014025 * t),
   );
-  return T > MK_TOP_K
-    ? p * Math.exp((FLUIDS.water.L / R_GAS) * (1 / MK_TOP_K - 1 / T))
-    : p;
+  return T > MK_TOP_K ? p * Math.exp((FLUIDS.water.L / R_GAS) * (1 / MK_TOP_K - 1 / T)) : p;
 }
 
 /**
