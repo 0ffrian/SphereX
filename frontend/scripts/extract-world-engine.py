@@ -11,6 +11,11 @@ PR #89 review: the committed engine files now carry reviewed physics fixes, mark
 (with `@rename` pairs or split `@verbatim` blocks) that this script does not reproduce. It refuses to
 overwrite a file holding a `@deviation` unless --force is given; port those deviations into SUBS (or
 into the prototype) before regenerating, or the fixes are lost.
+
+Issue #93 (phase 1, the first-open freeze and performance): its deviations ARE ported here (the DEV93_* texts, the
+split WorldGL slices and their SUBS), with the PR #89 renames of the same slices (shaders.js, WorldGL). Still not
+ported from PR #89: the L1701-L1726 and L1728-L1765 renames with the L1727 split, the gas.js renames, and core.js's
+header lines 4-5.
 """
 import sys, os, re
 
@@ -61,15 +66,103 @@ def w(name, text):
         f.write(text)
 
 
+# ---- issue #93 deviations (texts copied from the committed engine files) ----
+DEV93_HELPERS = r'''// @deviation (#93 1.2) compile() above reads the compile and link status straight away, so the main thread waits for
+// the driver (about 60 s for FLY_FS on a cold ANGLE D3D11 cache). The engine now submits with compileStart (compile,
+// attach, link, no status read), polls compileDone (KHR_parallel_shader_compile's COMPLETION_STATUS_KHR; without the
+// extension it reports done at once, so the next step blocks as compile() did) and reads the result with compileEnd,
+// which throws the shader or link log exactly as compile() did.
+function compileStart(gl, vs, fs) {
+  var p = gl.createProgram(), sv = gl.createShader(gl.VERTEX_SHADER), sf = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(sv, vs); gl.compileShader(sv); gl.shaderSource(sf, fs); gl.compileShader(sf);
+  gl.attachShader(p, sv); gl.attachShader(p, sf); gl.linkProgram(p);
+  return { p: p, vs: sv, fs: sf };
+}
+function compileDone(gl, job, ext) { return !ext || !!gl.getProgramParameter(job.p, ext.COMPLETION_STATUS_KHR); }
+function compileEnd(gl, job) {
+  if (!gl.getProgramParameter(job.p, gl.LINK_STATUS)) {
+    var s = [job.vs, job.fs].filter(function (o) { return !gl.getShaderParameter(o, gl.COMPILE_STATUS); })[0];
+    throw new Error(s ? gl.getShaderInfoLog(s) : gl.getProgramInfoLog(job.p));
+  }
+  return job.p;
+}'''
+DEV_SHADERS_TOP = r'''// @deviation (#89 review 1) the rename below: the fly view's cloud deck sat at a fixed 3 km (x the relief
+// exaggeration) while the readout gave the model's cloud base; it now reads uCloudKm, which core.js sets from m.zc.
+// @deviation (#93 1.4) the second and third renames below: the fly view's pixel footprint FP (which fades the noise
+// octaves finer than a pixel) divided by uR.y, the drawing-buffer height, which the resolution scaler changes on slow
+// frames, so the ground texture changed while flying. FP now uses the full-resolution height (uR.y / uScale; core.js
+// sets uScale to the scaler's factor), so a resolution change alters sharpness only, not the pattern.'''
+DEV93_SHADERS = r'''// @deviation (#93 1.1) on ANGLE D3D11 (Chrome's default on Windows) fxc unrolls every loop with a constant bound, and
+// FLY_FS took about 62 s to compile on a cold cache (WORLD_FS 6 to 8 s). Each constant bound N in WORLD_FS and FLY_FS
+// (11 loops in FLY_FS, 3 in WORLD_FS, NOISE's fbm and ridge included) becomes N+uZ0, with uZ0 a uniform that is never
+// set (always 0): the loops run exactly as before, but fxc keeps them as loops. Loops that leave early with break are
+// unchanged by it. ADV_FS and GAS_FS compile quickly and keep their source. Measured: see frontend/scripts/engine-bench.
+function noUnroll(src) {
+  return src.replace('precision highp float;', 'precision highp float;\nuniform int uZ0;')
+    .replace(/(for\(int [ijk]=-?\d+;[ijk])(<=?)(\d+|n);/g, function (m, a, op, b) { return a + op + b + '+uZ0;'; });
+}
+WORLD_FS = noUnroll(WORLD_FS); FLY_FS = noUnroll(FLY_FS);'''
+DEV93_ROLE = r'''// @deviation (#93 1.3, 1.6, 1.7) which view this instance draws: 'globe' never flies, 'fly' shows only the fly view.
+var role = (opt && opt.role) || 'both';'''
+DEV89_WORLDGL = r'''// @deviation (#89 review 1, 3) the renames in the WorldGL blocks below (L2267-L2301 and L2317-L2338; the prototype's own
+//   (ema one now sits in the #93 1.7 lines):
+//   Saturn's rings: Encke Gap centre 2.214 -> 2.2165 R_S (133,584 km) and half-width 0.005 -> 0.0027 R_S (about 160 km;
+//   the gap is about 325 km wide); F ring half-width 0.004 -> 0.0012 R_S (the ring is tens of km wide; 0.0012 still
+//   catches the one texel at 2.326, so it stays visible). Radii: PDS Ring-Moon Systems Node, Saturn ring table [verify].
+//   Fly view cloud deck: uCloudKm (declared in FLY_FS, never set from the model) now carries the model's cloud base
+//   m.zc, at least 0.3 km so it never sits in the ground; 3.5 km only when nothing condenses (no deck is drawn then).'''
+DEV93_COMPILE = r'''// @deviation (#93 1.2, 1.3) the prototype compiled its four programs here with compile(), which waits for the driver
+// (about 60 s for FLY_FS on a cold ANGLE D3D11 cache), and read their uniforms at once. They are now only submitted:
+// poll() says when the driver has finished (KHR_parallel_shader_compile) and link() reads the result, throwing the
+// compile or link log as compile() did, and then the uniforms. The draw and step methods call link() first (see the
+// end of createCore), so no uniform is read before its program is linked. FLY_FS is compiled only where the fly view
+// can be drawn (role 'fly', or the prototype's 'both'); a globe-only engine submits it the first time it flies.
+  var pex = gl.getExtension('KHR_parallel_shader_compile'), jobs = { A: compileStart(gl, FULL, ADV_FS), G: compileStart(gl, FULL, GAS_FS), W: compileStart(gl, FULL, WORLD_FS), F: role === 'globe' ? null : compileStart(gl, FULL, FLY_FS) }, pA, pG, pW, pF, uA, uG, uW, uF;
+  function link() {
+    if (!pA) { var a = compileEnd(gl, jobs.A), g2 = compileEnd(gl, jobs.G), w2 = compileEnd(gl, jobs.W); uA = unis(gl, a); uG = unis(gl, g2); uW = unis(gl, w2); pA = a; pG = g2; pW = w2; }
+    if (!pF && jobs.F) { var f2 = compileEnd(gl, jobs.F); uF = unis(gl, f2); pF = f2; }
+  }
+  this.poll = function () { for (var k in jobs) if (jobs[k] && !compileDone(gl, jobs[k], pex)) return false; link(); return true; };
+  this.link = function (fly) { if (fly && !jobs.F) jobs.F = compileStart(gl, FULL, FLY_FS); link(); };
+  this.programs = function () { return Object.keys(jobs).filter(function (k) { return !!jobs[k]; }).length; };'''
+DEV93_SCALER = r'''// @deviation (#93 1.7) the resolution scaler aims at 30 fps: it shrinks above 34 ms (was 42) and grows below 22 ms (was
+// 19). A gap over 250 ms is a pause between redraws of a still world, not a frame time, and is not counted (it used to
+// shrink the picture on every redraw after a pause). The pixel ratio is capped at 1.0 for the fly engine and 1.25 for
+// the globe engine; role 'both' (the prototype, parity) keeps 1.5. The scale also goes to FLY_FS as uScale (#93 1.4).
+// window.__sxPin still pins the scale for parity (PR #89's rename of these two lines, carried over by hand).
+    var now = performance.now(); if (last && now - last < 250) { ema = ema * 0.92 + (now - last) * 0.08; if (!window.__sxPin && ema > 34 && scale > 0.45) { scale *= 0.94; ema = 30; } else if (!window.__sxPin && ema < 22 && scale < 1) scale = Math.min(1, scale * 1.01); } last = now;
+    var d = Math.min(devicePixelRatio || 1, role === 'fly' ? 1 : role === 'globe' ? 1.25 : 1.5) * scale, w = Math.round(canvas.clientWidth * d), h = Math.round(canvas.clientHeight * d); if (!w || !h) return;'''
+DEV93_SKIP_GLOBE = r'''// @deviation (#93 1.6) the fly engine's canvas is 1.67 times its pane wide, so the globe beside the fly view is never
+// seen there and is not ray-marched. W.view (next line) is still set: flyAimPeak, flyAimDefault and globePick read it.
+// The first rename below (#93 1.4) passes the resolution scale to FLY_FS as uScale; the second is PR #89's.
+    if (!(fly && role === 'fly')) gl.drawArrays(gl.TRIANGLES, 0, 3);'''
+DEV93_GAS_CAP = r'''// @deviation (#93 1.8) at most 3 gas-solver steps per frame (was 8; GasSim.step costs about 4.5 ms), and a backlog of a
+// whole step or more is dropped, so a slow frame never schedules more work for the next one. A giant that needs more
+// than 3 steps a frame (HD 189733 b about 4.7 at 60 fps) then runs slower than one day per second.
+        while (W.simAcc >= GS.dt && n < 3) { GS.step(); acc += GS.dt; W.simAcc -= GS.dt; n++; }
+        if (W.simAcc >= GS.dt) W.simAcc = 0;'''
+DEV93_TERRAIN = r'''// @deviation (#93 1.5) the renames below build the terrain and its river routing once per set of inputs for every engine
+// on the page (terrainCache.js): the globe and the fly engine of one world used to build both twice (500 to 650 ms).
+// The result is shared read-only; nothing in the engine writes to it.'''
+DEV93_LINK_FIRST = r'''// @deviation (#93 1.2) every program is linked before the first step or draw (WorldGL.link); a host that wants no
+// main-thread wait polls W.gl.poll() until it is true (WorldEngine.whenReady) before it loads a world.
+['cloudStep', 'gasStep', 'draw'].forEach(function (k) { var f = W.gl[k]; W.gl[k] = function () { W.gl.link(k === 'draw' && !!W.fly); return f.apply(W.gl, arguments); }; });'''
+
+
 os.makedirs(OUT, exist_ok=True)
 
 # helpers.js: clamp lerp sstep fmt rng g planck planckRGB LMIN/LMAX/LUT compile unis FULL (not $, reduced, pills)
 w('helpers.js', hdr('helpers: maths, Planck colour, LUT, GL compile', '1267-1270, 1272-1282, 1291-1297') +
-  sl(1268, 1271) + '\n' + sl(1273, 1283) + '\n' + sl(1292, 1298) + '\nexport { ' + HELPERS_NAMES + ' };\n')
+  sl(1268, 1271) + '\n' + sl(1273, 1283) + '\n' + sl(1292, 1298) + '\n' + DEV93_HELPERS +
+  '\nexport { ' + HELPERS_NAMES + ', compileStart, compileDone, compileEnd };\n')
 
 # shaders.js
 w('shaders.js', hdr('shaders: NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS', '1299-1678') +
-  "import { LMIN, LMAX } from './helpers.js';\n" + sl(1299, 1678) + '\nexport { NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS };\n')
+  "import { LMIN, LMAX } from './helpers.js';\n" + DEV_SHADERS_TOP + '\n' +
+  sl(1299, 1678, [('1.+3.*uEx/uRkm', '1.+uCloudKm*uEx/uRkm'),          # PR #89 review 1
+                  ('uCloudKm,uHkm;', 'uCloudKm,uHkm,uScale;'),         # #93 1.4
+                  ('uFov/uR.y', 'uFov*uScale/uR.y')]) + '\n' +          # #93 1.4 (3 places)
+  DEV93_SHADERS + '\nexport { NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS };\n')
 
 # presets.js: FLUIDS, WP
 w('presets.js', hdr('FLUIDS and WP (example presets)', '1679-1700') + sl(1679, 1700) + '\nexport { FLUIDS, WP };\n')
@@ -86,19 +179,31 @@ w('gas.js', hdr('gas giants: GAS_NODES, gasProfile, GasSim', '2149-2261') + HELP
 core = []
 core.append(hdr('stateful engine core: one closure per WorldEngine instance',
                 '1662-1664, 1666-1726, 1861-1913(+1914-2008), 2123-2246, 2248, 2250-2270, 2274-2285, 2289, 2291-2303, 2305-2306, 2311, 2328-2330, 2332-2346'))
-core.append("""import { FULL, compile, unis, LUT, clamp, lerp, sstep, fmt, rng, planck, planckRGB } from './helpers.js';
+core.append("""import { FULL, compile, unis, compileStart, compileDone, compileEnd, LUT, clamp, lerp, sstep, fmt, rng, planck, planckRGB } from './helpers.js';
 import { ADV_FS, GAS_FS, WORLD_FS, FLY_FS } from './shaders.js';
 import { FLUIDS, WP } from './presets.js';
 import { fbm3, buildTerrain, routeTerrain } from './terrain.js';
+import { terrainCached, routeCached } from './terrainCache.js';
 import { GAS_NODES, gasProfile, GasSim } from './gas.js';
 
-/** Build one engine instance on a canvas. */
-export function createCore(canvas) {
+/** Build one engine instance on a canvas. opt.role: 'globe' | 'fly' | 'both' (default, the prototype's page). */
+export function createCore(canvas, opt) {
 var reduced = false;
-""")
+""" + DEV93_ROLE + "\n")
 core.append(sl(1701, 1765))                 # ORB, applySpin, W, slider constants, psatFn, worldModel
 core.append(sl(1906, 2147))                 # hydroRaster, EB
-core.append(sl(2262, 2355, [('(ema', '(!window.__sxPin&&ema')]))       # WorldGL
+# WorldGL, split around the #93 deviations (the prototype's (ema rename now sits inside DEV93_SCALER)
+core.append(DEV89_WORLDGL)
+core.append(sl(2262, 2265))
+core.append(DEV93_COMPILE)                   # replaces L2266: submit, poll, link (#93 1.2, 1.3)
+core.append(sl(2267, 2301, [('2.214)', '2.2165)'), ('0.005)', '0.0027)'), ('0.004)', '0.0012)')]))   # PR #89 review 3
+core.append(DEV93_SCALER)                    # replaces L2302-L2303 (#93 1.7)
+core.append(sl(2304, 2315))
+core.append(DEV93_SKIP_GLOBE)                # replaces L2316 (#93 1.6)
+core.append(sl(2317, 2338, [('uF.uFov,', 'uF.uScale,scale);gl.uniform1f(uF.uFov,'),   # #93 1.4
+                            ('uF.uCloudKm,', 'uF.uCloudKm,m.zc!=null?Math.max(m.zc,0.3):')]))   # PR #89 review 1
+core.append(DEV93_GAS_CAP)                   # replaces L2339-L2340 (#93 1.8)
+core.append(sl(2341, 2355))
 core.append(sl(2356, 2385))                 # fly camera, flyMove, globePick, GS
 core.append(sl(2387, 2387))                 # km
 # worldUi: rows and caption captured as data instead of written into the DOM
@@ -108,7 +213,8 @@ core.append("  W.rows = rows; W.mixed = mixed;")
 core.append(sl(2414, 2425, [("$('#world-cap').textContent", "W.cap")]))
 core.append(sl(2429, 2429, [("$('#world-tag').textContent", "W.tag")]))
 core.append('}')
-core.append(sl(2431, 2443))                 # resetWorld (its worldUi() call stays)
+core.append(DEV93_TERRAIN)                  # one terrain build per input set for every engine (#93 1.5)
+core.append(sl(2431, 2443, [('buildTerrain(', 'terrainCached('), ('routeTerrain(', 'routeCached(')]))   # resetWorld
 core.append('function setPreset(p) {')
 core.append(sl(2445, 2446))
 core.append(sl(2451, 2451))
@@ -118,6 +224,7 @@ core.append(sl(2468, 2470))                 # altRange altToS sToAlt
 core.append(sl(2472, 2486))                 # flyAimPeak, flyAimDefault
 core.append("""
 W.gl = new WorldGL(canvas);
+""" + DEV93_LINK_FIRST + """
 return {
   W: W, EB: EB, ORB: ORB, OCEANF: OCEANF, GAS_NODES: GAS_NODES, FLUIDS: FLUIDS,
   getGS: function () { return GS; },
