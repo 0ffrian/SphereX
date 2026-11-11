@@ -1,0 +1,17 @@
+// The honesty tag of the area flows (D-02, design-language tags): the results are a fixed demo, not
+// a search of the drawn square (areaService.ts, Q-205 pending).
+export const DEMO_NOTE =
+  'Demo data: this is not a search of the square you drew. Eros’s frames and path are real SPHEREx data shown as an example; where they sit here, the dots and the other movers are made up.';
+
+export function DemoTag() {
+  return (
+    <span
+      className="sx-tagbadge"
+      style={{ ['--dot' as string]: 'var(--p-asm)' }}
+      title={DEMO_NOTE}
+      data-testid="demo-tag"
+    >
+      Demo data
+    </span>
+  );
+}

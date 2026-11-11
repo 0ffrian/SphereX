@@ -4292,3 +4292,480 @@ body {
 .sx-panel[data-bare] .sx-panel-body > * {
   flex: none;
 }
+
+/* The #track window over the sky (Known objects, Discovery): one canvas, drawn inside the square. */
+.sx-area-track {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 6;
+  pointer-events: none;
+}
+
+/* MouldAnimation (build stage): the globe that takes shape while the body is generated, and its hand-over. */
+.sx-mould {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  background: #000;
+  pointer-events: none;
+  transition: background-color 350ms var(--ease);
+}
+.sx-mould[data-leaving] {
+  background-color: transparent;
+}
+.sx-mould-art {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  transition:
+    opacity 350ms var(--ease),
+    transform 350ms var(--ease);
+}
+.sx-mould[data-leaving] .sx-mould-art {
+  opacity: 0;
+  transform: scale(1.12);
+}
+.sx-mould-cap {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sx-mould,
+  .sx-mould-art {
+    transition: none;
+  }
+}
+
+/* The island's pill for a minimised area card: a button that brings the card back. */
+.sx-orb-mini {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  border-radius: 9999px;
+}
+.sx-orb-mini:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ---- Known objects and Discovery cards (the mock-up's `kn-*`, `lk-*`, `ar-steps`), design-language
+   tokens and tonal selection. Demo data: app/area/areaService.ts. ---- */
+.sx-kn-l,
+.sx-kn-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.sx-kn-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #000;
+  image-rendering: pixelated;
+}
+.sx-kn-demo {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 44px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.sx-kn-body {
+  padding-bottom: 16px;
+  gap: 12px;
+}
+.sx-kn-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sx-kn-opts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+.sx-kn-opts[data-off] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.sx-kn-opt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  color: var(--fg);
+  cursor: pointer;
+  user-select: none;
+}
+.sx-kn-opt input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.sx-kn-cb {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid var(--muted);
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.sx-kn-cb svg {
+  width: 12px;
+  height: 12px;
+  stroke: var(--on-ac);
+  stroke-width: 3;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+.sx-kn-opt input:checked + .sx-kn-cb {
+  background: var(--ac);
+  border-color: var(--accent);
+}
+.sx-kn-opt input:checked + .sx-kn-cb svg {
+  opacity: 1;
+}
+.sx-kn-opt input:focus-visible + .sx-kn-cb {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sx-kn-spec {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sx-kn-spec-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sx-kn-spec-h span {
+  font-size: 13px;
+  font-weight: 600;
+}
+.sx-kn-spec-h small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sx-kn-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  background: var(--s2);
+}
+.sx-kn-grid {
+  stroke: var(--line);
+}
+.sx-kn-tick {
+  fill: var(--muted);
+  font-size: 10px;
+}
+.sx-kn-cur {
+  stroke: var(--fg);
+  stroke-width: 1.4;
+}
+.sx-kn-spec-none {
+  margin: 0;
+  display: grid;
+  place-items: center;
+  height: 96px;
+  border-radius: 6px;
+  background: var(--s2);
+  color: var(--muted);
+  font-size: 13px;
+}
+.sx-kn-det {
+  border-radius: 6px;
+  background: var(--s2);
+}
+.sx-kn-det[data-off] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.sx-kn-det summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  font-weight: 500;
+  border-radius: 6px;
+}
+.sx-kn-det summary::-webkit-details-marker {
+  display: none;
+}
+.sx-kn-det summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sx-kn-det summary span + span {
+  color: var(--muted);
+  font-weight: 400;
+}
+.sx-kn-det summary span + span::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 9px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.2s;
+}
+.sx-kn-det[open] summary span + span::after {
+  transform: translateY(1px) rotate(-135deg);
+}
+.sx-kn-dets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+.sx-kn-detb {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--s3);
+  border: 1px solid transparent;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.sx-kn-detb:hover:not(:disabled) {
+  background: var(--s1);
+}
+.sx-kn-detb:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sx-kn-detb:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sx-kn-detb b {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+.sx-kn-detb small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.sx-kn-rd {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  flex: none;
+  position: relative;
+}
+.sx-kn-detb[aria-checked='true'] {
+  background: var(--ac);
+  border-color: var(--accent);
+}
+.sx-kn-detb[aria-checked='true'] .sx-kn-rd {
+  border-color: var(--accent);
+}
+.sx-kn-detb[aria-checked='true'] .sx-kn-rd::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.sx-kn-leg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sx-kn-leg span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sx-kn-leg i {
+  display: block;
+  width: 16px;
+  height: 0;
+  border-top: 2px solid var(--p-phys);
+}
+.sx-kn-leg i.d {
+  border-top-style: dashed;
+}
+.sx-kn-leg i.dot {
+  width: 6px;
+  height: 6px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--p-phys);
+}
+.sx-lk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sx-lk-row {
+  display: grid;
+  grid-template-columns: 38px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 6px;
+  background: var(--s2);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.sx-lk-row:hover {
+  background: var(--s3);
+}
+.sx-lk-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sx-lk-row b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sx-lk-row small {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sx-chip {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--s3);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.sx-chip[data-tone='ok'] {
+  background: var(--ac);
+  color: var(--on-ac);
+}
+.sx-chip[data-tone='warn'] {
+  color: var(--warn);
+}
+.sx-ar-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+}
+.sx-ar-steps li {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.sx-ar-steps li i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  display: inline-grid;
+  place-items: center;
+}
+.sx-ar-steps li i svg {
+  width: 9px;
+  height: 9px;
+  stroke: var(--on-ac);
+  stroke-width: 3.4;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  display: none;
+}
+.sx-ar-steps li small {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sx-ar-steps li[data-state='on'] {
+  color: var(--fg);
+}
+.sx-ar-steps li[data-state='on'] i {
+  background: var(--accent);
+  box-shadow: none;
+}
+.sx-ar-steps li[data-state='on'] i svg {
+  display: block;
+  stroke: var(--bg);
+}
+.sx-ar-steps li[data-state='now'] {
+  color: var(--fg);
+}
+.sx-ar-steps li[data-state='now'] i {
+  box-shadow: none;
+  overflow: visible;
+}
+.sx-panel[data-testid='area-card'][data-bare] {
+  width: min(408px, calc(100% - 64px));
+}
+@media (prefers-reduced-motion: reduce) {
+  .sx-kn-det summary span + span::after {
+    transition: none;
+  }
+}
+.sx-kn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+}
+.sx-area-size {
+  position: absolute;
+  left: 1px;
+  top: -20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sx-kn-body {
+  gap: 10px;
+}

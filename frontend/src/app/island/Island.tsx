@@ -10,7 +10,8 @@ import { useAppStore } from '@/state/store';
 import { useShellStore } from '@/app/shell/shellStore';
 import { useElapsedSeconds } from '@/app/StatusBoxes';
 import GridLoader from './GridLoader';
-import { IDLE_LOOK, LOADER_BASE, SEARCHING_LOOK, UPDATING_LOOK } from './loaderLooks';
+import { FOUND_LOOK, IDLE_LOOK, LOADER_BASE, SEARCHING_LOOK, UPDATING_LOOK } from './loaderLooks';
+import { areaMiniTitle, useAreaStore } from '@/app/shell/areaStore';
 import { subscribeMotion } from '@/app/sky/skyMotion';
 import { isThinking } from './islandText';
 import { useIslandStore } from './islandStore';
@@ -62,8 +63,21 @@ export function Island() {
       clearTimeout(t);
     };
   }, []);
-  const updating = !thinking && moving && panelBox === null;
-  const pillOn = thinking || updating;
+  // The square tools (Known objects, Discovery): the island says what the dummy search is doing, and
+  // it holds the place of a minimised card (a click brings it back).
+  const areaSay = useAreaStore((s) => s.say);
+  const areaMini = useAreaStore((s) => (s.minimised ? areaMiniTitle(s) : null));
+  const areaRunning = useAreaStore((s) => s.running);
+  const restore = () => useAreaStore.getState().setMinimised(false);
+  const miniRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (areaMini !== null) miniRef.current?.focus({ preventScroll: true });
+  }, [areaMini]);
+  const areaOn = areaSay !== null || areaMini !== null;
+  // While an area card is open the island steps aside (it would sit over the card's corner).
+  const areaCardOpen = useShellStore((s) => s.tool === 'area') && !areaOn;
+  const updating = !thinking && !areaOn && !areaCardOpen && moving && panelBox === null;
+  const pillOn = thinking || updating || areaOn;
   const panelTool = useShellStore((s) => s.tool === 'flipbook' || s.tool === 'spectrum');
   useEffect(() => {
     // Thinking starts a trip. It ends when the panel is closed, or when the search ended with no
@@ -135,7 +149,7 @@ export function Island() {
   useLayoutEffect(() => {
     if (!pillOn || !inRef.current) return;
     setPill({ w: inRef.current.offsetWidth, h: inRef.current.offsetHeight });
-  }, [pillOn, word, updating]);
+  }, [pillOn, word, updating, areaSay?.text, areaMini]);
 
   // The panel shows once the island has got there.
   useEffect(() => {
@@ -199,6 +213,7 @@ export function Island() {
         width: box.width,
         height: box.height,
         visibility: bezelW > 0 ? undefined : 'hidden',
+        opacity: areaCardOpen && !pillOn ? 0 : undefined,
       }}
     >
       <div className="sx-orb-glow" aria-hidden="true" data-on={mode !== 'panel' ? '' : undefined} />
@@ -208,15 +223,42 @@ export function Island() {
               2.2.2, and no repaint of the page every frame for a decoration (issue #66, Q-121).
               smoothui's loader is an <output aria-label="Loading">, a live region: hidden here, the
               word beside it is the status. */}
+          {areaMini !== null ? (
+            <button
+              type="button"
+              ref={miniRef}
+              className="sx-orb-mini"
+              onClick={restore}
+              aria-label={`${areaMini}, minimised. Open it`}
+              title="Open"
+              data-testid="island-mini"
+            >
+              <span aria-hidden="true" className="contents">
+                <GridLoader
+                  {...(areaRunning ? SEARCHING_LOOK : FOUND_LOOK)}
+                  className="flex-none"
+                />
+              </span>
+              <span className="sx-orb-word">{areaMini}</span>
+            </button>
+          ) : (
           <span aria-hidden="true" className="contents">
-            {thinking ? (
+            {thinking || areaSay?.kind === 'searching' ? (
               <GridLoader {...SEARCHING_LOOK} className="flex-none" />
+            ) : areaSay?.kind === 'found' ? (
+              <GridLoader {...FOUND_LOOK} className="flex-none" />
             ) : updating && !reduced ? (
               <GridLoader {...UPDATING_LOOK} className="flex-none" />
             ) : (
               <GridLoader {...LOADER_BASE} {...IDLE_LOOK} />
             )}
           </span>
+          )}
+          {areaSay && (
+            <span className="sx-orb-word" role="status" data-testid="area-island">
+              {areaSay.text}
+            </span>
+          )}
           {thinking && (
             <span className="sx-orb-word" role="status" data-testid="loading">
               {word}

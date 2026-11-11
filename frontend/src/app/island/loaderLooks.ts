@@ -55,3 +55,13 @@ export const UPDATING_LOOK: GridLoaderProps = {
   gap: 1,
   size: 'sm',
 };
+
+/** The known-objects search has answered (the island's "found" state): the same pill, in green. */
+export const FOUND_LOOK: GridLoaderProps = {
+  pattern: 'sparkle',
+  mode: 'pulse',
+  color: 'green',
+  blur: 1,
+  gap: 1,
+  size: 'sm',
+};

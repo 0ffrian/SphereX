@@ -2,7 +2,7 @@
 // dragged and once it is set (then it follows the view, written from the render listener).
 import { useEffect, useRef } from 'react';
 import type { SkyView } from '@/viewer/sky/SkyView';
-import { useAreaStore } from '@/app/shell/areaStore';
+import { formatAreaSize, useAreaStore } from '@/app/shell/areaStore';
 import { boxToPixels } from './areaDraw';
 
 export function AreaOverlay({ view }: { view: SkyView | null }) {
@@ -38,5 +38,10 @@ export function AreaOverlay({ view }: { view: SkyView | null }) {
     return view.onRender(draw);
   }, [drag, box, view]);
 
-  return <div ref={ref} className="sx-area-sq" style={{ display: 'none' }} aria-hidden="true" />;
+  return (
+    <div ref={ref} className="sx-area-sq" style={{ display: 'none' }} aria-hidden="true">
+      {/* The square's size over its top left, as the mock-up does (not while it is dragged). */}
+      {box && !drag && <span className="sx-area-size">{formatAreaSize(box.widthDeg)}</span>}
+    </div>
+  );
 }
