@@ -42,7 +42,7 @@ import { EmissionsPanel } from './EmissionsPanel';
 import { EPOCH_JD, timeRange } from '@/physics/cometGas';
 import { ConfidenceChip, ConfidenceDetails } from './ConfidencePanel';
 import { FeelPanel, HearPanel } from './build/Senses';
-import { BuildControls } from './build/BuildControls';
+import { BuildControls, BuildKeyNumbers, BuildSummaryRows } from './build/BuildControls';
 import GridLoader, { type GridLoaderProps } from './island/GridLoader';
 import { ConfidencePopover } from './ConfidencePopover';
 import { displayName } from './displayName';
@@ -77,6 +77,13 @@ export function ageFromLog(pos: number): number {
 }
 
 /** "1,200 years", "10 years". */
+/** Short Colour labels for the narrow Details pane. */
+function shortModeLabel(label: string): string {
+  if (/infrared/i.test(label)) return 'Infrared';
+  if (/^visible/i.test(label)) return 'Visible';
+  return label;
+}
+
 function formatYears(n: number): string {
   const w = n < 1000 ? Math.round(n) : n;
   return `${w.toLocaleString('en')} ${w === 1 ? 'year' : 'years'}`;
@@ -705,6 +712,13 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const motionPaused = (reducedMotion && !playAnyway) || spinPaused || idlePaused;
   const hiddenCount = plan?.missing.filter((m) => m.reason === 'honesty').length ?? 0;
 
+  // In the build pane, an engine-drawn body shows its notes as "Assumed values" lines, not as a paragraph list.
+  const assumedLines = plan && engineOwns
+    ? [
+        ...plan.notes.filter((n) => !/no motion data/i.test(n)),
+        ...lapses.map((t) => timeLapseText(t)),
+      ]
+    : [];
   const honestyGroup = plan ? (
     <ToggleGroup
       label="Show"
@@ -907,7 +921,6 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
         {params && (!pane || params.confidence?.gate.passed === false) && (
           <ConfidenceDetails params={params} />
         )}
-        {pane && <BuildControls />}
         {plan && (
           <>
             {honestyGroup}
@@ -919,13 +932,13 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                   value={plan.mode ?? null}
                   options={plan.modes.map((m) => ({
                     value: m.id,
-                    label: m.label,
+                    label: pane ? shortModeLabel(m.label) : m.label,
                     disabled: !m.available,
                     title: m.available ? m.badge : 'Not available for this object. See the list below.',
                   }))}
                   onChange={onMode}
                 />
-                {plan.mode && (
+                {plan.mode && !pane && (
                   <span className="text-xs" style={{ color: 'var(--muted)' }}>
                     {plan.modes.find((m) => m.id === plan.mode)?.badge}
                   </span>
@@ -959,7 +972,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
               />
             )}
 
-            {engineStar && <StarEngineDetails fixture={objectIsFixture} />}
+            {pane && <BuildControls />}
 
             {plan.star && !engineStar && (
               <div className="flex flex-col gap-2" data-testid="star-views">
@@ -1086,7 +1099,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
               </div>
             )}
 
-            {bar && (
+            {bar && !engineOwns && (
               <figure className="flex max-w-xl flex-col gap-1" data-testid="scale-bar">
                 <div className="flex flex-col gap-1" aria-hidden="true">
                   <div
@@ -1172,13 +1185,22 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             )}
 
             {/* Every time-lapse says where its rate comes from and its speed-up (R5.7, D-32). */}
-            {lapses.map((t) => (
+            {(engineOwns && pane ? [] : lapses).map((t) => (
               <p key={t.id} className="text-sm text-neutral-200" data-testid="time-lapse-note">
                 {timeLapseText(t)}
               </p>
             ))}
 
+            {pane && <BuildKeyNumbers fixture={objectIsFixture} />}
+
             <Rows>
+            {pane && (
+              <BuildSummaryRows
+                fixture={objectIsFixture}
+                flareChart={engineStar ? <StarEngineDetails fixture={objectIsFixture} /> : undefined}
+                extraAssumed={assumedLines}
+              />
+            )}
             <Row title="What is drawn" count={plan.drawn.length} testId="legend-row">
               <p className="text-xs text-neutral-400">
                 Measured: from observations. Estimated: worked out from data with a stated method.
@@ -1254,7 +1276,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             )}
             </Rows>
 
-            {plan.notes.length > 0 && (
+            {plan.notes.length > 0 && !(engineOwns && pane) && (
               <ul className="list-disc pl-5 text-xs text-neutral-400" data-testid="notes">
                 {plan.notes.map((n) => (
                   <li key={n}>{n}</li>

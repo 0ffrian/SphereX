@@ -252,8 +252,6 @@ export function worldControls(
   const t = world.tags;
   const gas = s.gas;
   const controls: BuildControl[] = [
-    { id: 'what', kind: 'readout', label: 'What you are seeing', value: r.caption, tag: 'model_dependent' },
-    { id: 'tag', kind: 'readout', label: 'Now showing', value: r.tag, tag: 'model_dependent' },
     {
       id: 'fluid',
       kind: 'choice',
@@ -402,25 +400,35 @@ export function worldControls(
       onChange: (v) => apply({ Ps: fromSlider(v, PS) }),
     },
   );
+  const rowTag = (label: string): Tag => READOUT_TAG[label] ?? 'model_dependent';
+  const rowOf = (label: string): string | undefined => r.rows.find(([l]) => l === label)?.[1];
+  const key = (id: string, label: string, value: string | undefined, tag: Tag): void => {
+    if (value !== undefined) controls.push({ id: `k-${id}`, kind: 'readout', slot: 'key', label, value, tag });
+  };
+  const p = world.preset;
+  const radiusKm = `${fmt(p.Rj * 71492)} km`;
+  if (gas) {
+    key('temp', 'Temperature', rowOf('Equilibrium temperature'), rowTag('Equilibrium temperature'));
+    key('radius', 'Radius', radiusKm, t.Rj ?? 'model_dependent');
+    const prot = p.Prot ?? (p.locked ? p.P : undefined);
+    key('rot', 'Rotation period', prot === undefined ? undefined : prot < 2 ? `${fmt(prot * 24, 1)} hours` : `${fmt(prot, 1)} days`, t.Prot ?? 'model_dependent');
+    key('wind', 'Wind speed', rowOf('Wind speed'), rowTag('Wind speed'));
+  } else {
+    key('temp', 'Surface temperature', rowOf('Average surface temperature'), rowTag('Average surface temperature'));
+    key('radius', 'Radius', radiusKm, t.Rj ?? 'model_dependent');
+    key('ps', 'Surface pressure', `${s.Ps < 0.1 ? fmt(s.Ps, 3) : fmt(s.Ps, 1)} bar`, t.Ps ?? 'model_dependent');
+    const g = (6.674e-11 * p.Me * 5.972e24) / (p.Rj * 71492e3) ** 2;
+    key('g', 'Surface gravity', `${fmt(g, 1)} m/s\u00b2`, 'derived');
+  }
+  const inKey = gas ? ['Equilibrium temperature', 'Wind speed'] : ['Average surface temperature'];
   for (const [label, value] of r.rows)
-    controls.push({ id: `r-${label}`, kind: 'readout', label, value, tag: READOUT_TAG[label] ?? 'model_dependent' });
-  if (world.assumptions.length)
-    controls.push({
-      id: 'assumed',
-      kind: 'readout',
-      label: 'Filled in, not measured',
-      value: world.assumptions.map((a) => a.field).join(', '),
-      tag: 'model_dependent',
-    });
-  if (world.mismatches.length)
-    controls.push({
-      id: 'mismatch',
-      kind: 'readout',
-      label: 'Card and artifact differ',
-      value: world.mismatches.join('; '),
-      tag: 'model_dependent',
-    });
-  return { title: gas ? 'Gas giant' : 'Planet surface', controls, notes: worldNotes(world) };
+    if (!inKey.includes(label)) controls.push({ id: `r-${label}`, kind: 'readout', label, value, tag: rowTag(label) });
+  const filled = [
+    ...world.assumptions.map((a) => `${a.field} = ${String(a.value)}: ${a.note}.`),
+    ...world.mismatches.map((m) => `Differs from the artifact: ${m}.`),
+  ];
+  const notes: BuildNote[] = filled.length ? [{ title: 'Filled in, not measured', lines: filled }] : [];
+  return { title: gas ? 'Gas giant' : 'Planet surface', controls, notes };
 }
 
 /** The prototype's world stage (globe), on the build pane's globe stage. */

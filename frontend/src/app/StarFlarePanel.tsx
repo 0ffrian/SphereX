@@ -6,7 +6,6 @@ import { lightCurves, STAGES, STAGE_TEXT, stageIndex } from '@/physics/flares';
 import type { ViewerApp } from '@/viewer/ViewerApp';
 import { Row, Rows, SwitchRow, ToggleGroup } from './PanelControls';
 import { ProvenanceBadge } from './Badge';
-import { useStarTarget } from './starTargetStore';
 import { useStarChart } from './starChartStore';
 
 export function StarFlarePanel({
@@ -147,9 +146,8 @@ const pathOf = (a: number[]) => a.map((v, i) => `${i ? 'L' : 'M'}${cx(i / 240).t
 const SOFT = '#c98a08';
 const HARD = '#2f9bd4';
 
-/** Details for a star the engine draws: the close-up choice, and the flare chart inside "About this flare". */
-export function StarEngineDetails({ fixture, flareView = true }: { fixture?: boolean; flareView?: boolean }) {
-  const left = useStarTarget((s) => s.left);
+/** The flare chart for a star the engine draws, to sit inside the "About this flare" row (the controls live in Details). */
+export function StarEngineDetails({ fixture }: { fixture?: boolean }) {
   const chart = useStarChart((s) => s.chart);
   const scrub = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!chart) return;
@@ -157,26 +155,8 @@ export function StarEngineDetails({ fixture, flareView = true }: { fixture?: boo
     const px = ((e.clientX - b.left) / b.width) * 524;
     chart.setTime((px - CH.x0) / (CH.x1 - CH.x0));
   };
+  if (!chart) return null;
   return (
-    <div className="flex flex-col gap-3" data-testid="star-engine-details">
-      <ToggleGroup
-        label="Close-up"
-        value={left}
-        options={[
-          { value: 'flare', label: 'Flare' },
-          { value: 'surface', label: 'Surface' },
-        ]}
-        onChange={(v) => useStarTarget.getState().show(v)}
-        testId="star-closeup-toggle"
-      />
-      {left === 'surface' && (
-        <button type="button" className="sx-btn-outline" onClick={() => useStarTarget.getState().home()} disabled={useStarTarget.getState().target === null}>
-          Back to the active region
-        </button>
-      )}
-      {flareView && chart && (
-        <Rows>
-          <Row title="About this flare" defaultOpen>
             <div className="flex flex-col gap-2" data-testid="flare-chart">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--muted)' }}>
                 <span>Flare brightness over 60 minutes</span>
@@ -222,9 +202,5 @@ export function StarEngineDetails({ fixture, flareView = true }: { fixture?: boo
                 <ProvenanceBadge tag="inferred_from_analog" fixture={fixture} />
               </p>
             </div>
-          </Row>
-        </Rows>
-      )}
-    </div>
   );
 }

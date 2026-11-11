@@ -9,9 +9,9 @@ import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { Tag } from '@/contract';
 import { useAppStore } from '@/state/store';
 import { nudge, projectSurface, globeRot, GLOBE_HALF, GLOBE_TILT } from '@/engine/stars/starPick';
-import { placeText, useStarTarget } from './starTargetStore';
+import { useStarTarget } from './starTargetStore';
 import { useStarChart } from './starChartStore';
-import { useBuildControls, type BuildControl, type BuildControlsSpec } from './build/BuildControls';
+import { useBuildControls, type BuildControl, type BuildControlsSpec, type BuildNote } from './build/BuildControls';
 import { cardToStar, type StarFromCard } from '@/engine/stars/cardToStar';
 import {
   StarEngine,
@@ -136,22 +136,16 @@ function useStarEngine(mode: StarMode, star: StarFromCard, redrawMs: number, slo
   return { hostRef, engine, failed, rev, bump };
 }
 
-function starValuesNote(star: StarFromCard): BuildControl[] {
-  const out: BuildControl[] = [];
-  if (star.assumed.length)
-    out.push({
-      id: 'assumed',
-      kind: 'readout',
-      label: 'Filled in, not measured',
-      value: star.assumed.join('; '),
-      tag: 'model_dependent',
-    });
-  return out;
+/** "0.19 R☉" for a small star, "281,341 km" never: the short form of the radius. */
+function sizeText(rsun: number): string {
+  return `${rsun < 10 ? rsun.toFixed(2) : Math.round(rsun).toLocaleString('en')} R\u2609`;
 }
 
 /** The prototype's "Star surface" stage, on the build pane's globe stage. */
 export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: () => void }) {
   const { hostRef, engine, failed, bump } = useStarEngine('globe', star, 500);
+  const left = useStarTarget((s) => s.left);
+  const target = useStarTarget((s) => s.target);
   // A new star starts looking at its strongest spot group, on the flare close-up.
   useEffect(() => useStarTarget.getState().reset(), [star.preset.id]);
   useEffect(() => {
@@ -189,15 +183,26 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
         },
       },
       {
-        id: 'pause',
-        kind: 'toggle',
-        label: 'Pause',
-        pressed: engine.paused,
-        onChange: (p) => {
-          engine.setPaused(p);
-          bump();
-        },
+        id: 'closeup',
+        kind: 'choice',
+        label: 'Close-up',
+        value: left,
+        options: [
+          { value: 'flare', label: 'Flare' },
+          { value: 'surface', label: 'Surface' },
+        ],
+        onChange: (v) => useStarTarget.getState().show(v as 'flare' | 'surface'),
       },
+      ...(left === 'surface' && target !== null
+        ? [
+            {
+              id: 'home',
+              kind: 'button',
+              label: 'Back to the active region',
+              onClick: () => useStarTarget.getState().home(),
+            } as BuildControl,
+          ]
+        : []),
       {
         id: 'lines',
         kind: 'toggle',
@@ -220,37 +225,38 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
           bump();
         },
       },
-      { id: 'latest', kind: 'readout', label: 'Latest flare on this star', value: engine.latestFlare(), tag: 'inferred_from_analog' },
+      { id: 'latest', kind: 'readout', slot: 'latest', label: 'Latest flare on this star', value: engine.latestFlare(), tag: 'inferred_from_analog' },
+      { id: 'k-teff', kind: 'readout', slot: 'key', label: 'Surface temperature', value: `${Math.round(star.teff.value).toLocaleString('en')} K`, tag: star.teff.tag },
+      { id: 'k-size', kind: 'readout', slot: 'key', label: 'Size', value: sizeText(star.radius.value), tag: star.radius.tag },
       {
-        id: 'rot',
-        kind: 'slider',
+        id: 'k-rot',
+        kind: 'readout',
+        slot: 'key',
         label: 'Rotation period',
-        min: 0,
-        max: 1000,
-        step: 1,
-        value: rot.position,
-        valueText: rot.text,
+        value: rot.text,
         tag: star.rotation.tag,
-        disabled: !rot.used,
-        why: rot.used ? star.rotation.note : 'Not used for this star: it has no outer convection layer or is not a dwarf.',
-        onChange: (v) => {
-          engine.setRotationPosition(v);
-          bump();
-        },
       },
-      { id: 'what', kind: 'readout', label: 'What you are seeing', value: engine.caption() || engine.stageTag() },
-      ...engine.readouts().map(
+      ...engine.readouts().filter((r) => r.label !== 'Surface temperature').map(
         (r): BuildControl => ({
           id: `r-${r.label}`,
           kind: 'readout',
+          slot: r.label === 'Average magnetic field' ? 'key' : undefined,
           label: r.label,
           value: r.value,
-          tag: r.label === 'Surface temperature' ? star.teff.tag : READOUT_TAG[r.label],
+          tag: READOUT_TAG[r.label],
         }),
       ),
-      ...starValuesNote(star),
     ];
-    spec = { title: 'Star surface', controls, notes: engine.notes() };
+    // Key numbers come in a fixed order: the engine's own temperature and field rows are placed among ours.
+    const order = ['Surface temperature', 'Size', 'Rotation period', 'Average magnetic field'];
+    const keyed = controls.filter((c) => c.kind === 'readout' && c.slot === 'key');
+    const others = controls.filter((c) => !(c.kind === 'readout' && c.slot === 'key'));
+    keyed.sort((x, y) => order.indexOf(x.label) - order.indexOf(y.label));
+    const notes: BuildNote[] = [];
+    const filled = [...star.assumed];
+    if (rot.used && star.rotation.note) filled.push(`Rotation period: ${star.rotation.note}`);
+    if (filled.length) notes.push({ title: 'Filled in, not measured', lines: filled });
+    spec = { title: 'Star surface', controls: [...others, ...keyed], notes };
   }
   useBuildControls('star-surface', spec);
 
@@ -483,31 +489,6 @@ export function StarSurfaceCloseUp({ star, onFail }: { star: StarFromCard; onFai
     bump();
   }, [engine, target, preset, bump]);
   const at = engine ? engine.closeTarget() : null;
-  useBuildControls(
-    'star-surface-close',
-    engine
-      ? {
-          title: 'Close-up on the star',
-          controls: [
-            {
-              id: 'at',
-              kind: 'readout',
-              label: 'Looking at',
-              value: placeText(target ?? at),
-              tag: target ? 'artistic' : 'inferred_from_analog',
-            },
-            {
-              id: 'home',
-              kind: 'button',
-              label: 'Back to the active region',
-              disabled: target === null,
-              why: target === null ? 'Already looking at the strongest spot group.' : undefined,
-              onClick: () => useStarTarget.getState().home(),
-            },
-          ],
-        }
-      : null,
-  );
   return (
     <div
       ref={hostRef}
