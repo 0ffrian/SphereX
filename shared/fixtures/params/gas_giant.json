@@ -84,7 +84,7 @@
     "texture": "flow",
     "texture_tag": "artistic",
     "data": "teq_pulse",
-    "data_tag": "measured",
+    "data_tag": "derived",
     "params": {
       "maxRateHz": 12.0
     }

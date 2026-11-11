@@ -391,28 +391,6 @@ function cardToWorldGeneric(card: ObjectCard, overrides: EngineOverrides): CardT
         '): A = 1 - (Ts / (T0 (1 + 0.75 tau)^1/4))^4, T0 = T_star sqrt(R_star / 2a)' +
         (r.clamped ? '; held at ' + r.A : ''),
     });
-  } else if (teqCard !== null) {
-    const r = invert(teqCard, 1);
-    preset.A = r.A;
-    tags.A = 'derived';
-    assumptions.push({
-      field: 'A',
-      value: Number(r.A.toFixed(3)),
-      tag: 'derived',
-      note:
-        "Bond albedo chosen so the engine's equilibrium temperature equals the card's " +
-        teqCard +
-        ' K (' +
-        card.teq_K!.tag +
-        '): A = 1 - (Teq / T0)^4, T0 = T_star sqrt(R_star / 2a) = ' +
-        Math.round(T0) +
-        ' K' +
-        (r.clamped
-          ? teqCard > T0
-            ? "; the card's Teq is hotter than zero albedo with full heat redistribution allows (the catalogue assumes less redistribution), so A = 0"
-            : "; the card's Teq is very cold, so A is held at " + ALBEDO_MAX
-          : ''),
-    });
   } else if (albedo !== null) {
     preset.A = albedo;
     tags.A = 'model_dependent';
@@ -426,10 +404,18 @@ function cardToWorldGeneric(card: ObjectCard, overrides: EngineOverrides): CardT
         ') used as the Bond albedo; a geometric albedo (as catalogues give for small bodies) differs from the Bond albedo by the phase integral, which is not on the card',
     });
   } else
+    // #93 3.5: a catalogue Teq (pl_eqt) is itself computed with an assumed albedo, usually zero, so inverting it
+    // gave A = 0 (TOI-700 d, 55 Cnc e about 25 K too hot). It is not inverted: the prototype's albedo is assumed.
     assume(
       'A',
       DEFAULT_ALBEDO,
-      'no albedo or temperature on the card; Bond albedo 0.3, as the prototype defaults',
+      teqCard !== null
+        ? "no albedo or measured surface temperature on the card; Bond albedo 0.3, as the prototype defaults. The card's Teq (" +
+            Math.round(teqCard) +
+            ' K, ' +
+            card.teq_K!.tag +
+            ') is not inverted into an albedo: a catalogue Teq assumes zero albedo and full heat redistribution itself'
+        : 'no albedo or temperature on the card; Bond albedo 0.3, as the prototype defaults',
     );
   if (gas && !refGiant) {
     assume(
