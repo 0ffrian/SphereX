@@ -290,6 +290,17 @@ DEV93_RIVER = r'''// @deviation (#93 3.4) the river relief noise had no seed, so
 
 os.makedirs(OUT, exist_ok=True)
 
+# Reviewed deviations (PR #89 review, issue #93) carried into the output: the block texts live in
+# world_engine_deviations.py; the renames and the split points are below, next to the slice they change.
+sys.path.insert(0, HERE)
+import world_engine_deviations as DV  # noqa: E402
+
+DEV_PRESETS = '\n'.join([DV.PRESETS_89_REVIEW_1, DV.PRESETS_89_REVIEW_2, DV.PRESETS_93_3_1]) + '\n'
+DEV_UMEAS = """// @deviation (#89 review 5) the rename below lets a measured peak jet speed replace the thermal-wind estimate:
+// cardToWorld sets p.Umeas for Jupiter (about 150 m/s, the 24 N jet) and Saturn (about 450 m/s, equatorial). For
+// every other giant p.Umeas is unset and the prototype's U = 0.6 sqrt(R dT) runs unchanged (its 10 K floor holds
+// U near 115 to 120 m/s for a cool giant that is not locked: an estimate, tagged model_dependent)."""
+
 # helpers.js: clamp lerp sstep fmt rng g planck planckRGB LMIN/LMAX/LUT compile unis FULL (not $, reduced, pills)
 w('helpers.js', hdr('helpers: maths, Planck colour, LUT, GL compile', '1267-1270, 1272-1282, 1291-1297') +
   sl(1268, 1271) + '\n' + sl(1273, 1283) + '\n' + sl(1292, 1298) + '\n' + DEV93_HELPERS +
@@ -303,8 +314,9 @@ w('shaders.js', hdr('shaders: NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS', '1299-16
                   ('uFov/uR.y', 'uFov*uScale/uR.y')]) + '\n' +          # #93 1.4 (3 places)
   DEV93_SHADERS + '\n' + DEV93_PATTERNS + '\nexport { NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS };\n')
 
-# presets.js: FLUIDS, WP
-w('presets.js', hdr('FLUIDS and WP (example presets)', '1679-1700') + sl(1679, 1700) + '\nexport { FLUIDS, WP };\n')
+# presets.js: FLUIDS, WP, then the reviewed data deviations (#89 review 1 and 2, #93 3.1)
+w('presets.js', hdr('FLUIDS and WP (example presets)', '1679-1700') + sl(1679, 1700) + '\n' + DEV_PRESETS +
+  'export { FLUIDS, WP };\n')
 
 # terrain.js: CPU noise, buildTerrain, routeTerrain (pure)
 w('terrain.js', hdr('CPU value noise, plate-tectonic terrain build, river routing', '1767-1905') + HELPERS_IMPORT +
@@ -329,8 +341,25 @@ import { GAS_NODES, gasProfile, GasSim } from './gas.js';
 export function createCore(canvas, opt) {
 var reduced = false;
 """ + DEV93_ROLE + "\n")
-core.append(sl(1701, 1765))                 # ORB, applySpin, W, slider constants, psatFn, worldModel
-core.append(sl(1906, 2147))                 # hydroRaster, EB
+# ORB, applySpin, W, slider constants, psatFn, worldModel; L1727 (the boiling line) is replaced (#89 review 2)
+core.append(DEV_UMEAS)
+core.append(sl(1701, 1704))
+core.append(DV.CORE_L1705_93_3_2)
+core.append(sl(1706, 1726, [('Math.max(1,', 'p.Umeas||Math.max(1,')]))
+core.append(DV.CORE_L1727_89_REVIEW_2)
+core.append(DV.CORE_L1727_93_3_1)
+core.append(sl(1728, 1734))
+core.append(DV.CORE_L1734_93_3_6)
+core.append(sl(1735, 1736))
+core.append(DV.CORE_L1736_93_3_6)
+core.append(DV.CORE_L1736_93_3_1)
+core.append(DV.CORE_L1762_93_3_3)
+core.append(sl(1737, 1765, [('flat:', 'flat:p.fMeas!=null?p.fMeas:'), ('ORB[p.id]', '(p.ob||ORB[p.id])'),
+                            ('runaway:', 'Tpost:Tpost,olrLim:runaway?RUNAWAY.olrLim:null,runaway:')]))
+# hydroRaster, EB; L2101 (outgoing radiation) gains the runaway limit (#93 3.6)
+core.append(sl(1906, 2101))
+core.append(DV.CORE_L2101_93_3_6)
+core.append(sl(2102, 2147))
 # WorldGL, split around the #93 deviations (the prototype's (ema rename now sits inside DEV93_SCALER)
 core.append(DEV89_WORLDGL)
 core.append(sl(2262, 2265))
@@ -348,15 +377,20 @@ core.append(sl(2356, 2385))                 # fly camera, flyMove, globePick, GS
 core.append(sl(2387, 2387))                 # km
 # worldUi: rows and caption captured as data instead of written into the DOM
 core.append('function worldUi() {')
-core.append(sl(2389, 2410))
+core.append(sl(2389, 2389))
+core.append(DV.CORE_L2389_93_3_1)
+core.append(sl(2390, 2410))
 core.append("  W.rows = rows; W.mixed = mixed;")
-core.append(sl(2414, 2425, [("$('#world-cap').textContent", "W.cap")]))
+core.append(sl(2414, 2424))
+core.append(DV.CORE_L2424_93_3_1)
+core.append(sl(2425, 2425, [("$('#world-cap').textContent", "W.cap")]))
 core.append(sl(2429, 2429, [("$('#world-tag').textContent", "W.tag")]))
 core.append('}')
 core.append(DEV93_TERRAIN)                  # one terrain build per input set for every engine (#93 1.5)
 core.append(sl(2431, 2443, [('buildTerrain(', 'terrainCached('), ('routeTerrain(', 'routeCached(')]))   # resetWorld
 core.append('function setPreset(p) {')
-core.append(sl(2445, 2446))
+core.append(DV.CORE_L2446_93_3_3)
+core.append(sl(2445, 2446, [('ORB[p.id]', '(p.ob||ORB[p.id])')]))
 core.append(sl(2451, 2451))
 core.append('}')
 core.append("W.timeSec = 300; W.simAcc = 0;")
@@ -368,6 +402,7 @@ W.gl = new WorldGL(canvas);
 return {
   W: W, EB: EB, ORB: ORB, OCEANF: OCEANF, GAS_NODES: GAS_NODES, FLUIDS: FLUIDS,
   getGS: function () { return GS; },
+  ebStep: ebStep, ebStats: ebStats, ebInit: ebInit,   // #93: the energy budget, for headless tests
   worldModel: worldModel, worldUi: worldUi, resetWorld: resetWorld, setPreset: setPreset, applySpin: applySpin,
   flyMove: flyMove, globePick: globePick, flyCamera: flyCamera, groundKm: groundKm,
   flyAimPeak: flyAimPeak, flyAimDefault: flyAimDefault, altRange: altRange, altToS: altToS, sToAlt: sToAlt,

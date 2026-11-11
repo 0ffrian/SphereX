@@ -201,6 +201,23 @@ ARCHIVE_TEQ_FORMULA = (
     "Teq = T_star * sqrt(R_star / a) * (1/4)^(1/4) (archive calculation: zero albedo, full "
     "heat redistribution)"
 )
+# #93 3.5: an equilibrium temperature is computed from the star and the orbit with an assumed albedo
+# and heat redistribution, never measured, so a published pl_eqt is ``derived`` with that assumption
+# too (it was tagged ``measured``). The archive's column carries no albedo; the zero-albedo,
+# full-redistribution convention is the one the archive states for its own calculation
+# (pscp_calc.html) and a common one in discovery papers, but each source may differ.
+ARCHIVE_TEQ_ASSUMPTION = (
+    "zero Bond albedo and full day-night heat redistribution; an equilibrium temperature, not a "
+    "measured one"
+)
+PUBLISHED_TEQ_FORMULA = (
+    "Teq = T_star * sqrt(R_star / (2a)) * (1 - A)^(1/4), as computed in the cited paper"
+)
+PUBLISHED_TEQ_ASSUMPTION = (
+    "the cited paper's own albedo and heat redistribution (often zero Bond albedo and full "
+    "redistribution; the Kepler KOI table assumes A = 0.3; the archive row does not say which); "
+    "an equilibrium temperature, not a measured one"
+)
 
 
 def _archive_errs(row: Mapping[str, Any], column: str) -> float | None:
@@ -344,11 +361,16 @@ def _planet_fields(card: dict[str, Any], row: Mapping[str, Any] | None) -> None:
             "tag": "derived",
             "source": f"{ARCHIVE_CALC}, pl_eqt",
             "formula": ARCHIVE_TEQ_FORMULA,
+            "assumption": ARCHIVE_TEQ_ASSUMPTION,
         }
     elif teq is not None and teq > 0:
-        card["teq_K"] = _measured(
-            teq, f"NASA Exoplanet Archive PSCompPars pl_eqt ({ref_text(row, 'pl_eqt')})"
-        )
+        card["teq_K"] = {
+            "value": teq,
+            "tag": "derived",
+            "source": f"NASA Exoplanet Archive PSCompPars pl_eqt ({ref_text(row, 'pl_eqt')})",
+            "formula": PUBLISHED_TEQ_FORMULA,
+            "assumption": PUBLISHED_TEQ_ASSUMPTION,
+        }
     else:
         card["teq_K"] = {
             "value": None,

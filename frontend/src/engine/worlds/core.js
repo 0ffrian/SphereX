@@ -22,13 +22,33 @@ var role = (opt && opt.role) || 'both';
 // cardToWorld sets p.Umeas for Jupiter (about 150 m/s, the 24 N jet) and Saturn (about 450 m/s, equatorial). For
 // every other giant p.Umeas is unset and the prototype's U = 0.6 sqrt(R dT) runs unchanged (its 10 K floor holds
 // U near 115 to 120 m/s for a cool giant that is not locked: an estimate, tagged model_dependent).
-// @verbatim L1701-L1726
-// @rename Math.max(1,=>p.Umeas||Math.max(1,
+// @verbatim L1701-L1704
 var ORB = { rivers: { Ms: 1, e: 0.01, obl: 0.3 }, earth: { Ms: 1, e: 0.0167, obl: 0.409 }, t1e: { Ms: 0.0898, e: 0.005, obl: 0 }, t1f: { Ms: 0.0898, e: 0.01, obl: 0 }, k186: { Ms: 0.544, e: 0.04, obl: 0 }, k218: { Ms: 0.359, e: 0.09, obl: 0 }, tit: { Ms: 1, e: 0.054, obl: 0.467 }, lava: { Ms: 0.95, e: 0, obl: 0 } };
 function applySpin(p) { if (p.type === 'gas') return p; var mode = W.spinMode, lock = mode === 'auto' ? (p.locked && (W.ecc || 0) < 0.15) : mode === 'lock', res = mode === 'res32' || (mode === 'auto' && p.locked && (W.ecc || 0) >= 0.15); return Object.assign({}, p, { locked: lock || res, res32: res, Prot: p.Prot || 1 }); }
 var W = { fly: false, flyLon: 0, flyLat: 0.3, flyHead: 0.6, flyPitch: -0.16, flyAlt: 14, flyAuto: false, clouds: true, pitch: 0, zoom: 1, yaw: 0, hydro: null, route: null, hydroDue: 0, spinMode: 'auto', tect: 'auto', co2Therm: false, overlay: 0, season: 0, ecc: 0, obl: 0, p: WP[0], fluid: 'water', Tstar: 2566, orbit: 1, Ps: 1, playing: !reduced, m: null, step: 0, spin: 0.4, gl: null, spinup: 0 };
 var STARMIN = Math.log(2300), STARMAX = Math.log(14000), ORBMIN = Math.log(0.25), ORBMAX = Math.log(5), PSMIN = Math.log(0.002), PSMAX = Math.log(100);
-function psatFn(F) { return function (T) { return F.Pt * Math.exp(F.L / 8.314 * (1 / F.Tt - 1 / T)); }; }
+// @end-verbatim
+// @deviation L1705 (#93 3.2) the latent heat in the saturation pressure. The prototype used one heat for the whole
+// curve: for water the 373 K heat of vaporisation (1,537 Pa at 288 K against 1,706 Pa measured), for CO2 the
+// sublimation heat above the triple point too (3.36 MPa at 250 K against 1.79 MPa). Now:
+//  - water: Murphy and Koop 2005 (QJRMS 131, 1539), eq. 7 over ice below the triple point and eq. 10 over liquid
+//    above it (their fit is for 123 to 332 K; carried to 373.15 K it is 0.6 % above IAPWS-95). Above 373.15 K the
+//    curve continues with Clausius-Clapeyron and the prototype's 373 K heat F.L, from the fit's value at 373.15 K.
+//  - CO2 (any fluid with F.Lv): the vaporisation heat F.Lv above the triple point, the sublimation heat F.L below.
+//  - other fluids: the prototype's line, unchanged. Same as physics/fluids.ts psatFn.
+function psatMK(T) {
+  if (T < 273.16) return Math.exp(9.550426 - 5723.265 / T + 3.53068 * Math.log(T) - 0.00728332 * T);
+  var t = Math.min(T, 373.15), p = Math.exp(54.842763 - 6763.22 / t - 4.21 * Math.log(t) + 0.000367 * t + Math.tanh(0.0415 * (t - 218.8)) * (53.878 - 1331.22 / t - 9.44523 * Math.log(t) + 0.014025 * t));
+  return T > 373.15 ? p * Math.exp(FLUIDS.water.L / 8.314 * (1 / 373.15 - 1 / T)) : p;
+}
+function psatFn(F) {
+  if (F === FLUIDS.water) return psatMK;
+  if (F.Lv > 0) return function (T) { return F.Pt * Math.exp((T >= F.Tt ? F.Lv : F.L) / 8.314 * (1 / F.Tt - 1 / T)); };
+  return function (T) { return F.Pt * Math.exp(F.L / 8.314 * (1 / F.Tt - 1 / T)); };
+}
+// @end-deviation
+// @verbatim L1706-L1726
+// @rename Math.max(1,=>p.Umeas||Math.max(1,
 function worldModel() {
   var p = W.p, F = FLUIDS[W.fluid], gas = p.type === 'gas', a = p.a * W.orbit, Ps = W.Ps, A = p.A != null ? p.A : 0.3;
   var Rsau = p.Rs * 0.00465047, Teq = W.Tstar * Math.sqrt(Rsau / (2 * a)) * Math.pow(1 - A, 0.25), S = 5.670374e-8 * Math.pow(W.Tstar, 4) * Math.pow(Rsau / a, 2) / Math.sqrt(1 - (W.ecc || 0) * (W.ecc || 0));
@@ -59,8 +79,12 @@ function worldModel() {
 // Every other fluid keeps the prototype's line exactly.
   var Pa = Ps * 1e5, subl = F.Tb < F.Tt, canLiquid = Pa > F.Pt && (subl ? F.Lv > 0 : F.Tb > F.Tt), Tb = !canLiquid ? F.Tt : subl ? (Pa >= F.Pc ? F.Tc : Math.min(F.Tc, 1 / (1 / F.Tt - 8.314 * Math.log(Pa / F.Pt) / F.Lv))) : 1 / (1 / F.Tb - 8.314 * Math.log(Pa / 101325) / F.L);
 // @end-deviation
-// @verbatim L1728-L1765
-// @rename flat:=>flat:p.fMeas!=null?p.fMeas:
+// @deviation L1727 (#93 3.1) every fluid's liquid-vapour line ends at its critical point (F.Tc, F.Pc in presets.js):
+// the boiling point is capped at Tc, and at or above Pc it is Tc itself (no boiling: a compressed liquid below Tc,
+// a supercritical fluid above it). Same rule as physics/fluids.ts boilingPointK.
+  var superC = Pa >= F.Pc; if (canLiquid) Tb = superC ? F.Tc : Math.min(Tb, F.Tc);
+// @end-deviation
+// @verbatim L1728-L1734
   var state = gas ? 'gas' : Ts < F.Tt ? 'frozen' : canLiquid && Ts < Tb ? 'liquid' : 'vapour';
   if (airless) state = Ts < F.Tt ? 'frozen' : 'vapour';
   // cloud level by following the adiabat up until the fluid saturates
@@ -68,8 +92,48 @@ function worldModel() {
   if (!gas && !airless) for (T = Ts; T > Ts * 0.45; T -= 0.5) { var Pz = Pa * Math.pow(T / Ts, 3.5); if (psat(T) <= F.q * Pz) { Tc = T; break; } }
   var Gam = gv / cp, zc = Tc != null ? (Ts - Tc) / Gam / 1000 : null;
   var Seff = S / 1361, tS = clamp(W.Tstar - 5780, -3180, 1420), sIn = 1.107 + 1.332e-4 * tS + 1.58e-8 * tS * tS - 8.308e-12 * tS * tS * tS - 1.931e-15 * tS * tS * tS * tS, sOut = 0.356 + 6.171e-5 * tS + 1.698e-9 * tS * tS - 3.198e-12 * tS * tS * tS - 5.575e-16 * tS * tS * tS * tS;   // Kopparapu et al. HZ limits
+// @end-verbatim
+// @deviation L1734 (#93 3.6) the inner edge (runaway greenhouse) depends on the planet's mass. Kopparapu et al. 2014
+// (ApJL 787, L29, Table 1, checked against arXiv:1404.5292): S_eff = S0 + a T + b T^2 + c T^3 + d T^4, T = Teff -
+// 5780 K, for 0.1, 1 and 5 Earth masses (the 1 Earth-mass row is the prototype's). Between rows the limit is
+// interpolated in log mass; outside 0.1 to 5 Earth masses the nearest row is used (no extrapolation). measured
+// coefficients of a published model: the limit is model_dependent. Same table as physics/climateBudget.ts.
+  var KOP14 = [[0.1, 0.99, 1.209e-4, 1.404e-8, -7.418e-12, -1.713e-15], [1, 1.107, 1.332e-4, 1.58e-8, -8.308e-12, -1.931e-15], [5, 1.188, 1.433e-4, 1.707e-8, -8.968e-12, -2.084e-15]];
+  var kopS = function (r) { return r[1] + r[2] * tS + r[3] * tS * tS + r[4] * tS * tS * tS + r[5] * tS * tS * tS * tS; };
+  var lMe = clamp(Math.log(p.Me), Math.log(0.1), Math.log(5)), kLo = lMe < 0 ? KOP14[0] : KOP14[1], kHi = lMe < 0 ? KOP14[1] : KOP14[2];
+  sIn = lerp(kopS(kLo), kopS(kHi), (lMe - Math.log(kLo[0])) / Math.log(kHi[0] / kLo[0]));
+// @end-deviation
+// @verbatim L1735-L1736
   var runaway = !gas && W.fluid === 'water' && Ps >= 0.1 && (state === 'vapour' || (Seff > sIn && OCEANF[p.id] > 0));
   if (runaway) state = 'vapour';
+// @end-verbatim
+// @deviation L1736 (#93 3.6) a runaway greenhouse no longer keeps a mild surface (K2-18 b read "runaway" at 401 K).
+// While the ocean evaporates the outgoing radiation is held at the steam limit, 282 W/m^2 (Goldblatt et al. 2013,
+// Nat. Geosci. 6, 661; RUNAWAY.olrLim), so the surface warms until it radiates through the near-infrared windows:
+// the post-runaway state. Its surface temperature depends on the steam column: about 1,500 K under 50 bar of steam and
+// about 1,800 K under 260 bar (one Earth ocean), from the radiative-convective models of Boukrouche et al. 2021
+// (ApJ 919, 130) as quoted by Dorn and Lichtenberg 2021 (ApJL 922, L4). The engine takes the steam pressure to be
+// the surface pressure Ps and interpolates in ln P through those two points, extrapolated outside them [verify]:
+// model_dependent. When that is hotter than the grey-greenhouse Ts, Ts takes it and tau is set so the grey model
+// balances there (the energy budget sees both); the scale height follows Ts. ebStep holds each cell's outgoing
+// radiation at olrLim until the cell reaches Tpost.
+  var RUNAWAY = { olrLim: 282, P1: 50, T1: 1500, P2: 260, T2: 1800 }, Tpost = null;
+  if (runaway) {
+    Tpost = RUNAWAY.T1 + (RUNAWAY.T2 - RUNAWAY.T1) * Math.log(Ps / RUNAWAY.P1) / Math.log(RUNAWAY.P2 / RUNAWAY.P1);
+    if (Tpost > Ts) { Ts = Tpost; tau = (Math.pow(Ts / Teq, 4) - 1) / 0.75; H = Rg * Ts / gv; } else Tpost = null;
+  }
+// @end-deviation
+// @deviation L1736 (#93 3.1) above both its critical temperature and pressure the fluid is supercritical: one dense
+// fluid, no sea surface. The state is set after the runaway test, so supercritical water still counts as boiled off.
+  if (!gas && !airless && superC && Ts >= F.Tc && state === 'vapour') state = 'supercritical';
+// @end-deviation
+// @deviation L1762 (#93 3.3) the ORB[p.id] rename below: the tidal heating reads the preset's own orbit extras p.ob
+// first (cardToWorld writes the host mass from the card's host_mass_msun, the eccentricity and the obliquity) and the
+// prototype's ORB table, which knows only its own presets, after. Code: the @rename only.
+// (#93 3.6) the runaway: rename below hands ebStep the post-runaway temperature and the outgoing-radiation limit.
+// @end-deviation
+// @verbatim L1737-L1765
+// @rename flat:=>flat:p.fMeas!=null?p.fMeas: ORB[p.id]=>(p.ob||ORB[p.id]) runaway:=>Tpost:Tpost,olrLim:runaway?RUNAWAY.olrLim:null,runaway:
   var cov = gas ? 0 : airless ? 0 : state === 'liquid' ? 0.3 + 0.42 * sstep(F.Tt, Math.min(Tb, F.Tt + 70), Ts) : state === 'frozen' ? 0.12 : runaway ? 0.95 : 0.06;
   // colour of the sky: the star's light scattered as lambda^-4, methane removes red
   var bands = [640, 540, 450], ch4 = W.fluid === 'methane' ? 2.1 : 0, sky = bands.map(function (l, n) { return planck(l, W.Tstar) * Math.pow(550 / l, 4) * (n === 0 ? Math.exp(-ch4) : 1); }), mx = Math.max(sky[0], sky[1], sky[2]);
@@ -95,12 +159,12 @@ function worldModel() {
   var dp2 = regime === 'Methane-rich air, blue' ? [[0.24, 0.32, 0.47], [0.5, 0.58, 0.7]] : regime === 'Ammonia clouds' ? [[0.3, 0.22, 0.18], [0.42, 0.44, 0.48]] : regime === 'Water clouds' ? [[0.45, 0.5, 0.6], [0.7, 0.74, 0.8]] : regime === 'Cloudless, deep blue' ? [[0.08, 0.14, 0.34], [0.2, 0.3, 0.55]] : regime === 'Silicate haze, dark blue' ? [[0.04, 0.08, 0.22], [0.12, 0.18, 0.36]] : [[0.3, 0.14, 0.08], [0.45, 0.3, 0.22]];
   var vesc = Math.sqrt(2 * gv * R) / 1000, fx = W.Tstar < 3500 ? 1e-3 : W.Tstar > 6000 ? 5e-6 : Math.pow(10, lerp(-3, -5.3, (W.Tstar - 3500) / 2500)), shoreB = Seff > Math.pow(vesc / 6.1, 4), shoreX = Seff * fx / 5e-6 > Math.pow(vesc / 6.1, 4);   // Zahnle and Catling 2017 shoreline, I proportional to v^4
   var mainN2 = mu < 40, Tcol = airless || gas ? 0 : 1 / ((mainN2 ? 1 / 77.36 : 1 / 194.7) - 8.314 * Math.log(Ps * 1e5 / 101325) / (mainN2 ? 5570 : 25200));
-  var ob = ORB[p.id] || { Ms: 1 }, an = 6.2832 / (p.P * Math.pow(W.orbit, 1.5) * 86400), aM = a * 1.496e11, tide = gas ? 0 : 10.5 * 0.003 * 6.674e-11 * Math.pow(ob.Ms * 1.989e30, 2) * Math.pow(R, 5) * an * (W.ecc || 0) * (W.ecc || 0) / Math.pow(aM, 6) / (4 * Math.PI * R * R);
+  var ob = (p.ob||ORB[p.id]) || { Ms: 1 }, an = 6.2832 / (p.P * Math.pow(W.orbit, 1.5) * 86400), aM = a * 1.496e11, tide = gas ? 0 : 10.5 * 0.003 * 6.674e-11 * Math.pow(ob.Ms * 1.989e30, 2) * Math.pow(R, 5) * an * (W.ecc || 0) * (W.ecc || 0) / Math.pow(aM, 6) / (4 * Math.PI * R * R);
   var phiH = clamp(Math.sqrt(5 / 3 * gv * 15000 * 0.25) / (Om * R), 0.2, 1.3);   // Held and Hou 1980 scaling, tropopause 15 km, contrast 0.25
-  return { Seff: Seff, sIn: sIn, sOut: sOut, shoreB: shoreB, shoreX: shoreX, Tcol: Tcol, tide: tide, phiH: phiH, pco2: pco2, d: p.pal ? p.pal.d : dp2[0], p: p.pal ? p.pal.p : dp2[1], gamK: Gam * 1000 * (gas ? 1 : 0.66),   /* environmental lapse: about 6.5 K/km on Earth (US Standard Atmosphere 1976), not the dry 9.8 */ gas: gas, Teq: Teq, Ts: Ts, S: S, tau: tau, gv: gv, H: H, Om: Om, rotD: rotD, eps: eps, U: U, N: N, jets: jets, LD: LD, sz: sz, Tb: Tb, canLiquid: canLiquid, state: state, Tc: Tc, zc: zc, cov: cov, sky: sky, sun: sun, haze: haze, hazeC: hazeC, z: z, b: b2, s: s2, regime: regime, V: V, airless: airless, runaway: runaway, F: F, flat:p.fMeas!=null?p.fMeas: gas ? clamp(0.7 * Om * Om * R * R * R / (6.674e-11 * M), 0, 0.14) : 0, a: a };
+  return { Seff: Seff, sIn: sIn, sOut: sOut, shoreB: shoreB, shoreX: shoreX, Tcol: Tcol, tide: tide, phiH: phiH, pco2: pco2, d: p.pal ? p.pal.d : dp2[0], p: p.pal ? p.pal.p : dp2[1], gamK: Gam * 1000 * (gas ? 1 : 0.66),   /* environmental lapse: about 6.5 K/km on Earth (US Standard Atmosphere 1976), not the dry 9.8 */ gas: gas, Teq: Teq, Ts: Ts, S: S, tau: tau, gv: gv, H: H, Om: Om, rotD: rotD, eps: eps, U: U, N: N, jets: jets, LD: LD, sz: sz, Tb: Tb, canLiquid: canLiquid, state: state, Tc: Tc, zc: zc, cov: cov, sky: sky, sun: sun, haze: haze, hazeC: hazeC, z: z, b: b2, s: s2, regime: regime, V: V, airless: airless, Tpost:Tpost,olrLim:runaway?RUNAWAY.olrLim:null,runaway: runaway, F: F, flat:p.fMeas!=null?p.fMeas: gas ? clamp(0.7 * Om * Om * R * R * R / (6.674e-11 * M), 0, 0.14) : 0, a: a };
 }
 // @end-verbatim
-// @verbatim L1906-L2147
+// @verbatim L1906-L2101
 /* ---------- lava: rivers, lakes and a magma sea on a hot rocky world ----------
    Same machinery as the water rivers above, with lava in place of runoff. Every constant is cited or tagged.
    1. Magma sea. Where the local surface temperature is above the basalt liquidus (about 1,500 K; solidus about 1,400 K, so
@@ -297,6 +361,12 @@ function ebStep(m, n, dt) {
         var qs = air ? Math.min(psat(Math.max(Tc - EB.elev[k] * 0, 20)) / qRef, 6) : 0, rh = qs > 1e-9 ? q[k] / qs : 0;
         var ic = 1 - Math.exp(-h[k] / 0.15), fs = 1 - Math.exp(-s[k] / 0.05), a0 = isO ? 0.07 + (aIce - 0.07) * ic : 0.22 + (aFrost - 0.22) * fs, cc = clamp((rh - 0.7) / 0.3, 0, 1) * 0.5 * (air ? 1 : 0), alb = a0 + (0.45 - a0) * cc;
         var asr = Se * mu * (1 - alb) + tidef, eps = eps0 / (1 + 0.3 * Math.min(rh, 1) * (air ? 1 : 0)), olr = eps * sg * Tc * Tc * Tc * Tc, Bl = 4 * eps * sg * Tc * Tc * Tc;
+// @end-verbatim
+// @deviation L2101 (#93 3.6) during a runaway greenhouse a cell's outgoing radiation cannot exceed the steam limit
+// m.olrLim (282 W/m^2, Goldblatt et al. 2013) until it reaches the post-runaway temperature m.Tpost (worldModel).
+        if (m.olrLim && m.Tpost && Tc < m.Tpost && olr > m.olrLim) { olr = m.olrLim; Bl = 0; }
+// @end-deviation
+// @verbatim L2102-L2147
         var open = isO && h[k] <= 0 && Tc < (Tb || 1e9);
         var E = air && open ? 0.5 * Math.max(qs - q[k], 0) : 0, wnd = ndWind ? (Math.abs(la) < phH ? -1 : 1) : 0, up = wnd ? clamp(wnd * (EB.elev[ke] - EB.elev[kw]) * 0.7, 0, 1.5) : 0, subA = lock ? Math.acos(clamp(cj * Math.cos(lo) * sx + sl * sy + cj * Math.sin(lo) * sz, -1, 1)) : 0, dPh = (Math.abs(la) - phH) / 0.16, qsP = qs * Math.exp(-1.1 * up) * (lock ? 1 - 0.3 * Math.exp(-subA * subA / 0.5) : (1 + 0.9 * Math.exp(-dPh * dPh)) * (1 - 0.25 * Math.exp(-la * la / 0.03))), P = air ? 0.25 * Math.max(q[k] - qsP, 0) : 0;
         var nb = D * (ae * (T[ke] + T[kw]) + an * T[kn] + as * T[ks]), sum = D * (2 * ae + an + as), Cx = isO ? (h[k] > 0 ? Ci : Co) : Cl, G = 0, lat = Lv * (P - E);
@@ -526,8 +596,13 @@ var GS = null;
 function km(m) { return m >= 1e9 ? fmt(m / 1e9, 1) + ' million km' : fmt(m / 1000) + ' km'; }
 // @end-verbatim
 function worldUi() {
-// @verbatim L2389-L2410
+// @verbatim L2389-L2389
   var m = W.m, p = W.p, F = m.F, gas = m.gas, state = { frozen: F.label + ' is frozen', liquid: F.label + ' is liquid', vapour: m.runaway ? 'Water has boiled off' : F.label + ' is gas', gas: 'All gas' }[m.state];
+// @end-verbatim
+// @deviation L2389 (#93 3.1) the supercritical state worldModel can now return.
+  if (m.state === 'supercritical') state = F.label + ' is supercritical (past its critical point, no sea surface)';
+// @end-deviation
+// @verbatim L2390-L2410
   var rows = [['Starlight here', fmt(m.S) + ' W/m² (' + fmt(m.S / 1361, m.S / 1361 < 10 ? 2 : 0) + '× Earth)'], ['Equilibrium temperature', fmt(m.Teq) + ' K']];
   if (!gas) rows.push(['Average surface temperature', fmt(EB.stats ? EB.stats.mean : m.Ts) + ' K']);
   var day = gas ? m.Teq : m.Ts, tD = p.locked ? day * (1 + 0.38 * m.eps) : day * (1 + 0.15 * m.eps), tN = p.locked ? day * (1 - 0.45 * m.eps) : day * (1 - 0.1 * m.eps);
@@ -551,8 +626,7 @@ function worldUi() {
   rows.push(['Scale height', fmt(m.H / 1000, 1) + ' km'], ['Wind speed', fmt(m.U) + ' m/s'], ['Jets (Rhines)', fmt(m.jets)], ['Storm size', km(m.sz * p.Rj * 71492e3 * 2)]);
 // @end-verbatim
   W.rows = rows; W.mixed = mixed;
-// @verbatim L2414-L2425
-// @rename $('#world-cap').textContent=>W.cap
+// @verbatim L2414-L2424
   var c;
   if (gas) c = (p.locked ? 'Locked to its star, so one giant jet carries heat around the planet and the hot spot sits downwind of the noon point. ' : 'Fast spin splits the winds into many jets, and storms sit in the shear between them. ') + (m.Teq * (1 - 0.45 * m.eps) > 900 ? 'At this temperature the night side glows from its own heat.' : '');
   else if (m.Ts * 1.3 > 1050 && m.airless) c = 'The day side is hot enough to melt rock, so it is a glowing magma ocean.';
@@ -564,6 +638,12 @@ function worldUi() {
   else if (m.state === 'liquid') c = F.label + ' is liquid here.' + (p.locked ? ' Locked planets pile clouds over the noon point, which shades the hottest part of the ocean.' : '');
   else c = 'This fluid cannot stay liquid at this temperature and pressure.';
   if (gas && GAS_NODES[p.id]) c = 'Belts and zones are placed where they are observed, and the deep jets hold them steady. Storms sit trapped between the jets.' + (p.rings ? ' The rings use their measured radii and gaps, with real shadows.' : '');
+// @end-verbatim
+// @deviation L2424 (#93 3.1) caption for a fluid past its critical point (the runaway caption keeps priority).
+  if (!gas && !m.runaway && m.state === 'supercritical') c = F.label + ' is past its critical point here: too hot and too dense to keep a sea, it is one supercritical fluid from the ground up.';
+// @end-deviation
+// @verbatim L2425-L2425
+// @rename $('#world-cap').textContent=>W.cap
   W.cap = c + (gas ? (W.timeSec < 1000 ? ' One second here is 5 minutes, so the planet turns slowly and its clouds barely change.' : ' One second here is one Earth day, viewed from above the turning planet, so you can watch storms drift.') : ' Motion is sped up.');
 // @end-verbatim
 // @verbatim L2429-L2429
@@ -591,9 +671,13 @@ function resetWorld() {
 }
 // @end-verbatim
 function setPreset(p) {
+// @deviation L2446 (#93 3.3) the ORB[p.id] rename below: eccentricity and obliquity come from the preset's own p.ob
+// first (cardToWorld), the prototype's ORB table after. Code: the @rename only.
+// @end-deviation
 // @verbatim L2445-L2446
+// @rename ORB[p.id]=>(p.ob||ORB[p.id])
   W.aimed = false; W.yaw = 0; W.pitch = 0;
-  var ob0 = ORB[p.id] || { e: 0, obl: 0 }; W.ecc = ob0.e || 0; W.obl = ob0.obl || 0; W.spinMode = 'auto'; W.base = p; W.p = applySpin(p); W.fluid = p.fluid; W.Tstar = p.Ts; W.orbit = 1; W.Ps = p.Ps; W.step = 0;
+  var ob0 = (p.ob||ORB[p.id]) || { e: 0, obl: 0 }; W.ecc = ob0.e || 0; W.obl = ob0.obl || 0; W.spinMode = 'auto'; W.base = p; W.p = applySpin(p); W.fluid = p.fluid; W.Tstar = p.Ts; W.orbit = 1; W.Ps = p.Ps; W.step = 0;
 // @end-verbatim
 // @verbatim L2451-L2451
   resetWorld();
@@ -631,6 +715,7 @@ W.gl = new WorldGL(canvas);
 return {
   W: W, EB: EB, ORB: ORB, OCEANF: OCEANF, GAS_NODES: GAS_NODES, FLUIDS: FLUIDS,
   getGS: function () { return GS; },
+  ebStep: ebStep, ebStats: ebStats, ebInit: ebInit,   // #93: the energy budget, for headless tests
   worldModel: worldModel, worldUi: worldUi, resetWorld: resetWorld, setPreset: setPreset, applySpin: applySpin,
   flyMove: flyMove, globePick: globePick, flyCamera: flyCamera, groundKm: groundKm,
   flyAimPeak: flyAimPeak, flyAimDefault: flyAimDefault, altRange: altRange, altToS: altToS, sToAlt: sToAlt,

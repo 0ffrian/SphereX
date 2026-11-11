@@ -41,4 +41,18 @@ FLUIDS.co2.Lv = 15300;
 FLUIDS.co2.Tc = 304.13;
 FLUIDS.co2.Pc = 7.3773e6;
 // @end-deviation
+// @deviation (#93 3.1) critical points for every fluid, so no sea stands above its critical point (core.js caps the
+// boiling line at Tc and calls the fluid supercritical above Tc and Pc). Handbook constants of the pure fluid, as the
+// NIST Chemistry WebBook lists them: water 647.096 K, 22.064 MPa (IAPWS-95, Wagner and Pruss 2002); methane
+// 190.564 K, 4.5992 MPa (Setzmann and Wagner 1991); ammonia 405.40 K, 11.333 MPa (Tillner-Roth et al. 1993);
+// nitrogen 126.192 K, 3.3958 MPa (Span et al. 2000). Same values as physics/fluids.ts.
+// The ammonia-water mixture has a critical locus between pure ammonia (405 K) and pure water (647 K) that depends
+// on the mix, which the prototype does not set; the pure-ammonia end is used, so the engine never draws a liquid
+// where the ammonia end would be supercritical (a conservative choice, model_dependent) [verify].
+FLUIDS.water.Tc = 647.1; FLUIDS.water.Pc = 22.064e6;
+FLUIDS.methane.Tc = 190.56; FLUIDS.methane.Pc = 4.599e6;
+FLUIDS.ammonia.Tc = 405.4; FLUIDS.ammonia.Pc = 11.33e6;
+FLUIDS.nitrogen.Tc = 126.19; FLUIDS.nitrogen.Pc = 3.3958e6;
+FLUIDS.ammoniaWater.Tc = 405.4; FLUIDS.ammoniaWater.Pc = 11.33e6;
+// @end-deviation
 export { FLUIDS, WP };

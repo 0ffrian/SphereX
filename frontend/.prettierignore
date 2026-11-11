@@ -7,3 +7,4 @@ package-lock.json
 src/engine/worlds/*.js
 src/engine/rocks/source.ts
 .bench-ref
+src/engine/stars/protoStar*.js

@@ -1,13 +1,13 @@
 // Issue #71 stream X (D-37): the star engine's inputs from any star card. The engine wants a preset
 // {T, R, M, P, dwarf}; this fills it from the card and, where the card is silent, from the
 // prototype's own tier chain (D-32): radius and mass from the Mamajek main-sequence table, the
-// rotation period from the Sun's Rossby number through Wright's turnover time. Every value carries
+// rotation period from the Sun's Rossby number through the Reiners et al. 2022 turnover time (12.3 d L^-1/2). Every value carries
 // one tag (D-02). A missing temperature refuses: nothing is drawn and it is listed in `missing`.
 // Brown dwarfs, Miras and anything that is not a star are out of scope (a Mira has no surface).
 import type { ObjectCard, Tag } from '@/contract';
 import {
   GIANT_LOGG_MAX,
-  convectiveTurnoverDays,
+  turnoverTimeDays,
   massFromRadius,
   massFromTeff,
   radiusFromTeff,
@@ -179,11 +179,11 @@ export function cardToStar(card: ObjectCard | null | undefined): StarFromCard | 
   if (p && positive(p.value))
     rotation = { value: p.value / 24, tag: p.tag, note: `from the card (${p.source})` };
   else {
-    const v = sunRossby() * convectiveTurnoverDays(mass.value);
+    const v = sunRossby() * turnoverTimeDays(radius.value, teff.value);
     rotation = {
       value: v,
       tag: 'inferred_from_analog',
-      note: `the Sun's Rossby number (${sunRossby().toFixed(2)}) assumed, with Wright et al. 2011's turnover time`,
+      note: `the Sun's Rossby number (${sunRossby().toFixed(2)}) assumed, with the Reiners et al. 2022 turnover time (12.3 d L^-1/2)`,
     };
     assumed.push(`rotation period ${v.toFixed(1)} days: the Sun's Rossby number assumed`);
   }
