@@ -41,7 +41,7 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
 |---|---|---|---|
 | `GET /v1/objects/{id}/path[?start=&end=]` | the Horizons path seen from SPHEREx, cache only, filled by the object job; planned errors 400 `path_span_too_long`, 404 `not_moving` | Q-141 (open, Kevin) | A19.5 ([moving-objects/track.md](moving-objects/track.md#a195-path-endpoint)); schema A19.13 |
 | `GET /v1/objects/{id}/track.ecsv` | Track export (shared ECSV writer with Area search) | Q-145 (open, Kevin) | A19.9 ([moving-objects/track-contract.md](moving-objects/track-contract.md)) |
-| `/v1/areas/...` (list, one area, known objects, dots, tracks, stamps, export) | Area search | Q-146 item 6 | A17.8 ([moving-objects/area-contract.md](moving-objects/area-contract.md#a178-endpoints)) owns the route list |
+| `/v1/areas/...` (list, one area, known objects, dots, tracks, checks (gated), stamps, export); planned errors 404 `area_not_found`, 404 `dot_not_found`, 503 `stamp_unavailable` | Area search | Q-146 item 6; payload shapes Q-208 (proposed) | A17.8 ([moving-objects/area-contract.md](moving-objects/area-contract.md#a178-endpoints)) owns the route list |
 
 **Rules shared by every route.**
 
