@@ -1,6 +1,6 @@
 // Area search state (A18.9; issue #96, P8). The `area` slice and its actions, composed into the
-// app store by store.ts (D-17: store.ts stays Moon's; the hand-over of this file is proposed in
-// Q-406). Fields P9 needs (`known`, `card`, `minimised`, `selectedResult`, `step`) are declared
+// app store by store.ts (D-17: store.ts stays Moon's; this file is Atish's, a hand-over agreed by
+// Moon on 11 Nov 2026, Q-406 (8)). Fields P9 needs (`known`, `card`, `minimised`, `selectedResult`, `step`) are declared
 // here so P9 builds on the same type.
 //
 // Requests: one AbortController per area, as the sky search's; a newer square or area aborts the
@@ -73,7 +73,7 @@ export interface AreaState {
 }
 
 /**
- * P9 PLACEHOLDER (Q-406 (7)): the final state is shown until the replay lands. When an area opens,
+ * P9 PLACEHOLDER (Q-406 (6)): the final state is shown until the replay lands. When an area opens,
  * both layers are on at the last step (5, checked), so the verdicts and labels show at once. P9
  * replaces this one constant: its Options card opens with the layers off and its Discovery replay
  * drives `step`, so a "found blind" label is not shown before Known or Discovery is chosen

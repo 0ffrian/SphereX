@@ -201,9 +201,27 @@ export function AreaLayer() {
       g.style.height = `${Math.max(1, y1 - y0).toFixed(1)}px`;
     };
 
+    /** Inactive and already emptied: nothing to do until the tool is chosen (review F9). */
+    let cleared = false;
     const redraw = () => {
       frame = 0;
       if (!have) return;
+      if (useShellStore.getState().tool !== 'area' || !AREA_TOOL_ENABLED) {
+        if (cleared) return;
+        // A 0 x 0 backing store: no pixels kept or composited while the sky is used without Area.
+        canvas.width = 0;
+        canvas.height = 0;
+        dpr = 0;
+        for (const t of sceneRef.current?.tracks ?? []) {
+          t.sx.fill(Number.NaN);
+          t.sy.fill(Number.NaN);
+        }
+        statsRef.current = emptyStats();
+        placeGroup(null);
+        cleared = true;
+        return;
+      }
+      cleared = false;
       const nextDpr = Math.min(window.devicePixelRatio || 1, AREA_MAX_DPR);
       const bw = Math.max(1, Math.round(w * nextDpr));
       const bh = Math.max(1, Math.round(h * nextDpr));
@@ -215,20 +233,9 @@ export function AreaLayer() {
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       redraws.current++;
-      const shell = useShellStore.getState();
       const s = useAppStore.getState();
       const a = s.area;
       const scene = sceneRef.current;
-      if (shell.tool !== 'area' || !AREA_TOOL_ENABLED) {
-        ctx.clearRect(0, 0, w, h);
-        for (const t of scene?.tracks ?? []) {
-          t.sx.fill(Number.NaN);
-          t.sy.fill(Number.NaN);
-        }
-        statsRef.current = emptyStats();
-        placeGroup(null);
-        return;
-      }
       const entry = openAreaEntry(a);
       const sq = squareOf(a);
       let outline: AreaOutline | null = null;
