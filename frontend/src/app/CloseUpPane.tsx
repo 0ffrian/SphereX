@@ -16,6 +16,7 @@ import { altRange } from '@/viewer/orbit/orbitMath';
 import { ProvenanceBadge } from './Badge';
 import { buttonClass, pressedClass } from './ui';
 import { StarCloseUp } from './StarCloseUp';
+import { RockCloseUp } from './RockCloseUp';
 import { STAR_CLOSEUP_TAG, useStarCloseUp } from './starCloseUp';
 
 export type CloseUpKind = 'orbit' | 'star' | 'body';
@@ -198,6 +199,7 @@ export function CloseUpPane() {
           onKeyDown={onKeyDown}
         />
       )}
+      {kind === 'body' && <RockCloseUp active={open} />}
       {kind === 'star' && starProps && open && (
         <div className="absolute inset-0 bg-black" data-testid="star-closeup">
           <StarCloseUp {...starProps} className="absolute inset-0" />
