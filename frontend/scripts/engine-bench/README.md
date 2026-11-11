@@ -27,6 +27,20 @@ shader cache; without it every page gets a fresh, empty profile, which is what a
 | `engines.html?which=star-globe` | Cold compile of every program the star engine (`star-globe`, `star-closeup`) or the rock engine (`rock`) builds, timed from `compileShader` to the return of the `LINK_STATUS` read.                                                                                                                                                                                                                               |
 | `fly.html?id=t1f&alt=3`         | The fly view from a fixed camera: frame time, and `scale_corr`, the picture at resolution scale 1 against the picture after the resolution scaler shrank to about 0.5 (upsampled; `all` = luminance, `detail` = its high-pass part). With `ref=<module folder>` it also draws with a second copy of the engine and reports the pixel difference (`mean_level`, `over8_pct` of channels off by more than 8 levels). |
 
+Issue #93 phase 2 (repeating patterns):
+
+- `patterns.html?what=corr&kind=world&ref=1`: N card objects of one kind (`world`, `gas`, `star`, `rock`) that differ
+  only in their id, drawn by this engine and (with `ref=1`) by the copy in `/.bench-ref/` with the seed it used.
+  Reports the pairwise correlation of the pictures (luminance `all`, high-pass `detail`), `shared` (the share of the
+  detail's variance common to all pictures: 1 when the seed changes nothing, about 1/N for independent patterns) and
+  `mad` (mean absolute luminance difference of a pair). `what=collide` draws two Earth-like card worlds whose old seeds
+  collided (FNV-1a mod 997). `what=presets` compares the prototype's presets (worlds on the globe, star rows, rock
+  bodies) with the copy in `/.bench-ref/` pixel by pixel; they must not differ. Needs `.bench-ref/worlds`, `stars`
+  and `rocks` (the engine folders of the older commit).
+- `flypath.html?id=t1f&alt=3&ref=/.bench-ref/worlds/`: the fly camera steps sideways (`step` km, `n` frames); for each
+  pair of frames, 32 x 32 ground tiles are matched within +-8 px. A planet-fixed texture moves rigidly and matches
+  well (`mean`, `p10` of the best matches); keep `step` so the ground moves fewer than 8 px a frame.
+
 Examples:
 
 ```sh
@@ -41,6 +55,10 @@ committed), then pass it as `ref`:
 mkdir -p .bench-ref/worlds
 for f in core.js helpers.js shaders.js presets.js terrain.js gas.js; do
   git show <commit>:frontend/src/engine/worlds/$f > .bench-ref/worlds/$f
+done
+# patterns.html also needs the older stars/ and rocks/ folders and the worlds' .ts files, whole:
+for d in worlds stars rocks; do mkdir -p .bench-ref/$d
+  for f in $(git ls-tree --name-only <commit> src/engine/$d/ | grep -v test); do git show <commit>:./$f > .bench-ref/$d/$(basename $f); done
 done
 node scripts/engine-bench/run.js --profile /tmp/sx-fly 'fly.html?id=t1f&alt=3&ref=/.bench-ref/worlds/'
 ```
