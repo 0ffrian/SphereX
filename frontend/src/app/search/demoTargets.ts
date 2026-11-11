@@ -135,6 +135,13 @@ export const DEMO_TARGETS: readonly DemoTarget[] = [
     id: 'simbad-m-1',
     classLabel: null,
   },
+  {
+    name: '433 Eros',
+    aliases: ['eros', '433'],
+    query: '433 Eros',
+    id: 'sbdb-20000433',
+    classLabel: 'asteroid with a shape model · S',
+  },
 ];
 
 /** The five A1.1 targets (rows 1 to 5): the sky view marks these when they are cached. */

@@ -62,11 +62,12 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
     expect(input().getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('opens on focus with all 16 rows in order, and wires the ARIA ids', () => {
+  it('opens on focus with all 17 rows in order, and wires the ARIA ids', () => {
     focus();
-    expect(options()).toHaveLength(16);
+    expect(options()).toHaveLength(17);
     expect(names().slice(0, 3)).toEqual(["Barnard's Star", 'Epsilon Indi B', 'WISE 0855-0714']);
     expect(names()[15]).toBe('Crab Nebula');
+    expect(names()[16]).toBe('433 Eros'); // row 17, the Track MVP (#73)
     expect(input().getAttribute('aria-expanded')).toBe('true');
     expect(input().getAttribute('aria-controls')).toBe(listbox()!.id);
     expect(input().getAttribute('aria-activedescendant')).toBeNull();
@@ -77,7 +78,7 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
     expect(status().getAttribute('aria-live')).toBe('polite');
     expect(status().textContent).toBe('');
     focus();
-    expect(status().textContent).toBe('16 demo objects. Use up and down arrows.');
+    expect(status().textContent).toBe('17 demo objects. Use up and down arrows.');
     type('oumuamua');
     expect(status().textContent).toBe('1 demo object. Use up and down arrows.');
     type('zzzzqq');
@@ -104,7 +105,7 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
       input().focus();
       input().select();
     });
-    expect(options()).toHaveLength(16);
+    expect(options()).toHaveLength(17);
     expect(document.activeElement).toBe(input());
   });
 
@@ -119,7 +120,7 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
     act(() => {
       input().click();
     });
-    expect(options()).toHaveLength(16);
+    expect(options()).toHaveLength(17);
   });
 
   it('Enter with keyCode 229 (an IME step) does not pick a row', () => {
@@ -212,14 +213,14 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
 
   it('text that matches no row shows the hint and still submits through parseQuery', () => {
     focus();
-    type('433 Eros');
+    type('16 Psyche'); // not a row (433 Eros became row 17 in #73)
     expect(options()).toHaveLength(0);
     expect(host.textContent).toContain(NO_MATCH_HINT);
     expect(NO_MATCH_HINT).toBe('No demo object matches. Press Enter to search the catalogues.');
     key('Enter'); // no highlighted row: nothing is picked
     expect(skySearch).not.toHaveBeenCalled();
     act(() => host.querySelector('form')!.requestSubmit());
-    expect(skySearch).toHaveBeenCalledWith({ q: '433 Eros', kind: 'name', origin: 'input' });
+    expect(skySearch).toHaveBeenCalledWith({ q: '16 Psyche', kind: 'name', origin: 'input' });
     expect(listbox()).toBeNull(); // submit closes the list
   });
 

@@ -98,6 +98,7 @@ def test_search_list_rows_have_a_demo_group_and_unique_aliases() -> None:
     for name in [
         "TRAPPIST-1 f", "Kepler-186 f", "Bennu", "'Oumuamua", "3I/ATLAS", "HD 189733 b",
         "TRAPPIST-1 e", "K2-18 b", "Comet 67P", "Orion Nebula", "Crab Nebula",
+        "433 Eros",  # row 17; in the warm start's group (Q-197, #73)
     ]:  # fmt: skip
         assert name in demo, name
     seen: dict[str, str] = {}
