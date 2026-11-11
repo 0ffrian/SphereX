@@ -25,6 +25,7 @@ list is complete (issue #95, A19.6), with the same keys as ``/overlays`` (``star
 from __future__ import annotations
 
 import argparse
+import csv
 import sys
 import tomllib
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -110,7 +111,14 @@ def prefetch_overlays(ctx: Context, obj: ResolvedObject, refresh: bool) -> dict[
     for cat in CATALOGS:
         try:
             tbl, table, truncated, _ = fetch_catalog(ctx, cat, cone, refresh=refresh)
-        except (CacheMissOffline, UpstreamUnavailable, UpstreamError, ValueError, KeyError) as exc:
+        except (
+            CacheMissOffline,
+            UpstreamUnavailable,
+            UpstreamError,
+            ValueError,
+            KeyError,
+            csv.Error,
+        ) as exc:
             out[cat] = f"FAILED ({exc})"
         else:
             out[cat] = f"{len(tbl.ids)} sources from {table}" + (
@@ -140,6 +148,7 @@ def prefetch_mover_overlays(
                 UpstreamError,
                 ValueError,
                 KeyError,
+                csv.Error,
             ) as exc:
                 parts.append(f"visit {v.visit} FAILED ({exc})")
             else:

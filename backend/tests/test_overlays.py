@@ -429,6 +429,83 @@ def test_mover_live_cones_are_capped_per_request(
     assert "overlay:gaia" in body["missing"]  # the started ones failed; failure wins
 
 
+def test_mover_cones_pend_without_blocking_fixed_cones(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review F1/F6: 10 visits online, every live visit cone blocked. The mover reports
+    ``:pending``; a fixed object's cones still complete (own pool); after release, polling ends
+    with every visit cone fetched live exactly once."""
+    ctx = make_context(make_settings(tmp_path / "cache", offline=False, overlay_wait_s=0.05))
+    frames = FrameService(ctx)
+    mover: Any = SimpleNamespace(id="sbdb-mover", moving=True)
+    fixed: Any = SimpleNamespace(id="fixed", moving=False)
+    by_id = {
+        "sbdb-mover": FramesResult("sbdb-mover", _synthetic_visits(10), [], None),
+        "fixed": FramesResult("fixed", [], [], None),
+    }
+    monkeypatch.setattr(frames, "get_frames", lambda obj, **kw: by_id[obj.id])
+    stub_served = SimpleNamespace(entry=None, from_cache=False)
+    fixed_cone = overlays_mod.Cone(200.0, -30.0, 0.08, [], stub_served)  # type: ignore[arg-type]
+    monkeypatch.setattr(overlays_mod, "overlay_cone", lambda ctx, obj, **kw: fixed_cone)
+
+    release = threading.Event()
+    lock = threading.Lock()
+    done: set[str] = set()  # digests "in the cache"
+    live: dict[str, int] = {}
+    fixed_threads: list[str] = []
+
+    def fake_get_meta(key: Any) -> Any:
+        return {} if key.digest in done else None
+
+    monkeypatch.setattr(ctx.cache, "get_meta", fake_get_meta)
+
+    def fetch(ctx_: Any, cat: Any, cone: Any, **kw: Any) -> Any:
+        tbl = overlays_mod.CatalogTable(
+            cat, [], np.zeros(0), np.zeros(0), np.zeros(0), np.zeros(0), np.zeros(0), []
+        )
+        if not isinstance(cone, stars.StarCone):  # the fixed object's cone
+            fixed_threads.append(threading.current_thread().name)
+            return tbl, "fixed", False, stub_served
+        digest = stars.cone_key(cat, cone).digest
+        with lock:
+            cached = digest in done
+            if not cached:
+                live[digest] = live.get(digest, 0) + 1
+        if not cached:
+            release.wait(10)
+            with lock:
+                done.add(digest)
+        return tbl, "t", False, stub_served
+
+    monkeypatch.setattr(overlays_mod, "fetch_catalog", fetch)
+    service = overlays_mod.OverlayService(frames)
+    try:
+        for _ in range(2):
+            body = service.get_overlays(mover).body
+            assert {"overlay:gaia:pending", "overlay:wise:pending"} <= set(body["missing"])
+        fixed_body = service.get_overlays(fixed).body
+        assert all(c["available"] for c in fixed_body["catalogs"])
+        assert fixed_threads and all(t.startswith("sx-cat") for t in fixed_threads)
+
+        release.set()
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            body = service.get_overlays(mover).body
+            if not any(m.startswith("overlay:") for m in body["missing"]):
+                break
+            time.sleep(0.05)
+        assert not any(m.startswith("overlay:") for m in body["missing"]), body["missing"]
+    finally:
+        service.close()
+        frames.close()
+    keys = {
+        stars.cone_key(c, v.cone).digest
+        for v in stars.mover_visits(_synthetic_visits(10), ctx.settings.cutout_size_arcsec)
+        for c in ("gaia", "wise")
+    }
+    assert set(live) == keys and all(n == 1 for n in live.values())
+
+
 def test_fixed_target_overlays_have_empty_masks(client: TestClient) -> None:
     body = _overlays(client, _oid(client, "WISE 0855"))
     assert all(f["masks"] == [] for f in body["frames"])
