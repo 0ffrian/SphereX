@@ -41,6 +41,8 @@ export interface RockFromCard {
   >;
   /** The card has a shape model: the mesh replaces the generated lumps (see meshRadial). */
   meshUrl: string | null;
+  /** Where the card differs from the artifact preset that is drawn instead (empty for every other body). */
+  mismatches: string[];
 }
 
 export type RockRefusal = { refused: true; reason: string; missing: string[] };
@@ -254,10 +256,37 @@ export function cardToRock(
       },
     },
     meshUrl,
+    mismatches: [],
   };
   if (fromArtifact) {
-    // The artifact's colour and seed are part of its look; the card's size, spin and albedo are
-    // listed as before, the artifact's own values are the ones drawn.
+    // The artifact's colour and seed are part of its look, and its size, shape, spin, albedo and density are
+    // what is drawn: the inputs show those, and where the card says something else that is reported.
+    const pr = fromArtifact;
+    const same = (a: number, b: number) => (Number.isFinite(a) && Number.isFinite(b) ? Math.abs(a - b) <= 0.01 * Math.max(Math.abs(a), Math.abs(b)) : a === b);
+    const why = "the approved preview's example value (this body is one of its own examples)";
+    const size = (d: number) => (d < 1 ? `${fmt(d * 1000)} m` : `${fmt(d, 1)} km`);
+    const note = (name: string, card: string, drawn: string) =>
+      out.mismatches.push(`${name}: the card has ${card} but the preview's example has ${drawn}; the example is drawn`);
+    if (!same(pr.D, D)) {
+      note('size', size(D), size(pr.D));
+      out.inputs.size = { value: size(pr.D), tag: 'artistic', why };
+    }
+    if (!same(pr.ab, ab)) {
+      note('shape', shape.value, `${fmt(pr.ab, 1)} : 1`);
+      out.inputs.shape = { value: `${fmt(pr.ab, 1)} : 1`, tag: 'artistic', why };
+    }
+    if (!same(pr.P, P)) {
+      note('spin', spin.value, `${fmt(pr.P, 1)} h`);
+      out.inputs.spin = { value: `${fmt(pr.P, 1)} h`, tag: 'artistic', why };
+    }
+    if (!same(pr.A, A)) {
+      note('reflectivity', albedo.value, `${fmt(pr.A * 100, 1)}%`);
+      out.inputs.albedo = { value: `${fmt(pr.A * 100, 1)}%`, tag: 'artistic', why };
+    }
+    if (!same(pr.rho, rho)) {
+      note('density', density.value, `${fmt(pr.rho)} kg/m³`);
+      out.inputs.density = { value: `${fmt(pr.rho)} kg/m³`, tag: 'artistic', why };
+    }
     out.inputs.colour = {
       value: "the artifact's tint",
       tag: 'artistic',

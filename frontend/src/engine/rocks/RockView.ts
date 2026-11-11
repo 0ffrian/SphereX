@@ -4,7 +4,6 @@
 // `loop`) without its DOM: Pause, Surface age and drag to turn are driven through this class.
 // Raw WebGL2 on its own canvas (D-37 overrides "three r187 TSL only" for generated bodies).
 import * as E from './source';
-/* eslint-disable @typescript-eslint/no-explicit-any -- the prototype engine is untyped JavaScript */
 const R: any = E.R;
 const RockGL: any = E.RockGL;
 const buildRock: any = E.buildRock;
@@ -33,7 +32,19 @@ export interface RockStats {
   fast: boolean;
 }
 
+let supportedCache: boolean | null = null;
+
+/** Release a canvas's WebGL context now (the browser keeps only a few alive). */
+function loseContext(canvas: HTMLCanvasElement): void {
+  try {
+    canvas.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();
+  } catch {
+    /* already gone */
+  }
+}
+
 export class RockView {
+  private lostCb: (() => void) | null = null;
   private views: View[] = [];
   private RM: any = null;
   private raf = 0;
@@ -53,13 +64,23 @@ export class RockView {
     this.raf = requestAnimationFrame(this.loop);
   }
 
-  /** The canvas can start WebGL2? (false: the caller keeps the three.js viewer, D-32). */
+  /** The canvas can start WebGL2? (false: the caller keeps the three.js viewer, D-32). Checked once; the probe context is released. */
   static supported(): boolean {
-    try {
-      return !!document.createElement('canvas').getContext('webgl2');
-    } catch {
-      return false;
+    if (supportedCache === null) {
+      try {
+        const gl = document.createElement('canvas').getContext('webgl2');
+        supportedCache = !!gl;
+        gl?.getExtension('WEBGL_lose_context')?.loseContext();
+      } catch {
+        supportedCache = false;
+      }
     }
+    return supportedCache;
+  }
+
+  /** Called when a canvas's WebGL context is lost, so the caller can fall back to the old path. */
+  onContextLost(cb: (() => void) | null): void {
+    this.lostCb = cb;
   }
 
   /** Attach a canvas. Throws if WebGL2 is not available. */
@@ -100,7 +121,13 @@ export class RockView {
       this.dirty = true;
     };
     canvas.addEventListener('keydown', key);
+    const lost = (e: Event) => {
+      e.preventDefault();
+      this.lostCb?.();
+    };
+    canvas.addEventListener('webglcontextlost', lost);
     view.off = () => {
+      canvas.removeEventListener('webglcontextlost', lost);
       canvas.removeEventListener('pointerdown', down);
       canvas.removeEventListener('pointermove', move);
       canvas.removeEventListener('pointerup', end);
@@ -115,6 +142,7 @@ export class RockView {
     return () => {
       view.off();
       this.views = this.views.filter((v) => v !== view);
+      loseContext(canvas);
     };
   }
 
@@ -250,6 +278,20 @@ export class RockView {
   draw(): void {
     this.drawAll();
   }
+  /** Turn the body one step (the on-screen arrows; the same step as the arrow keys). */
+  rotate(dir: 'left' | 'right' | 'up' | 'down'): void {
+    if (dir === 'left') R.yaw -= 0.1;
+    else if (dir === 'right') R.yaw += 0.1;
+    else if (dir === 'up') R.pitch = clamp(R.pitch - 0.1, -1.4, 1.4);
+    else R.pitch = clamp(R.pitch + 0.1, -1.4, 1.4);
+    this.dirty = true;
+  }
+  /** Back to the pose the body opened with. */
+  resetPose(): void {
+    R.yaw = 0.6;
+    R.pitch = 0.25;
+    this.dirty = true;
+  }
   /** Set the pose directly (tests). */
   pose(yaw: number, pitch: number, spin = 0): void {
     R.yaw = yaw;
@@ -285,7 +327,11 @@ export class RockView {
   dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
-    for (const v of this.views) v.off();
+    for (const v of this.views) {
+      v.off();
+      loseContext(v.canvas);
+    }
     this.views = [];
+    this.lostCb = null;
   }
 }

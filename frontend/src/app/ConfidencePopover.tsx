@@ -24,6 +24,7 @@ import {
   type Part,
 } from '@/viewer/confidenceFormula';
 import { FormulaMath } from './FormulaMath';
+import { ERROR_BARS_NOTE } from './worldNotes.generated';
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 const PART_COLOUR: Record<Part, string> = { d: '#4ade80', p: '#38bdf8', a: '#52525b' };
@@ -206,6 +207,9 @@ export function ConfidencePopover({
             <b>Why there is no 3D model.</b> Found: {c.found} Needed: {c.needed}
           </p>
         )}
+        <p className="sx-acc-rules" data-testid="formula-error-bars">
+          {ERROR_BARS_NOTE}
+        </p>
         <p className="sx-acc-rules sx-acc-last">{c.weights_note}</p>
     </>
   );

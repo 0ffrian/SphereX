@@ -16,6 +16,11 @@ import {
 } from '@/physics/cometGas';
 import { ProvenanceBadge } from './Badge';
 import { SpectrumChart } from './spectrum/SpectrumChart';
+import { FormulaMath } from './FormulaMath';
+import { COMET_FORMULA_NOTE, COMET_FORMULA_PLAIN } from './worldNotes.generated';
+
+/** The preview's formula, set in KaTeX (its plain twin is generated from the preview). */
+const COMET_FORMULA_LATEX = String.raw`N = \frac{4\pi\,\Delta^{2} F}{g\,h\,\nu} \;\to\; Q = \frac{2\,v\,N}{\pi\,\rho}`;
 
 const UNIX_JD = 2440587.5;
 /** A Julian date as a UTC calendar date, e.g. "11 Dec 2025". Display only. */
@@ -144,6 +149,11 @@ export function EmissionsPanel({
           })}
         </tbody>
       </table>
+      <div className="flex flex-col gap-1" data-testid="emissions-formula">
+        <h4 className="text-sm font-medium">From a SPHEREx gas band to a production rate</h4>
+        <FormulaMath latex={COMET_FORMULA_LATEX} plain={COMET_FORMULA_PLAIN} testId="emissions-formula-math" />
+        <p className="text-xs text-neutral-300">{COMET_FORMULA_NOTE}</p>
+      </div>
       {interpolated && (
         <p className="text-xs text-neutral-300" data-testid="emissions-guess">
           Nothing was observed between August and December 2025. The amounts here are a straight

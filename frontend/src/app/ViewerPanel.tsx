@@ -54,7 +54,8 @@ import { StarFlarePanel } from './StarFlarePanel';
 import { RockStage } from './build/RockStage';
 import { StarGlobeStage, useEngineStar } from './StarEngineStage';
 import { WorldGlobeStage, useEngineWorld } from './WorldEngineStage';
-import { useWorldStore } from './worldStore';
+import { engineKey, useWorldStore } from './worldStore';
+import { useViewControls } from './engineView';
 import { MouldStrip, type StripHandle } from './build/MouldStrip';
 import { useMould, type MouldPhase } from './build/useMould';
 import { usesBrowserSeed } from '@/viewer/mould/mouldSteps';
@@ -204,6 +205,11 @@ export const GAS_PACING_CHOICES = [
   { value: 1, label: '1 day per second' },
 ] as const;
 
+/** A control's name; when it is off the reason is part of the name (never a silent button). */
+function viewOff(label: string, off: string | null): string {
+  return off ? `${label}. Not available: ${off}` : label;
+}
+
 export function gasPacingStatus(value: 0 | 1): string {
   return value === 1
     ? 'One second here is one Earth day. The view stays above the turning planet, so you can watch storms drift.'
@@ -222,10 +228,12 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const card = blocked ? null : storeCard;
   // Issue #71 stream X (D-37): the prototype's star engine draws star cards in the build pane; null keeps the TSL path.
   const engineStarCard = useEngineStar();
-  const [engineFailed, setEngineFailed] = useState(false);
   // Issue #71 stream Y (D-37): the prototype's world engine draws planets and gas giants; null keeps the old path.
   const engineWorldCard = useEngineWorld();
   const worldFailedId = useWorldStore((s) => s.failedId);
+  const starFailedId = useWorldStore((s) => s.starFailedId);
+  // A rock engine draws the body: reported by RockStage once its canvas is attached.
+  const [rockOwns, setRockOwns] = useState(false);
   const storedParams = blocked ? null : storeParams;
   const seedOffset = pane?.seedOffset ?? 0;
   // "New seed" (issue #60): the same params with another seed; the same card + seed always give
@@ -615,17 +623,29 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const nothingDrawn = plan && plan.threeD && !showsBody(plan) ? nothingDrawnReason(plan) : null;
   const defaultsShown = plan?.missing.filter((m) => m.defaultShown) ?? [];
   const notDrawn = plan?.missing.filter((m) => !m.defaultShown) ?? [];
-  const disabled = viewer === null;
+  const vc = useViewControls();
   // The close-up pane (issue #71 stream H, Q-275) fills the left half of the app, over the sky, while
   // this viewer stays in the build pane: it opens with the build (mock-up `cuOpen`) and closes with
   // it (`cuClose`). The viewer and plan go to a small store the pane reads. The toggle next to Feel
   // hides or shows it.
   const closeKind = pane ? closeUpKindOf(params?.type) : null;
-  const engineStar = pane && !engineFailed && honesty !== 'measured' && plan?.threeD && card && !blocked ? engineStarCard : null;
+  const engineStar =
+    pane && honesty !== 'measured' && plan?.threeD && card && !blocked && engineStarCard && starFailedId !== engineKey(card.id, engineStarCard.preset.id)
+      ? engineStarCard
+      : null;
   const engineWorld =
-    pane && honesty !== 'measured' && plan?.threeD && card && !blocked && engineWorldCard && worldFailedId !== engineWorldCard.preset.id
+    pane && honesty !== 'measured' && plan?.threeD && card && !blocked && engineWorldCard && worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
       ? engineWorldCard
       : null;
+  // D-37: while an engine draws the body the three.js viewer builds and draws nothing under it.
+  const engineOwns = engineStar !== null || engineWorld !== null || rockOwns;
+  useEffect(() => {
+    viewer?.setEngineOwned?.(engineOwns);
+  }, [viewer, engineOwns]);
+  const tintTag = plan?.tint.tag ?? null;
+  const tintKey = plan?.tint.rgb.join(',') ?? '';
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- tintKey stands for the rgb values
+  const rockTint = useMemo<[number, number, number] | null>(() => (tintTag && plan ? [plan.tint.rgb[0]!, plan.tint.rgb[1]!, plan.tint.rgb[2]!] : null), [tintTag, tintKey]);
   // Hidden by the user, or held back until the build has shifted to the right half (stream U).
   const closeHidden = useCloseUpStore((s) => s.hidden || s.held);
   const closeInfo = useCloseUpStore((s) => s.info);
@@ -788,17 +808,18 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             params={params}
             plan={plan}
             honesty={honesty}
-            tint={plan?.tint.tag ? [...plan.tint.rgb] : null}
+            tint={rockTint}
             reducedMotion={reducedMotion}
+            onEngine={setRockOwns}
           />
           {engineStar && (
-            <StarGlobeStage key={engineStar.preset.id} star={engineStar} onFail={() => setEngineFailed(true)} />
+            <StarGlobeStage key={engineStar.preset.id} star={engineStar} onFail={() => useWorldStore.getState().failStar(engineKey(card?.id, engineStar.preset.id))} />
           )}
           {engineWorld && (
             <WorldGlobeStage
               key={engineWorld.preset.id}
               world={engineWorld}
-              onFail={() => useWorldStore.getState().fail(engineWorld.preset.id)}
+              onFail={() => useWorldStore.getState().fail(engineKey(card?.id, engineWorld.preset.id))}
             />
           )}
           {!pane && params && plan?.threeD && (
@@ -912,10 +933,10 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
               key={dir}
               type="button"
               className={buttonClass}
-              aria-label={label}
-              title={label}
-              disabled={disabled}
-              onClick={() => viewer?.rotate(dir)}
+              aria-label={viewOff(label, vc.rotateOff)}
+              title={vc.rotateOff ?? label}
+              disabled={vc.rotateOff !== null}
+              onClick={() => vc.rotate(dir)}
             >
               <span aria-hidden="true">{glyph}</span>
             </button>
@@ -923,28 +944,30 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           <button
             type="button"
             className={buttonClass}
-            aria-label="Zoom in"
-            title="Zoom in"
-            disabled={disabled}
-            onClick={() => viewer?.zoom('in')}
+            aria-label={viewOff('Zoom in', vc.zoomOff)}
+            title={vc.zoomOff ?? 'Zoom in'}
+            disabled={vc.zoomOff !== null}
+            onClick={() => vc.zoom('in')}
           >
             <span aria-hidden="true">+</span>
           </button>
           <button
             type="button"
             className={buttonClass}
-            aria-label="Zoom out"
-            title="Zoom out"
-            disabled={disabled}
-            onClick={() => viewer?.zoom('out')}
+            aria-label={viewOff('Zoom out', vc.zoomOff)}
+            title={vc.zoomOff ?? 'Zoom out'}
+            disabled={vc.zoomOff !== null}
+            onClick={() => vc.zoom('out')}
           >
             <span aria-hidden="true">−</span>
           </button>
           <button
             type="button"
             className={buttonClass}
-            disabled={disabled}
-            onClick={() => viewer?.resetView()}
+            aria-label={viewOff('Reset view', vc.resetOff)}
+            title={vc.resetOff ?? undefined}
+            disabled={vc.resetOff !== null}
+            onClick={() => vc.reset()}
           >
             Reset view
           </button>

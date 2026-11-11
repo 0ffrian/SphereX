@@ -140,6 +140,10 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
     sweepRef.current?.setHonesty(honesty);
   }, [honesty]);
 
+  const activeRef = useRef(active);
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
   const play = async () => {
     if (!plan) return;
     const sweep = (sweepRef.current ??= new ListenSweep());
@@ -153,6 +157,8 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
     }
     // The click is the user activation the audio context needs (Q-73): created and resumed here.
     await unlockAudio();
+    // The panel may have been left while the audio context woke: do not start a sound nobody asked for now.
+    if (!activeRef.current) return;
     sweep.onEnd = () => {
       cancelAnimationFrame(raf.current);
       setState('ended');

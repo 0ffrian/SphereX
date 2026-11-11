@@ -318,6 +318,8 @@ export class ViewerApp {
   private close: CloseState = { mode: null, view: null, resolved: null, last: 0, reading: false, dirty: false };
   private closeCanvas: HTMLCanvasElement | null = null;
   private closeRt: RenderTarget | null = null;
+  /** True while a D-37 engine (world, star, rock) draws the body: this viewer builds, steps and draws nothing. */
+  private engineOwned = false;
   private closeTmp: HTMLCanvasElement | null = null;
   private closeRaf: number | null = null;
   private readonly closeCamera = new PerspectiveCamera(40, 1, 0.01, 100);
@@ -493,6 +495,49 @@ export class ViewerApp {
     return this.built?.body ?? null;
   }
 
+  /**
+   * A D-37 engine (world, star or rock) draws the body on its own canvas: while it does, this viewer
+   * builds no body, runs no solver, tracer or governor and stops its frame loop. Turning it off (the
+   * engine failed, or "Measured only" unmounted it) builds the last plan again and draws as before.
+   */
+  setEngineOwned(owned: boolean): void {
+    if (this.disposed || owned === this.engineOwned) return;
+    this.engineOwned = owned;
+    if (owned) {
+      this.clearBuilt();
+      this.placeholder.visible = false;
+      this.syncProcesses(null, null);
+      this.closeUpOff(true);
+      this.releaseCloseRt();
+      this.cancelLoop();
+      this.flushSettled();
+    } else if (this.lastPlan) {
+      this.showPlan(this.lastPlan);
+    } else {
+      this.placeholder.visible = true;
+      this.restartSettle();
+    }
+  }
+
+  get isEngineOwned(): boolean {
+    return this.engineOwned;
+  }
+
+  private cancelLoop(): void {
+    if (this.frameRequest !== null) cancelAnimationFrame(this.frameRequest);
+    this.frameRequest = null;
+    this.loopLast = null;
+    this.burstLeft = 0;
+    this.primePending = false;
+    this.cap.reset();
+    this.governor.reset();
+  }
+
+  private releaseCloseRt(): void {
+    this.closeRt?.dispose();
+    this.closeRt = null;
+  }
+
   /** Draws a plan made with `planRender` (the panel plans once and reuses the plan for its UI). */
   showPlan(plan: RenderPlan): void {
     if (this.disposed) return;
@@ -538,7 +583,7 @@ export class ViewerApp {
     // A mesh that finishes loading in a scene that is no longer the current plan must not report its
     // size: the panel would attach it to the new object (Bennu's size on a cached Eros).
     const buildToken = this.compileToken;
-    if (plan.threeD && (plan.bodies.length > 0 || plan.shader !== null)) {
+    if (!this.engineOwned && plan.threeD && (plan.bodies.length > 0 || plan.shader !== null)) {
       try {
         next = buildScene(
           plan,
@@ -834,6 +879,7 @@ export class ViewerApp {
 
   /** One frame: through the pipeline, or plain if the pipeline is missing or failed. */
   private draw(): void {
+    if (this.engineOwned) return;
     this.frames++;
     this.updateScreenSize();
     // A body with an off-screen pass of its own (the gas world's tracer) runs it before the frame.
@@ -848,6 +894,7 @@ export class ViewerApp {
     } catch (err) {
       console.warn('[viewer] the cloud tracer failed; clouds stay as they are', err);
     }
+    let rendered = false;
     if (this.chain) {
       try {
         // Volumes shift their per-pixel ray jitter by the TAAU frame index (same index after a
@@ -855,14 +902,18 @@ export class ViewerApp {
         const jitter = this.chain.jitterIndex();
         if (jitter !== null) this.onScreen?.setJitterFrame(jitter);
         this.chain.render();
-        this.drawClose();
-        return;
+        rendered = true;
       } catch (err) {
         this.dropChain(err);
       }
     }
-    this.renderer.render(this.scene, this.camera);
-    this.drawClose();
+    if (!rendered) this.renderer.render(this.scene, this.camera);
+    // Outside the chain's try: a close-up error must not drop the post chain.
+    try {
+      this.drawClose();
+    } catch (err) {
+      console.warn('[viewer] the close-up failed', err);
+    }
   }
 
   /** The 160 px level-of-detail rule: tell the shape model how big it is on screen now. */
@@ -1013,13 +1064,13 @@ export class ViewerApp {
   }
 
   private schedule(): void {
-    if (this.disposed || this.frameRequest !== null) return;
+    if (this.disposed || this.engineOwned || this.frameRequest !== null) return;
     this.frameRequest = requestAnimationFrame(this.tick);
   }
 
   private readonly tick = (now: number): void => {
     this.frameRequest = null;
-    if (this.disposed) return;
+    if (this.disposed || this.engineOwned) return;
     // R5.7 phone frame-rate cap (30 fps on the low quality level): skip this display frame.
     if (!this.cap.shouldDraw(now)) {
       this.schedule();
@@ -1320,6 +1371,7 @@ export class ViewerApp {
     const c = this.close;
     if (c.mode === null && c.view === null) return;
     c.view?.dispose();
+    if (c.mode === 'body') this.releaseCloseRt();
     this.close = { mode: null, view: null, resolved: null, last: 0, reading: false, dirty: false };
     if (this.closeRaf !== null) cancelAnimationFrame(this.closeRaf);
     this.closeRaf = null;
@@ -1516,6 +1568,7 @@ export class ViewerApp {
     this.unsubscribeNoise?.();
     this.unsubscribeNoise = null;
     this.closeUpOff(true);
+    this.releaseCloseRt();
     this.clearBuilt();
     this.chain?.dispose();
     this.chain = null;

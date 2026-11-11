@@ -3,7 +3,6 @@
 // the same state as the artifact (`window.__sxProto.rock`): search the body by name through the real
 // app path, set the surface mode and age, draw, and read the picture back. Other engines compose by
 // routing on `c.kind`; this one answers `kind: 'rock'`.
-/* eslint-disable @typescript-eslint/no-explicit-any -- a test hook on window */
 import * as E from './source';
 import { useRockStore } from '@/app/rockStore';
 import type { RockView } from './RockView';

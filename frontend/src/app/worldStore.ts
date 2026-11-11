@@ -24,9 +24,12 @@ interface WorldStoreState {
   target: WorldTarget | null;
   /** Bumped when something the panels read changed, so they re-read the engine. */
   rev: number;
-  /** Preset id of a world whose engine could not start; the old path draws it. */
+  /** `engineKey` of a world whose engine could not start; the old path draws it. A new object has another key. */
   failedId: string | null;
-  fail(id: string): void;
+  fail(key: string): void;
+  /** The same for a star engine. */
+  starFailedId: string | null;
+  failStar(key: string): void;
   load(world: CardToWorldOk | null): void;
   setGlobe(e: WorldEngine | null): void;
   setFly(e: WorldEngine | null): void;
@@ -43,6 +46,14 @@ export function drawReady(e: WorldEngine): boolean {
   return !(e.state().gas && e.spinup > 0);
 }
 
+/**
+ * What a failure belongs to: the card and the preset it maps to. A failure must not carry over to the
+ * next object (the old flag was sticky), so every reader compares the key of what it is about to draw.
+ */
+export function engineKey(cardId: string | null | undefined, presetId: string): string {
+  return `${cardId ?? ''}|${presetId}`;
+}
+
 export const useWorldStore = create<WorldStoreState>((set, get) => ({
   world: null,
   globe: null,
@@ -53,6 +64,8 @@ export const useWorldStore = create<WorldStoreState>((set, get) => ({
   rev: 0,
   failedId: null,
   fail: (failedId) => set({ failedId }),
+  starFailedId: null,
+  failStar: (starFailedId) => set({ starFailedId }),
   load: (world) => set({ world, applied: {}, target: null, playing: true }),
   setGlobe: (globe) => set({ globe }),
   setFly: (fly) => set({ fly }),
