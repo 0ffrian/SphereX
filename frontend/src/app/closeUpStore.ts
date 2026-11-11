@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import type { CloseUpInfo, ViewerApp } from '@/viewer/ViewerApp';
 import type { RenderPlan } from '@/viewer/planTypes';
 import type { StarFromCard } from '@/engine/stars/cardToStar';
+import type { CardToWorldOk } from '@/engine/worlds/cardToWorld';
 
 interface CloseUpState {
   viewer: ViewerApp | null;
@@ -13,6 +14,8 @@ interface CloseUpState {
   fixture: boolean;
   /** Issue #71 stream X (D-37): the star the prototype's engine draws, or null (the TSL path). */
   engineStar: StarFromCard | null;
+  /** Issue #71 stream Y (D-37): the planet the prototype's world engine draws, or null (the old orbit view). */
+  engineWorld: CardToWorldOk | null;
   reducedMotion: boolean;
   info: CloseUpInfo | null;
   /** The user hid the pane with the toggle next to Feel (the mock-up has none: default shown). */
@@ -22,7 +25,7 @@ interface CloseUpState {
    * the pane shifts to the right half, `setShifted`). Not the user's choice: `hidden` stays theirs.
    */
   held: boolean;
-  publish(p: Partial<Pick<CloseUpState, 'viewer' | 'plan' | 'type' | 'fixture' | 'reducedMotion' | 'engineStar'>>): void;
+  publish(p: Partial<Pick<CloseUpState, 'viewer' | 'plan' | 'type' | 'fixture' | 'reducedMotion' | 'engineStar' | 'engineWorld'>>): void;
   setInfo(info: CloseUpInfo | null): void;
   setHidden(hidden: boolean): void;
   setHeld(held: boolean): void;
@@ -35,6 +38,7 @@ export const useCloseUpStore = create<CloseUpState>((set) => ({
   type: null,
   fixture: false,
   engineStar: null,
+  engineWorld: null,
   reducedMotion: false,
   info: null,
   hidden: false,
@@ -43,5 +47,5 @@ export const useCloseUpStore = create<CloseUpState>((set) => ({
   setInfo: (info) => set({ info }),
   setHidden: (hidden) => set({ hidden }),
   setHeld: (held) => set({ held }),
-  reset: () => set({ viewer: null, plan: null, type: null, engineStar: null, info: null, held: false }),
+  reset: () => set({ viewer: null, plan: null, type: null, engineStar: null, engineWorld: null, info: null, held: false }),
 }));
