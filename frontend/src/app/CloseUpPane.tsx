@@ -17,7 +17,13 @@ import { ProvenanceBadge } from './Badge';
 import { buttonClass, pressedClass } from './ui';
 import { StarCloseUp } from './StarCloseUp';
 import { RockCloseUp } from './RockCloseUp';
+import { StarFlareStage, StarSurfaceCloseUp } from './StarEngineStage';
+import { placeText, useStarTarget } from './starTargetStore';
 import { STAR_CLOSEUP_TAG, useStarCloseUp } from './starCloseUp';
+
+/** The mock-up's cuTag for the flare close-up, true to the prototype: a Sun-like flare, not this star's own. */
+const ENGINE_CAPTION =
+  'Close-up · a flare at the edge of a Sun-like star, hydrogen-alpha with hot loops · illustrative (Default), not a measurement of this star';
 
 export type CloseUpKind = 'orbit' | 'star' | 'body';
 
@@ -64,15 +70,22 @@ export function CloseUpPane() {
   const hidden = useCloseUpStore((s) => s.hidden);
   const reducedMotion = useCloseUpStore((s) => s.reducedMotion);
   const fixture = useCloseUpStore((s) => s.fixture);
+  const held = useCloseUpStore((s) => s.held);
+  const engineStar = useCloseUpStore((s) => s.engineStar);
+  const [engineFailed, setEngineFailed] = useState(false);
+  const left = useStarTarget((s) => s.left);
+  const starTarget = useStarTarget((s) => s.target);
   const kind = closeUpKindOf(type);
-  const open = !hidden && kind !== null && info !== null && info.mode !== null;
+  // Issue #71 stream X (D-37): a star the prototype's engine draws opens with the build, with the flare close-up.
+  const engine = kind === 'star' && engineStar && !engineFailed ? engineStar : null;
+  const open = !hidden && kind !== null && (engine ? !held : info !== null && info.mode !== null);
   const [, bump] = useReducer((n: number) => n + 1, 0);
   const [about, setAbout] = useState(false);
   const focusRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const view = viewer?.orbitView ?? null;
   const gas = view?.kind === 'gas';
-  const starProps = useStarCloseUp(kind === 'star' ? plan : null, null);
+  const starProps = useStarCloseUp(kind === 'star' && !engine ? plan : null, null);
   const drag = useRef<{ pts: Map<number, { x: number; y: number }>; pinch: number | null }>({
     pts: new Map(),
     pinch: null,
@@ -139,7 +152,11 @@ export function CloseUpPane() {
   }, [viewer, view, open]);
 
   if (!kind) return null;
-  const caption = closeUpCaption(kind, info, gas, starProps !== null);
+  const caption = engine
+    ? left === 'surface'
+      ? `Close-up · the star\u2019s surface at ${placeText(starTarget)} · generated (Default), not a photograph`
+      : ENGINE_CAPTION
+    : closeUpCaption(kind, info, gas, starProps !== null);
   const [lo, hi] = view ? altRange(view.kind) : [0, 1];
   const alt = view?.state.altKm ?? 0;
 
@@ -200,7 +217,28 @@ export function CloseUpPane() {
         />
       )}
       {kind === 'body' && <RockCloseUp active={open} />}
-      {kind === 'star' && starProps && open && (
+      {engine && open && left === 'flare' && (
+        <StarFlareStage key={engine.preset.id} star={engine} onFail={() => setEngineFailed(true)} />
+      )}
+      {engine && open && left === 'surface' && (
+        <StarSurfaceCloseUp key={engine.preset.id} star={engine} onFail={() => setEngineFailed(true)} />
+      )}
+      {engine && open && (
+        <div className="absolute right-3 top-3 z-[3] flex flex-wrap items-center gap-2" role="group" aria-label="Star close-up">
+          <button type="button" className={`${buttonClass} ${pressedClass}`} aria-pressed={left === 'flare'} onClick={() => useStarTarget.getState().show('flare')}>
+            Flare close-up
+          </button>
+          <button type="button" className={`${buttonClass} ${pressedClass}`} aria-pressed={left === 'surface'} onClick={() => useStarTarget.getState().show('surface')}>
+            Surface close-up
+          </button>
+          {left === 'surface' && (
+            <button type="button" className={buttonClass} disabled={starTarget === null} onClick={() => useStarTarget.getState().home()}>
+              Back to the active region
+            </button>
+          )}
+        </div>
+      )}
+      {kind === 'star' && !engine && starProps && open && (
         <div className="absolute inset-0 bg-black" data-testid="star-closeup">
           <StarCloseUp {...starProps} className="absolute inset-0" />
         </div>

@@ -4,6 +4,8 @@
 // Source: .claude/worktrees/sculptor-reference/sculptor-preview-next.html, lines 1029-1211 (flare close-up and light-curve chart).
 // Not yet imported by the app: it still needs the TypeScript host (DOM removed, `cardToStar`). Do not edit here;
 // re-run the slicing instead so the body stays byte-identical to the prototype.
+// @verbatim L1029-L1211
+// @rename (PL.ema=>(!window.__sxPin&&PL.ema
 /* ---------- flare ---------- */
 var FL = { kind: 'open', cls: 'x', t: 0.36, playing: !reduced };
 var CLS = { c: 0.55, m: 0.8, x: 1 };
@@ -175,7 +177,7 @@ try {
 var lastT = 0, tick = 0;
 function frame(now) {
   var dt = Math.min(0.06, (now - lastT) / 1000 || 0); lastT = now; tick++;
-  PL.ema = PL.ema * 0.93 + dt * 70; if (PL.ema > 36 && PL.q > 0.3) PL.q *= 0.985; else if (PL.ema < 20 && PL.q < 1) PL.q = Math.min(coarse ? 0.45 : 1, PL.q * 1.01);
+  PL.ema = PL.ema * 0.93 + dt * 70; if (!window.__sxPin&&PL.ema > 36 && PL.q > 0.3) PL.q *= 0.985; else if (!window.__sxPin&&PL.ema < 20 && PL.q < 1) PL.q = Math.min(coarse ? 0.45 : 1, PL.q * 1.01);
   if (ST.playing) { ST.time += dt * 0.2; OV.clock += dt; updateEvents(); showLatest(); if (vis.star) drawStar(); }
   if (vis.flare) {
     if (FL.playing) { FL.t += dt / 22; if (FL.t > 1) FL.t = 0; flareUi(); drawFlare(); }
@@ -187,3 +189,4 @@ drawStar(); drawFlareStar(); drawFlare();
 addEventListener('resize', function () { drawStar(); drawFlareStar(); drawFlare(); });
 requestAnimationFrame(frame);
 
+// @end-verbatim

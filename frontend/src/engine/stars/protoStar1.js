@@ -4,6 +4,8 @@
 // Source: .claude/worktrees/sculptor-reference/sculptor-preview-next.html, lines 357-662 (Planck colour, star shader FS, star model, tauC, drawStar).
 // Not yet imported by the app: it still needs the TypeScript host (DOM removed, `cardToStar`). Do not edit here;
 // re-run the slicing instead so the body stays byte-identical to the prototype.
+// @verbatim L357-L662
+// @rename m.best=>(CLOSE_AT||m.best) (ema=>(!window.__sxPin&&ema
 /* ---------- Planck spectrum to colour ---------- */
 function g(l, m, s1, s2) { var s = l < m ? s1 : s2, t = (l - m) / s; return Math.exp(-0.5 * t * t); }
 function planckRGB(T) {
@@ -183,7 +185,7 @@ function StarGL(canvas) {
   var scale = 1, ema = 16, last = 0;
   this.draw = function (o) {
     var now = performance.now();
-    if (last) { ema = ema * 0.92 + (now - last) * 0.08; if (ema > 42 && scale > 0.42) { scale *= 0.93; ema = 30; } else if (ema < 19 && scale < 1) { scale = Math.min(1, scale * 1.01); } }
+    if (last) { ema = ema * 0.92 + (now - last) * 0.08; if (!window.__sxPin&&ema > 42 && scale > 0.42) { scale *= 0.93; ema = 30; } else if (!window.__sxPin&&ema < 19 && scale < 1) { scale = Math.min(1, scale * 1.01); } }
     last = now;
     var w = Math.round(canvas.clientWidth * Math.min(devicePixelRatio || 1, 1.5) * scale), h = Math.round(canvas.clientHeight * Math.min(devicePixelRatio || 1, 1.5) * scale);
     if (!w || !h) return;
@@ -302,7 +304,7 @@ function drawStar() {
   if (ST.view === 'big') freq = Math.min(m.cells, BIG);
   if (ST.view === 'close') {
     half = Math.min(1.28, 15 / m.cells);
-    var b = m.best || [0.26, 0.5];
+    var b = (CLOSE_AT||m.best) || [0.26, 0.5];
     var c = Math.cos(b[0]), L = [c * Math.sin(b[1]), Math.sin(b[0]), c * Math.cos(b[1])];
     tilt = -Math.asin(L[1]); rot = Math.atan2(L[0], L[2]);
   }
@@ -310,3 +312,4 @@ function drawStar() {
   drawOverlay(rot, tilt, half);
 }
 
+// @end-verbatim
