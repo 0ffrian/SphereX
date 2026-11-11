@@ -64,6 +64,7 @@ export function RockStage({
   honesty,
   tint,
   reducedMotion,
+  onEngine,
 }: {
   card: ObjectCard | null;
   params: RenderParams | null;
@@ -71,6 +72,8 @@ export function RockStage({
   honesty: HonestyState;
   tint: [number, number, number] | null;
   reducedMotion: boolean;
+  /** True while this engine has a canvas attached and draws the body (the viewer underneath then stands down). */
+  onEngine?: (on: boolean) => void;
 }) {
   const wanted = rockEngineWanted(params, plan, honesty);
   const rock = useMemo(() => {
@@ -83,7 +86,16 @@ export function RockStage({
       ? { ...r, meshUrl: null }
       : r;
   }, [wanted, card, params, tint]);
-  const live = rock !== null;
+  // A lost GL context leaves a black canvas: the engine steps aside for this body and the old path draws.
+  const bodyKey = rock && card ? `${card.id}|${rock.preset.id}` : '';
+  const [lostKey, setLostKey] = useState('');
+  const live = rock !== null && lostKey !== bodyKey;
+  const onEngineRef = useRef(onEngine);
+  const bodyKeyRef = useRef(bodyKey);
+  useEffect(() => {
+    onEngineRef.current = onEngine;
+    bodyKeyRef.current = bodyKey;
+  });
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<RockView | null>(null);
   const [ready, setReady] = useState(false);
@@ -103,7 +115,8 @@ export function RockStage({
     canvas.style.aspectRatio = '8 / 5';
     canvas.style.maxHeight = '100%';
     canvas.tabIndex = 0;
-    canvas.setAttribute('role', 'img');
+    canvas.setAttribute('role', 'application');
+    canvas.setAttribute('aria-label', `${rock?.preset.label ?? 'Body'}, generated surface. Drag or use the arrow keys to turn it.`);
     canvas.dataset.testid = 'rock-canvas';
     host.appendChild(canvas);
     const view = new RockView(reducedMotion);
@@ -116,18 +129,22 @@ export function RockStage({
       return;
     }
     view.onChange(setStats);
+    view.onContextLost(() => setLostKey(bodyKeyRef.current));
     viewRef.current = view;
+    onEngineRef.current?.(true);
     setStore(view);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the engine now exists
     setReady(true);
     return () => {
       setReady(false);
+      onEngineRef.current?.(false);
       off?.();
       view.dispose();
       canvas.remove();
       viewRef.current = null;
       setStore(null);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `rock` is read once for the label; the body is swapped by `setBody` below
   }, [live, reducedMotion, setStore]);
 
   // The body: generated, or from a shape model (loaded after the generated body is already drawn).
@@ -235,6 +252,9 @@ export function RockStage({
       controls,
       notes: [
         ...rockNotes(rock),
+        ...(rock.mismatches.length
+          ? [{ title: 'Differs from the preview', lines: rock.mismatches.map((m) => `Differs from the artifact: ${m}.`) }]
+          : []),
         ...(meshNote ? [{ title: 'Shape model', lines: [meshNote] }] : []),
       ],
     };
