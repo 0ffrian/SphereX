@@ -31,6 +31,7 @@ import { SoundProvider } from '@/haptics/SoundProvider';
 import { AreaCard } from './sky/area/AreaCard';
 import { AreaLayer } from './sky/area/AreaLayer';
 import { AREA_TOOL_ENABLED } from './sky/area/areaTool';
+import { parseHash } from './urlHash';
 
 /**
  * A new search opens the object panel (unless it is already open at the spectrum), a marker click
@@ -48,8 +49,8 @@ function useOpenPanelOnSearch(): void {
       // The build pane keeps the view while a link or Back changes the object under it.
       if (shell.build.open) return;
       // A link that opens an area (`area=`) keeps Area search, even with an object in it (A18.9).
-      // The tool is only ever `area` while Area search is on.
-      if (q.origin === 'hash' && shell.tool === 'area') return;
+      // Only while Area search is on, and only for a link that names an area.
+      if (q.origin === 'hash' && AREA_TOOL_ENABLED && parseHash(window.location.hash).area) return;
       if (shell.tool !== 'flipbook' && shell.tool !== 'spectrum') shell.setTool('flipbook');
     };
     // A search from a shared link may have started before this subscription.
