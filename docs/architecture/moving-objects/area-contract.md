@@ -6,6 +6,8 @@ The second half of the Discovery backend ([A17](area-backend.md#a17-discovery-ba
 
 ### A17.8 Endpoints
 
+Payload shapes as built: `shared/schemas/area-*.schema.json`; gap choices in [Q-208](../../decisions/moving-objects.md) (Proposed).
+
 Beyond D-16, which keys every endpoint on one object id; Q-146 (6) answered the `/v1/areas` routes and a D-16 note is pending. The endpoint register is [A4.11](../endpoints.md); refusal codes are also in [A4.12](../refusals.md).
 
 | Endpoint | Returns |
@@ -24,6 +26,8 @@ Beyond D-16, which keys every endpoint on one object id; Q-146 (6) answered the 
 - **Errors:** 404 `area_not_found` (unknown id or not prepared with the running code), 404 `dot_not_found`, 503 `stamp_unavailable` (cutout not cached).
 
 ### A17.9 Schemas and fixtures
+
+Payload shapes as built: `shared/schemas/area-*.schema.json`; gap choices in [Q-208](../../decisions/moving-objects.md) (Proposed).
 
 - `shared/schemas/area-index.schema.json`, `area-summary.schema.json`, `area-known.schema.json`, `area-dots.schema.json`, `area-tracks.schema.json`, `area-checks.schema.json` (gated, Q-203); generated code in `backend/app/contract/` and `frontend/src/contract/` (D-18). Owner Moon (D-17).
 - `shared/fixtures/area/`: a synthetic area (2 visits × 4 exposures × 2 detectors; about 30 stars, 18 glitches; 4 movers: one `found_blind`, one `unexplained`, one `unchecked`, one `possible` with `one_visit`), plus a `checks` sample (a recovered test mover, a grid, a control of 0 in 20) and, for D7, a synthetic area of 4 visits in `shared/fixtures/area/multivisit/`, all with the Fixture badge and served by the dev fixture server with `X-SX-Fixture: synthetic` (Q-32). The frontend builds against it before the backend exists (D-29).
