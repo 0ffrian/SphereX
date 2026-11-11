@@ -81,7 +81,7 @@ function worldModel() {
 // a supercritical fluid above it). Same rule as physics/fluids.ts boilingPointK.
   var superC = Pa >= F.Pc; if (canLiquid) Tb = superC ? F.Tc : Math.min(Tb, F.Tc);
 // @end-deviation
-// @verbatim L1728-L1736
+// @verbatim L1728-L1734
   var state = gas ? 'gas' : Ts < F.Tt ? 'frozen' : canLiquid && Ts < Tb ? 'liquid' : 'vapour';
   if (airless) state = Ts < F.Tt ? 'frozen' : 'vapour';
   // cloud level by following the adiabat up until the fluid saturates
@@ -89,9 +89,37 @@ function worldModel() {
   if (!gas && !airless) for (T = Ts; T > Ts * 0.45; T -= 0.5) { var Pz = Pa * Math.pow(T / Ts, 3.5); if (psat(T) <= F.q * Pz) { Tc = T; break; } }
   var Gam = gv / cp, zc = Tc != null ? (Ts - Tc) / Gam / 1000 : null;
   var Seff = S / 1361, tS = clamp(W.Tstar - 5780, -3180, 1420), sIn = 1.107 + 1.332e-4 * tS + 1.58e-8 * tS * tS - 8.308e-12 * tS * tS * tS - 1.931e-15 * tS * tS * tS * tS, sOut = 0.356 + 6.171e-5 * tS + 1.698e-9 * tS * tS - 3.198e-12 * tS * tS * tS - 5.575e-16 * tS * tS * tS * tS;   // Kopparapu et al. HZ limits
+// @end-verbatim
+// @deviation L1734 (#93 3.6) the inner edge (runaway greenhouse) depends on the planet's mass. Kopparapu et al. 2014
+// (ApJL 787, L29, Table 1, checked against arXiv:1404.5292): S_eff = S0 + a T + b T^2 + c T^3 + d T^4, T = Teff -
+// 5780 K, for 0.1, 1 and 5 Earth masses (the 1 Earth-mass row is the prototype's). Between rows the limit is
+// interpolated in log mass; outside 0.1 to 5 Earth masses the nearest row is used (no extrapolation). measured
+// coefficients of a published model: the limit is model_dependent. Same table as physics/climateBudget.ts.
+  var KOP14 = [[0.1, 0.99, 1.209e-4, 1.404e-8, -7.418e-12, -1.713e-15], [1, 1.107, 1.332e-4, 1.58e-8, -8.308e-12, -1.931e-15], [5, 1.188, 1.433e-4, 1.707e-8, -8.968e-12, -2.084e-15]];
+  var kopS = function (r) { return r[1] + r[2] * tS + r[3] * tS * tS + r[4] * tS * tS * tS + r[5] * tS * tS * tS * tS; };
+  var lMe = clamp(Math.log(p.Me), Math.log(0.1), Math.log(5)), kLo = lMe < 0 ? KOP14[0] : KOP14[1], kHi = lMe < 0 ? KOP14[1] : KOP14[2];
+  sIn = lerp(kopS(kLo), kopS(kHi), (lMe - Math.log(kLo[0])) / Math.log(kHi[0] / kLo[0]));
+// @end-deviation
+// @verbatim L1735-L1736
   var runaway = !gas && W.fluid === 'water' && Ps >= 0.1 && (state === 'vapour' || (Seff > sIn && OCEANF[p.id] > 0));
   if (runaway) state = 'vapour';
 // @end-verbatim
+// @deviation L1736 (#93 3.6) a runaway greenhouse no longer keeps a mild surface (K2-18 b read "runaway" at 401 K).
+// While the ocean evaporates the outgoing radiation is held at the steam limit, 282 W/m^2 (Goldblatt et al. 2013,
+// Nat. Geosci. 6, 661; RUNAWAY.olrLim), so the surface warms until it radiates through the near-infrared windows:
+// the post-runaway state. Its surface temperature depends on the steam column: about 1,500 K under 50 bar of steam and
+// about 1,800 K under 260 bar (one Earth ocean), from the radiative-convective models of Boukrouche et al. 2021
+// (ApJ 919, 130) as quoted by Dorn and Lichtenberg 2021 (ApJL 922, L4). The engine takes the steam pressure to be
+// the surface pressure Ps and interpolates in ln P through those two points, extrapolated outside them [verify]:
+// model_dependent. When that is hotter than the grey-greenhouse Ts, Ts takes it and tau is set so the grey model
+// balances there (the energy budget sees both); the scale height follows Ts. ebStep holds each cell's outgoing
+// radiation at olrLim until the cell reaches Tpost.
+  var RUNAWAY = { olrLim: 282, P1: 50, T1: 1500, P2: 260, T2: 1800 }, Tpost = null;
+  if (runaway) {
+    Tpost = RUNAWAY.T1 + (RUNAWAY.T2 - RUNAWAY.T1) * Math.log(Ps / RUNAWAY.P1) / Math.log(RUNAWAY.P2 / RUNAWAY.P1);
+    if (Tpost > Ts) { Ts = Tpost; tau = (Math.pow(Ts / Teq, 4) - 1) / 0.75; H = Rg * Ts / gv; } else Tpost = null;
+  }
+// @end-deviation
 // @deviation L1736 (#93 3.1) above both its critical temperature and pressure the fluid is supercritical: one dense
 // fluid, no sea surface. The state is set after the runaway test, so supercritical water still counts as boiled off.
   if (!gas && !airless && superC && Ts >= F.Tc && state === 'vapour') state = 'supercritical';
@@ -99,9 +127,10 @@ function worldModel() {
 // @deviation L1762 (#93 3.3) the ORB[p.id] rename below: the tidal heating reads the preset's own orbit extras p.ob
 // first (cardToWorld writes the host mass from the card's host_mass_msun, the eccentricity and the obliquity) and the
 // prototype's ORB table, which knows only its own presets, after. Code: the @rename only.
+// (#93 3.6) the runaway: rename below hands ebStep the post-runaway temperature and the outgoing-radiation limit.
 // @end-deviation
 // @verbatim L1737-L1765
-// @rename flat:=>flat:p.fMeas!=null?p.fMeas: ORB[p.id]=>(p.ob||ORB[p.id])
+// @rename flat:=>flat:p.fMeas!=null?p.fMeas: ORB[p.id]=>(p.ob||ORB[p.id]) runaway:=>Tpost:Tpost,olrLim:runaway?RUNAWAY.olrLim:null,runaway:
   var cov = gas ? 0 : airless ? 0 : state === 'liquid' ? 0.3 + 0.42 * sstep(F.Tt, Math.min(Tb, F.Tt + 70), Ts) : state === 'frozen' ? 0.12 : runaway ? 0.95 : 0.06;
   // colour of the sky: the star's light scattered as lambda^-4, methane removes red
   var bands = [640, 540, 450], ch4 = W.fluid === 'methane' ? 2.1 : 0, sky = bands.map(function (l, n) { return planck(l, W.Tstar) * Math.pow(550 / l, 4) * (n === 0 ? Math.exp(-ch4) : 1); }), mx = Math.max(sky[0], sky[1], sky[2]);
@@ -129,10 +158,10 @@ function worldModel() {
   var mainN2 = mu < 40, Tcol = airless || gas ? 0 : 1 / ((mainN2 ? 1 / 77.36 : 1 / 194.7) - 8.314 * Math.log(Ps * 1e5 / 101325) / (mainN2 ? 5570 : 25200));
   var ob = (p.ob||ORB[p.id]) || { Ms: 1 }, an = 6.2832 / (p.P * Math.pow(W.orbit, 1.5) * 86400), aM = a * 1.496e11, tide = gas ? 0 : 10.5 * 0.003 * 6.674e-11 * Math.pow(ob.Ms * 1.989e30, 2) * Math.pow(R, 5) * an * (W.ecc || 0) * (W.ecc || 0) / Math.pow(aM, 6) / (4 * Math.PI * R * R);
   var phiH = clamp(Math.sqrt(5 / 3 * gv * 15000 * 0.25) / (Om * R), 0.2, 1.3);   // Held and Hou 1980 scaling, tropopause 15 km, contrast 0.25
-  return { Seff: Seff, sIn: sIn, sOut: sOut, shoreB: shoreB, shoreX: shoreX, Tcol: Tcol, tide: tide, phiH: phiH, pco2: pco2, d: p.pal ? p.pal.d : dp2[0], p: p.pal ? p.pal.p : dp2[1], gamK: Gam * 1000 * (gas ? 1 : 0.66),   /* environmental lapse: about 6.5 K/km on Earth (US Standard Atmosphere 1976), not the dry 9.8 */ gas: gas, Teq: Teq, Ts: Ts, S: S, tau: tau, gv: gv, H: H, Om: Om, rotD: rotD, eps: eps, U: U, N: N, jets: jets, LD: LD, sz: sz, Tb: Tb, canLiquid: canLiquid, state: state, Tc: Tc, zc: zc, cov: cov, sky: sky, sun: sun, haze: haze, hazeC: hazeC, z: z, b: b2, s: s2, regime: regime, V: V, airless: airless, runaway: runaway, F: F, flat:p.fMeas!=null?p.fMeas: gas ? clamp(0.7 * Om * Om * R * R * R / (6.674e-11 * M), 0, 0.14) : 0, a: a };
+  return { Seff: Seff, sIn: sIn, sOut: sOut, shoreB: shoreB, shoreX: shoreX, Tcol: Tcol, tide: tide, phiH: phiH, pco2: pco2, d: p.pal ? p.pal.d : dp2[0], p: p.pal ? p.pal.p : dp2[1], gamK: Gam * 1000 * (gas ? 1 : 0.66),   /* environmental lapse: about 6.5 K/km on Earth (US Standard Atmosphere 1976), not the dry 9.8 */ gas: gas, Teq: Teq, Ts: Ts, S: S, tau: tau, gv: gv, H: H, Om: Om, rotD: rotD, eps: eps, U: U, N: N, jets: jets, LD: LD, sz: sz, Tb: Tb, canLiquid: canLiquid, state: state, Tc: Tc, zc: zc, cov: cov, sky: sky, sun: sun, haze: haze, hazeC: hazeC, z: z, b: b2, s: s2, regime: regime, V: V, airless: airless, Tpost:Tpost,olrLim:runaway?RUNAWAY.olrLim:null,runaway: runaway, F: F, flat:p.fMeas!=null?p.fMeas: gas ? clamp(0.7 * Om * Om * R * R * R / (6.674e-11 * M), 0, 0.14) : 0, a: a };
 }
 // @end-verbatim
-// @verbatim L1906-L2147
+// @verbatim L1906-L2101
 /* ---------- lava: rivers, lakes and a magma sea on a hot rocky world ----------
    Same machinery as the water rivers above, with lava in place of runoff. Every constant is cited or tagged.
    1. Magma sea. Where the local surface temperature is above the basalt liquidus (about 1,500 K; solidus about 1,400 K, so
@@ -329,6 +358,12 @@ function ebStep(m, n, dt) {
         var qs = air ? Math.min(psat(Math.max(Tc - EB.elev[k] * 0, 20)) / qRef, 6) : 0, rh = qs > 1e-9 ? q[k] / qs : 0;
         var ic = 1 - Math.exp(-h[k] / 0.15), fs = 1 - Math.exp(-s[k] / 0.05), a0 = isO ? 0.07 + (aIce - 0.07) * ic : 0.22 + (aFrost - 0.22) * fs, cc = clamp((rh - 0.7) / 0.3, 0, 1) * 0.5 * (air ? 1 : 0), alb = a0 + (0.45 - a0) * cc;
         var asr = Se * mu * (1 - alb) + tidef, eps = eps0 / (1 + 0.3 * Math.min(rh, 1) * (air ? 1 : 0)), olr = eps * sg * Tc * Tc * Tc * Tc, Bl = 4 * eps * sg * Tc * Tc * Tc;
+// @end-verbatim
+// @deviation L2101 (#93 3.6) during a runaway greenhouse a cell's outgoing radiation cannot exceed the steam limit
+// m.olrLim (282 W/m^2, Goldblatt et al. 2013) until it reaches the post-runaway temperature m.Tpost (worldModel).
+        if (m.olrLim && m.Tpost && Tc < m.Tpost && olr > m.olrLim) { olr = m.olrLim; Bl = 0; }
+// @end-deviation
+// @verbatim L2102-L2147
         var open = isO && h[k] <= 0 && Tc < (Tb || 1e9);
         var E = air && open ? 0.5 * Math.max(qs - q[k], 0) : 0, wnd = ndWind ? (Math.abs(la) < phH ? -1 : 1) : 0, up = wnd ? clamp(wnd * (EB.elev[ke] - EB.elev[kw]) * 0.7, 0, 1.5) : 0, subA = lock ? Math.acos(clamp(cj * Math.cos(lo) * sx + sl * sy + cj * Math.sin(lo) * sz, -1, 1)) : 0, dPh = (Math.abs(la) - phH) / 0.16, qsP = qs * Math.exp(-1.1 * up) * (lock ? 1 - 0.3 * Math.exp(-subA * subA / 0.5) : (1 + 0.9 * Math.exp(-dPh * dPh)) * (1 - 0.25 * Math.exp(-la * la / 0.03))), P = air ? 0.25 * Math.max(q[k] - qsP, 0) : 0;
         var nb = D * (ae * (T[ke] + T[kw]) + an * T[kn] + as * T[ks]), sum = D * (2 * ae + an + as), Cx = isO ? (h[k] > 0 ? Ci : Co) : Cl, G = 0, lat = Lv * (P - E);
@@ -626,6 +661,7 @@ W.gl = new WorldGL(canvas);
 return {
   W: W, EB: EB, ORB: ORB, OCEANF: OCEANF, GAS_NODES: GAS_NODES, FLUIDS: FLUIDS,
   getGS: function () { return GS; },
+  ebStep: ebStep, ebStats: ebStats, ebInit: ebInit,   // #93: the energy budget, for headless tests
   worldModel: worldModel, worldUi: worldUi, resetWorld: resetWorld, setPreset: setPreset, applySpin: applySpin,
   flyMove: flyMove, globePick: globePick, flyCamera: flyCamera, groundKm: groundKm,
   flyAimPeak: flyAimPeak, flyAimDefault: flyAimDefault, altRange: altRange, altToS: altToS, sToAlt: sToAlt,

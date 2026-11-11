@@ -32,7 +32,10 @@ import {
   type FluidState,
   type Rgb3,
 } from './fluids';
-import { G, R_SUN_M, AU_M } from './constants';
+import { G, GM_EARTH, R_SUN_M, AU_M } from './constants';
+
+/** Earth mass, kg, from the nominal GM_EARTH (IAU 2015 B3) and G (CODATA 2018). */
+const M_EARTH_KG = GM_EARTH / G;
 
 const TAU = 6.283185307179586;
 
@@ -49,6 +52,50 @@ export const DEFAULT_MOLAR_MASS = 29;
 /** Default surface pressure, bar, and fluid for any exoplanet: Earth's. ASSUMPTION (D-36). */
 export const DEFAULT_PRESSURE_BAR = 1;
 export const DEFAULT_FLUID: FluidId = 'water';
+
+/** Solar constant used to express insolation in Earth units, W/m^2 (the prototype's 1361; Kopp and Lean 2011). */
+export const SOLAR_CONSTANT = 1361;
+/**
+ * Inner edge of the habitable zone (runaway greenhouse), Kopparapu et al. 2014 (ApJL 787, L29, Table 1; checked
+ * against arXiv:1404.5292): S_eff = S0 + a T + b T^2 + c T^3 + d T^4 with T = Teff - 5780 K (fit for 2600 to 7200 K),
+ * rows [Mearth, S0, a, b, c, d] for 0.1, 1 and 5 Earth masses. Same table as the engine (core.js, #93 3.6).
+ */
+export const KOPPARAPU_2014_RUNAWAY: readonly (readonly number[])[] = [
+  [0.1, 0.99, 1.209e-4, 1.404e-8, -7.418e-12, -1.713e-15],
+  [1, 1.107, 1.332e-4, 1.58e-8, -8.308e-12, -1.931e-15],
+  [5, 1.188, 1.433e-4, 1.707e-8, -8.968e-12, -2.084e-15],
+];
+
+/**
+ * Runaway-greenhouse insolation limit in Earth units for a star and planet mass (#93 3.6): the Kopparapu et al. 2014
+ * rows interpolated in log mass, the nearest row outside 0.1 to 5 Earth masses (no extrapolation); Teff clamped to
+ * the fit's 2600 to 7200 K as in the prototype. model_dependent (a published climate model).
+ */
+export function runawayInsolationLimit(starTeffK: number, massEarth: number): number {
+  const t = clamp(starTeffK - 5780, -3180, 1420);
+  const s = (r: readonly number[]): number =>
+    r[1]! + r[2]! * t + r[3]! * t * t + r[4]! * t * t * t + r[5]! * t * t * t * t;
+  const rows = KOPPARAPU_2014_RUNAWAY;
+  const lm = clamp(Math.log(massEarth), Math.log(0.1), Math.log(5));
+  const lo = lm < 0 ? rows[0]! : rows[1]!;
+  const hi = lm < 0 ? rows[1]! : rows[2]!;
+  const f = (lm - Math.log(lo[0]!)) / Math.log(hi[0]! / lo[0]!);
+  return s(lo) + (s(hi) - s(lo)) * f;
+}
+
+/** Outgoing radiation limit of a steam atmosphere, W/m^2: Goldblatt et al. 2013 (Nat. Geosci. 6, 661). measured-model value. */
+export const RUNAWAY_OLR_LIMIT = 282;
+/**
+ * Post-runaway surface temperature against the steam pressure (#93 3.6): about 1,500 K under 50 bar and about
+ * 1,800 K under 260 bar of steam (Boukrouche et al. 2021, ApJ 919, 130, as quoted by Dorn and Lichtenberg 2021,
+ * ApJL 922, L4), interpolated in ln P through the two points and extrapolated outside them. The steam pressure is
+ * taken to be the surface pressure. [verify] both points against Boukrouche et al. 2021; model_dependent.
+ */
+export const POST_RUNAWAY = { P1: 50, T1: 1500, P2: 260, T2: 1800 } as const;
+export function postRunawayTs(pressureBar: number): number {
+  const { P1, T1, P2, T2 } = POST_RUNAWAY;
+  return T1 + ((T2 - T1) * Math.log(pressureBar / P1)) / Math.log(P2 / P1);
+}
 
 /** Tags the same five as the app (D-02). */
 export type WorldTag =
@@ -69,6 +116,11 @@ export interface WorldInputs {
   rotPeriodD: number;
   /** Mean molar mass of the air, g/mol. */
   molarMass: number;
+  /**
+   * Whether the world has a water ocean (the engine's OCEANF > 0). With one, insolation past the Kopparapu et al.
+   * 2014 inner edge is a runaway greenhouse even before the mean surface boils (#93 3.6). Default false.
+   */
+  hasOcean?: boolean;
 }
 
 export interface WorldModel {
@@ -107,6 +159,12 @@ export interface WorldModel {
   locked: boolean;
   /** Star light reaching the world, W/m^2. */
   insolation: number;
+  /** Insolation in Earth units and the runaway limit for this star and mass (Kopparapu et al. 2014, #93 3.6). */
+  Seff: number;
+  sIn: number;
+  /** Post-runaway surface temperature when it set Ts (else null), and the steam OLR limit while running away. */
+  Tpost: number | null;
+  olrLim: number | null;
 }
 
 /** `sstep` as in the prototype: smoothstep of a clamped ratio. */
@@ -138,14 +196,13 @@ export function worldModel(i: WorldInputs): WorldModel | null {
   const S = SIGMA_SB * Math.pow(i.starTeffK, 4) * Math.pow(Rs / i.orbitAu, 2);
   const Ps = i.pressureBar;
   const airless = Ps < AIRLESS_BELOW_BAR;
-  const tau = airless
+  let tau = airless
     ? 0
     : GREENHOUSE_TAU_PER_BAR * Ps * (i.fluid === 'co2' ? CO2_GREENHOUSE_FACTOR : 1);
-  const Ts = Teq * Math.pow(1 + 0.75 * tau, 0.25);
+  let Ts = Teq * Math.pow(1 + 0.75 * tau, 0.25);
   const gv = (G * i.massKg) / (i.radiusM * i.radiusM);
   const Rg = 8314.462618 / i.molarMass; // J/(kg K)
   const cp = Rg * 3.5; // diatomic ideal gas
-  const H = (Rg * Ts) / gv;
   const Om = TAU / (i.rotPeriodD * 86400);
   const Pref = Math.max(Ps, 0.005) * 1e5;
   const tRad = (cp * Pref) / (gv * 4 * SIGMA_SB * Math.pow(Ts, 3));
@@ -159,12 +216,30 @@ export function worldModel(i: WorldInputs): WorldModel | null {
   }
   const Pa = Ps * 1e5;
   const Tb = airless ? null : boilingPointK(F, Pa);
-  const state = fluidState(F, Ts, Pa, airless);
+  let state = fluidState(F, Ts, Pa, airless);
   const Tc = !airless ? cloudBaseK(F, Ts, Pa) : null;
   const gam = gv / cp;
   const zc = Tc !== null ? (Ts - Tc) / gam / 1000 : null;
+  // #93 3.6: past the mass-dependent inner edge an ocean world runs away even before its mean surface boils (the
+  // engine's rule); a runaway then sits at the post-runaway temperature, held there by tau (Ts = Teq (1 + 0.75 tau)^1/4).
+  const Seff = S / SOLAR_CONSTANT;
+  const sIn = runawayInsolationLimit(i.starTeffK, i.massKg / M_EARTH_KG);
   const runaway =
-    i.fluid === 'water' && (state === 'vapour' || state === 'supercritical') && Ps >= 0.1;
+    i.fluid === 'water' &&
+    Ps >= 0.1 &&
+    (state === 'vapour' || state === 'supercritical' || (Seff > sIn && i.hasOcean === true));
+  let Tpost: number | null = null;
+  if (runaway) {
+    if (state !== 'supercritical') state = 'vapour';
+    const tp = postRunawayTs(Ps);
+    if (tp > Ts) {
+      Tpost = tp;
+      Ts = tp;
+      tau = (Math.pow(Ts / Teq, 4) - 1) / 0.75;
+      state = fluidState(F, Ts, Pa, airless) === 'supercritical' ? 'supercritical' : 'vapour';
+    }
+  }
+  const H = (Rg * Ts) / gv;
   const cov = airless
     ? 0
     : state === 'liquid'
@@ -207,6 +282,10 @@ export function worldModel(i: WorldInputs): WorldModel | null {
     visFrac: visFraction(i.starTeffK),
     locked: i.locked,
     insolation: S,
+    Seff,
+    sIn,
+    Tpost,
+    olrLim: runaway ? RUNAWAY_OLR_LIMIT : null,
   };
 }
 
@@ -355,8 +434,13 @@ export class ClimateBudget {
           const alb = a0 + (0.48 - a0) * cc;
           const asr = S * mu * (1 - alb);
           const eps = eps0 / (1 + 0.3 * Math.min(rh, 1) * (air ? 1 : 0));
-          const olr = eps * SIGMA_SB * Tc * Tc * Tc * Tc;
-          const Bl = 4 * eps * SIGMA_SB * Tc * Tc * Tc;
+          let olr = eps * SIGMA_SB * Tc * Tc * Tc * Tc;
+          let Bl = 4 * eps * SIGMA_SB * Tc * Tc * Tc;
+          // #93 3.6: while running away, a cell radiates at most the steam limit until it reaches Tpost.
+          if (m.olrLim !== null && m.Tpost !== null && Tc < m.Tpost && olr > m.olrLim) {
+            olr = m.olrLim;
+            Bl = 0;
+          }
           const open = isO && hk <= 0 && Tc < (Tb || 1e9);
           const E = air && open ? 0.5 * Math.max(qs - qk, 0) : 0;
           const P = air ? 0.25 * Math.max(qk - qs, 0) : 0;

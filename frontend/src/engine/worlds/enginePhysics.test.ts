@@ -1,6 +1,12 @@
 // Issue #93 phase 3 (physics): the verbatim engine's CPU model, run headless. Each block names its #93 item.
 import { describe, expect, it } from 'vitest';
 import type { ObjectCard } from '@/contract';
+import {
+  RUNAWAY_OLR_LIMIT,
+  postRunawayTs,
+  runawayInsolationLimit,
+  worldModel as tsWorldModel,
+} from '@/physics/climateBudget';
 import { FLUIDS as TS_FLUIDS, boilingPointK, cloudBaseK, fluidState } from '@/physics/fluids';
 import { cardToWorld } from './cardToWorld';
 import { headlessCore, loadModelOnly, preset } from './coreHarness.testutil';
@@ -138,5 +144,82 @@ describe('#93 3.3 tides read the preset orbit (p.ob) before the ORB table', () =
     expect(core.W.obl).toBe(0.3);
     core.setPreset(preset('earth'));
     expect(core.W.ecc).toBe(0.0167);
+  });
+});
+
+describe('#93 3.6 runaway greenhouse', () => {
+  it('Earth at 1 au is unchanged: the 1 Earth-mass Kopparapu row, 286 K, liquid, no runaway', () => {
+    const core = headlessCore();
+    loadModelOnly(core, preset('earth'));
+    const m = core.worldModel();
+    // The prototype's own 1 Earth-mass row at 5772 K: 1.107 + 1.332e-4 (-8) + ... = 1.1059.
+    expect(m.sIn).toBeCloseTo(
+      1.107 + 1.332e-4 * -8 + 1.58e-8 * 64 + 8.308e-12 * 512 - 1.931e-15 * 4096,
+      9,
+    );
+    expect(m.sIn).toBeCloseTo(runawayInsolationLimit(5772, 1), 9);
+    expect(m.runaway).toBe(false);
+    expect(m.Tpost).toBeNull();
+    expect(m.olrLim).toBeNull();
+    expect(m.Ts).toBeGreaterThan(285);
+    expect(m.Ts).toBeLessThan(288);
+    expect(m.state).toBe('liquid');
+  });
+
+  it('the inner edge moves out with mass (0.1 < 1 < 5 Earth masses) and matches physics/climateBudget.ts', () => {
+    const core = headlessCore();
+    const at = (Me: number): number => {
+      loadModelOnly(core, { ...preset('earth'), Me });
+      return core.worldModel().sIn;
+    };
+    expect(at(0.1)).toBeLessThan(at(1));
+    expect(at(1)).toBeLessThan(at(5));
+    expect(at(8.92)).toBeCloseTo(at(5), 12); // clamped to the 5 Earth-mass row, no extrapolation
+    for (const Me of [0.1, 0.3, 1, 2.5, 5])
+      expect(at(Me)).toBeCloseTo(runawayInsolationLimit(5772, Me), 12);
+    // Known answer: Table 1 S0 at Teff = 5780 K.
+    expect(runawayInsolationLimit(5780, 0.1)).toBeCloseTo(0.99, 12);
+    expect(runawayInsolationLimit(5780, 5)).toBeCloseTo(1.188, 12);
+  });
+
+  it('K2-18 b runs away to a hot surface, not a temperate one, and the energy budget follows it', () => {
+    const core = headlessCore();
+    core.setPreset(preset('k218'));
+    const m = core.W.m;
+    expect(m.runaway).toBe(true);
+    expect(m.state).toBe('vapour');
+    expect(m.olrLim).toBe(282);
+    expect(m.Tpost).toBeCloseTo(postRunawayTs(8), 6);
+    expect(m.Ts).toBeGreaterThan(1000);
+    core.ebStep(m, 120, 1.4);
+    core.ebStats(m);
+    expect(core.EB.stats.mean).toBeGreaterThan(900);
+    core.W.m = m;
+    core.worldUi();
+    const hz = (core.W.rows as [string, string][]).find((r) => r[0] === 'Habitable zone');
+    expect(hz?.[1]).toMatch(/runaway/);
+  });
+
+  it('the TypeScript model agrees: an ocean world past the edge runs away to the same temperature', () => {
+    const p = preset('k218');
+    const base = {
+      starTeffK: p.Ts,
+      starRadiusRsun: p.Rs,
+      orbitAu: p.a,
+      radiusM: p.Rj * 71492e3,
+      massKg: p.Me * 5.972e24,
+      bondAlbedo: 0.3,
+      pressureBar: p.Ps,
+      fluid: 'water' as const,
+      locked: true,
+      rotPeriodD: p.P,
+      molarMass: p.mu,
+    };
+    const dry = tsWorldModel(base)!;
+    const wet = tsWorldModel({ ...base, hasOcean: true })!;
+    expect(dry.runaway).toBe(false);
+    expect(wet.runaway).toBe(true);
+    expect(wet.Ts).toBeCloseTo(postRunawayTs(8), 6);
+    expect(wet.olrLim).toBe(RUNAWAY_OLR_LIMIT);
   });
 });

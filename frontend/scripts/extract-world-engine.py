@@ -115,11 +115,18 @@ core.append(DV.CORE_L1705_93_3_2)
 core.append(sl(1706, 1726, [('Math.max(1,', 'p.Umeas||Math.max(1,')]))
 core.append(DV.CORE_L1727_89_REVIEW_2)
 core.append(DV.CORE_L1727_93_3_1)
-core.append(sl(1728, 1736))
+core.append(sl(1728, 1734))
+core.append(DV.CORE_L1734_93_3_6)
+core.append(sl(1735, 1736))
+core.append(DV.CORE_L1736_93_3_6)
 core.append(DV.CORE_L1736_93_3_1)
 core.append(DV.CORE_L1762_93_3_3)
-core.append(sl(1737, 1765, [('flat:', 'flat:p.fMeas!=null?p.fMeas:'), ('ORB[p.id]', '(p.ob||ORB[p.id])')]))
-core.append(sl(1906, 2147))                 # hydroRaster, EB
+core.append(sl(1737, 1765, [('flat:', 'flat:p.fMeas!=null?p.fMeas:'), ('ORB[p.id]', '(p.ob||ORB[p.id])'),
+                            ('runaway:', 'Tpost:Tpost,olrLim:runaway?RUNAWAY.olrLim:null,runaway:')]))
+# hydroRaster, EB; L2101 (outgoing radiation) gains the runaway limit (#93 3.6)
+core.append(sl(1906, 2101))
+core.append(DV.CORE_L2101_93_3_6)
+core.append(sl(2102, 2147))
 core.append(sl(2262, 2355, [('(ema', '(!window.__sxPin&&ema')]))       # WorldGL
 core.append(sl(2356, 2385))                 # fly camera, flyMove, globePick, GS
 core.append(sl(2387, 2387))                 # km
@@ -148,6 +155,7 @@ W.gl = new WorldGL(canvas);
 return {
   W: W, EB: EB, ORB: ORB, OCEANF: OCEANF, GAS_NODES: GAS_NODES, FLUIDS: FLUIDS,
   getGS: function () { return GS; },
+  ebStep: ebStep, ebStats: ebStats, ebInit: ebInit,   // #93: the energy budget, for headless tests
   worldModel: worldModel, worldUi: worldUi, resetWorld: resetWorld, setPreset: setPreset, applySpin: applySpin,
   flyMove: flyMove, globePick: globePick, flyCamera: flyCamera, groundKm: groundKm,
   flyAimPeak: flyAimPeak, flyAimDefault: flyAimDefault, altRange: altRange, altToS: altToS, sToAlt: sToAlt,
