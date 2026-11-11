@@ -20,6 +20,9 @@ import type { BuildNote } from '@/app/build/BuildControls';
 import type { StarPreset } from './cardToStar';
 import { GLOBE_HALF, GLOBE_TILT, globeRot, pickSurface, viewPoint, type LatLon } from './starPick';
 
+/** Whole star: the disc's radius as a fraction of the shorter side (loops are drawn 3 times larger in 'big', so it gets more room). */
+const FRAME_TRUE = 0.36;
+const FRAME_BIG = 0.31;
 export type StarMode = 'globe' | 'closeup';
 /** The prototype's "Light" pills: 3 Observatory view, 2 Enhanced colour, 0 True colour. */
 export type StarLight = 0 | 2 | 3;
@@ -163,6 +166,7 @@ interface Inside {
   pFlare(kind: string, cls: string, t: number): void;
   pReset(): void;
   setAt(t: [number, number] | null): void;
+  setFlareZoom(z: number): void;
   at(): [number, number];
   lines(): boolean;
 }
@@ -173,6 +177,11 @@ const SRC = PREFIX + S1 + '\n' + S2 + '\n' + S3 + '\n' + S4;
 // What the prototype's page does after its slices: nothing but the loop (stubbed) and these reads.
 const SUFFIX = `
 vis.star = MODE === 'globe'; vis.flare = MODE === 'closeup';
+// Wrapper hooks (app level, the slices stay verbatim): the view's half height goes through HALF (framing the
+// whole star, zooming the surface close-up), and the flare close-up's Light follows the star's (FLARE_FILTER).
+if (starGL) { var _sd = starGL.draw; starGL.draw = function (o) { o.half = HALF(o.half); return _sd.call(starGL, o); }; }
+var _od = drawOverlay; drawOverlay = function (r, t, h) { return _od(r, t, HALF(h)); };
+if (flareGL) { var _fd = flareGL.draw; flareGL.draw = function (o) { o.filter = FLARE_FILTER(o.filter); return _fd.call(flareGL, o); }; }
 return {
   ST: ST, FL: FL, vis: vis,
   hasGL: function () { return { star: !!starGL, flare: !!flareGL }; },
@@ -195,6 +204,8 @@ return {
   pStep: function (n, dt) { for (var i = 0; i < n; i++) { ST.time += dt * 0.2; OV.clock += dt; updateEvents(); } },
   pFlare: function (kind, cls, t) { FL.playing = false; FL.kind = kind; FL.cls = cls; FL.t = t; flareUi(); },
   setAt: function (t) { CLOSE_AT = t; },
+  // Wrapper-owned (not verbatim): the flare window's half height V.h is the flare close-up's own zoom variable.
+  setFlareZoom: function (z) { V.h = 0.17 / z; drawFlare(); drawFlareStar(); },
   at: function () { return CLOSE_AT || MODEL.best || [0.26, 0.5]; },
   pReset: function () { ST.playing = false; FL.playing = false; ST.time = 3; OV.clock = 0; OV.ev = []; OV.next = 0; OV.r = rng(1); OV.shown = null; OV.loops = []; PL.q = 1; }
 };`;
@@ -206,6 +217,7 @@ export class StarEngine {
   private readonly inside: Inside;
   private readonly lines = new Stub();
   private disposed = false;
+  private zoomK = 1;
 
   constructor(host: HTMLElement, opts: StarOptions) {
     this.mode = opts.mode;
@@ -256,12 +268,54 @@ export class StarEngine {
     const quiet = { error: () => {}, warn: () => {}, log: () => {} };
     const make = new Function(
       '$', 'rng', 'lerp', 'smooth', 'clamp', 'reduced', 'console', 'document',
-      'requestAnimationFrame', 'addEventListener', 'MODE', 'LINES_BTN',
+      'requestAnimationFrame', 'addEventListener', 'MODE', 'LINES_BTN', 'HALF', 'FLARE_FILTER',
       SRC + SUFFIX,
     ) as (...a: unknown[]) => Inside;
-    this.inside = make($, rng, lerp, smooth, clamp, reduced, quiet, doc, () => 0, () => {}, opts.mode, this.lines);
+    this.inside = make($, rng, lerp, smooth, clamp, reduced, quiet, doc, () => 0, () => {}, opts.mode, this.lines,
+      (h: number) => this.effHalf(h),
+      (f: number) => (this.mode === 'closeup' ? this.lightNow() : f),
+    );
     const light = opts.light ?? 0;
     if (light !== 3) this.inside.setLight(light);
+  }
+
+  private lightNow(): number {
+    // The flare close-up's own H-alpha look is replaced by the star's Light setting (true colour, enhanced, observatory).
+    return (this.inside as Inside | undefined)?.ST.filter ?? 0;
+  }
+  /**
+   * The half height (in star radii) the view is drawn with. Whole star: wide enough that the disc and its loops
+   * fit with margin (disc radius at most FRAME of the shorter side; the engine's own 1.28 gave 0.39 of the height and
+   * cropped the loops). Surface close-up: the engine's half height divided by the zoom.
+   */
+  private effHalf(h: number): number {
+    if (this.mode !== 'globe') return h;
+    const view = (this.inside as Inside | undefined)?.ST.view;
+    if (view === 'close') return h / this.zoomK;
+    const c = this.canvases[0];
+    const W = c?.clientWidth ?? 0, H = c?.clientHeight ?? 0;
+    if (!W || !H) return h;
+    return Math.max(h, H / (2 * (view === 'big' ? FRAME_BIG : FRAME_TRUE) * Math.min(W, H)));
+  }
+  /** The half height the whole-star view uses now (for picking and the marker). */
+  globeHalf(): number {
+    return this.effHalf(GLOBE_HALF);
+  }
+  /** The close-up's zoom limits (1 = as opened), or null when this view has none (the whole star). */
+  get zoomRange(): [number, number] | null {
+    if (this.mode === 'closeup') return [0.25, 4];
+    return this.inside.ST.view === 'close' ? [0.5, 8] : null;
+  }
+  get zoom(): number {
+    return this.zoomK;
+  }
+  /** Surface close-up: drives the engine's half height (drawStar's `half`, via HALF). Flare close-up: V.h = 0.17 / zoom. */
+  setZoom(z: number): void {
+    const r = this.zoomRange;
+    if (!r || this.disposed) return;
+    this.zoomK = clamp(z, r[0], r[1]);
+    if (this.mode === 'closeup') this.inside.setFlareZoom(this.zoomK);
+    else this.inside.draw();
   }
 
   /** True when this mode's canvases got WebGL 2 (else the caller keeps its fallback). */
@@ -386,7 +440,7 @@ export class StarEngine {
   pick(nx: number, ny: number): LatLon | null {
     const c = this.canvases[0];
     if (!c || !c.clientHeight) return null;
-    const q = viewPoint(nx, ny, c.clientWidth / c.clientHeight, GLOBE_HALF);
+    const q = viewPoint(nx, ny, c.clientWidth / c.clientHeight, this.globeHalf());
     return pickSurface(q, globeRot(this.inside.ST.time), GLOBE_TILT);
   }
   /** The artifact's own state objects (ST, OV, PL, FL), for the parity harness. */
