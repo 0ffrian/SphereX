@@ -315,7 +315,11 @@ const AREA_NAMESPACES: ReadonlySet<string> = new Set([
   'checks',
 ]);
 
-/** Groups an Area reply's `missing`: area notes first, then anything else as groupMissing does. */
+/**
+ * Groups an Area reply's `missing`: area notes first, then anything else as groupMissing does.
+ * P8 lists only its own frontend code (`area:not_prepared`); showing the replies' `missing` lists
+ * (summary, dots, tracks, known) is P9's job, in the Discovery and Result cards.
+ */
 export function groupAreaMissing(codes: readonly string[]): RefusalGroup[] {
   const notes: RefusalGroup[] = [];
   const rest: string[] = [];
