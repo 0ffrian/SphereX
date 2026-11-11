@@ -46,6 +46,32 @@ export function drawReady(e: WorldEngine): boolean {
   return !(e.state().gas && e.spinup > 0);
 }
 
+/** Globe turn per CSS pixel of drag, radians, at zoom 1 (the artifact's value). */
+const DRAG_RAD_PER_PX = 0.006;
+
+/**
+ * The globe turn for a drag of (dx, dy) CSS pixels: the surface follows the hand, like grabbing a ball (issue #93
+ * regression fix). In the engine a larger yaw turns the surface to the left on screen and a larger pitch moves the
+ * front of the globe up (WORLD_FS: b = ry(rx(n, tilt + pitch), spin + yaw)), so both are subtracted. The Sun turns
+ * with the yaw (core.js rotates the light by -yaw), so the terminator stays where it is.
+ */
+export function globeTurn(s: { yaw: number; pitch: number; zoom: number }, dx: number, dy: number) {
+  return globeTurnBy(s, (dx * DRAG_RAD_PER_PX) / s.zoom, (dy * DRAG_RAD_PER_PX) / s.zoom);
+}
+
+/** Turn the globe so its surface moves right by `right` and down by `down` radians (pitch kept within +-1.4). */
+export function globeTurnBy(s: { yaw: number; pitch: number }, right: number, down: number) {
+  return { yaw: s.yaw - right, pitch: Math.max(-1.4, Math.min(1.4, s.pitch - down)) };
+}
+
+/** Arrow keys move the surface the way the arrow points, as a drag in that direction would. */
+export const GLOBE_KEYS: Record<string, [number, number]> = {
+  ArrowLeft: [-0.1, 0],
+  ArrowRight: [0.1, 0],
+  ArrowUp: [0, -0.1],
+  ArrowDown: [0, 0.1],
+};
+
 /**
  * What a failure belongs to: the card and the preset it maps to. A failure must not carry over to the
  * next object (the old flag was sticky), so every reader compares the key of what it is about to draw.

@@ -21,7 +21,7 @@ import {
   type BuildNote,
 } from './build/BuildControls';
 import { buttonClass, pressedClass } from './ui';
-import { drawReady, useWorldStore } from './worldStore';
+import { drawReady, GLOBE_KEYS, globeTurn, globeTurnBy, useWorldStore } from './worldStore';
 import { FLY_NOTE, WORLD_HONESTY, WORLD_NOTE_LINES } from './worldNotes.generated';
 
 /** The engine's world for the shown card, or null: not a planet, refused, or no WebGL 2 (old path). */
@@ -547,10 +547,7 @@ export function WorldGlobeStage({ world, onFail }: { world: CardToWorldOk; onFai
       drag.moved = true;
       if (canTurn()) {
         const s = engine.state();
-        useWorldStore.getState().apply({
-          yaw: s.yaw + ((e.clientX - drag.x) * 0.006) / s.zoom,
-          pitch: Math.max(-1.4, Math.min(1.4, s.pitch + ((e.clientY - drag.y) * 0.006) / s.zoom)),
-        });
+        useWorldStore.getState().apply(globeTurn(s, e.clientX - drag.x, e.clientY - drag.y));
       }
       drag.x = e.clientX;
       drag.y = e.clientY;
@@ -566,19 +563,10 @@ export function WorldGlobeStage({ world, onFail }: { world: CardToWorldOk; onFai
     };
     const key = (e: KeyboardEvent) => {
       if (!canTurn()) return;
-      const s = engine.state();
-      const d: Record<string, [number, number]> = {
-        ArrowLeft: [-0.1, 0],
-        ArrowRight: [0.1, 0],
-        ArrowUp: [0, -0.1],
-        ArrowDown: [0, 0.1],
-      };
-      const mv = d[e.key];
+      const mv = GLOBE_KEYS[e.key];
       if (!mv) return;
       e.preventDefault();
-      useWorldStore
-        .getState()
-        .apply({ yaw: s.yaw + mv[0], pitch: Math.max(-1.4, Math.min(1.4, s.pitch + mv[1])) });
+      useWorldStore.getState().apply(globeTurnBy(engine.state(), mv[0], mv[1]));
     };
     canvas.addEventListener('pointerdown', down);
     canvas.addEventListener('pointermove', move);
