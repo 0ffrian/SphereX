@@ -40,3 +40,33 @@ export function formatCoords(ra: number, dec: number): string {
   const sign = dec < 0 ? '−' : '+';
   return `RA ${ra.toFixed(5)}°, Dec ${sign}${Math.abs(dec).toFixed(5)}°`;
 }
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function utcDate(iso: string): Date | null {
+  if (!ISO_PARTS.test(iso)) return null;
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? null : new Date(ms);
+}
+
+/** "15 Jan 03:00 UTC" (Area search visits, A18.3). Zone-less strings are refused as in formatUtc. */
+export function formatVisitTime(iso: string): string {
+  const d = utcDate(iso);
+  if (!d) return TIME_WITHOUT_ZONE;
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mm = String(d.getUTCMinutes()).padStart(2, '0');
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${hh}:${mm} UTC`;
+}
+
+/** "15 to 16 Jan 2026", "30 Jan 2026 to 2 Feb 2026" or "15 Jan 2026" (UTC days). */
+export function formatUtcDayRange(firstIso: string, lastIso: string): string {
+  const a = utcDate(firstIso);
+  const b = utcDate(lastIso);
+  if (!a || !b) return TIME_WITHOUT_ZONE;
+  const day = (d: Date) => `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  const sameMonth =
+    a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth();
+  if (sameMonth && a.getUTCDate() === b.getUTCDate()) return day(a);
+  if (sameMonth) return `${a.getUTCDate()} to ${day(b)}`;
+  return `${day(a)} to ${day(b)}`;
+}

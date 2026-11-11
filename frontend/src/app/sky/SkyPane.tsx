@@ -13,6 +13,10 @@
 // - No React re-render per pointer move: the readout and markers are written from refs.
 // - R9: keyboard pan/zoom on the canvas (arrows, +/−, R), Enter picks the centre, aria-label and a
 //   text alternative. No on-screen pan and zoom buttons (Q-123).
+// - Extension points (A21.2, A21.6; Q-174, built ahead for Area search on issue #96, Q-406): a sky
+//   layer slot (`layers`, with the SkyView in SkyViewContext), the pointer mode (`draw` sends a
+//   primary drag to the registered draw handler), the hit-test chain (marker buttons, then layers,
+//   then the pick), described-by ids appended to the canvas, and the `skyFlyTo` camera command.
 import {
   useEffect,
   useId,
@@ -59,6 +63,15 @@ import {
 import { useShellStore } from '@/app/shell/shellStore';
 import { useCachedMarkers } from './useCachedMarkers';
 import { useTargetMarkers, type TargetMarker } from './useTargetMarkers';
+import {
+  getSkyDrawHandler,
+  runLayerHits,
+  skyDescribedByIds,
+  SkyViewContext,
+  subscribeSkyDescribedBy,
+} from './layers';
+import { invalidateSkySafeRect, skySafeRect } from './safeRect';
+import { cameraForTarget, useSkyFlyStore } from './skyFlyTo';
 
 /**
  * Start view. A display choice (artistic), roughly towards the Galactic centre, where the Milky Way
@@ -109,7 +122,7 @@ function deviceCaps(maxTextureSize: number) {
 /** Size of the square round a marker where a right-click or long press counts as on it (touch target). */
 const MARKER_HIT_PX = 44;
 
-export function SkyPane({ children }: { children?: ReactNode }) {
+export function SkyPane({ children, layers }: { children?: ReactNode; layers?: ReactNode }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<SkyView | null>(null);
   // Marker elements by key; filled by ref callbacks, read by the render listener (not React state).
@@ -309,6 +322,42 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     canvas.setAttribute('aria-label', what);
   }, [state]);
 
+  // ---- Layer text alternatives (A21.12): appended to the shell description, never replacing it --
+  useEffect(() => {
+    if (!view) return;
+    const canvas = hostRef.current?.querySelector('canvas');
+    if (!canvas) return;
+    // Written only when a layer adds an id, so with none the attribute stays as the renderer set it.
+    let added = false;
+    const write = () => {
+      const ids = skyDescribedByIds();
+      if (ids.length === 0 && !added) return;
+      added = ids.length > 0;
+      canvas.setAttribute('aria-describedby', [descId, ...ids].join(' '));
+    };
+    write();
+    return subscribeSkyDescribedBy(write);
+  }, [view, descId]);
+
+  // ---- Pointer mode (A21.6): crosshair, and markers let a drag through while drawing ------------
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    // Only `draw` is marked, so the pane is unchanged in the usual `pan` mode.
+    const write = (mode: string) => {
+      const canvas = host.querySelector('canvas');
+      for (const el of [host, canvas]) {
+        if (!el) continue;
+        if (mode === 'draw') el.dataset.pointerMode = mode;
+        else delete el.dataset.pointerMode;
+      }
+    };
+    write(useShellStore.getState().pointerMode);
+    return useShellStore.subscribe((s, prev) => {
+      if (s.pointerMode !== prev.pointerMode) write(s.pointerMode);
+    });
+  }, [view]);
+
   // ---- Markers: positions follow every render, written straight to the DOM ------------------------
   useEffect(() => {
     if (!view) return;
@@ -373,6 +422,48 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     flyCancel.current = () => cancelAnimationFrame(raf);
     return () => cancelAnimationFrame(raf);
   }, [view, resolved]);
+
+  // ---- skyFlyTo (A21.6): a camera command from a tool, centred on the safe rectangle -------------
+  useEffect(() => {
+    if (!view) return;
+    let handled = 0;
+    let raf = 0;
+    const run = () => {
+      const { seq, cmd } = useSkyFlyStore.getState();
+      if (seq === handled || !cmd) return;
+      handled = seq;
+      flyCancel.current?.();
+      flyCancel.current = null;
+      const from = view.getView();
+      const { width, height } = view.getSize();
+      invalidateSkySafeRect();
+      const target = cameraForTarget(cmd, from, width, height, skySafeRect());
+      if (prefersReducedMotion()) {
+        view.setView(target);
+        return;
+      }
+      const t0 = performance.now();
+      const cancel = () => cancelAnimationFrame(raf);
+      const step = (now: number) => {
+        // Only one fly at a time (red-team M12): a newer fly (the search's own, which this hook
+        // does not change) took flyCancel, so this one stops.
+        if (flyCancel.current !== cancel) return;
+        const t = (now - t0) / FLY_MS;
+        view.setView(interpolateView(from, target, t));
+        if (t < 1) raf = requestAnimationFrame(step);
+        else flyCancel.current = null;
+      };
+      raf = requestAnimationFrame(step);
+      flyCancel.current = cancel;
+    };
+    // A command given before the sky was ready (a shared link) is carried out now.
+    run();
+    const off = useSkyFlyStore.subscribe(run);
+    return () => {
+      off();
+      cancelAnimationFrame(raf);
+    };
+  }, [view]);
 
   // ---- Picking --------------------------------------------------------------------------------------
   const pickAt = (px: number, py: number) => {
@@ -474,6 +565,8 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     let pinchMid = { x: 0, y: 0 };
     let hover: { x: number; y: number } | null = null;
     let readoutFrame: number | null = null;
+    /** A primary drag is drawing (pointer mode `draw`), not panning. */
+    let drawing = false;
 
     const local = (e: PointerEvent | WheelEvent) => {
       const r = canvas.getBoundingClientRect();
@@ -508,6 +601,27 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       stopFly();
       canvas.setPointerCapture?.(e.pointerId);
       const p = local(e);
+      const draw = getSkyDrawHandler();
+      if (
+        pointers.size === 0 &&
+        e.isPrimary !== false &&
+        draw &&
+        useShellStore.getState().pointerMode === 'draw'
+      ) {
+        drawing = true;
+        pointers.set(e.pointerId, p);
+        start = p;
+        maxMove = 0;
+        // A texture swap waits until the drag ends, as for a pan.
+        view.setInteracting(true);
+        draw.start(p);
+        return;
+      }
+      if (drawing) {
+        // A second finger: the square is dropped and the gesture becomes a pinch.
+        drawing = false;
+        getSkyDrawHandler()?.cancel();
+      }
       pointers.set(e.pointerId, p);
       if (pointers.size === 1) {
         start = p;
@@ -531,6 +645,11 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         return;
       }
       pointers.set(e.pointerId, p);
+      if (drawing) {
+        if (start) maxMove = Math.max(maxMove, Math.hypot(p.x - start.x, p.y - start.y));
+        getSkyDrawHandler()?.move(p);
+        return;
+      }
       const { width, height } = view.getSize();
       if (pointers.size === 1) {
         if (start) maxMove = Math.max(maxMove, Math.hypot(p.x - start.x, p.y - start.y));
@@ -553,6 +672,15 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     const onUp = (e: PointerEvent) => {
       if (!pointers.has(e.pointerId)) return;
       const p = local(e);
+      if (drawing) {
+        drawing = false;
+        pointers.delete(e.pointerId);
+        view.setInteracting(false);
+        const draw = getSkyDrawHandler();
+        if (e.type === 'pointerup') draw?.end(p, isClick(maxMove));
+        else draw?.cancel();
+        return;
+      }
       const wasSingle = pointers.size === 1;
       pointers.delete(e.pointerId);
       if (pointers.size === 0) setDragging(false);
@@ -561,7 +689,12 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         const [rest] = [...pointers.values()] as [{ x: number; y: number }];
         start = rest;
       }
-      if (e.type === 'pointerup' && wasSingle && isClick(maxMove)) pickAt(p.x, p.y);
+      // Hit-test chain (A21.6): marker buttons took their own clicks; then the layers, topmost
+      // first; then the sky pick.
+      if (e.type === 'pointerup' && wasSingle && isClick(maxMove)) {
+        if (runLayerHits(p.x, p.y)) return;
+        pickAt(p.x, p.y);
+      }
     };
     const onLeave = (e: PointerEvent) => {
       if (e.pointerType !== 'mouse' || pointers.size > 0) return;
@@ -640,6 +773,11 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       canvas.removeEventListener('pointerleave', onLeave);
       canvas.removeEventListener('wheel', onWheel);
       canvas.removeEventListener('keydown', onKey);
+      if (drawing) {
+        drawing = false;
+        getSkyDrawHandler()?.cancel();
+        view.setInteracting(false);
+      }
     };
     // pickAt reads the latest search through the store action, which is stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -684,6 +822,8 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         <i />
         <i />
       </div>
+      {/* Sky layer slot (A21.2): tool layers over the sky, under the cards, panel and markers. */}
+      <SkyViewContext.Provider value={view}>{layers}</SkyViewContext.Provider>
       <p id={descId} className="sr-only">
         Drag to look around, use the mouse wheel or pinch to zoom, and click or tap to pick a
         position: its coordinates go into the search. With the keyboard, the arrow keys pan, plus
@@ -692,7 +832,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       </p>
 
       {/* Panels sit right after the canvas in the tab order. */}
-      {children}
+      <SkyViewContext.Provider value={view}>{children}</SkyViewContext.Provider>
 
       {/* Markers: buttons placed by the render listener (no React render per frame). */}
       <ul

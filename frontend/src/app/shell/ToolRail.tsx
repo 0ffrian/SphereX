@@ -7,7 +7,7 @@ import { useAppStore } from '@/state/store';
 import { RailIcon } from './railIcons';
 import { useShellStore, type ToolId } from './shellStore';
 
-const TOOLS: { id: ToolId; label: string; hint: string }[] = [
+export const TOOLS: { id: ToolId; label: string; hint: string }[] = [
   { id: 'sky', label: 'Sky', hint: 'The sky view alone' },
   { id: 'flipbook', label: 'Flipbook', hint: 'SPHEREx frames of the object' },
   { id: 'spectrum', label: 'Spectrum', hint: 'Spectrum of the object' },

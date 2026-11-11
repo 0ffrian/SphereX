@@ -2543,3 +2543,23 @@ body {
 .sx-acc-dim td {
   opacity: 0.45;
 }
+
+/* Area search (A18.1, A18.2; issue #96). Additions only: they apply while the pointer mode is draw
+   or to Area elements. The Area card is a feature card (A21.5) that scrolls when the sky is short.
+   Not in a layer: the canvas and markers carry Tailwind utilities (cursor-grab,
+   pointer-events-auto) that a layered rule could not override while drawing. */
+.sx-feature-card .sx-island {
+  max-height: calc(100% - 24px - var(--sx-credit-h, 0px));
+  overflow: auto;
+}
+.sx-sky-pane[data-pointer-mode='draw'] > canvas {
+  cursor: crosshair;
+}
+/* While drawing, a drag that starts on a marker draws the square instead of opening the marker. */
+.sx-sky-pane[data-pointer-mode='draw'] .sx-marker {
+  pointer-events: none;
+}
+.sx-area-square:focus-visible {
+  outline: 2px solid var(--color-sx-green);
+  outline-offset: 2px;
+}

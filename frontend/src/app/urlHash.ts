@@ -1,10 +1,13 @@
 // A10 hash routing (optional challenge item): a shareable link with coordinates.
-// Format: #ra=<deg>&dec=<deg>[&name=<search text>][&frame=<frame_id>][&colour=tint|composite][&build]
+// Format: #ra=<deg>&dec=<deg>[&name=<search text>][&frame=<frame_id>][&colour=tint|composite]
+//         [&area=<area_id>][&build]
 // `build` (issue #60, as the mock-up's `#build`) is there while the build pane is open; on its own
 // (`#build`) it is the 3D view with no object searched.
 // `name` is kept when the search was by name, so a link to a moving object reopens the same
 // object id rather than whatever sits at those coordinates. `colour` is the flipbook's colour view
 // (colourMode.ts); without it the flipbook shows the raw frames, so older links keep working.
+// `area` (A18.9, A21.11; issue #96) opens Area search on that prepared area; a hash with only
+// `area` is valid (no object needed).
 import { parseColourParam, type ColourView } from './flipbook/colourMode';
 import { validateCoords } from './search/parseQuery';
 
@@ -16,6 +19,8 @@ export interface HashState {
   colour?: ColourView;
   /** The build pane is open (issue #60). */
   build?: boolean;
+  /** Area search is open on this prepared area (A18.9). */
+  area?: string;
 }
 
 export interface ParsedHash extends HashState {
@@ -54,6 +59,8 @@ export function parseHash(hash: string): ParsedHash {
     if (view) out.colour = view;
     else out.problems.push(`Link colour view “${colour}” ignored; showing the raw frames.`);
   }
+  const area = params.get('area')?.trim();
+  if (area) out.area = area;
   if (params.has('build')) out.build = true;
   return out;
 }
@@ -67,6 +74,7 @@ export function formatHash(state: HashState): string {
   if (state.name) params.set('name', state.name);
   if (state.frame) params.set('frame', state.frame);
   if (state.colour) params.set('colour', state.colour);
+  if (state.area) params.set('area', state.area);
   const s = params.toString();
   // A bare `build` flag, written without "=" so the link reads as the mock-up's `#build`.
   const all = state.build ? (s === '' ? 'build' : `${s}&build`) : s;
