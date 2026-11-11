@@ -21,6 +21,14 @@ import {
   type BuildNote,
 } from './build/BuildControls';
 import { buttonClass, pressedClass } from './ui';
+import GridLoader, { type GridLoaderProps } from './island/GridLoader';
+import {
+  ENGINE_FORM_TIMEOUT_MS,
+  ENGINE_READY_TIMEOUT_MS,
+  FormClock,
+  formProgress,
+  readyOrTimeout,
+} from './engineWatchdog';
 import { drawReady, GLOBE_KEYS, globeTurn, globeTurnBy, useWorldStore } from './worldStore';
 import { FLY_NOTE, WORLD_HONESTY, WORLD_NOTE_LINES } from './worldNotes.generated';
 
@@ -97,90 +105,111 @@ type Role = 'globe' | 'fly';
 /**
  * Builds one engine on a canvas of its own inside `host`, drives its clock (the artifact's loop, with its pause) and
  * keeps React in step with it. The canvas is made here, in the effect, so a remount gets a fresh GL context.
+ *
+ * Issue #93 regression fix: the stage never hangs on "Forming…". A shader compile that has not finished after
+ * ENGINE_READY_TIMEOUT_MS, a world that has not formed after ENGINE_FORM_TIMEOUT_MS on screen, and any error while it
+ * starts or steps (which used to stop the frame loop for good) all call `onFail`, so the three.js path draws instead.
+ * `onFormed` is called once the world has formed (the build steps wait for it).
  */
-function useWorldEngine(role: Role, world: CardToWorldOk, onFail: (() => void) | undefined) {
+function useWorldEngine(
+  role: Role,
+  world: CardToWorldOk,
+  onFail: (() => void) | undefined,
+  onFormed?: () => void,
+) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [engine, setEngine] = useState<WorldEngine | null>(null);
   const [failed, setFailed] = useState(false);
   const [rev, bump] = useReducer((n: number) => n + 1, 0);
+  /** Spin-up steps the world started with (for the overlay's progress), null until it starts. */
+  const [spin0, setSpin0] = useState<number | null>(null);
+  const onFormedRef = useRef(onFormed);
+  useEffect(() => {
+    onFormedRef.current = onFormed;
+  });
   const presetId = world.preset.id;
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const canvas = document.createElement('canvas');
-    canvas.style.cssText =
-      'position:absolute;left:0;top:0;height:100%;display:block;touch-action:none;outline:none;width:' +
-      (role === 'fly' ? '166.6667%' : '100%');
-    host.appendChild(canvas);
     let dead = false;
-    const fail = (err: unknown) => {
-      if (dead) return;
-      console.warn('[world engine] could not start', err);
-      canvas.remove();
-      setFailed(true);
-    };
-    let e: WorldEngine;
-    try {
-      // Issue #93: the globe engine never compiles the fly shader; the fly engine skips the hidden globe.
-      e = new WorldEngine(canvas, { role });
-    } catch (err) {
-      fail(err);
-      return;
-    }
-    // A lost GL context leaves a black canvas: report it so the old path draws instead (not while we release it ourselves).
-    const onLost = (ev: Event) => {
-      ev.preventDefault();
-      if (!dead) setFailed(true);
-    };
-    canvas.addEventListener('webglcontextlost', onLost);
+    let broken = false;
+    let canvas: HTMLCanvasElement | null = null;
+    let e: WorldEngine | null = null;
+    let onLost: ((ev: Event) => void) | null = null;
     let raf = 0;
     let io: IntersectionObserver | null = null;
     let ro: ResizeObserver | null = null;
     let id = 0;
+    let cancelReady = (): void => undefined;
+    const fail = (err: unknown) => {
+      if (dead || broken) return;
+      broken = true;
+      console.warn('[world engine] could not start', err);
+      cancelReady();
+      cancelAnimationFrame(raf);
+      window.clearInterval(id);
+      canvas?.remove();
+      setFailed(true);
+    };
     // The shaders compile in the background while "Forming…" shows (issue #93: the fly shader took about 60 s on a
-    // cold ANGLE D3D11 cache and froze the page); the world is built once they are linked. A compile or link error
-    // takes the old three.js path, as a failed start always did.
-    const start = () => {
-      if (dead) return;
+    // cold ANGLE D3D11 cache and froze the page); the world is built once they are linked. A compile or link error,
+    // or a compile that takes too long, takes the old three.js path, as a failed start always did.
+    const start = (en: WorldEngine) => {
+      if (dead || broken) return;
+      const st = useWorldStore.getState();
       try {
-        e.setPreset(world.preset);
+        en.setPreset(world.preset);
+        if (role === 'globe') {
+          st.load(world);
+          st.setGlobe(en);
+          useWorldStore.setState({ playing: !reducedMotion() });
+        } else {
+          // The close-up opens in the state the globe is in: same controls, same turn angle, same clock.
+          if (st.world?.preset.id === world.preset.id) en.setOverrides(st.applied);
+          st.setFly(en);
+        }
       } catch (err) {
         fail(err);
         return;
       }
-      const st = useWorldStore.getState();
-      if (role === 'globe') {
-        st.load(world);
-        st.setGlobe(e);
-        useWorldStore.setState({ playing: !reducedMotion() });
-      } else {
-        // The close-up opens in the state the globe is in: same controls, same turn angle, same clock.
-        if (st.world?.preset.id === world.preset.id) e.setOverrides(st.applied);
-        st.setFly(e);
-      }
-      setEngine(e);
+      setSpin0(en.spinup);
+      setEngine(en);
       // Dev only: the verification scripts (issue #71) read and drive the engines through these.
       if (import.meta.env.DEV)
-        (window as unknown as Record<string, unknown>)[`__sxWorld_${role}`] = e;
+        (window as unknown as Record<string, unknown>)[`__sxWorld_${role}`] = en;
 
       // The world holds still while it forms (so the turn angle, and with it where the Sun is, stays what the
       // artifact has when its user presses Surface view) and starts moving when it has settled.
-      e.playing = false;
+      en.playing = false;
       let released = false;
       let shown = true;
       let last = performance.now();
+      const clock = new FormClock();
       const frame = (now: number) => {
-        if (dead) return;
-        const dt = (now - last) / 1000;
+        if (dead || broken) return;
+        const dtMs = now - last;
         last = now;
-        if (!released && e.spinup === 0) {
-          released = true;
-          const g = useWorldStore.getState();
-          if (role === 'fly' && g.globe) e.syncSpin(g.globe);
-          e.playing = g.playing;
+        try {
+          if (!released && en.spinup === 0) {
+            released = true;
+            const g = useWorldStore.getState();
+            if (role === 'fly' && g.globe) en.syncSpin(g.globe);
+            en.playing = g.playing;
+            bump();
+            onFormedRef.current?.();
+          }
+          const visible = shown && !document.hidden;
+          if (visible) en.tick(dtMs / 1000);
+          if (!released && clock.add(dtMs, visible, en.spinup > 0)) {
+            fail(new Error(`the world had not formed after ${ENGINE_FORM_TIMEOUT_MS / 1000} s`));
+            return;
+          }
+        } catch (err) {
+          // An exception here used to end the loop silently, leaving "Forming…" on screen for good.
+          fail(err);
+          return;
         }
-        if (shown && !document.hidden) e.tick(dt);
         raf = requestAnimationFrame(frame);
       };
       raf = requestAnimationFrame(frame);
@@ -194,7 +223,7 @@ function useWorldEngine(role: Role, world: CardToWorldOk, onFail: (() => void) |
                 // The fly pane was hidden while the globe turned: catch up to its phase when it shows again.
                 if (role === 'fly' && shown && !was && released) {
                   const g = useWorldStore.getState().globe;
-                  if (g) e.syncSpin(g);
+                  if (g) en.syncSpin(g);
                 }
               }
             });
@@ -204,33 +233,70 @@ function useWorldEngine(role: Role, world: CardToWorldOk, onFail: (() => void) |
         typeof ResizeObserver === 'undefined'
           ? null
           : new ResizeObserver(() => {
-              if (drawReady(e)) e.draw();
+              if (drawReady(en)) en.draw();
             });
-      ro?.observe(canvas);
+      if (canvas) ro?.observe(canvas);
       // React reads the readouts a few times a second while the world moves or forms, and not at all when it is paused and settled.
       let wasForming = true;
       id = window.setInterval(() => {
-        const forming = e.spinup > 0;
-        if (shown && (e.playing || forming || wasForming)) bump();
+        const forming = en.spinup > 0;
+        if (shown && (en.playing || forming || wasForming)) bump();
         wasForming = forming;
       }, 400);
     };
-    e.whenReady().then(start, fail);
+    // Created a tick later, so React's development double mount (mount, unmount, mount in one go) creates one engine,
+    // not two: the second compiled the fly shader again while the first was released mid-compile (issue #93).
+    const boot = window.setTimeout(() => {
+      if (dead) return;
+      const cv = document.createElement('canvas');
+      canvas = cv;
+      cv.style.cssText =
+        'position:absolute;left:0;top:0;height:100%;display:block;touch-action:none;outline:none;width:' +
+        (role === 'fly' ? '166.6667%' : '100%');
+      host.appendChild(cv);
+      let en: WorldEngine;
+      try {
+        // Issue #93: the globe engine never compiles the fly shader; the fly engine skips the hidden globe.
+        en = new WorldEngine(cv, { role });
+      } catch (err) {
+        fail(err);
+        return;
+      }
+      e = en;
+      // A lost GL context leaves a black canvas: report it so the old path draws instead (not while we release it ourselves).
+      onLost = (ev: Event) => {
+        ev.preventDefault();
+        fail(new Error('WebGL context lost'));
+      };
+      cv.addEventListener('webglcontextlost', onLost);
+      cancelReady = readyOrTimeout(
+        en.whenReady(),
+        ENGINE_READY_TIMEOUT_MS[role],
+        () => start(en),
+        fail,
+      );
+    }, 0);
     return () => {
-      if (import.meta.env.DEV)
-        (window as unknown as Record<string, unknown>)[`__sxWorld_${role}`] = null;
+      window.clearTimeout(boot);
       dead = true;
-      canvas.removeEventListener('webglcontextlost', onLost);
+      cancelReady();
+      if (canvas && onLost) canvas.removeEventListener('webglcontextlost', onLost);
       cancelAnimationFrame(raf);
       window.clearInterval(id);
       io?.disconnect();
       ro?.disconnect();
-      const s = useWorldStore.getState();
-      if (role === 'globe' && s.globe === e) s.setGlobe(null);
-      if (role === 'fly' && s.fly === e) s.setFly(null);
-      e.dispose();
-      canvas.remove();
+      if (e) {
+        if (import.meta.env.DEV)
+          (window as unknown as Record<string, unknown>)[`__sxWorld_${role}`] = null;
+        const s = useWorldStore.getState();
+        if (role === 'globe' && s.globe === e) s.setGlobe(null);
+        if (role === 'fly' && s.fly === e) s.setFly(null);
+        // Never blocks: a compile still running is waited for in the background (WorldEngine.dispose).
+        e.dispose();
+      }
+      canvas?.remove();
       setEngine(null);
+      setSpin0(null);
     };
     // `world` is read once per mount: the hosts are keyed by the preset id.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -240,18 +306,67 @@ function useWorldEngine(role: Role, world: CardToWorldOk, onFail: (() => void) |
     if (failed) onFail?.();
   }, [failed, onFail]);
 
-  return { hostRef, engine, rev, bump, failed };
+  const progress = engine ? formProgress(engine.spinup, spin0) : null;
+  return { hostRef, engine, rev, bump, failed, progress };
 }
 
-/** "Forming the planet…": drawn over the canvas until the spin-up has finished, so a half-formed world is never shown. */
-function Forming({ gas }: { gas: boolean }) {
+/** The build pane's loader sequence (ViewerPanel's BUILD_LOADER_LOOK), so the two waits look alike. */
+const FORMING_LOADER_LOOK: GridLoaderProps = {
+  mode: 'sequence',
+  sequence: ['spiral-cw', 'ripple-out', 'plus-full', 'frame', 'ripple-in', 'spiral-ccw'],
+  speed: 'normal',
+};
+
+/**
+ * "Forming the planet…": drawn over the canvas until the spin-up has finished, so a half-formed world is never shown.
+ * Issue #93: it moves (the build loader), so a long first compile never looks like a frozen page, says which wait it
+ * is, and shows how much of the spin-up is done. Under reduced motion the loader stands still.
+ */
+function Forming({ gas, progress }: { gas: boolean; progress: number | null }) {
+  const reduced = reducedMotion();
+  const pct = progress === null ? null : Math.round(progress * 100);
+  const what = gas ? 'Forming the atmosphere' : 'Forming the planet';
   return (
     <div
-      className="absolute inset-0 z-[2] grid place-content-center bg-black text-center text-xs text-neutral-300"
-      role="status"
+      className="absolute inset-0 z-[2] grid place-content-center justify-items-center gap-3 bg-black text-center text-xs text-neutral-300"
       data-testid="world-forming"
+      data-progress={pct ?? ''}
     >
-      {gas ? 'Forming the atmosphere' : 'Forming the planet…'}
+      <span aria-hidden="true">
+        <GridLoader
+          color="green"
+          rounded
+          size={36}
+          gap={2}
+          blur={0.3}
+          {...(reduced ? { pattern: 'heartbeat', static: true } : FORMING_LOADER_LOOK)}
+        />
+      </span>
+      {/* The live text changes twice (compile, then forming), not with every percent. */}
+      <span role="status">
+        {what}…
+        {pct === null && (
+          <span className="mt-1 block text-neutral-400">
+            Preparing the graphics. The first time can take a minute.
+          </span>
+        )}
+      </span>
+      {pct !== null && (
+        <span
+          className="block h-1 w-40 overflow-hidden rounded bg-neutral-800"
+          role="progressbar"
+          aria-label={what}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={pct}
+          data-testid="world-forming-progress"
+        >
+          <span
+            className="block h-full bg-emerald-500"
+            style={{ width: `${pct}%`, transition: reduced ? undefined : 'width 0.35s linear' }}
+          />
+        </span>
+      )}
     </div>
   );
 }
@@ -500,8 +615,24 @@ export function worldControls(
 }
 
 /** The prototype's world stage (globe), on the build pane's globe stage. */
-export function WorldGlobeStage({ world, onFail }: { world: CardToWorldOk; onFail?: () => void }) {
-  const { hostRef, engine, bump, failed, rev: clock } = useWorldEngine('globe', world, onFail);
+export function WorldGlobeStage({
+  world,
+  onFail,
+  onFormed,
+}: {
+  world: CardToWorldOk;
+  onFail?: () => void;
+  /** Called once the world has formed (its shaders linked and its spin-up done): the build steps wait for it. */
+  onFormed?: () => void;
+}) {
+  const {
+    hostRef,
+    engine,
+    bump,
+    failed,
+    progress,
+    rev: clock,
+  } = useWorldEngine('globe', world, onFail, onFormed);
   const rev = useWorldStore((s) => s.rev);
   const playing = useWorldStore((s) => s.playing);
   const apply = useWorldStore((s) => s.apply);
@@ -600,7 +731,9 @@ export function WorldGlobeStage({ world, onFail }: { world: CardToWorldOk; onFai
       data-failed={failed ? '1' : '0'}
       data-spinup={engine ? engine.spinup : ''}
     >
-      {forming && <Forming gas={state ? state.gas : world.preset.type === 'gas'} />}
+      {forming && (
+        <Forming gas={state ? state.gas : world.preset.type === 'gas'} progress={progress} />
+      )}
     </div>
   );
 }
@@ -615,7 +748,7 @@ export function WorldFlyStage({
   reduced: boolean;
   onFail?: () => void;
 }) {
-  const { hostRef, engine, bump, failed } = useWorldEngine('fly', world, onFail);
+  const { hostRef, engine, bump, failed, progress } = useWorldEngine('fly', world, onFail);
   const target = useWorldStore((s) => s.target);
   const [entered, setEntered] = useState(false);
   const settled = !!engine && engine.spinup === 0;
@@ -736,7 +869,7 @@ export function WorldFlyStage({
       data-failed={failed ? '1' : '0'}
     >
       <div ref={hostRef} className="absolute inset-0" />
-      {forming && <Forming gas={gas} />}
+      {forming && <Forming gas={gas} progress={progress} />}
       {engine && entered && (
         <div
           className="sx-cu-controls"

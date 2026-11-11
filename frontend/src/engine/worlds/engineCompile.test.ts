@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createCore } from './core.js';
 import { ADV_FS, FLY_FS, GAS_FS, WORLD_FS } from './shaders.js';
 import { clearTerrainCache } from './terrainCache.js';
-import { WorldEngine, WORLD_PRESETS } from './WorldEngine';
+import { DISPOSE_POLL_MS, WorldEngine, WORLD_PRESETS } from './WorldEngine';
 
 interface StubOpts {
   /** Polls before COMPLETION_STATUS_KHR turns true (per program). */
@@ -29,7 +29,10 @@ function stubGL(o: StubOpts = {}) {
       for (const n of m[1]!.split(',')) out.push(n.trim().replace(/\[\d+\]$/, ''));
     return out;
   };
-  const ext = { COMPLETION_STATUS_KHR: 'COMPLETION_STATUS_KHR' };
+  const ext = {
+    COMPLETION_STATUS_KHR: 'COMPLETION_STATUS_KHR',
+    loseContext: () => calls.push(['loseContext']),
+  };
   const api: Record<string, unknown> = {
     getExtension: (n: string) => (n === 'KHR_parallel_shader_compile' && o.noExt ? null : ext),
     createProgram: () => {
@@ -177,6 +180,31 @@ describe('background compile (issue #93 1.2, 1.3)', () => {
     const caught = p.catch((err: Error) => err.message);
     await vi.advanceTimersByTimeAsync(100);
     await expect(caught).resolves.toContain('stub link error');
+  });
+
+  it('dispose never blocks on a compile still running: the context goes once the driver is done', async () => {
+    vi.useFakeTimers();
+    const { gl, calls } = stubGL({ lateBy: 30 });
+    const e = new WorldEngine(stubCanvas(gl), { role: 'fly' });
+    const rejected = e.whenReady().catch(() => 'rejected');
+    e.dispose();
+    // loseContext() waits for the driver's compile (35 s on a cold ANGLE D3D11 cache): not called while it runs
+    expect(calls.some((c) => c[0] === 'loseContext')).toBe(false);
+    await vi.advanceTimersByTimeAsync(DISPOSE_POLL_MS * 3);
+    expect(calls.some((c) => c[0] === 'loseContext')).toBe(false);
+    await vi.advanceTimersByTimeAsync(DISPOSE_POLL_MS * 200);
+    expect(calls.filter((c) => c[0] === 'loseContext')).toHaveLength(1);
+    await expect(rejected).resolves.toBe('rejected');
+    e.dispose();
+    expect(calls.filter((c) => c[0] === 'loseContext')).toHaveLength(1);
+  });
+
+  it('dispose of a ready engine releases the context at once', async () => {
+    const { gl, calls } = stubGL();
+    const e = new WorldEngine(stubCanvas(gl), { role: 'globe' });
+    await e.whenReady();
+    e.dispose();
+    expect(calls.filter((c) => c[0] === 'loseContext')).toHaveLength(1);
   });
 
   it('without KHR_parallel_shader_compile it links at the first poll', () => {

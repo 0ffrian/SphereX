@@ -74,6 +74,11 @@ export interface EngineState {
   rotation: number;
 }
 
+/** How often a disposed engine checks whether its shaders have finished compiling (UI pacing, ms). */
+export const DISPOSE_POLL_MS = 100;
+/** Longest a disposed engine keeps its context for a compile still running (ms); then it is released anyway. */
+export const DISPOSE_MAX_WAIT_MS = 180_000;
+
 export class WorldEngine {
   private core: Core;
   private canvas: HTMLCanvasElement;
@@ -459,10 +464,33 @@ export class WorldEngine {
     this.core.W.spin = other.core.W.spin;
   }
 
-  /** Release the GL context. */
+  /**
+   * Release the GL context. Issue #93 regression fix: `loseContext()` waits for every shader compile still running in
+   * the driver, so releasing an engine whose fly shader was still compiling froze the page for about 35 s on a cold
+   * ANGLE D3D11 cache (React's development double mount did this on every first open; closing the build early did it
+   * in production). While programs are still compiling the context is released once the driver reports them done
+   * (polled every DISPOSE_POLL_MS, never blocking), or after DISPOSE_MAX_WAIT_MS at the latest.
+   */
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
-    const gl = this.canvas.getContext('webgl2');
-    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    const lose = () => {
+      const gl = this.canvas.getContext('webgl2');
+      gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    };
+    const t0 = Date.now();
+    const settled = (): boolean => {
+      if (this.isReady) return true;
+      try {
+        return (this.core.W.gl as CoreGL).poll();
+      } catch {
+        return true; // a compile or link error: nothing is running any more
+      }
+    };
+    const tryLose = () => {
+      if (settled() || Date.now() - t0 >= DISPOSE_MAX_WAIT_MS) lose();
+      else setTimeout(tryLose, DISPOSE_POLL_MS);
+    };
+    tryLose();
   }
 }
