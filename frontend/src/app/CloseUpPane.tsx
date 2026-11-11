@@ -28,6 +28,9 @@ import { useStarTarget } from './starTargetStore';
 export type CloseUpKind = 'orbit' | 'star' | 'body';
 
 /** Which close-up an object type gets. */
+// Moon (11 Nov 2026): no on-render control bars. Height follows scroll, pinch and the zoom bar; the
+// layer list lives in Details. Kept behind this flag so the controls can come back.
+const SHOW_FLY_BAR = false as boolean;
 export function closeUpKindOf(type: string | null | undefined): CloseUpKind | null {
   switch (type) {
     case 'planet_rocky':
@@ -238,7 +241,7 @@ export function CloseUpPane() {
           <StarCloseUp {...starProps} className="absolute inset-0" />
         </div>
       )}
-      {view && !world && (
+      {SHOW_FLY_BAR && view && !world && (
         <div className="sx-cu-controls" role="group" aria-label="Surface view controls">
           <label htmlFor="orbit-alt" className="flex-1 basis-40">
             {gas ? 'Height above the clouds' : 'Height above the ground'}: <span data-testid="orbit-alt-label">{formatKm(alt)}</span>
@@ -277,7 +280,7 @@ export function CloseUpPane() {
           </button>
         </div>
       )}
-      {view && !world && about && info?.resolved && (
+      {SHOW_FLY_BAR && view && !world && about && info?.resolved && (
         <div className="absolute inset-x-4 bottom-36 z-[3] max-h-[45%] overflow-auto rounded-lg border border-[#323a3e] bg-[#242729f2] p-3 text-xs text-neutral-200" data-testid="orbit-layers">
           <p className="mb-2">{ORBIT_NOTE}</p>
           <ul className="flex flex-col gap-1">

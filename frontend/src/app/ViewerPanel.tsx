@@ -888,8 +888,9 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
       </div>
 
       {pane && <MouldStrip ref={stripRef} script={mould.script} phase={mould.phase} />}
+      {/* Moon (11 Nov 2026): no "N hidden at this level" button on the render. */}
       {pane?.caption?.(
-        hiddenCount > 0 ? (
+        false as boolean && hiddenCount > 0 ? (
           <button
             type="button"
             className="sx-tag-btn"
