@@ -4,6 +4,7 @@
 // Source: .claude/worktrees/sculptor-reference/sculptor-preview-next.html, lines 850-1028 (loops and flares on the whole star).
 // Not yet imported by the app: it still needs the TypeScript host (DOM removed, `cardToStar`). Do not edit here;
 // re-run the slicing instead so the body stays byte-identical to the prototype.
+// @verbatim L850-L1028
 /* ---------- loops and flares on the whole star, from the same spot groups ---------- */
 var OV = { clock: 0, ev: [], next: 0, r: rng(1), eDraw: 1e30, shown: null, loops: [], rot: 0.55, tilt: 0.12 };
 var oc = $('#star-o'), ox = oc.getContext('2d');
@@ -183,3 +184,4 @@ function pauseLabel() { $('#star-pause').textContent = ST.playing ? 'Pause' : 'P
 $('#star-pause').addEventListener('click', function () { ST.playing = !ST.playing; pauseLabel(); }); pauseLabel();
 refreshStar();
 
+// @end-verbatim
