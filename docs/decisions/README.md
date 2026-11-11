@@ -39,7 +39,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 ## Rules for entries
 
 - **IDs never change and are never reused.** A new decision is the next free `D-` number; a new question the next free `Q-` number. Before you pick one, check `origin/main` and the open PRs (they pick numbers too).
-- **Q-294 to Q-298 (stream U, build view)** are in [shell-surfaces](shell-surfaces.md). **Q-274 to Q-276 (stream H, orbit view and close-up pane)** are in [rendering-bodies](rendering-bodies.md). **Next free:** D-37 and Q-204 (10 Nov 2026; Q-210 to Q-279 are reserved for issue #71). **Renumbered:** this PR's Q-150 to Q-183 became Q-170 to Q-203 on 10 Nov 2026, because main took Q-150 to Q-169 in PR #70; Q-203 is the four research checks, Q-170 to Q-202 are the spec-pass proposals. Q-149 in the Track block is still unused. **Reserved:** Q-130 to Q-149 for the Track tool and Area search (Q-130). **From PR #53 (merged):** Q-125 (frame search tags and refusals) and Q-126 (MOST). **Never used, do not reuse:** Q-46. **Never assigned:** Q-127 to Q-129 (skipped; do not reuse).
+- **Q-303 to Q-306 (stream W, engine port)** are in [rendering-bodies](rendering-bodies.md). **Q-294 to Q-298 (stream U, build view)** are in [shell-surfaces](shell-surfaces.md). **Q-274 to Q-276 (stream H, orbit view and close-up pane)** are in [rendering-bodies](rendering-bodies.md). **Next free:** D-37 and Q-204 (10 Nov 2026; Q-210 to Q-279 are reserved for issue #71). **Renumbered:** this PR's Q-150 to Q-183 became Q-170 to Q-203 on 10 Nov 2026, because main took Q-150 to Q-169 in PR #70; Q-203 is the four research checks, Q-170 to Q-202 are the spec-pass proposals. Q-149 in the Track block is still unused. **Reserved:** Q-130 to Q-149 for the Track tool and Area search (Q-130). **From PR #53 (merged):** Q-125 (frame search tags and refusals) and Q-126 (MOST). **Never used, do not reuse:** Q-46. **Never assigned:** Q-127 to Q-129 (skipped; do not reuse).
 - **One entry, one file.** Put a new entry in the topic file it belongs to and add its row to the index below in the same commit. An entry that changes another one says "amends D-xx" and the amended entry gets an "Amended by" line.
 - **Status words** (for new entries; older rows keep their wording): **Open**; **Open (built)** (code follows the proposal); **Proposed** (an owner must confirm); **Decided** (who and when); **Partly decided** (list what is open); **Superseded by** (the newer entry rules); **Deferred** (after the event). D- entries are **Accepted** unless marked otherwise.
 - **Spec text belongs in the specs.** A decision states the rule and cites the spec section that holds the detail; when a decision changes a rule, update that section in the same PR.
@@ -86,6 +86,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | D-34 | Motion, render-on-change and battery | Pending team confirmation | [rendering-motion](rendering-motion.md#d-34-motion-render-on-change-and-battery) |
 | D-35 | Local copy of sky survey tiles | Accepted (Atish) | [sky-shell](sky-shell.md#d-35-local-copy-of-sky-survey-tiles-for-the-sky-background) |
 | D-36 | Physics-based realism for generated bodies | Decided (Moon) | [rendering-bodies](rendering-bodies.md#d-36-physics-based-realism-for-generated-bodies-issue-71) |
+| D-37 | Prototype WebGL2 engine is the renderer for generated bodies (Decided by Moon, 11 Nov 2026) | Decided (Moon); being built | [rendering-bodies](rendering-bodies.md#d-37-the-approved-prototype-engine-is-the-renderer-for-generated-bodies-decided-by-moon-11-nov-2026) |
 | Q-01 | Backend framework | Answered: D-15 | [data-sources](data-sources.md) |
 | Q-02 | Frontend hosting | Answered: D-24 | [platform-hosting](platform-hosting.md) |
 | Q-03 | Sliders on baked bodies | Answered: D-26 | [rendering-bodies](rendering-bodies.md) |
@@ -331,6 +332,10 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-296 | Zoom bar and tool dock in the build view | Decided in code | [shell-surfaces](shell-surfaces.md) |
 | Q-297 | Details: the controls and honesty lists the mock-up's build view has no place for | Decided in code | [shell-surfaces](shell-surfaces.md) |
 | Q-298 | Build view follow-ups: mock-up title, island bottom right, `BuildControls` slot, Show dims rows only, phone close-up caption | Decided (coordinator) | [shell-surfaces](shell-surfaces.md) |
+| Q-303 | World engine layout, verbatim blocks, one canvas | Decided (coordinator) | [rendering-bodies](rendering-bodies.md) |
+| Q-304 | `cardToWorld`, artifact table and defaults | Decided (coordinator) | [rendering-bodies](rendering-bodies.md) |
+| Q-305 | Engine parity proof and `?parity=1` hook | Decided (coordinator) | [rendering-bodies](rendering-bodies.md) |
+| Q-306 | Spin-up budget and resolution scaler stay as the prototype | Decided (coordinator) | [rendering-bodies](rendering-bodies.md) |
 | Q-280 to Q-284 | Search list additions: Titan reference moon, four demo-pack rows, archive outage | Decided in code | [rendering-bodies](rendering-bodies.md) |
 | Q-290 to Q-293 | Gas giant and star parity: True colour default, solved gas world and star cells shown at + Estimated | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
 | Q-307 | The Sun as a reference star (`ref-sun`, NASA Sun Fact Sheet) | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
