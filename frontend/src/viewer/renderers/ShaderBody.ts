@@ -669,7 +669,8 @@ export class ShaderBody implements BodyRenderer {
   private orbit: OrbitSources | null = null;
   private pendingRocky: BodyRocky | null = null;
   private rocky: BodyRocky | null = null;
-  private worldInfo: { readouts: WorldReadout[]; assumptions: string[]; low: boolean } | null = null;
+  private worldInfo: { readouts: WorldReadout[]; assumptions: string[]; low: boolean } | null =
+    null;
   private readonly onChange: (() => void) | undefined;
   private readonly onFailed: ((layerId: string) => void) | undefined;
 
@@ -900,7 +901,9 @@ export class ShaderBody implements BodyRenderer {
     for (const v of this.volumes) v.setTier(tier);
     // A rocky world is built for the phone tier or the full one: a change between them rebuilds it.
     if (this.worldInfo && wasLow !== (tier === 'low')) {
-      this.rebuild().catch((err: unknown) => console.warn('[viewer] could not rebuild the world', err));
+      this.rebuild().catch((err: unknown) =>
+        console.warn('[viewer] could not rebuild the world', err),
+      );
     }
     this.onChange?.();
   }
@@ -1101,7 +1104,10 @@ export class ShaderBody implements BodyRenderer {
    * failed): the older planet look is then built, so the body is never blank. Returns null when this
    * build was superseded or the body was disposed.
    */
-  private async buildRocky(spec: ShaderSpec, textures: DataTexture[]): Promise<Built | null | undefined> {
+  private async buildRocky(
+    spec: ShaderSpec,
+    textures: DataTexture[],
+  ): Promise<Built | null | undefined> {
     this.worldInfo = null;
     this.orbit = null;
     if (spec.kind !== 'planet_rocky' && spec.kind !== 'planet_water') return undefined;
@@ -1140,7 +1146,12 @@ export class ShaderBody implements BodyRenderer {
     this.pendingRocky?.dispose();
     this.pendingRocky = built;
     this.worldInfo = {
-      readouts: worldReadouts(world.model, res.sources, world.climate.stats, world.hydrology?.stats ?? null),
+      readouts: worldReadouts(
+        world.model,
+        res.sources,
+        world.climate.stats,
+        world.hydrology?.stats ?? null,
+      ),
       assumptions: res.assumptions,
       low,
     };
@@ -1170,7 +1181,11 @@ export class ShaderBody implements BodyRenderer {
   }
 
   /** Issue #71 stream D: the numbers of the drawn world with their tags and assumptions, else null. */
-  get world(): { readouts: readonly WorldReadout[]; assumptions: readonly string[]; low: boolean } | null {
+  get world(): {
+    readouts: readonly WorldReadout[];
+    assumptions: readonly string[];
+    low: boolean;
+  } | null {
     return this.worldInfo;
   }
 

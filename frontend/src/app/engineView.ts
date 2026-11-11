@@ -48,7 +48,9 @@ export function resolveViewControls(src: {
         const g = globe();
         if (!g) return;
         const z = g.state().zoom * (dir === 'in' ? 1.25 : 0.8);
-        useWorldStore.getState().apply({ zoom: Math.max(WORLD_ZOOM[0], Math.min(WORLD_ZOOM[1], z)) });
+        useWorldStore
+          .getState()
+          .apply({ zoom: Math.max(WORLD_ZOOM[0], Math.min(WORLD_ZOOM[1], z)) });
       },
       rotate: (dir) => {
         const g = globe();
@@ -57,7 +59,10 @@ export function resolveViewControls(src: {
         const k = STEP / s.zoom;
         useWorldStore.getState().apply({
           yaw: s.yaw + (dir === 'left' ? -k : dir === 'right' ? k : 0),
-          pitch: Math.max(-1.4, Math.min(1.4, s.pitch + (dir === 'up' ? -k : dir === 'down' ? k : 0))),
+          pitch: Math.max(
+            -1.4,
+            Math.min(1.4, s.pitch + (dir === 'up' ? -k : dir === 'down' ? k : 0)),
+          ),
         });
       },
       reset: () => useWorldStore.getState().apply({ zoom: 1, yaw: 0, pitch: 0 }),

@@ -25,8 +25,8 @@ type C = NonNullable<RenderParams['confidence']>;
 function conf(over: Partial<C> = {}): C {
   return {
     score: 0.3,
-    measured_share: 0.15,
-    estimated_share: 0.15,
+    measured_share: 0.1,
+    estimated_share: 0.2,
     assumed_share: 0.7,
     threshold: 0.25,
     band: 'mostly_assumed',
@@ -35,7 +35,15 @@ function conf(over: Partial<C> = {}): C {
     needed: '',
     raise: null,
     inputs: [
-      { id: 'radius', label: 'Radius', weight: 40, c: 0.5, tag: 'model_dependent', points: 20, fields: [] },
+      {
+        id: 'radius',
+        label: 'Radius',
+        weight: 40,
+        c: 0.5,
+        tag: 'model_dependent',
+        points: 20,
+        fields: [],
+      },
       { id: 'mass', label: 'Mass', weight: 10, c: 1, tag: 'measured', points: 10, fields: [] },
       { id: 'storms', label: 'Storms', weight: 50, c: 0, tag: 'artistic', points: 0, fields: [] },
     ],
@@ -80,10 +88,12 @@ describe('formula strings', () => {
     expect(partOf('derived')).toBe('p');
     expect(partOf('model_dependent')).toBe('p');
     for (const t of ['inferred_from_analog', 'artistic', 'missing']) expect(partOf(t)).toBe('a');
+    // Contributions to the score (the chip's and Details' shares), not shares of the weight.
     const sh = partShares(conf());
     expect(sh.d).toBeCloseTo(0.1);
-    expect(sh.p).toBeCloseTo(0.4);
-    expect(sh.a).toBeCloseTo(0.5);
+    expect(sh.p).toBeCloseTo(0.2);
+    expect(sh.a).toBeCloseTo(0.7);
+    expect(sh.d + sh.p).toBeCloseTo(conf().score);
   });
   it('chips follow the mock-up wording', () => {
     const i = conf().inputs;
@@ -91,6 +101,10 @@ describe('formula strings', () => {
     expect(tagChip(i[1]!).text).toBe('Satellite data');
     expect(tagChip(i[2]!).text).toBe('Assumed, drawn');
     expect(tagChip({ ...i[0]!, tag: 'derived', c: 0.5 }).text).toBe('Physics, one input assumed');
+    // D-02: an analog value wears the Estimated badge, so its chip says so too.
+    expect(tagChip({ ...i[0]!, tag: 'inferred_from_analog', c: 0 }).text).toBe(
+      'Estimated, from a similar object',
+    );
   });
 });
 
@@ -111,9 +125,7 @@ function mount(params: RenderParams, onClose = () => {}, inline = false) {
   document.body.appendChild(host);
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const root = createRoot(host);
-  act(() =>
-    root.render(<ConfidencePopover params={params} onClose={onClose} inline={inline} />),
-  );
+  act(() => root.render(<ConfidencePopover params={params} onClose={onClose} inline={inline} />));
   return host;
 }
 const params = (c: C) => ({ confidence: c }) as unknown as RenderParams;
@@ -141,7 +153,12 @@ describe('Show level in the Accuracy panel', () => {
     const first = c.inputs[0]!.tag;
     act(() =>
       createRoot(host).render(
-        <ConfidencePopover params={params(c)} onClose={() => {}} inline isShown={(t) => t !== first} />,
+        <ConfidencePopover
+          params={params(c)}
+          onClose={() => {}}
+          inline
+          isShown={(t) => t !== first}
+        />,
       ),
     );
     expect(host.querySelectorAll('tr[data-dim="true"]').length).toBeGreaterThan(0);
@@ -158,7 +175,7 @@ describe('the popover', () => {
     expect(dlg.querySelector('[data-testid="formula-result"]')!.textContent).toBe('30%');
     expect(dlg.textContent).toContain('Mostly assumed');
     expect(dlg.querySelector('.sx-acc-bar')!.getAttribute('aria-label')).toBe(
-      'Satellite data 10 percent, physics 40 percent, assumed 50 percent',
+      'Satellite data 10 percent, physics 20 percent, assumed 70 percent',
     );
     expect(dlg.querySelector('[data-testid="formula-general"] .katex')).not.toBeNull();
     expect(dlg.querySelector('[data-testid="formula-gate"]')!.textContent).toContain('0.25');
@@ -171,7 +188,11 @@ describe('the popover', () => {
   });
   it('shows No chips when the gate fails', () => {
     const host = mount(
-      params(conf({ gate: { class_known: true, key_measurement: false, score_ok: false, passed: false } })),
+      params(
+        conf({
+          gate: { class_known: true, key_measurement: false, score_ok: false, passed: false },
+        }),
+      ),
     );
     expect(Array.from(host.querySelectorAll('.sx-acc-gv')).map((e) => e.textContent)).toEqual([
       'Yes',
@@ -193,7 +214,9 @@ describe('the popover', () => {
     expect(document.activeElement).toBe(btn);
     const dlg = host.querySelector('[role="dialog"]')!;
     act(() => {
-      btn.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+      btn.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }),
+      );
     });
     expect(document.activeElement).toBe(btn);
     act(() => {

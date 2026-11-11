@@ -1,0 +1,16 @@
+{
+ "body_sha256": "ef19fa646881c4c63d86f2a153ee5a69ecbf2bf79f51136358f551a54a89d125",
+ "body_size": 617,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-10T15:44:46.565Z",
+ "key": {
+  "query": {
+   "id": "simbad-k2-18b",
+   "v": "1"
+  },
+  "release": "-",
+  "source": "derived.object"
+ },
+ "status": 200,
+ "url": "derived:resolve"
+}

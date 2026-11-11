@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   AU_KM,
   GM_SUN_AU3_DAY2,
+  GRAIN_SIZE_ASSUMPTION,
   betaOfGrain,
   displayFrame,
   dustGrains,
+  referenceDriftKm,
   stateAt,
   summariseTail,
   sunDirectionAt,
@@ -13,6 +15,14 @@ import {
 } from './cometTail';
 
 // A circular orbit at 2 au, sampled every 3 days, in the ecliptic-like plane.
+// The committed JPL Horizons path of 3I/ATLAS (heliocentric ICRF, 3-day steps, Aug to Dec 2025).
+const horizons = Object.values(
+  import.meta.glob('../../../backend/assets/tracks/horizons-1004083.json', {
+    eager: true,
+    import: 'default',
+  }),
+)[0] as { rows: Row[] };
+
 const R = 2;
 const W = Math.sqrt(GM_SUN_AU3_DAY2 / R ** 3);
 const JD0 = 2460888.5;
@@ -73,5 +83,32 @@ describe('cometTail', () => {
     expect(validTrack([rows[0]!])).toBe(false);
     expect(validTrack([rows[1]!, rows[0]!])).toBe(false);
     expect(betaOfGrain(570)).toBeCloseTo(0.001, 4);
+  });
+  it('on the real Horizons path a beta = 0 grain sits on the comet (differential offsets)', () => {
+    const track = horizons.rows;
+    expect(validTrack(track)).toBe(true);
+    const start = track[0]![0];
+    const jd = 2461021.0; // December epoch centre
+    const frame = displayFrame(track, start)!;
+    // The two-body step alone drifts from Horizons (perturbations and non-gravitational forces):
+    // thousands of km after months. The differential offset removes it.
+    expect(referenceDriftKm(track, start, jd)!).toBeGreaterThan(1000);
+    const g = dustGrains(track, jd, frame, { betas: [0], startJd: start, perBeta: 6, seed: 4 });
+    expect(g).toHaveLength(6);
+    for (const x of g) expect(Math.hypot(...x.offsetKm)).toBeLessThan(1e-6);
+    // Radiation pressure still pushes a beta = 0.1 grain far behind, away from the Sun.
+    const sum = summariseTail(track, jd, frame, {
+      betas: [0.1],
+      startJd: start,
+      perBeta: 6,
+      seed: 4,
+    })!;
+    expect(sum.dustLengthKm).toBeGreaterThan(1e6);
+  });
+  it('states the grain-size assumption (rho = 1 g/cm3, Qpr = 1)', () => {
+    expect(betaOfGrain(28.5)).toBeCloseTo(0.02, 6);
+    expect(betaOfGrain(570 / 2.5, 2.5)).toBeCloseTo(0.001, 6);
+    expect(GRAIN_SIZE_ASSUMPTION).toMatch(/1 g\/cm³/);
+    expect(GRAIN_SIZE_ASSUMPTION).toMatch(/2 to 3 times smaller/);
   });
 });

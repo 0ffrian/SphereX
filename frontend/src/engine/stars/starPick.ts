@@ -13,11 +13,13 @@ export interface LatLon {
   lon: number;
 }
 const rx = (v: [number, number, number], a: number): [number, number, number] => {
-  const c = Math.cos(a), s = Math.sin(a);
+  const c = Math.cos(a),
+    s = Math.sin(a);
   return [v[0], v[1] * c - v[2] * s, v[1] * s + v[2] * c];
 };
 const ry = (v: [number, number, number], a: number): [number, number, number] => {
-  const c = Math.cos(a), s = Math.sin(a);
+  const c = Math.cos(a),
+    s = Math.sin(a);
   return [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c];
 };
 
@@ -29,7 +31,11 @@ export function pickSurface(q: [number, number], rot: number, tilt: number): Lat
   return { lat: Math.asin(Math.max(-1, Math.min(1, s[1]))), lon: Math.atan2(s[0], s[2]) };
 }
 /** Where a place lands in the view (star radii, y up) and whether it faces us. Inverse of `pickSurface`. */
-export function projectSurface(p: LatLon, rot: number, tilt: number): { x: number; y: number; visible: boolean } {
+export function projectSurface(
+  p: LatLon,
+  rot: number,
+  tilt: number,
+): { x: number; y: number; visible: boolean } {
   const c = Math.cos(p.lat);
   const n = rx(ry([c * Math.sin(p.lon), Math.sin(p.lat), c * Math.cos(p.lon)], -rot), -tilt);
   return { x: n[0], y: n[1], visible: n[2] > 0 };
@@ -47,6 +53,7 @@ export function viewPoint(nx: number, ny: number, aspect: number, half: number):
 /** One arrow-key step: 5 degrees, latitude kept off the poles. */
 export function nudge(p: LatLon, dLat: number, dLon: number): LatLon {
   const lim = (85 * Math.PI) / 180;
-  const lon = ((p.lon + dLon + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+  const lon =
+    ((((p.lon + dLon + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI;
   return { lat: Math.max(-lim, Math.min(lim, p.lat + dLat)), lon };
 }

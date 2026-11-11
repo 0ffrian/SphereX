@@ -182,3 +182,49 @@ name = "Crab Nebula"
 query = "M 1"
 group = "demo"
 aliases = ["Crab", "M1"]
+
+[[target]]
+name = "Procyon A"
+query = "Procyon"
+group = "demo"
+aliases = ["procyon", "alpha cmi", "alf cmi"]
+
+[[target]]
+name = "Epsilon Eridani"
+query = "eps Eri"
+group = "demo"
+aliases = ["eps eri", "epsilon eri", "eps eridani"]
+
+[[target]]
+name = "TOI-700 d"
+query = "TOI-700 d"
+group = "demo"
+aliases = ["TOI-700", "TOI700d", "TOI 700 d"]
+
+[[target]]
+name = "WASP-39 b"
+query = "WASP-39 b"
+group = "demo"
+aliases = ["WASP-39", "WASP39b", "WASP 39 b"]
+
+[[target]]
+name = "55 Cancri e"
+query = "55 Cnc e"
+group = "demo"
+aliases = ["55 Cnc e", "55 Cancri e", "55cnce", "cancri e"]
+
+# Area search areas (A16.4, A17.1, Q-400): a box on the gnomonic plane about (ra, dec), north up,
+# width_deg along RA; frames whose midpoint is inside one of the `windows` (UTC) are searched.
+# eros-2026-03: the Q-184 window (FIXTURE_MOVING in scripts/fixture_settings.py). Centre = the
+# midpoint of the extreme Horizons positions of the 16 recorded Eros frames (PR #53 fixtures):
+# RA 90.74807 to 91.71284, Dec 13.29589 to 13.55983. Size = A17.1's 1.05 x 0.63 deg (both
+# visits' positions, 0.938 x 0.264 deg on the plane, plus margins), so the 0.25 deg grid is
+# 5 x 3 = 15 cones. This choice used Eros's known path (A16.5).
+[[area]]
+id = "eros-2026-03"
+ra = 91.23046
+dec = 13.42786
+width_deg = 1.05
+height_deg = 0.63
+data_release = "spherex_qr2"
+windows = [["2026-03-20T00:00:00Z", "2026-03-21T12:00:00Z"]]

@@ -20,13 +20,7 @@ import {
   OrthographicCamera,
   Scene,
 } from 'three/webgpu';
-import {
-  CLASS_STRENGTH,
-  StreakSink,
-  emitStage,
-  groupPoint,
-  type Mapper,
-} from '@/physics/flares';
+import { CLASS_STRENGTH, StreakSink, emitStage, groupPoint, type Mapper } from '@/physics/flares';
 import {
   AREA_SPLIT,
   cellsForScale,

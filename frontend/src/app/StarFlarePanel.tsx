@@ -126,8 +126,9 @@ export function StarFlarePanel({
           {STAGE_TEXT[STAGES[stageIndex(t)]!.id][open ? 'open' : 'closed']}
         </p>
         <p className="text-xs text-neutral-400">
-          Amber: soft X-rays from hot loops. Blue: hard X-rays from fast electrons. Hard X-rays follow the rate of change of the
-          soft ones (the Neupert effect). The curve shapes are typical, not measured for this star.{' '}
+          Amber: soft X-rays from hot loops. Blue: hard X-rays from fast electrons. Hard X-rays
+          follow the rate of change of the soft ones (the Neupert effect). The curve shapes are
+          typical, not measured for this star.{' '}
           <ProvenanceBadge tag="inferred_from_analog" fixture={fixture} />
         </p>
       </div>

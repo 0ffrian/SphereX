@@ -14,6 +14,9 @@
 // SX_LIVE_CUTOUTS_PER_REQUEST; a resolve of it starts again from the first part. The parts are
 // counted per browser session (a cookie the resolve sets), so parallel e2e tests do not share
 // them. And `/v1/sky/cached` lists the targets whose frames are "cached" (complete).
+//
+// Issue #92: the eight Area search routes (`/v1/areas…`, A17.8) are in areas.ts; they serve the
+// synthetic replies in shared/fixtures/area/ with the same headers.
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +27,7 @@ import type {
   SkyCachedObject,
   SkyCachedResponse,
 } from '../src/app/api/types';
+import { areaReply } from './areas';
 import { combineInfo, makeOverlays, renderCombine, renderFlags } from './overlays';
 import {
   FIXTURE_DATA_RELEASE,
@@ -334,6 +338,12 @@ export function handleFixtureRequest(
         body: renderFixtureSky(w),
       };
     }
+  }
+
+  const area = areaReply(u.pathname);
+  if (area) {
+    const { status, contentType, body } = area;
+    return { status, headers: { ...BASE_HEADERS, 'content-type': contentType }, body };
   }
 
   const m = OBJECT_PATH.exec(u.pathname);

@@ -1,6 +1,6 @@
 # Risks and open questions
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A14–A14.1 · **Implements:** [D-14, D-29, Q-137](../decisions/scope-process.md), [D-19, D-25, D-31](../decisions/data-sources.md), [D-24, Q-132](../decisions/platform-hosting.md), [D-09](../decisions/haptics-design.md), [D-10](../decisions/haptics-sound.md), [Q-136, Q-139, Q-141, Q-146](../decisions/moving-objects.md), [Q-112](../decisions/pipeline-jobs.md) · **Read with:** [plan.md](plan.md) (A13), [../decisions/README.md](../decisions/README.md)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A14–A14.1 · **Implements:** [D-14, D-29, Q-137](../decisions/scope-process.md), [D-19, D-25, D-31, Q-328](../decisions/data-sources.md), [D-37](../decisions/rendering-engines.md), [D-24, Q-132](../decisions/platform-hosting.md), [D-09](../decisions/haptics-design.md), [D-10](../decisions/haptics-sound.md), [Q-136, Q-139, Q-141, Q-146](../decisions/moving-objects.md), [Q-112](../decisions/pipeline-jobs.md) · **Read with:** [plan.md](plan.md) (A13), [../decisions/README.md](../decisions/README.md)
 
 ## A14 Risks and open questions
 
@@ -62,6 +62,8 @@ Every **[verify]** marker in the architecture fragments, with an owner, the tick
 | CatWISE `pmra` includes cos δ | A3.3 | Kevin | Q-51 | after the event (display only) |
 | DAMIT licence and citation | A3.7 | Kevin | Q-61 | before any DAMIT model is registered |
 | FLAGS keyword names on a QR3 or DR1 header | A3.1 | Kevin | Q-31 | after the event (frozen on QR2) |
+| A15 frame rate of the D-37 engines (rock engine; two world-engine instances per planet) against ≥ 30 fps while rotating | A10.1 | Atish | D-37, #16, R12 #43 | 13 Nov |
+| The Sun's spectral class G2V citation (Gray and Corbally 2009) on the `ref-sun` card | A4.1 | Kevin | Q-328 | 13 Nov (card text) |
 | Phone items: self-signed certificate, battery saver, vibration amplitude | A14 post-event, A9 | Atish | Q-132 | after the event |
 
 **Closed:** the Horizons geocentre marker of A3.4 is settled by Q-138 (SPHEREx-centred); the frame search uses the SPHEREx observer since issue #26 (A3.4).

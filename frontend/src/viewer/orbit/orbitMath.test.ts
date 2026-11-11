@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ALT_RANGE_KM, aimAtPeak, aimDefault, altToSlider, applyDrag, dot3, flyCamera, flyMove, horizonDip,
-  latLonOf, nrm3, pickPlace, sliderToAlt, upOf, wheelAlt, type FlyState, type HeightGrid,
+  ALT_RANGE_KM,
+  aimAtPeak,
+  aimDefault,
+  altToSlider,
+  applyDrag,
+  dot3,
+  flyCamera,
+  flyMove,
+  horizonDip,
+  latLonOf,
+  nrm3,
+  pickPlace,
+  sliderToAlt,
+  upOf,
+  wheelAlt,
+  type FlyState,
+  type HeightGrid,
 } from './orbitMath';
 
 const body = { radiusKm: 6371, exaggeration: 3, groundKm: () => 0 };
@@ -66,7 +81,12 @@ describe('altitude mapping', () => {
 
 describe('picking', () => {
   it('round trip: a place, seen along a ray from +z, is picked back', () => {
-    for (const [lon, lat] of [[0, 0], [0.5, 0.4], [-0.7, -0.3], [1.2, 0.1]] as const) {
+    for (const [lon, lat] of [
+      [0, 0],
+      [0.5, 0.4],
+      [-0.7, -0.3],
+      [1.2, 0.1],
+    ] as const) {
       const p = upOf(lon, lat);
       if (p[2] <= 0) continue; // near side only
       const o: [number, number, number] = [0, 0, 5];

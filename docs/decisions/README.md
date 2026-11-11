@@ -13,27 +13,29 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [scope-process.md](scope-process.md) | scope cuts, doc layout, owners, build dates, milestones, the post-event backlog, the demo object and data release, ID reservations | 6 D, 10 Q, 13 KB |
 | [contract.md](contract.md) | the data contract, object types, the endpoint list (D-16), schemas and generated types, saved assets, `overrides`, card and fixture shapes, cached replies | 6 D, 17 Q, 18 KB |
 | [contract-tags.md](contract-tags.md) | provenance tags and badges, the honesty toggle, tier fallback, the policy for unverified constants (Q-110, Q-119), "which tag does X get" | 3 D, 12 Q, 19 KB |
-| [data-sources.md](data-sources.md) | the backend framework, external archives and adapters, name resolving, the read-through cache and offline mode, test targets, overlays and the composite backends | 4 D, 15 Q, 20 KB |
-| [pipeline-stages.md](pipeline-stages.md) | stages 3 to 7 as built, measurement choices, physics in stage 6, the Sun angle for SBDB bodies, the exoplanet adapter and type rule | 0 D, 5 Q, 13 KB |
+| [data-sources.md](data-sources.md) | the backend framework, external archives and adapters, name resolving, the read-through cache and offline mode, test targets, overlays and the composite backends | 4 D, 16 Q, 22 KB |
+| [pipeline-stages.md](pipeline-stages.md) | stages 3 to 7 as built, measurement choices, physics in stage 6, the Sun angle for SBDB bodies, the exoplanet adapter and type rule, the confidence score and 3D gate | 0 D, 11 Q, 20 KB |
 | [pipeline-jobs.md](pipeline-jobs.md) | shape models and their serving, where generated assets are saved, the live cutout budget, object jobs, fan-out and progress endpoints | 0 D, 6 Q, 14 KB |
-| [rendering-bodies.md](rendering-bodies.md) | where surfaces are generated, the baker, renderers per type, physics sliders, accuracy, golden images, the honest fixtures (Q-114) | 3 D, 10 Q, 17 KB |
+| [rendering-bodies.md](rendering-bodies.md) | where surfaces are generated, the baker, renderers per type, physics sliders, accuracy, golden images, the honest fixtures (Q-114), stars, worlds and gas giants on the TSL path, reference objects | 4 D, 60 Q, 63 KB (over the target; split pending) |
+| [rendering-engines.md](rendering-engines.md) | D-37: the prototype world, star and rock engines on raw WebGL2, the + Artistic gate (Q-287), the three.js fallback, determinism exemption, the engine port and hosting streams | 1 D, 19 Q, 23 KB |
+| [rendering-engines-review.md](rendering-engines-review.md) | the PR #89 review fixes to the engines: star, world, gas giant, rock, and the verbatim convention with reviewed deviations | 0 D, 5 Q, 10 KB |
 | [rendering-motion.md](rendering-motion.md) | motion, time-lapse, render-on-change, quality levels, tone mapping, golden frames, process gating and tier wording | 1 D, 5 Q, 9 KB |
-| [rendering-kinds.md](rendering-kinds.md) | shapes and volumes, animated sphere bodies, flattening, and the Q-107 visual findings and fix notes | 0 D, 4 Q, 15 KB |
+| [rendering-kinds.md](rendering-kinds.md) | shapes and volumes, animated sphere bodies, flattening, and the Q-107 visual findings and fix notes, the comet emissions and tail (Q-260 to Q-263, Q-333), the flattening disagreement (Q-332) | 0 D, 10 Q, 22 KB |
 | [rendering-layers.md](rendering-layers.md) | the per-layer body fixes of issue #62 (PR #63): gas giant five tiered layers, brown dwarf limb and infrared bands, asteroid sphere and displacement, the flared T Tauri disc | 0 D, 4 Q, 11 KB |
 | [gemini.md](gemini.md) | the Gemini layer: scope, offline behaviour and its contract | 1 D, 2 Q, 7 KB |
 | [sky-shell.md](sky-shell.md) | the sky view, sky endpoints and sky tiles, the flipbook UI | 1 D, 10 Q, 12 KB |
-| [shell-surfaces.md](shell-surfaces.md) | the tool rail and the island, the object panel and card, the Build split view, the full-bleed layout | 0 D, 5 Q, 13 KB |
+| [shell-surfaces.md](shell-surfaces.md) | the tool rail and the island, the object panel and card, the Build split view, the full-bleed layout | 1 D, 5 Q, 13 KB |
 | [shell-proposals.md](shell-proposals.md) | open shell proposals that Track and Area search need: pane kinds, feature cards, hash keys, Escape order | 0 D, 9 Q, 15 KB |
 | [haptics-design.md](haptics-design.md) | haptics design rules, creative ownership, the haptics API, the shared field on shader kinds, texture and data sources per type | 5 D, 12 Q, 20 KB |
 | [haptics-sound.md](haptics-sound.md) | audio pairing (D-10), spectrum pitch and voice hints, the body tone and the Track path sound | 1 D, 10 Q, 13 KB |
 | [haptics-built.md](haptics-built.md) | the haptic engine, calibration and source choices as built | 0 D, 9 Q, 20 KB |
-| [platform-hosting.md](platform-hosting.md) | the three.js pin, hardware and frame budgets, hosting, the demo machine and the event platform | 3 D, 5 Q, 6 KB |
-| [moving-objects.md](moving-objects.md) | Rainbow Trails, the Track tool, Area search and Discovery (agreed) | 1 D, 17 Q, 23 KB |
+| [platform-hosting.md](platform-hosting.md) | the three.js pin, hardware and frame budgets, hosting, the demo machine and the event platform | 3 D, 5 Q, 7 KB |
+| [moving-objects.md](moving-objects.md) | Rainbow Trails, the Track tool, Area search and Discovery (agreed), the P3 frames and dots choices (Q-400 to Q-402) | 1 D, 21 Q, 40 KB |
 | [moving-objects-review.md](moving-objects-review.md) | proposed fixes to Area search and Track after the 9 Nov 2026 audit, and Moon's review list (Q-202) | 0 D, 9 Q, 16 KB |
 | [moving-frames.md](moving-frames.md) | frames for moving objects: the path cone search, its tags and refusals, MOST | 0 D, 4 Q, 8 KB |
 | [exoplanets.md](exoplanets.md) | the exoplanet card fields (mass, orbit, host star), radius from the archive, tidal locking, mass in the physics layer, and the two demo exoplanet fixtures | 0 D, 5 Q, 15 KB |
 | [exoplanet-looks.md](exoplanet-looks.md) | the climate scenarios and locked-planet temperature map, starlight colour, scenario looks and presets, and the exoplanet mould steps | 0 D, 5 Q, 15 KB |
-| [catalogue-values.md](catalogue-values.md) | name resolution for the demo exoplanets, star Teff, radius and Mira periods, the literature registry, binary brown dwarf components, the issue #68 backend fixes and the slope unit | 0 D, 6 Q, 13 KB |
+| [catalogue-values.md](catalogue-values.md) | name resolution for the demo exoplanets, star Teff, radius and Mira periods, the literature registry, binary brown dwarf components, the issue #68 backend fixes and the slope unit, Gaia MSC (Q-220), Procyon's radius (Q-336) | 0 D, 8 Q, 16 KB |
 | [demo-pack.md](demo-pack.md) | the demo search list and aliases, the 67P and Bennu shape products, the WRL reader, and the pre-built demo pack | 0 D, 6 Q, 19 KB |
 
 Agenda of the 11 Nov 2026 decision session: [session-2026-11-11.md](session-2026-11-11.md). It holds no entries and is removed once the outcomes are recorded.
@@ -41,7 +43,8 @@ Agenda of the 11 Nov 2026 decision session: [session-2026-11-11.md](session-2026
 ## Rules for entries
 
 - **IDs never change and are never reused.** A new decision is the next free `D-` number; a new question the next free `Q-` number. Before you pick one, check `origin/main` and the open PRs (they pick numbers too).
-- **Next free:** D-37 and Q-208 (11 Nov 2026). **Taken by feat/ui (UI worktree, 11 Nov 2026):** D-38 and Q-326 to Q-330, numbered after PR #89, which takes D-36, D-37 and up to Q-325; renumber at the rebase if main took them first. **Taken by issue #75:** Q-206 (pack never hides a measured spectrum), Q-207 (Rainbow Trails rotation in the UI). **Taken by issue #80:** Q-205 (event cut, Proposed). **Taken by issue #79:** Q-204 (PNG determinism). **Reserved (provisional; confirm or renumber at the 11 Nov 2026 session):** D-36 and Q-210 to Q-279 for issue #71. **Renumbered:** this PR's Q-150 to Q-183 became Q-170 to Q-203 on 10 Nov 2026, because main took Q-150 to Q-169 in PR #70; Q-203 is the four research checks, Q-170 to Q-202 are the spec-pass proposals. Q-149 in the Track block is still unused. **Reserved:** Q-130 to Q-149 for the Track tool and Area search (Q-130). **From PR #53 (merged):** Q-125 (frame search tags and refusals) and Q-126 (MOST). **Never used, do not reuse:** Q-46. **Never assigned:** Q-127 to Q-129 (skipped; do not reuse).
+- **Next free:** D-39 and Q-408 (12 Nov 2026; Q-337 to Q-399 are skipped, main moved Area to Q-400 and up; before the merge it was D-38 and Q-337, checked against `origin/main` after merging issue #75, and the open PR #90; issue #71 took D-37 and Q-210 to Q-336). **Never assigned (do not reuse):** in issue #71's block, Q-213 to Q-219, Q-223 to Q-229, Q-236 to Q-239, Q-246 to Q-249, Q-264, Q-265, Q-268, Q-269, Q-277 to Q-279, Q-289 and Q-320 to Q-322; also Q-46, Q-127 to Q-129 and Q-149. **Taken by issue #75:** Q-206 (pack never hides a measured spectrum) and Q-207 (Rainbow Trails rotation in the UI). **Taken by feat/ui (UI worktree):** D-38 (design language) and Q-403 to Q-407 (light theme, the artist's impression line, Pause, Show level in the build pane, the island's pulse; first drafted as Q-326 to Q-330, renumbered at the merge with main). **Taken by issue #97:** Q-400 to Q-402 (Area frames and dots). **Taken by issue #92:** Q-208 (Area contract shape choices, Proposed). **Never assigned:** Q-209. **Taken by issue #80:** Q-205 (event cut, Proposed). **Taken by issue #79:** Q-204 (PNG determinism). **Renumbered:** this PR's Q-150 to Q-183 became Q-170 to Q-203 on 10 Nov 2026, because main took Q-150 to Q-169 in PR #70; Q-203 is the four research checks, Q-170 to Q-202 are the spec-pass proposals. **From PR #53 (merged):** Q-125 (frame search tags and refusals) and Q-126 (MOST). Q-130 to Q-149 were reserved for the Track tool and Area search (Q-130).
+- **D-37, Q-286 to Q-288, Q-299 to Q-306 and Q-309 to Q-316 (the engines)** are in [rendering-engines](rendering-engines.md) (moved from rendering-bodies on 11 Nov 2026); their PR #89 review fixes **Q-329 to Q-331, Q-334, Q-335** are in [rendering-engines-review](rendering-engines-review.md). **Q-294 to Q-298 (stream U, build view)** are in [shell-surfaces](shell-surfaces.md). **Q-274 to Q-276 (stream H, orbit view and close-up pane)** are in [rendering-bodies](rendering-bodies.md).
 - **One entry, one file.** Put a new entry in the topic file it belongs to and add its row to the index below in the same commit. An entry that changes another one says "amends D-xx" and the amended entry gets an "Amended by" line.
 - **Status words** (for new entries; older rows keep their wording): **Open**; **Open (built)** (code follows the proposal); **Proposed** (an owner must confirm); **Decided** (who and when); **Partly decided** (list what is open); **Superseded by** (the newer entry rules); **Deferred** (after the event). D- entries are **Accepted** unless marked otherwise.
 - **Spec text belongs in the specs.** A decision states the rule and cites the spec section that holds the detail; when a decision changes a rule, update that section in the same PR.
@@ -54,7 +57,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 |---|---|---|---|
 | D-01 | Where surfaces are generated | Accepted | [rendering-bodies](rendering-bodies.md#d-01-where-surfaces-are-generated) |
 | D-02 | Data model and provenance tags | Accepted | [contract-tags](contract-tags.md#d-02-data-model-and-provenance-tags) |
-| D-03 | three.js version r187 | Accepted | [platform-hosting](platform-hosting.md#d-03-threejs-version) |
+| D-03 | three.js version r187 | Accepted; amended by D-37 (acknowledged by Atish, 11 Nov 2026) | [platform-hosting](platform-hosting.md#d-03-threejs-version) |
 | D-04 | Object types union | Accepted | [contract](contract.md#d-04-object-types) |
 | D-05 | Target hardware and budgets | Accepted (frame-rate row "amended by D-34") | [platform-hosting](platform-hosting.md#d-05-target-hardware-and-budgets) |
 | D-06 | Scope cuts for the event | Accepted | [scope-process](scope-process.md#d-06-scope-cuts-for-the-event) |
@@ -70,7 +73,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | D-16 | API endpoints | Accepted; 3 notes "not yet decided" (Q-50, Q-… | [contract](contract.md#d-16-api-endpoints-answers-q-06) |
 | D-17 | Owners | Accepted (amended 9 Nov 2026, issue #68: Moon decides body rules) | [scope-process](scope-process.md#d-17-owners-answers-q-07-and-the-ownership-part-of-q-14) |
 | D-18 | Contract generated from shared/schemas | Accepted | [contract](contract.md#d-18-the-contract-is-generated-from-sharedschemas-answers-q-14) |
-| D-19 | Name resolver order | Accepted | [data-sources](data-sources.md#d-19-name-resolver-order-answers-q-05) |
+| D-19 | Name resolver order | Accepted; amended by Q-328 (reference objects first, open) | [data-sources](data-sources.md#d-19-name-resolver-order-answers-q-05) |
 | D-20 | Haptics API | Accepted; Q-103 amendment pending Atish | [haptics-design](haptics-design.md#d-20-haptics-api-answers-q-11) |
 | D-21 | Honesty toggle follows three badges | Accepted | [contract-tags](contract-tags.md#d-21-honesty-toggle-follows-the-three-badges-answers-q-08) |
 | D-22 | What a saved asset holds | Accepted | [contract](contract.md#d-22-what-a-saved-asset-holds-answers-q-09) |
@@ -87,6 +90,8 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | D-33 | Accuracy first | Pending team confirmation | [rendering-bodies](rendering-bodies.md#d-33-accuracy-first) |
 | D-34 | Motion, render-on-change and battery | Pending team confirmation | [rendering-motion](rendering-motion.md#d-34-motion-render-on-change-and-battery) |
 | D-35 | Local copy of sky survey tiles | Accepted (Atish) | [sky-shell](sky-shell.md#d-35-local-copy-of-sky-survey-tiles-for-the-sky-background) |
+| D-36 | Physics-based realism for generated bodies | Decided (Moon); engine frames exempt from determinism (D-37) | [rendering-bodies](rendering-bodies.md#d-36-physics-based-realism-for-generated-bodies-issue-71) |
+| D-37 | Prototype WebGL2 engines (world, star, rock) are the renderer for generated bodies at + Artistic; three.js TSL is the fallback | Decided (Moon); amends D-03 (acknowledged by Atish, 11 Nov 2026); amended by Q-287; built | [rendering-engines](rendering-engines.md#d-37-the-approved-prototype-engine-is-the-renderer-for-generated-bodies-decided-by-moon-11-nov-2026) |
 | D-38 | Design language: Graphite, Inter, tight radii, Animate UI | Accepted (Moon) | [shell-surfaces](shell-surfaces.md#d-38-design-language-graphite-inter-tight-radii-animate-ui) |
 | Q-01 | Backend framework | Answered: D-15 | [data-sources](data-sources.md) |
 | Q-02 | Frontend hosting | Answered: D-24 | [platform-hosting](platform-hosting.md) |
@@ -290,9 +295,92 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-205 | Event cut: Area search and D4 to D7 hidden | Proposed | [scope-process](scope-process.md) |
 | Q-206 | Pre-built pack never hides a measured spectrum | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
 | Q-207 | Rainbow Trails: the UI rotates, frames stay native | Proposed (needs a second team member) | [moving-objects](moving-objects.md) |
-| Q-326 | Light theme for the panels | Open | [shell-surfaces](shell-surfaces.md) |
-| Q-327 | The "artist's impression" line removed from Details | Open | [shell-surfaces](shell-surfaces.md) |
-| Q-328 | Pause removed from the Details pane | Open | [shell-surfaces](shell-surfaces.md) |
-| Q-329 | Show (honesty level) removed from the build pane | Open | [shell-surfaces](shell-surfaces.md) |
-| Q-330 | The island's loader pulses at rest | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-208 | Area contract: shape choices for the spec gaps | Proposed | [moving-objects](moving-objects.md) |
+| Q-210 | Asteroid and nucleus physics: strength, craters, lighting, lobed nucleus | Open (built); amended by Q-326, Q-334 | [rendering-bodies](rendering-bodies.md) |
+| Q-211 | Height field layers, erosion on craters only, seam test | Open (built) | [rendering-bodies](rendering-bodies.md) |
+| Q-212 | Rough by default, smooth only on data | Open (built) | [rendering-bodies](rendering-bodies.md) |
+| Q-220 | Gaia teff_msc1 as a star Teff source | Proposed (re-warm the A15 cache, 11 Nov 2026) | [catalogue-values](catalogue-values.md) |
+| Q-221 | Data confidence score | Proposed; amended by Q-323, Q-327 | [pipeline-stages](pipeline-stages.md) |
+| Q-222 | The 3D gate and its calibration (25 pinned scores) | Proposed; amended by Q-327 | [pipeline-stages](pipeline-stages.md) |
+| Q-230 | Star mass, radius and rotation fall down the tier chain | Decided in code (Mamajek table) | [rendering-bodies](rendering-bodies.md) |
+| Q-231 | Star physics constants and which are [verify] | Open (to verify) | [rendering-bodies](rendering-bodies.md) |
+| Q-232 | Spot coverage placeholder scaling | Open (placeholder) | [rendering-bodies](rendering-bodies.md) |
+| Q-233 | Spot-group interface for stream G | Open (implemented) | [rendering-bodies](rendering-bodies.md) |
+| Q-234 | Joy's law sign and butterfly latitudes (22° to 8.4°) | Open (implemented); corrected by Q-329 | [rendering-bodies](rendering-bodies.md) |
+| Q-235 | Star colour views, scales and defaults | Decided (Observatory default) | [rendering-bodies](rendering-bodies.md) |
+| Q-240 | Rocky and water world model (issue #71 stream D) | Open (built) | [rendering-bodies](rendering-bodies.md) |
+| Q-241 | Fluid table and constants (stream D) | Open (built); amended by Q-330 | [rendering-bodies](rendering-bodies.md) |
+| Q-242 | Plate tectonics terrain (stream D) | Open (built) | [rendering-bodies](rendering-bodies.md) |
+| Q-243 | Sliders and worker for stream D | Open (built) | [rendering-bodies](rendering-bodies.md) |
+| Q-244 | Rivers and lakes (stream D round 2) | Open (built) | [rendering-bodies](rendering-bodies.md) |
+| Q-245 | Cloud tracer (stream D round 2) | Open (built, GPU unchecked) | [rendering-bodies](rendering-bodies.md) |
+| Q-250 | Gas solver and stability | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-251 | Which giants run as a solved world | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-252 | Observed band and ring values [verify] | Open (built; Moon to confirm); amended by Q-331 | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-253 | Gas world tags | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-254 | Gas pacing and determinism | Open (built; Moon to confirm); step length corrected by Q-331 | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-255 | Pre-formed gas planet | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-256 | Gas tracer on the GPU | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-257 | Gas haptics from the solved flow | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-258 | Reference objects (Jupiter, Saturn) | Open (built; Moon to confirm); amended by Q-328 | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-259 | Locked giants and pacing control | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md#q-250-to-q-259-gas-giants-as-a-solved-flow-issue-71-stream-e) |
+| Q-260 | 3I/ATLAS gas rates by epoch, coma and nucleus (resolves the shape of Q-42) | Decided in code (Moon to confirm) | [rendering-kinds](rendering-kinds.md) |
+| Q-261 | Comet path on the card (`orbit_track`, Horizons) | Decided in code | [rendering-kinds](rendering-kinds.md) |
+| Q-262 | Emissions view and time between the epochs | Decided in code; amended by Q-333 | [rendering-kinds](rendering-kinds.md) |
+| Q-263 | Modelled comet tail (amends R7.3) | Decided in code; amended by Q-333 | [rendering-kinds](rendering-kinds.md) |
+| Q-266 | Confidence formula shown with KaTeX | Decided in code | [rendering-bodies](rendering-bodies.md) |
+| Q-267 | Accuracy popover follows the mock-up; tag-to-part mapping | Decided in code; amended by Q-327 | [rendering-bodies](rendering-bodies.md) |
+| Q-270 | Flare physics, energy cap, decay index and schedule | Decided in code ([verify] constants); citation corrected by Q-329 | [rendering-bodies](rendering-bodies.md) |
+| Q-271 | Plasma as additive line streaks, budgets | Decided in code (look unchecked) | [rendering-bodies](rendering-bodies.md) |
+| Q-272 | Plasma in the plan, view rules, controls, reduced motion | Decided in code | [rendering-bodies](rendering-bodies.md) |
+| Q-273 | Star close-up component for the split pane | Decided in code | [rendering-bodies](rendering-bodies.md) |
+| Q-274 | Surface view (orbit view): TSL port, draws into the viewer canvas, tags, performance (render on change, quarter scale while interacting, adaptive levels, pixel ratio 1.25) | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
+| Q-275 | Close-up pane, the app's #cuPane (left 50%, mock-up captions, every kind) | Decided in code | [rendering-bodies](rendering-bodies.md) |
+| Q-276 | Surface view inputs, entry and the fields asked of D and E | Decided in code | [rendering-bodies](rendering-bodies.md) |
+| Q-280 to Q-284 | Search list additions: Titan reference moon, four demo-pack rows, archive outage | Decided in code; Q-280 amended by Q-330, Q-283 by Q-336 | [rendering-bodies](rendering-bodies.md) |
+| Q-285 | Card fields for surface fluid and pressure (Titan) | Open (built) | [rendering-bodies](rendering-bodies.md) |
+| Q-286 | TSL port of the prototype's world (`RockyWorld.ts`), kept as the fallback | Superseded by D-37; kept as the fallback (Atish, 11 Nov 2026) | [rendering-engines](rendering-engines.md#q-286-to-q-288-the-world-adapter-tsl-port-honesty-level-ocean-basin) |
+| Q-287 | The engines draw only at + Artistic; + Estimated and Measured only draw the three.js path | Decided (Atish, 11 Nov 2026) | [rendering-engines](rendering-engines.md#q-286-to-q-288-the-world-adapter-tsl-port-honesty-level-ocean-basin) |
+| Q-288 | Ocean basin in the world adapter (sea share per type) | Open (built; Moon to confirm) | [rendering-engines](rendering-engines.md#q-286-to-q-288-the-world-adapter-tsl-port-honesty-level-ocean-basin) |
+| Q-290 to Q-293 | Gas giant and star parity: True colour default, solved gas world and star cells shown at + Estimated | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
+| Q-294 | Build view follows the mock-up: full-view build, shift to the right half, header, one panel at a time, honesty caption | Decided (Moon: loyal to the mock-up) | [shell-surfaces](shell-surfaces.md) |
+| Q-295 | Feel it (not available yet) and Hear it (the Listen sweep on the measured spectrum) in the build pane | Decided in code | [shell-surfaces](shell-surfaces.md) |
+| Q-296 | Zoom bar and tool dock in the build view | Decided in code | [shell-surfaces](shell-surfaces.md) |
+| Q-297 | Details: the controls and honesty lists the mock-up's build view has no place for | Decided in code | [shell-surfaces](shell-surfaces.md) |
+| Q-298 | Build view follow-ups: mock-up title, island bottom right, `BuildControls` slot, Show dims rows only, phone close-up caption | Decided (coordinator) | [shell-surfaces](shell-surfaces.md) |
+| Q-299 | Rock engine (prototype code, verbatim) draws asteroids and comet nuclei at + Artistic (Q-287) | Open (built; Moon to confirm) | [rendering-engines](rendering-engines.md#q-299-to-q-302-stream-v3-rock-engine-issue-71-d-37) |
+| Q-300 | `cardToRock` adapter and the artifact's own bodies by id | Open (built; Moon to confirm); amended by Q-334 | [rendering-engines](rendering-engines.md#q-299-to-q-302-stream-v3-rock-engine-issue-71-d-37) |
+| Q-301 | Shape models as a radial height map for the engine; jets | Open (built; Moon to confirm) | [rendering-engines](rendering-engines.md#q-299-to-q-302-stream-v3-rock-engine-issue-71-d-37) |
+| Q-302 | Rock controls and notes in `BuildControls`; known differences | Open (built; Moon to confirm); amended by Q-334 | [rendering-engines](rendering-engines.md#q-299-to-q-302-stream-v3-rock-engine-issue-71-d-37) |
+| Q-303 | World engine layout, verbatim blocks, one canvas | Decided (coordinator); amended by Q-335 | [rendering-engines](rendering-engines.md) |
+| Q-304 | `cardToWorld`, artifact table and defaults | Decided (coordinator); amended by Q-330, Q-288 | [rendering-engines](rendering-engines.md) |
+| Q-305 | Engine parity proof and `?parity=1` hook | Decided (coordinator); amended by Q-335 | [rendering-engines](rendering-engines.md) |
+| Q-306 | Spin-up budget and resolution scaler stay as the prototype | Decided (coordinator) | [rendering-engines](rendering-engines.md) |
+| Q-307 | The Sun as a reference star (`ref-sun`, NASA Sun Fact Sheet) | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
+| Q-308 | D-37 engine status: prototype star and flare code sliced into engine/stars | Open (being built) | [rendering-bodies](rendering-bodies.md) |
+| Q-309 to Q-312 | Star engine hosted (D-37): StarEngine, cardToStar and artifact presets, the globe pick and close-up target, mass assumption | Decided in code (Moon to confirm); Q-309, Q-310 amended by Q-329 | [rendering-engines](rendering-engines.md) |
+| Q-313 to Q-316 | World engine hosted (D-37): two instances (globe and fly), hosting rule with the Forming state, controls and notes, haptics sampler, known differences | Open (built; Moon to confirm); Q-314 amended by Q-287 | [rendering-engines](rendering-engines.md) |
+| Q-317 to Q-319 | Search list S2: 55 Cnc e (reviewed type override), stream S placeholders replaced, lava world in the engine | Open (built; Moon to confirm); Q-319 amended by Q-330 | [rendering-bodies](rendering-bodies.md) |
+| Q-323 | Comet gas_Q in the confidence score: flat and epoch-keyed shapes, best epoch per molecule | Open (built; Moon to confirm) | [pipeline-stages](pipeline-stages.md) |
+| Q-324 | Reviewed exoplanet type override limited to the water-range refusal with R and M on the card | Open (built; Moon to confirm) | [pipeline-stages](pipeline-stages.md) |
+| Q-325 | Review fixes: "found" text joins with "and", lump_ratio radius floor, Gaia MSC cool-star caveat | Open (built; Moon to confirm) | [pipeline-stages](pipeline-stages.md) |
+| Q-326 | Asteroid relief and crater review fixes: crater depth 0.33 r, reachable cap, rubble at the angle of repose, `p1-b4` | Open (built; Atish to confirm) | [rendering-bodies](rendering-bodies.md) |
+| Q-327 | Confidence score review fixes: surface fields, key-measurement tags, 25 pinned scores, popover bar | Open (built; Atish to confirm) | [pipeline-stages](pipeline-stages.md) |
+| Q-328 | Reference objects in the pipeline: looked up first, never through the catalogues, no sky position | Open (built; Kevin and Moon to confirm) | [data-sources](data-sources.md) |
+| Q-329 | Star engine review fixes: presets, close-up note, limb law, spot temperature, X10 rate, citations | Open (built; Moon to confirm) | [rendering-engines-review](rendering-engines-review.md) |
+| Q-330 | World engine and `cardToWorld` review fixes: clouds, CO₂ liquid, lava worlds, preset tolerance, Titan, albedo | Open (built; Moon to confirm) | [rendering-engines-review](rendering-engines-review.md) |
+| Q-331 | Gas giant review fixes: Saturn's rings, measured winds and flattening, Great Red Spot, cyclones | Open (built; Moon to confirm) | [rendering-engines-review](rendering-engines-review.md) |
+| Q-332 | Gas giant flattening: backend `f_J (P_J/P)^2` against the viewer's measured value or `0.7 q` | Open | [rendering-kinds](rendering-kinds.md) |
+| Q-333 | 3I/ATLAS: SOHO/SWAN water point, water break-up, tail reference grain, perihelion | Open (built; Moon to confirm) | [rendering-kinds](rendering-kinds.md) |
+| Q-334 | Rock engine review fixes: Bennu density, seed hash, preset badges, mesh readouts, lighting tag | Open (built; Moon to confirm) | [rendering-engines-review](rendering-engines-review.md) |
+| Q-335 | Verbatim with reviewed `@deviation` fixes; extractors; parity harness not in the repo | Open (built; parity harness to commit) | [rendering-engines-review](rendering-engines-review.md) |
+| Q-336 | Procyon A: interferometric radius 2.048 R☉ and the α CMi aliases | Open (built; Kevin to confirm) | [catalogue-values](catalogue-values.md) |
+| Q-400 | Area frames and dots: P3's choices for the spec gaps | Proposed | [moving-objects](moving-objects.md) |
+| Q-401 | Area starting values against the Day 0 count | Open (offline numbers; live Day 0 pending) | [moving-objects](moving-objects.md) |
+| Q-402 | Conflicts P3 met in the Area spec (incl. A17.3 star or fixed) | Open; (5) decided by Moon | [moving-objects](moving-objects.md) |
+| Q-403 | Light theme for the panels | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-404 | The "artist's impression" line removed from Details | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-405 | Pause removed from the Details pane | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-406 | Show (honesty level) removed from the build pane | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-407 | The island's loader pulses at rest | Open | [shell-surfaces](shell-surfaces.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |

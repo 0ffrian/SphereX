@@ -1,0 +1,16 @@
+{
+ "body_sha256": "469d7a31870ef977879afe4306336a836a4542273d180d770a92d143451517b9",
+ "body_size": 653,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-10T15:44:46.537Z",
+ "key": {
+  "query": {
+   "id": "simbad-trappist-1e",
+   "v": "1"
+  },
+  "release": "-",
+  "source": "derived.object"
+ },
+ "status": 200,
+ "url": "derived:resolve"
+}

@@ -18,7 +18,14 @@ describe('cloud tracer', () => {
   });
   it('builds without a renderer (no step is run) and disposes', () => {
     const clim = new DataTexture(new Float32Array(4 * 4 * 4), 4, 4, RGBAFormat, FloatType);
-    const t = new CloudTracer({ climate: clim, windMs: 100, jets: 6, locked: true, seed: 3, low: true });
+    const t = new CloudTracer({
+      climate: clim,
+      windMs: 100,
+      jets: 6,
+      locked: true,
+      seed: 3,
+      low: true,
+    });
     expect(t.stepsRun).toBe(0);
     expect(t.texture).toBeTruthy();
     t.dispose();

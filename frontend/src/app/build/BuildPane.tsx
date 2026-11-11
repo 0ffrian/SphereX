@@ -44,7 +44,12 @@ export const SHIFT_DELAY_MS = 650;
 const POP_BUTTONS: { id: PopId; label: string; title: string; icon: IconName }[] = [
   { id: 'acc', label: 'Accuracy', title: 'Accuracy', icon: 'accuracy' },
   { id: 'hear', label: 'Hear it', title: 'Hear it', icon: 'hear' },
-  { id: 'details', label: 'Details', title: 'Details: levels, view and what is drawn', icon: 'details' },
+  {
+    id: 'details',
+    label: 'Details',
+    title: 'Details: levels, view and what is drawn',
+    icon: 'details',
+  },
 ];
 
 export function BuildPane() {

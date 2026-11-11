@@ -155,7 +155,10 @@ export class StarPlasma {
     sink.cap = cap;
     emitQuiet(sink, groups, this.o.seed, opts);
     const t = this.stillAdjusted(tDisplay);
-    const events = [...eventsAt(this.ctx, t), ...this.fired.filter((f) => tDisplay >= f.t0 && tDisplay < f.t0 + f.life)];
+    const events = [
+      ...eventsAt(this.ctx, t),
+      ...this.fired.filter((f) => tDisplay >= f.t0 && tDisplay < f.t0 + f.life),
+    ];
     this.fired = this.fired.filter((f) => tDisplay < f.t0 + f.life + 30);
     for (const e of events) {
       const g = groups.find((x) => x.id === e.groupId);

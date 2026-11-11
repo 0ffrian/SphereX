@@ -101,7 +101,11 @@ export function orbitUniformValues(
   const hz = airDrawn ? src.haze : 0;
   const hv = Math.max((src.scaleHeightKm ?? 0) * ex, 0.3);
   const mx = Math.sqrt((Math.PI * src.radiusKm) / (2 * hv));
-  const scr: Vec3 = [RAYLEIGH_RGB[0] * tau / hv, RAYLEIGH_RGB[1] * tau / hv, RAYLEIGH_RGB[2] * tau / hv];
+  const scr: Vec3 = [
+    (RAYLEIGH_RGB[0] * tau) / hv,
+    (RAYLEIGH_RGB[1] * tau) / hv,
+    (RAYLEIGH_RGB[2] * tau) / hv,
+  ];
   const scmV = (hz * 0.5) / hv;
   const scm: Vec3 = [scmV, scmV, scmV];
   const hc = v3(src.hazeColour);
@@ -114,7 +118,8 @@ export function orbitUniformValues(
   const look = src.look;
   const hot = src.surfaceTempK !== null && src.surfaceTempK > HOT_ROCK_K;
   const gp = src.gasPalette;
-  const cloudsPresent = !gas && src.cloudCover !== null && (src.cloudBase !== null || src.climate !== null);
+  const cloudsPresent =
+    !gas && src.cloudCover !== null && (src.cloudBase !== null || src.climate !== null);
   return {
     size: [size.w, size.h],
     cam: cam.cam,

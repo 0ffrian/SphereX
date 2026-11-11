@@ -1,0 +1,277 @@
+{
+  "area_id": "fixture:area-main",
+  "ra": 150.0,
+  "dec": 10.0,
+  "width_deg": 1.0,
+  "height_deg": 0.6,
+  "data_release": "synthetic_fixture",
+  "n_frames": 16,
+  "n_visits": 2,
+  "frames": [
+    {
+      "frame_id": "fixture-area-main-v1e1-D1",
+      "detector": 1,
+      "visit": 1,
+      "exposure": 1,
+      "time": "2026-01-15T03:00:00.000Z",
+      "wavelength_min_um": 0.75,
+      "wavelength_max_um": 1.11,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.2523970 9.7001875 150.2523970 10.2998125 149.4926040 10.2998125"
+    },
+    {
+      "frame_id": "fixture-area-main-v1e1-D4",
+      "detector": 4,
+      "visit": 1,
+      "exposure": 1,
+      "time": "2026-01-15T03:00:00.000Z",
+      "wavelength_min_um": 2.42,
+      "wavelength_max_um": 3.82,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.2523970 9.7001875 150.2523970 10.2998125 149.4926040 10.2998125"
+    },
+    {
+      "frame_id": "fixture-area-main-v1e2-D1",
+      "detector": 1,
+      "visit": 1,
+      "exposure": 2,
+      "time": "2026-01-15T03:02:00.000Z",
+      "wavelength_min_um": 0.75,
+      "wavelength_max_um": 1.11,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.2523970 9.7001875 150.2523970 10.2998125 149.4926040 10.2998125"
+    },
+    {
+      "frame_id": "fixture-area-main-v1e2-D4",
+      "detector": 4,
+      "visit": 1,
+      "exposure": 2,
+      "time": "2026-01-15T03:02:00.000Z",
+      "wavelength_min_um": 2.42,
+      "wavelength_max_um": 3.82,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.2523970 9.7001875 150.2523970 10.2998125 149.4926040 10.2998125"
+    },
+    {
+      "frame_id": "fixture-area-main-v1e3-D1",
+      "detector": 1,
+      "visit": 1,
+      "exposure": 3,
+      "time": "2026-01-15T03:04:00.000Z",
+      "wavelength_min_um": 0.75,
+      "wavelength_max_um": 1.11,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.2523970 9.7001875 150.2523970 10.2998125 149.4926040 10.2998125"
+    },
+    {
+      "frame_id": "fixture-area-main-v1e3-D4",
+      "detector": 4,
+      "visit": 1,
+      "exposure": 3,
+      "time": "2026-01-15T03:04:00.000Z",
+      "wavelength_min_um": 2.42,
+      "wavelength_max_um": 3.82,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.2523970 9.7001875 150.2523970 10.2998125 149.4926040 10.2998125"
+    },
+    {
+      "frame_id": "fixture-area-main-v1e4-D1",
+      "detector": 1,
+      "visit": 1,
+      "exposure": 4,
+      "time": "2026-01-15T03:06:00.000Z",
+      "wavelength_min_um": 0.75,
+      "wavelength_max_um": 1.11,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.2523970 9.7001875 150.2523970 10.2998125 149.4926040 10.2998125"
+    },
+    {
+      "frame_id": "fixture-area-main-v1e4-D4",
+      "detector": 4,
+      "visit": 1,
+      "exposure": 4,
+      "time": "2026-01-15T03:06:00.000Z",
+      "wavelength_min_um": 2.42,
+      "wavelength_max_um": 3.82,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.2523970 9.7001875 150.2523970 10.2998125 149.4926040 10.2998125"
+    },
+    {
+      "frame_id": "fixture-area-main-v2e1-D1",
+      "detector": 1,
+      "visit": 2,
+      "exposure": 1,
+      "time": "2026-01-16T03:24:00.000Z",
+      "wavelength_min_um": 0.75,
+      "wavelength_max_um": 1.11,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.5073960 9.7001875 150.5073960 10.2998125 149.4926040 10.2998125"
+    },
+    {
+      "frame_id": "fixture-area-main-v2e1-D4",
+      "detector": 4,
+      "visit": 2,
+      "exposure": 1,
+      "time": "2026-01-16T03:24:00.000Z",
+      "wavelength_min_um": 2.42,
+      "wavelength_max_um": 3.82,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.5073960 9.7001875 150.5073960 10.2998125 149.4926040 10.2998125"
+    },
+    {
+      "frame_id": "fixture-area-main-v2e2-D1",
+      "detector": 1,
+      "visit": 2,
+      "exposure": 2,
+      "time": "2026-01-16T03:26:00.000Z",
+      "wavelength_min_um": 0.75,
+      "wavelength_max_um": 1.11,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.5073960 9.7001875 150.5073960 10.2998125 149.4926040 10.2998125"
+    },
+    {
+      "frame_id": "fixture-area-main-v2e2-D4",
+      "detector": 4,
+      "visit": 2,
+      "exposure": 2,
+      "time": "2026-01-16T03:26:00.000Z",
+      "wavelength_min_um": 2.42,
+      "wavelength_max_um": 3.82,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.5073960 9.7001875 150.5073960 10.2998125 149.4926040 10.2998125"
+    },
+    {
+      "frame_id": "fixture-area-main-v2e3-D1",
+      "detector": 1,
+      "visit": 2,
+      "exposure": 3,
+      "time": "2026-01-16T03:28:00.000Z",
+      "wavelength_min_um": 0.75,
+      "wavelength_max_um": 1.11,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.5073960 9.7001875 150.5073960 10.2998125 149.4926040 10.2998125"
+    },
+    {
+      "frame_id": "fixture-area-main-v2e3-D4",
+      "detector": 4,
+      "visit": 2,
+      "exposure": 3,
+      "time": "2026-01-16T03:28:00.000Z",
+      "wavelength_min_um": 2.42,
+      "wavelength_max_um": 3.82,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.5073960 9.7001875 150.5073960 10.2998125 149.4926040 10.2998125"
+    },
+    {
+      "frame_id": "fixture-area-main-v2e4-D1",
+      "detector": 1,
+      "visit": 2,
+      "exposure": 4,
+      "time": "2026-01-16T03:30:00.000Z",
+      "wavelength_min_um": 0.75,
+      "wavelength_max_um": 1.11,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.5073960 9.7001875 150.5073960 10.2998125 149.4926040 10.2998125"
+    },
+    {
+      "frame_id": "fixture-area-main-v2e4-D4",
+      "detector": 4,
+      "visit": 2,
+      "exposure": 4,
+      "time": "2026-01-16T03:30:00.000Z",
+      "wavelength_min_um": 2.42,
+      "wavelength_max_um": 3.82,
+      "s_region": "POLYGON ICRS 149.4926040 9.7001875 150.5073960 9.7001875 150.5073960 10.2998125 149.4926040 10.2998125"
+    }
+  ],
+  "coverage": [
+    {
+      "visit": 1,
+      "polygon": [
+        [
+          149.492604,
+          9.7001875
+        ],
+        [
+          150.252397,
+          9.7001875
+        ],
+        [
+          150.252397,
+          10.2998125
+        ],
+        [
+          149.492604,
+          10.2998125
+        ]
+      ]
+    },
+    {
+      "visit": 2,
+      "polygon": [
+        [
+          149.492604,
+          9.7001875
+        ],
+        [
+          150.507396,
+          9.7001875
+        ],
+        [
+          150.507396,
+          10.2998125
+        ],
+        [
+          149.492604,
+          10.2998125
+        ]
+      ]
+    }
+  ],
+  "steps": {
+    "n_dots": 570,
+    "n_glitches": 18,
+    "n_stars": 480,
+    "n_fixed": 16,
+    "n_static_one_visit": 1,
+    "n_tracks": 3,
+    "n_possible": 1,
+    "n_found_blind": 1,
+    "n_unexplained": 1,
+    "n_unchecked": 1
+  },
+  "method": {
+    "settings": {
+      "area_version": "fixture-0",
+      "bg_box_px": 32,
+      "bg_sigma": 3.0,
+      "bg_iters": 5,
+      "k_detect": 5.0,
+      "min_sep_px": 3.0,
+      "aperture_px": 3.0,
+      "annulus_in_px": 6.0,
+      "annulus_out_px": 9.0,
+      "visit_gap_h": 1.0,
+      "k_visit": 3,
+      "r_match_min_px": 2.0,
+      "rms_max_px": 1.0,
+      "min_motion_px": 1.0,
+      "ambiguity_ratio": 0.5,
+      "rate_max_deg_day": 1.2,
+      "r_known_min_px": 3.0,
+      "v_lim": 22.0,
+      "sed_snr_min": 3.0,
+      "sed_min_dots": 6,
+      "sed_sigma_floor": 0.15,
+      "sed_chi2_max": 3.0
+    }
+  },
+  "cached_at": "2026-11-10T12:00:00.000Z",
+  "computed_at": "2026-11-10T12:00:00.000Z",
+  "missing": [
+    "horizons:Synthetic fixture A2",
+    "rate_grid:visits",
+    "stamp:fixture-area-main-v2e4-D4:40"
+  ],
+  "provenance": {
+    "frames": {
+      "tag": "measured",
+      "source": "synthetic fixture: made-up frame list, not SPHEREx data"
+    },
+    "coverage": {
+      "tag": "derived",
+      "source": "synthetic fixture: made-up footprints",
+      "formula": "per visit, the union of its frames' s_region clipped to the area (A17.1)"
+    },
+    "steps": {
+      "tag": "derived",
+      "source": "synthetic fixture: counts of the fixture's own dots and tracks",
+      "formula": "labels counted in /dots, statuses and verdicts counted in /tracks (A17.3 to A17.5)"
+    }
+  }
+}

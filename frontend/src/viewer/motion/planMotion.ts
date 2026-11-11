@@ -98,7 +98,10 @@ export function activeProcessesOf(plan: RenderPlan): ProcessId[] {
         break;
       case 'winds':
         // A solved gas world (issue #71) has no `jets` layer: its bands are the moving thing.
-        on = drawn('jets') || drawn('clouds') || (plan.type === 'gas_giant' && drawn('bands') && m.rates.jet_speed_ms === undefined);
+        on =
+          drawn('jets') ||
+          drawn('clouds') ||
+          (plan.type === 'gas_giant' && drawn('bands') && m.rates.jet_speed_ms === undefined);
         break;
       case 'clouds':
         on = drawn('jets');

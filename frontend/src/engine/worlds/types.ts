@@ -34,6 +34,10 @@ export interface WorldPreset {
   ob?: { Ms: number; e: number; obl: number };
   /** Ocean share of the surface (the prototype's OCEANF table). */
   oceanF?: number;
+  /** Measured peak jet speed, m/s; replaces the engine's thermal-wind estimate (Jupiter, Saturn; #89 review 5). */
+  Umeas?: number;
+  /** Measured flattening; replaces the engine's 0.7 q (Jupiter, Saturn; #89 review 6). */
+  fMeas?: number;
 }
 
 export interface EngineOverrides {

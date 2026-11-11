@@ -1,0 +1,34 @@
+{
+  "method": {
+    "settings": {
+      "area_version": "fixture-0",
+      "bg_box_px": 32,
+      "bg_sigma": 3.0,
+      "bg_iters": 5,
+      "k_detect": 5.0,
+      "min_sep_px": 3.0,
+      "aperture_px": 3.0,
+      "annulus_in_px": 6.0,
+      "annulus_out_px": 9.0,
+      "visit_gap_h": 1.0,
+      "k_visit": 3,
+      "r_match_min_px": 2.0,
+      "rms_max_px": 1.0,
+      "min_motion_px": 1.0,
+      "ambiguity_ratio": 0.5,
+      "rate_max_deg_day": 1.2,
+      "r_known_min_px": 3.0,
+      "v_lim": 22.0,
+      "sed_snr_min": 3.0,
+      "sed_min_dots": 6,
+      "sed_sigma_floor": 0.15,
+      "sed_chi2_max": 3.0
+    }
+  },
+  "cached_at": "2026-11-10T12:05:00.000Z",
+  "computed_at": "2026-11-10T12:05:00.000Z",
+  "missing": [
+    "checks:not_run"
+  ],
+  "provenance": {}
+}

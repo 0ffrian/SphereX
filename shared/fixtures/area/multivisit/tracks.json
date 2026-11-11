@@ -1,0 +1,116 @@
+{
+  "tracks": [
+    {
+      "track_id": "T1",
+      "visits": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "tracklets": [
+        {
+          "visit": 1,
+          "dot_ids": [
+            "fixture-area-multivisit-v1e1-D2:1",
+            "fixture-area-multivisit-v1e1-D3:1",
+            "fixture-area-multivisit-v1e2-D2:1",
+            "fixture-area-multivisit-v1e2-D3:1"
+          ],
+          "v_in_deg_day": 0.1425,
+          "pa_in_deg": 56.96,
+          "rms_px": 0.12
+        },
+        {
+          "visit": 2,
+          "dot_ids": [
+            "fixture-area-multivisit-v2e1-D2:2",
+            "fixture-area-multivisit-v2e1-D3:2",
+            "fixture-area-multivisit-v2e2-D2:2",
+            "fixture-area-multivisit-v2e2-D3:2"
+          ],
+          "v_in_deg_day": 0.1425,
+          "pa_in_deg": 56.96,
+          "rms_px": 0.12
+        },
+        {
+          "visit": 3,
+          "dot_ids": [
+            "fixture-area-multivisit-v3e1-D2:3",
+            "fixture-area-multivisit-v3e1-D3:3",
+            "fixture-area-multivisit-v3e2-D2:3",
+            "fixture-area-multivisit-v3e2-D3:3"
+          ],
+          "v_in_deg_day": 0.1425,
+          "pa_in_deg": 56.96,
+          "rms_px": 0.12
+        },
+        {
+          "visit": 4,
+          "dot_ids": [
+            "fixture-area-multivisit-v4e1-D2:8",
+            "fixture-area-multivisit-v4e1-D3:9",
+            "fixture-area-multivisit-v4e2-D2:9",
+            "fixture-area-multivisit-v4e2-D3:8"
+          ],
+          "v_in_deg_day": 0.1425,
+          "pa_in_deg": 56.96,
+          "rms_px": 0.12
+        }
+      ],
+      "rate_deg_day": 0.147,
+      "pa_deg": 54.46,
+      "u_inv_au": 0.62,
+      "status": "track",
+      "reason": null,
+      "verdict": "unexplained",
+      "match": null,
+      "linker": "rate_grid",
+      "unchecked_by": [],
+      "sed": {
+        "label": "smooth",
+        "chi2_red": 1.4,
+        "n_dots": 16,
+        "sigma_floor": 0.15
+      }
+    }
+  ],
+  "skybot": [
+    {
+      "visit": 1,
+      "fetched_at": "2026-11-10T12:02:00.000Z"
+    },
+    {
+      "visit": 2,
+      "fetched_at": "2026-11-10T12:02:30.000Z"
+    },
+    {
+      "visit": 3,
+      "fetched_at": "2026-11-10T12:03:00.000Z"
+    },
+    {
+      "visit": 4,
+      "fetched_at": "2026-11-10T12:03:30.000Z"
+    }
+  ],
+  "cached_at": "2026-11-10T12:05:00.000Z",
+  "computed_at": "2026-11-10T12:05:00.000Z",
+  "missing": [],
+  "provenance": {
+    "tracks": {
+      "tag": "derived",
+      "source": "synthetic fixture: made-up tracks",
+      "formula": "tracklets and visit pairs of A17.4 (A17.12 for rate_grid) with the thresholds in method.settings"
+    },
+    "match": {
+      "tag": "model_dependent",
+      "source": "synthetic fixture: made-up known objects",
+      "assumption": "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of fetched_at, seen from SPHEREx (500@-163182)"
+    },
+    "sed": {
+      "tag": "derived",
+      "source": "synthetic fixture: made-up scores",
+      "formula": "weighted degree-2 fit of ln F against ln wavelength, chi2_red against sed_chi2_max (A17.13)"
+    }
+  }
+}

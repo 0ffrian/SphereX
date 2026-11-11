@@ -22,6 +22,7 @@ from app.core.render import gas_giant as gg
 from app.core.render.bake import BAKER_RULES_VERSION, FILES, bake_dir
 from app.core.render.blackbody import FORMULA as TEFF_FORMULA
 from app.core.render.blackbody import teff_to_rgb
+from app.core.render.confidence import confidence_block
 from app.core.render.palette import ASTEROID_PALETTE, BROWN_DWARF_PALETTE
 from app.core.render.params import BAKED_TYPES, BakeParams, BakeRefusal, params_from_card
 from app.core.render.spherex_rgb import CHANNELS_BY_TYPE
@@ -394,6 +395,18 @@ def _asteroid_shape(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
     }
 
 
+_STRUCTURE_WORDS = {
+    "solid": "solid rock (spinning past the rubble limit, or tiny)",
+    "rubble": "a rubble pile of rock and shattered rock",
+    "fractured": "fractured rock under regolith",
+}
+_ROUGHNESS_WORDS = {
+    "rocky": "Rough and rocky is the default: only a shape model, radar roughness or thermal "
+    "inertia could make it smoother, and the card has none.",
+    "smooth": "Smoother, because the card's data says so.",
+}
+
+
 def _asteroid_procedural(
     card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None
 ) -> dict[str, Any]:
@@ -436,7 +449,17 @@ def _asteroid_procedural(
         True,
         "relief",
         "artistic",
-        f"Procedural height field from the seed, style {bake.style} (R6.2, R6.3).",
+        "Procedural height field from the seed: "
+        f"{_STRUCTURE_WORDS[bake.structure]}; lumps "
+        + (
+            "held by slopes at the angle of repose (a rubble pile has almost no cohesion)"
+            if bake.structure == "rubble"
+            else "from rock strength against gravity"
+        )
+        + f" (h/R = {bake.lump:.2f}), craters N(>D) ~ D^-2, boulders "
+        f"by structure. {_ROUGHNESS_WORDS[bake.roughness]} The density is "
+        f"{'an analog of a real body' if bake.density_source != 'generic' else 'a generic value'}"
+        f" ({bake.density_kg_m3:g} kg/m3), an assumption (R6.2, R6.3, D-36).",
         ["diameter_km"],
     )
     # Issue #62, R7.2, Q-103: the viewer displaces the surface by the baked height map on the high
@@ -446,8 +469,8 @@ def _asteroid_procedural(
         bake.relief_amp > 0,
         "displacement",
         "artistic",
-        f"Surface pushed out by the height map, up to {bake.relief_amp:g} of the radius "
-        f"(style {bake.style}, R6.2, R7.2).",
+        f"Surface pushed in and out by the height map, over a range of {bake.relief_amp:g} of the "
+        f"radius (R6.2, R7.2, D-36).",
         ["diameter_km"],
     )
     return {
@@ -457,6 +480,44 @@ def _asteroid_procedural(
         "data_tag": "artistic",
         "params": {"tau": TAU},
     }
+
+
+# Q-263: assumed grain sizes of the modelled dust tail, as radiation-pressure ratios beta
+# (a = 570, 114, 28, 5.7 um at rho = 1 g/cm3, Qpr = 1). A display choice, not a measurement.
+DUST_TAIL_BETAS = "0.001, 0.005, 0.02, 0.1"
+DUST_GRAIN_DENSITY = 1.0
+
+_COMET_EPOCHS = ("2025-08", "2025-12")
+
+
+def _gas_epochs(gas: object) -> list[str]:
+    """Epochs a gas_Q keyed by epoch (Q-260) has at least one usable value for."""
+    if not isinstance(gas, Mapping):
+        return []
+    return [
+        e
+        for e in _COMET_EPOCHS
+        if isinstance(gas.get(e), Mapping) and any(_has(gas[e], k) for k in ("co2", "h2o", "co"))
+    ]
+
+
+def _has_track(card: Mapping[str, Any]) -> bool:
+    """Q-261: ``orbit_track`` holds at least two usable rows of seven finite numbers."""
+    tv = _tv(card, "orbit_track")
+    rows = tv.get("value") if tv else None
+    return (
+        isinstance(rows, list)
+        and len(rows) >= 2
+        and all(
+            isinstance(r, list | tuple)
+            and len(r) == 7
+            and all(
+                isinstance(c, numbers.Real) and not isinstance(c, bool) and math.isfinite(float(c))
+                for c in r
+            )
+            for r in rows
+        )
+    )
 
 
 def _comet(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
@@ -484,11 +545,15 @@ def _comet(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         formula="nucleus radius = nucleus_radius_km_max",
     )
     gas = card.get("gas_Q")
-    has_q = isinstance(gas, Mapping) and any(_has(gas, k) for k in ("co2", "h2o", "co"))
+    has_q = _gas_epochs(gas) or (
+        isinstance(gas, Mapping) and any(_has(gas, k) for k in ("co2", "h2o", "co"))
+    )
     epochs = card.get("epochs")
-    one_epoch = isinstance(epochs, list) and len(epochs) == 1  # Q-42
+    # Q-42: the R3.2 shape holds one epoch's values, so it needs exactly one listed epoch. A card
+    # keyed by epoch (Q-260) carries its own epochs and needs no such rule.
+    one_epoch = bool(_gas_epochs(gas)) or (isinstance(epochs, list) and len(epochs) == 1)
     shells = plan.layer(
-        has_q and one_epoch and _has(card, "coma_radius_km"),
+        bool(has_q) and one_epoch and _has(card, "coma_radius_km"),
         "gas_shells",
         "model_dependent",
         "Assumption: density falls as 1/r^2 out to the coma radius; Q itself is measured "
@@ -500,6 +565,15 @@ def _comet(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
     )
     if not shells:
         plan.refuse("field")
+    # Q-261, Q-263: modelled tails. Both need the sampled Horizons path (the real Sun direction and
+    # the comet's velocity); without it they are refused, never aimed by a guess.
+    # A card without an `orbit_track` member (every fixture comet, 67P) has no tail rows at all, as
+    # a comet without `shape_source` has no `mesh` row; one with the member but no usable path
+    # lists the tails in `missing`.
+    track = _has_track(card)
+    wants_tails = "orbit_track" in card
+    if wants_tails:
+        _tail_layers(card, plan, track)
     return {
         "texture": "none",
         "texture_tag": "artistic",
@@ -507,6 +581,38 @@ def _comet(card: Mapping[str, Any], plan: _Plan) -> dict[str, Any]:
         "data_tag": "model_dependent" if shells else "artistic",  # Q-17: the safer tag
         "params": {"maxRateHz": FIELD_MAX_RATE_HZ} if shells else {},
     }
+
+
+def _tail_layers(card: Mapping[str, Any], plan: _Plan, track: bool) -> None:
+    """Q-261, Q-263: the two modelled tail layers, from the sampled Horizons path."""
+    plan.layer(
+        track,
+        "ion_tail",
+        "derived",
+        "Ion tail along the anti-Sun direction (R7.3, Q-263). Its length and width are display "
+        "values and the tail is not to scale.",
+        ["orbit_track"],
+        card=card,
+        formula="tail direction = -(unit heliocentric position of the comet), from JPL Horizons "
+        "VECTORS at the shown time",
+    )
+    plan.layer(
+        track,
+        "dust_tail",
+        "model_dependent",
+        "Modelled dust tail: grains of assumed size released with the comet's velocity and pushed "
+        "by sunlight (Finson-Probstein, Q-263). SPHEREx saw no anti-solar dust tail, so this "
+        "shows what small grains would do, not what was seen.",
+        ["orbit_track"],
+        card=card,
+        formula="grain path under (1 - beta) GM_sun / r^2 from its release, compared with the "
+        "comet's own path from Horizons; beta = 5.7e-5 Qpr / (rho a) (Burns et al. 1979)",
+        rule_inputs={
+            "beta_values": DUST_TAIL_BETAS,
+            "grain_density_g_cm3": DUST_GRAIN_DENSITY,
+            "emission_start": "first SPHEREx epoch (earlier activity unknown)",
+        },
+    )
 
 
 def _brown_dwarf(card: Mapping[str, Any], plan: _Plan, bake: BakeParams | None) -> dict[str, Any]:
@@ -1113,6 +1219,9 @@ def card_to_params(
     for m in extra_missing:
         plan.refuse(m)
     out["missing"] = plan.missing
+    conf = confidence_block(card)
+    if conf is not None:
+        out["confidence"] = conf  # Q-220: the score and the 3D gate; the viewer applies the gate
     out["alt_text"] = _alt_text(card, out)
     # Fixed key order (R3.4) so serialised bytes are stable.
     order = (
@@ -1127,6 +1236,7 @@ def card_to_params(
         "lighting",
         "view_modes",
         "haptics",
+        "confidence",
         "alt_text",
         "missing",
     )

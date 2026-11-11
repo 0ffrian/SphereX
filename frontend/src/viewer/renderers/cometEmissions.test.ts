@@ -54,4 +54,16 @@ describe('comet emissions plan', () => {
     const b = plan({ epoch: '2025-12', cometJd: 2460990 });
     expect(JSON.stringify(a.volumes)).toBe(JSON.stringify(b.volumes));
   });
+  it('water near perihelion is the SOHO/SWAN value, thinned by its Haser break-up', () => {
+    const p = plan({ epoch: '2025-12', cometJd: 2460986.0 });
+    expect(p.notes.join(' ')).toMatch(/SOHO\/SWAN/);
+    expect(p.notes.join(' ')).toMatch(/above the top of the brightness scale/);
+    const haser = p.drawn.find((d) => d.id === 'h2o_breakup')!;
+    expect(haser.tag).toBe('model_dependent');
+    // Only water is thinned: CO2 keeps its pure 1/r^2 share.
+    const h2o = p.shells.find((s) => s.id === 'h2o')!;
+    expect(h2o.brightness).toBeLessThan(1);
+    const dec = plan({ epoch: '2025-12' });
+    expect(dec.notes.join(' ')).toMatch(/570, 114, 28\.5 and 5\.7/);
+  });
 });

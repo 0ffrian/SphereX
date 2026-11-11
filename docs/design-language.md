@@ -14,7 +14,7 @@ The reference for these rules is the approved preview of the Accuracy and Detail
 
 ## Tokens
 
-The app is dark-only for now (Q-326). The light values are defined so that artifact pages and a later light theme use them, never a dark token at low opacity.
+The app is dark-only for now (Q-403). The light values are defined so that artifact pages and a later light theme use them, never a dark token at low opacity.
 
 | Token | Dark | Light | Use |
 | --- | --- | --- | --- |

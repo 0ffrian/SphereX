@@ -137,7 +137,7 @@ export const DEMO_TARGETS: readonly DemoTarget[] = [
   },
   {
     name: 'Procyon A',
-    aliases: ['procyon', 'alpha cma', 'alf cma'],
+    aliases: ['procyon', 'alpha cmi', 'alf cmi'],
     query: 'Procyon',
     id: 'simbad-alf-cmi',
     classLabel: 'star · F5IV-V+DQZ',

@@ -42,13 +42,14 @@ export function formulaTerms(c: Confidence): FormulaTerms {
 export const C_TABLE_LINES: readonly string[] = [
   'c = 1: satellite data, or physics from measured values',
   'c = 0.5: model-dependent, or physics with an assumed input',
-  'c = 0: assumed from a similar object, drawn, or missing',
+  'c = 0: estimated from a similar object, drawn, or missing',
 ];
-export const C_TABLE_LATEX = String.raw`\begin{array}{ll}c=1 & \text{measured, or physics from measured values}\\ c=\tfrac{1}{2} & \text{model-dependent, or physics with an assumed input}\\ c=0 & \text{assumed from a similar object, drawn, or missing}\end{array}`;
+export const C_TABLE_LATEX = String.raw`\begin{array}{ll}c=1 & \text{measured, or physics from measured values}\\ c=\tfrac{1}{2} & \text{model-dependent, or physics with an assumed input}\\ c=0 & \text{estimated from a similar object, drawn, or missing}\end{array}`;
 
 export type Part = 'd' | 'p' | 'a';
-/** Q-267: the mock-up's three bar parts, mapped from the real tags. d = measured (Satellite data),
- *  p = derived or model_dependent (Physics), a = inferred_from_analog, artistic, missing (Assumed). */
+/** Q-267: the mock-up's three parts, mapped from the real tags. d = measured (Satellite data),
+ *  p = derived or model_dependent (Physics), a = inferred_from_analog, artistic, missing: these add
+ *  0 to the score (the chip colour; the chip text of an analog still reads "Estimated", D-02). */
 export function partOf(tag: string): Part {
   if (tag === 'measured') return 'd';
   if (tag === 'derived' || tag === 'model_dependent') return 'p';
@@ -58,19 +59,15 @@ export function partOf(tag: string): Part {
 export const PART_INFO: Record<Part, { label: string; note: string }> = {
   d: { label: 'Satellite data', note: 'measured by SPHEREx, Gaia and other archives' },
   p: { label: 'Physics', note: 'worked out from the data with a formula' },
-  a: { label: 'Assumed', note: 'typical values, drawn detail, or missing' },
+  a: { label: 'Assumed', note: 'not narrowed by data: similar objects, drawn detail, or missing' },
 };
 
-/** Share of the total weight in each part, 0..1, as the mock-up's bar. */
+/** Each part's contribution to the score, 0..1 (issue #71 review): the backend's measured,
+ *  estimated and assumed shares, the same numbers as the chip and the Details bar, so the three
+ *  agree. d + p is the score; a is the rest (1 - score), including the part of a model value that
+ *  the data does not narrow. */
 export function partShares(c: Confidence): Record<Part, number> {
-  const total = c.inputs.reduce((s, i) => s + i.weight, 0);
-  const out: Record<Part, number> = { d: 0, p: 0, a: 0 };
-  if (total <= 0) {
-    out.a = 1;
-    return out;
-  }
-  for (const i of c.inputs) out[partOf(i.tag)] += i.weight / total;
-  return out;
+  return { d: c.measured_share, p: c.estimated_share, a: c.assumed_share };
 }
 
 /** The row chip: text and part (colour). A derived row with c below 1 has an assumed input. */
@@ -79,11 +76,13 @@ export function tagChip(i: ConfidenceInput): { text: string; part: Part } {
     case 'measured':
       return { text: 'Satellite data', part: 'd' };
     case 'derived':
-      return i.c < 1 ? { text: 'Physics, one input assumed', part: 'p' } : { text: 'Physics', part: 'p' };
+      return i.c < 1
+        ? { text: 'Physics, one input assumed', part: 'p' }
+        : { text: 'Physics', part: 'p' };
     case 'model_dependent':
       return { text: 'Physics, from a model', part: 'p' };
     case 'inferred_from_analog':
-      return { text: 'Assumed, from a similar object', part: 'a' };
+      return { text: 'Estimated, from a similar object', part: 'a' };
     case 'artistic':
       return { text: 'Assumed, drawn', part: 'a' };
     default:

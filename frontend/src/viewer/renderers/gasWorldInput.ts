@@ -1,7 +1,14 @@
 // Issue #71 stream E: which gas giants run as a solved world, and with what input. Pure (no three.js)
 // so the plan can use it. A missing value refuses the world and the plain ShaderBody draws (never blank).
 import type { ObjectCard, RenderParams } from '@/contract';
-import { gasLayerTags, gasModel, PACE_DAY_S_PER_S, PACE_SLOW_S_PER_S, type GasInput, type ReferenceGasId } from '@/physics/gasDynamics';
+import {
+  gasLayerTags,
+  gasModel,
+  PACE_DAY_S_PER_S,
+  PACE_SLOW_S_PER_S,
+  type GasInput,
+  type ReferenceGasId,
+} from '@/physics/gasDynamics';
 import { STILL_MOTION, TIER_OF_TAG, type Motion, type ProcessPlan } from '../motion/motion';
 import { sliderValue, type Overrides } from '../sliders';
 
@@ -16,9 +23,11 @@ export const REFERENCE_IDS: Readonly<Record<string, ReferenceGasId>> = {
 
 /**
  * Internal-heat temperature and mean molecular weight of the references (not on a card).
- * [verify] Tint: Jupiter radiates about 1.67 times what it absorbs (Li et al. 2018), so
- * Tint = Teq (1.67 - 1)^(1/4) = 99 K; Saturn's excess in the literature gives about 77 K at the low
- * end. They feed only the cloud-top temperature (scale height, storm size), not the band positions.
+ * Tint: Jupiter radiates about 1.67 times what it absorbs (Hanel et al. 1981, JGR 86, 8705), so
+ * Tint = Teq (1.67 - 1)^(1/4) = 99 K; Li et al. 2018 (Nat. Commun. 9, 3709) revised the ratio to about 2.1,
+ * which would give a higher Tint. Saturn's 77 K follows Hanel et al. 1983 (Icarus 53, 262) and is the low end
+ * (Li et al. 2010 give about 84 K). They feed only the cloud-top temperature (scale height, storm size), not
+ * the band positions. [verify] the Tint arithmetic against the cited papers.
  */
 const REFERENCE_HEAT: Record<ReferenceGasId, { tintK: number; mu: number }> = {
   jup: { tintK: 99, mu: 2.3 },
@@ -45,13 +54,15 @@ export function gasWorldInput(card: ObjectCard, params: RenderParams): GasInput 
   const radiusRj = numberOf(card, 'radius_rjup');
   const massEarth = numberOf(card, 'mass_mearth');
   const teqK = numberOf(card, 'teq_K');
-  const dyn = (params.dynamics as { spin_period_h?: { value?: unknown } } | undefined)?.spin_period_h;
+  const dyn = (params.dynamics as { spin_period_h?: { value?: unknown } } | undefined)
+    ?.spin_period_h;
   const dynSpin = typeof dyn?.value === 'number' && Number.isFinite(dyn.value) ? dyn.value : null;
   const measuredSpin = numberOf(card, 'rot_period_h');
   const orbit = numberOf(card, 'orbital_period_d');
   // ASSUMPTION (Q-251, Q-259): a giant with no measured spin and an orbit under 30 days is tidally locked,
   // so its spin is its orbital period. `model_dependent`, never `measured`.
-  const locked = !reference && measuredSpin === null && orbit !== null && orbit < LOCKED_BELOW_PERIOD_D;
+  const locked =
+    !reference && measuredSpin === null && orbit !== null && orbit < LOCKED_BELOW_PERIOD_D;
   const rotPeriodH = locked ? orbit * 24 : (measuredSpin ?? dynSpin);
   if (radiusRj === null || massEarth === null || teqK === null || rotPeriodH === null) return null;
   const heat = reference ? REFERENCE_HEAT[reference] : null;
@@ -71,7 +82,9 @@ export function gasWorldInput(card: ObjectCard, params: RenderParams): GasInput 
 
 /** Planet seconds per real second: 5 minutes by default, one day when the `gas_pacing` slider is 1. */
 export function gasPacing(overrides: Overrides | undefined): number {
-  return sliderValue(overrides, 'gas_pacing', 'gas_giant') === 1 ? PACE_DAY_S_PER_S : PACE_SLOW_S_PER_S;
+  return sliderValue(overrides, 'gas_pacing', 'gas_giant') === 1
+    ? PACE_DAY_S_PER_S
+    : PACE_SLOW_S_PER_S;
 }
 
 /**
@@ -112,7 +125,10 @@ export function withGasWorldLayerTags(card: ObjectCard, params: RenderParams): R
   if (!input) return params;
   const tags = gasLayerTags(input.reference);
   const pick = (id: string) => tags.find((t) => t.id === id);
-  const of: Record<string, ReturnType<typeof pick>> = { storms: pick('storms'), turbulence: pick('flow') };
+  const of: Record<string, ReturnType<typeof pick>> = {
+    storms: pick('storms'),
+    turbulence: pick('flow'),
+  };
   return {
     ...params,
     layers: params.layers.map((l) => {

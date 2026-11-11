@@ -5,9 +5,7 @@
 import { generateWorld, type WorldData, type WorldParams } from './worldGenerator';
 
 export type WorldRequest = { id: number; params: WorldParams };
-export type WorldResponse =
-  | { id: number; world: WorldData | null }
-  | { id: number; error: string };
+export type WorldResponse = { id: number; world: WorldData | null } | { id: number; error: string };
 
 /** The worker's whole job, without the messaging, so it can be tested. */
 export function handleWorldRequest(req: WorldRequest): WorldResponse {
