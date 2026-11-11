@@ -7,7 +7,7 @@
 //   H = k T / (mu m_H g)                           model_dependent (mu is an assumption)
 //   L = 8 H                                        model_dependent (cell size rule of the issue)
 //   convection fades out for hot stars             model_dependent (placeholder window, [verify])
-//   tau_c = Wright et al. 2011 fit of mass         model_dependent ([verify])
+//   tau_c = 12.3 d (L/Lsun)^-1/2, Reiners 2022     model_dependent (#93 3.4: the field law's own definition)
 //   Ro = P_rot / tau_c                             model_dependent
 //   <B> = Reiners et al. 2022 law of Ro            model_dependent
 //   spot coverage f from <B>                       inferred_from_analog (Sun-anchored, PLACEHOLDER)
@@ -57,10 +57,24 @@ export const CONV_MIN = 0.05;
 /** Dwarfs only: the Reiners et al. 2022 sample is main-sequence M dwarfs and Sun-like dwarfs. */
 export const GIANT_LOGG_MAX = 3.5; // log10(g in cgs). PLACEHOLDER [verify]
 
-/** Wright et al. 2011 (ApJ 743, 48) convective turnover time fit, days: log tau = 1.16 - 1.49 log M - 0.54 log^2 M. [verify] */
-export function convectiveTurnoverDays(massMsun: number): number {
-  const l = Math.log10(massMsun);
-  return Math.pow(10, 1.16 - 1.49 * l - 0.54 * l * l);
+/** IAU 2015 Resolution B3 nominal solar effective temperature, K. */
+export const TEFF_SUN_K = 5772;
+/**
+ * Convective turnover time at one solar luminosity, days: Reiners et al. 2022 (A&A 662, A41, sect. 4) define the
+ * Rossby number of their field law with tau = 12.3 d (L / Lsun)^-1/2. #93 3.4: replaces the Wright et al. 2011
+ * mass fit, which belongs to a different Rossby scale (it gave Barnard's Star 101 d against 208 d here).
+ * [verify] the 12.3 d coefficient against the paper (quoted in issue #93, not re-opened in this session).
+ */
+export const TAU_SUN_REINERS_D = 12.3;
+
+/** Luminosity in solar units from the radius and temperature: L = R^2 (Teff / 5772 K)^4 (Stefan-Boltzmann). */
+export function luminosityLsun(radiusRsun: number, teffK: number): number {
+  return radiusRsun * radiusRsun * Math.pow(teffK / TEFF_SUN_K, 4);
+}
+
+/** Convective turnover time, days, as Reiners et al. 2022 define it: 12.3 d (L / Lsun)^-1/2. */
+export function turnoverTimeDays(radiusRsun: number, teffK: number): number {
+  return TAU_SUN_REINERS_D / Math.sqrt(luminosityLsun(radiusRsun, teffK));
 }
 
 /**
@@ -84,9 +98,13 @@ export function meanFieldG(ro: number): number {
 export const SUN_COVERAGE = 0.0015;
 export const COVERAGE_EXPONENT = 1.6;
 export const COVERAGE_MAX = 0.25;
-/** Solar field and rotation used as the anchor: Ro_sun = 25.4 d / tau_c(1 Msun). */
+/**
+ * Solar field and rotation used as the anchor: Ro_sun = 25.4 d / 12.3 d = 2.07 (#93 3.4; with the Wright fit it was
+ * 1.76). The Sun's field from the law is then 80 G (was 98 G); spot coverage is relative to it, so the Sun's
+ * coverage stays SUN_COVERAGE.
+ */
 export const SUN_ROTATION_DAYS = 25.4;
-const sunFieldG = (): number => meanFieldG(SUN_ROTATION_DAYS / convectiveTurnoverDays(1));
+const sunFieldG = (): number => meanFieldG(sunRossby());
 
 /**
  * Sunspot group areas are lognormal (Baumann and Solanki 2005; parameters [verify]): median
@@ -243,7 +261,7 @@ export function massFromRadius(radiusRsun: number): number | null {
   return msInterp(radiusRsun, 2, 1);
 }
 /** The Sun's Rossby number: assumed for a star with no rotation period (inferred_from_analog). */
-export const sunRossby = (): number => SUN_ROTATION_DAYS / convectiveTurnoverDays(1);
+export const sunRossby = (): number => SUN_ROTATION_DAYS / TAU_SUN_REINERS_D;
 
 export interface StellarInput {
   teffK: number;
@@ -327,8 +345,9 @@ const TAGS: Record<string, StellarTag> = {
   rossby: {
     tag: 'model_dependent',
     formula: 'Ro = P_rot / tau_c',
-    assumption: 'tau_c from the Wright et al. 2011 mass fit (main-sequence stars) [verify]',
-    cite: 'Wright et al. 2011, ApJ 743, 48 [verify]',
+    assumption:
+      'tau_c = 12.3 d (L/Lsun)^-1/2, L = R^2 (Teff / 5772 K)^4: the turnover time the field law is defined with',
+    cite: 'Reiners et al. 2022, A&A 662, A41 [verify the 12.3 d coefficient]',
   },
   field: {
     tag: 'model_dependent',
@@ -482,7 +501,7 @@ export function stellarModel(input: StellarInput): { model: StellarModel } | Ste
   let rotationPeriodD: number;
   if (ok(input.rotationPeriodD)) rotationPeriodD = input.rotationPeriodD;
   else {
-    rotationPeriodD = sunRossby() * convectiveTurnoverDays(massMsun);
+    rotationPeriodD = sunRossby() * turnoverTimeDays(radiusRsun, teffK);
     assumed.rotation = `rotation period ${rotationPeriodD.toFixed(1)} days: the Sun's Rossby number (${sunRossby().toFixed(2)}) assumed, so the field and spots are a Sun-like guess`;
   }
 
@@ -519,7 +538,7 @@ export function stellarModel(input: StellarInput): { model: StellarModel } | Ste
       'The magnetic-field fit covers dwarf stars only, so no field and no spots are drawn for a giant.',
     );
   } else {
-    rossby = rotationPeriodD / convectiveTurnoverDays(massMsun);
+    rossby = rotationPeriodD / turnoverTimeDays(radiusRsun, teffK);
     fieldG = meanFieldG(rossby);
     coverage =
       Math.min(COVERAGE_MAX, SUN_COVERAGE * Math.pow(fieldG / sunFieldG(), COVERAGE_EXPONENT)) *

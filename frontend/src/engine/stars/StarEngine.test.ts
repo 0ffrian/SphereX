@@ -96,8 +96,9 @@ describe('StarEngine (no WebGL in jsdom: the prototype logic still runs)', () =>
     };
     const a = run();
     expect(a).toEqual(run());
-    expect(a.r.find((x) => x.label === 'Rossby number')?.value).toBe('1.76');
-    expect(a.r.find((x) => x.label === 'Average magnetic field')?.value).toMatch(/^9\d G$/);
+    // #93 3.4: Ro_sun = 25.4 / 12.3 d (Reiners et al. 2022 turnover time; was 1.76 with the Wright fit), field 80 G.
+    expect(a.r.find((x) => x.label === 'Rossby number')?.value).toBe('2.07');
+    expect(a.r.find((x) => x.label === 'Average magnetic field')?.value).toMatch(/^8\d G$/);
     expect(a.f).toMatch(/^Class [CMX]/);
     // X10 rate recalibrated to GOES (about one per 800-1,000 days on the Sun): 900 days.
     expect(a.r.find((x) => x.label === 'X10 flare, about every')?.value).toBe('900 days');
