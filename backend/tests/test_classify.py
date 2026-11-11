@@ -84,3 +84,13 @@ def test_reviewed_override_only_when_rules_refuse() -> None:
     assert classify(CatalogueFacts(exoplanet=_CNC_E)).type == "planet_rocky"
     other = {**_CNC_E, "pl_name": "Some b"}
     assert classify(CatalogueFacts(exoplanet=other)).type == "candidate"
+
+
+def test_reviewed_override_needs_the_water_range_refusal_and_r_and_m() -> None:
+    """Q-324: the override applies to one refusal and only with radius and mass on the card."""
+    no_mass = {k: v for k, v in _CNC_E.items() if k != "pl_bmasse"}
+    assert classify_exoplanet(no_mass)[1] == ("type:exoplanet_mass",)
+    assert classify(CatalogueFacts(exoplanet=no_mass)).type == "candidate"
+    no_radius = {k: v for k, v in _CNC_E.items() if k != "pl_rade"}
+    assert classify(CatalogueFacts(exoplanet=no_radius)).type == "candidate"
+    assert "type:exoplanet_water_model_range" in classify_exoplanet(_CNC_E)[1]
