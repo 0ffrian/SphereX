@@ -32,6 +32,7 @@ Moving objects only: the path search of A4.1 (`backend/app/core/find/moving.py`,
 | `frames:cone_maxrec:<n>` | `n` cone answers hit `SX_MOVING_SIA_MAXREC`. A fixed object's own cut-off answer stays `frames:truncated` |
 | `frames:sparse_path:<n>` | at `n` cones the rate asked for a step below `SX_MOVING_MIN_STEP_H`, so the cones there are further apart than R / rate and a frame between them can be missed |
 | `frames:cone_failed:<n>` | `n` cones could not be fetched (not cached offline, or failed live). Incomplete |
+| `frames:cutout_failed:<n>` | `n` area cutout downloads failed (not cached offline, or upstream down). Incomplete, never stored or served ([Q-400](../decisions/moving-objects.md) (12)) |
 | `frames:search_deferred:<n>` | `n` Horizons or SIA calls are left to the object's job (Q-111); ask again, as for `cutouts:deferred`. Incomplete |
 | `frames:outside_window:<n>` | `n` frames found by the cones have a midpoint outside the ephemeris windows, so the object's position there is unknown |
 | `no_footprint:<frame_id>` | the frame has no usable `s_region`, so it could not be checked against the path (not the overlays' `footprint:<frame_id>`) |
