@@ -24,8 +24,9 @@ from app.adapters import irsa_sia
 from app.adapters.irsa_sia import SiaRow
 from app.cache.store import CacheMissOffline
 from app.core.area.config import DEFAULT_AREA_CONFIG, AreaConfig, AreaSpec
+from app.core.area.dots import run_dots
 from app.core.area.frames import CutoutPlan, assemble
-from app.core.area.records import AreaFrames
+from app.core.area.records import AreaFrames, FrameDots
 from app.timefmt import parse_utc
 from tests.helpers import entries
 
@@ -90,3 +91,9 @@ def recorded_frames(
 ) -> tuple[AreaFrames, dict[str, bytes]]:
     """The Eros area's frames and the cutout bodies by frame id (memoised; do not mutate)."""
     return _built(cfg)
+
+
+@lru_cache(maxsize=2)
+def recorded_dots(cfg: AreaConfig = DEFAULT_AREA_CONFIG) -> tuple[FrameDots, ...]:
+    frames, bodies = recorded_frames(cfg)
+    return tuple(run_dots(frames, bodies, cfg, workers=0))
