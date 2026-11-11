@@ -70,8 +70,8 @@ Not a refusal: a point kept with dropped pixels is `flagged`, with `dropped_flag
 
 | Code | Meaning |
 |---|---|
-| `overlay:gaia`, `overlay:wise` | the catalogue cannot be served (failed cone, remembered `catalog_failure_ttl_s`), or the object moves (cones for movers: Q-143, to build); a mover's frames still get flag masks and cutout boxes ([Q-125](../decisions/moving-frames.md)) |
-| `overlay:<cat>:pending` | the cone is still running after `overlay_wait_s`; a later request has it |
+| `overlay:gaia`, `overlay:wise` | the catalogue cannot be served (failed cone, remembered `catalog_failure_ttl_s`); for a moving object, any visit's cone failed, or its frame list is incomplete for a reason other than deferred work ([A19.6](moving-objects/track.md#a196-star-list-for-movers), Q-403); a mover's frames still get flag masks and cutout boxes ([Q-125](../decisions/moving-frames.md)) |
+| `overlay:<cat>:pending` | the cone is still running after `overlay_wait_s`; a later request has it. For a moving object also: its frames are still deferred to the object's job, or the visit cones beyond the 8 a request may start (A19.6) |
 | `overlay:<cat>:truncated` | the cone hit the 5000-row cap (brightest first) |
 | `footprint:<frame_id>` | no usable `s_region` for the frame; for a mover, every frame, because its frame record does not carry `s_region` (Q-125; Track changes this, A19.3) |
 | `flags_mask:<frame_id>` | no FLAGS mask for the frame (`flags.png` answers 404 `flags_unavailable`) |
