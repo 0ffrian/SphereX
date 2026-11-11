@@ -20,6 +20,8 @@ export function cachedMarkersToShow(
   const targetIds = new Set(targets.map((t) => t.id));
   const seen = new Set<string>();
   return cached.filter((c) => {
+    // A reference object has no place on the sky (ra = dec = 0 is a placeholder, Q-258).
+    if (c.resolver === 'reference') return false;
     if (seen.has(c.id) || targetIds.has(c.id)) return false;
     seen.add(c.id);
     return !targets.some((t) => separationDeg(t.ra, t.dec, c.ra, c.dec) <= CACHED_DEDUPE_DEG);

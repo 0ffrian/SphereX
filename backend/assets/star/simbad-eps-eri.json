@@ -1,0 +1,203 @@
+{
+  "asset_version": "11",
+  "card": {
+    "id": "simbad-eps-eri",
+    "name": "* eps Eri",
+    "pm_mas_yr": {
+      "source": "SIMBAD * eps Eri (pmra = mu_alpha * cos(delta), pmdec)",
+      "tag": "measured",
+      "value": [
+        -974.758,
+        20.876
+      ]
+    },
+    "radius_rsun": {
+      "assumption": "FLAME radius from the GSP-Phot Teff and a model bolometric luminosity (Gaia DR3 radius_flame); a model value, not a measured radius, and it inherits GSP-Phot's weakness for cool stars",
+      "err": 0.016599999999999948,
+      "source": "Gaia DR3 astrophysical_parameters radius_flame, source 5164707970261890560, matched 0.00 arcsec from the SIMBAD position moved to 2016.0 by its proper motion",
+      "tag": "model_dependent",
+      "value": 0.7761
+    },
+    "spectral_class": {
+      "source": "SIMBAD * eps Eri sp_type",
+      "tag": "measured",
+      "value": "K2V"
+    },
+    "teff_K": {
+      "formula": "median of the non-null Teff values in SIMBAD mesFe_h; of two middle values, the one from the most recent bibcode (Q-152)",
+      "source": "SIMBAD mesFe_h: median of 110 published spectroscopic Teff values (4857 to 5342 K); the middle value is from 2024A&A...683A.125P",
+      "tag": "derived",
+      "value": 5076.0
+    },
+    "type": "star"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b4",
+  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
+  "render_params": {
+    "alt_text": "* eps Eri, Star, 0.776 solar radii (model dependent), colour from Teff, self-luminous. Surface relief: illustrative.",
+    "confidence": {
+      "assumed_share": 0.4,
+      "band": "part_data",
+      "estimated_share": 0.45,
+      "formula": "C = sum(w_i c_i) / sum(w_i): c is 1 for a measured value or a formula of measured values, a placeholder share for a model-dependent one, and 0 for an assumed, artistic or missing one; the w_i are placeholder weights (D-36, Q-221)",
+      "found": "Data for: Temperature and colour, radius, spectral class and motion on the sky.",
+      "gate": {
+        "class_known": true,
+        "key_measurement": true,
+        "passed": true,
+        "score_ok": true
+      },
+      "inputs": [
+        {
+          "c": 1.0,
+          "fields": [
+            "teff_K"
+          ],
+          "id": "temperature",
+          "label": "Temperature and colour",
+          "points": 30.0,
+          "tag": "derived",
+          "weight": 30
+        },
+        {
+          "c": 0.5,
+          "fields": [
+            "radius_rsun"
+          ],
+          "id": "radius",
+          "label": "Radius",
+          "points": 10.0,
+          "tag": "model_dependent",
+          "weight": 20
+        },
+        {
+          "c": 0.5,
+          "fields": [],
+          "id": "limb",
+          "label": "Edge darkening",
+          "points": 5.0,
+          "tag": "model_dependent",
+          "weight": 10
+        },
+        {
+          "c": 1.0,
+          "fields": [
+            "spectral_class"
+          ],
+          "id": "spectral_class",
+          "label": "Spectral class",
+          "points": 10.0,
+          "tag": "measured",
+          "weight": 10
+        },
+        {
+          "c": 1.0,
+          "fields": [
+            "pm_mas_yr"
+          ],
+          "id": "motion",
+          "label": "Motion on the sky",
+          "points": 5.0,
+          "tag": "measured",
+          "weight": 5
+        },
+        {
+          "c": 0.0,
+          "fields": [],
+          "id": "cells",
+          "label": "Boiling cells",
+          "points": 0.0,
+          "tag": "artistic",
+          "weight": 15
+        },
+        {
+          "c": 0.0,
+          "fields": [],
+          "id": "spots",
+          "label": "Spots",
+          "points": 0.0,
+          "tag": "inferred_from_analog",
+          "weight": 10
+        }
+      ],
+      "measured_share": 0.15,
+      "needed": "",
+      "note": "This is how much of the picture rests on data. It is not the probability that the picture is correct.",
+      "raise": "A better measurement of: radius.",
+      "score": 0.6,
+      "tag": "derived",
+      "threshold": 0.25,
+      "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
+    },
+    "generator_version": "p1-b4",
+    "haptics": {
+      "data": "motion",
+      "data_tag": "measured",
+      "params": {},
+      "texture": "none",
+      "texture_tag": "artistic"
+    },
+    "id": "simbad-eps-eri",
+    "layers": [
+      {
+        "description": "Teff to sRGB through a blackbody colour calculation (R7.5).",
+        "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)",
+        "id": "colour",
+        "requires": [
+          "teff_K"
+        ],
+        "tag": "derived",
+        "tier": 2
+      },
+      {
+        "assumed": {
+          "limb_darkening_u": 0.6
+        },
+        "description": "Assumption: linear limb darkening, I(mu) = 1 - 0.6 * (1 - mu) (R7.5).",
+        "formula": "I(mu) = 1 - u * (1 - mu), u = 0.6",
+        "id": "limb_darkening",
+        "requires": [],
+        "tag": "model_dependent",
+        "tier": 3
+      },
+      {
+        "description": "Motion trail from pm_mas_yr over the SPHEREx epochs (R7.5).",
+        "id": "motion_trail",
+        "requires": [
+          "pm_mas_yr"
+        ],
+        "tag": "measured",
+        "tier": 1
+      }
+    ],
+    "lighting": {
+      "mode": "self"
+    },
+    "missing": [
+      "spectrum"
+    ],
+    "scale_m": 539932770.0,
+    "seed": 215345231,
+    "type": "star",
+    "view_modes": {
+      "visible": {
+        "available": true,
+        "badge": "Estimated visible colour",
+        "rgb": {
+          "formula": "Planck(Teff) integrated 380-780 nm against the CIE 1931 2-degree colour-matching functions (Wyman, Sloan & Shirley 2013 fit), XYZ -> linear sRGB (D65), clipped at 0, brightest channel = 1 (R7.5)",
+          "source": "teff_K = 5076 K",
+          "tag": "derived",
+          "value": [
+            1.0,
+            0.8044,
+            0.6488
+          ]
+        },
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 215345231,
+  "textures": null
+}

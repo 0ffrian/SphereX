@@ -217,6 +217,40 @@ export function dustTailVolume(
   };
 }
 
+/**
+ * Issue #71 F (Q-263): the modelled dust tail. `axis` is the real anti-solar direction, `bend` the
+ * side the Finson-Probstein grains fall toward (perpendicular to `axis`), `lengthScene` the grains'
+ * extent along the axis and `lateralScene` their sideways offset, both in scene units (coma radius
+ * 1). Tag `model_dependent`: the grain sizes are assumed. Null for a degenerate axis or length.
+ */
+export function modelledDustTailVolume(
+  axis: Vec3,
+  bend: Vec3 | null,
+  lengthScene: number,
+  lateralScene: number,
+  seed: number,
+): VolumePlan | null {
+  if (!(lengthScene > 0) || !Number.isFinite(lengthScene)) return null;
+  // The shader keeps the bent centre line inside the box, so the box is as tall as the bend needs
+  // (with a floor so a straight tail still has body).
+  const lateral = Math.min(Math.max(lateralScene, 0), DUST_TAIL_BEND * lengthScene);
+  const halfYZ = Math.max(lateral / DUST_BEND_LOCAL, 0.12 * lengthScene);
+  return {
+    id: 'dust_tail',
+    kind: 'dust_tail',
+    tag: 'model_dependent',
+    halfExtent: [lengthScene / 2, halfYZ, halfYZ],
+    center: [(axis[0] * lengthScene) / 2, (axis[1] * lengthScene) / 2, (axis[2] * lengthScene) / 2],
+    axis,
+    bend,
+    bendFraction: lateral > 0 ? DUST_BEND_LOCAL : 0,
+    seed,
+    emitters: [{ label: 'Dust tail', rgb: DUST_WARM, gain: 0.5 }],
+    dust: 0,
+    shell: 0,
+  };
+}
+
 /** '#rrggbb' (sRGB) to linear RGB in 0..1. Deterministic. */
 export function cssToLinear(css: string): Rgb {
   const m = /^#?([0-9a-f]{6})$/i.exec(css.trim());

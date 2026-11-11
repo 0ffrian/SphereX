@@ -11,7 +11,16 @@ import { NEUTRAL_TINT } from '../modes';
 import type { PulsationPlan, RenderPlan, ScrubPlan, StarSurfacePlan } from '../planTypes';
 import { processOf, resolveMotion, weakestTag } from '../motion/motion';
 import { listMotion, offerLayer, spinPlanOf, viewerLayer } from '../motion/planMotion';
-import { starRatesFrom } from '../bodies/starModel';
+import { configFromModel, starRatesFrom, STAR_SURFACE } from '../bodies/starModel';
+import {
+  MAX_GROUPS_DRAWN,
+  cellsForScale,
+  closeUpTarget,
+  granuleVisibility,
+  stellarModel,
+  type StellarModel,
+} from '@/physics/stellar';
+import type { TVNumber } from '@/contract';
 
 export interface StarConfig {
   /**
@@ -20,9 +29,22 @@ export interface StarConfig {
    * specs. While null, the trail is refused as "unverified".
    */
   spherexBaselineYears: number | null;
+  /**
+   * Stellar mass for the surface physics (issue #71 stream C). ASSUMPTION: the card has no mass
+   * field for a star (only `host_mass_msun` on planets), so the default returns null and the
+   * physics is refused: the star keeps the placeholder look. Wire a real source (for example a
+   * Gaia FLAME mass from stream B) here; a value must carry its own tag.
+   */
+  massMsun?: (card: ObjectCard) => TVNumber | null;
 }
 
-export const STAR_CONFIG: StarConfig = { spherexBaselineYears: null };
+export const STAR_CONFIG: StarConfig = {
+  spherexBaselineYears: null,
+  massMsun: () => null,
+};
+
+/** Groups drawn on the `low` quality tier (the phone tier), against MAX_GROUPS_DRAWN. */
+export const LOW_TIER_MAX_GROUPS = 4;
 
 /** Linear limb-darkening coefficient of R7.5, I(mu) = 1 - 0.6 (1 - mu). Tag model_dependent. */
 export const LIMB_DARKENING_U = 0.6;
@@ -102,14 +124,25 @@ export function screenOpacity(card: ObjectCard, index: number): number | null {
  *   prominences  4 for the placement along dipole field lines, 5 for the strand look (R7.5.5).
  *   glow         5 artistic.
  */
-export function starSurfaceLayers(flareRateTag: import('@/contract').Tag | null) {
+export function starSurfaceLayers(
+  flareRateTag: import('@/contract').Tag | null,
+  physics: { cellsEnlarged: boolean } | null = null,
+) {
   const flareTag = weakestTag(flareRateTag ? [flareRateTag, 'inferred_from_analog'] : ['artistic']);
   return [
-    viewerLayer(
-      'granulation',
-      'artistic',
-      'Convective cells and dark lanes, drawn far larger than real granules so they can be seen. How big real cells are depends on the star\u2019s mass and surface gravity, which are not checked yet, so the pattern is an artist look.',
-    ),
+    physics
+      ? viewerLayer(
+          'granulation',
+          'model_dependent',
+          physics.cellsEnlarged
+            ? 'Convective cells and dark lanes. The pattern follows the star\u2019s temperature, radius and mass; the cells are drawn larger than real ones so they can be seen (choose true scale for their real size). The pattern itself is not measured.'
+            : 'Convective cells and dark lanes at their modelled size: about eight pressure scale heights across, from the star\u2019s temperature, radius and mass. The pattern itself is not measured.',
+        )
+      : viewerLayer(
+          'granulation',
+          'artistic',
+          'Convective cells and dark lanes, drawn far larger than real granules so they can be seen. How big real cells are depends on the star\u2019s mass and surface gravity, which are not on the card, so the pattern is an artist look.',
+        ),
     viewerLayer(
       'spots',
       'inferred_from_analog',
@@ -134,6 +167,11 @@ export function starSurfaceLayers(flareRateTag: import('@/contract').Tag | null)
       'prominence_strands',
       'artistic',
       'The loops drawn as uneven, tapering strands (an artist look).',
+    ),
+    viewerLayer(
+      'plasma',
+      'model_dependent',
+      'Glowing arches along the magnetic field lines of each spot group, with plasma that evaporates up from white-hot footpoints, cools and rains back down. Flare energy is capped by the group\u2019s magnetic energy; whether a flare opens or stays closed comes from the decay index (open above 1.5). The arch shape follows a standard model; the wisps are an artist look. Loops are drawn three times larger in the enlarged view.',
     ),
     viewerLayer('glow', 'artistic', 'A soft glow around the edge of the star (an artist look).'),
   ];
@@ -214,7 +252,51 @@ export function planStar(input: PlanInput, config: StarConfig = STAR_CONFIG): Re
   let star: StarSurfacePlan | null = null;
   if (bodyOk && type !== 'star_mira') {
     const flareRate = motion.rates.flare_rate_per_d;
-    for (const l of starSurfaceLayers(flareRate ? flareRate.tag : null)) offerLayer(b, l);
+    // Issue #71 stream C: the physics of the surface, when the card gives teff, radius and mass.
+    const colourView = ctx.starColour ?? 'true';
+    const scale = ctx.starScale ?? 'enlarged';
+    const teff = card.teff_K?.value;
+    const radius = card.radius_rsun?.value;
+    const mass = config.massMsun?.(card) ?? null;
+    const spinH = motion.rates.spin_period_h;
+    let physics: StellarModel | null = null;
+    if (typeof teff === 'number') {
+      const r = stellarModel({
+        teffK: teff,
+        radiusRsun: typeof radius === 'number' ? radius : null,
+        massMsun: mass ? mass.value : null,
+        rotationPeriodD: spinH ? spinH.value / 24 : null,
+        seed: params.seed,
+        maxGroups: ctx.qualityTier === 'low' ? LOW_TIER_MAX_GROUPS : MAX_GROUPS_DRAWN,
+      });
+      physics = r.model;
+      if (!r.model && r.notes) b.notes.push(...r.notes);
+      if (physics) {
+        const a = Object.values(physics.assumed);
+        if (a.length)
+          b.notes.push(
+            `The surface physics assumes: ${a.join('; ')}. These are typical values, not measurements; the card is unchanged.`,
+          );
+      }
+    } else {
+      b.notes.push(
+        'Cell size, magnetic field and spots are not computed: the card has no effective temperature. The surface is a typical look.',
+      );
+    }
+    const cells = physics ? cellsForScale(physics, scale) : { cells: 30, artistic: true };
+    const half = scale === 'close' && physics ? closeUpTarget(physics).halfWidth : 1.28;
+    if (colourView === 'observatory')
+      b.notes.push(
+        'Observatory view is false-colour ultraviolet in the style of solar observatories: the colours are an artist look, not the star\u2019s real colour.',
+      );
+    else if (colourView === 'enhanced')
+      b.notes.push(
+        'Enhanced colour deepens the star\u2019s real hue so differences are easy to see.',
+      );
+    for (const l of starSurfaceLayers(flareRate ? flareRate.tag : null, {
+      cellsEnlarged: cells.artistic,
+    }))
+      offerLayer(b, l);
     const flaresMoving = processOf(motion, 'flares') !== undefined;
     if (b.has('flares') && !flaresMoving && motion.rates.flare_rate_per_d) {
       b.notes.push('Flares are not drawn: no speed-up is stated for them.');
@@ -226,7 +308,8 @@ export function planStar(input: PlanInput, config: StarConfig = STAR_CONFIG): Re
     const prominences = b.draw('prominences');
     const strands = prominences && b.draw('prominence_strands');
     const glow = b.draw('glow');
-    if (granulation || spots || faculae || flares || prominences || glow) {
+    const plasma = !!physics && physics.groups.length > 0 && flares && b.draw('plasma');
+    if (granulation || spots || faculae || flares || prominences || glow || plasma) {
       star = {
         seed: params.seed,
         granulation,
@@ -237,6 +320,14 @@ export function planStar(input: PlanInput, config: StarConfig = STAR_CONFIG): Re
         strands,
         glow,
         rates: starRatesFrom(motion),
+        physics,
+        config: physics ? configFromModel(physics, STAR_SURFACE) : null,
+        colourView,
+        scale,
+        cellsAcross: cells.cells,
+        granuleVisibility: physics ? granuleVisibility(cells.cells, half) : 1,
+        cellsEnlarged: cells.artistic,
+        plasma,
       };
     }
   }

@@ -69,6 +69,9 @@ classDiagram
     +mass_mearth, orbit_au, orbital_period_d: TV, optional
     +host_teff_K, host_radius_rsun, host_mass_msun, host_age_gyr: TV, optional
     +component_teff_K: TV~pair~, optional
+    +surface_pressure_bar: TV, optional
+    +surface_temperature_K: TV, optional
+    +surface_fluid: TV~string~, optional
     +period_var_d: TV, optional
     +lightcurve: LightcurvePoint list, optional
     +phase_angle_deg: TV, optional
@@ -76,6 +79,7 @@ classDiagram
     +gas_Q: GasQ, optional
     +coma_radius_km: TV, optional
     +nucleus_radius_km_max: TV, optional
+    +orbit_track: TV~rows~, optional
     +epochs: 2025-08 or 2025-12 list, optional
     +pm_mas_yr: TV~pair~, optional
   }
@@ -139,6 +143,18 @@ classDiagram
     +haptics: HapticProfile
     +alt_text: string
     +missing: string list
+    +confidence: Confidence, optional
+  }
+  class Confidence {
+    +score: number, 0 to 1
+    +measured_share, estimated_share, assumed_share: number
+    +threshold: number
+    +band: string
+    +gate: class_known, key_measurement, score_ok, passed
+    +found, needed: string, plain words
+    +raise: string or null
+    +inputs: id, label, weight, c, tag, points, fields list
+    +tag, formula, weights_note, note
   }
   class Layer {
     +id: string
@@ -254,6 +270,7 @@ classDiagram
   RenderParams "1" *-- "1" Lighting
   RenderParams "1" *-- "1" ViewModes
   RenderParams "1" *-- "1" HapticProfile
+  RenderParams "1" *-- "0..1" Confidence : stage 7, D-36, Q-221
   Lighting --> LightMode
   ViewModes --> VisibleMode
   ViewModes --> IRMode
@@ -270,6 +287,7 @@ classDiagram
 - `TV~T~` is one schema definition per payload in code (`TVNumber`, `TVString`, `TVRgb`, `TVVec3`, `TVPair`), because JSON Schema has no generics; `TV<T>` is a hand-written view of them in `frontend/src/contract/tags.ts`. Generated code: `backend/app/contract/`, `frontend/src/contract/generated.ts` (D-18).
 - `Layer.tier` and `DynamicsValue.tier` are fixed by the tag (1 measured, 2 derived, 3 model_dependent, 4 inferred_from_analog, 5 artistic). `formula` is required from tier 2 and `assumed` at tier 3 (D-32). A rate no rung answers is omitted and listed in `missing` as `dynamics:<key>`. `speedup` keys are `spin`, `spots`, `flares`, `winds`, `clouds`, `pulsation`.
 - `scale_m` is null when the size is unknown, for example on a `candidate` (Q-33).
+- Issue #71: the card gains `surface_pressure_bar`, `surface_temperature_K` and `surface_fluid` (one of water, methane, ammonia, nitrogen, co2; Q-285), measured only for a reference body (Titan) and read by the confidence score (Q-327) and the world adapters; `orbit_track` holds Horizons rows `[JD TDB, x, y, z, vx, vy, vz]` (Q-261; `rows` stands for that list of number lists). `RenderParams.confidence` is the data confidence and the 3D gate (Q-221, Q-222, Q-327): a key measurement tagged `inferred_from_analog` or `artistic` does not pass the gate. `/v1/resolve` answers `resolver` `simbad`, `sbdb`, `coords` or `reference` (Q-328); a reference object's card is built from `reference_objects.toml`, never from the catalogues.
 - `Textures` and `Lighting` are named `RenderTextures` and `RenderLighting` in the schema and the generated code. The schema has no `IRMode` definition: `spherex_ir` refers to `VisibleMode`, and `IRMode` is a type alias in `frontend/src/contract/index.ts` (D-23).
 - `rgb` and `vec3` stand for `[number, number, number]`; `pair` stands for `[number, number]`. They are written in words because Mermaid class members cannot hold brackets reliably.
 - Issue #68: the card gains the exoplanet orbit, mass and host-star fields and `component_teff_K` (Q-150, Q-154); `components` holds the two bodies' class tint and relative brightness of a `brown_dwarf_binary` (Q-154) and is absent when the class does not name two components.
