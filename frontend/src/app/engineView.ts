@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { useCloseUpStore } from './closeUpStore';
 import { useRockStore } from './rockStore';
 import { useWorldStore } from './worldStore';
+import { useStarView } from './starViewStore';
 import type { ViewerApp } from '@/viewer/ViewerApp';
 import type { RockView } from '@/engine/rocks/RockView';
 
@@ -64,8 +65,23 @@ export function resolveViewControls(src: {
     };
   }
   if (src.engineStar) {
-    const why = 'The star view has no zoom or turning here: use its View choices (whole star, close-up).';
-    return { kind: 'star', zoomOff: why, rotateOff: why, resetOff: why, zoom: NOTHING, rotate: NOTHING, reset: NOTHING, ratio: () => 1 };
+    // The zoom bar acts on the left close-up (flare: the window's half height; surface: the view's half height).
+    const eng = () => useStarView.getState().closeUp;
+    const off = eng() ? null : 'The star view is still starting.';
+    const why = 'Turn the star by dragging the whole star on the right.';
+    return {
+      kind: 'star',
+      zoomOff: off,
+      rotateOff: why,
+      resetOff: off,
+      zoom: (dir) => {
+        const e = eng();
+        if (e) e.setZoom(e.zoom * (dir === 'in' ? 1.25 : 0.8));
+      },
+      rotate: NOTHING,
+      reset: () => eng()?.setZoom(1),
+      ratio: () => eng()?.zoom ?? 1,
+    };
   }
   if (src.rockKind && src.rockView) {
     const v = src.rockView;
@@ -103,7 +119,8 @@ export function useViewControls(): ViewControls {
   const rockView = useRockStore((s) => s.view);
   const rockKind = type === 'asteroid_procedural' || type === 'asteroid_shape' || type === 'comet';
   const globe = useWorldStore((s) => s.globe);
+  const closeUp = useStarView((s) => s.closeUp);
   // `globe` is a dependency: the world controls are off until its engine exists.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemo(() => resolveViewControls({ viewer, engineWorld, engineStar, rockView, rockKind }), [viewer, engineWorld, engineStar, rockView, rockKind, globe]);
+  return useMemo(() => resolveViewControls({ viewer, engineWorld, engineStar, rockView, rockKind }), [viewer, engineWorld, engineStar, rockView, rockKind, globe, closeUp]);
 }

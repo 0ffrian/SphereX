@@ -8,9 +8,10 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { Tag } from '@/contract';
 import { useAppStore } from '@/state/store';
-import { nudge, projectSurface, globeRot, GLOBE_HALF, GLOBE_TILT } from '@/engine/stars/starPick';
+import { nudge, projectSurface, globeRot, GLOBE_TILT } from '@/engine/stars/starPick';
 import { useStarTarget } from './starTargetStore';
 import { useStarChart } from './starChartStore';
+import { useStarView } from './starViewStore';
 import { useBuildControls, type BuildControl, type BuildControlsSpec, type BuildNote } from './build/BuildControls';
 import { cardToStar, type StarFromCard } from '@/engine/stars/cardToStar';
 import {
@@ -133,7 +134,79 @@ function useStarEngine(mode: StarMode, star: StarFromCard, redrawMs: number, slo
     bump();
   }, [engine, preset]);
 
+  // Light and field lines are one state for the globe and both close-ups (the Details controls write it here).
+  const light = useStarView((s) => s.light);
+  const lines = useStarView((s) => s.lines);
+  useEffect(() => {
+    if (!engine) return;
+    // The surface close-up has no Observatory view in the engine (onView turns it into Enhanced colour).
+    const want = (slot === 'surface' && light === 3 ? 2 : light) as StarLight;
+    if (engine.light !== want) engine.setLight(want);
+    engine.setFieldLines(lines);
+    engine.draw();
+    bump();
+  }, [engine, light, lines, slot]);
+
   return { hostRef, engine, failed, rev, bump };
+}
+
+/** The left close-up's zoom: wheel and two-finger pinch on the stage, and registration for the zoom bar. */
+function useCloseUpZoom(host: React.RefObject<HTMLDivElement | null>, engine: StarEngine | null, bump: () => void) {
+  useEffect(() => {
+    if (!engine) return;
+    useStarView.getState().setCloseUp(engine);
+    return () => {
+      if (useStarView.getState().closeUp === engine) useStarView.getState().setCloseUp(null);
+    };
+  }, [engine]);
+  useEffect(() => {
+    const el = host.current;
+    if (!el || !engine) return;
+    const apply = (k: number) => {
+      engine.setZoom(engine.zoom * k);
+      bump();
+    };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      apply(Math.exp(-e.deltaY * 0.0015));
+    };
+    const pts = new Map<number, { x: number; y: number }>();
+    let last = 0;
+    const dist = () => {
+      const [a, b] = [...pts.values()];
+      return Math.hypot(a!.x - b!.x, a!.y - b!.y);
+    };
+    const down = (e: PointerEvent) => {
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2) last = dist();
+    };
+    const move = (e: PointerEvent) => {
+      if (!pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2) {
+        const d = dist();
+        if (last > 0 && d > 0) apply(d / last);
+        last = d;
+      }
+    };
+    const up = (e: PointerEvent) => {
+      pts.delete(e.pointerId);
+      last = 0;
+    };
+    el.style.touchAction = 'none';
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('pointerdown', down);
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+    };
+  }, [host, engine, bump]);
 }
 
 /** "0.19 R☉" for a small star, "281,341 km" never: the short form of the radius. */
@@ -163,10 +236,7 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
         label: 'Light',
         value: String(engine.light),
         options: ([0, 2, 3] as StarLight[]).map((l) => ({ value: String(l), label: LIGHT_LABEL[l] })),
-        onChange: (v) => {
-          engine.setLight(Number(v) as StarLight);
-          bump();
-        },
+        onChange: (v) => useStarView.getState().setLight(Number(v) as StarLight),
       },
       {
         id: 'scale',
@@ -208,10 +278,7 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
         kind: 'toggle',
         label: 'Field lines',
         pressed: engine.fieldLines,
-        onChange: (on) => {
-          engine.setFieldLines(on);
-          bump();
-        },
+        onChange: (on) => useStarView.getState().setLines(on),
       },
       {
         id: 'fire',
@@ -222,6 +289,8 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
         tag: 'inferred_from_analog',
         onClick: () => {
           engine.fireFlare();
+          // The prototype's button switches to Observatory view when it fires in true colour: keep the others in step.
+          useStarView.getState().setLight(engine.light);
           bump();
         },
       },
@@ -275,7 +344,7 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
     if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) <= 5) return;
     d.moved = true;
     const b = e.currentTarget.getBoundingClientRect();
-    const discPx = b.height / (2 * GLOBE_HALF); // pixels per star radius
+    const discPx = b.height / (2 * engine.globeHalf()); // pixels per star radius
     // Dragging right brings the surface to the right: the facing longitude (rot) goes down.
     st.time = d.time - ((e.clientX - d.x) / discPx) / 0.012;
     engine.draw();
@@ -301,8 +370,8 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
         const q = projectSurface(picked, globeRot(st.time), GLOBE_TILT);
         const aspect = c.clientWidth / c.clientHeight;
         el.style.display = q.visible ? 'block' : 'none';
-        el.style.left = `${((q.x / (aspect * GLOBE_HALF) + 1) / 2) * 100}%`;
-        el.style.top = `${((1 - q.y / GLOBE_HALF) / 2) * 100}%`;
+        el.style.left = `${((q.x / (aspect * engine.globeHalf()) + 1) / 2) * 100}%`;
+        el.style.top = `${((1 - q.y / engine.globeHalf()) / 2) * 100}%`;
       } else el.style.display = 'none';
       raf = requestAnimationFrame(place);
     };
@@ -362,6 +431,7 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
 /** The prototype's flare close-up with its light-curve chart, in the left pane. */
 export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: () => void }) {
   const { hostRef, engine, failed, bump } = useStarEngine('closeup', star, 150);
+  useCloseUpZoom(hostRef, engine, bump);
   useEffect(() => {
     if (failed) onFail?.();
   }, [failed, onFail]);
@@ -419,10 +489,7 @@ export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: 
           kind: 'toggle',
           label: 'Flare field lines',
           pressed: engine.fieldLines,
-          onChange: (on) => {
-            engine.setFieldLines(on);
-            bump();
-          },
+          onChange: (on) => useStarView.getState().setLines(on),
         },
         {
           id: 'time',
@@ -474,6 +541,7 @@ export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: 
 /** The star's surface close-up (the artifact's `Close-up` view), centred where the globe was clicked. */
 export function StarSurfaceCloseUp({ star, onFail }: { star: StarFromCard; onFail?: () => void }) {
   const { hostRef, engine, failed, bump } = useStarEngine('globe', star, 400, 'surface');
+  useCloseUpZoom(hostRef, engine, bump);
   const target = useStarTarget((s) => s.target);
   const preset = star.preset;
   useEffect(() => {
