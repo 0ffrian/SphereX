@@ -56,8 +56,12 @@ function worldModel() {
 // Every other fluid keeps the prototype's line exactly.
   var Pa = Ps * 1e5, subl = F.Tb < F.Tt, canLiquid = Pa > F.Pt && (subl ? F.Lv > 0 : F.Tb > F.Tt), Tb = !canLiquid ? F.Tt : subl ? (Pa >= F.Pc ? F.Tc : Math.min(F.Tc, 1 / (1 / F.Tt - 8.314 * Math.log(Pa / F.Pt) / F.Lv))) : 1 / (1 / F.Tb - 8.314 * Math.log(Pa / 101325) / F.L);
 // @end-deviation
-// @verbatim L1728-L1765
-// @rename flat:=>flat:p.fMeas!=null?p.fMeas:
+// @deviation L1727 (#93 3.1) every fluid's liquid-vapour line ends at its critical point (F.Tc, F.Pc in presets.js):
+// the boiling point is capped at Tc, and at or above Pc it is Tc itself (no boiling: a compressed liquid below Tc,
+// a supercritical fluid above it). Same rule as physics/fluids.ts boilingPointK.
+  var superC = Pa >= F.Pc; if (canLiquid) Tb = superC ? F.Tc : Math.min(Tb, F.Tc);
+// @end-deviation
+// @verbatim L1728-L1736
   var state = gas ? 'gas' : Ts < F.Tt ? 'frozen' : canLiquid && Ts < Tb ? 'liquid' : 'vapour';
   if (airless) state = Ts < F.Tt ? 'frozen' : 'vapour';
   // cloud level by following the adiabat up until the fluid saturates
@@ -67,6 +71,13 @@ function worldModel() {
   var Seff = S / 1361, tS = clamp(W.Tstar - 5780, -3180, 1420), sIn = 1.107 + 1.332e-4 * tS + 1.58e-8 * tS * tS - 8.308e-12 * tS * tS * tS - 1.931e-15 * tS * tS * tS * tS, sOut = 0.356 + 6.171e-5 * tS + 1.698e-9 * tS * tS - 3.198e-12 * tS * tS * tS - 5.575e-16 * tS * tS * tS * tS;   // Kopparapu et al. HZ limits
   var runaway = !gas && W.fluid === 'water' && Ps >= 0.1 && (state === 'vapour' || (Seff > sIn && OCEANF[p.id] > 0));
   if (runaway) state = 'vapour';
+// @end-verbatim
+// @deviation L1736 (#93 3.1) above both its critical temperature and pressure the fluid is supercritical: one dense
+// fluid, no sea surface. The state is set after the runaway test, so supercritical water still counts as boiled off.
+  if (!gas && !airless && superC && Ts >= F.Tc && state === 'vapour') state = 'supercritical';
+// @end-deviation
+// @verbatim L1737-L1765
+// @rename flat:=>flat:p.fMeas!=null?p.fMeas:
   var cov = gas ? 0 : airless ? 0 : state === 'liquid' ? 0.3 + 0.42 * sstep(F.Tt, Math.min(Tb, F.Tt + 70), Ts) : state === 'frozen' ? 0.12 : runaway ? 0.95 : 0.06;
   // colour of the sky: the star's light scattered as lambda^-4, methane removes red
   var bands = [640, 540, 450], ch4 = W.fluid === 'methane' ? 2.1 : 0, sky = bands.map(function (l, n) { return planck(l, W.Tstar) * Math.pow(550 / l, 4) * (n === 0 ? Math.exp(-ch4) : 1); }), mx = Math.max(sky[0], sky[1], sky[2]);
@@ -480,8 +491,13 @@ var GS = null;
 function km(m) { return m >= 1e9 ? fmt(m / 1e9, 1) + ' million km' : fmt(m / 1000) + ' km'; }
 // @end-verbatim
 function worldUi() {
-// @verbatim L2389-L2410
+// @verbatim L2389-L2389
   var m = W.m, p = W.p, F = m.F, gas = m.gas, state = { frozen: F.label + ' is frozen', liquid: F.label + ' is liquid', vapour: m.runaway ? 'Water has boiled off' : F.label + ' is gas', gas: 'All gas' }[m.state];
+// @end-verbatim
+// @deviation L2389 (#93 3.1) the supercritical state worldModel can now return.
+  if (m.state === 'supercritical') state = F.label + ' is supercritical (past its critical point, no sea surface)';
+// @end-deviation
+// @verbatim L2390-L2410
   var rows = [['Starlight here', fmt(m.S) + ' W/m² (' + fmt(m.S / 1361, m.S / 1361 < 10 ? 2 : 0) + '× Earth)'], ['Equilibrium temperature', fmt(m.Teq) + ' K']];
   if (!gas) rows.push(['Average surface temperature', fmt(EB.stats ? EB.stats.mean : m.Ts) + ' K']);
   var day = gas ? m.Teq : m.Ts, tD = p.locked ? day * (1 + 0.38 * m.eps) : day * (1 + 0.15 * m.eps), tN = p.locked ? day * (1 - 0.45 * m.eps) : day * (1 - 0.1 * m.eps);
@@ -505,8 +521,7 @@ function worldUi() {
   rows.push(['Scale height', fmt(m.H / 1000, 1) + ' km'], ['Wind speed', fmt(m.U) + ' m/s'], ['Jets (Rhines)', fmt(m.jets)], ['Storm size', km(m.sz * p.Rj * 71492e3 * 2)]);
 // @end-verbatim
   W.rows = rows; W.mixed = mixed;
-// @verbatim L2414-L2425
-// @rename $('#world-cap').textContent=>W.cap
+// @verbatim L2414-L2424
   var c;
   if (gas) c = (p.locked ? 'Locked to its star, so one giant jet carries heat around the planet and the hot spot sits downwind of the noon point. ' : 'Fast spin splits the winds into many jets, and storms sit in the shear between them. ') + (m.Teq * (1 - 0.45 * m.eps) > 900 ? 'At this temperature the night side glows from its own heat.' : '');
   else if (m.Ts * 1.3 > 1050 && m.airless) c = 'The day side is hot enough to melt rock, so it is a glowing magma ocean.';
@@ -518,6 +533,12 @@ function worldUi() {
   else if (m.state === 'liquid') c = F.label + ' is liquid here.' + (p.locked ? ' Locked planets pile clouds over the noon point, which shades the hottest part of the ocean.' : '');
   else c = 'This fluid cannot stay liquid at this temperature and pressure.';
   if (gas && GAS_NODES[p.id]) c = 'Belts and zones are placed where they are observed, and the deep jets hold them steady. Storms sit trapped between the jets.' + (p.rings ? ' The rings use their measured radii and gaps, with real shadows.' : '');
+// @end-verbatim
+// @deviation L2424 (#93 3.1) caption for a fluid past its critical point (the runaway caption keeps priority).
+  if (!gas && !m.runaway && m.state === 'supercritical') c = F.label + ' is past its critical point here: too hot and too dense to keep a sea, it is one supercritical fluid from the ground up.';
+// @end-deviation
+// @verbatim L2425-L2425
+// @rename $('#world-cap').textContent=>W.cap
   W.cap = c + (gas ? (W.timeSec < 1000 ? ' One second here is 5 minutes, so the planet turns slowly and its clouds barely change.' : ' One second here is one Earth day, viewed from above the turning planet, so you can watch storms drift.') : ' Motion is sped up.');
 // @end-verbatim
 // @verbatim L2429-L2429

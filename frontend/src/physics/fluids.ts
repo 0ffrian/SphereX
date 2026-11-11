@@ -34,11 +34,16 @@ export interface Fluid {
   L: number;
   /**
    * Only for a fluid whose one-atmosphere point is a sublimation point (Tb < Tt, CO2): the enthalpy of
-   * vaporisation near the triple point, J/mol, and the critical point (K, Pa) where the liquid-vapour line ends.
+   * vaporisation near the triple point, J/mol.
    */
   Lv?: number;
-  Tc?: number;
-  Pc?: number;
+  /**
+   * Critical point (K, Pa), where the liquid-vapour line ends (#93 3.1). At or above Pc there is no boiling; above
+   * both Tc and Pc the fluid is supercritical and no sea can stand on the surface. Handbook constants of the pure
+   * fluid from the NIST Chemistry WebBook fluid data (reference equations of state cited per fluid).
+   */
+  Tc: number;
+  Pc: number;
   /** Mixing ratio of the fluid's vapour at the cloud base, mass fraction (artistic; water 0.01 puts Earth's cloud base near 1 km, the prototype's 0.02 put it at the ground, Q-241). */
   q: number;
   /** Colours of the liquid, ice, cloud and bare land under this fluid, linear (artistic). */
@@ -57,6 +62,9 @@ export const FLUIDS: Readonly<Record<FluidId, Fluid>> = {
     Pt: 611.7,
     Tb: 373.15,
     L: 40650,
+    // Critical point: 647.096 K, 22.064 MPa (IAPWS-95, Wagner and Pruss 2002, as NIST lists).
+    Tc: 647.1,
+    Pc: 22.064e6,
     q: 0.01,
     liq: [0.012, 0.05, 0.13],
     ice: [0.82, 0.88, 0.96],
@@ -70,6 +78,9 @@ export const FLUIDS: Readonly<Record<FluidId, Fluid>> = {
     Pt: 11700,
     Tb: 111.67,
     L: 8190,
+    // Critical point: 190.564 K, 4.5992 MPa (Setzmann and Wagner 1991, as NIST lists).
+    Tc: 190.56,
+    Pc: 4.599e6,
     q: 0.05,
     liq: [0.03, 0.022, 0.014],
     ice: [0.72, 0.68, 0.58],
@@ -83,6 +94,9 @@ export const FLUIDS: Readonly<Record<FluidId, Fluid>> = {
     Pt: 6060,
     Tb: 239.8,
     L: 23350,
+    // Critical point: 405.40 K, 11.333 MPa (Tillner-Roth, Harms-Watzenberg and Baehr 1993, as NIST lists).
+    Tc: 405.4,
+    Pc: 11.33e6,
     q: 0.02,
     liq: [0.06, 0.09, 0.13],
     ice: [0.9, 0.9, 0.84],
@@ -96,6 +110,9 @@ export const FLUIDS: Readonly<Record<FluidId, Fluid>> = {
     Pt: 12500,
     Tb: 77.36,
     L: 5570,
+    // Critical point: 126.192 K, 3.3958 MPa (Span, Lemmon, Jacobsen, Wagner and Yokozeki 2000, as NIST lists).
+    Tc: 126.19,
+    Pc: 3.3958e6,
     q: 0.05,
     liq: [0.05, 0.06, 0.09],
     ice: [0.88, 0.82, 0.74],
@@ -135,25 +152,31 @@ export function psatFn(f: Fluid): (T: number) => number {
 /**
  * Boiling point at pressure `Pa`; null when there is no liquid range (below the triple-point pressure).
  * Normally anchored at the one-atmosphere point. When that point is a sublimation point (Tb < Tt, CO2) the
- * liquid-vapour line is drawn up from the triple point instead, Tb(P) = [1/Tt - R ln(P/Pt) / Lv]^-1, and
- * capped at the critical temperature (above the critical pressure there is no boiling, only a supercritical fluid).
+ * liquid-vapour line is drawn up from the triple point instead, Tb(P) = [1/Tt - R ln(P/Pt) / Lv]^-1.
+ * Every fluid's line ends at its critical point (#93 3.1): the result is capped at Tc, and at or above Pc it is
+ * Tc itself (no boiling there: below Tc the fluid is a compressed liquid, above it supercritical).
  */
 export function boilingPointK(f: Fluid, Pa: number): number | null {
   if (!(Pa > f.Pt)) return null;
+  if (Pa >= f.Pc) return f.Tc;
+  let tb: number;
   if (f.Tb < f.Tt) {
-    if (f.Lv === undefined || f.Tc === undefined || f.Pc === undefined) return null;
-    if (Pa >= f.Pc) return f.Tc;
-    return Math.min(f.Tc, 1 / (1 / f.Tt - (R_GAS * Math.log(Pa / f.Pt)) / f.Lv));
-  }
-  return 1 / (1 / f.Tb - (R_GAS * Math.log(Pa / ATM_PA)) / f.L);
+    if (f.Lv === undefined) return null;
+    tb = 1 / (1 / f.Tt - (R_GAS * Math.log(Pa / f.Pt)) / f.Lv);
+  } else tb = 1 / (1 / f.Tb - (R_GAS * Math.log(Pa / ATM_PA)) / f.L);
+  return Math.min(f.Tc, tb);
 }
 
-export type FluidState = 'frozen' | 'liquid' | 'vapour';
+export type FluidState = 'frozen' | 'liquid' | 'vapour' | 'supercritical';
 
-/** What the fluid does at the mean surface temperature `Ts` and pressure `Pa`. */
+/**
+ * What the fluid does at the mean surface temperature `Ts` and pressure `Pa`. At or above both its critical
+ * pressure and temperature it is `supercritical`: one dense fluid, no sea surface (#93 3.1).
+ */
 export function fluidState(f: Fluid, Ts: number, Pa: number, airless: boolean): FluidState {
   if (Ts < f.Tt) return 'frozen';
   if (airless) return 'vapour';
+  if (Pa >= f.Pc && Ts >= f.Tc) return 'supercritical';
   const tb = boilingPointK(f, Pa);
   return tb !== null && Ts < tb ? 'liquid' : 'vapour';
 }
