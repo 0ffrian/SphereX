@@ -4,7 +4,7 @@
 // Source: .claude/worktrees/sculptor-reference/sculptor-preview-next.html, lines 357-662 (Planck colour, star shader FS, star model, tauC, drawStar).
 // Not yet imported by the app: it still needs the TypeScript host (DOM removed, `cardToStar`). Do not edit here;
 // re-run the slicing instead so the body stays byte-identical to the prototype.
-// @verbatim L357-L662
+// @verbatim L358-L663
 // @rename m.best=>(CLOSE_AT||m.best) (ema=>(!window.__sxPin&&ema
 /* ---------- Planck spectrum to colour ---------- */
 function g(l, m, s1, s2) { var s = l < m ? s1 : s2, t = (l - m) / s; return Math.exp(-0.5 * t * t); }

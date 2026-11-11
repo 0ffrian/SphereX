@@ -49,22 +49,22 @@ os.makedirs(OUT, exist_ok=True)
 
 # helpers.js: clamp lerp sstep fmt rng g planck planckRGB LMIN/LMAX/LUT compile unis FULL (not $, reduced, pills)
 w('helpers.js', hdr('helpers: maths, Planck colour, LUT, GL compile', '1267-1270, 1272-1282, 1291-1297') +
-  sl(1267, 1270) + '\n' + sl(1272, 1282) + '\n' + sl(1291, 1297) + '\nexport { ' + HELPERS_NAMES + ' };\n')
+  sl(1268, 1271) + '\n' + sl(1273, 1283) + '\n' + sl(1292, 1298) + '\nexport { ' + HELPERS_NAMES + ' };\n')
 
 # shaders.js
-w('shaders.js', hdr('shaders: NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS', '1298-1639') +
-  "import { LMIN, LMAX } from './helpers.js';\n" + sl(1298, 1639) + '\nexport { NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS };\n')
+w('shaders.js', hdr('shaders: NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS', '1299-1678') +
+  "import { LMIN, LMAX } from './helpers.js';\n" + sl(1299, 1678) + '\nexport { NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS };\n')
 
 # presets.js: FLUIDS, WP
-w('presets.js', hdr('FLUIDS and WP (example presets)', '1640-1661') + sl(1640, 1661) + '\nexport { FLUIDS, WP };\n')
+w('presets.js', hdr('FLUIDS and WP (example presets)', '1679-1700') + sl(1679, 1700) + '\nexport { FLUIDS, WP };\n')
 
 # terrain.js: CPU noise, buildTerrain, routeTerrain (pure)
-w('terrain.js', hdr('CPU value noise, plate-tectonic terrain build, river routing', '1728-1860') + HELPERS_IMPORT +
-  sl(1727, 1860) + '\nexport { hsh, vn3, fbm3, buildTerrain, routeTerrain };\n')
+w('terrain.js', hdr('CPU value noise, plate-tectonic terrain build, river routing', '1767-1905') + HELPERS_IMPORT +
+  sl(1766, 1905) + '\nexport { hsh, vn3, fbm3, buildTerrain, routeTerrain };\n')
 
 # gas.js: GAS_NODES, gasProfile, GasSim (pure)
-w('gas.js', hdr('gas giants: GAS_NODES, gasProfile, GasSim', '2010-2122') + HELPERS_IMPORT +
-  sl(2009, 2122) + '\nexport { GAS_NODES, gasProfile, GasSim };\n')
+w('gas.js', hdr('gas giants: GAS_NODES, gasProfile, GasSim', '2149-2261') + HELPERS_IMPORT +
+  sl(2148, 2261) + '\nexport { GAS_NODES, gasProfile, GasSim };\n')
 
 # core.js: stateful pieces, closed over one instance state (W, EB, GS, OCEANF, ORB)
 core = []
@@ -80,26 +80,26 @@ import { GAS_NODES, gasProfile, GasSim } from './gas.js';
 export function createCore(canvas) {
 var reduced = false;
 """)
-core.append(sl(1662, 1726))                 # ORB, applySpin, W, slider constants, psatFn, worldModel
-core.append(sl(1861, 2008))                 # hydroRaster, EB
-core.append(sl(2123, 2216, [('(ema', '(!window.__sxPin&&ema')]))       # WorldGL
-core.append(sl(2217, 2246))                 # fly camera, flyMove, globePick, GS
-core.append(sl(2248, 2248))                 # km
+core.append(sl(1701, 1765))                 # ORB, applySpin, W, slider constants, psatFn, worldModel
+core.append(sl(1906, 2147))                 # hydroRaster, EB
+core.append(sl(2262, 2355, [('(ema', '(!window.__sxPin&&ema')]))       # WorldGL
+core.append(sl(2356, 2385))                 # fly camera, flyMove, globePick, GS
+core.append(sl(2387, 2387))                 # km
 # worldUi: rows and caption captured as data instead of written into the DOM
 core.append('function worldUi() {')
-core.append(sl(2250, 2270))
+core.append(sl(2389, 2410))
 core.append("  W.rows = rows; W.mixed = mixed;")
-core.append(sl(2274, 2285, [("$('#world-cap').textContent", "W.cap")]))
-core.append(sl(2289, 2289, [("$('#world-tag').textContent", "W.tag")]))
+core.append(sl(2414, 2425, [("$('#world-cap').textContent", "W.cap")]))
+core.append(sl(2429, 2429, [("$('#world-tag').textContent", "W.tag")]))
 core.append('}')
-core.append(sl(2291, 2303))                 # resetWorld (its worldUi() call stays)
+core.append(sl(2431, 2443))                 # resetWorld (its worldUi() call stays)
 core.append('function setPreset(p) {')
-core.append(sl(2305, 2306))
-core.append(sl(2311, 2311))
+core.append(sl(2445, 2446))
+core.append(sl(2451, 2451))
 core.append('}')
 core.append("W.timeSec = 300; W.simAcc = 0;")
-core.append(sl(2328, 2330))                 # altRange altToS sToAlt
-core.append(sl(2332, 2346))                 # flyAimPeak, flyAimDefault
+core.append(sl(2468, 2470))                 # altRange altToS sToAlt
+core.append(sl(2472, 2486))                 # flyAimPeak, flyAimDefault
 core.append("""
 W.gl = new WorldGL(canvas);
 return {

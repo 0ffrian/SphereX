@@ -4,7 +4,7 @@
 // Source: .claude/worktrees/sculptor-reference/sculptor-preview-next.html, lines 663-849 (field-guided plasma: PART_VS, PART_FS, BLUR_FS, COMP_FS).
 // Not yet imported by the app: it still needs the TypeScript host (DOM removed, `cardToStar`). Do not edit here;
 // re-run the slicing instead so the body stays byte-identical to the prototype.
-// @verbatim L663-L849
+// @verbatim L664-L850
 /* ---------- field-guided plasma: streaks accumulated as density and temperature, then coloured ---------- */
 var PART_VS = `#version 300 es
 layout(location=0) in vec2 aP;layout(location=1) in vec2 aD;layout(location=2) in vec3 aV;
