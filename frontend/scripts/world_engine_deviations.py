@@ -126,3 +126,9 @@ CORE_L2424_93_3_1 = r'''// @deviation L2424 (#93 3.1) caption for a fluid past i
 CORE_L2446_93_3_3 = r'''// @deviation L2446 (#93 3.3) the ORB[p.id] rename below: eccentricity and obliquity come from the preset's own p.ob
 // first (cardToWorld), the prototype's ORB table after. Code: the @rename only.
 // @end-deviation'''
+
+CORE_L2425_93_1_8 = r'''// @deviation L2425 (#93 1.8) the gas solver runs at most 3 steps a frame, so a giant that needs more (HD 189733 b about
+// 4.7 at 60 fps) runs slower than one day per second. The caption then says the real rate (at 60 fps) instead of the
+// prototype's fixed "one Earth day".
+  if (gas && W.timeSec >= 1000 && GS && GS.dt) { var need93 = W.timeSec / 60 / (p.Rj * 71492e3 / Math.max(m.U, 1)) / GS.dt; if (need93 > 3) W.cap = W.cap.replace('One second here is one Earth day', 'One second here is about ' + fmt(86400 * 3 / need93 / 3600, 0) + ' hours (the simulation runs at most 3 steps a frame)'); }
+// @end-deviation'''
