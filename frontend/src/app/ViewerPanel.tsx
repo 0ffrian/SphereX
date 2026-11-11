@@ -916,6 +916,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
               <b>Details</b>
               <span>{displayName(plan?.name)}</span>
             </div>
+            {engineStar && <StarEngineDetails />}
           </>
         )}
         {params && (!pane || params.confidence?.gate.passed === false) && (
@@ -1199,7 +1200,13 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             {pane && (
               <BuildSummaryRows
                 fixture={objectIsFixture}
-                flareChart={engineStar ? <StarEngineDetails fixture={objectIsFixture} /> : undefined}
+                flareChart={
+                  engineStar ? (
+                    <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                      Example curve. Hard X-rays follow the rate of change of soft X-rays (the Neupert effect).
+                    </p>
+                  ) : undefined
+                }
                 extraAssumed={assumedLines}
               />
             )}

@@ -255,6 +255,7 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
       {
         id: 'closeup',
         kind: 'choice',
+        group: 'flare-actions',
         label: 'Close-up',
         value: left,
         options: [
@@ -262,6 +263,28 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
           { value: 'surface', label: 'Surface' },
         ],
         onChange: (v) => useStarTarget.getState().show(v as 'flare' | 'surface'),
+      },
+      {
+        id: 'lines',
+        kind: 'toggle',
+        group: 'flare-actions',
+        label: 'Field lines',
+        pressed: engine.fieldLines,
+        onChange: (on) => useStarView.getState().setLines(on),
+      },
+      {
+        id: 'fire',
+        kind: 'button',
+        group: 'flare-actions',
+        label: 'Fire a big flare',
+        disabled: !flares,
+        why: flares ? undefined : 'This star has no spot groups, so it has no sunspot-driven flares.',
+        onClick: () => {
+          engine.fireFlare();
+          // The prototype's button switches to Observatory view when it fires in true colour: keep the others in step.
+          useStarView.getState().setLight(engine.light);
+          bump();
+        },
       },
       ...(left === 'surface' && target !== null
         ? [
@@ -273,27 +296,6 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
             } as BuildControl,
           ]
         : []),
-      {
-        id: 'lines',
-        kind: 'toggle',
-        label: 'Field lines',
-        pressed: engine.fieldLines,
-        onChange: (on) => useStarView.getState().setLines(on),
-      },
-      {
-        id: 'fire',
-        kind: 'button',
-        label: 'Fire a big flare',
-        disabled: !flares,
-        why: flares ? undefined : 'This star has no spot groups, so it has no sunspot-driven flares.',
-        tag: 'inferred_from_analog',
-        onClick: () => {
-          engine.fireFlare();
-          // The prototype's button switches to Observatory view when it fires in true colour: keep the others in step.
-          useStarView.getState().setLight(engine.light);
-          bump();
-        },
-      },
       { id: 'latest', kind: 'readout', slot: 'latest', label: 'Latest flare on this star', value: engine.latestFlare(), tag: 'inferred_from_analog' },
       { id: 'k-teff', kind: 'readout', slot: 'key', label: 'Surface temperature', value: `${Math.round(star.teff.value).toLocaleString('en')} K`, tag: star.teff.tag },
       { id: 'k-size', kind: 'readout', slot: 'key', label: 'Size', value: sizeText(star.radius.value), tag: star.radius.tag },
@@ -474,38 +476,6 @@ export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: 
             bump();
           },
         },
-        {
-          id: 'pause',
-          kind: 'toggle',
-          label: 'Pause the flare',
-          pressed: !flare.playing,
-          onChange: (p) => {
-            engine.setPaused(p);
-            bump();
-          },
-        },
-        {
-          id: 'lines',
-          kind: 'toggle',
-          label: 'Flare field lines',
-          pressed: engine.fieldLines,
-          onChange: (on) => useStarView.getState().setLines(on),
-        },
-        {
-          id: 'time',
-          kind: 'slider',
-          label: 'Time since the start',
-          min: 0,
-          max: 1000,
-          step: 1,
-          value: Math.round(flare.t * 1000),
-          valueText: flare.minutes,
-          tag: 'artistic',
-          onChange: (v) => {
-            engine.setFlareTime(v / 1000);
-            bump();
-          },
-        },
         { id: 'stage', kind: 'readout', label: 'What is happening', value: flare.caption },
       ],
       notes: engine.notes(),
@@ -521,14 +491,19 @@ export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: 
       soft: chart.soft,
       hard: chart.hard,
       t: flareT,
+      playing: flare?.playing ?? false,
       setTime: (t) => {
         engine.setFlareTime(t);
+        bump();
+      },
+      setPlaying: (p) => {
+        engine.setPaused(!p);
         bump();
       },
     });
     // `chart` is a new object each read; the curves change only with the flare kind and class.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, flareT, flare?.kind, flare?.cls]);
+  }, [engine, flareT, flare?.playing, flare?.kind, flare?.cls]);
   useEffect(() => () => useStarChart.getState().set(null), []);
 
   return (

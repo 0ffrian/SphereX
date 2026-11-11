@@ -7,7 +7,10 @@ export interface StarChartState {
   hard: number[];
   /** 0..1 along the 60 minutes. */
   t: number;
+  /** The flare clock is running (the engine advances `t` itself). */
+  playing: boolean;
   setTime(t: number): void;
+  setPlaying(playing: boolean): void;
 }
 interface Store {
   chart: StarChartState | null;
