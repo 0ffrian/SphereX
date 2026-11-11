@@ -259,7 +259,13 @@ def classify(facts: CatalogueFacts) -> Classification:
         if planet is not None:
             return Classification(planet, rule)
         reviewed = REVIEWED_EXOPLANET_TYPES.get(str(facts.exoplanet.get("pl_name")))
-        if reviewed is not None:
+        # Q-324: the review covers one refusal only (Teq above the water tables) and needs R and M.
+        if (
+            reviewed is not None
+            and "type:exoplanet_water_model_range" in refused
+            and _num(facts.exoplanet, "pl_rade") is not None
+            and _num(facts.exoplanet, "pl_bmasse") is not None
+        ):
             return Classification(reviewed[0], f"R3.3.4 {reviewed[1]}")
 
     if facts.slider_kind is not None:

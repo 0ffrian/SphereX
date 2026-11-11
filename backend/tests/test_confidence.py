@@ -156,7 +156,7 @@ def test_sweep_weights_find_the_field_that_moves_the_metric() -> None:
 # --- the 16 demo objects (calibration of the threshold, Q-222) -----------------------------------
 
 # Scores as calibrated on 10 Nov 2026 with the placeholder weights. Failing: the two candidates (no
-# class) (3I/ATLAS passes once stream F loaded the published gas rates, Lisse et al.).
+# class) (3I/ATLAS scores 0.5171 once the epoch-keyed gas rates count, Q-323).
 DEMO_SCORES = {
     "star/simbad-name-barnard-s-star": (0.6, True),
     "brown_dwarf_binary/simbad-eps-ind-b": (0.475, True),
@@ -167,7 +167,7 @@ DEMO_SCORES = {
     "planet_rocky/simbad-kepler-186f": (0.4831, True),
     "asteroid_shape/sbdb-20101955": (0.8407, True),
     "asteroid_procedural/sbdb-50788063": (0.475, True),
-    "comet/sbdb-1004083": (0.35, True),
+    "comet/sbdb-1004083": (0.5171, True),
     "gas_giant/simbad-hd-189733b": (0.5391, True),
     "planet_rocky/simbad-trappist-1e": (0.5788, True),
     "planet_water/simbad-k2-18b": (0.5191, True),
@@ -268,3 +268,51 @@ def test_r_draconis_gets_a_colour_and_every_other_demo_star_is_unchanged() -> No
     # Barnard's Star and RW Aur keep their SIMBAD-derived value: MSC is not read before it.
     assert card("star/simbad-name-barnard-s-star")["teff_K"]["tag"] == "derived"
     assert card("star_ttauri/simbad-v-rw-aur")["teff_K"]["tag"] == "derived"
+
+
+# --- comet gas_Q shapes (Q-323) -----------------------------------------------------------------
+
+
+def comet_card(gas: Any) -> dict[str, Any]:
+    return {"id": "c", "name": "c", "type": "comet", "gas_Q": gas}
+
+
+def test_gas_epoch_keyed_shape_counts_with_the_best_epoch_per_molecule() -> None:
+    card = json.loads((ASSETS / "comet/sbdb-1004083.json").read_text("utf-8"))["card"]
+    assert any(isinstance(v, dict) and "value" not in v for v in card["gas_Q"].values())
+    assert cf._present_gas(card["gas_Q"])
+    got = cf.confidence_block(card)
+    assert got is not None
+    row = next(r for r in got["inputs"] if r["id"] == "gas")
+    assert row["tag"] == "measured" and row["c"] > 0 and row["fields"] == ["gas_Q"]
+    assert got["gate"]["key_measurement"] is True
+    assert "gas amounts" in got["found"]
+
+
+def test_gas_flat_and_epoch_shapes_agree_for_one_epoch() -> None:
+    flat = {"co2": tv(1.0e27, err=1.0e26), "h2o": tv(3.0e26, err=6.0e25)}
+    assert cf._gas_c(flat) == cf._gas_c({"value": flat}) == cf._gas_c({"2025-08": flat})
+    c, tag = cf._gas_c(flat) or (0.0, "")
+    assert tag == "measured" and 0 < c < 2 / 3 + 1e-9
+
+
+def test_gas_epochs_take_the_best_per_molecule_and_never_average() -> None:
+    weak = {"co2": tv(1.0e27, err=9.0e26)}
+    strong = {"co2": tv(1.0e27, err=1.0e25), "h2o": tv(2.0e26, "model_dependent")}
+    c, tag = cf._gas_c({"a": weak, "b": strong}) or (0.0, "")
+    c_strong = cf._gas_c(strong)
+    assert c_strong is not None and c == c_strong[0] and tag == "model_dependent"
+
+
+def test_gas_absent_or_empty_is_missing_and_not_a_key() -> None:
+    for gas in (None, {}, {"2025-08": {}}, {"co2": {"value": None, "tag": "measured"}}):
+        assert not cf._present_gas(gas)
+        got = cf.confidence_block(comet_card(gas))
+        assert got is not None and got["gate"]["key_measurement"] is False
+
+
+def test_found_text_joins_with_and() -> None:
+    assert cf._join(["a", "b", "c"], "and") == "a, b and c"
+    assert cf._join(["a", "b", "c"]) == "a, b or c"
+    got = cf.confidence_block(star_card(teff_K=tv(3200.0), radius_rsun=tv(0.2)))
+    assert got is not None and " or " not in got["found"] and " and " in got["found"]

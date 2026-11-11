@@ -60,7 +60,7 @@
       "score_ok": true,
       "passed": true
     },
-    "found": "Data for: Radius, mass, orbit and tides, temperature or host star.",
+    "found": "Data for: Radius, mass, orbit and tides, temperature and host star.",
     "needed": "",
     "raise": "A better measurement of: mass.",
     "inputs": [
