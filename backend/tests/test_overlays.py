@@ -281,6 +281,36 @@ def test_mover_overlays_with_synthetic_cones(
     assert json.dumps(again.json(), sort_keys=True) == json.dumps(body, sort_keys=True)
 
 
+def test_mover_overlays_from_recorded_cones(client: TestClient) -> None:
+    """Done when (#95): offline on the recorded Eros cones, /overlays serves Gaia and CatWISE
+    sources, masks near the track and contamination for all 16 frames; deterministic."""
+    oid, visits = _eros(client)
+    r = client.get(f"/v1/objects/{oid}/overlays")
+    assert r.status_code == 200
+    body = r.json()
+    cats = {c["catalog"]: c for c in body["catalogs"]}
+    assert all(c["available"] and c["sources"] for c in cats.values())
+    assert cats["gaia"]["mag_limit"] == 20.0 and cats["wise"]["mag_limit"] == 16.5
+    assert all(s["mag"] is None or s["mag"] < 16.5 for s in cats["wise"]["sources"])
+    assert not any(m.startswith("overlay:") for m in body["missing"])
+    assert len(body["frames"]) == 16
+    visit_of = {fid: v.visit for v in visits for fid in v.frame_ids}
+    assert set(visit_of) == {f["frame_id"] for f in body["frames"]}
+    for fo in body["frames"]:
+        assert fo["markers"], fo["frame_id"]
+        assert fo["masks"], fo["frame_id"]
+        marker_ids = {m["id"] for m in fo["markers"]}
+        assert {m["id"] for m in fo["masks"]} <= marker_ids
+        assert all(2.0 <= m["r_px"] <= 10.0 for m in fo["masks"])
+    assert body["provenance"]["masks"]["tag"] == "derived"
+    assert all(f"footprint:{fid}" in body["missing"] for fid in visit_of)  # #74's, not P1's
+    assert oid in client.app.state.overlays._memo  # type: ignore[attr-defined]
+
+    client.app.state.overlays._memo.clear()  # type: ignore[attr-defined]
+    again = client.get(f"/v1/objects/{oid}/overlays")
+    assert again.content == r.content  # byte-identical from the same cache
+
+
 def test_mover_catalogue_is_all_or_nothing_across_visits(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
