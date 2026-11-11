@@ -81,7 +81,7 @@ def test_committed_assets_are_current() -> None:
 
 
 def test_sun_is_a_star_from_the_sun_fact_sheet(client: TestClient) -> None:
-    """Q-294: the Sun is a reference star: measured radius, Teff and rotation, each with its URL."""
+    """Q-307: the Sun is a reference star: measured radius, Teff and rotation, each with its URL."""
     r = client.get("/v1/resolve", params={"q": "Sun"})
     assert r.status_code == 200 and r.json()["id"] == "ref-sun"
     c = client.get("/v1/objects/ref-sun/card").json()
