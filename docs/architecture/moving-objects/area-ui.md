@@ -87,7 +87,7 @@ The card for one Discovery result (called "Track card" before; renamed so "Track
 
 ### A18.9 State, API client, accessibility, performance
 
-- An `area` slice (as built: defined in `frontend/src/state/area.ts`, composed by `frontend/src/state/store.ts`): `index`, `areaId`, `square`, `summary`, `known`, `dots`, `tracks` (each `idle | loading | ready | error`), `layers {dots, tracks}`, `step`, `visit`, `blink`, `selectedResult`, `card`, `minimised`.
+- An `area` slice (as built: defined in `frontend/src/state/area.ts`, composed by `frontend/src/state/store.ts`): `index`, `areaId`, `square`, `lastSquare`, `summary`, `known`, `dots`, `tracks` (each `idle | loading | ready | error`), `layers {dots, tracks, known}`, `step`, `visit`, `blink`, `selectedResult`, `card`, `minimised`, `refusal` (a refused square, `area:not_prepared` or `area:not_found`) and `fixture` (a reply came from the dev fixture server).
 - API functions in `frontend/src/app/api/` for A17.8, validated at runtime in `validate.ts` against the generated contract types (D-18). A newer square aborts older requests.
 - **URL hash** (A21.11, Q-173): `area=<area_id>` (sets the tool to `area` and opens that area's card; an unknown area is a link problem), plus `atrack=<T-id>` for an open Result card (`track=` belongs to the Track pane). A hash with only tool keys is valid. A new area pushes; choosing a result or a step replaces.
 - Copy in `app/messages.ts`; refusals through `refusals.ts` and `RefusalList.tsx`.

@@ -10,7 +10,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 
 | File | Holds | Size |
 |---|---|---|
-| [scope-process.md](scope-process.md) | scope cuts, doc layout, owners, build dates, milestones, the post-event backlog, the demo object and data release, ID reservations | 6 D, 10 Q, 13 KB |
+| [scope-process.md](scope-process.md) | scope cuts, doc layout, owners, build dates, milestones, the post-event backlog, the demo object and data release, ID reservations | 6 D, 10 Q, ~14 KB |
 | [contract.md](contract.md) | the data contract, object types, the endpoint list (D-16), schemas and generated types, saved assets, `overrides`, card and fixture shapes, cached replies | 6 D, 17 Q, 18 KB |
 | [contract-tags.md](contract-tags.md) | provenance tags and badges, the honesty toggle, tier fallback, the policy for unverified constants (Q-110, Q-119), "which tag does X get" | 3 D, 12 Q, 19 KB |
 | [data-sources.md](data-sources.md) | the backend framework, external archives and adapters, name resolving, the read-through cache and offline mode, test targets, overlays and the composite backends | 4 D, 16 Q, 22 KB |
@@ -30,7 +30,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [haptics-sound.md](haptics-sound.md) | audio pairing (D-10), spectrum pitch and voice hints, the body tone and the Track path sound | 1 D, 10 Q, 13 KB |
 | [haptics-built.md](haptics-built.md) | the haptic engine, calibration and source choices as built | 0 D, 9 Q, 20 KB |
 | [platform-hosting.md](platform-hosting.md) | the three.js pin, hardware and frame budgets, hosting, the demo machine and the event platform | 3 D, 5 Q, 7 KB |
-| [moving-objects.md](moving-objects.md) | Rainbow Trails, the Track tool, Area search and Discovery (agreed), the P3 frames and dots choices (Q-400 to Q-402) | 1 D, 21 Q, 40 KB |
+| [moving-objects.md](moving-objects.md) | Rainbow Trails, the Track tool, Area search and Discovery (agreed), the P3 frames and dots choices (Q-400 to Q-402), the Area search sky rules (Q-406 to Q-408) | 1 D, 24 Q, ~46 KB |
 | [moving-objects-review.md](moving-objects-review.md) | proposed fixes to Area search and Track after the 9 Nov 2026 audit, and Moon's review list (Q-202) | 0 D, 9 Q, 16 KB |
 | [moving-frames.md](moving-frames.md) | frames for moving objects: the path cone search, its tags and refusals, MOST | 0 D, 4 Q, 8 KB |
 | [exoplanets.md](exoplanets.md) | the exoplanet card fields (mass, orbit, host star), radius from the archive, tidal locking, mass in the physics layer, and the two demo exoplanet fixtures | 0 D, 5 Q, 15 KB |
@@ -291,7 +291,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-202 | Review of the Area search fixes (9 Nov 2026) | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-203 | Four research checks join the event build as gated extras | Decided (Moon, 10 Nov 2026); owners and thresholds Proposed | [moving-objects](moving-objects.md) |
 | Q-204 | PNG determinism across machines: chunks, not deflate bytes | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
-| Q-205 | Event cut: Area search and D4 to D7 hidden | Closed by Moon (11 Nov 2026): Area shown, precomputed, behind `AREA_TOOL_ENABLED` | [scope-process](scope-process.md) |
+| Q-205 | Area search at the event: shown, precomputed, behind `AREA_TOOL_ENABLED` (the proposed cut was not taken); D4 to D7 stay gated by Q-203 | Decided (Moon, 11 Nov 2026) | [scope-process](scope-process.md) |
 | Q-206 | Pre-built pack never hides a measured spectrum | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
 | Q-207 | Rainbow Trails: the UI rotates, frames stay native | Proposed (needs a second team member) | [moving-objects](moving-objects.md) |
 | Q-208 | Area contract: shape choices for the spec gaps | Proposed | [moving-objects](moving-objects.md) |
