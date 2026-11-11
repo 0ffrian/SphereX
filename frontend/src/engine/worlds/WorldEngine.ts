@@ -8,7 +8,14 @@
 // (or run two WorldEngine instances on two canvases, each with its own context, if it wants separate panes).
 import { createCore, type Core } from './core.js';
 import { WP, FLUIDS } from './presets.js';
-import type { EngineOptions, EngineOverrides, Readouts, WorldPreset } from './types';
+import type {
+  EngineOptions,
+  EngineOverrides,
+  FluidKey,
+  Readouts,
+  SpinMode,
+  WorldPreset,
+} from './types';
 
 export type { EngineOptions, EngineOverrides, Readouts, WorldPreset } from './types';
 export { WP as WORLD_PRESETS, FLUIDS as WORLD_FLUIDS };
@@ -44,6 +51,27 @@ export interface CpuFields {
   } | null;
   /** River raster: image + counts. */
   hydro: any;
+}
+
+export interface EngineState {
+  Tstar: number;
+  orbit: number;
+  Ps: number;
+  obl: number;
+  ecc: number;
+  co2: boolean;
+  clouds: boolean;
+  zoom: number;
+  yaw: number;
+  pitch: number;
+  fluid: FluidKey;
+  spin: SpinMode;
+  tect: 'auto' | 'plates' | 'lid';
+  overlay: number;
+  timeSec: number;
+  gas: boolean;
+  locked: boolean;
+  rotation: number;
 }
 
 export class WorldEngine {
@@ -190,6 +218,19 @@ export class WorldEngine {
   }
   get flying(): boolean {
     return !!this.core.W.fly;
+  }
+
+  /** Fly camera setters for hosts (the same fields as `fly`). */
+  setFlyAlt(km: number): void {
+    this.core.W.flyAlt = km;
+  }
+  /** Put the fly camera's foot point at a place (the prototype's globe click). */
+  setFlyPlace(lon: number, lat: number): void {
+    this.core.W.flyLon = lon;
+    this.core.W.flyLat = lat;
+  }
+  setFlyAuto(on: boolean): void {
+    this.core.W.flyAuto = on;
   }
 
   /** Move the fly camera: dKm forward, side km to the right. */
@@ -342,6 +383,39 @@ export class WorldEngine {
         : null,
       hydro: W.hydro ?? null,
     };
+  }
+
+  /**
+   * The prototype's current slider and pill values (what its controls would show), read from its own state.
+   * Hosts use this to draw controls; the engine stays the single source of truth.
+   */
+  state(): EngineState {
+    const W = this.core.W;
+    return {
+      Tstar: W.Tstar,
+      orbit: W.orbit,
+      Ps: W.Ps,
+      obl: W.obl,
+      ecc: W.ecc,
+      co2: !!W.co2Therm,
+      clouds: !!W.clouds,
+      zoom: W.zoom,
+      yaw: W.yaw,
+      pitch: W.pitch,
+      fluid: W.fluid,
+      spin: W.spinMode,
+      tect: W.tect,
+      overlay: W.overlay,
+      timeSec: W.timeSec,
+      gas: !!(W.m && W.m.gas),
+      locked: !!(W.p && W.p.locked),
+      rotation: W.spin,
+    };
+  }
+
+  /** Copy the planet's turn angle from another instance (two canvases of one world stay in the same phase). */
+  syncSpin(other: WorldEngine): void {
+    this.core.W.spin = other.core.W.spin;
   }
 
   /** Release the GL context. */
