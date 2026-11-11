@@ -154,14 +154,21 @@ export const DEMO_TARGETS: readonly DemoTarget[] = [
     aliases: ['toi-700', 'toi700d', 'toi 700 d'],
     query: 'TOI-700 d',
     id: 'simbad-toi-700d',
-    classLabel: null,
+    classLabel: 'rocky planet',
   },
   {
     name: 'WASP-39 b',
     aliases: ['wasp-39', 'wasp39b', 'wasp 39 b'],
     query: 'WASP-39 b',
     id: 'simbad-wasp-39b',
-    classLabel: null,
+    classLabel: 'gas giant',
+  },
+  {
+    name: '55 Cancri e',
+    aliases: ['55 cnc e', '55 cnc', '55cnce', 'cancri e'],
+    query: '55 Cnc e',
+    id: 'simbad-rho01-cnc-e',
+    classLabel: 'rocky planet',
   },
 ];
 

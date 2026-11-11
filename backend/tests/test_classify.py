@@ -66,3 +66,21 @@ def test_exoplanet_thresholds_refuse_when_unset(monkeypatch: pytest.MonkeyPatch)
 def test_classify_is_deterministic() -> None:
     f = CatalogueFacts(simbad_otype="BD*", simbad_sp_type="T1V+T6V", simbad_id="x")
     assert classify(f) == classify(f)
+
+
+_CNC_E = {
+    "pl_name": "55 Cnc e",
+    "pl_rade": 1.875,
+    "pl_bmasse": 7.99,
+    "pl_bmassprov": "Mass",
+    "pl_eqt": 1958.0,
+}
+
+
+def test_reviewed_override_only_when_rules_refuse() -> None:
+    """Q-317: 55 Cnc e is refused by the rules (Teq above the water tables) and typed by the
+    reviewed table; the same numbers under another name stay a candidate."""
+    assert classify_exoplanet(_CNC_E)[0] is None
+    assert classify(CatalogueFacts(exoplanet=_CNC_E)).type == "planet_rocky"
+    other = {**_CNC_E, "pl_name": "Some b"}
+    assert classify(CatalogueFacts(exoplanet=other)).type == "candidate"

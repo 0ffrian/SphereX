@@ -136,6 +136,8 @@ SEARCH_LIST: tuple[SearchRow, ...] = (
     SearchRow("Epsilon Eridani", "eps Eri", ("eps eri", "epsilon eri", "eps eridani")),
     SearchRow("TOI-700 d", "TOI-700 d", ("toi-700", "toi700d", "toi 700 d")),
     SearchRow("WASP-39 b", "WASP-39 b", ("wasp-39", "wasp39b", "wasp 39 b")),
+    # Issue #71 stream S2 (Q-317 to Q-319): a lava world.
+    SearchRow("55 Cancri e", "55 Cnc e", ("55 cnc e", "55 cnc", "55cnce", "cancri e")),
 )
 
 FileMap = dict[Path, bytes]
