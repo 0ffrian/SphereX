@@ -9,12 +9,19 @@
 //   pushes a history entry marked in `history.state` (`{ sxBuild: true }`), so Back closes it;
 //   closing it with × or Escape goes Back when the current entry carries that mark (no extra Back
 //   step is left), else replaces the entry. Back also returns focus, as × and Escape do.
+// - Issue #96 (A18.9, A21.11): `area=<area_id>` while Area search shows a prepared area. A link
+//   with it chooses the tool, opens the area and flies to its box; an unknown id is a link problem.
+//   A new area pushes a history entry; entering or leaving the tool replaces it. Back to an entry
+//   without `area` leaves the tool (its state is kept).
 import { useEffect, useRef } from 'react';
 import { requestedColour } from '@/app/flipbook/colourMode';
 import { useAppStore } from '@/state/store';
 import { formatHash, hashToQuery, parseHash, type HashState } from './urlHash';
 import { useShellStore } from './shell/shellStore';
 import { focusAfterBuildClose } from './build/focus';
+import { AREA_TOOL_ENABLED, enterAreaTool } from './sky/area/areaTool';
+import { skyFlyTo } from './sky/skyFlyTo';
+import { openAreaEntry } from '@/state/area';
 
 /** `history.state` of the entry the build pane pushed. */
 const BUILD_STATE = { sxBuild: true } as const;
@@ -23,9 +30,11 @@ const isBuildEntry = (state: unknown): boolean =>
 
 /** The hash for the current object, frame, colour view and build pane. */
 function currentHash(): string {
-  const sky = useAppStore.getState().sky;
-  const build = useShellStore.getState().build.open;
+  const { sky, area } = useAppStore.getState();
+  const shell = useShellStore.getState();
+  const build = shell.build.open;
   const state: HashState = { ...(build ? { build: true } : {}) };
+  if (AREA_TOOL_ENABLED && shell.tool === 'area' && area.areaId) state.area = area.areaId;
   if (sky.resolved && sky.query) {
     const frameId =
       sky.progress?.pendingFrameId ??
@@ -46,8 +55,23 @@ function currentHash(): string {
 
 const normalise = (hash: string) => new URLSearchParams(hash.replace(/^#/, '')).toString();
 
+/** Opens Area search on the area a link names, then flies to its box (A18.9). */
+function applyAreaHash(id: string): void {
+  const store = useAppStore.getState();
+  if (useShellStore.getState().tool !== 'area') enterAreaTool();
+  if (store.area.areaId === id && store.area.summary.status !== 'error') return;
+  void store.areaOpen(id, 'hash').then((ok) => {
+    if (!ok) return;
+    useShellStore.getState().setPointerMode('pan');
+    const entry = openAreaEntry(useAppStore.getState().area);
+    if (entry) skyFlyTo({ box: entry });
+  });
+}
+
 export function useHashSync(): void {
   const lastWritten = useRef<string | null>(null);
+  /** The area the last applied hash named, so Back to an entry without it leaves the tool. */
+  const lastArea = useRef<string | null>(null);
 
   useEffect(() => {
     const apply = () => {
@@ -57,6 +81,10 @@ export function useHashSync(): void {
       const store = useAppStore.getState();
       const shell = useShellStore.getState();
       const parsed = parseHash(hash);
+      const areaBefore = lastArea.current;
+      lastArea.current = AREA_TOOL_ENABLED ? (parsed.area ?? null) : null;
+      if (AREA_TOOL_ENABLED && parsed.area) applyAreaHash(parsed.area);
+      else if (areaBefore !== null && shell.tool === 'area') shell.setTool('sky');
       // Issue #60: the build pane follows the hash (Back closes it; a link with `build` opens it,
       // built at once).
       if (!parsed.build && shell.build.open) {
@@ -74,6 +102,11 @@ export function useHashSync(): void {
       // Only the build flag changed (Back from the build pane): the object stays as it is.
       if (q && store.sky.query?.q === q && store.sky.resolved) return;
       if (!q && parsed.build) return;
+      // A link with only an area (A18.9) needs no object; its own problems are still shown.
+      if (!q && AREA_TOOL_ENABLED && parsed.area) {
+        if (parsed.problems.length > 0) store.skySetLinkProblems(parsed.problems);
+        return;
+      }
 
       if (q) {
         void store.skySearch({
@@ -132,6 +165,38 @@ export function useHashSync(): void {
       }),
     [],
   );
+
+  // Issue #96: a new area pushes `area=` (so Back returns to the one before); entering or leaving
+  // Area search replaces the entry.
+  useEffect(() => {
+    const write = (push: boolean) => {
+      const next = currentHash();
+      const normal = normalise(next);
+      if (normal === normalise(window.location.hash)) return;
+      lastWritten.current = normal;
+      lastArea.current = parseHash(next).area ?? null;
+      if (push && next !== '') window.location.hash = next;
+      else
+        window.history.replaceState(
+          window.history.state,
+          '',
+          next === '' ? window.location.pathname + window.location.search : next,
+        );
+    };
+    const offArea = useAppStore.subscribe((s, prev) => {
+      if (s.area.areaId === prev.area.areaId) return;
+      if (useShellStore.getState().tool !== 'area') return;
+      write(s.area.areaId !== null);
+    });
+    const offTool = useShellStore.subscribe((s, prev) => {
+      if ((s.tool === 'area') === (prev.tool === 'area')) return;
+      write(false);
+    });
+    return () => {
+      offArea();
+      offTool();
+    };
+  }, []);
 
   // Issue #60: opening the build pane pushes `build` (so Back closes it); closing replaces it.
   useEffect(

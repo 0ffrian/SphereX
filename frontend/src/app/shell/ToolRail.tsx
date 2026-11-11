@@ -1,8 +1,11 @@
 // Left tool rail (mock-up `.rail.left`): icon buttons that open real tools only. Sky is the sky
 // view alone; Flipbook and Spectrum open the object panel at that section; 3D viewer opens the
-// build pane (issue #60) with the current body already built. Haptics are not wired into the app
-// until M5, so there is no Haptics tool.
+// build pane (issue #60) with the current body already built. Area search (A18.1, issue #96) draws
+// a square on the sky; it is behind AREA_TOOL_ENABLED. Haptics are not wired into the app until M5,
+// so there is no Haptics tool.
 import { useEffect, useLayoutEffect, useRef } from 'react';
+import { AREA_TOOL_HINT, AREA_TOOL_LABEL } from '@/app/messages';
+import { AREA_TOOL_ENABLED, enterAreaTool } from '@/app/sky/area/areaTool';
 import { useAppStore } from '@/state/store';
 import { RailIcon } from './railIcons';
 import { useShellStore, type ToolId } from './shellStore';
@@ -12,10 +15,17 @@ export const TOOLS: { id: ToolId; label: string; hint: string }[] = [
   { id: 'flipbook', label: 'Flipbook', hint: 'SPHEREx frames of the object' },
   { id: 'spectrum', label: 'Spectrum', hint: 'Spectrum of the object' },
   { id: 'viewer', label: '3D viewer', hint: '3D view of a loaded body' },
+  ...(AREA_TOOL_ENABLED
+    ? [{ id: 'area' as const, label: AREA_TOOL_LABEL, hint: AREA_TOOL_HINT }]
+    : []),
 ];
 
 /** Opens a tool (also from the selected object's card: "See fingerprint" is the spectrum). */
 export function openTool(id: ToolId): void {
+  if (id === 'area') {
+    if (AREA_TOOL_ENABLED) enterAreaTool();
+    return;
+  }
   useShellStore.getState().setTool(id);
   if (id === 'spectrum') {
     const sky = useAppStore.getState().sky;
