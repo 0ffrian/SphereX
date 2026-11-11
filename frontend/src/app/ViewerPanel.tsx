@@ -409,6 +409,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             ) => RenderPlan;
           };
           w.__sxViewer = created;
+          void import('@/perf/fixturesPerf').then((m) => m.installPerfHooks());
           // Plans and draws like the panel does, for a given honesty state.
           w.__sxShow = (c, p, honesty, mode) => {
             // The epoch the panel itself opens on (a comet: its latest epoch with gas data), so a

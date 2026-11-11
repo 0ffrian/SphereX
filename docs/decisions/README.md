@@ -10,9 +10,9 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 
 | File | Holds | Size |
 |---|---|---|
-| [scope-process.md](scope-process.md) | scope cuts, doc layout, owners, build dates, milestones, the post-event backlog, the demo object and data release, ID reservations | 6 D, 9 Q, 10 KB |
+| [scope-process.md](scope-process.md) | scope cuts, doc layout, owners, build dates, milestones, the post-event backlog, the demo object and data release, ID reservations | 6 D, 10 Q, 13 KB |
 | [contract.md](contract.md) | the data contract, object types, the endpoint list (D-16), schemas and generated types, saved assets, `overrides`, card and fixture shapes, cached replies | 6 D, 17 Q, 18 KB |
-| [contract-tags.md](contract-tags.md) | provenance tags and badges, the honesty toggle, tier fallback, the policy for unverified constants (Q-110, Q-119), "which tag does X get" | 3 D, 12 Q, 18 KB |
+| [contract-tags.md](contract-tags.md) | provenance tags and badges, the honesty toggle, tier fallback, the policy for unverified constants (Q-110, Q-119), "which tag does X get" | 3 D, 12 Q, 19 KB |
 | [data-sources.md](data-sources.md) | the backend framework, external archives and adapters, name resolving, the read-through cache and offline mode, test targets, overlays and the composite backends | 4 D, 15 Q, 20 KB |
 | [pipeline-stages.md](pipeline-stages.md) | stages 3 to 7 as built, measurement choices, physics in stage 6, the Sun angle for SBDB bodies, the exoplanet adapter and type rule | 0 D, 5 Q, 13 KB |
 | [pipeline-jobs.md](pipeline-jobs.md) | shape models and their serving, where generated assets are saved, the live cutout budget, object jobs, fan-out and progress endpoints | 0 D, 6 Q, 14 KB |
@@ -23,22 +23,25 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [gemini.md](gemini.md) | the Gemini layer: scope, offline behaviour and its contract | 1 D, 2 Q, 7 KB |
 | [sky-shell.md](sky-shell.md) | the sky view, sky endpoints and sky tiles, the flipbook UI | 1 D, 10 Q, 12 KB |
 | [shell-surfaces.md](shell-surfaces.md) | the tool rail and the island, the object panel and card, the Build split view, the full-bleed layout | 0 D, 5 Q, 13 KB |
-| [shell-proposals.md](shell-proposals.md) | open shell proposals that Track and Area search need: pane kinds, feature cards, hash keys, Escape order | 0 D, 9 Q, 13 KB |
+| [shell-proposals.md](shell-proposals.md) | open shell proposals that Track and Area search need: pane kinds, feature cards, hash keys, Escape order | 0 D, 9 Q, 15 KB |
 | [haptics-design.md](haptics-design.md) | haptics design rules, creative ownership, the haptics API, the shared field on shader kinds, texture and data sources per type | 5 D, 12 Q, 20 KB |
-| [haptics-sound.md](haptics-sound.md) | audio pairing (D-10), spectrum pitch and voice hints, the body tone and the Track path sound | 1 D, 10 Q, 12 KB |
+| [haptics-sound.md](haptics-sound.md) | audio pairing (D-10), spectrum pitch and voice hints, the body tone and the Track path sound | 1 D, 10 Q, 13 KB |
 | [haptics-built.md](haptics-built.md) | the haptic engine, calibration and source choices as built | 0 D, 9 Q, 20 KB |
 | [platform-hosting.md](platform-hosting.md) | the three.js pin, hardware and frame budgets, hosting, the demo machine and the event platform | 3 D, 5 Q, 6 KB |
-| [moving-objects.md](moving-objects.md) | Rainbow Trails, the Track tool, Area search and Discovery (agreed) | 1 D, 16 Q, 20 KB |
-| [moving-objects-review.md](moving-objects-review.md) | proposed fixes to Area search and Track after the 9 Nov 2026 audit, and Moon's review list (Q-202) | 0 D, 9 Q, 14 KB |
-| [moving-frames.md](moving-frames.md) | frames for moving objects: the path cone search, its tags and refusals, MOST | 0 D, 4 Q, 7 KB |
-| [exoplanets.md](exoplanets.md) | the exoplanet card fields (mass, orbit, host star), radius from the archive, tidal locking, mass in the physics layer, and the two demo exoplanet fixtures | 0 D, 5 Q, 13 KB |
-| [exoplanet-looks.md](exoplanet-looks.md) | the climate scenarios and locked-planet temperature map, starlight colour, scenario looks and presets, and the exoplanet mould steps | 0 D, 5 Q, 14 KB |
-| [catalogue-values.md](catalogue-values.md) | name resolution for the demo exoplanets, star Teff, radius and Mira periods, the literature registry, binary brown dwarf components, the issue #68 backend fixes and the slope unit | 0 D, 6 Q, 11 KB |
-| [demo-pack.md](demo-pack.md) | the demo search list and aliases, the 67P and Bennu shape products, the WRL reader, and the pre-built demo pack | 0 D, 4 Q, 14 KB |
+| [moving-objects.md](moving-objects.md) | Rainbow Trails, the Track tool, Area search and Discovery (agreed) | 1 D, 16 Q, 21 KB |
+| [moving-objects-review.md](moving-objects-review.md) | proposed fixes to Area search and Track after the 9 Nov 2026 audit, and Moon's review list (Q-202) | 0 D, 9 Q, 16 KB |
+| [moving-frames.md](moving-frames.md) | frames for moving objects: the path cone search, its tags and refusals, MOST | 0 D, 4 Q, 8 KB |
+| [exoplanets.md](exoplanets.md) | the exoplanet card fields (mass, orbit, host star), radius from the archive, tidal locking, mass in the physics layer, and the two demo exoplanet fixtures | 0 D, 5 Q, 15 KB |
+| [exoplanet-looks.md](exoplanet-looks.md) | the climate scenarios and locked-planet temperature map, starlight colour, scenario looks and presets, and the exoplanet mould steps | 0 D, 5 Q, 15 KB |
+| [catalogue-values.md](catalogue-values.md) | name resolution for the demo exoplanets, star Teff, radius and Mira periods, the literature registry, binary brown dwarf components, the issue #68 backend fixes and the slope unit | 0 D, 6 Q, 13 KB |
+| [demo-pack.md](demo-pack.md) | the demo search list and aliases, the 67P and Bennu shape products, the WRL reader, and the pre-built demo pack | 0 D, 5 Q, 17 KB |
+
+Agenda of the 11 Nov 2026 decision session: [session-2026-11-11.md](session-2026-11-11.md). It holds no entries and is removed once the outcomes are recorded.
 
 ## Rules for entries
 
 - **IDs never change and are never reused.** A new decision is the next free `D-` number; a new question the next free `Q-` number. Before you pick one, check `origin/main` and the open PRs (they pick numbers too).
+- **Next free:** D-38 and Q-320 (11 Nov 2026; issue #71 took D-37 and Q-210 to Q-319). **Taken by issue #80:** Q-205 (event cut, Proposed). **Taken by issue #79:** Q-204 (PNG determinism). **Reserved (provisional; confirm or renumber at the 11 Nov 2026 session):** D-36 and Q-210 to Q-279 for issue #71. **Renumbered:** this PR's Q-150 to Q-183 became Q-170 to Q-203 on 10 Nov 2026, because main took Q-150 to Q-169 in PR #70; Q-203 is the four research checks, Q-170 to Q-202 are the spec-pass proposals. Q-149 in the Track block is still unused. **Reserved:** Q-130 to Q-149 for the Track tool and Area search (Q-130). **From PR #53 (merged):** Q-125 (frame search tags and refusals) and Q-126 (MOST). **Never used, do not reuse:** Q-46. **Never assigned:** Q-127 to Q-129 (skipped; do not reuse).
 - **Q-313 to Q-316 (stream Y, world engine hosted)** are in [rendering-bodies](rendering-bodies.md). **Q-303 to Q-306 (stream W, engine port)** are in [rendering-bodies](rendering-bodies.md). **Q-294 to Q-298 (stream U, build view)** are in [shell-surfaces](shell-surfaces.md). **Q-274 to Q-276 (stream H, orbit view and close-up pane)** are in [rendering-bodies](rendering-bodies.md). **Next free:** D-37 and Q-204 (10 Nov 2026; Q-210 to Q-279 are reserved for issue #71). **Renumbered:** this PR's Q-150 to Q-183 became Q-170 to Q-203 on 10 Nov 2026, because main took Q-150 to Q-169 in PR #70; Q-203 is the four research checks, Q-170 to Q-202 are the spec-pass proposals. Q-149 in the Track block is still unused. **Reserved:** Q-130 to Q-149 for the Track tool and Area search (Q-130). **From PR #53 (merged):** Q-125 (frame search tags and refusals) and Q-126 (MOST). **Never used, do not reuse:** Q-46. **Never assigned:** Q-127 to Q-129 (skipped; do not reuse).
 - **One entry, one file.** Put a new entry in the topic file it belongs to and add its row to the index below in the same commit. An entry that changes another one says "amends D-xx" and the amended entry gets an "Amended by" line.
 - **Status words** (for new entries; older rows keep their wording): **Open**; **Open (built)** (code follows the proposal); **Proposed** (an owner must confirm); **Decided** (who and when); **Partly decided** (list what is open); **Superseded by** (the newer entry rules); **Deferred** (after the event). D- entries are **Accepted** unless marked otherwise.
@@ -245,7 +248,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-161 | Demo search list and aliases | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
 | Q-162 | 67P and Bennu shape products | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
 | Q-163 | WRL reader and Bennu shape model | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
-| Q-164 | Pre-built demo pack | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
+| Q-164 | Pre-built demo pack | Proposed (needs a second team member); amended by Q-204 | [demo-pack](demo-pack.md) |
 | Q-165 | The two demo exoplanet fixtures | Proposed (needs a second team member) | [exoplanets](exoplanets.md) |
 | Q-166 | Exoplanet mould steps, notes, alt text | Proposed (needs a second team member) | [exoplanet-looks](exoplanet-looks.md) |
 | Q-167 | Backend review fixes for issue #68 | Proposed (needs a second team member) | [catalogue-values](catalogue-values.md) |
@@ -285,6 +288,8 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-201 | One tag for Horizons-derived values | Open | [contract-tags](contract-tags.md) |
 | Q-202 | Review of the Area search fixes (9 Nov 2026) | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-203 | Four research checks join the event build as gated extras | Decided (Moon, 10 Nov 2026); owners and thresholds Proposed | [moving-objects](moving-objects.md) |
+| Q-204 | PNG determinism across machines: chunks, not deflate bytes | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
+| Q-205 | Event cut: Area search and D4 to D7 hidden | Proposed | [scope-process](scope-process.md) |
 | Q-210 | Asteroid and nucleus physics: strength, craters, lighting, lobed nucleus | Open (built) | [rendering-bodies](rendering-bodies.md) |
 | Q-211 | Height field layers, erosion on craters only, seam test | Open (built) | [rendering-bodies](rendering-bodies.md) |
 | Q-212 | Rough by default, smooth only on data | Open (built) | [rendering-bodies](rendering-bodies.md) |

@@ -1,6 +1,6 @@
 // R8.3, R8.8, R11: the engine's honesty gate, rate cap, strength multiplier, debug hook and the
 // phase-continuous train scheduler (Q-71), all on a fake clock and fake drivers.
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { HapticEvent } from '@/contract';
 import { FakeAudioContext, type FakeSource } from '@/test/fakeAudio';
 import {
@@ -11,6 +11,7 @@ import {
   motorOnsets,
   timedVibrate,
 } from '@/test/fakeHaptics';
+import { setAudioContextFactory } from './audioContext';
 import { AudioDriver } from './drivers/audio';
 import { WebVibrateDriver } from './drivers/webVibrate';
 import {
@@ -20,6 +21,7 @@ import {
   type HapticEngineOptions,
   type HapticTimers,
 } from './haptics';
+import { bindEngine, flushHapticSettings, useHapticSettings, defaultSettings } from './settings';
 
 const tick = (over: Partial<HapticEvent> = {}): HapticEvent => ({
   kind: 'tick',
@@ -329,10 +331,61 @@ describe('web drivers together (D-08, D-10, R11)', () => {
     expect(ctx.sources()).toHaveLength(1);
   });
 
-  it('createHaptics builds the engine and both drivers without an AudioContext', () => {
-    const h = createHaptics({ debugTarget: null });
-    expect(h.engine.activeDrivers).toEqual([h.vibrate, h.audio]);
-    h.engine.dispose();
+  describe('createHaptics (Q-132, R8.8.1 item 1)', () => {
+    afterEach(() => {
+      setAudioContextFactory(null);
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+      flushHapticSettings();
+      localStorage.clear();
+      useHapticSettings.setState({
+        ...defaultSettings({ hapticsOn: false, soundOn: true }),
+        loaded: false,
+      });
+    });
+
+    it('builds the audio driver only by default, with no WebVibrateDriver', () => {
+      const fake = new FakeAudioContext();
+      setAudioContextFactory(() => fake.asAudioContext());
+      const h = createHaptics({ debugTarget: null });
+      expect(h.engine.activeDrivers).toEqual([h.audio]);
+      expect(h.engine.activeDrivers.some((d) => d instanceof WebVibrateDriver)).toBe(false);
+      expect(h).not.toHaveProperty('vibrate');
+      h.engine.dispose();
+    });
+
+    it('never calls navigator.vibrate, even with hapticsOn, but still sounds', async () => {
+      const fake = new FakeAudioContext();
+      setAudioContextFactory(() => fake.asAudioContext());
+      const vibrate = vi.fn(() => true);
+      Object.defineProperty(navigator, 'vibrate', {
+        value: vibrate,
+        configurable: true,
+        writable: true,
+      });
+      try {
+        useHapticSettings.getState().update({ hapticsOn: true });
+        const h = createHaptics({ debugTarget: null });
+        const unbind = bindEngine(h);
+        await h.engine.unlock();
+        expect(h.engine.emit(tick({ strength: 1 }))).toBe(true);
+        expect(vibrate).not.toHaveBeenCalled();
+        expect(fake.sources().length).toBeGreaterThanOrEqual(1);
+        unbind();
+        h.engine.dispose();
+      } finally {
+        delete (navigator as { vibrate?: unknown }).vibrate;
+      }
+    });
+
+    it('adds the vibrate driver only with { vibrate: true } (dev page, after the event)', () => {
+      const fake = new FakeAudioContext();
+      setAudioContextFactory(() => fake.asAudioContext());
+      const h = createHaptics({ debugTarget: null, vibrate: true });
+      expect(h.engine.activeDrivers).toEqual([h.vibrate, h.audio]);
+      expect(h.vibrate).toBeInstanceOf(WebVibrateDriver);
+      h.engine.dispose();
+    });
   });
 });
 

@@ -24,7 +24,8 @@ No SPHEREx frames or spectra are fetched or written: the pack has a card without
 the alt text work with no frames. A row the pipeline cannot resolve or build gets no asset and a
 null class label; nothing is invented.
 
-``--check`` rebuilds everything in memory and compares every byte. It needs the catalogue answers
+``--check`` rebuilds everything in memory and compares every byte; PNG maps are compared by their
+chunks and inflated image data (Q-204). It needs the catalogue answers
 (SIMBAD, SBDB, Exoplanet Archive, Horizons) of each row in the D-25 cache (``SX_CACHE_DIR``,
 filled by running this script once online). For a row whose answers are not cached (a fresh CI
 checkout has no cache), plain ``--check`` falls back to what the committed card alone gives
@@ -61,7 +62,7 @@ from app.core.classify import classify
 from app.core.find.frames import FrameService
 from app.core.find.resolver import load_aliases, resolve
 from app.core.render.background import SIZES
-from app.core.render.bake import bake, bake_dir, encode
+from app.core.render.bake import bake, bake_dir, encode, same_png
 from app.core.render.card_to_params import (
     GENERATOR_VERSION,
     TEXTURE_URL_ROOT,
@@ -404,6 +405,15 @@ def _read(path: Path) -> bytes | None:
         return None
 
 
+def _same(rel: Path, on_disk: bytes | None, fresh: bytes) -> bool:
+    """Byte-exact, except a PNG map: same chunks and inflated image data suffices (Q-204)."""
+    if on_disk is None:
+        return False
+    if rel.suffix == ".png":
+        return same_png(on_disk, fresh)
+    return on_disk == fresh
+
+
 def managed_on_disk(assets_dir: Path, names: dict[str, str]) -> set[Path]:
     """Files this script owns: the texture tree and ``<type>/<id>.json`` of the object types."""
     out = {p.relative_to(assets_dir) for p in (assets_dir / "textures").rglob("*") if p.is_file()}
@@ -503,7 +513,7 @@ def run_check(
         final.append(r)
     files = expected_files(final)
     for rel, data in files.items():
-        if _read(assets_dir / rel) != data:
+        if not _same(rel, _read(assets_dir / rel), data):
             bad.append(f"differs: {rel}")
     for rel in sorted(managed_on_disk(assets_dir, names) - set(files)):
         bad.append(f"unexpected file: {rel}")
