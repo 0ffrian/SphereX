@@ -45,9 +45,11 @@ import { FeelPanel, HearPanel } from './build/Senses';
 import { BuildControls } from './build/BuildControls';
 import GridLoader, { type GridLoaderProps } from './island/GridLoader';
 import { ConfidencePopover } from './ConfidencePopover';
+import { displayName } from './displayName';
+import { Row, Rows, SwitchRow, ToggleGroup } from './PanelControls';
 import { timeLapsesOf } from '@/viewer/motion/planMotion';
 import { describeRefusal, layerName, timeLapseText } from './messages';
-import { buttonClass, pressedClass } from './ui';
+import { buttonClass } from './ui';
 import { closeUpKindOf } from './CloseUpPane';
 import { useCloseUpStore } from './closeUpStore';
 import { StarFlarePanel } from './StarFlarePanel';
@@ -55,7 +57,6 @@ import { RockStage } from './build/RockStage';
 import { StarGlobeStage, useEngineStar } from './StarEngineStage';
 import { WorldGlobeStage, useEngineWorld } from './WorldEngineStage';
 import { engineKey, useWorldStore } from './worldStore';
-import { useViewControls } from './engineView';
 import { MouldStrip, type StripHandle } from './build/MouldStrip';
 import { useMould, type MouldPhase } from './build/useMould';
 import { usesBrowserSeed } from '@/viewer/mould/mouldSteps';
@@ -124,6 +125,16 @@ const STAR_COLOUR_LABEL: Record<StarColourView, string> = {
   enhanced: 'Enhanced colour',
   true: 'True colour',
 };
+const STAR_COLOUR_OPTIONS: { value: StarColourView; label: string }[] = [
+  { value: 'true', label: 'True colour' },
+  { value: 'enhanced', label: 'Enhanced' },
+  { value: 'observatory', label: 'Observatory' },
+];
+const STAR_SCALE_OPTIONS: { value: StarScale; label: string }[] = [
+  { value: 'enlarged', label: 'Larger detail' },
+  { value: 'true', label: 'True scale' },
+  { value: 'close', label: 'Close-up' },
+];
 const STAR_SCALE_LABEL: Record<StarScale, string> = {
   enlarged: 'Whole star, larger detail',
   true: 'Whole star, true scale',
@@ -162,13 +173,6 @@ export const NO_SCORE_TEXT =
 
 const PLACEHOLDER_LABEL = 'Viewer placeholder: no object loaded';
 
-const ROTATE_BUTTONS: { dir: 'left' | 'right' | 'up' | 'down'; label: string; glyph: string }[] = [
-  { dir: 'left', label: 'Rotate left', glyph: '←' },
-  { dir: 'up', label: 'Rotate up', glyph: '↑' },
-  { dir: 'down', label: 'Rotate down', glyph: '↓' },
-  { dir: 'right', label: 'Rotate right', glyph: '→' },
-];
-
 /** Issue #71 stream U: the panels the build pane's header buttons open (mock-up `bpPop`, one at a time). */
 export type PopId = 'acc' | 'feel' | 'hear' | 'details';
 
@@ -204,11 +208,6 @@ export const GAS_PACING_CHOICES = [
   { value: 0, label: '5 minutes per second' },
   { value: 1, label: '1 day per second' },
 ] as const;
-
-/** A control's name; when it is off the reason is part of the name (never a silent button). */
-function viewOff(label: string, off: string | null): string {
-  return off ? `${label}. Not available: ${off}` : label;
-}
 
 export function gasPacingStatus(value: 0 | 1): string {
   return value === 1
@@ -283,7 +282,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   });
   const failed = failedState.key === objectKey ? failedState.ids : NO_FAILED;
   const reducedMotion = useReducedMotion();
-  const [spinPaused, setSpinPaused] = useState(false);
+  const [spinPaused] = useState(false); // the Pause button is gone from Details (Moon); kept for the engine hook
   // Under reduced motion the scene starts paused; this is the user's choice to play it anyway.
   const [playAnyway, setPlayAnyway] = useState(false);
   // The choice ends when the preference is switched off (adjusted while rendering, not in an effect).
@@ -623,7 +622,6 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const nothingDrawn = plan && plan.threeD && !showsBody(plan) ? nothingDrawnReason(plan) : null;
   const defaultsShown = plan?.missing.filter((m) => m.defaultShown) ?? [];
   const notDrawn = plan?.missing.filter((m) => !m.defaultShown) ?? [];
-  const vc = useViewControls();
   // The close-up pane (issue #71 stream H, Q-275) fills the left half of the app, over the sky, while
   // this viewer stays in the build pane: it opens with the build (mock-up `cuOpen`) and closes with
   // it (`cuClose`). The viewer and plan go to a small store the pane reads. The toggle next to Feel
@@ -708,23 +706,12 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const hiddenCount = plan?.missing.filter((m) => m.reason === 'honesty').length ?? 0;
 
   const honestyGroup = plan ? (
-    <div role="group" aria-label="Honesty level" className="flex flex-wrap items-center gap-2">
-      <span className="text-sm text-neutral-300">Show:</span>
-      {HONESTY_STATES.map((state) => (
-        <button
-          key={state}
-          type="button"
-          className={`${buttonClass} ${pressedClass}`}
-          aria-pressed={honesty === state}
-          onClick={() => onHonesty(state)}
-        >
-          {HONESTY_LABEL[state]}
-        </button>
-      ))}
-      {hiddenCount > 0 && (
-        <span className="text-xs text-neutral-400">{hiddenCount} hidden at this level</span>
-      )}
-    </div>
+    <ToggleGroup
+      label="Show"
+      options={HONESTY_STATES.map((state) => ({ value: state, label: HONESTY_LABEL[state] }))}
+      value={honesty}
+      onChange={onHonesty}
+    />
   ) : null;
   // Issue #71 stream U: in the build pane the Accuracy, Feel, Hear it and Details panels share one
   // popover under the header buttons, one at a time (mock-up `bpPop`). Outside the pane the details
@@ -750,12 +737,12 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
         <section hidden={pop !== 'acc'} data-testid="build-pop-acc">
           {pop === 'acc' &&
             (params?.confidence ? (
-              <ConfidencePopover inline isShown={(t) => t === 'missing' || isTagShown(honesty, t)} params={params} name={plan?.name} onClose={() => pane.onPop?.(null)} />
+              <ConfidencePopover inline isShown={(t) => t === 'missing' || isTagShown(honesty, t)} params={params} name={displayName(plan?.name)} onClose={() => pane.onPop?.(null)} />
             ) : (
               <>
                 <div className="sx-pop-h">
                   <b>Accuracy</b>
-                  <span>{plan?.name ?? ''}</span>
+                  <span>{displayName(plan?.name)}</span>
                 </div>
                 <p className="sx-acc-rules">{NO_SCORE_TEXT}</p>
               </>
@@ -829,7 +816,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             />
           )}
           {!pane && params && formulaOpen && (
-            <ConfidencePopover params={params} name={plan?.name} onClose={() => setFormulaOpen(false)} />
+            <ConfidencePopover params={params} name={displayName(plan?.name)} onClose={() => setFormulaOpen(false)} />
           )}
           {loadingBody && (
             <div className="sx-bp-loading" data-testid="build-loading" role="status">
@@ -913,102 +900,37 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           <>
             <div className="sx-pop-h">
               <b>Details</b>
-              <span>{plan?.name ?? ''}</span>
+              <span>{displayName(plan?.name)}</span>
             </div>
-            {pane.actions}
           </>
         )}
         {params && (!pane || params.confidence?.gate.passed === false) && (
           <ConfidenceDetails params={params} />
         )}
-        {plan?.threeD && (
-          <p className="text-xs text-neutral-400" data-testid="impression-note">
-            Artist&apos;s impression, drawn from the data listed under &ldquo;What is drawn&rdquo;.
-          </p>
-        )}
-
-        <div role="group" aria-label="View controls" className="flex flex-wrap gap-2">
-          {ROTATE_BUTTONS.map(({ dir, label, glyph }) => (
-            <button
-              key={dir}
-              type="button"
-              className={buttonClass}
-              aria-label={viewOff(label, vc.rotateOff)}
-              title={vc.rotateOff ?? label}
-              disabled={vc.rotateOff !== null}
-              onClick={() => vc.rotate(dir)}
-            >
-              <span aria-hidden="true">{glyph}</span>
-            </button>
-          ))}
-          <button
-            type="button"
-            className={buttonClass}
-            aria-label={viewOff('Zoom in', vc.zoomOff)}
-            title={vc.zoomOff ?? 'Zoom in'}
-            disabled={vc.zoomOff !== null}
-            onClick={() => vc.zoom('in')}
-          >
-            <span aria-hidden="true">+</span>
-          </button>
-          <button
-            type="button"
-            className={buttonClass}
-            aria-label={viewOff('Zoom out', vc.zoomOff)}
-            title={vc.zoomOff ?? 'Zoom out'}
-            disabled={vc.zoomOff !== null}
-            onClick={() => vc.zoom('out')}
-          >
-            <span aria-hidden="true">−</span>
-          </button>
-          <button
-            type="button"
-            className={buttonClass}
-            aria-label={viewOff('Reset view', vc.resetOff)}
-            title={vc.resetOff ?? undefined}
-            disabled={vc.resetOff !== null}
-            onClick={() => vc.reset()}
-          >
-            Reset view
-          </button>
-        </div>
-
         {pane && <BuildControls />}
         {plan && (
           <>
             {honestyGroup}
 
             {plan.threeD && plan.modes.length > 0 && (
-              <div
-                role="group"
-                aria-label="View mode"
-                className="flex flex-wrap items-center gap-2"
-              >
-                <span className="text-sm text-neutral-300">Colour:</span>
-                {plan.modes.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className={`${buttonClass} ${pressedClass}`}
-                    aria-pressed={plan.mode === m.id}
-                    aria-describedby={
-                      irHidesJets && m.id === 'visible' ? 'ir-jets-hint' : undefined
-                    }
-                    disabled={!m.available}
-                    title={
-                      m.available ? m.badge : 'Not available for this object. See the list below.'
-                    }
-                    onClick={() => onMode(m.id)}
-                  >
-                    {m.label}
-                  </button>
-                ))}
+              <>
+                <ToggleGroup
+                  label="Colour"
+                  value={plan.mode ?? null}
+                  options={plan.modes.map((m) => ({
+                    value: m.id,
+                    label: m.label,
+                    disabled: !m.available,
+                    title: m.available ? m.badge : 'Not available for this object. See the list below.',
+                  }))}
+                  onChange={onMode}
+                />
                 {plan.mode && (
-                  <span className="text-xs text-neutral-400">
+                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
                     {plan.modes.find((m) => m.id === plan.mode)?.badge}
                   </span>
                 )}
-              </div>
+              </>
             )}
 
             {/* Sits under the mode buttons it refers to. The region stays mounted while an object is
@@ -1026,78 +948,43 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             )}
 
             {plan.type === 'comet' && (
-              <div
-                role="group"
-                aria-label="Comet epoch"
-                className="flex flex-wrap items-center gap-2"
-              >
-                <span className="text-sm text-neutral-300">Epoch:</span>
-                {COMET_EPOCHS.map((e) => (
-                  <button
-                    key={e}
-                    type="button"
-                    className={`${buttonClass} ${pressedClass}`}
-                    aria-pressed={epoch === e}
-                    onClick={() => onEpoch(e)}
-                  >
-                    {EPOCH_LABEL[e]}
-                    {!plan.epochs.includes(e) && (
-                      <span className="ml-1 text-xs text-neutral-400">(no gas data)</span>
-                    )}
-                  </button>
-                ))}
-              </div>
+              <ToggleGroup
+                label="Epoch"
+                value={epoch}
+                options={COMET_EPOCHS.map((e) => ({
+                  value: e,
+                  label: `${EPOCH_LABEL[e]}${plan.epochs.includes(e) ? '' : ' (no gas data)'}`,
+                }))}
+                onChange={onEpoch}
+              />
             )}
 
             {plan.star && !engineStar && (
               <div className="flex flex-col gap-2" data-testid="star-views">
-                <div
-                  role="group"
-                  aria-label="Star colour view"
-                  className="flex flex-wrap items-center gap-2"
-                >
-                  <span className="text-sm text-neutral-300">Star colour:</span>
-                  {(Object.keys(STAR_COLOUR_LABEL) as StarColourView[]).map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      className={`${buttonClass} ${pressedClass}`}
-                      aria-pressed={starColour === c}
-                      onClick={() =>
-                        setStarView(
-                          c,
-                          c === 'observatory' && starScale === 'close' ? 'enlarged' : starScale,
-                        )
-                      }
-                    >
-                      {STAR_COLOUR_LABEL[c]}
-                    </button>
-                  ))}
-                </div>
-                <div
-                  role="group"
-                  aria-label="Star scale"
-                  className="flex flex-wrap items-center gap-2"
-                >
-                  <span className="text-sm text-neutral-300">Scale:</span>
-                  {(Object.keys(STAR_SCALE_LABEL) as StarScale[]).map((sc) => (
-                    <button
-                      key={sc}
-                      type="button"
-                      className={`${buttonClass} ${pressedClass}`}
-                      aria-pressed={starScale === sc}
-                      disabled={sc === 'close' && !plan.star?.physics}
-                      title={
-                        sc === 'close' && !plan.star?.physics
-                          ? 'Needs the star\u2019s temperature.'
-                          : undefined
-                      }
-                      onClick={() => setStarView(starColour, sc)}
-                    >
-                      {STAR_SCALE_LABEL[sc]}
-                    </button>
-                  ))}
-                </div>
+                <ToggleGroup
+                  label="Star colour"
+                  value={starColour}
+                  options={STAR_COLOUR_OPTIONS}
+                  onChange={(c) =>
+                    setStarView(
+                      c,
+                      c === 'observatory' && starScale === 'close' ? 'enlarged' : starScale,
+                    )
+                  }
+                />
+                <ToggleGroup
+                  label="View"
+                  value={starScale}
+                  options={STAR_SCALE_OPTIONS.map((o) => ({
+                    ...o,
+                    disabled: o.value === 'close' && !plan.star?.physics,
+                    title:
+                      o.value === 'close' && !plan.star?.physics
+                        ? 'Needs the star\u2019s temperature.'
+                        : undefined,
+                  }))}
+                  onChange={(sc) => setStarView(starColour, sc)}
+                />
                 {plan.star.physics && (
                   <p className="text-sm text-neutral-200" data-testid="star-caption">
                     {starCaption(plan.star.physics, starScale)}
@@ -1132,19 +1019,16 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             )}
 
             {plan.type === 'comet' && emissionsRange && (
-              <button
-                type="button"
-                className={`${buttonClass} ${pressedClass} self-start`}
-                aria-pressed={emissionsJd !== null}
-                onClick={() =>
+              <SwitchRow
+                label="View emissions"
+                checked={emissionsJd !== null}
+                onChange={() =>
                   setEmissions(
                     emissionsJd === null ? { key: objectKey, jd: EPOCH_JD[epoch] } : null,
                   )
                 }
-                data-testid="emissions-toggle"
-              >
-                View emissions
-              </button>
+                testId="emissions-toggle"
+              />
             )}
 
             {plan.scrub && (
@@ -1252,28 +1136,13 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
 
             {lapses.length > 0 && !engineWorld && (
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className={buttonClass}
-                  onClick={() => {
-                    if (motionPaused) {
-                      // Play: lift every pause that is on (reduced motion override, user, idle).
-                      if (reducedMotion && !playAnyway) setPlayAnyway(true);
-                      if (spinPaused) setSpinPaused(false);
-                      if (idlePaused) viewer?.resumeFromIdle?.();
-                    } else if (reducedMotion) setPlayAnyway(false);
-                    else setSpinPaused(true);
-                  }}
-                >
-                  {motionPaused ? 'Play motion' : 'Pause motion'}
-                </button>
                 <p className="text-sm text-neutral-200" data-testid="motion-status">
                   {reducedMotion && !playAnyway
                     ? 'Motion is off because your device asks for reduced motion.'
                     : spinPaused
                       ? 'Motion is paused.'
                       : idlePaused
-                        ? 'Motion paused after a minute without input. Tap the view or press Play motion.'
+                        ? 'Motion paused after a minute without input. Tap the view to resume.'
                         : 'Motion is playing.'}
                 </p>
               </div>
@@ -1282,19 +1151,12 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             {/* Issue #71 stream E: pacing of a simulated gas world; shown only for one. */}
             {plan.type === 'gas_giant' && !engineWorld && lapses.some((t) => t.id === 'winds') && (
               <div className="flex flex-col gap-1" data-testid="gas-pacing">
-                <div role="group" aria-label="Time speed of the winds" className="flex flex-wrap gap-2">
-                  {GAS_PACING_CHOICES.map((c) => (
-                    <button
-                      key={c.value}
-                      type="button"
-                      className={buttonClass}
-                      aria-pressed={gasPacing === c.value}
-                      onClick={() => onGasPacing(c.value)}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
-                </div>
+                <ToggleGroup
+                  label="Time speed of the winds"
+                  value={String(gasPacing) as '0' | '1'}
+                  options={GAS_PACING_CHOICES.map((c) => ({ value: String(c.value) as '0' | '1', label: c.label }))}
+                  onChange={(v) => onGasPacing(Number(v) as 0 | 1)}
+                />
                 <p className="text-sm text-neutral-200" data-testid="gas-pacing-status">
                   {gasPacingStatus(gasPacing)}
                 </p>
@@ -1314,10 +1176,8 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
               </p>
             ))}
 
-            <section aria-labelledby="legend-heading" className="flex flex-col gap-1">
-              <h3 id="legend-heading" className="text-sm font-medium text-neutral-200">
-                What is drawn
-              </h3>
+            <Rows>
+            <Row title="What is drawn" count={plan.drawn.length} testId="legend-row">
               <p className="text-xs text-neutral-400">
                 Measured: from observations. Estimated: worked out from data with a stated method.
                 Default: the artist&rsquo;s choice.
@@ -1363,13 +1223,10 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                   ))}
                 </ul>
               )}
-            </section>
+            </Row>
 
             {defaultsShown.length > 0 && (
-              <section aria-labelledby="defaults-heading" className="flex flex-col gap-1">
-                <h3 id="defaults-heading" className="text-sm font-medium text-neutral-200">
-                  Shown as a default
-                </h3>
+              <Row title="Shown as a default" count={defaultsShown.length}>
                 <ul
                   className="flex flex-col gap-1 text-sm text-neutral-300"
                   data-testid="default-list"
@@ -1381,21 +1238,19 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                     </li>
                   ))}
                 </ul>
-              </section>
+              </Row>
             )}
 
             {notDrawn.length > 0 && (
-              <section aria-labelledby="missing-heading" className="flex flex-col gap-1">
-                <h3 id="missing-heading" className="text-sm font-medium text-neutral-200">
-                  Not drawn
-                </h3>
+              <Row title="Not drawn" count={notDrawn.length}>
                 <ul className="list-disc pl-5 text-sm text-neutral-300" data-testid="missing-list">
                   {notDrawn.map((m) => (
                     <li key={m.id}>{describeRefusal(m)}</li>
                   ))}
                 </ul>
-              </section>
+              </Row>
             )}
+            </Rows>
 
             {plan.notes.length > 0 && (
               <ul className="list-disc pl-5 text-xs text-neutral-400" data-testid="notes">

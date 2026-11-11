@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { lightCurves, STAGES, STAGE_TEXT, stageIndex } from '@/physics/flares';
 import type { ViewerApp } from '@/viewer/ViewerApp';
-import { buttonClass, pressedClass } from './ui';
+import { Row, Rows, SwitchRow, ToggleGroup } from './PanelControls';
 import { ProvenanceBadge } from './Badge';
 
 export function StarFlarePanel({
@@ -32,57 +32,60 @@ export function StarFlarePanel({
     return () => window.clearInterval(id);
   }, [viewer, paused]);
 
+  const cls = text?.match(/Class (\w+\.?\d*)/)?.[1] ?? null;
+  const outcome = text ? (/stays closed/.test(text) ? 'stayed closed' : /erupt/.test(text) ? 'erupted' : null) : null;
+
   return (
-    <div className="flex flex-col gap-2" data-testid="star-flares">
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className={`${buttonClass} ${pressedClass}`}
-          aria-pressed={lines}
-          onClick={() => {
-            const next = !lines;
-            setLines(next);
-            viewer?.setFieldLines(next);
-          }}
-        >
-          Field lines
-        </button>
-        <button
-          type="button"
-          className={buttonClass}
-          onClick={() => {
-            viewer?.fireFlare();
-            setText(viewer?.latestFlareText() ?? null);
-          }}
-        >
-          Fire a big flare
-        </button>
+    <div className="flex flex-col gap-3" data-testid="star-flares">
+      <SwitchRow
+        label="Field lines"
+        checked={lines}
+        onChange={(next) => {
+          setLines(next);
+          viewer?.setFieldLines(next);
+        }}
+      />
+      <button
+        type="button"
+        className="sx-btn-outline"
+        onClick={() => {
+          viewer?.fireFlare();
+          setText(viewer?.latestFlareText() ?? null);
+        }}
+      >
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
+        </svg>
+        Fire a big flare
+      </button>
+      <div className="sx-flare" data-testid="latest-flare" aria-live="polite">
+        {text && cls ? (
+          <span>
+            Latest flare: <b>{cls}{outcome ? `, ${outcome}` : ''}</b>
+          </span>
+        ) : (
+          <span>{text ?? 'None yet. A flare starts at a spot group on a seeded schedule.'}</span>
+        )}
+        <ProvenanceBadge tag="inferred_from_analog" fixture={fixture} variant="tag" />
       </div>
-      <p className="text-sm text-neutral-200" data-testid="latest-flare" aria-live="polite">
-        <span className="font-medium text-neutral-100">Latest flare: </span>
-        {text ?? 'None yet. A flare starts at a spot group on a seeded schedule.'}{' '}
-        <ProvenanceBadge tag="inferred_from_analog" fixture={fixture} />
-      </p>
+      <Rows>
+        <Row title="About this flare">
+      {text && <p>{text}</p>}
       <div className="flex flex-col gap-2" data-testid="flare-chart">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-neutral-200">One flare, 60 minutes:</span>
-          {[false, true].map((o) => (
-            <button
-              key={String(o)}
-              type="button"
-              className={`${buttonClass} ${pressedClass}`}
-              aria-pressed={open === o}
-              onClick={() => setOpen(o)}
-            >
-              {o ? 'Open (eruption)' : 'Closed'}
-            </button>
-          ))}
-        </div>
+        <ToggleGroup
+          label="One flare, 60 minutes"
+          value={open ? 'open' : 'closed'}
+          options={[
+            { value: 'closed', label: 'Closed' },
+            { value: 'open', label: 'Open (eruption)' },
+          ]}
+          onChange={(v) => setOpen(v === 'open')}
+        />
         <svg
           viewBox="0 0 240 70"
           role="img"
           aria-label="Flare brightness: soft X-rays rise and fall slowly, hard X-rays peak during the burst"
-          className="w-full rounded border border-neutral-700 bg-neutral-950"
+          className="sx-chart"
           onPointerDown={(e) => {
             const r = e.currentTarget.getBoundingClientRect();
             setT(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)));
@@ -127,6 +130,8 @@ export function StarFlarePanel({
           <ProvenanceBadge tag="inferred_from_analog" fixture={fixture} />
         </p>
       </div>
+        </Row>
+      </Rows>
     </div>
   );
 }

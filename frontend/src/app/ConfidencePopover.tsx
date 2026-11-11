@@ -1,15 +1,14 @@
 // D-36, Q-266, Q-267: the Accuracy popover the data-confidence chip opens. It mirrors the mock-up's
-// #popAcc (mockup/spherex-ui.html): header, big score and band, three-part bar with key, KaTeX
+// #popAcc (mockup/spherex-ui.html): header, three-part bar with key, KaTeX
 // equations with this object's numbers, gate checklist, rules line, per-row table. Anchored to the
 // chip; a bottom sheet on Touch (CSS `pointer: coarse`). The score shown is the backend's.
 import { useEffect, useId, useRef } from 'react';
 import type { RenderParams } from '@/contract';
-import { BAND_WORDS, percent } from '@/viewer/confidenceGate';
+import { percent } from '@/viewer/confidenceGate';
 import {
   C_TABLE_LATEX,
   C_TABLE_LINES,
   GENERAL_LATEX,
-  PART_INFO,
   formulaTerms,
   gateLatex,
   gatePlain,
@@ -24,11 +23,17 @@ import {
   type Part,
 } from '@/viewer/confidenceFormula';
 import { FormulaMath } from './FormulaMath';
+import { Row, Rows } from './PanelControls';
 import { ERROR_BARS_NOTE } from './worldNotes.generated';
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-const PART_COLOUR: Record<Part, string> = { d: '#4ade80', p: '#38bdf8', a: '#52525b' };
+const PART_COLOUR: Record<Part, string> = { d: 'var(--p-meas)', p: 'var(--p-phys)', a: 'var(--p-asm)' };
 const PARTS: Part[] = ['d', 'p', 'a'];
+const PART_COPY: Record<Part, { label: string; note: string }> = {
+  d: { label: 'Measured', note: 'SPHEREx, Gaia and other archives' },
+  p: { label: 'Physics', note: 'worked out from the data' },
+  a: { label: 'Assumed', note: 'typical values or drawn detail' },
+};
 
 function Yes({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
@@ -110,107 +115,128 @@ export function ConfidencePopover({
     }
   };
 
+  const gateYes = [c.gate.class_known, c.gate.key_measurement, c.gate.score_ok].filter(Boolean).length;
   const body = (
     <>
-        <div className="sx-pop-h">
-          <b id={titleId}>Accuracy</b>
-          <span>{name ?? ''}</span>
-          {!inline && (
-            <button type="button" className="sx-acc-close" onClick={onClose}>
-              Close
-            </button>
-          )}
-        </div>
+      <div className="sx-pop-h">
+        <b id={titleId}>Accuracy</b>
+        <span>{name ?? ''}</span>
+        {!inline && (
+          <button type="button" className="sx-acc-close" onClick={onClose}>
+            Close
+          </button>
+        )}
+      </div>
 
-        <div className="sx-acc-top">
-          <span className="n" data-testid="formula-result">
-            {score}%
-          </span>
-          <span>{BAND_WORDS[c.band]}</span>
-        </div>
+      <div>
         <div
           className="sx-acc-bar"
           role="img"
-          aria-label={`Satellite data ${pct('d')} percent, physics ${pct('p')} percent, assumed ${pct('a')} percent`}
+          aria-label={`Measured ${pct('d')} percent, physics ${pct('p')} percent, assumed ${pct('a')} percent`}
         >
           {PARTS.map((k) => (
             <i key={k} style={{ flex: `${share[k]} 1 0`, background: PART_COLOUR[k] }} />
           ))}
         </div>
-        <div className="sx-acc-key">
+        <div className="sx-acc-leg">
           {PARTS.map((k) => (
             <KeyRow key={k} part={k} pct={pct(k)} />
           ))}
         </div>
+      </div>
 
+      <div className="sx-acc-formula">
         <FormulaMath latex={GENERAL_LATEX} plain={generalPlain()} testId="formula-general" />
-        <p className="sx-acc-rules">
-          w is how much a quantity changes the picture. c is how far the data narrows the range of
-          this kind of object.
-        </p>
-        <FormulaMath latex={C_TABLE_LATEX} plain={C_TABLE_LINES} testId="formula-ctable" />
-        <FormulaMath
-          latex={substitutionLatex(c)}
-          plain={substitutionPlain(c)}
-          testId="formula-substituted"
-        />
-        <p className="sx-acc-rules">Terms with c = 0 add nothing, so they are folded into the final + 0.</p>
-        <FormulaMath latex={gateLatex(c.threshold)} plain={gatePlain(c.threshold)} testId="formula-gate" />
-        <ul className="sx-acc-gate">
-          <Yes ok={c.gate.class_known}>The kind of object is known.</Yes>
-          <Yes ok={c.gate.key_measurement}>
-            At least one key measurement{keyLabels ? `: ${keyLabels}` : ''}.
-          </Yes>
-          <Yes ok={c.gate.score_ok}>
-            Score of at least {percent(c.threshold)}% (now {score}%).
-          </Yes>
-        </ul>
-        <p className="sx-acc-rules">
-          <b>{c.gate.passed ? 'The 3D body is drawn.' : 'The 3D body is not drawn.'}</b> {c.note}
-        </p>
+        <dl className="sx-acc-vars">
+          <dt>
+            <FormulaMath latex="C" plain="C" />
+          </dt>
+          <dd data-testid="formula-result">the accuracy score, {score}% for this object</dd>
+          <dt>
+            <FormulaMath latex="i" plain="i" />
+          </dt>
+          <dd>each quantity behind the picture (size, temperature, …)</dd>
+          <dt>
+            <FormulaMath latex="w_i" plain="w sub i" />
+          </dt>
+          <dd>how much that quantity changes the picture</dd>
+          <dt>
+            <FormulaMath latex="c_i" plain="c sub i" />
+          </dt>
+          <dd>how far the data pins it down, from 0 to 1</dd>
+        </dl>
+      </div>
 
-        <table className="sx-acc-tbl">
-          <caption className="sr-only">This object&apos;s terms</caption>
-          <thead>
-            <tr>
-              <th scope="col">Quantity</th>
-              <th scope="col">Source</th>
-              <th scope="col">Points</th>
-            </tr>
-          </thead>
-          <tbody>
-            {c.inputs.map((i) => {
-              const chip = tagChip(i);
-              const dim = isShown ? !isShown(i.tag) : false;
-              return (
-                <tr key={i.id} className={dim ? 'sx-acc-dim' : undefined} data-dim={dim || undefined}>
-                  <td>
-                    {i.label}
-                    {dim && <span className="sr-only"> (hidden at this Show level; still counted)</span>}
-                  </td>
-                  <td>
-                    <span className={`sx-acc-tag ${chip.part}`}>{chip.text}</span>
-                  </td>
-                  <td title={`weight ${num(i.weight)}, c ${num(i.c)}`}>{rowPoints(i)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {isShown && c.inputs.some((i) => !isShown(i.tag)) && (
-          <p className="sx-acc-rules">
-            Dimmed rows are hidden by the Show level. They still count: the score does not move with it.
+      <Rows>
+        <Row title="Values of c and this object's sum">
+          <FormulaMath latex={C_TABLE_LATEX} plain={C_TABLE_LINES} testId="formula-ctable" />
+          <FormulaMath
+            latex={substitutionLatex(c)}
+            plain={substitutionPlain(c)}
+            testId="formula-substituted"
+          />
+          <p>Terms with c = 0 add nothing, so they are folded into the final + 0.</p>
+        </Row>
+        <Row title="When it is shown in 3D" count={`${gateYes} of 3`}>
+          <FormulaMath latex={gateLatex(c.threshold)} plain={gatePlain(c.threshold)} testId="formula-gate" />
+          <ul className="sx-acc-gate2">
+            <Yes ok={c.gate.class_known}>The kind of object is known.</Yes>
+            <Yes ok={c.gate.key_measurement}>
+              At least one key measurement{keyLabels ? `: ${keyLabels}` : ''}.
+            </Yes>
+            <Yes ok={c.gate.score_ok}>
+              Score of at least {percent(c.threshold)}% (now {score}%).
+            </Yes>
+          </ul>
+          <p>
+            <b>{c.gate.passed ? 'The 3D body is drawn.' : 'The 3D body is not drawn.'}</b> {c.note}
           </p>
-        )}
-        {!c.gate.passed && (
-          <p className="sx-acc-rules" data-testid="formula-below">
-            <b>Why there is no 3D model.</b> Found: {c.found} Needed: {c.needed}
+        </Row>
+        <Row title="Every quantity" count={c.inputs.length}>
+          <table className="sx-acc-tbl">
+            <caption className="sr-only">This object&apos;s terms</caption>
+            <thead>
+              <tr>
+                <th scope="col">Quantity</th>
+                <th scope="col">Source</th>
+                <th scope="col">Points</th>
+              </tr>
+            </thead>
+            <tbody>
+              {c.inputs.map((i) => {
+                const chip = tagChip(i);
+                const dim = isShown ? !isShown(i.tag) : false;
+                return (
+                  <tr key={i.id} className={dim ? 'sx-acc-dim' : undefined} data-dim={dim || undefined}>
+                    <td>
+                      {i.label}
+                      {dim && <span className="sr-only"> (hidden at this Show level; still counted)</span>}
+                    </td>
+                    <td>
+                      <span className={`sx-acc-tag ${chip.part}`}>{chip.text}</span>
+                    </td>
+                    <td title={`weight ${num(i.weight)}, c ${num(i.c)}`}>{rowPoints(i)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {isShown && c.inputs.some((i) => !isShown(i.tag)) && (
+            <p className="sx-acc-rules">
+              Dimmed rows are hidden by the Show level. They still count: the score does not move with it.
+            </p>
+          )}
+          {!c.gate.passed && (
+            <p className="sx-acc-rules" data-testid="formula-below">
+              <b>Why there is no 3D model.</b> Found: {c.found} Needed: {c.needed}
+            </p>
+          )}
+          <p className="sx-acc-rules" data-testid="formula-error-bars">
+            {ERROR_BARS_NOTE}
           </p>
-        )}
-        <p className="sx-acc-rules" data-testid="formula-error-bars">
-          {ERROR_BARS_NOTE}
-        </p>
-        <p className="sx-acc-rules sx-acc-last">{c.weights_note}</p>
+          <p className="sx-acc-rules">{c.weights_note}</p>
+        </Row>
+      </Rows>
     </>
   );
   if (inline) {
@@ -245,15 +271,15 @@ export function ConfidencePopover({
 }
 
 function KeyRow({ part, pct }: { part: Part; pct: number }) {
-  const info = PART_INFO[part];
+  const info = PART_COPY[part];
   return (
-    <>
-      <span className="sx-acc-sw" style={{ background: PART_COLOUR[part] }} />
+    <div>
       <span>
+        <i style={{ background: PART_COLOUR[part] }} />
         {info.label}
-        <small>{info.note}</small>
       </span>
-      <b>{pct}%</b>
-    </>
+      <strong>{pct}%</strong>
+      <small>{info.note}</small>
+    </div>
   );
 }
