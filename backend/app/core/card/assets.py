@@ -1,19 +1,22 @@
 """Asset store for stage 4 (A4.4, A5.4, D-22).
 
 A saved asset holds the ObjectCard, the RenderParams, the texture URLs, ``generator_version``,
-``seed`` and ``created_at``. Two layers are read, in order:
+``seed`` and ``created_at``. Two layers are read, in order (issue #75):
 
-1. **Pre-baked:** JSON files in the repo, ``<assets_dir>/<type>/<id>.json`` (A5.4). Read only.
-2. **Generated:** assets this backend built and saved, kept as ``derived.asset`` entries in the
+1. **Generated:** assets this backend built and saved, kept as ``derived.asset`` entries in the
    D-25 cache. The key holds ``ASSET_VERSION``, the stage 7 ``GENERATOR_VERSION`` (which holds
    the baker's rules version) and the data release, so a rule or release change never serves a
-   stale asset.
+   stale asset. Saved only from final inputs, so it carries the measured spectrum.
+2. **Pre-baked:** JSON files in the repo, ``<assets_dir>/<type>/<id>.json`` (A5.4). Read only.
+   The pack has no spectrum (Q-164 (3)); ``ObjectPipeline`` uses it only as a stand-in when a
+   live build cannot measure one.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -93,6 +96,15 @@ class Asset:
         return cls(**d)
 
 
+@dataclass(frozen=True)
+class Found:
+    """One layer's asset. ``prebuilt``: from the repo pack, not the D-25 cache (issue #75)."""
+
+    asset: Asset
+    cached_at: datetime | None
+    prebuilt: bool
+
+
 def asset_key(object_id: str, release: str | None = None) -> CacheKey:
     return CacheKey.make(
         ASSET_SOURCE, release, id=object_id, v=ASSET_VERSION, generator=GENERATOR_VERSION
@@ -141,11 +153,25 @@ class AssetStore:
             return asset
         return None
 
-    def lookup(self, object_id: str) -> tuple[Asset, datetime | None] | None:
-        """The saved asset and, for a generated one, when it was cached (None if pre-baked)."""
+    def layers(self, object_id: str) -> Iterator[Found]:
+        """Every readable asset for ``object_id``, best first: the generated one, then the
+        pre-built one (issue #75). A generated asset is saved only from final inputs, so it
+        holds the measured spectrum, which the pack never has (Q-164 (3)). Lazy: the pack is
+        read only when the caller asks for the next layer (e.g. the generated one failed the
+        contract check)."""
+        generated = self._generated(object_id)
+        if generated is not None:
+            yield Found(generated[0], generated[1], prebuilt=False)
         asset = self._prebaked(object_id)
         if asset is not None:
-            return asset, None
+            yield Found(asset, None, prebuilt=True)
+
+    def lookup(self, object_id: str) -> tuple[Asset, datetime | None] | None:
+        """The best asset and, for a generated one, when it was cached (None if pre-built)."""
+        found = next(self.layers(object_id), None)
+        return (found.asset, found.cached_at) if found is not None else None
+
+    def _generated(self, object_id: str) -> tuple[Asset, datetime] | None:
         entry = self.cache.get(asset_key(object_id, self.release))
         if entry is None:
             return None
