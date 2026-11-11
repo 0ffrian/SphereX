@@ -26,7 +26,7 @@ export function RockCloseUp({ active }: { active: boolean }) {
       <canvas
         ref={ref}
         tabIndex={0}
-        role="img"
+        role="application"
         aria-label="The same body in the close-up pane. Drag or use the arrow keys to turn it."
         className="block w-full touch-none"
         style={{ aspectRatio: '8 / 5', maxHeight: '100%' }}

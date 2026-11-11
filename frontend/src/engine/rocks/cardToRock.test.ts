@@ -88,4 +88,19 @@ describe('radialHeights', () => {
     expect(m.ext).toBeGreaterThan(1);
     expect(Math.min(...m.h)).toBeGreaterThan(-0.5);
   });
+  it('an artifact body shows the values it draws and notes where the card differs', () => {
+    const r = cardToRock(
+      card({ id: 'sbdb-50788063', diameter_km: tv(0.5), rot_period_h: tv(8.1), albedo: tv(0.1) }),
+      { seed: 1 },
+    );
+    if ('refused' in r) throw new Error('refused');
+    expect(r.inputs.size.value).toBe('204 m');
+    expect(r.inputs.spin.value).toBe('7.9 h');
+    expect(r.inputs.albedo.value).toBe('4%');
+    expect(r.mismatches.some((m) => m.startsWith('size:'))).toBe(true);
+    expect(r.mismatches.some((m) => m.startsWith('reflectivity:'))).toBe(true);
+    const plain = cardToRock(card({ diameter_km: tv(2) }), { seed: 1 });
+    if ('refused' in plain) throw new Error('refused');
+    expect(plain.mismatches).toEqual([]);
+  });
 });
