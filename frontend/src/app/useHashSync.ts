@@ -72,9 +72,19 @@ export function useHashSync(): void {
   const lastWritten = useRef<string | null>(null);
   /** The area the last applied hash named, so Back to an entry without it leaves the tool. */
   const lastArea = useRef<string | null>(null);
+  /** True while a hash is being applied: the hash already says what the stores are changing to. */
+  const applying = useRef(false);
 
   useEffect(() => {
     const apply = () => {
+      applying.current = true;
+      try {
+        applyHash();
+      } finally {
+        applying.current = false;
+      }
+    };
+    const applyHash = () => {
       const hash = normalise(window.location.hash);
       if (hash === lastWritten.current) return;
       lastWritten.current = hash;
@@ -184,12 +194,14 @@ export function useHashSync(): void {
         );
     };
     const offArea = useAppStore.subscribe((s, prev) => {
-      if (s.area.areaId === prev.area.areaId) return;
+      if (s.area.areaId === prev.area.areaId || applying.current) return;
+      // An area a link or Back opened (it lands after the hash was applied): the hash names it.
+      if (s.area.areaId !== null && parseHash(window.location.hash).area === s.area.areaId) return;
       if (useShellStore.getState().tool !== 'area') return;
       write(s.area.areaId !== null);
     });
     const offTool = useShellStore.subscribe((s, prev) => {
-      if ((s.tool === 'area') === (prev.tool === 'area')) return;
+      if ((s.tool === 'area') === (prev.tool === 'area') || applying.current) return;
       write(false);
     });
     return () => {
