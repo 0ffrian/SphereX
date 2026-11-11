@@ -222,8 +222,11 @@ app/core/classify/ (Atish, Stage 3, A4.3) rules.py: R3.3 type selection; R12 #12
 app/core/card/    (Kevin, Stages 4-5, A4.4-A4.5) catalogue, build, assets (A5.4 store), validate, service
 app/core/render/  (Atish, R10) texture baker; card_to_params (Stage 7, A4.7), blackbody, spherex_rgb
 app/core/sky/     sky background: survey registry and layout, HEALPix NESTED, HiPS -> equirect bake
+app/core/area/    (Atish, A17) Area search Discovery: config ([[area]], starting values), frames, dots, day0
 app/core/composite/ (no D-17 owner yet) SPHEREx false-colour composite: config, select, grid, service
 assets/           A5.4 pre-baked assets, <type>/<id>.json (SX_ASSETS_DIR); the demo pack (Q-164) and its maps in assets/textures/
 scripts/          prefetch, smoke_offline, backup_cache, record_fixtures, generate_contract, sky_mirror, sky_bake, bake_demo_pack (`--check`, `--strict`)
+                  area_discovery (Area search precompute: `--area <id> --steps frames,dots --day0 <json>`; exit 0 done, 1 incomplete, 2 bad args;
+                  exit not 0: leave AREA_TOOL_ENABLED off, Q-205)
 tests/            pytest; tests/fixtures/cache holds the recorded cache entries
 ```
