@@ -277,7 +277,8 @@ function StarGL(canvas) {
     'uFilter',
     'uSpots',
     'uN',
-    'uLut','uSO',
+    'uLut',
+    'uSO',
   ].forEach(function (n) {
     U[n] = gl.getUniformLocation(p, n);
   });
@@ -317,7 +318,8 @@ function StarGL(canvas) {
     gl.uniform1f(U.uBeta, clamp(26180 / o.T, 1, 9));
     gl.uniform1f(U.uFilter, o.filter);
     gl.uniform4fv(U.uSpots, o.spots);
-    gl.uniform3fv(U.uSO,ST.p.so||[0,0,0]);gl.uniform1i(U.uN, o.n);
+    gl.uniform3fv(U.uSO, ST.p.so || [0, 0, 0]);
+    gl.uniform1i(U.uN, o.n);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
 }
@@ -368,7 +370,7 @@ function model() {
   var nReal = f / MEAN_A,
     nG = Math.min(12, Math.round(nReal)),
     k = nG ? f / (nG * MEAN_A) : 1;
-  var r = rng(1729^(ST.p.seed|0)),
+  var r = rng(1729 ^ (ST.p.seed | 0)),
     sp = new Float32Array(48 * 4),
     n = 0,
     best = null,
