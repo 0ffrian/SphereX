@@ -11,6 +11,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -26,6 +27,7 @@ import { isEditableTarget } from '@/app/shell/shortcuts';
 import { useShellStore } from '@/app/shell/shellStore';
 import { useAppStore } from '@/state/store';
 import { useAmbienceStore } from '@/app/sound/ambienceStore';
+import { atmosphereOf } from './hearModel';
 import type { MouldPhase } from './useMould';
 import { closeBuildPane } from './focus';
 import { displayName } from '@/app/displayName';
@@ -139,6 +141,14 @@ export function BuildPane() {
   // anywhere in the page that is not a text field (mock-up: Esc closes the build).
   // Ambience (the wind that outlives the Hear it panel) must always be visible and stoppable (WCAG 1.4.2).
   const ambienceOn = useAmbienceStore((s) => s.ambience && s.playing);
+  // The Atmosphere toggle in the header plays the ambience straight away, without opening Hear it.
+  // Shown only where an atmosphere sound is possible (same refusal rules as the Hear it panel).
+  const atmo = useMemo(() => atmosphereOf(card), [card]);
+  const atmoOn = useAmbienceStore((s) => s.ambience && s.playing && s.key === (card?.id ?? ''));
+  const toggleAtmo = (): void => {
+    if (!atmo.ok || !card) return;
+    useAmbienceStore.getState().setAmbience(!atmoOn, atmo.model, card.id);
+  };
   useEffect(() => {
     if (!ambienceOn) return;
     const onM = (e: globalThis.KeyboardEvent) => {
@@ -282,7 +292,25 @@ export function BuildPane() {
                 <span>{b.label}</span>
                 {b.id === 'hear' && ambienceOn && <i className="sx-bp-live" aria-hidden="true" data-testid="hear-live" />}
               </button>
-            ))}
+            )).flatMap((el, i) =>
+              i === 0 && atmo.ok
+                ? [
+                    el,
+                    <button
+                      key="atmo"
+                      type="button"
+                      className="sx-bp-tool sx-bp-text"
+                      title={atmoOn ? 'Stop the atmosphere sound (M)' : 'Play the atmosphere sound'}
+                      aria-pressed={atmoOn}
+                      onClick={toggleAtmo}
+                      data-testid="build-atmosphere"
+                    >
+                      <Icon name="wind" className="size-[15px]" />
+                      <span>Atmosphere</span>
+                    </button>,
+                  ]
+                : [el],
+            )}
             <i className="sx-bp-sep" aria-hidden="true" />
             <button
               type="button"
