@@ -77,6 +77,12 @@ test.describe('Area search', () => {
     await page.getByTestId('tool-area').click();
     await expect(pane(page)).toHaveAttribute('data-pointer-mode', 'draw');
     await expect(page.getByTestId('area-card-title')).toHaveText('Area search');
+    // Escape with no area yet leaves drawing; the card then offers Draw again (review F3).
+    await page.keyboard.press('Escape');
+    await expect(pane(page)).not.toHaveAttribute('data-pointer-mode', 'draw');
+    await page.getByTestId('area-draw-again').click();
+    await expect(pane(page)).toHaveAttribute('data-pointer-mode', 'draw');
+    await expect(page.getByTestId('area-draw-again')).toHaveCount(0);
     await setView(page, { ra: 150, dec: 10, fovDeg: 3 });
     await dragAround(page, 150.05, 10.0);
     await expect(page.getByTestId('area-card-title')).toHaveText('Area · 1.00° × 0.60°');

@@ -1,4 +1,4 @@
-// The Area card (A18.1; interim until P9, Q-406 (7)): a feature card shown while the tool is
+// The Area card (A18.1; interim until P9, Q-406 (6)): a feature card shown while the tool is
 // `area`. Before a square: the draw hint, "Use a square in the middle" and "Keep the last square";
 // a refused square says why; a square outside every prepared area lists them with "Fly there".
 // After a snap: "Area · w° × h°", its frames and visits, the layer switches, the honesty switch, the
@@ -95,8 +95,21 @@ export function AreaCard() {
 
 function DrawButtons({ area }: { area: AreaState }) {
   const view = useContext(SkyViewContext);
+  const panning = useShellStore((s) => s.pointerMode === 'pan');
   return (
     <div className="sx-island-actions">
+      {/* After Escape (pan mode) the card offers drawing again (PR #100 review F3). */}
+      {panning && (
+        <button
+          type="button"
+          className="sx-btn sx-btn-primary"
+          aria-pressed={false}
+          onClick={() => useShellStore.getState().setPointerMode('draw')}
+          data-testid="area-draw-again"
+        >
+          {AREA_DRAW_AGAIN}
+        </button>
+      )}
       <button
         type="button"
         className="sx-btn sx-btn-ghost"

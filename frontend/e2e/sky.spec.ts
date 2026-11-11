@@ -264,7 +264,9 @@ test('keyboard: arrows pan, +/− zoom, Enter picks the centre; "/" focuses the 
 test('tool rail opens real panels; Escape closes and returns focus', async ({ page }) => {
   await page.goto('/');
   const tools = page.getByRole('navigation', { name: 'Tools' });
-  // Sky, Flipbook, Spectrum, 3D viewer and Area search (issue #96, behind AREA_TOOL_ENABLED).
+  // Sky, Flipbook, Spectrum, 3D viewer and Area search. Depends on AREA_TOOL_ENABLED
+  // (frontend/src/app/sky/area/areaTool.ts, issue #96): with it false the rail has 4 buttons, so
+  // change this count with it. (The e2e specs cannot import app modules to read it.)
   await expect(tools.getByRole('button')).toHaveCount(5);
   await expect(tools.getByRole('button', { name: 'Sky' })).toHaveAttribute('aria-pressed', 'true');
   await tools.getByRole('button', { name: 'Flipbook' }).click();
