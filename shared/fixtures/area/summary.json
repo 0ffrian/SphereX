@@ -7,8 +7,6 @@
   "data_release": "synthetic_fixture",
   "n_frames": 16,
   "n_visits": 2,
-  "computed_at": "2026-11-10T12:00:00.000Z",
-  "cached_at": "2026-11-10T12:00:00.000Z",
   "frames": [
     {
       "frame_id": "fixture-area-main-v1e1-D1",
@@ -253,6 +251,8 @@
       "sed_chi2_max": 3.0
     }
   },
+  "cached_at": "2026-11-10T12:00:00.000Z",
+  "computed_at": "2026-11-10T12:00:00.000Z",
   "missing": [
     "horizons:Synthetic fixture A2",
     "rate_grid:visits",

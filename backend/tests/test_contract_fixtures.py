@@ -12,11 +12,17 @@ from typing import Any, get_args
 
 import jsonschema
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT7
 
 from app.api.models import Tag as ApiTag
+from app.contract.area_checks_schema import AreaChecks
+from app.contract.area_dots_schema import AreaDots
+from app.contract.area_index_schema import AreaIndex
+from app.contract.area_known_schema import AreaKnown
+from app.contract.area_summary_schema import AreaSummary
+from app.contract.area_tracks_schema import AreaTracks
 from app.contract.object_card_schema import ObjectCard
 from app.contract.render_params_schema import RenderParams
 from app.settings import BACKEND_DIR
@@ -48,13 +54,28 @@ CARDS = {k: v for k, v in _ALL_CARDS.items() if k not in EXTRA}
 PARAMS = {k: v for k, v in _ALL_PARAMS.items() if k not in EXTRA}
 INVALID = _load(SHARED / "fixtures" / "invalid" / "cases.json")
 
+# Every schema in shared/schemas/, keyed by its $id without ".schema.json" (the card, the params
+# and the six Area search schemas, A17.9).
+SCHEMAS = {
+    schema["$id"].removesuffix(".schema.json"): schema
+    for schema in (_load(p) for p in sorted((SHARED / "schemas").glob("*.schema.json")))
+}
 _REGISTRY: Registry[Any] = Registry().with_resources(
     (schema["$id"], Resource.from_contents(schema, default_specification=DRAFT7))
-    for schema in (CARD_SCHEMA, PARAMS_SCHEMA)
+    for schema in SCHEMAS.values()
 )
 VALIDATORS = {
-    "object-card": jsonschema.Draft7Validator(CARD_SCHEMA, registry=_REGISTRY),
-    "render-params": jsonschema.Draft7Validator(PARAMS_SCHEMA, registry=_REGISTRY),
+    name: jsonschema.Draft7Validator(schema, registry=_REGISTRY) for name, schema in SCHEMAS.items()
+}
+MODELS: dict[str, type[BaseModel]] = {
+    "object-card": ObjectCard,
+    "render-params": RenderParams,
+    "area-index": AreaIndex,
+    "area-summary": AreaSummary,
+    "area-known": AreaKnown,
+    "area-dots": AreaDots,
+    "area-tracks": AreaTracks,
+    "area-checks": AreaChecks,
 }
 
 
@@ -78,17 +99,25 @@ def _with_context(error: jsonschema.ValidationError) -> Iterator[jsonschema.Vali
 
 
 def _is_provenance_rule(case: dict[str, Any]) -> bool:
-    """The R3.1 if/then rules, which the generators drop."""
+    """The R3.1 if/then rules, which the generators drop.
+
+    ``const`` is the tier that must match the tag (D-32); a ``pattern`` counts only on a
+    ``formula`` or ``assumption`` (the non-blank rule), because other patterns (ids, times,
+    missing codes) are real field constraints that the models keep.
+    """
     expect = case["expect"]
+    path = expect["path"]
     return (
-        expect["keyword"] in {"pattern", "const"}  # const: the tier must match the tag (D-32)
+        expect["keyword"] == "const"
+        or (expect["keyword"] == "pattern" and path.endswith(("/formula", "/assumption")))
         or expect.get("detail") in {"formula", "assumption", "assumed"}
     )
 
 
 def test_schemas_are_valid_draft7() -> None:
-    jsonschema.Draft7Validator.check_schema(CARD_SCHEMA)
-    jsonschema.Draft7Validator.check_schema(PARAMS_SCHEMA)
+    assert sorted(SCHEMAS) == sorted(MODELS)
+    for schema in SCHEMAS.values():
+        jsonschema.Draft7Validator.check_schema(schema)
 
 
 def test_one_card_and_one_params_fixture_per_object_type() -> None:
@@ -179,7 +208,7 @@ def test_invalid_case_is_rejected_for_its_stated_reason(case: dict[str, Any]) ->
 @pytest.mark.parametrize("case", INVALID, ids=[case["name"] for case in INVALID])
 def test_generated_models_enforce_all_but_the_provenance_rules(case: dict[str, Any]) -> None:
     """Pydantic drops the R3.1 if/then rules, so it alone cannot guard a live reply (Q-40)."""
-    model = {"object-card": ObjectCard, "render-params": RenderParams}[case["schema"]]
+    model = MODELS[case["schema"]]
     if _is_provenance_rule(case):
         model.model_validate(case["instance"])
     else:
