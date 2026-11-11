@@ -144,8 +144,43 @@ export const FLUIDS: Readonly<Record<FluidId, Fluid>> = {
 /** Order of the `surface_fluid` slider: index to fluid id. */
 export const FLUID_ORDER: readonly FluidId[] = ['water', 'methane', 'ammonia', 'nitrogen', 'co2'];
 
-/** Saturation vapour pressure, Pa, at temperature T (Clausius-Clapeyron from the triple point). */
+/** Upper end of the liquid fit below, K: the one-atmosphere boiling point of water. */
+const MK_TOP_K = 373.15;
+
+/**
+ * Saturation vapour pressure of water, Pa (#93 3.2): Murphy and Koop 2005 (QJRMS 131, 1539), eq. 7 over ice below
+ * the triple point (273.16 K) and eq. 10 over liquid above it. Their liquid fit is stated for 123 to 332 K; carried
+ * to 373.15 K it is 0.6 % above IAPWS-95, so it is used up to there. Above 373.15 K the curve continues by
+ * Clausius-Clapeyron with the 373 K heat of vaporisation from the fit's value at 373.15 K. `derived` (a fit to
+ * measurements). The engine's core.js psatMK is the same function.
+ */
+export function psatWater(T: number): number {
+  if (T < 273.16)
+    return Math.exp(9.550426 - 5723.265 / T + 3.53068 * Math.log(T) - 0.00728332 * T);
+  const t = Math.min(T, MK_TOP_K);
+  const p = Math.exp(
+    54.842763 -
+      6763.22 / t -
+      4.21 * Math.log(t) +
+      0.000367 * t +
+      Math.tanh(0.0415 * (t - 218.8)) *
+        (53.878 - 1331.22 / t - 9.44523 * Math.log(t) + 0.014025 * t),
+  );
+  return T > MK_TOP_K
+    ? p * Math.exp((FLUIDS.water.L / R_GAS) * (1 / MK_TOP_K - 1 / T))
+    : p;
+}
+
+/**
+ * Saturation vapour pressure, Pa, at temperature T. Water follows Murphy and Koop 2005 (`psatWater`). Any other
+ * fluid follows Clausius-Clapeyron from the triple point; a fluid with a vaporisation heat `Lv` (CO2) uses it above
+ * the triple point and its sublimation heat `L` below (#93 3.2: the prototype used `L` on both sides).
+ */
 export function psatFn(f: Fluid): (T: number) => number {
+  if (f.id === 'water') return psatWater;
+  const Lv = f.Lv;
+  if (Lv !== undefined)
+    return (T) => f.Pt * Math.exp(((T >= f.Tt ? Lv : f.L) / R_GAS) * (1 / f.Tt - 1 / T));
   return (T) => f.Pt * Math.exp((f.L / R_GAS) * (1 / f.Tt - 1 / T));
 }
 

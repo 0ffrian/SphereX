@@ -36,6 +36,26 @@ FLUIDS.nitrogen.Tc = 126.19; FLUIDS.nitrogen.Pc = 3.3958e6;
 FLUIDS.ammoniaWater.Tc = 405.4; FLUIDS.ammoniaWater.Pc = 11.33e6;
 // @end-deviation'''
 
+CORE_L1705_93_3_2 = r'''// @deviation L1705 (#93 3.2) the latent heat in the saturation pressure. The prototype used one heat for the whole
+// curve: for water the 373 K heat of vaporisation (1,537 Pa at 288 K against 1,706 Pa measured), for CO2 the
+// sublimation heat above the triple point too (3.36 MPa at 250 K against 1.79 MPa). Now:
+//  - water: Murphy and Koop 2005 (QJRMS 131, 1539), eq. 7 over ice below the triple point and eq. 10 over liquid
+//    above it (their fit is for 123 to 332 K; carried to 373.15 K it is 0.6 % above IAPWS-95). Above 373.15 K the
+//    curve continues with Clausius-Clapeyron and the prototype's 373 K heat F.L, from the fit's value at 373.15 K.
+//  - CO2 (any fluid with F.Lv): the vaporisation heat F.Lv above the triple point, the sublimation heat F.L below.
+//  - other fluids: the prototype's line, unchanged. Same as physics/fluids.ts psatFn.
+function psatMK(T) {
+  if (T < 273.16) return Math.exp(9.550426 - 5723.265 / T + 3.53068 * Math.log(T) - 0.00728332 * T);
+  var t = Math.min(T, 373.15), p = Math.exp(54.842763 - 6763.22 / t - 4.21 * Math.log(t) + 0.000367 * t + Math.tanh(0.0415 * (t - 218.8)) * (53.878 - 1331.22 / t - 9.44523 * Math.log(t) + 0.014025 * t));
+  return T > 373.15 ? p * Math.exp(FLUIDS.water.L / 8.314 * (1 / 373.15 - 1 / T)) : p;
+}
+function psatFn(F) {
+  if (F === FLUIDS.water) return psatMK;
+  if (F.Lv > 0) return function (T) { return F.Pt * Math.exp((T >= F.Tt ? F.Lv : F.L) / 8.314 * (1 / F.Tt - 1 / T)); };
+  return function (T) { return F.Pt * Math.exp(F.L / 8.314 * (1 / F.Tt - 1 / T)); };
+}
+// @end-deviation'''
+
 CORE_L1727_89_REVIEW_2 = r'''// @deviation L1727 (#89 review 2): CO2 can be liquid. The prototype anchors the boiling point at the one-atmosphere
 // point F.Tb, but for CO2 that is the sublimation point (194.7 K, below its triple point 216.58 K), so `F.Tb > F.Tt`
 // was never true and CO2 was never liquid at any pressure. When Tb < Tt the liquid-vapour line is drawn up from the

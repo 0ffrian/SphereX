@@ -1,7 +1,7 @@
 // Issue #93 phase 3 (physics): the verbatim engine's CPU model, run headless. Each block names its #93 item.
 import { describe, expect, it } from 'vitest';
 import { headlessCore, loadModelOnly, preset } from './coreHarness.testutil';
-import { FLUIDS as TS_FLUIDS, boilingPointK, fluidState } from '@/physics/fluids';
+import { FLUIDS as TS_FLUIDS, boilingPointK, cloudBaseK, fluidState } from '@/physics/fluids';
 
 const PRESSURES_BAR = [0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30, 100];
 
@@ -58,6 +58,31 @@ describe('#93 3.1 critical points', () => {
     core.worldUi();
     const row = (core.W.rows as [string, string][]).find((r) => r[0] === 'Surface fluid');
     expect(row?.[1]).toMatch(/supercritical/);
+  });
+
+  it('#93 3.2: the engine saturation curve is the same as physics/fluids.ts (Murphy and Koop for water, Lv for CO2)', () => {
+    // Compared through the cloud base, which follows the adiabat until psat(T) <= q P: the same curve and inputs
+    // give the same cloud-base temperature (both step 0.5 K from the surface).
+    loadModelOnly(core, preset('earth'));
+    for (const [fluid, Ps] of [
+      ['water', 1],
+      ['water', 3],
+      ['co2', 20],
+    ] as const) {
+      core.W.fluid = fluid;
+      core.W.Ps = Ps;
+      // CO2: the first orbit (1.0 to 3.0 au) where the CO2 air condenses at all.
+      let m = core.worldModel();
+      for (let o = 1; fluid === 'co2' && o <= 3; o += 0.1) {
+        core.W.orbit = o;
+        m = core.worldModel();
+        if (m.Tc !== null) break;
+      }
+      const f = TS_FLUIDS[fluid];
+      const tc = cloudBaseK({ ...f, q: core.FLUIDS[fluid].q }, m.Ts, Ps * 1e5);
+      expect(m.Tc, `${fluid} ${Ps} bar`).not.toBeNull();
+      expect(Math.abs(m.Tc - tc!), `${fluid} ${Ps} bar`).toBeLessThanOrEqual(0.5);
+    }
   });
 
   it('below the critical pressure the line is unchanged: water boils at 373 K at 1 bar', () => {
