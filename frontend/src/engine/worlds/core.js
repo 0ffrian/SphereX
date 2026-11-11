@@ -13,7 +13,7 @@ import { GAS_NODES, gasProfile, GasSim } from './gas.js';
 export function createCore(canvas) {
 var reduced = false;
 
-// @verbatim L1662-L1726
+// @verbatim L1701-L1765
 var ORB = { rivers: { Ms: 1, e: 0.01, obl: 0.3 }, earth: { Ms: 1, e: 0.0167, obl: 0.409 }, t1e: { Ms: 0.0898, e: 0.005, obl: 0 }, t1f: { Ms: 0.0898, e: 0.01, obl: 0 }, k186: { Ms: 0.544, e: 0.04, obl: 0 }, k218: { Ms: 0.359, e: 0.09, obl: 0 }, tit: { Ms: 1, e: 0.054, obl: 0.467 }, lava: { Ms: 0.95, e: 0, obl: 0 } };
 function applySpin(p) { if (p.type === 'gas') return p; var mode = W.spinMode, lock = mode === 'auto' ? (p.locked && (W.ecc || 0) < 0.15) : mode === 'lock', res = mode === 'res32' || (mode === 'auto' && p.locked && (W.ecc || 0) >= 0.15); return Object.assign({}, p, { locked: lock || res, res32: res, Prot: p.Prot || 1 }); }
 var W = { fly: false, flyLon: 0, flyLat: 0.3, flyHead: 0.6, flyPitch: -0.16, flyAlt: 14, flyAuto: false, clouds: true, pitch: 0, zoom: 1, yaw: 0, hydro: null, route: null, hydroDue: 0, spinMode: 'auto', tect: 'auto', co2Therm: false, overlay: 0, season: 0, ecc: 0, obl: 0, p: WP[0], fluid: 'water', Tstar: 2566, orbit: 1, Ps: 1, playing: !reduced, m: null, step: 0, spin: 0.4, gl: null, spinup: 0 };
@@ -80,9 +80,103 @@ function worldModel() {
   return { Seff: Seff, sIn: sIn, sOut: sOut, shoreB: shoreB, shoreX: shoreX, Tcol: Tcol, tide: tide, phiH: phiH, pco2: pco2, d: p.pal ? p.pal.d : dp2[0], p: p.pal ? p.pal.p : dp2[1], gamK: Gam * 1000 * (gas ? 1 : 0.66),   /* environmental lapse: about 6.5 K/km on Earth (US Standard Atmosphere 1976), not the dry 9.8 */ gas: gas, Teq: Teq, Ts: Ts, S: S, tau: tau, gv: gv, H: H, Om: Om, rotD: rotD, eps: eps, U: U, N: N, jets: jets, LD: LD, sz: sz, Tb: Tb, canLiquid: canLiquid, state: state, Tc: Tc, zc: zc, cov: cov, sky: sky, sun: sun, haze: haze, hazeC: hazeC, z: z, b: b2, s: s2, regime: regime, V: V, airless: airless, runaway: runaway, F: F, flat: gas ? clamp(0.7 * Om * Om * R * R * R / (6.674e-11 * M), 0, 0.14) : 0, a: a };
 }
 // @end-verbatim
-// @verbatim L1861-L2008
+// @verbatim L1906-L2147
+/* ---------- lava: rivers, lakes and a magma sea on a hot rocky world ----------
+   Same machinery as the water rivers above, with lava in place of runoff. Every constant is cited or tagged.
+   1. Magma sea. Where the local surface temperature is above the basalt liquidus (about 1,500 K; solidus about 1,400 K, so
+      the range between is crystal mush; Lesher and Spera 2015) the ground is molten, and the hot lowlands pool: the sea
+      surface is the height that covers the lowest 70 % of the hot area (the share is chosen, there is no measurement;
+      artistic). Hot ground above that height stays solid as crust islands.
+   2. Vents. Effusion comes from the stagnant-lid shield summits and the rift-zone vents on their flanks (buildTerrain).
+   3. Routing. Priority-flood fills closed basins (Barnes et al. 2014); each flow follows the steepest filled slope, D8
+      (O'Callaghan and Mark 1984), through routeTerrain's raster. A flow that reaches a closed basin fills a lava lake
+      there, as far as its volume over an eruption lasting 10 years allows (flood-basalt eruptions last years to decades,
+      Self et al. 2008; the 10 years is chosen). One that reaches the magma sea joins it.
+   4. Flux. Each summit vent erupts 1e5 m3/s, flood-basalt scale (Self et al. 2008; chosen, not measured); a flank vent half of that. Fluxes add where flows merge.
+   5. Width. w = 4 Q^0.5, the WATER hydraulic-geometry law of Leopold and Maddock 1953, used here only as a stand-in
+      for lava channels: model_dependent. Channels are then drawn wider than that (3 map cells minimum, about 160 km) so they show from orbit.
+   6. Cooling. Along its path the flow loses heat by radiation, dT/T ~ (1 - (Tamb/Tvent)^4) per length (the radiative term of
+      FLOWGO, Harris and Rowland 2001), with an e-folding length proportional to the flux (flow length grows with effusion
+      rate, Walker 1973; Pinkerton and Wilson 1994). The constant, 400 km at 1e5 m3/s, is chosen so flood-scale flows run for
+      hundreds to a thousand km (Deccan and Columbia River flows reach hundreds of km, Self et al. 2008): model_dependent.
+      Stored as B (0 fresh, 1 crusted). The vent is at about 1,500 K, the crust surface about 950 K.
+   Texture meaning on a lava world (the same hyTex): R = liquid lava (channel or lake), G = solid crust island inside the
+   magma sea, B = cooling along the flow (0 at the vent, 1 crusted over), A = vent fountain. */
+var LAVA = { Tsol: 1400, Tliq: 1500, Tvent: 1500, Tcrust: 950, Q0: 1e5, Lc: 400, years: 10, seaShare: 0.7 };
+function lavaWorld(m) { return !m.gas && m.Ts > 700; }
+function lavaRaster(t, m, rt) {
+  var Wd = t.W, Hd = t.H, N = Wd * Hd, RW = 2048, RH = 1024, img = new Uint8Array(RW * RH * 4), i, k, ex = EB.NX / Wd, ey = EB.NY / Hd, Rm = W.p.Rj * 71492e3, texKm = 2 * Math.PI * Rm / RW / 1000, sx = RW / Wd, sy = RH / Hd, dLat = Math.PI / Hd;
+  var T = new Float32Array(N), cellA = (2 * Math.PI * Rm / Wd) * (Math.PI * Rm / Hd);
+  for (i = 0; i < N; i++) { var y0 = Math.floor(i / Wd), x0 = i - y0 * Wd, e0 = Math.min(EB.NX * EB.NY - 1, Math.floor(y0 * ey) * EB.NX + Math.floor(x0 * ex)); T[i] = EB.T[e0] - m.gamK * Math.max(rt.h[i], 0); }
+  function cool(Ta) { return clamp(1 - Math.pow(Ta / LAVA.Tvent, 4), 0, 1); }
+  function plotDisc(cx, cy, rad, ch, val) {
+    var xa = Math.floor(cx - rad - 1), xb = Math.ceil(cx + rad + 1), ya = Math.max(0, Math.floor(cy - rad - 1)), yb = Math.min(RH - 1, Math.ceil(cy + rad + 1));
+    for (var yy = ya; yy <= yb; yy++) for (var xx = xa; xx <= xb; xx++) { var d = Math.hypot(xx + 0.5 - cx, yy + 0.5 - cy), a = clamp(rad + 0.5 - d, 0, 1) * val; if (a <= 0) continue; var ix = (yy * RW + ((xx % RW) + RW) % RW) * 4 + ch; img[ix] = Math.max(img[ix], Math.round(a * 255)); }
+  }
+  function plotL(cx, cy, rad, Bv) {   // liquid lava: R takes the stronger cover, B follows the pixel that owns R
+    var xa = Math.floor(cx - rad - 1), xb = Math.ceil(cx + rad + 1), ya = Math.max(0, Math.floor(cy - rad - 1)), yb = Math.min(RH - 1, Math.ceil(cy + rad + 1));
+    for (var yy = ya; yy <= yb; yy++) for (var xx = xa; xx <= xb; xx++) { var d = Math.hypot(xx + 0.5 - cx, yy + 0.5 - cy), a = Math.round(clamp(rad + 0.5 - d, 0, 1) * 255); if (a <= 0) continue; var ix = (yy * RW + ((xx % RW) + RW) % RW) * 4; if (a >= img[ix]) { img[ix] = a; img[ix + 2] = Math.round(clamp(Bv, 0, 1) * 255); } }
+  }
+  function jit(c) { var hsh = Math.imul(c, 2654435761) >>> 0; return [((hsh & 1023) / 1023 - 0.5) * 0.6, (((hsh >>> 10) & 1023) / 1023 - 0.5) * 0.6]; }
+  function cen(c) { var y = Math.floor(c / Wd), x = c - y * Wd, j2 = jit(c); return [(x + 0.5 + j2[0]) * sx, (y + 0.5 + j2[1]) * sy]; }
+  function seg(a, b, rad, B0, B1) { var ax = a[0], ay = a[1], bx = b[0], by = b[1]; if (bx - ax > RW / 2) bx -= RW; else if (ax - bx > RW / 2) bx += RW; var L = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.ceil(L / Math.max(rad * 0.7, 0.5))); for (var s2 = 0; s2 <= n; s2++) plotL(ax + (bx - ax) * s2 / n, ay + (by - ay) * s2 / n, rad, B0 + (B1 - B0) * s2 / n); }
+  function dKm(c, r) { var y = Math.floor(c / Wd), x = c - y * Wd, y2 = Math.floor(r / Wd), x2 = r - y2 * Wd, dxl = Math.min(Math.abs(x2 - x), Wd - Math.abs(x2 - x)), cl = Math.max(Math.cos(((y + 0.5) / Hd - 0.5) * Math.PI), 0.02); return Math.hypot(dxl * cl, y2 - y) * dLat * Rm / 1000; }
+  // 1. magma sea: the hot lowlands (above the liquidus) pool below the height that covers the lowest share of the hot area
+  var hot = [], hw = 0;
+  for (i = 0; i < N; i++) if (T[i] > LAVA.Tliq) { var yh = Math.floor(i / Wd), wq = Math.cos(((yh + 0.5) / Hd - 0.5) * Math.PI); hot.push([rt.h[i], wq]); hw += wq; }
+  hot.sort(function (a, b) { return a[0] - b[0]; });
+  var hM = -1e3, acc = 0; for (k = 0; k < hot.length; k++) { acc += hot[k][1]; if (acc >= LAVA.seaShare * hw) { hM = hot[k][0]; break; } }
+  function isSea(c) { return T[c] > LAVA.Tliq && rt.h[c] <= hM; }
+  var nIsl = 0, nSea = 0;
+  for (i = 0; i < N; i++) if (T[i] > LAVA.Tliq) { if (rt.h[i] > hM) { var pi2 = cen(i); plotDisc(pi2[0], pi2[1], 1.7, 1, 1); nIsl++; } else nSea++; }
+  // closed basins that are not under the magma sea
+  var basin = new Int32Array(N).fill(-1), nb = 0, stack = [], basins = [];
+  function inBasin(c) { return rt.fill[c] - rt.h[c] >= 0.03 && !isSea(c); }
+  for (i = 0; i < N; i++) {
+    if (basin[i] >= 0 || !inBasin(i)) continue;
+    var cells = [], vol = 0, tsum = 0; basin[i] = nb; stack.push(i);
+    while (stack.length) { var c = stack.pop(); cells.push(c); var cy2 = Math.floor(c / Wd), cx2 = c - cy2 * Wd; vol += (rt.fill[c] - rt.h[c]) * 1000 * cellA * Math.cos(((cy2 + 0.5) / Hd - 0.5) * Math.PI); tsum += T[c];
+      for (var yj = Math.max(0, cy2 - 1); yj <= Math.min(Hd - 1, cy2 + 1); yj++) for (var dx2 = -1; dx2 <= 1; dx2++) { var n2 = yj * Wd + (cx2 + dx2 + Wd) % Wd; if (basin[n2] < 0 && inBasin(n2)) { basin[n2] = nb; stack.push(n2); } } }
+    basins.push({ cells: cells, vol: vol, Tm: tsum / cells.length, qin: 0 }); nb++;
+  }
+  // 2. vents: the shield summits and their rift-zone vents; a world without them uses its highest well-separated peaks
+  var vents = (t.vents || []).slice();
+  if (!vents.length) { var idx = []; for (i = 0; i < N; i++) idx.push(i); idx.sort(function (a, b) { return rt.h[b] - rt.h[a] || a - b; });
+    idx.forEach(function (c) { if (vents.length >= 8) return; var yc = Math.floor(c / Wd), xc = c - yc * Wd, la = ((yc + 0.5) / Hd - 0.5) * Math.PI, lo = ((xc + 0.5) / Wd - 0.5) * 6.2832, v = [Math.cos(la) * Math.cos(lo), Math.sin(la), Math.cos(la) * Math.sin(lo), 1]; if (vents.every(function (u) { return u[0] * v[0] + u[1] * v[1] + u[2] * v[2] < 0.88; })) vents.push(v); }); }
+  // 3.-6. flow along the steepest filled slope, cooling as it goes
+  var Qc = new Float64Array(N), segs = [], nVent = 0, nSink = 0;
+  vents.forEach(function (v) {
+    var la = Math.asin(clamp(v[1], -1, 1)), lo = Math.atan2(v[2], v[0]), x = clamp(Math.floor((lo / 6.2832 + 0.5) * Wd), 0, Wd - 1), y = clamp(Math.floor((la / Math.PI + 0.5) * Hd), 0, Hd - 1), c = y * Wd + x;
+    if (isSea(c)) return;
+    var Qv = LAVA.Q0 * v[3], Lc = LAVA.Lc * v[3], B = 0, steps = 0; nVent++; plotDisc(cen(c)[0], cen(c)[1], 2.2, 3, 1);
+    while (steps++ < 700) {
+      Qc[c] += Qv;
+      if (basin[c] >= 0) { basins[basin[c]].qin += Qv; break; }
+      var r = rt.rec[c]; if (r === c) break;
+      var B1 = 1 - (1 - B) * Math.exp(-dKm(c, r) * cool(T[c]) / Lc);
+      segs.push([c, r, B, B1]); B = B1;
+      if (isSea(r)) break;
+      if (B > 0.985) break;
+      c = r;
+    }
+  });
+  var bigQ = 0;
+  segs.forEach(function (sg) { var Q = Qc[sg[0]], wReal = 4 * Math.sqrt(Q) / 1000, wDraw = Math.max(wReal / texKm, 4.5 + 1.2 * Math.log10(Q / LAVA.Q0)); seg(cen(sg[0]), cen(sg[1]), wDraw / 2, sg[2], sg[3]); if (Q > bigQ) bigQ = Q; });
+  // lakes: a basin a flow reached fills with as much lava as its inflow brings over the eruption, lowest cells first; the lake keeps a crust, thicker where the ground is cold
+  var nLake = 0;
+  basins.forEach(function (bs) {
+    if (bs.qin <= 0 || bs.cells.length < 3) return;
+    var frac = clamp(bs.qin * LAVA.years * 3.156e7 / bs.vol, 0, 1); if (frac < 0.05) return;
+    bs.cells.sort(function (a, b) { return (rt.fill[b] - rt.h[b]) - (rt.fill[a] - rt.h[a]) || a - b; });
+    var nWet = Math.max(1, Math.round(bs.cells.length * frac)), Bl = 0.2 + 0.7 * cool(bs.Tm);
+    for (var q = 0; q < nWet; q++) { var p2 = cen(bs.cells[q]); plotL(p2[0], p2[1], 1.5 * sx, Bl); }
+    nLake++;
+  });
+  return { img: img, RW: RW, RH: RH, n: segs.length, big: bigQ, lava: true, vents: nVent, lakes: nLake, hM: hM, seaCells: nSea, islands: nIsl };
+}
 function hydroRaster(t, m, rt) {
   var Wd = t.W, Hd = t.H, N = Wd * Hd, RW = 2048, RH = 1024, img = new Uint8Array(RW * RH * 4), i, k, F = m.F;
+  if (rt && lavaWorld(m)) return lavaRaster(t, m, rt);
   if (!rt || OCEANF[W.p.id] <= 0 || m.airless) return { img: img, RW: RW, RH: RH, n: 0, big: 0 };
   var Rm = W.p.Rj * 71492e3, cellA = (2 * Math.PI * Rm / Wd) * (Math.PI * Rm / Hd), Q = new Float64Array(N), T = new Float32Array(N), rainC = new Float32Array(N), ex = EB.NX / Wd, ey = EB.NY / Hd;
   var P0 = W.fluid === 'water' ? 1.0 : 0.4;   // a normalised rain of 1 is about 1 m per year of liquid
@@ -230,7 +324,7 @@ function ebStats(m) {
 
 /* ---------- gas giants: quasi-geostrophic vorticity on the sphere, jets and storms emerge and interact ---------- */
 // @end-verbatim
-// @verbatim L2123-L2216
+// @verbatim L2262-L2355
 // @rename (ema=>(!window.__sxPin&&ema
 var OCEANF = { rivers: 0.5, earth: 0.71, t1e: 0.62, t1f: 0.7, k186: 0.55, k218: 1, tit: 0.18, lava: 0 };
 function WorldGL(canvas) {
@@ -281,7 +375,7 @@ function WorldGL(canvas) {
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, m.gas ? ga.t : ra.t);
     ['uTr', 'uLut', 'uHt', 'uEb'].forEach(function (n, i) { if (uW[n]) gl.uniform1i(uW[n], i); }); if (uW.uBand) gl.uniform1i(uW.uBand, 6); if (uW.uRing) gl.uniform1i(uW.uRing, 7); if (uW.uRv) gl.uniform1i(uW.uRv, 8); if (uW.uEb2) gl.uniform1i(uW.uEb2, 9); if (uW.uHy) gl.uniform1i(uW.uHy, 10);
     var ocean = OCEANF[W.p.id] > 0 && !m.airless ? 1 : 0;
-    var f1 = { uTime: W.step * 0.06, uMode: m.gas ? 1 : 0, uSpin: spin, uTilt: (W.p.axis != null ? W.p.axis : 0.12) + (m.gas ? 0 : W.pitch), uFrame: W.p.rings ? 2.75 : 1.2 / (m.gas ? 1 : W.zoom), uRoll: W.p.roll || 0, uRT: W.p.rings ? 1 : 0, uTt: F.Tt, uTb: m.canLiquid ? m.Tb : 0, uCov: m.cov, uTau: m.gas ? 0.06 : m.airless ? 0 : Math.min(3, 0.55 + 0.7 * Math.log10(W.Ps + 1)), uHz: m.haze, uHv: clamp(m.H / (W.p.Rj * 71492e3) * 9, 0.012, 0.09), uSeed: W.p.seed, uF: m.flat, uOcean: ocean, uGam: m.gamK, uTgas: m.Teq, uEpsG: m.eps, uLock: locked ? 1 : 0, uBump: 0.0035, uClouds: W.clouds ? 1 : 0, uOverlay: W.overlay, uSig: 0.003 + 0.00512 * clamp(m.U * 0.25, 2, 25), uTcol: EB.stats && EB.stats.min < m.Tcol ? m.Tcol : 0, uTide: clamp(m.tide / 2, 0, 1), uFluidK: W.fluid === 'methane' ? 1 : 0, uTrW: ga.w, uTrH: ga.h };
+    var f1 = { uTime: W.step * 0.06, uMode: m.gas ? 1 : 0, uSpin: spin, uTilt: (W.p.axis != null ? W.p.axis : 0.12) + (m.gas ? 0 : W.pitch), uFrame: W.p.rings ? 2.75 : 1.2 / (m.gas ? 1 : W.zoom), uRoll: W.p.roll || 0, uRT: W.p.rings ? 1 : 0, uTt: F.Tt, uTb: m.canLiquid ? m.Tb : 0, uCov: m.cov, uTau: m.gas ? 0.06 : m.airless ? 0 : Math.min(3, 0.55 + 0.7 * Math.log10(W.Ps + 1)), uHz: m.haze, uHv: clamp(m.H / (W.p.Rj * 71492e3) * 9, 0.012, 0.09), uSeed: W.p.seed, uF: m.flat, uOcean: ocean, uGam: m.gamK, uTgas: m.Teq, uEpsG: m.eps, uLock: locked ? 1 : 0, uBump: 0.0035, uClouds: W.clouds ? 1 : 0, uOverlay: W.overlay, uSig: 0.003 + 0.00512 * clamp(m.U * 0.25, 2, 25), uTcol: EB.stats && EB.stats.min < m.Tcol ? m.Tcol : 0, uTide: clamp(m.tide / 2, 0, 1), uFluidK: W.fluid === 'methane' ? 1 : 0, uTrW: ga.w, uTrH: ga.h, uLava: lavaWorld(m) ? 1 : 0, uHM: W.hydro && W.hydro.lava ? W.hydro.hM : 0 };
     Object.keys(f1).forEach(function (k) { if (uW[k]) gl.uniform1f(uW[k], f1[k]); });
     gl.uniform2f(uW.uR, gw, h); gl.uniform2f(uW.uOff, gx, 0);
     var star = planckRGB(W.Tstar), v3 = { uL: m.gas ? (W.p.L ? (function (v) { var l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; })(W.p.L) : Lg) : Lr, uAw: F.aw || [0.1, 0.1, 0.1], uLiq: F.liq, uIce: F.ice, uLand: m.Ts > 700 ? [0.15, 0.12, 0.11] : F.land, uCld: F.cld, uSky: m.sky, uSun: m.sun, uStar: star, uHazeC: m.hazeC, uZ: m.z, uB: m.b, uS: m.s, uD: m.d, uP: m.p };
@@ -327,7 +421,7 @@ function WorldGL(canvas) {
   };
 }
 // @end-verbatim
-// @verbatim L2217-L2246
+// @verbatim L2356-L2385
 function rxv(v, a) { var c = Math.cos(a), s = Math.sin(a); return [v[0], v[1] * c - v[2] * s, v[1] * s + v[2] * c]; }
 function ryv(v, a) { var c = Math.cos(a), s = Math.sin(a); return [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c]; }
 function nrm3(v) { var l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; }
@@ -359,11 +453,11 @@ function globePick(px, py) {
 }
 var GS = null;
 // @end-verbatim
-// @verbatim L2248-L2248
+// @verbatim L2387-L2387
 function km(m) { return m >= 1e9 ? fmt(m / 1e9, 1) + ' million km' : fmt(m / 1000) + ' km'; }
 // @end-verbatim
 function worldUi() {
-// @verbatim L2250-L2270
+// @verbatim L2389-L2410
   var m = W.m, p = W.p, F = m.F, gas = m.gas, state = { frozen: F.label + ' is frozen', liquid: F.label + ' is liquid', vapour: m.runaway ? 'Water has boiled off' : F.label + ' is gas', gas: 'All gas' }[m.state];
   var rows = [['Starlight here', fmt(m.S) + ' W/m² (' + fmt(m.S / 1361, m.S / 1361 < 10 ? 2 : 0) + '× Earth)'], ['Equilibrium temperature', fmt(m.Teq) + ' K']];
   if (!gas) rows.push(['Average surface temperature', fmt(EB.stats ? EB.stats.mean : m.Ts) + ' K']);
@@ -376,7 +470,8 @@ function worldUi() {
     rows.push(['Habitable zone', m.Seff > m.sIn ? 'Too hot: runaway greenhouse' : m.Seff < m.sOut ? 'Beyond the outer edge' : 'Inside']);
     rows.push(['Keeps air, starlight test', m.shoreB ? 'At risk' : 'Yes'], ['Keeps air, X-ray and UV test', m.shoreX ? 'At risk' : 'Yes']);
     if (!m.airless && EB.stats) rows.push(['Air freezing on the cold side', EB.stats.min < m.Tcol ? 'Yes, below ' + fmt(m.Tcol) + ' K' : 'No']);
-    if (W.hydro && W.hydro.n) rows.push(['Rivers drawn', fmt(W.hydro.n) + ' channel cells, largest ' + fmt(W.hydro.big) + ' m³/s'], ['Lakes / salt flats', fmt(W.hydro.lakes) + ' / ' + fmt(W.hydro.salt)], ['River deltas', fmt(W.hydro.mouths)]);
+    if (W.hydro && W.hydro.lava) rows.push(['Lava vents', fmt(W.hydro.vents)], ['Lava channel cells, largest', fmt(W.hydro.n) + ', ' + fmt(W.hydro.big) + ' m³/s'], ['Lava lakes', fmt(W.hydro.lakes)]);
+    else if (W.hydro && W.hydro.n) rows.push(['Rivers drawn', fmt(W.hydro.n) + ' channel cells, largest ' + fmt(W.hydro.big) + ' m³/s'], ['Lakes / salt flats', fmt(W.hydro.lakes) + ' / ' + fmt(W.hydro.salt)], ['River deltas', fmt(W.hydro.mouths)]);
     rows.push(['Tidal heat', m.tide < 0.01 ? 'Negligible' : fmt(m.tide, 2) + ' W/m²'], ['Crust', W.terr && W.terr.stagnant ? 'Stagnant lid' : 'Moving plates']);
     if (m.pco2 != null) rows.push(['CO₂ from weathering balance', fmt(m.pco2, m.pco2 < 10 ? 2 : 0) + '× Earth']);
     if (W.fluid === 'water' && EB.stats && EB.stats.max > 299.65 && EB.cyc && EB.cyc.length) { var To = 200, qst = 0.622 * psatFn(F)(EB.stats.max) / (W.Ps * 1e5), vmax = Math.sqrt(0.9 * (EB.stats.max - To) / To * 2.5e6 * qst * 0.2); rows.push(['Strongest hurricane possible', fmt(vmax) + ' m/s']); }
@@ -387,7 +482,7 @@ function worldUi() {
   rows.push(['Scale height', fmt(m.H / 1000, 1) + ' km'], ['Wind speed', fmt(m.U) + ' m/s'], ['Jets (Rhines)', fmt(m.jets)], ['Storm size', km(m.sz * p.Rj * 71492e3 * 2)]);
 // @end-verbatim
   W.rows = rows; W.mixed = mixed;
-// @verbatim L2274-L2285
+// @verbatim L2414-L2425
 // @rename $('#world-cap').textContent=>W.cap
   var c;
   if (gas) c = (p.locked ? 'Locked to its star, so one giant jet carries heat around the planet and the hot spot sits downwind of the noon point. ' : 'Fast spin splits the winds into many jets, and storms sit in the shear between them. ') + (m.Teq * (1 - 0.45 * m.eps) > 900 ? 'At this temperature the night side glows from its own heat.' : '');
@@ -402,12 +497,12 @@ function worldUi() {
   if (gas && GAS_NODES[p.id]) c = 'Belts and zones are placed where they are observed, and the deep jets hold them steady. Storms sit trapped between the jets.' + (p.rings ? ' The rings use their measured radii and gaps, with real shadows.' : '');
   W.cap = c + (gas ? (W.timeSec < 1000 ? ' One second here is 5 minutes, so the planet turns slowly and its clouds barely change.' : ' One second here is one Earth day, viewed from above the turning planet, so you can watch storms drift.') : ' Motion is sped up.');
 // @end-verbatim
-// @verbatim L2289-L2289
+// @verbatim L2429-L2429
 // @rename $('#world-tag').textContent=>W.tag
   W.tag = p.label + (gas ? ' · ' + m.regime : ' · ' + fmt(EB.stats ? EB.stats.mean : m.Ts) + ' K');
 // @end-verbatim
 }
-// @verbatim L2291-L2303
+// @verbatim L2431-L2443
 function resetWorld() {
   W.m = worldModel();
   var m = W.m;
@@ -423,21 +518,21 @@ function resetWorld() {
 }
 // @end-verbatim
 function setPreset(p) {
-// @verbatim L2305-L2306
+// @verbatim L2445-L2446
   W.aimed = false; W.yaw = 0; W.pitch = 0;
   var ob0 = ORB[p.id] || { e: 0, obl: 0 }; W.ecc = ob0.e || 0; W.obl = ob0.obl || 0; W.spinMode = 'auto'; W.base = p; W.p = applySpin(p); W.fluid = p.fluid; W.Tstar = p.Ts; W.orbit = 1; W.Ps = p.Ps; W.step = 0;
 // @end-verbatim
-// @verbatim L2311-L2311
+// @verbatim L2451-L2451
   resetWorld();
 // @end-verbatim
 }
 W.timeSec = 300; W.simAcc = 0;
-// @verbatim L2328-L2330
+// @verbatim L2468-L2470
 function altRange() { return W.m && W.m.gas ? [50, 80000] : [0.3, 3000]; }
 function altToS(a) { var r = altRange(); return Math.round(Math.log(a / r[0]) / Math.log(r[1] / r[0]) * 1000); }
 function sToAlt(v) { var r = altRange(); return r[0] * Math.pow(r[1] / r[0], v / 1000); }
 // @end-verbatim
-// @verbatim L2332-L2346
+// @verbatim L2472-L2486
 function flyAimPeak() {   // from orbit: look at the highest land that has the Sun 25 to 60 degrees up, from about 550 km back
   var v = W.view, t = W.terr; if (!v || !t || (W.m && W.m.gas)) return false; var Lb = ryv(rxv(v.L, v.tilt), v.spin), best = -1e9, bi = -1, bj = -1, i, j;
   for (j = 2; j < t.H - 2; j += 2) for (i = 0; i < t.W; i += 2) { var la = ((j + 0.5) / t.H - 0.5) * Math.PI, lo = ((i + 0.5) / t.W - 0.5) * 6.2832, d = [Math.cos(la) * Math.cos(lo), Math.sin(la), Math.cos(la) * Math.sin(lo)], se = d[0] * Lb[0] + d[1] * Lb[1] + d[2] * Lb[2];

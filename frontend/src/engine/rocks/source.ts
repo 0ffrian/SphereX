@@ -5,19 +5,19 @@
 // Do not edit by hand: change the script or the prototype and run it again. Only TypeScript wrapping
 // (this header, the shim below and the exports at the end) differs from the prototype; the DOM
 // and UI code (`pills`, `rockUi`, the event handlers) is not copied.
-//   1267-1267  clamp          (shared helper)
-//   1272-1272  rng            (shared helper)
-//   1291-1296  compile, unis  (shared helpers)
-//   1298-1305  NOISE          (GLSL noise block)
-//   2372-2505  RP, R, radialFn, rockModel, buildRock, ROCK_VS, ROCK_FS, JET_VS, JET_FS, RockGL
+//   1268-1268  clamp          (shared helper)
+//   1273-1273  rng            (shared helper)
+//   1292-1297  compile, unis  (shared helpers)
+//   1299-1306  NOISE          (GLSL noise block)
+//   2512-2645  RP, R, radialFn, rockModel, buildRock, ROCK_VS, ROCK_FS, JET_VS, JET_FS, RockGL
 var reduced = false;
-// @verbatim L1267-L1267
+// @verbatim L1268-L1268
 var clamp = function (x, a, b) { return Math.min(b, Math.max(a, x)); };
 // @end-verbatim
-// @verbatim L1272-L1272
+// @verbatim L1273-L1273
 function rng(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 // @end-verbatim
-// @verbatim L1291-L1296
+// @verbatim L1292-L1297
 function compile(gl, vs, fs) {
   function sh(t, s) { var o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; }
   var p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
@@ -25,7 +25,7 @@ function compile(gl, vs, fs) {
 }
 function unis(gl, p) { var u = {}, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS), i; for (i = 0; i < n; i++) { var a = gl.getActiveUniform(p, i), name = a.name.replace('[0]', ''); u[name] = gl.getUniformLocation(p, a.name); } return u; }
 // @end-verbatim
-// @verbatim L1298-L1305
+// @verbatim L1299-L1306
 var NOISE = `
 vec3 h33(vec3 p){p=fract(p*vec3(.1031,.1030,.0973));p+=dot(p,p.yxz+33.33);return fract((p.xxy+p.yxx)*p.zyx);}
 float vn(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
@@ -35,7 +35,7 @@ float fbm(vec3 p,int n){float a=.5,s=0.,t=0.;for(int i=0;i<n;i++){s+=a*vn(p);t+=
 float ridge(vec3 p,int n){float a=.5,s=0.,t=0.;for(int i=0;i<n;i++){s+=a*(1.-abs(2.*vn(p)-1.));t+=a;p=p*2.1+vec3(3.1,9.3,4.7);a*=.5;}return s/t;}
 `;
 // @end-verbatim
-// @verbatim L2372-L2505
+// @verbatim L2512-L2645
 var RP = [
   { id: 'oum', label: "'Oumuamua", D: 0.204, ab: 10, P: 7.937, A: 0.04, rho: 2000, tint: [0.62, 0.42, 0.3], seed: 5 },
   { id: 'rub', label: 'Rubble pile (Bennu-sized example)', D: 0.49, ab: 1.08, P: 4.3, A: 0.044, rho: 1200, tint: [0.45, 0.43, 0.41], seed: 17 },
