@@ -143,3 +143,42 @@ def test_a_reference_object_never_falls_through_to_the_catalogues(
             close = getattr(ctx, "close", None)
             if callable(close):
                 close()
+
+
+def test_a_poisoned_cached_candidate_never_wins_over_the_pack(
+    fixture_cache: Path, tmp_path: Path
+) -> None:
+    """Issue #75 reads generated assets before the pack. A ``candidate`` cached for ref-titan
+    before the reference guard existed (issue #71 review) must still lose to the pack."""
+    import json
+
+    from app.context import make_context
+    from app.core.card.assets import Asset, AssetStore
+
+    doc = json.loads((ASSETS_DIR / "reference" / "ref-titan.json").read_text("utf-8"))
+    poisoned = {
+        "card": {"id": "ref-titan", "name": "Titan", "type": "candidate"},
+        "render_params": {**doc["render_params"], "type": "candidate"},
+        "textures": None,
+        "generator_version": doc["generator_version"],
+        "seed": doc["seed"],
+        "created_at": doc["created_at"],
+    }
+    asset = Asset.from_json(poisoned)
+    assert asset is not None
+    settings = make_settings(fixture_cache, assets_dir=ASSETS_DIR)
+    ctx = make_context(settings)
+    try:
+        store = AssetStore(ctx.cache, ASSETS_DIR, settings.data_release)
+        store.put(asset)
+        found = store.lookup("ref-titan")  # what any non-reference path would serve
+        assert found is not None and found[0].card["type"] == "candidate"
+    finally:
+        close = getattr(ctx, "close", None)
+        if callable(close):
+            close()
+    with TestClient(create_app(settings)) as c:
+        assert c.get("/v1/resolve", params={"q": "Titan"}).json()["id"] == "ref-titan"
+        r = c.get("/v1/objects/ref-titan/card")
+        assert r.status_code == 200 and r.json()["type"] == "planet_rocky"
+        assert r.headers["X-SX-Asset-Status"] == "saved"
