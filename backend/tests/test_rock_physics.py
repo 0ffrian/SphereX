@@ -229,3 +229,7 @@ def test_missing_diameter_is_still_refused() -> None:
     c["diameter_km"]["value"] = None
     with pytest.raises(BakeRefusal):
         params_from_card(c, 1)
+
+
+def test_lump_ratio_survives_a_vanishing_radius() -> None:
+    assert lump_ratio(0.0, 2000.0) == 0.3

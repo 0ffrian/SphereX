@@ -154,6 +154,8 @@ def surface_gravity(radius_m: float, density: float) -> float:
 
 def lump_ratio(radius_m: float, density: float) -> float:
     """h/R = clamp(Y / (rho g R), 0.03, 0.3): the relief that rock strength can hold (derived)."""
+    # A vanishing radius would divide by zero; 1 mm is far below any body and clamps to LUMP_MAX.
+    radius_m = max(radius_m, 1e-3)
     g = surface_gravity(radius_m, density)
     return _clamp(STRENGTH_Y_PA / (density * g * radius_m), LUMP_MIN, LUMP_MAX)
 
