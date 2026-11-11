@@ -49,6 +49,66 @@ export type Pair = [number, number];
  */
 export type Tag = 'measured' | 'derived' | 'model_dependent' | 'inferred_from_analog' | 'artistic';
 /**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber1 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber2 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber3 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
  * Tagged value (R3.1) holding a string.
  */
 export type TVString = {
@@ -95,6 +155,126 @@ export type TVRgb = {
  * @maxItems 3
  */
 export type Triple = [number, number, number];
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber4 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber5 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber6 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber7 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber8 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber9 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
 /**
  * Tagged value (R3.1) holding a pair of numbers.
  */
@@ -319,6 +499,9 @@ export interface ObjectCard {
   diameter_km?: TVNumber;
   radius_rjup?: TVNumber;
   radius_rsun?: TVNumber;
+  lum_lsun?: TVNumber1;
+  mass_msun?: TVNumber2;
+  flare_rate_per_d?: TVNumber3;
   shape_source?: TVString;
   rot_period_h?: TVNumber;
   lightcurve_amp_mag?: TVNumber;
@@ -341,6 +524,12 @@ export interface ObjectCard {
   host_radius_rsun?: TVNumber;
   host_mass_msun?: TVNumber;
   host_age_gyr?: TVNumber;
+  orbit_ecc?: TVNumber4;
+  insolation_searth?: TVNumber5;
+  host_lum_lsun?: TVNumber6;
+  dayside_temp_K?: TVNumber7;
+  nightside_temp_K?: TVNumber8;
+  hotspot_offset_deg?: TVNumber9;
   surface_pressure_bar?: TVNumber;
   surface_temperature_K?: TVNumber;
   surface_fluid?: TVString;
