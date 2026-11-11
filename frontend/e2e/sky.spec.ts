@@ -264,7 +264,8 @@ test('keyboard: arrows pan, +/− zoom, Enter picks the centre; "/" focuses the 
 test('tool rail opens real panels; Escape closes and returns focus', async ({ page }) => {
   await page.goto('/');
   const tools = page.getByRole('navigation', { name: 'Tools' });
-  await expect(tools.getByRole('button')).toHaveCount(4);
+  // Sky, Flipbook, Spectrum, 3D viewer and Area search (issue #96, behind AREA_TOOL_ENABLED).
+  await expect(tools.getByRole('button')).toHaveCount(5);
   await expect(tools.getByRole('button', { name: 'Sky' })).toHaveAttribute('aria-pressed', 'true');
   await tools.getByRole('button', { name: 'Flipbook' }).click();
   await expect(page.getByTestId('panel-empty')).toBeVisible();
