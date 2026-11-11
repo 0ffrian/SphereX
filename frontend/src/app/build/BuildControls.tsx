@@ -29,7 +29,7 @@ import { useEffect, useId, type ReactNode } from 'react';
 import { create } from 'zustand';
 import type { Tag } from '@/contract';
 import { ProvenanceBadge } from '@/app/Badge';
-import { Row } from '@/app/PanelControls';
+import { Row, ToggleGroup } from '@/app/PanelControls';
 
 interface Base {
   id: string;
@@ -38,6 +38,8 @@ interface Base {
   /** D-02 tag, drawn as the control's badge. */
   tag?: Tag;
   disabled?: boolean;
+  /** Controls that share a `group` and sit next to each other are drawn as one compact horizontal row. */
+  group?: string;
   /** Said (title and accessible description) when `disabled`, or as a hint otherwise. */
   why?: string;
 }
@@ -225,6 +227,70 @@ function Control({ c }: { c: BuildControl }) {
   }
 }
 
+/** One control drawn compactly, for a `group` row: segmented choice, pressed chip, or action chip. No badges, no eyebrows. */
+function CompactControl({ c }: { c: BuildControl }) {
+  const name = c.disabled && c.why ? `${c.label}. ${c.why}` : c.label;
+  switch (c.kind) {
+    case 'choice':
+      return (
+        <ToggleGroup
+          label={c.label}
+          hideLabel
+          value={c.value}
+          options={c.options.map((o) => ({ value: o.value, label: o.label, disabled: c.disabled || o.disabled }))}
+          onChange={c.onChange}
+        />
+      );
+    case 'toggle':
+      return (
+        <button
+          type="button"
+          className="sx-act"
+          aria-pressed={c.pressed}
+          aria-label={name}
+          disabled={c.disabled}
+          title={c.why}
+          onClick={() => c.onChange(!c.pressed)}
+        >
+          {c.label}
+        </button>
+      );
+    case 'button':
+      return (
+        <button type="button" className="sx-act" aria-label={name} disabled={c.disabled} title={c.why} onClick={c.onClick}>
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
+          </svg>
+          {c.label}
+        </button>
+      );
+    default:
+      return <Control c={c} />;
+  }
+}
+
+/** Consecutive controls that share a `group` become one wrapping row; the rest are drawn as before. */
+function renderControls(controls: BuildControl[]): ReactNode[] {
+  const out: ReactNode[] = [];
+  for (let i = 0; i < controls.length; i++) {
+    const c = controls[i]!;
+    if (!c.group) {
+      out.push(<Control key={c.id} c={c} />);
+      continue;
+    }
+    const run: BuildControl[] = [c];
+    while (i + 1 < controls.length && controls[i + 1]!.group === c.group) run.push(controls[++i]!);
+    out.push(
+      <div key={`g-${c.group}-${c.id}`} className="sx-flare-row" data-testid={`ctl-group-${c.group}`}>
+        {run.map((r) => (
+          <CompactControl key={r.id} c={r} />
+        ))}
+      </div>,
+    );
+  }
+  return out;
+}
+
 /** The region itself: the interactive controls, rendered by the build pane's Details panel; nothing shows until something registers. */
 export function BuildControls() {
   const specs = useBuildControlsStore((s) => s.specs);
@@ -236,11 +302,7 @@ export function BuildControls() {
         const spec = specs[o]!;
         return (
           <section key={o} className="sx-bctl-group" aria-label={spec.title} data-owner={o}>
-            {spec.controls
-              .filter((c) => c.kind !== 'readout')
-              .map((c) => (
-                <Control key={c.id} c={c} />
-              ))}
+            {renderControls(spec.controls.filter((c) => c.kind !== 'readout'))}
           </section>
         );
       })}
@@ -326,7 +388,7 @@ export function BuildSummaryRows({
   return (
     <>
       {(latest || flareChart) && (
-        <Row title="About this flare" defaultOpen>
+        <Row title="About this flare">
           {latest && <p className="text-sm">{latest.value}</p>}
           {flareChart}
         </Row>
