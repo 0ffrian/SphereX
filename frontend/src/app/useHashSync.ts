@@ -91,10 +91,6 @@ export function useHashSync(): void {
       const store = useAppStore.getState();
       const shell = useShellStore.getState();
       const parsed = parseHash(hash);
-      const areaBefore = lastArea.current;
-      lastArea.current = AREA_TOOL_ENABLED ? (parsed.area ?? null) : null;
-      if (AREA_TOOL_ENABLED && parsed.area) applyAreaHash(parsed.area);
-      else if (areaBefore !== null && shell.tool === 'area') shell.setTool('sky');
       // Issue #60: the build pane follows the hash (Back closes it; a link with `build` opens it,
       // built at once).
       if (!parsed.build && shell.build.open) {
@@ -102,6 +98,14 @@ export function useHashSync(): void {
         shell.closeBuild();
         focusAfterBuildClose(tool);
       } else if (parsed.build && !shell.build.open) shell.openBuild(false);
+      // Area search (issue #96) after the build pane, from a fresh shell state, so Back from the
+      // pane to an `area=` entry closes the pane once and then opens the area (review F2).
+      const areaBefore = lastArea.current;
+      lastArea.current = AREA_TOOL_ENABLED ? (parsed.area ?? null) : null;
+      if (AREA_TOOL_ENABLED && parsed.area) applyAreaHash(parsed.area);
+      else if (areaBefore !== null && useShellStore.getState().tool === 'area') {
+        useShellStore.getState().setTool('sky');
+      }
       if (hash === '') {
         if (store.sky.query === null) return;
         // Back to the page without a hash (e.g. the Back button): show the empty start state.
@@ -202,6 +206,8 @@ export function useHashSync(): void {
     });
     const offTool = useShellStore.subscribe((s, prev) => {
       if ((s.tool === 'area') === (prev.tool === 'area') || applying.current) return;
+      // Opening or closing the build pane: its own subscriber below writes `build` (issue #60).
+      if (s.build.open !== prev.build.open) return;
       write(false);
     });
     return () => {
