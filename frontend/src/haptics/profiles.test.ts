@@ -95,7 +95,8 @@ const TABLE: Record<ObjectType, Expect> = {
   star_ttauri: { texture: null, data: 'dimming', dataTag: 'measured', missing: [] },
   star: { texture: null, data: null, missing: [MISSING.motion] },
   candidate: { texture: null, data: null, missing: [MISSING.detections] },
-  gas_giant: { texture: 'flow', data: 'teq_pulse', dataTag: 'measured', missing: [] },
+  // #93 3.5: the fixture's teq_K stands in for an archive pl_eqt, which is derived (an assumed albedo).
+  gas_giant: { texture: 'flow', data: 'teq_pulse', dataTag: 'derived', missing: [] },
   planet_water: { texture: 'terrain', data: 'teq_pulse', dataTag: 'derived', missing: [] },
   planet_rocky: { texture: 'terrain', data: null, missing: [] },
   // Q-103: the nebula (Moon's decision) and the nova (until a CPU twin of the noise cube can be
@@ -106,12 +107,12 @@ const TABLE: Record<ObjectType, Expect> = {
 
 /**
  * Issue #68 Part 6: the two demo exoplanets (real archive values) are extra planet_rocky fixtures,
- * not object types; their R8.5 rows are their own. Both have a measured `teq_K`, so the heat pulse
+ * not object types; their R8.5 rows are their own. Both have a `teq_K` (derived, #93 3.5), so the heat pulse
  * has data, and no `dynamics`, so nothing moves.
  */
 const DEMO_TABLE: Record<string, Expect> = {
-  planet_trappist1f: { texture: 'terrain', data: 'teq_pulse', dataTag: 'measured', missing: [] },
-  planet_kepler186f: { texture: 'terrain', data: 'teq_pulse', dataTag: 'measured', missing: [] },
+  planet_trappist1f: { texture: 'terrain', data: 'teq_pulse', dataTag: 'derived', missing: [] },
+  planet_kepler186f: { texture: 'terrain', data: 'teq_pulse', dataTag: 'derived', missing: [] },
   // Part 8a: the real Bennu model, drawn like Eros (R8.5 `asteroid_shape` row).
   asteroid_shape_bennu: { ...TABLE.asteroid_shape },
 };
@@ -344,8 +345,11 @@ function feel(name: string, honesty: HonestyState, edit?: (card: ObjectCard) => 
 }
 
 describe('R11 honesty: haptics follow the D-21 filter (through the real engine)', () => {
-  it('Measured only: gas giant texture silent; teq_pulse plays because teq_K is measured', () => {
-    const p = feel('gas_giant', 'measured');
+  it('Measured only: gas giant texture silent; teq_pulse plays when teq_K is measured', () => {
+    // A measured temperature (say a brightness temperature); the fixture's own teq_K is derived (#93 3.5).
+    const p = feel('gas_giant', 'measured', (c) => {
+      c.teq_K = { value: 900, tag: 'measured', source: 't' };
+    });
     expect(p.texture).toBe(0); // no band, storm or ring ticks
     expect(p.windows).toBeGreaterThan(0); // the held teq pulse
     expect(new Set(p.tags)).toEqual(new Set(['measured']));
@@ -491,7 +495,7 @@ describe('TouchHaptics: moving gives texture, holding still gives the data pulse
     touch.poll(HOLD_STILL_MS);
     expect(touch.isHolding).toBe(true);
     expect(sink.activeTrainId).toBe('data');
-    expect(sink.current!.tag).toBe('measured');
+    expect(sink.current!.tag).toBe('derived'); // the fixture's teq_K (#93 3.5)
   });
 
   it('jitter within the tolerance keeps holding; moving stops the pulse and texture resumes', () => {

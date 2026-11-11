@@ -10,8 +10,10 @@
   },
   "teq_K": {
     "value": 177.0,
-    "tag": "measured",
-    "source": "synthetic fixture: real Kepler-186 f value, NASA Exoplanet Archive PSCompPars pl_eqt (Q1_Q17_DR25_KOI_TABLE; the Kepler KOI value, which assumes a Bond albedo of 0.3 and even day-night heat redistribution, not the zero-albedo Teq)"
+    "tag": "derived",
+    "source": "synthetic fixture: real Kepler-186 f value, NASA Exoplanet Archive PSCompPars pl_eqt (Q1_Q17_DR25_KOI_TABLE; the Kepler KOI value, which assumes a Bond albedo of 0.3 and even day-night heat redistribution, not the zero-albedo Teq)",
+    "formula": "Teq = T_star * sqrt(R_star / (2a)) * (1 - A)^(1/4), as computed in the cited paper",
+    "assumption": "Bond albedo 0.3 and even day-night heat redistribution (the Kepler KOI table's); an equilibrium temperature, not a measured one (#93 3.5)"
   },
   "mass_mearth": {
     "value": 1.71,

@@ -159,20 +159,22 @@ def test_sweep_weights_find_the_field_that_moves_the_metric() -> None:
 # issue #71 (11 Nov 2026, after the review fixes: Procyon A's interferometric radius, the Sun's
 # class G2V, Titan's measured surface temperature, fluid and pressure). Failing: the two candidates
 # (no class) (3I/ATLAS scores 0.5171 once the epoch-keyed gas rates count, Q-323).
+# #93 3.5: an archive pl_eqt is derived with an assumed albedo (c = DERIVED_ASSUMED_C), so every
+# exoplanet lost 7.5 points of temperature (and a giant 5 more of colour) against the 11 Nov pins.
 DEMO_SCORES = {
     "star/simbad-name-barnard-s-star": (0.6, True),
     "brown_dwarf_binary/simbad-eps-ind-b": (0.475, True),
     "brown_dwarf/simbad-wisea-j085510-74-071442-5": (0.375, True),
     "star_ttauri/simbad-v-rw-aur": (0.5, True),
     "star_mira/simbad-v-r-dra": (0.5, True),
-    "planet_rocky/simbad-trappist-1f": (0.5873, True),
-    "planet_rocky/simbad-kepler-186f": (0.4831, True),
+    "planet_rocky/simbad-trappist-1f": (0.5123, True),
+    "planet_rocky/simbad-kepler-186f": (0.4081, True),
     "asteroid_shape/sbdb-20101955": (0.8407, True),
     "asteroid_procedural/sbdb-50788063": (0.475, True),
     "comet/sbdb-1004083": (0.5171, True),
-    "gas_giant/simbad-hd-189733b": (0.5391, True),
-    "planet_rocky/simbad-trappist-1e": (0.5788, True),
-    "planet_water/simbad-k2-18b": (0.5191, True),
+    "gas_giant/simbad-hd-189733b": (0.4141, True),
+    "planet_rocky/simbad-trappist-1e": (0.5038, True),
+    "planet_water/simbad-k2-18b": (0.4441, True),
     "comet/sbdb-1000012": (0.4, True),
     "candidate/simbad-m-42": (0.0, False),
     "candidate/simbad-m-1": (0.0, False),
@@ -182,9 +184,9 @@ DEMO_SCORES = {
     "reference/ref-titan": (0.7, True),
     "star/simbad-alf-cmi": (0.6951, True),
     "star/simbad-eps-eri": (0.6, True),
-    "planet_rocky/simbad-toi-700d": (0.5358, True),
-    "gas_giant/simbad-wasp-39b": (0.5275, True),
-    "planet_rocky/simbad-rho01-cnc-e": (0.5854, True),
+    "planet_rocky/simbad-toi-700d": (0.4608, True),
+    "gas_giant/simbad-wasp-39b": (0.4025, True),
+    "planet_rocky/simbad-rho01-cnc-e": (0.5104, True),
 }
 
 

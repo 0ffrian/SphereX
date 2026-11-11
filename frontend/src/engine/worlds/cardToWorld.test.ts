@@ -201,12 +201,18 @@ describe('cardToWorld: any other exoplanet goes through general defaults', () =>
       expect.arrayContaining(['fluid', 'Ps', 'mu', 'sea']),
     );
   });
-  it("uses the card's measured Teq: the albedo is chosen so the engine's Teq equals it (#89 review 10)", () => {
-    const r = cardToWorld(card({ ...OWN, teq_K: tv(200) }));
+  it("does not invert the card's Teq into an albedo: a catalogue Teq assumes A = 0 itself (#93 3.5)", () => {
+    const r = cardToWorld(card({ ...OWN, teq_K: tv(200, 'derived') }));
     if (!r.ok) throw new Error('refused');
-    const T0 = 5200 * Math.sqrt((0.9 * 0.00465047) / (2 * 1.1));
-    expect(T0 * Math.pow(1 - r.preset.A!, 0.25)).toBeCloseTo(200, 6);
-    expect(r.tags.A).toBe('derived');
+    expect(r.preset.A).toBeUndefined();
+    expect(r.tags.A).toBe('model_dependent');
+    expect(r.assumptions.find((a) => a.field === 'A')).toMatchObject({
+      value: 0.3,
+      tag: 'model_dependent',
+    });
+    expect(r.assumptions.find((a) => a.field === 'A')?.note).toMatch(
+      /200 K, derived\) is not inverted/,
+    );
     // Without a temperature or albedo the prototype's 0.3 is listed as an assumption, not applied silently.
     const d = cardToWorld(OWN);
     if (!d.ok) throw new Error('refused');
@@ -241,9 +247,14 @@ describe('cardToWorld: any other exoplanet goes through general defaults', () =>
     // Below the engine's 0.02 bar "airless" line and the 0.1 bar runaway line: no steam haze over the magma.
     expect(r.preset).toMatchObject({ Ps: 0.005, mu: 44, sea: 0, oceanF: 0 });
     expect(r.tags.Ps).toBe('inferred_from_analog');
-    // The card's Teq is a little hotter than zero albedo allows: A is held at 0, with the reason in the note.
-    expect(r.preset.A).toBe(0);
-    expect(r.assumptions.find((a) => a.field === 'A')?.note).toMatch(/hotter than zero albedo/);
+    // #93 3.5: the catalogue Teq (which assumes A = 0) is no longer inverted into A = 0; the prototype's 0.3 is
+    // assumed and listed. The Teq still marks it a lava world (above).
+    expect(r.preset.A).toBeUndefined();
+    expect(r.assumptions.find((a) => a.field === 'A')).toMatchObject({
+      value: 0.3,
+      tag: 'model_dependent',
+    });
+    expect(r.assumptions.find((a) => a.field === 'A')?.note).toMatch(/not inverted/);
   });
   it('a giant other than Jupiter or Saturn lists its wind as an estimate, with the 10 K floor stated', () => {
     const r = cardToWorld(

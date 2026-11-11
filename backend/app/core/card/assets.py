@@ -62,7 +62,9 @@ ASSET_SOURCE = "derived.asset"
 # 11 (issue #71 review): crater depth 0.33 r (Pike d/D), rubble-pile relief limited by the angle
 #   of repose instead of strength, the reachable crater cap in relief_range (relief_amp), the relief
 #   layer text; Procyon A takes its interferometric radius from the literature registry.
-ASSET_VERSION = "11"
+# 12 (issue #93 3.5): an Exoplanet Archive pl_eqt is `derived` with its assumption (zero albedo,
+#   full redistribution), never `measured`, so teq_K and the confidence scores change.
+ASSET_VERSION = "12"
 AssetStatus = Literal["saved", "generated", "sketch"]
 FIELDS = ("card", "render_params", "textures", "generator_version", "seed", "created_at")
 OPTIONAL_FIELDS = ("asset_version", "inputs_sha256")

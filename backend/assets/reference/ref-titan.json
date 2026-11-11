@@ -1,5 +1,5 @@
 {
-  "asset_version": "11",
+  "asset_version": "12",
   "card": {
     "host_radius_rsun": {
       "source": "NASA Planetary Fact Sheets, Sun and Saturn (nssdc.gsfc.nasa.gov/planetary/factsheet): Sun volumetric mean radius converted to the card's unit",
