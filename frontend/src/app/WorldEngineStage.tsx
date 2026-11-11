@@ -17,6 +17,7 @@ import { useCloseUpStore } from './closeUpStore';
 import { useBuildControls, type BuildControl, type BuildControlsSpec, type BuildNote } from './build/BuildControls';
 import { buttonClass, pressedClass } from './ui';
 import { drawReady, useWorldStore } from './worldStore';
+import { FLY_NOTE, WORLD_HONESTY, WORLD_NOTE_LINES } from './worldNotes.generated';
 
 /** The engine's world for the shown card, or null: not a planet, refused, or no WebGL 2 (old path). */
 export function useEngineWorld(): CardToWorldOk | null {
@@ -53,26 +54,9 @@ const READOUT_TAG: Record<string, Tag> = {
 
 const FLUID_LABEL = (k: string): string => (WORLD_FLUIDS[k] as { label: string }).label;
 
-/** The prototype's "How each part is worked out" list, in plain text, and its honesty line. */
-export const WORLD_NOTE_LINES: string[] = [
-  'Temperature: Teq = T★ √(R★/2a) (1−A)^¼, then a grey greenhouse, Ts = Teq (1 + ¾τ)^¼.',
-  'Fluids: each one has its own triple point, and Clausius–Clapeyron moves its boiling point with pressure. Every point on the map is tested for solid, liquid or gas.',
-  'Heat, ice and frost: every map cell runs an energy and water budget. Heat spreads through the air and ocean, sea ice grows and melts with latent heat, and evaporated water freezes out on cold ground as frost. Ice creeps slowly from thick to thin, so ice edges drift and stay ragged instead of forming a line.',
-  'Tectonics: plates move, and their relative motion at each boundary builds ranges, volcanic arcs, trenches and rifts. Ocean floor deepens with age, d = 2.5 + 0.35√t km, and rivers then carve the mountains with a stream-power law.',
-  'Bands and storms: gas giants solve the vorticity equation on the sphere, ∂q/∂t + J(ψ, q + f) = F − D, with q = ∇²ψ − ψ/L_D². Deep jets stay fixed and are kept inside the stability limit, so belts and zones persist. Rotation dominates (Rossby number near 0.02), so storms stay in balance. They sit in the shear between jets, which acts as a fence, and anticyclones live in zones while messy cyclones live in belts.',
-  'Gravity: sets the scale height, H = R_s T/g, which sets how fast waves travel and so the natural storm size, L_D. With spin it also sets the planet’s flattening.',
-  'Surface view: the same terrain, climate, rivers, clouds and gas-giant flow, seen from a low camera with the horizon in view. Heights, cloud layers and the air’s scale height are drawn 3 times taller (2 on gas giants) so relief reads. Sky and haze are single scattering through an exponential atmosphere whose depth comes from the model. Finer detail than the 55 km terrain grid is an artist’s addition: slope-damped fractal noise (Quilez) for eroded ridges and gully noise (after Clay John) for drainage lines. On gas giants, detail below the flow grid is the simulated cloud pattern carried back along the simulated winds plus small invented eddies, which is also an artist’s addition.',
-  'Rivers and lakes: every closed basin is filled to its spill point, water runs down the steepest slope, and runoff is rain minus evaporation from the Budyko curve. A basin keeps a lake only as far as inflow beats evaporation; otherwise it dries to a salt flat. Width follows w = 4 Q^0.5 (Leopold and Maddock). Big rivers build deltas and sediment plumes. Rivers are drawn wider than life so they show from orbit; zoom and drag to look closer. Ice carves valleys where the ground is frozen.',
-  'Rain: the Hadley cell width scales as in Held and Hou, so deserts sit at its edge. Air forced over mountains rains out and leaves a dry shadow behind.',
-  'Oceans: light is absorbed with depth by colour, sunglint spreads with wind (Cox–Munk), salt lowers freezing to −1.9 °C, and gyres follow Sverdrup balance with fast western currents.',
-  'Weather: cyclones form only over seas above 26.5 °C and away from the equator, on planets spinning fast enough.',
-  'Keeping air: the cosmic shoreline (Zahnle and Catling) tests whether starlight or X-rays strip the atmosphere. Air can also freeze out on a cold night side (Wordsworth 2015).',
-  'Crust and carbon: whether plates move is still debated, so it is a choice here, with a stagnant lid of big volcanoes as the alternative. CO₂ can balance itself through weathering (Walker et al. 1981). Tidal heat follows (21/2)(k₂/Q)GM²R⁵ne²/a⁶.',
-  'Colour: the star’s spectrum through Rayleigh scattering (λ⁻⁴), with methane absorbing red light. Ice reflects less red starlight, so it is darker around cool stars.',
-];
-/** The prototype's honesty line, word for word. */
-export const WORLD_HONESTY =
-  'No surface pressure or surface fluid has been measured for any of these exoplanets, so those two controls are assumptions. Plate tectonics is an assumption too: many rocky planets may have no moving plates. Orbits, radii, masses and star temperatures come from our demo pack, except the planets marked example.';
+// The prototype's "How each part is worked out" list and its honesty line are generated from the preview
+// (scripts/gen-world-notes.mjs), so they cannot drift from it.
+export { WORLD_NOTE_LINES, WORLD_HONESTY, FLY_NOTE };
 
 /** Notes for the Details panel: the prototype's list plus what `cardToWorld` filled in or changed. */
 export function worldNotes(world: CardToWorldOk): BuildNote[] {
@@ -137,6 +121,12 @@ function useWorldEngine(role: Role, world: CardToWorldOk, onFail: (() => void) |
       st.setFly(e);
     }
     setEngine(e);
+    // A lost GL context leaves a black canvas: report it so the old path draws instead (not while we release it ourselves).
+    const onLost = (ev: Event) => {
+      ev.preventDefault();
+      if (!dead) setFailed(true);
+    };
+    canvas.addEventListener('webglcontextlost', onLost);
     // Dev only: the verification scripts (issue #71) read and drive the engines through these.
     if (import.meta.env.DEV) (window as unknown as Record<string, unknown>)[`__sxWorld_${role}`] = e;
 
@@ -166,7 +156,15 @@ function useWorldEngine(role: Role, world: CardToWorldOk, onFail: (() => void) |
       typeof IntersectionObserver === 'undefined'
         ? null
         : new IntersectionObserver((es) => {
-            for (const x of es) shown = x.isIntersecting;
+            for (const x of es) {
+              const was = shown;
+              shown = x.isIntersecting;
+              // The fly pane was hidden while the globe turned: catch up to its phase when it shows again.
+              if (role === 'fly' && shown && !was && released) {
+                const g = useWorldStore.getState().globe;
+                if (g) e.syncSpin(g);
+              }
+            }
           });
     io?.observe(host);
     // A new size is a new picture; nothing else redraws a paused world.
@@ -187,6 +185,7 @@ function useWorldEngine(role: Role, world: CardToWorldOk, onFail: (() => void) |
     return () => {
       if (import.meta.env.DEV) (window as unknown as Record<string, unknown>)[`__sxWorld_${role}`] = null;
       dead = true;
+      canvas.removeEventListener('webglcontextlost', onLost);
       cancelAnimationFrame(raf);
       window.clearInterval(id);
       io?.disconnect();
@@ -495,7 +494,7 @@ export function WorldGlobeStage({ world, onFail }: { world: CardToWorldOk; onFai
     canvas.addEventListener('pointercancel', end);
     canvas.addEventListener('keydown', key);
     canvas.tabIndex = 0;
-    canvas.setAttribute('role', 'img');
+    canvas.setAttribute('role', 'application');
     canvas.setAttribute('aria-label', `${world.preset.label}, simulated planet. Click a place to look at it in the close-up on the left.`);
     return () => {
       canvas.removeEventListener('pointerdown', down);
@@ -603,6 +602,8 @@ export function WorldFlyStage({
       canvas.style.cursor = 'grab';
     };
     const key = (e: KeyboardEvent) => {
+      // Browser and system shortcuts (Ctrl+S, Cmd+W, Alt+Left) are not ours.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const st = Math.max(2, engine.fly.alt * 0.8);
       const k = e.key;
       if (k === 'ArrowUp' || k === 'w') engine.flyMove(st, 0);
@@ -688,7 +689,7 @@ export function WorldFlyStage({
           className="absolute inset-x-4 bottom-36 z-[3] max-h-[45%] overflow-auto rounded-lg border border-[#323a3e] bg-[#242729f2] p-3 text-xs text-neutral-200"
           data-testid="world-layers"
         >
-          <p className="mb-2">{WORLD_NOTE_LINES[6]}</p>
+          <p className="mb-2">{WORLD_NOTE_LINES.find((l) => l.startsWith('Surface view:'))}</p>
           <ul className="flex flex-col gap-1">
             <li className="flex flex-wrap items-center gap-2">
               <ProvenanceBadge tag="model_dependent" />

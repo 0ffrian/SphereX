@@ -21,7 +21,9 @@ import { StarFlareStage, StarSurfaceCloseUp } from './StarEngineStage';
 import { placeText, useStarTarget } from './starTargetStore';
 import { STAR_CLOSEUP_TAG, useStarCloseUp } from './starCloseUp';
 import { WorldFlyStage, worldCaption } from './WorldEngineStage';
-import { useWorldStore } from './worldStore';
+import { engineKey, useWorldStore } from './worldStore';
+import { FLY_NOTE } from './worldNotes.generated';
+import { useAppStore } from '@/state/store';
 import { useRockStore } from './rockStore';
 
 /** The mock-up's cuTag for the flare close-up, true to the prototype: a Sun-like flare, not this star's own. */
@@ -77,14 +79,16 @@ export function CloseUpPane() {
   const engineStar = useCloseUpStore((s) => s.engineStar);
   const engineWorld = useCloseUpStore((s) => s.engineWorld);
   const worldFailedId = useWorldStore((s) => s.failedId);
-  const [engineFailed, setEngineFailed] = useState(false);
+  const starFailedId = useWorldStore((s) => s.starFailedId);
+  // A failure belongs to the card and preset it happened on: the next object is tried afresh.
+  const cardId = useAppStore((s) => s.card?.id);
   const left = useStarTarget((s) => s.left);
   const starTarget = useStarTarget((s) => s.target);
   const kind = closeUpKindOf(type);
   // Issue #71 stream X (D-37): a star the prototype's engine draws opens with the build, with the flare close-up.
-  const engine = kind === 'star' && engineStar && !engineFailed ? engineStar : null;
+  const engine = kind === 'star' && engineStar && starFailedId !== engineKey(cardId, engineStar.preset.id) ? engineStar : null;
   // Issue #71 stream Y (D-37): a planet the prototype's world engine draws opens with the build, with its fly view.
-  const world = kind === 'orbit' && engineWorld && worldFailedId !== engineWorld.preset.id ? engineWorld : null;
+  const world = kind === 'orbit' && engineWorld && worldFailedId !== engineKey(cardId, engineWorld.preset.id) ? engineWorld : null;
   // Issue #71 (D-37): an asteroid or comet the rock engine draws opens with the build; its picture is the engine's, not the viewer's.
   const rockEngine = useRockStore((s) => s.view) !== null && kind === 'body';
   const open = !hidden && kind !== null && (engine || world || rockEngine ? !held : info !== null && info.mode !== null);
@@ -233,14 +237,14 @@ export function CloseUpPane() {
           key={world.preset.id}
           world={world}
           reduced={reducedMotion}
-          onFail={() => useWorldStore.getState().fail(world.preset.id)}
+          onFail={() => useWorldStore.getState().fail(engineKey(cardId, world.preset.id))}
         />
       )}
       {engine && open && left === 'flare' && (
-        <StarFlareStage key={engine.preset.id} star={engine} onFail={() => setEngineFailed(true)} />
+        <StarFlareStage key={engine.preset.id} star={engine} onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))} />
       )}
       {engine && open && left === 'surface' && (
-        <StarSurfaceCloseUp key={engine.preset.id} star={engine} onFail={() => setEngineFailed(true)} />
+        <StarSurfaceCloseUp key={engine.preset.id} star={engine} onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))} />
       )}
       {engine && open && (
         <div className="absolute right-3 top-3 z-[3] flex flex-wrap items-center gap-2" role="group" aria-label="Star close-up">
@@ -264,6 +268,11 @@ export function CloseUpPane() {
       )}
       <span className="sx-cu-tag" data-testid="closeup-caption">
         {caption}
+        {world && open && (
+          <span className="mt-1 block text-[#c1c9cd]" data-testid="fly-note">
+            {FLY_NOTE}
+          </span>
+        )}
       </span>
       {view && !world && (
         <div className="sx-cu-controls" role="group" aria-label="Surface view controls">

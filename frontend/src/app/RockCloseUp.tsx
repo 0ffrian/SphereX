@@ -7,30 +7,38 @@ import { useRockStore } from './rockStore';
 
 export function RockCloseUp({ active }: { active: boolean }) {
   const view = useRockStore((s) => s.view);
-  const ref = useRef<HTMLCanvasElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  // The canvas is made here, in the effect: the detach function releases its GL context, and a lost
+  // context cannot be brought back on the same element (effects run twice in dev, and on every re-attach).
   useEffect(() => {
-    const c = ref.current;
-    if (!view || !c || !active) return;
+    const host = ref.current;
+    if (!view || !host || !active) return;
+    const c = document.createElement('canvas');
+    c.tabIndex = 0;
+    c.setAttribute('role', 'application');
+    c.setAttribute('aria-label', 'The same body in the close-up pane. Drag or use the arrow keys to turn it.');
+    c.className = 'block w-full touch-none';
+    c.style.aspectRatio = '8 / 5';
+    c.style.maxHeight = '100%';
+    host.appendChild(c);
+    let off: (() => void) | undefined;
     try {
-      return view.attach(c, 1);
+      off = view.attach(c, 1);
     } catch {
+      c.remove();
       return;
     }
+    return () => {
+      off?.();
+      c.remove();
+    };
   }, [view, active]);
   if (!view || !active) return null;
   return (
     <div
+      ref={ref}
       className="absolute inset-0 z-[1] flex items-center justify-center bg-black"
       data-testid="rock-closeup"
-    >
-      <canvas
-        ref={ref}
-        tabIndex={0}
-        role="img"
-        aria-label="The same body in the close-up pane. Drag or use the arrow keys to turn it."
-        className="block w-full touch-none"
-        style={{ aspectRatio: '8 / 5', maxHeight: '100%' }}
-      />
-    </div>
+    />
   );
 }
