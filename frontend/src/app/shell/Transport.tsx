@@ -114,7 +114,7 @@ export function Transport() {
             <span className="inline-flex items-center gap-1.5">
               <b>{frame ? formatWavelength(frame.wavelength_um) : '– µm'}</b>
               {/* D-02: the frame's wavelength is SPHEREx data, badged as in the frame caption. */}
-              {frame && <DataBadge fixture={sky.fixture} variant="tag" />}
+              {frame && <DataBadge fixture={sky.fixture} />}
             </span>
           </span>
         </p>
