@@ -24,7 +24,8 @@ stateDiagram-v2
     flat measured tint, measured lighting.
     Haptics: measured events only. Mesh-normal ticks on real
     shape models, measured data haptics (spectrum, light curve),
-    teq_pulse only when teq_K is measured (pl_eqt).
+    teq_pulse only when teq_K is measured
+    (an archive pl_eqt is derived since Q-359).
     Silent: procedural relief, all texture haptics on shader
     kinds, every non-measured data haptic.
   end note

@@ -1,6 +1,6 @@
 # Data contract: TV, ObjectCard, RenderParams
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1, R3.2, R3.4 (R3.3 in [type-selection.md](type-selection.md)) · **Implements:** [D-02, D-32](../decisions/contract-tags.md), [D-04, D-16, D-18, D-23, Q-33, Q-35, Q-36](../decisions/contract.md), [D-01, Q-285](../decisions/rendering-bodies.md), [Q-221, Q-327](../decisions/pipeline-stages.md), [Q-117](../decisions/rendering-layers.md), [D-12](../decisions/haptics-design.md) · **Read with:** [type-selection.md](type-selection.md) (R3.3), [surface-generation.md](surface-generation.md) (R6.2), [display-rules.md](display-rules.md) (R5.2, R5.7)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1, R3.2, R3.4 (R3.3 in [type-selection.md](type-selection.md)) · **Implements:** [D-02, D-32](../decisions/contract-tags.md), [D-04, D-16, D-18, D-23, Q-33, Q-35, Q-36, Q-363](../decisions/contract.md), [Q-359](../decisions/physics-fixes.md), [D-01, Q-285](../decisions/rendering-bodies.md), [Q-221, Q-327](../decisions/pipeline-stages.md), [Q-117](../decisions/rendering-layers.md), [D-12](../decisions/haptics-design.md) · **Read with:** [type-selection.md](type-selection.md) (R3.3), [surface-generation.md](surface-generation.md) (R6.2), [display-rules.md](display-rules.md) (R5.2, R5.7)
 
 ## R3. Data contract
 
@@ -59,8 +59,9 @@ interface ObjectCard {
   ch4_depth_33?: TV; flux_45um?: TV;  // brown dwarfs
   teff_K?: TV;                        // stars (Q-152): SIMBAD mesFe_h median → 'derived'; else Gaia GSP-Phot (> 4000 K only) →
                                       // 'model_dependent'; else a main-sequence class table → 'inferred_from_analog'; else null
-  teq_K?: TV;                         // planet equilibrium temperature (D-12): Exoplanet Archive pl_eqt → 'measured',
-                                      // otherwise 'derived' (architecture spec §7.1). null → teq_pulse refused, listed in missing
+  teq_K?: TV;                         // planet equilibrium temperature (D-12): Exoplanet Archive pl_eqt → 'derived' with its
+                                      // formula and albedo assumption (issue #93, Q-359; it was 'measured'), otherwise 'derived'
+                                      // (architecture spec §7.1). null → teq_pulse refused, listed in missing
   // exoplanet orbit, mass and host star (issue #68, Q-150), from the Exoplanet Archive row (A3.8):
   mass_mearth?: TV;                   // 'measured' only when pl_bmassprov = 'Mass'; 'Msini' is a lower limit (model_dependent);
                                       // 'M-R relationship' (Chen & Kipping 2017) is model_dependent; 'Msin(i)/sin(i)' is derived
