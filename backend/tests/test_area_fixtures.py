@@ -295,3 +295,56 @@ def test_generator_reproduces_the_committed_bytes() -> None:
     assert area_fixtures.fixture_files() == area_fixtures.fixture_files()
     for data in area_fixtures.fixture_files().values():
         assert b"\r\n" not in data
+
+
+def test_check_fails_on_an_orphan_file(tmp_path: Path) -> None:
+    for rel, data in area_fixtures.fixture_files().items():
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_bytes(data)
+    assert area_fixtures.main(["--check"], out_dir=tmp_path) == 0
+    (tmp_path / "multivisit" / "stale.json").write_text("{}" + chr(10), encoding="utf-8")
+    assert area_fixtures.main(["--check"], out_dir=tmp_path) == 1
+
+
+def _d4_only(area: dict[str, Any]) -> None:
+    """The control (D5) was cut (Q-203 (7)); D4 still ran (A18.11)."""
+    checks = area["checks"]
+    del checks["control"]
+    del checks["provenance"]["control"]
+    for reply in (checks, area["summary"]):
+        reply["missing"] = sorted([*reply["missing"], "checks:d5_not_run"])
+
+
+def test_d4_only_checks_pass() -> None:
+    area = copy.deepcopy(_area("fixture:area-main"))
+    _d4_only(area)
+    _run(area, _entry("fixture:area-main"))
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda a: a["checks"].__setitem__(
+            "control", {"n_runs": 1, "tracks_per_run": [0], "mean": 0.0, "max": 0}
+        ),
+        lambda a: a["checks"]["provenance"].__setitem__(
+            "control", {"tag": "derived", "formula": "x"}
+        ),
+        lambda a: a["checks"].pop("linker"),
+    ],
+    ids=["control despite d5_not_run", "control provenance despite d5_not_run", "no linker"],
+)
+def test_d4_only_rules_catch(mutate: Mutation) -> None:
+    area = copy.deepcopy(_area("fixture:area-main"))
+    _d4_only(area)
+    mutate(area)
+    with pytest.raises(AssertionError):
+        _run(area, _entry("fixture:area-main"))
+
+
+def test_per_ticket_code_never_comes_with_not_run() -> None:
+    area = copy.deepcopy(_area("fixture:area-multivisit"))
+    for reply in (area["checks"], area["summary"]):
+        reply["missing"] = sorted([*reply["missing"], "checks:d4_not_run"])
+    with pytest.raises(AssertionError):
+        _run(area, _entry("fixture:area-multivisit"))

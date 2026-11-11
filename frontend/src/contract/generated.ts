@@ -258,7 +258,7 @@ export type AreaExposure = number;
  */
 export type AreaRaDec = [AreaRa, AreaDec];
 /**
- * <frame_id>:<n>, n from 1 in order of the peak pixel's row, then column (A17.2).
+ * <frame_id>:<n>, n from 1 by the rounded centroid row, then column (Q-208 (14)).
  */
 export type AreaDotId = string;
 export type AreaDotLabel = 'glitch' | 'star' | 'fixed' | 'mover';
@@ -271,7 +271,7 @@ export type AreaVerdict = 'found_blind' | 'unexplained' | 'unchecked' | 'possibl
 export type AreaLinker = 'pairs' | 'rate_grid';
 export type AreaSedLabel = 'smooth' | 'rough' | 'too_few' | 'not_informative';
 /**
- * GET /v1/areas/{area_id}/checks (A17.8, A17.6; gated, Q-203). All parts present, or none and checks:not_run in missing.
+ * GET /v1/areas/{area_id}/checks (A17.8, A17.6; gated, Q-203). Each part appears only if it ran (A18.11): checks:d4_not_run drops test_mover and completeness, checks:d5_not_run drops control, checks:not_run drops every part and the linker (Q-208 (12)).
  */
 export type AreaChecks = {
   test_mover?: AreaTestMover;

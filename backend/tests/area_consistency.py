@@ -148,8 +148,11 @@ def check_dots(summary: Reply, dots: Reply) -> None:
             _check(f is not None, f"{d['dot_id']}: unknown frame")
             assert f is not None
             _check(f["visit"] == block["visit"], f"{d['dot_id']}: in the wrong visit block")
-            for key in ("detector", "exposure", "time"):
-                _check(d[key] == f[key], f"{d['dot_id']}: {key} differs from its frame")
+            for field_name in ("detector", "exposure", "time"):
+                _check(
+                    d[field_name] == f[field_name],
+                    f"{d['dot_id']}: {field_name} differs from its frame",
+                )
             _check(_frame_of(d["dot_id"]) == d["frame_id"], f"{d['dot_id']}: id has another frame")
             lo, hi = f["wavelength_min_um"], f["wavelength_max_um"]
             _check(lo <= d["wavelength_um"] <= hi, f"{d['dot_id']}: wavelength outside its frame")
@@ -157,9 +160,9 @@ def check_dots(summary: Reply, dots: Reply) -> None:
                 inside(coverage[block["visit"]], d["ra"], d["dec"]),
                 f"{d['dot_id']}: outside its visit's coverage",
             )
-            key = (frame_index[d["frame_id"]], _n(d["dot_id"]))
-            _check(previous is None or key > previous, f"{d['dot_id']}: dots out of order")
-            previous = key
+            order = (frame_index[d["frame_id"]], _n(d["dot_id"]))
+            _check(previous is None or order > previous, f"{d['dot_id']}: dots out of order")
+            previous = order
             per_frame.setdefault(d["frame_id"], []).append(d)
     for frame_id, group in per_frame.items():
         _check(
@@ -390,24 +393,58 @@ def check_known(summary: Reply, known: Reply) -> None:
 
 
 def check_checks(summary: Reply, dots: Reply, checks: Reply) -> None:
-    not_run = "checks:not_run" in checks["missing"]
-    parts = [key for key in PART_KEYS if key in checks]
+    """Per ticket (A18.11, Q-208 (12)): D4 is test_mover + completeness, D5 is control.
+
+    ``checks:not_run`` means nothing ran (no part, no linker, no ``method.checks``, empty
+    provenance); ``checks:d4_not_run`` / ``checks:d5_not_run`` drop one ticket's parts and their
+    provenance keys, and never come with ``checks:not_run``.
+    """
+    missing = set(checks["missing"])
+    not_run = "checks:not_run" in missing
+    ran = {
+        "d4": not not_run and "checks:d4_not_run" not in missing,
+        "d5": not not_run and "checks:d5_not_run" not in missing,
+    }
+    owned = {"d4": ("test_mover", "completeness"), "d5": ("control",)}
     has_method = "checks" in checks["method"]
     if not_run:
-        _check(not parts and not has_method, f"checks:not_run, but parts present: {parts}")
+        _check(
+            not {"checks:d4_not_run", "checks:d5_not_run"} & missing,
+            "checks:not_run with a per-ticket code",
+        )
+        present = [k for k in PART_KEYS if k in checks]
+        _check(not present and not has_method, f"checks:not_run, but parts present: {present}")
         _check(checks["provenance"] == {}, "checks:not_run, but provenance has keys")
     else:
-        _check(parts == list(PART_KEYS) and has_method, f"checks ran, parts missing: {parts}")
-        _check(
-            sorted(checks["provenance"]) == ["completeness", "control", "test_mover"],
-            "checks provenance keys",
-        )
+        _check("linker" in checks, "checks ran without stating the linker")
+        _check(has_method == (ran["d4"] or ran["d5"]), "method.checks iff D4 or D5 ran")
+        for ticket, keys in owned.items():
+            for part in keys:
+                _check((part in checks) == ran[ticket], f"{part} present iff {ticket} ran")
+                _check(
+                    (part in checks["provenance"]) == ran[ticket],
+                    f"provenance.{part} present iff {ticket} ran",
+                )
     _check(
         checks["method"]["settings"] == summary["method"]["settings"],
         "checks settings differ from the summary's",
     )
     if not_run:
         return
+    if summary["n_visits"] < 3:
+        _check("rate_grid:visits" in missing, "checks ran on < 3 visits, no rate_grid:visits")
+    if ran["d4"]:
+        _check_d4(summary, dots, checks)
+    if ran["d5"]:
+        method = checks["method"]["checks"]
+        control = checks["control"]
+        runs = control["tracks_per_run"]
+        _check(len(runs) == control["n_runs"] == method["n_control_runs"], "control run count")
+        _check(abs(control["mean"] - sum(runs) / len(runs)) <= 1e-9, "control mean")
+        _check(control["max"] == max(runs), "control max")
+
+
+def _check_d4(summary: Reply, dots: Reply, checks: Reply) -> None:
     method = checks["method"]["checks"]
     grid = checks["completeness"]
     _check(grid["snr_bins"] == method["snr_bins"], "completeness snr_bins != method.checks")
@@ -421,27 +458,22 @@ def check_checks(summary: Reply, dots: Reply, checks: Reply) -> None:
         lo, hi = wilson95(c["k"], c["n"])
         _check(abs(c["wilson95"][0] - lo) <= 1e-4 and abs(c["wilson95"][1] - hi) <= 1e-4, "wilson")
         _check(c["n"] == method["n_per_cell"], "cell n != n_per_cell")
-    control = checks["control"]
-    runs = control["tracks_per_run"]
-    _check(len(runs) == control["n_runs"] == method["n_control_runs"], "control run count")
-    _check(abs(control["mean"] - sum(runs) / len(runs)) <= 1e-9, "control mean")
-    _check(control["max"] == max(runs), "control max")
     frames = {f["frame_id"]: f for f in summary["frames"]}
     real = all_dots(dots)
     for p in checks["test_mover"]["dots"]:
         f = frames.get(p["frame_id"])
         _check(f is not None, "planted dot at an unknown frame")
         assert f is not None
-        for key in ("detector", "exposure", "time"):
-            _check(p[key] == f[key], f"planted dot: {key} differs from its frame")
+        for field_name in ("detector", "exposure", "time"):
+            _check(
+                p[field_name] == f[field_name], f"planted dot: {field_name} differs from its frame"
+            )
         for d in real:
             if d["frame_id"] == p["frame_id"]:
                 _check(
                     math.hypot(d["x"] - p["x"], d["y"] - p["y"]) >= 0.5,
                     f"planted dot on top of the real dot {d['dot_id']} (A17.6: never in /dots)",
                 )
-    if summary["n_visits"] < 3:
-        _check("rate_grid:visits" in checks["missing"], "checks ran on < 3 visits, no rate_grid")
 
 
 def check_area(

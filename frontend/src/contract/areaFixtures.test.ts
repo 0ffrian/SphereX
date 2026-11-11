@@ -126,7 +126,17 @@ describe('Area search fixtures (A17.9)', () => {
     }
   });
 
-  it('checks: the main area ran them all, the multivisit area did not (Q-208 (12))', () => {
+  it('checks: D4 without D5 is valid with checks:d5_not_run, not without it (A18.11)', () => {
+    const validate = validator('checks');
+    const d4Only: AreaChecks = { ...reply<AreaChecks>('', 'checks') };
+    delete d4Only.control;
+    expect(validate({ ...d4Only, missing: [...d4Only.missing, 'checks:d5_not_run'].sort() })).toBe(
+      true,
+    );
+    expect(validate(d4Only)).toBe(false);
+  });
+
+  it('checks: the main area ran them all, the multivisit area ran none (Q-208 (12))', () => {
     const ran = reply<AreaChecks>('', 'checks');
     expect(ran.test_mover && ran.completeness && ran.control && ran.linker).toBeTruthy();
     expect(ran.method.checks).toBeDefined();

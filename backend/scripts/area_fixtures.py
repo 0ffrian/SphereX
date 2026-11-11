@@ -347,7 +347,7 @@ def _place_static(
 
 
 def _assign_ids(spec: Spec, dots: list[Dot]) -> None:
-    """``<frame_id>:<n>``, n from 1 by the peak pixel's row, then column (A17.2, Q-208 (14))."""
+    """``<frame_id>:<n>``, n from 1 by the rounded centroid row, then column (Q-208 (14))."""
     by_frame: dict[str, list[Dot]] = {}
     for d in dots:
         by_frame.setdefault(d.frame.frame_id, []).append(d)
@@ -981,17 +981,30 @@ def main(argv: list[str] | None = None, *, out_dir: Path = OUT_DIR) -> int:
     args = ap.parse_args(argv)
     files = fixture_files()
     stale = [rel for rel, data in files.items() if _read(out_dir / rel) != data]
+    orphans = orphan_files(out_dir, files)
     if args.check:
         for rel in stale:
             print(f"differs: {rel}", file=sys.stderr)
-        if not stale:
+        for rel in orphans:
+            print(f"not written by this script: {rel}", file=sys.stderr)
+        if not stale and not orphans:
             print(f"{len(files)} area fixture files match {out_dir.name}/")
-        return 1 if stale else 0
+        return 1 if stale or orphans else 0
+    for rel in orphans:
+        print(f"not written by this script (left in place): {rel}", file=sys.stderr)
     for rel in stale:
         (out_dir / rel).parent.mkdir(parents=True, exist_ok=True)
         (out_dir / rel).write_bytes(files[rel])
     print(f"{len(files)} files, {len(stale)} written, under {out_dir}")
     return 0
+
+
+def orphan_files(out_dir: Path, files: dict[str, bytes]) -> list[str]:
+    """Files under ``out_dir`` that this script does not write (hand-added or stale)."""
+    if not out_dir.is_dir():
+        return []
+    on_disk = {p.relative_to(out_dir).as_posix() for p in out_dir.rglob("*") if p.is_file()}
+    return sorted(on_disk - set(files))
 
 
 def _read(path: Path) -> bytes | None:
