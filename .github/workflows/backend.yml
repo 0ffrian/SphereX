@@ -40,6 +40,7 @@ jobs:
       - run: uv sync --locked
       - run: uv run python -m scripts.generate_contract --check
       - run: uv run python -m scripts.bake_fixtures --check
+      - run: uv run python -m scripts.area_fixtures --check
       # Q-164: no D-25 cache here, so this re-checks stage 7, the maps and the list from the
       # committed cards. `--strict` (catalogues from the cache) runs on the bake machine.
       - run: uv run python -m scripts.bake_demo_pack --check

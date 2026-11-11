@@ -3,7 +3,6 @@
 import Ajv, { type ValidateFunction } from 'ajv';
 import { describe, expect, it } from 'vitest';
 import cardSchema from '../../../shared/schemas/object-card.schema.json';
-import paramsSchema from '../../../shared/schemas/render-params.schema.json';
 import invalidCases from '../../../shared/fixtures/invalid/cases.json';
 import { assertTagged, OBJECT_TYPES, TAGS, type Tagged } from '@/contract';
 
@@ -22,13 +21,19 @@ const params = load(
   import.meta.glob('../../../shared/fixtures/params/*.json', { eager: true, import: 'default' }),
 );
 
+// Every schema in shared/schemas/ (the card, the params and the six Area search schemas, A17.9),
+// keyed by its $id without ".schema.json".
+const schemas = Object.values(
+  import.meta.glob<{ $id: string }>('../../../shared/schemas/*.schema.json', {
+    eager: true,
+    import: 'default',
+  }),
+);
 const ajv = new Ajv({ allErrors: true, strict: true });
-ajv.addSchema(cardSchema);
-ajv.addSchema(paramsSchema);
-const validators: Record<string, ValidateFunction> = {
-  'object-card': ajv.getSchema('object-card.schema.json')!,
-  'render-params': ajv.getSchema('render-params.schema.json')!,
-};
+for (const schema of schemas) ajv.addSchema(schema);
+const validators: Record<string, ValidateFunction> = Object.fromEntries(
+  schemas.map((s) => [s.$id.replace(/\.schema\.json$/, ''), ajv.getSchema(s.$id)!]),
+);
 
 function taggedValues(node: unknown): Tagged[] {
   if (Array.isArray(node)) return node.flatMap(taggedValues);

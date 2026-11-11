@@ -1,0 +1,7 @@
+# %ECSV 1.0
+# ---
+# datatype: []
+# meta:
+#   source: 'synthetic fixture: header-only stub (issue #92); the real writer is P7 (A17.7, A19.9)'
+#   area_id: 'fixture:area-multivisit'
+#   area_columns: [track_id, dot_id, status, verdict, match_designation]
