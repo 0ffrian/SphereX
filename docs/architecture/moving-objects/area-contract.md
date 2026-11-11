@@ -38,7 +38,7 @@ Payload shapes as built: `shared/schemas/area-*.schema.json`; gap choices in [Q-
 - **Outputs** are `derived.area` entries in the same cache (as `derived.spectrum`, [A4.2](../pipeline.md#a42-stage-2-measure-brightness-and-spectrum)): `summary`, `known`, `dots`, `tracks`, `checks` (gated), `export`. Key: `derived.area` + data release + `area_id` + `params_hash`. `params_hash` covers `AREA_VERSION`, `MEASURE_VERSION`, every `method` setting and the sorted SHA-256 of every input body. The API serves the entry whose `params_hash` matches the running code and settings; an older entry is not listed in the index (the operator re-runs the script).
 - **Offline:** the API only reads entries. Under `SX_OFFLINE=1` an absent area is 404 `area_not_found`.
 - **Determinism:** the same cache and settings give byte-identical entries (inputs sorted, fixed float formatting, ids as in A17.2 and A17.4). The checks of A17.6 draw from seeded generators (the seed list is in `method.checks`), so the same cache, settings and seeds still give the same bytes. Nothing else is random.
-- **Fixtures for tests:** PR #53's Eros fixtures are 0.1° cutouts centred on Eros and do not cover an area. D1 records area cutouts with the pre-fetch script (D-25, never hand-edited); the determinism test runs twice on a small synthetic area and compares bytes.
+- **Fixtures for tests:** PR #53's Eros fixtures are 0.1° cutouts centred on Eros and do not cover an area. D1 records area cutouts with the pre-fetch script (P3 uses the recorded 0.1° Eros cutouts instead, `backend/tests/area_recorded.py`; [Q-402](../../decisions/moving-objects.md) (3)) (D-25, never hand-edited); the determinism test runs twice on a small synthetic area and compares bytes.
 
 ### A17.11 Compute budget
 
@@ -48,7 +48,7 @@ Estimates, **not measured**; D1 records the real times.
 |---|---|---|
 | Frame search | About 15 cones of 4 s per area | Grid of A17.1 |
 | Downloads | Tens to a few hundred MB | Slowest step; IRSA at about 20 s per cutout (Q-111) |
-| Dots | Seconds per frame | Measure workers (Q-112) can run it |
+| Dots | Seconds per frame (estimate); measured offline: about 4 000 dots per area frame, Stage 2 13 to 21 ms a dot, so about 25 min per Eros area on one worker ([Q-401](../../decisions/moving-objects.md)) | Measure workers (Q-112) can run it |
 | Glitches, stars, join | Seconds | Few movers-to-be per area; exhaustive pairing is cheap |
 | Star lists, SkyBoT, Horizons | One cone per catalogue and visit; one SkyBoT cone per visit; one TLIST per candidate | Horizons one request at a time |
 | Serving | Reads cache entries | No compute in requests |
