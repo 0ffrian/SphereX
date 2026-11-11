@@ -19,6 +19,7 @@ import {
 import { BUILD_POP_ID, ViewerPanel, type PopId } from '@/app/ViewerPanel';
 import { CloseUpPane, closeUpButtonLabel, closeUpKindOf } from '@/app/CloseUpPane';
 import { useCloseUpStore } from '@/app/closeUpStore';
+import { useRockStore } from '@/app/rockStore';
 import { StatusLine } from '@/app/StatusLine';
 import { BuildDock, ZoomBar } from './BuildChrome';
 import { Icon, type IconName } from '@/app/shell/icons';
@@ -29,7 +30,7 @@ import { ProvenanceBadge } from '@/app/Badge';
 import { effectiveHonesty, HONESTY_LABEL } from '@/viewer/honesty';
 import type { MouldPhase } from './useMould';
 import { closeBuildPane } from './focus';
-import { PREBUILT_NOTE } from '@/app/messages';
+import { ENGINE_NOTE, PREBUILT_NOTE } from '@/app/messages';
 import { loadBodyFor, typeLabel, useSelection } from './selectedBody';
 
 export { closeBuildPane };
@@ -60,6 +61,10 @@ export function BuildPane() {
   const buttonRefs = useRef<Partial<Record<PopId, HTMLButtonElement | null>>>({});
   const closeKind = closeUpKindOf(params?.type);
   const closeHidden = useCloseUpStore((s) => s.hidden);
+  // A D-37 engine (world, star or rock) draws the body: its note replaces the baked path's.
+  const closeEngine = useCloseUpStore((s) => s.engineStar !== null || s.engineWorld !== null);
+  const rockEngine = useRockStore((s) => s.view !== null);
+  const engineDrawn = closeEngine || rockEngine;
   const [usesSeed, setUsesSeed] = useState(true);
   const spinRef = useRef<SVGSVGElement>(null);
   const sayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -235,8 +240,11 @@ export function BuildPane() {
         fixture={fixtureSky || (card?.id.startsWith('fixture:') ?? false)}
       />
       {honesty === 'artistic' && <span>artist&rsquo;s impression</span>}
-      {bodyHere?.status === 'ready' && bodyHere.prebuilt && (
-        <span data-testid="build-prebuilt">{PREBUILT_NOTE}</span>
+      {engineDrawn ? (
+        <span data-testid="build-engine-note">{ENGINE_NOTE}</span>
+      ) : (
+        bodyHere?.status === 'ready' &&
+        bodyHere.prebuilt && <span data-testid="build-prebuilt">{PREBUILT_NOTE}</span>
       )}
       <span className="sr-only">{HONESTY_LABEL[honesty]}</span>
       {extra}
