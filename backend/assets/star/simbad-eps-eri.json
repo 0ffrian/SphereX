@@ -1,7 +1,26 @@
 {
-  "asset_version": "11",
+  "asset_version": "12",
   "card": {
+    "flare_rate_per_d": {
+      "source": "not available: no published flare rate per day was confirmed: the star is in neither the Guenther et al. 2020 TESS catalogue (AJ 159, 60; sectors 1-2) nor the Medina et al. 2020 sample (ApJ 905, 107)",
+      "tag": "measured",
+      "value": null
+    },
     "id": "simbad-eps-eri",
+    "lum_lsun": {
+      "assumption": "FLAME luminosity from the Gaia G magnitude, the GSP-Phot extinction, the parallax (or GSP-Phot distance) and a bolometric correction that depends on the GSP-Phot Teff, gravity and metallicity (Gaia DR3 datamodel, lum_flame); a model value, not a measured luminosity, and it inherits GSP-Phot's weakness for cool stars",
+      "err": 0.0050000000000000044,
+      "source": "Gaia DR3 astrophysical_parameters lum_flame, source 5164707970261890560, matched 0.00 arcsec from the SIMBAD position moved to 2016.0 by its proper motion",
+      "tag": "model_dependent",
+      "value": 0.34
+    },
+    "mass_msun": {
+      "assumption": "FLAME mass from comparing the GSP-Phot Teff and the FLAME luminosity with the BaSTI solar-metallicity stellar evolution models (Gaia DR3 datamodel, mass_flame); solar metallicity is assumed, and it is a model value, not a dynamical mass",
+      "err": 0.04039999999999999,
+      "source": "Gaia DR3 astrophysical_parameters mass_flame, source 5164707970261890560, matched 0.00 arcsec from the SIMBAD position moved to 2016.0 by its proper motion",
+      "tag": "model_dependent",
+      "value": 0.8112
+    },
     "name": "* eps Eri",
     "pm_mas_yr": {
       "source": "SIMBAD * eps Eri (pmra = mu_alpha * cos(delta), pmdec)",
@@ -18,6 +37,12 @@
       "tag": "model_dependent",
       "value": 0.7761
     },
+    "rot_period_h": {
+      "err": 3.6,
+      "source": "literature: Petit et al. 2021, A&A 648, A55 (arXiv:2101.02643), Sect. 8 'Brightness fluctuations': Gaussian-process fit to the TESS light curve, 0.2 d bins (backend/assets/literature.toml). 11.62 +/- 0.15 d (x 24 h). With 0.05 d bins the same fit gives 11.56 +/- 0.19 d; the Ca II H&K period of Donahue et al. 1996 is 11.68 d (as quoted by Petit et al.)",
+      "tag": "measured",
+      "value": 278.88
+    },
     "spectral_class": {
       "source": "SIMBAD * eps Eri sp_type",
       "tag": "measured",
@@ -33,7 +58,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
+  "inputs_sha256": "eb40dd02945cf37be8fa91ab3ed6ad7e13d745c6ccbb5d17ae2e8c929dfdc9e9",
   "render_params": {
     "alt_text": "* eps Eri, Star, 0.776 solar radii (model dependent), colour from Teff, self-luminous. Surface relief: illustrative.",
     "confidence": {

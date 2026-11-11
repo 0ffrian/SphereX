@@ -1,7 +1,22 @@
 {
-  "asset_version": "11",
+  "asset_version": "12",
   "card": {
+    "flare_rate_per_d": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no flare rate for this star",
+      "tag": "measured",
+      "value": null
+    },
     "id": "simbad-alf-cmi",
+    "lum_lsun": {
+      "source": "not available: no Gaia DR3 source within the match radius",
+      "tag": "measured",
+      "value": null
+    },
+    "mass_msun": {
+      "source": "not available: no Gaia DR3 source within the match radius",
+      "tag": "measured",
+      "value": null
+    },
     "name": "* alf CMi",
     "pm_mas_yr": {
       "source": "SIMBAD * alf CMi (pmra = mu_alpha * cos(delta), pmdec)",
@@ -16,6 +31,11 @@
       "source": "literature: Kervella et al. 2004, A&A 413, 251, Sect. 4: interferometric (VLTI/VINCI) linear radius of Procyon A (backend/assets/literature.toml). Limb-darkened angular diameter from interferometry, scaled by the Hipparcos parallax",
       "tag": "measured",
       "value": 2.048
+    },
+    "rot_period_h": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no rotation period for this star",
+      "tag": "measured",
+      "value": null
     },
     "spectral_class": {
       "source": "SIMBAD * alf CMi sp_type",
@@ -32,7 +52,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
+  "inputs_sha256": "eb40dd02945cf37be8fa91ab3ed6ad7e13d745c6ccbb5d17ae2e8c929dfdc9e9",
   "render_params": {
     "alt_text": "* alf CMi, Star, 2.05 solar radii (measured), colour from Teff, self-luminous. Surface relief: illustrative.",
     "confidence": {

@@ -1,5 +1,5 @@
 {
-  "asset_version": "11",
+  "asset_version": "12",
   "card": {
     "ch4_depth_33": {
       "source": "not available: no source in the pipeline yet (no CH4 band-depth rule in the specs)",
@@ -41,7 +41,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
+  "inputs_sha256": "eb40dd02945cf37be8fa91ab3ed6ad7e13d745c6ccbb5d17ae2e8c929dfdc9e9",
   "render_params": {
     "alt_text": "WISEA J085510.74-071442.5, Brown dwarf, 1 Jupiter radii (model dependent), colour from a class palette, self-luminous. Surface relief: illustrative.",
     "confidence": {

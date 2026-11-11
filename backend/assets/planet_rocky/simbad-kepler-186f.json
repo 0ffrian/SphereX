@@ -1,11 +1,22 @@
 {
-  "asset_version": "11",
+  "asset_version": "12",
   "card": {
+    "dayside_temp_K": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no eclipse or phase-curve value for this planet",
+      "tag": "measured",
+      "value": null
+    },
     "host_age_gyr": {
       "err": 0.6,
       "source": "NASA Exoplanet Archive PSCompPars st_age (Torres et al. 2015)",
       "tag": "measured",
       "value": 4.0
+    },
+    "host_lum_lsun": {
+      "err": 0.010963302138669674,
+      "source": "NASA Exoplanet Archive PSCompPars st_lum, log10 L/L_sun converted as 10^st_lum (Torres et al. 2015)",
+      "tag": "measured",
+      "value": 0.054954087385762455
     },
     "host_mass_msun": {
       "err": 0.024,
@@ -25,7 +36,19 @@
       "tag": "measured",
       "value": 3755.0
     },
+    "hotspot_offset_deg": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no eclipse or phase-curve value for this planet",
+      "tag": "measured",
+      "value": null
+    },
     "id": "simbad-kepler-186f",
+    "insolation_searth": {
+      "err": 0.15,
+      "formula": "S / S_earth = (L_star / L_sun) / (a / au)^2, the flux at the planet computed by the reference from its host luminosity and orbit; not a direct measurement",
+      "source": "NASA Exoplanet Archive PSCompPars pl_insol (Torres et al. 2015)",
+      "tag": "derived",
+      "value": 0.3
+    },
     "mass_mearth": {
       "assumption": "mass estimated from the planet's radius with the Chen & Kipping 2017 mass-radius relation (archive pl_bmassprov = 'M-R relationship', pscp_calc.html); not a measured mass",
       "source": "NASA Exoplanet Archive PSCompPars calculated value (pscp_calc.html), pl_bmasse",
@@ -33,11 +56,22 @@
       "value": 1.71
     },
     "name": "Kepler-186 f",
+    "nightside_temp_K": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no eclipse or phase-curve value for this planet",
+      "tag": "measured",
+      "value": null
+    },
     "orbit_au": {
       "err": 0.171,
       "source": "NASA Exoplanet Archive PSCompPars pl_orbsmax (Torres et al. 2015)",
       "tag": "measured",
       "value": 0.432
+    },
+    "orbit_ecc": {
+      "err": 0.07,
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbeccen (Torres et al. 2015)",
+      "tag": "measured",
+      "value": 0.04
     },
     "orbital_period_d": {
       "err": 0.0013,
@@ -68,7 +102,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
+  "inputs_sha256": "eb40dd02945cf37be8fa91ab3ed6ad7e13d745c6ccbb5d17ae2e8c929dfdc9e9",
   "render_params": {
     "alt_text": "Kepler-186 f, Rocky planet, 0.104 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
     "confidence": {

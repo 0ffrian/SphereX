@@ -1,8 +1,18 @@
 {
-  "asset_version": "11",
+  "asset_version": "12",
   "card": {
     "id": "simbad-v-r-dra",
     "lightcurve": [],
+    "lum_lsun": {
+      "source": "not available: Gaia DR3 has no FLAME lum_flame for this star",
+      "tag": "measured",
+      "value": null
+    },
+    "mass_msun": {
+      "source": "not available: Gaia DR3 has no FLAME mass_flame for this star",
+      "tag": "measured",
+      "value": null
+    },
     "name": "V* R Dra",
     "period_var_d": {
       "formula": "median of the mesVar periods typed LPV or M; of two middle values, the one from the most recent bibcode (Q-152)",
@@ -39,7 +49,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
+  "inputs_sha256": "eb40dd02945cf37be8fa91ab3ed6ad7e13d745c6ccbb5d17ae2e8c929dfdc9e9",
   "render_params": {
     "alt_text": "V* R Dra, Mira variable, size unknown, colour from Teff, self-luminous. Surface relief: illustrative.",
     "confidence": {
