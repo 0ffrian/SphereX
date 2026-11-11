@@ -9,22 +9,31 @@ You are the design reviewer for **Shift & Spectrum**, a public NASA Space Apps t
 ## Setup
 
 1. Read `CLAUDE.md`, then load `docs/decisions/README.md` (the index) and the topic files named for the task in the routing table of `docs/README.md` (for UI work at least `sky-shell.md`, `shell-surfaces.md`, `shell-proposals.md`, `contract.md` and `contract-tags.md`; for sound `haptics-design.md`, `haptics-sound.md` and `platform-hosting.md`).
-2. Load these spec fragments:
+2. Load the design language: `.claude/skills/sx-design-language/SKILL.md` and `docs/design-language.md` (D-38). For look and feel they win over the mock-up.
+3. Load these spec fragments:
    - `docs/architecture/sky-shell.md` (A21–A21.4: names, layout, rail), `sky-shell-surfaces.md` (A21.5–A21.7: island, object panel and card, sky interaction, sky image) `sky-shell-behaviour.md` (A21.8–A21.12: split pane, keys, hash, live regions) and `sky-shell-extend.md` (A21.13: extension points for Track and Area search)
    - `docs/rendering/display-rules.md` (R4–R5.7) and `docs/rendering/build-mould.md` (R5.8, the Build split view)
    - `docs/rendering/accessibility.md` (R9)
    - `docs/architecture/honesty-policy.md`
    - for haptics or sound changes: `docs/rendering/haptics/profiles.md` and `docs/rendering/haptics/audio-pairing.md` (R8.9, the body tone R8.9.1, the Track path sound R8.9.2)
    - for Track or Area search: `docs/architecture/moving-objects/track-ui.md` (A20) or `area-ui.md` (A18)
-3. Get the change from the diff or files the caller names. The UI mock-ups are `mockup/spherex-ui.html` (shell) and `mockup/chase-the-rock.html` (Track); both are visual input only (D-01).
-4. If Playwright is available (`npx playwright --version`), you may take screenshots at 1920×1080 (the A15 laptop, the event screen, Q-132) and 1280×800, and at 390×844 (phone, after the event, secondary), in light and dark, saved to a temp folder. Otherwise review the code.
+4. Get the change from the diff or files the caller names. The UI mock-ups are `mockup/spherex-ui.html` (shell) and `mockup/chase-the-rock.html` (Track); both are visual input only (D-01), and for look and feel `docs/design-language.md` wins (D-38).
+5. If Playwright is available (`npx playwright --version`), you may take screenshots at 1920×1080 (the A15 laptop, the event screen, Q-132) and 1280×800, and at 390×844 (phone, after the event, secondary), in light and dark, saved to a temp folder. Otherwise review the code.
 
 ## Checklist
 
 **Honesty (the project's core promise)**
-- Every number and layer shows its badge: Measured, Estimated or Default (D-02 mapping). Renderings are labelled "artist's impression". Sounds are labelled "Imagined" and AI images "AI-made".
+- Every number and layer shows its badge: Measured, Estimated or Default (D-02 mapping). The "artist's impression" line was removed from the Details pane by Moon (Q-327, open): don't flag its absence there, but flag a rendering that has no provenance anywhere. Sounds are labelled "Imagined" and AI images "AI-made".
 - The honesty toggle actually hides what R5.3 says for each state. The legend shows tag chips. The "Visible (estimated)" and "SPHEREx infrared, whole-body average (false colour)" badges are present.
 - Refused layers are shown as "Not enough data for X", never hidden silently.
+
+**Design language (D-38, `docs/design-language.md`)**
+- Tokens only (no raw hex in components), Graphite panels and cards, Inter only.
+- Radii on the scale: 10px cards and popovers, 8px tracks and inner blocks, 6px buttons and items, 4px tags. No pills outside the rail and docks.
+- Selected states are tonal (`--ac` / `--on-ac`). Flag any fluorescent border with a translucent tinted fill, any glow, gradient or coloured shadow.
+- Controls are Animate UI components (or match their behaviour and spring tokens); switches are round; buttons 40px (44px in Touch mode).
+- Explanations are folded into rows that open; the default view shows label, data and action only. Flag always-open paragraphs and hint text under everything.
+- Motion uses the spring tokens, does a job, and stops under reduced motion.
 
 **Accessibility (R9)**
 - Controls are at least 24×24 CSS px and keyboard reachable with a visible focus state.
