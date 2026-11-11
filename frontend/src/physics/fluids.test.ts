@@ -44,6 +44,19 @@ describe('fluids', () => {
     expect(fluidState(FLUIDS.co2, 240, 5e5, false)).toBe('vapour');
   });
 
+  it('#93 3.1: every fluid has a critical point; at or above Pc the line is Tc, and above Tc and Pc it is supercritical', () => {
+    for (const f of Object.values(FLUIDS)) {
+      expect(f.Tc).toBeGreaterThan(f.Tt);
+      expect(boilingPointK(f, f.Pc)).toBe(f.Tc);
+      expect(boilingPointK(f, f.Pc * 0.999)!).toBeLessThanOrEqual(f.Tc);
+      expect(fluidState(f, f.Tc + 1, f.Pc * 1.01, false)).toBe('supercritical');
+      expect(fluidState(f, f.Tc - 1, f.Pc * 1.01, false)).toBe('liquid');
+      expect(fluidState(f, f.Tc + 1, f.Pc * 0.9, false)).toBe('vapour');
+    }
+    // Known answer (NIST): nitrogen's critical point is 126.19 K, 3.3958 MPa; 165 K at 100 bar is past it.
+    expect(fluidState(FLUIDS.nitrogen, 165, 100e5, false)).toBe('supercritical');
+  });
+
   it('phase: Earth is liquid, Mars-like air is frozen, an airless hot rock is vapour', () => {
     expect(fluidState(FLUIDS.water, 288, ATM_PA, false)).toBe('liquid');
     expect(fluidState(FLUIDS.water, 210, 600, false)).toBe('frozen');

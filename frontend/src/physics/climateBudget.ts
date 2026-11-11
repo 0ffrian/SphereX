@@ -163,7 +163,8 @@ export function worldModel(i: WorldInputs): WorldModel | null {
   const Tc = !airless ? cloudBaseK(F, Ts, Pa) : null;
   const gam = gv / cp;
   const zc = Tc !== null ? (Ts - Tc) / gam / 1000 : null;
-  const runaway = i.fluid === 'water' && state === 'vapour' && Ps >= 0.1;
+  const runaway =
+    i.fluid === 'water' && (state === 'vapour' || state === 'supercritical') && Ps >= 0.1;
   const cov = airless
     ? 0
     : state === 'liquid'

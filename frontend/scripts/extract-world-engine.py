@@ -63,6 +63,17 @@ def w(name, text):
 
 os.makedirs(OUT, exist_ok=True)
 
+# Reviewed deviations (PR #89 review, issue #93) carried into the output: the block texts live in
+# world_engine_deviations.py; the renames and the split points are below, next to the slice they change.
+sys.path.insert(0, HERE)
+import world_engine_deviations as DV  # noqa: E402
+
+DEV_PRESETS = '\n'.join([DV.PRESETS_89_REVIEW_1, DV.PRESETS_89_REVIEW_2, DV.PRESETS_93_3_1]) + '\n'
+DEV_UMEAS = """// @deviation (#89 review 5) the rename below lets a measured peak jet speed replace the thermal-wind estimate:
+// cardToWorld sets p.Umeas for Jupiter (about 150 m/s, the 24 N jet) and Saturn (about 450 m/s, equatorial). For
+// every other giant p.Umeas is unset and the prototype's U = 0.6 sqrt(R dT) runs unchanged (its 10 K floor holds
+// U near 115 to 120 m/s for a cool giant that is not locked: an estimate, tagged model_dependent)."""
+
 # helpers.js: clamp lerp sstep fmt rng g planck planckRGB LMIN/LMAX/LUT compile unis FULL (not $, reduced, pills)
 w('helpers.js', hdr('helpers: maths, Planck colour, LUT, GL compile', '1267-1270, 1272-1282, 1291-1297') +
   sl(1268, 1271) + '\n' + sl(1273, 1283) + '\n' + sl(1292, 1298) + '\nexport { ' + HELPERS_NAMES + ' };\n')
@@ -71,8 +82,9 @@ w('helpers.js', hdr('helpers: maths, Planck colour, LUT, GL compile', '1267-1270
 w('shaders.js', hdr('shaders: NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS', '1299-1678') +
   "import { LMIN, LMAX } from './helpers.js';\n" + sl(1299, 1678) + '\nexport { NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS };\n')
 
-# presets.js: FLUIDS, WP
-w('presets.js', hdr('FLUIDS and WP (example presets)', '1679-1700') + sl(1679, 1700) + '\nexport { FLUIDS, WP };\n')
+# presets.js: FLUIDS, WP, then the reviewed data deviations (#89 review 1 and 2, #93 3.1)
+w('presets.js', hdr('FLUIDS and WP (example presets)', '1679-1700') + sl(1679, 1700) + '\n' + DEV_PRESETS +
+  'export { FLUIDS, WP };\n')
 
 # terrain.js: CPU noise, buildTerrain, routeTerrain (pure)
 w('terrain.js', hdr('CPU value noise, plate-tectonic terrain build, river routing', '1767-1905') + HELPERS_IMPORT +
@@ -96,16 +108,27 @@ import { GAS_NODES, gasProfile, GasSim } from './gas.js';
 export function createCore(canvas) {
 var reduced = false;
 """)
-core.append(sl(1701, 1765))                 # ORB, applySpin, W, slider constants, psatFn, worldModel
+# ORB, applySpin, W, slider constants, psatFn, worldModel; L1727 (the boiling line) is replaced (#89 review 2)
+core.append(DEV_UMEAS)
+core.append(sl(1701, 1726, [('Math.max(1,', 'p.Umeas||Math.max(1,')]))
+core.append(DV.CORE_L1727_89_REVIEW_2)
+core.append(DV.CORE_L1727_93_3_1)
+core.append(sl(1728, 1736))
+core.append(DV.CORE_L1736_93_3_1)
+core.append(sl(1737, 1765, [('flat:', 'flat:p.fMeas!=null?p.fMeas:')]))
 core.append(sl(1906, 2147))                 # hydroRaster, EB
 core.append(sl(2262, 2355, [('(ema', '(!window.__sxPin&&ema')]))       # WorldGL
 core.append(sl(2356, 2385))                 # fly camera, flyMove, globePick, GS
 core.append(sl(2387, 2387))                 # km
 # worldUi: rows and caption captured as data instead of written into the DOM
 core.append('function worldUi() {')
-core.append(sl(2389, 2410))
+core.append(sl(2389, 2389))
+core.append(DV.CORE_L2389_93_3_1)
+core.append(sl(2390, 2410))
 core.append("  W.rows = rows; W.mixed = mixed;")
-core.append(sl(2414, 2425, [("$('#world-cap').textContent", "W.cap")]))
+core.append(sl(2414, 2424))
+core.append(DV.CORE_L2424_93_3_1)
+core.append(sl(2425, 2425, [("$('#world-cap').textContent", "W.cap")]))
 core.append(sl(2429, 2429, [("$('#world-tag').textContent", "W.tag")]))
 core.append('}')
 core.append(sl(2431, 2443))                 # resetWorld (its worldUi() call stays)
