@@ -1,0 +1,165 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "area-dots.schema.json",
+  "title": "AreaDots",
+  "description": "GET /v1/areas/{area_id}/dots (A17.8, A17.2): every dot of the area, per visit, with its label.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "visits",
+    "cached_at",
+    "computed_at",
+    "missing",
+    "provenance"
+  ],
+  "properties": {
+    "visits": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/AreaVisitDots"
+      }
+    },
+    "cached_at": {
+      "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+    },
+    "computed_at": {
+      "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+    },
+    "missing": {
+      "type": "array",
+      "items": {
+        "$ref": "area-index.schema.json#/definitions/AreaMissingCode"
+      }
+    },
+    "provenance": {
+      "$ref": "#/definitions/AreaDotsProvenance"
+    }
+  },
+  "definitions": {
+    "AreaVisitDots": {
+      "title": "AreaVisitDots",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visit",
+        "dots"
+      ],
+      "properties": {
+        "visit": {
+          "$ref": "area-index.schema.json#/definitions/AreaVisit"
+        },
+        "dots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AreaDot"
+          }
+        }
+      }
+    },
+    "AreaDot": {
+      "title": "AreaDot",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dot_id",
+        "frame_id",
+        "detector",
+        "exposure",
+        "time",
+        "x",
+        "y",
+        "ra",
+        "dec",
+        "flux_uJy",
+        "flux_err",
+        "snr",
+        "wavelength_um",
+        "bandwidth_um",
+        "flags",
+        "label"
+      ],
+      "properties": {
+        "dot_id": {
+          "$ref": "area-index.schema.json#/definitions/AreaDotId"
+        },
+        "frame_id": {
+          "$ref": "area-index.schema.json#/definitions/AreaFrameId"
+        },
+        "detector": {
+          "$ref": "area-index.schema.json#/definitions/AreaDetector"
+        },
+        "exposure": {
+          "$ref": "area-index.schema.json#/definitions/AreaExposure"
+        },
+        "time": {
+          "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "ra": {
+          "$ref": "area-index.schema.json#/definitions/AreaRa"
+        },
+        "dec": {
+          "$ref": "area-index.schema.json#/definitions/AreaDec"
+        },
+        "flux_uJy": {
+          "type": "number"
+        },
+        "flux_err": {
+          "type": "number",
+          "minimum": 0
+        },
+        "snr": {
+          "type": "number"
+        },
+        "wavelength_um": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "bandwidth_um": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          }
+        },
+        "label": {
+          "$ref": "area-index.schema.json#/definitions/AreaDotLabel"
+        }
+      }
+    },
+    "AreaDotsProvenance": {
+      "title": "AreaDotsProvenance",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "position",
+        "photometry",
+        "wavelength",
+        "label"
+      ],
+      "properties": {
+        "position": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "photometry": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "wavelength": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "label": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        }
+      }
+    }
+  }
+}
