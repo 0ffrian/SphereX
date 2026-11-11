@@ -1,5 +1,5 @@
 {
-  "asset_version": "10",
+  "asset_version": "11",
   "card": {
     "ch4_depth_33": {
       "source": "not available: no source in the pipeline yet (no CH4 band-depth rule in the specs)",
@@ -40,8 +40,8 @@
     "type": "brown_dwarf"
   },
   "created_at": "2025-10-01T00:00:00.000Z",
-  "generator_version": "p1-b3",
-  "inputs_sha256": "4d30394754ce61b83ba21606cfe420fb28cc45912350a92d60845b8e46f385e2",
+  "generator_version": "p1-b4",
+  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
   "render_params": {
     "alt_text": "WISEA J085510.74-071442.5, Brown dwarf, 1 Jupiter radii (model dependent), colour from a class palette, self-luminous. Surface relief: illustrative.",
     "confidence": {
@@ -143,7 +143,7 @@
       "threshold": 0.25,
       "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
     },
-    "generator_version": "p1-b3",
+    "generator_version": "p1-b4",
     "haptics": {
       "data": "none",
       "data_tag": "artistic",
@@ -191,12 +191,12 @@
       "spectrum"
     ],
     "scale_m": 71492000.0,
-    "seed": 1548685193,
+    "seed": 1735891108,
     "textures": {
-      "albedo": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b3/1548685193/1024x512/albedo.webp",
-      "height": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b3/1548685193/1024x512/height.png",
-      "height_bin": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b3/1548685193/1024x512/height.bin",
-      "normal": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b3/1548685193/1024x512/normal.png"
+      "albedo": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b4/1735891108/1024x512/albedo.webp",
+      "height": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b4/1735891108/1024x512/height.png",
+      "height_bin": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b4/1735891108/1024x512/height.bin",
+      "normal": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b4/1735891108/1024x512/normal.png"
     },
     "type": "brown_dwarf",
     "view_modes": {
@@ -227,11 +227,11 @@
       }
     }
   },
-  "seed": 1548685193,
+  "seed": 1735891108,
   "textures": {
-    "albedo": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b3/1548685193/1024x512/albedo.webp",
-    "height": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b3/1548685193/1024x512/height.png",
-    "height_bin": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b3/1548685193/1024x512/height.bin",
-    "normal": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b3/1548685193/1024x512/normal.png"
+    "albedo": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b4/1735891108/1024x512/albedo.webp",
+    "height": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b4/1735891108/1024x512/height.png",
+    "height_bin": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b4/1735891108/1024x512/height.bin",
+    "normal": "/data/demo-textures/simbad-wisea-j085510-74-071442-5/p1-b4/1735891108/1024x512/normal.png"
   }
 }

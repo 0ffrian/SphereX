@@ -242,30 +242,46 @@ REFERENCE_PROVENANCE = {
 }
 
 
+# path -> ((mtime_ns, size), {lower-case name or alias or id: (id, name)}). The file is curated by
+# hand, so the parse is reused until its stat changes (the same pattern as the literature registry).
+_REFERENCE_INDEX: dict[Path, tuple[tuple[int, int], dict[str, tuple[str, str]]]] = {}
+
+
+def _reference_index(path: Path) -> dict[str, tuple[str, str]]:
+    """The names of ``reference_objects.toml``, parsed once per file version; empty when missing."""
+    try:
+        st = path.stat()
+    except OSError:
+        return {}
+    stamp = (st.st_mtime_ns, st.st_size)
+    hit = _REFERENCE_INDEX.get(path)
+    if hit is not None and hit[0] == stamp:
+        return hit[1]
+    index: dict[str, tuple[str, str]] = {}
+    for row in tomllib.loads(path.read_text(encoding="utf-8")).get("object", []):
+        entry = (str(row["id"]), str(row["name"]))
+        for n in (row["id"], row["name"], *row.get("aliases", [])):
+            index.setdefault(str(n).lower(), entry)
+    _REFERENCE_INDEX[path] = (stamp, index)
+    return index
+
+
 def reference_object(ctx: Context, text: str) -> ResolvedObject | None:
     """Issue #71 stream E (Q-258): a reference object by name or id (``reference_objects.toml``)."""
-    path = ctx.settings.reference_file
-    if not path.is_file():
+    hit = _reference_index(ctx.settings.reference_file).get(norm_name(text).lower())
+    if hit is None:
         return None
-    key = norm_name(text).lower()
-    for row in tomllib.loads(path.read_text(encoding="utf-8")).get("object", []):
-        names = {
-            str(row["id"]).lower(),
-            str(row["name"]).lower(),
-            *(a.lower() for a in row.get("aliases", [])),
-        }
-        if key in names:
-            return ResolvedObject(
-                id=row["id"],
-                name=row["name"],
-                ra=0.0,
-                dec=0.0,
-                moving=False,
-                resolver="reference",
-                provenance={"ra": dict(REFERENCE_PROVENANCE), "dec": dict(REFERENCE_PROVENANCE)},
-                query=row["name"],
-            )
-    return None
+    ref_id, name = hit
+    return ResolvedObject(
+        id=ref_id,
+        name=name,
+        ra=0.0,
+        dec=0.0,
+        moving=False,
+        resolver="reference",
+        provenance={"ra": dict(REFERENCE_PROVENANCE), "dec": dict(REFERENCE_PROVENANCE)},
+        query=name,
+    )
 
 
 def save_object(ctx: Context, obj: ResolvedObject, sources: list[Served]) -> None:

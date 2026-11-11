@@ -450,8 +450,13 @@ def _asteroid_procedural(
         "relief",
         "artistic",
         "Procedural height field from the seed: "
-        f"{_STRUCTURE_WORDS[bake.structure]}; lumps from rock "
-        f"strength against gravity (h/R = {bake.lump:.2f}), craters N(>D) ~ D^-2, boulders "
+        f"{_STRUCTURE_WORDS[bake.structure]}; lumps "
+        + (
+            "held by slopes at the angle of repose (a rubble pile has almost no cohesion)"
+            if bake.structure == "rubble"
+            else "from rock strength against gravity"
+        )
+        + f" (h/R = {bake.lump:.2f}), craters N(>D) ~ D^-2, boulders "
         f"by structure. {_ROUGHNESS_WORDS[bake.roughness]} The density is "
         f"{'an analog of a real body' if bake.density_source != 'generic' else 'a generic value'}"
         f" ({bake.density_kg_m3:g} kg/m3), an assumption (R6.2, R6.3, D-36).",

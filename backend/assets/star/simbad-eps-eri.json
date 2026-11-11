@@ -1,5 +1,5 @@
 {
-  "asset_version": "10",
+  "asset_version": "11",
   "card": {
     "id": "simbad-eps-eri",
     "name": "* eps Eri",
@@ -32,8 +32,8 @@
     "type": "star"
   },
   "created_at": "2025-10-01T00:00:00.000Z",
-  "generator_version": "p1-b3",
-  "inputs_sha256": "4d30394754ce61b83ba21606cfe420fb28cc45912350a92d60845b8e46f385e2",
+  "generator_version": "p1-b4",
+  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
   "render_params": {
     "alt_text": "* eps Eri, Star, 0.776 solar radii (model dependent), colour from Teff, self-luminous. Surface relief: illustrative.",
     "confidence": {
@@ -130,7 +130,7 @@
       "threshold": 0.25,
       "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
     },
-    "generator_version": "p1-b3",
+    "generator_version": "p1-b4",
     "haptics": {
       "data": "motion",
       "data_tag": "measured",
@@ -178,7 +178,7 @@
       "spectrum"
     ],
     "scale_m": 539932770.0,
-    "seed": 2523356973,
+    "seed": 215345231,
     "type": "star",
     "view_modes": {
       "visible": {
@@ -198,6 +198,6 @@
       }
     }
   },
-  "seed": 2523356973,
+  "seed": 215345231,
   "textures": null
 }

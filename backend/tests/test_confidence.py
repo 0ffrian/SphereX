@@ -153,10 +153,12 @@ def test_sweep_weights_find_the_field_that_moves_the_metric() -> None:
     assert cf.sweep_weights(card, lambda _c: 1.0, ["a"]) == {"a": 0.0}
 
 
-# --- the 16 demo objects (calibration of the threshold, Q-222) -----------------------------------
+# --- the 25 demo objects (calibration of the threshold, Q-222) -----------------------------------
 
-# Scores as calibrated on 10 Nov 2026 with the placeholder weights. Failing: the two candidates (no
-# class) (3I/ATLAS scores 0.5171 once the epoch-keyed gas rates count, Q-323).
+# Scores as calibrated on 10 Nov 2026 with the placeholder weights, plus the nine objects added in
+# issue #71 (11 Nov 2026, after the review fixes: Procyon A's interferometric radius, the Sun's
+# class G2V, Titan's measured surface temperature, fluid and pressure). Failing: the two candidates
+# (no class) (3I/ATLAS scores 0.5171 once the epoch-keyed gas rates count, Q-323).
 DEMO_SCORES = {
     "star/simbad-name-barnard-s-star": (0.6, True),
     "brown_dwarf_binary/simbad-eps-ind-b": (0.475, True),
@@ -174,11 +176,20 @@ DEMO_SCORES = {
     "comet/sbdb-1000012": (0.4, True),
     "candidate/simbad-m-42": (0.0, False),
     "candidate/simbad-m-1": (0.0, False),
+    "reference/ref-sun": (0.65, True),
+    "reference/ref-jupiter": (0.55, True),
+    "reference/ref-saturn": (0.55, True),
+    "reference/ref-titan": (0.7, True),
+    "star/simbad-alf-cmi": (0.6951, True),
+    "star/simbad-eps-eri": (0.6, True),
+    "planet_rocky/simbad-toi-700d": (0.5358, True),
+    "gas_giant/simbad-wasp-39b": (0.5275, True),
+    "planet_rocky/simbad-rho01-cnc-e": (0.5854, True),
 }
 
 
 def test_demo_pack_scores_are_what_the_card_gives() -> None:
-    assert len(DEMO_SCORES) == 16
+    assert len(DEMO_SCORES) == 25
     for name, (score, passed) in DEMO_SCORES.items():
         asset = json.loads((ASSETS / f"{name}.json").read_text("utf-8"))
         got = cf.confidence_block(asset["card"])
@@ -309,6 +320,55 @@ def test_gas_absent_or_empty_is_missing_and_not_a_key() -> None:
         assert not cf._present_gas(gas)
         got = cf.confidence_block(comet_card(gas))
         assert got is not None and got["gate"]["key_measurement"] is False
+
+
+def block(card: dict[str, Any]) -> dict[str, Any]:
+    got = cf.confidence_block(card)
+    assert got is not None
+    return got
+
+
+def test_an_analog_or_artistic_key_value_does_not_pass_the_gate() -> None:
+    # Q-222 (issue #71 review): the key measurement must be data, not an analog or a drawn value.
+    for tag in ("inferred_from_analog", "artistic"):
+        got = cf.confidence_block(
+            star_card(teff_K=tv(3200.0, tag), radius_rsun=tv(0.2, tag), spectral_class=tv("M", tag))
+        )
+        assert got is not None and got["gate"]["key_measurement"] is False, tag
+        assert not got["gate"]["passed"]
+    ok = cf.confidence_block(star_card(teff_K=tv(3200.0, "model_dependent")))
+    assert ok is not None and ok["gate"]["key_measurement"] is True
+    gas = {"2025-08": {"co2": tv(1e26, "inferred_from_analog")}}
+    assert block(comet_card(gas))["gate"]["key_measurement"] is False
+
+
+def test_a_measured_surface_temperature_fluid_and_pressure_count_for_a_rocky_world() -> None:
+    base = {
+        "id": "w",
+        "name": "w",
+        "type": "planet_rocky",
+        "radius_rjup": tv(0.036),
+        "mass_mearth": tv(0.0225),
+    }
+    plain = block(base)
+    rows = {r["id"]: r for r in plain["inputs"]}
+    # Without surface data: the fluid row is an analog (as before), the temperature missing.
+    assert rows["fluid"]["tag"] == "inferred_from_analog" and rows["fluid"]["c"] == 0
+    assert rows["temperature"]["tag"] == "missing"
+    titan = {
+        **base,
+        "surface_temperature_K": tv(93.7),
+        "surface_fluid": tv("methane"),
+        "surface_pressure_bar": tv(1.467),
+    }
+    got = block(titan)
+    rows = {r["id"]: r for r in got["inputs"]}
+    assert rows["temperature"]["tag"] == "measured" and rows["temperature"]["c"] == 1
+    assert rows["fluid"]["tag"] == "measured" and rows["fluid"]["c"] == 1
+    assert got["score"] == pytest.approx(plain["score"] + 0.30)
+    # One of the two fluid fields: half the row.
+    half = block({**base, "surface_fluid": tv("methane")})
+    assert {r["id"]: r for r in half["inputs"]}["fluid"]["c"] == 0.5
 
 
 def test_found_text_joins_with_and() -> None:

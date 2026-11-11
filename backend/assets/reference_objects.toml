@@ -78,3 +78,7 @@ radius_km = 695700.0
 mass_1e24_kg = 1988400.0
 teff_K = 5772.0
 rot_period_h = 609.12
+# The Sun is the G2V standard of the MK system (the fact sheet gives no class). [verify] the
+# citation: Gray and Corbally 2009, Stellar Spectral Classification (Princeton), the MK standards.
+spectral_class = "G2V"
+spectral_class_source = "the Sun's MK spectral class, the G2V standard (Gray and Corbally 2009, Stellar Spectral Classification) [verify]"

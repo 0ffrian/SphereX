@@ -49,6 +49,7 @@ from app.core.card.catalogue import (
     gather,
     with_star_data,
 )
+from app.core.card.reference import reference_card
 from app.core.card.stars import STAR_TYPES
 from app.core.card.validate import ContractViolation, check_card, check_params
 from app.core.classify import Classification, classify
@@ -65,6 +66,7 @@ from app.core.render.card_to_params import (
     card_to_params,
     seed_for,
 )
+from app.errors import ApiError
 from app.timefmt import iso_utc_z, utc_now
 
 log = logging.getLogger("shift_spectrum")
@@ -112,6 +114,8 @@ class ObjectPipeline:
 
     def run(self, obj: ResolvedObject) -> ObjectResult:
         """The answer for ``/card`` and ``/render-params``: saved, refined or first-stage."""
+        if obj.resolver == "reference":
+            return self._reference(obj)
         saved = self._saved(obj)
         if saved is not None:
             return saved
@@ -139,7 +143,13 @@ class ObjectPipeline:
 
     def saved(self, obj: ResolvedObject) -> ObjectResult | None:
         """The saved or pre-baked asset ``run`` would answer with, from disk only; None when
-        there is none or it fails the contract (``run`` then rebuilds it)."""
+        there is none or it fails the contract (``run`` then rebuilds it). A reference object
+        answers with its own asset (``_reference``), never a cached catalogue build."""
+        if obj.resolver == "reference":
+            try:
+                return self._reference(obj)
+            except ApiError:
+                return None
         return self._saved(obj)
 
     def _saved(self, obj: ResolvedObject) -> ObjectResult | None:
@@ -159,7 +169,37 @@ class ObjectPipeline:
         status: AssetStatus = "sketch" if saved.card.get("type") == "candidate" else "saved"
         return ObjectResult(saved.card, saved.render_params, status, saved_at, None)
 
+    def _reference(self, obj: ResolvedObject) -> ObjectResult:
+        """A reference object (Q-258) never runs the catalogue stages and is never cached: the
+        pre-built pack's asset when it is current, else the same card built from
+        ``reference_objects.toml`` by the code the baker uses (deterministic, no network).
+        A stale or missing pack file would otherwise send ``ref-*`` through SIMBAD and cache a
+        ``candidate`` for it (issue #71 review)."""
+        asset = self.assets.prebaked(obj.id)
+        if asset is not None:
+            try:
+                check_card(asset.card)
+                check_params(asset.render_params)
+                return ObjectResult(asset.card, asset.render_params, "saved", None, None)
+            except ContractViolation as exc:
+                log.warning("ignoring pre-baked reference asset for %s: %s", obj.id, exc)
+        card = reference_card(self.ctx.settings.reference_file, obj.id)
+        if card is None:
+            raise ApiError(
+                503,
+                "reference_asset_missing",
+                f"No current pre-built asset and no row in reference_objects.toml for {obj.id}. "
+                "Re-bake: uv run python -m scripts.bake_reference_objects.",
+            )
+        log.warning("object %s: no current pre-built asset, built from reference_objects", obj.id)
+        params = card_to_params(card, generator_version=GENERATOR_VERSION)
+        check_card(card)
+        check_params(params)
+        return ObjectResult(card, params, "generated", None, None)
+
     def _job(self, obj: ResolvedObject, job: Job[ObjectResult]) -> ObjectResult:
+        if obj.resolver == "reference":
+            return self._reference(obj)  # no frames, no catalogues (Q-258)
         premeasured: dict[str, Premeasured] = {}
         saved = self._saved(obj)
         if saved is not None:

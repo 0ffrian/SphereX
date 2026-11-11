@@ -187,7 +187,7 @@ aliases = ["Crab", "M1"]
 name = "Procyon A"
 query = "Procyon"
 group = "demo"
-aliases = ["procyon", "alpha cma", "alf cma"]
+aliases = ["procyon", "alpha cmi", "alf cmi"]
 
 [[target]]
 name = "Epsilon Eridani"

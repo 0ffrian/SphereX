@@ -516,11 +516,11 @@ def test_windows_aliasing_ids_are_escaped(tmp_path: Path) -> None:
 # ---- golden hashes (N6) ------------------------------------------------------------------
 
 GOLDEN: dict[str, dict[str, str]] = {
-    "asteroid_procedural": {  # regenerated for issue #71 (BAKER_RULES_VERSION 3)
+    "asteroid_procedural": {  # regenerated for the issue #71 review (BAKER_RULES_VERSION 4)
         "albedo.webp": "30398d894f58c9ca8080d689f1e7b4ed595e8e6cc7fccec48b51c2f7c1bf6de0",
-        "height.png": "62f0f3503e8a9af94e80d1898dfd50155e791fe9ac629e7587a2c1eda4161808",
-        "height.bin": "b3f7caafe5619e893c0b52a99bddb693b2786583bf3ae812fe22e4af3650824e",
-        "normal.png": "1e84fc0ec8dedd673f077f97ceff11f51f04ced82c55906f0fd79f1924a263f9",
+        "height.png": "6648b94a234d4adf71069a483853e07cebf6797df4dbe8becd4038e495f1fb4c",
+        "height.bin": "cb4af8bdff86af4c15df2c9b3c5141db88f154c909b86002c4c06f4ab4d1e0b2",
+        "normal.png": "cc1a6c46d00c24f3e97c7c3e038d858360cbbb2cb40174420aeb223d93033a47",
     },
     "brown_dwarf": {
         "albedo.webp": "e6f9fc0f3d6c472460ac1045df2361a4834af91a10bbd8de0086cd964e021274",

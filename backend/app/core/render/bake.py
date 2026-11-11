@@ -27,7 +27,8 @@ from app.core.render.normals import normals_from_height
 from app.core.render.params import BakeParams
 
 # R6.7: bump whenever a rule in R6.2 to R6.5 changes, so cached maps are not reused.
-BAKER_RULES_VERSION = "3"  # 3: issue #71 physics-based asteroid shape, craters, height.png scale
+# 4: issue #71 review: crater depth 0.33 r (Pike d/D), rubble-pile relief at the angle of repose.
+BAKER_RULES_VERSION = "4"
 
 FILES = ("albedo.webp", "height.png", "height.bin", "normal.png")
 

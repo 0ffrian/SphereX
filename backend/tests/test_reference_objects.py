@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from collections.abc import Iterator
@@ -54,7 +55,7 @@ def test_values_match_the_nasa_fact_sheet(client: TestClient) -> None:
 
 
 def test_titan_is_a_rocky_world_from_the_satellite_sheet(client: TestClient) -> None:
-    """Q-280: Titan is a moon on the rocky-world path; the host is the Sun, the orbit is Saturn's."""
+    """Q-280: Titan is a moon on the rocky-world path; host the Sun, orbit Saturn's."""
     r = client.get("/v1/resolve", params={"q": "Titan"})
     assert r.status_code == 200 and r.json()["id"] == "ref-titan"
     c = client.get("/v1/objects/ref-titan/card").json()
@@ -70,12 +71,20 @@ def test_titan_is_a_rocky_world_from_the_satellite_sheet(client: TestClient) -> 
     assert client.get("/v1/objects/ref-titan/frames").json()["frames"] == []
 
 
+WINDOWS_ENV = ("SYSTEMROOT", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "HOME", "TEMP", "TMP")
+
+
 def test_committed_assets_are_current() -> None:
     p = subprocess.run(
         [sys.executable, "-m", "scripts.bake_reference_objects", "--check"],
         capture_output=True,
         text=True,
-        env={"PYTHONPATH": ".", "PATH": ""},
+        # Windows needs SYSTEMROOT (asyncio's socket provider) and a home directory (Settings).
+        env={
+            "PYTHONPATH": ".",
+            "PATH": "",
+            **{k: os.environ[k] for k in WINDOWS_ENV if k in os.environ},
+        },
     )
     assert p.returncode == 0, p.stdout + p.stderr
 
@@ -90,3 +99,47 @@ def test_sun_is_a_star_from_the_sun_fact_sheet(client: TestClient) -> None:
     assert c["radius_rsun"]["value"] == 1.0
     assert c["rot_period_h"]["value"] == 609.12
     assert "sunfact.html" in c["teff_K"]["source"]
+
+
+@pytest.mark.parametrize("pack", ["missing", "stale"])
+def test_a_reference_object_never_falls_through_to_the_catalogues(
+    fixture_cache: Path, tmp_path: Path, pack: str
+) -> None:
+    """Issue #71 review: with no current pre-built asset (a stale ASSET_VERSION, or none), Titan is
+    built from reference_objects.toml, never sent through SIMBAD and never cached as a
+    ``candidate``."""
+    import json
+
+    from app.core.card.assets import asset_key
+
+    assets = tmp_path / "pack"
+    if pack == "stale":
+        doc = json.loads((ASSETS_DIR / "reference" / "ref-titan.json").read_text("utf-8"))
+        doc["asset_version"] = "0"  # an older pack (Q-167): the store ignores it
+        (assets / "reference").mkdir(parents=True)
+        (assets / "reference" / "ref-titan.json").write_text(json.dumps(doc), "utf-8")
+    settings = make_settings(fixture_cache, assets_dir=assets)
+    with TestClient(create_app(settings)) as c:
+        assert c.get("/v1/resolve", params={"q": "Titan"}).json()["id"] == "ref-titan"
+        r = c.get("/v1/objects/ref-titan/card")
+        assert r.status_code == 200
+        assert r.headers["X-SX-Asset-Status"] == "generated"
+        card = r.json()
+        assert card["type"] == "planet_rocky"  # never "candidate"
+        assert card["surface_temperature_K"]["value"] == 93.7
+        p = c.get("/v1/objects/ref-titan/render-params")
+        assert p.status_code == 200 and p.json()["confidence"]["gate"]["passed"] is True
+        # The same card the pack would carry (one builder for both).
+        committed = json.loads((ASSETS_DIR / "reference" / "ref-titan.json").read_text("utf-8"))
+        assert card == committed["card"]
+        assert c.get("/v1/objects/ref-titan/frames").json()["frames"] == []
+        # Nothing was cached for it: a later request cannot serve a stored candidate.
+        from app.context import make_context
+
+        ctx = make_context(settings)
+        try:
+            assert ctx.cache.get(asset_key("ref-titan", settings.data_release)) is None
+        finally:
+            close = getattr(ctx, "close", None)
+            if callable(close):
+                close()

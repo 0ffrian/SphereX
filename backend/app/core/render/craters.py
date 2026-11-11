@@ -15,6 +15,11 @@ from app.core.render.params import (
     CRATER_DEPTH_PER_R,
     CRATER_R_MAX,
     CRATER_R_MIN,
+    CRATER_U_SPAN,
+    SHAPE_K_MIN,
+    SHAPE_K_POW,
+    SHAPE_K_SPAN,
+    SHAPE_RMS_PER_LUMP,
 )
 
 # CREATIVE constants (artistic): sizes of boulders, in mean radii (issue #71, Q-210).
@@ -100,12 +105,12 @@ def shape_layer(dirs: F64, seed: int, lump: float) -> F64:
     rng = np.random.Generator(np.random.PCG64(np.random.SeedSequence([seed, 3])))
     z = rng.uniform(-1.0, 1.0, N_WAVES)
     an = rng.uniform(0.0, 2 * np.pi, N_WAVES)
-    k = 1.3 + 7.5 * rng.random(N_WAVES) ** 1.4
+    k = SHAPE_K_MIN + SHAPE_K_SPAN * rng.random(N_WAVES) ** SHAPE_K_POW
     phase = rng.uniform(0.0, 2 * np.pi, N_WAVES)
     c2 = np.sqrt(1 - z * z)
     axis = np.stack([c2 * np.cos(an), z, c2 * np.sin(an)], axis=1)  # (n, 3)
     amp = k**-1.5
-    norm = lump * 0.45 / math.sqrt(float(np.sum(amp * amp)) / 2.0)
+    norm = lump * SHAPE_RMS_PER_LUMP / math.sqrt(float(np.sum(amp * amp)) / 2.0)
     out = np.zeros(dirs.shape[:2], dtype=np.float64)
     for n in range(N_WAVES):
         out += amp[n] * np.sin(k[n] * (dirs @ axis[n]) + phase[n])
@@ -138,7 +143,7 @@ def crater_radii(seed: int, coverage: float) -> tuple[F64, F64, F64, F64]:
         return empty, empty, empty, empty
     rng = np.random.Generator(np.random.PCG64(np.random.SeedSequence([seed, 1])))
     u = rng.random(MAX_CRATERS)
-    r = np.minimum(CRATER_R_MAX, CRATER_R_MIN * (1.0 - u * 0.985) ** -0.5)
+    r = np.minimum(CRATER_R_MAX, CRATER_R_MIN * (1.0 - u * CRATER_U_SPAN) ** -0.5)
     theta, phi = _centres(rng, MAX_CRATERS)
     deg = 0.35 + 0.65 * rng.random(MAX_CRATERS)
     n = int(np.searchsorted(np.cumsum(r * r), coverage * 4.0)) + 1
@@ -153,8 +158,11 @@ def craters(
     """Crater relief (fraction of the local radius) and floor mask in [0, 1], both (H, W).
 
     Profile (d = distance / crater radius): bowl ``-depth (1 - d^2) + 0.2 depth d^4`` inside,
-    ``0.2 depth d^-5`` outside, out to 2.4 radii. Each new crater wears the relief already
-    inside its bowl by 0.45 + 0.55 d. That erosion acts on this layer only (issue #71).
+    ``0.2 depth d^-5`` outside, out to 2.4 radii. Rim-to-floor is 1.2 depth = 0.198 D (Pike's
+    d/D = 0.196 for fresh simple craters). The d^-5 ejecta falloff is artistic (prototype): the
+    measured ejecta-thickness falloff is about r^-3 (McGetchin et al. 1973). Each new crater
+    wears the relief already inside its bowl by 0.45 + 0.55 d. That erosion acts on this layer
+    only (issue #71).
     """
     h = np.zeros((height, width), dtype=np.float64)
     floor = np.zeros((height, width), dtype=np.float64)
