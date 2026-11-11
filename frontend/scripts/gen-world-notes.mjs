@@ -12,7 +12,9 @@ const ENT = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'
 /** One HTML fragment as plain text: sub and sup flattened the way the app writes them, tags dropped. */
 export function plain(html) {
   let s = html
-    .replace(/<sup>([^<]*)<\/sup>/g, (_, t) => (/^\d+$/.test(t) ? [...t].map((d) => SUP[d]).join('') : `^${t}`))
+    .replace(/<sup>([^<]*)<\/sup>/g, (_, t) =>
+      /^\d+$/.test(t) ? [...t].map((d) => SUP[d]).join('') : `^${t}`,
+    )
     .replace(/<sub>([^<]*)<\/sub>/g, (_, t) => (/^[A-Z]$/.test(t) ? `_${t}` : t))
     .replace(/<[^>]+>/g, '');
   s = s.replace(/&[#a-z0-9]+;/g, (e) => ENT[e] ?? e);
@@ -31,15 +33,22 @@ export function extractWorldNotes(html) {
   // The heading is used by every section (stars, rocks too): the world's is the one whose list starts with Temperature.
   const head = '<h3>How each part is worked out</h3>';
   let sec = html.indexOf(head);
-  const isWorld = (at) => /^\s*<ul class="plain">\s*<li><b>Temperature:/.test(html.slice(at + head.length, at + head.length + 200));
+  const isWorld = (at) =>
+    /^\s*<ul class="plain">\s*<li><b>Temperature:/.test(
+      html.slice(at + head.length, at + head.length + 200),
+    );
   while (sec >= 0 && !isWorld(sec)) sec = html.indexOf(head, sec + 1);
   if (sec < 0) throw new Error('preview changed: no world "How each part is worked out"');
   const list = between(html, '<ul class="plain">', '</ul>', sec);
   const lines = [...list.text.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => plain(m[1]));
   const honesty = plain(between(html, '<p class="note">', '</p>', list.end).text);
-  const flyNote = plain(between(html, '<span class="note" id="w-fly-note" hidden>', '</span>').text);
+  const flyNote = plain(
+    between(html, '<span class="note" id="w-fly-note" hidden>', '</span>').text,
+  );
   const score = html.indexOf('<h3>The score</h3>');
-  const scoreItems = [...between(html, '<ul class="plain">', '</ul>', score).text.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => plain(m[1]));
+  const scoreItems = [
+    ...between(html, '<ul class="plain">', '</ul>', score).text.matchAll(/<li>([\s\S]*?)<\/li>/g),
+  ].map((m) => plain(m[1]));
   const errorBars = scoreItems.find((l) => l.startsWith('Once error bars'));
   const g = html.indexOf('<h3>From a SPHEREx gas band to a production rate</h3>');
   const cometFormula = plain(between(html, '<code class="eq">', '</code>', g).text);
@@ -63,7 +72,10 @@ export const COMET_FORMULA_NOTE = ${q(n.cometNote)};
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const src = process.argv[2] ?? process.env.SX_PREVIEW_HTML;
   if (!src) throw new Error('give the path of sculptor-preview-next.html');
-  const out = resolve(dirname(fileURLToPath(import.meta.url)), '../src/app/worldNotes.generated.ts');
+  const out = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    '../src/app/worldNotes.generated.ts',
+  );
   writeFileSync(out, render(extractWorldNotes(readFileSync(src, 'utf8'))));
   console.log('wrote', out);
 }

@@ -1,8 +1,9 @@
 // Issue #71, D-37 (stream V3): the prototype rock engine in the build pane's globe stage. Draws any
 // asteroid or comet nucleus from its card (cardToRock), a shape model as a radial height map
 // (meshRadial), on its own WebGL2 canvas over the three.js viewer. It renders nothing, and the
-// three.js body stays, when: WebGL2 is missing, the card has no size, "Measured only" is on (a
-// generated surface is not measured), or the plan did not draw the body (D-32). Pause, Surface age
+// three.js body stays, when: WebGL2 is missing, the card has no size, the honesty level is below
+// "+ Artistic" (the engines draw only there, PR #89 review; ViewerPanel enforces it), or the plan did
+// not draw the body (D-32). Pause, Surface age
 // and the "How each part is worked out" notes go in the BuildControls slot.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ObjectCard, RenderParams, Tag } from '@/contract';
@@ -26,8 +27,9 @@ export function rockEngineWanted(
 ): boolean {
   if (!params || !plan || !plan.threeD) return false;
   if (!KINDS.includes(params.type)) return false;
-  // A generated surface is model-dependent at best: "Measured only" hides it (R5.3).
-  return isTagShown(honesty, 'model_dependent');
+  // The engine's generated surface (seeded lumps and craters) is artistic, so it draws only at
+  // "+ Artistic" (PR #89 review, D-21 / Q-110).
+  return isTagShown(honesty, 'artistic');
 }
 
 const fmt = (x: number, d = 0) => x.toLocaleString('en', { maximumFractionDigits: d });
@@ -45,7 +47,7 @@ export function rockNotes(rock: RockFromCard) {
         'Lumps: gravity at the surface is g = (4/3)πGρR. Rock can hold relief up to about h/R ≈ Y/(ρgR), so small bodies are lumpy and large ones are round.',
         'Craters: sizes follow N(>D) ∝ D⁻², up to saturation. Depth is about 0.2 of the width, and each crater erodes the older ones.',
         'Boulders: rubble piles get far more. A body spinning faster than the limit P = √(3π/Gρ) has to be solid rock.',
-        'Light: airless surfaces use the Lommel–Seeliger law, which gives a flat-looking disc, with real cast shadows and brighter fresh craters.',
+        'Light: airless surfaces use a Lommel–Seeliger and Lambert blend (a look, not a fitted phase law: no opposition surge), which gives a flat-looking disc, with real cast shadows and brighter fresh craters.',
         rock.preset.comet
           ? 'Comets: two lobes, very dark, with gas jets strongest on the sunlit side.'
           : 'Rough and rocky is the default for every asteroid. Only data (radar or thermal) can make one smooth, and no card carries that yet.',
@@ -116,7 +118,10 @@ export function RockStage({
     canvas.style.maxHeight = '100%';
     canvas.tabIndex = 0;
     canvas.setAttribute('role', 'application');
-    canvas.setAttribute('aria-label', `${rock?.preset.label ?? 'Body'}, generated surface. Drag or use the arrow keys to turn it.`);
+    canvas.setAttribute(
+      'aria-label',
+      `${rock?.preset.label ?? 'Body'}, generated surface. Drag or use the arrow keys to turn it.`,
+    );
     canvas.dataset.testid = 'rock-canvas';
     host.appendChild(canvas);
     const view = new RockView(reducedMotion);
@@ -212,6 +217,7 @@ export function RockStage({
       row('rock-albedo', 'Reflectivity', i.albedo, 'key'),
       row('rock-density', 'Bulk density', i.density, 'key'),
       row('rock-strength', 'Rock strength', i.strength),
+      row('rock-light', 'Light', i.light),
     ];
     if (stats) {
       controls.push(
@@ -225,20 +231,25 @@ export function RockStage({
               : `${fmt(stats.gravity, 3)} m/s²`,
           tag: 'derived',
         },
-        {
-          kind: 'readout',
-          id: 'rock-lump',
-          label: 'Relief it can hold',
-          value: `${fmt(stats.lump * 100)}% of its radius`,
-          tag: 'artistic',
-        },
-        {
-          kind: 'readout',
-          id: 'rock-craters',
-          label: 'Craters generated',
-          value: fmt(stats.craters),
-          tag: 'artistic',
-        },
+        // With a shape model the mesh replaces the generated field, so its lumps and craters are not drawn.
+        ...(stats.shapeModel
+          ? []
+          : ([
+              {
+                kind: 'readout',
+                id: 'rock-lump',
+                label: 'Relief it can hold',
+                value: `${fmt(stats.lump * 100)}% of its radius`,
+                tag: 'artistic',
+              },
+              {
+                kind: 'readout',
+                id: 'rock-craters',
+                label: 'Craters generated',
+                value: fmt(stats.craters),
+                tag: 'artistic',
+              },
+            ] satisfies BuildControl[])),
         {
           kind: 'readout',
           id: 'rock-struct',
@@ -258,7 +269,12 @@ export function RockStage({
           lines: [`Rock strength ${i.strength.value}: ${i.strength.why}.`, `Bulk density ${i.density.value}: ${i.density.why}.`],
         },
         ...(rock.mismatches.length
-          ? [{ title: 'Differs from the preview', lines: rock.mismatches.map((m) => `Differs from the artifact: ${m}.`) }]
+          ? [
+              {
+                title: 'Differs from the preview',
+                lines: rock.mismatches.map((m) => `Differs from the artifact: ${m}.`),
+              },
+            ]
           : []),
         ...(meshNote ? [{ title: 'Shape model', lines: [meshNote] }] : []),
       ],

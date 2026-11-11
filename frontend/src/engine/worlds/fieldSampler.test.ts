@@ -57,6 +57,11 @@ describe('WorldFieldSampler', () => {
   });
   it('reports nothing when the engine has no arrays yet', () => {
     const s = new WorldFieldSampler({ terrain: null, climate: null, hydro: null });
-    expect(s.sampleLonLat(0, 0)).toEqual({ elevationKm: null, temperatureK: null, rain: null, land: null });
+    expect(s.sampleLonLat(0, 0)).toEqual({
+      elevationKm: null,
+      temperatureK: null,
+      rain: null,
+      land: null,
+    });
   });
 });

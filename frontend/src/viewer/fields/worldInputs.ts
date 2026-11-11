@@ -92,9 +92,13 @@ export function resolveWorld(
   const pressureSet = sliderValue(overrides, 'surface_pressure_bar', kind);
   const cardP = card.surface_pressure_bar;
   const cardPValue =
-    pressureSet === undefined && typeof cardP?.value === 'number' && cardP.value > 0 ? cardP.value : null;
+    pressureSet === undefined && typeof cardP?.value === 'number' && cardP.value > 0
+      ? cardP.value
+      : null;
   if (pressureSet === undefined && cardPValue === null)
-    assumptions.push(`surface pressure ${DEFAULT_PRESSURE_BAR} bar assumed (not measured for any exoplanet)`);
+    assumptions.push(
+      `surface pressure ${DEFAULT_PRESSURE_BAR} bar assumed (not measured for any exoplanet)`,
+    );
   const fluidIdx = sliderValue(overrides, 'surface_fluid', kind);
   const cardFluidName = card.surface_fluid?.value;
   const cardFluid = FLUID_ORDER.find((id) => id === cardFluidName);
@@ -109,7 +113,10 @@ export function resolveWorld(
   // Locked or not: the tidal rule of the physics layer (Q-155). A refused rule is "not known to be locked".
   const lock = deriveLocking(card);
   const locked = lock.ok && lock.locked;
-  if (!lock.ok) assumptions.push('tidal locking could not be tested (a needed value is missing); modelled as turning');
+  if (!lock.ok)
+    assumptions.push(
+      'tidal locking could not be tested (a needed value is missing); modelled as turning',
+    );
   const periodIn = reader.read('rot_period_h', 'rot_period_h');
   const orbitPeriodD = card.orbital_period_d?.value;
   let rotPeriodD = 1;
@@ -117,9 +124,17 @@ export function resolveWorld(
   else if (!locked && periodIn) rotPeriodD = periodIn.value / 24;
   else assumptions.push('rotation period 1 day assumed (it only sets the wind speed in the model)');
 
-  const sliders = (['star_teff_K', 'semi_major_axis_au', 'bond_albedo', 'surface_pressure_bar', 'surface_fluid', 'mass_mearth', 'star_radius_rsun'] as const).filter(
-    (k) => sliderValue(overrides, k, kind) !== undefined,
-  );
+  const sliders = (
+    [
+      'star_teff_K',
+      'semi_major_axis_au',
+      'bond_albedo',
+      'surface_pressure_bar',
+      'surface_fluid',
+      'mass_mearth',
+      'star_radius_rsun',
+    ] as const
+  ).filter((k) => sliderValue(overrides, k, kind) !== undefined);
   const inputs: WorldInputs = {
     starTeffK: teff.value,
     starRadiusRsun: rad.value,
@@ -147,8 +162,18 @@ export function resolveWorld(
       orbit: asWorld(orbit.tag),
       planet: weakestOf([asWorld(radiusRj.tag), massTag]),
       albedo: albedoTag,
-      pressure: pressureSet !== undefined ? 'artistic' : cardPValue !== null ? asWorld(cardP!.tag) : 'model_dependent',
-      fluid: fluidIdx !== undefined ? 'artistic' : cardFluidUsed !== null ? asWorld(card.surface_fluid!.tag) : 'model_dependent',
+      pressure:
+        pressureSet !== undefined
+          ? 'artistic'
+          : cardPValue !== null
+            ? asWorld(cardP!.tag)
+            : 'model_dependent',
+      fluid:
+        fluidIdx !== undefined
+          ? 'artistic'
+          : cardFluidUsed !== null
+            ? asWorld(card.surface_fluid!.tag)
+            : 'model_dependent',
       sliders,
     },
     assumptions,
@@ -156,7 +181,13 @@ export function resolveWorld(
   };
 }
 
-const ORDER: readonly WorldTag[] = ['measured', 'derived', 'model_dependent', 'inferred_from_analog', 'artistic'];
+const ORDER: readonly WorldTag[] = [
+  'measured',
+  'derived',
+  'model_dependent',
+  'inferred_from_analog',
+  'artistic',
+];
 function weakestOf(tags: readonly WorldTag[]): WorldTag {
   let w = 0;
   for (const t of tags) w = Math.max(w, ORDER.indexOf(t));

@@ -1,0 +1,184 @@
+"""Issue #71 stream E (Q-258): Jupiter and Saturn as reference objects, offline."""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+from collections.abc import Iterator
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.main import create_app
+from scripts.bake_demo_pack import ASSETS_DIR
+from tests.conftest import make_settings
+
+
+@pytest.fixture
+def client(fixture_cache: Path) -> Iterator[TestClient]:
+    with TestClient(create_app(make_settings(fixture_cache, assets_dir=ASSETS_DIR))) as c:
+        yield c
+
+
+@pytest.mark.parametrize(
+    ("q", "oid"),
+    [("Jupiter", "ref-jupiter"), ("saturn", "ref-saturn"), ("ref-jupiter", "ref-jupiter")],
+)
+def test_resolve_card_frames(client: TestClient, q: str, oid: str) -> None:
+    r = client.get("/v1/resolve", params={"q": q})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["id"] == oid and body["resolver"] == "reference" and body["moving"] is False
+    assert body["provenance"]["ra"]["tag"] == "artistic"  # no sky position is claimed as measured
+
+    card = client.get(f"/v1/objects/{oid}/card")
+    assert card.status_code == 200
+    assert card.headers["X-SX-Asset-Status"] == "saved"
+    c = card.json()
+    assert c["type"] == "gas_giant"
+    for f in ("radius_rjup", "mass_mearth", "rot_period_h", "teq_K", "orbit_au"):
+        assert c[f]["value"] > 0 and c[f]["tag"] in ("measured",) and "NASA" in c[f]["source"]
+
+    fr = client.get(f"/v1/objects/{oid}/frames")
+    assert fr.status_code == 200
+    assert fr.json()["frames"] == []  # not a SPHEREx target: no flipbook, no crash
+
+
+def test_values_match_the_nasa_fact_sheet(client: TestClient) -> None:
+    client.get("/v1/resolve", params={"q": "Jupiter"})
+    c = client.get("/v1/objects/ref-jupiter/card").json()
+    assert c["radius_rjup"]["value"] == 1.0
+    assert c["mass_mearth"]["value"] == pytest.approx(317.83, abs=0.01)
+    assert c["rot_period_h"]["value"] == 9.925
+
+
+def test_titan_is_a_rocky_world_from_the_satellite_sheet(client: TestClient) -> None:
+    """Q-280: Titan is a moon on the rocky-world path; host the Sun, orbit Saturn's."""
+    r = client.get("/v1/resolve", params={"q": "Titan"})
+    assert r.status_code == 200 and r.json()["id"] == "ref-titan"
+    c = client.get("/v1/objects/ref-titan/card").json()
+    assert c["type"] == "planet_rocky"
+    assert c["radius_rjup"]["value"] == pytest.approx(2575 / 71492, abs=1e-5)
+    assert c["mass_mearth"]["value"] == pytest.approx(0.02253, abs=1e-5)
+    assert c["host_teff_K"]["value"] == 5772.0
+    assert c["orbit_au"]["value"] == pytest.approx(9.5726, abs=1e-4)
+    assert c["rot_period_h"]["tag"] == "derived" and c["rot_period_h"]["formula"]
+    for f in ("radius_rjup", "mass_mearth", "host_teff_K", "host_radius_rsun", "orbit_au"):
+        assert c[f]["tag"] == "measured" and "nssdc.gsfc.nasa.gov" in c[f]["source"]
+    assert "teq_K" not in c  # not on the sheets: refused, not invented (Q-280)
+    assert client.get("/v1/objects/ref-titan/frames").json()["frames"] == []
+
+
+WINDOWS_ENV = ("SYSTEMROOT", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "HOME", "TEMP", "TMP")
+
+
+def test_committed_assets_are_current() -> None:
+    p = subprocess.run(
+        [sys.executable, "-m", "scripts.bake_reference_objects", "--check"],
+        capture_output=True,
+        text=True,
+        # Windows needs SYSTEMROOT (asyncio's socket provider) and a home directory (Settings).
+        env={
+            "PYTHONPATH": ".",
+            "PATH": "",
+            **{k: os.environ[k] for k in WINDOWS_ENV if k in os.environ},
+        },
+    )
+    assert p.returncode == 0, p.stdout + p.stderr
+
+
+def test_sun_is_a_star_from_the_sun_fact_sheet(client: TestClient) -> None:
+    """Q-307: the Sun is a reference star: measured radius, Teff and rotation, each with its URL."""
+    r = client.get("/v1/resolve", params={"q": "Sun"})
+    assert r.status_code == 200 and r.json()["id"] == "ref-sun"
+    c = client.get("/v1/objects/ref-sun/card").json()
+    assert c["type"] == "star"
+    assert c["teff_K"]["value"] == 5772.0 and c["teff_K"]["tag"] == "measured"
+    assert c["radius_rsun"]["value"] == 1.0
+    assert c["rot_period_h"]["value"] == 609.12
+    assert "sunfact.html" in c["teff_K"]["source"]
+
+
+@pytest.mark.parametrize("pack", ["missing", "stale"])
+def test_a_reference_object_never_falls_through_to_the_catalogues(
+    fixture_cache: Path, tmp_path: Path, pack: str
+) -> None:
+    """Issue #71 review: with no current pre-built asset (a stale ASSET_VERSION, or none), Titan is
+    built from reference_objects.toml, never sent through SIMBAD and never cached as a
+    ``candidate``."""
+    import json
+
+    from app.core.card.assets import asset_key
+
+    assets = tmp_path / "pack"
+    if pack == "stale":
+        doc = json.loads((ASSETS_DIR / "reference" / "ref-titan.json").read_text("utf-8"))
+        doc["asset_version"] = "0"  # an older pack (Q-167): the store ignores it
+        (assets / "reference").mkdir(parents=True)
+        (assets / "reference" / "ref-titan.json").write_text(json.dumps(doc), "utf-8")
+    settings = make_settings(fixture_cache, assets_dir=assets)
+    with TestClient(create_app(settings)) as c:
+        assert c.get("/v1/resolve", params={"q": "Titan"}).json()["id"] == "ref-titan"
+        r = c.get("/v1/objects/ref-titan/card")
+        assert r.status_code == 200
+        assert r.headers["X-SX-Asset-Status"] == "generated"
+        card = r.json()
+        assert card["type"] == "planet_rocky"  # never "candidate"
+        assert card["surface_temperature_K"]["value"] == 93.7
+        p = c.get("/v1/objects/ref-titan/render-params")
+        assert p.status_code == 200 and p.json()["confidence"]["gate"]["passed"] is True
+        # The same card the pack would carry (one builder for both).
+        committed = json.loads((ASSETS_DIR / "reference" / "ref-titan.json").read_text("utf-8"))
+        assert card == committed["card"]
+        assert c.get("/v1/objects/ref-titan/frames").json()["frames"] == []
+        # Nothing was cached for it: a later request cannot serve a stored candidate.
+        from app.context import make_context
+
+        ctx = make_context(settings)
+        try:
+            assert ctx.cache.get(asset_key("ref-titan", settings.data_release)) is None
+        finally:
+            close = getattr(ctx, "close", None)
+            if callable(close):
+                close()
+
+
+def test_a_poisoned_cached_candidate_never_wins_over_the_pack(
+    fixture_cache: Path, tmp_path: Path
+) -> None:
+    """Issue #75 reads generated assets before the pack. A ``candidate`` cached for ref-titan
+    before the reference guard existed (issue #71 review) must still lose to the pack."""
+    import json
+
+    from app.context import make_context
+    from app.core.card.assets import Asset, AssetStore
+
+    doc = json.loads((ASSETS_DIR / "reference" / "ref-titan.json").read_text("utf-8"))
+    poisoned = {
+        "card": {"id": "ref-titan", "name": "Titan", "type": "candidate"},
+        "render_params": {**doc["render_params"], "type": "candidate"},
+        "textures": None,
+        "generator_version": doc["generator_version"],
+        "seed": doc["seed"],
+        "created_at": doc["created_at"],
+    }
+    asset = Asset.from_json(poisoned)
+    assert asset is not None
+    settings = make_settings(fixture_cache, assets_dir=ASSETS_DIR)
+    ctx = make_context(settings)
+    try:
+        store = AssetStore(ctx.cache, ASSETS_DIR, settings.data_release)
+        store.put(asset)
+        found = store.lookup("ref-titan")  # what any non-reference path would serve
+        assert found is not None and found[0].card["type"] == "candidate"
+    finally:
+        close = getattr(ctx, "close", None)
+        if callable(close):
+            close()
+    with TestClient(create_app(settings)) as c:
+        assert c.get("/v1/resolve", params={"q": "Titan"}).json()["id"] == "ref-titan"
+        r = c.get("/v1/objects/ref-titan/card")
+        assert r.status_code == 200 and r.json()["type"] == "planet_rocky"
+        assert r.headers["X-SX-Asset-Status"] == "saved"

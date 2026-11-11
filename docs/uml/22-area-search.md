@@ -12,7 +12,7 @@ flowchart TB
   subgraph Core["backend/app/core/area/"]
     FRM["frames.py<br/>grid of small SIA cones, s_region overlap, time windows, visits, coverage"]
     DOT["dots.py<br/>mesh background, hardware flags masked, OUTLIER kept as a flag, detect, measure"]
-    CLN["clean.py<br/>glitches, fixed, stars per tracklet"]
+    CLN["clean.py<br/>glitch, star, fixed per tracklet"]
     JON["join.py<br/>tracklets, pairs, parallax-aware test, mutual best"]
     MAT["match.py<br/>SkyBoT candidates, Horizons positions from SPHEREx"]
     INJ["inject.py (gated D4)<br/>planted movers in memory, test mover, completeness grid"]
@@ -31,7 +31,7 @@ flowchart TB
     ECSV["core/export/ecsv.py shared writer (A19.9)"]
   end
   CACHE[("Read-through cache D-25<br/>raw replies + derived.area entries")]
-  API["api/areas.py<br/>/v1/areas/..."]
+  API["api/areas.py<br/>/v1/areas/... incl. /checks (gated)"]
   subgraph FE["frontend/src"]
     RAIL["app/shell ToolRail + railIcons<br/>ToolId area"]
     CARDS["Feature cards in the object card's slot (proposed Q-172)<br/>Area, Options, Known, Discovery, Result, Checks (gated)"]
@@ -94,7 +94,10 @@ sequenceDiagram
   F->>C: grid of small SIA cones, then cutouts (read-through)
   C-->>F: frame rows and cutouts, or frames:cone_maxrec, no_footprint, cutout codes
   F-->>S: frames in the time windows, visits, coverage (or area:visits)
-  S->>D: dots per frame, then glitch, fixed and star labels
+  alt run incomplete (cone_failed, cutout_failed, MAXREC, no usable cutout, no dots)
+    S-->>Op: exit 1, nothing stored (AREA_TOOL_ENABLED off, Q-205)
+  end
+  S->>D: dots per frame, then glitch, star and fixed labels
   D->>C: Gaia and CatWISE cones per visit (shared star list)
   D-->>S: movers-to-be per visit, step counts
   S->>J: tracklets, candidate pairs

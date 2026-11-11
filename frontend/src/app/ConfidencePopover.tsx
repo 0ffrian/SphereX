@@ -254,7 +254,11 @@ export function ConfidencePopover({
   }
   return (
     <>
-      <div className="sx-acc-backdrop" onClick={onClose} data-testid="confidence-formula-backdrop" />
+      <div
+        className="sx-acc-backdrop"
+        onClick={onClose}
+        data-testid="confidence-formula-backdrop"
+      />
       <div
         ref={ref}
         role="dialog"

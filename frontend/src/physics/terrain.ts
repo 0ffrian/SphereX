@@ -236,13 +236,17 @@ export function buildTerrain(opt: TerrainOptions): TerrainGrid {
     let up = 0;
     // Half-space cooling: young floor at a ridge (divergent), older away from it.
     const age = conv < -0.05 ? Math.min(d * 900, 180) : 110 + d * 200;
-    let h = me ? 0.15 + 3.2 * Math.max(0, C[i]! - th) : -(2.5 + HALF_SPACE_KM_PER_SQRT_MYR * Math.sqrt(age));
+    let h = me
+      ? 0.15 + 3.2 * Math.max(0, C[i]! - th)
+      : -(2.5 + HALF_SPACE_KM_PER_SQRT_MYR * Math.sqrt(age));
     if (conv > 0.05) {
-      if (pair === 3) up = 5.5 * cc * g2(d, 0, 0.085); // continents collide: thick crust, high range
+      if (pair === 3)
+        up = 5.5 * cc * g2(d, 0, 0.085); // continents collide: thick crust, high range
       else if (pair === 0) {
         up = 3.6 * cc * g2(d, 0.04, 0.02); // ocean under ocean: island arc
         h -= 4 * cc * g2(d, 0, 0.025); // and its trench
-      } else if (me) up = 3.8 * cc * g2(d, 0.055, 0.045); // ocean sinks under continent: volcanic range
+      } else if (me)
+        up = 3.8 * cc * g2(d, 0.055, 0.045); // ocean sinks under continent: volcanic range
       else h -= 3.5 * cc * g2(d, 0, 0.03); // the trench on the ocean side
     } else if (conv < -0.05 && me) h -= 1.2 * cc * g2(d, 0, 0.04); // continental rift
     if (up > 0.01) {
@@ -398,7 +402,11 @@ export function buildTerrain(opt: TerrainOptions): TerrainGrid {
       const ii = ai % LW;
       const i2 = (ai + 1) % LW;
       const dd = (a: number, b: number): number => hl[a * LW + b]! - h0[a * LW + b]!;
-      const delta = lerp(lerp(dd(aj, ii), dd(aj, i2), tx), lerp(dd(aj + 1, ii), dd(aj + 1, i2), tx), ty);
+      const delta = lerp(
+        lerp(dd(aj, ii), dd(aj, i2), tx),
+        lerp(dd(aj + 1, ii), dd(aj + 1, i2), tx),
+        ty,
+      );
       out[(j * W + i) * 2] = e[j * W + i]! + delta;
       out[(j * W + i) * 2 + 1] = sig[j * W + i]!;
     }
@@ -408,17 +416,28 @@ export function buildTerrain(opt: TerrainOptions): TerrainGrid {
 }
 
 /** Rebuilds the samplers of a grid from its raw data (the worker sends the data only). */
-export function terrainFromData(W: number, H: number, out: Float32Array, plates: number): TerrainGrid {
-  const sampleCh = (ch: number) => (lon: number, lat: number): number => {
-    const fx = ((((lon / TAU + 0.5) % 1) + 1) % 1) * W - 0.5;
-    const fy = clamp((lat / Math.PI + 0.5) * H - 0.5, 0, H - 1);
-    const x0 = Math.floor(fx);
-    const y0 = Math.min(Math.floor(fy), H - 2);
-    const tx = fx - x0;
-    const ty = fy - y0;
-    const at = (x: number, y: number): number => out[(y * W + ((x + W) % W)) * 2 + ch]!;
-    return lerp(lerp(at(x0, y0), at(x0 + 1, y0), tx), lerp(at(x0, y0 + 1), at(x0 + 1, y0 + 1), tx), ty);
-  };
+export function terrainFromData(
+  W: number,
+  H: number,
+  out: Float32Array,
+  plates: number,
+): TerrainGrid {
+  const sampleCh =
+    (ch: number) =>
+    (lon: number, lat: number): number => {
+      const fx = ((((lon / TAU + 0.5) % 1) + 1) % 1) * W - 0.5;
+      const fy = clamp((lat / Math.PI + 0.5) * H - 0.5, 0, H - 1);
+      const x0 = Math.floor(fx);
+      const y0 = Math.min(Math.floor(fy), H - 2);
+      const tx = fx - x0;
+      const ty = fy - y0;
+      const at = (x: number, y: number): number => out[(y * W + ((x + W) % W)) * 2 + ch]!;
+      return lerp(
+        lerp(at(x0, y0), at(x0 + 1, y0), tx),
+        lerp(at(x0, y0 + 1), at(x0 + 1, y0 + 1), tx),
+        ty,
+      );
+    };
   return { W, H, data: out, plates, heightAt: sampleCh(0), boundaryAt: sampleCh(1) };
 }
 

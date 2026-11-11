@@ -25,7 +25,14 @@ interface CloseUpState {
    * the pane shifts to the right half, `setShifted`). Not the user's choice: `hidden` stays theirs.
    */
   held: boolean;
-  publish(p: Partial<Pick<CloseUpState, 'viewer' | 'plan' | 'type' | 'fixture' | 'reducedMotion' | 'engineStar' | 'engineWorld'>>): void;
+  publish(
+    p: Partial<
+      Pick<
+        CloseUpState,
+        'viewer' | 'plan' | 'type' | 'fixture' | 'reducedMotion' | 'engineStar' | 'engineWorld'
+      >
+    >,
+  ): void;
   setInfo(info: CloseUpInfo | null): void;
   setHidden(hidden: boolean): void;
   setHeld(held: boolean): void;
@@ -47,5 +54,14 @@ export const useCloseUpStore = create<CloseUpState>((set) => ({
   setInfo: (info) => set({ info }),
   setHidden: (hidden) => set({ hidden }),
   setHeld: (held) => set({ held }),
-  reset: () => set({ viewer: null, plan: null, type: null, engineStar: null, engineWorld: null, info: null, held: false }),
+  reset: () =>
+    set({
+      viewer: null,
+      plan: null,
+      type: null,
+      engineStar: null,
+      engineWorld: null,
+      info: null,
+      held: false,
+    }),
 }));

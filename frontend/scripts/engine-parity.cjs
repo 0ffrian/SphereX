@@ -8,8 +8,9 @@
 const fs = require('fs');
 const { chromium } = require((process.env.FE || '.') + '/node_modules/playwright');
 const OUT = process.env.OUT;
-const REF =
-  process.env.REF || '/home/moon/Desktop/Projects/SphereX/.claude/worktrees/sculptor-reference';
+const REF = process.env.REF;
+if (!REF)
+  throw new Error('Set REF to the sculptor-reference folder that holds the prototype HTML.');
 const BASE = process.env.BASE || 'http://localhost:5185';
 const ARGS = [
   '--use-angle=swiftshader',

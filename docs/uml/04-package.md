@@ -14,7 +14,7 @@ flowchart TB
 
     subgraph Backend["backend/ (FastAPI, Python 3.12) : Kevin, Moon, Atish"]
       BApi["app/api (Kevin) : D-16 endpoints, app/main.py mounts /data/textures and the read-only /data/demo-textures (Q-164), objects.py : /card, /render-params, texture URLs, /job, /job/events (Q-111), sky.py : /v1/sky (prototype, Q-87, /v1/sky/cached, Q-98), composite.py : /composite, /composite.png (prototype, Q-92), overlays.py : /overlays, /flags, /combine.png (Q-50), gemini.py : /admin/.../gemini-repaint, /albedo-ai, /albedo-ai.webp (Q-122)"]
-      BPipe["app/core/find (stage 1, overlays, flagmask, combine, A4.9), app/adapters (gaia, wise = CatWISE2020, tap), app/cache, app/core/card (stages 4, 5) : Kevin, app/core/measure (stage 2, pool.py MeasurePool, Q-112) and physics : Moon, app/core/classify (stage 3) : Atish"]
+      BPipe["app/core/find (stage 1, overlays, flagmask, combine, A4.9), app/adapters (gaia, wise = CatWISE2020, tap), app/cache, app/core/card (stages 4, 5; reference.py, reference objects, Q-328) : Kevin, app/core/measure (stage 2, pool.py MeasurePool, Q-112) and physics : Moon, app/core/classify (stage 3) : Atish"]
       BRender["app/core/render (Atish) : card_to_params, gas_giant, blackbody, params, noise, craters, height, normals, palette, bake, __main__, spherex_rgb, gemini_paint, background (TextureBaker, Q-112)"]
       BScripts["backend/scripts/bake_fixtures.py (Atish, with the baker): bakes the shared fixture textures with the real baker (Q-114); --check fails on drift"]
       BPack["backend/scripts/bake_demo_pack.py (Moon, Q-164): runs the pipeline per search row, writes assets/<type>/<id>.json, assets/textures/ (served read-only at /data/demo-textures, also offline) and frontend/src/app/search/demoTargets.ts; --check fails on drift"]
@@ -37,6 +37,9 @@ flowchart TB
       FDev["fixtures/ (dev-only synthetic fixture server), scripts/ (check-dist), src/test (test helpers), src/fixtures.test.ts, e2e/ (Playwright) : dev and test only"]
       FPhysics["src/physics : A7 physics layer, derivePhysics, slider registry (D-26, D-27) : Moon"]
       FContract["src/contract : generated from shared/schemas (D-18), assertTagged next to it : follows the schemas owner"]
+      FEngine["src/engine (D-37, raw WebGL2) : worlds/ (WorldEngine, cardToWorld, core.js, gas.js, shaders.js, presets.js, terrain.js, helpers.js), stars/ (StarEngine, cardToStar, protoStar1-4), rocks/ (RockView, cardToRock, source.ts), parity/ (dev only) : Moon"]
+      FEngineStages["src/app WorldEngineStage, StarEngineStage, build/RockStage, RockCloseUp : engine hosts, + Artistic only (Q-287) : Moon"]
+      FEngineScripts["frontend/scripts extract-world-engine.py, extract-rock-engine.py, engine-parity.cjs : need SX_PREVIEW_HTML or REF; the prototype HTML is not in the repo (Q-335) : Moon"]
       subgraph FViewer["src/viewer (Moon)"]
         VCore["ViewerApp, lighting, modes, honesty, scaleBar, altText"]
         VRend["renderers/ : AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star, ShaderBody, bodyRenderer, fieldTexture, shaderPlan, shaderSpec, shaderPalette, pointClouds, StarBody, jetSurface, jetPalette, linearColour (sRGB to linear, once), asteroidLift (Q-117), ttauriDisc (Q-118), textureMean (Q-116, Q-117), sliders.ts"]
@@ -78,6 +81,11 @@ flowchart TB
   BContract -.->|"generated from (D-18)"| Schemas
 
   FApp --> VCore
+  FApp -->|"engine stages"| FEngineStages
+  FEngineStages -->|"+ Artistic only (Q-287)"| FEngine
+  FEngineStages -->|"setEngineOwned, fallback to three.js"| VCore
+  FEngine -->|"climate, fluids, gasDynamics, stellar"| FPhysics
+  FEngineScripts -.->|"generates the copied blocks"| FEngine
   FApp --> FPhysics
   FPhysics -->|"SliderKey, Overrides (viewer/sliders.ts)"| VRend
   VRend -->|"LAVA_START_K"| FPhysics

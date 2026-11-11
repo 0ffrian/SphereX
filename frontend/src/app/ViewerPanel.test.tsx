@@ -39,12 +39,34 @@ const fake = {
   latestFlareText: vi.fn(() => null),
   fireFlare: vi.fn(),
   setFieldLines: vi.fn(),
+  setEngineOwned: vi.fn(),
   dispose: vi.fn(),
 };
 
+// The star engine needs WebGL 2 (absent in jsdom): a test can hand the panel a star the engine "draws".
+const engine = vi.hoisted(() => ({ star: null as unknown, pane: false }));
+vi.mock('./StarEngineStage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./StarEngineStage')>();
+  return {
+    ...actual,
+    useEngineStar: () => engine.star,
+    StarGlobeStage: () => <div data-testid="star-engine-stub" />,
+  };
+});
+
 vi.mock('@/viewer/ViewerApp', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/viewer/ViewerApp')>();
-  return { ...actual, ViewerApp: { create: vi.fn(async () => fake) } };
+  // In the build pane the panel calls many more viewer methods: a test that mounts it there asks for a
+  // fake that answers every other method with a no-op (never `then`: the fake is awaited).
+  const noop = new Map<string, () => void>();
+  const paneFake = () =>
+    new Proxy(fake, {
+      get: (t, k) =>
+        k in t || typeof k !== 'string' || !/^set[A-Z]/.test(k)
+          ? (t as Record<string | symbol, unknown>)[k]
+          : (noop.get(k) ?? noop.set(k, () => {}).get(k)),
+    });
+  return { ...actual, ViewerApp: { create: vi.fn(async () => (engine.pane ? paneFake() : fake)) } };
 });
 
 // Imported after the mock is registered (vi.mock is hoisted).
@@ -77,6 +99,8 @@ beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   useAppStore.setState(initialAppData);
   shown.length = 0;
+  engine.star = null;
+  engine.pane = false;
   Object.values(fake).forEach((f) => typeof f === 'function' && 'mockClear' in f && f.mockClear());
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -89,6 +113,31 @@ afterEach(async () => {
 });
 
 describe('ViewerPanel', () => {
+  it('mounts the prototype engines only at + Artistic; below it the three.js viewer draws (PR #89 review)', async () => {
+    const { card, params } = fixture('star');
+    engine.pane = true;
+    engine.star = {
+      preset: { id: card.id, label: card.name, T: 5772, R: 1, M: 1, P: 25.4, dwarf: true },
+    };
+    useAppStore.getState().setObject(card, params);
+    const stub = () => container.querySelector('[data-testid="star-engine-stub"]');
+    const pane = { seq: 0, animate: false, seedOffset: 0 };
+    useAppStore.getState().setHonesty('derived');
+    await act(async () => {
+      root.render(<ViewerPanel pane={pane} />);
+    });
+    await act(async () => {});
+    expect(stub()).toBeNull();
+    expect(fake.setEngineOwned).not.toHaveBeenCalledWith(true);
+    expect(fake.setEngineOwned).toHaveBeenLastCalledWith(false);
+    await act(async () => useAppStore.getState().setHonesty('artistic'));
+    expect(stub()).not.toBeNull();
+    expect(fake.setEngineOwned).toHaveBeenLastCalledWith(true);
+    await act(async () => useAppStore.getState().setHonesty('measured'));
+    expect(stub()).toBeNull();
+    expect(fake.setEngineOwned).toHaveBeenLastCalledWith(false);
+  });
+
   it('announces a governor tier drop in plain words, but not a manual tier change', async () => {
     await mount();
     const handler = fake.setQualityChangeHandler.mock.calls.at(-1)?.[0] as

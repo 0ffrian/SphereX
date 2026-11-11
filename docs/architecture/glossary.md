@@ -1,6 +1,6 @@
 # Glossary
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A15 · **Implements:** [D-02, D-21, D-32](../decisions/contract-tags.md), [Q-132](../decisions/platform-hosting.md), [Q-131, Q-146](../decisions/moving-objects.md) · **Read with:** [sky-shell.md](sky-shell.md) (A21 Names table), [../rendering/README.md](../rendering/README.md)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A15 · **Implements:** [D-02, D-21, D-32](../decisions/contract-tags.md), [Q-132](../decisions/platform-hosting.md), [D-37](../decisions/rendering-engines.md), [Q-328](../decisions/data-sources.md), [Q-131, Q-146](../decisions/moving-objects.md) · **Read with:** [sky-shell.md](sky-shell.md) (A21 Names table), [../rendering/README.md](../rendering/README.md)
 
 ## A15 Glossary
 
@@ -87,6 +87,8 @@ One meaning per term. Where a word has two meanings, both are listed and the own
 | Rainbow Trails | A flipbook view mode: dots coloured by wavelength, a `derived` false colour (D-28). |
 | Wavelength tint, composite | Flipbook colour views: each frame tinted by its wavelength, or one RGB picture from three frames; both `derived` ([R4](../rendering/display-rules.md#r4-display-levels), Q-93). |
 | Sky Sculptor | Milestone M2: the 3D body from the ObjectCard and RenderParams, shown in the build pane ([A1.1](overview.md#a11-priority-tiers)). |
+| Engine (D-37) | One of the approved prototype's three renderers copied into `frontend/src/engine/`: the world engine (rocky, water and gas worlds), the star engine and the rock engine. Raw WebGL2 on its own canvas, drawn only at + Artistic; three.js r187 is the fallback ([R5.9](../rendering/engines.md#r59-prototype-engines-d-37)). Not the haptic engine (`HapticEngine`, [R8.8](../rendering/haptics/engine-api.md#r88-engine-api)). |
+| Reference object | A solar-system body with a card built from `backend/assets/reference_objects.toml` (the Sun, Jupiter, Saturn, Titan): `resolver: reference`, never looked up in the catalogues, no SPHEREx frames and no fixed sky position ([A4.1](pipeline.md#a41-stage-1-find-the-object), Q-258, Q-328). |
 
 **Sound and haptics**
 

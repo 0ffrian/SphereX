@@ -1,6 +1,6 @@
 # Acceptance tests
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R11 · **Implements:** [D-21](../decisions/contract-tags.md), [D-05, Q-132](../decisions/platform-hosting.md), [Q-69](../decisions/rendering-motion.md), [Q-113](../decisions/shell-surfaces.md), [Q-133](../decisions/haptics-sound.md) · **Read with:** [reference/README.md](reference/README.md) (R11.1), [reference/checklist.md](reference/checklist.md) (R11.2), [reference/frame-time.md](reference/frame-time.md) (R11.3), [reference/a15-checks.md](reference/a15-checks.md) (R11.4), [testing.md](../architecture/testing.md)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R11 · **Implements:** [D-21](../decisions/contract-tags.md), [D-37](../decisions/rendering-engines.md), [D-05, Q-132](../decisions/platform-hosting.md), [Q-69](../decisions/rendering-motion.md), [Q-113](../decisions/shell-surfaces.md), [Q-133](../decisions/haptics-sound.md) · **Read with:** [reference/README.md](reference/README.md) (R11.1), [reference/checklist.md](reference/checklist.md) (R11.2), [reference/frame-time.md](reference/frame-time.md) (R11.3), [reference/a15-checks.md](reference/a15-checks.md) (R11.4), [testing.md](../architecture/testing.md)
 
 ## R11. Acceptance tests
 
@@ -8,12 +8,12 @@ The sub-pages are R11.1 [reference frames](reference/README.md), R11.2 the [visu
 
 **Event build (desktop Chrome on the A15, sound only; Q-132)**
 
-- **Determinism:** the same card and seed give the same SHA-256 for every texture.
+- **Determinism:** the same card and seed give the same SHA-256 for every texture. Frames drawn by the D-37 engines are exempt ([R5.9](engines.md#r59-prototype-engines-d-37)).
 - **Seam:** the mean absolute height difference between column 0 and column W−1 is less than the median neighbour difference.
 - **Normals:** every decoded normal has length 1 ± 0.02.
 - **Honesty:** the toggle starts at + Estimated. In Measured only, no layer with a tag other than `measured` is drawn, and every sound the R8.2 filter hides is silent: procedural and shader-kind texture sounds, a `derived` `teq_pulse`, the Track path voice (D-21).
 - **Refusal:** removing `diameter_km` from an asteroid card puts the mesh in `missing`, with no crash.
-- **Performance:** ≥30 fps rotating `asteroid_procedural` at 2048×1024 on the A15, at the quality level it starts on (Medium), with no governor drop (R11.3).
+- **Performance:** ≥30 fps rotating `asteroid_procedural` at 2048×1024 on the A15, at the quality level it starts on (Medium), with no governor drop (R11.3). The same ≥30 fps while rotating, at + Artistic, for the D-37 engines: the rock engine on an asteroid, and a planet with both world-engine instances (globe and fly view) open ([R5.9](engines.md#r59-prototype-engines-d-37)); **not yet measured** (R12 #43).
 - **Sound:**
   - no more than 40 events per second under fast drags
   - the vibrate driver is not in the engine, and the audio driver plays every event

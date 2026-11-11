@@ -107,7 +107,10 @@ function drawnAs(
 
 export function planShaderKind(rawInput: PlanInput): RenderPlan {
   // Issue #71 (Q-291): a solved gas world's storms and turbulence carry the solver's tags.
-  const input: PlanInput = { ...rawInput, params: withGasWorldLayerTags(rawInput.card, rawInput.params) };
+  const input: PlanInput = {
+    ...rawInput,
+    params: withGasWorldLayerTags(rawInput.card, rawInput.params),
+  };
   const b = new PlanBuilder(input);
   const { card, params, ctx } = input;
   // What moves, by the tier chain (R5.7, D-32): spin, jets, storms, clouds.
@@ -429,7 +432,9 @@ export function planShaderKind(rawInput: PlanInput): RenderPlan {
           plain,
           // Issue #71: Saturn's measured rings (GasWorld) are wider than the sphere, so the camera backs off.
           distance:
-            gasWorldInput(card, params)?.reference === 'sat' ? DISTANCE.gasRings : shaderDistance(spec),
+            gasWorldInput(card, params)?.reference === 'sat'
+              ? DISTANCE.gasRings
+              : shaderDistance(spec),
         }
       : null,
     relief: 'illustrative',

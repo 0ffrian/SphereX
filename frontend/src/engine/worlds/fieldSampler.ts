@@ -49,7 +49,7 @@ export class WorldFieldSampler {
     const fx = px - x0;
     const fy = py - y0;
     const at = (x: number, y: number) =>
-      t.data[(Math.max(0, Math.min(t.H - 1, y)) * t.W + ((x % t.W) + t.W) % t.W) * 2]!;
+      t.data[(Math.max(0, Math.min(t.H - 1, y)) * t.W + (((x % t.W) + t.W) % t.W)) * 2]!;
     const top = at(x0, y0) * (1 - fx) + at(x0 + 1, y0) * fx;
     const bot = at(x0, y0 + 1) * (1 - fx) + at(x0 + 1, y0 + 1) * fx;
     return top * (1 - fy) + bot * fy;
@@ -69,13 +69,20 @@ export class WorldFieldSampler {
     // The viewer's UV (fieldGenerator.directionToUV: phi = atan2(z, -x), theta from the north pole) back to a direction.
     const phi = u * TAU;
     const theta = v * Math.PI;
-    return this.sampleDirection([-Math.cos(phi) * Math.sin(theta), Math.cos(theta), Math.sin(phi) * Math.sin(theta)]);
+    return this.sampleDirection([
+      -Math.cos(phi) * Math.sin(theta),
+      Math.cos(theta),
+      Math.sin(phi) * Math.sin(theta),
+    ]);
   }
 
   /** A body-frame direction (the engine's frame: lon = atan2(z, x), lat = asin(y)). */
   sampleDirection(d: [number, number, number]): FieldSample {
     const len = Math.hypot(d[0], d[1], d[2]) || 1;
-    const s = this.sampleLonLat(Math.atan2(d[2], d[0]), Math.asin(Math.max(-1, Math.min(1, d[1] / len))));
+    const s = this.sampleLonLat(
+      Math.atan2(d[2], d[0]),
+      Math.asin(Math.max(-1, Math.min(1, d[1] / len))),
+    );
     const e = s.elevationKm ?? 0;
     return {
       height: Math.max(0, Math.min(1, e / this.maxElev)),

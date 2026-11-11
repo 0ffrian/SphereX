@@ -1,6 +1,6 @@
 # Data contract: TV, ObjectCard, RenderParams
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1, R3.2, R3.4 (R3.3 in [type-selection.md](type-selection.md)) · **Implements:** [D-02, D-32](../decisions/contract-tags.md), [D-04, D-16, D-18, D-23, Q-33, Q-35, Q-36](../decisions/contract.md), [D-01](../decisions/rendering-bodies.md), [Q-117](../decisions/rendering-layers.md), [D-12](../decisions/haptics-design.md) · **Read with:** [type-selection.md](type-selection.md) (R3.3), [surface-generation.md](surface-generation.md) (R6.2), [display-rules.md](display-rules.md) (R5.2, R5.7)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1, R3.2, R3.4 (R3.3 in [type-selection.md](type-selection.md)) · **Implements:** [D-02, D-32](../decisions/contract-tags.md), [D-04, D-16, D-18, D-23, Q-33, Q-35, Q-36](../decisions/contract.md), [D-01, Q-285](../decisions/rendering-bodies.md), [Q-221, Q-327](../decisions/pipeline-stages.md), [Q-117](../decisions/rendering-layers.md), [D-12](../decisions/haptics-design.md) · **Read with:** [type-selection.md](type-selection.md) (R3.3), [surface-generation.md](surface-generation.md) (R6.2), [display-rules.md](display-rules.md) (R5.2, R5.7)
 
 ## R3. Data contract
 
@@ -69,6 +69,10 @@ interface ObjectCard {
                                       // a measured column cites its *_reflink; a CALCULATED_VALUE is never 'measured'; a missing
                                       // value is null with the reason in `source`
   component_teff_K?: TV<[number, number]>;  // brown_dwarf_binary only: Teff of body A then B (literature registry, Q-154)
+  // surface of a world (issue #71, Q-285): measured only for a reference body (Titan: Huygens HASI, Cassini radar);
+  // read by the confidence score (Q-327) and the world adapters; absent on exoplanet cards
+  surface_pressure_bar?: TV; surface_temperature_K?: TV;
+  surface_fluid?: TV<string>;         // 'water' | 'methane' | 'ammonia' | 'nitrogen' | 'co2'
   // variability
   period_var_d?: TV;                  // Mira period: SIMBAD mesVar median over rows typed LPV or M → 'measured' (Q-152)
   lightcurve?: { t_mjd: number; flux: number; sigma: number; lambda_um: number; flags: number }[];
@@ -76,7 +80,9 @@ interface ObjectCard {
   phase_angle_deg?: TV; sun_vector?: TV<[number, number, number]>;   // sun_vector: unit vector target -> Sun,
                                       // ICRF equatorial J2000 (Horizons, Q-62)
   // comet
-  gas_Q?: { co2?: TV; h2o?: TV; co?: TV };   // molecules/s, per epoch (the shape holds one epoch: Q-42)
+  gas_Q?: { co2?: TV; h2o?: TV; co?: TV }    // molecules/s; this flat shape holds one epoch (Q-42)
+        | { '2025-08'?: {co2?: TV; h2o?: TV; co?: TV}; '2025-12'?: {...} };   // or keyed by epoch (Q-260)
+  orbit_track?: TV<number[][]>;      // rows [JD TDB, x, y, z au, vx, vy, vz au/day], Horizons, heliocentric ICRF (Q-261)
   coma_radius_km?: TV; nucleus_radius_km_max?: TV;
   epochs?: ('2025-08' | '2025-12')[];
   // motion
@@ -102,6 +108,15 @@ interface RenderParams {
                                        // sun_dir: today a copy of the card's ICRF sun_vector; the viewer reads it
                                        // as scene space. Frame conversion open (Q-62); phase_angle_deg wins
   view_modes: { visible: VisibleMode; spherex_ir?: IRMode };
+  // D-36, Q-220 to Q-222: the score and the 3D gate, set by stage 7. Absent for nebula and nova and in
+  // older saved assets. Not the probability the picture is correct; never changes a badge.
+  confidence?: { score: number; measured_share: number; estimated_share: number; assumed_share: number;  // 0..1
+                 threshold: number; band: 'mostly_data' | 'part_data' | 'mostly_assumed' | 'too_little';
+                 gate: { class_known: boolean; key_measurement: boolean; score_ok: boolean; passed: boolean };
+                 found: string; needed: string; raise: string | null;
+                 inputs: { id: string; label: string; weight: number; c: number; points: number;
+                           tag: Tag | 'missing'; fields: string[] }[];
+                 tag: 'derived'; formula: string; weights_note: string; note: string };
   dynamics?: Dynamics;                 // D-32, D-34. Absent until stage 6: the body stays still (except R7.1 spin)
   haptics: HapticProfile;              // §8
   alt_text: string;                    // §9

@@ -3,7 +3,10 @@
 // shaders: NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS
 // Verbatim source lines: 1299-1678
 import { LMIN, LMAX } from './helpers.js';
+// @deviation (#89 review 1) the rename below: the fly view's cloud deck sat at a fixed 3 km (x the relief
+// exaggeration) while the readout gave the model's cloud base; it now reads uCloudKm, which core.js sets from m.zc.
 // @verbatim L1299-L1678
+// @rename 1.+3.*uEx/uRkm=>1.+uCloudKm*uEx/uRkm
 var NOISE = `
 vec3 h33(vec3 p){p=fract(p*vec3(.1031,.1030,.0973));p+=dot(p,p.yxz+33.33);return fract((p.xxy+p.yxx)*p.zyx);}
 float vn(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
@@ -329,7 +332,7 @@ void main(){
    n=normalize(n-(CA*gd.x+CB*gd.y)*.3*uEx);
    float slope2=(1.-dot(n,d))*uEx,Tl=E.r-uGam*max(hk+G*.3,0.);
    float cs=1.;
-   if(uClouds>.5&&uCov>.01){float rm=1.+3.*uEx/uRkm;vec3 sp=p0+uLb*((rm-length(p0))/max(mud,.1));cs=1.-.78*smoothstep(.15,.7,cov2(normalize(sp),hit));FP=hit*2.*uFov/uR.y/max(abs(dot(rd,d)),.2);}
+   if(uClouds>.5&&uCov>.01){float rm=1.+uCloudKm*uEx/uRkm;vec3 sp=p0+uLb*((rm-length(p0))/max(mud,.1));cs=1.-.78*smoothstep(.15,.7,cov2(normalize(sp),hit));FP=hit*2.*uFov/uR.y/max(abs(dot(rd,d)),.2);}
    if(uOcean>.5&&hk<=.001){
     vec3 trn=exp(-2.*uAw*min(max(-e,0.)*1000.,400.)),w=uLiq*(1.-trn)+uLand*.8*trn;
     float wl=lod(2600.);vec3 wn=normalize(d+(vec3(fbm(d*2600.+uTime*.2,3),fbm(d*2600.+7.-uTime*.17,3),fbm(d*2600.+13.,3))-.5)*.06*wl);
@@ -371,7 +374,7 @@ void main(){
     through a layer whose depth grows with cover; tops are lit from their own slope and shadowed by
     cloud toward the Sun */
  if(uClouds>.5&&uMode<.5&&uCov>.01){
-  float rc=1.+3.*uEx/uRkm,tmax=hit>0.?hit:1e9,u1,u0=rsph(ro,rd,rc,u1),above=step(rc,length(ro)),tc=above>.5?u0:u1;
+  float rc=1.+uCloudKm*uEx/uRkm,tmax=hit>0.?hit:1e9,u1,u0=rsph(ro,rd,rc,u1),above=step(rc,length(ro)),tc=above>.5?u0:u1;
   if(tc>0.&&tc<tmax){vec3 pc=ro+rd*tc,dc=normalize(pc);float c=cov2(dc,tc);
    if(c>.003){float mu=abs(dot(rd,dc)),al=1.-exp(-c*7./max(mu,.12));
     float ec=max(1.5/uRkm,FP*1.5),cx=cov2(normalize(dc+CA*ec),tc),cy=cov2(normalize(dc+CB*ec),tc);

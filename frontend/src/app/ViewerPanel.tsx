@@ -631,16 +631,21 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // it (`cuClose`). The viewer and plan go to a small store the pane reads. The toggle next to Feel
   // hides or shows it.
   const closeKind = pane ? closeUpKindOf(params?.type) : null;
+  // The prototype engines (star, world, rock) draw a generated surface: they mount only at "+ Artistic"
+  // (Atish's call on the PR #89 review, Q-287). At "Measured only" and "+ Estimated" the three.js path draws.
+  // The build pane has no Show control (Q-406); Build raises the level to + Artistic when the body has layers
+  // the level hides, which is what lets the engines draw.
+  const enginesShown = honesty === 'artistic';
   const engineStar =
-    pane && honesty !== 'measured' && plan?.threeD && card && !blocked && engineStarCard && starFailedId !== engineKey(card.id, engineStarCard.preset.id)
+    pane && enginesShown && plan?.threeD && card && !blocked && engineStarCard && starFailedId !== engineKey(card.id, engineStarCard.preset.id)
       ? engineStarCard
       : null;
   const engineWorld =
-    pane && honesty !== 'measured' && plan?.threeD && card && !blocked && engineWorldCard && worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
+    pane && enginesShown && plan?.threeD && card && !blocked && engineWorldCard && worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
       ? engineWorldCard
       : null;
   // D-37: while an engine draws the body the three.js viewer builds and draws nothing under it.
-  const engineOwns = engineStar !== null || engineWorld !== null || rockOwns;
+  const engineOwns = engineStar !== null || engineWorld !== null || (enginesShown && rockOwns);
   useEffect(() => {
     viewer?.setEngineOwned?.(engineOwns);
   }, [viewer, engineOwns]);
@@ -798,16 +803,19 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           data-testid="viewer-stage"
         >
           <div ref={hostRef} className="absolute inset-0" />
-          {/* D-37: the prototype rock engine draws asteroids and comet nuclei over the viewer. */}
-          <RockStage
-            card={card}
-            params={params}
-            plan={plan}
-            honesty={honesty}
-            tint={rockTint}
-            reducedMotion={reducedMotion}
-            onEngine={setRockOwns}
-          />
+          {/* D-37: the prototype rock engine draws asteroids and comet nuclei over the viewer, at "+ Artistic"
+              only; unmounting it hands the body back to the viewer (its cleanup reports onEngine(false)). */}
+          {enginesShown && (
+            <RockStage
+              card={card}
+              params={params}
+              plan={plan}
+              honesty={honesty}
+              tint={rockTint}
+              reducedMotion={reducedMotion}
+              onEngine={setRockOwns}
+            />
+          )}
           {engineStar && (
             <StarGlobeStage key={engineStar.preset.id} star={engineStar} onFail={() => useWorldStore.getState().failStar(engineKey(card?.id, engineStar.preset.id))} />
           )}

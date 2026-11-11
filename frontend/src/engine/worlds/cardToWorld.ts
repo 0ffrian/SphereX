@@ -3,6 +3,7 @@
 // assumed a value (fluid water, 1 bar, mu, sea share 0.5, no eccentricity or obliquity) the same default is used,
 // tagged model_dependent and listed in `assumptions`. A missing required input refuses: `{ ok: false, missing }`.
 import type { ObjectCard, Tag } from '@/contract';
+import { MEASURED_FLATTENING, MEASURED_PEAK_WIND_MS, WIND_DT_FLOOR_K } from '@/physics/gasDynamics';
 import { deriveLocking } from '@/physics/tides';
 import { FLUIDS, WP } from './presets.js';
 import type { EngineOverrides, FluidKey, TaggedAssumption, WorldPreset } from './types';
@@ -37,6 +38,25 @@ const REF_GIANT: Record<string, string> = { 'ref-jupiter': 'jup', 'ref-saturn': 
 const SUN = { Ts: 5772, Rs: 1, Ms: 1 };
 /** The prototype's default sea share of the surface. */
 const DEFAULT_SEA = 0.5;
+/** The prototype's Bond albedo when a preset has none (worldModel: `p.A != null ? p.A : 0.3`). */
+const DEFAULT_ALBEDO = 0.3;
+/** Albedo range a card temperature may be inverted to (a Bond albedo cannot be negative; 0.95 keeps it physical). */
+const ALBEDO_MIN = 0;
+const ALBEDO_MAX = 0.95;
+/** Solar radius in AU (IAU 2015 nominal R_sun / au), as the engine's worldModel uses it. */
+const RSUN_AU = 0.00465047;
+/**
+ * Basalt solidus, K (Lesher and Spera 2015; the engine's LAVA.Tsol). A rocky world whose equilibrium temperature is
+ * above it has molten rock on its day side and can hold only a thin rock-vapour atmosphere.
+ */
+const ROCK_SOLIDUS_K = 1400;
+/**
+ * The thin rock-vapour atmosphere given to such a world when its card has no pressure: the artifact's own lava-world
+ * example (WP 'lava': 0.005 bar, mu 44, no sea), so the engine draws it airless (below 0.02 bar) with the magma
+ * showing. Rock-vapour atmospheres of lava planets are of order millibars or less (Schaefer and Fegley 2009, ApJ 703,
+ * L113; Ito et al. 2015, ApJ 801, 144) [verify]. `inferred_from_analog`.
+ */
+const ROCK_VAPOUR = { Ps: 0.005, mu: 44, sea: 0 };
 
 /** FNV-1a of the card id, folded to 1..997: a small stable integer (the prototype's seeds are small; the shaders take them as floats). */
 export function seedFromId(id: string): number {
@@ -61,6 +81,27 @@ function fluidKey(raw: string): FluidKey | null {
   if (s === 'ch4') return 'methane';
   if (s === 'n2') return 'nitrogen';
   return Object.prototype.hasOwnProperty.call(FLUIDS, s) ? (s as FluidKey) : null;
+}
+
+/**
+ * Jupiter and Saturn: their measured peak jet speed and flattening replace the engine's estimates (#89 review 5, 6).
+ * The engine reads them as p.Umeas and p.fMeas (core.js, declared renames).
+ */
+function setMeasuredGiant(
+  preset: WorldPreset,
+  tags: Record<string, Tag>,
+  ref: string | undefined,
+): void {
+  if (ref !== 'jup' && ref !== 'sat') return;
+  preset.Umeas = MEASURED_PEAK_WIND_MS[ref];
+  preset.fMeas = MEASURED_FLATTENING[ref];
+  tags.Umeas = 'measured';
+  tags.fMeas = 'measured';
+}
+
+/** The engine's equilibrium temperature at zero albedo, K: T_star sqrt(R_star / 2a) (worldModel). */
+function teqZeroAlbedo(Ts: number, Rs: number, a: number): number {
+  return Ts * Math.sqrt((Rs * RSUN_AU) / (2 * a));
 }
 
 function cardToWorldGeneric(card: ObjectCard, overrides: EngineOverrides): CardToWorld {
@@ -221,11 +262,33 @@ function cardToWorldGeneric(card: ObjectCard, overrides: EngineOverrides): CardT
   } else assume('fluid', 'water', 'no surface fluid on the card; water, as the prototype defaults');
 
   const waterWorld = card.type === 'planet_water';
+  // Equilibrium temperature: the card's measured one when it has it (#89 review 10), else the engine's own with the
+  // default albedo. Used here to recognise a lava world; the albedo below makes the engine agree with the card.
+  const teqCard = num(card.teq_K);
+  const T0 = teqZeroAlbedo(Ts, Rs, a);
+  const teqEst = teqCard ?? T0 * Math.pow(1 - DEFAULT_ALBEDO, 0.25);
   const PsCard = num(card.surface_pressure_bar);
+  const lavaWorld = !gas && PsCard === null && teqEst >= ROCK_SOLIDUS_K;
   let Ps = 1;
   if (PsCard !== null) {
     Ps = PsCard;
     tags.Ps = card.surface_pressure_bar!.tag;
+  } else if (lavaWorld) {
+    // 55 Cnc e and its kind (Q-317, Q-319): the generic 1 bar of water made a runaway steam world whose haze hid
+    // the magma; a world this hot keeps only a thin rock-vapour atmosphere.
+    Ps = ROCK_VAPOUR.Ps;
+    tags.Ps = 'inferred_from_analog';
+    assumptions.push({
+      field: 'Ps',
+      value: Ps,
+      tag: 'inferred_from_analog',
+      note:
+        'no surface pressure on the card, and the world is hotter than molten rock (Teq ' +
+        Math.round(teqEst) +
+        ' K, above the basalt solidus of ' +
+        ROCK_SOLIDUS_K +
+        " K): a thin rock-vapour atmosphere of 0.005 bar, as the artifact's lava-world example, so it is drawn airless with the magma showing",
+    });
   } else
     assume(
       'Ps',
@@ -235,25 +298,29 @@ function cardToWorldGeneric(card: ObjectCard, overrides: EngineOverrides): CardT
         : 'no surface pressure on the card; 1 bar, as the prototype defaults',
     );
 
-  const mu = gas
-    ? refGiant === 'sat'
-      ? 2.1
-      : 2.3
-    : waterWorld
-      ? 18
-      : fluid === 'methane'
-        ? 28
-        : 29;
+  const mu = lavaWorld
+    ? ROCK_VAPOUR.mu
+    : gas
+      ? refGiant === 'sat'
+        ? 2.1
+        : 2.3
+      : waterWorld
+        ? 18
+        : fluid === 'methane'
+          ? 28
+          : 29;
   assume(
     'mu',
     mu,
-    gas
-      ? 'hydrogen-helium air (prototype 2.3 g/mol)'
-      : waterWorld
-        ? 'water-rich air (prototype ocean world, 18 g/mol)'
-        : fluid === 'methane'
-          ? 'nitrogen air under a methane cycle (prototype Titan example, 28 g/mol)'
-          : 'nitrogen-like air (prototype 29 g/mol)',
+    lavaWorld
+      ? 'rock-vapour air (the artifact lava-world example, 44 g/mol)'
+      : gas
+        ? 'hydrogen-helium air (prototype 2.3 g/mol)'
+        : waterWorld
+          ? 'water-rich air (prototype ocean world, 18 g/mol)'
+          : fluid === 'methane'
+            ? 'nitrogen air under a methane cycle (prototype Titan example, 28 g/mol)'
+            : 'nitrogen-like air (prototype 29 g/mol)',
   );
 
   const preset: WorldPreset = {
@@ -274,7 +341,18 @@ function cardToWorldGeneric(card: ObjectCard, overrides: EngineOverrides): CardT
   };
   tags.seed = 'artistic';
   if (Prot !== undefined) preset.Prot = Prot;
-  if (!gas) {
+  if (lavaWorld) {
+    preset.sea = ROCK_VAPOUR.sea;
+    preset.oceanF = 0;
+    tags.sea = 'inferred_from_analog';
+    tags.oceanF = 'inferred_from_analog';
+    assumptions.push({
+      field: 'sea',
+      value: 0,
+      tag: 'inferred_from_analog',
+      note: 'no water ocean on a world above the rock solidus (the artifact lava-world example); the magma sea is drawn instead',
+    });
+  } else if (!gas) {
     preset.sea = waterWorld ? 2 : DEFAULT_SEA;
     preset.oceanF = waterWorld ? 1 : DEFAULT_SEA;
     if (waterWorld) preset.ocean = true;
@@ -286,10 +364,91 @@ function cardToWorldGeneric(card: ObjectCard, overrides: EngineOverrides): CardT
     );
     tags.oceanF = 'model_dependent';
   }
+  // Bond albedo. The engine computes Teq = T0 (1 - A)^1/4 itself, so a measured temperature on the card is honoured
+  // by choosing A to match it (#89 review 10); otherwise the card's albedo, otherwise the prototype's 0.3.
+  const tSurfCard = gas ? null : num(card.surface_temperature_K);
   const albedo = num(card.albedo);
-  if (albedo !== null) {
+  const invert = (target: number, factor: number): { A: number; clamped: boolean } => {
+    const raw = 1 - Math.pow(target / (T0 * factor), 4);
+    const A = Math.min(ALBEDO_MAX, Math.max(ALBEDO_MIN, raw));
+    return { A, clamped: A !== raw };
+  };
+  if (tSurfCard !== null) {
+    // The engine's grey greenhouse: Ts = Teq (1 + 0.75 tau)^1/4, tau = 0.8 Ps (x1.8 under CO2), none below 0.02 bar.
+    const tau = Ps < 0.02 ? 0 : 0.8 * Ps * (fluid === 'co2' ? 1.8 : 1);
+    const r = invert(tSurfCard, Math.pow(1 + 0.75 * tau, 0.25));
+    preset.A = r.A;
+    tags.A = 'derived';
+    assumptions.push({
+      field: 'A',
+      value: Number(r.A.toFixed(3)),
+      tag: 'derived',
+      note:
+        "Bond albedo chosen so the engine's mean surface temperature equals the card's " +
+        tSurfCard +
+        ' K (' +
+        card.surface_temperature_K!.tag +
+        '): A = 1 - (Ts / (T0 (1 + 0.75 tau)^1/4))^4, T0 = T_star sqrt(R_star / 2a)' +
+        (r.clamped ? '; held at ' + r.A : ''),
+    });
+  } else if (teqCard !== null) {
+    const r = invert(teqCard, 1);
+    preset.A = r.A;
+    tags.A = 'derived';
+    assumptions.push({
+      field: 'A',
+      value: Number(r.A.toFixed(3)),
+      tag: 'derived',
+      note:
+        "Bond albedo chosen so the engine's equilibrium temperature equals the card's " +
+        teqCard +
+        ' K (' +
+        card.teq_K!.tag +
+        '): A = 1 - (Teq / T0)^4, T0 = T_star sqrt(R_star / 2a) = ' +
+        Math.round(T0) +
+        ' K' +
+        (r.clamped
+          ? teqCard > T0
+            ? "; the card's Teq is hotter than zero albedo with full heat redistribution allows (the catalogue assumes less redistribution), so A = 0"
+            : "; the card's Teq is very cold, so A is held at " + ALBEDO_MAX
+          : ''),
+    });
+  } else if (albedo !== null) {
     preset.A = albedo;
-    tags.A = card.albedo!.tag;
+    tags.A = 'model_dependent';
+    assumptions.push({
+      field: 'A',
+      value: albedo,
+      tag: 'model_dependent',
+      note:
+        "the card's albedo (" +
+        card.albedo!.tag +
+        ') used as the Bond albedo; a geometric albedo (as catalogues give for small bodies) differs from the Bond albedo by the phase integral, which is not on the card',
+    });
+  } else
+    assume(
+      'A',
+      DEFAULT_ALBEDO,
+      'no albedo or temperature on the card; Bond albedo 0.3, as the prototype defaults',
+    );
+  if (gas && !refGiant) {
+    assume(
+      'U',
+      'thermal-wind estimate',
+      'jet speed U = 0.6 sqrt(R_specific dT) with dT = ' +
+        (locked
+          ? 'eps 0.6 Ts (locked)'
+          : 'max(' +
+            WIND_DT_FLOOR_K +
+            ' K, eps 0.6 Ts); for a cool giant eps hits its floor, so the ' +
+            WIND_DT_FLOOR_K +
+            ' K floor sets U near 115-120 m/s: a floor, not a prediction'),
+    );
+    assume(
+      'flat',
+      '0.7 q',
+      'flattening from the spin, f = 0.7 Omega^2 R^3 / (G M), an estimate (it gives Saturn 0.108 against the measured 0.098)',
+    );
   }
   // Orbit extras (the prototype's ORB table): host mass, eccentricity and obliquity are not on the card.
   preset.ob = { Ms: Ms ?? 1, e: 0, obl: 0 };
@@ -309,6 +468,7 @@ function cardToWorldGeneric(card: ObjectCard, overrides: EngineOverrides): CardT
     }
     preset.fluid = ref.fluid;
     assume('fluid', ref.fluid, 'reference giant: ammonia clouds, as the prototype');
+    setMeasuredGiant(preset, tags, refGiant);
   }
 
   return {
@@ -336,12 +496,17 @@ export const ARTIFACT_PRESETS: Record<string, string> = {
   'ref-jupiter': 'jup',
   'ref-saturn': 'sat',
   'ref-titan': 'tit',
-  'ref-earth': 'earth',
 };
-/** Relative tolerance for "equal within rounding" (the prototype rounds its inputs to 3 or 4 figures). */
+/** Relative tolerance for a disagreement worth listing in `mismatches`. */
 const ROUND_TOL = 0.03;
-const same = (a: number, b: number): boolean =>
-  Math.abs(a - b) <= ROUND_TOL * Math.max(Math.abs(a), Math.abs(b), 1e-9);
+/**
+ * Relative tolerance for "the preset holds the card's value" (the prototype rounds its inputs to 3 or 4 figures, at
+ * most 0.13% for the objects here). Only then does the preset value carry the card's tag; a larger difference
+ * (Titan's 1.5 bar against the measured 1.467) is the artifact's own setting, `inferred_from_analog`.
+ */
+const CARD_TOL = 0.005;
+const within = (a: number, b: number, tol: number): boolean =>
+  Math.abs(a - b) <= tol * Math.max(Math.abs(a), Math.abs(b), 1e-9);
 
 export function cardToWorld(card: ObjectCard, overrides: EngineOverrides = {}): CardToWorld {
   const gen = cardToWorldGeneric(card, overrides);
@@ -379,26 +544,47 @@ export function cardToWorld(card: ObjectCard, overrides: EngineOverrides = {}): 
     const pv = preset[k];
     const cv = cardVals[k as string];
     if (cv && cv.v !== null && cv.tag) {
-      const ok =
-        typeof pv === 'number' && typeof cv.v === 'number'
-          ? same(pv, cv.v)
-          : typeof pv === 'string' && typeof cv.v === 'string'
-            ? fluidKey(cv.v) === pv
-            : false;
+      const nums = typeof pv === 'number' && typeof cv.v === 'number';
+      const ok = nums
+        ? within(pv as number, cv.v as number, CARD_TOL)
+        : typeof pv === 'string' && typeof cv.v === 'string'
+          ? fluidKey(cv.v) === pv
+          : false;
       if (ok) {
         tags[k] = cv.tag;
         continue;
       }
-      mismatches.push(
-        k +
-          ': card ' +
-          cv.src +
-          ' = ' +
+      if (!nums || !within(pv as number, cv.v as number, ROUND_TOL))
+        mismatches.push(
+          k +
+            ': card ' +
+            cv.src +
+            ' = ' +
+            String(cv.v) +
+            ' but the artifact preset has ' +
+            String(pv) +
+            '; the preset value is used',
+        );
+      // The preset's value is the artifact's setting, not the card's measurement: it must not carry the card's tag.
+      tags[k] = 'inferred_from_analog';
+      assumptions.push({
+        field: k,
+        value: pv as number | string,
+        tag: 'inferred_from_analog',
+        note:
+          'artifact example setting (the approved prototype preset ' +
+          pid +
+          '); the card says ' +
           String(cv.v) +
-          ' but the artifact preset has ' +
+          ' (' +
+          cv.src +
+          ', ' +
+          cv.tag +
+          "), the preset's " +
           String(pv) +
-          '; the preset value is used',
-      );
+          ' is used',
+      });
+      continue;
     }
     if (k === 'id' || k === 'label' || k === 'type') {
       tags[k] = 'derived';
@@ -413,6 +599,27 @@ export function cardToWorld(card: ObjectCard, overrides: EngineOverrides = {}): 
     });
   }
   preset.label = card.name;
+  if (pid === 'tit') {
+    // The preset mixed Titan's 15.95-day orbit around Saturn (P) with Saturn's 9.58 AU orbit around the Sun (a). The
+    // engine's orbit is the heliocentric one: a, the eccentricity and the obliquity set Titan's starlight and seasons
+    // (Saturn's), and "locked" means locked to the star. So P is Saturn's year (Kepler, host 1 M_sun), and the
+    // 15.95-day orbit around Saturn stays where it acts, as Titan's spin (Prot). Only the tidal-heat row reads P, and
+    // it is negligible either way.
+    preset.P = 365.25 * Math.pow(preset.a, 1.5);
+    tags.P = 'derived';
+    const i = assumptions.findIndex((x) => x.field === 'P');
+    if (i >= 0) assumptions.splice(i, 1);
+    assumptions.push({
+      field: 'P',
+      value: Number(preset.P.toFixed(0)),
+      tag: 'derived',
+      note:
+        "the orbit around the Sun (Saturn's year, P = 365.25 a^1.5 days), consistent with a = " +
+        preset.a +
+        " AU; Titan's 15.95-day orbit around Saturn is its spin",
+    });
+  }
+  setMeasuredGiant(preset, tags, pid);
   if (gen.ok && gen.preset.locked !== preset.locked)
     mismatches.push(
       'locked: the card rule gives ' +

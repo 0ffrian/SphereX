@@ -16,8 +16,7 @@ import type { FramesResponse, ResolveResponse } from '@/app/api/types';
 import { DataBadge, EstimatedBadge } from '@/app/Badge';
 import { Row, ToggleGroup } from '@/app/PanelControls';
 import { Icon } from '@/app/shell/icons';
-import { positionProvenance } from '@/app/sky/positionTags';
-import { formatCoords } from '@/app/format';
+import { positionProvenance, positionText } from '@/app/sky/positionTags';
 import { searchErrorMessage } from '@/app/messages';
 import { RefusalList } from '@/app/RefusalList';
 import { groupMissing } from '@/app/refusals';
@@ -124,7 +123,7 @@ export function Flipbook({ onClose, onBuild }: { onClose(): void; onBuild?: () =
 }
 
 function objectName(resolved: ResolveResponse): string {
-  return displayName(resolved.name) || formatCoords(resolved.ra, resolved.dec);
+  return displayName(resolved.name) || positionText(resolved);
 }
 
 /** The object's name (top left) and the close button (top right), each on a small dark tab. */
@@ -595,7 +594,7 @@ function Player({
               <dl className="fb-dl">
                 <dt>Position</dt>
                 <dd>
-                  {formatCoords(resolved.ra, resolved.dec)}
+                  {positionText(resolved)}
                   {resolved.moving && ' · moving object'}
                   {sky.fixture ? (
                     <DataBadge fixture variant="tag" />

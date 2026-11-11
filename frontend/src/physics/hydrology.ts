@@ -93,7 +93,11 @@ export function routeTerrain(t: HydroInput): Routing {
     const py = Math.sin(la) * 24;
     const pz = c * Math.sin(lo) * 24;
     h[i] = t.data[i * 2]!;
-    if (h[i]! > 0) h[i] = h[i]! + 0.12 * (fb(px, py, pz, 4) - 0.5) + 0.05 * (fb(px * 3.1, py * 3.1, pz * 3.1, 3) - 0.5);
+    if (h[i]! > 0)
+      h[i] =
+        h[i]! +
+        0.12 * (fb(px, py, pz, 4) - 0.5) +
+        0.05 * (fb(px * 3.1, py * 3.1, pz * 3.1, 3) - 0.5);
   }
   const fill = new Float32Array(N);
   const rec = new Int32Array(N);
@@ -281,13 +285,22 @@ export function hydroRaster(
       }
     }
   };
-  const seg = (ax: number, ay: number, bx0: number, by: number, rad: number, ch: number, val: number): void => {
+  const seg = (
+    ax: number,
+    ay: number,
+    bx0: number,
+    by: number,
+    rad: number,
+    ch: number,
+    val: number,
+  ): void => {
     let bx = bx0;
     if (bx - ax > RW / 2) bx -= RW;
     else if (ax - bx > RW / 2) bx += RW;
     const L = Math.hypot(bx - ax, by - ay);
     const n = Math.max(1, Math.ceil(L / Math.max(rad * 0.7, 0.5)));
-    for (let s = 0; s <= n; s++) plotDisc(ax + ((bx - ax) * s) / n, ay + ((by - ay) * s) / n, rad, ch, val);
+    for (let s = 0; s <= n; s++)
+      plotDisc(ax + ((bx - ax) * s) / n, ay + ((by - ay) * s) / n, rad, ch, val);
   };
   const sx = RW / Wd;
   const sy = RH / Hd;
@@ -330,7 +343,8 @@ export function hydroRaster(
       const cy2 = Math.floor(cc / Wd);
       const cx2 = cc - cy2 * Wd;
       inflow = Math.max(inflow, Q[cc]!);
-      petA += (clamp((T[cc]! - F.Tt) / 40, 0, 3) * P0 * 1.1 * cellA * cosLat(cy2)) / SECONDS_PER_YEAR;
+      petA +=
+        (clamp((T[cc]! - F.Tt) / 40, 0, 3) * P0 * 1.1 * cellA * cosLat(cy2)) / SECONDS_PER_YEAR;
       for (let yj = Math.max(0, cy2 - 1); yj <= Math.min(Hd - 1, cy2 + 1); yj++) {
         for (let dx2 = -1; dx2 <= 1; dx2++) {
           const n2 = yj * Wd + ((cx2 + dx2 + Wd) % Wd);
@@ -367,7 +381,15 @@ export function hydroRaster(
     const wDraw = Math.max(wReal / texKm, 0.9 + Math.log10(Q[i]! / CHANNEL_Q_M3S));
     const a = cen(i);
     const b2 = rt.h[r2]! > 0 ? cen(r2) : plain(r2);
-    seg(a[0], a[1], b2[0], b2[1], wDraw / 2, T[i]! < F.Tt - 4 ? 3 : 0, clamp(0.5 + 0.2 * Math.log10(Q[i]! / CHANNEL_Q_M3S), 0.5, 1));
+    seg(
+      a[0],
+      a[1],
+      b2[0],
+      b2[1],
+      wDraw / 2,
+      T[i]! < F.Tt - 4 ? 3 : 0,
+      clamp(0.5 + 0.2 * Math.log10(Q[i]! / CHANNEL_Q_M3S), 0.5, 1),
+    );
     nRiv++;
     if (Q[i]! > bigQ) bigQ = Q[i]!;
     if (rt.h[r2]! <= 0 && Q[i]! > PLUME_Q) mouths.push([i, r2, Q[i]!]);

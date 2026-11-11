@@ -2190,7 +2190,9 @@ body {
   margin-bottom: 12px;
 }
 .sx-acc-key b {
-  font: 600 12.5px ui-monospace, monospace;
+  font:
+    600 12.5px ui-monospace,
+    monospace;
   color: #fff;
   text-align: right;
 }
@@ -2207,7 +2209,9 @@ body {
 }
 .sx-acc-eq {
   display: block;
-  font: 12.5px/1.5 ui-monospace, monospace;
+  font:
+    12.5px/1.5 ui-monospace,
+    monospace;
   background: #1c1f21;
   border: 1px solid var(--color-sx-border);
   border-radius: 10px;
@@ -2247,7 +2251,9 @@ body {
 .sx-acc-gv {
   display: inline-block;
   min-width: 26px;
-  font: 500 10.5px ui-monospace, monospace;
+  font:
+    500 10.5px ui-monospace,
+    monospace;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-right: 4px;
@@ -2273,7 +2279,9 @@ body {
 }
 .sx-acc-tbl th {
   text-align: left;
-  font: 500 10.5px ui-monospace, monospace;
+  font:
+    500 10.5px ui-monospace,
+    monospace;
   color: var(--color-sx-dim-text);
   text-transform: uppercase;
   letter-spacing: 0.05em;

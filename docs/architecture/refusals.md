@@ -1,6 +1,6 @@
 # `missing` and refusal codes
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.12 · **Implements:** [D-25](../decisions/data-sources.md), [D-31](../decisions/data-sources.md), [D-32](../decisions/contract-tags.md), [Q-38](../decisions/contract-tags.md), [Q-111](../decisions/pipeline-jobs.md), [Q-139](../decisions/moving-objects.md), [Q-144](../decisions/moving-objects.md), [Q-21, Q-125](../decisions/moving-frames.md) · **Read with:** [endpoints.md](endpoints.md) (A4.11), [honesty-policy.md](honesty-policy.md) (A11)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.12 · **Implements:** [D-25, Q-328](../decisions/data-sources.md), [D-31](../decisions/data-sources.md), [D-32](../decisions/contract-tags.md), [Q-38](../decisions/contract-tags.md), [Q-111](../decisions/pipeline-jobs.md), [Q-139](../decisions/moving-objects.md), [Q-144](../decisions/moving-objects.md), [Q-21, Q-125](../decisions/moving-frames.md) · **Read with:** [endpoints.md](endpoints.md) (A4.11), [honesty-policy.md](honesty-policy.md) (A11)
 
 ### A4.12 `missing` and refusal codes
 
@@ -20,6 +20,7 @@ A value the backend cannot compute is never guessed: the reply leaves it out (or
 | `cutout_stretch:<frame_id>` | the display stretch could not be computed for the cutout |
 | `frames:truncated` | the SIA answer hit `SX_SIA_MAXREC` (`QUERY_STATUS=OVERFLOW`); the list is incomplete and not stored |
 | `cutouts:deferred:<n>` | `n` cutouts are not downloaded yet; ask again (progressive loading, A4.10) |
+| `reference:not_a_spherex_target` | a reference object (the Sun, Jupiter, Saturn, Titan; `resolver: reference`) is a solar-system body that is not a SPHEREx target, so the frame list is empty ([Q-258, Q-328](../decisions/data-sources.md)) |
 
 Moving objects only: the path search of A4.1 (`backend/app/core/find/moving.py`, issue #26, [Q-125](../decisions/moving-frames.md)). The codes marked "incomplete" keep the list out of the cache (it is asked for again); the others are deterministic for the settings in the cache key, so a list with only those is stored. Which of them Track treats as incomplete: A19.10 ([moving-objects/track-contract.md](moving-objects/track-contract.md#a1910-refusal-codes)).
 
@@ -31,6 +32,7 @@ Moving objects only: the path search of A4.1 (`backend/app/core/find/moving.py`,
 | `frames:cone_maxrec:<n>` | `n` cone answers hit `SX_MOVING_SIA_MAXREC`. A fixed object's own cut-off answer stays `frames:truncated` |
 | `frames:sparse_path:<n>` | at `n` cones the rate asked for a step below `SX_MOVING_MIN_STEP_H`, so the cones there are further apart than R / rate and a frame between them can be missed |
 | `frames:cone_failed:<n>` | `n` cones could not be fetched (not cached offline, or failed live). Incomplete |
+| `frames:cutout_failed:<n>` | `n` area cutout downloads failed (not cached offline, or upstream down). Incomplete, never stored or served ([Q-400](../decisions/moving-objects.md) (12)) |
 | `frames:search_deferred:<n>` | `n` Horizons or SIA calls are left to the object's job (Q-111); ask again, as for `cutouts:deferred`. Incomplete |
 | `frames:outside_window:<n>` | `n` frames found by the cones have a midpoint outside the ephemeris windows, so the object's position there is unknown |
 | `no_footprint:<frame_id>` | the frame has no usable `s_region`, so it could not be checked against the path (not the overlays' `footprint:<frame_id>`) |
@@ -88,4 +90,4 @@ The repaint status body's `missing` starts with `albedo_ai`, followed by the rea
 | Code | Spec | Status |
 |---|---|---|
 | `path:deferred`, `path:ephemeris`, `path:observer`, `path:not_cached`, `path:window` (`/path`); `extended_source:<frame_id>` (`/spectrum`); `imagery:<survey>`, `track:not_moving` (frontend) | A19.10 ([moving-objects/track-contract.md](moving-objects/track-contract.md#a1910-refusal-codes)), which says whether each marks a result incomplete; the meanings of the `/path` codes are in A19.5 ([moving-objects/track.md](moving-objects/track.md#a195-path-endpoint)) | to build (Track, Q-141, Q-144) |
-| `area:not_prepared` (a square outside the precomputed areas), `area:visits` (fewer than 2 visits), `stars:<cat>:<visit>` (a visit's star cone failed), `skybot:<visit>` (a visit's SkyBoT cone failed), `horizons:<designation>` (a candidate's Horizons call failed), `stamp:<dot_id>` (stamp cutout not cached) | [A17.8](moving-objects/area-contract.md#a178-endpoints), which owns their meanings | to build (D1, D2) |
+| `area:not_prepared` (a square outside the precomputed areas), `area:visits` (fewer than 2 visits), `stars:<cat>:<visit>` (a visit's star cone failed; `<cat>` is `gaia` or `wise`), `skybot:<visit>` (a visit's SkyBoT cone failed), `horizons:<designation>` (a candidate's Horizons call failed), `stamp:<dot_id>` (stamp cutout not cached), `cutout:<frame_id>` (a frame's cutout could not be fetched), `rate_grid:visits` (fewer than 3 visits; pairs used), `checks:not_run` (no gated check ran), `checks:d4_not_run` (no test mover or grid), `checks:d5_not_run` (no control); Q-208 | [A17.8](moving-objects/area-contract.md#a178-endpoints), which owns their meanings | to build (D1, D2) |

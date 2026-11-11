@@ -2,12 +2,29 @@
 import { describe, expect, it } from 'vitest';
 import { buildTerrain } from './terrain';
 import { FLUIDS } from './fluids';
-import { CHANNEL_Q_M3S, hydroRaster, routeTerrain, undrainedLandCells, HYDROLOGY_TAGS } from './hydrology';
+import {
+  CHANNEL_Q_M3S,
+  hydroRaster,
+  routeTerrain,
+  undrainedLandCells,
+  HYDROLOGY_TAGS,
+} from './hydrology';
 
-const terr = (seed: number, ocean = 0.5) => buildTerrain({ seed, oceanFraction: ocean, gravity: 9.8, W: 90, H: 45 });
-const asInput = (t: ReturnType<typeof terr>, seed: number) => ({ W: t.W, H: t.H, data: t.data, seed });
+const terr = (seed: number, ocean = 0.5) =>
+  buildTerrain({ seed, oceanFraction: ocean, gravity: 9.8, W: 90, H: 45 });
+const asInput = (t: ReturnType<typeof terr>, seed: number) => ({
+  W: t.W,
+  H: t.H,
+  data: t.data,
+  seed,
+});
 const world = { radiusM: 6.371e6, fluid: FLUIDS.water, lapseKPerKm: 9.8, isWater: true };
-const climate = (v: number, temp = 288) => ({ nx: 36, ny: 18, T: new Float32Array(36 * 18).fill(temp), rain: new Float32Array(36 * 18).fill(v) });
+const climate = (v: number, temp = 288) => ({
+  nx: 36,
+  ny: 18,
+  T: new Float32Array(36 * 18).fill(temp),
+  rain: new Float32Array(36 * 18).fill(v),
+});
 
 describe('routing', { timeout: 60000 }, () => {
   it('every land cell drains to the sea or to a basin outlet', () => {

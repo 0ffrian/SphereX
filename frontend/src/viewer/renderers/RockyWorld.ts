@@ -87,7 +87,9 @@ const ATMO_SCALE_HEIGHT = 0.03;
 /** World UV of a body-frame direction (row 0 = south). */
 function worldUV(dir: any) {
   const u = atan(dir.z, dir.x).div(TAU).add(0.5);
-  const v = asin(clamp(dir.y, -1, 1)).div(Math.PI).add(0.5);
+  const v = asin(clamp(dir.y, -1, 1))
+    .div(Math.PI)
+    .add(0.5);
   return { u, v };
 }
 
@@ -149,7 +151,12 @@ export interface OrbitSources {
    */
   hydrologyTexture: DataTexture | null;
   /** The raster's CPU copy and counts, for the camera and the readouts. */
-  hydrology: { img: Uint8Array; RW: number; RH: number; stats: { rivers: number; bigQ: number; lakes: number; salt: number; mouths: number } } | null;
+  hydrology: {
+    img: Uint8Array;
+    RW: number;
+    RH: number;
+    stats: { rivers: number; bigQ: number; lakes: number; salt: number; mouths: number };
+  } | null;
   /**
    * The cloud tracer (R cloud amount, G detail), a half-float render target on the world UV that
    * follows the winds. Read it through this getter: the texture changes after each step. Null
@@ -170,7 +177,12 @@ export interface OrbitSources {
   hazeColour: readonly [number, number, number];
   surfaceTempK: number;
   /** Fluid colours (linear, artistic): liquid, ice, cloud and bare land. */
-  palette: { liq: readonly number[]; ice: readonly number[]; cld: readonly number[]; land: readonly number[] };
+  palette: {
+    liq: readonly number[];
+    ice: readonly number[];
+    cld: readonly number[];
+    land: readonly number[];
+  };
 }
 
 export interface RockyBuilt {
@@ -238,7 +250,9 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
   const mtn = smoothstep(0.15, 2.2, e0);
   const ridge = (p: any) => float(1).sub(abs(vnoise3(p, octs).mul(2).sub(1)));
   let el: any = e0.add(
-    ridge(dir.mul(26).add(noiseOff)).sub(0.55).mul(float(0.2).add(mtn.mul(1.5))),
+    ridge(dir.mul(26).add(noiseOff))
+      .sub(0.55)
+      .mul(float(0.2).add(mtn.mul(1.5))),
   );
   if (!o.low) el = el.add(vnoise3(dir.mul(80).add(noiseOff), 3).sub(0.5).mul(0.1));
   const sig = T.y;
@@ -248,8 +262,13 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
   const fn = vnoise3(dir.mul(38).add(noiseOff), octs);
   const landBase = m.Ts > 700 ? ([0.15, 0.12, 0.11] as const) : F.land;
   const landLow = vnoise3(dir.mul(15).add(noiseOff), 3);
-  let ld: any = mix(rgb3(landBase), rgb3(landBase).mul(vec3(0.72, 0.7, 0.7)).add(0.06), smoothstep(0.5, 2.6, el))
-    .mul(landLow.mul(0.62).add(0.7));
+  let ld: any = mix(
+    rgb3(landBase),
+    rgb3(landBase)
+      .mul(vec3(0.72, 0.7, 0.7))
+      .add(0.06),
+    smoothstep(0.5, 2.6, el),
+  ).mul(landLow.mul(0.62).add(0.7));
   ld = mix(ld, ld.mul(1.18).add(vec3(0.03, 0.025, 0.015)), float(1).sub(smoothstep(0, 0.35, el)));
   // Frost in soft patches set by the frost budget and local temperature; ice on high cold ground.
   const fs = float(1).sub(exp(sn.negate().div(0.08)));
@@ -265,7 +284,13 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
   // salt flats in dry closed basins, ice where it is frozen. Sampled on the same world UV.
   const hyd: any = hydroTex ? texture(hydroTex, vec2(u, v)) : null;
   if (hyd) {
-    const riverC = mix(rgb3(F.liq).mul(2.6).add(vec3(0.01, 0.03, 0.04)), rgb3(F.liq), 0.35);
+    const riverC = mix(
+      rgb3(F.liq)
+        .mul(2.6)
+        .add(vec3(0.01, 0.03, 0.04)),
+      rgb3(F.liq),
+      0.35,
+    );
     ld = mix(ld, vec3(0.86, 0.84, 0.79), hyd.y.mul(0.9));
     ld = mix(ld, riverC, hyd.x.mul(float(1).sub(hyd.w)));
     ld = mix(ld, rgb3(F.ice), hyd.w.mul(hyd.x.max(hyd.y)));
@@ -279,7 +304,13 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
   );
   const ocean: any = mould.sea.greaterThanEqual(1).select(ocean0, ocean0.mul(mould.sea));
   const deep = clamp(el.negate().div(3.5), 0, 1);
-  const water = mix(rgb3(F.liq).mul(2.6).add(vec3(0.004, 0.012, 0.014)), rgb3(F.liq), smoothstep(0, 0.32, deep));
+  const water = mix(
+    rgb3(F.liq)
+      .mul(2.6)
+      .add(vec3(0.004, 0.012, 0.014)),
+    rgb3(F.liq),
+    smoothstep(0, 0.32, deep),
+  );
   const ic = float(1).sub(exp(hi.negate().div(0.55)));
   const fl = vnoise3(dir.mul(30).add(noiseOff), 5);
   const th = mix(float(0.86), float(0.14), ic);
@@ -288,7 +319,14 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
   const seabed = rgb3(landBase).mul(0.55).mul(fn.mul(0.6).add(0.7));
   let oc: any = mix(mix(seabed, water, ocean), iceC, ice.mul(ocean));
   // Sediment plume off big river mouths (hydrology B), a muddy tint in the shallow water.
-  if (hyd) oc = mix(oc, rgb3(F.land).mul(0.9).add(vec3(0.03, 0.02, 0)), hyd.z.mul(0.65).mul(float(1).sub(ice)));
+  if (hyd)
+    oc = mix(
+      oc,
+      rgb3(F.land)
+        .mul(0.9)
+        .add(vec3(0.03, 0.02, 0)),
+      hyd.z.mul(0.65).mul(float(1).sub(ice)),
+    );
   // The coast is a smoothstep of the height, never a step; a world with no basin is all land.
   const landW: any = seaOn ? smoothstep(-0.07, 0.07, el) : float(1);
   let col: any = mix(oc, ld, landW);
@@ -323,10 +361,15 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
   // Cloud shadow on the ground: the cloud that shades this point lies towards the Sun.
   const sunTan = sunLocal.sub(dir.mul(dot(sunLocal, dir)));
   const elev = max(dot(sunLocal, dir), 0.15);
-  const shaded = cloudMask(cloudAt(normalize(dir.add(sunTan.mul(float((CLOUD_SHELL - 1) * 2.2).div(elev))))));
+  const shaded = cloudMask(
+    cloudAt(normalize(dir.add(sunTan.mul(float((CLOUD_SHELL - 1) * 2.2).div(elev))))),
+  );
   col = col.mul(
     float(1).sub(
-      shaded.mul(0.42).mul(min(float(cov * 2), 1)).mul(smoothstep(-0.05, 0.25, dot(sunLocal, dir))),
+      shaded
+        .mul(0.42)
+        .mul(min(float(cov * 2), 1))
+        .mul(smoothstep(-0.05, 0.25, dot(sunLocal, dir))),
     ),
   );
 
@@ -341,7 +384,10 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
   const r2 = cross(n0, sx);
   const det = dot(sx, r1);
   const grad = sign(det).mul(r1.mul(dxh).add(r2.mul(dyh)));
-  let pv: any = grad.mul(o.relief).mul(mould.terrain).div(max(abs(det), 1e-6));
+  let pv: any = grad
+    .mul(o.relief)
+    .mul(mould.terrain)
+    .div(max(abs(det), 1e-6));
   pv = pv.mul(min(float(1), float(0.85).div(max(length(pv), 1e-5)))).mul(notPattern);
   const bumped = normalize(n0.sub(pv));
 
@@ -358,10 +404,13 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
   // Lava on a hot dayside: glowing cracks where the local temperature passes the rock's melting range.
   const crack = pow(ridge(dir.mul(7).add(noiseOff)), 3);
   const molten = smoothstep(1000, 1500, Tl);
-  const lava = rgb3(LAVA_COLOUR).mul(molten.mul(crack.mul(2.4).add(0.55))).mul(notPattern);
+  const lava = rgb3(LAVA_COLOUR)
+    .mul(molten.mul(crack.mul(2.4).add(0.55)))
+    .mul(notPattern);
 
   // Pattern mode (model_dependent only): water or ground, ice where it is colder than the fluid freezes.
-  const patternBase = o.kind === 'planet_water' && seaOn ? rgb3(PATTERN_WATER) : rgb3(PATTERN_GROUND);
+  const patternBase =
+    o.kind === 'planet_water' && seaOn ? rgb3(PATTERN_WATER) : rgb3(PATTERN_GROUND);
   const frozen = float(1).sub(smoothstep(F.Tt - 4, F.Tt + 4, T0));
   const patternCol = mix(patternBase, rgb3(PATTERN_ICE), frozen);
 
@@ -375,7 +424,13 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
   const mu = clamp(normalView.z, 0, 1);
   const fres = float(0.02).add(float(0.98).mul(pow(float(1).sub(mu), 5)));
   const sunlit = smoothstep(-0.1, 0.3, dot(normalWorld, o.sunWorld));
-  const skyRefl = rgb3(m.sky).mul(o.sunColour).mul(fres).mul(wet).mul(sunlit).mul(0.9).mul(notPattern);
+  const skyRefl = rgb3(m.sky)
+    .mul(o.sunColour)
+    .mul(fres)
+    .mul(wet)
+    .mul(sunlit)
+    .mul(0.9)
+    .mul(notPattern);
   mat.emissiveNode = lava.add(skyRefl);
   group.add(new Mesh(geo, mat));
 
@@ -458,7 +513,12 @@ export function buildRockyWorld(o: RockyOptions): RockyBuilt {
     hasOcean: world.hasOcean,
     hydrologyTexture: hydroTex,
     hydrology: world.hydrology
-      ? { img: world.hydrology.img, RW: world.hydrology.RW, RH: world.hydrology.RH, stats: world.hydrology.stats }
+      ? {
+          img: world.hydrology.img,
+          RW: world.hydrology.RW,
+          RH: world.hydrology.RH,
+          stats: world.hydrology.stats,
+        }
       : null,
     get cloudTracerTexture() {
       return tracerTex.texture;

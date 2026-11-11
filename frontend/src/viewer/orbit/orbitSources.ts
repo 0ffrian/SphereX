@@ -43,11 +43,41 @@ export interface FluidLook {
  * `palette` in `orbitSources` that one is used instead.
  */
 export const FLUID_LOOK: Readonly<Record<string, FluidLook>> = {
-  water: { liq: [0.012, 0.05, 0.13], ice: [0.82, 0.88, 0.96], cld: [1, 1, 1], land: [0.34, 0.27, 0.2], aw: [0.34, 0.056, 0.012] },
-  methane: { liq: [0.03, 0.022, 0.014], ice: [0.72, 0.68, 0.58], cld: [0.95, 0.9, 0.76], land: [0.3, 0.18, 0.09], aw: [0.08, 0.02, 0.01] },
-  ammonia: { liq: [0.06, 0.09, 0.13], ice: [0.9, 0.9, 0.84], cld: [1, 0.96, 0.84], land: [0.33, 0.29, 0.25], aw: [0.1, 0.1, 0.1] },
-  nitrogen: { liq: [0.05, 0.06, 0.09], ice: [0.88, 0.82, 0.74], cld: [0.9, 0.9, 0.93], land: [0.36, 0.3, 0.26], aw: [0.1, 0.1, 0.1] },
-  co2: { liq: [0.08, 0.09, 0.12], ice: [0.9, 0.9, 0.93], cld: [0.98, 0.98, 0.94], land: [0.42, 0.28, 0.18], aw: [0.1, 0.1, 0.1] },
+  water: {
+    liq: [0.012, 0.05, 0.13],
+    ice: [0.82, 0.88, 0.96],
+    cld: [1, 1, 1],
+    land: [0.34, 0.27, 0.2],
+    aw: [0.34, 0.056, 0.012],
+  },
+  methane: {
+    liq: [0.03, 0.022, 0.014],
+    ice: [0.72, 0.68, 0.58],
+    cld: [0.95, 0.9, 0.76],
+    land: [0.3, 0.18, 0.09],
+    aw: [0.08, 0.02, 0.01],
+  },
+  ammonia: {
+    liq: [0.06, 0.09, 0.13],
+    ice: [0.9, 0.9, 0.84],
+    cld: [1, 0.96, 0.84],
+    land: [0.33, 0.29, 0.25],
+    aw: [0.1, 0.1, 0.1],
+  },
+  nitrogen: {
+    liq: [0.05, 0.06, 0.09],
+    ice: [0.88, 0.82, 0.74],
+    cld: [0.9, 0.9, 0.93],
+    land: [0.36, 0.3, 0.26],
+    aw: [0.1, 0.1, 0.1],
+  },
+  co2: {
+    liq: [0.08, 0.09, 0.12],
+    ice: [0.9, 0.9, 0.93],
+    cld: [0.98, 0.98, 0.94],
+    land: [0.42, 0.28, 0.18],
+    aw: [0.1, 0.1, 0.1],
+  },
 };
 
 /** Default haze colour (prototype: orange-brown haze; the runaway-greenhouse white is the renderer's to send). */
@@ -139,14 +169,16 @@ export const ORBIT_LAYERS: readonly OrbitLayer[] = [
     id: 'orbit.ocean',
     label: 'Ocean and sunglint',
     tag: 'model_dependent',
-    assumption: 'Sea level comes from the plate model; water is shown only where the fluid is liquid at the modelled temperature.',
+    assumption:
+      'Sea level comes from the plate model; water is shown only where the fluid is liquid at the modelled temperature.',
     note: 'Sea level and sea ice come from the planet model; the glint is how light would reflect.',
   },
   {
     id: 'orbit.snow',
     label: 'Snow and frost',
     tag: 'model_dependent',
-    assumption: 'Temperature from the climate model, cooled with height by 0.66 times the dry lapse rate.',
+    assumption:
+      'Temperature from the climate model, cooled with height by 0.66 times the dry lapse rate.',
     note: 'Snow where the model is cold, more of it higher up.',
   },
   {
@@ -160,7 +192,8 @@ export const ORBIT_LAYERS: readonly OrbitLayer[] = [
     id: 'orbit.atmosphere',
     label: 'Air, haze and sky',
     tag: 'derived',
-    formula: 'single scattering through an exponential atmosphere, scale height H = R T / (mu g), air mass capped at sqrt(pi R / 2 H)',
+    formula:
+      'single scattering through an exponential atmosphere, scale height H = R T / (mu g), air mass capped at sqrt(pi R / 2 H)',
     note: 'The thickness of the air follows the model scale height and pressure.',
   },
   {
@@ -247,7 +280,12 @@ export interface GasOrbitInput {
 }
 
 export function isGasInput(x: unknown): x is GasOrbitInput {
-  return typeof x === 'object' && x !== null && ('velocity' in x || 'bands' in x || 'tracer' in x) && !('terrainTexture' in x);
+  return (
+    typeof x === 'object' &&
+    x !== null &&
+    ('velocity' in x || 'bands' in x || 'tracer' in x) &&
+    !('terrainTexture' in x)
+  );
 }
 
 export function isRockyInput(x: unknown): x is RockyOrbitInput {
@@ -264,7 +302,15 @@ function rgbOrNull(c: unknown): Rgb | null {
 function statuses(missing: ReadonlySet<string>, kind: OrbitKind): OrbitLayerStatus[] {
   const ids =
     kind === 'rocky'
-      ? ['orbit.height', 'orbit.detail', 'orbit.ocean', 'orbit.snow', 'orbit.hydrology', 'orbit.atmosphere', 'orbit.clouds']
+      ? [
+          'orbit.height',
+          'orbit.detail',
+          'orbit.ocean',
+          'orbit.snow',
+          'orbit.hydrology',
+          'orbit.atmosphere',
+          'orbit.clouds',
+        ]
       : ['orbit.gas', 'orbit.eddies', 'orbit.atmosphere'];
   return ids.map((id) => ({ ...LAYER_BY_ID.get(id)!, drawn: !missing.has(id) }));
 }
@@ -298,7 +344,8 @@ const EMPTY: OrbitSources = {
 export function rockyOrbitSources(input: RockyOrbitInput | null | undefined): OrbitResolved {
   const missing = new Set<string>();
   if (!input) return refuse('rocky', 'This object has no surface to fly over yet.');
-  if (!positive(input.radiusKm)) return refuse('rocky', 'The planet radius is not known, so the surface view cannot be sized.');
+  if (!positive(input.radiusKm))
+    return refuse('rocky', 'The planet radius is not known, so the surface view cannot be sized.');
   if (!input.terrainTexture || !input.terrain) {
     return refuse('rocky', 'The height map is not available, so the surface view cannot be drawn.');
   }
@@ -306,11 +353,18 @@ export function rockyOrbitSources(input: RockyOrbitInput | null | undefined): Or
   const baseLook = FLUID_LOOK[fluidId] ?? null;
   const look: FluidLook | null = baseLook
     ? ({ ...baseLook, ...(input.palette ?? {}) } as FluidLook)
-    : input.palette && input.palette.liq && input.palette.ice && input.palette.cld && input.palette.land
+    : input.palette &&
+        input.palette.liq &&
+        input.palette.ice &&
+        input.palette.cld &&
+        input.palette.land
       ? ({ aw: [0.1, 0.1, 0.1], ...input.palette } as FluidLook)
       : null;
   if (!look) {
-    return refuse('rocky', 'The colours of the ground are not known, so the surface view cannot be drawn.');
+    return refuse(
+      'rocky',
+      'The colours of the ground are not known, so the surface view cannot be drawn.',
+    );
   }
   const climate = input.climateTexture ?? null;
   if (!climate || !positive(input.lapseKPerKm) || !input.fluid) missing.add('orbit.snow');
@@ -320,7 +374,9 @@ export function rockyOrbitSources(input: RockyOrbitInput | null | undefined): Or
   const scaleHeight = positive(input.scaleHeightKm) ? input.scaleHeightKm : null;
   const pressure = positive(input.pressureBar) ? input.pressureBar : null;
   if (scaleHeight === null || pressure === null) missing.add('orbit.atmosphere');
-  const cloudBase: (() => Texture | null) | null = input.cloudTracerTexture ? () => input.cloudTracerTexture ?? null : null;
+  const cloudBase: (() => Texture | null) | null = input.cloudTracerTexture
+    ? () => input.cloudTracerTexture ?? null
+    : null;
   const cover = finite(input.cloudCover) ? input.cloudCover : null;
   if (cover === null || (!cloudBase && !climate)) missing.add('orbit.clouds');
   const t = input.terrain;
@@ -356,14 +412,27 @@ export function gasOrbitSources(
 ): OrbitResolved {
   const missing = new Set<string>();
   if (!input) return refuse('gas', 'This object has no cloud deck to fly over yet.');
-  if (!positive(input.radiusKm)) return refuse('gas', 'The planet radius is not known, so the surface view cannot be sized.');
-  if (input.ready === false) return refuse('gas', 'The planet is still forming. The surface view opens when it has settled.');
+  if (!positive(input.radiusKm))
+    return refuse('gas', 'The planet radius is not known, so the surface view cannot be sized.');
+  if (input.ready === false)
+    return refuse(
+      'gas',
+      'The planet is still forming. The surface view opens when it has settled.',
+    );
   if (!input.bands || !input.palette || input.tracer === undefined) {
-    return refuse('gas', 'The flow of the clouds is not available, so the surface view cannot be drawn.');
+    return refuse(
+      'gas',
+      'The flow of the clouds is not available, so the surface view cannot be drawn.',
+    );
   }
-  const asTex = (t: GasOrbitInput['tracer']): Texture | null => (typeof t === 'function' ? t() : (t ?? null));
+  const asTex = (t: GasOrbitInput['tracer']): Texture | null =>
+    typeof t === 'function' ? t() : (t ?? null);
   const tracerFn: () => Texture | null =
-    typeof input.tracer === 'function' ? input.tracer : live ? () => asTex(live()?.tracer) : () => asTex(input.tracer);
+    typeof input.tracer === 'function'
+      ? input.tracer
+      : live
+        ? () => asTex(live()?.tracer)
+        : () => asTex(input.tracer);
   if (!input.velocity) missing.add('orbit.eddies');
   const scaleHeight = positive(input.scaleHeightKm) ? input.scaleHeightKm : null;
   if (scaleHeight === null) missing.add('orbit.atmosphere');

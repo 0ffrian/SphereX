@@ -1,7 +1,8 @@
 // Issue #71 F (Q-262): the comet "emissions" view, left panel. Shows the SPHEREx spectrum (when one
 // has been measured), the gas bands with their production rates at the chosen time, and the time
 // control between the two observed epochs. The nucleus and its gas particles are drawn by the
-// viewer on the right. A rate inside an observing window is `measured`; between them it is a
+// viewer on the right. A rate inside an observing window is `measured` (SPHEREx, or SOHO/SWAN for
+// 3I/ATLAS water near perihelion, cometGas.RATE_ANCHORS_BY_CARD); between them it is a
 // `model_dependent` guess and says so. Nothing here is invented: a gas with no rate is listed as such.
 import { useId } from 'react';
 import type { ObjectCard } from '@/contract';
@@ -11,6 +12,7 @@ import {
   GAS_BANDS,
   daysFromPerihelion,
   gasRatesAt,
+  RATE_ANCHORS_BY_CARD,
   timeRange,
   weakestRateTag,
 } from '@/physics/cometGas';
@@ -57,7 +59,15 @@ export function EmissionsPanel({
   const interpolated = rates.some((r) => r.kind === 'interpolated');
   const days = Math.round(daysFromPerihelion(jd));
   const when = `${jdToDate(jd)}, ${Math.abs(days)} days ${days < 0 ? 'before' : 'after'} closest approach to the Sun`;
-  const state = interpolated ? 'between the two observations, a guess' : 'measured by SPHEREx';
+  const instruments = [
+    ...new Set(rates.filter((r) => r.kind === 'measured').map((r) => r.instrument ?? 'SPHEREx')),
+  ];
+  const measuredBy = `measured by ${instruments.length ? instruments.join(' and ') : 'SPHEREx'}`;
+  const state = interpolated
+    ? instruments.length
+      ? `partly ${measuredBy}, partly a guess between observations`
+      : 'between observations, a guess'
+    : measuredBy;
   const points = spectrum?.spectrum ?? [];
   return (
     <section
@@ -151,14 +161,21 @@ export function EmissionsPanel({
       </table>
       <div className="flex flex-col gap-1" data-testid="emissions-formula">
         <h4 className="text-sm font-medium">From a SPHEREx gas band to a production rate</h4>
-        <FormulaMath latex={COMET_FORMULA_LATEX} plain={COMET_FORMULA_PLAIN} testId="emissions-formula-math" />
+        <FormulaMath
+          latex={COMET_FORMULA_LATEX}
+          plain={COMET_FORMULA_PLAIN}
+          testId="emissions-formula-math"
+        />
         <p className="text-xs text-neutral-300">{COMET_FORMULA_NOTE}</p>
       </div>
       {interpolated && (
         <p className="text-xs text-neutral-300" data-testid="emissions-guess">
-          Nothing was observed between August and December 2025. The amounts here are a straight
-          line (in the logarithm) between the two measurements. Weakest label shown:{' '}
-          {weakestRateTag(rates)}.
+          SPHEREx observed in August and December 2025 only
+          {RATE_ANCHORS_BY_CARD[card.id]?.length
+            ? '; for water, SOHO/SWAN adds one measurement near closest approach to the Sun (6 Nov 2025)'
+            : ''}
+          . Between measurements the amounts here are a straight line (in the logarithm) between the
+          nearest ones. Weakest label shown: {weakestRateTag(rates)}.
         </p>
       )}
     </section>

@@ -5,6 +5,11 @@
 // Do not edit by hand: change the script or the prototype and run it again. Only TypeScript wrapping
 // (this header, the shim below and the exports at the end) differs from the prototype; the DOM
 // and UI code (`pills`, `rockUi`, the event handlers) is not copied.
+// PATCHES (issue #71 review; the script applies them after slicing, mirroring backend params.py):
+//   crater depth 0.42 -> 0.33 r (rim-to-floor 0.198 D, Pike d/D 0.196); rmax 0.38 -> the reachable
+//   0.014 / sqrt(0.015) = 0.114; a rubble pile's lump is slope-limited (35 deg repose, 3 sigma of
+//   the shape layer's rms slope 0.7837 per unit lump) instead of strength-limited. The d^-5 ejecta
+//   falloff is artistic (McGetchin et al. 1973 measure about r^-3).
 //   1268-1268  clamp          (shared helper)
 //   1273-1273  rng            (shared helper)
 //   1292-1297  compile, unis  (shared helpers)
@@ -48,6 +53,7 @@ function radialFn(ax, comet) { return function (x, y, z) { var r = 1 / Math.sqrt
 function rockModel() {
   var p = R.p, smooth = R.mode === 'smooth', rad = p.D * 500, G = 6.674e-11, gv = 4 / 3 * Math.PI * G * p.rho * rad, Y = 1e6, ratio = Y / (p.rho * gv * rad), lump = clamp(ratio, 0.03, 0.3) * (smooth ? 0.3 : 1);
   var limit = Math.sqrt(3 * Math.PI / (G * p.rho)) / 3600, fast = p.P < limit, kind = p.comet ? 'Icy, weak and porous' : fast || p.D < 0.15 ? 'Solid rock' : p.D < 40 ? 'Rubble and shattered rock' : 'Fractured rock under regolith';
+  if (!p.comet && !fast && p.D >= 0.15 && p.D < 40) lump = clamp(Math.tan(35 * Math.PI / 180) / (3 * 0.7837077), 0.03, 0.3) * (smooth ? 0.3 : 1);
   var cov = smooth ? 0.012 : 0.05 + 0.27 * R.age / 100, bld = smooth ? 0 : p.comet ? 0.5 : fast || p.D < 0.15 ? 0.45 : p.D < 40 ? 1 : 0.25;
   var ax0 = [Math.pow(p.ab, 2 / 3), Math.pow(p.ab, -1 / 3), Math.pow(p.ab, -1 / 3) * (p.comet ? 0.9 : 0.86)], k = Math.pow(ax0[0] * ax0[1] * ax0[2], -1 / 3), ax = ax0.map(function (v) { return v * k; });
   return { rad: rad, gv: gv, ratio: ratio, lump: lump, limit: limit, fast: fast, kind: kind, cov: cov, bld: bld, ax: ax, escape: Math.sqrt(2 * gv * rad) };
@@ -61,11 +67,11 @@ function buildRock(m) {
     for (n = 0; n < 26; n++) { var wv = W2[n]; h += wv[5] * Math.sin(wv[3] * (x * wv[0] + y * wv[1] + z2 * wv[2]) + wv[4]); }
     var ix = j * TW + i; base[ix] = h * norm; px[ix * 3] = x * rr; px[ix * 3 + 1] = y * rr; px[ix * 3 + 2] = z2 * rr; if (rr > ext) ext = rr;
   } }
-  var rmin = 0.014, rmax = 0.38, area = 0, target = m.cov * 4, count = 0;
+  var rmin = 0.014, rmax = 0.014 / Math.sqrt(0.015), area = 0, target = m.cov * 4, count = 0;
   var cr = []; while (area < target && count < 1500) { var rc = Math.min(rmax, rmin * Math.pow(1 - r() * 0.985, -0.5)); cr.push(rc); area += rc * rc; count++; }
   cr.sort(function (a, b) { return b - a; });
   cr.forEach(function (rc) {
-    var z = r() * 2 - 1, an = r() * 6.2832, c2 = Math.sqrt(1 - z * z), dx = c2 * Math.cos(an), dy = z, dz = c2 * Math.sin(an), rs = rf(dx, dy, dz), cx = dx * rs, cy = dy * rs, cz = dz * rs, deg = 0.35 + 0.65 * r(), depth = 0.42 * rc * deg, reach = 2.4 * rc;
+    var z = r() * 2 - 1, an = r() * 6.2832, c2 = Math.sqrt(1 - z * z), dx = c2 * Math.cos(an), dy = z, dz = c2 * Math.sin(an), rs = rf(dx, dy, dz), cx = dx * rs, cy = dy * rs, cz = dz * rs, deg = 0.35 + 0.65 * r(), depth = 0.33 * rc * deg, reach = 2.4 * rc;
     var la0 = Math.asin(dy), lo0 = Math.atan2(dz, dx), th = Math.min(Math.PI, reach / rs * 1.08), j0 = Math.max(0, Math.floor(((la0 - th) / Math.PI + 0.5) * TH)), j1 = Math.min(TH - 1, Math.ceil(((la0 + th) / Math.PI + 0.5) * TH));
     var dLo = Math.abs(la0) + th >= 1.5 ? Math.PI : Math.min(Math.PI, Math.asin(Math.min(1, Math.sin(th) / Math.cos(la0))) * 1.1);
     for (var jj = j0; jj <= j1; jj++) {

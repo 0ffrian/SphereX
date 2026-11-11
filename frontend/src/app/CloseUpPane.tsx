@@ -15,7 +15,9 @@ import { ORBIT_NOTE } from '@/viewer/orbit/orbitSources';
 import { altRange } from '@/viewer/orbit/orbitMath';
 import { ProvenanceBadge } from './Badge';
 import { buttonClass, pressedClass } from './ui';
-import { StarCloseUp } from './StarCloseUp';
+// Explicit extension: `starCloseUp.ts` (the hook) differs only by case, and a
+// case-insensitive file system (Windows) would resolve `./StarCloseUp` to it.
+import { StarCloseUp } from './StarCloseUp.tsx';
 import { RockCloseUp } from './RockCloseUp';
 import { StarFlareStage } from './StarEngineStage';
 import { STAR_CLOSEUP_TAG, useStarCloseUp } from './starCloseUp';
@@ -55,9 +57,16 @@ export function closeUpButtonLabel(kind: CloseUpKind | null): string {
 }
 
 /** The mock-up's caption for each kind (its `.cu-tag` wording: "Close-up · what · honesty"). */
-export function closeUpCaption(kind: CloseUpKind, info: CloseUpInfo | null, gas: boolean, starOk = false): string {
-  if (kind === 'star') return starOk ? STAR_CLOSEUP_TAG : 'Close-up · not available for this star (no surface model)';
-  if (kind === 'body') return 'Close-up · the same body seen from near its surface · generated (Default)';
+export function closeUpCaption(
+  kind: CloseUpKind,
+  info: CloseUpInfo | null,
+  gas: boolean,
+  starOk = false,
+): string {
+  if (kind === 'star')
+    return starOk ? STAR_CLOSEUP_TAG : 'Close-up · not available for this star (no surface model)';
+  if (kind === 'body')
+    return 'Close-up · the same body seen from near its surface · generated (Default)';
   if (info?.refusal) return `Close-up · ${info.refusal}`;
   return gas
     ? 'Close-up · from orbit, click the globe to look at a place · generated from the solved winds (Default), not a photograph'
@@ -81,12 +90,21 @@ export function CloseUpPane() {
   const cardId = useAppStore((s) => s.card?.id);
   const kind = closeUpKindOf(type);
   // Issue #71 stream X (D-37): a star the prototype's engine draws opens with the build, with the flare close-up.
-  const engine = kind === 'star' && engineStar && starFailedId !== engineKey(cardId, engineStar.preset.id) ? engineStar : null;
+  const engine =
+    kind === 'star' && engineStar && starFailedId !== engineKey(cardId, engineStar.preset.id)
+      ? engineStar
+      : null;
   // Issue #71 stream Y (D-37): a planet the prototype's world engine draws opens with the build, with its fly view.
-  const world = kind === 'orbit' && engineWorld && worldFailedId !== engineKey(cardId, engineWorld.preset.id) ? engineWorld : null;
+  const world =
+    kind === 'orbit' && engineWorld && worldFailedId !== engineKey(cardId, engineWorld.preset.id)
+      ? engineWorld
+      : null;
   // Issue #71 (D-37): an asteroid or comet the rock engine draws opens with the build; its picture is the engine's, not the viewer's.
   const rockEngine = useRockStore((s) => s.view) !== null && kind === 'body';
-  const open = !hidden && kind !== null && (engine || world || rockEngine ? !held : info !== null && info.mode !== null);
+  const open =
+    !hidden &&
+    kind !== null &&
+    (engine || world || rockEngine ? !held : info !== null && info.mode !== null);
   const [, bump] = useReducer((n: number) => n + 1, 0);
   const [about, setAbout] = useState(false);
   const focusRef = useRef<HTMLDivElement>(null);
@@ -104,7 +122,10 @@ export function CloseUpPane() {
     const c = canvasRef.current;
     if (!viewer || !c || world) return;
     viewer.setCloseUpCanvas(c);
-    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => viewer.requestCloseRender());
+    const ro =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => viewer.requestCloseRender());
     ro?.observe(c);
     return () => {
       ro?.disconnect();
@@ -239,7 +260,8 @@ export function CloseUpPane() {
       {SHOW_FLY_BAR && view && !world && (
         <div className="sx-cu-controls" role="group" aria-label="Surface view controls">
           <label htmlFor="orbit-alt" className="flex-1 basis-40">
-            {gas ? 'Height above the clouds' : 'Height above the ground'}: <span data-testid="orbit-alt-label">{formatKm(alt)}</span>
+            {gas ? 'Height above the clouds' : 'Height above the ground'}:{' '}
+            <span data-testid="orbit-alt-label">{formatKm(alt)}</span>
             <input
               id="orbit-alt"
               type="range"
@@ -270,7 +292,12 @@ export function CloseUpPane() {
           >
             Fly forward
           </button>
-          <button type="button" className={buttonClass} aria-expanded={about} onClick={() => setAbout((a) => !a)}>
+          <button
+            type="button"
+            className={buttonClass}
+            aria-expanded={about}
+            onClick={() => setAbout((a) => !a)}
+          >
             What is drawn
           </button>
         </div>

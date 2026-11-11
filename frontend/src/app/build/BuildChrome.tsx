@@ -36,9 +36,15 @@ export function ZoomBar() {
     setRatio(vc.ratio());
   };
   // A control the drawing view cannot do is disabled and says why in its name.
-  const named = (label: string, off: string | null) => (off ? `${label}. Not available: ${off}` : label);
+  const named = (label: string, off: string | null) =>
+    off ? `${label}. Not available: ${off}` : label;
   return (
-    <div className="sx-fl sx-zoom" role="group" aria-label="Zoom the 3D view" data-testid="build-zoom">
+    <div
+      className="sx-fl sx-zoom"
+      role="group"
+      aria-label="Zoom the 3D view"
+      data-testid="build-zoom"
+    >
       <button
         type="button"
         className="sx-btn-i"
@@ -52,7 +58,11 @@ export function ZoomBar() {
       <button
         type="button"
         className="sx-zval"
-        aria-label={vc.resetOff ? named('Reset the zoom', vc.resetOff) : `Reset the zoom. Now ${zoomPercent(ratio)}`}
+        aria-label={
+          vc.resetOff
+            ? named('Reset the zoom', vc.resetOff)
+            : `Reset the zoom. Now ${zoomPercent(ratio)}`
+        }
         title={vc.resetOff ?? 'Reset zoom'}
         disabled={vc.resetOff !== null}
         onClick={() => {

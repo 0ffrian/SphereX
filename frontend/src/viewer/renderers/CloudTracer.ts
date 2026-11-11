@@ -104,7 +104,11 @@ export class CloudTracer {
   constructor(o: TracerOptions) {
     const [w, h] = o.low ? TRACER_SIZE.low : TRACER_SIZE.full;
     const mk = (): RenderTarget => {
-      const rt = new RenderTarget(w, h, { type: HalfFloatType, format: RGBAFormat, depthBuffer: false });
+      const rt = new RenderTarget(w, h, {
+        type: HalfFloatType,
+        format: RGBAFormat,
+        depthBuffer: false,
+      });
       rt.texture.minFilter = LinearFilter;
       rt.texture.magFilter = LinearFilter;
       rt.texture.wrapS = RepeatWrapping;
@@ -134,7 +138,14 @@ export class CloudTracer {
       const uWind = float(u0)
         .mul(cos(la.mul(N)))
         .mul(smoothstep(1.55, 1.15, la.abs()))
-        .add(la.mul(la).negate().div(0.16).exp().mul(superRot * u0 * 2.4));
+        .add(
+          la
+            .mul(la)
+            .negate()
+            .div(0.16)
+            .exp()
+            .mul(superRot * u0 * 2.4),
+        );
       // A small seeded curl-noise kick keeps the flow from being purely zonal (the prototype's kick).
       const e = 0.03;
       const p0 = dirOf(lo, la).mul(7).add(noiseSeed).add(slowTime(1));
@@ -148,15 +159,33 @@ export class CloudTracer {
     const mid = vel(lat.sub(v1.y.mul(0.5)), lon.sub(v1.x.mul(0.5)));
     const bx = lon.sub(mid.x);
     const by = lat.sub(mid.y);
-    const s = this.prev.sample(vec2(bx.div(TAU).add(0.5), clamp(by.div(Math.PI).add(0.5), 0.002, 0.998)));
+    const s = this.prev.sample(
+      vec2(bx.div(TAU).add(0.5), clamp(by.div(Math.PI).add(0.5), 0.002, 0.998)),
+    );
     const d = dirOf(lon, lat);
     const slow = this.stepU.mul(0.0012);
-    const det = vnoise3(d.mul(vec3(9, 28, 9)).add(noiseSeed).add(vec3(slow.mul(2), slow.mul(2), slow.mul(2))), 4);
+    const det = vnoise3(
+      d
+        .mul(vec3(9, 28, 9))
+        .add(noiseSeed)
+        .add(vec3(slow.mul(2), slow.mul(2), slow.mul(2))),
+      4,
+    );
     const rh = bilinear(o.climate, pos.x, pos.y).w;
     const tr = clamp(
       smoothstep(0.55, 1.05, rh)
         .mul(0.85)
-        .add(vnoise3(d.mul(4.5).add(noiseSeed).add(vec3(slow.mul(3), slow.mul(3), slow.mul(3))), 4).sub(0.5).mul(1.3)),
+        .add(
+          vnoise3(
+            d
+              .mul(4.5)
+              .add(noiseSeed)
+              .add(vec3(slow.mul(3), slow.mul(3), slow.mul(3))),
+            4,
+          )
+            .sub(0.5)
+            .mul(1.3),
+        ),
       0,
       1,
     );

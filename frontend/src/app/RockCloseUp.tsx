@@ -16,7 +16,10 @@ export function RockCloseUp({ active }: { active: boolean }) {
     const c = document.createElement('canvas');
     c.tabIndex = 0;
     c.setAttribute('role', 'application');
-    c.setAttribute('aria-label', 'The same body in the close-up pane. Drag or use the arrow keys to turn it.');
+    c.setAttribute(
+      'aria-label',
+      'The same body in the close-up pane. Drag or use the arrow keys to turn it.',
+    );
     c.className = 'block w-full touch-none';
     c.style.aspectRatio = '8 / 5';
     c.style.maxHeight = '100%';

@@ -86,7 +86,7 @@ import {
   gasLayerTags,
   gasModel,
   gasProfile,
-  ringAt,
+  ringRegionAt,
   secondsPerStep,
   ringTexture,
   spinAngle,
@@ -102,15 +102,16 @@ import { R_JUP_M } from '@/physics/constants';
 import { gasPacing, gasWorldInput } from './gasWorldInput';
 import { ESTIMATED_TAGS } from './bodyRenderer';
 import type { BodyRenderer, BodyContext, BodyStatus } from './bodyRenderer';
-import {
-  FieldSampler,
-  type FieldData,
-  type Storm,
-  type Vec3,
-} from '../fields/fieldGenerator';
+import { FieldSampler, type FieldData, type Storm, type Vec3 } from '../fields/fieldGenerator';
 import { fbm } from '../fields/noise';
 import { startGasSolver, type GasFrame, type GasSolver } from '../fields/gasClient';
-import { GAS_LAYER_IDS, resolveShaderSpec, shaderDistance, type GasSwitches, type ShaderSpec } from './shaderSpec';
+import {
+  GAS_LAYER_IDS,
+  resolveShaderSpec,
+  shaderDistance,
+  type GasSwitches,
+  type ShaderSpec,
+} from './shaderSpec';
 import { resolveMotion, type Motion, type SimTimeFn } from '../motion/motion';
 import type { Overrides } from '../sliders';
 import type { TierName } from '../render/quality';
@@ -120,18 +121,33 @@ import type { PointSet } from './pointClouds';
 
 // ---- what the card gives -----------------------------------------------------------------------
 
-const REFERENCE: Record<ReferenceGasId, { tilt: number; roll: number; light: Vec3; palette: Palette }> = {
+const REFERENCE: Record<
+  ReferenceGasId,
+  { tilt: number; roll: number; light: Vec3; palette: Palette }
+> = {
   jup: {
     tilt: 0.054,
     roll: 0,
     light: [-0.2, 0.12, 0.97],
-    palette: { z: [0.93, 0.89, 0.76], b: [0.56, 0.29, 0.12], s: [0.78, 0.3, 0.13], d: [0.3, 0.2, 0.15], p: [0.45, 0.5, 0.53] },
+    palette: {
+      z: [0.93, 0.89, 0.76],
+      b: [0.56, 0.29, 0.12],
+      s: [0.78, 0.3, 0.13],
+      d: [0.3, 0.2, 0.15],
+      p: [0.45, 0.5, 0.53],
+    },
   },
   sat: {
     tilt: -0.36,
     roll: -0.55,
     light: [-0.42, 0.34, 0.84],
-    palette: { z: [0.93, 0.8, 0.5], b: [0.72, 0.54, 0.27], s: [0.9, 0.86, 0.72], d: [0.5, 0.4, 0.25], p: [0.62, 0.56, 0.42] },
+    palette: {
+      z: [0.93, 0.8, 0.5],
+      b: [0.72, 0.54, 0.27],
+      s: [0.9, 0.86, 0.72],
+      d: [0.5, 0.4, 0.25],
+      p: [0.62, 0.56, 0.42],
+    },
   },
 };
 /** View pose and palette are display values (`artistic`): the prototype's. */
@@ -147,12 +163,48 @@ interface Palette {
 
 /** Colour families by regime (prototype `worldModel`; artistic display values). */
 const REGIME_PALETTE: Record<GasRegime, Palette> = {
-  'Methane-rich air, blue': { z: [0.5, 0.64, 0.84], b: [0.3, 0.44, 0.68], s: [0.94, 0.96, 0.98], d: [0.24, 0.32, 0.47], p: [0.5, 0.58, 0.7] },
-  'Ammonia clouds': { z: [0.9, 0.85, 0.75], b: [0.62, 0.45, 0.3], s: [0.84, 0.38, 0.13], d: [0.3, 0.22, 0.18], p: [0.42, 0.44, 0.48] },
-  'Water clouds': { z: [0.93, 0.93, 0.95], b: [0.66, 0.72, 0.83], s: [0.98, 0.98, 1], d: [0.45, 0.5, 0.6], p: [0.7, 0.74, 0.8] },
-  'Cloudless, deep blue': { z: [0.33, 0.52, 0.88], b: [0.18, 0.33, 0.7], s: [0.55, 0.72, 0.96], d: [0.08, 0.14, 0.34], p: [0.2, 0.3, 0.55] },
-  'Silicate haze, dark blue': { z: [0.2, 0.34, 0.72], b: [0.08, 0.15, 0.42], s: [0.78, 0.86, 1], d: [0.04, 0.08, 0.22], p: [0.12, 0.18, 0.36] },
-  'Silicate clouds, glowing': { z: [0.92, 0.72, 0.55], b: [0.56, 0.28, 0.16], s: [1, 0.86, 0.66], d: [0.3, 0.14, 0.08], p: [0.45, 0.3, 0.22] },
+  'Methane-rich air, blue': {
+    z: [0.5, 0.64, 0.84],
+    b: [0.3, 0.44, 0.68],
+    s: [0.94, 0.96, 0.98],
+    d: [0.24, 0.32, 0.47],
+    p: [0.5, 0.58, 0.7],
+  },
+  'Ammonia clouds': {
+    z: [0.9, 0.85, 0.75],
+    b: [0.62, 0.45, 0.3],
+    s: [0.84, 0.38, 0.13],
+    d: [0.3, 0.22, 0.18],
+    p: [0.42, 0.44, 0.48],
+  },
+  'Water clouds': {
+    z: [0.93, 0.93, 0.95],
+    b: [0.66, 0.72, 0.83],
+    s: [0.98, 0.98, 1],
+    d: [0.45, 0.5, 0.6],
+    p: [0.7, 0.74, 0.8],
+  },
+  'Cloudless, deep blue': {
+    z: [0.33, 0.52, 0.88],
+    b: [0.18, 0.33, 0.7],
+    s: [0.55, 0.72, 0.96],
+    d: [0.08, 0.14, 0.34],
+    p: [0.2, 0.3, 0.55],
+  },
+  'Silicate haze, dark blue': {
+    z: [0.2, 0.34, 0.72],
+    b: [0.08, 0.15, 0.42],
+    s: [0.78, 0.86, 1],
+    d: [0.04, 0.08, 0.22],
+    p: [0.12, 0.18, 0.36],
+  },
+  'Silicate clouds, glowing': {
+    z: [0.92, 0.72, 0.55],
+    b: [0.56, 0.28, 0.16],
+    s: [1, 0.86, 0.66],
+    d: [0.3, 0.14, 0.08],
+    p: [0.45, 0.3, 0.22],
+  },
 };
 
 // ---- sizes and constants -----------------------------------------------------------------------
@@ -161,7 +213,11 @@ const REGIME_PALETTE: Record<GasRegime, Palette> = {
 export const GROUP_STEPS = 4;
 /** At most this many groups a frame catches up; further behind, the clock simply jumps ahead. */
 const MAX_BACKLOG_GROUPS = 24;
-const TRACER_SIZE: Record<TierName, [number, number]> = { high: [1536, 768], medium: [1536, 768], low: [768, 384] };
+const TRACER_SIZE: Record<TierName, [number, number]> = {
+  high: [1536, 768],
+  medium: [1536, 768],
+  low: [768, 384],
+};
 const NOISE_W = 512;
 const NOISE_H = 256;
 const TAU = Math.PI * 2;
@@ -177,7 +233,10 @@ function buildGlowTexture(): DataTexture {
   const n = 128;
   const src = new Float32Array(n * 4);
   for (let i = 0; i < n; i++) {
-    const t = Math.exp(Math.log(GLOW_LUT_MIN_K) + (i / (n - 1)) * (Math.log(GLOW_LUT_MAX_K) - Math.log(GLOW_LUT_MIN_K)));
+    const t = Math.exp(
+      Math.log(GLOW_LUT_MIN_K) +
+        (i / (n - 1)) * (Math.log(GLOW_LUT_MAX_K) - Math.log(GLOW_LUT_MIN_K)),
+    );
     const c = teffToRgbMax1(t) ?? [1, 0.3, 0.1];
     src.set([c[0], c[1], c[2], 1], i * 4);
   }
@@ -246,7 +305,13 @@ function noiseTexture(seed: number): DataTexture {
     const b1 = (j / NOISE_H) * TAU;
     for (let i = 0; i < NOISE_W; i++) {
       const a1 = (i / NOISE_W) * TAU;
-      const v = fbm(Math.cos(a1) * 6 + Math.cos(b1) * 3, Math.sin(a1) * 6, Math.sin(b1) * 18, 4, seed);
+      const v = fbm(
+        Math.cos(a1) * 6 + Math.cos(b1) * 3,
+        Math.sin(a1) * 6,
+        Math.sin(b1) * 18,
+        4,
+        seed,
+      );
       const k = (j * NOISE_W + i) * 4;
       data[k] = Math.round(Math.min(1, Math.max(0, v)) * 255);
       data[k + 3] = 255;
@@ -283,7 +348,12 @@ function catmullRom(taps: TapSet, uvIn: any, res: any): any {
     .add(taps.tap(t12).mul(w12.x.mul(w12.y)))
     .add(taps.tap(vec2(t3.x, t12.y)).mul(w3.x.mul(w12.y)))
     .add(taps.tap(vec2(t12.x, t3.y)).mul(w12.x.mul(w3.y)));
-  const wsum = w12.x.mul(w0.y).add(w0.x.mul(w12.y)).add(w12.x.mul(w12.y)).add(w3.x.mul(w12.y)).add(w12.x.mul(w3.y));
+  const wsum = w12.x
+    .mul(w0.y)
+    .add(w0.x.mul(w12.y))
+    .add(w12.x.mul(w12.y))
+    .add(w3.x.mul(w12.y))
+    .add(w12.x.mul(w3.y));
   return c.div(wsum);
 }
 
@@ -306,7 +376,13 @@ export interface GasOrbitSources {
   scaleHeightKm: number;
   seed: number;
   /** Linear-light-ready sRGB colours: zone, belt, storm, dark, polar. */
-  palette: Readonly<{ z: readonly number[]; b: readonly number[]; s: readonly number[]; d: readonly number[]; p: readonly number[] }>;
+  palette: Readonly<{
+    z: readonly number[];
+    b: readonly number[];
+    s: readonly number[];
+    d: readonly number[];
+    p: readonly number[];
+  }>;
   /** The planet has settled and the tracer works. */
   ready: boolean;
 }
@@ -376,6 +452,8 @@ export class GasWorld implements BodyRenderer {
   private readonly uColour = uniform(1);
   private readonly uStorms = uniform(1);
   private readonly uRings = uniform(1);
+  /** Polar over equatorial radius of the drawn planet, 1 - flattening (1 with the flattening layer off). */
+  private readonly uSquash = uniform(1);
   private readonly uLight = uniform(new Vector3(0, 0, 1)); // body frame
   private readonly uLightTilt = uniform(new Vector3(0, 0, 1)); // ring frame
   private readonly uStarColour = uniform(new Vector3(1, 1, 1));
@@ -410,7 +488,11 @@ export class GasWorld implements BodyRenderer {
     const t0 = makeTracerTarget(...TRACER_SIZE[this.tier]);
     this.prevTaps = new TapSet(t0.texture);
     this.displayTaps = new TapSet(t0.texture);
-    this.tracer = { rt: [t0, makeTracerTarget(...TRACER_SIZE[this.tier])], cur: 0, size: TRACER_SIZE[this.tier] };
+    this.tracer = {
+      rt: [t0, makeTracerTarget(...TRACER_SIZE[this.tier])],
+      cur: 0,
+      size: TRACER_SIZE[this.tier],
+    };
     this.ringTex = input.reference === 'sat' ? this.buildRingTexture() : null;
     this.glowTex = this.model.tDayK > GLOW_ABOVE_K ? buildGlowTexture() : null;
 
@@ -521,7 +603,8 @@ export class GasWorld implements BodyRenderer {
     const sw = this.switches();
     const tagOf = new Map(gasLayerTags(this.input.reference).map((l) => [l.id, l.tag] as const));
     const shownTags = new Set<Tag>();
-    for (const id of GAS_LAYER_IDS) if (sw[id]) shownTags.add(this.spec.gasLayers?.[id] ?? 'artistic');
+    for (const id of GAS_LAYER_IDS)
+      if (sw[id]) shownTags.add(this.spec.gasLayers?.[id] ?? 'artistic');
     for (const t of tagOf.values()) if (this.visibleTags.includes(t)) shownTags.add(t);
     return {
       state: 'drawn',
@@ -742,14 +825,16 @@ export class GasWorld implements BodyRenderer {
   private pump(elapsed: number): void {
     const solver = this.solver;
     if (!solver || this.pumping || this.disposed) return;
-    const target = GAS_SETTLE_STEPS + Math.floor(stepsFor(this.model, elapsed) / GROUP_STEPS) * GROUP_STEPS;
+    const target =
+      GAS_SETTLE_STEPS + Math.floor(stepsFor(this.model, elapsed) / GROUP_STEPS) * GROUP_STEPS;
     if (target <= this.stepsDone) return;
     this.pumping = true;
     let behind = (target - this.stepsDone) / GROUP_STEPS;
     if (behind > MAX_BACKLOG_GROUPS) {
       // Far behind (a slow frame, a hidden tab): drop the excess by moving the time origin, so a
       // later pause really stops the world instead of paying the backlog off.
-      this.t0 = (this.t0 ?? 0) + (behind - MAX_BACKLOG_GROUPS) * GROUP_STEPS * secondsPerStep(this.model);
+      this.t0 =
+        (this.t0 ?? 0) + (behind - MAX_BACKLOG_GROUPS) * GROUP_STEPS * secondsPerStep(this.model);
       behind = MAX_BACKLOG_GROUPS;
     }
     const groups = Math.min(behind, MAX_BACKLOG_GROUPS);
@@ -779,14 +864,22 @@ export class GasWorld implements BodyRenderer {
     const uvN = uv();
     const vel = (e: any) => texture(this.velTex, e);
     const v = vel(uvN);
-    const m = vec2(uvN.x.sub(v.x.div(TAU).mul(this.uDt).mul(0.5)), clamp(uvN.y.sub(v.y.div(Math.PI).mul(this.uDt).mul(0.5)), 0.001, 0.999));
+    const m = vec2(
+      uvN.x.sub(v.x.div(TAU).mul(this.uDt).mul(0.5)),
+      clamp(uvN.y.sub(v.y.div(Math.PI).mul(this.uDt).mul(0.5)), 0.001, 0.999),
+    );
     const v2 = vel(m).toVar();
-    const b = vec2(uvN.x.sub(v2.x.div(TAU).mul(this.uDt)), clamp(uvN.y.sub(v2.y.div(Math.PI).mul(this.uDt)), 0.002, 0.998));
+    const b = vec2(
+      uvN.x.sub(v2.x.div(TAU).mul(this.uDt)),
+      clamp(uvN.y.sub(v2.y.div(Math.PI).mul(this.uDt)), 0.002, 0.998),
+    );
     const bd = texture(this.bandTex, vec2(0.5, uvN.y));
     const nz = texture(this.noiseTex, uvN.mul(vec2(4, 3))).r;
     const rm = clamp(v2.a.sub(2), 0, 1).mul(this.uStormsOn);
     const mask = select(v2.a.greaterThan(1.5), float(0), clamp(v2.a, -1, 1)).mul(this.uStormsOn);
-    const tr = clamp(bd.r.sub(v2.z.mul(0.08)), 0, 1).add(max(mask, 0).mul(0.42)).sub(max(mask.negate(), 0).mul(0.3));
+    const tr = clamp(bd.r.sub(v2.z.mul(0.08)), 0, 1)
+      .add(max(mask, 0).mul(0.42))
+      .sub(max(mask.negate(), 0).mul(0.3));
     const tg = mix(mix(bd.g, 0.05, max(mask, 0).mul(0.95)), 0.95, max(mask.negate(), 0).mul(0.8));
     const first = vec4(tr, tg, nz, clamp(v.a.sub(2), 0, 1).mul(this.uStormsOn));
     const s: any = clamp(catmullRom(this.prevTaps, b, res), 0, 1.2);
@@ -807,7 +900,11 @@ export class GasWorld implements BodyRenderer {
   private ensureTracer(): Tracer {
     if (this.tracer) return this.tracer;
     const [w, h] = TRACER_SIZE[this.tier];
-    const t: Tracer = { rt: [makeTracerTarget(w, h), makeTracerTarget(w, h)], cur: 0, size: [w, h] };
+    const t: Tracer = {
+      rt: [makeTracerTarget(w, h), makeTracerTarget(w, h)],
+      cur: 0,
+      size: [w, h],
+    };
     this.tracer = t;
     this.prevTaps.set(t.rt[0].texture);
     this.displayTaps.set(t.rt[0].texture);
@@ -847,7 +944,8 @@ export class GasWorld implements BodyRenderer {
       this.tracerFailed = true;
       this.uTracerOn.value = 0;
       try {
-        if (this.rendererState) RendererUtils.restoreRendererState(renderer, this.rendererState as any);
+        if (this.rendererState)
+          RendererUtils.restoreRendererState(renderer, this.rendererState as any);
       } catch {
         /* nothing more to restore */
       }
@@ -881,10 +979,13 @@ export class GasWorld implements BodyRenderer {
     this.uStorms.value = sw.storms ? 1 : 0;
     this.uStormsOn.value = sw.storms ? 1 : 0;
     this.spinMesh.scale.y = sw.flattening ? 1 - this.model.flattening : 1;
-    this.spinMesh.visible = this.phase === 'ready' && this.spec.drawable && GAS_LAYER_IDS.some((id) => sw[id]);
+    this.uSquash.value = this.spinMesh.scale.y;
+    this.spinMesh.visible =
+      this.phase === 'ready' && this.spec.drawable && GAS_LAYER_IDS.some((id) => sw[id]);
     if (this.ringMesh) this.ringMesh.visible = this.spinMesh.visible;
     // Storms live inside the tracer colours, so switching them re-seeds the tracer from the field.
-    if (was !== this.uStormsOn.value && this.tracer && this.lastField) this.initTracer(this.lastField);
+    if (was !== this.uStormsOn.value && this.tracer && this.lastField)
+      this.initTracer(this.lastField);
   }
 
   private syncLight(): void {
@@ -905,17 +1006,29 @@ export class GasWorld implements BodyRenderer {
     const [tw, th] = TRACER_SIZE[this.tier];
     const b = normalize(positionLocal);
     const u = atan(b.z, b.x).div(TAU).add(0.5);
-    const v = asin(clamp(b.y, -1, 1)).div(Math.PI).add(0.5);
+    const v = asin(clamp(b.y, -1, 1))
+      .div(Math.PI)
+      .add(0.5);
     const uvB = vec2(u, v);
     const tap = (e: any) => this.displayTaps.tap(e);
     const bd = texture(this.bandTex, vec2(0.5, v));
     const seed = this.input.seed % 997;
     const nz = (p: any, oct: number) => mx_fractal_noise_float(p, oct, 2.0, 0.5).mul(0.5);
     const w1 = nz(b.mul(vec3(5, 16, 5)).add(seed), 4);
-    const mott = nz(b.mul(vec3(14, 46, 14)).add(vec3(w1.mul(3))).add(seed), 5);
+    const mott = nz(
+      b
+        .mul(vec3(14, 46, 14))
+        .add(vec3(w1.mul(3)))
+        .add(seed),
+      5,
+    );
     const uvWarp = vec2(u, v.add(w1.mul(float(0.01).add(bd.b.mul(0.02))).mul(this.uTurb)));
     const t = tap(uvWarp);
-    const streak = t.b.sub(0.5).mul(float(0.08).add(bd.b.mul(0.55))).add(mott.mul(float(0.12).add(bd.b.mul(0.8)))).mul(this.uTurb);
+    const streak = t.b
+      .sub(0.5)
+      .mul(float(0.08).add(bd.b.mul(0.55)))
+      .add(mott.mul(float(0.12).add(bd.b.mul(0.8))))
+      .mul(this.uTurb);
     // Without the tracer (a failed pass, or before the first) the bands come straight from the table.
     const trR = mix(bd.r, t.r, this.uTracerOn);
     const trG = mix(bd.g, t.g, this.uTracerOn);
@@ -951,16 +1064,31 @@ export class GasWorld implements BodyRenderer {
     if (this.glowTex) {
       // A hot giant glows by its own heat, strongest on the night side where the sky is dark. The
       // day-night temperature follows the light smoothly (no step at the terminator).
-      const Tg = mix(float(this.model.tNightK), float(this.model.tDayK), smoothstep(-0.2, 0.25, ns));
-      const lutU = log(clamp(Tg, GLOW_LUT_MIN_K, GLOW_LUT_MAX_K)).sub(Math.log(GLOW_LUT_MIN_K)).div(Math.log(GLOW_LUT_MAX_K) - Math.log(GLOW_LUT_MIN_K));
+      const Tg = mix(
+        float(this.model.tNightK),
+        float(this.model.tDayK),
+        smoothstep(-0.2, 0.25, ns),
+      );
+      const lutU = log(clamp(Tg, GLOW_LUT_MIN_K, GLOW_LUT_MAX_K))
+        .sub(Math.log(GLOW_LUT_MIN_K))
+        .div(Math.log(GLOW_LUT_MAX_K) - Math.log(GLOW_LUT_MIN_K));
       const lutC = (texture as any)(this.glowTex, vec2(lutU, 0.5)).rgb;
       const nt = smoothstep(0.25, -0.2, ns);
-      col = col.add(lutC.mul(pow(Tg.div(1900), 6)).mul(smoothstep(GLOW_ABOVE_K, GLOW_ABOVE_K + 50, Tg)).mul(mix(float(0.35), float(1), nt)));
+      col = col.add(
+        lutC
+          .mul(pow(Tg.div(1900), 6))
+          .mul(smoothstep(GLOW_ABOVE_K, GLOW_ABOVE_K + 50, Tg))
+          .mul(mix(float(0.35), float(1), nt)),
+      );
     }
     if (this.input.reference === 'sat') {
-      // Rings cast a shadow on the planet: follow the light from this point to the ring plane (y = 0).
+      // Rings cast a shadow on the planet: follow the light from this point to the ring plane (y = 0). The
+      // point is on the flattened planet, so its height is b.y times the polar squash.
       const ly = this.uLight.y;
-      const t2 = b.y.negate().div(select(abs(ly).lessThan(0.001), float(0.001), ly));
+      const t2 = b.y
+        .mul(this.uSquash)
+        .negate()
+        .div(select(abs(ly).lessThan(0.001), float(0.001), ly));
       const hit = vec3(b.x.add(this.uLight.x.mul(t2)), 0, b.z.add(this.uLight.z.mul(t2)));
       const rh = length(hit.xz);
       const inRing = step(0.0, t2).mul(step(RING_TEX_INNER, rh)).mul(step(rh, RING_TEX_OUTER));
@@ -972,11 +1100,20 @@ export class GasWorld implements BodyRenderer {
 
   /** Ring lookup: (radius in planet radii) -> RG (opacity, brightness). */
   private ringTexNode(r: any): any {
-    return (texture as any)(this.ringTex!, vec2(r.sub(RING_TEX_INNER).div(RING_TEX_OUTER - RING_TEX_INNER), 0.5));
+    return (texture as any)(
+      this.ringTex!,
+      vec2(r.sub(RING_TEX_INNER).div(RING_TEX_OUTER - RING_TEX_INNER), 0.5),
+    );
   }
 
   private buildRingTexture(): DataTexture {
-    const t = new DataTexture(new Uint16Array(RING_TEX_SIZE * 4), RING_TEX_SIZE, 1, RGBAFormat, HalfFloatType);
+    const t = new DataTexture(
+      new Uint16Array(RING_TEX_SIZE * 4),
+      RING_TEX_SIZE,
+      1,
+      RGBAFormat,
+      HalfFloatType,
+    );
     t.minFilter = LinearFilter;
     t.magFilter = LinearFilter;
     t.wrapS = ClampToEdgeWrapping;
@@ -993,7 +1130,9 @@ export class GasWorld implements BodyRenderer {
     const rho = sqrt(x.mul(x).add(y.mul(y)));
     const rt = this.ringTexNode(rho);
     const P3 = vec3(x, 0, y.negate());
-    const L = this.uLightTilt;
+    // The planet's shadow on the rings: a cylinder along the light around the flattened planet. Stretching y by
+    // 1 / squash makes the planet a unit sphere; the ring point (y = 0) is unchanged, the light direction is not.
+    const L = normalize(this.uLightTilt.mul(vec3(1, float(1).div(this.uSquash), 1)));
     const bL = dot(P3, L);
     const pp = P3.sub(L.mul(bL));
     const d = length(pp);
@@ -1034,7 +1173,8 @@ export class GasWorld implements BodyRenderer {
     }
     return {
       value: at,
-      index: (lat) => idx[Math.min(511, Math.max(0, Math.round(((lat + Math.PI / 2) / Math.PI) * 511)))]!,
+      index: (lat) =>
+        idx[Math.min(511, Math.max(0, Math.round(((lat + Math.PI / 2) / Math.PI) * 511)))]!,
     };
   }
 
@@ -1071,19 +1211,28 @@ export class GasWorld implements BodyRenderer {
     }
     const data: FieldData = { width: W, height: H, a, b };
     const sampler = new FieldSampler(data);
-    const ring = this.input.reference === 'sat' ? { classify: (r: number) => classifyRing(r) } : null;
+    const ring =
+      this.input.reference === 'sat' ? { classify: (r: number) => classifyRing(r) } : null;
     sampler.flow = {
-      wind: (d: Vec3) => this.profile.u(Math.asin(Math.max(-1, Math.min(1, d[1] / (Math.hypot(d[0], d[1], d[2]) || 1))))),
+      wind: (d: Vec3) =>
+        this.profile.u(
+          Math.asin(Math.max(-1, Math.min(1, d[1] / (Math.hypot(d[0], d[1], d[2]) || 1)))),
+        ),
       ring,
     };
     return sampler;
   }
 }
 
-/** Haptic classification of a ring radius (in planet radii): a ring, a gap, or nothing. */
+/**
+ * Haptic classification of a ring radius (in planet radii): a ring, a gap, or nothing. Every ring of the table is
+ * felt as a ring, however faint (the C and D rings too); the named gaps (Encke Gap, Cassini Division) and the empty
+ * spaces between rings inside the drawn span are gaps.
+ */
 export function classifyRing(r: number): 'none' | 'ring' | 'gap' {
   if (!(r >= RING_TEX_INNER && r <= RING_TEX_OUTER)) return 'none';
-  return ringAt(r).opacity < 0.15 ? 'gap' : 'ring';
+  const id = ringRegionAt(r);
+  return id === null || id === 'Encke' || id === 'Cassini' ? 'gap' : 'ring';
 }
 
 export { SATURN_RADIUS_KM, R_JUP_M, gasWorldInput };

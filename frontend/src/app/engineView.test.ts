@@ -10,7 +10,12 @@ const base = { viewer: null, engineWorld: null, engineStar: null, rockView: null
 
 describe('resolveViewControls', () => {
   it('drives the three.js viewer when no engine draws', () => {
-    const viewer = { zoom: vi.fn(), rotate: vi.fn(), resetView: vi.fn(), zoomRatio: () => 1.5 } as unknown as ViewerApp;
+    const viewer = {
+      zoom: vi.fn(),
+      rotate: vi.fn(),
+      resetView: vi.fn(),
+      zoomRatio: () => 1.5,
+    } as unknown as ViewerApp;
     const vc = resolveViewControls({ ...base, viewer });
     expect(vc.zoomOff).toBeNull();
     vc.zoom('in');
@@ -28,7 +33,11 @@ describe('resolveViewControls', () => {
 
   it('a world the engine draws zooms and turns through the world store', () => {
     const state = { zoom: 2, yaw: 0, pitch: 0 };
-    const globe = { state: () => state, setOverrides: vi.fn(), draw: vi.fn() } as unknown as WorldEngine;
+    const globe = {
+      state: () => state,
+      setOverrides: vi.fn(),
+      draw: vi.fn(),
+    } as unknown as WorldEngine;
     const apply = vi.fn();
     useWorldStore.setState({ globe, apply });
     const vc = resolveViewControls({ ...base, engineWorld: {} });
