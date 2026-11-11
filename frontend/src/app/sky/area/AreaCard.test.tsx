@@ -57,7 +57,7 @@ describe('Area card', () => {
     expect(m.q('area-use-middle')).not.toBeNull();
     expect(m.q('area-keep-last')).toBeNull();
     expect(document.activeElement).toBe(m.q('area-card-title'));
-    expect(m.host.querySelector('[aria-live]')).toBeNull();
+    expect(m.host.querySelector('[aria-live], [role="status"], [role="alert"]')).toBeNull();
   });
 
   it('lists the prepared areas with Fly there when the square is not prepared', async () => {

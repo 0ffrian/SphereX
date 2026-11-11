@@ -43,6 +43,8 @@ import { AreaBadges } from './AreaBadges';
 import { middleSquare } from './drawSquare';
 import { HonestySwitch } from './HonestySwitch';
 import { VisitControls } from './VisitControls';
+import { tracksShown } from './scene';
+import { effectiveHonesty } from '@/viewer/honesty';
 import type { SkySquare } from './geometry';
 
 /** Search a square from a card button; a snap ends drawing (A18.1). */
@@ -197,6 +199,7 @@ function Drawing({ area }: { area: AreaState }) {
 
 function OpenArea({ area }: { area: AreaState }) {
   const drawing = useShellStore((s) => s.pointerMode === 'draw');
+  const measured = useAppStore((s) => effectiveHonesty(s.honesty) === 'measured');
   const store = useAppStore.getState;
   if (area.summary.status === 'loading') {
     return (
@@ -250,7 +253,8 @@ function OpenArea({ area }: { area: AreaState }) {
       )}
       <HonestySwitch />
       <VisitControls />
-      {area.selectedResult && (
+      {/* A selection is a track: it shows only while tracks do (Measured only hides them). */}
+      {area.selectedResult && tracksShown(area.step, area.layers.tracks, measured) && (
         <p className="mt-2 text-sx-fg" data-testid="area-selected">
           {areaSelectedText(area.selectedResult)}
         </p>

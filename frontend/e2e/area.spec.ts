@@ -139,6 +139,8 @@ test.describe('Area search', () => {
     await expect(page.getByTestId('area-refusal')).toHaveText('Drag a bigger square');
     await drag(page, from, { x: from.x + 80, y: from.y + 80 });
     await expect(page.getByTestId('area-not-prepared')).toBeVisible();
+    // The marker did not open its object or its card (review finding 9).
+    await expect(page.getByTestId('selected-card')).toHaveCount(0);
     await expect(page.getByTestId('area-card')).toBeVisible();
     // Fly there.
     await page.locator('[data-testid="area-fly-there"][data-area-id="fixture:area-main"]').click();
@@ -187,6 +189,31 @@ test.describe('Area search', () => {
     await page.goto('/#area=nope');
     await expect(page.getByTestId('link-problem')).toHaveText(/Link area “nope” is not prepared/);
   });
+});
+
+test('a short sky: the Area card scrolls, and Draw again stays reachable', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 650 });
+  await page.goto('/#area=fixture%3Aarea-main');
+  await skyReady(page);
+  await expect(page.getByTestId('area-card-title')).toHaveText('Area · 1.00° × 0.60°');
+  await expect(page.getByTestId('area-badges')).toBeVisible();
+  const button = page.getByTestId('area-draw-again');
+  await button.scrollIntoViewIfNeeded();
+  await expect(button).toBeInViewport();
+  // The card ends above the bottom bars (the --sx-in-b inset) and the sky credit, so nothing of it
+  // is hidden under them.
+  const card = (await page.getByTestId('area-card').boundingBox())!;
+  const credit = (await page.getByTestId('sky-credit-box').boundingBox())!;
+  const bottomInset = await page.getByTestId('sky-pane').evaluate((el) => {
+    // This file is type-checked without the DOM lib.
+    const g = globalThis as unknown as {
+      getComputedStyle(e: unknown): { getPropertyValue(n: string): string };
+    };
+    return parseFloat(g.getComputedStyle(el).getPropertyValue('--sx-in-b')) || 0;
+  });
+  expect(card.y + card.height).toBeLessThanOrEqual(650 - bottomInset - credit.height + 1);
+  await button.click();
+  await expect(page.getByTestId('sky-pane')).toHaveAttribute('data-pointer-mode', 'draw');
 });
 
 test.describe('Area search under reduced motion', () => {

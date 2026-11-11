@@ -4,9 +4,9 @@ import { useShellStore, type ShellState } from '@/app/shell/shellStore';
 import { useAppStore } from '@/state/store';
 
 /**
- * Kill switch (owner decision, Atish, 11 Nov 2026; Q-205 stays open with Moon): Area search is
- * shown at the event with precomputed results. False hides the rail button, ignores `area=` in
- * links and draws no Area layer.
+ * Kill switch (Q-205, closed by Moon on 11 Nov 2026): Area search is shown at the event with
+ * precomputed results. False hides the rail button, ignores `area=` in links and mounts no Area
+ * card or layer. It is a compile-time constant: switching it off needs a rebuild.
  */
 export const AREA_TOOL_ENABLED = true;
 

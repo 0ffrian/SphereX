@@ -47,11 +47,31 @@ export const AREA_MAX_DPR = 1.5;
 
 const SCRATCH: ScreenPoint = { x: 0, y: 0, inFront: false };
 
+/** The square that covers an area's box (keyboard edits start from it). */
+function boxSquare(e: {
+  ra: number;
+  dec: number;
+  width_deg: number;
+  height_deg: number;
+}): SkySquare {
+  return { ra: e.ra, dec: e.dec, sideDeg: Math.max(e.width_deg, e.height_deg) };
+}
+
 /** The square shown for keyboard edits when only an area box is open (a link, Fly there). */
 function squareOf(area: AreaState): SkySquare | null {
   if (area.square) return area.square;
   const e = openAreaEntry(area);
-  return e ? { ra: e.ra, dec: e.dec, sideDeg: Math.max(e.width_deg, e.height_deg) } : null;
+  return e ? boxSquare(e) : null;
+}
+
+/**
+ * The square the keys act on (review finding 3): while an area is open and the square has not
+ * been edited since, the area's own box, never a square left from an earlier drag.
+ */
+function keySquare(area: AreaState, edited: boolean): SkySquare | null {
+  const e = openAreaEntry(area);
+  if (e && !edited) return boxSquare(e);
+  return squareOf(area);
 }
 
 function altText(area: AreaState, honesty: HonestyState | null): string {
@@ -109,7 +129,14 @@ export function AreaLayer() {
   const draft = useRef<{ start: SkyDrawPoint; cur: SkyDrawPoint } | null>(null);
   /** The square was moved with the keys since the last search: the outline shows it. */
   const edited = useRef(false);
-  const [editedShown, setEditedShown] = useState(false);
+  const areaId = useAppStore((s) => s.area.areaId);
+  /** The area the square was edited for (false: not edited); a new area shows its box again. */
+  const [editedFor, setEditedFor] = useState<string | null | false>(false);
+  const editedShown = editedFor !== false && editedFor === areaId;
+  // A new area (a snap, a link, Fly there) shows its box: earlier key edits no longer apply.
+  useEffect(() => {
+    edited.current = false;
+  }, [areaId]);
   const camRef = useRef<{ cam: SkyCamera; w: number; h: number } | null>(null);
   const scheduleRef = useRef<() => void>(() => undefined);
   const statsRef = useRef<AreaDrawStats>(emptyStats());
@@ -344,7 +371,7 @@ export function AreaLayer() {
             return;
           }
           edited.current = false;
-          setEditedShown(false);
+          setEditedFor(false);
           void searchSquareFromCard(sq);
         },
         cancel: () => {
@@ -382,12 +409,12 @@ export function AreaLayer() {
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.altKey || e.ctrlKey || e.metaKey) return;
     const store = useAppStore.getState();
-    const sq = squareOf(store.area);
+    const sq = keySquare(store.area, edited.current);
     if (!sq) return;
     if (e.key === 'Enter') {
       e.preventDefault();
       edited.current = false;
-      setEditedShown(false);
+      setEditedFor(false);
       void searchSquareFromCard(sq);
       return;
     }
@@ -397,7 +424,7 @@ export function AreaLayer() {
     const c = camRef.current;
     const minDeg = c ? (MIN_SQUARE_PX * c.cam.fovDeg) / Math.max(1, c.h) : 0;
     edited.current = true;
-    setEditedShown(true);
+    setEditedFor(store.area.areaId);
     store.areaSetSquare(nudgeSquare(sq, e.key, e.shiftKey, minDeg));
   };
 
@@ -422,7 +449,7 @@ export function AreaLayer() {
           role="group"
           tabIndex={0}
           aria-label={groupLabel}
-          aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowUp Shift+ArrowDown Enter"
+          aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight Enter"
           className="sx-area-square pointer-events-none absolute top-0 left-0"
           style={{ visibility: 'hidden' }}
           onKeyDown={onKeyDown}
