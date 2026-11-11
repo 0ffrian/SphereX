@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react';
 import { Icon } from '@/app/shell/icons';
 import { RailIcon } from '@/app/shell/railIcons';
 import { openTool } from '@/app/shell/ToolRail';
-import { useCloseUpStore } from '@/app/closeUpStore';
+import { useViewControls } from '@/app/engineView';
 import { closeBuildPane } from './focus';
 import type { PopId } from '@/app/ViewerPanel';
 
@@ -23,28 +23,29 @@ export function zoomPercent(ratio: number): string {
 }
 
 export function ZoomBar() {
-  const viewer = useCloseUpStore((s) => s.viewer);
+  const vc = useViewControls();
   const [ratio, setRatio] = useState(1);
   // The view also zooms with the wheel and a pinch, so the value is read, not counted.
   useEffect(() => {
-    if (!viewer) return;
-    const read = () => setRatio(viewer.zoomRatio());
+    const read = () => setRatio(vc.ratio());
     read();
     const id = window.setInterval(read, 250);
     return () => window.clearInterval(id);
-  }, [viewer]);
+  }, [vc]);
   const step = (dir: 'in' | 'out') => {
-    viewer?.zoom(dir);
-    setRatio(viewer?.zoomRatio() ?? 1);
+    vc.zoom(dir);
+    setRatio(vc.ratio());
   };
+  // A control the drawing view cannot do is disabled and says why in its name.
+  const named = (label: string, off: string | null) => (off ? `${label}. Not available: ${off}` : label);
   return (
     <div className="sx-fl sx-zoom" role="group" aria-label="Zoom the 3D view" data-testid="build-zoom">
       <button
         type="button"
         className="sx-btn-i"
-        aria-label="Zoom out"
-        title="Zoom out"
-        disabled={!viewer}
+        aria-label={named('Zoom out', vc.zoomOff)}
+        title={vc.zoomOff ?? 'Zoom out'}
+        disabled={vc.zoomOff !== null}
         onClick={() => step('out')}
       >
         <Icon name="zoomOut" className="size-4" />
@@ -52,12 +53,12 @@ export function ZoomBar() {
       <button
         type="button"
         className="sx-zval"
-        aria-label={`Reset the zoom. Now ${zoomPercent(ratio)}`}
-        title="Reset zoom"
-        disabled={!viewer}
+        aria-label={vc.resetOff ? named('Reset the zoom', vc.resetOff) : `Reset the zoom. Now ${zoomPercent(ratio)}`}
+        title={vc.resetOff ?? 'Reset zoom'}
+        disabled={vc.resetOff !== null}
         onClick={() => {
-          viewer?.resetView();
-          setRatio(viewer?.zoomRatio() ?? 1);
+          vc.reset();
+          setRatio(vc.ratio());
         }}
         data-testid="build-zoom-value"
       >
@@ -66,9 +67,9 @@ export function ZoomBar() {
       <button
         type="button"
         className="sx-btn-i"
-        aria-label="Zoom in"
-        title="Zoom in"
-        disabled={!viewer}
+        aria-label={named('Zoom in', vc.zoomOff)}
+        title={vc.zoomOff ?? 'Zoom in'}
+        disabled={vc.zoomOff !== null}
         onClick={() => step('in')}
       >
         <Icon name="zoomIn" className="size-4" />
