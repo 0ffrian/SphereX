@@ -21,6 +21,8 @@ import { BUILD_POP_ID, ViewerPanel, type PopId } from '@/app/ViewerPanel';
 import { CloseUpPane, closeUpButtonLabel, closeUpKindOf } from '@/app/CloseUpPane';
 import { useCloseUpStore } from '@/app/closeUpStore';
 import { StatusLine } from '@/app/StatusLine';
+import { StatePill } from '@/app/island/StatePill';
+import { GENERATING_LOOK } from '@/app/island/loaderLooks';
 import { BuildDock, ZoomBar } from './BuildChrome';
 import { Icon, type IconName } from '@/app/shell/icons';
 import { isEditableTarget } from '@/app/shell/shortcuts';
@@ -324,7 +326,11 @@ export function BuildPane() {
             </button>
           </div>
         </header>
-        {message ? (
+        {bodyHere?.status === 'loading' ? (
+          <div className="sx-bp-msg" data-testid="build-generating">
+            <StatePill look={GENERATING_LOOK} word="Generating" />
+          </div>
+        ) : message ? (
           <div className="sx-bp-msg" role="status" data-testid="build-message">
             <p>{message}</p>
             {bodyHere?.status === 'none' && bodyHere.transient && selection && (

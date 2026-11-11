@@ -26,6 +26,8 @@ export function ToggleGroup<T extends string>({
   onChange,
   testId,
   hideLabel = false,
+  tabs = false,
+  panelIds,
 }: {
   label: string;
   options: readonly ToggleOption<T>[];
@@ -34,6 +36,9 @@ export function ToggleGroup<T extends string>({
   testId?: string;
   /** Keep the name for screen readers but do not draw the eyebrow. */
   hideLabel?: boolean;
+  /** A tab bar: role tablist, one Tab stop, arrow keys move the choice. `panelIds` names each tab's panel. */
+  tabs?: boolean;
+  panelIds?: Readonly<Partial<Record<T, string>>>;
 }) {
   const labelId = useId();
   const trackRef = useRef<HTMLDivElement>(null);
@@ -69,7 +74,7 @@ export function ToggleGroup<T extends string>({
       s.raf = done ? 0 : requestAnimationFrame(step);
     };
     const sync = (jump: boolean) => {
-      const on = track.querySelector<HTMLElement>('[aria-pressed="true"]');
+      const on = track.querySelector<HTMLElement>('[aria-pressed="true"],[aria-selected="true"]');
       if (!on) {
         setReady(false);
         return;
@@ -102,13 +107,47 @@ export function ToggleGroup<T extends string>({
       <span id={labelId} className={hideLabel ? 'sr-only' : 'sx-eyebrow'}>
         {label}
       </span>
-      <div ref={trackRef} role="group" aria-labelledby={labelId} className="sx-seg" data-testid={testId}>
+      <div
+        ref={trackRef}
+        role={tabs ? 'tablist' : 'group'}
+        aria-labelledby={labelId}
+        className="sx-seg"
+        data-testid={testId}
+        onKeyDown={
+          tabs
+            ? (e) => {
+                const enabled = options.filter((o) => !o.disabled);
+                const i = enabled.findIndex((o) => o.value === value);
+                let next = -1;
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % enabled.length;
+                else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp')
+                  next = (i - 1 + enabled.length) % enabled.length;
+                else if (e.key === 'Home') next = 0;
+                else if (e.key === 'End') next = enabled.length - 1;
+                const o = enabled[next];
+                if (!o) return;
+                e.preventDefault();
+                onChange(o.value);
+                requestAnimationFrame(() =>
+                  trackRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus(),
+                );
+              }
+            : undefined
+        }
+      >
         <span ref={thumbRef} className="sx-seg-thumb" aria-hidden="true" style={{ opacity: ready ? 1 : 0 }} />
         {options.map((o) => (
           <button
             key={o.value}
             type="button"
-            aria-pressed={value === o.value}
+            {...(tabs
+              ? {
+                  role: 'tab',
+                  'aria-selected': value === o.value,
+                  'aria-controls': panelIds?.[o.value],
+                  tabIndex: value === o.value ? 0 : -1,
+                }
+              : { 'aria-pressed': value === o.value })}
             disabled={o.disabled}
             title={o.title}
             onClick={() => onChange(o.value)}

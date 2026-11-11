@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { useAppStore, type SkyState } from '@/state/store';
 import { PATTERNS } from './GridLoader';
-import { IDLE_LOOK, THINKING_LOOK } from './loaderLooks';
+import { IDLE_LOOK, SEARCHING_LOOK } from './loaderLooks';
 import { isThinking, thinkingRetry, thinkingSentence } from './islandText';
 
 const sky = (over: Partial<SkyState>): SkyState => ({ ...useAppStore.getState().sky, ...over });
@@ -16,9 +16,8 @@ describe('grid loader looks', () => {
   it('at rest it is the still heartbeat; thinking steps through four known patterns', () => {
     expect(IDLE_LOOK.pattern).toBe('heartbeat');
     expect(IDLE_LOOK.static).toBe(true);
-    expect(THINKING_LOOK.mode).toBe('sequence');
-    for (const p of THINKING_LOOK.sequence ?? [])
-      expect(typeof p === 'string' && p in PATTERNS).toBe(true);
+    expect(SEARCHING_LOOK.pattern).toBe('sparkle');
+    expect(typeof SEARCHING_LOOK.pattern === 'string' && SEARCHING_LOOK.pattern in PATTERNS).toBe(true);
   });
 });
 
