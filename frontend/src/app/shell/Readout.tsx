@@ -63,7 +63,8 @@ export function Readout() {
           </abbr>
         </span>
       </p>
-      {frame && (
+      {/* Moon (11 Nov 2026): no frame line under the readout; the player and the Flipbook picture show it. */}
+      {false as boolean && frame && (
         <p className="sx-coords-sub" data-testid="sky-readout-frame">
           {formatWavelength(frame.wavelength_um)}
           <br />
