@@ -92,11 +92,14 @@ export function ProvenanceBadge({
   tooltip,
   srText = false,
   fixture = false,
+  variant = 'outline',
 }: {
   tag: Tag;
   tooltip?: string;
   srText?: boolean;
   fixture?: boolean;
+  /** 'tag': the design-language tag (11px uppercase, --s3 fill, coloured dot). */
+  variant?: 'outline' | 'tag';
 }) {
   const name = badgeForTag(tag);
   if (fixture && name === 'Measured') {
@@ -117,6 +120,21 @@ export function ProvenanceBadge({
       : name === 'Estimated'
         ? 'border-sky-400 text-sky-300'
         : 'border-neutral-400 text-neutral-300';
+  if (variant === 'tag') {
+    const dot = name === 'Measured' ? 'var(--p-meas)' : name === 'Estimated' ? 'var(--p-phys)' : 'var(--p-asm)';
+    return (
+      <span
+        className="sx-tagbadge"
+        style={{ ['--dot' as string]: dot }}
+        title={tooltip ?? BADGE_MEANING[name]}
+        data-testid="provenance-badge"
+        data-tag={tag}
+      >
+        {name}
+        {srText && tooltip && <span className="sr-only">: {tooltip}</span>}
+      </span>
+    );
+  }
   return (
     <span
       className={`rounded border px-1.5 py-0.5 text-xs font-medium ${style}`}
