@@ -19,7 +19,7 @@ If two docs disagree and `docs/decisions/` is silent, follow the precedence (dec
 
 ## Rules for code
 
-- **Pinned versions only.** Never "latest". three.js is **r187** (`three/webgpu`). If an API is not in r187, check the r187 docs before using it.
+- **Pinned versions only.** Never "latest". three.js is **r187** (`three/webgpu`): it is the viewer and the fallback path. If an API is not in r187, check the r187 docs before using it. The D-37 engines (the approved prototype's world, star and rock code in `frontend/src/engine/`) run on raw WebGL2 on their own canvases, only at "+ Artistic" (Q-287); D-37 amends D-03 (acknowledged by Atish, 11 Nov 2026). Their A15 frame rate is not measured yet (R12 #43).
 - **Data first.** An LLM never produces a physical number. Code converts measurements to parameters deterministically.
 - **Provenance on everything.** Every value and render layer carries one tag: `measured`, `derived`, `model_dependent`, `inferred_from_analog`, `artistic`. The UI shows them as 3 badges (see decisions D-02).
 - **Fall back a tier, don't invent.** A missing value drops one tier and is labelled with it (D-32); a layer is refused and listed in `missing` only when no tier can answer. Physical size and ObjectCard values are still never guessed.

@@ -1,6 +1,6 @@
 # 08 Sequence: search and flipbook
 
-A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), the shell A21 (sky interaction A21.6, hash A21.11; shell states in [24](24-state-shell.md)), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache), D-28 (Rainbow Trails) and D-35 (sky tiles), and A4.9 (overlays, flag mask, combine). The sky-view prototype paths (sky pick, shared flipbook session, transport bar) follow Q-87 to Q-91; its cached markers, progressive frames and colour views follow Q-92, Q-93 and Q-95 to Q-99; overlays on the frame grid follow Q-102; downloads in the object's background job follow Q-111 and Q-112 (issue #41). How the backend builds the composite: [20](20-sequence-composite.md).
+A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), the shell A21 (sky interaction A21.6, hash A21.11; shell states in [24](24-state-shell.md)), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache), D-28 (Rainbow Trails) and D-35 (sky tiles), and A4.9 (overlays, flag mask, combine). The sky-view prototype paths (sky pick, shared flipbook session, transport bar) follow Q-87 to Q-91; its cached markers, progressive frames and colour views follow Q-92, Q-93 and Q-95 to Q-99; overlays on the frame grid follow Q-102; downloads in the object's background job follow Q-111 and Q-112 (issue #41); reference objects follow Q-258 and Q-328. How the backend builds the composite: [20](20-sequence-composite.md).
 
 ```mermaid
 sequenceDiagram
@@ -60,7 +60,9 @@ sequenceDiagram
     end
   end
   UI->>API: GET /v1/resolve?q=name or ra,dec
-  alt input is a name that looks like a small body
+  alt input is a name, id or alias in reference_objects.toml (the Sun, Jupiter, Saturn, Titan)
+    API->>API: Reference lookup before SBDB and SIMBAD (Q-328). resolver reference, ra = dec = 0 as a placeholder (artistic), no catalogue call
+  else input is a name that looks like a small body
     API->>R: SBDB first, SIMBAD on a miss (via the cache)
     R-->>API: RA, Dec
   else input is any other name
@@ -69,7 +71,11 @@ sequenceDiagram
   else input is RA/Dec
     API->>API: Skip name resolution
   end
-  API-->>UI: id, ra, dec, moving
+  API-->>UI: id, ra, dec, moving, resolver
+  opt resolver is reference (Q-328)
+    UI->>UI: No fixed sky position: the sky does not fly there, no marker, the island and flipbook say "no fixed sky position" (positionTags.hasSkyPosition)
+    Note over UI,API: GET frames then answers an empty list with reference:not_a_spherex_target in missing
+  end
   UI->>UI: Write #35;ra=…&dec=…[&name=…] to the URL hash (share link). A typed search or a sky pick adds a history entry, a link replaces it
   UI->>UI: Island shows Thinking: Searching the archive for SPHEREx frames at RA, Dec (Q-121)
   UI->>API: GET /v1/objects/{id}/frames

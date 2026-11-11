@@ -1,6 +1,6 @@
 # Data contract: TV, ObjectCard, RenderParams
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1, R3.2, R3.4 (R3.3 in [type-selection.md](type-selection.md)) · **Implements:** [D-02, D-32](../decisions/contract-tags.md), [D-04, D-16, D-18, D-23, Q-33, Q-35, Q-36](../decisions/contract.md), [D-01](../decisions/rendering-bodies.md), [Q-117](../decisions/rendering-layers.md), [D-12](../decisions/haptics-design.md) · **Read with:** [type-selection.md](type-selection.md) (R3.3), [surface-generation.md](surface-generation.md) (R6.2), [display-rules.md](display-rules.md) (R5.2, R5.7)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1, R3.2, R3.4 (R3.3 in [type-selection.md](type-selection.md)) · **Implements:** [D-02, D-32](../decisions/contract-tags.md), [D-04, D-16, D-18, D-23, Q-33, Q-35, Q-36](../decisions/contract.md), [D-01, Q-285](../decisions/rendering-bodies.md), [Q-221, Q-327](../decisions/pipeline-stages.md), [Q-117](../decisions/rendering-layers.md), [D-12](../decisions/haptics-design.md) · **Read with:** [type-selection.md](type-selection.md) (R3.3), [surface-generation.md](surface-generation.md) (R6.2), [display-rules.md](display-rules.md) (R5.2, R5.7)
 
 ## R3. Data contract
 
@@ -69,6 +69,10 @@ interface ObjectCard {
                                       // a measured column cites its *_reflink; a CALCULATED_VALUE is never 'measured'; a missing
                                       // value is null with the reason in `source`
   component_teff_K?: TV<[number, number]>;  // brown_dwarf_binary only: Teff of body A then B (literature registry, Q-154)
+  // surface of a world (issue #71, Q-285): measured only for a reference body (Titan: Huygens HASI, Cassini radar);
+  // read by the confidence score (Q-327) and the world adapters; absent on exoplanet cards
+  surface_pressure_bar?: TV; surface_temperature_K?: TV;
+  surface_fluid?: TV<string>;         // 'water' | 'methane' | 'ammonia' | 'nitrogen' | 'co2'
   // variability
   period_var_d?: TV;                  // Mira period: SIMBAD mesVar median over rows typed LPV or M → 'measured' (Q-152)
   lightcurve?: { t_mjd: number; flux: number; sigma: number; lambda_um: number; flags: number }[];

@@ -1,6 +1,6 @@
 # Endpoint register
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.11 · **Implements:** [D-16](../decisions/contract.md), [D-25](../decisions/data-sources.md), [Q-39](../decisions/contract.md), [Q-50](../decisions/data-sources.md), [Q-87](../decisions/sky-shell.md), [Q-92](../decisions/data-sources.md), [Q-98](../decisions/sky-shell.md), [Q-111](../decisions/pipeline-jobs.md), [Q-122](../decisions/gemini.md), [Q-141](../decisions/moving-objects.md), [Q-145](../decisions/moving-objects.md), [Q-146](../decisions/moving-objects.md), [Q-164](../decisions/demo-pack.md), [Q-195](../decisions/contract.md) · **Read with:** [refusals.md](refusals.md) (A4.12), [../../backend/README.md](../../backend/README.md#endpoints-d-16) (response shapes)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.11 · **Implements:** [D-16](../decisions/contract.md), [D-25, Q-328](../decisions/data-sources.md), [Q-39](../decisions/contract.md), [Q-50](../decisions/data-sources.md), [Q-87](../decisions/sky-shell.md), [Q-92](../decisions/data-sources.md), [Q-98](../decisions/sky-shell.md), [Q-111](../decisions/pipeline-jobs.md), [Q-122](../decisions/gemini.md), [Q-141](../decisions/moving-objects.md), [Q-145](../decisions/moving-objects.md), [Q-146](../decisions/moving-objects.md), [Q-164](../decisions/demo-pack.md), [Q-195](../decisions/contract.md) · **Read with:** [refusals.md](refusals.md) (A4.12), [../../backend/README.md](../../backend/README.md#endpoints-d-16) (response shapes)
 
 ### A4.11 Endpoint register
 
@@ -10,7 +10,7 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
 
 | Route | Purpose | Decision | Spec |
 |---|---|---|---|
-| `GET /v1/resolve?q=<name or ra,dec>` | name or position → object id, position, `moving` | D-16, D-19, Q-22, Q-25 | [A4.1](pipeline.md#a41-stage-1-find-the-object) |
+| `GET /v1/resolve?q=<name or ra,dec>` | name or position → object id, position, `moving` and `resolver` (`simbad`, `sbdb`, `coords` or `reference`; a reference object has no sky position, Q-328) | D-16, D-19, Q-22, Q-25, Q-258, Q-328 | [A4.1](pipeline.md#a41-stage-1-find-the-object) |
 | `GET /v1/objects/{id}/frames` | the frame list the flipbook plays | D-16 | [A4.1](pipeline.md#a41-stage-1-find-the-object) |
 | `GET /v1/objects/{id}/cutouts/{frame_id}.png` | one stretched cutout | D-16 | [A4.1](pipeline.md#a41-stage-1-find-the-object) |
 | `GET /v1/objects/{id}/spectrum` | spectrum and light curve, `measured` | D-16 | [A4.2](pipeline.md#a42-stage-2-measure-brightness-and-spectrum) |
@@ -64,6 +64,7 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
   | 503 | `offline_cache_miss` | `SX_OFFLINE=1` and the call is not in the cache (D-25) |
   | 503 | `upstream_unavailable` | an external service failed after retries and no older cache entry exists |
   | 503 | `cutout_unavailable` | a cutout that cannot be fetched or read |
+  | 503 | `reference_asset_missing` | `/card` or `/render-params` for a reference object (`resolver: reference`) with no current pre-built asset and no row in `reference_objects.toml`; re-bake with `scripts.bake_reference_objects` (Q-328) |
   | 500 | `internal` | any unexpected error; the traceback is logged, never sent |
   | other | `http_error` | any other framework HTTP error |
 
