@@ -60,6 +60,8 @@ export interface ToggleControl extends Base {
 }
 export interface ChoiceControl extends Base {
   kind: 'choice';
+  /** 'about': not drawn with the controls; shown inside the closed "About this flare" row. */
+  slot?: 'about';
   value: string;
   options: { value: string; label: string; disabled?: boolean }[];
   onChange(value: string): void;
@@ -74,9 +76,10 @@ export interface ReadoutControl extends Base {
   /**
    * Where the Details pane shows it. 'key': the always-visible grid of key numbers. 'latest': the
    * one-line "Latest flare" summary (its value is the long sentence, shown under "About this flare").
-   * 'assumed': a bullet in "Assumed values". Default: a row in "All numbers".
+   * 'assumed': a bullet in "Assumed values". 'where': the one short muted line under the flare chart. 'about': a
+   * line inside "About this flare". Default: a row in "All numbers".
    */
-  slot?: 'key' | 'latest' | 'assumed';
+  slot?: 'key' | 'latest' | 'assumed' | 'where' | 'about';
 }
 export type BuildControl =
   SliderControl | ToggleControl | ChoiceControl | ButtonControl | ReadoutControl;
@@ -124,7 +127,7 @@ function Control({ c }: { c: BuildControl }) {
   const id = useId();
   const hintId = `${id}-why`;
   const name = c.disabled && c.why ? `${c.label}. ${c.why}` : c.label;
-  const badge = c.tag ? <ProvenanceBadge tag={c.tag} /> : null;
+  const badge = c.tag ? <ProvenanceBadge tag={c.tag} variant="tag" /> : null;
   const hint = c.why ? (
     <span id={hintId} className="sx-ctl-why">
       {c.why}
@@ -174,25 +177,13 @@ function Control({ c }: { c: BuildControl }) {
       );
     case 'choice':
       return (
-        <div className="sx-ctl" role="group" aria-label={c.label}>
-          <span className="sx-ctl-row">
-            <span>{c.label}</span>
-            {badge}
-          </span>
-          <span className="sx-ctl-opts">
-            {c.options.map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                className="sx-btn-sm sx-ctl-btn"
-                aria-pressed={c.value === o.value}
-                disabled={c.disabled || o.disabled}
-                onClick={() => c.onChange(o.value)}
-              >
-                {o.label}
-              </button>
-            ))}
-          </span>
+        <div className="sx-ctl">
+          <ToggleGroup
+            label={c.label}
+            value={c.value}
+            options={c.options.map((o) => ({ value: o.value, label: o.label, disabled: c.disabled || o.disabled }))}
+            onChange={c.onChange}
+          />
           {hint}
         </div>
       );
@@ -290,7 +281,8 @@ function renderControls(controls: BuildControl[]): ReactNode[] {
 /** The region itself: the interactive controls, rendered by the build pane's Details panel; nothing shows until something registers. */
 export function BuildControls() {
   const specs = useBuildControlsStore((s) => s.specs);
-  const owners = Object.keys(specs).filter((o) => specs[o]!.controls.some((c) => c.kind !== 'readout'));
+  const drawn = (o: string) => specs[o]!.controls.filter((c) => c.kind !== 'readout' && !(c.kind === 'choice' && c.slot === 'about'));
+  const owners = Object.keys(specs).filter((o) => drawn(o).length > 0);
   if (owners.length === 0) return null;
   return (
     <div className="sx-bctl" data-testid="build-controls">
@@ -298,7 +290,7 @@ export function BuildControls() {
         const spec = specs[o]!;
         return (
           <section key={o} className="sx-bctl-group" aria-label={spec.title} data-owner={o}>
-            {renderControls(spec.controls.filter((c) => c.kind !== 'readout'))}
+            {renderControls(drawn(o))}
           </section>
         );
       })}
@@ -374,6 +366,10 @@ export function BuildSummaryRows({
   const all = readoutsOf(specs);
   const latest = all.find((r) => r.slot === 'latest');
   const rest = all.filter((r) => !r.slot);
+  const aboutReadouts = all.filter((r) => r.slot === 'about');
+  const aboutChoices = Object.values(specs).flatMap((sp) =>
+    sp.controls.filter((c): c is ChoiceControl => c.kind === 'choice' && c.slot === 'about'),
+  );
   const lines = [
     ...all.filter((r) => r.slot === 'assumed').map((r) => `${r.label}: ${r.value}`),
     ...Object.values(specs).flatMap((s) =>
@@ -383,9 +379,23 @@ export function BuildSummaryRows({
   ];
   return (
     <>
-      {(latest || flareChart) && (
-        <Row title="About this flare">
+      {(latest || flareChart || aboutReadouts.length > 0 || aboutChoices.length > 0) && (
+        <Row title="About this flare" testId="about-flare-row">
           {latest && <p className="text-sm">{latest.value}</p>}
+          {aboutReadouts.map((r) => (
+            <p key={r.id} className="text-sm" style={{ color: 'var(--muted)' }}>
+              {r.value}
+            </p>
+          ))}
+          {aboutChoices.map((c) => (
+            <ToggleGroup
+              key={c.id}
+              label={c.label}
+              value={c.value}
+              options={c.options.map((o) => ({ value: o.value, label: o.label, disabled: c.disabled || o.disabled }))}
+              onChange={c.onChange}
+            />
+          ))}
           {flareChart}
         </Row>
       )}

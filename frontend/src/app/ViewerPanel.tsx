@@ -54,6 +54,7 @@ import { buttonClass } from './ui';
 import { closeUpKindOf } from './CloseUpPane';
 import { useCloseUpStore } from './closeUpStore';
 import { StarEngineDetails, StarFlarePanel } from './StarFlarePanel';
+import { isEditableTarget } from './shell/shortcuts';
 import { RockStage } from './build/RockStage';
 import { StarGlobeStage, useEngineStar } from './StarEngineStage';
 import { WorldGlobeStage, useEngineWorld } from './WorldEngineStage';
@@ -141,8 +142,7 @@ const STAR_COLOUR_OPTIONS: { value: StarColourView; label: string }[] = [
 const STAR_SCALE_OPTIONS: { value: StarScale; label: string }[] = [
   { value: 'enlarged', label: 'Larger detail' },
   { value: 'true', label: 'True scale' },
-  { value: 'close', label: 'Close-up' },
-];
+];  // no Close-up option: the left pane is the close-up now
 const STAR_SCALE_LABEL: Record<StarScale, string> = {
   enlarged: 'Whole star, larger detail',
   true: 'Whole star, true scale',
@@ -283,7 +283,8 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   });
   const failed = failedState.key === objectKey ? failedState.ids : NO_FAILED;
   const reducedMotion = useReducedMotion();
-  const [spinPaused] = useState(false); // the Pause button is gone from Details (Moon); kept for the engine hook
+  // The Pause button is gone from Details (Moon, open question). `P` pauses and resumes motion in the build pane (WCAG 2.2.2).
+  const [spinPaused, setSpinPaused] = useState(false);
   // Under reduced motion the scene starts paused; this is the user's choice to play it anyway.
   const [playAnyway, setPlayAnyway] = useState(false);
   // The choice ends when the preference is switched off (adjusted while rendering, not in an effect).
@@ -568,6 +569,28 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   }, [viewer, plan, size]);
 
   const announce = useCallback((text: string) => setAnnouncement(text), []);
+
+  // WCAG 2.2.2: with no Pause button in Details, `P` stops and restarts everything that moves in the build pane.
+  // Under reduced motion nothing moves until it is pressed. Ignored while typing or with a modifier held.
+  useEffect(() => {
+    if (!pane) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'p' || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented || isEditableTarget(e.target)) return;
+      e.preventDefault();
+      if (idlePaused) {
+        viewer?.resumeFromIdle?.();
+        announce('Motion is playing.');
+      } else if (reducedMotion) {
+        setPlayAnyway(!playAnyway);
+        announce(playAnyway ? 'Motion is off.' : 'Motion is playing.');
+      } else {
+        setSpinPaused(!spinPaused);
+        announce(spinPaused ? 'Motion is playing.' : 'Motion is paused.');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pane, viewer, idlePaused, reducedMotion, playAnyway, spinPaused, announce]);
   const planWith = (patch: Partial<PlanContext>) =>
     card && params ? planRender(card, params, { ...ctx, ...patch }) : null;
 
@@ -942,6 +965,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                     label: pane ? shortModeLabel(m.label) : m.label,
                     disabled: !m.available,
                     title: m.available ? m.badge : 'Not available for this object. See the list below.',
+                    describedBy: irHidesJets && m.id === 'visible' ? 'ir-jets-hint' : undefined,
                   }))}
                   onChange={onMode}
                 />
@@ -984,7 +1008,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             {plan.star && !engineStar && (
               <div className="flex flex-col gap-2" data-testid="star-views">
                 <ToggleGroup
-                  label="Star colour"
+                  label="Light"
                   value={starColour}
                   options={STAR_COLOUR_OPTIONS}
                   onChange={(c) =>
@@ -997,14 +1021,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                 <ToggleGroup
                   label="View"
                   value={starScale}
-                  options={STAR_SCALE_OPTIONS.map((o) => ({
-                    ...o,
-                    disabled: o.value === 'close' && !plan.star?.physics,
-                    title:
-                      o.value === 'close' && !plan.star?.physics
-                        ? 'Needs the star\u2019s temperature.'
-                        : undefined,
-                  }))}
+                  options={STAR_SCALE_OPTIONS}
                   onChange={(sc) => setStarView(starColour, sc)}
                 />
                 {plan.star.physics && (

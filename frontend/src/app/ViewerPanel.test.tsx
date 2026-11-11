@@ -1,5 +1,7 @@
 // The 3D viewer panel with a fake renderer (no GPU): controls, legend, badges, refused layers,
 // canvas label and live announcements (R5.3, R7.3, R9, D-02, D-21).
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -165,25 +167,22 @@ describe('ViewerPanel', () => {
     expect(container.textContent).not.toMatch(/sped up/);
   });
 
-  it('a star opens in True colour (Q-290); Close-up from Observatory moves to Enhanced colour and the camera follows', async () => {
+  it('a star opens in True colour (Q-290); the Light and View groups have no Close-up option (the left pane is the close-up)', async () => {
     const { card, params } = fixture('star');
     useAppStore.getState().setObject(card, params);
     useAppStore.getState().setHonesty('artistic');
     await mount();
     const pressed = (n: string) => button(n)?.getAttribute('aria-pressed');
     expect(pressed('True colour')).toBe('true');
-    expect(pressed('Whole star, larger detail')).toBe('true');
-    await click('Observatory view');
-    expect(pressed('Observatory view')).toBe('true');
-    await click('Close-up');
-    expect(pressed('Enhanced colour')).toBe('true');
-    expect(pressed('Observatory view')).toBe('false');
-    expect(fake.setStarCloseUp).toHaveBeenLastCalledWith(
-      expect.objectContaining({ halfWidth: expect.any(Number) }),
-    );
-    expect(text('viewer-announcer')).toMatch(/Enhanced colour.*Close-up/);
-    await click('Whole star, true scale');
-    expect(fake.setStarCloseUp).toHaveBeenLastCalledWith(null);
+    expect(pressed('Larger detail')).toBe('true');
+    expect(button('Close-up')).toBeUndefined();
+    await click('Observatory');
+    expect(pressed('Observatory')).toBe('true');
+    expect(pressed('True colour')).toBe('false');
+    expect(text('viewer-announcer')).toMatch(/Observatory view.*larger detail/);
+    await click('True scale');
+    expect(pressed('True scale')).toBe('true');
+    expect(fake.setStarCloseUp).not.toHaveBeenCalledWith(expect.objectContaining({ halfWidth: expect.any(Number) }));
     expect(container.querySelector('[data-testid="star-readouts"]')?.textContent).toMatch(
       /Surface gravity/,
     );
@@ -340,8 +339,8 @@ describe('ViewerPanel', () => {
     expect(shown.at(-1)?.shells).toHaveLength(3);
     expect(text('viewer-announcer')).toMatch(/^August 2025\. Gas shells: CO₂, H₂O, CO\./);
     // The toggle says which epoch has no gas data.
-    expect(button('Dec 2025(no gas data)')).toBeDefined();
-    await click('Dec 2025(no gas data)');
+    expect(button('Dec 2025 (no gas data)')).toBeDefined();
+    await click('Dec 2025 (no gas data)');
     expect(shown.at(-1)?.shells).toHaveLength(0); // the fixture card holds August Q only
     expect(text('missing-list')).toContain(
       'Gas shells: not drawn for December 2025. The card has no gas measurements for this epoch.',
@@ -441,30 +440,64 @@ describe('ViewerPanel', () => {
     expect(text('missing-list')).not.toContain('Sun direction');
   });
 
-  it('one pause control for all motion, shown whenever something is a time-lapse (WCAG 2.2.2)', async () => {
-    // A Mira (pulsation only) has no spin and still gets the control.
+  // Moon removed the Pause/Play button from Details. Motion is stopped with `P` in the build pane (WCAG 2.2.2),
+  // announced in the live region; the status line in Details still says what the scene is doing.
+  const mountPane = async () => {
+    engine.pane = true;
+    await act(async () => {
+      root.render(<ViewerPanel pane={{ seq: 0, animate: false, seedOffset: 0 }} />);
+    });
+    await act(async () => {});
+  };
+  const pressP = async (target: EventTarget = window) => {
+    await act(async () => {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true, cancelable: true }));
+    });
+  };
+
+  it('there is no Pause button; P pauses and resumes everything that moves, and says so (WCAG 2.2.2)', async () => {
+    // A Mira (pulsation only) has no spin and still moves.
     const { card, params } = fixture('star_mira');
     useAppStore.getState().setObject(card, params);
     useAppStore.getState().setHonesty('artistic');
-    await mount();
-    expect(button('Pause motion')?.hasAttribute('aria-pressed')).toBe(false);
+    await mountPane();
+    expect(button('Pause motion')).toBeUndefined();
     expect(button('Pause spin')).toBeUndefined();
-    await click('Pause motion');
+    expect(text('motion-status')).toContain('Motion is playing');
+    await pressP();
     expect(fake.setSpinPaused).toHaveBeenLastCalledWith(true);
     expect(text('motion-status')).toContain('Motion is paused');
-    await click('Play motion');
+    expect(text('viewer-announcer')).toBe('Motion is paused.');
+    await pressP();
     expect(fake.setSpinPaused).toHaveBeenLastCalledWith(false);
+    expect(text('viewer-announcer')).toBe('Motion is playing.');
   });
 
-  it('no time-lapse, no pause control', async () => {
+  it('P is ignored while typing, and with a modifier held', async () => {
+    const { card, params } = fixture('star_mira');
+    useAppStore.getState().setObject(card, params);
+    useAppStore.getState().setHonesty('artistic');
+    await mountPane();
+    const field = document.createElement('input');
+    document.body.appendChild(field);
+    await pressP(field);
+    field.remove();
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true, cancelable: true }));
+    });
+    expect(fake.setSpinPaused).not.toHaveBeenCalledWith(true);
+  });
+
+  it('no time-lapse, no motion status', async () => {
     const { card, params } = fixture('star_mira'); // the pulsation is hidden at the default level
     useAppStore.getState().setObject(card, params);
     await mount();
     expect(button('Pause motion')).toBeUndefined();
     expect(button('Play motion')).toBeUndefined();
+    expect(container.querySelector('[data-testid="motion-status"]')).toBeNull();
   });
 
-  it('under reduced motion the control stays and starts as Play motion (R9, WCAG 2.2.2)', async () => {
+  it('under reduced motion nothing moves until P is pressed; P starts it and P stops it again (R9, WCAG 2.2.2)', async () => {
     vi.stubGlobal('matchMedia', (q: string) => ({
       matches: q === '(prefers-reduced-motion: reduce)',
       addEventListener() {},
@@ -474,20 +507,21 @@ describe('ViewerPanel', () => {
       const { card, params } = fixture('asteroid_shape');
       card.shape_source = { value: '/meshes/bennu.glb', tag: 'measured', source: 'test' };
       useAppStore.getState().setObject(card, params);
-      await mount();
-      expect(button('Play motion')?.hasAttribute('aria-pressed')).toBe(false);
-      expect(text('motion-status')).toContain('reduced motion');
-      await click('Play motion');
-      expect(fake.setMotionOverride).toHaveBeenLastCalledWith(true);
-      expect(button('Pause motion')).toBeDefined();
-      await click('Pause motion');
+      await mountPane();
       expect(fake.setMotionOverride).toHaveBeenLastCalledWith(false);
+      expect(text('motion-status')).toContain('reduced motion');
+      await pressP();
+      expect(fake.setMotionOverride).toHaveBeenLastCalledWith(true);
+      expect(text('motion-status')).toContain('Motion is playing');
+      await pressP();
+      expect(fake.setMotionOverride).toHaveBeenLastCalledWith(false);
+      expect(text('motion-status')).toContain('reduced motion');
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
-  it('reduced motion, Play motion, then an idle pause: the button and status show the pause', async () => {
+  it('reduced motion, P, then an idle pause: the status shows the pause and P resumes from it', async () => {
     vi.stubGlobal('matchMedia', (q: string) => ({
       matches: q === '(prefers-reduced-motion: reduce)',
       addEventListener() {},
@@ -497,16 +531,13 @@ describe('ViewerPanel', () => {
       const { card, params } = fixture('asteroid_shape');
       card.shape_source = { value: '/meshes/bennu.glb', tag: 'measured', source: 'test' };
       useAppStore.getState().setObject(card, params);
-      await mount();
-      await click('Play motion');
-      expect(button('Pause motion')).toBeDefined();
+      await mountPane();
+      await pressP();
       expect(text('motion-status')).toContain('Motion is playing');
       const idle = fake.setIdleChangeHandler.mock.calls.at(-1)?.[0] as (i: boolean) => void;
       await act(async () => idle(true));
-      expect(button('Play motion')).toBeDefined();
-      expect(button('Pause motion')).toBeUndefined();
       expect(text('motion-status')).toContain('paused after a minute');
-      await click('Play motion');
+      await pressP();
       expect(fake.resumeFromIdle).toHaveBeenCalled();
       // The reduced-motion override stays on (the user asked for motion).
       expect(fake.setMotionOverride).toHaveBeenLastCalledWith(true);
@@ -539,7 +570,7 @@ describe('ViewerPanel', () => {
     const a = fixture('comet');
     useAppStore.getState().setObject(a.card, a.params);
     await mount();
-    await click('Dec 2025(no gas data)');
+    await click('Dec 2025 (no gas data)');
     expect(shown.at(-1)?.epoch).toBe('2025-12');
     const b = fixture('comet');
     b.params.id = 'fixture:comet-2';
@@ -555,7 +586,21 @@ describe('ViewerPanel', () => {
     await mount();
     const buttons = [...container.querySelectorAll('button')];
     expect(buttons.length).toBeGreaterThan(8);
-    for (const b of buttons) expect(b.className).toMatch(/min-h-11/);
+    // Panel controls (the design-language `sx-` classes) get their size from index.css, which jsdom does not
+    // load: check the stylesheet. Every one has min-height >= 24 px, and 44 px on touch.
+    const css = readFileSync(resolve(__dirname, '../index.css'), 'utf8').replace(/@media[^{]*\{/g, '');
+    const heights = (selector: string): number[] =>
+      [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+        .filter(([, sel]) => sel!.split(',').some((x) => x.trim() === selector))
+        .map(([, , body]) => Number(/min-height:\s*(\d+)px/.exec(body!)?.[1] ?? 0));
+    for (const sel of ['.sx-seg button', '.sx-row-t', '.sx-btn-outline', '.sx-sw-row']) {
+      expect(Math.min(...heights(sel).filter(Boolean)), sel).toBeGreaterThanOrEqual(24);
+      expect(Math.max(...heights(sel)), `${sel} on touch`).toBeGreaterThanOrEqual(44);
+    }
+    for (const b of buttons) {
+      const sized = /min-h-(11|\[4\d)/.test(b.className) || /\bsx-/.test(b.className) || b.closest('.sx-seg, .sx-sw-row') !== null;
+      expect(sized, `button "${b.textContent}" has no size class`).toBe(true);
+    }
   });
 });
 
