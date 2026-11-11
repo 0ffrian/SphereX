@@ -3,7 +3,7 @@
 // shared playback session (flipbook/session.tsx); it holds no playback logic of its own.
 // While the SPHEREx colour composite shows (one picture), every control is disabled and a short
 // note says how to get the frames back (colourMode.ts).
-import { useId } from 'react';
+import { useEffect, useId } from 'react';
 import GridLoader from '@/app/island/GridLoader';
 import { useFlipbookSession } from '@/app/flipbook/session';
 import {
@@ -14,6 +14,7 @@ import {
 import { trailsMonochrome, wavelengthColor } from '@/app/flipbook/wavelengthColor';
 import { describeFrame, useAppStore } from '@/state/store';
 import { Icon } from './icons';
+import { currentHop, demoPlayerOn, erosList, useAreaStore } from './areaStore';
 
 export function Transport() {
   const sky = useAppStore((s) => s.sky);
@@ -24,19 +25,45 @@ export function Transport() {
   // The dot is the Rainbow Trails false colour (`derived`, Q-27): one colour in "Measured only".
   const honesty = useAppStore((s) => s.honesty);
   const monochrome = trailsMonochrome(honesty);
-  const locked = transportLocked(effectiveColour(sky.colour, honesty));
+  const demo = useAreaStore((s) => demoPlayerOn(s));
+  const locked = !demo && transportLocked(effectiveColour(sky.colour, honesty));
   const waitId = useId();
   const lockedId = useId();
 
+  // While the Eros card of the area tools is open, the player drives its exposures (demo data,
+  // app/area/areaService.ts) instead of the flipbook's frames.
+  const demoN = useAreaStore((s) => erosList(s.eros, s.det).length);
+  const demoIndex = useAreaStore((s) => s.index);
+  const demoPlaying = useAreaStore((s) => s.playing);
+  const demoHop = useAreaStore((s) => currentHop(s));
+  useEffect(() => {
+    if (!demo || !demoPlaying) return;
+    const t = setInterval(() => {
+      const a = useAreaStore.getState();
+      const n = erosList(a.eros, a.det).length;
+      a.setIndex(n > 0 ? (a.index + 1) % n : 0);
+    }, 700);
+    return () => clearInterval(t);
+  }, [demo, demoPlaying]);
+
   const response = sky.status === 'ready' ? sky.frames : null;
-  const n = response?.frames.length ?? 0;
-  const index = n > 0 ? Math.min(sky.index, n - 1) : 0;
+  const n = demo ? demoN : (response?.frames.length ?? 0);
+  const index = n > 0 ? Math.min(demo ? demoIndex : sky.index, n - 1) : 0;
   // The readout names the frame on screen (it can trail the scrubber until its picture decodes).
-  const shown = shownIndex !== null && shownIndex < n ? shownIndex : index;
-  const frame = response?.frames[shown] ?? null;
+  const shown = demo ? index : shownIndex !== null && shownIndex < n ? shownIndex : index;
+  const frame = demo ? null : (response?.frames[shown] ?? null);
+  const wavelengthUm = demo ? (demoHop?.wl_um ?? null) : (frame?.wavelength_um ?? null);
   const has = n > 0 && !locked;
-  const frameText = response && has ? describeFrame(response, index) : 'No frames loaded';
+  const frameText = demo
+    ? `Exposure ${index + 1} of ${n}`
+    : response && has
+      ? describeFrame(response, index)
+      : 'No frames loaded';
   const percent = n > 1 ? (index / (n - 1)) * 100 : 0;
+  const playing = demo ? demoPlaying : sky.playing;
+  const onStep = (d: number) => (demo ? useAreaStore.getState().setIndex(index + d) : step(d));
+  const onSeek = (i: number) => (demo ? useAreaStore.getState().setIndex(i) : seek(i));
+  const onToggle = () => (demo ? useAreaStore.getState().setPlaying(!demoPlaying) : togglePlay());
 
   return (
     <div role="region" aria-label="Playback controls" className="sx-player" data-testid="transport">
@@ -45,7 +72,7 @@ export function Transport() {
         className="sx-btn-i"
         aria-label="Previous frame"
         title="Previous frame"
-        onClick={() => step(-1)}
+        onClick={() => onStep(-1)}
         disabled={!has}
         aria-describedby={locked ? lockedId : undefined}
       >
@@ -54,20 +81,20 @@ export function Transport() {
       <button
         type="button"
         className="sx-btn-i sx-btn-play"
-        onClick={togglePlay}
-        disabled={!canPlay || locked}
+        onClick={onToggle}
+        disabled={demo ? !has : !canPlay || locked}
         aria-describedby={locked ? lockedId : !canPlay && n >= 2 ? waitId : undefined}
         data-testid="play-pause"
       >
-        <Icon name={sky.playing ? 'pause' : 'play'} className="size-4" />
-        <span className="sr-only">{sky.playing ? 'Pause' : 'Play'}</span>
+        <Icon name={playing ? 'pause' : 'play'} className="size-4" />
+        <span className="sr-only">{playing ? 'Pause' : 'Play'}</span>
       </button>
       <button
         type="button"
         className="sx-btn-i"
         aria-label="Next frame"
         title="Next frame"
-        onClick={() => step(1)}
+        onClick={() => onStep(1)}
         disabled={!has}
         aria-describedby={locked ? lockedId : undefined}
       >
@@ -88,7 +115,7 @@ export function Transport() {
             step={1}
             value={index}
             disabled={!has}
-            onChange={(e) => seek(Number(e.target.value))}
+            onChange={(e) => onSeek(Number(e.target.value))}
             aria-valuetext={frameText}
             style={{ ['--p' as string]: `${percent}%` }}
             data-testid="scrubber"
@@ -106,9 +133,9 @@ export function Transport() {
               gap={1}
               rounded
               color={
-                frame ? (monochrome ? '#a1a1aa' : wavelengthColor(frame.wavelength_um)) : '#a1a1aa'
+                wavelengthUm !== null ? (monochrome && !demo ? '#a1a1aa' : wavelengthColor(wavelengthUm)) : '#a1a1aa'
               }
-              {...(sky.playing
+              {...(playing
                 ? {
                     mode: 'sequence' as const,
                     sequence: ['wave-lr', 'ripple-out', 'wave-rl', 'ripple-in'],
@@ -123,11 +150,11 @@ export function Transport() {
           </span>
           {/* Not on the span with sx-hide-s: a display utility would beat its phone-width rule. */}
           <span className="sx-hide-s">
-            <b>{frame ? frame.wavelength_um.toFixed(2) : '–'}</b> µm
+            <b>{wavelengthUm !== null ? wavelengthUm.toFixed(2) : '–'}</b> µm
           </span>
         </div>
       )}
-      {!canPlay && !locked && n >= 2 && (
+      {!demo && !canPlay && !locked && n >= 2 && (
         <span id={waitId} className="sr-only">
           Play starts once the next frames have loaded.
         </span>

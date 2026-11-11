@@ -1,4 +1,5 @@
-// The sky view's bottom-centre dock (mock-up `.dock`): Sky and Discovery (the mock-up's Area search)
+// The sky view's bottom-centre dock (mock-up `.dock`): Known objects and Discovery (the mock-up's
+// two area tools; each starts a square on the sky and the highlight follows the one that did)
 // with a highlight that slides to the one under the pointer and a small green pip on the active one,
 // a divider, then the search, a button that opens into the search field when it takes focus.
 // Flipbook, Spectrum and the 3D viewer are not dock buttons: the flipbook opens with a search or a
@@ -7,15 +8,28 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import { SearchBar } from '@/app/search/SearchBar';
 import { RailIcon } from './railIcons';
 import { openTool } from './ToolRail';
-import { useShellStore, type ToolId } from './shellStore';
+import { useAreaStore } from './areaStore';
+import { useShellStore } from './shellStore';
+import type { AreaFlow } from '@/app/area/areaService';
 
-const TOOLS: { id: ToolId; label: string; hint: string }[] = [
-  { id: 'sky', label: 'Sky', hint: 'The sky view alone' },
-  { id: 'area', label: 'Discovery', hint: 'Draw a square on the sky and search it' },
+const TOOLS: { id: 'known' | 'area'; flow: AreaFlow; label: string; hint: string }[] = [
+  {
+    id: 'known',
+    flow: 'known',
+    label: 'Known objects',
+    hint: 'Draw a square on the sky and follow the asteroids and comets on file in it',
+  },
+  {
+    id: 'area',
+    flow: 'discovery',
+    label: 'Discovery',
+    hint: 'Draw a square on the sky and look for dots that move and match nothing on file',
+  },
 ];
 
 export function SkyDock() {
   const tool = useShellStore((s) => s.tool);
+  const flow = useAreaStore((s) => s.flow);
   const buildOpen = useShellStore((s) => s.build.open);
   const innerRef = useRef<HTMLDivElement>(null);
   const hlRef = useRef<HTMLDivElement>(null);
@@ -36,7 +50,7 @@ export function SkyDock() {
   };
   const active = () =>
     innerRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]') ?? null;
-  useLayoutEffect(() => moveHl(active()), [tool, buildOpen]);
+  useLayoutEffect(() => moveHl(active()), [tool, flow, buildOpen]);
   useEffect(() => {
     const on = () => moveHl(active());
     window.addEventListener('resize', on);
@@ -55,7 +69,7 @@ export function SkyDock() {
           <div className="sx-hl" ref={hlRef} aria-hidden="true" />
           <ul className="m-0 flex list-none gap-1 p-0">
             {TOOLS.map((t) => {
-              const pressed = tool === t.id && !buildOpen;
+              const pressed = tool === 'area' && flow === t.flow && !buildOpen;
               return (
                 <li key={t.id}>
                   <button
@@ -65,7 +79,10 @@ export function SkyDock() {
                     data-active={pressed}
                     aria-label={t.label}
                     aria-description={t.hint}
-                    onClick={() => openTool(t.id)}
+                    onClick={() => {
+                      useAreaStore.getState().startFlow(t.flow);
+                      openTool('area');
+                    }}
                     data-testid={`tool-${t.id}`}
                   >
                     <RailIcon id={t.id} />

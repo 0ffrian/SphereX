@@ -8,6 +8,9 @@ const PATHS = {
   viewer: 'M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z M12 12l8-4.5 M12 12v9 M12 12 4 7.5',
   info: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z M12 16v-4 M12 8h.01',
   close: 'M18 6 6 18M6 6l12 12',
+  // The area cards' tabs: a back chevron and the minimise dash (mock-up `knBack`, `knMin`).
+  back: 'M15 6l-6 6 6 6',
+  minimise: 'M6 12h12',
   search: 'm21 21-4.34-4.34 M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z',
   prev: 'M19 5v14L8 12zM5 5v14',
   next: 'M5 5v14l11-7zM19 5v14',

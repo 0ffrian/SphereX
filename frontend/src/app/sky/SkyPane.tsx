@@ -63,6 +63,7 @@ import {
 import { useShellStore } from '@/app/shell/shellStore';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { AreaOverlay } from './AreaOverlay';
+import { AreaTrackLayer } from '@/app/area/AreaTrackLayer';
 import { boxFromPixels, registerAreaView, squareOf } from './areaDraw';
 import { useCachedMarkers } from './useCachedMarkers';
 import { useTargetMarkers, type TargetMarker } from './useTargetMarkers';
@@ -524,7 +525,10 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     let hover: { x: number; y: number } | null = null;
     let readoutFrame: number | null = null;
     // Discovery tool: a drag draws a square instead of panning.
-    registerAreaView(view);
+    registerAreaView(view, (c) => {
+      flyCancel.current?.();
+      flyCancel.current = c;
+    });
     let drawing: { id: number; x: number; y: number } | null = null;
     const areaDrawing = () =>
       useShellStore.getState().tool === 'area' && useAreaStore.getState().stage === 'drawing';
@@ -766,6 +770,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       </p>
 
       <AreaOverlay view={view} />
+      <AreaTrackLayer view={view} />
       {/* Panels sit right after the canvas in the tab order. */}
       {children}
 
