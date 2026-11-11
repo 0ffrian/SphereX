@@ -24,8 +24,14 @@
 // every loop with a constant bound, and the star shader FS took 3.2 to 4.6 s to compile on a cold cache, freezing the
 // page. Each constant bound N becomes N+uZ0, with uZ0 a uniform that is never set (always 0): the loops run exactly as
 // before, but stay loops. Measured with frontend/scripts/engine-bench (engines.html).
+// Issue #93 3 (2.3; deviation 5, @rename pairs 12 to 19 and the uSO declaration added to pair 7): every star shared
+// one surface: boil(), the granulation filter, the supergranulation and the close-up filters read the sphere
+// direction with no seed, and the spots used rng(1729). A card star now passes `so` (three integers in [0, 256),
+// engine/seed.ts) as the vec3 uSO added to those noise coordinates, and `seed` (its 32-bit hash) to the spot RNG as
+// rng(1729 ^ seed). The prototype presets (and the Sun) have neither: uSO = 0 and rng(1729), as before. The first
+// three spot groups keep their fixed longitudes (they face the viewer); their latitudes, sizes and the rest move.
 // @verbatim L358-L663
-// @rename m.best=>(CLOSE_AT||m.best) (ema=>(!window.__sxPin&&ema pow(.4+.6*mu,.25)=>pow(.75*mu+.5,.25) pow(tl/uTeff,uBeta)=>pow(tl/uTeff/1.0574,uBeta) tt=mix(1.,.885+.05*fil,mpn);tt=mix(tt,.68,um);=>tt=mix(1.,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff*(.36-.16*fil),mpn);tt=mix(tt,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff,um); m.f;=>m.f*3; precision highp float;=>precision highp float;uniform int uZ0; i<4;=>i<4+uZ0; k<=1;=>k<=1+uZ0; j<=1;=>j<=1+uZ0; i<=1;=>i<=1+uZ0;
+// @rename m.best=>(CLOSE_AT||m.best) (ema=>(!window.__sxPin&&ema pow(.4+.6*mu,.25)=>pow(.75*mu+.5,.25) pow(tl/uTeff,uBeta)=>pow(tl/uTeff/1.0574,uBeta) tt=mix(1.,.885+.05*fil,mpn);tt=mix(tt,.68,um);=>tt=mix(1.,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff*(.36-.16*fil),mpn);tt=mix(tt,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff,um); m.f;=>m.f*3; precision highp float;=>precision highp float;uniform int uZ0;uniform vec3 uSO; i<4;=>i<4+uZ0; k<=1;=>k<=1+uZ0; j<=1;=>j<=1+uZ0; i<=1;=>i<=1+uZ0; p=s*uFreq;=>p=s*uFreq+uSO; s*mf+=>s*mf+uSO+ 2.2)+vec3(t*.012)=>2.2)+uSO+vec3(t*.012) s*F+=>s*F+uSO+ s*hf+=>s*hf+uSO+ rng(1729)=>rng(1729^(ST.p.seed|0)) 'uLut',=>'uLut','uSO', gl.uniform1i(U.uN,=>gl.uniform3fv(U.uSO,ST.p.so||[0,0,0]);gl.uniform1i(U.uN,
 /* ---------- Planck spectrum to colour ---------- */
 function g(l, m, s1, s2) {
   var s = l < m ? s1 : s2,
@@ -86,7 +92,7 @@ function hex(c) {
 var VS =
   '#version 300 es\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0.,1.);}';
 var FS = `#version 300 es
-precision highp float;uniform int uZ0;
+precision highp float;uniform int uZ0;uniform vec3 uSO;
 uniform vec2 uRes,uOff;
 uniform float uTime,uTeff,uFreq,uConv,uHalf,uRot,uTilt,uBeta,uFilter;
 uniform vec4 uSpots[48];
@@ -137,14 +143,14 @@ void main(){
   float vis=1.-smoothstep(.2,.55,foot);
   float gran=.55;
   if(vis>.002&&uConv>.01&&uFilter<2.5){
-   vec3 p=s*uFreq;
+   vec3 p=s*uFreq+uSO;
    vec3 w=vec3(vn(p*.35+t*.06),vn(p*.35+vec3(17.)-t*.05),vn(p*.35+vec3(31.)+t*.04))-.5;
    gran=boil(p+w*1.15,t);
   }
   float mf=uFreq*.2;
   float mvis=1.-smoothstep(.25,.7,px*mf/max(mu,.15));
-  float meso=mvis>.002?fbm(s*mf+vec3(0.,t*.03,0.)):.5;
-  float sup=ridged(s*max(uFreq/26.,2.2)+vec3(t*.012));
+  float meso=mvis>.002?fbm(s*mf+uSO+vec3(0.,t*.03,0.)):.5;
+  float sup=ridged(s*max(uFreq/26.,2.2)+uSO+vec3(t*.012));
   float tf=1.,mp=0.,fac=0.,pl=0.;
   for(int i=0;i<uN;i++){
    vec4 c=uSpots[i];float d=dot(s,c.xyz);
@@ -166,7 +172,7 @@ void main(){
   fac*=1.-mp;
   if(uFilter>2.5){
    float F=clamp(6.5/uHalf,5.,90.);
-   vec3 sp=s*F+vec3(0.,t*.07,t*.03);
+   vec3 sp=s*F+uSO+vec3(0.,t*.07,t*.03);
    vec3 wr=vec3(vn(sp*.8),vn(sp*.8+vec3(9.)),vn(sp*.8+vec3(21.)))-.5;
    float v1=fbm(sp+wr*2.2);
    float v2=ridged(sp*2.6+wr*3.4);
@@ -193,7 +199,7 @@ void main(){
    }
   }else{
    float hf=clamp(uFreq*.2,16.,240.);
-   vec3 sp=s*hf+vec3(0.,t*.05,0.);
+   vec3 sp=s*hf+uSO+vec3(0.,t*.05,0.);
    vec3 wr=vec3(fbm(sp*.7),fbm(sp*.7+9.),fbm(sp*.7+21.))-.5;
    float fib=ridged(sp+wr*2.6);
    float v=.20+.66*pow(fib,1.7)+.30*(sup-.5)+.1*(gran-.5)*vis*uConv;
@@ -271,7 +277,7 @@ function StarGL(canvas) {
     'uFilter',
     'uSpots',
     'uN',
-    'uLut',
+    'uLut','uSO',
   ].forEach(function (n) {
     U[n] = gl.getUniformLocation(p, n);
   });
@@ -311,7 +317,7 @@ function StarGL(canvas) {
     gl.uniform1f(U.uBeta, clamp(26180 / o.T, 1, 9));
     gl.uniform1f(U.uFilter, o.filter);
     gl.uniform4fv(U.uSpots, o.spots);
-    gl.uniform1i(U.uN, o.n);
+    gl.uniform3fv(U.uSO,ST.p.so||[0,0,0]);gl.uniform1i(U.uN, o.n);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
 }
@@ -362,7 +368,7 @@ function model() {
   var nReal = f / MEAN_A,
     nG = Math.min(12, Math.round(nReal)),
     k = nG ? f / (nG * MEAN_A) : 1;
-  var r = rng(1729),
+  var r = rng(1729^(ST.p.seed|0)),
     sp = new Float32Array(48 * 4),
     n = 0,
     best = null,
