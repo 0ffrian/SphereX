@@ -30,6 +30,47 @@ export type {
   VisibleMode,
 } from './generated';
 export { OBJECT_TYPES } from './generated';
+// Area search (A17.8, A17.9): one type per reply, the shared parts and the enum lists.
+export type {
+  AreaIndex,
+  AreaIndexEntry,
+  AreaSummary,
+  AreaSummaryFrame,
+  AreaCoverage,
+  AreaSteps,
+  AreaKnown,
+  AreaKnownObject,
+  AreaKnownPosition,
+  AreaDots,
+  AreaVisitDots,
+  AreaDot,
+  AreaDotLabel,
+  AreaTracks,
+  AreaTrack,
+  AreaTracklet,
+  AreaMatch,
+  AreaSed,
+  AreaSedLabel,
+  AreaVerdict,
+  AreaLinker,
+  AreaChecks,
+  AreaTestMover,
+  AreaPlantedDot,
+  AreaCompleteness,
+  AreaCompletenessCell,
+  AreaControl,
+  AreaBin,
+  AreaMethod,
+  AreaSettings,
+  AreaChecksMethod,
+  AreaSkybotAnswer,
+  AreaMissingCode,
+  AreaProvenanceEntry,
+  AreaTag,
+  AreaRaDec,
+  AreaError,
+} from './generated';
+export { AREA_DOT_LABELS, AREA_VERDICTS, AREA_SED_LABELS, AREA_LINKERS } from './generated';
 /** D-23: IRMode uses the same shape as VisibleMode; `channels_um` is set on IRMode only. */
 export type IRMode = VisibleMode;
 export type {
