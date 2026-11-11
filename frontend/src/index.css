@@ -2548,8 +2548,17 @@ body {
    or to Area elements. The Area card is a feature card (A21.5) that scrolls when the sky is short.
    Not in a layer: the canvas and markers carry Tailwind utilities (cursor-grab,
    pointer-events-auto) that a layered rule could not override while drawing. */
+/* The wrap is capped to the sky (minus the header and bar insets on desktop, 0 on a phone, and the
+   credit) and the card scrolls inside it, so its last button stays reachable on a short sky. */
+.sx-island-wrap.sx-feature-card {
+  max-height: calc(
+    100% - 16px - var(--sx-in-t, 0px) - var(--sx-in-b, 0px) - var(--sx-credit-h, 0px)
+  );
+  display: flex;
+  flex-direction: column;
+}
 .sx-feature-card .sx-island {
-  max-height: calc(100% - 24px - var(--sx-credit-h, 0px));
+  min-height: 0;
   overflow: auto;
 }
 .sx-sky-pane[data-pointer-mode='draw'] > canvas {
