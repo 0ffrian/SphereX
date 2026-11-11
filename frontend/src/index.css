@@ -1037,11 +1037,9 @@ body {
   }
   /* In the panel's place it is the panel's own box (same fill, border and shadow). */
   .sx-orb-wrap[data-mode='panel'] .sx-orb {
-    background: #050506;
-    border-color: #262629;
-    box-shadow:
-      0 24px 70px #000f,
-      0 2px 12px #000b;
+    background: var(--s1);
+    border-color: var(--line);
+    box-shadow: none;
   }
   .sx-orb-glow {
     position: absolute;
@@ -1707,11 +1705,10 @@ body {
     align-items: center;
     gap: 4px;
     height: 56px;
-    border-radius: 18px;
-    background: #242729;
-    border: 1px solid #323a3e;
-    box-shadow: 0 10px 28px #0007;
-    color: #c1c9cd;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--s1) 92%, transparent);
+    border: 1px solid var(--line);
+    color: var(--muted);
   }
   .sx-zoom {
     left: 16px;
@@ -1727,11 +1724,11 @@ body {
       transform 0.25s var(--sx-spring),
       background 0.2s;
   }
-  .sx-btn-i:enabled:hover,
+  .sx-fl .sx-btn-i:enabled:hover,
   .sx-zval:enabled:hover,
   .sx-dtool:enabled:hover {
-    background: #2f3538;
-    color: #fff;
+    background: var(--s2);
+    color: var(--fg);
   }
   .sx-btn-i:active {
     transform: scale(0.88);
@@ -1740,8 +1737,10 @@ body {
     min-width: 54px;
     height: 32px;
     border-radius: 10px;
-    font: 12px var(--font-mono);
-    color: #c1c9cd;
+    font-family: inherit;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
   }
   .sx-btn-i:disabled,
   .sx-zval:disabled,
@@ -1757,17 +1756,17 @@ body {
   .sx-dock {
     left: 50%;
     transform: translateX(-50%);
-    height: 58px;
-    padding: 0 9px;
+    height: 56px;
+    padding: 0 7px;
     gap: 6px;
-    border-radius: 22px;
+    border-radius: 10px;
   }
   .sx-vsep {
     display: block;
     flex: none;
     width: 1px;
     height: 24px;
-    background: #323a3e;
+    background: var(--line);
     margin: 0 5px;
   }
   .sx-dtool {
@@ -1776,8 +1775,8 @@ body {
     place-items: center;
     width: 42px;
     height: 42px;
-    border-radius: 14px;
-    color: #c1c9cd;
+    border-radius: 8px;
+    color: var(--muted);
     transition:
       background 0.2s,
       transform 0.25s var(--sx-spring);
@@ -1786,7 +1785,7 @@ body {
     transform: scale(0.9);
   }
   .sx-dtool[data-active='true'] {
-    color: #fff;
+    color: var(--fg);
   }
   .sx-dtool[data-active='true']::before {
     content: '';
@@ -1798,7 +1797,7 @@ body {
     border-radius: 3px;
     background: var(--color-sx-green);
   }
-  .sx-dtool[aria-pressed='true'] {
+  .sx-dtool[aria-pressed='true']:not(.sx-sdock-tool) {
     color: var(--on-ac);
     background: var(--ac);
   }
@@ -3405,4 +3404,449 @@ body {
   border-radius: 50%;
   background: var(--wave);
   flex: none;
+}
+
+/* ---- Floating layout (mock-up `.fl`: player top left, readout top right, zoom bottom left, dock
+   bottom centre, island bottom right) over the full-bleed sky. Surfaces are the design language's
+   (D-38): --s1 at 92 %, --line border, 10 px radius, no glow; 16 px from the bezel edge. ---- */
+@layer components {
+  .sx-zoom-slot {
+    display: contents;
+  }
+  .sx-bezel[data-split] .sx-zoom-slot {
+    display: none;
+  }
+  /* The RA/Dec card, with the frame's wavelength and date under it. */
+  .sx-coords-wrap {
+    text-align: right;
+    transition: opacity 0.35s;
+  }
+  .sx-coords {
+    display: inline-block;
+    padding: 9px 14px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--s1) 92%, transparent);
+    border: 1px solid var(--line);
+    font-size: 12px;
+    line-height: 18px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    text-align: left;
+  }
+  .sx-coords b {
+    font-weight: 500;
+    color: var(--fg);
+  }
+  .sx-coords-k {
+    color: var(--fg);
+    text-decoration: none;
+  }
+  .sx-coords-sub {
+    margin-top: 6px;
+    padding-right: 2px;
+    font-size: 11px;
+    line-height: 16px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 2px #000;
+  }
+  .sx-player {
+    background: color-mix(in srgb, var(--s1) 92%, transparent);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: none;
+  }
+  .sx-btn-i {
+    border-radius: 8px;
+  }
+  .sx-frame-info {
+    font: inherit;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .sx-sky-credit {
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+    border-radius: 6px;
+    font: inherit;
+    font-size: 11px;
+    line-height: 16px;
+    color: var(--muted);
+  }
+  .sx-credit-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    min-width: 0;
+  }
+  .sx-credit-text {
+    flex: 1 1 100%;
+  }
+  /* The object / flipbook card and the selected object's card take the mock-up's island place. */
+  .sx-panel,
+  .sx-island {
+    background: color-mix(in srgb, var(--s1) 92%, transparent);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: none;
+  }
+  .sx-island-head h2 {
+    color: var(--fg);
+  }
+}
+
+@media (min-width: 641px) {
+  @layer components {
+    .sx-bezel {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+      grid-template-areas: none;
+    }
+    /* No bars: the cards carry their own surface, so the sky needs no dark edges. */
+    .sx-sky-shade {
+      display: none;
+    }
+    .sx-top {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 20;
+      display: grid;
+      justify-items: end;
+      gap: 8px;
+      padding: 0;
+      width: auto;
+      max-width: min(26rem, 40%);
+    }
+    .sx-top > [data-testid='fixture-banner'] {
+      order: 2;
+      width: 100%;
+    }
+    .sx-transport-slot {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 20;
+      padding: 0;
+      max-width: calc(100% - 32px - min(26rem, 40%) - 16px);
+    }
+    .sx-scrub {
+      flex: 1 1 140px;
+      max-width: 180px;
+    }
+    .sx-bezel[data-split] .sx-coords-wrap {
+      opacity: 0;
+    }
+    /* Panels float at the bottom right, below the readout card. */
+    .sx-panel {
+      top: auto;
+      right: 16px;
+      bottom: 16px;
+      width: min(440px, calc(100% - 32px));
+      max-height: calc(100% - 16px - 112px);
+    }
+    .sx-panel-wide {
+      left: 16px;
+      right: auto;
+      width: min(680px, calc(100% - 32px));
+    }
+    .sx-island-wrap {
+      top: auto;
+      left: auto;
+      right: 16px;
+      bottom: 78px;
+      transform: none;
+    }
+    .sx-sky-status {
+      top: auto;
+      bottom: 88px;
+    }
+    /* Quiet survey credit above the zoom card: one muted line (the full text on hover or focus,
+       and in the tooltip). D-35 keeps it always on screen. */
+    .sx-sky-credit {
+      left: 16px;
+      bottom: 76px;
+      max-width: min(52rem, calc(100% - 32px));
+      padding: 3px 8px;
+    }
+    .sx-sky-pane:has(.sx-panel) .sx-sky-credit {
+      max-width: min(52rem, calc(100% - 32px - 456px));
+    }
+    .sx-credit-line {
+      flex-wrap: nowrap;
+    }
+    .sx-credit-line > :not(.sx-credit-text) {
+      flex: none;
+    }
+    .sx-credit-text {
+      flex: 0 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .sx-credit-line:hover,
+    .sx-credit-line:focus-within {
+      flex-wrap: wrap;
+    }
+    .sx-credit-line:hover .sx-credit-text,
+    .sx-credit-line:focus-within .sx-credit-text {
+      flex-basis: 100%;
+      white-space: normal;
+    }
+    .sx-sky-credit .sx-hide-s {
+      display: none;
+    }
+    .sx-zoom {
+      height: 48px;
+    }
+    /* ---- the dock: tools, a divider, then a search that opens when it takes focus ---- */
+    .sx-sdock {
+      transition: left 0.6s var(--sx-spring);
+    }
+    /* Clear of the card that opens at the bottom right (the mock-up slides its dock left). */
+    .sx-bezel:has(.sx-panel, .sx-island-wrap) .sx-sdock {
+      left: max(458px, min(50%, calc(100% - 752px)));
+    }
+    .sx-sdock-inner {
+      position: relative;
+    }
+    .sx-sdock .sx-hl {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      background: var(--s3);
+    }
+    .sx-sdock .sx-tool-tip {
+      position: absolute;
+      left: 50%;
+      top: auto;
+      bottom: calc(100% + 18px);
+      z-index: 60;
+      background: var(--fg);
+      color: var(--bg);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 9px;
+      border-radius: 6px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateX(-50%) translateY(4px);
+      transition:
+        opacity 0.15s,
+        transform 0.3s var(--sx-spring);
+    }
+    .sx-sdock .sx-dtool:hover .sx-tool-tip,
+    .sx-sdock .sx-dtool:focus-visible .sx-tool-tip {
+      opacity: 1;
+      transform: translateX(-50%);
+    }
+    .sx-sdock .sx-search-slot {
+      position: relative;
+      flex: none;
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      border-radius: 8px;
+      transition:
+        width 0.45s var(--sx-spring),
+        background 0.2s;
+    }
+    .sx-sdock .sx-search-slot:hover {
+      background: var(--s2);
+    }
+    .sx-sdock .sx-search-slot:focus-within {
+      width: 300px;
+      background: var(--s2);
+      z-index: 30;
+    }
+    .sx-sdock .sx-search {
+      height: 100%;
+    }
+    .sx-sdock .sx-search-form {
+      position: absolute;
+      inset: 0;
+    }
+    .sx-sdock .sx-search-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      padding: 0 80px 0 42px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: transparent;
+      caret-color: transparent;
+      cursor: pointer;
+      box-shadow: none;
+    }
+    .sx-sdock .sx-search-input::placeholder {
+      color: transparent;
+    }
+    .sx-sdock .sx-search-input:focus {
+      color: var(--fg);
+      caret-color: var(--accent);
+      cursor: text;
+      background: var(--s2);
+      border: 0;
+      box-shadow: inset 0 0 0 1px var(--accent);
+    }
+    .sx-sdock .sx-search-input:focus::placeholder {
+      color: var(--muted);
+    }
+    .sx-sdock .sx-search-input[aria-invalid='true'] {
+      box-shadow: inset 0 0 0 1px var(--color-fail);
+    }
+    .sx-sdock .sx-search-icon {
+      left: 12px;
+      top: 12px;
+      z-index: 1;
+      color: var(--muted);
+    }
+    .sx-sdock .sx-search-slot:hover .sx-search-icon,
+    .sx-sdock .sx-search-slot:focus-within .sx-search-icon {
+      color: var(--fg);
+    }
+    .sx-sdock .sx-kbd,
+    .sx-sdock .sx-search-go {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s 0.1s;
+    }
+    .sx-sdock .sx-kbd {
+      right: 44px;
+      top: 10px;
+      background: var(--s3);
+      border-color: var(--line);
+      color: var(--muted);
+    }
+    .sx-sdock .sx-search-slot:focus-within .sx-kbd {
+      opacity: 1;
+    }
+    .sx-sdock .sx-search-go {
+      top: 5px;
+      right: 5px;
+      border-radius: 6px;
+    }
+    .sx-sdock .sx-search-slot:focus-within .sx-search-go {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .sx-sdock .sx-search-pop {
+      bottom: calc(100% + 18px);
+    }
+    /* The list and help it opens sit above the survey credit while the search has focus. */
+    .sx-sdock:focus-within {
+      z-index: 30;
+    }
+    /* Build view: the build pane has its own dock, so the sky's shows only its search (when "/" or
+       its button brings focus), just above it. */
+    .sx-bezel[data-split] .sx-sdock {
+      bottom: 84px;
+    }
+    .sx-bezel[data-split] .sx-sdock .sx-sdock-tools,
+    .sx-bezel[data-split] .sx-sdock .sx-vsep {
+      display: none;
+    }
+    .sx-bezel[data-split] .sx-sdock:not(:focus-within) {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .sx-bezel[data-split] .sx-sdock:focus-within {
+      z-index: 30;
+    }
+  }
+}
+
+/* Phone: the player sits on top under the readout, the dock (tools as a tab bar, then the search)
+   at the bottom; the zoom card is not drawn (pinch zooms). */
+@media (max-width: 640px) {
+  @layer components {
+    .sx-bezel {
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      grid-template-areas: 'top' 'transport' 'view' 'dock';
+    }
+    .sx-coords-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: flex-end;
+      gap: 0 10px;
+    }
+    .sx-coords {
+      padding: 6px 10px;
+    }
+    .sx-sdock {
+      grid-area: dock;
+      position: static;
+      transform: none;
+      left: auto;
+      bottom: auto;
+      height: auto;
+      width: auto;
+      margin: 0 6px;
+      padding: 6px;
+      gap: 6px;
+      flex-direction: column;
+      align-items: stretch;
+      display: flex;
+    }
+    .sx-sdock .sx-vsep {
+      display: none;
+    }
+    .sx-sdock-tools ul {
+      display: flex;
+      gap: 4px;
+    }
+    .sx-sdock-tools li {
+      flex: 1 1 0;
+    }
+    .sx-sdock-tool {
+      width: 100%;
+      height: 52px;
+      grid-template-rows: auto auto;
+      align-content: center;
+      gap: 2px;
+    }
+    .sx-sdock .sx-hl {
+      border-radius: 8px;
+      background: var(--s3);
+    }
+    .sx-sdock .sx-tool-tip {
+      position: static;
+      opacity: 1;
+      transform: none;
+      background: none;
+      color: inherit;
+      padding: 0;
+      font-size: 11px;
+      line-height: 14px;
+    }
+    .sx-sdock-tool[data-active='true']::before {
+      left: 12px;
+      right: 12px;
+      bottom: 2px;
+    }
+    .sx-sdock .sx-search-slot {
+      grid-area: auto;
+      padding: 0;
+    }
+    .sx-sdock .sx-search-input {
+      border-radius: 8px;
+      background: var(--s2);
+      border: 1px solid var(--line);
+    }
+    .sx-sdock .sx-search-input:focus {
+      border-color: var(--accent);
+      box-shadow: none;
+    }
+    .sx-island-wrap {
+      top: auto;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+  }
 }

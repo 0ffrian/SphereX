@@ -50,6 +50,7 @@ import {
 import { pickSurvey, planSkyLoad } from '@/viewer/sky/surveys';
 import { PICK_FORMULA } from './positionTags';
 import { publishReadout } from './readout';
+import { registerSkyZoom } from './skyZoom';
 import {
   cachedMarkerDescription,
   cachedMarkerLabel,
@@ -227,6 +228,27 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       canvas.remove();
     };
   }, [descId]);
+
+  // The zoom card (bottom left) acts on this view like the wheel and the + and - keys.
+  useEffect(() => {
+    if (!view) return;
+    registerSkyZoom({
+      zoom: (factor) => {
+        flyCancel.current?.();
+        const { width, height } = view.getSize();
+        view.setView(zoomAt(view.getView(), factor, width, height));
+        announceView(view.getView());
+      },
+      reset: () => {
+        flyCancel.current?.();
+        view.setView(DEFAULT_SKY_VIEW);
+        announceView(view.getView());
+      },
+    });
+    return () => registerSkyZoom(null);
+    // announceView only touches a ref and a state setter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
 
   // ---- Index and image ---------------------------------------------------------------------------
   useEffect(() => {
@@ -809,17 +831,18 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       <div ref={creditRef} className="sx-sky-credit" data-testid="sky-credit-box">
         {survey && (
           <p
-            className="pointer-events-auto flex flex-wrap items-center gap-1.5"
+            className="sx-credit-line pointer-events-auto"
             data-testid="sky-credit"
           >
             <span className="text-sx-fg">{survey.title}</span>
             {survey.tag === 'derived' ? (
-              <EstimatedBadge tooltip={survey.formula ?? ''} />
+              <EstimatedBadge tooltip={survey.formula ?? ''} variant="tag" />
             ) : (
               <ProvenanceBadge
                 tag={survey.tag}
                 tooltip={survey.formula ?? survey.assumption ?? undefined}
                 srText
+                variant="tag"
               />
             )}
             {fixtureSky && (
@@ -827,7 +850,9 @@ export function SkyPane({ children }: { children?: ReactNode }) {
                 SYNTHETIC
               </span>
             )}
-            <span className="basis-full">{survey.credit}</span>
+            <span className="sx-credit-text" title={survey.credit}>
+              {survey.credit}
+            </span>
           </p>
         )}
         {picked && (
