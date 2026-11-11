@@ -87,6 +87,8 @@ export function ZoomBar() {
   );
 }
 
+// The props stay in the signature for the pane's call; the dock no longer opens a panel (Feel was removed on purpose).
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function BuildDock(_props: { pop: PopId | null; onPop(p: PopId | null): void }) {
   return (
     <nav className="sx-fl sx-dock" aria-label="Tools and search" data-testid="build-dock">

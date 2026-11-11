@@ -7,6 +7,7 @@ import type { ViewerApp } from '@/viewer/ViewerApp';
 import { Row, Rows, SwitchRow, ToggleGroup } from './PanelControls';
 import { ProvenanceBadge } from './Badge';
 import { useStarChart } from './starChartStore';
+import { useBuildControlsStore } from './build/BuildControls';
 
 export function StarFlarePanel({
   viewer,
@@ -151,6 +152,12 @@ const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce
 /** The compact flare chart and player, at the top of the star's Details pane. The controls row lives in BuildControls. */
 export function StarEngineDetails() {
   const chart = useStarChart((s) => s.chart);
+  // One short muted line under the player: where the close-up is looking, and whether it is quiet.
+  const where = useBuildControlsStore((s) => {
+    for (const spec of Object.values(s.specs))
+      for (const c of spec.controls) if (c.kind === 'readout' && c.slot === 'where') return c.value;
+    return null;
+  });
   const scrub = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!chart) return;
     const b = e.currentTarget.getBoundingClientRect();
@@ -235,6 +242,11 @@ export function StarEngineDetails() {
         />
         <output className="sx-flare-time">{minutes} min</output>
       </div>
+      {where && (
+        <p className="m-0 text-xs" style={{ color: 'var(--muted)' }} data-testid="flare-where">
+          {where}
+        </p>
+      )}
     </div>
   );
 }

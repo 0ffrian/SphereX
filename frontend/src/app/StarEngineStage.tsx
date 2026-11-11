@@ -47,13 +47,13 @@ const READOUT_TAG: Record<string, Tag> = {
 };
 const LIGHT_LABEL: Record<StarLight, string> = {
   0: 'True colour',
-  2: 'Enhanced colour',
-  3: 'Observatory view',
+  2: 'Enhanced',
+  3: 'Observatory',
 };
-const SCALE_LABEL: Record<StarScaleView, string> = {
-  big: 'Whole star, larger detail',
-  true: 'Whole star, true scale',
-  close: 'Close-up',
+// The left pane is the close-up now, so the globe offers two views; the engine's 'close' view is not offered.
+const SCALE_LABEL: Partial<Record<StarScaleView, string>> = {
+  big: 'Larger detail',
+  true: 'True scale',
 };
 
 /** Builds the engine in `host`, drives its clock, and keeps React in step with it. */
@@ -200,7 +200,7 @@ function useCloseUpZoom(host: React.RefObject<HTMLDivElement | null>, engine: St
       pts.delete(e.pointerId);
       last = 0;
     };
-    el.style.touchAction = 'none';
+    el.style.setProperty('touch-action', 'none');
     el.addEventListener('wheel', onWheel, { passive: false });
     el.addEventListener('pointerdown', down);
     el.addEventListener('pointermove', move);
@@ -248,10 +248,10 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
         id: 'scale',
         kind: 'choice',
         label: 'View',
-        value: engine.scale,
+        value: engine.scale === 'close' ? 'true' : engine.scale,
         options: (Object.keys(SCALE_LABEL) as StarScaleView[]).map((s) => ({
           value: s,
-          label: SCALE_LABEL[s],
+          label: SCALE_LABEL[s] ?? s,
         })),
         onChange: (v) => {
           engine.setScale(v as StarScaleView);
@@ -468,19 +468,20 @@ export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: 
         {
           id: 'where',
           kind: 'readout',
+          slot: 'where',
           label: 'Looking at',
-          value: `${placeText(target ?? at)} (${target ? 'picked on the globe' : 'strongest spot group'})`,
+          value: `Looking at ${placeText(target ?? at)} \u00b7 ${quiet ? 'quiet' : info.flaring ? 'flaring' : 'spot group'}`,
         },
         {
           id: 'kind',
           kind: 'choice',
+          slot: 'about',
           label: 'Flare type',
           value: flare.kind,
           options: [
             { value: 'closed', label: 'Closed' },
             { value: 'open', label: 'Open' },
           ],
-          tag: 'artistic',
           onChange: (v) => {
             engine.setFlareKind(v as 'closed' | 'open');
             bump();
@@ -489,6 +490,7 @@ export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: 
         {
           id: 'cls',
           kind: 'choice',
+          slot: 'about',
           label: 'Flare class',
           value: flare.cls,
           options: [
@@ -496,7 +498,6 @@ export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: 
             { value: 'm', label: 'M' },
             { value: 'x', label: 'X' },
           ],
-          tag: 'artistic',
           onChange: (v) => {
             engine.setFlareClass(v as 'c' | 'm' | 'x');
             bump();
@@ -505,6 +506,7 @@ export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: 
         {
           id: 'stage',
           kind: 'readout',
+          slot: 'about',
           label: 'What is happening',
           value: quiet
             ? 'A quiet place: boiling cells only. No spot group is in view, so there are no loops and no flare can start here. Pick a spot group on the globe, or press Fire a big flare.'

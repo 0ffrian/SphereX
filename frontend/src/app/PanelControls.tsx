@@ -15,6 +15,8 @@ export interface ToggleOption<T extends string> {
   label: string;
   disabled?: boolean;
   title?: string;
+  /** Id of a hint element that describes this option (aria-describedby). */
+  describedBy?: string;
   testId?: string;
 }
 
@@ -150,6 +152,7 @@ export function ToggleGroup<T extends string>({
               : { 'aria-pressed': value === o.value })}
             disabled={o.disabled}
             title={o.title}
+            aria-describedby={o.describedBy}
             onClick={() => onChange(o.value)}
             data-testid={o.testId}
           >
