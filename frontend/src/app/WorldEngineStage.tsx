@@ -44,6 +44,8 @@ const fromSlider = (s: number, r: readonly [number, number]): number =>
   Math.exp(r[0] + (r[1] - r[0]) * (s / 1000));
 
 const fmt = (x: number, d = 0): string => x.toLocaleString('en', { maximumFractionDigits: d });
+/** A press that moves less than this is a click (pick a place), more is a drag (turn the globe). */
+const DRAG_SLOP_PX = 4;
 
 /** Fly altitude, slider position (0..1000) and back, as the prototype's altToS / sToAlt. */
 export function altToSlider(alt: number, r: [number, number]): number {
@@ -488,12 +490,14 @@ export function WorldGlobeStage({ world, onFail }: { world: CardToWorldOk; onFai
   );
   useBuildControls('world', spec);
 
-  // Click a place: the left close-up goes there (the artifact's globePick). With the close-up closed, drag turns a rocky world.
+  // Drag turns a rocky world; with the close-up open, a click (no drag) picks the place the close-up
+  // goes to (the artifact's globePick). Issue #93: the pick used to fire on every press, so the globe
+  // could not be turned while the close-up was open.
   useEffect(() => {
     const host = hostRef.current;
     const canvas = host?.querySelector('canvas');
     if (!engine || !canvas) return;
-    let drag: { x: number; y: number } | null = null;
+    let drag: { x: number; y: number; x0: number; y0: number; moved: boolean } | null = null;
     const px = (e: PointerEvent): [number, number] => {
       const rc = canvas.getBoundingClientRect();
       const k = canvas.width / rc.width;
@@ -502,31 +506,37 @@ export function WorldGlobeStage({ world, onFail }: { world: CardToWorldOk; onFai
     const canTurn = () => !engine.state().gas;
     canvas.style.cursor = 'grab';
     const down = (e: PointerEvent) => {
-      if (useWorldStore.getState().fly) {
-        const p = engine.globePick(...px(e));
-        if (p) useWorldStore.getState().pick(p.lon, p.lat);
-        return;
-      }
-      if (!canTurn()) return;
-      drag = { x: e.clientX, y: e.clientY };
+      if (e.button !== 0) return;
+      drag = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, moved: false };
       canvas.setPointerCapture(e.pointerId);
-      canvas.style.cursor = 'grabbing';
+      if (canTurn()) canvas.style.cursor = 'grabbing';
     };
     const move = (e: PointerEvent) => {
       if (!drag) return;
-      const s = engine.state();
-      useWorldStore.getState().apply({
-        yaw: s.yaw + ((e.clientX - drag.x) * 0.006) / s.zoom,
-        pitch: Math.max(-1.4, Math.min(1.4, s.pitch + ((e.clientY - drag.y) * 0.006) / s.zoom)),
-      });
-      drag = { x: e.clientX, y: e.clientY };
+      if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < DRAG_SLOP_PX)
+        return;
+      drag.moved = true;
+      if (canTurn()) {
+        const s = engine.state();
+        useWorldStore.getState().apply({
+          yaw: s.yaw + ((e.clientX - drag.x) * 0.006) / s.zoom,
+          pitch: Math.max(-1.4, Math.min(1.4, s.pitch + ((e.clientY - drag.y) * 0.006) / s.zoom)),
+        });
+      }
+      drag.x = e.clientX;
+      drag.y = e.clientY;
     };
-    const end = () => {
+    const end = (e: PointerEvent) => {
+      const clicked = drag !== null && !drag.moved && e.type === 'pointerup';
       drag = null;
       canvas.style.cursor = 'grab';
+      if (clicked && useWorldStore.getState().fly) {
+        const p = engine.globePick(...px(e));
+        if (p) useWorldStore.getState().pick(p.lon, p.lat);
+      }
     };
     const key = (e: KeyboardEvent) => {
-      if (useWorldStore.getState().fly || !canTurn()) return;
+      if (!canTurn()) return;
       const s = engine.state();
       const d: Record<string, [number, number]> = {
         ArrowLeft: [-0.1, 0],
@@ -550,7 +560,7 @@ export function WorldGlobeStage({ world, onFail }: { world: CardToWorldOk; onFai
     canvas.setAttribute('role', 'application');
     canvas.setAttribute(
       'aria-label',
-      `${world.preset.label}, simulated planet. Click a place to look at it in the close-up on the left.`,
+      `${world.preset.label}, simulated planet. Drag or use the arrow keys to turn it. Click a place to look at it in the close-up on the left.`,
     );
     return () => {
       canvas.removeEventListener('pointerdown', down);
@@ -648,10 +658,11 @@ export function WorldFlyStage({
     };
     const move = (e: PointerEvent) => {
       if (!drag) return;
-      engine.fly.head += (e.clientX - drag[0]) * 0.005;
+      // The view follows the hand, as on the globe (issue #93: it used to turn against the drag).
+      engine.fly.head -= (e.clientX - drag[0]) * 0.005;
       engine.fly.pitch = Math.max(
         -1.2,
-        Math.min(0.6, engine.fly.pitch - (e.clientY - drag[1]) * 0.004),
+        Math.min(0.6, engine.fly.pitch + (e.clientY - drag[1]) * 0.004),
       );
       drag = [e.clientX, e.clientY];
       draw();
