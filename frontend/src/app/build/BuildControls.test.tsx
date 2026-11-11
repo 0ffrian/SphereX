@@ -31,15 +31,47 @@ describe('BuildControls slot', () => {
     const spec: BuildControlsSpec = {
       title: 'Surface',
       controls: [
-        { kind: 'slider', id: 'age', label: 'Surface age', min: 0, max: 10, value: 4, valueText: '4 Myr', tag: 'artistic', onChange: onAge },
+        {
+          kind: 'slider',
+          id: 'age',
+          label: 'Surface age',
+          min: 0,
+          max: 10,
+          value: 4,
+          valueText: '4 Myr',
+          tag: 'artistic',
+          onChange: onAge,
+        },
         { kind: 'button', id: 'f', label: 'Fire a big flare', onClick: onFlare },
-        { kind: 'toggle', id: 'p', label: 'Pause', pressed: false, disabled: true, why: 'Nothing moves here.', onChange: () => {} },
+        {
+          kind: 'toggle',
+          id: 'p',
+          label: 'Pause',
+          pressed: false,
+          disabled: true,
+          why: 'Nothing moves here.',
+          onChange: () => {},
+        },
       ],
       notes: [{ title: 'How it is worked out', lines: ['a'], placeholder: 'Placeholders.' }],
     };
-    await act(async () => root.render(<><BuildControls /><Owner spec={null} /></>));
+    await act(async () =>
+      root.render(
+        <>
+          <BuildControls />
+          <Owner spec={null} />
+        </>,
+      ),
+    );
     expect(host.querySelector('[data-testid="build-controls"]')).toBeNull();
-    await act(async () => root.render(<><BuildControls /><Owner spec={spec} /></>));
+    await act(async () =>
+      root.render(
+        <>
+          <BuildControls />
+          <Owner spec={spec} />
+        </>,
+      ),
+    );
     const region = host.querySelector('[data-testid="build-controls"]')!;
     expect(region.textContent).toContain('Surface age');
     expect(region.querySelector('[data-testid="provenance-badge"]')!.textContent).toBe('Default');

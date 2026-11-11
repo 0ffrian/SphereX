@@ -4,6 +4,8 @@
 //   used for scaling (Q-43), not a limit.
 //   Gas shells: one additive point cloud per gas, density ~ 1/r^2 out to the coma radius, point
 //   count and brightness proportional to Q of the selected epoch. False colours with a legend.
+//   Water's count and brightness also carry the Haser break-up share inside the coma
+//   (`h2o_breakup`, model_dependent); the drawn radial profile itself stays 1/r^2.
 //   Dust: Sun-pointing, December only. Tail: none in August; drawn in December only if a
 //   published result shows one, and the card holds no such field, so it is never drawn.
 //   Epoch toggle: Aug 2025 / Dec 2025.
@@ -16,10 +18,14 @@ import { comaVolume, dustConeVolume, dustTailVolume, ionTailVolume } from '../vo
 import {
   EPOCH_JD,
   gasRatesAt,
+  h2oScaleLengthKm,
+  haserShellFraction,
+  HASER_ASSUMPTION,
   hasKeyedEpochs,
   INTERPOLATION_ASSUMPTION,
   type GasKey,
 } from '@/physics/cometGas';
+import { GRAIN_SIZE_ASSUMPTION, stateAt } from '@/physics/cometTail';
 import { modelledTails, trackRows } from './cometTailPlan';
 
 export const COMET_EPOCHS: readonly CometEpoch[] = ['2025-08', '2025-12'];
@@ -89,15 +95,21 @@ export function epochsWithQ(card: ObjectCard): CometEpoch[] {
  * Shell sizes. Point count and brightness are proportional to Q, normalised by the largest Q of
  * any gas in any epoch of the card, so switching epoch changes the shells.
  */
+/** The largest Q of any gas in any epoch of the card (the brightness scale), 0 when none. */
+export function cardQMax(card: ObjectCard): number {
+  let qMax = 0;
+  for (const e of COMET_EPOCHS)
+    for (const g of GAS_STYLE) qMax = Math.max(qMax, qValue(gasQForEpoch(card, e), g.key) ?? 0);
+  return qMax;
+}
+
 export function planShells(
   card: ObjectCard,
   epoch: CometEpoch,
   seed: number,
   jd: number | null = null,
 ): ShellPlan[] {
-  let qMax = 0;
-  for (const e of COMET_EPOCHS)
-    for (const g of GAS_STYLE) qMax = Math.max(qMax, qValue(gasQForEpoch(card, e), g.key) ?? 0);
+  const qMax = cardQMax(card);
   if (qMax === 0) return [];
   // Issue #71 F (Q-262): at a chosen time the rates come from cometGas (measured inside an epoch
   // window, a log-linear interpolation between them), on the same scale as the epochs.
@@ -157,9 +169,35 @@ export function planComet(input: PlanInput): RenderPlan {
   ) {
     shells = planShells(card, epoch, params.seed, timed ? jd : null);
     if (rates?.rates.some((r) => r.kind === 'interpolated'))
+      b.notes.push(`Between observations the gas amounts are a guess. ${INTERPOLATION_ASSUMPTION}`);
+    for (const r of rates?.rates ?? [])
+      if (r.kind === 'measured' && r.instrument && r.instrument !== 'SPHEREx')
+        b.notes.push(`${r.label} at this time: ${r.source ?? r.instrument}`);
+    if (shells.some((s) => s.brightness >= 1) && rates?.rates.some((r) => r.value > cardQMax(card)))
       b.notes.push(
-        `Between the two observations the gas amounts are a guess. ${INTERPOLATION_ASSUMPTION}`,
+        'Near closest approach to the Sun the gas amount is above the top of the brightness scale (the largest SPHEREx value), so it is drawn at full brightness.',
       );
+    // Water is broken up by sunlight (Haser model, `model_dependent`): fewer of its molecules are
+    // left inside the coma than a pure 1/r^2 shell holds. The heliocentric distance comes from the
+    // card's Horizons path at the picture's time.
+    const h2o = shells.find((s) => s.id === 'h2o');
+    if (h2o) {
+      const path = trackRows(card.orbit_track?.value);
+      const st = path ? stateAt(path, jd) : null;
+      const L = st ? h2oScaleLengthKm(Math.hypot(st.r[0], st.r[1], st.r[2])) : null;
+      const comaR = numberField(card, 'coma_radius_km');
+      if (L !== null && comaR !== null && comaR > 0) {
+        if (b.drawLocal('h2o_breakup', 'model_dependent', HASER_ASSUMPTION)) {
+          const f = haserShellFraction(h2o.innerRadius, h2o.outerRadius, L / comaR);
+          h2o.brightness *= f;
+          h2o.count = Math.max(1, Math.round(h2o.count * f));
+        }
+      } else {
+        b.notes.push(
+          'Water is drawn without its break-up by sunlight: the distance from the Sun or the coma size is not known.',
+        );
+      }
+    }
   }
 
   // Nucleus: a dark sphere at the upper size limit; a point if the value is missing or hidden.
@@ -279,8 +317,9 @@ export function planComet(input: PlanInput): RenderPlan {
     }
     if (tailDrawn) {
       b.notes.push(
-        'The tails are modelled, not seen. The Sun direction comes from the comet\u2019s path (JPL Horizons). The dust tail assumes grain sizes. SPHEREx did not see a dust tail pointing away from the Sun.',
+        'The tails are modelled, not seen. The Sun direction comes from the comet\u2019s path (JPL Horizons). SPHEREx did not see a dust tail pointing away from the Sun.',
       );
+      if (tails.dust) b.notes.push(GRAIN_SIZE_ASSUMPTION);
       if (tails.dust && tails.dustCapped)
         b.notes.push('The dust tail is cut short in the picture; the model makes it longer.');
     }

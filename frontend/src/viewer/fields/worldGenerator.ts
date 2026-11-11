@@ -34,7 +34,14 @@ export interface WorldParams {
 export interface WorldData {
   model: WorldModel;
   terrain: { W: number; H: number; data: Float32Array; plates: number };
-  climate: { nx: number; ny: number; out: Float32Array; rain: Float32Array; stats: BudgetStats | null; hash: string };
+  climate: {
+    nx: number;
+    ny: number;
+    out: Float32Array;
+    rain: Float32Array;
+    stats: BudgetStats | null;
+    hash: string;
+  };
   /** Rivers, lakes, salt flats, plumes (physics/hydrology.ts); null when the world has no ocean basin or no air. */
   hydrology: HydroRaster | null;
   /** The shared field (D-12): R height 0..1 (sea level 0.5), ocean, ice and lava masks in B. */
@@ -76,12 +83,25 @@ export const WORLD_SIZES: Readonly<Record<WorldTier, WorldSize>> = {
   low: { ...GRID.low, steps: SETTLE_STEPS.low },
 };
 
-export function generateWorld(p: WorldParams, size: WorldSize = WORLD_SIZES[p.tier]): WorldData | null {
+export function generateWorld(
+  p: WorldParams,
+  size: WorldSize = WORLD_SIZES[p.tier],
+): WorldData | null {
   const model = worldModel(p.inputs);
   if (!model) return null;
   const g = size;
-  const terr = buildTerrain({ seed: p.seed, oceanFraction: p.oceanFraction, gravity: model.gv, W: g.tw, H: g.th });
-  const budget = new ClimateBudget(model, { nx: g.nx, ny: g.ny, oceanFraction: p.oceanFraction }, (lon, lat) => terr.heightAt(lon, lat));
+  const terr = buildTerrain({
+    seed: p.seed,
+    oceanFraction: p.oceanFraction,
+    gravity: model.gv,
+    W: g.tw,
+    H: g.th,
+  });
+  const budget = new ClimateBudget(
+    model,
+    { nx: g.nx, ny: g.ny, oceanFraction: p.oceanFraction },
+    (lon, lat) => terr.heightAt(lon, lat),
+  );
   budget.step(size.steps, SETTLE_DT);
 
   // Rivers and lakes on the final terrain, from the budget's rain (Q-244). Only a world with an ocean
@@ -94,7 +114,12 @@ export function generateWorld(p: WorldParams, size: WorldSize = WORLD_SIZES[p.ti
     for (let i = 0; i < T.length; i++) T[i] = budget.out[i * BUDGET_CHANNELS]!;
     hydrology = hydroRaster(
       t,
-      { radiusM: p.inputs.radiusM, fluid: model.fluid, lapseKPerKm: model.gamK, isWater: p.inputs.fluid === 'water' },
+      {
+        radiusM: p.inputs.radiusM,
+        fluid: model.fluid,
+        lapseKPerKm: model.gamK,
+        isWater: p.inputs.fluid === 'water',
+      },
       { nx: budget.nx, ny: budget.ny, T, rain: budget.rain },
       rt,
       g.rw,
@@ -107,7 +132,7 @@ export function generateWorld(p: WorldParams, size: WorldSize = WORLD_SIZES[p.ti
   const b = new Float32Array(FIELD_WIDTH * FIELD_HEIGHT * 4);
   const { nx, ny, out } = budget;
   const cellAt = (lon: number, lat: number): number => {
-    const cx = Math.min(nx - 1, Math.floor((((lon / (2 * Math.PI) + 0.5) % 1) + 1) % 1 * nx));
+    const cx = Math.min(nx - 1, Math.floor(((((lon / (2 * Math.PI) + 0.5) % 1) + 1) % 1) * nx));
     const cy = Math.min(ny - 1, Math.max(0, Math.floor((lat / Math.PI + 0.5) * ny)));
     return (cy * nx + cx) * BUDGET_CHANNELS;
   };

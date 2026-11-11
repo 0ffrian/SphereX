@@ -15,7 +15,9 @@ import { ORBIT_NOTE } from '@/viewer/orbit/orbitSources';
 import { altRange } from '@/viewer/orbit/orbitMath';
 import { ProvenanceBadge } from './Badge';
 import { buttonClass, pressedClass } from './ui';
-import { StarCloseUp } from './StarCloseUp';
+// Explicit extension: `starCloseUp.ts` (the hook) differs only by case, and a
+// case-insensitive file system (Windows) would resolve `./StarCloseUp` to it.
+import { StarCloseUp } from './StarCloseUp.tsx';
 import { RockCloseUp } from './RockCloseUp';
 import { StarFlareStage, StarSurfaceCloseUp } from './StarEngineStage';
 import { placeText, useStarTarget } from './starTargetStore';
@@ -58,9 +60,16 @@ export function closeUpButtonLabel(kind: CloseUpKind | null): string {
 }
 
 /** The mock-up's caption for each kind (its `.cu-tag` wording: "Close-up · what · honesty"). */
-export function closeUpCaption(kind: CloseUpKind, info: CloseUpInfo | null, gas: boolean, starOk = false): string {
-  if (kind === 'star') return starOk ? STAR_CLOSEUP_TAG : 'Close-up · not available for this star (no surface model)';
-  if (kind === 'body') return 'Close-up · the same body seen from near its surface · generated (Default)';
+export function closeUpCaption(
+  kind: CloseUpKind,
+  info: CloseUpInfo | null,
+  gas: boolean,
+  starOk = false,
+): string {
+  if (kind === 'star')
+    return starOk ? STAR_CLOSEUP_TAG : 'Close-up · not available for this star (no surface model)';
+  if (kind === 'body')
+    return 'Close-up · the same body seen from near its surface · generated (Default)';
   if (info?.refusal) return `Close-up · ${info.refusal}`;
   return gas
     ? 'Close-up · from orbit, click the globe to look at a place · generated from the solved winds (Default), not a photograph'
@@ -86,12 +95,21 @@ export function CloseUpPane() {
   const starTarget = useStarTarget((s) => s.target);
   const kind = closeUpKindOf(type);
   // Issue #71 stream X (D-37): a star the prototype's engine draws opens with the build, with the flare close-up.
-  const engine = kind === 'star' && engineStar && starFailedId !== engineKey(cardId, engineStar.preset.id) ? engineStar : null;
+  const engine =
+    kind === 'star' && engineStar && starFailedId !== engineKey(cardId, engineStar.preset.id)
+      ? engineStar
+      : null;
   // Issue #71 stream Y (D-37): a planet the prototype's world engine draws opens with the build, with its fly view.
-  const world = kind === 'orbit' && engineWorld && worldFailedId !== engineKey(cardId, engineWorld.preset.id) ? engineWorld : null;
+  const world =
+    kind === 'orbit' && engineWorld && worldFailedId !== engineKey(cardId, engineWorld.preset.id)
+      ? engineWorld
+      : null;
   // Issue #71 (D-37): an asteroid or comet the rock engine draws opens with the build; its picture is the engine's, not the viewer's.
   const rockEngine = useRockStore((s) => s.view) !== null && kind === 'body';
-  const open = !hidden && kind !== null && (engine || world || rockEngine ? !held : info !== null && info.mode !== null);
+  const open =
+    !hidden &&
+    kind !== null &&
+    (engine || world || rockEngine ? !held : info !== null && info.mode !== null);
   const [, bump] = useReducer((n: number) => n + 1, 0);
   const [about, setAbout] = useState(false);
   const focusRef = useRef<HTMLDivElement>(null);
@@ -109,7 +127,10 @@ export function CloseUpPane() {
     const c = canvasRef.current;
     if (!viewer || !c || world) return;
     viewer.setCloseUpCanvas(c);
-    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => viewer.requestCloseRender());
+    const ro =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => viewer.requestCloseRender());
     ro?.observe(c);
     return () => {
       ro?.disconnect();
@@ -168,10 +189,10 @@ export function CloseUpPane() {
   const caption = world
     ? worldCaption(world.preset.type === 'gas')
     : engine
-    ? left === 'surface'
-      ? `Close-up · the star\u2019s surface at ${placeText(starTarget)} · generated (Default), not a photograph`
-      : ENGINE_CAPTION
-    : closeUpCaption(kind, info, gas, starProps !== null);
+      ? left === 'surface'
+        ? `Close-up · the star\u2019s surface at ${placeText(starTarget)} · generated (Default), not a photograph`
+        : ENGINE_CAPTION
+      : closeUpCaption(kind, info, gas, starProps !== null);
   const [lo, hi] = view ? altRange(view.kind) : [0, 1];
   const alt = view?.state.altKm ?? 0;
 
@@ -241,21 +262,48 @@ export function CloseUpPane() {
         />
       )}
       {engine && open && left === 'flare' && (
-        <StarFlareStage key={engine.preset.id} star={engine} onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))} />
+        <StarFlareStage
+          key={engine.preset.id}
+          star={engine}
+          onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))}
+        />
       )}
       {engine && open && left === 'surface' && (
-        <StarSurfaceCloseUp key={engine.preset.id} star={engine} onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))} />
+        <StarSurfaceCloseUp
+          key={engine.preset.id}
+          star={engine}
+          onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))}
+        />
       )}
       {engine && open && (
-        <div className="absolute right-3 top-3 z-[3] flex flex-wrap items-center gap-2" role="group" aria-label="Star close-up">
-          <button type="button" className={`${buttonClass} ${pressedClass}`} aria-pressed={left === 'flare'} onClick={() => useStarTarget.getState().show('flare')}>
+        <div
+          className="absolute right-3 top-3 z-[3] flex flex-wrap items-center gap-2"
+          role="group"
+          aria-label="Star close-up"
+        >
+          <button
+            type="button"
+            className={`${buttonClass} ${pressedClass}`}
+            aria-pressed={left === 'flare'}
+            onClick={() => useStarTarget.getState().show('flare')}
+          >
             Flare close-up
           </button>
-          <button type="button" className={`${buttonClass} ${pressedClass}`} aria-pressed={left === 'surface'} onClick={() => useStarTarget.getState().show('surface')}>
+          <button
+            type="button"
+            className={`${buttonClass} ${pressedClass}`}
+            aria-pressed={left === 'surface'}
+            onClick={() => useStarTarget.getState().show('surface')}
+          >
             Surface close-up
           </button>
           {left === 'surface' && (
-            <button type="button" className={buttonClass} disabled={starTarget === null} onClick={() => useStarTarget.getState().home()}>
+            <button
+              type="button"
+              className={buttonClass}
+              disabled={starTarget === null}
+              onClick={() => useStarTarget.getState().home()}
+            >
               Back to the active region
             </button>
           )}
@@ -277,7 +325,8 @@ export function CloseUpPane() {
       {view && !world && (
         <div className="sx-cu-controls" role="group" aria-label="Surface view controls">
           <label htmlFor="orbit-alt" className="flex-1 basis-40">
-            {gas ? 'Height above the clouds' : 'Height above the ground'}: <span data-testid="orbit-alt-label">{formatKm(alt)}</span>
+            {gas ? 'Height above the clouds' : 'Height above the ground'}:{' '}
+            <span data-testid="orbit-alt-label">{formatKm(alt)}</span>
             <input
               id="orbit-alt"
               type="range"
@@ -308,13 +357,21 @@ export function CloseUpPane() {
           >
             Fly forward
           </button>
-          <button type="button" className={buttonClass} aria-expanded={about} onClick={() => setAbout((a) => !a)}>
+          <button
+            type="button"
+            className={buttonClass}
+            aria-expanded={about}
+            onClick={() => setAbout((a) => !a)}
+          >
             What is drawn
           </button>
         </div>
       )}
       {view && !world && about && info?.resolved && (
-        <div className="absolute inset-x-4 bottom-36 z-[3] max-h-[45%] overflow-auto rounded-lg border border-[#323a3e] bg-[#242729f2] p-3 text-xs text-neutral-200" data-testid="orbit-layers">
+        <div
+          className="absolute inset-x-4 bottom-36 z-[3] max-h-[45%] overflow-auto rounded-lg border border-[#323a3e] bg-[#242729f2] p-3 text-xs text-neutral-200"
+          data-testid="orbit-layers"
+        >
           <p className="mb-2">{ORBIT_NOTE}</p>
           <ul className="flex flex-col gap-1">
             {info.resolved.layers.map((l) => (

@@ -32,6 +32,13 @@ export interface Fluid {
   Tb: number;
   /** Molar enthalpy of vaporisation (sublimation for CO2), J/mol [verify]. */
   L: number;
+  /**
+   * Only for a fluid whose one-atmosphere point is a sublimation point (Tb < Tt, CO2): the enthalpy of
+   * vaporisation near the triple point, J/mol, and the critical point (K, Pa) where the liquid-vapour line ends.
+   */
+  Lv?: number;
+  Tc?: number;
+  Pc?: number;
   /** Mixing ratio of the fluid's vapour at the cloud base, mass fraction (artistic; water 0.01 puts Earth's cloud base near 1 km, the prototype's 0.02 put it at the ground, Q-241). */
   q: number;
   /** Colours of the liquid, ice, cloud and bare land under this fluid, linear (artistic). */
@@ -43,12 +50,78 @@ export interface Fluid {
 
 /** The five fluids of the prototype, in the order the `surface_fluid` slider indexes them. */
 export const FLUIDS: Readonly<Record<FluidId, Fluid>> = {
-  water: { id: 'water', label: 'Water', Tt: 273.16, Pt: 611.7, Tb: 373.15, L: 40650, q: 0.01, liq: [0.012, 0.05, 0.13], ice: [0.82, 0.88, 0.96], cld: [1, 1, 1], land: [0.34, 0.27, 0.2] },
-  methane: { id: 'methane', label: 'Methane', Tt: 90.69, Pt: 11700, Tb: 111.67, L: 8190, q: 0.05, liq: [0.03, 0.022, 0.014], ice: [0.72, 0.68, 0.58], cld: [0.95, 0.9, 0.76], land: [0.3, 0.18, 0.09] },
-  ammonia: { id: 'ammonia', label: 'Ammonia', Tt: 195.4, Pt: 6060, Tb: 239.8, L: 23350, q: 0.02, liq: [0.06, 0.09, 0.13], ice: [0.9, 0.9, 0.84], cld: [1, 0.96, 0.84], land: [0.33, 0.29, 0.25] },
-  nitrogen: { id: 'nitrogen', label: 'Nitrogen', Tt: 63.15, Pt: 12500, Tb: 77.36, L: 5570, q: 0.05, liq: [0.05, 0.06, 0.09], ice: [0.88, 0.82, 0.74], cld: [0.9, 0.9, 0.93], land: [0.36, 0.3, 0.26] },
+  water: {
+    id: 'water',
+    label: 'Water',
+    Tt: 273.16,
+    Pt: 611.7,
+    Tb: 373.15,
+    L: 40650,
+    q: 0.01,
+    liq: [0.012, 0.05, 0.13],
+    ice: [0.82, 0.88, 0.96],
+    cld: [1, 1, 1],
+    land: [0.34, 0.27, 0.2],
+  },
+  methane: {
+    id: 'methane',
+    label: 'Methane',
+    Tt: 90.69,
+    Pt: 11700,
+    Tb: 111.67,
+    L: 8190,
+    q: 0.05,
+    liq: [0.03, 0.022, 0.014],
+    ice: [0.72, 0.68, 0.58],
+    cld: [0.95, 0.9, 0.76],
+    land: [0.3, 0.18, 0.09],
+  },
+  ammonia: {
+    id: 'ammonia',
+    label: 'Ammonia',
+    Tt: 195.4,
+    Pt: 6060,
+    Tb: 239.8,
+    L: 23350,
+    q: 0.02,
+    liq: [0.06, 0.09, 0.13],
+    ice: [0.9, 0.9, 0.84],
+    cld: [1, 0.96, 0.84],
+    land: [0.33, 0.29, 0.25],
+  },
+  nitrogen: {
+    id: 'nitrogen',
+    label: 'Nitrogen',
+    Tt: 63.15,
+    Pt: 12500,
+    Tb: 77.36,
+    L: 5570,
+    q: 0.05,
+    liq: [0.05, 0.06, 0.09],
+    ice: [0.88, 0.82, 0.74],
+    cld: [0.9, 0.9, 0.93],
+    land: [0.36, 0.3, 0.26],
+  },
   // CO2 has no liquid at one atmosphere: `Tb` is its sublimation point and `Pt` (5.18 bar) is above it.
-  co2: { id: 'co2', label: 'CO₂', Tt: 216.58, Pt: 518000, Tb: 194.7, L: 25200, q: 0.02, liq: [0.08, 0.09, 0.12], ice: [0.9, 0.9, 0.93], cld: [0.98, 0.98, 0.94], land: [0.42, 0.28, 0.18] },
+  // Its liquid-vapour line starts at the triple point: Lv about 15.3 kJ/mol near the triple point (NIST Chemistry
+  // WebBook, CO2 phase-change data [verify]: not re-opened in this session); critical point 304.13 K, 7.3773 MPa
+  // (Span and Wagner 1996, J. Phys. Chem. Ref. Data 25, 1509).
+  co2: {
+    id: 'co2',
+    label: 'CO₂',
+    Tt: 216.58,
+    Pt: 518000,
+    Tb: 194.7,
+    L: 25200,
+    Lv: 15300,
+    Tc: 304.13,
+    Pc: 7.3773e6,
+    q: 0.02,
+    liq: [0.08, 0.09, 0.12],
+    ice: [0.9, 0.9, 0.93],
+    cld: [0.98, 0.98, 0.94],
+    land: [0.42, 0.28, 0.18],
+  },
 };
 
 /** Order of the `surface_fluid` slider: index to fluid id. */
@@ -59,9 +132,19 @@ export function psatFn(f: Fluid): (T: number) => number {
   return (T) => f.Pt * Math.exp((f.L / R_GAS) * (1 / f.Tt - 1 / T));
 }
 
-/** Boiling point at pressure `Pa` from the one-atmosphere point; null when there is no liquid range. */
+/**
+ * Boiling point at pressure `Pa`; null when there is no liquid range (below the triple-point pressure).
+ * Normally anchored at the one-atmosphere point. When that point is a sublimation point (Tb < Tt, CO2) the
+ * liquid-vapour line is drawn up from the triple point instead, Tb(P) = [1/Tt - R ln(P/Pt) / Lv]^-1, and
+ * capped at the critical temperature (above the critical pressure there is no boiling, only a supercritical fluid).
+ */
 export function boilingPointK(f: Fluid, Pa: number): number | null {
-  if (!(Pa > f.Pt) || !(f.Tb > f.Tt)) return null;
+  if (!(Pa > f.Pt)) return null;
+  if (f.Tb < f.Tt) {
+    if (f.Lv === undefined || f.Tc === undefined || f.Pc === undefined) return null;
+    if (Pa >= f.Pc) return f.Tc;
+    return Math.min(f.Tc, 1 / (1 / f.Tt - (R_GAS * Math.log(Pa / f.Pt)) / f.Lv));
+  }
   return 1 / (1 / f.Tb - (R_GAS * Math.log(Pa / ATM_PA)) / f.L);
 }
 
@@ -117,10 +200,7 @@ export type Rgb3 = [number, number, number];
  * (optical depth `ch4` at 640 nm). Direct sunlight is the same spectrum after scattering out an
  * optical depth of 3.2 at 550 nm. Both are `derived` from Teff with these stated shortcuts.
  */
-export function skyColours(
-  starTeffK: number,
-  methaneRedDepth: number,
-): { sky: Rgb3; sun: Rgb3 } {
+export function skyColours(starTeffK: number, methaneRedDepth: number): { sky: Rgb3; sun: Rgb3 } {
   const bands = [640, 540, 450];
   const sky = bands.map(
     (l, n) =>

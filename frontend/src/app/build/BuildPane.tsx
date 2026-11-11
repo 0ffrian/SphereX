@@ -43,7 +43,12 @@ const POP_BUTTONS: { id: PopId; label: string; title: string; icon: IconName }[]
   { id: 'acc', label: 'Accuracy', title: 'Accuracy', icon: 'accuracy' },
   { id: 'feel', label: 'Feel', title: 'Feel the surface', icon: 'fingerprint' },
   { id: 'hear', label: 'Hear it', title: 'Hear it', icon: 'hear' },
-  { id: 'details', label: 'Details', title: 'Details: levels, view and what is drawn', icon: 'details' },
+  {
+    id: 'details',
+    label: 'Details',
+    title: 'Details: levels, view and what is drawn',
+    icon: 'details',
+  },
 ];
 
 export function BuildPane() {
@@ -234,22 +239,22 @@ export function BuildPane() {
   const level = (extra: ReactNode) =>
     name &&
     bodyHere?.status !== 'none' && (
-    <p className="sx-bp-tag" data-testid="build-level">
-      <ProvenanceBadge
-        tag={levelTag}
-        fixture={fixtureSky || (card?.id.startsWith('fixture:') ?? false)}
-      />
-      {honesty === 'artistic' && <span>artist&rsquo;s impression</span>}
-      {engineDrawn ? (
-        <span data-testid="build-engine-note">{ENGINE_NOTE}</span>
-      ) : (
-        bodyHere?.status === 'ready' &&
-        bodyHere.prebuilt && <span data-testid="build-prebuilt">{PREBUILT_NOTE}</span>
-      )}
-      <span className="sr-only">{HONESTY_LABEL[honesty]}</span>
-      {extra}
-    </p>
-  );
+      <p className="sx-bp-tag" data-testid="build-level">
+        <ProvenanceBadge
+          tag={levelTag}
+          fixture={fixtureSky || (card?.id.startsWith('fixture:') ?? false)}
+        />
+        {honesty === 'artistic' && <span>artist&rsquo;s impression</span>}
+        {engineDrawn ? (
+          <span data-testid="build-engine-note">{ENGINE_NOTE}</span>
+        ) : (
+          bodyHere?.status === 'ready' &&
+          bodyHere.prebuilt && <span data-testid="build-prebuilt">{PREBUILT_NOTE}</span>
+        )}
+        <span className="sr-only">{HONESTY_LABEL[honesty]}</span>
+        {extra}
+      </p>
+    );
 
   return (
     <>

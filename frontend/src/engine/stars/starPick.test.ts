@@ -1,12 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { StarEngine } from './StarEngine';
-import { closeView, globeRot, GLOBE_HALF, GLOBE_TILT, nudge, pickSurface, projectSurface, viewPoint } from './starPick';
+import {
+  closeView,
+  globeRot,
+  GLOBE_HALF,
+  GLOBE_TILT,
+  nudge,
+  pickSurface,
+  projectSurface,
+  viewPoint,
+} from './starPick';
 
 describe('star globe pick', () => {
   it('round-trips: click -> lat/lon -> the same point on the globe, and the close-up centre -> the same place', () => {
     for (const time of [3, 40]) {
       const rot = globeRot(time);
-      for (const [x, y] of [[0, 0], [0.4, 0.3], [-0.7, 0.2], [0.1, -0.8], [-0.3, -0.5]] as const) {
+      for (const [x, y] of [
+        [0, 0],
+        [0.4, 0.3],
+        [-0.7, 0.2],
+        [0.1, -0.8],
+        [-0.3, -0.5],
+      ] as const) {
         const p = pickSurface([x, y], rot, GLOBE_TILT)!;
         const back = projectSurface(p, rot, GLOBE_TILT);
         expect(back.visible).toBe(true);

@@ -78,11 +78,16 @@ describe('gasWorldInput', () => {
     delete (g.card as unknown as Record<string, unknown>).rot_period_h;
     delete (g.params as unknown as Record<string, unknown>).dynamics;
     expect(gasWorldInput(g.card, g.params)).toBeNull();
-    const h = reference('ref-jupiter', { mass_mearth: { value: null, tag: 'measured', source: 'x' } });
+    const h = reference('ref-jupiter', {
+      mass_mearth: { value: null, tag: 'measured', source: 'x' },
+    });
     expect(gasWorldInput(h.card, h.params)).toBeNull();
   });
   it('a short-orbit giant with no measured spin is taken as locked: spin = orbital period', () => {
-    const f = reference('other', { orbital_period_d: { value: 2.2, tag: 'measured', source: 'x' }, teq_K: { value: 1209, tag: 'measured', source: 'x' } });
+    const f = reference('other', {
+      orbital_period_d: { value: 2.2, tag: 'measured', source: 'x' },
+      teq_K: { value: 1209, tag: 'measured', source: 'x' },
+    });
     delete (f.card as unknown as Record<string, unknown>).rot_period_h;
     const input = gasWorldInput(f.card, f.params)!;
     expect(input.locked).toBe(true);
@@ -92,7 +97,9 @@ describe('gasWorldInput', () => {
     const f = reference('ref-jupiter');
     const m = withGasWorldMotion(resolveMotion(f.card, f.params), f.card, f.params);
     expect(m.processes.find((p) => p.id === 'winds')?.speedup).toBe(300);
-    const d = withGasWorldMotion(resolveMotion(f.card, f.params), f.card, f.params, { gas_pacing: 1 });
+    const d = withGasWorldMotion(resolveMotion(f.card, f.params), f.card, f.params, {
+      gas_pacing: 1,
+    });
     expect(d.processes.find((p) => p.id === 'winds')?.speedup).toBe(86400);
   });
 });
@@ -100,7 +107,12 @@ describe('gasWorldInput', () => {
 describe('GasWorld', () => {
   it('is hidden while it settles, then appears already formed; step count is a function of time', async () => {
     const f = reference('ref-jupiter');
-    const world = GasWorld.start(f.card, f.params, { visibleTags: ALL_TAGS }, { solver: inlineSolver })!;
+    const world = GasWorld.start(
+      f.card,
+      f.params,
+      { visibleTags: ALL_TAGS },
+      { solver: inlineSolver },
+    )!;
     expect(world).not.toBeNull();
     expect(world.status.state).toBe('hidden');
     expect(world.drawn).toEqual([]);
@@ -121,7 +133,12 @@ describe('GasWorld', () => {
 
   it('keeps the honesty filter: at Measured only the artistic layers are hidden', async () => {
     const f = reference('ref-jupiter');
-    const world = GasWorld.start(f.card, f.params, { visibleTags: ['measured'] }, { solver: inlineSolver })!;
+    const world = GasWorld.start(
+      f.card,
+      f.params,
+      { visibleTags: ['measured'] },
+      { solver: inlineSolver },
+    )!;
     world.prepareFrame({} as unknown as WebGPURenderer);
     await until(() => world.ready);
     expect(world.drawn).not.toContain('colour');
@@ -132,7 +149,12 @@ describe('GasWorld', () => {
 
   it('the haptic field answers with the drawn bands, wind and storms', async () => {
     const f = reference('ref-jupiter');
-    const world = GasWorld.start(f.card, f.params, { visibleTags: ALL_TAGS }, { solver: inlineSolver })!;
+    const world = GasWorld.start(
+      f.card,
+      f.params,
+      { visibleTags: ALL_TAGS },
+      { solver: inlineSolver },
+    )!;
     world.prepareFrame({} as unknown as WebGPURenderer);
     await until(() => world.ready);
     const field = world.field!;
@@ -143,7 +165,8 @@ describe('GasWorld', () => {
     }
     expect(bands.size).toBeGreaterThan(8);
     expect(field.flow!.ring).toBeNull(); // Jupiter has no rings
-    const w = (deg: number) => field.flow!.wind([Math.cos((deg * Math.PI) / 180), Math.sin((deg * Math.PI) / 180), 0]);
+    const w = (deg: number) =>
+      field.flow!.wind([Math.cos((deg * Math.PI) / 180), Math.sin((deg * Math.PI) / 180), 0]);
     expect(Math.abs(w(24))).toBeGreaterThan(0.5); // the strongest jet is near 24 N
     expect(field.currentStorms?.length).toBeGreaterThan(20);
     world.dispose();
@@ -151,7 +174,12 @@ describe('GasWorld', () => {
 
   it('exposes orbitSources for the orbit camera', async () => {
     const f = reference('ref-jupiter');
-    const world = GasWorld.start(f.card, f.params, { visibleTags: ALL_TAGS }, { solver: inlineSolver })!;
+    const world = GasWorld.start(
+      f.card,
+      f.params,
+      { visibleTags: ALL_TAGS },
+      { solver: inlineSolver },
+    )!;
     const o = world.orbitSources;
     expect(o.radiusKm).toBeCloseTo(71492, 0);
     expect(o.scaleHeightKm).toBeGreaterThan(15);
@@ -161,14 +189,28 @@ describe('GasWorld', () => {
   });
 
   it('Saturn has rings, felt with measured radii', async () => {
-    const f = reference('ref-saturn', { radius_rjup: { value: 0.843, tag: 'measured', source: 't' }, mass_mearth: { value: 95.16, tag: 'measured', source: 't' }, teq_K: { value: 81.1, tag: 'measured', source: 't' }, rot_period_h: { value: 10.656, tag: 'measured', source: 't' } });
-    const world = GasWorld.start(f.card, f.params, { visibleTags: ALL_TAGS }, { solver: inlineSolver })!;
+    const f = reference('ref-saturn', {
+      radius_rjup: { value: 0.843, tag: 'measured', source: 't' },
+      mass_mearth: { value: 95.16, tag: 'measured', source: 't' },
+      teq_K: { value: 81.1, tag: 'measured', source: 't' },
+      rot_period_h: { value: 10.656, tag: 'measured', source: 't' },
+    });
+    const world = GasWorld.start(
+      f.card,
+      f.params,
+      { visibleTags: ALL_TAGS },
+      { solver: inlineSolver },
+    )!;
     expect(world.object.children[0]!.children.length).toBe(2); // planet and rings
     expect(world.suggestedDistance).toBeGreaterThan(5);
     expect(world.field!.flow!.ring).not.toBeNull();
     expect(classifyRing(1.7)).toBe('ring');
     expect(classifyRing(1.99)).toBe('gap');
     expect(classifyRing(3)).toBe('none');
+    // The faint C (0.08) and D (0.03) rings are rings, not gaps (#89 review 4); the Encke Gap is a gap.
+    expect(classifyRing(1.3)).toBe('ring');
+    expect(classifyRing(1.15)).toBe('ring');
+    expect(classifyRing(133584 / 60268)).toBe('gap');
     world.dispose();
   }, 60_000);
 
@@ -187,7 +229,12 @@ describe('GasWorld and the clock', () => {
     const clock = new SimClock(() => now);
     clock.setProcess({ id: 'winds', label: 'Winds', speedup: 86400 });
     const f = reference('ref-jupiter');
-    const world = GasWorld.start(f.card, f.params, { visibleTags: ALL_TAGS }, { solver: inlineSolver })!;
+    const world = GasWorld.start(
+      f.card,
+      f.params,
+      { visibleTags: ALL_TAGS },
+      { solver: inlineSolver },
+    )!;
     world.prepareFrame({} as unknown as WebGPURenderer);
     await until(() => world.ready);
     const frame = (ms: number) => {
@@ -202,7 +249,7 @@ describe('GasWorld and the clock', () => {
     expect(moved).toBeGreaterThan(420);
     for (const reason of ['user', 'reduced-motion'] as const) {
       // Let the steps already asked for finish: wait until the count is still for a moment.
-      for (let last = -1, same = 0; same < 6; ) {
+      for (let last = -1, same = 0; same < 6;) {
         await new Promise((r) => setTimeout(r, 100));
         frame(0); // the viewer calls setTime every frame, so the world catches up to the clock
         same = world.steps === last ? same + 1 : 0;

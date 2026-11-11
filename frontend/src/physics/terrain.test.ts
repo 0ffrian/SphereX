@@ -72,7 +72,10 @@ describe('terrain', { timeout: 30000 }, () => {
 
   it('samplers wrap in longitude and clamp in latitude', () => {
     const t = buildTerrain({ seed: 5, oceanFraction: 0.6, gravity: 9.8, ...small });
-    expect(t.heightAt(Math.PI - 1e-6, 0.3)).toBeCloseTo(t.heightAt(-Math.PI - 1e-6 + 2 * Math.PI, 0.3), 4);
+    expect(t.heightAt(Math.PI - 1e-6, 0.3)).toBeCloseTo(
+      t.heightAt(-Math.PI - 1e-6 + 2 * Math.PI, 0.3),
+      4,
+    );
     expect(Number.isFinite(t.heightAt(0, Math.PI / 2))).toBe(true);
     expect(Number.isFinite(t.boundaryAt(0, -Math.PI / 2))).toBe(true);
   });

@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { ObjectCard } from '@/contract';
-import { EPOCH_JD, gasRatesAt, hasKeyedEpochs, timeRange } from './cometGas';
+import {
+  daysFromPerihelion,
+  EPOCH_JD,
+  gasRatesAt,
+  h2oScaleLengthKm,
+  haserShellFraction,
+  hasKeyedEpochs,
+  PERIHELION_JD,
+  RATE_ANCHORS_BY_CARD,
+  timeRange,
+} from './cometGas';
 
 const tv = (value: number, err?: number) => ({
   value,
@@ -55,5 +65,55 @@ describe('gasRatesAt (Q-262)', () => {
     expect(hasKeyedEpochs(flat)).toBe(false);
     expect(timeRange(flat)).toBeNull();
     expect(timeRange(card())).toEqual({ startJd: EPOCH_JD['2025-08'], endJd: EPOCH_JD['2025-12'] });
+  });
+});
+
+describe('SOHO/SWAN water near perihelion (3I/ATLAS)', () => {
+  const atlas = () => card({ id: 'sbdb-1004083' });
+  const swan = RATE_ANCHORS_BY_CARD['sbdb-1004083']![0]!;
+  it('is a measured water point with its own instrument and the re-analysis in the note', () => {
+    const r = gasRatesAt(atlas(), swan.jd).rates;
+    const h2o = r.find((x) => x.key === 'h2o')!;
+    expect(h2o.value).toBe(3.2e29);
+    expect(h2o.tag).toBe('measured');
+    expect(h2o.instrument).toBe('SOHO/SWAN');
+    expect(h2o.source).toMatch(/arXiv:2512\.22354/);
+    expect(h2o.source).toMatch(/arXiv:2601\.15443/);
+    // CO2 and CO stay SPHEREx-only: interpolated between the two SPHEREx epochs.
+    expect(r.find((x) => x.key === 'co2')!.kind).toBe('interpolated');
+  });
+  it('the water path rises to the perihelion peak instead of a straight Aug-Dec line', () => {
+    const jd = (EPOCH_JD['2025-08'] + swan.jd) / 2;
+    const withPeak = gasRatesAt(atlas(), jd).rates.find((x) => x.key === 'h2o')!.value;
+    const straight = gasRatesAt(card(), jd).rates.find((x) => x.key === 'h2o')!.value;
+    expect(withPeak).toBeCloseTo(Math.sqrt(3.2e26 * 3.2e29), -24);
+    expect(withPeak).toBeGreaterThan(straight * 5);
+    // At the SWAN date the old straight line was about 65 times too low. Another card id gets no anchor.
+    const old = gasRatesAt(card(), swan.jd).rates.find((x) => x.key === 'h2o')!;
+    expect(old.kind).toBe('interpolated');
+    expect(swan.value / old.value).toBeGreaterThan(50);
+    expect(swan.value / old.value).toBeLessThan(80);
+  });
+  it('perihelion is 2025-Oct-29.48 TDB (JPL)', () => {
+    expect(PERIHELION_JD).toBe(2460977.98);
+    expect(Math.round(daysFromPerihelion(swan.jd))).toBe(8);
+  });
+});
+
+describe('Haser break-up of water', () => {
+  it('scale length L = v tau r_h^2 with v = 0.85/sqrt(r_h) km/s and tau = 8.3e4 s', () => {
+    expect(h2oScaleLengthKm(1)).toBeCloseTo(0.85 * 8.3e4, 6);
+    expect(h2oScaleLengthKm(2.1)!).toBeGreaterThan(1.9e5);
+    expect(h2oScaleLengthKm(2.1)!).toBeLessThan(2.3e5);
+    expect(h2oScaleLengthKm(0)).toBeNull();
+  });
+  it('the share inside the coma is 1 for an infinite L and drops as L shrinks', () => {
+    expect(haserShellFraction(0.03, 1, Infinity)).toBe(1);
+    const big = haserShellFraction(0.03, 1, 2);
+    const small = haserShellFraction(0.03, 1, 0.3);
+    expect(big).toBeLessThan(1);
+    expect(small).toBeLessThan(big);
+    // Exact: L (e^{-a/L} - e^{-b/L}) / (b - a).
+    expect(small).toBeCloseTo((0.3 * (Math.exp(-0.1) - Math.exp(-1 / 0.3))) / 0.97, 12);
   });
 });

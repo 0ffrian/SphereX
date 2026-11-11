@@ -13,8 +13,8 @@
 import { useCallback, useLayoutEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import type { FramesResponse, ResolveResponse } from '@/app/api/types';
 import { DataBadge, EstimatedBadge, ProvenanceBadge } from '@/app/Badge';
-import { positionProvenance } from '@/app/sky/positionTags';
-import { formatCoords, formatUtc, formatWavelength } from '@/app/format';
+import { positionProvenance, positionText, searchPlaceText } from '@/app/sky/positionTags';
+import { formatUtc, formatWavelength } from '@/app/format';
 import { framesRetryText, framesSearchingText, searchErrorMessage } from '@/app/messages';
 import { RefusalList } from '@/app/RefusalList';
 import { groupMissing } from '@/app/refusals';
@@ -81,7 +81,7 @@ export function Flipbook() {
         <>
           <LoadingBox
             text={framesSearchingText(
-              sky.resolved ? formatCoords(sky.resolved.ra, sky.resolved.dec) : (sky.query?.q ?? ''),
+              sky.resolved ? searchPlaceText(sky.resolved) : (sky.query?.q ?? ''),
             )}
             startedAt={sky.startedAt}
           />
@@ -126,7 +126,7 @@ export function Flipbook() {
 }
 
 function objectName(resolved: ResolveResponse): string {
-  return resolved.name ?? formatCoords(resolved.ra, resolved.dec);
+  return resolved.name ?? positionText(resolved);
 }
 
 function ObjectHeader({
@@ -153,7 +153,7 @@ function ObjectHeader({
       </p>
       <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-neutral-300">
         <span>
-          {formatCoords(resolved.ra, resolved.dec)}
+          {positionText(resolved)}
           {resolved.moving && ' · moving object'}
         </span>
         {/* D-02: the position wears its badge too (Q-25, Q-91 for typed and picked ones). */}

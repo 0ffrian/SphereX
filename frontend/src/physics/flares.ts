@@ -6,8 +6,8 @@
 //   which group flares, and when      inferred_from_analog (seeded draw at real spot groups)
 //   energy E                          inferred_from_analog (power law dN/dE ~ E^-2, flare statistics
 //                                     of the Sun and active stars, Hawley et al. 2014 [verify])
-//   E_max = 0.1 (B^2/8pi) A^(3/2)     model_dependent (Shibata and Yokoyama style energy budget;
-//                                     B = 1000 G and the 0.1 efficiency are [verify], issue #71)
+//   E_max = 0.1 (B^2/8pi) A^(3/2)     model_dependent (the energy budget of Shibata et al. 2013,
+//                                     PASJ 65, 49; B = 1000 G and the 0.1 efficiency are [verify], issue #71)
 //   decay index n = 3 h^2/(a^2+h^2)   model_dependent (Kliem and Torok 2006 torus threshold, n >= 1.5)
 //   open or closed, loop shape        model_dependent
 //   wisps, side-on turning, colours   artistic
@@ -50,7 +50,12 @@ export function emaxErg(areaFraction: number, radiusRsun: number): number {
 export const decayIndexOf = (x: number): number => (3 * x * x) / (1 + x * x);
 export const opens = (n: number): boolean => n >= DECAY_THRESHOLD;
 
-/** C, M or X class from the energy (display scale from E_REF: C below 1e30, M to 1e31, X above). */
+/**
+ * C, M or X class from the energy (display scale from E_REF: C below 1e30, M to 1e31, X above).
+ * The GOES classes are defined by peak soft X-ray flux, not energy: these energy thresholds are a
+ * convention, taken at the low end of published bolometric energies (an X1 flare is about 1-3e31 erg,
+ * Emslie et al. 2012, ApJ 759, 71).
+ */
 export function flareClass(e: number): string {
   if (e >= 10 * E_REF_ERG) return `X${(e / (10 * E_REF_ERG)).toFixed(1)}`;
   if (e >= E_REF_ERG) return `M${(e / E_REF_ERG).toFixed(1)}`;
@@ -261,11 +266,7 @@ export function softXray(t: number, open: boolean): number {
   return t < 0.47 ? smooth(0.26, 0.47, t) : Math.exp(-(t - 0.47) / tau);
 }
 /** Soft and hard curves at n + 1 points. Hard = d(soft)/dt with a seeded spiky factor, scaled to 1 (Neupert 1968). */
-export function lightCurves(
-  open: boolean,
-  seed = 5,
-  n = 240,
-): { soft: number[]; hard: number[] } {
+export function lightCurves(open: boolean, seed = 5, n = 240): { soft: number[]; hard: number[] } {
   const soft: number[] = [];
   const hard: number[] = [];
   let mx = 0;
@@ -481,7 +482,12 @@ export function plasmaRope(
     const v = ((h1 + u * 0.25) % 1) * 2 - 1;
     const p0 = at(v);
     const p1 = at(v + 0.03);
-    E.sink.push(p0, [p1[0], p1[1], p1[2]], clamp(0.16 + 0.55 * imp + 0.18 * h4, 0, 1), gain * alpha);
+    E.sink.push(
+      p0,
+      [p1[0], p1[1], p1[2]],
+      clamp(0.16 + 0.55 * imp + 0.18 * h4, 0, 1),
+      gain * alpha,
+    );
   }
 }
 
@@ -634,7 +640,8 @@ export function emitEvent(
   const E: Emit = { sink, at, q: o.q, len: 9 };
   const eT = clamp(Math.log10(e.energyErg / E_REF_ERG) / 2, 0, 1);
   const ad = clamp(
-    Math.max(0.012 * o.boost, g.separationRad * 0.5 * o.boost) * Math.pow(e.energyErg / E_REF_ERG, 0.1),
+    Math.max(0.012 * o.boost, g.separationRad * 0.5 * o.boost) *
+      Math.pow(e.energyErg / E_REF_ERG, 0.1),
     0.012,
     0.2,
   );
@@ -648,7 +655,19 @@ export function emitEvent(
     for (let n = 0; n < 12; n++) {
       const a = 1.1 + 0.9 * pr(e.s, 400 + n);
       const l = (pr(e.s, 420 + n) - 0.5) * 1.6;
-      plasmaLeg(E, e.s + n, ad * a * (1 - 0.3 * ko), ad * l, ad * (1.8 + 26 * ko * ko * ko), u, 1.3, 40, 23, 0.026 * (1 - 0.55 * ko) * fade, 0.46);
+      plasmaLeg(
+        E,
+        e.s + n,
+        ad * a * (1 - 0.3 * ko),
+        ad * l,
+        ad * (1.8 + 26 * ko * ko * ko),
+        u,
+        1.3,
+        40,
+        23,
+        0.026 * (1 - 0.55 * ko) * fade,
+        0.46,
+      );
     }
   }
   const zr = e.open
@@ -676,7 +695,17 @@ export function emitEvent(
     const ag = (u - bs) / 0.34;
     if (ag <= 0 || ag > 1.35) continue;
     const A2 = ad * (0.42 + (e.open ? 0.85 : 0.22) * smooth(0.13, 0.85, bs));
-    plasmaTube(E, (e.s % 1009) + i, A2, ad * tl * 0.95, A2 * th, ag, 20, 9, 0.11 * (0.6 + 0.5 * eT));
+    plasmaTube(
+      E,
+      (e.s % 1009) + i,
+      A2,
+      ad * tl * 0.95,
+      A2 * th,
+      ag,
+      20,
+      9,
+      0.11 * (0.6 + 0.5 * eT),
+    );
   }
   const rA = ad * (0.42 + (e.open ? 0.8 : 0.2) * smooth(0.13, 0.8, u));
   plasmaSurge(E, e.s % 811, u, 0.12, 0.55, rA, ad, e.open, eT, 6, 9, 0.15);
@@ -688,7 +717,12 @@ export function emitEvent(
         const l1 = ((q + 1) / 16 - 0.5) * ad * 1.9;
         for (let layer = 0; layer < 3; layer++) {
           const off = (layer - 1) * 0.02 * ad;
-          sink.push(at(side * rA + off, l0, 0.002), at(side * rA + off, l1, 0.002), 0.97, imp * (1 - layer * 0.25) * 0.3 * (0.5 + eT));
+          sink.push(
+            at(side * rA + off, l0, 0.002),
+            at(side * rA + off, l1, 0.002),
+            0.97,
+            imp * (1 - layer * 0.25) * 0.3 * (0.5 + eT),
+          );
         }
       }
     }
@@ -703,7 +737,11 @@ export interface StageOptions {
   q: number;
 }
 export const CLASS_STRENGTH = { c: 0.55, m: 0.8, x: 1 } as const;
-export const CLASS_LABEL = { c: 'about 10²⁹ erg', m: 'about 10³⁰ erg', x: 'about 10³¹ erg or more' } as const;
+export const CLASS_LABEL = {
+  c: 'about 10²⁹ erg',
+  m: 'about 10³⁰ erg',
+  x: 'about 10³¹ erg or more',
+} as const;
 
 /** Time-scale of the stage functions (0..1 = 60 minutes). */
 export const ribbonHalf = (t: number, open: boolean): number => {
@@ -726,11 +764,36 @@ export function emitStage(sink: StreakSink, at: Mapper, t: number, o: StageOptio
     const L = lerp(-0.13, 0.13, n / (over - 1));
     const a = 0.08 + 0.05 * pr(44, n);
     const h0 = 0.07 + 0.05 * pr(44, n + 50);
-    const h = open ? h0 * (1 + 42 * ko * ko * ko) : h0 * (1 + 0.14 * smooth(0.14, 0.3, t) - 0.08 * smooth(0.4, 0.72, t));
-    plasmaLeg(E, n + 301, a * (1 - 0.3 * ko), L, h, t, open ? 3 : 1.2, 14, 36, (0.016 + 0.03 * imp) * (1 - 0.5 * ko), 0.42);
+    const h = open
+      ? h0 * (1 + 42 * ko * ko * ko)
+      : h0 * (1 + 0.14 * smooth(0.14, 0.3, t) - 0.08 * smooth(0.4, 0.72, t));
+    plasmaLeg(
+      E,
+      n + 301,
+      a * (1 - 0.3 * ko),
+      L,
+      h,
+      t,
+      open ? 3 : 1.2,
+      14,
+      36,
+      (0.016 + 0.03 * imp) * (1 - 0.5 * ko),
+      0.42,
+    );
   }
   const ropeA = open ? 1 - 0.75 * smooth(0.55, 0.85, t) : 1 - smooth(0.42, 0.75, t);
-  plasmaRope(E, 7, ropeHeight(t, open), 0.006 + (open ? 0.05 * smooth(0.25, 0.7, t) : 0.004), 0.12, ropeA, imp, t * 2.5, 220, 0.055);
+  plasmaRope(
+    E,
+    7,
+    ropeHeight(t, open),
+    0.006 + (open ? 0.05 * smooth(0.25, 0.7, t) : 0.004),
+    0.12,
+    ropeA,
+    imp,
+    t * 2.5,
+    220,
+    0.055,
+  );
   const bEnd = open ? 0.84 : 0.56;
   const life = open ? 0.26 : 0.3;
   const count = Math.round(lerp(38, 90, (e - 0.55) / 0.45));
@@ -740,10 +803,23 @@ export function emitStage(sink: StreakSink, at: Mapper, t: number, o: StageOptio
     const ag = (t - born) / life;
     if (ag <= 0 || ag > 1.35) continue;
     const a0 = ribbonHalf(born, open);
-    plasmaTube(E, i + 11, a0, (pr(45, i) * 2 - 1) * 0.095, a0 * (1.15 + 0.3 * pr(45, i + 100)), ag, 20, 15, 0.1 * (0.5 + 0.5 * e));
+    plasmaTube(
+      E,
+      i + 11,
+      a0,
+      (pr(45, i) * 2 - 1) * 0.095,
+      a0 * (1.15 + 0.3 * pr(45, i + 100)),
+      ag,
+      20,
+      15,
+      0.1 * (0.5 + 0.5 * e),
+    );
   }
   plasmaSurge(E, 5, t, 0.29, 0.42, ribbonHalf(t, open), 0.04, open, e, 8, 15, 0.13);
-  const rA = smooth(0.25, 0.3, t) * (0.25 + 0.75 * Math.exp(-Math.max(0, t - 0.34) / 0.17)) * (0.55 + 0.45 * e);
+  const rA =
+    smooth(0.25, 0.3, t) *
+    (0.25 + 0.75 * Math.exp(-Math.max(0, t - 0.34) / 0.17)) *
+    (0.55 + 0.45 * e);
   if (rA > 0.01) {
     const r = ribbonHalf(t, open);
     for (const side of [-1, 1])

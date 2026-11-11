@@ -112,105 +112,114 @@ export function ConfidencePopover({
 
   const body = (
     <>
-        <div className="sx-pop-h">
-          <b id={titleId}>Accuracy</b>
-          <span>{name ?? ''}</span>
-          {!inline && (
-            <button type="button" className="sx-acc-close" onClick={onClose}>
-              Close
-            </button>
-          )}
-        </div>
-
-        <div className="sx-acc-top">
-          <span className="n" data-testid="formula-result">
-            {score}%
-          </span>
-          <span>{BAND_WORDS[c.band]}</span>
-        </div>
-        <div
-          className="sx-acc-bar"
-          role="img"
-          aria-label={`Satellite data ${pct('d')} percent, physics ${pct('p')} percent, assumed ${pct('a')} percent`}
-        >
-          {PARTS.map((k) => (
-            <i key={k} style={{ flex: `${share[k]} 1 0`, background: PART_COLOUR[k] }} />
-          ))}
-        </div>
-        <div className="sx-acc-key">
-          {PARTS.map((k) => (
-            <KeyRow key={k} part={k} pct={pct(k)} />
-          ))}
-        </div>
-
-        <FormulaMath latex={GENERAL_LATEX} plain={generalPlain()} testId="formula-general" />
-        <p className="sx-acc-rules">
-          w is how much a quantity changes the picture. c is how far the data narrows the range of
-          this kind of object.
-        </p>
-        <FormulaMath latex={C_TABLE_LATEX} plain={C_TABLE_LINES} testId="formula-ctable" />
-        <FormulaMath
-          latex={substitutionLatex(c)}
-          plain={substitutionPlain(c)}
-          testId="formula-substituted"
-        />
-        <p className="sx-acc-rules">Terms with c = 0 add nothing, so they are folded into the final + 0.</p>
-        <FormulaMath latex={gateLatex(c.threshold)} plain={gatePlain(c.threshold)} testId="formula-gate" />
-        <ul className="sx-acc-gate">
-          <Yes ok={c.gate.class_known}>The kind of object is known.</Yes>
-          <Yes ok={c.gate.key_measurement}>
-            At least one key measurement{keyLabels ? `: ${keyLabels}` : ''}.
-          </Yes>
-          <Yes ok={c.gate.score_ok}>
-            Score of at least {percent(c.threshold)}% (now {score}%).
-          </Yes>
-        </ul>
-        <p className="sx-acc-rules">
-          <b>{c.gate.passed ? 'The 3D body is drawn.' : 'The 3D body is not drawn.'}</b> {c.note}
-        </p>
-
-        <table className="sx-acc-tbl">
-          <caption className="sr-only">This object&apos;s terms</caption>
-          <thead>
-            <tr>
-              <th scope="col">Quantity</th>
-              <th scope="col">Source</th>
-              <th scope="col">Points</th>
-            </tr>
-          </thead>
-          <tbody>
-            {c.inputs.map((i) => {
-              const chip = tagChip(i);
-              const dim = isShown ? !isShown(i.tag) : false;
-              return (
-                <tr key={i.id} className={dim ? 'sx-acc-dim' : undefined} data-dim={dim || undefined}>
-                  <td>
-                    {i.label}
-                    {dim && <span className="sr-only"> (hidden at this Show level; still counted)</span>}
-                  </td>
-                  <td>
-                    <span className={`sx-acc-tag ${chip.part}`}>{chip.text}</span>
-                  </td>
-                  <td title={`weight ${num(i.weight)}, c ${num(i.c)}`}>{rowPoints(i)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {isShown && c.inputs.some((i) => !isShown(i.tag)) && (
-          <p className="sx-acc-rules">
-            Dimmed rows are hidden by the Show level. They still count: the score does not move with it.
-          </p>
+      <div className="sx-pop-h">
+        <b id={titleId}>Accuracy</b>
+        <span>{name ?? ''}</span>
+        {!inline && (
+          <button type="button" className="sx-acc-close" onClick={onClose}>
+            Close
+          </button>
         )}
-        {!c.gate.passed && (
-          <p className="sx-acc-rules" data-testid="formula-below">
-            <b>Why there is no 3D model.</b> Found: {c.found} Needed: {c.needed}
-          </p>
-        )}
-        <p className="sx-acc-rules" data-testid="formula-error-bars">
-          {ERROR_BARS_NOTE}
+      </div>
+
+      <div className="sx-acc-top">
+        <span className="n" data-testid="formula-result">
+          {score}%
+        </span>
+        <span>{BAND_WORDS[c.band]}</span>
+      </div>
+      <div
+        className="sx-acc-bar"
+        role="img"
+        aria-label={`Satellite data ${pct('d')} percent, physics ${pct('p')} percent, assumed ${pct('a')} percent`}
+      >
+        {PARTS.map((k) => (
+          <i key={k} style={{ flex: `${share[k]} 1 0`, background: PART_COLOUR[k] }} />
+        ))}
+      </div>
+      <div className="sx-acc-key">
+        {PARTS.map((k) => (
+          <KeyRow key={k} part={k} pct={pct(k)} />
+        ))}
+      </div>
+
+      <FormulaMath latex={GENERAL_LATEX} plain={generalPlain()} testId="formula-general" />
+      <p className="sx-acc-rules">
+        w is how much a quantity changes the picture. c is how far the data narrows the range of
+        this kind of object.
+      </p>
+      <FormulaMath latex={C_TABLE_LATEX} plain={C_TABLE_LINES} testId="formula-ctable" />
+      <FormulaMath
+        latex={substitutionLatex(c)}
+        plain={substitutionPlain(c)}
+        testId="formula-substituted"
+      />
+      <p className="sx-acc-rules">
+        Terms with c = 0 add nothing, so they are folded into the final + 0.
+      </p>
+      <FormulaMath
+        latex={gateLatex(c.threshold)}
+        plain={gatePlain(c.threshold)}
+        testId="formula-gate"
+      />
+      <ul className="sx-acc-gate">
+        <Yes ok={c.gate.class_known}>The kind of object is known.</Yes>
+        <Yes ok={c.gate.key_measurement}>
+          At least one key measurement{keyLabels ? `: ${keyLabels}` : ''}.
+        </Yes>
+        <Yes ok={c.gate.score_ok}>
+          Score of at least {percent(c.threshold)}% (now {score}%).
+        </Yes>
+      </ul>
+      <p className="sx-acc-rules">
+        <b>{c.gate.passed ? 'The 3D body is drawn.' : 'The 3D body is not drawn.'}</b> {c.note}
+      </p>
+
+      <table className="sx-acc-tbl">
+        <caption className="sr-only">This object&apos;s terms</caption>
+        <thead>
+          <tr>
+            <th scope="col">Quantity</th>
+            <th scope="col">Source</th>
+            <th scope="col">Points</th>
+          </tr>
+        </thead>
+        <tbody>
+          {c.inputs.map((i) => {
+            const chip = tagChip(i);
+            const dim = isShown ? !isShown(i.tag) : false;
+            return (
+              <tr key={i.id} className={dim ? 'sx-acc-dim' : undefined} data-dim={dim || undefined}>
+                <td>
+                  {i.label}
+                  {dim && (
+                    <span className="sr-only"> (hidden at this Show level; still counted)</span>
+                  )}
+                </td>
+                <td>
+                  <span className={`sx-acc-tag ${chip.part}`}>{chip.text}</span>
+                </td>
+                <td title={`weight ${num(i.weight)}, c ${num(i.c)}`}>{rowPoints(i)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {isShown && c.inputs.some((i) => !isShown(i.tag)) && (
+        <p className="sx-acc-rules">
+          Dimmed rows are hidden by the Show level. They still count: the score does not move with
+          it.
         </p>
-        <p className="sx-acc-rules sx-acc-last">{c.weights_note}</p>
+      )}
+      {!c.gate.passed && (
+        <p className="sx-acc-rules" data-testid="formula-below">
+          <b>Why there is no 3D model.</b> Found: {c.found} Needed: {c.needed}
+        </p>
+      )}
+      <p className="sx-acc-rules" data-testid="formula-error-bars">
+        {ERROR_BARS_NOTE}
+      </p>
+      <p className="sx-acc-rules sx-acc-last">{c.weights_note}</p>
     </>
   );
   if (inline) {
@@ -228,7 +237,11 @@ export function ConfidencePopover({
   }
   return (
     <>
-      <div className="sx-acc-backdrop" onClick={onClose} data-testid="confidence-formula-backdrop" />
+      <div
+        className="sx-acc-backdrop"
+        onClick={onClose}
+        data-testid="confidence-formula-backdrop"
+      />
       <div
         ref={ref}
         role="dialog"

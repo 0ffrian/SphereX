@@ -18,7 +18,20 @@
 // No step functions: insolation follows `max(cos z, 0)`, albedo follows the smooth ice thickness
 // `1 - exp(-h / 0.15)`, cloud albedo ramps over relative humidity 0.7 to 1, and the output the
 // renderer reads is smoothed by a 5 x 5 kernel. The tests check the neighbour jumps.
-import { FLUIDS, SIGMA_SB, boilingPointK, cloudBaseK, fluidState, psatFn, skyColours, visFraction, type Fluid, type FluidId, type FluidState, type Rgb3 } from './fluids';
+import {
+  FLUIDS,
+  SIGMA_SB,
+  boilingPointK,
+  cloudBaseK,
+  fluidState,
+  psatFn,
+  skyColours,
+  visFraction,
+  type Fluid,
+  type FluidId,
+  type FluidState,
+  type Rgb3,
+} from './fluids';
 import { G, R_SUN_M, AU_M } from './constants';
 
 const TAU = 6.283185307179586;
@@ -38,7 +51,8 @@ export const DEFAULT_PRESSURE_BAR = 1;
 export const DEFAULT_FLUID: FluidId = 'water';
 
 /** Tags the same five as the app (D-02). */
-export type WorldTag = 'measured' | 'derived' | 'model_dependent' | 'inferred_from_analog' | 'artistic';
+export type WorldTag =
+  'measured' | 'derived' | 'model_dependent' | 'inferred_from_analog' | 'artistic';
 
 export interface WorldInputs {
   starTeffK: number;
@@ -107,7 +121,15 @@ const sstep = (a: number, b: number, x: number): number => {
  * colour. Cheap (no grid), so the plan can call it too. `null` when an input is not usable.
  */
 export function worldModel(i: WorldInputs): WorldModel | null {
-  const need = [i.starTeffK, i.starRadiusRsun, i.orbitAu, i.radiusM, i.massKg, i.rotPeriodD, i.molarMass];
+  const need = [
+    i.starTeffK,
+    i.starRadiusRsun,
+    i.orbitAu,
+    i.radiusM,
+    i.massKg,
+    i.rotPeriodD,
+    i.molarMass,
+  ];
   if (need.some((v) => !(v > 0) || !Number.isFinite(v))) return null;
   if (!(i.bondAlbedo >= 0 && i.bondAlbedo < 1) || !(i.pressureBar > 0)) return null;
   const F = FLUIDS[i.fluid];
@@ -116,7 +138,9 @@ export function worldModel(i: WorldInputs): WorldModel | null {
   const S = SIGMA_SB * Math.pow(i.starTeffK, 4) * Math.pow(Rs / i.orbitAu, 2);
   const Ps = i.pressureBar;
   const airless = Ps < AIRLESS_BELOW_BAR;
-  const tau = airless ? 0 : GREENHOUSE_TAU_PER_BAR * Ps * (i.fluid === 'co2' ? CO2_GREENHOUSE_FACTOR : 1);
+  const tau = airless
+    ? 0
+    : GREENHOUSE_TAU_PER_BAR * Ps * (i.fluid === 'co2' ? CO2_GREENHOUSE_FACTOR : 1);
   const Ts = Teq * Math.pow(1 + 0.75 * tau, 0.25);
   const gv = (G * i.massKg) / (i.radiusM * i.radiusM);
   const Rg = 8314.462618 / i.molarMass; // J/(kg K)
@@ -154,9 +178,34 @@ export function worldModel(i: WorldInputs): WorldModel | null {
   const haze = i.fluid === 'methane' && Ps >= 0.3 ? 0.75 : runaway ? 0.9 : 0;
   const hazeC: Rgb3 = runaway ? [0.92, 0.9, 0.86] : [0.74, 0.46, 0.16];
   return {
-    fluid: F, S, Teq, Ts, tau, gv, H, gamK: (gam * 1000) as number, airless, Pa,
-    canLiquid: Tb !== null, Tb, Om, jets: Math.max(2, Math.round(clamp(Math.sqrt((2 * Om * i.radiusM) / U), 1, 22))), state, Tc, zc, runaway, cov, sky, sun, haze, hazeC, eps, U,
-    visFrac: visFraction(i.starTeffK), locked: i.locked, insolation: S,
+    fluid: F,
+    S,
+    Teq,
+    Ts,
+    tau,
+    gv,
+    H,
+    gamK: (gam * 1000) as number,
+    airless,
+    Pa,
+    canLiquid: Tb !== null,
+    Tb,
+    Om,
+    jets: Math.max(2, Math.round(clamp(Math.sqrt((2 * Om * i.radiusM) / U), 1, 22))),
+    state,
+    Tc,
+    zc,
+    runaway,
+    cov,
+    sky,
+    sun,
+    haze,
+    hazeC,
+    eps,
+    U,
+    visFrac: visFraction(i.starTeffK),
+    locked: i.locked,
+    insolation: S,
   };
 }
 
@@ -344,7 +393,8 @@ export class ClimateBudget {
               }
               h[k] = h[k]! + (G2 * (Tf - nT) * dt) / L;
               let tw =
-                ((Co / dt) * Tw[k]! + Do * (ae * (Tw[ke]! + Tw[kw]!) + an * Tw[kn]! + as * Tw[ks]!)) /
+                ((Co / dt) * Tw[k]! +
+                  Do * (ae * (Tw[ke]! + Tw[kw]!) + an * Tw[kn]! + as * Tw[ks]!)) /
                 (Co / dt + Do * (2 * ae + an + as));
               const Fb = gamma * Math.max(tw - Tf, 0);
               tw -= (Fb * dt) / Co;
@@ -470,8 +520,13 @@ export class ClimateBudget {
       }
     }
     this.stats = {
-      mean: tT / tw, max: mx, min: mn, ocean: oA / tw,
-      ice: oA ? oI / oA : 0, liquid: oA ? oO / oA : 0, frost: lA ? lF / lA : 0,
+      mean: tT / tw,
+      max: mx,
+      min: mn,
+      ocean: oA / tw,
+      ice: oA ? oI / oA : 0,
+      liquid: oA ? oO / oA : 0,
+      frost: lA ? lF / lA : 0,
     };
   }
 
@@ -520,7 +575,13 @@ export interface WorldInputSources {
   sliders: readonly string[];
 }
 
-const ORDER: readonly WorldTag[] = ['measured', 'derived', 'model_dependent', 'inferred_from_analog', 'artistic'];
+const ORDER: readonly WorldTag[] = [
+  'measured',
+  'derived',
+  'model_dependent',
+  'inferred_from_analog',
+  'artistic',
+];
 /** The weakest tag of a set (the last in the D-02 order wins), as `weakestTag` in the motion code. */
 export function weakest(tags: readonly WorldTag[]): WorldTag {
   let w = 0;
@@ -549,61 +610,114 @@ export function worldReadouts(
   const out: WorldReadout[] = [];
   const starKeys = ['star_teff_K', 'semi_major_axis_au'] as const;
   out.push({
-    id: 'insolation', label: 'Starlight here', value: Math.round(m.S), unit: 'W/m\u00b2',
+    id: 'insolation',
+    label: 'Starlight here',
+    value: Math.round(m.S),
+    unit: 'W/m\u00b2',
     tag: tagOf([src.star, src.orbit, 'derived'], starKeys),
     formula: 'S = sigma Tstar^4 (Rstar / a)^2',
     ...(moved(starKeys).length ? { assumption: assume('', starKeys) } : {}),
   });
   out.push({
-    id: 'teq', label: 'Equilibrium temperature', value: Math.round(m.Teq), unit: 'K',
+    id: 'teq',
+    label: 'Equilibrium temperature',
+    value: Math.round(m.Teq),
+    unit: 'K',
     tag: tagOf([src.star, src.orbit, src.albedo, 'derived'], [...starKeys, 'bond_albedo']),
     formula: 'Teq = Tstar sqrt(Rstar / 2a) (1 - A)^(1/4)',
     ...(src.albedo !== 'measured' || moved([...starKeys, 'bond_albedo']).length
-      ? { assumption: assume(src.albedo === 'measured' ? '' : 'Bond albedo assumed (Earth-like 0.3 unless the card has one)', [...starKeys, 'bond_albedo']) }
+      ? {
+          assumption: assume(
+            src.albedo === 'measured'
+              ? ''
+              : 'Bond albedo assumed (Earth-like 0.3 unless the card has one)',
+            [...starKeys, 'bond_albedo'],
+          ),
+        }
       : {}),
   });
   out.push({
-    id: 'ts', label: 'Average surface temperature', value: Math.round(stats?.mean ?? m.Ts), unit: 'K',
-    tag: tagOf(['model_dependent', src.pressure], ['surface_pressure_bar', ...starKeys, 'bond_albedo']),
+    id: 'ts',
+    label: 'Average surface temperature',
+    value: Math.round(stats?.mean ?? m.Ts),
+    unit: 'K',
+    tag: tagOf(
+      ['model_dependent', src.pressure],
+      ['surface_pressure_bar', ...starKeys, 'bond_albedo'],
+    ),
     assumption: assume(
       `grey greenhouse, optical depth ${m.tau.toFixed(2)} (${GREENHOUSE_TAU_PER_BAR} per bar, calibrated to Earth); surface pressure ${src.pressure === 'measured' ? 'measured' : src.pressure === 'artistic' ? 'set by you' : 'assumed'}`,
       ['surface_pressure_bar'],
     ),
   });
   out.push({
-    id: 'fluid_state', label: `${m.fluid.label} at the surface`, value: m.state, unit: '',
-    tag: tagOf(['model_dependent', src.fluid, src.pressure], ['surface_fluid', 'surface_pressure_bar']),
-    assumption: assume(src.fluid === 'measured' && src.pressure === 'measured' ? 'surface fluid and pressure from the card; phase from Clausius-Clapeyron' : 'surface fluid and pressure are assumed for any exoplanet; phase from Clausius-Clapeyron', ['surface_fluid', 'surface_pressure_bar']),
+    id: 'fluid_state',
+    label: `${m.fluid.label} at the surface`,
+    value: m.state,
+    unit: '',
+    tag: tagOf(
+      ['model_dependent', src.fluid, src.pressure],
+      ['surface_fluid', 'surface_pressure_bar'],
+    ),
+    assumption: assume(
+      src.fluid === 'measured' && src.pressure === 'measured'
+        ? 'surface fluid and pressure from the card; phase from Clausius-Clapeyron'
+        : 'surface fluid and pressure are assumed for any exoplanet; phase from Clausius-Clapeyron',
+      ['surface_fluid', 'surface_pressure_bar'],
+    ),
   });
   out.push({
-    id: 'scale_height', label: 'Scale height', value: Math.round(m.H / 100) / 10, unit: 'km',
-    tag: 'model_dependent', assumption: 'H = R T / (mu g), mean molar mass assumed, model surface temperature',
+    id: 'scale_height',
+    label: 'Scale height',
+    value: Math.round(m.H / 100) / 10,
+    unit: 'km',
+    tag: 'model_dependent',
+    assumption: 'H = R T / (mu g), mean molar mass assumed, model surface temperature',
   });
   out.push({
-    id: 'cloud_base', label: 'Clouds form at',
+    id: 'cloud_base',
+    label: 'Clouds form at',
     value: m.airless ? 'no air' : m.zc !== null ? Math.round(m.zc * 10) / 10 : 'no condensation',
     unit: m.zc !== null && !m.airless ? 'km up' : '',
-    tag: 'model_dependent', assumption: 'dry adiabat from the surface until the fluid saturates; mixing ratio assumed',
+    tag: 'model_dependent',
+    assumption: 'dry adiabat from the surface until the fluid saturates; mixing ratio assumed',
   });
   if (stats) {
     out.push({
-      id: 'ocean_open', label: 'Ocean that is open', value: Math.round(stats.liquid * 100), unit: '%',
-      tag: 'model_dependent', assumption: 'energy-balance model; ocean area is an assumption',
+      id: 'ocean_open',
+      label: 'Ocean that is open',
+      value: Math.round(stats.liquid * 100),
+      unit: '%',
+      tag: 'model_dependent',
+      assumption: 'energy-balance model; ocean area is an assumption',
     });
     out.push({
-      id: 'frost', label: 'Land under frost', value: Math.round(stats.frost * 100), unit: '%',
-      tag: 'model_dependent', assumption: 'energy-balance model with moisture transport',
+      id: 'frost',
+      label: 'Land under frost',
+      value: Math.round(stats.frost * 100),
+      unit: '%',
+      tag: 'model_dependent',
+      assumption: 'energy-balance model with moisture transport',
     });
   }
   if (hydro) {
     out.push({
-      id: 'rivers', label: 'Rivers drawn', value: hydro.rivers, unit: '',
+      id: 'rivers',
+      label: 'Rivers drawn',
+      value: hydro.rivers,
+      unit: '',
       tag: 'model_dependent',
-      assumption: 'drainage on the model terrain, runoff from the model rain (Budyko curve); the land roughness that steers it is artistic',
+      assumption:
+        'drainage on the model terrain, runoff from the model rain (Budyko curve); the land roughness that steers it is artistic',
     });
     out.push({
-      id: 'lakes', label: 'Lakes and salt flats', value: `${hydro.lakes} lakes, ${hydro.salt} salt flats`, unit: '',
-      tag: 'model_dependent', assumption: 'closed basins at least 30 m deep and 3 cells wide; lake or salt flat from inflow against evaporation',
+      id: 'lakes',
+      label: 'Lakes and salt flats',
+      value: `${hydro.lakes} lakes, ${hydro.salt} salt flats`,
+      unit: '',
+      tag: 'model_dependent',
+      assumption:
+        'closed basins at least 30 m deep and 3 cells wide; lake or salt flat from inflow against evaporation',
     });
   }
   return out;

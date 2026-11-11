@@ -12,7 +12,9 @@ const PREVIEW =
 describe('worldNotes.generated', () => {
   it('has the new Lava item, the updated crust item and the full honesty paragraph', () => {
     expect(gen.WORLD_NOTE_LINES.some((l) => l.startsWith('Lava:'))).toBe(true);
-    expect(gen.WORLD_NOTE_LINES.find((l) => l.startsWith('Crust and carbon:'))).toMatch(/stagnant lid/);
+    expect(gen.WORLD_NOTE_LINES.find((l) => l.startsWith('Crust and carbon:'))).toMatch(
+      /stagnant lid/,
+    );
     expect(gen.WORLD_HONESTY).toMatch(/lava example/);
     expect(gen.ERROR_BARS_NOTE).toMatch(/^Once error bars are wired in/);
     expect(gen.COMET_FORMULA_PLAIN).toBe('N = 4π Δ² F / (g h ν) → Q = 2 v N / (π ρ)');

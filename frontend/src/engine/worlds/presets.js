@@ -26,4 +26,19 @@ var WP = [
   { id: 'lava', label: 'Lava world (example)', type: 'rock', Ts: 5200, Rs: 0.95, a: 0.0155, P: 0.737, Rj: 0.167, Me: 8, locked: true, fluid: 'water', Ps: 0.005, mu: 44, sea: 0, seed: 97, A: 0.1 }
 ];
 // @end-verbatim
+// @deviation (#89 review 1) water q 0.02 -> 0.01, outside the verbatim block so it stays byte-identical. With
+// 0.02 an Earth-like world saturates at the ground ("Clouds form at: 0 km up"); 0.01 puts Earth's cloud base about
+// 0.7 km up (the lifting condensation level is typically 0.5 to 1.5 km), the same value as physics/fluids.ts (Q-241).
+FLUIDS.water.q = 0.01;
+// @end-deviation
+// @deviation (#89 review 2) CO2 liquid-vapour line. The prototype's `Tb` for CO2 is the sublimation point
+// (194.7 K < Tt), so its boiling test can never give a liquid. These are the data core.js needs to draw the
+// boiling curve up from the triple point instead: Lv, the molar enthalpy of vaporisation near the triple point
+// (about 15.3 kJ/mol, NIST Chemistry WebBook, CO2 phase-change data, [verify]: not re-opened in this session),
+// and the critical point (304.13 K, 7.3773 MPa; Span and Wagner 1996, J. Phys. Chem. Ref. Data 25, 1509),
+// where the liquid-vapour line ends.
+FLUIDS.co2.Lv = 15300;
+FLUIDS.co2.Tc = 304.13;
+FLUIDS.co2.Pc = 7.3773e6;
+// @end-deviation
 export { FLUIDS, WP };

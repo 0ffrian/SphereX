@@ -6,7 +6,10 @@ import { STAR_CONFIG, planStar } from './Star';
 import { StarBody } from './StarBody';
 import { STREAK_BUDGET } from '@/physics/flares';
 
-const config = { ...STAR_CONFIG, massMsun: () => ({ value: 0.7, tag: 'measured' as const, source: 't' }) };
+const config = {
+  ...STAR_CONFIG,
+  massMsun: () => ({ value: 0.7, tag: 'measured' as const, source: 't' }),
+};
 const plan = (ctx = {}) => {
   const { card, params } = fixture('star');
   return planStar({ card, params, ctx: defaultContext({ honesty: 'artistic', ...ctx }) }, config);
@@ -27,9 +30,7 @@ describe('plasma on the star', () => {
     const p = plan();
     expect(p.star?.plasma).toBe(true);
     expect(p.drawn.find((d) => d.id === 'plasma')?.tier).toBeDefined();
-    expect(p.drawn.find((d) => d.id === 'plasma')?.tag).toBe(
-      'model_dependent',
-    );
+    expect(p.drawn.find((d) => d.id === 'plasma')?.tag).toBe('model_dependent');
     const b = body(p);
     expect(b.plasma).not.toBeNull();
   });

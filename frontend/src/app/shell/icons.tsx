@@ -19,7 +19,8 @@ const PATHS = {
   shuffle: 'M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5',
   // Issue #71 stream U: the build view's header and zoom bar, the mock-up's shapes (`#bpAcc`,
   // `#bpHear`, `#zOut`, `#zIn`, the dock's area tool); `details` is lucide's sliders.
-  accuracy: 'M3.3 17a10 10 0 1 1 17.4 0 M12 14l4-5 M12 12.8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z',
+  accuracy:
+    'M3.3 17a10 10 0 1 1 17.4 0 M12 14l4-5 M12 12.8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z',
   hear: 'M11 5 6 9H3v6h3l5 4z M15.5 8.5a5 5 0 0 1 0 7 M18.5 5.5a9 9 0 0 1 0 13',
   details: 'M21 4h-7 M10 4H3 M21 12h-9 M8 12H3 M21 20h-5 M12 20H3 M14 2v4 M8 10v4 M16 18v4',
   zoomOut: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z M8 11h6 M21 21l-4.35-4.35',

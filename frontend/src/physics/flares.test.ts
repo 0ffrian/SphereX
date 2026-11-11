@@ -85,8 +85,12 @@ describe('schedule', () => {
     }
   });
   it('raises the threshold on an active star', () => {
-    const lo = Math.min(...Array.from({ length: 80 }, (_, k) => scheduledEvent(ctx(0.1), k)!.energyErg));
-    const hi = Math.min(...Array.from({ length: 80 }, (_, k) => scheduledEvent(ctx(10), k)!.energyErg));
+    const lo = Math.min(
+      ...Array.from({ length: 80 }, (_, k) => scheduledEvent(ctx(0.1), k)!.energyErg),
+    );
+    const hi = Math.min(
+      ...Array.from({ length: 80 }, (_, k) => scheduledEvent(ctx(10), k)!.energyErg),
+    );
     expect(hi).toBeGreaterThan(lo);
     expect(gapOf(10)).toBe(MIN_GAP_S);
   });
@@ -135,7 +139,8 @@ describe('plasma streaks', () => {
     const { g, e } = big();
     const small = new StreakSink(STREAK_BUDGET.low);
     emitQuiet(small, [g], 5, { boost: 3, q: 1, clock: 0 });
-    for (let i = 0; i < 10; i++) emitEvent(small, g, e, e.t0 + e.life * 0.4, { boost: 3, q: 1, clock: 0 });
+    for (let i = 0; i < 10; i++)
+      emitEvent(small, g, e, e.t0 + e.life * 0.4, { boost: 3, q: 1, clock: 0 });
     expect(small.n).toBeLessThanOrEqual(STREAK_BUDGET.low);
     const hi = new StreakSink(STREAK_BUDGET.high);
     const lo = new StreakSink(STREAK_BUDGET.high);

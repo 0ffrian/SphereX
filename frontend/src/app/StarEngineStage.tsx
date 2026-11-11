@@ -112,7 +112,8 @@ function useStarEngine(mode: StarMode, star: StarFromCard, redrawMs: number, slo
       if (shown) bump();
     }, redrawMs);
     return () => {
-      if (import.meta.env.DEV) (window as unknown as Record<string, unknown>)[`__sxStar_${slot}`] = null;
+      if (import.meta.env.DEV)
+        (window as unknown as Record<string, unknown>)[`__sxStar_${slot}`] = null;
       dead = true;
       for (const c of e.layers) c.removeEventListener('webglcontextlost', onLost);
       cancelAnimationFrame(raf);
@@ -167,7 +168,10 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
         kind: 'choice',
         label: 'Light',
         value: String(engine.light),
-        options: ([0, 2, 3] as StarLight[]).map((l) => ({ value: String(l), label: LIGHT_LABEL[l] })),
+        options: ([0, 2, 3] as StarLight[]).map((l) => ({
+          value: String(l),
+          label: LIGHT_LABEL[l],
+        })),
         onChange: (v) => {
           engine.setLight(Number(v) as StarLight);
           bump();
@@ -212,14 +216,22 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
         kind: 'button',
         label: 'Fire a big flare',
         disabled: !flares,
-        why: flares ? undefined : 'This star has no spot groups, so it has no sunspot-driven flares.',
+        why: flares
+          ? undefined
+          : 'This star has no spot groups, so it has no sunspot-driven flares.',
         tag: 'inferred_from_analog',
         onClick: () => {
           engine.fireFlare();
           bump();
         },
       },
-      { id: 'latest', kind: 'readout', label: 'Latest flare on this star', value: engine.latestFlare(), tag: 'inferred_from_analog' },
+      {
+        id: 'latest',
+        kind: 'readout',
+        label: 'Latest flare on this star',
+        value: engine.latestFlare(),
+        tag: 'inferred_from_analog',
+      },
       {
         id: 'rot',
         kind: 'slider',
@@ -231,22 +243,27 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
         valueText: rot.text,
         tag: star.rotation.tag,
         disabled: !rot.used,
-        why: rot.used ? star.rotation.note : 'Not used for this star: it has no outer convection layer or is not a dwarf.',
+        why: rot.used
+          ? star.rotation.note
+          : 'Not used for this star: it has no outer convection layer or is not a dwarf.',
         onChange: (v) => {
           engine.setRotationPosition(v);
           bump();
         },
       },
-      { id: 'what', kind: 'readout', label: 'What you are seeing', value: engine.caption() || engine.stageTag() },
-      ...engine.readouts().map(
-        (r): BuildControl => ({
-          id: `r-${r.label}`,
-          kind: 'readout',
-          label: r.label,
-          value: r.value,
-          tag: r.label === 'Surface temperature' ? star.teff.tag : READOUT_TAG[r.label],
-        }),
-      ),
+      {
+        id: 'what',
+        kind: 'readout',
+        label: 'What you are seeing',
+        value: engine.caption() || engine.stageTag(),
+      },
+      ...engine.readouts().map((r): BuildControl => ({
+        id: `r-${r.label}`,
+        kind: 'readout',
+        label: r.label,
+        value: r.value,
+        tag: r.label === 'Surface temperature' ? star.teff.tag : READOUT_TAG[r.label],
+      })),
       ...starValuesNote(star),
     ];
     spec = { title: 'Star surface', controls, notes: engine.notes() };
@@ -258,7 +275,13 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
   const onUp = (e: React.PointerEvent<HTMLDivElement>) => {
     const d = down.current;
     down.current = null;
-    if (!d || !engine || engine.scale === 'close' || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5) return;
+    if (
+      !d ||
+      !engine ||
+      engine.scale === 'close' ||
+      Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5
+    )
+      return;
     const b = e.currentTarget.getBoundingClientRect();
     const p = engine.pick((e.clientX - b.left) / b.width, (e.clientY - b.top) / b.height);
     if (p) useStarTarget.getState().pick(p);
@@ -302,7 +325,8 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
 const CH = { x0: 44, x1: 512, y0: 124, y1: 12 };
 const cx = (t: number) => CH.x0 + (CH.x1 - CH.x0) * t;
 const cy = (v: number) => CH.y0 + (CH.y1 - CH.y0) * v;
-const path = (a: number[]) => a.map((v, i) => `${i ? 'L' : 'M'}${cx(i / 240).toFixed(1)} ${cy(v).toFixed(1)}`).join('');
+const path = (a: number[]) =>
+  a.map((v, i) => `${i ? 'L' : 'M'}${cx(i / 240).toFixed(1)} ${cy(v).toFixed(1)}`).join('');
 
 /** The prototype's flare close-up with its light-curve chart, in the left pane. */
 export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: () => void }) {
@@ -403,12 +427,18 @@ export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: 
     <div className="absolute inset-0 bg-black" data-testid="star-engine-flare">
       <div ref={hostRef} className="absolute inset-0" />
       {flare && (
-        <span className="pointer-events-none absolute left-4 top-12 max-w-[calc(100%-2rem)] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300" data-testid="flare-tag">
+        <span
+          className="pointer-events-none absolute left-4 top-12 max-w-[calc(100%-2rem)] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300"
+          data-testid="flare-tag"
+        >
           {flare.tag}
         </span>
       )}
       {chart && flare && (
-        <div className="absolute inset-x-3 bottom-[8.75rem] z-[2] rounded-lg border border-neutral-700 bg-neutral-900/85 p-2" data-testid="flare-chart">
+        <div
+          className="absolute inset-x-3 bottom-[8.75rem] z-[2] rounded-lg border border-neutral-700 bg-neutral-900/85 p-2"
+          data-testid="flare-chart"
+        >
           <div className="mb-1 flex flex-wrap items-center gap-3 text-xs text-neutral-300">
             <span>Flare brightness over 60 minutes</span>
             <span className="text-[#c98a08]">Soft X-rays (hot loops)</span>
@@ -429,26 +459,68 @@ export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: 
             {[0, 0.5, 1].map((v) => (
               <g key={v}>
                 <line x1={CH.x0} x2={CH.x1} y1={cy(v)} y2={cy(v)} stroke="#2a2a30" />
-                <text x={CH.x0 - 8} y={cy(v) + 4} textAnchor="end" fill="#a1a1aa" fontSize="11" fontFamily="monospace">
+                <text
+                  x={CH.x0 - 8}
+                  y={cy(v) + 4}
+                  textAnchor="end"
+                  fill="#a1a1aa"
+                  fontSize="11"
+                  fontFamily="monospace"
+                >
                   {v}
                 </text>
               </g>
             ))}
             {[0, 15, 30, 45, 60].map((m) => (
-              <text key={m} x={cx(m / 60)} y={CH.y0 + 18} textAnchor="middle" fill="#a1a1aa" fontSize="11" fontFamily="monospace">
+              <text
+                key={m}
+                x={cx(m / 60)}
+                y={CH.y0 + 18}
+                textAnchor="middle"
+                fill="#a1a1aa"
+                fontSize="11"
+                fontFamily="monospace"
+              >
                 {m}
               </text>
             ))}
             <text x={CH.x1} y={CH.y0 + 34} textAnchor="end" fill="#a1a1aa" fontSize="11">
               minutes
             </text>
-            <path d={path(chart.hard)} fill="none" stroke="#2f9bd4" strokeWidth="2" strokeLinejoin="round" />
-            <path d={path(chart.soft)} fill="none" stroke="#c98a08" strokeWidth="2" strokeLinejoin="round" />
-            <line x1={cx(flare.t)} x2={cx(flare.t)} y1={CH.y1} y2={CH.y0} stroke="#fafafa" strokeWidth="1.5" />
-            <circle cx={cx(flare.t)} cy={cy(chart.soft[Math.round(flare.t * 240)] ?? 0)} r="4.5" fill="#c98a08" stroke="#111114" strokeWidth="2" />
+            <path
+              d={path(chart.hard)}
+              fill="none"
+              stroke="#2f9bd4"
+              strokeWidth="2"
+              strokeLinejoin="round"
+            />
+            <path
+              d={path(chart.soft)}
+              fill="none"
+              stroke="#c98a08"
+              strokeWidth="2"
+              strokeLinejoin="round"
+            />
+            <line
+              x1={cx(flare.t)}
+              x2={cx(flare.t)}
+              y1={CH.y1}
+              y2={CH.y0}
+              stroke="#fafafa"
+              strokeWidth="1.5"
+            />
+            <circle
+              cx={cx(flare.t)}
+              cy={cy(chart.soft[Math.round(flare.t * 240)] ?? 0)}
+              r="4.5"
+              fill="#c98a08"
+              stroke="#111114"
+              strokeWidth="2"
+            />
           </svg>
           <p className="mt-1 text-xs text-neutral-400">
-            Example curve. Hard X-rays follow the rate of change of soft X-rays (the Neupert effect).
+            Example curve. Hard X-rays follow the rate of change of soft X-rays (the Neupert
+            effect).
           </p>
         </div>
       )}

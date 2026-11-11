@@ -36,7 +36,7 @@ export interface RockFromCard {
   preset: RockPreset;
   /** Every value the engine uses and its tag, for the badges and the notes. */
   inputs: Record<
-    'size' | 'shape' | 'spin' | 'albedo' | 'density' | 'colour' | 'strength' | 'age',
+    'size' | 'shape' | 'spin' | 'albedo' | 'density' | 'colour' | 'strength' | 'age' | 'light',
     RockInput
   >;
   /** The card has a shape model: the mesh replaces the generated lumps (see meshRadial). */
@@ -54,8 +54,12 @@ const TINT_COMET: [number, number, number] = [0.42, 0.4, 0.38];
 const COMET_RHO = 530;
 const COMET_A = 0.05;
 const COMET_AB = 1.5;
-/** C-type: Bennu (Lauretta et al. 2019); S-type: Eros (Yeomans et al. 2000). Prototype `RP` values. */
-const RHO_C = 1200;
+/**
+ * C-type: Bennu, 1,190 +- 13 kg/m3 (Lauretta et al. 2019, Nature 568, 55); S-type: Eros, 2,670
+ * kg/m3 (Yeomans et al. 2000). Albedos are the prototype's `RP` values. The prototype's own 'rub'
+ * example keeps its rounded 1,200 (source.ts, verbatim); it is within 1 %, so no mismatch is noted.
+ */
+const RHO_C = 1190;
 const RHO_S = 2670;
 const RHO_GENERIC = 1500;
 const A_C = 0.044;
@@ -81,9 +85,26 @@ export function classFamily(cls: string | null): 'C' | 'S' | null {
   return null;
 }
 
-/** The prototype's seeds are small integers (the shader adds the seed to a position): keep it small. */
+/** Upper end (exclusive) of the engine seed: the shader adds the seed to a noise position, so it stays small. */
+export const ROCK_SEED_RANGE = 97;
+/** Engine seed steps: 1/4096, so a seed survives float32 exactly and prints the same everywhere. */
+const ROCK_SEED_STEPS = ROCK_SEED_RANGE * 4096;
+/**
+ * The engine seed for a card seed. The prototype's seeds are small numbers (the shader adds the seed
+ * to a noise position), so the card's 32-bit seed is hashed (murmur3 finaliser) and folded into
+ * [0, 97) in steps of 1/4096: about 400,000 values instead of 97, so two cards rarely share a field.
+ * Deterministic. The prototype's own examples keep their own integer seeds (artifactPreset).
+ * Note: the engine's crater RNG takes `seed * 31 + 7` as an integer, so craters alone repeat every
+ * ~1/31 of a seed; the shader's noise offset takes the full value.
+ */
 export function rockSeed(seed: number): number {
-  return Math.abs(Math.floor(Number.isFinite(seed) ? seed : 0)) % 97;
+  let h = Math.floor(Math.abs(Number.isFinite(seed) ? seed : 0)) >>> 0;
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return ((h >>> 0) % ROCK_SEED_STEPS) / 4096;
 }
 
 /**
@@ -254,6 +275,13 @@ export function cardToRock(
         tag: 'artistic',
         why: "no age on the card: the prototype's default of 70 on a 0 to 100 scale",
       },
+      // The engine's shading (source.ts fragment shader): Lommel-Seeliger plus a Lambert term, an
+      // exponential phase darkening, no opposition surge. Not fitted to any body.
+      light: {
+        value: 'Lommel–Seeliger and Lambert blend',
+        tag: 'artistic',
+        why: "the prototype's shading: a blend of the Lommel–Seeliger and Lambert laws with a simple darkening at high phase and no brightening at opposition; not fitted to this body",
+      },
     },
     meshUrl,
     mismatches: [],
@@ -262,30 +290,48 @@ export function cardToRock(
     // The artifact's colour and seed are part of its look, and its size, shape, spin, albedo and density are
     // what is drawn: the inputs show those, and where the card says something else that is reported.
     const pr = fromArtifact;
-    const same = (a: number, b: number) => (Number.isFinite(a) && Number.isFinite(b) ? Math.abs(a - b) <= 0.01 * Math.max(Math.abs(a), Math.abs(b)) : a === b);
+    const same = (a: number, b: number) =>
+      Number.isFinite(a) && Number.isFinite(b)
+        ? Math.abs(a - b) <= 0.01 * Math.max(Math.abs(a), Math.abs(b))
+        : a === b;
     const why = "the approved preview's example value (this body is one of its own examples)";
     const size = (d: number) => (d < 1 ? `${fmt(d * 1000)} m` : `${fmt(d, 1)} km`);
     const note = (name: string, card: string, drawn: string) =>
-      out.mismatches.push(`${name}: the card has ${card} but the preview's example has ${drawn}; the example is drawn`);
+      out.mismatches.push(
+        `${name}: the card has ${card} but the preview's example has ${drawn}; the example is drawn`,
+      );
+    const whyCard = (card: string) => `${why}; the card says ${card}`;
     if (!same(pr.D, D)) {
       note('size', size(D), size(pr.D));
-      out.inputs.size = { value: size(pr.D), tag: 'artistic', why };
+      out.inputs.size = { value: size(pr.D), tag: 'artistic', why: whyCard(size(D)) };
     }
     if (!same(pr.ab, ab)) {
       note('shape', shape.value, `${fmt(pr.ab, 1)} : 1`);
-      out.inputs.shape = { value: `${fmt(pr.ab, 1)} : 1`, tag: 'artistic', why };
+      out.inputs.shape = {
+        value: `${fmt(pr.ab, 1)} : 1`,
+        tag: 'artistic',
+        why: whyCard(shape.value),
+      };
     }
     if (!same(pr.P, P)) {
       note('spin', spin.value, `${fmt(pr.P, 1)} h`);
-      out.inputs.spin = { value: `${fmt(pr.P, 1)} h`, tag: 'artistic', why };
+      out.inputs.spin = { value: `${fmt(pr.P, 1)} h`, tag: 'artistic', why: whyCard(spin.value) };
     }
     if (!same(pr.A, A)) {
       note('reflectivity', albedo.value, `${fmt(pr.A * 100, 1)}%`);
-      out.inputs.albedo = { value: `${fmt(pr.A * 100, 1)}%`, tag: 'artistic', why };
+      out.inputs.albedo = {
+        value: `${fmt(pr.A * 100, 1)}%`,
+        tag: 'artistic',
+        why: whyCard(albedo.value),
+      };
     }
     if (!same(pr.rho, rho)) {
       note('density', density.value, `${fmt(pr.rho)} kg/m³`);
-      out.inputs.density = { value: `${fmt(pr.rho)} kg/m³`, tag: 'artistic', why };
+      out.inputs.density = {
+        value: `${fmt(pr.rho)} kg/m³`,
+        tag: 'artistic',
+        why: whyCard(density.value),
+      };
     }
     out.inputs.colour = {
       value: "the artifact's tint",

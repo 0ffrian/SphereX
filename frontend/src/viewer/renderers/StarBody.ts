@@ -94,7 +94,9 @@ export class StarBody {
       granuleVisibility: star.granuleVisibility,
       convection: star.physics ? star.physics.convection : 1,
       teffK: star.physics?.teffK,
-      coolTint: star.physics ? (teffToRgbMax1(star.physics.teffK * COOL_FACTOR) ?? undefined) : undefined,
+      coolTint: star.physics
+        ? (teffToRgbMax1(star.physics.teffK * COOL_FACTOR) ?? undefined)
+        : undefined,
     });
     this.geometry = new SphereGeometry(1, o.segments[0], o.segments[1]);
     this.spin.add(new Mesh(this.geometry, this.mat.material));
@@ -161,7 +163,10 @@ export class StarBody {
     const churn = (tau: number) => (spinPeriod > 0 ? (CHURN_PER_ROT * tau) / spinPeriod : 0);
 
     const regions = regionsAt(seed, tSpots, rates, this.cfg, tSpin);
-    const flares = this.star.flares && !this.star.plasma ? flaresAt(seed, tFlares, tSpots, rates, this.cfg, tSpin) : [];
+    const flares =
+      this.star.flares && !this.star.plasma
+        ? flaresAt(seed, tFlares, tSpots, rates, this.cfg, tSpin)
+        : [];
     if (this.plasma) {
       // Display seconds of the flare schedule: sim seconds over the shown speed-up.
       this.plasma.setTime(rates.flareSpeedup > 0 ? tFlares / rates.flareSpeedup : 0);

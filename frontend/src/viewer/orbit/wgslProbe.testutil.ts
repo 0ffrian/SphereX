@@ -12,7 +12,10 @@ export function buildWgsl(fragmentNode: unknown): string {
     contextNode: context({}),
     library: { fromMaterial: (m: unknown) => m },
     debug: { diagnostics: { keywords: false } },
-    backend: { utils: { getTextureSampleData: () => ({ primarySamples: 1, samples: 1, isMSAA: false }) }, get: () => ({}) },
+    backend: {
+      utils: { getTextureSampleData: () => ({ primarySamples: 1, samples: 1, isMSAA: false }) },
+      get: () => ({}),
+    },
     outputColorSpace: 'srgb',
     toneMapping: 0,
     coordinateSystem: 2000,
