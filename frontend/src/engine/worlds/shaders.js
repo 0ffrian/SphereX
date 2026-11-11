@@ -403,8 +403,10 @@ function noUnroll(src) {
 }
 WORLD_FS = noUnroll(WORLD_FS); FLY_FS = noUnroll(FLY_FS);
 // @deviation (#93 3) repeating patterns. Text edits applied to the shader sources above; each must match exactly as
-// often as stated, so a changed prototype fails loudly. Presets render as before: core.js sets uSeed3 = (seed, seed,
-// seed), uSeedN = 0 and uNzSph = 0 for them (WorldGL.seedFor); only card worlds (preset.seed3) get the new seeds.
+// often as stated, so a changed prototype fails loudly. Presets keep the prototype's seeds: core.js sets uSeed3 =
+// (seed, seed, seed), uSeedN = 0 and uNzSph = 0 for them (WorldGL.seedFor); only card worlds (preset.seed3) get the
+// new seeds. So the globe programs render presets as before, but the fly view does not: FLY_FS has other #93 changes
+// (its heights and detail), and the patterns.html presets check fails there by design.
 //  2.1, 2.9  uSeed3: every noise offset +uSeed (the prototype's one seed along (1, 1, 1)) becomes +uSeed3, a vec3; a
 //            card world gets three hashed integers in [0, 256) (engine/seed.ts), so two cards never share a shifted
 //            copy of one pattern.
