@@ -60,10 +60,10 @@ function buildTerrain(p, oceanFrac, gv, opt) {
     orog[i] = up * gf; e[i] = h + up * gf;
     sig[i] = clamp(Math.sign(conv) * cc * g2(d, 0, 0.012), -1, 1);
   }
-  if (opt.stagnant) {   // one rigid lid: no ranges or trenches, broad volcanic shields, rifts and old basins
+  if (opt.stagnant) {   // one rigid lid: no trenches or moving plates; volcanic shields, rifts, basins, and buckled mountain belts at 0.55 of a plate range (Venus tesserae, Titan's ridges)
     var rs = rng(p.seed * 7 + 3), vc = [], vi;
     for (vi = 0; vi < 11; vi++) { var vz = rs() * 2 - 1, va = rs() * 6.2832, vs = Math.sqrt(1 - vz * vz); vc.push([vs * Math.cos(va), vz, vs * Math.sin(va), vi < 5 ? 0.09 + 0.09 * rs() : 0.16 + 0.22 * rs(), vi < 5 ? 1 : -1, vi < 5 ? 6 + 9 * rs() : 1.5 + 2.5 * rs()]); }
-    for (i = 0; i < N; i++) { var hh = -1.2 + 6 * (C[i] - th) + 1.2 * (vn3(dx[i] * 7 + s, dy[i] * 7, dz[i] * 7) - 0.5); for (vi = 0; vi < vc.length; vi++) { var cd2 = 1 - (dx[i] * vc[vi][0] + dy[i] * vc[vi][1] + dz[i] * vc[vi][2]), rr2 = 2 * cd2 / (vc[vi][3] * vc[vi][3]); if (rr2 < 9) hh += vc[vi][4] * vc[vi][5] * gf * Math.exp(-rr2); } e[i] = hh; orog[i] = 0; sig[i] = 0; }
+    for (i = 0; i < N; i++) { var hh = -1.2 + 6 * (C[i] - th) + 1.2 * (vn3(dx[i] * 7 + s, dy[i] * 7, dz[i] * 7) - 0.5); for (vi = 0; vi < vc.length; vi++) { var cd2 = 1 - (dx[i] * vc[vi][0] + dy[i] * vc[vi][1] + dz[i] * vc[vi][2]), rr2 = 2 * cd2 / (vc[vi][3] * vc[vi][3]); if (rr2 < 9) hh += vc[vi][4] * vc[vi][5] * gf * Math.exp(-rr2); } e[i] = hh + 0.55 * orog[i]; orog[i] *= 0.55; sig[i] = 0; }
     K = 1;
   }
   // sea level: the height that puts the wanted share of the area under water
