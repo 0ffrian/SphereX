@@ -74,7 +74,15 @@ export interface TaggedAssumption {
 export interface EngineOptions {
   /** Make the drawing buffer readable after the frame (toDataURL, capture). Parity and test pages only. */
   preserveDrawingBuffer?: boolean;
+  /**
+   * Which view this instance draws (issue #93): 'globe' never flies, so it does not compile the fly shader; 'fly' is
+   * the close-up, whose canvas is wider than its pane, so the globe beside the fly view is not drawn. 'both' (the
+   * default) is the prototype's page, used by the parity hooks.
+   */
+  role?: EngineRole;
 }
+
+export type EngineRole = 'globe' | 'fly' | 'both';
 
 export type ReadoutRow = [label: string, value: string];
 export interface Readouts {

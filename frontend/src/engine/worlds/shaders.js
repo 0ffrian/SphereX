@@ -5,8 +5,12 @@
 import { LMIN, LMAX } from './helpers.js';
 // @deviation (#89 review 1) the rename below: the fly view's cloud deck sat at a fixed 3 km (x the relief
 // exaggeration) while the readout gave the model's cloud base; it now reads uCloudKm, which core.js sets from m.zc.
+// @deviation (#93 1.4) the second and third renames below: the fly view's pixel footprint FP (which fades the noise
+// octaves finer than a pixel) divided by uR.y, the drawing-buffer height, which the resolution scaler changes on slow
+// frames, so the ground texture changed while flying. FP now uses the full-resolution height (uR.y / uScale; core.js
+// sets uScale to the scaler's factor), so a resolution change alters sharpness only, not the pattern.
 // @verbatim L1299-L1678
-// @rename 1.+3.*uEx/uRkm=>1.+uCloudKm*uEx/uRkm
+// @rename 1.+3.*uEx/uRkm=>1.+uCloudKm*uEx/uRkm uCloudKm,uHkm;=>uCloudKm,uHkm,uScale; uFov/uR.y=>uFov*uScale/uR.y
 var NOISE = `
 vec3 h33(vec3 p){p=fract(p*vec3(.1031,.1030,.0973));p+=dot(p,p.yxz+33.33);return fract((p.xxy+p.yxx)*p.zyx);}
 float vn(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
@@ -221,7 +225,7 @@ void main(){
 var FLY_FS = `#version 300 es
 precision highp float;
 uniform vec2 uR,uOff;uniform vec3 uCam,uFwd,uRt,uUp,uLb,uStar,uSky,uLiq,uIce,uLand,uCld,uZ,uB,uS,uD,uP,uHazeC,uAw;
-uniform float uLava,uHM;uniform float uFov,uEx,uRkm,uOcean,uTt,uTb,uCov,uTau,uHz,uMode,uTime,uSeed,uGam,uClouds,uAltKm,uCloudKm,uHkm;
+uniform float uLava,uHM;uniform float uFov,uEx,uRkm,uOcean,uTt,uTb,uCov,uTau,uHz,uMode,uTime,uSeed,uGam,uClouds,uAltKm,uCloudKm,uHkm,uScale;
 uniform sampler2D uTr,uLut,uHt,uEb,uBand,uHy,uVel,uEb2;out vec4 O;
 const float LMIN=${LMIN.toFixed(6)},LMAX=${LMAX.toFixed(6)},PI=3.14159265,TAU=6.2831853;
 ${NOISE}
@@ -277,7 +281,7 @@ vec3 atmo(vec3 ro,vec3 rd,float tmax,out vec3 tr){
  return uStar*L*(SCR*pR+SCM*uHazeC*pM)*PI;
 }
 vec3 sunT(vec3 d){return exp(-EXT*HV*airm(dot(d,uLb)));}
-float cov2(vec3 d,float tq){FP=tq*2.*uFov/uR.y;vec3 q=d*260.+vec3(uTime*.01,0.,0.)+uSeed;
+float cov2(vec3 d,float tq){FP=tq*2.*uFov*uScale/uR.y;vec3 q=d*260.+vec3(uTime*.01,0.,0.)+uSeed;
  vec3 w=vec3(fbmL(q,260.,4),fbmL(q+5.2,260.,4),fbmL(q+9.7,260.,4))-.5;vec4 cl=tex4(uTr,uvOf(normalize(d+w*.035)));float th=1.-uCov;
  float b=cl.r+(cl.g-.5)*.32+(fbmL(d*1100.+w*30.+uSeed,1100.,5)-.5)*.42;
  return smoothstep(th-.08,th+.3,b);}
@@ -294,7 +298,7 @@ void main(){
  vec3 col=vec3(0.),amb;
  if(hit>0.){
   vec3 d=normalize(p);vec2 uv=uvOf(d);float mud=dot(d,uLb);
-  FP=hit*2.*uFov/uR.y/max(abs(dot(rd,d)),.2);
+  FP=hit*2.*uFov*uScale/uR.y/max(abs(dot(rd,d)),.2);
   amb=uStar*(SCR*HV*1.3+SCM*uHazeC*HV*.8+.012)*smoothstep(-.25,.3,mud);
   vec3 sT=sunT(d);
   if(uMode>.5){
@@ -332,7 +336,7 @@ void main(){
    n=normalize(n-(CA*gd.x+CB*gd.y)*.3*uEx);
    float slope2=(1.-dot(n,d))*uEx,Tl=E.r-uGam*max(hk+G*.3,0.);
    float cs=1.;
-   if(uClouds>.5&&uCov>.01){float rm=1.+uCloudKm*uEx/uRkm;vec3 sp=p0+uLb*((rm-length(p0))/max(mud,.1));cs=1.-.78*smoothstep(.15,.7,cov2(normalize(sp),hit));FP=hit*2.*uFov/uR.y/max(abs(dot(rd,d)),.2);}
+   if(uClouds>.5&&uCov>.01){float rm=1.+uCloudKm*uEx/uRkm;vec3 sp=p0+uLb*((rm-length(p0))/max(mud,.1));cs=1.-.78*smoothstep(.15,.7,cov2(normalize(sp),hit));FP=hit*2.*uFov*uScale/uR.y/max(abs(dot(rd,d)),.2);}
    if(uOcean>.5&&hk<=.001){
     vec3 trn=exp(-2.*uAw*min(max(-e,0.)*1000.,400.)),w=uLiq*(1.-trn)+uLand*.8*trn;
     float wl=lod(2600.);vec3 wn=normalize(d+(vec3(fbm(d*2600.+uTime*.2,3),fbm(d*2600.+7.-uTime*.17,3),fbm(d*2600.+13.,3))-.5)*.06*wl);
@@ -388,4 +392,14 @@ void main(){
  O=vec4(pow(1.-exp(-col*1.5),vec3(1./2.2)),1.);
 }`;
 // @end-verbatim
+// @deviation (#93 1.1) on ANGLE D3D11 (Chrome's default on Windows) fxc unrolls every loop with a constant bound, and
+// FLY_FS took about 62 s to compile on a cold cache (WORLD_FS 6 to 8 s). Each constant bound N in WORLD_FS and FLY_FS
+// (11 loops in FLY_FS, 3 in WORLD_FS, NOISE's fbm and ridge included) becomes N+uZ0, with uZ0 a uniform that is never
+// set (always 0): the loops run exactly as before, but fxc keeps them as loops. Loops that leave early with break are
+// unchanged by it. ADV_FS and GAS_FS compile quickly and keep their source. Measured: see frontend/scripts/engine-bench.
+function noUnroll(src) {
+  return src.replace('precision highp float;', 'precision highp float;\nuniform int uZ0;')
+    .replace(/(for\(int [ijk]=-?\d+;[ijk])(<=?)(\d+|n);/g, function (m, a, op, b) { return a + op + b + '+uZ0;'; });
+}
+WORLD_FS = noUnroll(WORLD_FS); FLY_FS = noUnroll(FLY_FS);
 export { NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS };

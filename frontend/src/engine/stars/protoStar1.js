@@ -5,7 +5,7 @@
 // Source: .claude/worktrees/sculptor-reference/sculptor-preview-next.html, lines 357-662 (Planck colour, star shader FS, star model, tauC, drawStar).
 // Not yet imported by the app: it still needs the TypeScript host (DOM removed, `cardToStar`). Do not edit here;
 // re-run the slicing instead so the body stays byte-identical to the prototype.
-// Deliberate deviations from the prototype (PR #89 review, Atish's call), declared as the last four @rename pairs:
+// Deliberate deviations from the prototype (PR #89 review, Atish's call), declared as @rename pairs 3 to 6:
 //  1. Limb darkening: the prototype's T^4 ~ 0.4 + 0.6 mu pinned the disc centre at Teff (the star drawn as if at
 //     0.946 Teff). Now the Eddington approximation T^4 = 3/4 Teff^4 (mu + 2/3), so T = Teff at mu = 2/3 and the
 //     centre is 1.25^(1/4) = 1.0574 Teff; the brightness pow(tl/uTeff, beta) is divided by 1.0574^beta so the
@@ -20,8 +20,12 @@
 //     Sun (GOES since 1976: about one flare >= X10 per 800 to 1,000 days). Now 900 f_sun/f days. inferred_from_analog.
 // Not changed but labelled: the granulation contrast (+-12 % in temperature, `(gran-.5)*.24`) is 2 to 3 times the
 // observed one, exaggerated so the cells show at this scale: artistic.
+// Issue #93 1.9 (deviation 4, @rename pairs 7 to 11): on ANGLE D3D11 (Chrome's default on Windows) fxc unrolls
+// every loop with a constant bound, and the star shader FS took 3.2 to 4.6 s to compile on a cold cache, freezing the
+// page. Each constant bound N becomes N+uZ0, with uZ0 a uniform that is never set (always 0): the loops run exactly as
+// before, but stay loops. Measured with frontend/scripts/engine-bench (engines.html).
 // @verbatim L358-L663
-// @rename m.best=>(CLOSE_AT||m.best) (ema=>(!window.__sxPin&&ema pow(.4+.6*mu,.25)=>pow(.75*mu+.5,.25) pow(tl/uTeff,uBeta)=>pow(tl/uTeff/1.0574,uBeta) tt=mix(1.,.885+.05*fil,mpn);tt=mix(tt,.68,um);=>tt=mix(1.,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff*(.36-.16*fil),mpn);tt=mix(tt,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff,um); m.f;=>m.f*3;
+// @rename m.best=>(CLOSE_AT||m.best) (ema=>(!window.__sxPin&&ema pow(.4+.6*mu,.25)=>pow(.75*mu+.5,.25) pow(tl/uTeff,uBeta)=>pow(tl/uTeff/1.0574,uBeta) tt=mix(1.,.885+.05*fil,mpn);tt=mix(tt,.68,um);=>tt=mix(1.,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff*(.36-.16*fil),mpn);tt=mix(tt,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff,um); m.f;=>m.f*3; precision highp float;=>precision highp float;uniform int uZ0; i<4;=>i<4+uZ0; k<=1;=>k<=1+uZ0; j<=1;=>j<=1+uZ0; i<=1;=>i<=1+uZ0;
 /* ---------- Planck spectrum to colour ---------- */
 function g(l, m, s1, s2) {
   var s = l < m ? s1 : s2,
@@ -82,7 +86,7 @@ function hex(c) {
 var VS =
   '#version 300 es\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0.,1.);}';
 var FS = `#version 300 es
-precision highp float;
+precision highp float;uniform int uZ0;
 uniform vec2 uRes,uOff;
 uniform float uTime,uTeff,uFreq,uConv,uHalf,uRot,uTilt,uBeta,uFilter;
 uniform vec4 uSpots[48];
@@ -94,13 +98,13 @@ vec3 h33(vec3 p){p=fract(p*vec3(.1031,.1030,.0973));p+=dot(p,p.yxz+33.33);return
 float vn(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
  return mix(mix(mix(h33(i).x,h33(i+vec3(1,0,0)).x,f.x),mix(h33(i+vec3(0,1,0)).x,h33(i+vec3(1,1,0)).x,f.x),f.y),
             mix(mix(h33(i+vec3(0,0,1)).x,h33(i+vec3(1,0,1)).x,f.x),mix(h33(i+vec3(0,1,1)).x,h33(i+vec3(1,1,1)).x,f.x),f.y),f.z);}
-float fbm(vec3 p){float a=.5,s=0.;for(int i=0;i<4;i++){s+=a*vn(p);p=p*2.03+vec3(7.1,3.3,1.7);a*=.5;}return s/.9375;}
-float ridged(vec3 p){float a=.5,s=0.;for(int i=0;i<4;i++){s+=a*(1.-abs(2.*vn(p)-1.));p=p*2.1+vec3(3.1,9.3,4.7);a*=.5;}return s/.9375;}
+float fbm(vec3 p){float a=.5,s=0.;for(int i=0;i<4+uZ0;i++){s+=a*vn(p);p=p*2.03+vec3(7.1,3.3,1.7);a*=.5;}return s/.9375;}
+float ridged(vec3 p){float a=.5,s=0.;for(int i=0;i<4+uZ0;i++){s+=a*(1.-abs(2.*vn(p)-1.));p=p*2.1+vec3(3.1,9.3,4.7);a*=.5;}return s/.9375;}
 vec3 lut(float T){return texture(uLut,vec2((log(T)-LMIN)/(LMAX-LMIN),.5)).rgb;}
 /* A cell is born small, grows, shows a dark core as it splits, then shrinks while its neighbours fill in. */
 float boil(vec3 p,float t){
  vec3 ip=floor(p),fp=fract(p);float f1=9.,f2=9.,pf=0.;
- for(int k=-1;k<=1;k++)for(int j=-1;j<=1;j++)for(int i=-1;i<=1;i++){
+ for(int k=-1;k<=1+uZ0;k++)for(int j=-1;j<=1+uZ0;j++)for(int i=-1;i<=1+uZ0;i++){
   vec3 g=vec3(i,j,k),c=ip+g,h=h33(c);
   float ph=t*(.7+.6*h.x)+h.y*7.,ep=floor(ph),fr=ph-ep;
   vec3 o=h33(c+ep*vec3(13.1,7.7,3.3));
