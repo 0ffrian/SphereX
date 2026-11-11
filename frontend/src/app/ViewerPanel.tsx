@@ -52,7 +52,7 @@ import { describeRefusal, layerName, timeLapseText } from './messages';
 import { buttonClass } from './ui';
 import { closeUpKindOf } from './CloseUpPane';
 import { useCloseUpStore } from './closeUpStore';
-import { StarFlarePanel } from './StarFlarePanel';
+import { StarEngineDetails, StarFlarePanel } from './StarFlarePanel';
 import { RockStage } from './build/RockStage';
 import { StarGlobeStage, useEngineStar } from './StarEngineStage';
 import { WorldGlobeStage, useEngineWorld } from './WorldEngineStage';
@@ -752,7 +752,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           <FeelPanel />
         </section>
         <section hidden={pop !== 'hear'} data-testid="build-pop-hear">
-          <HearPanel active={pop === 'hear'} name={plan?.name} />
+          <HearPanel active={pop === 'hear'} name={displayName(plan?.name)} />
         </section>
         {details}
       </div>
@@ -842,7 +842,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                 : 'pointer-events-none absolute left-3 top-3 max-w-[85%] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300'
             }
           >
-            {plan ? `${plan.name}${plan.threeD ? '' : ' (no 3D model)'}` : PLACEHOLDER_LABEL}
+            {plan ? `${displayName(plan.name)}${plan.threeD ? '' : ' (no 3D model)'}` : PLACEHOLDER_LABEL}
           </p>
           {plan && !plan.threeD && plan.message && (
             <p
@@ -958,6 +958,8 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                 onChange={onEpoch}
               />
             )}
+
+            {engineStar && <StarEngineDetails fixture={objectIsFixture} />}
 
             {plan.star && !engineStar && (
               <div className="flex flex-col gap-2" data-testid="star-views">

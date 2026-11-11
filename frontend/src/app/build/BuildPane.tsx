@@ -19,18 +19,15 @@ import {
 import { BUILD_POP_ID, ViewerPanel, type PopId } from '@/app/ViewerPanel';
 import { CloseUpPane, closeUpButtonLabel, closeUpKindOf } from '@/app/CloseUpPane';
 import { useCloseUpStore } from '@/app/closeUpStore';
-import { useRockStore } from '@/app/rockStore';
 import { StatusLine } from '@/app/StatusLine';
 import { BuildDock, ZoomBar } from './BuildChrome';
 import { Icon, type IconName } from '@/app/shell/icons';
 import { isEditableTarget } from '@/app/shell/shortcuts';
 import { useShellStore } from '@/app/shell/shellStore';
 import { useAppStore } from '@/state/store';
-import { ProvenanceBadge } from '@/app/Badge';
-import { effectiveHonesty, HONESTY_LABEL } from '@/viewer/honesty';
 import type { MouldPhase } from './useMould';
 import { closeBuildPane } from './focus';
-import { ENGINE_NOTE, PREBUILT_NOTE } from '@/app/messages';
+import { displayName } from '@/app/displayName';
 import { loadBodyFor, typeLabel, useSelection } from './selectedBody';
 
 export { closeBuildPane };
@@ -61,10 +58,6 @@ export function BuildPane() {
   const buttonRefs = useRef<Partial<Record<PopId, HTMLButtonElement | null>>>({});
   const closeKind = closeUpKindOf(params?.type);
   const closeHidden = useCloseUpStore((s) => s.hidden);
-  // A D-37 engine (world, star or rock) draws the body: its note replaces the baked path's.
-  const closeEngine = useCloseUpStore((s) => s.engineStar !== null || s.engineWorld !== null);
-  const rockEngine = useRockStore((s) => s.view !== null);
-  const engineDrawn = closeEngine || rockEngine;
   const [usesSeed, setUsesSeed] = useState(true);
   const spinRef = useRef<SVGSVGElement>(null);
   const sayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -77,16 +70,12 @@ export function BuildPane() {
 
   // The body of the selected object when it is loaded; otherwise whatever body the store holds
   // (the rail's 3D viewer with no selection).
-  const name = selection?.name ?? card?.name ?? null;
+  const name = displayName(selection?.name ?? card?.name ?? null) || null;
   const bodyHere = selection && body.status !== 'idle' && body.id === selection.id ? body : null;
   const type = typeLabel(params?.type);
   // The mock-up's title (Q-298, amends Q-113): "Building X" for a build that is played, and it stays;
   // the bare name when the body is shown built at once (`B.quick`).
   const title = name ? (build.animate ? `Building ${name}` : name) : '3D view';
-  const fixtureSky = useAppStore((s) => s.sky.fixture);
-  const honesty = effectiveHonesty(useAppStore((s) => s.honesty));
-  const levelTag =
-    honesty === 'measured' ? 'measured' : honesty === 'derived' ? 'derived' : 'artistic';
   const subtitle =
     bodyHere?.status === 'loading'
       ? 'Looking up its 3D model…'
@@ -95,7 +84,7 @@ export function BuildPane() {
         : (type ?? (name ? '' : 'No object loaded'));
   const message =
     bodyHere?.status === 'none'
-      ? `There is no 3D model of ${selection!.name} to build. ${bodyHere.reason}`
+      ? `There is no 3D model of ${name} to build. ${bodyHere.reason}`
       : null;
 
   // Mock-up `setShifted`: the pane slides to the right half 650 ms after the last step, and the
@@ -229,27 +218,17 @@ export function BuildPane() {
     </div>
   );
 
-  // The honesty line (D-02, D-21): the level the body is shown at, visible without opening anything,
-  // in the mock-up's caption style (`.cu-tag`).
+  // The note box (level badge, "artist's impression", "Generated live from physics…") is gone: the
+  // provenance stays in the Details lists. What is left of this slot is the "N hidden at this level"
+  // button, shown only when there is one.
   const level = (extra: ReactNode) =>
     name &&
-    bodyHere?.status !== 'none' && (
-    <p className="sx-bp-tag" data-testid="build-level">
-      <ProvenanceBadge
-        tag={levelTag}
-        fixture={fixtureSky || (card?.id.startsWith('fixture:') ?? false)}
-      />
-      {honesty === 'artistic' && <span>artist&rsquo;s impression</span>}
-      {engineDrawn ? (
-        <span data-testid="build-engine-note">{ENGINE_NOTE}</span>
-      ) : (
-        bodyHere?.status === 'ready' &&
-        bodyHere.prebuilt && <span data-testid="build-prebuilt">{PREBUILT_NOTE}</span>
-      )}
-      <span className="sr-only">{HONESTY_LABEL[honesty]}</span>
-      {extra}
-    </p>
-  );
+    bodyHere?.status !== 'none' &&
+    extra && (
+      <p className="sx-bp-tag" data-testid="build-level">
+        {extra}
+      </p>
+    );
 
   return (
     <>
