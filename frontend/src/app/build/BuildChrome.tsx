@@ -6,7 +6,6 @@
 //   zoom bar   -> the 3D view (ViewerApp.zoom / resetView; the value is its own zoom, 100% = as opened)
 //   target     -> back to the sky (closes the build)
 //   audio      -> the spectrum tool (the fingerprint chart; its Listen sweep is also in "Hear it")
-//   fingerprint-> "Feel it" (the build pane's Feel panel)
 //   area       -> Area search: not built, shown disabled
 //   search     -> the search field
 import { useEffect, useState } from 'react';
@@ -78,7 +77,7 @@ export function ZoomBar() {
   );
 }
 
-export function BuildDock({ pop, onPop }: { pop: PopId | null; onPop(p: PopId | null): void }) {
+export function BuildDock(_props: { pop: PopId | null; onPop(p: PopId | null): void }) {
   return (
     <nav className="sx-fl sx-dock" aria-label="Tools and search" data-testid="build-dock">
       <ul className="m-0 flex list-none gap-1 p-0">
@@ -105,19 +104,6 @@ export function BuildDock({ pop, onPop }: { pop: PopId | null; onPop(p: PopId | 
             data-testid="dock-spectrum"
           >
             <RailIcon id="spectrum" />
-          </button>
-        </li>
-        <li>
-          <button
-            type="button"
-            className="sx-dtool"
-            aria-pressed={pop === 'feel'}
-            aria-label="Feel the surface"
-            title="Feel the surface"
-            onClick={() => onPop(pop === 'feel' ? null : 'feel')}
-            data-testid="dock-feel"
-          >
-            <Icon name="fingerprint" className="size-5" />
           </button>
         </li>
         <li>
