@@ -5,6 +5,7 @@
 import type { ObjectCard, Tag } from '@/contract';
 import { MEASURED_FLATTENING, MEASURED_PEAK_WIND_MS, WIND_DT_FLOOR_K } from '@/physics/gasDynamics';
 import { deriveLocking } from '@/physics/tides';
+import { hashString32, seedVec } from '../seed';
 import { FLUIDS, WP } from './presets.js';
 import type { EngineOverrides, FluidKey, TaggedAssumption, WorldPreset } from './types';
 
@@ -58,14 +59,13 @@ const ROCK_SOLIDUS_K = 1400;
  */
 const ROCK_VAPOUR = { Ps: 0.005, mu: 44, sea: 0 };
 
-/** FNV-1a of the card id, folded to 1..997: a small stable integer (the prototype's seeds are small; the shaders take them as floats). */
+/**
+ * The card world's seed: a 32-bit avalanche hash of the card id (engine/seed.ts; #93 2.9). It was folded to 1..997 and
+ * added along (1, 1, 1), so two of 20 worlds shared a seed 17 % of the time and most had shifted, near-identical
+ * cloud bands. The CPU terrain and the random streams take it whole; the shaders take seed3 (seedVec of it).
+ */
 export function seedFromId(id: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return ((h >>> 0) % 997) + 1;
+  return hashString32(id);
 }
 
 function num(tv: { value: number | null } | undefined): number | null {
@@ -338,8 +338,10 @@ function cardToWorldGeneric(card: ObjectCard, overrides: EngineOverrides): CardT
     Ps,
     mu,
     seed: seedFromId(card.id),
+    seed3: seedVec(seedFromId(card.id)),
   };
   tags.seed = 'artistic';
+  tags.seed3 = 'artistic';
   if (Prot !== undefined) preset.Prot = Prot;
   if (lavaWorld) {
     preset.sea = ROCK_VAPOUR.sea;

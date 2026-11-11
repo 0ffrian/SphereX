@@ -101,7 +101,7 @@ describe('shader loop bounds (issue #93 1.1)', () => {
   const constLoop = /for\(int [ijk]=-?\d+;[ijk]<=?\d+;/;
   it('every loop in WORLD_FS and FLY_FS has a uniform bound, declared once', () => {
     for (const [fs, n] of [
-      [FLY_FS, 11],
+      [FLY_FS, 13], // 11, plus the two cube-face loops of #93 2.5
       [WORLD_FS, 3],
     ] as const) {
       expect(fs.match(/\+uZ0;/g)?.length).toBe(n);
