@@ -14,6 +14,7 @@ import {
   sunRossby,
 } from '@/physics/stellar';
 import { GM_SUN, R_SUN_M } from '@/physics/constants';
+import { hashString32, seedVec } from '../seed';
 
 /** What the engine's `setStar` takes: the prototype's PRESETS row. */
 export interface StarPreset {
@@ -29,6 +30,13 @@ export interface StarPreset {
   P: number;
   /** A dwarf: the field and spot fit applies (Reiners et al. 2022 covers dwarfs). */
   dwarf: boolean;
+  /**
+   * Card stars only (#93 2.3): the 32-bit hash of the card id, for the spot RNG (rng(1729 ^ seed)). Artistic. The
+   * prototype's rows have none, so they keep rng(1729).
+   */
+  seed?: number;
+  /** Card stars only: the vec3 noise offset uSO (seedVec of `seed`, three integers in [0, 256)). Artistic. */
+  so?: [number, number, number];
 }
 
 export interface StarValue {
@@ -72,7 +80,7 @@ const GIANT_MASS_MSUN = 1;
  * card values and the tier chain below, never a type row (the review of PR #89: a type row overruled
  * the card's temperature, radius and period). Parity runs against those rows load them by preset id
  * (`PROTOTYPE_PRESETS`, `?preset=` in the parity hook). The engine's seeds are fixed in the artifact
- * (1729, 2024, 808), so there is no per-star seed to carry over.
+ * (1729, 2024, 808); since #93 2.3 a card star (not these) carries its own `seed` and `so`.
  */
 export const ARTIFACT_PRESET_BY_CARD_ID: Record<string, StarPreset> = {
   'ref-sun': { id: 'g', label: 'Sun', T: 5772, R: 1, M: 1, P: 25.4, dwarf: true },
@@ -195,6 +203,8 @@ export function cardToStar(card: ObjectCard | null | undefined): StarFromCard | 
       M: mass.value,
       P: rotation.value,
       dwarf,
+      seed: hashString32(card.id),
+      so: seedVec(hashString32(card.id)),
     },
     teff,
     radius,
