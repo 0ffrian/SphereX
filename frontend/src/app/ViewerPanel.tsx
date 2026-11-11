@@ -923,7 +923,9 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
         )}
         {plan && (
           <>
-            {honestyGroup}
+            {/* Q-329: the build pane has no Show (honesty level) control; Build raises the level
+                (Q-113 item 7) and "N hidden at this level. Show them" remains as the way back. */}
+            {!pane && honestyGroup}
 
             {plan.threeD && plan.modes.length > 0 && (
               <>
