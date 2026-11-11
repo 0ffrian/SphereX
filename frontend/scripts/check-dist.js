@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const MARKERS = ['SX_FIXTURE_MARKER', 'synthetic_fixture', 'synthetic-mover', 'SYNTHETIC_FLAG'];
 // The dev-only pages (haptics-test.html, gpu-probe.html) and the fixtures-only perf hook (__sxPerf)
 // must never ship.
-const TEST_PAGE_MARKERS = ['hapticsTestPage', '__sxPerf', 'SX_DEV_ONLY_GPU_PROBE'];
+const TEST_PAGE_MARKERS = ['hapticsTestPage', '__sxPerf', 'SX_DEV_ONLY_GPU_PROBE', '__sxAreaLayer'];
 const TEST_PAGE_FILES = ['haptics-test.html', 'gpu-probe.html'];
 // Text in every file of shared/fixtures/. The flipbook's "synthetic fixture data" label must not match.
 const SHARED_FIXTURE_TEXT = /synthetic fixture[:.]/i;
