@@ -424,14 +424,15 @@ export function SkyPane({ children, layers }: { children?: ReactNode; layers?: R
   }, [view, resolved]);
 
   // ---- skyFlyTo (A21.6): a camera command from a tool, centred on the safe rectangle -------------
+  // The last command carried out, kept across re-runs (a new view must not repeat an old command).
+  const flyHandled = useRef(0);
   useEffect(() => {
     if (!view) return;
-    let handled = 0;
     let raf = 0;
     const run = () => {
       const { seq, cmd } = useSkyFlyStore.getState();
-      if (seq === handled || !cmd) return;
-      handled = seq;
+      if (seq === flyHandled.current || !cmd) return;
+      flyHandled.current = seq;
       flyCancel.current?.();
       flyCancel.current = null;
       const from = view.getView();
