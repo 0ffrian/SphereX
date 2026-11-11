@@ -1,0 +1,195 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Engine bench: fly view</title>
+<!--
+  Issue #93: the fly view of one world from a fixed camera, drawn by the engine as shipped (base) and, when ref is
+  given, by a second copy of the engine (for example the files of an older commit, see README.md).
+  Reports per engine: fly frame time (median of 30 after 30 warm-up frames) (fly view only, the hidden globe skipped where the engine does so), and
+    scale_corr: the picture at resolution scale 1 against the picture after the resolution scaler shrank to about 0.5
+    (upsampled back), as the Pearson correlation of luminance (all) and of its high-pass detail (detail);
+  and with ref: the pixel difference of the two engines at scale 1 (mean level, share of channels off by more than 8).
+  Query: id (preset, t1f), alt (km, 3), w, h (CSS size of the canvas, 1280 x 720), base, ref (module folders).
+-->
+<body style="margin: 0; background: #000">
+  <script type="module">
+    const out = {};
+    window.__out = out;
+    const Q = new URLSearchParams(location.search);
+    const id = Q.get('id') || 't1f',
+      alt = +(Q.get('alt') || 3),
+      Wd = +(Q.get('w') || 1280),
+      Hd = +(Q.get('h') || 720);
+    // A controllable clock: the spin-up steps by 1 ms per call (the step count is then machine-independent, as in
+    // WorldEngine.spinUp), and the slow-frame run steps 60 ms per frame so the resolution scaler shrinks.
+    const realNow = performance.now.bind(performance);
+    let fake = null;
+    performance.now = () => (fake === null ? realNow() : (fake.t += fake.inc));
+
+    function lum(buf, w, h) {
+      const L = new Float32Array(w * h);
+      for (let i = 0; i < w * h; i++)
+        L[i] = 0.2126 * buf[i * 4] + 0.7152 * buf[i * 4 + 1] + 0.0722 * buf[i * 4 + 2];
+      return L;
+    }
+    function upsample(L, w, h, W2, H2) {
+      const o = new Float32Array(W2 * H2);
+      for (let y = 0; y < H2; y++)
+        for (let x = 0; x < W2; x++) {
+          const fx = Math.min(Math.max(((x + 0.5) * w) / W2 - 0.5, 0), w - 1),
+            fy = Math.min(Math.max(((y + 0.5) * h) / H2 - 0.5, 0), h - 1);
+          const x0 = Math.floor(fx),
+            y0 = Math.floor(fy),
+            x1 = Math.min(x0 + 1, w - 1),
+            y1 = Math.min(y0 + 1, h - 1),
+            ax = fx - x0,
+            ay = fy - y0;
+          o[y * W2 + x] =
+            (L[y0 * w + x0] * (1 - ax) + L[y0 * w + x1] * ax) * (1 - ay) +
+            (L[y1 * w + x0] * (1 - ax) + L[y1 * w + x1] * ax) * ay;
+        }
+      return o;
+    }
+    function blur(L, w, h, r) {
+      const t = new Float32Array(w * h),
+        o = new Float32Array(w * h);
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++) {
+          let s = 0,
+            n = 0;
+          for (let k = -r; k <= r; k++) {
+            const xx = x + k;
+            if (xx >= 0 && xx < w) ((s += L[y * w + xx]), n++);
+          }
+          t[y * w + x] = s / n;
+        }
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++) {
+          let s = 0,
+            n = 0;
+          for (let k = -r; k <= r; k++) {
+            const yy = y + k;
+            if (yy >= 0 && yy < h) ((s += t[yy * w + x]), n++);
+          }
+          o[y * w + x] = s / n;
+        }
+      return o;
+    }
+    function corr(a, b) {
+      let ma = 0,
+        mb = 0;
+      for (let i = 0; i < a.length; i++) ((ma += a[i]), (mb += b[i]));
+      ma /= a.length;
+      mb /= b.length;
+      let sab = 0,
+        saa = 0,
+        sbb = 0;
+      for (let i = 0; i < a.length; i++) {
+        const x = a[i] - ma,
+          y = b[i] - mb;
+        sab += x * y;
+        saa += x * x;
+        sbb += y * y;
+      }
+      return +(sab / Math.sqrt(saa * sbb)).toFixed(4);
+    }
+    // the band a half-resolution picture can still show: what a scale change should leave alone
+    const bp = (L, w, h) => {
+      const B1 = blur(L, w, h, 2),
+        B2 = blur(L, w, h, 8);
+      return B1.map((v, i) => v - B2[i]);
+    };
+    const hp = (L, w, h) => {
+      const B = blur(L, w, h, 4);
+      return L.map((v, i) => v - B[i]);
+    };
+
+    async function run(base, tag) {
+      const { createCore } = await import(base + 'core.js');
+      const { WP } = await import(base + 'presets.js');
+      const canvas = document.createElement('canvas');
+      canvas.style.cssText = `width:${Wd}px;height:${Hd}px;display:block`;
+      document.body.appendChild(canvas);
+      window.__sxPin = true;
+      const c = createCore(canvas, { role: 'fly' }),
+        gl = canvas.getContext('webgl2'),
+        W = c.W;
+      fake = { t: 0, inc: 1 };
+      c.setPreset(WP.find((q) => q.id === id));
+      while (W.spinup > 0) W.gl.tick(W.m, false, 1 / 60);
+      fake = null;
+      W.gl.draw(W.m);
+      W.fly = true;
+      W.flyAlt = W.m.gas ? Math.max(alt, 50) : alt;
+      if (!c.flyAimPeak()) c.flyAimDefault();
+      const px = new Uint8Array(4);
+      W.gl.draw(W.m);
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      // The GPU clocks up over the first frames: 30 untimed frames, then the median of 30 (each read back, so timed).
+      const ft = [];
+      for (let i = 0; i < 60; i++) {
+        const t = realNow();
+        W.gl.draw(W.m);
+        gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        if (i >= 30) ft.push(realNow() - t);
+      }
+      ft.sort((x, y) => x - y);
+      const r = { fly_ms: +ft[ft.length >> 1].toFixed(2) };
+      W.gl.draw(W.m);
+      const v1 = W.view,
+        img1 = new Uint8Array(v1.gx * v1.h * 4);
+      gl.readPixels(0, 0, v1.gx, v1.h, gl.RGBA, gl.UNSIGNED_BYTE, img1);
+      r.px = v1.gx + 'x' + v1.h;
+      // Slow frames: let the engine's own scaler shrink the picture to about half.
+      window.__sxPin = false;
+      fake = { t: 1e6, inc: 0 };
+      let k = 0;
+      while (k++ < 400) {
+        fake.t += 60;
+        W.gl.draw(W.m);
+        if (W.view.gx <= v1.gx * 0.51) break;
+      }
+      fake = null;
+      const v2 = W.view,
+        img2 = new Uint8Array(v2.gx * v2.h * 4);
+      gl.readPixels(0, 0, v2.gx, v2.h, gl.RGBA, gl.UNSIGNED_BYTE, img2);
+      r.px_small = v2.gx + 'x' + v2.h;
+      const A = lum(img1, v1.gx, v1.h),
+        B = upsample(lum(img2, v2.gx, v2.h), v2.gx, v2.h, v1.gx, v1.h);
+      r.scale_corr = {
+        all: corr(A, B),
+        detail: corr(hp(A, v1.gx, v1.h), hp(B, v1.gx, v1.h)),
+        band: corr(bp(A, v1.gx, v1.h), bp(B, v1.gx, v1.h)),
+      };
+      window.__sxPin = true;
+      out[tag] = r;
+      canvas.remove();
+      return { img: img1, w: v1.gx, h: v1.h };
+    }
+
+    try {
+      const a = await run(Q.get('base') || '/src/engine/worlds/', 'cur');
+      const ref = Q.get('ref');
+      if (ref) {
+        const b = await run(ref, 'ref');
+        if (a.w === b.w && a.h === b.h) {
+          let s = 0,
+            big = 0;
+          for (let i = 0; i < a.img.length; i++) {
+            if ((i & 3) === 3) continue;
+            const d = Math.abs(a.img[i] - b.img[i]);
+            s += d;
+            if (d > 8) big++;
+          }
+          const nch = (a.img.length / 4) * 3;
+          out.diff = {
+            mean_level: +(s / nch).toFixed(4),
+            over8_pct: +((big / nch) * 100).toFixed(4),
+          };
+        } else out.diff = 'sizes differ';
+      }
+    } catch (e) {
+      out.err = String(e && e.stack ? e.stack : e);
+    }
+    out.done = true;
+  </script>
+</body>
