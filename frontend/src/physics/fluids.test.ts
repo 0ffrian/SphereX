@@ -18,7 +18,33 @@ describe('fluids', () => {
   });
 
   it('saturation pressure equals the triple-point pressure at the triple point', () => {
-    for (const f of Object.values(FLUIDS)) expect(psatFn(f)(f.Tt)).toBeCloseTo(f.Pt, 6);
+    for (const f of Object.values(FLUIDS))
+      if (f.id !== 'water') expect(psatFn(f)(f.Tt)).toBeCloseTo(f.Pt, 6);
+    // Water follows Murphy and Koop 2005, whose triple-point value is 611.657 Pa (the table's 611.7 rounded).
+    expect(Math.abs(psatFn(FLUIDS.water)(273.16) / FLUIDS.water.Pt - 1)).toBeLessThan(1e-3);
+  });
+
+  it('#93 3.2: water vapour pressure within 2 % of IAPWS-95 at 273.16, 288.15 and 373.15 K', () => {
+    // Known answers (Wagner and Pruss 2002, IAPWS-95, as NIST lists): 611.655 Pa, 1705.8 Pa, 101418 Pa.
+    const ps = psatFn(FLUIDS.water);
+    for (const [T, ref] of [
+      [273.16, 611.655],
+      [288.15, 1705.8],
+      [373.15, 101418],
+    ] as const)
+      expect(Math.abs(ps(T) / ref - 1), `${T} K`).toBeLessThan(0.02);
+    // Over ice (Murphy and Koop 2005, Table: 250 K over ice 76.0 Pa) and continuous across 373.15 K.
+    expect(ps(250)).toBeCloseTo(76.0, 0);
+    expect(Math.abs(ps(373.1501) / ps(373.15) - 1)).toBeLessThan(1e-4);
+  });
+
+  it('#93 3.2: CO2 above its triple point uses the vaporisation heat (NIST: 1.785 MPa at 250 K)', () => {
+    const p250 = psatFn(FLUIDS.co2)(250);
+    // Constant-Lv Clausius-Clapeyron gives 1.61 MPa (10 % low); the old sublimation heat gave 3.36 MPa.
+    expect(Math.abs(p250 / 1.785e6 - 1)).toBeLessThan(0.15);
+    // Below the triple point it is still the prototype's sublimation line: about 1 atm at 194.7 K (its constant L
+    // from the triple point gives 6 % low).
+    expect(Math.abs(psatFn(FLUIDS.co2)(194.7) / 101325 - 1)).toBeLessThan(0.08);
   });
 
   it('water boils at one atmosphere at 373.15 K and at about 344 K at a third of an atmosphere (Everest)', () => {

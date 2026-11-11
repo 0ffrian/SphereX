@@ -19,13 +19,33 @@ var reduced = false;
 // cardToWorld sets p.Umeas for Jupiter (about 150 m/s, the 24 N jet) and Saturn (about 450 m/s, equatorial). For
 // every other giant p.Umeas is unset and the prototype's U = 0.6 sqrt(R dT) runs unchanged (its 10 K floor holds
 // U near 115 to 120 m/s for a cool giant that is not locked: an estimate, tagged model_dependent).
-// @verbatim L1701-L1726
-// @rename Math.max(1,=>p.Umeas||Math.max(1,
+// @verbatim L1701-L1704
 var ORB = { rivers: { Ms: 1, e: 0.01, obl: 0.3 }, earth: { Ms: 1, e: 0.0167, obl: 0.409 }, t1e: { Ms: 0.0898, e: 0.005, obl: 0 }, t1f: { Ms: 0.0898, e: 0.01, obl: 0 }, k186: { Ms: 0.544, e: 0.04, obl: 0 }, k218: { Ms: 0.359, e: 0.09, obl: 0 }, tit: { Ms: 1, e: 0.054, obl: 0.467 }, lava: { Ms: 0.95, e: 0, obl: 0 } };
 function applySpin(p) { if (p.type === 'gas') return p; var mode = W.spinMode, lock = mode === 'auto' ? (p.locked && (W.ecc || 0) < 0.15) : mode === 'lock', res = mode === 'res32' || (mode === 'auto' && p.locked && (W.ecc || 0) >= 0.15); return Object.assign({}, p, { locked: lock || res, res32: res, Prot: p.Prot || 1 }); }
 var W = { fly: false, flyLon: 0, flyLat: 0.3, flyHead: 0.6, flyPitch: -0.16, flyAlt: 14, flyAuto: false, clouds: true, pitch: 0, zoom: 1, yaw: 0, hydro: null, route: null, hydroDue: 0, spinMode: 'auto', tect: 'auto', co2Therm: false, overlay: 0, season: 0, ecc: 0, obl: 0, p: WP[0], fluid: 'water', Tstar: 2566, orbit: 1, Ps: 1, playing: !reduced, m: null, step: 0, spin: 0.4, gl: null, spinup: 0 };
 var STARMIN = Math.log(2300), STARMAX = Math.log(14000), ORBMIN = Math.log(0.25), ORBMAX = Math.log(5), PSMIN = Math.log(0.002), PSMAX = Math.log(100);
-function psatFn(F) { return function (T) { return F.Pt * Math.exp(F.L / 8.314 * (1 / F.Tt - 1 / T)); }; }
+// @end-verbatim
+// @deviation L1705 (#93 3.2) the latent heat in the saturation pressure. The prototype used one heat for the whole
+// curve: for water the 373 K heat of vaporisation (1,537 Pa at 288 K against 1,706 Pa measured), for CO2 the
+// sublimation heat above the triple point too (3.36 MPa at 250 K against 1.79 MPa). Now:
+//  - water: Murphy and Koop 2005 (QJRMS 131, 1539), eq. 7 over ice below the triple point and eq. 10 over liquid
+//    above it (their fit is for 123 to 332 K; carried to 373.15 K it is 0.6 % above IAPWS-95). Above 373.15 K the
+//    curve continues with Clausius-Clapeyron and the prototype's 373 K heat F.L, from the fit's value at 373.15 K.
+//  - CO2 (any fluid with F.Lv): the vaporisation heat F.Lv above the triple point, the sublimation heat F.L below.
+//  - other fluids: the prototype's line, unchanged. Same as physics/fluids.ts psatFn.
+function psatMK(T) {
+  if (T < 273.16) return Math.exp(9.550426 - 5723.265 / T + 3.53068 * Math.log(T) - 0.00728332 * T);
+  var t = Math.min(T, 373.15), p = Math.exp(54.842763 - 6763.22 / t - 4.21 * Math.log(t) + 0.000367 * t + Math.tanh(0.0415 * (t - 218.8)) * (53.878 - 1331.22 / t - 9.44523 * Math.log(t) + 0.014025 * t));
+  return T > 373.15 ? p * Math.exp(FLUIDS.water.L / 8.314 * (1 / 373.15 - 1 / T)) : p;
+}
+function psatFn(F) {
+  if (F === FLUIDS.water) return psatMK;
+  if (F.Lv > 0) return function (T) { return F.Pt * Math.exp((T >= F.Tt ? F.Lv : F.L) / 8.314 * (1 / F.Tt - 1 / T)); };
+  return function (T) { return F.Pt * Math.exp(F.L / 8.314 * (1 / F.Tt - 1 / T)); };
+}
+// @end-deviation
+// @verbatim L1706-L1726
+// @rename Math.max(1,=>p.Umeas||Math.max(1,
 function worldModel() {
   var p = W.p, F = FLUIDS[W.fluid], gas = p.type === 'gas', a = p.a * W.orbit, Ps = W.Ps, A = p.A != null ? p.A : 0.3;
   var Rsau = p.Rs * 0.00465047, Teq = W.Tstar * Math.sqrt(Rsau / (2 * a)) * Math.pow(1 - A, 0.25), S = 5.670374e-8 * Math.pow(W.Tstar, 4) * Math.pow(Rsau / a, 2) / Math.sqrt(1 - (W.ecc || 0) * (W.ecc || 0));
