@@ -107,7 +107,8 @@ export function Flipbook({ onClose, onBuild }: { onClose(): void; onBuild?: () =
               <NoFrames frames={sky.frames} />
             </div>
           )}
-          {sky.progress && (
+          {/* Only when something is actually listed: an empty padded strip under the picture otherwise. */}
+          {sky.progress && sky.frames.missing.some((c) => !c.startsWith('cutouts:deferred:')) && (
             <div className="fb-c" style={{ paddingBottom: 16 }}>
               <MissingList missing={sky.frames.missing} hideDeferred />
             </div>
