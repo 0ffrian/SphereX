@@ -20,6 +20,8 @@ import { RockCloseUp } from './RockCloseUp';
 import { StarFlareStage, StarSurfaceCloseUp } from './StarEngineStage';
 import { placeText, useStarTarget } from './starTargetStore';
 import { STAR_CLOSEUP_TAG, useStarCloseUp } from './starCloseUp';
+import { WorldFlyStage, worldCaption } from './WorldEngineStage';
+import { useWorldStore } from './worldStore';
 
 /** The mock-up's cuTag for the flare close-up, true to the prototype: a Sun-like flare, not this star's own. */
 const ENGINE_CAPTION =
@@ -72,13 +74,17 @@ export function CloseUpPane() {
   const fixture = useCloseUpStore((s) => s.fixture);
   const held = useCloseUpStore((s) => s.held);
   const engineStar = useCloseUpStore((s) => s.engineStar);
+  const engineWorld = useCloseUpStore((s) => s.engineWorld);
+  const worldFailedId = useWorldStore((s) => s.failedId);
   const [engineFailed, setEngineFailed] = useState(false);
   const left = useStarTarget((s) => s.left);
   const starTarget = useStarTarget((s) => s.target);
   const kind = closeUpKindOf(type);
   // Issue #71 stream X (D-37): a star the prototype's engine draws opens with the build, with the flare close-up.
   const engine = kind === 'star' && engineStar && !engineFailed ? engineStar : null;
-  const open = !hidden && kind !== null && (engine ? !held : info !== null && info.mode !== null);
+  // Issue #71 stream Y (D-37): a planet the prototype's world engine draws opens with the build, with its fly view.
+  const world = kind === 'orbit' && engineWorld && worldFailedId !== engineWorld.preset.id ? engineWorld : null;
+  const open = !hidden && kind !== null && (engine || world ? !held : info !== null && info.mode !== null);
   const [, bump] = useReducer((n: number) => n + 1, 0);
   const [about, setAbout] = useState(false);
   const focusRef = useRef<HTMLDivElement>(null);
@@ -94,7 +100,7 @@ export function CloseUpPane() {
   // The pane's canvas receives the picture (orbit view and body close-up).
   useEffect(() => {
     const c = canvasRef.current;
-    if (!viewer || !c) return;
+    if (!viewer || !c || world) return;
     viewer.setCloseUpCanvas(c);
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => viewer.requestCloseRender());
     ro?.observe(c);
@@ -102,7 +108,7 @@ export function CloseUpPane() {
       ro?.disconnect();
       viewer.setCloseUpCanvas(null);
     };
-  }, [viewer, kind]);
+  }, [viewer, kind, world]);
 
   const changed = () => {
     viewer?.requestCloseRender();
@@ -125,7 +131,7 @@ export function CloseUpPane() {
 
   // A click on the globe (in the build pane on the right) moves the surface view to that place.
   useEffect(() => {
-    if (!viewer || !view || !open) return;
+    if (!viewer || !view || !open || world) return;
     const canvas = document.querySelector<HTMLCanvasElement>('[data-testid="viewer-stage"] canvas');
     if (!canvas) return;
     let down: { x: number; y: number } | null = null;
@@ -149,10 +155,12 @@ export function CloseUpPane() {
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointerup', onUp);
     };
-  }, [viewer, view, open]);
+  }, [viewer, view, open, world]);
 
   if (!kind) return null;
-  const caption = engine
+  const caption = world
+    ? worldCaption(world.preset.type === 'gas')
+    : engine
     ? left === 'surface'
       ? `Close-up · the star\u2019s surface at ${placeText(starTarget)} · generated (Default), not a photograph`
       : ENGINE_CAPTION
@@ -201,7 +209,7 @@ export function CloseUpPane() {
       data-kind={kind}
     >
       <canvas ref={canvasRef} className="sx-cu-canvas" aria-hidden="true" />
-      {view && (
+      {view && !world && (
         <div
           ref={focusRef}
           className="sx-cu-focus"
@@ -217,6 +225,14 @@ export function CloseUpPane() {
         />
       )}
       {kind === 'body' && <RockCloseUp active={open} />}
+      {world && open && (
+        <WorldFlyStage
+          key={world.preset.id}
+          world={world}
+          reduced={reducedMotion}
+          onFail={() => useWorldStore.getState().fail(world.preset.id)}
+        />
+      )}
       {engine && open && left === 'flare' && (
         <StarFlareStage key={engine.preset.id} star={engine} onFail={() => setEngineFailed(true)} />
       )}
@@ -246,7 +262,7 @@ export function CloseUpPane() {
       <span className="sx-cu-tag" data-testid="closeup-caption">
         {caption}
       </span>
-      {view && (
+      {view && !world && (
         <div className="sx-cu-controls" role="group" aria-label="Surface view controls">
           <label htmlFor="orbit-alt" className="flex-1 basis-40">
             {gas ? 'Height above the clouds' : 'Height above the ground'}: <span data-testid="orbit-alt-label">{formatKm(alt)}</span>
@@ -285,7 +301,7 @@ export function CloseUpPane() {
           </button>
         </div>
       )}
-      {view && about && info?.resolved && (
+      {view && !world && about && info?.resolved && (
         <div className="absolute inset-x-4 bottom-36 z-[3] max-h-[45%] overflow-auto rounded-lg border border-[#323a3e] bg-[#242729f2] p-3 text-xs text-neutral-200" data-testid="orbit-layers">
           <p className="mb-2">{ORBIT_NOTE}</p>
           <ul className="flex flex-col gap-1">
