@@ -360,7 +360,7 @@ export function drawTrackWindow(
     g.fillText(lab, ex + 20, ey + 25.5);
   }
   g.restore();
-  g.strokeStyle = accent;
+  g.strokeStyle = '#4ade80'; // the mock-up's area-square green
   g.lineWidth = 1.2;
   g.strokeRect(x0, y0, w, h);
 }
