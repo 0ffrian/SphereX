@@ -12,7 +12,7 @@ description: Load before writing, changing or reviewing any Shift & Spectrum UI 
 ## Rules
 
 - Colours only through tokens (`--bg`, `--s1` to `--s3`, `--line`, `--fg`, `--muted`, `--accent`, `--ac`/`--on-ac`, `--ok`, `--warn`, `--fail`, `--p-meas`, `--p-phys`, `--p-asm`). Never a raw hex in a component.
-- Panels and cards are Graphite (`--s1` on `--bg`), never near-black. The sky and the 3D view stay as they are.
+- Panels and cards are near-black with a trace of blue (`--s1 #0f1114` on `--bg #08090b`), to sit with the sky; not grey boxes, not pure black. The sky and the 3D view stay as they are.
 - Inter only, bundled (`@fontsource/inter`, pinned), never fetched at run time (D-24). Labels are Inter uppercase and tracked, not monospace. Aligned numbers use `tabular-nums`.
 - Radii: 10px cards and popovers, 8px tracks and inner blocks, 6px buttons and segmented items, 4px tags. No pills except the rail and docks. Switches are round.
 - Selected state is tonal: `--ac` fill, `--on-ac` text. **Never a fluorescent border with a translucent tinted fill, and never a glow.**

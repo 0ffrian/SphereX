@@ -6,7 +6,7 @@ The reference for these rules is the approved preview of the Accuracy and Detail
 
 ## Principles
 
-- **Graphite, not black.** Panels and cards are a dark grey with a trace of blue. Pure black halates under bright text and leaves no darker step for depth. The sky and the 3D view stay dark behind them: they are content, not chrome.
+- **Dark, to sit with the sky.** Panels and cards are near-black with a trace of blue (`--bg #08090b`, `--s1 #0f1114`), darker than Penrose's Graphite, so they read as part of the night sky and the black bezel rather than grey boxes on top (Moon, 11 Nov 2026). Not pure black: the `--s1` to `--s3` steps still give depth, and text stays off pure white.
 - **Depth from tone, not shadow.** Surfaces step `--s1` to `--s3`. No glows, no coloured shadows, no gradients.
 - **The accent is rationed.** Use it for focus, a switch that is on, and links. Never use it for a border around a selected button.
 - **Colour that means something stays.** The provenance colours (measured, physics, assumed: D-02) and the status colours are data, not decoration. Nothing else is coloured.
@@ -18,15 +18,15 @@ The app is dark-only for now (Q-326). The light values are defined so that artif
 
 | Token | Dark | Light | Use |
 | --- | --- | --- | --- |
-| `--bg` | `#141618` | `#fafafa` | page and panel background |
-| `--s1` | `#1a1d1f` | `#f4f5f5` | cards, side panels |
-| `--s2` | `#212528` | `#eff0f1` | tracks, inputs, blocks inside a card, row hover |
-| `--s3` | `#2a2f33` | `#e9ebec` | tags, raised chips, switch track when off |
-| `--line` | `#363d42` | `#c7ced1` | borders, dividers |
-| `--fg` | `#e3e6e8` | `#181a1b` | text |
-| `--muted` | `#a3adb3` | `#5c6a70` | secondary text, icons |
+| `--bg` | `#08090b` | `#fafafa` | page and panel background |
+| `--s1` | `#0f1114` | `#f4f5f5` | cards, side panels |
+| `--s2` | `#16191c` | `#eff0f1` | tracks, inputs, blocks inside a card, row hover |
+| `--s3` | `#1e2226` | `#e9ebec` | tags, raised chips, switch track when off |
+| `--line` | `#262b30` | `#c7ced1` | borders, dividers |
+| `--fg` | `#e6e9eb` | `#181a1b` | text |
+| `--muted` | `#9aa4ab` | `#5c6a70` | secondary text, icons |
 | `--accent` | `#89cff0` | `#1d79a5` | focus, switch on, links |
-| `--ac` / `--on-ac` | `#203a46` / `#d2e9f4` | `#d7ebf4` / `#193543` | the selected item in a segmented control or tab bar |
+| `--ac` / `--on-ac` | `#17303c` / `#d2e9f4` | `#d7ebf4` / `#193543` | the selected item in a segmented control or tab bar |
 | `--ok` | `#22c55e` | `#15803d` | yes, passed |
 | `--warn` | `#f2b84b` | `#a15c00` | caution |
 | `--fail` | `#ff4d4f` | `#c92a2a` | no, error |
