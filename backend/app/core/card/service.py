@@ -5,6 +5,10 @@
                                 -> "sketch":    card from SPHEREx only            (candidate)
     then card_to_params, validate both against shared/schemas, save when the inputs are final.
 
+A pre-built pack asset (Q-164) has no spectrum, so it is not "saved" in the sense above: the
+object is built live, and the pack answers only when that build has no spectrum, loses its
+catalogue type, or cannot run (issue #75).
+
 Stage 6 (physics, A4.6) adds no values yet. Every reply is checked with jsonschema (Q-40).
 
 Issue #41 fan-out. Each object is built by one background job (``app.core.jobs``):
@@ -75,6 +79,23 @@ MEASURING_SPECTRUM = MEASURING_PREFIX + "spectrum"
 MEASURING_FRAMES = MEASURING_PREFIX + "frames"  # a partial answer: more frames are coming
 
 
+def _missing(result: ObjectResult) -> list[str]:
+    return list(result.params.get("missing", []))
+
+
+def _stand_in(result: ObjectResult) -> bool:
+    """A pre-built pack asset with no spectrum (issue #75, Q-164 (3)): it answers only when a
+    live build cannot measure the object."""
+    return result.prebuilt and "spectrum" in _missing(result)
+
+
+def _measured_beats_pack(live: ObjectResult, pack: ObjectResult) -> bool:
+    """The live build replaces the pack when it has a measured spectrum and the same type. A
+    different type means the live build lost its catalogue answer (e.g. offline with only the
+    frames cached: a ``candidate`` sketch), so the pack's catalogue card is kept instead."""
+    return "spectrum" not in _missing(live) and live.card.get("type") == pack.card.get("type")
+
+
 @dataclass(frozen=True)
 class ObjectResult:
     card: dict[str, Any]
@@ -84,6 +105,23 @@ class ObjectResult:
     classification: Classification | None  # None for a saved asset
     # Issue #41: what is still being measured (first-stage answer); empty when refined.
     measuring: tuple[str, ...] = ()
+    # Issue #75: from the repo pack (Q-164), not built or saved by this backend.
+    prebuilt: bool = False
+
+
+@dataclass(frozen=True)
+class _Built:
+    """A live build and the asset to save for it (None unless its inputs are final)."""
+
+    result: ObjectResult
+    asset: Asset | None
+
+
+class _Lookup:
+    """Sentinel: ``ensure_job`` was not given the saved asset, so the job looks it up."""
+
+
+_LOOKUP = _Lookup()
 
 
 class ObjectPipeline:
@@ -113,19 +151,38 @@ class ObjectPipeline:
     def run(self, obj: ResolvedObject) -> ObjectResult:
         """The answer for ``/card`` and ``/render-params``: saved, refined or first-stage."""
         saved = self._saved(obj)
-        if saved is not None:
+        if saved is not None and not _stand_in(saved):
             return saved
-        job = self.ensure_job(obj)
-        return job.answer(self.ctx.settings.first_answer_wait_s)
+        job = self.ensure_job(obj, saved=saved)
+        wait = self.ctx.settings.first_answer_wait_s
+        if saved is None:
+            return job.answer(wait)
+        # A pack stand-in (issue #75): its job publishes no intermediate answer, so the reply is
+        # the final one or the pack, never a first-stage card that could later flip back. Offline
+        # nothing downloads, so wait for the final as for any offline object.
+        try:
+            final = job.wait_final(None if self.ctx.cache.offline else wait)
+        except Exception:  # the job failed (e.g. shutting down): the pack is still valid
+            log.exception("object %s: job failed, answering with the pack", obj.id)
+            return saved
+        return final if final is not None else saved
 
     def ensure_job(
-        self, obj: ResolvedObject, *, restart_finished: bool = False
+        self,
+        obj: ResolvedObject,
+        *,
+        restart_finished: bool = False,
+        saved: ObjectResult | _Lookup | None = _LOOKUP,
     ) -> Job[ObjectResult]:
         """Start or join the object's job. ``restart_finished``: a finished job is not reused
-        (``/frames`` found cutouts still to download, e.g. failures whose retry delay passed)."""
-        return self.jobs.ensure(
-            obj.id, lambda job: self._job(obj, job), reuse_finished=not restart_finished
-        )
+        (``/frames`` found cutouts still to download, e.g. failures whose retry delay passed).
+        ``saved``: the asset ``run`` already looked up; otherwise the job looks it up."""
+
+        def run(job: Job[ObjectResult]) -> ObjectResult:
+            found = self._saved(obj) if isinstance(saved, _Lookup) else saved
+            return self._job(obj, job, found)
+
+        return self.jobs.ensure(obj.id, run, reuse_finished=not restart_finished)
 
     def request_frames(self, obj: ResolvedObject) -> None:
         """``FrameService.on_request``: a web request found cutouts still to download."""
@@ -138,36 +195,81 @@ class ObjectPipeline:
     # --- the job --------------------------------------------------------------------------
 
     def saved(self, obj: ResolvedObject) -> ObjectResult | None:
-        """The saved or pre-baked asset ``run`` would answer with, from disk only; None when
-        there is none or it fails the contract (``run`` then rebuilds it)."""
-        return self._saved(obj)
+        """The asset ``run`` answers with, without building: the saved or pre-built asset, or,
+        for a pack stand-in whose job has finished, that job's answer (the live build when it
+        won, issue #75). None when there is none or none passes the contract (``run`` then
+        builds it)."""
+        saved = self._saved(obj)
+        if saved is not None and _stand_in(saved):
+            job = self.jobs.get(obj.id)
+            if job is not None and job.final is not None:
+                return job.final
+        return saved
 
     def _saved(self, obj: ResolvedObject) -> ObjectResult | None:
-        found = self.assets.lookup(obj.id)
-        if found is None:
-            return None
-        saved, saved_at = found
-        try:
-            check_card(saved.card)
-            check_params(saved.render_params)
-        except ContractViolation as exc:
-            # A hand-edited pre-baked file or an asset saved under an older schema: rebuild
-            # from the catalogues instead of failing every request for this object.
-            log.warning("ignoring saved asset for %s: %s", obj.id, exc)
-            return None
-        # A saved sketch keeps its "Sketch from SPHEREx only" label (UML 16, Q-57).
-        status: AssetStatus = "sketch" if saved.card.get("type") == "candidate" else "saved"
-        return ObjectResult(saved.card, saved.render_params, status, saved_at, None)
+        """The best asset that passes the contract, generated before pre-built (issue #75): a
+        generated asset saved under an older schema falls through to the pack."""
+        for found in self.assets.layers(obj.id):
+            asset = found.asset
+            try:
+                check_card(asset.card)
+                check_params(asset.render_params)
+            except ContractViolation as exc:
+                # A hand-edited pre-baked file or an asset saved under an older schema: try the
+                # next layer, else rebuild, instead of failing every request for this object.
+                log.warning("ignoring saved asset for %s: %s", obj.id, exc)
+                continue
+            # A saved sketch keeps its "Sketch from SPHEREx only" label (UML 16, Q-57).
+            status: AssetStatus = "sketch" if asset.card.get("type") == "candidate" else "saved"
+            return ObjectResult(
+                asset.card,
+                asset.render_params,
+                status,
+                found.cached_at,
+                None,
+                prebuilt=found.prebuilt,
+            )
+        return None
 
-    def _job(self, obj: ResolvedObject, job: Job[ObjectResult]) -> ObjectResult:
+    def _job(
+        self, obj: ResolvedObject, job: Job[ObjectResult], saved: ObjectResult | None
+    ) -> ObjectResult:
         premeasured: dict[str, Premeasured] = {}
-        saved = self._saved(obj)
-        if saved is not None:
-            # The card is saved (or pre-baked), but the flipbook, spectrum and composite still
-            # need the cutouts: download them, then answer with the saved asset.
+        if saved is None:
+            return self._build(obj, job, premeasured).result
+        if not _stand_in(saved):
+            # The card is saved, but the flipbook, spectrum and composite still need the
+            # cutouts: download them, then answer with the saved asset.
             with contextlib.suppress(CacheMissOffline, UpstreamUnavailable):
                 self._frames(obj, job, premeasured, measure=False)  # card saved: no spectrum
             return saved
+        # A pre-built pack asset has no spectrum (Q-164 (3)). Measure if this backend can (the
+        # D-25 cache or the network has the frames); the pack answers only when it cannot. The
+        # live build is quiet: nothing is published, baked or saved unless it wins.
+        try:
+            live = self._build(obj, job, premeasured, quiet=True)
+        except Exception:  # never blank: any failure of the live path keeps the valid pack
+            log.exception("object %s: live build failed, answering with the pack", obj.id)
+            return saved
+        if not _measured_beats_pack(live.result, saved):
+            log.info("object %s: live build has no spectrum or another type: the pack", obj.id)
+            return saved
+        if live.asset is not None:
+            self.assets.put(live.asset)
+        self._bake(live.result)
+        return live.result
+
+    def _build(
+        self,
+        obj: ResolvedObject,
+        job: Job[ObjectResult],
+        premeasured: dict[str, Premeasured],
+        *,
+        quiet: bool = False,
+    ) -> _Built:
+        """Stages 1 to 7 from the catalogues and the frames (the fan-out above). ``quiet`` (a
+        pack stand-in, issue #75): publish no first-stage or partial answer, and bake and save
+        nothing; the caller does that only if the result replaces the pack."""
         job.update(stage="catalogue")
         # shutdown(wait=False) never blocks the job on a branch it no longer needs (e.g. geometry
         # for a star). These are ordinary pool threads: at interpreter exit Python joins them, so
@@ -187,8 +289,8 @@ class ObjectPipeline:
         finally:
             fan.shutdown(wait=False)
 
-        if not f_frames.done() and not self.ctx.cache.offline:
-            first = self._assemble(obj, data, cls, None, None, pending=True)
+        if not quiet and not f_frames.done() and not self.ctx.cache.offline:
+            first, _ = self._assemble(obj, data, cls, None, None, pending=True)
             self._bake(first)
             job.publish(first, "first")
             log.info("object %s: first-stage answer published, measuring", obj.id)
@@ -199,13 +301,15 @@ class ObjectPipeline:
         # this full run: publish the partial answer, then fetch the rest.
         still_to_come = (DEFERRED + ":", moving.SEARCH_DEFERRED + ":")
         if frames is not None and any(m.startswith(still_to_come) for m in frames.missing):
-            job.update(stage="spectrum")
-            spectrum, spectrum_at = self._spectrum(obj, frames, premeasured)
-            partial = self._assemble(
-                obj, data, cls, spectrum, spectrum_at, pending=False, more=True
-            )
-            job.publish(partial, "partial")
-            log.info("object %s: partial answer published, %d frames", obj.id, len(frames.frames))
+            if not quiet:
+                job.update(stage="spectrum")
+                spectrum, spectrum_at = self._spectrum(obj, frames, premeasured)
+                partial, _ = self._assemble(
+                    obj, data, cls, spectrum, spectrum_at, pending=False, more=True
+                )
+                job.publish(partial, "partial")
+                n = len(frames.frames)
+                log.info("object %s: partial answer published, %d frames", obj.id, n)
             # If the full run fails (e.g. the SIA search on the second call), keep the batch.
             full = self._join_frames_now(obj, job, premeasured)
             batch_only = full is None  # the rest could not be fetched: still not the full list
@@ -213,11 +317,14 @@ class ObjectPipeline:
         job.update(stage="spectrum")
         spectrum, spectrum_at = self._spectrum(obj, frames, premeasured)
         job.update(stage="card")
-        result = self._assemble(
+        result, asset = self._assemble(
             obj, data, cls, spectrum, spectrum_at, pending=False, more=batch_only
         )
-        self._bake(result)
-        return result
+        if not quiet:
+            if asset is not None:
+                self.assets.put(asset)
+            self._bake(result)
+        return _Built(result, asset)
 
     def _frames(
         self,
@@ -302,7 +409,7 @@ class ObjectPipeline:
     ) -> ObjectResult:
         """Stage 5 and 7 with no frames: the card and params a live build gives for an object
         that has no spectrum (used by ``scripts/bake_demo_pack.py``, Q-164)."""
-        return self._assemble(obj, data, cls, None, None, pending=False)
+        return self._assemble(obj, data, cls, None, None, pending=False)[0]
 
     def _assemble(
         self,
@@ -314,9 +421,10 @@ class ObjectPipeline:
         *,
         pending: bool,
         more: bool = False,
-    ) -> ObjectResult:
-        """``pending``: first stage, no spectrum yet. ``more``: partial, the spectrum is from the
-        first batch of frames. Neither is ever saved."""
+    ) -> tuple[ObjectResult, Asset | None]:
+        """The answer, and the asset to save for it when its inputs are final (else None; the
+        caller saves it). ``pending``: first stage, no spectrum yet. ``more``: partial, the
+        spectrum is from the first batch of frames. Neither is ever saved."""
         status: AssetStatus = "sketch" if cls.type == "candidate" else "generated"
         card = build_card(obj, data, cls, spectrum, spectrum_pending=pending)
         check_card(card)
@@ -342,7 +450,7 @@ class ObjectPipeline:
         cached_at = min(times) if times else None
         if pending or more:
             measuring = tuple(m for m in params["missing"] if m.startswith(MEASURING_PREFIX))
-            return ObjectResult(card, params, status, cached_at, cls, measuring)
+            return ObjectResult(card, params, status, cached_at, cls, measuring), None
 
         # Save only final inputs: a spectrum from a complete frame list and a catalogue answer.
         # A truncated search or a deferred cutout could still change the card. A type refusal
@@ -352,16 +460,15 @@ class ObjectPipeline:
         # is a re-run of stages 3-7 from cached inputs.
         final = spectrum is not None and is_complete(list(spectrum.get("missing", [])))
         type_refused = any(m.startswith("type:") for m in cls.missing)
+        asset = None
         if final and not data.missing and not type_refused:
-            self.assets.put(
-                Asset(
-                    card=card,
-                    render_params=params,
-                    textures=params.get("textures"),
-                    generator_version=version,
-                    seed=seed,
-                    created_at=iso_utc_z(utc_now()),
-                )
+            asset = Asset(
+                card=card,
+                render_params=params,
+                textures=params.get("textures"),
+                generator_version=version,
+                seed=seed,
+                created_at=iso_utc_z(utc_now()),
             )
         log.info("object %s: %s, type %s (%s)", obj.id, status, cls.type, cls.rule)
-        return ObjectResult(card, params, status, cached_at, cls)
+        return ObjectResult(card, params, status, cached_at, cls), asset
