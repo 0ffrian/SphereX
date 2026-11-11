@@ -449,6 +449,16 @@ export function worldControls(
       value,
       tag: measuredReadout[label] ?? READOUT_TAG[label] ?? 'model_dependent',
     });
+  // Issue #93 C: eclipse and phase-curve temperatures from the card, shown beside the engine's own model numbers.
+  for (const m of world.measured ?? [])
+    controls.push({
+      id: `m-${m.field}`,
+      kind: 'readout',
+      label: m.label,
+      value: m.value,
+      tag: m.tag,
+      why: m.source,
+    });
   if (world.assumptions.length)
     controls.push({
       id: 'assumed',
