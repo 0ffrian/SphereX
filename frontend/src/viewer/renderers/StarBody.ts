@@ -18,6 +18,7 @@ import {
   regionsAt,
   smooth01,
   STAR_SURFACE,
+  type StarSurfaceConfig,
   type FlareState,
   type RegionState,
 } from '../bodies/starModel';
@@ -25,6 +26,12 @@ import { phasePair, wrap } from '../motion/phase';
 import type { SimTimeFn } from '../motion/motion';
 import { buildStarMaterial, type StarMaterial } from '../shaders/star';
 import { buildLoopMesh, type LoopMesh } from '../shaders/loops';
+import { StarPlasma } from './StarPlasma';
+import { teffToRgbMax1 } from '@/physics/starlight';
+
+/** The dim lanes and the limb are about this much cooler than the disc centre (display value, as the prototype). */
+const COOL_FACTOR = 0.8;
+import type { TierName } from '../render/quality';
 
 /** Largest shear of the granulation before its flow-map resets, radians (artistic). */
 const MAX_MOTTLE_SHEAR = 0.8;
@@ -46,16 +53,20 @@ export interface StarBodyOptions {
   /** Semi-axes of the body (the Mira pulsation scale is applied to the group). */
   axes: readonly [number, number, number];
   segments: readonly [number, number];
+  tier?: TierName;
 }
 
 export class StarBody {
   readonly group = new Group();
   /** The rotating frame: sphere, loops and glow turn together. */
   readonly spin = new Group();
+  private readonly cfg: StarSurfaceConfig;
   private readonly mat: StarMaterial;
   private readonly loops: LoopMesh[] = [];
   private readonly geometry: SphereGeometry;
   private readonly glow: Sprite | null = null;
+  /** Issue #71 stream G: flares and plasma along the physical spot groups (null: old look). */
+  readonly plasma: StarPlasma | null = null;
   /** The most recent CPU state, for tests and haptics (R7.5 has no star haptic yet). */
   lastRegions: readonly RegionState[] = [];
   lastFlares: readonly FlareState[] = [];
@@ -64,6 +75,7 @@ export class StarBody {
     private readonly star: StarSurfacePlan,
     o: StarBodyOptions,
   ) {
+    this.cfg = star.config ?? STAR_SURFACE;
     this.group.scale.set(o.axes[0], o.axes[1], o.axes[2]);
     this.group.add(this.spin);
     this.mat = buildStarMaterial({
@@ -75,13 +87,32 @@ export class StarBody {
       granulation: star.granulation,
       spots: star.spots,
       faculae: star.faculae,
-      flares: star.flares,
+      flares: star.flares && !star.plasma,
+      cfg: this.cfg,
+      colourView: star.colourView,
+      cellsAcross: star.cellsAcross,
+      granuleVisibility: star.granuleVisibility,
+      convection: star.physics ? star.physics.convection : 1,
+      teffK: star.physics?.teffK,
+      coolTint: star.physics ? (teffToRgbMax1(star.physics.teffK * COOL_FACTOR) ?? undefined) : undefined,
     });
     this.geometry = new SphereGeometry(1, o.segments[0], o.segments[1]);
     this.spin.add(new Mesh(this.geometry, this.mat.material));
 
-    if (star.prominences) {
-      for (let s = 0; s < STAR_SURFACE.regionCount; s++) {
+    if (star.plasma && star.physics) {
+      this.plasma = new StarPlasma({
+        seed: star.seed,
+        physics: star.physics,
+        ratePerDisplayS: star.rates.flareRatePerS * star.rates.flareSpeedup,
+        tier: o.tier ?? 'medium',
+        enlarged: star.scale === 'enlarged',
+      });
+      // True colour and the close-up show the bare surface (as in the prototype).
+      this.plasma.group.visible = star.colourView !== 'true' && star.scale !== 'close';
+      this.spin.add(this.plasma.group);
+    }
+    if (star.prominences && !star.plasma) {
+      for (let s = 0; s < this.cfg.regionCount; s++) {
         const loop = buildLoopMesh(star.seed, s, star.strands ? STRANDS_FULL : STRANDS_PLAIN);
         this.loops.push(loop);
         this.spin.add(loop.mesh);
@@ -129,10 +160,12 @@ export class StarBody {
     const pair = omega > 0 ? phasePair(tSpin, period) : { a: 0, b: period / 2, w: 0 };
     const churn = (tau: number) => (spinPeriod > 0 ? (CHURN_PER_ROT * tau) / spinPeriod : 0);
 
-    const regions = regionsAt(seed, tSpots, rates, STAR_SURFACE, tSpin);
-    const flares = this.star.flares
-      ? flaresAt(seed, tFlares, tSpots, rates, STAR_SURFACE, tSpin)
-      : [];
+    const regions = regionsAt(seed, tSpots, rates, this.cfg, tSpin);
+    const flares = this.star.flares && !this.star.plasma ? flaresAt(seed, tFlares, tSpots, rates, this.cfg, tSpin) : [];
+    if (this.plasma) {
+      // Display seconds of the flare schedule: sim seconds over the shown speed-up.
+      this.plasma.setTime(rates.flareSpeedup > 0 ? tFlares / rates.flareSpeedup : 0);
+    }
     this.lastRegions = regions;
     this.lastFlares = flares;
     this.mat.update({
@@ -171,6 +204,7 @@ export class StarBody {
   }
 
   dispose(): void {
+    this.plasma?.dispose();
     this.geometry.dispose();
     this.mat.material.dispose();
     for (const l of this.loops) l.dispose();

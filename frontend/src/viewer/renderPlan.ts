@@ -14,6 +14,7 @@ import { planBrownDwarf } from './renderers/BrownDwarf';
 import { planComet } from './renderers/Comet';
 import { planShaderKind } from './renderers/shaderPlan';
 import { planStar } from './renderers/Star';
+import { gateRefusal } from './confidenceGate';
 
 /** R7.6: the message shown for a `candidate`. */
 export const CANDIDATE_MESSAGE = 'Not enough data for a 3D model: distance and albedo unknown';
@@ -46,6 +47,9 @@ export function planRender(card: ObjectCard, params: RenderParams, ctx: PlanCont
 
 function planRenderRaw(card: ObjectCard, params: RenderParams, ctx: PlanContext): RenderPlan {
   const input: PlanInput = { card, params, ctx };
+  // D-36: a failed confidence gate draws no 3D body (a candidate keeps its own message).
+  const refusal = params.type === 'candidate' ? null : gateRefusal(params);
+  if (refusal) return planNoBody(input, refusal);
   try {
     switch (params.type) {
       case 'asteroid_shape':

@@ -1,0 +1,213 @@
+{
+  "asset_version": "10",
+  "card": {
+    "host_radius_rsun": {
+      "source": "NASA Planetary Fact Sheets, Sun and Saturn (nssdc.gsfc.nasa.gov/planetary/factsheet): Sun volumetric mean radius converted to the card's unit",
+      "tag": "measured",
+      "value": 1.0
+    },
+    "host_teff_K": {
+      "source": "NASA Planetary Fact Sheets, Sun and Saturn (nssdc.gsfc.nasa.gov/planetary/factsheet): Sun effective temperature",
+      "tag": "measured",
+      "value": 5772.0
+    },
+    "id": "ref-titan",
+    "mass_mearth": {
+      "source": "NASA Saturnian Satellite Fact Sheet, Titan (VI) (nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html): mass converted to the card's unit",
+      "tag": "measured",
+      "value": 0.02253
+    },
+    "name": "Titan",
+    "orbit_au": {
+      "source": "NASA Planetary Fact Sheets, Sun and Saturn (nssdc.gsfc.nasa.gov/planetary/factsheet): Saturn's semimajor axis, the distance from the Sun converted to the card's unit",
+      "tag": "measured",
+      "value": 9.5726
+    },
+    "radius_rjup": {
+      "source": "NASA Saturnian Satellite Fact Sheet, Titan (VI) (nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html): radius converted to the card's unit",
+      "tag": "measured",
+      "value": 0.03602
+    },
+    "rot_period_h": {
+      "formula": "rotation period = orbital period x 24 h/d (the sheet marks Titan synchronous)",
+      "source": "NASA Saturnian Satellite Fact Sheet, Titan (VI) (nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html): orbital period, rotation marked S (synchronous)",
+      "tag": "derived",
+      "value": 382.69
+    },
+    "surface_fluid": {
+      "source": "liquid methane (with ethane) lakes and seas seen by Cassini radar: Stofan et al. 2007, Nature 445, 61; Brown et al. 2008, Nature 454, 607 [verify: not fetched]",
+      "tag": "measured",
+      "value": "methane"
+    },
+    "surface_pressure_bar": {
+      "source": "Huygens Atmospheric Structure Instrument at the landing site, Fulchignoni et al. 2005, Nature 438, 785, as quoted by NASA NTRS 20240013879 (Vuitton et al., Titan's Atmospheric Structure, Composition, Haze, and Dynamics)",
+      "tag": "measured",
+      "value": 1.467
+    },
+    "surface_temperature_K": {
+      "source": "Huygens Atmospheric Structure Instrument at the landing site, Fulchignoni et al. 2005, Nature 438, 785, as quoted by NASA NTRS 20240013879 (Vuitton et al., Titan's Atmospheric Structure, Composition, Haze, and Dynamics)",
+      "tag": "measured",
+      "value": 93.7
+    },
+    "type": "planet_rocky"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b3",
+  "inputs_sha256": "4d30394754ce61b83ba21606cfe420fb28cc45912350a92d60845b8e46f385e2",
+  "render_params": {
+    "alt_text": "Titan, Rocky planet, 0.036 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
+    "confidence": {
+      "assumed_share": 0.6,
+      "band": "mostly_assumed",
+      "estimated_share": 0.0,
+      "formula": "C = sum(w_i c_i) / sum(w_i): c is 1 for a measured value or a formula of measured values, a placeholder share for a model-dependent one, and 0 for an assumed, artistic or missing one; the w_i are placeholder weights (D-36, Q-221)",
+      "found": "Data for: Radius, mass, orbit and tides and host star.",
+      "gate": {
+        "class_known": true,
+        "key_measurement": true,
+        "passed": true,
+        "score_ok": true
+      },
+      "inputs": [
+        {
+          "c": 1.0,
+          "fields": [
+            "radius_rjup"
+          ],
+          "id": "radius",
+          "label": "Radius",
+          "points": 15.0,
+          "tag": "measured",
+          "weight": 15
+        },
+        {
+          "c": 1.0,
+          "fields": [
+            "mass_mearth"
+          ],
+          "id": "mass",
+          "label": "Mass",
+          "points": 10.0,
+          "tag": "measured",
+          "weight": 10
+        },
+        {
+          "c": 0.5,
+          "fields": [
+            "orbit_au"
+          ],
+          "id": "orbit",
+          "label": "Orbit and tides",
+          "points": 5.0,
+          "tag": "measured",
+          "weight": 10
+        },
+        {
+          "c": 0.0,
+          "fields": [
+            "teq_K"
+          ],
+          "id": "temperature",
+          "label": "Temperature",
+          "points": 0.0,
+          "tag": "missing",
+          "weight": 15
+        },
+        {
+          "c": 1.0,
+          "fields": [
+            "host_teff_K",
+            "host_radius_rsun"
+          ],
+          "id": "host_star",
+          "label": "Host star",
+          "points": 10.0,
+          "tag": "measured",
+          "weight": 10
+        },
+        {
+          "c": 0.0,
+          "fields": [],
+          "id": "fluid",
+          "label": "Surface fluid and pressure",
+          "points": 0.0,
+          "tag": "inferred_from_analog",
+          "weight": 15
+        },
+        {
+          "c": 0.0,
+          "fields": [],
+          "id": "terrain",
+          "label": "Plates and terrain",
+          "points": 0.0,
+          "tag": "artistic",
+          "weight": 15
+        },
+        {
+          "c": 0.0,
+          "fields": [],
+          "id": "clouds",
+          "label": "Clouds and ice",
+          "points": 0.0,
+          "tag": "artistic",
+          "weight": 10
+        }
+      ],
+      "measured_share": 0.4,
+      "needed": "",
+      "note": "This is how much of the picture rests on data. It is not the probability that the picture is correct.",
+      "raise": "A better measurement of: temperature.",
+      "score": 0.4,
+      "tag": "derived",
+      "threshold": 0.25,
+      "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
+    },
+    "generator_version": "p1-b3",
+    "haptics": {
+      "data": "none",
+      "data_tag": "artistic",
+      "params": {
+        "tau": 0.15
+      },
+      "texture": "terrain",
+      "texture_tag": "artistic"
+    },
+    "id": "ref-titan",
+    "layers": [
+      {
+        "description": "Browser shader surface and shared CPU field (R7.7). Nothing about it is measured.",
+        "id": "surface",
+        "requires": [],
+        "tag": "artistic",
+        "tier": 5
+      }
+    ],
+    "lighting": {
+      "mode": "sun"
+    },
+    "missing": [
+      "teq_pulse"
+    ],
+    "scale_m": 2575141.8400000003,
+    "seed": 1131093134,
+    "type": "planet_rocky",
+    "view_modes": {
+      "visible": {
+        "available": true,
+        "badge": "Default (artist's choice)",
+        "rgb": {
+          "source": "artist's neutral default (R7.7, D-02)",
+          "tag": "artistic",
+          "value": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 1131093134,
+  "textures": null
+}

@@ -237,7 +237,7 @@ describe('alt text and announcements (R9)', () => {
     expect(epochAnnouncement('2025-08', plan)).toContain('No tail is drawn');
     const measured = planRender(card, params, defaultContext({ honesty: 'measured' }));
     expect(honestyAnnouncement('measured', measured)).toMatch(
-      /^Measured only\. \d+ layers? shown\. 1 layer hidden\./,
+      /^Measured only\. \d+ layers? shown\. 2 layers hidden\./,
     );
   });
 });

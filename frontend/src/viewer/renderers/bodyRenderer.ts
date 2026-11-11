@@ -1,11 +1,12 @@
 // Contract of a generated body (the shader kinds, D-01). The plan (`shaderPlan.ts`) decides what is
 // shown; `buildScene` makes the body from the plan; the viewer keeps it across plans that change
 // only the honesty state or the light. Types here are plain data; no GPU is needed to import them.
-import type { Object3D } from 'three/webgpu';
+import type { Object3D, WebGPURenderer } from 'three/webgpu';
 import type { Tag } from '@/contract';
 import { allowedTags, DEFAULT_HONESTY } from '../honesty';
 import type { Overrides } from '../sliders';
 import type { FieldData, FieldParams, FieldSampler, Vec3 } from '../fields/fieldGenerator';
+import type { WorldData, WorldParams } from '../fields/worldGenerator';
 import type { TierName } from '../render/quality';
 import type { PointSet } from './pointClouds';
 import type { Motion, SimTimeFn } from '../motion/motion';
@@ -56,6 +57,8 @@ export interface BodyContext {
   tier?: TierName;
   /** Replaces the field Web Worker (tests). Default: `requestField`. */
   fieldSource?: (params: FieldParams) => Promise<FieldData>;
+  /** Replaces the world Web Worker of the rocky planets (tests; issue #71 stream D). Default: `requestWorld`. */
+  worldSource?: (params: WorldParams) => Promise<WorldData | null>;
   /** Motion rates and processes the plan resolved (motion/motion.ts). Default: resolved from the card and params. */
   motion?: Motion;
   /** Noise octaves of the quality level (R5.7). Default 4 (the low level). */
@@ -102,6 +105,13 @@ export interface BodyRenderer {
   setTier?(tier: TierName): void;
   /** The TAAU frame index of the frame about to be drawn (volumes shift their jitter by it). */
   setJitterFrame?(index: number): void;
+  /**
+   * Issue #71: called before each draw with the renderer, for bodies that run an off-screen pass of
+   * their own (the gas world's tracer). Optional: most bodies draw with the scene alone.
+   */
+  prepareFrame?(renderer: WebGPURenderer): void;
+  /** Steps a GPU pass the body owns (a rocky world's cloud tracer) before the frame is drawn; true when it changed. Optional. */
+  stepGpu?(renderer: unknown): boolean;
   setSunDirection(dir: Vec3): void;
   /** Poses the body at the SimClock's times (D-34). Optional: still bodies have nothing to pose. */
   setTime?(time: SimTimeFn): void;
