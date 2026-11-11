@@ -53,6 +53,7 @@ classDiagram
     +diameter_km: TV, optional
     +radius_rjup: TV, optional
     +radius_rsun: TV, optional
+    +lum_lsun, mass_msun, flare_rate_per_d: TV, optional
     +shape_source: TV~string~, optional
     +rot_period_h: TV, optional
     +lightcurve_amp_mag: TV, optional
@@ -68,6 +69,8 @@ classDiagram
     +teq_K: TV, optional
     +mass_mearth, orbit_au, orbital_period_d: TV, optional
     +host_teff_K, host_radius_rsun, host_mass_msun, host_age_gyr: TV, optional
+    +orbit_ecc, insolation_searth, host_lum_lsun: TV, optional
+    +dayside_temp_K, nightside_temp_K, hotspot_offset_deg: TV, optional
     +component_teff_K: TV~pair~, optional
     +surface_pressure_bar: TV, optional
     +surface_temperature_K: TV, optional
