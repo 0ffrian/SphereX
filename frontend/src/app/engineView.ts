@@ -4,7 +4,7 @@
 import { useMemo } from 'react';
 import { useCloseUpStore } from './closeUpStore';
 import { useRockStore } from './rockStore';
-import { useWorldStore } from './worldStore';
+import { globeTurnBy, useWorldStore } from './worldStore';
 import type { ViewerApp } from '@/viewer/ViewerApp';
 import type { RockView } from '@/engine/rocks/RockView';
 
@@ -56,13 +56,16 @@ export function resolveViewControls(src: {
         if (!g) return;
         const s = g.state();
         const k = STEP / s.zoom;
-        useWorldStore.getState().apply({
-          yaw: s.yaw + (dir === 'left' ? -k : dir === 'right' ? k : 0),
-          pitch: Math.max(
-            -1.4,
-            Math.min(1.4, s.pitch + (dir === 'up' ? -k : dir === 'down' ? k : 0)),
-          ),
-        });
+        // The surface moves the way the arrow points, as the arrow keys and a drag do (issue #93).
+        useWorldStore
+          .getState()
+          .apply(
+            globeTurnBy(
+              s,
+              dir === 'left' ? -k : dir === 'right' ? k : 0,
+              dir === 'up' ? -k : dir === 'down' ? k : 0,
+            ),
+          );
       },
       reset: () => useWorldStore.getState().apply({ zoom: 1, yaw: 0, pitch: 0 }),
       ratio: () => globe()?.state().zoom ?? 1,
