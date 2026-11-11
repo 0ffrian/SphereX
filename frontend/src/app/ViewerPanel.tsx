@@ -53,6 +53,8 @@ import { useCloseUpStore } from './closeUpStore';
 import { StarFlarePanel } from './StarFlarePanel';
 import { RockStage } from './build/RockStage';
 import { StarGlobeStage, useEngineStar } from './StarEngineStage';
+import { WorldGlobeStage, useEngineWorld } from './WorldEngineStage';
+import { useWorldStore } from './worldStore';
 import { MouldStrip, type StripHandle } from './build/MouldStrip';
 import { useMould, type MouldPhase } from './build/useMould';
 import { usesBrowserSeed } from '@/viewer/mould/mouldSteps';
@@ -221,6 +223,9 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // Issue #71 stream X (D-37): the prototype's star engine draws star cards in the build pane; null keeps the TSL path.
   const engineStarCard = useEngineStar();
   const [engineFailed, setEngineFailed] = useState(false);
+  // Issue #71 stream Y (D-37): the prototype's world engine draws planets and gas giants; null keeps the old path.
+  const engineWorldCard = useEngineWorld();
+  const worldFailedId = useWorldStore((s) => s.failedId);
   const storedParams = blocked ? null : storeParams;
   const seedOffset = pane?.seedOffset ?? 0;
   // "New seed" (issue #60): the same params with another seed; the same card + seed always give
@@ -616,14 +621,18 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // hides or shows it.
   const closeKind = pane ? closeUpKindOf(params?.type) : null;
   const engineStar = pane && !engineFailed && honesty !== 'measured' && plan?.threeD && card && !blocked ? engineStarCard : null;
+  const engineWorld =
+    pane && honesty !== 'measured' && plan?.threeD && card && !blocked && engineWorldCard && worldFailedId !== engineWorldCard.preset.id
+      ? engineWorldCard
+      : null;
   // Hidden by the user, or held back until the build has shifted to the right half (stream U).
   const closeHidden = useCloseUpStore((s) => s.hidden || s.held);
   const closeInfo = useCloseUpStore((s) => s.info);
   const shaderKey = plan?.shader?.key ?? '';
   const pubFixture = fixture || (card?.id.startsWith('fixture:') ?? false);
   useEffect(() => {
-    useCloseUpStore.getState().publish({ viewer, plan, type: params?.type ?? null, fixture: pubFixture, reducedMotion, engineStar });
-  }, [viewer, plan, params?.type, reducedMotion, pubFixture, engineStar]);
+    useCloseUpStore.getState().publish({ viewer, plan, type: params?.type ?? null, fixture: pubFixture, reducedMotion, engineStar, engineWorld });
+  }, [viewer, plan, params?.type, reducedMotion, pubFixture, engineStar, engineWorld]);
   useEffect(() => () => useCloseUpStore.getState().reset(), []);
   useEffect(() => {
     if (!viewer) return;
@@ -647,9 +656,14 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
       viewer.closeUpOff(true);
       return;
     }
+    // A planet the world engine draws has its own surface view in the pane (stream Y), so the viewer's is off.
+    if (closeKind === 'orbit' && engineWorld) {
+      viewer.closeUpOff(true);
+      return;
+    }
     viewer.openCloseUp(closeKind === 'body', closeKind === 'star', gate);
     return () => viewer.closeUpOff(true);
-  }, [viewer, pane, closeKind, closeHidden, blocked, plan?.threeD, objectKey, shaderKey, artisticShown, engineStar]);
+  }, [viewer, pane, closeKind, closeHidden, blocked, plan?.threeD, objectKey, shaderKey, artisticShown, engineStar, engineWorld]);
   // A gas giant that is still forming opens when it has settled.
   useEffect(() => {
     if (!viewer || !closeInfo?.refusal || !/forming/.test(closeInfo.refusal) || closeHidden) return;
@@ -778,6 +792,13 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           />
           {engineStar && (
             <StarGlobeStage key={engineStar.preset.id} star={engineStar} onFail={() => setEngineFailed(true)} />
+          )}
+          {engineWorld && (
+            <WorldGlobeStage
+              key={engineWorld.preset.id}
+              world={engineWorld}
+              onFail={() => useWorldStore.getState().fail(engineWorld.preset.id)}
+            />
           )}
           {!pane && params && plan?.threeD && (
             <ConfidenceChip
@@ -1205,7 +1226,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
               </figure>
             )}
 
-            {lapses.length > 0 && (
+            {lapses.length > 0 && !engineWorld && (
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
@@ -1235,7 +1256,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             )}
 
             {/* Issue #71 stream E: pacing of a simulated gas world; shown only for one. */}
-            {plan.type === 'gas_giant' && lapses.some((t) => t.id === 'winds') && (
+            {plan.type === 'gas_giant' && !engineWorld && lapses.some((t) => t.id === 'winds') && (
               <div className="flex flex-col gap-1" data-testid="gas-pacing">
                 <div role="group" aria-label="Time speed of the winds" className="flex flex-wrap gap-2">
                   {GAS_PACING_CHOICES.map((c) => (
