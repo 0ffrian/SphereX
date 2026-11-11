@@ -28,20 +28,20 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [haptics-sound.md](haptics-sound.md) | audio pairing (D-10), spectrum pitch and voice hints, the body tone and the Track path sound | 1 D, 10 Q, 13 KB |
 | [haptics-built.md](haptics-built.md) | the haptic engine, calibration and source choices as built | 0 D, 9 Q, 20 KB |
 | [platform-hosting.md](platform-hosting.md) | the three.js pin, hardware and frame budgets, hosting, the demo machine and the event platform | 3 D, 5 Q, 6 KB |
-| [moving-objects.md](moving-objects.md) | Rainbow Trails, the Track tool, Area search and Discovery (agreed) | 1 D, 16 Q, 21 KB |
+| [moving-objects.md](moving-objects.md) | Rainbow Trails, the Track tool, Area search and Discovery (agreed) | 1 D, 17 Q, 23 KB |
 | [moving-objects-review.md](moving-objects-review.md) | proposed fixes to Area search and Track after the 9 Nov 2026 audit, and Moon's review list (Q-202) | 0 D, 9 Q, 16 KB |
 | [moving-frames.md](moving-frames.md) | frames for moving objects: the path cone search, its tags and refusals, MOST | 0 D, 4 Q, 8 KB |
 | [exoplanets.md](exoplanets.md) | the exoplanet card fields (mass, orbit, host star), radius from the archive, tidal locking, mass in the physics layer, and the two demo exoplanet fixtures | 0 D, 5 Q, 15 KB |
 | [exoplanet-looks.md](exoplanet-looks.md) | the climate scenarios and locked-planet temperature map, starlight colour, scenario looks and presets, and the exoplanet mould steps | 0 D, 5 Q, 15 KB |
 | [catalogue-values.md](catalogue-values.md) | name resolution for the demo exoplanets, star Teff, radius and Mira periods, the literature registry, binary brown dwarf components, the issue #68 backend fixes and the slope unit | 0 D, 6 Q, 13 KB |
-| [demo-pack.md](demo-pack.md) | the demo search list and aliases, the 67P and Bennu shape products, the WRL reader, and the pre-built demo pack | 0 D, 5 Q, 17 KB |
+| [demo-pack.md](demo-pack.md) | the demo search list and aliases, the 67P and Bennu shape products, the WRL reader, and the pre-built demo pack | 0 D, 6 Q, 19 KB |
 
 Agenda of the 11 Nov 2026 decision session: [session-2026-11-11.md](session-2026-11-11.md). It holds no entries and is removed once the outcomes are recorded.
 
 ## Rules for entries
 
 - **IDs never change and are never reused.** A new decision is the next free `D-` number; a new question the next free `Q-` number. Before you pick one, check `origin/main` and the open PRs (they pick numbers too).
-- **Next free:** D-37 and Q-206 (10 Nov 2026). **Taken by issue #80:** Q-205 (event cut, Proposed). **Taken by issue #79:** Q-204 (PNG determinism). **Reserved (provisional; confirm or renumber at the 11 Nov 2026 session):** D-36 and Q-210 to Q-279 for issue #71. **Renumbered:** this PR's Q-150 to Q-183 became Q-170 to Q-203 on 10 Nov 2026, because main took Q-150 to Q-169 in PR #70; Q-203 is the four research checks, Q-170 to Q-202 are the spec-pass proposals. Q-149 in the Track block is still unused. **Reserved:** Q-130 to Q-149 for the Track tool and Area search (Q-130). **From PR #53 (merged):** Q-125 (frame search tags and refusals) and Q-126 (MOST). **Never used, do not reuse:** Q-46. **Never assigned:** Q-127 to Q-129 (skipped; do not reuse).
+- **Next free:** D-37 and Q-208 (11 Nov 2026). **Taken by issue #75:** Q-206 (pack never hides a measured spectrum), Q-207 (Rainbow Trails rotation in the UI). **Taken by issue #80:** Q-205 (event cut, Proposed). **Taken by issue #79:** Q-204 (PNG determinism). **Reserved (provisional; confirm or renumber at the 11 Nov 2026 session):** D-36 and Q-210 to Q-279 for issue #71. **Renumbered:** this PR's Q-150 to Q-183 became Q-170 to Q-203 on 10 Nov 2026, because main took Q-150 to Q-169 in PR #70; Q-203 is the four research checks, Q-170 to Q-202 are the spec-pass proposals. Q-149 in the Track block is still unused. **Reserved:** Q-130 to Q-149 for the Track tool and Area search (Q-130). **From PR #53 (merged):** Q-125 (frame search tags and refusals) and Q-126 (MOST). **Never used, do not reuse:** Q-46. **Never assigned:** Q-127 to Q-129 (skipped; do not reuse).
 - **One entry, one file.** Put a new entry in the topic file it belongs to and add its row to the index below in the same commit. An entry that changes another one says "amends D-xx" and the amended entry gets an "Amended by" line.
 - **Status words** (for new entries; older rows keep their wording): **Open**; **Open (built)** (code follows the proposal); **Proposed** (an owner must confirm); **Decided** (who and when); **Partly decided** (list what is open); **Superseded by** (the newer entry rules); **Deferred** (after the event). D- entries are **Accepted** unless marked otherwise.
 - **Spec text belongs in the specs.** A decision states the rule and cites the spec section that holds the detail; when a decision changes a rule, update that section in the same PR.
@@ -245,7 +245,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-161 | Demo search list and aliases | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
 | Q-162 | 67P and Bennu shape products | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
 | Q-163 | WRL reader and Bennu shape model | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
-| Q-164 | Pre-built demo pack | Proposed (needs a second team member); amended by Q-204 | [demo-pack](demo-pack.md) |
+| Q-164 | Pre-built demo pack | Proposed (needs a second team member); amended by Q-204, Q-206 | [demo-pack](demo-pack.md) |
 | Q-165 | The two demo exoplanet fixtures | Proposed (needs a second team member) | [exoplanets](exoplanets.md) |
 | Q-166 | Exoplanet mould steps, notes, alt text | Proposed (needs a second team member) | [exoplanet-looks](exoplanet-looks.md) |
 | Q-167 | Backend review fixes for issue #68 | Proposed (needs a second team member) | [catalogue-values](catalogue-values.md) |
@@ -287,4 +287,6 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-203 | Four research checks join the event build as gated extras | Decided (Moon, 10 Nov 2026); owners and thresholds Proposed | [moving-objects](moving-objects.md) |
 | Q-204 | PNG determinism across machines: chunks, not deflate bytes | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
 | Q-205 | Event cut: Area search and D4 to D7 hidden | Proposed | [scope-process](scope-process.md) |
+| Q-206 | Pre-built pack never hides a measured spectrum | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
+| Q-207 | Rainbow Trails: the UI rotates, frames stay native | Proposed (needs a second team member) | [moving-objects](moving-objects.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |

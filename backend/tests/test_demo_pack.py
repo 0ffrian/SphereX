@@ -313,9 +313,14 @@ def test_pack_asset_failing_its_schema_is_ignored_with_a_warning(
     assert any("ignoring saved asset" in r.getMessage() for r in caplog.records)
 
 
-def test_api_answers_a_pack_row_as_saved(fixture_cache: Path) -> None:
+def test_api_answers_a_pack_row_as_saved(
+    fixture_cache: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """End to end through the API: resolve from the recorded SIMBAD answer, then card and
-    render-params come from the pack, with `X-SX-Asset-Status: saved` and no frames job."""
+    render-params come from the pack, with `X-SX-Asset-Status: saved`, when the live build has
+    no spectrum (a `frames = false` row). WISE 0855's frames are cached, so the spectrum is
+    switched off here; otherwise the measured build would answer (Q-206)."""
+    monkeypatch.setattr(ObjectPipeline, "_spectrum", lambda *a, **k: (None, None))
     with TestClient(create_app(make_settings(fixture_cache, assets_dir=bp.ASSETS_DIR))) as c:
         oid = c.get("/v1/resolve", params={"q": "WISE 0855-0714"}).json()["id"]
         card, params = c.get(f"/v1/objects/{oid}/card"), c.get(f"/v1/objects/{oid}/render-params")
