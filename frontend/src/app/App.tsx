@@ -28,6 +28,9 @@ import { SelectedCard } from './build/SelectedCard';
 import { useSelectedBodyLoader } from './build/selectedBody';
 import { Island } from './island/Island';
 import { SoundProvider } from '@/haptics/SoundProvider';
+import { AreaCard } from './sky/area/AreaCard';
+import { AreaLayer } from './sky/area/AreaLayer';
+import { AREA_TOOL_ENABLED } from './sky/area/areaTool';
 
 /**
  * A new search opens the object panel (unless it is already open at the spectrum), a marker click
@@ -44,6 +47,9 @@ function useOpenPanelOnSearch(): void {
       if (q.origin === 'sky' && shell.cardRequested) return;
       // The build pane keeps the view while a link or Back changes the object under it.
       if (shell.build.open) return;
+      // A link that opens an area (`area=`) keeps Area search, even with an object in it (A18.9).
+      // The tool is only ever `area` while Area search is on.
+      if (q.origin === 'hash' && shell.tool === 'area') return;
       if (shell.tool !== 'flipbook' && shell.tool !== 'spectrum') shell.setTool('flipbook');
     };
     // A search from a shared link may have started before this subscription.
@@ -119,8 +125,9 @@ export function App() {
             <ToolRail />
             <main className="sx-view" aria-label="Sky view" data-split={split || undefined}>
               <div className="sx-sky-slot" inert={skyHidden || undefined}>
-                <SkyPane>
+                <SkyPane layers={AREA_TOOL_ENABLED ? <AreaLayer /> : undefined}>
                   <SelectedCard />
+                  {AREA_TOOL_ENABLED && <AreaCard />}
                   <Panels />
                 </SkyPane>
               </div>

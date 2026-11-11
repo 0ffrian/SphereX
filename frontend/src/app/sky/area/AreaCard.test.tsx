@@ -3,6 +3,7 @@ import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '@/app/api/client';
 import { RailIcon } from '@/app/shell/railIcons';
+import { TOOLS } from '@/app/shell/ToolRail';
 import { useShellStore } from '@/app/shell/shellStore';
 import { setSkyDrawHandler } from '@/app/sky/layers';
 import { useSkyFlyStore } from '@/app/sky/skyFlyTo';
@@ -39,6 +40,7 @@ describe('Area card', () => {
   afterEach(() => m?.unmount());
 
   it('is a rail tool with a dashed-square icon (strokes of length 1)', () => {
+    expect(TOOLS.map((t) => t.id)).toContain('area');
     m = mount(<RailIcon id="area" />);
     const paths = m.host.querySelectorAll('path, circle');
     expect(paths.length).toBeGreaterThan(4);
