@@ -64,6 +64,8 @@ ASSET_SOURCE = "derived.asset"
 #   layer text; Procyon A takes its interferometric radius from the literature registry.
 # 12 (issue #93 3.5): an Exoplanet Archive pl_eqt is `derived` with its assumption (zero albedo,
 #   full redistribution), never `measured`, so teq_K and the confidence scores change.
+#   Also #93 3.8: the confidence tables drop proper motion, score star rotation and count a
+#   giant's colour from Teq as model_dependent (stage 7).
 ASSET_VERSION = "12"
 AssetStatus = Literal["saved", "generated", "sketch"]
 FIELDS = ("card", "render_params", "textures", "generator_version", "seed", "created_at")
