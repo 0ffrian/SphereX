@@ -96,8 +96,12 @@ function worldModel() {
 // fluid, no sea surface. The state is set after the runaway test, so supercritical water still counts as boiled off.
   if (!gas && !airless && superC && Ts >= F.Tc && state === 'vapour') state = 'supercritical';
 // @end-deviation
+// @deviation L1762 (#93 3.3) the ORB[p.id] rename below: the tidal heating reads the preset's own orbit extras p.ob
+// first (cardToWorld writes the host mass from the card's host_mass_msun, the eccentricity and the obliquity) and the
+// prototype's ORB table, which knows only its own presets, after. Code: the @rename only.
+// @end-deviation
 // @verbatim L1737-L1765
-// @rename flat:=>flat:p.fMeas!=null?p.fMeas:
+// @rename flat:=>flat:p.fMeas!=null?p.fMeas: ORB[p.id]=>(p.ob||ORB[p.id])
   var cov = gas ? 0 : airless ? 0 : state === 'liquid' ? 0.3 + 0.42 * sstep(F.Tt, Math.min(Tb, F.Tt + 70), Ts) : state === 'frozen' ? 0.12 : runaway ? 0.95 : 0.06;
   // colour of the sky: the star's light scattered as lambda^-4, methane removes red
   var bands = [640, 540, 450], ch4 = W.fluid === 'methane' ? 2.1 : 0, sky = bands.map(function (l, n) { return planck(l, W.Tstar) * Math.pow(550 / l, 4) * (n === 0 ? Math.exp(-ch4) : 1); }), mx = Math.max(sky[0], sky[1], sky[2]);
@@ -123,7 +127,7 @@ function worldModel() {
   var dp2 = regime === 'Methane-rich air, blue' ? [[0.24, 0.32, 0.47], [0.5, 0.58, 0.7]] : regime === 'Ammonia clouds' ? [[0.3, 0.22, 0.18], [0.42, 0.44, 0.48]] : regime === 'Water clouds' ? [[0.45, 0.5, 0.6], [0.7, 0.74, 0.8]] : regime === 'Cloudless, deep blue' ? [[0.08, 0.14, 0.34], [0.2, 0.3, 0.55]] : regime === 'Silicate haze, dark blue' ? [[0.04, 0.08, 0.22], [0.12, 0.18, 0.36]] : [[0.3, 0.14, 0.08], [0.45, 0.3, 0.22]];
   var vesc = Math.sqrt(2 * gv * R) / 1000, fx = W.Tstar < 3500 ? 1e-3 : W.Tstar > 6000 ? 5e-6 : Math.pow(10, lerp(-3, -5.3, (W.Tstar - 3500) / 2500)), shoreB = Seff > Math.pow(vesc / 6.1, 4), shoreX = Seff * fx / 5e-6 > Math.pow(vesc / 6.1, 4);   // Zahnle and Catling 2017 shoreline, I proportional to v^4
   var mainN2 = mu < 40, Tcol = airless || gas ? 0 : 1 / ((mainN2 ? 1 / 77.36 : 1 / 194.7) - 8.314 * Math.log(Ps * 1e5 / 101325) / (mainN2 ? 5570 : 25200));
-  var ob = ORB[p.id] || { Ms: 1 }, an = 6.2832 / (p.P * Math.pow(W.orbit, 1.5) * 86400), aM = a * 1.496e11, tide = gas ? 0 : 10.5 * 0.003 * 6.674e-11 * Math.pow(ob.Ms * 1.989e30, 2) * Math.pow(R, 5) * an * (W.ecc || 0) * (W.ecc || 0) / Math.pow(aM, 6) / (4 * Math.PI * R * R);
+  var ob = (p.ob||ORB[p.id]) || { Ms: 1 }, an = 6.2832 / (p.P * Math.pow(W.orbit, 1.5) * 86400), aM = a * 1.496e11, tide = gas ? 0 : 10.5 * 0.003 * 6.674e-11 * Math.pow(ob.Ms * 1.989e30, 2) * Math.pow(R, 5) * an * (W.ecc || 0) * (W.ecc || 0) / Math.pow(aM, 6) / (4 * Math.PI * R * R);
   var phiH = clamp(Math.sqrt(5 / 3 * gv * 15000 * 0.25) / (Om * R), 0.2, 1.3);   // Held and Hou 1980 scaling, tropopause 15 km, contrast 0.25
   return { Seff: Seff, sIn: sIn, sOut: sOut, shoreB: shoreB, shoreX: shoreX, Tcol: Tcol, tide: tide, phiH: phiH, pco2: pco2, d: p.pal ? p.pal.d : dp2[0], p: p.pal ? p.pal.p : dp2[1], gamK: Gam * 1000 * (gas ? 1 : 0.66),   /* environmental lapse: about 6.5 K/km on Earth (US Standard Atmosphere 1976), not the dry 9.8 */ gas: gas, Teq: Teq, Ts: Ts, S: S, tau: tau, gv: gv, H: H, Om: Om, rotD: rotD, eps: eps, U: U, N: N, jets: jets, LD: LD, sz: sz, Tb: Tb, canLiquid: canLiquid, state: state, Tc: Tc, zc: zc, cov: cov, sky: sky, sun: sun, haze: haze, hazeC: hazeC, z: z, b: b2, s: s2, regime: regime, V: V, airless: airless, runaway: runaway, F: F, flat:p.fMeas!=null?p.fMeas: gas ? clamp(0.7 * Om * Om * R * R * R / (6.674e-11 * M), 0, 0.14) : 0, a: a };
 }
@@ -582,9 +586,13 @@ function resetWorld() {
 }
 // @end-verbatim
 function setPreset(p) {
+// @deviation L2446 (#93 3.3) the ORB[p.id] rename below: eccentricity and obliquity come from the preset's own p.ob
+// first (cardToWorld), the prototype's ORB table after. Code: the @rename only.
+// @end-deviation
 // @verbatim L2445-L2446
+// @rename ORB[p.id]=>(p.ob||ORB[p.id])
   W.aimed = false; W.yaw = 0; W.pitch = 0;
-  var ob0 = ORB[p.id] || { e: 0, obl: 0 }; W.ecc = ob0.e || 0; W.obl = ob0.obl || 0; W.spinMode = 'auto'; W.base = p; W.p = applySpin(p); W.fluid = p.fluid; W.Tstar = p.Ts; W.orbit = 1; W.Ps = p.Ps; W.step = 0;
+  var ob0 = (p.ob||ORB[p.id]) || { e: 0, obl: 0 }; W.ecc = ob0.e || 0; W.obl = ob0.obl || 0; W.spinMode = 'auto'; W.base = p; W.p = applySpin(p); W.fluid = p.fluid; W.Tstar = p.Ts; W.orbit = 1; W.Ps = p.Ps; W.step = 0;
 // @end-verbatim
 // @verbatim L2451-L2451
   resetWorld();

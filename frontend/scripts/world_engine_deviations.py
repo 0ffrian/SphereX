@@ -76,10 +76,19 @@ CORE_L1736_93_3_1 = r'''// @deviation L1736 (#93 3.1) above both its critical te
   if (!gas && !airless && superC && Ts >= F.Tc && state === 'vapour') state = 'supercritical';
 // @end-deviation'''
 
+CORE_L1762_93_3_3 = r'''// @deviation L1762 (#93 3.3) the ORB[p.id] rename below: the tidal heating reads the preset's own orbit extras p.ob
+// first (cardToWorld writes the host mass from the card's host_mass_msun, the eccentricity and the obliquity) and the
+// prototype's ORB table, which knows only its own presets, after. Code: the @rename only.
+// @end-deviation'''
+
 CORE_L2389_93_3_1 = r'''// @deviation L2389 (#93 3.1) the supercritical state worldModel can now return.
   if (m.state === 'supercritical') state = F.label + ' is supercritical (past its critical point, no sea surface)';
 // @end-deviation'''
 
 CORE_L2424_93_3_1 = r'''// @deviation L2424 (#93 3.1) caption for a fluid past its critical point (the runaway caption keeps priority).
   if (!gas && !m.runaway && m.state === 'supercritical') c = F.label + ' is past its critical point here: too hot and too dense to keep a sea, it is one supercritical fluid from the ground up.';
+// @end-deviation'''
+
+CORE_L2446_93_3_3 = r'''// @deviation L2446 (#93 3.3) the ORB[p.id] rename below: eccentricity and obliquity come from the preset's own p.ob
+// first (cardToWorld), the prototype's ORB table after. Code: the @rename only.
 // @end-deviation'''

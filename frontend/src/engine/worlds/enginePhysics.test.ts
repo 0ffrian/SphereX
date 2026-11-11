@@ -1,7 +1,11 @@
 // Issue #93 phase 3 (physics): the verbatim engine's CPU model, run headless. Each block names its #93 item.
 import { describe, expect, it } from 'vitest';
-import { headlessCore, loadModelOnly, preset } from './coreHarness.testutil';
+import type { ObjectCard } from '@/contract';
 import { FLUIDS as TS_FLUIDS, boilingPointK, cloudBaseK, fluidState } from '@/physics/fluids';
+import { cardToWorld } from './cardToWorld';
+import { headlessCore, loadModelOnly, preset } from './coreHarness.testutil';
+
+const tv = (value: number) => ({ value, tag: 'measured', source: 'test' });
 
 const PRESSURES_BAR = [0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30, 100];
 
@@ -91,5 +95,48 @@ describe('#93 3.1 critical points', () => {
     expect(m.Tb).toBeGreaterThan(372);
     expect(m.Tb).toBeLessThan(374);
     expect(m.state).toBe('liquid');
+  });
+});
+
+describe('#93 3.3 tides read the preset orbit (p.ob) before the ORB table', () => {
+  const T1E_CARD = {
+    // Not one of ARTIFACT_PRESETS (those keep the prototype's own ORB row), so the generic path builds p.ob.
+    id: 'simbad-test-rocky',
+    name: 'Test rocky world (TRAPPIST-1 e values)',
+    type: 'planet_rocky',
+    host_mass_msun: tv(0.0898),
+    host_radius_rsun: tv(0.1192),
+    host_teff_K: tv(2566),
+    mass_mearth: tv(0.692),
+    orbit_au: tv(0.02925),
+    orbital_period_d: tv(6.101013),
+    radius_rjup: tv(0.08207751457505734),
+  } as unknown as ObjectCard;
+
+  it('cardToWorld fills ob.Ms from the card host_mass_msun', () => {
+    const r = cardToWorld(T1E_CARD);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.preset.ob?.Ms).toBe(0.0898);
+  });
+
+  it('the tidal heat scales with the p.ob host mass squared, without touching the ORB table', () => {
+    const core = headlessCore();
+    const base = { ...preset('t1e'), id: 'card-only-world' };
+    expect(core.ORB['card-only-world']).toBeUndefined();
+    const heat = (Ms: number): number => {
+      loadModelOnly(core, { ...base, ob: { Ms, e: 0.05, obl: 0 } });
+      return core.worldModel().tide;
+    };
+    expect(heat(0.0898)).toBeGreaterThan(0);
+    expect(heat(0.2) / heat(0.1)).toBeCloseTo(4, 6);
+  });
+
+  it('setPreset takes eccentricity and obliquity from p.ob; a prototype preset keeps its ORB row', () => {
+    const core = headlessCore();
+    core.setPreset({ ...preset('earth'), id: 'card-only-earth', ob: { Ms: 1, e: 0.2, obl: 0.3 } });
+    expect(core.W.ecc).toBe(0.2);
+    expect(core.W.obl).toBe(0.3);
+    core.setPreset(preset('earth'));
+    expect(core.W.ecc).toBe(0.0167);
   });
 });
