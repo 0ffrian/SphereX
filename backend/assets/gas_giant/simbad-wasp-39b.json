@@ -94,8 +94,10 @@
       "value": 1.279
     },
     "teq_K": {
+      "assumption": "the cited paper's own albedo and heat redistribution (often zero Bond albedo and full redistribution; the Kepler KOI table assumes A = 0.3; the archive row does not say which); an equilibrium temperature, not a measured one",
+      "formula": "Teq = T_star * sqrt(R_star / (2a)) * (1 - A)^(1/4), as computed in the cited paper",
       "source": "NASA Exoplanet Archive PSCompPars pl_eqt (Mancini et al. 2018)",
-      "tag": "measured",
+      "tag": "derived",
       "value": 1166.0
     },
     "type": "gas_giant"
@@ -106,9 +108,9 @@
   "render_params": {
     "alt_text": "WASP-39 b, Gas giant, 1.28 Jupiter radii (measured), colour family from the equilibrium temperature, lit by its star. Surface relief: illustrative.",
     "confidence": {
-      "assumed_share": 0.4725,
-      "band": "part_data",
-      "estimated_share": 0.1,
+      "assumed_share": 0.5975,
+      "band": "mostly_assumed",
+      "estimated_share": 0.125,
       "formula": "C = sum(w_i c_i) / sum(w_i): c is 1 for a measured value or a formula of measured values, a placeholder share for a model-dependent one, and 0 for an assumed, artistic or missing one; the w_i are placeholder weights (D-36, Q-221)",
       "found": "Data for: Radius, mass, orbit and tides, temperature and colour.",
       "gate": {
@@ -153,25 +155,25 @@
           "weight": 10
         },
         {
-          "c": 1.0,
+          "c": 0.5,
           "fields": [
             "teq_K"
           ],
           "id": "temperature",
           "label": "Temperature",
-          "points": 15.0,
-          "tag": "measured",
+          "points": 7.5,
+          "tag": "derived",
           "weight": 15
         },
         {
-          "c": 1.0,
+          "c": 0.5,
           "fields": [
             "teq_K"
           ],
           "id": "colour",
           "label": "Colour",
-          "points": 10.0,
-          "tag": "derived",
+          "points": 5.0,
+          "tag": "model_dependent",
           "weight": 10
         },
         {
@@ -202,11 +204,11 @@
           "weight": 10
         }
       ],
-      "measured_share": 0.4275,
+      "measured_share": 0.2775,
       "needed": "",
       "note": "This is how much of the picture rests on data. It is not the probability that the picture is correct.",
-      "raise": "A better measurement of: mass.",
-      "score": 0.5275,
+      "raise": "A better measurement of: temperature.",
+      "score": 0.4025,
       "tag": "derived",
       "threshold": 0.25,
       "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
@@ -214,7 +216,7 @@
     "generator_version": "p1-b4",
     "haptics": {
       "data": "teq_pulse",
-      "data_tag": "measured",
+      "data_tag": "derived",
       "params": {
         "maxRateHz": 12.0
       },

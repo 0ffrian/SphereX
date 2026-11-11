@@ -9,7 +9,9 @@
   },
   "teq_K": {
     "value": 100.0,
-    "tag": "measured",
-    "source": "synthetic fixture: stands in for Exoplanet Archive pl_eqt"
+    "tag": "derived",
+    "source": "synthetic fixture: stands in for Exoplanet Archive pl_eqt",
+    "formula": "Teq = T_star * sqrt(R_star / (2a)) * (1 - A)^(1/4), as computed in the cited paper",
+    "assumption": "the cited paper's own albedo and heat redistribution (#93 3.5: a catalogue Teq is derived, not measured)"
   }
 }
