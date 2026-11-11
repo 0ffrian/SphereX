@@ -206,3 +206,9 @@ name = "WASP-39 b"
 query = "WASP-39 b"
 group = "demo"
 aliases = ["WASP-39", "WASP39b", "WASP 39 b"]
+
+[[target]]
+name = "55 Cancri e"
+query = "55 Cnc e"
+group = "demo"
+aliases = ["55 Cnc e", "55 Cancri e", "55cnce", "cancri e"]

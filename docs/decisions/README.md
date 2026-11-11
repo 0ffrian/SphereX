@@ -351,4 +351,5 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-308 | D-37 engine status: prototype star and flare code sliced into engine/stars | Open (being built) | [rendering-bodies](rendering-bodies.md) |
 | Q-309 to Q-312 | Star engine hosted (D-37): StarEngine, cardToStar and artifact presets, the globe pick and close-up target, mass assumption | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
 | Q-313 to Q-316 | World engine hosted (D-37): two instances (globe and fly), hosting rule with the Forming state, controls and notes, haptics sampler, known differences | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
+| Q-317 to Q-319 | Search list S2: 55 Cnc e (reviewed type override), stream S placeholders replaced, lava world in the engine | Open (built; Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |
