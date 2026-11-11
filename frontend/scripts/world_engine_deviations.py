@@ -132,3 +132,9 @@ CORE_L2425_93_1_8 = r'''// @deviation L2425 (#93 1.8) the gas solver runs at mos
 // prototype's fixed "one Earth day".
   if (gas && W.timeSec >= 1000 && GS && GS.dt) { var need93 = W.timeSec / 60 / (p.Rj * 71492e3 / Math.max(m.U, 1)) / GS.dt; if (need93 > 3) W.cap = W.cap.replace('One second here is one Earth day', 'One second here is about ' + fmt(86400 * 3 / need93 / 3600, 0) + ' hours (the simulation runs at most 3 steps a frame)'); }
 // @end-deviation'''
+
+GAS_89_REVIEW_7_8 = r'''// @deviation (#89 review 7, 8) the renames below:
+//   Great Red Spot r 0.105 -> 0.083 planet radii and aspect 1.38 -> 1.49: about 11,000 x 16,350 km (Simon et al. 2024,
+//   PSJ 5, 223); the old values drew it near its size of decades ago.
+//   Cyclones (type 2) spin the other way: the stamped swirl is -sgn(lat) for anticyclones (the GRS, white ovals,
+//   Oval BA) and must be +sgn(lat) for cyclones, so it is multiplied by -1 for type 2.'''

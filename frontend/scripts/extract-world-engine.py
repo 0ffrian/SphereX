@@ -14,8 +14,11 @@ into the prototype) before regenerating, or the fixes are lost.
 
 Issue #93 (phase 1, the first-open freeze and performance): its deviations ARE ported here (the DEV93_* texts, the
 split WorldGL slices and their SUBS), with the PR #89 renames of the same slices (shaders.js, WorldGL). Still not
-ported from PR #89: the L1701-L1726 and L1728-L1765 renames with the L1727 split, the gas.js renames, and core.js's
-header lines 4-5.
+ported from PR #89: the L1701-L1726 and L1728-L1765 renames with the L1727 split, and core.js's header lines 4-5.
+The gas.js renames (#89 review 7, 8) are ported (DV.GAS_89_REVIEW_7_8 and the gas.js SUBS; issue #93 B6).
+
+DO NOT RUN WITH --force BEFORE 15 Nov 2026 (the event build, 14-15 Nov): --force overwrites every committed engine
+file, and the deviations listed above as not ported (core.js's) would be lost.
 Issue #93 phase 2 (repeating patterns): DEV93_PATTERNS (shaders.js), DEV93_SEED (core.js, WorldGL) and DEV93_RIVER
 (terrain.js, in place of L1884) are ported the same way.
 """
@@ -161,8 +164,10 @@ DEV93_SEED = r'''// @deviation (#93 3.1, 3.2, 3.4, 3.9) the seed uniforms of sha
     for (k in pr) { q = pr[k]; if (!q[0] || seedOn[k] === key) continue; gl.useProgram(q[0]); if (q[1].uSeed3) gl.uniform3fv(q[1].uSeed3, s3); if (q[1].uSeedN) gl.uniform3fv(q[1].uSeedN, sN); if (q[1].uNzSph) gl.uniform1f(q[1].uNzSph, card ? 1 : 0); seedOn[k] = key; }
   };'''
 DEV93_PATTERNS = r'''// @deviation (#93 3) repeating patterns. Text edits applied to the shader sources above; each must match exactly as
-// often as stated, so a changed prototype fails loudly. Presets render as before: core.js sets uSeed3 = (seed, seed,
-// seed), uSeedN = 0 and uNzSph = 0 for them (WorldGL.seedFor); only card worlds (preset.seed3) get the new seeds.
+// often as stated, so a changed prototype fails loudly. Presets keep the prototype's seeds: core.js sets uSeed3 =
+// (seed, seed, seed), uSeedN = 0 and uNzSph = 0 for them (WorldGL.seedFor); only card worlds (preset.seed3) get the
+// new seeds. So the globe programs render presets as before, but the fly view does not: FLY_FS has other #93 changes
+// (its heights and detail), and the patterns.html presets check fails there by design.
 //  2.1, 2.9  uSeed3: every noise offset +uSeed (the prototype's one seed along (1, 1, 1)) becomes +uSeed3, a vec3; a
 //            card world gets three hashed integers in [0, 256) (engine/seed.ts), so two cards never share a shifted
 //            copy of one pattern.
@@ -340,8 +345,12 @@ w('terrain.js', hdr('CPU value noise, plate-tectonic terrain build, river routin
   sl(1766, 1883) + '\n' + DEV93_RIVER + '\n' + sl(1885, 1905) + '\nexport { hsh, vn3, fbm3, buildTerrain, routeTerrain };\n')
 
 # gas.js: GAS_NODES, gasProfile, GasSim (pure)
+# PR #89 review 7, 8: the Great Red Spot's size and aspect (r, ar) and the cyclones' spin sign, as renames.
 w('gas.js', hdr('gas giants: GAS_NODES, gasProfile, GasSim', '2149-2261') + HELPERS_IMPORT +
-  sl(2148, 2261) + '\nexport { GAS_NODES, gasProfile, GasSim };\n')
+  DV.GAS_89_REVIEW_7_8 + '\n' +
+  sl(2148, 2261, [('0.105,', '0.083,'), ('1.38,', '1.49,'),             # review 7: GRS r and ar
+                  ('0.05;', '0.05*(s.type===2?-1:1);')]) +             # review 8: cyclone spin sign
+  '\nexport { GAS_NODES, gasProfile, GasSim };\n')
 
 # core.js: stateful pieces, closed over one instance state (W, EB, GS, OCEANF, ORB)
 core = []
