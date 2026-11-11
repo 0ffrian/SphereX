@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from app.core.render.card_to_params import card_to_params
-from app.core.render.confidence import sweep_weights
+from app.core.render.confidence import _present_gas, sweep_weights
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 
@@ -52,7 +52,12 @@ def sweep_card(card: Mapping[str, Any]) -> dict[str, float]:
         keys = set(base) | set(other)
         return float(sum(1 for k in keys if base.get(k) != other.get(k)))
 
-    fields = [k for k, v in card.items() if isinstance(v, Mapping) and v.get("value") is not None]
+    fields = [
+        k
+        for k, v in card.items()
+        if isinstance(v, Mapping)
+        and (_present_gas(v) if k == "gas_Q" else v.get("value") is not None)
+    ]
     # metric() is the distance to the full card, so the base of sweep_weights (0) is exact.
     return sweep_weights(card, metric, fields)
 
