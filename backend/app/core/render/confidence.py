@@ -303,13 +303,46 @@ def value_c(field: str, tv: Mapping[str, Any]) -> tuple[float, str]:
     return base, tag
 
 
-def _gas_c(tv: Mapping[str, Any]) -> tuple[float, str] | None:
-    """``gas_Q`` holds one TVNumber per molecule: the mean ``c`` of the three, 0 for an absent one
-    (so one molecule of three counts a third), and the weakest tag of the present ones."""
+def _gas_species(tv: Any) -> dict[str, Mapping[str, Any]]:
+    """The present TVNumber of each molecule of ``gas_Q``, in either shape (Q-323).
+
+    Flat (old): ``{"co2": {"value": ...}}``. Epoch-keyed: ``{"2025-08": {"co2": {...}}, ...}``.
+    A wrapping ``{"value": {...}}`` is unwrapped first. For the epoch-keyed shape each molecule
+    takes its best epoch: the highest ``c``, then the stronger tag. Epochs are never averaged
+    (the comet's output changes with distance, so a mean would be a number nobody measured)."""
+    if not isinstance(tv, Mapping):
+        return {}
     value = tv.get("value") if "value" in tv else tv
     if not isinstance(value, Mapping):
-        return None
-    got = [(value_c(f"gas_Q.{k}", m)) for k, m in value.items() if _present(m)]
+        return {}
+    best: dict[str, tuple[tuple[float, int], Mapping[str, Any]]] = {}
+
+    def offer(species: str, m: Any) -> None:
+        if not _present(m):
+            return
+        c, tag = value_c(f"gas_Q.{species}", m)
+        key = (c, -_RANK.index(tag) if tag in _RANK else -len(_RANK))
+        if species not in best or key > best[species][0]:
+            best[species] = (key, m)
+
+    for k, m in value.items():
+        if _present(m):
+            offer(str(k), m)
+        elif isinstance(m, Mapping):  # an epoch
+            for species, sm in m.items():
+                offer(str(species), sm)
+    return {k: v[1] for k, v in best.items()}
+
+
+def _present_gas(tv: Any) -> bool:
+    """Whether ``gas_Q`` holds at least one measured molecule, in either shape."""
+    return bool(_gas_species(tv))
+
+
+def _gas_c(tv: Mapping[str, Any]) -> tuple[float, str] | None:
+    """``gas_Q``: the mean ``c`` of the three molecules, 0 for an absent one (so one molecule of
+    three counts a third), and the weakest tag of the present ones. Epochs: see ``_gas_species``."""
+    got = [value_c(f"gas_Q.{k}", m) for k, m in _gas_species(tv).items()]
     if not got:
         return None
     return sum(c for c, _ in got) / 3.0, _weakest([t for _, t in got])
@@ -363,10 +396,10 @@ def _r(x: float) -> float:
     return round(x, 4)
 
 
-def _join(items: Sequence[str]) -> str:
+def _join(items: Sequence[str], conj: str = "or") -> str:
     if len(items) <= 1:
         return "".join(items)
-    return ", ".join(items[:-1]) + " or " + items[-1]
+    return ", ".join(items[:-1]) + f" {conj} " + items[-1]
 
 
 def confidence_block(
@@ -402,13 +435,15 @@ def confidence_block(
             }
         )
     score = m + e
-    key_ok = any(_present(card.get(f)) for f in table.key_fields)
+    key_ok = any(
+        (_present_gas if f == "gas_Q" else _present)(card.get(f)) for f in table.key_fields
+    )
     score_ok = score + 1e-9 >= threshold
     passed = key_ok and score_ok
 
     have = [r["label"] for r in rows if r["tag"] in _RANK[:3] and r["fields"]]
     found = (
-        "Data for: " + _join([x.lower() if i else x for i, x in enumerate(have)]) + "."
+        "Data for: " + _join([x.lower() if i else x for i, x in enumerate(have)], "and") + "."
         if have
         else "No usable measurement yet."
     )
