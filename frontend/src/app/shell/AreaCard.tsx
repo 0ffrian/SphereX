@@ -4,12 +4,11 @@
 //          the card lists the objects, and 433 Eros opens the Eros card with its track in the square.
 //   discovery: the sky flies to the square, the steps run and the movers are listed.
 // The results are a DEMO (app/area/areaService.ts, Q-205 pending) and are tagged as such.
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { DiscoveryCard, MoverCard } from '@/app/area/DiscoveryCard';
 import { ErosCard } from '@/app/area/ErosCard';
 import { KnownList } from '@/app/area/KnownList';
 import { fitCamera, flyToView, centreSquare, safeRect } from '@/app/sky/areaDraw';
-import { PanelCard } from './PanelCard';
 import { formatAreaSize, useAreaStore } from './areaStore';
 import { useShellStore } from './shellStore';
 
@@ -79,52 +78,32 @@ export function AreaCard() {
 }
 
 function DrawCard() {
-  const closePanel = useShellStore((s) => s.closePanel);
+  // Moon (12 Nov 2026): no card while drawing; the user drags a square of their own choice.
+  // A small hint says what to do. Keyboard users press Enter for a square in the middle (WCAG 2.5.7).
   const flow = useAreaStore((s) => s.flow);
   const stage = useAreaStore((s) => s.stage);
   const box = useAreaStore((s) => s.box);
-  const last = useAreaStore((s) => s.last);
-  const rootRef = useRef<HTMLElement>(null);
   const size = box ? formatAreaSize(box.widthDeg) : '';
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || e.defaultPrevented) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON' || t.isContentEditable)) return;
+      const b = centreSquare();
+      if (b) useAreaStore.getState().setBox(b);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   return (
-    <PanelCard
-      title={flow === 'known' ? 'Known objects' : 'Discovery'}
-      subtitle="Drag a square on the sky"
-      icon="area"
-      onClose={closePanel}
-      returnFocusTo={flow === 'known' ? '[data-testid="tool-known"]' : '[data-testid="tool-area"]'}
-      rootRef={rootRef}
-      testId="area-card"
-    >
-      {/* Announces the size of the square once it is set (also when it is set without a mouse). */}
+    <div className="sx-area-hint" data-testid="area-card">
       <p className="sr-only" role="status" aria-live="polite" data-testid="area-live">
         {stage === 'set' && box ? `Square set on the sky, ${size} wide.` : ''}
       </p>
-      <i className="sx-area-drawing" aria-hidden="true" />
-      <p className="text-sm text-sx-mfg">Drag a square over the part of the sky you want to search.</p>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className="sx-btn sx-btn-ghost"
-          data-testid="area-here"
-          onClick={() => {
-            const b = centreSquare();
-            if (b) useAreaStore.getState().setBox(b);
-          }}
-        >
-          Use a square in the middle
-        </button>
-        {last && (
-          <button
-            type="button"
-            className="sx-btn sx-btn-ghost"
-            data-testid="area-keep"
-            onClick={() => useAreaStore.getState().setBox(last)}
-          >
-            Keep the last square
-          </button>
-        )}
-      </div>
-    </PanelCard>
+      <span role="status">
+        {flow === 'known' ? 'Known objects' : 'Discovery'}: drag a square on the sky
+      </span>
+      <span className="sx-area-hint-keys" aria-hidden="true">Enter for the middle · Esc to cancel</span>
+    </div>
   );
 }
