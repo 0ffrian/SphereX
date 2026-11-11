@@ -86,22 +86,19 @@ body {
   }
 
   /* ---- screen + bezel (mock-up .screen / .bezel) ---- */
+  /* Full screen (Moon, 11 Nov 2026): no frame around the app; the sky runs to the window edges. */
   .sx-screen {
     position: fixed;
     inset: 0;
-    padding: 14px;
+    padding: 0;
     background: var(--color-sx-bg);
   }
   .sx-bezel {
     position: relative;
     height: 100%;
-    border-radius: 28px;
+    border-radius: 0;
     background: var(--color-sx-bezel);
-    border: 1px solid var(--color-sx-border);
-    box-shadow:
-      0 0 0 1px #000,
-      inset 0 1px 0 #ffffff0d,
-      0 30px 80px #000;
+    border: 0;
     display: grid;
     grid-template-columns: var(--sx-rail) minmax(0, 1fr) minmax(0, 24rem) 16px;
     /* Whole-pixel rows, so panels and canvases inside the view sit on whole pixels. */
