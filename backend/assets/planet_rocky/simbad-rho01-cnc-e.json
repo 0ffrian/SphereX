@@ -1,0 +1,230 @@
+{
+  "asset_version": "10",
+  "card": {
+    "host_age_gyr": {
+      "err": 2.5,
+      "source": "NASA Exoplanet Archive PSCompPars st_age (Marcy et al. 2002)",
+      "tag": "measured",
+      "value": 5.5
+    },
+    "host_mass_msun": {
+      "err": 0.015,
+      "source": "NASA Exoplanet Archive PSCompPars st_mass (Bourrier et al. 2018)",
+      "tag": "measured",
+      "value": 0.905
+    },
+    "host_radius_rsun": {
+      "err": 0.01,
+      "source": "NASA Exoplanet Archive PSCompPars st_rad (Bourrier et al. 2018)",
+      "tag": "measured",
+      "value": 0.943
+    },
+    "host_teff_K": {
+      "err": 18.0,
+      "source": "NASA Exoplanet Archive PSCompPars st_teff (Bourrier et al. 2018)",
+      "tag": "measured",
+      "value": 5172.0
+    },
+    "id": "simbad-rho01-cnc-e",
+    "mass_mearth": {
+      "err": 0.33,
+      "source": "NASA Exoplanet Archive PSCompPars pl_bmasse (Bourrier et al. 2018)",
+      "tag": "measured",
+      "value": 7.99
+    },
+    "name": "55 Cnc e",
+    "orbit_au": {
+      "err": 5e-05,
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbsmax (Bourrier et al. 2018)",
+      "tag": "measured",
+      "value": 0.01544
+    },
+    "orbital_period_d": {
+      "err": 1.4e-06,
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbper (Bourrier et al. 2018)",
+      "tag": "measured",
+      "value": 0.7365474
+    },
+    "pm_mas_yr": {
+      "source": "SIMBAD * rho01 Cnc e (pmra = mu_alpha * cos(delta), pmdec)",
+      "tag": "measured",
+      "value": [
+        -485.681,
+        -233.517
+      ]
+    },
+    "radius_rjup": {
+      "err": 0.0025872260029094164,
+      "source": "NASA Exoplanet Archive PSCompPars pl_rade x R_earth / R_Jup (6378.1366 km / 71492 km) (Bourrier et al. 2018)",
+      "tag": "measured",
+      "value": 0.16727754329155708
+    },
+    "teq_K": {
+      "source": "NASA Exoplanet Archive PSCompPars pl_eqt (Demory et al. 2011)",
+      "tag": "measured",
+      "value": 1958.0
+    },
+    "type": "planet_rocky"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b3",
+  "inputs_sha256": "4d30394754ce61b83ba21606cfe420fb28cc45912350a92d60845b8e46f385e2",
+  "render_params": {
+    "alt_text": "55 Cnc e, Rocky planet, 0.167 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
+    "confidence": {
+      "assumed_share": 0.4146,
+      "band": "part_data",
+      "estimated_share": 0.0,
+      "formula": "C = sum(w_i c_i) / sum(w_i): c is 1 for a measured value or a formula of measured values, a placeholder share for a model-dependent one, and 0 for an assumed, artistic or missing one; the w_i are placeholder weights (D-36, Q-221)",
+      "found": "Data for: Radius, mass, orbit and tides, temperature or host star.",
+      "gate": {
+        "class_known": true,
+        "key_measurement": true,
+        "passed": true,
+        "score_ok": true
+      },
+      "inputs": [
+        {
+          "c": 0.9691,
+          "fields": [
+            "radius_rjup"
+          ],
+          "id": "radius",
+          "label": "Radius",
+          "points": 14.536,
+          "tag": "measured",
+          "weight": 15
+        },
+        {
+          "c": 0.9174,
+          "fields": [
+            "mass_mearth"
+          ],
+          "id": "mass",
+          "label": "Mass",
+          "points": 9.174,
+          "tag": "measured",
+          "weight": 10
+        },
+        {
+          "c": 0.9968,
+          "fields": [
+            "orbit_au",
+            "orbital_period_d"
+          ],
+          "id": "orbit",
+          "label": "Orbit and tides",
+          "points": 9.9676,
+          "tag": "measured",
+          "weight": 10
+        },
+        {
+          "c": 1.0,
+          "fields": [
+            "teq_K"
+          ],
+          "id": "temperature",
+          "label": "Temperature",
+          "points": 15.0,
+          "tag": "measured",
+          "weight": 15
+        },
+        {
+          "c": 0.9859,
+          "fields": [
+            "host_teff_K",
+            "host_radius_rsun"
+          ],
+          "id": "host_star",
+          "label": "Host star",
+          "points": 9.8592,
+          "tag": "measured",
+          "weight": 10
+        },
+        {
+          "c": 0.0,
+          "fields": [],
+          "id": "fluid",
+          "label": "Surface fluid and pressure",
+          "points": 0.0,
+          "tag": "inferred_from_analog",
+          "weight": 15
+        },
+        {
+          "c": 0.0,
+          "fields": [],
+          "id": "terrain",
+          "label": "Plates and terrain",
+          "points": 0.0,
+          "tag": "artistic",
+          "weight": 15
+        },
+        {
+          "c": 0.0,
+          "fields": [],
+          "id": "clouds",
+          "label": "Clouds and ice",
+          "points": 0.0,
+          "tag": "artistic",
+          "weight": 10
+        }
+      ],
+      "measured_share": 0.5854,
+      "needed": "",
+      "note": "This is how much of the picture rests on data. It is not the probability that the picture is correct.",
+      "raise": "A better measurement of: mass.",
+      "score": 0.5854,
+      "tag": "derived",
+      "threshold": 0.25,
+      "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
+    },
+    "generator_version": "p1-b3",
+    "haptics": {
+      "data": "teq_pulse",
+      "data_tag": "measured",
+      "params": {
+        "maxRateHz": 12.0,
+        "tau": 0.15
+      },
+      "texture": "terrain",
+      "texture_tag": "artistic"
+    },
+    "id": "simbad-rho01-cnc-e",
+    "layers": [
+      {
+        "description": "Browser shader surface and shared CPU field (R7.7). Nothing about it is measured.",
+        "id": "surface",
+        "requires": [],
+        "tag": "artistic",
+        "tier": 5
+      }
+    ],
+    "lighting": {
+      "mode": "sun"
+    },
+    "missing": [
+      "spectrum"
+    ],
+    "scale_m": 11959006.125,
+    "seed": 3894803418,
+    "type": "planet_rocky",
+    "view_modes": {
+      "visible": {
+        "available": true,
+        "badge": "Default (artist's choice)",
+        "rgb": {
+          "source": "artist's neutral default (R7.7, D-02)",
+          "tag": "artistic",
+          "value": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 3894803418,
+  "textures": null
+}
