@@ -16,7 +16,7 @@ stages). ``--day0`` writes the Day 0 count (A16.6, Q-148, Q-401) as JSON.
 Exit codes, so an overnight run that failed can be detected and the Area tool switched off
 (Moon, 11 Nov 2026; Q-205, Q-400 (12)): 0 done; 1 not storable (a cone or a cutout download
 failed, a cone hit MAXREC, no usable cutout, or no dots); 2 unknown area or bad arguments, or an
-area of another data release.
+area of another data release. Leave ``AREA_TOOL_ENABLED`` off unless the exit is 0 (Q-205).
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ from app.context import Context, make_context
 from app.core.area import day0
 from app.core.area.config import DEFAULT_AREA_CONFIG, AreaConfig, load_areas
 from app.core.area.dots import run_dots
-from app.core.area.frames import find_frames
+from app.core.area.frames import AreaReleaseMismatch, find_frames
 from app.core.area.records import AreaFrames, FrameDots
 from app.core.find import moving
 from app.settings import Settings
@@ -112,9 +112,12 @@ def main(argv: list[str] | None = None, *, settings: Settings | None = None) -> 
     cfg = DEFAULT_AREA_CONFIG
     try:
         frames, bodies = run_frames(ctx, args.area, cfg, args.refresh)
-    except ValueError as exc:  # the area is for another data release
+    except AreaReleaseMismatch as exc:
         print(str(exc), file=sys.stderr)
         return EXIT_USAGE
+    except ValueError as exc:
+        print(f"INCOMPLETE: {exc}; nothing may be stored", file=sys.stderr)
+        return EXIT_INCOMPLETE
     per_frame: list[FrameDots] | None = None
     if frames.complete and "dots" in steps:
         t0 = time.perf_counter()

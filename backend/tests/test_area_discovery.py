@@ -106,3 +106,20 @@ def test_full_offline_run_with_day0(fixture_cache: Path) -> None:
     obj = rep["object"]
     assert obj["frames_found"] <= obj["frames_predicted"]
     assert _derived_area(fixture_cache) == []
+
+
+def test_failures_refuse_maxrec_and_no_dots() -> None:
+    from app.core.area.records import AreaFrames, FrameDots
+
+    ok = AreaFrames(EROS_AREA, (), (), (), True, 15, ())
+    assert area_discovery.failures(ok, {"F": b"x"}, None) == []
+    maxrec = AreaFrames(EROS_AREA, (), (), ("frames:cone_maxrec:1",), True, 15, ())
+    assert len(area_discovery.failures(maxrec, {"F": b"x"}, None)) == 1
+    no_dots = [FrameDots("F", (), (), (), 0)]
+    assert len(area_discovery.failures(ok, {"F": b"x"}, no_dots)) == 1
+    assert len(area_discovery.failures(ok, {"F": b"x"}, [])) == 1
+
+
+def test_another_data_release_exits_2(tmp_path: Path) -> None:
+    s = make_settings(tmp_path, data_release="spherex_qr1")
+    assert area_discovery.main(["--area", "eros-2026-03"], settings=s) == 2

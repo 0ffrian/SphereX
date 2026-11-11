@@ -65,6 +65,12 @@ CONE_FAILED = "frames:cone_failed"
 CUTOUT_FAILED = "frames:cutout_failed"
 NO_FOOTPRINT = "no_footprint"
 CUTOUT = "cutout"
+
+
+class AreaReleaseMismatch(ValueError):
+    """The area is configured for another data release than the settings (script exit 2)."""
+
+
 REQUIRED_HDUS = ("IMAGE", "FLAGS", "VARIANCE", "WCS-WAVE")
 
 
@@ -457,7 +463,7 @@ def find_frames(
     cutout download makes it incomplete too (``frames:cutout_failed:<n>``, Q-400 (12)); an
     unusable body is only ``cutout:<frame_id>``."""
     if spec.data_release != ctx.settings.data_release:
-        raise ValueError(
+        raise AreaReleaseMismatch(
             f"area {spec.id} is for {spec.data_release}, "
             f"the settings use {ctx.settings.data_release}"
         )
