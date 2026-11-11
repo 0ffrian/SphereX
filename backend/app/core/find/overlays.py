@@ -20,7 +20,7 @@ from collections import OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
 
@@ -29,18 +29,41 @@ from app.adapters.irsa_sia import SiaRow
 from app.cache.store import CacheMissOffline, Served, UpstreamUnavailable, earliest_cached_at
 from app.context import Context
 from app.core.find import flagmask, wcs
+from app.core.find.catalogs import (
+    CATALOGS,
+    CONE_MARGIN_ARCSEC,
+    Catalog,
+    CatalogFetch,
+    CatalogTable,
+    angular_sep_arcsec,
+    cone_radius_arcsec,
+    fetch_catalog,
+)
 from app.core.find.frames import FrameRecord, FrameService, frame_time, is_complete, position_at
 from app.core.find.propagate import CATALOGUE_FORMULA, propagate_many
 from app.core.find.resolver import ResolvedObject
 from app.core.measure.config import DEFAULT_CONFIG, MeasureConfig
 from app.timefmt import iso_utc_z, parse_utc
 
-Catalog = Literal["gaia", "wise"]
-CATALOGS: tuple[Catalog, ...] = ("gaia", "wise")
+# Moved to ``catalogs`` (issue #95) and re-exported for the pre-fetch and the tests.
+__all__ = [
+    "CATALOGS",
+    "CONE_MARGIN_ARCSEC",
+    "Catalog",
+    "CatalogFetch",
+    "CatalogTable",
+    "Cone",
+    "OverlayService",
+    "OverlaysResult",
+    "angular_sep_arcsec",
+    "cone_radius_arcsec",
+    "fetch_catalog",
+    "frame_markers",
+    "overlay_cone",
+    "provenance",
+    "wrap_ra",
+]
 
-# ASSUMPTION: slack for field-star proper motions between the catalogue epoch and the frame time
-# (30 arcsec = 3 arcsec/yr over 10 years) and for rounding. Not a physical value of any object.
-CONE_MARGIN_ARCSEC = 30.0
 # ASSUMPTION (Q-53): the catalogue source nearest the object, within this distance, is the
 # target itself. It stays a marker but is left out of the contamination list.
 TARGET_MATCH_PX = 2.0
@@ -75,20 +98,6 @@ class Cone:
     sia_served: Served
 
 
-@dataclass(frozen=True)
-class CatalogTable:
-    """One catalogue's sources as arrays, in the catalogue's answer order (brightest first)."""
-
-    catalog: Catalog
-    ids: list[str]
-    ra: np.ndarray
-    dec: np.ndarray
-    pmra: np.ndarray  # NaN when absent
-    pmdec: np.ndarray
-    epoch_jyear: np.ndarray
-    mag: list[float | None]
-
-
 @dataclass
 class OverlaysResult:
     body: dict[str, Any]
@@ -104,19 +113,6 @@ def wrap_ra(ra: float, ndigits: int) -> float:
     return 0.0 if r >= 360.0 or r == 0.0 else r
 
 
-def angular_sep_arcsec(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
-    """Haversine separation in arcsec."""
-    p1, p2 = math.radians(dec1), math.radians(dec2)
-    dp, dl = p2 - p1, math.radians(ra2 - ra1)
-    h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
-    return math.degrees(2 * math.asin(min(1.0, math.sqrt(h)))) * 3600.0
-
-
-def cone_radius_arcsec(cutout_size_arcsec: float, max_offset_arcsec: float) -> float:
-    half_diagonal = cutout_size_arcsec * math.sqrt(2.0) / 2.0
-    return float(math.ceil(half_diagonal + max_offset_arcsec + CONE_MARGIN_ARCSEC))
-
-
 def overlay_cone(ctx: Context, obj: ResolvedObject, *, refresh: bool = False) -> Cone:
     """The catalogue cone for an object (also used by the pre-fetch, so the keys match).
 
@@ -130,42 +126,6 @@ def overlay_cone(ctx: Context, obj: ResolvedObject, *, refresh: bool = False) ->
         offset = max(offset, angular_sep_arcsec(ra_c, dec_c, ra, dec))
     radius = cone_radius_arcsec(s.cutout_size_arcsec, offset)
     return Cone(ra_c, dec_c, radius / 3600.0, sia.rows, sia.served)
-
-
-def fetch_catalog(
-    ctx: Context, catalog: Catalog, cone: Cone, *, refresh: bool = False
-) -> tuple[CatalogTable, str, bool, Served]:
-    """(table, table name, truncated, served). Raises ``CacheMissOffline``,
-    ``UpstreamUnavailable`` or ``ValueError`` (unreadable cached body)."""
-    if catalog == "gaia":
-        g = gaia.cone(ctx, cone.ra, cone.dec, cone.radius_deg, refresh=refresh)
-        tbl = CatalogTable(
-            "gaia",
-            [s.source_id for s in g.sources],
-            np.array([s.ra for s in g.sources], dtype=np.float64),
-            np.array([s.dec for s in g.sources], dtype=np.float64),
-            _nan_array([s.pmra_mas_yr for s in g.sources]),
-            _nan_array([s.pmdec_mas_yr for s in g.sources]),
-            np.array([s.ref_epoch for s in g.sources], dtype=np.float64),
-            [s.g_mag for s in g.sources],
-        )
-        return tbl, g.table, g.truncated, g.served
-    w = wise.cone(ctx, cone.ra, cone.dec, cone.radius_deg, refresh=refresh)
-    tbl = CatalogTable(
-        "wise",
-        [s.source_name for s in w.sources],
-        np.array([s.ra for s in w.sources], dtype=np.float64),
-        np.array([s.dec for s in w.sources], dtype=np.float64),
-        _nan_array([s.pmra_mas_yr for s in w.sources]),
-        _nan_array([s.pmdec_mas_yr for s in w.sources]),
-        np.full(len(w.sources), wise.EPOCH_JYEAR, dtype=np.float64),
-        [s.w1_mag for s in w.sources],
-    )
-    return tbl, w.table, w.truncated, w.served
-
-
-def _nan_array(values: list[float | None]) -> np.ndarray:
-    return np.array([np.nan if v is None else v for v in values], dtype=np.float64)
 
 
 CATALOG_META: dict[Catalog, dict[str, Any]] = {
@@ -259,7 +219,6 @@ def provenance(cfg: MeasureConfig) -> dict[str, dict[str, str]]:
     }
 
 
-CatalogFetch = tuple[CatalogTable, str, bool, Served]
 FetchKey = tuple[Catalog, float, float, float]
 
 
