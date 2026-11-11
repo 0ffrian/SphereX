@@ -1,8 +1,8 @@
-// The sky view's bottom-centre dock (mock-up `.dock`): the tools (Sky, Flipbook, Spectrum, 3D viewer)
+// The sky view's bottom-centre dock (mock-up `.dock`): Sky and Discovery (the mock-up's Area search)
 // with a highlight that slides to the one under the pointer and a small green pip on the active one,
 // a divider, then the search, a button that opens into the search field when it takes focus.
-// It replaces the left tool rail. Area search is not built, so it has no button here (the build
-// view's dock shows it disabled). Haptics are dropped, so there is no Feel tool.
+// Flipbook, Spectrum and the 3D viewer are not dock buttons: the flipbook opens with a search or a
+// click on the sky, and the object panel and the selected object's card hold Spectrum and Build it.
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { SearchBar } from '@/app/search/SearchBar';
 import { RailIcon } from './railIcons';
@@ -11,9 +11,7 @@ import { useShellStore, type ToolId } from './shellStore';
 
 const TOOLS: { id: ToolId; label: string; hint: string }[] = [
   { id: 'sky', label: 'Sky', hint: 'The sky view alone' },
-  { id: 'flipbook', label: 'Flipbook', hint: 'SPHEREx frames of the object' },
-  { id: 'spectrum', label: 'Spectrum', hint: 'Spectrum of the object' },
-  { id: 'viewer', label: '3D viewer', hint: '3D view of a loaded body' },
+  { id: 'area', label: 'Discovery', hint: 'Draw a square on the sky and search it' },
 ];
 
 export function SkyDock() {
@@ -57,7 +55,7 @@ export function SkyDock() {
           <div className="sx-hl" ref={hlRef} aria-hidden="true" />
           <ul className="m-0 flex list-none gap-1 p-0">
             {TOOLS.map((t) => {
-              const pressed = t.id === 'viewer' ? buildOpen : tool === t.id && !buildOpen;
+              const pressed = tool === t.id && !buildOpen;
               return (
                 <li key={t.id}>
                   <button

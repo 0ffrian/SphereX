@@ -9,6 +9,7 @@ import { useSelection } from '@/app/build/selectedBody';
 import { isThinking } from '@/app/island/islandText';
 import { boxInBezel, useIslandStore } from '@/app/island/islandStore';
 import { useAppStore } from '@/state/store';
+import { AreaCard } from './AreaCard';
 import { PanelCard } from './PanelCard';
 import { useShellStore } from './shellStore';
 
@@ -17,6 +18,7 @@ export function Panels() {
   const thinking = useAppStore((s) => isThinking(s.sky.status));
   // While the object is found and its frames searched the island thinks (issue #66); the panel
   // opens from it when the data is in (or the search failed, so the error and Try again show).
+  if (tool === 'area') return <AreaCard />;
   if ((tool === 'flipbook' || tool === 'spectrum') && !thinking) return <ObjectPanel />;
   return null;
 }

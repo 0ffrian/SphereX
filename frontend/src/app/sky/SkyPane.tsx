@@ -59,6 +59,9 @@ import {
   cachedMarkersToShow,
 } from './cachedMarkers';
 import { useShellStore } from '@/app/shell/shellStore';
+import { useAreaStore } from '@/app/shell/areaStore';
+import { AreaOverlay } from './AreaOverlay';
+import { boxFromPixels, registerAreaView, squareOf } from './areaDraw';
 import { useCachedMarkers } from './useCachedMarkers';
 import { useTargetMarkers, type TargetMarker } from './useTargetMarkers';
 
@@ -518,6 +521,11 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     let pinchMid = { x: 0, y: 0 };
     let hover: { x: number; y: number } | null = null;
     let readoutFrame: number | null = null;
+    // Discovery tool: a drag draws a square instead of panning.
+    registerAreaView(view);
+    let drawing: { id: number; x: number; y: number } | null = null;
+    const areaDrawing = () =>
+      useShellStore.getState().tool === 'area' && useAreaStore.getState().stage === 'drawing';
 
     const local = (e: PointerEvent | WheelEvent) => {
       const r = canvas.getBoundingClientRect();
@@ -552,6 +560,11 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       stopFly();
       canvas.setPointerCapture?.(e.pointerId);
       const p = local(e);
+      if (areaDrawing() && !drawing && pointers.size === 0) {
+        drawing = { id: e.pointerId, x: p.x, y: p.y };
+        useAreaStore.getState().setDrag({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
+        return;
+      }
       pointers.set(e.pointerId, p);
       if (pointers.size === 1) {
         start = p;
@@ -566,6 +579,10 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     };
     const onMove = (e: PointerEvent) => {
       const p = local(e);
+      if (drawing && drawing.id === e.pointerId) {
+        useAreaStore.getState().setDrag(squareOf(drawing.x, drawing.y, p.x, p.y));
+        return;
+      }
       const prev = pointers.get(e.pointerId);
       if (!prev) {
         if (e.pointerType === 'mouse') {
@@ -595,6 +612,15 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       }
     };
     const onUp = (e: PointerEvent) => {
+      if (drawing && drawing.id === e.pointerId) {
+        const p = local(e);
+        const d = squareOf(drawing.x, drawing.y, p.x, p.y);
+        drawing = null;
+        const box = e.type === 'pointerup' && Math.abs(d.x1 - d.x0) >= 12 ? boxFromPixels(d) : null;
+        if (box) useAreaStore.getState().setBox(box);
+        else useAreaStore.getState().setDrag(null);
+        return;
+      }
       if (!pointers.has(e.pointerId)) return;
       const p = local(e);
       const wasSingle = pointers.size === 1;
@@ -675,6 +701,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     canvas.addEventListener('keydown', onKey);
     queueReadout();
     return () => {
+      registerAreaView(null);
       offRender();
       if (readoutFrame !== null) cancelAnimationFrame(readoutFrame);
       canvas.removeEventListener('pointerdown', onDown);
@@ -731,6 +758,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         is shown at the top right. You can also type coordinates or a name in the search field.
       </p>
 
+      <AreaOverlay view={view} />
       {/* Panels sit right after the canvas in the tab order. */}
       {children}
 

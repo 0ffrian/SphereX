@@ -1,12 +1,10 @@
 // Bottom-left transport bar (mock-up `.player`): previous / play / next, the frame scrubber,
-// "Frame n/N", the wavelength and the speed. It drives the flipbook's store actions and reads the
+// "Frame n/N", the wavelength and the frame's colour indicator. It drives the flipbook's store actions and reads the
 // shared playback session (flipbook/session.tsx); it holds no playback logic of its own.
 // While the SPHEREx colour composite shows (one picture), every control is disabled and a short
 // note says how to get the frames back (colourMode.ts).
 import { useId } from 'react';
-import { DataBadge } from '@/app/Badge';
-import { formatWavelength } from '@/app/format';
-import { FPS_OPTIONS, type Fps } from '@/app/flipbook/playback';
+import GridLoader from '@/app/island/GridLoader';
 import { useFlipbookSession } from '@/app/flipbook/session';
 import {
   COMPOSITE_TRANSPORT_NOTE,
@@ -22,7 +20,6 @@ export function Transport() {
   const step = useAppStore((s) => s.skyStep);
   const seek = useAppStore((s) => s.skySeek);
   const togglePlay = useAppStore((s) => s.skyTogglePlay);
-  const setFps = useAppStore((s) => s.skySetFps);
   const { canPlay, shownIndex } = useFlipbookSession();
   // The dot is the Rainbow Trails false colour (`derived`, Q-27): one colour in "Measured only".
   const honesty = useAppStore((s) => s.honesty);
@@ -99,42 +96,36 @@ export function Transport() {
         </label>
       )}
       {!locked && (
-        <p className="sx-frame-info" aria-hidden="true">
-          {frame && (
-            <span
-              className="sx-dot"
-              style={{ color: monochrome ? '#a1a1aa' : wavelengthColor(frame.wavelength_um) }}
+        <div className="sx-frame-info" aria-hidden="true">
+          {/* Mock-up `.wgrid`: the plus-hollow grid loader, in the frame's colour; it pulses slowly
+              at rest and runs its wave and ripple sequence while playing (still under reduced
+              motion, which GridLoader handles). */}
+          <span className="sx-wgrid" data-testid="frame-indicator">
+            <GridLoader
+              size={18}
+              gap={1}
+              rounded
+              color={
+                frame ? (monochrome ? '#a1a1aa' : wavelengthColor(frame.wavelength_um)) : '#a1a1aa'
+              }
+              {...(sky.playing
+                ? {
+                    mode: 'sequence' as const,
+                    sequence: ['wave-lr', 'ripple-out', 'wave-rl', 'ripple-in'],
+                    speed: 'fast' as const,
+                  }
+                : { mode: 'pulse' as const, pattern: 'plus-hollow' as const, speed: 'slow' as const })}
             />
-          )}
+          </span>
           <span>
-            Frame <b>{has ? shown + 1 : '–'}</b>/{has ? n : '–'}
+            Frame <b>{has ? shown + 1 : '–'}</b>
+            <span className="sx-frame-n">/{has ? n : '–'}</span>
           </span>
           {/* Not on the span with sx-hide-s: a display utility would beat its phone-width rule. */}
           <span className="sx-hide-s">
-            <span className="inline-flex items-center gap-1.5">
-              <b>{frame ? formatWavelength(frame.wavelength_um) : '– µm'}</b>
-              {/* D-02: the frame's wavelength is SPHEREx data, badged as in the frame caption. */}
-              {frame && <DataBadge fixture={sky.fixture} />}
-            </span>
+            <b>{frame ? frame.wavelength_um.toFixed(2) : '–'}</b> µm
           </span>
-        </p>
-      )}
-      {!locked && (
-        <label className="sx-speed">
-          <span className="sr-only">Speed</span>
-          <select
-            value={sky.fps}
-            onChange={(e) => setFps(Number(e.target.value) as Fps)}
-            disabled={!has}
-            title="Speed"
-          >
-            {FPS_OPTIONS.map((f) => (
-              <option key={f} value={f}>
-                {f} fps
-              </option>
-            ))}
-          </select>
-        </label>
+        </div>
       )}
       {!canPlay && !locked && n >= 2 && (
         <span id={waitId} className="sr-only">
