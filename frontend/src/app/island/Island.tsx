@@ -8,10 +8,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/state/store';
 import { useShellStore } from '@/app/shell/shellStore';
-import { useElapsedSeconds, SHOW_ELAPSED_AFTER_S } from '@/app/StatusBoxes';
+import { useElapsedSeconds } from '@/app/StatusBoxes';
 import GridLoader from './GridLoader';
-import { IDLE_LOOK, LOADER_BASE, THINKING_LOOK } from './loaderLooks';
-import { isThinking, thinkingRetry, thinkingSentence } from './islandText';
+import { IDLE_LOOK, LOADER_BASE, SEARCHING_LOOK } from './loaderLooks';
+import { isThinking } from './islandText';
 import { useIslandStore } from './islandStore';
 
 const CIRCLE = 52;
@@ -66,10 +66,9 @@ export function Island() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [thinking]);
-  const sentence = thinking ? thinkingSentence(sky) : null;
-  const retry = thinking ? thinkingRetry(sky) : null;
   const seconds = useElapsedSeconds(thinking ? sky.startedAt : null);
-  const waiting = thinking && seconds >= SHOW_ELAPSED_AFTER_S;
+  // One word; after 20 s it says it is still going.
+  const word = thinking && seconds >= 20 ? 'Still searching' : 'Searching';
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const inRef = useRef<HTMLDivElement>(null);
@@ -118,8 +117,8 @@ export function Island() {
   // The pill's natural size for its text (the inner box sizes to its content, at most 340 px).
   useLayoutEffect(() => {
     if (!thinking || !inRef.current) return;
-    setPill({ w: inRef.current.offsetWidth, h: Math.max(CIRCLE, inRef.current.offsetHeight) });
-  }, [thinking, sentence, retry, waiting]);
+    setPill({ w: inRef.current.offsetWidth, h: inRef.current.offsetHeight });
+  }, [thinking, word]);
 
   // The panel shows once the island has got there.
   useEffect(() => {
@@ -188,25 +187,21 @@ export function Island() {
       <div className="sx-orb-glow" aria-hidden="true" data-on={mode !== 'panel' ? '' : undefined} />
       <div className="sx-orb" style={{ borderRadius: box.radius }}>
         <div className="sx-orb-in" ref={inRef} data-mode={mode}>
-          {/* Moves only while it thinks (a progress indicator). At rest it is lit and still: WCAG
-              2.2.2 (nothing that starts by itself and moves for over 5 s), and no repaint of the
-              page every frame for a decoration (issue #66, Q-121). */}
-          {/* smoothui's loader is an <output aria-label="Loading">, a live region: hidden here, because the
-              island is decorative at rest and "Thinking" below says it while it thinks. */}
+          {/* Moves only while it searches (a progress indicator). At rest it is lit and still: WCAG
+              2.2.2, and no repaint of the page every frame for a decoration (issue #66, Q-121).
+              smoothui's loader is an <output aria-label="Loading">, a live region: hidden here, the
+              word beside it is the status. */}
           <span aria-hidden="true" className="contents">
-            <GridLoader {...LOADER_BASE} {...(thinking && !reduced ? THINKING_LOOK : IDLE_LOOK)} />
+            {thinking ? (
+              <GridLoader {...SEARCHING_LOOK} className="flex-none" />
+            ) : (
+              <GridLoader {...LOADER_BASE} {...IDLE_LOOK} />
+            )}
           </span>
           {thinking && (
-            <div className="sx-orb-label" role="status">
-              <b>Thinking</b>
-              {sentence && (
-                <span data-testid="loading">
-                  {sentence}
-                  {waiting && <span className="sx-orb-wait"> Still waiting ({seconds} s)…</span>}
-                </span>
-              )}
-              {retry && <span data-testid="frames-retry">{retry}</span>}
-            </div>
+            <span className="sx-orb-word" role="status" data-testid="loading">
+              {word}
+            </span>
           )}
         </div>
       </div>

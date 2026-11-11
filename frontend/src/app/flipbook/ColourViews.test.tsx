@@ -239,7 +239,7 @@ describe('Flipbook colour views and Measured only (D-21)', () => {
     act(() =>
       root.render(
         <FlipbookSessionProvider>
-          <Flipbook />
+          <Flipbook onClose={() => undefined} />
         </FlipbookSessionProvider>,
       ),
     );

@@ -2,10 +2,9 @@
 // spectrum, as one scrolling card). 'sky' shows no panel; the 3D viewer is the build pane
 // (app/build/BuildPane.tsx, issue #60), not a floating card.
 import { displayName } from '@/app/displayName';
+import { formatCoords } from '@/app/format';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { Flipbook } from '@/app/flipbook/Flipbook';
-import { formatCoords } from '@/app/format';
-import { SpectrumPanel } from '@/app/spectrum/SpectrumPanel';
 import { useSelection } from '@/app/build/selectedBody';
 import { isThinking } from '@/app/island/islandText';
 import { boxInBezel, useIslandStore } from '@/app/island/islandStore';
@@ -92,6 +91,7 @@ function ObjectPanel() {
 
   return (
     <PanelCard
+      bare
       title={tool === 'spectrum' ? 'Spectrum' : 'Flipbook'}
       subtitle={subtitle}
       icon={tool === 'spectrum' ? 'spectrum' : 'flipbook'}
@@ -102,28 +102,22 @@ function ObjectPanel() {
       pending={pending}
       testId="object-panel"
     >
-      {sky.status === 'idle' && (
-        <p className="text-sm text-sx-mfg" data-testid="panel-empty">
-          No object yet. Click a point or a marker on the sky, or search a name or RA, Dec.
-        </p>
-      )}
-      <Flipbook />
-      <SpectrumPanel />
-      {tool === 'spectrum' && sky.status === 'ready' && nFrames === 0 && !sky.progress && (
-        <p className="text-sm text-sx-mfg">There is no spectrum without frames.</p>
-      )}
-      {selection && (
-        // Issue #60: the same "Build it" as the selected object's card, for a typed search.
-        <div className="flex">
-          <button
-            type="button"
-            className="sx-btn sx-btn-ghost"
-            onClick={() => useShellStore.getState().openBuild(true)}
-            data-testid="panel-build-it"
-          >
-            Build it in 3D
-          </button>
-        </div>
+      {(close) => (
+        <>
+          {sky.status === 'idle' && (
+            <p className="p-4 text-sm text-sx-mfg" data-testid="panel-empty">
+              No object yet. Click a point or a marker on the sky, or search a name or RA, Dec.
+            </p>
+          )}
+          <Flipbook
+            onClose={close}
+            // Issue #60: the same "Build it" as the selected object's card, for a typed search.
+            onBuild={selection ? () => useShellStore.getState().openBuild(true) : undefined}
+          />
+          {tool === 'spectrum' && sky.status === 'ready' && nFrames === 0 && !sky.progress && (
+            <p className="p-4 text-sm text-sx-mfg">There is no spectrum without frames.</p>
+          )}
+        </>
       )}
     </PanelCard>
   );
