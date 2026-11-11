@@ -1,6 +1,6 @@
 # Haptics: platform reality and encoding
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8, R8.1–R8.3 · **Implements:** [D-08, D-09, D-12](../../decisions/haptics-design.md), [D-10, Q-133](../../decisions/haptics-sound.md), [D-21](../../decisions/contract-tags.md), [Q-132](../../decisions/platform-hosting.md), [Q-71](../../decisions/haptics-built.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8), [audio-pairing.md](audio-pairing.md) (R8.9)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8, R8.1–R8.3 · **Implements:** [D-08, D-09, D-12](../../decisions/haptics-design.md), [D-10, Q-133](../../decisions/haptics-sound.md), [D-21](../../decisions/contract-tags.md), [Q-359](../../decisions/physics-fixes.md), [Q-132](../../decisions/platform-hosting.md), [Q-71](../../decisions/haptics-built.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8), [audio-pairing.md](audio-pairing.md) (R8.9)
 
 ## R8. Haptics
 
@@ -26,7 +26,7 @@
 
 | State | What plays |
 |---|---|
-| Measured only | only `measured` events: the body tone and mesh cues of real shape models, `measured` data pulses (for example `teq_pulse` when `teq_K` is from Exoplanet Archive `pl_eqt`), spectrum haptics of a `measured` spectrum, Track exposure ticks (R8.9.2). Procedural relief, every shader-kind texture and every Estimated data haptic are silent |
+| Measured only | only `measured` events: the body tone and mesh cues of real shape models, `measured` data pulses (for example `teq_pulse` when `teq_K` is `measured`; an Exoplanet Archive `pl_eqt` is `derived` since issue #93, Q-359), spectrum haptics of a `measured` spectrum, Track exposure ticks (R8.9.2). Procedural relief, every shader-kind texture and every Estimated data haptic are silent |
 | + Estimated | adds `derived`, `model_dependent`, `inferred_from_analog` events: a `derived` `teq_pulse`, the Track path voice |
 | + Artistic | adds `artistic` events: the body tone on procedural and shader surfaces, the terrain and flow cues |
 

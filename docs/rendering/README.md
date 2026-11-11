@@ -24,6 +24,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | [renderers/stars.md](renderers/stars.md) | R7.5, R7.5.1–R7.5.5 | rendering `star`, `star_mira`, `star_ttauri`, and the star surface (spots, flares) |
 | [renderers/candidate.md](renderers/candidate.md) | R7.6 | handling `candidate` (no 3D) |
 | [renderers/shader-kinds.md](renderers/shader-kinds.md) | R7.7 | planets, gas giants (the shared CPU field), nebulae and novae (volumes, no haptics, Q-103) |
+| [renderers/world-engine.md](renderers/world-engine.md) | R7.7.1 | the D-37 world engine's values for planets and gas giants: card against preset, albedo, lava worlds, clouds, CO₂, giants and rings, and the issue #93 physics (critical points, saturation pressure, tides, runaway greenhouse) |
 | [haptics/platform-encoding.md](haptics/platform-encoding.md) | R8, R8.1–R8.3 | what each platform does (event: sound only on the A15), texture vs data haptics and the honesty rule for sounds, vibration patterns (after the event) |
 | [haptics/sources.md](haptics/sources.md) | R8.4 | implementing a source: height map, mesh, field, terrain, flow, band, data pulse, light curve; what feeds the body tone |
 | [haptics/profiles.md](haptics/profiles.md) | R8.5, R8.6 | mapping an object type to its texture/data haptics, or doing spectrum haptics |
@@ -85,6 +86,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | R7.5.5 | Flares and prominences | [renderers/stars.md#r755-flares-and-prominences](renderers/stars.md#r755-flares-and-prominences) |
 | R7.6 | `candidate` | [renderers/candidate.md#r76-candidate](renderers/candidate.md#r76-candidate) |
 | R7.7 | Shader-generated kinds: `planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova` | [renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova](renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova) |
+| R7.7.1 | World engine values | [renderers/world-engine.md#r771-world-engine-values](renderers/world-engine.md#r771-world-engine-values) |
 | R8 | Haptics | [haptics/platform-encoding.md#r8-haptics](haptics/platform-encoding.md#r8-haptics) |
 | R8.1 | Platform reality | [haptics/platform-encoding.md#r81-platform-reality](haptics/platform-encoding.md#r81-platform-reality) |
 | R8.2 | Two kinds of haptics (both labelled in the UI) | [haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui](haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui) |
