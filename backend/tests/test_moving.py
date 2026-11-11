@@ -118,6 +118,19 @@ def test_moving_provenance_is_model_dependent(client: TestClient) -> None:
     assert prov["time"]["tag"] == "measured"
 
 
+def test_frames_carry_what_the_ui_needs_to_rotate(client: TestClient) -> None:
+    """Issue #75 (Q-207): the frames stay in native orientation (`north_up: false`) and the UI
+    rotates them for Rainbow Trails, so every frame of a mover states its sky position, its north
+    angle and whether it is mirrored, each with a provenance entry."""
+    body = client.get(f"/v1/objects/{eros(client)}/frames").json()
+    assert body["north_up"] is False and body["frames"]
+    for f in body["frames"]:
+        assert isinstance(f["ra"], float) and isinstance(f["dec"], float)
+        assert isinstance(f["north_angle_deg"], float) and isinstance(f["mirrored"], bool)
+    for k in ("ra", "dec", "north_angle_deg", "mirrored"):
+        assert body["provenance"][k]["tag"]
+
+
 def test_positions_are_spherex_centred_horizons_at_each_midpoint(client: TestClient) -> None:
     oid = eros(client)
     frames = client.get(f"/v1/objects/{oid}/frames").json()["frames"]
