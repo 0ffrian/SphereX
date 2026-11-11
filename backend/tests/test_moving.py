@@ -363,13 +363,14 @@ def test_repo_targets_give_3i_atlas_its_windows() -> None:
     assert cfg.windows[1][1] >= datetime(2025, 12, 16, tzinfo=UTC)
 
 
-FIXTURE_WINDOW_FIELDS = ("moving_window_start", "moving_window_end")
+# The Settings fields of the release window, whose defaults the targets.toml window must beat.
+RELEASE_WINDOW_FIELDS = ("moving_window_start", "moving_window_end")
 
 
 def test_repo_targets_give_eros_the_demo_window() -> None:
     """Q-184 (amended, #73): the 16 demo frames' window, matched by SBDB's spkid for Eros."""
     # The production release window, so only targets.toml can give the 20-21 Mar window.
-    release = {k: Settings.model_fields[k].default for k in FIXTURE_WINDOW_FIELDS}
+    release = {k: Settings.model_fields[k].default for k in RELEASE_WINDOW_FIELDS}
     ctx = make_context(make_settings(Path("unused"), targets_file=TARGETS_FILE, **release))
     cfg = moving.MovingConfig.from_context(ctx, "20000433")
     assert cfg.windows == (
@@ -377,7 +378,21 @@ def test_repo_targets_give_eros_the_demo_window() -> None:
     )
 
 
+def test_eros_target_window_equals_the_fixture_window() -> None:
+    """The two definitions of the Eros window stay one: the derived frames key holds the window,
+    so a drift between targets.toml and FIXTURE_MOVING would miss the recorded fixtures."""
+    ctx = make_context(make_settings(Path("unused"), targets_file=TARGETS_FILE))
+    cfg = moving.MovingConfig.from_context(ctx, "20000433")
+    start, end = (
+        datetime.fromisoformat(FIXTURE_MOVING[k].replace("Z", "+00:00"))
+        for k in RELEASE_WINDOW_FIELDS
+    )
+    assert cfg.windows == ((start, end),)
+
+
 def _eros_windows(tmp_path: Path, *windows: tuple[str, str]) -> Path:
+    """The repo targets plus a second row with Eros's spkid and ``windows``. It wins because
+    ``moving._windows_in`` keeps the last row for a repeated spkid."""
     f = tmp_path / "targets.toml"
     rows = ", ".join(f'["{a}", "{b}"]' for a, b in windows)
     f.write_text(

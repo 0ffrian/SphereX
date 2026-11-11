@@ -90,6 +90,17 @@ def test_67p_aliases_map_to_the_sbdb_designation(alias: str) -> None:
     assert aliases[alias.lower()] == "67P/Churyumov-Gerasimenko"
 
 
+@pytest.mark.parametrize("alias", ["433 Eros", "Eros", "eros", "433"])
+def test_eros_aliases_resolve_to_the_cached_query(fixture_cache: Path, alias: str) -> None:
+    # #73: the search list's short names for row 17 must reach the cached SBDB answer offline,
+    # also when typed and submitted without picking the row.
+    ctx = make_context(make_settings(fixture_cache))
+    aliases = load_aliases(TARGETS_FILE)
+    assert aliases[alias.lower()] == "433 Eros"
+    obj = resolve(ctx, alias, aliases).obj
+    assert obj.id == "sbdb-20000433" and obj.moving
+
+
 def test_search_list_rows_have_a_demo_group_and_unique_aliases() -> None:
     import tomllib
 
