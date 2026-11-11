@@ -169,9 +169,9 @@ def test_volume_kinds_have_no_haptics(kind: str) -> None:
 
 def test_relief_amp_is_sent_for_the_procedural_asteroid_only() -> None:
     """Q-103, issue #62: the viewer displaces by textures.relief_amp (R7.2); the value is the R6.2
-    style rule's peak relief, so it travels with an `artistic` `displacement` layer."""
+    height field's design range (issue #71, Q-210), so it travels with an `artistic` layer."""
     p = params_for(load("asteroid_procedural", "cards"))
-    assert p["textures"]["relief_amp"] == 0.03  # style "cratered" for a 2 km body (R6.2)
+    assert 0.5 < p["textures"]["relief_amp"] < 1.2  # strength-limited relief of a 2 km body
     layer = next(x for x in p["layers"] if x["id"] == "displacement")
     assert (layer["tag"], layer["tier"]) == ("artistic", 5)
     assert errors(p, "render-params.schema.json") == []

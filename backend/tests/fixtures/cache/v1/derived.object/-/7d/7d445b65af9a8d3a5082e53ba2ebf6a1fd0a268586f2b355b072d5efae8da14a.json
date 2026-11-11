@@ -1,8 +1,8 @@
 {
- "body_sha256": "4cd4d35a4cff77c8165164812fec34ff4270e87fb5551037e79e7444036ad94b",
- "body_size": 666,
+ "body_sha256": "ddff3cea23a4d298072b4e63264d42b31b9402dea761fb6a9897f844c042a1d5",
+ "body_size": 667,
  "content_type": "application/json",
- "fetched_at": "2026-11-09T19:30:59.920Z",
+ "fetched_at": "2026-11-10T16:05:26.045Z",
  "key": {
   "query": {
    "id": "sbdb-50788063",

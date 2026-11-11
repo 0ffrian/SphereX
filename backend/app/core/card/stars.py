@@ -7,7 +7,11 @@ its reason, never replaced by a guess):
    two values sit in the middle the one from the most recent bibcode is taken. Tag ``derived``.
 2. Gaia DR3 GSP-Phot ``teff_gspphot``. Skipped at or below ``GSPPHOT_COOL_STAR_LIMIT_K``. Tag
    ``model_dependent``.
-3. Pecaut & Mamajek 2013 Table 5 mean dwarf Teff for the SIMBAD spectral type, dwarfs only
+3. Gaia DR3 Multiple Star Classifier ``teff_msc1`` (Q-220), tried when GSP-Phot gave nothing
+   usable. The classifier models the source as an unresolved binary and reports the primary's
+   Teff. Tag ``model_dependent``, with the binary assumption and, for a Mira, the variability
+   caveat stated in ``assumption``.
+4. Pecaut & Mamajek 2013 Table 5 mean dwarf Teff for the SIMBAD spectral type, dwarfs only
    (``V`` luminosity class, kind ``star``). Tag ``inferred_from_analog``. There is no verified
    table for giants, Miras or pre-main-sequence stars, so those are refused here.
 
@@ -42,6 +46,21 @@ GSPPHOT_COOL_STAR_LIMIT_K = 4000.0
 GAIA_DOCS_NOTE = (
     "Gaia DR3 documentation Sec 11.4.4: cool stars (Teff about 4000 K and below) show molecular "
     "absorption that GSP-Phot does not model well"
+)
+# The MSC value is the primary of a modelled unresolved binary (Gaia DR3 documentation,
+# astrophysical_parameters ``teff_msc1``). Gaia DR3 BP/RP spectra are means over the 34 months of
+# DR3 observations, so a variable star's value is not a snapshot.
+MSC_ASSUMPTION = (
+    "Gaia's Multiple Star Classifier fits the BP/RP spectrum with an unresolved binary model and "
+    "reports the primary's Teff: this assumes the source is a binary, which has not been "
+    "established for this star. For cool stars (below about 3500 K) molecular absorption "
+    "(TiO, VO) dominates the BP/RP spectrum and the fit can be biased. The spectrum is a mean "
+    "over the 34 months of Gaia DR3 "
+    "observations{mira}, and the 16th to 84th percentile range is the only uncertainty given"
+)
+MSC_MIRA_NOTE = (
+    ", so for a Mira variable such as this the value is an average over its pulsation cycles "
+    "and not the temperature at any one phase"
 )
 # Variability types of a pulsating long-period variable in SIMBAD ``mesVar.vartyp`` (Q-152).
 MIRA_VARTYPES = frozenset({"LPV", "M"})
@@ -183,6 +202,25 @@ def teff_field(cat: StarCatalogue | None, kind: str, table: DwarfTable | None) -
         skipped.append(cat.gaia_reason)
     else:
         skipped.append("Gaia DR3 has no GSP-Phot Teff for this star")
+
+    if g is not None and g.teff_msc1_k is not None:
+        out = {
+            "value": g.teff_msc1_k,
+            "tag": "model_dependent",
+            "source": f"Gaia DR3 astrophysical_parameters teff_msc1 (Multiple Star Classifier), "
+            f"source {g.source_id}{_match_note(cat)}",
+            "assumption": MSC_ASSUMPTION.format(mira=MSC_MIRA_NOTE if kind == "star_mira" else ""),
+        }
+        spread = [
+            abs(g.teff_msc1_k - x)
+            for x in (g.teff_msc1_lower_k, g.teff_msc1_upper_k)
+            if x is not None
+        ]
+        if spread:
+            out["err"] = max(spread)
+        return out
+    if g is not None:
+        skipped.append("Gaia DR3 has no Multiple Star Classifier Teff for this star")
 
     if kind == "star":
         cls = dwarf_class(cat.sp_type)

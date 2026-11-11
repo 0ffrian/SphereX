@@ -76,6 +76,9 @@
     "dynamics": {
       "$ref": "#/definitions/Dynamics"
     },
+    "confidence": {
+      "$ref": "#/definitions/Confidence"
+    },
     "alt_text": {
       "type": "string",
       "description": "R9."
@@ -767,6 +770,195 @@
             "type": "number"
           },
           "description": "For example tau, k, softness, maxRateHz."
+        }
+      }
+    },
+    "Confidence": {
+      "title": "Confidence",
+      "description": "How much of the picture rests on data, and the 3D gate (D-36, Q-220 to Q-222). C = sum(w c) / sum(w). It is not the probability that the picture is correct and it does not change a provenance tag. Absent for nebula and nova (no key measurement is defined for them).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "score",
+        "measured_share",
+        "estimated_share",
+        "assumed_share",
+        "threshold",
+        "band",
+        "gate",
+        "found",
+        "needed",
+        "raise",
+        "inputs",
+        "tag",
+        "formula",
+        "weights_note",
+        "note"
+      ],
+      "properties": {
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "C, 0 to 1."
+        },
+        "measured_share": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Part of the score from measured values."
+        },
+        "estimated_share": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Part of the score from derived and model-dependent values."
+        },
+        "assumed_share": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "The rest: assumed, artistic or missing."
+        },
+        "threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum C for a 3D body. Starts at 0.25 (D-36)."
+        },
+        "band": {
+          "type": "string",
+          "enum": [
+            "mostly_data",
+            "part_data",
+            "mostly_assumed",
+            "too_little"
+          ]
+        },
+        "gate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "class_known",
+            "key_measurement",
+            "score_ok",
+            "passed"
+          ],
+          "properties": {
+            "class_known": {
+              "type": "boolean"
+            },
+            "key_measurement": {
+              "type": "boolean"
+            },
+            "score_ok": {
+              "type": "boolean"
+            },
+            "passed": {
+              "type": "boolean",
+              "description": "All three. When false the viewer draws no 3D body and shows found and needed."
+            }
+          }
+        },
+        "found": {
+          "type": "string",
+          "description": "Plain words: what the card has."
+        },
+        "needed": {
+          "type": "string",
+          "description": "Plain words: what is missing for a 3D body. Empty when the gate passed."
+        },
+        "raise": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What would raise the score most."
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConfidenceInput"
+          }
+        },
+        "tag": {
+          "const": "derived",
+          "description": "The score is a formula of the card (D-02)."
+        },
+        "formula": {
+          "type": "string",
+          "minLength": 1
+        },
+        "weights_note": {
+          "type": "string",
+          "description": "States that the weights are placeholders."
+        },
+        "note": {
+          "type": "string",
+          "description": "States that this is not the probability the picture is correct."
+        }
+      }
+    },
+    "ConfidenceInput": {
+      "title": "ConfidenceInput",
+      "description": "One quantity in the score.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "weight",
+        "c",
+        "tag",
+        "points",
+        "fields"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Placeholder weight; the weights of one type sum to 100."
+        },
+        "c": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "How far the data narrows the class range."
+        },
+        "tag": {
+          "type": "string",
+          "enum": [
+            "measured",
+            "derived",
+            "model_dependent",
+            "inferred_from_analog",
+            "artistic",
+            "missing"
+          ],
+          "description": "The tag of the value that fed it, or missing."
+        },
+        "points": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "This input's part of C, in percentage points."
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Card fields that fed it (or could)."
         }
       }
     }

@@ -1,0 +1,84 @@
+# Reference objects (issue #71 stream E, Q-258): solar-system bodies that are not SPHEREx targets.
+# Curated read-only config, like literature.toml. Every number is copied from the NASA Goddard
+# Planetary Fact Sheets (read 10 Nov 2026) in the units the sheet uses; scripts/bake_reference_objects.py
+# converts units. They have no sky position or frames: the resolver gives them ra = dec = 0 tagged
+# `artistic` ("not a place on the sky"), and the frame and spectrum services answer with no frames.
+#
+# Jupiter: https://nssdc.gsfc.nasa.gov/planetary/factsheet/jupiterfact.html
+# Saturn:  https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturnfact.html
+# Titan:   https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html (read 10 Nov 2026)
+#          Sun: https://nssdc.gsfc.nasa.gov/planetary/factsheet/sunfact.html (read 10 Nov 2026)
+
+[[object]]
+id = "ref-jupiter"
+name = "Jupiter"
+aliases = ["jupiter", "jove"]
+source = "NASA Planetary Fact Sheet, Jupiter"
+radius_km = 71492.0          # equatorial radius at 1 bar
+mass_1e24_kg = 1898.13
+rot_period_h = 9.9250        # sidereal, System III
+semimajor_axis_1e6_km = 778.479
+orbital_period_d = 4332.589
+teq_K = 109.9                # "blackbody temperature" of the fact sheet
+
+[[object]]
+id = "ref-saturn"
+name = "Saturn"
+aliases = ["saturn"]
+source = "NASA Planetary Fact Sheet, Saturn"
+radius_km = 60268.0
+mass_1e24_kg = 568.32
+rot_period_h = 10.656        # System III
+semimajor_axis_1e6_km = 1432.041
+orbital_period_d = 10755.699
+teq_K = 81.0
+
+# Titan (issue #71 stream S, Q-280): a moon, drawn by the rocky-world path. Values from the Saturnian
+# Satellite Fact Sheet row "Titan (VI)": mass 1,345.5 x10^20 kg, radius 2,575 km, mean density
+# 1880 kg/m3, orbital period 15.945421 d with rotation "S" (synchronous: rotation = orbital period).
+# The world model wants the distance to the host star, so the orbit is Saturn's (Saturn fact sheet
+# semimajor axis, same as the Saturn row above); the host star is the Sun (Sun fact sheet: effective
+# temperature 5772 K, volumetric mean radius 695,700 km). Surface pressure and temperature are NOT
+# on those sheets (the NASA fact sheet URL for Titan alone returns 404); they come from the Huygens
+# Atmospheric Structure Instrument, as quoted in NASA's NTRS chapter "Titan's Atmospheric Structure,
+# Composition, Haze, and Dynamics" (Vuitton, Lavvas, Nixon, Teanby; ntrs.nasa.gov/citations/20240013879,
+# read 10 Nov 2026): "surface temperature of 93.7 K and a surface pressure of 1.467 bar at the
+# landing site (Fulchignoni et al., 2005)" (Nature 438, 785). The surface liquid is methane-rich
+# (ethane too) lakes and seas seen by Cassini radar (Stofan et al. 2007, Nature 445, 61; Brown et
+# al. 2008, Nature 454, 607) [verify: those two papers were not fetched in this session].
+[[object]]
+id = "ref-titan"
+name = "Titan"
+aliases = ["titan", "saturn vi"]
+type = "planet_rocky"
+source = "NASA Saturnian Satellite Fact Sheet, Titan (VI)"
+radius_km = 2575.0
+mass_1e20_kg = 1345.5
+density_kg_m3 = 1880.0
+moon_orbital_period_d = 15.945421   # around Saturn; synchronous, so also the rotation period
+host_source = "NASA Planetary Fact Sheets, Sun and Saturn"
+host_teff_K = 5772.0
+host_radius_km = 695700.0
+surface_pressure_bar = 1.467        # Huygens HASI at the landing site (Fulchignoni et al. 2005)
+surface_temperature_K = 93.7        # same
+surface_fluid = "methane"           # Cassini radar lakes and seas (Stofan et al. 2007)
+semimajor_axis_1e6_km = 1432.041    # Saturn's, from the Sun
+
+# The Sun (issue #71, Q-307): a star, drawn by the star path. NASA Sun Fact Sheet
+# (https://nssdc.gsfc.nasa.gov/planetary/factsheet/sunfact.html, read 11 Nov 2026): volumetric mean
+# radius 695,700 km, mass 1,988,400 x 10^24 kg, effective temperature 5772 K, sidereal rotation
+# period 609.12 hours (the adopted period at 16 degrees latitude; it varies with latitude).
+[[object]]
+id = "ref-sun"
+name = "Sun"
+aliases = ["sun", "sol", "the sun"]
+type = "star"
+source = "NASA Sun Fact Sheet"
+radius_km = 695700.0
+mass_1e24_kg = 1988400.0
+teff_K = 5772.0
+rot_period_h = 609.12
+# The Sun is the G2V standard of the MK system (the fact sheet gives no class). [verify] the
+# citation: Gray and Corbally 2009, Stellar Spectral Classification (Princeton), the MK standards.
+spectral_class = "G2V"
+spectral_class_source = "the Sun's MK spectral class, the G2V standard (Gray and Corbally 2009, Stellar Spectral Classification) [verify]"

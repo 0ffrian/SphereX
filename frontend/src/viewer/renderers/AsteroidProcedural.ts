@@ -7,10 +7,13 @@
 //   `textures.relief_amp` and the `displacement` layer (`artistic`) come from the backend.
 import { ellipsoidAxes, litBody, numberField, PlanBuilder, type PlanInput } from '../planCommon';
 import type { RenderParams } from '@/contract';
-import type { RenderPlan, Rgb } from '../planTypes';
+import type { RenderPlan, Rgb, ShapePlan } from '../planTypes';
 import { noteDisplayLift } from './asteroidLift';
 
 const WHITE: Rgb = [1, 1, 1];
+
+/** Shadow camera half-width as a multiple of the displaced radius (display choice). */
+const SHADOW_MARGIN = 1.15;
 
 /**
  * Display lift of the baked albedo map (artistic): capped by the map's own mean brightness, see
@@ -85,6 +88,35 @@ export function planAsteroidProcedural(input: PlanInput): RenderPlan {
   // The baked map is brightened for display (artistic, capped by its brightness): said so.
   if (bodyOk && albedo) noteDisplayLift(b);
 
+  // Airless rock lighting (issue #71, Q-210): Lommel-Seeliger blend (a standard model, so
+  // `model_dependent`) and shadows cast by the displaced surface. Shadows need the displacement,
+  // which is off on the phone's low level, so they are off there too (reduced tier).
+  let shape: ShapePlan | null = null;
+  if (bodyOk) {
+    const reflectance = b.drawLocal(
+      'reflectance',
+      'model_dependent',
+      'Light scatters off the surface the way dark, airless rock does. This is a standard model, not a measurement of this body.',
+    );
+    const shadows =
+      displaceDrawn &&
+      b.drawLocal(
+        'self_shadow',
+        b.lighting.source === 'phase_angle' ? 'derived' : 'artistic',
+        b.lighting.source === 'phase_angle'
+          ? 'Hills and crater rims shade each other, worked out from the relief and the Sun direction.'
+          : 'Hills and crater rims shade each other. The Sun direction is a default, so the shadows are an illustration.',
+      );
+    shape = {
+      lommelSeeliger: reflectance,
+      shadows,
+      ao: false,
+      regolith: false,
+      rock: true,
+      shadowExtent: SHADOW_MARGIN * (1 + (reliefAmp ?? 0) / 2),
+    };
+  }
+
   const axes = ellipsoid ? ellipsoidAxes(numberField(input.card, 'lightcurve_amp_mag')) : undefined;
   if (bodyOk && !ellipsoid) {
     b.notes.push('Shown as a plain sphere: the ellipsoid shape is an estimate.');
@@ -92,6 +124,7 @@ export function planAsteroidProcedural(input: PlanInput): RenderPlan {
   }
 
   return b.build({
+    shape,
     bodies: bodyOk
       ? [
           // The baked albedo already holds the colour; the tint is then white (not applied twice).

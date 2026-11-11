@@ -1,6 +1,6 @@
 # Principles and pinned stack
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R0, R1, R2 · **Implements:** [D-01](../decisions/rendering-bodies.md), [D-03, D-24, Q-132](../decisions/platform-hosting.md), [D-06](../decisions/scope-process.md), [D-08, D-12](../decisions/haptics-design.md), [D-10](../decisions/haptics-sound.md), [D-32](../decisions/contract-tags.md) · **Read with:** [data-contract.md](data-contract.md) (R3), [../decisions/README.md](../decisions/README.md)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R0, R1, R2 · **Implements:** [D-01](../decisions/rendering-bodies.md), [D-03, D-24, Q-132](../decisions/platform-hosting.md), [D-37](../decisions/rendering-engines.md), [D-06](../decisions/scope-process.md), [D-08, D-12](../decisions/haptics-design.md), [D-10](../decisions/haptics-sound.md), [D-32](../decisions/contract-tags.md) · **Read with:** [data-contract.md](data-contract.md) (R3), [../decisions/README.md](../decisions/README.md)
 
 ## R0. How to use this document
 
@@ -45,7 +45,7 @@
    - `artistic`: decorative and unconstrained by data
 3. **Fall back a tier, don't invent (D-32).** When a layer or motion rate lacks its measured input, it falls to the next tier (formula, formula with a stated typical input, typical for its kind, art) and its tag says which tier answered. It is refused (not drawn, listed in `missing`, the UI says "not enough data for X") only when no tier can answer, and always for physical size and for ObjectCard values.
 4. **Whole-body honesty.** SPHEREx spectra are disc-integrated averages. They can set global surface properties, never spatial patterns.
-5. **Determinism.** The same ObjectCard plus the same seed must give byte-identical textures (on one machine; committed PNG maps checked across machines: Q-204). Seed = hash of (object id + generator version); the hash is in [§6.3](surface-generation.md#r63-height-field).
+5. **Determinism.** The same ObjectCard plus the same seed must give byte-identical textures (on one machine; committed PNG maps checked across machines: Q-204). Seed = hash of (object id + generator version); the hash is in [§6.3](surface-generation.md#r63-height-field). Frames drawn by the D-37 engines are exempt (wall-clock spin-up, adaptive resolution; Atish, 11 Nov 2026); their baked inputs and the cards are not ([R5.9](engines.md#r59-prototype-engines-d-37)).
 6. **One height map drives everything.** The same height field feeds the normal map, the displacement, the haptics and the surface sound, including the body tone (R8.9.1). They must never disagree.
 
 ---
@@ -54,7 +54,7 @@
 
 | Layer | Package | Version | Notes |
 |---|---|---|---|
-| 3D | `three` | **0.187.0** (r187) | Use `three/webgpu` `WebGPURenderer`; it falls back to WebGL2 automatically **[verify on the A15]** (`chrome://gpu`); phones after the event (R12 #1) |
+| 3D | `three` | **0.187.0** (r187) | Use `three/webgpu` `WebGPURenderer`; it falls back to WebGL2 automatically **[verify on the A15]** (`chrome://gpu`); phones after the event (R12 #1). The D-37 engines (world, star, rock) are the prototype's code on raw WebGL2 beside it, at + Artistic only; three.js stays the viewer and the fallback (D-37 amends D-03, [R5.9](engines.md#r59-prototype-engines-d-37)) |
 | Raycast acceleration | `three-mesh-bvh` | **0.9.18** | Only for real shape-model meshes (mesh haptics and the mesh body tone, R8.4) |
 | Build | Vite + TypeScript | **Vite 8.3.5, TypeScript 6.0.3** | Exact versions in `package.json` and the lockfile (full list: [frontend/README.md](../../frontend/README.md#pinned-versions)) |
 | Browser ML (optional) | `@huggingface/transformers` | pin at install | Only for the image-first path ([§6.6](surface-generation.md#r66-optional-paths)) |
