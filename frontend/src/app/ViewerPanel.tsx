@@ -43,7 +43,8 @@ import { EPOCH_JD, timeRange } from '@/physics/cometGas';
 import { ConfidenceChip, ConfidenceDetails } from './ConfidencePanel';
 import { HearPanel } from './build/HearPanel';
 import { BuildControls, BuildKeyNumbers, BuildSummaryRows } from './build/BuildControls';
-import GridLoader, { type GridLoaderProps } from './island/GridLoader';
+import { MouldOverlay } from './build/MouldAnimation';
+import { useMouldLive } from './build/mouldLive';
 import { ConfidencePopover } from './ConfidencePopover';
 import { displayName } from './displayName';
 import { Row, Rows, SwitchRow, ToggleGroup } from './PanelControls';
@@ -59,7 +60,7 @@ import { WorldGlobeStage, useEngineWorld } from './WorldEngineStage';
 import { engineKey, useWorldStore } from './worldStore';
 import { MouldStrip, type StripHandle } from './build/MouldStrip';
 import { useMould, type MouldPhase } from './build/useMould';
-import { usesBrowserSeed } from '@/viewer/mould/mouldSteps';
+import { mouldKindOf, usesBrowserSeed } from '@/viewer/mould/mouldSteps';
 
 const NO_FAILED: readonly string[] = [];
 const AGE_SLIDER = SLIDER_REGISTRY.age_yr;
@@ -158,13 +159,6 @@ export const QUALITY_DROP_ANNOUNCEMENT = 'Lowered render quality to keep motion 
 /** Said when a brown dwarf is in the infrared view, which is a plain disc, and the visible view moves. */
 export const IR_JETS_HINT =
   'Switch to "Visible colour" to see the jets move. This motion is an artist\u2019s impression.';
-
-/** The mock-up's build loader sequence (`loading("bLoad")`). */
-const BUILD_LOADER_LOOK: GridLoaderProps = {
-  mode: 'sequence',
-  sequence: ['spiral-cw', 'ripple-out', 'plus-full', 'frame', 'ripple-in', 'spiral-ccw'],
-  speed: 'normal',
-};
 
 /** The id of the build pane's popover (the header buttons' `aria-controls`). */
 export const BUILD_POP_ID = 'bp-pop';
@@ -560,7 +554,10 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
     seq: pane?.seq ?? 0,
     animate: pane?.animate ?? false,
     reducedMotion,
-    onProgress: (p) => stripRef.current?.update(p),
+    onProgress: (p) => {
+      useMouldLive.getState().setProgress(p);
+      stripRef.current?.update(useMouldLive.getState().override ?? p);
+    },
     onPhase: (phase) => pane?.onPhase?.(phase),
   });
 
@@ -770,6 +767,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
     ) : (
       details
     );
+  const worldForming = useMouldLive((s) => s.forming);
   const loadingBody =
     pane &&
     (blocked || mould.phase === 'loading' || (viewer === null && rendererStatus !== 'unavailable'));
@@ -829,21 +827,21 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           {!pane && params && formulaOpen && (
             <ConfidencePopover params={params} name={displayName(plan?.name)} onClose={() => setFormulaOpen(false)} />
           )}
-          {loadingBody && (
-            <div className="sx-bp-loading" data-testid="build-loading" role="status">
-              {/* The mock-up's `loading("bLoad")`: its grid loader, size 44, the long sequence. */}
-              <span aria-hidden="true">
-                <GridLoader
-                  color="green"
-                  rounded
-                  size={44}
-                  gap={2}
-                  blur={0.3}
-                  {...(reducedMotion ? { pattern: 'heartbeat', static: true } : BUILD_LOADER_LOOK)}
-                />
-              </span>
-              <span>Loading the 3D view</span>
-            </div>
+          {pane && (
+            <MouldOverlay
+              active={loadingBody || worldForming}
+              id={card?.id ?? params?.type ?? 'body'}
+              kind={params ? mouldKindOf(params.type) : null}
+              steps={mould.script?.steps.length ?? 0}
+              seed={params?.seed}
+              inputs={{
+                T: card?.teff_K?.value ?? card?.teq_K?.value ?? null,
+                giant: params?.type === 'star_mira',
+                tint: rockTint,
+              }}
+              reduced={reducedMotion}
+              caption={worldForming ? (params?.type === 'gas_giant' ? 'Forming the atmosphere' : 'Forming the planet\u2026') : 'Loading the 3D view'}
+            />
           )}
           <p
             data-testid="viewer-label"
