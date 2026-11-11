@@ -71,6 +71,34 @@ CORE_L1727_93_3_1 = r'''// @deviation L1727 (#93 3.1) every fluid's liquid-vapou
   var superC = Pa >= F.Pc; if (canLiquid) Tb = superC ? F.Tc : Math.min(Tb, F.Tc);
 // @end-deviation'''
 
+CORE_L1734_93_3_6 = r'''// @deviation L1734 (#93 3.6) the inner edge (runaway greenhouse) depends on the planet's mass. Kopparapu et al. 2014
+// (ApJL 787, L29, Table 1, checked against arXiv:1404.5292): S_eff = S0 + a T + b T^2 + c T^3 + d T^4, T = Teff -
+// 5780 K, for 0.1, 1 and 5 Earth masses (the 1 Earth-mass row is the prototype's). Between rows the limit is
+// interpolated in log mass; outside 0.1 to 5 Earth masses the nearest row is used (no extrapolation). measured
+// coefficients of a published model: the limit is model_dependent. Same table as physics/climateBudget.ts.
+  var KOP14 = [[0.1, 0.99, 1.209e-4, 1.404e-8, -7.418e-12, -1.713e-15], [1, 1.107, 1.332e-4, 1.58e-8, -8.308e-12, -1.931e-15], [5, 1.188, 1.433e-4, 1.707e-8, -8.968e-12, -2.084e-15]];
+  var kopS = function (r) { return r[1] + r[2] * tS + r[3] * tS * tS + r[4] * tS * tS * tS + r[5] * tS * tS * tS * tS; };
+  var lMe = clamp(Math.log(p.Me), Math.log(0.1), Math.log(5)), kLo = lMe < 0 ? KOP14[0] : KOP14[1], kHi = lMe < 0 ? KOP14[1] : KOP14[2];
+  sIn = lerp(kopS(kLo), kopS(kHi), (lMe - Math.log(kLo[0])) / Math.log(kHi[0] / kLo[0]));
+// @end-deviation'''
+
+CORE_L1736_93_3_6 = r'''// @deviation L1736 (#93 3.6) a runaway greenhouse no longer keeps a mild surface (K2-18 b read "runaway" at 401 K).
+// While the ocean evaporates the outgoing radiation is held at the steam limit, 282 W/m^2 (Goldblatt et al. 2013,
+// Nat. Geosci. 6, 661; RUNAWAY.olrLim), so the surface warms until it radiates through the near-infrared windows:
+// the post-runaway state. Its surface temperature depends on the steam column: about 1,500 K under 50 bar of steam and
+// about 1,800 K under 260 bar (one Earth ocean), from the radiative-convective models of Boukrouche et al. 2021
+// (ApJ 919, 130) as quoted by Dorn and Lichtenberg 2021 (ApJL 922, L4). The engine takes the steam pressure to be
+// the surface pressure Ps and interpolates in ln P through those two points, extrapolated outside them [verify]:
+// model_dependent. When that is hotter than the grey-greenhouse Ts, Ts takes it and tau is set so the grey model
+// balances there (the energy budget sees both); the scale height follows Ts. ebStep holds each cell's outgoing
+// radiation at olrLim until the cell reaches Tpost.
+  var RUNAWAY = { olrLim: 282, P1: 50, T1: 1500, P2: 260, T2: 1800 }, Tpost = null;
+  if (runaway) {
+    Tpost = RUNAWAY.T1 + (RUNAWAY.T2 - RUNAWAY.T1) * Math.log(Ps / RUNAWAY.P1) / Math.log(RUNAWAY.P2 / RUNAWAY.P1);
+    if (Tpost > Ts) { Ts = Tpost; tau = (Math.pow(Ts / Teq, 4) - 1) / 0.75; H = Rg * Ts / gv; } else Tpost = null;
+  }
+// @end-deviation'''
+
 CORE_L1736_93_3_1 = r'''// @deviation L1736 (#93 3.1) above both its critical temperature and pressure the fluid is supercritical: one dense
 // fluid, no sea surface. The state is set after the runaway test, so supercritical water still counts as boiled off.
   if (!gas && !airless && superC && Ts >= F.Tc && state === 'vapour') state = 'supercritical';
@@ -79,6 +107,12 @@ CORE_L1736_93_3_1 = r'''// @deviation L1736 (#93 3.1) above both its critical te
 CORE_L1762_93_3_3 = r'''// @deviation L1762 (#93 3.3) the ORB[p.id] rename below: the tidal heating reads the preset's own orbit extras p.ob
 // first (cardToWorld writes the host mass from the card's host_mass_msun, the eccentricity and the obliquity) and the
 // prototype's ORB table, which knows only its own presets, after. Code: the @rename only.
+// (#93 3.6) the runaway: rename below hands ebStep the post-runaway temperature and the outgoing-radiation limit.
+// @end-deviation'''
+
+CORE_L2101_93_3_6 = r'''// @deviation L2101 (#93 3.6) during a runaway greenhouse a cell's outgoing radiation cannot exceed the steam limit
+// m.olrLim (282 W/m^2, Goldblatt et al. 2013) until it reaches the post-runaway temperature m.Tpost (worldModel).
+        if (m.olrLim && m.Tpost && Tc < m.Tpost && olr > m.olrLim) { olr = m.olrLim; Bl = 0; }
 // @end-deviation'''
 
 CORE_L2389_93_3_1 = r'''// @deviation L2389 (#93 3.1) the supercritical state worldModel can now return.

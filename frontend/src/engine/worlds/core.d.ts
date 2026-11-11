@@ -10,6 +10,10 @@ export interface Core {
   GAS_NODES: Record<string, number[][]>;
   FLUIDS: Record<string, any>;
   getGS(): any;
+  /** #93: the energy budget (prototype ebStep, ebStats, ebInit), exposed for headless tests. */
+  ebStep(m: any, n: number, dt: number): void;
+  ebStats(m: any): void;
+  ebInit(m: any, terr: any): void;
   worldModel(): any;
   worldUi(): void;
   resetWorld(): void;
