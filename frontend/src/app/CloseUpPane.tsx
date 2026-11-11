@@ -9,7 +9,6 @@
 // mock-up's .cu-tag), the controls and the input. Keyboard: arrows or W A S D move and turn, + and -
 // change the height, Page Up and Page Down tilt. Reduced motion: no automatic flying.
 import { useEffect, useReducer, useRef, useState } from 'react';
-import type { CloseUpInfo } from '@/viewer/ViewerApp';
 import { useCloseUpStore } from './closeUpStore';
 import { ORBIT_NOTE } from '@/viewer/orbit/orbitSources';
 import { altRange } from '@/viewer/orbit/orbitMath';
@@ -20,7 +19,7 @@ import { buttonClass, pressedClass } from './ui';
 import { StarCloseUp } from './StarCloseUp.tsx';
 import { RockCloseUp } from './RockCloseUp';
 import { StarFlareStage } from './StarEngineStage';
-import { STAR_CLOSEUP_TAG, useStarCloseUp } from './starCloseUp';
+import { useStarCloseUp } from './starCloseUp';
 import { WorldFlyStage } from './WorldEngineStage';
 import { engineKey, useWorldStore } from './worldStore';
 import { useAppStore } from '@/state/store';
@@ -54,23 +53,6 @@ export function closeUpKindOf(type: string | null | undefined): CloseUpKind | nu
 
 export function closeUpButtonLabel(kind: CloseUpKind | null): string {
   return kind === 'orbit' ? 'Surface view' : 'Close-up view';
-}
-
-/** The mock-up's caption for each kind (its `.cu-tag` wording: "Close-up · what · honesty"). */
-export function closeUpCaption(
-  kind: CloseUpKind,
-  info: CloseUpInfo | null,
-  gas: boolean,
-  starOk = false,
-): string {
-  if (kind === 'star')
-    return starOk ? STAR_CLOSEUP_TAG : 'Close-up · not available for this star (no surface model)';
-  if (kind === 'body')
-    return 'Close-up · the same body seen from near its surface · generated (Default)';
-  if (info?.refusal) return `Close-up · ${info.refusal}`;
-  return gas
-    ? 'Close-up · from orbit, click the globe to look at a place · generated from the solved winds (Default), not a photograph'
-    : 'Close-up · from orbit, click the globe to look at a place · generated from physics (Default), not a photograph';
 }
 
 export function CloseUpPane() {

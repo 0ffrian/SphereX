@@ -141,11 +141,24 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
   const raf = useRef(0);
   const touched = useRef(false); // the spectrum playhead shows once it has been played or scrubbed
 
-  const stopSpec = useCallback(() => {
+  /** Stops the spectrum sound only (no state): what the effects below call. */
+  const stopSpecSound = useCallback(() => {
     specH.current?.stop();
     specH.current = null;
-    setSpecPlaying(false);
   }, []);
+  const stopSpec = useCallback(() => {
+    stopSpecSound();
+    setSpecPlaying(false);
+  }, [stopSpecSound]);
+  // Another object, or the panel closed: the state is reset while rendering (not in an effect); the
+  // effects below stop the sound itself.
+  const [seenKey, setSeenKey] = useState(objectKey);
+  if (seenKey !== objectKey) {
+    setSeenKey(objectKey);
+    setSpecPlaying(false);
+    setPos(0);
+  }
+  if (!active && specPlaying) setSpecPlaying(false);
   /** Stops every sound, ambience included. */
   const stopAll = useCallback(() => {
     stopSpec();
@@ -155,17 +168,16 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
   // Closing the panel stops what it started, but not the ambience the user asked to keep.
   useEffect(() => {
     if (active) return;
-    stopSpec();
+    stopSpecSound();
     if (!useAmbienceStore.getState().ambience) useAmbienceStore.getState().stop();
-  }, [active, stopSpec]);
+  }, [active, stopSpecSound]);
   // Another object: stop everything and start the new object from the beginning.
   useEffect(() => {
-    stopSpec();
+    stopSpecSound();
     if (useAmbienceStore.getState().key !== objectKey) useAmbienceStore.getState().stop();
     posRef.current = 0;
     touched.current = false;
-    setPos(0);
-  }, [objectKey, stopSpec]);
+  }, [objectKey, stopSpecSound]);
   // The build pane closing unmounts the panel: nothing keeps playing.
   useEffect(() => stopAll, [stopAll]);
 

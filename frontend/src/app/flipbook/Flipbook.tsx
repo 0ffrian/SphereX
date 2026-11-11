@@ -104,6 +104,8 @@ export function Flipbook({ onClose, onBuild }: { onClose(): void; onBuild?: () =
           {!sky.progress && (
             <div className="fb-c" style={{ paddingBottom: 16 }}>
               <NoFrames frames={sky.frames} />
+              {/* A body can be built without SPHEREx frames (the offline demo pack, a refused mover). */}
+              {onBuild && <BuildItButton onBuild={onBuild} />}
             </div>
           )}
           {/* Only when something is actually listed: an empty padded strip under the picture otherwise. */}
@@ -124,6 +126,18 @@ export function Flipbook({ onClose, onBuild }: { onClose(): void; onBuild?: () =
 
 function objectName(resolved: ResolveResponse): string {
   return displayName(resolved.name) || positionText(resolved);
+}
+
+/** The primary "Build it" button of the card (also shown when there are no frames to play). */
+function BuildItButton({ onBuild }: { onBuild(): void }) {
+  return (
+    <button type="button" className="fb-btn-primary" onClick={onBuild} data-testid="panel-build-it">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z M12 12l8-4.5 M12 12v9 M12 12 4 7.5" />
+      </svg>
+      Build it
+    </button>
+  );
 }
 
 /** The object's name (top left) and the close button (top right), each on a small dark tab. */
@@ -524,12 +538,7 @@ function Player({
           {onBuild && (
             <div className="sx-pc-grp">
               <span className="sx-eyebrow">3D</span>
-              <button type="button" className="fb-btn-primary" onClick={onBuild} data-testid="panel-build-it">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z M12 12l8-4.5 M12 12v9 M12 12 4 7.5" />
-                </svg>
-                Build it
-              </button>
+              <BuildItButton onBuild={onBuild} />
             </div>
           )}
         </div>

@@ -1,4 +1,4 @@
-// The colour views in the DOM: the radio-group switch and its keys, the composite (legend, badge,
+// The colour views in the DOM: the composite (legend, badge,
 // marker, refusal in words) and the transport bar locked while the composite shows.
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -7,8 +7,8 @@ import { createApiClient } from '@/app/api/client';
 import { Transport } from '@/app/shell/Transport';
 import { initialAppData, setSkyApi, useAppStore } from '@/state/store';
 import { fixtureFetch } from '@/test/fixtureFetch';
-import { COMPOSITE_TRANSPORT_NOTE, type ColourChoice } from './colourMode';
-import { ColourControls, CompositeView, TintLegend } from './ColourViews';
+import { COMPOSITE_TRANSPORT_NOTE } from './colourMode';
+import { CompositeView, TintLegend } from './ColourViews';
 import { Flipbook } from './Flipbook';
 import { FlipbookSessionProvider } from './session';
 
@@ -22,10 +22,6 @@ let root: Root;
 
 const q = (id: string) => host.querySelector<HTMLElement>(`[data-testid="${id}"]`);
 const qa = (id: string) => [...host.querySelectorAll<HTMLElement>(`[data-testid="${id}"]`)];
-const key = (el: Element, k: string) =>
-  act(() => {
-    el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
-  });
 
 /** Lets the store's async work (fixture fetches, then React) finish. */
 async function settle() {
@@ -48,56 +44,6 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
-});
-
-describe('ColourControls', () => {
-  function Harness({ start }: { start: ColourChoice }) {
-    const choice = useAppStore((s) => s.sky.colour);
-    const set = useAppStore((s) => s.skySetColour);
-    return <ColourControls choice={choice ?? start} onChange={(c) => set(c)} />;
-  }
-
-  it('is a radio group: one tab stop, arrows move and pick, the sub-choice shows with Colour', () => {
-    act(() => root.render(<Harness start={{ on: false, view: 'tint' }} />));
-    const raw = q('colour-raw')!;
-    const colour = q('colour-on')!;
-    expect(q('colour-switch')!.getAttribute('role')).toBe('radiogroup');
-    expect(q('colour-switch')!.getAttribute('aria-labelledby')).toBeTruthy();
-    expect(raw.getAttribute('role')).toBe('radio');
-    expect(raw.getAttribute('aria-checked')).toBe('true');
-    expect([raw.tabIndex, colour.tabIndex]).toEqual([0, -1]);
-    expect(q('colour-view')).toBeNull();
-
-    raw.focus();
-    key(raw, 'ArrowRight');
-    expect(useAppStore.getState().sky.colour).toEqual({ on: true, view: 'tint' });
-    expect(document.activeElement).toBe(q('colour-on'));
-    expect(q('colour-on')!.getAttribute('aria-checked')).toBe('true');
-    expect(q('colour-tint')!.getAttribute('aria-checked')).toBe('true');
-
-    key(q('colour-tint')!, 'End');
-    expect(useAppStore.getState().sky.colour).toEqual({ on: true, view: 'composite' });
-    key(q('colour-composite')!, 'ArrowRight'); // wraps round
-    expect(useAppStore.getState().sky.colour.view).toBe('tint');
-
-    act(() => q('colour-raw')!.click());
-    expect(useAppStore.getState().sky.colour).toEqual({ on: false, view: 'tint' });
-    expect(q('colour-view')).toBeNull();
-  });
-
-  it('keeps arrow keys from reaching the flipbook', () => {
-    let reached = 0;
-    act(() =>
-      root.render(
-        <div onKeyDown={() => reached++}>
-          <Harness start={{ on: false, view: 'tint' }} />
-        </div>,
-      ),
-    );
-    key(q('colour-raw')!, 'ArrowLeft');
-    key(q('colour-raw')!, 'x');
-    expect(reached).toBe(1); // only the unhandled key
-  });
 });
 
 describe('TintLegend', () => {
@@ -264,7 +210,7 @@ describe('Flipbook colour views and Measured only (D-21)', () => {
     act(() => useAppStore.getState().setHonesty('derived'));
     expect(q('composite')).not.toBeNull();
     expect(q('frame-viewer')).toBeNull();
-    expect(q('orientation-note')).toBeNull(); // the composite is north up
+    // The About tab keeps describing the frames, so its orientation line stays while the composite shows.
     await settle();
   });
 });

@@ -1,6 +1,5 @@
-// The flipbook's colour views (colourMode.ts): the Raw | Colour switch, the wavelength tint's
-// legend, and the SPHEREx colour composite (one RGB picture from three aligned frames, built by the
-// backend). Both colour views are false colour, `derived`, with the Estimated badge (D-02, Q-27).
+// The flipbook's colour views (colourMode.ts): the wavelength tint's legend and the SPHEREx colour
+// composite (one RGB picture from three aligned frames, built by the backend). Both colour views are false colour, `derived`, with the Estimated badge (D-02, Q-27).
 import { useEffect, useId, useMemo, useState } from 'react';
 import type { CompositeBand, CompositeResponse } from '@/app/api/types';
 import { DataBadge, EstimatedBadge } from '@/app/Badge';
@@ -15,47 +14,11 @@ import {
 } from '@/app/messages';
 import { RefusalList } from '@/app/RefusalList';
 import { groupCompositeMissing } from '@/app/refusals';
-import { Segmented } from '@/app/Segmented';
 import { ErrorBox, LoadingBox } from '@/app/StatusBoxes';
 import { framesFetching, useAppStore } from '@/state/store';
 import { framesCounts } from './progressive';
-import { legendPosition, tintFormula, type ColourChoice, type ColourView } from './colourMode';
+import { legendPosition, tintFormula } from './colourMode';
 import { SPHEREX_MAX_UM, SPHEREX_MIN_UM, wavelengthGradient } from './wavelengthColor';
-
-export function ColourControls({
-  choice,
-  onChange,
-}: {
-  choice: ColourChoice;
-  onChange(c: ColourChoice): void;
-}) {
-  return (
-    <div className="flex flex-col gap-2" data-testid="colour-controls">
-      <Segmented
-        label="Picture"
-        value={choice.on ? 'colour' : 'raw'}
-        options={[
-          { value: 'raw', label: 'Raw', testId: 'colour-raw' },
-          { value: 'colour', label: 'Colour', testId: 'colour-on' },
-        ]}
-        onChange={(v) => onChange({ ...choice, on: v === 'colour' })}
-        testId="colour-switch"
-      />
-      {choice.on && (
-        <Segmented<ColourView>
-          label="Colour view"
-          value={choice.view}
-          options={[
-            { value: 'tint', label: 'Wavelength tint', testId: 'colour-tint' },
-            { value: 'composite', label: 'SPHEREx composite', testId: 'colour-composite' },
-          ]}
-          onChange={(view) => onChange({ on: true, view })}
-          testId="colour-view"
-        />
-      )}
-    </div>
-  );
-}
 
 /** Colour scale over the SPHEREx range with the current frame's wavelength marked. */
 export function TintLegend({ wavelengthUm, stretch }: { wavelengthUm: number; stretch: string }) {

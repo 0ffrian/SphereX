@@ -783,8 +783,3 @@ export function WorldFlyStage({
     </div>
   );
 }
-
-/** The honesty caption of the left pane while the engine's surface view is shown (the mock-up's `.cu-tag`). */
-export function worldCaption(gas: boolean): string {
-  return `Close-up · from orbit, click the globe to look at a place · heights, clouds and air drawn ${gas ? '2' : '3'} times taller, fine detail is an artist's addition (Default), not a photograph`;
-}

@@ -255,7 +255,7 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
         }, HAND_OVER_MS),
       );
     };
-    if (active) {
+    if (active && kind) {
       if (cur === 'on') return;
       clear();
       startedAt.current = now;
@@ -274,7 +274,7 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
     setRushMs(ms);
     setSt('rush');
     timers.current.push(setTimeout(leave, ms));
-  }, [active, id, reduced]);
+  }, [active, id, reduced, kind]);
 
   if (stage === 'off') return null;
   const leaving = stage === 'leave';

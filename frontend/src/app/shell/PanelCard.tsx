@@ -5,6 +5,12 @@ import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode, type Ref 
 import { useIslandStore } from '@/app/island/islandStore';
 import { Icon, type IconName } from './icons';
 
+/** Hands the element to a function or object ref (kept out of the component: a ref's owner is the caller). */
+function assignRef(ref: Ref<HTMLElement> | undefined, el: HTMLElement | null) {
+  if (typeof ref === 'function') ref(el);
+  else if (ref) (ref as { current: HTMLElement | null }).current = el;
+}
+
 export function PanelCard({
   title,
   subtitle,
@@ -57,7 +63,14 @@ export function PanelCard({
   const close = () => {
     onClose();
     // After React has removed the card.
-    requestAnimationFrame(() => document.querySelector<HTMLElement>(returnFocusTo)?.focus());
+    // The dock no longer has a button for every card (Flipbook, Spectrum): when the one asked for is
+    // not there, focus goes to the sky itself, never lost to <body> (WCAG 2.4.3).
+    requestAnimationFrame(() =>
+      (
+        document.querySelector<HTMLElement>(returnFocusTo) ??
+        document.querySelector<HTMLElement>('[data-testid="sky-canvas"]')
+      )?.focus(),
+    );
   };
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key !== 'Escape' || e.defaultPrevented) return;
@@ -71,8 +84,7 @@ export function PanelCard({
       tabIndex={bare ? -1 : undefined}
       ref={(el) => {
         rootEl.current = el;
-        if (typeof rootRef === 'function') rootRef(el);
-        else if (rootRef) (rootRef as { current: HTMLElement | null }).current = el;
+        assignRef(rootRef, el);
       }}
       className={`sx-panel ${wide ? 'sx-panel-wide' : ''}`}
       data-bare={bare ? '' : undefined}
