@@ -39,7 +39,7 @@
       "band": "part_data",
       "estimated_share": 0.35,
       "formula": "C = sum(w_i c_i) / sum(w_i): c is 1 for a measured value or a formula of measured values, a placeholder share for a model-dependent one, and 0 for an assumed, artistic or missing one; the w_i are placeholder weights (D-36, Q-221)",
-      "found": "Data for: Temperature and colour, spectral class or motion on the sky.",
+      "found": "Data for: Temperature and colour, spectral class and motion on the sky.",
       "gate": {
         "class_known": true,
         "key_measurement": true,

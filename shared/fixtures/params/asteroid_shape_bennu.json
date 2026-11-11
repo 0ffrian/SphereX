@@ -73,7 +73,7 @@
       "score_ok": true,
       "passed": true
     },
-    "found": "Data for: Shape, size, spin, albedo or spectral class.",
+    "found": "Data for: Shape, size, spin, albedo and spectral class.",
     "needed": "",
     "raise": "A better measurement of: surface colour map.",
     "inputs": [
