@@ -1,0 +1,198 @@
+{
+  "known": [
+    {
+      "designation": "Synthetic fixture A1",
+      "number": null,
+      "object_id": "synthetic-mover",
+      "kind": "asteroid",
+      "v_mag": 18.4,
+      "n_frames": 16,
+      "n_visits": 2,
+      "positions": [
+        {
+          "frame_id": "fixture-area-main-v1e1-D1",
+          "time": "2026-01-15T03:00:00.000Z",
+          "ra": 149.7533275,
+          "dec": 9.8032
+        },
+        {
+          "frame_id": "fixture-area-main-v1e1-D4",
+          "time": "2026-01-15T03:00:00.000Z",
+          "ra": 149.7533275,
+          "dec": 9.8032
+        },
+        {
+          "frame_id": "fixture-area-main-v1e2-D1",
+          "time": "2026-01-15T03:02:00.000Z",
+          "ra": 149.7540262,
+          "dec": 9.8032949
+        },
+        {
+          "frame_id": "fixture-area-main-v1e2-D4",
+          "time": "2026-01-15T03:02:00.000Z",
+          "ra": 149.7540262,
+          "dec": 9.8032949
+        },
+        {
+          "frame_id": "fixture-area-main-v1e3-D1",
+          "time": "2026-01-15T03:04:00.000Z",
+          "ra": 149.7547249,
+          "dec": 9.8033898
+        },
+        {
+          "frame_id": "fixture-area-main-v1e3-D4",
+          "time": "2026-01-15T03:04:00.000Z",
+          "ra": 149.7547249,
+          "dec": 9.8033898
+        },
+        {
+          "frame_id": "fixture-area-main-v1e4-D1",
+          "time": "2026-01-15T03:06:00.000Z",
+          "ra": 149.7554236,
+          "dec": 9.8034847
+        },
+        {
+          "frame_id": "fixture-area-main-v1e4-D4",
+          "time": "2026-01-15T03:06:00.000Z",
+          "ra": 149.7554236,
+          "dec": 9.8034847
+        },
+        {
+          "frame_id": "fixture-area-main-v2e1-D1",
+          "time": "2026-01-16T03:24:00.000Z",
+          "ra": 150.2647711,
+          "dec": 9.8726722
+        },
+        {
+          "frame_id": "fixture-area-main-v2e1-D4",
+          "time": "2026-01-16T03:24:00.000Z",
+          "ra": 150.2647711,
+          "dec": 9.8726722
+        },
+        {
+          "frame_id": "fixture-area-main-v2e2-D1",
+          "time": "2026-01-16T03:26:00.000Z",
+          "ra": 150.2654698,
+          "dec": 9.8727671
+        },
+        {
+          "frame_id": "fixture-area-main-v2e2-D4",
+          "time": "2026-01-16T03:26:00.000Z",
+          "ra": 150.2654698,
+          "dec": 9.8727671
+        },
+        {
+          "frame_id": "fixture-area-main-v2e3-D1",
+          "time": "2026-01-16T03:28:00.000Z",
+          "ra": 150.2661685,
+          "dec": 9.872862
+        },
+        {
+          "frame_id": "fixture-area-main-v2e3-D4",
+          "time": "2026-01-16T03:28:00.000Z",
+          "ra": 150.2661685,
+          "dec": 9.872862
+        },
+        {
+          "frame_id": "fixture-area-main-v2e4-D1",
+          "time": "2026-01-16T03:30:00.000Z",
+          "ra": 150.2668672,
+          "dec": 9.8729569
+        },
+        {
+          "frame_id": "fixture-area-main-v2e4-D4",
+          "time": "2026-01-16T03:30:00.000Z",
+          "ra": 150.2668672,
+          "dec": 9.8729569
+        }
+      ],
+      "track_available": true
+    },
+    {
+      "designation": "Synthetic fixture C1",
+      "number": null,
+      "object_id": null,
+      "kind": "comet",
+      "v_mag": 21.5,
+      "n_frames": 8,
+      "n_visits": 1,
+      "positions": [
+        {
+          "frame_id": "fixture-area-main-v1e1-D1",
+          "time": "2026-01-15T03:00:00.000Z",
+          "ra": 150.1517851,
+          "dec": 10.2639375
+        },
+        {
+          "frame_id": "fixture-area-main-v1e1-D4",
+          "time": "2026-01-15T03:00:00.000Z",
+          "ra": 150.1517851,
+          "dec": 10.2639375
+        },
+        {
+          "frame_id": "fixture-area-main-v1e2-D1",
+          "time": "2026-01-15T03:02:00.000Z",
+          "ra": 150.152267,
+          "dec": 10.2639375
+        },
+        {
+          "frame_id": "fixture-area-main-v1e2-D4",
+          "time": "2026-01-15T03:02:00.000Z",
+          "ra": 150.152267,
+          "dec": 10.2639375
+        },
+        {
+          "frame_id": "fixture-area-main-v1e3-D1",
+          "time": "2026-01-15T03:04:00.000Z",
+          "ra": 150.1527488,
+          "dec": 10.2639375
+        },
+        {
+          "frame_id": "fixture-area-main-v1e3-D4",
+          "time": "2026-01-15T03:04:00.000Z",
+          "ra": 150.1527488,
+          "dec": 10.2639375
+        },
+        {
+          "frame_id": "fixture-area-main-v1e4-D1",
+          "time": "2026-01-15T03:06:00.000Z",
+          "ra": 150.1532307,
+          "dec": 10.2639375
+        },
+        {
+          "frame_id": "fixture-area-main-v1e4-D4",
+          "time": "2026-01-15T03:06:00.000Z",
+          "ra": 150.1532307,
+          "dec": 10.2639375
+        }
+      ],
+      "track_available": false
+    }
+  ],
+  "skybot": [
+    {
+      "visit": 1,
+      "fetched_at": "2026-11-10T11:57:00.000Z"
+    },
+    {
+      "visit": 2,
+      "fetched_at": "2026-11-10T11:57:30.000Z"
+    }
+  ],
+  "cached_at": "2026-11-10T12:00:00.000Z",
+  "computed_at": "2026-11-10T12:00:00.000Z",
+  "missing": [
+    "horizons:Synthetic fixture A2"
+  ],
+  "provenance": {
+    "positions": {
+      "tag": "model_dependent",
+      "source": "synthetic fixture: made-up positions of made-up objects",
+      "assumption": "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of fetched_at, seen from SPHEREx (500@-163182)"
+    },
+    "skybot": {
+      "tag": "measured",
+      "source": "synthetic fixture: made-up answer dates"
+    }
+  }
+}

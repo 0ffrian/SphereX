@@ -1,0 +1,317 @@
+{
+  "area_id": "fixture:area-multivisit",
+  "ra": 210.0,
+  "dec": -20.0,
+  "width_deg": 0.6,
+  "height_deg": 0.6,
+  "data_release": "synthetic_fixture",
+  "n_frames": 16,
+  "n_visits": 4,
+  "computed_at": "2026-11-10T12:05:00.000Z",
+  "cached_at": "2026-11-10T12:05:00.000Z",
+  "frames": [
+    {
+      "frame_id": "fixture-area-multivisit-v1e1-D2",
+      "detector": 2,
+      "visit": 1,
+      "exposure": 1,
+      "time": "2026-02-03T06:00:00.000Z",
+      "wavelength_min_um": 1.11,
+      "wavelength_max_um": 1.64,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    },
+    {
+      "frame_id": "fixture-area-multivisit-v1e1-D3",
+      "detector": 3,
+      "visit": 1,
+      "exposure": 1,
+      "time": "2026-02-03T06:00:00.000Z",
+      "wavelength_min_um": 1.64,
+      "wavelength_max_um": 2.42,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    },
+    {
+      "frame_id": "fixture-area-multivisit-v1e2-D2",
+      "detector": 2,
+      "visit": 1,
+      "exposure": 2,
+      "time": "2026-02-03T06:02:00.000Z",
+      "wavelength_min_um": 1.11,
+      "wavelength_max_um": 1.64,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    },
+    {
+      "frame_id": "fixture-area-multivisit-v1e2-D3",
+      "detector": 3,
+      "visit": 1,
+      "exposure": 2,
+      "time": "2026-02-03T06:02:00.000Z",
+      "wavelength_min_um": 1.64,
+      "wavelength_max_um": 2.42,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    },
+    {
+      "frame_id": "fixture-area-multivisit-v2e1-D2",
+      "detector": 2,
+      "visit": 2,
+      "exposure": 1,
+      "time": "2026-02-04T06:00:00.000Z",
+      "wavelength_min_um": 1.11,
+      "wavelength_max_um": 1.64,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    },
+    {
+      "frame_id": "fixture-area-multivisit-v2e1-D3",
+      "detector": 3,
+      "visit": 2,
+      "exposure": 1,
+      "time": "2026-02-04T06:00:00.000Z",
+      "wavelength_min_um": 1.64,
+      "wavelength_max_um": 2.42,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    },
+    {
+      "frame_id": "fixture-area-multivisit-v2e2-D2",
+      "detector": 2,
+      "visit": 2,
+      "exposure": 2,
+      "time": "2026-02-04T06:02:00.000Z",
+      "wavelength_min_um": 1.11,
+      "wavelength_max_um": 1.64,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    },
+    {
+      "frame_id": "fixture-area-multivisit-v2e2-D3",
+      "detector": 3,
+      "visit": 2,
+      "exposure": 2,
+      "time": "2026-02-04T06:02:00.000Z",
+      "wavelength_min_um": 1.64,
+      "wavelength_max_um": 2.42,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    },
+    {
+      "frame_id": "fixture-area-multivisit-v3e1-D2",
+      "detector": 2,
+      "visit": 3,
+      "exposure": 1,
+      "time": "2026-02-05T06:00:00.000Z",
+      "wavelength_min_um": 1.11,
+      "wavelength_max_um": 1.64,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    },
+    {
+      "frame_id": "fixture-area-multivisit-v3e1-D3",
+      "detector": 3,
+      "visit": 3,
+      "exposure": 1,
+      "time": "2026-02-05T06:00:00.000Z",
+      "wavelength_min_um": 1.64,
+      "wavelength_max_um": 2.42,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    },
+    {
+      "frame_id": "fixture-area-multivisit-v3e2-D2",
+      "detector": 2,
+      "visit": 3,
+      "exposure": 2,
+      "time": "2026-02-05T06:02:00.000Z",
+      "wavelength_min_um": 1.11,
+      "wavelength_max_um": 1.64,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    },
+    {
+      "frame_id": "fixture-area-multivisit-v3e2-D3",
+      "detector": 3,
+      "visit": 3,
+      "exposure": 2,
+      "time": "2026-02-05T06:02:00.000Z",
+      "wavelength_min_um": 1.64,
+      "wavelength_max_um": 2.42,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    },
+    {
+      "frame_id": "fixture-area-multivisit-v4e1-D2",
+      "detector": 2,
+      "visit": 4,
+      "exposure": 1,
+      "time": "2026-02-06T06:00:00.000Z",
+      "wavelength_min_um": 1.11,
+      "wavelength_max_um": 1.64,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    },
+    {
+      "frame_id": "fixture-area-multivisit-v4e1-D3",
+      "detector": 3,
+      "visit": 4,
+      "exposure": 1,
+      "time": "2026-02-06T06:00:00.000Z",
+      "wavelength_min_um": 1.64,
+      "wavelength_max_um": 2.42,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    },
+    {
+      "frame_id": "fixture-area-multivisit-v4e2-D2",
+      "detector": 2,
+      "visit": 4,
+      "exposure": 2,
+      "time": "2026-02-06T06:02:00.000Z",
+      "wavelength_min_um": 1.11,
+      "wavelength_max_um": 1.64,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    },
+    {
+      "frame_id": "fixture-area-multivisit-v4e2-D3",
+      "detector": 3,
+      "visit": 4,
+      "exposure": 2,
+      "time": "2026-02-06T06:02:00.000Z",
+      "wavelength_min_um": 1.64,
+      "wavelength_max_um": 2.42,
+      "s_region": "POLYGON ICRS 209.6809462 -20.2998125 210.3190538 -20.2998125 210.3190538 -19.7001875 209.6809462 -19.7001875"
+    }
+  ],
+  "coverage": [
+    {
+      "visit": 1,
+      "polygon": [
+        [
+          209.6809462,
+          -20.2998125
+        ],
+        [
+          210.3190538,
+          -20.2998125
+        ],
+        [
+          210.3190538,
+          -19.7001875
+        ],
+        [
+          209.6809462,
+          -19.7001875
+        ]
+      ]
+    },
+    {
+      "visit": 2,
+      "polygon": [
+        [
+          209.6809462,
+          -20.2998125
+        ],
+        [
+          210.3190538,
+          -20.2998125
+        ],
+        [
+          210.3190538,
+          -19.7001875
+        ],
+        [
+          209.6809462,
+          -19.7001875
+        ]
+      ]
+    },
+    {
+      "visit": 3,
+      "polygon": [
+        [
+          209.6809462,
+          -20.2998125
+        ],
+        [
+          210.3190538,
+          -20.2998125
+        ],
+        [
+          210.3190538,
+          -19.7001875
+        ],
+        [
+          209.6809462,
+          -19.7001875
+        ]
+      ]
+    },
+    {
+      "visit": 4,
+      "polygon": [
+        [
+          209.6809462,
+          -20.2998125
+        ],
+        [
+          210.3190538,
+          -20.2998125
+        ],
+        [
+          210.3190538,
+          -19.7001875
+        ],
+        [
+          209.6809462,
+          -19.7001875
+        ]
+      ]
+    }
+  ],
+  "steps": {
+    "n_dots": 148,
+    "n_glitches": 4,
+    "n_stars": 128,
+    "n_fixed": 0,
+    "n_static_one_visit": 0,
+    "n_tracks": 1,
+    "n_possible": 0,
+    "n_found_blind": 0,
+    "n_unexplained": 1,
+    "n_unchecked": 0
+  },
+  "method": {
+    "settings": {
+      "area_version": "fixture-0",
+      "bg_box_px": 32,
+      "bg_sigma": 3.0,
+      "bg_iters": 5,
+      "k_detect": 5.0,
+      "min_sep_px": 3.0,
+      "aperture_px": 3.0,
+      "annulus_in_px": 6.0,
+      "annulus_out_px": 9.0,
+      "visit_gap_h": 1.0,
+      "k_visit": 3,
+      "r_match_min_px": 2.0,
+      "rms_max_px": 1.0,
+      "min_motion_px": 1.0,
+      "ambiguity_ratio": 0.5,
+      "rate_max_deg_day": 1.2,
+      "r_known_min_px": 3.0,
+      "v_lim": 22.0,
+      "sed_snr_min": 3.0,
+      "sed_min_dots": 6,
+      "sed_sigma_floor": 0.15,
+      "sed_chi2_max": 3.0
+    }
+  },
+  "missing": [
+    "checks:not_run"
+  ],
+  "provenance": {
+    "frames": {
+      "tag": "measured",
+      "source": "synthetic fixture: made-up frame list, not SPHEREx data"
+    },
+    "coverage": {
+      "tag": "derived",
+      "source": "synthetic fixture: made-up footprints",
+      "formula": "per visit, the union of its frames' s_region clipped to the area (A17.1)"
+    },
+    "steps": {
+      "tag": "derived",
+      "source": "synthetic fixture: counts of the fixture's own dots and tracks",
+      "formula": "labels counted in /dots, statuses and verdicts counted in /tracks (A17.3 to A17.5)"
+    }
+  }
+}
