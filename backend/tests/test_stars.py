@@ -471,3 +471,26 @@ def test_eros_visits_and_cone_keys(client: TestClient) -> None:
     assert [c.ra for c in stars.mover_star_cones(eros_frames(client), 360.0)] == [
         v.cone.ra for v in visits
     ]
+
+
+def test_prefetch_asks_for_the_overlays_keys(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The pre-fetch and /overlays build the cones with the same ``stars.mover_visits``, so the
+    pre-fetch fills exactly the keys /overlays reads (plan v2, row 8)."""
+    from scripts import prefetch
+
+    seen: list[tuple[str, str]] = []
+
+    def fetch(ctx: Any, cat: Any, cone: Any, **kw: Any) -> Any:
+        assert {k: v for k, v in kw.items() if k != "refresh"} == stars.fetch_options(cat, cone)
+        seen.append((cat, stars.cone_key(cat, cone).digest))
+        raise UpstreamUnavailable("recorded only")
+
+    monkeypatch.setattr(prefetch, "fetch_catalog", fetch)
+    ctx = client.app.state.ctx  # type: ignore[attr-defined]
+    out = prefetch.prefetch_mover_overlays(ctx, eros_frames(client), refresh=False)
+    assert sorted(seen) == sorted(
+        [("gaia", c[3]) for c in EROS_CONES] + [("wise", c[4]) for c in EROS_CONES]
+    )
+    assert out["gaia"].startswith("visit 1 FAILED") and "visit 2 FAILED" in out["wise"]
