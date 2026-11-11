@@ -18,7 +18,7 @@ Code paths are under `frontend/src/`. CSS is `index.css`. "Desktop" means wider 
 | **ObjectCard** | The data record from `GET /v1/objects/{id}/card` (D-02, D-16) | `contract/` types, `app/build/selectedBody.ts` | none | the object card |
 | **split pane** | The layout where the sky takes the left side and a pane the right | `app/App.tsx` (`data-split`) | `[data-split]` | |
 | **build pane** | The only occupant of the split pane today: the 3D view that moulds the body | `app/build/BuildPane.tsx` | `.sx-bp` | the removed floating viewer card (Q-113 item 2) |
-| **feature card** (proposed) | A tool's own card in the object card's slot, such as the Area cards of A18 | none yet | none yet | the object card (A21.5) |
+| **feature card** (built for Area, Q-406 (7)) | A tool's own card in the object card's slot, such as the Area cards of A18 | `app/shell/FeatureCard.tsx` (× only; Minimise is P9) | Area search (`app/sky/area/AreaCard.tsx`) | the object card (A21.5) |
 
 Other names: **rail** (`app/shell/ToolRail.tsx`, `.sx-rail`), **transport** (`app/shell/Transport.tsx`, `.sx-player`), **search pill** (`app/search/SearchBar.tsx`, `.sx-search`), **readout** (`app/shell/Readout.tsx`), **credit** (`.sx-sky-credit` in `app/sky/SkyPane.tsx`), **markers** and **brackets** (A21.6).
 
@@ -58,7 +58,7 @@ Other names: **rail** (`app/shell/ToolRail.tsx`, `.sx-rail`), **transport** (`ap
 | Bezel | build pane `.sx-bp` | 6 | above the bars; it stops at the insets so it does not overlap them |
 | Bezel | island `.sx-orb-wrap` | 40 | above everything; takes no clicks |
 
-**Sky layer slot** (proposed, Q-174): a tool's sky layer (A18.2) is a child of SkyPane placed after `.sx-sky-shade` and before `{children}` (object card, object panel), at z auto, so it paints over the fades and under the markers, panel, card and credit.
+**Sky layer slot** (built for Area, Q-406 (7); SkyPane's `layers` prop, with the SkyView in `SkyViewContext`): a tool's sky layer (A18.2) is a child of SkyPane placed after `.sx-sky-shade` and before `{children}` (object card, object panel), at z auto, so it paints over the fades and under the markers, panel, card and credit.
 
 ### A21.3 Phone width (≤ 640 px)
 
@@ -74,7 +74,7 @@ Other names: **rail** (`app/shell/ToolRail.tsx`, `.sx-rail`), **transport** (`ap
 
 ### A21.4 Tool rail and ToolId
 
-- `ToolId = 'sky' | 'flipbook' | 'spectrum' | 'viewer'` (`app/shell/shellStore.ts`). Labels and hints (`app/shell/ToolRail.tsx`, `TOOLS`): Sky "The sky view alone", Flipbook "SPHEREx frames of the object", Spectrum "Spectrum of the object", 3D viewer "3D view of a loaded body". Start tool: `sky`.
+- `ToolId = 'sky' | 'flipbook' | 'spectrum' | 'viewer' | 'area'` (`app/shell/shellStore.ts`). Labels and hints (`app/shell/ToolRail.tsx`, `TOOLS`): Sky "The sky view alone", Flipbook "SPHEREx frames of the object", Spectrum "Spectrum of the object", 3D viewer "3D view of a loaded body", Area search "Draw a square, then follow known objects or look for movers" (only while `AREA_TOOL_ENABLED`, issue #96). Start tool: `sky`. Every tool change sets the pointer mode to `pan`; `area` also drops a card request.
 - **Icons** are in `app/shell/railIcons.tsx` (`SHAPES: Record<ToolId, ReactNode>`): a new ToolId without a shape fails the typecheck. Every stroke has `pathLength="1"` so it draws itself again on hover (`.ai-draw`). `app/shell/icons.tsx` is a different set (`IconName`) for panel headers and buttons.
 - **Look** ([Q-121](../decisions/shell-surfaces.md) item 1): 44 × 44 px buttons; one highlight pill (`.sx-hl`) slides to the hovered button and back to the active one, placed from the button's own box (so the phone tab bar works too) and re-placed on resize; a green pip grows in on the active tool; a tooltip (z 60) shows the label to the right. No number keys; no buttons for unbuilt tools (Haptics, Comet Breath, Area search).
 - **Buttons:** `nav[aria-label="Tools"]`; each `button` has `aria-label` (the label), `aria-description` (the hint), `data-testid="tool-<id>"`. `aria-pressed` is `build.open` for 3D viewer and `tool === id && !build.open` for the others.
