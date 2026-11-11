@@ -274,7 +274,7 @@ body {
     gap: 8px;
     min-height: 48px;
     padding: 0 12px 0 8px;
-    border-radius: 14px;
+    border-radius: 10px;
     background: var(--color-sx-muted);
     border: 1px solid var(--color-sx-border);
     box-shadow: 0 8px 24px #0008;
@@ -364,6 +364,15 @@ body {
     font: 12px var(--font-mono);
     color: var(--color-sx-mfg);
     white-space: nowrap;
+  }
+  .sx-wgrid {
+    display: inline-grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+  }
+  .sx-frame-n {
+    color: var(--color-sx-mfg);
   }
   /* Shown instead of the scrubber while the colour composite (one picture) is on screen. */
   .sx-player-note {
@@ -3591,8 +3600,10 @@ body {
       transition: left 0.6s var(--sx-spring);
     }
     /* Clear of the card that opens at the bottom right (the mock-up slides its dock left). */
+    /* Centred; it only slides left when the card at the bottom right (424 px with its gap) would
+       overlap it: half the dock is about 125 px (the search open is wider, it grows over the gap). */
     .sx-bezel:has(.sx-panel, .sx-island-wrap) .sx-sdock {
-      left: max(458px, min(50%, calc(100% - 752px)));
+      left: max(340px, min(50%, calc(100% - 565px)));
     }
     .sx-sdock-inner {
       position: relative;
@@ -3848,5 +3859,80 @@ body {
       left: 50%;
       transform: translateX(-50%);
     }
+  }
+}
+
+/* ---- Discovery (the mock-up's area tool): drawing cursor, the square, the two options ---- */
+@layer components {
+  .sx-sky-pane:has(.sx-area-drawing) canvas {
+    cursor: crosshair;
+  }
+  .sx-area-sq {
+    position: absolute;
+    z-index: 5;
+    pointer-events: none;
+    box-sizing: border-box;
+    border: 1.5px solid var(--accent);
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+  .sx-ar-opts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .sx-ar-opt {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    text-align: left;
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--s2);
+    border: 1px solid var(--line);
+    color: var(--fg);
+    transition:
+      background 0.2s,
+      border-color 0.2s;
+  }
+  .sx-ar-opt:hover {
+    background: var(--s3);
+    border-color: var(--accent);
+  }
+  .sx-ar-opt:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .sx-ar-opt .sx-ico {
+    color: var(--accent);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+  }
+  .sx-ar-opt b {
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+  .sx-ar-opt span {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+}
+
+@layer components {
+  /* Mock-up widths: 380 while drawing, 408 once the square is set. */
+  .sx-panel[data-testid='area-card'] {
+    width: min(408px, calc(100% - 64px));
+  }
+  .sx-panel[data-testid='area-card']:has(.sx-area-drawing) {
+    width: min(380px, calc(100% - 64px));
+  }
+  .sx-ar-note {
+    min-height: 1.2em;
+    margin: 0;
+    font-size: 12px;
+    color: var(--muted);
   }
 }

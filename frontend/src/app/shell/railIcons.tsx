@@ -23,6 +23,15 @@ const SHAPES: Record<ToolId, ReactNode> = {
   ),
   // mock-up `bars`
   spectrum: <path pathLength="1" d="M3 10v4M7 7v10M11 3v18M15 8v8M19 5v14" />,
+  // mock-up `dots` (Discovery)
+  area: (
+    <>
+      <circle pathLength="1" cx="6" cy="7" r="2.2" />
+      <circle pathLength="1" cx="16" cy="6" r="2.2" />
+      <circle pathLength="1" cx="10" cy="15" r="2.2" />
+      <circle pathLength="1" cx="19" cy="17" r="2.2" />
+    </>
+  ),
   viewer: (
     <>
       <path pathLength="1" d="M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z" />
