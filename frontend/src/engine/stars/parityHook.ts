@@ -90,7 +90,7 @@ export function installParityHook(): void {
     /** Square PNG of the engine's layers, composited as the harness does (overlays with 'screen'). */
     capture(S: number): string {
       const e = current!;
-      return sized(e, 716, 447, () => {
+      return sized(e, 704.0625, 439.28125, () => { // the artifact stage size exactly (1200x900 viewport, DPR 1)
         e.draw(); // draw and read back in the same task: the GL canvases do not keep their buffer
         const out = document.createElement('canvas');
         out.width = out.height = S;
