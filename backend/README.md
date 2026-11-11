@@ -216,7 +216,7 @@ app/api/          (Kevin, R10)  resolve.py, objects.py, models.py, deps.py; spec
 app/cache/        keys.py, store.py: D-25 read-through cache
 app/adapters/     http.py, irsa_sia.py, irsa_cutout.py, simbad.py, sbdb.py, horizons.py, skybot.py
 app/contract/     generated from shared/schemas/ (D-18, do not edit): ObjectCard, RenderParams
-app/core/find/    (Kevin, Stage 1, A4.1) ids, resolver, propagate, wcs, frames, cutouts, png
+app/core/find/    (Kevin, Stage 1, A4.1) ids, resolver, propagate, wcs, frames, cutouts, png; stars, catalogs (star list for movers, A19.6, Atish)
 app/core/measure/ (Moon, Stage 2, A4.2) config, flags, aperture, solid_angle, photometry, spectrum
 app/core/classify/ (Atish, Stage 3, A4.3) rules.py: R3.3 type selection; R12 #12 exoplanet thresholds block (all None)
 app/core/card/    (Kevin, Stages 4-5, A4.4-A4.5) catalogue, build, assets (A5.4 store), validate, service

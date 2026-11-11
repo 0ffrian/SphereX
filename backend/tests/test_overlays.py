@@ -405,7 +405,9 @@ def test_mover_live_cones_are_capped_per_request(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """20 visits, nothing cached, online: at most MAX_LIVE_VISIT_CONES new cones per catalogue
-    per request; the rest wait (``:pending``) for a later request."""
+    per request (submitted visit by visit, both catalogues progressing); the rest wait
+    (``:pending``) for a later request. Every cone fails: 3 requests fetch 20 distinct cones per
+    catalogue, each once."""
     ctx = make_context(make_settings(tmp_path / "cache", offline=False))
     frames = FrameService(ctx)
     fr = FramesResult("sbdb-x", _synthetic_visits(20), [], None)
@@ -421,12 +423,20 @@ def test_mover_live_cones_are_capped_per_request(
     try:
         obj: Any = SimpleNamespace(id="sbdb-x", moving=True)
         body = service.get_overlays(obj).body
+        cap = stars.MAX_LIVE_VISIT_CONES
+        assert sum(c == "gaia" for c, _ in calls) == cap
+        assert sum(c == "wise" for c, _ in calls) == cap
+        assert "overlay:gaia" in body["missing"]  # the started ones failed; failure wins
+        # Review F6 (failure-TTL budget): failed cones inside their TTL start nothing, so the
+        # next requests start the next batches; 3 requests reach all 20 visits, each once.
+        for _ in range(2):
+            service.get_overlays(obj)
     finally:
         service.close()
         frames.close()
-    cap = stars.MAX_LIVE_VISIT_CONES
-    assert sum(c == "gaia" for c, _ in calls) == cap and sum(c == "wise" for c, _ in calls) == cap
-    assert "overlay:gaia" in body["missing"]  # the started ones failed; failure wins
+    for cat in ("gaia", "wise"):
+        ras = [ra for c, ra in calls if c == cat]
+        assert len(ras) == 20 and len(set(ras)) == 20, (cat, len(ras), len(set(ras)))
 
 
 def test_mover_cones_pend_without_blocking_fixed_cones(

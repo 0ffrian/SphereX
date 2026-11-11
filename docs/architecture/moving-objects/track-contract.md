@@ -2,7 +2,7 @@
 
 > **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A19.9 to A19.15 · **Implements:** [Q-137](../../decisions/scope-process.md), [Q-135, Q-136, Q-141, Q-145](../../decisions/moving-objects.md), D-16, D-18 ([contract](../../decisions/contract.md)), D-02, D-21 ([contract-tags](../../decisions/contract-tags.md)), D-25 ([data-sources](../../decisions/data-sources.md)) · **Read with:** [track.md](track.md) (A19 to A19.8), [track-ui.md](track-ui.md) (A20), [area-backend.md](area-backend.md) (A17.7)
 
-Status: **not built** (every section is **To build**). Owner: Kevin (**Proposed (Q-183)**). Sections A19.1 to A19.8 (scope, entry points, frames, positions, path endpoint, star list, photometry, extended sources) are in [track.md](track.md).
+Status: **not built**, except the star list for movers ([A19.6](track.md#a196-star-list-for-movers), #95). Owner: Kevin (**Proposed (Q-183)**). Sections A19.1 to A19.8 (scope, entry points, frames, positions, path endpoint, star list, photometry, extended sources) are in [track.md](track.md).
 
 ## A19 Track (continued)
 
