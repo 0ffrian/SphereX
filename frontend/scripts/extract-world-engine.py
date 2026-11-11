@@ -16,6 +16,8 @@ Issue #93 (phase 1, the first-open freeze and performance): its deviations ARE p
 split WorldGL slices and their SUBS), with the PR #89 renames of the same slices (shaders.js, WorldGL). Still not
 ported from PR #89: the L1701-L1726 and L1728-L1765 renames with the L1727 split, the gas.js renames, and core.js's
 header lines 4-5.
+Issue #93 phase 2 (repeating patterns): DEV93_PATTERNS (shaders.js), DEV93_SEED (core.js, WorldGL) and DEV93_RIVER
+(terrain.js, in place of L1884) are ported the same way.
 """
 import sys, os, re
 
@@ -146,7 +148,144 @@ DEV93_TERRAIN = r'''// @deviation (#93 1.5) the renames below build the terrain 
 // The result is shared read-only; nothing in the engine writes to it.'''
 DEV93_LINK_FIRST = r'''// @deviation (#93 1.2) every program is linked before the first step or draw (WorldGL.link); a host that wants no
 // main-thread wait polls W.gl.poll() until it is true (WorldEngine.whenReady) before it loads a world.
-['cloudStep', 'gasStep', 'draw'].forEach(function (k) { var f = W.gl[k]; W.gl[k] = function () { W.gl.link(k === 'draw' && !!W.fly); return f.apply(W.gl, arguments); }; });'''
+// (#93 3.1) and then sets the world's seed uniforms (WorldGL.seedFor; a no-op once they are set).
+['cloudStep', 'gasStep', 'draw'].forEach(function (k) { var f = W.gl[k]; W.gl[k] = function () { W.gl.link(k === 'draw' && !!W.fly); W.gl.seedFor(W.p); return f.apply(W.gl, arguments); }; });'''
+
+DEV93_SEED = r'''// @deviation (#93 3.1, 3.2, 3.4, 3.9) the seed uniforms of shaders.js's patterns(), set once per program and world (a
+// uniform keeps its value in its program). A prototype preset (no seed3) gets uSeed3 = (seed, seed, seed), uSeedN = 0
+// and uNzSph = 0, which is exactly what it drew before; a card world (cardToWorld: seed3, three hashed integers in
+// [0, 256)) gets uSeed3 = uSeedN = seed3 and the seeded gas noise (uNzSph = 1).
+  var seedOn = {};
+  this.seedFor = function (p) {
+    var card = !!p.seed3, s3 = card ? p.seed3 : [p.seed, p.seed, p.seed], sN = card ? p.seed3 : [0, 0, 0], key = s3.join() + '|' + sN.join() + '|' + card, pr = { A: [pA, uA], G: [pG, uG], W: [pW, uW], F: [pF, uF] }, k, q;
+    for (k in pr) { q = pr[k]; if (!q[0] || seedOn[k] === key) continue; gl.useProgram(q[0]); if (q[1].uSeed3) gl.uniform3fv(q[1].uSeed3, s3); if (q[1].uSeedN) gl.uniform3fv(q[1].uSeedN, sN); if (q[1].uNzSph) gl.uniform1f(q[1].uNzSph, card ? 1 : 0); seedOn[k] = key; }
+  };'''
+DEV93_PATTERNS = r'''// @deviation (#93 3) repeating patterns. Text edits applied to the shader sources above; each must match exactly as
+// often as stated, so a changed prototype fails loudly. Presets render as before: core.js sets uSeed3 = (seed, seed,
+// seed), uSeedN = 0 and uNzSph = 0 for them (WorldGL.seedFor); only card worlds (preset.seed3) get the new seeds.
+//  2.1, 2.9  uSeed3: every noise offset +uSeed (the prototype's one seed along (1, 1, 1)) becomes +uSeed3, a vec3; a
+//            card world gets three hashed integers in [0, 256) (engine/seed.ts), so two cards never share a shifted
+//            copy of one pattern.
+//  2.4       uSeedN: the layers that had no seed (sea-ice tint, convective clouds, waves, fly-view sea ice, slope rock
+//            colour) add uSeedN, 0 for presets and the card's offset for cards.
+//  2.2       GAS_FS: the tracer's source noise was one unseeded 512 x 256 texture tiled 4 x 3 times, the same on every
+//            gas giant, and the east-west jets never smeared the four copies out. With uNzSph = 1 (cards) it is value
+//            noise from the sphere direction and the seed, fbm(dir * (24, 54, 24) + uSeed3, 4): the stretched
+//            frequencies keep the streak density, and there is nothing to tile.
+//  2.5       FLY_FS: the gully stripes and the gas giant's small-scale detail were laid out on the plane under the
+//            camera (C0, CA, CB), so they slid and stretched as the camera moved. They are now laid out on the faces
+//            of a cube fixed to the planet (gnomonic projection on the face of the largest component of d, blended
+//            across the seams from the two or three largest components). The gully direction and the wind advection
+//            are mapped into face coordinates by the projection's Jacobian, and the shading gradient back by its
+//            transpose, so both stay consistent with the surface.
+//  2.6       FLY_FS lod(): an octave faded out over a factor 2.4 of pixel footprint, so detail popped in at its own
+//            distance; it now fades on log2(FP f) over two octaves (full below 0.15 cycles per pixel, gone at 0.62).
+//  2.7       FLY_FS: the 720 x 360 height grid (55.6 km a texel on an Earth-size world) and the climate grids are read
+//            with a cubic B-spline from 4 bilinear taps (Sigg and Hadwiger 2005, GPU Gems 2 ch. 20) instead of plain
+//            bilinear, so slope no longer breaks on every texel line; the coastline warp gains a low-frequency term of
+//            about 1.2 texels (artistic). viewer haptics read the same filter (engine/worlds/fieldSampler.ts).
+function patterns() {
+  function rep(src, a, b, n) {
+    var k = src.split(a).length - 1;
+    if (k !== (n || 1)) throw new Error('#93 patterns: ' + k + ' matches of ' + a.slice(0, 70));
+    return src.split(a).join(b);
+  }
+  function between(src, a, b, repl) {
+    var i = src.indexOf(a), j = src.indexOf(b);
+    if (i < 0 || j < i || src.indexOf(a, i + 1) >= 0 || src.indexOf(b, j + 1) >= 0) throw new Error('#93 patterns: block ' + a.slice(0, 50));
+    return src.slice(0, i) + repl + src.slice(j + b.length);
+  }
+  var DECL = 'precision highp float;\nuniform vec3 uSeed3,uSeedN;\n';
+  function seed3(src) { return rep(src, 'precision highp float;\n', DECL).replace(/\+uSeed\b/g, '+uSeed3'); }
+  ADV_FS = seed3(ADV_FS);
+  WORLD_FS = seed3(WORLD_FS);
+  WORLD_FS = rep(WORLD_FS, 'fbm(b*70.,3)', 'fbm(b*70.+uSeedN,3)');
+  WORLD_FS = rep(WORLD_FS, 'fbm(b*60.+uTime*.02,4)', 'fbm(b*60.+uSeedN+uTime*.02,4)');
+  GAS_FS = rep(GAS_FS, 'precision highp float;\n', 'precision highp float;\nuniform vec3 uSeed3;uniform float uNzSph;\n');
+  GAS_FS = rep(GAS_FS, 'const float PI=3.14159265,TAU=6.2831853;\n', 'const float PI=3.14159265,TAU=6.2831853;\n' + NOISE +
+    'vec3 gDir(vec2 uv){float lo=(uv.x-.5)*TAU,la=(uv.y-.5)*PI,c=cos(la);return vec3(c*cos(lo),sin(la),c*sin(lo));}\n');
+  GAS_FS = rep(GAS_FS, 'float nz=texture(uNz,uv*vec2(4.,3.)).r,', 'float nz=uNzSph>.5?fbm(gDir(uv)*vec3(24.,54.,24.)+uSeed3,4):texture(uNz,uv*vec2(4.,3.)).r,');
+  var F = seed3(FLY_FS);
+  F = rep(F, 'fbm(d*2600.+uTime*.2,3)', 'fbm(d*2600.+uSeedN+uTime*.2,3)');
+  F = rep(F, 'fbm(d*2600.+7.-uTime*.17,3)', 'fbm(d*2600.+uSeedN+7.-uTime*.17,3)');
+  F = rep(F, 'fbm(d*2600.+13.,3)', 'fbm(d*2600.+uSeedN+13.,3)');
+  F = rep(F, 'fbmL(d*700.,700.,3)', 'fbmL(d*700.+uSeedN,700.,3)');
+  F = rep(F, 'fbmL(d*5000.,5000.,3)', 'fbmL(d*5000.+uSeedN,5000.,3)');
+  // 2.6
+  F = rep(F, 'float lod(float f){return 1.-smoothstep(.25,.6,FP*f);}', 'float lod(float f){return 1.-smoothstep(-2.7,-.7,log2(max(FP*f,1e-12)));}');
+  // 2.5 cube faces and 2.7 B-spline reads
+  F = rep(F, 'float FP,HV,MX;vec3 C0,CA,CB,EXT,SCR,SCM;\n', 'float FP,HV,MX;vec3 C0,CA,CB,EXT,SCR,SCM;\n' +
+    'vec3 FAF,FAA,FAB;float GZ;\n' +
+    '/* cube face k (0 x, 1 y, 2 z) on the side of d: normal FAF and a fixed right-handed tangent basis FAA, FAB */\n' +
+    'void cubeFace(int k,vec3 d){float s=d[k]<0.?-1.:1.;if(k==0){FAF=vec3(s,0,0);FAA=vec3(0,0,-s);FAB=vec3(0,1,0);}else if(k==1){FAF=vec3(0,s,0);FAA=vec3(1,0,0);FAB=vec3(0,0,-s);}else{FAF=vec3(0,0,s);FAA=vec3(s,0,0);FAB=vec3(0,1,0);}GZ=float(k)*2.+step(0.,s);}\n' +
+    '/* blend weights of the three faces: 1 on the dominant face, fading out where another component is within 18 % of it */\n' +
+    'vec3 faceW(vec3 d){vec3 a=abs(d);float m=max(a.x,max(a.y,a.z));vec3 w=smoothstep(.82,1.,a/m);return w/(w.x+w.y+w.z);}\n');
+  F = rep(F, 'float rsph(', '/* cubic B-spline read from 4 bilinear taps (Sigg and Hadwiger 2005); wraps in longitude, clamps at the poles */\n' +
+    'vec4 bsp(sampler2D t,vec2 uv){vec2 sz=vec2(textureSize(t,0)),p=uv*sz-.5,i=floor(p),f=p-i,f2=f*f,f3=f2*f;\n' +
+    ' vec2 w0=(1.-3.*f+3.*f2-f3)/6.,w1=(4.-6.*f2+3.*f3)/6.,w2=(1.+3.*f+3.*f2-3.*f3)/6.,w3=f3/6.,g0=w0+w1,g1=w2+w3;\n' +
+    ' vec2 h0=(i-.5+w1/g0)/sz,h1=(i+1.5+w3/g1)/sz;\n' +
+    ' return g0.y*(g0.x*texture(t,h0)+g1.x*texture(t,vec2(h1.x,h0.y)))+g1.y*(g0.x*texture(t,vec2(h0.x,h1.y))+g1.x*texture(t,h1));}\n' +
+    'float rsph(');
+  // The cubic read costs 4 taps where bilinear costs 1, and hKm runs at every march and shadow step (about 30 % on the
+  // fly frame when used there). So the march and the shadow steps keep the bilinear read (HQ false) and only the
+  // shading reads (the normal, the shaded height and the climate) are cubic: slope, snow and colour no longer break
+  // on the texel lines; the hit point and the shadow follow the bilinear surface, at most a fraction of the relief off.
+  F = rep(F, 'float FP,HV,MX;', 'bool HQ=false;float FP,HV,MX;');
+  // The coastline warp: the two fine octaves as before (0.46 and 0.14 texel) plus a low-frequency one of about 1.5
+  // texels; each octave is one vector value noise (vn3, the three channels of h33) instead of three scalar ones, so the
+  // three octaves cost about what the prototype's two did (hKm runs at every march step).
+  F = rep(F, 'float rsph(', 'vec3 vn3(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);\n' +
+    ' return mix(mix(mix(h33(i),h33(i+vec3(1,0,0)),f.x),mix(h33(i+vec3(0,1,0)),h33(i+vec3(1,1,0)),f.x),f.y),\n' +
+    ' mix(mix(h33(i+vec3(0,0,1)),h33(i+vec3(1,0,1)),f.x),mix(h33(i+vec3(0,1,1)),h33(i+vec3(1,1,1)),f.x),f.y),f.z);}\n' +
+    'float rsph(');
+  F = rep(F, 'vec2 uv=uvOf(normalize(d+(vec3(vn(wq),vn(wq+7.3),vn(wq+3.1))-.5)*.008+(vec3(vn(wq*4.),vn(wq*4.+7.3),vn(wq*4.+3.1))-.5)*.0025));float e=texture(uHt,uv).r,',
+    'vec2 uv=uvOf(normalize(d+(vn3(wq)-.5)*.008+(vn3(wq*4.)-.5)*.0025+(vn3(wq*.2+11.)-.5)*.026));float e=HQ?bsp(uHt,uv).r:texture(uHt,uv).r,');
+  F = rep(F, 'vec3 d=normalize(p);vec2 uv=uvOf(d);float mud=dot(d,uLb);', 'HQ=true;vec3 d=normalize(p);vec2 uv=uvOf(d);float mud=dot(d,uLb);');
+  F = rep(F, '   float sh=1.;\n', '   HQ=false;float sh=1.;\n');
+  // the shadow ray starts on the bilinear surface it marches against (from the cubic p0 it would start inside it)
+  F = rep(F, 'vec3 s2=p0+d*2e-6;', 'vec3 s2=d*surfR(d)+d*2e-6;');
+  F = rep(F, 'vec4 E=texture(uEb,uv),hy=texture(uHy,uv);', 'HQ=true;vec4 E=texture(uEb,uv),hy=texture(uHy,uv);');
+  F = rep(F, 'vec4 E=texture(uEb,uv),hy=texture(uHy,uv);float e=texture(uHt,uv).r,', 'vec4 E=bsp(uEb,uv),hy=texture(uHy,uv);float e=bsp(uHt,uv).r,');
+  F = rep(F, 'float wet=clamp(texture(uEb2,uv).r,0.,1.);', 'float wet=clamp(bsp(uEb2,uv).r,0.,1.);');
+  F = rep(F, 'h33(vec3(ip+o,uSeed))', 'h33(vec3(ip+o,GZ)+uSeed3)');
+  F = between(F, 'vec2 X=vec2(dot(d,CA),dot(d,CB))/max(dot(d,C0),.05);', 'vec3 n=normalize(d-(CA*gx+CB*gy)/ex2*.0008*(.5+br));',
+    'float tb=texture(uBand,vec2(.5,uv.y)).b,fpX=FP;vec3 fw=faceW(d),cc=vec3(0.),gn=vec3(0.);\n' +
+    '   for(int k=0;k<3+uZ0;k++){float wk=fw[k];if(wk<.001)continue;cubeFace(k,d);vec3 s1=uSeed3+vec3(0.,0.,GZ*7.3);\n' +
+    '    float dF0=dot(d,FAF);FP=fpX/(dF0*dF0);vec2 X=vec2(dot(d,FAA),dot(d,FAB))/dF0,X0=X;\n' +
+    '    for(int i=0;i<10+uZ0;i++){vec3 dd=normalize(FAF+FAA*X.x+FAB*X.y);vec4 v=texture(uVel,uvOf(dd));\n' +
+    '     vec3 E=normalize(cross(vec3(0,1,0),dd)),N=cross(dd,E);vec3 V=E*v.x*sqrt(max(1.-dd.y*dd.y,0.))+N*v.y;\n' +
+    '     vec2 Y1=X*55.,Y2=X*170.+3.;float e=.2;\n' +
+    '     vec2 c1=vec2(vn(vec3(Y1.x,Y1.y+e,0.)+s1)-vn(vec3(Y1.x,Y1.y-e,0.)+s1),vn(vec3(Y1.x-e,Y1.y,0.)+s1)-vn(vec3(Y1.x+e,Y1.y,0.)+s1))/(2.*e);\n' +
+    '     vec2 c2=vec2(vn(vec3(Y2.x,Y2.y+e,0.)+s1)-vn(vec3(Y2.x,Y2.y-e,0.)+s1),vn(vec3(Y2.x-e,Y2.y,0.)+s1)-vn(vec3(Y2.x+e,Y2.y,0.)+s1))/(2.*e);\n' +
+    '     X-=(vec2(dot(V,FAA),dot(V,FAB))-X*dot(V,FAF))/dot(dd,FAF)*.004+(c1*(.3/55.)*lod(55.)+c2*(.25/170.)*lod(170.))*(.2+1.6*tb);}\n' +
+    '    vec3 df=normalize(FAF+FAA*X.x+FAB*X.y);vec2 uf=uvOf(df);\n' +
+    '    vec4 tt=tex4(uTr,uf),bd=texture(uBand,vec2(.5,uf.y));\n' +
+    '    float dye=fbmL(vec3(X*300.,0.)+s1,300.,4),dye2=fbmL(vec3(X*70.,4.)+s1,70.,3),ex2=.6/300.;\n' +
+    '    float streak=(tt.b-.5)*(.08+.55*bd.b)+(dye-.5)*(.3+.6*bd.b),br=tt.r+streak*.5;\n' +
+    '    vec3 ck=mix(uZ,uB,clamp(tt.g+streak*.9,0.,1.));ck=mix(ck,uS,clamp(tt.a*1.15,0.,.92));ck*=.38+.78*br;ck=mix(ck,uP*(.74+.5*br),bd.a*.85);\n' +
+    '    ck=mix(ck,uP*(.55+.8*dye),smoothstep(.55,.78,dye2)*(.25+.6*tb)*.7);ck=mix(ck,mix(uB,uS,dye)*(.55+.7*br),smoothstep(.45,.75,dye2)*tb*.55);\n' +
+    '    float gx=fbmL(vec3((X+vec2(ex2,0.))*300.,0.)+s1,300.,4)-dye,gy=fbmL(vec3((X+vec2(0.,ex2))*300.,0.)+s1,300.,4)-dye;\n' +
+    '    vec2 g2=vec2(gx,gy)/ex2*.0008*(.5+br);\n' +
+    '    cc+=wk*ck;gn+=wk*(FAA*g2.x+FAB*g2.y-FAF*dot(g2,X0))/dF0;}\n' +
+    '   FP=fpX;vec3 n=normalize(d-(gn-d*dot(gn,d)));');
+  F = between(F, 'vec2 P=vec2(dot(d,CA),dot(d,CB))/max(dot(d,C0),.05)*uRkm;', 'n=normalize(n-(CA*gd.x+CB*gd.y)*.3*uEx);',
+    'vec3 sl=n-d*dot(n,d),fw=faceW(d),gt=vec3(0.);float G=0.;\n' +
+    '   for(int k=0;k<3+uZ0;k++){float wk=fw[k];if(wk<.001)continue;cubeFace(k,d);float dF=dot(d,FAF);vec2 X=vec2(dot(d,FAA),dot(d,FAB))/dF,P=X*uRkm;\n' +
+    '    vec2 s2d=(vec2(dot(sl,FAA),dot(sl,FAB))-X*dot(sl,FAF))/dF;float sm=length(s2d);\n' +
+    '    vec2 dir=sm>1e-5?vec2(-s2d.y,s2d.x)/sm:vec2(1.,0.);float Gk=0.,ga=1.,fq=.16;vec2 gd=vec2(0.);\n' +
+    '    for(int i=0;i<3+uZ0;i++){float w=lod(fq*uRkm/(dF*dF));vec3 g3=gully(P*fq,dir);Gk+=ga*g3.x*w;gd+=ga*g3.yz*fq*w;ga*=.5;fq*=2.3;}\n' +
+    '    G+=wk*Gk;gt+=wk*(FAA*gd.x+FAB*gd.y-FAF*dot(gd,X))/dF;}\n' +
+    '   float gw=smoothstep(.03,.18,slope)*(1.-step(hk,.001)*uOcean);G*=gw;gt*=gw;\n' +
+    '   n=normalize(n-(gt-d*dot(gt,d))*.3*uEx);');
+  if (/[^A-Za-z]uSeed[^3A-Za-z]/.test(F.replace(/uniform[^;]*;/g, ''))) throw new Error('#93 patterns: a scalar uSeed is left in FLY_FS');
+  FLY_FS = F;
+}
+patterns();'''
+DEV93_RIVER = r'''// @deviation (#93 3.4) the river relief noise had no seed, so every world's rivers wandered over the same pattern. It
+// is offset by t.so, the card world's seed3 (terrainCache.js sets it; three integers in [0, 256)); a prototype preset
+// has none and reads at an offset of 0, exactly as before. Replaces the prototype's line L1884.
+  var so = t.so || [0, 0, 0];
+  for (i = 0; i < N; i++) { var yq = Math.floor(i / Wd), xq = i - yq * Wd, laq = ((yq + 0.5) / Hd - 0.5) * Math.PI, loq = ((xq + 0.5) / Wd - 0.5) * 6.2832, cq = Math.cos(laq), px = cq * Math.cos(loq) * 24, py = Math.sin(laq) * 24, pz = cq * Math.sin(loq) * 24; h[i] = t.data[i * 2]; if (h[i] > 0) h[i] += 0.12 * (fbm3(px + so[0], py + so[1], pz + so[2], 4) - 0.5) + 0.05 * (fbm3(px * 3.1 + so[0], py * 3.1 + so[1], pz * 3.1 + so[2], 3) - 0.5); }'''
 
 
 os.makedirs(OUT, exist_ok=True)
@@ -162,14 +301,14 @@ w('shaders.js', hdr('shaders: NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS', '1299-16
   sl(1299, 1678, [('1.+3.*uEx/uRkm', '1.+uCloudKm*uEx/uRkm'),          # PR #89 review 1
                   ('uCloudKm,uHkm;', 'uCloudKm,uHkm,uScale;'),         # #93 1.4
                   ('uFov/uR.y', 'uFov*uScale/uR.y')]) + '\n' +          # #93 1.4 (3 places)
-  DEV93_SHADERS + '\nexport { NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS };\n')
+  DEV93_SHADERS + '\n' + DEV93_PATTERNS + '\nexport { NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS };\n')
 
 # presets.js: FLUIDS, WP
 w('presets.js', hdr('FLUIDS and WP (example presets)', '1679-1700') + sl(1679, 1700) + '\nexport { FLUIDS, WP };\n')
 
 # terrain.js: CPU noise, buildTerrain, routeTerrain (pure)
 w('terrain.js', hdr('CPU value noise, plate-tectonic terrain build, river routing', '1767-1905') + HELPERS_IMPORT +
-  sl(1766, 1905) + '\nexport { hsh, vn3, fbm3, buildTerrain, routeTerrain };\n')
+  sl(1766, 1883) + '\n' + DEV93_RIVER + '\n' + sl(1885, 1905) + '\nexport { hsh, vn3, fbm3, buildTerrain, routeTerrain };\n')
 
 # gas.js: GAS_NODES, gasProfile, GasSim (pure)
 w('gas.js', hdr('gas giants: GAS_NODES, gasProfile, GasSim', '2149-2261') + HELPERS_IMPORT +
@@ -196,6 +335,7 @@ core.append(sl(1906, 2147))                 # hydroRaster, EB
 core.append(DEV89_WORLDGL)
 core.append(sl(2262, 2265))
 core.append(DEV93_COMPILE)                   # replaces L2266: submit, poll, link (#93 1.2, 1.3)
+core.append(DEV93_SEED)                      # seed uniforms (#93 3.1, 3.2, 3.4, 3.9)
 core.append(sl(2267, 2301, [('2.214)', '2.2165)'), ('0.005)', '0.0027)'), ('0.004)', '0.0012)')]))   # PR #89 review 3
 core.append(DEV93_SCALER)                    # replaces L2302-L2303 (#93 1.7)
 core.append(sl(2304, 2315))

@@ -22,6 +22,11 @@ export interface WorldPreset {
   mu: number;
   sea?: number;
   seed: number;
+  /**
+   * Card worlds only (#93 2.9): three integers in [0, 256) the shaders add to their noise coordinates (seedVec of the
+   * seed). A prototype preset has none and keeps its seed along (1, 1, 1), so it draws as in the prototype.
+   */
+  seed3?: [number, number, number];
   ocean?: boolean;
   A?: number;
   Tint?: number;

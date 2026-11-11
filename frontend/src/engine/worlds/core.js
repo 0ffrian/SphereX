@@ -371,6 +371,15 @@ function WorldGL(canvas) {
   this.poll = function () { for (var k in jobs) if (jobs[k] && !compileDone(gl, jobs[k], pex)) return false; link(); return true; };
   this.link = function (fly) { if (fly && !jobs.F) jobs.F = compileStart(gl, FULL, FLY_FS); link(); };
   this.programs = function () { return Object.keys(jobs).filter(function (k) { return !!jobs[k]; }).length; };
+// @deviation (#93 3.1, 3.2, 3.4, 3.9) the seed uniforms of shaders.js's patterns(), set once per program and world (a
+// uniform keeps its value in its program). A prototype preset (no seed3) gets uSeed3 = (seed, seed, seed), uSeedN = 0
+// and uNzSph = 0, which is exactly what it drew before; a card world (cardToWorld: seed3, three hashed integers in
+// [0, 256)) gets uSeed3 = uSeedN = seed3 and the seeded gas noise (uNzSph = 1).
+  var seedOn = {};
+  this.seedFor = function (p) {
+    var card = !!p.seed3, s3 = card ? p.seed3 : [p.seed, p.seed, p.seed], sN = card ? p.seed3 : [0, 0, 0], key = s3.join() + '|' + sN.join() + '|' + card, pr = { A: [pA, uA], G: [pG, uG], W: [pW, uW], F: [pF, uF] }, k, q;
+    for (k in pr) { q = pr[k]; if (!q[0] || seedOn[k] === key) continue; gl.useProgram(q[0]); if (q[1].uSeed3) gl.uniform3fv(q[1].uSeed3, s3); if (q[1].uSeedN) gl.uniform3fv(q[1].uSeedN, sN); if (q[1].uNzSph) gl.uniform1f(q[1].uNzSph, card ? 1 : 0); seedOn[k] = key; }
+  };
 // @verbatim L2267-L2301
 // @rename 2.214)=>2.2165) 0.005)=>0.0027) 0.004)=>0.0012)
   gl.bindVertexArray(gl.createVertexArray());
@@ -617,7 +626,8 @@ function flyAimDefault() {   // land where the Sun is about 35 degrees up from o
 W.gl = new WorldGL(canvas);
 // @deviation (#93 1.2) every program is linked before the first step or draw (WorldGL.link); a host that wants no
 // main-thread wait polls W.gl.poll() until it is true (WorldEngine.whenReady) before it loads a world.
-['cloudStep', 'gasStep', 'draw'].forEach(function (k) { var f = W.gl[k]; W.gl[k] = function () { W.gl.link(k === 'draw' && !!W.fly); return f.apply(W.gl, arguments); }; });
+// (#93 3.1) and then sets the world's seed uniforms (WorldGL.seedFor; a no-op once they are set).
+['cloudStep', 'gasStep', 'draw'].forEach(function (k) { var f = W.gl[k]; W.gl[k] = function () { W.gl.link(k === 'draw' && !!W.fly); W.gl.seedFor(W.p); return f.apply(W.gl, arguments); }; });
 return {
   W: W, EB: EB, ORB: ORB, OCEANF: OCEANF, GAS_NODES: GAS_NODES, FLUIDS: FLUIDS,
   getGS: function () { return GS; },

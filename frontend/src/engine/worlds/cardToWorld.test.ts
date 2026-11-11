@@ -267,6 +267,19 @@ describe('cardToWorld: any other exoplanet goes through general defaults', () =>
     expect(seedFromId('a')).toBe(seedFromId('a'));
     expect(seedFromId('a')).not.toBe(seedFromId('b'));
   });
+  it('a card world gets a vec3 seed (#93 2.9); an artifact preset keeps its integer seed and none', () => {
+    const r = cardToWorld(OWN);
+    if (!r.ok) throw new Error('refused');
+    expect(r.preset.seed3).toHaveLength(3);
+    for (const c of r.preset.seed3!) expect(Number.isInteger(c) && c >= 0 && c < 256).toBe(true);
+    expect(r.tags.seed3).toBe('artistic');
+    const ids = new Set<string>();
+    for (let i = 0; i < 40; i++) {
+      const c = cardToWorld({ ...OWN, id: 'user-own-' + i });
+      if (c.ok) ids.add(c.preset.seed3!.join(','));
+    }
+    expect(ids.size).toBe(40);
+  });
   it('refuses with the list of what is missing', () => {
     const thin = cardToWorld(
       card({ id: 'simbad-kepler-22b', name: 'Kepler-22b', type: 'candidate' }),
