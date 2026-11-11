@@ -89,5 +89,6 @@ Milestone M4 Extras, priority P1 because Track is the MVP demo (**Proposed (Q-18
 | CDS permission for an order-11 copy | Atish | Open (Q-136) |
 | Mask radius formula (G and W1 zero points, 2 to 10 px), `W1 < 16.5`, the 8 px near-track distance, the 3″ de-dupe radius | Atish (Q-404) | **[verify]** on the Eros frames: radial profiles of isolated stars per magnitude bin; W1 depth against SPHEREx QR2 point-source depth (Q-403) |
 | `MAX_LIVE_VISIT_CONES` = 8 per catalogue per request | Atish | Assumption (Q-403 (6)) |
+| ESA archive synchronous row limit for the 50000-row area cone | Atish | **[verify]**; until verified, P4 refuses an area Gaia answer not served from `gaia_dr3_source` (Q-403 (5)) |
 | Size of the marker's interpolation error | Kevin | **[verify]** against TLIST |
 | `SX_MOVING_*` limits, path span cap, Horizons pacing | Kevin | **[verify]** (`backend/app/settings.py`; A3.1 "Moving objects" row; A3.4) |
