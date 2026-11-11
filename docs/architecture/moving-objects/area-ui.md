@@ -2,7 +2,7 @@
 
 > **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A18 to A18.11 · **Implements:** [Q-146](../../decisions/moving-objects.md), [Q-120, Q-121, Q-123, Q-124](../../decisions/shell-surfaces.md), [Q-132](../../decisions/platform-hosting.md), D-21 ([contract-tags](../../decisions/contract-tags.md)) · **Read with:** [area-search.md](area-search.md) (A16), [area-backend.md](area-backend.md) (A17), [sky-shell.md](../sky-shell.md) (A21, with A21.8 to A21.13 in [sky-shell-behaviour.md](../sky-shell-behaviour.md)), [track-ui.md](track-ui.md) (A20)
 
-Status: **agreed plan, not built** ([Q-146](../../decisions/moving-objects.md)). Owner: Moon (ticket D2; `frontend/src/app/` and `state/` are Moon's, D-17). Area search uses the shell as [A21](../sky-shell.md) specifies it (layout, rail, surfaces, sky interaction, split pane, keys, hash) and changes nothing it already does for a searched object. Where A21 marks an extension point **To build (proposed, Q-170 to Q-177)**, Area search depends on it and names it; those placeholders are A21's, not this fragment's. Track's own screen is [A20](track-ui.md); this fragment only opens it.
+Status: **agreed plan; A18.1 to A18.3 built on fixtures by issue #96 (P8)**, the cards of A18.4 to A18.8 are P9 ([Q-146](../../decisions/moving-objects.md), [Q-406 to Q-408](../../decisions/moving-objects.md)). Owner: Atish for `frontend/src/state/area.ts` and `frontend/src/app/sky/area/*` (D-17 hand-over agreed by Moon, Q-406 (8)); the shell hooks and the rest of `frontend/src/app/` and `state/` are Moon's. Area search is behind `AREA_TOOL_ENABLED` (Q-205 closed by Moon). Area search uses the shell as [A21](../sky-shell.md) specifies it (layout, rail, surfaces, sky interaction, split pane, keys, hash) and changes nothing it already does for a searched object. Where A21 marks an extension point **To build (proposed, Q-170 to Q-177)**, Area search depends on it and names it; those placeholders are A21's, not this fragment's. Track's own screen is [A20](track-ui.md); this fragment only opens it.
 
 Mock-up: `mockup/spherex-ui.html`, mock-up tool 5 (the app adds no number keys, Q-121). How to run it: CLAUDE.md "Layout". Visual input only (D-01).
 
@@ -18,6 +18,7 @@ Mock-up: `mockup/spherex-ui.html`, mock-up tool 5 (the app adds no number keys, 
 - On release the frontend picks the prepared area holding the square from the `GET /v1/areas` index (A16.4). None: the card says "This part of the sky is not prepared" (`area:not_prepared`) and lists the prepared areas with **Fly there**, which uses `skyFlyTo` (A21.6, Q-174) and respects reduced motion.
 - Releasing a valid square sets the pointer mode back to `pan`, so later clicks reach the layer hit-tests and the pick (A18.2); **Draw again** (A18.5) sets `draw` again.
 - Escape leaves drawing mode and keeps the square, at rank 3 of the Escape order in A21.10 (Q-170). The pointer mode returns to `pan`.
+- **As built (issue #96, Q-406):** the square is a north-up square on a gnomonic tangent plane, its side the true on-sky angle; over 10° is refused; the snap needs the square's centre inside the box (largest overlap, then index order); the Area card states "Precomputed · run <computed_at>" (Q-205); choosing the tool again with an area open returns in `pan`; Escape is a capture-phase listener until Q-170.
 
 ### A18.2 Sky layers (`frontend/src/app/sky/area/AreaLayer.tsx`)
 
@@ -29,12 +30,14 @@ Mock-up: `mockup/spherex-ui.html`, mock-up tool 5 (the app adds no number keys, 
 - **Honesty toggle (D-21):** "Measured only" keeps the dots (measured centroids placed through the frame WCS), drawn in one colour as Rainbow Trails does; it hides track lines, labels, verdicts and Known positions and shows the note "Tracks and known paths are Estimated". "+ Estimated" (the starting state) shows everything. Nothing in Area search is `artistic`.
 - **Labels** at the last dot: "T1 · found blind = 433 Eros", "T2 · unexplained track", "T3 · possible · 1 visit", "T4 · not checked" (A16.5). Clamped inside the safe rectangle of A21.2 (insets, credit, open card; `skySafeRect()`, Q-174); hidden when the view is wider than 30°.
 - **Picking.** With the Tracks layer on, a click within 20 CSS px of a track's dot opens its Result card (A18.7). A marker button wins over a track hit; a track dot under a marker is reached from the results list. Otherwise the click falls through to the sky's own pick or the marker's left click, which leave Area search for the object panel while the tool keeps its state (A21.13 item 4, Q-175). Right-click keeps its Q-120 meaning (the object card).
+- **As built (issue #96):** the layer is `app/sky/area/AreaLayer.tsx` with the pure `scene.ts` and `drawLayer.ts`; the P9 placeholder `AREA_OPEN_DEFAULTS` opens an area with both layers on at step 5 (the final state is shown until the replay lands); the step rules, label hiding and honesty rules are Q-406 (3) and Q-407; Known positions are not drawn yet (P9).
 - **Text alternative:** a second id appended to the sky canvas's `aria-describedby`, never replacing the shell's instructions (A21.12): "Area 1.05° by 0.63°, visit 2 of 2: 4 movers, 1 found blind as 433 Eros, 1 unexplained, 1 not checked, 1 possible."
 
 ### A18.3 Visits and blink
 
 - Discovery shows one **visit** at a time, chosen in the Discovery card with a segmented control "Visit 1 · date, time UTC | Visit 2 · …". The transport belongs to the flipbook, has no modes and is not used (A21.9, Q-175).
 - **Blink the 2 visits** is a toggle button (`aria-pressed`) in the same card. While pressed it switches visits every 750 ms (under 3 Hz), the classic way to spot a mover by eye: stars stay put, movers jump. It stops when pressed again, when the Discovery card closes, when the Track pane opens and when the tool changes (WCAG 2.2.2). Under reduced motion it is off by default and each press steps one visit.
+- **As built (issue #96, Q-408):** "Blink the n visits" for any n ≥ 2, cycling in order; it also stops when the page is hidden, the area changes or reduced motion turns on. Until P9 the controls sit in the interim Area card.
 
 ### A18.4 Cards and minimise
 
@@ -84,7 +87,7 @@ The card for one Discovery result (called "Track card" before; renamed so "Track
 
 ### A18.9 State, API client, accessibility, performance
 
-- An `area` slice in `frontend/src/state/store.ts`: `index`, `areaId`, `square`, `summary`, `known`, `dots`, `tracks` (each `idle | loading | ready | error`), `layers {dots, tracks}`, `step`, `visit`, `blink`, `selectedResult`, `card`, `minimised`.
+- An `area` slice (as built: defined in `frontend/src/state/area.ts`, composed by `frontend/src/state/store.ts`): `index`, `areaId`, `square`, `summary`, `known`, `dots`, `tracks` (each `idle | loading | ready | error`), `layers {dots, tracks}`, `step`, `visit`, `blink`, `selectedResult`, `card`, `minimised`.
 - API functions in `frontend/src/app/api/` for A17.8, validated at runtime in `validate.ts` against the generated contract types (D-18). A newer square aborts older requests.
 - **URL hash** (A21.11, Q-173): `area=<area_id>` (sets the tool to `area` and opens that area's card; an unknown area is a link problem), plus `atrack=<T-id>` for an open Result card (`track=` belongs to the Track pane). A hash with only tool keys is valid. A new area pushes; choosing a result or a step replaces.
 - Copy in `app/messages.ts`; refusals through `refusals.ts` and `RefusalList.tsx`.
