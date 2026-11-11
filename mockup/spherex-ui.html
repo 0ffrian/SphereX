@@ -164,6 +164,21 @@ svg{display:block}
 .x:hover{background:var(--muted-2);color:var(--fg)}.x .ico{width:14px;height:14px}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:12px 0;font-size:12.5px}
 .kv dt{color:var(--dim)}.kv dd{font-family:var(--mono);text-align:right}
+.kn-ov{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px!important}.kn-tg{cursor:pointer;font-family:inherit}.kn-tg[aria-pressed="true"]{color:var(--green);border-color:#4ade8055;background:#4ade8012}
+.kn-det{margin-top:12px!important;border-radius:12px;background:var(--muted)}.kn-det summary{display:flex;justify-content:space-between;align-items:center;list-style:none;cursor:pointer;padding:10px 12px;font-size:13px;font-weight:500}
+.kn-det summary::-webkit-details-marker{display:none}.kn-det summary span+span{color:var(--mfg);font-weight:400}.kn-det summary span+span::after{content:"";display:inline-block;width:6px;height:6px;margin-left:9px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-2px) rotate(45deg);transition:transform .2s}
+.kn-det[open] summary span+span::after{transform:translateY(1px) rotate(-135deg)}.kn-det .dets{margin:0;padding:0 8px 8px}
+.kn-cut{position:relative;margin:0}.kn-cut canvas{display:block;width:100%;aspect-ratio:1;border-radius:0;background:#000;image-rendering:pixelated}
+.kn-cut .over{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;justify-content:space-between;padding:10px}
+.kn-cut .over h2{margin:0;font-size:15.5px;font-weight:600;background:rgba(8,9,11,.72);padding:5px 10px;border-radius:6px}
+.kn-cut .over .close{width:32px;height:32px;border-radius:6px;border:0;background:rgba(8,9,11,.72);color:var(--fg);display:grid;place-items:center;cursor:pointer}
+.kn-cut .over .close svg{width:16px;height:16px}
+.kn-cut .cap{position:absolute;left:10px;bottom:10px;display:flex;gap:6px;align-items:center;font-size:12px;color:var(--fg);background:rgba(8,9,11,.72);padding:4px 8px;border-radius:6px;font-variant-numeric:tabular-nums}
+.kn-cut .capr{left:auto;right:10px}.kn-cut .cap i{width:8px;height:8px;border-radius:50%;display:block}.kn-cut .cap b{font-weight:700}.kn-cut .cap span{color:var(--mfg)}
+#knWl i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.det:disabled{opacity:.4;cursor:default}.det:disabled:active{transform:none}
+.kn-leg{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:12px;font-size:11px;color:var(--mfg)}.kn-leg span{display:inline-flex;align-items:center;gap:6px}
+.kn-leg i{display:block;width:16px;height:0;border-top:2px solid #38bdf8}.kn-leg i.d{border-top-style:dashed;border-top-color:#38bdf8a6}.kn-leg i.sq{width:9px;height:9px;border:1px solid #fafafa8c}.kn-leg i.dot{width:6px;height:6px;border:0;border-radius:50%;background:#7dd3fc}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .chip{font-size:11px;padding:3px 9px;border-radius:99px;border:1px solid var(--border);color:var(--mfg);background:var(--muted)}
 .chip.g{color:var(--green);border-color:#4ade8055;background:#4ade8012}
@@ -487,6 +502,10 @@ body.bsplit .view.building #skyPane{right:0}
 .island-body{width:var(--cw,318px);max-height:calc(var(--maxh,600px) - 64px);overflow-y:auto;padding:8px 16px 16px;white-space:normal;opacity:0;filter:blur(8px);transform:translateY(10px);
   pointer-events:none;transition:opacity .25s,filter .25s,transform .4s var(--spring)}
 .island[data-card="true"] .island-body{opacity:1;filter:none;transform:none;pointer-events:auto;transition-delay:.2s}
+.island[data-bleed="true"] .island-in{display:none}
+.island[data-bleed="true"] .island-body{padding:0 0 16px;max-height:var(--maxh,600px)}
+.island[data-bleed="true"] .island-body>:not(.kn-cut){margin-left:16px;margin-right:16px}
+.island[data-bleed="true"] .island-body>.kn-cut+*{margin-top:14px}
 .island-body p{color:var(--mfg);line-height:1.5;font-size:13px}
 .island[data-open="true"]{justify-content:flex-start}
 .island-in{display:flex;align-items:center;gap:11px;padding:0 15px;height:100%}
@@ -514,6 +533,17 @@ body.bsplit .view.building #skyPane{right:0}
   .topr,.frame-info .hide-s{display:none}.scrub{width:140px}
 }
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+.over-btns{display:flex;gap:6px}.over-l{display:flex;gap:6px;align-items:center}
+.kn-demo{aspect-ratio:1;background:#000;display:grid;place-items:center;padding:0 44px;text-align:center;color:var(--mfg);font-size:12.5px;line-height:1.5}
+.kn-off{opacity:.45;pointer-events:none}.kn-spec-none{display:grid;place-items:center;height:96px;border-radius:8px;background:#16191c;color:var(--mfg);font-size:12px}
+.ar-steps li i{display:inline-grid;place-items:center}.ar-steps li i svg{width:9px;height:9px;stroke:#06240f;stroke-width:3.4;fill:none;stroke-linecap:round;stroke-linejoin:round;display:none}.ar-steps li.on i svg{display:block}
+.ar-steps li.now i{box-shadow:none;background:none;overflow:visible}
+.kn-spec{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.kn-spec-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.kn-spec-h span{font-size:12px;font-weight:600;color:var(--fg)}
+.kn-spec-h small{font-size:11px;color:var(--mfg)}
+#knSpec{width:100%;height:auto;display:block}
+.kn-ov.opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px}
 </style>
 </head>
 <body>
@@ -728,7 +758,7 @@ const island = (() => {
     const s = STATES.card; state = "card";
     grid.set({...s, size:28}); wrap.style.setProperty("--gc", s.glow); wrap.dataset.live = "true";
     lbl.textContent = c.title; sub.textContent = c.sub || ""; sub.style.display = c.sub ? "" : "none";
-    body.innerHTML = c.html; if(c.bind) c.bind(body);
+    el.dataset.bleed = c.bleed ? "true" : "false"; body.innerHTML = c.html; if(c.bind) c.bind(body);
     el.dataset.card = "true"; el.dataset.open = "true";
     el.setAttribute("aria-label", "Odysseus: " + c.title);
     const bz = document.getElementById("bezel"), cw = Math.min(c.width || 320, bz.clientWidth - 32), maxh = Math.max(200, bz.clientHeight - 104);
@@ -737,6 +767,10 @@ const island = (() => {
     const h = Math.min(el.offsetHeight, maxh); el.style.height = hh; void el.offsetWidth; el.style.transition = "";
     el.style.width = cw + "px"; el.style.height = h + "px"; el.style.borderRadius = "24px";
     if(c.after) c.after();
+  }
+  function fit(){   // re-measure the open card (after a section opens or closes)
+    if(!card) return; const bz = document.getElementById("bezel"), maxh = Math.max(200, bz.clientHeight - 104), hh = el.style.height;
+    el.style.transition = "none"; el.style.height = "auto"; const h = Math.min(el.offsetHeight, maxh); el.style.height = hh; void el.offsetWidth; el.style.transition = ""; el.style.height = h + "px";
   }
   function closeCard(){
     if(!card && mini){ mini = null; set("idle"); return true; }
@@ -758,7 +792,7 @@ const island = (() => {
     const [w, h] = measure(); el.style.width = w + "px"; el.style.height = Math.max(52, h) + "px"; el.style.borderRadius = Math.min(Math.max(52, h)/2, 28) + "px";
   }
   function minimize(){
-    if(!card) return; const c = last; token++; card = false; el.dataset.card = "false";
+    if(!card) return; const c = last; token++; card = false; el.dataset.card = "false"; el.dataset.bleed = "false";
     clearT = setTimeout(() => { if(!card) body.innerHTML = ""; }, 700); mini = c; showMini();
   }
   function restore(){ const c = mini; mini = null; if(!c) return; c.reopen ? c.reopen() : openCard(c); }
@@ -779,7 +813,7 @@ const island = (() => {
     else if(api.reopen) api.reopen(); });
   document.getElementById("xIsl").addEventListener("click", e => { e.stopPropagation(); api.onClose && api.onClose(); closeCard(); });
   set("idle");
-  const api = {set, run, openCard, closeCard, minimize, restore, status, onClose:null, reopen:null, get state(){return state}, get card(){return card}, get mini(){return !!mini}};
+  const api = {fit, set, run, openCard, closeCard, minimize, restore, status, onClose:null, reopen:null, get state(){return state}, get card(){return card}, get mini(){return !!mini}};
   return api;
 })();
 window.island = island;   // island.set("thinking") from the console
@@ -832,7 +866,12 @@ const TOOLS = [
   {id:"haptics", name:"Haptics", key:"4", ico:AI["fingerprint"],
     t:"Haptics", p:"Rub the surface of a body and feel it."},
   {id:"area", name:"Area search", key:"5", ico:AI["box"],
-    t:"Area search", p:"Draw a square on the sky. Follow known objects in it, or look for moving dots nobody has listed."}
+    t:"Area search", p:"Draw a square on the sky. Follow known objects in it, or look for moving dots nobody has listed."},
+  // The dock shows only these two (Moon, 12 Nov 2026): the app is the sky, so no Sky tool. Each starts by drawing a square.
+  {id:"known", name:"Known objects", key:"1", ico:AI["orbit"], dock:true,
+    t:"Known objects", p:"Draw a square on the sky, then follow the asteroids and comets on file that crossed it."},
+  {id:"disc", name:"Discovery", key:"2", ico:AI["dots"], dock:true,
+    t:"Discovery", p:"Draw a square on the sky, then look for moving dots that match nothing on file."}
 ];
 const SPEC_CARD = {id:"spec", t:"Fingerprint", p:"How bright it is at each colour of infrared light. Every material leaves its own pattern, so this tells you what it is made of.", spec:true};
 const LAYERS = [
@@ -849,6 +888,7 @@ let tool = "sky";
 
 const toolsEl = document.getElementById("tools"), hl = document.getElementById("hl");
 TOOLS.forEach((t, i) => {
+  if(!t.dock) return;
   const b = document.createElement("button");
   b.className = "tool"; b.dataset.id = t.id; b.innerHTML = t.ico;
   b.setAttribute("aria-label", t.name); b.dataset.tip = t.name; b.dataset.key = t.key; b.dataset.side = "top";
@@ -915,7 +955,7 @@ function bodyCoords(o){
   return [((ra0 - x*PX/3600/Math.cos(de0*Math.PI/180)) % 360 + 360) % 360, de0 - y*PX/3600];
 }
 function showInfo(t){
-  if(!t) return; lastCard = "body"; AR.selShow = false;
+  if(!t) return; knOff(); lastCard = "body"; AR.selShow = false;
   const [ra, dec] = bodyCoords(t), comet = t.kind === "comet";
   island.openCard({title:t.n, sub:t.cls||"Unknown object",
     html:`<div class="row-btn wrap" style="margin-top:6px"><button class="btn" id="goFp">See fingerprint</button><button class="btn ghost" id="goBuild">Build it</button></div>`,
@@ -924,7 +964,7 @@ function showInfo(t){
       b.querySelector("#goBuild").onclick = () => openBuild(t);
     }});
 }
-island.onClose = () => { tool = "sky"; markTool("sky"); AR.selShow = false; arStopDraw(); hint(); };
+island.onClose = () => { knOff(); tool = "sky"; markTool("sky"); AR.selShow = false; arStopDraw(); hint(); };
 function openFlip(){ tool = "sky"; markTool("sky"); flipCard(); }
 island.reopen = () => { lastCard === "body" ? showInfo(sel || cur) : openFlip(); };
 const CHK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
@@ -956,14 +996,16 @@ function flipCard(){
     after:() => refit()});
 }
 function markTool(id){
+  try{ if(id === "area" && AR.after) id = AR.after; }catch(_){}
   toolsEl.querySelectorAll(".tool").forEach(b => b.classList.toggle("active", b.dataset.id === id));
   moveHl(toolsEl.querySelector(".active"));
 }
 function selectTool(id){
   tool = id; markTool(id === "spec" ? "listen" : id);
   const t = TOOLS.find(x => x.id === id) || SPEC_CARD;
-  if(id !== "haptics" && B.building) closeBuild(); if(id !== "comet" && TR.open) closeTrail(); if(id !== "area"){ if(AR.track) closeTrack(); arStopDraw(); } markTool(id === "spec" ? "listen" : id);
-  if(id === "area"){ openAreaCard(); return; }
+  if(id !== "haptics" && B.building) closeBuild(); if(id !== "comet" && TR.open) closeTrail(); if(id !== "area" && id !== "known" && id !== "disc"){ if(AR.track) closeTrack(); arStopDraw(); AR.after = null; } markTool(id === "spec" ? "listen" : id);
+  if(id === "known" || id === "disc"){ AR.after = id; tool = "area"; openAreaCard(); markTool(id); return; }
+  if(id === "area"){ AR.after = null; openAreaCard(); return; }
   if(id === "haptics"){ openHaptics(); return; }
   if(id === "sky"){ if(island.closeCard()) hint(); return; }
   if(id === "flip"){ flipCard(); return; }
@@ -1059,6 +1101,7 @@ function buildSky(t){
 function resize(){
   DPR = Math.min(devicePixelRatio||1, 2); const b = document.getElementById("skyPane").getBoundingClientRect();
   W = b.width; H = b.height; cv.width = W*DPR; cv.height = H*DPR;
+  if(typeof KN !== "undefined" && KN.on && AR.box) knRefit();
 }
 new ResizeObserver(resize).observe(document.getElementById("skyPane"));
 
@@ -1076,7 +1119,8 @@ function pick(e){
 }
 function draw(ts){
   tms = ts; requestAnimationFrame(draw);
-  cam.x += (camT.x - cam.x)*.12; cam.y += (camT.y - cam.y)*.12; cam.z += (camT.z - cam.z)*.12;
+  if(KN.tw) knTween(ts); else { cam.x += (camT.x - cam.x)*.12; cam.y += (camT.y - cam.y)*.12; cam.z += (camT.z - cam.z)*.12; }
+  knTick(ts);
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.fillStyle = "#020204"; ctx.fillRect(0,0,W,H);
   // soft nebula wash
@@ -1122,8 +1166,9 @@ function draw(ts){
     if(layerOn.labels && cam.z > .5 && m !== T0){ ctx.fillStyle = "#a1a1aa"; ctx.font = "10px ui-monospace,monospace"; ctx.fillText(m.n, sx+9, sy-8); }
   }
 
-  arDraw();
-  // the target (searched object) and the selected body
+  arDraw(); knDraw();
+  // the target (searched object) and the selected body (not inside the square while Known is on)
+  ctx.save(); if(KN.on && AR.box){ const bb = AR.box, [hx0, hy0] = toScreen(bb.x0, bb.y0), [hx1, hy1] = toScreen(bb.x1, bb.y1); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.rect(hx0, hy0, hx1 - hx0, hy1 - hy0); ctx.clip("evenodd"); }
   if(cur){
     const [cx, cy] = toScreen(...targetPos(frame));
     for(let f = 0; f < 12; f++){ if(!opts.trail && f !== frame) continue; if(!activeFrames().includes(f) && f !== frame) continue; const [px, py] = targetPos(f), [gx, gy] = toScreen(px, py);
@@ -1140,12 +1185,18 @@ function draw(ts){
       ctx.beginPath(); ctx.moveTo(sx + dx*k, sy + dy*(k-L)); ctx.lineTo(sx + dx*k, sy + dy*k); ctx.lineTo(sx + dx*(k-L), sy + dy*k); ctx.stroke(); }
     if(layerOn.labels){ ctx.fillStyle = "#fafafa"; ctx.font = "500 12px system-ui,sans-serif"; ctx.fillText(T0.n, sx + k + 8, sy + 4); }
   }
+  ctx.restore();
   if(B.building && sel){ const p = posOf(sel, frame); camT.x = p[0]; camT.y = p[1]; }
   // scale bar text
   document.getElementById("scaleTxt").textContent = `${(80/cam.z*PX/60).toFixed(1)}′`; zVal.textContent = Math.round(camT.z*100) + "%";
+  const kh = KN.on && KN.hop;
+  if(kh){ const di = +kh.detector.slice(1) - 1;
+    document.getElementById("hudBr").innerHTML = `${kh.wl_um.toFixed(2)} µm<br>${knDay(kh.mjd_avg)} ${knHM(kh.mjd_avg)} UTC`;
+    document.getElementById("hudTl").textContent = `${DETS[di].n} · ${DETS[di].lo.toFixed(2)}–${DETS[di].hi.toFixed(2)} µm`; }
+  else
   document.getElementById("hudBr").innerHTML = cur ? `${opts.subtract ? "subtracted · " : ""}${WAVES[frame].toFixed(2)} µm<br>${fmtDate(frame)} · frame ${frame+1}/12` : "";
-  document.getElementById("hudTl").textContent = opts.band != null ? `${DETS[opts.band].n} · ${DETS[opts.band].lo.toFixed(2)}–${DETS[opts.band].hi.toFixed(2)} µm` : "";
-  if(AR.box && AR.step >= 0) document.getElementById("hudBr").innerHTML += `<br>area demo · visit ${AR.v + 1} of 2${AR.blink ? " · blinking" : ""}`;
+  if(!kh) document.getElementById("hudTl").textContent = opts.band != null ? `${DETS[opts.band].n} · ${DETS[opts.band].lo.toFixed(2)}–${DETS[opts.band].hi.toFixed(2)} µm` : "";
+  if(AR.box && AR.step >= 0 && !KN.on) document.getElementById("hudBr").innerHTML += `<br>area demo · visit ${AR.v + 1} of 2${AR.blink ? " · blinking" : ""}`;
 }
 function ring(x, y, r, col, dash){
   ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash(dash ? [3,3] : []);
@@ -1160,7 +1211,7 @@ function drawGrid(){
 
 /* interaction: drag to pan, wheel to zoom (around the cursor) */
 let drag = null;
-view.addEventListener("pointerdown", e => { if(e.target.closest("#bpane,#tpane,#kpane,#tCanvas")) return; if(arDown(e)) return;
+view.addEventListener("pointerdown", e => { if(e.target.closest("#bpane,#tpane,#kpane,#tCanvas")) return; if(arDown(e)) return; KN.tw = null;
   drag = {x:e.clientX, y:e.clientY, cx:camT.x, cy:camT.y}; view.classList.add("drag"); view.setPointerCapture(e.pointerId); });
 view.addEventListener("pointermove", e => {
   const b = view.getBoundingClientRect(), [wx, wy] = toWorld(e.clientX - b.left, e.clientY - b.top);
@@ -1173,7 +1224,7 @@ view.addEventListener("pointermove", e => {
   if(drag){ camT.x = drag.cx - (e.clientX - drag.x)/cam.z; camT.y = drag.cy - (e.clientY - drag.y)/cam.z; cam.x = camT.x; cam.y = camT.y; }
 });
 view.addEventListener("pointerup", e => { if(arUp(e)) return; drag = null; view.classList.remove("drag"); });
-view.addEventListener("wheel", e => { e.preventDefault(); if(e.target.closest("#bpane,#tpane,#kpane,#tCanvas")) return;
+view.addEventListener("wheel", e => { e.preventDefault(); if(e.target.closest("#bpane,#tpane,#kpane,#tCanvas")) return; KN.tw = null;
   const b = view.getBoundingClientRect(), sx = e.clientX - b.left, sy = e.clientY - b.top;
   const [bx, by] = toWorld(sx, sy), z = Math.min(4, Math.max(.25, camT.z * Math.exp(-e.deltaY*.0015)));
   camT.z = z; cam.z = z; cam.x = bx - (sx - W/2)/z; cam.y = by - (sy - H/2)/z; camT.x = cam.x; camT.y = cam.y;
@@ -1199,6 +1250,7 @@ function setFrame(f){
   document.getElementById("wl").textContent = WAVES[frame].toFixed(2);
   document.getElementById("fdate").textContent = fmtDate(frame);
   wgrid.set({color:wcol(WAVES[frame])});
+  if(KN.on) knSync();
 }
 const wgrid = GridLoader(document.getElementById("wdot"), {size:18, gap:1, rounded:true, color:"#4ade80", mode:"pulse", pattern:"plus-hollow", speed:"slow"});
 function startPlay(on){
@@ -2262,7 +2314,7 @@ const AR_STEPS = [
   ["Join what moves across visits", "3 groups"],
   ["Check known objects (SkyBoT)", "1 known"]];
 const stop = f => e => { e.stopPropagation(); f(e); };
-function arReset(){ clearInterval(AR.timer); arBlink(false); AR.box = null; AR.mode = "idle"; AR.step = -1; AR.running = false; AR.sel = -1; AR.selShow = false; view.classList.remove("boxing"); }
+function arReset(){ knOff(); clearInterval(AR.timer); arBlink(false); AR.box = null; AR.mode = "idle"; AR.step = -1; AR.running = false; AR.sel = -1; AR.selShow = false; view.classList.remove("boxing"); }
 function arStopDraw(){ if(AR.mode === "drawing"){ AR.mode = AR.box ? "set" : "idle"; AR.start = null; view.classList.remove("boxing"); } }
 function arNorm(a, b){ return {x0:Math.min(a[0], b[0]), y0:Math.min(a[1], b[1]), x1:Math.max(a[0], b[0]), y1:Math.max(a[1], b[1])}; }
 function arWorld(e){ const b = view.getBoundingClientRect(); return toWorld(e.clientX - b.left, e.clientY - b.top); }
@@ -2275,7 +2327,10 @@ function arUp(){ if(AR.mode !== "drawing" || !AR.start) return false; AR.start =
   arSet(); return true; }
 function arDefault(){ const [cx, cy] = toWorld(W/2, H*.66), hw = Math.min(W*.3, 230)/cam.z, hh = Math.min(H*.2, 140)/cam.z;
   AR.box = {x0:cx - hw, y0:cy - hh, x1:cx + hw, y1:cy + hh}; arSet(); }
-function arSet(){ AR.mode = "set"; view.classList.remove("boxing"); clearInterval(AR.timer); AR.step = -1; AR.running = false; arBlink(false); arGen(); openBoxCard(); }
+function arSet(){ AR.mode = "set"; view.classList.remove("boxing"); clearInterval(AR.timer); AR.step = -1; AR.running = false; arBlink(false); arGen();
+  // Known: the island searches first (SkyBoT, objects on file in this square), then shows what it found.
+  if(AR.after === "known"){ island.closeCard(); island.run([["searching", 1900, "Known objects in this square"], ["found", 1000, "1 known object: 433 Eros"]], () => openKnownCard()); }
+  else if(AR.after === "disc") openDiscoveryCard(); else openBoxCard(); }
 function arBlink(on){ AR.blink = on; clearInterval(AR.blinkT); if(on) AR.blinkT = setInterval(() => { AR.v ^= 1; }, 750); else AR.v = 1;
   const b = $("arBlink"); if(b) b.setAttribute("aria-pressed", String(on)); }
 function arGen(){
@@ -2300,7 +2355,7 @@ function arDraw(){
   ctx.strokeStyle = drawing ? "#4ade80aa" : "#4ade80"; ctx.lineWidth = 1.2; ctx.setLineDash(drawing ? [5, 4] : []);
   ctx.strokeRect(x0, y0, x1 - x0, y1 - y0); ctx.setLineDash([]);
   ctx.fillStyle = "#4ade80"; ctx.font = "500 11px ui-monospace,monospace"; ctx.fillText(arSize(), x0 + 1, y0 - 7);
-  if(AR.step < 0) return;
+  if(AR.step < 0 || KN.on) return;
   const O = layerOn.orph, C = layerOn.chains, v = AR.v, rr = 4.5 + Math.min(cam.z, 1.4)*2, joined = C && AR.step >= 3;
   if(O){
     if(AR.step < 1) AR.glitch.forEach(g => { if(g.v !== v) return; const [sx, sy] = toScreen(...g.p); ring(sx, sy, rr, wcol(g.w) + "dd", false); });
@@ -2327,25 +2382,28 @@ function arDraw(){
       ctx.fillText(txt, Math.max(8, Math.min(lx + 12, W - ctx.measureText(txt).width - 8)), ly - 10); }
   });
 }
-function arPick(e){
-  if(!AR.box || AR.step < 3 || !layerOn.chains) return false;
-  const b = view.getBoundingClientRect(); let best = -1, bd = 20;
-  AR.tracks.forEach((t, i) => t.pts.flat().forEach(q => { const [sx, sy] = toScreen(...q.p);
-    const d = Math.hypot(e.clientX - b.left - sx, e.clientY - b.top - sy); if(d < bd){ bd = d; best = i; } }));
-  if(best < 0) return false; openTrackCard(best); return true;
+function arPick(e){   // click a mover on the sky (Discovery results)
+  if(!KN.on || KN.mode !== "disc" || AR.step < 3 || !AR.mv.length) return false;
+  const b = view.getBoundingClientRect(); let best = -1, bd = 22;
+  AR.mv.forEach((m, i) => m.pts.forEach(q => { const [sx, sy] = toScreen(...knW(q)); const d = Math.hypot(e.clientX - b.left - sx, e.clientY - b.top - sy); if(d < bd){ bd = d; best = i; } }));
+  if(best < 0) return false; discOpenMover(best); return true;
 }
 function arRenderSteps(){
   const el = $("arSteps"); if(!el) return;
-  el.innerHTML = AR_STEPS.map(([a, n], k) => `<li class="${k <= AR.step ? "on" : AR.running && k === AR.step + 1 ? "now" : ""}"><i></i><span>${a}</span><small>${k <= AR.step ? n : ""}</small></li>`).join("");
+  if(el.children.length !== AR_STEPS.length) el.innerHTML = AR_STEPS.map(([a]) => `<li><i>${CHK}</i><span>${a}</span><small></small></li>`).join("");
+  [...el.children].forEach((li, k) => { const on = k <= AR.step, now = AR.running && k === AR.step + 1; li.className = on ? "on" : now ? "now" : ""; li.querySelector("small").textContent = on ? AR_STEPS[k][1] : "";
+    if(now){ if(!AR.ld){ AR.ld = document.createElement("span"); GridLoader(AR.ld, {size:14, gap:1, rounded:true, color:"green", mode:"pulse", pattern:"plus-hollow", speed:"fast"}); }
+      const host = li.querySelector("i"); if(AR.ld.parentNode !== host) host.appendChild(AR.ld); } });
+  if(AR.ld && !AR.running && AR.ld.parentNode) AR.ld.remove();
 }
 function arRenderList(){
   const list = $("arList"); if(!list) return; list.innerHTML = "";
-  AR.tracks.forEach((t, i) => { const live = AR.step >= 3, one = t.visits.length < 2, b = document.createElement("button");
-    b.type = "button"; b.className = "lk-row"; b.disabled = !live; b.style.opacity = live ? 1 : .4;
-    const chip = !live ? "" : AR.step < 4 ? '<span class="chip">checking</span>' : t.known ? `<span class="chip g">${t.known}</span>` : one ? '<span class="chip">possible</span>' : '<span class="chip a">unexplained</span>';
-    b.innerHTML = live ? `<b>${t.id}</b><span>${one ? "Seen in 1 visit" : "Moves across both visits"}<br><small>${t.visits.length*4} exposures</small></span>${chip}`
-      : `<b>${t.id}</b><span><small>waiting</small></span><span></span>`;
-    if(live) b.onclick = stop(() => openTrackCard(i)); list.appendChild(b); });
+  if(AR.step < 3) return;
+  AR.mv.forEach((m, i) => { const b = document.createElement("button"); b.type = "button"; b.className = "lk-row";
+    const chip = m.known ? (AR.step < 4 ? '<span class="chip">checking</span>' : `<span class="chip g">Known: ${m.known}</span>`) : m.pts.length < 2 ? '<span class="chip">Seen once</span>' : '<span class="chip a">Unexplained</span>';
+    b.innerHTML = `<b>${m.id}</b><span>${m.pts.length < 2 ? "Seen in 1 visit" : "Moves across both visits"}</span>${chip}`;
+    b.onclick = stop(() => discOpenMover(i)); list.appendChild(b); });
+  island.fit();
 }
 function arFit(){
   const b = AR.box, bw = b.x1 - b.x0, bh = b.y1 - b.y0;
@@ -2354,22 +2412,20 @@ function arFit(){
   camT.x = (b.x0 + b.x1)/2 - (sx - W/2)/camT.z; camT.y = (b.y0 + b.y1)/2 - (sy - H/2)/camT.z;
 }
 function arRun(){
-  clearInterval(AR.timer); AR.step = -1; AR.running = true; AR.selShow = false;
-  startPlay(false); setLayer("orph", true); setLayer("chains", true); arBlink(true); arFit(); arRenderSteps(); arRenderList(); island.status("Starting · " + AR_STEPS[0][0], true);
+  clearInterval(AR.timer); AR.step = -1; AR.running = true; AR.selShow = false; AR.sel = -1; arRenderSteps(); arRenderList(); island.status("Starting · " + AR_STEPS[0][0], true);
   AR.timer = setInterval(() => { AR.step++; arRenderSteps(); arRenderList();
     const nx = AR_STEPS[AR.step + 1]; island.status(nx ? `Step ${AR.step + 2} of ${AR_STEPS.length} · ${nx[0]}` : "3 movers found · 1 is 433 Eros", !!nx);
-    if(AR.step >= AR_STEPS.length - 1){ clearInterval(AR.timer); AR.running = false; arRenderSteps();
-      toast("3 movers: T1 is 433 Eros, found blind · T2 unexplained · T3 seen once"); } }, 1000);
+    if(AR.step >= AR_STEPS.length - 1){ clearInterval(AR.timer); AR.running = false; arRenderSteps(); toast("3 movers: T1 is 433 Eros, found blind · T2 unexplained · T3 seen once"); } }, 1000);
 }
 function openAreaCard(){
-  tool = "area"; markTool("area"); AR.mode = "drawing"; view.classList.add("boxing"); AR.selShow = false; lastCard = "area";
+  knOff(); tool = "area"; markTool("area"); AR.mode = "drawing"; view.classList.add("boxing"); AR.selShow = false; lastCard = "area";
   island.openCard({title:"Area search", sub:"Drag a square on the sky", width:380,
     html:`<div class="grp"><p>Drag a square over the part of the sky you want to search. Then choose how to search it.</p></div>
     <div class="row-btn wrap" style="margin-top:12px"><button class="btn ghost sm" id="arHere" type="button">Use a square in the middle</button>${AR.box ? '<button class="btn ghost sm" id="arKeep" type="button">Keep the last square</button>' : ""}</div>`,
     bind:b => { b.querySelector("#arHere").onclick = stop(arDefault); const k = b.querySelector("#arKeep"); if(k) k.onclick = stop(arSet); }});
 }
 function openBoxCard(){
-  tool = "area"; markTool("area"); AR.selShow = false;
+  knOff(); tool = "area"; markTool("area"); AR.selShow = false;
   island.openCard({title:"Area · " + arSize(), sub:"16 SPHEREx frames in 2 visits · 20–21 Mar 2026 (demo area)", width:408, reopen:openBoxCard,
     html:`<div class="ar-opts">
       <button class="ar-opt" id="arKnown" type="button">${AI["orbit"]}<b>Known objects</b><span>Follow asteroids and comets already on file that crossed this square.</span></button>
@@ -2379,25 +2435,68 @@ function openBoxCard(){
       b.querySelector("#arRedraw").onclick = stop(openAreaCard); }});
 }
 function openKnownCard(){
-  AR.from = "known"; AR.selShow = false; const m = movers[0];
+  knOff(); AR.from = "known"; AR.selShow = false; const m = movers[0];
   island.openCard({title:"Known objects", sub:"In this square · from SkyBoT", width:408, reopen:openKnownCard,
     html:`<div class="lk-list">
       <button class="lk-row" id="arEros" type="button"><b>433</b><span>Eros<br><small>asteroid · 16 frames in 2 visits · real SPHEREx data</small></span><span class="chip g">Track it</span></button>
       ${m ? `<button class="lk-row" id="arA" type="button"><b>A</b><span>${m.n}<br><small>demo body · sketch data</small></span><span class="chip">Open</span></button>` : ""}</div>
       <div class="row-btn wrap" style="margin-top:12px"><button class="btn ghost sm" id="arBack" type="button">Back</button></div>`,
-    bind:b => { b.querySelector("#arEros").onclick = stop(openTrack); const a = b.querySelector("#arA"); if(a) a.onclick = stop(() => { sel = m; showInfo(m); });
+    bind:b => { b.querySelector("#arEros").onclick = stop(openKnownEros); const a = b.querySelector("#arA"); if(a) a.onclick = stop(() => { sel = m; showInfo(m); });
       b.querySelector("#arBack").onclick = stop(openBoxCard); }});
 }
-function openDiscoveryCard(){
-  AR.from = "disc"; tool = "area"; markTool("area"); AR.selShow = false;
-  island.openCard({title:"Discovery", sub:"Area · " + arSize() + " · 2 visits", width:408, reopen:openDiscoveryCard,
-    html:`<div class="lk-note">Demo. Dots and counts are made up for this mock-up; only Eros's frames and path in Track are real. A track that matches nothing is "unexplained", never "a new asteroid".</div>
-      <ol class="ar-steps" id="arSteps"></ol>
-      <div class="row-btn wrap" style="margin-top:12px"><button class="btn sm" id="arRun" type="button">${AR.step >= 0 ? "Run again" : "Look for movers"}</button><button class="btn ghost sm" id="arBlink" type="button" aria-pressed="${AR.blink}">Blink the 2 visits</button><button class="btn ghost sm" id="arBack" type="button">Back</button></div>
+async function openDiscoveryCard(){
+  AR.from = "disc"; tool = "area"; markTool("area"); AR.selShow = false; AR.sel = -1;
+  if(KN.on && KN.mode === "disc") knCardOff();
+  else { knOff(); const ok = await knLoad();
+    if(!ok){ island.openCard({title:"Discovery", sub:"Area · " + arSize(), width:408, reopen:openDiscoveryCard,
+      html:`<div class="lk-note">The sky image for this view could not be loaded. Open this mock-up through its local server, not from a file.</div>
+        <div class="row-btn wrap" style="margin-top:12px"><button class="btn ghost sm" id="arBack" type="button">Back</button></div>`, bind:b => { b.querySelector("#arBack").onclick = stop(openBoxCard); }}); return; }
+    KN.on = true; KN.mode = "disc"; KN.card = false; knPlace(); discBuild(); knFly(knFit()); }
+  island.openCard({title:"Discovery", sub:"Area · " + arSize() + " · demo dots", width:408, reopen:openDiscoveryCard,
+    html:`<ol class="ar-steps" id="arSteps"></ol>
+      <div class="row-btn wrap" style="margin-top:12px"><button class="btn sm" id="arRun" type="button">${AR.step >= 0 ? "Run again" : "Look for movers"}</button><button class="btn ghost sm" id="arBack" type="button">Back</button></div>
       <div class="lk-list" id="arList"></div>`,
     bind:b => { b.querySelector("#arRun").onclick = stop(e => { e.currentTarget && (e.currentTarget.textContent = "Run again"); arRun(); });
-      b.querySelector("#arBlink").onclick = stop(() => arBlink(!AR.blink)); b.querySelector("#arBack").onclick = stop(() => { clearInterval(AR.timer); AR.running = false; openBoxCard(); });
+      b.querySelector("#arBack").onclick = stop(() => { clearInterval(AR.timer); AR.running = false; openBoxCard(); });
       arRenderSteps(); arRenderList(); }});
+}
+/* Discovery on the #track sky: demo dots appear per step; movers are drawn in sky-image pixels. T1 is Eros (real positions), T2 and T3 are made up. */
+function discBuild(){
+  const r = rng(77), X = () => 30 + r()*1220, Y = () => 30 + r()*660, hs = KN.hops, a = hs[0].wide_px, z = hs[hs.length - 1].wide_px;
+  AR.mv = [{id:"T1", known:"433 Eros", pts:[a, z], col:"#bae6fd", line:"#38bdf8"}, {id:"T2", known:null, pts:[[430, 540], [700, 330]], col:"#fde68a", line:"#fbbf24"}, {id:"T3", known:null, pts:[[1010, 560]], col:"#d4d4d8", line:"#a1a1aa"}];
+  AR.dots = []; for(let i = 0; i < 58; i++) AR.dots.push({p:[X(), Y()], k:"glitch"}); for(let i = 0; i < 141; i++) AR.dots.push({p:[X(), Y()], k:"star"});
+  for(let i = 0; i < 8; i++) AR.dots.push({p:[X(), Y()], k:"stray"}); AR.mv.forEach(m => m.pts.forEach(q => AR.dots.push({p:q, k:"mover"})));
+}
+function discDraw(P){
+  const st = AR.step; if(st < 0 || !AR.dots) return;
+  ctx.fillStyle = "rgba(228,228,231,.55)";
+  for(const d of AR.dots){ if(d.k === "glitch" ? st >= 1 : d.k === "star" ? st >= 2 : st >= 3) continue; const [x, y] = P(d.p); ctx.beginPath(); ctx.arc(x, y, 1.9, 0, 7); ctx.fill(); }
+  if(st < 3) return;
+  ctx.lineWidth = 2; ctx.lineCap = "round";
+  AR.mv.forEach((m, i) => { const on = AR.selShow && AR.sel === i, sp = m.pts.map(P);
+    if(sp.length > 1){ ctx.strokeStyle = on ? "#4ade80" : m.line; ctx.beginPath(); ctx.moveTo(...sp[0]); ctx.lineTo(...sp[1]); ctx.stroke(); }
+    sp.forEach(([x, y]) => { ctx.fillStyle = m.line; ctx.beginPath(); ctx.arc(x, y, 3.2, 0, 7); ctx.fill(); ctx.strokeStyle = "#fafafa"; ctx.lineWidth = 1; ctx.stroke(); ctx.lineWidth = 2; });
+    if(on){ const [x, y] = sp[sp.length - 1]; ctx.strokeStyle = "#fafafa"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.stroke(); ctx.strokeStyle = "rgba(250,250,250,.35)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, 15, 0, 7); ctx.stroke(); ctx.lineWidth = 2; }
+    if(!layerOn.labels) return;
+    const lab = m.known ? (st >= 4 ? `${m.id} · ${m.known}` : m.id) : m.pts.length < 2 ? `${m.id} · seen once` : m.id, mx = sp.reduce((a, q) => a + q[0], 0)/sp.length, my = sp.reduce((a, q) => a + q[1], 0)/sp.length;
+    ctx.font = "10.5px ui-monospace,monospace"; const w = ctx.measureText(lab).width + 8; ctx.fillStyle = "rgba(5,5,7,.75)"; ctx.fillRect(mx - w/2, my - 24, w, 14);
+    ctx.fillStyle = m.col; ctx.textAlign = "center"; ctx.fillText(lab, mx, my - 13.5); ctx.textAlign = "left"; });
+}
+async function discOpenMover(i){
+  AR.sel = i; AR.selShow = true; const m = AR.mv[i], title = m.known ? `${m.id} · ${m.known}` : m.id;
+  if(i === 0){ KN.det = null; KN.cutKey = ""; KN.card = true; const l = knList(); KN.hop = l[Math.round(frame/11*(l.length - 1))]; KN.t = KN.tt = KN.hop.mjd_avg;
+    knErosCard({title, back:openDiscoveryCard, reopen:() => discOpenMover(0)}); return; }
+  knCardOff(); const n = m.pts.length < 2 ? 4 : 8;
+  island.openCard({title, sub:m.pts.length < 2 ? "Seen once" : "Unexplained", width:408, reopen:() => discOpenMover(i), bleed:true,
+    html:`<div class="kn-cut"><div class="kn-demo">Demo mover: no frames in this mock-up</div>
+        <div class="over"><span class="over-l"><button class="close" id="knBack" type="button" aria-label="Back to the results" title="Back to the results"><svg class="ico" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><h2>${title}</h2></span><span class="over-btns"><button class="close" id="knMin" type="button" aria-label="Minimise" title="Minimise"><svg class="ico" viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button><button class="close" id="knX" type="button" aria-label="Close">${AI["x"]}</button></span></div>
+        <div class="cap"><i style="background:#6b6b75"></i>20 to 21 Mar 2026</div><div class="cap capr"><b>-</b><span>/ ${n}</span></div></div>
+      <dl class="kv"><dt>Wavelength</dt><dd>no frames</dd><dt>Taken</dt><dd>20 to 21 Mar 2026</dd></dl>
+      <div class="kn-ov opts kn-off" role="group" aria-label="Show on the image">${["Mask stars", "Predicted position", "Path", "Flagged pixels"].map(t => `<label class="opt"><input type="checkbox" disabled><span class="cb">${CHK}</span>${t}</label>`).join("")}</div>
+      <div class="kn-spec"><div class="kn-spec-h"><span>Wavelength</span><small>Brightness in each exposure</small></div><div class="kn-spec-none">No spectrum for a demo mover</div></div>
+      <details class="kn-det kn-off"><summary><span>Detectors</span><span>All</span></summary></details>`,
+    bind:b => { b.querySelector("#knBack").onclick = stop(openDiscoveryCard); b.querySelector("#knX").onclick = stop(() => { island.onClose && island.onClose(); island.closeCard(); });
+      b.querySelector("#knMin").onclick = stop(() => island.minimize()); }});
 }
 function openTrackCard(i){
   const t = AR.tracks[i], one = t.visits.length < 2, known = t.known && AR.step >= 4;
@@ -2415,6 +2514,191 @@ function openTrackCard(i){
       <div class="row-btn wrap">${known ? '<button class="btn" id="arTrack" type="button">Open in Track</button>' : ""}<button class="btn ghost" id="arBackD" type="button">Back to discovery</button></div>`,
     bind:b => { const k = b.querySelector("#arTrack"); if(k) k.onclick = stop(openTrack); b.querySelector("#arBackD").onclick = stop(openDiscoveryCard); }});
 }
+/* ============================================================
+   Known objects: follow one object across the drawn square.
+   The path, exposure squares, time ticks and the cutout are ported from the #track view
+   (chase-the-rock.html: real SPHEREx QR2 frames and the Horizons path of 433 Eros). The data is read
+   from that file. The path is laid on the sky at its true scale (1 SPHEREx pixel = 6.15") and centred
+   in the drawn square, clipped to it. Where it sits in the demo sky is made up; its shape is real.
+   ============================================================ */
+const KN = {sky:null, on:false, mode:"eros", card:false, D:null, loading:null, hops:[], track:[], S:5.625/6.15, rx:0, ry:0, bx:0, by:0,
+            t:0, tt:0, hop:null, ov:{mask:true, pred:true, path:true, flags:false}, det:null, tw:null, lt:0, cutKey:"", img:{}, flg:{}};
+const KN_MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const knMjd = s => Date.parse(s)/86400000 + 40587, knDate = m => new Date((m - 40587)*86400000), kp2 = n => String(n).padStart(2, "0");
+const knHM = m => { const d = knDate(m); return kp2(d.getUTCHours()) + ":" + kp2(d.getUTCMinutes()); };
+const knDay = m => { const d = knDate(m); return d.getUTCDate() + " " + KN_MON[d.getUTCMonth()]; };
+const knW = p => [KN.bx + (p[0] - KN.rx)*KN.S, KN.by + (p[1] - KN.ry)*KN.S];      // wide-image pixel to sky world
+function knLoad(){
+  if(KN.D) return Promise.resolve(true);
+  return KN.loading || (KN.loading = fetch("chase-the-rock.html").then(r => { if(!r.ok) throw 0; return r.text(); }).then(t => {
+    const m = t.match(/<script type="application\/json" id="sx-data">([\s\S]*?)<\/script>/); if(!m) throw 0;
+    const D = JSON.parse(m[1]); KN.track = D.track.map(p => ({...p, mjd:knMjd(p.t)}));
+    KN.hops = D.hops.slice().sort((a, b) => a.mjd_avg - b.mjd_avg || a.detector.localeCompare(b.detector)); KN.D = D; return true;
+  }).catch(() => { KN.loading = null; return false; }));
+}
+function knOff(){ const was = KN.on; KN.on = false; KN.card = false; KN.tw = null; KN.hop = null; if(was) setFrame(frame); }
+function knCardOff(){ if(!KN.card) return; KN.card = false; KN.hop = null; setFrame(frame); }
+function knPlace(){   // the #track sky image is fitted (same aspect) inside the drawn square, centred
+  const b = AR.box, W0 = KN.D.wide.w, H0 = KN.D.wide.h;
+  KN.S = Math.min((b.x1 - b.x0)/W0, (b.y1 - b.y0)/H0); KN.rx = W0/2; KN.ry = H0/2; KN.bx = (b.x0 + b.x1)/2; KN.by = (b.y0 + b.y1)/2;
+  if(!KN.sky){ KN.sky = new Image(); KN.sky.src = KN.D.wide.png; }
+}
+function knTrackAt(m){
+  const T = KN.track; if(m <= T[0].mjd) return T[0].px;
+  for(let i = 1; i < T.length; i++) if(m <= T[i].mjd){ const a = T[i - 1], b = T[i], f = (m - a.mjd)/(b.mjd - a.mjd);
+    return [a.px[0] + f*(b.px[0] - a.px[0]), a.px[1] + f*(b.px[1] - a.px[1])]; }
+  return T[T.length - 1].px;
+}
+/* Camera fit: the box of the path points and exposure squares that lie inside the drawn square, then scaled to the free
+   area left of the card between the bars (same area as arFit), with margin. Any square size works: a huge one just zooms in on the path. */
+function knSafe(){   // free rectangle (view px): below the player and its detector line, above the dock and zoom card, left of the card
+  const vr = view.getBoundingClientRect(), R = e => { if(!e) return null; const r = e.getBoundingClientRect(); return {l:r.left - vr.left, t:r.top - vr.top, r:r.right - vr.left, b:r.bottom - vr.top}; };
+  const pl = R(document.querySelector(".player")), hud = R($("hudTl")), dock = R(document.querySelector(".dock")), zc = R($("zIn").closest(".zoom")), M = 20;
+  const top = Math.max(pl ? pl.b : 0, hud ? hud.t + 16 : 0) + M + 12;      // 12 more for the size label above the square
+  const bot = Math.min(dock ? dock.t : H, zc ? zc.t : H, H) - M;
+  return {l:M, t:top, r:W - 408 - 16 - M, b:bot};
+}
+function knFit(){   // the WHOLE drawn square into the safe rectangle, by the limiting dimension
+  const b = AR.box, a = knSafe(), aw = Math.max(80, a.r - a.l), ah = Math.max(80, a.b - a.t);
+  const z = Math.min(12, Math.max(.03, Math.min(aw/(b.x1 - b.x0), ah/(b.y1 - b.y0)))), sx = a.l + aw/2, sy = a.t + ah/2;
+  return {z, x:(b.x0 + b.x1)/2 - (sx - W/2)/z, y:(b.y0 + b.y1)/2 - (sy - H/2)/z};
+}
+function knRefit(){ island.fit(); const to = knFit(); KN.tw = null; cam.x = camT.x = to.x; cam.y = camT.y = to.y; cam.z = camT.z = to.z; }
+function knFly(to){
+  if(REDUCED){ cam.x = camT.x = to.x; cam.y = camT.y = to.y; cam.z = camT.z = to.z; KN.tw = null; return; }
+  KN.tw = {t0:null, from:{x:cam.x, y:cam.y, z:cam.z}, to};
+}
+function knTween(ts){
+  const w = KN.tw; if(w.t0 === null) w.t0 = ts;
+  const u = Math.min(1, (ts - w.t0)/1000), e = u < .5 ? 4*u*u*u : 1 - Math.pow(-2*u + 2, 3)/2;
+  cam.x = w.from.x + (w.to.x - w.from.x)*e; cam.y = w.from.y + (w.to.y - w.from.y)*e; cam.z = w.from.z*Math.pow(w.to.z/w.from.z, e);
+  camT.x = cam.x; camT.y = cam.y; camT.z = cam.z; if(u >= 1) KN.tw = null;
+}
+function knTick(ts){   // the marker glides to the time of the current frame
+  const dt = Math.min(.1, (ts - (KN.lt || ts))/1000); KN.lt = ts; if(!KN.on) return;
+  KN.t += (KN.tt - KN.t)*(REDUCED ? 1 : 1 - Math.exp(-dt*5)); if(Math.abs(KN.tt - KN.t) < 1e-6) KN.t = KN.tt;
+}
+const knList = () => KN.det == null ? KN.hops : KN.hops.filter(h => +h.detector.slice(1) - 1 === KN.det);
+function knSync(){   // frame (global player) -> exposure -> time, cutout and wavelength
+  if(!KN.on || !KN.D || !KN.card) return; const l = knList(), h = l[Math.round(frame/11*(l.length - 1))]; KN.hop = h; KN.tt = h.mjd_avg;
+  const di = +h.detector.slice(1) - 1;
+  document.getElementById("wl").textContent = h.wl_um.toFixed(2);
+  const w = $("knWl"); if(w) w.innerHTML = `<i style="background:${wcol(h.wl_um)}"></i>${h.wl_um.toFixed(2)} µm · ${DETS[di].n}`;
+  const dd = $("knDate"); if(dd) dd.innerHTML = `<i style="background:${wcol(h.wl_um)}"></i>${knDay(h.mjd_avg)} ${knDate(h.mjd_avg).getUTCFullYear()}`;
+  const nn = $("knN"); if(nn) nn.innerHTML = `<b>${l.indexOf(h) + 1}</b><span>/ ${l.length}</span>`;
+  const t = $("knAt"); if(t) t.textContent = `${knDay(h.mjd_avg)} ${knHM(h.mjd_avg)} UTC · exposure ${h.exposure} of 4`;
+  if(KN.cutKey !== h.frame_id){ KN.cutKey = h.frame_id; knCut(); }
+  knSpec(h);
+}
+// Brightness against wavelength, one dot per exposure taken so far (the former #track spectrum, in the card's style).
+function knSpec(cur){
+  const svg = $("knSpec"); if(!svg) return;
+  const W = 360, H = 150, L = 30, R = 8, T = 10, B = 22, x0 = .75, x1 = 5;
+  const all = KN.hops, fmax = Math.max(...all.map(h => h.flux + (h.flux_err || 0))) * 1.08, fmin = Math.min(0, ...all.map(h => h.flux - (h.flux_err || 0)));
+  const X = l => L + (l - x0) / (x1 - x0) * (W - L - R), Y = f => T + (1 - (f - fmin) / (fmax - fmin)) * (H - T - B);
+  let g = `<rect x="0" y="0" width="${W}" height="${H}" rx="8" fill="#16191c"/>`;
+  [1, 2, 3, 4, 5].forEach(l => { g += `<line x1="${X(l)}" x2="${X(l)}" y1="${T}" y2="${H - B}" stroke="#262b30"/><text x="${X(l)}" y="${H - 7}" fill="#9aa4ab" font-size="10" text-anchor="middle">${l} µm</text>`; });
+  g += `<text x="6" y="${T + 8}" fill="#9aa4ab" font-size="9">MJy/sr</text>`;
+  const shown = all.filter(h => h.mjd_avg <= cur.mjd_avg + 1e-9);
+  shown.forEach(h => { const x = X(h.wl_um), y = Y(h.flux), c = wcol(h.wl_um), hollow = h.hw_flags && h.hw_flags.length;
+    if(h.flux_err) g += `<line x1="${x}" x2="${x}" y1="${Y(h.flux - h.flux_err)}" y2="${Y(h.flux + h.flux_err)}" stroke="${c}" stroke-opacity=".35"/>`;
+    g += hollow ? `<circle cx="${x}" cy="${y}" r="3.2" fill="none" stroke="${c}" stroke-width="1.4"/>` : `<circle cx="${x}" cy="${y}" r="3.2" fill="${c}"/>`;
+    if(h === cur) g += `<circle cx="${x}" cy="${y}" r="7" fill="none" stroke="#fafafa" stroke-width="1.4"/>`; });
+  svg.innerHTML = g;
+  svg.setAttribute("aria-label", `Brightness of Eros against wavelength, ${shown.length} of ${all.length} exposures: ` + shown.map(h => `${h.wl_um.toFixed(2)} µm ${h.flux.toFixed(0)}`).join("; "));
+}
+function knCompass(g, x, y, L){
+  g.strokeStyle = "#a1a1aa"; g.fillStyle = "#a1a1aa"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - L); g.moveTo(x, y); g.lineTo(x - L, y); g.stroke();
+  g.font = "600 10px ui-monospace,monospace"; g.textAlign = "center"; g.fillText("N", x, y - L - 4); g.fillText("E", x - L - 7, y + 3.5); g.textAlign = "left";
+}
+function knCut(){   // the SPHEREx cutout, ported from chase-the-rock.html drawZoom
+  const c = $("knCut"), h = KN.hop; if(!c || !h) return;
+  const cssW = c.clientWidth || 290, dpr = Math.min(devicePixelRatio || 1, 2); c.width = c.height = Math.round(cssW*dpr);
+  const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.fillStyle = "#000"; g.fillRect(0, 0, cssW, cssW);
+  let im = KN.img[h.frame_id]; if(!im){ im = KN.img[h.frame_id] = new Image(); im.onload = () => { if(KN.hop === h) knCut(); }; im.src = h.png; }
+  if(KN.ov.flags && !KN.flg[h.frame_id]){ const f = KN.flg[h.frame_id] = new Image(); f.onload = () => { if(KN.hop === h) knCut(); }; f.src = h.flags_png; }
+  const [e0, e1] = h.east, [n0, n1] = h.north, det = e0*n1 - n0*e1, inv = [[n1/det, -n0/det], [-e1/det, e0/det]];
+  const M = [[-inv[0][0], -inv[0][1]], [-inv[1][0], -inv[1][1]]];                      // north up, east left
+  const s = cssW/(Math.max(h.nx, h.ny) + 2), cx = (h.nx - 1)/2, cy = (h.ny - 1)/2, mid = cssW/2;
+  const P = (x, y) => { const dx = x - cx, dy = y - cy; return [mid + s*(M[0][0]*dx + M[0][1]*dy), mid + s*(M[1][0]*dx + M[1][1]*dy)]; };
+  if(im.complete && im.naturalWidth){ g.save(); g.setTransform(dpr*s*M[0][0], dpr*s*M[1][0], dpr*s*M[0][1], dpr*s*M[1][1], dpr*mid, dpr*mid);
+    g.translate(-(cx + .5), -(cy + .5)); g.imageSmoothingEnabled = false; g.drawImage(im, 0, 0); g.restore(); g.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  if(KN.ov.flags && KN.flg[h.frame_id] && KN.flg[h.frame_id].complete){ g.save(); g.setTransform(dpr*s*M[0][0], dpr*s*M[1][0], dpr*s*M[0][1], dpr*s*M[1][1], dpr*mid, dpr*mid); g.translate(-(cx + .5), -(cy + .5)); g.imageSmoothingEnabled = false; g.globalAlpha = .9; g.drawImage(KN.flg[h.frame_id], 0, 0); g.restore(); g.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  if(KN.ov.mask) for(const st of h.stars){ const [x, y] = P(st[0], st[1]), r = s*(st[2] > 60 ? 2 : 1.4);       // catalogue stars, masked
+    g.fillStyle = "rgba(17,17,20,.92)"; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.strokeStyle = "rgba(161,161,170,.3)"; g.lineWidth = 1; g.stroke(); }
+  if(KN.ov.path && h.seg.length > 1){ g.save(); g.beginPath(); g.rect(0, 0, cssW, cssW); g.clip(); g.setLineDash([6, 5]); g.strokeStyle = "rgba(56,189,248,.85)"; g.lineWidth = 1.6;
+    g.beginPath(); h.seg.forEach((p, j) => { const [x, y] = P(p[0], p[1]); j ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); g.restore(); g.setLineDash([]); }
+  if(KN.ov.pred){ const [x, y] = P(h.x, h.y), r = s*3.4; g.strokeStyle = "#4ade80"; g.lineWidth = 2; g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke();
+  g.beginPath(); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b]) => { g.moveTo(x + a*(r + 3), y + b*(r + 3)); g.lineTo(x + a*(r + 10), y + b*(r + 10)); }); g.stroke();
+  g.font = "600 12px system-ui,sans-serif"; g.fillStyle = "rgba(5,5,7,.85)"; g.fillRect(x + r + 8, y - r - 22, 44, 18); g.fillStyle = "#fafafa"; g.fillText("Eros", x + r + 13, y - r - 9); }
+  knCompass(g, cssW - 24, cssW - 50, 13);
+  c.setAttribute("aria-label", `SPHEREx cutout of 433 Eros at ${h.wl_um.toFixed(2)} micrometres, ${h.nx} by ${h.ny} pixels. Eros is ringed in green, its path is dashed, masked catalogue stars are grey circles.`);
+}
+function knDraw(){   // the path on the main sky, clipped to the drawn square; ported from chase-the-rock.html drawSky
+  if(!KN.on || !KN.D || !AR.box || (KN.mode === "eros" && !KN.hop)) return;
+  const b = AR.box, [x0, y0] = toScreen(b.x0, b.y0), [x1, y1] = toScreen(b.x1, b.y1), P = p => toScreen(...knW(p)), now = KN.t, T = KN.track;
+  ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
+  ctx.fillStyle = "#000"; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);                    // hides the mock-up's own sky inside the square
+  if(KN.sky && KN.sky.complete){ const [ix, iy] = P([0, 0]), [jx, jy] = P([KN.D.wide.w, KN.D.wide.h]); ctx.globalAlpha = .92; ctx.imageSmoothingEnabled = true; ctx.drawImage(KN.sky, ix, iy, jx - ix, jy - iy); ctx.globalAlpha = 1; }
+  if(KN.mode === "disc") discDraw(P); else {
+  ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.strokeStyle = "#38bdf8"; ctx.beginPath(); let started = false;
+  for(const p of T){ if(p.mjd > now) break; const [x, y] = P(p.px); started ? ctx.lineTo(x, y) : ctx.moveTo(x, y); started = true; }
+  const cur2 = knTrackAt(now); if(started){ const [x, y] = P(cur2); ctx.lineTo(x, y); } ctx.stroke();
+  ctx.setLineDash([5, 5]); ctx.strokeStyle = "rgba(56,189,248,.65)"; ctx.beginPath(); { const [x, y] = P(cur2); ctx.moveTo(x, y); }
+  for(const p of T){ if(p.mjd <= now) continue; const [x, y] = P(p.px); ctx.lineTo(x, y); } ctx.stroke(); ctx.setLineDash([]);
+  ctx.font = "10.5px ui-monospace,monospace";
+  for(const p of T){ const hr = knDate(p.mjd).getUTCHours(); if(hr % 6) continue; const [x, y] = P(p.px);
+    ctx.fillStyle = "#7dd3fc"; ctx.beginPath(); ctx.arc(x, y, 2.6, 0, 7); ctx.fill();
+    if(!layerOn.labels) continue; const lab = `${knDate(p.mjd).getUTCDate()} ${KN_MON[knDate(p.mjd).getUTCMonth()]} ${kp2(hr)}h`;
+    ctx.fillStyle = "rgba(5,5,7,.75)"; const w = ctx.measureText(lab).width + 8; ctx.fillRect(x - w/2, y - 22, w, 14); ctx.fillStyle = "#bae6fd"; ctx.textAlign = "center"; ctx.fillText(lab, x, y - 11.5); ctx.textAlign = "left"; }
+  const [ex, ey] = P(cur2); ctx.strokeStyle = "#fafafa"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ex, ey, 9, 0, 7); ctx.stroke();
+  ctx.strokeStyle = "rgba(250,250,250,.35)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(ex, ey, 15, 0, 7); ctx.stroke();
+  if(layerOn.labels){ ctx.font = "600 12px system-ui,sans-serif"; const lab = `Eros · ${knHM(now)} UTC`, lw = ctx.measureText(lab).width + 12;
+    ctx.fillStyle = "rgba(5,5,7,.85)"; ctx.fillRect(ex + 14, ey + 12, lw, 19); ctx.fillStyle = "#fafafa"; ctx.fillText(lab, ex + 20, ey + 25.5); }
+  }
+  ctx.restore();
+  ctx.strokeStyle = "#4ade80"; ctx.lineWidth = 1.2; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+}
+const wlColor = um => `hsl(${Math.round(270*(1 - Math.min(Math.max((um - .75)/4.25, 0), 1)))} 85% 62%)`;   // Rainbow Trails mapping, as in #track
+function knDetChips(){
+  const have = new Set(KN.hops.map(h => +h.detector.slice(1) - 1));
+  return DETS.map((d, i) => `<button type="button" class="det" role="radio" aria-checked="${KN.det === i}" data-i="${i}"${have.has(i) ? "" : ' disabled title="No Eros frame in this detector"'}>
+    <span class="rd"></span><span><b><i style="background:${d.c}"></i>${d.n}</b><small>${d.lo.toFixed(2)} to ${d.hi.toFixed(2)} µm</small></span></button>`).join("");
+}
+async function openKnownEros(){
+  AR.from = "known"; AR.selShow = false; AR.step = -1; tool = "area"; markTool("area"); startPlay(false);
+  const ok = await knLoad();
+  if(!ok){ island.openCard({title:"433 Eros", sub:"Known object · asteroid", width:408, reopen:openKnownEros,
+    html:`<div class="lk-note">Eros's real frames and path could not be loaded. Open this mock-up through its local server, not from a file.</div>
+      <div class="row-btn wrap" style="margin-top:12px"><button class="btn ghost sm" id="arBack" type="button">Back</button></div>`,
+    bind:b => { b.querySelector("#arBack").onclick = stop(openKnownCard); }}); return; }
+  KN.on = true; KN.mode = "eros"; KN.card = true; KN.det = null; KN.cutKey = ""; knPlace(); const l = knList(); KN.hop = l[Math.round(frame/11*(l.length - 1))]; KN.t = KN.tt = KN.hop.mjd_avg;
+  knFly(knFit());
+  knErosCard({reopen:openKnownEros});
+}
+function knErosCard(o){
+  const t = o.title || "433 Eros";
+  island.openCard({title:t, sub:"Known object · asteroid · from SkyBoT", width:408, reopen:o.reopen, bleed:true,
+    html:`<div class="kn-cut"><canvas id="knCut" role="img" aria-label="SPHEREx cutout"></canvas>
+        <div class="over"><span class="over-l">${o.back ? '<button class="close" id="knBack" type="button" aria-label="Back to the results" title="Back to the results"><svg class="ico" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>' : ""}<h2>${t}</h2></span><span class="over-btns"><button class="close" id="knMin" type="button" aria-label="Minimise" title="Minimise"><svg class="ico" viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button><button class="close" id="knX" type="button" aria-label="Close">${AI["x"]}</button></span></div>
+        <div class="cap" id="knDate"></div><div class="cap capr" id="knN"></div></div>
+      <dl class="kv"><dt>Wavelength</dt><dd id="knWl"></dd><dt>Taken</dt><dd id="knAt"></dd></dl>
+      <div class="kn-ov opts" role="group" aria-label="Show on the image">${[["mask","Mask stars"],["pred","Predicted position"],["path","Path"],["flags","Flagged pixels"]].map(([k, t]) => `<label class="opt"><input type="checkbox" class="kn-tg" data-k="${k}"${KN.ov[k] ? " checked" : ""}><span class="cb">${CHK}</span>${t}</label>`).join("")}</div>
+      <div class="kn-spec"><div class="kn-spec-h"><span>Wavelength</span><small>Eros's brightness in each exposure so far</small></div><svg id="knSpec" viewBox="0 0 360 150" role="img" aria-label="Brightness of Eros against wavelength"></svg></div>
+      <details class="kn-det" id="knDet"><summary><span>Detectors</span><span id="knDetV">${KN.det == null ? "All" : DETS[KN.det].n}</span></summary>
+        <div class="dets" role="radiogroup" aria-label="Detector">${knDetChips()}</div></details>
+      ${o.back ? "" : `<div class="kn-leg"><span><i></i>path so far</span><span><i class="d"></i>path to come</span><span><i class="dot"></i>every 6 h</span></div>`}`,
+    bind:b => {
+      b.querySelectorAll(".det").forEach(d => d.onclick = () => { if(d.disabled) return; const i = +d.dataset.i; KN.det = KN.det === i ? null : i;
+        b.querySelectorAll(".det").forEach(x => x.setAttribute("aria-checked", String(+x.dataset.i === KN.det))); b.querySelector("#knDetV").textContent = KN.det == null ? "All" : DETS[KN.det].n; knSync(); });
+      b.querySelectorAll(".kn-tg").forEach(t => t.onchange = () => { KN.ov[t.dataset.k] = t.checked; knCut(); });
+      b.querySelector("#knDet").addEventListener("toggle", () => island.fit());
+      if(o.back) b.querySelector("#knBack").onclick = stop(o.back);
+      b.querySelector("#knX").onclick = stop(() => { island.onClose && island.onClose(); island.closeCard(); });
+      b.querySelector("#knMin").onclick = stop(() => island.minimize()); },
+    after:() => knSync()});
+}
+
 const EMBED = `body{padding:0!important;background:#06060a!important}
 .page{max-width:none!important;gap:0!important}
 .intro,.notes,.rail,.objchip{display:none!important}
@@ -2427,7 +2711,7 @@ kFrame.addEventListener("load", () => {
   }catch(err){ /* opened from file://: the page shows as is, with its own header */ }
 });
 function openTrack(){
-  if(B.building) closeBuild(); if(TR.open) closeTrail(); island.closeCard(); startPlay(false); arBlink(false);
+  knOff(); if(B.building) closeBuild(); if(TR.open) closeTrail(); island.closeCard(); startPlay(false); arBlink(false);
   AR.track = true; tool = "area"; markTool("area");
   document.body.classList.add("split"); $("view").classList.add("tracking"); kpane.classList.add("open"); kpane.setAttribute("aria-hidden", "false");
   history.replaceState(null, "", "#track");
