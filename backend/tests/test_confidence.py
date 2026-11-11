@@ -165,7 +165,10 @@ def test_sweep_weights_find_the_field_that_moves_the_metric() -> None:
 # law (model_dependent, 2.5 of 5 when the card has one: the Sun); a giant's colour from Teq is
 # model_dependent (Jupiter and Saturn lose 5). The Sun (0.675) now scores above Procyon (0.6451).
 DEMO_SCORES = {
-    "star/simbad-name-barnard-s-star": (0.55, True),
+    "star/simbad-name-barnard-s-star": (
+        0.575,
+        True,
+    ),  # #93: measured rotation (Toledo-Padrón 2019) now scored
     "brown_dwarf_binary/simbad-eps-ind-b": (0.475, True),
     "brown_dwarf/simbad-wisea-j085510-74-071442-5": (0.375, True),
     "star_ttauri/simbad-v-rw-aur": (0.45, True),
@@ -186,7 +189,7 @@ DEMO_SCORES = {
     "reference/ref-saturn": (0.5, True),
     "reference/ref-titan": (0.7, True),
     "star/simbad-alf-cmi": (0.6451, True),
-    "star/simbad-eps-eri": (0.55, True),
+    "star/simbad-eps-eri": (0.575, True),  # #93: measured rotation (Petit 2021) now scored
     "planet_rocky/simbad-toi-700d": (0.4608, True),
     "gas_giant/simbad-wasp-39b": (0.4025, True),
     "planet_rocky/simbad-rho01-cnc-e": (0.5104, True),
