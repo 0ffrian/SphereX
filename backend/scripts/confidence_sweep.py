@@ -8,6 +8,12 @@ through stage 7 again, and the metric is the number of RenderParams leaf values 
 layer that disappears, a colour, a size). A field that moves nothing gets weight 0. It is a first,
 cheap measure of "how much that quantity changes the picture"; replace the metric with the
 distance between two baked textures (``core/render/bake.py``) for a finer one.
+
+Limit: the metric only sees RenderParams. The mass, orbit and host-star inputs (and whatever else
+the browser engines compute from the card: tides, climate, a star's spots) change the picture in
+the frontend, not in RenderParams, so this sweep gives them weight 0 and cannot calibrate those
+weights. Only asset files with a ``card`` are read (``tracks/horizons-*.json`` are paths, not
+assets).
 """
 
 from __future__ import annotations
@@ -64,8 +70,9 @@ def sweep_card(card: Mapping[str, Any]) -> dict[str, float]:
 
 def main() -> int:
     for path in sorted(ASSETS.glob("*/*.json")):
-        card = json.loads(path.read_text("utf-8"))["card"]
-        if card["type"] == "candidate":
+        doc = json.loads(path.read_text("utf-8"))
+        card = doc.get("card") if isinstance(doc, Mapping) else None
+        if not isinstance(card, Mapping) or card.get("type") == "candidate":
             continue
         print(f"{card['id']} ({card['type']})")
         for field, w in sorted(sweep_card(card).items(), key=lambda kv: -kv[1]):

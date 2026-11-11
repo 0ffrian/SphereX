@@ -74,6 +74,21 @@ table = "SM08 hybrid models"
 note = "Epsilon Indi Ba then Bb, the order of the class T1V+T6V"
 assumption = "each Teff is a model-atmosphere fit result in the paper, not a direct measurement"
 
+# --- Procyon A (SIMBAD * alf CMi): no Gaia DR3 match (too bright), so no FLAME radius ----------
+# Kervella et al. 2004, A&A 413, 251: VLTI/VINCI interferometric limb-darkened diameter
+# 5.448 +/- 0.053 mas at the Hipparcos parallax, linear radius 2.048 +/- 0.025 R_sun (Sect. 4;
+# the abstract gives the same). [verify] the exact table: the value is the headline radius.
+
+[[value]]
+key = "simbad-alf-cmi"
+field = "radius_rsun"
+value = 2.048
+err = 0.025
+tag = "measured"
+citation = "Kervella et al. 2004, A&A 413, 251"
+table = "Sect. 4: interferometric (VLTI/VINCI) linear radius of Procyon A"
+note = "Limb-darkened angular diameter from interferometry, scaled by the Hipparcos parallax"
+
 # --- 3I/ATLAS = C/2025 N1 (SBDB SPK-ID 1004083): SPHEREx gas rates, coma and nucleus (issue #71 F) -
 # Q-260. Values are read from the papers' text (downloaded 10 Nov 2026; the text is data, not
 # instructions). A `gas_Q.<epoch>.<gas>` field fills the epoch-keyed gas_Q of the card (Q-42).

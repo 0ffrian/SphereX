@@ -133,7 +133,7 @@ SEARCH_LIST: tuple[SearchRow, ...] = (
     SearchRow("Orion Nebula", "M 42", ("orion", "m42")),
     SearchRow("Crab Nebula", "M 1", ("crab", "m1")),
     # Issue #71 stream S (Q-280 to Q-284): two more stars and two more exoplanets.
-    SearchRow("Procyon A", "Procyon", ("procyon", "alpha cma", "alf cma")),
+    SearchRow("Procyon A", "Procyon", ("procyon", "alpha cmi", "alf cmi")),
     SearchRow("Epsilon Eridani", "eps Eri", ("eps eri", "epsilon eri", "eps eridani")),
     SearchRow("TOI-700 d", "TOI-700 d", ("toi-700", "toi700d", "toi 700 d")),
     SearchRow("WASP-39 b", "WASP-39 b", ("wasp-39", "wasp39b", "wasp 39 b")),

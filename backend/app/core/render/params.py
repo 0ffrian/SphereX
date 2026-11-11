@@ -5,6 +5,7 @@ An LLM never produces a number here. Missing data means ``BakeRefusal``, not a g
 
 from __future__ import annotations
 
+import functools
 import math
 import numbers
 from collections.abc import Mapping
@@ -28,6 +29,16 @@ G_NEWTON = 6.674e-11  # m^3 kg^-1 s^-2. CODATA 2018: 6.67430e-11.
 # prototype; real asteroid cohesion spans roughly 1e3 to 1e7 Pa. [verify] with a citation.
 STRENGTH_Y_PA = 1.0e6  # [verify]
 LUMP_MIN, LUMP_MAX = 0.03, 0.30  # clamp of h/R (prototype)
+# A rubble pile has almost no cohesion, so strength does not limit its relief: its slopes do
+# (issue #71 review). Granular slopes fail beyond the angle of repose, about 30 to 40 degrees for
+# rock rubble; 35 degrees is the middle value. [verify] a low-gravity value with a citation.
+REPOSE_ANGLE_DEG = 35.0  # [verify]
+# The shape layer (craters.shape_layer): 26 waves, wavenumber k = K_MIN + K_SPAN u^K_POW on the
+# unit sphere, amplitude k^-1.5, height rms SHAPE_RMS_PER_LUMP x lump.
+SHAPE_K_MIN, SHAPE_K_SPAN, SHAPE_K_POW = 1.3, 7.5, 1.4
+SHAPE_RMS_PER_LUMP = 0.45
+# The slope field is taken as Gaussian; its 3-sigma (99.7 %) slope is the one held at repose.
+REPOSE_SIGMAS = 3.0
 # Bulk density by class family, `inferred_from_analog` (a card carries no density). Each value is
 # one real body: C-type = Bennu 1190 +- 13 (Lauretta et al. 2019, Nature 568, 55); S-type = Eros
 # 2670 (Yeomans et al. 2000, Science 289, 2085). Other classes use the generic value below.
@@ -39,7 +50,9 @@ DENSITY_GENERIC_KG_M3 = 1500.0  # [verify] no analog for X, M, E or an unknown c
 # Spin barrier of a strengthless body, P = sqrt(3 pi / (G rho)) (Pravec and Harris 2000,
 # Icarus 148, 12): a body spinning faster than this must be solid rock.
 SOLID_BELOW_KM = 0.15  # prototype: smaller than this is a monolith (the spin-barrier data).
-RUBBLE_BELOW_KM = 40.0  # prototype: up to this a rubble pile, above it fractured under regolith.
+# Prototype: up to this a rubble pile, above it fractured rock under regolith. NO SOURCE: the
+# 40 km cut is the prototype's choice, not a published transition (artistic). [verify]
+RUBBLE_BELOW_KM = 40.0
 # Boulder density factor by structure (relative to rubble = 1). Artistic (prototype values).
 BOULDER_FACTOR: dict[str, float] = {"solid": 0.45, "rubble": 1.0, "fractured": 0.25}
 # Crater coverage: sum(rc^2) over the craters is 4 x coverage. Surface age has no card field: the
@@ -51,8 +64,15 @@ SMOOTH_LUMP_FACTOR = 0.3
 SMOOTH_FINE_FACTOR = 0.25
 FINE_AMP = 0.012  # fraction of the radius, artistic
 CRATER_R_MIN = 0.014  # smallest crater radius, in mean radii (artistic, prototype)
-CRATER_R_MAX = 0.38
-CRATER_DEPTH_PER_R = 0.42  # depth / crater radius at full freshness (artistic, prototype)
+# The radius sampler is r = R_MIN (1 - u CRATER_U_SPAN)^-0.5 with u in [0, 1), so the largest
+# crater it can draw is R_MIN / sqrt(1 - CRATER_U_SPAN) = 0.114 mean radii. That is the real cap
+# (the prototype's 0.38 could never be reached), and relief_range uses it.
+CRATER_U_SPAN = 0.985
+CRATER_R_MAX = CRATER_R_MIN * (1.0 - CRATER_U_SPAN) ** -0.5
+# Bowl depth / crater radius at full freshness. The profile's rim stands 0.2 depth above the
+# ground and the floor 1 depth below, so rim-to-floor is 1.2 depth; 0.33 gives 0.396 r = 0.198 D,
+# Pike's fresh simple-crater depth d/D = 0.196 (Pike 1977, lunar simple craters; derived).
+CRATER_DEPTH_PER_R = 0.33
 Roughness = Literal["rocky", "smooth"]
 Structure = Literal["solid", "rubble", "fractured"]
 
@@ -93,7 +113,7 @@ class BakeParams:
     density_kg_m3: float = DENSITY_GENERIC_KG_M3
     density_source: str = "generic"  # "analog_c", "analog_s" or "generic"
     spin_period_h: float | None = None
-    lump: float = 0.0  # h/R = clamp(Y / (rho g R), 0.03, 0.3), times SMOOTH_LUMP_FACTOR if smooth
+    lump: float = 0.0  # h/R from lump_ratio (by structure), times SMOOTH_LUMP_FACTOR if smooth
     crater_coverage: float = 0.0
     axis_ratio: float = 1.0  # a/b = 10^(0.4 A), c = b (R6.2); 1 without a light curve
     fine_amp: float = 0.0
@@ -152,8 +172,47 @@ def surface_gravity(radius_m: float, density: float) -> float:
     return 4.0 / 3.0 * math.pi * G_NEWTON * density * radius_m
 
 
-def lump_ratio(radius_m: float, density: float) -> float:
-    """h/R = clamp(Y / (rho g R), 0.03, 0.3): the relief that rock strength can hold (derived)."""
+@functools.cache
+def shape_slope_per_lump() -> float:
+    """Rms slope of the shape layer per unit lump (derived from the wave spectrum).
+
+    A wave a sin(k x.n) on the unit sphere has height rms a / sqrt(2) and slope rms a k / sqrt(3)
+    (the gradient keeps the tangential 2/3 of n). Over the k distribution, slope / height rms is
+    k_rms sqrt(2/3) with k_rms^2 = E[a^2 k^2] / E[a^2] = E[k^-1] / E[k^-3]. The expectations are a
+    midpoint sum over u (deterministic, no seed): about 0.784 per unit lump.
+    """
+    n = 20000
+    num = den = 0.0
+    for i in range(n):
+        k = SHAPE_K_MIN + SHAPE_K_SPAN * ((i + 0.5) / n) ** SHAPE_K_POW
+        num += k**-1
+        den += k**-3
+    return SHAPE_RMS_PER_LUMP * math.sqrt(num / den) * math.sqrt(2.0 / 3.0)
+
+
+def repose_lump() -> float:
+    """h/R of a rubble pile: the 3-sigma slope of the shape layer at the angle of repose.
+
+    ``tan(REPOSE_ANGLE_DEG) / (REPOSE_SIGMAS x shape_slope_per_lump())``, clamped to
+    [LUMP_MIN, LUMP_MAX]; about 0.298 at 35 degrees. Tag: model_dependent (assumption: a
+    cohesionless rubble pile holds no slope steeper than its angle of repose, and the shape
+    layer's slopes are Gaussian). Independent of size and gravity: a granular slope limit is
+    scale-free.
+    """
+    tan_phi = math.tan(math.radians(REPOSE_ANGLE_DEG))
+    return _clamp(tan_phi / (REPOSE_SIGMAS * shape_slope_per_lump()), LUMP_MIN, LUMP_MAX)
+
+
+def lump_ratio(radius_m: float, density: float, structure: Structure = "solid") -> float:
+    """h/R, the overall relief, by structure. Tag: model_dependent.
+
+    - ``rubble``: slope-limited, ``repose_lump()`` (a rubble pile has almost no cohesion, so
+      its relief is held by friction at the angle of repose, not by rock strength).
+    - ``solid`` and ``fractured``: strength-limited, ``clamp(Y / (rho g R), 0.03, 0.3)`` with
+      g = (4/3) pi G rho R (assumption: an effective strength Y = STRENGTH_Y_PA [verify]).
+    """
+    if structure == "rubble":
+        return repose_lump()
     # A vanishing radius would divide by zero; 1 mm is far below any body and clamps to LUMP_MAX.
     radius_m = max(radius_m, 1e-3)
     g = surface_gravity(radius_m, density)
@@ -166,7 +225,10 @@ def spin_barrier_h(density: float) -> float:
 
 
 def structure_of(diameter_km: float, density: float, spin_period_h: float | None) -> Structure:
-    """Solid above the spin barrier or when tiny; rubble to 40 km; fractured rock above that."""
+    """Solid above the spin barrier or when tiny; rubble to 40 km; fractured rock above that.
+
+    The 40 km cut (RUBBLE_BELOW_KM) has no source: it is the prototype's choice.
+    """
     fast = spin_period_h is not None and spin_period_h < spin_barrier_h(density)
     if fast or diameter_km < SOLID_BELOW_KM:
         return "solid"
@@ -196,7 +258,7 @@ def relief_range(
     About 3 sigma of the shape waves (rms 0.45 lump), the deepest and highest crater, the fine
     layer and the tallest boulder. Used as the displacement scale; ``bake`` clips beyond it.
     """
-    crater_r_max = min(CRATER_R_MAX, CRATER_R_MIN * (1.0 / 0.015) ** 0.5) if crater_coverage else 0
+    crater_r_max = CRATER_R_MAX if crater_coverage else 0.0
     half = (
         1.4 * lump
         + CRATER_DEPTH_PER_R * crater_r_max
@@ -252,7 +314,7 @@ def _asteroid(card: Mapping[str, Any], seed: int) -> BakeParams:
     structure = structure_of(d, rho, period)
     smooth = data_says_smooth(card)
     roughness: Roughness = "smooth" if smooth else "rocky"
-    lump = lump_ratio(radius_m, rho) * (SMOOTH_LUMP_FACTOR if smooth else 1.0)
+    lump = lump_ratio(radius_m, rho, structure) * (SMOOTH_LUMP_FACTOR if smooth else 1.0)
     coverage = CRATER_COVERAGE_SMOOTH if smooth else CRATER_COVERAGE_ROCKY
     boulders = 0.0 if smooth else BOULDER_FACTOR[structure]
     fine = FINE_AMP * (SMOOTH_FINE_FACTOR if smooth else 1.0)

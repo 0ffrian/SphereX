@@ -84,6 +84,9 @@ class Input:
     fixed_tag: str | None = None
     kind: Kind = "card"
     derived_from_fields: bool = False  # a formula of these card values: c = 1 when all are present
+    # A card input whose fields are usually absent (no survey measures them): with no field present
+    # it takes this tag, like a ``fixed`` input, instead of ``missing``. Not offered in ``raise``.
+    fallback_tag: str | None = None
 
 
 def _card(
@@ -98,6 +101,11 @@ def _fixed(id_: str, label: str, w: float, tag: str | None) -> Input:
 
 def _derived(id_: str, label: str, w: float, *fields: str) -> Input:
     return Input(id_, label, w, fields, "all", None, "card", True)
+
+
+def _card_or(id_: str, label: str, w: float, fallback: str, *fields: str) -> Input:
+    """A card input (mean over ``fields``) that falls back to ``fallback`` when none is present."""
+    return Input(id_, label, w, fields, "all", None, "card", False, fallback)
 
 
 @dataclass(frozen=True)
@@ -211,9 +219,18 @@ _ROCKY = TypeTable(
         _card("radius", "Radius", 15, "radius_rjup"),
         _card("mass", "Mass", 10, "mass_mearth"),
         _card("orbit", "Orbit and tides", 10, "orbit_au", "orbital_period_d", mode="all"),
-        _card("temperature", "Temperature", 15, "teq_K"),
+        # A measured surface temperature (Titan, Huygens) counts; else the equilibrium one.
+        _card("temperature", "Temperature", 15, "surface_temperature_K", "teq_K"),
         _card("host_star", "Host star", 10, "host_teff_K", "host_radius_rsun", mode="all"),
-        _fixed("fluid", "Surface fluid and pressure", 15, "inferred_from_analog"),
+        # Measured surface fluid and pressure (Titan) count; with neither, an analog (as before).
+        _card_or(
+            "fluid",
+            "Surface fluid and pressure",
+            15,
+            "inferred_from_analog",
+            "surface_fluid",
+            "surface_pressure_bar",
+        ),
         _fixed("terrain", "Plates and terrain", 15, "artistic"),
         _fixed("clouds", "Clouds and ice", 10, "artistic"),
     ),
@@ -367,6 +384,8 @@ def _score_input(card: Mapping[str, Any], inp: Input) -> tuple[float, str, tuple
     results = [(f, _field_c(card, f)) for f in inp.fields]
     have = [(f, r) for f, r in results if r is not None]
     if not have:
+        if inp.fallback_tag is not None:
+            return _TAG_C[inp.fallback_tag], inp.fallback_tag, ()
         return 0.0, "missing", ()
     if inp.derived_from_fields:
         if len(have) < len(inp.fields):
@@ -380,6 +399,23 @@ def _score_input(card: Mapping[str, Any], inp: Input) -> tuple[float, str, tuple
         return c, tag, tuple(f for f, _ in have)
     best = max(have, key=lambda fr: (fr[1][0], -_RANK.index(fr[1][1]) if fr[1][1] in _RANK else 0))
     return best[1][0], best[1][1], (best[0],)
+
+
+# Tags that never satisfy the key measurement (Q-222): an analog or an artistic value is not data.
+_KEY_REFUSED_TAGS = ("inferred_from_analog", "artistic")
+
+
+def _key_measured(card: Mapping[str, Any], field: str) -> bool:
+    """Whether ``field`` holds a key measurement: present, and not tagged as an analog or artistic.
+
+    ``gas_Q`` passes when one molecule (in either shape) is present with such a tag."""
+    if field == "gas_Q":
+        return any(
+            str(m.get("tag")) not in _KEY_REFUSED_TAGS
+            for m in _gas_species(card.get(field)).values()
+        )
+    tv = card.get(field)
+    return _present(tv) and isinstance(tv, Mapping) and str(tv.get("tag")) not in _KEY_REFUSED_TAGS
 
 
 def _band(score: float) -> str:
@@ -435,9 +471,7 @@ def confidence_block(
             }
         )
     score = m + e
-    key_ok = any(
-        (_present_gas if f == "gas_Q" else _present)(card.get(f)) for f in table.key_fields
-    )
+    key_ok = any(_key_measured(card, f) for f in table.key_fields)
     score_ok = score + 1e-9 >= threshold
     passed = key_ok and score_ok
 
@@ -458,7 +492,7 @@ def confidence_block(
     lacking = [
         (inp, r)
         for inp, r in zip(table.inputs, rows, strict=True)
-        if inp.kind == "card" and r["c"] < 1.0
+        if inp.kind == "card" and inp.fallback_tag is None and r["c"] < 1.0
     ]
     raise_text: str | None = None
     if lacking:

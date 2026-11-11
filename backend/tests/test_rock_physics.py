@@ -16,8 +16,11 @@ from app.core.render import height as heights
 from app.core.render.noise import sphere_dirs
 from app.core.render.params import (
     G_NEWTON,
+    REPOSE_ANGLE_DEG,
     SMOOTH_LUMP_FACTOR,
     lump_ratio,
+    repose_lump,
+    shape_slope_per_lump,
     spin_barrier_h,
     structure_of,
     surface_gravity,
@@ -36,11 +39,13 @@ def card(diameter_km: float = 2.0, **extra: float) -> dict[str, Any]:
 
 
 def test_gravity_matches_known_bodies() -> None:
-    # Bennu-sized sphere: R 262 m, rho 1190 -> 8.7e-5 m/s^2, the order of the measured 2.5e-5 to
-    # 8.5e-5 over its lumpy surface (Scheeres et al. 2019, Nat. Astron. 3, 352).
-    g = surface_gravity(262.0, 1190.0)
-    assert g == pytest.approx(4 / 3 * math.pi * G_NEWTON * 1190 * 262)
-    assert g == pytest.approx(8.7e-5, rel=0.01)
+    # Bennu-sized sphere: volume-equivalent radius 245 m (Barnouin et al. 2019, Nat. Geosci. 12,
+    # 247), rho 1190 (Lauretta et al. 2019) -> 8.2e-5 m/s^2, inside the measured surface
+    # acceleration of 26 to 80 um/s^2 over its spinning, lumpy surface (Scheeres et al. 2019,
+    # Nat. Astron. 3, 352); a sphere has no spin or shape, so it sits at the top of that range.
+    g = surface_gravity(245.0, 1190.0)
+    assert g == pytest.approx(4 / 3 * math.pi * G_NEWTON * 1190 * 245)
+    assert g == pytest.approx(8.15e-5, rel=0.01)
     # Earth-like sphere sanity: R 6371 km, rho 5514 -> 9.82 m/s^2.
     assert surface_gravity(6.371e6, 5514.0) == pytest.approx(9.82, abs=0.02)
 
@@ -52,11 +57,46 @@ def test_spin_barrier_is_about_two_hours_for_rubble() -> None:
 
 
 def test_lump_ratio_is_clamped_and_falls_with_size() -> None:
+    # Solid and fractured bodies: strength against gravity, Y / (rho g R).
     assert lump_ratio(100.0, 2000.0) == 0.3  # small body: clamped at the top
     assert lump_ratio(125_000.0, 2600.0) < 0.1  # 250 km body: strength cannot hold much
     assert lump_ratio(1.0e7, 2600.0) == 0.03  # planet sized: clamped at the bottom
     xs = [lump_ratio(r, 2000.0) for r in (1e3, 1e4, 1e5, 1e6)]
     assert xs == sorted(xs, reverse=True)
+
+
+def test_rubble_relief_is_slope_limited_not_strength_limited() -> None:
+    # A rubble pile: the 3-sigma slope of the shape layer at the angle of repose (35 degrees).
+    assert shape_slope_per_lump() == pytest.approx(0.7837, abs=1e-4)
+    expect = math.tan(math.radians(REPOSE_ANGLE_DEG)) / (3.0 * shape_slope_per_lump())
+    assert repose_lump() == pytest.approx(expect)
+    assert repose_lump() == pytest.approx(0.2978, abs=1e-4)
+    # Scale-free: the same for a 100 m and a 20 km rubble pile, and for any density.
+    assert lump_ratio(100.0, 2000.0, "rubble") == lump_ratio(1.0e4, 1190.0, "rubble")
+    # The strength rule still applies to fractured rock: a 250 km body holds little.
+    assert lump_ratio(125_000.0, 2600.0, "fractured") < 0.1
+    # The baked asteroid uses its structure's rule.
+    p = params_from_card(card(2.0), 1)
+    assert p.structure == "rubble" and p.lump == pytest.approx(repose_lump())
+
+
+def test_shape_layer_slope_matches_the_formula() -> None:
+    # The measured rms slope of a baked shape layer is near the formula's (the waves are few, so
+    # one seed scatters; the mean over seeds is the check).
+    from app.core.render import craters
+
+    w, h = 512, 256
+    dirs = sphere_dirs(h, w)
+    theta = (np.arange(h) + 0.5) / h * np.pi
+    ratios = []
+    for seed in range(12):
+        hh = craters.shape_layer(dirs, seed, 1.0)
+        gt = np.gradient(hh, np.pi / h, axis=0)
+        gp = np.gradient(hh, 2 * np.pi / w, axis=1) / np.maximum(np.sin(theta), 1e-3)[:, None]
+        wt = np.sin(theta)[:, None] * np.ones_like(hh)
+        slope_rms = math.sqrt(float(np.sum((gt**2 + gp**2) * wt) / np.sum(wt)))
+        ratios.append(slope_rms)
+    assert float(np.mean(ratios)) == pytest.approx(shape_slope_per_lump(), rel=0.1)
 
 
 def test_structure_rules() -> None:

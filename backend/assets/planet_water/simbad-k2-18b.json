@@ -1,5 +1,5 @@
 {
-  "asset_version": "10",
+  "asset_version": "11",
   "card": {
     "host_age_gyr": {
       "source": "not available: the Exoplanet Archive has no st_age (host star age in Gyr)",
@@ -66,8 +66,8 @@
     "type": "planet_water"
   },
   "created_at": "2025-10-01T00:00:00.000Z",
-  "generator_version": "p1-b3",
-  "inputs_sha256": "4d30394754ce61b83ba21606cfe420fb28cc45912350a92d60845b8e46f385e2",
+  "generator_version": "p1-b4",
+  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
   "render_params": {
     "alt_text": "K2-18 b, Water planet, 0.211 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
     "confidence": {
@@ -142,7 +142,10 @@
         },
         {
           "c": 0.0,
-          "fields": [],
+          "fields": [
+            "surface_fluid",
+            "surface_pressure_bar"
+          ],
           "id": "fluid",
           "label": "Surface fluid and pressure",
           "points": 0.0,
@@ -177,7 +180,7 @@
       "threshold": 0.25,
       "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
     },
-    "generator_version": "p1-b3",
+    "generator_version": "p1-b4",
     "haptics": {
       "data": "teq_pulse",
       "data_tag": "measured",
@@ -205,7 +208,7 @@
       "spectrum"
     ],
     "scale_m": 15116183.742,
-    "seed": 3456308104,
+    "seed": 1842563809,
     "type": "planet_water",
     "view_modes": {
       "visible": {
@@ -224,6 +227,6 @@
       }
     }
   },
-  "seed": 3456308104,
+  "seed": 1842563809,
   "textures": null
 }
