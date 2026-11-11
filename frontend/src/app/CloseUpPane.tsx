@@ -23,6 +23,7 @@ import { WorldFlyStage } from './WorldEngineStage';
 import { engineKey, useWorldStore } from './worldStore';
 import { useAppStore } from '@/state/store';
 import { useRockStore } from './rockStore';
+import { useStarTarget } from './starTargetStore';
 
 export type CloseUpKind = 'orbit' | 'star' | 'body';
 
