@@ -299,7 +299,8 @@ classDiagram
   }
   class WorldEngine {
     <<engine/worlds/WorldEngine.ts>>
-    createCore(canvas), the prototype's code with declared deviations
+    createCore(canvas, role), the prototype's code with declared deviations
+    +whenReady() Promise, shaders compiled in the background (issue #93)
     +setOverrides(o) void
     +setFly(on) void
     +spinUp() void, wall-clock budget, not byte-identical

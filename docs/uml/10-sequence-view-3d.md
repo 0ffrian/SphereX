@@ -73,7 +73,7 @@ sequenceDiagram
     V->>V: Honesty change with the same sceneKey: BuiltScene.update(plan) sets the tags and light in place, no field is regenerated
     alt honesty is + Artistic and the adapter accepts the card (D-37, Q-287)
       V->>ES: Mount the engine stage for the type (planets and gas giants, stars with a Teff, asteroids and comet nuclei)
-      ES->>EN: Own WebGL2 canvas, preset from cardToWorld, cardToStar or cardToRock, spin-up (wall clock, not byte-identical)
+      ES->>EN: Own WebGL2 canvas, preset from cardToWorld, cardToStar or cardToRock, spin-up (wall clock, not byte-identical)#59; a world engine first compiles in the background (whenReady) while "Forming" shows
       ES->>V: setEngineOwned(true): the viewer builds and draws nothing under the engine
       EN-->>U: The engine's picture, its readouts with badges and its notes
       opt engine fails, loses its WebGL context, or the user leaves + Artistic
