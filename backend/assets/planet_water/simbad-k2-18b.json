@@ -1,10 +1,21 @@
 {
-  "asset_version": "11",
+  "asset_version": "12",
   "card": {
+    "dayside_temp_K": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no eclipse or phase-curve value for this planet",
+      "tag": "measured",
+      "value": null
+    },
     "host_age_gyr": {
       "source": "not available: the Exoplanet Archive has no st_age (host star age in Gyr)",
       "tag": "measured",
       "value": null
+    },
+    "host_lum_lsun": {
+      "err": 0.00209999485250573,
+      "source": "NASA Exoplanet Archive PSCompPars st_lum, log10 L/L_sun converted as 10^st_lum (Benneke et al. 2019)",
+      "tag": "measured",
+      "value": 0.025299969638710982
     },
     "host_mass_msun": {
       "err": 0.047,
@@ -24,7 +35,19 @@
       "tag": "measured",
       "value": 3457.0
     },
+    "hotspot_offset_deg": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no eclipse or phase-curve value for this planet",
+      "tag": "measured",
+      "value": null
+    },
     "id": "simbad-k2-18b",
+    "insolation_searth": {
+      "err": 0.084,
+      "formula": "S / S_earth = (L_star / L_sun) / (a / au)^2, the flux at the planet computed by the reference from its host luminosity and orbit; not a direct measurement",
+      "source": "NASA Exoplanet Archive PSCompPars pl_insol (Benneke et al. 2019)",
+      "tag": "derived",
+      "value": 1.005
+    },
     "mass_mearth": {
       "err": 1.7,
       "source": "NASA Exoplanet Archive PSCompPars pl_bmasse (Sarkis et al. 2018)",
@@ -32,11 +55,22 @@
       "value": 8.92
     },
     "name": "K2-18 b",
+    "nightside_temp_K": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no eclipse or phase-curve value for this planet",
+      "tag": "measured",
+      "value": null
+    },
     "orbit_au": {
       "err": 0.0065,
       "source": "NASA Exoplanet Archive PSCompPars pl_orbsmax (Sarkis et al. 2018)",
       "tag": "measured",
       "value": 0.1429
+    },
+    "orbit_ecc": {
+      "err": 0.08,
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbeccen (Sarkis et al. 2018)",
+      "tag": "measured",
+      "value": 0.2
     },
     "orbital_period_d": {
       "err": 0.0001,
@@ -67,7 +101,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
+  "inputs_sha256": "eb40dd02945cf37be8fa91ab3ed6ad7e13d745c6ccbb5d17ae2e8c929dfdc9e9",
   "render_params": {
     "alt_text": "K2-18 b, Water planet, 0.211 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
     "confidence": {

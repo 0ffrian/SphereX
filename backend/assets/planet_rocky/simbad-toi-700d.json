@@ -1,10 +1,21 @@
 {
-  "asset_version": "11",
+  "asset_version": "12",
   "card": {
+    "dayside_temp_K": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no eclipse or phase-curve value for this planet",
+      "tag": "measured",
+      "value": null
+    },
     "host_age_gyr": {
       "source": "NASA Exoplanet Archive PSCompPars st_age (Kokori et al. 2023)",
       "tag": "measured",
       "value": 1.5
+    },
+    "host_lum_lsun": {
+      "err": 0.0010998597082859003,
+      "source": "NASA Exoplanet Archive PSCompPars st_lum, log10 L/L_sun converted as 10^st_lum (Kokori et al. 2023)",
+      "tag": "measured",
+      "value": 0.023300218838930804
     },
     "host_mass_msun": {
       "err": 0.02,
@@ -24,7 +35,19 @@
       "tag": "measured",
       "value": 3459.0
     },
+    "hotspot_offset_deg": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no eclipse or phase-curve value for this planet",
+      "tag": "measured",
+      "value": null
+    },
     "id": "simbad-toi-700d",
+    "insolation_searth": {
+      "err": 0.1,
+      "formula": "S / S_earth = (L_star / L_sun) / (a / au)^2, the flux at the planet computed by the reference from its host luminosity and orbit; not a direct measurement",
+      "source": "NASA Exoplanet Archive PSCompPars pl_insol (Gilbert et al. 2023)",
+      "tag": "derived",
+      "value": 0.85
+    },
     "mass_mearth": {
       "assumption": "mass estimated from the planet's radius with the Chen & Kipping 2017 mass-radius relation (archive pl_bmassprov = 'M-R relationship', pscp_calc.html); not a measured mass",
       "source": "NASA Exoplanet Archive PSCompPars calculated value (pscp_calc.html), pl_bmasse",
@@ -32,11 +55,22 @@
       "value": 1.58
     },
     "name": "TOI-700 d",
+    "nightside_temp_K": {
+      "source": "not available: the literature registry (backend/assets/literature.toml) has no eclipse or phase-curve value for this planet",
+      "tag": "measured",
+      "value": null
+    },
     "orbit_au": {
       "err": 0.0027,
       "source": "NASA Exoplanet Archive PSCompPars pl_orbsmax (Pass et al. 2026)",
       "tag": "measured",
       "value": 0.1642
+    },
+    "orbit_ecc": {
+      "err": 0.045,
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbeccen (Gilbert et al. 2023)",
+      "tag": "measured",
+      "value": 0.042
     },
     "orbital_period_d": {
       "err": 1.8e-05,
@@ -67,7 +101,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
+  "inputs_sha256": "eb40dd02945cf37be8fa91ab3ed6ad7e13d745c6ccbb5d17ae2e8c929dfdc9e9",
   "render_params": {
     "alt_text": "TOI-700 d, Rocky planet, 0.102 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
     "confidence": {

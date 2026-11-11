@@ -68,6 +68,19 @@ interface ObjectCard {
   host_teff_K?: TV; host_radius_rsun?: TV; host_mass_msun?: TV; host_age_gyr?: TV;
                                       // a measured column cites its *_reflink; a CALCULATED_VALUE is never 'measured'; a missing
                                       // value is null with the reason in `source`
+  orbit_ecc?: TV;                     // issue #93 A: pl_orbeccen → 'measured'; e = 0 with no error (a fit fixed to a circle)
+                                      // → 'model_dependent'. The world engine's eccentricity (seasons, tides, mean flux)
+  insolation_searth?: TV;             // issue #93 B: pl_insol, S/S_earth → 'derived' (the paper computed it from L and a)
+  host_lum_lsun?: TV;                 // issue #93 B: 10^st_lum → 'measured'. The world engine's starlight: R_star is set to
+                                      // sqrt(L) (5772/T)^2, else from insolation_searth, else host_radius_rsun as before
+  dayside_temp_K?: TV; nightside_temp_K?: TV; hotspot_offset_deg?: TV;
+                                      // issue #93 C: eclipse / phase-curve brightness temperatures (K) and hotspot offset
+                                      // (deg, + east), literature registry only; the band is in `source`. Shown as world
+                                      // readouts; not yet engine inputs
+  // stars (issue #93 B, C)
+  lum_lsun?: TV; mass_msun?: TV;      // Gaia FLAME lum_flame, mass_flame → 'model_dependent' (as radius_flame), else null
+  flare_rate_per_d?: TV;              // literature registry; band and threshold in `source`. Rung 1 of the flare rate (R5.7)
+                                      // star rot_period_h: literature registry → 'measured' (else the Sun's Rossby number)
   component_teff_K?: TV<[number, number]>;  // brown_dwarf_binary only: Teff of body A then B (literature registry, Q-154)
   // surface of a world (issue #71, Q-285): measured only for a reference body (Titan: Huygens HASI, Cassini radar);
   // read by the confidence score (Q-327) and the world adapters; absent on exoplanet cards

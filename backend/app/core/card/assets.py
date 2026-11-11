@@ -62,7 +62,10 @@ ASSET_SOURCE = "derived.asset"
 # 11 (issue #71 review): crater depth 0.33 r (Pike d/D), rubble-pile relief limited by the angle
 #   of repose instead of strength, the reachable crater cap in relief_range (relief_amp), the relief
 #   layer text; Procyon A takes its interferometric radius from the literature registry.
-ASSET_VERSION = "11"
+# 12 (issue #93 section 5): planets gain orbit_ecc, insolation_searth, host_lum_lsun and the
+#   eclipse / phase-curve fields; stars gain lum_lsun and mass_msun (Gaia FLAME), rot_period_h and
+#   flare_rate_per_d (literature registry); the archive and Gaia star queries changed columns.
+ASSET_VERSION = "12"
 AssetStatus = Literal["saved", "generated", "sketch"]
 FIELDS = ("card", "render_params", "textures", "generator_version", "seed", "created_at")
 OPTIONAL_FIELDS = ("asset_version", "inputs_sha256")

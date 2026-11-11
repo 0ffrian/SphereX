@@ -1,11 +1,23 @@
 {
-  "asset_version": "11",
+  "asset_version": "12",
   "card": {
+    "dayside_temp_K": {
+      "err": 65.0,
+      "source": "literature: Kammer et al. 2015, ApJ 810, 118 (arXiv:1508.00902), Table 3: 4.5 um secondary eclipse, brightness temperature 1055 (+60 / -65) K (backend/assets/literature.toml). Spitzer IRAC 4.5 um, one eclipse; err is the larger side of +60 / -65; the brightness temperature uses a PHOENIX stellar model. At 3.6 um: 1213 (+58 / -62) K",
+      "tag": "measured",
+      "value": 1055.0
+    },
     "host_age_gyr": {
       "err": 4.0,
       "source": "NASA Exoplanet Archive PSCompPars st_age (Mancini et al. 2018)",
       "tag": "measured",
       "value": 8.5
+    },
+    "host_lum_lsun": {
+      "err": 0.03402777295662529,
+      "source": "NASA Exoplanet Archive PSCompPars st_lum, log10 L/L_sun converted as 10^st_lum (Panek et al. 2023)",
+      "tag": "measured",
+      "value": 0.744869171241254
     },
     "host_mass_msun": {
       "err": 0.047,
@@ -25,7 +37,18 @@
       "tag": "measured",
       "value": 5485.0
     },
+    "hotspot_offset_deg": {
+      "source": "not available: no published full-orbit phase curve of WASP-39 b (Spitzer or JWST) was found, so no hotspot offset is measured",
+      "tag": "measured",
+      "value": null
+    },
     "id": "simbad-wasp-39b",
+    "insolation_searth": {
+      "formula": "S / S_earth = (L_star / L_sun) / (a / au)^2, the flux at the planet computed by the reference from its host luminosity and orbit; not a direct measurement",
+      "source": "NASA Exoplanet Archive PSCompPars pl_insol (ExoFOP)",
+      "tag": "derived",
+      "value": 316.269
+    },
     "mass_mearth": {
       "err": 10.17056,
       "source": "NASA Exoplanet Archive PSCompPars pl_bmasse (Mancini et al. 2018)",
@@ -33,11 +56,22 @@
       "value": 89.31023
     },
     "name": "WASP-39 b",
+    "nightside_temp_K": {
+      "source": "not available: no published full-orbit phase curve of WASP-39 b (Spitzer or JWST) was found; the JWST Early Release Science observations are transits and eclipses",
+      "tag": "measured",
+      "value": null
+    },
     "orbit_au": {
       "err": 0.00082,
       "source": "NASA Exoplanet Archive PSCompPars pl_orbsmax (Mancini et al. 2018)",
       "tag": "measured",
       "value": 0.04828
+    },
+    "orbit_ecc": {
+      "assumption": "the reference gives e = 0 with no uncertainty, which means the orbit was fixed to a circle in its fit; read as an assumed circular orbit, not a measured eccentricity",
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbeccen (Carter et al. 2024)",
+      "tag": "model_dependent",
+      "value": 0.0
     },
     "orbital_period_d": {
       "err": 3.4e-06,
@@ -68,7 +102,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
+  "inputs_sha256": "eb40dd02945cf37be8fa91ab3ed6ad7e13d745c6ccbb5d17ae2e8c929dfdc9e9",
   "render_params": {
     "alt_text": "WASP-39 b, Gas giant, 1.28 Jupiter radii (measured), colour family from the equilibrium temperature, lit by its star. Surface relief: illustrative.",
     "confidence": {
