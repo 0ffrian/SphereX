@@ -5,93 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createCore } from './core.js';
 import { ADV_FS, FLY_FS, GAS_FS, WORLD_FS } from './shaders.js';
 import { clearTerrainCache } from './terrainCache.js';
-import { DISPOSE_POLL_MS, WorldEngine, WORLD_PRESETS } from './WorldEngine';
-
-interface StubOpts {
-  /** Polls before COMPLETION_STATUS_KHR turns true (per program). */
-  lateBy?: number;
-  /** No KHR_parallel_shader_compile. */
-  noExt?: boolean;
-  /** A fragment shader containing this text fails to link. */
-  failOn?: string;
-}
-
-type Call = [string, ...unknown[]];
-
-function stubGL(o: StubOpts = {}) {
-  const calls: Call[] = [];
-  const progs: { fs: string; polls: number; linked: boolean }[] = [];
-  const shaders = new Map<object, { type: string; src: string }>();
-  const progOf = (p: unknown) => progs[(p as { i: number }).i]!;
-  const uniformNames = (src: string): string[] => {
-    const out: string[] = [];
-    for (const m of src.matchAll(/uniform\s+\w+\s+([^;]+);/g))
-      for (const n of m[1]!.split(',')) out.push(n.trim().replace(/\[\d+\]$/, ''));
-    return out;
-  };
-  const ext = {
-    COMPLETION_STATUS_KHR: 'COMPLETION_STATUS_KHR',
-    loseContext: () => calls.push(['loseContext']),
-  };
-  const api: Record<string, unknown> = {
-    getExtension: (n: string) => (n === 'KHR_parallel_shader_compile' && o.noExt ? null : ext),
-    createProgram: () => {
-      progs.push({ fs: '', polls: 0, linked: false });
-      calls.push(['createProgram']);
-      return { i: progs.length - 1 };
-    },
-    createShader: (t: string) => {
-      const s = {};
-      shaders.set(s, { type: t, src: '' });
-      return s;
-    },
-    shaderSource: (s: object, src: string) => {
-      shaders.get(s)!.src = src;
-    },
-    attachShader: (p: unknown, s: object) => {
-      const sh = shaders.get(s)!;
-      if (sh.type === 'FRAGMENT_SHADER') progOf(p).fs = sh.src;
-    },
-    getProgramParameter: (p: unknown, e: string) => {
-      const pr = progOf(p);
-      calls.push(['getProgramParameter', e]);
-      if (e === 'COMPLETION_STATUS_KHR') return ++pr.polls > (o.lateBy ?? 0);
-      if (e === 'LINK_STATUS') {
-        pr.linked = true;
-        return !(o.failOn && pr.fs.includes(o.failOn));
-      }
-      if (e === 'ACTIVE_UNIFORMS') return uniformNames(pr.fs).length;
-      return true;
-    },
-    getShaderParameter: () => true,
-    getProgramInfoLog: () => 'stub link error: varying mismatch',
-    getShaderInfoLog: () => '',
-    getActiveUniform: (p: unknown, i: number) => ({ name: uniformNames(progOf(p).fs)[i] }),
-    getUniformLocation: (_p: unknown, name: string) => ({ name }),
-    uniform1f: (loc: { name: string } | null, v: number) => calls.push(['uniform1f', loc?.name, v]),
-    drawArrays: () => calls.push(['drawArrays']),
-  };
-  const gl = new Proxy(api, {
-    get(t, k) {
-      if (typeof k !== 'string') return undefined;
-      if (k in t) return t[k];
-      if (/^[A-Z_0-9]+$/.test(k)) return k;
-      if (/^create/.test(k)) return () => ({});
-      return () => {};
-    },
-  });
-  return { gl, calls, progs };
-}
-
-function stubCanvas(gl: unknown, w = 400, h = 300) {
-  return {
-    clientWidth: w,
-    clientHeight: h,
-    width: 0,
-    height: 0,
-    getContext: () => gl,
-  } as unknown as HTMLCanvasElement;
-}
+import { stubCanvas, stubGL } from './glStub.testutil';
+import { DISPOSE_MAX_WAIT_MS, DISPOSE_POLL_MS, WorldEngine, WORLD_PRESETS } from './WorldEngine';
 
 const preset = (id: string) => WORLD_PRESETS.find((p) => p.id === id)!;
 
@@ -199,6 +114,23 @@ describe('background compile (issue #93 1.2, 1.3)', () => {
     expect(calls.filter((c) => c[0] === 'loseContext')).toHaveLength(1);
   });
 
+  it('dispose gives up after DISPOSE_MAX_WAIT_MS without loseContext (B1: it would block on the compile)', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { gl, calls } = stubGL({ lateBy: 1e9 });
+    const e = new WorldEngine(stubCanvas(gl), { role: 'fly' });
+    void e.whenReady().catch(() => {});
+    e.dispose();
+    await vi.advanceTimersByTimeAsync(DISPOSE_MAX_WAIT_MS + DISPOSE_POLL_MS * 5);
+    expect(calls.some((c) => c[0] === 'loseContext')).toBe(false);
+    // polling has stopped: no further completion reads after the deadline
+    const reads = calls.filter((c) => c[1] === 'COMPLETION_STATUS_KHR').length;
+    await vi.advanceTimersByTimeAsync(DISPOSE_POLL_MS * 50);
+    expect(calls.filter((c) => c[1] === 'COMPLETION_STATUS_KHR')).toHaveLength(reads);
+    expect(calls.some((c) => c[0] === 'loseContext')).toBe(false);
+    vi.restoreAllMocks();
+  });
+
   it('dispose of a ready engine releases the context at once', async () => {
     const { gl, calls } = stubGL();
     const e = new WorldEngine(stubCanvas(gl), { role: 'globe' });
@@ -225,6 +157,16 @@ describe('background compile (issue #93 1.2, 1.3)', () => {
       expect(e.programCount()).toBe(n);
       expect(progs.some((p) => p.fs === FLY_FS)).toBe(role !== 'globe');
     }
+  });
+
+  it('a globe-role engine ignores setFly(true) and never creates the fly program (B10)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { gl, progs } = stubGL();
+    const e = new WorldEngine(stubCanvas(gl), { role: 'globe' });
+    e.setFly(true);
+    expect(e.flying).toBe(false);
+    expect(progs.some((p) => p.fs === FLY_FS)).toBe(false);
+    warn.mockRestore();
   });
 
   it('a step before readiness links first (never reads a uniform of an unlinked program)', () => {

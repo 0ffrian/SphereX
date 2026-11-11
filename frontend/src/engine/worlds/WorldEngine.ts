@@ -11,6 +11,7 @@ import { WP, FLUIDS } from './presets.js';
 import type {
   EngineOptions,
   EngineOverrides,
+  EngineRole,
   FluidKey,
   Readouts,
   SpinMode,
@@ -76,7 +77,10 @@ export interface EngineState {
 
 /** How often a disposed engine checks whether its shaders have finished compiling (UI pacing, ms). */
 export const DISPOSE_POLL_MS = 100;
-/** Longest a disposed engine keeps its context for a compile still running (ms); then it is released anyway. */
+/**
+ * Longest a disposed engine waits for a compile still running (ms). After it the engine stops polling and drops the
+ * context to the browser without `loseContext()` (which would block on that compile); it goes with the canvas.
+ */
 export const DISPOSE_MAX_WAIT_MS = 180_000;
 
 export class WorldEngine {
@@ -86,6 +90,7 @@ export class WorldEngine {
   private isReady = false;
   private readyP: Promise<void> | null = null;
   private disposed = false;
+  private readonly role: EngineRole;
   /** Live fly-camera state. Assigning a field takes effect at the next draw(). */
   readonly fly: FlyState;
 
@@ -101,7 +106,8 @@ export class WorldEngine {
         powerPreference: 'high-performance',
       });
     // Issue #93: the shaders are submitted here and compile in the background (see whenReady).
-    this.core = createCore(canvas, { role: opts.role ?? 'both' });
+    this.role = opts.role ?? 'both';
+    this.core = createCore(canvas, { role: this.role });
     const W = this.core.W;
     this.fly = {
       get alt() {
@@ -254,6 +260,13 @@ export class WorldEngine {
 
   /** Switch the split fly view on or off (the prototype's Fly button). Aims the camera on entry. */
   setFly(on: boolean): void {
+    // Issue #93 B10: a globe-role engine has no fly program; flying would make the core link FLY_FS synchronously
+    // (a 35 s block on a cold ANGLE cache). Flying belongs to a 'fly' or 'both' engine, so the call is ignored.
+    if (on && this.role === 'globe') {
+      if (import.meta.env.DEV)
+        console.warn('WorldEngine.setFly(true) ignored on a globe-role engine');
+      return;
+    }
     const c = this.core,
       W = c.W;
     W.fly = on;
@@ -469,7 +482,10 @@ export class WorldEngine {
    * the driver, so releasing an engine whose fly shader was still compiling froze the page for about 35 s on a cold
    * ANGLE D3D11 cache (React's development double mount did this on every first open; closing the build early did it
    * in production). While programs are still compiling the context is released once the driver reports them done
-   * (polled every DISPOSE_POLL_MS, never blocking), or after DISPOSE_MAX_WAIT_MS at the latest.
+   * (polled every DISPOSE_POLL_MS, never blocking). If the compile is still running after DISPOSE_MAX_WAIT_MS the
+   * engine gives up without calling `loseContext()` (issue #93 B1: calling it then would still block on that compile):
+   * polling stops (no timer keeps the engine alive), and once its host drops the engine the browser reclaims the
+   * context with the detached canvas.
    */
   dispose(): void {
     if (this.disposed) return;
@@ -488,8 +504,12 @@ export class WorldEngine {
       }
     };
     const tryLose = () => {
-      if (settled() || Date.now() - t0 >= DISPOSE_MAX_WAIT_MS) lose();
-      else setTimeout(tryLose, DISPOSE_POLL_MS);
+      if (settled()) lose();
+      else if (Date.now() - t0 < DISPOSE_MAX_WAIT_MS) setTimeout(tryLose, DISPOSE_POLL_MS);
+      else if (import.meta.env.DEV)
+        console.warn(
+          'world engine: shaders still compiling after dispose; context left to the browser',
+        );
     };
     tryLose();
   }
