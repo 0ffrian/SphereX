@@ -13,7 +13,9 @@ inside the raw band stays inside the served band.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import json
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 import numpy as np
@@ -112,3 +114,51 @@ class AreaFrames:
     input_digests: tuple[str, ...]  # SHA-256 of every SIA and cutout body used, sorted
     cones: tuple[ConeLog, ...] = ()
     stats: dict[str, Any] = field(default_factory=dict)  # Day 0 timings and sizes, not compared
+
+
+def _mask_rows(mask: NDArray[np.bool_]) -> list[str]:
+    return ["".join("1" if v else "0" for v in row) for row in mask]
+
+
+def frames_jsonable(frames: AreaFrames) -> dict[str, Any]:
+    """The frames record as plain JSON values (no timings), for byte comparison and the Day 0
+    report. Coverage masks are rows of ``0``/``1`` (row 0 = lowest eta)."""
+    return {
+        "area_id": frames.spec.id,
+        "frames": [asdict(f) for f in frames.frames],
+        "coverage": [
+            {
+                "visit": c.visit,
+                "polygon": [list(p) for p in c.polygon],
+                "mask": _mask_rows(c.mask),
+                "cells_covered": c.cells_covered,
+                "pieces": c.pieces,
+                "cells_lost": c.cells_lost,
+                "holes": c.holes,
+            }
+            for c in frames.coverage
+        ],
+        "missing": list(frames.missing),
+        "complete": frames.complete,
+        "n_cones": frames.n_cones,
+        "input_digests": list(frames.input_digests),
+    }
+
+
+def dots_jsonable(per_frame: Sequence[FrameDots]) -> list[dict[str, Any]]:
+    """Dots per frame as plain JSON values (no timings)."""
+    return [
+        {
+            "frame_id": fd.frame_id,
+            "dots": [{**asdict(d), "flags": list(d.flags)} for d in fd.dots],
+            "refused": dict(fd.refused),
+            "noise": dict(fd.noise),
+            "peaks": fd.peaks,
+        }
+        for fd in per_frame
+    ]
+
+
+def canonical(value: Any) -> bytes:
+    """Sorted keys, no spaces: the byte form used by the determinism test (A17.10)."""
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
