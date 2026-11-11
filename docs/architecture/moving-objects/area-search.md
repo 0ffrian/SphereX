@@ -83,7 +83,7 @@ flowchart LR
 | Checks: planted movers and completeness, shuffled-time control, spectrum score, rate-grid linker (gated extras, Q-203) | `backend/app/core/area/` (`inject.py`, `control.py`, `sed.py`, `rategrid.py`) | Kevin |
 | Precompute script | `backend/scripts/area_discovery.py` | Kevin |
 | API | `backend/app/api/areas.py`, models generated from the schemas (D-18) | Kevin |
-| Star list for movers (shared by Track's masks and Discovery, Q-143) | `backend/app/core/find/overlays.py` extension ([A19.6](track.md#a196-star-list-for-movers)) | Kevin (Q-143) |
+| Star list for movers (shared by Track's masks and Discovery, Q-143) | `backend/app/core/find/stars.py` (library), `catalogs.py`, `overlays.py` ([A19.6](track.md#a196-star-list-for-movers)); built in #95 | Atish (proposed, Q-404) |
 | Shared ECSV writer | `backend/app/core/export/ecsv.py` ([A19.9](track-contract.md#a199-export)) | Kevin |
 | Schemas and fixtures | `shared/schemas/area-*.schema.json`, `shared/fixtures/area/` | Moon (D-17) |
 | Area tool, cards, layers, state | `frontend/src/app/sky/area/`, `frontend/src/app/shell/`, `frontend/src/state/store.ts` | Moon (D-17) |

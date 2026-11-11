@@ -66,14 +66,15 @@ Q-21's text still says `frames:truncated` past the cone cap; PR #53's entry, mer
 
 - `shared/schemas/track-path.schema.json` for the `/path` reply (D-18), generated into `backend/app/contract/` and `frontend/src/contract/`. Owner of `shared/schemas/`: Moon (D-17).
 - `shared/fixtures/track/eros-2026-03/`: the path reply built from PR #53's recorded Horizons answers (real data, no Fixture badge), plus a synthetic mover with a refused frame, a deferred path and an extended source (`X-SX-Fixture: synthetic`, Q-32).
-- Hand-typed replies (Q-50) gain: `detector` per frame in `/frames`; `north_angle_deg` and `mirrored` always set for movers; `frame_id` on spectrum and light-curve points; `footprint` and star lists for movers in `/overlays`.
+- Hand-typed replies (Q-50) gain: `detector` per frame in `/frames`; `north_angle_deg` and `mirrored` always set for movers; `frame_id` on spectrum and light-curve points; `footprint` for movers in `/overlays`. **Built (issue #95):** `frames[].masks` (`StarMask {catalog, id, x, y, r_px}`, `[]` for fixed objects) in `backend/app/api/models.py`; the frontend type and parser come with T2 (#82) (`validate.ts` drops the unknown field until then, without rejecting the reply).
 - The ECSV column list of A19.9 is the export's contract and is tested.
 
 ### A19.14 Owners, tickets and tests
 
 | Part | Owner | Ticket |
 |---|---|---|
-| Path endpoint, Horizons gate, `moving_windows` for Eros, overlays and star list for movers, ECSV writer, contract fields, pre-fetch | Kevin | **T1 Track backend** |
+| Path endpoint, Horizons gate, `moving_windows` for Eros, footprints for movers, ECSV writer, contract fields, pre-fetch | Kevin | **T1 Track backend** |
+| Star list for movers (A19.6), shared with Discovery | Atish (Q-404) | **P1** (#95, built) |
 | OUTLIER-core rule in Stage 2 (A4.2) | Moon | **T4** |
 | Track screen; Track sound | Atish | T2, T3 ([A20.15](track-ui.md#a2015-tests-and-tickets)) |
 
@@ -86,6 +87,7 @@ Milestone M4 Extras, priority P1 because Track is the MVP demo (**Proposed (Q-18
 | MOST against the cone search; MOST's observer | Kevin | Q-126 (Q-140 asks the same) **[verify]** |
 | DR1 release date | Atish | **[verify]** (Q-137) |
 | CDS permission for an order-11 copy | Atish | Open (Q-136) |
-| Mask radius formula and catalogue limits | Kevin | **[verify]** on the Eros frames |
+| Mask radius formula (G and W1 zero points, 2 to 10 px), `W1 < 16.5`, the 8 px near-track distance, the 3″ de-dupe radius | Atish (Q-404) | **[verify]** on the Eros frames: radial profiles of isolated stars per magnitude bin; W1 depth against SPHEREx QR2 point-source depth (Q-403) |
+| `MAX_LIVE_VISIT_CONES` = 8 per catalogue per request | Atish | Assumption (Q-403 (6)) |
 | Size of the marker's interpolation error | Kevin | **[verify]** against TLIST |
 | `SX_MOVING_*` limits, path span cap, Horizons pacing | Kevin | **[verify]** (`backend/app/settings.py`; A3.1 "Moving objects" row; A3.4) |
