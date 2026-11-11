@@ -52,6 +52,7 @@ import { closeUpKindOf } from './CloseUpPane';
 import { useCloseUpStore } from './closeUpStore';
 import { StarFlarePanel } from './StarFlarePanel';
 import { RockStage } from './build/RockStage';
+import { enginesEnabled } from './enginesSwitch';
 import { StarGlobeStage, useEngineStar } from './StarEngineStage';
 import { WorldGlobeStage, useEngineWorld } from './WorldEngineStage';
 import { engineKey, useWorldStore } from './worldStore';
@@ -226,6 +227,8 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const storeCard = useAppStore((s) => s.card);
   const storeParams = useAppStore((s) => s.params);
   const card = blocked ? null : storeCard;
+  // Issue #93 C4: the engines kill switch, read once per mount (the query string changes only with a reload).
+  const [enginesOn] = useState(() => enginesEnabled());
   // Issue #71 stream X (D-37): the prototype's star engine draws star cards in the build pane; null keeps the TSL path.
   const engineStarCard = useEngineStar();
   // Issue #71 stream Y (D-37): the prototype's world engine draws planets and gas giants; null keeps the old path.
@@ -546,7 +549,9 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   }, [waitForLevel, plan, paneSeq, honesty, setHonesty]);
   // The prototype engines (star, world, rock) draw a generated surface: they mount only at "+ Artistic"
   // (Atish's call on the PR #89 review). At "Measured only" and "+ Estimated" the three.js path draws.
-  const enginesShown = honesty === 'artistic';
+  // Issue #93 C4: `?engines=0` (remembered) turns them off at every level; the close-up pane follows, since it
+  // reads the engineStar / engineWorld published below and the rock view RockStage publishes.
+  const enginesShown = honesty === 'artistic' && enginesOn;
   const engineStar =
     pane &&
     enginesShown &&
