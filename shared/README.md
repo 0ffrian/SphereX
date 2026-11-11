@@ -6,6 +6,7 @@ The data contract, shared by the backend and the frontend ([D-18](../docs/decisi
 
 - `schemas/object-card.schema.json`: ObjectCard and the types it uses: `Tag`, `ObjectType`, the tagged values ([rendering doc R3.1, R3.2](../docs/rendering/data-contract.md))
 - `schemas/render-params.schema.json`: RenderParams (R3.4), `VisibleMode` (D-23) and `HapticProfile` (R8.8). It refers to the card schema for the shared types
+- `schemas/area-*.schema.json`: the six Area search replies of [A17.8](../docs/architecture/moving-objects/area-contract.md#a178-endpoints) (issue #92, shape choices in [Q-208](../docs/decisions/moving-objects.md)); see [Area search](#area-search-schemas-and-fixtures) below
 
 They are JSON Schema **draft-07**, the draft that both generators and both validators handle fully. `schemas/` is the single source: never edit the generated code. After changing a schema, run one command per side and commit the result:
 
@@ -22,6 +23,7 @@ Schema rules:
 - JSON Schema has no generics, so the tagged value is written out once per payload (`TVNumber`, `TVString`, `TVRgb`, `TVVec3`, `TVPair`). A backend test fails if their bodies stop matching.
 - The rules "`derived` needs a `formula`" and "`model_dependent` needs an `assumption`" are `if`/`then` in the schema. They match `assertTagged()`. The generated types cannot express them, so validate with a real validator (`jsonschema`, `ajv`), not only the Pydantic models.
 - Do not put a `description` next to a `$ref`: draft-07 ignores it, and `json-schema-to-typescript` then emits a duplicate type.
+- Give every definition a unique `title`: both generators name types by title. A nullable field is `anyOf: [{...}, {"type": "null"}]`, not a type array (ajv strict mode). Use `minItems` only where a tuple type is wanted (`json-schema-to-typescript` turns it into one).
 
 ## Fixtures
 
@@ -54,5 +56,35 @@ Tier and dynamics (D-32):
 - Rate formulas in the fixtures start with "placeholder, not a spec rule": they only exercise tiers 2 and 3 and are not physics for stage 6 to copy.
 - `assertTagged` checks card values only: a `DynamicsValue` is skipped, because its model_dependent rule is `assumed`, not `assumption`.
 - The live backend (stage 7) emits `tier`, `formula` and `assumed` on layers but no `dynamics` yet (stage 6, a later ticket); the field is optional.
+
+## Area search schemas and fixtures
+
+Six schemas, one per JSON reply of [A17.8](../docs/architecture/moving-objects/area-contract.md#a178-endpoints) (A17.9, issue #92). Every gap the spec leaves is a choice recorded in [Q-208](../docs/decisions/moving-objects.md) (Proposed, Moon).
+
+| Schema | Endpoint | Root |
+|---|---|---|
+| `area-index.schema.json` | `GET /v1/areas` | `AreaIndex {areas[]}`; also holds the shared definitions |
+| `area-summary.schema.json` | `GET /v1/areas/{area_id}` | `AreaSummary {…index entry, frames[], coverage[], steps, method}` |
+| `area-known.schema.json` | `/known` | `AreaKnown {known[], skybot[]}` |
+| `area-dots.schema.json` | `/dots` | `AreaDots {visits[{visit, dots[]}]}` |
+| `area-tracks.schema.json` | `/tracks` | `AreaTracks {tracks[], skybot[]}` |
+| `area-checks.schema.json` | `/checks` (gated, Q-203) | `AreaChecks {test_mover?, completeness?, control?, linker?, method}` |
+
+- **Every reply** is an object with `cached_at`, `computed_at` (ISO-8601 UTC ending in `Z`), `missing` (codes matching `AreaMissingCode`, A17.8) and `provenance`. RA is in [0, 360). The index's two times are null only when it lists no area.
+- **Shared definitions** live in `area-index.schema.json` (`AreaUtcTime`, `AreaRa`, `AreaDec`, `AreaRaDec`, the id patterns, `AreaMissingCode`, `AreaTag`, `AreaProvenanceEntry`, `AreaMethod`, `AreaBin`, `AreaSkybotAnswer`, `AreaError` and the four enums). The other five refer to it, so the generated Python modules import only from `area_index_schema.py`. Every type is prefixed `Area` (the served frame is `AreaSummaryFrame`), so the Track contract and the pipeline's own names cannot collide; Track keeps its own definitions.
+- **Provenance** is a closed object per reply; each value is `{tag, source?, formula?, assumption?}` under the card's rules (`derived` needs a non-blank `formula`, `model_dependent` a non-blank `assumption`). Tags are `measured`, `derived` or `model_dependent` only (A16.5). The generated models drop these rules, so the API (P7) builds plain dicts and checks them with `backend/app/core/card/validate.py`, not by serialising the models (Q-40).
+- **`method`** is `{settings: {name: integer | number | string}, checks?}`; `checks` holds the seeds and bins of A17.6.
+- **Errors** are `AreaError {error, detail}`: 404 `area_not_found`, 404 `dot_not_found`, 503 `stamp_unavailable`. The TypeScript bundle names it through its `areaError` root key.
+- **Enum lists** for the UI come from the generator: `AREA_DOT_LABELS`, `AREA_VERDICTS`, `AREA_SED_LABELS`, `AREA_LINKERS` (`@/contract`).
+- **Cross-reply rules** (step counts, ids and their order, verdicts against `missing` and `skybot`, `unchecked_by`, `sed`, checks all or nothing) are not expressible in a schema: they are functions in `backend/tests/area_consistency.py`, which the pipeline (P3) and API (P7) tests can call on their own replies.
+
+`fixtures/area/` is **synthetic** and written by `cd backend && uv run python -m scripts.area_fixtures` (never by hand; `--check` fails if a committed byte differs, CI runs it). Markers, tested: ids `fixture:…`, frame ids `fixture-…`, `data_release: "synthetic_fixture"`, designations "Synthetic fixture …", and every provenance `source` starting "synthetic fixture". The numbers in `method.settings` repeat the starting values of A17.2 to A17.13; nothing here is a pipeline setting to copy.
+
+| Area | Folder | Content |
+|---|---|---|
+| `fixture:area-main` | `fixtures/area/` | 2 visits × 4 exposures × detectors 1 and 4 (16 frames); visit 1 covers the west three quarters, visit 2 the whole square. 30 stars and 1 fixed source in every frame, 18 glitches, one static one-visit tracklet (4 mover dots in no track), and T1 `found_blind` (Synthetic fixture A1, `object_id` `synthetic-mover`, one `OUTLIER` dot), T2 `unexplained`, T3 `unchecked` (`unchecked_by: ["horizons:Synthetic fixture A2"]`), T4 `possible` / `one_visit` (4 dots on detector 4 in the strip only visit 2 covers, `sed` `too_few`). 570 dots. `/known` lists A1 and a comet C1 that is not detected (`object_id` null). `/checks`: a recovered test mover, a 4 × 4 grid of 50 per cell with Wilson intervals and no single figure, a control of 0 in 20, `rate_grid:visits`. One star dot is listed as `stamp:<dot_id>` |
+| `fixture:area-multivisit` | `fixtures/area/multivisit/` | For D7: 4 visits × 2 exposures × detectors 2 and 3, 8 stars, 4 glitches, one `unexplained` track over 4 visits with `linker: rate_grid`; `/known` is empty; `/checks` answers `missing: ["checks:not_run"]` with no parts. The index lists it, so the UI must handle 2 or more visits |
+
+`index.json` lists both; each area folder holds `summary.json`, `known.json`, `dots.json`, `tracks.json`, `checks.json` and a header-only `export.ecsv` stub (the real writer is P7, A17.7). The dev fixture server serves them at `/v1/areas…` (`frontend/fixtures/areas.ts`). Tests: `backend/tests/test_area_contract.py`, `backend/tests/test_area_fixtures.py`, `frontend/src/contract/areaFixtures.test.ts`, `frontend/src/fixturesArea.test.ts`, and the area cases in `fixtures/invalid/cases.json`.
 
 Tests: `backend/tests/test_contract_fixtures.py` and `frontend/src/contract/fixtures.test.ts`. Open contract questions: Q-33 to Q-42 in [decisions/contract.md](../docs/decisions/contract.md), Q-64 in [platform-hosting.md](../docs/decisions/platform-hosting.md) and Q-65 in [rendering-bodies.md](../docs/decisions/rendering-bodies.md) (index: [decisions/README.md](../docs/decisions/README.md)). The frontend's own M1 fixtures stay in `frontend/fixtures/` (Q-30).
