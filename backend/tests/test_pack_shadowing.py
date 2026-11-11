@@ -9,6 +9,7 @@ pack switched off (``make_settings``); these switch it on.
 from __future__ import annotations
 
 import json
+import shutil
 import threading
 from pathlib import Path
 from typing import Any, NoReturn
@@ -39,6 +40,9 @@ MEASURED_ROWS = {
     "Barnard's star": "star",
     "RW Aurigae": "star_ttauri",
     "R Draconis": "star_mira",
+    # The MVP (Q-131): a moving object. Its fixture spectrum has 1 point, so `spherex_rgb` is
+    # null and `spherex_ir` refused, but `spectrum` is not in `missing` and the live build wins.
+    "433 Eros": "asteroid_shape",
 }
 
 
@@ -71,8 +75,12 @@ def broken_build(*_: Any, **__: Any) -> NoReturn:
 def test_pack_does_not_hide_the_measured_spectrum(
     fixture_cache: Path, tmp_path: Path, name: str, kind: str
 ) -> None:
-    def replies(assets_dir: Path) -> tuple[str, Any, Any, ObjectResult | None]:
-        with TestClient(create_app(make_settings(fixture_cache, assets_dir=assets_dir))) as c:
+    # Eros's inputs are final, so its first build is saved to `derived.asset`: the pack-off run
+    # gets its own untouched copy of the cache, or it would answer from that saved asset.
+    clean_cache = Path(shutil.copytree(fixture_cache, tmp_path / "clean-cache"))
+
+    def replies(cache: Path, assets_dir: Path) -> tuple[str, Any, Any, ObjectResult | None]:
+        with TestClient(create_app(make_settings(cache, assets_dir=assets_dir))) as c:
             oid = resolve_id(c, name)
             card_r, params_r = get_both(c, oid)
             pipeline = pipeline_of(c)
@@ -80,13 +88,14 @@ def test_pack_does_not_hide_the_measured_spectrum(
             assert obj is not None
             return oid, card_r, params_r, pipeline.saved(obj)
 
-    oid, card_r, params_r, shown = replies(PACK)
+    oid, card_r, params_r, shown = replies(fixture_cache, PACK)
     assert "spectrum" in pack_params(kind, oid)["missing"]  # the committed pack holds the row
     assert card_r.headers["X-SX-Asset-Status"] == "generated"
     assert card_r.json()["type"] == kind
     assert "spectrum" not in params_r.json()["missing"]
     # Byte-equal to a build with the pack switched off.
-    _, card_off, params_off, _ = replies(tmp_path / "no-pack")
+    _, card_off, params_off, _ = replies(clean_cache, tmp_path / "no-pack")
+    assert card_off.headers["X-SX-Asset-Status"] == "generated"
     assert card_r.content == card_off.content
     assert params_r.content == params_off.content
     # The Gemini endpoints read `saved()`: it names the live build the viewer shows, not the pack.
