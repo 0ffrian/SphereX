@@ -108,6 +108,8 @@ def test_preflight_fails_on_a_5xx_after_resolve(capsys: object) -> None:
             return httpx.Response(200, json={"id": "x"})
         if path.endswith("/card"):
             return httpx.Response(500, json={"error": "internal", "detail": "boom"})
+        if path.endswith("/render-params"):
+            return httpx.Response(200, json={}, headers={"X-SX-Measuring": "measuring:frames"})
         if path.endswith("/frames"):
             return httpx.Response(200, json={"frames": []})
         return httpx.Response(200, json={})
@@ -116,6 +118,7 @@ def test_preflight_fails_on_a_5xx_after_resolve(capsys: object) -> None:
         assert preflight.run(c, [WISE]) == 1
     out = capsys.readouterr().out  # type: ignore[attr-defined]
     assert "!! card" in out and "skipped: no frames" in out
+    assert "warning: still measuring (measuring:frames)" in out  # a warning, not a failure
 
 
 def test_preflight_fails_when_backend_is_down(capsys: object) -> None:
