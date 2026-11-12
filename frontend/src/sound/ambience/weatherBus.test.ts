@@ -1,3 +1,5 @@
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Strike } from './types';
 import {
@@ -7,6 +9,8 @@ import {
   publishWeather,
   resetWeatherBus,
   subscribeWeather,
+  useWeatherSnapshot,
+  weatherBusStats,
   weatherRows,
   type WeatherSnapshot,
 } from './weatherBus';
@@ -69,5 +73,24 @@ describe('weatherBus (#117 contract, C8)', () => {
     const no = snap();
     no.lightning = { allowed: false, tag: null, reason: 'No lightning has ever been detected on Titan, so there is no thunder here.' };
     expect(weatherRows(no).at(-1)!.text).toMatch(/Titan/);
+  });
+
+  it('useWeatherSnapshot subscribes once per mount, not on every render (m6)', async () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const seen: (WeatherSnapshot | null)[] = [];
+    function Probe() {
+      seen.push(useWeatherSnapshot());
+      return null;
+    }
+    const el = document.createElement('div');
+    const root = createRoot(el);
+    await act(async () => root.render(createElement(Probe)));
+    expect(weatherBusStats()).toEqual({ listeners: 1, subscribes: 1 });
+    for (let i = 0; i < 5; i++) await act(async () => publishWeather(snap([], i)));
+    expect(seen.length).toBeGreaterThanOrEqual(6);
+    expect(seen.at(-1)!.tS).toBe(4);
+    expect(weatherBusStats()).toEqual({ listeners: 1, subscribes: 1 }); // never resubscribed by a re-render
+    await act(async () => root.unmount());
+    expect(weatherBusStats().listeners).toBe(0);
   });
 });
