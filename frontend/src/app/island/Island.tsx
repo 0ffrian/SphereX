@@ -83,9 +83,11 @@ export function Island() {
     else useAreaStore.getState().setMinimised(false);
   };
   const miniRef = useRef<HTMLButtonElement>(null);
+  // Focus moves to the pill when a card is minimised, not again when its name changes.
+  const miniOn = areaMini !== null;
   useEffect(() => {
-    if (areaMini !== null) miniRef.current?.focus({ preventScroll: true });
-  }, [areaMini]);
+    if (miniOn) miniRef.current?.focus({ preventScroll: true });
+  }, [miniOn]);
   const areaOn = areaSay !== null || areaMini !== null;
   const updating = !thinking && !areaOn && moving && panelBox === null;
   // The island travels into the area card once an area is set (after its Searching / found state),

@@ -22,6 +22,8 @@ export function FrameRate() {
   const [wantOpen, setOpen] = useState(false);
   // A locked player (the colour composite) has no speed to change: the menu closes.
   const open = wantOpen && !locked;
+  // Locked while open: forget it, so the menu does not come back (and take focus) when unlocked.
+  if (locked && wantOpen) setOpen(false);
   const [focusAt, setFocusAt] = useState(0);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
