@@ -136,6 +136,13 @@ export const DEMO_TARGETS: readonly DemoTarget[] = [
     classLabel: null,
   },
   {
+    name: '433 Eros',
+    aliases: ['eros', '433'],
+    query: '433 Eros',
+    id: 'sbdb-20000433',
+    classLabel: 'asteroid with a shape model · S',
+  },
+  {
     name: 'Procyon A',
     aliases: ['procyon', 'alpha cmi', 'alf cmi'],
     query: 'Procyon',

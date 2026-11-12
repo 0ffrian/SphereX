@@ -243,8 +243,9 @@ export function RockStage({
   const spec: BuildControlsSpec | null = useMemo(() => {
     if (!rock || !ready) return null;
     const i = rock.inputs;
-    const row = (id: string, label: string, v: { value: string; tag: Tag }): BuildControl => ({
+    const row = (id: string, label: string, v: { value: string; tag: Tag }, slot?: 'key'): BuildControl => ({
       kind: 'readout',
+      slot,
       id,
       label,
       value: v.value,
@@ -267,11 +268,11 @@ export function RockStage({
           ageApply.push(v);
         },
       },
-      row('rock-size', 'Size', i.size),
+      row('rock-size', 'Size', i.size, 'key'),
       row('rock-shape', 'Shape', i.shape),
-      row('rock-spin', 'Spin period', i.spin),
-      row('rock-albedo', 'Reflectivity', i.albedo),
-      row('rock-density', 'Bulk density', i.density),
+      row('rock-spin', 'Rotation period', i.spin, 'key'),
+      row('rock-albedo', 'Reflectivity', i.albedo, 'key'),
+      row('rock-density', 'Bulk density', i.density, 'key'),
       row('rock-strength', 'Rock strength', i.strength),
       row('rock-light', 'Light', i.light),
     ];
@@ -320,6 +321,10 @@ export function RockStage({
       controls,
       notes: [
         ...rockNotes(rock),
+        {
+          title: 'Filled in, not measured',
+          lines: [`Rock strength ${i.strength.value}: ${i.strength.why}.`, `Bulk density ${i.density.value}: ${i.density.why}.`],
+        },
         ...(rock.mismatches.length
           ? [
               {

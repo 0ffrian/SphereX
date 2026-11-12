@@ -2,6 +2,8 @@
 
 > **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.4 · **Implements:** [D-12, Q-17, Q-78, Q-79, Q-80, Q-81, Q-82](../../decisions/haptics-design.md), [Q-133](../../decisions/haptics-sound.md), [Q-71, Q-83, Q-84, Q-105](../../decisions/haptics-built.md), [Q-132](../../decisions/platform-hosting.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8), [audio-pairing.md](audio-pairing.md) (R8.9.1 body tone), [profiles.md](profiles.md) (R8.5)
 
+> **D-39 (12 Nov 2026), haptics cut:** the touch sources (height map, mesh normal, field, terrain, flow, band, data pulse, light curve) are deleted. What fed the body tone is deferred with it (Q-133). The flyover soundscape (R13) reads the world engine instead ([R13.4](../sound/place-wind.md#r134-listener-place-sampling-and-wind)). See [D-39](../../decisions/sound-ambience.md).
+
 ### R8.4 Event sources
 
 A source turns a pointer sample (or a scrub step) into engine calls. It owns no timers and never checks the honesty state (R8.2). The pointer comes from desktop Feel mode at the event, or Touch mode after the event (R5.6).

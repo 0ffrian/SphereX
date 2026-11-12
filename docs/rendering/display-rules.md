@@ -49,6 +49,8 @@
 
 ### R5.3 Honesty toggle (3 states)
 
+> **Changed by [Q-412](../decisions/shell-surfaces.md) (PR #104, Proposed):** in the build pane the control is a compact **Show** row inside the Details dropdown, no longer at the top of the pane. The three states and what they show are unchanged. Build still raises the level to + Artistic when layers are hidden (Q-113 item 7, Q-287).
+
 One state per badge (D-21):
 
 | State | Shows tags | Examples |

@@ -26,27 +26,28 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [rendering-layers.md](rendering-layers.md) | the per-layer body fixes of issue #62 (PR #63): gas giant five tiered layers, brown dwarf limb and infrared bands, asteroid sphere and displacement, the flared T Tauri disc | 0 D, 4 Q, 11 KB |
 | [gemini.md](gemini.md) | the Gemini layer: scope, offline behaviour and its contract | 1 D, 2 Q, 7 KB |
 | [sky-shell.md](sky-shell.md) | the sky view, sky endpoints and sky tiles, the flipbook UI | 1 D, 10 Q, 12 KB |
-| [shell-surfaces.md](shell-surfaces.md) | the tool rail and the island, the object panel and card, the Build split view, the full-bleed layout | 0 D, 5 Q, 13 KB |
+| [shell-surfaces.md](shell-surfaces.md) | the tool rail and the island, the object panel and card, the Build split view, the full-bleed layout | 1 D, 19 Q, 32 KB |
 | [shell-proposals.md](shell-proposals.md) | open shell proposals that Track and Area search need: pane kinds, feature cards, hash keys, Escape order | 0 D, 9 Q, 15 KB |
 | [haptics-design.md](haptics-design.md) | haptics design rules, creative ownership, the haptics API, the shared field on shader kinds, texture and data sources per type | 5 D, 12 Q, 20 KB |
 | [haptics-sound.md](haptics-sound.md) | audio pairing (D-10), spectrum pitch and voice hints, the body tone and the Track path sound | 1 D, 10 Q, 13 KB |
 | [haptics-built.md](haptics-built.md) | the haptic engine, calibration and source choices as built | 0 D, 9 Q, 20 KB |
 | [platform-hosting.md](platform-hosting.md) | the three.js pin, hardware and frame budgets, hosting, the demo machine and the event platform | 3 D, 5 Q, 7 KB |
-| [moving-objects.md](moving-objects.md) | Rainbow Trails, the Track tool, Area search and Discovery (agreed) | 1 D, 17 Q, 23 KB |
+| [moving-objects.md](moving-objects.md) | Rainbow Trails, the Track tool, Area search and Discovery (agreed), the P3 frames and dots choices (Q-400 to Q-402) | 1 D, 21 Q, 40 KB |
 | [moving-objects-review.md](moving-objects-review.md) | proposed fixes to Area search and Track after the 9 Nov 2026 audit, and Moon's review list (Q-202) | 0 D, 9 Q, 16 KB |
 | [moving-frames.md](moving-frames.md) | frames for moving objects: the path cone search, its tags and refusals, MOST | 0 D, 4 Q, 8 KB |
 | [exoplanets.md](exoplanets.md) | the exoplanet card fields (mass, orbit, host star), radius from the archive, tidal locking, mass in the physics layer, and the two demo exoplanet fixtures | 0 D, 5 Q, 15 KB |
 | [exoplanet-looks.md](exoplanet-looks.md) | the climate scenarios and locked-planet temperature map, starlight colour, scenario looks and presets, and the exoplanet mould steps | 0 D, 5 Q, 15 KB |
 | [catalogue-values.md](catalogue-values.md) | name resolution for the demo exoplanets, star Teff, radius and Mira periods, the literature registry, binary brown dwarf components, the issue #68 backend fixes and the slope unit, Gaia MSC (Q-220), Procyon's radius (Q-336), the issue #93 literature rows, SOHO/SWAN reference and cache keys (Q-364 to Q-366) | 0 D, 11 Q, 19 KB |
 | [demo-pack.md](demo-pack.md) | the demo search list and aliases, the 67P and Bennu shape products, the WRL reader, and the pre-built demo pack, with the catalogue-gap rule (Q-369) | 0 D, 7 Q, 21 KB (over the target) |
+| [sound-ambience.md](sound-ambience.md) | the haptics cut and the move to `frontend/src/sound/` (D-39), pitch polarity (Q-430), the flyover soundscape, weather, buses and stage audibility, the spectrum chord (Q-431 to Q-445) | 1 D, 16 Q, 11 KB |
 
 Agenda of the 11 Nov 2026 decision session: [session-2026-11-11.md](session-2026-11-11.md). It holds no entries and is removed once the outcomes are recorded.
 
 ## Rules for entries
 
 - **IDs never change and are never reused.** A new decision is the next free `D-` number; a new question the next free `Q-` number. Before you pick one, check `origin/main` and the open PRs (they pick numbers too).
-- **Next free:** D-39 and Q-370 (12 Nov 2026; Q-370 to Q-372 are free but kept for the lead, so the next free number for anyone else is **Q-381**; the #93 physics and data follow-up took Q-373 to Q-380, and Q-381 to Q-385, reserved for it, were not used and are free; the #93 regression and operations fixes took Q-367 to Q-369). Before that: D-39 and Q-367 (11 Nov 2026, checked against `origin/main` after merging issue #92, and the open PR #90; issue #93 took D-38 and Q-337 to Q-366; issue #71 took D-37 and Q-210 to Q-336). **Never assigned (do not reuse):** in issue #71's block, Q-213 to Q-219, Q-223 to Q-229, Q-236 to Q-239, Q-246 to Q-249, Q-264, Q-265, Q-268, Q-269, Q-277 to Q-279, Q-289 and Q-320 to Q-322; also Q-46, Q-127 to Q-129 and Q-149. **Taken by issue #75:** Q-206 (pack never hides a measured spectrum) and Q-207 (Rainbow Trails rotation in the UI). **Taken by issue #92:** Q-208 (Area contract shape choices, Proposed). **Never assigned:** Q-209. **Taken by issue #80:** Q-205 (event cut, Proposed). **Taken by issue #79:** Q-204 (PNG determinism). **Renumbered:** this PR's Q-150 to Q-183 became Q-170 to Q-203 on 10 Nov 2026, because main took Q-150 to Q-169 in PR #70; Q-203 is the four research checks, Q-170 to Q-202 are the spec-pass proposals. **From PR #53 (merged):** Q-125 (frame search tags and refusals) and Q-126 (MOST). Q-130 to Q-149 were reserved for the Track tool and Area search (Q-130).
-- **D-37, Q-286 to Q-288, Q-299 to Q-306 and Q-309 to Q-316 (the engines)** are in [rendering-engines](rendering-engines.md) (moved from rendering-bodies on 11 Nov 2026); their PR #89 review fixes **Q-329 to Q-331, Q-334, Q-335** are in [rendering-engines-review](rendering-engines-review.md). **D-38 and Q-337 to Q-354 (issue #93 engine fixes) and Q-367, Q-368 (#93 regression and operations fixes)** are in [rendering-engines-tuning](rendering-engines-tuning.md), **Q-369 (#93 pack catalogue gap)** in [demo-pack](demo-pack.md), **Q-355 to Q-362 (#93 physics) and Q-373 to Q-380 (#93 physics and data follow-up)** in [physics-fixes](physics-fixes.md), **Q-363 (#93 card fields)** in [contract](contract.md) and **Q-364 to Q-366 (#93 literature and cache)** in [catalogue-values](catalogue-values.md). **Q-294 to Q-298 (stream U, build view)** are in [shell-surfaces](shell-surfaces.md). **Q-274 to Q-276 (stream H, orbit view and close-up pane)** are in [rendering-bodies](rendering-bodies.md).
+- **Next free:** D-40 and Q-450 (12 Nov 2026, after merging issue #93 into the sound branch: issue #111 took D-39 and Q-430 to Q-444; Q-445 was taken by #113 (bake engine deviations, PR #119) and Q-446 to Q-449 are reserved for the other R13 sound tickets (#112, #114 to #117); Q-423 to Q-429 were skipped and are never assigned; the open PRs #107 and #110 take Q-418 to Q-422. **D-38 is held twice** (issue #93's engine decision and feat/ui's design language, PR #104): both rows stay until the lead renumbers one. Issue #93 took D-38, Q-337 to Q-369 and Q-373 to Q-380; Q-370 to Q-372 are kept for the lead; Q-381 to Q-385, reserved for #93's follow-up, were not used and are free. Before that it was D-39 and Q-418, checked against `origin/main` and the open PRs #90, #100 and #101; PR #100 takes Q-406 to Q-408. Before that it was D-38 and Q-337, checked against `origin/main` after merging issue #75, and the open PR #90; issue #71 took D-37 and Q-210 to Q-336). **Never assigned (do not reuse):** in issue #71's block, Q-213 to Q-219, Q-223 to Q-229, Q-236 to Q-239, Q-246 to Q-249, Q-264, Q-265, Q-268, Q-269, Q-277 to Q-279, Q-289 and Q-320 to Q-322; also Q-46, Q-127 to Q-129 and Q-149. **Taken by issue #75:** Q-206 (pack never hides a measured spectrum) and Q-207 (Rainbow Trails rotation in the UI). **Taken by feat/ui (PR #104):** D-38 (design language) and Q-409 to Q-417 (light theme, the artist's impression line, Pause, the Show row in Details, the island's pulse, the demo area flows, the mould, Hear it, the tab title; first drafted as Q-326 to Q-330, then Q-403 to Q-407, renumbered after main and PR #100 took those). **Taken by issue #97:** Q-400 to Q-402 (Area frames and dots). **Taken by issue #95:** Q-403 (star list choices) and Q-404 (star list owner), both Proposed; Q-405 reserved with them and never assigned. **Taken by issue #92:** Q-208 (Area contract shape choices, Proposed). **Never assigned:** Q-209. **Taken by issue #80:** Q-205 (event cut, Proposed). **Taken by issue #79:** Q-204 (PNG determinism). **Renumbered:** this PR's Q-150 to Q-183 became Q-170 to Q-203 on 10 Nov 2026, because main took Q-150 to Q-169 in PR #70; Q-203 is the four research checks, Q-170 to Q-202 are the spec-pass proposals. **From PR #53 (merged):** Q-125 (frame search tags and refusals) and Q-126 (MOST). Q-130 to Q-149 were reserved for the Track tool and Area search (Q-130).
+- **D-37, Q-286 to Q-288, Q-299 to Q-306 and Q-309 to Q-316 (the engines)** are in [rendering-engines](rendering-engines.md) (moved from rendering-bodies on 11 Nov 2026); their PR #89 review fixes **Q-329 to Q-331, Q-334, Q-335** are in [rendering-engines-review](rendering-engines-review.md). **D-38 and Q-337 to Q-354 (issue #93 engine fixes) and Q-367, Q-368 (#93 regression and operations fixes)** are in [rendering-engines-tuning](rendering-engines-tuning.md), **Q-369 (#93 pack catalogue gap)** in [demo-pack](demo-pack.md), **Q-355 to Q-362 (#93 physics) and Q-373 to Q-380 (#93 physics and data follow-up)** in [physics-fixes](physics-fixes.md), **Q-363 (#93 card fields)** in [contract](contract.md) and **Q-364 to Q-366 (#93 literature and cache)** in [catalogue-values](catalogue-values.md). **D-39 and Q-430 to Q-445 (sound)** are in [sound-ambience](sound-ambience.md). **Q-294 to Q-298 (stream U, build view)** are in [shell-surfaces](shell-surfaces.md). **Q-274 to Q-276 (stream H, orbit view and close-up pane)** are in [rendering-bodies](rendering-bodies.md).
 - **One entry, one file.** Put a new entry in the topic file it belongs to and add its row to the index below in the same commit. An entry that changes another one says "amends D-xx" and the amended entry gets an "Amended by" line.
 - **Status words** (for new entries; older rows keep their wording): **Open**; **Open (built)** (code follows the proposal); **Proposed** (an owner must confirm); **Decided** (who and when); **Partly decided** (list what is open); **Superseded by** (the newer entry rules); **Deferred** (after the event). D- entries are **Accepted** unless marked otherwise.
 - **Spec text belongs in the specs.** A decision states the rule and cites the spec section that holds the detail; when a decision changes a rule, update that section in the same PR.
@@ -64,20 +65,20 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | D-05 | Target hardware and budgets | Accepted (frame-rate row "amended by D-34") | [platform-hosting](platform-hosting.md#d-05-target-hardware-and-budgets) |
 | D-06 | Scope cuts for the event | Accepted | [scope-process](scope-process.md#d-06-scope-cuts-for-the-event) |
 | D-07 | Gemini artistic layer | Accepted | [gemini](gemini.md#d-07-gemini-artistic-layer) |
-| D-08 | Haptics run on the web | Accepted | [haptics-design](haptics-design.md#d-08-haptics-run-on-the-web-not-in-a-native-app) |
-| D-09 | Haptic strength is quantised | Accepted | [haptics-design](haptics-design.md#d-09-haptic-strength-is-quantised) |
-| D-10 | Audio pairing on every platform | Accepted | [haptics-sound](haptics-sound.md#d-10-audio-pairing-on-every-platform) |
+| D-08 | Haptics run on the web | Superseded by D-39 | [haptics-design](haptics-design.md#d-08-haptics-run-on-the-web-not-in-a-native-app) |
+| D-09 | Haptic strength is quantised | Superseded by D-39 | [haptics-design](haptics-design.md#d-09-haptic-strength-is-quantised) |
+| D-10 | Audio pairing on every platform | Accepted; amended by D-39 (no vibration; the timbre rules stay) | [haptics-sound](haptics-sound.md#d-10-audio-pairing-on-every-platform) |
 | D-11 | Repo and doc layout | Accepted | [scope-process](scope-process.md#d-11-repo-and-doc-layout) |
-| D-12 | Haptics on shader-generated bodies | Accepted (Atish); Moon pending; Q-103 amendme…; teq_K tag amended by Q-359 | [haptics-design](haptics-design.md#d-12-haptics-on-gas-giants-water-worlds-and-other-shader-generated-bodies) |
-| D-13 | Creative ownership of haptics | Accepted | [haptics-design](haptics-design.md#d-13-creative-ownership-of-haptics) |
+| D-12 | Haptics on shader-generated bodies | Accepted (Atish); Moon pending; Q-103 amendme…; teq_K tag amended by Q-359; haptic part superseded by D-39 | [haptics-design](haptics-design.md#d-12-haptics-on-gas-giants-water-worlds-and-other-shader-generated-bodies) |
+| D-13 | Creative ownership of haptics | Accepted; haptic part superseded by D-39 | [haptics-design](haptics-design.md#d-13-creative-ownership-of-haptics) |
 | D-14 | Build from 5 Nov | Approved Atish; Kevin, Moon pending | [scope-process](scope-process.md#d-14-build-from-5-nov-answers-q-10) |
 | D-15 | Backend framework FastAPI | Accepted | [data-sources](data-sources.md#d-15-backend-framework-fastapi-answers-q-01) |
 | D-16 | API endpoints | Accepted; 3 notes "not yet decided" (Q-50, Q-… | [contract](contract.md#d-16-api-endpoints-answers-q-06) |
 | D-17 | Owners | Accepted (amended 9 Nov 2026, issue #68: Moon decides body rules) | [scope-process](scope-process.md#d-17-owners-answers-q-07-and-the-ownership-part-of-q-14) |
 | D-18 | Contract generated from shared/schemas | Accepted | [contract](contract.md#d-18-the-contract-is-generated-from-sharedschemas-answers-q-14) |
 | D-19 | Name resolver order | Accepted; amended by Q-328 (reference objects first, open) | [data-sources](data-sources.md#d-19-name-resolver-order-answers-q-05) |
-| D-20 | Haptics API | Accepted; Q-103 amendment pending Atish | [haptics-design](haptics-design.md#d-20-haptics-api-answers-q-11) |
-| D-21 | Honesty toggle follows three badges | Accepted; haptics bullet amended by Q-359; card readouts Q-379 | [contract-tags](contract-tags.md#d-21-honesty-toggle-follows-the-three-badges-answers-q-08) |
+| D-20 | Haptics API | Accepted; Q-103 amendment pending Atish; amended by D-39 (vibration parts cut; the event API stays for sound) | [haptics-design](haptics-design.md#d-20-haptics-api-answers-q-11) |
+| D-21 | Honesty toggle follows three badges | Accepted; haptics bullet amended by Q-359 (haptics cut by D-39); card readouts Q-379 | [contract-tags](contract-tags.md#d-21-honesty-toggle-follows-the-three-badges-answers-q-08) |
 | D-22 | What a saved asset holds | Accepted | [contract](contract.md#d-22-what-a-saved-asset-holds-answers-q-09) |
 | D-23 | VisibleMode and IRMode fields | Accepted | [contract](contract.md#d-23-fields-of-visiblemode-and-irmode-answers-q-12) |
 | D-24 | Hosting local on Asus A15 | Accepted | [platform-hosting](platform-hosting.md#d-24-hosting-local-on-the-asus-a15-answers-q-02) |
@@ -95,6 +96,8 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | D-36 | Physics-based realism for generated bodies | Decided (Moon); engine frames exempt from determinism (D-37) | [rendering-bodies](rendering-bodies.md#d-36-physics-based-realism-for-generated-bodies-issue-71) |
 | D-37 | Prototype WebGL2 engines (world, star, rock) are the renderer for generated bodies at + Artistic; three.js TSL is the fallback | Decided (Moon); amends D-03 (acknowledged by Atish, 11 Nov 2026); amended by Q-287; built; determinism bullet amended by Q-349 (D-38) | [rendering-engines](rendering-engines.md#d-37-the-approved-prototype-engine-is-the-renderer-for-generated-bodies-decided-by-moon-11-nov-2026) |
 | D-38 | Issue #93: engine speed, seeded patterns, physics corrections and new card fields | Decided (Atish, 11 Nov 2026); built except Q-346, Q-361 | [rendering-engines-tuning](rendering-engines-tuning.md#d-38-issue-93-engine-speed-seeded-patterns-physics-corrections-and-new-card-fields-decided-by-atish-11-nov-2026) |
+| D-38 | Design language: Graphite, Inter, tight radii, Animate UI | Accepted (Moon) | [shell-surfaces](shell-surfaces.md#d-38-design-language-graphite-inter-tight-radii-animate-ui) |
+| D-39 | Haptics cut; the audio moves to frontend/src/sound | Accepted (Atish, 12 Nov 2026) | [sound-ambience](sound-ambience.md#d-39-haptics-cut-the-audio-moves-to-frontendsrcsound) |
 | Q-01 | Backend framework | Answered: D-15 | [data-sources](data-sources.md) |
 | Q-02 | Frontend hosting | Answered: D-24 | [platform-hosting](platform-hosting.md) |
 | Q-03 | Sliders on baked bodies | Answered: D-26 | [rendering-bodies](rendering-bodies.md) |
@@ -163,23 +166,23 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-67 | Tone mapping (clipHighlights) | Open (implemented as described) | [rendering-motion](rendering-motion.md) |
 | Q-68 | Field-worker interface at 4 Hz | Open | [haptics-design](haptics-design.md) |
 | Q-69 | Golden frames on SwiftShader | Open | [rendering-motion](rendering-motion.md) |
-| Q-70 | Spectrum pitch follows wavelength | Open (implemented as described) | [haptics-sound](haptics-sound.md) |
-| Q-71 | Engine-owned pulse trains | Open (implemented as described) | [haptics-built](haptics-built.md) |
+| Q-70 | Spectrum pitch follows wavelength | Open (implemented as described); amended by Q-430 (long wavelength = low pitch) | [haptics-sound](haptics-sound.md) |
+| Q-71 | Engine-owned pulse trains | Open (implemented as described); amended by D-39 (audio trains only) | [haptics-built](haptics-built.md) |
 | Q-72 | Audio voice hint on HapticEvent | Open (implemented as described) | [haptics-sound](haptics-sound.md) |
-| Q-73 | Default outputs and unlock gesture | Open (implemented as described) | [haptics-built](haptics-built.md) |
-| Q-74 | Calibration choices | Open (implemented as described) | [haptics-built](haptics-built.md) |
-| Q-75 | Tap-along avOffsetMs method | Open (implemented as described) | [haptics-built](haptics-built.md) |
-| Q-76 | Spectrum haptics choices | Open (implemented as described) | [haptics-built](haptics-built.md) |
-| Q-77 | R11 dip test at phone width | Open | [haptics-built](haptics-built.md) |
-| Q-78 | Crater rims, mesh normals refused | Open (refused until a mask and a mesh raycast… | [haptics-design](haptics-design.md) |
-| Q-79 | Gas giant band-boundary strength | Open (implemented as described) | [haptics-design](haptics-design.md) |
-| Q-80 | T Tauri dropped beats | Open (implemented as described) | [haptics-design](haptics-design.md) |
-| Q-81 | Tags of encoded data haptics | Open (implemented as described) | [haptics-design](haptics-design.md) |
-| Q-82 | Brown dwarf band ticks refused | Open (refused until band data reaches the cli… | [haptics-design](haptics-design.md) |
-| Q-83 | Holding still and source triggers | Open (implemented as described) | [haptics-built](haptics-built.md) |
-| Q-84 | Creative haptics placeholders (#11) | Open (placeholders) | [haptics-built](haptics-built.md) |
-| Q-85 | Texture/data channel hint | Open (implemented as described) | [haptics-design](haptics-design.md) |
-| Q-86 | Candidate detections haptics refused | Open (refused until a detection field exists) | [haptics-design](haptics-design.md) |
+| Q-73 | Default outputs and unlock gesture | Open (implemented as described); amended by D-39 (the unlock stays; no vibrate default) | [haptics-built](haptics-built.md) |
+| Q-74 | Calibration choices | Superseded by D-39 | [haptics-built](haptics-built.md) |
+| Q-75 | Tap-along avOffsetMs method | Superseded by D-39 | [haptics-built](haptics-built.md) |
+| Q-76 | Spectrum haptics choices | Open (implemented as described); amended by D-39 (the pad is cut; the spectrum mapping stays) | [haptics-built](haptics-built.md) |
+| Q-77 | R11 dip test at phone width | Superseded by D-39 | [haptics-built](haptics-built.md) |
+| Q-78 | Crater rims, mesh normals refused | Superseded by D-39 | [haptics-design](haptics-design.md) |
+| Q-79 | Gas giant band-boundary strength | Superseded by D-39 | [haptics-design](haptics-design.md) |
+| Q-80 | T Tauri dropped beats | Superseded by D-39 | [haptics-design](haptics-design.md) |
+| Q-81 | Tags of encoded data haptics | Superseded by D-39 | [haptics-design](haptics-design.md) |
+| Q-82 | Brown dwarf band ticks refused | Superseded by D-39 | [haptics-design](haptics-design.md) |
+| Q-83 | Holding still and source triggers | Superseded by D-39 | [haptics-built](haptics-built.md) |
+| Q-84 | Creative haptics placeholders (#11) | Open (placeholders); amended by D-39 (the audio placeholders stay) | [haptics-built](haptics-built.md) |
+| Q-85 | Texture/data channel hint | Superseded by D-39 | [haptics-design](haptics-design.md) |
+| Q-86 | Candidate detections haptics refused | Superseded by D-39 | [haptics-design](haptics-design.md) |
 | Q-87 | Sky endpoints beyond D-16 | Open (implemented as described) | [sky-shell](sky-shell.md) |
 | Q-88 | Sky survey, tag and depth | Open (2MASS colour, `derived`) | [sky-shell](sky-shell.md) |
 | Q-89 | Shell follows mock-up; sky default | Open (implemented as described) | [sky-shell](sky-shell.md) |
@@ -198,7 +201,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-102 | Overlays on the frame grid | Open | [sky-shell](sky-shell.md) |
 | Q-103 | Shapes and volumes | Open (implemented as described; Atish's accep… | [rendering-kinds](rendering-kinds.md) |
 | Q-104 | Animated sphere bodies | Open (implemented as described) | [rendering-kinds](rendering-kinds.md) |
-| Q-105 | Time-dependent storm channel (D-12) | Open (implemented as described; the amendment… | [haptics-built](haptics-built.md) |
+| Q-105 | Time-dependent storm channel (D-12) | Superseded by D-39 | [haptics-built](haptics-built.md) |
 | Q-106 | Tier wording in viewer panel | Open (implemented as described) | [rendering-motion](rendering-motion.md) |
 | Q-107 | Visual findings from #42 review | Mostly fixed (see below). Open: a check on a… | [rendering-kinds](rendering-kinds.md) |
 | Q-108 | Process gating and flare cap | Open (implemented as described) | [rendering-motion](rendering-motion.md) |
@@ -222,9 +225,9 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-126 | MOST as primary moving-object search | Open | [moving-frames](moving-frames.md) |
 | Q-130 | Reserved Track block Q-130 to Q-149 | Answered (Atish, 9 Nov 2026) | [scope-process](scope-process.md) |
 | Q-131 | Track scope: known objects only | Answered for scope (Atish, 9 Nov 2026); re-sc… | [moving-objects](moving-objects.md) |
-| Q-132 | Desktop-only event; A15 demo machine | Answered (Atish, 9 Nov 2026); open: M3 rename, issue #16 | [platform-hosting](platform-hosting.md) |
-| Q-133 | Body sound follows height map | Answered (Atish, 9 Nov 2026); open details Q-188 to Q-192 | [haptics-sound](haptics-sound.md) |
-| Q-134 | Track path sound | Answered (Atish, 9 Nov 2026) | [haptics-sound](haptics-sound.md) |
+| Q-132 | Desktop-only event; A15 demo machine | Answered (Atish, 9 Nov 2026); M3 rename done (#111, D-39); open: issue #16 | [platform-hosting](platform-hosting.md) |
+| Q-133 | Body sound follows height map | Deferred (D-39) | [haptics-sound](haptics-sound.md) |
+| Q-134 | Track path sound | Answered (Atish, 9 Nov 2026); amended by Q-430 (pitch polarity) | [haptics-sound](haptics-sound.md) |
 | Q-135 | Spin slider owner, tag, wording | Answered (Atish, 9 Nov 2026) | [moving-objects](moving-objects.md) |
 | Q-136 | High-res imagery only in path view | Answered for scope (Atish, 9 Nov 2026); CDS p… | [moving-objects](moving-objects.md) |
 | Q-137 | Demo object and data release | Answered (Atish, 9 Nov 2026) | [scope-process](scope-process.md) |
@@ -272,16 +275,16 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-180 | Known-object check: SkyBoT, Horizons, unchecked | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-181 | Track is a split-pane kind, no tool | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-182 | Discovery result card named Result card | Proposed | [moving-objects-review](moving-objects-review.md) |
-| Q-183 | Owners for Track and the star list | Proposed | [scope-process](scope-process.md) |
+| Q-183 | Owners for Track and the star list | Proposed; amended by Q-404 | [scope-process](scope-process.md) |
 | Q-184 | Eros Track window | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-185 | Marker between exposures | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-186 | Measurable coma-fills-aperture test | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-187 | Track tickets and milestone | Proposed | [scope-process](scope-process.md) |
-| Q-188 | Mesh height for the body tone | Proposed | [haptics-sound](haptics-sound.md) |
-| Q-189 | Tone stream in the haptics API | Proposed | [haptics-sound](haptics-sound.md) |
-| Q-190 | Sustained-tone timbre by tag; body level | Proposed | [haptics-sound](haptics-sound.md) |
-| Q-191 | Body tone on bodies without height | Proposed | [haptics-sound](haptics-sound.md) |
-| Q-192 | Height ticks after the event | Proposed | [haptics-sound](haptics-sound.md) |
+| Q-188 | Mesh height for the body tone | Deferred (D-39) | [haptics-sound](haptics-sound.md) |
+| Q-189 | Tone stream in the haptics API | Proposed (stays live for sound: Track path voice, D-39) | [haptics-sound](haptics-sound.md) |
+| Q-190 | Sustained-tone timbre by tag; body level | Proposed (timbre part stays live for sound, D-39) | [haptics-sound](haptics-sound.md) |
+| Q-191 | Body tone on bodies without height | Deferred (D-39) | [haptics-sound](haptics-sound.md) |
+| Q-192 | Height ticks after the event | Deferred (D-39) | [haptics-sound](haptics-sound.md) |
 | Q-193 | Desktop Feel mode in the build pane | Proposed | [shell-proposals](shell-proposals.md) |
 | Q-194 | Track path sound details | Proposed | [haptics-sound](haptics-sound.md) |
 | Q-195 | GET /v1/health beyond D-16 | Proposed | [contract](contract.md) |
@@ -345,11 +348,11 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-287 | The engines draw only at + Artistic; + Estimated and Measured only draw the three.js path | Decided (Atish, 11 Nov 2026); amended by Q-367 | [rendering-engines](rendering-engines.md#q-286-to-q-288-the-world-adapter-tsl-port-honesty-level-ocean-basin) |
 | Q-288 | Ocean basin in the world adapter (sea share per type) | Open (built; Moon to confirm) | [rendering-engines](rendering-engines.md#q-286-to-q-288-the-world-adapter-tsl-port-honesty-level-ocean-basin) |
 | Q-290 to Q-293 | Gas giant and star parity: True colour default, solved gas world and star cells shown at + Estimated | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
-| Q-294 | Build view follows the mock-up: full-view build, shift to the right half, header, one panel at a time, honesty caption | Decided (Moon: loyal to the mock-up) | [shell-surfaces](shell-surfaces.md) |
-| Q-295 | Feel it (not available yet) and Hear it (the Listen sweep on the measured spectrum) in the build pane | Decided in code | [shell-surfaces](shell-surfaces.md) |
-| Q-296 | Zoom bar and tool dock in the build view | Decided in code | [shell-surfaces](shell-surfaces.md) |
-| Q-297 | Details: the controls and honesty lists the mock-up's build view has no place for | Decided in code | [shell-surfaces](shell-surfaces.md) |
-| Q-298 | Build view follow-ups: mock-up title, island bottom right, `BuildControls` slot, Show dims rows only, phone close-up caption | Decided (coordinator) | [shell-surfaces](shell-surfaces.md) |
+| Q-294 | Build view follows the mock-up: full-view build, shift to the right half, header, one panel at a time, honesty caption (amended by PR #104) | Decided (Moon: loyal to the mock-up) | [shell-surfaces](shell-surfaces.md) |
+| Q-295 | Feel it (not available yet) and Hear it (the Listen sweep on the measured spectrum) in the build pane (amended by PR #104) | Decided in code | [shell-surfaces](shell-surfaces.md) |
+| Q-296 | Zoom bar and tool dock in the build view (amended by PR #104) | Decided in code | [shell-surfaces](shell-surfaces.md) |
+| Q-297 | Details: the controls and honesty lists the mock-up's build view has no place for (amended by PR #104) | Decided in code | [shell-surfaces](shell-surfaces.md) |
+| Q-298 | Build view follow-ups: mock-up title, island bottom right, `BuildControls` slot, Show dims rows only, phone close-up caption (amended by PR #104) | Decided (coordinator) | [shell-surfaces](shell-surfaces.md) |
 | Q-299 | Rock engine (prototype code, verbatim) draws asteroids and comet nuclei at + Artistic (Q-287) | Open (built; Moon to confirm) | [rendering-engines](rendering-engines.md#q-299-to-q-302-stream-v3-rock-engine-issue-71-d-37) |
 | Q-300 | `cardToRock` adapter and the artifact's own bodies by id | Open (built; Moon to confirm); amended by Q-334; Q-353 | [rendering-engines](rendering-engines.md#q-299-to-q-302-stream-v3-rock-engine-issue-71-d-37) |
 | Q-301 | Shape models as a radial height map for the engine; jets | Open (built; Moon to confirm) | [rendering-engines](rendering-engines.md#q-299-to-q-302-stream-v3-rock-engine-issue-71-d-37) |
@@ -418,4 +421,34 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-378 | Gaia FLAME luminosity ×1e6, `msc1-flame3`, `ASSET_VERSION` 13 | Open (built); Atish to confirm | [physics-fixes](physics-fixes.md#q-373-to-q-380-physics-and-data-follow-up-issue-93) |
 | Q-379 | Eclipse and phase-curve readouts at every honesty level, band-named labels (D-21) | Open (built); Atish to confirm whether text readouts follow the toggle | [physics-fixes](physics-fixes.md#q-373-to-q-380-physics-and-data-follow-up-issue-93) |
 | Q-380 | Gas caption rate at the measured frame rate | Open (built); Atish to confirm | [physics-fixes](physics-fixes.md#q-373-to-q-380-physics-and-data-follow-up-issue-93) |
+| Q-400 | Area frames and dots: P3's choices for the spec gaps | Proposed | [moving-objects](moving-objects.md) |
+| Q-401 | Area starting values against the Day 0 count | Open (offline numbers; live Day 0 pending) | [moving-objects](moving-objects.md) |
+| Q-402 | Conflicts P3 met in the Area spec (incl. A17.3 star or fixed) | Open; (5) decided by Moon | [moving-objects](moving-objects.md) |
+| Q-403 | Star list for movers: choices for the spec gaps | Proposed | [moving-objects-review](moving-objects-review.md) |
+| Q-404 | Owner of the star list for movers (amends Q-183, D-17) | Proposed | [scope-process](scope-process.md) |
+| Q-409 | Light theme for the panels | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-410 | The "artist's impression" line removed from Details | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-411 | Pause removed from the Details pane (P key instead) | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-412 | Show (honesty level) moves into Details in the build pane | Proposed (Moon to confirm) | [shell-surfaces](shell-surfaces.md) |
+| Q-413 | The island's loader pulses at rest | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-414 | Known objects and Discovery demo answers only inside the Eros area | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-415 | Moulding animation is the mock-up's generic body (amends Q-113 item 3) | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-416 | Hear it: Atmosphere and the spectrum sweep (amends Q-295) | Open (Atish to wire after merge) | [shell-surfaces](shell-surfaces.md) |
+| Q-417 | The browser tab reads "Odysseus" | Decided (Moon, tab title only) | [shell-surfaces](shell-surfaces.md) |
+| Q-430 | Pitch polarity: long wavelength = low pitch (amends Q-70, Q-134) | Decided (built #111) | [sound-ambience](sound-ambience.md) |
+| Q-431 | Listener model: quasi-static, no Doppler | Decided | [sound-ambience](sound-ambience.md) |
+| Q-432 | Air physics for sound | Decided | [sound-ambience](sound-ambience.md) |
+| Q-433 | Sound inputs and WorldEngine accessors | Decided | [sound-ambience](sound-ambience.md) |
+| Q-434 | `hKm` CPU port with a parity test | Decided | [sound-ambience](sound-ambience.md) |
+| Q-435 | Planetary wind model | Decided | [sound-ambience](sound-ambience.md) |
+| Q-436 | Sound source catalogue and gates | Decided | [sound-ambience](sound-ambience.md) |
+| Q-437 | Weather: lightning and thunder | Decided | [sound-ambience](sound-ambience.md) |
+| Q-438 | Weather visuals overlay and flash safety | Decided | [sound-ambience](sound-ambience.md) |
+| Q-439 | Ambience bake method (Moon's DSP, corrected) | Decided | [sound-ambience](sound-ambience.md) |
+| Q-440 | Ambience level model and presentation offset | Decided | [sound-ambience](sound-ambience.md) |
+| Q-441 | Stage audibility, buses and ducking | Decided (buses built #111) | [sound-ambience](sound-ambience.md) |
+| Q-442 | Sound UI, captions, "What you hear" | Decided (Sound popover built #111) | [sound-ambience](sound-ambience.md) |
+| Q-443 | Spectrum chord | Decided | [sound-ambience](sound-ambience.md) |
+| Q-444 | Determinism for sound: one JavaScript engine | Decided | [sound-ambience](sound-ambience.md) |
+| Q-445 | Bake engine deviations from R13 (PR #119, #113) | Decided (as built) | [sound-ambience](sound-ambience.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |

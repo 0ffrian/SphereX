@@ -58,7 +58,7 @@ def test_search_list_queries_are_targets() -> None:
 
 def test_every_search_row_has_a_committed_asset_that_passes_the_contract() -> None:
     by_id = {str(a.card["id"]): a for _, a in committed_assets()}
-    assert len(by_id) == len(bp.SEARCH_LIST) == 21
+    assert len(by_id) == len(bp.SEARCH_LIST) == 22
     for _, asset in committed_assets():
         check_card(asset.card)
         check_params(asset.render_params)
@@ -294,7 +294,7 @@ def test_pack_asset_is_served_as_saved(fixture_cache: Path, tmp_path: Path) -> N
             assert result.status == ("sketch" if asset.card["type"] == "candidate" else "saved")
             assert result.card == asset.card and result.params == asset.render_params
             seen += 1
-        assert seen == 21
+        assert seen == 22
 
 
 def test_pack_asset_failing_its_schema_is_ignored_with_a_warning(

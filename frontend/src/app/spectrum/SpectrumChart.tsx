@@ -1,7 +1,7 @@
 // A1.1 P0 spectrum chart: flux per frame against wavelength, with 1σ error bars; points the
 // pipeline flagged are drawn as hollow diamonds in a second colour and named in the legend, so
 // colour is never the only cue. Hand-rolled SVG (no chart library). The data table in
-// SpectrumPanel is the text equivalent (R9). Colours: dataviz reference palette, dark column,
+// FlipbookSpectrum's table is the text equivalent (R9). Colours: dataviz reference palette, dark column,
 // slots 1 (blue) and 2 (orange).
 import { useState } from 'react';
 import type { SpectrumPoint } from '@/app/api/types';

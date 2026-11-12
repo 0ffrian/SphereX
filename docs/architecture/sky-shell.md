@@ -41,6 +41,8 @@ Other names: **rail** (`app/shell/ToolRail.tsx`, `.sx-rail`), **transport** (`ap
 
 ### A21.2 Layout, insets, safe rectangle, z-order
 
+> **Changed by [D-38](../decisions/shell-surfaces.md#d-38-design-language-graphite-inter-tight-radii-animate-ui) and Q-296 (PR #104, `feat/ui`):** the shell is a full-screen floating layout. The sky fills the screen; the bottom centre holds the sky dock (A21.4), the bottom left the zoom card (`SkyZoom`) and the transport bar, and the left rail is no longer rendered (`App.tsx`). The `rail` column, `--sx-rail` and the rail-based insets and fades below describe the earlier layout; read them with that in mind until the grid is rewritten. Colours, radii and type follow [design-language.md](../design-language.md).
+
 - **Screen and bezel** ([Q-89](../decisions/sky-shell.md)): `.sx-screen` is fixed to the viewport with 14 px padding. `.sx-bezel` has a 28 px radius and a 1 px border. Tokens: `--sx-rail: 64px`, `--sx-top: 60px`, `--sx-bot: 64px`. Grid columns `rail | 1fr | minmax(0, 24rem) | 16px`, rows `top | 1fr | bot`, areas `'rail top top top' 'rail view view .' '. transport search .'`: transport bottom left, search pill bottom right.
 - **DOM and Tab order** (`app/App.tsx`): `header.sx-top` (sr-only h1 "Shift & Spectrum", fixture banner, readout) → `.sx-search-slot` → rail → `main.sx-view[aria-label="Sky view"]` (`.sx-sky-slot` > SkyPane; then the build pane when open) → `.sx-transport-slot` → island. `LiveAnnouncer` sits outside the bezel.
 - **Full-bleed sky** ([Q-124](../decisions/shell-surfaces.md), desktop only): `.sx-view` spans the whole bezel (`grid-area: 1 / 1 / -1 / -1`, no radius). Header, rail, search slot and transport slot get `position: relative; z-index: 2` and float over the sky. The header has no brand, only the sr-only h1.
@@ -73,6 +75,8 @@ Other names: **rail** (`app/shell/ToolRail.tsx`, `.sx-rail`), **transport** (`ap
 - The event is desktop only ([Q-132](../decisions/platform-hosting.md)); the phone layout is kept working but not demoed. The long press relies on the browser's `contextmenu` event, which iOS Safari does not fire.
 
 ### A21.4 Tool rail and ToolId
+
+> **Changed by [D-38](../decisions/shell-surfaces.md#d-38-design-language-graphite-inter-tight-radii-animate-ui) and Q-296 (PR #104):** `app/shell/SkyDock.tsx` (the sky dock, bottom centre) replaces the rail in the app. It holds **Known objects** and **Discovery** (each starts a square drawn on the sky and sets `ToolId` `'area'`, which is now in `ToolId`), a divider, and **Search** (a button that opens into the search field). Flipbook, Spectrum and 3D viewer are no longer buttons: Flipbook opens with a search or a click on the sky, and the object panel and the object card hold Spectrum and Build it. `ToolRail.tsx` stays only for `openTool`. The dock keeps the rail's sliding highlight and pip. The Known objects and Discovery results are a frontend demo (Q-414, see A18). The rail text below is the earlier state.
 
 - `ToolId = 'sky' | 'flipbook' | 'spectrum' | 'viewer'` (`app/shell/shellStore.ts`). Labels and hints (`app/shell/ToolRail.tsx`, `TOOLS`): Sky "The sky view alone", Flipbook "SPHEREx frames of the object", Spectrum "Spectrum of the object", 3D viewer "3D view of a loaded body". Start tool: `sky`.
 - **Icons** are in `app/shell/railIcons.tsx` (`SHAPES: Record<ToolId, ReactNode>`): a new ToolId without a shape fails the typecheck. Every stroke has `pathLength="1"` so it draws itself again on hover (`.ai-draw`). `app/shell/icons.tsx` is a different set (`IconName`) for panel headers and buttons.

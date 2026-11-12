@@ -57,7 +57,7 @@ This table holds the reply shapes. The register of every route (built and planne
 | `GET /v1/objects/{id}/job/events` | The same JSON as server-sent events (`text/event-stream`), one `data:` line per change and a `: keep-alive` comment every 15 s, until the job ends; one `idle` event when there is no job (Q-111) |
 | `GET /v1/objects/{id}/composite` | SPHEREx false-colour composite (beyond D-16, Q-92; constants Q-94). `{id, data_release, image_url, width, height, scale_arcsec_px, north_up: true, x, y, bands[], tag: "derived", formula, missing, cached_at}` plus optional `ra, dec, epoch` (the grid centre). Each band: `channel` (`blue`, `green`, `red`), `frame_id, wavelength_um, time` plus optional `bandwidth_um, nodata_px`. A refusal is a 200 with `image_url`, `width`, `height`, `scale_arcsec_px`, `x`, `y` all `null`, `bands: []` and the reasons in `missing` (see [Composite](#composite)) |
 | `GET /v1/objects/{id}/composite.png[?v=<sha>]` | 8-bit RGB PNG, north up, east left; the same bytes for the same inputs. `v` (from `image_url`) only changes the URL when the image changes. 404 `not_found` when the composite is refused |
-| `GET /v1/objects/{id}/overlays` | `{id, data_release, cached_at, catalogs[], aperture, flag_groups[], frames[], missing, provenance}`: Gaia DR3 and CatWISE2020 sources, per-frame markers in cutout pixels, aperture/annulus contamination, SIA footprint and cutout box. `missing` holds overlay codes only (`overlay:<cat>`, `overlay:<cat>:pending`, `overlay:<cat>:truncated`, `cutout:<id>`, `footprint:<id>`, `flags_mask:<id>`). A4.9, Q-50 |
+| `GET /v1/objects/{id}/overlays` | `{id, data_release, cached_at, catalogs[], aperture, flag_groups[], frames[], missing, provenance}`: Gaia DR3 and CatWISE2020 sources, per-frame markers in cutout pixels, aperture/annulus contamination, star masks near a mover's track (`masks`, `[]` for fixed objects; per-visit cones for movers, A19.6), SIA footprint and cutout box. `missing` holds overlay codes only (`overlay:<cat>`, `overlay:<cat>:pending`, `overlay:<cat>:truncated`, `cutout:<id>`, `footprint:<id>`, `flags_mask:<id>`). A4.9, Q-50 |
 | `GET /v1/objects/{id}/flags/{frame_id}.png` | RGBA mask from the cutout's FLAGS extension, colour per flag group; 404 `flags_unavailable` without a usable mask. A4.9 |
 | `GET /v1/objects/{id}/combine.png?op=add\|sub&a=&b=` | 8-bit grey PNG of A ± B on A's grid; metadata (both wavelengths, unit, stretch, `tag: "derived"`, formula) in the `X-SX-Combine` JSON header. A4.9, Q-54 |
 | `GET /data/shapes/{name}.glb` | A registered shape-model mesh (glTF binary, `model/gltf-binary`), metres, glTF +Y up (Q-61). Only names listed in `assets/shapes/registry.toml` are served; anything else is 404 |
@@ -201,7 +201,7 @@ uv run python -m scripts.backup_cache             # zip the cache next to it
 uv run python -m scripts.record_fixtures          # re-record tests/fixtures/cache (needs the internet)
 ```
 
-- **What is pre-fetched:** `targets.toml` lists the five test targets (`group = "test"`), `433 Eros`, a moving object for the SBDB and Horizons path (`group = "fixture"`), and the demo objects (`group = "demo"`, D-31): SIMP 0136, TWA 27 (2M1207 A) and IRAS 04302+2247. Barnard's Star, RW Aur and R Dra saturate: on the full cache Barnard's Star and R Dra have no measured point and RW Aur only 15 points at 0.74–1.09 µm; `spectrum:saturated` appears only on the recorded fixtures (A4.2). The demo objects are fainter and have measured spectra. A clean pre-fetch of all targets is about 320 MB on disk. The only full cache so far is on Atish's PC, not yet on the A15: 356 MB (it also holds about 35 MB of unused cutouts of a screened object), 122 MB zipped (6 Nov 2026).
+- **What is pre-fetched:** `targets.toml` lists the five test targets (`group = "test"`), `433 Eros`, a moving object for the SBDB and Horizons path and the Track MVP (`group = "demo"` since #73, Q-197, with its own `moving_windows`, Q-184), and the demo objects (`group = "demo"`, D-31): SIMP 0136, TWA 27 (2M1207 A) and IRAS 04302+2247. Barnard's Star, RW Aur and R Dra saturate: on the full cache Barnard's Star and R Dra have no measured point and RW Aur only 15 points at 0.74–1.09 µm; `spectrum:saturated` appears only on the recorded fixtures (A4.2). The demo objects are fainter and have measured spectra. A clean pre-fetch of all targets is about 320 MB on disk. The only full cache so far is on Atish's PC, not yet on the A15: 356 MB (it also holds about 35 MB of unused cutouts of a screened object), 122 MB zipped (6 Nov 2026).
 - **Timing:** a cutout takes 10–30 s to download, because IRSA sends the 5 MB PSF extension too. A full pre-fetch takes about 30 minutes per target at concurrency 6.
 - **Test fixtures:**
   - They are plain cache entries recorded live by `record_fixtures`: three frames per target (MAXREC=3) at the default cutout size, about 3.3 MB in all (5 test targets, 3 demo objects).
@@ -216,14 +216,17 @@ app/api/          (Kevin, R10)  resolve.py, objects.py, models.py, deps.py; spec
 app/cache/        keys.py, store.py: D-25 read-through cache
 app/adapters/     http.py, irsa_sia.py, irsa_cutout.py, simbad.py, sbdb.py, horizons.py, skybot.py
 app/contract/     generated from shared/schemas/ (D-18, do not edit): ObjectCard, RenderParams
-app/core/find/    (Kevin, Stage 1, A4.1) ids, resolver, propagate, wcs, frames, cutouts, png
+app/core/find/    (Kevin, Stage 1, A4.1) ids, resolver, propagate, wcs, frames, cutouts, png; stars, catalogs (star list for movers, A19.6, Atish)
 app/core/measure/ (Moon, Stage 2, A4.2) config, flags, aperture, solid_angle, photometry, spectrum
 app/core/classify/ (Atish, Stage 3, A4.3) rules.py: R3.3 type selection; R12 #12 exoplanet thresholds block (all None)
 app/core/card/    (Kevin, Stages 4-5, A4.4-A4.5) catalogue, build, assets (A5.4 store), validate, service
 app/core/render/  (Atish, R10) texture baker; card_to_params (Stage 7, A4.7), blackbody, spherex_rgb
 app/core/sky/     sky background: survey registry and layout, HEALPix NESTED, HiPS -> equirect bake
+app/core/area/    (Atish, A17) Area search Discovery: config ([[area]], starting values), frames, dots, day0
 app/core/composite/ (no D-17 owner yet) SPHEREx false-colour composite: config, select, grid, service
 assets/           A5.4 pre-baked assets, <type>/<id>.json (SX_ASSETS_DIR); the demo pack (Q-164) and its maps in assets/textures/
 scripts/          prefetch, smoke_offline, backup_cache, record_fixtures, generate_contract, sky_mirror, sky_bake, bake_demo_pack (`--check`, `--strict`)
+                  area_discovery (Area search precompute: `--area <id> --steps frames,dots --day0 <json>`; exit 0 done, 1 incomplete, 2 bad args;
+                  exit not 0: leave AREA_TOOL_ENABLED off, Q-205)
 tests/            pytest; tests/fixtures/cache holds the recorded cache entries
 ```
