@@ -1160,9 +1160,9 @@ body {
     background-color: #03030788;
     background-image: radial-gradient(70% 60% at 50% 45%, #1b1b2c66 0%, transparent 72%);
     animation: sx-bp-in 0.45s;
-    transition:
-      width 1s var(--sx-ease),
-      background-color 0.9s var(--sx-ease);
+    /* The width changes at once and the pane springs there by transform (exploreMotion.ts, Q-420):
+       animating the width resized the body's canvas on every frame. */
+    transition: background-color 0.9s var(--sx-ease);
   }
   .sx-bp[data-shifted] {
     width: 50%;
@@ -2153,20 +2153,14 @@ body {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transform: translateX(-36px) scale(0.985);
-  transition:
-    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 1s cubic-bezier(0.22, 1, 0.36, 1),
-    visibility 0s 0.8s;
+  /* Opacity and transform are sprung by motion (CloseUpPane, Q-420); visibility waits for the fade. */
+  transition: visibility 0s 0.4s;
 }
 .sx-cu.open {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
-  transform: none;
-  transition:
-    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.1s,
-    transform 1s cubic-bezier(0.22, 1, 0.36, 1) 0.1s;
+  transition: none;
 }
 .sx-cu-canvas {
   position: absolute;
@@ -4674,8 +4668,8 @@ body {
   margin-left: -7px;
 }
 
-/* The build view's Split view and Atmosphere toggles (Q-419): icon-only buttons in the header after
-   Details. A toggle with nothing to do (no atmosphere to hear) stays visible, dimmed, and says why. */
+/* The build view's Ambience and Explore toggles (Q-420). A toggle with nothing to do (no atmosphere
+   to hear) stays visible, dimmed, and says why. */
 .sx-bp-toggle[aria-disabled='true'] {
   opacity: 0.4;
   cursor: not-allowed;

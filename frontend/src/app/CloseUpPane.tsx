@@ -8,7 +8,9 @@
 // mock-up's cuDraw does the same); this layer has the honesty caption (.sx-cu-tag, the
 // mock-up's .cu-tag), the controls and the input. Keyboard: arrows or W A S D move and turn, + and -
 // change the height, Page Up and Page Down tilt. Reduced motion: no automatic flying.
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
+import { animate } from 'motion';
+import { deferFrames, EXPLORE_SPRING } from './build/exploreMotion';
 import { useCloseUpStore } from './closeUpStore';
 import { ORBIT_NOTE } from '@/viewer/orbit/orbitSources';
 import { altRange } from '@/viewer/orbit/orbitMath';
@@ -88,6 +90,31 @@ export function CloseUpPane() {
     kind !== null &&
     (engine || world || rockEngine ? !held : info !== null && info.mode !== null);
   const [, bump] = useReducer((n: number) => n + 1, 0);
+  // Q-420: the pane springs in first and its engine starts a couple of frames later, so starting the
+  // engine (a new WebGL context, shaders) never holds up the first frames of the slide. On close the
+  // picture stays until the fade has finished.
+  const [live, setLive] = useState(false);
+  useEffect(() => {
+    if (open) return deferFrames(() => setLive(true));
+    const id = window.setTimeout(() => setLive(false), 700);
+    return () => window.clearTimeout(id);
+  }, [open]);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const wasOpen = useRef(open);
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el || wasOpen.current === open) return;
+    wasOpen.current = open;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      el.style.opacity = '';
+      el.style.transform = '';
+      return;
+    }
+    const a = open
+      ? animate(el, { opacity: [0, 1], transform: ['translateX(-48px) scale(0.98)', 'translateX(0px) scale(1)'] }, EXPLORE_SPRING)
+      : animate(el, { opacity: 0, transform: 'translateX(-48px) scale(0.98)' }, { duration: 0.35, ease: [0.4, 0, 1, 1] });
+    return () => a.stop();
+  }, [open]);
   const [about, setAbout] = useState(false);
   const focusRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -201,6 +228,7 @@ export function CloseUpPane() {
 
   return (
     <div
+      ref={rootRef}
       className={`sx-cu${open ? ' open' : ''}`}
       aria-hidden={open ? undefined : true}
       data-testid="closeup-pane"
@@ -223,7 +251,7 @@ export function CloseUpPane() {
         />
       )}
       {kind === 'body' && <RockCloseUp active={open} />}
-      {world && open && (
+      {world && live && (
         <WorldFlyStage
           key={world.preset.id}
           world={world}
@@ -231,10 +259,10 @@ export function CloseUpPane() {
           onFail={() => useWorldStore.getState().fail(engineKey(cardId, world.preset.id))}
         />
       )}
-      {engine && open && (
+      {engine && live && (
         <StarFlareStage key={engine.preset.id} star={engine} onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))} />
       )}
-      {kind === 'star' && !engine && starProps && open && (
+      {kind === 'star' && !engine && starProps && live && (
         <div className="absolute inset-0 bg-black" data-testid="star-closeup">
           <StarCloseUp {...starProps} className="absolute inset-0" />
         </div>
