@@ -1,15 +1,97 @@
 // §12.2 live caption model and the §12.3 air facts. Pure; the 3 s throttle and the live region belong to T6.
-// Direction words come from the 8-point compass bearing of a bed's membership-weighted centroid (R9: never pan alone).
-import { earthRef } from './air';
-import { bedMembership } from './sources';
-import type { AirModel, CaptionModel, MixFrame, Place, SourceId } from './types';
-import { CO2_ABS, LEVEL_NOTE_MIN_DB, SILENT_DB } from './tuning';
-import { compass8 } from './wind';
+//
+// SINGLE SOURCE OF USER-FACING TEXT. Every string the ambience shows (refusals, data gaps, phrases, notes, facts) is
+// defined in this file; airModel.ts, sources.ts and weather.ts import (and re-export) them. Decisions implemented:
+//   Q-436 source catalogue and gates (§7)       -> REFUSAL_TEXT.noAir/lavaNoAir/noLiquid, SOURCE_TEXT.whistle
+//   Q-437 weather, lightning rule table (§8.2)  -> LIGHTNING_TEXT
+//   Q-440 level model and presentation (§11.4)  -> levelNote
+//   Q-442 UI, captions, "What you hear" (§12)   -> CEILING_TEXT, EYE_TEXT, phrases, airFacts
+//   R6  acoustic air is P0 >= 1 Pa              -> noAir/lavaNoAir only below P_FLOOR
+//   R7  liquid is local (canLiquid gated)       -> noLiquid, boiledAway
+//   R8  presence before presentation            -> only present beds are captioned
+//   R9  hurricane sanity                        -> EYE_TEXT, hurricane phrases
+//   R10 flow-noise presentation                 -> levelNote follows the loudest bed's own true level
+//   R11 lightning presets                       -> LIGHTNING_TEXT rows
+//   R12 fields not ready                        -> REFUSAL_TEXT.waiting
+// Strings marked "new" are not in the spec yet; they are proposed as Q- entries with the R13 docs (#111 / PR #121).
+// Direction words come from the 8-point compass bearing of a membership-weighted centroid (R9 of R13: never pan alone).
+import { bedWorldDb, earthRef } from './air';
+import type { AirModel, CaptionModel, MixFrame, Place, PlaceSample, SourceId } from './types';
+import { CO2_ABS, CRUST_WEIGHT, LEVEL_NOTE_MIN_DB, RIVER_Q_REF, SILENT_DB } from './tuning';
+
+// ---------- strings ----------
+
+/** §7, §13 refusal and data-gap strings (exact). */
+export const REFUSAL_TEXT = {
+  /** §7 (R6: only below P_FLOOR, 1 Pa). */
+  noAir: 'No air here, so there is no sound.',
+  /** §7 (R6: only below P_FLOOR). */
+  lavaNoAir: 'The magma glows, but with almost no air, it makes no sound you could hear.',
+  /** §7 (R7: when the fluid cannot be liquid here or no open water exists). */
+  noLiquid: 'No liquid can exist on the surface here, so there are no waves, rain or rivers.',
+  /** §13. */
+  dataGap: 'Sound needs the surface view.',
+  /** New. */
+  noSea: 'There is no sea on this world, so there are no waves.',
+  /** New (R12): transient while the climate and rivers form; re-evaluated each tick. */
+  waiting: 'Waiting for the world to form…',
+  /** New: mirrors the engine's runaway readout. */
+  boiledAway: 'The ocean has boiled away (runaway greenhouse), so there are no waves, rain or rivers.',
+  /** New. */
+  noRivers: 'No rivers flow here.',
+} as const;
+
+/** §7 source-gate strings. `whistle` is the spec's; the rest are new. */
+export const SOURCE_TEXT = {
+  whistle: 'The air is too thin for small stones to whistle.',
+  noWaves: 'The wind is too light to raise waves here.',
+  noSand: 'The wind never gets strong enough to lift sand here.',
+} as const;
+
+/** §8.2 lightning refusal strings (exact). */
+export const LIGHTNING_TEXT = {
+  titan: 'No lightning has ever been detected on Titan, so there is no thunder here.',
+  co2: 'Lightning on worlds like Venus and Mars is unconfirmed, so there is no thunder here.',
+  other: 'Lightning needs storm clouds of water or ammonia; there are none here.',
+} as const;
 
 /** §4.1 ceiling caption (exact). */
 export const CEILING_TEXT = 'Too high: the air here is too thin to carry sound.';
 /** §12.2 eye caption (exact). */
 export const EYE_TEXT = 'Calm eye of a hurricane';
+/** New (blue F5b): lava is around the listener but its roar does not carry to this height. */
+export const LAVA_GAP_TEXT = "The lava's roar does not carry through this thin air to your height.";
+
+// ---------- shared helpers (here so no module needs to import levels or sources for text) ----------
+
+const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'] as const;
+/** 8-point compass name for a bearing in degrees. */
+export function compass8(deg: number): (typeof COMPASS)[number] {
+  const i = Math.round((((deg % 360) + 360) % 360) / 45) % 8;
+  return COMPASS[i] as (typeof COMPASS)[number];
+}
+
+/** Ground-class membership of one sample for a bed (§11.1): 0/1, a rain weight, a discharge weight. */
+export function bedMembership(id: SourceId, s: PlaceSample, rainRate: number): number {
+  switch (id) {
+    case 'S4':
+      return s.coast ? 1 : 0;
+    case 'S5':
+      return s.cls === 'sea' || s.cls === 'lake' ? 1 : 0; // ASSUMPTION: lakes count as open water
+    case 'S6':
+      return Math.max(0, Math.min(3, s.rain / Math.max(rainRate, 1e-3)));
+    case 'S7':
+      return s.cls === 'river' ? Math.max(0, s.riverQ) / RIVER_Q_REF : 0;
+    case 'S8':
+      return s.cls === 'lava' ? 1 : s.cls === 'crust' ? CRUST_WEIGHT : 0;
+    case 'S10':
+      return s.cls === 'land' ? 1 : 0;
+    default:
+      return 1;
+  }
+}
+
+// ---------- phrases ----------
 
 function windStrength(U: number): string {
   if (U < 1) return 'still air';
@@ -104,9 +186,6 @@ function bedPhrase(id: SourceId, place: Place): string {
   }
 }
 
-/** New string (Q- proposal, blue F5b): lava is around the listener but its roar does not carry to this height. */
-export const LAVA_GAP_TEXT = "The lava's roar does not carry through this thin air to your height.";
-
 function weatherPhrase(place: Place): string | null {
   const f = place.features;
   if (f.precipPhase === 'snow' && f.rainRate > 0.05) return 'snow falling';
@@ -114,11 +193,14 @@ function weatherPhrase(place: Place): string | null {
   return null;
 }
 
-/** §11.4 "true level against Earth" note; offset > 0 means the world is quieter than Earth and was raised. */
-export function levelNote(offsetDb: number): { note: string | null; short: string | null } {
-  if (!(Math.abs(offsetDb) >= LEVEL_NOTE_MIN_DB)) return { note: null, short: null };
-  const n = Math.max(5, Math.round(Math.abs(offsetDb) / 5) * 5); // ASSUMPTION: rounded to the nearest 5 dB
-  return offsetDb > 0
+/**
+ * §11.4 "true level against Earth" note. `quieterDb` > 0 means the sound is quieter than the same source on Earth (and
+ * was raised for the stage); < 0 louder (lowered). Rounded to the nearest 5 dB (ASSUMPTION), at least 5.
+ */
+export function levelNote(quieterDb: number): { note: string | null; short: string | null } {
+  if (!(Math.abs(quieterDb) >= LEVEL_NOTE_MIN_DB)) return { note: null, short: null };
+  const n = Math.max(5, Math.round(Math.abs(quieterDb) / 5) * 5);
+  return quieterDb > 0
     ? { note: `Real level: about ${n} dB quieter than on Earth (raised so you can hear it)`, short: `real level about ${n} dB quieter than Earth` }
     : { note: `Real level: about ${n} dB louder than on Earth (lowered)`, short: `real level about ${n} dB louder than Earth` };
 }
@@ -127,18 +209,25 @@ function capitalise(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
-/** §12.2 the caption model for one mixer frame. */
+/**
+ * §12.2 the caption model for one mixer frame. The level note is the TRUE level of the loudest present bed against the
+ * same source on Earth, by the same rule playback uses (bedWorldDb: listener-height impedance for flow noise, R10).
+ */
 export function caption(air: AirModel, place: Place, frame: MixFrame): CaptionModel {
   const all = air.refusals.find((r) => r.source === 'all');
   const silentReason = all ? all.reason : frame.silent ? CEILING_TEXT : null;
-  const { note, short } = levelNote(frame.presentOffsetDb);
   if (silentReason) return { line: silentReason, heard: [], levelNote: null, silentReason };
 
   const live = frame.beds.filter((b) => b.gainDb > SILENT_DB + 1).sort((a, b) => b.trueDb - a.trueDb);
-  const top = live[0]?.trueDb ?? 0;
+  const topBed = live[0];
+  const { note, short } = topBed ? levelNote(-bedWorldDb(air, place.features.z_km, topBed.id)) : { note: null, short: null };
+  const top = topBed?.trueDb ?? 0;
   const seen = new Set<string>();
   const heard: CaptionModel['heard'] = [];
+  const hurricaneHeard = live.some((b) => b.id === 'S9');
   for (const b of live) {
+    // Red L5: one wind, one phrase: when the hurricane bed plays, the rumble's own hurricane phrase is dropped.
+    if (hurricaneHeard && (b.id === 'S1_land' || b.id === 'S1_sea') && place.features.wind.parts[0]?.kind === 'hurricane') continue;
     const phrase = bedPhrase(b.id, place);
     if (seen.has(phrase)) continue;
     seen.add(phrase);
@@ -148,7 +237,10 @@ export function caption(air: AirModel, place: Place, frame: MixFrame): CaptionMo
     return { line: [EYE_TEXT, short].filter(Boolean).join(' · '), heard, levelNote: note, silentReason: null };
   }
   const lavaHere = air.lavaWorld && place.samples.some((s) => s.cls === 'lava');
-  const lavaGap = lavaHere && frame.beds.some((b) => b.id === 'S8') && !heard.some((h) => h.id === 'S8') ? LAVA_GAP_TEXT.charAt(0).toLowerCase() + LAVA_GAP_TEXT.slice(1, -1) : null;
+  const lavaGap =
+    lavaHere && frame.beds.some((b) => b.id === 'S8') && !heard.some((h) => h.id === 'S8')
+      ? LAVA_GAP_TEXT.charAt(0).toLowerCase() + LAVA_GAP_TEXT.slice(1, -1)
+      : null;
   const parts = [heard[0]?.phrase, heard[1]?.phrase, weatherPhrase(place), lavaGap, short].filter((p): p is string => !!p);
   return { line: capitalise(parts.join(' · ')), heard, levelNote: note, silentReason: null };
 }
@@ -170,4 +262,3 @@ export function airFacts(air: AirModel): { label: string; text: string }[] {
   }
   return facts;
 }
-

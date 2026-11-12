@@ -176,4 +176,18 @@ describe('§8.5 overlay frame', () => {
     expect(f.rain?.snow).toBe(true);
     expect(f.rain?.vt).toBeCloseTo(1, 9);
   });
+
+  it('review L10: thunder heard from altitude uses the listener-height impedance', () => {
+    const e = earthAir();
+    const ground = thunderParams(e, 3000, 0).level_dB;
+    const high = thunderParams(e, 3000, 5).level_dB;
+    expect(high).toBeLessThan(ground);
+  });
+});
+
+describe('review L4: lightning follows local liquid', () => {
+  it('an eyeball world with open water (global state frozen) may have storms', () => {
+    const eyeball = { ...earthAir({ liquidState: false }), liquid: { name: 'water', rho: 998, sigma: 0.0728, viscous: false, tag: 'measured' as const } };
+    expect(lightningRule(eyeball, 't1e').allowed).toBe(true);
+  });
 });

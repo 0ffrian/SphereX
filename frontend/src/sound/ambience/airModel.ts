@@ -5,29 +5,12 @@ import type { Tag } from '@/contract';
 import type { CardToWorldOk } from '@/engine/worlds/cardToWorld';
 import type { FluidKey } from '@/engine/worlds/types';
 import { classify, density, gammaFor, soundSpeed } from './air';
+import { REFUSAL_TEXT } from './captions';
 import { liquidFor } from './liquids';
 import type { AirModel, Refusal, TaggedInput, WorldEngineLike } from './types';
-import { HURRICANE, K_SURF, P_FLOOR, RH_ASSUMED } from './tuning';
+import { HURRICANE, K_SURF, P_FLOOR, RH_ASSUMED, ROCK_VAPOUR_GAMMA } from './tuning';
 
-/** Exact refusal and data-gap strings (§7, §13). New strings (not in the spec) are proposed as Q- entries for T1. */
-export const REFUSAL_TEXT = {
-  /** R6: only below P_FLOOR (1 Pa). */
-  noAir: 'No air here, so there is no sound.',
-  /** R6: only below P_FLOOR. */
-  lavaNoAir: 'The magma glows, but with almost no air, it makes no sound you could hear.',
-  noLiquid: 'No liquid can exist on the surface here, so there are no waves, rain or rivers.',
-  dataGap: 'Sound needs the surface view.',
-  /** New (Q- proposal). */
-  noSea: 'There is no sea on this world, so there are no waves.',
-  /** New (Q- proposal, R12): transient while the climate and rivers form; re-evaluated each tick. */
-  waiting: 'Waiting for the world to form…',
-  /** New (Q- proposal): mirrors the engine's runaway readout. */
-  boiledAway: 'The ocean has boiled away (runaway greenhouse), so there are no waves, rain or rivers.',
-  /** New (Q- proposal). */
-  noRivers: 'No rivers flow here.',
-  /** New (Q- proposal): the fluid can be liquid but the air never brings rain (engine canLiquid false). */
-  noRain: 'Rain cannot fall here.',
-} as const;
+export { REFUSAL_TEXT };
 
 /**
  * Saturation vapour pressure of water, Pa: Murphy & Koop 2005 (QJRMS 131:1539) eq. 7 over ice below the triple point,
@@ -106,7 +89,10 @@ export function buildAirModel(world: CardToWorldOk, e: WorldEngineLike): AirMode
   const fluidTag: Tag = fluidSlid ? 'artistic' : (tags.fluid ?? 'model_dependent');
 
   const cls = classify(mu, fluid, gas);
-  const gamma = gammaFor(cls, mu, Ts ?? 0);
+  // Review L7: the lava world's assumed rock vapour takes gamma 1.4 (§4.2); its absorption uses the CO2 class (mu 44),
+  // labelled inferred_from_analog below.
+  const rockVapour = !gas && (Ts ?? 0) > 700 && !!hydro?.lava;
+  const gamma = rockVapour ? ROCK_VAPOUR_GAMMA : gammaFor(cls, mu, Ts ?? 0);
   const T0 = Ts ?? 0;
   const P0 = gas ? 1e4 : (Ps ?? 0) * 1e5;
   const H_km = (Hm ?? 0) / 1000;
@@ -120,15 +106,18 @@ export function buildAirModel(world: CardToWorldOk, e: WorldEngineLike): AirMode
   // transient state the caller re-evaluates each tick (isWaiting), never a permanent refusal.
   const waiting = dataOK && !gas && (!climate?.stats || !hydro);
 
-  // R7: liquid is local. It exists where the engine's global state is liquid, or where its climate shows open water
-  // (stats.liquid > 0 on an ocean, e.g. an eyeball world whose mean temperature is below freezing). Not after a runaway.
+  // R7 (amended): liquid = canLiquid && (state liquid || open water in the climate). canLiquid is false below the fluid's
+  // triple-point pressure (e.g. water at 500 Pa), where the climate grid's ice-free ocean is not liquid (it counts
+  // ice-free cells, and on an airless world sea ice never grows). Open water on a world whose mean state is frozen
+  // (an eyeball world) is liquid. Not after a runaway.
   const openWater = num(climate?.stats?.liquid);
   const statsOcean = num(climate?.stats?.ocean);
   const runaway = !!m.runaway;
-  const localLiquid = !gas && !runaway && m.state !== 'liquid' && statsOcean !== null && statsOcean > 0 && openWater !== null && openWater > 0;
+  const canLiquid = m.canLiquid === true;
+  const localLiquid = !gas && !runaway && canLiquid && m.state !== 'liquid' && statsOcean !== null && statsOcean > 0 && openWater !== null && openWater > 0;
   let liquid = null as AirModel['liquid'];
   if (lavaWorld) liquid = liquidFor(fluid, true);
-  else if (!gas && !runaway && (m.state === 'liquid' || localLiquid)) liquid = liquidFor(fluid, false);
+  else if (!gas && !runaway && canLiquid && (m.state === 'liquid' || localLiquid)) liquid = liquidFor(fluid, false);
 
   // Ocean share (coordinator ruling 1): engine climate statistics, else the preset, else 0.
   let oceanF = 0;
@@ -172,7 +161,6 @@ export function buildAirModel(world: CardToWorldOk, e: WorldEngineLike): AirMode
       if (!(oceanF > 0)) {
         for (const s of ['S1_sea', 'S4', 'S5'] as const) refusals.push({ source: s, reason: REFUSAL_TEXT.noSea });
       }
-      if (m.canLiquid === false) refusals.push({ source: 'S6', reason: REFUSAL_TEXT.noRain });
       if (typeof hydro?.n === 'number' && hydro.n === 0) refusals.push({ source: 'S7', reason: REFUSAL_TEXT.noRivers });
     }
   }
@@ -201,6 +189,7 @@ export function buildAirModel(world: CardToWorldOk, e: WorldEngineLike): AirMode
   if (lavaWorld && airOK) {
     // R6: the lava world's thin rock-vapour air is assumed (cardToWorld ROCK_VAPOUR), so its sound carries that label.
     inputs.push({ label: 'Atmosphere', value: 'thin rock vapour (assumed)', unit: '', tag: 'inferred_from_analog', source: 'assumed atmosphere (Schaefer & Fegley 2009 analog)' });
+    inputs.push({ label: 'Sound absorption', value: 'CO₂-like (rock vapour analog)', unit: '', tag: 'inferred_from_analog', source: 'CO₂ class absorption for mu 44 (§4.3)' });
   }
   if (localLiquid && openWater !== null) {
     inputs.push({ label: 'Open water share', value: openWater, unit: '', tag: 'model_dependent', source: 'engine climate (stats.liquid)' });

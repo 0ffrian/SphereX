@@ -2,15 +2,19 @@
 // priority order. The params keys are exactly the #113 table (contract amendment 2, PARAM_KEYS below). Memory caps,
 // caching and loudness belong to #113's palette; this module returns every passing bed.
 import { absorption, kinematicViscosity } from './air';
+import { bedMembership, SOURCE_TEXT } from './captions';
+import { hash32 } from './hash';
 import { bubbleFactor, dropPhysics } from './liquids';
-import type { AirModel, BedSpec, Place, PlaceSample, Refusal, SourceId } from './types';
+import type { AirModel, BedSpec, Place, Refusal, SourceId } from './types';
 import {
-  A_L, A_P, A_T, A_W, BED_N, BED_RATE, CRUST_WEIGHT, HISS_D_M, IU_LAND, IU_SEA, L_REF, PM_H, PM_T, RE_MIN, RIVER_Q_REF,
+  A_L, A_P, A_T, A_W, BED_N, BED_RATE, HISS_D_M, IU_LAND, IU_SEA, L_REF, PM_H, PM_T, RE_MIN,
   ROSHKO_A, ROSHKO_B, ROSHKO_RE_MAX, SAND_A, SAND_CO2_COHESION, SAND_DP, SAND_RHO_ORGANIC, SAND_RHO_SILICATE,
   SAND_U10_PER_USTAR, SPEEDUP, GAS_IU, ST_HIGH, SURF_DB_H04, SURF_DB_H2, THUNDER_VARIANT_D_M, U_E_REF, U_REF_MIN,
   U_WAVE_METHANE, U_WAVE_WATER, WHISTLE_D_M, WHITECAP_A, WHITECAP_B, WHITECAP_MIN_U, WHITECAP_RATE0, WHITECAP_RATE_U,
 } from './tuning';
 import { lightningRule, thunderParams } from './weather';
+
+export { bedMembership, SOURCE_TEXT };
 
 /** §9.4 bake priority. */
 export const PRIORITY: readonly SourceId[] = ['S1_land', 'S1_sea', 'S4', 'S5', 'S6', 'S12', 'S2', 'S3', 'S7', 'S8', 'S10', 'S9', 'thunder'];
@@ -39,27 +43,6 @@ export const PARAM_KEYS: Record<SourceId, { req: readonly string[]; opt: readonl
   S12: { req: [], opt: ['Iu'] },
   thunder: { req: ['fm_Hz', 'dur_s', 'd_m', 'crack', 'absK2'], opt: [] },
 };
-
-/** New refusal strings (not in the spec; proposed as Q- entries for T1). */
-export const SOURCE_TEXT = {
-  whistle: 'The air is too thin for small stones to whistle.',
-  noWaves: 'The wind is too light to raise waves here.',
-  noSand: 'The wind never gets strong enough to lift sand here.',
-} as const;
-
-/**
- * FNV-1a 32-bit over the UTF-16 code units of parts.join('|'). A private copy of #113's `hash32` (hash.ts, owned by
- * #113, App. B): byte-identical algorithm; replace with the import when both PRs have merged.
- */
-function hash32(...parts: (string | number)[]): number {
-  const s = parts.join('|');
-  let h = 0x811c9dc5;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
-}
 
 /** Reynolds number of an obstacle of size d (m) at wind U (m/s) in the reference-level air. */
 export function reynolds(air: AirModel, U: number, d: number): number {
@@ -215,26 +198,6 @@ export function lrefEarthDb(id: SourceId, g = 9.81): number {
       return L_REF.gas;
     case 'thunder':
       return L_REF.thunder;
-  }
-}
-
-/** Ground-class membership of one sample for a bed (§11.1): 0/1, a rain weight, a discharge weight. */
-export function bedMembership(id: SourceId, s: PlaceSample, rainRate: number): number {
-  switch (id) {
-    case 'S4':
-      return s.coast ? 1 : 0;
-    case 'S5':
-      return s.cls === 'sea' || s.cls === 'lake' ? 1 : 0; // ASSUMPTION: lakes count as open water
-    case 'S6':
-      return Math.max(0, Math.min(3, s.rain / Math.max(rainRate, 1e-3)));
-    case 'S7':
-      return s.cls === 'river' ? Math.max(0, s.riverQ) / RIVER_Q_REF : 0;
-    case 'S8':
-      return s.cls === 'lava' ? 1 : s.cls === 'crust' ? CRUST_WEIGHT : 0;
-    case 'S10':
-      return s.cls === 'land' ? 1 : 0;
-    default:
-      return 1;
   }
 }
 

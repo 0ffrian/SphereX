@@ -114,3 +114,18 @@ describe('gas giants and airless worlds', () => {
     expect(windAt(a, 0, 0.8, ctx()).U10).toBe(0);
   });
 });
+
+describe('§6.5 item 6: the order of worlds', () => {
+  it('by wind speed: Titan-like gentle < Earth < Mars-like strong; locked terminator > substellar calm', () => {
+    // Test inputs: thermal-wind scales m.U of the order the engine gives (Titan ~10, Earth 66.8, Mars ~90 m/s).
+    const at = (U: number) => windAt(makeAir({ T0: 250, P0: 1e5, mu: 29, U }), 0, 0.8, ctx()).U10;
+    expect(at(10)).toBeLessThan(at(66.8));
+    expect(at(66.8)).toBeLessThan(at(90));
+    const locked = makeAir({ T0: 250, P0: 1.2e5, mu: 29, locked: true, U: 60 });
+    const S = substellar();
+    const lonS = Math.atan2(S[2], S[0]);
+    const latS = Math.asin(S[1]);
+    expect(windAt(locked, lonS + Math.PI / 2, 0, ctx()).U10).toBeGreaterThan(windAt(locked, lonS, latS, ctx()).U10);
+  });
+});
+

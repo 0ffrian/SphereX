@@ -13,6 +13,8 @@ export const P_FLOOR = 1;
 export const R_GAS = 8.314;
 /** P/V: ratio of specific heats by class [PA Q4]. N2_WET: water-rich N2 class (mu < 25) [verify NIST]; H2 [verify ortho/para below 170 K]. */
 export const GAMMA = { N2: 1.4, N2_WET: 1.33, CO2: 1.29, H2: 1.43 } as const;
+/** P/V: rock vapour on a lava world (§4.2) [verify: Schaefer & Fegley 2009 suggest 1.4-1.67]. */
+export const ROCK_VAPOUR_GAMMA = 1.4;
 /** §3.2 composition thresholds (g/mol). */
 export const MU_WET_BELOW = 25;
 export const CO2_MU_MIN = 40;

@@ -143,4 +143,27 @@ describe('buildAirModel', () => {
     expect(boiled.Vmax).toBeNull();
     expect(boiled.refusals).toContainEqual({ source: 'S5', reason: REFUSAL_TEXT.boiledAway });
   });
+
+  it('R7 amended: below the triple point (Earth slid to 500 Pa) the ice-free ocean is not liquid', () => {
+    const air = buildAirModel(
+      makeWorld({}, { Ps: 'measured' }),
+      makeFakeEngine({
+        model: { ...EARTH_MODEL, airless: true, canLiquid: false, state: 'frozen' },
+        state: { Ps: 0.005 },
+        climate: { stats: { ocean: 0.7, liquid: 1, max: 280 } },
+      }),
+    );
+    expect(air.airOK).toBe(true);
+    expect(air.liquid).toBeNull();
+    for (const s of ['S4', 'S5', 'S6', 'S7']) expect(air.refusals).toContainEqual({ source: s, reason: REFUSAL_TEXT.noLiquid });
+  });
+
+  it('review L7: the lava world rock vapour takes gamma 1.4 and labels its absorption as an analog', () => {
+    const lava = buildAirModel(
+      makeWorld({ id: 'lava', Ps: 0.005, mu: 44 }),
+      makeFakeEngine({ model: { ...EARTH_MODEL, airless: true, Ts: 1800, state: 'vapour', canLiquid: false }, state: { Ps: 0.005 }, hydro: { n: 0, lava: true } }),
+    );
+    expect(lava.gamma).toBe(1.4);
+    expect(lava.inputs.find((i) => i.label === 'Sound absorption')?.tag).toBe('inferred_from_analog');
+  });
 });

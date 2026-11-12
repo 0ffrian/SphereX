@@ -2,10 +2,10 @@
 // surface directivity), absorption filter and path pressure, world scaling, the one presentation offset, the §11.7 stage
 // window, snow shelf and pan. Pure and deterministic. The whole ambience is `artistic` (§2 rule 2).
 import type { Tag } from '@/contract';
-import { absorption, airAt, earthRef, lowpassHz, meanPathAir } from './air';
-import { caption } from './captions';
+import { absorption, airAt, bedWorldDb, earthRef, lowpassHz, meanPathAir } from './air';
+import { bedMembership, caption } from './captions';
 import {
-  bakeWind, bandCenterHz, bedMembership, isGroundBed, isHarmonicBed, PRIORITY, surfDb, uSand, wavesPM, whitecapFraction,
+  bakeWind, bandCenterHz, isGroundBed, isHarmonicBed, PRIORITY, surfDb, uSand, wavesPM, whitecapFraction,
 } from './sources';
 import type { AirModel, BedLevel, BedSpec, MixFrame, Place, PlaceSample, SourceId } from './types';
 import {
@@ -75,7 +75,8 @@ export function patternSamples(z_km: number, head = 0): { s_km: number; bearing:
 
 const irefCache = new Map<number, number>();
 /** I_ref: a full plane of members, listener at 2 m, Earth air, at band centre f (Hz). About 1/4 at low f. */
-export function iRef(f: number): number {
+export function iRef(fHz: number): number {
+  const f = Math.round(fHz); // bounded cache: keyed on whole Hz (review nit)
   const hit = irefCache.get(f);
   if (hit !== undefined) return hit;
   const z_km = REF_LISTENER_M / 1000;
@@ -147,6 +148,13 @@ function groundDriverDb(id: SourceId, air: AirModel, place: Place): number {
 }
 
 /** The wind (m/s) driving a flow bed: S1/S9/S12 at the listener (Uz), S2/S3 at the ground (U10) (ASSUMPTION, Q-). */
+/** The wind at the listener without the cyclone: the strongest non-hurricane part, scaled to the listener height. */
+function backgroundWind(place: Place): number {
+  const w = place.features.wind;
+  const bg = w.parts.filter((p) => p.kind !== 'hurricane').reduce((m, p) => Math.max(m, p.U), 0);
+  return w.U10 > 0 ? (bg * w.Uz) / w.U10 : 0;
+}
+
 function flowWind(id: SourceId, place: Place): number {
   const w = place.features.wind;
   if (id === 'S2' || id === 'S3') return w.U10;
@@ -208,7 +216,6 @@ export function mixFrame(
   const silent = !air.airOK || at.silent;
   const Gground = presentOffsetDb(air);
   const Gflow = flowOffsetDb(air, f.z_km);
-  const E = earthRef();
   const { P: Pm, T: Tm } = meanPathAir(air, f.z_km);
   const snowFalling = f.precipPhase === 'snow' ? Math.max(0, Math.min(1, f.rainRate / 1.5)) : 0; // ASSUMPTION
   const shelf = -SNOW_DB * Math.max(f.snowCover, snowFalling);
@@ -220,6 +227,7 @@ export function mixFrame(
   keys.sort((a, b) => PRIORITY.indexOf(a.id) - PRIORITY.indexOf(b.id) || a.variant - b.variant);
   const hasLand = keys.some((k) => k.id === 'S1_land');
   const hasSea = keys.some((k) => k.id === 'S1_sea');
+  const hasHurricane = keys.some((k) => k.id === 'S9') && (f.wind.parts.find((p) => p.kind === 'hurricane')?.U ?? 0) > 0;
 
   // Land/sea share of the area around the listener splits the two wind rumble variants (ASSUMPTION); when only one
   // variant is baked it takes the whole share (blue F4c).
@@ -266,29 +274,30 @@ export function mixFrame(
         cands.push(silentBed(id, variant));
         continue;
       }
-      const world = 10 * Math.log10(at.Z / E.Z); // ΔL_world + the listener-height term, combined (§11.3)
+      const world = bedWorldDb(air, f.z_km, id); // ΔL_world + the listener-height term, combined (§11.3)
       trueDb = drive + Lrel + broadband + world;
       lp = lowpassHz((fr) => absorption(fr, Pm, Tm, air.cls), area.dEff);
       pan = area.pan;
       shelfDb = shelf;
       G = Gground;
     } else {
-      const U = flowWind(id, place);
+      // Review L5: with the hurricane bed playing, the rumble carries only the background (non-cyclone) wind.
+      const U = (id === 'S1_land' || id === 'S1_sea') && hasHurricane ? backgroundWind(place) : flowWind(id, place);
       const share = id === 'S1_land' ? landShare : id === 'S1_sea' ? seaShare : 1;
       if (!(U >= FLOW_MIN_U) || !(share > 0)) {
         cands.push(silentBed(id, variant));
         continue;
       }
       if (id === 'S2' || id === 'S3') {
-        trueDb = L_REF.wind + L_REF.hissRel + 3 * db(U / U_E_REF) + db(at.rho / at.c / (E.rho / E.c));
+        trueDb = L_REF.wind + L_REF.hissRel + 3 * db(U / U_E_REF) + bedWorldDb(air, f.z_km, id);
         if (id === 'S3') trueDb += db(Math.max(f.exposure, 0));
         playbackRate = Math.max(0.7, Math.min(1.4, U / Math.max(Uref, 1e-6)));
       } else if (id === 'S12') {
         // §11.3 flow noise against Earth at the same reference wind (blue F6); I_u as baked (GAS_IU).
         const Iu = spec?.params.Iu ?? GAS_IU;
-        trueDb = L_REF.gas + 2 * db(U / U_E_REF) + db(at.rho / E.rho) + db(Iu / IU_LAND);
+        trueDb = L_REF.gas + 2 * db(U / U_E_REF) + bedWorldDb(air, f.z_km, id) + db(Iu / IU_LAND);
       } else {
-        trueDb = L_REF.wind + 2 * db(U / U_E_REF) + db(at.rho / E.rho) + db(f.wind.Iu / IU_LAND) + 10 * Math.log10(share);
+        trueDb = L_REF.wind + 2 * db(U / U_E_REF) + bedWorldDb(air, f.z_km, id) + db(f.wind.Iu / IU_LAND) + 10 * Math.log10(share);
       }
     }
     if (!Number.isFinite(trueDb)) {

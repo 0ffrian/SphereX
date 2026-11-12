@@ -4,6 +4,7 @@ import { buildAirModel } from './airModel';
 import { earthRef } from './air';
 import { EARTH_MODEL, makeFakeEngine, makeWorld } from './fakeEngine.testutil';
 import { earthAir, makeAir, makeFeatures, makePlace, makeWind, marsAir, titanAir } from './fakeEngine.testutil';
+import { hash32 } from './hash';
 import { bubbleFactor, dropPhysics } from './liquids';
 import {
   aeolianHz, BED_RATE_OF, gates, PARAM_KEYS, PRIORITY, reynolds, selectBeds, SOURCE_TEXT, strouhal, uSand, wavesPM,
@@ -88,6 +89,12 @@ describe('waves, whitecaps, sand', () => {
 function earthPlace(U10 = 8) {
   return makePlace(0.3, (s) => ({ cls: s.s_km > 1.5 ? 'sea' : 'land', coast: s.s_km > 1.5 }), { wind: makeWind({ U10, Uz: U10 }) });
 }
+
+describe('seeds use the shared hash (#113 hash.ts)', () => {
+  it('BedSpec.seed = hash32(seed, id, variant)', () => {
+    for (const b of selectBeds(earthAir(), earthPlace()).beds) expect(b.seed).toBe(hash32(101, b.id, b.variant));
+  });
+});
 
 describe('selectBeds', () => {
   it('Earth with a hurricane and lightning: every bed in §9.4 order, params exactly the #113 keys', () => {
