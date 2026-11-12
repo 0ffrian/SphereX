@@ -4611,3 +4611,26 @@ body {
     margin: 0 0 8px;
   }
 }
+
+/* R13.12 (#115): the spectrum chord's 12-note strip, short wavelengths on the left like the chart. */
+.sx-chord-strip {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: end;
+  gap: 3px;
+  height: 44px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--s2);
+}
+.sx-chord-strip i {
+  display: block;
+  min-height: 3px;
+  border-radius: 2px;
+  background: var(--p-phys);
+}
+.sx-chord-strip i[data-silent='true'] {
+  background: transparent;
+  outline: 1px solid var(--line);
+  outline-offset: -1px;
+}

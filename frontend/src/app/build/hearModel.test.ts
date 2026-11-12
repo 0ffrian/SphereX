@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pitchToHz, wavelengthToPitch } from '@/sound/pitch';
 import { cutoffHz, freqAt, howlHz, lamAt, loudness, SOUND_REF_MS, L0_UM, L1_UM } from './hearModel';
 
 describe('hearModel pure functions', () => {
@@ -26,15 +27,16 @@ describe('hearModel pure functions', () => {
     expect(lamAt(0)).toBe(L0_UM);
     expect(lamAt(1)).toBe(L1_UM);
   });
-  it('freqAt falls monotonically from 880 Hz to 110 Hz', () => {
-    expect(freqAt(0)).toBeCloseTo(880, 6);
-    expect(freqAt(1)).toBeCloseTo(110, 6);
+  it('freqAt follows pitch.ts (Q-446): 220 x 2^2.4 Hz at 0.75 um falling to 220 Hz at 5 um', () => {
+    for (const p of [0, 0.25, 0.5, 0.75, 1]) {
+      expect(freqAt(p)).toBeCloseTo(pitchToHz(wavelengthToPitch(lamAt(p))), 9);
+    }
+    expect(freqAt(0)).toBeCloseTo(220 * 2 ** 2.4, 6);
+    expect(freqAt(1)).toBeCloseTo(220, 6);
     let prev = Infinity;
     for (let i = 0; i <= 20; i++) {
       const f = freqAt(i / 20);
       expect(f).toBeLessThan(prev);
-      expect(f).toBeGreaterThanOrEqual(110 - 1e-9);
-      expect(f).toBeLessThanOrEqual(880 + 1e-9);
       prev = f;
     }
   });

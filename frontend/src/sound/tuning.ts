@@ -163,3 +163,34 @@ export const HARMONIC_MIX_DB = -12;
 export const HARMONIC_CURVE_POINTS = 1025;
 /** Engineering: Q of each high-pass / low-pass in the branch and of the bus high-pass (Butterworth). */
 export const BUTTERWORTH_Q = Math.SQRT1_2;
+
+// ---------------------------------------------------------------- spectrum chord (R13.12, Q-443, Q-446)
+
+/** SPEC R13.12 item 1: 12 equal-pitch bins over the Q-70 pitch range (equal-λ bins, pitch.ts is linear in λ). */
+export const CHORD_BINS = 12;
+/** SPEC R13.12 item 3: a 6 s seamless loop (every frequency on the 1/6 Hz grid). */
+export const CHORD_LOOP_S = 6;
+/** SPEC R13.12 item 3: 30 ms attack. */
+export const CHORD_ATTACK_S = 0.03;
+/** Engineering: release on stop, so it does not click. */
+export const CHORD_RELEASE_S = 0.06;
+/** SPEC R13.12 item 4: flux maps to level over this many dB. */
+export const CHORD_RANGE_DB = 30;
+/** SPEC R13.12 item 4: master about −18 dBFS RMS. [verify on the A15] (level against the sweep, R12) */
+export const CHORD_TARGET_RMS_DBFS = -18;
+/** SPEC R13.12 item 5: ISO 226 equal-loudness weights at this loudness level (phon). */
+export const CHORD_ISO_PHON = 60;
+/** SPEC R13.12 item 5: the loudness correction is capped at this boost (dB). [verify on the A15] */
+export const CHORD_ISO_CAP_DB = 6;
+/** SPEC R13.12 item 6: beat rate = MIN + SPAN·clamp(σ/flux, 0, 1) Hz, capped at MAX. */
+export const CHORD_BEAT_MIN_HZ = 2;
+export const CHORD_BEAT_SPAN_HZ = 4;
+export const CHORD_BEAT_MAX_HZ = 6;
+/** Depth of the beating (research §2.6 "capped at about 50 %"). CREATIVE placeholder — Atish to decide (D-13). */
+export const CHORD_BEAT_DEPTH = 0.5;
+/** Coordinator ruling (Q-446): Smooth = running median of log flux over this window (µm, centred). */
+export const CHORD_SMOOTH_WINDOW_UM = 0.5;
+/** Engineering (Q-446): linear A/B crossfade (s). */
+export const CHORD_AB_FADE_S = 0.15;
+/** Engineering: the seed of the partial and beat phases (determinism). Chosen from 1–12 for headroom: 12 equal partials peak at 0.47 (≤ −6 dBFS) at −18 dBFS RMS. */
+export const CHORD_SEED = 11;

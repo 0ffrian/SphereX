@@ -26,4 +26,14 @@
    - Never claim a weak band is audible: at SNR below 5, listeners were at chance (Tucker Brown et al. 2022).
    - The tag follows the spectrum: `measured` for SPHEREx.
 
+**As built in #115 (Q-446):** `frontend/src/sound/spectrumChord.ts` (`planChord`, `renderChord`, `SpectrumChord`), `sound/iso226.ts`, `sound/spectrumExclusive.ts`, and the panels' controls in `app/sound/ChordPlayer.tsx` and `app/sound/SpectrumSound.tsx`.
+- Bins come from the usable points inside each bin (mean normalised flux), never from interpolation: a bin with no usable point, or only flagged ones, is silent in both modes and listed as `chord.bin.<i>.no-data`. Notes sit at the bin centres, 235.8–1083 Hz, 240 cents apart (0.70 ERB at the bottom, 1.14 at the top), on the 1/6 Hz loop grid.
+- Quiet and the 30 dB range are measured against the **Data bin peak**, in both modes. One power normalisation (from Data) and one −18 dBFS RMS scale (from the Data render) apply to both buffers, so A/B changes only the bins that differ.
+- **Smooth** = the running median of log flux over a 0.5 µm window (shrunk symmetrically at the spectrum ends), binned like the data, labelled "smoothed data", tagged `derived` (the weaker of the spectrum's tag and `derived`). It is unavailable at Measured only, with the reason shown. It removes features narrower than about 0.25 µm and never adds a dip.
+- Noise: σ/flux per point, each capped at 1, averaged over the bin's points (per point, not σ/√n). Beating depth 0.5 (CREATIVE placeholder) with a seeded phase per note; a beating note's gain is raised by 1/√(mean e²) (+2.26 dB) so it is not quieter.
+- A/B: a linear 150 ms crossfade between two phase-locked looping buffers (the same phase per note). The loop is exact (integer phase). Seed 11 (12 equal notes peak at 0.47). Determinism within one JavaScript engine (Q-444); the tests pin a golden FNV-1a hash.
+- The duck goes through `holdDuck` with a safety timeout (6 s + 1 s), kept alive by a heartbeat while the context runs.
+- One spectrum sound at a time: the chord, the Listen sweep and the Hear it sweep stop each other, whoever starts them. The Hear it sweep now uses `pitch.ts` (220–1158 Hz, Q-446; its octave-up sine is timbre only). The sky tool's Spectrum panel gets Sweep | Chord (its sweep is the Listen sweep, with no gas chimes).
+- Not built: the 3-example tutorial (item 7; cut, post-event backlog). The ISO table and the A15 checks are R12 #62 and #63.
+
 **As built in #111:** item 2 only. `PITCH_RISES_WITH_WAVELENGTH = false` in `frontend/src/sound/tuning.ts`; `wavelengthToPitch(0.75 µm) = 1`, `wavelengthToPitch(5 µm) = 0`; the Listen sweep falls in pitch from short to long wavelengths; the Senses copy reads "Short wavelengths sound high, long wavelengths low. Brighter is louder." The chord is #115.

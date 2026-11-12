@@ -34,6 +34,13 @@ import {
   type ListenSweepOptions,
 } from './listenSweep';
 import { buildSpectrumMapping } from './spectrumMapping';
+import {
+  planChord,
+  SpectrumChord,
+  type ChordMode,
+  type ChordPlan,
+  type SpectrumChordOptions,
+} from './spectrumChord';
 
 /** A `/spectrum` reply: its points and its provenance tag (`measured` today; any tag is gated). */
 export type SpectrumReply = Pick<SpectrumResponse, 'spectrum'> & {
@@ -54,6 +61,15 @@ export type ListenOutcome =
   /** `stopListen`, unbind, a hidden page, or a honesty change cancelled it during the unlock. */
   | 'stopped';
 
+/** R13.12: what `chord` did. Same meanings as ListenOutcome. */
+export type ChordOutcome = ListenOutcome;
+
+/** The chord that plays: which panel started it and in which mode (R13.12, Q-446). */
+export interface ChordStatus {
+  owner: string;
+  mode: ChordMode;
+}
+
 /** An immutable snapshot: the same object until a field changes (for `useSyncExternalStore`). */
 export interface SoundStatus {
   unlocked: boolean;
@@ -61,6 +77,8 @@ export interface SoundStatus {
   muted: boolean;
   volume: number;
   listening: boolean;
+  /** The spectrum chord, or null when it is off. */
+  chord: ChordStatus | null;
 }
 
 export interface AppSound {
@@ -80,6 +98,21 @@ export interface AppSound {
   stopListen(): void;
   /** 0–1 through the sweep, or null when not playing. Polled per frame; not part of the status. */
   listenProgress(): number | null;
+  /**
+   * The chord plan for a `/spectrum` reply (cached per points array), or null when there is nothing
+   * to play. Pure: no sound, no unlock. Panels use it for the strip and to show the player.
+   */
+  chordPlan(reply: SpectrumReply): ChordPlan | null;
+  /**
+   * Play the spectrum chord (R13.12). Call from a click (the unlock runs before any await). `owner`
+   * names the panel ('hear', 'sky'), so each panel shows only its own chord as playing. Any sweep
+   * stops (one spectrum sound at a time, Q-446). Default mode `data`.
+   */
+  chord(reply: SpectrumReply, options: { owner: string; mode?: ChordMode }): Promise<ChordOutcome>;
+  /** A/B while the chord plays. False when the honesty state hides Smooth (`derived`) or nothing plays. */
+  setChordMode(mode: ChordMode): boolean;
+  /** Stop the chord; with `owner`, only when that panel started it. */
+  stopChord(owner?: string): void;
   getStatus(): SoundStatus;
   subscribe(listener: () => void): () => void;
   /**
@@ -93,6 +126,7 @@ export interface AppSound {
 export interface AppSoundOptions {
   engine?: SoundEngineOptions;
   sweep?: ListenSweepOptions;
+  chord?: SpectrumChordOptions;
 }
 
 function sameStatus(a: SoundStatus, b: SoundStatus): boolean {
@@ -101,7 +135,9 @@ function sameStatus(a: SoundStatus, b: SoundStatus): boolean {
     a.audio === b.audio &&
     a.muted === b.muted &&
     a.volume === b.volume &&
-    a.listening === b.listening
+    a.listening === b.listening &&
+    a.chord?.owner === b.chord?.owner &&
+    a.chord?.mode === b.chord?.mode
   );
 }
 
@@ -111,6 +147,10 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
   const { engine } = outputs;
   const sweep = new ListenSweep(options.sweep);
   const page = options.sweep?.page ?? DOCUMENT_PAGE;
+  const chord = new SpectrumChord(options.chord ?? options.sweep);
+  const plans = new WeakMap<object, { tag: SpectrumReply['tag']; plan: ChordPlan | null }>();
+  let chordOwner: string | null = null;
+  let chordRun = 0;
   const listeners = new Set<() => void>();
   let listenRun = 0;
   let cached: SoundStatus | null = null;
@@ -124,6 +164,9 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
       muted: !s.soundOn,
       volume: s.volume,
       listening: sweep.playing,
+      chord: chord.playing && chordOwner !== null && chord.mode !== null
+        ? { owner: chordOwner, mode: chord.mode }
+        : null,
     };
   };
   const getStatus = (): SoundStatus => {
@@ -138,6 +181,42 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
   };
   getStatus();
   sweep.onEnd = notify;
+  chord.onEnd = () => {
+    chordOwner = null;
+    notify();
+  };
+
+  const chordPlan = (reply: SpectrumReply): ChordPlan | null => {
+    const hit = plans.get(reply.spectrum);
+    if (hit && hit.tag === reply.tag) return hit.plan;
+    const plan = planChord(buildSpectrumMapping(reply.spectrum), { tag: reply.tag });
+    plans.set(reply.spectrum, { tag: reply.tag, plan });
+    return plan;
+  };
+
+  async function playChord(
+    reply: SpectrumReply,
+    opts: { owner: string; mode?: ChordMode },
+  ): Promise<ChordOutcome> {
+    const plan = chordPlan(reply);
+    if (plan === null) return 'nothing-to-play';
+    if (!getSoundSettings().soundOn) return 'sound-off';
+    const honesty = engine.honesty;
+    if (!isTagShown(honesty, plan.tag)) return 'hidden';
+    const token = ++chordRun;
+    // Synchronously, before any await: the unlock must run inside the click's user activation (Q-73).
+    const running = await unlock();
+    if (token !== chordRun || page.isHidden()) return 'stopped';
+    if (!getSoundSettings().soundOn) return 'sound-off';
+    if (!running || getAudioContext()?.state !== 'running') return 'no-audio';
+    listenRun++; // a sweep still waiting for its unlock must not start over the chord
+    if (chord.start(plan, opts.mode ?? 'data', engine.honesty)) {
+      chordOwner = opts.owner;
+      notify();
+      return 'playing';
+    }
+    return engine.honesty !== honesty ? 'stopped' : 'no-audio';
+  }
 
   const unlock = (): Promise<boolean> => {
     const p = engine.unlock();
@@ -167,6 +246,7 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
     // Synchronously, before any await: the unlock must run inside the click's user activation (Q-73).
     const running = await unlock();
     if (token !== listenRun || page.isHidden()) return 'stopped';
+    chordRun++; // a chord still waiting for its unlock must not start over the sweep
     if (!getSoundSettings().soundOn) return 'sound-off';
     if (!running || getAudioContext()?.state !== 'running') return 'no-audio';
     if (sweep.play(plan, engine.honesty)) {
@@ -187,6 +267,18 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
       sweep.stop();
     },
     listenProgress: () => sweep.progress(),
+    chordPlan,
+    chord: playChord,
+    setChordMode(mode) {
+      const ok = chord.setMode(mode);
+      notify();
+      return ok;
+    },
+    stopChord(owner) {
+      if (owner !== undefined && chordOwner !== null && owner !== chordOwner) return;
+      chordRun++;
+      chord.stop();
+    },
     getStatus,
     subscribe(fn) {
       listeners.add(fn);
@@ -211,7 +303,18 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
         useSoundSettings.subscribe(refresh),
         bindEngine(outputs),
         bindHonesty(engine, honesty.get, honesty.subscribe),
-        bindHonesty(sweep, honesty.get, honesty.subscribe),
+        // The spectrum sounds (sweep and chord) share one honesty subscription.
+        bindHonesty(
+          {
+            setHonesty: (st: HonestyState) => {
+              sweep.setHonesty(st);
+              chord.setHonesty(st);
+              notify();
+            },
+          },
+          honesty.get,
+          honesty.subscribe,
+        ),
         subscribeUnlockState(notify),
         useSoundSettings.subscribe(notify),
       ];
@@ -220,6 +323,8 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
         for (const u of undo) u();
         listenRun++;
         sweep.stop();
+        chordRun++;
+        chord.stop();
         engine.stop();
         notify();
       };

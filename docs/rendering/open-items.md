@@ -69,5 +69,7 @@ Every **[verify]** marker in the rendering spec has one row here. Numbers 1–18
 | 59 | Whether `hM` (lava sea height) is reachable from the `WorldEngine` wrapper | R13.4 | Atish | event | reading the engine |
 | 60 | Bake time and memory on the A15 (measured) | R13.7 | Atish | event | a timing log on the A15 |
 | 61 | Harmonic branch (+18 dB drive, tanh(3x), −12 dB mix) heard through the A15 speakers and the venue PA; the 35 Hz ambience high-pass and the −3 dB limiter by ear | R13.9 | Atish | event | a listening check with `sound-check.html` (#116) |
+| 62 | Spectrum chord ISO 226:2003 table (`sound/iso226.ts`, rows 200–1250 Hz, copied from Tackett's `iso226.m`) against the standard | R13.12 | Atish | event | ISO 226:2003 Table 1 |
+| 63 | Spectrum chord by ear on the A15 (and the venue PA): −18 dBFS RMS level against the sweep (no jump on Sweep ↔ Chord), the +6 dB ISO cap and roughness of the two lowest notes, no click on start, stop or A/B, the lowest notes present, the limiter quiet; render time of one chord (two 6 s loops) on the A15 under 100 ms | R13.12 | Atish | event | a listening check and a timing log |
 
 **Removed (resolved):** the "name [verify]" markers on `viewer/renderers/ShaderBody.ts` and `viewer/fields/fieldWorker.ts` (both files exist), and the self-signed certificate step for phones (moot for the event, Q-132; R11.3 keeps the phone procedure for after the event).
