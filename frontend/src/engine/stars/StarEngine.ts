@@ -12,6 +12,10 @@
 // three stacked canvases (the surface, the plasma, the lines); the other mode's canvases are inert.
 // Everything is a function of the star, the step count and the step size: no wall clock except the
 // prototype's own adaptive resolution.
+//
+// Issue #93 W1: the star program compiles in the background (deviation 8 in protoStar1.js; `whenReady`), the surface
+// close-up (`surface: true`) keeps only its surface canvas (its plasma and lines can only be black there), and the
+// other mode's inert canvases no longer log "no webgl2".
 import S1 from './protoStar1.js?raw';
 import S2 from './protoStar2.js?raw';
 import S3 from './protoStar3.js?raw';
@@ -36,7 +40,22 @@ export interface StarOptions {
   reducedMotion?: boolean;
   /** Default 'true colour' (0): the star's own colour. */
   light?: StarLight;
+  /**
+   * Issue #93 W1 (render notes 0.5): the star's surface close-up (globe mode, always the `close` scale). Its plasma and
+   * line canvases are inert, as the other mode's are: the prototype draws neither in the close-up (drawOverlay returns
+   * before them), so this drops their WebGL 2 context, 3 render targets and about 5 passes a frame, and the picture is
+   * unchanged. Not for a stage whose scale can change.
+   */
+  surface?: boolean;
 }
+
+/** How often a disposed engine checks whether its shader has finished compiling (UI pacing, ms). */
+export const STAR_DISPOSE_POLL_MS = 100;
+/**
+ * Longest a disposed engine waits for a compile still running (ms). After it the engine stops polling and leaves the
+ * context to the browser without `loseContext()`, which would block on that compile (as WorldEngine does).
+ */
+export const STAR_DISPOSE_MAX_WAIT_MS = 120_000;
 export interface FlareState {
   kind: FlareKind;
   cls: FlareClass;
@@ -108,8 +127,11 @@ class Stub {
   }
 }
 
-/** An inert canvas: it takes 2D drawing (the prototype's overlays need a context) but offers no GL. */
-function inertCanvas(): HTMLCanvasElement {
+/**
+ * An inert canvas: it takes 2D drawing (the prototype's overlays need a context) but offers no GL. `onNoGL` is called
+ * when the prototype asks it for a GL context, just before the prototype throws (and logs) its "no webgl2".
+ */
+function inertCanvas(onNoGL: () => void = () => {}): HTMLCanvasElement {
   const c = document.createElement('canvas');
   const get = c.getContext.bind(c);
   const proxy = {
@@ -117,10 +139,17 @@ function inertCanvas(): HTMLCanvasElement {
     clientHeight: 0,
     width: 0,
     height: 0,
-    getContext: (t: string) => (t === '2d' ? get('2d') : null),
+    getContext: (t: string) => {
+      if (t === '2d') return get('2d');
+      onNoGL();
+      return null;
+    },
   };
   return proxy as unknown as HTMLCanvasElement;
 }
+
+/** The prototype's error when a canvas gives no WebGL 2 context (StarGL and PlasmaGL). */
+const NO_GL = 'no webgl2';
 
 /** The prototype's notes ("How each part is worked out"), formulas and the placeholders line unchanged. */
 const NOTE_STAR: BuildNote = {
@@ -157,6 +186,8 @@ interface Inside {
   FL: { kind: FlareKind; cls: FlareClass; t: number; playing: boolean };
   vis: { star: boolean; flare: boolean };
   hasGL: () => { star: boolean; flare: boolean };
+  poll: () => boolean;
+  pending: () => boolean;
   model: () => { groups: unknown[]; conv: number };
   setStar(p: StarPreset): void;
   setLight(id: number): void;
@@ -288,6 +319,8 @@ function cuAuto() {
 return {
   ST: ST, FL: FL, vis: vis,
   hasGL: function () { return { star: !!starGL, flare: !!flareGL }; },
+  poll: function () { var g = MODE === 'globe' ? starGL : flareGL; return g ? g.poll() : false; },
+  pending: function () { return !!(starGL && starGL.pending()) || !!(flareGL && flareGL.pending()); },
   lines: function () { return SHOW_LINES; },
   model: function () { return MODEL; },
   setStar: function (p) { ST.p = p; ST.P = p.P; refreshStar(); drawStar(); },
@@ -329,6 +362,8 @@ export class StarEngine {
   private readonly inside: Inside;
   private readonly lines = new Stub();
   private disposed = false;
+  private isReady = false;
+  private readyP: Promise<void> | null = null;
   private zoomK = 1;
 
   constructor(host: HTMLElement, opts: StarOptions) {
@@ -343,6 +378,7 @@ export class StarEngine {
         }
       })();
     const prefix = opts.mode === 'globe' ? 'star' : 'flare';
+    const surface = opts.mode === 'globe' && !!opts.surface;
     const layer = (id: string, blend: boolean, label?: string) => {
       const c = document.createElement('canvas');
       c.style.cssText = `position:absolute;inset:0;width:100%;height:100%;display:block;${blend ? 'mix-blend-mode:screen;pointer-events:none;' : ''}`;
@@ -354,21 +390,31 @@ export class StarEngine {
       this.canvases.push(c);
       return [id, c] as const;
     };
-    const live = new Map<string, HTMLCanvasElement>([
-      layer(`#${prefix}-c`, false),
-      layer(`#${prefix}-p`, true),
-      layer(
-        `#${prefix}-o`,
-        true,
-        opts.mode === 'globe'
-          ? 'Live simulated star with magnetic loops and flares rising from its spot groups'
-          : 'Simulated flare at the edge of the star',
-      ),
-    ]);
+    const live = new Map<string, HTMLCanvasElement>(
+      surface
+        ? [layer('#star-c', false, 'Simulated close-up of the star’s surface')]
+        : [
+            layer(`#${prefix}-c`, false),
+            layer(`#${prefix}-p`, true),
+            layer(
+              `#${prefix}-o`,
+              true,
+              opts.mode === 'globe'
+                ? 'Live simulated star with magnetic loops and flares rising from its spot groups'
+                : 'Simulated flare at the edge of the star',
+            ),
+          ],
+    );
+    // The prototype logs "no webgl2" for every inert canvas it asks for GL (the other mode's, and the surface
+    // close-up's plasma): expected here, so dropped. A live canvas with no GL still logs.
+    let inertAsked = 0;
+    const askedInert = () => {
+      inertAsked++;
+    };
     const $ = (sel: string): unknown => {
       const c = live.get(sel);
       if (c) return c;
-      if (/^#(star|flare)-[cpo]$/.test(sel)) return inertCanvas();
+      if (/^#(star|flare)-[cpo]$/.test(sel)) return inertCanvas(askedInert);
       let s = this.els.get(sel);
       if (!s) this.els.set(sel, (s = new Stub()));
       return s;
@@ -380,7 +426,13 @@ export class StarEngine {
     // The slices' own `console.log` chatter is dropped; errors and warnings reach the real console so a
     // failure inside the prototype code (a shader that will not compile, a missing element) is never silent.
     const quiet = {
-      error: (...a: unknown[]) => console.error('[star engine]', ...a),
+      error: (...a: unknown[]) => {
+        if (inertAsked > 0 && a.length === 1 && a[0] instanceof Error && a[0].message === NO_GL) {
+          inertAsked--;
+          return;
+        }
+        console.error('[star engine]', ...a);
+      },
       warn: (...a: unknown[]) => console.warn('[star engine]', ...a),
       log: () => {},
     };
@@ -439,10 +491,53 @@ export class StarEngine {
     else this.inside.draw();
   }
 
-  /** True when this mode's canvases got WebGL 2 (else the caller keeps its fallback). */
-  get ready(): boolean {
+  /** True when this mode's surface canvas got WebGL 2 (else the caller keeps its fallback). Its shader may still be compiling. */
+  get supported(): boolean {
     const g = this.inside.hasGL();
     return this.mode === 'globe' ? g.star : g.flare;
+  }
+
+  /** True once the star program is compiled and linked, so the engine draws (never waits for the driver). */
+  get ready(): boolean {
+    try {
+      return this.pollReady();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Issue #93 W1 (B7): true once the star program is linked. Never waits for the driver (KHR_parallel_shader_compile;
+   * without the extension it links at once, which waits as the prototype did). Throws the compile or link log.
+   */
+  pollReady(): boolean {
+    if (!this.isReady && !this.disposed) this.isReady = this.inside.poll();
+    return this.isReady;
+  }
+
+  /**
+   * Resolves when the star program is linked, checking every 16 ms so the page keeps running meanwhile, and draws the
+   * star once then. Rejects with the compile or link log, when this mode has no WebGL 2, or on dispose.
+   */
+  whenReady(): Promise<void> {
+    if (!this.readyP)
+      this.readyP = new Promise<void>((resolve, reject) => {
+        const check = () => {
+          if (this.disposed)
+            return reject(new Error('star engine disposed before its shader was ready'));
+          if (!this.supported) return reject(new Error('this browser gave the star no WebGL 2'));
+          try {
+            if (this.pollReady()) {
+              this.inside.draw();
+              resolve();
+            } else setTimeout(check, 16);
+          } catch (err) {
+            reject(err instanceof Error ? err : new Error(String(err)));
+          }
+        };
+        check();
+      });
+    return this.readyP;
   }
 
   setStar(preset: StarPreset): void {
@@ -628,19 +723,45 @@ export class StarEngine {
     if (!this.disposed) this.inside.draw();
   }
 
+  /**
+   * Release the GL contexts. Issue #93 W1 (B7): `loseContext()` waits for a shader compile still running in the
+   * driver, so while the star program is still compiling the contexts are released once the driver reports it done
+   * (polled every STAR_DISPOSE_POLL_MS, never blocking). After STAR_DISPOSE_MAX_WAIT_MS the engine gives up without
+   * calling `loseContext()`; the browser reclaims the contexts with the detached canvases. The canvases leave the page
+   * at once.
+   */
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    for (const c of this.canvases) {
-      for (const t of ['webgl2'] as const)
+    const canvases = [...this.canvases];
+    this.canvases.length = 0;
+    for (const c of canvases) c.remove();
+    const lose = () => {
+      for (const c of canvases)
         try {
-          c.getContext(t)?.getExtension('WEBGL_lose_context')?.loseContext();
+          c.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();
         } catch {
           /* context already gone */
         }
-      c.remove();
-    }
-    this.canvases.length = 0;
+    };
+    const pending = (): boolean => {
+      try {
+        return this.inside.pending();
+      } catch {
+        return false;
+      }
+    };
+    const t0 = Date.now();
+    const tryLose = () => {
+      if (!pending()) lose();
+      else if (Date.now() - t0 < STAR_DISPOSE_MAX_WAIT_MS)
+        setTimeout(tryLose, STAR_DISPOSE_POLL_MS);
+      else if (import.meta.env.DEV)
+        console.warn(
+          'star engine: shader still compiling after dispose; context left to the browser',
+        );
+    };
+    tryLose();
   }
 
   private el(sel: string): Stub {

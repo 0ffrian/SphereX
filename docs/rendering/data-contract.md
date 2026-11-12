@@ -1,6 +1,6 @@
 # Data contract: TV, ObjectCard, RenderParams
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1, R3.2, R3.4 (R3.3 in [type-selection.md](type-selection.md)) · **Implements:** [D-02, D-32](../decisions/contract-tags.md), [D-04, D-16, D-18, D-23, Q-33, Q-35, Q-36](../decisions/contract.md), [D-01, Q-285](../decisions/rendering-bodies.md), [Q-221, Q-327](../decisions/pipeline-stages.md), [Q-117](../decisions/rendering-layers.md), [D-12](../decisions/haptics-design.md) · **Read with:** [type-selection.md](type-selection.md) (R3.3), [surface-generation.md](surface-generation.md) (R6.2), [display-rules.md](display-rules.md) (R5.2, R5.7)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R3, R3.1, R3.2, R3.4 (R3.3 in [type-selection.md](type-selection.md)) · **Implements:** [D-02, D-32](../decisions/contract-tags.md), [D-04, D-16, D-18, D-23, Q-33, Q-35, Q-36, Q-363](../decisions/contract.md), [Q-359, Q-374 to Q-376, Q-379](../decisions/physics-fixes.md), [D-01, Q-285](../decisions/rendering-bodies.md), [Q-221, Q-327](../decisions/pipeline-stages.md), [Q-117](../decisions/rendering-layers.md), [D-12](../decisions/haptics-design.md) · **Read with:** [type-selection.md](type-selection.md) (R3.3), [surface-generation.md](surface-generation.md) (R6.2), [display-rules.md](display-rules.md) (R5.2, R5.7)
 
 ## R3. Data contract
 
@@ -59,8 +59,9 @@ interface ObjectCard {
   ch4_depth_33?: TV; flux_45um?: TV;  // brown dwarfs
   teff_K?: TV;                        // stars (Q-152): SIMBAD mesFe_h median → 'derived'; else Gaia GSP-Phot (> 4000 K only) →
                                       // 'model_dependent'; else a main-sequence class table → 'inferred_from_analog'; else null
-  teq_K?: TV;                         // planet equilibrium temperature (D-12): Exoplanet Archive pl_eqt → 'measured',
-                                      // otherwise 'derived' (architecture spec §7.1). null → teq_pulse refused, listed in missing
+  teq_K?: TV;                         // planet equilibrium temperature (D-12): Exoplanet Archive pl_eqt → 'derived' with its
+                                      // formula and albedo assumption (issue #93, Q-359; it was 'measured'), otherwise 'derived'
+                                      // (architecture spec §7.1). null → teq_pulse refused, listed in missing
   // exoplanet orbit, mass and host star (issue #68, Q-150), from the Exoplanet Archive row (A3.8):
   mass_mearth?: TV;                   // 'measured' only when pl_bmassprov = 'Mass'; 'Msini' is a lower limit (model_dependent);
                                       // 'M-R relationship' (Chen & Kipping 2017) is model_dependent; 'Msin(i)/sin(i)' is derived
@@ -68,6 +69,22 @@ interface ObjectCard {
   host_teff_K?: TV; host_radius_rsun?: TV; host_mass_msun?: TV; host_age_gyr?: TV;
                                       // a measured column cites its *_reflink; a CALCULATED_VALUE is never 'measured'; a missing
                                       // value is null with the reason in `source`
+  orbit_ecc?: TV;                     // issue #93 A: pl_orbeccen → 'measured'; e = 0 with no error (a fit fixed to a circle)
+                                      // → 'model_dependent'; a nonzero pl_orbeccenlim (a limit) → 'model_dependent', no err
+                                      // (Q-376). The world engine's eccentricity (seasons, tides, mean flux)
+  insolation_searth?: TV;             // issue #93 B: pl_insol, S/S_earth → 'derived' (the paper computed it from L and a)
+  host_lum_lsun?: TV;                 // issue #93 B: 10^st_lum → 'measured'. The world engine's starlight (Q-375): from
+                                      // insolation_searth first (L = S a^2), else this, else host_radius_rsun; R_star is set
+                                      // to sqrt(L) (5772/T)^2; the two differing by > 5 % is a `mismatches` line
+  dayside_temp_K?: TV; nightside_temp_K?: TV; hotspot_offset_deg?: TV;
+                                      // issue #93 C: eclipse / phase-curve brightness temperatures (K) and hotspot offset
+                                      // (deg, + east), literature registry only; the band is in `source`. Not engine inputs.
+                                      // Shown as readouts (below the block, Q-379)
+  // stars (issue #93 B, C)
+  lum_lsun?: TV; mass_msun?: TV;      // Gaia FLAME lum_flame, mass_flame → 'model_dependent' (as radius_flame), else null.
+                                      // lum_lsun is shown, not a star-engine input (the turnover time uses R and T, Q-374)
+  flare_rate_per_d?: TV;              // literature registry; band and threshold in `source`. Rung 1 of the flare rate (R5.7)
+                                      // star rot_period_h: literature registry → 'measured' (else the Sun's Rossby number)
   component_teff_K?: TV<[number, number]>;  // brown_dwarf_binary only: Teff of body A then B (literature registry, Q-154)
   // surface of a world (issue #71, Q-285): measured only for a reference body (Titan: Huygens HASI, Cassini radar);
   // read by the confidence score (Q-327) and the world adapters; absent on exoplanet cards
@@ -89,6 +106,18 @@ interface ObjectCard {
   pm_mas_yr?: TV<[number, number]>;
 }
 ```
+
+**Eclipse and phase-curve readouts (issue #93 A10, Q-379).** For a planet card, `measuredReadouts` (`engine/worlds/cardToWorld.ts`) turns `dayside_temp_K`, `nightside_temp_K` and `hotspot_offset_deg` into readouts. `ViewerPanel` lists them at the honesty levels their tags allow (`planet-measured`), each with its tag badge, and the world engine's panel also lists them at + Artistic. A null value is not shown.
+
+| Field | Label | Value text |
+|---|---|---|
+| `dayside_temp_K` | "Day side (brightness temperature)"; "Hot-spot hemisphere (brightness temperature)" when the registry note contains "hot-spot hemisphere" (55 Cnc e, Q-377) | "1192 ± 9 K at 4.5 µm" |
+| `nightside_temp_K` | "Night side (brightness temperature)" | the same form |
+| `hotspot_offset_deg` | "Hottest point" | "20.1 ± 5.5° east of noon at 4.5 µm" (west for a negative value) |
+
+- The label never says "measured": the tag badge says how the value is known.
+- The band ("at 4.5 µm") is read from the band named in `source`; with no band in `source` it is left out.
+- The list follows the honesty toggle like any other value (Q-379, decided by Atish, 12 Nov 2026): a `measured` readout shows from Measured only, a `derived` one (HD 189733 b's offset) from + Estimated.
 
 ### R3.4 RenderParams (produced by the backend: `GET /v1/objects/{id}/render-params`)
 

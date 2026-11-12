@@ -18,7 +18,8 @@ from urllib.parse import quote
 import pytest
 from fastapi.testclient import TestClient
 
-from app.cache.store import ReadThroughCache
+from app.adapters import gaia
+from app.cache.store import CacheMissOffline, ReadThroughCache
 from app.core.card.assets import Asset, AssetStore
 from app.core.card.service import ObjectPipeline, ObjectResult
 from app.core.find.resolver import ResolvedObject, load_object, save_object
@@ -118,6 +119,24 @@ def test_pack_answers_when_the_live_build_loses_the_catalogue(
     assert card_r.headers["X-SX-Asset-Status"] == "saved"
     assert card_r.json() == doc["card"] and params_r.json() == doc["render_params"]
     assert bakes == []
+
+
+def test_pack_answers_when_the_live_build_loses_gaia(
+    fixture_cache: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Issue #93 C1: offline with no cached Gaia cone, the live build of Barnard's star keeps its
+    spectrum and the type ``star`` but loses its Gaia values (``star_catalogue`` in `missing`).
+    That degraded card must not replace the pack's full catalogue card."""
+
+    def gaia_miss(*_: Any, **__: Any) -> NoReturn:
+        raise CacheMissOffline("gaia cone not cached")
+
+    monkeypatch.setattr(gaia, "astro_near", gaia_miss)
+    with TestClient(create_app(make_settings(fixture_cache, assets_dir=PACK))) as c:
+        oid = resolve_id(c, "Barnard's star")
+        card_r, params_r = get_both(c, oid)
+    assert card_r.headers["X-SX-Asset-Status"] == "saved", params_r.json()["missing"]
+    assert params_r.json() == pack_params("star", oid)
 
 
 def test_pack_answers_when_nothing_is_measured(

@@ -53,6 +53,8 @@ async function load(c: ParityCase): Promise<void> {
     'px;';
   document.body.appendChild(canvas);
   engine = new WorldEngine(canvas, { preserveDrawingBuffer: true });
+  // Issue #93: let the shaders compile in the background instead of waiting inside setPreset.
+  await engine.whenReady();
   engine.playing = false;
   engine.setPreset(preset);
   engine.spinUp(1 / 60, true);

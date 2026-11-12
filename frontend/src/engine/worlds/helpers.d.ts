@@ -8,3 +8,11 @@ export function planckRGB(T: number): [number, number, number];
 export const LMIN: number;
 export const LMAX: number;
 export const LUT: Uint8Array;
+export interface CompileJob {
+  p: WebGLProgram;
+  vs: WebGLShader;
+  fs: WebGLShader;
+}
+export function compileStart(gl: WebGL2RenderingContext, vs: string, fs: string): CompileJob;
+export function compileDone(gl: WebGL2RenderingContext, job: CompileJob, ext: unknown): boolean;
+export function compileEnd(gl: WebGL2RenderingContext, job: CompileJob): WebGLProgram;

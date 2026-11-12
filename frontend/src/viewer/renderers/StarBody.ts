@@ -64,6 +64,8 @@ export class StarBody {
   private readonly mat: StarMaterial;
   private readonly loops: LoopMesh[] = [];
   private readonly geometry: SphereGeometry;
+  /** The star's sphere with the surface shader (issue #93 W1: the close-up caches its picture). */
+  readonly sphere: Mesh;
   private readonly glow: Sprite | null = null;
   /** Issue #71 stream G: flares and plasma along the physical spot groups (null: old look). */
   readonly plasma: StarPlasma | null = null;
@@ -99,7 +101,8 @@ export class StarBody {
         : undefined,
     });
     this.geometry = new SphereGeometry(1, o.segments[0], o.segments[1]);
-    this.spin.add(new Mesh(this.geometry, this.mat.material));
+    this.sphere = new Mesh(this.geometry, this.mat.material);
+    this.spin.add(this.sphere);
 
     if (star.plasma && star.physics) {
       this.plasma = new StarPlasma({
