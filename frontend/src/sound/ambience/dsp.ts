@@ -45,7 +45,17 @@ export class BakeRefusedError extends Error {
   }
 }
 
-/** Required `params` keys per source (the frozen App. D table; plan v1 §4). */
+/**
+ * Required `params` keys per source: the frozen App. D table (plan v1 §4), which #112 fills. Notes for #112 and #116:
+ * - `spec.Uref` shapes the sound only for S1 and S9 (the top of the rumble band, 40 + 5·Uref Hz). For every other bed it
+ *   is cache identity only.
+ * - thunder `d_m` and `absK2` are validated but unused: thunder has no echo response (plan v2 item 3), and distance
+ *   absorption is applied live. The keys stay required because the table is frozen.
+ * - Gain 1 means −24 LUFS integrated (BED_LUFS) for a loop bed, and a −16 dBFS peak (ONE_SHOT_PEAK_DBFS, a 70 dB
+ *   L_TARGET peak) for a one-shot. A one-shot's `BakeResult.lufs` is informational: do not re-normalise by it.
+ * - `variant`: thunder 0–3 (0, 1 near with a crack; 2, 3 far rolls), S8 1 = vent burst one-shot, all others 0.
+ * `checkSpec` applies these rules, so a contract test can import them instead of copying them.
+ */
 export const REQUIRED_PARAMS: Record<SourceId, readonly string[]> = {
   S1_land: ['Iu'],
   S1_sea: ['Iu'],
@@ -68,9 +78,16 @@ export const OPTIONAL_PARAMS: Partial<Record<SourceId, readonly string[]>> = {
   S12: ['Iu'],
 };
 /** Keys that may be zero (all others must be > 0). */
-const ZERO_OK = new Set(['Iu', 'whitecapRate_per_s', 'absK2', 'crack', 'd_m']);
+export const ZERO_OK: ReadonlySet<string> = new Set([
+  'Iu',
+  'whitecapRate_per_s',
+  'absK2',
+  'crack',
+  'd_m',
+]);
 
-const VARIANTS: Record<SourceId, number> = {
+/** Number of variants per source (see REQUIRED_PARAMS). */
+export const VARIANTS: Record<SourceId, number> = {
   S1_land: 1,
   S1_sea: 1,
   S2: 1,
@@ -96,10 +113,12 @@ function okNumber(key: string, v: unknown): v is number {
   return ZERO_OK.has(key) ? v >= 0 : v > 0;
 }
 
-function validate(spec: BedSpec, air: AirModel): void {
+/** Every reason `bakeBed` would refuse this spec before baking (empty = bakeable). Pure; the palette uses it to keep
+ * an invalid spec out of the memory budget. */
+export function checkSpec(spec: BedSpec, air: AirModel): string[] {
   const missing: string[] = [];
   const nVariants = VARIANTS[spec.id];
-  if (nVariants === undefined) throw new BakeRefusedError(spec.id, spec.variant, ['id']);
+  if (nVariants === undefined) return ['id'];
   if (!Number.isInteger(spec.variant) || spec.variant < 0 || spec.variant >= nVariants)
     missing.push('variant');
   const N = spec.N;
@@ -122,8 +141,19 @@ function validate(spec: BedSpec, air: AirModel): void {
   }
   if (spec.id === 'S4' && !(air.c0 > 0)) missing.push('air.c0');
   if ((spec.id === 'S4' || spec.id === 'S5') && !(air.gv > 0)) missing.push('air.gv');
+  if (!missing.length && isOneShot(spec.id, spec.variant)) {
+    // A one-shot sets its own FFT size: keep it at or below 2^21 (64 MB of scratch).
+    if (nextPow2(bakedLength(spec)) > MAX_FFT) missing.push('sampleRate (one-shot too long)');
+  }
+  return missing;
+}
+
+function validate(spec: BedSpec, air: AirModel): void {
+  const missing = checkSpec(spec, air);
   if (missing.length) throw new BakeRefusedError(spec.id, spec.variant, missing);
 }
+
+const MAX_FFT = 1 << 21;
 
 // ---------------------------------------------------------------------------------------------------------------
 // FFT (Moon's radix-2, twiddles cached per size) and scratch buffers
@@ -150,6 +180,8 @@ function getTables(n: number): Tables {
   const bits = Math.round(Math.log2(n));
   for (let i = 1; i < n; i++) rev[i] = (rev[i >> 1]! >> 1) | ((i & 1) << (bits - 1));
   const t = { c, s, rev };
+  // Keep the two most recent sizes (a loop size and a one-shot size).
+  if (tables.size >= 2) tables.delete(tables.keys().next().value!);
   tables.set(n, t);
   return t;
 }
@@ -200,6 +232,12 @@ interface Scratch {
   aim: Float64Array;
 }
 const scratch = new Map<number, Scratch>();
+
+/** Frees the FFT tables and scratch buffers (about 45 MB at 2^20). The main-thread fallback calls it after its bake. */
+export function releaseBakeCaches(): void {
+  tables.clear();
+  scratch.clear();
+}
 function getScratch(n: number): Scratch {
   let s = scratch.get(n);
   if (!s) {
@@ -237,6 +275,8 @@ for (let i = 0; i < PHASES; i++) {
 export interface Comp {
   gain: number;
   shape: (f: number) => number;
+  /** Shape-table step for narrow components (Hz); default SHAPE_STEP_HZ. */
+  stepHz?: number;
 }
 
 interface Bake {
@@ -269,7 +309,8 @@ export function noiseMulti(b: Bake, comps: Comp[], rnd: () => number, fmax: numb
   im.fill(0);
   const fTop = Math.min(fmax, K.NYQ_GUARD * sr);
   const kmax = Math.min(n / 2 - 1, Math.floor((fTop * n) / sr));
-  const STEP = Math.max(1, Math.round((K.SHAPE_STEP_HZ * n) / sr));
+  const stepHz = Math.min(K.SHAPE_STEP_HZ, ...comps.map((c) => c.stepHz ?? K.SHAPE_STEP_HZ));
+  const STEP = Math.max(1, Math.round((stepHz * n) / sr));
   const S = comps.map(() => 0);
   for (let k = STEP; k <= kmax; k += STEP) {
     const f = (k * sr) / n;
@@ -730,7 +771,9 @@ function bakeS3(b: Bake, spec: BedSpec): void {
     }
     return s;
   };
-  bakeWind(b, spec, K.WHISTLE_ENV_POW, [{ gain: 1, shape }], 1.3 * Math.max(...tones));
+  // A narrow tone (σ = f0/(2.355·Q), under 1 Hz below ~59 Hz) needs a finer table so Q ≈ 25 holds.
+  const stepHz = Math.min(...tones) / (2.355 * K.WHISTLE_Q) / 4;
+  bakeWind(b, spec, K.WHISTLE_ENV_POW, [{ gain: 1, shape, stepHz }], 1.3 * Math.max(...tones));
 }
 
 function surfWaves(b: Bake, spec: BedSpec, air: AirModel) {
@@ -853,7 +896,9 @@ function bakeS6(b: Bake, spec: BedSpec): void {
   mixEnv(b, gustEnvelope(gustNoise(b.M, rng(b, 'wander')), K.RAIN_ENV_DEPTH, 1));
   // Patter: short clicks, so a sample-rate envelope (a 4 ms control step would smear them).
   const r = rng(b, 'patter');
-  const np = Math.round(K.RAIN_PATTER_PER_S * b.T * p3);
+  const npRaw = Math.round(K.RAIN_PATTER_PER_S * b.T * p3);
+  const np = Math.min(K.RAIN_PATTER_MAX, npRaw);
+  if (np < npRaw) b.notes.push(`rain patter capped at ${np} of ${npRaw} events`);
   if (np > 0) {
     const pat: Ev[] = [];
     for (let i = 0; i < np; i++)
@@ -1012,7 +1057,14 @@ function bakeThunder(b: Bake, spec: BedSpec, dur: number): void {
   // Event times are peak times (Moon's convention), so each onset (t − rise) is at or after the pad.
   const rollRise = Math.min(0.5, 0.1 * dur);
   const evs: Ev[] = [
-    { t: pad + 0.012, amp: 1, rise: 0.012, tau: near ? 0.45 : 0.8 },
+    near
+      ? { t: pad + 0.012, amp: 1, rise: 0.012, tau: 0.45 }
+      : {
+          t: pad + K.THUNDER_FAR_RISE_S,
+          amp: K.THUNDER_FAR_AMP,
+          rise: K.THUNDER_FAR_RISE_S,
+          tau: 0.8,
+        },
     { t: pad + 0.1 + rollRise, amp: 0.5, rise: rollRise, tau: dur / 5, end: dur },
   ];
   const nSub = 5 + Math.round(dur / 2);
@@ -1084,7 +1136,9 @@ export interface BakeOutput {
   peakDbfs: number;
 }
 
-const nextPow2 = (x: number) => 1 << Math.ceil(Math.log2(Math.max(2, x)));
+function nextPow2(x: number): number {
+  return 2 ** Math.ceil(Math.log2(Math.max(2, x)));
+}
 
 /** One-shot content length in seconds (thunder: `dur_s` capped at THUNDER_MAX_S; vent: VENT_DUR_S). */
 function oneShotDur(spec: BedSpec): number {

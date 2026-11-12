@@ -142,15 +142,17 @@ describe('Palette', () => {
     ]);
   });
 
-  it('keeps two worlds (LRU) and serves the previous world while a re-bake runs', () => {
+  it("keeps two worlds (LRU) and never serves another world's bed (ruling 1)", () => {
     const { w, p } = setup();
     const mars: AirModel = { ...TITAN_AIR, presetId: 'mars-like' };
     p.request([spec('S1_land', N)], EARTH_AIR);
     w.flush();
     const earthBuf = p.get('S1_land', 0);
+    expect(earthBuf).not.toBeNull();
     p.request([spec('S1_land', N)], TITAN_AIR);
-    expect(p.get('S1_land', 0)).toBe(earthBuf); // the latest older world until Titan's lands
+    expect(p.get('S1_land', 0)).toBeNull(); // Titan's is not baked yet: never Earth's wind
     w.flush();
+    expect(p.get('S1_land', 0)).not.toBeNull();
     expect(p.get('S1_land', 0)).not.toBe(earthBuf);
     p.request([spec('S1_land', N)], mars);
     w.flush();
@@ -163,15 +165,78 @@ describe('Palette', () => {
     const { w, p } = setup();
     p.request([spec('S2', N), spec('S7', N)], EARTH_AIR);
     p.request([spec('S1_land', N)], TITAN_AIR);
-    w.flush(1); // Earth's S2 was in flight: it is filed under Earth, and Titan's queue follows (S7 was dropped)
+    w.flush(1); // Earth's S2 was in flight; Titan's queue follows (S7 was dropped)
     expect(w.inbox.map((m) => m.spec.id)).toEqual(['S1_land']);
     w.flush();
     expect(p.get('S7', 0)).toBeNull();
-    expect(p.get('S2', 0)).not.toBeNull(); // Earth's, served as the latest older world
+    expect(p.get('S2', 0)).toBeNull(); // Titan never asked for S2
     expect(p.unavailable()).toEqual([]);
   });
 
-  it('falls back to the main thread for the first bed when there is no worker', () => {
+  it('a §9.6 re-bake reuses beds whose sound is unchanged (same spec, c0, gv)', () => {
+    const { w, p } = setup();
+    const cb = vi.fn();
+    p.onReady(cb);
+    p.request([spec('S1_land', N), spec('S4', N)], EARTH_AIR);
+    w.flush();
+    const s1 = p.get('S1_land', 0);
+    // Ps slider: a new air hash, same preset, same c0 and gv; S4's spec changes (new wave height).
+    const moved: AirModel = { ...EARTH_AIR, P0: 90000, rho0: 1.09 };
+    p.request(
+      [spec('S1_land', N), spec('S4', N, { params: { ...EARTH_PARAMS.S4, Hs_m: 1.3 } })],
+      moved,
+    );
+    expect(p.get('S1_land', 0)).toBe(s1);
+    expect(p.get('S4', 0)).toBeNull();
+    expect(w.inbox.map((m) => m.spec.id)).toEqual(['S4']);
+    expect(cb).toHaveBeenLastCalledWith({ id: 'S1_land', variant: 0, worldKey: worldKeyOf(moved) });
+  });
+
+  it('beds a later request drops are evicted and no longer served (code review M2)', () => {
+    const { w, p } = setup();
+    p.request([spec('S1_land', N), spec('S6', N), spec('S7', N)], EARTH_AIR);
+    w.flush();
+    p.request([spec('S1_sea', N), spec('S4', N)], EARTH_AIR);
+    w.flush();
+    expect(p.get('S6', 0)).toBeNull();
+    expect(p.get('S1_land', 0)).toBeNull();
+    expect(p.stats().beds).toBe(2);
+  });
+
+  it('does not bake the bed in flight twice', () => {
+    const { w, p } = setup();
+    p.request([spec('S1_land', N), spec('S2', N)], EARTH_AIR);
+    p.request([spec('S1_land', N), spec('S2', N)], EARTH_AIR);
+    expect(order(w)).toEqual(['S1_land/0', 'S2/0']);
+    expect(p.get('S1_land', 0)).not.toBeNull();
+  });
+
+  it('fits 4 thunder variants plus the vent burst on a slow-sound world (36 MB one-shot budget)', () => {
+    const { p } = setup();
+    const th = (variant: number, d_m: number, dur_s: number, crack: number) =>
+      spec('thunder', 1 << 20, { variant, params: { ...EARTH_PARAMS.thunder, d_m, dur_s, crack } });
+    p.request(
+      [
+        th(0, 400, 17.7, 1),
+        th(1, 800, 34.9, 1),
+        th(2, 5000, 35, 0),
+        th(3, 12000, 35, 0),
+        spec('S8', N, { variant: 1 }),
+      ],
+      TITAN_AIR,
+    );
+    expect(p.unavailable()).toEqual([]);
+  });
+
+  it('refuses an invalid spec before charging the budget (code review L5)', () => {
+    const { w, p } = setup();
+    const bad = spec('thunder', N, { params: { ...EARTH_PARAMS.thunder, dur_s: Number.NaN } });
+    p.request([bad, spec('thunder', N, { variant: 1 })], EARTH_AIR);
+    expect(p.unavailable().map((r) => r.reason)).toEqual([expect.stringMatching(/dur_s/)]);
+    expect(w.inbox.map((m) => `${m.spec.id}/${m.spec.variant}`)).toEqual(['thunder/1']);
+  });
+
+  it('falls back to the main thread for the first bed only, once per world', () => {
     const jobs: (() => void)[] = [];
     const p = new Palette(fakeCtx(), {
       workerFactory: () => null,
@@ -182,6 +247,8 @@ describe('Palette', () => {
     jobs.shift()!();
     expect(p.get('S1_land', 0)).not.toBeNull();
     expect(p.unavailable().map((r) => r.source)).toEqual(['S6', 'S2']);
+    p.request([spec('S2', N), spec('S1_land', N), spec('S6', N)], EARTH_AIR);
+    expect(jobs.length).toBe(0); // no second main-thread bake for this world (code review L4)
   });
 
   it('a worker error re-queues the bed on the main thread', () => {

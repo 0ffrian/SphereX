@@ -3,7 +3,7 @@
 // order. It keeps them inside the memory budgets and bakes them one at a time in the worker (bake engine ported from
 // Moon's Ambience Loop Lab). It wraps each result as an AudioBuffer and caches two worlds (LRU).
 // The AudioContext is injected (BaseAudioContext): nothing here imports haptics/ or creates a context.
-import { bakedLength, isOneShot } from './dsp';
+import { bakedLength, checkSpec, isOneShot, releaseBakeCaches } from './dsp';
 import * as K from './dspTuning';
 import { hash32 } from './hash';
 import { handleBakeRequest, type BakeRequest, type BakeResponse } from './bake.worker';
@@ -120,10 +120,18 @@ interface Item {
 }
 interface Entry {
   key: string;
+  /** Identity of the samples across worlds of one preset: bed, spec hash and the only air fields dsp reads (c0, gv). */
+  reuse: string;
   buf: AudioBuffer;
   bytes: number;
   ms: number;
+  notes: string[];
 }
+
+/** dsp.ts reads only `c0` and `gv` from the AirModel, so a bed with the same spec and these two is the same sound. */
+const reuseKey = (s: BedSpec, air: AirModel) =>
+  `${bedId(s.id, s.variant)}|${specHash(s).toString(16)}|${air.c0}|${air.gv}`;
+const presetOf = (worldKey: string) => worldKey.slice(0, worldKey.lastIndexOf('#'));
 
 export class Palette {
   private readonly ctx: BaseAudioContext;
@@ -137,7 +145,10 @@ export class Palette {
   private queue: Item[] = [];
   private inFlight: { reqId: number; item: Item } | null = null;
   private nextReq = 1;
-  private fallbackLeft = 0;
+  /** Main-thread fallback bakes used, per world (so repeated requests do not freeze the view again and again). */
+  private readonly fallbackUsed = new Map<string, number>();
+  /** Per world: the beds the latest request admitted (bed id to bed key). Only these are kept and stored. */
+  private readonly admitted = new Map<string, Map<string, string>>();
   private refusals: Refusal[] = [];
   private readonly listeners = new Set<(e: ReadyEvent) => void>();
   private disposed = false;
@@ -149,7 +160,8 @@ export class Palette {
   }
 
   /** Bakes the beds of this world in §9.4 order within the §9.5 budgets. A new call replaces the queue (re-bake or a
-   * new world) and makes this world current; finished beds of other worlds stay cached (LRU of CACHE_WORLDS). */
+   * new world) and makes this world current; beds it no longer asks for are dropped. Other worlds stay cached (LRU of
+   * CACHE_WORLDS). */
   request(beds: BedSpec[], air: AirModel): void {
     if (this.disposed) return;
     const worldKey = worldKeyOf(air);
@@ -173,7 +185,18 @@ export class Palette {
       usedShot = 0;
     this.refusals = [];
     this.queue = [];
+    const admitted = new Map<string, string>();
+    const ready: ReadyEvent[] = [];
     for (const s of sorted) {
+      const bad = checkSpec(s, air);
+      if (bad.length) {
+        // Refused before the budget is charged, so an invalid spec cannot distort it (code review L5).
+        this.refusals.push({
+          source: s.id,
+          reason: `Sound for ${s.id} unavailable: ${bad.join(', ')}`,
+        });
+        continue;
+      }
       const shot = isOneShot(s.id, s.variant),
         bytes = bytesOf(s);
       if (shot ? usedShot + bytes > capShot : usedBed + bytes > capBed) {
@@ -185,28 +208,33 @@ export class Palette {
       }
       if (shot) usedShot += bytes;
       else usedBed += bytes;
-      const key = `${worldKey}|${bedId(s.id, s.variant)}|${specHash(s).toString(16)}`;
-      if (world.get(bedId(s.id, s.variant))?.key === key) continue; // cached
+      const bid = bedId(s.id, s.variant);
+      const key = `${worldKey}|${bid}|${specHash(s).toString(16)}`;
+      admitted.set(bid, key);
+      if (world.get(bid)?.key === key) continue; // cached
+      // §9.6 re-bake: an older world of the same preset may hold exactly this sound (same spec, c0 and gv).
+      const reused = this.findReusable(worldKey, reuseKey(s, air));
+      if (reused) {
+        world.set(bid, { ...reused, key });
+        ready.push({ id: s.id, variant: s.variant, worldKey });
+        continue;
+      }
+      if (this.inFlight?.item.key === key) continue; // already baking (code review L3)
       this.queue.push({ key, worldKey, spec: s, air });
     }
-    this.fallbackLeft = K.MAIN_FALLBACK_MAX_BEDS;
+    // Beds this request no longer asks for are dropped, so the world stays inside its budget (code review M2) and a
+    // refused bed is never served.
+    for (const bid of [...world.keys()]) if (!admitted.has(bid)) world.delete(bid);
+    this.admitted.set(worldKey, admitted);
+    for (const ev of ready) this.emit(ev);
     this.pump();
   }
 
-  /** The bed's AudioBuffer in the current world; while it is (re)baking, the latest older world's buffer for the same
-   * bed (so the mixer can crossfade on a re-bake, §9.6); else null. */
+  /** The bed's AudioBuffer in the current world, or null. Never another world's bed (coordinator ruling 1): while a
+   * bed (re)bakes the mixer gets null and fades, unless the same sound was reused unchanged (§9.6). */
   get(id: SourceId, variant: number): AudioBuffer | null {
-    const k = bedId(id, variant);
-    if (this.current) {
-      const e = this.worlds.get(this.current)?.get(k);
-      if (e) return e.buf;
-    }
-    const keys = [...this.worlds.keys()].reverse();
-    for (const w of keys) {
-      const e = this.worlds.get(w)?.get(k);
-      if (e) return e.buf;
-    }
-    return null;
+    if (!this.current) return null;
+    return this.worlds.get(this.current)?.get(bedId(id, variant))?.buf ?? null;
   }
 
   /** Called once per finished bed; returns the unsubscribe function. */
@@ -221,7 +249,12 @@ export class Palette {
   }
 
   /** §14: bytes and beds held, and bake ms per bed of the current world. */
-  stats(): { bytes: number; beds: number; msPerBed: Record<string, number> } {
+  stats(): {
+    bytes: number;
+    beds: number;
+    msPerBed: Record<string, number>;
+    notes: Record<string, string[]>;
+  } {
     let bytes = 0,
       beds = 0;
     for (const w of this.worlds.values())
@@ -230,9 +263,14 @@ export class Palette {
         beds++;
       }
     const msPerBed: Record<string, number> = {};
+    const notes: Record<string, string[]> = {};
     const cur = this.current ? this.worlds.get(this.current) : undefined;
-    if (cur) for (const [k, e] of cur) msPerBed[k] = e.ms;
-    return { bytes, beds, msPerBed };
+    if (cur)
+      for (const [k, e] of cur) {
+        msPerBed[k] = e.ms;
+        if (e.notes.length) notes[k] = e.notes;
+      }
+    return { bytes, beds, msPerBed, notes };
   }
 
   dispose(): void {
@@ -242,6 +280,7 @@ export class Palette {
     this.queue = [];
     this.inFlight = null;
     this.worlds.clear();
+    this.admitted.clear();
     this.listeners.clear();
     this.current = null;
   }
@@ -253,7 +292,21 @@ export class Palette {
       const oldest = [...this.worlds.keys()].find((k) => k !== this.current);
       if (oldest === undefined) break;
       this.worlds.delete(oldest);
+      this.admitted.delete(oldest);
     }
+  }
+
+  private findReusable(worldKey: string, reuse: string): Entry | null {
+    const preset = presetOf(worldKey);
+    for (const [k, w] of [...this.worlds].reverse()) {
+      if (k === worldKey || presetOf(k) !== preset) continue;
+      for (const e of w.values()) if (e.reuse === reuse) return e;
+    }
+    return null;
+  }
+
+  private emit(ev: ReadyEvent): void {
+    for (const cb of [...this.listeners]) cb(ev);
   }
 
   private getWorker(): WorkerLike | null {
@@ -289,7 +342,8 @@ export class Palette {
       return;
     }
     // Never blank: no worker, so bake on the main thread, but only the first bed(s) by priority (each takes ~0.2–1 s).
-    if (this.fallbackLeft <= 0) {
+    const used = this.fallbackUsed.get(item.worldKey) ?? 0;
+    if (used >= K.MAIN_FALLBACK_MAX_BEDS) {
       this.inFlight = null;
       const rest = [item, ...this.queue];
       this.queue = [];
@@ -303,10 +357,12 @@ export class Palette {
       }
       return;
     }
-    this.fallbackLeft--;
+    this.fallbackUsed.set(item.worldKey, used + 1);
     this.schedule(() => {
       if (this.disposed) return;
-      this.onResponse(handleBakeRequest(msg));
+      const res = handleBakeRequest(msg);
+      releaseBakeCaches(); // do not keep the FFT scratch (about 45 MB) on the main thread
+      this.onResponse(res);
     });
   }
 
@@ -317,15 +373,23 @@ export class Palette {
     this.inFlight = null;
     const item = fl.item;
     const world = this.worlds.get(item.worldKey); // undefined if evicted meanwhile: drop the result
+    const bid = bedId(item.spec.id, item.spec.variant);
+    const wanted = this.admitted.get(item.worldKey)?.get(bid) === item.key;
     if ('result' in res) {
-      if (world) {
+      if (world && wanted) {
         const r = res.result;
         const buf = this.ctx.createBuffer(2, r.L.length, r.sampleRate);
         buf.copyToChannel(r.L as Float32Array<ArrayBuffer>, 0);
         buf.copyToChannel(r.R as Float32Array<ArrayBuffer>, 1);
-        world.set(bedId(r.id, r.variant), { key: item.key, buf, bytes: r.L.length * 8, ms: r.ms });
-        const ev: ReadyEvent = { id: r.id, variant: r.variant, worldKey: item.worldKey };
-        for (const cb of [...this.listeners]) cb(ev);
+        world.set(bid, {
+          key: item.key,
+          reuse: reuseKey(item.spec, item.air),
+          buf,
+          bytes: r.L.length * 8,
+          ms: r.ms,
+          notes: res.notes,
+        });
+        this.emit({ id: r.id, variant: r.variant, worldKey: item.worldKey });
       }
     } else if (item.worldKey === this.current) {
       this.refusals.push({
