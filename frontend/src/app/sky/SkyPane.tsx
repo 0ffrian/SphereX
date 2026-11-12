@@ -917,7 +917,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         onClick={() => setCreditOpen((o) => !o)}
         data-testid="sky-credit-button"
       >
-        <Icon name="info" className="size-4" />
+        <Icon name="info" className="size-[18px]" />
       </button>
       <div
         ref={creditRef}
@@ -928,31 +928,35 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         aria-label="About this sky image"
         hidden={!creditOpen}
       >
+        <p className="sx-credit-eyebrow" aria-hidden="true">About this sky</p>
         {survey && (
-          <p
-            className="sx-credit-line pointer-events-auto"
-            data-testid="sky-credit"
-          >
-            <span className="text-sx-fg">{survey.title}</span>
-            {survey.tag === 'derived' ? (
-              <EstimatedBadge tooltip={survey.formula ?? ''} variant="tag" />
-            ) : (
-              <ProvenanceBadge
-                tag={survey.tag}
-                tooltip={survey.formula ?? survey.assumption ?? undefined}
-                srText
-                variant="tag"
-              />
+          <div className="flex flex-col gap-1.5" data-testid="sky-credit">
+            <p className="sx-credit-line pointer-events-auto">
+              <span className="sx-credit-title">{survey.title}</span>
+              {survey.tag === 'derived' ? (
+                <EstimatedBadge tooltip={survey.formula ?? ''} variant="tag" />
+              ) : (
+                <ProvenanceBadge
+                  tag={survey.tag}
+                  tooltip={survey.formula ?? survey.assumption ?? undefined}
+                  srText
+                  variant="tag"
+                />
+              )}
+              {fixtureSky && (
+                <span className="rounded bg-amber-400 px-1 text-[10px] font-bold tracking-wide text-black">
+                  SYNTHETIC
+                </span>
+              )}
+            </p>
+            {/* What the colours mean, in plain words (the exact bands are in the badge's tooltip). */}
+            {survey.formula?.startsWith('false colour') && (
+              <p className="sx-credit-what" data-testid="sky-credit-what">
+                Infrared light your eyes cannot see, shown in false colour: red is the longest
+                wavelength, blue the shortest.
+              </p>
             )}
-            {fixtureSky && (
-              <span className="rounded bg-amber-400 px-1 text-[10px] font-bold tracking-wide text-black">
-                SYNTHETIC
-              </span>
-            )}
-            <span className="sx-credit-text" title={survey.credit}>
-              {survey.credit}
-            </span>
-          </p>
+          </div>
         )}
         {picked && (
           <p
@@ -972,19 +976,26 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         {/* Legend for the small lilac dots: their label shows only on hover or focus, and a touch
             screen has no hover. */}
         {cached.length > 0 && (
-          <p className="flex items-center gap-1.5" data-testid="sky-cached-legend">
+          <p className="sx-credit-legend" data-testid="sky-cached-legend">
             <span
               className="inline-block size-2.5 flex-none rounded-full border border-black bg-[#e9d5ff] shadow-[0_0_0_1px_#e9d5ffaa]"
               aria-hidden="true"
             />
-            <span>Lilac dots: already downloaded, open instantly.</span>
+            <span>Lilac dots are objects already downloaded: they open instantly.</span>
           </p>
         )}
-        {/* Renderer details, for the team; hidden on phones to save space. */}
-        <p className="sx-hide-s">
-          {state.kind === 'ready' ? `${state.width}×${state.width / 2} px · ` : ''}
-          {backend === 'webgpu' ? 'WebGPU' : backend === 'webgl2' ? 'WebGL2' : ''}
-        </p>
+        {survey && (
+          <div className="sx-credit-foot">
+            <span className="sx-credit-text" title={survey.credit}>
+              Credit: {survey.credit}
+            </span>
+            {/* Renderer details, for the team; hidden on phones to save space. */}
+            <span className="sx-credit-tech sx-hide-s">
+              {state.kind === 'ready' ? `${state.width} × ${state.width / 2} px · ` : ''}
+              {backend === 'webgpu' ? 'WebGPU' : backend === 'webgl2' ? 'WebGL2' : ''}
+            </span>
+          </div>
+        )}
       </div>
       <p aria-live="polite" className="sr-only" data-testid="sky-view-announcer">
         {viewSay}

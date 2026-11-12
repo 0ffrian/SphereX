@@ -4605,6 +4605,8 @@ body {
 .sx-player,
 .sx-coords,
 .sx-area-hint,
+.sx-credit-btn,
+.sx-sky-credit,
 .sx-orb {
   background: var(--glass-grain), var(--glass-bg);
   -webkit-backdrop-filter: var(--glass-filter);
@@ -4644,6 +4646,8 @@ body {
   .sx-player,
   .sx-coords,
   .sx-area-hint,
+  .sx-credit-btn,
+  .sx-sky-credit,
   .sx-orb {
     background: var(--s1);
   }
@@ -4681,4 +4685,71 @@ body {
 /* Split view off: once built, the body keeps the whole view instead of moving to the right half. */
 .sx-bp[data-shifted][data-solo] {
   width: 100%;
+}
+
+/* The sky's info button and its popover (Moon, 12 Nov 2026): the same matte glass as the zoom card
+   beside it, as tall as that card, and a popover that reads top-down: what you are looking at, how
+   to read it, then the credit and (quietest) the renderer. */
+@media (min-width: 641px) {
+  .sx-credit-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+  }
+  .sx-sky-credit {
+    bottom: 84px;
+    width: 340px;
+    max-width: calc(100% - 32px);
+    padding: 14px 16px;
+    border-radius: 12px;
+  }
+}
+.sx-credit-btn:hover,
+.sx-credit-btn[aria-expanded='true'] {
+  background: var(--glass-grain), rgba(30, 32, 36, 0.75);
+  color: var(--fg);
+}
+.sx-sky-credit {
+  gap: 10px;
+  color: var(--muted);
+}
+.sx-credit-eyebrow {
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sx-credit-title {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fg);
+}
+.sx-credit-what {
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--fg);
+  opacity: 0.82;
+}
+.sx-credit-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 18px;
+}
+.sx-credit-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--glass-edge);
+  font-size: 11.5px;
+  line-height: 16px;
+}
+.sx-credit-tech {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  opacity: 0.7;
 }
