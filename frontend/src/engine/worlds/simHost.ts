@@ -177,6 +177,56 @@ export class SimHost {
     W.gl.tick(W.m, playing, Math.min(0.06, dt || 0));
   }
 
+  /**
+   * Worker mode only: run the spin-up back to back for up to `ms`, then make the same GPU-side calls a tick makes
+   * after its steps. The prototype's tick holds the spin-up to 14 ms a frame (40 steps at most) so the page keeps
+   * drawing; a worker has no frame to protect, so that budget only slowed the forming (Earth 22 s against 6 s). The
+   * steps are the tick's own: the climate's ebStep(m, 1, 1.4), then uploadEb, ebStats and one cloud pass (relaxation
+   * 0.05, or 0.012 after the last step), as at the end of WorldGL.tick's climate branch; a giant's GasSim.step with a
+   * velocity upload and a tracer pass every 4 steps, as in its spin-up branch. Only the chunking differs (which the
+   * prototype's wall-clock budget already left to the machine, Q-306): the spin-up ends after exactly its 900 (or
+   * 420) steps, and the cloud passes come one per chunk.
+   */
+  spinChunk(ms: number): void {
+    const c = this.core,
+      W = c.W,
+      m = W.m;
+    if (!m || W.spinup <= 0) return;
+    const t0 = performance.now();
+    if (m.gas) {
+      const GS = c.getGS();
+      let n = 0,
+        acc = 0;
+      while (W.spinup > 0 && performance.now() - t0 < ms) {
+        GS.step();
+        acc += GS.dt;
+        W.spinup--;
+        if (++n % 4 === 0) {
+          W.gl.uploadVel(GS.exportField());
+          W.gl.gasStep(acc, false);
+          acc = 0;
+        }
+      }
+      if (acc > 0) {
+        W.gl.uploadVel(GS.exportField());
+        W.gl.gasStep(acc, false);
+      }
+      return;
+    }
+    let k = 0;
+    while (W.spinup > 0 && (k === 0 || performance.now() - t0 < ms)) {
+      c.ebStep(m, 1, 1.4);
+      W.spinup--;
+      k++;
+    }
+    W.gl.uploadEb();
+    c.ebStats(m);
+    W.gl.cloudStep(m, W.spinup > 0 ? 0.05 : 0.012);
+    // The tick that ends a spin-up also draws the rivers (and turns the globe to them) at once: a tick that is not
+    // playing runs no step, only that part.
+    if (W.spinup === 0) W.gl.tick(m, false, 0);
+  }
+
   get spinup(): number {
     return this.core.W.spinup;
   }
