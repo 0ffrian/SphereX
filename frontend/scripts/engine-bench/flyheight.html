@@ -1,0 +1,279 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Engine bench: fly height parity</title>
+<!--
+  Issue #114 (sound spec §6.1): the CPU port of FLY_FS hKm (src/engine/worlds/flyHeight.ts) against the GPU.
+  For each world the page:
+  - builds a real WorldEngine (role 'globe': no fly-shader compile) and settles the spin-up;
+  - compiles a small program from the runtime FLY_FS text: everything before `float surfR(`, so the exact patched hKm with
+    its uniforms and helpers, plus one added line that also writes hKm's own `e` and `uv`;
+  - uploads the engine's CPU arrays with core.js's formats (terrain RG16F, EB.out RGBA16F, hydro RGBA8; LINEAR, S
+    repeat, T clamp);
+  - renders 64 directions into a 64 x 1 RGBA32F target (HQ, then bilinear) and compares them with the CPU port:
+      total  = CPU hKm vs GPU hKm (spec: RMS <= 0.02 km, max <= 0.1 km)
+      filter = CPU grid read at the GPU's uv vs GPU e (bars, Q-434: RMS <= 0.01 km, max <= 0.05 km)
+      uv     = CPU uv vs GPU uv, in texels of the height grid
+      noise  = CPU hKm computed from the GPU's e vs GPU hKm (bar: RMS <= 0.005 km, at most 2 of 64 above 0.02 km)
+  __out.fixture holds what flyHeight.test.ts replays in CI; for lava worlds also EB.out's T and a second pass with the
+  GPU's own T, hydro G and pre-mix height (noise_land drops sea-clamped 0-vs-0 rows).
+  Query: worlds is a comma list (`id` = a preset with its own seed, `id+card` = a preset with a card-style seed3); the
+  default is earth,t1f+card,lava.
+  Run: npx vite --port 5199 --strictPort --host 127.0.0.1, then node scripts/engine-bench/run.js 'flyheight.html'.
+-->
+<body style="margin: 0; background: #000">
+  <script type="module">
+    import { WorldEngine } from '/src/engine/worlds/WorldEngine.ts';
+    import { FLY_FS } from '/src/engine/worlds/shaders.js';
+    import { WP } from '/src/engine/worlds/presets.js';
+    import {
+      makeFlyHeightCtx,
+      hKmParts,
+      heightAtUv,
+      lavaInputs,
+    } from '/src/engine/worlds/flyHeight.ts';
+    import { hashString32, seedVec } from '/src/engine/seed.ts';
+
+    const out = { worlds: {}, fixture: { version: 1, worlds: [] } };
+    window.__out = out;
+    const Q = new URLSearchParams(location.search);
+    const worlds = (Q.get('worlds') || 'earth,t1f+card,lava').split(',');
+    const F = Math.fround;
+
+    // 64 fixed directions: 60 on a Fibonacci sphere, the longitude seam from both sides, near both poles. float32.
+    const dirs = [];
+    for (let i = 0; i < 60; i++) {
+      const y = 1 - (2 * (i + 0.5)) / 60,
+        r = Math.sqrt(1 - y * y),
+        a = i * 2.399963229728653;
+      dirs.push([r * Math.cos(a), y, r * Math.sin(a)]);
+    }
+    dirs.push(
+      [-0.9, 0.2, 1e-4],
+      [-0.9, 0.2, -1e-4],
+      [0.01, 0.9999, 0.004],
+      [0.012, -0.9998, -0.01],
+    );
+    for (const d of dirs) {
+      const l = Math.hypot(d[0], d[1], d[2]);
+      for (let k = 0; k < 3; k++) d[k] = F(d[k] / l);
+    }
+
+    const fnv = (arr) => {
+      const b = new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
+      let h = 0x811c9dc5;
+      for (let i = 0; i < b.length; i++) h = Math.imul(h ^ b[i], 0x01000193);
+      return h >>> 0;
+    };
+
+    function program(gl) {
+      const i0 = FLY_FS.indexOf('float hKm(vec3 d){'),
+        i1 = FLY_FS.indexOf('float surfR(');
+      let hk = FLY_FS.slice(i0, i1);
+      const ret = 'return uOcean>.5?max(h,0.):h;';
+      if (hk.split(ret).length !== 2) throw new Error('hKm return line not found');
+      hk = hk.replace(ret, 'OE=e;OUV=uv;' + ret);
+      // the height before the magma-sea mix (pass 2 reports it with the GPU's own T and hydro G reads)
+      const lv = ' if(uLava>.5){';
+      if (hk.split(lv).length !== 2) throw new Error('hKm lava line not found');
+      hk = hk.replace(lv, ' OHP=h;' + lv);
+      const fs =
+        FLY_FS.slice(0, i0) +
+        'float OE,OHP;vec2 OUV;\n' +
+        hk +
+        'uniform vec3 uPD[64];uniform float uHQ,uPass;\n' +
+        'void main(){int k=int(gl_FragCoord.x);HQ=uHQ>.5;float h=hKm(uPD[k]);vec2 uh=uvOf(uPD[k]);\n' +
+        ' O=uPass>.5?vec4(tex4(uEb,uh).r,texture(uHy,uh).g,OHP,h):vec4(OE,h,OUV);}\n';
+      const vs =
+        '#version 300 es\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0,1);}';
+      const sh = (t, s) => {
+        const o = gl.createShader(t);
+        gl.shaderSource(o, s);
+        gl.compileShader(o);
+        if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o));
+        return o;
+      };
+      const p = gl.createProgram();
+      gl.attachShader(p, sh(gl.VERTEX_SHADER, vs));
+      gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+      gl.linkProgram(p);
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+      return p;
+    }
+
+    function tex(gl, unit, ifmt, w, h, fmt, type, data) {
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      const t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, ifmt, w, h, 0, fmt, type, data);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+
+    const stats = (a) => {
+      const abs = a.map(Math.abs);
+      return {
+        rms: +Math.sqrt(a.reduce((s, x) => s + x * x, 0) / a.length).toExponential(3),
+        max: +Math.max(...abs).toExponential(3),
+        worst: abs.indexOf(Math.max(...abs)),
+        over002: abs.filter((x) => x > 0.02).length,
+      };
+    };
+
+    try {
+      const cv = document.createElement('canvas');
+      cv.width = 64;
+      cv.height = 1;
+      const gl = cv.getContext('webgl2');
+      if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('no EXT_color_buffer_float');
+      const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+      out.renderer = dbg
+        ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)
+        : gl.getParameter(gl.RENDERER);
+      const prog = program(gl);
+      const fb = gl.createFramebuffer();
+      gl.activeTexture(gl.TEXTURE0);
+      const rt = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, rt);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 64, 1, 0, gl.RGBA, gl.FLOAT, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, rt, 0);
+      gl.bindVertexArray(gl.createVertexArray());
+
+      for (const spec of worlds) {
+        const [id, card] = spec.split('+');
+        const host = document.createElement('canvas');
+        host.width = 320;
+        host.height = 200;
+        const eng = new WorldEngine(host, { role: 'globe' });
+        await eng.whenReady();
+        const core = eng.core;
+        let pr = WP.find((p) => p.id === id);
+        if (card) pr = { ...pr, seed3: seedVec(hashString32('flyheight-card-' + id)) };
+        eng.setPreset(pr);
+        eng.spinUp(1 / 60, true);
+        for (let i = 0; i < 4; i++) eng.tick(0.016);
+        const W = core.W,
+          f = eng.cpuFields(),
+          wf = eng.weatherFields(),
+          m = W.m;
+        const seed3 = W.p.seed3 ? W.p.seed3 : [W.p.seed, W.p.seed, W.p.seed];
+        const oceanF = core.OCEANF[W.p.id] || 0;
+        const ocean = oceanF > 0 && !m.airless,
+          lava = !m.gas && m.Ts > 700,
+          hM = W.hydro && W.hydro.lava ? W.hydro.hM : 0;
+
+        gl.useProgram(prog);
+        const t = f.terrain;
+        tex(gl, 2, gl.RG16F, t.W, t.H, gl.RG, gl.FLOAT, t.data);
+        tex(
+          gl,
+          3,
+          gl.RGBA16F,
+          wf ? wf.NX : 1,
+          wf ? wf.NY : 1,
+          gl.RGBA,
+          gl.FLOAT,
+          wf ? wf.out : new Float32Array(4),
+        );
+        const hy = f.hydro;
+        if (hy && hy.img) tex(gl, 10, gl.RGBA8, hy.RW, hy.RH, gl.RGBA, gl.UNSIGNED_BYTE, hy.img);
+        else tex(gl, 10, gl.RGBA8, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+        const U = (n) => gl.getUniformLocation(prog, n);
+        gl.uniform1i(U('uHt'), 2);
+        gl.uniform1i(U('uEb'), 3);
+        gl.uniform1i(U('uHy'), 10);
+        gl.uniform3fv(U('uSeed3'), seed3);
+        gl.uniform1f(U('uOcean'), ocean ? 1 : 0);
+        gl.uniform1f(U('uLava'), lava ? 1 : 0);
+        gl.uniform1f(U('uHM'), hM);
+        gl.uniform3fv(U('uPD'), new Float32Array(dirs.flat()));
+        const res = {};
+        for (const hq of [true, false]) {
+          gl.viewport(0, 0, 64, 1);
+          gl.uniform1f(U('uHQ'), hq ? 1 : 0);
+          gl.uniform1f(U('uPass'), 0);
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
+          const px = new Float32Array(64 * 4);
+          gl.readPixels(0, 0, 64, 1, gl.RGBA, gl.FLOAT, px);
+          // pass 2 (lava worlds): [GPU T, GPU hydro G, h before the magma mix, h]
+          let px2 = null;
+          if (lava) {
+            gl.uniform1f(U('uPass'), 1);
+            gl.drawArrays(gl.TRIANGLES, 0, 3);
+            px2 = new Float32Array(64 * 4);
+            gl.readPixels(0, 0, 64, 1, gl.RGBA, gl.FLOAT, px2);
+          }
+          const ctx = makeFlyHeightCtx(eng, seed3, { oceanF, hq });
+          const tot = [],
+            fil = [],
+            uvE = [],
+            noi = [],
+            lavT = [],
+            lavG = [],
+            gpu = [];
+          dirs.forEach((d, k) => {
+            const [ge, gh, gu, gv] = px.slice(k * 4, k * 4 + 4);
+            gpu.push([ge, gh, gu, gv]);
+            const c = hKmParts(d, ctx);
+            tot.push(c.h - gh);
+            fil.push(heightAtUv(ctx, gu, gv) - ge);
+            let du = Math.abs(c.u - gu);
+            du = Math.min(du, 1 - du);
+            uvE.push(Math.max(du * t.W, Math.abs(c.v - gv) * t.H));
+            // with the GPU's own hydro G on lava worlds (the CPU raster read is checked by lavaG below)
+            noi.push(hKmParts(d, ctx, ge, px2 ? px2[k * 4 + 1] : undefined).h - gh);
+            if (px2) {
+              const L = lavaInputs(d, ctx);
+              lavT.push(L.T - px2[k * 4]);
+              lavG.push(L.g - px2[k * 4 + 1]);
+            }
+          });
+          const land = noi.filter((_, k) => !(ocean && gpu[k][1] === 0));
+          res[hq ? 'hq' : 'bilinear'] = {
+            total: stats(tot),
+            filter: stats(fil),
+            uv_texels: stats(uvE),
+            noise: stats(noi),
+            noise_land: { ...stats(land), rows: land.length },
+            poles_total: [tot[62], tot[63]].map((x) => +x.toExponential(3)),
+            ...(px2 ? { lavaT_K: stats(lavT), lavaG: stats(lavG) } : {}),
+          };
+          out.fixture.worlds.push({
+            world: spec,
+            presetId: id,
+            seed3,
+            ocean,
+            hq,
+            terrainFnv: fnv(t.data),
+            W: t.W,
+            H: t.H,
+            dirs,
+            gpu,
+            ...(px2
+              ? {
+                  lava: {
+                    hM,
+                    NX: wf.NX,
+                    NY: wf.NY,
+                    ebT: Array.from(wf.out.filter((_, i) => i % 4 === 0)),
+                    gpu2: Array.from({ length: 64 }, (_, k) =>
+                      Array.from(px2.slice(k * 4, k * 4 + 4)),
+                    ),
+                  },
+                }
+              : {}),
+          });
+        }
+        out.worlds[spec] = { seed3, ocean, lava, hM, ...res };
+        eng.dispose();
+      }
+    } catch (err) {
+      out.error = String(err && err.stack ? err.stack : err);
+    }
+    out.done = true;
+  </script>
+</body>
