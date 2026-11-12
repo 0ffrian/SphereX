@@ -4613,6 +4613,24 @@ body {
 }
 
 /* R13.10 (#116): the fly view's Sound chip, live caption and "What you hear" panel. Tokens only (D-38). */
+/* #117 (Q-449(11), PR #125 review B2): the weather honesty caption over the fly view. Bottom-left, so the Sound
+   chip (.sx-amb, top-left, z-index 3) never covers it; it never catches input. */
+.sx-wx-cap {
+  position: absolute;
+  left: 68px;
+  bottom: 16px;
+  z-index: 3;
+  max-width: calc(100% - 84px);
+  margin: 0;
+  padding: 6px 12px;
+  pointer-events: none;
+  background: var(--s1);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 18px;
+  line-height: 1.35;
+}
 .sx-amb {
   position: absolute;
   left: 68px;
@@ -4739,6 +4757,10 @@ body {
 }
 @media (max-width: 640px) {
   .sx-amb {
+    left: 16px;
+    max-width: calc(100% - 32px);
+  }
+  .sx-wx-cap {
     left: 16px;
     max-width: calc(100% - 32px);
   }

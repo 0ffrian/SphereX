@@ -961,7 +961,12 @@ export function WorldFlyStage({
     >
       <div ref={hostRef} className="absolute inset-0" />
       {/* R13.6 §8.5 (#117): rain, snow, bolts and glows over the fly view; never catches input. */}
-      <WeatherOverlay engine={engine} active={!!engine && entered && !paused} reduced={reduced} />
+      <WeatherOverlay
+        engine={engine}
+        active={!!engine && entered && !paused}
+        reduced={reduced}
+        seed={world.preset.seed}
+      />
       {forming && <Forming gas={gas} progress={progress} />}
       {/* The fly view's own sound controls, shown whatever SHOW_FLY_BAR is (C6). */}
       {engine && entered && <SoundChip />}

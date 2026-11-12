@@ -141,7 +141,8 @@ Thunder only where lightning has been observed, or where the analog is strong [S
   camera below the drawn deck; above the deck there is only the in-deck glow. On a gas giant every strike is an
   in-deck glow, with no bolt. A near bolt is clipped to the pane, and its cloud glow sits where it enters.
 - **Label:** while weather is drawn, an 18 px caption on the fly view reads "Weather: artist's impression from the
-  simulated climate · colour not from data". The "What is drawn" rows come from `weatherRows` (weather bus).
+  simulated climate · colour not from data", bottom-left (`.sx-wx-cap`), clear of the Sound chip (Q-449(11)). The
+  "What is drawn" rows come from `weatherRows` (weather bus). Rain and snow are seeded from the world's seed (Q-449(12)).
 - **Reduced motion and Flashes off:** both give §8.5's slow glow (a 1 s raised cosine at 0.15). This replaces §8.3's
   "off" and R13.10's "no flash".
 - **Timing:** strikes come from the weather bus (`onStrike`) ahead of their `t0`, and the first stroke draws at

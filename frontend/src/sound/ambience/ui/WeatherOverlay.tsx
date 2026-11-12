@@ -76,11 +76,13 @@ export interface DrawState {
   snow: Float32Array;
   worlds: Map<FlashGroup, StrikeWorld | null>;
   bolts: Map<FlashGroup, { key: string; lines: Float32Array[] }>;
+  /** §8.5 the world's seed (WorldPreset.seed, artistic): rain and snow are rng32(seed ^ frameBucket), per world. */
+  seed: number;
 }
 
-export function newDrawState(): DrawState {
+export function newDrawState(seed = 0): DrawState {
   return {
-    W: 0, H: 0, rain: new Float32Array(RAIN_STREAKS_MAX * 4), snow: new Float32Array(SNOW_FLAKES_MAX * 3), worlds: new Map(), bolts: new Map(),
+    seed: seed >>> 0, W: 0, H: 0, rain: new Float32Array(RAIN_STREAKS_MAX * 4), snow: new Float32Array(SNOW_FLAKES_MAX * 3), worlds: new Map(), bolts: new Map(),
   };
 }
 
@@ -114,7 +116,7 @@ export function drawWeatherFrame(
   const rain = frame?.rain ?? null;
   if (rain && !aboveDeck && !es.gas) {
     const N = particleCount(rain.density, rain.snow);
-    const seed = 0x5eed ^ 0x117;
+    const seed = st.seed; // PR #125 review N5: the world's seed, not a constant
     if (!rain.snow) {
       const lean = snap ? rainLean(snap.windDirDeg, snap.U10, engine.fly.head, rain.vt) : 0;
       const counts = buildRain(st.rain, N, seed, Math.floor(t * 60), W, H, fpx, rain.vt, lean);
@@ -225,10 +227,13 @@ export function WeatherOverlay({
   engine,
   active,
   reduced,
+  seed,
 }: {
   engine: OverlayEngine | null;
   active: boolean;
   reduced: boolean;
+  /** The world's seed (WorldPreset.seed): the same world draws the same rain, another world different rain. */
+  seed: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const reducedRef = useRef(reduced);
@@ -246,7 +251,7 @@ export function WeatherOverlay({
     }
     if (!cv || !got || typeof got.clearRect !== 'function') return;
     const ctx: Ctx2D = got;
-    const st = newDrawState();
+    const st = newDrawState(seed);
     let shownNow = false;
     const setShown = (v: boolean) => {
       if (v === shownNow) return;
@@ -333,7 +338,7 @@ export function WeatherOverlay({
       setShown(false);
       clear();
     };
-  }, [engine, active]);
+  }, [engine, active, seed]);
 
   // Reduced motion turned on through the prop: groups already showing become safe at once.
   useEffect(() => {
@@ -352,17 +357,8 @@ export function WeatherOverlay({
       />
       {drawing && active && (
         // Coordinator ruling 2: the label the stage audience sees while weather is drawn (the panel rows are folded).
-        <p
-          data-testid="weather-caption"
-          className="pointer-events-none absolute left-3 top-3 z-[2] m-0 max-w-[calc(100%-1.5rem)] rounded-lg border px-3 py-1.5"
-          style={{
-            fontSize: 18,
-            lineHeight: 1.35,
-            background: 'var(--s1)',
-            color: 'var(--fg)',
-            borderColor: 'var(--line)',
-          }}
-        >
+        // PR #125 review B2: bottom-left (.sx-wx-cap in index.css), clear of #116's Sound chip (.sx-amb, top-left).
+        <p data-testid="weather-caption" className="sx-wx-cap">
           {WEATHER_CAPTION}
         </p>
       )}
