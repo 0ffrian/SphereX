@@ -89,7 +89,7 @@ function Cutout({ hop }: { hop: ErosHop }) {
 }
 
 /** Brightness against wavelength, one dot per exposure taken so far. */
-function Chart({ eros, cur }: { eros: ErosDemo; cur: ErosHop }) {
+function Chart({ eros, cur, name }: { eros: ErosDemo; cur: ErosHop; name: string }) {
   const W = 360;
   const H = 118;
   const L = 30;
@@ -105,7 +105,7 @@ function Chart({ eros, cur }: { eros: ErosDemo; cur: ErosHop }) {
   const X = (l: number) => L + ((l - x0) / (x1 - x0)) * (W - L - R);
   const Y = (f: number) => T + (1 - (f - fmin) / (fmax - fmin)) * (H - T - B);
   const shown = all.filter((h) => h.mjd_avg <= cur.mjd_avg + 1e-9);
-  const label = `Brightness of Eros against wavelength, ${shown.length} of ${all.length} exposures: ${shown
+  const label = `Brightness of ${name} against wavelength, ${shown.length} of ${all.length} exposures: ${shown
     .map((h) => `${h.wl_um.toFixed(2)} µm ${h.flux.toFixed(0)}`)
     .join('; ')}`;
   return (
@@ -140,7 +140,7 @@ function Chart({ eros, cur }: { eros: ErosDemo; cur: ErosHop }) {
   );
 }
 
-function Detectors({ eros }: { eros: ErosDemo }) {
+function Detectors({ eros, name }: { eros: ErosDemo; name: string }) {
   const det = useAreaStore((s) => s.det);
   const setDet = useAreaStore((s) => s.setDet);
   const have = detectorsWithFrames(eros);
@@ -159,7 +159,7 @@ function Detectors({ eros }: { eros: ErosDemo }) {
             className="sx-kn-detb"
             aria-checked={det === i}
             disabled={!have.has(i)}
-            title={have.has(i) ? undefined : 'No Eros frame in this detector'}
+            title={have.has(i) ? undefined : `No ${name} frame in this detector`}
             onClick={() => setDet(det === i ? null : i)}
           >
             <span className="sx-kn-rd" aria-hidden="true" />
@@ -315,11 +315,11 @@ export function ErosCard({ title: given, back }: { title?: string; back?: () => 
                     variant="tag"
                   />
                 </span>
-                <small>Eros’s brightness in each exposure so far</small>
+                <small>Brightness of {title} in each exposure so far</small>
               </div>
-              {eros && hop && <Chart eros={eros} cur={hop} />}
+              {eros && hop && <Chart eros={eros} cur={hop} name={title} />}
             </div>
-            {eros && <Detectors eros={eros} />}
+            {eros && <Detectors eros={eros} name={title} />}
             <div className="sx-kn-foot">
               {real ? (
                 <DemoTag label="Demo cutouts" note={DEMO_CUTOUT_NOTE} testId="demo-tag" />
