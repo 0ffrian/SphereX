@@ -19,7 +19,7 @@ describe('shader loop bounds (issue #93 1.1)', () => {
   const constLoop = /for\(int [ijk]=-?\d+;[ijk]<=?\d+;/;
   it('every loop in WORLD_FS and FLY_FS has a uniform bound, declared once', () => {
     for (const [fs, n] of [
-      [FLY_FS, 13], // 11, plus the two cube-face loops of #93 2.5
+      [FLY_FS, 14], // 11, plus the two cube-face loops of #93 2.5 and the pyramid step of #93 F1
       [WORLD_FS, 3],
     ] as const) {
       expect(fs.match(/\+uZ0;/g)?.length).toBe(n);
@@ -201,6 +201,44 @@ describe('drawing (issue #93 1.4, 1.6, 1.7)', () => {
       expect(v.gw).toBe(400);
       // uScale (the scaler's factor) is passed to FLY_FS
       expect(calls.some((c) => c[0] === 'uniform1f' && c[1] === 'uScale' && c[2] === 1)).toBe(true);
+    }
+  });
+
+  it('the scaler steps rarely and FLY_FS follows the eased pixel (#93 B9)', async () => {
+    const { gl, calls } = stubGL();
+    const c = stubCanvas(gl, 1000, 400);
+    const e = new WorldEngine(c, { role: 'fly' });
+    await e.whenReady();
+    e.setPreset(preset('jup'));
+    e.setFly(true);
+    const g = globalThis as unknown as { __sxPin?: boolean };
+    const pin = g.__sxPin;
+    g.__sxPin = false;
+    let now = 1e6;
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => now);
+    try {
+      // slow frames (60 ms) for 3 s: the scale steps down by 0.8 at most once a second
+      const widths: number[] = [];
+      for (let i = 0; i < 50; i++) {
+        now += 60;
+        e.draw();
+        widths.push(c.width);
+      }
+      const steps = widths.filter((w, i) => i > 0 && w !== widths[i - 1]).length;
+      expect(steps).toBeGreaterThanOrEqual(2);
+      expect(steps).toBeLessThanOrEqual(3);
+      expect(c.width).toBe(Math.round(1000 * 0.8 ** steps));
+      // after a step, uScale (scale / eased scale) eases back to 1: FLY_FS's footprint is the real pixel
+      for (let i = 0; i < 40; i++) {
+        now += 20;
+        e.draw();
+      }
+      const us = calls.filter((x) => x[0] === 'uniform1f' && x[1] === 'uScale').map((x) => x[2]);
+      expect(us.some((v) => (v as number) < 0.99)).toBe(true);
+      expect(us[us.length - 1]).toBeCloseTo(1, 2);
+    } finally {
+      spy.mockRestore();
+      g.__sxPin = pin;
     }
   });
 

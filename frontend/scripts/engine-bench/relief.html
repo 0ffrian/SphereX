@@ -69,6 +69,25 @@
       return c.toDataURL('image/png');
     }
 
+    // #93 F1: with ref, the pixel difference of each picture pair (mean and largest level difference over the RGB
+    // channels, and the share of channels off by more than 8 levels).
+    const raw = {};
+    function pixDiff(a, b) {
+      if (a.length !== b.length) return 'sizes differ';
+      let s = 0,
+        mx = 0,
+        big = 0;
+      for (let i = 0; i < a.length; i++) {
+        if ((i & 3) === 3) continue;
+        const d = Math.abs(a[i] - b[i]);
+        s += d;
+        if (d > mx) mx = d;
+        if (d > 8) big++;
+      }
+      const n = (a.length / 4) * 3;
+      return { mean: +(s / n).toFixed(3), max: mx, over8_pct: +((big / n) * 100).toFixed(3) };
+    }
+
     async function run(base, tag) {
       const { createCore } = await import(base + 'core.js');
       const { WP } = await import(base + 'presets.js');
@@ -92,6 +111,7 @@
             img = new Uint8Array(v.w * v.h * 4);
           gl.readPixels(0, 0, v.w, v.h, gl.RGBA, gl.UNSIGNED_BYTE, img);
           r.globe = relief(img, v.w, v.h);
+          raw[tag + '_globe'] = img;
           out.png[tag + '_globe'] = png(img, v.w, v.h);
         } else {
           W.fly = true;
@@ -110,6 +130,7 @@
               img = new Uint8Array(v.gx * v.h * 4);
             gl.readPixels(0, 0, v.gx, v.h, gl.RGBA, gl.UNSIGNED_BYTE, img);
             r['fly_' + alt] = relief(img, v.gx, v.h);
+            raw[tag + '_fly_' + alt] = img;
             out.png[tag + '_fly_' + alt] = png(img, v.gx, v.h);
           }
         }
@@ -123,6 +144,12 @@
       await run(Q.get('base') || '/src/engine/worlds/', 'cur');
       const ref = Q.get('ref');
       if (ref) await run(ref, 'ref');
+      if (ref) {
+        out.diff = {};
+        for (const k of Object.keys(raw))
+          if (k.startsWith('cur_'))
+            out.diff[k.slice(4)] = pixDiff(raw[k], raw['ref_' + k.slice(4)]);
+      }
     } catch (e) {
       out.err = String(e && e.stack ? e.stack : e);
     }
