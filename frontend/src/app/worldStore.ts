@@ -90,7 +90,7 @@ export const useWorldStore = create<WorldStoreState>((set, get) => ({
   bump: () => set((s) => ({ rev: s.rev + 1 })),
 }));
 
-/** The haptics' view of the world on screen: CPU arrays of the globe engine, or null when the engine is not drawing. */
+/** The world on screen for sound and queries (was the haptics' view, D-39): CPU arrays of the globe engine, or null when the engine is not drawing. */
 export function worldCpuFields() {
   return useWorldStore.getState().globe?.cpuFields() ?? null;
 }

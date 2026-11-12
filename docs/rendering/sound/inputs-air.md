@@ -42,8 +42,8 @@ All engine values come from the fly engine instance (`useWorldStore.getState().f
 | `c0 = √(γ R T0 / M)` (R = 8.314, M = mu/1000) | — | `derived` from inputs |
 | `ρ0 = P0 M / (R T0)` | — | `derived` |
 | `Z0 = ρ0 c0` | — | `derived` |
-| `airOK` | `!airless && P0 >= P_FLOOR` (rocky); `true` (gas) | — |
-| `liquid` | `!gas && state==='liquid' && fluid ∈ liquids table (§4.4)`; a lava world (`Ts > 700`, `hydro.lava`) uses lava | as `fluid` |
+| `airOK` | `P0 >= P_FLOOR` (rocky); `true` (gas). The engine's climate `airless` flag does not gate sound (Appendix D R6) | — |
+| `liquid` | `!gas && model.canLiquid && (state==='liquid' \|\| climate stats.liquid > 0) && fluid ∈ liquids table (§4.4)`; open water on the day side of a locked world counts even when the global state is "frozen" (Appendix D R7, as amended 12 Nov). A lava world (`Ts > 700`, `hydro.lava`) uses lava | as `fluid` |
 
 #### 3.3 New read-only accessors (wrapper only; no `@verbatim` code changes)
 
@@ -90,7 +90,7 @@ The listener is at height `z` km above the drawn ground (`engine.fly.alt`). For 
 | `N2` with mu < 25 (water-rich, e.g. mu 18) | 1.33 | water vapour [verify NIST] |
 | `CO2` | 1.29 at T ≥ 250 K; 9/7 = 1.286 below the relaxation frequency, 7/5 above | Maurice 2022. Sound speed uses 1.29; Mars's two speeds of sound are a caption fact (§12.3) |
 | `H2` (H₂/He) | 1.43 | [derived, verify ortho/para at T < 170 K] |
-| Rock vapour (lava world, mu 44 assumed) | 1.4 | Its 0.005 bar is below the 0.02 bar airless limit, so it is silent anyway (§7) |
+| Rock vapour (lava world, mu 44 assumed) | 1.4 | Its 0.005 bar (about 500 Pa) is above `P_FLOOR`, so a lava world has faint wind, lava roar and vents, labelled with the assumed atmosphere (`inferred_from_analog`; Appendix D R6) |
 
 #### 4.3 Absorption α(f), in Np/m, by class [PA Q3, Petculescu & Lueptow 2007]
 
