@@ -11,6 +11,7 @@ import { useAppStore } from '@/state/store';
 import { cardToWorld, type CardToWorldOk } from '@/engine/worlds/cardToWorld';
 import { WORLD_FLUIDS, WorldEngine, type EngineState } from '@/engine/worlds/WorldEngine';
 import { worldEngineSupported } from '@/engine/worlds/support';
+import { simModeFromQuery, simSourceFor } from '@/engine/worlds/simSource';
 import type { FluidKey, SpinMode } from '@/engine/worlds/types';
 import { ProvenanceBadge } from './Badge';
 import { useCloseUpStore } from './closeUpStore';
@@ -193,6 +194,18 @@ function useWorldEngine(
           if (st.world?.preset.id === world.preset.id) en.setOverrides(st.applied);
           st.setFly(en);
         }
+        // Issue #93 1.9, 1.10: one simulation for both views (in a worker where there is one). A view that opens
+        // on a world the other view has formed shows it formed at once (`?sim=own` keeps one simulation per view).
+        const other = role === 'globe' ? st.fly : st.globe;
+        const same = role === 'fly' && st.world?.preset.id === world.preset.id;
+        const src = simSourceFor(
+          simModeFromQuery(),
+          world.preset,
+          same ? st.applied : {},
+          en,
+          other?.simSource,
+        );
+        if (src) en.followSim(src);
       } catch (err) {
         fail(err);
         return;
