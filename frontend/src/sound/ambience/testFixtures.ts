@@ -58,6 +58,34 @@ export const TITAN_AIR: AirModel = {
   Vmax: null,
 };
 
+/** Mars-like thin CO2 air (ruling R6: thin-air worlds are no longer silent): 600 Pa, 210 K, mu 43.3. */
+export const MARS_AIR: AirModel = {
+  ...EARTH_AIR,
+  cls: 'CO2',
+  fluid: 'co2',
+  state: 'none',
+  T0: 210,
+  P0: 600,
+  H_km: 11.1,
+  mu: 43.3,
+  gamma: 1.29,
+  gv: 3.71,
+  c0: 228,
+  rho0: 0.0149,
+  Z0: 3.4,
+  liquid: null,
+  seed: 4242,
+  seed3: [4242, 4242, 4242],
+  oceanF: 0,
+  presetId: 'mars-like',
+  regime: 'Dust',
+  Vmax: null,
+};
+
+/** Titan-like params per #112 (rulings R2/R3): m_f about 2.6, rainPitch about 0.50. */
+export const TITAN_MF = 2.6;
+export const TITAN_RAIN_PITCH = 0.5;
+
 /** Group sample rates from §9.2 (test copies; #112 owns the real ones). */
 export const RATE: Record<SourceId, number> = {
   S1_land: 32000,

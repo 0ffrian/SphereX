@@ -14,7 +14,16 @@ import {
   type BakeOutput,
 } from './dsp';
 import * as K from './dspTuning';
-import { ALL_LOOP_BEDS, EARTH_AIR, EARTH_PARAMS, TITAN_AIR, spec } from './testFixtures';
+import {
+  ALL_LOOP_BEDS,
+  EARTH_AIR,
+  EARTH_PARAMS,
+  MARS_AIR,
+  TITAN_AIR,
+  TITAN_MF,
+  TITAN_RAIN_PITCH,
+  spec,
+} from './testFixtures';
 import type { BedSpec, SourceId } from './types';
 
 const N_SMALL = 1 << 16;
@@ -92,6 +101,7 @@ const rms = (x: Float32Array, a: number, b: number) => {
   return Math.sqrt(s / (b - a));
 };
 const db = (x: number) => 20 * Math.log10(x);
+const allFinite = (x: Float32Array) => x.every((v) => Number.isFinite(v));
 
 describe("mulberry32 parity with Moon's rng32", () => {
   // Moon's prototype, verbatim, as the reference.
@@ -171,6 +181,20 @@ describe('seamless loops (§16.7)', () => {
     expect(wrap).toBeGreaterThanOrEqual(p1);
     expect(wrap).toBeLessThanOrEqual(p99);
   });
+  it.each(['S1_land', 'S1_sea', 'S2', 'S9', 'S12'] as const)(
+    '%s with Iu 0 (no gusts, no events): the wrap window is within ±1 dB of its neighbours',
+    (id) => {
+      const params = id === 'S12' ? { Iu: 0 } : { ...EARTH_PARAMS[id], Iu: 0 };
+      const { L, R } = baked(spec(id, N_PHYS, { params })).result;
+      const n = L.length,
+        w = 16384;
+      for (const x of [L, R]) {
+        const wrap = rms(x, n - w / 2, n + w / 2);
+        const side = (rms(x, n - w / 2 - 2 * w, n - w / 2) + rms(x, w / 2, w / 2 + 2 * w)) / 2;
+        expect(Math.abs(db(wrap / side))).toBeLessThan(1);
+      }
+    },
+  );
   it('S2 (noise only): the wrap window is within ±1 dB of the windows either side', () => {
     const { L } = baked(spec('S2', N_PHYS)).result;
     const n = L.length,
@@ -310,11 +334,63 @@ describe('params contract (App. D, frozen keys)', () => {
     ];
     for (const s of bad) expect(() => bakeBed(s, EARTH_AIR)).toThrow(BakeRefusedError);
   });
-  it('refuses a silent bed instead of returning zeros', () => {
-    // A whistle tone above the guard is dropped; with no tone left the bed is refused (never silence labelled ready).
+  it('refuses a bed whose every tone is above the guard', () => {
     expect(() =>
       bakeBed(spec('S3', 1 << 12, { params: { Iu: 0.24, fWhistle1_Hz: 20000 } }), EARTH_AIR),
     ).toThrow(BakeRefusedError);
+  });
+  it('refuses a silent bed instead of returning zeros (code review L7)', () => {
+    // A 0.5 Hz tone falls between the first FFT bins at 2^14 (bin 1.95 Hz), so the bed has no energy at all and is
+    // refused by the loudness gate as 'silent', never returned as zeros labelled ready.
+    try {
+      bakeBed(spec('S3', 1 << 14, { params: { Iu: 0.24, fWhistle1_Hz: 0.5 } }), EARTH_AIR);
+      throw new Error('no refusal');
+    } catch (e) {
+      expect(e).toBeInstanceOf(BakeRefusedError);
+      expect((e as BakeRefusedError).missing).toEqual(['silent']);
+    }
+  });
+});
+
+describe('thin air (ruling R6: Mars-like and lava worlds are not silent)', () => {
+  const marsParams: Record<string, Record<string, number>> = {
+    S1_land: { Iu: 0.24 },
+    S10: { Iu: 0.24 },
+    S3: { Iu: 0.24, fWhistle1_Hz: (0.15 * 20) / 0.006 },
+    S9: { Iu: 0.24 },
+    S8: {},
+  };
+  it.each(Object.keys(marsParams))('%s bakes finite at P0 600 Pa', (id) => {
+    const r = bakeBedDetailed(spec(id as SourceId, N_SMALL, { params: marsParams[id]! }), MARS_AIR);
+    expect(allFinite(r.result.L) && allFinite(r.result.R)).toBe(true);
+    expect(Math.abs(r.result.lufs - K.BED_LUFS)).toBeLessThan(0.5);
+  });
+  it('lava vent burst and thunder bake finite in thin air (500 Pa)', () => {
+    const air = { ...MARS_AIR, P0: 500, lavaWorld: true, presetId: 'lava-thin' };
+    for (const s of [
+      spec('S8', N_SMALL, { variant: 1 }),
+      spec('thunder', N_SMALL, {
+        variant: 2,
+        params: {
+          ...EARTH_PARAMS.thunder,
+          fm_Hz: 9,
+          d_m: 5000,
+          dur_s: 35,
+          crack: 0,
+          absK2: 1.7e-7,
+        },
+      }),
+    ]) {
+      const r = bakeBed(s, air);
+      expect(allFinite(r.L)).toBe(true);
+    }
+  });
+  it('S4 echo blur stays finite with strong CO2 absorption (absK2 1.7e-7)', () => {
+    const r = bakeBed(
+      spec('S4', N_SMALL, { params: { ...EARTH_PARAMS.S4, absK2: 1.7e-7 } }),
+      MARS_AIR,
+    );
+    expect(allFinite(r.L)).toBe(true);
   });
 });
 
@@ -334,14 +410,14 @@ describe('physics wiring (§7)', () => {
     expect(10 * Math.log10(at(400) / near(400))).toBeGreaterThan(10);
     expect(10 * Math.log10(at(400) / at(686))).toBeGreaterThan(30);
   });
-  it('S6 rain band falls with rainPitch (Titan p 0.49–0.68 below Earth 1.0, R3)', () => {
+  it('S6 rain band falls with rainPitch (Titan p 0.50–0.68 below Earth 1.0, R3)', () => {
     const e = baked(spec('S6', N_PHYS)).result;
     const t1 = baked(
-      spec('S6', N_PHYS, { params: { rainPitch: 0.68, mf: 2.2 } }),
+      spec('S6', N_PHYS, { params: { rainPitch: 0.68, mf: TITAN_MF } }),
       TITAN_AIR,
     ).result;
     const t2 = baked(
-      spec('S6', N_PHYS, { params: { rainPitch: 0.49, mf: 2.2 } }),
+      spec('S6', N_PHYS, { params: { rainPitch: TITAN_RAIN_PITCH, mf: TITAN_MF } }),
       TITAN_AIR,
     ).result;
     const c = (x: Float32Array) => centroid(x, e.sampleRate, 100, 12000);
@@ -360,9 +436,36 @@ describe('physics wiring (§7)', () => {
     expect(calm.ffts).toBe(1);
   });
   it('S6 notes the Titan bubble ring as dropped above the guard (G8)', () => {
-    const t = baked(spec('S6', N_PHYS, { params: { rainPitch: 0.6, mf: 2.2 } }), TITAN_AIR);
+    const t = baked(
+      spec('S6', N_PHYS, { params: { rainPitch: TITAN_RAIN_PITCH, mf: TITAN_MF } }),
+      TITAN_AIR,
+    );
     expect(t.notes.join(' ')).toMatch(/ring .* dropped/);
     expect(baked(spec('S6', N_PHYS)).notes.join(' ')).not.toMatch(/ring/);
+  });
+  it('S6 patter is capped at RAIN_PATTER_MAX (code review F3)', () => {
+    const big = bakeBedDetailed(
+      spec('S6', N_SMALL, { params: { rainPitch: 2, mf: 1 } }),
+      EARTH_AIR,
+    );
+    const loop = N_SMALL / 31000;
+    const raw = Math.round(K.RAIN_PATTER_PER_S * loop * 8);
+    if (raw > K.RAIN_PATTER_MAX) expect(big.notes.join(' ')).toMatch(/patter capped/);
+    else expect(big.notes.join(' ')).not.toMatch(/patter capped/);
+  });
+  it('far thunder swells in; near thunder knocks', () => {
+    const near = baked(spec('thunder', N_SMALL, { variant: 0 })).result;
+    const far = baked(
+      spec('thunder', N_SMALL, {
+        variant: 2,
+        params: { ...EARTH_PARAMS.thunder, d_m: 5000, dur_s: 35, crack: 0 },
+      }),
+    ).result;
+    const sr = near.sampleRate,
+      a = Math.floor(K.ONE_SHOT_PAD_S * sr),
+      b = a + Math.floor(0.03 * sr);
+    const early = (x: Float32Array) => rms(x, a, b) / rms(x, a, a + Math.floor(2 * sr));
+    expect(early(far.L)).toBeLessThan(early(near.L));
   });
   it('S4 uses at most 4 FFTs, the others at most 2', () => {
     for (const id of ALL_LOOP_BEDS)

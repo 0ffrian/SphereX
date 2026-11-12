@@ -26,8 +26,8 @@ export const LUFS_STEP_S = 0.1;
 // ---- Budgets and cache (§9.5) ----
 /** C. Loop-bed memory per world, MB (1e6 bytes). */
 export const BED_MEMORY_MB = 96;
-/** C. One-shot memory per world (thunder variants, vent burst), MB, outside the bed cap (coordinator ruling 2). */
-export const ONE_SHOT_MEMORY_MB = 24;
+/** C. One-shot memory per world (thunder variants, vent burst), MB, outside the bed cap (coordinator ruling 2), sized for 4 × 35 s thunder at 29 kHz plus the vent (33.8 MB, code review F1). */
+export const ONE_SHOT_MEMORY_MB = 36;
 /** C. Worlds kept in the palette cache (LRU). */
 export const CACHE_WORLDS = 2;
 /** C, V. Bake time budget per bed on the A15 (s) [verify by measurement, §19 item 10]. */
@@ -82,6 +82,8 @@ export const RAIN_ENV_DEPTH = 0.18;
 export const RAIN_PATTER_PER_S = 30;
 export const RAIN_DROPS_PER_S = 70;
 export const RAIN_DROPS_MAX = 6000;
+/** C. Cap on patter events (code review F3): keeps S6 inside the bake budget at large rainPitch. */
+export const RAIN_PATTER_MAX = 4000;
 /** P. Small-drop bubble ring on Earth, about 14 kHz [SS 4.3, Medwin et al. 1992], scaled by m_f. */
 export const RAIN_RING_HZ_EARTH = 14000;
 /** C. Share of impact drops that also ring. */
@@ -128,3 +130,6 @@ export const ONE_SHOT_TAIL_S = 0.5;
 /** C. Relative gains of the 20–60 Hz rumble and the crack. */
 export const THUNDER_RUMBLE_GAIN = 0.7;
 export const THUNDER_CRACK_GAIN = 0.8;
+/** C. Far rolls (no crack) swell in instead of knocking: onset rise (s) and level of the first event (tune by ear). */
+export const THUNDER_FAR_RISE_S = 0.2;
+export const THUNDER_FAR_AMP = 0.6;
