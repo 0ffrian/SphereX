@@ -4,7 +4,15 @@ import { BED_STEP_S, playlist } from './playlist';
 import type { BedLevel, SourceId } from '@/sound/ambience/types';
 
 const bed = (id: SourceId, gainDb = -6, variant = 0): BedLevel => ({
-  id, variant, trueDb: 60, gainDb, lowpassHz: 8000, shelfDb: 0, pan: 0, playbackRate: 1, harmonic: false,
+  id,
+  variant,
+  trueDb: 60,
+  gainDb,
+  lowpassHz: 8000,
+  shelfDb: 0,
+  pan: 0,
+  playbackRate: 1,
+  harmonic: false,
 });
 
 describe('sound-check playlist', () => {
@@ -17,7 +25,11 @@ describe('sound-check playlist', () => {
       chord: false,
     });
     expect(steps.map((s) => s.kind)).toEqual(['bed', 'bed', 'bed', 'thunder', 'data']);
-    expect(steps.slice(0, 3).map((s) => (s.kind === 'bed' ? s.id : ''))).toEqual(['S1_land', 'S5', 'S6']);
+    expect(steps.slice(0, 3).map((s) => (s.kind === 'bed' ? s.id : ''))).toEqual([
+      'S1_land',
+      'S5',
+      'S6',
+    ]);
     expect(steps[0]!.seconds).toBe(BED_STEP_S);
   });
 
@@ -25,7 +37,10 @@ describe('sound-check playlist', () => {
     const steps = playlist({
       beds: [bed('S1_land'), bed('S5')],
       baked: new Set(['S1_land|0']),
-      lightning: { allowed: false, reason: 'No lightning has ever been detected on Titan, so there is no thunder here.' },
+      lightning: {
+        allowed: false,
+        reason: 'No lightning has ever been detected on Titan, so there is no thunder here.',
+      },
       thunderVariants: [],
       chord: true,
     });
