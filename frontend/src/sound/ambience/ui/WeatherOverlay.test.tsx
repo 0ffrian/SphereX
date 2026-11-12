@@ -79,6 +79,19 @@ describe('drawWeatherFrame', () => {
     expect(strokes(frameAt(fakeEngine({ altKm: 3 }), snapOf(f, 10)).calls)).toHaveLength(0);
   });
 
+  it('PR #125 review N5: rain is seeded from the world: the same seed draws the same streaks, another seed others', () => {
+    const lines = (seed: number) => {
+      const { ctx, calls } = recordingCtx();
+      const st = newDrawState(seed);
+      st.W = W;
+      st.H = H;
+      drawWeatherFrame(ctx as never, st, fakeEngine({ altKm: 0.5 }), snapOf(rainFrame(), 10), new FlashGate(), 10, 1 / 30);
+      return JSON.stringify(calls.filter((c) => c.op === 'moveTo' || c.op === 'lineTo').map((c) => c.args));
+    };
+    expect(lines(101)).toBe(lines(101));
+    expect(lines(101)).not.toBe(lines(202));
+  });
+
   it('blue 16: a stale snapshot is not drawn; idle clears once and reports nothing to do', () => {
     const { calls, more } = frameAt(fakeEngine(), snapOf(rainFrame(), 9));
     expect(more).toBe(false);
@@ -248,7 +261,7 @@ describe('WeatherOverlay component', () => {
   });
 
   const mount = (engine: OverlayEngine | null = fakeEngine(), active = true, reduced = false) =>
-    act(() => root.render(<WeatherOverlay engine={engine} active={active} reduced={reduced} />));
+    act(() => root.render(<WeatherOverlay engine={engine} active={active} reduced={reduced} seed={101} />));
 
   it('is aria-hidden and never catches pointer input', () => {
     mount();
@@ -276,7 +289,11 @@ describe('WeatherOverlay component', () => {
     mount();
     act(() => publishWeather(snapOf(rainFrame(), now / 1000)));
     act(() => tick(40));
-    expect(container.querySelector('[data-testid="weather-caption"]')?.textContent).toBe(WEATHER_CAPTION);
+    const cap = container.querySelector('[data-testid="weather-caption"]') as HTMLElement | null;
+    expect(cap?.textContent).toBe(WEATHER_CAPTION);
+    // PR #125 review B2: the design-language class (bottom-left, clear of the Sound chip), no inline styles.
+    expect(cap?.className).toBe('sx-wx-cap');
+    expect(cap?.getAttribute('style')).toBeNull();
     act(() => publishWeather(null));
     act(() => tick(40));
     expect(rafQ.size).toBe(0);

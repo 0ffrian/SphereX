@@ -27,7 +27,7 @@ frontend/src/sound/ambience/
   captions.ts       §12 phrases
   useAmbience.ts    §10/13 hook (mounted in WorldFlyStage)
   (useWeather.ts)   not built: the overlay subscribes to weatherBus directly (#117)
-  weatherBus.ts     §8.5 the 10 Hz weather snapshot and the strike events (#116 publishes, #117 reads; Q-449)
+  weatherBus.ts     §8.5 the 10 Hz weather snapshot and the strike events (#116 publishes, #117 reads; Q-448(7))
   flashGate.ts      §8.5 flash safety: the strike gate and the stroke, group and safe envelopes (#117)
   weatherDraw.ts    §8.5 overlay geometry: particles, lean, the drawn deck, near-plane clipping, bolt (#117)
   ui/SoundChip.tsx, ui/WhatYouHear.tsx, ui/WeatherOverlay.tsx (rain, snow, bolts, glow, the weather caption),
@@ -149,7 +149,7 @@ sound/settings.ts              + ambienceOn, ambienceVolume, flashesOn, readCapt
 | `STAGE_WINDOW_DB`, harmonic branch mix | 24 dB, −12 dB | C |
 | `A_T`, `A_W`, `A_P`, `A_L`, `K_BR`, `H_BL`, `U_MIN` | 0.7, 1.0, 0.4, 1.2, 0.4, 500 m, 0.3 m/s | C / P (Simpson V) |
 | `RAIN_STREAKS_MAX`, snow cap, `SNOW_FALL_MS`, overlay fps | 600, 400, 1 m/s, 30 | C |
-| Overlay look (#117, all `artistic`): `RAIN_NEAR_M`, `RAIN_LAYER_SHARE`, `RAIN_WIDTH_PX`, `RAIN_ALPHA`, `SNOW_SIZE_PX`, `BOLT_RGB`, `BOLT_CORE_PX`/`BOLT_GLOW_PX`, `CLOUD_GLOW_R`, `DECK_GLOW_R`, `EDGE_GLOW_W`, `OVERLAY_DPR_CAP` | 2 m; 0.25/0.35/0.40; 2/1.5/1 px; 0.55/0.40/0.28; 3/2/1.5 px; (0.86, 0.91, 1); 2.5/8 px; 0.25 H; 0.3 H; 0.15 W; 1 | C [verify on the A15 + projector] |
+| Overlay look (#117, all `artistic`): `RAIN_NEAR_M`, `RAIN_LAYER_SHARE`, `RAIN_WIDTH_PX`, `RAIN_ALPHA`, `SNOW_SIZE_PX`, `BOLT_RGB`, `BOLT_CORE_PX`/`BOLT_GLOW_PX`, `CLOUD_GLOW_R`, `DECK_GLOW_R`, `EDGE_GLOW_W`, `OVERLAY_DPR_CAP` | 2 m; 0.25/0.35/0.40; 2/1.5/1.5 px; 0.55/0.40/0.35; 3/2/1.5 px; (0.86, 0.91, 1); 2.5/8 px; 0.25 H; 0.3 H; 0.15 W; 1 | C [verify on the A15 + projector] |
 | Overlay safety (#117, Q-449): `BOLT_STROKES_MIN/MAX`, stroke gap, bright, fade, `BOLT_LATE_S`, glow attack/fade, `SAFE_GLOW_*`, `WCAG_SMALL_AREA_PX2`, `NEAR_KM` | 2/3, 50 ms, 30 ms, 120 ms, 50 ms, 30/150 ms, 0.15 for 1 s, 21 824 px² at 1024×768, 0.1 km | C / WCAG |
 | `AMBIENCE_DUCK_DB`, duck attack/release | −9 dB, 0.05/0.6 s | C |
 | `PAN_MAX` | 0.8 | C |
