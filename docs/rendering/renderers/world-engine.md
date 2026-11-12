@@ -1,6 +1,6 @@
 # Renderers: world engine values
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7.7.1 · **Implements:** [D-37, Q-288, Q-304, Q-313 to Q-316](../../decisions/rendering-engines.md), [Q-330, Q-331](../../decisions/rendering-engines-review.md), [D-38, Q-343, Q-347 to Q-352](../../decisions/rendering-engines-tuning.md), [Q-355 to Q-361, Q-373, Q-375, Q-376, Q-379, Q-380](../../decisions/physics-fixes.md), [Q-363](../../decisions/contract.md) · **Read with:** [shader-kinds.md](shader-kinds.md) (R7.7, the three.js path), [engines.md](../engines.md) (R5.9), [open-items.md](../open-items.md) (R12)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R7.7.1 · **Implements:** [D-37, Q-288, Q-304, Q-313 to Q-316](../../decisions/rendering-engines.md), [Q-330, Q-331](../../decisions/rendering-engines-review.md), [D-40, Q-343, Q-347 to Q-352](../../decisions/rendering-engines-tuning.md), [Q-355 to Q-361, Q-373, Q-375, Q-376, Q-379, Q-380](../../decisions/physics-fixes.md), [Q-363](../../decisions/contract.md) · **Read with:** [shader-kinds.md](shader-kinds.md) (R7.7, the three.js path), [engines.md](../engines.md) (R5.9), [open-items.md](../open-items.md) (R12)
 
 ### R7.7.1 World engine values
 
@@ -17,7 +17,7 @@ Split out of [R7.7](shader-kinds.md#r77-shader-generated-kinds-planet_rocky-plan
 - **Saturn's rings:** Encke Gap centred at 133,584 km (2.2165 R_S), about 325 km wide; F ring at 140,180 to 140,240 km (one texture column), from the PDS Ring-Moon Systems Node table, **[verify]** (R12 #47). The TSL fallback uses the same radii (`ENCKE_GAP_KM`); `classifyRing` names the Encke Gap and the Cassini Division for the haptics.
 - **Solver pacing (TSL `GasWorld`):** one step is about 1,525 s of planet time for Jupiter and 430 s for Saturn (Q-331 corrects Q-254).
 
-**Issue #93 physics (D-38; Q-355 to Q-361; follow-up Q-373 to Q-380).** Each is a `@deviation (#93 3.x)` in the engine (`world_engine_deviations.py`) with the same rule in `frontend/src/physics/`.
+**Issue #93 physics (D-40; Q-355 to Q-361; follow-up Q-373 to Q-380).** Each is a `@deviation (#93 3.x)` in the engine (`world_engine_deviations.py`) with the same rule in `frontend/src/physics/`.
 
 - **Critical points (Q-355):** water 647.10 K, 22.064 MPa; NH₃ 405.4 K, 11.33 MPa; N₂ 126.19 K, 3.3958 MPa; CH₄ 190.56 K, 4.599 MPa; CO₂ 304.13 K, 7.3773 MPa (pure-fluid handbook values, NIST Chemistry WebBook). The boiling point is capped at Tc; above both Tc and Pc the fluid is `supercritical` (no sea surface) and the caption says so. NH₃–H₂O uses pure NH₃'s critical point, **[verify]** (R12 #53).
 - **Saturation pressure (Q-356):** water by Murphy and Koop 2005 (eq. 7 over ice, eq. 10 over liquid; 1,706 Pa at 288 K); CO₂ above its triple point with `Lv` (1.61 MPa at 250 K, NIST 1.785 MPa), below it with the sublimation heat.
