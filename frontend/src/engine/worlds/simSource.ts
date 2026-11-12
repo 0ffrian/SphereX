@@ -239,7 +239,8 @@ export class WorkerSimSource extends SimSource {
 
   protected step(playing: boolean, dt: number): void {
     this.dtAcc = Math.min(MAX_DT, this.dtAcc + (dt || 0));
-    if (this.inFlight) return;
+    // While the world forms the worker runs the spin-up on its own and reports as it goes (simWorkerCore form).
+    if (this.inFlight || (this.latest && this.latest.state.spinup > 0)) return;
     this.inFlight = true;
     this.post({ t: 'tick', playing, dt: this.dtAcc });
     this.dtAcc = 0;
@@ -269,13 +270,6 @@ export class WorkerSimSource extends SimSource {
       vel: r.state.gas ? this.lastVel : null,
     };
     this.deliverState(r.state, r.T, r.rain);
-    // While the world forms nothing is drawn (the Forming cover), so the worker spins up back to back instead of one
-    // tick a frame: a tick round trip is longer than a frame, which made the worker form Earth in 22 s against 15 s
-    // on the main thread. Each tick still keeps the prototype's 14 ms budget, so the steps are the same.
-    if (r.state.spinup > 0 && !this.error && this.viewCount) {
-      this.inFlight = true;
-      this.post({ t: 'tick', playing: false, dt: 0 });
-    }
   }
 
   private lastOut: Float32Array | null = null;
@@ -331,9 +325,13 @@ export function simSourceFor(
   return new LocalSimSource(preset, applied);
 }
 
-/** `?sim=own|shared|worker`; the default is the worker where there is one. */
+/**
+ * `?sim=own|shared|worker`. The default is one shared simulation on the main thread. The worker (`?sim=worker`) keeps
+ * the main thread free (longest task while forming 2 to 5 ms against 50 to 150 ms) but formed the globe 25 to 40 %
+ * slower than the old engine on the 4060 Ti desktop (12 Nov 2026), so it waits for the lead's call and the A15 run.
+ */
 export function simModeFromQuery(search = typeof location === 'undefined' ? '' : location.search) {
   const q = new URLSearchParams(search).get('sim');
   if (q === 'own' || q === 'shared' || q === 'worker') return q;
-  return typeof Worker === 'undefined' ? 'shared' : 'worker';
+  return 'shared';
 }

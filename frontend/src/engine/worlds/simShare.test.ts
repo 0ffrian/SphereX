@@ -182,8 +182,10 @@ class FakeWorker {
   onmessageerror: (() => void) | null = null;
   terminated = false;
   queue: WorkerReply[] = [];
-  private handle = makeSimWorker((m, transfer) =>
-    this.queue.push(structuredClone(m, { transfer })),
+  jobs: (() => void)[] = [];
+  private handle = makeSimWorker(
+    (m, transfer) => this.queue.push(structuredClone(m, { transfer })),
+    (f) => this.jobs.push(f),
   );
   postMessage(m: WorkerRequest) {
     this.handle(m);
@@ -191,8 +193,9 @@ class FakeWorker {
   terminate() {
     this.terminated = true;
   }
-  /** Deliver what the worker has posted (the event loop would). */
+  /** Run the worker's own next job (a spin-up chunk), then deliver what it has posted (the event loop would). */
   flush() {
+    this.jobs.shift()?.();
     for (const m of this.queue.splice(0))
       this.onmessage?.({ data: m } as MessageEvent<WorkerReply>);
   }

@@ -2,7 +2,8 @@
 // Issue #93 1.10: the simulation worker gives the same bytes as the synchronous engine. The worker's message handler
 // (simWorkerCore.ts, the code sim.worker.ts runs) is driven in-process; every reply goes through structuredClone with
 // its transfer list, as postMessage would send it. The synchronous side is the engine core ticking itself, as the
-// prototype does. Both use the parity virtual clock (1 ms a performance.now call), so they take the same steps a tick.
+// prototype does. The worker forms the world back to back (SimHost.spinChunk); after the same 900 (or 420) spin-up
+// steps and the same playing ticks (parity virtual clock, 1 ms a performance.now call) the grids must be identical.
 import { afterEach, describe, expect, it } from 'vitest';
 import { headlessCore, preset } from './coreHarness.testutil';
 import { makeSimWorker, type WorkerReply } from './simWorkerCore';
@@ -55,10 +56,15 @@ function runSync(id: string): Result {
   core.setPreset(preset(id));
   const W = core.W;
   let ticks = 0;
+  // 5.5 ms a clock read: one climate step a tick, so the spin-up takes exactly its 900 steps (the worker's back-to-back
+  // spin-up does too; the prototype's last tick can step past the end, see simBudget.test.ts).
+  let t = 0;
+  performance.now = () => (t += 5.5);
   while (W.spinup > 0 && ticks < 5000) {
     W.gl.tick(W.m, false, DT);
     ticks++;
   }
+  virtualClock();
   for (let i = 0; i < PLAY_TICKS; i++, ticks++) W.gl.tick(W.m, true, DT);
   const EB = core.EB,
     gas = !!W.m.gas;
@@ -78,7 +84,11 @@ function runSync(id: string): Result {
 function runWorker(id: string): Result {
   virtualClock();
   const replies: WorkerReply[] = [];
-  const handle = makeSimWorker((m, transfer) => replies.push(structuredClone(m, { transfer })));
+  const jobs: (() => void)[] = [];
+  const handle = makeSimWorker(
+    (m, transfer) => replies.push(structuredClone(m, { transfer })),
+    (f) => jobs.push(f),
+  );
   handle({ t: 'init', preset: preset(id), applied: {}, gen: 1 });
   const r: Result = {
     ticks: 0,
@@ -109,7 +119,7 @@ function runWorker(id: string): Result {
   };
   take();
   while (r.spinup > 0 && r.ticks < 5000) {
-    handle({ t: 'tick', playing: false, dt: DT });
+    jobs.shift()?.(); // the worker's own next spin-up chunk
     r.ticks++;
     take();
   }
@@ -127,9 +137,7 @@ describe('#93 1.10 the simulation worker matches the synchronous engine byte for
       () => {
         const a = runSync(id);
         const b = runWorker(id);
-        expect(b.ticks).toBe(a.ticks);
         expect(b.spinup).toBe(0);
-        expect(b.step).toBe(a.step);
         for (const k of ['out', 'out2', 'T', 'rain', 'vel'] as const) {
           expect(b[k] === null, k).toBe(a[k] === null);
           if (a[k]) expect(bytes(b[k])!.equals(bytes(a[k])!), k).toBe(true);

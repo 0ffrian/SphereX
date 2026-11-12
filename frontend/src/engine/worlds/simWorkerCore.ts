@@ -23,6 +23,12 @@ export type WorkerReply =
     }
   | { t: 'error'; message: string };
 
+/**
+ * How long the worker runs the spin-up between two reports while a world forms (UI pacing, ms): about 20 progress
+ * updates a second, each with one cloud pass. Nothing is drawn while a world forms (the Forming cover).
+ */
+export const SPIN_CHUNK_MS = 48;
+
 type Post = (m: WorkerReply, transfer: Transferable[]) => void;
 
 /** True when every byte is zero (a raster with nothing drawn, sent as one texel instead of 8 MB). */
@@ -34,10 +40,14 @@ function allZero(a: Uint8Array): boolean {
 }
 
 /** Message handler of the simulation worker. `post` is the worker's postMessage (or a test's stand-in). */
-export function makeSimWorker(post: Post): (m: WorkerRequest) => void {
+export function makeSimWorker(
+  post: Post,
+  schedule: (f: () => void) => void = (f) => setTimeout(f, 0),
+): (m: WorkerRequest) => void {
   let ops: SimOp[] = [];
   let host: SimHost | null = null;
   let gen = 0;
+  let forming = false;
   const sink = (op: SimOp) => {
     // GasSim reuses its export buffer within one tick (an upload every 4 steps of a spin-up): copy it now.
     if (op.o === 'vel') ops.push({ o: 'vel', d: op.d.slice() });
@@ -86,6 +96,30 @@ export function makeSimWorker(post: Post): (m: WorkerRequest) => void {
     post({ t: 'batch', ops: sent, state, T, rain }, transfer);
   };
 
+  const fail = (err: unknown) =>
+    post({ t: 'error', message: err instanceof Error ? err.message : String(err) }, []);
+  // While a world forms the worker runs the spin-up on its own, chunk after chunk (SimHost.spinChunk), reporting after
+  // each, without waiting for the page to ask (a round trip per chunk made it form slower than the main thread).
+  const formChunk = () => {
+    if (!host || host.spinup <= 0) {
+      forming = false;
+      return;
+    }
+    try {
+      host.spinChunk(SPIN_CHUNK_MS);
+      reply();
+      schedule(formChunk);
+    } catch (err) {
+      forming = false;
+      fail(err);
+    }
+  };
+  const form = () => {
+    if (forming || !host || host.spinup <= 0) return;
+    forming = true;
+    schedule(formChunk);
+  };
+
   return (m: WorkerRequest) => {
     try {
       switch (m.t) {
@@ -95,23 +129,29 @@ export function makeSimWorker(post: Post): (m: WorkerRequest) => void {
           host = new SimHost(sink);
           host.load(m.preset, m.applied);
           reply();
+          form();
           return;
         case 'set':
           gen = m.gen;
           host?.setOverrides(m.o);
           reply();
+          form();
           return;
         case 'tick':
-          host?.tick(m.playing, m.dt);
+          if (!host) return;
+          // After the spin-up: the prototype's tick, one a frame. While forming the worker runs on its own (form).
+          if (host.spinup > 0) form();
+          else host.tick(m.playing, m.dt);
           reply();
           return;
         case 'dispose':
           host = null;
           ops = [];
+          forming = false;
           return;
       }
     } catch (err) {
-      post({ t: 'error', message: err instanceof Error ? err.message : String(err) }, []);
+      fail(err);
     }
   };
 }

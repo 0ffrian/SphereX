@@ -107,6 +107,8 @@
             const t = performance.now();
             f(m);
             if (cur) cur.tasks.push(performance.now() - t);
+            if (cur && m.ops)
+              cur.clouds = (cur.clouds || 0) + m.ops.filter((o) => o.o === 'cloud').length;
           };
         }
       };
@@ -146,6 +148,14 @@
       }
       res.globe_formed = r1(performance.now() - t0);
       res.forming = summary(cur);
+      // Simulation ticks while forming (one cloud pass each): main-thread ticks, or the worker's cloud passes.
+      res.forming_ticks = cur.clouds || cur.sim.length;
+      if (Q.get('globeonly')) {
+        cur = null;
+        g.dispose();
+        gc.remove();
+        return res;
+      }
       g.playing = true;
       cur = phase();
       const tg = performance.now();
