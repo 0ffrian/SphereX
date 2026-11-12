@@ -542,4 +542,122 @@ function patterns() {
   FLY_FS = F;
 }
 patterns();
+// @deviation (#93 F1) fly view ticket 1: a faster march over the same surface. heightPyramid.js builds, once per
+// terrain, a pyramid of ceilings: for each cell of 2^L x 2^L height texels (L = 0 to 6), the highest the marched
+// surface can reach within one cell width of the cell (the height grid as the warp and the bilinear read can reach it,
+// plus the most every noise octave can add). core.js puts it on texture unit 11 and sets uPyrOn.
+//  - Each march step first tries the largest level whose ceiling stays below the ray, less the march's own hit
+//    tolerance (1e-6 + t 6e-5), over the next cell width of travel, and steps that far in one go: no hit can be there.
+//    The level climbs after such a step and falls after a miss; only when no level allows a step is the surface
+//    evaluated, exactly as before. Sky and horizon rays no longer crawl through the 14 km shell and run out of their
+//    360 steps, so the distant terrain the cap dropped is drawn.
+//  - A shadow step whose height above the level-0 ceiling is at least a tenth of its step length cannot darken the
+//    pixel (its penumbra term 10 gq / st is 1 or more), so it skips the surface: the shadow is unchanged.
+//  - The shaded height at the hit (HQ, for the normal's p0 and again as hk) is evaluated once.
+// The surface, the shading and their constants are unchanged; a hit moves by less than the hit tolerance.
+function flyMarch() {
+  function rep(src, a, b) {
+    if (src.split(a).length !== 2) throw new Error('#93 F1: ' + (src.split(a).length - 1) + ' matches of ' + a.slice(0, 70));
+    return src.split(a).join(b);
+  }
+  var F = FLY_FS;
+  F = rep(F, 'uniform sampler2D uTr,uLut,uHt,uEb,uBand,uHy,uVel,uEb2;out vec4 O;\n',
+    'uniform sampler2D uTr,uLut,uHt,uEb,uBand,uHy,uVel,uEb2;out vec4 O;\nuniform highp sampler2D uPyr;uniform float uPyrOn;\n');
+  F = rep(F, 'float rsph(', '/* (#93 F1) the max-height pyramid (heightPyramid.js): the ceiling (km) of level L around the texel under uv */\n' +
+    'float pyrK(vec2 uv,int L){ivec2 c=ivec2(clamp(floor(uv*vec2(720.,360.)),vec2(0.),vec2(719.,359.)))>>L;\n' +
+    ' return texelFetch(uPyr,c+(L==0?ivec2(0):ivec2(720-(720>>(L-1)),360)),0).r;}\n' +
+    '/* that ceiling as a radius, with the lava sea and the ocean floor that hKm applies */\n' +
+    'float pyrR(float k){return 1.+max(max(k,uLava>.5?uHM:-1e4),uOcean>.5?0.:-1e4)*uEx/uRkm;}\n' +
+    '/* the march\'s safe step from t: the largest level (from lv down) whose ceiling stays below the ray, less the hit\n' +
+    '   tolerance, over the next cell width of travel (s keeps every point within one cell of d); 0 if none */\n' +
+    'float pyrStep(vec3 ro,vec3 rd,float t,vec3 d,inout int lv){\n' +
+    ' vec2 uv=uvOf(d);float la=abs(asin(clamp(d.y,-1.,1.))),tc=-dot(ro,rd);\n' +
+    ' for(int k=0;k<7+uZ0;k++){if(lv<0)break;\n' +
+    '  float c=float(1<<lv)*(PI/360.),pm=la+c;\n' +
+    '  if(pm<1.5){float s=asin(sin(c)*cos(pm)),te=t+s,rm=length(ro+rd*clamp(tc,t,te));\n' +
+    '   if(rm>=1.&&rm-1e-6-te*6e-5>pyrR(pyrK(uv,lv))){lv=min(lv+1,6);return s;}}\n' +
+    '  lv--;}\n' +
+    ' return 0.;}\n' +
+    'float rsph(');
+  F = rep(F, 'for(int i=0;i<360+uZ0;i++){p=ro+rd*t;float r=length(p),g=r-surfR(p/r);',
+    'int lv=6;for(int i=0;i<360+uZ0;i++){p=ro+rd*t;float r=length(p);if(uPyrOn>.5){float sk=pyrStep(ro,rd,t,p/r,lv);if(sk>0.){t+=sk;if(t>t1)break;continue;}lv=0;}float g=r-surfR(p/r);');
+  F = rep(F, 'float rq=length(s2),gq=rq-surfR(s2/rq);',
+    'float rq=length(s2),gq=1e9;if(uPyrOn<.5||rq-pyrR(pyrK(uvOf(s2/rq),0))<st*.1)gq=rq-surfR(s2/rq);');
+  // the shaded height at the hit was evaluated twice (for the normal's p0 and as hk), with the same reads: once now
+  F = rep(F, 'vec3 da=normalize(d+tA*ee),db=normalize(d+tB*ee),p0=d*surfR(d),',
+    'float hk0=hKm(d);vec3 da=normalize(d+tA*ee),db=normalize(d+tB*ee),p0=d*(1.+hk0*uEx/uRkm),');
+  F = rep(F, 'float e=crs(uHt,uv).r,hk=hKm(d),', 'float e=crs(uHt,uv).r,hk=hk0,');
+  FLY_FS = F;
+}
+flyMarch();
+// @deviation (#93 F3) fly view ticket 3, the static G-buffer. The terrain never changes, so while the camera is still
+// the march, the normal and the gullies give the same result every frame. FLY_FS now also writes them (with uGB = 1,
+// into three float targets core.js attaches beside the colour): O1 = (hit distance, shaded height, gully value G,
+// shadow-ray start radius), O2 = (normal before the gullies, shadow), O3 = (normal after the gullies). With uGB = 2 it
+// reads them back (texelFetch at the same pixel) instead of marching, and with uGBsh = 1 (the Sun has not moved
+// either) the shadow too; light, colour, climate, clouds, water and air are drawn as before, every frame. The values
+// are the ones the full pass computed, so a still frame shows what the full pass drew. A drawing buffer without the
+// extra targets ignores O1 to O3. Gas giants and the globe do not use it (uGB = 0).
+function flyPasses() {
+  function rep(src, a, b) {
+    if (src.split(a).length !== 2) throw new Error('#93 F3: ' + (src.split(a).length - 1) + ' matches of ' + a.slice(0, 70));
+    return src.split(a).join(b);
+  }
+  var F = FLY_FS;
+  F = rep(F, 'out vec4 O;\nuniform highp sampler2D uPyr;',
+    'layout(location=0) out vec4 O;layout(location=1) out vec4 O1;layout(location=2) out vec4 O2;layout(location=3) out vec4 O3;\n' +
+    'uniform highp sampler2D uGB1,uGB2,uGB3;uniform float uGB,uGBsh;\nuniform highp sampler2D uPyr;');
+  F = rep(F, 'bool HQ=false;', 'vec4 GW1=vec4(-1.,0.,0.,0.),GW2=vec4(0.),GW3=vec4(0.),GB1,GB2,GB3;bool HQ=false;');
+  F = rep(F, 'vec3 rd=normalize(uFwd+q.x*uFov*uRt+q.y*uFov*uUp),ro=uCam;\n',
+    'vec3 rd=normalize(uFwd+q.x*uFov*uRt+q.y*uFov*uUp),ro=uCam;\n' +
+    ' if(uGB>1.5){ivec2 fc=ivec2(gl_FragCoord.xy);GB1=texelFetch(uGB1,fc,0);GB2=texelFetch(uGB2,fc,0);GB3=texelFetch(uGB3,fc,0);}\n');
+  F = rep(F, '\n else{float top=1.+14.*uEx/uRkm,t1,t0=rsph(ro,rd,top,t1);',
+    '\n else if(uGB>1.5){hit=GB1.x;p=ro+rd*hit;}\n else{float top=1.+14.*uEx/uRkm,t1,t0=rsph(ro,rd,top,t1);');
+  F = rep(F, 'float hk0=hKm(d);vec3 da=normalize(d+tA*ee),db=normalize(d+tB*ee),p0=d*(1.+hk0*uEx/uRkm),n=normalize(cross(da*surfR(da)-p0,db*surfR(db)-p0));if(dot(n,d)<0.)n=-n;',
+    'float hk0;vec3 p0,n;if(uGB>1.5){hk0=GB1.y;n=GB2.xyz;}else{hk0=hKm(d);vec3 da=normalize(d+tA*ee),db=normalize(d+tB*ee);p0=d*(1.+hk0*uEx/uRkm);n=normalize(cross(da*surfR(da)-p0,db*surfR(db)-p0));if(dot(n,d)<0.)n=-n;}\n' +
+    '   p0=d*(1.+hk0*uEx/uRkm);GW1=vec4(hit,hk0,0.,0.);GW2.xyz=n;');
+  F = rep(F, '   HQ=false;float sh=1.;\n   if(dot(n,uLb)>0.){vec3 s2=d*surfR(d)+d*2e-6;',
+    '   HQ=false;float sh=1.,rs0=0.;\n   if(uGB>1.5)rs0=GB1.w;else if(uGB>.5||dot(n,uLb)>0.)rs0=surfR(d);GW1.w=rs0;\n' +
+    '   if(uGBsh>.5)sh=GB2.w;else if(dot(n,uLb)>0.){vec3 s2=d*rs0+d*2e-6;');
+  F = rep(F, 'sh=clamp(sh,0.,1.);}\n', 'sh=clamp(sh,0.,1.);}GW2.w=sh;\n');
+  F = rep(F, 'vec3 sl=n-d*dot(n,d),fw=faceW(d),gt=vec3(0.);float G=0.;\n',
+    'float G=0.;if(uGB>1.5){G=GB1.z;n=GB3.xyz;}else{vec3 sl=n-d*dot(n,d),fw=faceW(d),gt=vec3(0.);\n');
+  F = rep(F, 'n=normalize(n-(gt-d*dot(gt,d))*.3*uEx);', 'n=normalize(n-(gt-d*dot(gt,d))*.3*uEx);}GW1.z=G;GW3.xyz=n;');
+  F = rep(F, 'O=vec4(pow(1.-exp(-col*1.5),vec3(1./2.2)),1.);', 'O=vec4(pow(1.-exp(-col*1.5),vec3(1./2.2)),1.);O1=GW1;O2=GW2;O3=GW3;');
+  FLY_FS = F;
+}
+flyPasses();
+// @deviation (#93 F3) the height reads (texture(s, uv) in hKm and in the Catmull-Rom crs()) and the gas giant's reads
+// (uVel, uBand in the uMode branch) become textureLod(s, uv, 0.). No texture of the world engine has mipmaps and each one
+// minifies and magnifies with the same filter, so both read the same texels with the same weights: the picture is
+// unchanged (measured: 0 levels of difference). But texture() takes screen-space derivatives, and on ANGLE D3D11 fxc
+// then flattens the branches around those reads and runs both sides; with textureLod() a branch that is not taken is
+// skipped. Measured on the RTX 4060 Ti (fly.html): the G-buffer's still frame no longer runs the march (TRAPPIST-1 f at
+// 3 km 11.7 to 0.5 ms), a rocky world no longer runs the gas giant's advection (moving 13.1 to 10.5 ms) and a gas giant
+// no longer runs the rocky march and shading (Jupiter at 50 km 9.7 to 0.6 ms). Every texture() in FLY_FS gave the same
+// frame times but a slower cold compile (median about 32 s against 22 s, Q-337), so only these reads are changed.
+function flyLod() {
+  function lod(F) {
+    var o = '', i = 0, k;
+    while ((k = F.indexOf('texture(', i)) >= 0) {
+      if (/[A-Za-z0-9_]/.test(F[k - 1])) { o += F.slice(i, k + 8); i = k + 8; continue; }
+      var d = 0, j = k + 8, c = 0;
+      for (; j < F.length; j++) { var ch = F[j]; if (ch === '(') d++; else if (ch === ')') { if (d === 0) break; d--; } else if (ch === ',' && d === 0) c++; }
+      if (c !== 1) throw new Error('#93 F3: a texture() call with ' + (c + 1) + ' arguments');
+      o += F.slice(i, k) + 'textureLod(' + F.slice(k + 8, j) + ',0.)'; i = j + 1;
+    }
+    return o + F.slice(i);
+  }
+  function inside(a, b, n) {
+    var i = FLY_FS.indexOf(a), j = FLY_FS.indexOf(b, i);
+    if (i < 0 || j < 0 || FLY_FS.indexOf(a, i + 1) >= 0) throw new Error('#93 F3: no single ' + a);
+    var t = lod(FLY_FS.slice(i, j));
+    if (t.split('textureLod(').length - 1 !== n) throw new Error('#93 F3: ' + (t.split('textureLod(').length - 1) + ' height reads in ' + a);
+    FLY_FS = FLY_FS.slice(0, i) + t + FLY_FS.slice(j);
+  }
+  inside('vec4 crs(sampler2D t,vec2 uv){', 'float rsph(', 9);
+  inside('float hKm(vec3 d){', 'float surfR(', 2);
+  inside('if(uMode>.5){\n   /* gas giant', '}else{\n   vec3 tA=', 3);
+}
+flyLod();
 export { NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS };

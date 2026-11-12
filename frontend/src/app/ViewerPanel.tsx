@@ -279,8 +279,12 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const [emissions, setEmissions] = useState<{ key: string; jd: number } | null>(null);
   const emissionsRange = card && params?.type === 'comet' ? timeRange(card) : null;
   // #93 A10 (D-21): a planet's eclipse and phase-curve values are card facts, shown at every honesty level, not
-  // only in the "+ Artistic" engine panel.
-  const planetMeasured = useMemo(() => (card ? measuredReadouts(card) : []), [card]);
+  // only in the "+ Artistic" engine panel. Each follows the level like any other value: a measured value shows at
+  // "Measured only", a derived one (HD 189733 b's offset, converted from hours) from "+ Estimated" up.
+  const planetMeasured = useMemo(
+    () => (card ? measuredReadouts(card).filter((m) => isTagShown(honesty, m.tag)) : []),
+    [card, honesty],
+  );
   const emissionsJd =
     emissions && emissions.key === objectKey && emissionsRange ? emissions.jd : null;
   // Layers whose mesh or texture failed to load, per object. Keyed so a new object starts clean.
