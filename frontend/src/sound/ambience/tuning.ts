@@ -303,3 +303,35 @@ export const L_REF = {
 } as const;
 /** C: live-caption minimum interval (consumed by T6). */
 export const CAPTION_MIN_S = 3;
+
+// ---------- live mixing and lifecycle (§10, §13; #116) ----------
+/** C: mixer tick rate, Hz (§10). */
+export const AMBIENCE_UPDATE_HZ = 10;
+/** C: bed gain and filter time constants, s (§10). */
+export const GAIN_TAU_S = 0.15;
+export const FILTER_TAU_S = 0.1;
+/** C: fade-out on every Fading trigger, s (§13); re-bake crossfade, s; physics-change debounce, ms (§9.6). */
+export const FADE_S = 0.6;
+export const REBAKE_XFADE_S = 1.0;
+export const REBAKE_DEBOUNCE_MS = 800;
+/** C (#116, red H4): a fade's time constant is its length / 7, so the level is −61 dB when the sources stop. */
+export const FADE_TAU_DIVISOR = 7;
+/** C (#116): wall-clock margin after a fade before the sources are stopped and disconnected, s. */
+export const STOP_MARGIN_S = 0.05;
+/** C (§13): beds stay cached this long after the soundscape goes idle, ms. */
+export const KEEP_ALIVE_MS = 120_000;
+/** C (#116, ASSUMPTION): AudioParam dead bands; a smaller change is not written (keeps the tick under 1 ms). */
+export const MIX_DEADBAND_DB = 0.25;
+export const MIX_DEADBAND_HZ_FRAC = 0.02;
+export const MIX_DEADBAND_PAN = 0.02;
+export const MIX_DEADBAND_RATE = 0.005;
+/** C (#116, ASSUMPTION): the snow high shelf's corner, Hz (§11: "8 dB above 1 kHz"). */
+export const SNOW_SHELF_HZ = 1000;
+/** C (§10 node budget): live plus pending events at once. */
+export const EVENT_MAX = 4;
+/** C (#116, blue 23): thunder further than this many seconds of travel is not played. */
+export const THUNDER_MAX_DELAY_S = 15;
+/** C (#116, C8): the strike scheduler runs this far ahead of now, so the overlay hears of a strike ≥ 150 ms early. */
+export const STRIKE_LOOKAHEAD_S = 0.3;
+/** V: lava vent-burst events per minute (§7 S8 gives no rate). null = not fired (refused, not invented). [verify] */
+export const VENT_BURST_PER_MIN: number | null = null;
