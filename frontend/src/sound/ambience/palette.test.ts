@@ -138,7 +138,7 @@ describe('Palette', () => {
     expect(p.get('S6', 0)).not.toBeNull();
     expect(p.get('S2', 0)).toBeNull();
     expect(p.unavailable()).toEqual([
-      { source: 'S2', reason: expect.stringMatching(/^Sound for S2 unavailable: .*fHiss_Hz/) },
+      { source: 'S2', reason: expect.stringMatching(/^The sound of grit hissing in the wind is unavailable: .*fHiss_Hz/) },
     ]);
   });
 
@@ -262,6 +262,12 @@ describe('Palette', () => {
     jobs.shift()!();
     expect(p.get('S1_land', 0)).not.toBeNull();
     expect(p.unavailable().map((r) => r.source)).toEqual(['S6', 'S2']);
+    // m5 (#116): the text the panel shows names the sound, never the raw id
+    expect(p.unavailable().map((r) => r.reason)).toEqual([
+      'The sound of the rain is unavailable: the background sound maker did not start',
+      'The sound of grit hissing in the wind is unavailable: the background sound maker did not start',
+    ]);
+    for (const r of p.unavailable()) expect(r.reason).not.toMatch(/\bS\d+\b/);
     p.request([spec('S2', N), spec('S1_land', N), spec('S6', N)], EARTH_AIR);
     expect(jobs.length).toBe(0); // no second main-thread bake for this world (code review L4)
   });

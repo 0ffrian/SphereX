@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import composite, gemini, objects, overlays, resolve, sky, spectrum
+from app.api import areas, composite, gemini, objects, overlays, resolve, sky, spectrum
 from app.context import make_context
 from app.core.card.assets import AssetStore
 from app.core.card.catalogue import SHAPE_URL_ROOT, load_shape_registry, mesh_file
@@ -127,6 +127,7 @@ def create_app(
     app.include_router(overlays.router)
     app.include_router(gemini.router)
     app.include_router(sky.router)
+    app.include_router(areas.router)  # A17.8, issue #108
     # R6.7 / A5.4: the baked textures that RenderParams.textures point at (TEXTURE_URL_ROOT).
     app.mount("/data/textures", StaticFiles(directory=textures), name="textures")
     # Q-164: the pre-built demo pack's maps (committed, read only). Same StaticFiles rules as
@@ -156,6 +157,19 @@ def create_app(
 
     @app.get("/v1/health", tags=["meta"])
     def health() -> dict[str, object]:
-        return {"status": "ok", "offline": s.offline, "data_release": s.data_release}
+        # Issue #103: the start-up warm cache's progress, so the operator knows when the demo
+        # objects answer from the cache. state "off" when SX_PREFETCH_ON_START is not set.
+        warm: WarmCache | None = getattr(app.state, "warm", None)
+        progress = (
+            warm.status()
+            if warm is not None
+            else {"state": "off", "total": 0, "done": 0, "failed": 0}
+        )
+        return {
+            "status": "ok",
+            "offline": s.offline,
+            "data_release": s.data_release,
+            "warm": progress,
+        }
 
     return app

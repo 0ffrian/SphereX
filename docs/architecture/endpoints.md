@@ -34,14 +34,14 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
 | `GET /data/textures/{id}/{generator_version}/{seed}/{W}x{H}/<file>` | baked texture files (static mount) | R6.7, Q-47, Q-112 | [A5.4](data-contract.md#a54-asset-store), [A4.10](jobs.md#a410-object-job-and-fan-out) |
 | `GET /data/demo-textures/{id}/{generator_version}/{seed}/{W}x{H}/<file>` | the pre-built demo pack's maps (static mount of `SX_DEMO_TEXTURES_DIR`, read only, mounted under `SX_OFFLINE=1` too; only when the folder exists) | Q-164 (proposed) | [A5.4](data-contract.md#a54-asset-store) |
 | `GET /data/shapes/{name}.glb` | a registered shape-model mesh | Q-44, Q-61 | [A3.10](object-sources.md#a310-added-for-the-object-view), [A5](data-contract.md#a5-data-contract) |
-| `GET /v1/health` | `{status, offline, data_release}`; built (`main.py`), beyond D-16 | Q-195 (proposed) | [A10.2](frontend-platform.md#a102-running-the-event-build) |
+| `GET /v1/health` | `{status, offline, data_release, warm}`; built (`main.py`), beyond D-16; `warm` = warm-start progress `{state, total, done, failed}`; `finished` = every query in the warm list tried (issue #103) | Q-195 (proposed), Q-454 (proposed) | [A10.2](frontend-platform.md#a102-running-the-event-build) |
 
 **Planned** (not built; proposals in open decisions):
 
 | Route | Purpose | Decision | Spec |
 |---|---|---|---|
 | `GET /v1/objects/{id}/track.ecsv` | Track export (shared ECSV writer with Area search) | Q-145 (open, Kevin) | A19.9 ([moving-objects/track-contract.md](moving-objects/track-contract.md)) |
-| `/v1/areas/...` (list, one area, known objects, dots, tracks, checks (gated), stamps, export); planned errors 404 `area_not_found`, 404 `dot_not_found`, 503 `stamp_unavailable` | Area search | Q-146 item 6; payload shapes Q-208 (proposed) | A17.8 ([moving-objects/area-contract.md](moving-objects/area-contract.md#a178-endpoints)) owns the route list |
+| `/v1/areas/...` (list, one area, known objects, dots, tracks, stamps, export; checks gated and not served, D4 and D5 cut); errors 404 `area_not_found`, 404 `dot_not_found`, 503 `stamp_unavailable`. Built (issue #108, `backend/app/api/areas.py`) | Area search | Q-146 item 6; payload shapes Q-208 (proposed); as built Q-420 (proposed) | A17.8 ([moving-objects/area-contract.md](moving-objects/area-contract.md#a178-endpoints)) owns the route list |
 
 **Rules shared by every route.**
 

@@ -425,3 +425,158 @@ def ephemeris_range(
     rows = parse(served.entry.body)
     points = [EphemPoint(_parse_horizons_time(t), ra, dec) for t, ra, dec in rows]
     return points, served
+
+
+# --- Area search (A17.4, A17.5): positions with their 3-sigma, and SPHEREx's own velocity ------
+# QUANTITIES 1,36: RA/Dec plus "RA_3sigma, DEC_3sigma" in arcsec (checked live 12 Nov 2026 on
+# 433 Eros from 500@-163182: two extra CSV columns after RA, DEC).
+SIGMA_QUANTITIES = "1,36"
+SPHEREX_COMMAND = "-163182"  # the spacecraft as the target (A17.4)
+# Checked live 12 Nov 2026: COMMAND='-163182', CENTER='500@399', VEC_TABLE=2 answers with a
+# GEOMETRIC cartesian state in ICRF (X, Y, Z, VX, VY, VZ in au and au/day), so A17.4's [verify]
+# "that Horizons serves it" holds. JD read as TDB (about 69 s after UT, negligible for a velocity).
+VELOCITY_TABLE = "2"
+
+
+@dataclass(frozen=True)
+class SigmaPoint:
+    time: datetime
+    ra: float
+    dec: float
+    ra_3sigma_arcsec: float | None
+    dec_3sigma_arcsec: float | None
+
+
+def sigma_key(
+    spkid: str, jds: list[str], *, comet: bool = False, center: str = OBSERVER_SPHEREX
+) -> CacheKey:
+    return CacheKey.make(
+        SOURCE,
+        None,
+        command=command(spkid, comet, min(jds, key=float, default=None)),
+        center=center,
+        tlist=",".join(jds),
+        quantities=SIGMA_QUANTITIES,
+    )
+
+
+def _opt_arcsec(text: str) -> float | None:
+    try:
+        v = float(text)
+    except ValueError:
+        return None
+    return v if math.isfinite(v) and v >= 0.0 else None
+
+
+def parse_sigma(body: bytes) -> list[SigmaPoint]:
+    out: list[SigmaPoint] = []
+    for cols in _soe_rows(body):
+        if len(cols) >= 5 and cols[3] and cols[4]:
+            ra3 = _opt_arcsec(cols[5]) if len(cols) > 5 else None
+            dec3 = _opt_arcsec(cols[6]) if len(cols) > 6 else None
+            out.append(
+                SigmaPoint(_parse_horizons_time(cols[0]), float(cols[3]), float(cols[4]), ra3, dec3)
+            )
+    return out
+
+
+def ephemeris_sigma(
+    ctx: Context,
+    spkid: str,
+    times: list[datetime],
+    *,
+    comet: bool = False,
+    refresh: bool = False,
+    center: str = OBSERVER_SPHEREX,
+) -> tuple[list[SigmaPoint], Served]:
+    """One TLIST with RA/Dec and their 3-sigma (A17.5 step 2). Same request as ``ephemeris``
+    except ``QUANTITIES='1,36'``, which is part of the key."""
+    jds = jd_list(times)
+    if not jds:
+        raise UpstreamError("no epochs requested: Horizons needs at least one time")
+    key = sigma_key(spkid, jds, comet=comet, center=center)
+
+    def live() -> LiveResponse:
+        params = {
+            "format": "json",
+            "COMMAND": f"'{command(spkid, comet, min(jds, key=float))}'",
+            "OBJ_DATA": "NO",
+            "MAKE_EPHEM": "YES",
+            "EPHEM_TYPE": "OBSERVER",
+            "CENTER": f"'{center}'",
+            "TLIST_TYPE": "JD",
+            "TIME_TYPE": "UT",
+            "TLIST": " ".join(f"'{j}'" for j in jds),
+            "QUANTITIES": f"'{SIGMA_QUANTITIES}'",
+            "ANG_FORMAT": "DEG",
+            "CSV_FORMAT": "YES",
+            "EXTRA_PREC": "YES",
+        }
+        resp = ctx.http.get(ctx.settings.horizons_url, params)
+        try:
+            if not parse_sigma(resp.body):
+                raise ValueError("Horizons ephemeris block is empty")
+        except ValueError as exc:
+            raise UpstreamError(str(exc)) from exc
+        return resp
+
+    served = ctx.cache.fetch(key, live, refresh=refresh)
+    return parse_sigma(served.entry.body), served
+
+
+def velocity_key(jd: str) -> CacheKey:
+    return CacheKey.make(
+        SOURCE,
+        None,
+        command=SPHEREX_COMMAND,
+        center=GEOCENTRE,
+        tlist=jd,
+        ephem_type="VECTORS",
+        vec_table=VELOCITY_TABLE,
+    )
+
+
+def parse_velocity(body: bytes) -> tuple[float, float, float]:
+    """VX, VY, VZ in au/day (ICRF) from a VEC_TABLE=2 CSV row: JD, date, X, Y, Z, VX, VY, VZ."""
+    for cols in _soe_rows(body):
+        if len(cols) >= 8 and cols[5] and cols[6] and cols[7]:
+            try:
+                v = (float(cols[5]), float(cols[6]), float(cols[7]))
+            except ValueError as exc:
+                raise ValueError("bad state vector") from exc
+            if not all(math.isfinite(c) for c in v):
+                raise ValueError("bad state vector")
+            return v
+    raise ValueError("Horizons result has no velocity")
+
+
+def spherex_velocity(
+    ctx: Context, when: datetime, *, refresh: bool = False
+) -> tuple[tuple[float, float, float], Served]:
+    """SPHEREx's velocity relative to the geocentre at ``when`` (A17.4 ``w``, before projection)."""
+    jd = f"{utc_to_jd(when):.6f}"
+
+    def live() -> LiveResponse:
+        params = {
+            "format": "json",
+            "COMMAND": f"'{SPHEREX_COMMAND}'",
+            "OBJ_DATA": "NO",
+            "MAKE_EPHEM": "YES",
+            "EPHEM_TYPE": "VECTORS",
+            "CENTER": f"'{GEOCENTRE}'",
+            "TLIST_TYPE": "JD",
+            "TLIST": f"'{jd}'",
+            "VEC_TABLE": VELOCITY_TABLE,
+            "REF_PLANE": "FRAME",
+            "OUT_UNITS": "AU-D",
+            "CSV_FORMAT": "YES",
+        }
+        resp = ctx.http.get(ctx.settings.horizons_url, params)
+        try:
+            parse_velocity(resp.body)
+        except ValueError as exc:
+            raise UpstreamError(str(exc)) from exc
+        return resp
+
+    served = ctx.cache.fetch(velocity_key(jd), live, refresh=refresh)
+    return parse_velocity(served.entry.body), served
