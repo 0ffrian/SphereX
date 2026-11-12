@@ -71,14 +71,13 @@ describe('the Sun', () => {
 });
 
 describe('#93 3.4 turnover time (Reiners et al. 2022)', () => {
-  it('Barnard’s Star (0.1867 Rsun, 3195 K; about 0.0035 Lsun) has tau_c near 208 d', () => {
-    // Known answer (issue #93): 208 d with the Reiners law against 101 d with the Wright et al. 2011 mass fit.
-    const L = luminosityLsun(0.1867, 3195);
-    expect(L).toBeGreaterThan(0.003);
-    expect(L).toBeLessThan(0.0037);
-    const tau = turnoverTimeDays(0.1867, 3195);
-    expect(tau).toBeGreaterThan(200);
-    expect(tau).toBeLessThan(216);
+  it('Barnard’s Star from its card (0.2022 Rsun Gaia FLAME, 3243 K; L = 0.0041 Lsun) has tau_c near 193 d', () => {
+    // Known answer (issue #93 A9): what the engine computes from the card's R and T, 12.3 / sqrt(L) = 192.7 d,
+    // against 101 d with the Wright et al. 2011 mass fit. (The 208 d once quoted came from R 0.1867, T 3195 K.)
+    const L = luminosityLsun(0.2022, 3243);
+    expect(L).toBeGreaterThan(0.004);
+    expect(L).toBeLessThan(0.0042);
+    expect(turnoverTimeDays(0.2022, 3243)).toBeCloseTo(192.7, 1);
   });
   it('scales as L^-1/2', () => {
     expect(turnoverTimeDays(2, 5772) / turnoverTimeDays(1, 5772)).toBeCloseTo(0.5, 9);

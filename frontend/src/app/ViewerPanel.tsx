@@ -55,6 +55,7 @@ import { RockStage } from './build/RockStage';
 import { enginesEnabled } from './enginesSwitch';
 import { StarGlobeStage, useEngineStar } from './StarEngineStage';
 import { WorldGlobeStage, useEngineWorld } from './WorldEngineStage';
+import { measuredReadouts } from '@/engine/worlds/cardToWorld';
 import { engineKey, useWorldStore } from './worldStore';
 import { useViewControls } from './engineView';
 import { MouldStrip, type StripHandle } from './build/MouldStrip';
@@ -277,6 +278,9 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // Issue #71 F: the emissions view (comets with gas in both epochs) and its time. A new object closes it.
   const [emissions, setEmissions] = useState<{ key: string; jd: number } | null>(null);
   const emissionsRange = card && params?.type === 'comet' ? timeRange(card) : null;
+  // #93 A10 (D-21): a planet's eclipse and phase-curve values are card facts, shown at every honesty level, not
+  // only in the "+ Artistic" engine panel.
+  const planetMeasured = useMemo(() => (card ? measuredReadouts(card) : []), [card]);
   const emissionsJd =
     emissions && emissions.key === objectKey && emissionsRange ? emissions.jd : null;
   // Layers whose mesh or texture failed to load, per object. Keyed so a new object starts clean.
@@ -1194,6 +1198,22 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                       <dd className="text-neutral-100">
                         {r.value}{' '}
                         {r.tag && <ProvenanceBadge tag={r.tag} fixture={objectIsFixture} />}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+
+              {planetMeasured.length > 0 && (
+                <dl
+                  className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
+                  data-testid="planet-measured"
+                >
+                  {planetMeasured.map((m) => (
+                    <div key={m.field} className="contents">
+                      <dt className="text-neutral-300">{m.label}</dt>
+                      <dd className="text-neutral-100" title={m.source}>
+                        {m.value} <ProvenanceBadge tag={m.tag} fixture={objectIsFixture} />
                       </dd>
                     </div>
                   ))}

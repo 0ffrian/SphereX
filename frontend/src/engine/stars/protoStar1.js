@@ -23,8 +23,9 @@
 //     tau = 12.3 d (L/Lsun)^-1/2. tauC now takes the star (tauC(p.M) => tauC(p)) and returns 12.3 / sqrt(L), with
 //     L = R^2 (T / 5772 K)^4 (Stefan-Boltzmann, IAU 2015 B3 nominal solar Teff); the old body is left unreachable.
 //     The solar anchor B_SUN uses the same tau (12.3 d, so Ro_sun = 25.4 / 12.3 = 2.07, field 80 G; was 1.76 and
-//     98 G); spot coverage is relative to B_SUN, so the Sun's coverage is unchanged. Barnard's Star (about
-//     0.0035 Lsun): tau about 208 d (was 101 d). Same law as physics/stellar.ts turnoverTimeDays. model_dependent.
+//     98 G); spot coverage is relative to B_SUN, so the Sun's coverage is unchanged. Barnard's Star from its card
+//     (R 0.2022 Rsun Gaia FLAME, T 3243 K, so L = 0.0041 Lsun): tau about 193 d (was 101 d); the card's own FLAME
+//     luminosity is not read (#93 A9). Same law as physics/stellar.ts turnoverTimeDays. model_dependent.
 // Not changed but labelled: the granulation contrast (+-12 % in temperature, `(gran-.5)*.24`) is 2 to 3 times the
 // observed one, exaggerated so the cells show at this scale: artistic.
 // Issue #93 1.9 (deviation 4, @rename pairs 7 to 11): on ANGLE D3D11 (Chrome's default on Windows) fxc unrolls
