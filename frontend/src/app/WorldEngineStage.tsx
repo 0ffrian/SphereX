@@ -34,6 +34,8 @@ import { drawReady, GLOBE_KEYS, globeTurn, globeTurnBy, useWorldStore } from './
 import { engineHostCap } from '@/viewer/render/quality';
 import { gpuTimingFlags } from '@/viewer/render/gpuTiming';
 import { FLY_NOTE, WORLD_HONESTY, WORLD_NOTE_LINES } from './worldNotes.generated';
+import { useAmbience } from '@/sound/ambience/useAmbience';
+import { SoundChip } from '@/sound/ambience/ui/SoundChip';
 
 /** The engine's world for the shown card, or null: not a planet, refused, or no WebGL 2 (old path). */
 export function useEngineWorld(): CardToWorldOk | null {
@@ -831,6 +833,15 @@ export function WorldFlyStage({
   const settled = !!engine && engine.spinup === 0;
   const [about, setAbout] = useState(false);
   const [, redo] = useReducer((n: number) => n + 1, 0);
+  // R13.8 / R13.10 (#116): the flyover soundscape and the weather frame (#117 draws it) for this fly engine.
+  useAmbience({
+    engine,
+    world,
+    entered,
+    paused,
+    failed,
+    applied: () => useWorldStore.getState().applied,
+  });
 
   // Entry: draw the globe view once (the camera aims from it), then the artifact's aim and landing height.
   useEffect(() => {
@@ -947,6 +958,8 @@ export function WorldFlyStage({
     >
       <div ref={hostRef} className="absolute inset-0" />
       {forming && <Forming gas={gas} progress={progress} />}
+      {/* The fly view's own sound controls, shown whatever SHOW_FLY_BAR is (C6). */}
+      {engine && entered && <SoundChip />}
       {SHOW_FLY_BAR && engine && entered && (
         <div
           className="sx-cu-controls"
