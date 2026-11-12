@@ -245,17 +245,17 @@ export function Island() {
               <span className="sx-orb-word">{areaMini}</span>
             </button>
           ) : (
-          <span aria-hidden="true" className="contents">
-            {thinking || areaSay?.kind === 'searching' ? (
-              <GridLoader {...SEARCHING_LOOK} className="flex-none" />
-            ) : areaSay?.kind === 'found' ? (
-              <GridLoader {...FOUND_LOOK} className="flex-none" />
-            ) : updating && !reduced ? (
-              <GridLoader {...UPDATING_LOOK} className="flex-none" />
-            ) : (
-              <GridLoader {...LOADER_BASE} {...IDLE_LOOK} />
-            )}
-          </span>
+            <span aria-hidden="true" className="contents">
+              {thinking || areaSay?.kind === 'searching' ? (
+                <GridLoader {...SEARCHING_LOOK} className="flex-none" />
+              ) : areaSay?.kind === 'found' ? (
+                <GridLoader {...FOUND_LOOK} className="flex-none" />
+              ) : updating && !reduced ? (
+                <GridLoader {...UPDATING_LOOK} className="flex-none" />
+              ) : (
+                <GridLoader {...LOADER_BASE} {...IDLE_LOOK} />
+              )}
+            </span>
           )}
           {areaSay && (
             <span className="sx-orb-word" role="status" data-testid="area-island">

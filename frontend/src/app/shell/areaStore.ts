@@ -154,7 +154,9 @@ const FRESH = {
 /** Exposures shown: all of them, or those of one detector (D1..D6 is 0..5). */
 export function erosList(eros: ErosDemo | null, det: number | null): ErosHop[] {
   if (!eros) return [];
-  return det === null ? eros.hops : eros.hops.filter((h) => Number(h.detector.slice(1)) - 1 === det);
+  return det === null
+    ? eros.hops
+    : eros.hops.filter((h) => Number(h.detector.slice(1)) - 1 === det);
 }
 
 export const useAreaStore = create<AreaState>()((set, get) => {
@@ -180,7 +182,14 @@ export const useAreaStore = create<AreaState>()((set, get) => {
   const runKnown = (box: AreaBox) => {
     clearTimers();
     const mine = token;
-    set({ ...FRESH, stage: 'set', box, last: box, screen: 'search', say: { kind: 'searching', text: 'Known objects in this area' } });
+    set({
+      ...FRESH,
+      stage: 'set',
+      box,
+      last: box,
+      screen: 'search',
+      say: { kind: 'searching', text: 'Known objects in this area' },
+    });
     // Settled at once (a refusal must not sit unhandled while the island "searches").
     const answer = knownObjectsIn(box).then(
       (res) => ({ res }),
@@ -208,7 +217,9 @@ export const useAreaStore = create<AreaState>()((set, get) => {
             say: {
               kind: 'found',
               text:
-                (n === 0 ? 'No known objects in this area' : `${n} known object${n === 1 ? '' : 's'}: ${names}`) +
+                (n === 0
+                  ? 'No known objects in this area'
+                  : `${n} known object${n === 1 ? '' : 's'}: ${names}`) +
                 (res.demo ? ' (demo)' : ''),
             },
           });
@@ -250,7 +261,15 @@ export const useAreaStore = create<AreaState>()((set, get) => {
       set({ screen: 'list', say: null, minimised: false, playing: false });
     },
     openEros: () => {
-      set((s) => ({ screen: 'eros', minimised: false, index: 0, det: null, playing: false, sel: -1, fitSeq: s.fitSeq + 1 }));
+      set((s) => ({
+        screen: 'eros',
+        minimised: false,
+        index: 0,
+        det: null,
+        playing: false,
+        sel: -1,
+        fitSeq: s.fitSeq + 1,
+      }));
       void loadEros();
     },
     openDisc: () => {
@@ -262,7 +281,14 @@ export const useAreaStore = create<AreaState>()((set, get) => {
       }
       clearTimers();
       const mine = token;
-      set((s) => ({ screen: 'disc', minimised: false, step: -1, running: false, sel: -1, fitSeq: s.fitSeq + 1 }));
+      set((s) => ({
+        screen: 'disc',
+        minimised: false,
+        step: -1,
+        running: false,
+        sel: -1,
+        fitSeq: s.fitSeq + 1,
+      }));
       const box = get().box;
       if (!box) return;
       void Promise.all([discoverIn(box), loadEros()]).then(

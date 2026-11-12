@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AreaRefused } from '@/app/area/areaService';
-import { erosList, formatAreaDims, formatAreaSize, refusalOf, useAreaStore, type AreaBox } from './areaStore';
+import {
+  erosList,
+  formatAreaDims,
+  formatAreaSize,
+  refusalOf,
+  useAreaStore,
+  type AreaBox,
+} from './areaStore';
 
 const box: AreaBox = { a: { ra: 10, dec: 5 }, b: { ra: 11, dec: 4 }, widthDeg: 1, heightDeg: 1 };
 
@@ -24,7 +31,10 @@ describe('area store', () => {
     expect(s.box).toBeNull();
   });
   it('Known: setBox starts the island search, and an unprepared area ends in a refusal', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, json: async () => null })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, json: async () => null })),
+    );
     useAreaStore.getState().startFlow('known');
     useAreaStore.getState().setBox(box);
     expect(useAreaStore.getState().screen).toBe('search');

@@ -83,7 +83,7 @@ function ObjectPanel() {
 
   const r = sky.resolved;
   const subtitle = r
-    ? (displayName(r.name) || formatCoords(r.ra, r.dec))
+    ? displayName(r.name) || formatCoords(r.ra, r.dec)
     : sky.query
       ? `Looking up ${sky.query.q}`
       : 'No object yet';

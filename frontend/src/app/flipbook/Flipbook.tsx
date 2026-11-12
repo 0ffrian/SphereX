@@ -47,11 +47,7 @@ import {
 } from './frameGrid';
 import { shownIndexIn } from './frameSwap';
 import { flipbookKeyAction } from './keys';
-import {
-  countNoData,
-  NO_DATA_CAPTION,
-  noDataSummary,
-} from './noData';
+import { countNoData, NO_DATA_CAPTION, noDataSummary } from './noData';
 import { CombinePanel } from './overlays/CombinePanel';
 import { FlagMaskImage } from './overlays/FlagMask';
 import { MarkerLayer } from './overlays/MarkerLayer';
@@ -66,9 +62,7 @@ export function Flipbook({ onClose, onBuild }: { onClose(): void; onBuild?: () =
   const sky = useAppStore((s) => s.sky);
   const retry = useAppStore((s) => s.skyRetry);
   if (sky.status === 'idle') return null;
-  const name = sky.resolved
-    ? objectName(sky.resolved)
-    : (sky.query?.q ?? 'Flipbook');
+  const name = sky.resolved ? objectName(sky.resolved) : (sky.query?.q ?? 'Flipbook');
 
   // Not a Player: the picture area alone (black), with the name and close over it.
   const area = (inner: React.ReactNode) => (
@@ -118,7 +112,13 @@ export function Flipbook({ onClose, onBuild }: { onClose(): void; onBuild?: () =
       );
     }
     return (
-      <Player sky={sky} resolved={sky.resolved} frames={sky.frames} onClose={onClose} onBuild={onBuild} />
+      <Player
+        sky={sky}
+        resolved={sky.resolved}
+        frames={sky.frames}
+        onClose={onClose}
+        onBuild={onBuild}
+      />
     );
   }
   return null;
@@ -132,7 +132,17 @@ function objectName(resolved: ResolveResponse): string {
 function BuildItButton({ onBuild }: { onBuild(): void }) {
   return (
     <button type="button" className="fb-btn-primary" onClick={onBuild} data-testid="panel-build-it">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
         <path d="M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z M12 12l8-4.5 M12 12v9 M12 12 4 7.5" />
       </svg>
       Build it
@@ -452,7 +462,9 @@ function Player({
           <FlagMaskImage url={ovFrame.flags_url} onError={() => setFailedMask(ovFrame.flags_url)} />
         )}
       </div>
-      {picture && markers.length > 0 && <MarkerLayer markers={markers} width={grid} height={grid} />}
+      {picture && markers.length > 0 && (
+        <MarkerLayer markers={markers} width={grid} height={grid} />
+      )}
       {view === 'failed' && (
         <p
           className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-neutral-300"
@@ -513,7 +525,12 @@ function Player({
             <h2 className="text-[15.5px] font-semibold" data-testid="object-name">
               {name}
             </h2>
-            <button type="button" className="fb-x" aria-label="Close the flipbook" onClick={onClose}>
+            <button
+              type="button"
+              className="fb-x"
+              aria-label="Close the flipbook"
+              onClick={onClose}
+            >
               <Icon name="close" className="size-4" />
             </button>
           </div>
@@ -560,7 +577,9 @@ function Player({
             {colourHiddenNote(sky.colour.view)}
           </p>
         )}
-        {tint && <TintLegend wavelengthUm={frame.wavelength_um} stretch={stretchFormula(response)} />}
+        {tint && (
+          <TintLegend wavelengthUm={frame.wavelength_um} stretch={stretchFormula(response)} />
+        )}
         {overlays && !composite && <ContaminationNote view={overlays} fixture={sky.fixture} />}
 
         <FlipbookSpectrum name={name} />
@@ -573,7 +592,11 @@ function Player({
               label="More"
               value={moreTab}
               onChange={setMoreTab}
-              panelIds={{ overlays: panelId('overlays'), about: panelId('about'), combine: panelId('combine') }}
+              panelIds={{
+                overlays: panelId('overlays'),
+                about: panelId('about'),
+                combine: panelId('combine'),
+              }}
               options={[
                 { value: 'overlays', label: 'Overlays', testId: 'more-tab-overlays' },
                 { value: 'about', label: 'About', testId: 'more-tab-about' },
@@ -581,7 +604,12 @@ function Player({
               ]}
               testId="more-tabs"
             />
-            <div role="tabpanel" id={panelId('overlays')} hidden={moreTab !== 'overlays'} className="flex flex-col gap-3">
+            <div
+              role="tabpanel"
+              id={panelId('overlays')}
+              hidden={moreTab !== 'overlays'}
+              className="flex flex-col gap-3"
+            >
               <OverlayControls sky={sky} view={overlays} />
               {composite && overlaysOn && (
                 <p className="fb-muted" data-testid="overlay-composite-note">
@@ -599,7 +627,12 @@ function Player({
                 />
               )}
             </div>
-            <div role="tabpanel" id={panelId('about')} hidden={moreTab !== 'about'} className="flex flex-col gap-3">
+            <div
+              role="tabpanel"
+              id={panelId('about')}
+              hidden={moreTab !== 'about'}
+              className="flex flex-col gap-3"
+            >
               <dl className="fb-dl">
                 <dt>Position</dt>
                 <dd>
@@ -608,7 +641,9 @@ function Player({
                   {sky.fixture ? (
                     <DataBadge fixture variant="tag" />
                   ) : (
-                    position.tag !== 'measured' && <EstimatedBadge variant="tag" tooltip={position.tooltip} />
+                    position.tag !== 'measured' && (
+                      <EstimatedBadge variant="tag" tooltip={position.tooltip} />
+                    )
                   )}
                 </dd>
                 <dt>Release</dt>
@@ -624,7 +659,9 @@ function Player({
                   <EstimatedBadge variant="tag" tooltip={stretchFormula(response)} />
                 </dd>
                 <dt>Flags</dt>
-                <dd data-testid="frame-flags">{frame.flags.length > 0 ? frame.flags.join(', ') : 'none'}</dd>
+                <dd data-testid="frame-flags">
+                  {frame.flags.length > 0 ? frame.flags.join(', ') : 'none'}
+                </dd>
                 <dt>Orientation</dt>
                 <dd data-testid="orientation-note">
                   {response.north_up

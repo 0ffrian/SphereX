@@ -207,7 +207,9 @@ describe('ViewerPanel', () => {
     expect(text('viewer-announcer')).toMatch(/Observatory view.*larger detail/);
     await click('True scale');
     expect(pressed('True scale')).toBe('true');
-    expect(fake.setStarCloseUp).not.toHaveBeenCalledWith(expect.objectContaining({ halfWidth: expect.any(Number) }));
+    expect(fake.setStarCloseUp).not.toHaveBeenCalledWith(
+      expect.objectContaining({ halfWidth: expect.any(Number) }),
+    );
     expect(container.querySelector('[data-testid="star-readouts"]')?.textContent).toMatch(
       /Surface gravity/,
     );
@@ -523,7 +525,9 @@ describe('ViewerPanel', () => {
   };
   const pressP = async (target: EventTarget = window) => {
     await act(async () => {
-      target.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true, cancelable: true }));
+      target.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'p', bubbles: true, cancelable: true }),
+      );
     });
   };
 
@@ -533,9 +537,11 @@ describe('ViewerPanel', () => {
     useAppStore.getState().setHonesty('artistic');
     await mountPane();
     const inDetails = (label: string) =>
-      [...container.querySelectorAll<HTMLButtonElement>('[data-testid="build-details-panel"] button')].find(
-        (b) => b.textContent === label,
-      );
+      [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          '[data-testid="build-details-panel"] button',
+        ),
+      ].find((b) => b.textContent === label);
     await act(async () => inDetails('Measured only')!.click());
     expect(useAppStore.getState().honesty).toBe('measured');
     await act(async () => {});
@@ -574,7 +580,9 @@ describe('ViewerPanel', () => {
     await pressP(field);
     field.remove();
     await act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true, cancelable: true }));
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'p', ctrlKey: true, cancelable: true }),
+      );
     });
     expect(fake.setSpinPaused).not.toHaveBeenCalledWith(true);
   });
@@ -679,7 +687,10 @@ describe('ViewerPanel', () => {
     expect(buttons.length).toBeGreaterThan(8);
     // Panel controls (the design-language `sx-` classes) get their size from index.css, which jsdom does not
     // load: check the stylesheet. Every one has min-height >= 24 px, and 44 px on touch.
-    const css = readFileSync(resolve(__dirname, '../index.css'), 'utf8').replace(/@media[^{]*\{/g, '');
+    const css = readFileSync(resolve(__dirname, '../index.css'), 'utf8').replace(
+      /@media[^{]*\{/g,
+      '',
+    );
     const heights = (selector: string): number[] =>
       [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)]
         .filter(([, sel]) => sel!.split(',').some((x) => x.trim() === selector))
@@ -689,7 +700,10 @@ describe('ViewerPanel', () => {
       expect(Math.max(...heights(sel)), `${sel} on touch`).toBeGreaterThanOrEqual(44);
     }
     for (const b of buttons) {
-      const sized = /min-h-(11|\[4\d)/.test(b.className) || /\bsx-/.test(b.className) || b.closest('.sx-seg, .sx-sw-row') !== null;
+      const sized =
+        /min-h-(11|\[4\d)/.test(b.className) ||
+        /\bsx-/.test(b.className) ||
+        b.closest('.sx-seg, .sx-sw-row') !== null;
       expect(sized, `button "${b.textContent}" has no size class`).toBe(true);
     }
   });

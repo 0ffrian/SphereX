@@ -27,7 +27,15 @@ export const STAGE_S = 2.3;
 const TURN_RAD_PER_S = 0.28;
 /** Number of stages the mock-up's body of each kind stages (its `PLAN`). */
 const STAGES: Record<MouldKind, number> = {
-  asteroid: 4, comet: 5, star: 4, dwarf: 4, rocky: 4, water: 5, gas: 5, nebula: 4, nova: 4,
+  asteroid: 4,
+  comet: 5,
+  star: 4,
+  dwarf: 4,
+  rocky: 4,
+  water: 5,
+  gas: 5,
+  nebula: 4,
+  nova: 4,
 };
 const CAMERA_Z: Partial<Record<MouldKind, number>> = { comet: 7.2, gas: 7.2, nebula: 5.4, nova: 5 };
 
@@ -62,7 +70,15 @@ export interface MouldAnimationProps {
   reduced?: boolean;
 }
 
-export function MouldAnimation({ kind, inputs, seed = 7, steps, rush = false, rushMs = CACHED_SHOW_MS, reduced = false }: MouldAnimationProps) {
+export function MouldAnimation({
+  kind,
+  inputs,
+  seed = 7,
+  steps,
+  rush = false,
+  rushMs = CACHED_SHOW_MS,
+  reduced = false,
+}: MouldAnimationProps) {
   const ref = useRef<HTMLDivElement>(null);
   const live = useRef({ rush, rushMs, steps });
   useEffect(() => {
@@ -109,7 +125,10 @@ export function MouldAnimation({ kind, inputs, seed = 7, steps, rush = false, ru
       kind,
       T: inputs?.T ?? undefined,
       giant: inputs?.giant,
-      tint: inputs?.tint && inputs.tint.length >= 3 ? [inputs.tint[0], inputs.tint[1], inputs.tint[2]] : undefined,
+      tint:
+        inputs?.tint && inputs.tint.length >= 3
+          ? [inputs.tint[0], inputs.tint[1], inputs.tint[2]]
+          : undefined,
       elong: inputs?.elong ?? undefined,
     };
     const body = makeBody(o, seed) as unknown as {
@@ -178,14 +197,18 @@ export function MouldAnimation({ kind, inputs, seed = 7, steps, rush = false, ru
       ro?.disconnect();
       document.removeEventListener('visibilitychange', onVis);
       useMouldLive.getState().setOverride(null);
-      body.root.traverse((m: THREE.Object3D & { geometry?: THREE.BufferGeometry; material?: THREE.Material }) => {
-        m.geometry?.dispose();
-        m.material?.dispose();
-      });
-      body.fixed.traverse((m: THREE.Object3D & { geometry?: THREE.BufferGeometry; material?: THREE.Material }) => {
-        m.geometry?.dispose();
-        m.material?.dispose();
-      });
+      body.root.traverse(
+        (m: THREE.Object3D & { geometry?: THREE.BufferGeometry; material?: THREE.Material }) => {
+          m.geometry?.dispose();
+          m.material?.dispose();
+        },
+      );
+      body.fixed.traverse(
+        (m: THREE.Object3D & { geometry?: THREE.BufferGeometry; material?: THREE.Material }) => {
+          m.geometry?.dispose();
+          m.material?.dispose();
+        },
+      );
       renderer.dispose();
       renderer.forceContextLoss();
       canvas.remove();
@@ -217,7 +240,16 @@ type Stage = 'off' | 'on' | 'rush' | 'leave';
  * Covers the stage while `active`, then hands over: a ready body (shorter than ~1.4 s of waiting)
  * gets the short show once per session; a longer wait just fades out. Never delays more than that.
  */
-export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, caption }: MouldOverlayProps) {
+export function MouldOverlay({
+  active,
+  id,
+  kind,
+  steps,
+  inputs,
+  seed,
+  reduced,
+  caption,
+}: MouldOverlayProps) {
   const [stage, setStage] = useState<Stage>('off');
   const [rushMs, setRushMs] = useState(CACHED_SHOW_MS);
   const [visible, setVisible] = useState(true);
@@ -289,7 +321,17 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
         {caption}
       </span>
       <div className="sx-mould-art" aria-hidden="true" style={{ opacity: visible ? undefined : 0 }}>
-        {kind && <MouldAnimation kind={kind} steps={steps} inputs={inputs} seed={seed} rush={stage === 'rush' || leaving} rushMs={rushMs} reduced={reduced} />}
+        {kind && (
+          <MouldAnimation
+            kind={kind}
+            steps={steps}
+            inputs={inputs}
+            seed={seed}
+            rush={stage === 'rush' || leaving}
+            rushMs={rushMs}
+            reduced={reduced}
+          />
+        )}
       </div>
     </div>
   );

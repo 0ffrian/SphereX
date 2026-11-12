@@ -14,8 +14,7 @@ import { ErosCard, MoverDemoCard } from './ErosCard';
 const ROW_SIZE = 19;
 const SEARCH_ROW = { ...SEARCHING_LOOK, size: ROW_SIZE };
 const THINK_ROW = { ...FETCHING_LOOK, size: ROW_SIZE };
-const stepLook = (label: string) =>
-  label.startsWith('Drop') ? THINK_ROW : SEARCH_ROW;
+const stepLook = (label: string) => (label.startsWith('Drop') ? THINK_ROW : SEARCH_ROW);
 
 export function DiscoveryCard() {
   const disc = useAreaStore((s) => s.disc);

@@ -97,8 +97,7 @@ export interface DiscoveryResult {
 
 export type AreaFlow = 'known' | 'discovery';
 export type AreaSearchResult =
-  | ({ flow: 'known' } & KnownObjectsResult)
-  | ({ flow: 'discovery' } & DiscoveryResult);
+  ({ flow: 'known' } & KnownObjectsResult) | ({ flow: 'discovery' } & DiscoveryResult);
 
 export const NOT_PREPARED = 'No prepared data for this area yet.';
 
@@ -114,7 +113,9 @@ export class AreaRefused extends Error {
 }
 
 /** The prepared Eros area on the sky: centre, and half sides in degrees (null when the file lacks them). */
-export function erosArea(d: ErosDemo): { ra: number; dec: number; halfW: number; halfH: number } | null {
+export function erosArea(
+  d: ErosDemo,
+): { ra: number; dec: number; halfW: number; halfH: number } | null {
   const c = d.wide.center;
   const k = d.wide.deg_per_px;
   if (!c || !k || !(d.wide.w > 0) || !(d.wide.h > 0)) return null;
@@ -150,7 +151,9 @@ export function erosDemo(): Promise<ErosDemo | null> {
     .then((r) => (r.ok ? (r.json() as Promise<ErosDemo>) : null))
     .then((d) => {
       if (!d) return null;
-      d.hops = d.hops.slice().sort((a, b) => a.mjd_avg - b.mjd_avg || a.detector.localeCompare(b.detector));
+      d.hops = d.hops
+        .slice()
+        .sort((a, b) => a.mjd_avg - b.mjd_avg || a.detector.localeCompare(b.detector));
       return d;
     })
     .catch(() => null)
@@ -203,7 +206,15 @@ export async function discoverIn(box: AreaBox): Promise<DiscoveryResult> {
   const Y = () => 30 + r() * 660;
   const movers: DiscoveryMover[] = [
     { id: 'T1', known: '433 Eros', kind: 'known', pts: [a, z] },
-    { id: 'T2', known: null, kind: 'unexplained', pts: [[430, 540], [700, 330]] },
+    {
+      id: 'T2',
+      known: null,
+      kind: 'unexplained',
+      pts: [
+        [430, 540],
+        [700, 330],
+      ],
+    },
     { id: 'T3', known: null, kind: 'once', pts: [[1010, 560]] },
   ];
   const dots: DiscoveryDot[] = [];

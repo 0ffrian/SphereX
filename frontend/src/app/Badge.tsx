@@ -156,7 +156,12 @@ export function ProvenanceBadge({
         ? 'border-sky-400 text-sky-300'
         : 'border-neutral-400 text-neutral-300';
   if (variant === 'tag') {
-    const dot = name === 'Measured' ? 'var(--p-meas)' : name === 'Estimated' ? 'var(--p-phys)' : 'var(--p-asm)';
+    const dot =
+      name === 'Measured'
+        ? 'var(--p-meas)'
+        : name === 'Estimated'
+          ? 'var(--p-phys)'
+          : 'var(--p-asm)';
     return (
       <span
         className="sx-tagbadge"
