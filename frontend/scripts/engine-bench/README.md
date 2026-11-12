@@ -15,8 +15,9 @@ npx vite --port 5199 --strictPort --host 127.0.0.1
 `run.js` drives Playwright's Chromium (`@playwright/test`, already a dev dependency; `npx playwright install chromium`
 once) on the real GPU and prints one JSON line per page. Options: `--base URL` (default `http://127.0.0.1:5199`, or
 `SX_BENCH_BASE`), `--angle d3d11|vulkan|gl` (default `d3d11`), `--profile DIR` (share one browser profile: a warm
-shader cache; without it every page gets a fresh, empty profile, which is what a first open costs) and
-`--timeout S` (default 900).
+shader cache; without it every page gets a fresh, empty profile, which is what a first open costs),
+`--timeout S` (default 900) and `--save DIR` (writes the PNG data URLs a page leaves in `__out.png` to `DIR/<name>.png`
+and leaves them out of the printed line).
 
 ## Pages
 
@@ -26,6 +27,17 @@ shader cache; without it every page gets a fresh, empty profile, which is what a
 | `async.html?role=fly`           | A `WorldEngine` waiting for `whenReady()`: time to ready, programs submitted (3 for `role=globe`), and the longest main-thread gap meanwhile.                                                                                                                                                                                                                                                                      |
 | `engines.html?which=star-globe` | Cold compile of every program the star engine (`star-globe`, `star-closeup`) or the rock engine (`rock`) builds, timed from `compileShader` to the return of the `LINK_STATUS` read.                                                                                                                                                                                                                               |
 | `fly.html?id=t1f&alt=3`         | The fly view from a fixed camera: frame time, and `scale_corr`, the picture at resolution scale 1 against the picture after the resolution scaler shrank to about 0.5 (upsampled; `all` = luminance, `detail` = its high-pass part). With `ref=<module folder>` it also draws with a second copy of the engine and reports the pixel difference (`mean_level`, `over8_pct` of channels off by more than 8 levels). |
+
+Issue #93 W1 (the star, before and after; needs `.bench-ref/stars` for the engine and `.bench-ref/viewer` for the
+three.js star, see the comments at the top of each page):
+
+- `star-engine.html?what=compile&src=cur` (or `src=ref`): cold compile of a star engine: how long the constructor
+  blocks the main thread, the time until the star draws, and the longest main-thread gap.
+- `star-engine.html?what=shots&png=1`: this engine against `/.bench-ref/stars/` for Procyon, eps Eri and Barnard's
+  Star in four views (Observatory after a flare, true colour, the surface close-up, the flare close-up): differing
+  bytes of the composited picture, the median frame cost and the GL contexts used.
+- `tsl-star.html?what=shader&png=1`: the three.js star surface shader against `/.bench-ref/viewer/` (raw half-float
+  read-back, so any difference counts); `what=still` draws the star close-up directly and through `StillStarCache`.
 
 Issue #93 phase 2 (repeating patterns):
 
