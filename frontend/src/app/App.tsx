@@ -29,7 +29,8 @@ import { BuildPane } from './build/BuildPane';
 import { SelectedCard } from './build/SelectedCard';
 import { useSelectedBodyLoader } from './build/selectedBody';
 import { Island } from './island/Island';
-import { SoundProvider } from '@/haptics/SoundProvider';
+import { SoundProvider } from '@/sound/SoundProvider';
+import { SoundSettings } from '@/sound/ui/SoundSettings';
 
 /**
  * A new search opens the object panel (unless it is already open at the spectrum), a marker click
@@ -113,6 +114,8 @@ export function App() {
               {/* The page heading stays for assistive technology; the brand is not drawn (Q-124). */}
               <h1 className="sr-only">Shift &amp; Spectrum</h1>
               <FixtureBanner />
+              {/* R13.9 (Q-442): sound on/off, volume, ambience and Flashes; its click unlocks audio. */}
+              <SoundSettings className="ml-auto" />
               <Readout />
             </header>
             <main className="sx-view" aria-label="Sky view" data-split={split || undefined}>

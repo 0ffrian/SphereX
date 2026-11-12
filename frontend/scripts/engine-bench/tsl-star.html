@@ -1,0 +1,294 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Engine bench: three.js star (issue #93 W1)</title>
+<!--
+  Issue #93 W1, the three.js star path (r187, WebGPU or its WebGL2 fallback):
+    what=shader  render notes 1.13: the surface shader (viewer/shaders/star.ts) of this tree against the copy in
+                 /.bench-ref/viewer/ (the older commit, imports rewritten to /src), for Procyon, eps Eri and Barnard's
+                 Star, whole star (true, enhanced, observatory) and a close-up on a spot. Each picture is rendered into a
+                 half-float target and read back raw: `diff` counts the values that differ (0 = identical).
+                 Also the GPU time per frame of each.
+    what=still   render notes 1.12: the star close-up (StarCloseUpScene) drawn directly against the StillStarCache, on
+                 the canvas (MSAA, sRGB output), read back 8-bit; and the GPU time per frame of each.
+  backend=webgpu | webgl. `png=1` keeps the pictures as PNG data URLs in __out.png for the driver to save.
+-->
+<body style="margin: 0; background: #000">
+  <canvas id="c" style="width: 800px; height: 500px; display: block"></canvas>
+  <script type="module">
+    const out = { png: {} };
+    window.__out = out;
+    const Q = new URLSearchParams(location.search);
+    const W = 800,
+      H = 500;
+    const STARS = {
+      procyon: { id: 'simbad-alf-cmi', teffK: 6530, radiusRsun: 2.05, rotationPeriodD: null },
+      epseri: { id: 'simbad-eps-eri', teffK: 5084, radiusRsun: 0.735, rotationPeriodD: 11.2 },
+      barnard: {
+        id: 'simbad-name-barnard-s-star',
+        teffK: 3243,
+        radiusRsun: 0.2022,
+        rotationPeriodD: 145,
+      },
+    };
+    try {
+      const T = await import('three/webgpu');
+      const { stellarModel, cellsForScale, granuleVisibility } =
+        await import('/src/physics/stellar.ts');
+      const { teffToRgbMax1 } = await import('/src/physics/starlight.ts');
+      const { srgbToLinear } = await import('/src/viewer/renderers/linearColour.ts');
+      const { STAR_SURFACE, STILL_STAR_RATES, configFromModel } =
+        await import('/src/viewer/bodies/starModel.ts');
+      const { hashString32 } = await import('/src/engine/seed.ts');
+      const backend = Q.get('backend') || 'webgpu';
+      const what = Q.get('what') || 'shader';
+      out.backend = backend;
+      out.what = what;
+      const canvas = document.getElementById('c');
+      out.log = [];
+      for (const k of ['warn', 'error']) {
+        const o = console[k].bind(console);
+        console[k] = (...a) => {
+          out.log.push(a.map(String).join(' ').slice(0, 300));
+          o(...a);
+        };
+      }
+      const renderer = new T.WebGPURenderer({
+        canvas,
+        antialias: what === 'still',
+        forceWebGL: backend === 'webgl',
+      });
+      await renderer.init();
+      out.isWebGPU = !!renderer.backend.isWebGPUBackend;
+      if (navigator.gpu) {
+        const ad = await navigator.gpu.requestAdapter();
+        out.adapter = ad ? (ad.info ? ad.info.vendor + ' ' + ad.info.architecture : 'yes') : 'none';
+      } else out.adapter = 'no navigator.gpu';
+      renderer.setPixelRatio(1);
+      renderer.setSize(W, H, false);
+      const gpuSync = async () => {
+        if (renderer.backend.isWebGPUBackend)
+          await renderer.backend.device.queue.onSubmittedWorkDone();
+        else {
+          const gl = renderer.backend.gl;
+          gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+        }
+      };
+      const model = (s) => {
+        const r = stellarModel({ ...s, massMsun: null, seed: hashString32(s.id) });
+        if (!r.model) throw new Error('no model for ' + s.id);
+        return r.model;
+      };
+      const tintOf = (s) => srgbToLinear(teffToRgbMax1(s.teffK));
+      const toPng = (rgba8) => {
+        const c2 = document.createElement('canvas');
+        c2.width = W;
+        c2.height = H;
+        const x = c2.getContext('2d');
+        x.putImageData(new ImageData(new Uint8ClampedArray(rgba8), W, H), 0, 0);
+        return c2.toDataURL('image/png');
+      };
+      const halfToByte = (u16) => {
+        // half float (linear) to an sRGB byte, for looking at only (the diff is on the raw values).
+        const o = new Uint8Array(u16.length);
+        for (let i = 0; i < u16.length; i++) {
+          const h = u16[i],
+            e = (h >> 10) & 31,
+            m = h & 1023;
+          let v = e === 0 ? m / 1024 / 16384 : e === 31 ? 1 : Math.pow(2, e - 15) * (1 + m / 1024);
+          if ((i & 3) === 3) v = 1;
+          v = Math.min(1, Math.max(0, v));
+          o[i] = Math.round(
+            255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055),
+          );
+        }
+        // flip rows: render targets read bottom-up on WebGL
+        return o;
+      };
+      const diff = (a, b) => {
+        let n = 0,
+          mx = 0;
+        for (let i = 0; i < a.length; i++)
+          if (a[i] !== b[i]) {
+            n++;
+            mx = Math.max(mx, Math.abs(a[i] - b[i]));
+          }
+        return { differing: n, of: a.length, max_raw: mx };
+      };
+      // Median of n frames, each drawn and waited for (other work on the GPU shows as outliers, not in the median).
+      const timeIt = async (draw, n = +(Q.get('frames') || 60)) => {
+        for (let i = 0; i < 5; i++) draw(i);
+        await gpuSync();
+        const ts = [];
+        for (let i = 0; i < n; i++) {
+          const t0 = performance.now();
+          draw(i);
+          await gpuSync();
+          ts.push(performance.now() - t0);
+        }
+        ts.sort((a, b) => a - b);
+        return +ts[Math.floor(n / 2)].toFixed(2);
+      };
+
+      if (what === 'shader') {
+        const cur = await import('/src/viewer/renderers/StarBody.ts');
+        const ref = await import('/.bench-ref/viewer/StarBody.ts');
+        const rt = new T.RenderTarget(W, H, { type: T.HalfFloatType, depthBuffer: true });
+        out.cases = [];
+        for (const [name, s] of Object.entries(STARS).filter(
+          ([k]) => !Q.get('stars') || Q.get('stars').split(',').includes(k),
+        )) {
+          const m = model(s);
+          for (const view of (Q.get('views') || 'true,enhanced,observatory,close').split(',')) {
+            const scale = view === 'close' ? 'close' : 'enlarged';
+            const cells = cellsForScale(m, scale);
+            const plan = {
+              seed: hashString32(s.id),
+              granulation: true,
+              spots: true,
+              faculae: true,
+              flares: false,
+              prominences: false,
+              strands: false,
+              glow: false,
+              rates: STILL_STAR_RATES,
+              physics: m,
+              config: configFromModel(m, STAR_SURFACE),
+              colourView: view === 'close' ? 'enhanced' : view,
+              scale,
+              cellsAcross: cells.cells,
+              granuleVisibility: granuleVisibility(cells.cells, view === 'close' ? 0.17 : 1.28),
+              cellsEnlarged: cells.artistic,
+              plasma: false,
+            };
+            const bodyOpts = {
+              tint: tintOf(s),
+              emissive: 1,
+              limbU: 0.6,
+              octaves: 4,
+              axes: [1, 1, 1],
+              segments: [128, 64],
+              tier: 'high',
+            };
+            const shots = {};
+            const times = {};
+            for (const [which, mod] of [
+              ['ref', ref],
+              ['cur', cur],
+            ]) {
+              const b = new mod.StarBody(plan, bodyOpts);
+              b.setTime(() => 0);
+              const scene = new T.Scene();
+              scene.add(b.group);
+              const cam = new T.PerspectiveCamera(30, W / H, 0.001, 50);
+              // The close-up looks straight down at the largest spot (or the sub-observer point when there is none).
+              let c = [0.3, 0.25, 0.92],
+                big = 0;
+              for (const r of b.lastRegions)
+                for (const dk of r.discs)
+                  if (dk.radius > big) {
+                    big = dk.radius;
+                    c = dk.center;
+                  }
+              const d = view === 'close' ? 1 + Math.max(0.02, big * 5) : 4.2;
+              const l = Math.hypot(c[0], c[1], c[2]);
+              cam.position.set((c[0] / l) * d, (c[1] / l) * d, (c[2] / l) * d);
+              cam.lookAt(0, 0, 0);
+              renderer.setRenderTarget(rt);
+              renderer.render(scene, cam);
+              const px = await renderer.readRenderTargetPixelsAsync(rt, 0, 0, W, H);
+              shots[which] = new Uint16Array(px.buffer.slice(0));
+              times[which] = await timeIt(() => renderer.render(scene, cam));
+              renderer.setRenderTarget(null);
+              b.dispose();
+            }
+            const row = {
+              star: name,
+              view,
+              ...diff(shots.ref, shots.cur),
+              ms_ref: times.ref,
+              ms_cur: times.cur,
+              spots: view === 'close' ? 'centred' : 'on the disc',
+            };
+            out.cases.push(row);
+            if (Q.get('png')) {
+              out.png[`${name}-${view}-ref`] = toPng(halfToByte(shots.ref));
+              out.png[`${name}-${view}-cur`] = toPng(halfToByte(shots.cur));
+            }
+          }
+        }
+      } else if (what === 'still') {
+        const { StarCloseUpScene } = await import('/src/viewer/renderers/starCloseUpScene.ts');
+        const { StillStarCache } = await import('/src/viewer/renderers/stillStarCache.ts');
+        out.cases = [];
+        const grab = () => {
+          const c2 = document.createElement('canvas');
+          c2.width = W;
+          c2.height = H;
+          const x = c2.getContext('2d');
+          x.drawImage(canvas, 0, 0);
+          return x.getImageData(0, 0, W, H).data;
+        };
+        for (const [name, s] of Object.entries(STARS).filter(
+          ([k]) => !Q.get('stars') || Q.get('stars').split(',').includes(k),
+        )) {
+          const m = model(s);
+          const props = {
+            physics: m,
+            tint: teffToRgbMax1(s.teffK),
+            emissive: 1,
+            limbU: 0.6,
+            seed: hashString32(s.id),
+            flare: null,
+          };
+          const sc = new StarCloseUpScene(props, 'high');
+          sc.setAspect(W / H);
+          const cache = new StillStarCache(sc);
+          const res = {};
+          // Warm both paths first: a material's first draw can be skipped while its program compiles.
+          for (let k = 0; k < 3; k++) {
+            sc.setStill('live');
+            renderer.render(sc.scene, sc.camera);
+            cache.render(renderer);
+          }
+          await gpuSync();
+          for (const t of [0.12, 0.36, 0.7]) {
+            sc.setStill('live');
+            sc.setStage(t);
+            renderer.render(sc.scene, sc.camera);
+            const a = grab();
+            cache.render(renderer);
+            const b = grab();
+            const d = diff(a, b);
+            d.mode_after = sc.stillMode;
+            res['t' + t] = d;
+            if (Q.get('png')) {
+              out.png[`${name}-closeup-t${t}-direct`] = toPng(a);
+              out.png[`${name}-closeup-t${t}-cached`] = toPng(b);
+            }
+          }
+          sc.setStill('live');
+          const msDirect = await timeIt((i) => {
+            sc.setStage(0.1 + (i % 50) / 60);
+            renderer.render(sc.scene, sc.camera);
+          });
+          const msCached = await timeIt((i) => {
+            sc.setStage(0.1 + (i % 50) / 60);
+            cache.render(renderer);
+          });
+          out.cases.push({
+            star: name,
+            ...res,
+            ms_direct: msDirect,
+            ms_cached: msCached,
+            bakes: cache.bakes,
+          });
+          cache.dispose();
+          sc.dispose();
+        }
+      }
+    } catch (e) {
+      out.err = String(e && e.stack ? e.stack : e);
+    }
+    out.done = true;
+  </script>
+</body>

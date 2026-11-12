@@ -20,6 +20,10 @@ export class FakeParam {
     this.calls.push(['target', v, t]);
     return this;
   }
+  setValueCurveAtTime(v: ArrayLike<number>, t: number) {
+    this.calls.push(['curve', v.length, t]);
+    return this;
+  }
   cancelScheduledValues(t: number) {
     this.calls.push(['cancel', 0, t]);
     return this;
@@ -89,6 +93,24 @@ export class FakePanner extends FakeNode {
   }
 }
 
+export class FakeAnalyser extends FakeNode {
+  fftSize = 2048;
+  constructor(ctx: FakeAudioContext) {
+    super(ctx, 'analyser');
+  }
+  getFloatTimeDomainData(out: Float32Array) {
+    out.fill(0);
+  }
+}
+
+export class FakeWaveShaper extends FakeNode {
+  curve: Float32Array | null = null;
+  oversample = 'none';
+  constructor(ctx: FakeAudioContext) {
+    super(ctx, 'waveshaper');
+  }
+}
+
 export class FakeCompressor extends FakeNode {
   readonly threshold = new FakeParam();
   readonly knee = new FakeParam();
@@ -105,6 +127,7 @@ export interface FakeAudioOptions {
   outputLatency?: number;
   stereoPanner?: boolean;
   compressor?: boolean;
+  waveShaper?: boolean;
 }
 
 export class FakeAudioContext extends EventTarget {
@@ -117,6 +140,7 @@ export class FakeAudioContext extends EventTarget {
   resumes = 0;
   createStereoPanner?: () => FakePanner;
   createDynamicsCompressor?: () => FakeCompressor;
+  createWaveShaper?: () => FakeWaveShaper;
 
   constructor(options: FakeAudioOptions = {}) {
     super();
@@ -127,6 +151,7 @@ export class FakeAudioContext extends EventTarget {
     if (options.compressor !== false) {
       this.createDynamicsCompressor = () => new FakeCompressor(this);
     }
+    if (options.waveShaper !== false) this.createWaveShaper = () => new FakeWaveShaper(this);
   }
 
   async resume() {
@@ -148,6 +173,9 @@ export class FakeAudioContext extends EventTarget {
   }
   createBufferSource() {
     return new FakeSource(this, 'bufferSource');
+  }
+  createAnalyser() {
+    return new FakeAnalyser(this);
   }
   createBiquadFilter() {
     return new FakeFilter(this);

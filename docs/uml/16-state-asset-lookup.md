@@ -1,6 +1,6 @@
 # 16 State: asset lookup and texture cache
 
-Diagram 1 is the asset status from pipeline stage 4 (`saved`, `generated`, `sketch`). Diagram 2 is the life of one backend texture-cache entry. Drawn from architecture spec §4.4, §5.4 and §10, rendering doc §6.6–6.7, §7.7, and decisions D-01, D-02, D-07 and D-22, Q-111 and Q-112 (issue #41: intermediate answers, background bake), the open Q-122 (Gemini layer files), and Q-206 (issue #75: the pre-built pack as a stand-in).
+Diagram 1 is the asset status from pipeline stage 4 (`saved`, `generated`, `sketch`). Diagram 2 is the life of one backend texture-cache entry. Drawn from architecture spec §4.4, §5.4 and §10, rendering doc §6.6–6.7, §7.7, and decisions D-01, D-02, D-07 and D-22, Q-111 and Q-112 (issue #41: intermediate answers, background bake), the open Q-122 (Gemini layer files), and Q-206 (issue #75: the pre-built pack as a stand-in), amended by Q-369 (issue #93: a live build with a catalogue gap loses to the pack).
 
 ## Diagram 1: asset status
 
@@ -10,7 +10,7 @@ stateDiagram-v2
   Lookup --> Saved : generated asset in store, or a pre-built one with a spectrum
   Lookup --> StandIn : pre-built pack asset, no spectrum (Q-206)
   StandIn --> Generated : build live
-  Generated --> Saved : pack only: live build has no spectrum, changes type or fails (Q-206)
+  Generated --> Saved : pack only: live build has no spectrum, changes type, has a catalogue gap or fails (Q-206, Q-369)
   Saved --> Rejected : ids or type mismatch, or fails schema check
   Rejected --> Generated : kind known
   Rejected --> Sketch : kind unknown

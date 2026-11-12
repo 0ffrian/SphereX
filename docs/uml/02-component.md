@@ -192,8 +192,7 @@ flowchart TB
     Panel["Object panel: spectrum, card, 3 badges"]
     Listen["Audio / Listen: data sweep, imagined drive"]
     Store["Store (Zustand): card, RenderParams, honesty state, overrides"]
-    PulseInd["On-screen pulse indicator (D-20)"]
-    Settings["Haptics + audio settings"]
+    Settings["Sound settings and the Sound popover (R13.9)"]
     Shell["Shell (A21, Q-89): SkyDock (Known objects, Discovery, Search; D-38, Q-296), SkyZoom, ToolRail (openTool only) + railIcons, FrameRate (frame-rate menu after the player, writes store sky.fps), shellStore, areaStore, AreaCard, PanelCard, Readout, shortcuts, floating full-screen layout"]
     Island["Island, app/island (Q-121, Q-123): orb, Thinking pill, grid loader"]
     SkyPane["SkyPane: sky image, markers, click to pick"]
@@ -240,24 +239,15 @@ flowchart TB
     BodiesEtc["viewer/bodies, volume, shape, motion"]
   end
 
-  subgraph Haptics["haptics/"]
-    Engine["HapticEngine: rate limit, fan-out"]
-    ListenSweep["sound/listenSweep.ts"]
-    Calib["Calibration"]
-    subgraph Sources["sources/"]
-      SrcSurface["heightMap, meshNormal, terrain, flow"]
-      SrcData["field, dataPulse, spectrum, lightcurve"]
-    end
-    subgraph Drivers["drivers/"]
-      DVib["WebVibrateDriver (after the event, Q-132)"]
-      DAud["AudioDriver (audio.ts)"]
-      DTauri["TauriDriver stub (B-01, post-event)"]
-    end
+  subgraph Sound["sound/ (haptics cut, D-39)"]
+    Engine["SoundEngine: rate limit, honesty, trains"]
+    ListenSweep["listenSweep.ts"]
+    DAud["AudioDriver (voices.ts)"]
+    Graph["audioGraph: events, spectrum, ambience buses; duck; limiter"]
   end
 
   IDB[("IndexedDB: session assets, overrides (D-22)")]
-  LS[("localStorage: calibration, settings")]
-  Vibrate["navigator.vibrate"]
+  LS[("localStorage: sound settings")]
   WebAudio["Web Audio AudioContext"]
 
   Router --> Store
@@ -326,26 +316,15 @@ flowchart TB
   RShader --> ShaderGen
   RShader -->|"request field (seed)"| FieldWorker
   FieldWorker -->|"DataTexture"| ShaderGen
-  ViewerApp -->|"pointer UV, honesty state"| Sources
-  SrcSurface -->|"sample height.bin or field"| FieldWorker
-  Panel -->|"drag on plot, scrub"| SrcData
-  Listen -->|"same events as spectrum haptics"| SrcData
-  Sources -->|"HapticEvent"| Engine
-  Engine -->|"emit"| DVib
   Engine -->|"emit"| DAud
-  Engine -.->|"emit"| DTauri
-  Engine -.->|"spherex:haptic debug event"| PulseInd
-  DVib --> Vibrate
-  DAud --> WebAudio
+  DAud --> Graph
+  Graph --> WebAudio
   Listen --> ListenSweep
-  ListenSweep --> WebAudio
-  Calib <--> LS
+  ListenSweep --> Graph
   Settings <--> LS
-  Calib --> DVib
-  Calib --> DAud
 
   classDef post stroke-dasharray: 5 5
-  class DTauri,DVib,TrackPane,AreaTool post
+  class TrackPane,AreaTool post
 ```
 
 ## Notes
@@ -360,8 +339,7 @@ flowchart TB
 - `core/classify`, `core/card` and the `card_to_params`, `blackbody` and `spherex_rgb` modules of `core/render` were built in issue #5. The `/card` and `/render-params` replies are plain dicts checked with `jsonschema`; the generated Pydantic models (D-18) only describe them in the OpenAPI docs (Q-40). The render-params endpoint names the texture URLs; since issue #41 every reply whose render params have textures queues both sizes on `TextureBaker` in a worker process off the request path, and the API serves them at `/data/textures`, so a texture URL answers 404 until its bake lands (Q-112).
 - Issue #41 (Q-111, Q-112): `/card` and `/render-params` start or join one background job per object (`core/jobs.py`, `ObjectPipeline._job`). The catalogue, the Horizons geometry and the frame list start together; cutouts download in one shared pool and each is measured in a `MeasurePool` worker as it lands. A job publishes up to three answers (first stage `measuring:`, partial `measuring:frames`, final); only the final can be saved. `/frames`, `/spectrum`, the overlays and the composite download nothing in the request: `FrameService.on_request` starts or joins the job and the rest are listed as `cutouts:deferred:<n>`. `SX_MAX_JOBS` caps only the full download after the first batch (stage `queued`). `GET /v1/objects/{id}/job` and `/job/events` are beyond D-16 (Q-111 (4)).
 - The physics layer is drawn on the backend, feeding derived values into the card. The browser reruns the same functions on slider changes (architecture spec §4.6). As of issue #13 only the browser half exists (`frontend/src/physics/`); whether the backend ports it is Q-60. Baked types allow only colour, lighting and spin sliders; relief sliders exist only on the shader kinds (D-26).
-- The `spherex:haptic` DOM event is a debug hook that also drives the on-screen pulse indicator (D-20). Which module fires it is not stated; it is drawn from the engine.
+- D-39 (12 Nov 2026): haptics are cut. The touch sources, calibration, the vibrate and Tauri drivers and the pulse indicator are gone; the sound engine, the audio driver, the Listen sweep and the audio graph remain in `frontend/src/sound/`.
 - `ShaderBody` (`viewer/renderers/ShaderBody.ts`) and the `fields/` folder (`viewer/fields/fieldWorker.ts`) follow from D-01 and D-12; the file layout is [R10](../rendering/layout.md#r10-file-layout-and-ownership).
-- The `terrain` and `flow` sources come from D-12. The data haptics live in `sources/dataPulse.ts` and `sources/lightcurve.ts`; the brown dwarf `bands` source is refused (Q-82) and `detections` is refused (Q-86).
 - Build split view (issue #60, R5.8): the rail's 3D viewer, *Build it* on the object card and *Build it in 3D* in the object panel all open the one build pane (Q-120 item 4); the body loads in `useSelectedBodyLoader` when the card is asked for or the pane opens (Q-120 item 5). The shell's states: [24-state-shell.md](24-state-shell.md).
-- The `Shell` node places every surface inside the bezel insets of Q-124 (A21.2). At the event the A15 laptop plays sound only, so `WebVibrateDriver` is drawn dashed (Q-132).
+- The `Shell` node places every surface inside the bezel insets of Q-124 (A21.2). At the event the A15 laptop plays sound only (Q-132); the vibrate driver is deleted (D-39).

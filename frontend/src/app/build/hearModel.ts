@@ -5,7 +5,8 @@
 //   Spectrum: the object's own SPHEREx spectrum (measured), flux normalised 0..1 on a 0.75 to 5 um axis.
 import type { ObjectCard, Tag } from '@/contract/generated';
 import { cardToWorld } from '@/engine/worlds/cardToWorld';
-import { buildSpectrumMapping, type SpectrumMappingPoint } from '@/haptics/spectrumMapping';
+import { pitchToHz, wavelengthToPitch } from '@/sound/pitch';
+import { buildSpectrumMapping, type SpectrumMappingPoint } from '@/sound/spectrumMapping';
 
 export const GAS_CONSTANT = 8.314; // J/(mol K)
 export const SOUND_REF_MS = 343; // m/s, air at 20 C: the howl pitch is scaled by c / this
@@ -155,10 +156,9 @@ export function spectrumCurve(points: readonly SpectrumMappingPoint[] | null): S
 export function lamAt(p: number): number {
   return L0_UM + (L1_UM - L0_UM) * p;
 }
-/** Pitch 880 to 110 Hz on log wavelength. */
+/** Q-446: the shared pitch law (pitch.ts): 1158 Hz at 0.75 µm down to 220 Hz at 5 µm (long λ low, Q-430). */
 export function freqAt(p: number): number {
-  const x = Math.log(lamAt(p) / L0_UM) / Math.log(L1_UM / L0_UM);
-  return 880 * Math.pow(110 / 880, x);
+  return pitchToHz(wavelengthToPitch(lamAt(p)));
 }
 
 export function reachFraction(P: number): number {

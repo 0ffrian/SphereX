@@ -1,19 +1,20 @@
 // Issue #71 stream X (D-37): the star engine's inputs from any star card. The engine wants a preset
 // {T, R, M, P, dwarf}; this fills it from the card and, where the card is silent, from the
 // prototype's own tier chain (D-32): radius and mass from the Mamajek main-sequence table, the
-// rotation period from the Sun's Rossby number through Wright's turnover time. Every value carries
+// rotation period from the Sun's Rossby number through the Reiners et al. 2022 turnover time (12.3 d L^-1/2). Every value carries
 // one tag (D-02). A missing temperature refuses: nothing is drawn and it is listed in `missing`.
 // Brown dwarfs, Miras and anything that is not a star are out of scope (a Mira has no surface).
 import type { ObjectCard, Tag } from '@/contract';
 import {
   GIANT_LOGG_MAX,
-  convectiveTurnoverDays,
+  turnoverTimeDays,
   massFromRadius,
   massFromTeff,
   radiusFromTeff,
   sunRossby,
 } from '@/physics/stellar';
 import { GM_SUN, R_SUN_M } from '@/physics/constants';
+import { hashString32, seedVec } from '../seed';
 
 /** What the engine's `setStar` takes: the prototype's PRESETS row. */
 export interface StarPreset {
@@ -29,6 +30,13 @@ export interface StarPreset {
   P: number;
   /** A dwarf: the field and spot fit applies (Reiners et al. 2022 covers dwarfs). */
   dwarf: boolean;
+  /**
+   * Card stars only (#93 2.3): the 32-bit hash of the card id, for the spot RNG (rng(1729 ^ seed)). Artistic. The
+   * prototype's rows have none, so they keep rng(1729).
+   */
+  seed?: number;
+  /** Card stars only: the vec3 noise offset uSO (seedVec of `seed`, three integers in [0, 256)). Artistic. */
+  so?: [number, number, number];
 }
 
 export interface StarValue {
@@ -72,7 +80,7 @@ const GIANT_MASS_MSUN = 1;
  * card values and the tier chain below, never a type row (the review of PR #89: a type row overruled
  * the card's temperature, radius and period). Parity runs against those rows load them by preset id
  * (`PROTOTYPE_PRESETS`, `?preset=` in the parity hook). The engine's seeds are fixed in the artifact
- * (1729, 2024, 808), so there is no per-star seed to carry over.
+ * (1729, 2024, 808); since #93 2.3 a card star (not these) carries its own `seed` and `so`.
  */
 export const ARTIFACT_PRESET_BY_CARD_ID: Record<string, StarPreset> = {
   'ref-sun': { id: 'g', label: 'Sun', T: 5772, R: 1, M: 1, P: 25.4, dwarf: true },
@@ -129,9 +137,13 @@ export function cardToStar(card: ObjectCard | null | undefined): StarFromCard | 
     assumed.push(`radius ${v.toFixed(2)} Rsun from the temperature of ${TYPICAL}`);
   }
 
-  // The cards carry no stellar mass: from the radius when it is a dwarf's, else from the temperature.
+  // The card's mass (Gaia FLAME, issue #93 B) when it has one; else from the radius when it is a dwarf's, else from
+  // the temperature.
   let mass: StarValue;
-  if (r && positive(r.value)) {
+  const mc = card.mass_msun;
+  if (mc && positive(mc.value))
+    mass = { value: mc.value, tag: mc.tag, note: `from the card (${mc.source})` };
+  else if (r && positive(r.value)) {
     const m = massFromRadius(r.value);
     if (m !== null) {
       mass = { value: m, tag: 'model_dependent', note: `from the radius of ${TYPICAL}` };
@@ -155,14 +167,17 @@ export function cardToStar(card: ObjectCard | null | undefined): StarFromCard | 
   if (p && positive(p.value))
     rotation = { value: p.value / 24, tag: p.tag, note: `from the card (${p.source})` };
   else {
-    const v = sunRossby() * convectiveTurnoverDays(mass.value);
+    const v = sunRossby() * turnoverTimeDays(radius.value, teff.value);
     rotation = {
       value: v,
       tag: 'inferred_from_analog',
-      note: `the Sun's Rossby number (${sunRossby().toFixed(2)}) assumed, with Wright et al. 2011's turnover time`,
+      note: `the Sun's Rossby number (${sunRossby().toFixed(2)}) assumed, with the Reiners et al. 2022 turnover time (12.3 d L^-1/2)`,
     };
     assumed.push(`rotation period ${v.toFixed(1)} days: the Sun's Rossby number assumed`);
   }
+
+  // #93 A9: no luminosity is computed here. The engine's turnover time (protoStar1.js tauC) uses L = R^2 (T / 5772 K)^4
+  // from the radius and temperature above, so the card's Gaia FLAME lum_lsun is not an engine input.
 
   const g = (GM_SUN * mass.value) / Math.pow(R_SUN_M * radius.value, 2);
   const dwarf = Math.log10(g * 100) >= GIANT_LOGG_MAX;
@@ -195,6 +210,8 @@ export function cardToStar(card: ObjectCard | null | undefined): StarFromCard | 
       M: mass.value,
       P: rotation.value,
       dwarf,
+      seed: hashString32(card.id),
+      so: seedVec(hashString32(card.id)),
     },
     teff,
     radius,

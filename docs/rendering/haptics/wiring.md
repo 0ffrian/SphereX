@@ -2,6 +2,8 @@
 
 > **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.8.1 · **Implements:** [D-20, Q-78](../../decisions/haptics-design.md), [Q-133, Q-134](../../decisions/haptics-sound.md), [D-21](../../decisions/contract-tags.md), [Q-73, Q-83](../../decisions/haptics-built.md), [Q-132](../../decisions/platform-hosting.md), [Q-113](../../decisions/shell-surfaces.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8), [../display-rules.md](../display-rules.md) (R5.6 Feel mode), [../build-mould.md](../build-mould.md) (R5.8)
 
+> **D-39 (12 Nov 2026), haptics cut:** the Feel, touch and vibration items are cut. **Still live:** the sound items (one audio-only engine in `SoundProvider`, the Listen sweep, the Track path sound, the unlock on a click, settings and the page lifecycle). Module paths are now `frontend/src/sound/`. See [D-39](../../decisions/sound-ambience.md).
+
 ### R8.8.1 Wiring checklist (M5)
 
 Issues #9 to #11 built the engine, drivers, sources, calibration and the Listen sweep against fixtures. None of it is wired into the app yet. This is the order to wire it for the event build (desktop Chrome on the A15, sound only, Q-132). Owner: Atish (D-13, D-17).
