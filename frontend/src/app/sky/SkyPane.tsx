@@ -928,7 +928,6 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         aria-label="About this sky image"
         hidden={!creditOpen}
       >
-        <p className="sx-credit-eyebrow" aria-hidden="true">About this sky</p>
         {survey && (
           <div className="flex flex-col gap-1.5" data-testid="sky-credit">
             <p className="sx-credit-line pointer-events-auto">
@@ -952,8 +951,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
             {/* What the colours mean, in plain words (the exact bands are in the badge's tooltip). */}
             {survey.formula?.startsWith('false colour') && (
               <p className="sx-credit-what" data-testid="sky-credit-what">
-                Infrared light your eyes cannot see, shown in false colour: red is the longest
-                wavelength, blue the shortest.
+                Infrared light, in false colour.
               </p>
             )}
           </div>
@@ -981,19 +979,21 @@ export function SkyPane({ children }: { children?: ReactNode }) {
               className="inline-block size-2.5 flex-none rounded-full border border-black bg-[#e9d5ff] shadow-[0_0_0_1px_#e9d5ffaa]"
               aria-hidden="true"
             />
-            <span>Lilac dots are objects already downloaded: they open instantly.</span>
+            <span>Lilac dots open instantly.</span>
           </p>
         )}
         {survey && (
           <div className="sx-credit-foot">
             <span className="sx-credit-text" title={survey.credit}>
-              Credit: {survey.credit}
+              {survey.credit}
             </span>
-            {/* Renderer details, for the team; hidden on phones to save space. */}
-            <span className="sx-credit-tech sx-hide-s">
-              {state.kind === 'ready' ? `${state.width} × ${state.width / 2} px · ` : ''}
-              {backend === 'webgpu' ? 'WebGPU' : backend === 'webgl2' ? 'WebGL2' : ''}
-            </span>
+            {/* Renderer details, for the team only (development builds). */}
+            {import.meta.env.DEV && (
+              <span className="sx-credit-tech">
+                {state.kind === 'ready' ? `${state.width} × ${state.width / 2} px · ` : ''}
+                {backend === 'webgpu' ? 'WebGPU' : backend === 'webgl2' ? 'WebGL2' : ''}
+              </span>
+            )}
           </div>
         )}
       </div>

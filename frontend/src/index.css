@@ -4700,9 +4700,9 @@ body {
   }
   .sx-sky-credit {
     bottom: 76px;
-    width: 340px;
+    width: 300px;
     max-width: calc(100% - 32px);
-    padding: 14px 16px;
+    padding: 12px 14px;
     border-radius: 12px;
   }
 }
@@ -4712,14 +4712,7 @@ body {
   color: var(--fg);
 }
 .sx-sky-credit {
-  gap: 10px;
-  color: var(--muted);
-}
-.sx-credit-eyebrow {
-  font-size: 11px;
-  line-height: 14px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  gap: 8px;
   color: var(--muted);
 }
 .sx-credit-title {
@@ -4745,10 +4738,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-top: 10px;
-  border-top: 1px solid var(--glass-edge);
-  font-size: 11.5px;
-  line-height: 16px;
+  font-size: 11px;
+  line-height: 15px;
+  opacity: 0.75;
 }
 .sx-credit-tech {
   font-family: var(--font-mono);
