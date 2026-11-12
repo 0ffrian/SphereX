@@ -34,7 +34,7 @@ The app is dark-only for now (Q-409). The light values are defined so that artif
 | `--p-phys` | `#38bdf8` | `#0284c7` | provenance: physics / derived |
 | `--p-asm` | `#5f686e` | `#9aa5ab` | provenance: assumed |
 
-**Floating surfaces are matte glass (Q-418).** The player, the sky dock and zoom bar, the readout, the island and every card it grows into use `--glass-bg` (`rgba(12,14,17,.3)`), `--glass-filter` (`blur(5px) saturate(170%)`), a faint grain, `--glass-edge` and `--glass-hi`, all defined at the end of `frontend/src/index.css`. Wells and toggles inside them use `--glass-inner`, not `--s2`. Keep the blur low (2 to 8px): more erases the stars and the glass reads as solid. Pictures of data (the Flipbook frame, the Eros cutout) stay opaque. The build pane and its popovers keep the solid tokens above.
+**Floating surfaces are matte glass (Q-418).** The player, the sky dock and zoom bar, the readout, the island and every card it grows into use `--glass-bg` (`rgba(6,7,9,.5)`), `--glass-filter` (`blur(5px) saturate(170%)`), a faint grain, `--glass-edge` and `--glass-hi`, all defined at the end of `frontend/src/index.css`. Wells and toggles inside them use `--glass-inner`, not `--s2`. Keep the blur low (2 to 8px): more erases the stars and the glass reads as solid. Pictures of data (the Flipbook frame, the Eros cutout) stay opaque. The build pane and its popovers keep the solid tokens above.
 
 Colours only through tokens (CSS variables or the Tailwind theme). Never a raw hex in a component.
 
