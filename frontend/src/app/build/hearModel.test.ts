@@ -41,3 +41,12 @@ describe('hearModel pure functions', () => {
     }
   });
 });
+
+describe('Hear it follows the app pitch polarity (Q-430)', () => {
+  it('freqAt moves the same way as pitch.ts across the band', () => {
+    // A flip of PITCH_RISES_WITH_WAVELENGTH would make these disagree.
+    const appRises = pitchToHz(wavelengthToPitch(L1_UM)) > pitchToHz(wavelengthToPitch(L0_UM));
+    const hearRises = freqAt(1) > freqAt(0);
+    expect(hearRises).toBe(appRises);
+  });
+});

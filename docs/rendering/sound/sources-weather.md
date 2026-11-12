@@ -9,21 +9,21 @@ Each source has four parts: a **gate** (it is baked only when the gate passes), 
 | # | Source | Gate (all must hold) | Spectrum (baked) | Live drivers | Tag |
 |---|---|---|---|---|---|
 | S1 | **Wind rumble** (land and sea variants) | `airOK` | Band 18 Hz to `40 + 5·U_ref` Hz, slopes per Moon's `bp(f, 18, 40+5v, 2, 7/6)`. Turbulence: f^-5/3 at the sensor, f^-7/3 in-flow [SS §1]. **Gust envelope** (corrected): Gaussian `1 + I_u·n(t)`, n from 24 sines with amplitudes ∝ k^-0.83 (−5/3 spectrum), clipped ≥ 0. Integral time 5–30 s; uses 12 s. Variants: land (I_u 0.24) and sea (0.11) | gain ∝ (U/U_ref)² (pressure ∝ ρ I_u U²) | `artistic` (relations `model_dependent`) |
-| S2 | **Wind hiss** (flow around grit and pebbles) | `airOK` and `Re = U_ref·d/ν ≥ 47` for `d = 4 mm` (ν = μ_v/ρ) | Band-pass centred at `St·U_ref/d`. **St = 0.212·(1 − 21.2/Re) for 47 ≤ Re ≤ 200, else 0.2** (Roshko) [SS §2] | gain ∝ (U/U_ref)³; `playbackRate = clamp(U/U_ref, 0.7, 1.4)` (the centre follows U, Strouhal) | as S1 |
+| S2 | **Wind hiss** (flow around grit and pebbles) | `airOK` and `Re = U_ref·d/ν ≥ 47` for `d = 4 mm` (ν = μ_v/ρ); the hiss and each S3 size are gated by their own Re (Appendix D R4) | Band-pass centred at `St·U_ref/d`. **St = 0.212·(1 − 21.2/Re) for 47 ≤ Re ≤ 200, else 0.2** (Roshko) [SS §2] | gain ∝ (U/U_ref)³; `playbackRate = clamp(U/U_ref, 0.7, 1.4)` (the centre follows U, Strouhal) | as S1 |
 | S3 | **Ridge whistle** (aeolian tones) | S2's gate at `d = 6, 3.5, 2.2 mm`, each tone separately | Narrow peaks (Q≈25) at `St·U_ref/d`, with a whistle envelope (squared gust envelope) | gain ∝ max(exposure, 0) × (U/U_ref)³; playbackRate as S2 | as S1 |
 | S4 | **Surf** (waves breaking on a shore) | `airOK`, `liquid`, `U10_ref ≥ U_wave` | Crash band 45 Hz to `900·√m_f` Hz, foam band `700·m_f` to `5200·m_f` Hz (Moon), times air absorption. Waves: `H_s = 0.22·U²/g` (Pierson–Moskowitz) and period `T_p = 7.14·U/g`, both capped by fetch [SS §4] | gain from Bolin & Åbom: 60 dB at H 0.4 m to 78 dB at H 2 m, interpolated in log H, × (1 − iceCover) | `artistic` |
 | S5 | **Open sea** (swell, whitecaps, bubbles) | as S4 | Swell band 25–180 Hz with an envelope at 1/T_p. Whitecap events at rate `λ = 0.35·(U/8)³`/s, which tracks whitecap fraction `W = 3.84e-6·U^3.41`; zero below 3.5 m/s. Bubble pings at Minnaert frequency × `m_f` | gain ∝ W/W_ref; × (1 − iceCover) | `artistic` |
-| S6 | **Rain** | `airOK`, `liquid` (the fluid can be liquid at the surface), and the world can rain (`canLiquid`) | Drop radius `r_max = 0.5 · 2.7·√(σ/(g·Δρ))` (capillary scaling, Loftus & Wordsworth 2021, scaled to Earth's 3.25 mm radius). Fall speed `v = √(8 r (ρ_l−ρ_a) g /(3·0.8·ρ_a))`. Hiss band `900·p` to `7000·p` Hz, with `p = r_E/r` (size → pitch); patter events at a rate ∝ size^-3 (Moon). Small-drop bubble ring near 14 kHz (Earth), scaled by Minnaert [SS §8] | gain = `RAIN_GAIN_DB + 10·log10(max(rainRate, 1e-3))` (proxy: impact energy per second), only when `precipPhase==='rain'` | `artistic` |
+| S6 | **Rain** | `airOK`, `liquid` (the fluid can be liquid at the surface), and the world can rain (`canLiquid`) | Drop radius `r_max = 3.25 mm · √((σ/(g·Δρ)) / (σ/(g·Δρ))_Earth)` (capillary scaling calibrated to Earth, Loftus & Wordsworth 2021; Appendix D R3; Titan between 4.75 and 6.6 mm [verify]). Fall speed `v = √(8 r (ρ_l−ρ_a) g /(3·0.8·ρ_a))`. Hiss band `900·p` to `7000·p` Hz, with `p = r_E/r` (size → pitch); patter events at a rate ∝ size^-3 (Moon). Small-drop bubble ring near 14 kHz (Earth), scaled by Minnaert [SS §8] | gain = `RAIN_GAIN_DB + 10·log10(max(rainRate, 1e-3))` (proxy: impact energy per second), only when `precipPhase==='rain'` | `artistic` |
 | S7 | **River** | `airOK`, `liquid`, hydro has rivers (`hydro.n > 0`) | Bubbly babble: Minnaert bubble pings (radii 1–5 mm) at `m_f`, broadband 300–4000 Hz | dissipated power ∝ ρ_l·g·Q·S (derived [SS §9]). Q from hydro R: `Q = 50·10^((R/255 − 0.5)/0.2)` m³/s (inverts the engine's line width); S = `slope` | `artistic` |
 | S8 | **Lava** | `airOK`, lava world (`hydro.lava`) | Low roar 25–200 Hz; crust crackle events (broadband 1–6 kHz clicks); no bubble ringing (lava is too viscous [SS §10]). Vent burst events: an audible thud 30–80 Hz plus spatter, standing in for the 2–9 Hz infrasound of a burst (Vergniolle & Brandeis 1996) | lava fraction near the listener; vents (hydro A ≥ 128) as point sources | `artistic`; vent events `artistic` (the infrasound is noted) |
-| S9 | **Storm roar** (cyclone) | `airOK`, cyclone active (§6.5 item 3) | Wind rumble and hiss baked at `U_ref = Vmax` | gain by the §6.5 profile, so the eye is quiet [SS W4: dust-devil eye]; rain bed raised by `STORM_RAIN_DB` inside `2r` | `model_dependent` (Vmax) / `artistic` |
+| S9 | **Storm roar** (cyclone) | `airOK`, cyclone active (§6.5 item 3), the engine's own "Strongest hurricane possible" condition, `Ps ≥ 0.1 bar` and a finite Vmax; Vmax is clamped to ≤ 100 m/s with a note (Appendix D R9) | Wind rumble and hiss baked at `U_ref = Vmax` | gain by the §6.5 profile, so the eye is quiet [SS W4: dust-devil eye]; rain bed raised by `STORM_RAIN_DB` inside `2r` | `model_dependent` (Vmax) / `artistic` |
 | S10 | **Blowing sand** (saltation) | `airOK`, land, not snow-covered, threshold reachable: `U10_max ≥ U_sand` | High hiss 2–10 kHz plus grain-click events | gain ∝ (U10 − U_sand)³ when positive, else 0; land fraction | `model_dependent` |
 | S11 | **Thunder** (event) | §8.2 | §8.4 | §8.4 | §8.2 |
 | S12 | **Gas giant roar** | `gas` | Deep band 15–120 Hz plus hiss 300–2000 Hz, baked at `U_ref = m.U`. Slow phaser sweep in the bed (0.05 Hz) | gain ∝ (U/U_ref)²; phaser rate × (1 + 3·stormNear); `vort` sign flips the sweep direction | `model_dependent` (Umeas `measured` on Jupiter and Saturn) |
 
 **Constants in the gates.**
 - **`U_wave`:** 0.6 m/s for methane; for water, about 1.5 m/s on Earth [SS §5, verify for water]. Others scale as `U_wave,water · (ν_l/ν_water)^(1/3)` [verify].
-- **`m_f` (bubble and foam pitch factor):** `√((P0/ρ_l)/(1.013e5/1000)) · √(γ/1.4)` [SS §6]. Titan works out at about 2–2.5×.
+- **`m_f` (bubble and foam pitch factor):** `√((P0/ρ_l)/(1.013e5/1000)) · √(γ/1.4) · ((σ_E/ρ_E)/(σ/ρ_l))^(3/5)` [SS §6]; the last factor is the shift of the Deane & Stokes size break (Appendix D R2). Titan works out at 2.0 to 2.7.
 - **`U_sand`:** `U10 = 23·u*_t`, with `u*_t = 0.136·√((ρ_p − ρ0)·gv·d_p/ρ0)`. `d_p = 100 µm`; `ρ_p` = 2650 (silicate) or 1000 (methane worlds: organic sand). The constant is calibrated to Earth's u*t of 0.2 m/s.
   - This gives about 0.95 m/s on Mars against 1.5–2 measured, so a cohesion factor 1.8 applies on `CO2`-class worlds [SS W4; verify].
 
@@ -31,13 +31,13 @@ Each source has four parts: a **gate** (it is baked only when the gate passes), 
 
 | Condition | Caption |
 |---|---|
-| `!airOK` (airless, or P below the floor) | "No air here, so there is no sound." |
-| airless lava world | "The magma glows, but with almost no air, it makes no sound you could hear." |
-| no liquid (S4–S7) | "No liquid can exist on the surface here, so there are no waves, rain or rivers." |
+| `!airOK` (`P0 < P_FLOOR`, Appendix D R6) | "No air here, so there is no sound." |
+| lava world with `P0 < P_FLOOR` (Appendix D R6) | "The magma glows, but with almost no air, it makes no sound you could hear." |
+| no liquid (S4–S7; `liquid` as in R13.2, Appendix D R7) | "No liquid can exist on the surface here, so there are no waves, rain or rivers." |
 | S2/S3 gate fails | "The air is too thin for small stones to whistle." |
 | thunder refused (§8.2) | per §8.2 |
 
-> **Appendix D rulings for this section:** R2 (bubble pitch factor `m_f`, Titan 2.0 to 2.7), R3 (raindrop size by capillary scaling calibrated to Earth; Titan `r_max` 4.75 to 6.6 mm [verify]), R4 (whistle gate: each obstacle size gated by its own Re), R6 (the "No air here" captions apply only when `P0 < P_FLOOR`; Mars-like and lava worlds get quiet wind sound). Text in [R13.11](files-tests.md#r1311-files-tests-constants-and-the-module-contract).
+> **Appendix D rulings in this section:** R2 (`m_f`), R3 (`r_max`), R4 (whistle gate per size), R6 (air for sound is `P0 >= P_FLOOR`), R7 (liquid is local), R9 (hurricane sanity), R11 (lightning: only "observed" is `measured`; strike timing and placement are `artistic`). Each is folded into the rows above; the full text is in [R13.11](files-tests.md#r1311-files-tests-constants-and-the-module-contract). Text in [R13.11](files-tests.md#r1311-files-tests-constants-and-the-module-contract).
 
 ## R13.6 Weather
 
@@ -67,6 +67,8 @@ Thunder only where lightning has been observed, or where the analog is strong [S
 | Methane worlds (Titan-like) | **refused**: "No lightning has ever been detected on Titan, so there is no thunder here." | — |
 | `co2` worlds (Venus-, Mars-like) | **refused**: "Lightning on worlds like Venus and Mars is unconfirmed, so there is no thunder here." | — |
 | any other | refused: "Lightning needs storm clouds of water or ammonia; there are none here." | — |
+
+> **Appendix D R11:** on preset worlds lightning still needs air and convection. The `measured` tag covers only the fact that lightning is observed on that world; strike timing and placement are `artistic`.
 
 #### 8.3 Lightning rate and placement
 - **Rate:** flashes per minute within the audible radius, `λ = LIGHTNING_MAX_PER_MIN · cnv_ring`. `cnv_ring` is the area-weighted mean of `cnv` over the samples (gas: `cnvG`; Jupiter additionally × (|lat| > 40° ? 1 : 0.3) [SS W2]).

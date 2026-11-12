@@ -182,7 +182,7 @@ export const CHORD_TARGET_RMS_DBFS = -18;
 export const CHORD_ISO_PHON = 60;
 /**
  * SPEC R13.12 item 5: the loudness correction is capped at this boost (dB). [verify on the A15]
- * Pre-agreed fallback (R12 #66): 3 dB if the venue PA check finds the two lowest notes rough
+ * Pre-agreed fallback (R12 #72): 3 dB if the venue PA check finds the two lowest notes rough
  * (240-cent neighbours near 236–311 Hz sit close to maximum Plomp–Levelt roughness). CREATIVE (D-13).
  */
 export const CHORD_ISO_CAP_DB = 6;

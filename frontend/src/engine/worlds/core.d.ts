@@ -10,6 +10,10 @@ export interface Core {
   GAS_NODES: Record<string, number[][]>;
   FLUIDS: Record<string, any>;
   getGS(): any;
+  /** #93: the energy budget (prototype ebStep, ebStats, ebInit), exposed for headless tests. */
+  ebStep(m: any, n: number, dt: number): void;
+  ebStats(m: any): void;
+  ebInit(m: any, terr: any): void;
   worldModel(): any;
   worldUi(): void;
   resetWorld(): void;
@@ -25,4 +29,16 @@ export interface Core {
   altToS(a: number): number;
   sToAlt(v: number): number;
 }
-export function createCore(canvas: HTMLCanvasElement): Core;
+/** The GL half of the engine (WorldGL): only the issue #93 compile hooks are typed. */
+export interface CoreGL {
+  /** True once every submitted program has finished compiling and is linked; throws the compile or link log. */
+  poll(): boolean;
+  /** Link now (blocks until the driver is done); with fly, also submit the fly program if this instance has none. */
+  link(fly?: boolean): void;
+  /** Number of programs submitted so far. */
+  programs(): number;
+}
+export function createCore(
+  canvas: HTMLCanvasElement,
+  opt?: { role?: 'globe' | 'fly' | 'both' },
+): Core;

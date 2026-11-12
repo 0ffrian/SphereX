@@ -112,7 +112,7 @@ The bake engine in `frontend/src/sound/ambience/` differs from the text above in
 | S7 | river |
 | S8 | lava and crust |
 
-- **Incoherent area-source integral (Rayleigh):** `I = Σ_i A_i · c_i · e^{−2·α(f_b)·d_i} / (4π d_i²)`, where `c_i` is the sample's class membership (0/1, or rain weight) and `f_b` the bed's band centre.
+- **Incoherent area-source integral (Rayleigh, Appendix D R1):** `I = Σ_i c_i · e^{−2·α(f_b)·d_i} · ∫_sector_i cos²θ / (4π d²) dA`: each sample's sector is integrated exactly with a cos² surface directivity factor (θ from the vertical at the source), where `c_i` is the sample's class membership (0/1, or rain weight) and `f_b` the bed's band centre. An infinite plane is then flat with height (under 0.1 dB) until absorption acts.
 - **Relative level:** `L_rel = 10·log10(I / I_ref)`, where `I_ref` is the same integral for an infinite plane of that class with the listener at 2 m on Earth air.
 - **What this gives:**
   - Directly over a sea the level is nearly flat with height until absorption cuts in.
@@ -129,7 +129,7 @@ The bake engine in `frontend/src/sound/ambience/` differs from the text above in
 ### World scaling (true level)
 - **Impedance between worlds.** Using `Z(z)` at the listener:
   - **Ground sources** (S4–S8, S10): radiate fixed power, so `ΔL = 10·log10(Z_w/Z_E)` [PA Q6]. Mars −20 dB, Titan +10 dB, Venus +20 dB, matching Petculescu & Lueptow.
-  - **Flow noise** (S1–S3, S9, S12): pressure amplitude `∝ ρ·I_u·U²` (rumble) and `∝ ρ·U³/c` (hiss) [SS §1]. Level `20·log10` of the ratio to Earth at the same reference.
+  - **Flow noise** (S1–S3, S9, S12; with `Z(z)` at the listener, Appendix D R10): pressure amplitude `∝ ρ·I_u·U²` (rumble) and `∝ ρ·U³/c` (hiss) [SS §1]. Level `20·log10` of the ratio to Earth at the same reference.
 - **Listener in thinner air.** A ground source heard at height z gets `+10·log10(Z(z)/Z(0))` on top of the absorption.
 - **True level:** `L_true(bed) = L_ref_E(bed) + L_rel + ΔL_world + live driver terms` (the §7 gains, in dB).
 - **Earth reference levels:** in `tuning.ts` as CREATIVE placeholders, apart from surf, which follows Bolin & Åbom. Defaults:
@@ -158,6 +158,6 @@ The bake engine in `frontend/src/sound/ambience/` differs from the text above in
 - **Front/back:** no cue for it [SP §4].
 - **No information by pan alone:** captions carry direction ("surf to the south") (R9, mono PA).
 
-> **Appendix D, R1 (area-source integral):** integrate each sample's sector exactly with a cos² surface directivity factor (replaces the plain `A_i/(4π d²)` sum); an infinite plane is then flat with height (under 0.1 dB) until absorption acts. Text in [R13.11](files-tests.md#r1311-files-tests-constants-and-the-module-contract).
+> **Appendix D rulings in this section:** R1 (the area integral above). **R8, presence before presentation:** a bed is present only if its class fraction > 0, its driver > 0 and its true level is within 40 dB of the loudest present bed; a bed that is not present is silent and never captioned. **R10:** for S1–S3, S9 and S12 the flow-noise offset (§11.3) uses `Z(z)` at the listener, not the ground's. Full text in [R13.11](files-tests.md#r1311-files-tests-constants-and-the-module-contract).
 
 Ducking, the master and stage audibility (spec §11.5, §11.7) are in [R13.9](buses-stage.md#r139-buses-ducking-master-settings-and-stage-audibility).

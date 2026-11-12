@@ -47,6 +47,8 @@ async function main(): Promise<void> {
   // and no frame-time resolution scaler, so the output depends on the code and not on how fast the machine is.
   const engine = new WorldEngine(canvas, { preserveDrawingBuffer: true });
   w2.__engine = engine;
+  // Issue #93: let the shaders compile in the background instead of waiting inside setPreset.
+  await engine.whenReady();
   engine.playing = false;
   // ?pre=<preset>: load and settle another world first, as the prototype's page always starts on 'rivers'.
   const pre = q.get('pre');
