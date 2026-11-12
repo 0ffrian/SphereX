@@ -569,23 +569,11 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // reads the engineStar / engineWorld published below and the rock view RockStage publishes.
   const enginesShown = honesty === 'artistic' && enginesOn;
   const engineStar =
-    pane &&
-    enginesShown &&
-    plan?.threeD &&
-    card &&
-    !blocked &&
-    engineStarCard &&
-    starFailedId !== engineKey(card.id, engineStarCard.preset.id)
+    pane && enginesShown && plan?.threeD && card && !blocked && engineStarCard && starFailedId !== engineKey(card.id, engineStarCard.preset.id)
       ? engineStarCard
       : null;
   const engineWorld =
-    pane &&
-    enginesShown &&
-    plan?.threeD &&
-    card &&
-    !blocked &&
-    engineWorldCard &&
-    worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
+    pane && enginesShown && plan?.threeD && card && !blocked && engineWorldCard && worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
       ? engineWorldCard
       : null;
   // Issue #93: the build steps wait for a world engine to compile and form the planet (`hold`). The key of the
@@ -883,9 +871,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             <WorldGlobeStage
               key={engineWorld.preset.id}
               world={engineWorld}
-              onFail={() =>
-                useWorldStore.getState().fail(engineKey(card?.id, engineWorld.preset.id))
-              }
+              onFail={() => useWorldStore.getState().fail(engineKey(card?.id, engineWorld.preset.id))}
               onFormed={() => setFormedKey(engineKey(card?.id, engineWorld.preset.id))}
             />
           )}

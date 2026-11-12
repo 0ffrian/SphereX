@@ -19,6 +19,7 @@ import { getAudioContext } from './audioContext';
 import { getBus, holdDuck, playBell, type DuckHold } from './audioGraph';
 import { pitchToHz, wavelengthToPitch } from './pitch';
 import { getSoundSettings, stopWhenHidden, useSoundSettings } from './settings';
+import { claimSpectrumSound, type SpectrumClaim } from './spectrumExclusive';
 import type { SpectrumMapping, SpectrumSample } from './spectrumMapping';
 import {
   AUDIO_LOOKAHEAD_S,
@@ -231,6 +232,8 @@ export class ListenSweep {
   private duck: DuckHold | null = null;
   private unsubscribe: (() => void) | null = null;
   private unhook: (() => void) | null = null;
+  /** Q-446: one spectrum sound at a time (the chord and the Hear it sweep stop when this starts). */
+  private claim: SpectrumClaim | null = null;
   private startAt = 0;
   private duration = 0;
   private active = false;
@@ -282,6 +285,7 @@ export class ListenSweep {
     if (!toneShown && chimes.length === 0) return false;
     const ctx = this.getContext();
     if (!ctx || ctx.state !== 'running') return false;
+    this.claim = claimSpectrumSound(() => this.stop());
     const my = ++this.run;
     this.ctx = ctx;
     this.honesty = honesty;
@@ -448,6 +452,8 @@ export class ListenSweep {
   }
 
   private ended(): void {
+    this.claim?.release();
+    this.claim = null;
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.unhook?.();

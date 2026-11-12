@@ -107,6 +107,9 @@ export const useWorldStore = create<WorldStoreState>((set, get) => ({
     const { globe, fly } = get();
     globe?.setOverrides(o);
     fly?.setOverrides(o);
+    // Issue #93 1.9: the simulation both views follow takes the change once, after the views (its key follows theirs).
+    for (const src of new Set([globe?.simSource, fly?.simSource]))
+      src?.setOverrides(o, (globe?.simSource === src ? globe : fly)?.simKey());
     set((s) => ({ applied: { ...s.applied, ...o }, rev: s.rev + 1 }));
     get().redraw();
   },

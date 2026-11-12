@@ -8,7 +8,7 @@
 //
 // Issue #93 W1: the star's shader compiles in the background while a loader shows (B7); a compile that fails or has
 // not finished after STAR_READY_TIMEOUT_MS takes the TSL path (the engine watchdog); the engine loop draws at most 60
-// frames a second (STAR_FPS_CAP); the surface close-up keeps only its surface canvas (render notes 0.5).
+// frames a second (STAR_FPS_CAP).
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { Tag } from '@/contract';
 import { useAppStore } from '@/state/store';
@@ -75,13 +75,7 @@ const SCALE_LABEL: Partial<Record<StarScaleView, string>> = {
 export const STAR_FPS_CAP: number | null = 60;
 
 /** Builds the engine in `host`, drives its clock, and keeps React in step with it. */
-function useStarEngine(
-  mode: StarMode,
-  star: StarFromCard,
-  redrawMs: number,
-  slot: string = mode,
-  surface = false,
-) {
+function useStarEngine(mode: StarMode, star: StarFromCard, redrawMs: number) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [engine, setEngine] = useState<StarEngine | null>(null);
   const [failed, setFailed] = useState(false);
@@ -118,7 +112,7 @@ function useStarEngine(
       if (dead) return;
       let en: StarEngine;
       try {
-        en = new StarEngine(host, { mode, surface });
+        en = new StarEngine(host, { mode });
       } catch (err) {
         fail(err);
         return;
@@ -137,7 +131,7 @@ function useStarEngine(
       for (const c of en.layers) c.addEventListener('webglcontextlost', onLost);
       // Dev only: the parity scripts (issue #71) pause and seek the engine through this.
       if (import.meta.env.DEV)
-        (window as unknown as Record<string, unknown>)[`__sxStar_${slot}`] = en;
+        (window as unknown as Record<string, unknown>)[`__sxStar_${mode}`] = en;
       let shown = true;
       const cap = new FrameCap(STAR_FPS_CAP ? 1000 / STAR_FPS_CAP : null);
       let last = performance.now();
@@ -191,7 +185,7 @@ function useStarEngine(
       ro?.disconnect();
       if (e) {
         if (import.meta.env.DEV)
-          (window as unknown as Record<string, unknown>)[`__sxStar_${slot}`] = null;
+          (window as unknown as Record<string, unknown>)[`__sxStar_${mode}`] = null;
         if (onLost) for (const c of e.layers) c.removeEventListener('webglcontextlost', onLost);
         // Never blocks: a compile still running is waited for in the background (StarEngine.dispose).
         e.dispose();
@@ -199,7 +193,7 @@ function useStarEngine(
       setEngine(null);
       setCompiling(true);
     };
-  }, [mode, redrawMs, slot, surface]);
+  }, [mode, redrawMs]);
 
   // A new star: the same engine, a new preset.
   const { preset } = star;

@@ -6,6 +6,7 @@ The epoch ``-ep`` must be a Julian day; a calendar date returned an empty 204 an
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -25,6 +26,10 @@ class SkybotBody:
     dec: float  # deg
     v_mag: float | None
     sso_class: str | None
+    # A17.5 (Q-180): SkyBoT's position error ("Err (arcsec)"), None when not given. The motion
+    # rates are not in the ``-output object`` answer this adapter asks for (its cache key does not
+    # carry the output mode), so they are not read.
+    pos_err_arcsec: float | None = None
 
 
 def skybot_key(ra: float, dec: float, radius_deg: float, jd: str) -> CacheKey:
@@ -45,6 +50,16 @@ def _dms_to_deg(text: str) -> float:
     return sign * (d + m / 60.0 + s / 3600.0)
 
 
+def _opt_float(value: object) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        v = float(str(value))
+    except ValueError:
+        return None
+    return v if math.isfinite(v) and v >= 0.0 else None
+
+
 def parse(status: int, body: bytes) -> list[SkybotBody]:
     if status == 204 or not body.strip():
         return []
@@ -61,6 +76,7 @@ def parse(status: int, body: bytes) -> list[SkybotBody]:
                 dec=_dms_to_deg(str(it["DEC (dms)"])),
                 v_mag=float(it["VMag (mag)"]) if it.get("VMag (mag)") is not None else None,
                 sso_class=str(it["Class"]) if it.get("Class") else None,
+                pos_err_arcsec=_opt_float(it.get("Err (arcsec)")),
             )
         )
     return out

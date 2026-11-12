@@ -12,6 +12,7 @@ import { useAppStore } from '@/state/store';
 import { cardToWorld, type CardToWorldOk } from '@/engine/worlds/cardToWorld';
 import { WORLD_FLUIDS, WorldEngine, type EngineState } from '@/engine/worlds/WorldEngine';
 import { worldEngineSupported } from '@/engine/worlds/support';
+import { simModeFromQuery, simSourceFor } from '@/engine/worlds/simSource';
 import type { FluidKey, SpinMode } from '@/engine/worlds/types';
 import { ProvenanceBadge } from './Badge';
 import { useCloseUpStore } from './closeUpStore';
@@ -198,6 +199,18 @@ function useWorldEngine(
           if (st.world?.preset.id === world.preset.id) en.setOverrides(st.applied);
           st.setFly(en);
         }
+        // Issue #93 1.9, 1.10: one simulation for both views (in a worker where there is one). A view that opens
+        // on a world the other view has formed shows it formed at once (`?sim=own` keeps one simulation per view).
+        const other = role === 'globe' ? st.fly : st.globe;
+        const same = role === 'fly' && st.world?.preset.id === world.preset.id;
+        const src = simSourceFor(
+          simModeFromQuery(),
+          world.preset,
+          same ? st.applied : {},
+          en,
+          other?.simSource,
+        );
+        if (src) en.followSim(src);
       } catch (err) {
         fail(err);
         return;
@@ -377,10 +390,24 @@ const FORMING_LOADER_LOOK: GridLoaderProps = {
 
 /**
  * "Forming the planet…": drawn over the canvas until the spin-up has finished, so a half-formed world is never shown.
- * Issue #93: it moves (the build loader), so a long first compile never looks like a frozen page, says which wait it
- * is, and shows how much of the spin-up is done. Under reduced motion the loader stands still.
+ * On the globe (`underMould`) the build pane's MouldAnimation draws over this cover (and says the same words); the
+ * cover stays so a half-formed world is never shown, and the words stay as the accessible status. In the left pane
+ * (the fly view, no mould over it) issue #93's loader shows: it moves, so a long first compile never looks like a
+ * frozen page, says which wait it is, and shows how much of the spin-up is done. Under reduced motion it stands still.
  */
-function Forming({ gas, progress }: { gas: boolean; progress: number | null }) {
+function Forming({
+  gas,
+  progress,
+  underMould = false,
+}: {
+  gas: boolean;
+  progress: number | null;
+  underMould?: boolean;
+}) {
+  useEffect(() => {
+    useMouldLive.getState().setForming(true);
+    return () => useMouldLive.getState().setForming(false);
+  }, []);
   const reduced = reducedMotion();
   // The build pane's MouldAnimation draws over this cover (and says the same words); the cover stays
   // so a half-formed world is never shown, and the words stay as the accessible status.
@@ -390,6 +417,18 @@ function Forming({ gas, progress }: { gas: boolean; progress: number | null }) {
   }, []);
   const pct = progress === null ? null : Math.round(progress * 100);
   const what = gas ? 'Forming the atmosphere' : 'Forming the planet';
+  if (underMould)
+    return (
+      <div
+        className="absolute inset-0 z-[2] bg-black"
+        data-testid="world-forming"
+        data-progress={pct ?? ''}
+      >
+        <span className="sr-only" role="status">
+          {what}…
+        </span>
+      </div>
+    );
   return (
     <div
       className="absolute inset-0 z-[2] grid place-content-center justify-items-center gap-3 bg-black text-center text-xs text-neutral-300"
@@ -794,7 +833,11 @@ export function WorldGlobeStage({
       data-spinup={engine ? engine.spinup : ''}
     >
       {forming && (
-        <Forming gas={state ? state.gas : world.preset.type === 'gas'} progress={progress} />
+        <Forming
+          gas={state ? state.gas : world.preset.type === 'gas'}
+          progress={progress}
+          underMould
+        />
       )}
     </div>
   );
@@ -971,12 +1014,7 @@ export function WorldFlyStage({
       {/* The fly view's own sound controls, shown whatever SHOW_FLY_BAR is (C6). */}
       {engine && entered && <SoundChip />}
       {SHOW_FLY_BAR && engine && entered && (
-        <div
-          className="sx-cu-controls"
-          role="group"
-          aria-label="Surface view controls"
-          style={{ zIndex: 3 }}
-        >
+        <div className="sx-cu-controls" role="group" aria-label="Surface view controls" style={{ zIndex: 3 }}>
           <label htmlFor="world-alt" className="flex-1 basis-40">
             {gas ? 'Height above the clouds' : 'Height above the ground'}:{' '}
             <span data-testid="world-alt-label">{`${fmt(alt, alt < 10 ? 1 : 0)} km`}</span>

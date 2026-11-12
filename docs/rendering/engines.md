@@ -1,6 +1,6 @@
 # Prototype engines (D-37)
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R5.9 · **Implements:** [D-37, Q-286 to Q-288, Q-299 to Q-306, Q-309 to Q-316](../decisions/rendering-engines.md), [Q-329 to Q-331, Q-334, Q-335](../decisions/rendering-engines-review.md), [D-38, Q-337 to Q-354, Q-367, Q-368](../decisions/rendering-engines-tuning.md), [D-03, D-05](../decisions/platform-hosting.md), [D-21, Q-110](../decisions/contract-tags.md), [D-36](../decisions/rendering-bodies.md) · **Read with:** [display-rules.md](display-rules.md) (R5.3 honesty, R5.5 budget), [renderers/stars.md](renderers/stars.md) (R7.5), [renderers/shader-kinds.md](renderers/shader-kinds.md) (R7.7), [renderers/asteroid.md](renderers/asteroid.md) (R7.2), [acceptance-tests.md](acceptance-tests.md) (R11)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R5.9 · **Implements:** [D-37, Q-286 to Q-288, Q-299 to Q-306, Q-309 to Q-316](../decisions/rendering-engines.md), [Q-329 to Q-331, Q-334, Q-335](../decisions/rendering-engines-review.md), [D-40, Q-337 to Q-354, Q-367, Q-368](../decisions/rendering-engines-tuning.md), [Q-381 to Q-386](../decisions/rendering-engines-perf.md), [D-03, D-05](../decisions/platform-hosting.md), [D-21, Q-110](../decisions/contract-tags.md), [D-36](../decisions/rendering-bodies.md) · **Read with:** [engines-performance.md](engines-performance.md) (R5.9.1 compile, caches, switches), [display-rules.md](display-rules.md) (R5.3 honesty, R5.5 budget), [renderers/stars.md](renderers/stars.md) (R7.5), [renderers/shader-kinds.md](renderers/shader-kinds.md) (R7.7), [renderers/asteroid.md](renderers/asteroid.md) (R7.2), [acceptance-tests.md](acceptance-tests.md) (R11)
 
 ### R5.9 Prototype engines (D-37)
 
@@ -27,7 +27,7 @@ For generated bodies the approved prototype's own code (`sculptor-preview-next.h
 3. when an engine fails to start;
 4. when an engine loses its WebGL context (no black canvas);
 5. when WebGL2 is missing;
-6. when a world engine times out or throws while it compiles or forms (below);
+6. when an engine times out or throws while it compiles or forms (below; star and rock: R5.9.1);
 7. when the engines are switched off (`?engines=0`).
 
 Never blank: the fallback is always the path that draws first.
@@ -59,21 +59,24 @@ The fly view lays its gullies and the gas giant's small-scale detail on planet-f
 | world `presets.js`, `core.js` | 3.1 critical points and the supercritical state; 3.2 saturation pressure; 3.3 tides from `p.ob`; 3.6 runaway | `PRESETS_93_3_1`, `CORE_L*_93_3_*` in `world_engine_deviations.py` |
 | star `protoStar1.js` | 1.9 loop bounds; 2.3 seeded surface and spots; 3.4 turnover time | deviations 4 to 6, `@rename` pairs 7 to 22 |
 | rock `source.ts` | 2.8 vec3 seed, crater hash, crater shapes, boulders | the extractor's PATCHES |
+| world `shaders.js`, `core.js`, `heightPyramid.js` (performance waves, Q-384) | F1 max-height pyramid, shadow skip, one shaded height, no `WORLD_FS` on the fly engine; B9 scaler; F3 static G-buffer and `textureLod` reads; F4 climate loop within its budget (Q-385) | `DEV93_FLY`, `DEV93_PYRAMID`, `DEV93_FLY_HOOKS`, `DEV93_SCALER`, `DEV93_COMPILE`, `DEV93_SKIP_GLOBE`, `DEV93_GBUF`, `DEV93_GBUF_DRAW`, `DEV93_FLY3`, `DEV93_FLY_LOD`; `DEV93_BUDGET` (`@deviation L2344`, F4) |
+| star `protoStar1.js`, `protoStar3.js` (wave 1, Q-381) | B7 background compile; 1.2 no black plasma pass | deviations 7 and 8, `@rename` pairs 23 to 29 |
+| rock `source.ts` (wave 1, Q-382) | B7 background compile, loops kept; 1.7 jets in the vertex shader; 2.1 baked cube maps | `PATCHES_93W1`, `DEV93W1_TAIL` in `extract-rock-engine.py` |
 
 The extractors (`frontend/scripts/extract-world-engine.py`, `extract-rock-engine.py`) take the prototype path as an argument or `SX_PREVIEW_HTML`. The world extractor refuses to overwrite a file holding `@deviation` unless `--force`; the rock extractor applies its PATCHES. **Open (Moon):** the prototype HTML and the parity harness (`parity/verbatim_check.py`, `parity/run.cjs`) are not in the repo, so the parity claims cannot be reproduced from a checkout.
 
-**Performance (D-05, R5.5).** The star and rock engines cap the device pixel ratio at 1.5 inside their own code; the world engine caps it at 1.25 for the globe and 1.0 for the fly view (issue #93; 1.5 only for the prototype's own page, `role: 'both'`, used by parity). Each engine drops its render scale on slow frames; the world engine's scaler aims at 30 fps (shrinks above 34 ms, grows below 22 ms) and passes the scale to the fly shader, so a scale change alters sharpness, not the ground pattern. A planet runs two GL contexts and two simulations (globe and fly view); they share one terrain build (`terrainCache.js`, keyed by every input of `buildTerrain`), the fly engine does not draw the globe hidden beside it, and no world is drawn while it spins up under the opaque "Forming" overlay. The gas solver runs at most 3 steps a frame, so a giant that needs more (HD 189733 b) runs slower than one day per second, and its caption states the real rate (about 15 h per second for HD 189733 b; Q-343). Decisions: Q-339 to Q-343.
+**Performance (D-05, R5.5).** The star and rock engines cap the device pixel ratio at 1.5 inside their own code; the world engine caps it at 1.25 for the globe and 1.0 for the fly view (issue #93; 1.5 only for the prototype's own page, `role: 'both'`, used by parity). Each engine drops its render scale on slow frames; the world engine's scaler aims at 30 fps (shrinks above 34 ms, grows below 20 ms, with the steps limited in time since Q-384) and passes the eased scale to the fly shader, so a scale change alters sharpness, not the ground pattern. The star and world engine hosts draw at most 60 frames a second (Q-386). A planet runs two GL contexts and two simulations (globe and fly view); they share one terrain build (`terrainCache.js`, keyed by every input of `buildTerrain`), the fly engine does not draw the globe hidden beside it, and no world is drawn while it spins up under the opaque "Forming" overlay. The gas solver runs at most 3 steps a frame, so a giant that needs more (HD 189733 b) runs slower than one day per second, and its caption states the real rate (about 15 h per second for HD 189733 b; Q-343). Decisions: Q-339 to Q-343. Since the #93 performance waves (Q-381 to Q-386) each engine compiles in the background, the fly view has a static G-buffer and stays mounted while its close-up is closed, and one simulation per world feeds both views, in a Web Worker by default (Q-385); the detail, the caches and the dev switches are in [R5.9.1](engines-performance.md#r591-engine-and-viewer-performance-issue-93-waves).
 
-**First open (issue #93).** On ANGLE D3D11 (Chrome's default on Windows) the driver unrolls every constant-bound loop, so the fly shader froze the page on a cold cache. The world shaders and the star shader now write each constant loop bound as `N+uZ0` (`uZ0` a uniform never set, always 0; pixels within rounding), and the world engine compiles in the background: `new WorldEngine(canvas, { role })` submits its programs without reading a status, and `whenReady()` polls `KHR_parallel_shader_compile` and resolves once they are linked (rejects with the compile or link log). A globe-only engine (`role: 'globe'`) never compiles the fly shader and ignores `setFly(true)`. The star and rock engines still compile synchronously (R12 #56).
+**First open (issue #93).** On ANGLE D3D11 (Chrome's default on Windows) the driver unrolls every constant-bound loop, so the fly shader froze the page on a cold cache. The world shaders and the star shader now write each constant loop bound as `N+uZ0` (`uZ0` a uniform never set, always 0; pixels within rounding), and the world engine compiles in the background: `new WorldEngine(canvas, { role })` submits its programs without reading a status, and `whenReady()` polls `KHR_parallel_shader_compile` and resolves once they are linked (rejects with the compile or link log). A globe-only engine (`role: 'globe'`) never compiles the fly shader and ignores `setFly(true)`. The star and rock engines also compile in the background since the #93 wave 1 (Q-381, Q-382; R12 #56), each with a 60 s watchdog ([R5.9.1](engines-performance.md#r591-engine-and-viewer-performance-issue-93-waves)).
 
 Measured cold (RTX 4060 Ti desktop, `frontend/scripts/engine-bench`, corrected 12 Nov 2026, Q-337):
 
 | Program | Cold compile |
 |---|---|
-| Fly shader (`FLY_FS`) | 22 to 43 s under load; 40 to 55 s in the app while the globe forms. The earlier 56 s and 78 s baselines were taken under uncontrolled load. |
+| Fly shader (`FLY_FS`) | 22 to 43 s under load; 40 to 55 s in the app while the globe forms. The earlier 56 s and 78 s baselines were taken under uncontrolled load. Unchanged by the wave 2 fly work: about 22 s median (Q-384). |
 | Globe programs | 2.3 to 4.6 s |
-| Star shader | 1.2 to 1.7 s |
-| Rock shader | 1.9 to 2.1 s, synchronous |
+| Star shader | 1.2 to 1.7 s in the driver; the page is blocked 0.12 to 0.19 s (was 1.5 to 1.8 s; background compile, Q-381) |
+| Rock shader | 1.9 to 2.1 s cold (Q-337); the page was blocked 1.3 to 2.5 s in the wave 1 bench; now compiled in the background with the loops kept: 0 s blocked (Q-382) |
 
 The A15 is not measured yet (R12 #55). The longest main-thread pause during a cold fly compile was 113 to 185 ms (blue team; the first measurement was 161 ms). Over a whole cold TRAPPIST-1 f build the longest pause was 2.7 s, while the world formed (it was 35.9 s before the regression fix).
 
@@ -85,12 +88,13 @@ The A15 is not measured yet (R12 #55). The longest main-thread pause during a co
 - **Wait for the shaders.** If they are not ready after 60 s (globe) or 180 s (fly), the stage fails and the three.js path draws (`readyOrTimeout`, `app/engineWatchdog.ts`).
 - **Form.** If the world has not formed after 90 s counted while it is on screen (`FormClock`; a frame counts at most 250 ms), the stage fails the same way. An exception while starting or stepping, or a lost context, fails it too. These limits are UI pacing, not physics.
 - **Loader.** The opaque "Forming" overlay shows the build loader (static under reduced motion), "Preparing the graphics. The first time can take a minute." while the shaders compile, then a progress bar of the spin-up.
+- **Closed close-up.** The fly view stays mounted and paused while its close-up is closed, and reopens in 0.3 s (Q-383).
 - **Formed.** The stage reports `onFormed`; the build steps wait for it (`useMould` phase `'forming'`, R5.8).
 - **Dispose.** `dispose()` never blocks: `loseContext()` waits for every compile still running in the driver, so the context is released only once the driver reports every program done (polled every 100 ms). If a compile is still pending after 180 s, the engine stops polling and leaves the context to the browser without calling `loseContext()`.
 
 **Globe controls (issue #93, Q-344).** On the world globe a press that moves less than 4 px is a click: with the close-up open it picks the place the close-up goes to. A longer press drags and turns the globe, and the drag follows the hand on both axes. The arrow keys and the Details rotate arrows move the surface the way the arrow points, also with the close-up open (`globeTurn`, `globeTurnBy` in `worldStore.ts`); the light turns with the view, so the terminator stays put. In the close-up the drag follows the hand.
 
-**Not measured:** the A15 check of at least 30 fps while rotating has not been run for the rock engine or for the two world-engine instances; it must be run on the A15 before the event (R11, R12 #43).
+**Not measured:** the A15 check of at least 30 fps while rotating has not been run for the rock engine or for the two world-engine instances; it must be run on the A15 before the event (R11, R12 #43); the performance waves are not measured there either (R12 #59).
 
 **Known limitation.** The star engine runs its slices through `new Function`, so a Content Security Policy needs `'unsafe-eval'` in `script-src`. The slices' errors and warnings reach the browser console, tagged `[star engine]` (Q-329).
 

@@ -3,6 +3,7 @@ the recorded Eros frames. Network blocked (conftest)."""
 
 from __future__ import annotations
 
+import ast
 import json
 import subprocess
 import sys
@@ -354,7 +355,14 @@ def test_find_frames_refuses_another_release(tmp_path: Path) -> None:
         area_frames.find_frames(ctx, EROS_AREA)
 
 
+# The read side the API may import (A17.8, issue #108); everything else in app.core.area computes.
+AREA_READ_SIDE = ["app.core.area", "app.core.area.config", "app.core.area.store"]
+
+
 def test_app_api_never_imports_the_area_pipeline() -> None:
+    """A16.2: no computing in a web request. The API serves ``derived.area`` entries through
+    ``store`` (stamps are made at prepare time and stored); no pipeline module (frames, dots,
+    labels, join, known check, service, stamps) is ever loaded by ``app.main``."""
     code = (
         "import sys, app.main; "
         "print(sorted(m for m in sys.modules if m.startswith('app.core.area')))"
@@ -362,7 +370,8 @@ def test_app_api_never_imports_the_area_pipeline() -> None:
     out = subprocess.run(
         [sys.executable, "-c", code], cwd=BACKEND_DIR, capture_output=True, text=True, check=True
     )
-    assert out.stdout.strip() == "[]"
+    loaded = ast.literal_eval(out.stdout.strip())
+    assert loaded == AREA_READ_SIDE
 
 
 # ------------------------------------------------------------------- recorded Eros frames
