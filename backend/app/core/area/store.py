@@ -26,7 +26,7 @@ from app.core.area.config import (
 )
 from app.core.card.validate import check
 
-STAGES = ("summary", "known", "dots", "tracks", "export", "cutouts")
+STAGES = ("summary", "known", "dots", "tracks", "export", "stamps")
 HEAD = "head"
 INDEX_FORMULA = (
     "the prepared derived.area entries whose settings match the running code and settings "

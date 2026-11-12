@@ -16,6 +16,7 @@ the run read after the dots step (star cones, SPHEREx vectors, SkyBoT, Horizons)
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import math
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -39,6 +40,7 @@ from app.core.area.config import (
     params_hash,
 )
 from app.core.area.records import AreaFrames, Dot, FrameDots
+from app.core.area.stamps import StampUnavailable, StretchedCutout
 from app.core.area.store import (
     HEAD,
     STAGES,
@@ -106,6 +108,7 @@ class AreaResult:
     known_objects: list[match.KnownObject]
     object_ids: dict[str, str | None]
     settings: dict[str, Setting]
+    cutouts: Mapping[str, bytes]  # frame_id -> cutout body (for the stamps stage)
     served: list[Served] = field(default_factory=list)
     sources: dict[str, str] = field(default_factory=dict)
 
@@ -128,6 +131,11 @@ class AreaResult:
 
     def params_hash(self) -> str:
         return params_hash(self.settings, self.input_digests())
+
+    def settings_sha(self) -> str:
+        """The head's ``settings_sha``: the method settings this run used (A17.10), never the
+        defaults, so an entry made with other settings is not served as the running code's."""
+        return settings_sha({k: self.settings[k] for k in method_settings()})
 
     def times(self) -> tuple[str, str]:
         """``(cached_at, computed_at)`` from the inputs read after the dots step."""
@@ -192,6 +200,7 @@ def run_area(
         objects,
         ids,
         settings,
+        dict(bodies),
         served,
         {**DEFAULT_SOURCES, **(sources or {})},
     )
@@ -529,13 +538,26 @@ def export_ecsv(replies: Mapping[str, Mapping[str, Any]], params: str) -> bytes:
 # --- derived.area entries (A17.10) ------------------------------------------------------------
 
 
-def _cutouts(frames: AreaFrames) -> dict[str, Any]:
-    """Internal stage for ``/stamps``: each frame's cutout key digest and body SHA-256."""
-    return {
-        f.frame_id: {"key": f.cutout_key, "sha256": f.cutout_sha256}
-        for f in frames.frames
-        if f.cutout_key and f.cutout_sha256
-    }
+def _stamps(dots_reply: Mapping[str, Any], cutouts: Mapping[str, bytes]) -> dict[str, str]:
+    """Internal stage for ``/stamps``: every dot's 15 x 15 px PNG (base64), made from the cutout
+    at prepare time, so the pack serves stamps under ``SX_OFFLINE=1`` without the cutouts. A dot
+    whose cutout is absent or cannot be stretched has no entry (503 ``stamp_unavailable``)."""
+    images: dict[str, StretchedCutout | None] = {}
+    out: dict[str, str] = {}
+    for visit in dots_reply["visits"]:
+        for d in visit["dots"]:
+            fid = str(d["frame_id"])
+            if fid not in images:
+                body = cutouts.get(fid)
+                try:
+                    images[fid] = StretchedCutout.of(body) if body is not None else None
+                except StampUnavailable:
+                    images[fid] = None
+            img = images[fid]
+            if img is not None:
+                png = img.stamp(float(d["x"]), float(d["y"]))
+                out[str(d["dot_id"])] = base64.b64encode(png).decode("ascii")
+    return out
 
 
 @dataclass(frozen=True)
@@ -550,7 +572,7 @@ def prepare(result: AreaResult) -> Prepared:
     p = result.params_hash()
     bodies = {name: canonical(r) for name, r in replies.items()}
     bodies["export"] = export_ecsv(replies, p)
-    bodies["cutouts"] = canonical(_cutouts(result.frames))
+    bodies["stamps"] = canonical(_stamps(replies["dots"], result.cutouts))
     return Prepared(p, bodies, replies["summary"]["computed_at"])
 
 
@@ -570,7 +592,7 @@ def store_area(cache: ReadThroughCache, result: AreaResult, prepared: Prepared) 
     head = {
         "area_id": spec.id,
         "params_hash": prepared.params_hash,
-        "settings_sha": settings_sha(method_settings(DEFAULT_AREA_CONFIG)),
+        "settings_sha": result.settings_sha(),
     }
     cache.put(
         head_key(spec.data_release, spec.id),

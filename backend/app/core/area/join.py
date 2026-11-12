@@ -10,7 +10,9 @@
    perpendicular to ``w`` is at most ``max(v_tol_min, v_tol_sigma * sigma_v)`` and
    ``u <= 1 / delta_min``. Without ``w`` (a failed or uncached vector) the test is the rate
    window only and the ranking uses ``|v_in - v_AB|`` (A17.4 fallback).
-4. **Tracks:** mutual best (smallest residual) with ``best <= ambiguity_ratio * next``. Else a
+4. **Tracks:** mutual best (smallest residual) with ``best <= ambiguity_ratio * next``, ranked
+   per direction: a middle visit's leg ranks its next-visit and its previous-visit partners
+   separately, so chains of three or more visits form. Else a
    **possible**: ``ambiguous`` (a candidate passed), ``no_partner`` (a neighbour visit covers the
    reachable ring) or ``one_visit`` (none does). A possible without a partner that moves less than
    ``min_motion_px`` is dropped and counted as ``static_one_visit``.
@@ -22,7 +24,7 @@ from __future__ import annotations
 
 import itertools
 import math
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -226,6 +228,59 @@ def _reachable(
     return bool(np.any((d >= rate_min * dt - half_cell) & (d <= rate_max * dt + half_cell)))
 
 
+Fit = tuple[Vec, float, float | None, float, bool]
+
+
+@dataclass(frozen=True)
+class Links:
+    fits: dict[tuple[int, int], Fit]  # (earlier leg, later leg) inside the rate window
+    links: dict[int, int]  # earlier leg -> later leg (consecutive visits, mutual best)
+    has_candidate: frozenset[int]  # legs with a passing pair in either direction
+
+
+def link_legs(
+    legs: Sequence[Leg],
+    windows: Mapping[tuple[int, int], tuple[float, float]],
+    w: Mapping[int, SkyVelocity],
+    cfg: AreaConfig = DEFAULT_AREA_CONFIG,
+) -> Links:
+    """A17.4 steps 2 to 4 on legs: ``windows`` maps each consecutive visit pair to its
+    ``(rate_min, rate_max)``. A leg of a middle visit has a forward list (partners in the next
+    visit) and a backward list (partners in the previous one), so mutual best is decided per
+    direction and chains of three or more visits form (PR #110 review)."""
+    by_visit: dict[int, list[int]] = {}
+    for i, lg in enumerate(legs):
+        by_visit.setdefault(lg.visit, []).append(i)
+    fits: dict[tuple[int, int], Fit] = {}
+    fwd: dict[int, list[tuple[float, int]]] = {}
+    bwd: dict[int, list[tuple[float, int]]] = {}
+    for (v1, v2), (rate_min, rate_max) in sorted(windows.items()):
+        for i in by_visit.get(v1, []):
+            for j in by_visit.get(v2, []):
+                got = pair_fit(legs[i], legs[j], w, rate_min, rate_max, cfg)
+                if got is None:
+                    continue
+                fits[(i, j)] = got
+                if got[4]:
+                    fwd.setdefault(i, []).append((got[3], j))
+                    bwd.setdefault(j, []).append((got[3], i))
+    for cands in (*fwd.values(), *bwd.values()):
+        cands.sort()
+
+    def best(c: list[tuple[float, int]] | None) -> int | None:
+        if not c:
+            return None
+        if len(c) > 1 and c[0][0] > cfg.ambiguity_ratio * c[1][0]:
+            return None
+        return c[0][1]
+
+    links: dict[int, int] = {}
+    for (i, j), f in sorted(fits.items()):
+        if f[4] and best(fwd.get(i)) == j and best(bwd.get(j)) == i:
+            links[i] = j
+    return Links(fits, links, frozenset({*fwd, *bwd}))
+
+
 def join(
     labels: Labels,
     frames: AreaFrames,
@@ -237,42 +292,12 @@ def join(
     visits = sorted(geo.visit_mid_d)
     coverage = {c.visit: c for c in frames.coverage}
     grid = CellGrid.of(geo.box, cfg.coverage_cell_arcsec)
-    by_visit: dict[int, list[int]] = {}
-    for i, lg in enumerate(legs):
-        by_visit.setdefault(lg.visit, []).append(i)
-
     rates: dict[tuple[int, int], tuple[float, float]] = {}
-    fits: dict[tuple[int, int], tuple[Vec, float, float | None, float, bool]] = {}
-    passing: dict[int, list[tuple[float, int]]] = {i: [] for i in range(len(legs))}
     for v1, v2 in itertools.pairwise(visits):
         dt_v = geo.visit_mid_d[v2] - geo.visit_mid_d[v1]
-        rate_min = cfg.r_match_min_px * PIXEL_DEG / dt_v
-        rate_max = geo.rate_max_for(dt_v, cfg)
-        rates[(v1, v2)] = (rate_min, rate_max)
-        for i in by_visit.get(v1, []):
-            for j in by_visit.get(v2, []):
-                got = pair_fit(legs[i], legs[j], w, rate_min, rate_max, cfg)
-                if got is None:
-                    continue
-                fits[(i, j)] = got
-                if got[4]:
-                    passing[i].append((got[3], j))
-                    passing[j].append((got[3], i))
-    for cands in passing.values():
-        cands.sort()
-
-    def best(i: int) -> int | None:
-        c = passing[i]
-        if not c:
-            return None
-        if len(c) > 1 and c[0][0] > cfg.ambiguity_ratio * c[1][0]:
-            return None
-        return c[0][1]
-
-    links: dict[int, int] = {}  # earlier leg -> later leg (consecutive visits)
-    for (i, j), f in sorted(fits.items()):
-        if f[4] and best(i) == j and best(j) == i:
-            links[i] = j
+        rates[(v1, v2)] = (cfg.r_match_min_px * PIXEL_DEG / dt_v, geo.rate_max_for(dt_v, cfg))
+    linked = link_legs(legs, rates, w, cfg)
+    fits, links = linked.fits, linked.links
     linked_to = set(links.values())
     out: list[JoinedTrack] = []
     for i in sorted(range(len(legs)), key=lambda k: legs[k].tracklet.first):
@@ -286,7 +311,7 @@ def join(
             out.append(JoinedTrack(tuple(legs[k] for k in chain), "track", None, f[0], f[2]))
             continue
         a = legs[i]
-        if passing[i]:
+        if i in linked.has_candidate:
             reason = "ambiguous"
         else:
             neighbours = [
