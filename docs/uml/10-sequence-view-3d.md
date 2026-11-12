@@ -71,15 +71,16 @@ sequenceDiagram
     V->>RC: Settle burst: restartTemporal, then 32 frames on TAAU or 2 on SMAA
     V->>V: Set canvas aria-label from the plan (altText.ts#59; size with its tag, "at most" for an upper limit#59; a shader kind adds the artist's-impression note)
     V->>V: Honesty change with the same sceneKey: BuiltScene.update(plan) sets the tags and light in place, no field is regenerated
-    alt honesty is + Artistic and the adapter accepts the card (D-37, Q-287)
+    alt honesty is + Artistic, the engines are on (enginesEnabled, not ?engines=0, Q-367) and the adapter accepts the card (D-37, Q-287)
       V->>ES: Mount the engine stage for the type (planets and gas giants, stars with a Teff, asteroids and comet nuclei)
-      ES->>EN: Own WebGL2 canvas, preset from cardToWorld, cardToStar or cardToRock, spin-up (wall clock, not byte-identical)#59; a world engine first compiles in the background (whenReady) while "Forming" shows
+      ES->>EN: Own WebGL2 canvas (created one tick after mount), preset from cardToWorld, cardToStar or cardToRock, spin-up (wall clock, not byte-identical)#59; a world engine first compiles in the background (whenReady) while "Forming" shows the loader, then a spin-up progress bar
+      Note over ES,EN: Watchdog (engineWatchdog.ts, Q-338): shaders ready within 60 s (globe) or 180 s (fly), world formed within 90 s on screen, else the stage fails
       ES->>V: setEngineOwned(true): the viewer builds and draws nothing under the engine
       EN-->>U: The engine's picture, its readouts with badges and its notes
-      opt engine fails, loses its WebGL context, or the user leaves + Artistic
+      opt engine fails or times out, loses its WebGL context, or the user leaves + Artistic
         ES->>V: setEngineOwned(false): the three.js body draws again (failure remembered for this object)
       end
-    else + Estimated or Measured only, refused card, or no WebGL2
+    else + Estimated or Measured only, engines switched off, refused card, or no WebGL2
       Note over V,R: The three.js TSL path draws (GasWorld, RockyWorld, orbit view, ShaderBody, Star, asteroid and comet renderers)
     end
     V-->>U: Render body, tag chips in legend, scale bar

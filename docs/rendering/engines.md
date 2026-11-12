@@ -1,6 +1,6 @@
 # Prototype engines (D-37)
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R5.9 · **Implements:** [D-37, Q-286 to Q-288, Q-299 to Q-306, Q-309 to Q-316](../decisions/rendering-engines.md), [Q-329 to Q-331, Q-334, Q-335](../decisions/rendering-engines-review.md), [D-38, Q-337 to Q-354](../decisions/rendering-engines-tuning.md), [D-03, D-05](../decisions/platform-hosting.md), [D-21, Q-110](../decisions/contract-tags.md), [D-36](../decisions/rendering-bodies.md) · **Read with:** [display-rules.md](display-rules.md) (R5.3 honesty, R5.5 budget), [renderers/stars.md](renderers/stars.md) (R7.5), [renderers/shader-kinds.md](renderers/shader-kinds.md) (R7.7), [renderers/asteroid.md](renderers/asteroid.md) (R7.2), [acceptance-tests.md](acceptance-tests.md) (R11)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R5.9 · **Implements:** [D-37, Q-286 to Q-288, Q-299 to Q-306, Q-309 to Q-316](../decisions/rendering-engines.md), [Q-329 to Q-331, Q-334, Q-335](../decisions/rendering-engines-review.md), [D-38, Q-337 to Q-354, Q-367, Q-368](../decisions/rendering-engines-tuning.md), [D-03, D-05](../decisions/platform-hosting.md), [D-21, Q-110](../decisions/contract-tags.md), [D-36](../decisions/rendering-bodies.md) · **Read with:** [display-rules.md](display-rules.md) (R5.3 honesty, R5.5 budget), [renderers/stars.md](renderers/stars.md) (R7.5), [renderers/shader-kinds.md](renderers/shader-kinds.md) (R7.7), [renderers/asteroid.md](renderers/asteroid.md) (R7.2), [acceptance-tests.md](acceptance-tests.md) (R11)
 
 ### R5.9 Prototype engines (D-37)
 
@@ -16,7 +16,8 @@ For generated bodies the approved prototype's own code (`sculptor-preview-next.h
 
 - Only at honesty **+ Artistic** (`artistic`). A generated surface is not measured, and several engine constants are **[verify]** (Q-110).
 - At **+ Estimated** (the start state, D-21) and **Measured only**, the three.js TSL path draws, each layer at its own tag (R5.3).
-- The engine also needs: the plan allows a 3D body (`threeD`, the confidence gate), the adapter accepts the card (a refusal lists the missing fields, D-32), WebGL2 (and float render targets for the world engine), and no earlier failure for this object (`engineKey`, per object).
+- The engine also needs: the plan allows a 3D body (`threeD`, the confidence gate), the adapter accepts the card (a refusal lists the missing fields, D-32), WebGL2 (and float render targets for the world engine), no earlier failure for this object (`engineKey`, per object), and the engines switched on (`enginesEnabled()`, below).
+- **Kill switch (Q-367).** `?engines=0` in the query string (before any `#`; the hash belongs to `useHashSync`) turns every engine off, so the three.js path draws at every level, also at + Artistic; `?engines=1` turns them back on. The choice is kept in `localStorage['sx.engines']` and the default is on (`app/enginesSwitch.ts`). `ViewerPanel` gates the world, star and rock stages and the close-up pane on it.
 - While an engine draws the body, the three.js viewer builds and draws nothing under it (`ViewerApp.setEngineOwned`). It takes over again when the engine stands down.
 
 **Fallback: the three.js renderers stay (Atish, 11 Nov 2026).** `GasWorld.ts`, `RockyWorld.ts` (Q-286), `viewer/orbit/*`, `ShaderBody`, `Star`, `AsteroidProcedural`, `AsteroidMesh` and `Comet` are kept. They draw:
@@ -25,7 +26,9 @@ For generated bodies the approved prototype's own code (`sculptor-preview-next.h
 2. when the adapter refuses the card;
 3. when an engine fails to start;
 4. when an engine loses its WebGL context (no black canvas);
-5. when WebGL2 is missing.
+5. when WebGL2 is missing;
+6. when a world engine times out or throws while it compiles or forms (below);
+7. when the engines are switched off (`?engines=0`).
 
 Never blank: the fallback is always the path that draws first.
 
@@ -45,7 +48,7 @@ The byte-identical rule still holds for the baked textures (`bake_demo_pack --ch
 
 The phase 2 constants are `artistic` choices, not cited values; Moon signs off the look (R12 #54).
 
-The fly view lays its gullies and the gas giant's small-scale detail on planet-fixed cube faces (blended at the seams) instead of the plane under the camera, fades noise octaves over two octaves of pixel footprint, and uses cubic reads of the height and climate grids for shading and haptics (the ray march and the shadows keep the bilinear read; the haptics and sound read the same filter through `engine/worlds/fieldSampler.ts`). See the #93 regression fix and Q-352 for the final height filter. Not changed: the CPU terrain hash and the octave lacunarity (backend change and re-bake, after the event), and Saturn's ring texture (only the Saturn preset draws rings).
+The fly view lays its gullies and the gas giant's small-scale detail on planet-fixed cube faces (blended at the seams) instead of the plane under the camera, fades noise octaves over two octaves of pixel footprint, and reads the grids with cubic filters for shading: a Catmull-Rom cubic for the height grid (it passes through every texel, so narrow peaks keep their height) and the B-spline for the climate grids (Q-352). The ray march and the shadows keep the bilinear read. The haptics and sound read the same filters through `engine/worlds/fieldSampler.ts` (Catmull-Rom heights from 16 texels, B-spline climate), so sound and touch match the picture. The phase 2 low-frequency coastline warp is dropped: the warp is the prototype's two fine octaves. Fly frame time (RTX 4060 Ti, phase 1 / phase 2 / now): TRAPPIST-1 f 14.9 / 16.6 / 14.3 ms, Earth 15.0 / 15.9 / 13.8 ms (`scripts/engine-bench/relief.html`). Not changed: the CPU terrain hash and the octave lacunarity (backend change and re-bake, after the event), and Saturn's ring texture (only the Saturn preset draws rings).
 
 **Copied code and deviations (Q-303, Q-335).** Copied blocks sit between `// @verbatim Lstart-Lend` and `// @end-verbatim`. Reviewed fixes are marked `// @deviation (#89 review N)` or `// @deviation (#93 N)` with `@rename` pairs or a split block, and say why; the world extractor carries the #93 ones (Q-354). The #93 deviations:
 
@@ -61,9 +64,31 @@ The extractors (`frontend/scripts/extract-world-engine.py`, `extract-rock-engine
 
 **Performance (D-05, R5.5).** The star and rock engines cap the device pixel ratio at 1.5 inside their own code; the world engine caps it at 1.25 for the globe and 1.0 for the fly view (issue #93; 1.5 only for the prototype's own page, `role: 'both'`, used by parity). Each engine drops its render scale on slow frames; the world engine's scaler aims at 30 fps (shrinks above 34 ms, grows below 22 ms) and passes the scale to the fly shader, so a scale change alters sharpness, not the ground pattern. A planet runs two GL contexts and two simulations (globe and fly view); they share one terrain build (`terrainCache.js`, keyed by every input of `buildTerrain`), the fly engine does not draw the globe hidden beside it, and no world is drawn while it spins up under the opaque "Forming" overlay. The gas solver runs at most 3 steps a frame, so a giant that needs more (HD 189733 b) runs slower than one day per second, and its caption states the real rate (about 15 h per second for HD 189733 b; Q-343). Decisions: Q-339 to Q-343.
 
-**First open (issue #93).** On ANGLE D3D11 (Chrome's default on Windows) the driver unrolls every constant-bound loop: the fly shader took about 60 s to compile on a cold cache and froze the page. The world shaders and the star shader now write each constant loop bound as `N+uZ0` (`uZ0` a uniform never set, always 0), and the world engine compiles in the background: `new WorldEngine(canvas, { role })` submits its programs without reading a status, `whenReady()` polls `KHR_parallel_shader_compile` and resolves once they are linked (rejects with the compile or link log), and the stage shows "Forming…" until then and loads the world after. A globe-only engine (`role: 'globe'`) never compiles the fly shader. Measured (RTX 4060 Ti, cold, `frontend/scripts/engine-bench`): fly shader 56.2 s to about 20 s, globe shader about 5 s to 1.2 to 1.9 s, star shader 3.2 to 4.6 s to 1.1 to 1.2 s, rock shader 1.5 s (unchanged); pixels within rounding; with a warm shader cache, milliseconds (Atish's test). The longest main-thread pause while the fly engine compiled was 161 ms (Q-337, Q-338). The star and rock engines still compile synchronously. On the A15, open every demo object once in the demo Chrome profile after the final build, so the disk cache is warm. What the stage shows while it waits, and when the build steps turn green, is being settled in the #93 regression fix (Q-338, Q-339).
+**First open (issue #93).** On ANGLE D3D11 (Chrome's default on Windows) the driver unrolls every constant-bound loop, so the fly shader froze the page on a cold cache. The world shaders and the star shader now write each constant loop bound as `N+uZ0` (`uZ0` a uniform never set, always 0; pixels within rounding), and the world engine compiles in the background: `new WorldEngine(canvas, { role })` submits its programs without reading a status, and `whenReady()` polls `KHR_parallel_shader_compile` and resolves once they are linked (rejects with the compile or link log). A globe-only engine (`role: 'globe'`) never compiles the fly shader and ignores `setFly(true)`. The star and rock engines still compile synchronously (R12 #56).
 
-**Globe controls (issue #93, Q-344).** On the world globe a press that moves less than 4 px is a click: with the close-up open it picks the place the close-up goes to. A longer press drags and turns the globe; the arrow keys turn it too, also with the close-up open. In the close-up the drag follows the hand. The drag direction is being settled in the #93 regression fix.
+Measured cold (RTX 4060 Ti desktop, `frontend/scripts/engine-bench`, corrected 12 Nov 2026, Q-337):
+
+| Program | Cold compile |
+|---|---|
+| Fly shader (`FLY_FS`) | 22 to 43 s under load; 40 to 55 s in the app while the globe forms. The earlier 56 s and 78 s baselines were taken under uncontrolled load. |
+| Globe programs | 2.3 to 4.6 s |
+| Star shader | 1.2 to 1.7 s |
+| Rock shader | 1.9 to 2.1 s, synchronous |
+
+The A15 is not measured yet (R12 #55). The longest main-thread pause during a cold fly compile was 113 to 185 ms (blue team; the first measurement was 161 ms). Over a whole cold TRAPPIST-1 f build the longest pause was 2.7 s, while the world formed (it was 35.9 s before the regression fix).
+
+**Shader cache (Q-368).** Chrome's GPU disk cache does not keep programs linked through `KHR_parallel_shader_compile` (measured on Chrome 157; synchronous links are kept; `FLY_FS`'s entry is only 74 KB, so the size limit is not the cause). With `--enable-features=ANGLEPerContextBlobCache` they are kept: the second launch was ready in about 52 ms instead of 22 s. So a warm cache gives milliseconds only within one Chrome session, or across launches with that flag. The demo launch and the warm-up are in [A10.2](../architecture/frontend-platform.md#a102-running-the-event-build).
+
+**Engine lifecycle (Q-338, Q-339).** A world stage (`app/WorldEngineStage.tsx`) never hangs on "Forming":
+
+- **Create.** The stage creates its engine one tick after it mounts, so React's development double mount builds one engine, not two.
+- **Wait for the shaders.** If they are not ready after 60 s (globe) or 180 s (fly), the stage fails and the three.js path draws (`readyOrTimeout`, `app/engineWatchdog.ts`).
+- **Form.** If the world has not formed after 90 s counted while it is on screen (`FormClock`; a frame counts at most 250 ms), the stage fails the same way. An exception while starting or stepping, or a lost context, fails it too. These limits are UI pacing, not physics.
+- **Loader.** The opaque "Forming" overlay shows the build loader (static under reduced motion), "Preparing the graphics. The first time can take a minute." while the shaders compile, then a progress bar of the spin-up.
+- **Formed.** The stage reports `onFormed`; the build steps wait for it (`useMould` phase `'forming'`, R5.8).
+- **Dispose.** `dispose()` never blocks: `loseContext()` waits for every compile still running in the driver, so the context is released only once the driver reports every program done (polled every 100 ms). If a compile is still pending after 180 s, the engine stops polling and leaves the context to the browser without calling `loseContext()`.
+
+**Globe controls (issue #93, Q-344).** On the world globe a press that moves less than 4 px is a click: with the close-up open it picks the place the close-up goes to. A longer press drags and turns the globe, and the drag follows the hand on both axes. The arrow keys and the Details rotate arrows move the surface the way the arrow points, also with the close-up open (`globeTurn`, `globeTurnBy` in `worldStore.ts`); the light turns with the view, so the terminator stays put. In the close-up the drag follows the hand.
 
 **Not measured:** the A15 check of at least 30 fps while rotating has not been run for the rock engine or for the two world-engine instances; it must be run on the A15 before the event (R11, R12 #43).
 
