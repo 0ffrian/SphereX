@@ -5025,7 +5025,8 @@ body {
   color: var(--muted);
 }
 .sx-snd-vol label {
-  width: 104px;
+  width: 118px;
+  white-space: nowrap;
   flex: none;
 }
 .sx-snd-vol input {
