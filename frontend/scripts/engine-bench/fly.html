@@ -125,15 +125,35 @@
       W.gl.draw(W.m);
       gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
       // The GPU clocks up over the first frames: 30 untimed frames, then the median of 30 (each read back, so timed).
-      const ft = [];
+      // #93 F1: the GPU time of each timed frame too (EXT_disjoint_timer_query_webgl2, when the browser has it), which
+      // other work on the machine's CPU does not change.
+      const ft = [],
+        tx = gl.getExtension('EXT_disjoint_timer_query_webgl2'),
+        qs = [];
       for (let i = 0; i < 60; i++) {
         const t = realNow();
+        const q = tx && i >= 30 ? gl.createQuery() : null;
+        if (q) gl.beginQuery(tx.TIME_ELAPSED_EXT, q);
         W.gl.draw(W.m);
+        if (q) (gl.endQuery(tx.TIME_ELAPSED_EXT), qs.push(q));
         gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
         if (i >= 30) ft.push(realNow() - t);
       }
       ft.sort((x, y) => x - y);
       const r = { fly_ms: +ft[ft.length >> 1].toFixed(2) };
+      if (qs.length) {
+        const gt = [];
+        for (let k = 0; k < 200 && qs.length; k++) {
+          await new Promise((res) => setTimeout(res, 5));
+          while (qs.length && gl.getQueryParameter(qs[0], gl.QUERY_RESULT_AVAILABLE)) {
+            const q = qs.shift();
+            if (!gl.getParameter(tx.GPU_DISJOINT_EXT))
+              gt.push(gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6);
+          }
+        }
+        gt.sort((x, y) => x - y);
+        if (gt.length) r.gpu_ms = +gt[gt.length >> 1].toFixed(2);
+      }
       W.gl.draw(W.m);
       const v1 = W.view,
         img1 = new Uint8Array(v1.gx * v1.h * 4);
@@ -147,6 +167,11 @@
         fake.t += 60;
         W.gl.draw(W.m);
         if (W.view.gx <= v1.gx * 0.51) break;
+      }
+      // #93 B9: FLY_FS's footprint follows the eased scale (W.fp93); let it settle (about 0.25 s of frames)
+      for (let j = 0; j < 20; j++) {
+        fake.t += 60;
+        W.gl.draw(W.m);
       }
       fake = null;
       const v2 = W.view,

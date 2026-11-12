@@ -542,4 +542,52 @@ function patterns() {
   FLY_FS = F;
 }
 patterns();
+// @deviation (#93 F1) fly view ticket 1: a faster march over the same surface. heightPyramid.js builds, once per
+// terrain, a pyramid of ceilings: for each cell of 2^L x 2^L height texels (L = 0 to 6), the highest the marched
+// surface can reach within one cell width of the cell (the height grid as the warp and the bilinear read can reach it,
+// plus the most every noise octave can add). core.js puts it on texture unit 11 and sets uPyrOn.
+//  - Each march step first tries the largest level whose ceiling stays below the ray, less the march's own hit
+//    tolerance (1e-6 + t 6e-5), over the next cell width of travel, and steps that far in one go: no hit can be there.
+//    The level climbs after such a step and falls after a miss; only when no level allows a step is the surface
+//    evaluated, exactly as before. Sky and horizon rays no longer crawl through the 14 km shell and run out of their
+//    360 steps, so the distant terrain the cap dropped is drawn.
+//  - A shadow step whose height above the level-0 ceiling is at least a tenth of its step length cannot darken the
+//    pixel (its penumbra term 10 gq / st is 1 or more), so it skips the surface: the shadow is unchanged.
+//  - The shaded height at the hit (HQ, for the normal's p0 and again as hk) is evaluated once.
+// The surface, the shading and their constants are unchanged; a hit moves by less than the hit tolerance.
+function flyMarch() {
+  function rep(src, a, b) {
+    if (src.split(a).length !== 2) throw new Error('#93 F1: ' + (src.split(a).length - 1) + ' matches of ' + a.slice(0, 70));
+    return src.split(a).join(b);
+  }
+  var F = FLY_FS;
+  F = rep(F, 'uniform sampler2D uTr,uLut,uHt,uEb,uBand,uHy,uVel,uEb2;out vec4 O;\n',
+    'uniform sampler2D uTr,uLut,uHt,uEb,uBand,uHy,uVel,uEb2;out vec4 O;\nuniform highp sampler2D uPyr;uniform float uPyrOn;\n');
+  F = rep(F, 'float rsph(', '/* (#93 F1) the max-height pyramid (heightPyramid.js): the ceiling (km) of level L around the texel under uv */\n' +
+    'float pyrK(vec2 uv,int L){ivec2 c=ivec2(clamp(floor(uv*vec2(720.,360.)),vec2(0.),vec2(719.,359.)))>>L;\n' +
+    ' return texelFetch(uPyr,c+(L==0?ivec2(0):ivec2(720-(720>>(L-1)),360)),0).r;}\n' +
+    '/* that ceiling as a radius, with the lava sea and the ocean floor that hKm applies */\n' +
+    'float pyrR(float k){return 1.+max(max(k,uLava>.5?uHM:-1e4),uOcean>.5?0.:-1e4)*uEx/uRkm;}\n' +
+    '/* the march\'s safe step from t: the largest level (from lv down) whose ceiling stays below the ray, less the hit\n' +
+    '   tolerance, over the next cell width of travel (s keeps every point within one cell of d); 0 if none */\n' +
+    'float pyrStep(vec3 ro,vec3 rd,float t,vec3 d,inout int lv){\n' +
+    ' vec2 uv=uvOf(d);float la=abs(asin(clamp(d.y,-1.,1.))),tc=-dot(ro,rd);\n' +
+    ' for(int k=0;k<7+uZ0;k++){if(lv<0)break;\n' +
+    '  float c=float(1<<lv)*(PI/360.),pm=la+c;\n' +
+    '  if(pm<1.5){float s=asin(sin(c)*cos(pm)),te=t+s,rm=length(ro+rd*clamp(tc,t,te));\n' +
+    '   if(rm>=1.&&rm-1e-6-te*6e-5>pyrR(pyrK(uv,lv))){lv=min(lv+1,6);return s;}}\n' +
+    '  lv--;}\n' +
+    ' return 0.;}\n' +
+    'float rsph(');
+  F = rep(F, 'for(int i=0;i<360+uZ0;i++){p=ro+rd*t;float r=length(p),g=r-surfR(p/r);',
+    'int lv=6;for(int i=0;i<360+uZ0;i++){p=ro+rd*t;float r=length(p);if(uPyrOn>.5){float sk=pyrStep(ro,rd,t,p/r,lv);if(sk>0.){t+=sk;if(t>t1)break;continue;}lv=0;}float g=r-surfR(p/r);');
+  F = rep(F, 'float rq=length(s2),gq=rq-surfR(s2/rq);',
+    'float rq=length(s2),gq=1e9;if(uPyrOn<.5||rq-pyrR(pyrK(uvOf(s2/rq),0))<st*.1)gq=rq-surfR(s2/rq);');
+  // the shaded height at the hit was evaluated twice (for the normal's p0 and as hk), with the same reads: once now
+  F = rep(F, 'vec3 da=normalize(d+tA*ee),db=normalize(d+tB*ee),p0=d*surfR(d),',
+    'float hk0=hKm(d);vec3 da=normalize(d+tA*ee),db=normalize(d+tB*ee),p0=d*(1.+hk0*uEx/uRkm),');
+  F = rep(F, 'float e=crs(uHt,uv).r,hk=hKm(d),', 'float e=crs(uHt,uv).r,hk=hk0,');
+  FLY_FS = F;
+}
+flyMarch();
 export { NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS };

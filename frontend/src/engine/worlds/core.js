@@ -10,6 +10,7 @@ import { ADV_FS, GAS_FS, WORLD_FS, FLY_FS } from './shaders.js';
 import { FLUIDS, WP } from './presets.js';
 import { fbm3, buildTerrain, routeTerrain } from './terrain.js';
 import { terrainCached, routeCached } from './terrainCache.js';
+import { pyramidCached } from './heightPyramid.js';
 import { GAS_NODES, gasProfile, GasSim } from './gas.js';
 
 /** Build one engine instance on a canvas. opt.role: 'globe' | 'fly' | 'both' (default, the prototype's page). */
@@ -452,6 +453,20 @@ function WorldGL(canvas) {
     var card = !!p.seed3, s3 = card ? p.seed3 : [p.seed, p.seed, p.seed], sN = card ? p.seed3 : [0, 0, 0], key = s3.join() + '|' + sN.join() + '|' + card, pr = { A: [pA, uA], G: [pG, uG], W: [pW, uW], F: [pF, uF] }, k, q;
     for (k in pr) { q = pr[k]; if (!q[0] || seedOn[k] === key) continue; gl.useProgram(q[0]); if (q[1].uSeed3) gl.uniform3fv(q[1].uSeed3, s3); if (q[1].uSeedN) gl.uniform3fv(q[1].uSeedN, sN); if (q[1].uNzSph) gl.uniform1f(q[1].uNzSph, card ? 1 : 0); seedOn[k] = key; }
   };
+// @deviation (#93 F1) the fly view's max-height pyramid (heightPyramid.js, built once per terrain) on texture unit 11,
+// for the engines that can fly; pyrBind tells FLY_FS (uPyr, uPyrOn) once per program and terrain. A grid that is not
+// 720 x 360 has no pyramid: uPyrOn stays 0 and the march runs as before.
+  var pyt = null, pyrOk = 0, pyrFor = null;
+  this.setPyramid = function (t) {
+    if (role === 'globe') return;
+    var P = pyramidCached(t);
+    gl.activeTexture(gl.TEXTURE11); if (!pyt) pyt = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, pyt);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, P ? P.w : 1, P ? P.h : 1, 0, gl.RED, gl.FLOAT, P ? P.data : new Float32Array(1));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.activeTexture(gl.TEXTURE0); pyrOk = P ? 1 : 0; pyrFor = null;
+  };
+  this.pyrBind = function () { if (!pF || pyrFor === pF) return; gl.useProgram(pF); if (uF.uPyr) gl.uniform1i(uF.uPyr, 11); if (uF.uPyrOn) gl.uniform1f(uF.uPyrOn, pyrOk); pyrFor = pF; };
 // @verbatim L2267-L2301
 // @rename 2.214)=>2.2165) 0.005)=>0.0027) 0.004)=>0.0012)
   gl.bindVertexArray(gl.createVertexArray());
@@ -495,7 +510,13 @@ function WorldGL(canvas) {
 // shrink the picture on every redraw after a pause). The pixel ratio is capped at 1.0 for the fly engine and 1.25 for
 // the globe engine; role 'both' (the prototype, parity) keeps 1.5. The scale also goes to FLY_FS as uScale (#93 1.4).
 // window.__sxPin still pins the scale for parity (PR #89's rename of these two lines, carried over by hand).
-    var now = performance.now(); if (last && now - last < 250) { ema = ema * 0.92 + (now - last) * 0.08; if (!window.__sxPin && ema > 34 && scale > 0.45) { scale *= 0.94; ema = 30; } else if (!window.__sxPin && ema < 22 && scale < 1) scale = Math.min(1, scale * 1.01); } last = now;
+// (#93 B9) Hysteresis: the scale moved a little on almost every frame, so the picture never settled. It now changes in
+// steps of 0.8 (down, at most once a second, while the average frame takes over 34 ms) or 1.25 (up, at most once every
+// 3 s, under 20 ms), between 0.45 and 1. And FLY_FS fades detail by the real pixel: at scale 0.5 it kept detail for
+// pixels half the size, which shimmered in motion (B9). uScale (the first rename below) is scale / W.fp93, with W.fp93
+// the scale eased over about 0.25 s, so FLY_FS's footprint is that of the eased drawing-buffer pixel and a step fades.
+    var now = performance.now(), s93 = W.sc93 || (W.sc93 = { at: -1e9 }), dt93 = last ? now - last : 0; if (last && now - last < 250) { ema = ema * 0.92 + (now - last) * 0.08; if (!window.__sxPin && ema > 34 && scale > 0.45 && now - s93.at > 1000) { scale = Math.max(0.45, scale * 0.8); ema = 28; s93.at = now; } else if (!window.__sxPin && ema < 20 && scale < 1 && now - s93.at > 3000) { scale = Math.min(1, scale * 1.25); s93.at = now; } } last = now;
+    W.fp93 = window.__sxPin || !W.fp93 ? scale : W.fp93 + (scale - W.fp93) * (1 - Math.exp(-Math.min(dt93, 250) / 250));
     var d = Math.min(devicePixelRatio || 1, role === 'fly' ? 1 : role === 'globe' ? 1.25 : 1.5) * scale, w = Math.round(canvas.clientWidth * d), h = Math.round(canvas.clientHeight * d); if (!w || !h) return;
 // @verbatim L2304-L2315
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
@@ -513,10 +534,11 @@ function WorldGL(canvas) {
 // @end-verbatim
 // @deviation (#93 1.6) the fly engine's canvas is 1.67 times its pane wide, so the globe beside the fly view is never
 // seen there and is not ray-marched. W.view (next line) is still set: flyAimPeak, flyAimDefault and globePick read it.
-// The first rename below (#93 1.4) passes the resolution scale to FLY_FS as uScale; the second is PR #89's.
+// The first rename below (#93 1.4, B9) passes the resolution scale over the eased scale W.fp93 to FLY_FS as uScale; the
+// second is PR #89's.
     if (!(fly && role === 'fly')) gl.drawArrays(gl.TRIANGLES, 0, 3);
 // @verbatim L2317-L2338
-// @rename uF.uFov,=>uF.uScale,scale);gl.uniform1f(uF.uFov, uF.uCloudKm,=>uF.uCloudKm,m.zc!=null?Math.max(m.zc,0.3):
+// @rename uF.uFov,=>uF.uScale,scale/W.fp93);gl.uniform1f(uF.uFov, uF.uCloudKm,=>uF.uCloudKm,m.zc!=null?Math.max(m.zc,0.3):
     W.view = { tilt: f1.uTilt, spin: f1.uSpin, frame: f1.uFrame, flat: f1.uF, roll: f1.uRoll, gx: gx, gw: gw, w: w, h: h, L: v3.uL };
     if (!fly) return;
     var cam = flyCamera(m, f1.uTilt, f1.uSpin, v3.uL);
@@ -526,7 +548,7 @@ function WorldGL(canvas) {
     Object.keys(v3).forEach(function (k) { if (uF[k] && k !== 'uL') gl.uniform3fv(uF[k], v3[k]); });
     gl.uniform2f(uF.uR, gx, h); gl.uniform2f(uF.uOff, 0, 0);
     ['uCam', 'uFwd', 'uRt', 'uUp', 'uLb'].forEach(function (k) { gl.uniform3fv(uF[k], cam[k]); });
-    gl.uniform1f(uF.uScale,scale);gl.uniform1f(uF.uFov, 0.62); gl.uniform1f(uF.uEx, cam.ex); gl.uniform1f(uF.uRkm, cam.rkm); gl.uniform1f(uF.uAltKm, W.flyAlt); gl.uniform1f(uF.uCloudKm,m.zc!=null?Math.max(m.zc,0.3): 3.5); if (uF.uHkm) gl.uniform1f(uF.uHkm, m.H / 1000);
+    gl.uniform1f(uF.uScale,scale/W.fp93);gl.uniform1f(uF.uFov, 0.62); gl.uniform1f(uF.uEx, cam.ex); gl.uniform1f(uF.uRkm, cam.rkm); gl.uniform1f(uF.uAltKm, W.flyAlt); gl.uniform1f(uF.uCloudKm,m.zc!=null?Math.max(m.zc,0.3): 3.5); if (uF.uHkm) gl.uniform1f(uF.uHkm, m.H / 1000);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
   this.tick = function (m, playing, dtw) {
@@ -734,6 +756,28 @@ W.gl = new WorldGL(canvas);
 // main-thread wait polls W.gl.poll() until it is true (WorldEngine.whenReady) before it loads a world.
 // (#93 3.1) and then sets the world's seed uniforms (WorldGL.seedFor; a no-op once they are set).
 ['cloudStep', 'gasStep', 'draw'].forEach(function (k) { var f = W.gl[k]; W.gl[k] = function () { W.gl.link(k === 'draw' && !!W.fly); W.gl.seedFor(W.p); return f.apply(W.gl, arguments); }; });
+// @deviation (#93 F1) a new terrain also builds its max-height pyramid, and a fly draw first binds it (WorldGL.setPyramid,
+// pyrBind). Dev only: with window.__sxGpuTime set, each draw is timed on the GPU (EXT_disjoint_timer_query_webgl2) and
+// W.gpuMs holds the average (weight 0.1), W.gpuLast the last result and an array W.gpuLog, if the caller set one, every
+// result; a disjoint result is dropped. Off, it costs nothing.
+(function () {
+  var st = W.gl.setTerrain, dr = W.gl.draw, gl = canvas.getContext('webgl2'), tx = null, qs = [];
+  W.gl.setTerrain = function (t) { st.call(W.gl, t); W.gl.setPyramid(t); };
+  W.gl.draw = function () {
+    if (W.fly) { W.gl.link(true); W.gl.pyrBind(); }
+    if (typeof window === 'undefined' || !window.__sxGpuTime) return dr.apply(W.gl, arguments);
+    tx = tx || gl.getExtension('EXT_disjoint_timer_query_webgl2');
+    if (!tx) return dr.apply(W.gl, arguments);
+    while (qs.length && gl.getQueryParameter(qs[0], gl.QUERY_RESULT_AVAILABLE)) {
+      var q = qs.shift();
+      if (!gl.getParameter(tx.GPU_DISJOINT_EXT)) { var ms = gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6; W.gpuLast = ms; W.gpuMs = W.gpuMs ? W.gpuMs * 0.9 + ms * 0.1 : ms; if (W.gpuLog) W.gpuLog.push(ms); }
+      gl.deleteQuery(q);
+    }
+    if (qs.length > 3) return dr.apply(W.gl, arguments);
+    var qq = gl.createQuery(); gl.beginQuery(tx.TIME_ELAPSED_EXT, qq);
+    try { return dr.apply(W.gl, arguments); } finally { gl.endQuery(tx.TIME_ELAPSED_EXT); qs.push(qq); }
+  };
+})();
 return {
   W: W, EB: EB, ORB: ORB, OCEANF: OCEANF, GAS_NODES: GAS_NODES, FLUIDS: FLUIDS,
   getGS: function () { return GS; },
