@@ -6,7 +6,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WorldEngine } from './WorldEngine';
 import { stubCanvas, stubGL } from './glStub.testutil';
 import { preset } from './coreHarness.testutil';
-import { LocalSimSource, SIM_LIVE_MS, simSourceFor } from './simSource';
+import {
+  LocalSimSource,
+  SIM_LIVE_MS,
+  WorkerSimSource,
+  simSourceFor,
+  type SimSource,
+} from './simSource';
+import { makeSimWorker, type WorkerReply, type WorkerRequest } from './simWorkerCore';
 
 // Node, not jsdom: the climate steps run about 8 times faster. The draw reads these two browser globals.
 const g0 = globalThis as unknown as { window?: unknown; devicePixelRatio?: number };
@@ -166,4 +173,75 @@ describe('#93 1.9 one simulation for the globe and the fly view (main thread)', 
     other.dispose();
     src2!.detach(other);
   }, 60_000);
+});
+
+/** A worker stand-in: the real handler, replies cloned with their transfer lists, delivered asynchronously. */
+class FakeWorker {
+  onmessage: ((e: MessageEvent<WorkerReply>) => void) | null = null;
+  onerror: ((e: ErrorEvent) => void) | null = null;
+  onmessageerror: (() => void) | null = null;
+  terminated = false;
+  queue: WorkerReply[] = [];
+  private handle = makeSimWorker((m, transfer) =>
+    this.queue.push(structuredClone(m, { transfer })),
+  );
+  postMessage(m: WorkerRequest) {
+    this.handle(m);
+  }
+  terminate() {
+    this.terminated = true;
+  }
+  /** Deliver what the worker has posted (the event loop would). */
+  flush() {
+    for (const m of this.queue.splice(0))
+      this.onmessage?.({ data: m } as MessageEvent<WorkerReply>);
+  }
+}
+
+describe('#93 1.10 the worker source', () => {
+  it('drives both views, forms the fly view at once, survives either disposal order and ends the worker', () => {
+    for (const first of ['globe', 'fly'] as const) {
+      clock();
+      const g = engine('globe').e;
+      let w!: FakeWorker;
+      const src: SimSource = new WorkerSimSource(preset('t1f'), {}, g.simKey(), () => {
+        w = new FakeWorker();
+        return w as unknown as Worker;
+      });
+      g.followSim(src);
+      for (let i = 0; i < 4000 && g.spinup > 0; i++) {
+        g.tick(1 / 60);
+        w.flush();
+      }
+      expect(g.spinup).toBe(0);
+      const f = engine('fly').e;
+      f.followSim(src);
+      f.tick(1 / 60);
+      expect(f.spinup).toBe(0);
+      const [gone, kept] = first === 'globe' ? [g, f] : [f, g];
+      gone.dispose();
+      kept.playing = true;
+      for (let i = 0; i < 3; i++) {
+        kept.tick(1 / 60);
+        w.flush();
+      }
+      expect(w.terminated).toBe(false);
+      kept.dispose();
+      expect(w.terminated).toBe(true);
+    }
+  }, 120_000);
+
+  it('a worker error reaches the view on its next frame, so the stage falls back (watchdog)', () => {
+    clock();
+    const g = engine('globe').e;
+    let w!: FakeWorker;
+    const src = new WorkerSimSource(preset('t1f'), {}, g.simKey(), () => {
+      w = new FakeWorker();
+      return w as unknown as Worker;
+    });
+    g.followSim(src);
+    w.onerror!({ message: 'boom', preventDefault() {} } as unknown as ErrorEvent);
+    expect(() => g.tick(1 / 60)).toThrow(/simulation worker failed: boom/);
+    g.dispose();
+  });
 });
