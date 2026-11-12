@@ -161,3 +161,34 @@ The bake engine in `frontend/src/sound/ambience/` differs from the text above in
 > **Appendix D rulings in this section:** R1 (the area integral above). **R8, presence before presentation:** a bed is present only if its class fraction > 0, its driver > 0 and its true level is within 40 dB of the loudest present bed; a bed that is not present is silent and never captioned. **R10:** for S1–S3, S9 and S12 the flow-noise offset (§11.3) uses `Z(z)` at the listener, not the ground's. Full text in [R13.11](files-tests.md#r1311-files-tests-constants-and-the-module-contract).
 
 Ducking, the master and stage audibility (spec §11.5, §11.7) are in [R13.9](buses-stage.md#r139-buses-ducking-master-settings-and-stage-audibility).
+
+### As built in #116 ([Q-448](../../decisions/sound-ambience.md))
+
+- **Mixer** (`frontend/src/sound/ambience/mixer.ts`): `AmbienceMixer(ctx, bus, opts?)` with `setWorld(key)`, `apply(frame, palette)`, `fire(strike, air, palette, { nowS, z_km, head })`, `fadeOut(s)`, `fadeIn()`, `setHarmonicSendDb(db)`, `stats()`, `dispose()`.
+  - **One group per world:** `worldGain` into the ambience bus, plus `harmGain` into the shared harmonic branch. The harmonic beds (S1, S8, S12) and thunder tap `harmGain`.
+  - **Per bed:** `source(loop) → lowpass → highshelf (1 kHz, snow) → bedGain → [StereoPanner] → worldGain`. Without a StereoPanner the bed has 4 nodes and is centred.
+  - **Per event:** `source → lowpass → gain → [panner] → worldGain`.
+- **Automation:**
+  - `apply()` writes only bed params, with `setTargetAtTime` and dead bands (0.25 dB, 2 % of the cut-off, 0.02 pan, 0.5 % rate).
+  - Fades and the world crossfade write only the group gains, also with `setTargetAtTime`. Nothing uses `setValueCurveAtTime`, so automation kinds never overlap on one param.
+  - The crossfade is an exponential approach with τ = 1 s / 7, not an equal-power curve.
+- **Fades:**
+  - Fades run on the audio clock with τ = length / 7, so the level is −61 dB at the end.
+  - Sources stop from a wall-clock timer 0.05 s after the fade, never from a mixer tick, and never from a `stop()` scheduled when the fade starts.
+  - Coming back during a fade ramps the same group up again.
+- **World change:** any new world key fades the old group at once, whatever the new world holds, airless included.
+- **Thunder:**
+  - Thunder starts at `t0 + d/c` on the audio clock, with gain `stageGainDb(level_dB, presentOffsetDb(air))`.
+  - It is dropped when it is not baked or when `d/c > THUNDER_MAX_DELAY_S` (15 s).
+  - At most 4 thunder events are live or pending at once. Fades, world changes and `dispose` cancel pending ones.
+- **Loop** (`ambienceLoop.ts`, wrapped by `useAmbience.ts`):
+  - **Gating:** a 10 Hz tick on `requestAnimationFrame` while the fly view is live. The tick is pure apart from injected deps.
+  - **AirModel:** rebuilt every tick while the world forms or waits, and once when it settles. After that it is rebuilt after an 800 ms debounce of `Ps|fluid|gas|locked|Tstar|orbit|co2`.
+  - **Beds:** selected per world key. The ready set comes from `palette.get` every tick.
+  - **Strikes:** the scheduler runs 0.3 s ahead of now.
+  - **Errors:** each tick is wrapped in try/catch. An error logs once, fades out, and shows "Sound unavailable."; the weather keeps publishing.
+- **Holder** (`ambienceHolder.ts`):
+  - **Lifetime:** the palette and the mixer live in the holder and are released after 2 minutes with no active loop.
+  - **Early baking:** the palette bakes before the unlock click, through an `OfflineAudioContext`.
+- **Tick cost:** median 0.10 ms, p95 0.22 ms on the dev machine, not counting `samplePlace` (opt-in bench, `SX_AMB_BENCH=1`). The A15 figure is not measured yet.
+- **Vent bursts not fired:** §7 S8 gives no rate (`VENT_BURST_PER_MIN = null` [verify]). S8 variant 1 is baked but not played.
