@@ -84,7 +84,8 @@ const K1 = F(0.1031),
  * Measured on ANGLE D3D11 (NVIDIA RTX 4060 Ti, flyheight.html): with this order the CPU hKm matches the GPU to about
  * 1e-5 km. With separately rounded products and sums, a hash bit flipped in 1 to 3 of 64 directions (errors up to 0.1 km).
  * A float32 product is exact in a double, so F(a * b + c) is one fused float32 rounding (except for a rare double rounding).
- * ASSUMPTION: other GPUs (the A15's) fuse the same way; re-measure with flyheight.html on the event laptop.
+ * ASSUMPTION: the fused multiply-add emulation is assumed for ANGLE D3D11 (measured on one NVIDIA card only). Re-check
+ * it on the A15 event laptop with the dev parity page (scripts/engine-bench/flyheight.html) before relying on it.
  */
 function dot3(a: number, b: number, c: number, d: number, e: number, f: number): number {
   return F(e * f + F(c * d + F(a * b)));

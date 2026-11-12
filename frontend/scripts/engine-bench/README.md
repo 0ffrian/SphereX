@@ -117,5 +117,5 @@ Issue #114 (sound, fly height):
 - `flyheight.html?worlds=earth,t1f+card,lava` compares the CPU port of FLY_FS `hKm` (`src/engine/worlds/flyHeight.ts`)
   with the GPU over 64 directions per world, for HQ (Catmull-Rom) and bilinear. It reports four errors, each as RMS,
   max and worst direction: `total`, `filter` (the CPU grid read at the GPU's uv against the GPU's `e`), `uv_texels` and
-  `noise` (the CPU hKm from the GPU's `e`). It leaves `__out.fixture`, the GPU values `flyHeight.test.ts` replays in CI;
+  `noise` (the CPU hKm from the GPU's `e`). It leaves `__out.fixture`, the GPU values `flyHeight.test.ts` replays in CI (bars: noise RMS 0.005 km; filter RMS 0.01, max 0.05 km, Q-434);
   save it to `src/engine/worlds/__fixtures__/flyHeight.gpu.json` when the terrain or the ported GLSL changes.

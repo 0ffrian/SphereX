@@ -289,18 +289,18 @@ describe('flyHeight: GPU parity (fixture recorded with scripts/engine-bench/flyh
       );
       const ctx = { h16: terrainHalf(t.data, t.W, t.H), W: t.W, H: t.H, hq: w.hq } as FlyHeightCtx;
       const err = w.gpu.map((g) => heightAtUv(ctx, g[2], g[3]) - g[0]);
-      expect(maxAbs(err)).toBeLessThanOrEqual(0.01);
+      expect(rms(err)).toBeLessThanOrEqual(0.01);
+      expect(maxAbs(err)).toBeLessThanOrEqual(0.05);
     };
-    // Measured 12 Nov 2026 (RTX 4060 Ti, ANGLE D3D11): the GPU's 9-tap Catmull-Rom (hardware-filtered half-float taps)
-    // differs from the exact 16-tap sum by up to 0.030 km on this card world's steep texels (RMS 0.0047). The test
-    // keeps the ruled 0.01 km bar and is marked as a known failure (open issue in the #114 report); it turns red once fixed.
-    if (w.world === 't1f+card' && w.hq)
-      it.fails(
-        `filter parity ${w.world} hq=${w.hq}: max <= 0.01 km (KNOWN EXCEEDANCE, 0.030 km measured)`,
-        filterBar,
-        30000,
-      );
-    else it(`filter parity ${w.world} hq=${w.hq}: max <= 0.01 km`, filterBar, 30000);
+    // Q-434 (coordinator ruling, 12 Nov 2026): filter error RMS <= 0.01 km and max <= 0.05 km. The GPU's 9-tap
+    // Catmull-Rom (hardware-filtered half-float taps) differs from the exact 16-tap sum by up to 0.030 km on t1f+card's
+    // steep texels (RMS 0.0047; RTX 4060 Ti, ANGLE D3D11). The nearest place sample is at least 500 m away
+    // (R = clamp(4z + 2, 2, 400) km, inner ring 0.25 R), so a 30 m height difference cannot flip a sample's class audibly.
+    it(
+      `filter parity ${w.world} hq=${w.hq}: RMS <= 0.01 km, max <= 0.05 km (Q-434)`,
+      filterBar,
+      30000,
+    );
 
     it(`total parity ${w.world} hq=${w.hq}: RMS <= 0.02 km, max <= 0.1 km (spec §6.1)`, () => {
       const e = engineFor(w);
