@@ -164,7 +164,7 @@ export const IR_JETS_HINT =
 export const BUILD_POP_ID = 'bp-pop';
 const POP_LABEL: Record<PopId, string> = {
   acc: 'Accuracy',
-  feel: 'Feel it', // kept so the PopId type still maps; the Feel UI is not shown (Atish removes haptics)
+  feel: 'Feel it', // kept so the PopId type still maps; the Feel UI is not shown (haptics cut, D-39)
   hear: 'Hear it',
   details: 'Details',
 };

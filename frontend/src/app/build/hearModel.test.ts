@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pitchToHz, wavelengthToPitch } from '@/sound/pitch';
 import { cutoffHz, freqAt, howlHz, lamAt, loudness, SOUND_REF_MS, L0_UM, L1_UM } from './hearModel';
 
 describe('hearModel pure functions', () => {
@@ -37,5 +38,14 @@ describe('hearModel pure functions', () => {
       expect(f).toBeLessThanOrEqual(880 + 1e-9);
       prev = f;
     }
+  });
+});
+
+describe('Hear it follows the app pitch polarity (Q-430)', () => {
+  it('freqAt moves the same way as pitch.ts across the band', () => {
+    // A flip of PITCH_RISES_WITH_WAVELENGTH would make these disagree.
+    const appRises = pitchToHz(wavelengthToPitch(L1_UM)) > pitchToHz(wavelengthToPitch(L0_UM));
+    const hearRises = freqAt(1) > freqAt(0);
+    expect(hearRises).toBe(appRises);
   });
 });

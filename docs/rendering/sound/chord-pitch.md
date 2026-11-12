@@ -26,4 +26,4 @@
    - Never claim a weak band is audible: at SNR below 5, listeners were at chance (Tucker Brown et al. 2022).
    - The tag follows the spectrum: `measured` for SPHEREx.
 
-**As built in #111:** item 2 only. `PITCH_RISES_WITH_WAVELENGTH = false` in `frontend/src/sound/tuning.ts`; `wavelengthToPitch(0.75 µm) = 1`, `wavelengthToPitch(5 µm) = 0`; the Listen sweep falls in pitch from short to long wavelengths; the Senses copy reads "Short wavelengths sound high, long wavelengths low. Brighter is louder." The chord is #115.
+**As built in #111:** item 2 only. `PITCH_RISES_WITH_WAVELENGTH = false` in `frontend/src/sound/tuning.ts`; `wavelengthToPitch(0.75 µm) = 1`, `wavelengthToPitch(5 µm) = 0`; the Listen sweep falls in pitch from short to long wavelengths; the Hear it panel (`app/build/HearPanel.tsx`, `HEAR_SPEC_MAPPING`) reads "Short wavelengths sound high, long wavelengths low. Brighter is louder." The chord is #115.

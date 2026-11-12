@@ -3,6 +3,7 @@
 // (sound/audioContext, unlocked inside the click that starts a sound, Q-73), the `spectrum` bus
 // into the one limiter, and the Sound settings: Sound off silences it, Volume scales it. While the
 // spectrum sweep plays it ducks the flyover ambience like every data sound.
+// If PR #107 (Q-420, Hear it removed) merges, the spectrum routing here becomes dead: remove it then.
 import { getAudioContext, unlockAudio } from '@/sound/audioContext';
 import { getBus as getSoundBus, holdDuck, type DuckHold } from '@/sound/audioGraph';
 import { getSoundSettings, useSoundSettings, type SoundSettingsValues } from '@/sound/settings';
