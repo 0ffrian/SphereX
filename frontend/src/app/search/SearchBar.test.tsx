@@ -74,6 +74,7 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
     expect(options()).toHaveLength(ROWS);
     expect(names().slice(0, 3)).toEqual(["Barnard's Star", 'Epsilon Indi B', 'WISE 0855-0714']);
     expect(names()[15]).toBe('Crab Nebula');
+    expect(names()[16]).toBe('433 Eros'); // row 17, the Track MVP (#73)
     expect(input().getAttribute('aria-expanded')).toBe('true');
     expect(input().getAttribute('aria-controls')).toBe(listbox()!.id);
     expect(input().getAttribute('aria-activedescendant')).toBeNull();
@@ -219,14 +220,14 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
 
   it('text that matches no row shows the hint and still submits through parseQuery', () => {
     focus();
-    type('433 Eros');
+    type('16 Psyche'); // not a row (433 Eros became row 17 in #73)
     expect(options()).toHaveLength(0);
     expect(host.textContent).toContain(NO_MATCH_HINT);
     expect(NO_MATCH_HINT).toBe('No demo object matches. Press Enter to search the catalogues.');
     key('Enter'); // no highlighted row: nothing is picked
     expect(skySearch).not.toHaveBeenCalled();
     act(() => host.querySelector('form')!.requestSubmit());
-    expect(skySearch).toHaveBeenCalledWith({ q: '433 Eros', kind: 'name', origin: 'input' });
+    expect(skySearch).toHaveBeenCalledWith({ q: '16 Psyche', kind: 'name', origin: 'input' });
     expect(listbox()).toBeNull(); // submit closes the list
   });
 

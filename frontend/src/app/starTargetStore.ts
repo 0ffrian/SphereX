@@ -5,20 +5,15 @@ import type { LatLon } from '@/engine/stars/starPick';
 
 interface State {
   target: LatLon | null;
-  /** What the left pane shows for a star: the artifact's flare close-up, or the surface at `target`. */
-  left: 'flare' | 'surface';
   pick(t: LatLon): void;
   home(): void;
-  show(left: 'flare' | 'surface'): void;
   reset(): void;
 }
 export const useStarTarget = create<State>((set) => ({
   target: null,
-  left: 'flare',
-  pick: (target) => set({ target, left: 'surface' }),
-  home: () => set({ target: null, left: 'surface' }),
-  show: (left) => set({ left }),
-  reset: () => set({ target: null, left: 'flare' }),
+  pick: (target) => set({ target }),
+  home: () => set({ target: null }),
+  reset: () => set({ target: null }),
 }));
 
 export const degrees = (r: number): string => `${Math.abs(Math.round((r * 180) / Math.PI))}°`;

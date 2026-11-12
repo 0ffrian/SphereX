@@ -46,24 +46,20 @@ frontend/src/viewer/                 (Moon)
   fields/             (Atish)  # shared field for shader kinds (§7.7, D-12): fieldGenerator.ts (pure, FieldSampler), noise.ts,
                                # fieldWorker.ts, fieldClient.ts (main-thread fallback), flowModel.ts (moving storms, Q-105)
 frontend/src/app/build/              (Moon)   # R5.8 (issue #60): BuildPane, SelectedCard, MouldStrip, useMould, selectedBody, focus.ts
-frontend/src/haptics/                (Atish: design D-13, all haptics D-17)
-  haptics.ts          # R8.8 HapticEngine: honesty gate, rate cap, multiplier, trains (Q-71), createHaptics; issue #9
+frontend/src/sound/                  (Atish: D-13, D-17; haptics cut and the audio moved here, D-39)
+  engine.ts           # R8.8 SoundEngine: honesty gate, rate cap, trains (Q-71), createSoundEngine (audio only)
+  voices.ts           # R8.9 audio driver: timbre by tag, pitch, pan; plays into the events bus, ducks the ambience
   audioContext.ts     # the one shared AudioContext, created only by a click (R8.9); shared unlock state
-  audioGraph.ts       # one master bus and limiter per AudioContext; the shared bell (playBell)
-  settings.ts         # R8.7 settings, own Zustand store, one localStorage key; bindEngine
-  calibration.ts      # R8.7 calibration (after the event): types, offset rule, levels, tap-along maths, persistence
-  platform.ts pitch.ts spectrumMapping.ts   # default outputs and deviceVibrates (Q-73), pitch from λ (Q-70), spectrum → sample (R8.6)
-  tuning.ts           # every tuning constant, marked CREATIVE placeholder (D-13) or [verify]
-  drivers/audio.ts drivers/webVibrate.ts (after the event) drivers/tauri.ts (stub, B-01)
-  sources/heightMap.ts meshNormal.ts field.ts terrain.ts flow.ts spectrum.ts lightcurve.ts dataPulse.ts
-  sources/types.ts relief.ts   # TouchSample, TrainSlot; R8.4 peak rule
-  profiles.ts         # R8.5 buildHaptics per ObjectType + TouchHaptics (move, hold-still poll, scrub); issue #11
-  probe.ts            # pointer → ray → analytic ellipsoid → body direction, UV, normal, distance, ring radius, pan (#11)
-  ui/                 # PulseIndicator (D-20), UnlockButton (#9); CalibrationWizard, HapticsSettings, SpectrumHapticsPad (#10)
-  sound/              # listenSweep.ts (A8 Listen sweep, issue #11); body tone and Track path sound not built (R8.9.1, R8.9.2)
+  audioGraph.ts       # R13.9: events, spectrum and ambience buses, duck, 35 Hz HPF, harmonic branch, limiter; playBell
+  settings.ts         # R13.9 settings, own Zustand store, one localStorage key; bindEngine
+  pitch.ts spectrumMapping.ts   # pitch from λ (Q-70, Q-430: long λ low), spectrum → sample (R8.6)
+  tuning.ts           # every sound tuning constant, marked CREATIVE placeholder (D-13) or [verify]
+  listenSweep.ts      # A8 Listen sweep, into the spectrum bus
+  appSound.ts SoundProvider.tsx   # the app's one engine and sweep, bound to settings, honesty and the page
+  ui/SoundSettings.tsx            # R13.9 Sound popover in the top bar
+  ambience/           # R13 flyover soundscape and weather (planned, #112 to #117; layout in R13.11)
 frontend/src/contract/               (generated, D-18)  # generated.ts from shared/schemas/; hand-written helpers next to it:
-                                                        # assertTagged(), tags.ts (TV<T>), haptics.ts (the R8.8 runtime types, Q-19)
-frontend/src/hapticsTestPage/        (Atish)  # dev-only test page behind frontend/haptics-test.html; not a build input
+                                                        # assertTagged(), tags.ts (TV<T>), haptics.ts (the R8.8 runtime types, Q-19; names kept after D-39)
 frontend/src/shaderlab/                       # dev-only shader harness behind frontend/shaderlab.html; not a build input, not in dist/
 shared/schemas/object-card.schema.json  render-params.schema.json   (Moon)
 shared/fixtures/                     (Moon)  # cards/ and params/: one synthetic pair per ObjectType; invalid/: rejected cases

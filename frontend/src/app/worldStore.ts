@@ -107,6 +107,9 @@ export const useWorldStore = create<WorldStoreState>((set, get) => ({
     const { globe, fly } = get();
     globe?.setOverrides(o);
     fly?.setOverrides(o);
+    // Issue #93 1.9: the simulation both views follow takes the change once, after the views (its key follows theirs).
+    for (const src of new Set([globe?.simSource, fly?.simSource]))
+      src?.setOverrides(o, (globe?.simSource === src ? globe : fly)?.simKey());
     set((s) => ({ applied: { ...s.applied, ...o }, rev: s.rev + 1 }));
     get().redraw();
   },
@@ -124,7 +127,7 @@ export const useWorldStore = create<WorldStoreState>((set, get) => ({
   bump: () => set((s) => ({ rev: s.rev + 1 })),
 }));
 
-/** The haptics' view of the world on screen: CPU arrays of the globe engine, or null when the engine is not drawing. */
+/** The world on screen for sound and queries (was the haptics' view, D-39): CPU arrays of the globe engine, or null when the engine is not drawing. */
 export function worldCpuFields() {
   return useWorldStore.getState().globe?.cpuFields() ?? null;
 }

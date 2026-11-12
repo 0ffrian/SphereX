@@ -1,6 +1,6 @@
 # 14 State: honesty toggle
 
-The three-state honesty toggle in the 3D view, one state per badge: which tags each state shows and which haptics stay active. Drawn from rendering doc §5.3, §7.7, §8.2, §9, §11 (honesty test) and decisions D-02, D-12 and D-21.
+The three-state honesty toggle in the 3D view, one state per badge: which tags each state shows and which haptics stay active. Drawn from rendering doc §5.3, §7.7, §8.2, §9, §11 (honesty test) and decisions D-02, D-12 and D-21. **Changed by Q-412 (PR #104, Proposed):** in the build pane the toggle is a compact **Show** row inside the Details dropdown, no longer at the top of the pane; the states and transitions are unchanged. Q-416: the Hear it Atmosphere (artistic) still plays at Measured only until it is wired to this filter.
 
 ```mermaid
 stateDiagram-v2
@@ -52,5 +52,5 @@ stateDiagram-v2
 - One state per badge (D-02, D-21): Measured, Estimated, Default (artistic). The toggle starts at **+ Estimated**, so everything shown on load is backed by data or a stated formula.
 - Every visible layer shows a tag chip in the legend. Each state change is announced through `aria-live="polite"` (rendering doc §9).
 - Acceptance test: in Measured only no layer with a tag other than `measured` is drawn, and procedural texture haptics are silent (rendering doc §11).
-- Card readouts are not layers: a planet's eclipse and phase-curve readouts are listed in every state with their badges (Q-379); whether text readouts should follow this filter is open there.
+- Card readouts are not layers, but they follow the same filter: a planet's eclipse and phase-curve readouts are listed with their badges in every state their tags allow, so a `derived` one is hidden in Measured only (Q-379, decided 12 Nov 2026).
 - Haptics use the same filter as the layers (D-21). Whether the comet field pulse, tagged `measured` + `model_dependent` (rendering doc §8.4), plays in Measured only is Q-17.

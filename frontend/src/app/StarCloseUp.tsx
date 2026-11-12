@@ -7,7 +7,6 @@ import { useEffect, useRef, useState } from 'react';
 import { WebGPURenderer } from 'three/webgpu';
 import { StarCloseUpScene, type StarCloseUpProps } from '@/viewer/renderers/starCloseUpScene';
 import { StillStarCache } from '@/viewer/renderers/stillStarCache';
-import { STAR_CLOSEUP_TAG } from './starCloseUp';
 
 /** Seconds the 60 minutes of a flare take on screen (the prototype: 22 s), and where a still frame sits. */
 const PLAY_SECONDS = 22;
@@ -135,10 +134,6 @@ export function StarCloseUp(props: StarCloseUpProps & { className?: string }) {
           This browser could not start the 3D close-up of the flare.
         </div>
       )}
-      <span className="pointer-events-none absolute left-4 top-4 max-w-[calc(100%-2rem)] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300">
-        {STAR_CLOSEUP_TAG}
-        {caption && <span className="block text-neutral-400">{caption}</span>}
-      </span>
     </div>
   );
 }

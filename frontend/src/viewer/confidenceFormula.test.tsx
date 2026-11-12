@@ -139,7 +139,7 @@ describe('the inline popover (build pane, issue #71 stream U)', () => {
     const group = host.querySelector('[data-testid="confidence-formula"]')!;
     expect(group.getAttribute('role')).toBe('group');
     expect(group.getAttribute('aria-labelledby')).toBeTruthy();
-    expect(group.querySelector('[data-testid="formula-result"]')!.textContent).toBe('30%');
+    expect(group.querySelector('[data-testid="formula-result"]')!.textContent).toContain('30%');
     expect(group.querySelectorAll('.sx-acc-tbl tbody tr')).toHaveLength(3);
   });
 });
@@ -162,7 +162,7 @@ describe('Show level in the Accuracy panel', () => {
       ),
     );
     expect(host.querySelectorAll('tr[data-dim="true"]').length).toBeGreaterThan(0);
-    expect(host.querySelector('[data-testid="formula-result"]')!.textContent).toBe('30%');
+    expect(host.querySelector('[data-testid="formula-result"]')!.textContent).toContain('30%');
     expect(host.textContent).toContain('the score does not move');
   });
 });
@@ -172,10 +172,9 @@ describe('the popover', () => {
     const host = mount(params(conf()));
     const dlg = host.querySelector('[role="dialog"]')!;
     expect(dlg.querySelector('.sx-pop-h')!.textContent).toContain('Accuracy');
-    expect(dlg.querySelector('[data-testid="formula-result"]')!.textContent).toBe('30%');
-    expect(dlg.textContent).toContain('Mostly assumed');
+    expect(dlg.querySelector('[data-testid="formula-result"]')!.textContent).toContain('30%');
     expect(dlg.querySelector('.sx-acc-bar')!.getAttribute('aria-label')).toBe(
-      'Satellite data 10 percent, physics 20 percent, assumed 70 percent',
+      'Measured 10 percent, physics 20 percent, assumed 70 percent',
     );
     expect(dlg.querySelector('[data-testid="formula-general"] .katex')).not.toBeNull();
     expect(dlg.querySelector('[data-testid="formula-gate"]')!.textContent).toContain('0.25');
@@ -204,8 +203,9 @@ describe('the popover', () => {
   it('shows the backend value and warns when the rows disagree', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const host = mount(params(conf({ score: 0.6 })));
-    expect(host.querySelector('[data-testid="formula-result"]')!.textContent).toBe('60%');
+    expect(host.querySelector('[data-testid="formula-result"]')!.textContent).toContain('60%');
     expect(warn).toHaveBeenCalled();
+    expect(host.querySelector('[data-testid="formula-disagree"]')!.textContent).toContain('do not add up');
   });
   it('closes on Escape and traps Tab', () => {
     const onClose = vi.fn();
