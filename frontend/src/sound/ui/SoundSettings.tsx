@@ -15,7 +15,8 @@ import { ensureLoaded, useSoundSettings } from '../settings';
 export const SOUND_STATUS_OFF = 'Sound is off.';
 export const SOUND_STATUS_NONE = 'This browser cannot play sound.';
 export const SOUND_STATUS_SUSPENDED = 'The browser paused the sound. Click Ambience again to resume it.';
-export const SOUND_STATUS_READY = 'Ambience plays in the fly view at + Artistic.';
+export const SOUND_STATUS_READY = 'Ambience plays in the fly view when Show is set to + Artistic.';
+export const SOUND_STATUS_AMBIENCE_OFF = 'Ambience is off.';
 export const FLASHES_HINT = 'Lightning in the fly view. Off with reduced motion.';
 
 function Volume({
@@ -70,11 +71,13 @@ export function SoundControls() {
 
   const line = !s.soundOn
     ? SOUND_STATUS_OFF
-    : status.audio === 'none'
-      ? SOUND_STATUS_NONE
-      : status.unlocked && status.audio === 'suspended'
-        ? SOUND_STATUS_SUSPENDED
-        : SOUND_STATUS_READY;
+    : !s.ambienceOn
+      ? SOUND_STATUS_AMBIENCE_OFF
+      : status.audio === 'none'
+        ? SOUND_STATUS_NONE
+        : status.unlocked && status.audio === 'suspended'
+          ? SOUND_STATUS_SUSPENDED
+          : SOUND_STATUS_READY;
 
   return (
     <div className="sx-snd" data-testid="sound-settings">
@@ -84,7 +87,7 @@ export function SoundControls() {
       <div className="sx-snd-group">
         <SwitchRow label="Sound" checked={s.soundOn} onChange={(v) => s.update({ soundOn: v })} testId="sound-on" />
         <Volume
-          label="Volume"
+          label="Sound volume"
           value={s.volume}
           disabled={!s.soundOn}
           onChange={(v) => s.update({ volume: v })}
@@ -99,7 +102,7 @@ export function SoundControls() {
           testId="sound-ambience"
         />
         <Volume
-          label="Volume"
+          label="Ambience volume"
           value={s.ambienceVolume}
           disabled={!s.soundOn || !s.ambienceOn}
           onChange={(v) => s.update({ ambienceVolume: v })}

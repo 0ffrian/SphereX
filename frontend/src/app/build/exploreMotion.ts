@@ -125,7 +125,9 @@ export function flyIsland(
     () => {
       if (stopped) return;
       done?.();
-      settle();
+      // Going in: keep the pane at its end values until React has hidden it, so it never flashes back.
+      if (dir === 'in') requestAnimationFrame(() => requestAnimationFrame(() => !stopped && settle()));
+      else settle();
     },
     () => {},
   );

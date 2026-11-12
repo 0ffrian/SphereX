@@ -88,6 +88,13 @@ export const PAPER_PENDING = 'The paper is still being written.';
 
 /** Beside the zoom card: a paper icon that opens out to "Read paper" on hover or focus. */
 export function ReadPaper({ url = PROCEDURAL_PAPER_URL }: { url?: string | null }) {
+  // Before the paper exists a press says why (a touch screen has no hover and shows no tooltip).
+  const [note, setNote] = useState(false);
+  useEffect(() => {
+    if (!note) return;
+    const id = window.setTimeout(() => setNote(false), 4000);
+    return () => window.clearTimeout(id);
+  }, [note]);
   const inner = (
     <>
       <Icon name="paper" className="size-[18px] flex-none" />
@@ -106,15 +113,23 @@ export function ReadPaper({ url = PROCEDURAL_PAPER_URL }: { url?: string | null 
       {inner}
     </a>
   ) : (
-    <button
-      type="button"
-      className="sx-fl sx-paper"
-      aria-disabled="true"
-      aria-label={`Read paper. ${PAPER_PENDING}`}
-      title={PAPER_PENDING}
-      data-testid="build-paper"
-    >
-      {inner}
-    </button>
+    <>
+      <button
+        type="button"
+        className="sx-fl sx-paper"
+        aria-disabled="true"
+        aria-label={`Read paper. ${PAPER_PENDING}`}
+        title={PAPER_PENDING}
+        onClick={() => setNote(true)}
+        data-testid="build-paper"
+      >
+        {inner}
+      </button>
+      {note && (
+        <p className="sx-paper-note" role="status" data-testid="build-paper-note">
+          {PAPER_PENDING}
+        </p>
+      )}
+    </>
   );
 }
