@@ -110,6 +110,14 @@ export function CloseUpPane() {
     !hidden &&
     kind !== null &&
     (engine || world || rockEngine ? !held : info !== null && info.mode !== null);
+  // Render-performance roadmap 0.7: once the fly view has been opened for this object, it stays
+  // mounted (paused) while the close-up is closed, so reopening skips the GL context, the fly-shader
+  // compile (22 to 43 s cold) and the 900-step spin-up. Another object (or preset) drops it: the
+  // key changes, and a null `world` (engines off, "Measured only", a failure) unmounts it.
+  const flyKey = world ? engineKey(cardId, world.preset.id) : null;
+  const [keptFly, setKeptFly] = useState<string | null>(null);
+  if (open && flyKey !== null && keptFly !== flyKey) setKeptFly(flyKey);
+  const mountFly = flyKey !== null && (open || keptFly === flyKey);
   const [, bump] = useReducer((n: number) => n + 1, 0);
   const [about, setAbout] = useState(false);
   const focusRef = useRef<HTMLDivElement>(null);
@@ -253,11 +261,12 @@ export function CloseUpPane() {
         />
       )}
       {kind === 'body' && <RockCloseUp active={open} />}
-      {world && open && (
+      {world && mountFly && (
         <WorldFlyStage
-          key={world.preset.id}
+          key={flyKey}
           world={world}
           reduced={reducedMotion}
+          paused={!open}
           onFail={() => useWorldStore.getState().fail(engineKey(cardId, world.preset.id))}
         />
       )}
