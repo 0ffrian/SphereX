@@ -11,12 +11,16 @@ export interface MouldLiveState {
   /** Set while the animation drives the strip itself (a ready body's short show or the finish). */
   override: readonly number[] | null;
   /**
-   * Bumped when the mould show has played its last step (Colour) and starts to fade (Q-421). The
+   * Set when the mould show has played its last step (Colour) and starts to fade (Q-421). The
    * show is the one clock for the strip: the real build ends on it instead of staging on afterwards
    * (which sent the strip back from Colour to Spots).
    */
-  shownSeq: number;
-  markShown(): void;
+  /** The build now running (bumped by useMould at each start); a show remembers the one it covered. */
+  buildSeq: number;
+  startBuild(): number;
+  /** The build whose show has finished; only that build ends on it (never a later one). */
+  shownFor: number;
+  markShown(build: number): void;
   setOverride(p: readonly number[] | null): void;
   setProgress(p: readonly number[]): void;
   setForming(f: boolean): void;
@@ -26,8 +30,17 @@ export const useMouldLive = create<MouldLiveState>((set) => ({
   progress: [],
   forming: false,
   override: null,
-  shownSeq: 0,
-  markShown: () => set((s) => ({ shownSeq: s.shownSeq + 1 })),
+  buildSeq: 0,
+  startBuild: () => {
+    let n = 0;
+    set((s) => {
+      n = s.buildSeq + 1;
+      return { buildSeq: n };
+    });
+    return n;
+  },
+  shownFor: -1,
+  markShown: (build) => set({ shownFor: build }),
   setOverride: (override) => set({ override }),
   setProgress: (progress) => set({ progress }),
   setForming: (forming) => set((s) => (s.forming === forming ? s : { forming })),

@@ -224,6 +224,12 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
   const [rushMs, setRushMs] = useState(CACHED_SHOW_MS);
   const [visible, setVisible] = useState(true);
   const startedAt = useRef(0);
+  /** The build this show covers (mouldLive.buildSeq when it came on); its end finishes only that build. */
+  const coveredBuild = useRef(-1);
+  const stepsRef = useRef(steps);
+  useEffect(() => {
+    stepsRef.current = steps;
+  });
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const idRef = useRef(id);
   const stageRef = useRef<Stage>('off');
@@ -245,7 +251,7 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
     const cur = stageRef.current;
     const leave = () => {
       // The show has reached its last step: the real build ends on it (one clock for the strip).
-      useMouldLive.getState().markShown();
+      useMouldLive.getState().markShown(coveredBuild.current);
       if (reduced) {
         seen.add(idRef.current);
         setSt('off');
@@ -263,6 +269,7 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
       if (cur === 'on') return;
       clear();
       startedAt.current = now;
+      coveredBuild.current = useMouldLive.getState().buildSeq;
       setSt('on');
       // Always drawn, also for a body seen before (at least MIN_SHOW_MS in all).
       setVisible(true);
@@ -275,11 +282,11 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
     // The mould plays its remaining stages over whatever is left of MIN_SHOW_MS (a cached body that
     // was ready at once gets the whole 5 s show). After a long real wait every step still gets
     // STEP_MIN_MS, so the body morphs through each one and the strip can be read (Q-421).
-    const ms = Math.max(FINISH_MS, steps * STEP_MIN_MS, MIN_SHOW_MS - elapsed);
+    const ms = Math.max(FINISH_MS, stepsRef.current * STEP_MIN_MS, MIN_SHOW_MS - elapsed);
     setRushMs(ms);
     setSt('rush');
     timers.current.push(setTimeout(leave, ms));
-  }, [active, id, reduced, kind, steps]);
+  }, [active, id, reduced, kind]);
 
   if (stage === 'off') return null;
   const leaving = stage === 'leave';

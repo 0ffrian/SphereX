@@ -102,8 +102,9 @@ export function useMould(inp: MouldInputs): MouldState {
       return;
     }
     const script = mouldScript(plan);
-    // The mould show (MouldOverlay) is the one clock for the strip: when it has finished, so has this build.
-    const shownAt = useMouldLive.getState().shownSeq;
+    // The mould show (MouldOverlay) is the one clock for the strip: when the show that covered THIS
+    // build has finished, so has the build. A show left over from an earlier build cannot end it.
+    const token = useMouldLive.getState().startBuild();
     const finish = (settleTurn = false) => {
       viewer.setMould(null);
       // The newest plan (a honesty or mode change during the build ends on it).
@@ -169,7 +170,7 @@ export function useMould(inp: MouldInputs): MouldState {
           finish();
           return;
         }
-        if (useMouldLive.getState().shownSeq !== shownAt) {
+        if (useMouldLive.getState().shownFor === token) {
           finish(true);
           return;
         }

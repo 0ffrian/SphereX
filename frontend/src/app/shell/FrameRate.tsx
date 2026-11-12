@@ -6,7 +6,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { FPS_OPTIONS, type Fps } from '@/app/flipbook/playback';
-import { effectiveColour, transportLocked } from '@/app/flipbook/colourMode';
+import { COMPOSITE_TRANSPORT_NOTE, effectiveColour, transportLocked } from '@/app/flipbook/colourMode';
 import { useAppStore } from '@/state/store';
 import { demoPlayerOn, useAreaStore } from './areaStore';
 import { EXPLORE_SPRING } from '@/app/build/exploreMotion';
@@ -56,6 +56,7 @@ export function FrameRate() {
   }, [open]);
 
   const onButtonKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (locked) return;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       show();
@@ -93,10 +94,15 @@ export function FrameRate() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label={`Frame rate, ${fps} frames a second`}
-        title="Frame rate"
-        disabled={locked}
-        onClick={() => (open ? close(false) : show())}
+        aria-label={locked ? `Frame rate, ${fps} frames a second. ${COMPOSITE_TRANSPORT_NOTE}` : `Frame rate, ${fps} frames a second`}
+        title={locked ? COMPOSITE_TRANSPORT_NOTE : 'Frame rate'}
+        // Focusable while locked, so the reason can be read (it is in the label and the title).
+        aria-disabled={locked || undefined}
+        onClick={() => {
+          if (locked) return;
+          if (open) close(false);
+          else show();
+        }}
         onKeyDown={onButtonKey}
         data-testid="frame-rate-button"
       >

@@ -4,7 +4,7 @@
 
 ## R11. Acceptance tests
 
-> **Known gap ([Q-416](../decisions/shell-surfaces.md), PR #104):** the Hear it panel's artistic Atmosphere still plays at Measured only, which the honesty test below forbids, until Atish wires `build/hearAudio.ts` to the honesty filter and the shared audio bus.
+> **Known gap ([Q-416](../decisions/shell-surfaces.md), PR #104):** the build header's Ambience toggle (the artistic Atmosphere; the Hear it panel itself is dormant since Q-420) still plays at Measured only, which the honesty test below forbids, until Atish wires `build/hearAudio.ts` to the honesty filter and the shared audio bus.
 
 The sub-pages are R11.1 [reference frames](reference/README.md), R11.2 the [visual review checklist](reference/checklist.md), R11.3 [frame-time checks](reference/frame-time.md) and R11.4 the [A15 event-machine checks](reference/a15-checks.md).
 

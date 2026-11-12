@@ -4784,11 +4784,11 @@ body {
   line-height: 11px;
   color: var(--muted);
 }
-.sx-fps-btn:enabled:hover,
+.sx-fps-btn:not([aria-disabled='true']):hover,
 .sx-fps-btn[aria-expanded='true'] {
   background: var(--glass-grain), rgba(30, 32, 36, 0.75);
 }
-.sx-fps-btn:disabled {
+.sx-fps-btn[aria-disabled='true'] {
   opacity: 0.4;
   cursor: not-allowed;
 }
