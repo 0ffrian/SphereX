@@ -64,6 +64,7 @@ export function stubGL(o: StubOpts = {}) {
     getUniformLocation: (_p: unknown, name: string) => ({ name }),
     uniform1f: (loc: { name: string } | null, v: number) => calls.push(['uniform1f', loc?.name, v]),
     drawArrays: () => calls.push(['drawArrays']),
+    checkFramebufferStatus: () => 'FRAMEBUFFER_COMPLETE',
   };
   const gl = new Proxy(api, {
     get(t, k) {

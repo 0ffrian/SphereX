@@ -239,12 +239,18 @@ describe('ViewerPanel', () => {
       const t = dl!.textContent ?? '';
       expect(t).toContain('Day side (brightness temperature)');
       expect(t).toContain('1192 ± 9 K at 4.5 µm');
-      expect(t).toContain('Hottest point');
-      expect(t).toContain('20.1 ± 5.5° east of noon at 4.5 µm');
       expect(t).not.toMatch(/, measured/);
-      expect(dl!.querySelectorAll('dd').length).toBe(2);
+      // The derived offset follows the honesty level: hidden at "Measured only", shown from "+ Estimated" up.
+      const shown = level === 'measured' ? 1 : 2;
+      if (shown === 2) {
+        expect(t).toContain('Hottest point');
+        expect(t).toContain('20.1 ± 5.5° east of noon at 4.5 µm');
+      } else {
+        expect(t).not.toContain('Hottest point');
+      }
+      expect(dl!.querySelectorAll('dd').length).toBe(shown);
       // Each value carries its tag badge (the badge, not the label, says how it is known).
-      expect(dl!.querySelectorAll('[data-testid="provenance-badge"]').length).toBe(2);
+      expect(dl!.querySelectorAll('[data-testid="provenance-badge"]').length).toBe(shown);
     }
   });
 
