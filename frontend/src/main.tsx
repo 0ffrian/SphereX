@@ -1,14 +1,20 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from '@/app/App';
+import { ErrorBoundary, installGlobalErrorLogging } from '@/app/ErrorBoundary';
 import './index.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('#root element missing from index.html');
 
+// Issue #102: log what escapes React, and never leave a blank page on a throw during render.
+installGlobalErrorLogging();
+
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary area="The app" className="m-4">
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );
 

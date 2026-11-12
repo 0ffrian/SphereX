@@ -91,6 +91,8 @@ export interface SkyError {
   status: number | null;
   code: string | null;
   detail: string | null;
+  /** For a 'timeout': how long the request waited, in ms (issue #102). Absent otherwise. */
+  timeoutMs?: number | null;
 }
 
 export interface SpectrumState {
@@ -280,7 +282,15 @@ export function getSkyApi(): ApiClient {
 }
 
 function toSkyError(e: unknown): SkyError {
-  if (isApiError(e)) return { kind: e.kind, status: e.status, code: e.code, detail: e.detail };
+  if (isApiError(e)) {
+    return {
+      kind: e.kind,
+      status: e.status,
+      code: e.code,
+      detail: e.detail,
+      ...(e.timeoutMs !== null ? { timeoutMs: e.timeoutMs } : {}),
+    };
+  }
   return {
     kind: 'bad_response',
     status: null,

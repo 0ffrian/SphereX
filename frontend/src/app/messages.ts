@@ -39,7 +39,8 @@ export function searchErrorMessage(err: SkyError, query: string): string {
         ? 'The archive is slow or not answering right now. Try again, or pick an object from the list.'
         : 'The server had a problem or is not answering. Try again in a moment.';
     case 'timeout':
-      return `No answer after ${Math.round(API_TIMEOUT_MS / 1000)} seconds. The archive may be slow; try again, or pick an object from the list.`;
+      // Issue #102: the wait the request actually had (25 s for a search, 90 s for frames).
+      return `No answer after ${Math.round((err.timeoutMs ?? API_TIMEOUT_MS) / 1000)} seconds. The archive may be slow; try again, or pick an object from the list.`;
     case 'network':
       return 'Can’t reach the server. Check that the backend is running.';
     case 'bad_response':

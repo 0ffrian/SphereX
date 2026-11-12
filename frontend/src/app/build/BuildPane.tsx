@@ -18,6 +18,7 @@ import {
 } from 'react';
 import { BUILD_POP_ID, ViewerPanel, type PopId } from '@/app/ViewerPanel';
 import { CloseUpPane, closeUpButtonLabel, closeUpKindOf } from '@/app/CloseUpPane';
+import { ErrorBoundary } from '@/app/ErrorBoundary';
 import { useCloseUpStore } from '@/app/closeUpStore';
 import { useRockStore } from '@/app/rockStore';
 import { StatusLine } from '@/app/StatusLine';
@@ -57,6 +58,7 @@ export function BuildPane() {
   const selection = useSelection();
   const card = useAppStore((s) => s.card);
   const params = useAppStore((s) => s.params);
+  const query = useAppStore((s) => s.sky.query);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
   const [phase, setPhase] = useState<MouldPhase>('idle');
@@ -259,7 +261,10 @@ export function BuildPane() {
   return (
     <>
       {/* The close-up fills the left half over the sky, as the mock-up's #cuPane (Q-275). */}
-      <CloseUpPane />
+      {/* Issue #102: a throw in the close-up leaves the build pane usable. */}
+      <ErrorBoundary area="The close-up" resetKey={query} className="relative z-10 m-4">
+        <CloseUpPane />
+      </ErrorBoundary>
       <aside
         className="sx-bp"
         aria-labelledby={titleId}

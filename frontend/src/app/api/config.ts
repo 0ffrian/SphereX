@@ -9,6 +9,13 @@ export const API_BASE = '/v1';
  */
 export const API_TIMEOUT_MS = 90_000;
 
+/**
+ * ASSUMPTION (issue #102): a shorter wait for the requests a person waits on before anything
+ * shows: `resolve`, `card` and `render-params`. A hung one shows its error after this, not after
+ * API_TIMEOUT_MS. The frames poll and the other requests keep API_TIMEOUT_MS.
+ */
+export const API_QUICK_TIMEOUT_MS = 25_000;
+
 /** Response header the dev fixture server sets on every synthetic reply. */
 export const FIXTURE_HEADER = 'x-sx-fixture';
 
