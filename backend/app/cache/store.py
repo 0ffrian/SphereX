@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import tempfile
 import threading
 import time
@@ -135,6 +136,25 @@ class ReadThroughCache:
         if meta.get("body_sha256") != hashlib.sha256(body).hexdigest():
             return None  # torn or tampered entry: treat as a miss
         return CacheEntry(key, body, meta)
+
+    def get_digest(self, source: str, release: str, digest: str) -> CacheEntry | None:
+        """The entry stored under ``digest`` (A17.8 stamps: the area keeps each frame's cutout
+        key digest, not the key). The key is rebuilt from the meta and must hash to ``digest``;
+        the body is verified as in ``get``. Anything else is a miss."""
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            return None
+        meta_path = self.root / LAYOUT_VERSION / source / release / digest[:2] / f"{digest}.json"
+        meta = self._read_meta(meta_path) if meta_path.is_file() else None
+        if meta is None:
+            return None
+        try:
+            k = meta["key"]
+            key = CacheKey.make(str(k["source"]), str(k["release"]), **dict(k["query"]))
+        except (KeyError, TypeError, ValueError):
+            return None
+        if key.digest != digest or key.source != source or key.release != release:
+            return None
+        return self.get(key)
 
     def get_meta(self, key: CacheKey) -> dict[str, Any] | None:
         """The meta of a committed entry without reading its body (issue #2: Stage 2 keys its

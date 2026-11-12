@@ -166,6 +166,11 @@ class Settings(BaseSettings):
     # Q-164 (issue #68, 7c): the committed maps of the pre-built demo pack, served read-only at
     # /data/demo-textures, also under SX_OFFLINE=1. Written by scripts/bake_demo_pack.py.
     demo_textures_dir: Path = BACKEND_DIR / "assets" / "textures"
+    # Issue #108 (A17.10, Q-420): the committed, read-only pack of precomputed areas, in the D-25
+    # cache layout (``v1/derived.area/...``). The API reads the cache first, then this pack, so
+    # the Eros area is served under SX_OFFLINE=1 on a fresh machine. Written by
+    # ``scripts/area_discovery.py --recorded --pack``.
+    area_pack_dir: Path = BACKEND_DIR / "assets" / "areas"
 
     # Admin token for admin-only endpoints (R10: gemini_paint.py "behind the admin token").
     # ASSUMPTION: unset disables every admin endpoint (404); a wrong token gets 403.
