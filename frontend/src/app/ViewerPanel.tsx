@@ -41,6 +41,7 @@ import { ProvenanceBadge } from './Badge';
 import { EmissionsPanel } from './EmissionsPanel';
 import { EPOCH_JD, timeRange } from '@/physics/cometGas';
 import { ConfidenceChip, ConfidenceDetails } from './ConfidencePanel';
+import { useShellStore } from '@/app/shell/shellStore';
 import { HearPanel } from './build/HearPanel';
 import { AmbiencePanel } from './build/AmbiencePanel';
 import { BuildControls, BuildKeyNumbers, BuildSummaryRows } from './build/BuildControls';
@@ -622,8 +623,10 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
       announce(spinPaused ? 'Motion is playing.' : 'Motion is paused.');
     }
   }, [viewer, idlePaused, reducedMotion, playAnyway, spinPaused, announce]);
+  // Q-457: a minimised build is hidden: P must not toggle (and announce) motion nobody can see.
+  const buildMinimised = useShellStore((s) => s.buildMinimised);
   useEffect(() => {
-    if (!pane) return;
+    if (!pane || buildMinimised) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key.toLowerCase() !== 'p' || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented || isEditableTarget(e.target)) return;
       e.preventDefault();
@@ -631,7 +634,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [pane, toggleMotion]);
+  }, [pane, toggleMotion, buildMinimised]);
   const planWith = (patch: Partial<PlanContext>) =>
     card && params ? planRender(card, params, { ...ctx, ...patch }) : null;
 

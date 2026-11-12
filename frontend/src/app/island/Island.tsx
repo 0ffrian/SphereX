@@ -55,10 +55,10 @@ export function Island() {
       : null,
   );
   // Q-457: a minimised build view is a pill too, named after the body; a click brings it back.
+  // Named from the body the build holds (the card), not from the sky's current selection.
+  const buildCardName = useAppStore((s) => s.card?.name);
   const buildMini = useShellStore((s) =>
-    s.build.open && s.buildMinimised
-      ? (sky.resolved ? displayName(sky.resolved.name) || '3D view' : '3D view')
-      : null,
+    s.build.open && s.buildMinimised ? displayName(buildCardName) || '3D view' : null,
   );
   const areaMiniOn = useAreaStore((s) => s.minimised) || objMini !== null || buildMini !== null;
   const inPanel = panelBox !== null && travels && !areaMiniOn;

@@ -1235,7 +1235,9 @@ body {
     margin-right: 4px;
   }
   .sx-bp-tool[aria-pressed='true'],
-  .sx-bp-tool[aria-pressed='true']:hover {
+  .sx-bp-tool[aria-pressed='true']:hover,
+  .sx-bp-tool[data-pop][aria-expanded='true'],
+  .sx-bp-tool[data-pop][aria-expanded='true']:hover {
     background: var(--ac);
     color: var(--on-ac);
   }
@@ -5023,7 +5025,7 @@ body {
   color: var(--muted);
 }
 .sx-snd-vol label {
-  width: 56px;
+  width: 104px;
   flex: none;
 }
 .sx-snd-vol input {
@@ -5280,4 +5282,30 @@ body {
 .sx-bezel[data-split] .sx-orb-wrap {
   visibility: hidden;
   pointer-events: none;
+}
+/* A minimised build is hidden whole: its close-up too (the open close-up sets its own visibility). */
+.sx-bp-mini .sx-cu,
+.sx-bp-mini .sx-cu.open {
+  visibility: hidden;
+}
+/* "Read paper" before the paper exists: dimmed; a press says why for a few seconds. */
+.sx-paper[aria-disabled='true'] {
+  opacity: 0.7;
+}
+.sx-paper-note {
+  position: absolute;
+  left: 174px;
+  bottom: 72px;
+  z-index: 21;
+  max-width: 260px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-edge);
+  background: var(--glass-grain), var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--fg);
+  text-shadow: var(--glass-text-shadow);
 }

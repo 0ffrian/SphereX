@@ -61,6 +61,8 @@ describe('dock', () => {
     await act(async () => root.render(<ReadPaper url={null} />));
     expect(q('build-paper').getAttribute('aria-disabled')).toBe('true');
     expect(q('build-paper').getAttribute('aria-label')).toContain(PAPER_PENDING);
+    await act(async () => q('build-paper').click());
+    expect(q('build-paper-note').textContent).toBe(PAPER_PENDING);
     await act(async () => root.render(<ReadPaper url="https://example.org/paper.pdf" />));
     expect(q('build-paper').getAttribute('href')).toBe('https://example.org/paper.pdf');
   });

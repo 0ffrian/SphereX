@@ -80,6 +80,8 @@ export const useShellStore = create<ShellState>()((set) => ({
     set((s) => ({
       tool,
       minimised: false,
+      // A minimised build is over once another tool is chosen (the viewer tool opens it fresh).
+      buildMinimised: false,
       focusSeq: s.focusSeq + 1,
       cardRequested: tool === 'flipbook' || tool === 'spectrum' ? false : s.cardRequested,
       // The rail's 3D viewer is the build pane, with the body already built (no animation).

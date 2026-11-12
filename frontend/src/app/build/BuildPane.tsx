@@ -116,11 +116,16 @@ export function BuildPane() {
     const id = window.setTimeout(() => setShiftedSeq(build.seq), reduced ? 0 : SHIFT_DELAY_MS);
     return () => window.clearTimeout(id);
   }, [phase, build.animate, build.seq]);
-  // The close-up waits for the shift (a store the close-up pane and the viewer panel both read).
+  // Q-457: minimised, the pane is hidden behind the island's pill: its keys stay off until restored,
+  // and on restore focus goes back to its title.
+  const minimised = useShellStore((s) => s.buildMinimised);
+  // The close-up waits for the shift (a store the close-up pane and the viewer panel both read). It is
+  // also held while the build is minimised, so a hidden close-up stops drawing (its fly view stays
+  // mounted and paused, ready for the restore).
   useEffect(() => {
-    useCloseUpStore.getState().setHeld(!shifted);
+    useCloseUpStore.getState().setHeld(!shifted || minimised);
     return () => useCloseUpStore.getState().setHeld(false);
-  }, [shifted]);
+  }, [shifted, minimised]);
 
   const setPop = useCallback((next: PopId | null, returnFocus = false) => {
     const prev = popRef.current;
@@ -177,7 +182,7 @@ export function BuildPane() {
       type="button"
       className="sx-bp-tool sx-bp-text"
       title={b.title}
-      aria-pressed={pop === b.id}
+      data-pop={b.id}
       aria-expanded={pop === b.id}
       aria-controls={BUILD_POP_ID}
       onClick={() => setPop(pop === b.id ? null : b.id)}
@@ -200,9 +205,6 @@ export function BuildPane() {
     if (popRef.current) setPop(null, true);
     else closeBuildPane();
   }, [setPop]);
-  // Q-457: minimised, the pane is hidden behind the island's pill: its keys stay off until restored,
-  // and on restore focus goes back to its title.
-  const minimised = useShellStore((s) => s.buildMinimised);
   // Q-457: the pane (and its zoom card and paper button) shrinks into the island on a spring, in
   // animate-ui's style, and only then is it hidden; restoring grows it back out of the island.
   const flyEls = () => [
@@ -211,14 +213,22 @@ export function BuildPane() {
     document.querySelector<HTMLElement>('[data-testid="build-paper"]'),
   ];
   const stopFly = useRef<() => void>(() => {});
+  /** A second click while the pane is on its way into the island does nothing (no snap back). */
+  const minimising = useRef(false);
   const minimise = useCallback(() => {
+    if (minimising.current) return;
+    minimising.current = true;
     setPop(null);
     stopFly.current();
-    stopFly.current = flyIsland(flyEls(), 'in', () => useShellStore.getState().setBuildMinimised(true));
+    stopFly.current = flyIsland(flyEls(), 'in', () => {
+      minimising.current = false;
+      useShellStore.getState().setBuildMinimised(true);
+    });
   }, [setPop]);
   const wasMini = useRef(minimised);
   useLayoutEffect(() => {
     if (wasMini.current && !minimised) {
+      minimising.current = false;
       titleRef.current?.focus({ preventScroll: true });
       stopFly.current();
       stopFly.current = flyIsland(flyEls(), 'out');
@@ -349,7 +359,7 @@ export function BuildPane() {
                 type="button"
                 className="sx-bp-tool sx-bp-text"
                 title="Ambience and sound settings"
-                aria-pressed={pop === 'amb'}
+                data-pop="amb"
                 aria-expanded={pop === 'amb'}
                 aria-controls={BUILD_POP_ID}
                 onClick={() => {
@@ -382,7 +392,7 @@ export function BuildPane() {
               type="button"
               className="sx-bp-tool"
               aria-label="Minimise the build view"
-              title="Minimise: the island brings it back"
+              title="Minimise (the pill reopens it)"
               onClick={minimise}
               data-testid="build-minimise"
             >

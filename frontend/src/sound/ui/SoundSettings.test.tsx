@@ -9,6 +9,7 @@ import { createAppSound, type AppSound } from '../appSound';
 import { defaultSettings, flushSoundSettings, useSoundSettings } from '../settings';
 import { SoundProvider } from '../SoundProvider';
 import {
+  SOUND_STATUS_AMBIENCE_OFF,
   SOUND_STATUS_NONE,
   SOUND_STATUS_OFF,
   SOUND_STATUS_READY,
@@ -97,6 +98,8 @@ describe('SoundControls', () => {
     expect(q('sound-status').textContent).toBe(SOUND_STATUS_READY);
     await act(async () => ctx.simulateState('suspended'));
     expect(q('sound-status').textContent).toBe(SOUND_STATUS_SUSPENDED);
+    await act(async () => useSoundSettings.getState().update({ ambienceOn: false }));
+    expect(q('sound-status').textContent).toBe(SOUND_STATUS_AMBIENCE_OFF);
     await act(async () => useSoundSettings.getState().update({ soundOn: false }));
     expect(q('sound-status').textContent).toBe(SOUND_STATUS_OFF);
   });
