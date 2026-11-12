@@ -290,6 +290,39 @@ export function BuildPane() {
                 {b.id === 'hear' && ambienceOn && <i className="sx-bp-live" aria-hidden="true" data-testid="hear-live" />}
               </button>
             ))}
+            {/* Split view and Atmosphere (Moon, 12 Nov 2026, Q-419): icon-only toggles in the header,
+                after Details. Atmosphere is local synthesis for now (Q-416); where there is no
+                atmosphere to hear it stays visible but off, and its name says why. */}
+            {canBuild && (
+              <>
+                <i className="sx-bp-sep" aria-hidden="true" />
+                {closeKind && (
+                  <button
+                    type="button"
+                    className="sx-bp-tool sx-bp-toggle"
+                    aria-label="Split view"
+                    aria-pressed={!closeHidden}
+                    title={closeHidden ? 'Split view: the close-up on the left' : 'Close the split view'}
+                    onClick={() => useCloseUpStore.getState().setHidden(!closeHidden)}
+                    data-testid="build-split"
+                  >
+                    <Icon name="split" className="size-4" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="sx-bp-tool sx-bp-toggle"
+                  aria-label={atmo.ok ? 'Atmosphere sound' : `Atmosphere sound. ${atmo.line}`}
+                  aria-pressed={atmoOn}
+                  aria-disabled={!atmo.ok || undefined}
+                  title={atmo.ok ? (atmoOn ? 'Stop the atmosphere sound (M)' : 'Play the atmosphere sound') : atmo.line}
+                  onClick={toggleAtmo}
+                  data-testid="build-atmosphere"
+                >
+                  <Icon name="wind" className="size-4" />
+                </button>
+              </>
+            )}
             <i className="sx-bp-sep" aria-hidden="true" />
             <button
               type="button"
@@ -337,38 +370,6 @@ export function BuildPane() {
               caption: level,
             }}
           />
-        )}
-        {/* The side bar (Moon, 12 Nov 2026): Split view (the close-up on the left) and the
-            Atmosphere sound, each a toggle. Atmosphere is local synthesis for now (Q-416); where
-            there is no atmosphere to hear it stays visible but off, and says why. */}
-        {canBuild && (
-          <div className="sx-bp-side" role="group" aria-label="View and sound">
-            {closeKind && (
-              <button
-                type="button"
-                className="sx-bp-sidebtn"
-                aria-label="Split view"
-                aria-pressed={!closeHidden}
-                title={closeHidden ? 'Split view: the close-up on the left' : 'Close the split view'}
-                onClick={() => useCloseUpStore.getState().setHidden(!closeHidden)}
-                data-testid="build-split"
-              >
-                <Icon name="split" className="size-[18px]" />
-              </button>
-            )}
-            <button
-              type="button"
-              className="sx-bp-sidebtn"
-              aria-label={atmo.ok ? 'Atmosphere sound' : `Atmosphere sound. ${atmo.line}`}
-              aria-pressed={atmoOn}
-              aria-disabled={!atmo.ok || undefined}
-              title={atmo.ok ? (atmoOn ? 'Stop the atmosphere sound (M)' : 'Play the atmosphere sound') : atmo.line}
-              onClick={toggleAtmo}
-              data-testid="build-atmosphere"
-            >
-              <Icon name="wind" className="size-[18px]" />
-            </button>
-          </div>
         )}
         <div className="sx-bp-status sr-only">
           <StatusLine />

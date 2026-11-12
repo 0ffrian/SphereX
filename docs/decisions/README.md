@@ -390,5 +390,5 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-416 | Hear it: Atmosphere and the spectrum sweep (amends Q-295) | Open (Atish to wire after merge) | [shell-surfaces](shell-surfaces.md) |
 | Q-417 | The browser tab reads "Odysseus" | Decided (Moon, tab title only) | [shell-surfaces](shell-surfaces.md) |
 | Q-418 | Matte glass on the floating surfaces; island cards minimise into the pill | Decided (Moon) | [shell-surfaces](shell-surfaces.md) |
-| Q-419 | Build view opens without the split; side bar with Split view and Atmosphere | Decided (Moon) | [shell-surfaces](shell-surfaces.md) |
+| Q-419 | Build view opens without the split; Split view and Atmosphere toggles in its header | Decided (Moon) | [shell-surfaces](shell-surfaces.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |
