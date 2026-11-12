@@ -63,3 +63,75 @@ function translateXOf(el: HTMLElement): number {
     return 0;
   }
 }
+
+/** The transform that puts `el`'s centre on the island's and shrinks it to a pill (Q-456). */
+function towardIsland(el: HTMLElement): string {
+  const island = document.querySelector<HTMLElement>('[data-testid="island"]');
+  const r = el.getBoundingClientRect();
+  if (!island || r.width === 0) return 'translate(0px, 40px) scale(0.6)';
+  const i = island.getBoundingClientRect();
+  const dx = i.left + i.width / 2 - (r.left + r.width / 2);
+  const dy = i.top + i.height / 2 - (r.top + r.height / 2);
+  return `translate(${dx}px, ${dy}px) scale(${Math.max(0.04, i.width / r.width)})`;
+}
+
+/**
+ * Minimise and restore the build view (Moon, 13 Nov 2026, Q-456), in animate-ui's style on `motion`:
+ * the pane shrinks into the island and fades with a light blur, or grows back out of it on a spring.
+ * Transform, opacity and filter only. `done` runs once the pane has gone (minimise). Reduced motion:
+ * no animation. Returns a stop function.
+ */
+export function flyIsland(
+  els: (HTMLElement | null)[],
+  dir: 'in' | 'out',
+  done?: () => void,
+): () => void {
+  const list = els.filter((e): e is HTMLElement => e !== null);
+  if (list.length === 0 || reducedMotion()) {
+    done?.();
+    return () => {};
+  }
+  const runs = list.map((el) => {
+    const away = towardIsland(el);
+    const here = 'translate(0px, 0px) scale(1)';
+    // Growing out: start hidden at the island in this very frame, so the full pane never flashes.
+    if (dir === 'out') {
+      el.style.opacity = '0';
+      el.style.transform = away;
+    }
+    const a =
+      dir === 'in'
+        ? animate(
+            el,
+            { transform: [here, away], opacity: [1, 0], filter: ['blur(0px)', 'blur(6px)'] },
+            { duration: 0.38, ease: [0.4, 0, 0.2, 1] },
+          )
+        : animate(
+            el,
+            { transform: [away, here], opacity: [0, 1], filter: ['blur(6px)', 'blur(0px)'] },
+            EXPLORE_SPRING,
+          );
+    return { el, a };
+  });
+  const settle = () => {
+    for (const { el } of runs) {
+      el.style.removeProperty('transform');
+      el.style.removeProperty('opacity');
+      el.style.removeProperty('filter');
+    }
+  };
+  let stopped = false;
+  void Promise.all(runs.map((r) => r.a.finished)).then(
+    () => {
+      if (stopped) return;
+      done?.();
+      settle();
+    },
+    () => {},
+  );
+  return () => {
+    stopped = true;
+    for (const r of runs) r.a.stop();
+    settle();
+  };
+}
