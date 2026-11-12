@@ -10,16 +10,17 @@
 // the picture; they are not drawn on the colour composite (its own grid).
 // Keyboard (R9): Space or K play/pause, ←/→ step, Home/End first/last, while focus is in the
 // flipbook but not on a button or form field (those keep their own keys).
-import { useCallback, useLayoutEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { displayName } from '@/app/displayName';
+import { useCallback, useId, useLayoutEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import type { FramesResponse, ResolveResponse } from '@/app/api/types';
-import { DataBadge, EstimatedBadge, ProvenanceBadge } from '@/app/Badge';
-import { positionProvenance, positionText, searchPlaceText } from '@/app/sky/positionTags';
-import { formatUtc, formatWavelength } from '@/app/format';
-import { framesRetryText, framesSearchingText, searchErrorMessage } from '@/app/messages';
+import { DataBadge, EstimatedBadge } from '@/app/Badge';
+import { Row, ToggleGroup } from '@/app/PanelControls';
+import { Icon } from '@/app/shell/icons';
+import { positionProvenance, positionText } from '@/app/sky/positionTags';
+import { searchErrorMessage } from '@/app/messages';
 import { RefusalList } from '@/app/RefusalList';
 import { groupMissing } from '@/app/refusals';
-import { ErrorBox, LoadingBox } from '@/app/StatusBoxes';
-import { buttonClass, pressedClass } from '@/app/ui';
+import { ErrorBox } from '@/app/StatusBoxes';
 import { describeFrame, useAppStore, type SkyState } from '@/state/store';
 import {
   colourHidden,
@@ -28,8 +29,9 @@ import {
   tintColour,
   transportLocked,
 } from './colourMode';
-import { ColourControls, CompositeView, TintLegend } from './ColourViews';
-import { FramesProgress } from './FramesProgress';
+import { CompositeView, TintLegend } from './ColourViews';
+import { FramesTab, FramesWait } from './FramesProgress';
+import { FlipbookSpectrum } from './FlipbookSpectrum';
 import {
   frameSize,
   gridSize,
@@ -48,8 +50,6 @@ import { flipbookKeyAction } from './keys';
 import {
   countNoData,
   NO_DATA_CAPTION,
-  NO_DATA_KINDS,
-  noDataCaptionVisible,
   noDataSummary,
 } from './noData';
 import { CombinePanel } from './overlays/CombinePanel';
@@ -60,129 +60,113 @@ import { ContaminationNote, OverlayControls, OverlayDetails } from './overlays/O
 import { RainbowTrails, RainbowTrailsLegend, trailsUnavailableReason } from './RainbowTrails';
 import { useFlipbookSession } from './session';
 import { useFrameSwap } from './useFrameSwap';
-import { trailsMonochrome } from './wavelengthColor';
+import { trailsMonochrome, wavelengthColor } from './wavelengthColor';
 
-export function Flipbook() {
+export function Flipbook({ onClose, onBuild }: { onClose(): void; onBuild?: () => void }) {
   const sky = useAppStore((s) => s.sky);
   const retry = useAppStore((s) => s.skyRetry);
   if (sky.status === 'idle') return null;
+  const name = sky.resolved
+    ? objectName(sky.resolved)
+    : (sky.query?.q ?? 'Flipbook');
 
-  return (
-    <section aria-labelledby="flipbook-heading" className="flex flex-col gap-3">
-      {/* A section label: the card's title already says "Flipbook" and names the object. */}
-      {/* No `uppercase`: it would turn "SPHEREx" into "SPHEREX". */}
-      <h3 id="flipbook-heading" className="text-sm font-medium text-neutral-400">
-        SPHEREx frames
-      </h3>
-      {sky.status === 'resolving' && (
-        <LoadingBox text={`Finding “${sky.query?.q ?? ''}”…`} startedAt={sky.startedAt} />
-      )}
-      {sky.status === 'loading_frames' && (
-        <>
-          <LoadingBox
-            text={framesSearchingText(
-              sky.resolved ? searchPlaceText(sky.resolved) : (sky.query?.q ?? ''),
-            )}
-            startedAt={sky.startedAt}
-          />
-          {sky.progress?.retry && (
-            <p className="text-sm text-amber-200" data-testid="frames-retry">
-              {framesRetryText(sky.progress.retry)}
-            </p>
-          )}
-        </>
-      )}
-      {sky.status === 'error' && sky.error && (
-        <ErrorBox
-          message={searchErrorMessage(sky.error, sky.query?.q ?? '')}
-          detail={sky.error.detail}
-          onRetry={() => void retry()}
-        />
-      )}
-      {sky.status === 'ready' && sky.resolved && sky.frames && (
-        <>
-          {/* First, so it is in view on a phone's bottom sheet too. */}
-          {sky.progress && (
-            <FramesProgress
-              progress={sky.progress}
-              frames={sky.frames}
-              where={sky.resolved.resolver === 'coords' ? 'spot' : 'object'}
-            />
-          )}
-          <ObjectHeader sky={sky} resolved={sky.resolved} frames={sky.frames} />
-          {sky.frames.frames.length === 0 ? (
-            sky.progress ? (
-              <MissingList missing={sky.frames.missing} hideDeferred />
-            ) : (
-              <NoFrames frames={sky.frames} />
-            )
-          ) : (
-            <Player sky={sky} resolved={sky.resolved} frames={sky.frames} />
-          )}
-        </>
-      )}
-    </section>
+  // Not a Player: the picture area alone (black), with the name and close over it.
+  const area = (inner: React.ReactNode) => (
+    <div className="fb-view" data-testid="frame-viewer-wait">
+      <TopTabs name={name} onClose={onClose} />
+      {inner}
+    </div>
   );
+
+  if (sky.status === 'resolving' || sky.status === 'loading_frames') {
+    // The island says it; the card is not shown meanwhile (Panels.tsx).
+    return area(null);
+  }
+  if (sky.status === 'error' && sky.error) {
+    return (
+      <>
+        {area(null)}
+        <div className="fb-c" style={{ paddingBottom: 16 }}>
+          <ErrorBox
+            message={searchErrorMessage(sky.error, sky.query?.q ?? '')}
+            detail={sky.error.detail}
+            onRetry={() => void retry()}
+          />
+        </div>
+      </>
+    );
+  }
+  if (sky.status === 'ready' && sky.resolved && sky.frames) {
+    if (sky.frames.frames.length === 0) {
+      return (
+        <>
+          {area(sky.progress ? <FramesWait progress={sky.progress} frames={sky.frames} /> : null)}
+          {!sky.progress && (
+            <div className="fb-c" style={{ paddingBottom: 16 }}>
+              <NoFrames frames={sky.frames} />
+              {/* A body can be built without SPHEREx frames (the offline demo pack, a refused mover). */}
+              {onBuild && <BuildItButton onBuild={onBuild} />}
+            </div>
+          )}
+          {/* Only when something is actually listed: an empty padded strip under the picture otherwise. */}
+          {sky.progress && sky.frames.missing.some((c) => !c.startsWith('cutouts:deferred:')) && (
+            <div className="fb-c" style={{ paddingBottom: 16 }}>
+              <MissingList missing={sky.frames.missing} hideDeferred />
+            </div>
+          )}
+        </>
+      );
+    }
+    return (
+      <Player sky={sky} resolved={sky.resolved} frames={sky.frames} onClose={onClose} onBuild={onBuild} />
+    );
+  }
+  return null;
 }
 
 function objectName(resolved: ResolveResponse): string {
-  return resolved.name ?? positionText(resolved);
+  return displayName(resolved.name) || positionText(resolved);
 }
 
-function ObjectHeader({
-  sky,
-  resolved,
-  frames,
-}: {
-  sky: SkyState;
-  resolved: ResolveResponse;
-  frames: FramesResponse;
-}) {
-  const loadSpectrum = useAppStore((s) => s.skyLoadSpectrum);
-  const cachedAt = frames.cached_at ?? resolved.cached_at;
-  const position = positionProvenance(resolved.resolver, sky.query?.origin === 'sky');
-  const notes = [
-    cachedAt ? `Cached ${formatUtc(cachedAt)}` : null,
-    sky.fixture ? 'synthetic fixture data' : null,
-  ].filter((t) => t !== null);
+/** The primary "Build it" button of the card (also shown when there are no frames to play). */
+function BuildItButton({ onBuild }: { onBuild(): void }) {
   return (
-    <div className="flex flex-col gap-1">
-      {/* The card's subtitle shows the name; screen readers get it here, with the position. */}
-      <p className="sr-only" data-testid="object-name">
-        {objectName(resolved)}
-      </p>
-      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-neutral-300">
-        <span>
-          {positionText(resolved)}
-          {resolved.moving && ' · moving object'}
-        </span>
-        {/* D-02: the position wears its badge too (Q-25, Q-91 for typed and picked ones). */}
-        <ProvenanceBadge
-          tag={position.tag}
-          tooltip={position.tooltip}
-          srText
-          fixture={sky.fixture}
-        />
-      </p>
-      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-neutral-400">
-        <span>Data release: {frames.data_release} ·</span>
-        <span data-testid="stretch">Display stretch: {frames.stretch.kind}</span>
-        {/* A display choice, not data: Estimated even on fixtures (Fixture replaces Measured only). */}
-        <EstimatedBadge tooltip={stretchFormula(frames)} />
-      </p>
-      {notes.length > 0 && <p className="text-sm text-neutral-400">{notes.join(' · ')}</p>}
-      {frames.frames.length > 0 && (
-        <button
-          type="button"
-          className={`${buttonClass} self-start`}
-          onClick={() => void loadSpectrum()}
-          disabled={sky.spectrum.status === 'loading' || sky.spectrum.status === 'waiting'}
-        >
-          Show spectrum
-        </button>
-      )}
+    <button type="button" className="fb-btn-primary" onClick={onBuild} data-testid="panel-build-it">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z M12 12l8-4.5 M12 12v9 M12 12 4 7.5" />
+      </svg>
+      Build it
+    </button>
+  );
+}
+
+/** The object's name (top left) and the close button (top right), each on a small dark tab. */
+function TopTabs({ name, onClose }: { name: string; onClose(): void }) {
+  return (
+    <div className="fb-over">
+      <h2 className="fb-name" title={name} data-testid="object-name">
+        {name}
+      </h2>
+      <button
+        type="button"
+        className="fb-x"
+        aria-label="Close the flipbook"
+        title="Close (Esc)"
+        onClick={onClose}
+        data-testid="panel-close"
+      >
+        <Icon name="close" className="size-4" />
+      </button>
     </div>
   );
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** "24 Aug 2025" (UTC), or '' when the time does not parse. */
+function shortDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
 /** The display stretch is `derived` (#1): its formula is the stretch kind and parameters. */
@@ -240,15 +224,23 @@ const SLOTS = [0, 1] as const;
 const OVERLAYS_NOT_ON_COMPOSITE =
   'Overlays are drawn on the frames, not on the colour composite. Choose Raw or Wavelength tint to see them.';
 
+type MoreTab = 'overlays' | 'about' | 'combine';
+
 function Player({
   sky,
   resolved,
   frames: response,
+  onClose,
+  onBuild,
 }: {
   sky: SkyState;
   resolved: ResolveResponse;
   frames: FramesResponse;
+  onClose(): void;
+  onBuild?: () => void;
 }) {
+  const [moreTab, setMoreTab] = useState<MoreTab>('overlays');
+  const tabsId = useId();
   const frames = response.frames;
   const n = frames.length;
   // The requested frame (timer, keys, scrubber). The viewer shows `frame` below, which trails it
@@ -260,7 +252,6 @@ function Player({
   const step = useAppStore((s) => s.skyStep);
   const togglePlay = useAppStore((s) => s.skyTogglePlay);
   const setViewMode = useAppStore((s) => s.skySetViewMode);
-  const loadSpectrum = useAppStore((s) => s.skyLoadSpectrum);
   const setColour = useAppStore((s) => s.skySetColour);
 
   const honesty = useAppStore((s) => s.honesty);
@@ -314,7 +305,6 @@ function Player({
   // Hatched only under a drawn frame: while it loads or when it failed, nothing is claimed.
   const noData: NoData =
     size && placement && picture ? noDataKind(grid, placement, size, fullSide) : 'none';
-  const captionOn = noDataCaptionVisible(sky.playing, noData);
 
   const trailsReason = trailsUnavailableReason(resolved, response, {
     imageSize: session.size,
@@ -381,291 +371,321 @@ function Player({
     e.preventDefault();
   };
 
+  const moreCount = Object.values(sky.overlays.toggles).filter(Boolean).length;
+  const cachedAt = response.cached_at ?? resolved.cached_at;
+  const position = positionProvenance(resolved.resolver, sky.query?.origin === 'sky');
+  const panelId = (t: MoreTab) => `${tabsId}-${t}`;
+  const dot = wavelengthColor(frame.wavelength_um);
+
+  const viewer = (
+    <div
+      tabIndex={0}
+      role="group"
+      aria-label={`Frame viewer. ${frameText}. Space plays or pauses; arrow keys step.`}
+      className="fb-view"
+      data-colour={colour}
+      data-grid={grid}
+      // Diagnostics (frameSwap.ts): what is shown, requests passed before they were shown,
+      // older decodes dropped after the timeout, and decodes that failed.
+      data-shown={view}
+      data-shown-index={shownIndex}
+      data-late={swap.state.late}
+      data-timed-out={swap.state.timedOut}
+      data-decode-failed={swap.state.failed}
+      data-testid="frame-viewer"
+    >
+      {noData !== 'none' && (
+        // Behind the frame: only the grid area outside the frame's rectangle shows it.
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: NO_DATA_HATCH }}
+          aria-hidden="true"
+          data-testid="no-data-hatch"
+          data-no-data={noData}
+        />
+      )}
+      {/* The frame at its place on the grid; the tint layer has exactly the same box. Two <img>
+          slots serve the whole object: the front one is drawn, the other decodes the next frame
+          out of sight, then they swap (frameSwap.ts); neither is remounted. A frame of unknown
+          size is not placed until it has decoded (no wrong placement). */}
+      <div
+        className="absolute"
+        style={
+          placement && picture
+            ? placementStyle(grid, placement)
+            : { inset: 0, visibility: 'hidden' as const }
+        }
+        data-testid="frame-place"
+      >
+        {SLOTS.map((slot) => {
+          const isFront = slot === swap.state.front;
+          const src = swap.state.srcs[slot];
+          return (
+            <img
+              key={slot}
+              ref={swap.slots[slot]}
+              src={src ?? undefined}
+              alt={isFront ? alt : ''}
+              aria-hidden={isFront ? undefined : true}
+              className="absolute inset-0 h-full w-full"
+              style={{
+                imageRendering: 'pixelated',
+                visibility: isFront && picture ? undefined : 'hidden',
+              }}
+              draggable={false}
+              data-slot={slot}
+              data-testid={isFront ? 'cutout' : 'cutout-next'}
+            />
+          );
+        })}
+        {tint && picture && (
+          // Grey luminance × the frame's false colour: a multiply blend over the pixelated image.
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ background: tintColour(frame.wavelength_um), mixBlendMode: 'multiply' }}
+            aria-hidden="true"
+            data-testid="tint-overlay"
+            data-wavelength={frame.wavelength_um}
+          />
+        )}
+        {picture && showMask && ovFrame && (
+          <FlagMaskImage url={ovFrame.flags_url} onError={() => setFailedMask(ovFrame.flags_url)} />
+        )}
+      </div>
+      {picture && markers.length > 0 && <MarkerLayer markers={markers} width={grid} height={grid} />}
+      {view === 'failed' && (
+        <p
+          className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-neutral-300"
+          data-testid="cutout-unavailable"
+        >
+          Cutout unavailable for this frame.
+        </p>
+      )}
+      {viewMode === 'trails' && (
+        <RainbowTrails
+          frames={frames}
+          width={grid}
+          height={grid}
+          currentIndex={shownIndex}
+          monochrome={monochrome}
+        />
+      )}
+      {ring && picture && (
+        // The target ring: a marker only; the spectrum is always shown in the card.
+        <span
+          className="fb-ring"
+          style={{ left: `${(ring.x / grid) * 100}%`, top: `${(ring.y / grid) * 100}%` }}
+          aria-hidden="true"
+          data-testid="object-ring"
+        />
+      )}
+      <TopTabs name={name} onClose={onClose} />
+      {sky.fixture && (
+        <span className="pointer-events-none absolute top-14 left-2.5 z-[3] rounded bg-amber-400 px-1 text-[10px] font-bold tracking-wide text-black">
+          SYNTHETIC
+        </span>
+      )}
+      {sky.progress && <FramesTab progress={sky.progress} frames={response} />}
+      <span className="fb-cap fb-cap-l" data-testid="frame-date">
+        <i style={{ background: dot }} aria-hidden="true" />
+        {shortDate(frame.time)}
+      </span>
+      <span className="fb-cap fb-cap-r" data-testid="frame-counter">
+        <span>
+          <b>{shownIndex + 1}</b>
+          <span className="fb-dim"> / {n}</span>
+        </span>
+      </span>
+    </div>
+  );
+
   return (
     <div
       role="region"
       aria-label={`SPHEREx frames for ${name}`}
-      className="flex flex-col gap-3"
+      className="flex flex-col"
       onKeyDown={onKeyDown}
       data-testid="flipbook"
     >
-      {!response.north_up && !composite && (
-        <p className="text-sm text-amber-200" data-testid="orientation-note">
-          Frames are in the telescope’s native orientation, so the picture may rotate between
-          frames.
-        </p>
-      )}
-
-      <ColourControls choice={sky.colour} onChange={(c) => setColour(c)} />
-      {hiddenColour && (
-        <p className="text-sm text-amber-200" data-testid="colour-hidden-note">
-          {colourHiddenNote(sky.colour.view)}
-        </p>
-      )}
-
       {composite ? (
-        <CompositeView
-          name={name}
-          fixture={sky.fixture}
-          onShowSpectrum={() => void loadSpectrum()}
-        />
+        <div className="fb-c" style={{ paddingBottom: 0 }}>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-[15.5px] font-semibold" data-testid="object-name">
+              {name}
+            </h2>
+            <button type="button" className="fb-x" aria-label="Close the flipbook" onClick={onClose}>
+              <Icon name="close" className="size-4" />
+            </button>
+          </div>
+          <CompositeView name={name} fixture={sky.fixture} onShowSpectrum={() => undefined} />
+        </div>
       ) : (
-        <>
-          <div
-            tabIndex={0}
-            role="group"
-            aria-label={`Frame viewer. ${frameText}. Space plays or pauses; arrow keys step.`}
-            className="relative isolate aspect-square w-full max-w-md overflow-hidden rounded-lg border border-neutral-800 bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
-            data-colour={colour}
-            data-grid={grid}
-            // Diagnostics (frameSwap.ts): what is shown, requests passed before they were shown,
-            // older decodes dropped after the timeout, and decodes that failed.
-            data-shown={view}
-            data-shown-index={shownIndex}
-            data-late={swap.state.late}
-            data-timed-out={swap.state.timedOut}
-            data-decode-failed={swap.state.failed}
-            data-testid="frame-viewer"
-          >
-            {noData !== 'none' && (
-              // Behind the frame: only the grid area outside the frame's rectangle shows it.
-              <div
-                className="pointer-events-none absolute inset-0"
-                style={{ background: NO_DATA_HATCH }}
-                aria-hidden="true"
-                data-testid="no-data-hatch"
-                data-no-data={noData}
-              />
-            )}
-            {/* The frame at its place on the grid; the tint layer has exactly the same box. Two
-                <img> slots serve the whole object: the front one is drawn, the other decodes the
-                next frame out of sight, then they swap (frameSwap.ts); neither is remounted. A
-                frame of unknown size is not placed until it has decoded (no wrong placement). */}
-            <div
-              className="absolute"
-              style={
-                placement && picture
-                  ? placementStyle(grid, placement)
-                  : { inset: 0, visibility: 'hidden' as const }
-              }
-              data-testid="frame-place"
-            >
-              {SLOTS.map((slot) => {
-                const isFront = slot === swap.state.front;
-                const src = swap.state.srcs[slot];
-                return (
-                  <img
-                    key={slot}
-                    ref={swap.slots[slot]}
-                    src={src ?? undefined}
-                    alt={isFront ? alt : ''}
-                    aria-hidden={isFront ? undefined : true}
-                    className="absolute inset-0 h-full w-full"
-                    style={{
-                      imageRendering: 'pixelated',
-                      visibility: isFront && picture ? undefined : 'hidden',
-                    }}
-                    draggable={false}
-                    data-slot={slot}
-                    data-testid={isFront ? 'cutout' : 'cutout-next'}
-                  />
-                );
-              })}
-              {tint && picture && (
-                // Grey luminance × the frame's false colour: a multiply blend over the pixelated
-                // image, so the pixels stay sharp and nothing is decoded or allocated per frame.
-                <div
-                  className="pointer-events-none absolute inset-0"
-                  style={{
-                    background: tintColour(frame.wavelength_um),
-                    mixBlendMode: 'multiply',
-                  }}
-                  aria-hidden="true"
-                  data-testid="tint-overlay"
-                  data-wavelength={frame.wavelength_um}
-                />
-              )}
-              {picture && showMask && ovFrame && (
-                // The shown frame's mask, in the frame's own box (same size and orientation as
-                // its cutout), above the tint so its colours stay as the legend says.
-                <FlagMaskImage
-                  url={ovFrame.flags_url}
-                  onError={() => setFailedMask(ovFrame.flags_url)}
-                />
-              )}
-            </div>
-            {picture && markers.length > 0 && (
-              // Grid pixels (markersOnGrid): the same transform as the picture's placement box.
-              <MarkerLayer markers={markers} width={grid} height={grid} />
-            )}
-            {view === 'failed' && (
-              <p
-                className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-neutral-300"
-                data-testid="cutout-unavailable"
-              >
-                Cutout unavailable for this frame.
-              </p>
-            )}
-            {viewMode === 'trails' && (
-              // Offered only on a shared north-up grid, where frames sit at offset 0: the dots use
-              // each frame's own (x, y) on the same N×N grid.
-              <RainbowTrails
-                frames={frames}
-                width={grid}
-                height={grid}
-                currentIndex={shownIndex}
-                monochrome={monochrome}
-              />
-            )}
-            {ring && picture && (
-              <button
-                type="button"
-                className="absolute flex size-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-sky-400"
-                style={{
-                  left: `${(ring.x / grid) * 100}%`,
-                  top: `${(ring.y / grid) * 100}%`,
-                }}
-                aria-label={`Show spectrum for ${name}`}
-                title={`Show spectrum for ${name}`}
-                onClick={() => void loadSpectrum()}
-                data-testid="object-ring"
-              >
-                <svg viewBox="0 0 40 40" className="size-9" aria-hidden="true">
-                  <circle cx="20" cy="20" r="15" fill="none" stroke="#0a0a0a" strokeWidth="4" />
-                  <circle cx="20" cy="20" r="15" fill="none" stroke="#38bdf8" strokeWidth="2" />
-                </svg>
-              </button>
-            )}
-            {sky.fixture && (
-              <span className="pointer-events-none absolute right-1 bottom-1 rounded bg-amber-400 px-1 text-[10px] font-bold tracking-wide text-black">
-                SYNTHETIC
-              </span>
-            )}
-          </div>
-
-          {/* Fixed-width digits and reserved lines, so a frame's caption never moves what follows.
-              Everything here names the shown frame, so it changes with the picture. */}
-          <div className="flex flex-col gap-1 text-sm tabular-nums" data-testid="frame-caption">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span data-testid="frame-counter">
-                Frame {shownIndex + 1} of {n}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span data-testid="frame-wavelength">{formatWavelength(frame.wavelength_um)}</span>
-                <DataBadge fixture={sky.fixture} />
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span data-testid="frame-time">{formatUtc(frame.time)}</span>
-                <DataBadge fixture={sky.fixture} />
-              </span>
-            </div>
-            <span
-              className="line-clamp-2 min-h-10 text-neutral-400"
-              title={frame.flags.length > 2 ? frame.flags.join(', ') : undefined}
-              data-testid="frame-flags"
-            >
-              {frame.flags.length > 0 ? `Flags: ${frame.flags.join(', ')}` : 'No flags'}
-            </span>
-            {summary !== null && (
-              // Only for objects with a hatched frame. The steady line stays for every frame; the
-              // per-frame caption shows only while paused or stopped (R9: nothing flashes during
-              // playback). Its cell holds every caption, the inactive ones invisible (and so not
-              // read out), so it is as tall as the longest at any width and nothing moves.
-              <div className="flex flex-col gap-1" data-testid="frame-no-data">
-                <span className="flex items-center gap-1.5 text-neutral-300">
-                  <span
-                    className="inline-block h-3 w-5 shrink-0 rounded-sm border border-neutral-600"
-                    style={{ background: NO_DATA_HATCH }}
-                    aria-hidden="true"
-                    data-testid="no-data-swatch"
-                  />
-                  <span data-testid="no-data-summary">{summary}</span>
-                </span>
-                <div className="grid" data-testid="no-data-caption-cell">
-                  {NO_DATA_KINDS.map((k) => {
-                    const on = captionOn && noData === k;
-                    return (
-                      <span
-                        key={k}
-                        className={`col-start-1 row-start-1 text-amber-200 ${on ? '' : 'invisible'}`}
-                        data-testid={on ? 'frame-no-data-caption' : undefined}
-                      >
-                        {NO_DATA_CAPTION[k]}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {overlays && <ContaminationNote view={overlays} fixture={sky.fixture} />}
-
-          <p className="min-h-10 text-sm text-neutral-400" data-testid="preload-progress">
-            Cutouts loaded: {loadedCount} of {n}
-            {failedCount > 0 && ` · ${failedCount} unavailable`}
-            {!canPlay && n >= 2 && <span> · Play starts once the next frames have loaded.</span>}
-          </p>
-          {tint && (
-            <TintLegend wavelengthUm={frame.wavelength_um} stretch={stretchFormula(response)} />
-          )}
-        </>
+        viewer
       )}
 
-      {!composite && (
-        <div role="group" aria-label="View mode" className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className={`${buttonClass} ${pressedClass}`}
-            aria-pressed={viewMode === 'frames'}
-            onClick={() => setViewMode('frames')}
-          >
-            Frames
-          </button>
-          <button
-            type="button"
-            className={`${buttonClass} ${pressedClass}`}
-            aria-pressed={viewMode === 'trails'}
-            disabled={trailsReason !== null}
-            aria-describedby={trailsReason ? 'trails-reason' : undefined}
-            onClick={() => setViewMode('trails')}
-            data-testid="trails-toggle"
-          >
-            Rainbow Trails
-          </button>
-          {trailsReason && (
-            <span
-              id="trails-reason"
-              className="text-sm text-neutral-400"
-              data-testid="trails-reason"
-            >
-              {trailsReason}
-            </span>
+      <div className="fb-c">
+        <div className="fb-two">
+          <ToggleGroup
+            label="Picture"
+            value={sky.colour.on ? 'colour' : 'raw'}
+            options={[
+              { value: 'raw', label: 'Raw', testId: 'colour-raw' },
+              { value: 'colour', label: 'Colour', testId: 'colour-on' },
+            ]}
+            onChange={(v) => setColour({ ...sky.colour, on: v === 'colour' })}
+            testId="colour-switch"
+          />
+          {onBuild && (
+            <div className="sx-pc-grp">
+              <span className="sx-eyebrow">3D</span>
+              <BuildItButton onBuild={onBuild} />
+            </div>
           )}
         </div>
-      )}
-      {viewMode === 'trails' && <RainbowTrailsLegend monochrome={monochrome} />}
+        {sky.colour.on && (
+          <ToggleGroup
+            label="Colour view"
+            hideLabel
+            value={sky.colour.view}
+            options={[
+              { value: 'tint', label: 'Wavelength tint', testId: 'colour-tint' },
+              { value: 'composite', label: 'SPHEREx composite', testId: 'colour-composite' },
+            ]}
+            onChange={(v) => setColour({ on: true, view: v })}
+            testId="colour-view"
+          />
+        )}
+        {hiddenColour && (
+          <p className="fb-muted" style={{ color: 'var(--warn)' }} data-testid="colour-hidden-note">
+            {colourHiddenNote(sky.colour.view)}
+          </p>
+        )}
+        {tint && <TintLegend wavelengthUm={frame.wavelength_um} stretch={stretchFormula(response)} />}
+        {overlays && !composite && <ContaminationNote view={overlays} fixture={sky.fixture} />}
 
-      <OverlayControls sky={sky} view={overlays} />
-      {composite && overlaysOn && (
-        <p className="text-sm text-neutral-400" data-testid="overlay-composite-note">
-          {OVERLAYS_NOT_ON_COMPOSITE}
-        </p>
-      )}
-      {overlays && !composite && (
-        <OverlayDetails
-          view={overlays}
-          sky={sky}
-          frame={frame}
-          index={shownIndex}
-          center={center}
-          flagFailed={ovFrame !== undefined && failedMask === ovFrame.flags_url}
-        />
-      )}
+        <FlipbookSpectrum name={name} />
 
-      {n >= 2 && <CombinePanel sky={sky} frames={frames} />}
-
-      <MissingList missing={response.missing} hideDeferred={sky.progress !== null} />
+        <div className="fb-rows" data-testid="more">
+          <Row title="More" count={moreCount > 0 ? `${moreCount} on` : 'None on'} testId="more-row">
+            <ToggleGroup<MoreTab>
+              tabs
+              hideLabel
+              label="More"
+              value={moreTab}
+              onChange={setMoreTab}
+              panelIds={{ overlays: panelId('overlays'), about: panelId('about'), combine: panelId('combine') }}
+              options={[
+                { value: 'overlays', label: 'Overlays', testId: 'more-tab-overlays' },
+                { value: 'about', label: 'About', testId: 'more-tab-about' },
+                { value: 'combine', label: 'Combine', testId: 'more-tab-combine' },
+              ]}
+              testId="more-tabs"
+            />
+            <div role="tabpanel" id={panelId('overlays')} hidden={moreTab !== 'overlays'} className="flex flex-col gap-3">
+              <OverlayControls sky={sky} view={overlays} />
+              {composite && overlaysOn && (
+                <p className="fb-muted" data-testid="overlay-composite-note">
+                  {OVERLAYS_NOT_ON_COMPOSITE}
+                </p>
+              )}
+              {overlays && !composite && (
+                <OverlayDetails
+                  view={overlays}
+                  sky={sky}
+                  frame={frame}
+                  index={shownIndex}
+                  center={center}
+                  flagFailed={ovFrame !== undefined && failedMask === ovFrame.flags_url}
+                />
+              )}
+            </div>
+            <div role="tabpanel" id={panelId('about')} hidden={moreTab !== 'about'} className="flex flex-col gap-3">
+              <dl className="fb-dl">
+                <dt>Position</dt>
+                <dd>
+                  {positionText(resolved)}
+                  {resolved.moving && ' · moving object'}
+                  {sky.fixture ? (
+                    <DataBadge fixture variant="tag" />
+                  ) : (
+                    position.tag !== 'measured' && <EstimatedBadge variant="tag" tooltip={position.tooltip} />
+                  )}
+                </dd>
+                <dt>Release</dt>
+                <dd>
+                  {response.data_release}
+                  {cachedAt && shortDate(cachedAt) ? `, cached ${shortDate(cachedAt)}` : ''}
+                  {sky.fixture && ' · synthetic fixture data'}
+                </dd>
+                <dt>Stretch</dt>
+                <dd>
+                  <span data-testid="stretch">{response.stretch.kind}</span>
+                  {/* A display choice, not data: Estimated. */}
+                  <EstimatedBadge variant="tag" tooltip={stretchFormula(response)} />
+                </dd>
+                <dt>Flags</dt>
+                <dd data-testid="frame-flags">{frame.flags.length > 0 ? frame.flags.join(', ') : 'none'}</dd>
+                <dt>Orientation</dt>
+                <dd data-testid="orientation-note">
+                  {response.north_up
+                    ? 'North up, so the frames share one grid'
+                    : 'Native, so the picture may rotate between frames'}
+                </dd>
+                {summary !== null && (
+                  <>
+                    <dt>Edges</dt>
+                    <dd data-testid="frame-no-data">
+                      <span
+                        className="inline-block h-3 w-5 shrink-0 rounded-sm border border-neutral-600"
+                        style={{ background: NO_DATA_HATCH }}
+                        aria-hidden="true"
+                        data-testid="no-data-swatch"
+                      />
+                      <span data-testid="no-data-summary">{summary}</span>
+                    </dd>
+                  </>
+                )}
+                <dt>Cutouts</dt>
+                <dd data-testid="preload-progress">
+                  {loadedCount} of {n} loaded
+                  {failedCount > 0 && ` · ${failedCount} unavailable`}
+                </dd>
+                {!composite && (
+                  <>
+                    <dt>Trails</dt>
+                    <dd>
+                      {trailsReason ? (
+                        <span id="trails-reason" data-testid="trails-reason">
+                          Rainbow Trails: {trailsReason}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="fb-stop"
+                          aria-pressed={viewMode === 'trails'}
+                          onClick={() => setViewMode(viewMode === 'trails' ? 'frames' : 'trails')}
+                          data-testid="trails-toggle"
+                        >
+                          {viewMode === 'trails' ? 'Show the frames' : 'Show Rainbow Trails'}
+                        </button>
+                      )}
+                    </dd>
+                  </>
+                )}
+              </dl>
+              {viewMode === 'trails' && <RainbowTrailsLegend monochrome={monochrome} />}
+              <MissingList missing={response.missing} hideDeferred={sky.progress !== null} />
+            </div>
+            <div role="tabpanel" id={panelId('combine')} hidden={moreTab !== 'combine'}>
+              {n >= 2 ? (
+                <CombinePanel sky={sky} frames={frames} />
+              ) : (
+                <p className="fb-muted">Combining needs two or more frames.</p>
+              )}
+            </div>
+          </Row>
+        </div>
+      </div>
     </div>
   );
 }

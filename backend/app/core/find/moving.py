@@ -115,6 +115,11 @@ STEP_FORMULA = (
 
 Window = tuple[datetime, datetime]
 
+# Version of a moving object's stored frame record, in its frames key only (a fixed object's key
+# is unchanged). 2: the record keeps the frame's ``s_region`` (issue #74), so a list stored
+# before it is rebuilt from the cached answers rather than served without footprints.
+RECORD_VERSION = "2"
+
 
 # --- configuration -------------------------------------------------------------------------
 
@@ -196,6 +201,7 @@ class MovingConfig:
             "m_maxrec": str(self.maxrec),
             "m_margin_arcsec": norm_float(self.margin_arcsec, 3),
             "m_center": horizons.OBSERVER_SPHEREX,
+            "m_record": RECORD_VERSION,
         }
 
 
@@ -286,6 +292,8 @@ class Track:
         pts = [by_time[t] for t in sorted(by_time)]
         self.times = [p.time.timestamp() for p in pts]
         self.vecs = [_unit(p.ra, p.dec) for p in pts]
+        # The samples as Horizons gave them (issue #74: the /path reply serves these).
+        self.samples = [(p.time, p.ra, p.dec) for p in pts]
         # Angular rate of each segment, degrees per hour.
         self.rates = [
             _sep_deg(self.vecs[i], self.vecs[i + 1]) / ((self.times[i + 1] - self.times[i]) / 3600)

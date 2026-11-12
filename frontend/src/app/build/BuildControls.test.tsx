@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BuildControls, useBuildControls, type BuildControlsSpec } from './BuildControls';
+import { BuildControls, BuildSummaryRows, useBuildControls, type BuildControlsSpec } from './BuildControls';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -85,5 +85,39 @@ describe('BuildControls slot', () => {
     expect(pause.getAttribute('aria-label')).toBe('Pause. Nothing moves here.');
     await act(async () => root.render(<BuildControls />));
     expect(host.querySelector('[data-testid="build-controls"]')).toBeNull();
+  });
+});
+
+describe('choices are ToggleGroups; the about-slot ones live in "About this flare"', () => {
+  it('draws a choice as a ToggleGroup with no outlined badge, and moves slot "about" choices into the closed row', async () => {
+    const onKind = vi.fn();
+    const spec: BuildControlsSpec = {
+      title: 'Close-up',
+      controls: [
+        { kind: 'choice', id: 'light', label: 'Light', value: 'a', options: [{ value: 'a', label: 'True colour' }, { value: 'b', label: 'Enhanced' }], tag: 'artistic', onChange: () => {} },
+        { kind: 'choice', id: 'kind', slot: 'about', label: 'Flare type', value: 'closed', options: [{ value: 'closed', label: 'Closed' }, { value: 'open', label: 'Open' }], onChange: onKind },
+        { kind: 'readout', id: 'where', slot: 'where', label: 'Looking at', value: 'Looking at 12\u00b0 N, 40\u00b0 E \u00b7 quiet' },
+      ],
+    };
+    await act(async () =>
+      root.render(
+        <>
+          <Owner spec={spec} />
+          <BuildControls />
+          <BuildSummaryRows />
+        </>,
+      ),
+    );
+    const ctl = host.querySelector('[data-testid="build-controls"]')!;
+    expect(ctl.querySelector('.sx-seg')).not.toBeNull();
+    expect(ctl.textContent).toContain('True colour');
+    expect(ctl.textContent).not.toContain('Flare type');
+    expect(ctl.textContent).not.toContain('Looking at');
+    expect(ctl.querySelector('.sx-badge, [data-tag]:not(.sx-tag)')).toBeNull();
+    const about = host.querySelector('[data-testid="about-flare-row"]')!;
+    expect(about.textContent).toContain('Flare type');
+    const open = [...about.querySelectorAll('button')].find((b) => b.textContent === 'Open')!;
+    await act(async () => open.click());
+    expect(onKind).toHaveBeenCalledWith('open');
   });
 });

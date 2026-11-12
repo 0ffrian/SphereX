@@ -33,7 +33,8 @@ flowchart TB
   CACHE[("Read-through cache D-25<br/>raw replies + derived.area entries")]
   API["api/areas.py<br/>/v1/areas/... incl. /checks (gated)"]
   subgraph FE["frontend/src"]
-    RAIL["app/shell ToolRail + railIcons<br/>ToolId area"]
+    RAIL["app/shell SkyDock (Known objects, Discovery)<br/>ToolId area (D-38)"]
+    DEMO["app/area areaService demo seam<br/>answers only inside the prepared Eros area (Q-414)"]
     CARDS["Feature cards in the object card's slot (proposed Q-172)<br/>Area, Options, Known, Discovery, Result, Checks (gated)"]
     ISL["Island progress pill (proposed)"]
     LAYER["app/sky/area AreaLayer<br/>sky layer slot"]
@@ -68,6 +69,7 @@ flowchart TB
   CACHE --> API
   API --> STORE
   RAIL --> CARDS
+  DEMO -.->|"demo stand-in for the API until Q-205"| CARDS
   STORE --> CARDS
   CARDS --> ISL
   STORE --> LAYER
@@ -118,6 +120,8 @@ sequenceDiagram
 ```
 
 ## In the sky view
+
+> **As built in PR #104 (Q-414):** the tool is started from the sky dock's Known objects or Discovery, and the answers come from the frontend demo `app/area/areaService.ts`, not `/v1/areas`: only a square that overlaps the prepared 433 Eros area gets results, any other refuses with `area:not_prepared`, and demo cards and the canvas carry a "Demo data" tag. The diagram below is the planned flow with the real API.
 
 ```mermaid
 sequenceDiagram

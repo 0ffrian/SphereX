@@ -2,11 +2,12 @@
 // the picture box, the object ring and the lines below never move between frames of different
 // sizes. Barnard's Star in the SYNTHETIC fixtures cycles 64×64, 63×64, 64×63, 63×63 px cutouts
 // and frame 2 is clipped at a detector edge (64×40, object near the top): the grid area outside it
-// is hatched as "no data". One steady line says how many frames are hatched; the per-frame caption
+// is hatched as "no data". One steady line says how many frames are hatched; the per-frame caption (gone with the redesign; the picture's alt text names the edge)
 // shows only while paused, in lines reserved for every frame (R9: nothing flashes in playback).
 // The picture swaps only once the next <img> has decoded (frameSwap.ts), so playback never shows
 // an undecoded, black <img>.
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { openMore, setFps } from './flipbookUi';
 
 const SUMMARY = '1 of 24 frames is at a detector edge; its missing part is hatched.';
 const EDGE_CAPTION = 'Edge of the detector: part of this cutout lies outside it.';
@@ -35,14 +36,13 @@ for (const tint of [false, true]) {
     await input.fill("Barnard's Star");
     await input.press('Enter');
     const counter = page.getByTestId('frame-counter');
-    await expect(counter).toHaveText('Frame 1 of 24');
+    await expect(counter).toHaveText('1 / 24');
     if (tint) {
-      await page
-        .getByRole('radiogroup', { name: 'Picture' })
-        .getByRole('radio', { name: 'Colour' })
-        .click();
+      await page.getByRole('group', { name: 'Picture' }).getByRole('button', { name: 'Colour' }).click();
       await expect(page.getByTestId('tint-overlay')).toBeVisible();
     }
+    // The steady no-data line and the cutout count are in More > About.
+    await openMore(page, 'about');
     await cutoutLoaded(page);
     const viewer = page.getByTestId('frame-viewer');
     await expect(viewer).toHaveAttribute('data-grid', '65');
@@ -63,7 +63,7 @@ for (const tint of [false, true]) {
     for (let k = 0; k < 7; k++) {
       if (k > 0) {
         await page.keyboard.press('ArrowRight');
-        await expect(counter).toHaveText(`Frame ${k + 1} of 24`);
+        await expect(counter).toHaveText(`${k + 1} / 24`);
       }
       await cutoutLoaded(page);
       const place = await box(page.getByTestId('frame-place'));
@@ -83,7 +83,6 @@ for (const tint of [false, true]) {
       }
       // Only the clipped frame (index 2) is hatched; 63/64 px frames on the 65 px grid are not.
       const hatch = page.getByTestId('no-data-hatch');
-      const caption = page.getByTestId('frame-no-data-caption');
       // One steady line for the whole object, with the hatch swatch, on every frame.
       await expect(page.getByTestId('no-data-summary')).toHaveText(SUMMARY);
       await expect(page.getByTestId('no-data-swatch')).toBeVisible();
@@ -100,19 +99,16 @@ for (const tint of [false, true]) {
         expect(
           await hatch.evaluate((el) => el.nextElementSibling?.getAttribute('data-testid')),
         ).toBe('frame-place');
-        // Stepped there (paused): the per-frame caption shows.
-        await expect(caption).toHaveText(EDGE_CAPTION);
-        await expect(caption).toBeVisible();
+        // Stepped there (paused): the picture's text alternative names the edge (the per-frame
+        // caption under the picture went with the redesign).
+        await expect(page.getByTestId('cutout')).toHaveAttribute('alt', new RegExp(EDGE_CAPTION));
         await expect(page.getByTestId('cutout')).toHaveAttribute(
           'alt',
           /The hatched area has no data\.$/,
         );
       } else {
         await expect(hatch).toHaveCount(0);
-        await expect(caption).toHaveCount(0);
-        await expect(
-          page.getByTestId('frame-no-data').getByText('Edge of the detector'),
-        ).toBeHidden();
+        await expect(page.getByTestId('cutout')).not.toHaveAttribute('alt', /hatched/);
       }
       // The box, the ring, the reserved no-data lines and the line below stay put.
       expect(await box(viewer)).toEqual(first.viewer);
@@ -130,8 +126,9 @@ test('an object without clipped frames reserves no no-data lines', async ({ page
   const input = page.getByTestId('search-input');
   await input.fill('Epsilon Indi B');
   await input.press('Enter');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
   await cutoutLoaded(page);
+  await openMore(page, 'about');
   await expect(page.getByTestId('frame-no-data')).toHaveCount(0);
   await expect(page.getByTestId('no-data-hatch')).toHaveCount(0);
 });
@@ -198,16 +195,14 @@ async function openBarnard(page: Page, tint: boolean) {
   const input = page.getByTestId('search-input');
   await input.fill("Barnard's Star");
   await input.press('Enter');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
   if (tint) {
-    await page
-      .getByRole('radiogroup', { name: 'Picture' })
-      .getByRole('radio', { name: 'Colour' })
-      .click();
+    await page.getByRole('group', { name: 'Picture' }).getByRole('button', { name: 'Colour' }).click();
     await expect(page.getByTestId('tint-overlay')).toBeVisible();
   }
-  // Every cutout preloaded, none unavailable.
-  await expect(page.getByTestId('preload-progress')).toHaveText(/^Cutouts loaded: 24 of 24$/);
+  // Every cutout preloaded, none unavailable (More > About).
+  await openMore(page, 'about');
+  await expect(page.getByTestId('preload-progress')).toHaveText(/^24 of 24 loaded$/);
   await cutoutLoaded(page);
 }
 
@@ -216,7 +211,7 @@ for (const tint of [false, true]) {
     page,
   }) => {
     await openBarnard(page, tint);
-    await page.locator('select[title="Speed"]').selectOption('8');
+    await setFps(page, 8);
     const play = page.getByTestId('play-pause');
     await play.click();
     await expect(play).toHaveText('Pause');
@@ -242,29 +237,22 @@ for (const tint of [false, true]) {
   });
 }
 
-test('paused on the clipped frame the per-frame caption shows; playing it does not', async ({
+test('paused on the clipped frame the picture names the edge; the steady line never changes', async ({
   page,
 }) => {
   await openBarnard(page, false);
   const counter = page.getByTestId('frame-counter');
-  const caption = page.getByTestId('frame-no-data-caption');
-  const cell = page.getByTestId('no-data-caption-cell');
-  const cellBox = await box(cell);
-  await page.locator('select[title="Speed"]').selectOption('1');
+  await setFps(page, 1);
   await page.getByTestId('scrubber').fill('1');
-  await expect(counter).toHaveText('Frame 2 of 24');
+  await expect(counter).toHaveText('2 / 24');
   const play = page.getByTestId('play-pause');
   await play.click();
-  // At 1 fps frame 3 (the clipped one) shows for a second: hatched, caption hidden.
-  await expect(counter).toHaveText('Frame 3 of 24');
+  // At 1 fps frame 3 (the clipped one) shows for a second: hatched.
+  await expect(counter).toHaveText('3 / 24');
   await expect(page.getByTestId('no-data-hatch')).toHaveCount(1);
-  await expect(caption).toHaveCount(0);
   await expect(page.getByTestId('no-data-summary')).toHaveText(SUMMARY);
   await play.click();
   await expect(play).toHaveText('Play');
-  await expect(counter).toHaveText('Frame 3 of 24');
-  await expect(caption).toBeVisible();
-  await expect(caption).toHaveText(EDGE_CAPTION);
-  // Its space was reserved: nothing moved.
-  expect(await box(cell)).toEqual(cellBox);
+  await expect(counter).toHaveText('3 / 24');
+  await expect(page.getByTestId('cutout')).toHaveAttribute('alt', new RegExp(EDGE_CAPTION));
 });
