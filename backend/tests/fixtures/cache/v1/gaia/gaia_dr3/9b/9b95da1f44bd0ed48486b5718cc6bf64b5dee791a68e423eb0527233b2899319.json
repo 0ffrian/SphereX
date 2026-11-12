@@ -1,0 +1,21 @@
+{
+ "adql": "SELECT TOP 10 s.source_id, s.ra, s.dec, s.phot_g_mean_mag, a.teff_gspphot, a.teff_gspphot_lower, a.teff_gspphot_upper, a.radius_flame, a.radius_flame_lower, a.radius_flame_upper, a.lum_flame*1000000 AS lum_flame, a.lum_flame_lower*1000000 AS lum_flame_lower, a.lum_flame_upper*1000000 AS lum_flame_upper, a.mass_flame, a.mass_flame_lower, a.mass_flame_upper, a.teff_msc1, a.teff_msc1_lower, a.teff_msc1_upper FROM gaia_dr3_source AS s LEFT OUTER JOIN gaia_dr3_astrophys_param AS a ON s.source_id = a.source_id WHERE 1=CONTAINS(POINT('ICRS',s.ra,s.dec),CIRCLE('ICRS',76.95656,30.40135,0.00083)) ORDER BY s.phot_g_mean_mag, s.source_id",
+ "body_sha256": "b780ed2e11d796b9b559fa8422b6194f95fd45d93e489ebbdc045413686961ad",
+ "body_size": 448,
+ "content_type": "text/csv",
+ "fetched_at": "2026-11-12T02:13:00.921Z",
+ "key": {
+  "query": {
+   "cols": "msc1-flame3",
+   "dec": "30.40135",
+   "ra": "76.95656",
+   "radius": "0.00083",
+   "what": "astrophysical_parameters"
+  },
+  "release": "gaia_dr3",
+  "source": "gaia"
+ },
+ "status": 200,
+ "table": "gaia_dr3_source",
+ "url": "https://irsa.ipac.caltech.edu/TAP/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=SELECT+TOP+10+s.source_id%2C+s.ra%2C+s.dec%2C+s.phot_g_mean_mag%2C+a.teff_gspphot%2C+a.teff_gspphot_lower%2C+a.teff_gspphot_upper%2C+a.radius_flame%2C+a.radius_flame_lower%2C+a.radius_flame_upper%2C+a.lum_flame%2A1000000+AS+lum_flame%2C+a.lum_flame_lower%2A1000000+AS+lum_flame_lower%2C+a.lum_flame_upper%2A1000000+AS+lum_flame_upper%2C+a.mass_flame%2C+a.mass_flame_lower%2C+a.mass_flame_upper%2C+a.teff_msc1%2C+a.teff_msc1_lower%2C+a.teff_msc1_upper+FROM+gaia_dr3_source+AS+s+LEFT+OUTER+JOIN+gaia_dr3_astrophys_param+AS+a+ON+s.source_id+%3D+a.source_id+WHERE+1%3DCONTAINS%28POINT%28%27ICRS%27%2Cs.ra%2Cs.dec%29%2CCIRCLE%28%27ICRS%27%2C76.95656%2C30.40135%2C0.00083%29%29+ORDER+BY+s.phot_g_mean_mag%2C+s.source_id"
+}

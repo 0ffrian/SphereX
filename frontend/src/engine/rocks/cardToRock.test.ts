@@ -137,6 +137,25 @@ describe('review fixes (#71)', () => {
     if ('refused' in eros) throw new Error('refused');
     expect(eros.preset.seed).toBe(29);
   });
+  it('a card body gets a vec3 offset and its full seed hash; the artifact bodies do not (#93 2.8)', () => {
+    const a = cardToRock(card({ diameter_km: tv(2) }), { seed: 1 });
+    const b = cardToRock(card({ diameter_km: tv(2) }), { seed: 2 });
+    if ('refused' in a || 'refused' in b) throw new Error('refused');
+    expect(a.preset.seed3).toHaveLength(3);
+    expect(a.preset.seed3).not.toEqual(b.preset.seed3);
+    expect(a.preset.seedHash).not.toBe(b.preset.seedHash);
+    // 40 bodies: no two share a crater layout (the old seed * 31 + 7 had about 3,000)
+    const hs = new Set<number>();
+    for (let s = 0; s < 40; s++) {
+      const r = cardToRock(card({ diameter_km: tv(2) }), { seed: s });
+      if (!('refused' in r)) hs.add(r.preset.seedHash!);
+    }
+    expect(hs.size).toBe(40);
+    const eros = cardToRock(card({ id: 'sbdb-20000433', diameter_km: tv(16.8) }), { seed: 9 });
+    if ('refused' in eros) throw new Error('refused');
+    expect(eros.preset.seed3).toBeUndefined();
+    expect(eros.preset.seedHash).toBeUndefined();
+  });
   it('tags the lighting model artistic', () => {
     const r = cardToRock(card({ diameter_km: tv(2) }), { seed: 1 });
     if ('refused' in r) throw new Error('refused');

@@ -20,6 +20,9 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
 
   beforeEach(() => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    // Issue #93 C7: a focus counts as the user's only within USER_FOCUS_WINDOW_MS of the key before it. Under load the
+    // gap between the Tab keydown and focus() could exceed it and the list stayed shut: the clock stands still here.
+    vi.spyOn(performance, 'now').mockReturnValue(1_000);
     skySearch = vi.fn(() => Promise.resolve());
     useAppStore.setState({ skySearch } as never);
     host = document.createElement('div');
@@ -31,6 +34,7 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
   afterEach(() => {
     act(() => root.unmount());
     host.remove();
+    vi.restoreAllMocks();
   });
 
   const input = () => host.querySelector<HTMLInputElement>('[data-testid="search-input"]')!;
