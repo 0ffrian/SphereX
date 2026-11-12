@@ -129,7 +129,7 @@ describe('API client (D-16)', () => {
     expect(err.timeoutMs).toBe(1000);
   });
 
-  it('gives resolve, card and render-params the quick timeout, frames the long one (#102)', async () => {
+  it('gives resolve the quick timeout; card, render-params and frames keep the long one (#102)', async () => {
     vi.useFakeTimers();
     const fetchImpl = ((_input: RequestInfo | URL, init?: RequestInit) =>
       new Promise((_resolve, reject) => {
@@ -137,7 +137,7 @@ describe('API client (D-16)', () => {
           reject(new DOMException('aborted', 'AbortError')),
         );
       })) as typeof fetch;
-    // The defaults: 25 s for the quick requests, 90 s for the rest.
+    // The defaults: 25 s for resolve, 90 s for the rest.
     const api = createApiClient({ fetchImpl });
     const settled = new Set<string>();
     const track = (name: string, p: Promise<unknown>) =>
@@ -145,21 +145,20 @@ describe('API client (D-16)', () => {
         settled.add(name);
         return e;
       });
-    const quick = [
-      track('resolve', api.resolve('x')),
+    const resolve = track('resolve', api.resolve('x'));
+    // Offline, /card waits for the object's job with no limit of its own (Q-111 (2)).
+    const slow = [
       track('card', api.card('x')),
       track('renderParams', api.renderParams('x')),
+      track('frames', api.frames('x')),
     ];
-    const frames = track('frames', api.frames('x'));
     await vi.advanceTimersByTimeAsync(25_001);
-    expect([...settled].sort()).toEqual(['card', 'renderParams', 'resolve']);
-    for (const p of quick) {
-      const err = (await p) as ApiError;
-      expect(err.kind).toBe('timeout');
-      expect(err.timeoutMs).toBe(25_000);
-    }
+    expect([...settled]).toEqual(['resolve']);
+    const quickErr = (await resolve) as ApiError;
+    expect(quickErr.kind).toBe('timeout');
+    expect(quickErr.timeoutMs).toBe(25_000);
     await vi.advanceTimersByTimeAsync(90_000 - 25_001);
-    expect(((await frames) as ApiError).timeoutMs).toBe(90_000);
+    for (const p of slow) expect(((await p) as ApiError).timeoutMs).toBe(90_000);
   });
 
   it('reports a caller abort as aborted, not as an error to show', async () => {

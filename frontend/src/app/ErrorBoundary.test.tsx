@@ -1,7 +1,8 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ErrorBoundary } from './ErrorBoundary';
+import { ApiError } from './api/errors';
+import { ErrorBoundary, installGlobalErrorLogging } from './ErrorBoundary';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -69,7 +70,7 @@ describe('ErrorBoundary (#102)', () => {
     expect(onReload).toHaveBeenCalledOnce();
   });
 
-  it('a new resetKey clears the fallback; the same key keeps it', () => {
+  it('a changed reset key clears the fallback; equal keys keep it', () => {
     let fail = true;
     function Maybe() {
       if (fail) throw new Error('test: forced render throw');
@@ -78,7 +79,7 @@ describe('ErrorBoundary (#102)', () => {
     const at = (key: string) =>
       act(() =>
         root.render(
-          <ErrorBoundary area="This panel" resetKey={key}>
+          <ErrorBoundary area="This panel" resetKeys={[key, 'kind']}>
             <Maybe />
           </ErrorBoundary>,
         ),
@@ -102,5 +103,31 @@ describe('ErrorBoundary (#102)', () => {
       ),
     );
     expect(host.innerHTML).toBe('<p data-testid="ok">ok</p>');
+  });
+});
+
+describe('installGlobalErrorLogging (#102)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const reject = (reason: unknown) =>
+    window.dispatchEvent(Object.assign(new Event('unhandledrejection'), { reason }));
+
+  it('logs unhandled rejections and uncaught errors, but not a request cancelled on purpose', () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    installGlobalErrorLogging();
+    installGlobalErrorLogging(); // a second call adds no second listener
+
+    reject(new ApiError('aborted', 'Replaced by a newer request.'));
+    reject(new DOMException('aborted', 'AbortError'));
+    expect(log).not.toHaveBeenCalled();
+
+    const boom = new Error('test: unhandled');
+    reject(boom);
+    expect(log).toHaveBeenCalledOnce();
+    expect(log).toHaveBeenCalledWith('[sx] unhandled promise rejection:', boom);
+
+    window.dispatchEvent(new ErrorEvent('error', { error: boom, message: boom.message }));
+    expect(log).toHaveBeenCalledTimes(2);
+    expect(log).toHaveBeenLastCalledWith('[sx] uncaught error:', boom);
   });
 });

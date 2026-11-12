@@ -83,7 +83,7 @@ export interface ApiClientOptions {
   baseUrl?: string;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
-  /** Timeout of `resolve`, `card` and `render-params` (issue #102). Defaults to API_QUICK_TIMEOUT_MS. */
+  /** Timeout of `resolve` (issue #102, Q-451). Defaults to API_QUICK_TIMEOUT_MS. */
   quickTimeoutMs?: number;
   /** Turns the combine PNG into a URL for <img>. Defaults to URL.createObjectURL. */
   createObjectUrl?: (blob: Blob) => string;
@@ -209,7 +209,8 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const objectPath = (id: string) => `/objects/${encodeURIComponent(id)}`;
 
   return {
-    // Issue #102: the requests a person waits on use the quick timeout; the rest keep the long one.
+    // Issue #102 (Q-451): only resolve uses the quick timeout. Offline, `/card` waits for the
+    // object's job with no limit of its own (Q-111 (2), A4.10), so it keeps the long one.
     resolve: (q, signal) =>
       getJson(`/resolve?q=${encodeURIComponent(q)}`, parseResolve, signal, quickTimeoutMs),
     frames: (id, signal) => getJson(`${objectPath(id)}/frames`, parseFrames, signal),
@@ -217,10 +218,9 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     skyIndex: (signal) => getJson('/sky/index.json', parseSkyIndex, signal),
     skyCached: (signal) => getJson('/sky/cached', parseSkyCached, signal),
     composite: (id, signal) => getJson(`${objectPath(id)}/composite`, parseComposite, signal),
-    card: (id, signal) =>
-      getJson(`${objectPath(id)}/card`, parseObjectCard, signal, quickTimeoutMs),
+    card: (id, signal) => getJson(`${objectPath(id)}/card`, parseObjectCard, signal),
     renderParams: (id, signal) =>
-      getJson(`${objectPath(id)}/render-params`, parseRenderParams, signal, quickTimeoutMs),
+      getJson(`${objectPath(id)}/render-params`, parseRenderParams, signal),
     getOverlays: (id, signal) => getJson(`${objectPath(id)}/overlays`, parseOverlays, signal),
     getCombine: (id, op, a, b, signal) => {
       const query = new URLSearchParams({ op, a, b }).toString();

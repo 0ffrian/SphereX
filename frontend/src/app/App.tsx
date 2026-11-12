@@ -105,7 +105,8 @@ export function App() {
   const phone = usePhoneWidth();
   const skyHidden = split && phone;
   // Issue #102: a new search clears a part that failed, so the demo goes on without a reload.
-  const resetKey = useAppStore((s) => s.sky.query);
+  const query = useAppStore((s) => s.sky.query);
+  const resetKeys = [query];
   return (
     <SoundProvider>
       <FlipbookSessionProvider>
@@ -115,23 +116,29 @@ export function App() {
               {/* The page heading stays for assistive technology; the brand is not drawn (Q-124). */}
               <h1 className="sr-only">Shift &amp; Spectrum</h1>
               <FixtureBanner />
-              <Readout />
+              <ErrorBoundary
+                area="The sky position"
+                resetKeys={resetKeys}
+                className="absolute top-4 right-4 z-30"
+              >
+                <Readout />
+              </ErrorBoundary>
             </header>
             <main className="sx-view" aria-label="Sky view" data-split={split || undefined}>
               {/* Issue #102: each part fails on its own; a throw in one leaves the others usable. */}
               <div className="sx-sky-slot" inert={skyHidden || undefined}>
-                <ErrorBoundary area="The sky view" resetKey={resetKey} className="m-4">
+                <ErrorBoundary area="The sky view" resetKeys={resetKeys} className="m-4">
                   <SkyPane>
                     <ErrorBoundary
                       area="The object card"
-                      resetKey={resetKey}
+                      resetKeys={resetKeys}
                       className="relative z-10 m-4"
                     >
                       <SelectedCard />
                     </ErrorBoundary>
                     <ErrorBoundary
                       area="This panel"
-                      resetKey={resetKey}
+                      resetKeys={resetKeys}
                       className="relative z-10 m-4"
                     >
                       <Panels />
@@ -142,7 +149,7 @@ export function App() {
               {split && (
                 <ErrorBoundary
                   area="The build pane"
-                  resetKey={resetKey}
+                  resetKeys={resetKeys}
                   className="relative z-10 m-4"
                 >
                   <BuildPane />
@@ -152,16 +159,41 @@ export function App() {
             {/* Mock-up floating layout: the dock (tools, then the search) bottom centre and the zoom
                 card bottom left, over the full-bleed sky; the player is top left, the readout top
                 right (the header) and the island bottom right. */}
-            <SkyDock />
+            {/* Issue #102: the floating parts fail on their own too; a fallback sits in their corner. */}
+            <ErrorBoundary
+              area="The search and tools"
+              resetKeys={resetKeys}
+              className="absolute bottom-4 left-1/2 z-30 -translate-x-1/2"
+            >
+              <SkyDock />
+            </ErrorBoundary>
             <div className="sx-zoom-slot" inert={split || undefined}>
-              <SkyZoom />
+              <ErrorBoundary
+                area="The zoom control"
+                resetKeys={resetKeys}
+                className="absolute bottom-4 left-4 z-30"
+              >
+                <SkyZoom />
+              </ErrorBoundary>
             </div>
             {/* The flipbook transport belongs to the flipbook: it steps aside in the split view. */}
             <div className="sx-transport-slot" inert={split || undefined}>
-              <Transport />
+              <ErrorBoundary
+                area="The frame player"
+                resetKeys={resetKeys}
+                className="absolute top-4 left-4 z-30"
+              >
+                <Transport />
+              </ErrorBoundary>
             </div>
             {/* Issue #66 (mock-up `.island-wrap`): the island, over everything in the bezel. */}
-            <Island />
+            <ErrorBoundary
+              area="The status island"
+              resetKeys={resetKeys}
+              className="absolute right-4 bottom-4 z-40"
+            >
+              <Island />
+            </ErrorBoundary>
           </div>
           <LiveAnnouncer />
         </div>
