@@ -2,6 +2,8 @@
 
 > **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8, R8.1–R8.3 · **Implements:** [D-08, D-09, D-12](../../decisions/haptics-design.md), [D-10, Q-133](../../decisions/haptics-sound.md), [D-21](../../decisions/contract-tags.md), [Q-359](../../decisions/physics-fixes.md), [Q-132](../../decisions/platform-hosting.md), [Q-71](../../decisions/haptics-built.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8), [audio-pairing.md](audio-pairing.md) (R8.9)
 
+> **D-39 (12 Nov 2026), haptics cut:** the vibration parts are cut: R8.1's Android and vibration platforms, R8.2's touch channel and R8.3's vibration patterns, levels and calibration. **Still live, as sound rules:** R8.2's honesty rule for sounds, and R8.3's rate cap (at most 40 events per second, dropped and never queued), the 25 ms minimum interval and the 250 ms train windows, which the sound engine (`frontend/src/sound/engine.ts`) applies to the audio voices. See [D-39](../../decisions/sound-ambience.md).
+
 ## R8. Haptics
 
 "Haptics" here means every touch and sound cue that encodes a surface or a value. At the event they are heard, not felt (Q-132): the engine plays through the audio driver only.

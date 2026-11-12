@@ -4,7 +4,7 @@
 
 ## R12. Open items [verify]
 
-Every **[verify]** marker in the rendering spec has one row here. Numbers 1–18 never change, because code cites "R12 #n"; new items are appended. **When:** "event" items are checked on the A15 before 14 Nov; "after" items wait for phones and vibration (Q-132). Owners follow D-17: Moon for the viewer, Kevin for card values, Atish for the baker, classify and haptics and sound. A constant still marked [verify] may be used only under the Q-110 policy (proposed; upheld by Atish in Q-119): at tier 4 or 5, or at tier 3 once checked against a cited source.
+Every **[verify]** marker in the rendering spec has one row here. Numbers 1–18 never change, because code cites "R12 #n"; new items are appended. **When:** "event" items are checked on the A15 before 14 Nov; "after" items wait for phones and vibration (Q-132). Owners follow D-17: Moon for the viewer, Kevin for card values, Atish for the baker, classify and sound (haptics cut, D-39). Rows 7, 8 and 9 are moot after D-39. A constant still marked [verify] may be used only under the Q-110 policy (proposed; upheld by Atish in Q-119): at tier 4 or 5, or at tier 3 once checked against a cited source.
 
 | # | Item | Fragment | Owner | When | Resolved by |
 |---|---|---|---|---|---|
@@ -68,5 +68,16 @@ Every **[verify]** marker in the rendering spec has one row here. Numbers 1–18
 | 58 | At a reduced render scale the fly view's `uScale` pixel footprint may shimmer while moving (#93 B9; Q-340). **Done** (Q-384): the footprint follows the eased real pixel (`uScale = scale / W.fp93`) and the scaler steps at most once a second down and once every 3 s up | R5.9.1 | Atish | done | built on `fix/93-engines` (5a82001) |
 | 59 | A15 measurement of the #93 performance waves (Q-381 to Q-386): star and rock compile blocks, the rock bake (about 60 MB per canvas, needs `EXT_color_buffer_float`), the fly view moving and still and its G-buffer (about 26 MB), the reopen time, the shared simulation's forming time, the 60 Hz host caps, the 75 % TAAU scene (`TAAU_RENDER_SCALE`, a display choice) and dynamic resolution; all numbers so far are from the RTX 4060 Ti desktop | R5.9.1, R5.5, R5.7 | Atish (A15) | event (before 14 Nov) | one run of the bench pages and R11.3 on the A15 |
 | 60 | The three.js star close-up (`StillStarCache`, the direct `CanvasTarget` paint of the close-up pane) is checked only on WebGL2, not on WebGPU (#93 wave 1, Q-381, Q-383) | R7.5, R5.9.1 | Atish | event | a pixel check on WebGPU (`tsl-star.html?what=still`) |
+| 61 | Liquids table: methane, N₂, CO₂ and ammonia-water densities and surface tensions (NIST); basalt density | R13.3 | Atish | event | NIST tables |
+| 62 | γ for water vapour and H₂/He at 100–170 K; H₂/He transport properties | R13.3 | Atish | event | cited tables |
+| 63 | CO₂ absorption between Mars and Venus (Gillier et al. 2024 table; Petculescu 2016) | R13.3 | Atish | event | the two papers |
+| 64 | Wave threshold over water; viscosity scaling of `U_wave` | R13.5 | Atish | event | a cited source |
+| 65 | Gust factors and integral time; hill speed-up (Jackson & Hunt 1975) | R13.4 | Atish | event | the papers |
+| 66 | Bolin & Åbom surf spectrum shape (paywalled) | R13.5 | Atish | event | the paper |
+| 67 | Mars saltation cohesion factor | R13.5 | Atish | event | a cited source |
+| 68 | Nystuen rain-rate coefficients (if used for finer rain levels); Titan raindrop size spread 4.75 to 6.6 mm (Appendix D R3) | R13.5 | Atish | event | the papers |
+| 69 | Whether `hM` (lava sea height) is reachable from the `WorldEngine` wrapper | R13.4 | Atish | event | reading the engine |
+| 70 | Bake time and memory on the A15 (measured) | R13.7 | Atish | event | a timing log on the A15 |
+| 71 | Harmonic branch (+18 dB drive, tanh(3x), −12 dB mix) heard through the A15 speakers and the venue PA; the 35 Hz ambience high-pass and the −3 dB limiter by ear | R13.9 | Atish | event | a listening check with `sound-check.html` (#116) |
 
 **Removed (resolved):** the "name [verify]" markers on `viewer/renderers/ShaderBody.ts` and `viewer/fields/fieldWorker.ts` (both files exist), and the self-signed certificate step for phones (moot for the event, Q-132; R11.3 keeps the phone procedure for after the event).
