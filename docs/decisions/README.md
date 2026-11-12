@@ -40,7 +40,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [exoplanet-looks.md](exoplanet-looks.md) | the climate scenarios and locked-planet temperature map, starlight colour, scenario looks and presets, and the exoplanet mould steps | 0 D, 5 Q, 15 KB |
 | [catalogue-values.md](catalogue-values.md) | name resolution for the demo exoplanets, star Teff, radius and Mira periods, the literature registry, binary brown dwarf components, the issue #68 backend fixes and the slope unit, Gaia MSC (Q-220), Procyon's radius (Q-336), the issue #93 literature rows, SOHO/SWAN reference and cache keys (Q-364 to Q-366) | 0 D, 11 Q, 19 KB |
 | [demo-pack.md](demo-pack.md) | the demo search list and aliases, the 67P and Bennu shape products, the WRL reader, and the pre-built demo pack, with the catalogue-gap rule (Q-369) | 0 D, 7 Q, 21 KB (over the target) |
-| [sound-ambience.md](sound-ambience.md) | the haptics cut and the move to `frontend/src/sound/` (D-39), pitch polarity (Q-430), the flyover soundscape, weather, buses and stage audibility, the spectrum chord (Q-431 to Q-448) | 1 D, 19 Q, 18 KB |
+| [sound-ambience.md](sound-ambience.md) | the haptics cut and the move to `frontend/src/sound/` (D-39), pitch polarity (Q-430), the flyover soundscape, weather, buses and stage audibility, the spectrum chord and the weather overlay (Q-431 to Q-449) | 1 D, 20 Q, 20 KB |
 
 Agenda of the 11 Nov 2026 decision session: [session-2026-11-11.md](session-2026-11-11.md). It holds no entries and is removed once the outcomes are recorded.
 
@@ -465,6 +465,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-446 | Spectrum chord as built (amends Q-443, Q-416): the Hear it sweep on `pitch.ts`, Smooth = running median, empty bins silent, tutorial cut, one normalisation (#115) | Decided (as built) | [sound-ambience](sound-ambience.md) |
 | Q-447 | Ceiling caption gains the height to fly below, N = H ln(P0 / P_FLOOR) (#116 code review) | Decided | [sound-ambience](sound-ambience.md) |
 | Q-448 | Ambience integration as built (#116): fades, groups, weatherBus, chip, sound-check | Decided (as built; contract amendment 4 proposed) | [sound-ambience](sound-ambience.md) |
+| Q-449 | Weather overlay as built: strokes, glow spacing, small area, drawn deck (#117) | Decided (as built); parts open | [sound-ambience](sound-ambience.md) |
 | Q-450 | Build header: Accuracy, Ambience, Explore, Details; Hear it opens from Details; Explore springs | Proposed (Atish to confirm the Hear it part) | [shell-surfaces](shell-surfaces.md) |
 | Q-452 | Frame-rate menu after the player; simpler sky info popover | Decided (Moon) | [shell-surfaces](shell-surfaces.md) |
 | Q-453 | One clock for the build strip; chips leave with a staggered spring | Decided (Moon) | [shell-surfaces](shell-surfaces.md) |
