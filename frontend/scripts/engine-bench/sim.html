@@ -1,0 +1,210 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Engine bench: world simulation (main thread, shared, worker)</title>
+<!--
+  Issue #93 F4, 1.9, 1.10 (PR #101 render-performance findings 3, 4, 12): the world engine's simulation as the app
+  hosts it. A globe engine forms a world; then a fly engine opens on it (as the close-up does) and both run together.
+  Each variant in `runs` (comma separated) is measured in turn, in the same page and browser session:
+    ref     the engine of an older commit, from /.bench-ref/worlds-base/ (each view runs its own simulation)
+    own     this engine, each view running its own simulation (the old hosting, with the F4 budget fix)
+    shared  this engine, one simulation on the main thread for both views (1.9)
+    worker  this engine, one simulation in a Web Worker for both views (1.10)
+  Reported per variant (ms): globe_setPreset and fly_setPreset (the load itself: terrain from the cache, model, the
+  first climate step; one task, not in the phases), globe_formed (setPreset to spin-up done), fly_ready (fly engine created to shaders
+  linked), fly_formed_after_ready (shaders linked to the fly view formed, the globe formed already), and for the
+  phases forming, globe (formed, playing) and both (globe and fly playing): the longest main-thread task (the longest
+  frame callback, simulation reply handler or Long Task entry), the 95th percentile frame callback, the frame rate,
+  and the simulation tick on the main thread (W.gl.tick of each engine, or of the shared host; 0 in a worker).
+  Query: id (preset, t1f), runs (default ref,own,shared,worker), play (s per phase, 3), w, h (globe CSS size).
+  A first, discarded run of the fly engine warms the shader cache, so every variant compiles warm.
+-->
+<body style="margin: 0; background: #000">
+  <script type="module">
+    const out = { runs: {} };
+    window.__out = out;
+    const Q = new URLSearchParams(location.search);
+    const id = Q.get('id') || 't1f';
+    const runs = (Q.get('runs') || 'ref,own,shared,worker').split(',');
+    const playS = +(Q.get('play') || 3);
+    const Wd = +(Q.get('w') || 900),
+      Hd = +(Q.get('h') || 600);
+    const raf = () => new Promise((r) => requestAnimationFrame(r));
+    const r1 = (x) => +x.toFixed(1);
+
+    const long = [];
+    try {
+      new PerformanceObserver((l) => {
+        for (const e of l.getEntries()) long.push([e.startTime, e.duration]);
+      }).observe({ type: 'longtask', buffered: false });
+    } catch {
+      /* no Long Tasks API */
+    }
+
+    function canvas(w, h) {
+      const c = document.createElement('canvas');
+      c.style.cssText = `width:${w}px;height:${h}px;display:block`;
+      document.body.appendChild(c);
+      return c;
+    }
+
+    /** A phase recorder: frame callbacks, frame intervals, extra tasks, simulation tick time. */
+    function phase() {
+      return { cb: [], gaps: [], tasks: [], sim: [], t0: performance.now(), last: 0 };
+    }
+    function summary(p) {
+      const t1 = performance.now();
+      const lt = long.filter(([s]) => s >= p.t0 && s <= t1).map(([, d]) => d);
+      const cb = p.cb.slice().sort((a, b) => a - b);
+      const sim = p.sim.slice().sort((a, b) => a - b);
+      const pct = (a, q) => (a.length ? a[Math.min(a.length - 1, Math.floor(q * a.length))] : 0);
+      return {
+        longest_task: r1(Math.max(0, ...p.cb, ...p.tasks, ...lt)),
+        frame_cb_p95: r1(pct(cb, 0.95)),
+        frame_cb_p50: r1(pct(cb, 0.5)),
+        longtasks_over_50: lt.length,
+        fps: r1((p.gaps.length * 1000) / Math.max(1, t1 - p.t0)),
+        sim_tick_p50: r1(pct(sim, 0.5)),
+        sim_tick_p95: r1(pct(sim, 0.95)),
+        sim_tick_max: r1(sim.length ? sim[sim.length - 1] : 0),
+      };
+    }
+
+    async function variant(name, warmOnly) {
+      const ref = name === 'ref';
+      const base = ref ? '/.bench-ref/worlds-base/' : '/src/engine/worlds/';
+      const { WorldEngine, WORLD_PRESETS } = await import(base + 'WorldEngine.ts');
+      const S = ref ? null : await import('/src/engine/worlds/simSource.ts');
+      const mode = ref ? 'own' : name;
+      const preset = WORLD_PRESETS.find((q) => q.id === id);
+      const res = {};
+      let cur = null; // the phase being recorded
+      const timeTicks = (e) => {
+        // W.gl.tick of an engine that runs its own simulation.
+        const gl = e.core.W.gl,
+          f = gl.tick;
+        gl.tick = function (...a) {
+          const t = performance.now();
+          const r = f.apply(gl, a);
+          if (cur) cur.sim.push(performance.now() - t);
+          return r;
+        };
+      };
+      const timeSource = (src) => {
+        if (!src) return;
+        if (src.host) {
+          const gl = src.host.core.W.gl,
+            f = gl.tick;
+          gl.tick = function (...a) {
+            const t = performance.now();
+            const r = f.apply(gl, a);
+            if (cur) cur.sim.push(performance.now() - t);
+            return r;
+          };
+        }
+        if (src.receive) {
+          const f = src.receive.bind(src);
+          src.receive = (m) => {
+            const t = performance.now();
+            f(m);
+            if (cur) cur.tasks.push(performance.now() - t);
+          };
+        }
+      };
+
+      // ---- globe ----
+      const gc = canvas(Wd, Hd);
+      const g = new WorldEngine(gc, { role: 'globe' });
+      await g.whenReady();
+      g.playing = false;
+      const t0 = performance.now();
+      const ts = performance.now();
+      g.setPreset(preset);
+      res.globe_setPreset = r1(performance.now() - ts);
+      cur = phase();
+      let src = null;
+      if (S && mode !== 'own') {
+        const tc = performance.now();
+        src = S.simSourceFor(mode, preset, {}, g, null);
+        g.followSim(src);
+        res.source_create = r1(performance.now() - tc);
+        cur.tasks.push(res.source_create);
+        timeSource(src);
+      } else timeTicks(g);
+      let last = performance.now();
+      const frame = (views) => {
+        const now = performance.now();
+        const t = now;
+        for (const v of views) v.tick((now - last) / 1000);
+        last = now;
+        const d = performance.now() - t;
+        cur.cb.push(d);
+        cur.gaps.push(now);
+      };
+      while (g.spinup > 0 && performance.now() - t0 < 120000) {
+        await raf();
+        frame([g]);
+      }
+      res.globe_formed = r1(performance.now() - t0);
+      res.forming = summary(cur);
+      g.playing = true;
+      cur = phase();
+      const tg = performance.now();
+      while (performance.now() - tg < playS * 1000) {
+        await raf();
+        frame([g]);
+      }
+      res.globe = summary(cur);
+
+      // ---- fly, opened on the formed globe ----
+      const fc = canvas(Math.round(Wd / 0.6), Hd);
+      const tf = performance.now();
+      const f = new WorldEngine(fc, { role: 'fly' });
+      await f.whenReady();
+      res.fly_ready = r1(performance.now() - tf);
+      if (warmOnly) {
+        f.dispose();
+        g.dispose();
+        fc.remove();
+        gc.remove();
+        return null;
+      }
+      const tr = performance.now();
+      f.setPreset(preset);
+      res.fly_setPreset = r1(performance.now() - tr);
+      f.playing = false;
+      cur = phase();
+      if (src) f.followSim(g.simSource);
+      else timeTicks(f);
+      while (f.spinup > 0 && performance.now() - tr < 120000) {
+        await raf();
+        frame([g, f]);
+      }
+      res.fly_formed_after_ready = r1(performance.now() - tr);
+      res.fly_forming = summary(cur);
+      f.syncSpin(g);
+      f.setFly(true);
+      f.playing = true;
+      cur = phase();
+      const tb = performance.now();
+      while (performance.now() - tb < playS * 1000) {
+        await raf();
+        frame([g, f]);
+      }
+      res.both = summary(cur);
+      cur = null;
+      f.dispose();
+      g.dispose();
+      fc.remove();
+      gc.remove();
+      return res;
+    }
+
+    try {
+      await variant('own', true);
+      for (const [i, name] of runs.entries()) out.runs[i + ':' + name] = await variant(name, false);
+    } catch (e) {
+      out.err = String(e && e.stack ? e.stack : e);
+    }
+    out.done = true;
+  </script>
+</body>

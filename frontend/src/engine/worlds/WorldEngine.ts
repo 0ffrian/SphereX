@@ -9,6 +9,10 @@
 import { createCore, type Core, type CoreGL } from './core.js';
 import { WP, FLUIDS } from './presets.js';
 import { GlGpuTimer } from './glTimer';
+import { applyOverrides, loadPreset, resetsWorld, simKey } from './engineControls';
+import { LocalSimSource, type SimFollower, type SimSource } from './simSource';
+import { applySimOp, applySimState, resyncSim } from './simFollow';
+import type { SimOp, SimSnapshot, SimState } from './simHost';
 import type {
   EngineOptions,
   EngineOverrides,
@@ -84,8 +88,15 @@ export const DISPOSE_POLL_MS = 100;
  */
 export const DISPOSE_MAX_WAIT_MS = 180_000;
 
-export class WorldEngine {
+export class WorldEngine implements SimFollower {
   private core: Core;
+  /**
+   * Issue #93 1.9, 1.10: the simulation this engine draws when it does not run its own (null: it runs its own, as the
+   * prototype does). See simSource.ts.
+   */
+  private sim: SimSource | null = null;
+  /** This core's own climate arrays; a followed simulation's arrays replace them while it is followed. */
+  private ownEb: Record<'T' | 'rain' | 'out' | 'out2', Float32Array>;
   private canvas: HTMLCanvasElement;
   private tickN = 0;
   private isReady = false;
@@ -114,6 +125,8 @@ export class WorldEngine {
     // The same context the core made (getContext returns it again); read-only timing around tick().
     this.gpuTimer = opts.gpuTiming ? GlGpuTimer.create(canvas.getContext('webgl2')) : null;
     const W = this.core.W;
+    const EB = this.core.EB;
+    this.ownEb = { T: EB.T, rain: EB.rain, out: EB.out, out2: EB.out2 };
     this.fly = {
       get alt() {
         return W.flyAlt;
@@ -193,11 +206,9 @@ export class WorldEngine {
 
   /** Load a world: a preset object, or the id of one of the prototype's example presets. Rebuilds terrain and spin-up. */
   setPreset(p: WorldPreset | string): void {
-    const pr = typeof p === 'string' ? WP.find((q) => q.id === p) : p;
-    if (!pr) throw new Error('unknown preset ' + String(p));
-    if (pr.ob) this.core.ORB[pr.id] = pr.ob;
-    if (pr.oceanF != null) this.core.OCEANF[pr.id] = pr.oceanF;
-    this.core.setPreset(pr);
+    this.restoreOwnEb();
+    loadPreset(this.core, p);
+    this.sim?.markStale(this);
   }
 
   /**
@@ -205,62 +216,11 @@ export class WorldEngine {
    * (as in the prototype); fluid, spin and tect rebuild the world; overlay, clouds, zoom, yaw, pitch only redraw.
    */
   setOverrides(o: EngineOverrides): void {
-    const c = this.core,
-      W = c.W;
-    let model = false,
-      reset = false;
-    if (o.Tstar != null) {
-      W.Tstar = o.Tstar;
-      model = true;
-    }
-    if (o.orbit != null) {
-      W.orbit = o.orbit;
-      model = true;
-    }
-    if (o.Ps != null) {
-      W.Ps = o.Ps;
-      model = true;
-    }
-    if (o.obl != null) {
-      W.obl = o.obl;
-      model = true;
-    }
-    if (o.ecc != null) {
-      W.ecc = o.ecc;
-      model = true;
-    }
-    if (o.co2 != null) {
-      W.co2Therm = o.co2;
-      model = true;
-    }
-    if (o.season != null) W.season = o.season;
-    if (o.overlay != null) W.overlay = o.overlay;
-    if (o.clouds != null) W.clouds = o.clouds;
-    if (o.zoom != null) W.zoom = o.zoom;
-    if (o.yaw != null) W.yaw = o.yaw;
-    if (o.pitch != null) W.pitch = o.pitch;
-    if (o.timeSec != null) {
-      W.timeSec = o.timeSec;
-      model = true;
-    }
-    if (o.fluid != null) {
-      W.fluid = o.fluid;
-      reset = true;
-    }
-    if (o.spin != null) {
-      W.spinMode = o.spin;
-      W.p = c.applySpin(W.base);
-      reset = true;
-    }
-    if (o.tect != null) {
-      W.tect = o.tect;
-      reset = true;
-    }
-    if (reset) c.resetWorld();
-    else if (model) {
-      W.m = c.worldModel();
-      c.worldUi();
-    }
+    const reset = resetsWorld(o);
+    // A rebuild runs here on this core's own arrays (never on a followed simulation's), then catches up.
+    if (reset) this.restoreOwnEb();
+    applyOverrides(this.core, o);
+    if (reset) this.sim?.markStale(this);
   }
 
   /** Switch the split fly view on or off (the prototype's Fly button). Aims the camera on entry. */
@@ -380,7 +340,10 @@ export class WorldEngine {
       if (!W.playing) W.gl.draw(W.m);
     }
     if (W.playing || need) {
-      W.gl.tick(W.m, W.playing, dt);
+      // Issue #93 1.9, 1.10: a followed simulation steps once a frame for every view (the driving view runs or asks
+      // for the tick; the others replay its ops); W.spinup, the climate grids and the clouds come from it.
+      if (this.sim) this.sim.pump(this, W.playing, dt);
+      else W.gl.tick(W.m, W.playing, dt);
       if (W.playing)
         W.spin += W.m.gas ? (W.timeSec < 1000 ? dt * W.timeSec * W.m.Om : 0) : dt * 0.09;
       if (W.spinup === 0) W.gl.draw(W.m);
@@ -396,6 +359,13 @@ export class WorldEngine {
    */
   spinUp(dt = 1 / 60, virtualClock = false): void {
     const W = this.core.W;
+    if (this.sim) {
+      // Issue #93 1.9: a shared simulation on this thread spins up the same way; a worker cannot be waited for here.
+      if (!(this.sim instanceof LocalSimSource))
+        throw new Error('spinUp needs the simulation on this thread (?sim=shared or own)');
+      this.sim.spinUpSync(this, dt, virtualClock);
+      return;
+    }
     const real = performance.now.bind(performance);
     let t = 0;
     if (virtualClock) performance.now = () => (t += 1);
@@ -506,6 +476,53 @@ export class WorldEngine {
   }
 
   /**
+   * Issue #93 1.9, 1.10: draw a simulation that another source runs (one for the globe and the fly view, on this
+   * thread or in a worker) instead of running one here. Call it once the shaders are ready (whenReady), after
+   * setPreset and the controls already applied; the engine catches up at its next tick (a formed world shows formed).
+   */
+  followSim(src: SimSource): void {
+    if (this.sim === src) return;
+    if (src.key !== this.simKey())
+      throw new Error(
+        'the simulation runs another world (' + src.key + ' vs ' + this.simKey() + ')',
+      );
+    this.sim?.detach(this);
+    this.sim = src;
+    src.attach(this);
+  }
+
+  /** The simulation this engine follows, or null when it runs its own. */
+  get simSource(): SimSource | null {
+    return this.sim;
+  }
+
+  /** What this engine's simulation depends on (engineControls.simKey). */
+  simKey(): string {
+    return simKey(this.core);
+  }
+
+  /** @internal SimFollower: replay one of the simulation's GPU-side calls in this context. */
+  simApply(op: SimOp): void {
+    applySimOp(this.core, op);
+  }
+
+  /** @internal SimFollower: the simulation's state after a tick. */
+  simState(s: SimState, T: Float32Array | null, rain: Float32Array | null): void {
+    applySimState(this.core, s, T, rain);
+  }
+
+  /** @internal SimFollower: catch up with the simulation at once. */
+  simResync(snap: SimSnapshot): void {
+    resyncSim(this.core, snap);
+  }
+
+  /** Put this core's own climate arrays back (before it rebuilds a world locally, or stops following). */
+  private restoreOwnEb(): void {
+    const EB = this.core.EB;
+    Object.assign(EB, this.ownEb);
+  }
+
+  /**
    * Release the GL context. Issue #93 regression fix: `loseContext()` waits for every shader compile still running in
    * the driver, so releasing an engine whose fly shader was still compiling froze the page for about 35 s on a cold
    * ANGLE D3D11 cache (React's development double mount did this on every first open; closing the build early did it
@@ -518,6 +535,9 @@ export class WorldEngine {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    // Issue #93 1.9: the simulation stays with the other view, or is released with this, its last one.
+    this.sim?.detach(this);
+    this.sim = null;
     try {
       this.gpuTimer?.dispose();
     } catch {
