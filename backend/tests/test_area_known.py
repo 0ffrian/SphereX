@@ -75,6 +75,16 @@ def test_kind_skips_planets_and_names_comets() -> None:
     assert match.kind_of(body("MB>Inner")) == "asteroid"
 
 
+def test_the_spk_offset_is_for_numbered_asteroids_only() -> None:
+    """A comet's SPK-ID is not 20000000 + n: it is asked by its designation (PR #110 review)."""
+    ast = skybot.SkybotBody("Eros", 433, 0.0, 0.0, 10.0, "NEA>Amor")
+    comet = skybot.SkybotBody("67P", 67, 0.0, 0.0, 10.0, "Comet JFc")
+    unnumbered = skybot.SkybotBody("2024 AB1", None, 0.0, 0.0, 10.0, "MB>Inner")
+    assert match.horizons_id(ast, "asteroid") == "20000433"
+    assert match.horizons_id(comet, "comet") == "67P"
+    assert match.horizons_id(unnumbered, "asteroid") == "2024 AB1"
+
+
 # --- verdicts -----------------------------------------------------------------------------------
 
 

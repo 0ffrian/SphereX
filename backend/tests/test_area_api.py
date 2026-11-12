@@ -8,6 +8,7 @@ blocked.
 
 from __future__ import annotations
 
+import dataclasses
 import io
 import json
 import shutil
@@ -21,13 +22,16 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from app.cache.store import LiveResponse, ReadThroughCache
+from app.context import make_context
 from app.core.area import service
-from app.core.area.config import AREA_SOURCE
+from app.core.area.config import AREA_SOURCE, DEFAULT_AREA_CONFIG, area_key, method_settings
+from app.core.area.service import run_area
 from app.core.card.validate import errors
 from app.main import create_app
 from app.settings import BACKEND_DIR
 from scripts import area_discovery
 from tests import area_consistency as ac
+from tests.area_recorded import recorded_dots, recorded_frames, recorded_star_cones
 from tests.conftest import make_settings
 from tests.test_area_join import eros_dot_ids, run_recorded
 
@@ -47,7 +51,7 @@ def _client(cache: Path, **kw: Any) -> TestClient:
 
 @pytest.fixture
 def client(fixture_cache: Path) -> TestClient:
-    """Offline, the fixture cache (recorded cutouts for stamps) and the committed pack."""
+    """Offline, the fixture cache and the committed pack."""
     return _client(fixture_cache)
 
 
@@ -144,29 +148,51 @@ def test_unknown_dot_is_404_dot_not_found(client: TestClient) -> None:
     )
 
 
-def test_stamp_without_its_cutout_is_503(tmp_path: Path) -> None:
-    c = _client(tmp_path / "empty-cache")  # the pack still answers, the cutouts are not cached
+def test_stamps_are_served_offline_without_the_cutouts(tmp_path: Path) -> None:
+    """A clean machine under SX_OFFLINE=1: the pack alone answers the stamps (Q-420 (11))."""
+    c = _client(tmp_path / "empty-cache")
     dot = sorted(eros_dot_ids())[0]
-    _error(c.get(f"/v1/areas/{EROS}/stamps/{dot}.png"), 503, "stamp_unavailable")
+    r = c.get(f"/v1/areas/{EROS}/stamps/{dot}.png")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png"
 
 
-def test_an_entry_made_with_other_settings_is_not_served(tmp_path: Path) -> None:
+def test_a_dot_without_a_stored_stamp_is_503(tmp_path: Path) -> None:
     pack = tmp_path / "pack"
     shutil.copytree(PACK, pack)
     root = ReadThroughCache(pack, offline=True)
-    key = service.head_key("spherex_qr2", EROS)
-    head = json.loads(root.get(key).body)  # type: ignore[union-attr]
-    head["settings_sha"] = "0" * 64
-    root.put(key, LiveResponse(service.canonical(head), "test", 200, "application/json"))
+    head = json.loads(root.get(service.head_key("spherex_qr2", EROS)).body)  # type: ignore[union-attr]
+    key = area_key("spherex_qr2", EROS, "stamps", head["params_hash"])
+    stamps = json.loads(root.get(key).body)  # type: ignore[union-attr]
+    dot = sorted(eros_dot_ids())[0]
+    del stamps[dot]
+    root.put(key, LiveResponse(service.canonical(stamps), "test", 200, "application/json"))
     c = _client(tmp_path / "cache", area_pack_dir=pack)
-    assert c.get("/v1/areas").json()["areas"] == []
+    _error(c.get(f"/v1/areas/{EROS}/stamps/{dot}.png"), 503, "stamp_unavailable")
+
+
+def test_the_head_names_the_settings_the_run_used(fixture_cache: Path, tmp_path: Path) -> None:
+    """A run with non-default settings stores a head whose settings_sha is its own, so the API
+    never serves it as the running code's (A17.10, PR #110 review)."""
+    frames, bodies = recorded_frames()
+    cfg = dataclasses.replace(DEFAULT_AREA_CONFIG, ambiguity_ratio=0.4)
+    result = run_area(
+        make_context(make_settings(fixture_cache)), frames, bodies, recorded_dots(), cfg,
+        star_cones=recorded_star_cones(), inputs="recorded_eros_fixture",
+    )  # fmt: skip
+    pack = tmp_path / "pack"
+    root = ReadThroughCache(pack, offline=True)
+    service.store_area(root, result, service.prepare(result))
+    head = json.loads(root.get(service.head_key("spherex_qr2", EROS)).body)  # type: ignore[union-attr]
+    assert head["settings_sha"] == service.settings_sha(method_settings(cfg))
+    assert head["settings_sha"] != service.settings_sha(method_settings(DEFAULT_AREA_CONFIG))
+    c = _client(tmp_path / "cache", area_pack_dir=pack)
     _error(c.get(f"/v1/areas/{EROS}/tracks"), 404, "area_not_found")
 
 
 # --- stamps and export --------------------------------------------------------------------------
 
 
-def test_stamp_is_a_15_px_png_from_the_cached_cutout(client: TestClient) -> None:
+def test_stamp_is_a_15_px_png_from_the_cutout(client: TestClient) -> None:
     dot = sorted(eros_dot_ids())[0]
     r = client.get(f"/v1/areas/{EROS}/stamps/{dot}.png")
     assert r.status_code == 200 and r.headers["content-type"] == "image/png"
@@ -229,7 +255,7 @@ def test_two_runs_give_the_same_bytes(fixture_cache: Path, tmp_path: Path) -> No
 
 def test_the_pack_holds_every_stage_and_the_head(tmp_path: Path) -> None:
     """A17.10: ``summary``, ``known``, ``dots``, ``tracks``, ``export`` (and the internal
-    ``cutouts`` for stamps), then the head that names the params_hash."""
+    ``stamps``), then the head that names the params_hash."""
     out = tmp_path / "pack"
     assert (
         area_discovery.main(

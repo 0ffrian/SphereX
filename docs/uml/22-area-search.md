@@ -13,7 +13,7 @@ flowchart TB
     FRM["frames.py<br/>grid of small SIA cones, s_region overlap, time windows, visits, coverage"]
     DOT["dots.py<br/>mesh background, hardware flags masked, OUTLIER kept as a flag, detect, measure"]
     CLN["clean.py<br/>glitch, star, fixed per tracklet"]
-    JON["join.py<br/>tracklets, pairs, parallax-aware test, mutual best"]
+    JON["join.py<br/>tracklets, pairs, parallax-aware test, mutual best per direction"]
     MAT["match.py<br/>SkyBoT candidates, Horizons positions from SPHEREx"]
     INJ["inject.py (gated D4)<br/>planted movers in memory, test mover, completeness grid"]
     CTL["control.py (gated D5)<br/>shuffled-time runs"]
@@ -117,7 +117,7 @@ sequenceDiagram
     J-->>S: checks (planted and control results never enter tracks)
   end
   S->>C: pre-fetch Track for every Known object (or list it as skipped), not built: waits on T1
-  S->>C: write derived.area entries (summary, known, dots, tracks, export, cutouts), then the head
+  S->>C: write derived.area entries (summary, known, dots, tracks, export, stamps made from the cutouts), then the head naming the run's settings
   Note over Op,S: --recorded --pack assets/areas makes the committed Eros pack from the recorded fixtures (issue #108)
   Note over S,C: Same cache + settings give byte-identical entries (A17.10)
 ```

@@ -47,7 +47,10 @@ from app.timefmt import iso_utc_z, parse_utc
 TLIST_TOLERANCE_S = 1.0  # same as moving.TLIST_TIME_TOLERANCE_S
 SKIP_CLASSES = ("Planet", "Satellite")
 # ASSUMPTION (SPK-ID scheme of the recorded fixtures, "DES=20000433;" for 433 Eros): a numbered
-# asteroid's Horizons id is 20000000 + number; an unnumbered body is asked by its designation.
+# asteroid's Horizons id is 20000000 + number. The offset is for asteroids only: a comet's SPK-ID
+# is not 20000000 + n (67P is 1000012), so a comet, and any unnumbered body, is asked by its
+# SkyBoT designation [verify] (PR #110 review). A name Horizons does not resolve fails the call,
+# so the tracks it could match are ``unchecked``, never matched to another body.
 NUMBERED_SPK_OFFSET = 20_000_000
 
 
@@ -69,6 +72,14 @@ class Candidate:
 
 def designation_of(body: skybot.SkybotBody) -> str:
     return f"{body.number} {body.name}" if body.number is not None else body.name
+
+
+def horizons_id(body: skybot.SkybotBody, kind: str) -> str:
+    """The Horizons small-body id: ``20000000 + number`` for a numbered asteroid, else the
+    designation (comets, unnumbered bodies)."""
+    if kind == "asteroid" and body.number is not None:
+        return str(NUMBERED_SPK_OFFSET + body.number)
+    return body.name
 
 
 def kind_of(body: skybot.SkybotBody) -> str | None:
@@ -173,8 +184,9 @@ def known_candidates(
     out: list[Candidate] = []
     for name, (b, listed) in sorted(found.items()):
         kind = kind_of(b) or "asteroid"
-        hid = str(NUMBERED_SPK_OFFSET + b.number) if b.number is not None else b.name
-        out.append(Candidate(name, b.number, kind, b.v_mag, hid, tuple(sorted(listed))))
+        out.append(
+            Candidate(name, b.number, kind, b.v_mag, horizons_id(b, kind), tuple(sorted(listed)))
+        )
     return answers, out, served
 
 

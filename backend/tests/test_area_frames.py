@@ -356,14 +356,13 @@ def test_find_frames_refuses_another_release(tmp_path: Path) -> None:
 
 
 # The read side the API may import (A17.8, issue #108); everything else in app.core.area computes.
-AREA_READ_SIDE = ["app.core.area", "app.core.area.config", "app.core.area.stamps",
-                  "app.core.area.store"]  # fmt: skip
+AREA_READ_SIDE = ["app.core.area", "app.core.area.config", "app.core.area.store"]
 
 
 def test_app_api_never_imports_the_area_pipeline() -> None:
     """A16.2: no computing in a web request. The API serves ``derived.area`` entries through
-    ``store`` (and ``stamps``); no pipeline module (frames, dots, labels, join, known check,
-    service) is ever loaded by ``app.main``."""
+    ``store`` (stamps are made at prepare time and stored); no pipeline module (frames, dots,
+    labels, join, known check, service, stamps) is ever loaded by ``app.main``."""
     code = (
         "import sys, app.main; "
         "print(sorted(m for m in sys.modules if m.startswith('app.core.area')))"

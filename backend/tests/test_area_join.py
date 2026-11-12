@@ -19,6 +19,7 @@ from app.adapters import horizons
 from app.context import make_context
 from app.core.area import clean, join
 from app.core.area.config import DEFAULT_AREA_CONFIG
+from app.core.area.geometry import CellGrid
 from app.core.area.join import Leg, SkyVelocity
 from app.core.area.match import sep_px
 from app.core.area.service import AreaResult, run_area
@@ -126,6 +127,27 @@ def test_without_w_the_rate_window_alone_decides() -> None:
     assert got is not None and got[2] is None and got[4]
 
 
+def test_three_visits_chain_into_one_track() -> None:
+    """A middle visit's leg ranks its next-visit and previous-visit partners separately, so a
+    mover seen in three visits is one track of three legs (PR #110 review)."""
+    v = (0.9, -0.25)
+    legs = [_leg(k + 1, v, (v[0] * k, v[1] * k), float(k)) for k in range(3)]
+    windows = {(1, 2): (0.0034, 1.16), (2, 3): (0.0034, 1.16)}
+    got = join.link_legs(legs, windows, {}, CFG)
+    assert got.links == {0: 1, 1: 2}
+    assert got.has_candidate == {0, 1, 2}
+
+
+def test_three_visits_with_a_decoy_keep_the_true_chain() -> None:
+    """A decoy in the last visit that fits worse does not break the chain."""
+    v = (0.9, -0.25)
+    legs = [_leg(k + 1, v, (v[0] * k, v[1] * k), float(k)) for k in range(3)]
+    legs.append(_leg(3, (0.0, 0.5), (1.0, 0.2), 2.0))  # moves the other way
+    windows = {(1, 2): (0.0034, 1.16), (2, 3): (0.0034, 1.16)}
+    got = join.link_legs(legs, windows, {}, CFG)
+    assert got.links == {0: 1, 1: 2}
+
+
 # --- the Eros gate ------------------------------------------------------------------------------
 
 
@@ -179,7 +201,7 @@ def test_reachable_ring_decides_no_partner_or_one_visit(eros: AreaResult) -> Non
     frames, _ = recorded_frames()
     geo = clean.area_geometry(frames, CFG)
     cov = {c.visit: c for c in frames.coverage}
-    grid = clean.CellGrid.of(geo.box, CFG.coverage_cell_arcsec)
+    grid = CellGrid.of(geo.box, CFG.coverage_cell_arcsec)
     lg = next(t.legs[0] for t in eros.joined.tracks if t.status == "track")
     assert join._reachable(lg, 2, geo, cov, grid, 0.0034, 1.16)
     # Visit 2 lies about 0.39 deg east: a 0.1 deg/day limit cannot reach it.

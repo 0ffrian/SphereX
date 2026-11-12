@@ -5,7 +5,8 @@ area is 404 ``area_not_found``. Beyond D-16 (Q-146 (6)).
 - ``GET /v1/areas``: the index (built from the stored summaries, checked against the schema).
 - ``GET /v1/areas/{area_id}``, ``/known``, ``/dots``, ``/tracks``: the stored replies, byte for
   byte (they were checked against ``shared/schemas/area-*.schema.json`` when stored).
-- ``GET /v1/areas/{area_id}/stamps/{dot_id}.png``: 15 x 15 px from the cached cutout.
+- ``GET /v1/areas/{area_id}/stamps/{dot_id}.png``: 15 x 15 px, made from the cutout when the
+  area was prepared and stored with it (so it works offline without the cutouts).
 - ``GET /v1/areas/{area_id}/export.ecsv``: the A17.7 file.
 
 ``/checks`` is not served: D4 and D5 are cut (Q-203 gate); ``summary.missing`` says
@@ -15,17 +16,16 @@ area is 404 ``area_not_found``. Beyond D-16 (Q-146 (6)).
 
 from __future__ import annotations
 
+import base64
 import json
 from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, Path, Request
 from fastapi.responses import Response
 
-from app.api.deps import get_ctx
 from app.api.models import ErrorResponse
 from app.context import Context
 from app.core.area.config import AREA_ID
-from app.core.area.stamps import StampUnavailable, stamp_png
 from app.core.area.store import AreaStore
 from app.errors import ApiError
 
@@ -112,26 +112,17 @@ def get_stamp(
     area_id: AreaIdPath,
     dot_id: DotIdPath,
     store: Annotated[AreaStore, Depends(get_area_store)],
-    ctx: Annotated[Context, Depends(get_ctx)],
 ) -> Response:
     dots = json.loads(_stage(store, area_id, "dots"))
-    dot = next((d for v in dots["visits"] for d in v["dots"] if d["dot_id"] == dot_id), None)
-    if dot is None:
+    if not any(d["dot_id"] == dot_id for v in dots["visits"] for d in v["dots"]):
         raise ApiError(404, "dot_not_found", f"Area '{area_id}' has no dot '{dot_id}'.")
-    cutouts = json.loads(_stage(store, area_id, "cutouts"))
-    ref = cutouts.get(dot["frame_id"])
-    unavailable = ApiError(
-        503, "stamp_unavailable", f"The cutout of dot '{dot_id}' is not in the cache."
-    )
-    if ref is None:
-        raise unavailable
-    entry = ctx.cache.get_digest("irsa_cutout", ctx.settings.data_release, str(ref["key"]))
-    if entry is None or entry.meta.get("body_sha256") != ref["sha256"]:
-        raise unavailable
-    try:
-        data = stamp_png(entry.body, float(dot["x"]), float(dot["y"]))
-    except StampUnavailable as exc:
-        raise unavailable from exc
+    stamp = json.loads(_stage(store, area_id, "stamps")).get(dot_id)
+    if stamp is None:
+        raise ApiError(
+            503, "stamp_unavailable", f"The cutout of dot '{dot_id}' could not be stamped."
+        )
     return Response(
-        content=data, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"}
+        content=base64.b64decode(stamp),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
     )
