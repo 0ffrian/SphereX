@@ -548,11 +548,20 @@ function WorldGL(canvas) {
         W.dt93 = W.dt93 ? W.dt93 * 0.95 + dtw * 0.05 : dtw;
         while (W.simAcc >= GS.dt && n < 3) { GS.step(); acc += GS.dt; W.simAcc -= GS.dt; n++; }
         if (W.simAcc >= GS.dt) W.simAcc = 0;
-// @verbatim L2341-L2355
+// @verbatim L2341-L2343
         if (n) { this.uploadVel(GS.exportField()); this.gasStep(acc, false); }
       }
     } else {
-      var k = 0, st = W.spinup > 0, budget = st ? 14 : 7; while ((playing || st) && k < (st ? 40 : 4) && (performance.now() - t0 < budget || k === 0)) { ebStep(m, 1, st ? 1.4 : 0.7); k++; if (W.spinup > 0) W.spinup--; }
+// @end-verbatim
+// @deviation L2344 (#93 F4) the climate loop checked the clock only before each step, so a step (ebStep, about 5 to 6 ms)
+// that started just under the budget ran past it: W.gl.tick measured 19.4 ms against the 14 ms spin-up budget. A step
+// now starts only if the time spent so far plus the last step's duration (dk, the time between two checks) stays within
+// the budget; the first step always runs, as before. Each step is unchanged, so a spin-up ends in the same state after
+// its 900 steps, spread over more frames. The clock is still read once per check, so the parity spin-up's virtual
+// clock (1 ms a call, WorldEngine.spinUp) takes the same steps per tick as the prototype's rule.
+      var k = 0, st = W.spinup > 0, budget = st ? 14 : 7, tp = t0, tn, dk; while ((playing || st) && k < (st ? 40 : 4) && ((tn = performance.now(), dk = tn - tp, tp = tn, tn - t0 + dk <= budget) || k === 0)) { ebStep(m, 1, st ? 1.4 : 0.7); k++; if (W.spinup > 0) W.spinup--; }
+// @end-deviation
+// @verbatim L2345-L2355
       if (k) { this.uploadEb(); ebStats(m); this.cloudStep(m, W.spinup > 0 ? 0.05 : 0.012); }
       if (W.terr && W.spinup === 0 && (W.hydroDue === 0 || W.step - W.hydroDue > 400)) { W.hydro = hydroRaster(W.terr, m, W.route); this.setHydro(W.hydro); W.hydroDue = W.step;
         if (!W.aimed && !W.p.locked && W.hydro.n) { W.aimed = true; var im = W.hydro.img, sx2 = 0, sy2 = 0, sz2 = 0, sl2 = 0, x2, y2, bin = new Float32Array(24 * 12), bb2 = 0;
