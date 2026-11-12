@@ -2,7 +2,7 @@
 //
 // Every motion rate comes from `RenderParams.dynamics` and follows the tier chain of D-32:
 //   rung 1  a measured card field in the same unit (`rot_period_h` -> `spin_period_h`,
-//           `period_var_d` -> `pulsation_period_d`); it wins over every other rung (R3.4),
+//           `period_var_d` -> `pulsation_period_d`, `flare_rate_per_d` -> `flare_rate_per_d`); it wins over every other rung (R3.4),
 //   rung 2+ the backend's `dynamics` value, with the tier it carries,
 //   rung 4  a typical value for the kind of body (`MOTION_CONFIG.typical`; every entry is still
 //           [verify], so it is `null` and answers nothing),
@@ -174,10 +174,13 @@ const PROCESS_ORDER: readonly ProcessId[] = [
 ];
 
 /** The card field that holds a measured value of the same unit as a rate (R3.4: tier 1 wins). */
-const CARD_FIELD: Partial<Record<MotionKey, 'rot_period_h' | 'period_var_d'>> = {
-  spin_period_h: 'rot_period_h',
-  pulsation_period_d: 'period_var_d',
-};
+const CARD_FIELD: Partial<Record<MotionKey, 'rot_period_h' | 'period_var_d' | 'flare_rate_per_d'>> =
+  {
+    spin_period_h: 'rot_period_h',
+    pulsation_period_d: 'period_var_d',
+    // Issue #93 C: a measured flare rate from the literature registry (its band and threshold in `source`).
+    flare_rate_per_d: 'flare_rate_per_d',
+  };
 
 function validValue(key: MotionKey, v: unknown): v is number {
   if (typeof v !== 'number' || !Number.isFinite(v)) return false;

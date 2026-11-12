@@ -1,6 +1,6 @@
 # Build split view and moulding
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R5.8 · **Implements:** [Q-113, Q-120](../decisions/shell-surfaces.md), [D-21](../decisions/contract-tags.md), [Q-49](../decisions/rendering-bodies.md), [D-34](../decisions/rendering-motion.md) · **Read with:** [display-rules.md](display-rules.md) (R5.3, R5.6, R5.7), [accessibility.md](accessibility.md) (R9), [sky-shell.md](../architecture/sky-shell.md) (A21, the shell around the pane)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R5.8 · **Implements:** [Q-113, Q-120](../decisions/shell-surfaces.md), [D-21](../decisions/contract-tags.md), [Q-49](../decisions/rendering-bodies.md), [D-34](../decisions/rendering-motion.md), [Q-339](../decisions/rendering-engines-tuning.md) · **Read with:** [display-rules.md](display-rules.md) (R5.3, R5.6, R5.7), [accessibility.md](accessibility.md) (R9), [sky-shell.md](../architecture/sky-shell.md) (A21, the shell around the pane)
 
 ### R5.8 Build split view and moulding
 
@@ -20,7 +20,7 @@ These are the presentation rules of the one 3D view (Q-113, as amended by Q-120)
 
 **The moulding is a presentation of the real plan**
 
-- The moulding is never a second model. The body is planned and fully loaded first (card, params, plan, meshes, textures and the generated field, `ViewerApp.whenLoaded`) behind a loading state ("Looking up its 3D model…"). Only then do the steps play.
+- The moulding is never a second model. The body is planned and fully loaded first (card, params, plan, meshes, textures and the generated field, `ViewerApp.whenLoaded`) behind a loading state ("Looking up its 3D model…"). Only then do the steps play. When a D-37 world engine draws the body ([R5.9](engines.md#r59-prototype-engines-d-37)), the steps also wait for it: the phase is `'forming'`, the first step shows in progress, and the steps play from the start once the engine has compiled and formed the world (`onFormed`, Q-339). A failed engine ends the wait and the three.js path draws.
 - Each body type has the mock-up's steps (`viewer/mould/mouldSteps.ts`, `mouldKindOf`). A step reveals plan layers. `PlanContext.hold` holds the layers of later steps: they are not drawn and not listed in `missing`. The `tint` hold shows the colour as plain grey until its step.
 - Knobs run from their start value to 1, and value 1 is the normal render:
   - whole-body scale from 0.55 to 1, and a wireframe scaffold;

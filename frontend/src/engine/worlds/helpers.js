@@ -30,4 +30,23 @@ function compile(gl, vs, fs) {
 function unis(gl, p) { var u = {}, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS), i; for (i = 0; i < n; i++) { var a = gl.getActiveUniform(p, i), name = a.name.replace('[0]', ''); u[name] = gl.getUniformLocation(p, a.name); } return u; }
 var FULL = '#version 300 es\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0.,1.);}';
 // @end-verbatim
-export { clamp, lerp, sstep, fmt, rng, g, planck, planckRGB, LMIN, LMAX, LUT, compile, unis, FULL };
+// @deviation (#93 1.2) compile() above reads the compile and link status straight away, so the main thread waits for
+// the driver (about 60 s for FLY_FS on a cold ANGLE D3D11 cache). The engine now submits with compileStart (compile,
+// attach, link, no status read), polls compileDone (KHR_parallel_shader_compile's COMPLETION_STATUS_KHR; without the
+// extension it reports done at once, so the next step blocks as compile() did) and reads the result with compileEnd,
+// which throws the shader or link log exactly as compile() did.
+function compileStart(gl, vs, fs) {
+  var p = gl.createProgram(), sv = gl.createShader(gl.VERTEX_SHADER), sf = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(sv, vs); gl.compileShader(sv); gl.shaderSource(sf, fs); gl.compileShader(sf);
+  gl.attachShader(p, sv); gl.attachShader(p, sf); gl.linkProgram(p);
+  return { p: p, vs: sv, fs: sf };
+}
+function compileDone(gl, job, ext) { return !ext || !!gl.getProgramParameter(job.p, ext.COMPLETION_STATUS_KHR); }
+function compileEnd(gl, job) {
+  if (!gl.getProgramParameter(job.p, gl.LINK_STATUS)) {
+    var s = [job.vs, job.fs].filter(function (o) { return !gl.getShaderParameter(o, gl.COMPILE_STATUS); })[0];
+    throw new Error(s ? gl.getShaderInfoLog(s) : gl.getProgramInfoLog(job.p));
+  }
+  return job.p;
+}
+export { clamp, lerp, sstep, fmt, rng, g, planck, planckRGB, LMIN, LMAX, LUT, compile, unis, FULL, compileStart, compileDone, compileEnd };
