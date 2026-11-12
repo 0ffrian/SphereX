@@ -18,7 +18,7 @@ import {
   type ReactNode,
 } from 'react';
 import { BUILD_POP_ID, ViewerPanel, type PopId } from '@/app/ViewerPanel';
-import { CloseUpPane, closeUpButtonLabel, closeUpKindOf } from '@/app/CloseUpPane';
+import { CloseUpPane, closeUpKindOf } from '@/app/CloseUpPane';
 import { useCloseUpStore } from '@/app/closeUpStore';
 import { StatusLine } from '@/app/StatusLine';
 import { StatePill } from '@/app/island/StatePill';
@@ -231,18 +231,6 @@ export function BuildPane() {
         <Icon name="shuffle" className="size-3.5" />
         New seed
       </button>
-      {closeKind && canBuild && (
-        <button
-          type="button"
-          className="sx-btn-sm"
-          aria-pressed={!closeHidden}
-          title={closeHidden ? 'Show the close-up on the left' : 'Hide the close-up on the left'}
-          onClick={() => useCloseUpStore.getState().setHidden(!closeHidden)}
-          data-testid="build-closeup"
-        >
-          {closeUpButtonLabel(closeKind)}
-        </button>
-      )}
     </div>
   );
 
@@ -269,6 +257,8 @@ export function BuildPane() {
         data-testid="build-pane"
         data-phase={phase}
         data-shifted={shifted || undefined}
+        // No split: the body keeps the whole view after it is built (the close-up is off).
+        data-solo={closeHidden || !closeKind || undefined}
         data-pop={pop ?? undefined}
       >
         <header className="sx-bp-head">
@@ -299,25 +289,7 @@ export function BuildPane() {
                 <span>{b.label}</span>
                 {b.id === 'hear' && ambienceOn && <i className="sx-bp-live" aria-hidden="true" data-testid="hear-live" />}
               </button>
-            )).flatMap((el, i) =>
-              i === 0 && atmo.ok
-                ? [
-                    el,
-                    <button
-                      key="atmo"
-                      type="button"
-                      className="sx-bp-tool sx-bp-text"
-                      title={atmoOn ? 'Stop the atmosphere sound (M)' : 'Play the atmosphere sound'}
-                      aria-pressed={atmoOn}
-                      onClick={toggleAtmo}
-                      data-testid="build-atmosphere"
-                    >
-                      <Icon name="wind" className="size-[15px]" />
-                      <span>Atmosphere</span>
-                    </button>,
-                  ]
-                : [el],
-            )}
+            ))}
             <i className="sx-bp-sep" aria-hidden="true" />
             <button
               type="button"
@@ -365,6 +337,38 @@ export function BuildPane() {
               caption: level,
             }}
           />
+        )}
+        {/* The side bar (Moon, 12 Nov 2026): Split view (the close-up on the left) and the
+            Atmosphere sound, each a toggle. Atmosphere is local synthesis for now (Q-416); where
+            there is no atmosphere to hear it stays visible but off, and says why. */}
+        {canBuild && (
+          <div className="sx-bp-side" role="group" aria-label="View and sound">
+            {closeKind && (
+              <button
+                type="button"
+                className="sx-bp-sidebtn"
+                aria-label="Split view"
+                aria-pressed={!closeHidden}
+                title={closeHidden ? 'Split view: the close-up on the left' : 'Close the split view'}
+                onClick={() => useCloseUpStore.getState().setHidden(!closeHidden)}
+                data-testid="build-split"
+              >
+                <Icon name="split" className="size-[18px]" />
+              </button>
+            )}
+            <button
+              type="button"
+              className="sx-bp-sidebtn"
+              aria-label={atmo.ok ? 'Atmosphere sound' : `Atmosphere sound. ${atmo.line}`}
+              aria-pressed={atmoOn}
+              aria-disabled={!atmo.ok || undefined}
+              title={atmo.ok ? (atmoOn ? 'Stop the atmosphere sound (M)' : 'Play the atmosphere sound') : atmo.line}
+              onClick={toggleAtmo}
+              data-testid="build-atmosphere"
+            >
+              <Icon name="wind" className="size-[18px]" />
+            </button>
+          </div>
         )}
         <div className="sx-bp-status sr-only">
           <StatusLine />
