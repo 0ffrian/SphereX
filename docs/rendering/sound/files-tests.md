@@ -39,13 +39,13 @@ sound/settings.ts              + ambienceOn, ambienceVolume, flashesOn, readCapt
 
 1. **`air.ts`:**
    - Earth `c` within 1% of 340 m/s, `ρ` 1.2.
-   - Mars `Z` within 5% of 4.44.
+   - Mars `Z` self-consistent (`ρ·c` from the inputs): Mars-like air (600 Pa, 210 K, mu 43.3) gives Z in [3.3, 4.8]; ground-source level −20 ± 2 dB against Earth (Appendix D R5).
    - Titan α(15 kHz) within 10% of 0.014 dB/m.
    - Mars α at 4.5, 8.5 and 13 kHz inside Maurice's 95% intervals.
    - Venus α(100 Hz) and α(15 kHz) match the anchors.
    - P(z) ceiling heights (Earth about 97 km).
 2. **`airModel.ts`:**
-   - Refusals: `Ps = 0.005` → no air.
+   - Refusals: `P0 < P_FLOOR` (1 Pa) → no air; `Ps = 0.005` bar (Mars-like, lava rock vapour) has air for sound (Appendix D R6).
    - `fluid` with no liquid state → no S4–S7.
    - Each tag passes through.
 3. **`flyHeight.ts`:**
@@ -59,10 +59,10 @@ sound/settings.ts              + ambienceOn, ambienceVolume, flashesOn, readCapt
    - The cyclone profile has a calm eye and peaks at Rm.
    - The wind log law is monotone in z.
 5. **`sources.ts`:**
-   - The Re gate removes S2/S3 on a Mars-like model at 8 m/s.
+   - The Re gate per size on Mars-like air at 8 m/s: the 4 mm hiss is removed, the 6 mm tone survives with St ≈ 0.15; the refusal caption appears only when every size is gated out (Appendix D R4).
    - Roshko St at Re 100.
-   - Titan surf pitch factor 2–2.5×.
-   - Titan rain: max drop radius 4.75 mm ±20%, fall 1.6 m/s ±15%.
+   - Titan `m_f` between 2.0 and 2.7 (Appendix D R2).
+   - Titan rain: `r_max` between 4.75 mm (Lorenz 1993) and 6.6 mm (the scaling) [verify]; the fall speed is tested only for consistency with the drop size (Appendix D R3).
    - Earth rain 3.25 mm, 9.2 m/s ±10%.
 6. **`weather.ts`:**
    - The lightning rule table (every row).
@@ -178,7 +178,7 @@ sound/settings.ts              + ambienceOn, ambienceVolume, flashesOn, readCapt
 9. Whether `hM` (lava sea height) is reachable from the wrapper.
 10. Bake time and memory on the A15 (measured).
 
-The §19 items are rows 51 to 60 of [R12](../open-items.md); the harmonic branch by-ear check is row 61.
+The §19 items are rows 61 to 70 of [R12](../open-items.md); the harmonic branch by-ear check is row 71.
 
 ### Module contract (spec Appendix B)
 
@@ -306,7 +306,7 @@ export interface WorldEngineLike {
 | `useAmbience.ts` | the hook (§10, §13) |
 | `useWeather.ts` | the overlay driver (§8.5) |
 
-### Rulings R1 to R6 and contract amendments 1 to 3 (spec Appendix D; amendment 1 is in the module contract above)
+### Rulings R1 to R12 and contract amendments 1 to 3 (spec Appendix D; amendment 1 is in the module contract above)
 
 **R1. Area-source integral (§11.1).**
 - Integrate each sample's sector exactly, with a cos² surface directivity factor (cos of the angle from the vertical at the source). This replaces the plain `A_i/(4π d²)` sum.
@@ -364,3 +364,18 @@ Bearings are measured clockwise from `north` towards `east`, matching `fly.head`
 - **Liquids, rain and surf** still follow the engine's own `state`, `canLiquid` and rain fields, so an airless-by-climate world still gets no rain or surf.
 
 **What it replaces.** The §7 captions "No air here" and "The magma glows, but with almost no air…" now apply only when `P0 < P_FLOOR`.
+
+**Rulings R7–R12 (12 Nov, from the #112 code review):**
+- **R7. Liquid is local (as amended 12 Nov).** `liquid = model.canLiquid && (state==='liquid' || climate stats.liquid > 0)`. On a locked world, open water on the day side counts even when the global state is "frozen".
+- **R8. Presence before presentation.**
+  - A bed is present only if all hold: its class fraction > 0, its driver > 0, and its true level is within 40 dB of the loudest present bed.
+  - A bed that is not present is silent and never captioned.
+  - The stage window lifts present beds only.
+- **R9. Hurricane sanity.**
+  - S9 needs the engine's own "Strongest hurricane possible" condition, Ps ≥ 0.1 bar, and a finite Vmax.
+  - Vmax is clamped to ≤ 100 m/s, with a note.
+- **R10. Flow-noise presentation uses the listener's impedance.** For S1–S3, S9 and S12, the offset is computed from `Z(z)` at the listener, not the ground's.
+- **R11. Lightning on preset worlds still needs air and convection.**
+  - The `measured` tag covers only the fact that lightning is observed on that world.
+  - Strike timing and placement are `artistic`.
+- **R12. Fields not yet ready mean "waiting", not a refusal.** The state is re-evaluated every tick.

@@ -21,7 +21,7 @@ import json
 import logging
 from collections.abc import Mapping
 from concurrent.futures import Future
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -125,7 +125,7 @@ def frames_digest(fr: FramesResult, shas: dict[str, str]) -> str:
     """Stage 1's ``missing`` + every frame record + each cutout's body SHA-256."""
     doc = {
         "missing": sorted(fr.missing),
-        "frames": [{**asdict(f), "cutout_sha256": shas.get(f.frame_id, "")} for f in fr.frames],
+        "frames": [{**f.key_doc(), "cutout_sha256": shas.get(f.frame_id, "")} for f in fr.frames],
     }
     text = json.dumps(doc, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(text.encode("utf-8")).hexdigest()

@@ -13,6 +13,7 @@ import {
   AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
+  DynamicDrawUsage,
   Group,
   LineBasicNodeMaterial,
   LineSegments,
@@ -46,6 +47,21 @@ export interface StarPlasmaOptions {
   enlarged: boolean;
 }
 
+/**
+ * Issue #93 W1 (render notes 0.6): the next upload of a streak buffer carries only its first `floats` values, the part
+ * the draw range uses (`BufferAttribute.addUpdateRange`, three r187: both the WebGPU and the WebGL2 backends write just
+ * that range). The buffers are sized for the whole budget (60,000 streaks, 2 x 1.44 MB) while a frame uses a few
+ * thousand, so this cuts the per-frame upload from about 2.9 MB to what is drawn. With nothing drawn there is no upload:
+ * the draw range is empty, so the stale contents are never read.
+ */
+export function uploadUsed(attr: BufferAttribute, floats: number): void {
+  attr.clearUpdateRanges();
+  const n = Math.min(Math.max(0, Math.floor(floats)), attr.array.length);
+  if (n === 0) return;
+  attr.addUpdateRange(0, n);
+  attr.needsUpdate = true;
+}
+
 export class StarPlasma {
   readonly group = new Group();
   private readonly ctx: ScheduleContext;
@@ -70,8 +86,8 @@ export class StarPlasma {
       ratePerDisplayS: o.ratePerDisplayS,
     };
     this.sink = new StreakSink(STREAK_BUDGET.high);
-    this.pos = new BufferAttribute(this.sink.pos, 3);
-    this.col = new BufferAttribute(this.sink.col, 3);
+    this.pos = new BufferAttribute(this.sink.pos, 3).setUsage(DynamicDrawUsage);
+    this.col = new BufferAttribute(this.sink.col, 3).setUsage(DynamicDrawUsage);
     this.geometry.setAttribute('position', this.pos);
     this.geometry.setAttribute('color', this.col);
     this.material = new LineBasicNodeMaterial({
@@ -165,8 +181,8 @@ export class StarPlasma {
       if (g) emitEvent(sink, g, e, e.m < 0 ? tDisplay : t, opts);
     }
     this.lastEvents = events;
-    this.pos.needsUpdate = true;
-    this.col.needsUpdate = true;
+    uploadUsed(this.pos, sink.n * 6);
+    uploadUsed(this.col, sink.n * 6);
     this.geometry.setDrawRange(0, sink.n * 2);
   }
 

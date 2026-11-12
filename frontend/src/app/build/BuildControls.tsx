@@ -206,7 +206,7 @@ function Control({ c }: { c: BuildControl }) {
       );
     case 'readout':
       return (
-        <div className="sx-ctl sx-ctl-row">
+        <div className="sx-ctl sx-ctl-row" title={c.why}>
           <span>{c.label}</span>
           <output className="sx-ctl-val">{c.value}</output>
           {badge}

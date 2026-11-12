@@ -19,7 +19,7 @@ import hashlib
 import json
 import math
 import statistics
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -139,7 +139,7 @@ def composite_key(
         "params": config.params_sha(),
         "object": [obj.ra, obj.dec, obj.pm_ra_mas_yr, obj.pm_dec_mas_yr, obj.resolver],
         "frames": [
-            {**asdict(f), "cutout_sha256": sha} for f, sha in zip(frames, shas, strict=True)
+            {**f.key_doc(), "cutout_sha256": sha} for f, sha in zip(frames, shas, strict=True)
         ],
         "selection_notes": sorted(selection_notes),
     }

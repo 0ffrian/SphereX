@@ -6,6 +6,7 @@ import {
   groupMissing,
   parseMissing,
   summarizeSpectrum,
+  trackRefusal,
 } from './refusals';
 
 // Test data only, not physical claims. Real backend frame IDs look like `2026W17_1B_0634_4_D3`.
@@ -253,5 +254,14 @@ describe('moving-object path search codes', () => {
     expect(summarizeSpectrum([], ['saturated:a', 'frames:outside_window:291']).incomplete).toBe(
       false,
     );
+  });
+});
+
+describe('trackRefusal (A19.2)', () => {
+  it('refuses an object that does not move and lets a mover through', () => {
+    expect(trackRefusal({ moving: false })).toBe('track:not_moving');
+    expect(trackRefusal({ moving: true })).toBeNull();
+    const [group] = groupMissing([trackRefusal({ moving: false })!]);
+    expect(group?.known).toBe(true);
   });
 });

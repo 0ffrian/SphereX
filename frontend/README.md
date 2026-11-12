@@ -113,8 +113,8 @@ src/
     build/                (issue #60) SelectedCard, BuildPane, MouldStrip, useMould, selectedBody
     sky/                  (prototype) SkyPane (sky view, markers, picking), useTargetMarkers, readout feed
     spectrum/             SpectrumPanel, hand-rolled SVG SpectrumChart, scales
-  test/           test-only helpers (fixtureFetch, sharedFixtures: loads shared/fixtures; fakeHaptics,
-                  fakeAudio, fakeSound: sound fakes)
+  test/           test-only helpers (fixtureFetch, sharedFixtures: loads shared/fixtures; fakeSound
+                  and fakeAudio: sound fakes)
   viewer/         (Moon)  ViewerApp, lighting, modes, honesty, scaleBar, altText, renderPlan + planCommon + planTypes (pure plan)
     renderers/            AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star (plan functions), build (plan to three.js), ShaderBody
     mould/                (issue #60) mouldSteps (pure steps, layers, progress, pose), MouldRig (apply / undo a pose)

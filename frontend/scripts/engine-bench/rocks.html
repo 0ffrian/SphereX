@@ -1,0 +1,218 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Engine bench: rock engine</title>
+<!--
+  Issue #93 wave 1 (rocks): the rock engine's costs, for one body, with this engine or an older copy.
+    body  = proc (fixture asteroid_procedural) | eros (fixture asteroid_shape + its shape model) | comet (fixture comet)
+    impl  = module folder of the rock engine (default /src/engine/rocks/; an older copy: /.bench-ref/<name>/engine/rocks/)
+    mesh  = URL of the Eros shape model (default /.bench-ref/eros.glb: copy backend/assets/shapes/eros-gaskell.glb)
+    two   = 1 attaches a second canvas of the same size (the close-up pane), so both panes draw the body
+    w, h  = canvas size in CSS px (default 1056 x 660, the build pane's stage at 8:5); run at device scale 1
+  Reports:
+    build_ms        setBody on the main thread (height map, crater stamping; with a worker: the post only)
+    attach_ms       the attach() call (the old engine compiles its programs here, synchronously)
+    ready_ms        attach to programs linked (whenReady; the old engine: 0)
+    first_draw_ms   the first draw (a link still pending blocks here)
+    longest_task_ms the longest main-thread task from attach to the first picture (PerformanceObserver longtask)
+    frame_ms        median of 40 draws, each followed by a 1-pixel readPixels (CPU submit + GPU), pose fixed
+    gpu_ms          median GPU time of a draw (EXT_disjoint_timer_query_webgl2), null when not exposed
+    submit_ms       median CPU time of draw() alone (the comet jets' JavaScript runs here)
+    age_*           20 Surface age changes 16 ms apart: longest main-thread task, the sum of tasks over 50 ms, the
+                    time until the last one shows
+    png             the canvas after a fixed pose and clock (data URL) for the driver to save
+-->
+<body style="margin: 0; background: #000">
+  <div id="host" style="position: relative"></div>
+  <script type="module">
+    const out = {};
+    window.__out = out;
+    const Q = new URLSearchParams(location.search);
+    const body = Q.get('body') || 'proc';
+    const impl = Q.get('impl') || '/src/engine/rocks/';
+    const meshUrl = Q.get('mesh') || '/.bench-ref/eros.glb';
+    const W = +(Q.get('w') || 1056),
+      H = +(Q.get('h') || 660);
+    const two = Q.get('two') === '1';
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const raf = () => new Promise((r) => requestAnimationFrame(() => r()));
+    const med = (a) => {
+      const s = [...a].sort((x, y) => x - y);
+      return s.length ? +s[Math.floor(s.length / 2)].toFixed(2) : null;
+    };
+    const tasks = [];
+    try {
+      new PerformanceObserver((l) => {
+        for (const e of l.getEntries()) tasks.push({ t: e.startTime, d: e.duration });
+      }).observe({ type: 'longtask', buffered: true });
+    } catch {
+      /* no longtask API */
+    }
+    const longest = (t0, t1) =>
+      +Math.max(0, ...tasks.filter((x) => x.t + x.d >= t0 && x.t <= t1).map((x) => x.d)).toFixed(1);
+    const blocked = (t0, t1) =>
+      +tasks
+        .filter((x) => x.t + x.d >= t0 && x.t <= t1)
+        .reduce((s, x) => s + Math.max(0, x.d - 50), 0)
+        .toFixed(1);
+    function canvas() {
+      const c = document.createElement('canvas');
+      c.style.cssText = `width:${W}px;height:${H}px;display:block`;
+      document.getElementById('host').appendChild(c);
+      return c;
+    }
+    try {
+      out.body = body;
+      out.impl = impl;
+      const { RockView } = await import(impl + 'RockView.ts');
+      const { cardToRock } = await import(impl + 'cardToRock.ts');
+      // Switches of this engine (#93 wave 1); an older copy has none and ignores them.
+      if (Q.get('bake') === '0') RockView.setBake?.(false);
+      if (Q.get('bakeN')) RockView.setBake?.(true, +Q.get('bakeN'));
+      if (Q.get('cull') === '0') RockView.cullBackFaces = false;
+      if (Q.get('share') === '0') RockView.shareCanvases = false;
+      out.switches = {
+        bake: Q.get('bake'),
+        bakeN: Q.get('bakeN'),
+        cull: Q.get('cull'),
+        share: Q.get('share'),
+      };
+      const file = { proc: 'asteroid_procedural', eros: 'asteroid_shape', comet: 'comet' }[body];
+      const card = await (await fetch(`/.bench-ref/${file}.json`)).json();
+      const seed = { proc: 2, eros: 3, comet: 5 }[body];
+      const rock = cardToRock(card, { seed, tint: null });
+      if (rock.refused) throw new Error('refused: ' + rock.reason);
+      let map = null;
+      if (body === 'eros') {
+        const { loadMeshTriangles } = await import(impl + 'loadMesh.ts');
+        const { radialHeights } = await import(impl + 'meshRadial.ts');
+        map = radialHeights(await loadMeshTriangles(meshUrl));
+      }
+      // Synchronous builds here, so every copy measures the same work (the worker path is timed under age_*).
+      const view = new RockView(true, { worker: false });
+      let t = performance.now();
+      view.setBody(rock, map);
+      out.build_ms = +(performance.now() - t).toFixed(1);
+      view.setPlaying(false);
+      view.pose(0.6, 0.25, 0);
+      await raf();
+      const c = canvas();
+      const t0 = performance.now();
+      view.attach(c);
+      out.attach_ms = +(performance.now() - t0).toFixed(1);
+      if (typeof view.whenReady === 'function') await view.whenReady();
+      out.ready_ms = +(performance.now() - t0).toFixed(1);
+      t = performance.now();
+      view.draw();
+      out.first_draw_ms = +(performance.now() - t).toFixed(1);
+      const t1 = performance.now();
+      await wait(200);
+      out.longest_task_ms = longest(t0, t1);
+      let c2 = null;
+      if (two) {
+        c2 = canvas();
+        view.attach(c2);
+        if (typeof view.whenReady === 'function') await view.whenReady();
+        view.draw();
+      }
+      out.stats = { built: view.built, baked: view.baked };
+      // Frame time: a fixed clock (the comet's jets move with it) and pose.
+      view.step(180);
+      const gl = c.getContext('webgl2');
+      const px = new Uint8Array(4);
+      const fr = [],
+        sub = [],
+        gpu = [];
+      // GPU time of both canvases' contexts (the second pane draws or copies in its own context).
+      const ctxs = [gl, ...(c2 ? [c2.getContext('webgl2')] : [])].map((g) => ({
+        g,
+        tq: g.getExtension('EXT_disjoint_timer_query_webgl2'),
+      }));
+      for (let i = 0; i < 48; i++) {
+        const qs = ctxs.map(({ g, tq }) => {
+          if (!tq || i < 8) return null;
+          const q = g.createQuery();
+          g.beginQuery(tq.TIME_ELAPSED_EXT, q);
+          return q;
+        });
+        const a = performance.now();
+        view.draw();
+        const b = performance.now();
+        ctxs.forEach(({ g, tq }, k) => qs[k] && g.endQuery(tq.TIME_ELAPSED_EXT));
+        for (const { g } of ctxs) g.readPixels(0, 0, 1, 1, g.RGBA, g.UNSIGNED_BYTE, px);
+        const e = performance.now();
+        if (i >= 8) {
+          fr.push(e - a);
+          sub.push(b - a);
+        }
+        if (qs.some((q) => q)) {
+          await raf();
+          let total = 0,
+            ok = true;
+          for (let k = 0; k < ctxs.length; k++) {
+            const { g, tq } = ctxs[k],
+              q = qs[k];
+            if (!q) continue;
+            for (let n = 0; n < 20 && !g.getQueryParameter(q, g.QUERY_RESULT_AVAILABLE); n++)
+              await raf();
+            if (
+              g.getQueryParameter(q, g.QUERY_RESULT_AVAILABLE) &&
+              !g.getParameter(tq.GPU_DISJOINT_EXT)
+            )
+              total += g.getQueryParameter(q, g.QUERY_RESULT) / 1e6;
+            else ok = false;
+            g.deleteQuery(q);
+          }
+          if (ok) gpu.push(total);
+        }
+      }
+      out.frame_ms = med(fr);
+      out.submit_ms = med(sub);
+      out.gpu_ms = gpu.length ? med(gpu) : null;
+      // The picture, before the age sweep changes it.
+      view.draw();
+      out.png = c.toDataURL('image/png');
+      if (c2) {
+        view.draw();
+        out.png2 = c2.toDataURL('image/png');
+      }
+      // One draw right after a new height map: with the bake (#93 2.1) this is the re-bake plus the draw.
+      if (body !== 'eros') {
+        view.setAge(71);
+        await raf();
+        const a = performance.now();
+        view.draw();
+        gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        out.rebake_ms = +(performance.now() - a).toFixed(1);
+      }
+      // Surface age: 20 changes 16 ms apart, as a slider drag sends them. The default (worker) path where the
+      // engine has one; the old engine rebuilds on the main thread each time.
+      if (body !== 'eros') {
+        const vw = new RockView(true);
+        vw.setBody(rock, null);
+        vw.setPlaying(false);
+        if (typeof vw.whenBuilt === 'function') await vw.whenBuilt();
+        await wait(300);
+        const a0 = performance.now();
+        const per = [];
+        for (let i = 0; i < 20; i++) {
+          const s = performance.now();
+          vw.setAge(30 + i * 2);
+          per.push(performance.now() - s);
+          await wait(16);
+        }
+        if (typeof vw.whenBuilt === 'function') await vw.whenBuilt();
+        const a1 = performance.now();
+        await wait(200);
+        out.age_call_ms = med(per);
+        out.age_longest_task_ms = longest(a0, a1);
+        out.age_blocked_ms = blocked(a0, a1);
+        out.age_settle_ms = +(a1 - a0 - 20 * 16).toFixed(0);
+        vw.dispose();
+      }
+      view.dispose();
+    } catch (e) {
+      out.err = String(e && e.stack ? e.stack : e);
+    }
+    out.done = true;
+  </script>
+</body>

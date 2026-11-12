@@ -98,7 +98,25 @@ export const WHOLE_RESULT_CODES = [
   // The cone hit the row cap (brightest first), so the faintest sources are left out.
   'overlay:gaia:truncated',
   'overlay:wise:truncated',
+  // Track path (`/v1/objects/{id}/path`, A19.5, A19.10; issue #74). `path:deferred`: poll.
+  'path:deferred',
+  'path:not_cached',
+  'path:observer',
+  'path:ephemeris',
+  'path:window',
+  'path:frames_incomplete',
+  // Track refuses an object that does not move (A19.2); raised in the frontend.
+  'track:not_moving',
 ] as const;
+
+/**
+ * Track opens only for an object that moves (A19.2): the refusal code for one that does not, or
+ * `null`. The Track pane calls this before it asks `/path`, whose 404 `not_moving` is the
+ * backend's own check of the same rule.
+ */
+export function trackRefusal(object: { readonly moving: boolean }): 'track:not_moving' | null {
+  return object.moving ? null : 'track:not_moving';
+}
 
 export const ALL_SATURATED = 'spectrum:saturated';
 const TRUNCATED = 'frames:truncated';
@@ -109,6 +127,8 @@ const NAMESPACES: ReadonlySet<string> = new Set([
   'cutouts',
   'composite',
   'overlay',
+  'path',
+  'track',
   // UI-side code for an overlay layer the reply gave no provenance for (OverlayPanel).
   'provenance',
 ]);

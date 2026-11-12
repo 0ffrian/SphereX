@@ -6,6 +6,10 @@
 // the frame after a build is the normal render of the same card, params and seed.
 //
 // Reduced motion (R9): no animation; the built body is shown at once.
+//
+// Issue #93: when a D-37 engine draws the body (`hold`), the steps wait for it: the first step shows as in progress
+// ('forming') until the engine has compiled its shaders and formed the world, then the steps play. They used to run
+// on their own clock and turn green long before the planet showed.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ObjectCard, RenderParams } from '@/contract';
 import type { PlanContext, RenderPlan } from '@/viewer/planTypes';
@@ -21,7 +25,10 @@ import {
   type MouldScript,
 } from '@/viewer/mould/mouldSteps';
 
-export type MouldPhase = 'idle' | 'loading' | 'building' | 'done';
+export type MouldPhase = 'idle' | 'loading' | 'forming' | 'building' | 'done';
+
+/** Progress the first step shows while the steps wait for an engine (in progress, its bar barely started). */
+export const FORMING_PROGRESS = 0.04;
 
 /** Mock-up build view: starting turn of the body and its auto-rotation while it is built. */
 export const BUILD_START_TURN = { x: 0.28, y: 0.6 };
@@ -46,6 +53,8 @@ export interface MouldInputs {
   reducedMotion: boolean;
   /** Hold the build back (the level is being raised first, so the first plan is not the final one). */
   wait?: boolean;
+  /** An engine draws the body and has not formed it yet: the steps wait (the first one shown in progress). */
+  hold?: boolean;
   /** Per-frame step progress for the strip (written to the DOM, not to React state). */
   onProgress(p: readonly number[]): void;
   onPhase?(phase: MouldPhase, script: MouldScript | null): void;
@@ -150,6 +159,23 @@ export function useMould(inp: MouldInputs): MouldState {
         finish();
         return;
       }
+      if (latest.current.hold) {
+        // Issue #93: an engine is still compiling or forming the world. Wait for it, the first step in progress.
+        set('forming', script);
+        onProgress(script.steps.map((_, i) => (i === 0 ? FORMING_PROGRESS : 0)));
+        const wait = () => {
+          if (cancelled) return;
+          if (latest.current.plan !== plan) {
+            finish();
+            return;
+          }
+          if (latest.current.hold) raf = requestAnimationFrame(wait);
+          else play();
+        };
+        raf = requestAnimationFrame(wait);
+      } else play();
+    });
+    const play = () => {
       const plans = script.steps.map((_, i) => stagePlan(card, params, ctx, plan, script, i));
       const n = script.steps.length;
       let stage = -1;
@@ -190,7 +216,7 @@ export function useMould(inp: MouldInputs): MouldState {
         raf = requestAnimationFrame(loop);
       };
       raf = requestAnimationFrame(loop);
-    });
+    };
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);

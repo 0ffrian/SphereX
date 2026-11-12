@@ -1,6 +1,6 @@
 # 10 Sequence: open the 3D view (build pane)
 
-Opening the Sky Sculptor view in the build pane of the split pane ([R5.8](../rendering/build-mould.md#r58-build-split-view-and-moulding), [A21.8](../architecture/sky-shell-behaviour.md#a218-split-pane)). There is one 3D view: *Build it* on the object card, *Build it in 3D* in the object panel and the rail's 3D viewer all open it (Q-120 item 4). This diagram draws the load with `animate` false (the rail, or the end state of a build); the moulding steps are [21](21-sequence-build-mould.md). Then: the frontend asks for `RenderParams`, the backend looks up the asset, queues a texture bake off the request path if they are not cached, and the viewer picks a renderer by `type`. Drawn from architecture spec §4.4, rendering doc §3.4, §4, §5, §6.7, §7, §7.7, and decisions D-01, D-05, D-12, D-21 and D-22, and Q-111 and Q-112 (issue #41: object job, background bake). The D-37 engines draw at + Artistic only (Q-287, [R5.9](../rendering/engines.md#r59-prototype-engines-d-37)); a reference object's RenderParams come from its pre-built asset or `reference_objects.toml`, never the catalogues (Q-328).
+Opening the Sky Sculptor view in the build pane of the split pane ([R5.8](../rendering/build-mould.md#r58-build-split-view-and-moulding), [A21.8](../architecture/sky-shell-behaviour.md#a218-split-pane)). There is one 3D view: *Build it* on the object card, *Build it in 3D* in the object panel and the rail's 3D viewer all open it (Q-120 item 4). This diagram draws the load with `animate` false (the rail, or the end state of a build); the moulding steps are [21](21-sequence-build-mould.md). Then: the frontend asks for `RenderParams`, the backend looks up the asset, queues a texture bake off the request path if they are not cached, and the viewer picks a renderer by `type`. Drawn from architecture spec §4.4, rendering doc §3.4, §4, §5, §6.7, §7, §7.7, and decisions D-01, D-05, D-12, D-21 and D-22, and Q-111 and Q-112 (issue #41: object job, background bake). The D-37 engines draw at + Artistic only (Q-287, [R5.9](../rendering/engines.md#r59-prototype-engines-d-37)); their compile, the fly view kept mounted and the caches are in [R5.9.1](../rendering/engines-performance.md#r591-engine-and-viewer-performance-issue-93-waves) (Q-381 to Q-385); a reference object's RenderParams come from its pre-built asset or `reference_objects.toml`, never the catalogues (Q-328).
 
 ```mermaid
 sequenceDiagram
@@ -71,15 +71,21 @@ sequenceDiagram
     V->>RC: Settle burst: restartTemporal, then 32 frames on TAAU or 2 on SMAA
     V->>V: Set canvas aria-label from the plan (altText.ts#59; size with its tag, "at most" for an upper limit#59; a shader kind adds the artist's-impression note)
     V->>V: Honesty change with the same sceneKey: BuiltScene.update(plan) sets the tags and light in place, no field is regenerated
-    alt honesty is + Artistic and the adapter accepts the card (D-37, Q-287)
+    alt honesty is + Artistic, the engines are on (enginesEnabled, not ?engines=0, Q-367) and the adapter accepts the card (D-37, Q-287)
       V->>ES: Mount the engine stage for the type (planets and gas giants, stars with a Teff, asteroids and comet nuclei)
-      ES->>EN: Own WebGL2 canvas, preset from cardToWorld, cardToStar or cardToRock, spin-up (wall clock, not byte-identical)
+      ES->>EN: Own WebGL2 canvas (created one tick after mount), preset from cardToWorld, cardToStar or cardToRock, spin-up (wall clock, not byte-identical)#59; every engine first compiles in the background (whenReady): a world under "Forming" with the loader, then a spin-up progress bar, a star or rock body under the three.js body with a small loader (Q-381, Q-382)
+      Note over ES,EN: Watchdog (engineWatchdog.ts, Q-338): shaders ready within 60 s (globe, star, rock) or 180 s (fly), world formed within 90 s on screen, else the stage fails
       ES->>V: setEngineOwned(true): the viewer builds and draws nothing under the engine
       EN-->>U: The engine's picture, its readouts with badges and its notes
-      opt engine fails, loses its WebGL context, or the user leaves + Artistic
+      opt fly view: the user closes the close-up, then reopens it (Q-383)
+        ES->>EN: Closed: the fly stage stays mounted and paused (no tick, no draw, no frame loop, no globe pick)
+        ES->>EN: Reopened: resume with the same context, no FLY_FS compile, no spin-up (about 0.3 s)
+        Note over ES,EN: Another object or preset, the kill switch or a failure unmounts it (dispose never blocks)
+      end
+      opt engine fails or times out, loses its WebGL context, or the user leaves + Artistic
         ES->>V: setEngineOwned(false): the three.js body draws again (failure remembered for this object)
       end
-    else + Estimated or Measured only, refused card, or no WebGL2
+    else + Estimated or Measured only, engines switched off, refused card, or no WebGL2
       Note over V,R: The three.js TSL path draws (GasWorld, RockyWorld, orbit view, ShaderBody, Star, asteroid and comet renderers)
     end
     V-->>U: Render body, tag chips in legend, scale bar

@@ -156,5 +156,5 @@ classDiagram
   audioGraph --> HarmonicBranch : "40–120 Hz, +18 dB, tanh(3x), −18 dB, 200–600 Hz, −12 dB"
   AudioDriver ..> audioGraph : events bus, one duck hold
   ListenSweep ..> audioGraph : spectrum bus, one duck hold
-  AmbienceMixer ..> audioGraph : ambience bus, harmonic branch (planned, #116)
+  AmbienceMixer ..> audioGraph : ambience bus, harmonic branch (planned, issue 116)
 ```

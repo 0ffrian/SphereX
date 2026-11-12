@@ -14,12 +14,20 @@ import {
   AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
+  DynamicDrawUsage,
   Group,
   LineBasicNodeMaterial,
   LineSegments,
+  Mesh,
+  MeshBasicNodeMaterial,
+  NoBlending,
   OrthographicCamera,
+  PlaneGeometry,
   Scene,
+  type Material,
+  type Texture,
 } from 'three/webgpu';
+import { positionGeometry, screenUV, texture, vec4 } from 'three/tsl';
 import { CLASS_STRENGTH, StreakSink, emitStage, groupPoint, type Mapper } from '@/physics/flares';
 import {
   AREA_SPLIT,
@@ -33,6 +41,7 @@ import {
 import { STAR_SURFACE, STILL_STAR_RATES, configFromModel } from '../bodies/starModel';
 import type { StarSurfacePlan } from '../planTypes';
 import { StarBody } from './StarBody';
+import { uploadUsed } from './StarPlasma';
 import { srgbToLinear } from './linearColour';
 import type { TierName } from '../render/quality';
 
@@ -114,6 +123,15 @@ export class StarCloseUpScene {
   private open = true;
   private cls: FlareClass = 'x';
   private readonly root = new Group();
+  private readonly lines: LineSegments;
+  private readonly starMaterial: Material;
+  private readonly stillQuad: Mesh;
+  /** Writes the sphere's depth only, while the cached picture stands in for its colour. */
+  private readonly depthOnly = new MeshBasicNodeMaterial({ colorWrite: false });
+  private stillTex: Texture | null = null;
+  private mode: StillMode = 'live';
+  /** Goes up whenever the picture of the star changes (the window shape): a cached picture is then stale. */
+  viewVersion = 0;
 
   constructor(p: StarCloseUpProps, tier: TierName = 'medium') {
     const model: StellarModel = { ...p.physics, groups: [this.group] };
@@ -148,8 +166,8 @@ export class StarCloseUpScene {
     });
     this.star.setTime(() => 0);
     this.root.add(this.star.group);
-    this.pos = new BufferAttribute(this.sink.pos, 3);
-    this.col = new BufferAttribute(this.sink.col, 3);
+    this.pos = new BufferAttribute(this.sink.pos, 3).setUsage(DynamicDrawUsage);
+    this.col = new BufferAttribute(this.sink.col, 3).setUsage(DynamicDrawUsage);
     this.geometry.setAttribute('position', this.pos);
     this.geometry.setAttribute('color', this.col);
     this.material = new LineBasicNodeMaterial({
@@ -162,8 +180,23 @@ export class StarCloseUpScene {
     const lines = new LineSegments(this.geometry, this.material);
     lines.frustumCulled = false;
     lines.renderOrder = 2;
+    this.lines = lines;
     this.root.add(lines);
     this.scene.add(this.root);
+    this.starMaterial = this.star.sphere.material as Material;
+    // The cached picture (issue #93 W1, see setStill): a full-screen quad drawn first, read pixel for pixel. No blending
+    // (so r187 does not treat it as opaque and force alpha to 1): it writes the picture's colour and alpha as they are.
+    const still = new MeshBasicNodeMaterial({
+      depthTest: false,
+      depthWrite: false,
+      blending: NoBlending,
+    });
+    still.vertexNode = vec4(positionGeometry.xy, 0, 1);
+    this.stillQuad = new Mesh(new PlaneGeometry(2, 2), still);
+    this.stillQuad.frustumCulled = false;
+    this.stillQuad.renderOrder = -1;
+    this.stillQuad.visible = false;
+    this.scene.add(this.stillQuad);
     const g = this.group;
     this.at = (a, l, h) => groupPoint(g, a, l, h);
     this.setFlare(p.flare);
@@ -189,14 +222,41 @@ export class StarCloseUpScene {
     c.position.set(0, 0, 5);
     c.lookAt(0, 0, 0);
     c.updateProjectionMatrix();
+    this.viewVersion++;
+  }
+
+  /**
+   * Issue #93 W1 (render notes 1.12): the star below the flare never moves here (its clock is held at 0, STILL rates),
+   * yet its surface shader (granulation, faculae, spots) ran for every pixel of every frame. A host can draw it once
+   * into a texture (`bake`: the star alone, as it would be drawn) and then show that texture (`cached`): a full-screen
+   * quad behind the plasma, while the sphere writes depth only, so the loops behind the limb stay hidden as before.
+   * `live` is the old path. The picture is the same up to the half-float rounding of the sum (see the W1 report).
+   */
+  setStill(mode: StillMode, tex: Texture | null = null): void {
+    if (mode === 'cached' && !tex) throw new Error('setStill: the cached mode needs the texture');
+    this.mode = mode;
+    const sphere = this.star.sphere;
+    sphere.material = mode === 'cached' ? this.depthOnly : this.starMaterial;
+    this.lines.visible = mode !== 'bake';
+    this.stillQuad.visible = mode === 'cached';
+    if (mode === 'cached' && tex !== this.stillTex) {
+      this.stillTex = tex;
+      const m = this.stillQuad.material as MeshBasicNodeMaterial;
+      m.colorNode = texture(tex!, screenUV);
+      m.needsUpdate = true;
+    }
+  }
+  get stillMode(): StillMode {
+    return this.mode;
   }
 
   /** Poses the plasma at stage time t (0..1 of the 60 minutes shown). Pure in (t, kind, class). */
   setStage(t: number, q = 1): void {
     this.sink.reset();
     emitStage(this.sink, this.at, t, { open: this.open, strength: CLASS_STRENGTH[this.cls], q });
-    this.pos.needsUpdate = true;
-    this.col.needsUpdate = true;
+    // Issue #93 W1 (0.6): only the streaks in use are uploaded (the buffers hold 40,000, about 1.9 MB).
+    uploadUsed(this.pos, this.sink.n * 6);
+    uploadUsed(this.col, this.sink.n * 6);
     this.geometry.setDrawRange(0, this.sink.n * 2);
   }
   get streakCount(): number {
@@ -213,5 +273,11 @@ export class StarCloseUpScene {
     this.star.dispose();
     this.geometry.dispose();
     this.material.dispose();
+    this.depthOnly.dispose();
+    this.stillQuad.geometry.dispose();
+    (this.stillQuad.material as Material).dispose();
   }
 }
+
+/** How the star below the flare is drawn (see `StarCloseUpScene.setStill`). */
+export type StillMode = 'live' | 'bake' | 'cached';
