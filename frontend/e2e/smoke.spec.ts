@@ -7,16 +7,11 @@ test('app loads: header, viewer canvas, renderer status, no console errors', asy
   });
   page.on('pageerror', (err) => errors.push(err.message));
 
-  await page.goto('/');
-
+  // The sky view is the main pane; the 3D viewer is the build pane, opened here by the link's
+  // `build` hash (the dock has no 3D viewer button since the D-38 redesign).
+  await page.goto('/#build');
   await expect(page.getByRole('heading', { level: 1, name: 'Shift & Spectrum' })).toBeAttached();
-
-  // The sky view is the main pane; the 3D viewer opens from the tool rail (shell layout).
   await expect(page.getByTestId('sky-canvas')).toHaveCount(1);
-  await page
-    .getByRole('navigation', { name: 'Tools' })
-    .getByRole('button', { name: '3D viewer' })
-    .click();
   const viewer = page.getByRole('region', { name: '3D view', exact: true });
   const canvas = viewer.locator('canvas[aria-label]');
   await expect(canvas).toHaveCount(1);
@@ -32,20 +27,16 @@ test('app loads: header, viewer canvas, renderer status, no console errors', asy
   test.info().annotations.push({ type: 'renderer-backend', description: backend ?? 'unknown' });
   console.log(`renderer backend in headless Chromium: ${backend}`);
 
-  // On-screen rotate buttons exist (WCAG 2.5.7) and work when a backend is up. In the build pane
-  // (issue #60, #71 stream U) they sit under Details, so the stage stays clear at first sight.
-  await page.getByTestId('build-details').click();
-  const rotateLeft = viewer.getByRole('button', { name: 'Rotate left' });
-  await expect(rotateLeft).toBeVisible();
+  // On-screen zoom buttons exist (WCAG 2.5.7) and work when a backend is up. (The rotate buttons
+  // went with Details in the redesign; drag and the arrow keys still rotate.)
+  const zoomIn = page.getByRole('button', { name: /^Zoom in/ });
+  await expect(zoomIn).toBeVisible();
   if (backend !== 'unavailable') {
     // Render-on-change (R5.5): a zoom must produce a new frame, so the canvas pixels change.
     const before = await canvas.screenshot();
-    await viewer.getByRole('button', { name: 'Zoom in' }).click();
+    await zoomIn.click();
     const changed = async () => !(await canvas.screenshot()).equals(before);
     await expect.poll(changed, { timeout: 5_000 }).toBe(true);
-
-    await rotateLeft.click();
-    await viewer.getByRole('button', { name: 'Reset view' }).click();
   }
 
   expect(errors, errors.join('\n')).toEqual([]);

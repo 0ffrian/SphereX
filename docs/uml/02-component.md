@@ -186,14 +186,15 @@ flowchart TB
 
   subgraph UI["UI shell (React, Tailwind, animate-ui)"]
     Router["Hash routing: share link"]
-    Flipbook["Flipbook, with the Rainbow Trails view mode (P1, D-28)"]
+    Flipbook["Flipbook, with the Rainbow Trails view mode (P1, D-28) and FlipbookSpectrum"]
+    AreaDemo["app/area: areaService demo seam (Eros only, Q-414), KnownList, DiscoveryCard, ErosCard"]
     Overlays["Overlays (P1, issue #12): toggles, markers, flag mask, field of view, combine panel"]
     Panel["Object panel: spectrum, card, 3 badges"]
     Listen["Audio / Listen: data sweep, imagined drive"]
     Store["Store (Zustand): card, RenderParams, honesty state, overrides"]
     PulseInd["On-screen pulse indicator (D-20)"]
     Settings["Haptics + audio settings"]
-    Shell["Shell (A21, Q-89): ToolRail + railIcons, shellStore, PanelCard, Readout, shortcuts, bezel insets (Q-124)"]
+    Shell["Shell (A21, Q-89): SkyDock (Known objects, Discovery, Search; D-38, Q-296), SkyZoom, ToolRail (openTool only) + railIcons, shellStore, areaStore, AreaCard, PanelCard, Readout, shortcuts, floating full-screen layout"]
     Island["Island, app/island (Q-121, Q-123): orb, Thinking pill, grid loader"]
     SkyPane["SkyPane: sky image, markers, click to pick"]
     Transport["Transport bar"]
@@ -210,6 +211,8 @@ flowchart TB
     BodyLoader["selectedBody.ts: useSelectedBodyLoader"]
     BuildPane["BuildPane: split pane, Feel, Replay, New seed, Close"]
     Mould["useMould + MouldStrip"]
+    MouldAnim["MouldAnimation + mouldBody: mock-up moulding body, own WebGLRenderer (Q-415)"]
+    HearPanel["HearPanel + hearAudio: Atmosphere and spectrum sweep, own AudioContext (Q-416)"]
   end
 
   TrackPane["Track pane (A20, to build): time slider, zoom, spectrum hop by hop"]
@@ -262,7 +265,9 @@ flowchart TB
   Shell -->|"panel card"| Flipbook
   Shell -->|"panel card"| Panel
   Shell --> Island
-  Shell -->|"rail 3D viewer: built at once"| BuildPane
+  Shell -->|"dock: Known objects, Discovery"| AreaDemo
+  AreaDemo -.->|"demo cards, Demo data tag"| SkyPane
+  Shell -->|"3D viewer link: built at once"| BuildPane
   Shell -.->|"Area search tool"| AreaTool
   AreaTool -.->|"sky layer slot"| SkyPane
   AreaTool -.->|"Track it: openPane track"| TrackPane
@@ -273,6 +278,8 @@ flowchart TB
   Store -->|"card asked for or pane open"| BodyLoader
   BodyLoader -->|"GET card, render-params"| BackendAPI
   BuildPane --> Mould
+  BuildPane --> MouldAnim
+  BuildPane --> HearPanel
   Mould -->|"showPlan, whenLoaded, setMould"| ViewerApp
   ViewerApp --> MouldRig
   BuildPane -->|"+ Artistic and the adapter accepts the card"| EngStages

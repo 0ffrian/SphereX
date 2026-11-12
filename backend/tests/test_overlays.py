@@ -158,7 +158,7 @@ def _no_star_cones(cache: Path) -> None:
 def test_moving_object_overlays_refused_without_cones(fixture_cache: Path) -> None:
     """Offline with no Gaia or CatWISE cone cached, a mover's catalogues are refused, never
     invented (A19.6). Since issue #26 the frames exist, so each gets its flag mask and cutout
-    box; the SIA footprint is not carried on the frame record, so it is refused per frame."""
+    box; since issue #74 the frame record keeps its SIA footprint, so that is served too."""
     _no_star_cones(fixture_cache)
     with TestClient(create_app(make_settings(fixture_cache))) as c:
         oid = _oid(c, "433 Eros")
@@ -166,9 +166,9 @@ def test_moving_object_overlays_refused_without_cones(fixture_cache: Path) -> No
         frames = c.get(f"/v1/objects/{oid}/frames").json()["frames"]
     assert [f["frame_id"] for f in body["frames"]] == [f["frame_id"] for f in frames]
     assert {"overlay:gaia", "overlay:wise"} <= set(body["missing"])
-    assert all(f["footprint"] is None and f["markers"] == [] for f in body["frames"])
+    assert all(f["footprint"] and f["markers"] == [] for f in body["frames"])
     assert all(f["masks"] == [] for f in body["frames"])
-    assert all(f"footprint:{f['frame_id']}" in body["missing"] for f in frames)
+    assert not any(m.startswith("footprint:") for m in body["missing"])
     assert all(not c["available"] and c["sources"] == [] for c in body["catalogs"])
 
 
@@ -273,7 +273,8 @@ def test_mover_overlays_with_synthetic_cones(
     prov = body["provenance"]
     assert prov["masks"]["tag"] == "derived" and "[verify]" in prov["masks"]["formula"]
     assert "no self-match for movers" in prov["contamination"]["formula"]
-    assert all(f"footprint:{fid}" in body["missing"] for fid in visit_of)  # still #74's
+    assert all(fo["footprint"] for fo in body["frames"])  # issue #74
+    assert not any(m.startswith("footprint:") for m in body["missing"])
 
     # Deterministic: a rebuilt reply is identical, byte for byte.
     client.app.state.overlays._memo.clear()  # type: ignore[attr-defined]
@@ -303,7 +304,8 @@ def test_mover_overlays_from_recorded_cones(client: TestClient) -> None:
         assert {m["id"] for m in fo["masks"]} <= marker_ids
         assert all(2.0 <= m["r_px"] <= 10.0 for m in fo["masks"])
     assert body["provenance"]["masks"]["tag"] == "derived"
-    assert all(f"footprint:{fid}" in body["missing"] for fid in visit_of)  # #74's, not P1's
+    assert all(fo["footprint"] for fo in body["frames"])  # issue #74
+    assert not any(m.startswith("footprint:") for m in body["missing"])
     assert oid in client.app.state.overlays._memo  # type: ignore[attr-defined]
 
     client.app.state.overlays._memo.clear()  # type: ignore[attr-defined]

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ObjectCard } from '@/contract';
 import { ARTIFACT_PRESET_BY_CARD_ID, PROTOTYPE_PRESETS, cardToStar } from './cardToStar';
 import { StarEngine } from './StarEngine';
@@ -79,6 +79,16 @@ describe('cardToStar', () => {
     expect(r.mass.tag).toBe('inferred_from_analog');
   });
 });
+
+// The close-up draws its flare onto a 2D canvas, which jsdom does not have: give it a context that takes any call.
+const noop2d = (): unknown => {
+  const f: unknown = new Proxy(() => f, { get: (_t, k) => (k === Symbol.toPrimitive ? () => 0 : f), set: () => true, apply: () => f });
+  return f;
+};
+beforeEach(() => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(((kind: string) => (kind === '2d' ? noop2d() : null)) as never);
+});
+afterEach(() => vi.restoreAllMocks());
 
 describe('StarEngine (no WebGL in jsdom: the prototype logic still runs)', () => {
   const sun = { id: 'g', label: 'Sun', T: 5772, R: 1, M: 1, P: 25.4, dwarf: true };

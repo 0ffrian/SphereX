@@ -11,7 +11,8 @@ Project: **Shift & Spectrum**, a public web tool for NASA Space Apps 2026 (Port 
 | [docs/architecture/](docs/architecture/README.md) | Source of truth for everything else: data sources, pipeline, tiers, plan, risks. Sections `A1`–`A21` (Track and Area search A16–A20 in `moving-objects/`, app shell A21). Terms: [glossary](docs/architecture/glossary.md) (A15). |
 | [docs/uml/](docs/uml/README.md) | Architecture diagrams (UML, Mermaid). Keep in sync when a spec changes. |
 | [docs/handover.md](docs/handover.md) | Background only (competition, data, early concepts). Not a spec. |
-| [mockup/](mockup/) | Visual input only, never a spec (D-01). `spherex-ui.html` is the app shell and the Area search tool (mock-up tool 5; the app adds no number keys); `chase-the-rock.html` is the Track tool (see Layout). |
+| [docs/design-language.md](docs/design-language.md) | **Look and feel of every screen** (D-38): tokens, Inter, radii, controls (Animate UI), motion. Wins over the mock-up for looks. Load the `sx-design-language` skill before any UI work. |
+| [mockup/](mockup/) | Visual input only, never a spec (D-01); for looks, docs/design-language.md wins (D-38). `spherex-ui.html` is the app shell and the Area search tool (mock-up tool 5; the app adds no number keys); `chase-the-rock.html` is the Track tool (see Layout). |
 
 If two docs disagree and `docs/decisions/` is silent, follow the precedence (decisions > rendering > architecture), add a `Q-` entry to the matching topic file in `docs/decisions/` (and its index row) describing the conflict, and continue. Never pick silently.
 
@@ -43,6 +44,7 @@ Project agents live in `.claude/agents/` and skills in `.claude/skills/`. Agents
 | `/sx-implement <task>` | auto-implementer, then code-reviewer (with fixes), design-reviewer for UI/haptics, and spec-keeper for docs. `--commit` commits on a feature branch (never pushes). |
 | `/sx-code-review [paths] [--fix] [--deep]` | code-reviewer; `--deep` adds security, performance and accessibility passes |
 | `/sx-pr-review <n> [--comment] [--deep]` | pr-reviewer on a GitHub PR; `--comment` posts the review |
+| `/sx-design-language` | loads the design language (D-38) before any UI work: tokens, type, radii, controls, motion, checks |
 | `/sx-design-review [target] [--fix]` | design-reviewer, accessibility-tester and ux-microcopy-reviewer (plus haptics-audio-engineer when relevant) |
 | `/sx-spec-sync [change]` | spec-keeper: section maps, links, UML, decisions |
 | `/sx-verify [item\|all] [--apply]` | astro-verifier resolves **[verify]** items with citations |
@@ -71,6 +73,7 @@ docs/       decisions/ (index + topic files), architecture/ (A1–A21; moving-ob
 mockup/     single-file HTML mock-ups, not the app
   spherex-ui.html       app shell and tools (three.js r128), incl. Area search (mock-up tool 5),
                         which opens chase-the-rock.html in its Track pane
+  closeup-orbit.html, closeup-star.html   orbit close-up and star close-up pages (visual input for the 3D close-up)
   chase-the-rock.html   Track tool: a known asteroid's path, its SPHEREx frames, a zoom with
                         stars masked, and a spectrum built hop by hop (433 Eros, 20–21 Mar 2026)
 backend/    Python 3.12 API, pipeline, texture baker        (Kevin, Moon, Atish)
