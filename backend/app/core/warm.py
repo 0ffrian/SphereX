@@ -54,8 +54,10 @@ class WarmCache:
         self.pipeline = pipeline
         self.aliases = aliases
         self.queries = queries
-        self.done: list[str] = []  # object ids warmed, in order (for tests and the log)
-        self.failed: list[str] = []  # queries not resolved or whose job failed (issue #103)
+        # Both hold queries, in order (issue #103): ``done`` warmed, ``failed`` not resolved or
+        # whose job could not start or raised. Health exposes only their lengths.
+        self.done: list[str] = []
+        self.failed: list[str] = []
         self._finished = threading.Event()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -73,8 +75,9 @@ class WarmCache:
 
     @property
     def state(self) -> str:
-        """``running``, ``finished`` (every query tried, some may have failed) or ``stopped``
-        (shut down before the end). ``idle`` before ``start``."""
+        """``idle`` (built, ``start`` not called yet; the lifespan starts it at once, so health
+        does not normally show it), ``running``, ``finished`` (every query in the warm list
+        tried; ``failed`` counts the ones that did not warm) or ``stopped`` (shut down first)."""
         if self._finished.is_set():
             return "finished"
         if self._stop.is_set():
@@ -101,7 +104,12 @@ class WarmCache:
                 log.warning("warm cache: %r not resolved: %s", q, exc)
                 self.failed.append(q)
                 continue
-            job = self.pipeline.ensure_job(obj)
+            try:
+                job = self.pipeline.ensure_job(obj)
+            except Exception as exc:  # a dead thread would leave health "running" for ever
+                log.warning("warm cache: %r job not started: %s", q, exc)
+                self.failed.append(q)
+                continue
             ok = True
             while not self._stop.is_set():
                 try:
@@ -114,7 +122,7 @@ class WarmCache:
             else:
                 return
             if ok:
-                self.done.append(obj.id)
+                self.done.append(q)
                 log.info("warm cache: %s ready", obj.id)
             else:
                 self.failed.append(q)
