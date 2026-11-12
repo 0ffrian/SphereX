@@ -209,4 +209,11 @@ describe('Area search replies (A17.8, A19.5; issue #130)', () => {
     const p = shared('track/eros-2026-03/path.json') as Record<string, unknown>;
     expect(() => parseTrackPath({ ...p, tag: 'measured' })).toThrow(/model_dependent/);
   });
+  it('refuses a path with the wrong observer, step, null-time shape or refusal code', () => {
+    const p = shared('track/eros-2026-03/path.json') as Record<string, unknown>;
+    expect(() => parseTrackPath({ ...p, observer: '500@399' })).toThrow(/observer/);
+    expect(() => parseTrackPath({ ...p, step_min: 0 })).toThrow(/step_min/);
+    expect(() => parseTrackPath({ ...p, fetched_at: undefined })).toThrow(/fetched_at/);
+    expect(() => parseTrackPath({ ...p, missing: ['path:made_up'] })).toThrow(/missing/);
+  });
 });

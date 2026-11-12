@@ -797,6 +797,12 @@ export function parseTrackPath(raw: unknown): TrackPath {
   const p = 'path';
   const o = obj(raw, p);
   str(o, 'id', p);
+  if (o.observer !== '500@-163182') fail(`${p}.observer`, 'expected the SPHEREx observer 500@-163182');
+  const step = num(o, 'step_min', p);
+  if (!Number.isInteger(step) || step < 1) fail(`${p}.step_min`, 'expected a whole number of 1 or more');
+  if (o.interp_error_arcsec !== null && num(o, 'interp_error_arcsec', p) < 0) fail(`${p}.interp_error_arcsec`, 'expected 0 or more');
+  nullableTime(o, 'fetched_at', p);
+  nullableTime(o, 'cached_at', p);
   if (o.tag !== 'model_dependent') fail(`${p}.tag`, 'expected model_dependent');
   str(o, 'assumption', p);
   str(o, 'formula', p);
@@ -808,11 +814,22 @@ export function parseTrackPath(raw: unknown): TrackPath {
     });
   timed(arr(o, 'points', p), `${p}.points`);
   timed(arr(o, 'frame_points', p), `${p}.frame_points`);
+  arr(o, 'frame_points', p).forEach((r, i) => {
+    const q = `${p}.frame_points[${i}]`;
+    const e = obj(r, q);
+    if (str(e, 'frame_id', q) === '') fail(`${q}.frame_id`, 'expected a frame id');
+    for (const k of ['ra_3sigma_arcsec', 'dec_3sigma_arcsec']) {
+      if (e[k] !== null && num(e, k, q) < 0) fail(`${q}.${k}`, 'expected 0 or more');
+    }
+  });
   arr(o, 'windows', p).forEach((r, i) => {
     const w = obj(r, `${p}.windows[${i}]`);
     time(w, 'start', `${p}.windows[${i}]`);
     time(w, 'end', `${p}.windows[${i}]`);
   });
-  strList(o, 'missing', p);
+  const codes = ['path:deferred', 'path:not_cached', 'path:observer', 'path:ephemeris', 'path:window', 'path:frames_incomplete'];
+  strList(o, 'missing', p).forEach((c, i) => {
+    if (!codes.includes(c)) fail(`${p}.missing[${i}]`, 'expected a path refusal code');
+  });
   return raw as TrackPath;
 }

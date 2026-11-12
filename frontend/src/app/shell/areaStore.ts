@@ -145,6 +145,8 @@ let trackAbort: AbortController | null = null;
 function clearTimers(): void {
   knownAbort?.abort();
   knownAbort = null;
+  trackAbort?.abort();
+  trackAbort = null;
   for (const t of timers) clearTimeout(t);
   timers = [];
   if (stepTimer !== null) clearInterval(stepTimer);
@@ -183,7 +185,9 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     trackAbort?.abort();
     const ctl = new AbortController();
     trackAbort = ctl;
-    const demo = await erosDemo();
+    // The demo file is 433 Eros only: another object never borrows its sky image, cutouts or title.
+    const demoAll = await erosDemo();
+    const demo = !obj || obj.objectId === DEMO_OBJECT_ID ? demoAll : null;
     if (ctl.signal.aborted) return demo;
     // A real object: its frames and path from the API (issue #130).
     if (obj?.objectId) {

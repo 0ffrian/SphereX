@@ -47,13 +47,21 @@ export function KnownPositionsLayer({ view }: { view: { onRender(l: () => void):
       <svg className="sx-area-pos" aria-hidden="true" data-testid="known-positions" data-tag="model_dependent">
         {withPositions.map((o) => {
           const pts = distinctTimes(o.positions ?? []).map((p) => skyToPixels(p.ra, p.dec));
-          const line = pts.filter((p): p is { x: number; y: number } => p !== null);
+          // A position behind the camera breaks the line: no segment is drawn across the gap.
+          const segs: { x: number; y: number }[][] = [[]];
+          for (const p of pts) {
+            if (p) segs[segs.length - 1]!.push(p);
+            else if (segs[segs.length - 1]!.length) segs.push([]);
+          }
+          const line = segs.flat();
           const on = !focus || focus === o;
           return (
             <g key={o.designation ?? o.id} data-object={o.designation ?? o.id} opacity={on ? 1 : 0.45}>
-              {line.length > 1 && (
-                <polyline points={line.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} className="sx-area-pos-line" />
-              )}
+              {segs
+                .filter((sg) => sg.length > 1)
+                .map((sg, i) => (
+                  <polyline key={i} points={sg.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} className="sx-area-pos-line" />
+                ))}
               {line.map((p, i) => (
                 <path
                   key={i}
