@@ -114,6 +114,9 @@ class AreaFrames:
     input_digests: tuple[str, ...]  # SHA-256 of every SIA and cutout body used, sorted
     cones: tuple[ConeLog, ...] = ()
     stats: dict[str, Any] = field(default_factory=dict)  # Day 0 timings and sizes, not compared
+    # ISO-Z ``fetched_at`` of every SIA cone body, sorted: the run's date when no input after the
+    # dots step was read (``AreaResult.times``, Q-420 (9)). Not in ``frames_jsonable``.
+    sia_fetched: tuple[str, ...] = ()
 
 
 def _mask_rows(mask: NDArray[np.bool_]) -> list[str]:
