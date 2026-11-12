@@ -117,7 +117,7 @@ sequenceDiagram
     J-->>S: checks (planted and control results never enter tracks)
   end
   S->>C: pre-fetch Track for every Known object (or list it as skipped), not built: waits on T1
-  S->>C: write derived.area entries (summary, known, dots, tracks, export, stamps made from the cutouts), then the head naming the run's settings
+  S->>C: write derived.area entries (summary, known, dots, tracks, export, stamps as raw pixels made from the cutouts; PNG encoded when served), then the head naming the run's settings
   Note over Op,S: --recorded --pack assets/areas makes the committed Eros pack from the recorded fixtures (issue #108)
   Note over S,C: Same cache + settings give byte-identical entries (A17.10)
 ```
