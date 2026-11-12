@@ -4,6 +4,10 @@ import {
   initialTier,
   lowerTier,
   capIntervalMs,
+  desktopCapFromSearch,
+  engineCapIntervalMs,
+  engineHostCap,
+  ENGINE_FPS_CAP,
   FrameCap,
   PHONE_FPS_CAP,
   qualityFromSearch,
@@ -17,7 +21,8 @@ describe('quality levels (R5.7)', () => {
     expect(TIERS.high).toMatchObject({
       octaves: 6,
       volumeSteps: 96,
-      bloomScale: 1,
+      // Roadmap 1.3: half-resolution bloom on High as on Medium.
+      bloomScale: 0.5,
       aa: 'taau',
       targetFps: 60,
     });
@@ -134,6 +139,26 @@ describe('qualityFromSearch and capIntervalMs', () => {
     expect(capIntervalMs('medium', true)).toBeNull();
     expect(capIntervalMs('high', false)).toBeNull();
   });
+
+  it('the desktop 60 Hz cap is a setting, off by default (Q-66)', () => {
+    expect(desktopCapFromSearch('')).toBeNull();
+    expect(desktopCapFromSearch('?fpscap=60')).toBe(60);
+    expect(desktopCapFromSearch('?fpscap=0')).toBeNull();
+    expect(desktopCapFromSearch('?fpscap=abc')).toBeNull();
+    expect(desktopCapFromSearch('?fpscap=5')).toBeNull();
+    expect(capIntervalMs('medium', false, 60)).toBeCloseTo(1000 / 60);
+    expect(capIntervalMs('high', false, null)).toBeNull();
+    // The phone cap (lower) wins where both apply.
+    expect(capIntervalMs('low', true, 60)).toBeCloseTo(1000 / PHONE_FPS_CAP);
+  });
+
+  it('engine host loops cap at 60 Hz unless ?enginefps= says otherwise', () => {
+    expect(ENGINE_FPS_CAP).toBe(60);
+    expect(engineCapIntervalMs('')).toBeCloseTo(1000 / 60);
+    expect(engineCapIntervalMs('?enginefps=0')).toBeNull();
+    expect(engineCapIntervalMs('?enginefps=120')).toBeCloseTo(1000 / 120);
+    expect(engineCapIntervalMs('?enginefps=7')).toBeCloseTo(1000 / 60);
+  });
 });
 
 describe('FrameCap', () => {
@@ -152,6 +177,25 @@ describe('FrameCap', () => {
 
   it.each([60, 75, 90, 144])('draws every frame at %i Hz when uncapped', (hz) => {
     expect(drawn(new FrameCap(null), hz)).toBe(hz);
+  });
+
+  it.each([120, 144, 165, 240])('averages 60 fps at %i Hz under the 60 Hz engine cap', (hz) => {
+    const fps = drawn(engineHostCap(''), hz);
+    expect(fps).toBeGreaterThanOrEqual(59.5);
+    expect(fps).toBeLessThanOrEqual(60.5);
+  });
+
+  it('the 60 Hz cap is harmless at 60 Hz: every frame draws, also with rAF jitter', () => {
+    expect(drawn(engineHostCap(''), 60)).toBe(60);
+    const cap = engineHostCap('');
+    // 59.94 Hz with +-2 ms jitter (a real vsync): no frame is skipped.
+    let t = 0;
+    let skipped = 0;
+    for (let i = 0; i < 600; i++) {
+      t += 1000 / 59.94 + (i % 2 === 0 ? 2 : -2);
+      if (!cap.shouldDraw(t)) skipped++;
+    }
+    expect(skipped).toBe(0);
   });
 
   it('a 30 Hz display (energy saver) draws every frame under a 30 fps cap', () => {

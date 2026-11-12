@@ -160,6 +160,23 @@ def test_mass_tag_follows_pl_bmassprov(prov: str, tag: str, key: str | None) -> 
         assert "lower limit" in mass["assumption"]
 
 
+@pytest.mark.parametrize(
+    "reflink",
+    [
+        CALC,
+        "<a refstr=DUCROT_ET_AL__2020 href=https://ui.adsabs.harvard.edu/abs/2020A&A...640A.112D/"
+        "abstract target=ref>Ducrot et al. 2020</a>",
+    ],
+)
+def test_pl_eqt_is_derived_with_its_assumption_never_measured(reflink: str) -> None:
+    """#93 3.5: pl_eqt assumes an albedo and a heat redistribution, so it is ``derived`` with that
+    assumption stated, whether the archive calculated it or a paper did."""
+    teq = planet_card(row(pl_eqt=249.7, pl_eqt_reflink=reflink))["teq_K"]
+    assert teq["value"] == 249.7 and teq["tag"] == "derived"
+    assert teq["formula"].strip() and "albedo" in teq["assumption"]
+    assert "not a measured one" in teq["assumption"]
+
+
 def test_calculated_mass_is_never_measured_even_with_provenance_mass() -> None:
     mass = planet_card(row(pl_bmasse=5.0, pl_bmassprov="Mass", pl_bmasse_reflink=CALC))
     assert mass["mass_mearth"]["tag"] == "model_dependent"
@@ -212,7 +229,8 @@ def test_a_small_planet_without_pl_rade_falls_back_to_pl_radj() -> None:
 
 
 def test_asset_version_is_bumped_for_the_new_fields() -> None:
-    assert ASSET_VERSION == "11"
+    # 12: #93 section 5 card fields and 3.5 (pl_eqt derived); 13: #93 A2-A4, A6 data fixes
+    assert ASSET_VERSION == "13"
 
 
 def test_jupiter_radius_is_the_equatorial_one_defined_once() -> None:

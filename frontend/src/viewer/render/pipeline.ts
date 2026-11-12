@@ -9,6 +9,9 @@
 //   Renderer: getRenderTarget/setRenderTarget, getMRT/setMRT, getDrawingBufferSize,
 //     compileAsync(object, camera, targetScene)
 //   BloomNode: bloom(node, strength, radius, threshold), .setResolutionScale(s)
+//   PassNode#setResolutionScale(s) and RTTNode#setResolutionScale(s) (convertToTexture returns an
+//     RTTNode): both size their targets as floor(drawing buffer * s) every frame, so the scale can
+//     change between frames without a rebuild
 //   TAAUNode:  taau(beauty, depth, velocity, camera); needs MRT {output, velocity} from the pass
 //   SMAANode:  smaa(node); needs tone-mapped sRGB input, hence outputColorTransform = false
 import {
@@ -78,6 +81,11 @@ export const SETTLE_FRAMES_SMAA = 2;
 export interface ChainConfig {
   aa: AntiAlias;
   bloomScale: number;
+  /**
+   * Base scene scale (roadmap 1.14): the scene pass and the tone-mapped copy render at this
+   * fraction of the drawing buffer and TAAU upscales to full size. Always 1 with SMAA.
+   */
+  renderScale: number;
   /** TAAU needs a velocity attachment on the scene pass. */
   needsVelocity: boolean;
   /** Frames to render after a change so temporal anti-aliasing converges. */
@@ -95,6 +103,7 @@ export function chainConfig(tier: TierName, reducedMotion = false): ChainConfig 
   return {
     aa,
     bloomScale: t.bloomScale,
+    renderScale: aa === 'taau' ? t.renderScale : 1,
     needsVelocity: aa === 'taau',
     settleFrames: aa === 'taau' ? SETTLE_FRAMES_TAAU : SETTLE_FRAMES_SMAA,
   };
@@ -114,8 +123,18 @@ export class RenderChain {
    */
   private owned: Disposable[] = [];
   private scenePass: PassNode | null = null;
+  /** The tone-mapped copy (an RTTNode); its scale follows the scene pass's. */
+  private toneMapped: { setResolutionScale(s: number): unknown } | null = null;
   private cfg: ChainConfig;
   private tier: TierName;
+  /**
+   * Issue #50 / roadmap 1.3: bloom runs only while something on screen can pass its threshold. A
+   * scene with no HDR emitter gets a chain without the bloom pass; its output is identical, because
+   * bloom of a frame with nothing above the threshold adds exactly 0.
+   */
+  private bloomOn = true;
+  /** Scene scale in use now (dynamic resolution lowers it while the clock runs). */
+  private scaleNow = 1;
 
   /** Throws if the pipeline cannot be built; the caller falls back to `renderer.render`. */
   constructor(
@@ -127,6 +146,7 @@ export class RenderChain {
   ) {
     this.tier = tier;
     this.cfg = chainConfig(tier, reducedMotion);
+    this.scaleNow = this.cfg.renderScale;
     // No curve: the fallback path (plain renderer.render) then draws LDR exactly like the chain.
     renderer.toneMapping = NoToneMapping;
     this.build();
@@ -139,7 +159,35 @@ export class RenderChain {
   setTier(tier: TierName): void {
     this.tier = tier;
     this.cfg = chainConfig(tier, this.reducedMotion);
+    this.scaleNow = this.cfg.renderScale;
     this.build();
+  }
+
+  /** Whether the bloom pass runs (issue #50). Rebuilds the chain only on a change. */
+  setBloom(on: boolean): void {
+    if (on === this.bloomOn) return;
+    this.bloomOn = on;
+    this.build();
+  }
+
+  get bloomEnabled(): boolean {
+    return this.bloomOn;
+  }
+
+  /**
+   * Scene scale for the next frames (roadmap 2.5, dynamic resolution). Clamped to (0, base]; with
+   * SMAA it stays 1 (nothing upscales). No rebuild: the pass and the copy resize on their next frame.
+   */
+  setRenderScale(scale: number): void {
+    const s = this.cfg.aa === 'taau' ? Math.min(this.cfg.renderScale, Math.max(0.25, scale)) : 1;
+    if (s === this.scaleNow) return;
+    this.scaleNow = s;
+    this.scenePass?.setResolutionScale(s);
+    this.toneMapped?.setResolutionScale(s);
+  }
+
+  get renderScale(): number {
+    return this.scaleNow;
   }
 
   /** R9: no temporal jitter while the user asks for reduced motion. Rebuilds only on a change. */
@@ -147,6 +195,7 @@ export class RenderChain {
     if (reduced === this.reducedMotion) return;
     this.reducedMotion = reduced;
     this.cfg = chainConfig(this.tier, reduced);
+    this.scaleNow = this.cfg.renderScale;
     this.build();
   }
 
@@ -156,13 +205,15 @@ export class RenderChain {
     // fallback) would otherwise give the pass a 4x half-float MRT target on top of SMAA or TAAU.
     const scenePass = pass(this.scene, this.camera, { samples: 0 });
     if (this.cfg.needsVelocity) scenePass.setMRT(mrt({ output, velocity }));
+    scenePass.setResolutionScale(this.scaleNow);
     const color = scenePass.getTextureNode('output');
-    const glow = bloom(color, BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD);
-    glow.setResolutionScale(this.cfg.bloomScale);
+    const glow = this.bloomOn ? bloom(color, BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD) : null;
+    glow?.setResolutionScale(this.cfg.bloomScale);
     // Converted to a texture here (taau/smaa would do it internally) so its target can be disposed.
-    const toneMapped = convertToTexture(
-      renderOutput(clipHighlights(color.add(glow))),
-    ) as unknown as TextureNode;
+    // At the scene's scale, so TAAU sees a low-resolution input and upscales it (roadmap 1.14).
+    const rtt = convertToTexture(renderOutput(clipHighlights(glow ? color.add(glow) : color)));
+    rtt.setResolutionScale(this.scaleNow);
+    const toneMapped = rtt as unknown as TextureNode;
     next.outputColorTransform = false;
     const aaNode =
       this.cfg.aa === 'taau'
@@ -178,7 +229,8 @@ export class RenderChain {
     this.release();
     this.pipeline = next;
     this.scenePass = scenePass;
-    this.owned = [scenePass, glow, toneMapped, aaNode];
+    this.toneMapped = rtt;
+    this.owned = glow ? [scenePass, glow, toneMapped, aaNode] : [scenePass, toneMapped, aaNode];
   }
 
   /**
@@ -267,6 +319,7 @@ export class RenderChain {
     this.pipeline?.dispose();
     this.pipeline = null;
     this.scenePass = null;
+    this.toneMapped = null;
     for (const n of this.owned) n.dispose();
     this.owned = [];
   }

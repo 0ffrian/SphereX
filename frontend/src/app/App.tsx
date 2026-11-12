@@ -28,7 +28,8 @@ import { BuildPane } from './build/BuildPane';
 import { SelectedCard } from './build/SelectedCard';
 import { useSelectedBodyLoader } from './build/selectedBody';
 import { Island } from './island/Island';
-import { SoundProvider } from '@/haptics/SoundProvider';
+import { SoundProvider } from '@/sound/SoundProvider';
+import { SoundSettings } from '@/sound/ui/SoundSettings';
 import { ErrorBoundary } from './ErrorBoundary';
 
 /**
@@ -116,6 +117,10 @@ export function App() {
               {/* The page heading stays for assistive technology; the brand is not drawn (Q-124). */}
               <h1 className="sr-only">Shift &amp; Spectrum</h1>
               <FixtureBanner />
+              {/* R13.9 (Q-442): sound on/off, volume, ambience and Flashes; its click unlocks audio. */}
+              <ErrorBoundary area="The sound settings" resetKeys={resetKeys} className="ml-auto">
+                <SoundSettings className="ml-auto" />
+              </ErrorBoundary>
               <ErrorBoundary
                 area="The sky position"
                 resetKeys={resetKeys}

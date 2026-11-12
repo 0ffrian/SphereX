@@ -31,6 +31,8 @@
   | **+ Artistic** | adds `artistic` |
 
 - Haptics use the same filter. `teq_pulse` plays in "Measured only" only when Teq comes from Exoplanet Archive `pl_eqt` (`measured`); when it is `derived` it is silent there.
+  - **Amended by:** Q-359 (issue #93, 11 Nov 2026): the archive's `pl_eqt` is now `derived` (an assumed albedo), so `teq_pulse` plays in "Measured only" only for a measured `teq_K` ([physics-fixes](physics-fixes.md)).
+- **Card readouts:** Q-379 (issue #93, 12 Nov 2026): a planet's eclipse and phase-curve readouts are listed outside the engine panel with their badges, so a `measured` one is no longer reachable only at + Artistic; they follow this filter (decided by Atish, 12 Nov 2026: a `derived` readout is hidden at Measured only) ([physics-fixes](physics-fixes.md)).
 - **Why start at + Estimated:** everything shown on load is backed by data or a stated formula. Moving up to Artistic and down to Measured is the demo of the honesty story.
 - **Status note (9 Nov 2026):** Q-113 item 7 (built: Build it, Replay and New seed raise the global level to + Artistic) and Q-49 (should the showcase kinds start at + Artistic?) depart from the + Estimated start; open in Q-200.
 

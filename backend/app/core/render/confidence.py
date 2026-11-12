@@ -10,7 +10,10 @@ quantity ``i``; ``w_i`` is how much that quantity changes the picture.
 * ``model_dependent`` -> ``MODEL_DEPENDENT_C``; ``inferred_from_analog``, ``artistic`` and a
   missing value -> 0;
 * a value with error bars: ``c = 1 - sigma_data / sigma_class`` (relative sigma), never above the
-  tag's own ``c``.
+  tag's own ``c``;
+* an input drawn through a conversion (the gas-giant colour from Teq, a star's field from its
+  rotation) takes ``min(c of the value, c of the conversion's tag)`` and the weaker of the two tags
+  (#93 3.8).
 
 **The weights below are placeholders.** They come from the approved prototype's hand tables
 (Moon, 10 Nov 2026) until a sensitivity sweep exists. ``sweep_weights`` and
@@ -87,6 +90,9 @@ class Input:
     # A card input whose fields are usually absent (no survey measures them): with no field present
     # it takes this tag, like a ``fixed`` input, instead of ``missing``. Not offered in ``raise``.
     fallback_tag: str | None = None
+    # #93 3.8: the tag of the rule that turns the card value into the picture. The input's c is
+    # min(c of the value, c of this tag) and its status the weaker of the two tags.
+    conversion_tag: str | None = None
 
 
 def _card(
@@ -99,13 +105,15 @@ def _fixed(id_: str, label: str, w: float, tag: str | None) -> Input:
     return Input(id_, label, w, (), "any", tag, "fixed")
 
 
-def _derived(id_: str, label: str, w: float, *fields: str) -> Input:
-    return Input(id_, label, w, fields, "all", None, "card", True)
+def _derived(id_: str, label: str, w: float, *fields: str, conversion: str | None = None) -> Input:
+    return Input(id_, label, w, fields, "all", None, "card", True, None, conversion)
 
 
-def _card_or(id_: str, label: str, w: float, fallback: str, *fields: str) -> Input:
+def _card_or(
+    id_: str, label: str, w: float, fallback: str, *fields: str, conversion: str | None = None
+) -> Input:
     """A card input (mean over ``fields``) that falls back to ``fallback`` when none is present."""
-    return Input(id_, label, w, fields, "all", None, "card", False, fallback)
+    return Input(id_, label, w, fields, "all", None, "card", False, fallback, conversion)
 
 
 @dataclass(frozen=True)
@@ -179,7 +187,18 @@ _STAR = TypeTable(
         _card("radius", "Radius", 20, "radius_rsun"),
         _fixed("limb", "Edge darkening", 10, "model_dependent"),
         _card("spectral_class", "Spectral class", 10, "spectral_class"),
-        _card("motion", "Motion on the sky", 5, "pm_mas_yr"),
+        # #93 3.8: proper motion does not change the picture of the star (the Sun scored below
+        # Procyon only for having none), so its 5 go to the rotation period, which sets the
+        # magnetic field through the Reiners et al. 2022 law (model_dependent). Without one the
+        # Sun's Rossby number is assumed (inferred_from_analog, as cardToStar labels it).
+        _card_or(
+            "rotation",
+            "Rotation and magnetic field",
+            5,
+            "inferred_from_analog",
+            "rot_period_h",
+            conversion="model_dependent",
+        ),
         _fixed("cells", "Boiling cells", 15, "artistic"),
         _fixed("spots", "Spots", 10, "inferred_from_analog"),
     ),
@@ -189,8 +208,9 @@ _STAR = TypeTable(
 _MIRA = TypeTable(
     (
         _card("spectral_class", "Spectral class", 15, "spectral_class"),
-        _card("period", "Pulsation period", 15, "period_var_d"),
-        _card("motion", "Motion on the sky", 5, "pm_mas_yr"),
+        # #93 3.8: proper motion is dropped (it does not change the picture); its 5 go to the
+        # pulsation period, which drives the pulsation drawn.
+        _card("period", "Pulsation period", 20, "period_var_d"),
         _card("temperature", "Temperature and colour", 25, "teff_K"),
         _card("radius", "Radius", 15, "radius_rsun"),
         _fixed("limb", "Edge darkening", 5, "model_dependent"),
@@ -206,7 +226,8 @@ _GAS_GIANT = TypeTable(
         _card("mass", "Mass", 5, "mass_mearth"),
         _card("orbit", "Orbit and tides", 10, "orbit_au", "orbital_period_d", mode="all"),
         _card("temperature", "Temperature", 15, "teq_K"),
-        _derived("colour", "Colour", 10, "teq_K"),
+        # #93 3.8: the colour is a Sudarsky-style class chosen by Teq: a model, so model_dependent.
+        _derived("colour", "Colour", 10, "teq_K", conversion="model_dependent"),
         _fixed("bands", "Band structure", 20, "inferred_from_analog"),
         _fixed("storms", "Storms", 15, "artistic"),
         _fixed("turbulence", "Turbulence", 10, "artistic"),
@@ -392,13 +413,21 @@ def _score_input(card: Mapping[str, Any], inp: Input) -> tuple[float, str, tuple
             return 0.0, "missing", tuple(f for f, _ in have)
         # A formula of the card values: only as strong as its weakest input.
         c = min(r[0] for _, r in have)
-        return c, "derived", tuple(f for f, _ in have)
+        return (*_converted(inp, c, "derived"), tuple(f for f, _ in have))
     if inp.mode == "all":
         c = sum(r[0] for _, r in have) / len(inp.fields)
         tag = _weakest([r[1] for _, r in have])
-        return c, tag, tuple(f for f, _ in have)
+        return (*_converted(inp, c, tag), tuple(f for f, _ in have))
     best = max(have, key=lambda fr: (fr[1][0], -_RANK.index(fr[1][1]) if fr[1][1] in _RANK else 0))
-    return best[1][0], best[1][1], (best[0],)
+    return (*_converted(inp, best[1][0], best[1][1]), (best[0],))
+
+
+def _converted(inp: Input, c: float, tag: str) -> tuple[float, str]:
+    """#93 3.8: ``min(c, c of the conversion's tag)`` and the weaker tag, for an input drawn
+    through a conversion; unchanged without one."""
+    if inp.conversion_tag is None:
+        return c, tag
+    return min(c, _TAG_C[inp.conversion_tag]), _weakest([tag, inp.conversion_tag])
 
 
 # Tags that never satisfy the key measurement (Q-222): an analog or an artistic value is not data.

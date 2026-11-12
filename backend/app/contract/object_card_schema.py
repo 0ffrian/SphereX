@@ -194,6 +194,18 @@ class ObjectCard(BaseModel):
     diameter_km: TVNumber | None = None
     radius_rjup: TVNumber | None = None
     radius_rsun: TVNumber | None = None
+    lum_lsun: TVNumber | None = Field(
+        None,
+        description="Star luminosity in solar luminosities (Gaia DR3 FLAME lum_flame, model_dependent). Issue #93 B.",
+    )
+    mass_msun: TVNumber | None = Field(
+        None,
+        description="Star mass in solar masses (Gaia DR3 FLAME mass_flame, model_dependent). Issue #93 B.",
+    )
+    flare_rate_per_d: TVNumber | None = Field(
+        None,
+        description="Measured flare rate of a star, flares per day, from the literature registry. The band and the energy threshold or detection limit the rate refers to are stated in source (no common threshold exists across papers). Issue #93 C.",
+    )
     shape_source: TVString | None = None
     rot_period_h: TVNumber | None = None
     lightcurve_amp_mag: TVNumber | None = None
@@ -216,6 +228,30 @@ class ObjectCard(BaseModel):
     host_radius_rsun: TVNumber | None = None
     host_mass_msun: TVNumber | None = None
     host_age_gyr: TVNumber | None = None
+    orbit_ecc: TVNumber | None = Field(
+        None,
+        description="Orbital eccentricity, 0 to <1 (Exoplanet Archive pl_orbeccen). Issue #93 A.",
+    )
+    insolation_searth: TVNumber | None = Field(
+        None,
+        description="Stellar flux at the planet in units of the Earth's (Exoplanet Archive pl_insol). Issue #93 B.",
+    )
+    host_lum_lsun: TVNumber | None = Field(
+        None,
+        description="Host star luminosity in solar luminosities, 10^st_lum (Exoplanet Archive st_lum is log10 L/Lsun). Issue #93 B.",
+    )
+    dayside_temp_K: TVNumber | None = Field(
+        None,
+        description="Hemisphere-averaged brightness temperature of the day side (or of the hottest hemisphere, centred on the hotspot, when the source says so), K, from a secondary eclipse or phase curve. The bandpass is in source; a brightness temperature depends on it. Issue #93 C.",
+    )
+    nightside_temp_K: TVNumber | None = Field(
+        None,
+        description="Hemisphere-averaged brightness temperature of the night side, K, from a phase curve. The bandpass is in source. Issue #93 C.",
+    )
+    hotspot_offset_deg: TVNumber | None = Field(
+        None,
+        description="Longitude of the brightest point of a phase curve from the substellar point, degrees, positive east (in the direction of rotation). The bandpass is in source. Issue #93 C.",
+    )
     surface_pressure_bar: TVNumber | None = None
     surface_temperature_K: TVNumber | None = None
     surface_fluid: TVString | None = None
