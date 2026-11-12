@@ -1,0 +1,140 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Engine bench: fly path stability</title>
+<!--
+  Issue #93 2.5, 2.6: frame-to-frame stability of the ground texture along a fixed camera path. The fly camera
+  of one world moves sideways in small steps (flyMove); each pair of consecutive frames is split into 32 x 32 tiles
+  over the ground (the lower 60 % of the picture), and for each tile the best match within +-8 pixels is found
+  (Pearson correlation of the high-pass luminance). Ground detail fixed to the planet moves rigidly with the parallax
+  and matches well; detail laid out around the camera, or octaves that fade in and out, does not. Reports per engine
+  the mean and the 10th percentile of the tiles' best match over the path, and the fly frame time.
+  Query: id (t1f), alt (km, 3), step (km per frame, 0.05), n (frames, 16), ref (module folder of an older copy).
+-->
+<body style="margin: 0; background: #000">
+  <script type="module">
+    const out = {};
+    window.__out = out;
+    const Q = new URLSearchParams(location.search);
+    const id = Q.get('id') || 't1f',
+      alt = +(Q.get('alt') || 3),
+      step = +(Q.get('step') || 0.05),
+      n = +(Q.get('n') || 16),
+      Wd = 1280,
+      Hd = 720;
+    const realNow = performance.now.bind(performance);
+    let fake = null;
+    performance.now = () => (fake === null ? realNow() : (fake.t += fake.inc));
+    const lum = (buf, w, h) => {
+      const L = new Float32Array(w * h);
+      for (let i = 0; i < w * h; i++)
+        L[i] = 0.2126 * buf[i * 4] + 0.7152 * buf[i * 4 + 1] + 0.0722 * buf[i * 4 + 2];
+      return L;
+    };
+    function hp(L, w, h) {
+      const o = new Float32Array(w * h);
+      for (let y = 1; y < h - 1; y++)
+        for (let x = 1; x < w - 1; x++) {
+          const i = y * w + x;
+          o[i] = 4 * L[i] - L[i - 1] - L[i + 1] - L[i - w] - L[i + w];
+        }
+      return o;
+    }
+    function bestMatch(A, B, w, h) {
+      const T = 32,
+        R = 8,
+        res = [];
+      for (let ty = Math.floor(h * 0.4) + R; ty + T + R < h; ty += T)
+        for (let tx = R; tx + T + R < w; tx += T) {
+          let best = -1;
+          let sa = 0,
+            saa = 0;
+          for (let y = 0; y < T; y++)
+            for (let x = 0; x < T; x++) {
+              const a = A[(ty + y) * w + tx + x];
+              sa += a;
+              saa += a * a;
+            }
+          const N = T * T,
+            va = saa - (sa * sa) / N;
+          if (va < 1e-3 * N) continue;
+          for (let dy = -R; dy <= R; dy++)
+            for (let dx = -R; dx <= R; dx++) {
+              let sb = 0,
+                sbb = 0,
+                sab = 0;
+              for (let y = 0; y < T; y++) {
+                const ra = (ty + y) * w + tx,
+                  rb = (ty + y + dy) * w + tx + dx;
+                for (let x = 0; x < T; x++) {
+                  const a = A[ra + x],
+                    b = B[rb + x];
+                  sb += b;
+                  sbb += b * b;
+                  sab += a * b;
+                }
+              }
+              const vb = sbb - (sb * sb) / N;
+              if (vb <= 0) continue;
+              const c = (sab - (sa * sb) / N) / Math.sqrt(va * vb);
+              if (c > best) best = c;
+            }
+          res.push(best);
+        }
+      return res;
+    }
+    async function run(base, tag) {
+      const { createCore } = await import(base + 'core.js');
+      const { WP } = await import(base + 'presets.js');
+      const canvas = document.createElement('canvas');
+      canvas.style.cssText = `width:${Wd}px;height:${Hd}px;display:block`;
+      document.body.appendChild(canvas);
+      window.__sxPin = true;
+      const c = createCore(canvas, { role: 'fly' }),
+        gl = canvas.getContext('webgl2'),
+        W = c.W;
+      fake = { t: 0, inc: 1 };
+      c.setPreset(WP.find((q) => q.id === id));
+      while (W.spinup > 0) W.gl.tick(W.m, false, 1 / 60);
+      fake = null;
+      W.gl.draw(W.m);
+      W.fly = true;
+      W.flyAlt = W.m.gas ? Math.max(alt, 50) : alt;
+      if (!c.flyAimPeak()) c.flyAimDefault();
+      let prev = null;
+      const all = [],
+        ft = [];
+      for (let k = 0; k < n; k++) {
+        const t = realNow();
+        W.gl.draw(W.m);
+        const v = W.view,
+          img = new Uint8Array(v.gx * v.h * 4);
+        gl.readPixels(0, 0, v.gx, v.h, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        ft.push(realNow() - t);
+        const H = hp(lum(img, v.gx, v.h), v.gx, v.h);
+        // readPixels is bottom-up: flip so the ground (the picture's lower part) is at the high rows
+        const F = new Float32Array(H.length);
+        for (let y = 0; y < v.h; y++)
+          F.set(H.subarray((v.h - 1 - y) * v.gx, (v.h - y) * v.gx), y * v.gx);
+        if (prev) all.push(...bestMatch(prev, F, v.gx, v.h));
+        prev = F;
+        c.flyMove(0, step);
+      }
+      all.sort((a, b) => a - b);
+      ft.sort((a, b) => a - b);
+      out[tag] = {
+        tiles: all.length,
+        mean: +(all.reduce((s, x) => s + x, 0) / all.length).toFixed(4),
+        p10: +all[Math.floor(all.length * 0.1)].toFixed(4),
+        frame_ms: +ft[ft.length >> 1].toFixed(1),
+      };
+      canvas.remove();
+    }
+    try {
+      await run(Q.get('base') || '/src/engine/worlds/', 'cur');
+      if (Q.get('ref')) await run(Q.get('ref'), 'ref');
+    } catch (e) {
+      out.err = String(e && e.stack ? e.stack : e);
+    }
+    out.done = true;
+  </script>
+</body>

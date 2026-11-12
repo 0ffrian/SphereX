@@ -1,0 +1,374 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Engine bench: repeating patterns</title>
+<!--
+  Issue #93 phase 2 (repeating patterns). Two measurements:
+
+  what=corr: draws N card objects of one kind that differ only in their id (so only the seed differs) and reports
+  the pairwise Pearson correlation of their pictures (luminance: all; its high-pass detail: detail) as min, median,
+  90th percentile and max. A shared or shifted pattern shows as a high detail correlation. With ref=1 the same cards
+  are drawn by the older engine copy in /.bench-ref/ (see README.md) with the seed it used: worlds 1..997 along
+  (1, 1, 1), stars none, rocks rockSeed().
+    kind = world (Earth-like rock worlds), gas (HD 189733 b-like giants), star (Sun-like stars), rock (2 km asteroids)
+    n = number of cards (20 worlds, 10 gas, 10 stars, 20 rocks by default)
+
+  what=collide: two Earth-like card worlds whose seeds collided before #93 2.9 (FNV-1a mod 997), before and after.
+
+  what=presets: draws the prototype's presets (worlds on the globe, star rows, rock bodies) with this engine and with
+  the copy in /.bench-ref/ and reports the pixel difference (mean level, share of channels off by more than 8).
+-->
+<body style="margin: 0; background: #000">
+  <div id="host" style="position: relative; width: 480px; height: 480px"></div>
+  <script type="module">
+    const out = {};
+    window.__out = out;
+    const Q = new URLSearchParams(location.search);
+    const what = Q.get('what') || 'corr',
+      kind = Q.get('kind') || 'world',
+      useRef = Q.get('ref') === '1';
+    const SZ = 320;
+    const realNow = performance.now.bind(performance);
+    let fake = null;
+    performance.now = () => (fake === null ? realNow() : (fake.t += fake.inc));
+
+    const lum = (buf) => {
+      const L = new Float32Array(buf.length / 4);
+      for (let i = 0; i < L.length; i++)
+        L[i] = 0.2126 * buf[i * 4] + 0.7152 * buf[i * 4 + 1] + 0.0722 * buf[i * 4 + 2];
+      return L;
+    };
+    function blur(L, w, h, r) {
+      const t = new Float32Array(w * h),
+        o = new Float32Array(w * h);
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++) {
+          let s = 0,
+            n = 0;
+          for (let k = -r; k <= r; k++) {
+            const xx = x + k;
+            if (xx >= 0 && xx < w) ((s += L[y * w + xx]), n++);
+          }
+          t[y * w + x] = s / n;
+        }
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++) {
+          let s = 0,
+            n = 0;
+          for (let k = -r; k <= r; k++) {
+            const yy = y + k;
+            if (yy >= 0 && yy < h) ((s += t[yy * w + x]), n++);
+          }
+          o[y * w + x] = s / n;
+        }
+      return o;
+    }
+    function corr(a, b) {
+      let ma = 0,
+        mb = 0;
+      for (let i = 0; i < a.length; i++) ((ma += a[i]), (mb += b[i]));
+      ma /= a.length;
+      mb /= b.length;
+      let sab = 0,
+        saa = 0,
+        sbb = 0;
+      for (let i = 0; i < a.length; i++) {
+        const x = a[i] - ma,
+          y = b[i] - mb;
+        sab += x * y;
+        saa += x * x;
+        sbb += y * y;
+      }
+      return saa && sbb ? sab / Math.sqrt(saa * sbb) : 1;
+    }
+    const hp = (L) => {
+      const B = blur(L, SZ, SZ, 3);
+      return L.map((v, i) => v - B[i]);
+    };
+    function stats(v) {
+      const s = [...v].sort((a, b) => a - b),
+        q = (p) => +s[Math.min(s.length - 1, Math.floor(p * s.length))].toFixed(3);
+      return {
+        pairs: s.length,
+        min: q(0),
+        median: q(0.5),
+        p90: q(0.9),
+        max: +s[s.length - 1].toFixed(3),
+      };
+    }
+    function pairwise(imgs) {
+      const L = imgs.map(lum),
+        H = L.map(hp),
+        all = [],
+        det = [];
+      for (let i = 0; i < L.length; i++)
+        for (let j = i + 1; j < L.length; j++) {
+          all.push(corr(L[i], L[j]));
+          det.push(corr(H[i], H[j]));
+        }
+      // shared: the share of the detail's variance that all pictures have in common (variance of the ensemble mean
+      // over the mean variance); near 1 when the seed changes nothing, about 1/N for independent patterns
+      const M = new Float32Array(H[0].length);
+      for (const h of H) for (let i = 0; i < M.length; i++) M[i] += h[i] / H.length;
+      const vr = (a) => {
+        let m = 0,
+          v = 0;
+        for (const x of a) m += x;
+        m /= a.length;
+        for (const x of a) v += (x - m) * (x - m);
+        return v / a.length;
+      };
+      const vm = H.reduce((t, h) => t + vr(h), 0) / H.length;
+      const mad = [];
+      for (let i = 0; i < L.length; i++)
+        for (let j = i + 1; j < L.length; j++) {
+          let t = 0;
+          for (let k = 0; k < L[i].length; k++) t += Math.abs(L[i][k] - L[j][k]);
+          mad.push(t / L[i].length);
+        }
+      // mad: mean absolute luminance difference of a pair, in 8-bit levels
+      return {
+        all: stats(all),
+        detail: stats(det),
+        shared: +(vr(M) / vm).toFixed(3),
+        mad: stats(mad),
+        n: H.length,
+      };
+    }
+    function diff(a, b) {
+      if (a.length !== b.length) return 'sizes differ';
+      let s = 0,
+        big = 0,
+        mx = 0,
+        lv = 0;
+      for (let i = 0; i < a.length; i++) {
+        if ((i & 3) === 3) continue;
+        lv += a[i];
+        const d = Math.abs(a[i] - b[i]);
+        s += d;
+        if (d > 8) big++;
+        if (d > mx) mx = d;
+      }
+      const nch = (a.length / 4) * 3;
+      return {
+        level: +(lv / nch).toFixed(1),
+        mean_level: +(s / nch).toFixed(4),
+        over8_pct: +((big / nch) * 100).toFixed(4),
+        max: mx,
+      };
+    }
+    // FNV-1a folded to 1..997: the world seed before #93 2.9
+    const oldWorldSeed = (id) => {
+      let h = 0x811c9dc5;
+      for (let i = 0; i < id.length; i++) ((h ^= id.charCodeAt(i)), (h = Math.imul(h, 0x01000193)));
+      return ((h >>> 0) % 997) + 1;
+    };
+
+    // ---- worlds: the globe engine, one canvas, read back right after the draw ----
+    const worldCores = {};
+    async function worldCore(base) {
+      if (worldCores[base]) return worldCores[base];
+      const { createCore } = await import(base + 'core.js');
+      const { WP } = await import(base + 'presets.js');
+      const canvas = document.createElement('canvas');
+      canvas.style.cssText = `width:${SZ}px;height:${SZ}px;display:block`;
+      document.body.appendChild(canvas);
+      window.__sxPin = true;
+      const c = createCore(canvas, { role: 'both' });
+      return (worldCores[base] = {
+        c,
+        WP,
+        gl: canvas.getContext('webgl2', { preserveDrawingBuffer: true }),
+        canvas,
+      });
+    }
+    async function drawWorld(base, p, ocean, spin) {
+      const { c, gl } = await worldCore(base);
+      if (ocean != null) c.OCEANF[p.id] = ocean;
+      fake = { t: 0, inc: 1 };
+      c.setPreset(p);
+      const W = c.W;
+      if (spin != null) W.spinup = Math.min(W.spinup, spin);
+      while (W.spinup > 0) W.gl.tick(W.m, false, 1 / 60);
+      fake = null;
+      W.gl.draw(W.m);
+      const img = new Uint8Array(W.view.w * W.view.h * 4);
+      gl.readPixels(0, 0, W.view.w, W.view.h, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      return img;
+    }
+    // ---- stars: the globe-mode StarEngine; its surface canvas copied out right after the draw ----
+    async function drawStar(base, preset) {
+      const { StarEngine } = await import(base + 'StarEngine.ts');
+      const host = document.getElementById('host');
+      host.innerHTML = '';
+      const e = new StarEngine(host, { mode: 'globe', reducedMotion: true });
+      window.__sxPin = true;
+      e.setStar(preset);
+      e.inside.pReset();
+      e.draw();
+      const cv = host.querySelector('canvas');
+      const o = document.createElement('canvas');
+      o.width = o.height = SZ;
+      const g = o.getContext('2d');
+      g.drawImage(cv, 0, 0, SZ, SZ);
+      const img = g.getImageData(0, 0, SZ, SZ).data;
+      e.dispose();
+      return new Uint8Array(img.buffer.slice(0));
+    }
+    // ---- rocks: RockView.capture ----
+    async function drawRock(base, rock) {
+      const { RockView } = await import(base + 'RockView.ts');
+      const v = new RockView(true);
+      v.setBody(rock);
+      const url = v.capture(SZ);
+      v.dispose();
+      const im = new Image();
+      im.src = url;
+      await im.decode();
+      const o = document.createElement('canvas');
+      o.width = o.height = SZ;
+      const g = o.getContext('2d');
+      g.drawImage(im, 0, 0);
+      return new Uint8Array(g.getImageData(0, 0, SZ, SZ).data.buffer.slice(0));
+    }
+
+    const CUR = {
+      world: '/src/engine/worlds/',
+      star: '/src/engine/stars/',
+      rock: '/src/engine/rocks/',
+    };
+    const REF = {
+      world: '/.bench-ref/worlds/',
+      star: '/.bench-ref/stars/',
+      rock: '/.bench-ref/rocks/',
+    };
+
+    async function cards(ref) {
+      const { hashString32, seedVec } = await import('/src/engine/seed.ts');
+      const n = +(Q.get('n') || (kind === 'world' || kind === 'rock' ? 20 : 10));
+      const imgs = [];
+      for (let i = 0; i < n; i++) {
+        const id = 'bench-card-' + i,
+          h = hashString32(id);
+        if (kind === 'world' || kind === 'gas') {
+          const base = ref ? REF.world : CUR.world;
+          const { WP } = await worldCore(base);
+          const row = WP.find(
+            (q) => q.id === (Q.get('row') || (kind === 'world' ? 'earth' : 'hd')),
+          );
+          const p = { ...JSON.parse(JSON.stringify(row)), id, label: id };
+          if (ref) p.seed = oldWorldSeed(id);
+          else ((p.seed = h), (p.seed3 = seedVec(h)));
+          imgs.push(await drawWorld(base, p, kind === 'world' ? 0.71 : null, 240));
+        } else if (kind === 'star') {
+          const { PROTOTYPE_PRESETS } = await import('/src/engine/stars/cardToStar.ts');
+          const p = { ...PROTOTYPE_PRESETS.g, id, label: id };
+          if (!ref) ((p.seed = h), (p.so = seedVec(h)));
+          imgs.push(await drawStar(ref ? REF.star : CUR.star, p));
+        } else {
+          const base = ref ? REF.rock : CUR.rock;
+          const { cardToRock } = await import(base + 'cardToRock.ts');
+          const card = {
+            id,
+            name: id,
+            type: 'asteroid_procedural',
+            diameter_km: { value: 2, tag: 'measured' },
+          };
+          const r = cardToRock(card, { seed: h });
+          if (r.refused) throw new Error('rock refused');
+          imgs.push(await drawRock(base, r));
+        }
+      }
+      return pairwise(imgs);
+    }
+
+    async function presets() {
+      const res = {};
+      const worldIds = (
+        Q.get('ids') || 't1e,t1f,k186,k218,rivers,earth,tit,lava,hd,jup,sat,nep'
+      ).split(',');
+      for (const id of worldIds) {
+        const imgs = [];
+        for (const base of [CUR.world, REF.world]) {
+          const { WP } = await worldCore(base);
+          imgs.push(
+            await drawWorld(
+              base,
+              WP.find((q) => q.id === id),
+              null,
+              240,
+            ),
+          );
+        }
+        res['world:' + id] = diff(imgs[0], imgs[1]);
+      }
+      const { PROTOTYPE_PRESETS } = await import('/src/engine/stars/cardToStar.ts');
+      for (const id of Object.keys(PROTOTYPE_PRESETS)) {
+        const a = await drawStar(CUR.star, PROTOTYPE_PRESETS[id]),
+          b = await drawStar(REF.star, PROTOTYPE_PRESETS[id]);
+        res['star:' + id] = diff(a, b);
+      }
+      for (const [cid, d] of [
+        ['sbdb-50788063', 0.204],
+        ['sbdb-20101955', 0.49],
+        ['sbdb-20000433', 17],
+      ]) {
+        const imgs = [];
+        for (const base of [CUR.rock, REF.rock]) {
+          const { cardToRock } = await import(base + 'cardToRock.ts');
+          const r = cardToRock(
+            {
+              id: cid,
+              name: cid,
+              type: 'asteroid_procedural',
+              diameter_km: { value: d, tag: 'measured' },
+            },
+            { seed: 1 },
+          );
+          imgs.push(await drawRock(base, r));
+        }
+        res['rock:' + cid] = diff(imgs[0], imgs[1]);
+      }
+      return res;
+    }
+
+    try {
+      if (what === 'collide') {
+        // two world ids whose seeds collided before #93 2.9 (FNV-1a mod 997): their pictures before and after
+        const seen = {};
+        let pair = null;
+        for (let i = 0; !pair; i++) {
+          const k = oldWorldSeed('bench-card-' + i);
+          if (seen[k] != null) pair = [seen[k], i];
+          else seen[k] = i;
+        }
+        out.pair = pair.map((i) => 'bench-card-' + i);
+        const { hashString32, seedVec } = await import('/src/engine/seed.ts');
+        const imgs = { cur: [], ref: [] };
+        for (const ref of [false, true]) {
+          const base = ref ? REF.world : CUR.world;
+          const { WP } = await worldCore(base);
+          for (const id of out.pair) {
+            const p = {
+              ...JSON.parse(JSON.stringify(WP.find((q) => q.id === 'earth'))),
+              id,
+              label: id,
+            };
+            const h = hashString32(id);
+            if (ref) p.seed = oldWorldSeed(id);
+            else ((p.seed = h), (p.seed3 = seedVec(h)));
+            imgs[ref ? 'ref' : 'cur'].push(await drawWorld(base, p, 0.71, 240));
+          }
+        }
+        out.cur = pairwise(imgs.cur);
+        out.ref = pairwise(imgs.ref);
+      } else if (what === 'corr') {
+        out.kind = kind;
+        out.cur = await cards(false);
+        if (useRef) out.ref = await cards(true);
+      } else out.presets = await presets();
+    } catch (e) {
+      out.err = String(e && e.stack ? e.stack : e);
+    }
+    out.done = true;
+  </script>
+</body>

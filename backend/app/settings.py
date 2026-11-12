@@ -148,6 +148,9 @@ class Settings(BaseSettings):
     # within this margin of its edge (the interpolation error, a few arcsec at a 10 min step);
     # the exact Horizons position at the frame time then decides.
     moving_footprint_margin_arcsec: float = Field(default=60.0, ge=0)
+    # [verify] A19.5: the longest span one /path reply serves, in days (31 in the spec). Past it,
+    # explicit start/end answer 400 path_span_too_long and no parameters give the first window.
+    path_max_span_days: float = Field(default=31.0, gt=0)
 
     cors_origins: str = ""
     # A5.4 pre-baked assets: `<assets_dir>/<type>/<id>.json`, read only (stage 4).

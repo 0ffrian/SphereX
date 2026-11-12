@@ -178,7 +178,7 @@ sound/settings.ts              + ambienceOn, ambienceVolume, flashesOn, readCapt
 9. Whether `hM` (lava sea height) is reachable from the wrapper.
 10. Bake time and memory on the A15 (measured).
 
-The §19 items are rows 51 to 60 of [R12](../open-items.md); the harmonic branch by-ear check is row 61.
+The §19 items are rows 61 to 70 of [R12](../open-items.md); the harmonic branch by-ear check is row 71.
 
 ### Module contract (spec Appendix B)
 
