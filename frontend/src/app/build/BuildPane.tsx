@@ -11,6 +11,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -32,7 +33,7 @@ import { useAmbienceStore } from '@/app/sound/ambienceStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useSound, useSoundStatus } from '@/sound/SoundProvider';
 import { useSoundSettings } from '@/sound/settings';
-import { useSpringResize } from './exploreMotion';
+import { flyIsland, useSpringResize } from './exploreMotion';
 import { ExploreIcon } from './ExploreIcon';
 import type { MouldPhase } from './useMould';
 import { closeBuildPane } from './focus';
@@ -202,15 +203,29 @@ export function BuildPane() {
   // Q-456: minimised, the pane is hidden behind the island's pill: its keys stay off until restored,
   // and on restore focus goes back to its title.
   const minimised = useShellStore((s) => s.buildMinimised);
+  // Q-456: the pane (and its zoom card and paper button) shrinks into the island on a spring, in
+  // animate-ui's style, and only then is it hidden; restoring grows it back out of the island.
+  const flyEls = () => [
+    paneRef.current,
+    document.querySelector<HTMLElement>('[data-testid="build-zoom"]'),
+    document.querySelector<HTMLElement>('[data-testid="build-paper"]'),
+  ];
+  const stopFly = useRef<() => void>(() => {});
   const minimise = useCallback(() => {
     setPop(null);
-    useShellStore.getState().setBuildMinimised(true);
+    stopFly.current();
+    stopFly.current = flyIsland(flyEls(), 'in', () => useShellStore.getState().setBuildMinimised(true));
   }, [setPop]);
   const wasMini = useRef(minimised);
-  useEffect(() => {
-    if (wasMini.current && !minimised) titleRef.current?.focus({ preventScroll: true });
+  useLayoutEffect(() => {
+    if (wasMini.current && !minimised) {
+      titleRef.current?.focus({ preventScroll: true });
+      stopFly.current();
+      stopFly.current = flyIsland(flyEls(), 'out');
+    }
     wasMini.current = minimised;
   }, [minimised]);
+  useEffect(() => () => stopFly.current(), []);
   useEffect(() => {
     if (minimised) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
