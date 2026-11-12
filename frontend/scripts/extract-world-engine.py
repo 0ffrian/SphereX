@@ -488,13 +488,15 @@ function flyPasses() {
   FLY_FS = F;
 }
 flyPasses();'''
-DEV93_FLY_LOD = r'''// @deviation (#93 F3) the height reads, texture(s, uv) in hKm and in the Catmull-Rom crs(), become textureLod(s, uv, 0.).
-// No texture of the world engine has mipmaps and each one minifies and magnifies with the same filter, so both read the
-// same texels with the same weights: the picture is unchanged (measured: 0 levels of difference). But texture() takes
-// screen-space derivatives, and on ANGLE D3D11 fxc then flattens the branches around the height reads and runs both
-// sides; with textureLod() a branch that is not taken is skipped: the march and the normal when the G-buffer answers
-// (still frame, TRAPPIST-1 f at 3 km on the RTX 4060 Ti: 11.7 to 2.1 ms). Every texture() in FLY_FS would also make the
-// moving frame faster (13.1 to 10.5 ms) but the cold compile slower (median about 32 s against 22 s, Q-337): not done.
+DEV93_FLY_LOD = r'''// @deviation (#93 F3) the height reads (texture(s, uv) in hKm and in the Catmull-Rom crs()) and the gas giant's reads
+// (uVel, uBand in the uMode branch) become textureLod(s, uv, 0.). No texture of the world engine has mipmaps and each one
+// minifies and magnifies with the same filter, so both read the same texels with the same weights: the picture is
+// unchanged (measured: 0 levels of difference). But texture() takes screen-space derivatives, and on ANGLE D3D11 fxc
+// then flattens the branches around those reads and runs both sides; with textureLod() a branch that is not taken is
+// skipped. Measured on the RTX 4060 Ti (fly.html): the G-buffer's still frame no longer runs the march (TRAPPIST-1 f at
+// 3 km 11.7 to 0.5 ms), a rocky world no longer runs the gas giant's advection (moving 13.1 to 10.5 ms) and a gas giant
+// no longer runs the rocky march and shading (Jupiter at 50 km 9.7 to 0.6 ms). Every texture() in FLY_FS gave the same
+// frame times but a slower cold compile (median about 32 s against 22 s, Q-337), so only these reads are changed.
 function flyLod() {
   function lod(F) {
     var o = '', i = 0, k;
@@ -516,6 +518,7 @@ function flyLod() {
   }
   inside('vec4 crs(sampler2D t,vec2 uv){', 'float rsph(', 9);
   inside('float hKm(vec3 d){', 'float surfR(', 2);
+  inside('if(uMode>.5){\n   /* gas giant', '}else{\n   vec3 tA=', 3);
 }
 flyLod();'''
 

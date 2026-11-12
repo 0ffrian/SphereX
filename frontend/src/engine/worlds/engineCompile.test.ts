@@ -294,9 +294,10 @@ describe('fly view static G-buffer (issue #93 F3)', () => {
     expect(FLY_FS).toContain('else if(uGB>1.5){hit=GB1.x;p=ro+rd*hit;}');
     expect(FLY_FS).toContain('O1=GW1;O2=GW2;O3=GW3;');
     expect(FLY_FS).toContain('if(uGBsh>.5)sh=GB2.w;else if(dot(n,uLb)>0.)');
-    // the height reads take no derivatives, so fxc keeps the branches around them (textureLod at level 0: no texture
+    // the height and gas reads take no derivatives, so fxc keeps the branches around them (textureLod at level 0: no texture
     // has mipmaps); the other reads keep texture() (every one as textureLod compiles slower, Q-337)
-    expect(FLY_FS.match(/textureLod\(/g)?.length).toBe(11);
+    expect(FLY_FS.match(/textureLod\(/g)?.length).toBe(14);
+    expect(FLY_FS).toContain('vec4 v=textureLod(uVel,uvOf(dd),0.);');
     expect(FLY_FS).toContain('float e=HQ?crs(uHt,uv).r:textureLod(uHt,uv,0.).r');
   });
 
