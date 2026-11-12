@@ -228,8 +228,8 @@ export const RAIN_PARALLAX: readonly [number, number, number] = [1, 0.6, 0.35];
 export const RAIN_NEAR_M = 2;
 export const RAIN_LAYER_SHARE: readonly [number, number, number] = [0.25, 0.35, 0.4];
 /** Blue 18: widths (CSS px) and opacities per layer, raised for a projector [verify on the A15 + projector]. */
-export const RAIN_WIDTH_PX: readonly [number, number, number] = [2, 1.5, 1];
-export const RAIN_ALPHA: readonly [number, number, number] = [0.55, 0.4, 0.28];
+export const RAIN_WIDTH_PX: readonly [number, number, number] = [2, 1.5, 1.5];
+export const RAIN_ALPHA: readonly [number, number, number] = [0.55, 0.4, 0.35];
 /** Blue 22: the streak lean is clamped to this (rad). */
 export const RAIN_LEAN_MAX_RAD = Math.PI / 3;
 /** §8.5 snow: flake size per layer (CSS px), lateral wobble amplitude (px at the near layer) and rate (rad/s). */
@@ -249,6 +249,8 @@ export const BOLT_RGB: readonly [number, number, number] = [0.86, 0.91, 1];
 /** Bolt core and glow line widths (CSS px). */
 export const BOLT_CORE_PX = 2.5;
 export const BOLT_GLOW_PX = 8;
+/** Red 3: the bolt is clipped to the pane grown by this share of its height on every side. */
+export const BOLT_CLIP_MARGIN = 0.25;
 /** Blue 17: below this projected length (px) the bolt is not drawn, only its glow. */
 export const BOLT_MIN_PX = 12;
 /** Bolt shape: midpoint-displacement levels, lateral jitter (share of the segment length), branch count range. */

@@ -254,6 +254,36 @@ export function boltPolyline(seed: number, ax: number, ay: number, bx: number, b
   return lines;
 }
 
+/**
+ * Red 3: clip a screen segment to the rectangle [-m, W + m] x [-m, H + m] (Liang-Barsky), so a near strike whose deck
+ * point projects far above the pane keeps only the part that can be seen. Null when nothing is inside.
+ */
+export function clipToRect(
+  ax: number, ay: number, bx: number, by: number, W: number, H: number, m: number,
+): [number, number, number, number] | null {
+  if (!fin(ax, ay, bx, by, W, H, m)) return null;
+  const dx = bx - ax, dy = by - ay;
+  let t0 = 0, t1 = 1;
+  const p = [-dx, dx, -dy, dy];
+  const q = [ax + m, W + m - ax, ay + m, H + m - ay];
+  for (let i = 0; i < 4; i++) {
+    const pi = p[i]!, qi = q[i]!;
+    if (pi === 0) {
+      if (qi < 0) return null;
+    } else {
+      const r = qi / pi;
+      if (pi < 0) {
+        if (r > t1) return null;
+        if (r > t0) t0 = r;
+      } else {
+        if (r < t0) return null;
+        if (r < t1) t1 = r;
+      }
+    }
+  }
+  return [ax + dx * t0, ay + dy * t0, ax + dx * t1, ay + dy * t1];
+}
+
 /** Total length (px) of a set of polylines. */
 export function polylineLength(lines: readonly Float32Array[]): number {
   let s = 0;
