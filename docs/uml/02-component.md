@@ -209,11 +209,11 @@ flowchart TB
   subgraph Build["app/build (issue #60, R5.8)"]
     SelectedCard["SelectedCard: the object card"]
     BodyLoader["selectedBody.ts: useSelectedBodyLoader"]
-    BuildPane["BuildPane: header Accuracy, Ambience toggle, Explore, Details, Close; Replay, New seed (Q-419, Q-420)"]
+    BuildPane["BuildPane: header Accuracy, Ambience toggle, Explore, Details, Close; Replay, New seed (Q-419, Q-450)"]
     Mould["useMould + MouldStrip"]
     MouldAnim["MouldAnimation + mouldBody: mock-up moulding body, own WebGLRenderer (Q-415)"]
-    HearPanel["HearPanel + hearAudio (dormant, kept for Atish; no longer reachable from the header, Q-420): Atmosphere and spectrum sweep, own AudioContext (Q-416)"]
-    ExploreUI["ExploreIcon + exploreMotion: Explore toggle (compass on a spring) and the pane and close-up springs (Q-419, Q-420)"]
+    HearPanel["HearPanel + hearAudio (opens from the Hear it row in Details, Q-450; Atish's audio): Atmosphere and spectrum sweep, own AudioContext (Q-416)"]
+    ExploreUI["ExploreIcon + exploreMotion: Explore toggle (compass on a spring) and the pane and close-up springs (Q-419, Q-450)"]
   end
 
   TrackPane["Track pane (A20, to build): time slider, zoom, spectrum hop by hop"]
@@ -280,7 +280,7 @@ flowchart TB
   BodyLoader -->|"GET card, render-params"| BackendAPI
   BuildPane --> Mould
   BuildPane --> MouldAnim
-  BuildPane -.->|"dormant since Q-420"| HearPanel
+  BuildPane -->|"Details: Hear it row (Q-450)"| HearPanel
   BuildPane --> ExploreUI
   Mould -->|"showPlan, whenLoaded, setMould"| ViewerApp
   ViewerApp --> MouldRig

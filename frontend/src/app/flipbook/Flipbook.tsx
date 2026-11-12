@@ -145,7 +145,7 @@ function BuildItButton({ onBuild }: { onBuild(): void }) {
 function TopTabs({ name, onClose }: { name: string; onClose(): void }) {
   return (
     <div className="fb-over">
-      <h2 className="fb-name" title={name} data-testid="object-name">
+      <h2 className="fb-name" title={name} tabIndex={-1} data-testid="object-name">
         {name}
       </h2>
       <span className="sx-kn-btns">

@@ -48,7 +48,7 @@ export const useCloseUpStore = create<CloseUpState>((set) => ({
   engineWorld: null,
   reducedMotion: false,
   info: null,
-  // Moon (12 Nov 2026, Q-419/Q-420): off until Explore is pressed; then the choice holds for the session.
+  // Moon (12 Nov 2026, Q-419/Q-450): off until Explore is pressed; then the choice holds for the session.
   hidden: true,
   held: false,
   publish: (p) => set(p),

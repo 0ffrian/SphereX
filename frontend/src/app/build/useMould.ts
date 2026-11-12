@@ -170,6 +170,9 @@ export function useMould(inp: MouldInputs): MouldState {
           finish();
           return;
         }
+        // Q-451: the show is the strip's one clock, so its end ends this build. Merge rule with the
+        // #93 engine PRs (#122, #124, #125; PR #107 review): their hold / 'forming' phase must still
+        // win, so once they land this finishes only after the engine has formed the world.
         if (useMouldLive.getState().shownFor === token) {
           finish(true);
           return;

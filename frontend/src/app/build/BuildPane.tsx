@@ -103,7 +103,7 @@ export function BuildPane() {
   const [shiftedSeq, setShiftedSeq] = useState(-1);
   const shifted = !build.animate || shiftedSeq === build.seq;
   const paneRef = useRef<HTMLElement>(null);
-  // Full view or the right half: the pane springs between them (transform only, Q-420).
+  // Full view or the right half: the pane springs between them (transform only, Q-450).
   useSpringResize(paneRef, shifted && !closeHidden && closeKind ? 'half' : 'full');
   useEffect(() => {
     if (!build.animate || phase !== 'done') return;
@@ -122,7 +122,9 @@ export function BuildPane() {
     popRef.current = next;
     setPopState(next);
     if (next === null && returnFocus && prev) {
-      requestAnimationFrame(() => buttonRefs.current[prev]?.focus());
+      // Hear it has no header button any more (Q-450): it opens from Details, so focus goes back there.
+      const back = prev === 'hear' ? 'details' : prev;
+      requestAnimationFrame(() => buttonRefs.current[back]?.focus());
     }
   }, []);
 
@@ -304,9 +306,9 @@ export function BuildPane() {
             <p data-testid="build-subtitle">{subtitle}</p>
           </div>
           <div className="sx-bp-tools" role="group" aria-label="Build tools">
-            {/* Moon (12 Nov 2026, Q-420): Accuracy, Ambience, Explore, Details, then close. Ambience is a
-                toggle (off, crossed out, until clicked; local synthesis for now, Q-416) and replaces
-                Hear it: there is no "listen to the wavelengths" any more. Explore is the split view
+            {/* Moon (12 Nov 2026, Q-450): Accuracy, Ambience, Explore, Details, then close. Ambience is a
+                toggle (off, crossed out, until clicked; local synthesis for now, Q-416) and takes Hear it's
+                place in the header; Hear it opens from a row in Details (PR #107 review). Explore is the split view
                 (the close-up on the left). Where there is no atmosphere to hear, Ambience stays
                 visible but off, and its name says why. */}
             {renderPop(POP_BUTTONS[0]!)}

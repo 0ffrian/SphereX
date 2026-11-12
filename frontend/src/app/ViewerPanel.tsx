@@ -794,6 +794,8 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
               </>
             ))}
         </section>
+        {/* Hear it (Atish's audio, Q-416): no header button since Q-450; Details opens it ("Hear it"
+            row). Keep it mounted: the sound PRs route the sweep and the chord through this panel. */}
         <section hidden={pop !== 'hear'} data-testid="build-pop-hear">
           <HearPanel active={pop === 'hear'} name={displayName(plan?.name)} />
         </section>
@@ -939,6 +941,18 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
               <b>Details</b>
               <span>{displayName(plan?.name)}</span>
             </div>
+            {/* Q-450 (PR #107 review, Atish): Hear it left the header, so Details keeps the way into it
+                (the spectrum sweep, and the chord the sound PRs add there). */}
+            <button
+              type="button"
+              className="sx-bp-row-btn"
+              aria-controls={BUILD_POP_ID}
+              onClick={() => pane.onPop?.('hear')}
+              data-testid="build-open-hear"
+            >
+              <span>Hear it</span>
+              <span className="sx-bp-row-sub">The spectrum as sound, and the atmosphere</span>
+            </button>
             {engineStar && <StarEngineDetails />}
           </>
         )}
