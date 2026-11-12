@@ -105,7 +105,7 @@ export function App() {
   useSearchShortcut();
   useSelectedBodyLoader();
   const buildOpen = useShellStore((s) => s.build.open);
-  // Q-456: a minimised build stays mounted (hidden), and the sky is the view again.
+  // Q-457: a minimised build stays mounted (hidden), and the sky is the view again.
   const buildMini = useShellStore((s) => s.buildMinimised);
   const split = buildOpen && !buildMini;
   // Under the phone sheet the sky must not be reachable by Tab or a screen reader.
@@ -123,7 +123,7 @@ export function App() {
               {/* The page heading stays for assistive technology; the brand is not drawn (Q-124). */}
               <h1 className="sr-only">Shift &amp; Spectrum</h1>
               <FixtureBanner />
-              {/* Q-455: no Sound control on the sky; the sound settings sit in the build view's Ambience dropdown. */}
+              {/* Q-456: no Sound control on the sky; the sound settings sit in the build view's Ambience dropdown. */}
               <ErrorBoundary
                 area="The sky position"
                 resetKeys={resetKeys}

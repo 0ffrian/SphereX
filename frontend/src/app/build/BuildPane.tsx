@@ -159,7 +159,7 @@ export function BuildPane() {
   // anywhere in the page that is not a text field (mock-up: Esc closes the build).
   // Ambience (the wind that outlives the Hear it panel) must always be visible and stoppable (WCAG 1.4.2).
   const ambienceOn = useAmbienceStore((s) => s.ambience && s.playing);
-  // Q-455: Ambience opens a dropdown (this body's atmosphere and the sound settings, AmbiencePanel).
+  // Q-456: Ambience opens a dropdown (this body's atmosphere and the sound settings, AmbiencePanel).
   // Its click unlocks audio (Q-73: a user gesture). The icon is crossed out until something can be
   // heard: before the first click, with Sound off, or with neither the atmosphere nor the fly view's
   // ambience on.
@@ -200,10 +200,10 @@ export function BuildPane() {
     if (popRef.current) setPop(null, true);
     else closeBuildPane();
   }, [setPop]);
-  // Q-456: minimised, the pane is hidden behind the island's pill: its keys stay off until restored,
+  // Q-457: minimised, the pane is hidden behind the island's pill: its keys stay off until restored,
   // and on restore focus goes back to its title.
   const minimised = useShellStore((s) => s.buildMinimised);
-  // Q-456: the pane (and its zoom card and paper button) shrinks into the island on a spring, in
+  // Q-457: the pane (and its zoom card and paper button) shrinks into the island on a spring, in
   // animate-ui's style, and only then is it hidden; restoring grows it back out of the island.
   const flyEls = () => [
     paneRef.current,
@@ -337,7 +337,7 @@ export function BuildPane() {
           </div>
           <div className="sx-bp-tools" role="group" aria-label="Build tools">
             {/* Moon (12 Nov 2026, Q-450): Accuracy, Ambience, Explore, Details, then close. Ambience
-                opens a dropdown with this body's atmosphere and the sound settings (Q-455; crossed out
+                opens a dropdown with this body's atmosphere and the sound settings (Q-456; crossed out
                 until something can be heard); Hear it opens from a row in Details (PR #107 review).
                 Explore is the split view (the close-up on the left). */}
             {renderPop(POP_BUTTONS[0]!)}
@@ -442,7 +442,7 @@ export function BuildPane() {
           {say}
         </p>
       </aside>
-      {/* Q-456: no dock in the build view (Moon); the zoom card and the paper link stay. */}
+      {/* Q-457: no dock in the build view (Moon); the zoom card and the paper link stay. */}
       <ZoomBar />
       <ReadPaper />
     </>

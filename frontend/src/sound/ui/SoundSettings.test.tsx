@@ -1,4 +1,4 @@
-// R13.9 / R13.10 (Q-442; moved into the build view's Ambience dropdown by Q-455): each control
+// R13.9 / R13.10 (Q-442; moved into the build view's Ambience dropdown by Q-456): each control
 // updates the saved settings, every slider has a visible label, and the status line names each state.
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

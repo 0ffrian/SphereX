@@ -47,7 +47,7 @@ export interface ShellState {
   minimised: boolean;
   setMinimised(on: boolean): void;
   /**
-   * The build view is minimised into the island's pill (Moon, 13 Nov 2026, Q-456): the pane stays
+   * The build view is minimised into the island's pill (Moon, 13 Nov 2026, Q-457): the pane stays
    * mounted but hidden, so a click on the pill brings the same body back without a rebuild. Opening
    * or closing a build clears it.
    */
