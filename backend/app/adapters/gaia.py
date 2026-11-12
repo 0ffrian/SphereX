@@ -215,7 +215,9 @@ def _lum(r: dict[str, str], column: str) -> float | None:
     v = tap.opt_float(r[column])
     if v is None or v == 0:
         return None
-    return v / LUM_FLAME_SCALE
+    # Shift the decimal point in the text, so 3398.05347 comes back as 0.00339805347 and not as
+    # 0.0033980534699999997 (the binary rounding of a division).
+    return float(f"{v!r}e-6") if LUM_FLAME_SCALE == 1_000_000 else v / LUM_FLAME_SCALE
 
 
 def parse_astro(body: bytes) -> list[GaiaAstro]:
