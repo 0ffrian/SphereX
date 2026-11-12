@@ -21,6 +21,7 @@ import { useShellStore } from './shell/shellStore';
 import { isEditableTarget, isSearchShortcut } from './shell/shortcuts';
 import { SkyDock } from './shell/SkyDock';
 import { SkyZoom } from './shell/SkyZoom';
+import { FrameRate } from './shell/FrameRate';
 import { Transport } from './shell/Transport';
 import { SkyPane } from './sky/SkyPane';
 import { useHashSync } from './useHashSync';
@@ -193,6 +194,7 @@ export function App() {
                 className="absolute top-4 left-4 z-30"
               >
                 <Transport />
+                <FrameRate />
               </ErrorBoundary>
             </div>
             {/* Issue #66 (mock-up `.island-wrap`): the island, over everything in the bezel. */}

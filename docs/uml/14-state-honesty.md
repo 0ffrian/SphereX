@@ -1,6 +1,6 @@
 # 14 State: honesty toggle
 
-The three-state honesty toggle in the 3D view, one state per badge: which tags each state shows and which haptics stay active. Drawn from rendering doc §5.3, §7.7, §8.2, §9, §11 (honesty test) and decisions D-02, D-12 and D-21. **Changed by Q-412 (PR #104, Proposed):** in the build pane the toggle is a compact **Show** row inside the Details dropdown, no longer at the top of the pane; the states and transitions are unchanged. Q-416: the Hear it Atmosphere (artistic) still plays at Measured only until it is wired to this filter.
+The three-state honesty toggle in the 3D view, one state per badge: which tags each state shows and which haptics stay active. Drawn from rendering doc §5.3, §7.7, §8.2, §9, §11 (honesty test) and decisions D-02, D-12 and D-21. **Changed by Q-412 (PR #104, Proposed):** in the build pane the toggle is a compact **Show** row inside the Details dropdown, no longer at the top of the pane; the states and transitions are unchanged. Q-416, Q-450: the Ambience toggle (artistic Atmosphere, local synthesis) still plays at Measured only until it is wired to this filter; Hear it opens from Details.
 
 ```mermaid
 stateDiagram-v2

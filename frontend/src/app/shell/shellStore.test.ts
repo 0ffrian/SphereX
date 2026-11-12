@@ -46,3 +46,22 @@ describe('build pane state', () => {
     expect(b.seedOffset).toBe(0);
   });
 });
+
+describe('minimise the object panel into the island', () => {
+  it('is set by setMinimised and cleared by closing, choosing a tool or building', () => {
+    const s = () => useShellStore.getState();
+    s().setTool('flipbook');
+    s().setMinimised(true);
+    expect(s().minimised).toBe(true);
+    expect(s().tool).toBe('flipbook');
+    s().closePanel();
+    expect(s().minimised).toBe(false);
+    s().setTool('flipbook');
+    s().setMinimised(true);
+    s().setTool('spectrum');
+    expect(s().minimised).toBe(false);
+    s().setMinimised(true);
+    s().openBuild(true);
+    expect(s().minimised).toBe(false);
+  });
+});
