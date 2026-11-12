@@ -451,6 +451,17 @@ describe('samplePlace: gas giants (§6.6)', () => {
     expect(e.gasCalls).toBe(3);
   });
 
+  it('no model wind scale: jetU is null (refuse rather than invent), never 0', () => {
+    const r = recorder();
+    samplePlace(
+      fakeEngine({ gas: true, gasField: field, model: { U: undefined } }),
+      gasAir,
+      r.windAt,
+      { now: () => 0 },
+    );
+    expect(r.calls[0]!.jetU).toBeNull();
+  });
+
   it('no gas field yet: neutral storms, still a wind', () => {
     const p = samplePlace(fakeEngine({ gas: true, gasField: null }), gasAir, recorder().windAt, {
       now: () => 0,
@@ -547,6 +558,33 @@ describe('samplePlace: reuse and cost (ruling 5)', () => {
     expect(p3.samples[1]!.bearing).toBeCloseTo(e.fly.head, 12);
     const fresh = samplePlace(e, a, recorder().windAt, { reuseFraction: 0 })!;
     expect(fresh.samples[1]!.bearing).toBeCloseTo(e.fly.head, 12);
+  });
+
+  it('a change of altitude alone resamples: z_km, R and the ring radii follow a climb and a descent (PR #122 review 1)', () => {
+    const e = fakeEngine({ elev: terrain, fly: { lon: 0.3, lat: 0.2, alt: 2, head: 0.4 } });
+    const a = air();
+    const check = (alt: number) => {
+      e.fly.alt = alt;
+      const p = samplePlace(e, a, recorder().windAt)!;
+      const z = alt + 3 * (e.groundKm(0.3, 0.2) - p.samples[0]!.h_km);
+      expect(p.features.z_km).toBeCloseTo(Math.max(z, 0.002), 9);
+      const R = reachKm(p.features.z_km);
+      for (let r = 0; r < 3; r++)
+        expect(p.samples[1 + r * 12]!.s_km).toBeCloseTo([0.25, 0.5, 1][r]! * R, 9);
+      expect(p.samples[0]!.d_m).toBeCloseTo(Math.max(p.features.z_km * 1000, 2), 6);
+      return p;
+    };
+    const low = check(2);
+    const high = check(50);
+    expect(high.features.z_km).toBeGreaterThan(low.features.z_km + 40);
+    expect(high.samples[13]!.s_km).toBeGreaterThan(low.samples[13]!.s_km * 5);
+    const back = check(2);
+    expect(back.features.z_km).toBeCloseTo(low.features.z_km, 9);
+    // a tiny altitude change inside 1 % of R keeps the heights but still reports the new z
+    e.fly.alt = 2.001;
+    const tiny = samplePlace(e, a, recorder().windAt)!;
+    expect(tiny.samples.map((q) => q.h_km)).toEqual(back.samples.map((q) => q.h_km));
+    expect(tiny.features.z_km).toBeCloseTo(back.features.z_km + 0.001, 9);
   });
 
   it('cost: full sampling, hovering and auto-flight at 10 Hz (logged; asserted loosely)', () => {

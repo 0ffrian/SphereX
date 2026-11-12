@@ -422,6 +422,7 @@ describe('planSweep limits (security review)', () => {
         s.pitch = 0.5;
         return s;
       },
+      points: () => [],
     };
     const p = planSweep(mapping)!;
     expect(p.steps.every((st) => Number.isFinite(st.level))).toBe(true);

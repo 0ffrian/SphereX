@@ -107,7 +107,7 @@ interface ObjectCard {
 }
 ```
 
-**Eclipse and phase-curve readouts (issue #93 A10, Q-379).** For a planet card, `measuredReadouts` (`engine/worlds/cardToWorld.ts`) turns `dayside_temp_K`, `nightside_temp_K` and `hotspot_offset_deg` into readouts. `ViewerPanel` lists them at every honesty level (`planet-measured`), each with its tag badge, and the world engine's panel also lists them at + Artistic. A null value is not shown.
+**Eclipse and phase-curve readouts (issue #93 A10, Q-379).** For a planet card, `measuredReadouts` (`engine/worlds/cardToWorld.ts`) turns `dayside_temp_K`, `nightside_temp_K` and `hotspot_offset_deg` into readouts. `ViewerPanel` lists them at the honesty levels their tags allow (`planet-measured`), each with its tag badge, and the world engine's panel also lists them at + Artistic. A null value is not shown.
 
 | Field | Label | Value text |
 |---|---|---|
@@ -117,7 +117,7 @@ interface ObjectCard {
 
 - The label never says "measured": the tag badge says how the value is known.
 - The band ("at 4.5 µm") is read from the band named in `source`; with no band in `source` it is left out.
-- The list is not filtered by the honesty toggle, so a `derived` readout also shows in Measured only with its Estimated badge; whether text readouts follow D-21 is open (Q-379).
+- The list follows the honesty toggle like any other value (Q-379, decided by Atish, 12 Nov 2026): a `measured` readout shows from Measured only, a `derived` one (HD 189733 b's offset) from + Estimated.
 
 ### R3.4 RenderParams (produced by the backend: `GET /v1/objects/{id}/render-params`)
 
