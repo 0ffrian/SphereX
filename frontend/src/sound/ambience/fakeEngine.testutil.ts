@@ -118,3 +118,62 @@ export function makePlace(z_km: number, fn: SampleFn = () => ({}), features: Par
   }));
   return { lon: 0, lat: 0, head, samples, features: makeFeatures({ z_km, ...features }) };
 }
+
+export interface FlyEngineInit {
+  fly?: Partial<WorldEngineLike['fly']>;
+  spinup?: number;
+  /** R12: the climate and hydro fields are not there yet (cpuFields returns null for both). */
+  forming?: boolean;
+  /** Ground height, km (uniform). */
+  elev?: number;
+  rain?: number;
+}
+
+/**
+ * A fake engine with real grids (terrain, climate, hydro, weather) so the REAL buildAirModel and samplePlace run on it
+ * (#116 code review M1, m4: the loop test at 400 km and the spin-up bench). Earth calibration model; uniform land.
+ * `calls` counts readouts() (buildAirModel's worldUi cost). Mutate `spinup`, `forming` and `fly` between ticks.
+ */
+export function makeFlyEngine(init: FlyEngineInit = {}) {
+  const W = 360,
+    H = 180,
+    NX = 90,
+    NY = 45,
+    RW = 128,
+    RH = 64;
+  const data = new Float32Array(W * H * 2).fill(init.elev ?? 0.2);
+  for (let k = 1; k < data.length; k += 2) data[k] = 0;
+  const n = NX * NY;
+  const T = new Float32Array(n).fill(288);
+  const out = new Float32Array(n * 4),
+    out2 = new Float32Array(n * 4);
+  for (let k = 0; k < n; k++) {
+    out[k * 4] = 288;
+    out[k * 4 + 3] = 0.5;
+    out2[k * 4] = init.rain ?? 0;
+  }
+  const hydro = { img: new Uint8Array(RW * RH * 4), RW, RH, lava: false, hM: 0, n: 12 };
+  const st = { Ps: 1, fluid: 'water' as FluidKey, gas: false, locked: false };
+  const eng = {
+    spinup: init.spinup ?? 0,
+    forming: init.forming ?? false,
+    calls: 0,
+    fly: { alt: 1, lon: 0.3, lat: 0.2, head: 0.5, pitch: -0.1, auto: false, ...init.fly },
+    readouts: () => {
+      eng.calls++;
+      return { model: EARTH_MODEL };
+    },
+    state: () => st,
+    cpuFields: () => ({
+      terrain: { W, H, data },
+      climate: eng.forming ? null : { NX, NY, T, land: new Uint8Array(n).fill(1), stats: { ocean: 0.71, max: 295 } },
+      hydro: eng.forming ? null : hydro,
+    }),
+    weatherFields: () => ({ NX, NY, iceH: new Float32Array(n), snow: new Float32Array(n), out, out2, cyclones: [] }),
+    gasField: () => null,
+    groundKm: () => init.elev ?? 0.2,
+    flyCameraBasis: () => null,
+    altRange: (): [number, number] => [0.3, 3000],
+  };
+  return eng;
+}

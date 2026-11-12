@@ -515,8 +515,8 @@ def test_warm_cache_runs_demo_targets_at_startup(fixture_cache: Path, tmp_path: 
     with TestClient(create_app(settings)) as client:
         warm = client.app.state.warm  # type: ignore[attr-defined]
         warm.join(timeout=60)
-        assert warm.done == ["simbad-wisea-j085510-74-071442-5"]  # demo group only
-        job = client.app.state.pipeline.jobs.get(warm.done[0])  # type: ignore[attr-defined]
+        assert warm.done == ["WISE J085510.83-071442.5"]  # demo group only
+        job = client.app.state.pipeline.jobs.get("simbad-wisea-j085510-74-071442-5")  # type: ignore[attr-defined]
         assert job is not None and job.snapshot()["state"] == "done"
 
 

@@ -35,6 +35,20 @@ sound/audioGraph.ts            + getBus('ambience'|'events'|'spectrum'), ducking
 sound/settings.ts              + ambienceOn, ambienceVolume, flashesOn, readCaptions (hapticsOn removed)
 ```
 
+**As built in #116** ([Q-448](../../decisions/sound-ambience.md)), in `frontend/src/sound/ambience/` unless a path is given:
+
+| File | What it holds |
+|---|---|
+| `mixer.ts` | the §10 graph |
+| `ambienceState.ts` | the §13 reducer |
+| `ambienceLoop.ts` | the per-tick pipeline |
+| `ambienceHolder.ts` | the palette and mixer, kept for 2 minutes |
+| `ambienceStore.ts` | the UI model |
+| `useAmbience.ts` | the hook |
+| `weatherBus.ts` | the WeatherVisualFrame shared with #117, which replaces the planned `useWeather` sharing |
+| `ui/SoundChip.tsx`, `ui/WhatYouHear.tsx` | the chip and the panel |
+| `frontend/sound-check.html`, `frontend/src/soundCheck/` | the sound-check page |
+
 ### Tests (Vitest; FakeAudioContext; no network)
 
 1. **`air.ts`:**
