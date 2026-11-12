@@ -3,8 +3,8 @@
 // routes (resolve, card, render-params) and /data/demo-textures are passed through to a backend
 // this spec starts: its cache is a copy of backend/tests/fixtures/cache with the SPHEREx frame
 // entries removed, so the only way "WISE 0855-0714" can build is its committed pack asset.
-// Expect X-SX-Asset-Status: saved, the note "Built ahead of time from the same data", and the
-// baked maps fetched from /data/demo-textures.
+// Expect X-SX-Asset-Status: saved and the baked maps fetched from /data/demo-textures. (UNVERIFIED
+// after the D-38 redesign: it needs the Python backend, which was not run here.)
 // Needs `uv` and the backend's environment (`uv sync` in backend/). Run it with --workers=1.
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { cpSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
@@ -16,7 +16,6 @@ import { expect, test } from '@playwright/test';
 const BACKEND_PORT = Number(process.env.SX_E2E_BACKEND_PORT ?? 8791);
 const BACKEND = `http://localhost:${BACKEND_PORT}`;
 const BACKEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../backend');
-const PREBUILT = 'Built ahead of time from the same data';
 
 let server: ChildProcess | null = null;
 let cacheRoot = '';
@@ -106,7 +105,8 @@ test('Build it on a pack row renders the body offline, as a saved asset', async 
   await expect(pane).toBeVisible();
   await expect(pane).toHaveAttribute('data-phase', 'done', { timeout: 60_000 });
   await expect(page.getByTestId('build-message')).toHaveCount(0);
-  await expect(page.getByTestId('build-prebuilt')).toHaveText(PREBUILT);
+  // The "Built ahead of time" note (Q-164) is no longer shown in the build pane since the redesign;
+  // the saved-asset status header below is what this spec checks now.
   expect(statuses).toContain('saved');
   // The pack's maps are served by the read-only mount, with no network behind it (the viewer asks
   // for them only at the honesty levels that draw them).
