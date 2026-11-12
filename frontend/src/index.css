@@ -4667,3 +4667,9 @@ body {
     backdrop-filter: none;
   }
 }
+
+/* Minimise beside close in a card header (Q-418): only the first button pushes right, so the two
+   sit together (4px apart) instead of splitting the free space between them. */
+.sx-panel-head .sx-panel-x + .sx-panel-x {
+  margin-left: -7px;
+}
