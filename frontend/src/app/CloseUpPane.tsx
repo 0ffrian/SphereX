@@ -53,6 +53,10 @@ export function closeUpKindOf(type: string | null | undefined): CloseUpKind | nu
   }
 }
 
+/**
+ * The close-up's name per kind. Unused in the UI since Q-450 (the header toggle is always "Explore");
+ * kept on purpose for the Details row or a tooltip that names the view, and covered by its test.
+ */
 export function closeUpButtonLabel(kind: CloseUpKind | null): string {
   return kind === 'orbit' ? 'Surface view' : 'Close-up view';
 }
@@ -90,7 +94,7 @@ export function CloseUpPane() {
     kind !== null &&
     (engine || world || rockEngine ? !held : info !== null && info.mode !== null);
   const [, bump] = useReducer((n: number) => n + 1, 0);
-  // Q-420: the pane springs in first and its engine starts a couple of frames later, so starting the
+  // Q-450: the pane springs in first and its engine starts a couple of frames later, so starting the
   // engine (a new WebGL context, shaders) never holds up the first frames of the slide. On close the
   // picture stays until the fade has finished.
   // `live` names the stage that is mounted, so a new object's stage never starts while the pane is closed.
@@ -98,6 +102,8 @@ export function CloseUpPane() {
   const [liveKey, setLiveKey] = useState<string | null>(null);
   useEffect(() => {
     if (open) return deferFrames(() => setLiveKey(stageKey));
+    // Merge rule with #122 (PR #107 review): once WorldFlyStage can pause, a world stage stays mounted
+    // and paused after close, so a reopen skips the shader compile; only other stages unmount here.
     const id = window.setTimeout(() => setLiveKey(null), 700);
     return () => window.clearTimeout(id);
   }, [open, stageKey]);

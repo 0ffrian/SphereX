@@ -8,6 +8,7 @@ The reference for these rules is the approved preview of the Accuracy and Detail
 
 - **Dark, to sit with the sky.** Panels and cards are near-black with a trace of blue (`--bg #08090b`, `--s1 #0f1114`), darker than Penrose's Graphite, so they read as part of the night sky and the black bezel rather than grey boxes on top (Moon, 11 Nov 2026). Not pure black: the `--s1` to `--s3` steps still give depth, and text stays off pure white.
 - **Depth from tone, not shadow.** Surfaces step `--s1` to `--s3`. No glows, no coloured shadows, no gradients.
+  - **Glass exception (Q-418, Q-452).** The matte-glass surfaces that float over the sky (player, sky dock, zoom card, readout, island and its cards, frame-rate menu, sky info) have no solid tone to step from, so they may carry two neutral black shadows, and nothing else may: `--glass-lift` (`0 10px 30px` at 35%) to lift the glass off the sky, and `--glass-text-shadow` (`0 1px 2px` at 60%) under small text on the glass, for contrast over bright sky. Never coloured, never a glow. Hovers on the glass use `--glass-hover` (a glass button) and `--glass-veil-hover` (a row inside the glass).
 - **The accent is rationed.** Use it for focus, a switch that is on, and links. Never use it for a border around a selected button.
 - **Colour that means something stays.** The provenance colours (measured, physics, assumed: D-02) and the status colours are data, not decoration. Nothing else is coloured.
 - **Show the label, the data and the action.** Fold explanations into rows that open; don't stack paragraphs.

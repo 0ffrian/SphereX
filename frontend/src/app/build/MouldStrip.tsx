@@ -2,7 +2,7 @@
 // `loop`). The steps come from the plan (viewer/mould/mouldSteps.ts). Progress is written straight
 // to the DOM every frame (no React render per frame): a step is "active" while it runs (green ring
 // and glow), "done" when it ends (the number turns into a tick), and its bar fills with progress.
-// Once the last step is done the chips leave one after another (Q-421): a staggered spring with a
+// Once the last step is done the chips leave one after another (Q-451): a staggered spring with a
 // blur fade, animate-ui's exit (https://animate-ui.com, built on `motion`, pinned in package.json).
 import { useEffect, useImperativeHandle, useRef, type Ref } from 'react';
 import { animate, stagger } from 'motion';

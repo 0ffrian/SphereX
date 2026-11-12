@@ -140,6 +140,21 @@ describe('ViewerPanel', () => {
     expect(fake.setEngineOwned).toHaveBeenLastCalledWith(false);
   });
 
+  it('Details opens Hear it, which has no header button since Q-450 (PR #107 review)', async () => {
+    const { card, params } = fixture('star');
+    engine.pane = true;
+    useAppStore.getState().setObject(card, params);
+    const onPop = vi.fn();
+    await act(async () => {
+      root.render(<ViewerPanel pane={{ seq: 0, animate: false, seedOffset: 0, pop: 'details', onPop }} />);
+    });
+    await act(async () => {});
+    const row = container.querySelector<HTMLButtonElement>('[data-testid="build-open-hear"]')!;
+    expect(row.textContent).toContain('Hear it');
+    await act(async () => row.click());
+    expect(onPop).toHaveBeenCalledWith('hear');
+  });
+
   it('announces a governor tier drop in plain words, but not a manual tier change', async () => {
     await mount();
     const handler = fake.setQualityChangeHandler.mock.calls.at(-1)?.[0] as

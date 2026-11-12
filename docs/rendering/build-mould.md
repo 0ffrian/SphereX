@@ -6,6 +6,8 @@
 
 > **Changed by [Q-415](../decisions/shell-surfaces.md) (PR #104):** the moulding animation shown for at least 5 s on every build (cached bodies too) is the mock-up's own generic body of the object's kind (`build/MouldAnimation.tsx`, `build/mouldBody.ts`), fed by the card's temperature, colour and elongation where present, on its own plain three `WebGLRenderer`. It is decorative and `aria-hidden`, seeded so it is deterministic, and the real render replaces it. This departs from "the moulding presents the real plan" below; the extra GL context is outside the D-03 and D-37 budget (open in Q-415).
 
+> **Changed by [Q-419, Q-450 and Q-451](../decisions/shell-surfaces.md) (PR #107, 12 Nov 2026):** the build view opens full width with no close-up; the close-up (left) and the shift to the right half come only when the user turns on **Explore** in the header (`closeUpStore.hidden` starts `true`; the choice then holds for the session). The header reads Accuracy, Ambience, Explore, Details, close; Hear it opens from a row in Details. The mould show is the strip's one clock: its end ends the build, every step lasts at least 0.7 s, and the steps only move forward (Q-451).
+
 These are the presentation rules of the one 3D view (Q-113, as amended by Q-120). How a user reaches it from the sky (marker click, card, brackets, rail) is shell behaviour, specified in A21 ([sky-shell.md](../architecture/sky-shell.md)). Every R5 rule applies inside the pane.
 
 **One 3D view and the split**

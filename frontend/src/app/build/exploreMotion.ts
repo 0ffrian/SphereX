@@ -1,4 +1,4 @@
-// Explore's transitions (Moon, 12 Nov 2026, Q-420): springs in the style of animate-ui
+// Explore's transitions (Moon, 12 Nov 2026, Q-450): springs in the style of animate-ui
 // (https://animate-ui.com), which is built on `motion` (pinned in package.json). Only transform and
 // opacity are animated, so motion hands them to the compositor (WAAPI): they keep running while the
 // close-up's engine starts on the main thread, and no canvas is resized on every frame.

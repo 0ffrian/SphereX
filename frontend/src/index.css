@@ -1160,7 +1160,7 @@ body {
     background-color: #03030788;
     background-image: radial-gradient(70% 60% at 50% 45%, #1b1b2c66 0%, transparent 72%);
     animation: sx-bp-in 0.45s;
-    /* The width changes at once and the pane springs there by transform (exploreMotion.ts, Q-420):
+    /* The width changes at once and the pane springs there by transform (exploreMotion.ts, Q-450):
        animating the width resized the body's canvas on every frame. */
     transition: background-color 0.9s var(--sx-ease);
   }
@@ -2153,7 +2153,7 @@ body {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  /* Opacity and transform are sprung by motion (CloseUpPane, Q-420); visibility waits for the fade. */
+  /* Opacity and transform are sprung by motion (CloseUpPane, Q-450); visibility waits for the fade. */
   transition: visibility 0s 0.4s;
 }
 .sx-cu.open {
@@ -4595,6 +4595,12 @@ body {
   --glass-hi: rgba(255, 255, 255, 0.07);
   --glass-inner: rgba(255, 255, 255, 0.06);
   --glass-inner-edge: rgba(255, 255, 255, 0.07);
+  /* Hover on glass: a button that is itself glass darkens; a row inside the glass gets a veil. */
+  --glass-hover: rgba(30, 32, 36, 0.75);
+  --glass-veil-hover: rgba(255, 255, 255, 0.08);
+  /* The one shadow D-38 allows (design-language.md, glass exception): neutral, to lift the glass off the sky. */
+  --glass-lift: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --glass-text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   /* Fractal noise at a few percent white: the matte grain. */
   --glass-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
@@ -4616,7 +4622,7 @@ body {
   border-color: var(--glass-edge);
   box-shadow:
     inset 0 1px 0 var(--glass-hi),
-    0 10px 30px rgba(0, 0, 0, 0.35);
+    var(--glass-lift);
 }
 /* Once the island has grown into a card, the card is the glass: the orb under it goes clear, so
    the tint is not laid on twice. */
@@ -4633,7 +4639,7 @@ body {
   border-color: var(--glass-inner-edge);
 }
 :is(.sx-panel, .sx-player) :is(.fb-ov:hover:not(:disabled), .fb-x:hover, .fb-stop:hover) {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-veil-hover);
 }
 /* Separator lines inside the cards follow the glass edge. */
 .sx-panel :is(.sx-panel-head, .fb-rows, .sx-rows) {
@@ -4705,7 +4711,7 @@ body {
   margin-left: -7px;
 }
 
-/* The build view's Ambience and Explore toggles (Q-420). A toggle with nothing to do (no atmosphere
+/* The build view's Ambience and Explore toggles (Q-450). A toggle with nothing to do (no atmosphere
    to hear) stays visible, dimmed, and says why. */
 .sx-bp-toggle[aria-disabled='true'] {
   opacity: 0.4;
@@ -4741,7 +4747,7 @@ body {
 }
 .sx-credit-btn:hover,
 .sx-credit-btn[aria-expanded='true'] {
-  background: var(--glass-grain), rgba(30, 32, 36, 0.75);
+  background: var(--glass-grain), var(--glass-hover);
   color: var(--fg);
 }
 .sx-sky-credit {
@@ -4814,7 +4820,7 @@ body {
 }
 .sx-fps-btn:not([aria-disabled='true']):hover,
 .sx-fps-btn[aria-expanded='true'] {
-  background: var(--glass-grain), rgba(30, 32, 36, 0.75);
+  background: var(--glass-grain), var(--glass-hover);
 }
 .sx-fps-btn[aria-disabled='true'] {
   opacity: 0.4;
@@ -4844,16 +4850,17 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  height: 32px;
+  /* D-38: menu rows in panels are 40 px (44 px on a phone, below). */
+  height: 40px;
   padding: 0 10px;
-  border-radius: 7px;
+  border-radius: 6px;
   font-size: 13px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 .sx-fps-item:hover,
 .sx-fps-item:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-veil-hover);
   color: var(--fg);
 }
 .sx-fps-item[aria-checked='true'] {
@@ -4863,7 +4870,7 @@ body {
 /* Small text on the glass keeps its contrast over the brightest sky (the Galactic plane, nebula
    cores): a soft dark shadow under it (design review of PR #107; Q-418's open contrast check). */
 :is(.sx-sky-credit, .sx-fps-btn, .sx-fps-menu, .sx-player, .sx-fl, .sx-coords) {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  text-shadow: var(--glass-text-shadow);
 }
 /* Phone: the speed menu opens to the left of its button (it sits near the right edge), its rows
    are 44 px to tap, and the sky's info button is 44 px too. */
@@ -4886,6 +4893,38 @@ body {
   }
   .sx-sky-credit {
     bottom: 60px;
+  }
+}
+
+/* Details' way into Hear it (Q-450): a full-width outline row, like the panel's other buttons (D-38). */
+.sx-bp-row-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  font-size: 13px;
+  text-align: left;
+}
+.sx-bp-row-btn:hover {
+  background: var(--s2);
+}
+.sx-bp-row-btn:active {
+  transform: scale(0.98);
+}
+.sx-bp-row-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+@media (pointer: coarse) {
+  .sx-bp-row-btn {
+    min-height: 44px;
   }
 }
 

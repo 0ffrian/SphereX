@@ -1,4 +1,4 @@
-// The Explore button's icon (Moon, 12 Nov 2026, Q-420): a compass whose needle swings on a spring
+// The Explore button's icon (Moon, 12 Nov 2026, Q-450): a compass whose needle swings on a spring
 // when the close-up opens or closes, and wiggles on hover, in the style of animate-ui's animated
 // icons. The geometry is lucide's `compass` (ISC). Decorative: the button's text names it.
 import { motion, useReducedMotion } from 'motion/react';
