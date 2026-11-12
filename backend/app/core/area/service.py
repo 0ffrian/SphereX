@@ -51,6 +51,8 @@ from app.core.area.store import (
     index_reply,
     settings_sha,
 )
+from app.core.area.track import TrackCheck
+from app.core.area.track import check as track_check
 from app.core.card.validate import check
 from app.core.export.ecsv import EcsvColumn, write_ecsv
 from app.core.find.stars import StarCone
@@ -111,6 +113,8 @@ class AreaResult:
     cutouts: Mapping[str, bytes]  # frame_id -> cutout body (for the stamps stage)
     served: list[Served] = field(default_factory=list)
     sources: dict[str, str] = field(default_factory=dict)
+    # designation -> A19.12 check (``with_track``); absent means not checked, so false.
+    track: dict[str, TrackCheck] = field(default_factory=dict)
 
     @property
     def missing_dots(self) -> list[str]:
@@ -126,8 +130,16 @@ class AreaResult:
         return sorted({*self.known.missing, *extra})
 
     def input_digests(self) -> list[str]:
+        """A17.10: every input body. The Track entries (frames, path, spectrum) of an object
+        with ``track_available`` true are inputs of ``/known``, so they count too; an area
+        whose Known objects all lack them keeps the hash it had before issue #129."""
         mine = [hashlib.sha256(s.entry.body).hexdigest() for s in self.served]
-        return sorted({*self.frames.input_digests, *mine})
+        tracked = [d for c in self.track.values() if c.available for d in c.digests]
+        return sorted({*self.frames.input_digests, *mine, *tracked})
+
+    def track_available(self, designation: str) -> bool:
+        c = self.track.get(designation)
+        return c is not None and c.available
 
     def params_hash(self) -> str:
         return params_hash(self.settings, self.input_digests())
@@ -204,6 +216,16 @@ def run_area(
         served,
         {**DEFAULT_SOURCES, **(sources or {})},
     )
+
+
+def with_track(ctx: Context, result: AreaResult) -> AreaResult:
+    """Fill ``result.track`` for every Known object with an ``object_id`` (A17.5 step 4, A19.12).
+    Reads the cache only (``track.check``); an object without an id stays false."""
+    for o in result.known_objects:
+        oid = result.object_ids.get(o.candidate.designation)
+        if oid is not None:
+            result.track[o.candidate.designation] = track_check(ctx, oid)
+    return result
 
 
 # --- replies ------------------------------------------------------------------------------------
@@ -342,9 +364,8 @@ def build_replies(result: AreaResult) -> dict[str, dict[str, Any]]:
                     {"frame_id": p.frame_id, "time": p.time, "ra": p.ra, "dec": p.dec}
                     for p in o.positions
                 ],
-                # ASSUMPTION: A19.12's condition (frame list, path and spectrum final) cannot hold
-                # until Track's path endpoint (A19.5, ticket T1) exists, so it is false for now.
-                "track_available": False,
+                # A19.12: frames, path and spectrum final in the cache (``with_track``).
+                "track_available": result.track_available(o.candidate.designation),
             }
             for o in result.known_objects
         ],

@@ -200,6 +200,25 @@ def frames_key(
     )
 
 
+def object_frames_key(ctx: Context, obj: ResolvedObject) -> CacheKey:
+    """``frames_key`` for one object, with a moving object's path-search settings."""
+    cfg = moving.MovingConfig.from_context(ctx, obj.spkid) if obj.moving else None
+    return frames_key(ctx, obj.id, moving_cfg=cfg)
+
+
+def stored_result(obj: ResolvedObject, body: bytes) -> FramesResult:
+    """A stored frame list (the body of a ``frames_key`` entry) as a ``FramesResult``."""
+    doc = json.loads(body)
+    cached = doc.get("sources_earliest_fetched_at")
+    return FramesResult(
+        object_id=obj.id,
+        frames=[FrameRecord.from_stored(f) for f in doc["frames"]],
+        missing=list(doc["missing"]),
+        cached_at=parse_utc(cached) if cached else None,
+        has_proper_motion=has_proper_motion(obj),
+    )
+
+
 class FrameService:
     def __init__(self, ctx: Context) -> None:
         self.ctx = ctx
@@ -306,15 +325,7 @@ class FrameService:
         if not (refresh or rebuild):
             entry = self.ctx.cache.get(key)
             if entry is not None:
-                doc = json.loads(entry.body)
-                cached = doc.get("sources_earliest_fetched_at")
-                return FramesResult(
-                    object_id=obj.id,
-                    frames=[FrameRecord.from_stored(f) for f in doc["frames"]],
-                    missing=list(doc["missing"]),
-                    cached_at=parse_utc(cached) if cached else None,
-                    has_proper_motion=has_pm,
-                )
+                return stored_result(obj, entry.body)
         handoff = not unlimited_live and live_cap is None and self.on_request is not None
         served: list[Served]
         missing: list[str]
