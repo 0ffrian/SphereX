@@ -326,12 +326,13 @@ export function simSourceFor(
 }
 
 /**
- * `?sim=own|shared|worker`. The default is one shared simulation on the main thread. The worker (`?sim=worker`) keeps
- * the main thread free (longest task while forming 2 to 5 ms against 50 to 150 ms) but formed the globe 25 to 40 %
- * slower than the old engine on the 4060 Ti desktop (12 Nov 2026), so it waits for the lead's call and the A15 run.
+ * `?sim=own|shared|worker`. The default is the worker (Atish, 12 Nov 2026): it keeps the main thread free (longest task
+ * while forming 2 to 5 ms against 50 to 150 ms) and the fly view forms at once, at the cost of the globe forming 10 to
+ * 40 % slower than the old engine on the 4060 Ti desktop. Without Worker support it runs on the main thread (above).
+ * `?sim=shared` is the main-thread fallback. [verify] the globe's forming time on the A15.
  */
 export function simModeFromQuery(search = typeof location === 'undefined' ? '' : location.search) {
   const q = new URLSearchParams(search).get('sim');
   if (q === 'own' || q === 'shared' || q === 'worker') return q;
-  return 'shared';
+  return 'worker';
 }
