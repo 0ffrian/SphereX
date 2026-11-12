@@ -3,7 +3,7 @@ Offline on the recorded fixture cache; the autouse socket guard plays the unplug
 
 from __future__ import annotations
 
-import time
+import shutil
 from pathlib import Path
 
 import httpx
@@ -98,12 +98,8 @@ def test_preflight_passes_on_a_cached_row(
     monkeypatch.setattr(card_to_params, "TEXTURE_HEIGHT", 32)
     settings = make_settings(fixture_cache, bake_textures=True, bake_workers=0)
     with TestClient(create_app(settings)) as client:
-        oid = client.get("/v1/resolve", params={"q": WISE.query}).json()["id"]
-        client.get(f"/v1/objects/{oid}/render-params")
-        baker = client.app.state.baker  # type: ignore[attr-defined]
-        deadline = time.monotonic() + 60
-        while baker._inflight and time.monotonic() < deadline:
-            time.sleep(0.05)
+        # Cold: nothing baked yet. The params name the texture at once and the bake lands in the
+        # background; the preflight's 404 retry waits for it (PR #105 review).
         assert preflight.run(client, [WISE]) == 0
     out = capsys.readouterr().out
     for label in ("resolve", "card", "render-params", "texture", "frames", "spectrum", "cutout"):
@@ -113,7 +109,7 @@ def test_preflight_passes_on_a_cached_row(
 
 def test_preflight_fails_on_a_cache_miss(client: TestClient, capsys: object) -> None:
     miss = preflight.Row("Nowhere", "No Such Object 103")
-    assert preflight.run(client, [WISE, miss]) == 1
+    assert preflight.run(client, [WISE, miss], texture_wait_s=0) == 1
     out = capsys.readouterr().out  # type: ignore[attr-defined]
     assert "FAIL Nowhere" in out and "503" in out and "offline_cache_miss" in out
 
@@ -150,7 +146,7 @@ def test_preflight_fails_when_backend_is_down(capsys: object) -> None:
 
 def test_wait_warm_fails_when_warm_start_is_off(client: TestClient) -> None:
     assert preflight.wait_warm(client, timeout_s=5, sleep=lambda _: None) is False
-    assert preflight.run(client, [WISE], warm_timeout_s=5) == 1
+    assert preflight.run(client, [WISE], warm_timeout_s=5, texture_wait_s=0) == 1
 
 
 def test_wait_warm_polls_until_finished() -> None:
@@ -175,7 +171,7 @@ def test_preflight_passes_frames_false_rows_on_the_fixture_cache(
     would answer 503 offline, so they are skipped, and the row passes."""
     rows = [r for r in preflight.demo_rows(Settings().targets_file) if not r.frames]
     assert len(rows) == 2
-    assert preflight.run(client, rows) == 0
+    assert preflight.run(client, rows, texture_wait_s=0) == 0
     out = capsys.readouterr().out  # type: ignore[attr-defined]
     assert out.count(preflight.SKIPPED_NO_FRAMES) == 6  # frames, spectrum, cutout per row
     assert "preflight: PASS" in out
@@ -202,10 +198,38 @@ def test_preflight_fetches_one_texture(capsys: object) -> None:
     }
     with _mock({**ok, "albedo.webp": httpx.Response(200, content=b"RIFF")}) as c:
         assert preflight.run(c, [WISE]) == 0
+    slept: list[float] = []
     with _mock({**ok, "albedo.webp": httpx.Response(404, json={"detail": "Not Found"})}) as c:
-        assert preflight.run(c, [WISE]) == 1  # the bake never landed
+        assert preflight.run(c, [WISE], texture_wait_s=10, sleep=slept.append) == 1  # never landed
+    assert len(slept) == 5  # 10 s at the 2 s poll, then it gives up
     out = capsys.readouterr().out  # type: ignore[attr-defined]
-    assert "!! texture" in out
+    assert "!! texture" in out and "still 404 after 10 s" in out
+
+
+def test_preflight_texture_404_is_retried_until_the_bake_lands(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    textures = {"albedo": "/data/textures/x/albedo.webp", "height": "/h.png", "normal": "/n.png"}
+    answers = iter([404, 404, 200])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path.endswith("albedo.webp"):
+            code = next(answers)
+            return httpx.Response(code, content=b"RIFF" if code == 200 else b"{}")
+        if path == "/v1/resolve":
+            return httpx.Response(200, json={"id": "x"})
+        if path.endswith("/render-params"):
+            return httpx.Response(200, json={"textures": textures})
+        if path.endswith("/frames"):
+            return httpx.Response(200, json={"frames": []})
+        return httpx.Response(200, json={"warm": {"state": "off"}})
+
+    slept: list[float] = []
+    with httpx.Client(base_url="http://sx", transport=httpx.MockTransport(handler)) as c:
+        assert preflight.run(c, [WISE], sleep=slept.append) == 0
+    assert len(slept) == 2
+    assert "bake landed, 3 tries" in capsys.readouterr().out
 
 
 def test_preflight_fails_on_a_bad_200_without_crashing(capsys: object) -> None:
@@ -246,21 +270,44 @@ def test_warm_start_finishes_when_a_job_cannot_start(offline_settings: Settings)
     assert warm.failed == [WISE.query]
 
 
-def test_smoke_offline_skips_frames_false_targets(
-    fixture_cache: Path, tmp_path: Path, monkeypatch: object, capsys: object
-) -> None:
+def _run_smoke(
+    cache: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, targets_toml: str
+) -> int:
     from scripts import smoke_offline
 
-    targets = _targets(
-        tmp_path,
-        '[[target]]\nname = "TRAPPIST-1 e"\nquery = "TRAPPIST-1 e"\ngroup = "demo"\n'
-        "frames = false\n",
-    )
-    for key, value in {
-        "SX_CACHE_DIR": str(fixture_cache),
-        "SX_TARGETS_FILE": str(targets),
-    }.items():
-        monkeypatch.setenv(key, value)  # type: ignore[attr-defined]
-    monkeypatch.setattr(smoke_offline, "block_network", lambda: None)  # type: ignore[attr-defined]
-    assert smoke_offline.main(["--group", "demo"]) == 0
-    assert "SKIP TRAPPIST-1 e" in capsys.readouterr().out  # type: ignore[attr-defined]
+    monkeypatch.setenv("SX_CACHE_DIR", str(cache))
+    monkeypatch.setenv("SX_TARGETS_FILE", str(_targets(tmp_path, targets_toml)))
+    monkeypatch.setenv("SX_ASSETS_DIR", str(cache / "no-prebaked-assets"))
+    monkeypatch.setenv("SX_BAKE_TEXTURES", "0")
+    monkeypatch.setattr(smoke_offline, "block_network", lambda: None)
+    return smoke_offline.main(["--group", "demo"])
+
+
+TRAPPIST_E = (
+    '[[target]]\nname = "TRAPPIST-1 e"\nquery = "TRAPPIST-1 e"\ngroup = "demo"\nframes = false\n'
+)
+
+
+def test_smoke_offline_skips_frames_only_for_frames_false(
+    fixture_cache: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert _run_smoke(fixture_cache, tmp_path, monkeypatch, TRAPPIST_E) == 0
+    out = capsys.readouterr().out
+    assert "OK   TRAPPIST-1 e" in out and "frames=skipped" in out
+
+
+def test_smoke_offline_still_fails_a_frames_false_archive_gap(
+    fixture_cache: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Skipping /frames must not skip the gap check: a lost Exoplanet Archive answer is exactly
+    what matters for a catalogue-only exoplanet (PR #105 review)."""
+    shutil.rmtree(fixture_cache / "v1" / "exoplanet_archive")
+    assert _run_smoke(fixture_cache, tmp_path, monkeypatch, TRAPPIST_E) == 1
+    out = capsys.readouterr().out
+    assert "FAIL TRAPPIST-1 e" in out and "exoplanet_archive" in out

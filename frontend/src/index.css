@@ -4588,3 +4588,84 @@ body {
 .sx-bezel[data-split] .sx-top {
   pointer-events: none;
 }
+
+/* #111 (R13.9): the Sound control in the top bar. Its open popover lifts the top bar above the
+   object panel (z 20) and the sky credit (z 25), so the popover is never covered. */
+.sx-top:has(.sx-sound-pop:not([hidden])) {
+  z-index: 31;
+}
+/* Build view: the top bar is click-through (the build pane's header buttons sit under it), so the
+   Sound control moves to the bottom right, left of the island, and takes clicks again; its popover
+   opens upwards. */
+@media (min-width: 641px) {
+  .sx-bezel[data-split] .sx-sound {
+    position: fixed;
+    right: calc(var(--sx-in-r, 16px) + 72px);
+    bottom: 22px;
+    margin: 0;
+    pointer-events: auto;
+  }
+  .sx-bezel[data-split] .sx-sound-pop {
+    top: auto;
+    bottom: 100%;
+    margin: 0 0 8px;
+  }
+}
+
+/* R13.12 (#115): the spectrum chord's 12-note strip, short wavelengths on the left like the chart.
+   A tick marks the other mode's level on notes the A/B changes; "~" under a note marks noisy data. */
+.sx-chord-strip {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 3px;
+  padding: 6px 8px 2px;
+  border-radius: 8px;
+  background: var(--s2);
+}
+.sx-chord-note {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.sx-chord-bar {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  height: 44px;
+}
+.sx-chord-bar i {
+  display: block;
+  width: 100%;
+  min-height: 3px;
+  border-radius: 2px;
+  background: var(--p-phys);
+}
+.sx-chord-note[data-noisy='true'] .sx-chord-bar i {
+  background: repeating-linear-gradient(135deg, var(--p-phys) 0 3px, transparent 3px 5px);
+}
+.sx-chord-bar i[data-silent='true'] {
+  background: transparent;
+  outline: 1px dashed var(--line);
+  outline-offset: -1px;
+}
+.sx-chord-bar b {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  height: 2px;
+  background: var(--fg);
+}
+.sx-chord-noise {
+  height: 14px;
+  font-size: 12px;
+  line-height: 14px;
+  text-align: center;
+  color: var(--muted);
+}
+.sx-chord-ax {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -8px;
+  font-size: 11px;
+  color: var(--muted);
+}

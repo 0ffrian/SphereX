@@ -7,7 +7,7 @@ Project: **Shift & Spectrum**, a public web tool for NASA Space Apps 2026 (Port 
 | Doc | Authority |
 |---|---|
 | [docs/decisions/](docs/decisions/README.md) | **Wins over every other doc** where it states a decision. Load the index (`README.md`: every D-/Q- entry and its topic file), then only the topic files (`docs/decisions/<topic>.md`) that the task's routing row names. |
-| [docs/rendering/](docs/rendering/README.md) | Source of truth for how an object is **displayed**, how its **surface is generated**, how it **feels (haptics)** and how that **sounds (audio pairing)**. Sections `R0`–`R12`. |
+| [docs/rendering/](docs/rendering/README.md) | Source of truth for how an object is **displayed**, how its **surface is generated**, and how it **sounds** (audio pairing, the flyover soundscape and weather, R13). Haptics were cut by D-39. Sections `R0`–`R13`. |
 | [docs/architecture/](docs/architecture/README.md) | Source of truth for everything else: data sources, pipeline, tiers, plan, risks. Sections `A1`–`A21` (Track and Area search A16–A20 in `moving-objects/`, app shell A21). Terms: [glossary](docs/architecture/glossary.md) (A15). |
 | [docs/uml/](docs/uml/README.md) | Architecture diagrams (UML, Mermaid). Keep in sync when a spec changes. |
 | [docs/handover.md](docs/handover.md) | Background only (competition, data, early concepts). Not a spec. |
@@ -26,7 +26,7 @@ If two docs disagree and `docs/decisions/` is silent, follow the precedence (dec
 - **Fall back a tier, don't invent.** A missing value drops one tier and is labelled with it (D-32); a layer is refused and listed in `missing` only when no tier can answer. Physical size and ObjectCard values are still never guessed.
 - **Determinism.** Same ObjectCard + seed → byte-identical textures.
 - **Never blank.** The code path loads first; optional layers (Gemini) swap in only on success.
-- **The event build is a desktop browser on the A15 laptop, sound only** (Q-132). Phones and vibration come after the event.
+- **The event build is a desktop browser on the A15 laptop, sound only** (Q-132), presented on stage. Haptics and vibration are cut from the product (D-39); the audio code lives in `frontend/src/sound/`.
 - Do not invent fields, endpoints or library APIs that are not in the specs. Items marked **[verify]** must be checked against real output first.
 
 ## Git workflow
@@ -41,11 +41,11 @@ Project agents live in `.claude/agents/` and skills in `.claude/skills/`. Agents
 
 | Skill | Does |
 |---|---|
-| `/sx-implement <task>` | auto-implementer, then code-reviewer (with fixes), design-reviewer for UI/haptics, and spec-keeper for docs. `--commit` commits on a feature branch (never pushes). |
+| `/sx-implement <task>` | auto-implementer, then code-reviewer (with fixes), design-reviewer for UI/sound, and spec-keeper for docs. `--commit` commits on a feature branch (never pushes). |
 | `/sx-code-review [paths] [--fix] [--deep]` | code-reviewer; `--deep` adds security, performance and accessibility passes |
 | `/sx-pr-review <n> [--comment] [--deep]` | pr-reviewer on a GitHub PR; `--comment` posts the review |
 | `/sx-design-language` | loads the design language (D-38) before any UI work: tokens, type, radii, controls, motion, checks |
-| `/sx-design-review [target] [--fix]` | design-reviewer, accessibility-tester and ux-microcopy-reviewer (plus haptics-audio-engineer when relevant) |
+| `/sx-design-review [target] [--fix]` | design-reviewer, accessibility-tester and ux-microcopy-reviewer (plus haptics-audio-engineer, now the sound engineer, when relevant) |
 | `/sx-spec-sync [change]` | spec-keeper: section maps, links, UML, decisions |
 | `/sx-verify [item\|all] [--apply]` | astro-verifier resolves **[verify]** items with citations |
 
@@ -77,7 +77,7 @@ mockup/     single-file HTML mock-ups, not the app
   chase-the-rock.html   Track tool: a known asteroid's path, its SPHEREx frames, a zoom with
                         stars masked, and a spectrum built hop by hop (433 Eros, 20–21 Mar 2026)
 backend/    Python 3.12 API, pipeline, texture baker        (Kevin, Moon, Atish)
-frontend/   Vite + TypeScript + React app, viewer, haptics   (Moon; Atish for haptics and viewer/fields)
+frontend/   Vite + TypeScript + React app, viewer, sound     (Moon; Atish for sound and viewer/fields)
 shared/     JSON schemas shared by backend and frontend      (Moon)
 ```
 

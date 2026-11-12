@@ -34,7 +34,7 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
 | `GET /data/textures/{id}/{generator_version}/{seed}/{W}x{H}/<file>` | baked texture files (static mount) | R6.7, Q-47, Q-112 | [A5.4](data-contract.md#a54-asset-store), [A4.10](jobs.md#a410-object-job-and-fan-out) |
 | `GET /data/demo-textures/{id}/{generator_version}/{seed}/{W}x{H}/<file>` | the pre-built demo pack's maps (static mount of `SX_DEMO_TEXTURES_DIR`, read only, mounted under `SX_OFFLINE=1` too; only when the folder exists) | Q-164 (proposed) | [A5.4](data-contract.md#a54-asset-store) |
 | `GET /data/shapes/{name}.glb` | a registered shape-model mesh | Q-44, Q-61 | [A3.10](object-sources.md#a310-added-for-the-object-view), [A5](data-contract.md#a5-data-contract) |
-| `GET /v1/health` | `{status, offline, data_release, warm}`; built (`main.py`), beyond D-16; `warm` = warm-start progress `{state, total, done, failed}`; `finished` = every query in the warm list tried (issue #103) | Q-195 (proposed), Q-451 (proposed) | [A10.2](frontend-platform.md#a102-running-the-event-build) |
+| `GET /v1/health` | `{status, offline, data_release, warm}`; built (`main.py`), beyond D-16; `warm` = warm-start progress `{state, total, done, failed}`; `finished` = every query in the warm list tried (issue #103) | Q-195 (proposed), Q-454 (proposed) | [A10.2](frontend-platform.md#a102-running-the-event-build) |
 
 **Planned** (not built; proposals in open decisions):
 

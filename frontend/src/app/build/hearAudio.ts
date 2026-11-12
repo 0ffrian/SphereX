@@ -1,40 +1,65 @@
-// "Hear it" synthesis (approved preview, panels-preview.html). Own AudioContext, a master gain at 0.9 (no
-// global sound control exists in the app, Q-132) and an analyser the panel's waveform canvases read.
+// "Hear it" synthesis (approved preview, panels-preview.html). An analyser the panel's waveform
+// canvases read, on the app's shared sound engine (#111, R13.9, Q-442): the shared AudioContext
+// (sound/audioContext, unlocked inside the click that starts a sound, Q-73), the `spectrum` bus
+// into the one limiter, and the Sound settings: Sound off silences it, Volume scales it. While the
+// spectrum sweep plays it ducks the flyover ambience like every data sound.
+// If PR #107 (Q-420, Hear it removed) merges, the spectrum routing here becomes dead: remove it then.
+import { getAudioContext, unlockAudio } from '@/sound/audioContext';
+import { getBus as getSoundBus, holdDuck, type DuckHold } from '@/sound/audioGraph';
+import { getSoundSettings, useSoundSettings, type SoundSettingsValues } from '@/sound/settings';
+import { claimSpectrumSound, type SpectrumClaim } from '@/sound/spectrumExclusive';
+import { DUCK_SAFETY_S } from '@/sound/tuning';
 import { cutoffHz, freqAt, howlHz, loudness, SPEC_POINTS, SPEC_SECONDS, type AtmosphereModel } from './hearModel';
 
 export const MASTER_GAIN = 0.9;
+
+/** The panel's output gain for these settings: 0 when sound is off, else MASTER_GAIN × volume. */
+export function hearGain(s: Pick<SoundSettingsValues, 'soundOn' | 'volume'>): number {
+  if (!s.soundOn) return 0;
+  const v = Number.isFinite(s.volume) ? Math.min(1, Math.max(0, s.volume)) : 0;
+  return MASTER_GAIN * v;
+}
 
 interface Bus {
   ctx: AudioContext;
   master: GainNode;
   analyser: AnalyserNode;
+  unsubscribe(): void;
 }
 let bus: Bus | null = null;
 
+/** The panel's nodes on the shared context. Call from a click: it unlocks audio first (Q-73). */
 function getBus(): Bus | null {
-  if (bus) {
-    if (bus.ctx.state === 'suspended') void bus.ctx.resume();
-    return bus;
-  }
-  const Ctor: typeof AudioContext | undefined =
-    typeof window === 'undefined'
-      ? undefined
-      : (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
-  if (!Ctor) return null;
+  void unlockAudio(); // creates or resumes the shared context synchronously inside the gesture
+  const ctx = getAudioContext();
+  if (!ctx) return null;
+  if (bus && bus.ctx === ctx) return bus;
+  bus?.unsubscribe();
   try {
-    const ctx = new Ctor();
     const master = ctx.createGain();
-    master.gain.value = MASTER_GAIN;
+    master.gain.value = hearGain(getSoundSettings());
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 2048;
     master.connect(analyser);
-    analyser.connect(ctx.destination);
-    bus = { ctx, master, analyser };
-    if (ctx.state === 'suspended') void ctx.resume();
+    analyser.connect(getSoundBus(ctx, 'spectrum'));
+    // Follow the switch and the volume live (a slider drag: short glide, no piled-up events).
+    const unsubscribe = useSoundSettings.subscribe((st) => {
+      const t = ctx.currentTime;
+      master.gain.cancelScheduledValues(t);
+      master.gain.setTargetAtTime(hearGain(st), t, 0.02);
+    });
+    bus = { ctx, master, analyser, unsubscribe };
     return bus;
   } catch {
     return null;
   }
+}
+
+/** Tests: forget the panel's nodes (the next sound builds them on the current context). */
+export function resetHearAudioForTests(): void {
+  bus?.unsubscribe();
+  bus = null;
+  liveSpectrum = null;
 }
 
 /** Fills `out` with the current waveform (-1..1); false when nothing is available. */
@@ -153,10 +178,18 @@ export interface SpectrumHandle {
   position(): { pos: number; done: boolean };
 }
 
-/** Triangle plus a quieter sine octave sweeping 880 to 110 Hz over the rest of SPEC_SECONDS; gain from flux. */
+/**
+ * Triangle plus a quieter sine an octave up (timbre only), the pitch from `pitch.ts` (Q-446: 1158 Hz at
+ * 0.75 µm down to 220 Hz at 5 µm, as the chord and the Listen sweep), over the rest of SPEC_SECONDS;
+ * gain from flux. It takes the one spectrum-sound slot (Q-446): the chord or the Listen sweep stops.
+ */
 export function startSpectrum(values: readonly (number | null)[], from: number): SpectrumHandle | null {
   const b = getBus();
   if (!b) return null;
+  // Q-446: one spectrum sound at a time. Claimed before anything is scheduled, so the chord or the
+  // Listen sweep stops first; `letGo` gives the slot back.
+  let stopMe: () => void = () => {};
+  let claim: SpectrumClaim | null = claimSpectrumSound(() => stopMe());
   const { ctx, master } = b;
   let pos = from;
   let rest = (1 - pos) * SPEC_SECONDS;
@@ -198,6 +231,15 @@ export function startSpectrum(values: readonly (number | null)[], from: number):
   o2.stop(now + rest + 0.05);
   let alive = true;
   let stoppedAt: number | null = null;
+  // R13.9: a data sound ducks the ambience until it ends or is stopped (safety: its length + 1 s).
+  let duck: DuckHold | null = holdDuck(ctx, 0.03 + rest + 0.05 + DUCK_SAFETY_S);
+  const letGo = () => {
+    duck?.release();
+    duck = null;
+    claim?.release();
+    claim = null;
+  };
+  o1.onended = letGo;
   const handle: SpectrumHandle = {
     position: () => {
       const e = ((stoppedAt ?? ctx.currentTime) - now) / rest;
@@ -209,6 +251,7 @@ export function startSpectrum(values: readonly (number | null)[], from: number):
       if (!alive) return;
       alive = false;
       stoppedAt = ctx.currentTime;
+      letGo();
       if (liveSpectrum === handle) liveSpectrum = null;
       try {
         o1.stop();
@@ -222,5 +265,6 @@ export function startSpectrum(values: readonly (number | null)[], from: number):
     },
   };
   liveSpectrum = handle;
+  stopMe = handle.stop;
   return handle;
 }

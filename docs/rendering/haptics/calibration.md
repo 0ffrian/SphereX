@@ -2,6 +2,8 @@
 
 > **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.7 · **Implements:** [D-09](../../decisions/haptics-design.md), [D-10](../../decisions/haptics-sound.md), [Q-73, Q-74, Q-75](../../decisions/haptics-built.md), [Q-132](../../decisions/platform-hosting.md) · **Read with:** [engine-api.md](engine-api.md) (R8.8), [platform-encoding.md](platform-encoding.md) (R8.3)
 
+> **D-39 (12 Nov 2026), haptics cut:** vibration calibration and the vibration switch are cut. **Still live:** the sound switch and volume, saved under one localStorage key, now with the ambience and Flashes settings ([R13.9](../sound/buses-stage.md#r139-buses-ducking-master-settings-and-stage-audibility)). See [D-39](../../decisions/sound-ambience.md).
+
 ### R8.7 Calibration and settings
 
 **At the event (Q-132)** there is no vibration, so there is nothing to calibrate. The event keeps the **settings** below: sound on/off, volume and the strength multiplier (which still scales the audio gain), with the desktop default "sound only". The calibration wizard is **after the event**; everything from "First use" to the end of this section applies when the vibrate driver ships.

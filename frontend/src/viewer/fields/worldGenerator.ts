@@ -87,7 +87,8 @@ export function generateWorld(
   p: WorldParams,
   size: WorldSize = WORLD_SIZES[p.tier],
 ): WorldData | null {
-  const model = worldModel(p.inputs);
+  // #93 3.6: an ocean basin makes the Kopparapu inner edge a runaway limit, as the engine's OCEANF > 0.
+  const model = worldModel({ ...p.inputs, hasOcean: p.oceanFraction > 0 });
   if (!model) return null;
   const g = size;
   const terr = buildTerrain({
