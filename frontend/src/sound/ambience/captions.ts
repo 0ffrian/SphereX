@@ -6,6 +6,7 @@
 //   Q-437 weather, lightning rule table (§8.2)  -> LIGHTNING_TEXT
 //   Q-440 level model and presentation (§11.4)  -> levelNote
 //   Q-442 UI, captions, "What you hear" (§12)   -> CEILING_TEXT, EYE_TEXT, phrases, airFacts
+//   Q-447 ceiling caption with its height       -> ceilingCaption (N = H ln(P0/P_FLOOR), derived)
 //   R6  acoustic air is P0 >= 1 Pa              -> noAir/lavaNoAir only below P_FLOOR
 //   R7  liquid is local (canLiquid gated)       -> noLiquid, boiledAway
 //   R8  presence before presentation            -> only present beds are captioned
@@ -15,7 +16,7 @@
 //   R12 fields not ready                        -> REFUSAL_TEXT.waiting
 // Strings marked "new" are not in the spec yet; they are proposed as Q- entries with the R13 docs (#111 / PR #121).
 // Direction words come from the 8-point compass bearing of a membership-weighted centroid (R9 of R13: never pan alone).
-import { bedWorldDb, earthRef } from './air';
+import { bedWorldDb, ceilingKm, earthRef } from './air';
 import type { AirModel, CaptionModel, MixFrame, Place, PlaceSample, SourceId } from './types';
 import { CO2_ABS, CRUST_WEIGHT, LEVEL_NOTE_MIN_DB, RIVER_Q_REF, SILENT_DB } from './tuning';
 
@@ -55,8 +56,47 @@ export const LIGHTNING_TEXT = {
   other: 'Lightning needs storm clouds of water or ammonia; there are none here.',
 } as const;
 
-/** §4.1 ceiling caption (exact). */
+/** §4.1 ceiling caption (exact); ceilingCaption adds the Q-447 action with the height. */
 export const CEILING_TEXT = 'Too high: the air here is too thin to carry sound.';
+
+/** Two significant figures for a caption height (Q-447): 97.2 -> "97", 1234 -> "1200", 4.56 -> "4.6". */
+export function sig2(x: number): string {
+  return String(Number(x.toPrecision(2)));
+}
+
+/**
+ * Q-447 (§4.1): the ceiling caption with what to do about it. N = H ln(P0 / P_FLOOR) (isothermal, derived: ceilingKm),
+ * rounded to 2 significant figures (Earth about 97 km). Without a usable height the exact §4.1 text stands alone.
+ */
+export function ceilingCaption(air: AirModel): string {
+  const n = ceilingKm(air);
+  return n > 0 && Number.isFinite(n) ? `${CEILING_TEXT} Fly below about ${sig2(n)} km to hear it.` : CEILING_TEXT;
+}
+
+/** A plain name per source for refusal text (m5: never a raw id such as "S6" in front of the user). New. */
+export const SOURCE_NAME: Record<SourceId, string> = {
+  S1_land: 'the wind over land',
+  S1_sea: 'the wind over the sea',
+  S2: 'grit hissing in the wind',
+  S3: 'wind whistling over the rocks',
+  S4: 'the surf',
+  S5: 'the open sea',
+  S6: 'the rain',
+  S7: 'the river',
+  S8: 'the lava',
+  S9: 'the hurricane winds',
+  S10: 'the blowing sand',
+  S12: 'the jet stream',
+  thunder: 'the thunder',
+};
+
+/** Refusal text for a bed that could not be made (palette). New. */
+export function bakeRefusalText(id: SourceId, why: string): string {
+  return `The sound of ${SOURCE_NAME[id]} is unavailable: ${why}`;
+}
+
+/** Why the palette refused the beds it could not bake without a worker (m5). New. */
+export const NO_WORKER_TEXT = 'the background sound maker did not start';
 /** §12.2 eye caption (exact). */
 export const EYE_TEXT = 'Calm eye of a hurricane';
 /** New (blue F5b): lava is around the listener but its roar does not carry to this height. */
@@ -215,7 +255,7 @@ function capitalise(s: string): string {
  */
 export function caption(air: AirModel, place: Place, frame: MixFrame): CaptionModel {
   const all = air.refusals.find((r) => r.source === 'all');
-  const silentReason = all ? all.reason : frame.silent ? CEILING_TEXT : null;
+  const silentReason = all ? all.reason : frame.silent ? ceilingCaption(air) : null;
   if (silentReason) return { line: silentReason, heard: [], levelNote: null, silentReason };
 
   const live = frame.beds.filter((b) => b.gainDb > SILENT_DB + 1).sort((a, b) => b.trueDb - a.trueDb);

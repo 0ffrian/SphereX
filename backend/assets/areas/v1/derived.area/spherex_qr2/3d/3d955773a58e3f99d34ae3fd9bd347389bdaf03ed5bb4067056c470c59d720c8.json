@@ -1,0 +1,18 @@
+{
+ "body_sha256": "e431c25055c939f4acd803c8ac79179c44a38c39580c9af4005ff76d60342bd7",
+ "body_size": 5488,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-12T08:59:13.327Z",
+ "key": {
+  "query": {
+   "id": "eros-2026-03",
+   "p": "72e58c5d579b470b6e949fafa24082696a80724255c6d93c794a75972e14cecd",
+   "stage": "tracks",
+   "v": "area-2"
+  },
+  "release": "spherex_qr2",
+  "source": "derived.area"
+ },
+ "status": 200,
+ "url": "derived:area:tracks"
+}

@@ -16,8 +16,11 @@ export class FakeParam {
     this.calls.push(['exp', v, t]);
     return this;
   }
-  setTargetAtTime(v: number, t: number) {
+  /** Every setTargetAtTime with its time constant (the calls list keeps its 3-tuple shape). */
+  readonly targets: { v: number; t: number; tau: number }[] = [];
+  setTargetAtTime(v: number, t: number, tau = 0) {
     this.calls.push(['target', v, t]);
+    this.targets.push({ v, t, tau });
     return this;
   }
   setValueCurveAtTime(v: ArrayLike<number>, t: number) {
@@ -63,7 +66,9 @@ export class FakeSource extends FakeNode {
   onended: (() => void) | null = null;
   type = 'sine';
   buffer: unknown = null;
+  loop = false;
   readonly frequency = new FakeParam();
+  readonly playbackRate = new FakeParam();
   /** Simulate the source finishing. */
   end() {
     this.onended?.();
@@ -81,6 +86,7 @@ export class FakeFilter extends FakeNode {
   type = 'lowpass';
   readonly frequency = new FakeParam();
   readonly Q = new FakeParam();
+  readonly gain = new FakeParam();
   constructor(ctx: FakeAudioContext) {
     super(ctx, 'biquad');
   }
