@@ -49,7 +49,7 @@ function Row({ o }: { o: KnownObject }) {
             {o.skybotAt ? <span>SkyBoT answered {dateOf(o.skybotAt)}</span> : <span>No SkyBoT answer</span>}
           </small>
         )}
-        {!track && o.designation && <small data-testid="known-no-track">{NO_TRACK_NOTE}</small>}
+        {!track && <small data-testid="known-no-track">{NO_TRACK_NOTE}</small>}
       </span>
       <span className="sx-chip" data-tone={track ? 'ok' : undefined}>
         {track ? 'Track it' : 'Open'}

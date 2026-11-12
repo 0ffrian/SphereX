@@ -37,7 +37,7 @@ export function KnownPositionsLayer({ view }: { view: { onRender(l: () => void):
   if (!known || withPositions.length === 0) return null;
   if (!knownPositionsVisible(honesty)) {
     return (
-      <span className="sx-area-track-tag sx-area-pos-tag" data-testid="known-positions-note">
+      <span className="sx-area-track-tag sx-area-pos-tag" role="status" data-testid="known-positions-note">
         <span className="sx-tagbadge">{MEASURED_ONLY_NOTE}</span>
       </span>
     );
