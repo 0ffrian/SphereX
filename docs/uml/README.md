@@ -34,7 +34,7 @@ Mermaid renders natively on GitHub, and in VS Code with a Mermaid extension (for
 | [22-area-search.md](22-area-search.md) | Component, Sequence (2) | Area search (Q-146; A16 to A18): offline Discovery (fixed-position frame grid, dots, glitches/stars/fixed, parallax-aware join, SkyBoT candidates + Horizons from SPHEREx), `derived.area` and `/v1/areas`, the sky interaction (feature cards, hand-off to the Track pane) |
 | [23-track.md](23-track.md) | Component, Sequence (2) | Track (A19, A20): the object job filling frames and `/path`, the Track pane opening and polling, the time slider driving marker, zoom, spectrum and sound |
 | [24-state-shell.md](24-state-shell.md) | State (2 diagrams) | The app shell (A21): object panel, object card, build pane in the split pane, the proposed Track pane and Area feature cards (dashed); the island's modes |
-| [25-sequence-ambience.md](25-sequence-ambience.md) | Sequence | The flyover ambience tick (planned, R13.8, R13.10): engine fields, bake, 10 Hz mixer, the ambience bus |
+| [25-sequence-ambience.md](25-sequence-ambience.md) | Sequence | The flyover ambience tick (built #116, R13.8, R13.10): engine fields, bake, 10 Hz mixer, the ambience bus |
 
 ## Conventions
 
