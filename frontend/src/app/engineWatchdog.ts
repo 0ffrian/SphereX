@@ -12,6 +12,13 @@ export type EngineRole = 'globe' | 'fly';
  */
 export const ENGINE_READY_TIMEOUT_MS: Record<EngineRole, number> = { globe: 60_000, fly: 180_000 };
 
+/**
+ * Issue #93 W1 (B7): longest wait for the star engine's shader before its stage gives up and the three.js star draws
+ * (ms). Measured cold on an RTX 4060 Ti desktop: 1.2 to 1.7 s (ANGLE D3D11); the limit is the globe's, with the same
+ * margin for a slower machine. The A15 is not measured: [verify] there. UI pacing, not physics.
+ */
+export const STAR_READY_TIMEOUT_MS = 60_000;
+
 /** Longest the world may take to form once its shaders are ready, counted only while it is on screen (ms). */
 export const ENGINE_FORM_TIMEOUT_MS = 90_000;
 
