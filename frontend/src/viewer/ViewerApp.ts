@@ -43,7 +43,7 @@ import { SimClock, type ClockProcess, type PauseReason } from './render/clock';
 import type { Motion } from './motion/motion';
 import type { MouldPose } from './mould/mouldSteps';
 import { RenderChain } from './render/pipeline';
-import { planMayBloom } from './render/bloomGate';
+import { bloomGateFromSearch, planMayBloom } from './render/bloomGate';
 import {
   DynamicResolution,
   dynamicResolutionFromSearch,
@@ -337,11 +337,16 @@ export class ViewerApp {
   private readonly gpuStats = new RollingStats(STATS_WINDOW);
   private gpuTiming = false;
   private gpuResolving = false;
-  private gpuFramesAt = 0;
   /** Roadmap 2.5: scene scale from GPU time while the clock runs; null when off. */
   private dynRes: DynamicResolution | null = null;
-  /** Issue #50: 'auto' follows the plan (`planMayBloom`); 'on' and 'off' are test hooks. */
-  private bloomMode: 'auto' | 'on' | 'off' = 'auto';
+  /**
+   * Issue #50: 'auto' follows the plan (`planMayBloom`); 'on' and 'off' are test hooks. 'on' by
+   * default: the gate is proven pixel-identical only at the low level (e2e/bloomGate.spec.ts), so it
+   * is opt-in with `?bloomgate=1` until a decision or a measured gate settles it.
+   */
+  private bloomMode: 'auto' | 'on' | 'off' = bloomGateFromSearch(window.location?.search ?? '')
+    ? 'auto'
+    : 'on';
   /** The placeholder sphere is LDR; each plan sets this (`planMayBloom`). */
   private bloomWanted = false;
   /** Coarse pointer (phone or tablet): 30 fps start tier and the R5.7 idle pause. */
@@ -474,9 +479,11 @@ export class ViewerApp {
   }
 
   /**
-   * After a drawn frame: asks r187 for the GPU time of the render passes since the last ask (one
-   * ask at a time) and spreads it over the frames it covers. Feeds dynamic resolution while the
-   * clock runs.
+   * After a drawn frame: asks r187 for the GPU time of the render passes (one ask at a time) and
+   * feeds dynamic resolution while the clock runs. r187 (WebGPUTimestampQueryPool) keys each query
+   * by render context and `info.frame`, which only `setAnimationLoop` advances; this viewer has its
+   * own loop, so each context keeps its latest query and the sum is about one frame's passes, not
+   * the sum since the last ask. [verify] against a GPU capture on the A15.
    */
   private sampleGpu(): void {
     if (!this.gpuTiming || this.gpuResolving) return;
@@ -484,14 +491,12 @@ export class ViewerApp {
       resolveTimestampsAsync?: (type?: string) => Promise<number | undefined>;
     };
     if (typeof r.resolveTimestampsAsync !== 'function') return;
-    const frames = Math.max(1, this.frames - this.gpuFramesAt);
-    this.gpuFramesAt = this.frames;
     this.gpuResolving = true;
     void r
       .resolveTimestampsAsync('render')
       .then((ms) => {
         if (this.disposed || typeof ms !== 'number' || !(ms > 0)) return;
-        const perFrame = ms / frames;
+        const perFrame = ms;
         this.gpuStats.push(perFrame);
         if (this.dynRes && this.clock.running && this.chain) {
           const next = this.dynRes.feed(perFrame);
