@@ -43,4 +43,9 @@ export default tseslint.config(
     files: ['src/engine/**/*.{ts,d.ts}'],
     rules: { '@typescript-eslint/no-explicit-any': 'off' },
   },
+  {
+    // the sound ambience contract is copied verbatim from the spec (Appendix B), whose engine fields are `any`
+    files: ['src/sound/ambience/types.ts'],
+    rules: { '@typescript-eslint/no-explicit-any': 'off' },
+  },
 );

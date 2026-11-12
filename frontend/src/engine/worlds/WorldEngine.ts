@@ -55,6 +55,39 @@ export interface CpuFields {
   hydro: any;
 }
 
+/** Issue #114 (sound spec §3.3): the energy budget's weather arrays, NX x NY cells, row 0 = south pole. */
+export interface WeatherFields {
+  NX: number;
+  NY: number;
+  /** EB.h, sea-ice thickness (engine units). */
+  iceH: Float32Array;
+  /** EB.s, frost and snow on land. */
+  snow: Float32Array;
+  /** EB.out, 4 per cell: T, smoothed ice, smoothed frost, relative humidity. */
+  out: Float32Array;
+  /** EB.out2, 4 per cell: rain / rainMax, ocean-current speed, u, v. */
+  out2: Float32Array;
+  /** EB.cyc (a copy): cyclone centre (rad), radius r (rad), spin sign s. */
+  cyclones: { lon: number; lat: number; r: number; s: number }[];
+}
+
+/** Issue #114 (§3.3, §8.5): the fly camera basis (body frame) and its drawing constants. */
+export interface FlyCameraBasis {
+  cam: [number, number, number];
+  fwd: [number, number, number];
+  rt: [number, number, number];
+  up: [number, number, number];
+  /** Planet radius, km. */
+  rkm: number;
+  /** Vertical exaggeration of the drawn relief (3 rocky, 2 gas). */
+  ex: number;
+  /** Vertical field of view, radians. */
+  fov: number;
+}
+
+/** The fly view's field of view: core.js draw sets `gl.uniform1f(uF.uFov, 0.62)`. */
+export const FLY_FOV = 0.62;
+
 export interface EngineState {
   Tstar: number;
   orbit: number;
@@ -469,6 +502,62 @@ export class WorldEngine {
           }
         : null,
       hydro: W.hydro ?? null,
+    };
+  }
+
+  /**
+   * Issue #114 (sound spec §3.3): the energy budget's weather arrays (references; do not write). Null until the budget is
+   * ready, and null on a gas giant: EB keeps the previous rocky world's state across a switch to a giant.
+   */
+  weatherFields(): WeatherFields | null {
+    const EB = this.core.EB;
+    if (!EB.ready || this.core.W.m?.gas) return null;
+    const cyc = (EB.cyc ?? []) as { lon: number; lat: number; r: number; s: number }[];
+    return {
+      NX: EB.NX,
+      NY: EB.NY,
+      iceH: EB.h,
+      snow: EB.s,
+      out: EB.out,
+      out2: EB.out2,
+      cyclones: cyc.map((c) => ({ lon: c.lon, lat: c.lat, r: c.r, s: c.s })),
+    };
+  }
+
+  /**
+   * Issue #114 (§3.3): the gas simulation's field, 256 x 128 x [u, v, vorticity, storm stamp], row 0 = south pole,
+   * column 0 = lon -pi. `exportField(false)` rewrites the simulation's own buffer from the current state, so the array
+   * is live: the next call (or the next GPU upload) overwrites it. Null on rocky worlds (the simulation outlives a switch
+   * to a rocky world, so its field would be stale).
+   */
+  gasField(): Float32Array | null {
+    if (!this.core.W.m?.gas) return null;
+    const gs = this.core.getGS();
+    return gs ? (gs.exportField(false) as Float32Array) : null;
+  }
+
+  /** Issue #114 (§3.3): the raw terrain cell under (lon, lat) in km, clamped at sea level on ocean worlds (core.groundKm). */
+  groundKm(lon: number, lat: number): number {
+    return this.core.groundKm(lon, lat);
+  }
+
+  /**
+   * Issue #114 (§3.3, §8.5): the fly camera's basis, from core.flyCamera(m, 0, 0, [0, 0, 1]). Tilt, spin and the light
+   * vector change only the light direction, never the basis. Null before a world is loaded.
+   */
+  flyCameraBasis(): FlyCameraBasis | null {
+    const W = this.core.W;
+    if (!W.m || !W.p) return null;
+    const c = this.core.flyCamera(W.m, 0, 0, [0, 0, 1]);
+    const v3 = (v: number[]): [number, number, number] => [v[0]!, v[1]!, v[2]!];
+    return {
+      cam: v3(c.uCam),
+      fwd: v3(c.uFwd),
+      rt: v3(c.uRt),
+      up: v3(c.uUp),
+      rkm: c.rkm,
+      ex: c.ex,
+      fov: FLY_FOV,
     };
   }
 
