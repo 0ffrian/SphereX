@@ -170,6 +170,15 @@ DEV93_LINK_FIRST = r'''// @deviation (#93 1.2) every program is linked before th
 // (#93 3.1) and then sets the world's seed uniforms (WorldGL.seedFor; a no-op once they are set).
 ['cloudStep', 'gasStep', 'draw'].forEach(function (k) { var f = W.gl[k]; W.gl[k] = function () { W.gl.link(k === 'draw' && !!W.fly); W.gl.seedFor(W.p); return f.apply(W.gl, arguments); }; });'''
 
+DEV93_BUDGET = r'''// @deviation L2344 (#93 F4) the climate loop checked the clock only before each step, so a step (ebStep, about 5 to 6 ms)
+// that started just under the budget ran past it: W.gl.tick measured 19.4 ms against the 14 ms spin-up budget. A step
+// now starts only if the time spent so far plus the last step's duration (dk, the time between two checks) stays within
+// the budget; the first step always runs, as before. Each step is unchanged, so a spin-up ends in the same state after
+// its 900 steps, spread over more frames. The clock is still read once per check, so the parity spin-up's virtual
+// clock (1 ms a call, WorldEngine.spinUp) takes the same steps per tick as the prototype's rule.
+      var k = 0, st = W.spinup > 0, budget = st ? 14 : 7, tp = t0, tn, dk; while ((playing || st) && k < (st ? 40 : 4) && ((tn = performance.now(), dk = tn - tp, tp = tn, tn - t0 + dk <= budget) || k === 0)) { ebStep(m, 1, st ? 1.4 : 0.7); k++; if (W.spinup > 0) W.spinup--; }
+// @end-deviation'''
+
 DEV93_SEED = r'''// @deviation (#93 3.1, 3.2, 3.4, 3.9) the seed uniforms of shaders.js's patterns(), set once per program and world (a
 // uniform keeps its value in its program). A prototype preset (no seed3) gets uSeed3 = (seed, seed, seed), uSeedN = 0
 // and uNzSph = 0, which is exactly what it drew before; a card world (cardToWorld: seed3, three hashed integers in
@@ -615,7 +624,9 @@ core.append(sl(2317, 2326, [('uF.uFov,', 'uF.uScale,scale/W.fp93);gl.uniform1f(u
 core.append(DEV93_GBUF_DRAW)                 # replaces L2327: the fly draw (#93 F3)
 core.append(sl(2328, 2338))
 core.append(DEV93_GAS_CAP)                   # replaces L2339-L2340 (#93 1.8)
-core.append(sl(2341, 2355))
+core.append(sl(2341, 2343))
+core.append(DEV93_BUDGET)                    # replaces L2344: the climate loop stops within its budget (#93 F4)
+core.append(sl(2345, 2355))
 core.append(sl(2356, 2385))                 # fly camera, flyMove, globePick, GS
 core.append(sl(2387, 2387))                 # km
 # worldUi: rows and caption captured as data instead of written into the DOM

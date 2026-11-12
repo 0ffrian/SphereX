@@ -1,16 +1,19 @@
 // Issue #12 overlays on the SYNTHETIC fixtures: markers, flag mask, field of view, contamination,
 // refusals and the combine panel. The flipbook keeps working whatever the overlays do.
 import { expect, test, type Page } from '@playwright/test';
+import { openMore } from './flipbookUi';
 
 async function search(page: Page, text: string) {
   const input = page.getByTestId('search-input');
   await input.fill(text);
   await input.press('Enter');
-  await expect(page.getByTestId('frame-counter')).toHaveText(/^Frame 1 of \d+$/);
+  await expect(page.getByTestId('frame-counter')).toHaveText(/^1 \/ \d+$/);
   const img = page.getByTestId('cutout');
   await expect
     .poll(() => img.evaluate((el: { naturalWidth: number }) => el.naturalWidth))
     .toBeGreaterThan(0);
+  // The toggles are in the card's "More" row (closed at first), Overlays tab.
+  await openMore(page, 'overlays');
 }
 
 test('Epsilon Indi B: markers, contamination, flags, field of view and combine', async ({
@@ -34,9 +37,8 @@ test('Epsilon Indi B: markers, contamination, flags, field of view and combine',
   await expect(page.getByTestId('contamination-line').first()).toContainText(
     'inside the photometry aperture',
   );
-  // The ring still takes the click through the marker layer.
-  await page.getByTestId('object-ring').click();
-  await expect(page.locator('#spectrum-heading')).toBeFocused();
+  // The spectrum stays on the card under the markers (no ring click to open it any more).
+  await expect(page.getByTestId('spectrum-panel')).toBeVisible();
 
   await page.getByTestId('overlay-toggle-flags').click();
   await expect(page.getByTestId('flag-mask')).toBeAttached();
@@ -49,6 +51,7 @@ test('Epsilon Indi B: markers, contamination, flags, field of view and combine',
   await expect(page.getByTestId('fov-refused')).toBeVisible();
   await expect(page.getByTestId('overlay-missing')).toContainText('no detector footprint');
 
+  await openMore(page, 'combine');
   await page.getByTestId('combine').locator('summary').click();
   await expect(page.getByTestId('combine-warning')).toContainText('µm and');
   await page.getByTestId('combine-show').click();
@@ -89,6 +92,6 @@ test('a failed overlays request leaves the flipbook working', async ({ page }) =
   await page.getByTestId('overlay-toggle-gaia').click();
   await expect(page.getByTestId('error')).toContainText('Overlays could not be loaded');
   await page.getByTestId('scrubber').fill('3');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 4 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('4 / 24');
   await expect(page.getByTestId('cutout')).toBeVisible();
 });

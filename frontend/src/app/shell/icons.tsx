@@ -6,7 +6,11 @@ const PATHS = {
   flipbook: 'M4 5h16v14H4z M4 9h16 M8 5v4 M16 5v4 M10 13l4 2-4 2z',
   spectrum: 'M2 12h2 M6 8v8 M10 4v16 M14 7v10 M18 10v4 M22 12h-2',
   viewer: 'M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z M12 12l8-4.5 M12 12v9 M12 12 4 7.5',
+  info: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z M12 16v-4 M12 8h.01',
   close: 'M18 6 6 18M6 6l12 12',
+  // The area cards' tabs: a back chevron and the minimise dash (mock-up `knBack`, `knMin`).
+  back: 'M15 6l-6 6 6 6',
+  minimise: 'M6 12h12',
   search: 'm21 21-4.34-4.34 M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z',
   prev: 'M19 5v14L8 12zM5 5v14',
   next: 'M5 5v14l11-7zM19 5v14',
@@ -19,8 +23,9 @@ const PATHS = {
   shuffle: 'M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5',
   // Issue #71 stream U: the build view's header and zoom bar, the mock-up's shapes (`#bpAcc`,
   // `#bpHear`, `#zOut`, `#zIn`, the dock's area tool); `details` is lucide's sliders.
-  accuracy:
-    'M3.3 17a10 10 0 1 1 17.4 0 M12 14l4-5 M12 12.8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z',
+  accuracy: 'M3.3 17a10 10 0 1 1 17.4 0 M12 14l4-5 M12 12.8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z',
+  // lucide `wind`: the build view's Atmosphere (ambience) toggle.
+  wind: 'M12.8 19.6A2 2 0 1 0 14 16H2 M17.5 8a2.5 2.5 0 1 1 2 4H2 M9.8 4.4A2 2 0 1 1 11 8H2',
   hear: 'M11 5 6 9H3v6h3l5 4z M15.5 8.5a5 5 0 0 1 0 7 M18.5 5.5a9 9 0 0 1 0 13',
   details: 'M21 4h-7 M10 4H3 M21 12h-9 M8 12H3 M21 20h-5 M12 20H3 M14 2v4 M8 10v4 M16 18v4',
   zoomOut: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z M8 11h6 M21 21l-4.35-4.35',

@@ -1,6 +1,6 @@
 # Display levels and shared 3D view rules
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.7 · **Implements:** [D-05, Q-15, Q-64, Q-132](../decisions/platform-hosting.md), [D-21, Q-27](../decisions/contract-tags.md), [Q-379](../decisions/physics-fixes.md), [D-37, Q-287](../decisions/rendering-engines.md), [D-23, Q-36](../decisions/contract.md), [D-34, Q-66](../decisions/rendering-motion.md), [Q-104, Q-107](../decisions/rendering-kinds.md), [Q-115, Q-116, Q-117](../decisions/rendering-layers.md), [Q-119](../decisions/contract-tags.md), [D-28](../decisions/moving-objects.md), [Q-113](../decisions/shell-surfaces.md), [Q-155, Q-165](../decisions/exoplanets.md), [Q-156, Q-157, Q-166](../decisions/exoplanet-looks.md) · **Read with:** [build-mould.md](build-mould.md) (R5.8), [engines.md](engines.md) (R5.9), [data-contract.md](data-contract.md) (R3.4), [accessibility.md](accessibility.md) (R9)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.7 · **Implements:** [D-05, Q-15, Q-64, Q-132](../decisions/platform-hosting.md), [D-21, Q-27](../decisions/contract-tags.md), [Q-379](../decisions/physics-fixes.md), [Q-383, Q-386](../decisions/rendering-engines-perf.md), [D-37, Q-287](../decisions/rendering-engines.md), [D-23, Q-36](../decisions/contract.md), [D-34, Q-66](../decisions/rendering-motion.md), [Q-104, Q-107](../decisions/rendering-kinds.md), [Q-115, Q-116, Q-117](../decisions/rendering-layers.md), [Q-119](../decisions/contract-tags.md), [D-28](../decisions/moving-objects.md), [Q-113](../decisions/shell-surfaces.md), [Q-155, Q-165](../decisions/exoplanets.md), [Q-156, Q-157, Q-166](../decisions/exoplanet-looks.md) · **Read with:** [build-mould.md](build-mould.md) (R5.8), [engines.md](engines.md) (R5.9), [data-contract.md](data-contract.md) (R3.4), [accessibility.md](accessibility.md) (R9)
 
 ## R4. Display levels
 
@@ -49,6 +49,8 @@
 
 ### R5.3 Honesty toggle (3 states)
 
+> **Changed by [Q-412](../decisions/shell-surfaces.md) (PR #104, Proposed):** in the build pane the control is a compact **Show** row inside the Details dropdown, no longer at the top of the pane. The three states and what they show are unchanged. Build still raises the level to + Artistic when layers are hidden (Q-113 item 7, Q-287).
+
 One state per badge (D-21):
 
 | State | Shows tags | Examples |
@@ -62,7 +64,7 @@ One state per badge (D-21):
 - **Build exception (proposed, Q-113 item 7; Moon to confirm, with Q-49):** *Build it*, *Replay* and *New seed* raise the level to + Artistic when the plan has hidden layers, and say so. Rules in R5.8.
 - **Engines (Q-287, Atish, 11 Nov 2026):** the prototype engines mount only at + Artistic; at + Estimated and Measured only the three.js path draws ([R5.9](engines.md#r59-prototype-engines-d-37)).
 - Each visible layer shows a small tag chip in the legend.
-- **Card readouts (Q-379, open):** a planet's eclipse and phase-curve readouts are listed at every level, each with its tag badge, so a `measured` one is not reachable only at + Artistic; they are not filtered by the toggle (rules in [R3.2](data-contract.md#r32-objectcard-produced-by-the-backend-get-v1objectsidcard)).
+- **Card readouts (Q-379):** a planet's eclipse and phase-curve readouts are listed outside the engine panel, each with its tag badge, so a `measured` one is not reachable only at + Artistic; they follow the toggle, so a `derived` one is hidden at Measured only (rules in [R3.2](data-contract.md#r32-objectcard-produced-by-the-backend-get-v1objectsidcard)).
 - Haptics and sounds use the same filter. The rule is owned by [§8.2](haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui).
 
 ### R5.4 Scale bar
@@ -86,7 +88,7 @@ Targets, as amended by Q-132 (which answers Q-15):
 | Phones | realme 14 Pro and a Samsung, both Android 16 with Chrome. Vibration needs these | after the event |
 | Zenbook 14X (Intel Iris Xe) | no longer the demo screen (Q-132) | — |
 
-- ≥30 fps while rotating. Render when the view changes, or every frame while a simulation clock runs (D-34, [§5.7](#r57-motion-and-time-lapse)). Not yet measured on the A15 for the D-37 engines ([R5.9](engines.md#r59-prototype-engines-d-37), R12 #43).
+- ≥30 fps while rotating. Render when the view changes, or every frame while a simulation clock runs (D-34, [§5.7](#r57-motion-and-time-lapse)). Not yet measured on the A15 for the D-37 engines ([R5.9](engines.md#r59-prototype-engines-d-37), R12 #43). The star and world engine hosts draw at most 60 frames a second (Q-386); compile, caches and switches: [R5.9.1](engines-performance.md#r591-engine-and-viewer-performance-issue-93-waves).
 - `renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))`.
 - Textures: 2048×1024 on desktop. After the event, 1024×512 on phones. Serve as WebP for albedo; normal maps as lossless PNG or KTX2.
 - Meshes ≤ 50k triangles. Decimate NASA GLBs offline.
@@ -140,4 +142,5 @@ Proposed in D-34 (pending team confirmation). Rates come from `RenderParams.dyna
 | Low | the WebGL2 fallback, or a coarse pointer (phones, after the event) | 30 fps; capped at 30 only on a coarse pointer (Q-66) |
 
 - Pixel ratio stays capped at 1.5 (D-05). A governor drops one level when frames take more than 33 ms for 2 s, and says so on screen. It only ever lowers. Reduced motion pauses every clock. See Q-64 for the frame-rate row of D-05.
+- **Resolution (Q-383):** on High and Medium (TAAU) the scene renders at 75 % and TAAU upscales; while a clock runs, dynamic resolution lowers it from GPU time; bloom is at half resolution. The viewer has no desktop frame cap (`?fpscap=60` exists, off, Q-66); the engine hosts have one (Q-386). Details: [R5.9.1](engines-performance.md#r591-engine-and-viewer-performance-issue-93-waves).
 - After the event: a 15-minute session on either phone uses at most 10% battery at demo brightness **[verify on phones]** (R12 #39).

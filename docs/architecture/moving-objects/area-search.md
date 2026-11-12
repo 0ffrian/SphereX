@@ -83,7 +83,7 @@ flowchart LR
 | Checks: planted movers and completeness, shuffled-time control, spectrum score, rate-grid linker (gated extras, Q-203) | `backend/app/core/area/` (`inject.py`, `control.py`, `sed.py`, `rategrid.py`) | Kevin |
 | Precompute script | `backend/scripts/area_discovery.py` | Kevin |
 | API | `backend/app/api/areas.py`, models generated from the schemas (D-18) | Kevin |
-| Star list for movers (shared by Track's masks and Discovery, Q-143) | `backend/app/core/find/overlays.py` extension ([A19.6](track.md#a196-star-list-for-movers)) | Kevin (Q-143) |
+| Star list for movers (shared by Track's masks and Discovery, Q-143) | `backend/app/core/find/stars.py` (library), `catalogs.py`, `overlays.py` ([A19.6](track.md#a196-star-list-for-movers)); built in #95 | Atish (proposed, Q-404) |
 | Shared ECSV writer | `backend/app/core/export/ecsv.py` ([A19.9](track-contract.md#a199-export)) | Kevin |
 | Schemas and fixtures | `shared/schemas/area-*.schema.json`, `shared/fixtures/area/` | Moon (D-17) |
 | Area tool, cards, layers, state | `frontend/src/app/sky/area/`, `frontend/src/app/shell/`, `frontend/src/state/store.ts` | Moon (D-17) |
@@ -94,7 +94,7 @@ Reused, not rewritten: `adapters/irsa_sia.py`, `adapters/irsa_cutout.py`, `adapt
 
 ### A16.4 Data flow
 
-1. **Choose areas** in `backend/targets.toml` ([A3.12](../targets.md)) as `[[area]]` tables: `id`, `ra`, `dec`, `width_deg`, `height_deg`, `data_release` (`spherex_qr2`), `windows` (UTC time spans to search). Visits are computed, not configured (A17.1). The Eros area is set from Eros's known path of 20 to 21 Mar 2026, sized to hold both visits' positions (A17.1). **To build** (the file has only `[[target]]` tables today).
+1. **Choose areas** in `backend/targets.toml` ([A3.12](../targets.md)) as `[[area]]` tables: `id`, `ra`, `dec`, `width_deg`, `height_deg`, `data_release` (`spherex_qr2`), `windows` (UTC time spans to search). Visits are computed, not configured (A17.1). The Eros area is set from Eros's known path of 20 to 21 Mar 2026, sized to hold both visits' positions (A17.1). Built (issue #97): `eros-2026-03`, loaded by `app/core/area/config.load_areas` ([Q-400](../../decisions/moving-objects.md)).
 2. **Precompute** with `python -m scripts.area_discovery --area <id>` while the internet is good. Every external call goes through the read-through cache (D-25); results are stored as `derived.area` entries (A17.10). The same run pre-fetches Track for every Known object of the area, or lists the ones it skipped ([A19.12](track-contract.md#a1912-cache-offline-and-pre-fetch)).
 3. **Serve.** `/v1/areas/...` reads those entries. Under `SX_OFFLINE=1` nothing reaches the network.
 4. **Draw a square.** The frontend checks the `GET /v1/areas` index and picks the precomputed area that holds the square. None: refused in the frontend as `area:not_prepared`; the card lists the prepared areas with **Fly there** (A18.1).
@@ -136,6 +136,7 @@ Facts measured on PR #53's recorded Eros fixtures (16 cutouts, `mockup/chase-the
 | Motion between visits | 0.970° in 1.017 d: 0.954 deg/day at PA 105.7°. The two directions differ by 25° because of SPHEREx's orbital parallax (Q-134); A17.4 handles it | Tested (Eros) |
 | Sky position | Galactic l = 195.6°, b = −4.0°: a crowded field, so star masking is tested hard (A17.3) | Tested |
 | Per-exposure depth (5σ point source per band) | Survey depths of 19.5 to 19.9 AB (Bock et al. 2025, [arXiv:2511.02985](https://arxiv.org/abs/2511.02985)) are not per exposure | **[verify]**, Day 0 |
+| Dot density and run times (offline, recorded Eros cutouts) | About 6 400 kept dots per deg² per frame (about 76 000 for the Eros area, an estimate extrapolated from 0.1° cutouts); mesh std 1.8 × sqrt(VARIANCE); Eros found in 14 of 16 frames; Stage 2 13 to 21 ms a dot | Measured offline ([Q-401](../../decisions/moving-objects.md)); live **[verify]** |
 | Visits and gap for the other demo areas | Joining needs 2 visits; the gap sets `rate_min` (A17.4). A3.1 says about 0.8 days for one spot; a cache check reported 0.7 to 88 days | **[verify]**, Q-148, Day 0 |
 | Trailing | Smear starts near 0.53 deg/day and is significant near 1.2 deg/day (Lisse et al. 2024, appendix) | Documented |
 | IRSA MOST for frame lists | One question, Q-126 (PR #53's entry); Q-140 asks the same | Open (Kevin), [A19.3](track.md#a193-frame-list) |

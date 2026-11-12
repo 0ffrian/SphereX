@@ -8,14 +8,14 @@ Track of [A19](../architecture/moving-objects/track.md) (data and backend, with 
 flowchart TB
   subgraph Job["backend object job (Q-111)"]
     PS["core/find/moving.py<br/>path search, exact TLIST (PR 53)"]
-    PATH["path builder<br/>derived.path, 10 min samples"]
-    OVL["core/find/overlays.py<br/>star list and footprint for movers (A19.6)"]
+    PATH["core/find/path.py (built, #74)<br/>cached range samples, no derived.path"]
+    OVL["core/find/overlays.py + stars.py<br/>star list per visit (built, #95)<br/>footprint for movers (built, #74)"]
     MEAS["core/measure (Stage 2)<br/>OUTLIER-core rule Q-139"]
   end
   HOR["adapters/horizons.py<br/>observer 500@-163182, one-request gate"]
   SIA["adapters/irsa_sia.py + irsa_cutout.py"]
   CAT["adapters/gaia.py + wise.py"]
-  CACHE[("Read-through cache D-25<br/>raw replies, derived.path, frames, spectrum")]
+  CACHE[("Read-through cache D-25<br/>raw replies, frames, spectrum")]
   subgraph API["FastAPI, reads the cache"]
     FR["/v1/objects/id/frames"]
     PA["/v1/objects/id/path (A19.5)"]
@@ -87,7 +87,7 @@ sequenceDiagram
   end
   J->>H: SPHEREx-centred ephemeris per window, then TLIST at frame midpoints
   H-->>J: positions (an over-limit text answer is a failure, never cached)
-  J->>J: cones, s_region test, cutouts, Stage 2, derived.path
+  J->>J: cones, s_region test, cutouts, Stage 2 (the range answers /path reads are cached)
   loop Q-97 polling, one request in flight
     ST->>API: GET frames, GET path
     API-->>ST: final frames and path

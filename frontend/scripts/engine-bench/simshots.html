@@ -1,0 +1,182 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Engine bench: world simulation pictures</title>
+<!--
+  Issue #93 1.9, 1.10: pictures of the globe and the fly view while the world forms and once it has formed, for each
+  variant in `runs` (ref = the engine of an older commit in /.bench-ref/worlds-base/, each view running its own
+  simulation; own, shared, worker as in sim.html). The fly view opens once the globe has formed, as the close-up does.
+  While a view forms the app covers it with "Forming the planet…"; these pictures show that cover with its progress
+  (what a visitor sees), next to the engine's own half-formed globe (drawn on purpose) for the globe.
+  __out.png holds the pictures (run.js --save DIR), __out.times the timings (ms).
+  Query: id (t1f), runs (ref,worker).
+-->
+<body style="margin: 0; background: #000">
+  <script type="module">
+    const out = { png: {}, times: {} };
+    window.__out = out;
+    const Q = new URLSearchParams(location.search);
+    const id = Q.get('id') || 't1f';
+    const runs = (Q.get('runs') || 'ref,worker').split(',');
+    const GW = 480,
+      GH = 360,
+      FW = 640,
+      FH = 360;
+    const raf = () => new Promise((r) => requestAnimationFrame(r));
+
+    function canvas(w, h) {
+      const c = document.createElement('canvas');
+      c.style.cssText = `width:${w}px;height:${h}px;display:block`;
+      document.body.appendChild(c);
+      return c;
+    }
+    /** The picture a visitor sees: the engine's canvas (left `frac` of it), or the Forming cover with its progress. */
+    function shot(name, c, frac, forming, pct, note) {
+      const w = Math.round(c.width * frac),
+        h = c.height;
+      const o = document.createElement('canvas');
+      o.width = w;
+      o.height = h + 22;
+      const x = o.getContext('2d');
+      x.fillStyle = '#000';
+      x.fillRect(0, 0, w, h + 22);
+      if (forming) {
+        x.fillStyle = '#ccc';
+        x.font = '16px sans-serif';
+        x.textAlign = 'center';
+        x.fillText('Forming the planet…', w / 2, h / 2 - 8);
+        x.fillStyle = '#333';
+        x.fillRect(w / 2 - 80, h / 2 + 6, 160, 4);
+        x.fillStyle = '#10b981';
+        x.fillRect(w / 2 - 80, h / 2 + 6, (160 * pct) / 100, 4);
+      } else x.drawImage(c, 0, 0, w, h, 0, 0, w, h);
+      x.fillStyle = '#fff';
+      x.font = '12px monospace';
+      x.textAlign = 'left';
+      x.fillText(note, 6, h + 15);
+      out.png[name] = o.toDataURL('image/png');
+    }
+
+    async function variant(name) {
+      const ref = name === 'ref';
+      const base = ref ? '/.bench-ref/worlds-base/' : '/src/engine/worlds/';
+      const { WorldEngine, WORLD_PRESETS } = await import(base + 'WorldEngine.ts');
+      const S = ref ? null : await import('/src/engine/worlds/simSource.ts');
+      const preset = WORLD_PRESETS.find((q) => q.id === id);
+      const T = {};
+      const gc = canvas(GW, GH);
+      const g = new WorldEngine(gc, { role: 'globe', preserveDrawingBuffer: true });
+      await g.whenReady();
+      g.playing = false;
+      const t0 = performance.now();
+      g.setPreset(preset);
+      if (S && name !== 'own') g.followSim(S.simSourceFor(name, preset, {}, g, null));
+      const sp0 = 900;
+      let last = performance.now(),
+        mid = false;
+      while (g.spinup > 0) {
+        await raf();
+        const now = performance.now();
+        g.tick((now - last) / 1000);
+        last = now;
+        if (!mid && g.spinup > 0 && g.spinup <= sp0 / 2) {
+          mid = true;
+          const s = ((performance.now() - t0) / 1000).toFixed(1);
+          g.draw();
+          shot(
+            `${name}-globe-forming-engine`,
+            gc,
+            1,
+            false,
+            0,
+            `${name} globe half formed, ${s} s (engine, under the cover)`,
+          );
+          shot(`${name}-globe-forming`, gc, 1, true, 50, `${name} globe forming, ${s} s`);
+        }
+      }
+      T.globe_formed = Math.round(performance.now() - t0);
+      g.playing = true;
+      for (let i = 0; i < 30; i++) {
+        await raf();
+        const now = performance.now();
+        g.tick((now - last) / 1000);
+        last = now;
+      }
+      shot(
+        `${name}-globe-formed`,
+        gc,
+        1,
+        false,
+        0,
+        `${name} globe formed at ${(T.globe_formed / 1000).toFixed(1)} s`,
+      );
+
+      const fc = canvas(Math.round(FW / 0.6), FH);
+      const f = new WorldEngine(fc, { role: 'fly', preserveDrawingBuffer: true });
+      await f.whenReady();
+      const tr = performance.now();
+      f.setPreset(preset);
+      f.playing = false;
+      if (g.simSource) f.followSim(g.simSource);
+      f.syncSpin(g);
+      f.setFly(true);
+      // One frame after the fly view's shaders are ready: formed already, or forming.
+      await raf();
+      for (const v of [g, f]) v.tick(1 / 60);
+      const s1 = Math.round(performance.now() - tr);
+      if (f.spinup > 0)
+        shot(
+          `${name}-fly-first`,
+          fc,
+          0.6,
+          true,
+          Math.round(100 * (1 - f.spinup / 900)),
+          `${name} fly view ${s1} ms after it was ready: forming`,
+        );
+      else {
+        f.draw();
+        shot(
+          `${name}-fly-first`,
+          fc,
+          0.6,
+          false,
+          0,
+          `${name} fly view ${s1} ms after it was ready: formed`,
+        );
+      }
+      while (f.spinup > 0) {
+        await raf();
+        const now = performance.now();
+        for (const v of [g, f]) v.tick((now - last) / 1000);
+        last = now;
+      }
+      T.fly_formed_after_ready = Math.round(performance.now() - tr);
+      f.playing = true;
+      for (let i = 0; i < 30; i++) {
+        await raf();
+        const now = performance.now();
+        for (const v of [g, f]) v.tick((now - last) / 1000);
+        last = now;
+      }
+      f.draw();
+      shot(
+        `${name}-fly-formed`,
+        fc,
+        0.6,
+        false,
+        0,
+        `${name} fly view formed ${(T.fly_formed_after_ready / 1000).toFixed(2)} s after it was ready`,
+      );
+      out.times[name] = T;
+      f.dispose();
+      g.dispose();
+      fc.remove();
+      gc.remove();
+    }
+    try {
+      for (const r of runs) await variant(r);
+    } catch (e) {
+      out.err = String(e && e.stack ? e.stack : e);
+    }
+    out.done = true;
+  </script>
+</body>

@@ -2,7 +2,7 @@
 
 Vite + TypeScript + React web app. three.js **r187** (`three/webgpu`).
 
-Status: the tooling, the data-contract types, typed placeholder modules for every R10 file and a viewer smoke scene (one plain sphere), set up on 4 Nov 2026. M1 (issue #3, 5 Nov 2026) adds the SPHEREx flipbook and spectrum view: search by name or RA/Dec, frame playback, the spectrum chart, Rainbow Trails and the shareable URL hash. Issue #7 (M2) adds the 3D viewer for the baked types: see "Viewer: baked types" below. Issues #9, #10 and #11 (M3) add the haptics and sound modules (`src/haptics`), built and tested against fixtures and the haptics test page; M5 wires them into the app. On 7 Nov 2026 a feasibility prototype (branch `feat/sky-view-prototype`, not yet confirmed by Moon, D-17) rebuilt the shell in the mock-up's layout with an all-sky image as the main view: see "Shell and sky view (prototype)" below.
+Status: the tooling, the data-contract types, typed placeholder modules for every R10 file and a viewer smoke scene (one plain sphere), set up on 4 Nov 2026. M1 (issue #3, 5 Nov 2026) adds the SPHEREx flipbook and spectrum view: search by name or RA/Dec, frame playback, the spectrum chart, Rainbow Trails and the shareable URL hash. Issue #7 (M2) adds the 3D viewer for the baked types: see "Viewer: baked types" below. Issues #9, #10 and #11 (M3) add the haptics and sound modules (`src/sound` (haptics cut, D-39)), built and tested against fixtures and the haptics test page; M5 wires them into the app. On 7 Nov 2026 a feasibility prototype (branch `feat/sky-view-prototype`, not yet confirmed by Moon, D-17) rebuilt the shell in the mock-up's layout with an all-sky image as the main view: see "Shell and sky view (prototype)" below.
 
 ## Run it
 
@@ -113,23 +113,21 @@ src/
     build/                (issue #60) SelectedCard, BuildPane, MouldStrip, useMould, selectedBody
     sky/                  (prototype) SkyPane (sky view, markers, picking), useTargetMarkers, readout feed
     spectrum/             SpectrumPanel, hand-rolled SVG SpectrumChart, scales
-  test/           test-only helpers (fixtureFetch, sharedFixtures: loads shared/fixtures; fakeHaptics,
-                  fakeAudio, hapticRecorder: haptics fakes)
+  test/           test-only helpers (fixtureFetch, sharedFixtures: loads shared/fixtures; fakeSound
+                  and fakeAudio: sound fakes)
   viewer/         (Moon)  ViewerApp, lighting, modes, honesty, scaleBar, altText, renderPlan + planCommon + planTypes (pure plan)
     renderers/            AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star (plan functions), build (plan to three.js), ShaderBody
     mould/                (issue #60) mouldSteps (pure steps, layers, progress, pose), MouldRig (apply / undo a pose)
     fields/               fieldWorker (D-12 shared field; file name [verify])
     sky/                  (prototype) SkyView (inside-out sky sphere, three r187), skyMath (pure: RA/Dec,
                           camera, picking, pan/zoom), surveys (which equirect to load)
-  haptics/        (Atish)  haptics (engine), audioContext, audioGraph, settings, calibration, platform,
-                  pitch, spectrumMapping, tuning (every tuning constant, D-13), profiles (buildHaptics,
-                  TouchHaptics), probe (TouchProbe)
+  sound/          (Atish)  engine, voices (audio driver), audioContext, audioGraph (buses, duck), settings,
+                           pitch, spectrumMapping, tuning, listenSweep, appSound, SoundProvider, ui/SoundSettings (D-39)
     drivers/              webVibrate, audio, tauri (stub, B-01)
     sources/              types, relief, heightMap, meshNormal, field, dataPulse, terrain, flow,
                           spectrum, lightcurve
     sound/                listenSweep (A8 Listen sweep)
     ui/                   PulseIndicator, UnlockButton, SpectrumHapticsPad, CalibrationWizard, HapticsSettings
-  hapticsTestPage/  dev-only haptics test page (/haptics-test.html on the dev server; not built)
   gpuProbe/         dev-only GPU probe (/gpu-probe.html on the dev server; not built)
   perf/             adapter report, frame stats and the `__sxPerf` recorder (fixtures build only)
 e2e/              Playwright smoke test and flipbook flow (fixtures mode)
@@ -141,13 +139,7 @@ Modules that are not built yet (now only the Tauri driver) export a single `*_PL
 
 ### Haptics test page
 
-`npm run dev` (or `npm run dev:phone` for HTTPS on a phone over the LAN), then open `/haptics-test.html`. It has synthetic inputs only, in three panels:
-
-- **Engine:** every event kind, level and tag, pulse trains at 1, 2, 4, 12 and 20 Hz, the output switches, the honesty state, the audio latency readout and the pulse indicator.
-- **Spectrum** (issue #10): a synthetic spectrum with a dip to feel with the spectrum pad, the calibration wizard and the settings.
-- **Texture** (issue #11): a feel pad per synthetic body (gas giant, water world, rocky world, procedural asteroid, comet coma, nebula), built through `buildHaptics` with its refusals listed, and the Listen sweep.
-
-Tap "Turn on vibration and sound" first. Debug a phone with `chrome://inspect`. The page is not a build input, so `vite build` never includes it.
+Deleted with the haptics (D-39, issue #111). The sound-check page (`sound-check.html`, R13.9) replaces it in #116.
 
 ### GPU probe page
 
@@ -197,7 +189,7 @@ The spec is [R5.8](../docs/rendering/build-mould.md#r58-build-split-view-and-mou
 
 ### Flipbook and spectrum (M1, issue #3)
 
-- **Search:** a name, or RA, Dec in decimal degrees (`parseQuery`). Three or more numbers (sexagesimal) ask for decimal degrees. The search box lists 16 demo objects (Q-161); the "Try:" quick picks are gone.
+- **Search:** a name, or RA, Dec in decimal degrees (`parseQuery`). Three or more numbers (sexagesimal) ask for decimal degrees. The search box lists 17 demo objects (Q-161; 433 Eros added as row 17 in #73); the "Try:" quick picks are gone.
 - **Flipbook:** plays the frames in the order the API lists them. Play/pause, step, a scrubber and a speed control (in the shell's transport bar; Home/End in the flipbook go to the first and last frame); it shows each frame's number, wavelength, UTC time and flags. Play is enabled once the current frame and the next 3 cutouts have loaded or failed; a failed cutout shows "Cutout unavailable" instead of a picture. When `north_up` is false, a note says the picture may rotate between frames.
 - **Fixed frame grid** (`flipbook/frameGrid.ts`): SPHEREx cutouts differ in size (58×58 to 59×59 px, smaller where a detector edge clips them), so every frame of an object is drawn on one N×N grid of source pixels (N = the largest side, rounded up to odd; 59 when no size is stated) at one scale, in a square box that never changes size. Native-orientation frames are shifted by whole pixels so the object's (x, y) lands on the grid centre; frames on a shared north-up grid are drawn at offset 0 (Rainbow Trails uses their own x, y). Grid area that a frame leaves without data (a cutout clipped at a detector edge, wider than a 1 px sliver) is hatched dark grey, not black, behind the frame; it is static. For an object with such frames one steady line says how many ("2 of 240 frames are at a detector edge; their missing part is hatched.", with the hatch swatch); the per-frame caption shows only while paused or stopped, in space reserved for every frame (`flipbook/noData.ts`, R9: nothing flashes during playback). The tint layer has the frame's box; the ring stays on the grid centre. The caption's flags line and the preload line reserve two lines, so nothing below moves during playback.
 - **Picture swap** (`flipbook/frameSwap.ts`, `useFrameSwap.ts`): the viewer keeps two `<img>` slots for the object and decodes the next frame in the hidden one (`HTMLImageElement.decode()`), then swaps, so it never shows an undecoded, black `<img>`. The picture, placement, tint, ring, hatching, caption and the transport bar's frame number and wavelength follow the shown frame and change together; the scrubber shows the requested frame. A decode slower than 1 s stops holding the old picture (the frame shows once it loads); "Cutout unavailable" appears only for a failed cutout or a real load error of that frame's own URL, never for a decode the browser cut short. The playback timer keeps its pace and never waits for a decode. When decodes are slower than the timer, a passed frame is shown only if it was requested after the frame on screen, so the picture never steps back; a decode of a cutout still downloading is replaced by the newest request (scrubbing). `data-shown`, `data-late`, `data-timed-out` and `data-decode-failed` on the viewer are diagnostics.

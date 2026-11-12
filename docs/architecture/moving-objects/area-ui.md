@@ -8,6 +8,8 @@ Mock-up: `mockup/spherex-ui.html`, mock-up tool 5 (the app adds no number keys, 
 
 ## A18 Area search in the sky view
 
+> **Note ([Q-414](../../decisions/shell-surfaces.md), PR #104, `feat/ui`):** the **Known objects** and **Discovery** flow built in this PR is a frontend demo, not A18. It is started from the sky dock (A21.4) and answers through `app/area/areaService.ts` only when the drawn area overlaps the prepared 433 Eros area (the box of `public/demo/eros/eros.json`); elsewhere it refuses with `area:not_prepared`. Its cards and the canvas carry a "Demo data" tag. It does not read `/v1/areas` (Q-205). Which of this demo and PR #100's real Area UI survives is open (Q-414).
+
 **Principle: one sky.** Area search is one **tool** in the left rail, a **square** drawn on the sky, two **layers** (Dots, Tracks) and **feature cards** (A21.5). Target markers, cached markers, the picked position and click-to-pick keep working outside the drawing step.
 
 ### A18.1 Tool and drawing

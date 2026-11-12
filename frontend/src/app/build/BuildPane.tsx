@@ -11,6 +11,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -19,18 +20,19 @@ import {
 import { BUILD_POP_ID, ViewerPanel, type PopId } from '@/app/ViewerPanel';
 import { CloseUpPane, closeUpButtonLabel, closeUpKindOf } from '@/app/CloseUpPane';
 import { useCloseUpStore } from '@/app/closeUpStore';
-import { useRockStore } from '@/app/rockStore';
 import { StatusLine } from '@/app/StatusLine';
+import { StatePill } from '@/app/island/StatePill';
+import { GENERATING_LOOK } from '@/app/island/loaderLooks';
 import { BuildDock, ZoomBar } from './BuildChrome';
 import { Icon, type IconName } from '@/app/shell/icons';
 import { isEditableTarget } from '@/app/shell/shortcuts';
 import { useShellStore } from '@/app/shell/shellStore';
 import { useAppStore } from '@/state/store';
-import { ProvenanceBadge } from '@/app/Badge';
-import { effectiveHonesty, HONESTY_LABEL } from '@/viewer/honesty';
+import { useAmbienceStore } from '@/app/sound/ambienceStore';
+import { atmosphereOf } from './hearModel';
 import type { MouldPhase } from './useMould';
 import { closeBuildPane } from './focus';
-import { ENGINE_NOTE, PREBUILT_NOTE } from '@/app/messages';
+import { displayName } from '@/app/displayName';
 import { loadBodyFor, typeLabel, useSelection } from './selectedBody';
 
 export { closeBuildPane };
@@ -41,7 +43,6 @@ export const SHIFT_DELAY_MS = 650;
 /** The header buttons that open a panel, in the mock-up's order (Details is the app's extra). */
 const POP_BUTTONS: { id: PopId; label: string; title: string; icon: IconName }[] = [
   { id: 'acc', label: 'Accuracy', title: 'Accuracy', icon: 'accuracy' },
-  { id: 'feel', label: 'Feel', title: 'Feel the surface', icon: 'fingerprint' },
   { id: 'hear', label: 'Hear it', title: 'Hear it', icon: 'hear' },
   {
     id: 'details',
@@ -66,10 +67,6 @@ export function BuildPane() {
   const buttonRefs = useRef<Partial<Record<PopId, HTMLButtonElement | null>>>({});
   const closeKind = closeUpKindOf(params?.type);
   const closeHidden = useCloseUpStore((s) => s.hidden);
-  // A D-37 engine (world, star or rock) draws the body: its note replaces the baked path's.
-  const closeEngine = useCloseUpStore((s) => s.engineStar !== null || s.engineWorld !== null);
-  const rockEngine = useRockStore((s) => s.view !== null);
-  const engineDrawn = closeEngine || rockEngine;
   const [usesSeed, setUsesSeed] = useState(true);
   const spinRef = useRef<SVGSVGElement>(null);
   const sayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -82,16 +79,12 @@ export function BuildPane() {
 
   // The body of the selected object when it is loaded; otherwise whatever body the store holds
   // (the rail's 3D viewer with no selection).
-  const name = selection?.name ?? card?.name ?? null;
+  const name = displayName(selection?.name ?? card?.name ?? null) || null;
   const bodyHere = selection && body.status !== 'idle' && body.id === selection.id ? body : null;
   const type = typeLabel(params?.type);
   // The mock-up's title (Q-298, amends Q-113): "Building X" for a build that is played, and it stays;
   // the bare name when the body is shown built at once (`B.quick`).
   const title = name ? (build.animate ? `Building ${name}` : name) : '3D view';
-  const fixtureSky = useAppStore((s) => s.sky.fixture);
-  const honesty = effectiveHonesty(useAppStore((s) => s.honesty));
-  const levelTag =
-    honesty === 'measured' ? 'measured' : honesty === 'derived' ? 'derived' : 'artistic';
   const subtitle =
     bodyHere?.status === 'loading'
       ? 'Looking up its 3D model…'
@@ -100,7 +93,7 @@ export function BuildPane() {
         : (type ?? (name ? '' : 'No object loaded'));
   const message =
     bodyHere?.status === 'none'
-      ? `There is no 3D model of ${selection!.name} to build. ${bodyHere.reason}`
+      ? `There is no 3D model of ${name} to build. ${bodyHere.reason}`
       : null;
 
   // Mock-up `setShifted`: the pane slides to the right half 650 ms after the last step, and the
@@ -153,6 +146,25 @@ export function BuildPane() {
 
   // Escape closes the open panel first (focus goes back to its button), then the pane. It works from
   // anywhere in the page that is not a text field (mock-up: Esc closes the build).
+  // Ambience (the wind that outlives the Hear it panel) must always be visible and stoppable (WCAG 1.4.2).
+  const ambienceOn = useAmbienceStore((s) => s.ambience && s.playing);
+  // The Atmosphere toggle in the header plays the ambience straight away, without opening Hear it.
+  // Shown only where an atmosphere sound is possible (same refusal rules as the Hear it panel).
+  const atmo = useMemo(() => atmosphereOf(card), [card]);
+  const atmoOn = useAmbienceStore((s) => s.ambience && s.playing && s.key === (card?.id ?? ''));
+  const toggleAtmo = (): void => {
+    if (!atmo.ok || !card) return;
+    useAmbienceStore.getState().setAmbience(!atmoOn, atmo.model, card.id);
+  };
+  useEffect(() => {
+    if (!ambienceOn) return;
+    const onM = (e: globalThis.KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'm' || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented || isEditableTarget(e.target)) return;
+      useAmbienceStore.getState().stop();
+    };
+    window.addEventListener('keydown', onM);
+    return () => window.removeEventListener('keydown', onM);
+  }, [ambienceOn]);
   const onEscape = useCallback(() => {
     if (popRef.current) setPop(null, true);
     else closeBuildPane();
@@ -234,24 +246,14 @@ export function BuildPane() {
     </div>
   );
 
-  // The honesty line (D-02, D-21): the level the body is shown at, visible without opening anything,
-  // in the mock-up's caption style (`.cu-tag`).
+  // The note box (level badge, "artist's impression", "Generated live from physics…") is gone: the
+  // provenance stays in the Details lists. What is left of this slot is the "N hidden at this level"
+  // button, shown only when there is one.
   const level = (extra: ReactNode) =>
     name &&
-    bodyHere?.status !== 'none' && (
+    bodyHere?.status !== 'none' &&
+    extra && (
       <p className="sx-bp-tag" data-testid="build-level">
-        <ProvenanceBadge
-          tag={levelTag}
-          fixture={fixtureSky || (card?.id.startsWith('fixture:') ?? false)}
-        />
-        {honesty === 'artistic' && <span>artist&rsquo;s impression</span>}
-        {engineDrawn ? (
-          <span data-testid="build-engine-note">{ENGINE_NOTE}</span>
-        ) : (
-          bodyHere?.status === 'ready' &&
-          bodyHere.prebuilt && <span data-testid="build-prebuilt">{PREBUILT_NOTE}</span>
-        )}
-        <span className="sr-only">{HONESTY_LABEL[honesty]}</span>
         {extra}
       </p>
     );
@@ -286,6 +288,7 @@ export function BuildPane() {
                 type="button"
                 className="sx-bp-tool sx-bp-text"
                 title={b.title}
+                aria-label={b.id === 'hear' && ambienceOn ? 'Hear it. Ambience on, open Hear it to stop, or press M.' : undefined}
                 aria-pressed={pop === b.id}
                 aria-expanded={pop === b.id}
                 aria-controls={BUILD_POP_ID}
@@ -294,8 +297,27 @@ export function BuildPane() {
               >
                 <Icon name={b.icon} className="size-[15px]" />
                 <span>{b.label}</span>
+                {b.id === 'hear' && ambienceOn && <i className="sx-bp-live" aria-hidden="true" data-testid="hear-live" />}
               </button>
-            ))}
+            )).flatMap((el, i) =>
+              i === 0 && atmo.ok
+                ? [
+                    el,
+                    <button
+                      key="atmo"
+                      type="button"
+                      className="sx-bp-tool sx-bp-text"
+                      title={atmoOn ? 'Stop the atmosphere sound (M)' : 'Play the atmosphere sound'}
+                      aria-pressed={atmoOn}
+                      onClick={toggleAtmo}
+                      data-testid="build-atmosphere"
+                    >
+                      <Icon name="wind" className="size-[15px]" />
+                      <span>Atmosphere</span>
+                    </button>,
+                  ]
+                : [el],
+            )}
             <i className="sx-bp-sep" aria-hidden="true" />
             <button
               type="button"
@@ -309,7 +331,11 @@ export function BuildPane() {
             </button>
           </div>
         </header>
-        {message ? (
+        {bodyHere?.status === 'loading' ? (
+          <div className="sx-bp-msg" data-testid="build-generating">
+            <StatePill look={GENERATING_LOOK} word="Generating" />
+          </div>
+        ) : message ? (
           <div className="sx-bp-msg" role="status" data-testid="build-message">
             <p>{message}</p>
             {bodyHere?.status === 'none' && bodyHere.transient && selection && (

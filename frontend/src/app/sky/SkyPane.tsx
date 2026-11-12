@@ -13,6 +13,8 @@
 // - No React re-render per pointer move: the readout and markers are written from refs.
 // - R9: keyboard pan/zoom on the canvas (arrows, +/−, R), Enter picks the centre, aria-label and a
 //   text alternative. No on-screen pan and zoom buttons (Q-123).
+import { publishMotion } from './skyMotion';
+import { displayName } from '@/app/displayName';
 import {
   useEffect,
   useId,
@@ -26,6 +28,7 @@ import { EstimatedBadge, ProvenanceBadge } from '@/app/Badge';
 import type { SkyCachedObject, SkySurvey } from '@/app/api/types';
 import { isApiError } from '@/app/api/errors';
 import { formatCoords } from '@/app/format';
+import { Icon } from '@/app/shell/icons';
 import { getSkyApi, useAppStore } from '@/state/store';
 import { prefersReducedMotion, type RendererBackend } from '@/viewer/ViewerApp';
 import { SkyView } from '@/viewer/sky/SkyView';
@@ -50,6 +53,7 @@ import {
 import { pickSurvey, planSkyLoad } from '@/viewer/sky/surveys';
 import { hasSkyPosition, PICK_FORMULA } from './positionTags';
 import { publishReadout } from './readout';
+import { registerSkyZoom } from './skyZoom';
 import {
   cachedMarkerDescription,
   cachedMarkerLabel,
@@ -57,6 +61,10 @@ import {
   cachedMarkersToShow,
 } from './cachedMarkers';
 import { useShellStore } from '@/app/shell/shellStore';
+import { useAreaStore } from '@/app/shell/areaStore';
+import { AreaOverlay } from './AreaOverlay';
+import { AreaTrackLayer } from '@/app/area/AreaTrackLayer';
+import { boxFromPixels, centreRect, registerAreaView, rectOf } from './areaDraw';
 import { useCachedMarkers } from './useCachedMarkers';
 import { useTargetMarkers, type TargetMarker } from './useTargetMarkers';
 
@@ -153,6 +161,29 @@ export function SkyPane({ children }: { children?: ReactNode }) {
   // D-35: the credit is always visible. Panels read its height (--sx-credit-h) to stay clear of it
   // (desktop) or to keep their content above it (phone bottom sheet, where it sits on top).
   const creditRef = useRef<HTMLDivElement>(null);
+  const creditBtnRef = useRef<HTMLButtonElement>(null);
+  const creditId = useId();
+  const [creditOpen, setCreditOpen] = useState(false);
+  // Escape or a press outside the popover and its button closes it.
+  useEffect(() => {
+    if (!creditOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      setCreditOpen(false);
+      creditBtnRef.current?.focus();
+    };
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (creditRef.current?.contains(t) || creditBtnRef.current?.contains(t)) return;
+      setCreditOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('pointerdown', onDown, true);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', onDown, true);
+    };
+  }, [creditOpen]);
   useEffect(() => {
     const host = hostRef.current;
     const credit = creditRef.current;
@@ -227,6 +258,25 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       canvas.remove();
     };
   }, [descId]);
+
+  // The zoom card (bottom left) acts on this view like the wheel and the + and - keys.
+  useEffect(() => {
+    if (!view) return;
+    registerSkyZoom({
+      zoom: (factor) => {
+        flyCancel.current?.();
+        const { width, height } = view.getSize();
+        view.setView(zoomAt(view.getView(), factor, width, height));
+        announceView(view.getView());
+      },
+      reset: () => {
+        flyCancel.current?.();
+        view.setView(DEFAULT_SKY_VIEW);
+        announceView(view.getView());
+      },
+    });
+    return () => registerSkyZoom(null);
+  }, [view]);
 
   // ---- Index and image ---------------------------------------------------------------------------
   useEffect(() => {
@@ -397,7 +447,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
   const onContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     // Panels, the card and the on-screen controls keep the browser's menu.
-    if (target.closest('.sx-island-wrap, .sx-panel, .sx-sky-credit, input')) return;
+    if (target.closest('.sx-island-wrap, .sx-panel, .sx-sky-credit, .sx-credit-btn, input')) return;
     let key = target.closest<HTMLElement>('[data-marker-key]')?.dataset.markerKey ?? null;
     if (key === null) {
       let best = Infinity;
@@ -474,14 +524,27 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     let pinchMid = { x: 0, y: 0 };
     let hover: { x: number; y: number } | null = null;
     let readoutFrame: number | null = null;
+    // Discovery tool: a drag draws a rectangle instead of panning.
+    registerAreaView(view, (c) => {
+      flyCancel.current?.();
+      flyCancel.current = c;
+    });
+    let drawing: { id: number; x: number; y: number } | null = null;
+    const areaDrawing = () =>
+      useShellStore.getState().tool === 'area' && useAreaStore.getState().stage === 'drawing';
 
     const local = (e: PointerEvent | WheelEvent) => {
       const r = canvas.getBoundingClientRect();
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     };
+    let lastCam: { ra: number; dec: number; fovDeg: number } | null = null;
     const sendReadout = () => {
       readoutFrame = null;
       const cam = view.getView();
+      if (lastCam === null || cam.ra !== lastCam.ra || cam.dec !== lastCam.dec || cam.fovDeg !== lastCam.fovDeg) {
+        if (lastCam !== null) publishMotion();
+        lastCam = { ra: cam.ra, dec: cam.dec, fovDeg: cam.fovDeg };
+      }
       if (hover) {
         const { width, height } = view.getSize();
         const p = screenToRaDec(cam, hover.x, hover.y, width, height, PICK_SCRATCH);
@@ -508,6 +571,11 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       stopFly();
       canvas.setPointerCapture?.(e.pointerId);
       const p = local(e);
+      if (areaDrawing() && !drawing && pointers.size === 0) {
+        drawing = { id: e.pointerId, x: p.x, y: p.y };
+        useAreaStore.getState().setDrag({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
+        return;
+      }
       pointers.set(e.pointerId, p);
       if (pointers.size === 1) {
         start = p;
@@ -522,6 +590,10 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     };
     const onMove = (e: PointerEvent) => {
       const p = local(e);
+      if (drawing && drawing.id === e.pointerId) {
+        useAreaStore.getState().setDrag(rectOf(drawing.x, drawing.y, p.x, p.y));
+        return;
+      }
       const prev = pointers.get(e.pointerId);
       if (!prev) {
         if (e.pointerType === 'mouse') {
@@ -551,6 +623,19 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       }
     };
     const onUp = (e: PointerEvent) => {
+      if (drawing && drawing.id === e.pointerId) {
+        const p = local(e);
+        const d = rectOf(drawing.x, drawing.y, p.x, p.y);
+        drawing = null;
+        // The tool may have been left mid-drag (Escape): then nothing is set and no search starts.
+        const box =
+          areaDrawing() && e.type === 'pointerup' && Math.abs(d.x1 - d.x0) >= 12 && Math.abs(d.y1 - d.y0) >= 12
+            ? boxFromPixels(d)
+            : null;
+        if (box) useAreaStore.getState().setBox(box);
+        else useAreaStore.getState().setDrag(null);
+        return;
+      }
       if (!pointers.has(e.pointerId)) return;
       const p = local(e);
       const wasSingle = pointers.size === 1;
@@ -610,6 +695,12 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         case 'Enter':
         case ' ':
           e.preventDefault();
+          // Known objects / Discovery: Enter sets an area in the middle (the keyboard way to draw one).
+          if (areaDrawing()) {
+            const mid = centreRect();
+            if (mid) useAreaStore.getState().setBox(mid);
+            return;
+          }
           pickAt(width / 2, height / 2);
           return;
         default:
@@ -631,6 +722,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     canvas.addEventListener('keydown', onKey);
     queueReadout();
     return () => {
+      registerAreaView(null);
       offRender();
       if (readoutFrame !== null) cancelAnimationFrame(readoutFrame);
       canvas.removeEventListener('pointerdown', onDown);
@@ -649,7 +741,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     state.kind === 'ready' || state.kind === 'loading' || state.kind === 'error'
       ? state.survey
       : null;
-  const resolvedLabel = resolved ? (resolved.name ?? formatCoords(resolved.ra, resolved.dec)) : '';
+  const resolvedLabel = resolved ? (displayName(resolved.name) || formatCoords(resolved.ra, resolved.dec)) : '';
   const showPicked =
     picked !== null &&
     !(
@@ -691,6 +783,8 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         is shown at the top right. You can also type coordinates or a name in the search field.
       </p>
 
+      <AreaOverlay view={view} />
+      <AreaTrackLayer view={view} />
       {/* Panels sit right after the canvas in the tab order. */}
       {children}
 
@@ -812,20 +906,42 @@ export function SkyPane({ children }: { children?: ReactNode }) {
 
       {/* Provenance and credit of the picture (D-02, A11). */}
       {/* Always on top and never covered by a panel (D-35; see --sx-credit-h above). */}
-      <div ref={creditRef} className="sx-sky-credit" data-testid="sky-credit-box">
+      <button
+        type="button"
+        ref={creditBtnRef}
+        className="sx-credit-btn"
+        aria-label="About this sky image"
+        aria-expanded={creditOpen}
+        aria-controls={creditId}
+        title="About this sky image"
+        onClick={() => setCreditOpen((o) => !o)}
+        data-testid="sky-credit-button"
+      >
+        <Icon name="info" className="size-4" />
+      </button>
+      <div
+        ref={creditRef}
+        id={creditId}
+        className="sx-sky-credit"
+        data-testid="sky-credit-box"
+        role="region"
+        aria-label="About this sky image"
+        hidden={!creditOpen}
+      >
         {survey && (
           <p
-            className="pointer-events-auto flex flex-wrap items-center gap-1.5"
+            className="sx-credit-line pointer-events-auto"
             data-testid="sky-credit"
           >
             <span className="text-sx-fg">{survey.title}</span>
             {survey.tag === 'derived' ? (
-              <EstimatedBadge tooltip={survey.formula ?? ''} />
+              <EstimatedBadge tooltip={survey.formula ?? ''} variant="tag" />
             ) : (
               <ProvenanceBadge
                 tag={survey.tag}
                 tooltip={survey.formula ?? survey.assumption ?? undefined}
                 srText
+                variant="tag"
               />
             )}
             {fixtureSky && (
@@ -833,7 +949,9 @@ export function SkyPane({ children }: { children?: ReactNode }) {
                 SYNTHETIC
               </span>
             )}
-            <span className="basis-full">{survey.credit}</span>
+            <span className="sx-credit-text" title={survey.credit}>
+              {survey.credit}
+            </span>
           </p>
         )}
         {picked && (

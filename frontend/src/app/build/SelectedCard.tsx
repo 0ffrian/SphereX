@@ -13,6 +13,7 @@ import { openTool } from '@/app/shell/ToolRail';
 import { isEditableTarget } from '@/app/shell/shortcuts';
 import { focusSelectedMarker } from './focus';
 import { formatCoords } from '@/app/format';
+import { displayName } from '@/app/displayName';
 import { loadBodyFor, typeLabel, useSelection } from './selectedBody';
 
 /** Deselects the object: clears the search (brackets, card, flipbook) and the link, then focuses its marker. */
@@ -79,7 +80,7 @@ export function SelectedCard() {
   // The type from the loaded render params; before that, only what the search itself says.
   const bodyHere = selection && body.status !== 'idle' && body.id === selection.id;
   const type = bodyHere && body.status === 'ready' ? typeLabel(params?.type) : null;
-  const title = selection?.name ?? position ?? '';
+  const title = displayName(selection?.name) || (position ?? '');
   const noModelHere = position !== null;
   const subtitle = noModelHere
     ? 'No 3D model at this position'
