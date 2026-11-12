@@ -24,7 +24,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [rendering-layers.md](rendering-layers.md) | the per-layer body fixes of issue #62 (PR #63): gas giant five tiered layers, brown dwarf limb and infrared bands, asteroid sphere and displacement, the flared T Tauri disc | 0 D, 4 Q, 11 KB |
 | [gemini.md](gemini.md) | the Gemini layer: scope, offline behaviour and its contract | 1 D, 2 Q, 7 KB |
 | [sky-shell.md](sky-shell.md) | the sky view, sky endpoints and sky tiles, the flipbook UI | 1 D, 10 Q, 12 KB |
-| [shell-surfaces.md](shell-surfaces.md) | the tool rail and the island, the object panel and card, the Build split view, the full-bleed layout | 1 D, 5 Q, 13 KB |
+| [shell-surfaces.md](shell-surfaces.md) | the tool rail and the island, the object panel and card, the Build split view, the full-bleed layout | 1 D, 19 Q, 32 KB |
 | [shell-proposals.md](shell-proposals.md) | open shell proposals that Track and Area search need: pane kinds, feature cards, hash keys, Escape order | 0 D, 9 Q, 15 KB |
 | [haptics-design.md](haptics-design.md) | haptics design rules, creative ownership, the haptics API, the shared field on shader kinds, texture and data sources per type | 5 D, 12 Q, 20 KB |
 | [haptics-sound.md](haptics-sound.md) | audio pairing (D-10), spectrum pitch and voice hints, the body tone and the Track path sound | 1 D, 10 Q, 13 KB |
@@ -43,7 +43,7 @@ Agenda of the 11 Nov 2026 decision session: [session-2026-11-11.md](session-2026
 ## Rules for entries
 
 - **IDs never change and are never reused.** A new decision is the next free `D-` number; a new question the next free `Q-` number. Before you pick one, check `origin/main` and the open PRs (they pick numbers too).
-- **Next free:** D-39 and Q-408 (12 Nov 2026; Q-337 to Q-399 are skipped, main moved Area to Q-400 and up; before the merge it was D-38 and Q-337, checked against `origin/main` after merging issue #75, and the open PR #90; issue #71 took D-37 and Q-210 to Q-336). **Never assigned (do not reuse):** in issue #71's block, Q-213 to Q-219, Q-223 to Q-229, Q-236 to Q-239, Q-246 to Q-249, Q-264, Q-265, Q-268, Q-269, Q-277 to Q-279, Q-289 and Q-320 to Q-322; also Q-46, Q-127 to Q-129 and Q-149. **Taken by issue #75:** Q-206 (pack never hides a measured spectrum) and Q-207 (Rainbow Trails rotation in the UI). **Taken by feat/ui (UI worktree):** D-38 (design language) and Q-403 to Q-407 (light theme, the artist's impression line, Pause, Show level in the build pane, the island's pulse; first drafted as Q-326 to Q-330, renumbered at the merge with main). **Taken by issue #97:** Q-400 to Q-402 (Area frames and dots). **Taken by issue #92:** Q-208 (Area contract shape choices, Proposed). **Never assigned:** Q-209. **Taken by issue #80:** Q-205 (event cut, Proposed). **Taken by issue #79:** Q-204 (PNG determinism). **Renumbered:** this PR's Q-150 to Q-183 became Q-170 to Q-203 on 10 Nov 2026, because main took Q-150 to Q-169 in PR #70; Q-203 is the four research checks, Q-170 to Q-202 are the spec-pass proposals. **From PR #53 (merged):** Q-125 (frame search tags and refusals) and Q-126 (MOST). Q-130 to Q-149 were reserved for the Track tool and Area search (Q-130).
+- **Next free:** D-39 and Q-418 (12 Nov 2026, checked against `origin/main` and the open PRs #90, #100 and #101; PR #100 takes Q-406 to Q-408. Before that it was D-38 and Q-337, checked against `origin/main` after merging issue #75, and the open PR #90; issue #71 took D-37 and Q-210 to Q-336). **Never assigned (do not reuse):** in issue #71's block, Q-213 to Q-219, Q-223 to Q-229, Q-236 to Q-239, Q-246 to Q-249, Q-264, Q-265, Q-268, Q-269, Q-277 to Q-279, Q-289 and Q-320 to Q-322; also Q-46, Q-127 to Q-129 and Q-149. **Taken by issue #75:** Q-206 (pack never hides a measured spectrum) and Q-207 (Rainbow Trails rotation in the UI). **Taken by feat/ui (PR #104):** D-38 (design language) and Q-409 to Q-417 (light theme, the artist's impression line, Pause, the Show row in Details, the island's pulse, the demo area flows, the mould, Hear it, the tab title; first drafted as Q-326 to Q-330, then Q-403 to Q-407, renumbered after main and PR #100 took those). **Taken by issue #97:** Q-400 to Q-402 (Area frames and dots). **Taken by issue #95:** Q-403 (star list choices) and Q-404 (star list owner), both Proposed; Q-405 reserved with them and never assigned. **Taken by issue #92:** Q-208 (Area contract shape choices, Proposed). **Never assigned:** Q-209. **Taken by issue #80:** Q-205 (event cut, Proposed). **Taken by issue #79:** Q-204 (PNG determinism). **Renumbered:** this PR's Q-150 to Q-183 became Q-170 to Q-203 on 10 Nov 2026, because main took Q-150 to Q-169 in PR #70; Q-203 is the four research checks, Q-170 to Q-202 are the spec-pass proposals. **From PR #53 (merged):** Q-125 (frame search tags and refusals) and Q-126 (MOST). Q-130 to Q-149 were reserved for the Track tool and Area search (Q-130).
 - **D-37, Q-286 to Q-288, Q-299 to Q-306 and Q-309 to Q-316 (the engines)** are in [rendering-engines](rendering-engines.md) (moved from rendering-bodies on 11 Nov 2026); their PR #89 review fixes **Q-329 to Q-331, Q-334, Q-335** are in [rendering-engines-review](rendering-engines-review.md). **Q-294 to Q-298 (stream U, build view)** are in [shell-surfaces](shell-surfaces.md). **Q-274 to Q-276 (stream H, orbit view and close-up pane)** are in [rendering-bodies](rendering-bodies.md).
 - **One entry, one file.** Put a new entry in the topic file it belongs to and add its row to the index below in the same commit. An entry that changes another one says "amends D-xx" and the amended entry gets an "Amended by" line.
 - **Status words** (for new entries; older rows keep their wording): **Open**; **Open (built)** (code follows the proposal); **Proposed** (an owner must confirm); **Decided** (who and when); **Partly decided** (list what is open); **Superseded by** (the newer entry rules); **Deferred** (after the event). D- entries are **Accepted** unless marked otherwise.
@@ -270,7 +270,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-180 | Known-object check: SkyBoT, Horizons, unchecked | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-181 | Track is a split-pane kind, no tool | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-182 | Discovery result card named Result card | Proposed | [moving-objects-review](moving-objects-review.md) |
-| Q-183 | Owners for Track and the star list | Proposed | [scope-process](scope-process.md) |
+| Q-183 | Owners for Track and the star list | Proposed; amended by Q-404 | [scope-process](scope-process.md) |
 | Q-184 | Eros Track window | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-185 | Marker between exposures | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-186 | Measurable coma-fills-aperture test | Proposed | [moving-objects-review](moving-objects-review.md) |
@@ -343,11 +343,11 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-287 | The engines draw only at + Artistic; + Estimated and Measured only draw the three.js path | Decided (Atish, 11 Nov 2026) | [rendering-engines](rendering-engines.md#q-286-to-q-288-the-world-adapter-tsl-port-honesty-level-ocean-basin) |
 | Q-288 | Ocean basin in the world adapter (sea share per type) | Open (built; Moon to confirm) | [rendering-engines](rendering-engines.md#q-286-to-q-288-the-world-adapter-tsl-port-honesty-level-ocean-basin) |
 | Q-290 to Q-293 | Gas giant and star parity: True colour default, solved gas world and star cells shown at + Estimated | Decided in code (Moon to confirm) | [rendering-bodies](rendering-bodies.md) |
-| Q-294 | Build view follows the mock-up: full-view build, shift to the right half, header, one panel at a time, honesty caption | Decided (Moon: loyal to the mock-up) | [shell-surfaces](shell-surfaces.md) |
-| Q-295 | Feel it (not available yet) and Hear it (the Listen sweep on the measured spectrum) in the build pane | Decided in code | [shell-surfaces](shell-surfaces.md) |
-| Q-296 | Zoom bar and tool dock in the build view | Decided in code | [shell-surfaces](shell-surfaces.md) |
-| Q-297 | Details: the controls and honesty lists the mock-up's build view has no place for | Decided in code | [shell-surfaces](shell-surfaces.md) |
-| Q-298 | Build view follow-ups: mock-up title, island bottom right, `BuildControls` slot, Show dims rows only, phone close-up caption | Decided (coordinator) | [shell-surfaces](shell-surfaces.md) |
+| Q-294 | Build view follows the mock-up: full-view build, shift to the right half, header, one panel at a time, honesty caption (amended by PR #104) | Decided (Moon: loyal to the mock-up) | [shell-surfaces](shell-surfaces.md) |
+| Q-295 | Feel it (not available yet) and Hear it (the Listen sweep on the measured spectrum) in the build pane (amended by PR #104) | Decided in code | [shell-surfaces](shell-surfaces.md) |
+| Q-296 | Zoom bar and tool dock in the build view (amended by PR #104) | Decided in code | [shell-surfaces](shell-surfaces.md) |
+| Q-297 | Details: the controls and honesty lists the mock-up's build view has no place for (amended by PR #104) | Decided in code | [shell-surfaces](shell-surfaces.md) |
+| Q-298 | Build view follow-ups: mock-up title, island bottom right, `BuildControls` slot, Show dims rows only, phone close-up caption (amended by PR #104) | Decided (coordinator) | [shell-surfaces](shell-surfaces.md) |
 | Q-299 | Rock engine (prototype code, verbatim) draws asteroids and comet nuclei at + Artistic (Q-287) | Open (built; Moon to confirm) | [rendering-engines](rendering-engines.md#q-299-to-q-302-stream-v3-rock-engine-issue-71-d-37) |
 | Q-300 | `cardToRock` adapter and the artifact's own bodies by id | Open (built; Moon to confirm); amended by Q-334 | [rendering-engines](rendering-engines.md#q-299-to-q-302-stream-v3-rock-engine-issue-71-d-37) |
 | Q-301 | Shape models as a radial height map for the engine; jets | Open (built; Moon to confirm) | [rendering-engines](rendering-engines.md#q-299-to-q-302-stream-v3-rock-engine-issue-71-d-37) |
@@ -378,9 +378,15 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-400 | Area frames and dots: P3's choices for the spec gaps | Proposed | [moving-objects](moving-objects.md) |
 | Q-401 | Area starting values against the Day 0 count | Open (offline numbers; live Day 0 pending) | [moving-objects](moving-objects.md) |
 | Q-402 | Conflicts P3 met in the Area spec (incl. A17.3 star or fixed) | Open; (5) decided by Moon | [moving-objects](moving-objects.md) |
-| Q-403 | Light theme for the panels | Open | [shell-surfaces](shell-surfaces.md) |
-| Q-404 | The "artist's impression" line removed from Details | Open | [shell-surfaces](shell-surfaces.md) |
-| Q-405 | Pause removed from the Details pane | Open | [shell-surfaces](shell-surfaces.md) |
-| Q-406 | Show (honesty level) removed from the build pane | Open | [shell-surfaces](shell-surfaces.md) |
-| Q-407 | The island's loader pulses at rest | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-403 | Star list for movers: choices for the spec gaps | Proposed | [moving-objects-review](moving-objects-review.md) |
+| Q-404 | Owner of the star list for movers (amends Q-183, D-17) | Proposed | [scope-process](scope-process.md) |
+| Q-409 | Light theme for the panels | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-410 | The "artist's impression" line removed from Details | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-411 | Pause removed from the Details pane (P key instead) | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-412 | Show (honesty level) moves into Details in the build pane | Proposed (Moon to confirm) | [shell-surfaces](shell-surfaces.md) |
+| Q-413 | The island's loader pulses at rest | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-414 | Known objects and Discovery demo answers only inside the Eros area | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-415 | Moulding animation is the mock-up's generic body (amends Q-113 item 3) | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-416 | Hear it: Atmosphere and the spectrum sweep (amends Q-295) | Open (Atish to wire after merge) | [shell-surfaces](shell-surfaces.md) |
+| Q-417 | The browser tab reads "Odysseus" | Decided (Moon, tab title only) | [shell-surfaces](shell-surfaces.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |

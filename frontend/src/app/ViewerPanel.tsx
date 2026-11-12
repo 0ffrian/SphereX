@@ -656,7 +656,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const closeKind = pane ? closeUpKindOf(params?.type) : null;
   // The prototype engines (star, world, rock) draw a generated surface: they mount only at "+ Artistic"
   // (Atish's call on the PR #89 review, Q-287). At "Measured only" and "+ Estimated" the three.js path draws.
-  // The build pane has no Show control (Q-406); Build raises the level to + Artistic when the body has layers
+  // The build pane has no Show control (Q-412); Build raises the level to + Artistic when the body has layers
   // the level hides, which is what lets the engines draw.
   const enginesShown = honesty === 'artistic';
   const engineStar =

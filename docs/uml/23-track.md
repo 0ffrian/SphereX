@@ -9,7 +9,7 @@ flowchart TB
   subgraph Job["backend object job (Q-111)"]
     PS["core/find/moving.py<br/>path search, exact TLIST (PR 53)"]
     PATH["path builder<br/>derived.path, 10 min samples"]
-    OVL["core/find/overlays.py<br/>star list and footprint for movers (A19.6)"]
+    OVL["core/find/overlays.py + stars.py<br/>star list per visit (built, #95)<br/>footprint for movers (A19.6)"]
     MEAS["core/measure (Stage 2)<br/>OUTLIER-core rule Q-139"]
   end
   HOR["adapters/horizons.py<br/>observer 500@-163182, one-request gate"]

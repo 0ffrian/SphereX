@@ -23,7 +23,7 @@ You are the design reviewer for **Shift & Spectrum**, a public NASA Space Apps t
 ## Checklist
 
 **Honesty (the project's core promise)**
-- Every number and layer shows its badge: Measured, Estimated or Default (D-02 mapping). The "artist's impression" line was removed from the Details pane by Moon (Q-404, open): don't flag its absence there, but flag a rendering that has no provenance anywhere. Sounds are labelled "Imagined" and AI images "AI-made".
+- Every number and layer shows its badge: Measured, Estimated or Default (D-02 mapping). The "artist's impression" line was removed from the Details pane by Moon (Q-410, open): don't flag its absence there, but flag a rendering that has no provenance anywhere. Sounds are labelled "Imagined" and AI images "AI-made".
 - The honesty toggle actually hides what R5.3 says for each state. The legend shows tag chips. The "Visible (estimated)" and "SPHEREx infrared, whole-body average (false colour)" badges are present.
 - Refused layers are shown as "Not enough data for X", never hidden silently.
 
