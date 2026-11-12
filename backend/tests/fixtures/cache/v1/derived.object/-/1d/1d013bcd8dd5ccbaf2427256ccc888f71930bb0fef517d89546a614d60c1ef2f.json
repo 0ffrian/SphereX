@@ -1,0 +1,16 @@
+{
+ "body_sha256": "fd5b9e6d1769ee59c077c504fa149312268550a1b87739af97eede72c1b540e1",
+ "body_size": 740,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-10T15:44:46.335Z",
+ "key": {
+  "query": {
+   "id": "simbad-wisea-j085510-74-071442-5",
+   "v": "1"
+  },
+  "release": "-",
+  "source": "derived.object"
+ },
+ "status": 200,
+ "url": "derived:resolve"
+}

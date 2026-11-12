@@ -20,7 +20,7 @@ from collections import OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
 
@@ -28,19 +28,52 @@ from app.adapters import gaia, irsa_cutout, irsa_sia, wise
 from app.adapters.irsa_sia import SiaRow
 from app.cache.store import CacheMissOffline, Served, UpstreamUnavailable, earliest_cached_at
 from app.context import Context
-from app.core.find import flagmask, wcs
-from app.core.find.frames import FrameRecord, FrameService, frame_time, is_complete, position_at
+from app.core.find import flagmask, stars, wcs
+from app.core.find import moving as moving_mod
+from app.core.find.catalogs import (
+    CATALOGS,
+    CONE_MARGIN_ARCSEC,
+    Catalog,
+    CatalogFetch,
+    CatalogTable,
+    ConeLike,
+    angular_sep_arcsec,
+    cone_radius_arcsec,
+    fetch_catalog,
+)
+from app.core.find.frames import (
+    DEFERRED,
+    FrameRecord,
+    FrameService,
+    FramesResult,
+    frame_time,
+    is_complete,
+    position_at,
+)
 from app.core.find.propagate import CATALOGUE_FORMULA, propagate_many
 from app.core.find.resolver import ResolvedObject
 from app.core.measure.config import DEFAULT_CONFIG, MeasureConfig
 from app.timefmt import iso_utc_z, parse_utc
 
-Catalog = Literal["gaia", "wise"]
-CATALOGS: tuple[Catalog, ...] = ("gaia", "wise")
+# Moved to ``catalogs`` (issue #95) and re-exported for the pre-fetch and the tests.
+__all__ = [
+    "CATALOGS",
+    "CONE_MARGIN_ARCSEC",
+    "Catalog",
+    "CatalogFetch",
+    "CatalogTable",
+    "Cone",
+    "OverlayService",
+    "OverlaysResult",
+    "angular_sep_arcsec",
+    "cone_radius_arcsec",
+    "fetch_catalog",
+    "frame_markers",
+    "overlay_cone",
+    "provenance",
+    "wrap_ra",
+]
 
-# ASSUMPTION: slack for field-star proper motions between the catalogue epoch and the frame time
-# (30 arcsec = 3 arcsec/yr over 10 years) and for rounding. Not a physical value of any object.
-CONE_MARGIN_ARCSEC = 30.0
 # ASSUMPTION (Q-53): the catalogue source nearest the object, within this distance, is the
 # target itself. It stays a marker but is left out of the contamination list.
 TARGET_MATCH_PX = 2.0
@@ -57,12 +90,22 @@ CUTOUT_BOX_FORMULA = (
 )
 
 
-def contamination_formula(cfg: MeasureConfig) -> str:
-    return (
+def contamination_formula(cfg: MeasureConfig, moving: bool = False) -> str:
+    base = (
         "sep_px = hypot(x_src - x, y_src - y) from the frame's object x, y; zone aperture if "
         f"sep_px <= {cfg.aperture_radius_px} px, annulus if {cfg.annulus_inner_px} <= sep_px <= "
-        f"{cfg.annulus_outer_px} px (the Stage 2 method radii); the nearest source of each "
-        f"catalogue within {TARGET_MATCH_PX} px of the object is taken as the target and left out"
+        f"{cfg.annulus_outer_px} px (the Stage 2 method radii); "
+    )
+    if moving:
+        # A19.6: a mover is never a catalogue source, so nothing is taken as the target (Q-53
+        # does not apply); x, y is the predicted pixel (Horizons TLIST at the frame midpoint).
+        return base + (
+            "x, y is the predicted pixel; no self-match for movers (a mover is never a catalogue "
+            "source), so every source in a zone is listed; each frame uses its own visit's cones"
+        )
+    return base + (
+        f"the nearest source of each catalogue within {TARGET_MATCH_PX} px of the object is "
+        "taken as the target and left out"
     )
 
 
@@ -73,20 +116,6 @@ class Cone:
     radius_deg: float
     rows: list[SiaRow]
     sia_served: Served
-
-
-@dataclass(frozen=True)
-class CatalogTable:
-    """One catalogue's sources as arrays, in the catalogue's answer order (brightest first)."""
-
-    catalog: Catalog
-    ids: list[str]
-    ra: np.ndarray
-    dec: np.ndarray
-    pmra: np.ndarray  # NaN when absent
-    pmdec: np.ndarray
-    epoch_jyear: np.ndarray
-    mag: list[float | None]
 
 
 @dataclass
@@ -104,19 +133,6 @@ def wrap_ra(ra: float, ndigits: int) -> float:
     return 0.0 if r >= 360.0 or r == 0.0 else r
 
 
-def angular_sep_arcsec(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
-    """Haversine separation in arcsec."""
-    p1, p2 = math.radians(dec1), math.radians(dec2)
-    dp, dl = p2 - p1, math.radians(ra2 - ra1)
-    h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
-    return math.degrees(2 * math.asin(min(1.0, math.sqrt(h)))) * 3600.0
-
-
-def cone_radius_arcsec(cutout_size_arcsec: float, max_offset_arcsec: float) -> float:
-    half_diagonal = cutout_size_arcsec * math.sqrt(2.0) / 2.0
-    return float(math.ceil(half_diagonal + max_offset_arcsec + CONE_MARGIN_ARCSEC))
-
-
 def overlay_cone(ctx: Context, obj: ResolvedObject, *, refresh: bool = False) -> Cone:
     """The catalogue cone for an object (also used by the pre-fetch, so the keys match).
 
@@ -132,42 +148,6 @@ def overlay_cone(ctx: Context, obj: ResolvedObject, *, refresh: bool = False) ->
     return Cone(ra_c, dec_c, radius / 3600.0, sia.rows, sia.served)
 
 
-def fetch_catalog(
-    ctx: Context, catalog: Catalog, cone: Cone, *, refresh: bool = False
-) -> tuple[CatalogTable, str, bool, Served]:
-    """(table, table name, truncated, served). Raises ``CacheMissOffline``,
-    ``UpstreamUnavailable`` or ``ValueError`` (unreadable cached body)."""
-    if catalog == "gaia":
-        g = gaia.cone(ctx, cone.ra, cone.dec, cone.radius_deg, refresh=refresh)
-        tbl = CatalogTable(
-            "gaia",
-            [s.source_id for s in g.sources],
-            np.array([s.ra for s in g.sources], dtype=np.float64),
-            np.array([s.dec for s in g.sources], dtype=np.float64),
-            _nan_array([s.pmra_mas_yr for s in g.sources]),
-            _nan_array([s.pmdec_mas_yr for s in g.sources]),
-            np.array([s.ref_epoch for s in g.sources], dtype=np.float64),
-            [s.g_mag for s in g.sources],
-        )
-        return tbl, g.table, g.truncated, g.served
-    w = wise.cone(ctx, cone.ra, cone.dec, cone.radius_deg, refresh=refresh)
-    tbl = CatalogTable(
-        "wise",
-        [s.source_name for s in w.sources],
-        np.array([s.ra for s in w.sources], dtype=np.float64),
-        np.array([s.dec for s in w.sources], dtype=np.float64),
-        _nan_array([s.pmra_mas_yr for s in w.sources]),
-        _nan_array([s.pmdec_mas_yr for s in w.sources]),
-        np.full(len(w.sources), wise.EPOCH_JYEAR, dtype=np.float64),
-        [s.w1_mag for s in w.sources],
-    )
-    return tbl, w.table, w.truncated, w.served
-
-
-def _nan_array(values: list[float | None]) -> np.ndarray:
-    return np.array([np.nan if v is None else v for v in values], dtype=np.float64)
-
-
 CATALOG_META: dict[Catalog, dict[str, Any]] = {
     "gaia": {"mag_band": "G", "mag_limit": gaia.MAG_LIMIT_G, "table": gaia.DEFAULT_TABLE},
     "wise": {"mag_band": "W1", "mag_limit": None, "table": wise.TABLE},
@@ -180,9 +160,18 @@ def _epoch_text(jyear: float) -> str:
 
 
 def frame_markers(
-    hdul: Any, frame: FrameRecord, when: datetime, tables: list[CatalogTable], cfg: MeasureConfig
+    hdul: Any,
+    frame: FrameRecord,
+    when: datetime,
+    tables: list[CatalogTable],
+    cfg: MeasureConfig,
+    *,
+    self_match: bool = True,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Markers inside the cutout and contamination of the aperture/annulus, for one frame."""
+    """Markers inside the cutout and contamination of the aperture/annulus, for one frame.
+
+    ``self_match`` (Q-53): the nearest source within ``TARGET_MATCH_PX`` is the target and left
+    out of the contamination; ``False`` for movers (A19.6), which are never catalogue sources."""
     ny, nx = np.asarray(hdul["IMAGE"].data).shape
     markers: list[dict[str, Any]] = []
     contamination: list[dict[str, Any]] = []
@@ -198,7 +187,7 @@ def frame_markers(
             continue
         sep = np.hypot(xs[idx] - frame.x, ys[idx] - frame.y)
         nearest = int(np.argmin(sep))
-        target = int(idx[nearest]) if sep[nearest] <= TARGET_MATCH_PX else -1
+        target = int(idx[nearest]) if self_match and sep[nearest] <= TARGET_MATCH_PX else -1
         for k, i in enumerate(idx.tolist()):
             markers.append(
                 {
@@ -230,7 +219,7 @@ def frame_markers(
     return markers, contamination
 
 
-def provenance(cfg: MeasureConfig) -> dict[str, dict[str, str]]:
+def provenance(cfg: MeasureConfig, moving: bool = False) -> dict[str, dict[str, str]]:
     return {
         "catalog_positions": {
             "tag": "measured",
@@ -242,7 +231,9 @@ def provenance(cfg: MeasureConfig) -> dict[str, dict[str, str]]:
             "source": "Gaia DR3 phot_g_mean_mag; CatWISE2020 w1mpro_pm",
         },
         "markers": {"tag": "derived", "formula": MARKER_FORMULA},
-        "contamination": {"tag": "derived", "formula": contamination_formula(cfg)},
+        "contamination": {"tag": "derived", "formula": contamination_formula(cfg, moving)},
+        # Issue #95 (A19.6): star masks near a mover's track; always [] for fixed objects.
+        "masks": {"tag": "derived", "formula": f"moving objects only; {stars.MASKS_FORMULA}"},
         "footprint": {
             "tag": "measured",
             "source": "IRSA SIA s_region (POLYGON ICRS) of the frame, closing vertex removed",
@@ -259,8 +250,8 @@ def provenance(cfg: MeasureConfig) -> dict[str, dict[str, str]]:
     }
 
 
-CatalogFetch = tuple[CatalogTable, str, bool, Served]
-FetchKey = tuple[Catalog, float, float, float]
+# (catalogue, ra, dec, radius_deg, adapter options): the options (W1 cut, row cap) change the key.
+FetchKey = tuple[Catalog, float, float, float, tuple[tuple[str, Any], ...]]
 
 
 class OverlayService:
@@ -285,9 +276,16 @@ class OverlayService:
         self._fetches: dict[FetchKey, Future[CatalogFetch]] = {}
         self._failed: dict[FetchKey, float] = {}
         self._pool = ThreadPoolExecutor(max_workers=2 * len(CATALOGS), thread_name_prefix="sx-cat")
+        # Issue #95: a mover's visit cones run on their own pool (two workers, shared by both
+        # catalogues; submitted visit by visit), so a fixed object's cones never queue behind
+        # them.
+        self._star_pool = ThreadPoolExecutor(
+            max_workers=len(CATALOGS), thread_name_prefix="sx-star"
+        )
 
     def close(self) -> None:
         self._pool.shutdown(wait=False, cancel_futures=True)
+        self._star_pool.shutdown(wait=False, cancel_futures=True)
 
     def get_overlays(self, obj: ResolvedObject) -> OverlaysResult:
         with self._lock:
@@ -319,9 +317,18 @@ class OverlayService:
         mine.set_result(result)
         return result
 
-    def _catalog_future(self, cat: Catalog, cone: Cone) -> Future[CatalogFetch] | None:
-        """The running or new fetch of one cone; ``None`` while a recent live failure holds."""
-        key: FetchKey = (cat, cone.ra, cone.dec, cone.radius_deg)
+    def _catalog_future(
+        self,
+        cat: Catalog,
+        cone: ConeLike,
+        opts: dict[str, Any] | None = None,
+        *,
+        pool: ThreadPoolExecutor | None = None,
+    ) -> Future[CatalogFetch] | None:
+        """The running or new fetch of one cone; ``None`` while a recent live failure holds.
+        ``opts`` are the adapter options (W1 cut, row cap) of a star-list cone."""
+        options = dict(opts or {})
+        key = _fetch_key(cat, cone, options)
         ttl = self.ctx.settings.catalog_failure_ttl_s
         with self._lock:
             now = time.monotonic()
@@ -331,10 +338,14 @@ class OverlayService:
                 return None
             fut = self._fetches.get(key)
             if fut is None:
-                fut = self._pool.submit(fetch_catalog, self.ctx, cat, cone)
+                fut = (pool or self._pool).submit(fetch_catalog, self.ctx, cat, cone, **options)
                 self._fetches[key] = fut
                 fut.add_done_callback(lambda f: self._fetch_done(key, f))
             return fut
+
+    def _is_fetching(self, cat: Catalog, cone: ConeLike, opts: dict[str, Any]) -> bool:
+        with self._lock:
+            return _fetch_key(cat, cone, opts) in self._fetches
 
     def _fetch_done(self, key: FetchKey, fut: Future[CatalogFetch]) -> None:
         with self._lock:
@@ -342,25 +353,21 @@ class OverlayService:
             if not fut.cancelled() and isinstance(fut.exception(), UpstreamUnavailable):
                 self._failed[key] = time.monotonic()
 
-    def _compute(self, obj: ResolvedObject) -> OverlaysResult:
-        ctx, cfg = self.ctx, self.cfg
-        fr = self.frames.get_frames(obj, use_memo=True)
-        # Overlay codes only: the frames reply already reports its own refusals (saturated,
-        # frames:truncated, ...) and the UI shows them with the flipbook.
-        missing: set[str] = set()
-        served: list[Served] = []
+    def _fixed_catalogs(
+        self, obj: ResolvedObject, missing: set[str], served: list[Served]
+    ) -> tuple[list[dict[str, Any]], list[CatalogTable], dict[str, SiaRow]]:
+        """One cone per catalogue at the SIA search position (issue #12)."""
+        ctx = self.ctx
         catalogs: list[dict[str, Any]] = []
         tables: list[CatalogTable] = []
         rows: dict[str, SiaRow] = {}
-
         futures: dict[Catalog, Future[CatalogFetch] | None] = {}
         deadline = 0.0
-        cone: Cone | None = None
-        if not obj.moving:
-            try:
-                cone = overlay_cone(ctx, obj)
-            except (CacheMissOffline, UpstreamUnavailable):
-                cone = None
+        cone: Cone | None
+        try:
+            cone = overlay_cone(ctx, obj)
+        except (CacheMissOffline, UpstreamUnavailable):
+            cone = None
         if cone is not None:
             served.append(cone.sia_served)
             rows = {r.frame_id: r for r in cone.rows}
@@ -369,64 +376,123 @@ class OverlayService:
             deadline = time.monotonic() + ctx.settings.overlay_wait_s
 
         for cat in CATALOGS:
-            meta = CATALOG_META[cat]
-            entry: dict[str, Any] = {
-                "catalog": cat,
-                "available": False,
-                "table": meta["table"],
-                "epoch": None,
-                "mag_band": meta["mag_band"],
-                "mag_limit": meta["mag_limit"],
-                "sources": [],
-            }
+            entry = _catalog_entry(cat, CATALOG_META[cat]["mag_limit"])
+            catalogs.append(entry)
             if cone is None:
                 missing.add(f"overlay:{cat}")
-                catalogs.append(entry)
                 continue
-            fut = futures[cat]
-            if fut is None:  # failed live moments ago (catalog_failure_ttl_s)
-                missing.add(f"overlay:{cat}")
-                catalogs.append(entry)
+            got = _await(futures[cat], deadline)
+            if isinstance(got, str):
+                missing.add(f"overlay:{cat}{got}")
                 continue
-            try:
-                tbl, table_name, truncated, srv = fut.result(
-                    timeout=max(0.0, deadline - time.monotonic())
-                )
-            except TimeoutError:
-                missing.add(f"overlay:{cat}:pending")
-                catalogs.append(entry)
-                continue
-            except (CacheMissOffline, UpstreamUnavailable, ValueError, KeyError, csv.Error):
-                # A cached body that no longer parses is refused, not a 500.
-                missing.add(f"overlay:{cat}")
-                catalogs.append(entry)
-                continue
+            tbl, table_name, truncated, srv = got
             served.append(srv)
             tables.append(tbl)
             if truncated:
                 missing.add(f"overlay:{cat}:truncated")
-            epochs = sorted({float(e) for e in tbl.epoch_jyear.tolist()})
-            if cat == "wise":
-                epochs = [wise.EPOCH_JYEAR]
-            elif not epochs:
-                epochs = [gaia.DR3_EPOCH_JYEAR]
-            entry.update(
-                available=True,
-                table=table_name,
-                epoch=", ".join(_epoch_text(e) for e in epochs),
-                sources=[
-                    {
-                        "id": tbl.ids[i],
-                        "ra": wrap_ra(tbl.ra[i], 8),
-                        "dec": round(float(tbl.dec[i]), 8),
-                        "mag": tbl.mag[i],
-                        "pmra_mas_yr": _opt(tbl.pmra[i]),
-                        "pmdec_mas_yr": _opt(tbl.pmdec[i]),
-                    }
-                    for i in range(len(tbl.ids))
-                ],
-            )
+            _fill_entry(entry, cat, table_name, [tbl])
+        return catalogs, tables, rows
+
+    def _mover_catalogs(
+        self, fr: FramesResult, missing: set[str], served: list[Served]
+    ) -> tuple[list[dict[str, Any]], dict[str, list[CatalogTable]], dict[str, _MoverFrame]]:
+        """Issue #95 (A19.6, Q-403): one Gaia and one CatWISE cone per visit.
+
+        - The cones are built only from a complete frame list (their centres and radii depend
+          on it). Otherwise ``overlay:<cat>:pending`` while frames are still deferred to the
+          object's job, else ``overlay:<cat>``; such a reply is never memoised.
+        - All or nothing per catalogue: it is available only when every visit's cone is served.
+          Each frame uses only its own visit's cones.
+        - At most ``stars.MAX_LIVE_VISIT_CONES`` new live cones per catalogue per request; the
+          rest are ``overlay:<cat>:pending`` until a later request starts them.
+        """
+        ctx = self.ctx
+        catalogs: list[dict[str, Any]] = []
+        per_frame_tables: dict[str, list[CatalogTable]] = {}
+        per_frame: dict[str, _MoverFrame] = {}
+        visits: list[stars.TrackVisit] = []
+        refusal = ""  # no frames, or a frame list that will not change: overlay:<cat>
+        if fr.frames and is_complete(fr.missing):
+            visits = stars.mover_visits(fr.frames, ctx.settings.cutout_size_arcsec)
+        elif any(m.startswith(_DEFERRED_PREFIXES) for m in fr.missing):
+            refusal = ":pending"
+
+        # Start every cone of every visit before awaiting any (one shared deadline). The
+        # sx-star pool has two workers, shared by both catalogues; cones are submitted visit by
+        # visit (Gaia, CatWISE, next visit), so neither catalogue waits behind all of the other's.
+        futures: dict[tuple[Catalog, int], Future[CatalogFetch] | str | None] = {}
+        started: dict[Catalog, int] = dict.fromkeys(CATALOGS, 0)
+        for v in visits:
+            for cat in CATALOGS:
+                opts = stars.fetch_options(cat, v.cone)
+                live = not (
+                    ctx.cache.offline
+                    or ctx.cache.get_meta(stars.cone_key(cat, v.cone)) is not None
+                    or self._is_fetching(cat, v.cone, opts)
+                )
+                if live and started[cat] >= stars.MAX_LIVE_VISIT_CONES:
+                    futures[(cat, v.visit)] = PENDING
+                    continue
+                new = self._catalog_future(cat, v.cone, opts, pool=self._star_pool)
+                # A cone inside its failure TTL starts nothing, so it does not use the budget.
+                started[cat] += int(live and new is not None)
+                futures[(cat, v.visit)] = new
+        deadline = time.monotonic() + ctx.settings.overlay_wait_s
+
+        visit_tables: dict[int, dict[Catalog, CatalogTable]] = {v.visit: {} for v in visits}
+        for cat in CATALOGS:
+            limit = gaia.MAG_LIMIT_G if cat == "gaia" else stars.W1_LIMIT
+            entry = _catalog_entry(cat, limit)
             catalogs.append(entry)
+            if not visits:
+                missing.add(f"overlay:{cat}{refusal}")
+                continue
+            got_all: list[CatalogFetch] = []
+            codes: set[str] = set()
+            for v in visits:
+                fut = futures[(cat, v.visit)]
+                got = fut if isinstance(fut, str) else _await(fut, deadline)
+                if isinstance(got, str):
+                    codes.add(got)
+                    continue
+                got_all.append(got)
+                served.append(got[3])
+            if codes:
+                # A failed cone wins over a pending one: the catalogue is refused either way.
+                missing.add(f"overlay:{cat}" if REFUSED in codes else f"overlay:{cat}{PENDING}")
+                continue
+            if any(g[2] for g in got_all):
+                missing.add(f"overlay:{cat}:truncated")
+            for v, g in zip(visits, got_all, strict=True):
+                visit_tables[v.visit][cat] = g[0]
+            table_name = ", ".join(sorted({g[1] for g in got_all}))
+            _fill_entry(entry, cat, table_name, [g[0] for g in got_all])
+
+        for v in visits:
+            mine = visit_tables[v.visit]
+            tables = [mine[c] for c in CATALOGS if c in mine]
+            star_list = stars.stars_from_tables(mine.get("gaia"), mine.get("wise"))
+            track = v.track_radec()
+            for f in v.frames:
+                per_frame_tables[f.frame_id] = tables
+                per_frame[f.frame_id] = _MoverFrame(star_list, track)
+        return catalogs, per_frame_tables, per_frame
+
+    def _compute(self, obj: ResolvedObject) -> OverlaysResult:
+        ctx, cfg = self.ctx, self.cfg
+        fr = self.frames.get_frames(obj, use_memo=True)
+        # Overlay codes only: the frames reply already reports its own refusals (saturated,
+        # frames:truncated, ...) and the UI shows them with the flipbook.
+        missing: set[str] = set()
+        served: list[Served] = []
+        rows: dict[str, SiaRow] = {}
+        tables: list[CatalogTable] = []
+        per_frame_tables: dict[str, list[CatalogTable]] = {}
+        per_frame: dict[str, _MoverFrame] = {}
+        if obj.moving:
+            catalogs, per_frame_tables, per_frame = self._mover_catalogs(fr, missing, served)
+        else:
+            catalogs, tables, rows = self._fixed_catalogs(obj, missing, served)
 
         frames_out: list[dict[str, Any]] = []
         for f in fr.frames:
@@ -439,12 +505,21 @@ class OverlayService:
             except (OSError, ValueError):
                 missing.add(f"cutout:{f.frame_id}")
                 continue
+            masks: list[dict[str, Any]] = []
             with hdul:
                 if "IMAGE" not in hdul:
                     missing.add(f"cutout:{f.frame_id}")
                     continue
                 when = frame_time(f.sia_row())
-                markers, contamination = frame_markers(hdul, f, when, tables, cfg)
+                if obj.moving:
+                    markers, contamination = frame_markers(
+                        hdul, f, when, per_frame_tables.get(f.frame_id, []), cfg, self_match=False
+                    )
+                    mf = per_frame.get(f.frame_id)
+                    if mf is not None:
+                        masks = stars.frame_masks(hdul, when, mf.stars, mf.track)
+                else:
+                    markers, contamination = frame_markers(hdul, f, when, tables, cfg)
                 box = [[wrap_ra(r, 7), round(d, 7)] for r, d in wcs.png_corners_world(hdul)]
                 if not flagmask.available(hdul):
                     missing.add(f"flags_mask:{f.frame_id}")
@@ -464,6 +539,7 @@ class OverlayService:
                     "flags_url": f"/v1/objects/{obj.id}/flags/{f.frame_id}.png",
                     "markers": markers,
                     "contamination": contamination,
+                    "masks": masks,
                     "footprint": footprint,
                     "cutout_box": box,
                 }
@@ -487,7 +563,7 @@ class OverlayService:
             ],
             "frames": frames_out,
             "missing": sorted(missing),
-            "provenance": provenance(cfg),
+            "provenance": provenance(cfg, obj.moving),
         }
         complete = (
             is_complete(fr.missing)
@@ -495,6 +571,89 @@ class OverlayService:
             and not any(m.startswith("cutout:") for m in missing)
         )
         return OverlaysResult(body, cached_at, complete, served)
+
+
+# Code suffixes of a catalogue that could not be used: refused, or still running.
+REFUSED = ""
+PENDING = ":pending"
+# A mover's frame list still filling (cutouts or path-search calls left to the object's job).
+_DEFERRED_PREFIXES = (DEFERRED + ":", moving_mod.SEARCH_DEFERRED + ":")
+
+
+def _fetch_key(cat: Catalog, cone: ConeLike, opts: dict[str, Any]) -> FetchKey:
+    return (cat, cone.ra, cone.dec, cone.radius_deg, tuple(sorted(opts.items())))
+
+
+@dataclass(frozen=True)
+class _MoverFrame:
+    """A mover frame's visit star list and the visit's predicted track (ra, dec)."""
+
+    stars: list[stars.Star]
+    track: tuple[np.ndarray, np.ndarray]
+
+
+def _catalog_entry(cat: Catalog, mag_limit: float | None) -> dict[str, Any]:
+    meta = CATALOG_META[cat]
+    return {
+        "catalog": cat,
+        "available": False,
+        "table": meta["table"],
+        "epoch": None,
+        "mag_band": meta["mag_band"],
+        "mag_limit": mag_limit,
+        "sources": [],
+    }
+
+
+def _await(fut: Future[CatalogFetch] | None, deadline: float) -> CatalogFetch | str:
+    """The fetch result, or the code suffix ``REFUSED`` / ``PENDING``."""
+    if fut is None:  # failed live moments ago (catalog_failure_ttl_s)
+        return REFUSED
+    try:
+        return fut.result(timeout=max(0.0, deadline - time.monotonic()))
+    except TimeoutError:
+        return PENDING
+    except (CacheMissOffline, UpstreamUnavailable, ValueError, KeyError, csv.Error):
+        # A cached body that no longer parses is refused, not a 500.
+        return REFUSED
+
+
+def _fill_entry(
+    entry: dict[str, Any], cat: Catalog, table_name: str, tbls: list[CatalogTable]
+) -> None:
+    """Mark the catalogue available with the sources of ``tbls``. One table keeps its answer
+    order (brightest first); several (a mover's visits) are merged by id and sorted the same
+    way, by magnitude (none last), then id."""
+    seen: dict[str, dict[str, Any]] = {}
+    epochs: set[float] = set()
+    for tbl in tbls:
+        epochs |= {float(e) for e in tbl.epoch_jyear.tolist()}
+        for i in range(len(tbl.ids)):
+            seen.setdefault(
+                tbl.ids[i],
+                {
+                    "id": tbl.ids[i],
+                    "ra": wrap_ra(tbl.ra[i], 8),
+                    "dec": round(float(tbl.dec[i]), 8),
+                    "mag": tbl.mag[i],
+                    "pmra_mas_yr": _opt(tbl.pmra[i]),
+                    "pmdec_mas_yr": _opt(tbl.pmdec[i]),
+                },
+            )
+    sources = list(seen.values())
+    if len(tbls) > 1:
+        sources.sort(key=lambda s: (s["mag"] is None, s["mag"] or 0.0, s["id"]))
+    epoch_list = sorted(epochs)
+    if cat == "wise":
+        epoch_list = [wise.EPOCH_JYEAR]
+    elif not epoch_list:
+        epoch_list = [gaia.DR3_EPOCH_JYEAR]
+    entry.update(
+        available=True,
+        table=table_name,
+        epoch=", ".join(_epoch_text(e) for e in epoch_list),
+        sources=sources,
+    )
 
 
 def _opt(v: float) -> float | None:

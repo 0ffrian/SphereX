@@ -134,6 +134,13 @@ SEARCH_LIST: tuple[SearchRow, ...] = (
     SearchRow("Crab Nebula", "M 1", ("crab", "m1")),
     # Row 17 (issue #73, Q-197): the Track MVP (Q-137), appended so rows 1 to 16 keep Q-161's order.
     SearchRow("433 Eros", "433 Eros", ("eros", "433")),
+    # Issue #71 stream S (Q-280 to Q-284): two more stars and two more exoplanets.
+    SearchRow("Procyon A", "Procyon", ("procyon", "alpha cmi", "alf cmi")),
+    SearchRow("Epsilon Eridani", "eps Eri", ("eps eri", "epsilon eri", "eps eridani")),
+    SearchRow("TOI-700 d", "TOI-700 d", ("toi-700", "toi700d", "toi 700 d")),
+    SearchRow("WASP-39 b", "WASP-39 b", ("wasp-39", "wasp39b", "wasp 39 b")),
+    # Issue #71 stream S2 (Q-317 to Q-319): a lava world.
+    SearchRow("55 Cancri e", "55 Cnc e", ("55 cnc e", "55 cnc", "55cnce", "cancri e")),
 )
 
 FileMap = dict[Path, bytes]

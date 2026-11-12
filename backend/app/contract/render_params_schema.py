@@ -181,12 +181,95 @@ class HapticProfile(BaseModel):
     params: dict[str, float] = Field(..., description="For example tau, k, softness, maxRateHz.")
 
 
+class Gate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    class_known: bool
+    key_measurement: bool
+    score_ok: bool
+    passed: bool = Field(
+        ...,
+        description="All three. When false the viewer draws no 3D body and shows found and needed.",
+    )
+
+
+class ConfidenceInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: str
+    label: str
+    weight: float = Field(
+        ...,
+        description="Placeholder weight; the weights of one type sum to 100.",
+        ge=0.0,
+    )
+    c: float = Field(..., description="How far the data narrows the class range.", ge=0.0, le=1.0)
+    tag: Literal[
+        "measured",
+        "derived",
+        "model_dependent",
+        "inferred_from_analog",
+        "artistic",
+        "missing",
+    ] = Field(..., description="The tag of the value that fed it, or missing.")
+    points: float = Field(
+        ...,
+        description="This input's part of C, in percentage points.",
+        ge=0.0,
+        le=100.0,
+    )
+    fields: list[str] = Field(..., description="Card fields that fed it (or could).")
+
+
 class ViewModes(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     visible: VisibleMode
     spherex_ir: VisibleMode | None = None
+
+
+class Confidence(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    score: float = Field(..., description="C, 0 to 1.", ge=0.0, le=1.0)
+    measured_share: float = Field(
+        ..., description="Part of the score from measured values.", ge=0.0, le=1.0
+    )
+    estimated_share: float = Field(
+        ...,
+        description="Part of the score from derived and model-dependent values.",
+        ge=0.0,
+        le=1.0,
+    )
+    assumed_share: float = Field(
+        ..., description="The rest: assumed, artistic or missing.", ge=0.0, le=1.0
+    )
+    threshold: float = Field(
+        ...,
+        description="Minimum C for a 3D body. Starts at 0.25 (D-36).",
+        ge=0.0,
+        le=1.0,
+    )
+    band: Literal["mostly_data", "part_data", "mostly_assumed", "too_little"]
+    gate: Gate
+    found: str = Field(..., description="Plain words: what the card has.")
+    needed: str = Field(
+        ...,
+        description="Plain words: what is missing for a 3D body. Empty when the gate passed.",
+    )
+    raise_: str | None = Field(..., alias="raise", description="What would raise the score most.")
+    inputs: list[ConfidenceInput]
+    tag: Literal["derived"] = Field(..., description="The score is a formula of the card (D-02).")
+    formula: str = Field(..., min_length=1)
+    weights_note: str = Field(..., description="States that the weights are placeholders.")
+    note: str = Field(
+        ...,
+        description="States that this is not the probability the picture is correct.",
+    )
 
 
 class RenderParams(BaseModel):
@@ -217,6 +300,7 @@ class RenderParams(BaseModel):
     view_modes: ViewModes
     haptics: HapticProfile
     dynamics: Dynamics | None = None
+    confidence: Confidence | None = None
     alt_text: str = Field(..., description="R9.")
     missing: list[str] = Field(
         ..., description="Layers refused for missing data, shown to the user."

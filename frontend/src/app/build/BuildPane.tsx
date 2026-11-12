@@ -1,28 +1,56 @@
-// Issue #60: the build pane (mock-up `.bpane`, `openBuild`, `closeBuild`). The sky moves to the left
-// half and this pane takes the right half; on a phone it is a full-height sheet over the sky. It
-// holds the one 3D view (ViewerPanel with its ViewerApp canvas), the title "Building <name>", the
-// tools (Feel, Replay, New seed, Close) and the numbered steps. Focus moves into the pane when it
-// opens and back to the object's marker (or the rail button) when it closes. Escape and Back close.
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { ViewerPanel } from '@/app/ViewerPanel';
+// Issue #60, rebuilt for issue #71 stream U (Q-294): the build pane (mock-up `#bpane`, `openBuild`,
+// `closeBuild`, `setShifted`). While the body is built the pane fills the screen over the dimmed sky
+// with the body in the middle and the numbered steps under it; when the build ends it slides to the
+// right half and the close-up opens on the left (`shifted`). On a phone it stays a full-height
+// sheet. The header is the mock-up's: "Building <name>", its kind, then Accuracy, Feel, Hear it, and
+// the close button. One panel opens under those buttons at a time (`pop`). Details (the honesty
+// level, view controls, what is drawn and not drawn) is the app's one extra button: the mock-up has
+// no counterpart. Focus moves into the pane when it opens and back to the object's marker (or the
+// rail button) when it closes. Escape closes the open panel first, then the pane; Back closes.
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
+import { BUILD_POP_ID, ViewerPanel, type PopId } from '@/app/ViewerPanel';
+import { CloseUpPane, closeUpButtonLabel, closeUpKindOf } from '@/app/CloseUpPane';
+import { useCloseUpStore } from '@/app/closeUpStore';
 import { StatusLine } from '@/app/StatusLine';
-import { Icon } from '@/app/shell/icons';
+import { StatePill } from '@/app/island/StatePill';
+import { GENERATING_LOOK } from '@/app/island/loaderLooks';
+import { BuildDock, ZoomBar } from './BuildChrome';
+import { Icon, type IconName } from '@/app/shell/icons';
 import { isEditableTarget } from '@/app/shell/shortcuts';
 import { useShellStore } from '@/app/shell/shellStore';
 import { useAppStore } from '@/state/store';
-import { ProvenanceBadge } from '@/app/Badge';
-import { effectiveHonesty, HONESTY_LABEL } from '@/viewer/honesty';
+import { useAmbienceStore } from '@/app/sound/ambienceStore';
+import { atmosphereOf } from './hearModel';
 import type { MouldPhase } from './useMould';
-import { focusAfterBuildClose } from './focus';
-import { PREBUILT_NOTE } from '@/app/messages';
+import { closeBuildPane } from './focus';
+import { displayName } from '@/app/displayName';
 import { loadBodyFor, typeLabel, useSelection } from './selectedBody';
 
-/** Closes the pane (× and Escape; the hash follows, see useHashSync) and returns focus. */
-export function closeBuildPane(): void {
-  const { tool } = useShellStore.getState();
-  useShellStore.getState().closeBuild();
-  focusAfterBuildClose(tool);
-}
+export { closeBuildPane };
+
+/** The mock-up's pause between the last step finishing and the pane sliding right (`shiftT`). */
+export const SHIFT_DELAY_MS = 650;
+
+/** The header buttons that open a panel, in the mock-up's order (Details is the app's extra). */
+const POP_BUTTONS: { id: PopId; label: string; title: string; icon: IconName }[] = [
+  { id: 'acc', label: 'Accuracy', title: 'Accuracy', icon: 'accuracy' },
+  { id: 'hear', label: 'Hear it', title: 'Hear it', icon: 'hear' },
+  {
+    id: 'details',
+    label: 'Details',
+    title: 'Details: levels, view and what is drawn',
+    icon: 'details',
+  },
+];
 
 export function BuildPane() {
   const build = useShellStore((s) => s.build);
@@ -34,7 +62,11 @@ export function BuildPane() {
   const titleId = useId();
   const [phase, setPhase] = useState<MouldPhase>('idle');
   const [say, setSay] = useState('');
-  const [feel, setFeel] = useState(false);
+  const [pop, setPopState] = useState<PopId | null>(null);
+  const popRef = useRef<PopId | null>(null);
+  const buttonRefs = useRef<Partial<Record<PopId, HTMLButtonElement | null>>>({});
+  const closeKind = closeUpKindOf(params?.type);
+  const closeHidden = useCloseUpStore((s) => s.hidden);
   const [usesSeed, setUsesSeed] = useState(true);
   const spinRef = useRef<SVGSVGElement>(null);
   const sayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,16 +79,12 @@ export function BuildPane() {
 
   // The body of the selected object when it is loaded; otherwise whatever body the store holds
   // (the rail's 3D viewer with no selection).
-  const name = selection?.name ?? card?.name ?? null;
+  const name = displayName(selection?.name ?? card?.name ?? null) || null;
   const bodyHere = selection && body.status !== 'idle' && body.id === selection.id ? body : null;
   const type = typeLabel(params?.type);
-  // "Building X" while it is being built, "X" once it is built (or opened built).
-  const built = phase === 'done' || !build.animate;
-  const title = name ? (built ? name : `Building ${name}`) : '3D view';
-  const fixtureSky = useAppStore((s) => s.sky.fixture);
-  const honesty = effectiveHonesty(useAppStore((s) => s.honesty));
-  const levelTag =
-    honesty === 'measured' ? 'measured' : honesty === 'derived' ? 'derived' : 'artistic';
+  // The mock-up's title (Q-298, amends Q-113): "Building X" for a build that is played, and it stays;
+  // the bare name when the body is shown built at once (`B.quick`).
+  const title = name ? (build.animate ? `Building ${name}` : name) : '3D view';
   const subtitle =
     bodyHere?.status === 'loading'
       ? 'Looking up its 3D model…'
@@ -65,8 +93,34 @@ export function BuildPane() {
         : (type ?? (name ? '' : 'No object loaded'));
   const message =
     bodyHere?.status === 'none'
-      ? `There is no 3D model of ${selection!.name} to build. ${bodyHere.reason}`
+      ? `There is no 3D model of ${name} to build. ${bodyHere.reason}`
       : null;
+
+  // Mock-up `setShifted`: the pane slides to the right half 650 ms after the last step, and the
+  // close-up opens on the left. A body shown built at once (the rail's 3D viewer, `B.quick`) starts
+  // shifted. The flag is per build (`seq`), so a Replay or a New seed starts full width again.
+  const [shiftedSeq, setShiftedSeq] = useState(-1);
+  const shifted = !build.animate || shiftedSeq === build.seq;
+  useEffect(() => {
+    if (!build.animate || phase !== 'done') return;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const id = window.setTimeout(() => setShiftedSeq(build.seq), reduced ? 0 : SHIFT_DELAY_MS);
+    return () => window.clearTimeout(id);
+  }, [phase, build.animate, build.seq]);
+  // The close-up waits for the shift (a store the close-up pane and the viewer panel both read).
+  useEffect(() => {
+    useCloseUpStore.getState().setHeld(!shifted);
+    return () => useCloseUpStore.getState().setHeld(false);
+  }, [shifted]);
+
+  const setPop = useCallback((next: PopId | null, returnFocus = false) => {
+    const prev = popRef.current;
+    popRef.current = next;
+    setPopState(next);
+    if (next === null && returnFocus && prev) {
+      requestAnimationFrame(() => buttonRefs.current[prev]?.focus());
+    }
+  }, []);
 
   // Focus into the pane when it opens (R9: the user knows where they are).
   useEffect(() => {
@@ -90,20 +144,44 @@ export function BuildPane() {
     [name, build.animate],
   );
 
-  // Escape closes from anywhere in the page that is not a text field (mock-up: Esc closes the build).
+  // Escape closes the open panel first (focus goes back to its button), then the pane. It works from
+  // anywhere in the page that is not a text field (mock-up: Esc closes the build).
+  // Ambience (the wind that outlives the Hear it panel) must always be visible and stoppable (WCAG 1.4.2).
+  const ambienceOn = useAmbienceStore((s) => s.ambience && s.playing);
+  // The Atmosphere toggle in the header plays the ambience straight away, without opening Hear it.
+  // Shown only where an atmosphere sound is possible (same refusal rules as the Hear it panel).
+  const atmo = useMemo(() => atmosphereOf(card), [card]);
+  const atmoOn = useAmbienceStore((s) => s.ambience && s.playing && s.key === (card?.id ?? ''));
+  const toggleAtmo = (): void => {
+    if (!atmo.ok || !card) return;
+    useAmbienceStore.getState().setAmbience(!atmoOn, atmo.model, card.id);
+  };
+  useEffect(() => {
+    if (!ambienceOn) return;
+    const onM = (e: globalThis.KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'm' || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented || isEditableTarget(e.target)) return;
+      useAmbienceStore.getState().stop();
+    };
+    window.addEventListener('keydown', onM);
+    return () => window.removeEventListener('keydown', onM);
+  }, [ambienceOn]);
+  const onEscape = useCallback(() => {
+    if (popRef.current) setPop(null, true);
+    else closeBuildPane();
+  }, [setPop]);
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented || isEditableTarget(e.target)) return;
       e.preventDefault();
-      closeBuildPane();
+      onEscape();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [onEscape]);
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key !== 'Escape' || e.defaultPrevented) return;
     e.preventDefault();
-    closeBuildPane();
+    onEscape();
   };
 
   const replay = () => {
@@ -113,6 +191,7 @@ export function BuildPane() {
       duration: 650,
       easing: 'cubic-bezier(.34,1.2,.64,1)',
     });
+    setPop(null);
   };
   // The store holds another object's card (or none yet): wait, and do not hand it to the viewer.
   const blocked = selection !== null && (!bodyHere || bodyHere.status === 'loading');
@@ -120,132 +199,182 @@ export function BuildPane() {
   const seedMoot = !usesSeed;
   const NO_SEED_TEXT = "This body's surface is baked, so a new seed would look the same";
 
-  return (
-    <aside
-      className="sx-bp"
-      aria-labelledby={titleId}
-      onKeyDown={onKeyDown}
-      data-testid="build-pane"
-      data-phase={phase}
-    >
-      <header className="sx-bp-head">
-        <div className="min-w-0">
-          <h2 id={titleId} ref={titleRef} tabIndex={-1} data-testid="build-title">
-            {title}
-          </h2>
-          <p data-testid="build-subtitle" className="flex flex-wrap items-center gap-2">
-            {subtitle && <span>{subtitle}</span>}
-            {bodyHere?.status === 'ready' && bodyHere.prebuilt && (
-              <span className="text-xs text-sx-mfg" data-testid="build-prebuilt">
-                {PREBUILT_NOTE}
-              </span>
-            )}
-            {name && (
-              // The level the body is shown at (D-02, D-21), visible without opening Details.
-              <span className="inline-flex items-center gap-1" data-testid="build-level">
-                <ProvenanceBadge
-                  tag={levelTag}
-                  fixture={fixtureSky || (card?.id.startsWith('fixture:') ?? false)}
-                />
-                {honesty === 'artistic' && (
-                  <span className="text-xs text-sx-mfg">artist&rsquo;s impression</span>
-                )}
-                <span className="sr-only">{HONESTY_LABEL[honesty]}</span>
-              </span>
-            )}
-          </p>
-        </div>
-        <div className="sx-bp-tools" role="group" aria-label="Build tools">
-          <button
-            type="button"
-            className="sx-bp-tool sx-bp-feel"
-            aria-pressed={feel}
-            title="Feel the surface"
-            onClick={() => setFeel((f) => !f)}
-            data-testid="build-feel"
-          >
-            <Icon name="fingerprint" className="size-4" />
-            <span>Feel</span>
-          </button>
-          <button
-            type="button"
-            className="sx-bp-tool"
-            aria-label="Replay the build"
-            title="Replay"
-            disabled={!canBuild}
-            onClick={replay}
-            data-testid="build-replay"
-          >
-            <svg ref={spinRef} viewBox="0 0 24 24" className="sx-ico size-4" aria-hidden="true">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="sx-bp-tool"
-            aria-label={seedMoot ? `New seed. ${NO_SEED_TEXT}` : 'Build it again with a new seed'}
-            title={seedMoot ? NO_SEED_TEXT : 'New seed'}
-            // aria-disabled would keep it focusable for the tooltip, but a disabled control is
-            // clearer here: nothing happens, and the name above says why.
-            disabled={!canBuild || seedMoot}
-            onClick={() => useShellStore.getState().newSeed()}
-            data-testid="build-seed"
-          >
-            <Icon name="shuffle" className="size-4" />
-          </button>
-          <i className="sx-bp-sep" aria-hidden="true" />
-          <button
-            type="button"
-            className="sx-bp-tool"
-            aria-label="Close the build view"
-            title="Close (Esc)"
-            onClick={closeBuildPane}
-            data-testid="build-close"
-          >
-            <Icon name="close" className="size-4" />
-          </button>
-        </div>
-      </header>
-      {feel && (
-        // TODO(Atish, M5): wire Feel to TouchHaptics (src/haptics/profiles.ts) over this canvas, as
-        // the mock-up's `bpFeel`. Until then the toggle only says so (no silent no-op).
-        <p className="sx-bp-note" role="status" data-testid="build-feel-note">
-          Touch feedback arrives with the phone build.
-        </p>
+  // The build actions the mock-up has no buttons for (it replays from code): the top of Details.
+  const actions = (
+    <div className="sx-bp-actions" role="group" aria-label="Build actions">
+      <button
+        type="button"
+        className="sx-btn-sm"
+        aria-label="Replay the build"
+        disabled={!canBuild}
+        onClick={replay}
+        data-testid="build-replay"
+      >
+        <svg ref={spinRef} viewBox="0 0 24 24" className="sx-ico size-3.5" aria-hidden="true">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5" />
+        </svg>
+        Replay
+      </button>
+      <button
+        type="button"
+        className="sx-btn-sm"
+        aria-label={seedMoot ? `New seed. ${NO_SEED_TEXT}` : 'Build it again with a new seed'}
+        title={seedMoot ? NO_SEED_TEXT : undefined}
+        // A disabled control is clearer here: nothing happens, and the name says why.
+        disabled={!canBuild || seedMoot}
+        onClick={() => {
+          useShellStore.getState().newSeed();
+          setPop(null);
+        }}
+        data-testid="build-seed"
+      >
+        <Icon name="shuffle" className="size-3.5" />
+        New seed
+      </button>
+      {closeKind && canBuild && (
+        <button
+          type="button"
+          className="sx-btn-sm"
+          aria-pressed={!closeHidden}
+          title={closeHidden ? 'Show the close-up on the left' : 'Hide the close-up on the left'}
+          onClick={() => useCloseUpStore.getState().setHidden(!closeHidden)}
+          data-testid="build-closeup"
+        >
+          {closeUpButtonLabel(closeKind)}
+        </button>
       )}
-      {message ? (
-        <div className="sx-bp-msg" role="status" data-testid="build-message">
-          <p>{message}</p>
-          {bodyHere?.status === 'none' && bodyHere.transient && selection && (
+    </div>
+  );
+
+  // The note box (level badge, "artist's impression", "Generated live from physics…") is gone: the
+  // provenance stays in the Details lists. What is left of this slot is the "N hidden at this level"
+  // button, shown only when there is one.
+  const level = (extra: ReactNode) =>
+    name &&
+    bodyHere?.status !== 'none' &&
+    extra && (
+      <p className="sx-bp-tag" data-testid="build-level">
+        {extra}
+      </p>
+    );
+
+  return (
+    <>
+      {/* The close-up fills the left half over the sky, as the mock-up's #cuPane (Q-275). */}
+      <CloseUpPane />
+      <aside
+        className="sx-bp"
+        aria-labelledby={titleId}
+        onKeyDown={onKeyDown}
+        data-testid="build-pane"
+        data-phase={phase}
+        data-shifted={shifted || undefined}
+        data-pop={pop ?? undefined}
+      >
+        <header className="sx-bp-head">
+          <div className="min-w-0">
+            <h2 id={titleId} ref={titleRef} tabIndex={-1} data-testid="build-title">
+              {title}
+            </h2>
+            <p data-testid="build-subtitle">{subtitle}</p>
+          </div>
+          <div className="sx-bp-tools" role="group" aria-label="Build tools">
+            {POP_BUTTONS.map((b) => (
+              <button
+                key={b.id}
+                ref={(el) => {
+                  buttonRefs.current[b.id] = el;
+                }}
+                type="button"
+                className="sx-bp-tool sx-bp-text"
+                title={b.title}
+                aria-label={b.id === 'hear' && ambienceOn ? 'Hear it. Ambience on, open Hear it to stop, or press M.' : undefined}
+                aria-pressed={pop === b.id}
+                aria-expanded={pop === b.id}
+                aria-controls={BUILD_POP_ID}
+                onClick={() => setPop(pop === b.id ? null : b.id)}
+                data-testid={`build-${b.id === 'acc' ? 'accuracy' : b.id}`}
+              >
+                <Icon name={b.icon} className="size-[15px]" />
+                <span>{b.label}</span>
+                {b.id === 'hear' && ambienceOn && <i className="sx-bp-live" aria-hidden="true" data-testid="hear-live" />}
+              </button>
+            )).flatMap((el, i) =>
+              i === 0 && atmo.ok
+                ? [
+                    el,
+                    <button
+                      key="atmo"
+                      type="button"
+                      className="sx-bp-tool sx-bp-text"
+                      title={atmoOn ? 'Stop the atmosphere sound (M)' : 'Play the atmosphere sound'}
+                      aria-pressed={atmoOn}
+                      onClick={toggleAtmo}
+                      data-testid="build-atmosphere"
+                    >
+                      <Icon name="wind" className="size-[15px]" />
+                      <span>Atmosphere</span>
+                    </button>,
+                  ]
+                : [el],
+            )}
+            <i className="sx-bp-sep" aria-hidden="true" />
             <button
               type="button"
-              className="sx-btn sx-btn-ghost mt-3"
-              onClick={() => loadBodyFor(selection.id)}
-              data-testid="build-retry"
+              className="sx-bp-tool"
+              aria-label="Close the build view"
+              title="Close (Esc)"
+              onClick={closeBuildPane}
+              data-testid="build-close"
             >
-              Try again
+              <Icon name="close" className="size-4" />
             </button>
-          )}
+          </div>
+        </header>
+        {bodyHere?.status === 'loading' ? (
+          <div className="sx-bp-msg" data-testid="build-generating">
+            <StatePill look={GENERATING_LOOK} word="Generating" />
+          </div>
+        ) : message ? (
+          <div className="sx-bp-msg" role="status" data-testid="build-message">
+            <p>{message}</p>
+            {bodyHere?.status === 'none' && bodyHere.transient && selection && (
+              <button
+                type="button"
+                className="sx-btn sx-btn-ghost mt-3"
+                onClick={() => loadBodyFor(selection.id)}
+                data-testid="build-retry"
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        ) : (
+          <ViewerPanel
+            // A new seed is a new body: the panel and its ViewerApp stay, the build starts again.
+            pane={{
+              seq: build.seq,
+              animate: build.animate,
+              seedOffset: build.seedOffset,
+              blocked,
+              onPhase,
+              onUsesSeed: setUsesSeed,
+              pop,
+              onPop: setPop,
+              actions,
+              caption: level,
+            }}
+          />
+        )}
+        <div className="sx-bp-status sr-only">
+          <StatusLine />
         </div>
-      ) : (
-        <ViewerPanel
-          // A new seed is a new body: the panel and its ViewerApp stay, the build starts again.
-          pane={{
-            seq: build.seq,
-            animate: build.animate,
-            seedOffset: build.seedOffset,
-            blocked,
-            onPhase,
-            onUsesSeed: setUsesSeed,
-          }}
-        />
-      )}
-      <div className="sx-bp-status">
-        <StatusLine />
-      </div>
-      <p className="sr-only" aria-live="polite" data-testid="build-announcer">
-        {say}
-      </p>
-    </aside>
+        <p className="sr-only" aria-live="polite" data-testid="build-announcer">
+          {say}
+        </p>
+      </aside>
+      <ZoomBar />
+      <BuildDock pop={pop} onPop={setPop} />
+    </>
   );
 }

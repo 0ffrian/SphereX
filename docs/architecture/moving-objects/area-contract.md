@@ -6,6 +6,8 @@ The second half of the Discovery backend ([A17](area-backend.md#a17-discovery-ba
 
 ### A17.8 Endpoints
 
+Payload shapes as built: `shared/schemas/area-*.schema.json`; gap choices in [Q-208](../../decisions/moving-objects.md) (Proposed).
+
 Beyond D-16, which keys every endpoint on one object id; Q-146 (6) answered the `/v1/areas` routes and a D-16 note is pending. The endpoint register is [A4.11](../endpoints.md); refusal codes are also in [A4.12](../refusals.md).
 
 | Endpoint | Returns |
@@ -20,10 +22,12 @@ Beyond D-16, which keys every endpoint on one object id; Q-146 (6) answered the 
 | `GET /v1/areas/{area_id}/export.ecsv` | The file of A17.7 |
 
 - Every JSON reply carries `cached_at`, `computed_at`, `missing` and `provenance`. Times are ISO-8601 UTC with `Z`; every RA is in [0, 360).
-- **`missing` codes:** `checks:not_run` (the area was prepared without D4 to D7; the Checks section is hidden, A18.11), `rate_grid:visits` (fewer than 3 visits; pairs used, A17.12), `area:visits` (fewer than 2 visits; Discovery refused, A17.1), `frames:cone_maxrec:<n>`, `no_footprint:<frame_id>`, `cutout:<frame_id>`, `stars:<cat>:<visit>` (that visit's Gaia DR3 or CatWISE2020 cone failed; the star step used the other catalogue, A17.3), `skybot:<visit>` (that visit's SkyBoT cone failed; its tracks are `unchecked`, A17.5), `horizons:<designation>` (a candidate's Horizons call failed; the tracks it could match are `unchecked`, A17.5), `stamp:<dot_id>` (the stamp's cutout is not cached). A square outside every prepared area is `area:not_prepared`, decided in the frontend from the index; the wording lives in `refusals.ts`. The register of every code is [A4.12](../refusals.md).
+- **`missing` codes:** `checks:not_run` (the area was prepared without D4 to D7; the Checks section is hidden, A18.11; it covers only the area-level checks in `/checks`, while D6 `sed` and D7 `linker` are reported per track in `/tracks`, [Q-208](../../decisions/moving-objects.md) (25)), `checks:d4_not_run` and `checks:d5_not_run` (only that ticket did not run: D4 drops the test mover and the grid, D5 the control; [Q-208](../../decisions/moving-objects.md) (12)), `rate_grid:visits` (fewer than 3 visits; pairs used, A17.12), `area:visits` (fewer than 2 visits; Discovery refused, A17.1), `frames:cone_maxrec:<n>`, `no_footprint:<frame_id>`, `cutout:<frame_id>`, `stars:<cat>:<visit>` (that visit's Gaia DR3 or CatWISE2020 cone failed, was not cached offline, or reached `STAR_LIST_MAX_ROWS`; the star step used the other catalogue, A17.3, [A19.6](track.md#a196-star-list-for-movers), Q-403 (5)), `skybot:<visit>` (that visit's SkyBoT cone failed; its tracks are `unchecked`, A17.5), `horizons:<designation>` (a candidate's Horizons call failed; the tracks it could match are `unchecked`, A17.5), `stamp:<dot_id>` (the stamp's cutout is not cached). A square outside every prepared area is `area:not_prepared`, decided in the frontend from the index; the wording lives in `refusals.ts`. The register of every code is [A4.12](../refusals.md).
 - **Errors:** 404 `area_not_found` (unknown id or not prepared with the running code), 404 `dot_not_found`, 503 `stamp_unavailable` (cutout not cached).
 
 ### A17.9 Schemas and fixtures
+
+Payload shapes as built: `shared/schemas/area-*.schema.json`; gap choices in [Q-208](../../decisions/moving-objects.md) (Proposed).
 
 - `shared/schemas/area-index.schema.json`, `area-summary.schema.json`, `area-known.schema.json`, `area-dots.schema.json`, `area-tracks.schema.json`, `area-checks.schema.json` (gated, Q-203); generated code in `backend/app/contract/` and `frontend/src/contract/` (D-18). Owner Moon (D-17).
 - `shared/fixtures/area/`: a synthetic area (2 visits × 4 exposures × 2 detectors; about 30 stars, 18 glitches; 4 movers: one `found_blind`, one `unexplained`, one `unchecked`, one `possible` with `one_visit`), plus a `checks` sample (a recovered test mover, a grid, a control of 0 in 20) and, for D7, a synthetic area of 4 visits in `shared/fixtures/area/multivisit/`, all with the Fixture badge and served by the dev fixture server with `X-SX-Fixture: synthetic` (Q-32). The frontend builds against it before the backend exists (D-29).
@@ -34,7 +38,7 @@ Beyond D-16, which keys every endpoint on one object id; Q-146 (6) answered the 
 - **Outputs** are `derived.area` entries in the same cache (as `derived.spectrum`, [A4.2](../pipeline.md#a42-stage-2-measure-brightness-and-spectrum)): `summary`, `known`, `dots`, `tracks`, `checks` (gated), `export`. Key: `derived.area` + data release + `area_id` + `params_hash`. `params_hash` covers `AREA_VERSION`, `MEASURE_VERSION`, every `method` setting and the sorted SHA-256 of every input body. The API serves the entry whose `params_hash` matches the running code and settings; an older entry is not listed in the index (the operator re-runs the script).
 - **Offline:** the API only reads entries. Under `SX_OFFLINE=1` an absent area is 404 `area_not_found`.
 - **Determinism:** the same cache and settings give byte-identical entries (inputs sorted, fixed float formatting, ids as in A17.2 and A17.4). The checks of A17.6 draw from seeded generators (the seed list is in `method.checks`), so the same cache, settings and seeds still give the same bytes. Nothing else is random.
-- **Fixtures for tests:** PR #53's Eros fixtures are 0.1° cutouts centred on Eros and do not cover an area. D1 records area cutouts with the pre-fetch script (D-25, never hand-edited); the determinism test runs twice on a small synthetic area and compares bytes.
+- **Fixtures for tests:** PR #53's Eros fixtures are 0.1° cutouts centred on Eros and do not cover an area. D1 records area cutouts with the pre-fetch script (P3 uses the recorded 0.1° Eros cutouts instead, `backend/tests/area_recorded.py`; [Q-402](../../decisions/moving-objects.md) (3)) (D-25, never hand-edited); the determinism test runs twice on a small synthetic area and compares bytes.
 
 ### A17.11 Compute budget
 
@@ -44,7 +48,7 @@ Estimates, **not measured**; D1 records the real times.
 |---|---|---|
 | Frame search | About 15 cones of 4 s per area | Grid of A17.1 |
 | Downloads | Tens to a few hundred MB | Slowest step; IRSA at about 20 s per cutout (Q-111) |
-| Dots | Seconds per frame | Measure workers (Q-112) can run it |
+| Dots | Seconds per frame (estimate); measured offline: about 4 000 dots per area frame, Stage 2 13 to 21 ms a dot, so about 25 min per Eros area on one worker ([Q-401](../../decisions/moving-objects.md)) | Measure workers (Q-112) can run it |
 | Glitches, stars, join | Seconds | Few movers-to-be per area; exhaustive pairing is cheap |
 | Star lists, SkyBoT, Horizons | One cone per catalogue and visit; one SkyBoT cone per visit; one TLIST per candidate | Horizons one request at a time |
 | Serving | Reads cache entries | No compute in requests |

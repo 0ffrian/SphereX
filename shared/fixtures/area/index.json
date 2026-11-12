@@ -1,0 +1,38 @@
+{
+  "areas": [
+    {
+      "area_id": "fixture:area-main",
+      "ra": 150.0,
+      "dec": 10.0,
+      "width_deg": 1.0,
+      "height_deg": 0.6,
+      "data_release": "synthetic_fixture",
+      "n_frames": 16,
+      "n_visits": 2,
+      "computed_at": "2026-11-10T12:00:00.000Z",
+      "cached_at": "2026-11-10T12:00:00.000Z"
+    },
+    {
+      "area_id": "fixture:area-multivisit",
+      "ra": 210.0,
+      "dec": -20.0,
+      "width_deg": 0.6,
+      "height_deg": 0.6,
+      "data_release": "synthetic_fixture",
+      "n_frames": 16,
+      "n_visits": 4,
+      "computed_at": "2026-11-10T12:05:00.000Z",
+      "cached_at": "2026-11-10T12:05:00.000Z"
+    }
+  ],
+  "cached_at": "2026-11-10T12:00:00.000Z",
+  "computed_at": "2026-11-10T12:05:00.000Z",
+  "missing": [],
+  "provenance": {
+    "areas": {
+      "tag": "derived",
+      "source": "synthetic fixture: made-up index",
+      "formula": "the prepared derived.area entries whose params_hash matches the running code and settings (A17.10); n_frames and n_visits counted from each summary"
+    }
+  }
+}

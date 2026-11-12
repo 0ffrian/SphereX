@@ -8,6 +8,8 @@ Mock-up: `mockup/spherex-ui.html`, mock-up tool 5 (the app adds no number keys, 
 
 ## A18 Area search in the sky view
 
+> **Note ([Q-414](../../decisions/shell-surfaces.md), PR #104, `feat/ui`):** the **Known objects** and **Discovery** flow built in this PR is a frontend demo, not A18. It is started from the sky dock (A21.4) and answers through `app/area/areaService.ts` only when the drawn area overlaps the prepared 433 Eros area (the box of `public/demo/eros/eros.json`); elsewhere it refuses with `area:not_prepared`. Its cards and the canvas carry a "Demo data" tag. It does not read `/v1/areas` (Q-205). Which of this demo and PR #100's real Area UI survives is open (Q-414).
+
 **Principle: one sky.** Area search is one **tool** in the left rail, a **square** drawn on the sky, two **layers** (Dots, Tracks) and **feature cards** (A21.5). Target markers, cached markers, the picked position and click-to-pick keep working outside the drawing step.
 
 ### A18.1 Tool and drawing
@@ -106,6 +108,8 @@ The card for one Discovery result (called "Track card" before; renamed so "Track
 ### A18.11 Checks
 
 **Gated extras (Q-203), proposed.** Built only if its ticket passes the gate of [A16.7](area-plan.md#a167-tickets-and-plan); until then the Discovery card has no Checks section and nothing is greyed out or promised. Not in the mock-up yet. Data: `GET /v1/areas/{area_id}/checks` ([A17.8](area-contract.md#a178-endpoints)).
+
+Payload: a part is present only when its ticket ran; `checks:d4_not_run`, `checks:d5_not_run` and `checks:not_run` in `missing` say which did not ([Q-208](../../decisions/moving-objects.md) (12)).
 
 - **Where.** A **Checks** disclosure at the foot of the Discovery card, closed until Discovery has run. Each part appears only if its data exists; a part that is missing says so ("Control not run") and its code goes to the refusal list, never an empty frame.
 - **Planted test mover (D4).** A switch **Include a planted test mover**, off by default, enabled after the first run. On: the planted path is drawn on the sky with a dashed outline and the label "Injected", and one row "Test · planted by us · recovered" (or "not recovered") joins the results under a divider headed "Planted, not real". The row opens a small card: "We planted this mover. The search was not told where, and it found it." (or "did not find it"). It is excluded from every count, from Known and from the export. Badge **Injected**: text plus an outline colour that is not the green, amber or grey of the real verdicts, so colour is never the only cue (R9).

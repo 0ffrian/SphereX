@@ -17,6 +17,7 @@ import { Icon } from '@/app/shell/icons';
 import { useAppStore } from '@/state/store';
 import { parseQuery } from './parseQuery';
 import { DEMO_TARGETS, filterTargets, type DemoTarget } from './demoTargets';
+import { REFERENCE_TARGETS } from './referenceTargets';
 
 export const NO_MATCH_HINT = 'No demo object matches. Press Enter to search the catalogues.';
 // parseQuery accepts both examples (a name, and RA, Dec in decimal degrees).
@@ -32,7 +33,7 @@ export function SearchBar() {
   const [problem, setProblem] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
-  const rows = useMemo(() => filterTargets(DEMO_TARGETS, text), [text]);
+  const rows = useMemo(() => filterTargets([...DEMO_TARGETS, ...REFERENCE_TARGETS], text), [text]);
   const listId = useId();
   const inputId = useId();
   const helpId = useId();
@@ -158,6 +159,10 @@ export function SearchBar() {
     }
   };
 
+  // The coordinates hint is for an empty field or numbers being typed, not once a name is chosen.
+  // It stays in the DOM (aria-describedby), so a screen reader still has it.
+  const hintShown = /^[\s\d+\-.,]*$/.test(text);
+
   const onChange = (value: string) => {
     setText(value);
     setActive(-1);
@@ -224,7 +229,7 @@ export function SearchBar() {
         {/* Help sits on top, so showing it never moves the chips under the pointer. */}
         <p
           id={helpId}
-          className="sx-search-note sr-only text-sx-mfg group-has-[input:focus]:not-sr-only"
+          className={`sx-search-note sr-only text-sx-mfg ${hintShown ? 'group-has-[input:focus]:not-sr-only' : ''}`}
         >
           Decimal degrees only, for example 269.452, 4.693. Search by name for moving objects.
         </p>

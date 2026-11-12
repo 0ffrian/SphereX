@@ -17,11 +17,15 @@ Catalogue overlays (issue #12): one Gaia DR3 and one CatWISE2020 cone per fixed 
 failed cone is reported (``overlays: FAILED``) but does not make the target incomplete or change
 the exit code: overlays are optional layers, and the frames and spectrum do not depend on them.
 ``--overlays-only`` resolves, searches SIA and fetches the cones, skipping cutout downloads.
+A moving object gets one Gaia DR3 and one CatWISE2020 (W1 cut) cone per visit after its frame
+list is complete (issue #95, A19.6), with the same keys as ``/overlays`` (``stars.mover_visits``);
+``--overlays-only`` skips movers, whose cones need the frame list.
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import sys
 import tomllib
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -37,7 +41,8 @@ from app.core.card.stars import STAR_TYPES
 from app.core.classify import classify
 from app.core.classify.rules import SIMBAD_PLANET
 from app.core.composite.service import CompositeService
-from app.core.find.frames import FrameService, frame_time, is_complete, position_at
+from app.core.find import stars
+from app.core.find.frames import FrameRecord, FrameService, frame_time, is_complete, position_at
 from app.core.find.overlays import CATALOGS, fetch_catalog, overlay_cone
 from app.core.find.resolver import ResolvedObject, is_comet, load_aliases, resolve
 from app.settings import Settings
@@ -106,13 +111,54 @@ def prefetch_overlays(ctx: Context, obj: ResolvedObject, refresh: bool) -> dict[
     for cat in CATALOGS:
         try:
             tbl, table, truncated, _ = fetch_catalog(ctx, cat, cone, refresh=refresh)
-        except (CacheMissOffline, UpstreamUnavailable, UpstreamError, ValueError, KeyError) as exc:
+        except (
+            CacheMissOffline,
+            UpstreamUnavailable,
+            UpstreamError,
+            ValueError,
+            KeyError,
+            csv.Error,
+        ) as exc:
             out[cat] = f"FAILED ({exc})"
         else:
             out[cat] = f"{len(tbl.ids)} sources from {table}" + (
                 " (truncated)" if truncated else ""
             )
         print(f'  overlay {cat}: {out[cat]} (cone r={cone.radius_deg * 3600:.0f}")', flush=True)
+    return out
+
+
+def prefetch_mover_overlays(
+    ctx: Context, frames: list[FrameRecord], refresh: bool
+) -> dict[str, str]:
+    """A mover's per-visit Gaia and CatWISE cones (issue #95), built by the same
+    ``stars.mover_visits`` as ``/overlays`` so the keys match. Never raises; a failed cone is
+    reported."""
+    out: dict[str, str] = {}
+    visits = stars.mover_visits(frames, ctx.settings.cutout_size_arcsec)
+    for cat in CATALOGS:
+        parts: list[str] = []
+        for v in visits:
+            opts = stars.fetch_options(cat, v.cone)
+            try:
+                tbl, table, truncated, _ = fetch_catalog(ctx, cat, v.cone, refresh=refresh, **opts)
+            except (
+                CacheMissOffline,
+                UpstreamUnavailable,
+                UpstreamError,
+                ValueError,
+                KeyError,
+                csv.Error,
+            ) as exc:
+                parts.append(f"visit {v.visit} FAILED ({exc})")
+            else:
+                parts.append(
+                    f"visit {v.visit} {len(tbl.ids)} from {table}"
+                    + (" (truncated)" if truncated else "")
+                )
+            r_as = v.cone.radius_deg * 3600
+            print(f'  overlay {cat} visit {v.visit}: {parts[-1]} (cone r={r_as:.0f}")', flush=True)
+        out[cat] = "; ".join(parts) if parts else "no visits"
     return out
 
 
@@ -162,7 +208,8 @@ def prefetch_target(
             rep.error = f"SkyBoT failed: {exc}"
             return rep
         if getattr(args, "overlays_only", False):
-            # Movers have no catalogue cones (Q-50); skip the path search and its cutouts.
+            # A mover's cones need its complete frame list (issue #95): skip the path search,
+            # its cutouts and the cones.
             rep.frames_skipped = True
             return rep
         # Phase angle and Sun vector for the card (Q-62); the same two cached Horizons calls.
@@ -184,6 +231,10 @@ def prefetch_target(
             fs.close()
         rep.frames, rep.missing = len(result.frames), result.missing
         print(f"  path search: {rep.frames} frames, missing={result.missing[:5]}", flush=True)
+        if is_complete(result.missing):
+            rep.overlays = prefetch_mover_overlays(ctx, result.frames, args.refresh)
+        else:
+            rep.overlays = {cat: "skipped (frame list incomplete)" for cat in CATALOGS}
         return rep
 
     search_ra, search_dec = position_at(obj, parse_utc(ctx.settings.search_epoch))

@@ -1,6 +1,6 @@
 # Display levels and shared 3D view rules
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.7 · **Implements:** [D-05, Q-15, Q-64, Q-132](../decisions/platform-hosting.md), [D-21, Q-27](../decisions/contract-tags.md), [D-23, Q-36](../decisions/contract.md), [D-34, Q-66](../decisions/rendering-motion.md), [Q-104, Q-107](../decisions/rendering-kinds.md), [Q-115, Q-116, Q-117](../decisions/rendering-layers.md), [Q-119](../decisions/contract-tags.md), [D-28](../decisions/moving-objects.md), [Q-113](../decisions/shell-surfaces.md), [Q-155, Q-165](../decisions/exoplanets.md), [Q-156, Q-157, Q-166](../decisions/exoplanet-looks.md) · **Read with:** [build-mould.md](build-mould.md) (R5.8), [data-contract.md](data-contract.md) (R3.4), [accessibility.md](accessibility.md) (R9)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.7 · **Implements:** [D-05, Q-15, Q-64, Q-132](../decisions/platform-hosting.md), [D-21, Q-27](../decisions/contract-tags.md), [D-37, Q-287](../decisions/rendering-engines.md), [D-23, Q-36](../decisions/contract.md), [D-34, Q-66](../decisions/rendering-motion.md), [Q-104, Q-107](../decisions/rendering-kinds.md), [Q-115, Q-116, Q-117](../decisions/rendering-layers.md), [Q-119](../decisions/contract-tags.md), [D-28](../decisions/moving-objects.md), [Q-113](../decisions/shell-surfaces.md), [Q-155, Q-165](../decisions/exoplanets.md), [Q-156, Q-157, Q-166](../decisions/exoplanet-looks.md) · **Read with:** [build-mould.md](build-mould.md) (R5.8), [engines.md](engines.md) (R5.9), [data-contract.md](data-contract.md) (R3.4), [accessibility.md](accessibility.md) (R9)
 
 ## R4. Display levels
 
@@ -49,17 +49,20 @@
 
 ### R5.3 Honesty toggle (3 states)
 
+> **Changed by [Q-412](../decisions/shell-surfaces.md) (PR #104, Proposed):** in the build pane the control is a compact **Show** row inside the Details dropdown, no longer at the top of the pane. The three states and what they show are unchanged. Build still raises the level to + Artistic when layers are hidden (Q-113 item 7, Q-287).
+
 One state per badge (D-21):
 
 | State | Shows tags | Examples |
 |---|---|---|
 | Measured only | `measured` | Real mesh or a plain sphere at measured size, flat measured tint, measured lighting. The body is kept only when its size value is `measured`; the `ellipsoid` layer is `model_dependent`, so Measured only shows a sphere |
 | + Estimated (starting state) | adds `derived`, `model_dependent`, `inferred_from_analog` | Class palette, derived colours, brightness from Teff/flux; the starlight colour of an exoplanet's light (`starlight`, `derived` or weaker, Q-157); the climate scenario text (`climate`, `model_dependent`, Q-156): for a locked planet (`eyeball` or `snowball`) the artistic terrain stays hidden and the field's ocean and ice masks are drawn on a smooth sphere in three plain key colours, with the locked pose; a planet that is not locked, or is `lava` or `hot_dry`, adds nothing; gas giant bands, flattening and colour (Q-115; the bands are `inferred_from_analog` while the typical wind is unverified, and the flattening is when the card has no spin, Q-119) |
-| + Artistic | adds `artistic` | Procedural relief, AI paint, baked band patterns (brown dwarf), gas giant storms and turbulence (seeded looks), orbit drawings |
+| + Artistic | adds `artistic` | Procedural relief, AI paint, baked band patterns (brown dwarf), gas giant storms and turbulence (seeded looks), orbit drawings; the D-37 engines draw stars, worlds and rocks only here (Q-287, R5.9) |
 
 - The toggle starts at **+ Estimated**: everything shown on load is backed by data or a stated formula.
 - **Demo exoplanets at each level (issue #68 Part 6, Q-165, Q-166):** Measured only is a plain grey sphere at the measured radius in white light (the starlight is `derived`); + Estimated adds the star-coloured light and, for a tidally locked planet, the climate pattern on a smooth sphere (the default terrain stays hidden: it is `artistic`); + Artistic adds the generated surface, the scenario look and the preset. The alt text and notes say which of these is shown and which level shows the rest.
 - **Build exception (proposed, Q-113 item 7; Moon to confirm, with Q-49):** *Build it*, *Replay* and *New seed* raise the level to + Artistic when the plan has hidden layers, and say so. Rules in R5.8.
+- **Engines (Q-287, Atish, 11 Nov 2026):** the prototype engines mount only at + Artistic; at + Estimated and Measured only the three.js path draws ([R5.9](engines.md#r59-prototype-engines-d-37)).
 - Each visible layer shows a small tag chip in the legend.
 - Haptics and sounds use the same filter. The rule is owned by [§8.2](haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui).
 
@@ -84,7 +87,7 @@ Targets, as amended by Q-132 (which answers Q-15):
 | Phones | realme 14 Pro and a Samsung, both Android 16 with Chrome. Vibration needs these | after the event |
 | Zenbook 14X (Intel Iris Xe) | no longer the demo screen (Q-132) | — |
 
-- ≥30 fps while rotating. Render when the view changes, or every frame while a simulation clock runs (D-34, [§5.7](#r57-motion-and-time-lapse)).
+- ≥30 fps while rotating. Render when the view changes, or every frame while a simulation clock runs (D-34, [§5.7](#r57-motion-and-time-lapse)). Not yet measured on the A15 for the D-37 engines ([R5.9](engines.md#r59-prototype-engines-d-37), R12 #43).
 - `renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))`.
 - Textures: 2048×1024 on desktop. After the event, 1024×512 on phones. Serve as WebP for albedo; normal maps as lossless PNG or KTX2.
 - Meshes ≤ 50k triangles. Decimate NASA GLBs offline.
