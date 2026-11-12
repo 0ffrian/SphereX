@@ -19,6 +19,13 @@ export const ENGINE_READY_TIMEOUT_MS: Record<EngineRole, number> = { globe: 60_0
  */
 export const STAR_READY_TIMEOUT_MS = 60_000;
 
+/**
+ * Longest wait for the rock engine's programs before the build stage gives up and the three.js body stays (ms). Issue
+ * #93 wave 1 (B7): measured cold on the RTX 4060 Ti desktop at 0.5 to 1.0 s with the loops kept (1.3 to 3.7 s before,
+ * all of it a frozen page). Generous, as the world's: the A15 is not measured [verify] there.
+ */
+export const ROCK_READY_TIMEOUT_MS = 60_000;
+
 /** Longest the world may take to form once its shaders are ready, counted only while it is on screen (ms). */
 export const ENGINE_FORM_TIMEOUT_MS = 90_000;
 

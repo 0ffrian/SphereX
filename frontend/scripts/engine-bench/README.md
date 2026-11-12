@@ -53,6 +53,20 @@ Issue #93 phase 2 (repeating patterns):
   pair of frames, 32 x 32 ground tiles are matched within +-8 px. A planet-fixed texture moves rigidly and matches
   well (`mean`, `p10` of the best matches); keep `step` so the ground moves fewer than 8 px a frame.
 
+Issue #93 wave 1 (rocks):
+
+- `rocks.html?body=proc|eros|comet`: one rock body from the shared fixture cards (`asteroid_procedural`,
+  `asteroid_shape` with the Eros model, `comet`). Reports the main-thread build, the `attach()` call, the time until
+  the programs are linked, the longest main-thread task from attach to the first picture, the frame time (median of 40
+  draws each followed by a 1-pixel read), the GPU time of a draw (`EXT_disjoint_timer_query_webgl2`, both contexts
+  with `two=1`), a draw right after a new height map (`rebake_ms`), and a Surface age sweep (20 changes 16 ms apart:
+  longest task, blocked time, settle time). Keeps the canvas in `__out.png` (and `png2`). Switches: `impl=<folder>`
+  (an older copy, e.g. `/.bench-ref/before/engine/rocks/` with `seed.ts` one level up), `bake=0` (the prototype's
+  per-pixel `ROCK_FS`), `bakeN=<texels>`, `cull=0`, `two=1` (a second canvas, the close-up pane), `share=0` (each
+  canvas draws), `w`/`h` (CSS px; run at device scale 1). The Eros model is read from `/.bench-ref/eros.glb` (copy
+  `backend/assets/shapes/eros-gaskell.glb`) and the cards from `/.bench-ref/<kind>.json` (copy
+  `shared/fixtures/cards/`).
+
 Issue #93 regression fix (mountain heights):
 
 - `relief.html?id=t1f&alts=3,40,400&base=/.bench-ref/<copy>/&ref=/.bench-ref/<other>/`: one preset on the globe and in
