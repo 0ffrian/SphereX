@@ -1,5 +1,7 @@
 # Recorded cache entries are byte-exact (their SHA-256 is in the meta). Never convert line endings.
 backend/tests/fixtures/** -text
+# The precomputed area pack (issue #108) is cache entries too, compared byte for byte (A17.10).
+backend/assets/areas/** -text
 # The contract drift check compares bytes (D-18), so these stay LF on every platform.
 shared/** text eol=lf
 backend/app/contract/*.py text eol=lf

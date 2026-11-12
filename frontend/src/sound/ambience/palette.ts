@@ -3,6 +3,7 @@
 // order. It keeps them inside the memory budgets and bakes them one at a time in the worker (bake engine ported from
 // Moon's Ambience Loop Lab). It wraps each result as an AudioBuffer and caches two worlds (LRU).
 // The AudioContext is injected (BaseAudioContext): nothing here imports haptics/ or creates a context.
+import { bakeRefusalText, NO_WORKER_TEXT } from './captions';
 import { bakedLength, checkSpec, isOneShot, releaseBakeCaches } from './dsp';
 import * as K from './dspTuning';
 import { hash32 } from './hash';
@@ -196,7 +197,7 @@ export class Palette {
         // Refused before the budget is charged, so an invalid spec cannot distort it (code review L5).
         this.refusals.push({
           source: s.id,
-          reason: `Sound for ${s.id} unavailable: ${bad.join(', ')}`,
+          reason: bakeRefusalText(s.id, bad.join(', ')),
         });
         continue;
       }
@@ -205,7 +206,7 @@ export class Palette {
       if (shot ? usedShot + bytes > capShot : usedBed + bytes > capBed) {
         this.refusals.push({
           source: s.id,
-          reason: `Sound for ${s.id} unavailable: over the ${shot ? 'one-shot' : 'bed'} memory budget`,
+          reason: bakeRefusalText(s.id, `over the ${shot ? 'one-shot' : 'bed'} memory budget`),
         });
         continue;
       }
@@ -358,7 +359,7 @@ export class Palette {
         if (it.worldKey === this.current) {
           this.refusals.push({
             source: it.spec.id,
-            reason: `Sound for ${it.spec.id} unavailable: no bake worker`,
+            reason: bakeRefusalText(it.spec.id, NO_WORKER_TEXT),
           });
         }
       }
@@ -401,7 +402,7 @@ export class Palette {
     } else if (item.worldKey === this.current) {
       this.refusals.push({
         source: item.spec.id,
-        reason: `Sound for ${item.spec.id} unavailable: ${res.error}`,
+        reason: bakeRefusalText(item.spec.id, res.error),
       });
     }
     this.pump();
