@@ -18,9 +18,7 @@ describe('grid loader looks', () => {
     expect(IDLE_LOOK.mode).toBe('pulse');
     expect(IDLE_LOOK.speed).toBe('idle');
     expect(SEARCHING_LOOK.pattern).toBe('sparkle');
-    expect(typeof SEARCHING_LOOK.pattern === 'string' && SEARCHING_LOOK.pattern in PATTERNS).toBe(
-      true,
-    );
+    expect(typeof SEARCHING_LOOK.pattern === 'string' && SEARCHING_LOOK.pattern in PATTERNS).toBe(true);
   });
 });
 

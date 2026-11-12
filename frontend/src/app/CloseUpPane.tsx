@@ -241,11 +241,7 @@ export function CloseUpPane() {
         />
       )}
       {engine && open && (
-        <StarFlareStage
-          key={engine.preset.id}
-          star={engine}
-          onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))}
-        />
+        <StarFlareStage key={engine.preset.id} star={engine} onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))} />
       )}
       {kind === 'star' && !engine && starProps && open && (
         <div className="absolute inset-0 bg-black" data-testid="star-closeup">
@@ -298,10 +294,7 @@ export function CloseUpPane() {
         </div>
       )}
       {SHOW_FLY_BAR && view && !world && about && info?.resolved && (
-        <div
-          className="absolute inset-x-4 bottom-36 z-[3] max-h-[45%] overflow-auto rounded-lg border border-[#323a3e] bg-[#242729f2] p-3 text-xs text-neutral-200"
-          data-testid="orbit-layers"
-        >
+        <div className="absolute inset-x-4 bottom-36 z-[3] max-h-[45%] overflow-auto rounded-lg border border-[#323a3e] bg-[#242729f2] p-3 text-xs text-neutral-200" data-testid="orbit-layers">
           <p className="mb-2">{ORBIT_NOTE}</p>
           <ul className="flex flex-col gap-1">
             {info.resolved.layers.map((l) => (

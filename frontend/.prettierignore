@@ -10,5 +10,3 @@ src/engine/rocks/source.ts
 src/engine/stars/protoStar*.js
 # Spec R13 App. B: the ambience contract is copied verbatim from the spec.
 src/sound/ambience/types.ts
-# Prepared demo data (the Eros area), kept compact.
-public/demo/eros/eros.json

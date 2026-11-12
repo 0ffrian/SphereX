@@ -662,12 +662,10 @@ export function worldControls(
     'Wind speed': world.tags.Umeas,
     'Flattened by spin': world.tags.fMeas,
   };
-  const rowTag = (label: string): Tag =>
-    measuredReadout[label] ?? READOUT_TAG[label] ?? 'model_dependent';
+  const rowTag = (label: string): Tag => measuredReadout[label] ?? READOUT_TAG[label] ?? 'model_dependent';
   const rowOf = (label: string): string | undefined => r.rows.find(([l]) => l === label)?.[1];
   const key = (id: string, label: string, value: string | undefined, tag: Tag): void => {
-    if (value !== undefined)
-      controls.push({ id: `k-${id}`, kind: 'readout', slot: 'key', label, value, tag });
+    if (value !== undefined) controls.push({ id: `k-${id}`, kind: 'readout', slot: 'key', label, value, tag });
   };
   const p = world.preset;
   const radiusKm = `${fmt(p.Rj * 71492)} km`;
@@ -675,38 +673,18 @@ export function worldControls(
     key('temp', 'Temperature', rowOf('Equilibrium temperature'), rowTag('Equilibrium temperature'));
     key('radius', 'Radius', radiusKm, t.Rj ?? 'model_dependent');
     const prot = p.Prot ?? (p.locked ? p.P : undefined);
-    key(
-      'rot',
-      'Rotation period',
-      prot === undefined
-        ? undefined
-        : prot < 2
-          ? `${fmt(prot * 24, 1)} hours`
-          : `${fmt(prot, 1)} days`,
-      t.Prot ?? 'model_dependent',
-    );
+    key('rot', 'Rotation period', prot === undefined ? undefined : prot < 2 ? `${fmt(prot * 24, 1)} hours` : `${fmt(prot, 1)} days`, t.Prot ?? 'model_dependent');
     key('wind', 'Wind speed', rowOf('Wind speed'), rowTag('Wind speed'));
   } else {
-    key(
-      'temp',
-      'Surface temperature',
-      rowOf('Average surface temperature'),
-      rowTag('Average surface temperature'),
-    );
+    key('temp', 'Surface temperature', rowOf('Average surface temperature'), rowTag('Average surface temperature'));
     key('radius', 'Radius', radiusKm, t.Rj ?? 'model_dependent');
-    key(
-      'ps',
-      'Surface pressure',
-      `${s.Ps < 0.1 ? fmt(s.Ps, 3) : fmt(s.Ps, 1)} bar`,
-      t.Ps ?? 'model_dependent',
-    );
+    key('ps', 'Surface pressure', `${s.Ps < 0.1 ? fmt(s.Ps, 3) : fmt(s.Ps, 1)} bar`, t.Ps ?? 'model_dependent');
     const g = (6.674e-11 * p.Me * 5.972e24) / (p.Rj * 71492e3) ** 2;
     key('g', 'Surface gravity', `${fmt(g, 1)} m/s\u00b2`, 'derived');
   }
   const inKey = gas ? ['Equilibrium temperature', 'Wind speed'] : ['Average surface temperature'];
   for (const [label, value] of r.rows)
-    if (!inKey.includes(label))
-      controls.push({ id: `r-${label}`, kind: 'readout', label, value, tag: rowTag(label) });
+    if (!inKey.includes(label)) controls.push({ id: `r-${label}`, kind: 'readout', label, value, tag: rowTag(label) });
   // Issue #93 C: eclipse and phase-curve temperatures from the card, shown beside the engine's own model numbers.
   for (const m of world.measured ?? [])
     controls.push({
@@ -721,9 +699,7 @@ export function worldControls(
     ...world.assumptions.map((a) => `${a.field} = ${String(a.value)}: ${a.note}.`),
     ...world.mismatches.map((m) => `Differs from the artifact: ${m}.`),
   ];
-  const notes: BuildNote[] = filled.length
-    ? [{ title: 'Filled in, not measured', lines: filled }]
-    : [];
+  const notes: BuildNote[] = filled.length ? [{ title: 'Filled in, not measured', lines: filled }] : [];
   return { title: gas ? 'Gas giant' : 'Planet surface', controls, notes };
 }
 
@@ -1009,12 +985,7 @@ export function WorldFlyStage({
       <div ref={hostRef} className="absolute inset-0" />
       {forming && <Forming gas={gas} progress={progress} />}
       {SHOW_FLY_BAR && engine && entered && (
-        <div
-          className="sx-cu-controls"
-          role="group"
-          aria-label="Surface view controls"
-          style={{ zIndex: 3 }}
-        >
+        <div className="sx-cu-controls" role="group" aria-label="Surface view controls" style={{ zIndex: 3 }}>
           <label htmlFor="world-alt" className="flex-1 basis-40">
             {gas ? 'Height above the clouds' : 'Height above the ground'}:{' '}
             <span data-testid="world-alt-label">{`${fmt(alt, alt < 10 ? 1 : 0)} km`}</span>

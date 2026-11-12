@@ -27,11 +27,7 @@ import { Row, Rows } from './PanelControls';
 import { ERROR_BARS_NOTE } from './worldNotes.generated';
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-const PART_COLOUR: Record<Part, string> = {
-  d: 'var(--p-meas)',
-  p: 'var(--p-phys)',
-  a: 'var(--p-asm)',
-};
+const PART_COLOUR: Record<Part, string> = { d: 'var(--p-meas)', p: 'var(--p-phys)', a: 'var(--p-asm)' };
 const PARTS: Part[] = ['d', 'p', 'a'];
 const PART_COPY: Record<Part, { label: string; note: string }> = {
   d: { label: 'Measured', note: 'SPHEREx, Gaia and other archives' },
@@ -119,9 +115,7 @@ export function ConfidencePopover({
     }
   };
 
-  const gateYes = [c.gate.class_known, c.gate.key_measurement, c.gate.score_ok].filter(
-    Boolean,
-  ).length;
+  const gateYes = [c.gate.class_known, c.gate.key_measurement, c.gate.score_ok].filter(Boolean).length;
   const body = (
     <>
       <div className="sx-pop-h">
@@ -185,17 +179,12 @@ export function ConfidencePopover({
           {!formulaTerms(c).agrees && (
             <p className="sx-acc-rules" role="note" data-testid="formula-disagree">
               <b>These rows do not add up to the score.</b> The rows give{' '}
-              {percent(formulaTerms(c).fromRows ?? 0)}%, the backend sent {score}%. The backend
-              value is shown.
+              {percent(formulaTerms(c).fromRows ?? 0)}%, the backend sent {score}%. The backend value is shown.
             </p>
           )}
         </Row>
         <Row title="When it is shown in 3D" count={`${gateYes} of 3`}>
-          <FormulaMath
-            latex={gateLatex(c.threshold)}
-            plain={gatePlain(c.threshold)}
-            testId="formula-gate"
-          />
+          <FormulaMath latex={gateLatex(c.threshold)} plain={gatePlain(c.threshold)} testId="formula-gate" />
           <ul className="sx-acc-gate2">
             <Yes ok={c.gate.class_known}>The kind of object is known.</Yes>
             <Yes ok={c.gate.key_measurement}>
@@ -224,16 +213,10 @@ export function ConfidencePopover({
                 const chip = tagChip(i);
                 const dim = isShown ? !isShown(i.tag) : false;
                 return (
-                  <tr
-                    key={i.id}
-                    className={dim ? 'sx-acc-dim' : undefined}
-                    data-dim={dim || undefined}
-                  >
+                  <tr key={i.id} className={dim ? 'sx-acc-dim' : undefined} data-dim={dim || undefined}>
                     <td>
                       {i.label}
-                      {dim && (
-                        <span className="sr-only"> (hidden at this Show level; still counted)</span>
-                      )}
+                      {dim && <span className="sr-only"> (hidden at this Show level; still counted)</span>}
                     </td>
                     <td>
                       <span className={`sx-acc-tag ${chip.part}`}>{chip.text}</span>
@@ -246,8 +229,7 @@ export function ConfidencePopover({
           </table>
           {isShown && c.inputs.some((i) => !isShown(i.tag)) && (
             <p className="sx-acc-rules">
-              Dimmed rows are hidden by the Show level. They still count: the score does not move
-              with it.
+              Dimmed rows are hidden by the Show level. They still count: the score does not move with it.
             </p>
           )}
           {!c.gate.passed && (

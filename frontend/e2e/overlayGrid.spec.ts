@@ -271,10 +271,7 @@ test('the colour composite hides the overlays and says so; Raw brings them back'
   await page.getByTestId('overlay-toggle-gaia').click();
   await expect(page.locator('[data-testid="marker"]').first()).toBeAttached();
   // Wavelength tint: markers stay, above the tint.
-  await page
-    .getByRole('group', { name: 'Picture' })
-    .getByRole('button', { name: 'Colour' })
-    .click();
+  await page.getByRole('group', { name: 'Picture' }).getByRole('button', { name: 'Colour' }).click();
   await expect(page.getByTestId('tint-overlay')).toBeVisible();
   await expect(page.locator('[data-testid="marker"]').first()).toBeAttached();
   await page

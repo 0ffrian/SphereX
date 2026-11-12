@@ -1,14 +1,6 @@
 // "Hear it" synthesis (approved preview, panels-preview.html). Own AudioContext, a master gain at 0.9 (no
 // global sound control exists in the app, Q-132) and an analyser the panel's waveform canvases read.
-import {
-  cutoffHz,
-  freqAt,
-  howlHz,
-  loudness,
-  SPEC_POINTS,
-  SPEC_SECONDS,
-  type AtmosphereModel,
-} from './hearModel';
+import { cutoffHz, freqAt, howlHz, loudness, SPEC_POINTS, SPEC_SECONDS, type AtmosphereModel } from './hearModel';
 
 export const MASTER_GAIN = 0.9;
 
@@ -27,8 +19,7 @@ function getBus(): Bus | null {
   const Ctor: typeof AudioContext | undefined =
     typeof window === 'undefined'
       ? undefined
-      : (window.AudioContext ??
-        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
+      : (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
   if (!Ctor) return null;
   try {
     const ctx = new Ctor();
@@ -130,10 +121,7 @@ export function startAtmosphere(m: AtmosphereModel): AtmosphereHandle | null {
     tick: (t, p) => {
       if (!alive) return;
       const { P, c, s } = p;
-      let g =
-        0.5 +
-        0.5 * Math.sin(t * 0.0007 * (0.6 + s)) * Math.sin(t * 0.00031 + 1.3) +
-        0.25 * Math.sin(t * 0.0021 * s);
+      let g = 0.5 + 0.5 * Math.sin(t * 0.0007 * (0.6 + s)) * Math.sin(t * 0.00031 + 1.3) + 0.25 * Math.sin(t * 0.0021 * s);
       g = Math.max(0.05, Math.min(1, 0.25 + g * s));
       const base = loudness(P) * (0.25 + 0.75 * s);
       const now = ctx.currentTime;
@@ -166,10 +154,7 @@ export interface SpectrumHandle {
 }
 
 /** Triangle plus a quieter sine octave sweeping 880 to 110 Hz over the rest of SPEC_SECONDS; gain from flux. */
-export function startSpectrum(
-  values: readonly (number | null)[],
-  from: number,
-): SpectrumHandle | null {
+export function startSpectrum(values: readonly (number | null)[], from: number): SpectrumHandle | null {
   const b = getBus();
   if (!b) return null;
   const { ctx, master } = b;

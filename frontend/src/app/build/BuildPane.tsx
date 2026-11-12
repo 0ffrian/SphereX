@@ -159,15 +159,7 @@ export function BuildPane() {
   useEffect(() => {
     if (!ambienceOn) return;
     const onM = (e: globalThis.KeyboardEvent) => {
-      if (
-        e.key.toLowerCase() !== 'm' ||
-        e.altKey ||
-        e.ctrlKey ||
-        e.metaKey ||
-        e.defaultPrevented ||
-        isEditableTarget(e.target)
-      )
-        return;
+      if (e.key.toLowerCase() !== 'm' || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented || isEditableTarget(e.target)) return;
       useAmbienceStore.getState().stop();
     };
     window.addEventListener('keydown', onM);
@@ -296,11 +288,7 @@ export function BuildPane() {
                 type="button"
                 className="sx-bp-tool sx-bp-text"
                 title={b.title}
-                aria-label={
-                  b.id === 'hear' && ambienceOn
-                    ? 'Hear it. Ambience on, open Hear it to stop, or press M.'
-                    : undefined
-                }
+                aria-label={b.id === 'hear' && ambienceOn ? 'Hear it. Ambience on, open Hear it to stop, or press M.' : undefined}
                 aria-pressed={pop === b.id}
                 aria-expanded={pop === b.id}
                 aria-controls={BUILD_POP_ID}
@@ -309,9 +297,7 @@ export function BuildPane() {
               >
                 <Icon name={b.icon} className="size-[15px]" />
                 <span>{b.label}</span>
-                {b.id === 'hear' && ambienceOn && (
-                  <i className="sx-bp-live" aria-hidden="true" data-testid="hear-live" />
-                )}
+                {b.id === 'hear' && ambienceOn && <i className="sx-bp-live" aria-hidden="true" data-testid="hear-live" />}
               </button>
             )).flatMap((el, i) =>
               i === 0 && atmo.ok

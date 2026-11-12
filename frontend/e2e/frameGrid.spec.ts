@@ -38,10 +38,7 @@ for (const tint of [false, true]) {
     const counter = page.getByTestId('frame-counter');
     await expect(counter).toHaveText('1 / 24');
     if (tint) {
-      await page
-        .getByRole('group', { name: 'Picture' })
-        .getByRole('button', { name: 'Colour' })
-        .click();
+      await page.getByRole('group', { name: 'Picture' }).getByRole('button', { name: 'Colour' }).click();
       await expect(page.getByTestId('tint-overlay')).toBeVisible();
     }
     // The steady no-data line and the cutout count are in More > About.
@@ -200,10 +197,7 @@ async function openBarnard(page: Page, tint: boolean) {
   await input.press('Enter');
   await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
   if (tint) {
-    await page
-      .getByRole('group', { name: 'Picture' })
-      .getByRole('button', { name: 'Colour' })
-      .click();
+    await page.getByRole('group', { name: 'Picture' }).getByRole('button', { name: 'Colour' }).click();
     await expect(page.getByTestId('tint-overlay')).toBeVisible();
   }
   // Every cutout preloaded, none unavailable (More > About).

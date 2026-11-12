@@ -124,30 +124,13 @@ function MarkerIcon({ catalog }: { catalog: OverlayLayer }) {
   if (catalog === 'flags')
     return (
       <svg viewBox="0 0 14 14" className="size-3.5" aria-hidden="true">
-        <rect
-          x="2"
-          y="2"
-          width="10"
-          height="10"
-          fill="none"
-          stroke="var(--warn)"
-          strokeWidth="2"
-          strokeDasharray="2 2"
-        />
+        <rect x="2" y="2" width="10" height="10" fill="none" stroke="var(--warn)" strokeWidth="2" strokeDasharray="2 2" />
       </svg>
     );
   if (catalog === 'fov')
     return (
       <svg viewBox="0 0 14 14" className="size-3.5" aria-hidden="true">
-        <rect
-          x="2"
-          y="2"
-          width="10"
-          height="10"
-          fill="none"
-          stroke="var(--muted)"
-          strokeWidth="1.6"
-        />
+        <rect x="2" y="2" width="10" height="10" fill="none" stroke="var(--muted)" strokeWidth="1.6" />
       </svg>
     );
   const s = MARKER_STYLE[catalog];
