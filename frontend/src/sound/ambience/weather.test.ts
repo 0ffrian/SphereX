@@ -36,6 +36,18 @@ describe('§8.2 lightning rule table', () => {
   });
 });
 
+describe('R11: observed worlds still need air and convection; a slid world is not the observed one', () => {
+  it('Earth without convection has no lightning', () => {
+    const e = earthAir();
+    expect(lightningRate(e, makePlace(1, () => ({}), { cnv: 0, cnvRing: 0 }), lightningRule(e, 'earth'))).toBe(0);
+    expect(lightningRate(e, makePlace(1, () => ({}), { cnv: 0.6, cnvRing: 0.5 }), lightningRule(e, 'earth'))).toBeCloseTo(3, 12);
+  });
+  it('Earth with the fluid slid to methane falls through to the Titan row', () => {
+    const slid = { ...titanAir(), inputs: [{ label: 'Surface liquid', value: 'methane', unit: '', tag: 'artistic' as const, source: 'slider' }] };
+    expect(lightningRule(slid, 'earth').reason).toBe(LIGHTNING_TEXT.titan);
+  });
+});
+
 describe('§8.3 rate', () => {
   it('rocky exoplanets need deep convection; Jupiter is quieter at low latitude', () => {
     const air = earthAir({ presetId: 't1e' });
@@ -96,12 +108,13 @@ describe('StrikeScheduler', () => {
     expect(got).toBeCloseTo(expected, 9);
   });
 
-  it('after a pause, old strikes are dropped and at most one is returned', () => {
+  it('after a pause, old strikes are dropped and exactly one recent strike is returned', () => {
+    // At 600 per minute (10/s) a strike inside the last second is all but certain (1 - e^-10); the seed fixes it.
     const s = new StrikeScheduler(5);
-    s.next(0, 6, air, place);
-    const out = s.next(600, 6, air, place);
-    expect(out.length).toBeLessThanOrEqual(1);
-    if (out.length) expect(out[0]!.t0).toBeGreaterThanOrEqual(599);
+    s.next(0, 600, air, place);
+    const out = s.next(600, 600, air, place);
+    expect(out.length).toBe(1);
+    expect(out[0]!.t0).toBeGreaterThanOrEqual(599);
   });
 
   it('never two flashes within 2 s, even at a high rate', () => {

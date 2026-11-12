@@ -4,7 +4,7 @@
 import type { Tag } from '@/contract';
 import type { AirModel, PlaceFeatures, WindResult } from './types';
 import {
-  A_L, A_P, A_T, A_W, COAST_FADE_KM, CYCLONE_REACH, H_BL, H_EARTH_KM, I_U_MIN, K_BR, POLAR_EDGE_MAX, RELIEF_SAT_KM,
+  A_L, A_P, A_T, A_W, COAST_FADE_KM, GAS_IU, CYCLONE_REACH, H_BL, H_EARTH_KM, I_U_MIN, K_BR, POLAR_EDGE_MAX, RELIEF_SAT_KM,
   SHELTER, SPEEDUP, U_MIN, Z0_LAND, Z0_SEA, Z_JET_EARTH,
 } from './tuning';
 
@@ -130,7 +130,7 @@ export function windAt(air: AirModel, lon: number, lat: number, ctx: WindCtx): W
     // §6.6: jetU is already m/s (m.U x the normalised profile), filled by place.ts. Missing -> no wind (never guessed).
     if (ctx.jetU === null || !Number.isFinite(ctx.jetU)) return { U10: 0, Uz: 0, Iu: I_U_MIN, dirDeg: 0, parts: [], tag };
     const U = Math.abs(ctx.jetU);
-    return { U10: U, Uz: U, Iu: I_U_MIN, dirDeg: ctx.jetU >= 0 ? 270 : 90, parts: [{ kind: 'jet', U }], tag };
+    return { U10: U, Uz: U, Iu: GAS_IU, dirDeg: ctx.jetU >= 0 ? 270 : 90, parts: [{ kind: 'jet', U }], tag };
   }
 
   const p = circulation(air, lon, lat);

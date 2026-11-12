@@ -27,7 +27,11 @@ export interface LightningRule { allowed: boolean; tag: Tag | null; reason: stri
 export function lightningRule(air: AirModel, presetId: string): LightningRule {
   const refuse = (reason: string): LightningRule => ({ allowed: false, tag: null, reason });
   if (!air.airOK) return refuse(LIGHTNING_TEXT.other);
-  if ((LIGHTNING_OBSERVED as readonly string[]).includes(presetId)) return { allowed: true, tag: 'measured', reason: null };
+  // R11 / red M1: the observed row applies only to the world as observed; a slid Ps or fluid (tagged artistic, source
+  // "slider") falls through to the exoplanet rows. 'measured' is the fact that lightning is observed there; strike
+  // timing and placement stay artistic.
+  const slid = air.inputs.some((i) => i.source === 'slider');
+  if (!slid && (LIGHTNING_OBSERVED as readonly string[]).includes(presetId)) return { allowed: true, tag: 'measured', reason: null };
   if (air.gas) {
     return air.regime === 'Water clouds' || air.regime === 'Ammonia clouds'
       ? { allowed: true, tag: 'inferred_from_analog', reason: null }
@@ -42,14 +46,15 @@ export function lightningRule(air: AirModel, presetId: string): LightningRule {
 }
 
 /**
- * §8.3 flashes per minute inside the audible radius. Rocky exoplanets also need deep convection: max(cnv, cnvRing) > 0.3
- * (ASSUMPTION: per-sample cnv is not in PlaceSample). On gas giants place.ts fills cnvRing with cnvG.
+ * §8.3 flashes per minute inside the audible radius. R11: every world, observed ones included, needs convection near
+ * the listener: max(cnv, cnvRing) > 0.3 on rocky worlds (ASSUMPTION: per-sample cnv is not in PlaceSample), and
+ * max(cnvRing, stormNear) > 0.3 on gas giants (place.ts fills cnvRing with cnvG).
  */
 export function lightningRate(air: AirModel, place: Place, rule: LightningRule): number {
   if (!rule.allowed) return 0;
   const f = place.features;
-  const observed = (LIGHTNING_OBSERVED as readonly string[]).includes(air.presetId);
-  if (!air.gas && !observed && !(Math.max(f.cnv, f.cnvRing) > LIGHTNING_CNV_MIN)) return 0;
+  const conv = air.gas ? Math.max(f.cnvRing, f.stormNear) : Math.max(f.cnv, f.cnvRing);
+  if (!air.airOK || !(conv > LIGHTNING_CNV_MIN)) return 0;
   let rate = LIGHTNING_MAX_PER_MIN * Math.max(0, Math.min(1, f.cnvRing));
   if ((JUPITER_IDS as readonly string[]).includes(air.presetId)) {
     rate *= Math.abs(place.lat) > (JUPITER_LAT_DEG * Math.PI) / 180 ? 1 : JUPITER_LOW_LAT_FACTOR;

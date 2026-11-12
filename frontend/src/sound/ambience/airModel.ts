@@ -19,8 +19,10 @@ export const REFUSAL_TEXT = {
   dataGap: 'Sound needs the surface view.',
   /** New (Q- proposal). */
   noSea: 'There is no sea on this world, so there are no waves.',
-  /** New (Q- proposal). */
-  seaUnknown: 'The sea is not known yet, so there are no waves.',
+  /** New (Q- proposal, R12): transient while the climate and rivers form; re-evaluated each tick. */
+  waiting: 'Waiting for the world to form…',
+  /** New (Q- proposal): mirrors the engine's runaway readout. */
+  boiledAway: 'The ocean has boiled away (runaway greenhouse), so there are no waves, rain or rivers.',
   /** New (Q- proposal). */
   noRivers: 'No rivers flow here.',
   /** New (Q- proposal): the fluid can be liquid but the air never brings rain (engine canLiquid false). */
@@ -41,6 +43,11 @@ export function psatWater(T: number): number {
   );
   // FLUIDS.water.L = 40650 J/mol (the prototype's 373 K heat).
   return T > 373.15 ? p * Math.exp((40650 / 8.314) * (1 / 373.15 - 1 / T)) : p;
+}
+
+/** R12: true while the world's climate or rivers are not ready; rebuild the AirModel on the next tick. */
+export function isWaiting(air: AirModel): boolean {
+  return air.refusals.some((r) => r.source === 'all' && r.reason === REFUSAL_TEXT.waiting);
 }
 
 /** The engine's "Strongest hurricane possible" (core.js worldUi), m/s. */
@@ -109,44 +116,64 @@ export function buildAirModel(world: CardToWorldOk, e: WorldEngineLike): AirMode
   const c0 = dataOK ? soundSpeed(gamma, T0, mu) : 0;
   const rho0 = dataOK ? density(P0, T0, mu) : 0;
   const lavaWorld = !gas && T0 > 700 && !!hydro?.lava;
+  // R12: the climate and hydro fields arrive after the spin-up (EB.ready). Until then the world is still forming: a
+  // transient state the caller re-evaluates each tick (isWaiting), never a permanent refusal.
+  const waiting = dataOK && !gas && (!climate?.stats || !hydro);
 
+  // R7: liquid is local. It exists where the engine's global state is liquid, or where its climate shows open water
+  // (stats.liquid > 0 on an ocean, e.g. an eyeball world whose mean temperature is below freezing). Not after a runaway.
+  const openWater = num(climate?.stats?.liquid);
+  const statsOcean = num(climate?.stats?.ocean);
+  const runaway = !!m.runaway;
+  const localLiquid = !gas && !runaway && m.state !== 'liquid' && statsOcean !== null && statsOcean > 0 && openWater !== null && openWater > 0;
   let liquid = null as AirModel['liquid'];
   if (lavaWorld) liquid = liquidFor(fluid, true);
-  else if (!gas && m.state === 'liquid') liquid = liquidFor(fluid, false);
+  else if (!gas && !runaway && (m.state === 'liquid' || localLiquid)) liquid = liquidFor(fluid, false);
 
-  // Ocean share (coordinator ruling 1): engine climate statistics, else the preset, else 0 with a refusal note.
+  // Ocean share (coordinator ruling 1): engine climate statistics, else the preset, else 0.
   let oceanF = 0;
   let oceanTag: Tag = 'model_dependent';
   let oceanSrc = 'engine climate (stats.ocean)';
-  const statsOcean = num(climate?.stats?.ocean);
   if (statsOcean !== null) oceanF = statsOcean;
   else if (num(preset.oceanF) !== null) {
     oceanF = preset.oceanF as number;
     oceanTag = tags.oceanF ?? 'model_dependent';
     oceanSrc = 'card world (preset.oceanF)';
-  } else oceanSrc = 'not known yet';
+  } else oceanSrc = 'not known';
   if (gas) oceanF = 0;
 
+  // R9: the engine's own "Strongest hurricane possible" condition (liquid water, stats.max > 299.65 K, cyclones
+  // present), plus Ps >= 0.1 bar and a finite value, clamped to 100 m/s (Emanuel potential intensity rarely exceeds
+  // ~90 m/s). model_dependent.
   let Vmax: number | null = null;
+  let vmaxClamped = false;
   const Tmax = num(climate?.stats?.max);
-  if (airOK && !gas && fluid === 'water' && Tmax !== null && Tmax > HURRICANE.Tmin && Ps !== null && Ps > 0) {
-    Vmax = hurricaneVmax(Tmax, Ps);
+  const cyclones = e.weatherFields()?.cyclones?.length ?? 0;
+  if (
+    airOK && !gas && !lavaWorld && fluid === 'water' && liquid?.name === 'water' && cyclones > 0 &&
+    Tmax !== null && Tmax > HURRICANE.Tmin && Ps !== null && Ps >= HURRICANE.PsMin
+  ) {
+    const v = hurricaneVmax(Tmax, Ps);
+    if (Number.isFinite(v) && v > 0) {
+      vmaxClamped = v > HURRICANE.VmaxCap;
+      Vmax = Math.min(v, HURRICANE.VmaxCap);
+    }
   }
 
   // ---------- refusals ----------
   if (!dataOK) refusals.push({ source: 'all', reason: REFUSAL_TEXT.dataGap });
-  else if (!airOK) refusals.push({ source: 'all', reason: !gas && T0 > 700 ? REFUSAL_TEXT.lavaNoAir : REFUSAL_TEXT.noAir });
+  else if (!airOK) refusals.push({ source: 'all', reason: lavaWorld ? REFUSAL_TEXT.lavaNoAir : REFUSAL_TEXT.noAir });
+  else if (waiting) refusals.push({ source: 'all', reason: REFUSAL_TEXT.waiting });
   else if (!gas && !lavaWorld) {
     if (!liquid) {
-      for (const s of ['S1_sea', 'S4', 'S5', 'S6', 'S7'] as const) refusals.push({ source: s, reason: REFUSAL_TEXT.noLiquid });
+      const why = runaway ? REFUSAL_TEXT.boiledAway : REFUSAL_TEXT.noLiquid;
+      for (const s of ['S1_sea', 'S4', 'S5', 'S6', 'S7'] as const) refusals.push({ source: s, reason: why });
     } else {
-      if (statsOcean === null && num(preset.oceanF) === null) {
-        for (const s of ['S1_sea', 'S4', 'S5'] as const) refusals.push({ source: s, reason: REFUSAL_TEXT.seaUnknown });
-      } else if (!(oceanF > 0)) {
+      if (!(oceanF > 0)) {
         for (const s of ['S1_sea', 'S4', 'S5'] as const) refusals.push({ source: s, reason: REFUSAL_TEXT.noSea });
       }
       if (m.canLiquid === false) refusals.push({ source: 'S6', reason: REFUSAL_TEXT.noRain });
-      if (hydro && typeof hydro.n === 'number' && hydro.n === 0) refusals.push({ source: 'S7', reason: REFUSAL_TEXT.noRivers });
+      if (typeof hydro?.n === 'number' && hydro.n === 0) refusals.push({ source: 'S7', reason: REFUSAL_TEXT.noRivers });
     }
   }
 
@@ -174,6 +201,12 @@ export function buildAirModel(world: CardToWorldOk, e: WorldEngineLike): AirMode
   if (lavaWorld && airOK) {
     // R6: the lava world's thin rock-vapour air is assumed (cardToWorld ROCK_VAPOUR), so its sound carries that label.
     inputs.push({ label: 'Atmosphere', value: 'thin rock vapour (assumed)', unit: '', tag: 'inferred_from_analog', source: 'assumed atmosphere (Schaefer & Fegley 2009 analog)' });
+  }
+  if (localLiquid && openWater !== null) {
+    inputs.push({ label: 'Open water share', value: openWater, unit: '', tag: 'model_dependent', source: 'engine climate (stats.liquid)' });
+  }
+  if (Vmax !== null) {
+    inputs.push({ label: 'Strongest hurricane', value: Vmax, unit: 'm/s', tag: 'model_dependent', source: vmaxClamped ? 'engine formula, capped at 100 m/s' : 'engine formula' });
   }
   if (!gas) inputs.push({ label: 'Ocean share', value: oceanF, unit: '', tag: oceanTag, source: oceanSrc });
 

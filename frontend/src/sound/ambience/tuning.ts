@@ -95,11 +95,20 @@ export const I_U_MIN = 0.05;
 export const U_E_REF = 7;
 export const IU_LAND = 0.24;
 export const IU_SEA = 0.11;
+/** C: gas-giant roar turbulence intensity; the same value #113 bakes S12 with (dspTuning GAS_IU), passed in the S12 params. */
+export const GAS_IU = 0.15;
+/** C (R8): flow beds below this wind are "still air" (silent), m/s. */
+export const FLOW_MIN_U = 1;
+/** C (R8): a present bed must be within this of the loudest present bed, dB. */
+export const PRESENCE_RANGE_DB = 40;
+/** C (blue F4a): a ground bed whose area and broadband loss exceeds this is absorption-dead, dB. */
+export const ABS_DEAD_DB = 60;
 /**
  * P: the engine's hurricane maximum (core.js worldUi): sqrt(eff (Tmax - To)/To Lv qst Ck), shown only for water with
  * EB.stats.max > 299.65 K and cyclones present.
  */
-export const HURRICANE = { Tmin: 299.65, To: 200, eff: 0.9, Lv: 2.5e6, ck: 0.2 } as const;
+export const HURRICANE = { Tmin: 299.65, To: 200, eff: 0.9, Lv: 2.5e6, ck: 0.2, PsMin: 0.1, VmaxCap: 100 } as const;
+// R9: PsMin (bar) and VmaxCap (m/s, model_dependent: Emanuel potential intensity rarely exceeds ~90 m/s) are rulings.
 
 // ---------- sources (§7) ----------
 /** P: Roshko 1954 (NACA TN-3169) laminar shedding: St = A (1 - B/Re) for RE_MIN <= Re <= ROSHKO_RE_MAX, else ST_HIGH. */
@@ -173,7 +182,10 @@ export const JUPITER_LOW_LAT_FACTOR = 0.3;
 /** §8.2 worlds with observed lightning (engine preset ids and their card aliases). */
 export const LIGHTNING_OBSERVED = ['earth', 'jup', 'sat', 'ref-jupiter', 'ref-saturn'] as const;
 export const JUPITER_IDS = ['jup', 'ref-jupiter'] as const;
-/** P: thunder peak (Few 1967 averaged 200 Hz on Earth; Few 1969 f_m = 0.63 c0 sqrt(P0/E_l)). */
+/**
+ * P: thunder peak (Few 1967 averaged 200 Hz on Earth; Few 1969 f_m = 0.63 c0 sqrt(P0/E_l)). E_l is calibrated so Earth
+ * peaks at 200 Hz (1.16e5 J/m, ~17x below Few's physical 2-4e6 J/m); only ratios between worlds are used (derived, calibrated).
+ */
 export const THUNDER_FM_EARTH = 200;
 export const THUNDER_FEW_K = 0.63;
 /** P/C: roll duration, audible-range cap, loss for R_aud (30 dB = 3.45 Np), crack distance, level at 1 km. */

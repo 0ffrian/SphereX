@@ -1,7 +1,7 @@
 // §12.2 caption model and §12.3 air facts.
 import { describe, expect, it } from 'vitest';
-import { airFacts, bedDirection, caption, EYE_TEXT, levelNote } from './captions';
-import { earthAir, makePlace, makeWind, marsAir } from './fakeEngine.testutil';
+import { airFacts, bedDirection, caption, EYE_TEXT, LAVA_GAP_TEXT, levelNote } from './captions';
+import { earthAir, makePlace, makeWind, marsAir, venusAir } from './fakeEngine.testutil';
 import type { MixFrame } from './types';
 
 const frame = (beds: MixFrame['beds'], presentOffsetDb = 0, silent = false): MixFrame => ({
@@ -35,6 +35,25 @@ describe('captions', () => {
     expect(levelNote(2.9).note).toBeNull();
     expect(levelNote(20.9).note).toBe('Real level: about 20 dB quieter than on Earth (raised so you can hear it)');
     expect(levelNote(-18).note).toBe('Real level: about 20 dB louder than on Earth (lowered)');
+  });
+  it('red M5: a sea breeze is named from the sea side; a hurricane gets no invented direction', () => {
+    const coast = makePlace(
+      0.3,
+      (s) => (s.s_km > 0 && Math.sin(s.bearing) < -0.5 ? { cls: 'sea', T: 290 } : { cls: 'land', T: 300 }),
+      { wind: makeWind({ U10: 5, dirDeg: 45, parts: [{ kind: 'breeze', U: 4 }, { kind: 'trade', U: 3 }] }) },
+    );
+    expect(caption(earthAir(), coast, frame([level('S1_land', 60)])).line).toBe('Steady sea breeze from the west');
+    const storm = makePlace(0.3, () => ({}), { wind: makeWind({ U10: 40, parts: [{ kind: 'hurricane', U: 40 }] }) });
+    expect(caption(earthAir({ Vmax: 70 }), storm, frame([level('S1_land', 80)])).line).toBe('Storm-force hurricane wind');
+  });
+  it('lava around the listener that cannot be heard is captioned honestly', () => {
+    const lava = { ...earthAir(), lavaWorld: true };
+    const p = makePlace(0.3, () => ({ cls: 'lava' }), { wind: makeWind({ U10: 5 }) });
+    const silentS8 = { ...level('S8', -120), gainDb: -120 };
+    expect(caption(lava, p, frame([level('S1_land', 50), silentS8])).line.toLowerCase()).toContain(LAVA_GAP_TEXT.toLowerCase().slice(0, -1));
+  });
+  it('the CO2 two-speed fact only at the thin end', () => {
+    expect(airFacts(venusAir()).some((f) => f.label === 'Two speeds of sound')).toBe(false);
   });
   it('air facts include the CO2 two-speed note', () => {
     const facts = airFacts(marsAir());

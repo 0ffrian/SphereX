@@ -1,6 +1,6 @@
 // §16 test 2: AirModel from a fake engine — refusals, tags, amendment-1 fields, res32, Vmax.
 import { describe, expect, it } from 'vitest';
-import { buildAirModel, hurricaneVmax, psatWater, REFUSAL_TEXT } from './airModel';
+import { buildAirModel, hurricaneVmax, isWaiting, psatWater, REFUSAL_TEXT } from './airModel';
 import { EARTH_MODEL, makeFakeEngine, makeWorld } from './fakeEngine.testutil';
 
 describe('buildAirModel', () => {
@@ -83,13 +83,19 @@ describe('buildAirModel', () => {
     expect(buildAirModel(makeWorld({ locked: true, ob: { Ms: 1, e: 0.05, obl: 0 } }), e).res32).toBe(false);
   });
 
-  it('Vmax only for water with stats.max above 299.65 K, equal to the engine formula', () => {
-    expect(buildAirModel(makeWorld(), makeFakeEngine()).Vmax).toBeNull();
-    const hot = buildAirModel(makeWorld(), makeFakeEngine({ climate: { stats: { ocean: 0.7, max: 303 } } }));
+  it('R9: Vmax only under the engine condition (water, stats.max > 299.65 K, cyclones), Ps >= 0.1 bar, capped at 100 m/s', () => {
+    expect(buildAirModel(makeWorld(), makeFakeEngine({ cyclones: 2 })).Vmax).toBeNull();
+    expect(buildAirModel(makeWorld(), makeFakeEngine({ climate: { stats: { ocean: 0.7, max: 303 } } })).Vmax).toBeNull();
+    const thin = buildAirModel(makeWorld({ Ps: 0.05 }), makeFakeEngine({ state: { Ps: 0.05 }, cyclones: 2, climate: { stats: { ocean: 0.7, max: 303 } } }));
+    expect(thin.Vmax).toBeNull();
+    const scorching = buildAirModel(makeWorld(), makeFakeEngine({ cyclones: 1, climate: { stats: { ocean: 0.7, max: 360 } } }));
+    expect(scorching.Vmax).toBe(100);
+    expect(scorching.inputs.find((i) => i.label === 'Strongest hurricane')?.source).toContain('capped');
+    const hot = buildAirModel(makeWorld(), makeFakeEngine({ cyclones: 3, climate: { stats: { ocean: 0.7, max: 303 } } }));
     expect(hot.Vmax).toBeCloseTo(hurricaneVmax(303, 1), 9);
     expect(hot.Vmax as number).toBeGreaterThan(70);
     expect(hot.Vmax as number).toBeLessThan(90);
-    const meth = buildAirModel(makeWorld({ fluid: 'methane' }), makeFakeEngine({ state: { fluid: 'methane' }, climate: { stats: { ocean: 0.2, max: 303 } } }));
+    const meth = buildAirModel(makeWorld({ fluid: 'methane' }), makeFakeEngine({ state: { fluid: 'methane' }, cyclones: 1, climate: { stats: { ocean: 0.2, max: 303 } } }));
     expect(meth.Vmax).toBeNull();
   });
 
@@ -97,12 +103,9 @@ describe('buildAirModel', () => {
     expect(Math.abs(psatWater(303.15) - 4247) / 4247).toBeLessThan(0.005);
   });
 
-  it('ocean share: engine climate, else the preset, else 0 with a refusal note', () => {
-    const fromPreset = buildAirModel(makeWorld({ oceanF: 0.4 }, { oceanF: 'model_dependent' }), makeFakeEngine({ climate: null }));
+  it('ocean share: engine climate, else the preset, else 0', () => {
+    const fromPreset = buildAirModel(makeWorld({ oceanF: 0.4 }, { oceanF: 'model_dependent' }), makeFakeEngine({ climate: { stats: { max: 280 } } }));
     expect(fromPreset.oceanF).toBe(0.4);
-    const unknown = buildAirModel(makeWorld(), makeFakeEngine({ climate: null }));
-    expect(unknown.oceanF).toBe(0);
-    expect(unknown.refusals).toContainEqual({ source: 'S4', reason: REFUSAL_TEXT.seaUnknown });
     const dry = buildAirModel(makeWorld(), makeFakeEngine({ climate: { stats: { ocean: 0, max: 280 } } }));
     expect(dry.refusals).toContainEqual({ source: 'S5', reason: REFUSAL_TEXT.noSea });
   });
@@ -111,5 +114,33 @@ describe('buildAirModel', () => {
     const a = buildAirModel(makeWorld(), makeFakeEngine());
     const b = buildAirModel(makeWorld(), makeFakeEngine());
     expect(a).toEqual(b);
+  });
+
+  it('R12: climate or rivers not ready yet -> a transient waiting state, not a physical refusal', () => {
+    const early = buildAirModel(makeWorld(), makeFakeEngine({ climate: null }));
+    expect(isWaiting(early)).toBe(true);
+    expect(early.refusals).toEqual([{ source: 'all', reason: REFUSAL_TEXT.waiting }]);
+    expect(isWaiting(buildAirModel(makeWorld(), makeFakeEngine({ hydro: null })))).toBe(true);
+    expect(isWaiting(buildAirModel(makeWorld(), makeFakeEngine()))).toBe(false);
+  });
+
+  it('R7: open water on a world whose mean state is frozen (eyeball) is liquid; a runaway ocean has boiled away', () => {
+    const eyeball = buildAirModel(
+      makeWorld({ id: 't1e', locked: true }),
+      makeFakeEngine({ model: { ...EARTH_MODEL, Ts: 262, state: 'frozen' }, climate: { stats: { ocean: 0.65, liquid: 1, max: 290 } } }),
+    );
+    expect(eyeball.liquid?.name).toBe('water');
+    expect(eyeball.refusals).toEqual([]);
+    expect(eyeball.inputs.find((i) => i.label === 'Open water share')?.tag).toBe('model_dependent');
+    const iced = buildAirModel(makeWorld(), makeFakeEngine({ model: { ...EARTH_MODEL, state: 'frozen' }, climate: { stats: { ocean: 0.7, liquid: 0, max: 250 } } }));
+    expect(iced.liquid).toBeNull();
+    expect(iced.refusals).toContainEqual({ source: 'S4', reason: REFUSAL_TEXT.noLiquid });
+    const boiled = buildAirModel(
+      makeWorld({ id: 'k218', Ps: 8, mu: 18 }),
+      makeFakeEngine({ model: { ...EARTH_MODEL, Ts: 401, state: 'vapour', runaway: true }, state: { Ps: 8 }, climate: { stats: { ocean: 1, liquid: 1, max: 420 } }, cyclones: 2 }),
+    );
+    expect(boiled.liquid).toBeNull();
+    expect(boiled.Vmax).toBeNull();
+    expect(boiled.refusals).toContainEqual({ source: 'S5', reason: REFUSAL_TEXT.boiledAway });
   });
 });
