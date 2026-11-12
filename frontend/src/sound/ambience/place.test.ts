@@ -2,6 +2,7 @@
 // synthetic grids and a recording windAt stub (wind.ts is ticket T2).
 import { describe, expect, it } from 'vitest';
 import { gasProfile } from '@/engine/worlds/gas.js';
+import { bspline } from '@/engine/worlds/fieldSampler';
 import {
   cellOf,
   destination,
@@ -20,8 +21,8 @@ const W = 720,
   H = 360,
   NX = 180,
   NY = 90,
-  RW = 2048,
-  RH = 1024;
+  RW = 256,
+  RH = 128;
 
 interface FakeOpts {
   elev?: (lon: number, lat: number) => number;
@@ -475,20 +476,71 @@ describe('samplePlace: the height context follows the sliders (ruling 3)', () =>
   });
 });
 
-describe('samplePlace: cost', () => {
-  it('one call (37 samples + 4 slope samples, weather reads) stays inside the 10 Hz tick (asserted at 5 ms; logged)', () => {
-    const e = fakeEngine({ elev: (lo, la) => 4 * Math.sin(lo * 9) * Math.cos(la * 7), rain: 1 });
+describe('samplePlace: reuse and cost (ruling 5)', () => {
+  const terrain = (lo: number, la: number) => 4 * Math.sin(lo * 9) * Math.cos(la * 7);
+
+  it('the fused climate read equals fieldSampler.bspline for T, rain and RH', () => {
+    const T = (lo: number, la: number) => 250 + 40 * Math.sin(lo * 3) * Math.cos(la * 2);
+    const e = fakeEngine({
+      elev: terrain,
+      T,
+      rain: 1,
+      RH: 0.7,
+      fly: { lon: 0.31, lat: 0.27, alt: 5 },
+    });
+    const p = samplePlace(e, air(), recorder().windAt)!;
+    const c = e.cpuFields().climate!;
+    for (const s of p.samples) {
+      expect(s.T).toBeCloseTo(bspline(c.T, 1, c.NX, c.NY, s.lon, s.lat), 9);
+      expect(s.rain).toBeCloseTo(1, 9);
+    }
+    expect(p.features.RH).toBeCloseTo(Math.fround(0.7), 9);
+  });
+
+  it('reuses the heights while the camera moves < 1 % of R and turns < 1 degree; recomputes otherwise', () => {
+    const e = fakeEngine({ elev: terrain, fly: { lon: 0.3, lat: 0.2, alt: 5, head: 0.4 } });
+    const a = air();
+    const p0 = samplePlace(e, a, recorder().windAt)!;
+    const R = reachKm(p0.features.z_km);
+    e.fly.lon += (0.004 * R) / a.R_km; // 0.4 % of R
+    const p1 = samplePlace(e, a, recorder().windAt)!;
+    expect(p1.samples.map((s) => s.h_km)).toEqual(p0.samples.map((s) => s.h_km));
+    expect(p1.samples[5]!.lon).toBe(p0.samples[5]!.lon);
+    e.fly.lon += (0.02 * R) / a.R_km; // now 2.4 % of R from the cached place
+    const p2 = samplePlace(e, a, recorder().windAt)!;
+    expect(p2.samples[5]!.lon).not.toBe(p0.samples[5]!.lon);
+    e.fly.head += 0.05; // about 3 degrees
+    const p3 = samplePlace(e, a, recorder().windAt)!;
+    expect(p3.samples[1]!.bearing).toBeCloseTo(e.fly.head, 12);
+    const fresh = samplePlace(e, a, recorder().windAt, { reuseFraction: 0 })!;
+    expect(fresh.samples[1]!.bearing).toBeCloseTo(e.fly.head, 12);
+  });
+
+  it('cost: full sampling, hovering and auto-flight at 10 Hz (logged; asserted loosely)', () => {
     const a = air({ oceanF: 0.7 });
     const r = recorder();
-    for (let i = 0; i < 20; i++) samplePlace(e, a, r.windAt);
-    const N = 200;
-    const t0 = performance.now();
-    for (let i = 0; i < N; i++) {
-      e.fly.lon = 0.3 + i * 1e-3;
-      samplePlace(e, a, r.windAt);
-    }
-    const ms = (performance.now() - t0) / N;
-    console.info(`[place] ${ms.toFixed(3)} ms per samplePlace`);
-    expect(ms).toBeLessThanOrEqual(5);
+    const time = (e: ReturnType<typeof fakeEngine>, step: () => void, opts = {}) => {
+      for (let i = 0; i < 20; i++) samplePlace(e, a, r.windAt, opts);
+      const N = 300;
+      const t0 = performance.now();
+      for (let i = 0; i < N; i++) {
+        step();
+        samplePlace(e, a, r.windAt, opts);
+      }
+      return (performance.now() - t0) / N;
+    };
+    const full = fakeEngine({ elev: terrain, rain: 1, fly: { alt: 2 } });
+    const msFull = time(full, () => (full.fly.lon += 1e-3), { reuseFraction: 0 });
+    // hovering at 2 km (a paused demo, or the user looking around slowly): the drift stays inside 1 % of R
+    const hover = fakeEngine({ elev: terrain, rain: 1, fly: { alt: 2 } });
+    const msHover = time(hover, () => (hover.fly.lon += 1e-9));
+    // auto-flight (tickNow: max(0.4 alt, 4) km/s), sampled at 10 Hz: 0.4 km a tick at 2 km, so every tick resamples
+    const fly = fakeEngine({ elev: terrain, rain: 1, fly: { alt: 2 } });
+    const msFly = time(fly, () => (fly.fly.lon += 0.4 / 6371));
+    console.info(
+      `[place] ms per samplePlace: full ${msFull.toFixed(3)}, hovering ${msHover.toFixed(3)}, auto-flight ${msFly.toFixed(3)}`,
+    );
+    expect(msFull).toBeLessThanOrEqual(2);
+    expect(msHover).toBeLessThanOrEqual(msFull);
   });
 });

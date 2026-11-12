@@ -1,6 +1,6 @@
 // Issue #114 (sound spec §3.3): the read-only accessors the ambience uses, on a headless engine (WebGL stub).
 import { describe, expect, it } from 'vitest';
-import { FLY_FOV, WorldEngine } from './WorldEngine';
+import { FLY_FOV, projectFly, WorldEngine } from './WorldEngine';
 import { stubCanvas, stubGL } from './glStub.testutil';
 import type { WorldEngineLike } from '@/sound/ambience/types';
 
@@ -23,10 +23,26 @@ describe('WorldEngine sound accessors', () => {
     expect(w!.iceH).toBe(core.EB.h);
     expect(w!.snow).toBe(core.EB.s);
     expect(w!.out2).toBe(core.EB.out2);
-    core.EB.cyc = [{ lon: 0.1, lat: 0.2, r: 0.06, s: 1, born: 3, drift: -0.0009 }];
+    // the engine's own drift (core.js cloudStep): lon + (W.step - born) * drift, wrapped with 6.2832
+    const drawn = (c: { lon: number; born: number; drift: number }) => {
+      const lon = c.lon + (core.W.step - c.born) * c.drift;
+      return ((((lon + Math.PI) % 6.2832) + 6.2832) % 6.2832) - Math.PI;
+    };
+    core.W.step = 1150;
+    const raw = [
+      { lon: 0.1, lat: 0.2, r: 0.06, s: 1, born: 1000, drift: -0.0009 },
+      { lon: -3.1, lat: -0.3, r: 0.07, s: -1, born: 1100, drift: -0.0009 },
+    ];
+    core.EB.cyc = raw;
     const c = e.weatherFields()!.cyclones;
-    expect(c).toEqual([{ lon: 0.1, lat: 0.2, r: 0.06, s: 1 }]);
-    expect(c).not.toBe(core.EB.cyc);
+    expect(c).toHaveLength(2);
+    expect(c[0]!.lon).toBeCloseTo(drawn(raw[0]!), 12);
+    expect(c[0]!.lon).toBeCloseTo(0.1 - 150 * 0.0009, 12);
+    expect(c[1]!.lon).toBeCloseTo(drawn(raw[1]!), 12); // wrapped across -pi
+    expect(c[1]!.lon).toBeGreaterThan(3);
+    expect(c[0]).toEqual({ lon: c[0]!.lon, lat: 0.2, r: 0.06, s: 1 });
+    core.EB.cyc = Array.from({ length: 14 }, (_, i) => ({ ...raw[0]!, lat: i * 0.01 }));
+    expect(e.weatherFields()!.cyclones).toHaveLength(12); // cloudStep draws the first 12
     expect(e.gasField()).toBeNull();
   });
 
@@ -61,5 +77,34 @@ describe('WorldEngine sound accessors', () => {
     expect(f!.length).toBe(256 * 128 * 4);
     expect(e.weatherFields()).toBeNull();
     expect(e.flyCameraBasis()!.ex).toBe(2);
+  });
+
+  it('projectFly inverts the fly shader ray (rd = fwd + q.x fov rt + q.y fov up) on the engine basis', () => {
+    e.setPreset('earth');
+    e.setFlyPlace(0.4, 0.2);
+    const b = e.flyCameraBasis()!;
+    const aspect = 1.6;
+    for (const [qx, qy, t] of [
+      [0, 0, 0.01],
+      [1.6, 1, 0.003],
+      [-0.8, -0.5, 0.02],
+      [0.3, 0.9, 0.5],
+    ] as const) {
+      const rd = [0, 1, 2].map((k) => b.fwd[k]! + qx * b.fov * b.rt[k]! + qy * b.fov * b.up[k]!);
+      const p = [0, 1, 2].map((k) => b.cam[k]! + rd[k]! * t) as [number, number, number];
+      const r = projectFly(b, aspect, p);
+      expect(r.inFront).toBe(true);
+      expect(r.x).toBeCloseTo(qx / aspect, 9);
+      expect(r.y).toBeCloseTo(qy, 9);
+    }
+    // cam + fwd + 0.62 up is the top edge
+    const top = [0, 1, 2].map((k) => b.cam[k]! + b.fwd[k]! + 0.62 * b.up[k]!) as [
+      number,
+      number,
+      number,
+    ];
+    expect(projectFly(b, aspect, top).y).toBeCloseTo(1, 12);
+    const behind = [0, 1, 2].map((k) => b.cam[k]! - b.fwd[k]!) as [number, number, number];
+    expect(projectFly(b, aspect, behind).inFront).toBe(false);
   });
 });

@@ -196,20 +196,37 @@ interface WorldCache {
   ctx: FlyHeightCtx;
   Tt: number;
 }
+/** The last rocky Place's height work, reused while the camera stays within REUSE_FRACTION of R (blue 15, ruling 5). */
+interface Heights {
+  world: WorldCache;
+  lon: number;
+  lat: number;
+  head: number;
+  z: number;
+  R: number;
+  geo: RingPoint[];
+  hs: number[];
+  slope: number;
+}
 interface EngineCache {
   world: WorldCache | null;
+  heights: Heights | null;
   gasF: { air: AirModel; t: number; f: Float32Array | null } | null;
   prof: { key: string; air: AirModel; U: number; u: (lat: number) => number } | null;
 }
 const caches = new WeakMap<object, EngineCache>();
 
-function spinupOf(e: WorldEngineLike): number {
-  const s = (e as unknown as { spinup?: number }).spinup;
-  if (typeof s === 'number') return s;
-  return Number((e.readouts() as { spinup?: number }).spinup ?? 0);
-}
+/**
+ * The engine surface samplePlace reads: the contract's WorldEngineLike plus the spin-up counter (WorldEngine.spinup).
+ * Kept local (ruling 6); the contract change waits for #116.
+ */
+export type WorldEngineWithSpinup = WorldEngineLike & { readonly spinup: number };
 
-function worldFor(e: WorldEngineLike, air: AirModel, c: EngineCache): WorldCache {
+/** Ruling 5: reuse the last rings' heights while the camera moved less than this fraction of R and turned < 1 degree. */
+export const REUSE_FRACTION = 0.01;
+const REUSE_HEAD_RAD = Math.PI / 180;
+
+function worldFor(e: WorldEngineWithSpinup, air: AirModel, c: EngineCache): WorldCache {
   const st = e.state();
   const f = e.cpuFields();
   const hyd = f.hydro as Hydro | null;
@@ -221,6 +238,7 @@ function worldFor(e: WorldEngineLike, air: AirModel, c: EngineCache): WorldCache
     st.fluid,
     st.gas,
     airless,
+    // uLava is m.Ts > 700; AirModel.T0 is m.Ts on rocky worlds (#112 airModel), rebuilt on the §9.6 triggers
     !st.gas && air.T0 > 700,
     !!hyd?.lava,
     air.oceanF,
@@ -240,14 +258,14 @@ function worldFor(e: WorldEngineLike, air: AirModel, c: EngineCache): WorldCache
  * hydro raster and the climate still belong to the previous world then.
  */
 export function samplePlace(
-  e: WorldEngineLike,
+  e: WorldEngineWithSpinup,
   air: AirModel,
   windAt: WindAt,
-  opts: { now?: () => number } = {},
+  opts: { now?: () => number; reuseFraction?: number } = {},
 ): Place | null {
-  if (spinupOf(e) > 0) return null;
+  if (e.spinup > 0) return null;
   let c = caches.get(e);
-  if (!c) caches.set(e, (c = { world: null, gasF: null, prof: null }));
+  if (!c) caches.set(e, (c = { world: null, heights: null, gasF: null, prof: null }));
   if (air.gas) return gasPlace(e, air, windAt, c, opts.now ?? (() => performance.now()));
 
   const fly = e.fly;
@@ -256,13 +274,8 @@ export function samplePlace(
     head = fly.head;
   const w = worldFor(e, air, c);
   const ctx = w.ctx;
-  const { up } = localFrame(lon, lat);
-  const hc = hKm(up, ctx);
-  // ASSUMPTION (red 9): flyCamera puts the eye at ex * groundKm (the nearest raw cell) + alt above the radius, and the
-  // drawn surface is at ex * hKm, so the eye's gap above the drawn ground is alt + ex * (groundKm - hKm).
-  const z = Math.max(fly.alt + FLY_EX_ROCKY * (e.groundKm(lon, lat) - hc), D_MIN_M / 1000);
-  const geo = ringGeometry(lon, lat, head, reachKm(z), air.R_km);
-
+  const H = heightsFor(e, air, c, w, lon, lat, head, opts.reuseFraction ?? REUSE_FRACTION);
+  const { geo, hs, z } = H;
   const f = e.cpuFields();
   const wf = e.weatherFields();
   const clim = f.climate as { NX: number; NY: number; T: Float32Array } | null;
@@ -273,7 +286,7 @@ export function samplePlace(
   const cnvs: number[] = [];
   for (let n = 0; n < geo.length; n++) {
     const g = geo[n]!;
-    const h = n === 0 ? hc : hKm(g.dir, ctx);
+    const h = hs[n]!;
     const seaCand = ctx.ocean && h <= 0.001;
     let cls: SampleClass = 'land';
     let riverQ = 0;
@@ -287,12 +300,12 @@ export function samplePlace(
       riverQ = px[0] / 255; // ASSUMPTION: the raster's water strength as a 0..1 flow proxy (artistic)
     }
     const vent = !!(lavaW && px && px[3] >= 128);
+    // one set of B-spline weights for the climate T and the weather grids (the same NX x NY cells)
+    climateAt(clim, wf, g.lon, g.lat);
     // the fly shader's lapse: Tl = T - uGam * max(h, 0)
-    const T = clim
-      ? bspline(clim.T, 1, clim.NX, clim.NY, g.lon, g.lat) - air.gamK * Math.max(h, 0)
-      : air.T0;
-    const rain = wf ? clamp(bspline(wf.out2, 4, wf.NX, wf.NY, g.lon, g.lat), 0, 3) : 0;
-    const RH = wf ? bspline(wf.out.subarray(3), 4, wf.NX, wf.NY, g.lon, g.lat) : 0;
+    const T = clim ? BS.T - air.gamK * Math.max(h, 0) : air.T0;
+    const rain = wf ? clamp(BS.rain, 0, 3) : 0;
+    const RH = wf ? BS.RH : 0;
     cnvs.push(
       wf && Number.isFinite(w.Tt)
         ? smoothstep(w.Tt + 12, w.Tt + 28, T) * smoothstep(0.6, 1, RH)
@@ -316,8 +329,114 @@ export function samplePlace(
     });
   }
   markCoast(samples);
-  const features = rockyFeatures(samples, cnvs, air, w, ctx, z, lon, lat, wf, windAt);
+  const features = rockyFeatures(samples, cnvs, air, w, H.slope, z, lon, lat, wf, windAt);
   return { lon, lat, head, samples, features };
+}
+
+/**
+ * The 37 sample positions and heights, and the slope (4 more hKm calls). They are reused from the previous call while
+ * the camera stays within `frac` of R and turns less than 1 degree, so a hovering or slowly moving listener costs no hKm
+ * calls; the classes and the weather are still read on every call. ASSUMPTION (blue 20): the centre height uses the
+ * Catmull-Rom (shaded) read, while the GPU march hits the bilinear surface. They agree on texels and differ by a fraction
+ * of a texel's relief, which is negligible for z. Do not switch it to bilinear.
+ */
+function heightsFor(
+  e: WorldEngineWithSpinup,
+  air: AirModel,
+  c: EngineCache,
+  w: WorldCache,
+  lon: number,
+  lat: number,
+  head: number,
+  frac: number,
+): Heights {
+  const p = c.heights;
+  if (p && p.world === w && frac > 0) {
+    const moved = angDist(lon, lat, p.lon, p.lat) * air.R_km;
+    const turn = Math.abs(((((head - p.head + Math.PI) % TAU) + TAU) % TAU) - Math.PI);
+    if (moved < frac * p.R && turn < REUSE_HEAD_RAD) return p;
+  }
+  const ctx = w.ctx;
+  const { up } = localFrame(lon, lat);
+  const hc = hKm(up, ctx);
+  // ASSUMPTION (red 9): flyCamera puts the eye at ex * groundKm (the nearest raw cell) + alt above the radius, and the
+  // drawn surface is at ex * hKm, so the eye's gap above the drawn ground is alt + ex * (groundKm - hKm).
+  const z = Math.max(e.fly.alt + FLY_EX_ROCKY * (e.groundKm(lon, lat) - hc), D_MIN_M / 1000);
+  const R = reachKm(z);
+  const geo = ringGeometry(lon, lat, head, R, air.R_km);
+  const hs = geo.map((g, n) => (n === 0 ? hc : hKm(g.dir, ctx)));
+  // slope: central differences at +-0.5 km along the engine's north and east (rise / run, both km)
+  const at = (b: number): number => hKm(destination(lon, lat, b, SLOPE_STEP_KM, air.R_km).dir, ctx);
+  const gN = (at(0) - at(Math.PI)) / (2 * SLOPE_STEP_KM),
+    gE = (at(Math.PI / 2) - at(-Math.PI / 2)) / (2 * SLOPE_STEP_KM);
+  c.heights = { world: w, lon, lat, head, z, R, geo, hs, slope: Math.hypot(gN, gE) };
+  return c.heights;
+}
+
+/** Cubic B-spline weights (fieldSampler's, Sigg and Hadwiger 2005) for fraction f, into a reused 4-array. */
+function bw4(f: number, o: Float64Array): void {
+  const f2 = f * f,
+    f3 = f2 * f;
+  o[0] = (1 - 3 * f + 3 * f2 - f3) / 6;
+  o[1] = (4 - 6 * f2 + 3 * f3) / 6;
+  o[2] = (1 + 3 * f + 3 * f2 - 3 * f3) / 6;
+  o[3] = f3 / 6;
+}
+const WX = new Float64Array(4),
+  WY = new Float64Array(4);
+const BS = { T: 0, rain: 0, RH: 0 };
+
+/**
+ * Climate T, rain (out2 channel 0) and RH (out channel 3) at (lon, lat) into BS. Each value is the B-spline that
+ * fieldSampler.bspline gives (wrap in longitude, clamp at the poles), computed with one set of weights because the three
+ * grids share the NX x NY cells.
+ */
+function climateAt(
+  clim: { NX: number; NY: number; T: Float32Array } | null,
+  wf: { NX: number; NY: number; out: Float32Array; out2: Float32Array } | null,
+  lon: number,
+  lat: number,
+): void {
+  BS.T = BS.rain = BS.RH = 0;
+  const NX = wf?.NX ?? clim?.NX,
+    NY = wf?.NY ?? clim?.NY;
+  if (!NX || !NY) return;
+  if (clim && wf && (clim.NX !== NX || clim.NY !== NY)) {
+    BS.T = bspline(clim.T, 1, clim.NX, clim.NY, lon, lat);
+    BS.rain = bspline(wf.out2, 4, NX, NY, lon, lat);
+    BS.RH = bspline(wf.out.subarray(3), 4, NX, NY, lon, lat);
+    return;
+  }
+  const px = (lon / TAU + 0.5) * NX - 0.5,
+    py = (lat / Math.PI + 0.5) * NY - 0.5;
+  const x0 = Math.floor(px),
+    y0 = Math.floor(py);
+  bw4(px - x0, WX);
+  bw4(py - y0, WY);
+  let T = 0,
+    rain = 0,
+    RH = 0;
+  for (let b = 0; b < 4; b++) {
+    const y = clamp(y0 - 1 + b, 0, NY - 1);
+    let rT = 0,
+      rR = 0,
+      rH = 0;
+    for (let a = 0; a < 4; a++) {
+      const k = y * NX + ((((x0 - 1 + a) % NX) + NX) % NX);
+      const wa = WX[a]!;
+      if (clim) rT += wa * clim.T[k]!;
+      if (wf) {
+        rR += wa * wf.out2[k * 4]!;
+        rH += wa * wf.out[k * 4 + 3]!;
+      }
+    }
+    T += WY[b]! * rT;
+    rain += WY[b]! * rR;
+    RH += WY[b]! * rH;
+  }
+  BS.T = T;
+  BS.rain = rain;
+  BS.RH = RH;
 }
 
 /**
@@ -390,7 +509,7 @@ function rockyFeatures(
   cnvs: number[],
   air: AirModel,
   w: WorldCache,
-  ctx: FlyHeightCtx,
+  slope: number,
   z: number,
   lon: number,
   lat: number,
@@ -403,11 +522,6 @@ function rockyFeatures(
   const ring1 = s.slice(1, 1 + BEARINGS);
   const m1 = ring1.reduce((a, p) => a + p.h_km, 0) / ring1.length;
   const exposure = clamp((s[0]!.h_km - m1) / Math.max(relief, 0.05), -1, 1);
-  // slope: central differences at +-0.5 km along the engine's north and east (rise / run, both km)
-  const at = (b: number): number => hKm(destination(lon, lat, b, SLOPE_STEP_KM, air.R_km).dir, ctx);
-  const gN = (at(0) - at(Math.PI)) / (2 * SLOPE_STEP_KM),
-    gE = (at(Math.PI / 2) - at(-Math.PI / 2)) / (2 * SLOPE_STEP_KM);
-  const slope = Math.hypot(gN, gE);
 
   let snowCover = 0,
     iceCover = 0,
@@ -416,8 +530,9 @@ function rockyFeatures(
   if (wf) {
     snowCover = 1 - Math.exp(-Math.max(bspline(wf.snow, 1, wf.NX, wf.NY, lon, lat), 0) / 0.05);
     iceCover = 1 - Math.exp(-Math.max(bspline(wf.iceH, 1, wf.NX, wf.NY, lon, lat), 0) / 0.15);
-    rainRate = clamp(bspline(wf.out2, 4, wf.NX, wf.NY, lon, lat), 0, 3);
-    RH = bspline(wf.out.subarray(3), 4, wf.NX, wf.NY, lon, lat);
+    climateAt(null, wf, lon, lat);
+    rainRate = clamp(BS.rain, 0, 3);
+    RH = BS.RH;
   }
   const Tloc = s[0]!.T;
   const cnv = cnvs[0] ?? 0;
@@ -479,7 +594,7 @@ function rockyFeatures(
 
 /** §6.6: a gas giant has no surface classes; its storms come from the gas field and its jet from the zonal profile. */
 function gasPlace(
-  e: WorldEngineLike,
+  e: WorldEngineWithSpinup,
   air: AirModel,
   windAt: WindAt,
   c: EngineCache,

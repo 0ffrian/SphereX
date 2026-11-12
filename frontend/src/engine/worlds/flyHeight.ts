@@ -168,16 +168,18 @@ function vn3(x: number, y: number, z: number): void {
     C3[k * 3 + 1] = hy;
     C3[k * 3 + 2] = hz;
   }
-  const o = (k: number, c: number): number => C3[k * 3 + c]!;
-  const one = (c: number): number =>
-    mix(
-      mix(mix(o(0, c), o(1, c), ux), mix(o(2, c), o(3, c), ux), uy),
-      mix(mix(o(4, c), o(5, c), ux), mix(o(6, c), o(7, c), ux), uy),
-      uz,
-    );
-  v3x = one(0);
-  v3y = one(1);
-  v3z = one(2);
+  v3x = trilerp(0, ux, uy, uz);
+  v3y = trilerp(1, ux, uy, uz);
+  v3z = trilerp(2, ux, uy, uz);
+}
+
+/** The vn mix nest (x, then y, then z) over channel c of the 8 corner hashes in C3 (no closure per call). */
+function trilerp(c: number, ux: number, uy: number, uz: number): number {
+  return mix(
+    mix(mix(C3[c]!, C3[3 + c]!, ux), mix(C3[6 + c]!, C3[9 + c]!, ux), uy),
+    mix(mix(C3[12 + c]!, C3[15 + c]!, ux), mix(C3[18 + c]!, C3[21 + c]!, ux), uy),
+    uz,
+  );
 }
 
 const FB = [F(7.1), F(3.3), F(1.7)] as const,
@@ -450,6 +452,21 @@ export function heightAtUv(ctx: FlyHeightCtx, u: number, v: number): number {
     : bilinear(ctx.h16, 1, ctx.W, ctx.H, u, v);
 }
 
+/**
+ * The magma-sea inputs at the unwarped direction: tex4(uEb, uvOf(d)).r (EB.out T, half float) and texture(uHy, uh).g
+ * (0 before the first raster: the GPU's 1 x 1 zero texture). Exported for the parity test.
+ */
+export function lavaInputs(
+  dir: readonly [number, number, number],
+  ctx: FlyHeightCtx,
+): { T: number; g: number } {
+  const [uh, vh] = uvOf(F(dir[0]), F(dir[1]), F(dir[2]));
+  return {
+    T: ctx.ebOut ? tex4T(ctx.ebOut, ctx.ebNX, ctx.ebNY, uh, vh) : 0,
+    g: ctx.hydro ? hydroG(ctx.hydro, uh, vh) : 0,
+  };
+}
+
 /** One hKm evaluation with its parts (the parity page and tests read e, u, v). */
 export interface HKmParts {
   /** The filtered raw grid height, km (before the noise detail). */
@@ -469,11 +486,15 @@ export function hKm(dir: readonly [number, number, number], ctx: FlyHeightCtx): 
   return hKmParts(dir, ctx).h;
 }
 
-/** hKm with its parts; `eGiven` replaces the filtered grid height (the parity test feeds the GPU's own value). */
+/**
+ * hKm with its parts. `eGiven` replaces the filtered grid height and `gGiven` the hydro G read (the parity test feeds
+ * the GPU's own values).
+ */
 export function hKmParts(
   dir: readonly [number, number, number],
   ctx: FlyHeightCtx,
   eGiven?: number,
+  gGiven?: number,
 ): HKmParts {
   if (ctx.gas || !ctx.h16) return { e: 0, u: 0, v: 0, h: 0 };
   const dx = F(dir[0]),
@@ -507,10 +528,9 @@ export function hKmParts(
   let h = e + ((r - 0.55) * 0.6 + ef * 1.1) * (0.3 + 2.6 * m) + (fb - 0.5) * 0.14;
   // if(uLava>.5){vec2 uh=uvOf(d);h=mix(h,uHM,smoothstep(1400.,1500.,tex4(uEb,uh).r)*(1.-texture(uHy,uh).g));}
   if (ctx.lava) {
-    const [uh, vh] = uvOf(dx, dy, dz);
-    const T = ctx.ebOut ? tex4T(ctx.ebOut, ctx.ebNX, ctx.ebNY, uh, vh) : 0;
-    const g = ctx.hydro ? hydroG(ctx.hydro, uh, vh) : 0; // no raster yet: the GPU's 1 x 1 zero texture
-    h = h + (ctx.hM - h) * (smoothstep(1400, 1500, T) * (1 - g));
+    const L = lavaInputs(dir, ctx);
+    const g = gGiven ?? L.g;
+    h = h + (ctx.hM - h) * (smoothstep(1400, 1500, L.T) * (1 - g));
   }
   // return uOcean>.5?max(h,0.):h
   if (ctx.ocean) h = Math.max(h, 0);
