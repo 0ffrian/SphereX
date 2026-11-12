@@ -1,5 +1,8 @@
 // §16 test 5: source gates and bake parameters (R2, R3, R4), and the #113 params contract (amendment 2).
 import { describe, expect, it } from 'vitest';
+import { buildAirModel } from './airModel';
+import { earthRef } from './air';
+import { EARTH_MODEL, makeFakeEngine, makeWorld } from './fakeEngine.testutil';
 import { earthAir, makeAir, makeFeatures, makePlace, makeWind, marsAir, titanAir } from './fakeEngine.testutil';
 import { bubbleFactor, dropPhysics } from './liquids';
 import {
@@ -146,5 +149,45 @@ describe('selectBeds', () => {
   it('Methane world: thunder refused with the Titan reason', () => {
     const r = selectBeds(titanAir(), makePlace(0.3, () => ({}), { ...makeFeatures(), z_km: 0.3 }));
     expect(r.refusals).toContainEqual({ source: 'lightning', reason: 'No lightning has ever been detected on Titan, so there is no thunder here.' });
+  });
+
+  it('R6: a real-Mars card at 0.006 bar gets wind beds, about 20 dB quieter than Earth for ground sources', () => {
+    const e = makeFakeEngine({
+      model: { ...EARTH_MODEL, Ts: 210, H: 11100, gv: 3.71, U: 70, airless: true, state: 'frozen', canLiquid: false, zc: null },
+      state: { Ps: 0.006, fluid: 'co2' },
+      climate: { stats: { ocean: 0, max: 260 } },
+      hydro: { n: 0, lava: false },
+    });
+    const air = buildAirModel(makeWorld({ id: 'mars', Ps: 0.006, mu: 43.3, fluid: 'co2' }), e);
+    const { beds, refusals } = selectBeds(air, makePlace(0.3, () => ({}), { wind: makeWind({ U10: 8, Uz: 8 }) }));
+    expect(beds.map((b) => b.id)).toContain('S1_land');
+    expect(refusals.some((r) => r.source === 'all')).toBe(false);
+    for (const id of ['S4', 'S5', 'S6', 'S7']) expect(beds.map((b) => b.id)).not.toContain(id);
+    const dL = 10 * Math.log10(air.Z0 / earthRef().Z);
+    expect(Math.abs(dL + 20)).toBeLessThanOrEqual(2);
+  });
+
+  it('R6: the lava preset (0.005 bar rock vapour) gets wind, lava and vent beds with the assumed-atmosphere label', () => {
+    const e = makeFakeEngine({
+      model: { ...EARTH_MODEL, Ts: 1800, H: 30000, gv: 23, U: 300, airless: true, state: 'vapour', canLiquid: false, zc: null },
+      state: { Ps: 0.005, locked: true },
+      climate: { stats: { ocean: 0, max: 2500 } },
+      hydro: { n: 4, lava: true },
+    });
+    const air = buildAirModel(makeWorld({ id: 'lava', Ps: 0.005, mu: 44, locked: true, sea: 0 }), e);
+    expect(air.lavaWorld).toBe(true);
+    expect(air.inputs.find((i) => i.label === 'Atmosphere')?.tag).toBe('inferred_from_analog');
+    const ids = selectBeds(air, makePlace(0.3, () => ({ cls: 'lava' }), { wind: makeWind({ U10: 8, Uz: 8 }) })).beds.map((b) => `${b.id}|${b.variant}`);
+    expect(ids).toContain('S1_land|0');
+    expect(ids).toContain('S8|0');
+    expect(ids).toContain('S8|1');
+  });
+
+  it('R6: P0 = 0.5 Pa refuses everything', () => {
+    const e = makeFakeEngine({ model: { ...EARTH_MODEL, Ts: 210, airless: true, state: 'frozen' }, state: { Ps: 5e-6 } });
+    const air = buildAirModel(makeWorld({ Ps: 5e-6 }), e);
+    const r = selectBeds(air, makePlace(0.3));
+    expect(r.beds).toEqual([]);
+    expect(r.refusals).toEqual([{ source: 'all', reason: 'No air here, so there is no sound.' }]);
   });
 });
