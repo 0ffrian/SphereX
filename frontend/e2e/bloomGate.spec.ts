@@ -89,11 +89,24 @@ for (const kind of kinds) {
           });
           return { gate, png };
         };
-        const on = await shot('on');
-        const off = await shot('off');
-        if (on.gate) continue; // the gate keeps bloom here: nothing to prove
+        // Up to three on/off pairs; the smallest difference counts. Bloom adds the same light to every
+        // frame of a state, so a real bloom contribution shows in every pair. The shape models settle
+        // once more in the background at + Estimated, at a varying point: on asteroid_shape and
+        // asteroid_shape_bennu one frame in a sequence of eight differed from the one before by 6 and
+        // 4 levels, and every bloom-on/off pair after that step was byte-identical (probe, 12 Nov
+        // 2026). That step is not bloom, and one pair may straddle it.
+        let diff = Infinity;
+        let gate = false;
+        for (let attempt = 0; attempt < 3 && diff > 0; attempt++) {
+          const on = await shot('on');
+          const off = await shot('off');
+          gate = on.gate;
+          if (gate) break;
+          const d = off.png.equals(on.png) ? 0 : await maxChannelDiff(decoder, on.png, off.png);
+          diff = Math.min(diff, d);
+        }
+        if (gate) continue; // the gate keeps bloom here: nothing to prove
         skipped++;
-        const diff = off.png.equals(on.png) ? 0 : await maxChannelDiff(decoder, on.png, off.png);
         expect
           .soft(
             diff,
