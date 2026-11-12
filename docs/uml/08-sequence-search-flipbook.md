@@ -1,6 +1,6 @@
 # 08 Sequence: search and flipbook
 
-A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), the shell A21 (sky interaction A21.6, hash A21.11; shell states in [24](24-state-shell.md)), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache), D-28 (Rainbow Trails) and D-35 (sky tiles), and A4.9 (overlays, flag mask, combine). The sky-view prototype paths (sky pick, shared flipbook session, transport bar) follow Q-87 to Q-91; its cached markers, progressive frames and colour views follow Q-92, Q-93 and Q-95 to Q-99; overlays on the frame grid follow Q-102; downloads in the object's background job follow Q-111 and Q-112 (issue #41). How the backend builds the composite: [20](20-sequence-composite.md).
+A user searches by name or RA/Dec and the flipbook plays the SPHEREx frames of that patch (the P0 base requirement). Drawn from architecture spec §1.1, §3.1, §3.4–3.5, §4.1, §10 (hash routing) and §11 (badges), the shell A21 (sky interaction A21.6, hash A21.11; shell states in [24](24-state-shell.md)), rendering doc §4 (display level 1) and decisions D-16 (endpoints), D-19 (resolver order), D-25 (cache), D-28 (Rainbow Trails) and D-35 (sky tiles), and A4.9 (overlays, flag mask, combine). The sky-view prototype paths (sky pick, shared flipbook session, transport bar) follow Q-87 to Q-91; its cached markers, progressive frames and colour views follow Q-92, Q-93 and Q-95 to Q-99; overlays on the frame grid follow Q-102; downloads in the object's background job follow Q-111 and Q-112 (issue #41); reference objects follow Q-258 and Q-328. How the backend builds the composite: [20](20-sequence-composite.md).
 
 ```mermaid
 sequenceDiagram
@@ -60,7 +60,9 @@ sequenceDiagram
     end
   end
   UI->>API: GET /v1/resolve?q=name or ra,dec
-  alt input is a name that looks like a small body
+  alt input is a name, id or alias in reference_objects.toml (the Sun, Jupiter, Saturn, Titan)
+    API->>API: Reference lookup before SBDB and SIMBAD (Q-328). resolver reference, ra = dec = 0 as a placeholder (artistic), no catalogue call
+  else input is a name that looks like a small body
     API->>R: SBDB first, SIMBAD on a miss (via the cache)
     R-->>API: RA, Dec
   else input is any other name
@@ -69,7 +71,11 @@ sequenceDiagram
   else input is RA/Dec
     API->>API: Skip name resolution
   end
-  API-->>UI: id, ra, dec, moving
+  API-->>UI: id, ra, dec, moving, resolver
+  opt resolver is reference (Q-328)
+    UI->>UI: No fixed sky position: the sky does not fly there, no marker, the island and flipbook say "no fixed sky position" (positionTags.hasSkyPosition)
+    Note over UI,API: GET frames then answers an empty list with reference:not_a_spherex_target in missing
+  end
   UI->>UI: Write #35;ra=…&dec=…[&name=…] to the URL hash (share link). A typed search or a sky pick adds a history entry, a link replaces it
   UI->>UI: Island shows Thinking: Searching the archive for SPHEREx frames at RA, Dec (Q-121)
   UI->>API: GET /v1/objects/{id}/frames
@@ -232,6 +238,7 @@ sequenceDiagram
 - Search combobox (issue #68, Q-161; `app/search/SearchBar.tsx`, R9): the list over `demoTargets` opens on focus, on "/" (`shell/shortcuts.ts`) or on typing. It filters on the name and the aliases (`filterTargets`, ignoring case and punctuation). Up and Down move `aria-activedescendant`, Enter on a highlighted row picks it, Escape closes the list and keeps the text. A pick calls `skySearch({q: name, kind: 'name', origin: 'input'})`. With no match the list says "No demo object matches. Press Enter to search the catalogues."; Enter then submits the typed text through `parseQuery` (a name or RA, Dec), so any SIMBAD or SBDB name still works.
 - The demo pack (Q-164): the 17 rows of the search list (433 Eros is row 17 since #73) are built ahead of time by `backend/scripts/bake_demo_pack.py` from the same pipeline and committed (cards, render params and 1024x512 maps; no frames, no spectrum). The class labels in the list come from those cards. A row's frames still come from the D-25 cache, so the flipbook needs `scripts.prefetch` (or the cache backup) for a stage demo; "Build it" does not.
 - A `candidate` source gets one haptic tick per frame where it is detected (rendering doc §8.5). That path is not drawn here.
+- The Flipbook card carries the object's spectrum (`flipbook/FlipbookSpectrum.tsx`, `measured` points); there is no separate SpectrumPanel (D-38, PR #104). The search box is the dock's Search button, which opens into the field.
 - Rainbow Trails is built after basic playback works (D-28). As built in M1 (issue #3), the dot colour is a false colour, hue = wavelength, tagged `derived` with that formula, so it wears the Estimated badge. In "Measured only" (D-21) the dots are drawn in one colour. The mode is offered only for a `moving` object whose frames share a north-up grid, The frame search for real movers is built (issue #26, Q-21); whether its frames meet that grid condition is not checked yet. The M1 UI has no honesty toggle yet, so the monochrome state is not reachable from the page. Tagging question: Q-27.
 - Sky pick (prototype, Q-89, Q-91): a click that moved under 5 px is a pick. The position under the pointer is computed analytically from the camera ray (`viewer/sky/skyMath.ts`), written as `ra,dec` with 6 decimals and searched with origin `sky`; from there it is an ordinary RA/Dec search. The picked position is user input, tagged `derived` (Estimated badge). The `/v1/sky` endpoints are open as Q-87 and serve only the local copy of the survey tiles (D-35).
 - Cached markers (prototype, Q-98): `GET /v1/sky/cached` reads only the derived cache and lists the positions whose frame list is complete. `app/sky/useCachedMarkers.ts` loads it and loads it again when a frame list has just become complete; `cachedMarkers.ts` skips a position already marked as a test target (same id, or within 2″) and turns a click into a search of its query or its id coordinates.

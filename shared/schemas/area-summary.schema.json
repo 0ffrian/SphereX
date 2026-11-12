@@ -1,0 +1,237 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "area-summary.schema.json",
+  "title": "AreaSummary",
+  "description": "GET /v1/areas/{area_id} (A17.8): frames, coverage, step counts and method.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "area_id",
+    "ra",
+    "dec",
+    "width_deg",
+    "height_deg",
+    "data_release",
+    "n_frames",
+    "n_visits",
+    "frames",
+    "coverage",
+    "steps",
+    "method",
+    "cached_at",
+    "computed_at",
+    "missing",
+    "provenance"
+  ],
+  "properties": {
+    "area_id": {
+      "$ref": "area-index.schema.json#/definitions/AreaId"
+    },
+    "ra": {
+      "$ref": "area-index.schema.json#/definitions/AreaRa"
+    },
+    "dec": {
+      "$ref": "area-index.schema.json#/definitions/AreaDec"
+    },
+    "width_deg": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "height_deg": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "data_release": {
+      "type": "string",
+      "minLength": 1
+    },
+    "n_frames": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "n_visits": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "frames": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/AreaSummaryFrame"
+      }
+    },
+    "coverage": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/AreaCoverage"
+      }
+    },
+    "steps": {
+      "$ref": "#/definitions/AreaSteps"
+    },
+    "method": {
+      "$ref": "area-index.schema.json#/definitions/AreaMethod"
+    },
+    "cached_at": {
+      "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+    },
+    "computed_at": {
+      "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+    },
+    "missing": {
+      "type": "array",
+      "items": {
+        "$ref": "area-index.schema.json#/definitions/AreaMissingCode"
+      }
+    },
+    "provenance": {
+      "$ref": "#/definitions/AreaSummaryProvenance"
+    }
+  },
+  "definitions": {
+    "AreaSummaryFrame": {
+      "title": "AreaSummaryFrame",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame_id",
+        "detector",
+        "visit",
+        "exposure",
+        "time",
+        "wavelength_min_um",
+        "wavelength_max_um",
+        "s_region"
+      ],
+      "properties": {
+        "frame_id": {
+          "$ref": "area-index.schema.json#/definitions/AreaFrameId"
+        },
+        "detector": {
+          "$ref": "area-index.schema.json#/definitions/AreaDetector"
+        },
+        "visit": {
+          "$ref": "area-index.schema.json#/definitions/AreaVisit"
+        },
+        "exposure": {
+          "$ref": "area-index.schema.json#/definitions/AreaExposure"
+        },
+        "time": {
+          "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+        },
+        "wavelength_min_um": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "wavelength_max_um": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "s_region": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "AreaCoverage": {
+      "title": "AreaCoverage",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visit",
+        "polygon"
+      ],
+      "properties": {
+        "visit": {
+          "$ref": "area-index.schema.json#/definitions/AreaVisit"
+        },
+        "polygon": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "$ref": "area-index.schema.json#/definitions/AreaRaDec"
+          }
+        }
+      }
+    },
+    "AreaSteps": {
+      "title": "AreaSteps",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "n_dots",
+        "n_glitches",
+        "n_stars",
+        "n_fixed",
+        "n_static_one_visit",
+        "n_tracks",
+        "n_possible",
+        "n_found_blind",
+        "n_unexplained",
+        "n_unchecked"
+      ],
+      "properties": {
+        "n_dots": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "n_glitches": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "n_stars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "n_fixed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "n_static_one_visit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "n_tracks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "n_possible": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "n_found_blind": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "n_unexplained": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "n_unchecked": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "AreaSummaryProvenance": {
+      "title": "AreaSummaryProvenance",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frames",
+        "coverage",
+        "steps"
+      ],
+      "properties": {
+        "frames": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "coverage": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "steps": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        }
+      }
+    }
+  }
+}

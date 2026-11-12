@@ -136,6 +136,31 @@ export type TVVec3 = {
   assumption?: string;
 };
 export type CometEpoch = '2025-08' | '2025-12';
+/**
+ * Tagged value (R3.1) holding a sampled path: rows of [JD TDB, x, y, z (au), vx, vy, vz (au/day)], heliocentric ICRF (Q-261).
+ */
+export type TVTrack = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value:
+    | [
+        [number, number, number, number, number, number, number],
+        [number, number, number, number, number, number, number],
+        ...[number, number, number, number, number, number, number][],
+      ]
+    | null;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
 export type Layer = {
   id: string;
   tag: Tag;
@@ -194,13 +219,92 @@ export type DynamicsValue = {
 export type NonNegativeDynamicsValue = DynamicsValue & {
   value?: number;
 };
+export type AreaId = string;
+export type AreaRa = number;
+export type AreaDec = number;
+/**
+ * ISO-8601 UTC with a trailing Z (A17.8).
+ */
+export type AreaUtcTime = string;
+/**
+ * A refusal code of A17.8 (register: A4.12).
+ */
+export type AreaMissingCode = string;
+export type AreaProvenanceEntry = {
+  tag: AreaTag;
+  source?: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
+ * The tags Area search uses (A16.5); never inferred_from_analog or artistic.
+ */
+export type AreaTag = 'measured' | 'derived' | 'model_dependent';
+export type AreaFrameId = string;
+export type AreaDetector = number;
+export type AreaVisit = number;
+export type AreaExposure = number;
+/**
+ * One polygon vertex: [ra, dec] in degrees.
+ *
+ * @minItems 2
+ * @maxItems 2
+ */
+export type AreaRaDec = [AreaRa, AreaDec];
+/**
+ * <frame_id>:<n>, n from 1 by the rounded centroid row, then column (Q-208 (14)).
+ */
+export type AreaDotId = string;
+export type AreaDotLabel = 'glitch' | 'star' | 'fixed' | 'mover';
+export type AreaTrackId = string;
+/**
+ * Position angle in degrees, east of north, in [0, 360).
+ */
+export type AreaAngleDeg = number;
+export type AreaVerdict = 'found_blind' | 'unexplained' | 'unchecked' | 'possible';
+export type AreaLinker = 'pairs' | 'rate_grid';
+export type AreaSedLabel = 'smooth' | 'rough' | 'too_few' | 'not_informative';
+/**
+ * GET /v1/areas/{area_id}/checks (A17.8, A17.6; gated, Q-203). Each part appears only if it ran (A18.11): checks:d4_not_run drops test_mover and completeness, checks:d5_not_run drops control, checks:not_run drops every part and the linker (Q-208 (12)).
+ */
+export type AreaChecks = {
+  test_mover?: AreaTestMover;
+  completeness?: AreaCompleteness;
+  control?: AreaControl;
+  linker?: AreaLinker;
+  method: AreaMethod;
+  cached_at: AreaUtcTime;
+  computed_at: AreaUtcTime;
+  missing: AreaMissingCode[];
+  provenance: AreaChecksProvenance;
+};
+/**
+ * [low, high], both in [0, 1].
+ *
+ * @minItems 2
+ * @maxItems 2
+ */
+export type AreaInterval = [number, number];
 
 /**
- * Bundle root: exists only so that both schemas compile into this one file.
+ * Bundle root: exists only so that every schema compiles into this one file.
  */
 export interface ContractSchemas {
   card: ObjectCard;
   params: RenderParams;
+  areaIndex: AreaIndex;
+  areaSummary: AreaSummary;
+  areaKnown: AreaKnown;
+  areaDots: AreaDots;
+  areaTracks: AreaTracks;
+  areaChecks: AreaChecks;
+  areaError: AreaError;
 }
 /**
  * What is known about one object (R3.2). Served by GET /v1/objects/{id}/card (D-16). Single source of the contract (D-18).
@@ -237,6 +341,9 @@ export interface ObjectCard {
   host_radius_rsun?: TVNumber;
   host_mass_msun?: TVNumber;
   host_age_gyr?: TVNumber;
+  surface_pressure_bar?: TVNumber;
+  surface_temperature_K?: TVNumber;
+  surface_fluid?: TVString;
   component_teff_K?: TVPair;
   period_var_d?: TVNumber;
   lightcurve?: LightcurvePoint[];
@@ -246,6 +353,7 @@ export interface ObjectCard {
   coma_radius_km?: TVNumber;
   nucleus_radius_km_max?: TVNumber;
   epochs?: CometEpoch[];
+  orbit_track?: TVTrack;
   pm_mas_yr?: TVPair;
 }
 export interface LightcurvePoint {
@@ -256,9 +364,19 @@ export interface LightcurvePoint {
   flags: number;
 }
 /**
- * Gas production rates, molecules/s. One value per molecule; R3.2's 'per epoch' does not fit this shape (Q-42).
+ * Gas production rates, molecules/s. Either one value per molecule (the R3.2 shape, valid for one epoch), or keyed by epoch ('2025-08', '2025-12'), each holding one value per molecule (the Q-42 proposal, read by the comet renderer, Q-260). An epoch with no measurement is left out, never guessed.
  */
 export interface GasQ {
+  co2?: TVNumber;
+  h2o?: TVNumber;
+  co?: TVNumber;
+  '2025-08'?: GasQEpoch;
+  '2025-12'?: GasQEpoch;
+}
+/**
+ * Gas production rates at one SPHEREx epoch, molecules/s (Q-260).
+ */
+export interface GasQEpoch {
   co2?: TVNumber;
   h2o?: TVNumber;
   co?: TVNumber;
@@ -294,6 +412,7 @@ export interface RenderParams {
   view_modes: ViewModes;
   haptics: HapticProfile;
   dynamics?: Dynamics;
+  confidence?: Confidence;
   /**
    * R9.
    */
@@ -381,6 +500,404 @@ export interface Dynamics {
     [k: string]: number;
   };
 }
+/**
+ * How much of the picture rests on data, and the 3D gate (D-36, Q-220 to Q-222). C = sum(w c) / sum(w). It is not the probability that the picture is correct and it does not change a provenance tag. Absent for nebula and nova (no key measurement is defined for them).
+ */
+export interface Confidence {
+  /**
+   * C, 0 to 1.
+   */
+  score: number;
+  /**
+   * Part of the score from measured values.
+   */
+  measured_share: number;
+  /**
+   * Part of the score from derived and model-dependent values.
+   */
+  estimated_share: number;
+  /**
+   * The rest: assumed, artistic or missing.
+   */
+  assumed_share: number;
+  /**
+   * Minimum C for a 3D body. Starts at 0.25 (D-36).
+   */
+  threshold: number;
+  band: 'mostly_data' | 'part_data' | 'mostly_assumed' | 'too_little';
+  gate: {
+    class_known: boolean;
+    key_measurement: boolean;
+    score_ok: boolean;
+    /**
+     * All three. When false the viewer draws no 3D body and shows found and needed.
+     */
+    passed: boolean;
+  };
+  /**
+   * Plain words: what the card has.
+   */
+  found: string;
+  /**
+   * Plain words: what is missing for a 3D body. Empty when the gate passed.
+   */
+  needed: string;
+  /**
+   * What would raise the score most.
+   */
+  raise: string | null;
+  inputs: ConfidenceInput[];
+  /**
+   * The score is a formula of the card (D-02).
+   */
+  tag: 'derived';
+  formula: string;
+  /**
+   * States that the weights are placeholders.
+   */
+  weights_note: string;
+  /**
+   * States that this is not the probability the picture is correct.
+   */
+  note: string;
+}
+/**
+ * One quantity in the score.
+ */
+export interface ConfidenceInput {
+  id: string;
+  label: string;
+  /**
+   * Placeholder weight; the weights of one type sum to 100.
+   */
+  weight: number;
+  /**
+   * How far the data narrows the class range.
+   */
+  c: number;
+  /**
+   * The tag of the value that fed it, or missing.
+   */
+  tag: 'measured' | 'derived' | 'model_dependent' | 'inferred_from_analog' | 'artistic' | 'missing';
+  /**
+   * This input's part of C, in percentage points.
+   */
+  points: number;
+  /**
+   * Card fields that fed it (or could).
+   */
+  fields: string[];
+}
+/**
+ * GET /v1/areas (A17.8): the prepared areas. Also holds the definitions the other area schemas share.
+ */
+export interface AreaIndex {
+  areas: AreaIndexEntry[];
+  cached_at: AreaUtcTime | null;
+  computed_at: AreaUtcTime | null;
+  missing: AreaMissingCode[];
+  provenance: AreaIndexProvenance;
+}
+export interface AreaIndexEntry {
+  area_id: AreaId;
+  ra: AreaRa;
+  dec: AreaDec;
+  width_deg: number;
+  height_deg: number;
+  data_release: string;
+  n_frames: number;
+  n_visits: number;
+  computed_at: AreaUtcTime;
+  cached_at: AreaUtcTime;
+}
+export interface AreaIndexProvenance {
+  areas: AreaProvenanceEntry;
+}
+/**
+ * GET /v1/areas/{area_id} (A17.8): frames, coverage, step counts and method.
+ */
+export interface AreaSummary {
+  area_id: AreaId;
+  ra: AreaRa;
+  dec: AreaDec;
+  width_deg: number;
+  height_deg: number;
+  data_release: string;
+  n_frames: number;
+  n_visits: number;
+  frames: AreaSummaryFrame[];
+  coverage: AreaCoverage[];
+  steps: AreaSteps;
+  method: AreaMethod;
+  cached_at: AreaUtcTime;
+  computed_at: AreaUtcTime;
+  missing: AreaMissingCode[];
+  provenance: AreaSummaryProvenance;
+}
+export interface AreaSummaryFrame {
+  frame_id: AreaFrameId;
+  detector: AreaDetector;
+  visit: AreaVisit;
+  exposure: AreaExposure;
+  time: AreaUtcTime;
+  wavelength_min_um: number;
+  wavelength_max_um: number;
+  s_region: string;
+}
+export interface AreaCoverage {
+  visit: AreaVisit;
+  /**
+   * @minItems 3
+   */
+  polygon: [AreaRaDec, AreaRaDec, AreaRaDec, ...AreaRaDec[]];
+}
+export interface AreaSteps {
+  n_dots: number;
+  n_glitches: number;
+  n_stars: number;
+  n_fixed: number;
+  n_static_one_visit: number;
+  n_tracks: number;
+  n_possible: number;
+  n_found_blind: number;
+  n_unexplained: number;
+  n_unchecked: number;
+}
+export interface AreaMethod {
+  settings: AreaSettings;
+  checks?: AreaChecksMethod;
+}
+/**
+ * Named starting values of the run (A17 intro), as written into the reply.
+ */
+export interface AreaSettings {
+  [k: string]: number | string;
+}
+/**
+ * Settings of the gated checks (A17.6).
+ */
+export interface AreaChecksMethod {
+  seeds: number[];
+  n_per_cell: number;
+  snr_bins: AreaBin[];
+  rate_bins: AreaBin[];
+  n_control_runs: number;
+  psf: string;
+  distance_model: string;
+}
+/**
+ * A half-open bin [min, max); max null for the open top bin.
+ */
+export interface AreaBin {
+  min: number;
+  max: number | null;
+}
+export interface AreaSummaryProvenance {
+  frames: AreaProvenanceEntry;
+  coverage: AreaProvenanceEntry;
+  steps: AreaProvenanceEntry;
+}
+/**
+ * GET /v1/areas/{area_id}/known (A17.8, A17.5): known objects in the area, positions seen from SPHEREx.
+ */
+export interface AreaKnown {
+  known: AreaKnownObject[];
+  skybot: AreaSkybotAnswer[];
+  cached_at: AreaUtcTime;
+  computed_at: AreaUtcTime;
+  missing: AreaMissingCode[];
+  provenance: AreaKnownProvenance;
+}
+export interface AreaKnownObject {
+  designation: string;
+  number: number | null;
+  object_id: string | null;
+  kind: 'asteroid' | 'comet';
+  v_mag: number | null;
+  n_frames: number;
+  n_visits: number;
+  positions: AreaKnownPosition[];
+  track_available: boolean;
+}
+export interface AreaKnownPosition {
+  frame_id: AreaFrameId;
+  time: AreaUtcTime;
+  ra: AreaRa;
+  dec: AreaDec;
+}
+/**
+ * When that visit's SkyBoT cone was answered; null when it failed (skybot:<visit> in missing).
+ */
+export interface AreaSkybotAnswer {
+  visit: AreaVisit;
+  fetched_at: AreaUtcTime | null;
+}
+export interface AreaKnownProvenance {
+  positions: AreaProvenanceEntry;
+  skybot: AreaProvenanceEntry;
+}
+/**
+ * GET /v1/areas/{area_id}/dots (A17.8, A17.2): every dot of the area, per visit, with its label.
+ */
+export interface AreaDots {
+  visits: AreaVisitDots[];
+  cached_at: AreaUtcTime;
+  computed_at: AreaUtcTime;
+  missing: AreaMissingCode[];
+  provenance: AreaDotsProvenance;
+}
+export interface AreaVisitDots {
+  visit: AreaVisit;
+  dots: AreaDot[];
+}
+export interface AreaDot {
+  dot_id: AreaDotId;
+  frame_id: AreaFrameId;
+  detector: AreaDetector;
+  exposure: AreaExposure;
+  time: AreaUtcTime;
+  x: number;
+  y: number;
+  ra: AreaRa;
+  dec: AreaDec;
+  flux_uJy: number;
+  flux_err: number;
+  snr: number;
+  wavelength_um: number;
+  bandwidth_um: number;
+  flags: string[];
+  label: AreaDotLabel;
+}
+export interface AreaDotsProvenance {
+  position: AreaProvenanceEntry;
+  photometry: AreaProvenanceEntry;
+  wavelength: AreaProvenanceEntry;
+  label: AreaProvenanceEntry;
+}
+/**
+ * GET /v1/areas/{area_id}/tracks (A17.8): tracks and possibles (A17.4) with match and verdict (A17.5), sed (A17.13) and linker (A17.12).
+ */
+export interface AreaTracks {
+  tracks: AreaTrack[];
+  skybot: AreaSkybotAnswer[];
+  cached_at: AreaUtcTime;
+  computed_at: AreaUtcTime;
+  missing: AreaMissingCode[];
+  provenance: AreaTracksProvenance;
+}
+export interface AreaTrack {
+  track_id: AreaTrackId;
+  visits: AreaVisit[];
+  /**
+   * @minItems 1
+   */
+  tracklets: [AreaTracklet, ...AreaTracklet[]];
+  rate_deg_day: number | null;
+  pa_deg: AreaAngleDeg | null;
+  u_inv_au: number | null;
+  status: 'track' | 'possible';
+  reason: ('ambiguous' | 'no_partner' | 'one_visit') | null;
+  verdict: AreaVerdict;
+  match: AreaMatch | null;
+  linker: AreaLinker;
+  unchecked_by: AreaMissingCode[];
+  sed?: AreaSed;
+}
+export interface AreaTracklet {
+  visit: AreaVisit;
+  /**
+   * @minItems 1
+   */
+  dot_ids: [AreaDotId, ...AreaDotId[]];
+  v_in_deg_day: number;
+  pa_in_deg: AreaAngleDeg;
+  rms_px: number;
+}
+export interface AreaMatch {
+  designation: string;
+  number: number | null;
+  object_id: string | null;
+  v_mag: number | null;
+  median_sep_px: number;
+  fetched_at: AreaUtcTime;
+}
+export interface AreaSed {
+  label: AreaSedLabel;
+  chi2_red: number | null;
+  n_dots: number;
+  sigma_floor: number;
+}
+export interface AreaTracksProvenance {
+  tracks: AreaProvenanceEntry;
+  match: AreaProvenanceEntry;
+  sed?: AreaProvenanceEntry;
+}
+export interface AreaTestMover {
+  ra: AreaRa;
+  dec: AreaDec;
+  rate_deg_day: number;
+  pa_deg: AreaAngleDeg;
+  snr: number;
+  dots: AreaPlantedDot[];
+  recovered: boolean;
+  reason: string | null;
+}
+/**
+ * A planted dot: an AreaDot without dot_id and label. Never in /dots (A17.6).
+ */
+export interface AreaPlantedDot {
+  frame_id: AreaFrameId;
+  detector: AreaDetector;
+  exposure: AreaExposure;
+  time: AreaUtcTime;
+  x: number;
+  y: number;
+  ra: AreaRa;
+  dec: AreaDec;
+  flux_uJy: number;
+  flux_err: number;
+  snr: number;
+  wavelength_um: number;
+  bandwidth_um: number;
+  flags: string[];
+}
+/**
+ * Per cell only; no single figure (A17.6, A16.5).
+ */
+export interface AreaCompleteness {
+  snr_bins: AreaBin[];
+  rate_bins: AreaBin[];
+  cells: AreaCompletenessCell[];
+}
+export interface AreaCompletenessCell {
+  snr_bin: number;
+  rate_bin: number;
+  n: number;
+  k: number;
+  frac: number;
+  wilson95: AreaInterval;
+}
+export interface AreaControl {
+  n_runs: number;
+  tracks_per_run: number[];
+  mean: number;
+  max: number;
+}
+/**
+ * Keys present exactly when the checks ran.
+ */
+export interface AreaChecksProvenance {
+  test_mover?: AreaProvenanceEntry;
+  completeness?: AreaProvenanceEntry;
+  control?: AreaProvenanceEntry;
+}
+/**
+ * Error body: 404 area_not_found, 404 dot_not_found, 503 stamp_unavailable (A17.8).
+ */
+export interface AreaError {
+  error: 'area_not_found' | 'dot_not_found' | 'stamp_unavailable';
+  detail: string;
+}
 
 export const TAGS: readonly Tag[] = [
   'measured',
@@ -406,3 +923,21 @@ export const OBJECT_TYPES: readonly ObjectType[] = [
   'nebula',
   'nova',
 ];
+
+export const AREA_DOT_LABELS: readonly AreaDotLabel[] = ['glitch', 'star', 'fixed', 'mover'];
+
+export const AREA_VERDICTS: readonly AreaVerdict[] = [
+  'found_blind',
+  'unexplained',
+  'unchecked',
+  'possible',
+];
+
+export const AREA_SED_LABELS: readonly AreaSedLabel[] = [
+  'smooth',
+  'rough',
+  'too_few',
+  'not_informative',
+];
+
+export const AREA_LINKERS: readonly AreaLinker[] = ['pairs', 'rate_grid'];

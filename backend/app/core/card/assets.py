@@ -56,7 +56,13 @@ ASSET_SOURCE = "derived.asset"
 #   stage 2 measures their spectrum (a card saved before had none: `frames:moving_object_search`
 #   was final); the comet path search uses `CAP<JD` (Q-167); a Mira period that is a median of
 #   several SIMBAD rows is `derived` (Q-152). Stage 1 and 2 changes count too.
-ASSET_VERSION = "9"
+# 10 (issue #71 stream A, Q-210): procedural asteroids bake a physics-based height field (shape
+#   from strength against gravity, crater population by coverage, boulders by structure), so
+#   textures, `relief_amp` and the relief and displacement layer text change.
+# 11 (issue #71 review): crater depth 0.33 r (Pike d/D), rubble-pile relief limited by the angle
+#   of repose instead of strength, the reachable crater cap in relief_range (relief_amp), the relief
+#   layer text; Procyon A takes its interferometric radius from the literature registry.
+ASSET_VERSION = "11"
 AssetStatus = Literal["saved", "generated", "sketch"]
 FIELDS = ("card", "render_params", "textures", "generator_version", "seed", "created_at")
 OPTIONAL_FIELDS = ("asset_version", "inputs_sha256")
@@ -152,6 +158,10 @@ class AssetStore:
                 continue
             return asset
         return None
+
+    def prebaked(self, object_id: str) -> Asset | None:
+        """The pre-built pack's asset for ``object_id`` with this ``ASSET_VERSION``, or None."""
+        return self._prebaked(object_id)
 
     def layers(self, object_id: str) -> Iterator[Found]:
         """Every readable asset for ``object_id``, best first: the generated one, then the

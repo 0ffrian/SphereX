@@ -154,6 +154,19 @@ export const SLIDER_REGISTRY = {
     spec: ARTISTIC,
   },
 
+  // Issue #71 stream E: pacing of a solved gas world. 0 = 5 minutes of planet time per second (the
+  // default, slow like the real planet), 1 = one Earth day per second (storms visibly drift).
+  gas_pacing: {
+    key: 'gas_pacing',
+    min: 0,
+    max: 1,
+    step: 1,
+    unit: '',
+    appliesTo: ['gas_giant'],
+    group: 'spin',
+    spec: 'D-36 (pacing of the simulated winds; a display choice)',
+  },
+
   // ---- A7.1 planets (shader kinds). ---------------------------------------------------------
   teq_K: {
     key: 'teq_K',
@@ -224,6 +237,43 @@ export const SLIDER_REGISTRY = {
     appliesTo: WORLDS,
     group: 'physics',
     spec: 'A7.1',
+  },
+
+  // ---- Issue #71 stream D (Q-240, Q-243): the climate-budget world of a rocky or water planet. The
+  // star temperature and orbit sliders are `star_teff_K` and `semi_major_axis_au` above; these are
+  // the rest. Pressure and surface fluid are assumptions for any exoplanet (D-36); a value the
+  // visitor sets is `artistic` "(your setting)" (Q-58). Each rebuilds the world (a worker run). ---
+  surface_pressure_bar: {
+    key: 'surface_pressure_bar',
+    min: 0.002,
+    max: 100,
+    step: 0.001,
+    unit: 'bar',
+    appliesTo: PLANETS,
+    group: 'physics',
+    spec: 'Q-240 (assumed for any exoplanet, D-36)',
+  },
+  // Index into FLUID_ORDER (physics/fluids.ts): 0 water, 1 methane, 2 ammonia, 3 nitrogen, 4 CO2.
+  surface_fluid: {
+    key: 'surface_fluid',
+    min: 0,
+    max: 4,
+    step: 1,
+    unit: '',
+    appliesTo: PLANETS,
+    group: 'physics',
+    spec: 'Q-240 (assumed for any exoplanet, D-36)',
+  },
+  // 0 or 1: draws the plate boundaries over the surface (artistic overlay).
+  show_plates: {
+    key: 'show_plates',
+    min: 0,
+    max: 1,
+    step: 1,
+    unit: '',
+    appliesTo: PLANETS,
+    group: 'relief',
+    spec: 'Q-242 (plate tectonics is an assumption, D-36)',
   },
 
   // ---- A7.2 gas giants. Feeds band_count only; the drawn wind comes from the band phase
@@ -308,6 +358,8 @@ export const SLIDERS: readonly (SliderDef & { key: SliderKey })[] = Object.value
 
 /** Keys that change the field (re-run the worker); the rest are shader uniforms only. */
 export const FIELD_SLIDER_KEYS: readonly SliderKey[] = [
+  'surface_pressure_bar',
+  'surface_fluid',
   'sea_level',
   'ice',
   'lava_heat',

@@ -331,12 +331,27 @@ export interface FieldSample {
 }
 
 /**
+ * Issue #71 stream E: what a solved gas world tells the haptics where the artistic band model of
+ * this file would otherwise answer. The GasWorld body sets it, so the felt jets, storms and ring
+ * edges are the drawn ones (D-12, D-34). Absent: the functions of this file are used.
+ */
+export interface GasFlowOverride {
+  /** Zonal wind at a body-frame direction, in units of the strongest jet (-1..1). */
+  wind(d: Vec3): number;
+  /** Ring edges and gaps by radius in body radii; null when the world has no rings. */
+  ring: { classify(r: number): 'none' | 'ring' | 'gap' } | null;
+}
+
+/**
  * Typed sampler over the field arrays, for haptic sources (D-12). Height and masks are bilinear
  * (wrapping in u, clamped in v); band and storm ids are nearest, because ids must not blend.
  */
 export class FieldSampler {
   /** Moving storms (issue #42, D-34): when set, the storm id is computed from them, not read from the t = 0 field. */
   private storms: readonly Storm[] | null = null;
+
+  /** Issue #71: set by a solved gas world (see `GasFlowOverride`); null for every other body. */
+  flow: GasFlowOverride | null = null;
 
   constructor(private readonly field: FieldData) {}
 

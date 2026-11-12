@@ -5,7 +5,7 @@
 // plain-words list of layers that are not drawn. Rotate/zoom buttons are the WCAG 2.5.7
 // alternative to dragging (R5.6). R9: canvas aria-label follows the view; a polite live region
 // announces mode, epoch and honesty changes.
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useAppStore } from '@/state/store';
 import { prefersReducedMotion, ViewerApp } from '@/viewer/ViewerApp';
 import { showsBody } from '@/viewer/planCommon';
@@ -21,21 +21,47 @@ import {
   effectiveHonesty,
   HONESTY_LABEL,
   HONESTY_STATES,
+  isTagShown,
   type HonestyState,
 } from '@/viewer/honesty';
 import type { PlanContext, RenderPlan, ViewModeId } from '@/viewer/planTypes';
 import { defaultContext, planRender } from '@/viewer/renderPlan';
 import { COMET_EPOCHS, epochsWithQ, EPOCH_LABEL } from '@/viewer/renderers/Comet';
+import {
+  closeUpTarget,
+  starCaption,
+  starReadouts,
+  type StarColourView,
+  type StarScale,
+} from '@/physics/stellar';
 import { AT_AGE_MAX_PHRASE, scaleBarFor, shownSize } from '@/viewer/scaleBar';
 import { SLIDER_REGISTRY } from '@/viewer/sliders';
 import type { CometEpoch, ObjectCard, RenderParams } from '@/contract';
 import { ProvenanceBadge } from './Badge';
+import { EmissionsPanel } from './EmissionsPanel';
+import { EPOCH_JD, timeRange } from '@/physics/cometGas';
+import { ConfidenceChip, ConfidenceDetails } from './ConfidencePanel';
+import { HearPanel } from './build/HearPanel';
+import { BuildControls, BuildKeyNumbers, BuildSummaryRows } from './build/BuildControls';
+import { MouldOverlay } from './build/MouldAnimation';
+import { useMouldLive } from './build/mouldLive';
+import { ConfidencePopover } from './ConfidencePopover';
+import { displayName } from './displayName';
+import { Row, Rows, SwitchRow, ToggleGroup } from './PanelControls';
 import { timeLapsesOf } from '@/viewer/motion/planMotion';
 import { describeRefusal, layerName, timeLapseText } from './messages';
-import { buttonClass, pressedClass } from './ui';
+import { buttonClass } from './ui';
+import { closeUpKindOf } from './CloseUpPane';
+import { useCloseUpStore } from './closeUpStore';
+import { StarEngineDetails, StarFlarePanel } from './StarFlarePanel';
+import { isEditableTarget } from './shell/shortcuts';
+import { RockStage } from './build/RockStage';
+import { StarGlobeStage, useEngineStar } from './StarEngineStage';
+import { WorldGlobeStage, useEngineWorld } from './WorldEngineStage';
+import { engineKey, useWorldStore } from './worldStore';
 import { MouldStrip, type StripHandle } from './build/MouldStrip';
 import { useMould, type MouldPhase } from './build/useMould';
-import { usesBrowserSeed } from '@/viewer/mould/mouldSteps';
+import { mouldKindOf, usesBrowserSeed } from '@/viewer/mould/mouldSteps';
 
 const NO_FAILED: readonly string[] = [];
 const AGE_SLIDER = SLIDER_REGISTRY.age_yr;
@@ -53,6 +79,13 @@ export function ageFromLog(pos: number): number {
 }
 
 /** "1,200 years", "10 years". */
+/** Short Colour labels for the narrow Details pane. */
+function shortModeLabel(label: string): string {
+  if (/infrared/i.test(label)) return 'Infrared';
+  if (/^visible/i.test(label)) return 'Visible';
+  return label;
+}
+
 function formatYears(n: number): string {
   const w = n < 1000 ? Math.round(n) : n;
   return `${w.toLocaleString('en')} ${w === 1 ? 'year' : 'years'}`;
@@ -78,6 +111,9 @@ interface Choices {
   mode: ViewModeId | null;
   epoch: CometEpoch | null;
   scrub: number;
+  /** Issue #71 stream C: a star's colour view and scale; null = the default (true colour, enlarged; Q-290). */
+  starColour?: StarColourView | null;
+  starScale?: StarScale | null;
 }
 
 /** What a provenance tier (D-32) means, in words for a non-astronomer. */
@@ -93,6 +129,26 @@ export function tierText(tier: number): string {
   return words ? `tier ${tier} of 5, ${words}` : `tier ${tier} of 5`;
 }
 
+const STAR_COLOUR_LABEL: Record<StarColourView, string> = {
+  observatory: 'Observatory view',
+  enhanced: 'Enhanced colour',
+  true: 'True colour',
+};
+const STAR_COLOUR_OPTIONS: { value: StarColourView; label: string }[] = [
+  { value: 'true', label: 'True colour' },
+  { value: 'enhanced', label: 'Enhanced' },
+  { value: 'observatory', label: 'Observatory' },
+];
+const STAR_SCALE_OPTIONS: { value: StarScale; label: string }[] = [
+  { value: 'enlarged', label: 'Larger detail' },
+  { value: 'true', label: 'True scale' },
+];  // no Close-up option: the left pane is the close-up now
+const STAR_SCALE_LABEL: Record<StarScale, string> = {
+  enlarged: 'Whole star, larger detail',
+  true: 'Whole star, true scale',
+  close: 'Close-up',
+};
+
 /** Said when a build starts and the level goes up so the whole body can be built (issue #60). */
 export const LEVEL_RAISED_ANNOUNCEMENT =
   "Showing artist's impression so the whole body can be built";
@@ -104,17 +160,33 @@ export const QUALITY_DROP_ANNOUNCEMENT = 'Lowered render quality to keep motion 
 export const IR_JETS_HINT =
   'Switch to "Visible colour" to see the jets move. This motion is an artist\u2019s impression.';
 
+/** The id of the build pane's popover (the header buttons' `aria-controls`). */
+export const BUILD_POP_ID = 'bp-pop';
+const POP_LABEL: Record<PopId, string> = {
+  acc: 'Accuracy',
+  feel: 'Feel it', // kept so the PopId type still maps; the Feel UI is not shown (Atish removes haptics)
+  hear: 'Hear it',
+  details: 'Details',
+};
+/** The mock-up's words for a kind it has no score for (`renderAcc`, no rows). */
+export const NO_SCORE_TEXT =
+  'No score is set for this kind of object. It has no measurement that could stand for a key measurement, so the viewer shows what it can and says what it leaves out.';
+
 const PLACEHOLDER_LABEL = 'Viewer placeholder: no object loaded';
 
-const ROTATE_BUTTONS: { dir: 'left' | 'right' | 'up' | 'down'; label: string; glyph: string }[] = [
-  { dir: 'left', label: 'Rotate left', glyph: '←' },
-  { dir: 'up', label: 'Rotate up', glyph: '↑' },
-  { dir: 'down', label: 'Rotate down', glyph: '↓' },
-  { dir: 'right', label: 'Rotate right', glyph: '→' },
-];
+/** Issue #71 stream U: the panels the build pane's header buttons open (mock-up `bpPop`, one at a time). */
+export type PopId = 'acc' | 'feel' | 'hear' | 'details';
 
 /** Issue #60: the panel inside the build pane (canvas fills the stage, controls behind Details). */
 export interface PaneOptions {
+  /** Which popover is open under the header buttons (null = none). */
+  pop?: PopId | null;
+  /** Closes (null) or switches the open popover (the Accuracy panel's own close, Escape). */
+  onPop?(pop: PopId | null): void;
+  /** The build actions (Replay, New seed, close-up toggle): the top of Details. */
+  actions?: ReactNode;
+  /** The honesty caption under the body (the level it is shown at); `extra` is added at its end. */
+  caption?(extra: ReactNode): ReactNode;
   /** Changes start a new build (open, Replay, New seed). */
   seq: number;
   animate: boolean;
@@ -132,6 +204,23 @@ export interface PaneOptions {
   onViewer?(viewer: ViewerApp | null): void;
 }
 
+/** Issue #71 stream E: the two speeds of a simulated gas world (the slider `gas_pacing`: 0 or 1). */
+export const GAS_PACING_CHOICES = [
+  { value: 0, label: '5 minutes per second' },
+  { value: 1, label: '1 day per second' },
+] as const;
+
+export function gasPacingStatus(value: 0 | 1): string {
+  return value === 1
+    ? 'One second here is one Earth day. The view stays above the turning planet, so you can watch storms drift.'
+    : 'One second here is 5 minutes, so the planet turns slowly and its clouds barely change.';
+}
+
+const MOTION_OPTIONS = [
+  { value: 'playing', label: 'Playing' },
+  { value: 'paused', label: 'Paused' },
+] as const;
+
 export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -142,6 +231,14 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const storeCard = useAppStore((s) => s.card);
   const storeParams = useAppStore((s) => s.params);
   const card = blocked ? null : storeCard;
+  // Issue #71 stream X (D-37): the prototype's star engine draws star cards in the build pane; null keeps the TSL path.
+  const engineStarCard = useEngineStar();
+  // Issue #71 stream Y (D-37): the prototype's world engine draws planets and gas giants; null keeps the old path.
+  const engineWorldCard = useEngineWorld();
+  const worldFailedId = useWorldStore((s) => s.failedId);
+  const starFailedId = useWorldStore((s) => s.starFailedId);
+  // A rock engine draws the body: reported by RockStage once its canvas is attached.
+  const [rockOwns, setRockOwns] = useState(false);
   const storedParams = blocked ? null : storeParams;
   const seedOffset = pane?.seedOffset ?? 0;
   // "New seed" (issue #60): the same params with another seed; the same card + seed always give
@@ -179,6 +276,11 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
     [card, params],
   );
   const epoch: CometEpoch = choices.epoch ?? epochsWithData.at(-1) ?? defaultContext().epoch;
+  // Issue #71 F: the emissions view (comets with gas in both epochs) and its time. A new object closes it.
+  const [emissions, setEmissions] = useState<{ key: string; jd: number } | null>(null);
+  const emissionsRange = card && params?.type === 'comet' ? timeRange(card) : null;
+  const emissionsJd =
+    emissions && emissions.key === objectKey && emissionsRange ? emissions.jd : null;
   // Layers whose mesh or texture failed to load, per object. Keyed so a new object starts clean.
   const [failedState, setFailedState] = useState<{ key: string; ids: string[] }>({
     key: '',
@@ -186,6 +288,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   });
   const failed = failedState.key === objectKey ? failedState.ids : NO_FAILED;
   const reducedMotion = useReducedMotion();
+  // The Pause button is gone from Details (Moon, open question). `P` pauses and resumes motion in the build pane (WCAG 2.2.2).
   const [spinPaused, setSpinPaused] = useState(false);
   // Under reduced motion the scene starts paused; this is the user's choice to play it anyway.
   const [playAnyway, setPlayAnyway] = useState(false);
@@ -203,7 +306,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
     return () => viewer.setIdleChangeHandler?.(null);
   }, [viewer]);
   const [whyOpen, setWhyOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [formulaOpen, setFormulaOpen] = useState(false);
   const detailsId = useId();
   const whyId = useId();
   const fixture = useAppStore((s) => s.sky.fixture);
@@ -230,12 +333,26 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
         honesty,
         mode: modeChoice,
         epoch,
+        cometJd: emissionsJd,
         scrubIndex,
         failed,
         overrides,
         qualityTier,
+        starColour: choices.starColour ?? undefined,
+        starScale: choices.starScale ?? undefined,
       }),
-    [honesty, modeChoice, epoch, scrubIndex, failed, overrides, qualityTier],
+    [
+      honesty,
+      modeChoice,
+      epoch,
+      emissionsJd,
+      scrubIndex,
+      failed,
+      overrides,
+      qualityTier,
+      choices.starColour,
+      choices.starScale,
+    ],
   );
   const plan = useMemo(
     () => (card && params ? planRender(card, params, ctx) : null),
@@ -419,7 +536,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   }, [viewer, inPane]);
   // Issue #60: a build from the card or Replay shows the whole plan. If the plan has layers the
   // honesty level hides (the generated world is `artistic`, D-21), the level goes up to
-  // "+ Artistic" first and says so; the Show control stays, so the user can drop back at any time.
+  // "+ Artistic" first and says so (once per build); the Show row in Details lets the user drop back.
   // The build waits for this (`waitForLevel`), so it never starts on the plan of the old level.
   const [levelSeq, setLevelSeq] = useState(-1);
   const paneSeq = pane?.seq ?? 0;
@@ -443,7 +560,10 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
     seq: pane?.seq ?? 0,
     animate: pane?.animate ?? false,
     reducedMotion,
-    onProgress: (p) => stripRef.current?.update(p),
+    onProgress: (p) => {
+      useMouldLive.getState().setProgress(p);
+      stripRef.current?.update(useMouldLive.getState().override ?? p);
+    },
     onPhase: (phase) => pane?.onPhase?.(phase),
   });
 
@@ -454,6 +574,31 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   }, [viewer, plan, size]);
 
   const announce = useCallback((text: string) => setAnnouncement(text), []);
+
+  // WCAG 2.2.2: with no Pause button in Details, `P` stops and restarts everything that moves in the build pane.
+  // Under reduced motion nothing moves until it is pressed. Ignored while typing or with a modifier held.
+  const toggleMotion = useCallback(() => {
+    if (idlePaused) {
+      viewer?.resumeFromIdle?.();
+      announce('Motion is playing.');
+    } else if (reducedMotion) {
+      setPlayAnyway(!playAnyway);
+      announce(playAnyway ? 'Motion is off.' : 'Motion is playing.');
+    } else {
+      setSpinPaused(!spinPaused);
+      announce(spinPaused ? 'Motion is playing.' : 'Motion is paused.');
+    }
+  }, [viewer, idlePaused, reducedMotion, playAnyway, spinPaused, announce]);
+  useEffect(() => {
+    if (!pane) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'p' || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented || isEditableTarget(e.target)) return;
+      e.preventDefault();
+      toggleMotion();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pane, toggleMotion]);
   const planWith = (patch: Partial<PlanContext>) =>
     card && params ? planRender(card, params, { ...ctx, ...patch }) : null;
 
@@ -475,8 +620,35 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
     const next = planWith({ epoch: e });
     if (next) announce(epochAnnouncement(e, next));
   };
+  // Issue #71 stream C: colour view and scale of a star. Cells do not show in the Observatory view,
+  // so choosing Close-up from it moves to Enhanced colour (and the reverse leaves Close-up).
+  const starColour: StarColourView = plan?.star?.colourView ?? 'true';
+  const starScale: StarScale = plan?.star?.scale ?? 'enlarged';
+  const setStarView = (colour: StarColourView, scale: StarScale) => {
+    let c = colour;
+    const sc = scale;
+    let moved = '';
+    if (sc === 'close' && c === 'observatory') {
+      c = 'enhanced';
+      moved =
+        ' Colour changed to Enhanced colour, because cells do not show in the Observatory view.';
+    }
+    setChoices({ ...choices, starColour: c, starScale: sc });
+    const next = planWith({ starColour: c, starScale: sc });
+    if (sc === 'close' && next?.star?.physics)
+      viewer?.setStarCloseUp(closeUpTarget(next.star.physics));
+    else if (starScale === 'close') viewer?.setStarCloseUp(null);
+    announce(
+      `${STAR_COLOUR_LABEL[c]}, ${STAR_SCALE_LABEL[sc]}.${moved} ${next?.star?.physics ? starCaption(next.star.physics, sc) : ''}`.trim(),
+    );
+  };
   // Not announced here: the slider's own value text is read by screen readers when it moves.
   const onScrub = (i: number) => setChoices({ ...choices, scrub: i });
+  const gasPacing = overrides.gas_pacing === 1 ? 1 : 0;
+  const onGasPacing = (value: 0 | 1) => {
+    setOverride('gas_pacing', value);
+    announce(gasPacingStatus(value));
+  };
   const onAge = (pos: number) => setOverride('age_yr', ageFromLog(pos));
 
   // The age slider shows only while the remnant is drawn (it is an artist's impression).
@@ -485,7 +657,78 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const nothingDrawn = plan && plan.threeD && !showsBody(plan) ? nothingDrawnReason(plan) : null;
   const defaultsShown = plan?.missing.filter((m) => m.defaultShown) ?? [];
   const notDrawn = plan?.missing.filter((m) => !m.defaultShown) ?? [];
-  const disabled = viewer === null;
+  // The close-up pane (issue #71 stream H, Q-275) fills the left half of the app, over the sky, while
+  // this viewer stays in the build pane: it opens with the build (mock-up `cuOpen`) and closes with
+  // it (`cuClose`). The viewer and plan go to a small store the pane reads. The toggle next to Feel
+  // hides or shows it.
+  const closeKind = pane ? closeUpKindOf(params?.type) : null;
+  // The prototype engines (star, world, rock) draw a generated surface: they mount only at "+ Artistic"
+  // (Atish's call on the PR #89 review, Q-287). At "Measured only" and "+ Estimated" the three.js path draws.
+  // The build pane has no Show control (Q-412); Build raises the level to + Artistic when the body has layers
+  // the level hides, which is what lets the engines draw.
+  const enginesShown = honesty === 'artistic';
+  const engineStar =
+    pane && enginesShown && plan?.threeD && card && !blocked && engineStarCard && starFailedId !== engineKey(card.id, engineStarCard.preset.id)
+      ? engineStarCard
+      : null;
+  const engineWorld =
+    pane && enginesShown && plan?.threeD && card && !blocked && engineWorldCard && worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
+      ? engineWorldCard
+      : null;
+  // D-37: while an engine draws the body the three.js viewer builds and draws nothing under it.
+  const engineOwns = engineStar !== null || engineWorld !== null || (enginesShown && rockOwns);
+  useEffect(() => {
+    viewer?.setEngineOwned?.(engineOwns);
+  }, [viewer, engineOwns]);
+  const tintTag = plan?.tint.tag ?? null;
+  const tintKey = plan?.tint.rgb.join(',') ?? '';
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- tintKey stands for the rgb values
+  const rockTint = useMemo<[number, number, number] | null>(() => (tintTag && plan ? [plan.tint.rgb[0]!, plan.tint.rgb[1]!, plan.tint.rgb[2]!] : null), [tintTag, tintKey]);
+  // Hidden by the user, or held back until the build has shifted to the right half (stream U).
+  const closeHidden = useCloseUpStore((s) => s.hidden || s.held);
+  const closeInfo = useCloseUpStore((s) => s.info);
+  const shaderKey = plan?.shader?.key ?? '';
+  const pubFixture = fixture || (card?.id.startsWith('fixture:') ?? false);
+  useEffect(() => {
+    useCloseUpStore.getState().publish({ viewer, plan, type: params?.type ?? null, fixture: pubFixture, reducedMotion, engineStar, engineWorld });
+  }, [viewer, plan, params?.type, reducedMotion, pubFixture, engineStar, engineWorld]);
+  useEffect(() => () => useCloseUpStore.getState().reset(), []);
+  useEffect(() => {
+    if (!viewer) return;
+    viewer.setCloseUpHandler((info) => useCloseUpStore.getState().setInfo(info));
+    return () => viewer.setCloseUpHandler(null);
+  }, [viewer]);
+  const artisticShown = honesty === 'artistic';
+  useEffect(() => {
+    if (!viewer) return;
+    if (!pane || !closeKind || !plan?.threeD || closeHidden || blocked) {
+      viewer.closeUpOff(true);
+      return;
+    }
+    // The orbit view is an artist's impression (heights, clouds, detail): shown at "+ Artistic" like the globe's surface.
+    const gate =
+      closeKind === 'orbit' && !artisticShown
+        ? "Close-up · the surface from orbit is an artist's impression: choose + Artistic to see it"
+        : null;
+    // A star the engine draws has its own close-up in the pane (the flare close-up), so the viewer's is off.
+    if (closeKind === 'star' && engineStar) {
+      viewer.closeUpOff(true);
+      return;
+    }
+    // A planet the world engine draws has its own surface view in the pane (stream Y), so the viewer's is off.
+    if (closeKind === 'orbit' && engineWorld) {
+      viewer.closeUpOff(true);
+      return;
+    }
+    viewer.openCloseUp(closeKind === 'body', closeKind === 'star', gate);
+    return () => viewer.closeUpOff(true);
+  }, [viewer, pane, closeKind, closeHidden, blocked, plan?.threeD, objectKey, shaderKey, artisticShown, engineStar, engineWorld]);
+  // A gas giant that is still forming opens when it has settled.
+  useEffect(() => {
+    if (!viewer || !closeInfo?.refusal || !/forming/.test(closeInfo.refusal) || closeHidden) return;
+    const id = window.setTimeout(() => viewer.openCloseUp(false, false), 1000);
+    return () => window.clearTimeout(id);
+  }, [viewer, closeInfo, closeHidden]);
   const objectIsFixture = fixture || (card?.id.startsWith('fixture:') ?? false);
   // Read from the plan, not from the viewer, so it is never a frame behind (what the clock runs).
   const lapses = plan ? timeLapsesOf(plan) : [];
@@ -500,27 +743,66 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // One pause control for everything that moves (WCAG 2.2.2, R9). Under reduced motion the scene
   // starts paused and the button starts it.
   const motionPaused = (reducedMotion && !playAnyway) || spinPaused || idlePaused;
-  const hiddenCount = plan?.missing.filter((m) => m.reason === 'honesty').length ?? 0;
 
+  // In the build pane, an engine-drawn body shows its notes as "Assumed values" lines, not as a paragraph list.
+  const assumedLines = plan && engineOwns
+    ? [
+        ...plan.notes.filter((n) => !/no motion data/i.test(n)),
+        ...lapses.map((t) => timeLapseText(t)),
+      ]
+    : [];
   const honestyGroup = plan ? (
-    <div role="group" aria-label="Honesty level" className="flex flex-wrap items-center gap-2">
-      <span className="text-sm text-neutral-300">Show:</span>
-      {HONESTY_STATES.map((state) => (
-        <button
-          key={state}
-          type="button"
-          className={`${buttonClass} ${pressedClass}`}
-          aria-pressed={honesty === state}
-          onClick={() => onHonesty(state)}
-        >
-          {HONESTY_LABEL[state]}
-        </button>
-      ))}
-      {hiddenCount > 0 && (
-        <span className="text-xs text-neutral-400">{hiddenCount} hidden at this level</span>
-      )}
-    </div>
+    <ToggleGroup
+      label="Show"
+      options={HONESTY_STATES.map((state) => ({ value: state, label: HONESTY_LABEL[state] }))}
+      value={honesty}
+      onChange={onHonesty}
+    />
   ) : null;
+  // Issue #71 stream U: in the build pane the Accuracy, Feel, Hear it and Details panels share one
+  // popover under the header buttons, one at a time (mock-up `bpPop`). Outside the pane the details
+  // are plain content, as before.
+  const popRef = useRef<HTMLDivElement>(null);
+  const pop = pane?.pop ?? null;
+  useEffect(() => {
+    if (pop) popRef.current?.focus({ preventScroll: true });
+  }, [pop]);
+  const wrapPop = (details: ReactNode): ReactNode =>
+    pane ? (
+      <div
+        ref={popRef}
+        id={BUILD_POP_ID}
+        className="sx-bp-pop"
+        data-w={pop ?? ''}
+        hidden={pop === null}
+        tabIndex={-1}
+        role="group"
+        aria-label={pop ? POP_LABEL[pop] : 'Senses'}
+        data-testid="build-pop"
+      >
+        <section hidden={pop !== 'acc'} data-testid="build-pop-acc">
+          {pop === 'acc' &&
+            (params?.confidence ? (
+              <ConfidencePopover inline isShown={(t) => t === 'missing' || isTagShown(honesty, t)} params={params} name={displayName(plan?.name)} onClose={() => pane.onPop?.(null)} />
+            ) : (
+              <>
+                <div className="sx-pop-h">
+                  <b>Accuracy</b>
+                  <span>{displayName(plan?.name)}</span>
+                </div>
+                <p className="sx-acc-rules">{NO_SCORE_TEXT}</p>
+              </>
+            ))}
+        </section>
+        <section hidden={pop !== 'hear'} data-testid="build-pop-hear">
+          <HearPanel active={pop === 'hear'} name={displayName(plan?.name)} />
+        </section>
+        {details}
+      </div>
+    ) : (
+      details
+    );
+  const worldForming = useMouldLive((s) => s.forming);
   const loadingBody =
     pane &&
     (blocked || mould.phase === 'loading' || (viewer === null && rendererStatus !== 'unavailable'));
@@ -533,164 +815,171 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
       <h2 id="viewer-heading" className={pane ? 'sr-only' : 'text-lg font-medium'}>
         3D view
       </h2>
-      <div
-        className={
-          pane
-            ? 'sx-bp-stage'
-            : 'relative aspect-square w-full max-w-xl overflow-hidden rounded-lg border border-neutral-800 bg-black sm:aspect-[4/3]'
-        }
-        data-testid="viewer-stage"
-      >
-        <div ref={hostRef} className="absolute inset-0" />
-        {loadingBody && (
-          <div className="sx-bp-loading" data-testid="build-loading" role="status">
-            <span className="sx-spinner" aria-hidden="true" />
-            <span>Loading the 3D view</span>
-          </div>
+      <div className={emissionsJd !== null ? 'flex flex-col gap-3 lg:flex-row' : 'contents'}>
+        {card && emissionsJd !== null && (
+          <EmissionsPanel
+            card={card}
+            jd={emissionsJd}
+            onJd={(jd) => setEmissions({ key: objectKey, jd })}
+            fixture={objectIsFixture}
+          />
         )}
-        <p
-          data-testid="viewer-label"
-          className="pointer-events-none absolute left-3 top-3 max-w-[85%] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300"
+        <div
+          className={
+            pane
+              ? 'sx-bp-stage'
+              : 'relative aspect-square w-full max-w-xl overflow-hidden rounded-lg border border-neutral-800 bg-black sm:aspect-[4/3]'
+          }
+          data-testid="viewer-stage"
         >
-          {plan ? `${plan.name}${plan.threeD ? '' : ' (no 3D model)'}` : PLACEHOLDER_LABEL}
-        </p>
-        {plan && !plan.threeD && plan.message && (
+          <div ref={hostRef} className="absolute inset-0" />
+          {/* D-37: the prototype rock engine draws asteroids and comet nuclei over the viewer, at "+ Artistic"
+              only; unmounting it hands the body back to the viewer (its cleanup reports onEngine(false)). */}
+          {enginesShown && (
+            <RockStage
+              card={card}
+              params={params}
+              plan={plan}
+              honesty={honesty}
+              tint={rockTint}
+              reducedMotion={reducedMotion}
+              onEngine={setRockOwns}
+            />
+          )}
+          {engineStar && (
+            <StarGlobeStage key={engineStar.preset.id} star={engineStar} onFail={() => useWorldStore.getState().failStar(engineKey(card?.id, engineStar.preset.id))} />
+          )}
+          {engineWorld && (
+            <WorldGlobeStage
+              key={engineWorld.preset.id}
+              world={engineWorld}
+              onFail={() => useWorldStore.getState().fail(engineKey(card?.id, engineWorld.preset.id))}
+            />
+          )}
+          {!pane && params && plan?.threeD && (
+            <ConfidenceChip
+              params={params}
+              onOpen={() => setFormulaOpen(true)}
+            />
+          )}
+          {!pane && params && formulaOpen && (
+            <ConfidencePopover params={params} name={displayName(plan?.name)} onClose={() => setFormulaOpen(false)} />
+          )}
+          {pane && (
+            <MouldOverlay
+              active={loadingBody || worldForming}
+              id={card?.id ?? params?.type ?? 'body'}
+              kind={params ? mouldKindOf(params.type) : null}
+              steps={mould.script?.steps.length ?? 0}
+              seed={params?.seed}
+              inputs={{
+                T: card?.teff_K?.value ?? card?.teq_K?.value ?? null,
+                giant: params?.type === 'star_mira',
+                tint: rockTint,
+              }}
+              reduced={reducedMotion}
+              caption={worldForming ? (params?.type === 'gas_giant' ? 'Forming the atmosphere' : 'Forming the planet\u2026') : 'Loading the 3D view'}
+            />
+          )}
           <p
-            className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 rounded bg-neutral-900/90 px-3 py-2 text-center text-sm text-neutral-100"
-            data-testid="viewer-message"
+            data-testid="viewer-label"
+            className={
+              pane
+                ? 'sr-only'
+                : 'pointer-events-none absolute left-3 top-3 max-w-[85%] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300'
+            }
           >
-            {plan.message}
+            {plan ? `${displayName(plan.name)}${plan.threeD ? '' : ' (no 3D model)'}` : PLACEHOLDER_LABEL}
           </p>
-        )}
-        {plan && plan.threeD && !showsBody(plan) && (
-          <p
-            className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 rounded bg-neutral-900/90 px-3 py-2 text-center text-sm text-neutral-100"
-            data-testid="viewer-nothing"
-          >
-            {nothingDrawn
-              ? `Nothing is drawn. ${nothingDrawn.text}${
-                  nothingDrawn.needs
-                    ? ` Switch to “${HONESTY_LABEL[nothingDrawn.needs]}” to see it.`
-                    : ''
-                } See the list below.`
-              : ''}
-          </p>
-        )}
-        {rendererStatus === 'unavailable' && (
-          // Not a live region: the status line already announces this change.
-          <p className="absolute inset-x-3 bottom-3 rounded bg-neutral-900/90 px-3 py-2 text-sm text-neutral-100">
-            The 3D view can&rsquo;t start in this browser. Try the latest Chrome, Edge or Firefox,
-            and check that hardware acceleration is turned on.
-          </p>
-        )}
+          {plan && !plan.threeD && plan.message && (
+            <p
+              className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 rounded bg-neutral-900/90 px-3 py-2 text-center text-sm text-neutral-100"
+              data-testid="viewer-message"
+            >
+              {plan.message}
+            </p>
+          )}
+          {plan && plan.threeD && !showsBody(plan) && (
+            <p
+              className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 rounded bg-neutral-900/90 px-3 py-2 text-center text-sm text-neutral-100"
+              data-testid="viewer-nothing"
+            >
+              {nothingDrawn
+                ? `Nothing is drawn. ${nothingDrawn.text}${
+                    nothingDrawn.needs
+                      ? ` Switch to “${HONESTY_LABEL[nothingDrawn.needs]}” to see it.`
+                      : ''
+                  } ${pane ? 'Open Details for the list.' : 'See the list below.'}`
+                : ''}
+            </p>
+          )}
+          {rendererStatus === 'unavailable' && (
+            // Not a live region: the status line already announces this change.
+            <p className="absolute inset-x-3 bottom-3 rounded bg-neutral-900/90 px-3 py-2 text-sm text-neutral-100">
+              The 3D view can&rsquo;t start in this browser. Try the latest Chrome, Edge or Firefox,
+              and check that hardware acceleration is turned on.
+            </p>
+          )}
+        </div>
       </div>
 
       {pane && <MouldStrip ref={stripRef} script={mould.script} phase={mould.phase} />}
-      {pane && (
-        <div className="sx-bp-show">
-          {honestyGroup}
-          <button
-            type="button"
-            className={`${buttonClass} ml-auto`}
-            aria-expanded={detailsOpen}
-            aria-controls={detailsId}
-            onClick={() => setDetailsOpen((o) => !o)}
-            data-testid="viewer-details-toggle"
-          >
-            {detailsOpen ? 'Hide details' : 'Details'}
-          </button>
-        </div>
-      )}
+      {/* Moon (11 Nov 2026): no "N hidden at this level" button on the render; the way back down is the Show row in Details. */}
+      {pane?.caption?.(null)}
+      {wrapPop(
       <div
         id={detailsId}
         className={pane ? 'sx-bp-details' : 'contents'}
-        hidden={pane ? !detailsOpen : undefined}
+        hidden={pane ? pane.pop !== 'details' : undefined}
+        data-testid={pane ? 'build-details-panel' : undefined}
       >
-        {plan?.threeD && (
-          <p className="text-xs text-neutral-400" data-testid="impression-note">
-            Artist&apos;s impression, drawn from the data listed under &ldquo;What is drawn&rdquo;.
-          </p>
+        {pane && (
+          <>
+            <div className="sx-pop-h">
+              <b>Details</b>
+              <span>{displayName(plan?.name)}</span>
+            </div>
+            {engineStar && <StarEngineDetails />}
+          </>
         )}
-
-        <div role="group" aria-label="View controls" className="flex flex-wrap gap-2">
-          {ROTATE_BUTTONS.map(({ dir, label, glyph }) => (
-            <button
-              key={dir}
-              type="button"
-              className={buttonClass}
-              aria-label={label}
-              title={label}
-              disabled={disabled}
-              onClick={() => viewer?.rotate(dir)}
-            >
-              <span aria-hidden="true">{glyph}</span>
-            </button>
-          ))}
-          <button
-            type="button"
-            className={buttonClass}
-            aria-label="Zoom in"
-            title="Zoom in"
-            disabled={disabled}
-            onClick={() => viewer?.zoom('in')}
-          >
-            <span aria-hidden="true">+</span>
-          </button>
-          <button
-            type="button"
-            className={buttonClass}
-            aria-label="Zoom out"
-            title="Zoom out"
-            disabled={disabled}
-            onClick={() => viewer?.zoom('out')}
-          >
-            <span aria-hidden="true">−</span>
-          </button>
-          <button
-            type="button"
-            className={buttonClass}
-            disabled={disabled}
-            onClick={() => viewer?.resetView()}
-          >
-            Reset view
-          </button>
-        </div>
-
+        {params && (!pane || params.confidence?.gate.passed === false) && (
+          <ConfidenceDetails params={params} />
+        )}
         {plan && (
           <>
-            {!pane && honestyGroup}
+            {/* Q-412 / D-21: Build raises the level once (Q-113 item 7); the Show row (and Motion,
+                WCAG 2.2.2) sit in Details so the level can always be lowered again. */}
+            {honestyGroup}
+            {pane && !engineOwns && (
+              <ToggleGroup
+                label="Motion"
+                options={MOTION_OPTIONS}
+                value={motionPaused ? 'paused' : 'playing'}
+                onChange={(v) => { if ((v === 'paused') !== motionPaused) toggleMotion(); }}
+                testId="build-motion"
+              />
+            )}
 
             {plan.threeD && plan.modes.length > 0 && (
-              <div
-                role="group"
-                aria-label="View mode"
-                className="flex flex-wrap items-center gap-2"
-              >
-                <span className="text-sm text-neutral-300">Colour:</span>
-                {plan.modes.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className={`${buttonClass} ${pressedClass}`}
-                    aria-pressed={plan.mode === m.id}
-                    aria-describedby={
-                      irHidesJets && m.id === 'visible' ? 'ir-jets-hint' : undefined
-                    }
-                    disabled={!m.available}
-                    title={
-                      m.available ? m.badge : 'Not available for this object. See the list below.'
-                    }
-                    onClick={() => onMode(m.id)}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-                {plan.mode && (
-                  <span className="text-xs text-neutral-400">
+              <>
+                <ToggleGroup
+                  label="Colour"
+                  value={plan.mode ?? null}
+                  options={plan.modes.map((m) => ({
+                    value: m.id,
+                    label: pane ? shortModeLabel(m.label) : m.label,
+                    disabled: !m.available,
+                    title: m.available ? m.badge : 'Not available for this object. See the list below.',
+                    describedBy: irHidesJets && m.id === 'visible' ? 'ir-jets-hint' : undefined,
+                  }))}
+                  onChange={onMode}
+                />
+                {plan.mode && !pane && (
+                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
                     {plan.modes.find((m) => m.id === plan.mode)?.badge}
                   </span>
                 )}
-              </div>
+              </>
             )}
 
             {/* Sits under the mode buttons it refers to. The region stays mounted while an object is
@@ -708,27 +997,82 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             )}
 
             {plan.type === 'comet' && (
-              <div
-                role="group"
-                aria-label="Comet epoch"
-                className="flex flex-wrap items-center gap-2"
-              >
-                <span className="text-sm text-neutral-300">Epoch:</span>
-                {COMET_EPOCHS.map((e) => (
-                  <button
-                    key={e}
-                    type="button"
-                    className={`${buttonClass} ${pressedClass}`}
-                    aria-pressed={epoch === e}
-                    onClick={() => onEpoch(e)}
-                  >
-                    {EPOCH_LABEL[e]}
-                    {!plan.epochs.includes(e) && (
-                      <span className="ml-1 text-xs text-neutral-400">(no gas data)</span>
-                    )}
-                  </button>
-                ))}
+              <ToggleGroup
+                label="Epoch"
+                value={epoch}
+                options={COMET_EPOCHS.map((e) => ({
+                  value: e,
+                  label: `${EPOCH_LABEL[e]}${plan.epochs.includes(e) ? '' : ' (no gas data)'}`,
+                }))}
+                onChange={onEpoch}
+              />
+            )}
+
+            {pane && <BuildControls />}
+
+            {plan.star && !engineStar && (
+              <div className="flex flex-col gap-2" data-testid="star-views">
+                <ToggleGroup
+                  label="Light"
+                  value={starColour}
+                  options={STAR_COLOUR_OPTIONS}
+                  onChange={(c) =>
+                    setStarView(
+                      c,
+                      c === 'observatory' && starScale === 'close' ? 'enlarged' : starScale,
+                    )
+                  }
+                />
+                <ToggleGroup
+                  label="View"
+                  value={starScale}
+                  options={STAR_SCALE_OPTIONS}
+                  onChange={(sc) => setStarView(starColour, sc)}
+                />
+                {plan.star.physics && (
+                  <p className="text-sm text-neutral-200" data-testid="star-caption">
+                    {starCaption(plan.star.physics, starScale)}
+                    {starColour === 'observatory' &&
+                      ' This is false colour (ultraviolet, as solar observatories show it), not the star\u2019s real colour.'}
+                  </p>
+                )}
+                {plan.star.plasma && (
+                  <StarFlarePanel
+                    viewer={viewer}
+                    paused={motionPaused}
+                    fixture={objectIsFixture}
+                  />
+                )}
               </div>
+            )}
+
+            {plan.star?.physics && !engineStar && (
+              <dl
+                className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
+                data-testid="star-readouts"
+              >
+                {starReadouts(plan.star.physics).map((r) => (
+                  <div key={r.label} className="contents">
+                    <dt className="text-neutral-300">{r.label}</dt>
+                    <dd className="text-neutral-100">
+                      {r.value} {r.tag && <ProvenanceBadge tag={r.tag} fixture={objectIsFixture} />}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+
+            {plan.type === 'comet' && emissionsRange && (
+              <SwitchRow
+                label="View emissions"
+                checked={emissionsJd !== null}
+                onChange={() =>
+                  setEmissions(
+                    emissionsJd === null ? { key: objectKey, jd: EPOCH_JD[epoch] } : null,
+                  )
+                }
+                testId="emissions-toggle"
+              />
             )}
 
             {plan.scrub && (
@@ -784,7 +1128,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
               </div>
             )}
 
-            {bar && (
+            {bar && !engineOwns && (
               <figure className="flex max-w-xl flex-col gap-1" data-testid="scale-bar">
                 <div className="flex flex-col gap-1" aria-hidden="true">
                   <div
@@ -834,31 +1178,31 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
               </figure>
             )}
 
-            {lapses.length > 0 && (
+            {lapses.length > 0 && !engineWorld && (
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className={buttonClass}
-                  onClick={() => {
-                    if (motionPaused) {
-                      // Play: lift every pause that is on (reduced motion override, user, idle).
-                      if (reducedMotion && !playAnyway) setPlayAnyway(true);
-                      if (spinPaused) setSpinPaused(false);
-                      if (idlePaused) viewer?.resumeFromIdle?.();
-                    } else if (reducedMotion) setPlayAnyway(false);
-                    else setSpinPaused(true);
-                  }}
-                >
-                  {motionPaused ? 'Play motion' : 'Pause motion'}
-                </button>
                 <p className="text-sm text-neutral-200" data-testid="motion-status">
                   {reducedMotion && !playAnyway
                     ? 'Motion is off because your device asks for reduced motion.'
                     : spinPaused
                       ? 'Motion is paused.'
                       : idlePaused
-                        ? 'Motion paused after a minute without input. Tap the view or press Play motion.'
+                        ? 'Motion paused after a minute without input. Tap the view to resume.'
                         : 'Motion is playing.'}
+                </p>
+              </div>
+            )}
+
+            {/* Issue #71 stream E: pacing of a simulated gas world; shown only for one. */}
+            {plan.type === 'gas_giant' && !engineWorld && lapses.some((t) => t.id === 'winds') && (
+              <div className="flex flex-col gap-1" data-testid="gas-pacing">
+                <ToggleGroup
+                  label="Time speed of the winds"
+                  value={String(gasPacing) as '0' | '1'}
+                  options={GAS_PACING_CHOICES.map((c) => ({ value: String(c.value) as '0' | '1', label: c.label }))}
+                  onChange={(v) => onGasPacing(Number(v) as 0 | 1)}
+                />
+                <p className="text-sm text-neutral-200" data-testid="gas-pacing-status">
+                  {gasPacingStatus(gasPacing)}
                 </p>
               </div>
             )}
@@ -870,16 +1214,29 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             )}
 
             {/* Every time-lapse says where its rate comes from and its speed-up (R5.7, D-32). */}
-            {lapses.map((t) => (
+            {(engineOwns && pane ? [] : lapses).map((t) => (
               <p key={t.id} className="text-sm text-neutral-200" data-testid="time-lapse-note">
                 {timeLapseText(t)}
               </p>
             ))}
 
-            <section aria-labelledby="legend-heading" className="flex flex-col gap-1">
-              <h3 id="legend-heading" className="text-sm font-medium text-neutral-200">
-                What is drawn
-              </h3>
+            {pane && <BuildKeyNumbers fixture={objectIsFixture} />}
+
+            <Rows>
+            {pane && (
+              <BuildSummaryRows
+                fixture={objectIsFixture}
+                flareChart={
+                  engineStar ? (
+                    <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                      Example curve. Hard X-rays follow the rate of change of soft X-rays (the Neupert effect).
+                    </p>
+                  ) : undefined
+                }
+                extraAssumed={assumedLines}
+              />
+            )}
+            <Row title="What is drawn" count={plan.drawn.length} testId="legend-row">
               <p className="text-xs text-neutral-400">
                 Measured: from observations. Estimated: worked out from data with a stated method.
                 Default: the artist&rsquo;s choice.
@@ -925,13 +1282,10 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                   ))}
                 </ul>
               )}
-            </section>
+            </Row>
 
             {defaultsShown.length > 0 && (
-              <section aria-labelledby="defaults-heading" className="flex flex-col gap-1">
-                <h3 id="defaults-heading" className="text-sm font-medium text-neutral-200">
-                  Shown as a default
-                </h3>
+              <Row title="Shown as a default" count={defaultsShown.length}>
                 <ul
                   className="flex flex-col gap-1 text-sm text-neutral-300"
                   data-testid="default-list"
@@ -943,23 +1297,21 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                     </li>
                   ))}
                 </ul>
-              </section>
+              </Row>
             )}
 
             {notDrawn.length > 0 && (
-              <section aria-labelledby="missing-heading" className="flex flex-col gap-1">
-                <h3 id="missing-heading" className="text-sm font-medium text-neutral-200">
-                  Not drawn
-                </h3>
+              <Row title="Not drawn" count={notDrawn.length}>
                 <ul className="list-disc pl-5 text-sm text-neutral-300" data-testid="missing-list">
                   {notDrawn.map((m) => (
                     <li key={m.id}>{describeRefusal(m)}</li>
                   ))}
                 </ul>
-              </section>
+              </Row>
             )}
+            </Rows>
 
-            {plan.notes.length > 0 && (
+            {plan.notes.length > 0 && !(engineOwns && pane) && (
               <ul className="list-disc pl-5 text-xs text-neutral-400" data-testid="notes">
                 {plan.notes.map((n) => (
                   <li key={n}>{n}</li>
@@ -969,6 +1321,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
           </>
         )}
       </div>
+      )}
 
       <div aria-live="polite" aria-atomic="true" className="sr-only" data-testid="viewer-announcer">
         {announcement}

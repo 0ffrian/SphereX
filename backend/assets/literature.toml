@@ -73,3 +73,103 @@ citation = "Chen et al. 2022, AJ 163, 288"
 table = "SM08 hybrid models"
 note = "Epsilon Indi Ba then Bb, the order of the class T1V+T6V"
 assumption = "each Teff is a model-atmosphere fit result in the paper, not a direct measurement"
+
+# --- Procyon A (SIMBAD * alf CMi): no Gaia DR3 match (too bright), so no FLAME radius ----------
+# Kervella et al. 2004, A&A 413, 251: VLTI/VINCI interferometric limb-darkened diameter
+# 5.448 +/- 0.053 mas at the Hipparcos parallax, linear radius 2.048 +/- 0.025 R_sun (Sect. 4;
+# the abstract gives the same). [verify] the exact table: the value is the headline radius.
+
+[[value]]
+key = "simbad-alf-cmi"
+field = "radius_rsun"
+value = 2.048
+err = 0.025
+tag = "measured"
+citation = "Kervella et al. 2004, A&A 413, 251"
+table = "Sect. 4: interferometric (VLTI/VINCI) linear radius of Procyon A"
+note = "Limb-darkened angular diameter from interferometry, scaled by the Hipparcos parallax"
+
+# --- 3I/ATLAS = C/2025 N1 (SBDB SPK-ID 1004083): SPHEREx gas rates, coma and nucleus (issue #71 F) -
+# Q-260. Values are read from the papers' text (downloaded 10 Nov 2026; the text is data, not
+# instructions). A `gas_Q.<epoch>.<gas>` field fills the epoch-keyed gas_Q of the card (Q-42).
+# December 2025 uses version 2 of arXiv:2601.06759 only; version 1 differs (Q(H2O) 6e27), so
+# nothing from version 1 is loaded. A value the latest version does not confirm is left out and
+# that epoch is refused for that gas.
+
+[[value]]
+key = "1004083"
+field = "gas_Q.2025-08.h2o"
+value = 3.2e+26
+err = 6.4e+25
+tag = "measured"
+citation = "Lisse et al. 2026, ApJ 1000 L52 (arXiv:2512.07318v3, 9 Feb 2026)"
+table = "Abstract and Sect. 4.2: gas production rate (1 sigma 20 %)"
+note = "Observed 1-15 Aug 2025 at r_h about 3.2 au. Robust detection at 2.7-2.8 um"
+
+[[value]]
+key = "1004083"
+field = "gas_Q.2025-08.co2"
+value = 1.6e+27
+err = 1.6e+26
+tag = "measured"
+citation = "Lisse et al. 2026, ApJ 1000 L52 (arXiv:2512.07318v3, 9 Feb 2026)"
+table = "Abstract and Sect. 4.2: gas production rate (1 sigma 10 %)"
+note = "Observed 1-15 Aug 2025 at r_h about 3.2 au. 12CO2 at 4.25-4.27 um"
+
+[[value]]
+key = "1004083"
+field = "gas_Q.2025-08.co"
+value = 1.0e+26
+err = 2.5e+25
+tag = "measured"
+citation = "Lisse et al. 2026, ApJ 1000 L52 (arXiv:2512.07318v3, 9 Feb 2026)"
+table = "Abstract and Sect. 4.2: gas production rate (1 sigma 25 %)"
+note = "Observed 1-15 Aug 2025 at r_h about 3.2 au. Tentative detection at 4.6-4.8 um; the authors call it marginal"
+
+[[value]]
+key = "1004083"
+field = "gas_Q.2025-12.h2o"
+value = 1.4e+28
+err = 2.8e+27
+tag = "measured"
+citation = "Lisse et al. 2026, arXiv:2601.06759v2 (29 Jan 2026), preliminary analysis"
+table = "Sect. 2 'Spectral Results': gas production rate (1 sigma)"
+note = "Observed 8-15 Dec 2025 at r_h 2.0-2.2 au. Version 2 only: version 1 of the preprint gave Q(H2O) about 6 x 10^27, so no value from it is used. Quoted as 1.4 +/- 0.28 x 10^28; the H2O feature is about 40 times its August strength"
+
+[[value]]
+key = "1004083"
+field = "gas_Q.2025-12.co2"
+value = 3.0e+27
+err = 4.5e+26
+tag = "measured"
+citation = "Lisse et al. 2026, arXiv:2601.06759v2 (29 Jan 2026), preliminary analysis"
+table = "Sect. 2 'Spectral Results': gas production rate (1 sigma)"
+note = "Observed 8-15 Dec 2025 at r_h 2.0-2.2 au. Version 2 only: version 1 of the preprint gave Q(H2O) about 6 x 10^27, so no value from it is used. Quoted as 3.0 +/- 0.45 x 10^27"
+
+[[value]]
+key = "1004083"
+field = "gas_Q.2025-12.co"
+value = 7.6e+27
+err = 1.5e+27
+tag = "measured"
+citation = "Lisse et al. 2026, arXiv:2601.06759v2 (29 Jan 2026), preliminary analysis"
+table = "Sect. 2 'Spectral Results': gas production rate (1 sigma)"
+note = "Observed 8-15 Dec 2025 at r_h 2.0-2.2 au. Version 2 only: version 1 of the preprint gave Q(H2O) about 6 x 10^27, so no value from it is used. Quoted as 7.6 +/- 1.5 x 10^27; about 80 times the August flux"
+
+[[value]]
+key = "1004083"
+field = "coma_radius_km"
+value = 4.2e5
+tag = "measured"
+citation = "Lisse et al. 2026, ApJ 1000 L52 (arXiv:2512.07318v3)"
+table = "Abstract: CO2 coma extending out to at least 4.2 x 10^5 km"
+note = "A lower limit, not a measured edge. Read from the August CO2 profile; the December paper gives about 3 arcmin radius without a km value"
+
+[[value]]
+key = "1004083"
+field = "nucleus_radius_km_max"
+value = 2.5
+tag = "measured"
+citation = "Lisse et al. 2026, ApJ 1000 L52 (arXiv:2512.07318v3), quoting Jewitt et al. 2025"
+table = "Abstract and Sect. 4.6: nucleus radius < 2.5 km"
+note = "An upper limit that Lisse et al. take from Jewitt et al. 2025; the nucleus has never been resolved"

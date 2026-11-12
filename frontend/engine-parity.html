@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>engine-parity (dev only)</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #000;
+        color: #ccc;
+        font: 12px monospace;
+      }
+      canvas {
+        display: block;
+      }
+      #msg {
+        padding: 4px 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Dev-only proof page for the D-37 world engine (src/engine/worlds). Not an input of the production build.
+         ?preset=t1e|rivers|earth|k218|tit|jup|sat|hd|nep|lava|t1f|k186
+         ?card=<object id>   (fetched from /v1/objects/{id}/card and mapped by cardToWorld)
+         &w=&h=  canvas size in CSS px (default 760x475)   &fly=1  fly view on   &alt=km   -->
+    <canvas id="c"></canvas>
+    <div id="msg"></div>
+    <script type="module" src="/src/engine/parity/main.ts"></script>
+  </body>
+</html>

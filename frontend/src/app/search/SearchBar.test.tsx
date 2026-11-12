@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAppStore } from '@/state/store';
 import { isEditableTarget, isSearchShortcut } from '@/app/shell/shortcuts';
 import { DEMO_TARGETS, filterTargets } from './demoTargets';
+import { REFERENCE_TARGETS } from './referenceTargets';
+
+const ROWS = DEMO_TARGETS.length + REFERENCE_TARGETS.length;
 import { CLOSING_HINT, NO_MATCH_HINT, SearchBar } from './SearchBar';
 
 declare global {
@@ -62,9 +65,9 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
     expect(input().getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('opens on focus with all 17 rows in order, and wires the ARIA ids', () => {
+  it('opens on focus with all rows in order, and wires the ARIA ids', () => {
     focus();
-    expect(options()).toHaveLength(17);
+    expect(options()).toHaveLength(ROWS);
     expect(names().slice(0, 3)).toEqual(["Barnard's Star", 'Epsilon Indi B', 'WISE 0855-0714']);
     expect(names()[15]).toBe('Crab Nebula');
     expect(names()[16]).toBe('433 Eros'); // row 17, the Track MVP (#73)
@@ -78,7 +81,7 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
     expect(status().getAttribute('aria-live')).toBe('polite');
     expect(status().textContent).toBe('');
     focus();
-    expect(status().textContent).toBe('17 demo objects. Use up and down arrows.');
+    expect(status().textContent).toBe(`${ROWS} demo objects. Use up and down arrows.`);
     type('oumuamua');
     expect(status().textContent).toBe('1 demo object. Use up and down arrows.');
     type('zzzzqq');
@@ -105,7 +108,7 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
       input().focus();
       input().select();
     });
-    expect(options()).toHaveLength(17);
+    expect(options()).toHaveLength(ROWS);
     expect(document.activeElement).toBe(input());
   });
 
@@ -120,7 +123,7 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
     act(() => {
       input().click();
     });
-    expect(options()).toHaveLength(17);
+    expect(options()).toHaveLength(ROWS);
   });
 
   it('Enter with keyCode 229 (an IME step) does not pick a row', () => {
@@ -152,7 +155,7 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
     const shown = [...host.querySelectorAll('[role="option"]')].map(
       (o) => o.querySelector('.sx-suggest-label')?.textContent ?? null,
     );
-    expect(shown).toEqual(DEMO_TARGETS.map((t) => t.classLabel));
+    expect(shown).toEqual([...DEMO_TARGETS, ...REFERENCE_TARGETS].map((t) => t.classLabel));
     expect(DEMO_TARGETS.some((t) => t.classLabel !== null)).toBe(true);
   });
 

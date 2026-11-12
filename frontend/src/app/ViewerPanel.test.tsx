@@ -1,5 +1,7 @@
 // The 3D viewer panel with a fake renderer (no GPU): controls, legend, badges, refused layers,
 // canvas label and live announcements (R5.3, R7.3, R9, D-02, D-21).
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -19,6 +21,12 @@ const fake = {
   clearObject: vi.fn(),
   setLoadFailedHandler: vi.fn(),
   setMeshMeasuredHandler: vi.fn(),
+  setCloseUpHandler: vi.fn(),
+  openCloseUp: vi.fn(),
+  closeUpOff: vi.fn(),
+  requestRender: vi.fn(),
+  pickGlobe: vi.fn(),
+  orbitView: null,
   setOverrides: vi.fn(),
   setSpinPaused: vi.fn(),
   setMotionOverride: vi.fn(),
@@ -29,12 +37,38 @@ const fake = {
   rotate: vi.fn(),
   zoom: vi.fn(),
   resetView: vi.fn(),
+  setStarCloseUp: vi.fn(),
+  latestFlareText: vi.fn(() => null),
+  fireFlare: vi.fn(),
+  setFieldLines: vi.fn(),
+  setEngineOwned: vi.fn(),
   dispose: vi.fn(),
 };
 
+// The star engine needs WebGL 2 (absent in jsdom): a test can hand the panel a star the engine "draws".
+const engine = vi.hoisted(() => ({ star: null as unknown, pane: false }));
+vi.mock('./StarEngineStage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./StarEngineStage')>();
+  return {
+    ...actual,
+    useEngineStar: () => engine.star,
+    StarGlobeStage: () => <div data-testid="star-engine-stub" />,
+  };
+});
+
 vi.mock('@/viewer/ViewerApp', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/viewer/ViewerApp')>();
-  return { ...actual, ViewerApp: { create: vi.fn(async () => fake) } };
+  // In the build pane the panel calls many more viewer methods: a test that mounts it there asks for a
+  // fake that answers every other method with a no-op (never `then`: the fake is awaited).
+  const noop = new Map<string, () => void>();
+  const paneFake = () =>
+    new Proxy(fake, {
+      get: (t, k) =>
+        k in t || typeof k !== 'string' || !/^set[A-Z]/.test(k)
+          ? (t as Record<string | symbol, unknown>)[k]
+          : (noop.get(k) ?? noop.set(k, () => {}).get(k)),
+    });
+  return { ...actual, ViewerApp: { create: vi.fn(async () => (engine.pane ? paneFake() : fake)) } };
 });
 
 // Imported after the mock is registered (vi.mock is hoisted).
@@ -67,6 +101,8 @@ beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   useAppStore.setState(initialAppData);
   shown.length = 0;
+  engine.star = null;
+  engine.pane = false;
   Object.values(fake).forEach((f) => typeof f === 'function' && 'mockClear' in f && f.mockClear());
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -79,6 +115,31 @@ afterEach(async () => {
 });
 
 describe('ViewerPanel', () => {
+  it('mounts the prototype engines only at + Artistic; below it the three.js viewer draws (PR #89 review)', async () => {
+    const { card, params } = fixture('star');
+    engine.pane = true;
+    engine.star = {
+      preset: { id: card.id, label: card.name, T: 5772, R: 1, M: 1, P: 25.4, dwarf: true },
+    };
+    useAppStore.getState().setObject(card, params);
+    const stub = () => container.querySelector('[data-testid="star-engine-stub"]');
+    const pane = { seq: 0, animate: false, seedOffset: 0 };
+    useAppStore.getState().setHonesty('derived');
+    await act(async () => {
+      root.render(<ViewerPanel pane={pane} />);
+    });
+    await act(async () => {});
+    expect(stub()).toBeNull();
+    expect(fake.setEngineOwned).not.toHaveBeenCalledWith(true);
+    expect(fake.setEngineOwned).toHaveBeenLastCalledWith(false);
+    await act(async () => useAppStore.getState().setHonesty('artistic'));
+    expect(stub()).not.toBeNull();
+    expect(fake.setEngineOwned).toHaveBeenLastCalledWith(true);
+    await act(async () => useAppStore.getState().setHonesty('measured'));
+    expect(stub()).toBeNull();
+    expect(fake.setEngineOwned).toHaveBeenLastCalledWith(false);
+  });
+
   it('announces a governor tier drop in plain words, but not a manual tier change', async () => {
     await mount();
     const handler = fake.setQualityChangeHandler.mock.calls.at(-1)?.[0] as
@@ -104,6 +165,27 @@ describe('ViewerPanel', () => {
       'Flares: rate taken from a typical value; shown 86,400\u00d7 faster.',
     ]);
     expect(container.textContent).not.toMatch(/sped up/);
+  });
+
+  it('a star opens in True colour (Q-290); the Light and View groups have no Close-up option (the left pane is the close-up)', async () => {
+    const { card, params } = fixture('star');
+    useAppStore.getState().setObject(card, params);
+    useAppStore.getState().setHonesty('artistic');
+    await mount();
+    const pressed = (n: string) => button(n)?.getAttribute('aria-pressed');
+    expect(pressed('True colour')).toBe('true');
+    expect(pressed('Larger detail')).toBe('true');
+    expect(button('Close-up')).toBeUndefined();
+    await click('Observatory');
+    expect(pressed('Observatory')).toBe('true');
+    expect(pressed('True colour')).toBe('false');
+    expect(text('viewer-announcer')).toMatch(/Observatory view.*larger detail/);
+    await click('True scale');
+    expect(pressed('True scale')).toBe('true');
+    expect(fake.setStarCloseUp).not.toHaveBeenCalledWith(expect.objectContaining({ halfWidth: expect.any(Number) }));
+    expect(container.querySelector('[data-testid="star-readouts"]')?.textContent).toMatch(
+      /Surface gravity/,
+    );
   });
 
   it('shows no note for a process whose layer is not drawn (Measured only)', async () => {
@@ -257,8 +339,8 @@ describe('ViewerPanel', () => {
     expect(shown.at(-1)?.shells).toHaveLength(3);
     expect(text('viewer-announcer')).toMatch(/^August 2025\. Gas shells: CO₂, H₂O, CO\./);
     // The toggle says which epoch has no gas data.
-    expect(button('Dec 2025(no gas data)')).toBeDefined();
-    await click('Dec 2025(no gas data)');
+    expect(button('Dec 2025 (no gas data)')).toBeDefined();
+    await click('Dec 2025 (no gas data)');
     expect(shown.at(-1)?.shells).toHaveLength(0); // the fixture card holds August Q only
     expect(text('missing-list')).toContain(
       'Gas shells: not drawn for December 2025. The card has no gas measurements for this epoch.',
@@ -358,30 +440,83 @@ describe('ViewerPanel', () => {
     expect(text('missing-list')).not.toContain('Sun direction');
   });
 
-  it('one pause control for all motion, shown whenever something is a time-lapse (WCAG 2.2.2)', async () => {
-    // A Mira (pulsation only) has no spin and still gets the control.
+  // Moon removed the Pause/Play button from Details. Motion is stopped with `P` in the build pane (WCAG 2.2.2),
+  // announced in the live region; the status line in Details still says what the scene is doing.
+  const mountPane = async () => {
+    engine.pane = true;
+    await act(async () => {
+      root.render(<ViewerPanel pane={{ seq: 0, animate: false, seedOffset: 0 }} />);
+    });
+    await act(async () => {});
+  };
+  const pressP = async (target: EventTarget = window) => {
+    await act(async () => {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true, cancelable: true }));
+    });
+  };
+
+  it('Details has a Show row in the build pane that lowers the level, and a Motion row wired like P (D-21, Q-412)', async () => {
     const { card, params } = fixture('star_mira');
     useAppStore.getState().setObject(card, params);
     useAppStore.getState().setHonesty('artistic');
-    await mount();
-    expect(button('Pause motion')?.hasAttribute('aria-pressed')).toBe(false);
-    expect(button('Pause spin')).toBeUndefined();
-    await click('Pause motion');
+    await mountPane();
+    const inDetails = (label: string) =>
+      [...container.querySelectorAll<HTMLButtonElement>('[data-testid="build-details-panel"] button')].find(
+        (b) => b.textContent === label,
+      );
+    await act(async () => inDetails('Measured only')!.click());
+    expect(useAppStore.getState().honesty).toBe('measured');
+    await act(async () => {});
+    expect(useAppStore.getState().honesty).toBe('measured');
+    await act(async () => inDetails('Paused')!.click());
     expect(fake.setSpinPaused).toHaveBeenLastCalledWith(true);
-    expect(text('motion-status')).toContain('Motion is paused');
-    await click('Play motion');
+    await act(async () => inDetails('Playing')!.click());
     expect(fake.setSpinPaused).toHaveBeenLastCalledWith(false);
   });
 
-  it('no time-lapse, no pause control', async () => {
+  it('there is no Pause button; P pauses and resumes everything that moves, and says so (WCAG 2.2.2)', async () => {
+    // A Mira (pulsation only) has no spin and still moves.
+    const { card, params } = fixture('star_mira');
+    useAppStore.getState().setObject(card, params);
+    useAppStore.getState().setHonesty('artistic');
+    await mountPane();
+    expect(button('Pause motion')).toBeUndefined();
+    expect(button('Pause spin')).toBeUndefined();
+    expect(text('motion-status')).toContain('Motion is playing');
+    await pressP();
+    expect(fake.setSpinPaused).toHaveBeenLastCalledWith(true);
+    expect(text('motion-status')).toContain('Motion is paused');
+    expect(text('viewer-announcer')).toBe('Motion is paused.');
+    await pressP();
+    expect(fake.setSpinPaused).toHaveBeenLastCalledWith(false);
+    expect(text('viewer-announcer')).toBe('Motion is playing.');
+  });
+
+  it('P is ignored while typing, and with a modifier held', async () => {
+    const { card, params } = fixture('star_mira');
+    useAppStore.getState().setObject(card, params);
+    useAppStore.getState().setHonesty('artistic');
+    await mountPane();
+    const field = document.createElement('input');
+    document.body.appendChild(field);
+    await pressP(field);
+    field.remove();
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true, cancelable: true }));
+    });
+    expect(fake.setSpinPaused).not.toHaveBeenCalledWith(true);
+  });
+
+  it('no time-lapse, no motion status', async () => {
     const { card, params } = fixture('star_mira'); // the pulsation is hidden at the default level
     useAppStore.getState().setObject(card, params);
     await mount();
     expect(button('Pause motion')).toBeUndefined();
     expect(button('Play motion')).toBeUndefined();
+    expect(container.querySelector('[data-testid="motion-status"]')).toBeNull();
   });
 
-  it('under reduced motion the control stays and starts as Play motion (R9, WCAG 2.2.2)', async () => {
+  it('under reduced motion nothing moves until P is pressed; P starts it and P stops it again (R9, WCAG 2.2.2)', async () => {
     vi.stubGlobal('matchMedia', (q: string) => ({
       matches: q === '(prefers-reduced-motion: reduce)',
       addEventListener() {},
@@ -391,20 +526,21 @@ describe('ViewerPanel', () => {
       const { card, params } = fixture('asteroid_shape');
       card.shape_source = { value: '/meshes/bennu.glb', tag: 'measured', source: 'test' };
       useAppStore.getState().setObject(card, params);
-      await mount();
-      expect(button('Play motion')?.hasAttribute('aria-pressed')).toBe(false);
-      expect(text('motion-status')).toContain('reduced motion');
-      await click('Play motion');
-      expect(fake.setMotionOverride).toHaveBeenLastCalledWith(true);
-      expect(button('Pause motion')).toBeDefined();
-      await click('Pause motion');
+      await mountPane();
       expect(fake.setMotionOverride).toHaveBeenLastCalledWith(false);
+      expect(text('motion-status')).toContain('reduced motion');
+      await pressP();
+      expect(fake.setMotionOverride).toHaveBeenLastCalledWith(true);
+      expect(text('motion-status')).toContain('Motion is playing');
+      await pressP();
+      expect(fake.setMotionOverride).toHaveBeenLastCalledWith(false);
+      expect(text('motion-status')).toContain('reduced motion');
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
-  it('reduced motion, Play motion, then an idle pause: the button and status show the pause', async () => {
+  it('reduced motion, P, then an idle pause: the status shows the pause and P resumes from it', async () => {
     vi.stubGlobal('matchMedia', (q: string) => ({
       matches: q === '(prefers-reduced-motion: reduce)',
       addEventListener() {},
@@ -414,16 +550,13 @@ describe('ViewerPanel', () => {
       const { card, params } = fixture('asteroid_shape');
       card.shape_source = { value: '/meshes/bennu.glb', tag: 'measured', source: 'test' };
       useAppStore.getState().setObject(card, params);
-      await mount();
-      await click('Play motion');
-      expect(button('Pause motion')).toBeDefined();
+      await mountPane();
+      await pressP();
       expect(text('motion-status')).toContain('Motion is playing');
       const idle = fake.setIdleChangeHandler.mock.calls.at(-1)?.[0] as (i: boolean) => void;
       await act(async () => idle(true));
-      expect(button('Play motion')).toBeDefined();
-      expect(button('Pause motion')).toBeUndefined();
       expect(text('motion-status')).toContain('paused after a minute');
-      await click('Play motion');
+      await pressP();
       expect(fake.resumeFromIdle).toHaveBeenCalled();
       // The reduced-motion override stays on (the user asked for motion).
       expect(fake.setMotionOverride).toHaveBeenLastCalledWith(true);
@@ -456,7 +589,7 @@ describe('ViewerPanel', () => {
     const a = fixture('comet');
     useAppStore.getState().setObject(a.card, a.params);
     await mount();
-    await click('Dec 2025(no gas data)');
+    await click('Dec 2025 (no gas data)');
     expect(shown.at(-1)?.epoch).toBe('2025-12');
     const b = fixture('comet');
     b.params.id = 'fixture:comet-2';
@@ -472,7 +605,21 @@ describe('ViewerPanel', () => {
     await mount();
     const buttons = [...container.querySelectorAll('button')];
     expect(buttons.length).toBeGreaterThan(8);
-    for (const b of buttons) expect(b.className).toMatch(/min-h-11/);
+    // Panel controls (the design-language `sx-` classes) get their size from index.css, which jsdom does not
+    // load: check the stylesheet. Every one has min-height >= 24 px, and 44 px on touch.
+    const css = readFileSync(resolve(__dirname, '../index.css'), 'utf8').replace(/@media[^{]*\{/g, '');
+    const heights = (selector: string): number[] =>
+      [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+        .filter(([, sel]) => sel!.split(',').some((x) => x.trim() === selector))
+        .map(([, , body]) => Number(/min-height:\s*(\d+)px/.exec(body!)?.[1] ?? 0));
+    for (const sel of ['.sx-seg button', '.sx-row-t', '.sx-btn-outline', '.sx-sw-row']) {
+      expect(Math.min(...heights(sel).filter(Boolean)), sel).toBeGreaterThanOrEqual(24);
+      expect(Math.max(...heights(sel)), `${sel} on touch`).toBeGreaterThanOrEqual(44);
+    }
+    for (const b of buttons) {
+      const sized = /min-h-(11|\[4\d)/.test(b.className) || /\bsx-/.test(b.className) || b.closest('.sx-seg, .sx-sw-row') !== null;
+      expect(sized, `button "${b.textContent}" has no size class`).toBe(true);
+    }
   });
 });
 

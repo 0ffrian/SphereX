@@ -39,6 +39,9 @@ This is **reduced, physically inspired physics**, not simulation. Each rule is a
 
 **Stretch: real fluid solver.** A 2D barotropic vorticity solver on a latitude-longitude grid, with the equation `d(zeta)/dt + J(psi, zeta + f) = nu * del2(zeta) + forcing`. Storms then form, merge, shear and die on their own. Needs a GPU pass. A 256 x 128 grid should be possible on the demo laptop's GPU (A10.1), but this is **untested**. P3, not built. Build it only after the rules layer works.
 
+
+**Solved gas worlds (issue #71, D-36, Q-250 to Q-259).** A giant with radius, mass, `teq_K` and a spin (or, with no measured spin and an orbit under 30 days, taken as tidally locked with spin = orbit, `model_dependent`) is run as a simulation: quasi-geostrophic vorticity `dq/dt + J(psi, q + f) = F - D`, `q = lap(psi) - psi / L_D^2`, over fixed deep jets kept inside the Rayleigh-Kuo limit. Code: `frontend/src/physics/gasDynamics.ts`. Gravity `g = G M / R^2`, scale height `H = R_gas T / (mu g)`, deformation radius `L_D = 0.35 sqrt(g H) / Omega`, storm size `3 L_D / R`. Jupiter and Saturn (`ref-jupiter`, `ref-saturn`, values from the NASA Planetary Fact Sheets) use observed belt and zone latitudes and named storms; a locked hot giant has one superrotating equatorial jet and a day-night temperature, with a night-side glow only above 850 K. Still `[verify]`: `cp = 3.5 R`, the 0.1 bar radiative reference, the wind law `U = 0.6 sqrt(R dT)`, the 0.35 factor, the day/night factors 1.3 and 0.55.
+
 ### A7.3 Brown dwarfs
 
 | Quantity | Rule | Status |

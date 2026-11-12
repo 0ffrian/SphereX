@@ -4,15 +4,29 @@
 //   used for scaling (Q-43), not a limit.
 //   Gas shells: one additive point cloud per gas, density ~ 1/r^2 out to the coma radius, point
 //   count and brightness proportional to Q of the selected epoch. False colours with a legend.
+//   Water's count and brightness also carry the Haser break-up share inside the coma
+//   (`h2o_breakup`, model_dependent); the drawn radial profile itself stays 1/r^2.
 //   Dust: Sun-pointing, December only. Tail: none in August; drawn in December only if a
 //   published result shows one, and the card holds no such field, so it is never drawn.
 //   Epoch toggle: Aug 2025 / Dec 2025.
 import type { CometEpoch, GasQ, ObjectCard } from '@/contract';
 import { isTagShown, weakerOf } from '../honesty';
 import { isPresent, litBody, numberField, PlanBuilder, type PlanInput } from '../planCommon';
-import type { RenderPlan, ShellPlan, Vec3, VolumePlan } from '../planTypes';
+import type { RenderPlan, ShapePlan, ShellPlan, Vec3, VolumePlan } from '../planTypes';
 import { isLoadableMeshUrl, planShapeLayers } from './AsteroidMesh';
 import { comaVolume, dustConeVolume, dustTailVolume, ionTailVolume } from '../volume/volumeSpecs';
+import {
+  EPOCH_JD,
+  gasRatesAt,
+  h2oScaleLengthKm,
+  haserShellFraction,
+  HASER_ASSUMPTION,
+  hasKeyedEpochs,
+  INTERPOLATION_ASSUMPTION,
+  type GasKey,
+} from '@/physics/cometGas';
+import { GRAIN_SIZE_ASSUMPTION, stateAt } from '@/physics/cometTail';
+import { modelledTails, trackRows } from './cometTailPlan';
 
 export const COMET_EPOCHS: readonly CometEpoch[] = ['2025-08', '2025-12'];
 
@@ -25,6 +39,9 @@ export const EPOCH_LABEL: Readonly<Record<CometEpoch, string>> = {
  * Display budget. R5.5 allows at most 60k points in total: three gas shells plus the dust cloud.
  * 3 x 18,000 + 6,000 = 60,000. All values here are artistic.
  */
+/** Grains per assumed grain size in the modelled dust tail (display count; the low tier uses fewer). */
+export const DUST_GRAINS_PER_BETA = 24;
+export const DUST_GRAINS_PER_BETA_LOW = 10;
 export const MAX_SHELL_POINTS = 18_000;
 export const DUST_POINTS = 6000;
 /** R5.5: points <= 60k, for every gas at its maximum plus the dust. */
@@ -78,17 +95,32 @@ export function epochsWithQ(card: ObjectCard): CometEpoch[] {
  * Shell sizes. Point count and brightness are proportional to Q, normalised by the largest Q of
  * any gas in any epoch of the card, so switching epoch changes the shells.
  */
-export function planShells(card: ObjectCard, epoch: CometEpoch, seed: number): ShellPlan[] {
+/** The largest Q of any gas in any epoch of the card (the brightness scale), 0 when none. */
+export function cardQMax(card: ObjectCard): number {
   let qMax = 0;
   for (const e of COMET_EPOCHS)
     for (const g of GAS_STYLE) qMax = Math.max(qMax, qValue(gasQForEpoch(card, e), g.key) ?? 0);
+  return qMax;
+}
+
+export function planShells(
+  card: ObjectCard,
+  epoch: CometEpoch,
+  seed: number,
+  jd: number | null = null,
+): ShellPlan[] {
+  const qMax = cardQMax(card);
   if (qMax === 0) return [];
+  // Issue #71 F (Q-262): at a chosen time the rates come from cometGas (measured inside an epoch
+  // window, a log-linear interpolation between them), on the same scale as the epochs.
+  const at = jd !== null && hasKeyedEpochs(card) ? gasRatesAt(card, jd).rates : null;
+  const byKey = new Map<GasKey, number>(at?.map((r) => [r.key, r.value]) ?? []);
   const q = gasQForEpoch(card, epoch);
   const shells: ShellPlan[] = [];
   GAS_STYLE.forEach((g, i) => {
-    const v = qValue(q, g.key);
+    const v = at ? (byKey.get(g.key) ?? null) : qValue(q, g.key);
     if (v === null) return;
-    const brightness = v / qMax;
+    const brightness = Math.min(1, v / qMax);
     shells.push({
       id: g.key,
       label: g.label,
@@ -109,10 +141,16 @@ export function planComet(input: PlanInput): RenderPlan {
   b.tintLegend = false; // the nucleus is a fixed dark colour; the mode colours the dust only
   const epoch = ctx.epoch;
   const epochs = epochsWithQ(card);
+  // Issue #71 F: the time of the picture. The emissions view sets `cometJd`; without it the
+  // epoch's own centre time. Only a card keyed by epoch has gas between the epochs (Q-42, Q-262).
+  const keyedGas = hasKeyedEpochs(card);
+  const timed = ctx.cometJd !== undefined && ctx.cometJd !== null && keyedGas;
+  const jd = timed ? (ctx.cometJd as number) : EPOCH_JD[epoch];
+  const rates = timed ? gasRatesAt(card, jd) : null;
 
   // Gas shells. If the card has Q but not for this epoch, say so instead of guessing.
   const q = gasQForEpoch(card, epoch);
-  const hasQ = GAS_STYLE.some((g) => qValue(q, g.key) !== null);
+  const hasQ = rates ? rates.rates.length > 0 : GAS_STYLE.some((g) => qValue(q, g.key) !== null);
   let shells: ShellPlan[] = [];
   const layer = params.layers.find((l) => l.id === 'gas_shells');
   if (layer && b.ready('gas_shells') && isPresent(card.gas_Q) && !hasQ) {
@@ -129,7 +167,37 @@ export function planComet(input: PlanInput): RenderPlan {
   } else if (
     b.draw('gas_shells', { swatches: GAS_STYLE.map((g) => ({ label: g.label, css: g.css })) })
   ) {
-    shells = planShells(card, epoch, params.seed);
+    shells = planShells(card, epoch, params.seed, timed ? jd : null);
+    if (rates?.rates.some((r) => r.kind === 'interpolated'))
+      b.notes.push(`Between observations the gas amounts are a guess. ${INTERPOLATION_ASSUMPTION}`);
+    for (const r of rates?.rates ?? [])
+      if (r.kind === 'measured' && r.instrument && r.instrument !== 'SPHEREx')
+        b.notes.push(`${r.label} at this time: ${r.source ?? r.instrument}`);
+    if (shells.some((s) => s.brightness >= 1) && rates?.rates.some((r) => r.value > cardQMax(card)))
+      b.notes.push(
+        'Near closest approach to the Sun the gas amount is above the top of the brightness scale (the largest SPHEREx value), so it is drawn at full brightness.',
+      );
+    // Water is broken up by sunlight (Haser model, `model_dependent`): fewer of its molecules are
+    // left inside the coma than a pure 1/r^2 shell holds. The heliocentric distance comes from the
+    // card's Horizons path at the picture's time.
+    const h2o = shells.find((s) => s.id === 'h2o');
+    if (h2o) {
+      const path = trackRows(card.orbit_track?.value);
+      const st = path ? stateAt(path, jd) : null;
+      const L = st ? h2oScaleLengthKm(Math.hypot(st.r[0], st.r[1], st.r[2])) : null;
+      const comaR = numberField(card, 'coma_radius_km');
+      if (L !== null && comaR !== null && comaR > 0) {
+        if (b.drawLocal('h2o_breakup', 'model_dependent', HASER_ASSUMPTION)) {
+          const f = haserShellFraction(h2o.innerRadius, h2o.outerRadius, L / comaR);
+          h2o.brightness *= f;
+          h2o.count = Math.max(1, Math.round(h2o.count * f));
+        }
+      } else {
+        b.notes.push(
+          'Water is drawn without its break-up by sunlight: the distance from the Sun or the coma size is not known.',
+        );
+      }
+    }
   }
 
   // Nucleus: a dark sphere at the upper size limit; a point if the value is missing or hidden.
@@ -203,44 +271,96 @@ export function planComet(input: PlanInput): RenderPlan {
     }
   }
   if (dust) volumes.push(dustConeVolume(dust, b.layers.get('dust')?.tag ?? 'artistic'));
+  // Issue #71 F (Q-261, Q-263): with a sampled Horizons path on the card the tails are modelled
+  // from it at the picture's time: the ion tail along the real anti-Sun direction (`derived`) and
+  // the dust tail by Finson-Probstein with assumed grain sizes (`model_dependent`). Without a path
+  // the older display tails below are used.
+  const track = trackRows(card.orbit_track?.value);
+  const tails =
+    track && (b.has('ion_tail') || b.has('dust_tail'))
+      ? modelledTails(
+          track,
+          jd,
+          comaKm,
+          params.seed,
+          ctx.qualityTier === 'low' ? DUST_GRAINS_PER_BETA_LOW : DUST_GRAINS_PER_BETA,
+        )
+      : null;
+  let sunScene: Vec3 | null = null;
   const sunKnown = b.lighting.source === 'phase_angle' || b.lighting.source === 'sun_dir';
   let tailDrawn = false;
-  for (const [id, make] of [
-    [
-      'ion_tail',
-      () => ionTailVolume(b.lighting.direction ?? [0, 0, 1], (params.seed * 8 + 5) >>> 0),
-    ],
-    [
-      'dust_tail',
-      () => dustTailVolume(b.lighting.direction ?? [0, 0, 1], (params.seed * 8 + 6) >>> 0),
-    ],
-  ] as const) {
-    if (!b.has(id)) continue;
-    if (!sunKnown) {
-      b.reject({
-        id,
-        reason: 'data',
-        fields: ['phase_angle_deg'],
-        detail: 'The Sun direction is not known.',
-      });
-      continue;
+  if (tails) {
+    sunScene = tails.sunScene;
+    for (const [id, vol] of [
+      ['ion_tail', tails.ion],
+      ['dust_tail', tails.dust],
+    ] as const) {
+      if (!b.has(id)) continue;
+      if (!vol) {
+        b.reject({
+          id,
+          reason: 'data',
+          detail:
+            id === 'dust_tail' ? (tails.dustWhy ?? undefined) : 'The Sun direction is not known.',
+        });
+        continue;
+      }
+      const tag = weakerOf(vol.tag, b.layers.get(id)!.tag);
+      if (b.ready(id) && !isTagShown(b.ctx.honesty, tag)) {
+        b.reject({ id, reason: 'honesty', tag });
+      } else if (b.draw(id)) {
+        const entry = b.drawn.find((d) => d.id === id);
+        if (entry) entry.tag = tag;
+        volumes.push({ ...vol, tag });
+        tailDrawn = true;
+      }
     }
-    const v = make();
-    if (!v) continue;
-    // The tail rests on the backend layer (that it exists) and on the viewer's own shape (a
-    // display value). It claims no more than the weaker of the two, so a dust tail whose bend is
-    // a display choice is never shown as better than that (D-02).
-    // Only a phase angle fixes the Sun direction; the `sun_dir` hint is in an unspecified frame
-    // (lighting.ts), so a tail aimed by it alone is artistic.
-    const sunTag = b.lighting.source === 'phase_angle' ? v.tag : 'artistic';
-    const tag = weakerOf(weakerOf(v.tag, b.layers.get(id)!.tag), sunTag);
-    if (b.ready(id) && !isTagShown(b.ctx.honesty, tag)) {
-      b.reject({ id, reason: 'honesty', tag });
-    } else if (b.draw(id)) {
-      const entry = b.drawn.find((d) => d.id === id);
-      if (entry) entry.tag = tag;
-      volumes.push({ ...v, tag });
-      tailDrawn = true;
+    if (tailDrawn) {
+      b.notes.push(
+        'The tails are modelled, not seen. The Sun direction comes from the comet\u2019s path (JPL Horizons). SPHEREx did not see a dust tail pointing away from the Sun.',
+      );
+      if (tails.dust) b.notes.push(GRAIN_SIZE_ASSUMPTION);
+      if (tails.dust && tails.dustCapped)
+        b.notes.push('The dust tail is cut short in the picture; the model makes it longer.');
+    }
+  } else {
+    for (const [id, make] of [
+      [
+        'ion_tail',
+        () => ionTailVolume(b.lighting.direction ?? [0, 0, 1], (params.seed * 8 + 5) >>> 0),
+      ],
+      [
+        'dust_tail',
+        () => dustTailVolume(b.lighting.direction ?? [0, 0, 1], (params.seed * 8 + 6) >>> 0),
+      ],
+    ] as const) {
+      if (!b.has(id)) continue;
+      if (!sunKnown) {
+        b.reject({
+          id,
+          reason: 'data',
+          fields: ['phase_angle_deg'],
+          detail: 'The Sun direction is not known.',
+        });
+        continue;
+      }
+      const v = make();
+      if (!v) continue;
+      // The tail rests on the backend layer (that it exists) and on the viewer's own shape (a
+      // display value). It claims no more than the weaker of the two, so a dust tail whose bend is
+      // a display choice is never shown as better than that (D-02).
+      // Only a phase angle fixes the Sun direction; the `sun_dir` hint is in an unspecified frame
+      // (lighting.ts), so a tail aimed by it alone is artistic.
+      const sunTag = b.lighting.source === 'phase_angle' ? v.tag : 'artistic';
+      const tag = weakerOf(weakerOf(v.tag, b.layers.get(id)!.tag), sunTag);
+      if (b.ready(id) && !isTagShown(b.ctx.honesty, tag)) {
+        b.reject({ id, reason: 'honesty', tag });
+      } else if (b.draw(id)) {
+        const entry = b.drawn.find((d) => d.id === id);
+        if (entry) entry.tag = tag;
+        volumes.push({ ...v, tag });
+        tailDrawn = true;
+      }
     }
   }
   // The R7.3 layer `tail` (published result) is still never drawn from a card without one.
@@ -253,7 +373,30 @@ export function planComet(input: PlanInput): RenderPlan {
   // Nucleus from a shape model when one exists (67P): the same path as an asteroid shape (R7.1).
   const nucleusUrl = card.shape_source?.value ?? null;
   const meshDrawn = b.draw('mesh', { asset: isLoadableMeshUrl(nucleusUrl) ? nucleusUrl : null });
-  const shape = meshDrawn ? planShapeLayers(b) : null;
+  let shape: ShapePlan | null = meshDrawn ? planShapeLayers(b) : null;
+  // No shape model (issue #71, Q-210): a two-lobed, dark outline, drawn as an illustration, lit
+  // like airless rock. The lobes are `artistic`; the reflectance is a standard model.
+  const lobed =
+    !meshDrawn &&
+    nucleusDrawn &&
+    b.drawLocal(
+      'nucleus_shape',
+      'artistic',
+      'Two lobes joined at a neck, the common shape of a comet nucleus. No shape model exists for this nucleus, so the outline is an illustration.',
+    );
+  if (lobed) {
+    shape = {
+      lommelSeeliger: b.drawLocal(
+        'reflectance',
+        'model_dependent',
+        'Light scatters off the surface the way dark, airless rock does. This is a standard model, not a measurement of this body.',
+      ),
+      shadows: false,
+      ao: false,
+      regolith: false,
+      rock: true,
+    };
+  }
   // Sized by a shape model that is drawn and loaded: its own bounding sphere, not a limit (Q-43, Q-162).
   const meshSized = meshDrawn && isLoadableMeshUrl(nucleusUrl);
   if (meshSized && sizeNote >= 0)
@@ -261,12 +404,13 @@ export function planComet(input: PlanInput): RenderPlan {
       "The nucleus is scaled to its shape model's own bounding sphere, not to a measured radius.";
 
   const nucleus = litBody('nucleus', [nucleusScene, nucleusScene, nucleusScene], NUCLEUS_TINT, {
-    segments: [32, 16],
+    segments: lobed ? [64, 32] : [32, 16],
     meshUrl: meshDrawn ? nucleusUrl : null,
+    lobed,
     // The nucleus is dark and lit like a solar-system body.
   });
   // The plan has a body even when the nucleus layer was refused: a point (R7.3), tinted dark.
-  return b.build({
+  const plan = b.build({
     bodies: [nucleus],
     shells,
     dust,
@@ -284,4 +428,16 @@ export function planComet(input: PlanInput): RenderPlan {
     tintUsed: dust !== null,
     relief: 'illustrative',
   });
+  // The nucleus is lit from the Sun direction of the picture's time when the path gives one, so the
+  // light and the tails agree (Q-261). `derived` from Horizons; not a phase angle.
+  if (sunScene) {
+    plan.lighting = {
+      ...plan.lighting,
+      direction: sunScene,
+      source: 'sun_dir',
+      tag: 'derived',
+      phaseAngleDeg: null,
+    };
+  }
+  return plan;
 }

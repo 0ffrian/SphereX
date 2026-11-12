@@ -47,15 +47,24 @@ class WiseCone:
     served: Served
 
 
-def wise_key(ra: float, dec: float, radius_deg: float) -> CacheKey:
-    return CacheKey.make(
-        SOURCE,
-        RELEASE,
-        ra=norm_ra(ra),
-        dec=norm_dec(dec),
-        radius=norm_float(radius_deg, 5),
-        top=str(MAX_ROWS),
-    )
+def wise_key(
+    ra: float,
+    dec: float,
+    radius_deg: float,
+    w1_lt: float | None = None,
+    max_rows: int = MAX_ROWS,
+) -> CacheKey:
+    """The defaults give the key every recorded cone was stored under (no W1 cut, Q-51); a W1
+    cut (the star list for movers, issue #95) adds ``w1_lt`` to the key."""
+    query = {
+        "ra": norm_ra(ra),
+        "dec": norm_dec(dec),
+        "radius": norm_float(radius_deg, 5),
+        "top": str(max_rows),
+    }
+    if w1_lt is not None:
+        query["w1_lt"] = norm_float(w1_lt, 2)
+    return CacheKey.make(SOURCE, RELEASE, **query)
 
 
 def _mas(arcsec_per_yr: float | None) -> float | None:
@@ -82,11 +91,21 @@ def parse(body: bytes) -> list[WiseSource]:
 
 
 def cone(
-    ctx: Context, ra: float, dec: float, radius_deg: float, *, refresh: bool = False
+    ctx: Context,
+    ra: float,
+    dec: float,
+    radius_deg: float,
+    *,
+    refresh: bool = False,
+    w1_lt: float | None = None,
+    max_rows: int = MAX_ROWS,
 ) -> WiseCone:
-    """One cone, through the cache. Raises ``CacheMissOffline`` / ``UpstreamUnavailable``."""
-    key = wise_key(ra, dec, radius_deg)
+    """One cone, through the cache. Raises ``CacheMissOffline`` / ``UpstreamUnavailable``.
+    ``w1_lt`` adds ``w1mpro_pm < w1_lt`` to the query (``None``: no cut); ``max_rows`` is the
+    row cap. Both are part of the key."""
+    key = wise_key(ra, dec, radius_deg, w1_lt=w1_lt, max_rows=max_rows)
     q = dict(key.query)
+    where = f"w1mpro_pm < {q['w1_lt']}" if "w1_lt" in q else ""
 
     def adql(table: str) -> str:
         return tap.cone_adql(
@@ -95,8 +114,9 @@ def cone(
             q["ra"],
             q["dec"],
             q["radius"],
+            where=where,
             order_by="w1mpro_pm, source_name",
-            top=MAX_ROWS,
+            top=max_rows,
         )
 
     def live() -> LiveResponse:
@@ -112,4 +132,4 @@ def cone(
     served = ctx.cache.fetch(key, live, refresh=refresh)
     sources = parse(served.entry.body)
     raw_rows = len(tap.read_csv(served.entry.body, COLUMNS))
-    return WiseCone(sources, raw_rows >= MAX_ROWS, TABLE, served)
+    return WiseCone(sources, raw_rows >= max_rows, TABLE, served)

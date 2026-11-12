@@ -1,0 +1,424 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "area-checks.schema.json",
+  "title": "AreaChecks",
+  "description": "GET /v1/areas/{area_id}/checks (A17.8, A17.6; gated, Q-203). Each part appears only if it ran (A18.11): checks:d4_not_run drops test_mover and completeness, checks:d5_not_run drops control, checks:not_run drops every part and the linker (Q-208 (12)).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "method",
+    "cached_at",
+    "computed_at",
+    "missing",
+    "provenance"
+  ],
+  "properties": {
+    "test_mover": {
+      "$ref": "#/definitions/AreaTestMover"
+    },
+    "completeness": {
+      "$ref": "#/definitions/AreaCompleteness"
+    },
+    "control": {
+      "$ref": "#/definitions/AreaControl"
+    },
+    "linker": {
+      "$ref": "area-index.schema.json#/definitions/AreaLinker"
+    },
+    "method": {
+      "$ref": "area-index.schema.json#/definitions/AreaMethod"
+    },
+    "cached_at": {
+      "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+    },
+    "computed_at": {
+      "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+    },
+    "missing": {
+      "type": "array",
+      "items": {
+        "$ref": "area-index.schema.json#/definitions/AreaMissingCode"
+      }
+    },
+    "provenance": {
+      "$ref": "#/definitions/AreaChecksProvenance"
+    }
+  },
+  "definitions": {
+    "AreaTestMover": {
+      "title": "AreaTestMover",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ra",
+        "dec",
+        "rate_deg_day",
+        "pa_deg",
+        "snr",
+        "dots",
+        "recovered",
+        "reason"
+      ],
+      "properties": {
+        "ra": {
+          "$ref": "area-index.schema.json#/definitions/AreaRa"
+        },
+        "dec": {
+          "$ref": "area-index.schema.json#/definitions/AreaDec"
+        },
+        "rate_deg_day": {
+          "type": "number",
+          "minimum": 0
+        },
+        "pa_deg": {
+          "$ref": "area-index.schema.json#/definitions/AreaAngleDeg"
+        },
+        "snr": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "dots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AreaPlantedDot"
+          }
+        },
+        "recovered": {
+          "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "AreaPlantedDot": {
+      "title": "AreaPlantedDot",
+      "description": "A planted dot: an AreaDot without dot_id and label. Never in /dots (A17.6).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame_id",
+        "detector",
+        "exposure",
+        "time",
+        "x",
+        "y",
+        "ra",
+        "dec",
+        "flux_uJy",
+        "flux_err",
+        "snr",
+        "wavelength_um",
+        "bandwidth_um",
+        "flags"
+      ],
+      "properties": {
+        "frame_id": {
+          "$ref": "area-index.schema.json#/definitions/AreaFrameId"
+        },
+        "detector": {
+          "$ref": "area-index.schema.json#/definitions/AreaDetector"
+        },
+        "exposure": {
+          "$ref": "area-index.schema.json#/definitions/AreaExposure"
+        },
+        "time": {
+          "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "ra": {
+          "$ref": "area-index.schema.json#/definitions/AreaRa"
+        },
+        "dec": {
+          "$ref": "area-index.schema.json#/definitions/AreaDec"
+        },
+        "flux_uJy": {
+          "type": "number"
+        },
+        "flux_err": {
+          "type": "number",
+          "minimum": 0
+        },
+        "snr": {
+          "type": "number"
+        },
+        "wavelength_um": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "bandwidth_um": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          }
+        }
+      }
+    },
+    "AreaCompleteness": {
+      "title": "AreaCompleteness",
+      "description": "Per cell only; no single figure (A17.6, A16.5).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snr_bins",
+        "rate_bins",
+        "cells"
+      ],
+      "properties": {
+        "snr_bins": {
+          "type": "array",
+          "items": {
+            "$ref": "area-index.schema.json#/definitions/AreaBin"
+          }
+        },
+        "rate_bins": {
+          "type": "array",
+          "items": {
+            "$ref": "area-index.schema.json#/definitions/AreaBin"
+          }
+        },
+        "cells": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AreaCompletenessCell"
+          }
+        }
+      }
+    },
+    "AreaCompletenessCell": {
+      "title": "AreaCompletenessCell",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snr_bin",
+        "rate_bin",
+        "n",
+        "k",
+        "frac",
+        "wilson95"
+      ],
+      "properties": {
+        "snr_bin": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rate_bin": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "n": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "k": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "frac": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "wilson95": {
+          "$ref": "#/definitions/AreaInterval"
+        }
+      }
+    },
+    "AreaInterval": {
+      "title": "AreaInterval",
+      "description": "[low, high], both in [0, 1].",
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "AreaControl": {
+      "title": "AreaControl",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "n_runs",
+        "tracks_per_run",
+        "mean",
+        "max"
+      ],
+      "properties": {
+        "n_runs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tracks_per_run": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "mean": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "AreaChecksProvenance": {
+      "title": "AreaChecksProvenance",
+      "description": "Keys present exactly when the checks ran.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "test_mover": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "completeness": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "control": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "missing"
+        ],
+        "properties": {
+          "missing": {
+            "type": "array",
+            "contains": {
+              "const": "checks:not_run"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "test_mover": false,
+          "completeness": false,
+          "control": false,
+          "linker": false
+        }
+      },
+      "else": {
+        "required": [
+          "linker"
+        ]
+      }
+    },
+    {
+      "if": {
+        "anyOf": [
+          {
+            "required": [
+              "missing"
+            ],
+            "properties": {
+              "missing": {
+                "type": "array",
+                "contains": {
+                  "const": "checks:d4_not_run"
+                }
+              }
+            }
+          },
+          {
+            "required": [
+              "missing"
+            ],
+            "properties": {
+              "missing": {
+                "type": "array",
+                "contains": {
+                  "const": "checks:not_run"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "test_mover": false,
+          "completeness": false
+        }
+      },
+      "else": {
+        "required": [
+          "test_mover",
+          "completeness"
+        ]
+      }
+    },
+    {
+      "if": {
+        "anyOf": [
+          {
+            "required": [
+              "missing"
+            ],
+            "properties": {
+              "missing": {
+                "type": "array",
+                "contains": {
+                  "const": "checks:d5_not_run"
+                }
+              }
+            }
+          },
+          {
+            "required": [
+              "missing"
+            ],
+            "properties": {
+              "missing": {
+                "type": "array",
+                "contains": {
+                  "const": "checks:not_run"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "control": false
+        }
+      },
+      "else": {
+        "required": [
+          "control"
+        ]
+      }
+    }
+  ]
+}

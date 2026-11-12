@@ -31,7 +31,7 @@ class ResolveResponse(BaseModel):
     ra: float
     dec: float
     moving: bool
-    resolver: Literal["simbad", "sbdb", "coords"]
+    resolver: Literal["simbad", "sbdb", "coords", "reference"]
     cached_at: str | None
     # Optional additions
     # ISO-8601 UTC time the position refers to: 2000-01-01T11:58:55.816Z (J2000.0) for SIMBAD
@@ -127,11 +127,22 @@ class Contaminant(BaseModel):
     sep_px: float
 
 
+class StarMask(BaseModel):
+    """A star mask near a mover's track (issue #95, A19.6); ``r_px`` from magnitude [verify]."""
+
+    catalog: CatalogName
+    id: str
+    x: float
+    y: float
+    r_px: float
+
+
 class FrameOverlay(BaseModel):
     frame_id: str
     flags_url: str
     markers: list[Marker]
     contamination: list[Contaminant]
+    masks: list[StarMask]  # [] for fixed objects
     footprint: list[list[float]] | None
     cutout_box: list[list[float]]
 

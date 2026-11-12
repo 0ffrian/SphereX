@@ -1,6 +1,6 @@
 # 02 Components
 
-The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Every route is listed once in the endpoint register [A4.11](../architecture/endpoints.md#a411-endpoint-register); the object job is [A4.10](../architecture/jobs.md#a410-object-job-and-fan-out); the shell is [A21](../architecture/sky-shell.md#a21-app-shell-and-sky-view); Track is A19 and A20, Area search A16 to A18 (their own diagrams: [23](23-track.md), [22](22-area-search.md)). Dashed nodes and edges are post-event, stretch or **to build** (Track, Area search, `/path`, `/v1/areas`). Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12, D-15, D-16, D-18, D-19, D-20, D-22, D-25, D-28 and D-35 (sky-view prototype: Q-87 to Q-91; colour composite, colour views, progressive frames and cached markers: Q-92 to Q-95, Q-97 and Q-98), and A4.9 (overlays; on the frame grid: Q-102). Object jobs, the shared pools, the background bake and the warm cache follow Q-111 and Q-112 (issue #41), and A6.2 (Gemini layer, Q-122).
+The main components and the interfaces between them. Diagram 1 is the system and backend view; diagram 2 opens up the frontend. Every route is listed once in the endpoint register [A4.11](../architecture/endpoints.md#a411-endpoint-register); the object job is [A4.10](../architecture/jobs.md#a410-object-job-and-fan-out); the shell is [A21](../architecture/sky-shell.md#a21-app-shell-and-sky-view); Track is A19 and A20, Area search A16 to A18 (their own diagrams: [23](23-track.md), [22](22-area-search.md)). Dashed nodes and edges are post-event, stretch or **to build** (Track, Area search, `/path`, `/v1/areas`). Drawn from architecture spec §2, §3, §4, §9, rendering doc §3, §6, §7.7, §8, §10 and decisions D-01, D-02, D-07, D-08, D-10, D-12, D-15, D-16, D-18, D-19, D-20, D-22, D-25, D-28 and D-35 (sky-view prototype: Q-87 to Q-91; colour composite, colour views, progressive frames and cached markers: Q-92 to Q-95, Q-97 and Q-98), and A4.9 (overlays; on the frame grid: Q-102). Object jobs, the shared pools, the background bake and the warm cache follow Q-111 and Q-112 (issue #41), and A6.2 (Gemini layer, Q-122). Reference objects follow Q-258 and Q-328; the D-37 engines, their + Artistic gate and the three.js fallback follow D-37 and Q-287 ([R5.9](../rendering/engines.md#r59-prototype-engines-d-37)).
 
 ## Diagram 1: system and backend
 
@@ -46,9 +46,10 @@ flowchart LR
         S4["4 Asset lookup, assets.py: saved / generated / sketch"]
         CardB["5 Card builder, build.py: ObjectCard with tags"]
         Validate["validate.py: jsonschema check of every reply (Q-40)"]
+        RefCard["reference.py: reference cards built from reference_objects.toml, no catalogues (Q-258, Q-328)"]
       end
       Physics["6 Physics layer (derived values)"]
-      Ovl["Overlays, flag mask, combine (A4.9): markers, contamination, footprint, cutout box"]
+      Ovl["Overlays, flag mask, combine (A4.9): markers, contamination, footprint, cutout box, star masks (movers)"]
     end
     subgraph Render["core/render"]
       C2P["7 card_to_params.py"]
@@ -63,6 +64,7 @@ flowchart LR
     TexCache[("/data/textures/{id}/{generator_version}/{seed}/")]
     AiStore[("SX_TEXTURES_AI_DIR: albedo_ai.webp, gemini.json, pointers; not served as static files (Q-122)")]
     Prebaked[("backend/assets/{type}/{id}.json (SX_ASSETS_DIR), pre-baked assets")]
+    RefToml[("backend/assets/reference_objects.toml and reference/ (the Sun, Jupiter, Saturn, Titan)")]
   end
 
   subgraph Shared["shared/ (single source of the contract, D-18)"]
@@ -74,7 +76,7 @@ flowchart LR
   subgraph Ext["External services"]
     IRSA["IRSA SIA + S3 (SPHEREx QR2)"]
     HiPS["IRSA HiPS: 2MASS colour, AllWISE colour (A3.11)"]
-    Resolver["SBDB / SIMBAD name resolve (D-19: SBDB first for small-body names, SIMBAD first otherwise)"]
+    Resolver["SBDB / SIMBAD name resolve (D-19: SBDB first for small-body names, SIMBAD first otherwise; after the reference lookup, Q-328)"]
     Horizons["JPL Horizons"]
     SkyBoT["IMCCE SkyBoT"]
     Gaia["Gaia DR3 TAP (IRSA first, then ESA)"]
@@ -133,6 +135,9 @@ flowchart LR
   Warm -->|"ensure_job per demo target"| Svc
   API -->|"mounts /data/textures (404 until the bake lands)"| TexCache
   Svc --> S4
+  S1 -->|"reference names first, before SBDB and SIMBAD (Q-328)"| RefToml
+  Svc -->|"resolver reference: pack asset, else reference card, else 503 reference_asset_missing"| RefCard
+  RefCard --> RefToml
   S1 --> S2 --> S3 --> TypeSel --> S4 --> CardB
   Catalogue -->|"catalogue facts"| S3
   Catalogue -->|"SBDB phys-par, SIMBAD values"| CardB
@@ -181,14 +186,15 @@ flowchart TB
 
   subgraph UI["UI shell (React, Tailwind, animate-ui)"]
     Router["Hash routing: share link"]
-    Flipbook["Flipbook, with the Rainbow Trails view mode (P1, D-28)"]
+    Flipbook["Flipbook, with the Rainbow Trails view mode (P1, D-28) and FlipbookSpectrum"]
+    AreaDemo["app/area: areaService demo seam (Eros only, Q-414), KnownList, DiscoveryCard, ErosCard"]
     Overlays["Overlays (P1, issue #12): toggles, markers, flag mask, field of view, combine panel"]
     Panel["Object panel: spectrum, card, 3 badges"]
     Listen["Audio / Listen: data sweep, imagined drive"]
     Store["Store (Zustand): card, RenderParams, honesty state, overrides"]
     PulseInd["On-screen pulse indicator (D-20)"]
     Settings["Haptics + audio settings"]
-    Shell["Shell (A21, Q-89): ToolRail + railIcons, shellStore, PanelCard, Readout, shortcuts, bezel insets (Q-124)"]
+    Shell["Shell (A21, Q-89): SkyDock (Known objects, Discovery, Search; D-38, Q-296), SkyZoom, ToolRail (openTool only) + railIcons, shellStore, areaStore, AreaCard, PanelCard, Readout, shortcuts, floating full-screen layout"]
     Island["Island, app/island (Q-121, Q-123): orb, Thinking pill, grid loader"]
     SkyPane["SkyPane: sky image, markers, click to pick"]
     Transport["Transport bar"]
@@ -205,9 +211,18 @@ flowchart TB
     BodyLoader["selectedBody.ts: useSelectedBodyLoader"]
     BuildPane["BuildPane: split pane, Feel, Replay, New seed, Close"]
     Mould["useMould + MouldStrip"]
+    MouldAnim["MouldAnimation + mouldBody: mock-up moulding body, own WebGLRenderer (Q-415)"]
+    HearPanel["HearPanel + hearAudio: Atmosphere and spectrum sweep, own AudioContext (Q-416)"]
   end
 
   TrackPane["Track pane (A20, to build): time slider, zoom, spectrum hop by hop"]
+
+  subgraph Engines["src/engine (D-37): the prototype's code on raw WebGL2, own canvases, at + Artistic only (Q-287)"]
+    WorldEng["worlds/: WorldEngine, cardToWorld (two instances per planet: globe and fly view)"]
+    StarEng["stars/: StarEngine, cardToStar"]
+    RockEng["rocks/: RockView, cardToRock"]
+  end
+  EngStages["Engine stages: WorldGlobeStage, WorldFlyStage, StarEngineStage, RockStage, RockCloseUp"]
   AreaTool["Area search tool and sky layer (A18, to build)"]
 
   subgraph Viewer["Sky Sculptor viewer (three r187, three/webgpu)"]
@@ -250,7 +265,9 @@ flowchart TB
   Shell -->|"panel card"| Flipbook
   Shell -->|"panel card"| Panel
   Shell --> Island
-  Shell -->|"rail 3D viewer: built at once"| BuildPane
+  Shell -->|"dock: Known objects, Discovery"| AreaDemo
+  AreaDemo -.->|"demo cards, Demo data tag"| SkyPane
+  Shell -->|"3D viewer link: built at once"| BuildPane
   Shell -.->|"Area search tool"| AreaTool
   AreaTool -.->|"sky layer slot"| SkyPane
   AreaTool -.->|"Track it: openPane track"| TrackPane
@@ -261,8 +278,16 @@ flowchart TB
   Store -->|"card asked for or pane open"| BodyLoader
   BodyLoader -->|"GET card, render-params"| BackendAPI
   BuildPane --> Mould
+  BuildPane --> MouldAnim
+  BuildPane --> HearPanel
   Mould -->|"showPlan, whenLoaded, setMould"| ViewerApp
   ViewerApp --> MouldRig
+  BuildPane -->|"+ Artistic and the adapter accepts the card"| EngStages
+  EngStages --> WorldEng
+  EngStages --> StarEng
+  EngStages --> RockEng
+  EngStages -->|"setEngineOwned: the viewer stands down while an engine draws"| ViewerApp
+  EngStages -.->|"refused, failed, context lost, no WebGL2, + Estimated or Measured only: three.js draws"| Renderers
   ViewerApp --> BodiesEtc
   SkyPane --> SkyView
   SkyPane --> CachedMarkers

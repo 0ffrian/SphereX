@@ -1,16 +1,38 @@
 {
-  "asset_version": "9",
+  "asset_version": "11",
   "card": {
     "id": "simbad-m-1",
     "name": "M   1",
     "type": "candidate"
   },
   "created_at": "2025-10-01T00:00:00.000Z",
-  "generator_version": "p1-b2",
-  "inputs_sha256": "ffa059f36dc4327154473203418e2bf8acd3317bea275504d2c63a3c5b6b463a",
+  "generator_version": "p1-b4",
+  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
   "render_params": {
     "alt_text": "M   1. Candidate. Not enough data for a 3D model: distance and albedo unknown.",
-    "generator_version": "p1-b2",
+    "confidence": {
+      "assumed_share": 1.0,
+      "band": "too_little",
+      "estimated_share": 0.0,
+      "formula": "No class is known, so no weights apply and the score is 0 (Q-222)",
+      "found": "Its name and position.",
+      "gate": {
+        "class_known": false,
+        "key_measurement": false,
+        "passed": false,
+        "score_ok": false
+      },
+      "inputs": [],
+      "measured_share": 0.0,
+      "needed": "A rule that identifies the kind of object, then a measurement of its size or gas.",
+      "note": "This is how much of the picture rests on data. It is not the probability that the picture is correct.",
+      "raise": null,
+      "score": 0.0,
+      "tag": "derived",
+      "threshold": 0.25,
+      "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
+    },
+    "generator_version": "p1-b4",
     "haptics": {
       "data": "detections",
       "data_tag": "measured",
@@ -29,7 +51,7 @@
       "spectrum"
     ],
     "scale_m": null,
-    "seed": 3848739952,
+    "seed": 2021630048,
     "type": "candidate",
     "view_modes": {
       "visible": {
@@ -40,6 +62,6 @@
       }
     }
   },
-  "seed": 3848739952,
+  "seed": 2021630048,
   "textures": null
 }

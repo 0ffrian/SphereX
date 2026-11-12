@@ -4,7 +4,30 @@ import { useState } from 'react';
 import type { Tag } from '@/contract';
 import { badgeForTag } from '@/viewer/honesty';
 
-export function DataBadge({ fixture }: { fixture: boolean }) {
+export function DataBadge({
+  fixture,
+  variant = 'outline',
+}: {
+  fixture: boolean;
+  /** 'tag': the design-language tag (11px uppercase, --s3 fill, coloured dot). */
+  variant?: 'outline' | 'tag';
+}) {
+  if (variant === 'tag') {
+    return (
+      <span
+        className="sx-tagbadge"
+        style={{ ['--dot' as string]: fixture ? 'var(--color-warn)' : 'var(--p-meas)' }}
+        title={
+          fixture
+            ? 'Synthetic fixture data for development, not a SPHEREx measurement'
+            : 'Measured by SPHEREx'
+        }
+        data-testid="badge"
+      >
+        {fixture ? 'Fixture' : 'Measured'}
+      </span>
+    );
+  }
   if (fixture) {
     return (
       <span
@@ -31,7 +54,14 @@ export function DataBadge({ fixture }: { fixture: boolean }) {
  * D-02 Estimated badge for `derived`, `model_dependent` and `inferred_from_analog` values. The
  * tooltip states the formula, assumption or analog.
  */
-export function EstimatedBadge({ tooltip }: { tooltip: string }) {
+export function EstimatedBadge({
+  tooltip,
+  variant = 'outline',
+}: {
+  tooltip: string;
+  /** 'tag': the design-language tag (11px uppercase, --s3 fill, coloured dot). */
+  variant?: 'outline' | 'tag';
+}) {
   // A `title` tooltip opens only on mouse hover, so the badge is a button: a tap or Enter shows
   // the formula as visible text next to it (WCAG 2.1.1, 1.4.13), Escape or a second press hides it.
   const [open, setOpen] = useState(false);
@@ -39,7 +69,12 @@ export function EstimatedBadge({ tooltip }: { tooltip: string }) {
     <span className="inline-flex flex-wrap items-center gap-1">
       <button
         type="button"
-        className="cursor-help rounded border border-sky-400 px-1.5 py-0.5 text-xs font-medium text-sky-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300"
+        className={
+          variant === 'tag'
+            ? 'sx-tagbadge cursor-help focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300'
+            : 'cursor-help rounded border border-sky-400 px-1.5 py-0.5 text-xs font-medium text-sky-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300'
+        }
+        style={variant === 'tag' ? { ['--dot' as string]: 'var(--p-phys)' } : undefined}
         title={tooltip}
         // No aria-expanded: screen readers already hear the formula in the name, and the note
         // it opens is visual only.
@@ -61,7 +96,7 @@ export function EstimatedBadge({ tooltip }: { tooltip: string }) {
       {open && (
         // Already in the button's name, so hidden from screen readers to avoid reading it twice.
         <span
-          className="text-xs text-sky-200"
+          className={variant === 'tag' ? 'text-xs text-muted' : 'text-xs text-sky-200'}
           aria-hidden="true"
           data-testid="badge-estimated-note"
         >
@@ -92,11 +127,14 @@ export function ProvenanceBadge({
   tooltip,
   srText = false,
   fixture = false,
+  variant = 'outline',
 }: {
   tag: Tag;
   tooltip?: string;
   srText?: boolean;
   fixture?: boolean;
+  /** 'tag': the design-language tag (11px uppercase, --s3 fill, coloured dot). */
+  variant?: 'outline' | 'tag';
 }) {
   const name = badgeForTag(tag);
   if (fixture && name === 'Measured') {
@@ -117,6 +155,21 @@ export function ProvenanceBadge({
       : name === 'Estimated'
         ? 'border-sky-400 text-sky-300'
         : 'border-neutral-400 text-neutral-300';
+  if (variant === 'tag') {
+    const dot = name === 'Measured' ? 'var(--p-meas)' : name === 'Estimated' ? 'var(--p-phys)' : 'var(--p-asm)';
+    return (
+      <span
+        className="sx-tagbadge"
+        style={{ ['--dot' as string]: dot }}
+        title={tooltip ?? BADGE_MEANING[name]}
+        data-testid="provenance-badge"
+        data-tag={tag}
+      >
+        {name}
+        {srText && tooltip && <span className="sr-only">: {tooltip}</span>}
+      </span>
+    );
+  }
   return (
     <span
       className={`rounded border px-1.5 py-0.5 text-xs font-medium ${style}`}

@@ -1,25 +1,26 @@
-// App shell in the mock-up's layout (mockup/spherex-ui.html): a full-viewport dark bezel with the
-// fixture banner and RA/Dec readout on top, the tool rail on the left, the sky view as the
-// main pane, the transport bar bottom left and the search pill bottom right. The active tool opens
-// a floating panel (object info, flipbook, spectrum) over the sky.
+// App shell in the mock-up's floating layout (mockup/spherex-ui.html): a full-viewport dark bezel with
+// the sky full-bleed under floating cards: the flipbook player top left, the RA/Dec card (and the
+// fixture banner) top right, the zoom card bottom left, the dock (tools, then the search) bottom
+// centre and the island bottom right. The active tool opens a floating card (object info, flipbook,
+// spectrum) at the bottom right over the sky. Phone width stacks them: player on top, dock below.
 //
 // Issue #60: a marker click selects the object (brackets on the sky and the top-centre card with
 // See fingerprint / Build it). Build it splits the view: the sky moves to the left half and the
 // build pane on the right moulds the body. The rail's 3D viewer opens the same pane, built.
 //
-// DOM (and Tab) order: header, search, tools, sky (canvas, then the open panel, markers and sky
-// controls), transport. The live announcer stays global.
+// DOM (and Tab) order: header, sky (canvas, then the open panel, markers and sky controls), dock
+// (tools, then search), zoom, transport. The live announcer stays global.
 import { useEffect, useState } from 'react';
 import { useAppStore, type SkyQuery } from '@/state/store';
 import { FlipbookSessionProvider } from './flipbook/session';
 import { FixtureBanner } from './FixtureBanner';
 import { LiveAnnouncer } from './LiveAnnouncer';
-import { SearchBar } from './search/SearchBar';
 import { Panels } from './shell/Panels';
 import { Readout } from './shell/Readout';
 import { useShellStore } from './shell/shellStore';
 import { isEditableTarget, isSearchShortcut } from './shell/shortcuts';
-import { ToolRail } from './shell/ToolRail';
+import { SkyDock } from './shell/SkyDock';
+import { SkyZoom } from './shell/SkyZoom';
 import { Transport } from './shell/Transport';
 import { SkyPane } from './sky/SkyPane';
 import { useHashSync } from './useHashSync';
@@ -113,10 +114,6 @@ export function App() {
               <FixtureBanner />
               <Readout />
             </header>
-            <div className="sx-search-slot">
-              <SearchBar />
-            </div>
-            <ToolRail />
             <main className="sx-view" aria-label="Sky view" data-split={split || undefined}>
               <div className="sx-sky-slot" inert={skyHidden || undefined}>
                 <SkyPane>
@@ -126,6 +123,13 @@ export function App() {
               </div>
               {split && <BuildPane />}
             </main>
+            {/* Mock-up floating layout: the dock (tools, then the search) bottom centre and the zoom
+                card bottom left, over the full-bleed sky; the player is top left, the readout top
+                right (the header) and the island bottom right. */}
+            <SkyDock />
+            <div className="sx-zoom-slot" inert={split || undefined}>
+              <SkyZoom />
+            </div>
             {/* The flipbook transport belongs to the flipbook: it steps aside in the split view. */}
             <div className="sx-transport-slot" inert={split || undefined}>
               <Transport />

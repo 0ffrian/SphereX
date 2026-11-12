@@ -18,10 +18,6 @@ import {
   type SpectrumOutcome,
 } from './refusals';
 
-/** Q-164: shown for a body the backend answered from a saved asset (a pre-built demo-pack row).
- * It says how the body was made, nothing about how fresh the data is. */
-export const PREBUILT_NOTE = 'Built ahead of time from the same data';
-
 export function searchErrorMessage(err: SkyError, query: string): string {
   switch (err.kind) {
     case 'not_found':

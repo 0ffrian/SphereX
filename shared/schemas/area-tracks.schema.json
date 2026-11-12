@@ -1,0 +1,311 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "area-tracks.schema.json",
+  "title": "AreaTracks",
+  "description": "GET /v1/areas/{area_id}/tracks (A17.8): tracks and possibles (A17.4) with match and verdict (A17.5), sed (A17.13) and linker (A17.12).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tracks",
+    "skybot",
+    "cached_at",
+    "computed_at",
+    "missing",
+    "provenance"
+  ],
+  "properties": {
+    "tracks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/AreaTrack"
+      }
+    },
+    "skybot": {
+      "type": "array",
+      "items": {
+        "$ref": "area-index.schema.json#/definitions/AreaSkybotAnswer"
+      }
+    },
+    "cached_at": {
+      "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+    },
+    "computed_at": {
+      "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+    },
+    "missing": {
+      "type": "array",
+      "items": {
+        "$ref": "area-index.schema.json#/definitions/AreaMissingCode"
+      }
+    },
+    "provenance": {
+      "$ref": "#/definitions/AreaTracksProvenance"
+    }
+  },
+  "definitions": {
+    "AreaTrack": {
+      "title": "AreaTrack",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "track_id",
+        "visits",
+        "tracklets",
+        "rate_deg_day",
+        "pa_deg",
+        "u_inv_au",
+        "status",
+        "reason",
+        "verdict",
+        "match",
+        "linker",
+        "unchecked_by"
+      ],
+      "properties": {
+        "track_id": {
+          "$ref": "area-index.schema.json#/definitions/AreaTrackId"
+        },
+        "visits": {
+          "type": "array",
+          "items": {
+            "$ref": "area-index.schema.json#/definitions/AreaVisit"
+          }
+        },
+        "tracklets": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/AreaTracklet"
+          }
+        },
+        "rate_deg_day": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pa_deg": {
+          "anyOf": [
+            {
+              "$ref": "area-index.schema.json#/definitions/AreaAngleDeg"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "u_inv_au": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "track",
+            "possible"
+          ]
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "ambiguous",
+                "no_partner",
+                "one_visit"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "verdict": {
+          "$ref": "area-index.schema.json#/definitions/AreaVerdict"
+        },
+        "match": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AreaMatch"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "linker": {
+          "$ref": "area-index.schema.json#/definitions/AreaLinker"
+        },
+        "unchecked_by": {
+          "type": "array",
+          "items": {
+            "$ref": "area-index.schema.json#/definitions/AreaMissingCode"
+          }
+        },
+        "sed": {
+          "$ref": "#/definitions/AreaSed"
+        }
+      }
+    },
+    "AreaTracklet": {
+      "title": "AreaTracklet",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visit",
+        "dot_ids",
+        "v_in_deg_day",
+        "pa_in_deg",
+        "rms_px"
+      ],
+      "properties": {
+        "visit": {
+          "$ref": "area-index.schema.json#/definitions/AreaVisit"
+        },
+        "dot_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "area-index.schema.json#/definitions/AreaDotId"
+          }
+        },
+        "v_in_deg_day": {
+          "type": "number",
+          "minimum": 0
+        },
+        "pa_in_deg": {
+          "$ref": "area-index.schema.json#/definitions/AreaAngleDeg"
+        },
+        "rms_px": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "AreaMatch": {
+      "title": "AreaMatch",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "designation",
+        "number",
+        "object_id",
+        "v_mag",
+        "median_sep_px",
+        "fetched_at"
+      ],
+      "properties": {
+        "designation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "object_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "v_mag": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "median_sep_px": {
+          "type": "number",
+          "minimum": 0
+        },
+        "fetched_at": {
+          "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+        }
+      }
+    },
+    "AreaSed": {
+      "title": "AreaSed",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "chi2_red",
+        "n_dots",
+        "sigma_floor"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "area-index.schema.json#/definitions/AreaSedLabel"
+        },
+        "chi2_red": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "n_dots": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sigma_floor": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "AreaTracksProvenance": {
+      "title": "AreaTracksProvenance",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tracks",
+        "match"
+      ],
+      "properties": {
+        "tracks": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "match": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "sed": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        }
+      }
+    }
+  }
+}
