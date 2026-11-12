@@ -17,6 +17,21 @@
 //   5. Thunder and the vent burst are linear one-shots (no wrap, no echo IR), sized to their duration.
 //   6. Shape table in Hz (1 Hz), pings by a two-pole recurrence, clicks with a sample-rate envelope, echo taps as a
 //      closed-form spectrum: at most 4 N-point FFTs per bed.
+// Deviations from spec R13 as written (recorded as Q-445):
+//   - Thunder and the vent burst are linear one-shots sized to their duration plus a tail, not 2^20-sample loops.
+//   - One-shots have their own 36 MB budget, outside the 96 MB bed cap; a one-shot whose FFT exceeds 2^21 is refused.
+//   - One-shots peak at ONE_SHOT_PEAK_DBFS −16 (gain 1 = a 70 dB L_TARGET peak, so the +6 dB stage window gives −10).
+//   - Thunder has no echo response; its d_m and absK2 params are validated but unused.
+//   - Air absorption is not baked (applied live, §11.2); only echo-tap extra paths are blurred.
+//   - Loudness gain is limited by the sample peak (not a 4× true peak) at −1 dBFS; no soft clip.
+//   - GUST_TIME_S is recorded but does not shape the gust spectrum.
+//   - Pings above 0.47·sampleRate are dropped and noted (e.g. the Titan rain bubble ring).
+//   - The S12 phaser rate is baked; live rate and direction changes need a live filter (#116).
+//   - The vent burst is S8 variant 1 (no new SourceId).
+//   - The palette cache key adds a spec hash; the main-thread fallback bakes one bed per world.
+//   - Seam test: the 256-sample ±1 dB check runs on S2, a ±1 dB check with Iu 0 on 16384-sample windows on the
+//     continuous beds, and an exact-step plus percentile check on every bed.
+//   - The module lives in sound/ambience/, not haptics/sound/ambience/.
 // Determinism: Math.sin/exp/pow are not correctly rounded, so outputs are byte-identical within one JS engine
 // (V8 in Chrome and Node), not across engines (Q-444).
 

@@ -2,7 +2,7 @@
 // §9.5: the worker bakes one bed per message and transfers both channel buffers; a refusal is a message, not a throw.
 import { describe, expect, it } from 'vitest';
 import { bakeTransferables, handleBakeRequest } from './bake.worker';
-import { EARTH_AIR, spec } from './testFixtures';
+import { EARTH_AIR, spec } from './bakeFixtures.testutil';
 
 describe('bake worker', () => {
   it('returns the result with both buffers in the transfer list', () => {

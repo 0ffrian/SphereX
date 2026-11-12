@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { handleBakeRequest, type BakeRequest, type BakeResponse } from './bake.worker';
 import { BED_MEMORY_MB } from './dspTuning';
 import { Palette, worldKeyOf, type WorkerLike } from './palette';
-import { EARTH_AIR, EARTH_PARAMS, TITAN_AIR, spec } from './testFixtures';
+import { EARTH_AIR, EARTH_PARAMS, TITAN_AIR, spec } from './bakeFixtures.testutil';
 import type { AirModel, BedSpec } from './types';
 
 const N = 1 << 12;
@@ -190,6 +190,21 @@ describe('Palette', () => {
     expect(p.get('S4', 0)).toBeNull();
     expect(w.inbox.map((m) => m.spec.id)).toEqual(['S4']);
     expect(cb).toHaveBeenLastCalledWith({ id: 'S1_land', variant: 0, worldKey: worldKeyOf(moved) });
+  });
+
+  it('a re-bake that changes c0 still reuses beds that do not read it, and counts shared buffers once', () => {
+    const { w, p } = setup();
+    p.request([spec('S1_land', N), spec('S4', N)], EARTH_AIR);
+    w.flush();
+    const s1 = p.get('S1_land', 0);
+    const bytesBefore = p.stats().bytes;
+    const warmer: AirModel = { ...EARTH_AIR, T0: 300, c0: 347.3 };
+    p.request([spec('S1_land', N), spec('S4', N)], warmer);
+    expect(p.get('S1_land', 0)).toBe(s1); // S1 does not read c0
+    expect(w.inbox.map((m) => m.spec.id)).toEqual(['S4']); // S4's echo delays do
+    w.flush();
+    // Two worlds hold S1, but it is one AudioBuffer: only the new S4 adds bytes.
+    expect(p.stats().bytes).toBe(bytesBefore + N * 8);
   });
 
   it('beds a later request drops are evicted and no longer served (code review M2)', () => {
