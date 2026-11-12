@@ -49,7 +49,7 @@ flowchart LR
         RefCard["reference.py: reference cards built from reference_objects.toml, no catalogues (Q-258, Q-328)"]
       end
       Physics["6 Physics layer (derived values)"]
-      Ovl["Overlays, flag mask, combine (A4.9): markers, contamination, footprint, cutout box"]
+      Ovl["Overlays, flag mask, combine (A4.9): markers, contamination, footprint, cutout box, star masks (movers)"]
     end
     subgraph Render["core/render"]
       C2P["7 card_to_params.py"]
