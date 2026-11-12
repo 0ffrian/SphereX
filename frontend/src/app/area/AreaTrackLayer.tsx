@@ -8,6 +8,7 @@ import { DEMO_CUTOUT_NOTE, DemoTag } from './DemoTag';
 import type { SkyView } from '@/viewer/sky/SkyView';
 import { currentHop, useAreaStore } from '@/app/shell/areaStore';
 import { boxToPixels } from '@/app/sky/areaDraw';
+import { useAppStore } from '@/state/store';
 import { drawTrackWindow } from './erosDraw';
 
 export function AreaTrackLayer({ view }: { view: SkyView | null }) {
@@ -47,10 +48,12 @@ export function AreaTrackLayer({ view }: { view: SkyView | null }) {
       const hop = currentHop(s);
       const target = hop ? hop.mjd_avg : (s.eros.hops[0]?.mjd_avg ?? 0);
       if (now === null) now = target;
+      // The real Horizons path is Estimated (model_dependent): "Measured only" hides it (D-21, R5.3).
+      const hidePath = s.trackSource === 'real' && s.trackPath && useAppStore.getState().honesty === 'measured';
       drawTrackWindow(
         g,
         rect,
-        s.eros,
+        hidePath ? { ...s.eros, track: [] } : s.eros,
         { mode: s.flow === 'known' ? 'eros' : 'disc', now, step: s.step, sel: s.screen === 'mover' ? s.sel : -1, disc: s.disc },
         () => paint(),
       );
@@ -76,10 +79,12 @@ export function AreaTrackLayer({ view }: { view: SkyView | null }) {
 
     paint();
     const offStore = useAreaStore.subscribe(kick);
+    const offHonesty = useAppStore.subscribe(kick);
     const offRender = view.onRender(paint);
     return () => {
       cancelAnimationFrame(raf);
       offStore();
+      offHonesty();
       offRender();
     };
   }, [view]);

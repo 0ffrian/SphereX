@@ -150,6 +150,25 @@ describe('Known flow on the API (issue #130)', () => {
     expect(s.erosFailed).toBe(true);
     expect(s.eros).toBeNull();
   });
+  it('another object never borrows the Eros demo, and leaving the card aborts its request', async () => {
+    const signals: AbortSignal[] = [];
+    setAreaApi({
+      frames: async (_id: string, sig?: AbortSignal) => {
+        signals.push(sig!);
+        return { data: { frames: [{ frame_id: 'x_1_D1', time: '2026-03-20T08:30:00.000Z', wavelength_um: 1, x: 1, y: 1, cutout_url: '', flags: [] }] }, fixture: null };
+      },
+      path: async () => { throw new ApiError('not_found', null, 404); },
+    } as unknown as ApiClient);
+    useAreaStore.getState().openEros({ id: '9', name: 'Other', kind: 'asteroid', frames: 1, visits: 1, objectId: 'sbdb-9', trackAvailable: true });
+    await vi.advanceTimersByTimeAsync(50);
+    const e = useAreaStore.getState().eros!;
+    expect(e.wide.png).toBe('');
+    expect(e.track).toEqual([]);
+    useAreaStore.getState().openEros({ id: '9', name: 'Other', kind: 'asteroid', frames: 1, visits: 1, objectId: 'sbdb-9', trackAvailable: true });
+    await vi.advanceTimersByTimeAsync(50);
+    useAreaStore.getState().openList();
+    expect(signals[signals.length - 1]!.aborted).toBe(true);
+  });
 });
 
 describe('area helpers', () => {
