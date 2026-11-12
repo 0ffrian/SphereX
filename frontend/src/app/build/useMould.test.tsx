@@ -9,6 +9,7 @@ import type { PlanContext, RenderPlan } from '@/viewer/planTypes';
 import { buildDuration, DONE_AFTER_S, mouldScript } from '@/viewer/mould/mouldSteps';
 import type { ViewerApp } from '@/viewer/ViewerApp';
 import { FORMING_PROGRESS, TURN_SETTLE_MS, useMould, type MouldPhase } from './useMould';
+import { useMouldLive } from './mouldLive';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -88,6 +89,52 @@ describe('useMould', () => {
     expect(viewer.setTurn).toHaveBeenLastCalledWith(0, 0);
     expect(viewer.setMould).toHaveBeenLastCalledWith(null);
   });
+  it('ends early only on the show that covered this build, never on one left from an earlier build', async () => {
+    const { card, params } = fixture('asteroid_procedural');
+    const ctx = defaultContext({ honesty: 'derived' });
+    const plan = planRender(card, params, ctx);
+    const viewer = fakeViewer();
+    const phases: MouldPhase[] = [];
+    function Harness({ seq }: { seq: number }) {
+      useMould({
+        viewer: viewer as unknown as ViewerApp,
+        card,
+        params,
+        ctx,
+        plan,
+        seq,
+        animate: true,
+        reducedMotion: false,
+        onProgress: () => {},
+        onPhase: (p) => phases.push(p),
+      });
+      return null;
+    }
+    // Build A, then a Replay (build B) while A's show is still pending.
+    await act(async () => root.render(<Harness seq={1} />));
+    const buildA = useMouldLive.getState().buildSeq;
+    await act(async () => root.render(<Harness seq={2} />));
+    await act(async () => {}); // whenLoaded
+    const buildB = useMouldLive.getState().buildSeq;
+    expect(buildB).not.toBe(buildA);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    expect(phases.at(-1)).toBe('building');
+    // A's show ends now: B must keep building.
+    act(() => useMouldLive.getState().markShown(buildA));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(TURN_SETTLE_MS * 3);
+    });
+    expect(phases.at(-1)).toBe('building');
+    // B's own show ends: B finishes there (after easing back to the normal pose).
+    act(() => useMouldLive.getState().markShown(buildB));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(TURN_SETTLE_MS * 3);
+    });
+    expect(phases.at(-1)).toBe('done');
+  });
+
   it('waits for an engine to form the world before the steps play (issue #93)', async () => {
     const { card, params } = fixture('asteroid_procedural');
     const ctx = defaultContext({ honesty: 'derived' });

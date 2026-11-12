@@ -21,6 +21,8 @@ export const CACHED_SHOW_MS = 1400;
 /** Moon (12 Nov 2026): every build shows the mould for at least this long, cached bodies included. */
 export const MIN_SHOW_MS = 5000;
 export const FINISH_MS = 600;
+/** Each step of the show gets at least this long, also after a long load (Moon: the body morphs slowly, Q-453). */
+export const STEP_MIN_MS = 700;
 export const HAND_OVER_MS = 350;
 /** The mock-up's `STAGE_S` and the rotation speed of the body while it is built. */
 export const STAGE_S = 2.3;
@@ -222,6 +224,12 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
   const [rushMs, setRushMs] = useState(CACHED_SHOW_MS);
   const [visible, setVisible] = useState(true);
   const startedAt = useRef(0);
+  /** The build this show covers; its end finishes only that build (-1: none). */
+  const coveredBuild = useRef(-1);
+  const stepsRef = useRef(steps);
+  useEffect(() => {
+    stepsRef.current = steps;
+  });
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const idRef = useRef(id);
   const stageRef = useRef<Stage>('off');
@@ -237,11 +245,24 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
     idRef.current = id;
   });
   useEffect(() => clear, []);
+  // Which build this show covers. A build that starts while the show is on (the usual case: the
+  // pane opens, the show comes on while the viewer loads, then the build starts) is the one it
+  // covers. A build that starts once the show is already finishing (a Replay during the rush) is
+  // not: that show then covers no build, so its end cannot finish the new one early.
+  useEffect(
+    () =>
+      useMouldLive.subscribe((s, prev) => {
+        if (s.buildSeq !== prev.buildSeq) coveredBuild.current = stageRef.current === 'on' ? s.buildSeq : -1;
+      }),
+    [],
+  );
 
   useEffect(() => {
     const now = performance.now();
     const cur = stageRef.current;
     const leave = () => {
+      // The show has reached its last step: the real build ends on it (one clock for the strip).
+      useMouldLive.getState().markShown(coveredBuild.current);
       if (reduced) {
         seen.add(idRef.current);
         setSt('off');
@@ -259,6 +280,7 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
       if (cur === 'on') return;
       clear();
       startedAt.current = now;
+      coveredBuild.current = useMouldLive.getState().buildSeq;
       setSt('on');
       // Always drawn, also for a body seen before (at least MIN_SHOW_MS in all).
       setVisible(true);
@@ -269,8 +291,9 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
     const elapsed = now - startedAt.current;
     if (reduced) return leave();
     // The mould plays its remaining stages over whatever is left of MIN_SHOW_MS (a cached body that
-    // was ready at once gets the whole 5 s show); a long real wait just finishes its stage quickly.
-    const ms = Math.max(FINISH_MS, MIN_SHOW_MS - elapsed);
+    // was ready at once gets the whole 5 s show). After a long real wait every step still gets
+    // STEP_MIN_MS, so the body morphs through each one and the strip can be read (Q-453).
+    const ms = Math.max(FINISH_MS, stepsRef.current * STEP_MIN_MS, MIN_SHOW_MS - elapsed);
     setRushMs(ms);
     setSt('rush');
     timers.current.push(setTimeout(leave, ms));

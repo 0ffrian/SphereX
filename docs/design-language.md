@@ -8,6 +8,7 @@ The reference for these rules is the approved preview of the Accuracy and Detail
 
 - **Dark, to sit with the sky.** Panels and cards are near-black with a trace of blue (`--bg #08090b`, `--s1 #0f1114`), darker than Penrose's Graphite, so they read as part of the night sky and the black bezel rather than grey boxes on top (Moon, 11 Nov 2026). Not pure black: the `--s1` to `--s3` steps still give depth, and text stays off pure white.
 - **Depth from tone, not shadow.** Surfaces step `--s1` to `--s3`. No glows, no coloured shadows, no gradients.
+  - **Glass exception (Q-418, Q-452).** The matte-glass surfaces that float over the sky (player, sky dock, zoom card, readout, island and its cards, frame-rate menu, sky info) have no solid tone to step from, so they may carry two neutral black shadows, and nothing else may: `--glass-lift` (`0 10px 30px` at 35%) to lift the glass off the sky, and `--glass-text-shadow` (`0 1px 2px` at 60%) under small text on the glass, for contrast over bright sky. Never coloured, never a glow. Hovers on the glass use `--glass-hover` (a glass button) and `--glass-veil-hover` (a row inside the glass).
 - **The accent is rationed.** Use it for focus, a switch that is on, and links. Never use it for a border around a selected button.
 - **Colour that means something stays.** The provenance colours (measured, physics, assumed: D-02) and the status colours are data, not decoration. Nothing else is coloured.
 - **Show the label, the data and the action.** Fold explanations into rows that open; don't stack paragraphs.
@@ -33,6 +34,8 @@ The app is dark-only for now (Q-409). The light values are defined so that artif
 | `--p-meas` | `#4ade80` | `#16a34a` | provenance: measured (D-02) |
 | `--p-phys` | `#38bdf8` | `#0284c7` | provenance: physics / derived |
 | `--p-asm` | `#5f686e` | `#9aa5ab` | provenance: assumed |
+
+**Floating surfaces are matte glass (Q-418).** The player, the sky dock and zoom bar, the readout, the island and every card it grows into use `--glass-bg` (`rgba(5,6,8,.65)`), `--glass-filter` (`blur(5px) saturate(170%)`), a faint grain, `--glass-edge` and `--glass-hi`, all defined at the end of `frontend/src/index.css`. Wells and toggles inside them use `--glass-inner`, not `--s2`. Keep the blur low (2 to 8px): more erases the stars and the glass reads as solid. Pictures of data (the Flipbook frame, the Eros cutout) stay opaque. The build pane and its popovers keep the solid tokens above.
 
 Colours only through tokens (CSS variables or the Tailwind theme). Never a raw hex in a component.
 

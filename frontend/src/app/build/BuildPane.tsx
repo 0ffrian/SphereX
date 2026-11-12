@@ -2,7 +2,7 @@
 // `closeBuild`, `setShifted`). While the body is built the pane fills the screen over the dimmed sky
 // with the body in the middle and the numbered steps under it; when the build ends it slides to the
 // right half and the close-up opens on the left (`shifted`). On a phone it stays a full-height
-// sheet. The header is the mock-up's: "Building <name>", its kind, then Accuracy, Feel, Hear it, and
+// sheet. The header is the mock-up's: "Building <name>", its kind, then Accuracy, Ambience, Explore, Details and
 // the close button. One panel opens under those buttons at a time (`pop`). Details (the honesty
 // level, view controls, what is drawn and not drawn) is the app's one extra button: the mock-up has
 // no counterpart. Focus moves into the pane when it opens and back to the object's marker (or the
@@ -18,7 +18,7 @@ import {
   type ReactNode,
 } from 'react';
 import { BUILD_POP_ID, ViewerPanel, type PopId } from '@/app/ViewerPanel';
-import { CloseUpPane, closeUpButtonLabel, closeUpKindOf } from '@/app/CloseUpPane';
+import { CloseUpPane, closeUpKindOf } from '@/app/CloseUpPane';
 import { ErrorBoundary } from '@/app/ErrorBoundary';
 import { useCloseUpStore } from '@/app/closeUpStore';
 import { StatusLine } from '@/app/StatusLine';
@@ -31,6 +31,8 @@ import { useShellStore } from '@/app/shell/shellStore';
 import { useAppStore } from '@/state/store';
 import { useAmbienceStore } from '@/app/sound/ambienceStore';
 import { atmosphereOf } from './hearModel';
+import { useSpringResize } from './exploreMotion';
+import { ExploreIcon } from './ExploreIcon';
 import type { MouldPhase } from './useMould';
 import { closeBuildPane } from './focus';
 import { displayName } from '@/app/displayName';
@@ -44,7 +46,6 @@ export const SHIFT_DELAY_MS = 650;
 /** The header buttons that open a panel, in the mock-up's order (Details is the app's extra). */
 const POP_BUTTONS: { id: PopId; label: string; title: string; icon: IconName }[] = [
   { id: 'acc', label: 'Accuracy', title: 'Accuracy', icon: 'accuracy' },
-  { id: 'hear', label: 'Hear it', title: 'Hear it', icon: 'hear' },
   {
     id: 'details',
     label: 'Details',
@@ -104,6 +105,9 @@ export function BuildPane() {
   // shifted. The flag is per build (`seq`), so a Replay or a New seed starts full width again.
   const [shiftedSeq, setShiftedSeq] = useState(-1);
   const shifted = !build.animate || shiftedSeq === build.seq;
+  const paneRef = useRef<HTMLElement>(null);
+  // Full view or the right half: the pane springs between them (transform only, Q-450).
+  useSpringResize(paneRef, shifted && !closeHidden && closeKind ? 'half' : 'full');
   useEffect(() => {
     if (!build.animate || phase !== 'done') return;
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -121,7 +125,9 @@ export function BuildPane() {
     popRef.current = next;
     setPopState(next);
     if (next === null && returnFocus && prev) {
-      requestAnimationFrame(() => buttonRefs.current[prev]?.focus());
+      // Hear it has no header button any more (Q-450): it opens from Details, so focus goes back there.
+      const back = prev === 'hear' ? 'details' : prev;
+      requestAnimationFrame(() => buttonRefs.current[back]?.focus());
     }
   }, []);
 
@@ -155,10 +161,40 @@ export function BuildPane() {
   // Shown only where an atmosphere sound is possible (same refusal rules as the Hear it panel).
   const atmo = useMemo(() => atmosphereOf(card), [card]);
   const atmoOn = useAmbienceStore((s) => s.ambience && s.playing && s.key === (card?.id ?? ''));
+  // A tap on the dimmed Ambience says why there is nothing to hear (a touch screen shows no title).
+  const [atmoHint, setAtmoHint] = useState(false);
+  useEffect(() => {
+    if (!atmoHint) return;
+    const id = window.setTimeout(() => setAtmoHint(false), 4000);
+    return () => window.clearTimeout(id);
+  }, [atmoHint]);
   const toggleAtmo = (): void => {
-    if (!atmo.ok || !card) return;
+    if (!atmo.ok) {
+      setAtmoHint(true);
+      return;
+    }
+    if (!card) return;
     useAmbienceStore.getState().setAmbience(!atmoOn, atmo.model, card.id);
   };
+  const renderPop = (b: (typeof POP_BUTTONS)[number]) => (
+    <button
+      key={b.id}
+      ref={(el) => {
+        buttonRefs.current[b.id] = el;
+      }}
+      type="button"
+      className="sx-bp-tool sx-bp-text"
+      title={b.title}
+      aria-pressed={pop === b.id}
+      aria-expanded={pop === b.id}
+      aria-controls={BUILD_POP_ID}
+      onClick={() => setPop(pop === b.id ? null : b.id)}
+      data-testid={`build-${b.id === 'acc' ? 'accuracy' : b.id}`}
+    >
+      <Icon name={b.icon} className="size-[15px]" />
+      <span>{b.label}</span>
+    </button>
+  );
   useEffect(() => {
     if (!ambienceOn) return;
     const onM = (e: globalThis.KeyboardEvent) => {
@@ -234,18 +270,6 @@ export function BuildPane() {
         <Icon name="shuffle" className="size-3.5" />
         New seed
       </button>
-      {closeKind && canBuild && (
-        <button
-          type="button"
-          className="sx-btn-sm"
-          aria-pressed={!closeHidden}
-          title={closeHidden ? 'Show the close-up on the left' : 'Hide the close-up on the left'}
-          onClick={() => useCloseUpStore.getState().setHidden(!closeHidden)}
-          data-testid="build-closeup"
-        >
-          {closeUpButtonLabel(closeKind)}
-        </button>
-      )}
     </div>
   );
 
@@ -274,12 +298,15 @@ export function BuildPane() {
         <CloseUpPane />
       </ErrorBoundary>
       <aside
+        ref={paneRef}
         className="sx-bp"
         aria-labelledby={titleId}
         onKeyDown={onKeyDown}
         data-testid="build-pane"
         data-phase={phase}
         data-shifted={shifted || undefined}
+        // No split: the body keeps the whole view after it is built (the close-up is off).
+        data-solo={closeHidden || !closeKind || undefined}
         data-pop={pop ?? undefined}
       >
         <header className="sx-bp-head">
@@ -290,45 +317,41 @@ export function BuildPane() {
             <p data-testid="build-subtitle">{subtitle}</p>
           </div>
           <div className="sx-bp-tools" role="group" aria-label="Build tools">
-            {POP_BUTTONS.map((b) => (
+            {/* Moon (12 Nov 2026, Q-450): Accuracy, Ambience, Explore, Details, then close. Ambience is a
+                toggle (off, crossed out, until clicked; local synthesis for now, Q-416) and takes Hear it's
+                place in the header; Hear it opens from a row in Details (PR #107 review). Explore is the split view
+                (the close-up on the left). Where there is no atmosphere to hear, Ambience stays
+                visible but off, and its name says why. */}
+            {renderPop(POP_BUTTONS[0]!)}
+            {canBuild && (
               <button
-                key={b.id}
-                ref={(el) => {
-                  buttonRefs.current[b.id] = el;
-                }}
                 type="button"
-                className="sx-bp-tool sx-bp-text"
-                title={b.title}
-                aria-label={b.id === 'hear' && ambienceOn ? 'Hear it. Ambience on, open Hear it to stop, or press M.' : undefined}
-                aria-pressed={pop === b.id}
-                aria-expanded={pop === b.id}
-                aria-controls={BUILD_POP_ID}
-                onClick={() => setPop(pop === b.id ? null : b.id)}
-                data-testid={`build-${b.id === 'acc' ? 'accuracy' : b.id}`}
+                className="sx-bp-tool sx-bp-text sx-bp-toggle"
+                aria-label={atmo.ok ? 'Ambience' : `Ambience. ${atmo.line}`}
+                aria-pressed={atmoOn}
+                aria-disabled={!atmo.ok || undefined}
+                title={atmo.ok ? (atmoOn ? 'Stop the ambience (M)' : 'Play the ambience') : atmo.line}
+                onClick={toggleAtmo}
+                data-testid="build-ambience"
               >
-                <Icon name={b.icon} className="size-[15px]" />
-                <span>{b.label}</span>
-                {b.id === 'hear' && ambienceOn && <i className="sx-bp-live" aria-hidden="true" data-testid="hear-live" />}
+                <Icon name={atmoOn ? 'hear' : 'hearOff'} className="size-[15px]" />
+                <span>Ambience</span>
               </button>
-            )).flatMap((el, i) =>
-              i === 0 && atmo.ok
-                ? [
-                    el,
-                    <button
-                      key="atmo"
-                      type="button"
-                      className="sx-bp-tool sx-bp-text"
-                      title={atmoOn ? 'Stop the atmosphere sound (M)' : 'Play the atmosphere sound'}
-                      aria-pressed={atmoOn}
-                      onClick={toggleAtmo}
-                      data-testid="build-atmosphere"
-                    >
-                      <Icon name="wind" className="size-[15px]" />
-                      <span>Atmosphere</span>
-                    </button>,
-                  ]
-                : [el],
             )}
+            {canBuild && closeKind && (
+              <button
+                type="button"
+                className="sx-bp-tool sx-bp-text sx-bp-toggle"
+                aria-pressed={!closeHidden}
+                title="Explore: the close-up on the left"
+                onClick={() => useCloseUpStore.getState().setHidden(!closeHidden)}
+                data-testid="build-explore"
+              >
+                <ExploreIcon on={!closeHidden} className="size-[15px]" />
+                <span>Explore</span>
+              </button>
+            )}
+            {renderPop(POP_BUTTONS[1]!)}
             <i className="sx-bp-sep" aria-hidden="true" />
             <button
               type="button"
@@ -342,6 +365,11 @@ export function BuildPane() {
             </button>
           </div>
         </header>
+        {atmoHint && !atmo.ok && (
+          <p className="sx-bp-hint" role="status" data-testid="build-ambience-hint">
+            {atmo.line}
+          </p>
+        )}
         {bodyHere?.status === 'loading' ? (
           <div className="sx-bp-msg" data-testid="build-generating">
             <StatePill look={GENERATING_LOOK} word="Generating" />

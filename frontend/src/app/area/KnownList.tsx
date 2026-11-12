@@ -16,6 +16,7 @@ export function KnownList() {
       subtitle="In this area"
       icon="area"
       onClose={closePanel}
+      onMinimise={() => useAreaStore.getState().setMinimised(true)}
       returnFocusTo='[data-testid="tool-known"]'
       testId="area-card"
     >

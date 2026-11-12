@@ -8,7 +8,9 @@
 // mock-up's cuDraw does the same); this layer has the honesty caption (.sx-cu-tag, the
 // mock-up's .cu-tag), the controls and the input. Keyboard: arrows or W A S D move and turn, + and -
 // change the height, Page Up and Page Down tilt. Reduced motion: no automatic flying.
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
+import { animate } from 'motion';
+import { deferFrames, EXPLORE_SPRING } from './build/exploreMotion';
 import { useCloseUpStore } from './closeUpStore';
 import { ORBIT_NOTE } from '@/viewer/orbit/orbitSources';
 import { altRange } from '@/viewer/orbit/orbitMath';
@@ -51,6 +53,10 @@ export function closeUpKindOf(type: string | null | undefined): CloseUpKind | nu
   }
 }
 
+/**
+ * The close-up's name per kind. Unused in the UI since Q-450 (the header toggle is always "Explore");
+ * kept on purpose for the Details row or a tooltip that names the view, and covered by its test.
+ */
 export function closeUpButtonLabel(kind: CloseUpKind | null): string {
   return kind === 'orbit' ? 'Surface view' : 'Close-up view';
 }
@@ -96,6 +102,56 @@ export function CloseUpPane() {
   if (open && flyKey !== null && keptFly !== flyKey) setKeptFly(flyKey);
   const mountFly = flyKey !== null && (open || keptFly === flyKey);
   const [, bump] = useReducer((n: number) => n + 1, 0);
+  // Q-450: the star stages start a couple of frames after the pane springs in, so a new WebGL
+  // context never holds up the first frames of the slide, and they unmount once the fade has
+  // finished. The fly view does not use this: it follows `mountFly` above (kept mounted, paused).
+  // `live` names the stage that is mounted, so a new object's stage never starts while the pane is closed.
+  const stageKey = engine ? `star:${engine.preset.id}` : `kind:${kind ?? ''}`;
+  const [liveKey, setLiveKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (open) return deferFrames(() => setLiveKey(stageKey));
+    const id = window.setTimeout(() => setLiveKey(null), 700);
+    return () => window.clearTimeout(id);
+  }, [open, stageKey]);
+  const live = liveKey === stageKey;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const wasOpen = useRef(open);
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el || wasOpen.current === open) return;
+    wasOpen.current = open;
+    // When an animation ends, its inline styles go, so the stylesheet (and the phone layout) rules again.
+    const settle = () => {
+      el.style.removeProperty('opacity');
+      el.style.removeProperty('transform');
+    };
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      settle();
+      return;
+    }
+    // On a phone the pane is the top of the screen: it fades, it does not slide in from the left.
+    const phone = window.matchMedia?.('(max-width: 640px)').matches ?? false;
+    const away = 'translateX(-48px) scale(0.98)';
+    const here = 'translateX(0px) scale(1)';
+    // Start from where the pane is now: the inline values a stopped animation left, else the state
+    // it was in before the class changed (the stylesheet already shows the new state).
+    const fromOpacity = el.style.opacity !== '' ? Number(el.style.opacity) : open ? 0 : 1;
+    const fromTransform = el.style.transform || (open ? away : here);
+    const a = open
+      ? animate(
+          el,
+          phone ? { opacity: [fromOpacity, 1] } : { opacity: [fromOpacity, 1], transform: [fromTransform, here] },
+          EXPLORE_SPRING,
+        )
+      : animate(
+          el,
+          phone ? { opacity: [fromOpacity, 0] } : { opacity: [fromOpacity, 0], transform: [fromTransform, away] },
+          { duration: 0.35, ease: [0.4, 0, 1, 1] },
+        );
+    void a.finished.then(settle, () => {});
+    // Stopped by the next change: its values stay inline for the next animation to start from.
+    return () => a.stop();
+  }, [open]);
   const [about, setAbout] = useState(false);
   const focusRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -209,6 +265,7 @@ export function CloseUpPane() {
 
   return (
     <div
+      ref={rootRef}
       className={`sx-cu${open ? ' open' : ''}`}
       aria-hidden={open ? undefined : true}
       data-testid="closeup-pane"
@@ -240,10 +297,10 @@ export function CloseUpPane() {
           onFail={() => useWorldStore.getState().fail(engineKey(cardId, world.preset.id))}
         />
       )}
-      {engine && open && (
+      {engine && live && (
         <StarFlareStage key={engine.preset.id} star={engine} onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))} />
       )}
-      {kind === 'star' && !engine && starProps && open && (
+      {kind === 'star' && !engine && starProps && live && (
         <div className="absolute inset-0 bg-black" data-testid="star-closeup">
           <StarCloseUp {...starProps} className="absolute inset-0" />
         </div>

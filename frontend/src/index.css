@@ -1160,9 +1160,9 @@ body {
     background-color: #03030788;
     background-image: radial-gradient(70% 60% at 50% 45%, #1b1b2c66 0%, transparent 72%);
     animation: sx-bp-in 0.45s;
-    transition:
-      width 1s var(--sx-ease),
-      background-color 0.9s var(--sx-ease);
+    /* The width changes at once and the pane springs there by transform (exploreMotion.ts, Q-450):
+       animating the width resized the body's canvas on every frame. */
+    transition: background-color 0.9s var(--sx-ease);
   }
   .sx-bp[data-shifted] {
     width: 50%;
@@ -2153,20 +2153,14 @@ body {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transform: translateX(-36px) scale(0.985);
-  transition:
-    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 1s cubic-bezier(0.22, 1, 0.36, 1),
-    visibility 0s 0.8s;
+  /* Opacity and transform are sprung by motion (CloseUpPane, Q-450); visibility waits for the fade. */
+  transition: visibility 0s 0.4s;
 }
 .sx-cu.open {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
-  transform: none;
-  transition:
-    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.1s,
-    transform 1s cubic-bezier(0.22, 1, 0.36, 1) 0.1s;
+  transition: none;
 }
 .sx-cu-canvas {
   position: absolute;
@@ -4587,6 +4581,369 @@ body {
 }
 .sx-bezel[data-split] .sx-top {
   pointer-events: none;
+}
+
+/* ---- Matte glass on the floating surfaces (Moon, 12 Nov 2026; amends D-38's solid --s1 panels, Q-418).
+   The approved "Matte" preset of the matte-glass test page: a dark tint thin enough for the sky to
+   show through, a light blur that softens the stars instead of erasing them, a faint grain so it
+   reads matte rather than glossy, a hairline edge and a top highlight. Unlayered so it wins over
+   the component layers. The Flipbook picture itself stays opaque (it is data). ---- */
+:root {
+  --glass-bg: rgba(5, 6, 8, 0.65);
+  --glass-filter: blur(5px) saturate(170%);
+  --glass-edge: rgba(255, 255, 255, 0.09);
+  --glass-hi: rgba(255, 255, 255, 0.07);
+  --glass-inner: rgba(255, 255, 255, 0.06);
+  --glass-inner-edge: rgba(255, 255, 255, 0.07);
+  /* Hover on glass: a button that is itself glass darkens; a row inside the glass gets a veil. */
+  --glass-hover: rgba(30, 32, 36, 0.75);
+  --glass-veil-hover: rgba(255, 255, 255, 0.08);
+  /* The one shadow D-38 allows (design-language.md, glass exception): neutral, to lift the glass off the sky. */
+  --glass-lift: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --glass-text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  /* Fractal noise at a few percent white: the matte grain. */
+  --glass-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.sx-panel,
+.sx-panel[data-bare],
+.sx-island,
+.sx-fl,
+.sx-player,
+.sx-coords,
+.sx-area-hint,
+.sx-credit-btn,
+.sx-sky-credit,
+.sx-fps-btn,
+.sx-fps-menu,
+.sx-orb {
+  background: var(--glass-grain), var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  border-color: var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 var(--glass-hi),
+    var(--glass-lift);
+}
+/* Once the island has grown into a card, the card is the glass: the orb under it goes clear, so
+   the tint is not laid on twice. */
+.sx-orb-wrap[data-mode='panel'][data-arrived] .sx-orb {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+/* Wells and toggles inside a glass surface: a lighter veil, not a solid grey block. */
+:is(.sx-panel, .sx-fl, .sx-player) :is(.sx-seg, .fb-spec, .fb-empty, .sx-kn-chart, .sx-kn-det, .sx-kn-spec-none) {
+  background: var(--glass-inner);
+  border-color: var(--glass-inner-edge);
+}
+:is(.sx-panel, .sx-player) :is(.fb-ov:hover:not(:disabled), .fb-x:hover, .fb-stop:hover) {
+  background: var(--glass-veil-hover);
+}
+/* Separator lines inside the cards follow the glass edge. */
+.sx-panel :is(.sx-panel-head, .fb-rows, .sx-rows) {
+  border-color: var(--glass-edge);
+}
+/* No backdrop-filter support: fall back to the solid surfaces. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .sx-panel,
+  .sx-panel[data-bare],
+  .sx-island,
+  .sx-fl,
+  .sx-player,
+  .sx-coords,
+  .sx-area-hint,
+  .sx-credit-btn,
+  .sx-sky-credit,
+  .sx-fps-btn,
+  .sx-fps-menu,
+  .sx-orb {
+    background: var(--s1);
+  }
+}
+/* Windows high contrast: plain system surfaces. */
+@media (forced-colors: active) {
+  .sx-panel,
+  .sx-island,
+  .sx-fl,
+  .sx-player,
+  .sx-coords,
+  .sx-area-hint,
+  .sx-credit-btn,
+  .sx-sky-credit,
+  .sx-fps-btn,
+  .sx-fps-menu,
+  .sx-orb {
+    background: Canvas;
+    backdrop-filter: none;
+  }
+  /* Pressed toggles and the chosen speed keep a visible mark when backgrounds are forced. */
+  .sx-bp-tool[aria-pressed='true'],
+  .sx-fps-item[aria-checked='true'] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+/* The user asked for less transparency: the solid surfaces, no blur. */
+@media (prefers-reduced-transparency: reduce) {
+  .sx-panel,
+  .sx-panel[data-bare],
+  .sx-island,
+  .sx-fl,
+  .sx-player,
+  .sx-coords,
+  .sx-area-hint,
+  .sx-credit-btn,
+  .sx-sky-credit,
+  .sx-fps-btn,
+  .sx-fps-menu,
+  .sx-orb {
+    background: var(--s1);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* Minimise beside close in a card header (Q-418): only the first button pushes right, so the two
+   sit together (4px apart) instead of splitting the free space between them. */
+.sx-panel-head .sx-panel-x + .sx-panel-x {
+  margin-left: -7px;
+}
+
+/* The build view's Ambience and Explore toggles (Q-450). A toggle with nothing to do (no atmosphere
+   to hear) stays visible, dimmed, and says why. */
+.sx-bp-toggle[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sx-bp-toggle[aria-disabled='true']:hover {
+  background: transparent;
+  color: var(--color-sx-mfg);
+}
+/* Split view off: once built, the body keeps the whole view instead of moving to the right half. */
+.sx-bp[data-shifted][data-solo] {
+  width: 100%;
+}
+
+/* The sky's info button and its popover (Moon, 12 Nov 2026): the same matte glass as the zoom card
+   beside it, as tall as that card, and a popover that reads top-down: what you are looking at, how
+   to read it, then the credit and (quietest) the renderer. */
+@media (min-width: 641px) {
+  /* Level with the zoom card: same bottom edge (16 px) as well as the same height. */
+  .sx-credit-btn {
+    width: 48px;
+    height: 48px;
+    bottom: 16px;
+    border-radius: 10px;
+  }
+  .sx-sky-credit {
+    bottom: 76px;
+    width: 300px;
+    max-width: calc(100% - 32px);
+    padding: 12px 14px;
+    border-radius: 12px;
+  }
+}
+.sx-credit-btn:hover,
+.sx-credit-btn[aria-expanded='true'] {
+  background: var(--glass-grain), var(--glass-hover);
+  color: var(--fg);
+}
+.sx-sky-credit {
+  gap: 8px;
+  color: var(--muted);
+}
+.sx-credit-title {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fg);
+}
+.sx-credit-what {
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--fg);
+  opacity: 0.82;
+}
+.sx-credit-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 18px;
+}
+.sx-credit-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 15px;
+}
+.sx-credit-tech {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+/* The frame-rate menu after the player (FrameRate.tsx): a square glass button as tall as the player,
+   and a short menu that opens under it. */
+.sx-transport-slot {
+  gap: 8px;
+}
+.sx-fps {
+  position: relative;
+  flex: none;
+}
+.sx-fps-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-edge);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.sx-fps-btn b {
+  font-size: 15px;
+  line-height: 16px;
+  font-weight: 600;
+}
+.sx-fps-btn span {
+  font-size: 10px;
+  line-height: 11px;
+  color: var(--fg);
+  opacity: 0.8;
+}
+.sx-fps-btn:not([aria-disabled='true']):hover,
+.sx-fps-btn[aria-expanded='true'] {
+  background: var(--glass-grain), var(--glass-hover);
+}
+.sx-fps-btn[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sx-fps-btn:focus-visible,
+.sx-fps-item:focus-visible {
+  outline: 2px solid var(--color-sx-green);
+  outline-offset: 2px;
+}
+.sx-fps-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  min-width: 112px;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-edge);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transform-origin: top left;
+}
+.sx-fps-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  /* D-38: menu rows in panels are 40 px (44 px on a phone, below). */
+  height: 40px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sx-fps-item:hover,
+.sx-fps-item:focus-visible {
+  background: var(--glass-veil-hover);
+  color: var(--fg);
+}
+.sx-fps-item[aria-checked='true'] {
+  color: var(--fg);
+}
+
+/* Small text on the glass keeps its contrast over the brightest sky (the Galactic plane, nebula
+   cores): a soft dark shadow under it (design review of PR #107; Q-418's open contrast check). */
+:is(.sx-sky-credit, .sx-fps-btn, .sx-fps-menu, .sx-player, .sx-fl, .sx-coords) {
+  text-shadow: var(--glass-text-shadow);
+}
+/* Phone: the speed menu opens to the left of its button (it sits near the right edge), its rows
+   are 44 px to tap, and the sky's info button is 44 px too. */
+@media (max-width: 640px), (pointer: coarse) {
+  .sx-fps-menu {
+    left: auto;
+    right: 0;
+    max-width: calc(100vw - 16px);
+    transform-origin: top right;
+    gap: 0;
+  }
+  .sx-fps-item {
+    height: 44px;
+  }
+}
+@media (max-width: 640px) {
+  .sx-credit-btn {
+    width: 44px;
+    height: 44px;
+  }
+  .sx-sky-credit {
+    bottom: 60px;
+  }
+}
+
+/* Details' way into Hear it (Q-450): a full-width outline row, like the panel's other buttons (D-38). */
+.sx-bp-row-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  font-size: 13px;
+  text-align: left;
+}
+.sx-bp-row-btn:hover {
+  background: var(--s2);
+}
+.sx-bp-row-btn:active {
+  transform: scale(0.98);
+}
+.sx-bp-row-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+@media (pointer: coarse) {
+  .sx-bp-row-btn {
+    min-height: 44px;
+  }
+}
+
+/* Why Ambience has nothing to play, shown for a few seconds after a tap on the dimmed button. */
+.sx-bp-hint {
+  position: absolute;
+  top: 64px;
+  right: 24px;
+  z-index: 6;
+  max-width: min(22rem, calc(100% - 48px));
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-edge);
+  background: var(--glass-grain), var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--fg);
 }
 
 /* #111 (R13.9): the Sound control in the top bar. Its open popover lifts the top bar above the

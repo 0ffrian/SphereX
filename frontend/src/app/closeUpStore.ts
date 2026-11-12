@@ -18,7 +18,7 @@ interface CloseUpState {
   engineWorld: CardToWorldOk | null;
   reducedMotion: boolean;
   info: CloseUpInfo | null;
-  /** The user hid the pane with the toggle next to Feel (the mock-up has none: default shown). */
+  /** The close-up is off (Explore not pressed). The user's choice, kept for the session (Q-419). */
   hidden: boolean;
   /**
    * Issue #71 stream U: the build is still running, so the close-up waits (the mock-up opens it when
@@ -48,7 +48,8 @@ export const useCloseUpStore = create<CloseUpState>((set) => ({
   engineWorld: null,
   reducedMotion: false,
   info: null,
-  hidden: false,
+  // Moon (12 Nov 2026, Q-419/Q-450): off until Explore is pressed; then the choice holds for the session.
+  hidden: true,
   held: false,
   publish: (p) => set(p),
   setInfo: (info) => set({ info }),

@@ -17,6 +17,7 @@ export function PanelCard({
   icon,
   wide = false,
   onClose,
+  onMinimise,
   returnFocusTo,
   bodyRef,
   rootRef,
@@ -30,6 +31,8 @@ export function PanelCard({
   icon: IconName;
   wide?: boolean;
   onClose(): void;
+  /** Shows a minimise button beside close: the card folds into the island's pill. */
+  onMinimise?: () => void;
   /** CSS selector of the element that gets focus after Escape or the close button. */
   returnFocusTo: string;
   bodyRef?: Ref<HTMLDivElement>;
@@ -58,7 +61,11 @@ export function PanelCard({
   useEffect(() => {
     if (pending) return;
     const a = document.activeElement;
-    if (!a || a === document.body) (bare ? rootEl.current : titleRef.current)?.focus({ preventScroll: true });
+    if (a && a !== document.body) return;
+    // A21.5: restoring a minimised card (its pill unmounts, focus falls to <body>) focuses its
+    // heading. A bare card draws its own heading; it takes focus when it is focusable (tabIndex -1).
+    const heading = bare ? rootEl.current?.querySelector<HTMLElement>('h2[tabindex]') : titleRef.current;
+    (heading ?? rootEl.current)?.focus({ preventScroll: true });
   }, [pending, bare]);
   const close = () => {
     onClose();
@@ -113,6 +120,18 @@ export function PanelCard({
             </p>
           )}
         </div>
+        {onMinimise && (
+          <button
+            type="button"
+            className="sx-panel-x"
+            aria-label={`Minimise ${title}`}
+            title="Minimise"
+            onClick={onMinimise}
+            data-testid="area-min"
+          >
+            <Icon name="minimise" className="size-4" />
+          </button>
+        )}
         <button
           type="button"
           className="sx-panel-x"

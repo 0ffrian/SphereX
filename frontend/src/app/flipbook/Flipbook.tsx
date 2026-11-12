@@ -22,6 +22,7 @@ import { RefusalList } from '@/app/RefusalList';
 import { groupMissing } from '@/app/refusals';
 import { ErrorBox } from '@/app/StatusBoxes';
 import { describeFrame, useAppStore, type SkyState } from '@/state/store';
+import { useShellStore } from '@/app/shell/shellStore';
 import {
   colourHidden,
   colourHiddenNote,
@@ -144,19 +145,31 @@ function BuildItButton({ onBuild }: { onBuild(): void }) {
 function TopTabs({ name, onClose }: { name: string; onClose(): void }) {
   return (
     <div className="fb-over">
-      <h2 className="fb-name" title={name} data-testid="object-name">
+      <h2 className="fb-name" title={name} tabIndex={-1} data-testid="object-name">
         {name}
       </h2>
-      <button
-        type="button"
-        className="fb-x"
-        aria-label="Close the flipbook"
-        title="Close (Esc)"
-        onClick={onClose}
-        data-testid="panel-close"
-      >
-        <Icon name="close" className="size-4" />
-      </button>
+      <span className="sx-kn-btns">
+        <button
+          type="button"
+          className="fb-x"
+          aria-label="Minimise"
+          title="Minimise"
+          onClick={() => useShellStore.getState().setMinimised(true)}
+          data-testid="panel-min"
+        >
+          <Icon name="minimise" className="size-4" />
+        </button>
+        <button
+          type="button"
+          className="fb-x"
+          aria-label="Close the flipbook"
+          title="Close (Esc)"
+          onClick={onClose}
+          data-testid="panel-close"
+        >
+          <Icon name="close" className="size-4" />
+        </button>
+      </span>
     </div>
   );
 }

@@ -24,6 +24,7 @@ import {
   stepProgress,
   type MouldScript,
 } from '@/viewer/mould/mouldSteps';
+import { useMouldLive } from './mouldLive';
 
 export type MouldPhase = 'idle' | 'loading' | 'forming' | 'building' | 'done';
 
@@ -110,6 +111,9 @@ export function useMould(inp: MouldInputs): MouldState {
       return;
     }
     const script = mouldScript(plan);
+    // The mould show (MouldOverlay) is the one clock for the strip: when the show that covered THIS
+    // build has finished, so has the build. A show left over from an earlier build cannot end it.
+    const token = useMouldLive.getState().startBuild();
     const finish = (settleTurn = false) => {
       viewer.setMould(null);
       // The newest plan (a honesty or mode change during the build ends on it).
@@ -190,6 +194,13 @@ export function useMould(inp: MouldInputs): MouldState {
         // screen): end at once on the new plan.
         if (latest.current.plan !== plan) {
           finish();
+          return;
+        }
+        // Q-453: the show is the strip's one clock, so its end ends this build. This loop only runs
+        // after the hold above ('forming', issue #93) has let go, so a show ending while an engine
+        // still forms the world can never finish the build early.
+        if (useMouldLive.getState().shownFor === token) {
+          finish(true);
           return;
         }
         const t = (now - t0) / 1000;

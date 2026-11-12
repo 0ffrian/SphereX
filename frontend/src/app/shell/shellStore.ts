@@ -40,6 +40,12 @@ export interface ShellState {
    * opening the object panel drops the request, so closing the panel shows the sky, not the card.
    */
   cardRequested: boolean;
+  /**
+   * The object panel (the Flipbook card) is minimised into the island's pill (Moon, 12 Nov 2026):
+   * a click on the pill opens it again. Any other way of opening or leaving a panel clears it.
+   */
+  minimised: boolean;
+  setMinimised(on: boolean): void;
   setTool(tool: ToolId): void;
   closePanel(): void;
   setBody(body: BodyLoad): void;
@@ -58,9 +64,12 @@ export const useShellStore = create<ShellState>()((set) => ({
   body: { status: 'idle' },
   build: { open: false, animate: false, seq: 0, seedOffset: 0 },
   cardRequested: false,
+  minimised: false,
+  setMinimised: (minimised) => set((s) => (s.minimised === minimised ? s : { minimised })),
   setTool: (tool) =>
     set((s) => ({
       tool,
+      minimised: false,
       focusSeq: s.focusSeq + 1,
       cardRequested: tool === 'flipbook' || tool === 'spectrum' ? false : s.cardRequested,
       // The rail's 3D viewer is the build pane, with the body already built (no animation).
@@ -72,11 +81,12 @@ export const useShellStore = create<ShellState>()((set) => ({
             ? { ...s.build, open: false, seedOffset: 0 }
             : s.build,
     })),
-  closePanel: () => set({ tool: 'sky' }),
+  closePanel: () => set({ tool: 'sky', minimised: false }),
   setBody: (body) => set({ body }),
   requestCard: () =>
     set((s) => ({
       cardRequested: true,
+      minimised: false,
       // The object panel steps aside so the card shows; an open build pane keeps the view.
       tool: s.build.open ? s.tool : 'sky',
     })),
@@ -85,6 +95,7 @@ export const useShellStore = create<ShellState>()((set) => ({
     set((s) => ({
       // The object panel steps aside: the sky takes the left half and the pane the right.
       tool: animate ? 'sky' : 'viewer',
+      minimised: false,
       build: { open: true, animate, seq: s.build.seq + 1, seedOffset: 0 },
     })),
   replayBuild: () => set((s) => ({ build: { ...s.build, animate: true, seq: s.build.seq + 1 } })),
