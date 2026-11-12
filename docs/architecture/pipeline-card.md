@@ -1,6 +1,6 @@
 # Pipeline: classify to RenderParams
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.3–A4.8 · **Implements:** [D-04](../decisions/contract.md), [D-22](../decisions/contract.md), [D-32](../decisions/contract-tags.md), [Q-55, Q-56, Q-60, Q-62, Q-63, Q-221, Q-222, Q-327](../decisions/pipeline-stages.md), [Q-359, Q-362](../decisions/physics-fixes.md), [Q-366](../decisions/catalogue-values.md), [Q-206, Q-369](../decisions/demo-pack.md), [Q-326](../decisions/rendering-bodies.md), [Q-57, Q-61](../decisions/pipeline-jobs.md), [Q-58, Q-59](../decisions/rendering-bodies.md), [Q-35](../decisions/contract.md), [Q-39](../decisions/contract.md), [Q-47](../decisions/rendering-bodies.md) · **Read with:** [pipeline.md](pipeline.md) (A4 overview), [../rendering/data-contract.md](../rendering/data-contract.md) (R3), [refusals.md](refusals.md) (A4.12)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.3–A4.8 · **Implements:** [D-04](../decisions/contract.md), [D-22](../decisions/contract.md), [D-32](../decisions/contract-tags.md), [Q-55, Q-56, Q-60, Q-62, Q-63, Q-221, Q-222, Q-327](../decisions/pipeline-stages.md), [Q-359, Q-362, Q-376 to Q-378](../decisions/physics-fixes.md), [Q-366](../decisions/catalogue-values.md), [Q-206, Q-369](../decisions/demo-pack.md), [Q-326](../decisions/rendering-bodies.md), [Q-57, Q-61](../decisions/pipeline-jobs.md), [Q-58, Q-59](../decisions/rendering-bodies.md), [Q-35](../decisions/contract.md), [Q-39](../decisions/contract.md), [Q-47](../decisions/rendering-bodies.md) · **Read with:** [pipeline.md](pipeline.md) (A4 overview), [../rendering/data-contract.md](../rendering/data-contract.md) (R3), [refusals.md](refusals.md) (A4.12)
 
 Stages 3 to 7 of the pipeline ([A4](pipeline.md#a4-pipeline)). They run inside the object job ([A4.10](jobs.md#a410-object-job-and-fan-out)). Their routes are listed in [A4.11](endpoints.md#a411-endpoint-register) and their `missing` codes in [A4.12](refusals.md#a412-missing-and-refusal-codes).
 
@@ -45,9 +45,9 @@ A sketch from SPHEREx only is often a `candidate`, which gets no 3D body (render
 - The status is sent as the `X-SX-Asset-Status` response header (Q-39, [A4.11](endpoints.md#a411-endpoint-register)).
 - **Version constants** (this list is the one place for their values; bump the one whose rule changed):
 
-  | Constant | File | Value (11 Nov 2026) | Bump when |
+  | Constant | File | Value (12 Nov 2026) | Bump when |
   |---|---|---|---|
-  | `ASSET_VERSION` | `core/card/assets.py` | `12` (4: the issue #62 layers, Q-115 to Q-117; 5: the Q-63 thresholds on, issue #68; 10: issue #71; 11: the PR #89 crater, relief and Procyon fixes, Q-326, Q-336; 12: the issue #93 card fields and the Teq and confidence fixes, Q-359, Q-362, Q-363, Q-366) | a stage 3 or 5 rule changes, or stage 7 sends other layers without changing a seed |
+  | `ASSET_VERSION` | `core/card/assets.py` | `13` (4: the issue #62 layers, Q-115 to Q-117; 5: the Q-63 thresholds on, issue #68; 10: issue #71; 11: the PR #89 crater, relief and Procyon fixes, Q-326, Q-336; 12: the issue #93 card fields and the Teq and confidence fixes, Q-359, Q-362, Q-363, Q-366; 13: the #93 follow-up registry rows, Gaia FLAME precision and eccentricity limits, Q-376 to Q-378) | a stage 3 or 5 rule changes, or stage 7 sends other layers without changing a seed |
   | `CARD_TO_PARAMS_VERSION` | `core/render/card_to_params.py` | `1` | a stage 7 rule changes the drawn body |
   | `BAKER_RULES_VERSION` | `core/render/bake.py` | `4` (3: issue #71 asteroid physics, Q-210; 4: crater depth and rubble relief, Q-326) | an R6.2 to R6.5 rule changes |
   | `GENERATOR_VERSION` | `core/render/card_to_params.py` | `p1-b4` | follows the two above; it also seeds every body (A5.1) |
