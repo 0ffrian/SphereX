@@ -37,6 +37,7 @@ Topic files, short names used below: [scope-process](decisions/scope-process.md)
 | Get oriented | scope-process (D-06, Q-137), platform-hosting (Q-132) | [overview.md](architecture/overview.md) (A1–A2.1), [principles-stack.md](rendering/principles-stack.md) (R0–R2), [glossary.md](architecture/glossary.md) (A15) |
 | An unfamiliar term | none | [glossary.md](architecture/glossary.md) (A15) |
 | Port something from a mock-up | rendering-bodies (D-01), sky-shell (Q-89), shell-surfaces (Q-121) | the spec fragment for the feature (mock-ups are visual input only); for Track, the approximations listed in the header of [track-ui.md](architecture/moving-objects/track-ui.md) (A20) |
+| UI look and feel (colours, type, radii, selected states, components, motion tokens) | shell-surfaces (D-38; Q-409 light theme, Q-410 to Q-413) | [design-language.md](design-language.md); the skill `sx-design-language` loads it. Layout, structure and wording still come from the mock-up (D-01) |
 | Edit a diagram | the topic file of the spec you changed | [uml/README.md](uml/README.md), then the diagram; the spec fragment it illustrates |
 | Record or change a decision | the topic file it belongs to | [decisions/README.md](decisions/README.md#rules-for-entries) (rules, next free IDs) |
 

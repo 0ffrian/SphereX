@@ -12,13 +12,14 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
 |---|---|---|---|
 | `GET /v1/resolve?q=<name or ra,dec>` | name or position → object id, position, `moving` and `resolver` (`simbad`, `sbdb`, `coords` or `reference`; a reference object has no sky position, Q-328) | D-16, D-19, Q-22, Q-25, Q-258, Q-328 | [A4.1](pipeline.md#a41-stage-1-find-the-object) |
 | `GET /v1/objects/{id}/frames` | the frame list the flipbook plays | D-16 | [A4.1](pipeline.md#a41-stage-1-find-the-object) |
+| `GET /v1/objects/{id}/path[?start=&end=]` | a mover's Horizons path seen from SPHEREx and the exact position at each frame, cache only (the path search's cached ephemeris; a missing answer starts the object job); errors 400 `path_span_too_long`, 400 `bad_request`, 404 `not_moving`; built (issue #74), beyond D-16 | Q-141 (open, Kevin; built as option b) | A19.5 ([moving-objects/track.md](moving-objects/track.md#a195-path-endpoint)); schema `track-path.schema.json` (A19.13) |
 | `GET /v1/objects/{id}/cutouts/{frame_id}.png` | one stretched cutout | D-16 | [A4.1](pipeline.md#a41-stage-1-find-the-object) |
 | `GET /v1/objects/{id}/spectrum` | spectrum and light curve, `measured` | D-16 | [A4.2](pipeline.md#a42-stage-2-measure-brightness-and-spectrum) |
 | `GET /v1/objects/{id}/card` | ObjectCard (R3.2) | D-16 | [A4.5](pipeline-card.md#a45-stage-5-objectcard) |
 | `GET /v1/objects/{id}/render-params` | RenderParams (R3.4) | D-16 | [A4.7](pipeline-card.md#a47-stage-7-renderparams) |
 | `GET /v1/objects/{id}/job` | the object job's state | Q-111 (open) | [A4.10](jobs.md#a410-object-job-and-fan-out) |
 | `GET /v1/objects/{id}/job/events` | the same, as server-sent events | Q-111 (open) | [A4.10](jobs.md#a410-object-job-and-fan-out) |
-| `GET /v1/objects/{id}/overlays` | Gaia and CatWISE markers, contamination, footprint | Q-50 (open) | [A4.9](overlays.md#a49-overlays-flag-mask-and-combine) |
+| `GET /v1/objects/{id}/overlays` | Gaia and CatWISE markers, contamination, footprint, star masks for movers (A19.6) | Q-50 (open) | [A4.9](overlays.md#a49-overlays-flag-mask-and-combine) |
 | `GET /v1/objects/{id}/flags/{frame_id}.png` | flag mask PNG | Q-50 (open) | [A4.9](overlays.md#a49-overlays-flag-mask-and-combine) |
 | `GET /v1/objects/{id}/combine.png?op=add\|sub&a=&b=` | A ± B on frame A's grid | Q-50, Q-54 (open) | [A4.9](overlays.md#a49-overlays-flag-mask-and-combine) |
 | `GET /v1/objects/{id}/composite` | false-colour SPHEREx composite, metadata | Q-92, Q-94 (open) | [backend/README.md#composite](../../backend/README.md#composite); colour views in [A11](honesty-policy.md#a11-honesty-policy-user-facing) |
@@ -39,7 +40,6 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
 
 | Route | Purpose | Decision | Spec |
 |---|---|---|---|
-| `GET /v1/objects/{id}/path[?start=&end=]` | the Horizons path seen from SPHEREx, cache only, filled by the object job; planned errors 400 `path_span_too_long`, 404 `not_moving` | Q-141 (open, Kevin) | A19.5 ([moving-objects/track.md](moving-objects/track.md#a195-path-endpoint)); schema A19.13 |
 | `GET /v1/objects/{id}/track.ecsv` | Track export (shared ECSV writer with Area search) | Q-145 (open, Kevin) | A19.9 ([moving-objects/track-contract.md](moving-objects/track-contract.md)) |
 | `/v1/areas/...` (list, one area, known objects, dots, tracks, checks (gated), stamps, export); planned errors 404 `area_not_found`, 404 `dot_not_found`, 503 `stamp_unavailable` | Area search | Q-146 item 6; payload shapes Q-208 (proposed) | A17.8 ([moving-objects/area-contract.md](moving-objects/area-contract.md#a178-endpoints)) owns the route list |
 
@@ -59,8 +59,8 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
   | 404 | `frame_not_found` | a frame id the object's list does not hold |
   | 404 | `flags_unavailable` | a cutout with no usable FLAGS mask (permanent) |
   | 404 | `albedo_ai_unavailable` | no applied, current AI albedo |
-  | 400 | `path_span_too_long` | **planned** (A19.5): `/path` with a `start`–`end` span over the cap |
-  | 404 | `not_moving` | **planned** (A19.5): `/path` for an id with `moving = false` |
+  | 400 | `path_span_too_long` | `/path` with a `start`–`end` span over `SX_PATH_MAX_SPAN_DAYS` (A19.5) |
+  | 404 | `not_moving` | `/path` for an id with `moving = false` (A19.5) |
   | 503 | `offline_cache_miss` | `SX_OFFLINE=1` and the call is not in the cache (D-25) |
   | 503 | `upstream_unavailable` | an external service failed after retries and no older cache entry exists |
   | 503 | `cutout_unavailable` | a cutout that cannot be fetched or read |

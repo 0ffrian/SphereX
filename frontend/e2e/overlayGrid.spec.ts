@@ -4,6 +4,7 @@
 // the grid is 65 px. A catalogue marker must sit on its source in the picture on every frame, use
 // the same placement as the picture, and follow the frame on screen (which can trail the requested
 // one while the next cutout decodes).
+import { openMore, setFps } from './flipbookUi';
 import { expect, test, type Page } from '@playwright/test';
 
 interface Marker {
@@ -27,8 +28,10 @@ async function openBarnard(page: Page) {
   const input = page.getByTestId('search-input');
   await input.fill("Barnard's Star");
   await input.press('Enter');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
   await expect(page.getByTestId('frame-viewer')).toHaveAttribute('data-grid', String(GRID));
+  // The toggles are in the card's "More" row, Overlays tab.
+  await openMore(page, 'overlays');
 }
 
 async function replies(page: Page): Promise<{ overlays: OverlaysReply; frames: FramesReply }> {
@@ -170,7 +173,7 @@ test('Gaia markers sit on their stars on every frame size, clipped frame include
       await viewer.focus();
       await page.keyboard.press('ArrowRight');
     }
-    await expect(counter).toHaveText(`Frame ${k + 1} of 24`);
+    await expect(counter).toHaveText(`${k + 1} / 24`);
     await expect(viewer).toHaveAttribute('data-shown', 'picture');
     await expect(viewer).toHaveAttribute('data-shown-index', String(k));
     // Placement: the same transform as the picture box (checked over a few animation frames).
@@ -192,7 +195,7 @@ test('Gaia markers sit on their stars on every frame size, clipped frame include
   const mask = page.getByTestId('flag-mask');
   await expect(mask).toBeAttached();
   await page.getByTestId('scrubber').fill('2');
-  await expect(counter).toHaveText('Frame 3 of 24');
+  await expect(counter).toHaveText('3 / 24');
   await expect(viewer).toHaveAttribute('data-shown-index', '2');
   await expect(page.getByTestId('no-data-hatch')).toHaveCount(1);
   await expect
@@ -205,10 +208,12 @@ test('markers follow the frame on screen during fast playback', async ({ page })
   test.setTimeout(60_000);
   await openBarnard(page);
   const expected = gaiaByFrame(await replies(page));
-  await expect(page.getByTestId('preload-progress')).toHaveText(/^Cutouts loaded: 24 of 24$/);
+  await openMore(page, 'about');
+  await expect(page.getByTestId('preload-progress')).toHaveText(/^24 of 24 loaded$/);
+  await openMore(page, 'overlays');
   await page.getByTestId('overlay-toggle-gaia').click();
   await expect(page.locator('[data-testid="marker"]').first()).toBeAttached();
-  await page.locator('select[title="Speed"]').selectOption('8');
+  await setFps(page, 8);
   const play = page.getByTestId('play-pause');
   await play.click();
   await expect(play).toHaveText('Pause');
@@ -266,23 +271,17 @@ test('the colour composite hides the overlays and says so; Raw brings them back'
   await page.getByTestId('overlay-toggle-gaia').click();
   await expect(page.locator('[data-testid="marker"]').first()).toBeAttached();
   // Wavelength tint: markers stay, above the tint.
-  await page
-    .getByRole('radiogroup', { name: 'Picture' })
-    .getByRole('radio', { name: 'Colour' })
-    .click();
+  await page.getByRole('group', { name: 'Picture' }).getByRole('button', { name: 'Colour' }).click();
   await expect(page.getByTestId('tint-overlay')).toBeVisible();
   await expect(page.locator('[data-testid="marker"]').first()).toBeAttached();
   await page
-    .getByRole('radiogroup', { name: 'Colour view' })
-    .getByRole('radio', { name: 'SPHEREx composite' })
+    .getByRole('group', { name: 'Colour view' })
+    .getByRole('button', { name: 'SPHEREx composite' })
     .click();
   await expect(page.getByTestId('overlay-composite-note')).toBeVisible();
   await expect(page.getByTestId('marker')).toHaveCount(0);
   await expect(page.getByTestId('overlay-details')).toHaveCount(0);
-  await page
-    .getByRole('radiogroup', { name: 'Picture' })
-    .getByRole('radio', { name: 'Raw' })
-    .click();
+  await page.getByRole('group', { name: 'Picture' }).getByRole('button', { name: 'Raw' }).click();
   await expect(page.getByTestId('overlay-composite-note')).toHaveCount(0);
   await expect(page.locator('[data-testid="marker"]').first()).toBeAttached();
 });
@@ -299,6 +298,7 @@ test('progressive loading: overlays wait for the full frame list and are asked f
   await input.fill('Synthetic progressive');
   await input.press('Enter');
   await expect(page.getByTestId('frames-progress')).toBeVisible();
+  await openMore(page, 'overlays');
   await page.getByTestId('overlay-toggle-gaia').click();
   await expect(page.getByTestId('overlay-waiting')).toBeVisible();
   expect(asked).toHaveLength(0);

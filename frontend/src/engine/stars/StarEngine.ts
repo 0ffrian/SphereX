@@ -24,6 +24,9 @@ import type { BuildNote } from '@/app/build/BuildControls';
 import type { StarPreset } from './cardToStar';
 import { GLOBE_HALF, GLOBE_TILT, globeRot, pickSurface, viewPoint, type LatLon } from './starPick';
 
+/** Whole star: the disc's radius as a fraction of the shorter side (loops are drawn 3 times larger in 'big', so it gets more room). */
+const FRAME_TRUE = 0.36;
+const FRAME_BIG = 0.31;
 export type StarMode = 'globe' | 'closeup';
 /** The prototype's "Light" pills: 3 Observatory view, 2 Enhanced colour, 0 True colour. */
 export type StarLight = 0 | 2 | 3;
@@ -68,6 +71,14 @@ export interface ChartData {
   soft: number[];
   hard: number[];
   open: boolean;
+}
+/** What the close-up sees at its target (see `StarEngine.closeInfo`). */
+export interface CloseInfo {
+  active: boolean;
+  near: number;
+  nearAt: LatLon | null;
+  auto: boolean;
+  flaring: boolean;
 }
 export interface Readout {
   label: string;
@@ -195,6 +206,10 @@ interface Inside {
   pFlare(kind: string, cls: string, t: number): void;
   pReset(): void;
   setAt(t: [number, number] | null): void;
+  setFlareZoom(z: number): void;
+  setAuto(on: boolean): void;
+  setForce(i: number): void;
+  cuInfo(): { active: boolean; near: number; nearAt: [number, number] | null; auto: boolean; flaring: boolean };
   at(): [number, number];
   lines(): boolean;
 }
@@ -205,6 +220,102 @@ const SRC = PREFIX + S1 + '\n' + S2 + '\n' + S3 + '\n' + S4;
 // What the prototype's page does after its slices: nothing but the loop (stubbed) and these reads.
 const SUFFIX = `
 vis.star = MODE === 'globe'; vis.flare = MODE === 'closeup';
+// Wrapper hooks (app level, the slices stay verbatim): the view's half height goes through HALF (framing the
+// whole star, zooming the surface close-up), and the flare close-up's Light follows the star's (FLARE_FILTER).
+if (starGL) { var _sd = starGL.draw; starGL.draw = function (o) { o.half = HALF(o.half); return _sd.call(starGL, o); }; }
+var _od = drawOverlay; drawOverlay = function (r, t, h) { return _od(r, t, HALF(h)); };
+if (flareGL) { var _fd = flareGL.draw; flareGL.draw = function (o) {
+  o.filter = FLARE_FILTER(o.filter);
+  if (MODE === 'closeup' && MODEL) {
+    // The star's own surface at the target: its temperature, cell size (View: larger detail or true scale), spots and the
+    // camera turn that puts the target in front of the horizon camera.
+    cuUpdate();
+    o.T = ST.p.T; o.conv = MODEL.conv; o.freq = ST.view === 'big' ? Math.min(MODEL.cells, BIG) : MODEL.cells;
+    o.spots = MODEL.sp; o.n = MODEL.n; o.rot = CU.rot; o.tilt = CU.tilt; o.off = V.off; o.half = V.h;
+  }
+  return _fd.call(flareGL, o); }; }
+// ---- Wrapper (app level; the slices stay verbatim): the flare close-up looks at the star's CURRENT TARGET ----
+// The engine's flare view is an oblique horizon camera (V.off, V.h, proj(), the flare GL surface). Here it is driven
+// from the star's own state at the target place: the surface shader gets the star's spots, cell size and rotation
+// (so the camera sits over that lat/lon), the loops and the flare are anchored on the nearest spot group (only when
+// one is in view), and the flare shown is the engine's own schedule event for that group.
+var CU = { auto: true, G: -1, near: -1, ang: 9, k: 0.6, alpha: 1, rot: 0, tilt: 0, gv: null, ZK: 1, ev: null, sig: '' };
+var CU_FORCE = -1;
+var _pg = pickGroup;
+pickGroup = function (r) { return CU_FORCE >= 0 && CU_FORCE < MODEL.groups.length ? CU_FORCE : _pg(r); };
+function cuAt() { return CLOSE_AT || MODEL.best || [0.26, 0.5]; }
+function cuVec(a) { var c = Math.cos(a[0]); return [c * Math.sin(a[1]), Math.sin(a[0]), c * Math.cos(a[1])]; }
+function cuNearest(T) {
+  var bi = -1, ba = 9;
+  MODEL.groups.forEach(function (g, i) { var a = Math.acos(clamp(g.c[0] * T[0] + g.c[1] * T[1] + g.c[2] * T[2], -1, 1)); if (a < ba) { ba = a; bi = i; } });
+  return { i: bi, a: ba };
+}
+// star-fixed vector -> the camera's view space: the inverse of the shader's ry(rx(n, tilt), rot)
+function cuView(s) {
+  var cr = Math.cos(-CU.rot), sr = Math.sin(-CU.rot), ct = Math.cos(-CU.tilt), st = Math.sin(-CU.tilt);
+  var x = s[0] * cr + s[2] * sr, y = s[1], z = -s[0] * sr + s[2] * cr;
+  return [x, y * ct - z * st, y * st + z * ct];
+}
+function cuPoint(A, L, w) {
+  var g = CU.gv, k = CU.k, x = g.c[0] + (g.es[0] * A + g.en[0] * L) * k, y = g.c[1] + (g.es[1] * A + g.en[1] * L) * k, z = g.c[2] + (g.es[2] * A + g.en[2] * L) * k, s = (1 + w * k) / (Math.hypot(x, y, z) || 1);
+  return [x * s, y * s, z * s];
+}
+function cuUpdate() {
+  if (MODE !== 'closeup' || !MODEL) return;
+  var T = cuVec(cuAt()), ty = clamp(T[1], -1, 1);
+  // The camera: the view-space point C = (0, cos B0, sin B0) (where the canned flare sits) is the target.
+  CU.tilt = Math.acos(ty) - B0; CU.rot = Math.atan2(T[0], T[2]);
+  OV.rot = CU.rot; OV.tilt = CU.tilt;
+  var n = MODEL.groups.length ? cuNearest(T) : { i: -1, a: 9 };
+  CU.near = n.i; CU.ang = n.a;
+  var reach = clamp(0.28 / CU.ZK, 0.08, 0.9), g = n.i >= 0 ? MODEL.groups[n.i] : null;
+  CU.G = g && n.a < Math.max(reach, g.sep * 0.8) ? n.i : -1;
+  if (CU.G >= 0) {
+    var gx = sideOn(g);
+    CU.gv = { c: cuView(g.c), es: cuView(gx.es), en: cuView(gx.en) };
+    CU.k = clamp(g.sep / 0.185, 0.4, 3);
+    CU.alpha = clamp(0.45 + 0.35 * Math.sqrt(g.area / MEAN_A), 0.5, 1);
+  } else CU.gv = null;
+  V.h = 0.17 * (CU.G >= 0 ? Math.max(0.75, CU.k) : 0.75) / CU.ZK;
+  V.off[0] = 0; V.off[1] = cb + 0.63 * V.h;
+}
+if (MODE === 'closeup') {
+  proj = function (A, L, w, W, H) { var q = cuPoint(A, L, w); return [W / 2 + (q[0] - V.off[0]) / V.h * H / 2, H / 2 - (q[1] - V.off[1]) / V.h * H / 2]; };
+  atStage = function (a, l, h) { var q = cuPoint(a, l, h); AT.x = AT.W / 2 + (q[0] - V.off[0]) / V.h * AT.H / 2; AT.y = AT.H / 2 - (q[1] - V.off[1]) / V.h * AT.H / 2; AT.hid = false; };
+  var _df = drawFlare;
+  drawFlare = function () {
+    cuUpdate();
+    if (CU.G < 0) {
+      // A quiet place: plain granulation, no loops, no plasma.
+      var dpr = Math.min(devicePixelRatio || 1, 1.5), W = Math.round(fc.clientWidth * dpr), H = Math.round(fc.clientHeight * dpr);
+      if (!W || !H) return;
+      if (fc.width !== W || fc.height !== H) { fc.width = W; fc.height = H; }
+      fx.clearRect(0, 0, W, H);
+      if (flarePL) { PL.n = 0; flarePL.draw(W, H, PL.data, 0); }
+      return;
+    }
+    fx.globalAlpha = CU.alpha; _df(); fx.globalAlpha = 1;
+  };
+  var _rf = resetFlares;
+  resetFlares = function () {
+    // The first (big) flare goes to the group at the target, so the close-up opens on it.
+    if (MODEL.groups.length) CU_FORCE = cuNearest(cuVec(cuAt())).i;
+    try { _rf(); } finally { CU_FORCE = -1; }
+  };
+}
+function cuAuto() {
+  if (MODE !== 'closeup' || !MODEL) return;
+  cuUpdate();
+  if (CU.auto) {
+    var ev = null, t = 0.06, kind = FL.kind, cls = FL.cls;
+    if (CU.G >= 0) OV.ev.forEach(function (e) { var u = (OV.clock - e.t0) / e.life; if (e.g === CU.G && u >= 0 && u < 1 && (!ev || e.t0 > ev.t0)) ev = e; });
+    if (ev) { t = 0.18 + 0.78 * Math.min(1, (OV.clock - ev.t0) / ev.life); kind = ev.open ? 'open' : 'closed'; cls = ev.E >= 1e31 ? 'x' : ev.E >= 1e30 ? 'm' : 'c'; }
+    if (kind !== FL.kind || cls !== FL.cls) { FL.kind = kind; FL.cls = cls; chartBase(); }
+    FL.t = t; CU.ev = ev;
+    var sig = [t.toFixed(3), kind, cls, CU.G, V.h.toFixed(4), CLOSE_AT ? CLOSE_AT[0] + ',' + CLOSE_AT[1] : ''].join('|');
+    if (ST.playing || sig !== CU.sig) { CU.sig = sig; flareUi(); drawFlare(); }
+  }
+}
 return {
   ST: ST, FL: FL, vis: vis,
   hasGL: function () { return { star: !!starGL, flare: !!flareGL }; },
@@ -216,11 +327,20 @@ return {
   setLight: function (id) { onFilter({ id: id }); },
   setScale: function (id) { onView({ id: id }); },
   setLines: function (on) { if (on !== SHOW_LINES) LINES_BTN.fire('click'); return SHOW_LINES; },
-  setKind: function (id) { FL.kind = id; chartBase(); flareUi(); drawFlare(); },
-  setClass: function (id) { FL.cls = id; flareUi(); drawFlare(); },
-  scrub: function (t) { FL.t = t; FL.playing = false; flPlay(); flareUi(); drawFlare(); drawFlareStar(); },
+  // The close-up's own controls hold the flare (CU.auto off) until Play, Fire or a new target hands it back to the schedule.
+  setKind: function (id) { CU.auto = false; FL.kind = id; FL.t = 0.1; FL.playing = true; flPlay(); chartBase(); flareUi(); drawFlare(); },
+  setClass: function (id) { CU.auto = false; FL.cls = id; FL.t = 0.1; FL.playing = true; flPlay(); flareUi(); drawFlare(); },
+  scrub: function (t) { CU.auto = false; FL.t = t; FL.playing = false; flPlay(); flareUi(); drawFlare(); drawFlareStar(); },
+  setAuto: function (on) { CU.auto = on; CU.sig = ''; if (on) FL.playing = ST.playing; },
+  setForce: function (i) { CU_FORCE = i; },
+  cuInfo: function () { cuUpdate(); var g = CU.near >= 0 ? MODEL.groups[CU.near] : null; return { active: CU.G >= 0, near: CU.near, nearAt: g ? [Math.asin(clamp(g.c[1], -1, 1)), Math.atan2(g.c[0], g.c[2])] : null, auto: CU.auto, flaring: !!CU.ev }; },
   play: function (on) { FL.playing = on; flPlay(); },
-  step: function (dt) { lastT = 0; frame(dt * 1000); },
+  step: function (dt) {
+    lastT = 0;
+    // Close-up, live: the flare shown is the schedule's event at the target (cuAuto), so the verbatim player advance is off.
+    if (MODE === 'closeup' && CU.auto) { FL.playing = false; frame(dt * 1000); FL.playing = ST.playing; cuAuto(); }
+    else frame(dt * 1000);
+  },
   draw: function () { drawStar(); drawFlareStar(); drawFlare(); },
   series: function () { return SER; },
   state: function () { return { ST: ST, OV: OV, PL: PL, FL: FL }; },
@@ -228,7 +348,9 @@ return {
   pView: function (view, filter) { ST.view = view; ST.filter = filter; refreshStar(); },
   pStep: function (n, dt) { for (var i = 0; i < n; i++) { ST.time += dt * 0.2; OV.clock += dt; updateEvents(); } },
   pFlare: function (kind, cls, t) { FL.playing = false; FL.kind = kind; FL.cls = cls; FL.t = t; flareUi(); },
-  setAt: function (t) { CLOSE_AT = t; },
+  setAt: function (t) { CLOSE_AT = t; CU.auto = true; CU.sig = ''; },
+  // Wrapper-owned (not verbatim): the flare window's half height V.h is the flare close-up's own zoom variable.
+  setFlareZoom: function (z) { CU.ZK = z; cuUpdate(); drawFlare(); drawFlareStar(); },
   at: function () { return CLOSE_AT || MODEL.best || [0.26, 0.5]; },
   pReset: function () { ST.playing = false; FL.playing = false; ST.time = 3; OV.clock = 0; OV.ev = []; OV.next = 0; OV.r = rng(1); OV.shown = null; OV.loops = []; PL.q = 1; }
 };`;
@@ -242,6 +364,7 @@ export class StarEngine {
   private disposed = false;
   private isReady = false;
   private readyP: Promise<void> | null = null;
+  private zoomK = 1;
 
   constructor(host: HTMLElement, opts: StarOptions) {
     this.mode = opts.mode;
@@ -317,36 +440,55 @@ export class StarEngine {
     // to the prototype) and are scoped per instance here; turning them into a module closure (as
     // engine/worlds/core.js's createCore does) would need a generated wrapper file and is left for later.
     const make = new Function(
-      '$',
-      'rng',
-      'lerp',
-      'smooth',
-      'clamp',
-      'reduced',
-      'console',
-      'document',
-      'requestAnimationFrame',
-      'addEventListener',
-      'MODE',
-      'LINES_BTN',
+      '$', 'rng', 'lerp', 'smooth', 'clamp', 'reduced', 'console', 'document',
+      'requestAnimationFrame', 'addEventListener', 'MODE', 'LINES_BTN', 'HALF', 'FLARE_FILTER',
       SRC + SUFFIX,
     ) as (...a: unknown[]) => Inside;
-    this.inside = make(
-      $,
-      rng,
-      lerp,
-      smooth,
-      clamp,
-      reduced,
-      quiet,
-      doc,
-      () => 0,
-      () => {},
-      opts.mode,
-      this.lines,
+    this.inside = make($, rng, lerp, smooth, clamp, reduced, quiet, doc, () => 0, () => {}, opts.mode, this.lines,
+      (h: number) => this.effHalf(h),
+      (f: number) => (this.mode === 'closeup' ? this.lightNow() : f),
     );
     const light = opts.light ?? 0;
     if (light !== 3) this.inside.setLight(light);
+  }
+
+  private lightNow(): number {
+    // The flare close-up's own H-alpha look is replaced by the star's Light setting (true colour, enhanced, observatory).
+    return (this.inside as Inside | undefined)?.ST.filter ?? 0;
+  }
+  /**
+   * The half height (in star radii) the view is drawn with. Whole star: wide enough that the disc and its loops
+   * fit with margin (disc radius at most FRAME of the shorter side; the engine's own 1.28 gave 0.39 of the height and
+   * cropped the loops). Surface close-up: the engine's half height divided by the zoom.
+   */
+  private effHalf(h: number): number {
+    if (this.mode !== 'globe') return h;
+    const view = (this.inside as Inside | undefined)?.ST.view;
+    if (view === 'close') return h / this.zoomK;
+    const c = this.canvases[0];
+    const W = c?.clientWidth ?? 0, H = c?.clientHeight ?? 0;
+    if (!W || !H) return h;
+    return Math.max(h, H / (2 * (view === 'big' ? FRAME_BIG : FRAME_TRUE) * Math.min(W, H)));
+  }
+  /** The half height the whole-star view uses now (for picking and the marker). */
+  globeHalf(): number {
+    return this.effHalf(GLOBE_HALF);
+  }
+  /** The close-up's zoom limits (1 = as opened), or null when this view has none (the whole star). */
+  get zoomRange(): [number, number] | null {
+    if (this.mode === 'closeup') return [0.25, 4];
+    return this.inside.ST.view === 'close' ? [0.5, 8] : null;
+  }
+  get zoom(): number {
+    return this.zoomK;
+  }
+  /** Surface close-up: drives the engine's half height (drawStar's `half`, via HALF). Flare close-up: V.h = 0.17 / zoom. */
+  setZoom(z: number): void {
+    const r = this.zoomRange;
+    if (!r || this.disposed) return;
+    this.zoomK = clamp(z, r[0], r[1]);
+    if (this.mode === 'closeup') this.inside.setFlareZoom(this.zoomK);
+    else this.inside.draw();
   }
 
   /** True when this mode's surface canvas got WebGL 2 (else the caller keeps its fallback). Its shader may still be compiling. */
@@ -417,6 +559,8 @@ export class StarEngine {
   setPaused(paused: boolean): void {
     this.inside.ST.playing = !paused;
     this.inside.FL.playing = !paused;
+    // Play hands the close-up back to the star's own flare schedule.
+    if (!paused && this.mode === 'closeup') this.inside.setAuto(true);
   }
   get light(): StarLight {
     return this.inside.ST.filter as StarLight;
@@ -427,9 +571,32 @@ export class StarEngine {
   get paused(): boolean {
     return !this.inside.ST.playing;
   }
-  /** The prototype's "Fire a big flare" button. */
-  fireFlare(): void {
-    this.el('#star-fire').fire('click');
+  /**
+   * The prototype's "Fire a big flare" button. `group` (an index into the star's spot groups) makes the flare start at
+   * that group instead of the engine's weighted pick.
+   */
+  fireFlare(group?: number): void {
+    this.inside.setForce(group ?? -1);
+    try {
+      this.el('#star-fire').fire('click');
+    } finally {
+      this.inside.setForce(-1);
+    }
+    if (this.mode === 'closeup') this.inside.setAuto(true);
+  }
+  /**
+   * What the close-up sees at its target: whether a spot group is in view (`active`), the nearest group's index and
+   * place, and whether it shows the live schedule (`auto`) or a flare the user chose.
+   */
+  closeInfo(): CloseInfo {
+    const i = this.inside.cuInfo();
+    return {
+      active: i.active,
+      near: i.near,
+      nearAt: i.nearAt ? { lat: i.nearAt[0], lon: i.nearAt[1] } : null,
+      auto: i.auto,
+      flaring: i.flaring,
+    };
   }
   setFieldLines(on: boolean): void {
     this.inside.setLines(on);
@@ -518,7 +685,7 @@ export class StarEngine {
   pick(nx: number, ny: number): LatLon | null {
     const c = this.canvases[0];
     if (!c || !c.clientHeight) return null;
-    const q = viewPoint(nx, ny, c.clientWidth / c.clientHeight, GLOBE_HALF);
+    const q = viewPoint(nx, ny, c.clientWidth / c.clientHeight, this.globeHalf());
     return pickSurface(q, globeRot(this.inside.ST.time), GLOBE_TILT);
   }
   /** The artifact's own state objects (ST, OV, PL, FL), for the parity harness. */
