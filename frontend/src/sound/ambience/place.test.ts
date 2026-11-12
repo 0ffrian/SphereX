@@ -60,6 +60,8 @@ function fakeEngine(o: FakeOpts = {}) {
   }
   const iceH = new Float32Array(n).fill(o.iceH ?? 0),
     snow = new Float32Array(n);
+  // the engine's EB arrays; a test may swap them for new ones, as the #93 shared simulation source does
+  const EB = { out, out2 };
   const img = new Uint8Array(RW * RH * 4);
   if (o.hydro)
     for (let j = 0; j < RH; j++)
@@ -87,8 +89,9 @@ function fakeEngine(o: FakeOpts = {}) {
       climate: o.gas ? null : { NX, NY, T, land: new Uint8Array(n), stats: {} },
       hydro: o.gas ? null : hydro,
     }),
+    EB,
     weatherFields: () =>
-      o.gas ? null : { NX, NY, iceH, snow, out, out2, cyclones: o.cyclones ?? [] },
+      o.gas ? null : { NX, NY, iceH, snow, out: EB.out, out2: EB.out2, cyclones: o.cyclones ?? [] },
     gasField() {
       eng.gasCalls++;
       return o.gasField ?? null;
@@ -473,6 +476,36 @@ describe('samplePlace: the height context follows the sliders (ruling 3)', () =>
     // the magma sea (hM = 0, T 1600 K, no crust) replaces the relief once the world is hot
     expect(Math.abs(cool.samples[0]!.h_km)).toBeGreaterThan(0.1);
     expect(warm.samples[0]!.h_km).toBe(0);
+  });
+});
+
+describe('samplePlace: the engine may swap its EB arrays between ticks (#93 shared simulation source)', () => {
+  it('a new EB.out2 (rain) is read on the next call, even while the heights are reused', () => {
+    const e = fakeEngine({ rain: 0.5, fly: { alt: 5 } });
+    const a = air();
+    expect(samplePlace(e, a, recorder().windAt)!.features.rainRate).toBeCloseTo(0.5, 6);
+    const out2 = new Float32Array(e.EB.out2.length);
+    for (let k = 0; k < out2.length; k += 4) out2[k] = 2;
+    e.EB.out2 = out2;
+    expect(samplePlace(e, a, recorder().windAt)!.features.rainRate).toBeCloseTo(2, 6);
+  });
+
+  it('a new EB.out (T) reaches the magma-sea height on the next resample', () => {
+    const e = fakeEngine({
+      elev: () => 2,
+      hydroLava: true,
+      hydro: () => [0, 0, 0, 0],
+      T: () => 1000,
+      model: { Ts: 1600 },
+    });
+    const a = air({ T0: 1600, lavaWorld: true });
+    const cool = samplePlace(e, a, recorder().windAt, { reuseFraction: 0 })!;
+    expect(Math.abs(cool.samples[0]!.h_km)).toBeGreaterThan(0.1); // T 1000 K: below the 1400-1500 K magma ramp
+    const out = new Float32Array(e.EB.out.length);
+    for (let k = 0; k < out.length; k += 4) out[k] = 1600;
+    e.EB.out = out;
+    const hot = samplePlace(e, a, recorder().windAt, { reuseFraction: 0 })!;
+    expect(hot.samples[0]!.h_km).toBe(0); // hM = 0: the magma sea
   });
 });
 

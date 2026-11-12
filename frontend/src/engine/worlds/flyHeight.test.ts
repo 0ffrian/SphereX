@@ -82,12 +82,14 @@ describe('flyHeight: the port follows the GLSL it was written from', () => {
     ridge: ['float ridge(', 3362652897],
     uvOf: ['vec2 uvOf(', 2301282815],
     tex4: ['vec4 tex4(', 941328995],
-    crs: ['vec4 crs(', 1570515431],
+    // #93 F3 (flyLod): crs and hKm read with textureLod(s, uv, 0.) instead of texture(); no mipmaps, the same texels and
+    // weights (re-measured with flyheight.html after the merge), so the port is unchanged.
+    crs: ['vec4 crs(', 3136391028],
     vn3: ['vec3 vn3(', 2618246900],
     vnd: ['vec4 vnd(', 3463262401],
     RM: ['const mat3 RM=', 694511531],
     efbm: ['float efbm(', 4152600],
-    hKm: ['float hKm(', 523901393],
+    hKm: ['float hKm(', 4107844165],
   };
   const body = (src: string, d: string): string => {
     const i = src.indexOf(d);
