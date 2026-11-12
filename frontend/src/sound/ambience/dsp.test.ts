@@ -23,7 +23,7 @@ import {
   TITAN_MF,
   TITAN_RAIN_PITCH,
   spec,
-} from './testFixtures';
+} from './bakeFixtures.testutil';
 import type { BedSpec, SourceId } from './types';
 
 const N_SMALL = 1 << 16;

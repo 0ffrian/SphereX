@@ -128,9 +128,12 @@ interface Entry {
   notes: string[];
 }
 
-/** dsp.ts reads only `c0` and `gv` from the AirModel, so a bed with the same spec and these two is the same sound. */
-const reuseKey = (s: BedSpec, air: AirModel) =>
-  `${bedId(s.id, s.variant)}|${specHash(s).toString(16)}|${air.c0}|${air.gv}`;
+/** dsp.ts reads only `c0` (S4 echo delays) and `gv` (S4/S5 wave fall time) from the AirModel, so a bed with the
+ * same spec, and the same c0/gv where it reads them, is the same sound. */
+const reuseKey = (s: BedSpec, air: AirModel) => {
+  const airPart = s.id === 'S4' ? `|${air.c0}|${air.gv}` : s.id === 'S5' ? `|${air.gv}` : '';
+  return `${bedId(s.id, s.variant)}|${specHash(s).toString(16)}${airPart}`;
+};
 const presetOf = (worldKey: string) => worldKey.slice(0, worldKey.lastIndexOf('#'));
 
 export class Palette {
@@ -257,10 +260,13 @@ export class Palette {
   } {
     let bytes = 0,
       beds = 0;
+    const seen = new Set<AudioBuffer>();
     for (const w of this.worlds.values())
       for (const e of w.values()) {
-        bytes += e.bytes;
         beds++;
+        if (seen.has(e.buf)) continue; // a reused bed shares one AudioBuffer between worlds
+        seen.add(e.buf);
+        bytes += e.bytes;
       }
     const msPerBed: Record<string, number> = {};
     const notes: Record<string, string[]> = {};
@@ -293,6 +299,7 @@ export class Palette {
       if (oldest === undefined) break;
       this.worlds.delete(oldest);
       this.admitted.delete(oldest);
+      this.fallbackUsed.delete(oldest);
     }
   }
 

@@ -14,7 +14,7 @@ import {
   TITAN_MF,
   TITAN_RAIN_PITCH,
   spec,
-} from './testFixtures';
+} from './bakeFixtures.testutil';
 import type { AirModel, BedSpec } from './types';
 
 const ON = typeof process !== 'undefined' && process.env.SX_BAKE_BENCH === '1';
