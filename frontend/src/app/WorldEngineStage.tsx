@@ -37,6 +37,8 @@ import { gpuTimingFlags } from '@/viewer/render/gpuTiming';
 import { FLY_NOTE, WORLD_HONESTY, WORLD_NOTE_LINES } from './worldNotes.generated';
 import { useAmbience } from '@/sound/ambience/useAmbience';
 import { SoundChip } from '@/sound/ambience/ui/SoundChip';
+import { WeatherOverlay } from '@/sound/ambience/ui/WeatherOverlay';
+import { WeatherDrawnRows } from '@/sound/ambience/ui/WeatherDrawnRows';
 
 /** The engine's world for the shown card, or null: not a planet, refused, or no WebGL 2 (old path). */
 export function useEngineWorld(): CardToWorldOk | null {
@@ -844,6 +846,7 @@ export function WorldGlobeStage({
 // Moon (11 Nov 2026): no on-render control bars. Height follows scroll, pinch and the zoom bar; the
 // layer list lives in Details. Kept behind this flag so the controls can come back.
 const SHOW_FLY_BAR = false as boolean;
+
 /** The prototype's surface (fly) view with its altitude slider and Fly forward, in the left pane. */
 export function WorldFlyStage({
   world,
@@ -1000,6 +1003,13 @@ export function WorldFlyStage({
       data-failed={failed ? '1' : '0'}
     >
       <div ref={hostRef} className="absolute inset-0" />
+      {/* R13.6 §8.5 (#117): rain, snow, bolts and glows over the fly view; never catches input. */}
+      <WeatherOverlay
+        engine={engine}
+        active={!!engine && entered && !paused}
+        reduced={reduced}
+        seed={world.preset.seed}
+      />
       {forming && <Forming gas={gas} progress={progress} />}
       {/* The fly view's own sound controls, shown whatever SHOW_FLY_BAR is (C6). */}
       {engine && entered && <SoundChip />}
@@ -1068,6 +1078,7 @@ export function WorldFlyStage({
                 {gas ? '2' : '3'} times taller than real.
               </span>
             </li>
+            <WeatherDrawnRows />
           </ul>
         </div>
       )}
