@@ -523,14 +523,14 @@ class OverlayService:
                 box = [[wrap_ra(r, 7), round(d, 7)] for r, d in wcs.png_corners_world(hdul)]
                 if not flagmask.available(hdul):
                     missing.add(f"flags_mask:{f.frame_id}")
+            # The frame record keeps its own s_region (issue #74, A19.3), which a mover needs:
+            # its rows come from the path search's cones. A fixed object's list stored before
+            # that has none, so its cone row is the fallback.
             row = rows.get(f.frame_id)
+            region = f.s_region or (row.s_region if row is not None else None)
             # s_region RAs are passed through by IRSA as written; a polygon across RA 0 can hold
             # -0.1 or 360.2, so they are wrapped like every other RA in the reply.
-            footprint = (
-                [[wrap_ra(r, 7), round(d, 7)] for r, d in row.s_region]
-                if row is not None and row.s_region
-                else None
-            )
+            footprint = [[wrap_ra(r, 7), round(d, 7)] for r, d in region] if region else None
             if footprint is None:
                 missing.add(f"footprint:{f.frame_id}")
             frames_out.append(

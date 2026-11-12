@@ -25,6 +25,7 @@ from app.contract.area_summary_schema import AreaSummary
 from app.contract.area_tracks_schema import AreaTracks
 from app.contract.object_card_schema import ObjectCard
 from app.contract.render_params_schema import RenderParams
+from app.contract.track_path_schema import TrackPath
 from app.settings import BACKEND_DIR
 
 SHARED = BACKEND_DIR.parent / "shared"
@@ -76,6 +77,7 @@ MODELS: dict[str, type[BaseModel]] = {
     "area-dots": AreaDots,
     "area-tracks": AreaTracks,
     "area-checks": AreaChecks,
+    "track-path": TrackPath,
 }
 
 

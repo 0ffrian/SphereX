@@ -1,0 +1,224 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "track-path.schema.json",
+  "title": "TrackPath",
+  "description": "GET /v1/objects/{id}/path (A19.5, Q-141): a moving object's path seen from SPHEREx, from the path search's cached Horizons ephemeris. Cache only; model_dependent.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "observer",
+    "step_min",
+    "windows",
+    "points",
+    "frame_points",
+    "tag",
+    "assumption",
+    "formula",
+    "interp_error_arcsec",
+    "missing",
+    "fetched_at",
+    "cached_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observer": {
+      "description": "Horizons CENTER of every position: the SPHEREx spacecraft (A3.4, Q-138).",
+      "type": "string",
+      "enum": [
+        "500@-163182"
+      ]
+    },
+    "step_min": {
+      "description": "Minutes between two samples (SX_MOVING_EPHEM_STEP_MIN).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "windows": {
+      "description": "The spans served, each inside one search window; never joined across a gap.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/TrackPathWindow"
+      }
+    },
+    "points": {
+      "description": "Horizons samples inside the windows, in time order.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/TrackPathPoint"
+      }
+    },
+    "frame_points": {
+      "description": "The exact Horizons TLIST position at each frame midpoint inside the windows (the /frames positions).",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/TrackPathFramePoint"
+      }
+    },
+    "tag": {
+      "type": "string",
+      "enum": [
+        "model_dependent"
+      ]
+    },
+    "assumption": {
+      "type": "string",
+      "minLength": 1
+    },
+    "formula": {
+      "type": "string",
+      "minLength": 1
+    },
+    "interp_error_arcsec": {
+      "description": "Largest separation between the interpolated path and the exact TLIST position over frame_points; null without frame points.",
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "missing": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/TrackPathMissingCode"
+      }
+    },
+    "fetched_at": {
+      "$ref": "#/definitions/TrackPathUtcTimeOrNull"
+    },
+    "cached_at": {
+      "$ref": "#/definitions/TrackPathUtcTimeOrNull"
+    }
+  },
+  "definitions": {
+    "TrackPathUtcTime": {
+      "title": "TrackPathUtcTime",
+      "description": "ISO-8601 UTC with milliseconds and a trailing Z.",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "TrackPathUtcTimeOrNull": {
+      "title": "TrackPathUtcTimeOrNull",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/TrackPathUtcTime"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "TrackPathRa": {
+      "title": "TrackPathRa",
+      "description": "Right ascension in degrees, ICRF.",
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMaximum": 360
+    },
+    "TrackPathDec": {
+      "title": "TrackPathDec",
+      "description": "Declination in degrees, ICRF.",
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90
+    },
+    "TrackPathWindow": {
+      "title": "TrackPathWindow",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end"
+      ],
+      "properties": {
+        "start": {
+          "$ref": "#/definitions/TrackPathUtcTime"
+        },
+        "end": {
+          "$ref": "#/definitions/TrackPathUtcTime"
+        }
+      }
+    },
+    "TrackPathPoint": {
+      "title": "TrackPathPoint",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "time",
+        "ra",
+        "dec"
+      ],
+      "properties": {
+        "time": {
+          "$ref": "#/definitions/TrackPathUtcTime"
+        },
+        "ra": {
+          "$ref": "#/definitions/TrackPathRa"
+        },
+        "dec": {
+          "$ref": "#/definitions/TrackPathDec"
+        }
+      }
+    },
+    "TrackPathFramePoint": {
+      "title": "TrackPathFramePoint",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame_id",
+        "time",
+        "ra",
+        "dec",
+        "ra_3sigma_arcsec",
+        "dec_3sigma_arcsec"
+      ],
+      "properties": {
+        "frame_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "time": {
+          "$ref": "#/definitions/TrackPathUtcTime"
+        },
+        "ra": {
+          "$ref": "#/definitions/TrackPathRa"
+        },
+        "dec": {
+          "$ref": "#/definitions/TrackPathDec"
+        },
+        "ra_3sigma_arcsec": {
+          "description": "Horizons 3-sigma RA uncertainty (quantity 36); null until it is asked for (cut for the event, issue #74).",
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "dec_3sigma_arcsec": {
+          "description": "Horizons 3-sigma Dec uncertainty (quantity 36); null until it is asked for.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "TrackPathMissingCode": {
+      "title": "TrackPathMissingCode",
+      "description": "A19.5, A19.10: path:deferred (poll), path:not_cached, path:observer, path:ephemeris, path:window, path:frames_incomplete (the frame list is not final; poll).",
+      "type": "string",
+      "enum": [
+        "path:deferred",
+        "path:not_cached",
+        "path:observer",
+        "path:ephemeris",
+        "path:window",
+        "path:frames_incomplete"
+      ]
+    }
+  }
+}
