@@ -1,11 +1,9 @@
-// R8.9, D-10, D-12: the audio driver. It plays alongside vibration on every platform, and is the
-// only output on iPhone, iPad and desktop. Strength is continuous gain (× volume), `pitch` sets the
+// R8.9, D-10, D-12, D-39: the audio driver, the app's only output (haptics are cut, D-39). Strength is continuous gain (× volume), `pitch` sets the
 // frequency, `pan` a StereoPannerNode, and the provenance `tag` the timbre. Every sound is scheduled
 // on the shared AudioContext's clock (currentTime + lookahead), never with timers.
 import type { HapticEvent, HapticVoice, Tag } from '@/contract';
 import { audioContextSupported, getAudioContext } from '../audioContext';
 import { getMasterBus, playBell } from '../audioGraph';
-import { clampTrainRate } from './webVibrate';
 import type { TrainCapableDriver, TrainWindow } from '../haptics';
 import { clamp01, pitchToHz } from '../pitch';
 import {
@@ -15,9 +13,9 @@ import {
   AUDIO_REANCHOR_TOLERANCE_S,
   MAX_AUDIO_VOICES,
   DEFAULT_VOLUME,
-  DOUBLE_PATTERN,
+  DOUBLE_ONSETS_PATTERN_MS,
   GRAIN_BANDPASS_Q,
-  HEARTBEAT_PATTERN,
+  HEARTBEAT_ONSETS_PATTERN_MS,
   HIGH_OUTPUT_LATENCY_S,
   NOISE_BURST_S,
   NOISE_DECAY_S,
@@ -27,8 +25,16 @@ import {
   SURF_LOWPASS_HZ,
   TONE_ATTACK_S,
   TONE_BLIP_S,
+  TRAIN_MAX_RATE_HZ,
+  TRAIN_MIN_RATE_HZ,
   TRAIN_WINDOW_MS,
 } from '../tuning';
+
+/** A train's rate clamped to the R8.3 range; null for a missing, non-finite or non-positive rate. */
+export function clampTrainRate(rateHz: number | undefined): number | null {
+  if (rateHz === undefined || !Number.isFinite(rateHz) || rateHz <= 0) return null;
+  return Math.min(TRAIN_MAX_RATE_HZ, Math.max(TRAIN_MIN_RATE_HZ, rateHz));
+}
 
 /** What makes the sound: a tone, a bell, a noise grain or low-passed noise (surf). */
 export type AudioSource = 'tone' | 'bell' | 'grain' | 'surf';
@@ -71,8 +77,8 @@ export function patternOnsetsMs(pattern: readonly number[]): number[] {
   return onsets;
 }
 
-const DOUBLE_ONSETS = patternOnsetsMs(DOUBLE_PATTERN);
-const HEARTBEAT_ONSETS = patternOnsetsMs(HEARTBEAT_PATTERN);
+const DOUBLE_ONSETS = patternOnsetsMs(DOUBLE_ONSETS_PATTERN_MS);
+const HEARTBEAT_ONSETS = patternOnsetsMs(HEARTBEAT_ONSETS_PATTERN_MS);
 const SINGLE_ONSET: readonly number[] = [0];
 
 /** Deterministic noise (no Math.random): a 32-bit LCG. */

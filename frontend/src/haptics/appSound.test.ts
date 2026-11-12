@@ -4,12 +4,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '@/app/api/client';
 import type { SpectrumResponse } from '@/app/api/types';
-import { linearScale } from '@/app/spectrum/scale';
 import { FakeAudioContext } from '@/test/fakeAudio';
 import { fixtureFetch } from '@/test/fixtureFetch';
 import { setAudioContextFactory } from './audioContext';
 import { createAppSound, type AppSound, type SpectrumReply } from './appSound';
-import { WebVibrateDriver } from './drivers/webVibrate';
 import { defaultSettings, flushHapticSettings, useHapticSettings } from './settings';
 import { buildSpectrumMapping } from './spectrumMapping';
 import type { HonestyState } from '@/viewer/honesty';
@@ -65,7 +63,7 @@ afterEach(() => {
   flushHapticSettings();
   localStorage.clear();
   useHapticSettings.setState({
-    ...defaultSettings({ hapticsOn: false, soundOn: true }),
+    ...defaultSettings(),
     loaded: false,
   });
   useAppStore.setState({ honesty: 'derived' });
@@ -80,13 +78,9 @@ describe('the fixture replies', () => {
 });
 
 describe('createAppSound: audio only (Q-132)', () => {
-  it('has no vibrate driver, no side effects and a valid status before bind', () => {
+  it('has the audio driver only, no side effects and a valid status before bind', () => {
     const sound = make();
-    expect(sound.canVibrate).toBe(false);
     expect(sound.outputs.engine.activeDrivers).toEqual([sound.outputs.audio]);
-    expect(sound.outputs.engine.activeDrivers.some((d) => d instanceof WebVibrateDriver)).toBe(
-      false,
-    );
     expect(sound.outputs).not.toHaveProperty('vibrate');
     expect(ctx.nodes.filter((n) => n.nodeType !== 'destination')).toHaveLength(0); // nothing built yet
     expect(sound.getStatus()).toEqual({
@@ -94,7 +88,6 @@ describe('createAppSound: audio only (Q-132)', () => {
       audio: 'suspended',
       muted: false,
       volume: sound.getStatus().volume,
-      strengthMultiplier: 1,
       listening: false,
     });
   });
@@ -218,7 +211,7 @@ describe('listen: honesty changes during the unlock', () => {
 });
 
 describe('settings reach the engine (R8.7)', () => {
-  it('mute stops a playing sweep; volume and strength reach the engine', async () => {
+  it('mute stops a playing sweep; the volume reaches the engine', async () => {
     const sound = make();
     const unbind = sound.bind(honestySource());
     expect(await sound.listen(wise)).toBe('playing');
@@ -229,8 +222,6 @@ describe('settings reach the engine (R8.7)', () => {
     sound.setVolume(0.3);
     expect(sound.outputs.audio.volume).toBeCloseTo(0.3);
     expect(sound.getStatus().volume).toBeCloseTo(0.3);
-    sound.setStrengthMultiplier(1.4);
-    expect(sound.outputs.engine.strengthMultiplier).toBeCloseTo(1.4);
     unbind();
   });
 });
@@ -304,56 +295,6 @@ describe('status and subscriptions', () => {
 
     off();
     unbind();
-  });
-});
-
-describe('spectrumSource (R8.6, R8.3)', () => {
-  const m = () => buildSpectrumMapping(wise.spectrum);
-
-  function run(seed: number) {
-    const sound = make();
-    const unbind = sound.bind(honestySource());
-    const steps: { lambdaUm: number; strength: number }[] = [];
-    const src = sound.spectrumSource(wise, {
-      xToLambda: linearScale([0, 800], [m().lambdaMinUm, m().lambdaMaxUm]),
-      seed,
-      onStep: (s) => steps.push({ lambdaUm: s.lambdaUm, strength: s.strength }),
-    });
-    src.begin(0);
-    for (let x = 8; x <= 160; x += 8) src.move(x);
-    src.end();
-    unbind();
-    return steps;
-  }
-
-  it('emits measured data ticks through the engine', async () => {
-    const sound = make();
-    const unbind = sound.bind(honestySource());
-    await sound.unlock();
-    const events: { tag: string; channel?: string }[] = [];
-    const spy = vi.spyOn(sound.outputs.engine, 'emit').mockImplementation((e) => {
-      events.push({ tag: e.tag, channel: (e as { channel?: string }).channel });
-      return true;
-    });
-    const src = sound.spectrumSource(wise, {
-      xToLambda: linearScale([0, 800], [m().lambdaMinUm, m().lambdaMaxUm]),
-      seed: 7,
-    });
-    src.begin(0);
-    src.move(100);
-    src.end();
-    expect(spy).toHaveBeenCalled();
-    expect(events.length).toBeGreaterThan(0);
-    for (const e of events) {
-      expect(e.tag).toBe('measured');
-      expect(e.channel).toBe('data');
-    }
-    unbind();
-  });
-
-  it('the same seed and gesture give the same steps', () => {
-    expect(run(7)).toEqual(run(7));
-    expect(run(7).length).toBeGreaterThan(0);
   });
 });
 

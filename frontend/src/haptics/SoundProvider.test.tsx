@@ -105,7 +105,7 @@ afterEach(() => {
   flushHapticSettings();
   localStorage.clear();
   useHapticSettings.setState({
-    ...defaultSettings({ hapticsOn: false, soundOn: true }),
+    ...defaultSettings(),
     loaded: false,
   });
   useAppStore.setState({ honesty: 'derived' });

@@ -1,5 +1,5 @@
 // R8.6, R8.9, D-10, D-12: the `pitch` (0–1) of a HapticEvent and its frequency. One mapping for the
-// audio driver, the spectrum source and the Listen sweep, so sound and touch match (R8.6 item 3).
+// audio driver and the Listen sweep (and the chord and Track, R13.12).
 // Pitch follows λ (R8.6/R8.9), not brightness as in the mock-up's sweep (Q-70).
 import {
   DEFAULT_PITCH,
@@ -7,7 +7,6 @@ import {
   PITCH_LAMBDA_MIN_UM,
   PITCH_MIN_HZ,
   PITCH_OCTAVES,
-  PITCH_RISES_TO_NORTH,
   PITCH_RISES_WITH_WAVELENGTH,
 } from './tuning';
 
@@ -34,10 +33,4 @@ export function wavelengthToPitch(
   if (!(span > 0) || !Number.isFinite(lambdaUm)) return 0.5;
   const t = clamp01((lambdaUm - lambdaMinUm) / span);
   return PITCH_RISES_WITH_WAVELENGTH ? t : 1 - t;
-}
-
-/** D-12 gas giant bands: latitude (degrees, −90 south to 90 north) → pitch 0–1. */
-export function latitudeToPitch(latitudeDeg: number): number {
-  const t = clamp01((latitudeDeg + 90) / 180);
-  return PITCH_RISES_TO_NORTH ? t : 1 - t;
 }

@@ -4,7 +4,6 @@
 // settings (R8.7), the honesty toggle (D-21) and the page lifecycle (R8.8). Creating one has no side
 // effects: no AudioContext and no listeners until `bind()`.
 import type { SpectrumResponse } from '@/app/api/types';
-import type { LinearScale } from '@/app/spectrum/scale';
 import type { Tag } from '@/contract';
 import { isTagShown, type HonestyState } from '@/viewer/honesty';
 import {
@@ -23,7 +22,6 @@ import {
   type ListenSweepOptions,
 } from './sound/listenSweep';
 import { buildSpectrumMapping } from './spectrumMapping';
-import { SpectrumHapticSource, type SpectrumStep } from './sources/spectrum';
 
 /** A `/spectrum` reply: its points and its provenance tag (`measured` today; any tag is gated). */
 export type SpectrumReply = Pick<SpectrumResponse, 'spectrum'> & {
@@ -50,22 +48,17 @@ export interface SoundStatus {
   audio: UnlockState['audio'];
   muted: boolean;
   volume: number;
-  strengthMultiplier: number;
   listening: boolean;
 }
 
 export interface AppSound {
-  /** For `UnlockButton` and `SpectrumHapticsPad` (the engine and the audio driver only). */
+  /** The engine and its audio driver (the only driver, Q-132, D-39). */
   readonly outputs: SoundOutputs;
-  /** Q-132: the event build has no vibration. */
-  readonly canVibrate: false;
   /** Call synchronously from a click (Q-73). Resolves to whether audio is running. */
   unlock(): Promise<boolean>;
   /** R8.7 "sound on/off": `settings.update({ soundOn: !muted })`. */
   setMuted(muted: boolean): void;
   setVolume(volume: number): void;
-  /** R8.7: 0.5–1.5. */
-  setStrengthMultiplier(multiplier: number): void;
   /**
    * Listen to a `/spectrum` reply (A8, R8.6 item 3, R8.8.1 item 10). Call from a click: the unlock
    * starts before any await. `lines` are the comet gas chimes (`gasLinesForEpoch`); each carries
@@ -75,15 +68,6 @@ export interface AppSound {
   stopListen(): void;
   /** 0–1 through the sweep, or null when not playing. Polled per frame; not part of the status. */
   listenProgress(): number | null;
-  /** The spectrum-pad source (R8.6, R8.8.1 item 9). `seed` is required (R8.3 jitter). */
-  spectrumSource(
-    reply: SpectrumReply,
-    options: {
-      xToLambda: LinearScale;
-      seed: number;
-      onStep?: (step: Readonly<SpectrumStep>) => void;
-    },
-  ): SpectrumHapticSource;
   getStatus(): SoundStatus;
   subscribe(listener: () => void): () => void;
   /**
@@ -105,13 +89,12 @@ function sameStatus(a: SoundStatus, b: SoundStatus): boolean {
     a.audio === b.audio &&
     a.muted === b.muted &&
     a.volume === b.volume &&
-    a.strengthMultiplier === b.strengthMultiplier &&
     a.listening === b.listening
   );
 }
 
 export function createAppSound(options: AppSoundOptions = {}): AppSound {
-  // Audio only (Q-132): no `vibrate` option, so no WebVibrateDriver exists in the app.
+  // Audio only (Q-132, D-39).
   const outputs = createHaptics(options.engine);
   const { engine } = outputs;
   const sweep = new ListenSweep(options.sweep);
@@ -128,7 +111,6 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
       audio: u.audio,
       muted: !s.soundOn,
       volume: s.volume,
-      strengthMultiplier: s.strengthMultiplier,
       listening: sweep.playing,
     };
   };
@@ -184,25 +166,15 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
 
   return {
     outputs,
-    canVibrate: false,
     unlock,
     setMuted: (muted) => update({ soundOn: !muted }),
     setVolume: (volume) => update({ volume }),
-    setStrengthMultiplier: (strengthMultiplier) => update({ strengthMultiplier }),
     listen,
     stopListen() {
       listenRun++;
       sweep.stop();
     },
     listenProgress: () => sweep.progress(),
-    spectrumSource: (reply, o) =>
-      new SpectrumHapticSource(engine, {
-        points: reply.spectrum,
-        tag: reply.tag,
-        xToLambda: o.xToLambda,
-        seed: o.seed,
-        onStep: o.onStep,
-      }),
     getStatus,
     subscribe(fn) {
       listeners.add(fn);

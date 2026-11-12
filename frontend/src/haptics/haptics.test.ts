@@ -7,13 +7,9 @@ import {
   FakeClock,
   FakeDriver,
   PlainDriver,
-  fakeVibrate,
-  motorOnsets,
-  timedVibrate,
 } from '@/test/fakeHaptics';
 import { setAudioContextFactory } from './audioContext';
 import { AudioDriver } from './drivers/audio';
-import { WebVibrateDriver } from './drivers/webVibrate';
 import {
   HAPTIC_DEBUG_EVENT,
   HapticEngine,
@@ -299,110 +295,49 @@ describe('pulse trains (Q-71)', () => {
   });
 });
 
-describe('web drivers together (D-08, D-10, R11)', () => {
-  it('iPhone: no navigator.vibrate → vibrate unsupported, audio still plays', () => {
-    const clock = new FakeClock();
-    const ctx = new FakeAudioContext();
-    const vibrate = new WebVibrateDriver({ vibrate: null });
-    const audio = new AudioDriver({ context: () => ctx.asAudioContext(), supported: true });
-    const engine = new HapticEngine([vibrate, audio], {
-      clock: clock.clock,
-      timers: clock,
-      debugTarget: null,
-    });
-    expect(vibrate.supported).toBe(false);
-    expect(engine.emit(tick())).toBe(true);
-    expect(ctx.sources()).toHaveLength(1);
+describe('createHaptics (Q-132, D-39, R8.8.1 item 1)', () => {
+  afterEach(() => {
+    setAudioContextFactory(null);
+    vi.restoreAllMocks();
+    flushHapticSettings();
+    localStorage.clear();
+    useHapticSettings.setState({ ...defaultSettings(), loaded: false });
   });
 
-  it('Android: both drivers get the same event', () => {
-    const clock = new FakeClock();
-    const ctx = new FakeAudioContext();
-    const v = fakeVibrate();
-    const vibrate = new WebVibrateDriver({ vibrate: v.fn });
-    const audio = new AudioDriver({ context: () => ctx.asAudioContext(), supported: true });
-    const engine = new HapticEngine([vibrate, audio], {
-      clock: clock.clock,
-      timers: clock,
-      debugTarget: null,
-    });
-    engine.emit(tick({ strength: 1 }));
-    expect(v.calls).toEqual([25]);
-    expect(ctx.sources()).toHaveLength(1);
+  it('builds the audio driver only', () => {
+    const fake = new FakeAudioContext();
+    setAudioContextFactory(() => fake.asAudioContext());
+    const h = createHaptics({ debugTarget: null });
+    expect(h.engine.activeDrivers).toEqual([h.audio]);
+    expect(h).not.toHaveProperty('vibrate');
+    h.engine.dispose();
   });
 
-  describe('createHaptics (Q-132, R8.8.1 item 1)', () => {
-    afterEach(() => {
-      setAudioContextFactory(null);
-      vi.restoreAllMocks();
-      vi.unstubAllGlobals();
-      flushHapticSettings();
-      localStorage.clear();
-      useHapticSettings.setState({
-        ...defaultSettings({ hapticsOn: false, soundOn: true }),
-        loaded: false,
-      });
-    });
-
-    it('builds the audio driver only by default, with no WebVibrateDriver', () => {
-      const fake = new FakeAudioContext();
-      setAudioContextFactory(() => fake.asAudioContext());
-      const h = createHaptics({ debugTarget: null });
-      expect(h.engine.activeDrivers).toEqual([h.audio]);
-      expect(h.engine.activeDrivers.some((d) => d instanceof WebVibrateDriver)).toBe(false);
-      expect(h).not.toHaveProperty('vibrate');
-      h.engine.dispose();
-    });
-
-    it('never calls navigator.vibrate, even with hapticsOn, but still sounds', async () => {
-      const fake = new FakeAudioContext();
-      setAudioContextFactory(() => fake.asAudioContext());
-      const vibrate = vi.fn(() => true);
-      Object.defineProperty(navigator, 'vibrate', {
-        value: vibrate,
-        configurable: true,
-        writable: true,
-      });
-      try {
-        useHapticSettings.getState().update({ hapticsOn: true });
-        const h = createHaptics({ debugTarget: null });
-        const unbind = bindEngine(h);
-        await h.engine.unlock();
-        expect(h.engine.emit(tick({ strength: 1 }))).toBe(true);
-        expect(vibrate).not.toHaveBeenCalled();
-        expect(fake.sources().length).toBeGreaterThanOrEqual(1);
-        unbind();
-        h.engine.dispose();
-      } finally {
-        delete (navigator as { vibrate?: unknown }).vibrate;
-      }
-    });
-
-    it('adds the vibrate driver only with { vibrate: true } (dev page, after the event)', () => {
-      const fake = new FakeAudioContext();
-      setAudioContextFactory(() => fake.asAudioContext());
-      const h = createHaptics({ debugTarget: null, vibrate: true });
-      expect(h.engine.activeDrivers).toEqual([h.vibrate, h.audio]);
-      expect(h.vibrate).toBeInstanceOf(WebVibrateDriver);
-      h.engine.dispose();
-    });
+  it('sounds once bound and unlocked', async () => {
+    const fake = new FakeAudioContext();
+    setAudioContextFactory(() => fake.asAudioContext());
+    const h = createHaptics({ debugTarget: null });
+    const unbind = bindEngine(h);
+    await h.engine.unlock();
+    expect(h.engine.emit(tick({ strength: 1 }))).toBe(true);
+    expect(fake.sources().length).toBeGreaterThanOrEqual(1);
+    unbind();
+    h.engine.dispose();
   });
 });
 
-/** Real web drivers on a fake clock, fake navigator.vibrate and fake AudioContext. */
+/** The real audio driver on a fake clock and a fake AudioContext. */
 function web(timers?: HapticTimers) {
   const clock = new FakeClock();
   const t = timers ?? clock;
-  const v = timedVibrate(clock.clock);
   const ctx = new FakeAudioContext();
-  const vibrate = new WebVibrateDriver({ vibrate: v.fn, timers: t });
   const audio = new AudioDriver({ context: () => ctx.asAudioContext(), supported: true });
-  const engine = new HapticEngine([vibrate, audio], {
+  const engine = new HapticEngine([audio], {
     clock: clock.clock,
     timers: t,
     debugTarget: null,
   });
-  return { clock, v, ctx, vibrate, audio, engine };
+  return { clock, ctx, audio, engine };
 }
 
 /** Timers that fire `ms` late. */
@@ -412,55 +347,21 @@ const lateBy = (clock: FakeClock, ms: number): HapticTimers => ({
 });
 
 describe('review fixes', () => {
-  it('a vibration delay (R8.9 offset) loses no train pulse and no tick (finding 1)', () => {
-    const { clock, v, vibrate, engine } = web();
-    vibrate.setDelayMs(40);
-    engine.startTrain('t', { rateHz: 20, strength: 0.5, tag: 'measured' });
-    clock.advance(1100);
-    const alone = motorOnsets(v.calls).filter((t) => t < 1040);
-    expect(alone).toEqual(Array.from({ length: 20 }, (_, i) => 40 + 50 * i));
-
-    const b = web();
-    b.vibrate.setDelayMs(40);
-    b.engine.startTrain('t', { rateHz: 20, strength: 0.5, tag: 'measured' });
-    b.clock.advance(310);
-    for (let i = 0; i < 3; i++) {
-      expect(b.engine.emit(tick({ strength: 1 }))).toBe(true);
-      b.clock.advance(25);
-    }
-    b.clock.advance(800);
-    const ticks = [350, 375, 400];
-    const onsets = motorOnsets(b.v.calls);
-    for (const t of ticks) expect(onsets).toContain(t); // every tick plays
-    const train = onsets.filter((t) => !ticks.includes(t) && t < 1040);
-    for (const t of train) expect((t - 40) % 50).toBe(0); // on the delayed grid
-    expect(train.length).toBeGreaterThanOrEqual(17); // only pulses under the ticks are lost
-  });
-
-  it('stopTrain leaves a just-played one-shot alone in both channels (finding 2)', () => {
-    const { clock, v, ctx, engine } = web();
+  it('stopTrain leaves a just-played one-shot alone (finding 2)', () => {
+    const { clock, ctx, engine } = web();
     engine.startTrain('ocean', { rateHz: 2, strength: 0.5, tag: 'measured' });
     clock.advance(100);
     const trainSources = ctx.sources().length;
     expect(trainSources).toBe(1);
     engine.emit(tick({ strength: 1, voice: 'chime' })); // a coastline tick that rings on
     engine.stopTrain('ocean');
-    expect(v.calls.at(-1)!.pattern).toBe(25); // no vibrate(0) after the tick
     const sources = ctx.sources();
     for (const s of sources.slice(0, trainSources)) expect(s.stopCalls).toBe(2); // cancelled
     for (const s of sources.slice(trainSources)) expect(s.stopCalls).toBe(1); // still ringing
   });
 
-  it('stopTrain silences the motor when a train window is what plays (finding 2)', () => {
-    const { clock, v, engine } = web();
-    engine.startTrain('t', { rateHz: 20, strength: 0.5, tag: 'measured' });
-    clock.advance(10);
-    engine.stopTrain('t');
-    expect(v.calls.at(-1)!.pattern).toBe(0);
-  });
-
-  it('refuses non-finite strengths; strength 0 plays in both channels (finding 3)', () => {
-    const { clock, v, ctx, engine } = web();
+  it('refuses non-finite strengths; strength 0 still plays (finding 3)', () => {
+    const { clock, ctx, engine } = web();
     expect(engine.emit(tick({ strength: NaN }))).toBe(false);
     expect(engine.emit(tick({ strength: Infinity }))).toBe(false);
     expect(engine.startTrain('t', { rateHz: 4, strength: NaN, tag: 'measured' })).toBe(false);
@@ -470,9 +371,7 @@ describe('review fixes', () => {
     engine.stopTrain();
     const before = ctx.sources().length;
     clock.advance(100);
-    v.calls.length = 0;
     expect(engine.emit(tick({ strength: 0 }))).toBe(true);
-    expect(v.calls.map((c) => c.pattern)).toEqual([8]);
     expect(ctx.sources().length).toBe(before + 1);
   });
 
