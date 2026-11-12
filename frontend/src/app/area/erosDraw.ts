@@ -53,7 +53,7 @@ export function drawCutout(
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   c.width = c.height = Math.round(cssW * dpr);
   const g = c.getContext('2d');
-  const alt = `SPHEREx cutout of 433 Eros at ${h.wl_um.toFixed(2)} micrometres, ${h.nx} by ${h.ny} pixels. Eros is ringed, its path is dashed, masked catalogue stars are grey circles.`;
+  const alt = `SPHEREx cutout of 433 Eros at ${h.wl_um.toFixed(2)} micrometres, ${h.nx} by ${h.ny} pixels. Eros is ringed, its path is dashed, bright peaks (estimated) are masked with grey circles.`;
   if (!g) return alt;
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.fillStyle = '#000';

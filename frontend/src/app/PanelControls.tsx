@@ -30,6 +30,7 @@ export function ToggleGroup<T extends string>({
   hideLabel = false,
   tabs = false,
   panelIds,
+  wrap = false,
 }: {
   label: string;
   options: readonly ToggleOption<T>[];
@@ -41,6 +42,8 @@ export function ToggleGroup<T extends string>({
   /** A tab bar: role tablist, one Tab stop, arrow keys move the choice. `panelIds` names each tab's panel. */
   tabs?: boolean;
   panelIds?: Readonly<Partial<Record<T, string>>>;
+  /** Many or long options: lay them out in a wrapping grid instead of one row. */
+  wrap?: boolean;
 }) {
   const labelId = useId();
   const trackRef = useRef<HTMLDivElement>(null);
@@ -113,7 +116,7 @@ export function ToggleGroup<T extends string>({
         ref={trackRef}
         role={tabs ? 'tablist' : 'group'}
         aria-labelledby={labelId}
-        className="sx-seg"
+        className={wrap ? 'sx-seg sx-seg-wrap' : 'sx-seg'}
         data-testid={testId}
         onKeyDown={
           tabs

@@ -24,7 +24,7 @@ flowchart LR
     UCColour(["Flipbook colour views: wavelength tint, SPHEREx composite (Q-93)"])
     UCListen(["Listen (data sweep)"])
     UCFeelSpec(["Feel spectrum (drag along plot)"])
-    UCView3D(["Build it: split view, moulding, 3D body (R5.8)"])
+    UCView3D(["Build it: split view, moulding (mock-up body, Q-415), 3D body (R5.8)"])
     UCFeel(["Feel mode: hear the body tone (desktop, Q-133)"])
     UCRotate(["Rotate / zoom (drag, keys, buttons)"])
     UCTouch(["Touch mode: feel surface (phones, after the event)"])
@@ -112,6 +112,7 @@ flowchart LR
 ## Notes
 
 - "External archives" stands for IRSA (SPHEREx), Gaia, CatWISE2020 (IRSA), Horizons, SkyBoT, SBDB, DAMIT, SIMBAD, the Exoplanet Archive and the Gemini API. See [03-deployment.md](03-deployment.md).
+- PR #104 (D-38): the rail is the sky dock (Known objects, Discovery, Search); Known objects and Discovery are a frontend demo that answers only in the prepared Eros area (Q-414). In the build pane the honesty toggle is the Show row in Details (Q-412) and Hear it plays Atmosphere and the spectrum sweep (Q-416).
 - Build it is not offered for `candidate`; the panel says "Not enough data for a 3D model" (rendering doc R4, R7.6). It opens from the object card, the object panel (*Build it in 3D*) or the rail's 3D viewer (Q-120 item 4).
 - At the event (Q-132) the A15 laptop runs desktop Feel mode with sound only. Touch mode and vibration calibration are after the event, on Android Chrome; iPhone, iPad and desktop get the paired audio only (D-08, D-10).
 - Track is the MVP (Q-131, Q-137: 433 Eros), built for researchers looking at known objects only; Area search (Q-146) is dashed because Discovery may be cut first (A14). The spin slider and export follow Q-135 and Q-145.

@@ -2443,6 +2443,17 @@ body {
   cursor: pointer;
   transition: color 0.2s var(--ease);
 }
+.sx-seg-wrap {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 4px;
+}
+.sx-seg-wrap .sx-seg-thumb {
+  display: none;
+}
+.sx-seg-wrap button[aria-pressed='true'] {
+  background: var(--ac);
+}
 .sx-seg button:hover:not(:disabled) {
   color: var(--fg);
 }
@@ -3342,9 +3353,15 @@ body {
       width: auto;
       max-width: min(26rem, 40%);
     }
+    /* Bottom left, so it never sits on the Accuracy / Details / Hear it panel titles at the top right. */
     .sx-top > [data-testid='fixture-banner'] {
-      order: 2;
-      width: 100%;
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      z-index: 30;
+      width: min(24rem, 40vw);
+      flex: none;
+      pointer-events: none;
     }
     .sx-transport-slot {
       position: absolute;
@@ -4046,6 +4063,16 @@ body {
   pointer-events: none;
 }
 
+/* The "Demo data" tag on the canvas while a demo track is drawn (Q-414). */
+.sx-area-track-tag {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  pointer-events: none;
+}
+
 /* MouldAnimation (build stage): the globe that takes shape while the body is generated, and its hand-over. */
 .sx-mould {
   position: absolute;
@@ -4132,7 +4159,7 @@ body {
   line-height: 1.5;
 }
 .sx-kn-body {
-  padding-bottom: 16px;
+  padding-bottom: 20px;
   gap: 12px;
 }
 .sx-kn-foot {
@@ -4203,6 +4230,11 @@ body {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  gap: 8px;
+}
+.sx-kn-spec-t {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
 }
 .sx-kn-spec-h span {

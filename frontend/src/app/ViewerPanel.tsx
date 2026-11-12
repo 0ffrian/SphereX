@@ -216,6 +216,11 @@ export function gasPacingStatus(value: 0 | 1): string {
     : 'One second here is 5 minutes, so the planet turns slowly and its clouds barely change.';
 }
 
+const MOTION_OPTIONS = [
+  { value: 'playing', label: 'Playing' },
+  { value: 'paused', label: 'Paused' },
+] as const;
+
 export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -531,7 +536,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   }, [viewer, inPane]);
   // Issue #60: a build from the card or Replay shows the whole plan. If the plan has layers the
   // honesty level hides (the generated world is `artistic`, D-21), the level goes up to
-  // "+ Artistic" first and says so; the Show control stays, so the user can drop back at any time.
+  // "+ Artistic" first and says so (once per build); the Show row in Details lets the user drop back.
   // The build waits for this (`waitForLevel`), so it never starts on the plan of the old level.
   const [levelSeq, setLevelSeq] = useState(-1);
   const paneSeq = pane?.seq ?? 0;
@@ -572,25 +577,28 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
 
   // WCAG 2.2.2: with no Pause button in Details, `P` stops and restarts everything that moves in the build pane.
   // Under reduced motion nothing moves until it is pressed. Ignored while typing or with a modifier held.
+  const toggleMotion = useCallback(() => {
+    if (idlePaused) {
+      viewer?.resumeFromIdle?.();
+      announce('Motion is playing.');
+    } else if (reducedMotion) {
+      setPlayAnyway(!playAnyway);
+      announce(playAnyway ? 'Motion is off.' : 'Motion is playing.');
+    } else {
+      setSpinPaused(!spinPaused);
+      announce(spinPaused ? 'Motion is playing.' : 'Motion is paused.');
+    }
+  }, [viewer, idlePaused, reducedMotion, playAnyway, spinPaused, announce]);
   useEffect(() => {
     if (!pane) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key.toLowerCase() !== 'p' || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented || isEditableTarget(e.target)) return;
       e.preventDefault();
-      if (idlePaused) {
-        viewer?.resumeFromIdle?.();
-        announce('Motion is playing.');
-      } else if (reducedMotion) {
-        setPlayAnyway(!playAnyway);
-        announce(playAnyway ? 'Motion is off.' : 'Motion is playing.');
-      } else {
-        setSpinPaused(!spinPaused);
-        announce(spinPaused ? 'Motion is playing.' : 'Motion is paused.');
-      }
+      toggleMotion();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [pane, viewer, idlePaused, reducedMotion, playAnyway, spinPaused, announce]);
+  }, [pane, toggleMotion]);
   const planWith = (patch: Partial<PlanContext>) =>
     card && params ? planRender(card, params, { ...ctx, ...patch }) : null;
 
@@ -735,7 +743,6 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // One pause control for everything that moves (WCAG 2.2.2, R9). Under reduced motion the scene
   // starts paused and the button starts it.
   const motionPaused = (reducedMotion && !playAnyway) || spinPaused || idlePaused;
-  const hiddenCount = plan?.missing.filter((m) => m.reason === 'honesty').length ?? 0;
 
   // In the build pane, an engine-drawn body shows its notes as "Assumed values" lines, not as a paragraph list.
   const assumedLines = plan && engineOwns
@@ -917,19 +924,8 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
       </div>
 
       {pane && <MouldStrip ref={stripRef} script={mould.script} phase={mould.phase} />}
-      {/* Moon (11 Nov 2026): no "N hidden at this level" button on the render. */}
-      {pane?.caption?.(
-        false as boolean && hiddenCount > 0 ? (
-          <button
-            type="button"
-            className="sx-tag-btn"
-            onClick={() => onHonesty('artistic')}
-            data-testid="build-show-hidden"
-          >
-            {hiddenCount} hidden at this level. Show them
-          </button>
-        ) : null,
-      )}
+      {/* Moon (11 Nov 2026): no "N hidden at this level" button on the render; the way back down is the Show row in Details. */}
+      {pane?.caption?.(null)}
       {wrapPop(
       <div
         id={detailsId}
@@ -951,9 +947,18 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
         )}
         {plan && (
           <>
-            {/* Q-329: the build pane has no Show (honesty level) control; Build raises the level
-                (Q-113 item 7) and "N hidden at this level. Show them" remains as the way back. */}
-            {!pane && honestyGroup}
+            {/* Q-412 / D-21: Build raises the level once (Q-113 item 7); the Show row (and Motion,
+                WCAG 2.2.2) sit in Details so the level can always be lowered again. */}
+            {honestyGroup}
+            {pane && !engineOwns && (
+              <ToggleGroup
+                label="Motion"
+                options={MOTION_OPTIONS}
+                value={motionPaused ? 'paused' : 'playing'}
+                onChange={(v) => { if ((v === 'paused') !== motionPaused) toggleMotion(); }}
+                testId="build-motion"
+              />
+            )}
 
             {plan.threeD && plan.modes.length > 0 && (
               <>

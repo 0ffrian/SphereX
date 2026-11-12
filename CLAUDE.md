@@ -73,6 +73,7 @@ docs/       decisions/ (index + topic files), architecture/ (A1–A21; moving-ob
 mockup/     single-file HTML mock-ups, not the app
   spherex-ui.html       app shell and tools (three.js r128), incl. Area search (mock-up tool 5),
                         which opens chase-the-rock.html in its Track pane
+  closeup-orbit.html, closeup-star.html   orbit close-up and star close-up pages (visual input for the 3D close-up)
   chase-the-rock.html   Track tool: a known asteroid's path, its SPHEREx frames, a zoom with
                         stars masked, and a spectrum built hop by hop (433 Eros, 20–21 Mar 2026)
 backend/    Python 3.12 API, pipeline, texture baker        (Kevin, Moon, Atish)

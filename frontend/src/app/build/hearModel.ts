@@ -1,6 +1,6 @@
 // "Hear it" panel model (approved preview, panels-preview.html): the pure parts. No browser globals.
 //   Atmosphere: the wind you would hear on the surface. Inputs are the card's measured surface pressure and
-//   temperature plus the dominant gas; the sound itself is `artistic` (shown as "Imagined"), the speed of
+//   temperature plus the dominant gas; the sound itself is `artistic` (shown as "Default"), the speed of
 //   sound is `derived` (c = sqrt(gamma R T / M)). Missing input: the sound is refused, never guessed.
 //   Spectrum: the object's own SPHEREx spectrum (measured), flux normalised 0..1 on a 0.75 to 5 um axis.
 import type { ObjectCard, Tag } from '@/contract/generated';
@@ -47,7 +47,7 @@ export interface AtmosphereModel {
   c: number; // speed of sound, m/s
   /** Surface gravity, m/s^2 (derived from the card's mass and radius: g = G M / R^2). */
   gMs2: number;
-  cTag: Extract<Tag, 'derived'>;
+  cTag: Extract<Tag, 'model_dependent'>;
   cFormula: string;
   /** Provenance of the inputs, for the tooltip. */
   pTag: Tag;
@@ -122,7 +122,7 @@ export function atmosphereOf(card: ObjectCard | null): AtmosphereResult {
       gasLabel: GASES[gas].label,
       c: soundSpeed(gas, T),
       gMs2: (6.674e-11 * world.preset.Me * 5.972e24) / (world.preset.Rj * 71492e3) ** 2,
-      cTag: 'derived',
+      cTag: 'model_dependent',
       cFormula: 'c = sqrt(gamma R T / M)',
       pTag: card.surface_pressure_bar!.tag,
       tTag: card.surface_temperature_K!.tag,

@@ -22,6 +22,7 @@ export function DiscoveryCard() {
   const step = useAreaStore((s) => s.step);
   const running = useAreaStore((s) => s.running);
   const box = useAreaStore((s) => s.box);
+  const refusal = useAreaStore((s) => s.refusal);
   const closePanel = useShellStore((s) => s.closePanel);
   const steps = disc?.steps ?? [];
   const total = steps.length;
@@ -43,13 +44,31 @@ export function DiscoveryCard() {
       returnFocusTo='[data-testid="tool-area"]'
       testId="area-card"
     >
-      <div className="sx-kn-foot">
-        <DemoTag />
-      </div>
+      {refusal ? (
+        <>
+          <p className="fb-muted" role="status" data-testid="area-refused" data-code={refusal.code}>
+            {refusal.message}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="sx-btn sx-btn-ghost"
+              data-testid="area-redraw"
+              onClick={() => useAreaStore.getState().redraw()}
+            >
+              Draw again
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="sx-kn-foot">
+          <DemoTag />
+        </div>
+      )}
       <p className="sr-only" role="status" aria-live="polite">
         {announce}
       </p>
-      {total === 0 && (
+      {total === 0 && !refusal && (
         <div className="fb-muted sx-ar-wait">
           <GridLoader {...SEARCH_ROW} />
           Loading the demo…

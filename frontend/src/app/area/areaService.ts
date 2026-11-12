@@ -1,13 +1,16 @@
 // The area search service seam (Known objects and Discovery, the dock's two square tools).
 //
 // DUMMY DATA. The area search backend is not built, so every function here returns a fixed,
-// clearly marked demo answer (`demo: true`) and never queries anything: the square the user drew
-// does not change the result. Eros's frames and path are real SPHEREx demo data (public/demo/eros,
-// extracted from mockup/chase-the-rock.html); where they sit in the drawn square, the dots, the
-// counts and the two other movers are made up. The UI shows a "Demo data" tag wherever it uses them.
+// clearly marked demo answer (`demo: true`) and never queries anything. The demo answers only when
+// the drawn area overlaps the prepared Eros area (the sky image of public/demo/eros/eros.json);
+// anywhere else it refuses with `area:not_prepared` (Q-414). Eros's frames and path are real
+// SPHEREx demo data (extracted from mockup/chase-the-rock.html); where they sit in the drawn
+// square, the dots, the counts and the two other movers are made up. The UI shows a "Demo data"
+// tag wherever it uses them.
 //
 // TODO Atish: replace the bodies of areaSearch() / knownObjectsIn() / discoverIn() with calls to
 // /v1/areas (Q-205). Keep the return types: the cards and the sky layer read only these.
+import { deltaRa, wrapRa } from '@/viewer/sky/skyMath';
 import type { AreaBox } from '@/app/shell/areaStore';
 
 /** One exposure of 433 Eros (the demo frames). Fields as in the demo file's `hops`. */
@@ -24,7 +27,7 @@ export interface ErosHop {
   wl_um: number;
   flux: number;
   flux_err?: number;
-  /** [x, y, flux] of catalogue stars in the cutout, in cutout pixels. */
+  /** [x, y, flux] of bright-peak masks in the cutout, in cutout pixels (artistic: not catalogue stars). */
   stars: [number, number, number][];
   /** The path across the cutout, in cutout pixels relative to its centre. */
   seg: [number, number][];
@@ -41,9 +44,16 @@ export interface ErosTrackPoint {
   t: string;
   px: [number, number];
 }
+/** D-02 provenance of a field of the demo file. */
+export interface ErosProvenance {
+  tag: 'measured' | 'derived' | 'model_dependent' | 'inferred_from_analog' | 'artistic';
+  note: string;
+}
 export interface ErosDemo {
   object: { name: string };
-  wide: { png: string; w: number; h: number };
+  /** The prepared sky image: `center` (RA, Dec in degrees) and `deg_per_px`. */
+  wide: { png: string; w: number; h: number; center?: [number, number]; deg_per_px?: number };
+  provenance?: Record<string, ErosProvenance>;
   track: ErosTrackPoint[];
   hops: ErosHop[];
 }
@@ -75,7 +85,7 @@ export interface DiscoveryDot {
 }
 export interface DiscoveryStep {
   label: string;
-  /** What the step reports once done (dummy numbers). */
+  /** What the step reports once done (dummy numbers, labelled "(demo)"). */
   result: string;
 }
 export interface DiscoveryResult {
@@ -89,6 +99,46 @@ export type AreaFlow = 'known' | 'discovery';
 export type AreaSearchResult =
   | ({ flow: 'known' } & KnownObjectsResult)
   | ({ flow: 'discovery' } & DiscoveryResult);
+
+export const NOT_PREPARED = 'No prepared data for this area yet.';
+
+/** The demo refuses an area it has no data for (Q-414). */
+export type AreaRefusalCode = 'area:not_prepared';
+export class AreaRefused extends Error {
+  readonly code: AreaRefusalCode;
+  constructor(code: AreaRefusalCode = 'area:not_prepared', message = NOT_PREPARED) {
+    super(message);
+    this.name = 'AreaRefused';
+    this.code = code;
+  }
+}
+
+/** The prepared Eros area on the sky: centre, and half sides in degrees (null when the file lacks them). */
+export function erosArea(d: ErosDemo): { ra: number; dec: number; halfW: number; halfH: number } | null {
+  const c = d.wide.center;
+  const k = d.wide.deg_per_px;
+  if (!c || !k || !(d.wide.w > 0) || !(d.wide.h > 0)) return null;
+  return { ra: c[0], dec: c[1], halfW: (d.wide.w * k) / 2, halfH: (d.wide.h * k) / 2 };
+}
+
+/** True when the drawn box overlaps the prepared Eros area (small-angle: RA scaled by cos Dec). */
+export function boxOverlapsEros(box: AreaBox, d: ErosDemo): boolean {
+  const e = erosArea(d);
+  if (!e) return false;
+  const cosD = Math.cos((e.dec * Math.PI) / 180);
+  const bra = wrapRa(box.a.ra + deltaRa(box.b.ra, box.a.ra) / 2);
+  const bdec = (box.a.dec + box.b.dec) / 2;
+  const dx = Math.abs(deltaRa(bra, e.ra)) * cosD;
+  const dy = Math.abs(bdec - e.dec);
+  return dx < box.widthDeg / 2 + e.halfW && dy < box.heightDeg / 2 + e.halfH;
+}
+
+/** The demo file when the box overlaps the prepared area; else refuses with `area:not_prepared`. */
+async function preparedFor(box: AreaBox): Promise<ErosDemo> {
+  const d = await erosDemo();
+  if (!d || !boxOverlapsEros(box, d)) throw new AreaRefused();
+  return d;
+}
 
 let erosPromise: Promise<ErosDemo | null> | null = null;
 
@@ -111,10 +161,9 @@ export function erosDemo(): Promise<ErosDemo | null> {
   return erosPromise;
 }
 
-/** Dummy: the same one known object for any square. */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function knownObjectsIn(_box: AreaBox): Promise<KnownObjectsResult> {
-  const d = await erosDemo();
+/** Dummy: the one known object, only for a box that overlaps the prepared Eros area. */
+export async function knownObjectsIn(box: AreaBox): Promise<KnownObjectsResult> {
+  const d = await preparedFor(box);
   return {
     demo: true,
     objects: [
@@ -140,10 +189,12 @@ function rng(seed: number): () => number {
   };
 }
 
-/** Dummy: the mock-up's 212 dots and three movers (T1 is Eros, T2 and T3 are made up). */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function discoverIn(_box: AreaBox): Promise<DiscoveryResult> {
-  const d = await erosDemo();
+/**
+ * Dummy: the mock-up's 212 dots and three movers (T1 is Eros, T2 and T3 are made up), only for a
+ * box that overlaps the prepared Eros area. The counts are demo counts, not catalogue results.
+ */
+export async function discoverIn(box: AreaBox): Promise<DiscoveryResult> {
+  const d = await preparedFor(box);
   const hs = d?.hops ?? [];
   const a: [number, number] = hs[0]?.wide_px ?? [867, 291];
   const z: [number, number] = hs[hs.length - 1]?.wide_px ?? [1080, 235];
@@ -163,11 +214,11 @@ export async function discoverIn(_box: AreaBox): Promise<DiscoveryResult> {
   return {
     demo: true,
     steps: [
-      { label: 'Find dots', result: '212 in 16 frames' },
-      { label: 'Drop one-exposure glitches', result: '−58' },
-      { label: 'Drop stars (Gaia DR3, CatWISE)', result: '−141' },
-      { label: 'Join what moves across visits', result: '3 groups' },
-      { label: 'Check known objects (SkyBoT)', result: '1 known' },
+      { label: 'Find dots', result: '212 in 16 frames (demo)' },
+      { label: 'Drop one-exposure glitches', result: '−58 (demo)' },
+      { label: 'Drop stars (Gaia DR3, CatWISE)', result: '−141 (demo)' },
+      { label: 'Join what moves across visits', result: '3 groups (demo)' },
+      { label: 'Check known objects (SkyBoT)', result: '1 known (demo)' },
     ],
     dots,
     movers,

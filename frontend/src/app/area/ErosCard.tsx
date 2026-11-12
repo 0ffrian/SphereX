@@ -11,12 +11,13 @@ import { currentHop, erosList, useAreaStore, type ErosOverlays } from '@/app/she
 import { useShellStore } from '@/app/shell/shellStore';
 import { wavelengthColor } from '@/app/flipbook/wavelengthColor';
 import type { ErosDemo, ErosHop } from './areaService';
+import { ProvenanceBadge } from '@/app/Badge';
 import { DemoTag } from './DemoTag';
 import { drawCutout } from './erosDraw';
 import { DETECTORS, detectorIndex, detectorsWithFrames, mjdDay, mjdHM, mjdYear } from './erosModel';
 
 const OVERLAYS: { key: keyof ErosOverlays; label: string }[] = [
-  { key: 'mask', label: 'Mask stars' },
+  { key: 'mask', label: 'Mask bright peaks' },
   { key: 'pred', label: 'Predicted position' },
   { key: 'path', label: 'Path' },
   { key: 'flags', label: 'Flagged pixels' },
@@ -88,9 +89,9 @@ function Cutout({ hop }: { hop: ErosHop }) {
 /** Brightness against wavelength, one dot per exposure taken so far. */
 function Chart({ eros, cur }: { eros: ErosDemo; cur: ErosHop }) {
   const W = 360;
-  const H = 130;
+  const H = 118;
   const L = 30;
-  const R = 8;
+  const R = 20; // room for the "5 µm" label, centred on the last gridline
   const T = 10;
   const B = 22;
   const x0 = 0.75;
@@ -262,15 +263,6 @@ export function ErosCard({ title = '433 Eros', back }: { title?: string; back?: 
                 {hop ? `${mjdDay(hop.mjd_avg)} ${mjdHM(hop.mjd_avg)} UTC · exposure ${hop.exposure} of 4` : '-'}
               </dd>
             </dl>
-            <CheckGroup />
-            <div className="sx-kn-spec">
-              <div className="sx-kn-spec-h">
-                <span>Wavelength</span>
-                <small>Eros’s brightness in each exposure so far</small>
-              </div>
-              {eros && hop && <Chart eros={eros} cur={hop} />}
-            </div>
-            {eros && <Detectors eros={eros} />}
             {known && (
               <div className="sx-kn-leg" aria-hidden="true">
                 <span><i />path so far</span>
@@ -278,6 +270,26 @@ export function ErosCard({ title = '433 Eros', back }: { title?: string; back?: 
                 <span><i className="dot" />every 6 h</span>
               </div>
             )}
+            <CheckGroup />
+            <div className="sx-kn-spec">
+              <div className="sx-kn-spec-h">
+                <span className="sx-kn-spec-t">
+                  Wavelength
+                  <ProvenanceBadge
+                    tag={eros?.provenance?.['hops[].flux']?.tag ?? 'model_dependent'}
+                    tooltip={
+                      eros?.provenance?.['hops[].flux']?.note ??
+                      'Approximate photometry from the demo extraction; not a calibrated SPHEREx flux.'
+                    }
+                    srText
+                    variant="tag"
+                  />
+                </span>
+                <small>Eros’s brightness in each exposure so far</small>
+              </div>
+              {eros && hop && <Chart eros={eros} cur={hop} />}
+            </div>
+            {eros && <Detectors eros={eros} />}
             <div className="sx-kn-foot">
               <DemoTag />
             </div>

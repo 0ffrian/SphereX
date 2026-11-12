@@ -4,7 +4,7 @@
 // CLOUD/ATM/RING shaders, makeBody and its per-kind `apply(P, t)` staging, disposeBody). The shader
 // code is unchanged. Changes for three r187 (plain `three`, WebGLRenderer): `import * as THREE`, the
 // shared state `B` is a module object, and ShaderMaterial's `extensions:{derivatives:true}` is dropped
-// (derivatives are always on in WebGL2). Math.random stays as in the mock-up: this is a loader's
+// (derivatives are always on in WebGL2). The mould draws from a seeded PRNG (mulberry32): this is a loader's
 // picture, not a generated texture. Not for lint or strict types: keep it as the mock-up has it.
 import * as THREE from 'three';
 
@@ -16,7 +16,7 @@ export function initShared() {
   const gr = g.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,'#fff'); gr.addColorStop(.3,'#ffffffaa'); gr.addColorStop(1,'#ffffff00');
   g.fillStyle = gr; g.fillRect(0,0,64,64); B.dotTex = new THREE.CanvasTexture(dot);
 }
-function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+export function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
   t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const NOISE = `float hash13(vec3 p){ p = fract(p * 0.3183099 + vec3(0.71, 0.113, 0.419)); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float vnoise(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
@@ -224,6 +224,7 @@ function wireMesh(uni, detail){
   return new THREE.Mesh(new THREE.IcosahedronGeometry(1.004, detail), wm);
 }
 function makeBody(o, seed){
+  const rand = rng(seed); // seeded: the same seed gives the same mould
   const k = o.kind || "star", V = THREE.Vector3, root = new THREE.Group(), fixed = new THREE.Group(), res = {root, fixed, k, ionOn:1, dustOn:1};
   if(k === "asteroid" || k === "comet"){
     const comet = k === "comet", el = o.elong || [1.5,.9,.8];
@@ -235,7 +236,7 @@ function makeBody(o, seed){
     if(comet){
       root.position.set(-1.25, .75, 0); fixed.position.copy(root.position);
       pos = new Float32Array(N*3); col = new Float32Array(N*3);
-      dat = Array.from({length:N}, (_, i) => ({s:Math.random(), spd:.05 + Math.random()*.06, ion:i % 3 === 0, a:Math.random()*2 - 1, b:Math.random()*2 - 1, c:Math.random()*2 - 1}));
+      dat = Array.from({length:N}, (_, i) => ({s:rand(), spd:.05 + rand()*.06, ion:i % 3 === 0, a:rand()*2 - 1, b:rand()*2 - 1, c:rand()*2 - 1}));
       const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3));
       pts = new THREE.Points(g, new THREE.PointsMaterial({size:7, map:B.dotTex, vertexColors:true, blending:THREE.AdditiveBlending, transparent:true, depthWrite:false, sizeAttenuation:false}));
       const coma = new THREE.Sprite(new THREE.SpriteMaterial({map:B.dotTex, color:0xbfe8ff, blending:THREE.AdditiveBlending, transparent:true, depthWrite:false, opacity:0}));
