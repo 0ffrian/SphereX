@@ -21,6 +21,9 @@ DO NOT RUN WITH --force BEFORE 15 Nov 2026 (the event build, 14-15 Nov): --force
 file, and the deviations listed above as not ported (core.js's) would be lost.
 Issue #93 phase 2 (repeating patterns): DEV93_PATTERNS (shaders.js), DEV93_SEED (core.js, WorldGL) and DEV93_RIVER
 (terrain.js, in place of L1884) are ported the same way.
+Issue #93 fly view (tickets 1 and 3): DEV93_FLY, DEV93_FLY3, DEV93_FLY_LOD (shaders.js), DEV93_PYRAMID, DEV93_GBUF,
+DEV93_GBUF_DRAW (in place of L2327) and DEV93_FLY_HOOKS (core.js) are ported the same way; core.js imports
+heightPyramid.js (hand-written, not extracted).
 """
 import sys, os, re
 
@@ -406,6 +409,126 @@ function flyMarch() {
   FLY_FS = F;
 }
 flyMarch();'''
+DEV93_GBUF = r'''// @deviation (#93 F3) the fly view's static G-buffer (shaders.js flyPasses). A rocky world's fly draw renders into gbo
+// (colour plus the three float targets of the march, normal, gullies and shadow) and copies the colour to the canvas
+// once the camera has stopped (the second draw with the same camera, size, footprint scale, terrain, seed, ocean and
+// lava settings, gbLast); the draws after that (gbGeo) read the targets back instead (uGB = 2), and the shadow too when
+// the Sun has not moved either (gbSun). While the camera moves, it draws straight to the canvas (uGB = 0), as before. A gas giant draws
+// straight to the canvas as before (uGB = 0). Units 12 to 14 hold the targets only during a read-back pass (a target
+// bound for reading while it is drawn to would be a feedback loop). A G-buffer the driver cannot draw to (incomplete)
+// is not used: the fly view then draws straight to the canvas, as before.
+  var gbo = null, gbGeo = null, gbSun = null, gbTerr = null, gbGen = 0, gbLast = null;
+  function gbUnits(on) { for (var i = 0; i < 3; i++) { gl.activeTexture(gl.TEXTURE12 + i); gl.bindTexture(gl.TEXTURE_2D, on ? gbo.t[i] : null); } gl.activeTexture(gl.TEXTURE0); }
+  function geoMoved(m, cam, f1, gx, h) {
+    if (m.gas) return true;
+    if (W.terr !== gbTerr) { gbTerr = W.terr; gbGen++; }
+    var geo = [cam.uCam, cam.uFwd, cam.uRt, cam.uUp, cam.ex, cam.rkm, gx, h, scale / W.fp93, f1.uOcean, f1.uLava, f1.uHM, gbGen, W.p.seed3 || W.p.seed].join('|'), moved = geo !== gbLast;
+    gbLast = geo; if (moved) gbGeo = null;
+    return moved;
+  }
+  this.flyDraw = function (m, cam, f1, gx, h) {
+    if (uF.uGB1) { gl.uniform1i(uF.uGB1, 12); gl.uniform1i(uF.uGB2, 13); gl.uniform1i(uF.uGB3, 14); }
+    if (m.gas || !uF.uGB || geoMoved(m, cam, f1, gx, h)) { if (uF.uGB) { gl.uniform1f(uF.uGB, 0); gl.uniform1f(uF.uGBsh, 0); } gl.drawArrays(gl.TRIANGLES, 0, 3); return; }
+    var geo = gbLast, sun = cam.uLb.join();
+    if (gbo && gbo.ok && gbo.w === gx && gbo.h === h && gbGeo === geo) {
+      gl.uniform1f(uF.uGB, 2); gl.uniform1f(uF.uGBsh, gbSun === sun ? 1 : 0); gbUnits(true);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gbUnits(false);
+      return;
+    }
+    if (!gbo || gbo.w !== gx || gbo.h !== h) {
+      if (gbo) { gl.deleteFramebuffer(gbo.f); gbo.t.forEach(function (t) { gl.deleteTexture(t); }); gl.deleteTexture(gbo.c); }
+      gbo = { w: gx, h: h, f: gl.createFramebuffer(), c: gl.createTexture(), t: [gl.createTexture(), gl.createTexture(), gl.createTexture()] };
+      gl.activeTexture(gl.TEXTURE15);
+      [gbo.c].concat(gbo.t).forEach(function (t, i) {
+        gl.bindTexture(gl.TEXTURE_2D, t); gl.texStorage2D(gl.TEXTURE_2D, 1, i ? gl.RGBA32F : gl.RGBA8, gx, h);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      });
+      gl.bindTexture(gl.TEXTURE_2D, null); gl.activeTexture(gl.TEXTURE0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, gbo.f);
+      [gbo.c].concat(gbo.t).forEach(function (t, i) { gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, t, 0); });
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]);
+      gbo.ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE; gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+    if (!gbo.ok) { gl.uniform1f(uF.uGB, 0); gl.uniform1f(uF.uGBsh, 0); gl.drawArrays(gl.TRIANGLES, 0, 3); return; }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, gbo.f); gbUnits(false);
+    gl.uniform1f(uF.uGB, 1); gl.uniform1f(uF.uGBsh, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, gbo.f); gl.readBuffer(gl.COLOR_ATTACHMENT0); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+    gl.blitFramebuffer(0, 0, gx, h, 0, 0, gx, h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gbGeo = geo; gbSun = sun;
+  };'''
+DEV93_GBUF_DRAW = r'''// @deviation (#93 F3) the fly draw goes through WorldGL.flyDraw (the static G-buffer): a full pass into the G-buffer
+// when the camera or the terrain changed, a pass that reads it back while they have not. Replaces L2327.
+    this.flyDraw(m, cam, f1, gx, h);'''
+DEV93_FLY3 = r'''// @deviation (#93 F3) fly view ticket 3, the static G-buffer. The terrain never changes, so while the camera is still
+// the march, the normal and the gullies give the same result every frame. FLY_FS now also writes them (with uGB = 1,
+// into three float targets core.js attaches beside the colour): O1 = (hit distance, shaded height, gully value G,
+// shadow-ray start radius), O2 = (normal before the gullies, shadow), O3 = (normal after the gullies). With uGB = 2 it
+// reads them back (texelFetch at the same pixel) instead of marching, and with uGBsh = 1 (the Sun has not moved
+// either) the shadow too; light, colour, climate, clouds, water and air are drawn as before, every frame. The values
+// are the ones the full pass computed, so a still frame shows what the full pass drew. A drawing buffer without the
+// extra targets ignores O1 to O3. Gas giants and the globe do not use it (uGB = 0).
+function flyPasses() {
+  function rep(src, a, b) {
+    if (src.split(a).length !== 2) throw new Error('#93 F3: ' + (src.split(a).length - 1) + ' matches of ' + a.slice(0, 70));
+    return src.split(a).join(b);
+  }
+  var F = FLY_FS;
+  F = rep(F, 'out vec4 O;\nuniform highp sampler2D uPyr;',
+    'layout(location=0) out vec4 O;layout(location=1) out vec4 O1;layout(location=2) out vec4 O2;layout(location=3) out vec4 O3;\n' +
+    'uniform highp sampler2D uGB1,uGB2,uGB3;uniform float uGB,uGBsh;\nuniform highp sampler2D uPyr;');
+  F = rep(F, 'bool HQ=false;', 'vec4 GW1=vec4(-1.,0.,0.,0.),GW2=vec4(0.),GW3=vec4(0.),GB1,GB2,GB3;bool HQ=false;');
+  F = rep(F, 'vec3 rd=normalize(uFwd+q.x*uFov*uRt+q.y*uFov*uUp),ro=uCam;\n',
+    'vec3 rd=normalize(uFwd+q.x*uFov*uRt+q.y*uFov*uUp),ro=uCam;\n' +
+    ' if(uGB>1.5){ivec2 fc=ivec2(gl_FragCoord.xy);GB1=texelFetch(uGB1,fc,0);GB2=texelFetch(uGB2,fc,0);GB3=texelFetch(uGB3,fc,0);}\n');
+  F = rep(F, '\n else{float top=1.+14.*uEx/uRkm,t1,t0=rsph(ro,rd,top,t1);',
+    '\n else if(uGB>1.5){hit=GB1.x;p=ro+rd*hit;}\n else{float top=1.+14.*uEx/uRkm,t1,t0=rsph(ro,rd,top,t1);');
+  F = rep(F, 'float hk0=hKm(d);vec3 da=normalize(d+tA*ee),db=normalize(d+tB*ee),p0=d*(1.+hk0*uEx/uRkm),n=normalize(cross(da*surfR(da)-p0,db*surfR(db)-p0));if(dot(n,d)<0.)n=-n;',
+    'float hk0;vec3 p0,n;if(uGB>1.5){hk0=GB1.y;n=GB2.xyz;}else{hk0=hKm(d);vec3 da=normalize(d+tA*ee),db=normalize(d+tB*ee);p0=d*(1.+hk0*uEx/uRkm);n=normalize(cross(da*surfR(da)-p0,db*surfR(db)-p0));if(dot(n,d)<0.)n=-n;}\n' +
+    '   p0=d*(1.+hk0*uEx/uRkm);GW1=vec4(hit,hk0,0.,0.);GW2.xyz=n;');
+  F = rep(F, '   HQ=false;float sh=1.;\n   if(dot(n,uLb)>0.){vec3 s2=d*surfR(d)+d*2e-6;',
+    '   HQ=false;float sh=1.,rs0=0.;\n   if(uGB>1.5)rs0=GB1.w;else if(uGB>.5||dot(n,uLb)>0.)rs0=surfR(d);GW1.w=rs0;\n' +
+    '   if(uGBsh>.5)sh=GB2.w;else if(dot(n,uLb)>0.){vec3 s2=d*rs0+d*2e-6;');
+  F = rep(F, 'sh=clamp(sh,0.,1.);}\n', 'sh=clamp(sh,0.,1.);}GW2.w=sh;\n');
+  F = rep(F, 'vec3 sl=n-d*dot(n,d),fw=faceW(d),gt=vec3(0.);float G=0.;\n',
+    'float G=0.;if(uGB>1.5){G=GB1.z;n=GB3.xyz;}else{vec3 sl=n-d*dot(n,d),fw=faceW(d),gt=vec3(0.);\n');
+  F = rep(F, 'n=normalize(n-(gt-d*dot(gt,d))*.3*uEx);', 'n=normalize(n-(gt-d*dot(gt,d))*.3*uEx);}GW1.z=G;GW3.xyz=n;');
+  F = rep(F, 'O=vec4(pow(1.-exp(-col*1.5),vec3(1./2.2)),1.);', 'O=vec4(pow(1.-exp(-col*1.5),vec3(1./2.2)),1.);O1=GW1;O2=GW2;O3=GW3;');
+  FLY_FS = F;
+}
+flyPasses();'''
+DEV93_FLY_LOD = r'''// @deviation (#93 F3) the height reads, texture(s, uv) in hKm and in the Catmull-Rom crs(), become textureLod(s, uv, 0.).
+// No texture of the world engine has mipmaps and each one minifies and magnifies with the same filter, so both read the
+// same texels with the same weights: the picture is unchanged (measured: 0 levels of difference). But texture() takes
+// screen-space derivatives, and on ANGLE D3D11 fxc then flattens the branches around the height reads and runs both
+// sides; with textureLod() a branch that is not taken is skipped: the march and the normal when the G-buffer answers
+// (still frame, TRAPPIST-1 f at 3 km on the RTX 4060 Ti: 11.7 to 2.1 ms). Every texture() in FLY_FS would also make the
+// moving frame faster (13.1 to 10.5 ms) but the cold compile slower (median about 32 s against 22 s, Q-337): not done.
+function flyLod() {
+  function lod(F) {
+    var o = '', i = 0, k;
+    while ((k = F.indexOf('texture(', i)) >= 0) {
+      if (/[A-Za-z0-9_]/.test(F[k - 1])) { o += F.slice(i, k + 8); i = k + 8; continue; }
+      var d = 0, j = k + 8, c = 0;
+      for (; j < F.length; j++) { var ch = F[j]; if (ch === '(') d++; else if (ch === ')') { if (d === 0) break; d--; } else if (ch === ',' && d === 0) c++; }
+      if (c !== 1) throw new Error('#93 F3: a texture() call with ' + (c + 1) + ' arguments');
+      o += F.slice(i, k) + 'textureLod(' + F.slice(k + 8, j) + ',0.)'; i = j + 1;
+    }
+    return o + F.slice(i);
+  }
+  function inside(a, b, n) {
+    var i = FLY_FS.indexOf(a), j = FLY_FS.indexOf(b, i);
+    if (i < 0 || j < 0 || FLY_FS.indexOf(a, i + 1) >= 0) throw new Error('#93 F3: no single ' + a);
+    var t = lod(FLY_FS.slice(i, j));
+    if (t.split('textureLod(').length - 1 !== n) throw new Error('#93 F3: ' + (t.split('textureLod(').length - 1) + ' height reads in ' + a);
+    FLY_FS = FLY_FS.slice(0, i) + t + FLY_FS.slice(j);
+  }
+  inside('vec4 crs(sampler2D t,vec2 uv){', 'float rsph(', 9);
+  inside('float hKm(vec3 d){', 'float surfR(', 2);
+}
+flyLod();'''
 
 os.makedirs(OUT, exist_ok=True)
 
@@ -431,7 +554,7 @@ w('shaders.js', hdr('shaders: NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS', '1299-16
   sl(1299, 1678, [('1.+3.*uEx/uRkm', '1.+uCloudKm*uEx/uRkm'),          # PR #89 review 1
                   ('uCloudKm,uHkm;', 'uCloudKm,uHkm,uScale;'),         # #93 1.4
                   ('uFov/uR.y', 'uFov*uScale/uR.y')]) + '\n' +          # #93 1.4 (3 places)
-  DEV93_SHADERS + '\n' + DEV93_PATTERNS + '\n' + DEV93_FLY + '\nexport { NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS };\n')
+  DEV93_SHADERS + '\n' + DEV93_PATTERNS + '\n' + DEV93_FLY + '\n' + DEV93_FLY3 + '\n' + DEV93_FLY_LOD + '\nexport { NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS };\n')
 
 # presets.js: FLUIDS, WP, then the reviewed data deviations (#89 review 1 and 2, #93 3.1)
 w('presets.js', hdr('FLUIDS and WP (example presets)', '1679-1700') + sl(1679, 1700) + '\n' + DEV_PRESETS +
@@ -490,12 +613,15 @@ core.append(sl(2262, 2265))
 core.append(DEV93_COMPILE)                   # replaces L2266: submit, poll, link (#93 1.2, 1.3)
 core.append(DEV93_SEED)                      # seed uniforms (#93 3.1, 3.2, 3.4, 3.9)
 core.append(DEV93_PYRAMID)                   # the fly view's max-height pyramid (#93 F1)
+core.append(DEV93_GBUF)                      # the fly view's static G-buffer (#93 F3)
 core.append(sl(2267, 2301, [('2.214)', '2.2165)'), ('0.005)', '0.0027)'), ('0.004)', '0.0012)')]))   # PR #89 review 3
 core.append(DEV93_SCALER)                    # replaces L2302-L2303 (#93 1.7)
 core.append(sl(2304, 2315))
 core.append(DEV93_SKIP_GLOBE)                # replaces L2316 (#93 1.6)
-core.append(sl(2317, 2338, [('uF.uFov,', 'uF.uScale,scale/W.fp93);gl.uniform1f(uF.uFov,'),   # #93 1.4, B9
+core.append(sl(2317, 2326, [('uF.uFov,', 'uF.uScale,scale/W.fp93);gl.uniform1f(uF.uFov,'),   # #93 1.4, B9
                             ('uF.uCloudKm,', 'uF.uCloudKm,m.zc!=null?Math.max(m.zc,0.3):')]))   # PR #89 review 1
+core.append(DEV93_GBUF_DRAW)                 # replaces L2327: the fly draw (#93 F3)
+core.append(sl(2328, 2338))
 core.append(DEV93_GAS_CAP)                   # replaces L2339-L2340 (#93 1.8)
 core.append(sl(2341, 2355))
 core.append(sl(2356, 2385))                 # fly camera, flyMove, globePick, GS

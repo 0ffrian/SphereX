@@ -285,6 +285,69 @@ describe('drawing (issue #93 1.4, 1.6, 1.7)', () => {
   }, 30000);
 });
 
+describe('fly view static G-buffer (issue #93 F3)', () => {
+  const lastGB = (calls: unknown[][]) =>
+    calls.filter((c) => c[0] === 'uniform1f' && (c[1] === 'uGB' || c[1] === 'uGBsh')).slice(-2);
+
+  it('FLY_FS writes the geometry targets and reads them back only with uGB = 2', () => {
+    expect(FLY_FS).toContain('layout(location=3) out vec4 O3;');
+    expect(FLY_FS).toContain('else if(uGB>1.5){hit=GB1.x;p=ro+rd*hit;}');
+    expect(FLY_FS).toContain('O1=GW1;O2=GW2;O3=GW3;');
+    expect(FLY_FS).toContain('if(uGBsh>.5)sh=GB2.w;else if(dot(n,uLb)>0.)');
+    // the height reads take no derivatives, so fxc keeps the branches around them (textureLod at level 0: no texture
+    // has mipmaps); the other reads keep texture() (every one as textureLod compiles slower, Q-337)
+    expect(FLY_FS.match(/textureLod\(/g)?.length).toBe(11);
+    expect(FLY_FS).toContain('float e=HQ?crs(uHt,uv).r:textureLod(uHt,uv,0.).r');
+  });
+
+  it(
+    'a moving camera draws as before, a still one reads the G-buffer, a moved Sun redraws the shadow, a gas giant draws as before',
+    { timeout: 30000 },
+    async () => {
+      const { gl, calls } = stubGL();
+      const e = new WorldEngine(stubCanvas(gl, 1000, 400), { role: 'fly' });
+      await e.whenReady();
+      const core = (e as unknown as { core: { W: Record<string, unknown> & { spinup: number } } })
+        .core;
+      e.setPreset(preset('t1e'));
+      core.W.spinup = 0;
+      e.setFly(true);
+      // the first frame of a camera draws straight to the canvas (it may be moving)
+      e.draw();
+      expect(lastGB(calls)[0]).toEqual(['uniform1f', 'uGB', 0]);
+      // the camera has stopped: one full pass that fills the G-buffer, then read-backs
+      e.draw();
+      expect(lastGB(calls)).toEqual([
+        ['uniform1f', 'uGB', 1],
+        ['uniform1f', 'uGBsh', 0],
+      ]);
+      e.draw();
+      expect(lastGB(calls)).toEqual([
+        ['uniform1f', 'uGB', 2],
+        ['uniform1f', 'uGBsh', 1],
+      ]);
+      // the camera turns: straight to the canvas, then the full pass, then read-backs
+      core.W.flyHead = (core.W.flyHead as number) + 0.01;
+      e.draw();
+      expect(lastGB(calls)[0]).toEqual(['uniform1f', 'uGB', 0]);
+      e.draw();
+      expect(lastGB(calls)[0]).toEqual(['uniform1f', 'uGB', 1]);
+      e.draw();
+      expect(lastGB(calls)[0]).toEqual(['uniform1f', 'uGB', 2]);
+      // the Sun moves (the view turns the light; t1e is locked): geometry kept, the shadow is redrawn
+      core.W.yaw = (core.W.yaw as number) + 0.1;
+      e.draw();
+      expect(lastGB(calls)).toEqual([
+        ['uniform1f', 'uGB', 2],
+        ['uniform1f', 'uGBsh', 0],
+      ]);
+      e.setPreset(preset('jup'));
+      e.draw();
+      expect(lastGB(calls)[0]).toEqual(['uniform1f', 'uGB', 0]);
+    },
+  );
+});
+
 describe('gas solver cap (issue #93 1.8)', () => {
   it('runs at most 3 steps a frame and drops the backlog', () => {
     const { gl } = stubGL();

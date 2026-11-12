@@ -126,33 +126,73 @@
       gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
       // The GPU clocks up over the first frames: 30 untimed frames, then the median of 30 (each read back, so timed).
       // #93 F1: the GPU time of each timed frame too (EXT_disjoint_timer_query_webgl2, when the browser has it), which
-      // other work on the machine's CPU does not change.
-      const ft = [],
-        tx = gl.getExtension('EXT_disjoint_timer_query_webgl2'),
-        qs = [];
-      for (let i = 0; i < 60; i++) {
-        const t = realNow();
-        const q = tx && i >= 30 ? gl.createQuery() : null;
-        if (q) gl.beginQuery(tx.TIME_ELAPSED_EXT, q);
-        W.gl.draw(W.m);
-        if (q) (gl.endQuery(tx.TIME_ELAPSED_EXT), qs.push(q));
-        gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-        if (i >= 30) ft.push(realNow() - t);
-      }
-      ft.sort((x, y) => x - y);
-      const r = { fly_ms: +ft[ft.length >> 1].toFixed(2) };
-      if (qs.length) {
-        const gt = [];
-        for (let k = 0; k < 200 && qs.length; k++) {
-          await new Promise((res) => setTimeout(res, 5));
-          while (qs.length && gl.getQueryParameter(qs[0], gl.QUERY_RESULT_AVAILABLE)) {
-            const q = qs.shift();
-            if (!gl.getParameter(tx.GPU_DISJOINT_EXT))
-              gt.push(gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6);
-          }
+      // other work on the machine's CPU does not change. #93 F3: a still camera (fly_ms, gpu_ms) and a camera that
+      // turns by 1e-6 rad every frame (move_ms, move_gpu_ms), so an engine that keeps the still frame's geometry is
+      // timed both ways.
+      const tx = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+      async function timeFrames(moving) {
+        const ft = [],
+          qs = [],
+          head = W.flyHead;
+        for (let i = 0; i < 60; i++) {
+          if (moving) W.flyHead = head + (i & 1 ? 1e-6 : -1e-6);
+          const t = realNow();
+          const q = tx && i >= 30 ? gl.createQuery() : null;
+          if (q) gl.beginQuery(tx.TIME_ELAPSED_EXT, q);
+          W.gl.draw(W.m);
+          if (q) (gl.endQuery(tx.TIME_ELAPSED_EXT), qs.push(q));
+          gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+          if (i >= 30) ft.push(realNow() - t);
         }
-        gt.sort((x, y) => x - y);
-        if (gt.length) r.gpu_ms = +gt[gt.length >> 1].toFixed(2);
+        W.flyHead = head;
+        ft.sort((x, y) => x - y);
+        const o = { ms: +ft[ft.length >> 1].toFixed(2) };
+        if (qs.length) {
+          const gt = [];
+          for (let k = 0; k < 200 && qs.length; k++) {
+            await new Promise((res) => setTimeout(res, 5));
+            while (qs.length && gl.getQueryParameter(qs[0], gl.QUERY_RESULT_AVAILABLE)) {
+              const q = qs.shift();
+              if (!gl.getParameter(tx.GPU_DISJOINT_EXT))
+                gt.push(gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6);
+            }
+          }
+          gt.sort((x, y) => x - y);
+          if (gt.length) o.gpu = +gt[gt.length >> 1].toFixed(2);
+        }
+        return o;
+      }
+      const tMove = await timeFrames(true),
+        tStill = await timeFrames(false);
+      const r = {
+        fly_ms: tStill.ms,
+        gpu_ms: tStill.gpu,
+        move_ms: tMove.ms,
+        move_gpu_ms: tMove.gpu,
+      };
+      // a still frame against the full frame of the same camera (drawn right after the camera came back)
+      {
+        const v = W.view,
+          n = v.gx * v.h * 4,
+          A = new Uint8Array(n),
+          B = new Uint8Array(n),
+          head = W.flyHead;
+        W.flyHead = head + 1e-6;
+        W.gl.draw(W.m);
+        W.flyHead = head;
+        W.gl.draw(W.m);
+        gl.readPixels(0, 0, v.gx, v.h, gl.RGBA, gl.UNSIGNED_BYTE, A);
+        W.gl.draw(W.m);
+        gl.readPixels(0, 0, v.gx, v.h, gl.RGBA, gl.UNSIGNED_BYTE, B);
+        let s2 = 0,
+          mx = 0;
+        for (let i = 0; i < n; i++) {
+          if ((i & 3) === 3) continue;
+          const dd = Math.abs(A[i] - B[i]);
+          s2 += dd;
+          if (dd > mx) mx = dd;
+        }
+        r.still_vs_full = { mean: +(s2 / ((n / 4) * 3)).toFixed(4), max: mx };
       }
       W.gl.draw(W.m);
       const v1 = W.view,
