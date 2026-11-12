@@ -263,6 +263,37 @@ describe('gas solver cap (issue #93 1.8)', () => {
     expect(n).toBe(3);
     expect(core.W.simAcc).toBeLessThan(GS.dt);
   });
+
+  it('the caption gives the rate at the measured frame rate, not an assumed 60 fps (#93 A7)', () => {
+    const { gl } = stubGL();
+    const core = createCore(stubCanvas(gl), { role: 'globe' });
+    core.setPreset(preset('hd'));
+    core.W.spinup = 0;
+    core.W.timeSec = 86400;
+    const hours = (): number => {
+      core.worldUi();
+      const m = /about (\d+) hours/.exec(core.W.cap as string);
+      return m ? Number(m[1]) : 24;
+    };
+    const GS = core.getGS();
+    const m = core.W.m;
+    const req = 86400 / ((core.W.p.Rj * 71492e3) / Math.max(m.U, 1)) / GS.dt;
+    // Rounded to 1 h below 10 h, to 2 h above (core.js L2425 deviation).
+    const coarse = (h: number): number =>
+      h < 10 ? Math.max(1, Math.round(h)) : 2 * Math.round(h / 2);
+    // Before any gas frame: 60 fps.
+    expect(hours()).toBe(coarse((24 * 180) / req));
+    // Frames measured at 30 fps (the tick's average of dtw): half the rate. The 15 % hold is cleared first.
+    GS.step = () => {}; // only the frame-time average is under test: skip the solver's cost
+    for (let i = 0; i < 400; i++) core.W.gl.tick(m, true, 1 / 30);
+    expect(core.W.dt93).toBeCloseTo(1 / 30, 6);
+    core.W.capH93 = 0;
+    const at30 = hours();
+    expect(at30).toBe(coarse((24 * 90) / req));
+    // A small wobble in the frame rate does not change the shown number.
+    core.W.dt93 = 1 / 31;
+    expect(hours()).toBe(at30);
+  });
 });
 
 describe('shared terrain (issue #93 1.5)', () => {
