@@ -2,6 +2,8 @@
 
 > **Part of:** Architecture spec ([index](README.md)) · **Sections:** A9–A9.5 · **Implements:** [D-08, D-09, D-12, D-20](../decisions/haptics-design.md), [D-10, Q-133](../decisions/haptics-sound.md), [Q-132](../decisions/platform-hosting.md), [D-21](../decisions/contract-tags.md) · **Read with:** [rendering/README.md](../rendering/README.md) (R8), [sound-voice.md](sound-voice.md) (A8)
 
+> **D-39 (12 Nov 2026), haptics cut:** A9 is kept for history and its IDs stay. Vibration, touch and calibration are cut; what A9.3 says about audio pairing lives on in the sound engine ([A8](sound-voice.md), [R8.9](../rendering/haptics/audio-pairing.md), [R13](../rendering/sound/overview.md)). See [D-39](../decisions/sound-ambience.md).
+
 ## A9 Haptics
 
 **Event scope (Q-132):** the event build runs in desktop Chrome on Atish's Asus TUF A15. Haptics are **heard, not felt**: the engine plays through the audio driver only. Phones, `navigator.vibrate` and calibration come after the event.

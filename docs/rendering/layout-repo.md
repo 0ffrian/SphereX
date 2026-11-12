@@ -38,7 +38,7 @@ frontend/src/app/                    (Moon)   # React shell (A10 hash routing, m
   shell/ sky/                        # the shell and sky pane (A21; provisional, Q-89)
   build/                             # R5.8, listed in R10
   island/                            # the island and its loader (A21.5; Q-121, Q-123)
-frontend/src/test/                            # test-only helpers (fixtureFetch, sharedFixtures, fakeHaptics, fakeAudio, hapticRecorder)
+frontend/src/test/                            # test-only helpers (fixtureFetch, sharedFixtures, fakeSound, fakeAudio)
 frontend/src/fixtures.test.ts                 # fixtures are deterministic, pass the API validators, never imported by app code
 frontend/e2e/                                 # Playwright tests against the fixture server (R11 lists the rendering gates)
 frontend/fixtures/                            # dev and test only: SYNTHETIC fixture server (`npm run dev:fixtures`); never in a build;
