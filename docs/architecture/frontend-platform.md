@@ -41,7 +41,7 @@ The run steps for 14 to 15 Nov, gathered from D-24, D-25, Q-112, Q-137, Q-366, Q
 
 **1. Online, before the event** (in `backend/`):
 
-- [ ] Fill the cache: `uv run python -m scripts.prefetch --group test`, `--group demo` and the Track object (433 Eros is in group `fixture`, see Q-197 in [A3.12](targets.md#a312-test-and-demo-targets)); the sky with `uv run python -m scripts.sky_mirror --max-order 6 --max-mb 45000 --allow-unclonable --bake` (D-35, depth Q-88); the precomputed Area search areas (D3, A16.7).
+- [ ] Fill the cache: `uv run python -m scripts.prefetch --group test`, `--group demo` (this includes the Track object, 433 Eros, which is in group `demo` since #73; Q-197 in [A3.12](targets.md#a312-test-and-demo-targets)); the sky with `uv run python -m scripts.sky_mirror --max-order 6 --max-mb 45000 --allow-unclonable --bake` (D-35, depth Q-88); the precomputed Area search areas (D3, A16.7).
 - [ ] Re-warm the Gaia and Exoplanet Archive caches (the #93 keys `cols="msc1-flame3"` and the archive's columns version 4 changed every Gaia star and archive planet key, Q-220, Q-366, Q-378): `uv run python -m scripts.prefetch --group test --group demo --overlays-only`.
 - [ ] `uv run python -m scripts.bake_demo_pack --check --strict`. It must exit 0. **Never run `bake_demo_pack` without `--check` while `SX_OFFLINE=1`.**
 - [ ] `uv run python -m scripts.smoke_offline --group test --group demo`: every target answers with the network blocked, its render parameters carry no data gap, and its asset status is printed (Q-369).
@@ -49,9 +49,9 @@ The run steps for 14 to 15 Nov, gathered from D-24, D-25, Q-112, Q-137, Q-366, Q
 
 **2. Freeze the release:** `SX_DATA_RELEASE=spherex_qr2`; do not switch to DR1 (Q-137).
 
-**3. Start the backend:** `SX_OFFLINE=1 SX_PREFETCH_ON_START=1 SX_PREFETCH_GROUPS=test,demo uv run uvicorn app.main:create_app --factory --host localhost --port 8000`. The warm start builds every test and demo object's card and bakes its textures from the cache before visitors arrive (about 17 s per bake otherwise, Q-112; `SX_PREFETCH_GROUPS` defaults to `demo`, see the [settings](../../backend/README.md#settings-sx_-environment-variables)). Leave `SX_ADMIN_TOKEN` unset, so the Gemini repaint route does not exist; `SX_GEMINI_OFFLINE_CACHE` follows Q-29.
+**3. Start the backend:** `SX_OFFLINE=1 SX_PREFETCH_ON_START=1 SX_PREFETCH_GROUPS=test,demo uv run uvicorn app.main:create_app --factory --host localhost --port 8000`. The warm start builds every test and demo object's card and bakes its textures from the cache before visitors arrive (about 17 s per bake otherwise, Q-112; `SX_PREFETCH_GROUPS` defaults to `demo`, see the [settings](../../backend/README.md#settings-sx_-environment-variables)). Leave `SX_ADMIN_TOKEN` unset, so the Gemini repaint route does not exist; `SX_GEMINI_OFFLINE_CACHE` follows Q-29. Leave `SX_ADMIN_TOKEN` unset, so the Gemini repaint route does not exist; `SX_GEMINI_OFFLINE_CACHE` follows Q-29.
 
-**4. Serve the frontend:** the one-origin server is #15 (to build). **Proposed (Q-198):** until #15 lands, run `npm run build` and `npm run preview` in `frontend/` (port 4173, which proxies `/v1` and `/data` to the backend).
+**4. Serve the frontend:** the one-origin server is #15 (to build). **Proposed (Q-198):** until #15 lands, run `npm run build` and `npm run preview` in `frontend/` (port 4173, which proxies `/v1` and `/data` to the backend), and open `http://localhost:4173` in Chrome on the A15 (step 5).
 
 **5. Chrome on the A15** (Q-368):
 

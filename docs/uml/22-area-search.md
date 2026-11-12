@@ -12,7 +12,7 @@ flowchart TB
   subgraph Core["backend/app/core/area/"]
     FRM["frames.py<br/>grid of small SIA cones, s_region overlap, time windows, visits, coverage"]
     DOT["dots.py<br/>mesh background, hardware flags masked, OUTLIER kept as a flag, detect, measure"]
-    CLN["clean.py<br/>glitches, fixed, stars per tracklet"]
+    CLN["clean.py<br/>glitch, star, fixed per tracklet"]
     JON["join.py<br/>tracklets, pairs, parallax-aware test, mutual best"]
     MAT["match.py<br/>SkyBoT candidates, Horizons positions from SPHEREx"]
     INJ["inject.py (gated D4)<br/>planted movers in memory, test mover, completeness grid"]
@@ -33,7 +33,8 @@ flowchart TB
   CACHE[("Read-through cache D-25<br/>raw replies + derived.area entries")]
   API["api/areas.py<br/>/v1/areas/... incl. /checks (gated)"]
   subgraph FE["frontend/src"]
-    RAIL["app/shell ToolRail + railIcons<br/>ToolId area"]
+    RAIL["app/shell SkyDock (Known objects, Discovery)<br/>ToolId area (D-38)"]
+    DEMO["app/area areaService demo seam<br/>answers only inside the prepared Eros area (Q-414)"]
     CARDS["Feature cards in the object card's slot (proposed Q-172)<br/>Area, Options, Known, Discovery, Result, Checks (gated)"]
     ISL["Island progress pill (proposed)"]
     LAYER["app/sky/area AreaLayer<br/>sky layer slot"]
@@ -68,6 +69,7 @@ flowchart TB
   CACHE --> API
   API --> STORE
   RAIL --> CARDS
+  DEMO -.->|"demo stand-in for the API until Q-205"| CARDS
   STORE --> CARDS
   CARDS --> ISL
   STORE --> LAYER
@@ -94,7 +96,10 @@ sequenceDiagram
   F->>C: grid of small SIA cones, then cutouts (read-through)
   C-->>F: frame rows and cutouts, or frames:cone_maxrec, no_footprint, cutout codes
   F-->>S: frames in the time windows, visits, coverage (or area:visits)
-  S->>D: dots per frame, then glitch, fixed and star labels
+  alt run incomplete (cone_failed, cutout_failed, MAXREC, no usable cutout, no dots)
+    S-->>Op: exit 1, nothing stored (AREA_TOOL_ENABLED off, Q-205)
+  end
+  S->>D: dots per frame, then glitch, star and fixed labels
   D->>C: Gaia and CatWISE cones per visit (shared star list)
   D-->>S: movers-to-be per visit, step counts
   S->>J: tracklets, candidate pairs
@@ -115,6 +120,8 @@ sequenceDiagram
 ```
 
 ## In the sky view
+
+> **As built in PR #104 (Q-414):** the tool is started from the sky dock's Known objects or Discovery, and the answers come from the frontend demo `app/area/areaService.ts`, not `/v1/areas`: only a square that overlaps the prepared 433 Eros area gets results, any other refuses with `area:not_prepared`, and demo cards and the canvas carry a "Demo data" tag. The diagram below is the planned flow with the real API.
 
 ```mermaid
 sequenceDiagram

@@ -5,7 +5,7 @@
 import type { ReactNode } from 'react';
 import type { ToolId } from './shellStore';
 
-const SHAPES: Record<ToolId, ReactNode> = {
+const SHAPES: Record<ToolId | 'known', ReactNode> = {
   // mock-up `reticle`
   sky: (
     <>
@@ -23,6 +23,25 @@ const SHAPES: Record<ToolId, ReactNode> = {
   ),
   // mock-up `bars`
   spectrum: <path pathLength="1" d="M3 10v4M7 7v10M11 3v18M15 8v8M19 5v14" />,
+  // mock-up `dots` (Discovery)
+  area: (
+    <>
+      <circle pathLength="1" cx="6" cy="7" r="2.2" />
+      <circle pathLength="1" cx="16" cy="6" r="2.2" />
+      <circle pathLength="1" cx="10" cy="15" r="2.2" />
+      <circle pathLength="1" cx="19" cy="17" r="2.2" />
+    </>
+  ),
+  // mock-up `orbit` (Known objects)
+  known: (
+    <>
+      <path pathLength="1" d="M20.341 6.484A10 10 0 0 1 10.266 21.85" />
+      <path pathLength="1" d="M3.659 17.516A10 10 0 0 1 13.74 2.152" />
+      <circle pathLength="1" cx="12" cy="12" r="3" />
+      <circle pathLength="1" cx="19" cy="5" r="2" />
+      <circle pathLength="1" cx="5" cy="19" r="2" />
+    </>
+  ),
   viewer: (
     <>
       <path pathLength="1" d="M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z" />
@@ -31,7 +50,7 @@ const SHAPES: Record<ToolId, ReactNode> = {
   ),
 };
 
-export function RailIcon({ id }: { id: ToolId }) {
+export function RailIcon({ id }: { id: ToolId | 'known' }) {
   return (
     <svg
       viewBox="0 0 24 24"

@@ -7,6 +7,7 @@ The data contract, shared by the backend and the frontend ([D-18](../docs/decisi
 - `schemas/object-card.schema.json`: ObjectCard and the types it uses: `Tag`, `ObjectType`, the tagged values ([rendering doc R3.1, R3.2](../docs/rendering/data-contract.md))
 - `schemas/render-params.schema.json`: RenderParams (R3.4), `VisibleMode` (D-23) and `HapticProfile` (R8.8). It refers to the card schema for the shared types
 - `schemas/area-*.schema.json`: the six Area search replies of [A17.8](../docs/architecture/moving-objects/area-contract.md#a178-endpoints) (issue #92, shape choices in [Q-208](../docs/decisions/moving-objects.md)); see [Area search](#area-search-schemas-and-fixtures) below
+- `schemas/track-path.schema.json`: the Track path reply `GET /v1/objects/{id}/path` ([A19.5](../docs/architecture/moving-objects/track.md#a195-path-endpoint), [A19.13](../docs/architecture/moving-objects/track-contract.md#a1913-contract); issue #74); see [Track](#track-fixture) below
 
 They are JSON Schema **draft-07**, the draft that both generators and both validators handle fully. `schemas/` is the single source: never edit the generated code. After changing a schema, run one command per side and commit the result:
 
@@ -89,3 +90,7 @@ Six schemas, one per JSON reply of [A17.8](../docs/architecture/moving-objects/a
 `index.json` lists both; each area folder holds `summary.json`, `known.json`, `dots.json`, `tracks.json`, `checks.json` and a header-only `export.ecsv` stub (the real writer is P7, A17.7). The dev fixture server serves them at `/v1/areas…` (`frontend/fixtures/areas.ts`). Tests: `backend/tests/test_area_contract.py`, `backend/tests/test_area_fixtures.py`, `frontend/src/contract/areaFixtures.test.ts`, `frontend/src/fixturesArea.test.ts`, and the area cases in `fixtures/invalid/cases.json`.
 
 Tests: `backend/tests/test_contract_fixtures.py` and `frontend/src/contract/fixtures.test.ts`. Open contract questions: Q-33 to Q-42 in [decisions/contract.md](../docs/decisions/contract.md), Q-64 in [platform-hosting.md](../docs/decisions/platform-hosting.md) and Q-65 in [rendering-bodies.md](../docs/decisions/rendering-bodies.md) (index: [decisions/README.md](../docs/decisions/README.md)). The frontend's own M1 fixtures stay in `frontend/fixtures/` (Q-30).
+
+## Track fixture
+
+`fixtures/track/eros-2026-03/path.json` is the **real** `/path` reply for 433 Eros (A19.13; issue #74), the labelled exception to "everything is synthetic": the backend builds it offline from PR #53's recorded Horizons answers in `backend/tests/fixtures/cache/` (20 to 21 Mar 2026, the fixture path settings of `backend/scripts/fixture_settings.py`, so a 60 min step, not production's 10 min). No Fixture badge. Write it with `cd backend && uv run python -m scripts.track_fixtures`; `--check` (and `tests/test_track_path.py`) fails if a committed byte differs. The synthetic mover of A19.13 (a refused frame, a deferred path, an extended source) is not built yet.

@@ -118,11 +118,14 @@ def cutout_key(
     )
 
 
-def key_for(ctx: Context, row: SiaRow, ra: float, dec: float) -> CacheKey:
+def key_for(
+    ctx: Context, row: SiaRow, ra: float, dec: float, size_arcsec: float | None = None
+) -> CacheKey:
+    """``size_arcsec`` overrides ``SX_CUTOUT_SIZE_ARCSEC`` (Area search cutouts, Q-400 (3)); the
+    default gives the same key as before, so existing entries keep their digests."""
     s = ctx.settings
-    return cutout_key(
-        s.data_release, row.frame_id, ra, dec, s.cutout_size_arcsec, keep_psf=s.cutout_keep_psf
-    )
+    size = s.cutout_size_arcsec if size_arcsec is None else size_arcsec
+    return cutout_key(s.data_release, row.frame_id, ra, dec, size, keep_psf=s.cutout_keep_psf)
 
 
 def fetch_cutout(
@@ -133,15 +136,17 @@ def fetch_cutout(
     *,
     refresh: bool = False,
     read_timeout_s: float | None = None,
+    size_arcsec: float | None = None,
 ) -> Served:
     s = ctx.settings
-    key = key_for(ctx, row, ra, dec)
+    key = key_for(ctx, row, ra, dec, size_arcsec)
     q = dict(key.query)
 
     def live() -> LiveResponse:
         if not is_irsa_url(row.access_url):
             raise UpstreamError(f"unexpected access_url host: {row.access_url}")
-        size_deg = norm_float(s.cutout_size_arcsec / 3600.0, 6)
+        # The size comes from the key, so the request and its cache entry always agree.
+        size_deg = norm_float(float(q["size_arcsec"]) / 3600.0, 6)
         params = {"center": f"{q['ra']},{q['dec']}", "size": size_deg}
         resp = ctx.http.get(row.access_url, params, read_timeout_s=read_timeout_s)
         # The client follows redirects, so check where the body actually came from.

@@ -5,10 +5,6 @@ import type { RenderPlan } from '@/viewer/planTypes';
 import { LIMB_DARKENING_U } from '@/viewer/renderers/Star';
 import type { StarCloseUpProps } from '@/viewer/renderers/starCloseUpScene';
 
-/** The honesty line the mock-up shows over the close-up (cuTag). */
-export const STAR_CLOSEUP_TAG =
-  'Close-up · a flare on the star’s surface · illustrative (Default), not a measurement';
-
 /**
  * Props for the star close-up, or null when the plan has no star with surface physics (a Mira, a
  * star with no temperature, or a body that is not drawn): then the host shows its usual fallback.

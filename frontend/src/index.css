@@ -19,6 +19,23 @@
   --color-sx-blue: #38bdf8;
   --color-sx-amber: #fbbf24;
   --color-sx-red: #f87171;
+  /* D-38 design-language tokens (dark values) */
+  --color-bg: #08090b;
+  --color-s1: #0f1114;
+  --color-s2: #16191c;
+  --color-s3: #1e2226;
+  --color-line: #262b30;
+  --color-fg: #e6e9eb;
+  --color-muted: #9aa4ab;
+  --color-accent: #89cff0;
+  --color-ac: #17303c;
+  --color-on-ac: #d2e9f4;
+  --color-ok: #22c55e;
+  --color-warn: #f2b84b;
+  --color-fail: #ff4d4f;
+  --color-p-meas: #4ade80;
+  --color-p-phys: #38bdf8;
+  --color-p-asm: #5f686e;
 }
 
 /* Dark-only theme in both OS colour schemes (matches the mock-up). The page colours live here as
@@ -32,10 +49,30 @@
   --sx-bot: 64px;
   --sx-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
   --sx-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --bg: #08090b;
+  --s1: #0f1114;
+  --s2: #16191c;
+  --s3: #1e2226;
+  --line: #262b30;
+  --fg: #e6e9eb;
+  --muted: #9aa4ab;
+  --accent: #89cff0;
+  --ac: #17303c;
+  --on-ac: #d2e9f4;
+  --ok: #22c55e;
+  --warn: #f2b84b;
+  --fail: #ff4d4f;
+  --p-meas: #4ade80;
+  --p-phys: #38bdf8;
+  --p-asm: #5f686e;
+  --wave: #4ade80;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Fonts: Tailwind's system stacks (no web fonts: the demo runs offline, D-24). */
 body {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -49,22 +86,19 @@ body {
   }
 
   /* ---- screen + bezel (mock-up .screen / .bezel) ---- */
+  /* Full screen (Moon, 11 Nov 2026): no frame around the app; the sky runs to the window edges. */
   .sx-screen {
     position: fixed;
     inset: 0;
-    padding: 14px;
+    padding: 0;
     background: var(--color-sx-bg);
   }
   .sx-bezel {
     position: relative;
     height: 100%;
-    border-radius: 28px;
+    border-radius: 0;
     background: var(--color-sx-bezel);
-    border: 1px solid var(--color-sx-border);
-    box-shadow:
-      0 0 0 1px #000,
-      inset 0 1px 0 #ffffff0d,
-      0 30px 80px #000;
+    border: 0;
     display: grid;
     grid-template-columns: var(--sx-rail) minmax(0, 1fr) minmax(0, 24rem) 16px;
     /* Whole-pixel rows, so panels and canvases inside the view sit on whole pixels. */
@@ -105,45 +139,8 @@ body {
     padding: 12px 0 6px;
     min-height: 0;
   }
-  .sx-rail-label {
-    font: 10px var(--font-mono);
-    color: var(--color-sx-dim-text);
-    letter-spacing: 0.08em;
-    writing-mode: vertical-rl;
-    margin: auto 0 0;
-    padding-bottom: 10px;
-  }
-  .sx-tool {
-    position: relative;
-    width: 44px;
-    height: 44px;
-    display: grid;
-    place-items: center;
-    border-radius: 12px;
-    color: var(--color-sx-mfg);
-    transition:
-      color 0.2s,
-      background 0.2s,
-      transform 0.25s var(--sx-spring);
-  }
-  .sx-tool:hover {
-    color: var(--color-sx-fg);
-  }
-  .sx-tool:active {
-    transform: scale(0.9);
-  }
-  .sx-tool:focus-visible {
-    outline: 2px solid var(--color-sx-green);
-    outline-offset: 2px;
-  }
-  .sx-tool[aria-pressed='true'] {
-    color: var(--color-sx-fg);
-  }
   /* The pill behind the tools (mock-up `.hl`): slides to the hovered tool and back to the active
      one. Its size and place are set from the tool's box (ToolRail). */
-  .sx-rail-inner {
-    position: relative;
-  }
   .sx-hl {
     position: absolute;
     left: 0;
@@ -159,18 +156,6 @@ body {
       opacity 0.2s,
       width 0.3s,
       height 0.3s;
-  }
-  .sx-tool[aria-pressed='true']::before {
-    animation: sx-pip 0.5s var(--sx-spring);
-    content: '';
-    position: absolute;
-    left: -10px;
-    top: 12px;
-    bottom: 12px;
-    width: 3px;
-    border-radius: 3px;
-    background: var(--color-sx-green);
-    box-shadow: 0 0 10px var(--color-sx-green);
   }
   @keyframes sx-pip {
     from {
@@ -217,11 +202,6 @@ body {
       opacity 0.15s,
       transform 0.3s var(--sx-spring);
   }
-  .sx-tool:hover .sx-tool-tip,
-  .sx-tool:focus-visible .sx-tool-tip {
-    opacity: 1;
-    transform: translateY(-50%);
-  }
 
   /* ---- transport (mock-up .player / .btn-i / .scrub / .frame-info) ---- */
   .sx-transport-slot {
@@ -237,7 +217,7 @@ body {
     gap: 8px;
     min-height: 48px;
     padding: 0 12px 0 8px;
-    border-radius: 14px;
+    border-radius: 10px;
     background: var(--color-sx-muted);
     border: 1px solid var(--color-sx-border);
     box-shadow: 0 8px 24px #0008;
@@ -274,8 +254,7 @@ body {
     background: #e4e4e7;
   }
   .sx-btn-i:focus-visible,
-  .sx-scrub input:focus-visible,
-  .sx-speed select:focus-visible {
+  .sx-scrub input:focus-visible {
     outline: 2px solid var(--color-sx-green);
     outline-offset: 2px;
   }
@@ -328,6 +307,15 @@ body {
     color: var(--color-sx-mfg);
     white-space: nowrap;
   }
+  .sx-wgrid {
+    display: inline-grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+  }
+  .sx-frame-n {
+    color: var(--color-sx-mfg);
+  }
   /* Shown instead of the scrubber while the colour composite (one picture) is on screen. */
   .sx-player-note {
     flex: 1 1 220px;
@@ -342,25 +330,6 @@ body {
   .sx-frame-info b {
     color: var(--color-sx-fg);
     font-weight: 500;
-  }
-  .sx-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: currentColor;
-    box-shadow: 0 0 10px currentColor;
-  }
-  .sx-speed select {
-    height: 30px;
-    border-radius: 8px;
-    background: var(--color-sx-bezel);
-    border: 1px solid var(--color-sx-border);
-    color: var(--color-sx-fg);
-    font: 12px var(--font-mono);
-    padding: 0 6px;
-  }
-  .sx-speed select:disabled {
-    opacity: 0.5;
   }
 
   /* ---- search pill (mock-up .search / .kbd) ---- */
@@ -755,20 +724,8 @@ body {
       flex-direction: row;
       padding: 0 10px;
     }
-    .sx-rail-label {
-      display: none;
-    }
     /* Touch has no hover, so the tool names show as captions under the icons (a tab bar). */
-    .sx-tool {
-      width: 72px;
-      height: 52px;
-      grid-template-rows: auto auto;
-      align-content: center;
-      gap: 2px;
-    }
-    .sx-tool-tip,
-    .sx-tool:hover .sx-tool-tip,
-    .sx-tool:focus-visible .sx-tool-tip {
+    .sx-tool-tip {
       position: static;
       opacity: 1;
       transform: none;
@@ -777,14 +734,6 @@ body {
       padding: 0;
       font-size: 11px;
       line-height: 14px;
-    }
-    .sx-tool[aria-pressed='true']::before {
-      left: 12px;
-      right: 12px;
-      top: auto;
-      bottom: -6px;
-      width: auto;
-      height: 3px;
     }
     .sx-view {
       margin: 0 6px;
@@ -873,9 +822,6 @@ body {
     .sx-player {
       min-height: 56px;
     }
-    .sx-speed select {
-      height: 44px;
-    }
     .sx-scrub {
       height: 44px;
     }
@@ -911,9 +857,6 @@ body {
       order: 10;
       flex-basis: 100%;
       margin: 0;
-    }
-    .sx-speed {
-      margin-left: auto;
     }
   }
 }
@@ -1000,11 +943,9 @@ body {
   }
   /* In the panel's place it is the panel's own box (same fill, border and shadow). */
   .sx-orb-wrap[data-mode='panel'] .sx-orb {
-    background: #050506;
-    border-color: #262629;
-    box-shadow:
-      0 24px 70px #000f,
-      0 2px 12px #000b;
+    background: var(--s1);
+    border-color: var(--line);
+    box-shadow: none;
   }
   .sx-orb-glow {
     position: absolute;
@@ -1041,34 +982,17 @@ body {
     justify-content: center;
   }
   .sx-orb-in[data-mode='thinking'] {
-    padding: 12px 18px 12px 15px;
-    min-height: 50px;
+    padding: 8px 16px;
+    gap: 10px;
   }
-  .sx-orb-in[data-mode='panel'] {
-    opacity: 0;
-  }
-  .sx-orb-label {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    line-height: 1.2;
-    min-width: 0;
-  }
-  .sx-orb-label b {
+  .sx-orb-word {
     font-size: 14px;
     font-weight: 500;
     color: #fff;
     white-space: nowrap;
   }
-  .sx-orb-label span {
-    margin-top: 2px;
-    font-size: 12.5px;
-    line-height: 1.35;
-    color: var(--color-sx-mfg);
-    max-width: 270px;
-  }
-  .sx-orb-wait {
-    color: var(--color-sx-dim-text);
+  .sx-orb-in[data-mode='panel'] {
+    opacity: 0;
   }
   /* The panel is laid out (so the island knows its box) but waits for the island to arrive. */
   .sx-panel {
@@ -1251,7 +1175,7 @@ body {
   }
   .sx-bp-head {
     position: relative;
-    z-index: 2;
+    z-index: 5; /* above the mould cover (.sx-mould), so the header and its close button stay usable */
     display: flex;
     justify-content: space-between;
     gap: 10px;
@@ -1312,8 +1236,8 @@ body {
   }
   .sx-bp-tool[aria-pressed='true'],
   .sx-bp-tool[aria-pressed='true']:hover {
-    background: #4ade8026;
-    color: var(--color-sx-green);
+    background: var(--ac);
+    color: var(--on-ac);
   }
   .sx-bp-sep {
     width: 1px;
@@ -1344,18 +1268,6 @@ body {
   }
   .sx-bp-stage:active {
     cursor: grabbing;
-  }
-  .sx-bp-loading {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-content: center;
-    justify-items: center;
-    gap: 14px;
-    pointer-events: none;
-    color: var(--color-sx-mfg);
-    font-size: 12.5px;
-    text-align: center;
   }
   .sx-bp-status {
     padding: 0 18px 8px;
@@ -1410,10 +1322,10 @@ body {
     width: min(340px, calc(100% - 48px));
     max-height: calc(100% - 160px);
     overflow-y: auto;
-    background: #242729;
-    border: 1px solid #323a3e;
-    border-radius: 18px;
-    padding: 14px 16px 16px;
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
     box-shadow: 0 18px 50px #000b;
     transform-origin: top right;
     animation: sx-pop-in 0.45s var(--sx-spring);
@@ -1423,6 +1335,7 @@ body {
     outline: none;
   }
   .sx-bp-pop[data-w='acc'],
+  .sx-bp-pop[data-w='hear'],
   .sx-bp-pop[data-w='details'] {
     width: min(400px, calc(100% - 48px));
   }
@@ -1519,13 +1432,14 @@ body {
     box-shadow: inset 0 0 0 1px var(--color-sx-border);
   }
   .sx-bp-actions .sx-btn-sm[aria-pressed='true'] {
-    box-shadow: inset 0 0 0 1px #4ade8088;
-    color: var(--color-sx-green);
+    background: var(--ac);
+    box-shadow: none;
+    color: var(--on-ac);
   }
   .sx-bp-details {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 18px;
   }
   .sx-bp-details[hidden] {
     display: none;
@@ -1668,11 +1582,10 @@ body {
     align-items: center;
     gap: 4px;
     height: 56px;
-    border-radius: 18px;
-    background: #242729;
-    border: 1px solid #323a3e;
-    box-shadow: 0 10px 28px #0007;
-    color: #c1c9cd;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--s1) 92%, transparent);
+    border: 1px solid var(--line);
+    color: var(--muted);
   }
   .sx-zoom {
     left: 16px;
@@ -1688,11 +1601,11 @@ body {
       transform 0.25s var(--sx-spring),
       background 0.2s;
   }
-  .sx-btn-i:enabled:hover,
+  .sx-fl .sx-btn-i:enabled:hover,
   .sx-zval:enabled:hover,
   .sx-dtool:enabled:hover {
-    background: #2f3538;
-    color: #fff;
+    background: var(--s2);
+    color: var(--fg);
   }
   .sx-btn-i:active {
     transform: scale(0.88);
@@ -1701,8 +1614,10 @@ body {
     min-width: 54px;
     height: 32px;
     border-radius: 10px;
-    font: 12px var(--font-mono);
-    color: #c1c9cd;
+    font-family: inherit;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
   }
   .sx-btn-i:disabled,
   .sx-zval:disabled,
@@ -1718,17 +1633,17 @@ body {
   .sx-dock {
     left: 50%;
     transform: translateX(-50%);
-    height: 58px;
-    padding: 0 9px;
+    height: 56px;
+    padding: 0 7px;
     gap: 6px;
-    border-radius: 22px;
+    border-radius: 10px;
   }
   .sx-vsep {
     display: block;
     flex: none;
     width: 1px;
     height: 24px;
-    background: #323a3e;
+    background: var(--line);
     margin: 0 5px;
   }
   .sx-dtool {
@@ -1737,8 +1652,8 @@ body {
     place-items: center;
     width: 42px;
     height: 42px;
-    border-radius: 14px;
-    color: #c1c9cd;
+    border-radius: 8px;
+    color: var(--muted);
     transition:
       background 0.2s,
       transform 0.25s var(--sx-spring);
@@ -1747,7 +1662,7 @@ body {
     transform: scale(0.9);
   }
   .sx-dtool[data-active='true'] {
-    color: #fff;
+    color: var(--fg);
   }
   .sx-dtool[data-active='true']::before {
     content: '';
@@ -1759,9 +1674,9 @@ body {
     border-radius: 3px;
     background: var(--color-sx-green);
   }
-  .sx-dtool[aria-pressed='true'] {
-    color: var(--color-sx-green);
-    background: #2f3538;
+  .sx-dtool[aria-pressed='true']:not(.sx-sdock-tool) {
+    color: var(--on-ac);
+    background: var(--ac);
   }
 
   /* Desktop, while the build is open: the rail and the RA/Dec readout step aside (the mock-up's
@@ -2052,12 +1967,12 @@ body {
   width: min(400px, calc(100% - 24px));
   max-height: calc(100% - 72px);
   overflow-y: auto;
-  background: var(--color-sx-card);
-  border: 1px solid var(--color-sx-border);
-  border-radius: 18px;
-  padding: 14px 16px 16px;
+  background: var(--s1);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 20px;
   box-shadow: 0 18px 50px #000b;
-  color: var(--color-sx-mfg);
+  color: var(--muted);
   font-size: 12.5px;
   line-height: 1.5;
   text-align: left;
@@ -2073,8 +1988,8 @@ body {
     bottom: 0;
     width: 100%;
     max-height: 85vh;
-    border-radius: 18px 18px 0 0;
-    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    border-radius: 10px 10px 0 0;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
   }
 }
 .sx-pop-h {
@@ -2106,18 +2021,6 @@ body {
 .sx-acc-close:focus-visible {
   outline: 2px solid var(--color-sx-blue);
 }
-.sx-acc-top {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin: 2px 0 10px;
-}
-.sx-acc-top .n {
-  font: 600 34px/1 var(--font-sans, system-ui);
-  letter-spacing: -0.02em;
-  color: #fff;
-  font-variant-numeric: tabular-nums;
-}
 .sx-acc-bar {
   display: flex;
   gap: 2px;
@@ -2131,31 +2034,6 @@ body {
   display: block;
   height: 100%;
   min-width: 0;
-}
-.sx-acc-key {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 6px 10px;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.sx-acc-key b {
-  font:
-    600 12.5px ui-monospace,
-    monospace;
-  color: #fff;
-  text-align: right;
-}
-.sx-acc-key small {
-  display: block;
-  font-size: 11px;
-  color: var(--color-sx-dim-text);
-}
-.sx-acc-sw {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  display: inline-block;
 }
 .sx-acc-eq {
   display: block;
@@ -2188,16 +2066,6 @@ body {
 .sx-acc-tex .katex-display {
   margin: 0.3em 0;
 }
-.sx-acc-gate {
-  list-style: none;
-  margin: 0 0 8px;
-  padding: 0;
-  font-size: 12px;
-  color: #c9d1d5;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
 .sx-acc-gv {
   display: inline-block;
   min-width: 26px;
@@ -2218,9 +2086,6 @@ body {
   font-size: 11.5px;
   color: var(--color-sx-dim-text);
   margin: 0 0 12px;
-}
-.sx-acc-last {
-  margin: 10px 0 0;
 }
 .sx-acc-tbl {
   width: 100%;
@@ -2502,44 +2367,2224 @@ body {
   min-height: 32px;
   accent-color: var(--color-sx-green);
 }
-.sx-ctl-opts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
 .sx-ctl-btn {
   background: var(--color-sx-muted);
   color: var(--color-sx-fg);
   box-shadow: inset 0 0 0 1px var(--color-sx-border);
 }
 .sx-ctl-btn[aria-pressed='true'] {
-  box-shadow: inset 0 0 0 1px #4ade8088;
-  color: var(--color-sx-green);
+  background: var(--ac);
+  box-shadow: none;
+  color: var(--on-ac);
 }
 .sx-ctl-why {
   font-size: 11px;
   color: #9aa4a9;
 }
-.sx-bctl-note summary {
-  min-height: 32px;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  font-size: 12px;
-  color: #c1c9cd;
-}
-.sx-bctl-note p {
-  font-size: 11.5px;
-  color: #9aa4a9;
-  margin: 0 0 6px;
-}
 @media (pointer: coarse) {
-  .sx-ctl-range,
-  .sx-bctl-note summary {
+  .sx-ctl-range {
     min-height: 44px;
   }
 }
 
 .sx-acc-dim td {
   opacity: 0.45;
+}
+
+/* D-38 panel controls and the Accuracy / Details cards (approved preview: panels-preview.html).
+   Unlayered on purpose: it wins over the older component rules above. */
+.sx-eyebrow {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.sx-pc-grp {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sx-seg {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--s2);
+  border: 1px solid var(--line);
+}
+.sx-seg-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: 0;
+  border-radius: 6px;
+  background: var(--ac);
+  z-index: 0;
+  will-change: transform, width;
+  pointer-events: none;
+}
+.sx-seg button {
+  position: relative;
+  z-index: 1;
+  min-height: 40px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 4px 8px;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: color 0.2s var(--ease);
+}
+.sx-seg-wrap {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 4px;
+}
+.sx-seg-wrap .sx-seg-thumb {
+  display: none;
+}
+.sx-seg-wrap button[aria-pressed='true'] {
+  background: var(--ac);
+}
+.sx-seg button:hover:not(:disabled) {
+  color: var(--fg);
+}
+.sx-seg button[aria-pressed='true'] {
+  color: var(--on-ac);
+}
+.sx-seg button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sx-seg button:focus-visible,
+.sx-switch:focus-visible,
+.sx-row-t:focus-visible,
+.sx-btn-outline:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sx-sw-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px 0 12px;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg);
+}
+.sx-switch {
+  position: relative;
+  width: 46px;
+  height: 28px;
+  border-radius: 14px;
+  border: 0;
+  background: var(--s3);
+  cursor: pointer;
+  flex: none;
+  transition: background 0.25s var(--ease);
+}
+.sx-switch i {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--muted);
+  transition:
+    transform 0.35s var(--spring),
+    width 0.2s var(--ease),
+    background 0.25s var(--ease);
+}
+.sx-switch:active:not(:disabled) i {
+  width: 24px;
+}
+.sx-switch[aria-checked='true'] {
+  background: var(--accent);
+}
+.sx-switch[aria-checked='true'] i {
+  transform: translateX(18px);
+  background: var(--bg);
+}
+.sx-switch[aria-checked='true']:active:not(:disabled) i {
+  transform: translateX(14px);
+}
+.sx-switch:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sx-btn-outline {
+  min-height: 40px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  cursor: pointer;
+  transition:
+    transform 0.2s var(--spring),
+    background 0.2s var(--ease);
+}
+.sx-btn-outline:hover {
+  background: var(--s2);
+}
+.sx-btn-outline:active {
+  transform: scale(0.98);
+}
+.sx-btn-outline svg {
+  color: var(--muted);
+}
+.sx-flare {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--muted);
+}
+.sx-flare b {
+  color: var(--fg);
+  font-weight: 600;
+}
+.sx-tagbadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  background: var(--s3);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.sx-tagbadge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dot, var(--p-phys));
+}
+.sx-rows {
+  border-top: 1px solid var(--line);
+  margin: 0 -20px;
+}
+.sx-row {
+  border-bottom: 1px solid var(--line);
+}
+.sx-row:last-child {
+  border-bottom: 0;
+}
+.sx-row-t {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: none;
+  border: 0;
+  padding: 0 20px;
+  cursor: pointer;
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+}
+.sx-row-t:hover {
+  background: var(--s2);
+}
+.sx-row-r {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.sx-row-r svg {
+  transition: transform 0.3s var(--ease);
+}
+.sx-row-t[aria-expanded='true'] .sx-row-r svg {
+  transform: rotate(180deg);
+}
+.sx-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.3s var(--ease),
+    opacity 0.3s var(--ease);
+}
+.sx-reveal.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.sx-reveal > div {
+  overflow: hidden;
+  min-height: 0;
+}
+.sx-reveal-in {
+  padding: 2px 20px 16px;
+  font-size: 14px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sx-reveal-in p,
+.sx-bp-pop .sx-reveal-in p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+.sx-chart {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  background: var(--s2);
+}
+.sx-bp-pop .sx-pop-h,
+.sx-acc-pop .sx-pop-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-bottom: 0;
+}
+.sx-bp-pop .sx-pop-h b,
+.sx-acc-pop .sx-pop-h b {
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.sx-bp-pop .sx-pop-h span,
+.sx-acc-pop .sx-pop-h span {
+  flex: none;
+  margin-left: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+.sx-bp-pop .sx-bp-details,
+.sx-bp-pop .sx-acc-inline,
+.sx-acc-pop {
+  gap: 18px;
+}
+.sx-acc-inline,
+.sx-acc-pop {
+  display: flex;
+  flex-direction: column;
+}
+.sx-acc-pop {
+  gap: 18px;
+}
+/* Accuracy */
+.sx-acc-bar {
+  height: 10px;
+  gap: 2px;
+  border-radius: 0;
+  overflow: visible;
+  background: none;
+  margin: 0;
+}
+.sx-acc-bar i {
+  border-radius: 2px;
+  transform-origin: left;
+  animation: sx-acc-fill 0.5s var(--spring) both;
+}
+.sx-acc-bar i:nth-child(2) {
+  animation-delay: 0.04s;
+}
+.sx-acc-bar i:nth-child(3) {
+  animation-delay: 0.08s;
+}
+@keyframes sx-acc-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+.sx-acc-leg {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.sx-acc-leg > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sx-acc-leg span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.sx-acc-leg span i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  display: block;
+}
+.sx-acc-leg strong {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.sx-acc-leg small {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.sx-acc-formula {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--s2);
+}
+.sx-acc-formula .sx-acc-tex,
+.sx-reveal-in .sx-acc-tex {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: var(--fg);
+  text-align: center;
+}
+.sx-reveal-in .sx-acc-tex {
+  background: var(--s2);
+  border-radius: 8px;
+  padding: 12px;
+}
+.sx-acc-formula .sx-acc-tex .katex {
+  font-size: 1.25em;
+}
+.sx-acc-vars {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  font-size: 13.5px;
+  color: var(--muted);
+  align-items: baseline;
+  margin: 0;
+}
+.sx-acc-vars dt {
+  color: var(--fg);
+  text-align: right;
+  white-space: nowrap;
+}
+.sx-acc-vars dd {
+  margin: 0;
+}
+.sx-acc-vars .sx-acc-tex {
+  text-align: right;
+}
+.sx-acc-vars .katex-display {
+  display: inline;
+  margin: 0;
+}
+.sx-acc-gate2 {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--fg);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sx-acc-gate2 li {
+  display: flex;
+  gap: 10px;
+}
+.sx-acc-gate2 .sx-acc-gv {
+  width: 30px;
+  min-width: 30px;
+  flex: none;
+  margin: 0;
+  font: 600 14px var(--font-sans, inherit);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.sx-acc-gv.ok {
+  color: var(--ok);
+}
+.sx-acc-gv.no {
+  color: var(--fail);
+}
+.sx-reveal-in .sx-acc-tbl {
+  font-size: 13px;
+}
+.sx-reveal-in .sx-acc-rules,
+.sx-bp-pop .sx-reveal-in .sx-acc-rules {
+  font-size: 13px;
+  margin: 0;
+  color: var(--muted);
+}
+.sx-reveal-in .sx-acc-tbl td {
+  color: var(--fg);
+  border-top-color: var(--line);
+}
+.sx-reveal-in .sx-acc-tbl th {
+  font: 500 11px var(--font-sans, inherit);
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+@media (pointer: coarse) {
+  .sx-seg button,
+  .sx-sw-row,
+  .sx-btn-outline,
+  .sx-row-t {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sx-acc-bar i,
+  .sx-reveal,
+  .sx-switch,
+  .sx-switch i,
+  .sx-row-r svg,
+  .sx-btn-outline {
+    animation: none;
+    transition-duration: 0.01ms;
+  }
+}
+
+/* Star Details: one compact row of flare controls, and the compact flare chart with its player. */
+.sx-flare-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.sx-flare-row .sx-pc-grp {
+  gap: 0;
+}
+.sx-flare-row .sx-seg button {
+  min-height: 28px;
+  font-size: 13px;
+  padding: 2px 12px;
+}
+.sx-act {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--s2);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.sx-act svg {
+  color: var(--muted);
+}
+.sx-act:hover:not(:disabled) {
+  background: var(--s3);
+}
+.sx-act[aria-pressed='true'] {
+  background: var(--ac);
+  border-color: transparent;
+  color: var(--on-ac);
+}
+.sx-act:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sx-act:focus-visible,
+.sx-play:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sx-flare-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sx-flare-legend {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sx-flare-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sx-flare-legend i {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+}
+.sx-flare-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sx-play {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--s2);
+  color: var(--fg);
+  cursor: pointer;
+}
+.sx-play:hover {
+  background: var(--s3);
+}
+.sx-flare-range {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--ac);
+}
+.sx-flare-time {
+  flex: none;
+  min-width: 52px;
+  text-align: right;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+@media (pointer: coarse) {
+  .sx-flare-row .sx-seg button {
+    min-height: 36px;
+  }
+  .sx-act,
+  .sx-play {
+    min-height: 44px;
+  }
+  .sx-play {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* Hear it panel (approved preview, panels-preview.html). */
+.sx-hr,
+.sx-hr-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sx-hr {
+  margin-top: 14px;
+}
+.sx-hr-pane[hidden] {
+  display: none;
+}
+.sx-hr-viz {
+  position: relative;
+  border-radius: 8px;
+  background: var(--s2);
+  overflow: hidden;
+}
+.sx-hr-viz canvas {
+  display: block;
+  width: 100%;
+}
+.sx-hr-viz canvas:not([role]) {
+  height: 44px;
+}
+.sx-hr-viz canvas[data-testid='hear-atmo-canvas'] {
+  height: 110px;
+}
+.sx-hr-viz canvas[data-testid='hear-spec-canvas'] {
+  height: 150px;
+}
+.sx-hr-cap {
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.sx-hr-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sx-hr-grow {
+  flex: 1;
+  min-width: 0;
+}
+.sx-hr-grow .sx-seg {
+  width: 100%;
+}
+.sx-hr-play {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--s2);
+  color: var(--fg);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex: none;
+  transition: transform 0.2s var(--spring);
+}
+.sx-hr-play:hover:not(:disabled) {
+  background: var(--s3);
+}
+.sx-hr-play:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.sx-hr-play:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+.sx-hr-play[aria-pressed='true'] {
+  background: var(--ac);
+  color: var(--on-ac);
+  border-color: transparent;
+}
+.sx-hr-play:focus-visible,
+.sx-hr-player input[type='range']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sx-hr-player input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.sx-hr-player input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--s3);
+}
+.sx-hr-player input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--s3);
+}
+.sx-hr-player input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--fg);
+  border: 0;
+}
+.sx-hr-player input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--fg);
+  border: 0;
+}
+.sx-hr-t {
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 64px;
+  text-align: right;
+}
+.sx-hr-hint {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+.sx-hr-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.sx-hr-facts div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--s2);
+}
+.sx-hr-facts span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sx-hr-facts b {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.sx-hr-reach {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sx-hr-reach-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sx-hr-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--s3);
+  overflow: hidden;
+}
+.sx-hr-bar i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 4px;
+  background: var(--p-phys);
+  transition: width 0.5s var(--spring);
+}
+.sx-hr-ax {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sx-hr-imag {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  background: var(--s3);
+  border-radius: 4px;
+  padding: 2px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.sx-hr-imag::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--p-asm);
+}
+.sx-bp-pop .sx-hr-empty {
+  font-size: 14px;
+  color: var(--muted);
+  padding: 18px;
+  border-radius: 8px;
+  background: var(--s2);
+  margin: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sx-hr-play,
+  .sx-hr-bar i {
+    transition-duration: 0.01ms;
+  }
+}
+.sx-bp-live {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wave);
+  flex: none;
+}
+
+/* ---- Floating layout (mock-up `.fl`: player top left, readout top right, zoom bottom left, dock
+   bottom centre, island bottom right) over the full-bleed sky. Surfaces are the design language's
+   (D-38): --s1 at 92 %, --line border, 10 px radius, no glow; 16 px from the bezel edge. ---- */
+@layer components {
+  .sx-zoom-slot {
+    display: contents;
+  }
+  .sx-bezel[data-split] .sx-zoom-slot {
+    display: none;
+  }
+  /* The RA/Dec card, with the frame's wavelength and date under it. */
+  .sx-coords-wrap {
+    text-align: right;
+    transition: opacity 0.35s;
+  }
+  .sx-coords {
+    display: inline-block;
+    padding: 9px 14px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--s1) 92%, transparent);
+    border: 1px solid var(--line);
+    font-size: 12px;
+    line-height: 18px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    text-align: left;
+  }
+  .sx-coords b {
+    font-weight: 500;
+    color: var(--fg);
+  }
+  .sx-coords-k {
+    color: var(--fg);
+    text-decoration: none;
+  }
+  .sx-coords-sub {
+    margin-top: 6px;
+    padding-right: 2px;
+    font-size: 11px;
+    line-height: 16px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 2px #000;
+  }
+  /* The survey credit is a popover behind the info button next to the zoom card (D-35). */
+  .sx-sky-credit {
+    background: color-mix(in srgb, var(--s1) 96%, transparent);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font: inherit;
+    font-size: 12px;
+    line-height: 18px;
+    color: var(--muted);
+    padding: 10px 12px;
+    gap: 6px;
+    pointer-events: auto;
+  }
+  .sx-sky-credit[hidden] {
+    display: none;
+  }
+  .sx-credit-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    min-width: 0;
+  }
+  .sx-credit-text {
+    flex: 1 1 100%;
+  }
+  .sx-credit-btn {
+    position: absolute;
+    z-index: 26;
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--s1) 92%, transparent);
+    border: 1px solid var(--line);
+  }
+  .sx-credit-btn:hover,
+  .sx-credit-btn[aria-expanded='true'] {
+    background: var(--s2);
+    color: var(--fg);
+  }
+  .sx-credit-btn:focus-visible {
+    outline: 2px solid var(--color-sx-green);
+    outline-offset: 2px;
+  }
+  /* The object / flipbook card and the selected object's card take the mock-up's island place. */
+  .sx-panel,
+  .sx-island {
+    background: color-mix(in srgb, var(--s1) 92%, transparent);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: none;
+  }
+  .sx-island-head h2 {
+    color: var(--fg);
+  }
+}
+
+@media (min-width: 641px) {
+  @layer components {
+    .sx-bezel {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+      grid-template-areas: none;
+    }
+    /* No bars: the cards carry their own surface, so the sky needs no dark edges. */
+    .sx-sky-shade {
+      display: none;
+    }
+    .sx-top {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 20;
+      display: grid;
+      justify-items: end;
+      gap: 8px;
+      padding: 0;
+      width: auto;
+      max-width: min(26rem, 40%);
+    }
+    /* Bottom left, so it never sits on the Accuracy / Details / Hear it panel titles at the top right. */
+    .sx-top > [data-testid='fixture-banner'] {
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      z-index: 30;
+      width: min(24rem, 40vw);
+      flex: none;
+      pointer-events: none;
+    }
+    .sx-transport-slot {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 20;
+      padding: 0;
+      max-width: calc(100% - 32px - min(26rem, 40%) - 16px);
+    }
+    .sx-bezel[data-split] .sx-coords-wrap {
+      opacity: 0;
+    }
+    /* Panels float at the bottom right, below the readout card. */
+    .sx-panel {
+      top: auto;
+      right: 16px;
+      bottom: 16px;
+      width: min(440px, calc(100% - 32px));
+      max-height: calc(100% - 16px - 112px);
+    }
+    .sx-panel-wide {
+      left: 16px;
+      right: auto;
+      width: min(680px, calc(100% - 32px));
+    }
+    .sx-island-wrap {
+      top: auto;
+      left: auto;
+      right: 16px;
+      bottom: 78px;
+      transform: none;
+    }
+    .sx-sky-status {
+      top: auto;
+      bottom: 88px;
+    }
+    /* The info button sits right of the zoom card; its popover opens above them. */
+    .sx-credit-btn {
+      left: 174px;
+      bottom: 24px;
+    }
+    .sx-sky-credit {
+      left: 16px;
+      bottom: 76px;
+      width: max-content;
+      max-width: min(30rem, calc(100% - 32px));
+    }
+    .sx-zoom {
+      height: 48px;
+    }
+    /* ---- the dock: tools, a divider, then a search that opens when it takes focus ---- */
+    .sx-sdock {
+      transition: left 0.6s var(--sx-spring);
+    }
+    /* Clear of the card that opens at the bottom right (the mock-up slides its dock left). */
+    /* Centred; it only slides left when the card at the bottom right (424 px with its gap) would
+       overlap it: half the dock is about 125 px (the search open is wider, it grows over the gap). */
+    .sx-bezel:has(.sx-panel, .sx-island-wrap) .sx-sdock {
+      left: max(340px, min(50%, calc(100% - 565px)));
+    }
+    .sx-sdock-inner {
+      position: relative;
+    }
+    .sx-sdock .sx-hl {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      background: var(--s3);
+    }
+    .sx-sdock .sx-tool-tip {
+      position: absolute;
+      left: 50%;
+      top: auto;
+      bottom: calc(100% + 18px);
+      z-index: 60;
+      background: var(--fg);
+      color: var(--bg);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 9px;
+      border-radius: 6px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateX(-50%) translateY(4px);
+      transition:
+        opacity 0.15s,
+        transform 0.3s var(--sx-spring);
+    }
+    .sx-sdock .sx-dtool:hover .sx-tool-tip,
+    .sx-sdock .sx-dtool:focus-visible .sx-tool-tip {
+      opacity: 1;
+      transform: translateX(-50%);
+    }
+    .sx-sdock .sx-search-slot {
+      position: relative;
+      flex: none;
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      border-radius: 8px;
+      transition:
+        width 0.45s var(--sx-spring),
+        background 0.2s;
+    }
+    .sx-sdock .sx-search-slot:hover {
+      background: var(--s2);
+    }
+    .sx-sdock .sx-search-slot:focus-within {
+      width: 300px;
+      background: var(--s2);
+      z-index: 30;
+    }
+    .sx-sdock .sx-search {
+      height: 100%;
+    }
+    .sx-sdock .sx-search-form {
+      position: absolute;
+      inset: 0;
+    }
+    .sx-sdock .sx-search-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      padding: 0 80px 0 42px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: transparent;
+      caret-color: transparent;
+      cursor: pointer;
+      box-shadow: none;
+    }
+    .sx-sdock .sx-search-input::placeholder {
+      color: transparent;
+    }
+    .sx-sdock .sx-search-input:focus {
+      color: var(--fg);
+      caret-color: var(--accent);
+      cursor: text;
+      background: var(--s2);
+      border: 0;
+      box-shadow: inset 0 0 0 1px var(--accent);
+    }
+    .sx-sdock .sx-search-input:focus::placeholder {
+      color: var(--muted);
+    }
+    .sx-sdock .sx-search-input[aria-invalid='true'] {
+      box-shadow: inset 0 0 0 1px var(--color-fail);
+    }
+    .sx-sdock .sx-search-icon {
+      left: 12px;
+      top: 12px;
+      z-index: 1;
+      color: var(--muted);
+    }
+    .sx-sdock .sx-search-slot:hover .sx-search-icon,
+    .sx-sdock .sx-search-slot:focus-within .sx-search-icon {
+      color: var(--fg);
+    }
+    .sx-sdock .sx-kbd,
+    .sx-sdock .sx-search-go {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s 0.1s;
+    }
+    .sx-sdock .sx-kbd {
+      right: 44px;
+      top: 10px;
+      background: var(--s3);
+      border-color: var(--line);
+      color: var(--muted);
+    }
+    .sx-sdock .sx-search-slot:focus-within .sx-kbd {
+      opacity: 1;
+    }
+    .sx-sdock .sx-search-go {
+      top: 5px;
+      right: 5px;
+      border-radius: 6px;
+    }
+    .sx-sdock .sx-search-slot:focus-within .sx-search-go {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .sx-sdock .sx-search-pop {
+      bottom: calc(100% + 18px);
+    }
+    /* The list and help it opens sit above the survey credit while the search has focus. */
+    .sx-sdock:focus-within {
+      z-index: 30;
+    }
+    /* Build view: the build pane has its own dock, so the sky's shows only its search (when "/" or
+       its button brings focus), just above it. */
+    .sx-bezel[data-split] .sx-sdock {
+      bottom: 84px;
+    }
+    .sx-bezel[data-split] .sx-sdock .sx-sdock-tools,
+    .sx-bezel[data-split] .sx-sdock .sx-vsep {
+      display: none;
+    }
+    .sx-bezel[data-split] .sx-sdock:not(:focus-within) {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .sx-bezel[data-split] .sx-sdock:focus-within {
+      z-index: 30;
+    }
+  }
+}
+
+/* Phone: the player sits on top under the readout, the dock (tools as a tab bar, then the search)
+   at the bottom; the zoom card is not drawn (pinch zooms). */
+@media (max-width: 640px) {
+  @layer components {
+    .sx-bezel {
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      grid-template-areas: 'top' 'transport' 'view' 'dock';
+    }
+    .sx-coords-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: flex-end;
+      gap: 0 10px;
+    }
+    .sx-coords {
+      padding: 6px 10px;
+    }
+    .sx-sdock {
+      grid-area: dock;
+      position: static;
+      transform: none;
+      left: auto;
+      bottom: auto;
+      height: auto;
+      width: auto;
+      margin: 0 6px;
+      padding: 6px;
+      gap: 6px;
+      flex-direction: column;
+      align-items: stretch;
+      display: flex;
+    }
+    .sx-sdock .sx-vsep {
+      display: none;
+    }
+    .sx-sdock-tools ul {
+      display: flex;
+      gap: 4px;
+    }
+    .sx-sdock-tools li {
+      flex: 1 1 0;
+    }
+    .sx-sdock-tool {
+      width: 100%;
+      height: 52px;
+      grid-template-rows: auto auto;
+      align-content: center;
+      gap: 2px;
+    }
+    .sx-sdock .sx-hl {
+      border-radius: 8px;
+      background: var(--s3);
+    }
+    .sx-sdock .sx-tool-tip {
+      position: static;
+      opacity: 1;
+      transform: none;
+      background: none;
+      color: inherit;
+      padding: 0;
+      font-size: 11px;
+      line-height: 14px;
+    }
+    .sx-sdock-tool[data-active='true']::before {
+      left: 12px;
+      right: 12px;
+      bottom: 2px;
+    }
+    .sx-sdock .sx-search-slot {
+      grid-area: auto;
+      padding: 0;
+    }
+    .sx-sdock .sx-search-input {
+      border-radius: 8px;
+      background: var(--s2);
+      border: 1px solid var(--line);
+    }
+    .sx-sdock .sx-search-input:focus {
+      border-color: var(--accent);
+      box-shadow: none;
+    }
+    .sx-credit-btn {
+      left: 8px;
+      bottom: 8px;
+    }
+    .sx-sky-credit {
+      left: 8px;
+      right: 8px;
+      bottom: 48px;
+      max-width: none;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: color-mix(in srgb, var(--s1) 96%, transparent);
+      padding: 10px 12px;
+    }
+    .sx-island-wrap {
+      top: auto;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+  }
+}
+
+/* ---- Discovery (the mock-up's area tool): drawing cursor, the square, the two options ---- */
+@layer components {
+  .sx-area-sq {
+    position: absolute;
+    z-index: 5;
+    pointer-events: none;
+    box-sizing: border-box;
+    /* The mock-up's area square: green #4ade80, 1.2 px, a very light green fill. */
+    border: 1.2px solid #4ade80;
+    border-radius: 0;
+    background: #4ade800b;
+  }
+}
+
+@layer components {
+  /* Mock-up widths: 380 while drawing, 408 once the square is set. */
+  .sx-panel[data-testid='area-card'] {
+    width: min(408px, calc(100% - 64px));
+  }
+}
+
+/* Refined Flipbook card and the state pills (approved preview: fb/template.html). Unlayered. */
+.sx-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  align-self: flex-start;
+  border-radius: 9999px;
+  background: #000;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+}
+.sx-panel[data-bare] {
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--s1);
+  border-color: var(--line);
+}
+.sx-panel[data-bare] .sx-panel-body {
+  padding: 0;
+  gap: 0;
+}
+.sx-panel[data-bare]:focus {
+  outline: none;
+}
+.fb-view {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  background: #000;
+  overflow: hidden;
+  flex: none;
+}
+.fb-view:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.fb-over {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  pointer-events: none;
+}
+.fb-name {
+  margin: 0;
+  min-width: 0;
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  background: rgba(8, 9, 11, 0.72);
+  padding: 5px 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fb-x {
+  pointer-events: auto;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 0;
+  background: rgba(8, 9, 11, 0.72);
+  color: var(--fg);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.fb-x:hover {
+  background: var(--s2);
+}
+.fb-x:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.fb-cap {
+  position: absolute;
+  bottom: 10px;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--fg);
+  background: rgba(8, 9, 11, 0.72);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.fb-cap-l {
+  left: 10px;
+}
+.fb-cap-r {
+  right: 10px;
+}
+.fb-cap i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: block;
+}
+.fb-cap b {
+  font-weight: 600;
+}
+.fb-cap .fb-dim {
+  color: var(--muted);
+}
+.fb-ring {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  pointer-events: none;
+  z-index: 2;
+}
+.fb-c {
+  padding: 14px 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.fb-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+/* Build it fills its cell so it matches the Picture toggle's full height and corners. */
+.fb-two > .sx-pc-grp {
+  display: flex;
+  flex-direction: column;
+}
+.fb-two .fb-btn-primary {
+  flex: 1;
+  border-radius: 8px;
+}
+.fb-btn-primary {
+  min-height: 40px;
+  border-radius: 6px;
+  border: 0;
+  background: var(--accent);
+  color: #08090b;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition:
+    transform 0.2s var(--spring),
+    filter 0.2s var(--ease);
+}
+.fb-btn-primary:hover {
+  filter: brightness(1.08);
+}
+.fb-btn-primary:active {
+  transform: scale(0.98);
+}
+.fb-btn-primary:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+.fb-spec {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: var(--s2);
+  border-radius: 8px;
+}
+.fb-empty {
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--s2);
+  font-size: 13px;
+  color: var(--muted);
+}
+.fb-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.fb-meta b {
+  color: var(--fg);
+  font-weight: 500;
+}
+.fb-muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.fb-rows {
+  border-top: 1px solid var(--line);
+  margin: 0 -16px;
+}
+.fb-rows .sx-row-t {
+  padding: 0 16px;
+}
+.fb-rows .sx-reveal-in {
+  padding: 2px 16px 16px;
+}
+.fb-ovl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.fb-ov {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg);
+  font-size: 13.5px;
+  cursor: pointer;
+  text-align: left;
+}
+.fb-ov:hover:not(:disabled) {
+  background: var(--s2);
+}
+.fb-ov[aria-pressed='true'] {
+  background: var(--ac);
+  color: var(--on-ac);
+  border-color: transparent;
+}
+.fb-ov:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.fb-ov:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.fb-ov svg {
+  flex: none;
+}
+.fb-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 14px;
+  font-size: 13px;
+  color: var(--muted);
+  align-items: baseline;
+  margin: 0;
+}
+.fb-dl dd {
+  margin: 0;
+  color: var(--fg);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+.fb-wait {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 16px;
+  text-align: center;
+}
+.fb-wait b {
+  font-size: 14px;
+  font-weight: 500;
+}
+.fb-n {
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.fb-prog {
+  display: block;
+  width: 160px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--s3);
+  overflow: hidden;
+}
+.fb-prog i {
+  display: block;
+  height: 100%;
+  background: var(--p-phys);
+  border-radius: 2px;
+  transition: width 0.3s var(--ease);
+}
+.fb-stop {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg);
+  font-size: 13px;
+  cursor: pointer;
+}
+.fb-stop:hover {
+  background: var(--s2);
+}
+.fb-stop:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.fb-fetch {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 44px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(8, 9, 11, 0.85);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.fb-fetch .fb-prog {
+  flex: 1;
+  width: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fb-prog i,
+  .fb-btn-primary {
+    transition: none;
+  }
+}
+.sx-panel[data-bare] .sx-panel-body > * {
+  flex: none;
+}
+
+/* The #track window over the sky (Known objects, Discovery): one canvas, drawn inside the square. */
+.sx-area-track {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 6;
+  pointer-events: none;
+}
+
+/* The "Demo data" tag on the canvas while a demo track is drawn (Q-414). */
+.sx-area-track-tag {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  pointer-events: none;
+}
+
+/* MouldAnimation (build stage): the globe that takes shape while the body is generated, and its hand-over. */
+.sx-mould {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  background: #000;
+  pointer-events: none;
+  transition: background-color 350ms var(--ease);
+}
+.sx-mould[data-leaving] {
+  background-color: transparent;
+}
+.sx-mould-art {
+  position: absolute;
+  inset: 0;
+  transition:
+    opacity 350ms var(--ease),
+    transform 350ms var(--ease);
+}
+.sx-mould-host {
+  position: absolute;
+  inset: 0;
+}
+.sx-mould[data-leaving] .sx-mould-art {
+  opacity: 0;
+  transform: scale(1.12);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sx-mould,
+  .sx-mould-art {
+    transition: none;
+  }
+}
+
+/* The island's pill for a minimised area card: a button that brings the card back. */
+.sx-orb-mini {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  border-radius: 9999px;
+}
+.sx-orb-mini:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ---- Known objects and Discovery cards (the mock-up's `kn-*`, `lk-*`, `ar-steps`), design-language
+   tokens and tonal selection. Demo data: app/area/areaService.ts. ---- */
+.sx-kn-l,
+.sx-kn-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.sx-kn-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #000;
+  image-rendering: pixelated;
+}
+.sx-kn-demo {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 44px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.sx-kn-body {
+  padding-bottom: 20px;
+  gap: 12px;
+}
+.sx-kn-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sx-kn-opts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+.sx-kn-opts[data-off] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.sx-kn-opt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  color: var(--fg);
+  cursor: pointer;
+  user-select: none;
+}
+.sx-kn-opt input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.sx-kn-cb {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid var(--muted);
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.sx-kn-cb svg {
+  width: 12px;
+  height: 12px;
+  stroke: var(--on-ac);
+  stroke-width: 3;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+.sx-kn-opt input:checked + .sx-kn-cb {
+  background: var(--ac);
+  border-color: var(--accent);
+}
+.sx-kn-opt input:checked + .sx-kn-cb svg {
+  opacity: 1;
+}
+.sx-kn-opt input:focus-visible + .sx-kn-cb {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sx-kn-spec {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sx-kn-spec-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sx-kn-spec-t {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sx-kn-spec-h span {
+  font-size: 13px;
+  font-weight: 600;
+}
+.sx-kn-spec-h small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sx-kn-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  background: var(--s2);
+}
+.sx-kn-grid {
+  stroke: var(--line);
+}
+.sx-kn-tick {
+  fill: var(--muted);
+  font-size: 10px;
+}
+.sx-kn-cur {
+  stroke: var(--fg);
+  stroke-width: 1.4;
+}
+.sx-kn-spec-none {
+  margin: 0;
+  display: grid;
+  place-items: center;
+  height: 96px;
+  border-radius: 6px;
+  background: var(--s2);
+  color: var(--muted);
+  font-size: 13px;
+}
+.sx-kn-det {
+  border-radius: 6px;
+  background: var(--s2);
+}
+.sx-kn-det[data-off] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.sx-kn-det summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  font-weight: 500;
+  border-radius: 6px;
+}
+.sx-kn-det summary::-webkit-details-marker {
+  display: none;
+}
+.sx-kn-det summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sx-kn-det summary span + span {
+  color: var(--muted);
+  font-weight: 400;
+}
+.sx-kn-det summary span + span::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 9px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.2s;
+}
+.sx-kn-det[open] summary span + span::after {
+  transform: translateY(1px) rotate(-135deg);
+}
+.sx-kn-dets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+.sx-kn-detb {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--s3);
+  border: 1px solid transparent;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.sx-kn-detb:hover:not(:disabled) {
+  background: var(--s1);
+}
+.sx-kn-detb:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sx-kn-detb:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sx-kn-detb b {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+.sx-kn-detb small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.sx-kn-rd {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  flex: none;
+  position: relative;
+}
+.sx-kn-detb[aria-checked='true'] {
+  background: var(--ac);
+  border-color: var(--accent);
+}
+.sx-kn-detb[aria-checked='true'] .sx-kn-rd {
+  border-color: var(--accent);
+}
+.sx-kn-detb[aria-checked='true'] .sx-kn-rd::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.sx-kn-leg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sx-kn-leg span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sx-kn-leg i {
+  display: block;
+  width: 16px;
+  height: 0;
+  border-top: 2px solid var(--p-phys);
+}
+.sx-kn-leg i.d {
+  border-top-style: dashed;
+}
+.sx-kn-leg i.dot {
+  width: 6px;
+  height: 6px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--p-phys);
+}
+.sx-lk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sx-lk-row {
+  display: grid;
+  grid-template-columns: 38px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 6px;
+  background: var(--s2);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.sx-lk-row:hover {
+  background: var(--s3);
+}
+.sx-lk-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sx-lk-row b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sx-lk-row small {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sx-chip {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--s3);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.sx-chip[data-tone='ok'] {
+  background: var(--ac);
+  color: var(--on-ac);
+}
+.sx-chip[data-tone='warn'] {
+  color: var(--warn);
+}
+.sx-ar-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+}
+.sx-ar-steps li {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.sx-ar-steps li i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  display: inline-grid;
+  place-items: center;
+}
+.sx-ar-steps li i svg {
+  width: 9px;
+  height: 9px;
+  stroke: var(--on-ac);
+  stroke-width: 3.4;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  display: none;
+}
+.sx-ar-steps li small {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sx-ar-steps li[data-state='on'] {
+  color: var(--fg);
+}
+.sx-ar-steps li[data-state='on'] i {
+  background: var(--accent);
+  box-shadow: none;
+}
+.sx-ar-steps li[data-state='on'] i svg {
+  display: block;
+  stroke: var(--bg);
+}
+.sx-ar-steps li[data-state='now'] {
+  color: var(--fg);
+}
+.sx-ar-steps li[data-state='now'] i {
+  box-shadow: none;
+  overflow: visible;
+}
+.sx-panel[data-testid='area-card'][data-bare] {
+  width: min(408px, calc(100% - 64px));
+}
+@media (prefers-reduced-motion: reduce) {
+  .sx-kn-det summary span + span::after {
+    transition: none;
+  }
+}
+.sx-kn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+}
+.sx-area-size {
+  position: absolute;
+  left: 1px;
+  top: -20px;
+  font: 500 11px ui-monospace, monospace;
+  color: #4ade80;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sx-kn-body {
+  gap: 10px;
+}
+
+/* Drawing a square (Known objects / Discovery): a small hint above the dock instead of a card. */
+.sx-area-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 124px;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(8, 9, 11, 0.85);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--fg);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.sx-area-hint-keys {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Discovery steps: the current step's smoothui loader (19 px) in an 18 px slot; pending = muted ring. */
+.sx-ar-steps li[data-state='now'] i {
+  width: 19px;
+  height: 19px;
+  margin-left: -0.5px;
+  background: none;
+}
+.sx-ar-wait {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Build view open: the sky's RA/Dec card sat over the build pane's close button and took its clicks.
+   It describes the sky, which the build view covers, so it steps aside while the pane is open. */
+.sx-bezel[data-split] .sx-coords-wrap {
+  visibility: hidden;
+  pointer-events: none;
+}
+.sx-bezel[data-split] .sx-top {
+  pointer-events: none;
 }
