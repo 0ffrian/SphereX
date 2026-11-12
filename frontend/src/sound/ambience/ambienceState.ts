@@ -3,7 +3,7 @@
 // Timers (fade end, 2-minute keep-alive) belong to the loop; the reducer only says what to do.
 //
 //   idle ──(gate on, place not ready)──► waiting ──(place ready)──► baking ──(first bed ready)──► playing
-//   baking/playing ──(gate off)──► fading ──(timer)──► idle        fading ──(gate on)──► baking/playing (fadeIn)
+//   baking/playing ──(gate off)──► fading ──(timer)──► idle        any not audible ──► baking/playing (fadeIn)
 //   any ──(engine failed)──► noSurface        any ──(exception)──► error
 // A world or physics change is a worldKey change inside baking/playing: the mixer crossfades its groups (C5), so it
 // needs no state of its own (blue 11, 12). Nothing in "waiting" is a refusal (R12).
@@ -60,7 +60,10 @@ export function step(prev: AmbienceStatus, i: StepInput): { status: AmbienceStat
   }
   if (!i.placeReady) return { status: 'waiting', effects: fade };
   const status: AmbienceStatus = i.selected > 0 && i.ready === 0 ? 'baking' : 'playing';
-  return { status, effects: prev === 'fading' ? ['fadeIn'] : [] };
+  // B1 (#116 code review): every not-audible → audible step fades in, not only fading → audible. After playing →
+  // waiting → playing (or a remount of the same world) within the fade, the mixer's group is still fading and only
+  // fadeIn revives it; the mixer ignores fadeIn when nothing is fading.
+  return { status, effects: audible(prev) ? [] : ['fadeIn'] };
 }
 
 /** The fade timer fired. */

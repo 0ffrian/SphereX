@@ -6,7 +6,8 @@ import { FakeAudioContext } from '@/test/fakeAudio';
 import { REFUSAL_TEXT } from './airModel';
 import { createAmbienceLoop, SOUND_UNAVAILABLE, type AmbienceUi, type LoopDeps, type PaletteLike } from './ambienceLoop';
 import type { GateInputs } from './ambienceState';
-import { earthAir, makePlace, makeWind, makeWorld } from './fakeEngine.testutil';
+import { ceilingCaption } from './captions';
+import { earthAir, makeFlyEngine, makePlace, makeWind, makeWorld } from './fakeEngine.testutil';
 import { AmbienceMixer } from './mixer';
 import type { WorldEngineWithSpinup } from './place';
 import { FADE_S, REBAKE_DEBOUNCE_MS, STOP_MARGIN_S } from './tuning';
@@ -55,6 +56,8 @@ function setup(over: Partial<LoopDeps> = {}, gate: Partial<GateInputs> = ON) {
     spinup: 0,
     ps: 1,
     fly: { alt: 0.05, lon: 0, lat: 0, head: 0, pitch: 0, auto: false },
+    // R12 readiness as the real engine reports it (the loop's m4 cache keys on it)
+    cpuFields: () => (waiting ? { terrain: null, climate: null, hydro: null } : { terrain: null, climate: { stats: {} }, hydro: {} }),
     state() {
       return { Ps: this.ps, fluid: 'water', gas: false, locked: false, Tstar: 5772, orbit: 1, co2: false };
     },
@@ -255,3 +258,132 @@ describe('ambience loop: weather and captions', () => {
   });
 });
 
+describe('ambience loop: #116 code review fixes', () => {
+  it('M1: at the 400 km fly start (REAL buildAirModel and samplePlace) the ceiling caption shows on the first playing tick', () => {
+    const fe = makeFlyEngine({ fly: { alt: 400 } });
+    const { loop, palette } = setup(
+      { engine: () => fe as unknown as WorldEngineWithSpinup, buildAir: undefined, sample: undefined },
+      { ...ON, audioRunning: false },
+    );
+    ticks(loop, 3); // before the click: the place is sampled and the beds are requested (M16)
+    expect(loop.status()).toBe('idle');
+    expect(palette.requests).toHaveLength(1);
+    palette.bakeAll();
+    loop.setGate({ audioRunning: true }); // the click
+    expect(loop.status()).toBe('playing');
+    // Earth calibration model (H = 8.43 km, Ps = 1 bar): the derived ceiling is about 97 km
+    expect(uis.at(-1)!.caption).toBe(ceilingCaption(earthAir({ P0: 1e5 })));
+    expect(uis.at(-1)!.caption).toMatch(/^Too high: the air here is too thin to carry sound\. Fly below about 97 km to hear it\.$/);
+    const at = uis.length;
+    ticks(loop, 1); // the first playing tick with a mix frame
+    expect(uis.slice(at - 1).every((u) => u.caption.startsWith('Too high'))).toBe(true);
+    ticks(loop, 40);
+    expect(uis.filter((u) => u.status === 'playing').every((u) => u.caption !== '')).toBe(true);
+  });
+
+  it('Q-447: above the ceiling the caption shows while the beds still bake', () => {
+    const fe = makeFlyEngine({ fly: { alt: 400 } });
+    const { loop } = setup({ engine: () => fe as unknown as WorldEngineWithSpinup, buildAir: undefined, sample: undefined });
+    ticks(loop, 1);
+    expect(loop.status()).toBe('baking');
+    expect(uis.at(-1)!.caption).toMatch(/^Too high: .* Fly below about \d+ km to hear it\.$/);
+  });
+
+  it('B2: baking → playing captions the new frame on that tick, not after CAPTION_MIN_S', () => {
+    const { loop, palette } = setup();
+    ticks(loop, 1);
+    expect(loop.status()).toBe('baking');
+    palette.bakeAll();
+    ticks(loop, 1);
+    expect(loop.status()).toBe('playing');
+    expect(uis.at(-1)!.status).toBe('playing');
+    expect(uis.at(-1)!.caption).not.toBe('');
+    expect(uis.at(-1)!.heard.length).toBeGreaterThan(0);
+  });
+
+  it('m1: a place or sampling exception skips the tick and retries; it never latches the soundscape off', () => {
+    const log = vi.fn();
+    let fail = false;
+    const { loop, palette } = setup({
+      log,
+      sample: (_e, a) => {
+        if (fail) throw new Error('arrays swapped');
+        return makePlace(0.05, () => ({ cls: 'land' }), { wind: makeWind({ U10: 9, Uz: 9 }), rainRate: a.P0 > 0 ? 1 : 0, precipPhase: 'rain' });
+      },
+    });
+    ticks(loop, 1);
+    palette.bakeAll();
+    ticks(loop, 1);
+    expect(loop.status()).toBe('playing');
+    fail = true;
+    ticks(loop, 2);
+    expect(loop.status()).toBe('playing');
+    expect(log).toHaveBeenCalledTimes(1);
+    fail = false;
+    const n = published.length;
+    ticks(loop, 1);
+    expect(loop.status()).toBe('playing');
+    expect(published.length).toBe(n + 1);
+    expect(uis.at(-1)!.caption).not.toBe(SOUND_UNAVAILABLE);
+  });
+
+  it('B1: playing → waiting → playing inside the fade revives the same group (no gap, no new sources)', () => {
+    const { loop, palette } = setup();
+    ticks(loop, 1);
+    palette.bakeAll();
+    ticks(loop, 1);
+    const srcs = ctx.sources();
+    engine.spinup = 30; // a respin after a physics change: no place, so waiting
+    ticks(loop, 1);
+    expect(loop.status()).toBe('waiting');
+    expect(mixer.playing).toBe(false);
+    engine.spinup = 0;
+    ticks(loop, 1);
+    expect(loop.status()).toBe('playing');
+    expect(mixer.playing).toBe(true);
+    vi.advanceTimersByTime(5000);
+    expect(srcs.every((x) => x.stopCalls === 0)).toBe(true);
+    expect(ctx.sources()).toHaveLength(srcs.length);
+  });
+
+  it('m3: a remount of the same world while its group fades fades it back in', () => {
+    const first = setup();
+    ticks(first.loop, 1);
+    first.palette.bakeAll();
+    ticks(first.loop, 1);
+    const srcs = ctx.sources();
+    first.loop.dispose();
+    expect(mixer.playing).toBe(false);
+    vi.advanceTimersByTime(200);
+    const second = setup({ palette: () => first.palette }); // the shared palette keeps the beds
+    ticks(second.loop, 1);
+    expect(second.loop.status()).toBe('playing');
+    expect(mixer.playing).toBe(true);
+    vi.advanceTimersByTime(5000);
+    expect(srcs.every((x) => x.stopCalls === 0)).toBe(true);
+  });
+
+  it('m4: during spin-up and R12 waiting the AirModel is built once per change, not every tick', () => {
+    const fe = makeFlyEngine({ spinup: 40, forming: true });
+    const build = vi.fn();
+    const { loop } = setup({
+      engine: () => fe as unknown as WorldEngineWithSpinup,
+      buildAir: () => {
+        build();
+        return fe.forming ? { ...earthAir(), refusals: [{ source: 'all', reason: REFUSAL_TEXT.waiting }] } : earthAir();
+      },
+    });
+    ticks(loop, 20);
+    expect(build).toHaveBeenCalledTimes(1);
+    fe.spinup = 0; // the spin-up ends; the climate is still forming (waiting)
+    ticks(loop, 20);
+    expect(build).toHaveBeenCalledTimes(2);
+    expect(loop.status()).toBe('waiting');
+    fe.forming = false; // EB.ready
+    ticks(loop, 1);
+    expect(build).toHaveBeenCalledTimes(3);
+    expect(loop.status()).toBe('baking');
+    ticks(loop, 20);
+    expect(build).toHaveBeenCalledTimes(3); // settled: physics changes only, debounced
+  });
+});
