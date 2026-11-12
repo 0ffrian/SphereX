@@ -173,10 +173,11 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
     <>
       <div className="sx-pop-h">
         <b>Hear it</b>
-        <span>Brightness becomes pitch</span>
+        <span>Wavelength becomes pitch</span>
       </div>
       <p>
-        A sweep across the object&rsquo;s infrared fingerprint, {range}. Higher pitch is brighter.
+        A sweep across the object&rsquo;s infrared fingerprint, {range}. Short wavelengths sound
+        high, long wavelengths low. Brighter is louder.
         {lines.length > 0 ? ' Bells mark gases and dips.' : ' Quiet dips stay silent.'}
       </p>
       {plan ? (
@@ -184,7 +185,7 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
           ref={canvasRef}
           className="sx-hear-canvas"
           role="img"
-          aria-label={`The spectrum of ${name ?? 'this object'}, ${range}, brightness against colour`}
+          aria-label={`The spectrum of ${name ?? 'this object'}, ${range}, wavelength as pitch, brightness as loudness`}
           data-testid="hear-canvas"
         />
       ) : (

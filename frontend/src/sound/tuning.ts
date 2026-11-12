@@ -45,8 +45,11 @@ export const DEFAULT_PITCH = 0.5;
  */
 export const PITCH_LAMBDA_MIN_UM = 0.75;
 export const PITCH_LAMBDA_MAX_UM = 5.0;
-/** Longer λ sounds higher when true. CREATIVE placeholder — Atish to decide (D-13). */
-export const PITCH_RISES_WITH_WAVELENGTH = true;
+/**
+ * Q-430 (Atish, 12 Nov 2026; amends Q-70): long wavelength = LOW pitch for the sweep, the chord and
+ * Track (Trayford et al. 2023). Short wavelengths sound high.
+ */
+export const PITCH_RISES_WITH_WAVELENGTH = false;
 
 /** R8.9 `measured`: clean tone blip. Length (s) and attack (s): CREATIVE placeholder — Atish to decide (D-13). */
 export const TONE_BLIP_S = 0.04;
@@ -76,8 +79,8 @@ export const DEFAULT_VOLUME = 0.7;
 export const MAX_AUDIO_VOICES = 32;
 /** Engineering: a train's audio clock anchor is reset when it drifts by more than this (s). */
 export const AUDIO_REANCHOR_TOLERANCE_S = 0.05;
-/** Engineering: limiter on the audio master so overlapping sounds do not clip. */
-export const LIMITER_THRESHOLD_DB = -6;
+/** SPEC R13.9 (§11.5): the master limiter (threshold −3 dB, knee 0, ratio 20, attack 3 ms, release 100 ms). */
+export const LIMITER_THRESHOLD_DB = -3;
 export const LIMITER_RATIO = 20;
 export const LIMITER_ATTACK_S = 0.003;
 export const LIMITER_RELEASE_S = 0.1;
@@ -123,3 +126,40 @@ export const SWEEP_PEAK_GAIN = 0.3;
 export const SWEEP_PAN = 0.8;
 /** Gain of a gas-line chime. CREATIVE placeholder — Atish to decide (D-13). */
 export const SWEEP_CHIME_GAIN = 0.3;
+
+// ---------------------------------------------------------------- buses, ducking, stage (R13.9, Q-441)
+
+/** SPEC R13.9: the ambience is ducked by this many dB while any data sound plays. CREATIVE placeholder — Atish to decide (D-13). */
+export const AMBIENCE_DUCK_DB = -9;
+/**
+ * SPEC R13.9: duck attack and release (s), read as ~95 % settle times: `setTargetAtTime` uses
+ * τ = time / DUCK_TAU_DIVISOR. CREATIVE placeholder — Atish to decide (D-13).
+ */
+export const AMBIENCE_DUCK_ATTACK_S = 0.05;
+export const AMBIENCE_DUCK_RELEASE_S = 0.6;
+export const DUCK_TAU_DIVISOR = 3;
+/** Engineering (coordinator ruling): a duck hold is released this long after its longest voice should have ended. */
+export const DUCK_SAFETY_S = 1;
+/** SPEC R13.9 (§11.7): high-pass on the ambience bus, protects laptop and PA speakers. */
+export const AMBIENCE_HIGHPASS_HZ = 35;
+/** SPEC R13.9 (§11.5): default ambience volume (× the master volume). */
+export const AMBIENCE_DEFAULT_VOLUME = 0.5;
+/** Engineering: time constant (s) for ambience level changes (a slider drag). */
+export const AMBIENCE_LEVEL_TAU_S = 0.05;
+/** SPEC R13.9 (§11.7) harmonic branch: input band (Hz), shaper tanh(DRIVE·x), output band (Hz), mix (dB). */
+export const HARMONIC_IN_LOW_HZ = 40;
+export const HARMONIC_IN_HIGH_HZ = 120;
+export const HARMONIC_OUT_LOW_HZ = 200;
+export const HARMONIC_OUT_HIGH_HZ = 600;
+export const HARMONIC_SHAPER_DRIVE = 3;
+/**
+ * Coordinator ruling (12 Nov): +18 dB before the shaper and the matching −18 dB make-up after it,
+ * so beds at −24 LUFS reach the non-linear part of tanh. [verify by ear on the A15 and the venue PA] (R12)
+ */
+export const HARMONIC_PREGAIN_DB = 18;
+/** SPEC R13.9 (§11.7): the branch is mixed at −12 dB. [verify by ear on the A15 and the venue PA] (R12) */
+export const HARMONIC_MIX_DB = -12;
+/** Engineering: points in the tanh curve (odd, so 0 maps to 0 exactly). */
+export const HARMONIC_CURVE_POINTS = 1025;
+/** Engineering: Q of each high-pass / low-pass in the branch and of the bus high-pass (Butterworth). */
+export const BUTTERWORTH_Q = Math.SQRT1_2;

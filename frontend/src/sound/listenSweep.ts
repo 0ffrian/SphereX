@@ -16,12 +16,14 @@ import type { CometEpoch, ObjectCard, Tag } from '@/contract';
 import { isTagShown, type HonestyState } from '@/viewer/honesty';
 import { gasQForEpoch } from '@/viewer/renderers/Comet';
 import { getAudioContext } from './audioContext';
-import { getMasterBus, playBell } from './audioGraph';
+import { getBus, holdDuck, playBell, type DuckHold } from './audioGraph';
 import { pitchToHz, wavelengthToPitch } from './pitch';
 import { getSoundSettings, stopWhenHidden, useSoundSettings } from './settings';
 import type { SpectrumMapping, SpectrumSample } from './spectrumMapping';
 import {
   AUDIO_LOOKAHEAD_S,
+  CHIME_DECAY_S,
+  DUCK_SAFETY_S,
   SWEEP_CHIME_GAIN,
   SWEEP_DURATION_S,
   SWEEP_EDGE_S,
@@ -155,7 +157,7 @@ export function sweepPanAt(t: number, durationS: number): number {
   return -SWEEP_PAN + 2 * SWEEP_PAN * f;
 }
 
-/** What the sweep reads from the haptics settings (R8.7). */
+/** What the sweep reads from the sound settings (R8.7, R13.9). */
 export interface SweepSettings {
   get(): { volume: number; soundOn: boolean };
   /** Called on every settings change; returns the unsubscribe function. */
@@ -183,7 +185,7 @@ export const DOCUMENT_PAGE: PageVisibility = {
 export interface ListenSweepOptions {
   /** Default: the shared context, once unlocked. */
   context?: () => AudioContext | null;
-  /** Default: the haptics settings store: its volume (followed live) and its sound switch. */
+  /** Default: the sound settings store: its volume (followed live) and its sound switch. */
   settings?: SweepSettings;
   /** Default: `document.hidden`, `visibilitychange` and `pagehide`. A hidden page stops the sweep (R8.8). */
   page?: PageVisibility;
@@ -214,16 +216,19 @@ function release(v: Voice, cancel: boolean): void {
 /**
  * Plays a `SweepPlan`. One sweep at a time; `play` stops the previous one. "Sound off" in the
  * settings means off: `play` refuses, and switching sound off mid-sweep stops it. The volume is
- * followed live through the sweep's own volume gain, which feeds the shared master bus and its
- * limiter (audioGraph.ts), so the sweep and the haptics audio cannot add up past it.
+ * followed live through the sweep's own volume gain, which feeds the spectrum bus, the master and
+ * its limiter (audioGraph.ts), so the sweep and the event sounds cannot add up past it. While it
+ * plays it ducks the ambience (R13.9).
  */
 export class ListenSweep {
   private readonly getContext: () => AudioContext | null;
   private readonly settings: SweepSettings;
   private readonly page: PageVisibility;
   private readonly live = new Set<Voice>();
-  /** This sweep's volume gain into the master bus (freed when the last voice ends). */
+  /** This sweep's volume gain into the spectrum bus (freed when the last voice ends). */
   private volumeGain: GainNode | null = null;
+  /** R13.9: the sweep's hold on the ambience duck, from `play` until its last voice ends or `stop`. */
+  private duck: DuckHold | null = null;
   private unsubscribe: (() => void) | null = null;
   private unhook: (() => void) | null = null;
   private startAt = 0;
@@ -243,6 +248,11 @@ export class ListenSweep {
 
   get playing(): boolean {
     return this.active;
+  }
+
+  /** Whether the sweep holds the ambience duck now (tests). */
+  get ducking(): boolean {
+    return this.duck !== null && !this.duck.released;
   }
 
   /** Voices still connected, the volume gain included (tests: nothing leaks after the end or `stop`). */
@@ -279,8 +289,13 @@ export class ListenSweep {
     const end = base + plan.durationS;
     const volume = ctx.createGain();
     volume.gain.value = clampVolume(st0.volume);
-    volume.connect(getMasterBus(ctx));
+    volume.connect(getBus(ctx, 'spectrum'));
     this.volumeGain = volume;
+    // Safety: the tone, then a chime ringing past its end, then DUCK_SAFETY_S.
+    this.duck = holdDuck(
+      ctx,
+      AUDIO_LOOKAHEAD_S + plan.durationS + SWEEP_EDGE_S + CHIME_DECAY_S + DUCK_SAFETY_S,
+    );
 
     // The sweep ends with its last sound (the tone or a chime still ringing after it), so the
     // settings subscription and `playing` last as long as anything is audible.
@@ -422,9 +437,12 @@ export class ListenSweep {
     g.linearRampToValueAtTime(0, prevAt + SWEEP_EDGE_S);
   }
 
-  /** Disconnect the volume gain once no voice uses it (the shared master bus stays). */
+  /** Once no voice is left: let go of the duck and disconnect the volume gain (the buses stay). */
   private freeIfIdle(): void {
-    if (this.live.size > 0 || !this.volumeGain) return;
+    if (this.live.size > 0) return;
+    this.duck?.release();
+    this.duck = null;
+    if (!this.volumeGain) return;
     this.volumeGain.disconnect();
     this.volumeGain = null;
   }

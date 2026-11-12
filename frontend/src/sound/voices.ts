@@ -1,9 +1,10 @@
-// R8.9, D-10, D-12, D-39: the audio driver, the app's only output (haptics are cut, D-39). Strength is continuous gain (× volume), `pitch` sets the
-// frequency, `pan` a StereoPannerNode, and the provenance `tag` the timbre. Every sound is scheduled
+// R8.9, D-10, D-12, D-39: the audio driver ("voices"), the app's only output (haptics are cut,
+// D-39). It plays into the events bus and holds the ambience duck while it sounds (R13.9).
+// Strength is continuous gain (× volume), `pitch` sets the frequency, `pan` a StereoPannerNode, and the provenance `tag` the timbre. Every sound is scheduled
 // on the shared AudioContext's clock (currentTime + lookahead), never with timers.
 import type { HapticEvent, HapticVoice, Tag } from '@/contract';
 import { audioContextSupported, getAudioContext } from './audioContext';
-import { getMasterBus, playBell } from './audioGraph';
+import { getBus, holdDuck, playBell, type DuckHold } from './audioGraph';
 import type { TrainCapableDriver, TrainWindow } from './engine';
 import { clamp01, pitchToHz } from './pitch';
 import {
@@ -11,6 +12,8 @@ import {
   AUDIO_LOOKAHEAD_S,
   AUDIO_PEAK_GAIN,
   AUDIO_REANCHOR_TOLERANCE_S,
+  CHIME_DECAY_S,
+  DUCK_SAFETY_S,
   MAX_AUDIO_VOICES,
   DEFAULT_VOLUME,
   DOUBLE_ONSETS_PATTERN_MS,
@@ -112,6 +115,8 @@ interface Voice {
   nodes: AudioNode[];
   /** Part of a pulse train: `stopTrain` cancels it, one-shots are left alone. */
   train: boolean;
+  /** Start time on the context clock (s). */
+  when: number;
 }
 
 /** What one sound needs from a HapticEvent or a TrainWindow. */
@@ -133,6 +138,8 @@ export class AudioDriver implements TrainCapableDriver {
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private readonly live = new Set<Voice>();
+  /** R13.9: this driver's one hold on the ambience duck while any of its voices lives. */
+  private duck: DuckHold | null = null;
   /** Engine time ↔ audio time of the running train (`seq` −1: none yet). */
   private readonly anchor = { seq: -1, engineMs: 0, audioS: 0 };
 
@@ -242,6 +249,7 @@ export class AudioDriver implements TrainCapableDriver {
       this.live.delete(v);
     }
     this.anchor.seq = -1;
+    this.syncDuck();
   }
 
   /** Cancel every scheduled and playing sound. */
@@ -249,6 +257,12 @@ export class AudioDriver implements TrainCapableDriver {
     for (const v of this.live) this.release(v, true);
     this.live.clear();
     this.anchor.seq = -1;
+    this.syncDuck();
+  }
+
+  /** Whether this driver holds the ambience duck now (tests). */
+  get ducking(): boolean {
+    return this.duck !== null && !this.duck.released;
   }
 
   // ------------------------------------------------------------ graph
@@ -260,12 +274,13 @@ export class AudioDriver implements TrainCapableDriver {
       // Sounds of a previous (closed) context never end there: drop and disconnect them.
       for (const v of this.live) this.release(v, true);
       this.live.clear();
+      this.syncDuck();
       this.ctx = ctx;
       this.anchor.seq = -1;
-      // The driver's volume, into the app's one master bus and limiter (audioGraph.ts).
+      // The driver's volume, into the events bus, the master and its limiter (audioGraph.ts).
       this.master = ctx.createGain();
       this.master.gain.value = this.vol;
-      this.master.connect(getMasterBus(ctx));
+      this.master.connect(getBus(ctx, 'events'));
       const length = Math.max(1, Math.ceil(ctx.sampleRate * SURF_DURATION_S));
       this.noise = ctx.createBuffer(1, length, ctx.sampleRate);
       fillNoise(this.noise.getChannelData(0), NOISE_SEED);
@@ -307,7 +322,7 @@ export class AudioDriver implements TrainCapableDriver {
     pan: number | undefined,
     train: boolean,
   ): void {
-    const voice: Voice = { sources: [], nodes: [], train };
+    const voice: Voice = { sources: [], nodes: [], train, when };
     let out: AudioNode = this.master!;
     if (pan !== undefined && Number.isFinite(pan) && typeof ctx.createStereoPanner === 'function') {
       const p = ctx.createStereoPanner();
@@ -404,7 +419,10 @@ export class AudioDriver implements TrainCapableDriver {
   private track(voice: Voice): void {
     let playing = voice.sources.length;
     const ended = () => {
-      if (--playing === 0 && this.live.delete(voice)) this.release(voice, false);
+      if (--playing === 0 && this.live.delete(voice)) {
+        this.release(voice, false);
+        this.syncDuck();
+      }
     };
     for (const src of voice.sources) src.onended = ended;
     while (this.live.size >= MAX_AUDIO_VOICES) {
@@ -413,6 +431,24 @@ export class AudioDriver implements TrainCapableDriver {
       this.release(oldest, true);
     }
     this.live.add(voice);
+    this.syncDuck(voice.when);
+  }
+
+  /**
+   * Hold the ambience duck while any voice lives and let go when the last one ends or is cut
+   * (R13.9). Each new voice re-arms the safety timeout: its start + the longest voice (the bell)
+   * + DUCK_SAFETY_S, so a missed `onended` (a suspended context) cannot keep the duck.
+   */
+  private syncDuck(whenS?: number): void {
+    if (this.live.size === 0 || !this.ctx) {
+      this.duck?.release();
+      this.duck = null;
+      return;
+    }
+    if (!this.duck || this.duck.released) this.duck = holdDuck(this.ctx);
+    if (whenS !== undefined) {
+      this.duck.extend(Math.max(0, whenS - this.ctx.currentTime) + CHIME_DECAY_S + DUCK_SAFETY_S);
+    }
   }
 
   private noiseSource(ctx: AudioContext): AudioBufferSourceNode {

@@ -12,8 +12,10 @@ import {
 } from './audioContext';
 import { AudioDriver } from './voices';
 import { SoundEngine, createSoundEngine, type SoundOutputs } from './engine';
+import { DEFAULT_VOLUME } from './tuning';
 import {
   SETTINGS_STORAGE_KEY,
+  ambienceLevelFor,
   bindEngine,
   defaultSettings,
   SAVE_DEBOUNCE_MS,
@@ -115,7 +117,7 @@ describe('settings store (R8.7)', () => {
     useSoundSettings.getState().update({ volume: 2 });
     flushSoundSettings();
     const saved = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!);
-    expect(saved).toEqual({ soundOn: true, volume: 1 });
+    expect(saved).toEqual({ ...defaultSettings(), volume: 1 });
     expect(Object.keys(localStorage)).toEqual([SETTINGS_STORAGE_KEY]);
     expect(loadSoundSettings()).toEqual(saved);
   });
@@ -157,6 +159,36 @@ describe('settings store (R8.7)', () => {
     expect(s).toEqual({ ...defaultSettings(), soundOn: false, volume: 0.4 });
     expect(s).not.toHaveProperty('hapticsOn');
     expect(s).not.toHaveProperty('strengthMultiplier');
+  });
+
+  it('the R13.9 fields have their defaults, clamp and round-trip through storage', () => {
+    expect(defaultSettings()).toEqual({
+      soundOn: true,
+      volume: DEFAULT_VOLUME,
+      ambienceOn: true,
+      ambienceVolume: 0.5,
+      flashesOn: true,
+      readCaptions: false,
+    });
+    useSoundSettings
+      .getState()
+      .update({ ambienceOn: false, ambienceVolume: 3, flashesOn: false, readCaptions: true });
+    flushSoundSettings();
+    resetStore(); // forget the in-memory state: the next read loads from storage
+    expect(getSoundSettings()).toMatchObject({
+      ambienceOn: false,
+      ambienceVolume: 1,
+      flashesOn: false,
+      readCaptions: true,
+    });
+    expect(localStorage.getItem(SETTINGS_STORAGE_KEY)).toContain('"ambienceVolume":1');
+  });
+
+  it('ambienceLevelFor: ambienceVolume × volume, 0 when sound or the ambience is off', () => {
+    const d = defaultSettings();
+    expect(ambienceLevelFor({ ...d, volume: 0.8, ambienceVolume: 0.5 })).toBeCloseTo(0.4);
+    expect(ambienceLevelFor({ ...d, soundOn: false })).toBe(0);
+    expect(ambienceLevelFor({ ...d, ambienceOn: false })).toBe(0);
   });
 
   it('reset clears the key and restores the defaults', () => {
