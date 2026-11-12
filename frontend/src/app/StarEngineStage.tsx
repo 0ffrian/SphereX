@@ -5,6 +5,10 @@
 // notes go to the build pane's Details through `useBuildControls`. A star the engine refuses (no
 // temperature, brown dwarf, Mira) or a browser without WebGL 2 keeps the TSL star path (the hosts call
 // `onFail`, or are not mounted at all, see `useEngineStar`).
+//
+// Issue #93 W1: the star's shader compiles in the background while a loader shows (B7); a compile that fails or has
+// not finished after STAR_READY_TIMEOUT_MS takes the TSL path (the engine watchdog); the engine loop draws at most 60
+// frames a second (STAR_FPS_CAP); the surface close-up keeps only its surface canvas (render notes 0.5).
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { Tag } from '@/contract';
 import { useAppStore } from '@/state/store';
@@ -12,6 +16,9 @@ import { nudge } from '@/engine/stars/starPick';
 import { placeText, useStarTarget } from './starTargetStore';
 import { useBuildControls, type BuildControl, type BuildControlsSpec } from './build/BuildControls';
 import { cardToStar, type StarFromCard } from '@/engine/stars/cardToStar';
+import { FrameCap } from '@/viewer/render/quality';
+import { readyOrTimeout, STAR_READY_TIMEOUT_MS } from './engineWatchdog';
+import GridLoader, { type GridLoaderProps } from './island/GridLoader';
 import {
   StarEngine,
   starEngineSupported,
@@ -54,76 +61,143 @@ const SCALE_LABEL: Record<StarScaleView, string> = {
   close: 'Close-up',
 };
 
+/**
+ * Issue #93 W1 (render notes 0.2, star host only): the engine loop draws at most this many frames a second (a due-time
+ * cap, `FrameCap`: on a 144 Hz panel the frames come 13.9 or 20.8 ms apart, about 58 a second on average). Each step
+ * advances by the real time since the last drawn frame, so the star moves at the same speed. The prototype's own
+ * resolution scalers react to the frame time: the surface shrinks above an average of 42 ms and grows below 19 ms, the
+ * plasma above 36 ms and below 20 ms. A cap at 60 keeps the average near 17 ms, under both "grow" limits, so the cap
+ * never holds the picture at a lower resolution; a cap below about 53 a second would. null: no cap (the display rate).
+ * Q-66 and R5.7 say the three.js path draws at the display rate; they do not cover the engines (see the W1 report).
+ */
+export const STAR_FPS_CAP: number | null = 60;
+
 /** Builds the engine in `host`, drives its clock, and keeps React in step with it. */
-function useStarEngine(mode: StarMode, star: StarFromCard, redrawMs: number, slot: string = mode) {
+function useStarEngine(
+  mode: StarMode,
+  star: StarFromCard,
+  redrawMs: number,
+  slot: string = mode,
+  surface = false,
+) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [engine, setEngine] = useState<StarEngine | null>(null);
   const [failed, setFailed] = useState(false);
+  /** True until the star's shader has compiled (the loader shows meanwhile). */
+  const [compiling, setCompiling] = useState(true);
   const [rev, bump] = useReducer((n: number) => n + 1, 0);
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    let e: StarEngine;
-    try {
-      e = new StarEngine(host, { mode });
-    } catch (err) {
-      console.warn('[star engine] could not start', err);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- the engine can only be tried once mounted
-      setFailed(true);
-      return;
-    }
-    if (!e.ready) {
-      e.dispose();
-      setFailed(true);
-      return;
-    }
     let dead = false;
-    setEngine(e);
-    // A lost GL context leaves a black canvas: report it so the TSL path draws instead (not while we release it ourselves).
-    const onLost = (ev: Event) => {
-      ev.preventDefault();
-      if (!dead) setFailed(true);
-    };
-    for (const c of e.layers) c.addEventListener('webglcontextlost', onLost);
-    // Dev only: the parity scripts (issue #71) pause and seek the engine through this.
-    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>)[`__sxStar_${slot}`] = e;
+    let broken = false;
+    let e: StarEngine | null = null;
+    let onLost: ((ev: Event) => void) | null = null;
     let raf = 0;
-    let shown = true;
-    let last = performance.now();
-    const frame = (now: number) => {
-      if (dead) return;
-      const dt = (now - last) / 1000;
-      last = now;
-      if (shown && !document.hidden) e.tick(dt);
-      raf = requestAnimationFrame(frame);
+    let io: IntersectionObserver | null = null;
+    let ro: ResizeObserver | null = null;
+    let id = 0;
+    let cancelReady = (): void => undefined;
+    // Any failure to start (no WebGL 2, a compile or link error, a compile past the watchdog's limit, a lost context)
+    // takes the TSL path: the host calls onFail and unmounts this stage.
+    const fail = (err: unknown) => {
+      if (dead || broken) return;
+      broken = true;
+      console.warn('[star engine] could not start', err);
+      cancelReady();
+      cancelAnimationFrame(raf);
+      window.clearInterval(id);
+      setFailed(true);
     };
-    raf = requestAnimationFrame(frame);
-    const io =
-      typeof IntersectionObserver === 'undefined'
-        ? null
-        : new IntersectionObserver((es) => {
-            for (const x of es) shown = x.isIntersecting;
-          });
-    io?.observe(host);
-    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => e.draw());
-    ro?.observe(host);
-    const id = window.setInterval(() => {
-      if (shown) bump();
-    }, redrawMs);
-    return () => {
+    // Built a tick later, so React's development double mount (mount, unmount, mount in one go) builds one engine,
+    // not two compiling the same shader (as WorldEngineStage does).
+    const boot = window.setTimeout(() => {
+      if (dead) return;
+      let en: StarEngine;
+      try {
+        en = new StarEngine(host, { mode, surface });
+      } catch (err) {
+        fail(err);
+        return;
+      }
+      e = en;
+      if (!en.supported) {
+        fail(new Error('this browser gave the star no WebGL 2'));
+        return;
+      }
+      setEngine(en);
+      // A lost GL context leaves a black canvas: report it so the TSL path draws instead (not while we release it ourselves).
+      onLost = (ev: Event) => {
+        ev.preventDefault();
+        fail(new Error('WebGL context lost'));
+      };
+      for (const c of en.layers) c.addEventListener('webglcontextlost', onLost);
+      // Dev only: the parity scripts (issue #71) pause and seek the engine through this.
       if (import.meta.env.DEV)
-        (window as unknown as Record<string, unknown>)[`__sxStar_${slot}`] = null;
+        (window as unknown as Record<string, unknown>)[`__sxStar_${slot}`] = en;
+      let shown = true;
+      const cap = new FrameCap(STAR_FPS_CAP ? 1000 / STAR_FPS_CAP : null);
+      let last = performance.now();
+      const frame = (now: number) => {
+        if (dead || broken) return;
+        if (cap.shouldDraw(now)) {
+          const dt = (now - last) / 1000;
+          last = now;
+          try {
+            if (shown && !document.hidden) en.tick(dt);
+          } catch (err) {
+            // An exception here used to end the loop silently, leaving a frozen star.
+            fail(err);
+            return;
+          }
+        }
+        raf = requestAnimationFrame(frame);
+      };
+      raf = requestAnimationFrame(frame);
+      io =
+        typeof IntersectionObserver === 'undefined'
+          ? null
+          : new IntersectionObserver((es) => {
+              for (const x of es) shown = x.isIntersecting;
+            });
+      io?.observe(host);
+      ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => en.draw());
+      ro?.observe(host);
+      id = window.setInterval(() => {
+        if (shown) bump();
+      }, redrawMs);
+      // Issue #93 W1 (B7): the shader compiles in the background; the loader shows until it is linked.
+      cancelReady = readyOrTimeout(
+        en.whenReady(),
+        STAR_READY_TIMEOUT_MS,
+        () => {
+          if (dead) return;
+          setCompiling(false);
+          bump();
+        },
+        fail,
+      );
+    }, 0);
+    return () => {
+      window.clearTimeout(boot);
       dead = true;
-      for (const c of e.layers) c.removeEventListener('webglcontextlost', onLost);
+      cancelReady();
       cancelAnimationFrame(raf);
       window.clearInterval(id);
       io?.disconnect();
       ro?.disconnect();
-      e.dispose();
+      if (e) {
+        if (import.meta.env.DEV)
+          (window as unknown as Record<string, unknown>)[`__sxStar_${slot}`] = null;
+        if (onLost) for (const c of e.layers) c.removeEventListener('webglcontextlost', onLost);
+        // Never blocks: a compile still running is waited for in the background (StarEngine.dispose).
+        e.dispose();
+      }
       setEngine(null);
+      setCompiling(true);
     };
-  }, [mode, redrawMs, slot]);
+  }, [mode, redrawMs, slot, surface]);
 
   // A new star: the same engine, a new preset.
   const { preset } = star;
@@ -133,7 +207,53 @@ function useStarEngine(mode: StarMode, star: StarFromCard, redrawMs: number, slo
     bump();
   }, [engine, preset]);
 
-  return { hostRef, engine, failed, rev, bump };
+  return { hostRef, engine, failed, compiling: compiling && !failed, rev, bump };
+}
+
+/** The build pane's loader sequence (as WorldEngineStage's "Forming…"), so the waits look alike. */
+const STAR_LOADER_LOOK: GridLoaderProps = {
+  mode: 'sequence',
+  sequence: ['spiral-cw', 'ripple-out', 'plus-full', 'frame', 'ripple-in', 'spiral-ccw'],
+  speed: 'normal',
+};
+
+const reducedMotion = (): boolean => {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Issue #93 W1 (B7): drawn over the stage while the star's shader compiles, so a slow first compile never looks like a
+ * frozen or empty page. It does not block: the controls and readouts already work. Under reduced motion it stands still.
+ */
+export function StarPreparing() {
+  const reduced = reducedMotion();
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 z-[2] grid place-content-center justify-items-center gap-3 bg-black text-center text-xs text-neutral-300"
+      data-testid="star-preparing"
+    >
+      <span aria-hidden="true">
+        <GridLoader
+          color="green"
+          rounded
+          size={36}
+          gap={2}
+          blur={0.3}
+          {...(reduced ? { pattern: 'heartbeat', static: true } : STAR_LOADER_LOOK)}
+        />
+      </span>
+      <span role="status">
+        Preparing the star…
+        <span className="mt-1 block text-neutral-400">
+          Preparing the graphics. The first time can take a few seconds.
+        </span>
+      </span>
+    </div>
+  );
 }
 
 function starValuesNote(star: StarFromCard): BuildControl[] {
@@ -151,7 +271,7 @@ function starValuesNote(star: StarFromCard): BuildControl[] {
 
 /** The prototype's "Star surface" stage, on the build pane's globe stage. */
 export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: () => void }) {
-  const { hostRef, engine, failed, bump } = useStarEngine('globe', star, 500);
+  const { hostRef, engine, failed, compiling, bump } = useStarEngine('globe', star, 500);
   // A new star starts looking at its strongest spot group, on the flare close-up.
   useEffect(() => useStarTarget.getState().reset(), [star.preset.id]);
   useEffect(() => {
@@ -317,7 +437,9 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
       data-testid="star-engine-globe"
       data-star={star.preset.label}
       data-preset={JSON.stringify(star.preset)}
-    />
+    >
+      {compiling && <StarPreparing />}
+    </div>
   );
 }
 
@@ -330,7 +452,7 @@ const path = (a: number[]) =>
 
 /** The prototype's flare close-up with its light-curve chart, in the left pane. */
 export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: () => void }) {
-  const { hostRef, engine, failed, bump } = useStarEngine('closeup', star, 150);
+  const { hostRef, engine, failed, compiling, bump } = useStarEngine('closeup', star, 150);
   useEffect(() => {
     if (failed) onFail?.();
   }, [failed, onFail]);
@@ -426,6 +548,7 @@ export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: 
   return (
     <div className="absolute inset-0 bg-black" data-testid="star-engine-flare">
       <div ref={hostRef} className="absolute inset-0" />
+      {compiling && <StarPreparing />}
       {flare && (
         <span
           className="pointer-events-none absolute left-4 top-12 max-w-[calc(100%-2rem)] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300"
@@ -530,7 +653,14 @@ export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: 
 
 /** The star's surface close-up (the artifact's `Close-up` view), centred where the globe was clicked. */
 export function StarSurfaceCloseUp({ star, onFail }: { star: StarFromCard; onFail?: () => void }) {
-  const { hostRef, engine, failed, bump } = useStarEngine('globe', star, 400, 'surface');
+  // Issue #93 W1 (0.5): the surface close-up keeps only its surface canvas (no plasma or line overlays).
+  const { hostRef, engine, failed, compiling, bump } = useStarEngine(
+    'globe',
+    star,
+    400,
+    'surface',
+    true,
+  );
   const target = useStarTarget((s) => s.target);
   const preset = star.preset;
   useEffect(() => {
@@ -577,6 +707,8 @@ export function StarSurfaceCloseUp({ star, onFail }: { star: StarFromCard; onFai
       className="absolute inset-0 bg-black"
       data-testid="star-engine-surface"
       data-at={at ? `${at.lat.toFixed(4)},${at.lon.toFixed(4)}` : ''}
-    />
+    >
+      {compiling && <StarPreparing />}
+    </div>
   );
 }
