@@ -28,6 +28,7 @@ import { SelectedCard } from './build/SelectedCard';
 import { useSelectedBodyLoader } from './build/selectedBody';
 import { Island } from './island/Island';
 import { SoundProvider } from '@/haptics/SoundProvider';
+import { ErrorBoundary } from './ErrorBoundary';
 
 /**
  * A new search opens the object panel (unless it is already open at the spectrum), a marker click
@@ -102,6 +103,8 @@ export function App() {
   // Under the phone sheet the sky must not be reachable by Tab or a screen reader.
   const phone = usePhoneWidth();
   const skyHidden = split && phone;
+  // Issue #102: a new search clears a part that failed, so the demo goes on without a reload.
+  const resetKey = useAppStore((s) => s.sky.query);
   return (
     <SoundProvider>
       <FlipbookSessionProvider>
@@ -118,13 +121,36 @@ export function App() {
             </div>
             <ToolRail />
             <main className="sx-view" aria-label="Sky view" data-split={split || undefined}>
+              {/* Issue #102: each part fails on its own; a throw in one leaves the others usable. */}
               <div className="sx-sky-slot" inert={skyHidden || undefined}>
-                <SkyPane>
-                  <SelectedCard />
-                  <Panels />
-                </SkyPane>
+                <ErrorBoundary area="The sky view" resetKey={resetKey} className="m-4">
+                  <SkyPane>
+                    <ErrorBoundary
+                      area="The object card"
+                      resetKey={resetKey}
+                      className="relative z-10 m-4"
+                    >
+                      <SelectedCard />
+                    </ErrorBoundary>
+                    <ErrorBoundary
+                      area="This panel"
+                      resetKey={resetKey}
+                      className="relative z-10 m-4"
+                    >
+                      <Panels />
+                    </ErrorBoundary>
+                  </SkyPane>
+                </ErrorBoundary>
               </div>
-              {split && <BuildPane />}
+              {split && (
+                <ErrorBoundary
+                  area="The build pane"
+                  resetKey={resetKey}
+                  className="relative z-10 m-4"
+                >
+                  <BuildPane />
+                </ErrorBoundary>
+              )}
             </main>
             {/* The flipbook transport belongs to the flipbook: it steps aside in the split view. */}
             <div className="sx-transport-slot" inert={split || undefined}>

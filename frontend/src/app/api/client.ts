@@ -4,6 +4,7 @@
 // is checked against the contract (validate.ts).
 import {
   API_BASE,
+  API_QUICK_TIMEOUT_MS,
   API_TIMEOUT_MS,
   ASSET_STATUS_HEADER,
   COMBINE_HEADER,
@@ -82,6 +83,8 @@ export interface ApiClientOptions {
   baseUrl?: string;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  /** Timeout of `resolve`, `card` and `render-params` (issue #102). Defaults to API_QUICK_TIMEOUT_MS. */
+  quickTimeoutMs?: number;
   /** Turns the combine PNG into a URL for <img>. Defaults to URL.createObjectURL. */
   createObjectUrl?: (blob: Blob) => string;
 }
@@ -101,7 +104,8 @@ export function revokeObjectUrl(url: string | null | undefined): void {
 
 export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const baseUrl = options.baseUrl ?? API_BASE;
-  const timeoutMs = options.timeoutMs ?? API_TIMEOUT_MS;
+  const slowTimeoutMs = options.timeoutMs ?? API_TIMEOUT_MS;
+  const quickTimeoutMs = options.quickTimeoutMs ?? API_QUICK_TIMEOUT_MS;
   const createObjectUrl = options.createObjectUrl ?? defaultCreateObjectUrl;
   // Looked up per call, so tests can stub globalThis.fetch after the client is made.
   const doFetch: typeof fetch =
@@ -116,6 +120,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     accept: string,
     read: (res: Response, aborted: () => ApiError | null) => Promise<T>,
     signal?: AbortSignal,
+    timeoutMs: number = slowTimeoutMs,
   ): Promise<ApiResult<T>> {
     const controller = new AbortController();
     let timedOut = false;
@@ -129,7 +134,13 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 
     const abortedError = () =>
       timedOut
-        ? new ApiError('timeout', `No answer within ${Math.round(timeoutMs / 1000)} s.`)
+        ? new ApiError(
+            'timeout',
+            `No answer within ${Math.round(timeoutMs / 1000)} s.`,
+            null,
+            null,
+            timeoutMs,
+          )
         : new ApiError('aborted', 'Replaced by a newer request.');
     const ifAborted = () => (controller.signal.aborted ? abortedError() : null);
 
@@ -176,6 +187,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     path: string,
     parse: (raw: unknown) => T,
     signal?: AbortSignal,
+    timeoutMs: number = slowTimeoutMs,
   ): Promise<ApiResult<T>> {
     return request(
       path,
@@ -190,21 +202,25 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         return parse(body);
       },
       signal,
+      timeoutMs,
     );
   }
 
   const objectPath = (id: string) => `/objects/${encodeURIComponent(id)}`;
 
   return {
-    resolve: (q, signal) => getJson(`/resolve?q=${encodeURIComponent(q)}`, parseResolve, signal),
+    // Issue #102: the requests a person waits on use the quick timeout; the rest keep the long one.
+    resolve: (q, signal) =>
+      getJson(`/resolve?q=${encodeURIComponent(q)}`, parseResolve, signal, quickTimeoutMs),
     frames: (id, signal) => getJson(`${objectPath(id)}/frames`, parseFrames, signal),
     spectrum: (id, signal) => getJson(`${objectPath(id)}/spectrum`, parseSpectrum, signal),
     skyIndex: (signal) => getJson('/sky/index.json', parseSkyIndex, signal),
     skyCached: (signal) => getJson('/sky/cached', parseSkyCached, signal),
     composite: (id, signal) => getJson(`${objectPath(id)}/composite`, parseComposite, signal),
-    card: (id, signal) => getJson(`${objectPath(id)}/card`, parseObjectCard, signal),
+    card: (id, signal) =>
+      getJson(`${objectPath(id)}/card`, parseObjectCard, signal, quickTimeoutMs),
     renderParams: (id, signal) =>
-      getJson(`${objectPath(id)}/render-params`, parseRenderParams, signal),
+      getJson(`${objectPath(id)}/render-params`, parseRenderParams, signal, quickTimeoutMs),
     getOverlays: (id, signal) => getJson(`${objectPath(id)}/overlays`, parseOverlays, signal),
     getCombine: (id, op, a, b, signal) => {
       const query = new URLSearchParams({ op, a, b }).toString();
