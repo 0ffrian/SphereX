@@ -1,5 +1,5 @@
 {
-  "asset_version": "12",
+  "asset_version": "13",
   "card": {
     "dayside_temp_K": {
       "err": 9.0,
@@ -38,10 +38,11 @@
       "value": 5052.0
     },
     "hotspot_offset_deg": {
-      "err": 2.5,
-      "source": "literature: Bell et al. 2021, MNRAS 504, 3316 (arXiv:2010.00687), Table 4, HD 189733b, preferred model Poly5: offset +33.7 (+2.5 / -2.2) deg east (backend/assets/literature.toml). Spitzer IRAC 4.5 um reanalysis; err is the larger side of +2.5 / -2.2. Knutson et al. 2012 give the peak time in hours only",
-      "tag": "measured",
-      "value": 33.7
+      "err": 5.5,
+      "formula": "offset_deg = hours x 360 / (P x 24) = 2.98 x 360 / (2.21857 x 24) = 20.15, shown as 20.1; err 0.82 h -> 5.5 deg",
+      "source": "literature: Knutson et al. 2012, ApJ 754, 22 (arXiv:1206.6887), Sect. 4.3: flux maximum 2.98 +/- 0.82 h before the centre of the secondary eclipse at 4.5 um; P = 2.21857 d (Sect. 4.1) (backend/assets/literature.toml). Spitzer IRAC 4.5 um phase curve; the peak time converted to an angle east of the substellar point. Bell et al. 2021 (MNRAS 504, 3316) give 33.7 (+2.5 / -2.2) deg for the same band, but their Sect. 6.2 finds that for HD 189733 b the fitted error underpredicts the scatter between detector models by about 21 times (about 51 deg), so their tighter number is not used",
+      "tag": "derived",
+      "value": 20.1
     },
     "id": "simbad-hd-189733b",
     "insolation_searth": {
@@ -107,7 +108,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "eb40dd02945cf37be8fa91ab3ed6ad7e13d745c6ccbb5d17ae2e8c929dfdc9e9",
+  "inputs_sha256": "c73f3bd3f7e58b621893d02343575816cfd4e8594ad4d1423f16a4e3a9b45893",
   "render_params": {
     "alt_text": "HD 189733 b, Gas giant, 1.13 Jupiter radii (measured), colour family from the equilibrium temperature, lit by its star. Surface relief: illustrative.",
     "confidence": {

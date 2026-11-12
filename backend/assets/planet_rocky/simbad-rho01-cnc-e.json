@@ -1,9 +1,9 @@
 {
-  "asset_version": "12",
+  "asset_version": "13",
   "card": {
     "dayside_temp_K": {
       "err": 270.0,
-      "source": "literature: Demory et al. 2016, Nature 532, 207 (arXiv:1604.05725), Abstract: warmest hemisphere (centred on the hot spot) 2700 +/- 270 K at 4.5 um (backend/assets/literature.toml). Spitzer IRAC 4.5 um phase curve. This is the hemisphere centred on the hot spot, 41 deg east of the substellar point, not the substellar day side. The JWST eclipses of Hu et al. 2024 (Nature 630, 609) were not read in full, so they are not used",
+      "source": "literature: Demory et al. 2016, Nature 532, 207 (arXiv:1604.05725), Abstract: warmest hemisphere (centred on the hot spot) 2700 +/- 270 K at 4.5 um (backend/assets/literature.toml). Spitzer IRAC 4.5 um phase curve. This is the hot-spot hemisphere (the hemisphere centred on the hot spot), not the substellar day side. Mercier et al. 2022 (AJ 164, 204) reanalysed the same Spitzer data and found a dayside of 3771 (+669 / -520) K and a nightside below 1649 K (2 sigma), so the two analyses disagree. JWST eclipses show the dayside changing from visit to visit (Hu et al. 2024, Nature 630, 609; Patel et al. 2024, A&A 690), so no single dayside temperature holds",
       "tag": "measured",
       "value": 2700.0
     },
@@ -38,10 +38,9 @@
       "value": 5172.0
     },
     "hotspot_offset_deg": {
-      "err": 12.0,
-      "source": "literature: Demory et al. 2016, Nature 532, 207 (arXiv:1604.05725), Abstract: hot spot 41 +/- 12 degrees east of the substellar point (backend/assets/literature.toml). Spitzer IRAC 4.5 um phase curve",
+      "source": "not available: two analyses of the same Spitzer data disagree: Demory et al. 2016 41 +/- 12 deg east, Mercier et al. 2022 -12 (+21 / -18) deg (AJ 164, 204)",
       "tag": "measured",
-      "value": 41.0
+      "value": null
     },
     "id": "simbad-rho01-cnc-e",
     "insolation_searth": {
@@ -59,7 +58,7 @@
     "name": "55 Cnc e",
     "nightside_temp_K": {
       "err": 400.0,
-      "source": "literature: Demory et al. 2016, Nature 532, 207 (arXiv:1604.05725), Abstract: nightside brightness temperature 1380 +/- 400 K (backend/assets/literature.toml). Spitzer IRAC 4.5 um phase curve",
+      "source": "literature: Demory et al. 2016, Nature 532, 207 (arXiv:1604.05725), Abstract: nightside brightness temperature 1380 +/- 400 K (backend/assets/literature.toml). Spitzer IRAC 4.5 um phase curve. Mercier et al. 2022 (AJ 164, 204) reanalysed the same Spitzer data and found a nightside below 1649 K (2 sigma) and a dayside of 3771 (+669 / -520) K. JWST eclipses show the dayside changing from visit to visit (Hu et al. 2024, Nature 630, 609; Patel et al. 2024, A&A 690)",
       "tag": "measured",
       "value": 1380.0
     },
@@ -106,7 +105,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "eb40dd02945cf37be8fa91ab3ed6ad7e13d745c6ccbb5d17ae2e8c929dfdc9e9",
+  "inputs_sha256": "c73f3bd3f7e58b621893d02343575816cfd4e8594ad4d1423f16a4e3a9b45893",
   "render_params": {
     "alt_text": "55 Cnc e, Rocky planet, 0.167 Jupiter radii (measured), artist's colour, lit by its star. Surface relief: illustrative.",
     "confidence": {
