@@ -22,7 +22,7 @@ test('picking "Barnard\'s Star" from the list flies there and opens the panel', 
   // A pointer press is a user focus; programmatic .focus() deliberately does not open the list (WCAG 3.2.1).
   await input.click();
   await expect(input).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.getByTestId('search-list').getByRole('option')).toHaveCount(16);
+  await expect(page.getByTestId('search-list').getByRole('option')).toHaveCount(25);
   await input.pressSequentially('barnard');
   await expect(page.getByTestId('search-list').getByRole('option')).toHaveCount(1);
   await page.getByRole('option', { name: "Barnard's Star" }).click();
@@ -30,7 +30,7 @@ test('picking "Barnard\'s Star" from the list flies there and opens the panel', 
   await expect(input).toHaveValue("Barnard's Star");
   await expect(input).toBeFocused();
   await expect.poll(() => new URL(page.url()).hash).toMatch(/^#ra=269\.45\d*&dec=4\.69\d*/);
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
   await expect(page.getByTestId('frame-counter')).toBeVisible();
 });
 
@@ -40,7 +40,7 @@ test('desktop: the list is 380 px, right-aligned, and leaves the sky credit visi
   await page.goto('/');
   const input = page.getByTestId('search-input');
   await input.click();
-  await expect(page.getByTestId('search-list').getByRole('option')).toHaveCount(16);
+  await expect(page.getByTestId('search-list').getByRole('option')).toHaveCount(25);
   const list = (await page.getByTestId('search-list').boundingBox())!;
   expect(list.width).toBeLessThanOrEqual(381);
   const pill = (await input.boundingBox())!;
@@ -51,7 +51,7 @@ test('desktop: the list is 380 px, right-aligned, and leaves the sky credit visi
     const overlapY = list.y < credit.y + credit.height && list.y + list.height > credit.y;
     expect(overlapX && overlapY).toBe(false);
   }
-  await expect(page.getByRole('status')).toHaveText('16 demo objects. Use up and down arrows.');
+  await expect(page.getByRole('status')).toHaveText('25 demo objects. Use up and down arrows.');
 });
 
 test.describe('phone width (400 x 860, touch)', () => {
@@ -64,7 +64,7 @@ test.describe('phone width (400 x 860, touch)', () => {
     const input = page.getByTestId('search-input');
     const before = await input.boundingBox();
     await input.tap();
-    await expect(page.getByTestId('search-list').getByRole('option')).toHaveCount(16);
+    await expect(page.getByTestId('search-list').getByRole('option')).toHaveCount(25);
     const after = await input.boundingBox();
     expect(after).toEqual(before);
     expect(after!.height).toBeGreaterThanOrEqual(44);

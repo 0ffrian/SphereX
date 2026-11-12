@@ -4,6 +4,8 @@
 
 ### R5.8 Build split view and moulding
 
+> **Changed by [Q-415](../decisions/shell-surfaces.md) (PR #104):** the moulding animation shown for at least 5 s on every build (cached bodies too) is the mock-up's own generic body of the object's kind (`build/MouldAnimation.tsx`, `build/mouldBody.ts`), fed by the card's temperature, colour and elongation where present, on its own plain three `WebGLRenderer`. It is decorative and `aria-hidden`, seeded so it is deterministic, and the real render replaces it. This departs from "the moulding presents the real plan" below; the extra GL context is outside the D-03 and D-37 budget (open in Q-415).
+
 These are the presentation rules of the one 3D view (Q-113, as amended by Q-120). How a user reaches it from the sky (marker click, card, brackets, rail) is shell behaviour, specified in A21 ([sky-shell.md](../architecture/sky-shell.md)). Every R5 rule applies inside the pane.
 
 **One 3D view and the split**

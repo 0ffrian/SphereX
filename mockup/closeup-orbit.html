@@ -1,0 +1,1124 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orbit close-up</title>
+<style>
+/* Orbit close-up for the Shift & Spectrum mock-up. Extracted from the realism preview (sculptor-preview-next.html): the planet simulation and its orbit camera, full page, no globe half and no page chrome. No image files and no external scripts are needed. */
+:root{color-scheme:dark;--fg:#fafafa;--mfg:#a1a1aa;--border:#2a2a30;--blue:#38bdf8;--sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#000;color:var(--fg);font:13px/1.45 var(--sans);overflow:hidden}
+#world-c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;outline:none;background:#000}
+#world-c:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.foot{position:fixed;left:10px;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px;align-items:flex-start;pointer-events:none}
+.tag,.note,.hint,.alt{background:#171717d1;color:#d4d4d4;border-radius:6px;padding:4px 9px;pointer-events:none;font-size:12px}
+.tag,.alt{position:fixed;top:10px}
+.tag{left:10px;max-width:70%}
+.alt{right:10px;font-family:var(--mono)}
+.hint{color:var(--mfg)}
+.note{color:#e4e4e7}
+body.emb .foot{bottom:150px}
+#build{position:fixed;inset:0;display:grid;place-content:center;gap:8px;text-align:center;font-size:15px;color:var(--mfg);background:#000;transition:opacity .5s}
+#build.badge{inset:auto;left:50%;top:50%;transform:translate(-50%,-50%);padding:10px 18px;border-radius:999px;background:#000c;border:1px solid var(--border)}
+#build[hidden]{display:none}
+#build .bar{width:180px;height:3px;background:#232328;border-radius:2px;overflow:hidden;margin:auto}
+#build .bar i{display:block;height:100%;width:0;background:var(--blue)}
+#fail{position:fixed;inset:0;display:grid;place-content:center;padding:20px;text-align:center;color:var(--mfg)}
+#fail[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){#build{transition:none}}
+</style></head>
+<body>
+<script>try{if(window.parent!==window)document.body.className='emb'}catch(e){}</script>
+<canvas id="world-c" aria-label="The planet seen from orbit. Drag to look around, scroll to change height, arrow keys to move."></canvas>
+<span class="tag" id="world-tag">Orbit close-up</span>
+<span class="alt" id="alt-v" aria-live="off"></span>
+<div class="foot"><span class="hint">Drag to look around. Scroll to go up or down. Arrow keys or W A S D to move.</span>
+<span class="note" id="honesty">Heights, cloud layers and air are drawn 3 times taller than true (2 times on gas giants) so they are easy to see. Fine detail is an artist's addition. Generated from physics, not a photograph.</span></div>
+<div id="build" role="status" aria-live="polite"><span id="build-t">Forming the planet…</span><div class="bar"><i id="build-p"></i></div></div>
+<div id="fail" hidden role="alert">This browser could not start the WebGL 2 float targets the planet simulation needs.</div>
+<script>
+(function () {
+'use strict';
+var $ = function (s) { return document.querySelector(s); };
+var clamp = function (x, a, b) { return Math.min(b, Math.max(a, x)); };
+var lerp = function (a, b, t) { return a + (b - a) * t; };
+var sstep = function (a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+var fmt = function (x, d) { return x.toLocaleString('en', { maximumFractionDigits: d == null ? 0 : d }); };
+var reduced = false; try { reduced = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+function rng(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function g(l, m, s1, s2) { var s = l < m ? s1 : s2, t = (l - m) / s; return Math.exp(-0.5 * t * t); }
+function planck(lnm, T) { var m = lnm * 1e-9; return 1 / (Math.pow(m, 5) * (Math.exp(0.014388 / (m * T)) - 1)); }
+function planckRGB(T) {
+  var X = 0, Y = 0, Z = 0, l;
+  for (l = 380; l <= 780; l += 5) { var B = planck(l, T); X += B * (1.056 * g(l, 599.8, 37.9, 31.0) + 0.362 * g(l, 442.0, 16.0, 26.7) - 0.065 * g(l, 501.1, 20.4, 26.2)); Y += B * (0.821 * g(l, 568.8, 46.9, 40.5) + 0.286 * g(l, 530.9, 16.3, 31.1)); Z += B * (1.217 * g(l, 437.0, 11.8, 36.0) + 0.681 * g(l, 459.0, 26.0, 13.8)); }
+  var c = [Math.max(3.2406 * X - 1.5372 * Y - 0.4986 * Z, 0), Math.max(-0.9689 * X + 1.8758 * Y + 0.0415 * Z, 0), Math.max(0.0557 * X - 0.2040 * Y + 1.0570 * Z, 0)], mx = Math.max(c[0], c[1], c[2]);
+  return [c[0] / mx, c[1] / mx, c[2] / mx];
+}
+var LMIN = Math.log(600), LMAX = Math.log(60000), LUT = new Uint8Array(1024);
+for (var li = 0; li < 256; li++) { var lc = planckRGB(Math.exp(lerp(LMIN, LMAX, li / 255))); LUT[li * 4] = lc[0] * 255; LUT[li * 4 + 1] = lc[1] * 255; LUT[li * 4 + 2] = lc[2] * 255; LUT[li * 4 + 3] = 255; }
+function pills(host, items, cur, on) {
+  host.innerHTML = '';
+  items.forEach(function (it) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'b'; b.textContent = it.label; b.dataset.id = it.id; b.setAttribute('aria-pressed', String(it.id === cur));
+    b.addEventListener('click', function () { [].forEach.call(host.children, function (c) { c.setAttribute('aria-pressed', String(c === b)); }); on(it); });
+    host.appendChild(b);
+  });
+}
+function compile(gl, vs, fs) {
+  function sh(t, s) { var o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; }
+  var p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  return p;
+}
+function unis(gl, p) { var u = {}, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS), i; for (i = 0; i < n; i++) { var a = gl.getActiveUniform(p, i), name = a.name.replace('[0]', ''); u[name] = gl.getUniformLocation(p, a.name); } return u; }
+var FULL = '#version 300 es\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0.,1.);}';
+var NOISE = `
+vec3 h33(vec3 p){p=fract(p*vec3(.1031,.1030,.0973));p+=dot(p,p.yxz+33.33);return fract((p.xxy+p.yxx)*p.zyx);}
+float vn(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
+ return mix(mix(mix(h33(i).x,h33(i+vec3(1,0,0)).x,f.x),mix(h33(i+vec3(0,1,0)).x,h33(i+vec3(1,1,0)).x,f.x),f.y),
+ mix(mix(h33(i+vec3(0,0,1)).x,h33(i+vec3(1,0,1)).x,f.x),mix(h33(i+vec3(0,1,1)).x,h33(i+vec3(1,1,1)).x,f.x),f.y),f.z);}
+float fbm(vec3 p,int n){float a=.5,s=0.,t=0.;for(int i=0;i<n;i++){s+=a*vn(p);t+=a;p=p*2.03+vec3(7.1,3.3,1.7);a*=.5;}return s/t;}
+float ridge(vec3 p,int n){float a=.5,s=0.,t=0.;for(int i=0;i<n;i++){s+=a*(1.-abs(2.*vn(p)-1.));t+=a;p=p*2.1+vec3(3.1,9.3,4.7);a*=.5;}return s/t;}
+`;
+
+/* ---------- rock planets: cloud tracer carried by the winds, fed by the humidity from the water budget ---------- */
+var ADV_FS = `#version 300 es
+precision highp float;
+uniform vec2 uR;uniform sampler2D uT,uEb;uniform float uU0,uN,uSuper,uRelax,uStep,uKick,uSeed;uniform vec4 uV[12];uniform int uNV;out vec4 O;
+const float PI=3.14159265,TAU=6.2831853;
+${NOISE}
+vec3 dirOf(vec2 l){float c=cos(l.y);return vec3(c*cos(l.x),sin(l.y),c*sin(l.x));}
+vec2 vel(vec2 l){
+ float la=l.y,cl=max(cos(la),.08);
+ float u=uU0*cos(uN*la)*smoothstep(1.55,1.15,abs(la))+uSuper*uU0*2.4*exp(-la*la/.16),v=0.;
+ for(int i=0;i<uNV;i++){vec4 k=uV[i];float dl=mod(l.x-k.x+PI,TAU)-PI,dx=dl*cos(k.y),dy=la-k.y,g=k.w*exp(-(dx*dx+dy*dy)/(k.z*k.z));u+=-dy*g/k.z;v+=dx*g/k.z;}
+ vec3 p=dirOf(l)*7.+uSeed+vec3(0.,uStep*.0025,0.);float e=.03,n0=vn(p),nx=vn(dirOf(l+vec2(e,0.))*7.+uSeed+vec3(0.,uStep*.0025,0.)),ny=vn(dirOf(l+vec2(0.,e))*7.+uSeed+vec3(0.,uStep*.0025,0.));
+ u+=uKick*(ny-n0)/e;v-=uKick*(nx-n0)/e;
+ return vec2(u/cl,v);
+}
+void main(){
+ vec2 uv=gl_FragCoord.xy/uR,l=vec2((uv.x-.5)*TAU,(uv.y-.5)*PI);
+ vec2 v1=vel(l),v2=vel(l-.5*v1),b=l-v2;
+ vec4 s=texture(uT,vec2(b.x/TAU+.5,clamp(b.y/PI+.5,.002,.998)));
+ vec3 d=dirOf(l);float slow=uStep*.0012;
+ float det=fbm(d*vec3(9.,28.,9.)+uSeed+vec3(slow*2.),4),rh=texture(uEb,uv).a;
+ float tr=clamp(smoothstep(.55,1.05,rh)*.85+(fbm(d*4.5+uSeed+vec3(slow*3.),4)-.5)*1.3,0.,1.);
+ for(int i=0;i<uNV;i++){vec4 k=uV[i];float dl=mod(l.x-k.x+PI,TAU)-PI,dx=dl*cos(k.y),dy=l.y-k.y,rho=sqrt(dx*dx+dy*dy)/k.z;tr=max(tr,smoothstep(1.15,.45,rho)*smoothstep(.07,.2,rho));}
+ O=mix(s,vec4(tr,det,0.,1.),uRelax);
+}`;
+/* ---------- gas giants: colour fields carried by the simulated flow, sourced by its vorticity ---------- */
+var GAS_FS = `#version 300 es
+precision highp float;
+uniform vec2 uR;uniform sampler2D uT,uV,uNz,uBand;uniform float uDt,uInit;out vec4 O;
+const float PI=3.14159265,TAU=6.2831853;
+vec4 cr(sampler2D t,vec2 uv,vec2 res){vec2 p=uv*res,ip=floor(p-.5),f=p-.5-ip;
+ vec2 w0=f*(-.5+f*(1.-.5*f)),w1=1.+f*f*(-2.5+1.5*f),w2=f*(.5+f*(2.-1.5*f)),w3=f*f*(-.5+.5*f),w12=w1+w2,o=w2/w12;
+ vec2 t0=(ip-.5)/res,t3=(ip+2.5)/res,t12=(ip+o+.5)/res;
+ vec4 c=texture(t,vec2(t12.x,t0.y))*w12.x*w0.y+texture(t,vec2(t0.x,t12.y))*w0.x*w12.y+texture(t,t12)*w12.x*w12.y+texture(t,vec2(t3.x,t12.y))*w3.x*w12.y+texture(t,vec2(t12.x,t3.y))*w12.x*w3.y;
+ return c/(w12.x*w0.y+w0.x*w12.y+w12.x*w12.y+w3.x*w12.y+w12.x*w3.y);}
+void main(){
+ vec2 uv=gl_FragCoord.xy/uR;
+ vec4 v=texture(uV,uv);
+ vec2 m=uv-vec2(v.x/TAU,v.y/PI)*uDt*.5;m.y=clamp(m.y,.001,.999);
+ vec4 v2=texture(uV,m);
+ vec2 b=uv-vec2(v2.x/TAU,v2.y/PI)*uDt;b.y=clamp(b.y,.002,.998);
+ vec4 bd=texture(uBand,vec2(.5,uv.y));
+ float nz=texture(uNz,uv*vec2(4.,3.)).r,rm=clamp(v2.a-2.,0.,1.),mask=v2.a>1.5?0.:clamp(v2.a,-1.,1.);
+ float tr=clamp(bd.r-.08*v2.z,0.,1.)+max(mask,0.)*.42-max(-mask,0.)*.3,tg=mix(mix(bd.g,.05,max(mask,0.)*.95),.95,max(-mask,0.)*.8);
+ if(uInit>.5){O=vec4(tr,tg,nz,clamp(v.a-2.,0.,1.));return;}
+ vec4 s=clamp(cr(uT,b,uR),0.,1.2);
+ float rate=clamp(uDt*1.4,0.,1.);
+ O=vec4(mix(s.r,tr,rate),mix(s.g,tg,rate),mix(s.b,nz,clamp(uDt*.15,0.,1.)),max(s.a*(1.-uDt*1.2),rm));
+}`;
+var WORLD_FS = `#version 300 es
+precision highp float;
+uniform sampler2D uRv,uEb2,uHy;uniform float uClouds;uniform float uOverlay,uSig,uTcol,uTide,uFluidK;uniform vec3 uAw;
+uniform vec2 uR,uOff;uniform sampler2D uBand,uRing;uniform float uFrame,uRoll,uRT,uTgas,uEpsG,uLock,uTime,uMode,uSpin,uTilt,uTt,uTb,uCov,uTau,uHz,uHv,uSeed,uF,uOcean,uGam,uBump,uPlates,uTrW,uTrH;
+uniform vec3 uL,uLiq,uIce,uLand,uCld,uSky,uSun,uStar,uHazeC,uZ,uB,uS,uD,uP;uniform sampler2D uTr,uLut,uHt,uEb;out vec4 O;
+const float LMIN=${LMIN.toFixed(6)},LMAX=${LMAX.toFixed(6)},PI=3.14159265,TAU=6.2831853;
+${NOISE}
+vec3 lut(float T){return texture(uLut,vec2((log(clamp(T,620.,50000.))-LMIN)/(LMAX-LMIN),.5)).rgb;}
+vec3 rx(vec3 v,float a){float c=cos(a),s=sin(a);return vec3(v.x,v.y*c-v.z*s,v.y*s+v.z*c);}
+vec3 ry(vec3 v,float a){float c=cos(a),s=sin(a);return vec3(v.x*c+v.z*s,v.y,-v.x*s+v.z*c);}
+vec2 uvOf(vec3 b){return vec2(atan(b.z,b.x)/TAU+.5,asin(clamp(b.y,-1.,1.))/PI+.5);}
+vec4 scatter(vec2 qq,float zs){
+ float H0=max(uHv*.9,.006),top=1.+H0*6.,r2=dot(qq,qq);
+ if(r2>=top*top||uTau<.001)return vec4(0.,0.,0.,1.);
+ float zt=sqrt(top*top-r2),zb=zs>-8.?zs:-zt,dz=(zt-zb)/10.,b0=uTau*.1/H0,od=0.,mu=uL.z,g=.72;
+ vec3 br=vec3(.51,1.,2.23),ins=vec3(0.);
+ float pr=.75*(1.+mu*mu),pm=(1.-g*g)/pow(1.+g*g-2.*g*mu,1.5)*.08;
+ for(int i=0;i<10;i++){
+  vec3 p=vec3(qq,zt-dz*(float(i)+.5));float r=length(p),d=exp(-max(r-1.,0.)/H0),c=dot(p/r,uL);
+  od+=d*dz;
+  if(c>-.18){float am=min(1./max(c+.2,.03),28.);vec3 tS=exp(-br*b0*H0*am*d),tV=exp(-br*b0*od);ins+=d*tS*tV*(br*pr+vec3(pm))*dz;}
+ }
+ return vec4(ins*b0*uStar,exp(-dot(br,vec3(.333))*b0*od));
+}
+float eFn(vec3 b){float e=texture(uHt,uvOf(b)).r,m=smoothstep(.15,2.2,e);return e+(ridge(b*26.+uSeed,4)-.55)*(.2+1.5*m)+(fbm(b*80.+uSeed,3)-.5)*.1;}
+void main(){
+ vec2 q0=(2.*(gl_FragCoord.xy-uOff)-uR)/uR.y*uFrame;float cro=cos(uRoll),sro=sin(uRoll);q0=vec2(cro*q0.x-sro*q0.y,sro*q0.x+cro*q0.y);
+ vec2 q=q0;q.y/=max(1.-uF,.6);
+ float r=length(q),px=2.*uFrame/uR.y;vec3 col=vec3(0);vec3 rN=rx(vec3(0.,1.,0.),-uTilt);
+ float edge=smoothstep(1.+px,1.-px,r);
+ if(edge>0.){
+  float z=sqrt(max(0.,1.-min(r*r,1.)));vec3 n=vec3(q,z),b=ry(rx(n,uTilt),uSpin);
+  float la=asin(clamp(b.y,-1.,1.)),am=min(1./max(z,.07),9.),ns=dot(n,uL);
+  vec2 uv=uvOf(b);
+  if(uMode>.5){
+   vec4 bd=texture(uBand,vec2(.5,uv.y));float ex=2./uTrW,ey=2./uTrH;
+   float w1=fbm(b*vec3(5.,16.,5.)+uSeed,4)-.5,mott=fbm(b*vec3(14.,46.,14.)+vec3(w1*3.)+uSeed,5)-.5;
+   vec2 uv2=uv+vec2(0.,w1*(.01+.02*bd.b));vec4 t=texture(uTr,uv2);
+   float streak=(t.b-.5)*(.08+.55*bd.b)+mott*(.12+.8*bd.b),br=t.r+streak*.5;
+   float dx=texture(uTr,uv+vec2(ex,0.)).r-texture(uTr,uv-vec2(ex,0.)).r,dy=texture(uTr,uv+vec2(0.,ey)).r-texture(uTr,uv-vec2(0.,ey)).r;
+   vec3 east=normalize(cross(vec3(0.,1.,0.),b)),north=cross(b,east);
+   vec3 nv=normalize(n+rx(ry(east*dx+north*dy,-uSpin),-uTilt)*(-.35));
+   vec3 c=mix(uZ,uB,clamp(t.g+streak*.9,0.,1.));
+   c=mix(c,uS,clamp(t.a*1.15,0.,.92));
+   c*=.38+.78*br;
+   c=mix(c,uP*(.74+.5*br),bd.a*.85);
+   float nl=max(dot(nv,uL),0.);
+   col=c*uStar*smoothstep(-.04,.16,ns)*(.26+.74*pow(nl,.8))*(.3+.7*pow(z,.7))*.76;
+   float Tg=uTgas*(uLock>.5?mix(1.,ns>0.?1.3:.55,uEpsG):1.);
+   if(Tg>850.){float nt=smoothstep(.25,-.2,ns);col+=lut(Tg)*pow(Tg/1900.,6.)*mix(.35,1.,nt);}
+   if(uRT>.5){float dn=dot(uL,rN);if(abs(dn)>.001){float t2=-dot(n,rN)/dn;if(t2>0.){vec3 P2=n+uL*t2;float rh2=length(P2);if(rh2>1.11&&rh2<2.34)col*=1.-texture(uRing,vec2((rh2-1.1)/1.25,.5)).r*.82;}}}
+  }else{
+   vec4 E=texture(uEb,uv);float T0=E.r,hi=max(E.g,0.),sn=max(E.b,0.);
+   float e=.004,el=eFn(b);
+   vec3 tA=normalize(cross(b,vec3(.2,1.,.3))),tB=cross(b,tA);
+   float eA=eFn(normalize(b+tA*e)),eB=eFn(normalize(b+tB*e));
+   vec3 ng=normalize(n+rx(ry((tA*(el-eA)+tB*(el-eB))/e,-uSpin),-uTilt)*uBump);
+   float Tl=T0-uGam*max(el,0.);
+   float fn=fbm(b*38.+uSeed,4);
+   /* land: rock with height, frost in soft patches set by the frost budget and local temperature */
+   vec3 ld=mix(uLand,uLand*vec3(.72,.7,.7)+.06,smoothstep(.5,2.6,el))*(.7+.62*fbm(b*15.+uSeed,3));
+   ld=mix(ld,ld*1.18+vec3(.03,.025,.015),1.-smoothstep(0.,.35,el));
+   vec4 E2=texture(uEb2,uv);float wet=clamp(E2.r,0.,1.);
+   vec4 hy=texture(uHy,uv);
+   ld=mix(ld*vec3(1.22,1.08,.82)+vec3(.05,.035,.012),ld*vec3(.62,.6,.56),smoothstep(.05,.6,wet));
+   vec2 rvw=uv+vec2(fbm(b*22.+uSeed,3)-.5,fbm(b*22.+uSeed+9.,3)-.5)*.004,rv=texture(uRv,rvw).rg;
+   float fs=1.-exp(-sn/.08),cold=smoothstep(uTt+9.,uTt-5.,Tl);
+   float fa=clamp(fs*(.35+.65*cold)+cold*smoothstep(1.6,3.4,el)*.75,0.,1.);
+   fa=smoothstep(0.,1.,fa*(.7+.7*fn));
+   ld=mix(ld,uIce*(.92+.2*fn),fa);
+   if(T0<uTcol)ld=mix(ld,vec3(.9,.92,.95),smoothstep(uTcol,uTcol-6.,T0)*.8);
+   /* ocean: open water to pack ice through floes, thickness sets how much of the cell is ice */
+   float hasSea=uOcean*(1.-smoothstep(uTb-2.,uTb+6.,T0)),deep=clamp(-el/3.5,0.,1.);
+   if(uFluidK>.5)hasSea*=smoothstep(.01,.2,wet);
+   vec3 tr2=exp(-2.*uAw*min(max(-el,0.)*1000.,400.)),water=uLiq*(1.-tr2)+uLand*.85*tr2;
+   float ic=1.-exp(-hi/.55),fl=fbm(b*30.+uSeed,5),th=mix(.86,.14,ic),ice=smoothstep(th-.1,th+.1,fl)*step(.0008,ic+.0009);
+   vec3 ice_c=uIce*(.82+.28*fbm(b*70.,3));
+   vec3 seabed=uLand*.55*(.7+.6*fn);
+   water=mix(water,uLand*.62+vec3(.04,.03,.01),hy.b*.55);
+   vec3 oc=mix(mix(seabed,water,hasSea),ice_c,ice*hasSea);
+   float lw=smoothstep(uTb,uTb-4.,Tl)*uOcean;
+   vec3 rc=uLiq*.7+uSky*.03;
+   ld=mix(ld,vec3(.93,.91,.86),hy.g*.9);
+   ld=mix(ld,rc,min(hy.r*1.3,1.)*lw);
+   ld=mix(ld,uIce*1.02,hy.a*.9);
+   float landW=uOcean>.5?smoothstep(-.07,.07,el):1.;
+   vec3 c=mix(oc,ld,landW);
+   float nl=max(dot(mix(n,ng,landW+(1.-landW)*ice),uL),0.),soft=smoothstep(-.05,.2,ns);
+   col=c*uStar*nl*soft;
+   vec3 hv=normalize(uL+vec3(0.,0.,1.));float ch=max(dot(n,hv),.05),tn=1./(ch*ch)-1.;
+   col+=uStar*exp(-tn/uSig)*.9*sqrt(.05/uSig)*(1.-landW)*(1.-ice)*hasSea*soft*exp(-uHz*3.);
+   col+=c*uSky*.06*min(uTau,1.);
+   if(Tl>1000.){float crack=pow(ridge(b*7.+uSeed+vec3(uTime*.012),4),3.),mo=smoothstep(1000.,1500.,Tl);col=mix(col,lut(max(Tl,900.))*(.55+2.4*crack),mo);}
+   float cth=1.-uCov,cd=smoothstep(cth,cth+.26,texture(uTr,uv).r+(texture(uTr,uv).g-.5)*.32);
+   float cnv=smoothstep(uTt+12.,uTt+28.,T0)*smoothstep(.6,1.,E.a),bil=fbm(b*60.+uTime*.02,4);cd=clamp(cd*mix(1.,.55+.9*bil,cnv)+cnv*smoothstep(.62,.8,bil)*.35*cd,0.,1.);
+   vec3 lb=ry(rx(uL,uTilt),uSpin);
+   float csh=smoothstep(cth,cth+.3,texture(uTr,uvOf(normalize(b+lb*.03))).r);
+   cd*=uClouds;csh*=uClouds;
+   col*=1.-.42*csh*min(uCov*2.,1.);
+   vec3 cc=uCld*uStar*(max(ns,0.)*.96+.04);
+   col=mix(col,cc,cd*.94*soft+cd*.1*(1.-soft));
+   vec4 sc=scatter(q,z);col=col*sc.a+sc.rgb;
+   if(uTide>.05){float vv=pow(ridge(b*9.+uSeed,3),6.);col+=vec3(1.,.35,.08)*vv*min(uTide,1.)*2.;}
+   if(uHz>.001){float hzt=1.-exp(-uHz*am*.8);col=mix(col,uHazeC*uStar*smoothstep(-.18,.55,ns),hzt);}
+   if(uOverlay>.5&&uOverlay<1.5){vec2 h2=texture(uHt,uv).rg;col=mix(col,h2.g>0.?vec3(1.,.28,.12):vec3(.2,.6,1.),clamp(abs(h2.g)*1.6,0.,.95)*soft);}
+   if(uOverlay>1.5&&uOverlay<2.5)col=mix(col,mix(vec3(.85,.68,.32),vec3(.08,.32,1.),sqrt(wet)),.8);
+   if(uOverlay>3.5){col*=.45;col=mix(col,vec3(.15,.75,1.),hy.r);col=mix(col,vec3(1.,.95,.6),hy.g*.9);col=mix(col,vec3(.85,.9,1.),hy.a*.8);col=mix(col,vec3(1.,.55,.2),hy.b*.6*(1.-landW));}
+   else if(uOverlay>2.5)col=mix(col,mix(vec3(.08,.12,.3),vec3(1.,.82,.25),clamp(E2.g*1.6,0.,1.)),(1.-landW)*.9);
+  }
+  col*=edge;
+ }
+ float planetFront=r<1.?sqrt(max(0.,1.-r*r)):-9.;
+ if(r>1.-px){
+  float h=max(r-1.,0.),o=smoothstep(1.-px,1.+px,r),side=dot(normalize(vec3(q,0.)),uL)*.5+.5,lit=smoothstep(.15,.75,side);
+  vec3 g=uHz>.4?uHazeC:uSky;
+  if(uMode<.5&&uHz<.4)col+=o*scatter(q,-9.).rgb;else col+=o*g*uStar*lit*(exp(-h/uHv)*.75+exp(-h/(uHv*3.))*.14)*(1.-exp(-(uTau+uHz*2.)*1.2));
+ }
+ if(uRT>.5&&abs(rN.z)>.001){
+  float tp=-(q0.x*rN.x+q0.y*rN.y)/rN.z;vec3 P=vec3(q0,tp);float rho=length(P);
+  if(rho>1.11&&rho<2.34&&tp>planetFront){vec2 rg=texture(uRing,vec2((rho-1.1)/1.25,.5)).rg;float bL=dot(P,uL);vec3 pp=P-uL*bL;float sh=(bL<0.&&dot(pp,pp)<1.)?.04:1.;
+   col=mix(col,vec3(.9,.8,.62)*rg.g*sh*uStar*1.05,rg.r);}
+ }
+ col=1.-exp(-col*1.5);
+ O=vec4(pow(col,vec3(1./2.2)),1.);
+}`;
+
+var FLY_FS = `#version 300 es
+precision highp float;
+uniform vec2 uR,uOff;uniform vec3 uCam,uFwd,uRt,uUp,uLb,uStar,uSky,uLiq,uIce,uLand,uCld,uZ,uB,uS,uD,uP,uHazeC,uAw;
+uniform float uFov,uEx,uRkm,uOcean,uTt,uTb,uCov,uTau,uHz,uMode,uTime,uSeed,uGam,uClouds,uAltKm,uCloudKm,uHkm;
+uniform sampler2D uTr,uLut,uHt,uEb,uBand,uHy,uVel,uEb2;out vec4 O;
+const float PI=3.14159265,TAU=6.2831853;
+${NOISE}
+float FP,HV,MX;vec3 C0,CA,CB,EXT,SCR,SCM;
+vec2 uvOf(vec3 b){return vec2(atan(b.z,b.x)/TAU+.5,asin(clamp(b.y,-1.,1.))/PI+.5);}
+/* bilinear read of a float target (those are stored unfiltered), wrapping in longitude */
+vec4 tex4(sampler2D t,vec2 uv){ivec2 sz=textureSize(t,0);vec2 p=uv*vec2(sz)-.5,f=fract(p);ivec2 i=ivec2(floor(p));
+ int x0=(i.x%sz.x+sz.x)%sz.x,x1=(x0+1)%sz.x,y0=clamp(i.y,0,sz.y-1),y1=clamp(i.y+1,0,sz.y-1);
+ return mix(mix(texelFetch(t,ivec2(x0,y0),0),texelFetch(t,ivec2(x1,y0),0),f.x),mix(texelFetch(t,ivec2(x0,y1),0),texelFetch(t,ivec2(x1,y1),0),f.x),f.y);}
+float rsph(vec3 ro,vec3 rd,float r,out float t1){float b=dot(ro,rd),c=dot(ro,ro)-r*r,h=b*b-c;if(h<0.){t1=-1.;return -1.;}h=sqrt(h);t1=-b+h;return -b-h;}
+/* detail that is finer than a pixel fades out instead of shimmering: FP is the pixel footprint in planet radii */
+float lod(float f){return 1.-smoothstep(.25,.6,FP*f);}
+float fbmL(vec3 p,float f,int n){float a=.5,s=0.,t=0.;for(int i=0;i<8;i++){if(i>=n)break;s+=a*lod(f)*(vn(p)-.5);t+=a;p=p*2.03+vec3(7.1,3.3,1.7);f*=2.03;a*=.5;}return .5+s/t;}
+/* value noise with its analytic gradient (Quilez) */
+vec4 vnd(vec3 x){vec3 i=floor(x),f=fract(x),u=f*f*(3.-2.*f),du=6.*f*(1.-f);
+ float a=h33(i).x,b=h33(i+vec3(1,0,0)).x,c=h33(i+vec3(0,1,0)).x,d=h33(i+vec3(1,1,0)).x,e=h33(i+vec3(0,0,1)).x,f1=h33(i+vec3(1,0,1)).x,g=h33(i+vec3(0,1,1)).x,h=h33(i+vec3(1,1,1)).x;
+ float k1=b-a,k2=c-a,k3=e-a,k4=a-b-c+d,k5=a-c-e+g,k6=a-b-e+f1,k7=-a+b+c-d+e-f1-g+h;
+ return vec4(a+k1*u.x+k2*u.y+k3*u.z+k4*u.x*u.y+k5*u.y*u.z+k6*u.z*u.x+k7*u.x*u.y*u.z,
+  du*vec3(k1+k4*u.y+k6*u.z+k7*u.y*u.z,k2+k5*u.z+k4*u.x+k7*u.z*u.x,k3+k6*u.x+k5*u.y+k7*u.x*u.y));}
+const mat3 RM=mat3(.00,.80,.60,-.80,.36,-.48,-.60,-.48,.64);
+/* slope-damped fBm: each octave is weakened where the octaves above it are steep, which gives
+   smooth valleys and sharp eroded crests (I. Quilez, "morenoise"/elevated terrain technique) */
+float efbm(vec3 p){float a=.5,s=0.;vec3 g=vec3(0.);for(int i=0;i<6;i++){vec4 n=vnd(p);n=vec4(n.x*2.-1.,n.yzw*2.);g+=n.yzw;s+=a*n.x/(1.+dot(g,g));a*=.5;p=RM*p*2.;}return s;}
+/* gully noise: stripes that run straight down the local slope, blended over jittered cells,
+   so each slope gets its own drainage lines (after Clay John's erosion noise) */
+vec3 gully(vec2 p,vec2 dir){vec2 ip=floor(p),fp=fract(p);vec3 va=vec3(0.);float wt=0.;
+ for(int i=-1;i<=1;i++)for(int j=-1;j<=1;j++){vec2 o=vec2(i,j),pp=fp-o-h33(vec3(ip+o,uSeed)).xy*.8+.4;float w=exp(-dot(pp,pp)*2.),mg=dot(pp,dir)*TAU;va+=vec3(cos(mg),-sin(mg)*dir*TAU)*w;wt+=w;}
+ return va/wt;}
+float hKm(vec3 d){
+ /* the 55 km height grid is read through a small fractal warp so coastlines are ragged, not grid-straight (artistic) */
+ vec3 wq=d*300.+uSeed;vec2 uv=uvOf(normalize(d+(vec3(vn(wq),vn(wq+7.3),vn(wq+3.1))-.5)*.008+(vec3(vn(wq*4.),vn(wq*4.+7.3),vn(wq*4.+3.1))-.5)*.0025));float e=texture(uHt,uv).r,m=smoothstep(.1,2.5,e);vec3 p=d*420.+uSeed;
+ float h=e+((ridge(p,4)-.55)*.6+efbm(p*.8)*1.1)*(.3+2.6*m)+(fbm(p*3.7,3)-.5)*.14;
+ return uOcean>.5?max(h,0.):h;
+}
+float surfR(vec3 d){return 1.+hKm(d)*uEx/uRkm;}
+/* air mass toward the Sun from height dn-weighted point; capped at the grazing value sqrt(pi R / 2H) */
+float airm(float mus){return mus<0.?MX:min(1./(mus+.035),MX);}
+/* single scattering through an exponential atmosphere (scale height HV): Rayleigh plus haze */
+vec3 atmo(vec3 ro,vec3 rd,float tmax,out vec3 tr){
+ tr=vec3(1.);if(uTau+uHz<.001)return vec3(0.);
+ float t1,t0=rsph(ro,rd,1.+HV*8./uRkm,t1);if(t1<=0.)return vec3(0.);
+ t0=max(t0,0.);t1=min(t1,tmax);if(t1<=t0)return vec3(0.);
+ float dt=(t1-t0)/16.,od=0.;vec3 L=vec3(0.);
+ for(int i=0;i<16;i++){vec3 p=ro+rd*(t0+(float(i)+.5)*dt);float r=length(p),dn=exp(-max(r-1.,0.)*uRkm/HV),ds=dn*dt*uRkm;
+  float mus=dot(p/r,uLb),cz=-sqrt(max(1.-1./(r*r),0.));
+  L+=exp(-EXT*(od+ds*.5+HV*dn*airm(mus)))*smoothstep(cz-.03,cz+.01,mus)*ds;od+=ds;}
+ tr=exp(-EXT*od);
+ float c=dot(rd,uLb),g=.72,pR=.0597*(1.+c*c),pM=(1.-g*g)/(12.566*pow(1.+g*g-2.*g*c,1.5));
+ return uStar*L*(SCR*pR+SCM*uHazeC*pM)*PI;
+}
+vec3 sunT(vec3 d){return exp(-EXT*HV*airm(dot(d,uLb)));}
+float cov2(vec3 d,float tq){FP=tq*2.*uFov/uR.y;vec3 q=d*260.+vec3(uTime*.01,0.,0.)+uSeed;
+ vec3 w=vec3(fbmL(q,260.,4),fbmL(q+5.2,260.,4),fbmL(q+9.7,260.,4))-.5;vec4 cl=tex4(uTr,uvOf(normalize(d+w*.035)));float th=1.-uCov;
+ float b=cl.r+(cl.g-.5)*.32+(fbmL(d*1100.+w*30.+uSeed,1100.,5)-.5)*.42;
+ return smoothstep(th-.08,th+.3,b);}
+void main(){
+ vec2 q=(2.*(gl_FragCoord.xy-uOff)-uR)/uR.y;
+ vec3 rd=normalize(uFwd+q.x*uFov*uRt+q.y*uFov*uUp),ro=uCam;
+ C0=normalize(uCam);CA=normalize(cross(abs(C0.y)<.99?vec3(0,1,0):vec3(1,0,0),C0));CB=cross(C0,CA);
+ HV=max(uHkm*(uMode>.5?2.:uEx),.3);MX=sqrt(PI*uRkm/(2.*HV));
+ SCR=vec3(.061,.142,.349)*uTau/HV;SCM=vec3(uHz*.5/HV);EXT=SCR+SCM*max(1.35-uHazeC,.05);
+ float hit=-1.;vec3 p=ro;
+ if(uMode>.5){float t1,t0=rsph(ro,rd,1.,t1);if(t0>0.){hit=t0;p=ro+rd*t0;}}
+ else{float top=1.+14.*uEx/uRkm,t1,t0=rsph(ro,rd,top,t1);
+  if(t1>0.){float t=max(t0,0.);for(int i=0;i<360;i++){p=ro+rd*t;float r=length(p),g=r-surfR(p/r);if(g<1e-6+t*6e-5){hit=t;break;}if(t>t1)break;t+=max(g*.55,2e-7+t*.0012);}}}
+ vec3 col=vec3(0.),amb;
+ if(hit>0.){
+  vec3 d=normalize(p);vec2 uv=uvOf(d);float mud=dot(d,uLb);
+  FP=hit*2.*uFov/uR.y/max(abs(dot(rd,d)),.2);
+  amb=uStar*(SCR*HV*1.3+SCM*uHazeC*HV*.8+.012)*smoothstep(-.25,.3,mud);
+  vec3 sT=sunT(d);
+  if(uMode>.5){
+   /* gas giant: the cloud deck. Large scale = the simulated tracer; small scale = that tracer
+      carried backward along the simulated winds plus sub-grid curl-noise eddies, so filaments
+      stretch along jets and wrap round the storms (artistic below the 280 km grid) */
+   vec2 X=vec2(dot(d,CA),dot(d,CB))/max(dot(d,C0),.05);
+   float tb=texture(uBand,vec2(.5,uv.y)).b,fpX=FP;
+   for(int i=0;i<10;i++){vec3 dd=normalize(C0+CA*X.x+CB*X.y);vec4 v=texture(uVel,uvOf(dd));
+    vec3 E=normalize(cross(vec3(0,1,0),dd)),N=cross(dd,E);vec3 V=E*v.x*sqrt(max(1.-dd.y*dd.y,0.))+N*v.y;
+    vec2 Y1=X*55.,Y2=X*170.+3.;float e=.2;
+    vec2 c1=vec2(vn(vec3(Y1.x,Y1.y+e,uSeed))-vn(vec3(Y1.x,Y1.y-e,uSeed)),vn(vec3(Y1.x-e,Y1.y,uSeed))-vn(vec3(Y1.x+e,Y1.y,uSeed)))/(2.*e);
+    vec2 c2=vec2(vn(vec3(Y2.x,Y2.y+e,uSeed))-vn(vec3(Y2.x,Y2.y-e,uSeed)),vn(vec3(Y2.x-e,Y2.y,uSeed))-vn(vec3(Y2.x+e,Y2.y,uSeed)))/(2.*e);
+    X-=vec2(dot(V,CA),dot(V,CB))*.004+(c1*(.3/55.)*lod(55.)+c2*(.25/170.)*lod(170.))*(.2+1.6*tb);}
+   vec3 df=normalize(C0+CA*X.x+CB*X.y);vec2 uf=uvOf(df);
+   vec4 tt=tex4(uTr,uf),bd=texture(uBand,vec2(.5,uf.y));
+   float dye=fbmL(vec3(X*300.,uSeed),300.,4),dye2=fbmL(vec3(X*70.,uSeed+4.),70.,3),ex2=.6/300.;
+   float streak=(tt.b-.5)*(.08+.55*bd.b)+(dye-.5)*(.3+.6*bd.b),br=tt.r+streak*.5;
+   vec3 cc=mix(uZ,uB,clamp(tt.g+streak*.9,0.,1.));cc=mix(cc,uS,clamp(tt.a*1.15,0.,.92));cc*=.38+.78*br;cc=mix(cc,uP*(.74+.5*br),bd.a*.85);
+   cc=mix(cc,uP*(.55+.8*dye),smoothstep(.55,.78,dye2)*(.25+.6*tb)*.7);cc=mix(cc,mix(uB,uS,dye)*(.55+.7*br),smoothstep(.45,.75,dye2)*tb*.55);
+   float gx=fbmL(vec3((X+vec2(ex2,0.))*300.,uSeed),300.,4)-dye,gy=fbmL(vec3((X+vec2(0.,ex2))*300.,uSeed),300.,4)-dye;
+   vec3 n=normalize(d-(CA*gx+CB*gy)/ex2*.0008*(.5+br));
+   col=cc*(uStar*sT*(.04+.96*max(dot(n,uLb),0.))*smoothstep(-.08,.05,mud)+amb*.5);
+  }else{
+   vec3 tA=normalize(cross(d,abs(d.y)<.99?vec3(0,1,0):vec3(1,0,0))),tB=cross(d,tA);float ee=max(.35/uRkm,FP*.7);
+   vec3 da=normalize(d+tA*ee),db=normalize(d+tB*ee),p0=d*surfR(d),n=normalize(cross(da*surfR(da)-p0,db*surfR(db)-p0));if(dot(n,d)<0.)n=-n;
+   float sh=1.;
+   if(dot(n,uLb)>0.){vec3 s2=p0+d*2e-6;float st=6e-6;for(int k=0;k<36;k++){s2+=uLb*st;float rq=length(s2),gq=rq-surfR(s2/rq);if(gq<0.){sh=0.;break;}sh=min(sh,10.*gq/st);st*=1.3;if(rq>1.+14.*uEx/uRkm)break;}sh=clamp(sh,0.,1.);}
+   vec4 E=texture(uEb,uv),hy=texture(uHy,uv);float e=texture(uHt,uv).r,hk=hKm(d),slope=(1.-dot(n,d))*uEx;
+   /* drainage gullies on slopes, a few km apart, shading and snow only */
+   vec2 P=vec2(dot(d,CA),dot(d,CB))/max(dot(d,C0),.05)*uRkm;vec3 sl=n-d*dot(n,d);vec2 s2d=vec2(dot(sl,CA),dot(sl,CB));float sm=length(s2d);
+   vec2 dir=sm>1e-5?vec2(-s2d.y,s2d.x)/sm:vec2(1.,0.);float G=0.,ga=1.,fq=.16;vec2 gd=vec2(0.);
+   for(int i=0;i<3;i++){float w=lod(fq*uRkm);vec3 g3=gully(P*fq,dir);G+=ga*g3.x*w;gd+=ga*g3.yz*fq*w;ga*=.5;fq*=2.3;}
+   float gw=smoothstep(.03,.18,slope)*(1.-step(hk,.001)*uOcean);G*=gw;gd*=gw;
+   n=normalize(n-(CA*gd.x+CB*gd.y)*.3*uEx);
+   float slope2=(1.-dot(n,d))*uEx,Tl=E.r-uGam*max(hk+G*.3,0.);
+   float cs=1.;
+   if(uClouds>.5&&uCov>.01){float rm=1.+3.*uEx/uRkm;vec3 sp=p0+uLb*((rm-length(p0))/max(mud,.1));cs=1.-.78*smoothstep(.15,.7,cov2(normalize(sp),hit));FP=hit*2.*uFov/uR.y/max(abs(dot(rd,d)),.2);}
+   if(uOcean>.5&&hk<=.001){
+    vec3 trn=exp(-2.*uAw*min(max(-e,0.)*1000.,400.)),w=uLiq*(1.-trn)+uLand*.8*trn;
+    float wl=lod(2600.);vec3 wn=normalize(d+(vec3(fbm(d*2600.+uTime*.2,3),fbm(d*2600.+7.-uTime*.17,3),fbm(d*2600.+13.,3))-.5)*.06*wl);
+    vec3 v=-rd,hv=normalize(uLb+v);float pw=mix(14.,140.,wl),spec=pow(max(dot(wn,hv),0.),pw)*(pw+8.)/150.,fr=.02+.98*pow(1.-max(dot(wn,v),0.),5.);
+    float ice=smoothstep(.02,.45,E.g)*smoothstep(.3,.6,fbmL(d*700.,700.,3)+E.g*.4);
+    vec3 skyR=uStar*(SCR*HV*3.+SCM*uHazeC*HV*2.+.02)*smoothstep(-.2,.3,mud);
+    col=w*(uStar*sT*max(mud,0.)*cs+amb)+skyR*fr+uStar*sT*spec*sh*cs*smoothstep(-.05,.15,mud);
+    col=mix(col,uIce*(uStar*sT*max(dot(n,uLb),0.)*sh*cs+amb),ice);
+   }else{
+    /* same palette as the globe: brighter lowlands, darker heights, dry ground warmer, wet ground darker */
+    float fn=fbm(d*38.+uSeed,4);
+    vec3 ld=mix(uLand,uLand*vec3(.72,.7,.7)+.06,smoothstep(.5,2.6,e))*(.7+.62*fbm(d*15.+uSeed,3));
+    ld=mix(ld,ld*1.18+vec3(.03,.025,.015),1.-smoothstep(0.,.35,e));
+    float wet=clamp(texture(uEb2,uv).r,0.,1.);
+    ld=mix(ld*vec3(1.22,1.08,.82)+vec3(.05,.035,.012),ld*vec3(.62,.6,.56),smoothstep(.05,.6,wet));
+    ld*=(.78+.44*fbmL(d*110.+uSeed,110.,3))*(.85+.3*fbmL(d*1500.+uSeed,1500.,4));ld=mix(ld,ld.gbr*.35+ld*.75,smoothstep(.55,.8,fbm(d*60.+uSeed+3.,3))*.5);
+    ld=mix(ld,uLand*vec3(.58,.56,.55)*(.8+.4*fbmL(d*5000.,5000.,3)),smoothstep(.1,.35,slope2));
+    float fs=1.-exp(-E.b/.08),cold=smoothstep(uTt+9.,uTt-5.,Tl);
+    float fa=clamp(fs*(.35+.65*cold)+cold*smoothstep(1.6,3.4,hk)*.75,0.,1.);
+    fa=smoothstep(0.,1.,fa*(.7+.7*fn))*(1.-.8*smoothstep(.35,.7,slope2));
+    ld=mix(ld,uIce*(.92+.1*fn),fa);
+    ld=mix(ld,vec3(.93,.91,.86),hy.g*.85);
+    float riv=hy.r*smoothstep(uTb,uTb-4.,Tl)*uOcean*(1.-smoothstep(.1,.3,slope2));
+    ld=mix(ld,uLiq*.7+uSky*.03,min(riv*1.3,1.));ld=mix(ld,uIce,hy.a*.8);
+    col=ld*(uStar*sT*max(dot(n,uLb),0.)*sh*cs+amb);
+   }
+  }
+ }else{
+  float sd=max(dot(rd,uLb),0.);col=uStar*pow(sd,2400.)*40.;
+ }
+ /* rock worlds: one cloud deck about 3 km up (drawn x uEx). Opacity is the cover times the slant path
+    through a layer whose depth grows with cover; tops are lit from their own slope and shadowed by
+    cloud toward the Sun */
+ if(uClouds>.5&&uMode<.5&&uCov>.01){
+  float rc=1.+3.*uEx/uRkm,tmax=hit>0.?hit:1e9,u1,u0=rsph(ro,rd,rc,u1),above=step(rc,length(ro)),tc=above>.5?u0:u1;
+  if(tc>0.&&tc<tmax){vec3 pc=ro+rd*tc,dc=normalize(pc);float c=cov2(dc,tc);
+   if(c>.003){float mu=abs(dot(rd,dc)),al=1.-exp(-c*7./max(mu,.12));
+    float ec=max(1.5/uRkm,FP*1.5),cx=cov2(normalize(dc+CA*ec),tc),cy=cov2(normalize(dc+CB*ec),tc);
+    vec3 nc=normalize(dc-(CA*(cx-c)+CB*(cy-c))/ec*(2.5*uEx/uRkm));
+    float mus=dot(dc,uLb),o=cov2(normalize(dc+uLb*4.*uEx/uRkm),tc),sl=exp(-max(o-c*.6,0.)*1.8);
+    float lit=above>.5?(.25+.75*max(dot(nc,uLb),0.))*sl:.35*(1.-c*.7);
+    vec3 lc=uCld*(uStar*sunT(dc)*lit*smoothstep(-.06,.08,mus)*(.85+.6*pow(max(dot(rd,uLb),0.),6.))+uStar*(SCR*HV*1.3+.05)*smoothstep(-.25,.3,mus)*(above>.5?1.:.6));
+    col=mix(col,lc,al);}}
+ }
+ vec3 tr,ins=atmo(ro,rd,hit>0.?hit:1e9,tr);col=col*tr+ins;
+ O=vec4(pow(1.-exp(-col*1.5),vec3(1./2.2)),1.);
+}`;
+var FLUIDS = {
+  water: { aw: [0.34, 0.056, 0.012], label: 'Water', Tt: 273.16, Pt: 611.7, Tb: 373.15, L: 40650, liq: [0.012, 0.05, 0.13], ice: [0.82, 0.88, 0.96], cld: [1, 1, 1], land: [0.34, 0.27, 0.2], q: 0.02 },
+  ammoniaWater: { aw: [0.2, 0.08, 0.04], label: 'Ammonia–water', Tt: 176, Pt: 3000, Tb: 320, L: 34000, liq: [0.03, 0.06, 0.1], ice: [0.86, 0.9, 0.92], cld: [1, 0.98, 0.9], land: [0.33, 0.29, 0.25], q: 0.02 },
+  methane: { aw: [0.08, 0.02, 0.01], label: 'Methane', Tt: 90.69, Pt: 11700, Tb: 111.67, L: 8190, liq: [0.03, 0.022, 0.014], ice: [0.72, 0.68, 0.58], cld: [0.95, 0.9, 0.76], land: [0.3, 0.18, 0.09], q: 0.05 },
+  ammonia: { label: 'Ammonia', Tt: 195.4, Pt: 6060, Tb: 239.8, L: 23350, liq: [0.06, 0.09, 0.13], ice: [0.9, 0.9, 0.84], cld: [1, 0.96, 0.84], land: [0.33, 0.29, 0.25], q: 0.02 },
+  nitrogen: { label: 'Nitrogen', Tt: 63.15, Pt: 12500, Tb: 77.36, L: 5570, liq: [0.05, 0.06, 0.09], ice: [0.88, 0.82, 0.74], cld: [0.9, 0.9, 0.93], land: [0.36, 0.3, 0.26], q: 0.05 },
+  co2: { label: 'CO₂', Tt: 216.58, Pt: 518000, Tb: 194.7, L: 25200, liq: [0.08, 0.09, 0.12], ice: [0.9, 0.9, 0.93], cld: [0.98, 0.98, 0.94], land: [0.42, 0.28, 0.18], q: 0.02 }
+};
+var WP = [
+  { id: 't1e', label: 'TRAPPIST-1 e', type: 'rock', Ts: 2566, Rs: 0.1192, a: 0.02925, P: 6.101, Rj: 0.08208, Me: 0.692, locked: true, fluid: 'water', Ps: 1.2, mu: 29, sea: 0.5, seed: 11 },
+  { id: 't1f', label: 'TRAPPIST-1 f', type: 'rock', Ts: 2566, Rs: 0.1192, a: 0.03849, P: 9.2075, Rj: 0.09323, Me: 1.039, locked: true, fluid: 'water', Ps: 1, mu: 29, sea: 0.5, seed: 23 },
+  { id: 'k186', label: 'Kepler-186 f', type: 'rock', Ts: 3755, Rs: 0.523, a: 0.432, P: 129.94, Rj: 0.10438, Me: 1.71, locked: true, fluid: 'water', Ps: 3, mu: 29, sea: 0.47, seed: 37 },
+  { id: 'k218', label: 'K2-18 b', type: 'rock', ocean: true, Ts: 3457, Rs: 0.411, a: 0.1429, P: 32.94, Rj: 0.2114, Me: 8.92, locked: true, fluid: 'water', Ps: 8, mu: 18, sea: 2, seed: 41 },
+  { id: 'rivers', label: 'River world (example)', type: 'rock', Ts: 5772, Rs: 1, a: 0.98, P: 354, Prot: 1.1, Rj: 0.1, Me: 1.4, locked: false, fluid: 'water', Ps: 1.4, mu: 29, sea: 0.5, seed: 131 },
+  { id: 'earth', label: 'Earth (calibration)', type: 'rock', Ts: 5772, Rs: 1, a: 1, P: 365.25, Prot: 1, Rj: 0.0892, Me: 1, locked: false, fluid: 'water', Ps: 1, mu: 29, sea: 0.5, seed: 101 },
+  { id: 'hd', label: 'HD 189733 b', type: 'gas', Ts: 5052, Rs: 0.75, a: 0.03126, P: 2.2186, Rj: 1.13, Me: 359.15, locked: true, fluid: 'water', Ps: 1, mu: 2.3, seed: 53 },
+  { id: 'jup', label: 'Jupiter', type: 'gas', Ts: 5772, Rs: 1, a: 5.204, P: 4333, Prot: 0.4135, Rj: 1, Me: 317.8, locked: false, fluid: 'ammonia', Ps: 1, mu: 2.3, seed: 67, Tint: 99, axis: 0.054, L: [-0.2, 0.12, 0.97], pal: { z: [0.93, 0.89, 0.76], b: [0.56, 0.29, 0.12], s: [0.78, 0.3, 0.13], d: [0.3, 0.2, 0.15], p: [0.45, 0.5, 0.53] } },
+  { id: 'sat', label: 'Saturn', type: 'gas', Ts: 5772, Rs: 1, a: 9.58, P: 10759, Prot: 0.444, Rj: 0.843, Me: 95.16, locked: false, fluid: 'ammonia', Ps: 1, mu: 2.1, seed: 79, Tint: 77, axis: -0.36, roll: -0.55, rings: true, L: [-0.42, 0.34, 0.84], pal: { z: [0.93, 0.8, 0.5], b: [0.72, 0.54, 0.27], s: [0.9, 0.86, 0.72], d: [0.5, 0.4, 0.25], p: [0.62, 0.56, 0.42] } },
+  { id: 'nep', label: 'Methane giant (example)', type: 'gas', Ts: 5772, Rs: 1, a: 30, P: 60190, Prot: 0.67, Rj: 0.346, Me: 17.1, locked: false, fluid: 'methane', Ps: 1, mu: 2.5, seed: 71 },
+  { id: 'tit', label: 'Methane seas (Titan-based example)', type: 'rock', Ts: 5772, Rs: 1, a: 9.58, P: 15.95, Prot: 15.95, Rj: 0.03600, Me: 0.0225, locked: false, fluid: 'methane', Ps: 1.5, mu: 28, sea: 0.5, seed: 83, A: 0.22 },
+  { id: 'lava', label: 'Lava world (example)', type: 'rock', Ts: 5200, Rs: 0.95, a: 0.0155, P: 0.737, Rj: 0.167, Me: 8, locked: true, fluid: 'water', Ps: 0.005, mu: 44, sea: 0, seed: 97, A: 0.1 }
+];
+var ORB = { rivers: { Ms: 1, e: 0.01, obl: 0.3 }, earth: { Ms: 1, e: 0.0167, obl: 0.409 }, t1e: { Ms: 0.0898, e: 0.005, obl: 0 }, t1f: { Ms: 0.0898, e: 0.01, obl: 0 }, k186: { Ms: 0.544, e: 0.04, obl: 0 }, k218: { Ms: 0.359, e: 0.09, obl: 0 }, tit: { Ms: 1, e: 0.054, obl: 0.467 }, lava: { Ms: 0.95, e: 0, obl: 0 } };
+function applySpin(p) { if (p.type === 'gas') return p; var mode = W.spinMode, lock = mode === 'auto' ? (p.locked && (W.ecc || 0) < 0.15) : mode === 'lock', res = mode === 'res32' || (mode === 'auto' && p.locked && (W.ecc || 0) >= 0.15); return Object.assign({}, p, { locked: lock || res, res32: res, Prot: p.Prot || 1 }); }
+var W = { fly: false, flyLon: 0, flyLat: 0.3, flyHead: 0.6, flyPitch: -0.16, flyAlt: 14, flyAuto: false, clouds: true, pitch: 0, zoom: 1, yaw: 0, hydro: null, route: null, hydroDue: 0, spinMode: 'auto', tect: 'auto', co2Therm: false, overlay: 0, season: 0, ecc: 0, obl: 0, p: WP[0], fluid: 'water', Tstar: 2566, orbit: 1, Ps: 1, playing: !reduced, m: null, step: 0, spin: 0.4, gl: null, spinup: 0 };
+var STARMIN = Math.log(2300), STARMAX = Math.log(14000), ORBMIN = Math.log(0.25), ORBMAX = Math.log(5), PSMIN = Math.log(0.002), PSMAX = Math.log(100);
+function psatFn(F) { return function (T) { return F.Pt * Math.exp(F.L / 8.314 * (1 / F.Tt - 1 / T)); }; }
+function worldModel() {
+  var p = W.p, F = FLUIDS[W.fluid], gas = p.type === 'gas', a = p.a * W.orbit, Ps = W.Ps, A = p.A != null ? p.A : 0.3;
+  var Rsau = p.Rs * 0.00465047, Teq = W.Tstar * Math.sqrt(Rsau / (2 * a)) * Math.pow(1 - A, 0.25), S = 5.670374e-8 * Math.pow(W.Tstar, 4) * Math.pow(Rsau / a, 2) / Math.sqrt(1 - (W.ecc || 0) * (W.ecc || 0));
+  var airless = !gas && Ps < 0.02, tau = gas || airless ? 0 : 0.8 * Ps * (W.fluid === 'co2' ? 1.8 : 1), Ts = Teq * Math.pow(1 + 0.75 * tau, 0.25);
+  var pco2 = null;
+  if (W.co2Therm && !gas && !airless && W.fluid === 'water' && OCEANF[p.id] > 0 && OCEANF[p.id] < 1) {   // Walker, Hays and Kasting 1981: W/W0 = (P/P0)^0.3 exp((T-288)/13.7)
+    var lo2 = Math.log(0.01), hi2 = Math.log(1e4), it2, tau0 = tau;
+    for (it2 = 0; it2 < 40; it2++) { var mid2 = (lo2 + hi2) / 2, t3 = Teq * Math.pow(1 + 0.75 * Math.max(0, tau0 + 0.09 * mid2 / Math.LN2), 0.25); if (0.3 * mid2 + (t3 - 288) / 13.7 > 0) hi2 = mid2; else lo2 = mid2; }
+    pco2 = Math.exp((lo2 + hi2) / 2); tau = Math.max(0, tau0 + 0.09 * Math.log(pco2) / Math.LN2); Ts = Teq * Math.pow(1 + 0.75 * tau, 0.25);
+  }
+  if (gas && p.Tint) Ts = 1.3 * Math.pow(Math.pow(Teq, 4) + Math.pow(p.Tint, 4), 0.25);
+  var R = p.Rj * 71492e3, M = p.Me * 5.972e24, gv = 6.674e-11 * M / (R * R), mu = p.mu, Rg = 8314 / mu, cp = Rg * 3.5, H = Rg * Ts / gv;
+  var rotD = p.locked ? (W.orbit === 1 ? p.P : p.P * Math.pow(W.orbit, 1.5)) : p.Prot, Om = 6.2832 / (rotD * 86400);
+  var Pref = gas ? 1e4 : Math.max(Ps, 0.005) * 1e5, tRad = cp * Pref / (gv * 4 * 5.670374e-8 * Math.pow(Ts, 3)), U = 100, eps = 1, i, dT;
+  for (i = 0; i < 6; i++) {
+    var tAdv = Math.min(R / U, p.locked ? 1e13 : 1 / Om); eps = airless ? 1 : clamp(tAdv / (tAdv + tRad), 0.02, 1);
+    dT = p.locked ? eps * 0.6 * Ts : gas ? Math.max(10, eps * 0.6 * Ts) : 0.15 * Ts;
+    U = Math.max(1, 0.6 * Math.sqrt(Rg * dT));
+  }
+  var N = Math.sqrt(2 * Om * R / U), jets = Math.max(2, Math.round(clamp(N, 1, 22))), LD = (gas ? 0.35 : 1) * Math.sqrt(gv * H) / Om, sz = gas ? clamp(3 * LD / R, 0.03, 0.2) : clamp(LD / R, 0.09, 0.2);
+  // what the fluid is doing
+  var Pa = Ps * 1e5, canLiquid = Pa > F.Pt && F.Tb > F.Tt, Tb = canLiquid ? 1 / (1 / F.Tb - 8.314 * Math.log(Pa / 101325) / F.L) : F.Tt;
+  var state = gas ? 'gas' : Ts < F.Tt ? 'frozen' : canLiquid && Ts < Tb ? 'liquid' : 'vapour';
+  if (airless) state = Ts < F.Tt ? 'frozen' : 'vapour';
+  // cloud level by following the adiabat up until the fluid saturates
+  var psat = psatFn(F), Tc = null, T;
+  if (!gas && !airless) for (T = Ts; T > Ts * 0.45; T -= 0.5) { var Pz = Pa * Math.pow(T / Ts, 3.5); if (psat(T) <= F.q * Pz) { Tc = T; break; } }
+  var Gam = gv / cp, zc = Tc != null ? (Ts - Tc) / Gam / 1000 : null;
+  var Seff = S / 1361, tS = clamp(W.Tstar - 5780, -3180, 1420), sIn = 1.107 + 1.332e-4 * tS + 1.58e-8 * tS * tS - 8.308e-12 * tS * tS * tS - 1.931e-15 * tS * tS * tS * tS, sOut = 0.356 + 6.171e-5 * tS + 1.698e-9 * tS * tS - 3.198e-12 * tS * tS * tS - 5.575e-16 * tS * tS * tS * tS;   // Kopparapu et al. HZ limits
+  var runaway = !gas && W.fluid === 'water' && Ps >= 0.1 && (state === 'vapour' || (Seff > sIn && OCEANF[p.id] > 0));
+  if (runaway) state = 'vapour';
+  var cov = gas ? 0 : airless ? 0 : state === 'liquid' ? 0.3 + 0.42 * sstep(F.Tt, Math.min(Tb, F.Tt + 70), Ts) : state === 'frozen' ? 0.12 : runaway ? 0.95 : 0.06;
+  // colour of the sky: the star's light scattered as lambda^-4, methane removes red
+  var bands = [640, 540, 450], ch4 = W.fluid === 'methane' ? 2.1 : 0, sky = bands.map(function (l, n) { return planck(l, W.Tstar) * Math.pow(550 / l, 4) * (n === 0 ? Math.exp(-ch4) : 1); }), mx = Math.max(sky[0], sky[1], sky[2]);
+  sky = sky.map(function (v) { return v / mx; });
+  var sun = bands.map(function (l) { return planck(l, W.Tstar) * Math.exp(-3.2 * Math.pow(550 / l, 4)); }), ms = Math.max(sun[0], sun[1], sun[2]); sun = sun.map(function (v) { return v / ms; });
+  var haze = !gas && W.fluid === 'methane' && Ps >= 0.3 ? 0.75 : runaway ? 0.9 : 0;
+  var hazeC = runaway ? [0.92, 0.9, 0.86] : [0.74, 0.46, 0.16];
+  // gas giant colour regime (Sudarsky-style, by temperature)
+  var z, b2, s2, regime;
+  if (W.fluid === 'methane' && Teq < 160 && gas) { z = [0.5, 0.64, 0.84]; b2 = [0.3, 0.44, 0.68]; s2 = [0.94, 0.96, 0.98]; regime = 'Methane-rich air, blue'; }
+  else if (Teq < 150) { z = [0.9, 0.85, 0.75]; b2 = [0.62, 0.45, 0.3]; s2 = [0.84, 0.38, 0.13]; regime = 'Ammonia clouds'; }
+  else if (Teq < 350) { z = [0.93, 0.93, 0.95]; b2 = [0.66, 0.72, 0.83]; s2 = [0.98, 0.98, 1]; regime = 'Water clouds'; }
+  else if (Teq < 850) { z = [0.33, 0.52, 0.88]; b2 = [0.18, 0.33, 0.7]; s2 = [0.55, 0.72, 0.96]; regime = 'Cloudless, deep blue'; }
+  else if (Teq < 1400) { z = [0.2, 0.34, 0.72]; b2 = [0.08, 0.15, 0.42]; s2 = [0.78, 0.86, 1]; regime = 'Silicate haze, dark blue'; }
+  else { z = [0.92, 0.72, 0.55]; b2 = [0.56, 0.28, 0.16]; s2 = [1, 0.86, 0.66]; regime = 'Silicate clouds, glowing'; }
+  var r = rng(p.seed * 7 + 1), nv = gas ? clamp(Math.round(3 + jets * 0.55), 3, 12) : clamp(Math.round(2 + cov * 8), 2, 8), V = [];
+  for (i = 0; i < nv; i++) {
+    var band = Math.floor(r() * jets) - Math.floor(jets / 2), la = clamp((band + 0.5) * Math.PI / jets * 0.98 + (r() - 0.5) * 0.06, -1.2, 1.2);
+    if (Math.abs(la) < 0.09) la += 0.2;
+    V.push({ lon: r() * 6.2832 - 3.1416, lat: la, r: sz * (0.55 + 0.9 * r()), s: (Math.sign(la) || 1) * (r() < 0.25 ? -1 : 1) });
+  }
+  if (p.pal) { z = p.pal.z; b2 = p.pal.b; s2 = p.pal.s; }
+  var dp2 = regime === 'Methane-rich air, blue' ? [[0.24, 0.32, 0.47], [0.5, 0.58, 0.7]] : regime === 'Ammonia clouds' ? [[0.3, 0.22, 0.18], [0.42, 0.44, 0.48]] : regime === 'Water clouds' ? [[0.45, 0.5, 0.6], [0.7, 0.74, 0.8]] : regime === 'Cloudless, deep blue' ? [[0.08, 0.14, 0.34], [0.2, 0.3, 0.55]] : regime === 'Silicate haze, dark blue' ? [[0.04, 0.08, 0.22], [0.12, 0.18, 0.36]] : [[0.3, 0.14, 0.08], [0.45, 0.3, 0.22]];
+  var vesc = Math.sqrt(2 * gv * R) / 1000, fx = W.Tstar < 3500 ? 1e-3 : W.Tstar > 6000 ? 5e-6 : Math.pow(10, lerp(-3, -5.3, (W.Tstar - 3500) / 2500)), shoreB = Seff > Math.pow(vesc / 6.1, 4), shoreX = Seff * fx / 5e-6 > Math.pow(vesc / 6.1, 4);   // Zahnle and Catling 2017 shoreline, I proportional to v^4
+  var mainN2 = mu < 40, Tcol = airless || gas ? 0 : 1 / ((mainN2 ? 1 / 77.36 : 1 / 194.7) - 8.314 * Math.log(Ps * 1e5 / 101325) / (mainN2 ? 5570 : 25200));
+  var ob = ORB[p.id] || { Ms: 1 }, an = 6.2832 / (p.P * Math.pow(W.orbit, 1.5) * 86400), aM = a * 1.496e11, tide = gas ? 0 : 10.5 * 0.003 * 6.674e-11 * Math.pow(ob.Ms * 1.989e30, 2) * Math.pow(R, 5) * an * (W.ecc || 0) * (W.ecc || 0) / Math.pow(aM, 6) / (4 * Math.PI * R * R);
+  var phiH = clamp(Math.sqrt(5 / 3 * gv * 15000 * 0.25) / (Om * R), 0.2, 1.3);   // Held and Hou 1980 scaling, tropopause 15 km, contrast 0.25
+  return { Seff: Seff, sIn: sIn, sOut: sOut, shoreB: shoreB, shoreX: shoreX, Tcol: Tcol, tide: tide, phiH: phiH, pco2: pco2, d: p.pal ? p.pal.d : dp2[0], p: p.pal ? p.pal.p : dp2[1], gamK: Gam * 1000 * (gas ? 1 : 0.66),   /* environmental lapse: about 6.5 K/km on Earth (US Standard Atmosphere 1976), not the dry 9.8 */ gas: gas, Teq: Teq, Ts: Ts, S: S, tau: tau, gv: gv, H: H, Om: Om, rotD: rotD, eps: eps, U: U, N: N, jets: jets, LD: LD, sz: sz, Tb: Tb, canLiquid: canLiquid, state: state, Tc: Tc, zc: zc, cov: cov, sky: sky, sun: sun, haze: haze, hazeC: hazeC, z: z, b: b2, s: s2, regime: regime, V: V, airless: airless, runaway: runaway, F: F, flat: gas ? clamp(0.7 * Om * Om * R * R * R / (6.674e-11 * M), 0, 0.14) : 0, a: a };
+}
+/* ---------- value noise on the CPU for the terrain builder ---------- */
+function hsh(i, j, k) { var h = Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(k, 2147483647) | 0; h = Math.imul(h ^ h >>> 13, 1274126177); return ((h ^ h >>> 16) >>> 0) / 4294967296; }
+function vn3(x, y, z) {
+  var i = Math.floor(x), j = Math.floor(y), k = Math.floor(z), fx = x - i, fy = y - j, fz = z - k;
+  fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy); fz = fz * fz * (3 - 2 * fz);
+  var a = lerp(lerp(hsh(i, j, k), hsh(i + 1, j, k), fx), lerp(hsh(i, j + 1, k), hsh(i + 1, j + 1, k), fx), fy), b = lerp(lerp(hsh(i, j, k + 1), hsh(i + 1, j, k + 1), fx), lerp(hsh(i, j + 1, k + 1), hsh(i + 1, j + 1, k + 1), fx), fy);
+  return lerp(a, b, fz);
+}
+function fbm3(x, y, z, n) { var a = 0.5, s = 0, t = 0, i; for (i = 0; i < n; i++) { s += a * vn3(x, y, z); t += a; x = x * 2.03 + 7.1; y = y * 2.03 + 3.3; z = z * 2.03 + 1.7; a *= 0.5; } return s / t; }
+
+/* ---------- plate tectonics: plates, boundary physics, isostasy, then river erosion ---------- */
+function buildTerrain(p, oceanFrac, gv, opt) {
+  opt = opt || {};
+  var W = 720, H = 360, N = W * H, r = rng(p.seed * 97 + 13), i, j, k, ix, s = p.seed * 1.37;
+  var dx = new Float32Array(N), dy = new Float32Array(N), dz = new Float32Array(N), plate = new Uint8Array(N), C = new Float32Array(N), cl = new Float32Array(H);
+  var K = 8 + Math.floor(r() * 6), pl = [];
+  for (k = 0; k < K; k++) { var z = r() * 2 - 1, an = r() * 6.2832, c2 = Math.sqrt(1 - z * z), oz = r() * 2 - 1, oa = r() * 6.2832, oc = Math.sqrt(1 - oz * oz), sp = 0.3 + 0.9 * r(); pl.push({ d: [c2 * Math.cos(an), z, c2 * Math.sin(an)], w: 0.85 + 0.4 * r(), om: [oc * Math.cos(oa) * sp, oz * sp, oc * Math.sin(oa) * sp] }); }
+  for (j = 0; j < H; j++) { var la = ((j + 0.5) / H - 0.5) * Math.PI, c = Math.cos(la), sl = Math.sin(la); cl[j] = Math.max(c, 0.02); for (i = 0; i < W; i++) {
+    var lo = ((i + 0.5) / W - 0.5) * 6.2832, x = c * Math.cos(lo), y = sl, zz = c * Math.sin(lo); ix = j * W + i; dx[ix] = x; dy[ix] = y; dz[ix] = zz;
+    var wx = x + 0.3 * (vn3(x * 3 + s, y * 3, zz * 3) - 0.5), wy = y + 0.3 * (vn3(x * 3 + 31, y * 3 + s, zz * 3) - 0.5), wz = zz + 0.3 * (vn3(x * 3 + 57, y * 3, zz * 3 + s) - 0.5), best = -9, bk = 0;
+    for (k = 0; k < K; k++) { var v = (wx * pl[k].d[0] + wy * pl[k].d[1] + wz * pl[k].d[2]) * pl[k].w; if (v > best) { best = v; bk = k; } }
+    plate[ix] = bk; C[ix] = fbm3(x * 1.7 + s, y * 1.7, zz * 1.7, 4);
+  } }
+  // continental crust takes the highest part of the slowly varying field, up to the land fraction wanted
+  var sorted = Float32Array.from(C).sort(), th = sorted[Math.floor(clamp(1 - (1 - oceanFrac + 0.06), 0.02, 0.98) * N)], isC = new Uint8Array(N);
+  for (i = 0; i < N; i++) isC[i] = C[i] > th ? 1 : 0;
+  // boundaries: relative plate velocity along the boundary normal tells convergent from divergent
+  var dist = new Float32Array(N).fill(9), src = new Int32Array(N).fill(-1), bC = new Float32Array(N), bP = new Uint8Array(N), dLat = Math.PI / H, dLon = 6.2832 / W;
+  function mark(a, b) {
+    if (plate[a] === plate[b]) return;
+    var A = pl[plate[a]].om, B = pl[plate[b]].om, x = dx[a], y = dy[a], z = dz[a], rx = (A[1] - B[1]) * z - (A[2] - B[2]) * y, ry = (A[2] - B[2]) * x - (A[0] - B[0]) * z, rz = (A[0] - B[0]) * y - (A[1] - B[1]) * x;
+    var nx = dx[b] - x, ny = dy[b] - y, nz = dz[b] - z, l = Math.hypot(nx, ny, nz) || 1, conv = (rx * nx + ry * ny + rz * nz) / l;
+    dist[a] = 0; dist[b] = 0; src[a] = a; src[b] = b; bC[a] = conv; bC[b] = conv; var pa = isC[a] | (isC[b] << 1); bP[a] = pa; bP[b] = pa;
+  }
+  for (j = 0; j < H; j++) for (i = 0; i < W; i++) { ix = j * W + i; mark(ix, j * W + (i + 1) % W); if (j < H - 1) mark(ix, ix + W); }
+  function relax(a, b, d) { if (src[b] >= 0 && dist[b] + d < dist[a]) { dist[a] = dist[b] + d; src[a] = src[b]; } }
+  for (var pass = 0; pass < 3; pass++) {
+    for (j = 0; j < H; j++) { var dl = dLon * cl[j], dg = Math.hypot(dl, dLat); for (i = 0; i < W; i++) { ix = j * W + i; relax(ix, j * W + (i + W - 1) % W, dl); if (j > 0) { relax(ix, ix - W, dLat); relax(ix, (j - 1) * W + (i + W - 1) % W, dg); relax(ix, (j - 1) * W + (i + 1) % W, dg); } } }
+    for (j = H - 1; j >= 0; j--) { var dl2 = dLon * cl[j], dg2 = Math.hypot(dl2, dLat); for (i = W - 1; i >= 0; i--) { ix = j * W + i; relax(ix, j * W + (i + 1) % W, dl2); if (j < H - 1) { relax(ix, ix + W, dLat); relax(ix, (j + 1) * W + (i + 1) % W, dg2); relax(ix, (j + 1) * W + (i + W - 1) % W, dg2); } } }
+  }
+  var gf = clamp(9.81 / gv, 0.5, 2.5), e = new Float32Array(N), orog = new Float32Array(N), sig = new Float32Array(N);
+  function g2(v, c0, w) { var t = (v - c0) / w; return Math.exp(-t * t); }
+  for (i = 0; i < N; i++) {
+    var d = dist[i], sc = src[i] < 0 ? i : src[i], conv = bC[sc], cc = Math.min(1, Math.abs(conv) * 1.4), pair = bP[sc], me = isC[i], up = 0, h;
+    var age = conv < -0.05 ? Math.min(d * 900, 180) : 110 + d * 200;
+    h = me ? 0.15 + 3.2 * Math.max(0, C[i] - th) : -(2.5 + 0.35 * Math.sqrt(age));   // ocean floor deepens as it cools (half-space cooling)
+    if (conv > 0.05) {
+      if (pair === 3) up = 5.5 * cc * g2(d, 0, 0.085);                                 // continents collide: thick crust, high range
+      else if (pair === 0) { up = 3.6 * cc * g2(d, 0.04, 0.02); h -= 4 * cc * g2(d, 0, 0.025); }   // ocean under ocean: trench and island arc
+      else if (me) up = 3.8 * cc * g2(d, 0.055, 0.045);                                // ocean sinks under continent: volcanic range
+      else h -= 3.5 * cc * g2(d, 0, 0.03);                                             // and the trench on the ocean side
+    } else if (conv < -0.05 && me) h -= 1.2 * cc * g2(d, 0, 0.04);                     // continent rifting
+    if (up > 0.01) { var rg = 1 - Math.abs(2 * vn3(dx[i] * 14 + s, dy[i] * 14, dz[i] * 14) - 1); up *= 0.55 + 0.75 * rg; }
+    orog[i] = up * gf; e[i] = h + up * gf;
+    sig[i] = clamp(Math.sign(conv) * cc * g2(d, 0, 0.012), -1, 1);
+  }
+  if (opt.stagnant) {   // one rigid lid: no ranges or trenches, broad volcanic shields, rifts and old basins
+    var rs = rng(p.seed * 7 + 3), vc = [], vi;
+    for (vi = 0; vi < 11; vi++) { var vz = rs() * 2 - 1, va = rs() * 6.2832, vs = Math.sqrt(1 - vz * vz); vc.push([vs * Math.cos(va), vz, vs * Math.sin(va), vi < 5 ? 0.09 + 0.09 * rs() : 0.16 + 0.22 * rs(), vi < 5 ? 1 : -1, vi < 5 ? 6 + 9 * rs() : 1.5 + 2.5 * rs()]); }
+    for (i = 0; i < N; i++) { var hh = -1.2 + 6 * (C[i] - th) + 1.2 * (vn3(dx[i] * 7 + s, dy[i] * 7, dz[i] * 7) - 0.5); for (vi = 0; vi < vc.length; vi++) { var cd2 = 1 - (dx[i] * vc[vi][0] + dy[i] * vc[vi][1] + dz[i] * vc[vi][2]), rr2 = 2 * cd2 / (vc[vi][3] * vc[vi][3]); if (rr2 < 9) hh += vc[vi][4] * vc[vi][5] * gf * Math.exp(-rr2); } e[i] = hh; orog[i] = 0; sig[i] = 0; }
+    K = 1;
+  }
+  // sea level: the height that puts the wanted share of the area under water
+  var smp = [], st = 0; for (j = 0; j < H; j += 2) for (i = 0; i < W; i += 2) { smp.push([e[j * W + i], cl[j]]); st += cl[j]; }
+  smp.sort(function (a, b) { return a[0] - b[0]; });
+  var acc = 0, sea = smp[smp.length - 1][0] + 0.5; if (oceanFrac < 1) { sea = smp[0][0] - 0.1; for (i = 0; i < smp.length && oceanFrac > 0; i++) { acc += smp[i][1]; if (acc >= oceanFrac * st) { sea = smp[i][0]; break; } } }
+  for (i = 0; i < N; i++) e[i] -= sea;
+  // rivers: stream-power erosion on a coarser grid, solved implicitly downstream to upstream (Braun and Willett)
+  var LW = 360, LH = 180, LN = LW * LH, hl = new Float32Array(LN), h0 = new Float32Array(LN), ul = new Float32Array(LN), cl2 = new Float32Array(LH);
+  for (j = 0; j < LH; j++) { cl2[j] = Math.max(Math.cos(((j + 0.5) / LH - 0.5) * Math.PI), 0.02); for (i = 0; i < LW; i++) { var a0 = j * 2 * W + i * 2; hl[j * LW + i] = (e[a0] + e[a0 + 1] + e[a0 + W] + e[a0 + W + 1]) / 4; ul[j * LW + i] = orog[a0]; } }
+  h0.set(hl);
+  var hIdx = new Int32Array(LN + 8), hVal = new Float32Array(LN + 8), order = new Int32Array(LN), rec = new Int32Array(LN), seen = new Uint8Array(LN), fill = new Float32Array(LN), area = new Float32Array(LN), hn;
+  function push(ix2, v) { var c = hn++; while (c > 0) { var par = (c - 1) >> 1; if (hVal[par] <= v) break; hVal[c] = hVal[par]; hIdx[c] = hIdx[par]; c = par; } hVal[c] = v; hIdx[c] = ix2; }
+  function pop() { var top = hIdx[0], lv = hVal[--hn], li2 = hIdx[hn], c = 0; for (;;) { var ch = 2 * c + 1; if (ch >= hn) break; if (ch + 1 < hn && hVal[ch + 1] < hVal[ch]) ch++; if (hVal[ch] >= lv) break; hVal[c] = hVal[ch]; hIdx[c] = hIdx[ch]; c = ch; } hVal[c] = lv; hIdx[c] = li2; return top; }
+  var ero = new Float32Array(LN), riv = new Float32Array(LN * 2), Tf0 = opt.Tf || 273, Tb0 = opt.Tsurf || 288, Gm = opt.Gam || 9.8;
+  function coldAt(ix2) { var la2 = ((Math.floor(ix2 / LW) + 0.5) / LH - 0.5) * Math.PI, lo2 = (((ix2 % LW) + 0.5) / LW - 0.5) * 6.2832, c2 = Math.cos(la2), mu2 = opt.locked ? Math.max(c2 * Math.cos(lo2 + 2.06), 0) : c2, t2 = Tb0 * (opt.locked ? (mu2 > 0 ? 1.12 * Math.pow(mu2, 0.25) : 0.82) : 1.12 * Math.pow(Math.max(c2, 0.05), 0.25)) - Gm * Math.max(hl[ix2], 0); return t2 < Tf0; }
+  if (oceanFrac < 1) for (var it = 0; it < 9; it++) {
+    seen.fill(0); hn = 0; var cnt = 0, low = 0;
+    for (i = 0; i < LN; i++) { rec[i] = i; if (hl[i] < hl[low]) low = i; if (hl[i] <= 0) { seen[i] = 1; fill[i] = hl[i]; push(i, hl[i]); } }
+    if (hn === 0) { seen[low] = 1; fill[low] = hl[low]; push(low, hl[low]); }
+    while (hn > 0) {
+      var cur = pop(); order[cnt++] = cur; var cy = Math.floor(cur / LW), cx = cur - cy * LW;
+      for (var nj = Math.max(0, cy - 1); nj <= Math.min(LH - 1, cy + 1); nj++) for (var di = -1; di <= 1; di++) { var nb = nj * LW + (cx + di + LW) % LW; if (seen[nb]) continue; seen[nb] = 1; rec[nb] = cur; fill[nb] = Math.max(hl[nb], fill[cur] + 1e-4); push(nb, fill[nb]); }
+    }
+    for (j = 0; j < LH; j++) for (i = 0; i < LW; i++) area[j * LW + i] = cl2[j];
+    for (i = cnt - 1; i >= 0; i--) { var c0 = order[i]; if (rec[c0] !== c0) area[rec[c0]] += area[c0]; }
+    ero.fill(0);
+    for (i = 0; i < cnt; i++) { var c1 = order[i], r0 = rec[c1]; if (r0 === c1) continue; if (fill[c1] > hl[c1]) hl[c1] = fill[c1]; var ice2 = opt.wet !== false && coldAt(c1), F = 0.012 * Math.sqrt(area[c1]) * (ice2 ? 2.4 : 1); if (hl[c1] > hl[r0]) { var old2 = hl[c1]; hl[c1] = (hl[c1] + F * hl[r0]) / (1 + F); ero[c1] = old2 - hl[c1]; if (ice2 && area[c1] > 6) { var cy2 = Math.floor(c1 / LW), cx2 = c1 - cy2 * LW; hl[c1] = lerp(hl[c1], 0.5 * (hl[cy2 * LW + (cx2 + 1) % LW] + hl[cy2 * LW + (cx2 + LW - 1) % LW]), 0.22); } } }
+    for (i = cnt - 1; i >= 0; i--) { var c2 = order[i], r2 = rec[c2]; if (r2 === c2) continue; if (hl[r2] <= 0 && hl[c2] > 0) hl[r2] = Math.min(hl[r2] + Math.min(0.35, ero[c2] * 0.25), -0.01); else ero[r2] += ero[c2]; }
+    for (i = 0; i < LN; i++) if (ul[i] > 0.02) hl[i] += (h0[i] - hl[i]) * 0.1;
+  }
+  if (oceanFrac < 1 && oceanFrac > 0 && opt.wet !== false) for (i = 0; i < LN; i++) if (hl[i] > 0) { riv[i * 2] = clamp(Math.log(area[i] / 6) / Math.log(40), 0, 1); riv[i * 2 + 1] = fill[i] > hl[i] + 0.05 && area[i] > 8 ? Math.min(1, (fill[i] - hl[i]) * 3) : 0; }
+  var out = new Float32Array(N * 2);
+  for (j = 0; j < H; j++) for (i = 0; i < W; i++) {
+    var fx = i / 2, fy = j / 2, ai = Math.floor(fx), aj = Math.min(Math.floor(fy), LH - 2), tx = fx - ai, ty = fy - aj, ii = ai % LW, i2 = (ai + 1) % LW;
+    var dd = lerp(lerp(hl[aj * LW + ii] - h0[aj * LW + ii], hl[aj * LW + i2] - h0[aj * LW + i2], tx), lerp(hl[(aj + 1) * LW + ii] - h0[(aj + 1) * LW + ii], hl[(aj + 1) * LW + i2] - h0[(aj + 1) * LW + i2], tx), ty);
+    out[(j * W + i) * 2] = e[j * W + i] + dd; out[(j * W + i) * 2 + 1] = sig[j * W + i];
+  }
+  return { W: W, H: H, data: out, plates: K, riv: riv, LW: LW, LH: LH, stagnant: !!opt.stagnant };
+}
+
+
+/* ---------- rivers and lakes: drainage on the final terrain, discharge from the climate's rain ----------
+   1. Priority-flood fills every closed basin to its spill level (Barnes et al. 2014), so every land cell drains.
+   2. Each cell sends water to its steepest lower neighbour on the filled surface (D8, O'Callaghan and Mark 1984).
+   3. Runoff = rain minus evaporation from the Budyko curve (Budyko 1974), with dryness = potential evaporation / rain.
+   4. Discharge Q accumulates downstream. A channel starts above a threshold discharge.
+   5. Width follows hydraulic geometry, w = 4 Q^0.5 (Leopold and Maddock 1953).
+   6. A closed basin holds a lake only as far as inflow can balance open-water evaporation; otherwise it is a salt flat.
+   7. Big rivers carry sediment into the sea as a plume at the mouth (deltas). */
+function routeTerrain(t) {
+  var Wd = t.W, Hd = t.H, N = Wd * Hd, h = new Float32Array(N), i;
+  for (i = 0; i < N; i++) { var yq = Math.floor(i / Wd), xq = i - yq * Wd, laq = ((yq + 0.5) / Hd - 0.5) * Math.PI, loq = ((xq + 0.5) / Wd - 0.5) * 6.2832, cq = Math.cos(laq), px = cq * Math.cos(loq) * 24, py = Math.sin(laq) * 24, pz = cq * Math.sin(loq) * 24; h[i] = t.data[i * 2]; if (h[i] > 0) h[i] += 0.12 * (fbm3(px, py, pz, 4) - 0.5) + 0.05 * (fbm3(px * 3.1, py * 3.1, pz * 3.1, 3) - 0.5); }
+  var fill = new Float32Array(N), rec = new Int32Array(N), order = new Int32Array(N), seen = new Uint8Array(N), hIdx = new Int32Array(N + 8), hVal = new Float32Array(N + 8), hn = 0, cnt = 0, low = 0;
+  function push(ix, v) { var c = hn++; while (c > 0) { var p = (c - 1) >> 1; if (hVal[p] <= v) break; hVal[c] = hVal[p]; hIdx[c] = hIdx[p]; c = p; } hVal[c] = v; hIdx[c] = ix; }
+  function pop() { var top = hIdx[0], lv = hVal[--hn], li = hIdx[hn], c = 0; for (;;) { var ch = 2 * c + 1; if (ch >= hn) break; if (ch + 1 < hn && hVal[ch + 1] < hVal[ch]) ch++; if (hVal[ch] >= lv) break; hVal[c] = hVal[ch]; hIdx[c] = hIdx[ch]; c = ch; } hVal[c] = lv; hIdx[c] = li; return top; }
+  for (i = 0; i < N; i++) { rec[i] = i; if (h[i] < h[low]) low = i; if (h[i] <= 0) { seen[i] = 1; fill[i] = h[i]; push(i, h[i]); } }
+  if (hn === 0) { seen[low] = 1; fill[low] = h[low]; push(low, h[low]); }
+  while (hn > 0) {
+    var cur = pop(); order[cnt++] = cur; var cy = Math.floor(cur / Wd), cx = cur - cy * Wd;
+    for (var nj = Math.max(0, cy - 1); nj <= Math.min(Hd - 1, cy + 1); nj++) for (var di = -1; di <= 1; di++) { var nb = nj * Wd + (cx + di + Wd) % Wd; if (seen[nb]) continue; seen[nb] = 1; fill[nb] = Math.max(h[nb], fill[cur] + 1e-5); push(nb, fill[nb]); }
+  }
+  var dLat = Math.PI / Hd;
+  for (i = 0; i < N; i++) {
+    if (h[i] <= 0) continue;
+    var y = Math.floor(i / Wd), x = i - y * Wd, cl = Math.max(Math.cos(((y + 0.5) / Hd - 0.5) * Math.PI), 0.02), best = i, bs = 0;
+    for (var yj = Math.max(0, y - 1); yj <= Math.min(Hd - 1, y + 1); yj++) for (var dx = -1; dx <= 1; dx++) {
+      if (!dx && yj === y) continue; var nb2 = yj * Wd + (x + dx + Wd) % Wd, dist = Math.hypot(dx * cl, yj - y) * dLat, sl = (fill[i] - fill[nb2]) / dist;
+      if (sl > bs) { bs = sl; best = nb2; }
+    }
+    rec[i] = best;
+  }
+  return { h: h, fill: fill, rec: rec, order: order, cnt: cnt };
+}
+function hydroRaster(t, m, rt) {
+  var Wd = t.W, Hd = t.H, N = Wd * Hd, RW = 2048, RH = 1024, img = new Uint8Array(RW * RH * 4), i, k, F = m.F;
+  if (!rt || OCEANF[W.p.id] <= 0 || m.airless) return { img: img, RW: RW, RH: RH, n: 0, big: 0 };
+  var Rm = W.p.Rj * 71492e3, cellA = (2 * Math.PI * Rm / Wd) * (Math.PI * Rm / Hd), Q = new Float64Array(N), T = new Float32Array(N), rainC = new Float32Array(N), ex = EB.NX / Wd, ey = EB.NY / Hd;
+  var P0 = W.fluid === 'water' ? 1.0 : 0.4;   // a normalised rain of 1 is about 1 m per year of liquid
+  for (i = 0; i < N; i++) {
+    var y = Math.floor(i / Wd), x = i - y * Wd, e = Math.min(EB.NX * EB.NY - 1, Math.floor(y * ey) * EB.NX + Math.floor(x * ex)), tc = EB.T[e] - m.gamK * Math.max(rt.h[i], 0);
+    T[i] = tc; var P = clamp(EB.out2[e * 4], 0, 3) * P0, pet = clamp((tc - F.Tt) / 40, 0, 3) * P0 * 1.1, phi = P > 1e-6 ? pet / P : 9;
+    var ep = P > 1e-6 ? Math.sqrt(phi * Math.tanh(1 / phi) * (1 - Math.exp(-phi))) : 1;   // Budyko evaporation share
+    var run = tc > F.Tt - 10 ? P * Math.max(0, 1 - ep) : 0;   // frozen ground stores snow and ice instead of running off
+    rainC[i] = run; Q[i] = rt.h[i] > 0 ? run * cellA * Math.cos(((y + 0.5) / Hd - 0.5) * Math.PI) / 3.156e7 : 0;
+  }
+  for (k = rt.cnt - 1; k >= 0; k--) { i = rt.order[k]; var r = rt.rec[i]; if (r !== i && rt.h[i] > 0) Q[r] += Q[i]; }
+  function plotDisc(cx, cy, rad, ch, val) {
+    var x0 = Math.floor(cx - rad - 1), x1 = Math.ceil(cx + rad + 1), y0 = Math.max(0, Math.floor(cy - rad - 1)), y1 = Math.min(RH - 1, Math.ceil(cy + rad + 1));
+    for (var yy = y0; yy <= y1; yy++) for (var xx = x0; xx <= x1; xx++) { var d = Math.hypot(xx + 0.5 - cx, yy + 0.5 - cy), a = clamp(rad + 0.5 - d, 0, 1) * val; if (a <= 0) continue; var ix = (yy * RW + ((xx % RW) + RW) % RW) * 4 + ch; img[ix] = Math.max(img[ix], Math.round(a * 255)); }
+  }
+  function seg(ax, ay, bx, by, rad, ch, val) { if (bx - ax > RW / 2) bx -= RW; else if (ax - bx > RW / 2) bx += RW; var L = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.ceil(L / Math.max(rad * 0.7, 0.5))); for (var s2 = 0; s2 <= n; s2++) plotDisc(ax + (bx - ax) * s2 / n, ay + (by - ay) * s2 / n, rad, ch, val); }
+  var sx = RW / Wd, sy = RH / Hd;
+  function jit(c) { var hsh = Math.imul(c, 2654435761) >>> 0; return [((hsh & 1023) / 1023 - 0.5) * 0.6, (((hsh >>> 10) & 1023) / 1023 - 0.5) * 0.6]; }
+  function cen(c) { var y = Math.floor(c / Wd), x = c - y * Wd, j2 = jit(c); return [(x + 0.5 + j2[0]) * sx, (y + 0.5 + j2[1]) * sy]; }
+  var Qc = 50, texKm = 2 * Math.PI * Rm / RW / 1000, nRiv = 0, bigQ = 0, mouths = [];
+  // closed basins: label each set of flooded cells and decide lake or salt flat from its water balance
+  var basin = new Int32Array(N).fill(-1), nb = 0, stack = [], basins = [];
+  for (i = 0; i < N; i++) {
+    if (rt.h[i] <= 0 || basin[i] >= 0 || rt.fill[i] - rt.h[i] < 0.03) continue;
+    var cells = [], inflow = 0, petA = 0; basin[i] = nb; stack.push(i);
+    while (stack.length) { var c = stack.pop(); cells.push(c); var cy2 = Math.floor(c / Wd), cx2 = c - cy2 * Wd; inflow = Math.max(inflow, Q[c]); petA += clamp((T[c] - F.Tt) / 40, 0, 3) * P0 * 1.1 * cellA * Math.cos(((cy2 + 0.5) / Hd - 0.5) * Math.PI) / 3.156e7;
+      for (var yj = Math.max(0, cy2 - 1); yj <= Math.min(Hd - 1, cy2 + 1); yj++) for (var dx2 = -1; dx2 <= 1; dx2++) { var n2 = yj * Wd + (cx2 + dx2 + Wd) % Wd; if (basin[n2] < 0 && rt.h[n2] > 0 && rt.fill[n2] - rt.h[n2] >= 0.03) { basin[n2] = nb; stack.push(n2); } } }
+    if (cells.length < 3) { nb++; continue; }
+    var frac = petA > 0 ? clamp(inflow / petA, 0, 1) : 1, frozen = 0; cells.forEach(function (c3) { if (T[c3] < F.Tt) frozen++; });
+    cells.sort(function (a, b) { return (rt.fill[b] - rt.h[b]) - (rt.fill[a] - rt.h[a]); });
+    var nWet = Math.round(cells.length * frac);
+    cells.forEach(function (c3, idx) { var p2 = cen(c3), wet = idx < nWet; plotDisc(p2[0], p2[1], 1.05 * sx, wet ? (frozen > cells.length / 2 ? 3 : 0) : 1, 1); });
+    basins.push({ n: cells.length, frac: frac }); nb++;
+  }
+  // channels
+  for (i = 0; i < N; i++) {
+    if (rt.h[i] <= 0 || Q[i] < Qc) continue;
+    var r2 = rt.rec[i]; if (r2 === i) continue;
+    var wReal = 4 * Math.sqrt(Q[i]) / 1000, wDraw = Math.max(wReal / texKm, 0.9 + 1.0 * Math.log10(Q[i] / Qc)), a = cen(i), b2 = rt.h[r2] > 0 ? cen(r2) : (function () { var y = Math.floor(r2 / Wd), x = r2 - y * Wd; return [(x + 0.5) * sx, (y + 0.5) * sy]; })();
+    seg(a[0], a[1], b2[0], b2[1], wDraw / 2, T[i] < F.Tt - 4 ? 3 : 0, clamp(0.5 + 0.2 * Math.log10(Q[i] / Qc), 0.5, 1));
+    nRiv++; if (Q[i] > bigQ) bigQ = Q[i];
+    if (rt.h[r2] <= 0 && Q[i] > 3000) mouths.push([i, r2, Q[i]]);
+  }
+  // deltas and sediment plumes at big river mouths
+  mouths.forEach(function (mo) { var a = cen(mo[0]), y = Math.floor(mo[1] / Wd), x = mo[1] - y * Wd, b3 = [(x + 0.5) * sx, (y + 0.5) * sy], dx3 = b3[0] - a[0], dy3 = b3[1] - a[1], L = Math.hypot(dx3, dy3) || 1, ux = dx3 / L, uy = dy3 / L, sz = 1.6 + 1.4 * Math.log10(mo[2] / 3000);
+    for (var f = -2; f <= 2; f++) { var ang = f * 0.38, vx = ux * Math.cos(ang) - uy * Math.sin(ang), vy = ux * Math.sin(ang) + uy * Math.cos(ang); seg(a[0], a[1], a[0] + vx * sz * 2.2, a[1] + vy * sz * 2.2, 0.45, 0, 0.8); }
+    plotDisc(a[0] + ux * sz * 3, a[1] + uy * sz * 3, sz * 3.2, 2, 0.75); });
+  return { img: img, RW: RW, RH: RH, n: nRiv, big: bigQ, mouths: mouths.length, lakes: basins.filter(function (bb) { return bb.frac > 0.05; }).length, salt: basins.filter(function (bb) { return bb.frac <= 0.05; }).length };
+}
+
+/* ---------- heat, ice and water budget on a latitude-longitude grid ---------- */
+var EB = { NX: 180, NY: 90, ready: false, stats: null };
+(function () { var n = EB.NX * EB.NY; EB.rain = new Float32Array(n); EB.u = new Float32Array(n); EB.v = new Float32Array(n); EB.out2 = new Float32Array(n * 4); EB.T = new Float32Array(n); EB.Tw = new Float32Array(n); EB.h = new Float32Array(n); EB.s = new Float32Array(n); EB.q = new Float32Array(n); EB.land = new Uint8Array(n); EB.elev = new Float32Array(n); EB.out = new Float32Array(n * 4); EB.mu = new Float32Array(n); })();
+function visFraction(T) { var a = 0, b = 0, l; for (l = 300; l <= 4000; l += 25) { var v = planck(l, T); b += v; if (l <= 700) a += v; } return a / b; }
+function ebInit(m, terr) {
+  var NX = EB.NX, NY = EB.NY, i, j, k = 0;
+  for (j = 0; j < NY; j++) for (i = 0; i < NX; i++, k++) {
+    var fx = terr ? Math.floor((i + 0.5) / NX * terr.W) : 0, fy = terr ? Math.floor((j + 0.5) / NY * terr.H) : 0, e = terr ? terr.data[(fy * terr.W + fx) * 2] : -1;
+    EB.land[k] = OCEANF[W.p.id] > 0 && e < 0 ? 0 : 1; EB.elev[k] = Math.max(e, 0); EB.T[k] = m.Ts; EB.Tw[k] = m.Ts; EB.h[k] = 0; EB.s[k] = 0; EB.q[k] = 0;
+  }
+  EB.rain.fill(0); EB.u.fill(0); EB.v.fill(0); EB.cyc = []; EB.cycAt = -1;
+  // wind-driven gyres: Sverdrup balance integrated west from each eastern coast, with a western boundary layer
+  var psi = new Float32Array(NX * NY), kw2 = Math.PI / 2 / Math.max(m.phiH, 0.2);
+  if (!W.p.locked && OCEANF[W.p.id] > 0 && OCEANF[W.p.id] < 1) {
+    for (j = 2; j < NY - 2; j++) { var la3 = ((j + 0.5) / NY - 0.5) * Math.PI, curl = -kw2 * Math.sin(kw2 * la3) * (Math.abs(la3) < 1.25 ? 1 : 0), beta3 = Math.max(Math.cos(la3), 0.15), acc = 0, dw;
+      for (i = 2 * NX - 1; i >= 0; i--) { var ii = i % NX, c3 = j * NX + ii; if (EB.land[c3]) { acc = 0; continue; } acc -= curl / beta3; if (i < NX) { dw = 0; while (dw < 18 && !EB.land[j * NX + (ii + NX - dw - 1) % NX]) dw++; psi[c3] = acc * (1 - Math.exp(-dw / 3)); } } }
+    var mxs = 0, k4;
+    for (j = 1; j < NY - 1; j++) { var cj3 = Math.max(Math.cos(((j + 0.5) / NY - 0.5) * Math.PI), 0.1); for (i = 0; i < NX; i++) { k4 = j * NX + i; if (EB.land[k4]) continue; EB.u[k4] = -(psi[k4 + NX] - psi[k4 - NX]) / 2; EB.v[k4] = (psi[j * NX + (i + 1) % NX] - psi[j * NX + (i + NX - 1) % NX]) / (2 * cj3); mxs = Math.max(mxs, Math.hypot(EB.u[k4], EB.v[k4])); } }
+    if (mxs > 0) for (i = 0; i < NX * NY; i++) { EB.u[i] /= mxs; EB.v[i] /= mxs; }
+  }
+  EB.ready = true; ebStats(m);
+}
+function ebCyclones(m) {
+  if (EB.cycAt >= 0 && W.step - EB.cycAt < 200) return EB.cyc;
+  EB.cycAt = W.step; EB.cyc = [];
+  var NX = EB.NX, NY = EB.NY, Tgen = m.F.Tt + 26.5, sec, j, i;
+  if (m.airless || OCEANF[W.p.id] <= 0) return EB.cyc;
+  for (sec = 0; sec < 9; sec++) { var best = -1, bt = Tgen, x0 = Math.floor(sec * NX / 9), x1 = Math.floor((sec + 1) * NX / 9);
+    for (j = 8; j < NY - 8; j++) { var la = ((j + 0.5) / NY - 0.5) * Math.PI; if (Math.abs(la) < 0.087 || Math.abs(la) > 0.6 || 2 * m.Om * Math.sin(Math.abs(la)) < 1e-5) continue; for (i = x0; i < x1; i++) { var k = j * NX + i; if (!EB.land[k] && EB.h[k] <= 0 && EB.T[k] > bt && EB.out[k * 4 + 3] > 0.5) { bt = EB.T[k]; best = k; } } }
+    if (best >= 0) { var by = Math.floor(best / NX), bx = best - by * NX, la2 = ((by + 0.5) / NY - 0.5) * Math.PI; EB.cyc.push({ lon: (bx + 0.5) / NX * 6.2832 - Math.PI, lat: la2, r: 0.05 + 0.03 * ((bx * 7 + by) % 5) / 5, s: Math.sign(la2), born: W.step, drift: -0.0009 }); } }
+  return EB.cyc;
+}
+function ebStep(m, n, dt) {
+  var NX = EB.NX, NY = EB.NY, F = m.F, Tf = F.Tt - (W.fluid === 'water' ? 1.9 : 0), Ts0 = Math.max(m.Ts, 40), sg = 5.670374e-8, B = 4 * sg * Ts0 * Ts0 * Ts0, T = EB.T, Tw = EB.Tw, h = EB.h, s = EB.s, q = EB.q, land = EB.land;
+  var dp = Math.PI / NY, dl = 6.2832 / NX, Ps = W.Ps, air = !m.airless, D = air ? 0.13 * B * Math.pow(Math.min(Ps, 30), 0.5) : 0, Do = 0.1 * B, Co = 100 * B, Cl = 8 * B, Ci = 4 * B, L = 4500 * B, kI = 0.4 * B, gamma = 0.3 * B;
+  var vf = visFraction(W.Tstar), aIce = 0.15 + 0.85 * vf, aFrost = Math.min(0.85, aIce + 0.1), eps0 = 1 / (1 + 0.75 * m.tau), S = m.S, lock = W.p.locked, psat = psatFn(F), qRef = psat(Tf + 15), Tb = m.canLiquid ? m.Tb : 0, Lv = 2 * B;
+  var c = Math.cos(0.12), sn = Math.sin(0.12), LL = [-0.74, 0.34, 0.58], ln = Math.hypot(LL[0], LL[1], LL[2]), sx = LL[0] / ln, sy = (LL[1] * c - LL[2] * sn) / ln, sz = (LL[1] * sn + LL[2] * c) / ln, st, i, j;
+  var oceanW = OCEANF[W.p.id] > 0;
+  for (st = 0; st < n; st++) {
+    W.season = (W.season + dt / 500) % 1;
+    var lamS = W.season * 6.2832, sd = Math.sin(W.obl || 0) * Math.sin(lamS), cd = Math.sqrt(1 - sd * sd), ee = W.ecc || 0, Se = S * (lock ? 1 : Math.pow(1 - ee * Math.cos(lamS), -2) * Math.sqrt(1 - ee * ee)), tidef = m.tide || 0, res = W.p.res32, phH = m.phiH || 0.5, ndWind = !lock;
+    for (j = 0; j < NY; j++) {
+      var la = ((j + 0.5) / NY - 0.5) * Math.PI, cj = Math.cos(la), cn = Math.cos(la + dp / 2), cs = Math.cos(la - dp / 2), an = cn / (cj * dp * dp), as = cs / (cj * dp * dp), ae = (lock ? 1.6 : 1) / (Math.max(cj * cj, 0.0025) * dl * dl), sl = Math.sin(la);
+      if (j === NY - 1) an = 0; if (j === 0) as = 0;
+      for (i = 0; i < NX; i++) {
+        var k = j * NX + i, ke = j * NX + (i + 1) % NX, kw = j * NX + (i + NX - 1) % NX, kn = j < NY - 1 ? k + NX : k, ks = j > 0 ? k - NX : k, isO = !land[k], lo = ((i + 0.5) / NX - 0.5) * 6.2832;
+        var h0 = Math.acos(clamp(-sl * sd / Math.max(cj * cd, 1e-4), -1, 1)), mu = res ? cj / Math.PI * (1 + 0.45 * Math.cos(2 * (lo - Math.atan2(sz, sx)))) : lock ? Math.max(cj * Math.cos(lo) * sx + sl * sy + cj * Math.sin(lo) * sz, 0) : (h0 * sl * sd + cj * cd * Math.sin(h0)) / Math.PI, Tc = T[k];
+        var qs = air ? Math.min(psat(Math.max(Tc - EB.elev[k] * 0, 20)) / qRef, 6) : 0, rh = qs > 1e-9 ? q[k] / qs : 0;
+        var ic = 1 - Math.exp(-h[k] / 0.15), fs = 1 - Math.exp(-s[k] / 0.05), a0 = isO ? 0.07 + (aIce - 0.07) * ic : 0.22 + (aFrost - 0.22) * fs, cc = clamp((rh - 0.7) / 0.3, 0, 1) * 0.5 * (air ? 1 : 0), alb = a0 + (0.45 - a0) * cc;
+        var asr = Se * mu * (1 - alb) + tidef, eps = eps0 / (1 + 0.3 * Math.min(rh, 1) * (air ? 1 : 0)), olr = eps * sg * Tc * Tc * Tc * Tc, Bl = 4 * eps * sg * Tc * Tc * Tc;
+        var open = isO && h[k] <= 0 && Tc < (Tb || 1e9);
+        var E = air && open ? 0.5 * Math.max(qs - q[k], 0) : 0, wnd = ndWind ? (Math.abs(la) < phH ? -1 : 1) : 0, up = wnd ? clamp(wnd * (EB.elev[ke] - EB.elev[kw]) * 0.7, 0, 1.5) : 0, subA = lock ? Math.acos(clamp(cj * Math.cos(lo) * sx + sl * sy + cj * Math.sin(lo) * sz, -1, 1)) : 0, dPh = (Math.abs(la) - phH) / 0.16, qsP = qs * Math.exp(-1.1 * up) * (lock ? 1 - 0.3 * Math.exp(-subA * subA / 0.5) : (1 + 0.9 * Math.exp(-dPh * dPh)) * (1 - 0.25 * Math.exp(-la * la / 0.03))), P = air ? 0.25 * Math.max(q[k] - qsP, 0) : 0;
+        var nb = D * (ae * (T[ke] + T[kw]) + an * T[kn] + as * T[ks]), sum = D * (2 * ae + an + as), Cx = isO ? (h[k] > 0 ? Ci : Co) : Cl, G = 0, lat = Lv * (P - E);
+        if (isO && h[k] <= 0) { var oe = land[ke] ? 0 : 1, ow = land[kw] ? 0 : 1, on = land[kn] ? 0 : 1, os = land[ks] ? 0 : 1; nb += Do * (ae * (oe * Tw[ke] + ow * Tw[kw]) + an * on * Tw[kn] + as * os * Tw[ks]); sum += Do * (ae * (oe + ow) + an * on + as * os); }
+        if (isO && h[k] > 0) G = kI / (h[k] + 0.05);
+        var den = Cx / dt + Bl + sum + G, nT = (Cx / dt * Tc + asr - olr + Bl * Tc + nb + G * Tf + lat) / den;
+        if (isO && oceanW) {
+          if (h[k] <= 0) {
+            var eq = Math.abs(la) < 0.5 ? 0.3 * (1 - Math.abs(la) / 0.5) * (lock ? 1 : 0) : 0; if (eq > 0 && !land[kw]) nT = nT * (1 - eq) + Tw[kw] * eq;   // ocean current carries heat eastward along the equator
+            Tw[k] = nT; if (nT < Tf) { h[k] = (Tf - nT) * Co / L; nT = Tf; Tw[k] = Tf; }
+          } else {
+            if (nT > Tf) { h[k] -= (nT - Tf) * den * dt / L; nT = Tf; }
+            h[k] += G * (Tf - nT) * dt / L;
+            var tw = (Co / dt * Tw[k] + Do * (ae * (Tw[ke] + Tw[kw]) + an * Tw[kn] + as * Tw[ks])) / (Co / dt + Do * (2 * ae + an + as)), Fb = gamma * Math.max(tw - Tf, 0); tw -= Fb * dt / Co; h[k] -= Fb * dt / L; Tw[k] = Math.max(tw, Tf);
+            if (h[k] <= 0) { h[k] = 0; nT = Tw[k]; }
+          }
+          h[k] = Math.min(h[k], 8);
+        } else if (!isO) {
+          if (nT > Tf && s[k] > 0) { var mlt = Math.min(s[k], (nT - Tf) * 0.06); s[k] -= mlt; nT -= mlt * 6; }
+          if (air && s[k] > 0) s[k] = Math.max(0, s[k] - 0.002 * Math.max(qs - q[k], 0));
+        }
+        T[k] = clamp(nT, 10, 6000);
+        if (air) {
+          var Tsn = T[k] - EB.elev[k] * m.gamK;
+          if (P > 0 && Tsn < Tf) { if (isO && oceanW) h[k] += P * 0.4 * dt; else s[k] = Math.min(s[k] + P * 1.5 * dt, 6); }
+          var qn = D / B * 0.35, nq = qn * (ae * (q[ke] + q[kw]) + an * q[kn] + as * q[ks]), sq = qn * (2 * ae + an + as);
+          q[k] = Math.max(0, (q[k] + (E - P) * dt + nq * dt * 0.2) / (1 + sq * dt * 0.2));
+          if (wnd) q[k] = lerp(q[k], q[wnd > 0 ? kw : ke], 0.25);
+          EB.rain[k] += (P - EB.rain[k]) * 0.02;
+        }
+      }
+    }
+    if (st % 3 === 0 && oceanW && !lock) for (j = 1; j < NY - 1; j++) for (i = 0; i < NX; i++) { var kc = j * NX + i; if (land[kc]) continue; var uu = EB.u[kc] * 0.55, vv = EB.v[kc] * 0.55, ku = j * NX + (i + (uu > 0 ? NX - 1 : 1)) % NX, kv = kc + (vv > 0 ? -NX : NX); if (land[ku] || land[kv]) continue; Tw[kc] += Math.abs(uu) * (Tw[ku] - Tw[kc]) + Math.abs(vv) * (Tw[kv] - Tw[kc]); if (h[kc] <= 0) T[kc] = Tw[kc]; }
+    // ice and frost creep slowly from thick to thin
+    for (j = 1; j < NY - 1; j++) for (i = 0; i < NX; i++) { var k2 = j * NX + i, ke2 = j * NX + (i + 1) % NX, kn2 = k2 + NX; for (var ep = 0; ep < 2; ep++) { var b0 = ep ? kn2 : ke2, fl; if (land[k2] === land[b0]) { if (!land[k2]) { fl = 0.04 * (h[k2] - h[b0]) * Math.min(1, Math.min(h[k2], h[b0]) + 0.3); h[k2] -= fl; h[b0] += fl; } else if (T[k2] < Tf + 2 && T[b0] < Tf + 2) { fl = (W.fluid === 'nitrogen' ? 0.12 : 0.03) * (s[k2] - s[b0]); s[k2] -= fl; s[b0] += fl; } } } }
+  }
+  var rmx = 0; for (i = 0; i < NX * NY; i++) if (EB.rain[i] > rmx) rmx = EB.rain[i]; EB.rainMax = rmx * 0.6;
+  var o = EB.out, n3 = NX * NY; for (i = 0; i < n3; i++) { var yy = Math.floor(i / NX), xx = i - yy * NX, hs0 = 0, ss0 = 0, wt0 = 0; for (var oy = -2; oy <= 2; oy++) { var y2 = clamp(yy + oy, 0, NY - 1); for (var ox2 = -2; ox2 <= 2; ox2++) { var k3 = y2 * NX + (xx + ox2 + NX) % NX, w3 = 1 / (1 + oy * oy + ox2 * ox2); hs0 += h[k3] * w3; ss0 += s[k3] * w3; wt0 += w3; } } o[i * 4] = T[i]; o[i * 4 + 1] = hs0 / wt0; o[i * 4 + 2] = ss0 / wt0; EB.out2[i * 4] = EB.rain[i] / Math.max(EB.rainMax || 1e-6, 1e-6); EB.out2[i * 4 + 1] = Math.hypot(EB.u[i], EB.v[i]); EB.out2[i * 4 + 2] = EB.u[i]; EB.out2[i * 4 + 3] = EB.v[i]; var qs2 = air ? Math.min(psat(Math.max(T[i], 20)) / qRef, 6) : 1; o[i * 4 + 3] = air ? clamp(q[i] / Math.max(qs2, 1e-9), 0, 1.2) : 0; }
+}
+function ebStats(m) {
+  var NX = EB.NX, NY = EB.NY, j, i, tw = 0, tT = 0, mx = 0, mn = 1e9, oA = 0, oI = 0, oO = 0, lA = 0, lF = 0, Tb = m.canLiquid ? m.Tb : 0;
+  for (j = 0; j < NY; j++) { var c = Math.cos(((j + 0.5) / NY - 0.5) * Math.PI); for (i = 0; i < NX; i++) { var k = j * NX + i, t = EB.T[k]; tw += c; tT += t * c; if (t > mx) mx = t; if (t < mn) mn = t; if (!EB.land[k]) { oA += c; if (EB.h[k] > 0.02) oI += c; else if (t < (Tb || 1e9)) oO += c; } else { lA += c; if (EB.s[k] > 0.02) lF += c; } } }
+  EB.stats = { mean: tT / tw, max: mx, min: mn, ocean: oA / tw, ice: oA ? oI / oA : 0, liquid: oA ? oO / oA : 0, frost: lA ? lF / lA : 0 };
+}
+
+/* ---------- gas giants: quasi-geostrophic vorticity on the sphere, jets and storms emerge and interact ---------- */
+/* Band tables by latitude: degrees, brightness, brown chromophore, roughness. Belts and zones as observed. */
+var GAS_NODES = {
+  jup: [[-90, .5, .35, .1], [-60, .58, .34, .25], [-52, .66, .22, .3], [-47, .58, .33, .3], [-43, .72, .12, .25], [-38, .6, .35, .3], [-34, .76, .1, .2], [-30, .55, .45, .35], [-26, .85, .08, .2], [-20, .88, .1, .3], [-18, .45, .72, .75], [-12, .42, .8, .9], [-8, .5, .65, .7], [-6, .88, .08, .35], [0, .92, .06, .3], [5, .88, .1, .4], [7.5, .44, .78, .75], [12, .4, .85, .85], [17, .45, .72, .6], [19, .87, .1, .2], [23, .84, .1, .2], [25, .5, .55, .4], [30, .55, .5, .35], [32, .78, .1, .2], [36, .6, .32, .3], [40, .72, .15, .25], [46, .6, .3, .3], [52, .64, .25, .25], [60, .56, .33, .2], [90, .5, .35, .1]],
+  sat: [[-90, .55, .5, .03], [-70, .62, .42, .04], [-55, .72, .32, .05], [-40, .8, .22, .05], [-28, .74, .34, .06], [-15, .85, .18, .05], [0, .93, .08, .06], [12, .86, .18, .05], [25, .75, .33, .06], [38, .82, .2, .05], [50, .7, .35, .05], [65, .6, .45, .04], [78, .5, .5, .03], [90, .5, .5, .03]]
+};
+function gasProfile(m, p) {
+  var N = 1024, u = new Float64Array(N), bri = new Float64Array(N), bro = new Float64Array(N), tu = new Float64Array(N), i, dp = Math.PI / N, cs = new Float64Array(N), la = new Float64Array(N), nodes = GAS_NODES[p.id];
+  for (i = 0; i < N; i++) { la[i] = -Math.PI / 2 + (i + 0.5) * dp; cs[i] = Math.max(Math.cos(la[i]), 0.02); }
+  if (nodes) {
+    var k = 0, mean = 0, tot = 0, z = new Float64Array(N);
+    for (i = 0; i < N; i++) { var deg = la[i] * 180 / Math.PI; while (k < nodes.length - 2 && deg > nodes[k + 1][0]) k++; var a = nodes[k], b = nodes[k + 1], t = sstep(a[0], b[0], deg); bri[i] = lerp(a[1], b[1], t); bro[i] = lerp(a[2], b[2], t); tu[i] = lerp(a[3], b[3], t); mean += bri[i] * cs[i]; tot += cs[i]; }
+    mean /= tot;
+    var zm = 0; for (i = 0; i < N; i++) { z[i] = -Math.tanh(la[i] / 0.12) * (bri[i] - mean); zm += z[i] * cs[i]; } zm /= tot;
+    var acc = 0; for (i = 0; i < N; i++) { acc += -(z[i] - zm) * cs[i] * dp; u[i] = acc / cs[i]; }
+    var eq = p.id === 'sat' ? 1.5 : 0.2, width = p.id === 'sat' ? 0.18 : 0.02, mx0 = 0;
+    for (i = 0; i < N; i++) mx0 = Math.max(mx0, Math.abs(u[i]));
+    for (i = 0; i < N; i++) { u[i] = u[i] / mx0 * sstep(1.5, 1.15, Math.abs(la[i])) + eq * Math.exp(-la[i] * la[i] / width); if (p.id === 'jup') { var d24 = (la[i] - 0.419) / 0.07; u[i] += 0.8 * Math.exp(-d24 * d24); } }
+  } else {
+    var js = m.jets, lock = p.locked, zv = new Float64Array(N), zmx = 0;
+    for (i = 0; i < N; i++) { var e0 = sstep(1.5, 1.15, Math.abs(la[i])); u[i] = e0 * (lock ? 0.2 * Math.cos(js * la[i]) + 1.2 * Math.exp(-la[i] * la[i] / 0.16) : Math.cos(js * la[i])); }
+    for (i = 1; i < N - 1; i++) { zv[i] = -(cs[i + 1] * u[i + 1] - cs[i - 1] * u[i - 1]) / (2 * dp * cs[i]); zmx = Math.max(zmx, Math.abs(zv[i])); }
+    for (i = 0; i < N; i++) { var an = clamp(-Math.tanh(la[i] / 0.12) * zv[i] / (zmx || 1) * 1.4, -1, 1); bri[i] = 0.66 + 0.22 * an; bro[i] = 0.42 - 0.34 * an; tu[i] = 0.3 + 0.35 * clamp(-an, 0, 1); }
+  }
+  var mx = 0; for (i = 0; i < N; i++) mx = Math.max(mx, Math.abs(u[i])); for (i = 0; i < N; i++) u[i] /= mx || 1;
+  var tex = new Float32Array(512 * 4);
+  for (i = 0; i < 512; i++) { var s = Math.min(N - 1, i * 2); tex[i * 4] = bri[s]; tex[i * 4 + 1] = bro[s]; tex[i * 4 + 2] = tu[s]; tex[i * 4 + 3] = sstep(0.95, 1.28, Math.abs(la[s])); }
+  var r = rng(p.seed * 23 + 1), zones = [], big = [], small = [];
+  for (i = 4; i < N - 4; i++) if (bri[i] >= bri[i - 3] && bri[i] > bri[i + 3] && Math.abs(la[i]) < 1.1 && Math.abs(la[i]) > 0.16) { if (!zones.length || la[i] - zones[zones.length - 1] > 0.08) zones.push(la[i]); }
+  if (!zones.length) zones = [-0.5, 0.5];
+  function ovals(n, lat, r0, type) { for (var q = 0; q < n; q++) small.push({ lat: lat + (r() - 0.5) * 0.02, lon: r() * 6.2832 - Math.PI, r: r0 * (0.8 + 0.4 * r()), ar: 1.2, type: type }); }
+  if (p.id === 'jup') {
+    big.push({ lat: -22 * Math.PI / 180, lon: 0.75, r: 0.105, ar: 1.38, str: 2.6, red: 1 });
+    for (i = 0; i < 8; i++) small.push({ lat: -41 * Math.PI / 180, lon: -2.2 + i * 0.42 + (r() - 0.5) * 0.08, r: 0.021, ar: 1.2, type: 1 });
+    small.push({ lat: -33 * Math.PI / 180, lon: 2.4, r: 0.04, ar: 1.25, type: 3 });   // Oval BA, reddish since 2005-06
+    ovals(3, 14 * Math.PI / 180, 0.024, 2); ovals(5, -14 * Math.PI / 180, 0.013, 1); ovals(3, 20 * Math.PI / 180, 0.015, 1); ovals(4, 41 * Math.PI / 180, 0.016, 1);
+    ovals(9, 7.5 * Math.PI / 180, 0.013, 2);   // 5-micron hot spots: dry, cloud-free gaps at the North Equatorial Belt edge
+    for (i = 0; i < 8; i++) small.push({ lat: 83 * Math.PI / 180, lon: i * 0.785, r: 0.032, ar: 1, type: 2 }); small.push({ lat: 89 * Math.PI / 180, lon: 0, r: 0.032, ar: 1, type: 2 });   // north polar cluster: 8 around 1
+    for (i = 0; i < 5; i++) small.push({ lat: -83 * Math.PI / 180, lon: i * 1.257, r: 0.036, ar: 1, type: 2 }); small.push({ lat: -89 * Math.PI / 180, lon: 0, r: 0.036, ar: 1, type: 2 });   // south polar cluster: 5 around 1
+  } else if (p.id === 'sat') {
+    ovals(2, 40 * Math.PI / 180, 0.018, 1); ovals(2, -42 * Math.PI / 180, 0.014, 1);
+  } else {
+    var nb = clamp(Math.round(1 + m.jets * 0.12), 1, 3); for (i = 0; i < nb; i++) big.push({ lat: zones[Math.floor(r() * zones.length)], lon: r() * 6.2832 - Math.PI, r: 0.08 + 0.05 * r(), ar: 1.3, str: 2.3, red: m.regime === 'Ammonia clouds' ? 1 : 0 });
+    var ns = clamp(Math.round(4 + m.jets * 0.5), 4, 12); for (i = 0; i < ns; i++) ovals(1, zones[Math.floor(r() * zones.length)], 0.02 + 0.016 * r(), 1);
+  }
+  return { u: function (lat) { var x = clamp((lat + Math.PI / 2) / dp - 0.5, 0, N - 2), a0 = Math.floor(x); return lerp(u[a0], u[a0 + 1], x - a0); }, tex: tex, big: big, small: small };
+}
+function GasSim(m, seed, R0, prof) {
+  var NX = 256, NY = 128, N = NX * NY, dp = Math.PI / NY, dl = 6.2832 / NX, M = NX / 2 + 1, j, i, k;
+  var q = new Float64Array(N), psi = new Float64Array(N), tn = new Float64Array(N), to = new Float64Array(N), lap = new Float64Array(N), plume = new Float32Array(N), out = new Float32Array(N * 4), A = new Float64Array(N);
+  var lat = new Float64Array(NY), cs = new Float64Array(NY), csF = new Float64Array(NY + 1), f = new Float64Array(NY), jets = m.jets, Om = Math.max(jets * jets / 2, 6), ld = clamp(m.LD / R0, 0.06, 0.22), r = rng(seed * 11 + 5), steps = 0, dt = 0.0032;
+  for (j = 0; j < NY; j++) { lat[j] = -Math.PI / 2 + (j + 0.5) * dp; cs[j] = Math.cos(lat[j]); f[j] = 2 * Om * Math.sin(lat[j]); }
+  for (j = 0; j <= NY; j++) csF[j] = Math.max(Math.cos(-Math.PI / 2 + j * dp), 0);
+  var re = new Float64Array(NX), im = new Float64Array(NX), rev = new Int32Array(NX), twr = new Float64Array(NX / 2), twi = new Float64Array(NX / 2);
+  for (i = 0; i < NX; i++) { var x = i, y = 0; for (k = 0; k < 8; k++) { y = y << 1 | x & 1; x >>= 1; } rev[i] = y; }
+  for (i = 0; i < NX / 2; i++) { twr[i] = Math.cos(-2 * Math.PI * i / NX); twi[i] = Math.sin(-2 * Math.PI * i / NX); }
+  function fft() { var i, j2, t; for (i = 0; i < NX; i++) { j2 = rev[i]; if (j2 > i) { t = re[i]; re[i] = re[j2]; re[j2] = t; t = im[i]; im[i] = im[j2]; im[j2] = t; } } for (var sz = 2; sz <= NX; sz <<= 1) { var hs = sz >> 1, st = NX / sz; for (var a = 0; a < NX; a += sz) for (var b = 0, c = 0; b < hs; b++, c += st) { var p = a + b, o = p + hs, wr = twr[c], wi = twi[c], xr = re[o] * wr - im[o] * wi, xi = re[o] * wi + im[o] * wr; re[o] = re[p] - xr; im[o] = im[p] - xi; re[p] += xr; im[p] += xi; } } }
+  var a0 = new Float64Array(NY), c0 = new Float64Array(NY), CP = new Float64Array(M * NY), DN = new Float64Array(M * NY), Qr = new Float64Array(M * NY), Qi = new Float64Array(M * NY), Pr = new Float64Array(M * NY), Pi = new Float64Array(M * NY), mcut = new Int32Array(NY), ldi = 1 / (ld * ld);
+  for (j = 0; j < NY; j++) { a0[j] = csF[j] / (cs[j] * dp * dp); c0[j] = csF[j + 1] / (cs[j] * dp * dp); mcut[j] = Math.max(2, Math.floor((NX / 2) * Math.min(1, cs[j] * 1.25))); }
+  for (var mm = 0; mm < M; mm++) { var prevC = 0; for (j = 0; j < NY; j++) { var b0 = -(a0[j] + c0[j]) - mm * mm / (cs[j] * cs[j]) - ldi, den = b0 - a0[j] * prevC; DN[mm * NY + j] = den; prevC = c0[j] / den; CP[mm * NY + j] = prevC; } }
+  function solve() {
+    var j, i, mm, row;
+    for (j = 0; j < NY; j++) { row = j * NX; for (i = 0; i < NX; i++) { re[i] = q[row + i]; im[i] = 0; } fft(); for (mm = 0; mm < M; mm++) { var ok = mm <= mcut[j]; Qr[mm * NY + j] = ok ? re[mm] / NX : 0; Qi[mm * NY + j] = ok ? im[mm] / NX : 0; } }
+    for (mm = 0; mm < M; mm++) {
+      var o = mm * NY;
+      for (j = 0; j < NY; j++) { var ar = a0[j], d = DN[o + j]; Pr[o + j] = (Qr[o + j] - ar * (j ? Pr[o + j - 1] : 0)) / d; Pi[o + j] = (Qi[o + j] - ar * (j ? Pi[o + j - 1] : 0)) / d; }
+      for (j = NY - 2; j >= 0; j--) { Pr[o + j] -= CP[o + j] * Pr[o + j + 1]; Pi[o + j] -= CP[o + j] * Pi[o + j + 1]; }
+    }
+    for (j = 0; j < NY; j++) { row = j * NX; re[0] = Pr[j]; im[0] = 0; for (mm = 1; mm < M; mm++) { var pr = Pr[mm * NY + j], pi = Pi[mm * NY + j]; re[mm] = pr; im[mm] = -pi; if (mm < NX / 2) { re[NX - mm] = pr; im[NX - mm] = pi; } } fft(); for (i = 0; i < NX; i++) psi[row + i] = re[i]; }
+  }
+  /* deep jets: fixed, scaled to stay inside the Rayleigh-Kuo stability limit so they cannot break down */
+  var ut = new Float64Array(NY), qt = new Float64Array(NY), pt = new Float64Array(NY), zt = new Float64Array(NY), Ua = 0.6, maxC = 0;
+  for (j = 0; j < NY; j++) ut[j] = prof.u(lat[j]);
+  for (j = 2; j < NY - 2; j++) { if (Math.abs(lat[j]) > 1.1) continue; maxC = Math.max(maxC, Math.abs((ut[j + 1] - 2 * ut[j] + ut[j - 1]) / (dp * dp)) / (2 * Om * cs[j])); }
+  var ks = Math.min(Ua, 0.7 / (maxC || 1)); for (j = 0; j < NY; j++) ut[j] *= ks;
+  var acc = 0, mean = 0; for (j = 0; j < NY; j++) { acc += -ut[j] * dp; pt[j] = acc; mean += acc; } mean /= NY; for (j = 0; j < NY; j++) pt[j] -= mean;
+  var zmax = 0.5; for (j = 1; j < NY - 1; j++) { zt[j] = -(cs[j + 1] * ut[j + 1] - cs[j - 1] * ut[j - 1]) / (2 * dp * cs[j]); qt[j] = zt[j] - pt[j] * ldi; if (Math.abs(lat[j]) < 1.15) zmax = Math.max(zmax, Math.abs(zt[j])); }
+  qt[0] = qt[1]; qt[NY - 1] = qt[NY - 2];
+  for (j = 0; j < NY; j++) for (i = 0; i < NX; i++) q[j * NX + i] = qt[j];
+  function vortex(lt, ln, rad, amp, ar) { var j0 = Math.max(0, Math.floor((lt - 3 * rad + Math.PI / 2) / dp)), j1 = Math.min(NY - 1, Math.ceil((lt + 3 * rad + Math.PI / 2) / dp)), cl0 = Math.max(Math.cos(lt), 0.1), ci = Math.round((ln + Math.PI) / dl), wi = Math.ceil(3 * rad * ar / (cl0 * dl)); for (var j2 = j0; j2 <= j1; j2++) for (var ii = ci - wi; ii <= ci + wi; ii++) { var iw = ((ii % NX) + NX) % NX, dx = (ii - ci) * dl * cl0 / ar, dy = lat[j2] - lt; q[j2 * NX + iw] += amp * Math.exp(-(dx * dx + dy * dy) / (rad * rad)); } }
+  prof.big.forEach(function (s) { vortex(s.lat, s.lon, s.r, -Math.sign(s.lat) * s.str * zmax, s.ar); });
+  function step() {
+    var j, i;
+    solve();
+    for (i = 0; i < N; i++) A[i] = q[i] + f[Math.floor(i / NX)];
+    var dd = 1 / (12 * dl * dp);
+    for (j = 1; j < NY - 1; j++) { var row = j * NX, cc = 1 / cs[j]; for (i = 0; i < NX; i++) {
+      var ie = (i + 1) % NX, iw = (i + NX - 1) % NX, C0 = row + i, E = row + ie, W2 = row + iw, Nn = row + NX + i, S = row - NX + i, NE = row + NX + ie, NW = row + NX + iw, SE = row - NX + ie, SW = row - NX + iw;
+      tn[C0] = -((psi[E] - psi[W2]) * (A[Nn] - A[S]) - (psi[Nn] - psi[S]) * (A[E] - A[W2]) + psi[E] * (A[NE] - A[SE]) - psi[W2] * (A[NW] - A[SW]) - psi[Nn] * (A[NE] - A[NW]) + psi[S] * (A[SE] - A[SW]) + A[Nn] * (psi[NE] - psi[NW]) - A[S] * (psi[SE] - psi[SW]) - A[E] * (psi[NE] - psi[SE]) + A[W2] * (psi[NW] - psi[SW])) * dd * cc;
+    } }
+    for (i = 0; i < N; i++) { q[i] += dt * (steps ? 1.5 * tn[i] - 0.5 * to[i] : tn[i]); to[i] = tn[i]; plume[i] *= 0.97; }
+    for (j = 2; j < NY - 2; j++) { var r2 = j * NX, nuL = Math.min(0.055, 0.02 / Math.max(cs[j] * cs[j], 0.02)); for (i = 0; i < NX; i++) { var e1 = (i + 1) % NX, e2 = (i + 2) % NX, w1 = (i + NX - 1) % NX, w2 = (i + NX - 2) % NX; lap[r2 + i] = nuL * (q[r2 + e2] - 4 * q[r2 + e1] + 6 * q[r2 + i] - 4 * q[r2 + w1] + q[r2 + w2]) + 0.02 * (q[r2 + 2 * NX + i] - 4 * q[r2 + NX + i] + 6 * q[r2 + i] - 4 * q[r2 - NX + i] + q[r2 - 2 * NX + i]); } }
+    for (j = 2; j < NY - 2; j++) { var r3 = j * NX; for (i = 0; i < NX; i++) q[r3 + i] -= lap[r3 + i]; }
+    for (j = 0; j < NY; j++) { var r4 = j * NX, m0 = 0; for (i = 0; i < NX; i++) m0 += q[r4 + i]; m0 /= NX; var dz = (qt[j] - m0) * dt / 0.06, sp = Math.abs(lat[j]) > 1.22 ? 0.05 : 0; if (Math.abs(lat[j]) > 1.34) { for (i = 0; i < NX; i++) q[r4 + i] = qt[j]; continue; } for (i = 0; i < NX; i++) q[r4 + i] = clamp(q[r4 + i] + dz + (m0 - q[r4 + i]) * (sp + dt * 0.12), m0 - 6 * zmax / Math.min(ld, 0.25), m0 + 6 * zmax / Math.min(ld, 0.25)); }
+    var la0 = (r() - 0.5) * 2.2, ln0 = r() * 6.2832 - Math.PI, jj = clamp(Math.round((la0 + Math.PI / 2) / dp), 2, NY - 3);
+    if (zt[jj] * Math.sign(la0) > 0 && r() < 0.14) { var am = (r() < 0.5 ? -1 : 1) * 0.12 * zmax; vortex(la0, ln0, ld * 0.6, am, 1); }
+    steps++;
+  }
+  function exportField(redInit) {
+    var j, i, t = steps * dt, Z0 = zmax;
+    for (j = 0; j < NY; j++) { var row = j * NX, jn = Math.min(j + 1, NY - 1), js = Math.max(j - 1, 0), sg = Math.sign(lat[j]) || 1; for (i = 0; i < NX; i++) { var ie = (i + 1) % NX, iw = (i + NX - 1) % NX, k0 = (row + i) * 4; out[k0] = clamp(-(psi[jn * NX + i] - psi[js * NX + i]) / (2 * dp) / Math.max(cs[j], 0.1), -6, 6); out[k0 + 1] = clamp((psi[row + ie] - psi[row + iw]) / (2 * dl * Math.max(cs[j], 0.1)), -3, 3); out[k0 + 2] = clamp((q[row + i] + psi[row + i] * ldi) * sg / Z0, -3, 3); out[k0 + 3] = 0; } }
+    function stamp(s, lon, val, swirl) {
+      var j0 = Math.max(0, Math.floor((s.lat - 2.6 * s.r + Math.PI / 2) / dp)), j1 = Math.min(NY - 1, Math.ceil((s.lat + 2.6 * s.r + Math.PI / 2) / dp)), cl0 = Math.max(Math.cos(s.lat), 0.1), ci = Math.round((lon + Math.PI) / dl), wi = Math.ceil(2.6 * s.r * s.ar / (cl0 * dl));
+      for (var j2 = j0; j2 <= j1; j2++) for (var ii = ci - wi; ii <= ci + wi; ii++) { var iw = ((ii % NX) + NX) % NX, k0 = (j2 * NX + iw) * 4, dx = (ii - ci) * dl * cl0 / s.ar, dy = lat[j2] - s.lat, g0 = Math.exp(-(dx * dx + dy * dy) / (s.r * s.r)); out[k0 + 3] += val * g0; if (swirl) { var sv = -Math.sign(s.lat) * 0.9 * g0 / s.r * 0.05; out[k0] += -dy * sv / Math.max(cs[j2], 0.1) * 12; out[k0 + 1] += dx * sv * 12; } }
+    }
+    prof.small.forEach(function (s) { var jr = clamp(Math.round((s.lat + Math.PI / 2) / dp - 0.5), 0, NY - 1); stamp(s, s.lon + ut[jr] / Math.max(cs[jr], 0.1) * t, s.type === 2 ? -1 : 1, true); });
+    prof.big.forEach(function (s) { var jr = clamp(Math.round((s.lat + Math.PI / 2) / dp - 0.5), 0, NY - 1), lon = s.lon + ut[jr] / Math.max(cs[jr], 0.1) * t; if (!s.red) { stamp(s, lon, 1, true); return; }
+      var j0 = Math.max(0, Math.floor((s.lat - 2.2 * s.r + Math.PI / 2) / dp)), j1 = Math.min(NY - 1, Math.ceil((s.lat + 2.2 * s.r + Math.PI / 2) / dp)), cl0 = Math.max(Math.cos(s.lat), 0.1), ci = Math.round((lon + Math.PI) / dl), wi = Math.ceil(2.2 * s.r * s.ar / (cl0 * dl));
+      for (var j2 = j0; j2 <= j1; j2++) for (var ii = ci - wi; ii <= ci + wi; ii++) { var iw = ((ii % NX) + NX) % NX, k0 = (j2 * NX + iw) * 4, dx = (ii - ci) * dl * cl0 / s.ar, dy = lat[j2] - s.lat, g0 = Math.exp(-(dx * dx + dy * dy) / (s.r * s.r)), sv = -Math.sign(s.lat) * 0.55 * g0 / s.r; out[k0] += -dy * sv / Math.max(cs[j2], 0.1); out[k0 + 1] += dx * sv; out[k0 + 3] = g0 > 0.42 ? 2 + clamp((g0 - 0.42) / 0.3, 0, 1) : Math.max(out[k0 + 3], 0.75 * g0 / 0.42); } });
+    if (redInit) prof.big.forEach(function () {}); if (redInit) prof.small.forEach(function (s) { if (s.type === 3) stamp(s, s.lon, 3, false); });
+    return out;
+  }
+  return { step: step, exportField: exportField, jets: jets, dt: dt, zmax: zmax };
+}
+
+var OCEANF = { rivers: 0.5, earth: 0.71, t1e: 0.62, t1f: 0.7, k186: 0.55, k218: 1, tit: 0.18, lava: 0 };
+function WorldGL(canvas) {
+  var gl = canvas.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance' });
+  if (!gl || !gl.getExtension('EXT_color_buffer_float')) throw new Error('float targets unavailable');
+  var pA = compile(gl, FULL, ADV_FS), pG = compile(gl, FULL, GAS_FS), pW = compile(gl, FULL, WORLD_FS), pF = compile(gl, FULL, FLY_FS), uA = unis(gl, pA), uG = unis(gl, pG), uW = unis(gl, pW), uF = unis(gl, pF);
+  gl.bindVertexArray(gl.createVertexArray());
+  function tgt(w, h) { var t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null); filt(gl.REPEAT); var f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0); return { t: t, f: f, w: w, h: h }; }
+  function filt(wrapS) { gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); }
+  var ra = tgt(768, 384), rb = tgt(768, 384), ga = tgt(1536, 768), gb = tgt(1536, 768);
+  gl.activeTexture(gl.TEXTURE1); var lt = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, lt); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, LUT); filt(gl.CLAMP_TO_EDGE);
+  gl.activeTexture(gl.TEXTURE2); var ht = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, ht); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG16F, 2, 2, 0, gl.RG, gl.FLOAT, new Float32Array(8)); filt(gl.REPEAT);
+  gl.activeTexture(gl.TEXTURE3); var eb = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, eb); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, EB.NX, EB.NY, 0, gl.RGBA, gl.FLOAT, EB.out); filt(gl.REPEAT);
+  gl.activeTexture(gl.TEXTURE4); var vt = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, vt); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 256, 128, 0, gl.RGBA, gl.FLOAT, new Float32Array(256 * 128 * 4)); filt(gl.REPEAT);
+  gl.activeTexture(gl.TEXTURE5); var nt = gl.createTexture(), nz = new Uint8Array(512 * 256 * 4), ni, nj; for (nj = 0; nj < 256; nj++) for (ni = 0; ni < 512; ni++) { var a1 = ni / 512 * 6.2832, b1 = nj / 256 * 6.2832, nv = fbm3(Math.cos(a1) * 6 + Math.cos(b1) * 3, Math.sin(a1) * 6, Math.sin(b1) * 18, 4) * 255; nz[(nj * 512 + ni) * 4] = nv; nz[(nj * 512 + ni) * 4 + 3] = 255; } gl.bindTexture(gl.TEXTURE_2D, nt); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 512, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, nz); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+  gl.activeTexture(gl.TEXTURE6); var bt = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, bt); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 1, 512, 0, gl.RGBA, gl.FLOAT, new Float32Array(2048)); filt(gl.CLAMP_TO_EDGE);
+  gl.activeTexture(gl.TEXTURE7); var rt = gl.createTexture(), rd = new Uint8Array(512 * 4), ri; (function () { var ra = rng(9); for (ri = 0; ri < 512; ri++) { var rr = 1.1 + ri / 511 * 1.25, op = 0, br = 0.7, fine = 0.86 + 0.28 * ra(); if (rr > 1.239 && rr < 1.527) { op = 0.08; br = 0.3; } else if (rr >= 1.527 && rr < 1.951) { op = 0.92; br = 0.86 + 0.14 * Math.sin(rr * 90) * Math.sin(rr * 37); } else if (rr >= 2.027 && rr < 2.269 && Math.abs(rr - 2.214) > 0.005) { op = 0.62; br = 0.76; } else if (rr >= 1.951 && rr < 2.027) { op = 0.05; br = 0.4; } else if (rr >= 1.11 && rr < 1.239) { op = 0.03; br = 0.3; } else if (Math.abs(rr - 2.326) < 0.004) { op = 0.2; br = 0.6; } rd[ri * 4] = clamp(op * fine, 0, 1) * 255; rd[ri * 4 + 1] = clamp(br * (0.9 + 0.2 * ra()), 0, 1) * 255; rd[ri * 4 + 3] = 255; } })(); gl.bindTexture(gl.TEXTURE_2D, rt); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 512, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, rd); filt(gl.CLAMP_TO_EDGE);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.activeTexture(gl.TEXTURE8); var rvt = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, rvt); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG16F, 2, 2, 0, gl.RG, gl.FLOAT, new Float32Array(8)); filt(gl.REPEAT);
+  gl.activeTexture(gl.TEXTURE10); var hyt = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, hyt); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4)); filt(gl.REPEAT);
+  this.setHydro = function (hd) { gl.activeTexture(gl.TEXTURE10); gl.bindTexture(gl.TEXTURE_2D, hyt); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, hd.RW, hd.RH, 0, gl.RGBA, gl.UNSIGNED_BYTE, hd.img); gl.activeTexture(gl.TEXTURE0); };
+  gl.activeTexture(gl.TEXTURE9); var eb2 = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, eb2); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, EB.NX, EB.NY, 0, gl.RGBA, gl.FLOAT, EB.out2); filt(gl.REPEAT);
+  gl.activeTexture(gl.TEXTURE0);
+  this.setBand = function (d) { gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, bt); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 1, 512, gl.RGBA, gl.FLOAT, d); gl.activeTexture(gl.TEXTURE0); };
+  var L = (function () { var v = [-0.74, 0.34, 0.58], l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; })(), Lg = (function () { var v = [-0.42, 0.26, 0.87], l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; })(), scale = 1, ema = 16, last = 0, vArr = new Float32Array(48);
+  this.setTerrain = function (t) { gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, rvt); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG16F, t.LW, t.LH, 0, gl.RG, gl.FLOAT, t.riv); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, ht); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG16F, t.W, t.H, 0, gl.RG, gl.FLOAT, t.data); gl.activeTexture(gl.TEXTURE0); };
+  this.uploadEb = function () { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, eb); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, EB.NX, EB.NY, gl.RGBA, gl.FLOAT, EB.out); gl.activeTexture(gl.TEXTURE9); gl.bindTexture(gl.TEXTURE_2D, eb2); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, EB.NX, EB.NY, gl.RGBA, gl.FLOAT, EB.out2); gl.activeTexture(gl.TEXTURE0); };
+  this.uploadVel = function (d) { gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, vt); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 256, 128, gl.RGBA, gl.FLOAT, d); gl.activeTexture(gl.TEXTURE0); };
+  this.cloudStep = function (m, relax) {
+    var u0 = clamp(0.0035 + 0.0012 * Math.log10(m.U), 0.003, 0.0095), vs0 = ebCyclones(m), n = Math.min(vs0.length, 12), i;
+    for (i = 0; i < 12; i++) if (i < n) { var v = vs0[i], lon = v.lon + (W.step - v.born) * v.drift; vArr[i * 4] = ((lon + Math.PI) % 6.2832 + 6.2832) % 6.2832 - Math.PI; vArr[i * 4 + 1] = v.lat; vArr[i * 4 + 2] = v.r; vArr[i * 4 + 3] = v.s * u0 * 2.6; }
+    gl.useProgram(pA); gl.bindFramebuffer(gl.FRAMEBUFFER, rb.f); gl.viewport(0, 0, rb.w, rb.h); gl.bindTexture(gl.TEXTURE_2D, ra.t);
+    gl.uniform1i(uA.uT, 0); gl.uniform1i(uA.uEb, 3); gl.uniform2f(uA.uR, rb.w, rb.h); gl.uniform1f(uA.uU0, u0); gl.uniform1f(uA.uN, m.jets); gl.uniform1f(uA.uSuper, W.p.locked ? 0.4 : 0); gl.uniform1f(uA.uRelax, relax); gl.uniform1f(uA.uStep, W.step); gl.uniform1f(uA.uKick, u0 * 0.3); gl.uniform1f(uA.uSeed, W.p.seed); gl.uniform4fv(uA.uV, vArr); gl.uniform1i(uA.uNV, n);
+    gl.drawArrays(gl.TRIANGLES, 0, 3); var t = ra; ra = rb; rb = t; W.step++;
+  };
+  this.gasStep = function (dt, init) {
+    gl.useProgram(pG); gl.bindFramebuffer(gl.FRAMEBUFFER, gb.f); gl.viewport(0, 0, gb.w, gb.h); gl.bindTexture(gl.TEXTURE_2D, ga.t);
+    gl.uniform1i(uG.uT, 0); gl.uniform1i(uG.uV, 4); gl.uniform1i(uG.uNz, 5); gl.uniform1i(uG.uBand, 6); gl.uniform2f(uG.uR, gb.w, gb.h); gl.uniform1f(uG.uDt, dt); gl.uniform1f(uG.uInit, init ? 1 : 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3); var t = ga; ga = gb; gb = t;
+  };
+  this.draw = function (m) {
+    var now = performance.now(); if (last) { ema = ema * 0.92 + (now - last) * 0.08; if (ema > 42 && scale > 0.45) { scale *= 0.94; ema = 30; } else if (ema < 19 && scale < 1) scale = Math.min(1, scale * 1.01); } last = now;
+    var d = Math.min(devicePixelRatio || 1, 1.5) * scale, w = Math.round(canvas.clientWidth * d), h = Math.round(canvas.clientHeight * d); if (!w || !h) return;
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    var locked = W.p.locked, F = m.F, spin = (locked ? 0 : W.spin) + (m.gas ? 0 : W.yaw), tilt0 = W.p.axis != null ? W.p.axis : 0.12, Lr = (function () { function rxv(v, a) { var c = Math.cos(a), s = Math.sin(a); return [v[0], v[1] * c - v[2] * s, v[1] * s + v[2] * c]; } function ryv(v, a) { var c = Math.cos(a), s = Math.sin(a); return [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c]; } return rxv(ryv(rxv(L, tilt0), -W.yaw), -(tilt0 + W.pitch)); })();
+    var fly = W.fly, gx = fly && !W.only ? Math.round(w * 0.6) : 0, gw = w - gx;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(gx, 0, gw, h); gl.useProgram(pW);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, m.gas ? ga.t : ra.t);
+    ['uTr', 'uLut', 'uHt', 'uEb'].forEach(function (n, i) { if (uW[n]) gl.uniform1i(uW[n], i); }); if (uW.uBand) gl.uniform1i(uW.uBand, 6); if (uW.uRing) gl.uniform1i(uW.uRing, 7); if (uW.uRv) gl.uniform1i(uW.uRv, 8); if (uW.uEb2) gl.uniform1i(uW.uEb2, 9); if (uW.uHy) gl.uniform1i(uW.uHy, 10);
+    var ocean = OCEANF[W.p.id] > 0 && !m.airless ? 1 : 0;
+    var f1 = { uTime: W.step * 0.06, uMode: m.gas ? 1 : 0, uSpin: spin, uTilt: (W.p.axis != null ? W.p.axis : 0.12) + (m.gas ? 0 : W.pitch), uFrame: W.p.rings ? 2.75 : 1.2 / (m.gas ? 1 : W.zoom), uRoll: W.p.roll || 0, uRT: W.p.rings ? 1 : 0, uTt: F.Tt, uTb: m.canLiquid ? m.Tb : 0, uCov: m.cov, uTau: m.gas ? 0.06 : m.airless ? 0 : Math.min(3, 0.55 + 0.7 * Math.log10(W.Ps + 1)), uHz: m.haze, uHv: clamp(m.H / (W.p.Rj * 71492e3) * 9, 0.012, 0.09), uSeed: W.p.seed, uF: m.flat, uOcean: ocean, uGam: m.gamK, uTgas: m.Teq, uEpsG: m.eps, uLock: locked ? 1 : 0, uBump: 0.0035, uClouds: W.clouds ? 1 : 0, uOverlay: W.overlay, uSig: 0.003 + 0.00512 * clamp(m.U * 0.25, 2, 25), uTcol: EB.stats && EB.stats.min < m.Tcol ? m.Tcol : 0, uTide: clamp(m.tide / 2, 0, 1), uFluidK: W.fluid === 'methane' ? 1 : 0, uTrW: ga.w, uTrH: ga.h };
+    Object.keys(f1).forEach(function (k) { if (uW[k]) gl.uniform1f(uW[k], f1[k]); });
+    gl.uniform2f(uW.uR, gw, h); gl.uniform2f(uW.uOff, gx, 0);
+    var star = planckRGB(W.Tstar), v3 = { uL: m.gas ? (W.p.L ? (function (v) { var l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; })(W.p.L) : Lg) : Lr, uAw: F.aw || [0.1, 0.1, 0.1], uLiq: F.liq, uIce: F.ice, uLand: m.Ts > 700 ? [0.15, 0.12, 0.11] : F.land, uCld: F.cld, uSky: m.sky, uSun: m.sun, uStar: star, uHazeC: m.hazeC, uZ: m.z, uB: m.b, uS: m.s, uD: m.d, uP: m.p };
+    Object.keys(v3).forEach(function (k) { if (uW[k]) gl.uniform3fv(uW[k], v3[k]); });
+    if (!W.only) gl.drawArrays(gl.TRIANGLES, 0, 3);
+    W.view = { tilt: f1.uTilt, spin: f1.uSpin, frame: f1.uFrame, flat: f1.uF, roll: f1.uRoll, gx: gx, gw: gw, w: w, h: h, L: v3.uL };
+    if (!fly) return;
+    var cam = flyCamera(m, f1.uTilt, f1.uSpin, v3.uL);
+    var fw = W.only ? w : gx; gl.viewport(0, 0, fw, h); gl.useProgram(pF);
+    ['uTr', 'uLut', 'uHt', 'uEb'].forEach(function (n, i) { if (uF[n]) gl.uniform1i(uF[n], i); }); if (uF.uBand) gl.uniform1i(uF.uBand, 6); if (uF.uHy) gl.uniform1i(uF.uHy, 10); if (uF.uVel) gl.uniform1i(uF.uVel, 4); if (uF.uEb2) gl.uniform1i(uF.uEb2, 9);
+    Object.keys(f1).forEach(function (k) { if (uF[k]) gl.uniform1f(uF[k], f1[k]); });
+    Object.keys(v3).forEach(function (k) { if (uF[k] && k !== 'uL') gl.uniform3fv(uF[k], v3[k]); });
+    gl.uniform2f(uF.uR, fw, h); gl.uniform2f(uF.uOff, 0, 0);
+    ['uCam', 'uFwd', 'uRt', 'uUp', 'uLb'].forEach(function (k) { gl.uniform3fv(uF[k], cam[k]); });
+    gl.uniform1f(uF.uFov, 0.62); gl.uniform1f(uF.uEx, cam.ex); gl.uniform1f(uF.uRkm, cam.rkm); gl.uniform1f(uF.uAltKm, W.flyAlt); gl.uniform1f(uF.uCloudKm, 3.5); if (uF.uHkm) gl.uniform1f(uF.uHkm, m.H / 1000);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  };
+  this.tick = function (m, playing, dtw) {
+    var t0 = performance.now(), n = 0, acc = 0;
+    if (m.gas) {
+      if (GS && !GAS_NODES[W.p.id] && GS.jets !== m.jets) { resetWorld(); return; }
+      if (W.spinup > 0) {
+        while (W.spinup > 0 && performance.now() - t0 < 14) { GS.step(); acc += GS.dt; W.spinup--; if (++n % 4 === 0) { this.uploadVel(GS.exportField()); this.gasStep(acc, false); acc = 0; } }
+        if (acc > 0) { this.uploadVel(GS.exportField()); this.gasStep(acc, false); }
+      } else if (playing) {
+        var tu = W.p.Rj * 71492e3 / Math.max(m.U, 1);
+        W.simAcc += dtw * W.timeSec / tu;
+        while (W.simAcc >= GS.dt && n < 8) { GS.step(); acc += GS.dt; W.simAcc -= GS.dt; n++; }
+        if (W.simAcc > GS.dt * 8) W.simAcc = 0;
+        if (n) { this.uploadVel(GS.exportField()); this.gasStep(acc, false); }
+      }
+    } else {
+      var k = 0, st = W.spinup > 0, budget = st ? 14 : 7; while ((playing || st) && k < (st ? 40 : 4) && (performance.now() - t0 < budget || k === 0)) { ebStep(m, 1, st ? 1.4 : 0.7); k++; if (W.spinup > 0) W.spinup--; }
+      if (k) { this.uploadEb(); ebStats(m); this.cloudStep(m, W.spinup > 0 ? 0.05 : 0.012); }
+      if (W.terr && W.spinup === 0 && (W.hydroDue === 0 || W.step - W.hydroDue > 400)) { W.hydro = hydroRaster(W.terr, m, W.route); this.setHydro(W.hydro); W.hydroDue = W.step;
+        if (!W.aimed && !W.p.locked && W.hydro.n) { W.aimed = true; var im = W.hydro.img, sx2 = 0, sy2 = 0, sz2 = 0, sl2 = 0, x2, y2, bin = new Float32Array(24 * 12), bb2 = 0;
+          for (y2 = 0; y2 < 1024; y2 += 4) for (x2 = 0; x2 < 2048; x2 += 4) if (im[(y2 * 2048 + x2) * 4] > 60) bin[Math.floor(y2 / 1024 * 12) * 24 + Math.floor(x2 / 2048 * 24)] += Math.cos(((y2 + 0.5) / 1024 - 0.5) * Math.PI);
+          for (x2 = 0; x2 < bin.length; x2++) { var sm2 = 0; for (var dy4 = -1; dy4 <= 1; dy4++) for (var dx4 = -1; dx4 <= 1; dx4++) { var yy4 = Math.floor(x2 / 24) + dy4; if (yy4 >= 0 && yy4 < 12) sm2 += bin[yy4 * 24 + ((x2 % 24) + dx4 + 24) % 24]; } if (sm2 > sl2) { sl2 = sm2; bb2 = x2; } }
+          if (sl2 > 0) { var lo3 = ((bb2 % 24 + 0.5) / 24 - 0.5) * 6.2832; sx2 = Math.cos(lo3); sz2 = Math.sin(lo3); sy2 = 1; sl2 = ((Math.floor(bb2 / 24) + 0.5) / 12 - 0.5) * Math.PI; }
+          if (sy2) { var lc3 = Math.atan2(sz2, sx2), best3 = 0, bd3 = 9, n0 = [-0.33, 0, 0.94]; for (var a3 = 0; a3 < 6.2832; a3 += 0.01) { var bx3 = n0[0] * Math.cos(a3) + n0[2] * Math.sin(a3), bz3 = -n0[0] * Math.sin(a3) + n0[2] * Math.cos(a3), dd3 = Math.abs(((Math.atan2(bz3, bx3) - lc3 + 9.4248) % 6.2832) - 3.1416); if (dd3 < bd3) { bd3 = dd3; best3 = a3; } } W.spin = best3 - W.yaw; W.pitch = clamp(-(sl2 / sy2) * 0.8, -0.9, 0.9); }
+        } }
+    }
+  };
+}
+function rxv(v, a) { var c = Math.cos(a), s = Math.sin(a); return [v[0], v[1] * c - v[2] * s, v[1] * s + v[2] * c]; }
+function ryv(v, a) { var c = Math.cos(a), s = Math.sin(a); return [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c]; }
+function nrm3(v) { var l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; }
+function cross3(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+function groundKm(lon, lat) {
+  if (!W.terr || (W.m && W.m.gas)) return 0;
+  var t = W.terr, i = Math.floor((lon / 6.2832 + 0.5) * t.W), j = Math.floor((lat / Math.PI + 0.5) * t.H); i = ((i % t.W) + t.W) % t.W; j = clamp(j, 0, t.H - 1);
+  var e = t.data[(j * t.W + i) * 2]; return OCEANF[W.p.id] > 0 ? Math.max(e, 0) : e;
+}
+function flyCamera(m, tilt, spin, Lview) {
+  var rkm = W.p.Rj * 71492, ex = m.gas ? 2 : 3, up = [Math.cos(W.flyLat) * Math.cos(W.flyLon), Math.sin(W.flyLat), Math.cos(W.flyLat) * Math.sin(W.flyLon)];
+  var east = nrm3(cross3([0, 1, 0], up)), north = cross3(up, east), ch = Math.cos(W.flyHead), sh2 = Math.sin(W.flyHead);
+  var r = 1 + ((m.gas ? 0 : groundKm(W.flyLon, W.flyLat) * ex) + W.flyAlt) / rkm, pitch = W.flyPitch - Math.acos(Math.min(1 / r, 1));
+  var fh = [north[0] * ch + east[0] * sh2, north[1] * ch + east[1] * sh2, north[2] * ch + east[2] * sh2], cp = Math.cos(pitch), sp = Math.sin(pitch);
+  var fwd = nrm3([fh[0] * cp + up[0] * sp, fh[1] * cp + up[1] * sp, fh[2] * cp + up[2] * sp]), rt = nrm3(cross3(fwd, up)), cu = cross3(rt, fwd);
+  return { uCam: [up[0] * r, up[1] * r, up[2] * r], uFwd: fwd, uRt: rt, uUp: cu, uLb: ryv(rxv(Lview, tilt), spin), ex: ex, rkm: rkm, fh: fh, up: up };
+}
+function flyMove(dKm, side) {
+  var m = W.m, c = flyCamera(m, 0, 0, [0, 0, 1]), rkm = W.p.Rj * 71492, rt = nrm3(cross3(c.fh, c.up)), mv = [c.fh[0] * dKm + rt[0] * side, c.fh[1] * dKm + rt[1] * side, c.fh[2] * dKm + rt[2] * side];
+  var nu = nrm3([c.up[0] + mv[0] / rkm, c.up[1] + mv[1] / rkm, c.up[2] + mv[2] / rkm]), lat2 = Math.asin(clamp(nu[1], -0.999, 0.999)), lon2 = Math.atan2(nu[2], nu[0]);
+  var e2 = nrm3(cross3([0, 1, 0], nu)), n2 = cross3(nu, e2), oldF = nrm3([c.fh[0] - nu[0] * (c.fh[0] * nu[0] + c.fh[1] * nu[1] + c.fh[2] * nu[2]), c.fh[1] - nu[1] * (c.fh[0] * nu[0] + c.fh[1] * nu[1] + c.fh[2] * nu[2]), c.fh[2] - nu[2] * (c.fh[0] * nu[0] + c.fh[1] * nu[1] + c.fh[2] * nu[2])]);
+  W.flyHead = Math.atan2(oldF[0] * e2[0] + oldF[1] * e2[1] + oldF[2] * e2[2], oldF[0] * n2[0] + oldF[1] * n2[1] + oldF[2] * n2[2]); W.flyLat = lat2; W.flyLon = lon2;
+}
+function globePick(px, py) {
+  var v = W.view; if (!v) return null; var x = px - v.gx; if (x < 0) return null;
+  var q = [(2 * x - v.gw) / v.h * v.frame, (2 * (v.h - py) - v.h) / v.h * v.frame], cr = Math.cos(v.roll), sr = Math.sin(v.roll); q = [cr * q[0] - sr * q[1], sr * q[0] + cr * q[1]]; q[1] /= Math.max(1 - v.flat, 0.6);
+  var r2 = q[0] * q[0] + q[1] * q[1]; if (r2 >= 1) return null;
+  var b = ryv(rxv([q[0], q[1], Math.sqrt(1 - r2)], v.tilt), v.spin); return { lon: Math.atan2(b[2], b[0]), lat: Math.asin(clamp(b[1], -1, 1)) };
+}
+var GS = null;
+try { W.gl = new WorldGL($('#world-c')); } catch (e) { console.error(e); }
+function resetWorld() {
+  W.m = worldModel();
+  var m = W.m;
+  if (W.gl) {
+    if (m.gas) { var prof = gasProfile(m, W.p); W.gl.setBand(prof.tex); GS = new GasSim(m, W.p.seed, W.p.Rj * 71492e3, prof); GS.step(); W.gl.uploadVel(GS.exportField(true)); W.gl.gasStep(0, true); W.spinup = 420; W.simAcc = 0; }
+    else {
+      var stag = W.tect === 'lid' || (W.tect === 'auto' && !(W.fluid === 'water' && OCEANF[W.p.id] > 0 && m.Ts * 1.25 > m.F.Tt && m.Ts < 700)), tkey = W.p.id + '|' + stag + '|' + W.p.locked;
+      if (W.terrP !== tkey) { W.terr = buildTerrain(W.p, OCEANF[W.p.id], m.gv, { stagnant: stag, Tf: m.F.Tt, Tsurf: m.Ts, locked: W.p.locked, Gam: m.gamK, wet: OCEANF[W.p.id] > 0 && !m.airless }); W.terrP = tkey; W.gl.setTerrain(W.terr); W.route = routeTerrain(W.terr); }
+      ebInit(m, W.terr); ebStep(m, 1, 1); W.gl.uploadEb(); W.gl.cloudStep(m, 1); W.spinup = 900; W.hydroDue = 0; W.gl.setHydro(hydroRaster(W.terr, m, null));
+    }
+  }
+  worldUi();
+}
+/* ---------- orbit-only page: presets, parameters, controls, messages ---------- */
+function worldUi() {
+  var m = W.m, p = W.p;
+  $('#world-tag').textContent = p.label + (m.gas ? ' · ' + m.regime : ' · ' + fmt(EB.stats ? EB.stats.mean : m.Ts) + ' K') + ' · orbit view';
+}
+function km(m) { return m >= 1e9 ? fmt(m / 1e9, 1) + ' million km' : fmt(m / 1000) + ' km'; }
+function altRange() { return W.m && W.m.gas ? [50, 80000] : [0.3, 3000]; }
+function flyStatus() { $('#alt-v').textContent = 'Height ' + fmt(W.flyAlt, W.flyAlt < 10 ? 1 : 0) + ' km'; }
+function flyAimPeak() {   // from orbit: look at the highest land that has the Sun 25 to 60 degrees up, from about 550 km back
+  var v = W.view, t = W.terr; if (!v || !t || (W.m && W.m.gas)) return false; var Lb = ryv(rxv(v.L, v.tilt), v.spin), best = -1e9, bi = -1, bj = -1, i, j;
+  for (j = 2; j < t.H - 2; j += 2) for (i = 0; i < t.W; i += 2) { var la = ((j + 0.5) / t.H - 0.5) * Math.PI, lo = ((i + 0.5) / t.W - 0.5) * 6.2832, d = [Math.cos(la) * Math.cos(lo), Math.sin(la), Math.cos(la) * Math.sin(lo)], se = d[0] * Lb[0] + d[1] * Lb[1] + d[2] * Lb[2];
+    if (se < 0.42 || se > 0.87) continue; var e = t.data[(j * t.W + i) * 2]; if (e > best) { best = e; bi = lo; bj = la; } }
+  if (best < 0.8) return false;
+  var up = [Math.cos(bj) * Math.cos(bi), Math.sin(bj), Math.cos(bj) * Math.sin(bi)], east = nrm3(cross3([0, 1, 0], up)), north = cross3(up, east), k = Lb[0] * up[0] + Lb[1] * up[1] + Lb[2] * up[2], sh = [Lb[0] - up[0] * k, Lb[1] - up[1] * k, Lb[2] - up[2] * k];
+  W.flyLon = bi; W.flyLat = bj; W.flyHead = Math.atan2(sh[0] * east[0] + sh[1] * east[1] + sh[2] * east[2], sh[0] * north[0] + sh[1] * north[1] + sh[2] * north[2]) + 2.2; W.flyPitch = -0.3;
+  flyMove(-W.flyAlt * 1.4, 0); return true;
+}
+function flyAimDefault() {   // land where the Sun is about 35 degrees up from orbit, or low (15 degrees) near the ground so relief casts long shadows, with the Sun ahead and to the right
+  var v = W.view; if (!v) return; var Lv = v.L, vz = [0, 0, 1], dd = Lv[2], u = nrm3([-Lv[0] * dd, -Lv[1] * dd, 1 - Lv[2] * dd]), se = W.flyAlt > 50 ? 0.6 : 0.26, n = nrm3([Math.sin(se) * Lv[0] + Math.cos(se) * u[0], Math.sin(se) * Lv[1] + Math.cos(se) * u[1], Math.sin(se) * Lv[2] + Math.cos(se) * u[2]]);
+  var b = ryv(rxv(n, v.tilt), v.spin), Lb = ryv(rxv(Lv, v.tilt), v.spin); W.flyLon = Math.atan2(b[2], b[0]); W.flyLat = Math.asin(clamp(b[1], -1, 1));
+  var up = nrm3(b), east = nrm3(cross3([0, 1, 0], up)), north = cross3(up, east), k = Lb[0] * up[0] + Lb[1] * up[1] + Lb[2] * up[2], sh = [Lb[0] - up[0] * k, Lb[1] - up[1] * k, Lb[2] - up[2] * k];
+  W.flyHead = Math.atan2(sh[0] * east[0] + sh[1] * east[1] + sh[2] * east[2], sh[0] * north[0] + sh[1] * north[1] + sh[2] * north[2]) - 0.7; W.flyPitch = W.flyAlt > 50 ? (W.m && W.m.gas ? -0.42 : -0.3) : -0.14;
+}
+function redraw() { if (W.gl && W.m) W.gl.draw(W.m); }
+function setPreset(p) {
+  W.aimed = false; W.yaw = 0; W.pitch = 0;
+  var ob0 = ORB[p.id] || { e: 0, obl: 0 }; W.ecc = ob0.e || 0; W.obl = ob0.obl || 0; W.spinMode = 'auto'; W.base = p; W.p = applySpin(p); W.fluid = p.fluid; W.Tstar = p.Ts; W.orbit = 1; W.Ps = p.Ps; W.step = 0;
+  resetWorld();
+}
+function pickPreset(q) {
+  var id = q.get('preset'), p = null, i;
+  if (id) for (i = 0; i < WP.length; i++) if (WP[i].id === id) p = WP[i];
+  if (p) return p;
+  var num = function (k, d) { var v = parseFloat(q.get(k)); return isFinite(v) ? v : d; };
+  var type = q.get('type') === 'gas' ? 'gas' : 'rock', fluid = q.get('fluid'), lk = (q.get('locked') || '').toLowerCase();
+  if (!FLUIDS[fluid]) fluid = type === 'gas' ? 'ammonia' : 'water';
+  var sea = Math.min(1, Math.max(0, num('sea', 0.5)));
+  var custom = { id: 'custom', label: type === 'gas' ? 'Gas giant' : 'Rocky world', type: type, Ts: num('Ts', 5772), Rs: num('Rs', 1), a: num('a', 1), P: num('P', 365), Prot: num('Prot', type === 'gas' ? 0.4 : 1), Rj: num('Rj', type === 'gas' ? 1 : 0.0892), Me: num('Me', type === 'gas' ? 300 : 1), locked: lk === '1' || lk === 'true', fluid: fluid, Ps: num('Ps', 1), mu: num('mu', type === 'gas' ? 2.3 : 29), sea: sea, seed: Math.round(num('seed', 7)) };
+  OCEANF.custom = type === 'gas' ? 0 : sea; ORB.custom = { Ms: 1, e: 0, obl: 0 };
+  return custom;
+}
+var fp = pickPreset(new URLSearchParams(location.search)), firstDrawn = false, buildMax = 1;
+W.only = true; W.fly = true; W.playing = !reduced; W.timeSec = 300;
+setPreset(fp);
+if (W.gl) {
+  W.flyAlt = W.m.gas ? 6000 : 400; W.gl.draw(W.m);
+  if (!flyAimPeak()) flyAimDefault();
+  flyStatus(); W.gl.draw(W.m);
+  $('#build').classList.toggle('badge', !W.m.gas); $('#build-t').textContent = 'Forming the planet…'; buildMax = Math.max(1, W.spinup);
+}
+else { $('#fail').hidden = false; $('#build').hidden = true; }
+var cv = $('#world-c'); cv.tabIndex = 0; cv.focus();
+cv.addEventListener('wheel', function (e) { if (!W.view) return; e.preventDefault(); var r = altRange(); W.flyAlt = clamp(W.flyAlt * Math.exp(e.deltaY * 0.0015), r[0], r[1]); flyStatus(); redraw(); }, { passive: false });
+window.addEventListener('keydown', function (e) {
+  if (!W.m) return; var st = Math.max(2, W.flyAlt * 0.8), k = e.key.toLowerCase();
+  if (k === 'arrowup' || k === 'w') flyMove(st, 0); else if (k === 'arrowdown' || k === 's') flyMove(-st, 0); else if (k === 'arrowleft' || k === 'a') W.flyHead -= 0.08; else if (k === 'arrowright' || k === 'd') W.flyHead += 0.08;
+  else if (k === '+' || k === '=' || k === 'pagedown') W.flyAlt = clamp(W.flyAlt / 1.25, altRange()[0], altRange()[1]); else if (k === '-' || k === 'pageup') W.flyAlt = clamp(W.flyAlt * 1.25, altRange()[0], altRange()[1]);
+  else return; e.preventDefault(); flyStatus(); redraw();
+});
+(function () {
+  var d = null;
+  cv.addEventListener('pointerdown', function (e) { cv.focus(); d = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; });
+  cv.addEventListener('pointermove', function (e) { if (!d) return; W.flyHead += (e.clientX - d[0]) * 0.005; W.flyPitch = clamp(W.flyPitch - (e.clientY - d[1]) * 0.004, -1.2, 0.6); d = [e.clientX, e.clientY]; redraw(); });
+  var end = function () { d = null; cv.style.cursor = 'grab'; }; cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+})();
+/* The parent page sends {type:'orbit-goto', lat, lon} in radians (latitude north, longitude east of the planet's own zero meridian). */
+window.addEventListener('message', function (e) {
+  var d = e.data; if (e.source !== window.parent || !d || d.type !== 'orbit-goto' || !W.m) return;
+  var lat = +d.lat, lon = +d.lon; if (!isFinite(lat) || !isFinite(lon)) return;
+  W.flyLat = clamp(lat, -1.45, 1.45); W.flyLon = Math.atan2(Math.sin(lon), Math.cos(lon)); redraw();
+});
+var last = 0, tickN = 0;
+function loop(now) {
+  var dt = Math.min(0.06, (now - last) / 1000 || 0); last = now;
+  if (W.gl && !document.hidden) {
+    var need = W.spinup > 0;
+    if (W.playing || need) {
+      W.gl.tick(W.m, W.playing, dt);
+      if (W.playing) W.spin += W.m.gas ? (W.timeSec < 1000 ? dt * W.timeSec * W.m.Om : 0) : dt * 0.09;
+      var bld = W.m.gas && W.spinup > 0; if (!bld) { W.gl.draw(W.m); firstDrawn = true; }
+      if (tickN++ % 20 === 0) worldUi();
+    }
+    var busy = W.spinup > 0; $('#build').hidden = !busy; $('#build-p').style.width = Math.round((1 - Math.max(0, W.spinup) / buildMax) * 100) + '%';
+  }
+  requestAnimationFrame(loop);
+}
+window.__orbit = { W: W, ready: function () { return W.spinup === 0; } };
+requestAnimationFrame(loop);
+})();
+</script></body></html>

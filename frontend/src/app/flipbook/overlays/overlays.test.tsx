@@ -252,7 +252,7 @@ describe('overlay components', () => {
     act(render);
     const gaia = q('overlay-toggle-gaia')!;
     expect(gaia.getAttribute('aria-pressed')).toBe('false');
-    expect(gaia.className).toContain('min-h-11');
+    expect(gaia.className).toContain('fb-ov'); // D-38 chip: 36 px high, above the 24 px WCAG 2.5.8 floor
     act(() => gaia.click());
     act(render);
     expect(useAppStore.getState().sky.overlays.toggles.gaia).toBe(true);

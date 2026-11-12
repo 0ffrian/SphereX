@@ -1,7 +1,8 @@
 // Phone bottom sheet (390 px, touch): the first tap in the sheet right after a search lands where
 // it was aimed. The search help shows while the field has focus; it used to take a row in the
 // layout, so the tap that blurred the field hid it and moved the sheet by its height. Also: the
-// sheet sits on top of the sky credit (D-35) and Stop is in view without scrolling.
+// sheet is docked at the bottom of the sky and Stop is in view without scrolling. (The credit strip is
+// behind the info button since the D-38 redesign, so the sheet no longer sits on top of it.)
 import { expect, test } from '@playwright/test';
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -12,31 +13,19 @@ test('the first tap in the sheet after a search hits its target', async ({ page 
   await input.fill('Synthetic progressive');
   await input.press('Enter');
   const headline = page.getByTestId('frames-progress-headline');
-  await expect(headline).toContainText('Fetching SPHEREx frames');
+  await expect(headline).toHaveText(/^\d+ \/ 31$/);
   await expect(input).toBeFocused();
 
   const sheet = page.getByTestId('object-panel');
   // The island has grown into the sheet (issue #66): from now on it can be tapped.
   await expect(page.getByTestId('island')).toHaveAttribute('data-arrived', '');
-  // The search has put the object in view, so the sky lists the cached spots next to it: one more
-  // line in the credit strip, and the sheet (docked on top of it) moves up by that line. Wait for
-  // it, or the sheet is measured before it moves and the strip after.
-  const creditBox = page.getByTestId('sky-credit-box');
-  await expect(creditBox).toContainText('Lilac dots');
-  await expect
-    .poll(async () => {
-      const s = await sheet.boundingBox();
-      const c = await creditBox.boundingBox();
-      return s!.y + s!.height <= c!.y + 1;
-    })
-    .toBe(true);
   const before = await sheet.boundingBox();
   const stop = page.getByTestId('frames-stop');
   const target = await stop.boundingBox();
-  // Stop is visible in the sheet without scrolling, above the credit strip.
-  const credit = await page.getByTestId('sky-credit-box').boundingBox();
-  expect(target!.y + target!.height).toBeLessThanOrEqual(credit!.y);
-  expect(before!.y + before!.height).toBeLessThanOrEqual(credit!.y + 1);
+  // Stop is visible in the sheet without scrolling, inside the window.
+  const view = await page.locator('.sx-view').boundingBox();
+  expect(target!.y + target!.height).toBeLessThanOrEqual(view!.y + view!.height);
+  expect(before!.y + before!.height).toBeLessThanOrEqual(view!.y + view!.height + 1);
 
   // Blurring the field (what the first tap does) moves nothing.
   await input.evaluate((el: { blur(): void }) => el.blur());
@@ -47,5 +36,5 @@ test('the first tap in the sheet after a search hits its target', async ({ page 
   // And a real tap at the spot aimed at while the field had focus works.
   await input.focus();
   await page.touchscreen.tap(target!.x + target!.width / 2, target!.y + target!.height / 2);
-  await expect(headline).toHaveText(/^Stopped\./);
+  await expect(page.getByTestId('frames-continue')).toBeVisible();
 });
