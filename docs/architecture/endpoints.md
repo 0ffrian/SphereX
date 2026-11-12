@@ -18,7 +18,7 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
 | `GET /v1/objects/{id}/render-params` | RenderParams (R3.4) | D-16 | [A4.7](pipeline-card.md#a47-stage-7-renderparams) |
 | `GET /v1/objects/{id}/job` | the object job's state | Q-111 (open) | [A4.10](jobs.md#a410-object-job-and-fan-out) |
 | `GET /v1/objects/{id}/job/events` | the same, as server-sent events | Q-111 (open) | [A4.10](jobs.md#a410-object-job-and-fan-out) |
-| `GET /v1/objects/{id}/overlays` | Gaia and CatWISE markers, contamination, footprint | Q-50 (open) | [A4.9](overlays.md#a49-overlays-flag-mask-and-combine) |
+| `GET /v1/objects/{id}/overlays` | Gaia and CatWISE markers, contamination, footprint, star masks for movers (A19.6) | Q-50 (open) | [A4.9](overlays.md#a49-overlays-flag-mask-and-combine) |
 | `GET /v1/objects/{id}/flags/{frame_id}.png` | flag mask PNG | Q-50 (open) | [A4.9](overlays.md#a49-overlays-flag-mask-and-combine) |
 | `GET /v1/objects/{id}/combine.png?op=add\|sub&a=&b=` | A ± B on frame A's grid | Q-50, Q-54 (open) | [A4.9](overlays.md#a49-overlays-flag-mask-and-combine) |
 | `GET /v1/objects/{id}/composite` | false-colour SPHEREx composite, metadata | Q-92, Q-94 (open) | [backend/README.md#composite](../../backend/README.md#composite); colour views in [A11](honesty-policy.md#a11-honesty-policy-user-facing) |
