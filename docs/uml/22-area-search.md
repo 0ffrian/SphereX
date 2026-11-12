@@ -1,6 +1,6 @@
 # 22 Area search: components and sequences
 
-Area search of [A16](../architecture/moving-objects/area-search.md) (agreed plan, Q-146): a square drawn on the sky, then **Known objects** (hand-off to Track, [A19](../architecture/moving-objects/track.md) and [A20](../architecture/moving-objects/track-ui.md)) or **Discovery** (dots, glitches, stars and fixed dots removed, joined across visits with a parallax-aware test, checked against known objects). Three diagrams: components, the offline precompute, and the sky interaction. Drawn 9 Nov 2026 from A16 to A18 (backend [A17](../architecture/moving-objects/area-backend.md), sky UI [A18](../architecture/moving-objects/area-ui.md), shell [A21](../architecture/sky-shell.md)); nothing here is built yet. Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
+Area search of [A16](../architecture/moving-objects/area-search.md) (agreed plan, Q-146): a square drawn on the sky, then **Known objects** (hand-off to Track, [A19](../architecture/moving-objects/track.md) and [A20](../architecture/moving-objects/track-ui.md)) or **Discovery** (dots, glitches, stars and fixed dots removed, joined across visits with a parallax-aware test, checked against known objects). Three diagrams: components, the offline precompute, and the sky interaction. Drawn 9 Nov 2026 from A16 to A18 (backend [A17](../architecture/moving-objects/area-backend.md), sky UI [A18](../architecture/moving-objects/area-ui.md), shell [A21](../architecture/sky-shell.md)). **Built:** the backend from frames to the API (issues #97 and #108: `frames.py`, `dots.py`, `clean.py`, `join.py`, `match.py`, `service.py`, `api/areas.py`, `core/export/ecsv.py`) and the committed Eros pack. The frontend reads `/v1/areas` from the sky dock (issue #96, Q-406): a prepared area that holds the drawn box answers first, and the Q-414 demo only where none does. Not built: the gated extras D4 to D7 (cut). Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
 
 ## Components
 
@@ -13,7 +13,7 @@ flowchart TB
     FRM["frames.py<br/>grid of small SIA cones, s_region overlap, time windows, visits, coverage"]
     DOT["dots.py<br/>mesh background, hardware flags masked, OUTLIER kept as a flag, detect, measure"]
     CLN["clean.py<br/>glitch, star, fixed per tracklet"]
-    JON["join.py<br/>tracklets, pairs, parallax-aware test, mutual best"]
+    JON["join.py<br/>tracklets, pairs, parallax-aware test, mutual best per direction"]
     MAT["match.py<br/>SkyBoT candidates, Horizons positions from SPHEREx"]
     INJ["inject.py (gated D4)<br/>planted movers in memory, test mover, completeness grid"]
     CTL["control.py (gated D5)<br/>shuffled-time runs"]
@@ -31,9 +31,11 @@ flowchart TB
     ECSV["core/export/ecsv.py shared writer (A19.9)"]
   end
   CACHE[("Read-through cache D-25<br/>raw replies + derived.area entries")]
-  API["api/areas.py<br/>/v1/areas/... incl. /checks (gated)"]
+  API["api/areas.py: /v1/areas, /area_id, /known, /dots, /tracks,<br/>/stamps/dot_id.png, /export.ecsv (no /checks: D4 to D7 cut)"]
+  PACK[("assets/areas pack<br/>derived.area entries, Eros (issue #108)")]
   subgraph FE["frontend/src"]
-    RAIL["app/shell ToolRail + railIcons<br/>ToolId area"]
+    RAIL["app/shell SkyDock (Known objects, Discovery)<br/>ToolId area (D-38)"]
+    DEMO["app/area areaService demo seam<br/>answers only inside the prepared Eros area (Q-414)"]
     CARDS["Feature cards in the object card's slot (proposed Q-172)<br/>Area, Options, Known, Discovery, Result, Checks (gated)"]
     ISL["Island progress pill (proposed)"]
     LAYER["app/sky/area AreaLayer<br/>sky layer slot"]
@@ -66,8 +68,10 @@ flowchart TB
   HOR --> CACHE
   SVC --> CACHE
   CACHE --> API
+  PACK --> API
   API --> STORE
   RAIL --> CARDS
+  DEMO -.->|"demo stand-in for the API until Q-205"| CARDS
   STORE --> CARDS
   CARDS --> ISL
   STORE --> LAYER
@@ -75,7 +79,7 @@ flowchart TB
   CARDS --> TRK
 ```
 
-`join.py` asks Horizons for SPHEREx's velocity relative to the geocentre, one vector per visit, for the parallax-aware test (A17.4, proposed).
+`join.py` asks Horizons for SPHEREx's velocity relative to the geocentre, one vector per visit, for the parallax-aware test (A17.4; built in issue #108, `horizons.spherex_velocity`).
 
 ## Offline precompute
 
@@ -95,7 +99,7 @@ sequenceDiagram
   C-->>F: frame rows and cutouts, or frames:cone_maxrec, no_footprint, cutout codes
   F-->>S: frames in the time windows, visits, coverage (or area:visits)
   alt run incomplete (cone_failed, cutout_failed, MAXREC, no usable cutout, no dots)
-    S-->>Op: exit 1, nothing stored (AREA_TOOL_ENABLED off, Q-205)
+    S-->>Op: exit 1, nothing stored (the index has no area; the dock keeps the tagged demo, Q-406)
   end
   S->>D: dots per frame, then glitch, star and fixed labels
   D->>C: Gaia and CatWISE cones per visit (shared star list)
@@ -112,12 +116,46 @@ sequenceDiagram
     S->>J: shuffled-time runs, rate grid when 3 or more visits, spectrum score
     J-->>S: checks (planted and control results never enter tracks)
   end
-  S->>C: pre-fetch Track for every Known object (or list it as skipped)
-  S->>C: write derived.area entries (summary, known, dots, tracks, checks, export)
+  S->>C: pre-fetch Track for every Known object (or list it as skipped), not built: waits on T1
+  S->>C: write derived.area entries (summary, known, dots, tracks, export, stamps as raw pixels made from the cutouts; PNG encoded when served), then the head naming the run's settings
+  Note over Op,S: --recorded --pack assets/areas makes the committed Eros pack from the recorded fixtures (issue #108)
   Note over S,C: Same cache + settings give byte-identical entries (A17.10)
 ```
 
 ## In the sky view
+
+> **As built (PR #104, Q-414; issue #96, Q-406):** the tool is started from the sky dock's Known objects or Discovery, so there is no Options card. The first diagram is the built flow; the second is the remaining plan (Options card, Fly there, Track hand-off, Result card hash), not built.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant D as Sky dock + area cards
+  participant AS as areaStore + areaService
+  participant A as /v1/areas (reads the cache only)
+  participant L as AreaTrackLayer (drawLayer)
+  U->>D: Known objects or Discovery
+  U->>D: drag an area on the sky
+  D->>AS: setBox(box)
+  AS->>A: GET /v1/areas (index), snap the box centre (geometry.ts, snap.ts)
+  alt a prepared area holds the box
+    alt Discovery
+      AS->>A: GET area_id, dots, tracks
+      A-->>AS: stored replies (a failed dots or tracks reply goes to missing)
+      AS-->>D: steps from stored counts, movers from stored tracks, Precomputed · run, Not shown (n)
+      AS-->>L: dots and tracks at their RA/Dec, by step and honesty
+      U->>D: a mover row
+      D-->>U: RealTrackCard (verdict, visits, rate, match, badges)
+    else Known objects
+      AS->>A: GET area_id/known
+      A-->>D: known objects as stored
+    end
+  else no prepared area, or no backend
+    AS-->>D: the Eros demo (tagged Demo data), or area:not_prepared outside it
+  end
+```
+
+Planned flow with the full A18 cards:
 
 ```mermaid
 sequenceDiagram

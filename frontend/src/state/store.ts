@@ -53,7 +53,6 @@ import {
 } from '@/app/messages';
 import { summarizeSpectrum } from '@/app/refusals';
 import { isValidOverride, type Overrides, type SliderKey } from '@/viewer/sliders';
-import { createAreaActions, initialAreaState, type AreaActions, type AreaState } from './area';
 
 /**
  * Honesty toggle (D-21, R5.3): Measured only, + Estimated, + Artistic. The value names the most
@@ -92,6 +91,8 @@ export interface SkyError {
   status: number | null;
   code: string | null;
   detail: string | null;
+  /** For a 'timeout': how long the request waited, in ms (issue #102). Absent otherwise. */
+  timeoutMs?: number | null;
 }
 
 export interface SpectrumState {
@@ -281,7 +282,15 @@ export function getSkyApi(): ApiClient {
 }
 
 function toSkyError(e: unknown): SkyError {
-  if (isApiError(e)) return { kind: e.kind, status: e.status, code: e.code, detail: e.detail };
+  if (isApiError(e)) {
+    return {
+      kind: e.kind,
+      status: e.status,
+      code: e.code,
+      detail: e.detail,
+      ...(e.timeoutMs !== null ? { timeoutMs: e.timeoutMs } : {}),
+    };
+  }
   return {
     kind: 'bad_response',
     status: null,
@@ -334,8 +343,6 @@ export interface AppData {
   overrides: Overrides;
   rendererStatus: RendererStatus;
   sky: SkyState;
-  /** Area search (A18.9; issue #96): defined in ./area.ts. */
-  area: AreaState;
 }
 
 export interface AppActions {
@@ -412,7 +419,7 @@ export interface AppActions {
   skyCombineClear(): void;
 }
 
-export type AppStore = AppData & AppActions & AreaActions;
+export type AppStore = AppData & AppActions;
 
 export const initialAppData: AppData = {
   card: null,
@@ -421,7 +428,6 @@ export const initialAppData: AppData = {
   overrides: {},
   rendererStatus: 'starting',
   sky: initialSkyState,
-  area: initialAreaState,
 };
 
 export const useAppStore = create<AppStore>()((set, get) => {
@@ -594,7 +600,6 @@ export const useAppStore = create<AppStore>()((set, get) => {
 
   return {
     ...initialAppData,
-    ...createAreaActions(set, get, () => skyApi),
     setObject: (card, params) => set({ card, params, overrides: {} }),
     clearObject: () => set({ card: null, params: null, overrides: {} }),
     // A change out of "Measured only" can bring the composite back: it does not play (one picture).

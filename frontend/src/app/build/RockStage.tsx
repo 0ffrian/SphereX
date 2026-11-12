@@ -5,6 +5,9 @@
 // "+ Artistic" (the engines draw only there, PR #89 review; ViewerPanel enforces it), or the plan did
 // not draw the body (D-32). Pause, Surface age
 // and the "How each part is worked out" notes go in the BuildControls slot.
+// Issue #93 wave 1: the engine's programs compile in the background (B7). Until the body is compiled and built the
+// three.js body keeps drawing under a small loader (never blank); a compile that fails or is not ready after
+// ROCK_READY_TIMEOUT_MS hands the body back to the three.js path for good. Surface age is debounced (1.8).
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ObjectCard, RenderParams, Tag } from '@/contract';
 import { cardToRock, type RockFromCard } from '@/engine/rocks/cardToRock';
@@ -16,6 +19,29 @@ import { isTagShown } from '@/viewer/honesty';
 import type { HonestyState } from '@/state/store';
 import type { RenderPlan } from '@/viewer/planTypes';
 import { loadMeshTriangles } from '@/engine/rocks/loadMesh';
+import { ROCK_READY_TIMEOUT_MS, readyOrTimeout } from '@/app/engineWatchdog';
+import GridLoader from '@/app/island/GridLoader';
+
+/** Surface age: the height map is rebuilt this long after the slider stops (UI pacing, ms; 1.8). */
+export const ROCK_AGE_DEBOUNCE_MS = 150;
+
+/** Calls `apply` with the last value pushed, once no value has come for `ms`. `cancel` drops a value still waiting. */
+export function trailingDebounce<T>(apply: (v: T) => void, ms: number) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return {
+    push(v: T): void {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        apply(v);
+      }, ms);
+    },
+    cancel(): void {
+      if (timer) clearTimeout(timer);
+      timer = null;
+    },
+  };
+}
 
 const KINDS = ['asteroid_procedural', 'asteroid_shape', 'comet'];
 
@@ -105,7 +131,19 @@ export function RockStage({
   const [age, setAge] = useState(70);
   const [stats, setStats] = useState<RockStats | null>(null);
   const [meshNote, setMeshNote] = useState<string | null>(null);
+  /** The engine's programs are linked (B7); with `stats` (a body built) the engine's picture replaces the viewer's. */
+  const [compiled, setCompiled] = useState(false);
   const setStore = useRockStore((s) => s.set);
+  const ageApply = useMemo(
+    () =>
+      trailingDebounce(
+        (v: number) => useRockStore.getState().view?.setAge(v),
+        ROCK_AGE_DEBOUNCE_MS,
+      ),
+    [],
+  );
+  useEffect(() => () => ageApply.cancel(), [ageApply]);
+  const shown = ready && compiled && stats !== null;
 
   // One engine for the life of the stage, one canvas.
   useEffect(() => {
@@ -124,7 +162,9 @@ export function RockStage({
     );
     canvas.dataset.testid = 'rock-canvas';
     host.appendChild(canvas);
-    const view = new RockView(reducedMotion);
+    // The parity harness sets the age and captures at once, so it builds on this thread; the app uses a worker.
+    const parity = typeof location !== 'undefined' && /[?&]parity=1/.test(location.search);
+    const view = new RockView(reducedMotion, { worker: !parity });
     let off: (() => void) | null = null;
     try {
       off = view.attach(canvas);
@@ -136,12 +176,24 @@ export function RockStage({
     view.onChange(setStats);
     view.onContextLost(() => setLostKey(bodyKeyRef.current));
     viewRef.current = view;
-    onEngineRef.current?.(true);
     setStore(view);
+    // B7: the programs compile in the background; a compile error or a compile that never finishes steps aside.
+    const cancelReady = readyOrTimeout(
+      view.whenReady(canvas),
+      ROCK_READY_TIMEOUT_MS,
+      () => setCompiled(true),
+      (err) => {
+        console.warn('[rock engine] could not start', err);
+        setLostKey(bodyKeyRef.current);
+      },
+    );
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the engine now exists
     setReady(true);
     return () => {
+      cancelReady();
       setReady(false);
+      setCompiled(false);
+      setStats(null);
       onEngineRef.current?.(false);
       off?.();
       view.dispose();
@@ -183,11 +235,17 @@ export function RockStage({
     viewRef.current?.setPlaying(!paused);
   }, [paused, ready]);
 
+  // The viewer underneath stands down only once the engine has a picture (never blank).
+  useEffect(() => {
+    if (shown) onEngineRef.current?.(true);
+  }, [shown]);
+
   const spec: BuildControlsSpec | null = useMemo(() => {
     if (!rock || !ready) return null;
     const i = rock.inputs;
-    const row = (id: string, label: string, v: { value: string; tag: Tag }): BuildControl => ({
+    const row = (id: string, label: string, v: { value: string; tag: Tag }, slot?: 'key'): BuildControl => ({
       kind: 'readout',
+      slot,
       id,
       label,
       value: v.value,
@@ -207,14 +265,14 @@ export function RockStage({
         tag: 'artistic',
         onChange: (v) => {
           setAge(v);
-          useRockStore.getState().view?.setAge(v);
+          ageApply.push(v);
         },
       },
-      row('rock-size', 'Size', i.size),
+      row('rock-size', 'Size', i.size, 'key'),
       row('rock-shape', 'Shape', i.shape),
-      row('rock-spin', 'Spin period', i.spin),
-      row('rock-albedo', 'Reflectivity', i.albedo),
-      row('rock-density', 'Bulk density', i.density),
+      row('rock-spin', 'Rotation period', i.spin, 'key'),
+      row('rock-albedo', 'Reflectivity', i.albedo, 'key'),
+      row('rock-density', 'Bulk density', i.density, 'key'),
       row('rock-strength', 'Rock strength', i.strength),
       row('rock-light', 'Light', i.light),
     ];
@@ -263,6 +321,10 @@ export function RockStage({
       controls,
       notes: [
         ...rockNotes(rock),
+        {
+          title: 'Filled in, not measured',
+          lines: [`Rock strength ${i.strength.value}: ${i.strength.why}.`, `Bulk density ${i.density.value}: ${i.density.why}.`],
+        },
         ...(rock.mismatches.length
           ? [
               {
@@ -274,16 +336,46 @@ export function RockStage({
         ...(meshNote ? [{ title: 'Shape model', lines: [meshNote] }] : []),
       ],
     };
-  }, [rock, ready, paused, age, stats, meshNote]);
+  }, [rock, ready, paused, age, stats, meshNote, ageApply]);
   useBuildControls('rocks', spec);
 
   if (!rock) return null;
   return (
+    <>
+      {/* Until the engine has a picture, its canvas is invisible and lets the viewer's body show through. */}
+      <div
+        ref={hostRef}
+        className={
+          shown
+            ? 'absolute inset-0 z-[1] flex items-center justify-center bg-black'
+            : 'pointer-events-none invisible absolute inset-0 z-[1] flex items-center justify-center'
+        }
+        data-testid="rock-stage"
+        data-ready={shown ? 'true' : 'false'}
+        aria-label={`${rock.preset.label}, generated surface. Drag or use the arrow keys to turn it.`}
+      />
+      {live && !shown && <RockPreparing reducedMotion={reducedMotion} />}
+    </>
+  );
+}
+
+/** B7: a small, non-blocking note while the engine compiles and builds; the viewer's body stays visible and usable. */
+export function RockPreparing({ reducedMotion }: { reducedMotion: boolean }) {
+  return (
     <div
-      ref={hostRef}
-      className="absolute inset-0 z-[1] flex items-center justify-center bg-black"
-      data-testid="rock-stage"
-      aria-label={`${rock.preset.label}, generated surface. Drag or use the arrow keys to turn it.`}
-    />
+      className="pointer-events-none absolute bottom-2 left-2 z-[2] flex items-center gap-2 rounded bg-black/70 px-2 py-1 text-xs text-neutral-300"
+      data-testid="rock-preparing"
+    >
+      <span aria-hidden="true">
+        <GridLoader
+          color="green"
+          rounded
+          size={14}
+          gap={1}
+          {...(reducedMotion ? { pattern: 'heartbeat', static: true } : { pattern: 'spiral-cw' })}
+        />
+      </span>
+      <span role="status">Preparing the detailed surface…</span>
+    </div>
   );
 }

@@ -98,7 +98,25 @@ export const WHOLE_RESULT_CODES = [
   // The cone hit the row cap (brightest first), so the faintest sources are left out.
   'overlay:gaia:truncated',
   'overlay:wise:truncated',
+  // Track path (`/v1/objects/{id}/path`, A19.5, A19.10; issue #74). `path:deferred`: poll.
+  'path:deferred',
+  'path:not_cached',
+  'path:observer',
+  'path:ephemeris',
+  'path:window',
+  'path:frames_incomplete',
+  // Track refuses an object that does not move (A19.2); raised in the frontend.
+  'track:not_moving',
 ] as const;
+
+/**
+ * Track opens only for an object that moves (A19.2): the refusal code for one that does not, or
+ * `null`. The Track pane calls this before it asks `/path`, whose 404 `not_moving` is the
+ * backend's own check of the same rule.
+ */
+export function trackRefusal(object: { readonly moving: boolean }): 'track:not_moving' | null {
+  return object.moving ? null : 'track:not_moving';
+}
 
 export const ALL_SATURATED = 'spectrum:saturated';
 const TRUNCATED = 'frames:truncated';
@@ -109,6 +127,8 @@ const NAMESPACES: ReadonlySet<string> = new Set([
   'cutouts',
   'composite',
   'overlay',
+  'path',
+  'track',
   // UI-side code for an overlay layer the reply gave no provenance for (OverlayPanel).
   'provenance',
 ]);
@@ -293,50 +313,6 @@ export function summarizeSpectrum(
     largestGap: widestGap(points.map((p) => p.wavelength_um)),
     groups: saturated > 0 ? all.filter((g) => g.reason !== ALL_SATURATED) : all,
   };
-}
-
-// ---- Area search (A18; issue #96) ------------------------------------------------------------
-// Kept apart from parseMissing so the flipbook's grouping is unchanged (Moon: hooks only add).
-
-/** Area codes with their own wording (Q-208 (13)): frontend codes of the Area card. */
-export const AREA_WHOLE_CODES = ['area:not_prepared', 'area:visits'] as const;
-const AREA_KNOWN: ReadonlySet<string> = new Set(AREA_WHOLE_CODES);
-/**
- * Prefixes of the Area replies' codes (A17.8): `horizons:<designation>`, `skybot:<visit>`,
- * `stamp:<dot_id>`, `rate_grid:visits`, `checks:*`, and the frontend's `area:*`. They are notes
- * about the area, never frame refusals; an unworded one is shown as is.
- */
-const AREA_NAMESPACES: ReadonlySet<string> = new Set([
-  'area',
-  'horizons',
-  'skybot',
-  'stamp',
-  'rate_grid',
-  'checks',
-]);
-
-/**
- * Groups an Area reply's `missing`: area notes first, then anything else as groupMissing does.
- * P8 lists only its own frontend code (`area:not_prepared`); showing the replies' `missing` lists
- * (summary, dots, tracks, known) is P9's job, in the Discovery and Result cards.
- */
-export function groupAreaMissing(codes: readonly string[]): RefusalGroup[] {
-  const notes: RefusalGroup[] = [];
-  const rest: string[] = [];
-  for (const code of new Set(codes)) {
-    const colon = code.indexOf(':');
-    if (colon > 0 && AREA_NAMESPACES.has(code.slice(0, colon))) {
-      notes.push({
-        key: `note:${code}`,
-        kind: 'note',
-        reason: code,
-        known: AREA_KNOWN.has(code),
-        count: 1,
-        frameIds: [],
-      });
-    } else rest.push(code);
-  }
-  return [...notes, ...groupMissing(rest)];
 }
 
 /**

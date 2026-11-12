@@ -1,6 +1,6 @@
 # Area search: tickets, plan and the four checks
 
-> **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A16.7 to A16.8 (A16 to A16.6 in [area-search.md](area-search.md)) · **Implements:** [Q-146](../../decisions/moving-objects.md), [Q-203](../../decisions/moving-objects.md), [Q-137](../../decisions/scope-process.md) · **Read with:** [area-search.md](area-search.md) (A16 to A16.6), [area-backend.md](area-backend.md) (A17), [area-contract.md](area-contract.md) (A17.8 to A17.13), [area-ui.md](area-ui.md) (A18), [plan.md](../plan.md) (A13)
+> **Part of:** Architecture spec ([index](../README.md)) · **Sections:** A16.7 to A16.8 (A16 to A16.6 in [area-search.md](area-search.md)) · **Implements:** [Q-146](../../decisions/moving-objects.md), [Q-203](../../decisions/moving-objects.md), [Q-137](../../decisions/scope-process.md) · **Read with:** [area-search.md](area-search.md) (A16 to A16.6), [area-backend.md](area-backend.md) (A17), [area-contract.md](area-contract.md) (A17.6 to A17.13), [area-ui.md](area-ui.md) (A18), [plan.md](../plan.md) (A13)
 
 The end of [A16](area-search.md#a16-area-search): the tickets, the Day 0 gate and the plan, and why the four gated checks of [Q-203](../../decisions/moving-objects.md) are worth their cost.
 

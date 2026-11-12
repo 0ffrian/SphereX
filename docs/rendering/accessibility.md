@@ -4,6 +4,8 @@
 
 ## R9. Accessibility tie-ins
 
+> **Changed by [D-38](../decisions/shell-surfaces.md#d-38-design-language-graphite-inter-tight-radii-animate-ui), [Q-411](../decisions/shell-surfaces.md) and [Q-413](../decisions/shell-surfaces.md) (PR #104):** the Pause button is removed from the Details pane. The `P` key in the build pane pauses and resumes motion (and starts it under reduced motion), announced in the live region and ignored while typing; Details has a motion toggle. Reduced motion still stops auto-spin. The island's idle loader pulses softly (opacity 0.4 to 1, 3 s) and stays still under reduced motion (Q-413). Both are open against WCAG 2.2.2 (Q-411, Q-413).
+
 - **Alt text** (from the card): "<name>, <type>, <size + tag>, <colour basis>, viewed at <phase angle>°. Surface relief: <measured | illustrative>." Update `aria-label` on the canvas whenever the mode changes.
 - `aria-live="polite"` announces mode, epoch and honesty-state changes, the build's start and end ("Building <name>", "Built <name>") and the build's honesty raise ("Showing artist's impression so the whole body can be built", R5.8).
 - All controls are ≥24×24 CSS px and keyboard reachable. The 3D view has on-screen rotate buttons as an alternative to dragging (WCAG 2.5.7, R5.6). Feel mode works from the keyboard too (R5.6).

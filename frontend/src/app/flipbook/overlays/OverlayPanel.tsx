@@ -8,7 +8,7 @@ import { overlaysErrorMessage } from '@/app/messages';
 import { RefusalList } from '@/app/RefusalList';
 import { groupMissing } from '@/app/refusals';
 import { ErrorBox, LoadingBox } from '@/app/StatusBoxes';
-import { buttonClass, pressedClass } from '@/app/ui';
+import { buttonClass } from '@/app/ui';
 import { useAppStore, type OverlayLayer, type SkyState } from '@/state/store';
 import { FieldOfView } from './FieldOfView';
 import { FlagLegend } from './FlagMask';
@@ -54,24 +54,21 @@ export function OverlayControls({ sky, view }: { sky: SkyState; view: OverlayVie
 
   return (
     <div className="flex flex-col gap-2" data-testid="overlay-controls">
-      <div role="group" aria-label="Overlays" className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-neutral-300" aria-hidden="true">
-          Overlays:
-        </span>
+      <div role="group" aria-label="Overlays" className="fb-ovl">
         {TOGGLES.map(({ layer, label }) => {
           const why = reasonOf(layer);
           return (
             <button
               key={layer}
               type="button"
-              className={`${buttonClass} ${pressedClass} gap-2`}
+              className="fb-ov"
               aria-pressed={why === null && overlays.toggles[layer]}
               disabled={why !== null}
               aria-describedby={why ? `overlay-reason-${layer}` : undefined}
               onClick={() => toggle(layer)}
               data-testid={`overlay-toggle-${layer}`}
             >
-              {(layer === 'gaia' || layer === 'wise') && <MarkerIcon catalog={layer} />}
+              <MarkerIcon catalog={layer} />
               {label}
             </button>
           );
@@ -123,7 +120,19 @@ export function OverlayControls({ sky, view }: { sky: SkyState; view: OverlayVie
 }
 
 /** The marker shape in the button, so the legend is the control itself. */
-function MarkerIcon({ catalog }: { catalog: OverlayCatalogName }) {
+function MarkerIcon({ catalog }: { catalog: OverlayLayer }) {
+  if (catalog === 'flags')
+    return (
+      <svg viewBox="0 0 14 14" className="size-3.5" aria-hidden="true">
+        <rect x="2" y="2" width="10" height="10" fill="none" stroke="var(--warn)" strokeWidth="2" strokeDasharray="2 2" />
+      </svg>
+    );
+  if (catalog === 'fov')
+    return (
+      <svg viewBox="0 0 14 14" className="size-3.5" aria-hidden="true">
+        <rect x="2" y="2" width="10" height="10" fill="none" stroke="var(--muted)" strokeWidth="1.6" />
+      </svg>
+    );
   const s = MARKER_STYLE[catalog];
   return (
     <svg viewBox="-8 -8 16 16" className="size-4" aria-hidden="true">

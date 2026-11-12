@@ -4,6 +4,7 @@
 // is checked against the contract (validate.ts).
 import {
   API_BASE,
+  API_QUICK_TIMEOUT_MS,
   API_TIMEOUT_MS,
   ASSET_STATUS_HEADER,
   COMBINE_HEADER,
@@ -105,6 +106,8 @@ export interface ApiClientOptions {
   baseUrl?: string;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  /** Timeout of `resolve` (issue #102, Q-451). Defaults to API_QUICK_TIMEOUT_MS. */
+  quickTimeoutMs?: number;
   /** Turns the combine PNG into a URL for <img>. Defaults to URL.createObjectURL. */
   createObjectUrl?: (blob: Blob) => string;
 }
@@ -124,7 +127,8 @@ export function revokeObjectUrl(url: string | null | undefined): void {
 
 export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const baseUrl = options.baseUrl ?? API_BASE;
-  const timeoutMs = options.timeoutMs ?? API_TIMEOUT_MS;
+  const slowTimeoutMs = options.timeoutMs ?? API_TIMEOUT_MS;
+  const quickTimeoutMs = options.quickTimeoutMs ?? API_QUICK_TIMEOUT_MS;
   const createObjectUrl = options.createObjectUrl ?? defaultCreateObjectUrl;
   // Looked up per call, so tests can stub globalThis.fetch after the client is made.
   const doFetch: typeof fetch =
@@ -139,6 +143,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     accept: string,
     read: (res: Response, aborted: () => ApiError | null) => Promise<T>,
     signal?: AbortSignal,
+    timeoutMs: number = slowTimeoutMs,
   ): Promise<ApiResult<T>> {
     const controller = new AbortController();
     let timedOut = false;
@@ -152,7 +157,13 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 
     const abortedError = () =>
       timedOut
-        ? new ApiError('timeout', `No answer within ${Math.round(timeoutMs / 1000)} s.`)
+        ? new ApiError(
+            'timeout',
+            `No answer within ${Math.round(timeoutMs / 1000)} s.`,
+            null,
+            null,
+            timeoutMs,
+          )
         : new ApiError('aborted', 'Replaced by a newer request.');
     const ifAborted = () => (controller.signal.aborted ? abortedError() : null);
 
@@ -199,6 +210,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     path: string,
     parse: (raw: unknown) => T,
     signal?: AbortSignal,
+    timeoutMs: number = slowTimeoutMs,
   ): Promise<ApiResult<T>> {
     return request(
       path,
@@ -213,6 +225,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         return parse(body);
       },
       signal,
+      timeoutMs,
     );
   }
 
@@ -220,7 +233,10 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const areaPath = (id: string) => `/areas/${encodeURIComponent(id)}`;
 
   return {
-    resolve: (q, signal) => getJson(`/resolve?q=${encodeURIComponent(q)}`, parseResolve, signal),
+    // Issue #102 (Q-451): only resolve uses the quick timeout. Offline, `/card` waits for the
+    // object's job with no limit of its own (Q-111 (2), A4.10), so it keeps the long one.
+    resolve: (q, signal) =>
+      getJson(`/resolve?q=${encodeURIComponent(q)}`, parseResolve, signal, quickTimeoutMs),
     frames: (id, signal) => getJson(`${objectPath(id)}/frames`, parseFrames, signal),
     spectrum: (id, signal) => getJson(`${objectPath(id)}/spectrum`, parseSpectrum, signal),
     skyIndex: (signal) => getJson('/sky/index.json', parseSkyIndex, signal),

@@ -41,24 +41,29 @@ import { ProvenanceBadge } from './Badge';
 import { EmissionsPanel } from './EmissionsPanel';
 import { EPOCH_JD, timeRange } from '@/physics/cometGas';
 import { ConfidenceChip, ConfidenceDetails } from './ConfidencePanel';
-import { FeelPanel, HearPanel } from './build/Senses';
-import { BuildControls } from './build/BuildControls';
-import GridLoader, { type GridLoaderProps } from './island/GridLoader';
+import { HearPanel } from './build/HearPanel';
+import { BuildControls, BuildKeyNumbers, BuildSummaryRows } from './build/BuildControls';
+import { MouldOverlay } from './build/MouldAnimation';
+import { useMouldLive } from './build/mouldLive';
 import { ConfidencePopover } from './ConfidencePopover';
+import { displayName } from './displayName';
+import { Row, Rows, SwitchRow, ToggleGroup } from './PanelControls';
 import { timeLapsesOf } from '@/viewer/motion/planMotion';
 import { describeRefusal, layerName, timeLapseText } from './messages';
-import { buttonClass, pressedClass } from './ui';
+import { buttonClass } from './ui';
 import { closeUpKindOf } from './CloseUpPane';
 import { useCloseUpStore } from './closeUpStore';
-import { StarFlarePanel } from './StarFlarePanel';
+import { StarEngineDetails, StarFlarePanel } from './StarFlarePanel';
+import { isEditableTarget } from './shell/shortcuts';
 import { RockStage } from './build/RockStage';
+import { enginesEnabled } from './enginesSwitch';
 import { StarGlobeStage, useEngineStar } from './StarEngineStage';
 import { WorldGlobeStage, useEngineWorld } from './WorldEngineStage';
+import { measuredReadouts } from '@/engine/worlds/cardToWorld';
 import { engineKey, useWorldStore } from './worldStore';
-import { useViewControls } from './engineView';
 import { MouldStrip, type StripHandle } from './build/MouldStrip';
 import { useMould, type MouldPhase } from './build/useMould';
-import { usesBrowserSeed } from '@/viewer/mould/mouldSteps';
+import { mouldKindOf, usesBrowserSeed } from '@/viewer/mould/mouldSteps';
 
 const NO_FAILED: readonly string[] = [];
 const AGE_SLIDER = SLIDER_REGISTRY.age_yr;
@@ -76,6 +81,13 @@ export function ageFromLog(pos: number): number {
 }
 
 /** "1,200 years", "10 years". */
+/** Short Colour labels for the narrow Details pane. */
+function shortModeLabel(label: string): string {
+  if (/infrared/i.test(label)) return 'Infrared';
+  if (/^visible/i.test(label)) return 'Visible';
+  return label;
+}
+
 function formatYears(n: number): string {
   const w = n < 1000 ? Math.round(n) : n;
   return `${w.toLocaleString('en')} ${w === 1 ? 'year' : 'years'}`;
@@ -124,6 +136,15 @@ const STAR_COLOUR_LABEL: Record<StarColourView, string> = {
   enhanced: 'Enhanced colour',
   true: 'True colour',
 };
+const STAR_COLOUR_OPTIONS: { value: StarColourView; label: string }[] = [
+  { value: 'true', label: 'True colour' },
+  { value: 'enhanced', label: 'Enhanced' },
+  { value: 'observatory', label: 'Observatory' },
+];
+const STAR_SCALE_OPTIONS: { value: StarScale; label: string }[] = [
+  { value: 'enlarged', label: 'Larger detail' },
+  { value: 'true', label: 'True scale' },
+];  // no Close-up option: the left pane is the close-up now
 const STAR_SCALE_LABEL: Record<StarScale, string> = {
   enlarged: 'Whole star, larger detail',
   true: 'Whole star, true scale',
@@ -141,18 +162,11 @@ export const QUALITY_DROP_ANNOUNCEMENT = 'Lowered render quality to keep motion 
 export const IR_JETS_HINT =
   'Switch to "Visible colour" to see the jets move. This motion is an artist\u2019s impression.';
 
-/** The mock-up's build loader sequence (`loading("bLoad")`). */
-const BUILD_LOADER_LOOK: GridLoaderProps = {
-  mode: 'sequence',
-  sequence: ['spiral-cw', 'ripple-out', 'plus-full', 'frame', 'ripple-in', 'spiral-ccw'],
-  speed: 'normal',
-};
-
 /** The id of the build pane's popover (the header buttons' `aria-controls`). */
 export const BUILD_POP_ID = 'bp-pop';
 const POP_LABEL: Record<PopId, string> = {
   acc: 'Accuracy',
-  feel: 'Feel it',
+  feel: 'Feel it', // kept so the PopId type still maps; the Feel UI is not shown (haptics cut, D-39)
   hear: 'Hear it',
   details: 'Details',
 };
@@ -161,13 +175,6 @@ export const NO_SCORE_TEXT =
   'No score is set for this kind of object. It has no measurement that could stand for a key measurement, so the viewer shows what it can and says what it leaves out.';
 
 const PLACEHOLDER_LABEL = 'Viewer placeholder: no object loaded';
-
-const ROTATE_BUTTONS: { dir: 'left' | 'right' | 'up' | 'down'; label: string; glyph: string }[] = [
-  { dir: 'left', label: 'Rotate left', glyph: '←' },
-  { dir: 'up', label: 'Rotate up', glyph: '↑' },
-  { dir: 'down', label: 'Rotate down', glyph: '↓' },
-  { dir: 'right', label: 'Rotate right', glyph: '→' },
-];
 
 /** Issue #71 stream U: the panels the build pane's header buttons open (mock-up `bpPop`, one at a time). */
 export type PopId = 'acc' | 'feel' | 'hear' | 'details';
@@ -205,16 +212,16 @@ export const GAS_PACING_CHOICES = [
   { value: 1, label: '1 day per second' },
 ] as const;
 
-/** A control's name; when it is off the reason is part of the name (never a silent button). */
-function viewOff(label: string, off: string | null): string {
-  return off ? `${label}. Not available: ${off}` : label;
-}
-
 export function gasPacingStatus(value: 0 | 1): string {
   return value === 1
     ? 'One second here is one Earth day. The view stays above the turning planet, so you can watch storms drift.'
     : 'One second here is 5 minutes, so the planet turns slowly and its clouds barely change.';
 }
+
+const MOTION_OPTIONS = [
+  { value: 'playing', label: 'Playing' },
+  { value: 'paused', label: 'Paused' },
+] as const;
 
 export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -226,6 +233,8 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const storeCard = useAppStore((s) => s.card);
   const storeParams = useAppStore((s) => s.params);
   const card = blocked ? null : storeCard;
+  // Issue #93 C4: the engines kill switch, read once per mount (the query string changes only with a reload).
+  const [enginesOn] = useState(() => enginesEnabled());
   // Issue #71 stream X (D-37): the prototype's star engine draws star cards in the build pane; null keeps the TSL path.
   const engineStarCard = useEngineStar();
   // Issue #71 stream Y (D-37): the prototype's world engine draws planets and gas giants; null keeps the old path.
@@ -274,6 +283,13 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // Issue #71 F: the emissions view (comets with gas in both epochs) and its time. A new object closes it.
   const [emissions, setEmissions] = useState<{ key: string; jd: number } | null>(null);
   const emissionsRange = card && params?.type === 'comet' ? timeRange(card) : null;
+  // #93 A10 (D-21): a planet's eclipse and phase-curve values are card facts, shown at every honesty level, not
+  // only in the "+ Artistic" engine panel. Each follows the level like any other value: a measured value shows at
+  // "Measured only", a derived one (HD 189733 b's offset, converted from hours) from "+ Estimated" up.
+  const planetMeasured = useMemo(
+    () => (card ? measuredReadouts(card).filter((m) => isTagShown(honesty, m.tag)) : []),
+    [card, honesty],
+  );
   const emissionsJd =
     emissions && emissions.key === objectKey && emissionsRange ? emissions.jd : null;
   // Layers whose mesh or texture failed to load, per object. Keyed so a new object starts clean.
@@ -283,6 +299,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   });
   const failed = failedState.key === objectKey ? failedState.ids : NO_FAILED;
   const reducedMotion = useReducedMotion();
+  // The Pause button is gone from Details (Moon, open question). `P` pauses and resumes motion in the build pane (WCAG 2.2.2).
   const [spinPaused, setSpinPaused] = useState(false);
   // Under reduced motion the scene starts paused; this is the user's choice to play it anyway.
   const [playAnyway, setPlayAnyway] = useState(false);
@@ -530,7 +547,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   }, [viewer, inPane]);
   // Issue #60: a build from the card or Replay shows the whole plan. If the plan has layers the
   // honesty level hides (the generated world is `artistic`, D-21), the level goes up to
-  // "+ Artistic" first and says so; the Show control stays, so the user can drop back at any time.
+  // "+ Artistic" first and says so (once per build); the Show row in Details lets the user drop back.
   // The build waits for this (`waitForLevel`), so it never starts on the plan of the old level.
   const [levelSeq, setLevelSeq] = useState(-1);
   const paneSeq = pane?.seq ?? 0;
@@ -544,8 +561,28 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
       setAnnouncement(LEVEL_RAISED_ANNOUNCEMENT);
     }
   }, [waitForLevel, plan, paneSeq, honesty, setHonesty]);
+  // The prototype engines (star, world, rock) draw a generated surface: they mount only at "+ Artistic"
+  // (Atish's call on the PR #89 review, Q-287). At "Measured only" and "+ Estimated" the three.js path draws.
+  // The build pane has no Show control (Q-412); Build raises the level to + Artistic when the body has layers
+  // the level hides, which is what lets the engines draw.
+  // Issue #93 C4: `?engines=0` (remembered) turns them off at every level; the close-up pane follows, since it
+  // reads the engineStar / engineWorld published below and the rock view RockStage publishes.
+  const enginesShown = honesty === 'artistic' && enginesOn;
+  const engineStar =
+    pane && enginesShown && plan?.threeD && card && !blocked && engineStarCard && starFailedId !== engineKey(card.id, engineStarCard.preset.id)
+      ? engineStarCard
+      : null;
+  const engineWorld =
+    pane && enginesShown && plan?.threeD && card && !blocked && engineWorldCard && worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
+      ? engineWorldCard
+      : null;
+  // Issue #93: the build steps wait for a world engine to compile and form the planet (`hold`). The key of the
+  // world it formed; the engine reports it through WorldGlobeStage's onFormed. A failed engine unmounts (the
+  // three.js path draws), so it holds nothing.
+  const [formedKey, setFormedKey] = useState<string | null>(null);
   const mould = useMould({
     wait: waitForLevel,
+    hold: engineWorld !== null && formedKey !== engineKey(card?.id, engineWorld.preset.id),
     viewer: inPane ? viewer : null,
     card,
     params,
@@ -554,7 +591,10 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
     seq: pane?.seq ?? 0,
     animate: pane?.animate ?? false,
     reducedMotion,
-    onProgress: (p) => stripRef.current?.update(p),
+    onProgress: (p) => {
+      useMouldLive.getState().setProgress(p);
+      stripRef.current?.update(useMouldLive.getState().override ?? p);
+    },
     onPhase: (phase) => pane?.onPhase?.(phase),
   });
 
@@ -565,6 +605,31 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   }, [viewer, plan, size]);
 
   const announce = useCallback((text: string) => setAnnouncement(text), []);
+
+  // WCAG 2.2.2: with no Pause button in Details, `P` stops and restarts everything that moves in the build pane.
+  // Under reduced motion nothing moves until it is pressed. Ignored while typing or with a modifier held.
+  const toggleMotion = useCallback(() => {
+    if (idlePaused) {
+      viewer?.resumeFromIdle?.();
+      announce('Motion is playing.');
+    } else if (reducedMotion) {
+      setPlayAnyway(!playAnyway);
+      announce(playAnyway ? 'Motion is off.' : 'Motion is playing.');
+    } else {
+      setSpinPaused(!spinPaused);
+      announce(spinPaused ? 'Motion is playing.' : 'Motion is paused.');
+    }
+  }, [viewer, idlePaused, reducedMotion, playAnyway, spinPaused, announce]);
+  useEffect(() => {
+    if (!pane) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'p' || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented || isEditableTarget(e.target)) return;
+      e.preventDefault();
+      toggleMotion();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pane, toggleMotion]);
   const planWith = (patch: Partial<PlanContext>) =>
     card && params ? planRender(card, params, { ...ctx, ...patch }) : null;
 
@@ -623,35 +688,11 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const nothingDrawn = plan && plan.threeD && !showsBody(plan) ? nothingDrawnReason(plan) : null;
   const defaultsShown = plan?.missing.filter((m) => m.defaultShown) ?? [];
   const notDrawn = plan?.missing.filter((m) => !m.defaultShown) ?? [];
-  const vc = useViewControls();
   // The close-up pane (issue #71 stream H, Q-275) fills the left half of the app, over the sky, while
   // this viewer stays in the build pane: it opens with the build (mock-up `cuOpen`) and closes with
   // it (`cuClose`). The viewer and plan go to a small store the pane reads. The toggle next to Feel
   // hides or shows it.
   const closeKind = pane ? closeUpKindOf(params?.type) : null;
-  // The prototype engines (star, world, rock) draw a generated surface: they mount only at "+ Artistic"
-  // (Atish's call on the PR #89 review). At "Measured only" and "+ Estimated" the three.js path draws.
-  const enginesShown = honesty === 'artistic';
-  const engineStar =
-    pane &&
-    enginesShown &&
-    plan?.threeD &&
-    card &&
-    !blocked &&
-    engineStarCard &&
-    starFailedId !== engineKey(card.id, engineStarCard.preset.id)
-      ? engineStarCard
-      : null;
-  const engineWorld =
-    pane &&
-    enginesShown &&
-    plan?.threeD &&
-    card &&
-    !blocked &&
-    engineWorldCard &&
-    worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
-      ? engineWorldCard
-      : null;
   // D-37: while an engine draws the body the three.js viewer builds and draws nothing under it.
   const engineOwns = engineStar !== null || engineWorld !== null || (enginesShown && rockOwns);
   useEffect(() => {
@@ -659,26 +700,15 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   }, [viewer, engineOwns]);
   const tintTag = plan?.tint.tag ?? null;
   const tintKey = plan?.tint.rgb.join(',') ?? '';
-  const rockTint = useMemo<[number, number, number] | null>(
-    () => (tintTag && plan ? [plan.tint.rgb[0]!, plan.tint.rgb[1]!, plan.tint.rgb[2]!] : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- tintKey stands for the rgb values
-    [tintTag, tintKey],
-  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- tintKey stands for the rgb values
+  const rockTint = useMemo<[number, number, number] | null>(() => (tintTag && plan ? [plan.tint.rgb[0]!, plan.tint.rgb[1]!, plan.tint.rgb[2]!] : null), [tintTag, tintKey]);
   // Hidden by the user, or held back until the build has shifted to the right half (stream U).
   const closeHidden = useCloseUpStore((s) => s.hidden || s.held);
   const closeInfo = useCloseUpStore((s) => s.info);
   const shaderKey = plan?.shader?.key ?? '';
   const pubFixture = fixture || (card?.id.startsWith('fixture:') ?? false);
   useEffect(() => {
-    useCloseUpStore.getState().publish({
-      viewer,
-      plan,
-      type: params?.type ?? null,
-      fixture: pubFixture,
-      reducedMotion,
-      engineStar,
-      engineWorld,
-    });
+    useCloseUpStore.getState().publish({ viewer, plan, type: params?.type ?? null, fixture: pubFixture, reducedMotion, engineStar, engineWorld });
   }, [viewer, plan, params?.type, reducedMotion, pubFixture, engineStar, engineWorld]);
   useEffect(() => () => useCloseUpStore.getState().reset(), []);
   useEffect(() => {
@@ -710,19 +740,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
     }
     viewer.openCloseUp(closeKind === 'body', closeKind === 'star', gate);
     return () => viewer.closeUpOff(true);
-  }, [
-    viewer,
-    pane,
-    closeKind,
-    closeHidden,
-    blocked,
-    plan?.threeD,
-    objectKey,
-    shaderKey,
-    artisticShown,
-    engineStar,
-    engineWorld,
-  ]);
+  }, [viewer, pane, closeKind, closeHidden, blocked, plan?.threeD, objectKey, shaderKey, artisticShown, engineStar, engineWorld]);
   // A gas giant that is still forming opens when it has settled.
   useEffect(() => {
     if (!viewer || !closeInfo?.refusal || !/forming/.test(closeInfo.refusal) || closeHidden) return;
@@ -743,26 +761,21 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // One pause control for everything that moves (WCAG 2.2.2, R9). Under reduced motion the scene
   // starts paused and the button starts it.
   const motionPaused = (reducedMotion && !playAnyway) || spinPaused || idlePaused;
-  const hiddenCount = plan?.missing.filter((m) => m.reason === 'honesty').length ?? 0;
 
+  // In the build pane, an engine-drawn body shows its notes as "Assumed values" lines, not as a paragraph list.
+  const assumedLines = plan && engineOwns
+    ? [
+        ...plan.notes.filter((n) => !/no motion data/i.test(n)),
+        ...lapses.map((t) => timeLapseText(t)),
+      ]
+    : [];
   const honestyGroup = plan ? (
-    <div role="group" aria-label="Honesty level" className="flex flex-wrap items-center gap-2">
-      <span className="text-sm text-neutral-300">Show:</span>
-      {HONESTY_STATES.map((state) => (
-        <button
-          key={state}
-          type="button"
-          className={`${buttonClass} ${pressedClass}`}
-          aria-pressed={honesty === state}
-          onClick={() => onHonesty(state)}
-        >
-          {HONESTY_LABEL[state]}
-        </button>
-      ))}
-      {hiddenCount > 0 && (
-        <span className="text-xs text-neutral-400">{hiddenCount} hidden at this level</span>
-      )}
-    </div>
+    <ToggleGroup
+      label="Show"
+      options={HONESTY_STATES.map((state) => ({ value: state, label: HONESTY_LABEL[state] }))}
+      value={honesty}
+      onChange={onHonesty}
+    />
   ) : null;
   // Issue #71 stream U: in the build pane the Accuracy, Feel, Hear it and Details panels share one
   // popover under the header buttons, one at a time (mock-up `bpPop`). Outside the pane the details
@@ -788,34 +801,28 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
         <section hidden={pop !== 'acc'} data-testid="build-pop-acc">
           {pop === 'acc' &&
             (params?.confidence ? (
-              <ConfidencePopover
-                inline
-                isShown={(t) => t === 'missing' || isTagShown(honesty, t)}
-                params={params}
-                name={plan?.name}
-                onClose={() => pane.onPop?.(null)}
-              />
+              <ConfidencePopover inline isShown={(t) => t === 'missing' || isTagShown(honesty, t)} params={params} name={displayName(plan?.name)} onClose={() => pane.onPop?.(null)} />
             ) : (
               <>
                 <div className="sx-pop-h">
                   <b>Accuracy</b>
-                  <span>{plan?.name ?? ''}</span>
+                  <span>{displayName(plan?.name)}</span>
                 </div>
                 <p className="sx-acc-rules">{NO_SCORE_TEXT}</p>
               </>
             ))}
         </section>
-        <section hidden={pop !== 'feel'} data-testid="build-pop-feel">
-          <FeelPanel />
-        </section>
+        {/* Hear it (Atish's audio, Q-416): no header button since Q-450; Details opens it ("Hear it"
+            row). Keep it mounted: the sound PRs route the sweep and the chord through this panel. */}
         <section hidden={pop !== 'hear'} data-testid="build-pop-hear">
-          <HearPanel active={pop === 'hear'} name={plan?.name} />
+          <HearPanel active={pop === 'hear'} name={displayName(plan?.name)} />
         </section>
         {details}
       </div>
     ) : (
       details
     );
+  const worldForming = useMouldLive((s) => s.forming);
   const loadingBody =
     pane &&
     (blocked || mould.phase === 'loading' || (viewer === null && rendererStatus !== 'unavailable'));
@@ -860,48 +867,40 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             />
           )}
           {engineStar && (
-            <StarGlobeStage
-              key={engineStar.preset.id}
-              star={engineStar}
-              onFail={() =>
-                useWorldStore.getState().failStar(engineKey(card?.id, engineStar.preset.id))
-              }
-            />
+            <StarGlobeStage key={engineStar.preset.id} star={engineStar} onFail={() => useWorldStore.getState().failStar(engineKey(card?.id, engineStar.preset.id))} />
           )}
           {engineWorld && (
             <WorldGlobeStage
               key={engineWorld.preset.id}
               world={engineWorld}
-              onFail={() =>
-                useWorldStore.getState().fail(engineKey(card?.id, engineWorld.preset.id))
-              }
+              onFail={() => useWorldStore.getState().fail(engineKey(card?.id, engineWorld.preset.id))}
+              onFormed={() => setFormedKey(engineKey(card?.id, engineWorld.preset.id))}
             />
           )}
           {!pane && params && plan?.threeD && (
-            <ConfidenceChip params={params} onOpen={() => setFormulaOpen(true)} />
-          )}
-          {!pane && params && formulaOpen && (
-            <ConfidencePopover
+            <ConfidenceChip
               params={params}
-              name={plan?.name}
-              onClose={() => setFormulaOpen(false)}
+              onOpen={() => setFormulaOpen(true)}
             />
           )}
-          {loadingBody && (
-            <div className="sx-bp-loading" data-testid="build-loading" role="status">
-              {/* The mock-up's `loading("bLoad")`: its grid loader, size 44, the long sequence. */}
-              <span aria-hidden="true">
-                <GridLoader
-                  color="green"
-                  rounded
-                  size={44}
-                  gap={2}
-                  blur={0.3}
-                  {...(reducedMotion ? { pattern: 'heartbeat', static: true } : BUILD_LOADER_LOOK)}
-                />
-              </span>
-              <span>Loading the 3D view</span>
-            </div>
+          {!pane && params && formulaOpen && (
+            <ConfidencePopover params={params} name={displayName(plan?.name)} onClose={() => setFormulaOpen(false)} />
+          )}
+          {pane && (
+            <MouldOverlay
+              active={loadingBody || worldForming}
+              id={card?.id ?? params?.type ?? 'body'}
+              kind={params ? mouldKindOf(params.type) : null}
+              steps={mould.script?.steps.length ?? 0}
+              seed={params?.seed}
+              inputs={{
+                T: card?.teff_K?.value ?? card?.teq_K?.value ?? null,
+                giant: params?.type === 'star_mira',
+                tint: rockTint,
+              }}
+              reduced={reducedMotion}
+              caption={worldForming ? (params?.type === 'gas_giant' ? 'Forming the atmosphere' : 'Forming the planet\u2026') : 'Loading the 3D view'}
+            />
           )}
           <p
             data-testid="viewer-label"
@@ -911,7 +910,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                 : 'pointer-events-none absolute left-3 top-3 max-w-[85%] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300'
             }
           >
-            {plan ? `${plan.name}${plan.threeD ? '' : ' (no 3D model)'}` : PLACEHOLDER_LABEL}
+            {plan ? `${displayName(plan.name)}${plan.threeD ? '' : ' (no 3D model)'}` : PLACEHOLDER_LABEL}
           </p>
           {plan && !plan.threeD && plan.message && (
             <p
@@ -946,534 +945,431 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
       </div>
 
       {pane && <MouldStrip ref={stripRef} script={mould.script} phase={mould.phase} />}
-      {pane?.caption?.(
-        hiddenCount > 0 ? (
-          <button
-            type="button"
-            className="sx-tag-btn"
-            onClick={() => onHonesty('artistic')}
-            data-testid="build-show-hidden"
-          >
-            {hiddenCount} hidden at this level. Show them
-          </button>
-        ) : null,
-      )}
+      {/* Moon (11 Nov 2026): no "N hidden at this level" button on the render; the way back down is the Show row in Details. */}
+      {pane?.caption?.(null)}
       {wrapPop(
-        <div
-          id={detailsId}
-          className={pane ? 'sx-bp-details' : 'contents'}
-          hidden={pane ? pane.pop !== 'details' : undefined}
-          data-testid={pane ? 'build-details-panel' : undefined}
-        >
-          {pane && (
-            <>
-              <div className="sx-pop-h">
-                <b>Details</b>
-                <span>{plan?.name ?? ''}</span>
-              </div>
-              {pane.actions}
-            </>
-          )}
-          {params && (!pane || params.confidence?.gate.passed === false) && (
-            <ConfidenceDetails params={params} />
-          )}
-          {plan?.threeD && (
-            <p className="text-xs text-neutral-400" data-testid="impression-note">
-              Artist&apos;s impression, drawn from the data listed under &ldquo;What is
-              drawn&rdquo;.
-            </p>
-          )}
-
-          <div role="group" aria-label="View controls" className="flex flex-wrap gap-2">
-            {ROTATE_BUTTONS.map(({ dir, label, glyph }) => (
-              <button
-                key={dir}
-                type="button"
-                className={buttonClass}
-                aria-label={viewOff(label, vc.rotateOff)}
-                title={vc.rotateOff ?? label}
-                disabled={vc.rotateOff !== null}
-                onClick={() => vc.rotate(dir)}
-              >
-                <span aria-hidden="true">{glyph}</span>
-              </button>
-            ))}
+      <div
+        id={detailsId}
+        className={pane ? 'sx-bp-details' : 'contents'}
+        hidden={pane ? pane.pop !== 'details' : undefined}
+        data-testid={pane ? 'build-details-panel' : undefined}
+      >
+        {pane && (
+          <>
+            <div className="sx-pop-h">
+              <b>Details</b>
+              <span>{displayName(plan?.name)}</span>
+            </div>
+            {/* Q-450 (PR #107 review, Atish): Hear it left the header, so Details keeps the way into it
+                (the spectrum sweep, and the chord the sound PRs add there). */}
             <button
               type="button"
-              className={buttonClass}
-              aria-label={viewOff('Zoom in', vc.zoomOff)}
-              title={vc.zoomOff ?? 'Zoom in'}
-              disabled={vc.zoomOff !== null}
-              onClick={() => vc.zoom('in')}
+              className="sx-bp-row-btn"
+              aria-controls={BUILD_POP_ID}
+              onClick={() => pane.onPop?.('hear')}
+              data-testid="build-open-hear"
             >
-              <span aria-hidden="true">+</span>
+              <span>Hear it</span>
+              <span className="sx-bp-row-sub">The spectrum as sound, and the atmosphere</span>
             </button>
-            <button
-              type="button"
-              className={buttonClass}
-              aria-label={viewOff('Zoom out', vc.zoomOff)}
-              title={vc.zoomOff ?? 'Zoom out'}
-              disabled={vc.zoomOff !== null}
-              onClick={() => vc.zoom('out')}
-            >
-              <span aria-hidden="true">−</span>
-            </button>
-            <button
-              type="button"
-              className={buttonClass}
-              aria-label={viewOff('Reset view', vc.resetOff)}
-              title={vc.resetOff ?? undefined}
-              disabled={vc.resetOff !== null}
-              onClick={() => vc.reset()}
-            >
-              Reset view
-            </button>
-          </div>
+            {engineStar && <StarEngineDetails />}
+          </>
+        )}
+        {params && (!pane || params.confidence?.gate.passed === false) && (
+          <ConfidenceDetails params={params} />
+        )}
+        {plan && (
+          <>
+            {/* Q-412 / D-21: Build raises the level once (Q-113 item 7); the Show row (and Motion,
+                WCAG 2.2.2) sit in Details so the level can always be lowered again. */}
+            {honestyGroup}
+            {pane && !engineOwns && (
+              <ToggleGroup
+                label="Motion"
+                options={MOTION_OPTIONS}
+                value={motionPaused ? 'paused' : 'playing'}
+                onChange={(v) => { if ((v === 'paused') !== motionPaused) toggleMotion(); }}
+                testId="build-motion"
+              />
+            )}
 
-          {pane && <BuildControls />}
-          {plan && (
-            <>
-              {honestyGroup}
+            {plan.threeD && plan.modes.length > 0 && (
+              <>
+                <ToggleGroup
+                  label="Colour"
+                  value={plan.mode ?? null}
+                  options={plan.modes.map((m) => ({
+                    value: m.id,
+                    label: pane ? shortModeLabel(m.label) : m.label,
+                    disabled: !m.available,
+                    title: m.available ? m.badge : 'Not available for this object. See the list below.',
+                    describedBy: irHidesJets && m.id === 'visible' ? 'ir-jets-hint' : undefined,
+                  }))}
+                  onChange={onMode}
+                />
+                {plan.mode && !pane && (
+                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                    {plan.modes.find((m) => m.id === plan.mode)?.badge}
+                  </span>
+                )}
+              </>
+            )}
 
-              {plan.threeD && plan.modes.length > 0 && (
-                <div
-                  role="group"
-                  aria-label="View mode"
-                  className="flex flex-wrap items-center gap-2"
-                >
-                  <span className="text-sm text-neutral-300">Colour:</span>
-                  {plan.modes.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      className={`${buttonClass} ${pressedClass}`}
-                      aria-pressed={plan.mode === m.id}
-                      aria-describedby={
-                        irHidesJets && m.id === 'visible' ? 'ir-jets-hint' : undefined
-                      }
-                      disabled={!m.available}
-                      title={
-                        m.available ? m.badge : 'Not available for this object. See the list below.'
-                      }
-                      onClick={() => onMode(m.id)}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                  {plan.mode && (
-                    <span className="text-xs text-neutral-400">
-                      {plan.modes.find((m) => m.id === plan.mode)?.badge}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Sits under the mode buttons it refers to. The region stays mounted while an object is
+            {/* Sits under the mode buttons it refers to. The region stays mounted while an object is
               shown, so a change of mode or level is announced politely when the text appears. */}
-              {plan.threeD && plan.modes.length > 0 && (
-                <div
-                  id="ir-jets-hint"
-                  role="status"
-                  aria-live="polite"
-                  className="empty:hidden"
-                  data-testid="ir-jets-hint"
-                >
-                  {irHidesJets && <p className="text-sm text-neutral-200">{IR_JETS_HINT}</p>}
-                </div>
-              )}
+            {plan.threeD && plan.modes.length > 0 && (
+              <div
+                id="ir-jets-hint"
+                role="status"
+                aria-live="polite"
+                className="empty:hidden"
+                data-testid="ir-jets-hint"
+              >
+                {irHidesJets && <p className="text-sm text-neutral-200">{IR_JETS_HINT}</p>}
+              </div>
+            )}
 
-              {plan.type === 'comet' && (
-                <div
-                  role="group"
-                  aria-label="Comet epoch"
-                  className="flex flex-wrap items-center gap-2"
-                >
-                  <span className="text-sm text-neutral-300">Epoch:</span>
-                  {COMET_EPOCHS.map((e) => (
-                    <button
-                      key={e}
-                      type="button"
-                      className={`${buttonClass} ${pressedClass}`}
-                      aria-pressed={epoch === e}
-                      onClick={() => onEpoch(e)}
-                    >
-                      {EPOCH_LABEL[e]}
-                      {!plan.epochs.includes(e) && (
-                        <span className="ml-1 text-xs text-neutral-400">(no gas data)</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
+            {plan.type === 'comet' && (
+              <ToggleGroup
+                label="Epoch"
+                value={epoch}
+                options={COMET_EPOCHS.map((e) => ({
+                  value: e,
+                  label: `${EPOCH_LABEL[e]}${plan.epochs.includes(e) ? '' : ' (no gas data)'}`,
+                }))}
+                onChange={onEpoch}
+              />
+            )}
 
-              {plan.star && !engineStar && (
-                <div className="flex flex-col gap-2" data-testid="star-views">
-                  <div
-                    role="group"
-                    aria-label="Star colour view"
-                    className="flex flex-wrap items-center gap-2"
-                  >
-                    <span className="text-sm text-neutral-300">Star colour:</span>
-                    {(Object.keys(STAR_COLOUR_LABEL) as StarColourView[]).map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        className={`${buttonClass} ${pressedClass}`}
-                        aria-pressed={starColour === c}
-                        onClick={() =>
-                          setStarView(
-                            c,
-                            c === 'observatory' && starScale === 'close' ? 'enlarged' : starScale,
-                          )
-                        }
-                      >
-                        {STAR_COLOUR_LABEL[c]}
-                      </button>
-                    ))}
-                  </div>
-                  <div
-                    role="group"
-                    aria-label="Star scale"
-                    className="flex flex-wrap items-center gap-2"
-                  >
-                    <span className="text-sm text-neutral-300">Scale:</span>
-                    {(Object.keys(STAR_SCALE_LABEL) as StarScale[]).map((sc) => (
-                      <button
-                        key={sc}
-                        type="button"
-                        className={`${buttonClass} ${pressedClass}`}
-                        aria-pressed={starScale === sc}
-                        disabled={sc === 'close' && !plan.star?.physics}
-                        title={
-                          sc === 'close' && !plan.star?.physics
-                            ? 'Needs the star\u2019s temperature.'
-                            : undefined
-                        }
-                        onClick={() => setStarView(starColour, sc)}
-                      >
-                        {STAR_SCALE_LABEL[sc]}
-                      </button>
-                    ))}
-                  </div>
-                  {plan.star.physics && (
-                    <p className="text-sm text-neutral-200" data-testid="star-caption">
-                      {starCaption(plan.star.physics, starScale)}
-                      {starColour === 'observatory' &&
-                        ' This is false colour (ultraviolet, as solar observatories show it), not the star\u2019s real colour.'}
-                    </p>
-                  )}
-                  {plan.star.plasma && (
-                    <StarFlarePanel
-                      viewer={viewer}
-                      paused={motionPaused}
-                      fixture={objectIsFixture}
-                    />
-                  )}
-                </div>
-              )}
+            {pane && <BuildControls />}
 
-              {plan.star?.physics && !engineStar && (
-                <dl
-                  className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
-                  data-testid="star-readouts"
-                >
-                  {starReadouts(plan.star.physics).map((r) => (
-                    <div key={r.label} className="contents">
-                      <dt className="text-neutral-300">{r.label}</dt>
-                      <dd className="text-neutral-100">
-                        {r.value}{' '}
-                        {r.tag && <ProvenanceBadge tag={r.tag} fixture={objectIsFixture} />}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-
-              {plan.type === 'comet' && emissionsRange && (
-                <button
-                  type="button"
-                  className={`${buttonClass} ${pressedClass} self-start`}
-                  aria-pressed={emissionsJd !== null}
-                  onClick={() =>
-                    setEmissions(
-                      emissionsJd === null ? { key: objectKey, jd: EPOCH_JD[epoch] } : null,
+            {plan.star && !engineStar && (
+              <div className="flex flex-col gap-2" data-testid="star-views">
+                <ToggleGroup
+                  label="Light"
+                  value={starColour}
+                  options={STAR_COLOUR_OPTIONS}
+                  onChange={(c) =>
+                    setStarView(
+                      c,
+                      c === 'observatory' && starScale === 'close' ? 'enlarged' : starScale,
                     )
                   }
-                  data-testid="emissions-toggle"
-                >
-                  View emissions
-                </button>
-              )}
-
-              {plan.scrub && (
-                <label className="flex flex-col gap-1 text-sm text-neutral-300">
-                  Light curve: point {plan.scrub.index + 1} of {plan.scrub.count}
-                  <input
-                    type="range"
-                    min={0}
-                    max={Math.max(0, plan.scrub.count - 1)}
-                    value={plan.scrub.index}
-                    className="min-h-11 w-full max-w-xl"
-                    aria-valuetext={`Point ${plan.scrub.index + 1} of ${plan.scrub.count}, ${formatMjdDate(plan.scrub.tMjd)}, brightness ${Math.round(plan.scrub.brightness * 100)}% of the maximum`}
-                    onChange={(e) => onScrub(Number(e.target.value))}
-                  />
-                  <span className="text-xs text-neutral-400">
-                    {formatMjdDate(plan.scrub.tMjd)}, brightness{' '}
-                    {Math.round(plan.scrub.brightness * 100)}% of the maximum
-                    {plan.scrub.flagged > 0
-                      ? `; ${plan.scrub.flagged} flagged points are left out`
-                      : ''}
-                  </span>
-                </label>
-              )}
-
-              {remnantShown && (
-                <div className="flex flex-col gap-1 text-sm text-neutral-300">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <label htmlFor={`${whyId}-age-input`} id={`${whyId}-age`}>
-                      Age of the remnant
-                    </label>
-                    <output aria-hidden="true" className="tabular-nums text-neutral-100">
-                      {formatYears(age)}
-                    </output>
-                    <ProvenanceBadge tag="artistic" fixture={objectIsFixture} />
-                  </span>
-                  <input
-                    id={`${whyId}-age-input`}
-                    type="range"
-                    min={AGE_LOG_MIN}
-                    max={AGE_LOG_MAX}
-                    step={AGE_LOG_STEP}
-                    value={Math.log10(age)}
-                    className="min-h-11 w-full max-w-xl"
-                    aria-labelledby={`${whyId}-age`}
-                    aria-describedby={`${whyId}-age-hint`}
-                    aria-valuetext={`${formatYears(age)} old`}
-                    onChange={(e) => onAge(Number(e.target.value))}
-                  />
-                  <span id={`${whyId}-age-hint`} className="text-xs text-neutral-400">
-                    Your choice, not a measurement. The shell is drawn smaller when it is younger,
-                    so the size shown is the shell{AT_AGE_MAX_PHRASE}.
-                  </span>
-                </div>
-              )}
-
-              {bar && (
-                <figure className="flex max-w-xl flex-col gap-1" data-testid="scale-bar">
-                  <div className="flex flex-col gap-1" aria-hidden="true">
-                    <div
-                      className="h-1.5 rounded bg-sky-400"
-                      style={{ width: `${bar.bodyFraction * 100}%` }}
-                    />
-                    <div
-                      className="h-1.5 rounded bg-neutral-400"
-                      style={{ width: `${bar.comparisonFraction * 100}%` }}
-                    />
-                  </div>
-                  <figcaption className="text-sm text-neutral-200">
-                    {bar.headline}
-                    {size?.atSliderMax && AT_AGE_MAX_PHRASE}
-                    {bar.qualifier === 'upper_limit' && ' (upper limit)'}
-                    {size?.tag && (
-                      <>
-                        {' '}
-                        <ProvenanceBadge
-                          tag={size.tag}
-                          tooltip={size.why ?? undefined}
-                          srText
-                          fixture={objectIsFixture}
-                        />
-                      </>
-                    )}
-                    , {bar.comparison.text}.
-                  </figcaption>
-                  {size?.why && (
-                    <div className="flex flex-col items-start gap-1">
-                      <button
-                        type="button"
-                        className={buttonClass}
-                        aria-expanded={whyOpen}
-                        aria-controls={whyId}
-                        onClick={() => setWhyOpen((o) => !o)}
-                      >
-                        Why this size?
-                      </button>
-                      {whyOpen && (
-                        <p id={whyId} className="text-sm text-neutral-300" data-testid="size-why">
-                          {size.why}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </figure>
-              )}
-
-              {lapses.length > 0 && !engineWorld && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    className={buttonClass}
-                    onClick={() => {
-                      if (motionPaused) {
-                        // Play: lift every pause that is on (reduced motion override, user, idle).
-                        if (reducedMotion && !playAnyway) setPlayAnyway(true);
-                        if (spinPaused) setSpinPaused(false);
-                        if (idlePaused) viewer?.resumeFromIdle?.();
-                      } else if (reducedMotion) setPlayAnyway(false);
-                      else setSpinPaused(true);
-                    }}
-                  >
-                    {motionPaused ? 'Play motion' : 'Pause motion'}
-                  </button>
-                  <p className="text-sm text-neutral-200" data-testid="motion-status">
-                    {reducedMotion && !playAnyway
-                      ? 'Motion is off because your device asks for reduced motion.'
-                      : spinPaused
-                        ? 'Motion is paused.'
-                        : idlePaused
-                          ? 'Motion paused after a minute without input. Tap the view or press Play motion.'
-                          : 'Motion is playing.'}
+                />
+                <ToggleGroup
+                  label="View"
+                  value={starScale}
+                  options={STAR_SCALE_OPTIONS}
+                  onChange={(sc) => setStarView(starColour, sc)}
+                />
+                {plan.star.physics && (
+                  <p className="text-sm text-neutral-200" data-testid="star-caption">
+                    {starCaption(plan.star.physics, starScale)}
+                    {starColour === 'observatory' &&
+                      ' This is false colour (ultraviolet, as solar observatories show it), not the star\u2019s real colour.'}
                   </p>
-                </div>
-              )}
+                )}
+                {plan.star.plasma && (
+                  <StarFlarePanel
+                    viewer={viewer}
+                    paused={motionPaused}
+                    fixture={objectIsFixture}
+                  />
+                )}
+              </div>
+            )}
 
-              {/* Issue #71 stream E: pacing of a simulated gas world; shown only for one. */}
-              {plan.type === 'gas_giant' &&
-                !engineWorld &&
-                lapses.some((t) => t.id === 'winds') && (
-                  <div className="flex flex-col gap-1" data-testid="gas-pacing">
-                    <div
-                      role="group"
-                      aria-label="Time speed of the winds"
-                      className="flex flex-wrap gap-2"
+            {plan.star?.physics && !engineStar && (
+              <dl
+                className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
+                data-testid="star-readouts"
+              >
+                {starReadouts(plan.star.physics).map((r) => (
+                  <div key={r.label} className="contents">
+                    <dt className="text-neutral-300">{r.label}</dt>
+                    <dd className="text-neutral-100">
+                      {r.value} {r.tag && <ProvenanceBadge tag={r.tag} fixture={objectIsFixture} />}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+
+            {planetMeasured.length > 0 && (
+              <dl
+                className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
+                data-testid="planet-measured"
+              >
+                {planetMeasured.map((m) => (
+                  <div key={m.field} className="contents">
+                    <dt className="text-neutral-300">{m.label}</dt>
+                    <dd className="text-neutral-100" title={m.source}>
+                      {m.value} <ProvenanceBadge tag={m.tag} fixture={objectIsFixture} />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+
+            {plan.type === 'comet' && emissionsRange && (
+              <SwitchRow
+                label="View emissions"
+                checked={emissionsJd !== null}
+                onChange={() =>
+                  setEmissions(
+                    emissionsJd === null ? { key: objectKey, jd: EPOCH_JD[epoch] } : null,
+                  )
+                }
+                testId="emissions-toggle"
+              />
+            )}
+
+            {plan.scrub && (
+              <label className="flex flex-col gap-1 text-sm text-neutral-300">
+                Light curve: point {plan.scrub.index + 1} of {plan.scrub.count}
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.max(0, plan.scrub.count - 1)}
+                  value={plan.scrub.index}
+                  className="min-h-11 w-full max-w-xl"
+                  aria-valuetext={`Point ${plan.scrub.index + 1} of ${plan.scrub.count}, ${formatMjdDate(plan.scrub.tMjd)}, brightness ${Math.round(plan.scrub.brightness * 100)}% of the maximum`}
+                  onChange={(e) => onScrub(Number(e.target.value))}
+                />
+                <span className="text-xs text-neutral-400">
+                  {formatMjdDate(plan.scrub.tMjd)}, brightness{' '}
+                  {Math.round(plan.scrub.brightness * 100)}% of the maximum
+                  {plan.scrub.flagged > 0
+                    ? `; ${plan.scrub.flagged} flagged points are left out`
+                    : ''}
+                </span>
+              </label>
+            )}
+
+            {remnantShown && (
+              <div className="flex flex-col gap-1 text-sm text-neutral-300">
+                <span className="flex flex-wrap items-center gap-2">
+                  <label htmlFor={`${whyId}-age-input`} id={`${whyId}-age`}>
+                    Age of the remnant
+                  </label>
+                  <output aria-hidden="true" className="tabular-nums text-neutral-100">
+                    {formatYears(age)}
+                  </output>
+                  <ProvenanceBadge tag="artistic" fixture={objectIsFixture} />
+                </span>
+                <input
+                  id={`${whyId}-age-input`}
+                  type="range"
+                  min={AGE_LOG_MIN}
+                  max={AGE_LOG_MAX}
+                  step={AGE_LOG_STEP}
+                  value={Math.log10(age)}
+                  className="min-h-11 w-full max-w-xl"
+                  aria-labelledby={`${whyId}-age`}
+                  aria-describedby={`${whyId}-age-hint`}
+                  aria-valuetext={`${formatYears(age)} old`}
+                  onChange={(e) => onAge(Number(e.target.value))}
+                />
+                <span id={`${whyId}-age-hint`} className="text-xs text-neutral-400">
+                  Your choice, not a measurement. The shell is drawn smaller when it is younger, so
+                  the size shown is the shell{AT_AGE_MAX_PHRASE}.
+                </span>
+              </div>
+            )}
+
+            {bar && !engineOwns && (
+              <figure className="flex max-w-xl flex-col gap-1" data-testid="scale-bar">
+                <div className="flex flex-col gap-1" aria-hidden="true">
+                  <div
+                    className="h-1.5 rounded bg-sky-400"
+                    style={{ width: `${bar.bodyFraction * 100}%` }}
+                  />
+                  <div
+                    className="h-1.5 rounded bg-neutral-400"
+                    style={{ width: `${bar.comparisonFraction * 100}%` }}
+                  />
+                </div>
+                <figcaption className="text-sm text-neutral-200">
+                  {bar.headline}
+                  {size?.atSliderMax && AT_AGE_MAX_PHRASE}
+                  {bar.qualifier === 'upper_limit' && ' (upper limit)'}
+                  {size?.tag && (
+                    <>
+                      {' '}
+                      <ProvenanceBadge
+                        tag={size.tag}
+                        tooltip={size.why ?? undefined}
+                        srText
+                        fixture={objectIsFixture}
+                      />
+                    </>
+                  )}
+                  , {bar.comparison.text}.
+                </figcaption>
+                {size?.why && (
+                  <div className="flex flex-col items-start gap-1">
+                    <button
+                      type="button"
+                      className={buttonClass}
+                      aria-expanded={whyOpen}
+                      aria-controls={whyId}
+                      onClick={() => setWhyOpen((o) => !o)}
                     >
-                      {GAS_PACING_CHOICES.map((c) => (
-                        <button
-                          key={c.value}
-                          type="button"
-                          className={buttonClass}
-                          aria-pressed={gasPacing === c.value}
-                          onClick={() => onGasPacing(c.value)}
-                        >
-                          {c.label}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-sm text-neutral-200" data-testid="gas-pacing-status">
-                      {gasPacingStatus(gasPacing)}
-                    </p>
+                      Why this size?
+                    </button>
+                    {whyOpen && (
+                      <p id={whyId} className="text-sm text-neutral-300" data-testid="size-why">
+                        {size.why}
+                      </p>
+                    )}
                   </div>
                 )}
+              </figure>
+            )}
 
-              {qualityLowered && (
-                <p className="text-sm text-neutral-200" data-testid="quality-note">
-                  {QUALITY_DROP_ANNOUNCEMENT}.
+            {lapses.length > 0 && !engineWorld && (
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm text-neutral-200" data-testid="motion-status">
+                  {reducedMotion && !playAnyway
+                    ? 'Motion is off because your device asks for reduced motion.'
+                    : spinPaused
+                      ? 'Motion is paused.'
+                      : idlePaused
+                        ? 'Motion paused after a minute without input. Tap the view to resume.'
+                        : 'Motion is playing.'}
                 </p>
-              )}
+              </div>
+            )}
 
-              {/* Every time-lapse says where its rate comes from and its speed-up (R5.7, D-32). */}
-              {lapses.map((t) => (
-                <p key={t.id} className="text-sm text-neutral-200" data-testid="time-lapse-note">
-                  {timeLapseText(t)}
+            {/* Issue #71 stream E: pacing of a simulated gas world; shown only for one. */}
+            {plan.type === 'gas_giant' && !engineWorld && lapses.some((t) => t.id === 'winds') && (
+              <div className="flex flex-col gap-1" data-testid="gas-pacing">
+                <ToggleGroup
+                  label="Time speed of the winds"
+                  value={String(gasPacing) as '0' | '1'}
+                  options={GAS_PACING_CHOICES.map((c) => ({ value: String(c.value) as '0' | '1', label: c.label }))}
+                  onChange={(v) => onGasPacing(Number(v) as 0 | 1)}
+                />
+                <p className="text-sm text-neutral-200" data-testid="gas-pacing-status">
+                  {gasPacingStatus(gasPacing)}
                 </p>
-              ))}
+              </div>
+            )}
 
-              <section aria-labelledby="legend-heading" className="flex flex-col gap-1">
-                <h3 id="legend-heading" className="text-sm font-medium text-neutral-200">
-                  What is drawn
-                </h3>
-                <p className="text-xs text-neutral-400">
-                  Measured: from observations. Estimated: worked out from data with a stated method.
-                  Default: the artist&rsquo;s choice.
-                </p>
-                {plan.drawn.length === 0 ? (
-                  <p className="text-sm text-neutral-400">Nothing yet.</p>
-                ) : (
-                  <ul className="flex flex-col gap-1" data-testid="legend">
-                    {plan.drawn.map((l) => (
-                      <li
-                        key={l.id}
-                        className="flex flex-wrap items-center gap-2 text-sm text-neutral-200"
-                      >
-                        <ProvenanceBadge tag={l.tag} fixture={objectIsFixture} />
-                        <span>{layerName(l.id)}</span>
-                        {l.tier ? (
-                          <span className="text-xs text-neutral-400" data-testid="layer-tier">
-                            {tierText(l.tier)}
-                          </span>
-                        ) : null}
-                        {l.swatches?.map((s) => (
+            {qualityLowered && (
+              <p className="text-sm text-neutral-200" data-testid="quality-note">
+                {QUALITY_DROP_ANNOUNCEMENT}.
+              </p>
+            )}
+
+            {/* Every time-lapse says where its rate comes from and its speed-up (R5.7, D-32). */}
+            {(engineOwns && pane ? [] : lapses).map((t) => (
+              <p key={t.id} className="text-sm text-neutral-200" data-testid="time-lapse-note">
+                {timeLapseText(t)}
+              </p>
+            ))}
+
+            {pane && <BuildKeyNumbers fixture={objectIsFixture} />}
+
+            <Rows>
+            {pane && (
+              <BuildSummaryRows
+                fixture={objectIsFixture}
+                flareChart={
+                  engineStar ? (
+                    <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                      Example curve. Hard X-rays follow the rate of change of soft X-rays (the Neupert effect).
+                    </p>
+                  ) : undefined
+                }
+                extraAssumed={assumedLines}
+              />
+            )}
+            <Row title="What is drawn" count={plan.drawn.length} testId="legend-row">
+              <p className="text-xs text-neutral-400">
+                Measured: from observations. Estimated: worked out from data with a stated method.
+                Default: the artist&rsquo;s choice.
+              </p>
+              {plan.drawn.length === 0 ? (
+                <p className="text-sm text-neutral-400">Nothing yet.</p>
+              ) : (
+                <ul className="flex flex-col gap-1" data-testid="legend">
+                  {plan.drawn.map((l) => (
+                    <li
+                      key={l.id}
+                      className="flex flex-wrap items-center gap-2 text-sm text-neutral-200"
+                    >
+                      <ProvenanceBadge tag={l.tag} fixture={objectIsFixture} />
+                      <span>{layerName(l.id)}</span>
+                      {l.tier ? (
+                        <span className="text-xs text-neutral-400" data-testid="layer-tier">
+                          {tierText(l.tier)}
+                        </span>
+                      ) : null}
+                      {l.swatches?.map((s) => (
+                        <span
+                          key={s.label}
+                          className="inline-flex items-center gap-1 text-xs text-neutral-300"
+                        >
                           <span
-                            key={s.label}
-                            className="inline-flex items-center gap-1 text-xs text-neutral-300"
-                          >
-                            <span
-                              aria-hidden="true"
-                              className="inline-block h-3 w-3 rounded-sm border border-neutral-500"
-                              style={{ backgroundColor: s.css }}
-                            />
-                            {s.label}
-                          </span>
-                        ))}
-                        {l.description && (
-                          <details className="w-full text-xs text-neutral-300">
-                            <summary className="min-h-11 cursor-pointer py-2 focus-visible:outline-2 focus-visible:outline-sky-400">
-                              How it is made
-                            </summary>
-                            <p className="pb-1">{l.description}</p>
-                          </details>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-
-              {defaultsShown.length > 0 && (
-                <section aria-labelledby="defaults-heading" className="flex flex-col gap-1">
-                  <h3 id="defaults-heading" className="text-sm font-medium text-neutral-200">
-                    Shown as a default
-                  </h3>
-                  <ul
-                    className="flex flex-col gap-1 text-sm text-neutral-300"
-                    data-testid="default-list"
-                  >
-                    {defaultsShown.map((m) => (
-                      <li key={m.id} className="flex flex-wrap items-center gap-2">
-                        <ProvenanceBadge tag="artistic" />
-                        <span>{describeRefusal(m)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-
-              {notDrawn.length > 0 && (
-                <section aria-labelledby="missing-heading" className="flex flex-col gap-1">
-                  <h3 id="missing-heading" className="text-sm font-medium text-neutral-200">
-                    Not drawn
-                  </h3>
-                  <ul
-                    className="list-disc pl-5 text-sm text-neutral-300"
-                    data-testid="missing-list"
-                  >
-                    {notDrawn.map((m) => (
-                      <li key={m.id}>{describeRefusal(m)}</li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-
-              {plan.notes.length > 0 && (
-                <ul className="list-disc pl-5 text-xs text-neutral-400" data-testid="notes">
-                  {plan.notes.map((n) => (
-                    <li key={n}>{n}</li>
+                            aria-hidden="true"
+                            className="inline-block h-3 w-3 rounded-sm border border-neutral-500"
+                            style={{ backgroundColor: s.css }}
+                          />
+                          {s.label}
+                        </span>
+                      ))}
+                      {l.description && (
+                        <details className="w-full text-xs text-neutral-300">
+                          <summary className="min-h-11 cursor-pointer py-2 focus-visible:outline-2 focus-visible:outline-sky-400">
+                            How it is made
+                          </summary>
+                          <p className="pb-1">{l.description}</p>
+                        </details>
+                      )}
+                    </li>
                   ))}
                 </ul>
               )}
-            </>
-          )}
-        </div>,
+            </Row>
+
+            {defaultsShown.length > 0 && (
+              <Row title="Shown as a default" count={defaultsShown.length}>
+                <ul
+                  className="flex flex-col gap-1 text-sm text-neutral-300"
+                  data-testid="default-list"
+                >
+                  {defaultsShown.map((m) => (
+                    <li key={m.id} className="flex flex-wrap items-center gap-2">
+                      <ProvenanceBadge tag="artistic" />
+                      <span>{describeRefusal(m)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Row>
+            )}
+
+            {notDrawn.length > 0 && (
+              <Row title="Not drawn" count={notDrawn.length}>
+                <ul className="list-disc pl-5 text-sm text-neutral-300" data-testid="missing-list">
+                  {notDrawn.map((m) => (
+                    <li key={m.id}>{describeRefusal(m)}</li>
+                  ))}
+                </ul>
+              </Row>
+            )}
+            </Rows>
+
+            {plan.notes.length > 0 && !(engineOwns && pane) && (
+              <ul className="list-disc pl-5 text-xs text-neutral-400" data-testid="notes">
+                {plan.notes.map((n) => (
+                  <li key={n}>{n}</li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
       )}
 
       <div aria-live="polite" aria-atomic="true" className="sr-only" data-testid="viewer-announcer">

@@ -7,3 +7,4 @@ blob-report/
 playwright/.cache/
 *.tsbuildinfo
 *.local
+.bench-ref/

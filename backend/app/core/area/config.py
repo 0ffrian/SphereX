@@ -34,7 +34,7 @@ from app.timefmt import parse_utc
 log = logging.getLogger("shift_spectrum")
 
 # Bump when the area code changes in a way that changes results (A17.10).
-AREA_VERSION = "area-1"
+AREA_VERSION = "area-2"  # area-2: labels, join, known check, served entries (P4 to P7)
 
 # SPHEREx pixel (A17 "Units and symbols"): used only to turn pixel settings into sky distances.
 PIXEL_ARCSEC = 6.15
@@ -110,6 +110,30 @@ class AreaConfig:
     # whole annulus; measuring on it gives the same outcome as on the whole cutout (tested).
     stamp_half_px: int = 11
     measure: MeasureConfig = field(default=AREA_MEASURE_CONFIG)
+    # --- labels (A17.3, P4) ---
+    r_match_min_px: float = 2.0  # A17.3: r_match = max(2 px, 3 sigma_c)
+    r_match_sigma: float = 3.0  # A17.3
+    k_visit_max: int = 3  # A17.3: k_visit = min(3, frames of the visit that cover the dot)
+    # ASSUMPTION ([verify], A17.3 names no flag list): core-pixel flags of a bright-star artefact.
+    # The names are read from the MP_* keywords (wcs.flag_names), never assumed as bits.
+    star_artefact_flags: str = "BLOOM,HALO"
+    # --- join (A17.4, P5) ---
+    rms_max_px: float = 1.0  # A17.4 step 1
+    rate_max_deg_day: float = 1.2  # A17.4 step 2 (strong-trailing limit), before the size rule
+    v_tol_min_deg_day: float = 0.1  # [verify] A17.4 step 3 (Q-179)
+    v_tol_sigma: float = 3.0  # [verify] A17.4 step 3: v_tol = max(0.1 deg/day, 3 sigma_v)
+    delta_min_au: float = 0.05  # A17.4 step 3: u <= 1 / delta_min
+    ambiguity_ratio: float = 0.5  # A17.4 step 4
+    min_motion_px: float = 1.0  # A17.4 step 4: static one-visit tracklets
+    # --- known-object check (A17.5, P6) ---
+    p_max_arcsec: float = 60.0  # [verify] A17.5 step 1 (parallax and orbit error)
+    v_lim: float = 22.0  # [verify] A17.5 step 1
+    r_known_min_px: float = 3.0  # A17.5 step 3
+    known_min_frac: float = 2.0 / 3.0  # A17.5 step 3: at least two thirds of the dots
+
+    @property
+    def artefact_flags(self) -> tuple[str, ...]:
+        return tuple(sorted(f for f in self.star_artefact_flags.split(",") if f))
 
     @property
     def coverage_erode_deg(self) -> float:
@@ -162,11 +186,88 @@ def dots_method(cfg: AreaConfig = DEFAULT_AREA_CONFIG) -> dict[str, Setting]:
     }
 
 
+GLITCH_FORMULA = (
+    "a dot is kept when it has a counterpart within r_match + rate_max * |dt| (px) in at least "
+    "k_visit - 1 other frames of its visit, both detectors counting; r_match = max(r_match_min_px,"
+    " r_match_sigma * sigma_c) of the larger of the two dots; k_visit = min(k_visit_max, frames of "
+    "the visit whose cutout holds the dot at least coverage_erode_px inside its edge)"
+)
+TRACKLET_FORMULA = (
+    "per visit, greedy best-first over seed pairs within the glitch radius: the line through the "
+    "pair predicts each frame, the nearest unused dot within r_match joins; least-squares line "
+    "x(t), y(t) on the area plane; kept when rms <= rms_max_px and the dots span 2 or more times;"
+    " best = most dots, then smallest rms, then the earliest dot; sigma_v from the fit residuals"
+)
+STAR_FORMULA = (
+    "a tracklet is star when every dot lies within max(r_match, r_px) of the same Gaia DR3 or "
+    "CatWISE2020 source of the visit's star list, propagated to the dot time (r_px: the A19.6 "
+    "mask radius); a dot whose flags hold a star_artefact_flags name is star too"
+)
+FIXED_FORMULA = (
+    "a dot that is not star with a dot of another visit within r_match at the same RA/Dec, where "
+    "that visit's coverage holds it"
+)
+PAIR_FORMULA = (
+    "rate window rate_min = r_match_min_px / dt_v to rate_max = min(rate_max_deg_day, (diagonal - "
+    "2 margin) / dt_v); v_in = v_AB - w u with w the SPHEREx velocity about the geocentre "
+    "projected on the sky at the area centre (Horizons VECTORS, one per visit); u >= 0 fitted by "
+    "least squares; residual = largest |v_in - v_AB + w u| perpendicular to w; pass when residual "
+    "<= max(v_tol_min, v_tol_sigma * sigma_v) and u <= 1/delta_min; track when mutual best and "
+    "best <= ambiguity_ratio * next"
+)
+KNOWN_FORMULA = (
+    "SkyBoT cone per visit (area half-diagonal + rate_max * visit span / 2 + p_max), V <= v_lim; "
+    "Horizons TLIST from 500@-163182 at every exposure time; a track matches when at least "
+    "known_min_frac of its dots lie within max(r_known_min_px, 3 sigma_c + ephemeris 3 sigma)"
+)
+
+
+def labels_method(cfg: AreaConfig = DEFAULT_AREA_CONFIG) -> dict[str, Setting]:
+    """``method.settings`` of the labels step (A17.3); names as the fixture's where they meet."""
+    return {
+        "r_match_min_px": cfg.r_match_min_px,
+        "r_match_sigma": cfg.r_match_sigma,
+        "k_visit_max": cfg.k_visit_max,
+        "star_artefact_flags": ",".join(cfg.artefact_flags),
+        "glitch_formula": GLITCH_FORMULA,
+        "tracklet_formula": TRACKLET_FORMULA,
+        "star_formula": STAR_FORMULA,
+        "fixed_formula": FIXED_FORMULA,
+    }
+
+
+def join_method(cfg: AreaConfig = DEFAULT_AREA_CONFIG) -> dict[str, Setting]:
+    return {
+        "rms_max_px": cfg.rms_max_px,
+        "rate_max_deg_day": cfg.rate_max_deg_day,
+        "v_tol_min_deg_day": cfg.v_tol_min_deg_day,
+        "v_tol_sigma": cfg.v_tol_sigma,
+        "delta_min_au": cfg.delta_min_au,
+        "ambiguity_ratio": cfg.ambiguity_ratio,
+        "min_motion_px": cfg.min_motion_px,
+        "pair_formula": PAIR_FORMULA,
+    }
+
+
+def known_method(cfg: AreaConfig = DEFAULT_AREA_CONFIG) -> dict[str, Setting]:
+    return {
+        "p_max_arcsec": cfg.p_max_arcsec,
+        "v_lim": cfg.v_lim,
+        "r_known_min_px": cfg.r_known_min_px,
+        "known_min_frac": round(cfg.known_min_frac, 6),
+        "known_formula": KNOWN_FORMULA,
+    }
+
+
 def method_settings(cfg: AreaConfig = DEFAULT_AREA_CONFIG) -> dict[str, Setting]:
-    """Everything P3 adds to ``method.settings``, with the versions (A17.10)."""
+    """Every starting value of the area pipeline in ``method.settings``, with the versions
+    (A17.10)."""
     return {
         **frames_method(cfg),
         **dots_method(cfg),
+        **labels_method(cfg),
+        **join_method(cfg),
+        **known_method(cfg),
         "area_version": AREA_VERSION,
         "measure_version": MEASURE_VERSION,
     }
@@ -191,8 +292,7 @@ AREA_SOURCE = "derived.area"
 
 
 def area_key(release: str, area_id: str, stage: str, params: str) -> CacheKey:
-    """Key of a ``derived.area`` entry (A17.10), modelled on ``spectrum_key``. Unused in P3:
-    P7 writes the served entries and may add per-stage checkpoints with it."""
+    """Key of a ``derived.area`` entry (A17.10), modelled on ``spectrum_key``."""
     return CacheKey.make(AREA_SOURCE, release, id=area_id, v=AREA_VERSION, stage=stage, p=params)
 
 

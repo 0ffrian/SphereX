@@ -2,7 +2,7 @@
 // `closeBuild`, `setShifted`). While the body is built the pane fills the screen over the dimmed sky
 // with the body in the middle and the numbered steps under it; when the build ends it slides to the
 // right half and the close-up opens on the left (`shifted`). On a phone it stays a full-height
-// sheet. The header is the mock-up's: "Building <name>", its kind, then Accuracy, Feel, Hear it, and
+// sheet. The header is the mock-up's: "Building <name>", its kind, then Accuracy, Ambience, Explore, Details and
 // the close button. One panel opens under those buttons at a time (`pop`). Details (the honesty
 // level, view controls, what is drawn and not drawn) is the app's one extra button: the mock-up has
 // no counterpart. Focus moves into the pane when it opens and back to the object's marker (or the
@@ -11,26 +11,31 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
 import { BUILD_POP_ID, ViewerPanel, type PopId } from '@/app/ViewerPanel';
-import { CloseUpPane, closeUpButtonLabel, closeUpKindOf } from '@/app/CloseUpPane';
+import { CloseUpPane, closeUpKindOf } from '@/app/CloseUpPane';
+import { ErrorBoundary } from '@/app/ErrorBoundary';
 import { useCloseUpStore } from '@/app/closeUpStore';
-import { useRockStore } from '@/app/rockStore';
 import { StatusLine } from '@/app/StatusLine';
+import { StatePill } from '@/app/island/StatePill';
+import { GENERATING_LOOK } from '@/app/island/loaderLooks';
 import { BuildDock, ZoomBar } from './BuildChrome';
 import { Icon, type IconName } from '@/app/shell/icons';
 import { isEditableTarget } from '@/app/shell/shortcuts';
 import { useShellStore } from '@/app/shell/shellStore';
 import { useAppStore } from '@/state/store';
-import { ProvenanceBadge } from '@/app/Badge';
-import { effectiveHonesty, HONESTY_LABEL } from '@/viewer/honesty';
+import { useAmbienceStore } from '@/app/sound/ambienceStore';
+import { atmosphereOf } from './hearModel';
+import { useSpringResize } from './exploreMotion';
+import { ExploreIcon } from './ExploreIcon';
 import type { MouldPhase } from './useMould';
 import { closeBuildPane } from './focus';
-import { ENGINE_NOTE, PREBUILT_NOTE } from '@/app/messages';
+import { displayName } from '@/app/displayName';
 import { loadBodyFor, typeLabel, useSelection } from './selectedBody';
 
 export { closeBuildPane };
@@ -41,8 +46,6 @@ export const SHIFT_DELAY_MS = 650;
 /** The header buttons that open a panel, in the mock-up's order (Details is the app's extra). */
 const POP_BUTTONS: { id: PopId; label: string; title: string; icon: IconName }[] = [
   { id: 'acc', label: 'Accuracy', title: 'Accuracy', icon: 'accuracy' },
-  { id: 'feel', label: 'Feel', title: 'Feel the surface', icon: 'fingerprint' },
-  { id: 'hear', label: 'Hear it', title: 'Hear it', icon: 'hear' },
   {
     id: 'details',
     label: 'Details',
@@ -57,6 +60,8 @@ export function BuildPane() {
   const selection = useSelection();
   const card = useAppStore((s) => s.card);
   const params = useAppStore((s) => s.params);
+  const query = useAppStore((s) => s.sky.query);
+  const closeType = useCloseUpStore((s) => s.type);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
   const [phase, setPhase] = useState<MouldPhase>('idle');
@@ -66,10 +71,6 @@ export function BuildPane() {
   const buttonRefs = useRef<Partial<Record<PopId, HTMLButtonElement | null>>>({});
   const closeKind = closeUpKindOf(params?.type);
   const closeHidden = useCloseUpStore((s) => s.hidden);
-  // A D-37 engine (world, star or rock) draws the body: its note replaces the baked path's.
-  const closeEngine = useCloseUpStore((s) => s.engineStar !== null || s.engineWorld !== null);
-  const rockEngine = useRockStore((s) => s.view !== null);
-  const engineDrawn = closeEngine || rockEngine;
   const [usesSeed, setUsesSeed] = useState(true);
   const spinRef = useRef<SVGSVGElement>(null);
   const sayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -82,16 +83,12 @@ export function BuildPane() {
 
   // The body of the selected object when it is loaded; otherwise whatever body the store holds
   // (the rail's 3D viewer with no selection).
-  const name = selection?.name ?? card?.name ?? null;
+  const name = displayName(selection?.name ?? card?.name ?? null) || null;
   const bodyHere = selection && body.status !== 'idle' && body.id === selection.id ? body : null;
   const type = typeLabel(params?.type);
   // The mock-up's title (Q-298, amends Q-113): "Building X" for a build that is played, and it stays;
   // the bare name when the body is shown built at once (`B.quick`).
   const title = name ? (build.animate ? `Building ${name}` : name) : '3D view';
-  const fixtureSky = useAppStore((s) => s.sky.fixture);
-  const honesty = effectiveHonesty(useAppStore((s) => s.honesty));
-  const levelTag =
-    honesty === 'measured' ? 'measured' : honesty === 'derived' ? 'derived' : 'artistic';
   const subtitle =
     bodyHere?.status === 'loading'
       ? 'Looking up its 3D model…'
@@ -100,7 +97,7 @@ export function BuildPane() {
         : (type ?? (name ? '' : 'No object loaded'));
   const message =
     bodyHere?.status === 'none'
-      ? `There is no 3D model of ${selection!.name} to build. ${bodyHere.reason}`
+      ? `There is no 3D model of ${name} to build. ${bodyHere.reason}`
       : null;
 
   // Mock-up `setShifted`: the pane slides to the right half 650 ms after the last step, and the
@@ -108,6 +105,9 @@ export function BuildPane() {
   // shifted. The flag is per build (`seq`), so a Replay or a New seed starts full width again.
   const [shiftedSeq, setShiftedSeq] = useState(-1);
   const shifted = !build.animate || shiftedSeq === build.seq;
+  const paneRef = useRef<HTMLElement>(null);
+  // Full view or the right half: the pane springs between them (transform only, Q-450).
+  useSpringResize(paneRef, shifted && !closeHidden && closeKind ? 'half' : 'full');
   useEffect(() => {
     if (!build.animate || phase !== 'done') return;
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -125,7 +125,9 @@ export function BuildPane() {
     popRef.current = next;
     setPopState(next);
     if (next === null && returnFocus && prev) {
-      requestAnimationFrame(() => buttonRefs.current[prev]?.focus());
+      // Hear it has no header button any more (Q-450): it opens from Details, so focus goes back there.
+      const back = prev === 'hear' ? 'details' : prev;
+      requestAnimationFrame(() => buttonRefs.current[back]?.focus());
     }
   }, []);
 
@@ -153,6 +155,55 @@ export function BuildPane() {
 
   // Escape closes the open panel first (focus goes back to its button), then the pane. It works from
   // anywhere in the page that is not a text field (mock-up: Esc closes the build).
+  // Ambience (the wind that outlives the Hear it panel) must always be visible and stoppable (WCAG 1.4.2).
+  const ambienceOn = useAmbienceStore((s) => s.ambience && s.playing);
+  // The Atmosphere toggle in the header plays the ambience straight away, without opening Hear it.
+  // Shown only where an atmosphere sound is possible (same refusal rules as the Hear it panel).
+  const atmo = useMemo(() => atmosphereOf(card), [card]);
+  const atmoOn = useAmbienceStore((s) => s.ambience && s.playing && s.key === (card?.id ?? ''));
+  // A tap on the dimmed Ambience says why there is nothing to hear (a touch screen shows no title).
+  const [atmoHint, setAtmoHint] = useState(false);
+  useEffect(() => {
+    if (!atmoHint) return;
+    const id = window.setTimeout(() => setAtmoHint(false), 4000);
+    return () => window.clearTimeout(id);
+  }, [atmoHint]);
+  const toggleAtmo = (): void => {
+    if (!atmo.ok) {
+      setAtmoHint(true);
+      return;
+    }
+    if (!card) return;
+    useAmbienceStore.getState().setAmbience(!atmoOn, atmo.model, card.id);
+  };
+  const renderPop = (b: (typeof POP_BUTTONS)[number]) => (
+    <button
+      key={b.id}
+      ref={(el) => {
+        buttonRefs.current[b.id] = el;
+      }}
+      type="button"
+      className="sx-bp-tool sx-bp-text"
+      title={b.title}
+      aria-pressed={pop === b.id}
+      aria-expanded={pop === b.id}
+      aria-controls={BUILD_POP_ID}
+      onClick={() => setPop(pop === b.id ? null : b.id)}
+      data-testid={`build-${b.id === 'acc' ? 'accuracy' : b.id}`}
+    >
+      <Icon name={b.icon} className="size-[15px]" />
+      <span>{b.label}</span>
+    </button>
+  );
+  useEffect(() => {
+    if (!ambienceOn) return;
+    const onM = (e: globalThis.KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'm' || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented || isEditableTarget(e.target)) return;
+      useAmbienceStore.getState().stop();
+    };
+    window.addEventListener('keydown', onM);
+    return () => window.removeEventListener('keydown', onM);
+  }, [ambienceOn]);
   const onEscape = useCallback(() => {
     if (popRef.current) setPop(null, true);
     else closeBuildPane();
@@ -219,39 +270,17 @@ export function BuildPane() {
         <Icon name="shuffle" className="size-3.5" />
         New seed
       </button>
-      {closeKind && canBuild && (
-        <button
-          type="button"
-          className="sx-btn-sm"
-          aria-pressed={!closeHidden}
-          title={closeHidden ? 'Show the close-up on the left' : 'Hide the close-up on the left'}
-          onClick={() => useCloseUpStore.getState().setHidden(!closeHidden)}
-          data-testid="build-closeup"
-        >
-          {closeUpButtonLabel(closeKind)}
-        </button>
-      )}
     </div>
   );
 
-  // The honesty line (D-02, D-21): the level the body is shown at, visible without opening anything,
-  // in the mock-up's caption style (`.cu-tag`).
+  // The note box (level badge, "artist's impression", "Generated live from physics…") is gone: the
+  // provenance stays in the Details lists. What is left of this slot is the "N hidden at this level"
+  // button, shown only when there is one.
   const level = (extra: ReactNode) =>
     name &&
-    bodyHere?.status !== 'none' && (
+    bodyHere?.status !== 'none' &&
+    extra && (
       <p className="sx-bp-tag" data-testid="build-level">
-        <ProvenanceBadge
-          tag={levelTag}
-          fixture={fixtureSky || (card?.id.startsWith('fixture:') ?? false)}
-        />
-        {honesty === 'artistic' && <span>artist&rsquo;s impression</span>}
-        {engineDrawn ? (
-          <span data-testid="build-engine-note">{ENGINE_NOTE}</span>
-        ) : (
-          bodyHere?.status === 'ready' &&
-          bodyHere.prebuilt && <span data-testid="build-prebuilt">{PREBUILT_NOTE}</span>
-        )}
-        <span className="sr-only">{HONESTY_LABEL[honesty]}</span>
         {extra}
       </p>
     );
@@ -259,14 +288,25 @@ export function BuildPane() {
   return (
     <>
       {/* The close-up fills the left half over the sky, as the mock-up's #cuPane (Q-275). */}
-      <CloseUpPane />
+      {/* Issue #102: a throw in the close-up leaves the build pane usable. A new object, a new kind
+          of close-up, or hiding and showing it again (the toggle next to Feel) gives it a fresh try. */}
+      <ErrorBoundary
+        area="The close-up"
+        resetKeys={[query, closeType, closeHidden]}
+        className="relative z-10 m-4"
+      >
+        <CloseUpPane />
+      </ErrorBoundary>
       <aside
+        ref={paneRef}
         className="sx-bp"
         aria-labelledby={titleId}
         onKeyDown={onKeyDown}
         data-testid="build-pane"
         data-phase={phase}
         data-shifted={shifted || undefined}
+        // No split: the body keeps the whole view after it is built (the close-up is off).
+        data-solo={closeHidden || !closeKind || undefined}
         data-pop={pop ?? undefined}
       >
         <header className="sx-bp-head">
@@ -277,25 +317,41 @@ export function BuildPane() {
             <p data-testid="build-subtitle">{subtitle}</p>
           </div>
           <div className="sx-bp-tools" role="group" aria-label="Build tools">
-            {POP_BUTTONS.map((b) => (
+            {/* Moon (12 Nov 2026, Q-450): Accuracy, Ambience, Explore, Details, then close. Ambience is a
+                toggle (off, crossed out, until clicked; local synthesis for now, Q-416) and takes Hear it's
+                place in the header; Hear it opens from a row in Details (PR #107 review). Explore is the split view
+                (the close-up on the left). Where there is no atmosphere to hear, Ambience stays
+                visible but off, and its name says why. */}
+            {renderPop(POP_BUTTONS[0]!)}
+            {canBuild && (
               <button
-                key={b.id}
-                ref={(el) => {
-                  buttonRefs.current[b.id] = el;
-                }}
                 type="button"
-                className="sx-bp-tool sx-bp-text"
-                title={b.title}
-                aria-pressed={pop === b.id}
-                aria-expanded={pop === b.id}
-                aria-controls={BUILD_POP_ID}
-                onClick={() => setPop(pop === b.id ? null : b.id)}
-                data-testid={`build-${b.id === 'acc' ? 'accuracy' : b.id}`}
+                className="sx-bp-tool sx-bp-text sx-bp-toggle"
+                aria-label={atmo.ok ? 'Ambience' : `Ambience. ${atmo.line}`}
+                aria-pressed={atmoOn}
+                aria-disabled={!atmo.ok || undefined}
+                title={atmo.ok ? (atmoOn ? 'Stop the ambience (M)' : 'Play the ambience') : atmo.line}
+                onClick={toggleAtmo}
+                data-testid="build-ambience"
               >
-                <Icon name={b.icon} className="size-[15px]" />
-                <span>{b.label}</span>
+                <Icon name={atmoOn ? 'hear' : 'hearOff'} className="size-[15px]" />
+                <span>Ambience</span>
               </button>
-            ))}
+            )}
+            {canBuild && closeKind && (
+              <button
+                type="button"
+                className="sx-bp-tool sx-bp-text sx-bp-toggle"
+                aria-pressed={!closeHidden}
+                title="Explore: the close-up on the left"
+                onClick={() => useCloseUpStore.getState().setHidden(!closeHidden)}
+                data-testid="build-explore"
+              >
+                <ExploreIcon on={!closeHidden} className="size-[15px]" />
+                <span>Explore</span>
+              </button>
+            )}
+            {renderPop(POP_BUTTONS[1]!)}
             <i className="sx-bp-sep" aria-hidden="true" />
             <button
               type="button"
@@ -309,7 +365,16 @@ export function BuildPane() {
             </button>
           </div>
         </header>
-        {message ? (
+        {atmoHint && !atmo.ok && (
+          <p className="sx-bp-hint" role="status" data-testid="build-ambience-hint">
+            {atmo.line}
+          </p>
+        )}
+        {bodyHere?.status === 'loading' ? (
+          <div className="sx-bp-msg" data-testid="build-generating">
+            <StatePill look={GENERATING_LOOK} word="Generating" />
+          </div>
+        ) : message ? (
           <div className="sx-bp-msg" role="status" data-testid="build-message">
             <p>{message}</p>
             {bodyHere?.status === 'none' && bodyHere.transient && selection && (

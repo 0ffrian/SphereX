@@ -18,6 +18,10 @@ its reason, never replaced by a guess):
 ``radius_rsun``: a registry (``literature.toml``) interferometric radius, else Gaia FLAME
 ``radius_flame`` (``model_dependent``), else refused. A spectral-class table never gives a radius.
 
+``lum_lsun`` and ``mass_msun`` (issue #93 B): Gaia FLAME ``lum_flame`` and ``mass_flame``
+(``model_dependent``, as ``radius_flame``), else refused. No table or relation fills them here; the
+frontend's own tier chain answers when they are null.
+
 ``period_var_d`` (Mira only): median of the SIMBAD ``mesVar`` periods whose ``vartyp`` is LPV or M.
 Tag ``measured``.
 """
@@ -287,6 +291,72 @@ def radius_field(cat: StarCatalogue | None) -> dict[str, Any]:
         f"not available: {why}; no interferometric radius is in the literature registry, and a "
         "spectral-class table is never used for a radius (Q-152)",
         "measured",
+    )
+
+
+# --- lum_lsun, mass_msun (issue #93 B) -------------------------------------------------------
+
+FLAME_LUM_ASSUMPTION = (
+    "FLAME luminosity from the Gaia G magnitude, the GSP-Phot extinction, the parallax (or "
+    "GSP-Phot distance) and a bolometric correction that depends on the GSP-Phot Teff, gravity "
+    "and metallicity (Gaia DR3 datamodel, lum_flame); a model value, not a measured luminosity, "
+    "and it inherits GSP-Phot's weakness for cool stars"
+)
+FLAME_MASS_ASSUMPTION = (
+    "FLAME mass from comparing the GSP-Phot Teff and the FLAME luminosity with the BaSTI "
+    "solar-metallicity stellar evolution models (Gaia DR3 datamodel, mass_flame); solar "
+    "metallicity is assumed, and it is a model value, not a dynamical mass"
+)
+
+
+def _flame_field(
+    cat: StarCatalogue | None,
+    column: str,
+    pick: Callable[[GaiaAstro], tuple[float | None, float | None, float | None]],
+    assumption: str,
+) -> dict[str, Any]:
+    """One Gaia FLAME column as a ``model_dependent`` value with the larger half-width of its 16th
+    to 84th percentile range as ``err``, else a refusal with the reason (the radius_flame rule)."""
+    if cat is not None and cat.gaia is not None:
+        g = cat.gaia
+        x, lo, hi = pick(g)
+        if x is not None and x > 0:
+            out: dict[str, Any] = {
+                "value": x,
+                "tag": "model_dependent",
+                "source": f"Gaia DR3 astrophysical_parameters {column}, source {g.source_id}"
+                f"{_match_note(cat)}",
+                "assumption": assumption,
+            }
+            errs = [abs(x - b) for b in (lo, hi) if b is not None]
+            if errs and max(errs) > 0:  # a range rounded to nothing is not a zero error
+                out["err"] = max(errs)
+            return out
+    why = f"Gaia DR3 has no FLAME {column} for this star"
+    if cat is None:
+        why = "the star catalogues were not queried"
+    elif cat.gaia is None and cat.gaia_reason:
+        why = cat.gaia_reason
+    return _null(f"not available: {why}", "measured")
+
+
+def luminosity_field(cat: StarCatalogue | None) -> dict[str, Any]:
+    """``lum_lsun`` from Gaia FLAME ``lum_flame``, else a refusal (issue #93 B)."""
+    return _flame_field(
+        cat,
+        "lum_flame",
+        lambda g: (g.lum_flame_lsun, g.lum_flame_lower_lsun, g.lum_flame_upper_lsun),
+        FLAME_LUM_ASSUMPTION,
+    )
+
+
+def mass_field(cat: StarCatalogue | None) -> dict[str, Any]:
+    """``mass_msun`` from Gaia FLAME ``mass_flame``, else a refusal (issue #93 B)."""
+    return _flame_field(
+        cat,
+        "mass_flame",
+        lambda g: (g.mass_flame_msun, g.mass_flame_lower_msun, g.mass_flame_upper_msun),
+        FLAME_MASS_ASSUMPTION,
     )
 
 

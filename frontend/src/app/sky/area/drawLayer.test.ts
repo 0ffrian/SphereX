@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { areaFixture } from '@/test/areaFixtures';
 import type { AreaTracks } from '@/contract';
-import { areaTrackLabel } from '@/app/messages';
+import { areaTrackLabel } from '@/app/area/realArea';
 import { clampLabel, drawArea, hitTestTracks, type AreaCtx, type AreaDrawInput } from './drawLayer';
 import { dotStyle, joinStyle, orderDots, prepareScene } from './scene';
 

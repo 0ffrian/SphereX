@@ -11,6 +11,19 @@ PR #89 review: the committed engine files now carry reviewed physics fixes, mark
 (with `@rename` pairs or split `@verbatim` blocks) that this script does not reproduce. It refuses to
 overwrite a file holding a `@deviation` unless --force is given; port those deviations into SUBS (or
 into the prototype) before regenerating, or the fixes are lost.
+
+Issue #93 (phase 1, the first-open freeze and performance): its deviations ARE ported here (the DEV93_* texts, the
+split WorldGL slices and their SUBS), with the PR #89 renames of the same slices (shaders.js, WorldGL). Still not
+ported from PR #89: the L1701-L1726 and L1728-L1765 renames with the L1727 split, and core.js's header lines 4-5.
+The gas.js renames (#89 review 7, 8) are ported (DV.GAS_89_REVIEW_7_8 and the gas.js SUBS; issue #93 B6).
+
+DO NOT RUN WITH --force BEFORE 15 Nov 2026 (the event build, 14-15 Nov): --force overwrites every committed engine
+file, and the deviations listed above as not ported (core.js's) would be lost.
+Issue #93 phase 2 (repeating patterns): DEV93_PATTERNS (shaders.js), DEV93_SEED (core.js, WorldGL) and DEV93_RIVER
+(terrain.js, in place of L1884) are ported the same way.
+Issue #93 fly view (tickets 1 and 3): DEV93_FLY, DEV93_FLY3, DEV93_FLY_LOD (shaders.js), DEV93_PYRAMID, DEV93_GBUF,
+DEV93_GBUF_DRAW (in place of L2327) and DEV93_FLY_HOOKS (core.js) are ported the same way; core.js imports
+heightPyramid.js (hand-written, not extracted).
 """
 import sys, os, re
 
@@ -61,56 +74,578 @@ def w(name, text):
         f.write(text)
 
 
+# ---- issue #93 deviations (texts copied from the committed engine files) ----
+DEV93_HELPERS = r'''// @deviation (#93 1.2) compile() above reads the compile and link status straight away, so the main thread waits for
+// the driver (about 60 s for FLY_FS on a cold ANGLE D3D11 cache). The engine now submits with compileStart (compile,
+// attach, link, no status read), polls compileDone (KHR_parallel_shader_compile's COMPLETION_STATUS_KHR; without the
+// extension it reports done at once, so the next step blocks as compile() did) and reads the result with compileEnd,
+// which throws the shader or link log exactly as compile() did.
+function compileStart(gl, vs, fs) {
+  var p = gl.createProgram(), sv = gl.createShader(gl.VERTEX_SHADER), sf = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(sv, vs); gl.compileShader(sv); gl.shaderSource(sf, fs); gl.compileShader(sf);
+  gl.attachShader(p, sv); gl.attachShader(p, sf); gl.linkProgram(p);
+  return { p: p, vs: sv, fs: sf };
+}
+function compileDone(gl, job, ext) { return !ext || !!gl.getProgramParameter(job.p, ext.COMPLETION_STATUS_KHR); }
+function compileEnd(gl, job) {
+  if (!gl.getProgramParameter(job.p, gl.LINK_STATUS)) {
+    var s = [job.vs, job.fs].filter(function (o) { return !gl.getShaderParameter(o, gl.COMPILE_STATUS); })[0];
+    throw new Error(s ? gl.getShaderInfoLog(s) : gl.getProgramInfoLog(job.p));
+  }
+  return job.p;
+}'''
+DEV_SHADERS_TOP = r'''// @deviation (#89 review 1) the rename below: the fly view's cloud deck sat at a fixed 3 km (x the relief
+// exaggeration) while the readout gave the model's cloud base; it now reads uCloudKm, which core.js sets from m.zc.
+// @deviation (#93 1.4) the second and third renames below: the fly view's pixel footprint FP (which fades the noise
+// octaves finer than a pixel) divided by uR.y, the drawing-buffer height, which the resolution scaler changes on slow
+// frames, so the ground texture changed while flying. FP now uses the full-resolution height (uR.y / uScale; core.js
+// sets uScale to the scaler's factor), so a resolution change alters sharpness only, not the pattern.'''
+DEV93_SHADERS = r'''// @deviation (#93 1.1) on ANGLE D3D11 (Chrome's default on Windows) fxc unrolls every loop with a constant bound, and
+// FLY_FS took about 62 s to compile on a cold cache (WORLD_FS 6 to 8 s). Each constant bound N in WORLD_FS and FLY_FS
+// (11 loops in FLY_FS, 3 in WORLD_FS, NOISE's fbm and ridge included) becomes N+uZ0, with uZ0 a uniform that is never
+// set (always 0): the loops run exactly as before, but fxc keeps them as loops. Loops that leave early with break are
+// unchanged by it. ADV_FS and GAS_FS compile quickly and keep their source. Measured: see frontend/scripts/engine-bench.
+function noUnroll(src) {
+  return src.replace('precision highp float;', 'precision highp float;\nuniform int uZ0;')
+    .replace(/(for\(int [ijk]=-?\d+;[ijk])(<=?)(\d+|n);/g, function (m, a, op, b) { return a + op + b + '+uZ0;'; });
+}
+WORLD_FS = noUnroll(WORLD_FS); FLY_FS = noUnroll(FLY_FS);'''
+DEV93_ROLE = r'''// @deviation (#93 1.3, 1.6, 1.7) which view this instance draws: 'globe' never flies, 'fly' shows only the fly view.
+var role = (opt && opt.role) || 'both';'''
+DEV89_WORLDGL = r'''// @deviation (#89 review 1, 3) the renames in the WorldGL blocks below (L2267-L2301 and L2317-L2338; the prototype's own
+//   (ema one now sits in the #93 1.7 lines):
+//   Saturn's rings: Encke Gap centre 2.214 -> 2.2165 R_S (133,584 km) and half-width 0.005 -> 0.0027 R_S (about 160 km;
+//   the gap is about 325 km wide); F ring half-width 0.004 -> 0.0012 R_S (the ring is tens of km wide; 0.0012 still
+//   catches the one texel at 2.326, so it stays visible). Radii: PDS Ring-Moon Systems Node, Saturn ring table [verify].
+//   Fly view cloud deck: uCloudKm (declared in FLY_FS, never set from the model) now carries the model's cloud base
+//   m.zc, at least 0.3 km so it never sits in the ground; 3.5 km only when nothing condenses (no deck is drawn then).'''
+DEV93_COMPILE = r'''// @deviation (#93 1.2, 1.3) the prototype compiled its four programs here with compile(), which waits for the driver
+// (about 60 s for FLY_FS on a cold ANGLE D3D11 cache), and read their uniforms at once. They are now only submitted:
+// poll() says when the driver has finished (KHR_parallel_shader_compile) and link() reads the result, throwing the
+// compile or link log as compile() did, and then the uniforms. The draw and step methods call link() first (see the
+// end of createCore), so no uniform is read before its program is linked. FLY_FS is compiled only where the fly view
+// can be drawn (role 'fly', or the prototype's 'both'); a globe-only engine submits it the first time it flies.
+// (#93 F1) The fly engine never draws the globe once it flies (1.6), so it does not compile WORLD_FS either: pW stays
+// null, uW is empty, and a draw before it flies (the entry draw that sets W.view) draws nothing.
+  var pex = gl.getExtension('KHR_parallel_shader_compile'), jobs = { A: compileStart(gl, FULL, ADV_FS), G: compileStart(gl, FULL, GAS_FS), W: role === 'fly' ? null : compileStart(gl, FULL, WORLD_FS), F: role === 'globe' ? null : compileStart(gl, FULL, FLY_FS) }, pA, pG, pW, pF, uA, uG, uW, uF;
+  function link() {
+    if (!pA) { var a = compileEnd(gl, jobs.A), g2 = compileEnd(gl, jobs.G), w2 = jobs.W ? compileEnd(gl, jobs.W) : null; uA = unis(gl, a); uG = unis(gl, g2); uW = w2 ? unis(gl, w2) : {}; pA = a; pG = g2; pW = w2; }
+    if (!pF && jobs.F) { var f2 = compileEnd(gl, jobs.F); uF = unis(gl, f2); pF = f2; }
+  }
+  this.poll = function () { for (var k in jobs) if (jobs[k] && !compileDone(gl, jobs[k], pex)) return false; link(); return true; };
+  this.link = function (fly) { if (fly && !jobs.F) jobs.F = compileStart(gl, FULL, FLY_FS); link(); };
+  this.programs = function () { return Object.keys(jobs).filter(function (k) { return !!jobs[k]; }).length; };'''
+DEV93_SCALER = r'''// @deviation (#93 1.7) the resolution scaler aims at 30 fps: it shrinks above 34 ms (was 42) and grows below 22 ms (was
+// 19). A gap over 250 ms is a pause between redraws of a still world, not a frame time, and is not counted (it used to
+// shrink the picture on every redraw after a pause). The pixel ratio is capped at 1.0 for the fly engine and 1.25 for
+// the globe engine; role 'both' (the prototype, parity) keeps 1.5. The scale also goes to FLY_FS as uScale (#93 1.4).
+// window.__sxPin still pins the scale for parity (PR #89's rename of these two lines, carried over by hand).
+// (#93 B9) Hysteresis: the scale moved a little on almost every frame, so the picture never settled. It now changes in
+// steps of 0.8 (down, at most once a second, while the average frame takes over 34 ms) or 1.25 (up, at most once every
+// 3 s, under 20 ms), between 0.45 and 1. And FLY_FS fades detail by the real pixel: at scale 0.5 it kept detail for
+// pixels half the size, which shimmered in motion (B9). uScale (the first rename below) is scale / W.fp93, with W.fp93
+// the scale eased over about 0.25 s, so FLY_FS's footprint is that of the eased drawing-buffer pixel and a step fades.
+    var now = performance.now(), s93 = W.sc93 || (W.sc93 = { at: -1e9 }), dt93 = last ? now - last : 0; if (last && now - last < 250) { ema = ema * 0.92 + (now - last) * 0.08; if (!window.__sxPin && ema > 34 && scale > 0.45 && now - s93.at > 1000) { scale = Math.max(0.45, scale * 0.8); ema = 28; s93.at = now; } else if (!window.__sxPin && ema < 20 && scale < 1 && now - s93.at > 3000) { scale = Math.min(1, scale * 1.25); s93.at = now; } } last = now;
+    W.fp93 = window.__sxPin || !W.fp93 ? scale : W.fp93 + (scale - W.fp93) * (1 - Math.exp(-Math.min(dt93, 250) / 250));
+    var d = Math.min(devicePixelRatio || 1, role === 'fly' ? 1 : role === 'globe' ? 1.25 : 1.5) * scale, w = Math.round(canvas.clientWidth * d), h = Math.round(canvas.clientHeight * d); if (!w || !h) return;'''
+DEV93_SKIP_GLOBE = r'''// @deviation (#93 1.6) the fly engine's canvas is 1.67 times its pane wide, so the globe beside the fly view is never
+// seen there and is not ray-marched. W.view (next line) is still set: flyAimPeak, flyAimDefault and globePick read it.
+// (#93 F1) A fly engine has no globe program (pW null) and draws no globe at all.
+// The first rename below (#93 1.4, B9) passes the resolution scale over the eased scale W.fp93 to FLY_FS as uScale; the
+// second is PR #89's.
+    if (pW && !(fly && role === 'fly')) gl.drawArrays(gl.TRIANGLES, 0, 3);'''
+DEV93_GAS_CAP = r'''// @deviation (#93 1.8) at most 3 gas-solver steps per frame (was 8; GasSim.step costs about 4.5 ms), and a backlog of a
+// whole step or more is dropped, so a slow frame never schedules more work for the next one. A giant that needs more
+// than 3 steps a frame (HD 189733 b about 4.7 at 60 fps) then runs slower than one day per second.
+// (#93 A7) W.dt93 averages the frame time dtw (exponential, weight 0.05), so the caption (worldUi) can give the rate at
+// the frame rate this machine really draws, not at an assumed 60 fps.
+        W.dt93 = W.dt93 ? W.dt93 * 0.95 + dtw * 0.05 : dtw;
+        while (W.simAcc >= GS.dt && n < 3) { GS.step(); acc += GS.dt; W.simAcc -= GS.dt; n++; }
+        if (W.simAcc >= GS.dt) W.simAcc = 0;'''
+DEV93_TERRAIN = r'''// @deviation (#93 1.5) the renames below build the terrain and its river routing once per set of inputs for every engine
+// on the page (terrainCache.js): the globe and the fly engine of one world used to build both twice (500 to 650 ms).
+// The result is shared read-only; nothing in the engine writes to it.'''
+DEV93_LINK_FIRST = r'''// @deviation (#93 1.2) every program is linked before the first step or draw (WorldGL.link); a host that wants no
+// main-thread wait polls W.gl.poll() until it is true (WorldEngine.whenReady) before it loads a world.
+// (#93 3.1) and then sets the world's seed uniforms (WorldGL.seedFor; a no-op once they are set).
+['cloudStep', 'gasStep', 'draw'].forEach(function (k) { var f = W.gl[k]; W.gl[k] = function () { W.gl.link(k === 'draw' && !!W.fly); W.gl.seedFor(W.p); return f.apply(W.gl, arguments); }; });'''
+
+DEV93_BUDGET = r'''// @deviation L2344 (#93 F4) the climate loop checked the clock only before each step, so a step (ebStep, about 5 to 6 ms)
+// that started just under the budget ran past it: W.gl.tick measured 19.4 ms against the 14 ms spin-up budget. A step
+// now starts only if the time spent so far plus the last step's duration (dk, the time between two checks) stays within
+// the budget; the first step always runs, as before. Each step is unchanged, so a spin-up ends in the same state after
+// its 900 steps, spread over more frames. The clock is still read once per check, so the parity spin-up's virtual
+// clock (1 ms a call, WorldEngine.spinUp) takes the same steps per tick as the prototype's rule.
+      var k = 0, st = W.spinup > 0, budget = st ? 14 : 7, tp = t0, tn, dk; while ((playing || st) && k < (st ? 40 : 4) && ((tn = performance.now(), dk = tn - tp, tp = tn, tn - t0 + dk <= budget) || k === 0)) { ebStep(m, 1, st ? 1.4 : 0.7); k++; if (W.spinup > 0) W.spinup--; }
+// @end-deviation'''
+
+DEV93_SEED = r'''// @deviation (#93 3.1, 3.2, 3.4, 3.9) the seed uniforms of shaders.js's patterns(), set once per program and world (a
+// uniform keeps its value in its program). A prototype preset (no seed3) gets uSeed3 = (seed, seed, seed), uSeedN = 0
+// and uNzSph = 0, which is exactly what it drew before; a card world (cardToWorld: seed3, three hashed integers in
+// [0, 256)) gets uSeed3 = uSeedN = seed3 and the seeded gas noise (uNzSph = 1).
+  var seedOn = {};
+  this.seedFor = function (p) {
+    var card = !!p.seed3, s3 = card ? p.seed3 : [p.seed, p.seed, p.seed], sN = card ? p.seed3 : [0, 0, 0], key = s3.join() + '|' + sN.join() + '|' + card, pr = { A: [pA, uA], G: [pG, uG], W: [pW, uW], F: [pF, uF] }, k, q;
+    for (k in pr) { q = pr[k]; if (!q[0] || seedOn[k] === key) continue; gl.useProgram(q[0]); if (q[1].uSeed3) gl.uniform3fv(q[1].uSeed3, s3); if (q[1].uSeedN) gl.uniform3fv(q[1].uSeedN, sN); if (q[1].uNzSph) gl.uniform1f(q[1].uNzSph, card ? 1 : 0); seedOn[k] = key; }
+  };'''
+DEV93_PATTERNS = r'''// @deviation (#93 3) repeating patterns. Text edits applied to the shader sources above; each must match exactly as
+// often as stated, so a changed prototype fails loudly. Presets keep the prototype's seeds: core.js sets uSeed3 =
+// (seed, seed, seed), uSeedN = 0 and uNzSph = 0 for them (WorldGL.seedFor); only card worlds (preset.seed3) get the
+// new seeds. So the globe programs render presets as before, but the fly view does not: FLY_FS has other #93 changes
+// (its heights and detail), and the patterns.html presets check fails there by design.
+//  2.1, 2.9  uSeed3: every noise offset +uSeed (the prototype's one seed along (1, 1, 1)) becomes +uSeed3, a vec3; a
+//            card world gets three hashed integers in [0, 256) (engine/seed.ts), so two cards never share a shifted
+//            copy of one pattern.
+//  2.4       uSeedN: the layers that had no seed (sea-ice tint, convective clouds, waves, fly-view sea ice, slope rock
+//            colour) add uSeedN, 0 for presets and the card's offset for cards.
+//  2.2       GAS_FS: the tracer's source noise was one unseeded 512 x 256 texture tiled 4 x 3 times, the same on every
+//            gas giant, and the east-west jets never smeared the four copies out. With uNzSph = 1 (cards) it is value
+//            noise from the sphere direction and the seed, fbm(dir * (24, 54, 24) + uSeed3, 4): the stretched
+//            frequencies keep the streak density, and there is nothing to tile.
+//  2.5       FLY_FS: the gully stripes and the gas giant's small-scale detail were laid out on the plane under the
+//            camera (C0, CA, CB), so they slid and stretched as the camera moved. They are now laid out on the faces
+//            of a cube fixed to the planet (gnomonic projection on the face of the largest component of d, blended
+//            across the seams from the two or three largest components). The gully direction and the wind advection
+//            are mapped into face coordinates by the projection's Jacobian, and the shading gradient back by its
+//            transpose, so both stay consistent with the surface.
+//  2.6       FLY_FS lod(): an octave faded out over a factor 2.4 of pixel footprint, so detail popped in at its own
+//            distance; it now fades on log2(FP f) over two octaves (full below 0.15 cycles per pixel, gone at 0.62).
+//  2.7       FLY_FS: the 720 x 360 height grid (55.6 km a texel on an Earth-size world) and the climate grids are read
+//            with a cubic instead of plain bilinear, so slope no longer breaks on every texel line. The climate grids use a cubic B-spline from 4
+//            bilinear taps (Sigg and Hadwiger 2005, GPU Gems 2 ch. 20). The height grid uses a Catmull-Rom cubic from 9
+//            bilinear taps (#93 regression fix): the B-spline only approximates, so a one-texel peak read a third of its
+//            height and ranges one or two texels wide were flattened; Catmull-Rom passes through every texel value, so
+//            the shaded heights and normals keep the relief of the bilinear surface the ray march hits. viewer haptics
+//            read the same filters (engine/worlds/fieldSampler.ts). Phase 2 also gave the coastline warp a
+//            low-frequency term of about 1.5 texels; it moved the drawn heights up to 80 km (Earth size) away from
+//            every other grid (climate, rivers, the CPU terrain the camera aims with and the haptics read), so peaks
+//            drew as basins and lakes. The regression fix drops it: the warp is the prototype's two fine octaves.
+function patterns() {
+  function rep(src, a, b, n) {
+    var k = src.split(a).length - 1;
+    if (k !== (n || 1)) throw new Error('#93 patterns: ' + k + ' matches of ' + a.slice(0, 70));
+    return src.split(a).join(b);
+  }
+  function between(src, a, b, repl) {
+    var i = src.indexOf(a), j = src.indexOf(b);
+    if (i < 0 || j < i || src.indexOf(a, i + 1) >= 0 || src.indexOf(b, j + 1) >= 0) throw new Error('#93 patterns: block ' + a.slice(0, 50));
+    return src.slice(0, i) + repl + src.slice(j + b.length);
+  }
+  var DECL = 'precision highp float;\nuniform vec3 uSeed3,uSeedN;\n';
+  function seed3(src) { return rep(src, 'precision highp float;\n', DECL).replace(/\+uSeed\b/g, '+uSeed3'); }
+  ADV_FS = seed3(ADV_FS);
+  WORLD_FS = seed3(WORLD_FS);
+  WORLD_FS = rep(WORLD_FS, 'fbm(b*70.,3)', 'fbm(b*70.+uSeedN,3)');
+  WORLD_FS = rep(WORLD_FS, 'fbm(b*60.+uTime*.02,4)', 'fbm(b*60.+uSeedN+uTime*.02,4)');
+  GAS_FS = rep(GAS_FS, 'precision highp float;\n', 'precision highp float;\nuniform vec3 uSeed3;uniform float uNzSph;\n');
+  GAS_FS = rep(GAS_FS, 'const float PI=3.14159265,TAU=6.2831853;\n', 'const float PI=3.14159265,TAU=6.2831853;\n' + NOISE +
+    'vec3 gDir(vec2 uv){float lo=(uv.x-.5)*TAU,la=(uv.y-.5)*PI,c=cos(la);return vec3(c*cos(lo),sin(la),c*sin(lo));}\n');
+  GAS_FS = rep(GAS_FS, 'float nz=texture(uNz,uv*vec2(4.,3.)).r,', 'float nz=uNzSph>.5?fbm(gDir(uv)*vec3(24.,54.,24.)+uSeed3,4):texture(uNz,uv*vec2(4.,3.)).r,');
+  var F = seed3(FLY_FS);
+  F = rep(F, 'fbm(d*2600.+uTime*.2,3)', 'fbm(d*2600.+uSeedN+uTime*.2,3)');
+  F = rep(F, 'fbm(d*2600.+7.-uTime*.17,3)', 'fbm(d*2600.+uSeedN+7.-uTime*.17,3)');
+  F = rep(F, 'fbm(d*2600.+13.,3)', 'fbm(d*2600.+uSeedN+13.,3)');
+  F = rep(F, 'fbmL(d*700.,700.,3)', 'fbmL(d*700.+uSeedN,700.,3)');
+  F = rep(F, 'fbmL(d*5000.,5000.,3)', 'fbmL(d*5000.+uSeedN,5000.,3)');
+  // 2.6
+  F = rep(F, 'float lod(float f){return 1.-smoothstep(.25,.6,FP*f);}', 'float lod(float f){return 1.-smoothstep(-2.7,-.7,log2(max(FP*f,1e-12)));}');
+  // 2.5 cube faces and 2.7 B-spline reads
+  F = rep(F, 'float FP,HV,MX;vec3 C0,CA,CB,EXT,SCR,SCM;\n', 'float FP,HV,MX;vec3 C0,CA,CB,EXT,SCR,SCM;\n' +
+    'vec3 FAF,FAA,FAB;float GZ;\n' +
+    '/* cube face k (0 x, 1 y, 2 z) on the side of d: normal FAF and a fixed right-handed tangent basis FAA, FAB */\n' +
+    'void cubeFace(int k,vec3 d){float s=d[k]<0.?-1.:1.;if(k==0){FAF=vec3(s,0,0);FAA=vec3(0,0,-s);FAB=vec3(0,1,0);}else if(k==1){FAF=vec3(0,s,0);FAA=vec3(1,0,0);FAB=vec3(0,0,-s);}else{FAF=vec3(0,0,s);FAA=vec3(s,0,0);FAB=vec3(0,1,0);}GZ=float(k)*2.+step(0.,s);}\n' +
+    '/* blend weights of the three faces: 1 on the dominant face, fading out where another component is within 18 % of it */\n' +
+    'vec3 faceW(vec3 d){vec3 a=abs(d);float m=max(a.x,max(a.y,a.z));vec3 w=smoothstep(.82,1.,a/m);return w/(w.x+w.y+w.z);}\n');
+  F = rep(F, 'float rsph(', '/* cubic B-spline read from 4 bilinear taps (Sigg and Hadwiger 2005); wraps in longitude, clamps at the poles */\n' +
+    'vec4 bsp(sampler2D t,vec2 uv){vec2 sz=vec2(textureSize(t,0)),p=uv*sz-.5,i=floor(p),f=p-i,f2=f*f,f3=f2*f;\n' +
+    ' vec2 w0=(1.-3.*f+3.*f2-f3)/6.,w1=(4.-6.*f2+3.*f3)/6.,w2=(1.+3.*f+3.*f2-3.*f3)/6.,w3=f3/6.,g0=w0+w1,g1=w2+w3;\n' +
+    ' vec2 h0=(i-.5+w1/g0)/sz,h1=(i+1.5+w3/g1)/sz;\n' +
+    ' return g0.y*(g0.x*texture(t,h0)+g1.x*texture(t,vec2(h1.x,h0.y)))+g1.y*(g0.x*texture(t,vec2(h0.x,h1.y))+g1.x*texture(t,h1));}\n' +
+    'float rsph(');
+  // #93 regression fix: the height grid is read with this interpolating cubic instead (see 2.7 above).
+  F = rep(F, 'float rsph(', '/* Catmull-Rom cubic from 9 bilinear taps (the middle two of each 4 merged into one): interpolating, so it\n' +
+    '   passes through every texel value; wraps in longitude, clamps at the poles */\n' +
+    'vec4 crs(sampler2D t,vec2 uv){vec2 sz=vec2(textureSize(t,0)),p=uv*sz-.5,i=floor(p),f=p-i;\n' +
+    ' vec2 w0=f*(-.5+f*(1.-.5*f)),w1=1.+f*f*(-2.5+1.5*f),w2=f*(.5+f*(2.-1.5*f)),w3=f*f*(-.5+.5*f),w12=w1+w2;\n' +
+    ' vec2 t0=(i-.5)/sz,t3=(i+2.5)/sz,tm=(i+.5+w2/w12)/sz;\n' +
+    ' return (texture(t,t0)*w0.x+texture(t,vec2(tm.x,t0.y))*w12.x+texture(t,vec2(t3.x,t0.y))*w3.x)*w0.y\n' +
+    '  +(texture(t,vec2(t0.x,tm.y))*w0.x+texture(t,tm)*w12.x+texture(t,vec2(t3.x,tm.y))*w3.x)*w12.y\n' +
+    '  +(texture(t,vec2(t0.x,t3.y))*w0.x+texture(t,vec2(tm.x,t3.y))*w12.x+texture(t,t3)*w3.x)*w3.y;}\n' +
+    'float rsph(');
+  // The cubic read costs 9 taps (heights) or 4 (climate) where bilinear costs 1, and hKm runs at every march and shadow
+  // step. So the march and the shadow steps keep the bilinear read (HQ false) and only the shading reads (the normal,
+  // the shaded height and the climate) are cubic: slope, snow and colour no longer break on the texel lines. The
+  // Catmull-Rom heights equal the bilinear ones on every texel, so the hit point and the shadow, which follow the
+  // bilinear surface, stay within a small part of a texel's relief of the shaded surface.
+  F = rep(F, 'float FP,HV,MX;', 'bool HQ=false;float FP,HV,MX;');
+  // The coastline warp: the two fine octaves as before (0.46 and 0.14 texel), each one vector value noise (vn3, the
+  // three channels of h33) instead of three scalar ones, so they cost less (hKm runs at every march step). The
+  // low-frequency octave phase 2 added is gone (#93 regression fix, see 2.7 above).
+  F = rep(F, 'float rsph(', 'vec3 vn3(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);\n' +
+    ' return mix(mix(mix(h33(i),h33(i+vec3(1,0,0)),f.x),mix(h33(i+vec3(0,1,0)),h33(i+vec3(1,1,0)),f.x),f.y),\n' +
+    ' mix(mix(h33(i+vec3(0,0,1)),h33(i+vec3(1,0,1)),f.x),mix(h33(i+vec3(0,1,1)),h33(i+vec3(1,1,1)),f.x),f.y),f.z);}\n' +
+    'float rsph(');
+  F = rep(F, 'vec2 uv=uvOf(normalize(d+(vec3(vn(wq),vn(wq+7.3),vn(wq+3.1))-.5)*.008+(vec3(vn(wq*4.),vn(wq*4.+7.3),vn(wq*4.+3.1))-.5)*.0025));float e=texture(uHt,uv).r,',
+    'vec2 uv=uvOf(normalize(d+(vn3(wq)-.5)*.008+(vn3(wq*4.)-.5)*.0025));float e=HQ?crs(uHt,uv).r:texture(uHt,uv).r,');
+  F = rep(F, 'vec3 d=normalize(p);vec2 uv=uvOf(d);float mud=dot(d,uLb);', 'HQ=true;vec3 d=normalize(p);vec2 uv=uvOf(d);float mud=dot(d,uLb);');
+  F = rep(F, '   float sh=1.;\n', '   HQ=false;float sh=1.;\n');
+  // the shadow ray starts on the bilinear surface it marches against (from the cubic p0 it would start inside it)
+  F = rep(F, 'vec3 s2=p0+d*2e-6;', 'vec3 s2=d*surfR(d)+d*2e-6;');
+  F = rep(F, 'vec4 E=texture(uEb,uv),hy=texture(uHy,uv);', 'HQ=true;vec4 E=texture(uEb,uv),hy=texture(uHy,uv);');
+  F = rep(F, 'vec4 E=texture(uEb,uv),hy=texture(uHy,uv);float e=texture(uHt,uv).r,', 'vec4 E=bsp(uEb,uv),hy=texture(uHy,uv);float e=crs(uHt,uv).r,');
+  F = rep(F, 'float wet=clamp(texture(uEb2,uv).r,0.,1.);', 'float wet=clamp(bsp(uEb2,uv).r,0.,1.);');
+  F = rep(F, 'h33(vec3(ip+o,uSeed))', 'h33(vec3(ip+o,GZ)+uSeed3)');
+  F = between(F, 'vec2 X=vec2(dot(d,CA),dot(d,CB))/max(dot(d,C0),.05);', 'vec3 n=normalize(d-(CA*gx+CB*gy)/ex2*.0008*(.5+br));',
+    'float tb=texture(uBand,vec2(.5,uv.y)).b,fpX=FP;vec3 fw=faceW(d),cc=vec3(0.),gn=vec3(0.);\n' +
+    '   for(int k=0;k<3+uZ0;k++){float wk=fw[k];if(wk<.001)continue;cubeFace(k,d);vec3 s1=uSeed3+vec3(0.,0.,GZ*7.3);\n' +
+    '    float dF0=dot(d,FAF);FP=fpX/(dF0*dF0);vec2 X=vec2(dot(d,FAA),dot(d,FAB))/dF0,X0=X;\n' +
+    '    for(int i=0;i<10+uZ0;i++){vec3 dd=normalize(FAF+FAA*X.x+FAB*X.y);vec4 v=texture(uVel,uvOf(dd));\n' +
+    '     vec3 E=normalize(cross(vec3(0,1,0),dd)),N=cross(dd,E);vec3 V=E*v.x*sqrt(max(1.-dd.y*dd.y,0.))+N*v.y;\n' +
+    '     vec2 Y1=X*55.,Y2=X*170.+3.;float e=.2;\n' +
+    '     vec2 c1=vec2(vn(vec3(Y1.x,Y1.y+e,0.)+s1)-vn(vec3(Y1.x,Y1.y-e,0.)+s1),vn(vec3(Y1.x-e,Y1.y,0.)+s1)-vn(vec3(Y1.x+e,Y1.y,0.)+s1))/(2.*e);\n' +
+    '     vec2 c2=vec2(vn(vec3(Y2.x,Y2.y+e,0.)+s1)-vn(vec3(Y2.x,Y2.y-e,0.)+s1),vn(vec3(Y2.x-e,Y2.y,0.)+s1)-vn(vec3(Y2.x+e,Y2.y,0.)+s1))/(2.*e);\n' +
+    '     X-=(vec2(dot(V,FAA),dot(V,FAB))-X*dot(V,FAF))/dot(dd,FAF)*.004+(c1*(.3/55.)*lod(55.)+c2*(.25/170.)*lod(170.))*(.2+1.6*tb);}\n' +
+    '    vec3 df=normalize(FAF+FAA*X.x+FAB*X.y);vec2 uf=uvOf(df);\n' +
+    '    vec4 tt=tex4(uTr,uf),bd=texture(uBand,vec2(.5,uf.y));\n' +
+    '    float dye=fbmL(vec3(X*300.,0.)+s1,300.,4),dye2=fbmL(vec3(X*70.,4.)+s1,70.,3),ex2=.6/300.;\n' +
+    '    float streak=(tt.b-.5)*(.08+.55*bd.b)+(dye-.5)*(.3+.6*bd.b),br=tt.r+streak*.5;\n' +
+    '    vec3 ck=mix(uZ,uB,clamp(tt.g+streak*.9,0.,1.));ck=mix(ck,uS,clamp(tt.a*1.15,0.,.92));ck*=.38+.78*br;ck=mix(ck,uP*(.74+.5*br),bd.a*.85);\n' +
+    '    ck=mix(ck,uP*(.55+.8*dye),smoothstep(.55,.78,dye2)*(.25+.6*tb)*.7);ck=mix(ck,mix(uB,uS,dye)*(.55+.7*br),smoothstep(.45,.75,dye2)*tb*.55);\n' +
+    '    float gx=fbmL(vec3((X+vec2(ex2,0.))*300.,0.)+s1,300.,4)-dye,gy=fbmL(vec3((X+vec2(0.,ex2))*300.,0.)+s1,300.,4)-dye;\n' +
+    '    vec2 g2=vec2(gx,gy)/ex2*.0008*(.5+br);\n' +
+    '    cc+=wk*ck;gn+=wk*(FAA*g2.x+FAB*g2.y-FAF*dot(g2,X0))/dF0;}\n' +
+    '   FP=fpX;vec3 n=normalize(d-(gn-d*dot(gn,d)));');
+  F = between(F, 'vec2 P=vec2(dot(d,CA),dot(d,CB))/max(dot(d,C0),.05)*uRkm;', 'n=normalize(n-(CA*gd.x+CB*gd.y)*.3*uEx);',
+    'vec3 sl=n-d*dot(n,d),fw=faceW(d),gt=vec3(0.);float G=0.;\n' +
+    '   for(int k=0;k<3+uZ0;k++){float wk=fw[k];if(wk<.001)continue;cubeFace(k,d);float dF=dot(d,FAF);vec2 X=vec2(dot(d,FAA),dot(d,FAB))/dF,P=X*uRkm;\n' +
+    '    vec2 s2d=(vec2(dot(sl,FAA),dot(sl,FAB))-X*dot(sl,FAF))/dF;float sm=length(s2d);\n' +
+    '    vec2 dir=sm>1e-5?vec2(-s2d.y,s2d.x)/sm:vec2(1.,0.);float Gk=0.,ga=1.,fq=.16;vec2 gd=vec2(0.);\n' +
+    '    for(int i=0;i<3+uZ0;i++){float w=lod(fq*uRkm/(dF*dF));vec3 g3=gully(P*fq,dir);Gk+=ga*g3.x*w;gd+=ga*g3.yz*fq*w;ga*=.5;fq*=2.3;}\n' +
+    '    G+=wk*Gk;gt+=wk*(FAA*gd.x+FAB*gd.y-FAF*dot(gd,X))/dF;}\n' +
+    '   float gw=smoothstep(.03,.18,slope)*(1.-step(hk,.001)*uOcean);G*=gw;gt*=gw;\n' +
+    '   n=normalize(n-(gt-d*dot(gt,d))*.3*uEx);');
+  if (/[^A-Za-z]uSeed[^3A-Za-z]/.test(F.replace(/uniform[^;]*;/g, ''))) throw new Error('#93 patterns: a scalar uSeed is left in FLY_FS');
+  FLY_FS = F;
+}
+patterns();'''
+DEV93_RIVER = r'''// @deviation (#93 3.4) the river relief noise had no seed, so every world's rivers wandered over the same pattern. It
+// is offset by t.so, the card world's seed3 (terrainCache.js sets it; three integers in [0, 256)); a prototype preset
+// has none and reads at an offset of 0, exactly as before. Replaces the prototype's line L1884.
+  var so = t.so || [0, 0, 0];
+  for (i = 0; i < N; i++) { var yq = Math.floor(i / Wd), xq = i - yq * Wd, laq = ((yq + 0.5) / Hd - 0.5) * Math.PI, loq = ((xq + 0.5) / Wd - 0.5) * 6.2832, cq = Math.cos(laq), px = cq * Math.cos(loq) * 24, py = Math.sin(laq) * 24, pz = cq * Math.sin(loq) * 24; h[i] = t.data[i * 2]; if (h[i] > 0) h[i] += 0.12 * (fbm3(px + so[0], py + so[1], pz + so[2], 4) - 0.5) + 0.05 * (fbm3(px * 3.1 + so[0], py * 3.1 + so[1], pz * 3.1 + so[2], 3) - 0.5); }'''
+
+DEV93_PYRAMID = r'''// @deviation (#93 F1) the fly view's max-height pyramid (heightPyramid.js, built once per terrain) on texture unit 11,
+// for the engines that can fly; pyrBind tells FLY_FS (uPyr, uPyrOn) once per program and terrain. A grid that is not
+// 720 x 360 has no pyramid: uPyrOn stays 0 and the march runs as before.
+  var pyt = null, pyrOk = 0, pyrFor = null;
+  this.setPyramid = function (t) {
+    if (role === 'globe') return;
+    var P = pyramidCached(t);
+    gl.activeTexture(gl.TEXTURE11); if (!pyt) pyt = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, pyt);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, P ? P.w : 1, P ? P.h : 1, 0, gl.RED, gl.FLOAT, P ? P.data : new Float32Array(1));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.activeTexture(gl.TEXTURE0); pyrOk = P ? 1 : 0; pyrFor = null;
+  };
+  this.pyrBind = function () { if (!pF || pyrFor === pF) return; gl.useProgram(pF); if (uF.uPyr) gl.uniform1i(uF.uPyr, 11); if (uF.uPyrOn) gl.uniform1f(uF.uPyrOn, pyrOk); pyrFor = pF; };'''
+DEV93_FLY_HOOKS = r'''// @deviation (#93 F1) a new terrain also builds its max-height pyramid, and a fly draw first binds it (WorldGL.setPyramid,
+// pyrBind). GPU timing is the host's (WorldEngine's glTimer.ts, ?gputime=1, around the whole tick): a second timer query
+// here would nest inside it, which the extension does not allow.
+(function () {
+  var st = W.gl.setTerrain, dr = W.gl.draw;
+  W.gl.setTerrain = function (t) { st.call(W.gl, t); W.gl.setPyramid(t); };
+  W.gl.draw = function () {
+    if (W.fly) { W.gl.link(true); W.gl.pyrBind(); }
+    return dr.apply(W.gl, arguments);
+  };
+})();'''
+DEV93_FLY = r'''// @deviation (#93 F1) fly view ticket 1: a faster march over the same surface. heightPyramid.js builds, once per
+// terrain, a pyramid of ceilings: for each cell of 2^L x 2^L height texels (L = 0 to 6), the highest the marched
+// surface can reach within one cell width of the cell (the height grid as the warp and the bilinear read can reach it,
+// plus the most every noise octave can add). core.js puts it on texture unit 11 and sets uPyrOn.
+//  - Each march step first tries the largest level whose ceiling stays below the ray, less the march's own hit
+//    tolerance (1e-6 + t 6e-5), over the next cell width of travel, and steps that far in one go: no hit can be there.
+//    The level climbs after such a step and falls after a miss; only when no level allows a step is the surface
+//    evaluated, exactly as before. Sky and horizon rays no longer crawl through the 14 km shell and run out of their
+//    360 steps, so the distant terrain the cap dropped is drawn.
+//  - A shadow step whose height above the level-0 ceiling is at least a tenth of its step length cannot darken the
+//    pixel (its penumbra term 10 gq / st is 1 or more), so it skips the surface: the shadow is unchanged.
+//  - The shaded height at the hit (HQ, for the normal's p0 and again as hk) is evaluated once.
+// The surface, the shading and their constants are unchanged; a hit moves by less than the hit tolerance.
+function flyMarch() {
+  function rep(src, a, b) {
+    if (src.split(a).length !== 2) throw new Error('#93 F1: ' + (src.split(a).length - 1) + ' matches of ' + a.slice(0, 70));
+    return src.split(a).join(b);
+  }
+  var F = FLY_FS;
+  F = rep(F, 'uniform sampler2D uTr,uLut,uHt,uEb,uBand,uHy,uVel,uEb2;out vec4 O;\n',
+    'uniform sampler2D uTr,uLut,uHt,uEb,uBand,uHy,uVel,uEb2;out vec4 O;\nuniform highp sampler2D uPyr;uniform float uPyrOn;\n');
+  F = rep(F, 'float rsph(', '/* (#93 F1) the max-height pyramid (heightPyramid.js): the ceiling (km) of level L around the texel under uv */\n' +
+    'float pyrK(vec2 uv,int L){ivec2 c=ivec2(clamp(floor(uv*vec2(720.,360.)),vec2(0.),vec2(719.,359.)))>>L;\n' +
+    ' return texelFetch(uPyr,c+(L==0?ivec2(0):ivec2(720-(720>>(L-1)),360)),0).r;}\n' +
+    '/* that ceiling as a radius, with the lava sea and the ocean floor that hKm applies */\n' +
+    'float pyrR(float k){return 1.+max(max(k,uLava>.5?uHM:-1e4),uOcean>.5?0.:-1e4)*uEx/uRkm;}\n' +
+    '/* the march\'s safe step from t: the largest level (from lv down) whose ceiling stays below the ray, less the hit\n' +
+    '   tolerance, over the next cell width of travel (s keeps every point within one cell of d); 0 if none */\n' +
+    'float pyrStep(vec3 ro,vec3 rd,float t,vec3 d,inout int lv){\n' +
+    ' vec2 uv=uvOf(d);float la=abs(asin(clamp(d.y,-1.,1.))),tc=-dot(ro,rd);\n' +
+    ' for(int k=0;k<7+uZ0;k++){if(lv<0)break;\n' +
+    '  float c=float(1<<lv)*(PI/360.),pm=la+c;\n' +
+    '  if(pm<1.5){float s=asin(sin(c)*cos(pm)),te=t+s,rm=length(ro+rd*clamp(tc,t,te));\n' +
+    '   if(rm>=1.&&rm-1e-6-te*6e-5>pyrR(pyrK(uv,lv))){lv=min(lv+1,6);return s;}}\n' +
+    '  lv--;}\n' +
+    ' return 0.;}\n' +
+    'float rsph(');
+  F = rep(F, 'for(int i=0;i<360+uZ0;i++){p=ro+rd*t;float r=length(p),g=r-surfR(p/r);',
+    'int lv=6;for(int i=0;i<360+uZ0;i++){p=ro+rd*t;float r=length(p);if(uPyrOn>.5){float sk=pyrStep(ro,rd,t,p/r,lv);if(sk>0.){t+=sk;if(t>t1)break;continue;}lv=0;}float g=r-surfR(p/r);');
+  F = rep(F, 'float rq=length(s2),gq=rq-surfR(s2/rq);',
+    'float rq=length(s2),gq=1e9;if(uPyrOn<.5||rq-pyrR(pyrK(uvOf(s2/rq),0))<st*.1)gq=rq-surfR(s2/rq);');
+  // the shaded height at the hit was evaluated twice (for the normal's p0 and as hk), with the same reads: once now
+  F = rep(F, 'vec3 da=normalize(d+tA*ee),db=normalize(d+tB*ee),p0=d*surfR(d),',
+    'float hk0=hKm(d);vec3 da=normalize(d+tA*ee),db=normalize(d+tB*ee),p0=d*(1.+hk0*uEx/uRkm),');
+  F = rep(F, 'float e=crs(uHt,uv).r,hk=hKm(d),', 'float e=crs(uHt,uv).r,hk=hk0,');
+  FLY_FS = F;
+}
+flyMarch();'''
+DEV93_GBUF = r'''// @deviation (#93 F3) the fly view's static G-buffer (shaders.js flyPasses). A rocky world's fly draw renders into gbo
+// (colour plus the three float targets of the march, normal, gullies and shadow) and copies the colour to the canvas
+// once the camera has stopped (the second draw with the same camera, size, footprint scale, terrain, seed, ocean and
+// lava settings, gbLast); the draws after that (gbGeo) read the targets back instead (uGB = 2), and the shadow too when
+// the Sun has not moved either (gbSun). While the camera moves, it draws straight to the canvas (uGB = 0), as before. A gas giant draws
+// straight to the canvas as before (uGB = 0). Units 12 to 14 hold the targets only during a read-back pass (a target
+// bound for reading while it is drawn to would be a feedback loop). A G-buffer the driver cannot draw to (incomplete)
+// is not used: the fly view then draws straight to the canvas, as before.
+  var gbo = null, gbGeo = null, gbSun = null, gbTerr = null, gbGen = 0, gbLast = null;
+  function gbUnits(on) { for (var i = 0; i < 3; i++) { gl.activeTexture(gl.TEXTURE12 + i); gl.bindTexture(gl.TEXTURE_2D, on ? gbo.t[i] : null); } gl.activeTexture(gl.TEXTURE0); }
+  function geoMoved(m, cam, f1, gx, h) {
+    if (m.gas) return true;
+    if (W.terr !== gbTerr) { gbTerr = W.terr; gbGen++; }
+    var geo = [cam.uCam, cam.uFwd, cam.uRt, cam.uUp, cam.ex, cam.rkm, gx, h, scale / W.fp93, f1.uOcean, f1.uLava, f1.uHM, gbGen, W.p.seed3 || W.p.seed].join('|'), moved = geo !== gbLast;
+    gbLast = geo; if (moved) gbGeo = null;
+    return moved;
+  }
+  this.flyDraw = function (m, cam, f1, gx, h) {
+    if (uF.uGB1) { gl.uniform1i(uF.uGB1, 12); gl.uniform1i(uF.uGB2, 13); gl.uniform1i(uF.uGB3, 14); }
+    if (m.gas || !uF.uGB || geoMoved(m, cam, f1, gx, h)) { if (uF.uGB) { gl.uniform1f(uF.uGB, 0); gl.uniform1f(uF.uGBsh, 0); } gl.drawArrays(gl.TRIANGLES, 0, 3); return; }
+    var geo = gbLast, sun = cam.uLb.join();
+    if (gbo && gbo.ok && gbo.w === gx && gbo.h === h && gbGeo === geo) {
+      gl.uniform1f(uF.uGB, 2); gl.uniform1f(uF.uGBsh, gbSun === sun ? 1 : 0); gbUnits(true);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gbUnits(false);
+      return;
+    }
+    if (!gbo || gbo.w !== gx || gbo.h !== h) {
+      if (gbo) { gl.deleteFramebuffer(gbo.f); gbo.t.forEach(function (t) { gl.deleteTexture(t); }); gl.deleteTexture(gbo.c); }
+      gbo = { w: gx, h: h, f: gl.createFramebuffer(), c: gl.createTexture(), t: [gl.createTexture(), gl.createTexture(), gl.createTexture()] };
+      gl.activeTexture(gl.TEXTURE15);
+      [gbo.c].concat(gbo.t).forEach(function (t, i) {
+        gl.bindTexture(gl.TEXTURE_2D, t); gl.texStorage2D(gl.TEXTURE_2D, 1, i ? gl.RGBA32F : gl.RGBA8, gx, h);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      });
+      gl.bindTexture(gl.TEXTURE_2D, null); gl.activeTexture(gl.TEXTURE0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, gbo.f);
+      [gbo.c].concat(gbo.t).forEach(function (t, i) { gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, t, 0); });
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]);
+      gbo.ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE; gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+    if (!gbo.ok) { gl.uniform1f(uF.uGB, 0); gl.uniform1f(uF.uGBsh, 0); gl.drawArrays(gl.TRIANGLES, 0, 3); return; }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, gbo.f); gbUnits(false);
+    gl.uniform1f(uF.uGB, 1); gl.uniform1f(uF.uGBsh, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, gbo.f); gl.readBuffer(gl.COLOR_ATTACHMENT0); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+    gl.blitFramebuffer(0, 0, gx, h, 0, 0, gx, h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gbGeo = geo; gbSun = sun;
+  };'''
+DEV93_GBUF_DRAW = r'''// @deviation (#93 F3) the fly draw goes through WorldGL.flyDraw (the static G-buffer): a full pass into the G-buffer
+// when the camera or the terrain changed, a pass that reads it back while they have not. Replaces L2327.
+    this.flyDraw(m, cam, f1, gx, h);'''
+DEV93_FLY3 = r'''// @deviation (#93 F3) fly view ticket 3, the static G-buffer. The terrain never changes, so while the camera is still
+// the march, the normal and the gullies give the same result every frame. FLY_FS now also writes them (with uGB = 1,
+// into three float targets core.js attaches beside the colour): O1 = (hit distance, shaded height, gully value G,
+// shadow-ray start radius), O2 = (normal before the gullies, shadow), O3 = (normal after the gullies). With uGB = 2 it
+// reads them back (texelFetch at the same pixel) instead of marching, and with uGBsh = 1 (the Sun has not moved
+// either) the shadow too; light, colour, climate, clouds, water and air are drawn as before, every frame. The values
+// are the ones the full pass computed, so a still frame shows what the full pass drew. A drawing buffer without the
+// extra targets ignores O1 to O3. Gas giants and the globe do not use it (uGB = 0).
+function flyPasses() {
+  function rep(src, a, b) {
+    if (src.split(a).length !== 2) throw new Error('#93 F3: ' + (src.split(a).length - 1) + ' matches of ' + a.slice(0, 70));
+    return src.split(a).join(b);
+  }
+  var F = FLY_FS;
+  F = rep(F, 'out vec4 O;\nuniform highp sampler2D uPyr;',
+    'layout(location=0) out vec4 O;layout(location=1) out vec4 O1;layout(location=2) out vec4 O2;layout(location=3) out vec4 O3;\n' +
+    'uniform highp sampler2D uGB1,uGB2,uGB3;uniform float uGB,uGBsh;\nuniform highp sampler2D uPyr;');
+  F = rep(F, 'bool HQ=false;', 'vec4 GW1=vec4(-1.,0.,0.,0.),GW2=vec4(0.),GW3=vec4(0.),GB1,GB2,GB3;bool HQ=false;');
+  F = rep(F, 'vec3 rd=normalize(uFwd+q.x*uFov*uRt+q.y*uFov*uUp),ro=uCam;\n',
+    'vec3 rd=normalize(uFwd+q.x*uFov*uRt+q.y*uFov*uUp),ro=uCam;\n' +
+    ' if(uGB>1.5){ivec2 fc=ivec2(gl_FragCoord.xy);GB1=texelFetch(uGB1,fc,0);GB2=texelFetch(uGB2,fc,0);GB3=texelFetch(uGB3,fc,0);}\n');
+  F = rep(F, '\n else{float top=1.+14.*uEx/uRkm,t1,t0=rsph(ro,rd,top,t1);',
+    '\n else if(uGB>1.5){hit=GB1.x;p=ro+rd*hit;}\n else{float top=1.+14.*uEx/uRkm,t1,t0=rsph(ro,rd,top,t1);');
+  F = rep(F, 'float hk0=hKm(d);vec3 da=normalize(d+tA*ee),db=normalize(d+tB*ee),p0=d*(1.+hk0*uEx/uRkm),n=normalize(cross(da*surfR(da)-p0,db*surfR(db)-p0));if(dot(n,d)<0.)n=-n;',
+    'float hk0;vec3 p0,n;if(uGB>1.5){hk0=GB1.y;n=GB2.xyz;}else{hk0=hKm(d);vec3 da=normalize(d+tA*ee),db=normalize(d+tB*ee);p0=d*(1.+hk0*uEx/uRkm);n=normalize(cross(da*surfR(da)-p0,db*surfR(db)-p0));if(dot(n,d)<0.)n=-n;}\n' +
+    '   p0=d*(1.+hk0*uEx/uRkm);GW1=vec4(hit,hk0,0.,0.);GW2.xyz=n;');
+  F = rep(F, '   HQ=false;float sh=1.;\n   if(dot(n,uLb)>0.){vec3 s2=d*surfR(d)+d*2e-6;',
+    '   HQ=false;float sh=1.,rs0=0.;\n   if(uGB>1.5)rs0=GB1.w;else if(uGB>.5||dot(n,uLb)>0.)rs0=surfR(d);GW1.w=rs0;\n' +
+    '   if(uGBsh>.5)sh=GB2.w;else if(dot(n,uLb)>0.){vec3 s2=d*rs0+d*2e-6;');
+  F = rep(F, 'sh=clamp(sh,0.,1.);}\n', 'sh=clamp(sh,0.,1.);}GW2.w=sh;\n');
+  F = rep(F, 'vec3 sl=n-d*dot(n,d),fw=faceW(d),gt=vec3(0.);float G=0.;\n',
+    'float G=0.;if(uGB>1.5){G=GB1.z;n=GB3.xyz;}else{vec3 sl=n-d*dot(n,d),fw=faceW(d),gt=vec3(0.);\n');
+  F = rep(F, 'n=normalize(n-(gt-d*dot(gt,d))*.3*uEx);', 'n=normalize(n-(gt-d*dot(gt,d))*.3*uEx);}GW1.z=G;GW3.xyz=n;');
+  F = rep(F, 'O=vec4(pow(1.-exp(-col*1.5),vec3(1./2.2)),1.);', 'O=vec4(pow(1.-exp(-col*1.5),vec3(1./2.2)),1.);O1=GW1;O2=GW2;O3=GW3;');
+  FLY_FS = F;
+}
+flyPasses();'''
+DEV93_FLY_LOD = r'''// @deviation (#93 F3) the height reads (texture(s, uv) in hKm and in the Catmull-Rom crs()) and the gas giant's reads
+// (uVel, uBand in the uMode branch) become textureLod(s, uv, 0.). No texture of the world engine has mipmaps and each one
+// minifies and magnifies with the same filter, so both read the same texels with the same weights: the picture is
+// unchanged (measured: 0 levels of difference). But texture() takes screen-space derivatives, and on ANGLE D3D11 fxc
+// then flattens the branches around those reads and runs both sides; with textureLod() a branch that is not taken is
+// skipped. Measured on the RTX 4060 Ti (fly.html): the G-buffer's still frame no longer runs the march (TRAPPIST-1 f at
+// 3 km 11.7 to 0.5 ms), a rocky world no longer runs the gas giant's advection (moving 13.1 to 10.5 ms) and a gas giant
+// no longer runs the rocky march and shading (Jupiter at 50 km 9.7 to 0.6 ms). Every texture() in FLY_FS gave the same
+// frame times but a slower cold compile (median about 32 s against 22 s, Q-337), so only these reads are changed.
+function flyLod() {
+  function lod(F) {
+    var o = '', i = 0, k;
+    while ((k = F.indexOf('texture(', i)) >= 0) {
+      if (/[A-Za-z0-9_]/.test(F[k - 1])) { o += F.slice(i, k + 8); i = k + 8; continue; }
+      var d = 0, j = k + 8, c = 0;
+      for (; j < F.length; j++) { var ch = F[j]; if (ch === '(') d++; else if (ch === ')') { if (d === 0) break; d--; } else if (ch === ',' && d === 0) c++; }
+      if (c !== 1) throw new Error('#93 F3: a texture() call with ' + (c + 1) + ' arguments');
+      o += F.slice(i, k) + 'textureLod(' + F.slice(k + 8, j) + ',0.)'; i = j + 1;
+    }
+    return o + F.slice(i);
+  }
+  function inside(a, b, n) {
+    var i = FLY_FS.indexOf(a), j = FLY_FS.indexOf(b, i);
+    if (i < 0 || j < 0 || FLY_FS.indexOf(a, i + 1) >= 0) throw new Error('#93 F3: no single ' + a);
+    var t = lod(FLY_FS.slice(i, j));
+    if (t.split('textureLod(').length - 1 !== n) throw new Error('#93 F3: ' + (t.split('textureLod(').length - 1) + ' height reads in ' + a);
+    FLY_FS = FLY_FS.slice(0, i) + t + FLY_FS.slice(j);
+  }
+  inside('vec4 crs(sampler2D t,vec2 uv){', 'float rsph(', 9);
+  inside('float hKm(vec3 d){', 'float surfR(', 2);
+  inside('if(uMode>.5){\n   /* gas giant', '}else{\n   vec3 tA=', 3);
+}
+flyLod();'''
+
 os.makedirs(OUT, exist_ok=True)
+
+# Reviewed deviations (PR #89 review, issue #93) carried into the output: the block texts live in
+# world_engine_deviations.py; the renames and the split points are below, next to the slice they change.
+sys.path.insert(0, HERE)
+import world_engine_deviations as DV  # noqa: E402
+
+DEV_PRESETS = '\n'.join([DV.PRESETS_89_REVIEW_1, DV.PRESETS_89_REVIEW_2, DV.PRESETS_93_3_1]) + '\n'
+DEV_UMEAS = """// @deviation (#89 review 5) the rename below lets a measured peak jet speed replace the thermal-wind estimate:
+// cardToWorld sets p.Umeas for Jupiter (about 150 m/s, the 24 N jet) and Saturn (about 450 m/s, equatorial). For
+// every other giant p.Umeas is unset and the prototype's U = 0.6 sqrt(R dT) runs unchanged (its 10 K floor holds
+// U near 115 to 120 m/s for a cool giant that is not locked: an estimate, tagged model_dependent)."""
 
 # helpers.js: clamp lerp sstep fmt rng g planck planckRGB LMIN/LMAX/LUT compile unis FULL (not $, reduced, pills)
 w('helpers.js', hdr('helpers: maths, Planck colour, LUT, GL compile', '1267-1270, 1272-1282, 1291-1297') +
-  sl(1268, 1271) + '\n' + sl(1273, 1283) + '\n' + sl(1292, 1298) + '\nexport { ' + HELPERS_NAMES + ' };\n')
+  sl(1268, 1271) + '\n' + sl(1273, 1283) + '\n' + sl(1292, 1298) + '\n' + DEV93_HELPERS +
+  '\nexport { ' + HELPERS_NAMES + ', compileStart, compileDone, compileEnd };\n')
 
 # shaders.js
 w('shaders.js', hdr('shaders: NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS', '1299-1678') +
-  "import { LMIN, LMAX } from './helpers.js';\n" + sl(1299, 1678) + '\nexport { NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS };\n')
+  "import { LMIN, LMAX } from './helpers.js';\n" + DEV_SHADERS_TOP + '\n' +
+  sl(1299, 1678, [('1.+3.*uEx/uRkm', '1.+uCloudKm*uEx/uRkm'),          # PR #89 review 1
+                  ('uCloudKm,uHkm;', 'uCloudKm,uHkm,uScale;'),         # #93 1.4
+                  ('uFov/uR.y', 'uFov*uScale/uR.y')]) + '\n' +          # #93 1.4 (3 places)
+  DEV93_SHADERS + '\n' + DEV93_PATTERNS + '\n' + DEV93_FLY + '\n' + DEV93_FLY3 + '\n' + DEV93_FLY_LOD + '\nexport { NOISE, ADV_FS, GAS_FS, WORLD_FS, FLY_FS };\n')
 
-# presets.js: FLUIDS, WP
-w('presets.js', hdr('FLUIDS and WP (example presets)', '1679-1700') + sl(1679, 1700) + '\nexport { FLUIDS, WP };\n')
+# presets.js: FLUIDS, WP, then the reviewed data deviations (#89 review 1 and 2, #93 3.1)
+w('presets.js', hdr('FLUIDS and WP (example presets)', '1679-1700') + sl(1679, 1700) + '\n' + DEV_PRESETS +
+  'export { FLUIDS, WP };\n')
 
 # terrain.js: CPU noise, buildTerrain, routeTerrain (pure)
 w('terrain.js', hdr('CPU value noise, plate-tectonic terrain build, river routing', '1767-1905') + HELPERS_IMPORT +
-  sl(1766, 1905) + '\nexport { hsh, vn3, fbm3, buildTerrain, routeTerrain };\n')
+  sl(1766, 1883) + '\n' + DEV93_RIVER + '\n' + sl(1885, 1905) + '\nexport { hsh, vn3, fbm3, buildTerrain, routeTerrain };\n')
 
 # gas.js: GAS_NODES, gasProfile, GasSim (pure)
+# PR #89 review 7, 8: the Great Red Spot's size and aspect (r, ar) and the cyclones' spin sign, as renames.
 w('gas.js', hdr('gas giants: GAS_NODES, gasProfile, GasSim', '2149-2261') + HELPERS_IMPORT +
-  sl(2148, 2261) + '\nexport { GAS_NODES, gasProfile, GasSim };\n')
+  DV.GAS_89_REVIEW_7_8 + '\n' +
+  sl(2148, 2261, [('0.105,', '0.083,'), ('1.38,', '1.49,'),             # review 7: GRS r and ar
+                  ('0.05;', '0.05*(s.type===2?-1:1);')]) +             # review 8: cyclone spin sign
+  '\nexport { GAS_NODES, gasProfile, GasSim };\n')
 
 # core.js: stateful pieces, closed over one instance state (W, EB, GS, OCEANF, ORB)
 core = []
 core.append(hdr('stateful engine core: one closure per WorldEngine instance',
                 '1662-1664, 1666-1726, 1861-1913(+1914-2008), 2123-2246, 2248, 2250-2270, 2274-2285, 2289, 2291-2303, 2305-2306, 2311, 2328-2330, 2332-2346'))
-core.append("""import { FULL, compile, unis, LUT, clamp, lerp, sstep, fmt, rng, planck, planckRGB } from './helpers.js';
+core.append("""import { FULL, compile, unis, compileStart, compileDone, compileEnd, LUT, clamp, lerp, sstep, fmt, rng, planck, planckRGB } from './helpers.js';
 import { ADV_FS, GAS_FS, WORLD_FS, FLY_FS } from './shaders.js';
 import { FLUIDS, WP } from './presets.js';
 import { fbm3, buildTerrain, routeTerrain } from './terrain.js';
+import { terrainCached, routeCached } from './terrainCache.js';
+import { pyramidCached } from './heightPyramid.js';
 import { GAS_NODES, gasProfile, GasSim } from './gas.js';
 
-/** Build one engine instance on a canvas. */
-export function createCore(canvas) {
+/** Build one engine instance on a canvas. opt.role: 'globe' | 'fly' | 'both' (default, the prototype's page). */
+export function createCore(canvas, opt) {
 var reduced = false;
-""")
-core.append(sl(1701, 1765))                 # ORB, applySpin, W, slider constants, psatFn, worldModel
-core.append(sl(1906, 2147))                 # hydroRaster, EB
-core.append(sl(2262, 2355, [('(ema', '(!window.__sxPin&&ema')]))       # WorldGL
+""" + DEV93_ROLE + "\n")
+# ORB, applySpin, W, slider constants, psatFn, worldModel; L1727 (the boiling line) is replaced (#89 review 2)
+core.append(DEV_UMEAS)
+core.append(sl(1701, 1704))
+core.append(DV.CORE_L1705_93_3_2)
+core.append(sl(1706, 1726, [('Math.max(1,', 'p.Umeas||Math.max(1,')]))
+core.append(DV.CORE_L1727_89_REVIEW_2)
+core.append(DV.CORE_L1727_93_3_1)
+core.append(sl(1728, 1734))
+core.append(DV.CORE_L1734_93_3_6)
+core.append(sl(1735, 1736))
+core.append(DV.CORE_L1736_93_3_6)
+core.append(DV.CORE_L1736_93_3_1)
+core.append(DV.CORE_L1762_93_3_3)
+core.append(sl(1737, 1765, [('flat:', 'flat:p.fMeas!=null?p.fMeas:'), ('ORB[p.id]', '(p.ob||ORB[p.id])'),
+                            ('runaway:', 'Tpost:Tpost,olrLim:runaway?RUNAWAY.olrLim:null,runaway:')]))
+# hydroRaster, EB; L2101 (outgoing radiation) gains the runaway limit (#93 3.6)
+core.append(sl(1906, 2101))
+core.append(DV.CORE_L2101_93_3_6)
+core.append(sl(2102, 2147))
+# WorldGL, split around the #93 deviations (the prototype's (ema rename now sits inside DEV93_SCALER)
+core.append(DEV89_WORLDGL)
+core.append(sl(2262, 2265))
+core.append(DEV93_COMPILE)                   # replaces L2266: submit, poll, link (#93 1.2, 1.3)
+core.append(DEV93_SEED)                      # seed uniforms (#93 3.1, 3.2, 3.4, 3.9)
+core.append(DEV93_PYRAMID)                   # the fly view's max-height pyramid (#93 F1)
+core.append(DEV93_GBUF)                      # the fly view's static G-buffer (#93 F3)
+core.append(sl(2267, 2301, [('2.214)', '2.2165)'), ('0.005)', '0.0027)'), ('0.004)', '0.0012)')]))   # PR #89 review 3
+core.append(DEV93_SCALER)                    # replaces L2302-L2303 (#93 1.7)
+core.append(sl(2304, 2315))
+core.append(DEV93_SKIP_GLOBE)                # replaces L2316 (#93 1.6)
+core.append(sl(2317, 2326, [('uF.uFov,', 'uF.uScale,scale/W.fp93);gl.uniform1f(uF.uFov,'),   # #93 1.4, B9
+                            ('uF.uCloudKm,', 'uF.uCloudKm,m.zc!=null?Math.max(m.zc,0.3):')]))   # PR #89 review 1
+core.append(DEV93_GBUF_DRAW)                 # replaces L2327: the fly draw (#93 F3)
+core.append(sl(2328, 2338))
+core.append(DEV93_GAS_CAP)                   # replaces L2339-L2340 (#93 1.8)
+core.append(sl(2341, 2343))
+core.append(DEV93_BUDGET)                    # replaces L2344: the climate loop stops within its budget (#93 F4)
+core.append(sl(2345, 2355))
 core.append(sl(2356, 2385))                 # fly camera, flyMove, globePick, GS
 core.append(sl(2387, 2387))                 # km
 # worldUi: rows and caption captured as data instead of written into the DOM
 core.append('function worldUi() {')
-core.append(sl(2389, 2410))
+core.append(sl(2389, 2389))
+core.append(DV.CORE_L2389_93_3_1)
+core.append(sl(2390, 2410))
 core.append("  W.rows = rows; W.mixed = mixed;")
-core.append(sl(2414, 2425, [("$('#world-cap').textContent", "W.cap")]))
+core.append(sl(2414, 2424))
+core.append(DV.CORE_L2424_93_3_1)
+core.append(sl(2425, 2425, [("$('#world-cap').textContent", "W.cap")]))
+core.append(DV.CORE_L2425_93_1_8)
 core.append(sl(2429, 2429, [("$('#world-tag').textContent", "W.tag")]))
 core.append('}')
-core.append(sl(2431, 2443))                 # resetWorld (its worldUi() call stays)
+core.append(DEV93_TERRAIN)                  # one terrain build per input set for every engine (#93 1.5)
+core.append(sl(2431, 2443, [('buildTerrain(', 'terrainCached('), ('routeTerrain(', 'routeCached(')]))   # resetWorld
 core.append('function setPreset(p) {')
-core.append(sl(2445, 2446))
+core.append(DV.CORE_L2446_93_3_3)
+core.append(sl(2445, 2446, [('ORB[p.id]', '(p.ob||ORB[p.id])')]))
 core.append(sl(2451, 2451))
 core.append('}')
 core.append("W.timeSec = 300; W.simAcc = 0;")
@@ -118,9 +653,11 @@ core.append(sl(2468, 2470))                 # altRange altToS sToAlt
 core.append(sl(2472, 2486))                 # flyAimPeak, flyAimDefault
 core.append("""
 W.gl = new WorldGL(canvas);
+""" + DEV93_LINK_FIRST + "\n" + DEV93_FLY_HOOKS + """
 return {
   W: W, EB: EB, ORB: ORB, OCEANF: OCEANF, GAS_NODES: GAS_NODES, FLUIDS: FLUIDS,
   getGS: function () { return GS; },
+  ebStep: ebStep, ebStats: ebStats, ebInit: ebInit,   // #93: the energy budget, for headless tests
   worldModel: worldModel, worldUi: worldUi, resetWorld: resetWorld, setPreset: setPreset, applySpin: applySpin,
   flyMove: flyMove, globePick: globePick, flyCamera: flyCamera, groundKm: groundKm,
   flyAimPeak: flyAimPeak, flyAimDefault: flyAimDefault, altRange: altRange, altToS: altToS, sToAlt: sToAlt,

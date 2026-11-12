@@ -148,6 +148,9 @@ class Settings(BaseSettings):
     # within this margin of its edge (the interpolation error, a few arcsec at a 10 min step);
     # the exact Horizons position at the frame time then decides.
     moving_footprint_margin_arcsec: float = Field(default=60.0, ge=0)
+    # [verify] A19.5: the longest span one /path reply serves, in days (31 in the spec). Past it,
+    # explicit start/end answer 400 path_span_too_long and no parameters give the first window.
+    path_max_span_days: float = Field(default=31.0, gt=0)
 
     cors_origins: str = ""
     # A5.4 pre-baked assets: `<assets_dir>/<type>/<id>.json`, read only (stage 4).
@@ -166,6 +169,11 @@ class Settings(BaseSettings):
     # Q-164 (issue #68, 7c): the committed maps of the pre-built demo pack, served read-only at
     # /data/demo-textures, also under SX_OFFLINE=1. Written by scripts/bake_demo_pack.py.
     demo_textures_dir: Path = BACKEND_DIR / "assets" / "textures"
+    # Issue #108 (A17.10, Q-420): the committed, read-only pack of precomputed areas, in the D-25
+    # cache layout (``v1/derived.area/...``). The API reads the cache first, then this pack, so
+    # the Eros area is served under SX_OFFLINE=1 on a fresh machine. Written by
+    # ``scripts/area_discovery.py --recorded --pack``.
+    area_pack_dir: Path = BACKEND_DIR / "assets" / "areas"
 
     # Admin token for admin-only endpoints (R10: gemini_paint.py "behind the admin token").
     # ASSUMPTION: unset disables every admin endpoint (404); a wrong token gets 403.

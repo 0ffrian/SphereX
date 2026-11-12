@@ -159,32 +159,40 @@ def test_sweep_weights_find_the_field_that_moves_the_metric() -> None:
 # issue #71 (11 Nov 2026, after the review fixes: Procyon A's interferometric radius, the Sun's
 # class G2V, Titan's measured surface temperature, fluid and pressure). Failing: the two candidates
 # (no class) (3I/ATLAS scores 0.5171 once the epoch-keyed gas rates count, Q-323).
+# #93 3.5: an archive pl_eqt is derived with an assumed albedo (c = DERIVED_ASSUMED_C), so every
+# exoplanet lost 7.5 points of temperature (and a giant 5 more of colour) against the 11 Nov pins.
+# #93 3.8: stars no longer score proper motion (5 points) and score their rotation through the field
+# law (model_dependent, 2.5 of 5 when the card has one: the Sun); a giant's colour from Teq is
+# model_dependent (Jupiter and Saturn lose 5). The Sun (0.675) now scores above Procyon (0.6451).
 DEMO_SCORES = {
-    "star/simbad-name-barnard-s-star": (0.6, True),
+    "star/simbad-name-barnard-s-star": (
+        0.575,
+        True,
+    ),  # #93: measured rotation (Toledo-Padrón 2019) now scored
     "brown_dwarf_binary/simbad-eps-ind-b": (0.475, True),
     "brown_dwarf/simbad-wisea-j085510-74-071442-5": (0.375, True),
-    "star_ttauri/simbad-v-rw-aur": (0.5, True),
+    "star_ttauri/simbad-v-rw-aur": (0.45, True),
     "star_mira/simbad-v-r-dra": (0.5, True),
-    "planet_rocky/simbad-trappist-1f": (0.5873, True),
-    "planet_rocky/simbad-kepler-186f": (0.4831, True),
+    "planet_rocky/simbad-trappist-1f": (0.5123, True),
+    "planet_rocky/simbad-kepler-186f": (0.4081, True),
     "asteroid_shape/sbdb-20101955": (0.8407, True),
     "asteroid_procedural/sbdb-50788063": (0.475, True),
     "comet/sbdb-1004083": (0.5171, True),
-    "gas_giant/simbad-hd-189733b": (0.5391, True),
-    "planet_rocky/simbad-trappist-1e": (0.5788, True),
-    "planet_water/simbad-k2-18b": (0.5191, True),
+    "gas_giant/simbad-hd-189733b": (0.4141, True),
+    "planet_rocky/simbad-trappist-1e": (0.5038, True),
+    "planet_water/simbad-k2-18b": (0.4441, True),
     "comet/sbdb-1000012": (0.4, True),
     "candidate/simbad-m-42": (0.0, False),
     "candidate/simbad-m-1": (0.0, False),
-    "reference/ref-sun": (0.65, True),
-    "reference/ref-jupiter": (0.55, True),
-    "reference/ref-saturn": (0.55, True),
+    "reference/ref-sun": (0.675, True),
+    "reference/ref-jupiter": (0.5, True),
+    "reference/ref-saturn": (0.5, True),
     "reference/ref-titan": (0.7, True),
-    "star/simbad-alf-cmi": (0.6951, True),
-    "star/simbad-eps-eri": (0.6, True),
-    "planet_rocky/simbad-toi-700d": (0.5358, True),
-    "gas_giant/simbad-wasp-39b": (0.5275, True),
-    "planet_rocky/simbad-rho01-cnc-e": (0.5854, True),
+    "star/simbad-alf-cmi": (0.6451, True),
+    "star/simbad-eps-eri": (0.575, True),  # #93: measured rotation (Petit 2021) now scored
+    "planet_rocky/simbad-toi-700d": (0.4608, True),
+    "gas_giant/simbad-wasp-39b": (0.4025, True),
+    "planet_rocky/simbad-rho01-cnc-e": (0.5104, True),
 }
 
 
@@ -229,7 +237,7 @@ def astro(**kw: Any) -> GaiaAstro:
 
 
 def test_the_adapter_reads_the_msc_columns() -> None:
-    row = "1648328016354496384,248.1,66.7,6.37,,,,,,,3047.9,3000.0,3367.8"
+    row = "1648328016354496384,248.1,66.7,6.37,,,,,,,,,,,,,3047.9,3000.0,3367.8"
     (g,) = gaia.parse_astro(f"{MSC_HEADER}\n{row}\n".encode())
     assert (g.teff_msc1_k, g.teff_msc1_lower_k, g.teff_msc1_upper_k) == (3047.9, 3000.0, 3367.8)
     assert g.teff_gspphot_k is None
@@ -376,3 +384,46 @@ def test_found_text_joins_with_and() -> None:
     assert cf._join(["a", "b", "c"]) == "a, b or c"
     got = cf.confidence_block(star_card(teff_K=tv(3200.0), radius_rsun=tv(0.2)))
     assert got is not None and " or " not in got["found"] and " and " in got["found"]
+
+
+# --- #93 3.8 ---------------------------------------------------------------------------------
+
+
+def _row(block: dict[str, Any] | None, id_: str) -> dict[str, Any]:
+    assert block is not None
+    return next(r for r in block["inputs"] if r["id"] == id_)
+
+
+def test_no_star_table_scores_proper_motion() -> None:
+    for kind in ("star", "star_ttauri", "star_mira"):
+        assert all("pm_mas_yr" not in i.fields for i in cf.TABLES[kind].inputs), kind
+    base = star_card(teff_K=tv(5772.0), radius_rsun=tv(1.0), spectral_class=tv("G2V"))
+    with_pm = cf.confidence_block({**base, "pm_mas_yr": tv([1.0, 2.0])})
+    assert with_pm == cf.confidence_block(base)
+
+
+def test_star_rotation_counts_through_the_model_dependent_field_law() -> None:
+    base = star_card(teff_K=tv(5772.0), radius_rsun=tv(1.0), spectral_class=tv("G2V"))
+    none = _row(cf.confidence_block(base), "rotation")
+    assert none["tag"] == "inferred_from_analog" and none["c"] == 0.0  # the Sun's Rossby number
+    got = _row(cf.confidence_block({**base, "rot_period_h": tv(609.12)}), "rotation")
+    # min(c of a measured period = 1, c of the model_dependent field law) and the weaker tag.
+    assert got["c"] == cf.MODEL_DEPENDENT_C and got["tag"] == "model_dependent"
+
+
+def test_the_sun_no_longer_scores_below_procyon() -> None:
+    sun = json.loads((ASSETS / "reference/ref-sun.json").read_text("utf-8"))["card"]
+    procyon = json.loads((ASSETS / "star/simbad-alf-cmi.json").read_text("utf-8"))["card"]
+    s, p = cf.confidence_block(sun), cf.confidence_block(procyon)
+    assert s is not None and p is not None and s["score"] > p["score"]
+
+
+def test_a_giant_colour_from_teq_is_model_dependent() -> None:
+    card = {"id": "x", "name": "x", "type": "gas_giant", "teq_K": tv(1200.0)}
+    got = _row(cf.confidence_block(card), "colour")
+    assert got["tag"] == "model_dependent" and got["c"] == cf.MODEL_DEPENDENT_C
+    # The value's own c still caps it: a derived Teq with an assumed albedo gives the lower of two.
+    derived = {**card, "teq_K": tv(1200.0, "derived", formula="f", assumption="A = 0")}
+    assert _row(cf.confidence_block(derived), "colour")["c"] == min(
+        cf.DERIVED_ASSUMED_C, cf.MODEL_DEPENDENT_C
+    )

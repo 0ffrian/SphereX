@@ -6,7 +6,7 @@ import { badgeForTag, HONESTY_LABEL, stateThatShows } from '@/viewer/honesty';
 import type { MissingItem } from '@/viewer/planTypes';
 import { API_TIMEOUT_MS } from './api/config';
 import type { CompositeResponse } from './api/types';
-import { formatUtc, formatWavelength } from './format';
+import { formatWavelength } from './format';
 import {
   countedCode,
   groupCompositeMissing,
@@ -17,13 +17,6 @@ import {
   type RefusalGroup,
   type SpectrumOutcome,
 } from './refusals';
-
-/** Q-164: shown for a body the backend answered from a saved asset (a pre-built demo-pack row).
- * It says how the body was made, nothing about how fresh the data is. */
-export const PREBUILT_NOTE = 'Built ahead of time from the same data';
-
-/** Issue #71 (D-37): shown when an engine draws the body (worlds, stars, rocks): it is made live, not baked. */
-export const ENGINE_NOTE = 'Generated live from physics by the same code as the approved preview';
 
 export function searchErrorMessage(err: SkyError, query: string): string {
   switch (err.kind) {
@@ -39,7 +32,8 @@ export function searchErrorMessage(err: SkyError, query: string): string {
         ? 'The archive is slow or not answering right now. Try again, or pick an object from the list.'
         : 'The server had a problem or is not answering. Try again in a moment.';
     case 'timeout':
-      return `No answer after ${Math.round(API_TIMEOUT_MS / 1000)} seconds. The archive may be slow; try again, or pick an object from the list.`;
+      // Issue #102: the wait the request actually had (25 s for a search, 90 s for the rest).
+      return `No answer after ${Math.round((err.timeoutMs ?? API_TIMEOUT_MS) / 1000)} seconds. The archive may be slow; try again, or pick an object from the list.`;
     case 'network':
       return 'Can’t reach the server. Check that the backend is running.';
     case 'bad_response':
@@ -214,10 +208,20 @@ const NOTE_TEXT: Readonly<Record<string, string>> = {
     'The Gaia list hit its size limit, so only the brightest stars are shown.',
   'overlay:wise:truncated':
     'The WISE list hit its size limit, so only the brightest sources are shown.',
-  // Area search (A18.1, A18.3): frontend codes (Q-208 (13)).
-  'area:not_prepared': 'This part of the sky is not prepared, so it can’t be searched here.',
-  'area:visits':
-    'This area has fewer than two visits, so nothing can be followed from one visit to the next.',
+  // Track path (A19.5): the predicted path seen from SPHEREx.
+  'path:deferred':
+    'The predicted path is still being loaded from JPL Horizons. It appears here when it is ready.',
+  'path:not_cached':
+    'The predicted path for this object is not saved on this computer, and the app is offline, so it can’t be drawn.',
+  'path:observer':
+    'Part of this time span is past the end of the spacecraft’s own orbit data, so the path stops there.',
+  'path:ephemeris':
+    'JPL Horizons gave no usable path for all or part of this time span, so part of the path is missing. Try again later.',
+  'path:window':
+    'SPHEREx did not observe this object in the time span asked for, so there is no path to show.',
+  'path:frames_incomplete':
+    'Some frames are still being loaded, so not every exposure is marked on the path yet.',
+  'track:not_moving': 'This object does not move across the sky, so it has no path to follow.',
 };
 
 /** Per colour band (`composite:<channel>:<reason>`): the words after "Blue band:". */
@@ -687,183 +691,4 @@ export function spectrumWaitingStoppedText(c: ProgressCounts | null): string {
 export function compositeWaitingText(c: ProgressCounts | null): string {
   const tally = c ? ` (${c.ready} of ${c.found} ready)` : '';
   return `The SPHEREx colour composite is built once all frames have been downloaded${tally}.`;
-}
-
-// ---- Area search (A18; issue #96, P8) ---------------------------------------------------------
-// A16.5: an unmatched track is never called an asteroid, new or a discovery (messages.test.ts).
-
-export const AREA_TOOL_LABEL = 'Area search';
-export const AREA_TOOL_HINT = 'Draw a square, then follow known objects or look for movers';
-export const AREA_DRAW_HINT = 'Drag a square over the part of the sky you want to search';
-export const AREA_TOO_SMALL = 'Drag a bigger square';
-export const AREA_TOO_BIG = 'Draw a smaller square, 10° at most';
-export const AREA_NOT_PREPARED = 'This part of the sky is not prepared';
-export const AREA_PREPARED_LEAD = 'Prepared areas:';
-export const AREA_INDEX_EMPTY = 'No areas are prepared on this server';
-export const AREA_INDEX_LOADING = 'Loading the prepared areas…';
-export const AREA_NOT_FOUND = 'This area is no longer prepared on this server.';
-export const AREA_LOADING = 'Loading the area…';
-export const AREA_USE_MIDDLE = 'Use a square in the middle';
-export const AREA_KEEP_LAST = 'Keep the last square';
-export const AREA_DRAW_AGAIN = 'Draw again';
-export const AREA_FLY_THERE = 'Fly there';
-export const AREA_TRY_AGAIN = 'Try again';
-export const AREA_NEXT_VISIT = 'Next visit';
-export const AREA_NEEDS_TWO_VISITS = 'Needs two visits to compare';
-export const AREA_BLINK_STOP_HINT = '(on, press to stop)';
-export const AREA_MEASURED_NOTE = 'Tracks and known paths are Estimated';
-export const AREA_ARTISTIC_NOTE =
-  '+ Artistic is set in the 3D view; Area search shows its Estimated layers.';
-export const AREA_DRAWING_STOPPED = 'Drawing stopped. The square is kept.';
-export const AREA_LAYERS_LABEL = 'Layers';
-export const AREA_SHOW_LABEL = 'Show';
-
-export function areaIndexErrorMessage(err: SkyError): string {
-  return `The list of prepared areas could not be loaded. ${searchErrorMessage(err, '')}`;
-}
-
-export function areaLoadErrorMessage(err: SkyError): string {
-  if (err.kind === 'not_found') return AREA_NOT_FOUND;
-  return `This area could not be loaded. ${searchErrorMessage(err, '')}`;
-}
-
-/** A shared link names an area this server has not prepared (A18.9). */
-export function areaLinkProblem(id: string): string {
-  return `Link area “${id}” is not prepared on this server.`;
-}
-
-const deg2 = (v: number) => `${v.toFixed(2)}°`;
-
-/** "Area · 1.00° × 0.60°" */
-export function areaTitle(widthDeg: number, heightDeg: number): string {
-  return `Area · ${deg2(widthDeg)} × ${deg2(heightDeg)}`;
-}
-
-/** "1.00° × 0.60°", the label drawn above the box. */
-export function areaSizeLabel(widthDeg: number, heightDeg: number): string {
-  return `${deg2(widthDeg)} × ${deg2(heightDeg)}`;
-}
-
-/** "16 SPHEREx frames in 2 visits · 15 to 16 Jan 2026" */
-export function areaSubtitle(nFrames: number, nVisits: number, dates: string): string {
-  const frames = nFrames === 1 ? '1 SPHEREx frame' : `${nFrames} SPHEREx frames`;
-  const visits = nVisits === 1 ? '1 visit' : `${nVisits} visits`;
-  return `${frames} in ${visits} · ${dates}`;
-}
-
-/** A row of the prepared-areas list: "fixture:area-main · 1.00° × 0.60° · 2 visits" */
-export function areaRowText(a: {
-  area_id: string;
-  width_deg: number;
-  height_deg: number;
-  n_visits: number;
-}): string {
-  const visits = a.n_visits === 1 ? '1 visit' : `${a.n_visits} visits`;
-  return `${a.area_id} · ${areaSizeLabel(a.width_deg, a.height_deg)} · ${visits}`;
-}
-
-/** "Visit 1 · 15 Jan 03:00 UTC" (the time is formatted by the caller). */
-export function visitLabel(visit: number, time: string | null): string {
-  return time ? `Visit ${visit} · ${time}` : `Visit ${visit}`;
-}
-
-/** "Blink the 2 visits" (Q-408). */
-export function blinkLabel(nVisits: number): string {
-  return `Blink the ${nVisits} visits`;
-}
-
-/** "Visit 2 of 2, 16 Jan 03:24 UTC." Never said for a blink tick. */
-export function visitAnnouncement(visit: number, nVisits: number, time: string | null): string {
-  return `Visit ${visit} of ${nVisits}${time ? `, ${time}` : ''}.`;
-}
-
-/** "Search square, 0.84 by 0.84 degrees" (A18.9). */
-export function squareGroupLabel(widthDeg: number, heightDeg: number): string {
-  return `Search square, ${widthDeg.toFixed(2)} by ${heightDeg.toFixed(2)} degrees`;
-}
-
-export function areaSnapAnnouncement(widthDeg: number, heightDeg: number, nVisits: number): string {
-  const visits = nVisits === 1 ? '1 visit' : `${nVisits} visits`;
-  return `Area found: ${deg2(widthDeg)} by ${deg2(heightDeg)}, ${visits}.`;
-}
-
-/**
- * Q-205 (closed by Moon, 11 Nov 2026): the results are precomputed, and the card says when the run
- * was made (the summary's `computed_at`).
- */
-export function areaPrecomputedNote(computedAt: string): string {
-  return `Precomputed · run ${formatUtc(computedAt)}`;
-}
-
-export function areaSelectedText(trackId: string): string {
-  return `Selected: ${trackId}`;
-}
-
-export function areaHonestyAnnouncement(measured: boolean): string {
-  return measured
-    ? 'Measured only: track lines, labels and known paths hidden.'
-    : '+ Estimated: track lines and labels shown.';
-}
-
-/** The known object a track matched: "433 Eros" when numbered, else the designation. */
-export function areaMatchName(m: { designation: string; number: number | null }): string {
-  return m.number !== null ? `${m.number} ${m.designation}` : m.designation;
-}
-
-export interface AreaTrackForLabel {
-  track_id: string;
-  verdict: 'found_blind' | 'unexplained' | 'unchecked' | 'possible';
-  reason: 'ambiguous' | 'no_partner' | 'one_visit' | null;
-  visits: readonly number[];
-  match: { designation: string; number: number | null } | null;
-}
-
-/**
- * The label at a track's last dot (A16.5, A18.2): "T1 · found blind = 433 Eros", "T2 · unexplained
- * track", "T3 · possible · 1 visit" (or "· ambiguous pair"), "T4 · not checked".
- */
-export function areaTrackLabel(t: AreaTrackForLabel): string {
-  switch (t.verdict) {
-    case 'found_blind':
-      return `${t.track_id} · found blind = ${t.match ? areaMatchName(t.match) : 'a known object'}`;
-    case 'unexplained':
-      return `${t.track_id} · unexplained track`;
-    case 'unchecked':
-      return `${t.track_id} · not checked`;
-    case 'possible':
-      if (t.reason === 'ambiguous') return `${t.track_id} · possible · ambiguous pair`;
-      return t.visits.length === 1
-        ? `${t.track_id} · possible · 1 visit`
-        : `${t.track_id} · possible`;
-  }
-}
-
-export interface AreaAltInput {
-  widthDeg: number;
-  heightDeg: number;
-  visit: number;
-  nVisits: number;
-  measured: boolean;
-  /** Dots of the current visit. */
-  nDots: number;
-  tracks: readonly AreaTrackForLabel[] | null;
-}
-
-/** Text alternative for the Area layers (A18.2), appended to the sky canvas's description. */
-export function areaTextAlternative(i: AreaAltInput): string {
-  const head = `Area ${deg2(i.widthDeg)} by ${deg2(i.heightDeg)}, visit ${i.visit} of ${i.nVisits}`;
-  const dots = i.nDots === 1 ? '1 dot' : `${i.nDots} dots`;
-  if (i.measured) return `${head}: ${dots}. Tracks are Estimated and hidden in Measured only.`;
-  if (!i.tracks) return `${head}: ${dots}.`;
-  const all = i.tracks;
-  const count = (v: AreaTrackForLabel['verdict']) => all.filter((t) => t.verdict === v).length;
-  const found = all.filter((t) => t.verdict === 'found_blind');
-  const names = found.flatMap((t) => (t.match ? [areaMatchName(t.match)] : []));
-  const parts = [`${all.length} ${all.length === 1 ? 'mover' : 'movers'}`];
-  if (found.length > 0)
-    parts.push(`${found.length} found blind${names.length > 0 ? ` as ${names.join(', ')}` : ''}`);
-  if (count('unexplained') > 0) parts.push(`${count('unexplained')} unexplained`);
-  if (count('unchecked') > 0) parts.push(`${count('unchecked')} not checked`);
-  if (count('possible') > 0) parts.push(`${count('possible')} possible`);
-  return `${head}: ${parts.join(', ')}.`;
 }

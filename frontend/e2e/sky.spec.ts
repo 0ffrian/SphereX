@@ -105,7 +105,10 @@ test('the shell and search render, then the sky image loads (smallest first, the
   await expect(canvas).toHaveAttribute('data-sky-width', '512');
   release();
   await expect(canvas).toHaveAttribute('data-sky-width', '1024');
-  // Provenance and credit of the picture (D-02): Estimated with the formula, plus the credit.
+  // Provenance and credit of the picture (D-02): behind the info button by the zoom card, closed by
+  // default; opened, Estimated with the formula, plus the credit.
+  await expect(page.getByTestId('sky-credit-box')).toBeHidden();
+  await page.getByTestId('sky-credit-button').click();
   const credit = page.getByTestId('sky-credit');
   await expect(credit).toContainText('Synthetic test sky (fixture)');
   await expect(credit.getByTestId('badge-estimated')).toHaveText(/^Estimated/);
@@ -179,6 +182,7 @@ test('a click picks the position and runs the search; a drag does not', async ({
   // The fixture server knows only its targets, so this position is a clean "not found".
   await expect(page.getByRole('alert')).toContainText(`No object found for “${q}”`);
   // Picked coordinates are user input, tagged `derived` (Q-25).
+  await page.getByTestId('sky-credit-button').click(); // the picked position is in the info box
   const picked = page.getByTestId('sky-picked-text');
   await expect(picked.getByTestId('badge-estimated')).toBeVisible();
   await expect(page.getByTestId('sky-picked')).toBeAttached();
@@ -208,13 +212,13 @@ test('clicking the centre on a known target opens its flipbook; a newer click wi
   await page.mouse.click(b.x + 40, b.y + 40);
   await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
   await expect(page.getByTestId('object-name')).toHaveText('RA 76.95653°, Dec +30.40144°');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
   await page.waitForTimeout(1700);
   await expect(page.getByTestId('object-name')).toHaveText('RA 76.95653°, Dec +30.40144°');
   await expect(page.getByRole('alert')).toHaveCount(0);
   // The transport bar drives the flipbook.
   await page.getByRole('button', { name: 'Next frame' }).click();
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 2 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('2 / 24');
 });
 
 test('target markers come from /v1/resolve and open the object', async ({ page }) => {
@@ -254,29 +258,32 @@ test('keyboard: arrows pan, +/− zoom, Enter picks the centre; "/" focuses the 
   await expect(page.getByTestId('search-input')).toHaveValue('104.000000,4.000000');
 
   // "/" from a button focuses the search; typed into the field it is just a character.
-  await page.getByTestId('tool-flipbook').focus();
+  await page.getByTestId('sky-credit-button').focus();
   await page.keyboard.press('/');
   await expect(page.getByTestId('search-input')).toBeFocused();
   await page.keyboard.type('a/b');
   await expect(page.getByTestId('search-input')).toHaveValue('a/b');
 });
 
-test('tool rail opens real panels; Escape closes and returns focus', async ({ page }) => {
+test('the dock has the two area tools; a tool is pressed while it draws and Escape cancels it', async ({
+  page,
+}) => {
   await page.goto('/');
   const tools = page.getByRole('navigation', { name: 'Tools' });
-  // Sky, Flipbook, Spectrum, 3D viewer and Area search. Depends on AREA_TOOL_ENABLED
-  // (frontend/src/app/sky/area/areaTool.ts, issue #96): with it false the rail has 4 buttons, so
-  // change this count with it. (The e2e specs cannot import app modules to read it.)
-  await expect(tools.getByRole('button')).toHaveCount(5);
-  await expect(tools.getByRole('button', { name: 'Sky' })).toHaveAttribute('aria-pressed', 'true');
-  await tools.getByRole('button', { name: 'Flipbook' }).click();
-  await expect(page.getByTestId('panel-empty')).toBeVisible();
-  await page.getByRole('button', { name: 'Close Flipbook' }).focus();
+  await expect(tools.getByRole('button')).toHaveCount(2);
+  const known = tools.getByRole('button', { name: 'Known objects' });
+  await expect(known).toHaveAttribute('aria-pressed', 'false');
+  await expect(tools.getByRole('button', { name: 'Discovery' })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+  await known.click();
+  await expect(known).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('Escape');
-  await expect(page.getByTestId('object-panel')).toHaveCount(0);
-  await expect(tools.getByRole('button', { name: 'Flipbook' })).toBeFocused();
-  await tools.getByRole('button', { name: '3D viewer' }).click();
-  await expect(page.getByRole('region', { name: '3D view', exact: true })).toBeVisible();
+  await expect(known).toHaveAttribute('aria-pressed', 'false');
+  // Flipbook, Spectrum and the 3D viewer are no dock buttons: a search or a click opens the Flipbook,
+  // and Build it is on the object's card (build.spec.ts).
+  await expect(tools.getByRole('button', { name: 'Flipbook' })).toHaveCount(0);
 });
 
 test('no sky image installed: says so, shows a grid, and picking still works', async ({ page }) => {
@@ -298,7 +305,7 @@ test('a broken sky index or image is refused, never blank, and search still work
   await expect(page.getByTestId('sky-status')).toContainText('could not be loaded');
   await page.getByTestId('search-input').fill('RW Aur');
   await page.getByTestId('search-input').press('Enter');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
 });
 
 test.describe('phone width (400 × 860, touch)', () => {
@@ -354,10 +361,8 @@ test.describe('phone width (400 × 860, touch)', () => {
     await expect(panel).toBeVisible();
     const p = await panel.boundingBox();
     const v = await page.locator('.sx-view').boundingBox();
-    // Docked at the bottom, on top of the credit strip (D-35), which it never covers.
-    const c = await page.getByTestId('sky-credit-box').boundingBox();
-    expect(Math.abs(c!.y + c!.height - (v!.y + v!.height))).toBeLessThan(2);
-    expect(Math.abs(p!.y + p!.height - c!.y)).toBeLessThan(2);
+    // Docked at the bottom of the sky as a sheet (the credit strip is behind the info button now).
+    expect(Math.abs(p!.y + p!.height - (v!.y + v!.height))).toBeLessThan(2);
     expect(p!.width).toBeGreaterThan(v!.width - 2);
     expect(
       await page.evaluate(

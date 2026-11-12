@@ -4,7 +4,7 @@
 // (2)), their label text and a screen cache the draw fills for the hit test.
 import type { AreaDot, AreaDotLabel, AreaDots, AreaSummary, AreaTracks } from '@/contract';
 import { wavelengthColor } from '@/app/flipbook/wavelengthColor';
-import { areaTrackLabel } from '@/app/messages';
+import { areaTrackLabel } from '@/app/area/realArea';
 
 export interface SceneDot {
   ra: number;

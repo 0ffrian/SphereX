@@ -4,6 +4,8 @@
 
 ## R11. Acceptance tests
 
+> **Known gap ([Q-416](../decisions/shell-surfaces.md), PR #104):** the build header's Ambience toggle (the artistic Atmosphere; Hear it opens from Details since Q-450) still plays at Measured only, which the honesty test below forbids, until Atish wires `build/hearAudio.ts` to the honesty filter and the shared audio bus.
+
 The sub-pages are R11.1 [reference frames](reference/README.md), R11.2 the [visual review checklist](reference/checklist.md), R11.3 [frame-time checks](reference/frame-time.md) and R11.4 the [A15 event-machine checks](reference/a15-checks.md).
 
 **Event build (desktop Chrome on the A15, sound only; Q-132)**
@@ -16,12 +18,15 @@ The sub-pages are R11.1 [reference frames](reference/README.md), R11.2 the [visu
 - **Performance:** ≥30 fps rotating `asteroid_procedural` at 2048×1024 on the A15, at the quality level it starts on (Medium), with no governor drop (R11.3). The same ≥30 fps while rotating, at + Artistic, for the D-37 engines: the rock engine on an asteroid, and a planet with both world-engine instances (globe and fly view) open ([R5.9](engines.md#r59-prototype-engines-d-37)); **not yet measured** (R12 #43).
 - **Sound:**
   - no more than 40 events per second under fast drags
-  - the vibrate driver is not in the engine, and the audio driver plays every event
+  - the audio driver is the engine's only driver (haptics cut, D-39) and plays every event
+  - **Ducking (R13.9):** while the Listen sweep or event voices play, the ambience bus sits at −9 dB, and it comes back after every end path (end, stop, sound off, hidden page, unbind)
+  - **Pitch polarity (Q-430):** the Listen sweep falls in pitch from 0.75 µm to 5 µm
+  - nothing sounds before a click; the Sound popover's click unlocks audio and plays nothing
   - in Measured only, gas giant and planet texture sounds are silent; the `teq_pulse` plays only when `teq_K` is `measured` (D-21)
   - **Body tone (Q-133):** the tone's pitch is monotone in the sampled height, and the tone stops on release, on leaving the body and when the honesty level hides its tag (R8.9.1)
-  - **Track (Q-134):** one tick per exposure, pitch rising with wavelength; the path voice is silent in Measured only (R8.9.2)
+  - **Track (Q-134):** one tick per exposure, pitch falling as the wavelength grows (long λ = low, Q-430); the path voice is silent in Measured only (R8.9.2)
 - **Shared field:** on a gas giant, band-boundary ticks line up with the drawn band edges, so the shader and the field agree.
-- **Spectrum haptics:** dragging across a known absorption dip gives at least 3 consecutive quiet steps.
+- **Spectrum haptics:** cut (D-39). The Listen sweep keeps the rule: a known absorption dip gives at least 3 consecutive quiet steps.
 - **Comet:** toggling Aug/Dec changes the CO and H₂O shells. No tail is drawn for August.
 
 **Automated gates (Playwright, `frontend/e2e/`)**

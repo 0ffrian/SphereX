@@ -49,6 +49,66 @@ export type Pair = [number, number];
  */
 export type Tag = 'measured' | 'derived' | 'model_dependent' | 'inferred_from_analog' | 'artistic';
 /**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber1 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber2 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber3 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
  * Tagged value (R3.1) holding a string.
  */
 export type TVString = {
@@ -95,6 +155,126 @@ export type TVRgb = {
  * @maxItems 3
  */
 export type Triple = [number, number, number];
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber4 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber5 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber6 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber7 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber8 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
+/**
+ * Tagged value (R3.1) holding a number.
+ */
+export type TVNumber9 = {
+  /**
+   * null = unknown, never a guess.
+   */
+  value: number | null;
+  err?: number | Pair;
+  tag: Tag;
+  source: string;
+  /**
+   * Required, non-blank, when tag is derived.
+   */
+  formula?: string;
+  /**
+   * Required, non-blank, when tag is model_dependent.
+   */
+  assumption?: string;
+};
 /**
  * Tagged value (R3.1) holding a pair of numbers.
  */
@@ -291,6 +471,29 @@ export type AreaChecks = {
  * @maxItems 2
  */
 export type AreaInterval = [number, number];
+/**
+ * ISO-8601 UTC with milliseconds and a trailing Z.
+ */
+export type TrackPathUtcTime = string;
+/**
+ * Right ascension in degrees, ICRF.
+ */
+export type TrackPathRa = number;
+/**
+ * Declination in degrees, ICRF.
+ */
+export type TrackPathDec = number;
+/**
+ * A19.5, A19.10: path:deferred (poll), path:not_cached, path:observer, path:ephemeris, path:window, path:frames_incomplete (the frame list is not final; poll).
+ */
+export type TrackPathMissingCode =
+  | 'path:deferred'
+  | 'path:not_cached'
+  | 'path:observer'
+  | 'path:ephemeris'
+  | 'path:window'
+  | 'path:frames_incomplete';
+export type TrackPathUtcTimeOrNull = TrackPathUtcTime | null;
 
 /**
  * Bundle root: exists only so that every schema compiles into this one file.
@@ -305,6 +508,7 @@ export interface ContractSchemas {
   areaTracks: AreaTracks;
   areaChecks: AreaChecks;
   areaError: AreaError;
+  trackPath: TrackPath;
 }
 /**
  * What is known about one object (R3.2). Served by GET /v1/objects/{id}/card (D-16). Single source of the contract (D-18).
@@ -319,6 +523,9 @@ export interface ObjectCard {
   diameter_km?: TVNumber;
   radius_rjup?: TVNumber;
   radius_rsun?: TVNumber;
+  lum_lsun?: TVNumber1;
+  mass_msun?: TVNumber2;
+  flare_rate_per_d?: TVNumber3;
   shape_source?: TVString;
   rot_period_h?: TVNumber;
   lightcurve_amp_mag?: TVNumber;
@@ -341,6 +548,12 @@ export interface ObjectCard {
   host_radius_rsun?: TVNumber;
   host_mass_msun?: TVNumber;
   host_age_gyr?: TVNumber;
+  orbit_ecc?: TVNumber4;
+  insolation_searth?: TVNumber5;
+  host_lum_lsun?: TVNumber6;
+  dayside_temp_K?: TVNumber7;
+  nightside_temp_K?: TVNumber8;
+  hotspot_offset_deg?: TVNumber9;
   surface_pressure_bar?: TVNumber;
   surface_temperature_K?: TVNumber;
   surface_fluid?: TVString;
@@ -897,6 +1110,65 @@ export interface AreaChecksProvenance {
 export interface AreaError {
   error: 'area_not_found' | 'dot_not_found' | 'stamp_unavailable';
   detail: string;
+}
+/**
+ * GET /v1/objects/{id}/path (A19.5, Q-141): a moving object's path seen from SPHEREx, from the path search's cached Horizons ephemeris. Cache only; model_dependent.
+ */
+export interface TrackPath {
+  id: string;
+  /**
+   * Horizons CENTER of every position: the SPHEREx spacecraft (A3.4, Q-138).
+   */
+  observer: '500@-163182';
+  /**
+   * Minutes between two samples (SX_MOVING_EPHEM_STEP_MIN).
+   */
+  step_min: number;
+  /**
+   * The spans served, each inside one search window; never joined across a gap.
+   */
+  windows: TrackPathWindow[];
+  /**
+   * Horizons samples inside the windows, in time order.
+   */
+  points: TrackPathPoint[];
+  /**
+   * The exact Horizons TLIST position at each frame midpoint inside the windows (the /frames positions).
+   */
+  frame_points: TrackPathFramePoint[];
+  tag: 'model_dependent';
+  assumption: string;
+  formula: string;
+  /**
+   * Largest separation between the interpolated path and the exact TLIST position over frame_points; null without frame points.
+   */
+  interp_error_arcsec: number | null;
+  missing: TrackPathMissingCode[];
+  fetched_at: TrackPathUtcTimeOrNull;
+  cached_at: TrackPathUtcTimeOrNull;
+}
+export interface TrackPathWindow {
+  start: TrackPathUtcTime;
+  end: TrackPathUtcTime;
+}
+export interface TrackPathPoint {
+  time: TrackPathUtcTime;
+  ra: TrackPathRa;
+  dec: TrackPathDec;
+}
+export interface TrackPathFramePoint {
+  frame_id: string;
+  time: TrackPathUtcTime;
+  ra: TrackPathRa;
+  dec: TrackPathDec;
+  /**
+   * Horizons 3-sigma RA uncertainty (quantity 36); null until it is asked for (cut for the event, issue #74).
+   */
+  ra_3sigma_arcsec: number | null;
+  /**
+   * Horizons 3-sigma Dec uncertainty (quantity 36); null until it is asked for.
+   */
+  dec_3sigma_arcsec: number | null;
 }
 
 export const TAGS: readonly Tag[] = [

@@ -1,6 +1,6 @@
 # 14 State: honesty toggle
 
-The three-state honesty toggle in the 3D view, one state per badge: which tags each state shows and which haptics stay active. Drawn from rendering doc §5.3, §7.7, §8.2, §9, §11 (honesty test) and decisions D-02, D-12 and D-21.
+The three-state honesty toggle in the 3D view, one state per badge: which tags each state shows and which haptics stay active. Drawn from rendering doc §5.3, §7.7, §8.2, §9, §11 (honesty test) and decisions D-02, D-12 and D-21. **Changed by Q-412 (PR #104, Proposed):** in the build pane the toggle is a compact **Show** row inside the Details dropdown, no longer at the top of the pane; the states and transitions are unchanged. Q-416, Q-450: the Ambience toggle (artistic Atmosphere, local synthesis) still plays at Measured only until it is wired to this filter; Hear it opens from Details.
 
 ```mermaid
 stateDiagram-v2
@@ -24,7 +24,8 @@ stateDiagram-v2
     flat measured tint, measured lighting.
     Haptics: measured events only. Mesh-normal ticks on real
     shape models, measured data haptics (spectrum, light curve),
-    teq_pulse only when teq_K is measured (pl_eqt).
+    teq_pulse only when teq_K is measured
+    (an archive pl_eqt is derived since Q-359).
     Silent: procedural relief, all texture haptics on shader
     kinds, every non-measured data haptic.
   end note
@@ -51,4 +52,5 @@ stateDiagram-v2
 - One state per badge (D-02, D-21): Measured, Estimated, Default (artistic). The toggle starts at **+ Estimated**, so everything shown on load is backed by data or a stated formula.
 - Every visible layer shows a tag chip in the legend. Each state change is announced through `aria-live="polite"` (rendering doc §9).
 - Acceptance test: in Measured only no layer with a tag other than `measured` is drawn, and procedural texture haptics are silent (rendering doc §11).
+- Card readouts are not layers, but they follow the same filter: a planet's eclipse and phase-curve readouts are listed with their badges in every state their tags allow, so a `derived` one is hidden in Measured only (Q-379, decided 12 Nov 2026).
 - Haptics use the same filter as the layers (D-21). Whether the comet field pulse, tagged `measured` + `model_dependent` (rendering doc §8.4), plays in Measured only is Q-17.

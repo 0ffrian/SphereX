@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { WebGPURenderer } from 'three/webgpu';
 import { StarCloseUpScene, type StarCloseUpProps } from '@/viewer/renderers/starCloseUpScene';
-import { STAR_CLOSEUP_TAG } from './starCloseUp';
+import { StillStarCache } from '@/viewer/renderers/stillStarCache';
 
 /** Seconds the 60 minutes of a flare take on screen (the prototype: 22 s), and where a still frame sits. */
 const PLAY_SECONDS = 22;
@@ -35,6 +35,9 @@ export function StarCloseUp(props: StarCloseUpProps & { className?: string }) {
     let raf = 0;
     let renderer: WebGPURenderer | null = null;
     let scene: StarCloseUpScene | null = null;
+    // Issue #93 W1 (1.12): the still star is drawn once into a picture and shown behind the plasma.
+    let cache: StillStarCache | null = null;
+    let draw: (() => void) | null = null;
     const ro = new ResizeObserver(() => size());
     function size() {
       if (!renderer || !scene || !host) return;
@@ -43,6 +46,8 @@ export function StarCloseUp(props: StarCloseUpProps & { className?: string }) {
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
       renderer.setSize(w, h, false);
       scene.setAspect(w / h);
+      // A still frame (reduced motion) has no loop: draw the new size now.
+      if (reduced()) draw?.();
     }
     (async () => {
       try {
@@ -55,6 +60,7 @@ export function StarCloseUp(props: StarCloseUpProps & { className?: string }) {
         if (dead) return renderer.dispose();
         scene = new StarCloseUpScene({ physics, tint, emissive, limbU, seed, flare });
         sceneRef.current = scene;
+        cache = new StillStarCache(scene);
         setCaption(scene.caption);
         size();
         ro.observe(host);
@@ -69,8 +75,23 @@ export function StarCloseUp(props: StarCloseUpProps & { className?: string }) {
           }
           last = now;
           scene.setStage(t);
-          renderer.render(scene.scene, scene.camera);
+          draw?.();
           if (!still) raf = requestAnimationFrame(frame);
+        };
+        draw = () => {
+          if (!renderer || !scene) return;
+          if (cache) {
+            try {
+              cache.render(renderer);
+              return;
+            } catch (err) {
+              // Never blank: the live star draws instead.
+              console.warn('[close-up] cached star failed; drawing it live', err);
+              cache.dispose();
+              cache = null;
+            }
+          }
+          renderer.render(scene.scene, scene.camera);
         };
         raf = requestAnimationFrame(frame);
       } catch (err) {
@@ -83,6 +104,8 @@ export function StarCloseUp(props: StarCloseUpProps & { className?: string }) {
       cancelAnimationFrame(raf);
       ro.disconnect();
       sceneRef.current = null;
+      draw = null;
+      cache?.dispose();
       scene?.dispose();
       renderer?.dispose();
       host.replaceChildren();
@@ -111,10 +134,6 @@ export function StarCloseUp(props: StarCloseUpProps & { className?: string }) {
           This browser could not start the 3D close-up of the flare.
         </div>
       )}
-      <span className="pointer-events-none absolute left-4 top-4 max-w-[calc(100%-2rem)] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300">
-        {STAR_CLOSEUP_TAG}
-        {caption && <span className="block text-neutral-400">{caption}</span>}
-      </span>
     </div>
   );
 }

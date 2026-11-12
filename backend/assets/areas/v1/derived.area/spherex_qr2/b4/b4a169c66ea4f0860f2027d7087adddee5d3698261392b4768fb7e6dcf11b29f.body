@@ -1,0 +1,123 @@
+# %ECSV 1.0
+# ---
+# datatype:
+# - {name: track_id, datatype: string, description: T1... (A17.4)}
+# - {name: dot_id, datatype: string, description: '<frame_id>:<n> (Q-208 (14))'}
+# - {name: status, datatype: string, description: track or possible (A17.4)}
+# - {name: verdict, datatype: string, description: A17.5 known-object check}
+# - {name: match_designation, datatype: string, description: empty when no match}
+# - {name: frame_id, datatype: string, description: SPHEREx frame}
+# - {name: detector, datatype: int64}
+# - {name: time_utc, datatype: string, description: 'exposure time, ISO-8601 UTC'}
+# - {name: mjd_utc, unit: d, datatype: float64, description: 'exposure time, MJD (UTC)'}
+# - {name: ra_deg, unit: deg, datatype: float64, description: centroid through the frame WCS}
+# - {name: dec_deg, unit: deg, datatype: float64, description: centroid through the frame WCS}
+# - {name: x_px, unit: pix, datatype: float64, description: 'centroid, PNG convention of /frames'}
+# - {name: y_px, unit: pix, datatype: float64, description: 'centroid, PNG convention of /frames'}
+# - {name: wavelength_um, unit: um, datatype: float64, description: WCS-WAVE at the centroid}
+# - {name: bandwidth_um, unit: um, datatype: float64, description: WCS-WAVE at the centroid}
+# - {name: flux_ujy, unit: uJy, datatype: float64, description: Stage 2 aperture photometry}
+# - {name: flux_err_ujy, unit: uJy, datatype: float64, description: Stage 2 error}
+# - {name: flagged, datatype: bool, description: true when flags is not empty}
+# - {name: flags, datatype: string, description: comma-separated flag names (OUTLIER kept)}
+# meta: !!omap
+# - {area_id: eros-2026-03}
+# - {data_release: spherex_qr2}
+# - {observer: 500@-163182}
+# - {assumption: 'orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of fetched_at, seen from SPHEREx (500@-163182)'}
+# - {area_version: area-2}
+# - {measure_version: measure-1}
+# - {params_hash: 72e58c5d579b470b6e949fafa24082696a80724255c6d93c794a75972e14cecd}
+# - {linker: pairs}
+# - {generated_at: '2026-11-12T08:59:13.327Z'}
+# - {cached_at: '2026-11-11T18:27:26.421Z'}
+# - missing: ['checks:not_run', 'cutout:2026W12_2A_0340_1_D1', 'cutout:2026W12_2A_0340_1_D4', 'rate_grid:visits']
+# - {columns_not_applicable: 'exptime_s, ra_3sigma_arcsec, dec_3sigma_arcsec, flag_reasons, contamination, refusal'}
+# - {ades: 'phase 2 (no SPHEREx MPC observatory code, Q-145)'}
+# - {wording: 'an unexplained track is a lead for follow-up, not a discovery (A16.5)'}
+# - method:
+#     settings: {ambiguity_ratio: 0.5, annulus_in_px: 6.0, annulus_out_px: 9.0, aperture_px: 3.0, area_version: area-2, bg_box_px: 32,
+#       bg_iters: 5, bg_min_frac: 0.5, bg_sigma: 3.0, centroid_box_px: 5, centroid_formula: 'first moment of D = I - B over the centroid
+#         box at the peak, positive unmasked pixels only: x_c = sum x_i D_i / F, F = sum D_i; sigma_x^2 = sum (x_i - x_c)^2 V_i / F^2
+#         (same for y); sigma_c = sqrt((sigma_x^2 + sigma_y^2) / 2). Noise only: no pixel-phase or PSF term', cone_maxrec: 500, cone_radius_deg: 0.001,
+#       coverage_cell_arcsec: 30.0, coverage_erode_px: 10.0, coverage_rule: largest_4_connected_piece, cutout_rule: bbox_of_frame_in_box_plus_2_margin,
+#       delta_min_au: 0.05, detect_formula: 'peak = unmasked pixel with I - B > k_detect * sqrt(VARIANCE) that is the maximum of its peak
+#         box; B = bilinear mesh of sigma-clipped box means; greedy minimum separation by (-D, row, column), on the peaks and again on
+#         the centroids', exposure_tol_s: 1.0, fixed_formula: 'a dot that is not star with a dot of another visit within r_match at the
+#         same RA/Dec, where that visit''s coverage holds it', glitch_formula: 'a dot is kept when it has a counterpart within r_match
+#         + rate_max * |dt| (px) in at least k_visit - 1 other frames of its visit, both detectors counting; r_match = max(r_match_min_px,
+#         r_match_sigma * sigma_c) of the larger of the two dots; k_visit = min(k_visit_max, frames of the visit whose cutout holds the
+#         dot at least coverage_erode_px inside its edge)', grid_step_deg: 0.25, hardware_flags: 'TRANSIENT,OVERFLOW,SUR_ERROR,PHANTOM,REFERENCE,NONFUNC,DICHROIC,MISSING_DATA,HOT,COLD,FULLSAMPLE,PHANMISS,NONLINEAR,PERSIST',
+#       inputs: recorded_eros_fixture, k_detect: 5.0, k_visit_max: 3, known_formula: 'SkyBoT cone per visit (area half-diagonal + rate_max
+#         * visit span / 2 + p_max), V <= v_lim; Horizons TLIST from 500@-163182 at every exposure time; a track matches when at least
+#         known_min_frac of its dots lie within max(r_known_min_px, 3 sigma_c + ephemeris 3 sigma)', known_min_frac: 0.666667, linker: pairs,
+#       margin_deg: 0.02, measure_method_sha: ee37fa9c0d73f8f12ea154cd080f882b8e140ac87074893034111359ffc14e5f, measure_version: measure-1,
+#       min_motion_px: 1.0, min_sep_px: 3.0, overlap_eps_deg2: 1.0e-12, p_max_arcsec: 60.0, pair_formula: 'rate window rate_min = r_match_min_px
+#         / dt_v to rate_max = min(rate_max_deg_day, (diagonal - 2 margin) / dt_v); v_in = v_AB - w u with w the SPHEREx velocity about
+#         the geocentre projected on the sky at the area centre (Horizons VECTORS, one per visit); u >= 0 fitted by least squares; residual
+#         = largest |v_in - v_AB + w u| perpendicular to w; pass when residual <= max(v_tol_min, v_tol_sigma * sigma_v) and u <= 1/delta_min;
+#         track when mutual best and best <= ambiguity_ratio * next', pair_test: parallax, peak_box_px: 3, r_known_min_px: 3.0, r_match_min_px: 2.0,
+#       r_match_sigma: 3.0, rate_max_deg_day: 1.2, rms_max_px: 1.0, stamp_half_px: 11, star_artefact_flags: 'BLOOM,HALO', star_cones: 'track:1,track:2',
+#       star_formula: 'a tracklet is star when every dot lies within max(r_match, r_px) of the same Gaia DR3 or CatWISE2020 source of
+#         the visit''s star list, propagated to the dot time (r_px: the A19.6 mask radius); a dot whose flags hold a star_artefact_flags
+#         name is star too', tracklet_formula: 'per visit, greedy best-first over seed pairs within the glitch radius: the line through
+#         the pair predicts each frame, the nearest unused dot within r_match joins; least-squares line x(t), y(t) on the area plane;
+#         kept when rms <= rms_max_px and the dots span 2 or more times; best = most dots, then smallest rms, then the earliest dot; sigma_v
+#         from the fit residuals', v_lim: 22.0, v_tol_min_deg_day: 0.1, v_tol_sigma: 3.0, visit_gap_h: 1.0}
+# - column_tags: {bandwidth_um: measured, dec_deg: derived, detector: measured, flagged: measured, flags: measured, flux_err_ujy: measured,
+#     flux_ujy: measured, frame_id: measured, match_designation: model_dependent, mjd_utc: measured, ra_deg: derived, status: derived,
+#     time_utc: measured, verdict: model_dependent, wavelength_um: measured, x_px: measured, y_px: measured}
+# schema: astropy-2.0
+track_id dot_id status verdict match_designation frame_id detector time_utc mjd_utc ra_deg dec_deg x_px y_px wavelength_um bandwidth_um flux_ujy flux_err_ujy flagged flags
+T1 2026W12_2A_0158_1_D1:3 possible possible "" 2026W12_2A_0158_1_D1 1 2026-03-20T08:33:43.156Z 61119.35674949 90.7784776 13.5309623 46.848 13.1 0.9831 0.02556 4947.1 151.284 True SOURCE
+T1 2026W12_2A_0158_1_D4:2 possible possible "" 2026W12_2A_0158_1_D4 4 2026-03-20T08:33:43.156Z 61119.35674949 90.7810377 13.5325468 47.8 13.623 3.32135 0.09536 2411.925 104.454 True SOURCE,TRANSIENT
+T1 2026W12_2A_0158_2_D1:3 possible possible "" 2026W12_2A_0158_2_D1 1 2026-03-20T08:35:52.108Z 61119.35824199 90.7811431 13.5322557 46.717 13.193 1.00654 0.02656 4822.202 153.684 True SOURCE
+T1 2026W12_2A_0158_2_D4:2 possible possible "" 2026W12_2A_0158_2_D4 4 2026-03-20T08:35:52.108Z 61119.35824199 90.7807279 13.5322303 46.793 12.629 3.41116 0.09759 2171.606 96.473 True SOURCE
+T1 2026W12_2A_0158_3_D1:2 possible possible "" 2026W12_2A_0158_3_D1 1 2026-03-20T08:38:01.017Z 61119.35973399 90.7788154 13.5311157 44.835 12.929 1.0305 0.02745 5493.604 181.146 True SOURCE
+T1 2026W12_2A_0158_3_D4:2 possible possible "" 2026W12_2A_0158_3_D4 4 2026-03-20T08:38:01.017Z 61119.35973399 90.7823594 13.5335849 46.93 13.737 3.50344 0.09973 1865.807 86.269 True SOURCE
+T1 2026W12_2A_0158_4_D1:3 possible possible "" 2026W12_2A_0158_4_D1 1 2026-03-20T08:40:09.926Z 61119.361226 90.7814167 13.5326649 45.752 13.302 1.05502 0.02834 4452.153 153.943 True SOURCE
+T1 2026W12_2A_0158_4_D4:2 possible possible "" 2026W12_2A_0158_4_D4 4 2026-03-20T08:40:09.926Z 61119.361226 90.7816507 13.532757 45.777 12.6 3.59644 0.1019 1639.186 88.634 True SOURCE
+T2 2026W12_2A_0158_1_D1:9 possible possible "" 2026W12_2A_0158_1_D1 1 2026-03-20T08:33:43.156Z 61119.35674949 90.7761563 13.5388013 45.364 17.685 0.984 0.0256 246.086 126.333 True COLD,NONFUNC,SOURCE,SUR_ERROR,TRANSIENT
+T2 2026W12_2A_0158_1_D4:7 possible possible "" 2026W12_2A_0158_1_D4 4 2026-03-20T08:33:43.156Z 61119.35674949 90.7763167 13.5402764 44.944 18.119 3.32462 0.09547 -97.312 85.353 True SOURCE
+T2 2026W12_2A_0158_2_D1:8 possible possible "" 2026W12_2A_0158_2_D1 1 2026-03-20T08:35:52.108Z 61119.35824199 90.7759203 13.5399524 43.58 17.679 1.0074 0.0266 132.105 135.853 True SOURCE
+T2 2026W12_2A_0158_3_D4:7 possible possible "" 2026W12_2A_0158_3_D4 4 2026-03-20T08:38:01.017Z 61119.35973399 90.7837249 13.5412125 47.545 18.22 3.50709 0.09982 1234.94 87.953 True SOURCE
+T2 2026W12_2A_0158_4_D4:7 possible possible "" 2026W12_2A_0158_4_D4 4 2026-03-20T08:40:09.926Z 61119.361226 90.7846321 13.5404389 47.314 17.128 3.60038 0.10186 1247.752 88.822 True SOURCE
+T3 2026W12_2A_0158_1_D1:18 track found_blind "433 Eros" 2026W12_2A_0158_1_D1 1 2026-03-20T08:33:43.156Z 61119.35674949 90.7480074 13.5591074 28.894 29.434 0.98614 0.02569 109686.453 373.506 True OUTLIER
+T3 2026W12_2A_0158_1_D4:15 track found_blind "433 Eros" 2026W12_2A_0158_1_D4 4 2026-03-20T08:33:43.156Z 61119.35674949 90.7479448 13.5591082 28.373 28.961 3.33186 0.09573 76280.095 261.219 True OUTLIER
+T3 2026W12_2A_0158_2_D1:18 track found_blind "433 Eros" 2026W12_2A_0158_2_D1 1 2026-03-20T08:35:52.108Z 61119.35824199 90.7494625 13.5594451 28.084 28.963 1.00945 0.0267 106288.426 362.184 True OUTLIER,PERSIST
+T3 2026W12_2A_0158_2_D4:12 track found_blind "433 Eros" 2026W12_2A_0158_2_D4 4 2026-03-20T08:35:52.108Z 61119.35824199 90.7494541 13.5593429 28.383 28.306 3.42238 0.09788 79616.235 266.421 True OUTLIER
+T3 2026W12_2A_0158_3_D1:15 track found_blind "433 Eros" 2026W12_2A_0158_3_D1 1 2026-03-20T08:38:01.017Z 61119.35973399 90.7510179 13.5596335 28.385 29.505 1.03375 0.02757 106916.211 365.464 True OUTLIER
+T3 2026W12_2A_0158_3_D4:15 track found_blind "433 Eros" 2026W12_2A_0158_3_D4 4 2026-03-20T08:38:01.017Z 61119.35973399 90.7510148 13.5596421 28.494 28.798 3.51451 0.10027 86874.24 274.097 True OUTLIER
+T3 2026W12_2A_0158_4_D4:14 track found_blind "433 Eros" 2026W12_2A_0158_4_D4 4 2026-03-20T08:40:09.926Z 61119.361226 90.7525306 13.5597707 28.583 28.241 3.60874 0.10236 96807.677 287.265 True OUTLIER,SOURCE
+T3 2026W12_2A_0341_1_D1:12 track found_blind "433 Eros" 2026W12_2A_0341_1_D1 1 2026-03-21T08:58:24.830Z 61120.3738985 91.7083296 13.2958454 28.89 28.96 0.79187 0.01919 45543.948 269.026 True OUTLIER
+T3 2026W12_2A_0341_1_D4:13 track found_blind "433 Eros" 2026W12_2A_0341_1_D4 4 2026-03-21T08:58:24.830Z 61120.3738985 91.7083719 13.2959073 28.716 29.01 2.59097 0.07352 27132.394 176.947 True OUTLIER
+T3 2026W12_2A_0341_2_D1:15 track found_blind "433 Eros" 2026W12_2A_0341_2_D1 1 2026-03-21T09:00:33.782Z 61120.375391 91.7097924 13.2962218 28.407 28.655 0.81061 0.02021 43865.793 263.618 True OUTLIER
+T3 2026W12_2A_0341_3_D1:11 track found_blind "433 Eros" 2026W12_2A_0341_3_D1 1 2026-03-21T09:02:42.691Z 61120.376883 91.7113378 13.2963392 28.108 29.29 0.82982 0.02087 49269.492 265.074 True NONFUNC,OUTLIER,PERSIST,SUR_ERROR,TRANSIENT
+T3 2026W12_2A_0341_3_D4:13 track found_blind "433 Eros" 2026W12_2A_0341_3_D4 4 2026-03-21T09:02:42.691Z 61120.376883 91.7112701 13.2963773 28.443 29.118 2.73304 0.078 29181.476 180.397 True NONFUNC,OUTLIER,PERSIST,SOURCE
+T3 2026W12_2A_0341_4_D1:12 track found_blind "433 Eros" 2026W12_2A_0341_4_D1 1 2026-03-21T09:04:51.643Z 61120.3783755 91.712857 13.2965786 28.753 29.014 0.84943 0.02125 51446.65 272.298 True OUTLIER,PERSIST
+T3 2026W12_2A_0341_4_D4:15 track found_blind "433 Eros" 2026W12_2A_0341_4_D4 4 2026-03-21T09:04:51.643Z 61120.3783755 91.7128168 13.2966389 28.877 28.752 2.80723 0.08015 29314.911 179.594 True OUTLIER,PERSIST,SOURCE
+T4 2026W12_2A_0158_1_D1:24 possible possible "" 2026W12_2A_0158_1_D1 1 2026-03-20T08:33:43.156Z 61119.35674949 90.7393678 13.571074 23.722 36.405 0.98748 0.02575 1397.974 133.281 True SOURCE
+T4 2026W12_2A_0158_1_D4:20 possible possible "" 2026W12_2A_0158_1_D4 4 2026-03-20T08:33:43.156Z 61119.35674949 90.7358911 13.5723521 21.221 36.641 3.33729 0.09594 491.741 103.438 True SOURCE
+T4 2026W12_2A_0158_2_D4:18 possible possible "" 2026W12_2A_0158_2_D4 4 2026-03-20T08:35:52.108Z 61119.35824199 90.7403049 13.5702687 22.934 34.649 3.42704 0.098 542.14 90.827 True SOURCE
+T4 2026W12_2A_0158_3_D1:18 possible possible "" 2026W12_2A_0158_3_D1 1 2026-03-20T08:38:01.017Z 61119.35973399 90.7439264 13.5697698 24.13 35.415 1.03494 0.02761 696.309 130.947 True NONFUNC,OUTLIER,SOURCE,SUR_ERROR,TRANSIENT
+T4 2026W12_2A_0158_3_D4:19 possible possible "" 2026W12_2A_0158_3_D4 4 2026-03-20T08:38:01.017Z 61119.35973399 90.7446094 13.5682078 24.658 33.778 3.51831 0.10043 119.885 107.524 True COLD,NONFUNC,OUTLIER,SOURCE,SUR_ERROR,TRANSIENT
+T5 2026W12_2A_0158_1_D1:32 possible possible "" 2026W12_2A_0158_1_D1 1 2026-03-20T08:33:43.156Z 61119.35674949 90.7299383 13.5921203 17.916 48.699 0.98988 0.02586 439.325 130.414 True SOURCE
+T5 2026W12_2A_0158_2_D1:31 possible possible "" 2026W12_2A_0158_2_D1 1 2026-03-20T08:35:52.108Z 61119.35824199 90.7313415 13.5915057 17.092 47.674 1.0132 0.02684 660.999 128.176 True SOURCE
+T5 2026W12_2A_0158_3_D1:27 possible possible "" 2026W12_2A_0158_3_D1 1 2026-03-20T08:38:01.017Z 61119.35973399 90.7347057 13.591088 18.434 47.877 1.03748 0.0277 370.353 122.355 True SOURCE,SUR_ERROR,TRANSIENT
+T5 2026W12_2A_0158_4_D1:28 possible possible "" 2026W12_2A_0158_4_D1 1 2026-03-20T08:40:09.926Z 61119.361226 90.734166 13.5913346 17.573 47.472 1.06181 0.02855 453.534 164.817 True OUTLIER,SOURCE
+T6 2026W12_2A_0158_2_D1:23 possible possible "" 2026W12_2A_0158_2_D1 1 2026-03-20T08:35:52.108Z 61119.35824199 90.7313663 13.5718827 17.505 36.158 1.01078 0.02676 637.828 138.809 True NONFUNC,SOURCE,SUR_ERROR,TRANSIENT
+T6 2026W12_2A_0158_3_D1:20 possible possible "" 2026W12_2A_0158_3_D1 1 2026-03-20T08:38:01.017Z 61119.35973399 90.7352027 13.5723425 19.098 36.875 1.03517 0.02762 1106.004 133.51 True SOURCE
+T6 2026W12_2A_0158_4_D1:21 possible possible "" 2026W12_2A_0158_4_D1 1 2026-03-20T08:40:09.926Z 61119.361226 90.7392234 13.5712076 20.87 35.682 1.05937 0.02847 1621.314 139.829 True SOURCE
+T7 2026W12_2A_0158_2_D1:24 possible possible "" 2026W12_2A_0158_2_D1 1 2026-03-20T08:35:52.108Z 61119.35824199 90.7366342 13.5722 20.505 36.374 1.01087 0.02676 1391.571 141.257 True SOURCE
+T7 2026W12_2A_0158_4_D1:20 possible possible "" 2026W12_2A_0158_4_D1 1 2026-03-20T08:40:09.926Z 61119.361226 90.7317222 13.5719191 16.572 36.055 1.05939 0.02846 798.942 135.087 True SOURCE
+T8 2026W12_2A_0341_1_D1:10 possible possible "" 2026W12_2A_0341_1_D1 1 2026-03-21T08:58:24.830Z 61120.3738985 91.7096119 13.2834941 30.014 21.749 0.79068 0.01913 96.971 126.72 True SOURCE
+T8 2026W12_2A_0341_1_D4:10 possible possible "" 2026W12_2A_0341_1_D4 4 2026-03-21T08:58:24.830Z 61120.3738985 91.7106086 13.2831704 30.406 21.585 2.58644 0.07348 570.99 99.591 True SOURCE
+T8 2026W12_2A_0341_2_D4:12 possible possible "" 2026W12_2A_0341_2_D4 4 2026-03-21T09:00:33.782Z 61120.375391 91.7094713 13.2840114 28.22 21.439 2.65671 0.0754 513.177 108.217 True SOURCE
+T8 2026W12_2A_0341_3_D1:9 possible possible "" 2026W12_2A_0341_3_D1 1 2026-03-21T09:02:42.691Z 61120.376883 91.7090332 13.2838848 27.204 22.004 0.82859 0.02085 373.419 134.243 True SOURCE,SUR_ERROR,TRANSIENT
+T8 2026W12_2A_0341_3_D4:10 possible possible "" 2026W12_2A_0341_3_D4 4 2026-03-21T09:02:42.691Z 61120.376883 91.7103756 13.2833103 28.373 21.484 2.72813 0.07787 580.908 98.432 True SOURCE
+T8 2026W12_2A_0341_4_D1:9 possible possible "" 2026W12_2A_0341_4_D1 1 2026-03-21T09:04:51.643Z 61120.3783755 91.7094055 13.2842914 27.193 21.819 0.84823 0.02123 110.576 126.451 True PERSIST,SOURCE
+T8 2026W12_2A_0341_4_D4:10 possible possible "" 2026W12_2A_0341_4_D4 4 2026-03-21T09:04:51.643Z 61120.3783755 91.7125327 13.2804839 29.253 19.313 2.80091 0.07988 533.25 96.932 True SOURCE
+T9 2026W12_2A_0341_1_D4:31 possible possible "" 2026W12_2A_0341_1_D4 4 2026-03-21T08:58:24.830Z 61120.3738985 91.7158559 13.3267106 31.916 47.004 2.60163 0.07363 325.664 87.725 True NONFUNC,OVERFLOW,SOURCE,SUR_ERROR,TRANSIENT
+T9 2026W12_2A_0341_2_D4:34 possible possible "" 2026W12_2A_0341_2_D4 4 2026-03-21T09:00:33.782Z 61120.375391 91.7158425 13.3254141 30.441 45.626 2.67151 0.07596 612.743 89.439 True SOURCE
+T9 2026W12_2A_0341_3_D4:29 possible possible "" 2026W12_2A_0341_3_D4 4 2026-03-21T09:02:42.691Z 61120.376883 91.7142354 13.3219022 29.27 44.034 2.74261 0.07826 435.213 84.06 True COLD,SOURCE,SUR_ERROR,TRANSIENT
+T9 2026W12_2A_0341_4_D4:29 possible possible "" 2026W12_2A_0341_4_D4 4 2026-03-21T09:04:51.643Z 61120.3783755 91.7147296 13.3206633 29.161 42.796 2.81662 0.08056 468.587 91.411 True SOURCE
