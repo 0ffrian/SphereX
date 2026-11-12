@@ -24,6 +24,7 @@ export interface WeatherSnapshot {
 let current: WeatherSnapshot | null = null;
 const listeners = new Set<(s: WeatherSnapshot | null) => void>();
 const strikeListeners = new Set<(s: Strike) => void>();
+let subscribes = 0;
 
 /**
  * The ambience loop only: 10 Hz whenever the fly view is live at "+ Artistic", with sound off, muted or still locked
@@ -47,6 +48,7 @@ export function getWeather(): WeatherSnapshot | null {
 
 /** Called on every publish (10 Hz) and on null. Returns the unsubscribe function. */
 export function subscribeWeather(cb: (s: WeatherSnapshot | null) => void): () => void {
+  subscribes++;
   listeners.add(cb);
   return () => void listeners.delete(cb);
 }
@@ -57,13 +59,13 @@ export function onStrike(cb: (s: Strike) => void): () => void {
   return () => void strikeListeners.delete(cb);
 }
 
-/** React: the latest snapshot. Re-renders at 10 Hz; a canvas overlay should subscribeWeather from its own loop. */
+/**
+ * React: the latest snapshot. Re-renders at 10 Hz; a canvas overlay should subscribeWeather from its own loop.
+ * The subscribe and getSnapshot functions are module-level (stable), so React subscribes once per mount, not on every
+ * render (#116 code review m6).
+ */
 export function useWeatherSnapshot(): WeatherSnapshot | null {
-  return useSyncExternalStore(
-    (cb) => subscribeWeather(() => cb()),
-    getWeather,
-    getWeather,
-  );
+  return useSyncExternalStore(subscribeWeather, getWeather, getWeather);
 }
 
 /** One weather row for "What is drawn" (#117) and "What you hear" (#116), with its §8.5 tag. */
@@ -100,9 +102,15 @@ export function weatherRows(s: WeatherSnapshot | null): WeatherRow[] {
   return rows;
 }
 
+/** Tests: weather subscribers registered now, and subscribeWeather calls since the last reset. */
+export function weatherBusStats(): { listeners: number; subscribes: number } {
+  return { listeners: listeners.size, subscribes };
+}
+
 /** Tests. */
 export function resetWeatherBus(): void {
   current = null;
+  subscribes = 0;
   listeners.clear();
   strikeListeners.clear();
 }
