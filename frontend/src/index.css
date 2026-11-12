@@ -5274,3 +5274,10 @@ body {
 .sx-paper:focus-visible {
   background: var(--glass-grain), var(--glass-hover);
 }
+/* Q-456: the island has nothing to say while a body is viewed, so it is not shown in the build view.
+   Hidden, not removed: the minimise animation still flies to its place, and it shows again as the
+   minimised pill (the build view is then no longer the split). */
+.sx-bezel[data-split] .sx-orb-wrap {
+  visibility: hidden;
+  pointer-events: none;
+}
