@@ -138,11 +138,15 @@ class AreaResult:
         return settings_sha({k: self.settings[k] for k in method_settings()})
 
     def times(self) -> tuple[str, str]:
-        """``(cached_at, computed_at)`` from the inputs read after the dots step."""
-        when = sorted(s.entry.fetched_at for s in self.served)
+        """``(cached_at, computed_at)`` from the inputs read after the dots step. When none was
+        read (every star cone, vector, SkyBoT and Horizons call failed or missed the offline
+        cache; each is listed in ``missing``), the dates of the frame cones the dots came from,
+        which every stored run has read (Q-420 (9)). Never the wall clock (A17.10)."""
+        when = [iso_utc_z(t) for t in sorted(s.entry.fetched_at for s in self.served)]
+        when = when or list(self.frames.sia_fetched)
         if not when:
-            raise ValueError("no cached input: the run has no date to report")
-        return iso_utc_z(when[0]), iso_utc_z(when[-1])
+            raise ValueError("no input with a fetched_at: the run has no date to report")
+        return when[0], when[-1]
 
 
 DEFAULT_SOURCES = {
