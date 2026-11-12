@@ -327,3 +327,18 @@ export function groupCompositeMissing(codes: readonly string[]): RefusalGroup[] 
     }),
   );
 }
+
+/**
+ * Plain-English line for a code of the Known objects reply (A17.8, A17.5, A16.5): `area:not_prepared`,
+ * `area_not_found`, `skybot:<visit>` and `horizons:<designation>`. Any other code is shown as is,
+ * never dropped.
+ */
+export function areaMissingNote(code: string): string {
+  if (code === 'area:not_prepared') return 'No prepared data for this area yet.';
+  if (code === 'area_not_found') return 'This area is no longer in the prepared set.';
+  const sky = /^skybot:(\d+)$/.exec(code);
+  if (sky) return `SkyBoT did not answer for visit ${sky[1]}, so objects seen only then may be missing.`;
+  const hor = /^horizons:(.+)$/.exec(code);
+  if (hor) return `Horizons gave no positions for ${hor[1]}, so its path is not drawn.`;
+  return code;
+}

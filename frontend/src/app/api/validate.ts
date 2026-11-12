@@ -30,7 +30,18 @@ import type {
   SpectrumPoint,
   SpectrumResponse,
 } from './types';
-import { OBJECT_TYPES, TAGS, type ObjectCard, type RenderParams, type Tag } from '@/contract';
+import {
+  OBJECT_TYPES,
+  TAGS,
+  type AreaIndex,
+  type AreaKnown,
+  type AreaKnownObject,
+  type AreaKnownPosition,
+  type ObjectCard,
+  type RenderParams,
+  type Tag,
+  type TrackPath,
+} from '@/contract';
 
 type Obj = Readonly<Record<string, unknown>>;
 
@@ -685,4 +696,123 @@ export function parseRenderParams(raw: unknown): RenderParams {
   });
   strList(o, 'missing', p);
   return raw as RenderParams;
+}
+
+
+// ---- Area search and the object path (A17.8, A19.5; issue #130) -----------------------------------
+// Checked against the generated types (D-18): required fields and their types, the ranges that
+// matter to the UI. A reply that does not match is refused; nothing is defaulted.
+
+function lonLat(o: Obj, path: string): { ra: number; dec: number } {
+  const ra = num(o, 'ra', path);
+  const dec = num(o, 'dec', path);
+  if (ra < 0 || ra >= 360) fail(`${path}.ra`, 'expected 0 ≤ RA < 360');
+  if (dec < -90 || dec > 90) fail(`${path}.dec`, 'expected −90 ≤ Dec ≤ 90');
+  return { ra, dec };
+}
+
+function provEntry(raw: unknown, path: string): { tag: 'measured' | 'derived' | 'model_dependent' } {
+  const o = obj(raw, path);
+  const tag = str(o, 'tag', path);
+  if (tag !== 'measured' && tag !== 'derived' && tag !== 'model_dependent') {
+    fail(`${path}.tag`, 'expected measured, derived or model_dependent');
+  }
+  return { tag };
+}
+
+/** `GET /v1/areas` (A17.8): the prepared areas. */
+export function parseAreaIndex(raw: unknown): AreaIndex {
+  const p = 'areas';
+  const o = obj(raw, p);
+  arr(o, 'areas', p).forEach((a, i) => {
+    const q = `${p}.areas[${i}]`;
+    const e = obj(a, q);
+    str(e, 'area_id', q);
+    lonLat(e, q);
+    for (const k of ['width_deg', 'height_deg']) {
+      if (num(e, k, q) <= 0) fail(`${q}.${k}`, 'expected a positive size');
+    }
+    str(e, 'data_release', q);
+    num(e, 'n_frames', q);
+    num(e, 'n_visits', q);
+    time(e, 'computed_at', q);
+    time(e, 'cached_at', q);
+  });
+  nullableTime(o, 'cached_at', p);
+  nullableTime(o, 'computed_at', p);
+  strList(o, 'missing', p);
+  const prov = obj(o.provenance, `${p}.provenance`);
+  provEntry(prov.areas, `${p}.provenance.areas`);
+  return raw as AreaIndex;
+}
+
+function parseKnownObject(raw: unknown, path: string): AreaKnownObject {
+  const o = obj(raw, path);
+  str(o, 'designation', path);
+  if (o.number !== null && !(Number.isInteger(o.number) && (o.number as number) >= 1)) {
+    fail(`${path}.number`, 'expected a whole number or null');
+  }
+  if (o.object_id !== null) str(o, 'object_id', path);
+  const kind = str(o, 'kind', path);
+  if (kind !== 'asteroid' && kind !== 'comet') fail(`${path}.kind`, 'expected asteroid or comet');
+  if (o.v_mag !== null) num(o, 'v_mag', path);
+  for (const k of ['n_frames', 'n_visits']) {
+    const n = num(o, k, path);
+    if (!Number.isInteger(n) || n < 1) fail(`${path}.${k}`, 'expected a whole number of 1 or more');
+  }
+  const positions: AreaKnownPosition[] = arr(o, 'positions', path).map((r, i) => {
+    const q = `${path}.positions[${i}]`;
+    const po = obj(r, q);
+    return { frame_id: str(po, 'frame_id', q), time: time(po, 'time', q), ...lonLat(po, q) };
+  });
+  bool(o, 'track_available', path);
+  return { ...(o as unknown as AreaKnownObject), positions };
+}
+
+/** `GET /v1/areas/{id}/known` (A17.8, A17.5). */
+export function parseAreaKnown(raw: unknown): AreaKnown {
+  const p = 'known';
+  const o = obj(raw, p);
+  const known = arr(o, 'known', p).map((k, i) => parseKnownObject(k, `${p}.known[${i}]`));
+  const skybot = arr(o, 'skybot', p).map((s, i) => {
+    const q = `${p}.skybot[${i}]`;
+    const so = obj(s, q);
+    return { visit: num(so, 'visit', q), fetched_at: nullableTime(so, 'fetched_at', q) };
+  });
+  const prov = obj(o.provenance, `${p}.provenance`);
+  provEntry(prov.positions, `${p}.provenance.positions`);
+  provEntry(prov.skybot, `${p}.provenance.skybot`);
+  return {
+    known,
+    skybot,
+    cached_at: time(o, 'cached_at', p),
+    computed_at: time(o, 'computed_at', p),
+    missing: strList(o, 'missing', p),
+    provenance: prov as unknown as AreaKnown['provenance'],
+  };
+}
+
+/** `GET /v1/objects/{id}/path` (A19.5, Q-141): model_dependent by contract. */
+export function parseTrackPath(raw: unknown): TrackPath {
+  const p = 'path';
+  const o = obj(raw, p);
+  str(o, 'id', p);
+  if (o.tag !== 'model_dependent') fail(`${p}.tag`, 'expected model_dependent');
+  str(o, 'assumption', p);
+  str(o, 'formula', p);
+  const timed = (list: readonly unknown[], q: string) =>
+    list.forEach((r, i) => {
+      const e = obj(r, `${q}[${i}]`);
+      time(e, 'time', `${q}[${i}]`);
+      lonLat(e, `${q}[${i}]`);
+    });
+  timed(arr(o, 'points', p), `${p}.points`);
+  timed(arr(o, 'frame_points', p), `${p}.frame_points`);
+  arr(o, 'windows', p).forEach((r, i) => {
+    const w = obj(r, `${p}.windows[${i}]`);
+    time(w, 'start', `${p}.windows[${i}]`);
+    time(w, 'end', `${p}.windows[${i}]`);
+  });
+  strList(o, 'missing', p);
+  return raw as TrackPath;
 }

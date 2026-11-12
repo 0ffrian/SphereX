@@ -11,7 +11,7 @@ import {
   FIXTURE_HEADER,
 } from './config';
 import { ApiError } from './errors';
-import type { ObjectCard, RenderParams } from '@/contract';
+import type { AreaIndex, AreaKnown, ObjectCard, RenderParams, TrackPath } from '@/contract';
 import type {
   CombineInfo,
   CombineOp,
@@ -25,6 +25,9 @@ import type {
 } from './types';
 import {
   parseApiError,
+  parseAreaIndex,
+  parseAreaKnown,
+  parseTrackPath,
   parseCombineInfo,
   parseComposite,
   parseFrames,
@@ -67,6 +70,12 @@ export interface ApiClient {
   card(id: string, signal?: AbortSignal): Promise<ApiResult<ObjectCard>>;
   /** `GET /v1/objects/{id}/render-params` (D-16): what the 3D view may draw (issue #60). */
   renderParams(id: string, signal?: AbortSignal): Promise<ApiResult<RenderParams>>;
+  /** `GET /v1/areas` (A17.8, issue #130): the prepared areas. */
+  areas(signal?: AbortSignal): Promise<ApiResult<AreaIndex>>;
+  /** `GET /v1/areas/{id}/known` (A17.8, issue #130). */
+  areaKnown(areaId: string, signal?: AbortSignal): Promise<ApiResult<AreaKnown>>;
+  /** `GET /v1/objects/{id}/path` (A19.5, issue #130): the Horizons path seen from SPHEREx. */
+  path(id: string, signal?: AbortSignal): Promise<ApiResult<TrackPath>>;
   /** `GET /v1/objects/{id}/overlays` (issue #12). */
   getOverlays(id: string, signal?: AbortSignal): Promise<ApiResult<OverlaysResponse>>;
   /** `GET /v1/objects/{id}/combine.png?op=&a=&b=` (issue #12). The caller owns the object URL. */
@@ -221,6 +230,10 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     card: (id, signal) => getJson(`${objectPath(id)}/card`, parseObjectCard, signal),
     renderParams: (id, signal) =>
       getJson(`${objectPath(id)}/render-params`, parseRenderParams, signal),
+    areas: (signal) => getJson('/areas', parseAreaIndex, signal),
+    areaKnown: (areaId, signal) =>
+      getJson(`/areas/${encodeURIComponent(areaId)}/known`, parseAreaKnown, signal),
+    path: (id, signal) => getJson(`${objectPath(id)}/path`, parseTrackPath, signal),
     getOverlays: (id, signal) => getJson(`${objectPath(id)}/overlays`, parseOverlays, signal),
     getCombine: (id, op, a, b, signal) => {
       const query = new URLSearchParams({ op, a, b }).toString();

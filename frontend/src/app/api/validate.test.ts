@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from './errors';
-import { isIsoWithZone, parseApiError, parseFrames, parseResolve, parseSpectrum } from './validate';
+import { readFileSync } from 'node:fs';
+import {
+  isIsoWithZone,
+  parseApiError,
+  parseAreaIndex,
+  parseAreaKnown,
+  parseFrames,
+  parseResolve,
+  parseSpectrum,
+  parseTrackPath,
+} from './validate';
+
+const shared = (rel: string): unknown =>
+  JSON.parse(readFileSync(`${process.cwd()}/../shared/fixtures/${rel}`, 'utf8'));
 
 // Contract-shaped test data. Values are test data only, not physical claims.
 const resolve = {
@@ -167,5 +180,33 @@ describe('contract checks (D-16, M1 brief)', () => {
     });
     expect(parseApiError('oops')).toBeNull();
     expect(parseApiError({ detail: 'no code' })).toBeNull();
+  });
+});
+
+describe('Area search replies (A17.8, A19.5; issue #130)', () => {
+  it('accepts the shared fixtures', () => {
+    expect(parseAreaIndex(shared('area/index.json')).areas).toHaveLength(2);
+    const known = parseAreaKnown(shared('area/known.json'));
+    expect(known.known[0]!.track_available).toBe(true);
+    expect(known.known[0]!.positions.length).toBeGreaterThan(0);
+    expect(parseTrackPath(shared('track/eros-2026-03/path.json')).frame_points).toHaveLength(16);
+  });
+  it('refuses an index without the areas list or with a bad size', () => {
+    const idx = shared('area/index.json') as { areas: Record<string, unknown>[] };
+    expect(() => parseAreaIndex({ ...idx, areas: undefined })).toThrow(ApiError);
+    expect(() => parseAreaIndex({ ...idx, areas: [{ ...idx.areas[0], width_deg: 0 }] })).toThrow(/width_deg/);
+  });
+  it('refuses a known object with a bad kind, count or position', () => {
+    const k = shared('area/known.json') as { known: Record<string, unknown>[] };
+    const bad = (patch: Record<string, unknown>) => parseAreaKnown({ ...k, known: [{ ...k.known[0], ...patch }] });
+    expect(() => bad({ kind: 'planet' })).toThrow(/kind/);
+    expect(() => bad({ n_frames: 0 })).toThrow(/n_frames/);
+    expect(() => bad({ positions: [{ frame_id: 'f', time: 'soon', ra: 1, dec: 1 }] })).toThrow(/time/);
+    expect(() => bad({ positions: [{ frame_id: 'f', time: '2026-03-20T00:00:00.000Z', ra: 400, dec: 1 }] })).toThrow(/ra/);
+    expect(() => parseAreaKnown({ ...k, provenance: { positions: { tag: 'artistic' }, skybot: { tag: 'measured' } } })).toThrow(/tag/);
+  });
+  it('refuses a path that is not model_dependent', () => {
+    const p = shared('track/eros-2026-03/path.json') as Record<string, unknown>;
+    expect(() => parseTrackPath({ ...p, tag: 'measured' })).toThrow(/model_dependent/);
   });
 });

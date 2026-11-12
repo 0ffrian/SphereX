@@ -1,9 +1,10 @@
 // The #track window inside the drawn square (mock-up `knDraw` / `discDraw`): one canvas over the sky
 // view, drawn only inside the square. It repaints with the view (the square follows the sky), when
 // the area state changes and while the marker glides to the time of the shown exposure.
-// Demo data: see areaService.ts.
+// The sky image under the path is a demo extraction; in the Known flow the path itself is the real
+// Horizons path (issue #130). See areaService.ts.
 import { useEffect, useRef } from 'react';
-import { DemoTag } from './DemoTag';
+import { DEMO_CUTOUT_NOTE, DemoTag } from './DemoTag';
 import type { SkyView } from '@/viewer/sky/SkyView';
 import { currentHop, useAreaStore } from '@/app/shell/areaStore';
 import { boxToPixels } from '@/app/sky/areaDraw';
@@ -12,6 +13,7 @@ import { drawTrackWindow } from './erosDraw';
 export function AreaTrackLayer({ view }: { view: SkyView | null }) {
   const ref = useRef<HTMLCanvasElement>(null);
   // The canvas draws demo data (Eros's real frames, made-up dots): it wears the tag too (Q-414).
+  const real = useAreaStore((s) => s.trackSource === 'real');
   const demoOn = useAreaStore(
     (s) => (s.screen === 'eros' || s.screen === 'disc' || s.screen === 'mover') && !!s.box && !!s.eros && !s.refusal,
   );
@@ -87,7 +89,10 @@ export function AreaTrackLayer({ view }: { view: SkyView | null }) {
       <canvas ref={ref} className="sx-area-track" aria-hidden="true" data-testid="area-track" />
       {demoOn && (
         <span className="sx-area-track-tag" data-testid="area-track-demo">
-          <DemoTag testId="area-track-demo-tag" />
+          <DemoTag
+            testId="area-track-demo-tag"
+            {...(real ? { label: 'Demo image', note: DEMO_CUTOUT_NOTE } : {})}
+          />
         </span>
       )}
     </>
