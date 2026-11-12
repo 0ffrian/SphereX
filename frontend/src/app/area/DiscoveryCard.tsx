@@ -41,6 +41,7 @@ export function DiscoveryCard() {
       subtitle={box ? `Area · ${formatAreaDims(box)}` : 'Area'}
       icon="area"
       onClose={closePanel}
+      onMinimise={() => useAreaStore.getState().setMinimised(true)}
       returnFocusTo='[data-testid="tool-area"]'
       testId="area-card"
     >

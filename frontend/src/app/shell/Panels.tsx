@@ -16,10 +16,17 @@ import { useShellStore } from './shellStore';
 export function Panels() {
   const tool = useShellStore((s) => s.tool);
   const thinking = useAppStore((s) => isThinking(s.sky.status));
+  const minimised = useShellStore((s) => s.minimised);
+  // A new search opens the card again (its result belongs on screen, not in the pill).
+  const query = useAppStore((s) => s.sky.query);
+  useEffect(() => {
+    useShellStore.getState().setMinimised(false);
+  }, [query]);
   // While the object is found and its frames searched the island thinks (issue #66); the panel
   // opens from it when the data is in (or the search failed, so the error and Try again show).
   if (tool === 'area') return <AreaCard />;
-  if ((tool === 'flipbook' || tool === 'spectrum') && !thinking) return <ObjectPanel />;
+  // Minimised: the island's pill holds its place (Island.tsx) and a click on it brings it back.
+  if ((tool === 'flipbook' || tool === 'spectrum') && !thinking && !minimised) return <ObjectPanel />;
   return null;
 }
 

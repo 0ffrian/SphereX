@@ -8,6 +8,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/state/store';
 import { useShellStore } from '@/app/shell/shellStore';
+import { displayName } from '@/app/displayName';
 import { useElapsedSeconds } from '@/app/StatusBoxes';
 import GridLoader from './GridLoader';
 import { FOUND_LOOK, IDLE_LOOK, LOADER_BASE, SEARCHING_LOOK, UPDATING_LOOK } from './loaderLooks';
@@ -47,7 +48,13 @@ export function Island() {
 
   // Only a panel that opens after the island thought is travelled to; one opened from the rail
   // with nothing loading just shows, and the island stays at the top.
-  const areaMiniOn = useAreaStore((s) => s.minimised);
+  // A minimised card (an area card, or the Flipbook card): the island is a pill that holds its place.
+  const objMini = useShellStore((s) =>
+    s.minimised && (s.tool === 'flipbook' || s.tool === 'spectrum')
+      ? (sky.resolved ? displayName(sky.resolved.name) || 'Flipbook' : 'Flipbook')
+      : null,
+  );
+  const areaMiniOn = useAreaStore((s) => s.minimised) || objMini !== null;
   const inPanel = panelBox !== null && travels && !areaMiniOn;
   const thinking = panelBox === null && isThinking(sky.status);
   // While the sky view moves, the island shows "Updating" for a moment (a cue only; nothing loads).
@@ -67,9 +74,14 @@ export function Island() {
   // The square tools (Known objects, Discovery): the island says what the dummy search is doing, and
   // it holds the place of a minimised card (a click brings it back).
   const areaSay = useAreaStore((s) => s.say);
-  const areaMini = useAreaStore((s) => (s.minimised ? areaMiniTitle(s) : null));
+  const areaMini = useAreaStore((s) => (s.minimised ? areaMiniTitle(s) : null)) ?? objMini;
   const areaRunning = useAreaStore((s) => s.running);
-  const restore = () => useAreaStore.getState().setMinimised(false);
+  const restore = () => {
+    // The card grows out of the island again, as when it first opened.
+    setTravels(true);
+    if (objMini !== null) useShellStore.getState().setMinimised(false);
+    else useAreaStore.getState().setMinimised(false);
+  };
   const miniRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (areaMini !== null) miniRef.current?.focus({ preventScroll: true });
