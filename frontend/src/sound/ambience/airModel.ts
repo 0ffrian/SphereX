@@ -11,7 +11,9 @@ import { HURRICANE, K_SURF, P_FLOOR, RH_ASSUMED } from './tuning';
 
 /** Exact refusal and data-gap strings (§7, §13). New strings (not in the spec) are proposed as Q- entries for T1. */
 export const REFUSAL_TEXT = {
+  /** R6: only below P_FLOOR (1 Pa). */
   noAir: 'No air here, so there is no sound.',
+  /** R6: only below P_FLOOR. */
   lavaNoAir: 'The magma glows, but with almost no air, it makes no sound you could hear.',
   noLiquid: 'No liquid can exist on the surface here, so there are no waves, rain or rivers.',
   dataGap: 'Sound needs the surface view.',
@@ -101,8 +103,9 @@ export function buildAirModel(world: CardToWorldOk, e: WorldEngineLike): AirMode
   const T0 = Ts ?? 0;
   const P0 = gas ? 1e4 : (Ps ?? 0) * 1e5;
   const H_km = (Hm ?? 0) / 1000;
-  const airless = !!m.airless;
-  const airOK = dataOK && (gas || (!airless && P0 >= P_FLOOR));
+  // R6: acoustic air is P0 >= P_FLOOR. The engine's `airless` (Ps < 0.02 bar) is a climate threshold (no greenhouse,
+  // no rain) and does not gate sound; liquids and rain still follow the engine's state and canLiquid.
+  const airOK = dataOK && (gas || P0 >= P_FLOOR);
   const c0 = dataOK ? soundSpeed(gamma, T0, mu) : 0;
   const rho0 = dataOK ? density(P0, T0, mu) : 0;
   const lavaWorld = !gas && T0 > 700 && !!hydro?.lava;
@@ -168,6 +171,10 @@ export function buildAirModel(world: CardToWorldOk, e: WorldEngineLike): AirMode
     inputs.push({ label: 'Acoustic impedance', value: rho0 * c0, unit: 'kg m⁻² s⁻¹', tag: 'derived', source: 'Z0 = ρ0 c0' });
   }
   if (cls === 'N2') inputs.push({ label: 'Humidity (for absorption)', value: RH_ASSUMED * 100, unit: '%', tag: 'inferred_from_analog', source: 'assumed 50 % (ISO 9613-1)' });
+  if (lavaWorld && airOK) {
+    // R6: the lava world's thin rock-vapour air is assumed (cardToWorld ROCK_VAPOUR), so its sound carries that label.
+    inputs.push({ label: 'Atmosphere', value: 'thin rock vapour (assumed)', unit: '', tag: 'inferred_from_analog', source: 'assumed atmosphere (Schaefer & Fegley 2009 analog)' });
+  }
   if (!gas) inputs.push({ label: 'Ocean share', value: oceanF, unit: '', tag: oceanTag, source: oceanSrc });
 
   return {

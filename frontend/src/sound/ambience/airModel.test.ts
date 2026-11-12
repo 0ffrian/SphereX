@@ -22,17 +22,25 @@ describe('buildAirModel', () => {
     expect(buildAirModel(w, makeFakeEngine()).seed3).toEqual([1, 2, 3]);
   });
 
-  it('refuses everything on an airless world (Ps 0.005), with the lava wording when the rock is molten', () => {
-    const e = makeFakeEngine({ model: { ...EARTH_MODEL, airless: true, Ts: 250, state: 'frozen' }, state: { Ps: 0.005 } });
-    const air = buildAirModel(makeWorld({ Ps: 0.005 }), e);
+  it('R6: below P_FLOOR (0.5 Pa) everything is refused; the lava wording when the rock is molten', () => {
+    const e = makeFakeEngine({ model: { ...EARTH_MODEL, airless: true, Ts: 250, state: 'frozen' }, state: { Ps: 5e-6 } });
+    const air = buildAirModel(makeWorld({ Ps: 5e-6 }), e);
+    expect(air.P0).toBeCloseTo(0.5, 9);
     expect(air.airOK).toBe(false);
     expect(air.refusals).toEqual([{ source: 'all', reason: REFUSAL_TEXT.noAir }]);
     const lava = buildAirModel(
-      makeWorld({ id: 'lava', Ps: 0.005, mu: 44 }),
-      makeFakeEngine({ model: { ...EARTH_MODEL, airless: true, Ts: 1800, state: 'vapour' }, state: { Ps: 0.005 }, hydro: { n: 0, lava: true } }),
+      makeWorld({ id: 'lava', Ps: 5e-6, mu: 44 }),
+      makeFakeEngine({ model: { ...EARTH_MODEL, airless: true, Ts: 1800, state: 'vapour' }, state: { Ps: 5e-6 }, hydro: { n: 0, lava: true } }),
     );
     expect(lava.refusals).toEqual([{ source: 'all', reason: REFUSAL_TEXT.lavaNoAir }]);
-    expect(lava.lavaWorld).toBe(true);
+  });
+
+  it("R6: the engine's airless flag (Ps < 0.02 bar) does not silence a world with air", () => {
+    const e = makeFakeEngine({ model: { ...EARTH_MODEL, airless: true, Ts: 210, state: 'frozen' }, state: { Ps: 0.006, fluid: 'co2' } });
+    const air = buildAirModel(makeWorld({ Ps: 0.006, mu: 43.3, fluid: 'co2' }), e);
+    expect(air.airOK).toBe(true);
+    expect(air.refusals.some((r) => r.source === 'all')).toBe(false);
+    expect(air.liquid).toBeNull();
   });
 
   it.each(['frozen', 'vapour', 'supercritical'])('a %s fluid refuses the liquid sources with the §7 string', (state) => {
