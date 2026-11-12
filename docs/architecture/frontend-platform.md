@@ -1,6 +1,6 @@
 # Frontend and platform
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A10–A10.2 · **Implements:** [D-03, D-05, D-24, Q-132](../decisions/platform-hosting.md), [D-37](../decisions/rendering-engines.md), [Q-220, Q-366](../decisions/catalogue-values.md), [D-15, D-25](../decisions/data-sources.md), [D-22, D-27](../decisions/contract.md), [Q-29](../decisions/gemini.md), [Q-112](../decisions/pipeline-jobs.md), [Q-137](../decisions/scope-process.md) · **Read with:** [../../frontend/README.md](../../frontend/README.md), [../../backend/README.md](../../backend/README.md#settings-sx_-environment-variables) (settings), [../rendering/display-rules.md](../rendering/display-rules.md) (R5.5 budget), [sky-shell.md](sky-shell.md) (A21 app shell)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A10–A10.2 · **Implements:** [D-03, D-05, D-24, Q-132](../decisions/platform-hosting.md), [D-37](../decisions/rendering-engines.md), [Q-367, Q-368](../decisions/rendering-engines-tuning.md), [Q-369](../decisions/demo-pack.md), [Q-220, Q-366](../decisions/catalogue-values.md), [D-15, D-25](../decisions/data-sources.md), [D-22, D-27](../decisions/contract.md), [Q-29](../decisions/gemini.md), [Q-112](../decisions/pipeline-jobs.md), [Q-137](../decisions/scope-process.md) · **Read with:** [../../frontend/README.md](../../frontend/README.md), [../../backend/README.md](../../backend/README.md#settings-sx_-environment-variables) (settings), [../rendering/display-rules.md](../rendering/display-rules.md) (R5.5 budget), [sky-shell.md](sky-shell.md) (A21 app shell)
 
 ## A10 Frontend and platform
 
@@ -36,11 +36,40 @@ The budget (frame rate, pixel ratio, mesh, points, textures, displacement, shade
 
 ### A10.2 Running the event build
 
-The run steps for 14 to 15 Nov, gathered from D-24, D-25, Q-112 and Q-137. Owner: Kevin (M5, #15), with Atish (the A15).
+The run steps for 14 to 15 Nov, gathered from D-24, D-25, Q-112, Q-137, Q-366, Q-367, Q-368 and Q-369. Owner: Kevin (M5, #15), with Atish (the A15). Tick each box in order.
 
-1. **Before the event, with internet** (backend folder): `uv run python -m scripts.prefetch --group test`, `--group demo` and the Track object (433 Eros is in group `fixture`, see Q-197 in [A3.12](targets.md#a312-test-and-demo-targets)); `uv run python -m scripts.sky_mirror --max-order 6 --max-mb 45000 --allow-unclonable --bake` for the sky (D-35, depth Q-88); the precomputed Area search areas (D3, A16.7); **re-warm the Gaia and Exoplanet Archive caches** (the `cols="msc1"` change of Q-220, then `cols="msc1-flame2"` and the archive's columns version 3 of issue #93, changed every Gaia star and archive planet key, Q-366; `--overlays-only` still fetches both): `uv run python -m scripts.prefetch --group demo --overlays-only`, then `uv run python -m scripts.bake_demo_pack --check --strict`; then `uv run python -m scripts.smoke_offline --group test` and `--group demo` to check every target answers offline; then `uv run python -m scripts.backup_cache` (zipped copy, D-25).
-2. **Freeze the release:** `SX_DATA_RELEASE=spherex_qr2`; do not switch to DR1 (Q-137).
-3. **Start the backend:** `SX_OFFLINE=1 SX_PREFETCH_ON_START=1 uv run uvicorn app.main:create_app --factory --host localhost --port 8000`. The warm start builds every demo object's card and bakes its textures from the cache before visitors arrive (about 17 s per bake otherwise, Q-112). Leave `SX_ADMIN_TOKEN` unset, so the Gemini repaint route does not exist; `SX_GEMINI_OFFLINE_CACHE` follows Q-29.
-4. **Serve the frontend:** the one-origin server is #15 (to build). **Proposed (Q-198):** until #15 lands, run `npm run build` and `npm run preview` in `frontend/` (port 4173, which proxies `/v1` and `/data` to the backend), and open `http://localhost:4173` in Chrome on the A15.
-5. **Check:** `GET /v1/health` answers `{status: "ok", offline: true, data_release: "spherex_qr2"}`; open Eros in Track and one demo object in the flipbook.
-6. **Fallback:** the recorded backup demo video (#17).
+**1. Online, before the event** (in `backend/`):
+
+- [ ] Fill the cache: `uv run python -m scripts.prefetch --group test`, `--group demo` and the Track object (433 Eros is in group `fixture`, see Q-197 in [A3.12](targets.md#a312-test-and-demo-targets)); the sky with `uv run python -m scripts.sky_mirror --max-order 6 --max-mb 45000 --allow-unclonable --bake` (D-35, depth Q-88); the precomputed Area search areas (D3, A16.7).
+- [ ] Re-warm the Gaia and Exoplanet Archive caches (the #93 keys `cols="msc1-flame2"` and the archive's columns version 3 changed every Gaia star and archive planet key, Q-220, Q-366): `uv run python -m scripts.prefetch --group test --group demo --overlays-only`.
+- [ ] `uv run python -m scripts.bake_demo_pack --check --strict`. It must exit 0. **Never run `bake_demo_pack` without `--check` while `SX_OFFLINE=1`.**
+- [ ] `uv run python -m scripts.smoke_offline --group test --group demo`: every target answers with the network blocked, its render parameters carry no data gap, and its asset status is printed (Q-369).
+- [ ] `uv run python -m scripts.backup_cache` (zipped copy, D-25).
+
+**2. Freeze the release:** `SX_DATA_RELEASE=spherex_qr2`; do not switch to DR1 (Q-137).
+
+**3. Start the backend:** `SX_OFFLINE=1 SX_PREFETCH_ON_START=1 SX_PREFETCH_GROUPS=test,demo uv run uvicorn app.main:create_app --factory --host localhost --port 8000`. The warm start builds every test and demo object's card and bakes its textures from the cache before visitors arrive (about 17 s per bake otherwise, Q-112; `SX_PREFETCH_GROUPS` defaults to `demo`, see the [settings](../../backend/README.md#settings-sx_-environment-variables)). Leave `SX_ADMIN_TOKEN` unset, so the Gemini repaint route does not exist; `SX_GEMINI_OFFLINE_CACHE` follows Q-29.
+
+**4. Serve the frontend:** the one-origin server is #15 (to build). **Proposed (Q-198):** until #15 lands, run `npm run build` and `npm run preview` in `frontend/` (port 4173, which proxies `/v1` and `/data` to the backend).
+
+**5. Chrome on the A15** (Q-368):
+
+- [ ] Pause Chrome updates for the event days.
+- [ ] Close every Chrome process.
+- [ ] Launch `chrome.exe --user-data-dir=C:\sx-demo-profile --enable-features=ANGLEPerContextBlobCache` (keep it as a shortcut; every later launch uses the same one). Without the flag Chrome does not keep the world engine's compiled shaders across launches.
+- [ ] In `chrome://gpu`, check that the renderer is ANGLE D3D11 on the NVIDIA GPU. Set Chrome to the high-performance GPU in Windows and keep the laptop on mains power.
+
+**6. Warm the shaders, after the final frontend build:**
+
+- [ ] At "+ Artistic", open every object in the search list.
+- [ ] For every world, open the Surface view and wait until it has formed. For every star, open the close-ups. Open a rock.
+- [ ] Quit Chrome and relaunch it with the same shortcut. A Surface view must be ready in under 1 s. If it is not, keep Chrome open for the whole event.
+
+**7. Check:** `GET /v1/health` answers `{status: "ok", offline: true, data_release: "spherex_qr2"}`; open Eros in Track and one demo object in the flipbook.
+
+**8. Measure once on the A15:** the cold and warm `FLY_FS` compile and the time a world takes to form. They must sit well inside the 60 s globe and 180 s fly ready timeouts and the 90 s form clock ([R5.9](../rendering/engines.md#r59-prototype-engines-d-37), R12 #55).
+
+**9. Fallback:**
+
+1. If an engine misbehaves, open the page with `?engines=0` before any `#` (for example `http://localhost:4173/?engines=0` with the preview of step 4, or `http://localhost:5173/?engines=0` under `npm run dev`). The three.js path then draws every body at every level; the choice is remembered, and `?engines=1` turns the engines back on (Q-367).
+2. Then the recorded backup demo video (#17).
