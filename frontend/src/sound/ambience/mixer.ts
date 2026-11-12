@@ -9,6 +9,7 @@
 // Sources are stopped by a wall-clock timer after 7 time constants (−61 dB), never by a tick (C1, C3).
 // The mixer never applies the master or ambience volume: the bus level node already carries it (R13.9 as built).
 import { createHarmonicBranch, dbToGain, type HarmonicBranch } from '../audioGraph';
+import { airAt } from './air';
 import { presentOffsetDb, stageGainDb } from './levels';
 import {
   EVENT_MAX,
@@ -179,13 +180,16 @@ export class AmbienceMixer {
 
   /**
    * §8.4 one thunder clap for a strike, at t0 + d/c on the audio clock, through the current world's group (so every
-   * fade reaches it). Returns false when it is not played (no group, not baked, too far, disposed).
+   * fade reaches it). Returns false when it is not played (no group, not baked, too far, disposed, or the listener is
+   * above the silence ceiling: §11.7 physical silence is never lifted, PR #124 review N1).
    * Gain: the stage window over the world offset, stageGainDb(level_dB, presentOffsetDb) (red M9).
    */
   fire(strike: Strike, air: AirModel, palette: BufferSource, o: FireOptions): boolean {
     if (this.disposed || !this.current) return false;
     const g = this.groups.get(this.current);
     if (!g || g.fading) return false;
+    // §11.7: no air at the listener, no thunder. Explicit, so it never rests on THUNDER_MAX_DELAY_S (review N1).
+    if (airAt(air, o.z_km).silent) return false;
     const buf = palette.get('thunder', strike.variant);
     if (!buf) return false;
     const tp = thunderParams(air, strike.d_m, o.z_km);

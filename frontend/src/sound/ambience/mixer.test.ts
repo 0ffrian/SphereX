@@ -314,6 +314,16 @@ describe('AmbienceMixer events (thunder)', () => {
     expect(m.fire(strike({ d_m: 20000 }), air, p, opts)).toBe(false);
   });
 
+  it('never fires above the silence ceiling, even for a near strike (§11.7, PR #124 review N1)', () => {
+    const { m, p } = live();
+    const n = sources().length;
+    for (const z_km of [100, 120, 400]) expect(m.fire(strike({ d_m: 50 }), air, p, { ...opts, z_km })).toBe(false);
+    expect(m.fire(strike({ d_m: 50 }), { ...air, airOK: false }, p, opts)).toBe(false);
+    expect(sources().length).toBe(n);
+    expect(m.stats().events).toBe(0);
+    expect(m.fire(strike({ d_m: 50 }), air, p, { ...opts, z_km: 90 })).toBe(true); // just under the ~97 km ceiling
+  });
+
   it('keeps at most EVENT_MAX live or pending', () => {
     const { m, p } = live();
     for (let i = 0; i < EVENT_MAX + 2; i++) m.fire(strike(), air, p, opts);
