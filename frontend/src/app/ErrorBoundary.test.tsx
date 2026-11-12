@@ -70,6 +70,21 @@ describe('ErrorBoundary (#102)', () => {
     expect(onReload).toHaveBeenCalledOnce();
   });
 
+  it('offers a second action when given one (the build pane: Close build)', () => {
+    const onClick = vi.fn();
+    act(() =>
+      root.render(
+        <ErrorBoundary area="The build pane" action={{ label: 'Close build', onClick }}>
+          <Boom />
+        </ErrorBoundary>,
+      ),
+    );
+    const buttons = [...host.querySelectorAll('button')].map((b) => b.textContent);
+    expect(buttons).toEqual(['Reload view', 'Close build']);
+    act(() => host.querySelectorAll('button')[1]?.click());
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+
   it('a changed reset key clears the fallback; equal keys keep it', () => {
     let fail = true;
     function Maybe() {

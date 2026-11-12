@@ -24,7 +24,7 @@ import { SkyZoom } from './shell/SkyZoom';
 import { Transport } from './shell/Transport';
 import { SkyPane } from './sky/SkyPane';
 import { useHashSync } from './useHashSync';
-import { BuildPane } from './build/BuildPane';
+import { BuildPane, closeBuildPane } from './build/BuildPane';
 import { SelectedCard } from './build/SelectedCard';
 import { useSelectedBodyLoader } from './build/selectedBody';
 import { Island } from './island/Island';
@@ -57,6 +57,9 @@ function useOpenPanelOnSearch(): void {
     });
   }, []);
 }
+
+/** Issue #102: the build pane's fallback can close it, since a reload reopens it (`&build`). */
+const CLOSE_BUILD = { label: 'Close build', onClick: closeBuildPane };
 
 /** "/" focuses the search field from anywhere except a text field. */
 function useSearchShortcut(): void {
@@ -124,7 +127,7 @@ export function App() {
               <ErrorBoundary
                 area="The sky position"
                 resetKeys={resetKeys}
-                className="absolute top-4 right-4 z-30"
+                className="absolute top-4 right-4 z-50"
               >
                 <Readout />
               </ErrorBoundary>
@@ -155,6 +158,7 @@ export function App() {
                 <ErrorBoundary
                   area="The build pane"
                   resetKeys={resetKeys}
+                  action={CLOSE_BUILD}
                   className="relative z-10 m-4"
                 >
                   <BuildPane />
