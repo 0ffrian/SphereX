@@ -132,6 +132,8 @@ SEARCH_LIST: tuple[SearchRow, ...] = (
     SearchRow("Comet 67P", "67P/Churyumov-Gerasimenko", ("67p", "churyumov", "gerasimenko")),
     SearchRow("Orion Nebula", "M 42", ("orion", "m42")),
     SearchRow("Crab Nebula", "M 1", ("crab", "m1")),
+    # Row 17 (issue #73, Q-197): the Track MVP (Q-137), appended so rows 1 to 16 keep Q-161's order.
+    SearchRow("433 Eros", "433 Eros", ("eros", "433")),
     # Issue #71 stream S (Q-280 to Q-284): two more stars and two more exoplanets.
     SearchRow("Procyon A", "Procyon", ("procyon", "alpha cmi", "alf cmi")),
     SearchRow("Epsilon Eridani", "eps Eri", ("eps eri", "epsilon eri", "eps eridani")),

@@ -5,6 +5,7 @@
 // readouts and the "How each part is worked out" notes go to the build pane's Details through `useBuildControls`.
 // A card `cardToWorld` refuses, a browser without WebGL 2, or "Measured only" keeps the old three.js path (the hosts
 // call `onFail`, or are not mounted at all, see `useEngineWorld`).
+import { useMouldLive } from './build/mouldLive';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { Tag } from '@/contract';
 import { useAppStore } from '@/state/store';
@@ -377,6 +378,12 @@ const FORMING_LOADER_LOOK: GridLoaderProps = {
  */
 function Forming({ gas, progress }: { gas: boolean; progress: number | null }) {
   const reduced = reducedMotion();
+  // The build pane's MouldAnimation draws over this cover (and says the same words); the cover stays
+  // so a half-formed world is never shown, and the words stay as the accessible status.
+  useEffect(() => {
+    useMouldLive.getState().setForming(true);
+    return () => useMouldLive.getState().setForming(false);
+  }, []);
   const pct = progress === null ? null : Math.round(progress * 100);
   const what = gas ? 'Forming the atmosphere' : 'Forming the planet';
   return (
@@ -458,14 +465,6 @@ export function worldControls(
   const t = world.tags;
   const gas = s.gas;
   const controls: BuildControl[] = [
-    {
-      id: 'what',
-      kind: 'readout',
-      label: 'What you are seeing',
-      value: r.caption,
-      tag: 'model_dependent',
-    },
-    { id: 'tag', kind: 'readout', label: 'Now showing', value: r.tag, tag: 'model_dependent' },
     {
       id: 'fluid',
       kind: 'choice',
@@ -630,14 +629,29 @@ export function worldControls(
     'Wind speed': world.tags.Umeas,
     'Flattened by spin': world.tags.fMeas,
   };
+  const rowTag = (label: string): Tag => measuredReadout[label] ?? READOUT_TAG[label] ?? 'model_dependent';
+  const rowOf = (label: string): string | undefined => r.rows.find(([l]) => l === label)?.[1];
+  const key = (id: string, label: string, value: string | undefined, tag: Tag): void => {
+    if (value !== undefined) controls.push({ id: `k-${id}`, kind: 'readout', slot: 'key', label, value, tag });
+  };
+  const p = world.preset;
+  const radiusKm = `${fmt(p.Rj * 71492)} km`;
+  if (gas) {
+    key('temp', 'Temperature', rowOf('Equilibrium temperature'), rowTag('Equilibrium temperature'));
+    key('radius', 'Radius', radiusKm, t.Rj ?? 'model_dependent');
+    const prot = p.Prot ?? (p.locked ? p.P : undefined);
+    key('rot', 'Rotation period', prot === undefined ? undefined : prot < 2 ? `${fmt(prot * 24, 1)} hours` : `${fmt(prot, 1)} days`, t.Prot ?? 'model_dependent');
+    key('wind', 'Wind speed', rowOf('Wind speed'), rowTag('Wind speed'));
+  } else {
+    key('temp', 'Surface temperature', rowOf('Average surface temperature'), rowTag('Average surface temperature'));
+    key('radius', 'Radius', radiusKm, t.Rj ?? 'model_dependent');
+    key('ps', 'Surface pressure', `${s.Ps < 0.1 ? fmt(s.Ps, 3) : fmt(s.Ps, 1)} bar`, t.Ps ?? 'model_dependent');
+    const g = (6.674e-11 * p.Me * 5.972e24) / (p.Rj * 71492e3) ** 2;
+    key('g', 'Surface gravity', `${fmt(g, 1)} m/s\u00b2`, 'derived');
+  }
+  const inKey = gas ? ['Equilibrium temperature', 'Wind speed'] : ['Average surface temperature'];
   for (const [label, value] of r.rows)
-    controls.push({
-      id: `r-${label}`,
-      kind: 'readout',
-      label,
-      value,
-      tag: measuredReadout[label] ?? READOUT_TAG[label] ?? 'model_dependent',
-    });
+    if (!inKey.includes(label)) controls.push({ id: `r-${label}`, kind: 'readout', label, value, tag: rowTag(label) });
   // Issue #93 C: eclipse and phase-curve temperatures from the card, shown beside the engine's own model numbers.
   for (const m of world.measured ?? [])
     controls.push({
@@ -648,23 +662,12 @@ export function worldControls(
       tag: m.tag,
       why: m.source,
     });
-  if (world.assumptions.length)
-    controls.push({
-      id: 'assumed',
-      kind: 'readout',
-      label: 'Filled in, not measured',
-      value: world.assumptions.map((a) => a.field).join(', '),
-      tag: 'model_dependent',
-    });
-  if (world.mismatches.length)
-    controls.push({
-      id: 'mismatch',
-      kind: 'readout',
-      label: 'Card and artifact differ',
-      value: world.mismatches.join('; '),
-      tag: 'model_dependent',
-    });
-  return { title: gas ? 'Gas giant' : 'Planet surface', controls, notes: worldNotes(world) };
+  const filled = [
+    ...world.assumptions.map((a) => `${a.field} = ${String(a.value)}: ${a.note}.`),
+    ...world.mismatches.map((m) => `Differs from the artifact: ${m}.`),
+  ];
+  const notes: BuildNote[] = filled.length ? [{ title: 'Filled in, not measured', lines: filled }] : [];
+  return { title: gas ? 'Gas giant' : 'Planet surface', controls, notes };
 }
 
 /** The prototype's world stage (globe), on the build pane's globe stage. */
@@ -793,6 +796,9 @@ export function WorldGlobeStage({
   );
 }
 
+// Moon (11 Nov 2026): no on-render control bars. Height follows scroll, pinch and the zoom bar; the
+// layer list lives in Details. Kept behind this flag so the controls can come back.
+const SHOW_FLY_BAR = false as boolean;
 /** The prototype's surface (fly) view with its altitude slider and Fly forward, in the left pane. */
 export function WorldFlyStage({
   world,
@@ -941,7 +947,7 @@ export function WorldFlyStage({
     >
       <div ref={hostRef} className="absolute inset-0" />
       {forming && <Forming gas={gas} progress={progress} />}
-      {engine && entered && (
+      {SHOW_FLY_BAR && engine && entered && (
         <div
           className="sx-cu-controls"
           role="group"
@@ -990,7 +996,7 @@ export function WorldFlyStage({
           </button>
         </div>
       )}
-      {engine && about && (
+      {SHOW_FLY_BAR && engine && about && (
         <div
           className="absolute inset-x-4 bottom-36 z-[3] max-h-[45%] overflow-auto rounded-lg border border-[#323a3e] bg-[#242729f2] p-3 text-xs text-neutral-200"
           data-testid="world-layers"
@@ -1016,9 +1022,4 @@ export function WorldFlyStage({
       )}
     </div>
   );
-}
-
-/** The honesty caption of the left pane while the engine's surface view is shown (the mock-up's `.cu-tag`). */
-export function worldCaption(gas: boolean): string {
-  return `Close-up · from orbit, click the globe to look at a place · heights, clouds and air drawn ${gas ? '2' : '3'} times taller, fine detail is an artist's addition (Default), not a photograph`;
 }

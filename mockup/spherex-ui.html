@@ -164,6 +164,21 @@ svg{display:block}
 .x:hover{background:var(--muted-2);color:var(--fg)}.x .ico{width:14px;height:14px}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:12px 0;font-size:12.5px}
 .kv dt{color:var(--dim)}.kv dd{font-family:var(--mono);text-align:right}
+.kn-ov{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px!important}.kn-tg{cursor:pointer;font-family:inherit}.kn-tg[aria-pressed="true"]{color:var(--green);border-color:#4ade8055;background:#4ade8012}
+.kn-det{margin-top:12px!important;border-radius:12px;background:var(--muted)}.kn-det summary{display:flex;justify-content:space-between;align-items:center;list-style:none;cursor:pointer;padding:10px 12px;font-size:13px;font-weight:500}
+.kn-det summary::-webkit-details-marker{display:none}.kn-det summary span+span{color:var(--mfg);font-weight:400}.kn-det summary span+span::after{content:"";display:inline-block;width:6px;height:6px;margin-left:9px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-2px) rotate(45deg);transition:transform .2s}
+.kn-det[open] summary span+span::after{transform:translateY(1px) rotate(-135deg)}.kn-det .dets{margin:0;padding:0 8px 8px}
+.kn-cut{position:relative;margin:0}.kn-cut canvas{display:block;width:100%;aspect-ratio:1;border-radius:0;background:#000;image-rendering:pixelated}
+.kn-cut .over{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;justify-content:space-between;padding:10px}
+.kn-cut .over h2{margin:0;font-size:15.5px;font-weight:600;background:rgba(8,9,11,.72);padding:5px 10px;border-radius:6px}
+.kn-cut .over .close{width:32px;height:32px;border-radius:6px;border:0;background:rgba(8,9,11,.72);color:var(--fg);display:grid;place-items:center;cursor:pointer}
+.kn-cut .over .close svg{width:16px;height:16px}
+.kn-cut .cap{position:absolute;left:10px;bottom:10px;display:flex;gap:6px;align-items:center;font-size:12px;color:var(--fg);background:rgba(8,9,11,.72);padding:4px 8px;border-radius:6px;font-variant-numeric:tabular-nums}
+.kn-cut .capr{left:auto;right:10px}.kn-cut .cap i{width:8px;height:8px;border-radius:50%;display:block}.kn-cut .cap b{font-weight:700}.kn-cut .cap span{color:var(--mfg)}
+#knWl i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.det:disabled{opacity:.4;cursor:default}.det:disabled:active{transform:none}
+.kn-leg{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:12px;font-size:11px;color:var(--mfg)}.kn-leg span{display:inline-flex;align-items:center;gap:6px}
+.kn-leg i{display:block;width:16px;height:0;border-top:2px solid #38bdf8}.kn-leg i.d{border-top-style:dashed;border-top-color:#38bdf8a6}.kn-leg i.sq{width:9px;height:9px;border:1px solid #fafafa8c}.kn-leg i.dot{width:6px;height:6px;border:0;border-radius:50%;background:#7dd3fc}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .chip{font-size:11px;padding:3px 9px;border-radius:99px;border:1px solid var(--border);color:var(--mfg);background:var(--muted)}
 .chip.g{color:var(--green);border-color:#4ade8055;background:#4ade8012}
@@ -288,12 +303,11 @@ svg{display:block}
 .tp-sw{display:flex;gap:22px;align-items:center}
 .btn.sm{height:32px;font-size:12px;padding:0 13px;gap:7px;display:inline-flex;align-items:center}
 .btn.sm svg{width:12px;height:12px}
-.bp-tools #bpFeel{width:auto;padding:0 11px 0 9px;display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;margin-right:4px}
+.bp-tools #bpAcc svg{width:15px;height:15px}
+.bp-tools #bpAcc,.bp-tools #bpFeel,.bp-tools #bpHear{width:auto;padding:0 11px 0 9px;display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;margin-right:4px}
+.bp-tools #bpHear svg{width:15px;height:15px}
 .bp-tools .x.on,.bp-tools .x.on:hover{background:#4ade8026;color:var(--green)}
 .bp-stage{touch-action:none}
-.bp-wave{display:none;padding:0 18px 20px}
-.bpane.feeling .bp-steps{display:none}
-.bpane.feeling .bp-wave{display:block}
 .bw-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:12.5px;color:var(--mfg)}
 .bw-head b{font:600 13px var(--mono);color:var(--fg);font-variant-numeric:tabular-nums}
 #bwCanvas{display:block;width:100%;height:124px;border-radius:14px;background:var(--card);box-shadow:inset 0 0 0 1px var(--border)}
@@ -355,6 +369,54 @@ body.split .player{opacity:0;transform:translateY(-14px);pointer-events:none}
 .rw .chip{font-size:10px;padding:1px 7px;flex:none}
 .row-btn.wrap{flex-wrap:wrap}
 
+/* ---------- build split: close-up on the left half, the turning object on the right ---------- */
+#cuPane{position:absolute;left:0;top:0;bottom:0;width:50%;z-index:5;background:#000;opacity:0;visibility:hidden;pointer-events:none;transform:translateX(-36px) scale(.985);transition:opacity .7s var(--ease),transform 1s var(--ease),visibility 0s .8s}
+#cuPane.open{opacity:1;visibility:visible;transform:none;transition:opacity .7s var(--ease) .1s,transform 1s var(--ease) .1s}
+#cuPane iframe,#cuPane canvas{position:absolute;inset:0;width:100%;height:100%;border:0;display:none}
+#cuPane[data-mode="frame"] iframe,#cuPane[data-mode="canvas"] canvas{display:block}
+body.split .hud.sc{display:none}
+/* Build: the shape pops out of the crosshair over the dimmed sky, morphs in the middle of the screen with its loader timeline; then the pane slides to the right half and the close-up opens on the left. */
+#bpane{top:0;bottom:0;right:0;width:100%;border:0;border-radius:0;box-shadow:none;transform:none;
+  background-color:#03030788;background-image:radial-gradient(70% 60% at 50% 45%,#1b1b2c66 0%,transparent 72%);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  transition:opacity .45s,width 1s var(--ease),background-color .9s var(--ease)}
+#bpane.shifted{width:50%;background-color:#05050a}
+#bpane .bp-stage{position:absolute;inset:0;min-height:0}
+#bpane .bp-head{position:relative;z-index:2;padding:24px 28px 4px;pointer-events:none}
+#bpane .bp-head .bp-tools,#bpane .bp-head button{pointer-events:auto}
+#bpane .bp-steps,#bpane .bp-wave{z-index:2}
+body.bsplit .hud{opacity:0;transition:opacity .35s}
+#bpane .bp-steps{position:absolute;left:50%;bottom:104px;width:min(720px,calc(100% - 56px));padding:0;transform:translateX(-50%);
+  transition:opacity .5s,transform .8s var(--spring)}
+#bpane.shifted .bp-steps{opacity:0;transform:translate(-50%,18px);pointer-events:none}
+/* the Feel and Hear it popover: one panel under the buttons, one sense at a time */
+.bp-pop{position:absolute;z-index:3;top:72px;right:24px;width:min(340px,calc(100% - 48px));background:var(--panel);border:1px solid var(--panel-line);border-radius:18px;padding:14px 16px 16px;box-shadow:0 18px 50px #000b;transform-origin:top right;animation:popIn .45s var(--spring)}
+.bp-pop[data-w="acc"]{width:min(400px,calc(100% - 48px));max-height:calc(100% - 160px);overflow-y:auto}
+.bp-pop[hidden],.bp-pop section[hidden]{display:none}
+.acc-top{display:flex;align-items:baseline;gap:10px;margin:2px 0 10px}.acc-top .n{font:600 34px/1 var(--font);letter-spacing:-.02em;color:#fff;font-variant-numeric:tabular-nums}.acc-top span{font-size:12.5px;color:var(--panel-fg)}
+.acc-bar{display:flex;gap:2px;height:10px;border-radius:5px;overflow:hidden;background:#1c1f21;margin-bottom:10px}.acc-bar i{display:block;height:100%;min-width:0;transition:flex-basis .7s var(--ease)}
+.acc-key{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:12.5px;color:var(--panel-fg);margin-bottom:12px}.acc-key b{font:600 12.5px var(--mono);color:#fff;text-align:right}.acc-key small{display:block;font-size:11px;color:#9aa4a9}
+.acc-sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+.acc-eq{display:block;font:12.5px/1.5 var(--mono);background:#1c1f21;border:1px solid var(--panel-line);border-radius:10px;padding:9px 11px;color:#e5e7e8;margin-bottom:6px;overflow-x:auto;white-space:nowrap}
+.acc-tex{margin:0 0 6px;overflow-x:auto;overflow-y:hidden;max-width:100%}.acc-tex.math-on{background:#1c1f21;border:1px solid var(--panel-line);border-radius:10px;padding:6px 10px;color:#e5e7e8}.acc-tex .katex{font-size:.92em}.acc-tex .katex-display{margin:.3em 0}
+.acc-gate{list-style:none;margin:0 0 8px;padding:0;font-size:12px;color:#c9d1d5;display:flex;flex-direction:column;gap:3px}.acc-gv{display:inline-block;min-width:26px;font:500 10.5px var(--mono);text-transform:uppercase;letter-spacing:.04em;margin-right:4px}.acc-gv.ok{color:#4ade80}.acc-gv.no{color:#f87171}
+.acc-rules{font-size:11.5px!important;color:#9aa4a9!important;margin-bottom:12px!important}
+.acc-tbl{width:100%;border-collapse:collapse;font-size:12.5px}.acc-tbl th{text-align:left;font:500 10.5px var(--mono);color:#9aa4a9;text-transform:uppercase;letter-spacing:.05em;padding:0 8px 5px 0}.acc-tbl td{padding:5px 8px 5px 0;border-top:1px solid var(--panel-line);color:#e5e7e8}
+.acc-tbl th:last-child,.acc-tbl td:last-child{text-align:right;padding-right:0;font-family:var(--mono);white-space:nowrap}
+.acc-tag{display:inline-block;border:1px solid;border-radius:4px;padding:1px 6px;font-size:11.5px;white-space:nowrap}
+.acc-tag.d{border-color:#34d399;color:#6ee7b7}.acc-tag.p{border-color:#38bdf8;color:#7dd3fc}.acc-tag.a{border-color:#71717a;border-style:dashed;color:#a1a1aa}
+@keyframes popIn{from{opacity:0;transform:translateY(-8px) scale(.92)}}
+.pop-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px}
+.pop-h b{font-size:14px;font-weight:600;color:#fff}.pop-h span{font-size:11.5px;color:#9aa4a9}
+.bp-pop p{font-size:12.5px;line-height:1.5;color:var(--panel-fg);margin-bottom:12px}
+.pop-row{display:flex;align-items:center;gap:12px;margin-top:10px}.pop-note{font-size:11px;line-height:1.35;color:#9aa4a9}
+#hearCanvas{display:block;width:100%;height:96px;border-radius:12px;background:#1c1f21;box-shadow:inset 0 0 0 1px var(--panel-line)}
+#bwCanvas{background:#1c1f21!important;box-shadow:inset 0 0 0 1px var(--panel-line)!important}
+body.bsplit .topr{opacity:0;transform:translateY(-14px);pointer-events:none}
+.topr{transition:opacity .35s,transform .6s var(--spring)}
+body.bsplit .view.building #skyPane{right:0}
+#cuPane::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,transparent 80%,#0008 100%)}
+.cu-tag{position:absolute;left:var(--gap);bottom:88px;z-index:2;max-width:calc(100% - 2*var(--gap));font:11px var(--mono);color:var(--panel-fg);background:#242729cc;border:1px solid var(--panel-line);border-radius:10px;padding:6px 10px;line-height:1.4}
 /* ---------- area tool: draw a square on the sky, then Known objects (Track) or Discovery ---------- */
 .view.boxing #skyPane,.view.boxing #sky{cursor:crosshair}
 .view.tracking #skyPane{right:62%}
@@ -440,6 +502,10 @@ body.split .player{opacity:0;transform:translateY(-14px);pointer-events:none}
 .island-body{width:var(--cw,318px);max-height:calc(var(--maxh,600px) - 64px);overflow-y:auto;padding:8px 16px 16px;white-space:normal;opacity:0;filter:blur(8px);transform:translateY(10px);
   pointer-events:none;transition:opacity .25s,filter .25s,transform .4s var(--spring)}
 .island[data-card="true"] .island-body{opacity:1;filter:none;transform:none;pointer-events:auto;transition-delay:.2s}
+.island[data-bleed="true"] .island-in{display:none}
+.island[data-bleed="true"] .island-body{padding:0 0 16px;max-height:var(--maxh,600px)}
+.island[data-bleed="true"] .island-body>:not(.kn-cut){margin-left:16px;margin-right:16px}
+.island[data-bleed="true"] .island-body>.kn-cut+*{margin-top:14px}
 .island-body p{color:var(--mfg);line-height:1.5;font-size:13px}
 .island[data-open="true"]{justify-content:flex-start}
 .island-in{display:flex;align-items:center;gap:11px;padding:0 15px;height:100%}
@@ -467,6 +533,17 @@ body.split .player{opacity:0;transform:translateY(-14px);pointer-events:none}
   .topr,.frame-info .hide-s{display:none}.scrub{width:140px}
 }
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+.over-btns{display:flex;gap:6px}.over-l{display:flex;gap:6px;align-items:center}
+.kn-demo{aspect-ratio:1;background:#000;display:grid;place-items:center;padding:0 44px;text-align:center;color:var(--mfg);font-size:12.5px;line-height:1.5}
+.kn-off{opacity:.45;pointer-events:none}.kn-spec-none{display:grid;place-items:center;height:96px;border-radius:8px;background:#16191c;color:var(--mfg);font-size:12px}
+.ar-steps li i{display:inline-grid;place-items:center}.ar-steps li i svg{width:9px;height:9px;stroke:#06240f;stroke-width:3.4;fill:none;stroke-linecap:round;stroke-linejoin:round;display:none}.ar-steps li.on i svg{display:block}
+.ar-steps li.now i{box-shadow:none;background:none;overflow:visible}
+.kn-spec{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.kn-spec-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.kn-spec-h span{font-size:12px;font-weight:600;color:var(--fg)}
+.kn-spec-h small{font-size:11px;color:var(--mfg)}
+#knSpec{width:100%;height:auto;display:block}
+.kn-ov.opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px}
 </style>
 </head>
 <body>
@@ -477,20 +554,34 @@ body.split .player{opacity:0;transform:translateY(-14px);pointer-events:none}
     <main class="view" id="view">
       <div id="skyPane"><canvas id="sky"></canvas><div class="gload" id="tLoad"><div id="tLoadG"></div><span>Loading the 3D view</span></div><canvas id="tCanvas" aria-label="3D comet with its gas clouds and tails. Drag to turn it."></canvas></div>
       <div class="vignette"></div>
+      <div id="cuPane" aria-hidden="true"><iframe id="cuFrame" title="Close-up of the object" tabindex="-1"></iframe><canvas id="cuCanvas"></canvas><span class="cu-tag" id="cuTag"></span></div>
       <div class="hud tl" id="hudTl"></div>
       <div class="hud br" id="hudBr"></div>
 
       <aside class="bpane" id="bpane" aria-label="Procedural build" aria-hidden="true">
         <div class="bp-head"><div><h3 id="bpTitle"></h3><p id="bpSub"></p></div>
           <div class="bp-tools">
-            <button class="x" id="bpFeel" type="button" title="Feel the surface" aria-label="Feel the surface" aria-pressed="false"><svg class="ico ai ai-fingerprint" viewBox="0 0 24 24"><path class="v-path" stroke="currentColor" d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4 M14 13.12c0 2.38 0 6.38-1 8.88 M17.29 21.02c.12-.6.43-2.3.5-3.02 M2 12a10 10 0 0 1 18-6 M2 16h.01 M21.8 16c.2-2 .131-5.354 0-6 M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2 M8.65 22c.21-.66.45-1.32.57-2 M9 6.8a6 6 0 0 1 9 5.2v2"/><path class="v-path1" d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" pathLength="1"/><path class="v-path2" d="M14 13.12c0 2.38 0 6.38-1 8.88" pathLength="1"/><path class="v-path3" d="M17.29 21.02c.12-.6.43-2.3.5-3.02" pathLength="1"/><path class="v-path4" d="M2 12a10 10 0 0 1 18-6" pathLength="1"/><path class="v-path5" d="M2 16h.01" pathLength="1"/><path class="v-path6" d="M21.8 16c.2-2 .131-5.354 0-6" pathLength="1"/><path class="v-path7" d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" pathLength="1"/><path class="v-path8" d="M8.65 22c.21-.66.45-1.32.57-2" pathLength="1"/><path class="v-path9" d="M9 6.8a6 6 0 0 1 9 5.2v2" pathLength="1"/></svg><span>Feel</span></button>
-            <button class="x" id="bpReplay" type="button" title="Replay" aria-label="Replay the build"><svg class="ico ai ai-rotate-ccw" viewBox="0 0 24 24"><path class="v-path1" d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path class="v-path2" d="M3 3v5h5"/></svg></button>
-            <button class="x" id="bpSeed" type="button" title="New seed" aria-label="Build a different one"><svg class="ico" viewBox="0 0 24 24"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
+            <button class="x" id="bpAcc" type="button" title="Accuracy" aria-label="Accuracy" aria-pressed="false" aria-expanded="false" aria-controls="bpPop"><svg class="ico" viewBox="0 0 24 24"><path d="M3.3 17a10 10 0 1 1 17.4 0"/><path d="M12 14l4-5"/><circle cx="12" cy="14" r="1.2"/></svg><span>Accuracy</span></button>
+            <button class="x" id="bpFeel" type="button" title="Feel the surface" aria-label="Feel the surface" aria-pressed="false" aria-expanded="false" aria-controls="bpPop"><svg class="ico ai ai-fingerprint" viewBox="0 0 24 24"><path class="v-path" stroke="currentColor" d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4 M14 13.12c0 2.38 0 6.38-1 8.88 M17.29 21.02c.12-.6.43-2.3.5-3.02 M2 12a10 10 0 0 1 18-6 M2 16h.01 M21.8 16c.2-2 .131-5.354 0-6 M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2 M8.65 22c.21-.66.45-1.32.57-2 M9 6.8a6 6 0 0 1 9 5.2v2"/><path class="v-path1" d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" pathLength="1"/><path class="v-path2" d="M14 13.12c0 2.38 0 6.38-1 8.88" pathLength="1"/><path class="v-path3" d="M17.29 21.02c.12-.6.43-2.3.5-3.02" pathLength="1"/><path class="v-path4" d="M2 12a10 10 0 0 1 18-6" pathLength="1"/><path class="v-path5" d="M2 16h.01" pathLength="1"/><path class="v-path6" d="M21.8 16c.2-2 .131-5.354 0-6" pathLength="1"/><path class="v-path7" d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" pathLength="1"/><path class="v-path8" d="M8.65 22c.21-.66.45-1.32.57-2" pathLength="1"/><path class="v-path9" d="M9 6.8a6 6 0 0 1 9 5.2v2" pathLength="1"/></svg><span>Feel</span></button>
+            <button class="x" id="bpHear" type="button" title="Hear it" aria-label="Hear it" aria-pressed="false" aria-expanded="false" aria-controls="bpPop"><svg class="ico" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg><span>Hear it</span></button>
             <i class="sep"></i>
             <button class="x" id="bpClose" type="button" aria-label="Close build view"><svg class="ico ai ai-x" viewBox="0 0 24 24"><line class="v-line1" x1="6" y1="18" x2="18" y2="6"/><line class="v-line2" x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>
         <div class="bp-stage" id="bpStage"><canvas id="bpCanvas"></canvas><i id="bpRing"></i><div class="bp-msg" id="bpMsg" hidden></div><div class="gload" id="bLoad"><div id="bLoadG"></div><span>Loading the 3D view</span></div></div>
         <ol class="bp-steps" id="bpSteps"></ol>
-        <div class="bp-wave"><div class="bw-head"><span>Vibration</span><b id="bwHz">0 Hz</b></div><canvas id="bwCanvas"></canvas></div>
+        <div class="bp-pop" id="bpPop" hidden role="group" aria-label="Senses">
+          <section id="popAcc" hidden></section>
+          <section id="popFeel" hidden>
+            <div class="pop-h"><b>Feel it</b><span>Drag over the object</span></div>
+            <p>Bumps buzz and smooth ground stays quiet. On a phone it vibrates. Here you also hear it.</p>
+            <div class="bw-head"><span>Vibration</span><b id="bwHz">0 Hz</b></div><canvas id="bwCanvas"></canvas>
+          </section>
+          <section id="popHear" hidden>
+            <div class="pop-h"><b>Hear it</b><span>Brightness becomes pitch</span></div>
+            <p>A sweep across the object's infrared fingerprint, 0.75 to 5 µm. Higher pitch is brighter. Bells mark gases and dips.</p>
+            <canvas id="hearCanvas"></canvas>
+            <div class="pop-row"><button class="btn sm" id="hearGo" type="button">Play</button><span class="pop-note">Example spectrum for the demo, not a measurement.</span></div>
+          </section>
+        </div>
       </aside>
       <aside class="bpane" id="tpane" aria-label="Comet trail" aria-hidden="true">
         <div class="bp-head"><div><h3 id="tpTitle"></h3><p>Comet trail</p></div>
@@ -667,7 +758,7 @@ const island = (() => {
     const s = STATES.card; state = "card";
     grid.set({...s, size:28}); wrap.style.setProperty("--gc", s.glow); wrap.dataset.live = "true";
     lbl.textContent = c.title; sub.textContent = c.sub || ""; sub.style.display = c.sub ? "" : "none";
-    body.innerHTML = c.html; if(c.bind) c.bind(body);
+    el.dataset.bleed = c.bleed ? "true" : "false"; body.innerHTML = c.html; if(c.bind) c.bind(body);
     el.dataset.card = "true"; el.dataset.open = "true";
     el.setAttribute("aria-label", "Odysseus: " + c.title);
     const bz = document.getElementById("bezel"), cw = Math.min(c.width || 320, bz.clientWidth - 32), maxh = Math.max(200, bz.clientHeight - 104);
@@ -676,6 +767,10 @@ const island = (() => {
     const h = Math.min(el.offsetHeight, maxh); el.style.height = hh; void el.offsetWidth; el.style.transition = "";
     el.style.width = cw + "px"; el.style.height = h + "px"; el.style.borderRadius = "24px";
     if(c.after) c.after();
+  }
+  function fit(){   // re-measure the open card (after a section opens or closes)
+    if(!card) return; const bz = document.getElementById("bezel"), maxh = Math.max(200, bz.clientHeight - 104), hh = el.style.height;
+    el.style.transition = "none"; el.style.height = "auto"; const h = Math.min(el.offsetHeight, maxh); el.style.height = hh; void el.offsetWidth; el.style.transition = ""; el.style.height = h + "px";
   }
   function closeCard(){
     if(!card && mini){ mini = null; set("idle"); return true; }
@@ -697,7 +792,7 @@ const island = (() => {
     const [w, h] = measure(); el.style.width = w + "px"; el.style.height = Math.max(52, h) + "px"; el.style.borderRadius = Math.min(Math.max(52, h)/2, 28) + "px";
   }
   function minimize(){
-    if(!card) return; const c = last; token++; card = false; el.dataset.card = "false";
+    if(!card) return; const c = last; token++; card = false; el.dataset.card = "false"; el.dataset.bleed = "false";
     clearT = setTimeout(() => { if(!card) body.innerHTML = ""; }, 700); mini = c; showMini();
   }
   function restore(){ const c = mini; mini = null; if(!c) return; c.reopen ? c.reopen() : openCard(c); }
@@ -718,7 +813,7 @@ const island = (() => {
     else if(api.reopen) api.reopen(); });
   document.getElementById("xIsl").addEventListener("click", e => { e.stopPropagation(); api.onClose && api.onClose(); closeCard(); });
   set("idle");
-  const api = {set, run, openCard, closeCard, minimize, restore, status, onClose:null, reopen:null, get state(){return state}, get card(){return card}, get mini(){return !!mini}};
+  const api = {fit, set, run, openCard, closeCard, minimize, restore, status, onClose:null, reopen:null, get state(){return state}, get card(){return card}, get mini(){return !!mini}};
   return api;
 })();
 window.island = island;   // island.set("thinking") from the console
@@ -771,7 +866,12 @@ const TOOLS = [
   {id:"haptics", name:"Haptics", key:"4", ico:AI["fingerprint"],
     t:"Haptics", p:"Rub the surface of a body and feel it."},
   {id:"area", name:"Area search", key:"5", ico:AI["box"],
-    t:"Area search", p:"Draw a square on the sky. Follow known objects in it, or look for moving dots nobody has listed."}
+    t:"Area search", p:"Draw a square on the sky. Follow known objects in it, or look for moving dots nobody has listed."},
+  // The dock shows only these two (Moon, 12 Nov 2026): the app is the sky, so no Sky tool. Each starts by drawing a square.
+  {id:"known", name:"Known objects", key:"1", ico:AI["orbit"], dock:true,
+    t:"Known objects", p:"Draw a square on the sky, then follow the asteroids and comets on file that crossed it."},
+  {id:"disc", name:"Discovery", key:"2", ico:AI["dots"], dock:true,
+    t:"Discovery", p:"Draw a square on the sky, then look for moving dots that match nothing on file."}
 ];
 const SPEC_CARD = {id:"spec", t:"Fingerprint", p:"How bright it is at each colour of infrared light. Every material leaves its own pattern, so this tells you what it is made of.", spec:true};
 const LAYERS = [
@@ -788,6 +888,7 @@ let tool = "sky";
 
 const toolsEl = document.getElementById("tools"), hl = document.getElementById("hl");
 TOOLS.forEach((t, i) => {
+  if(!t.dock) return;
   const b = document.createElement("button");
   b.className = "tool"; b.dataset.id = t.id; b.innerHTML = t.ico;
   b.setAttribute("aria-label", t.name); b.dataset.tip = t.name; b.dataset.key = t.key; b.dataset.side = "top";
@@ -854,7 +955,7 @@ function bodyCoords(o){
   return [((ra0 - x*PX/3600/Math.cos(de0*Math.PI/180)) % 360 + 360) % 360, de0 - y*PX/3600];
 }
 function showInfo(t){
-  if(!t) return; lastCard = "body"; AR.selShow = false;
+  if(!t) return; knOff(); lastCard = "body"; AR.selShow = false;
   const [ra, dec] = bodyCoords(t), comet = t.kind === "comet";
   island.openCard({title:t.n, sub:t.cls||"Unknown object",
     html:`<div class="row-btn wrap" style="margin-top:6px"><button class="btn" id="goFp">See fingerprint</button><button class="btn ghost" id="goBuild">Build it</button></div>`,
@@ -863,7 +964,7 @@ function showInfo(t){
       b.querySelector("#goBuild").onclick = () => openBuild(t);
     }});
 }
-island.onClose = () => { tool = "sky"; markTool("sky"); AR.selShow = false; arStopDraw(); hint(); };
+island.onClose = () => { knOff(); tool = "sky"; markTool("sky"); AR.selShow = false; arStopDraw(); hint(); };
 function openFlip(){ tool = "sky"; markTool("sky"); flipCard(); }
 island.reopen = () => { lastCard === "body" ? showInfo(sel || cur) : openFlip(); };
 const CHK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
@@ -895,14 +996,16 @@ function flipCard(){
     after:() => refit()});
 }
 function markTool(id){
+  try{ if(id === "area" && AR.after) id = AR.after; }catch(_){}
   toolsEl.querySelectorAll(".tool").forEach(b => b.classList.toggle("active", b.dataset.id === id));
   moveHl(toolsEl.querySelector(".active"));
 }
 function selectTool(id){
   tool = id; markTool(id === "spec" ? "listen" : id);
   const t = TOOLS.find(x => x.id === id) || SPEC_CARD;
-  if(id !== "haptics" && B.building) closeBuild(); if(id !== "comet" && TR.open) closeTrail(); if(id !== "area"){ if(AR.track) closeTrack(); arStopDraw(); } markTool(id === "spec" ? "listen" : id);
-  if(id === "area"){ openAreaCard(); return; }
+  if(id !== "haptics" && B.building) closeBuild(); if(id !== "comet" && TR.open) closeTrail(); if(id !== "area" && id !== "known" && id !== "disc"){ if(AR.track) closeTrack(); arStopDraw(); AR.after = null; } markTool(id === "spec" ? "listen" : id);
+  if(id === "known" || id === "disc"){ AR.after = id; tool = "area"; openAreaCard(); markTool(id); return; }
+  if(id === "area"){ AR.after = null; openAreaCard(); return; }
   if(id === "haptics"){ openHaptics(); return; }
   if(id === "sky"){ if(island.closeCard()) hint(); return; }
   if(id === "flip"){ flipCard(); return; }
@@ -998,6 +1101,7 @@ function buildSky(t){
 function resize(){
   DPR = Math.min(devicePixelRatio||1, 2); const b = document.getElementById("skyPane").getBoundingClientRect();
   W = b.width; H = b.height; cv.width = W*DPR; cv.height = H*DPR;
+  if(typeof KN !== "undefined" && KN.on && AR.box) knRefit();
 }
 new ResizeObserver(resize).observe(document.getElementById("skyPane"));
 
@@ -1015,7 +1119,8 @@ function pick(e){
 }
 function draw(ts){
   tms = ts; requestAnimationFrame(draw);
-  cam.x += (camT.x - cam.x)*.12; cam.y += (camT.y - cam.y)*.12; cam.z += (camT.z - cam.z)*.12;
+  if(KN.tw) knTween(ts); else { cam.x += (camT.x - cam.x)*.12; cam.y += (camT.y - cam.y)*.12; cam.z += (camT.z - cam.z)*.12; }
+  knTick(ts);
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.fillStyle = "#020204"; ctx.fillRect(0,0,W,H);
   // soft nebula wash
@@ -1061,8 +1166,9 @@ function draw(ts){
     if(layerOn.labels && cam.z > .5 && m !== T0){ ctx.fillStyle = "#a1a1aa"; ctx.font = "10px ui-monospace,monospace"; ctx.fillText(m.n, sx+9, sy-8); }
   }
 
-  arDraw();
-  // the target (searched object) and the selected body
+  arDraw(); knDraw();
+  // the target (searched object) and the selected body (not inside the square while Known is on)
+  ctx.save(); if(KN.on && AR.box){ const bb = AR.box, [hx0, hy0] = toScreen(bb.x0, bb.y0), [hx1, hy1] = toScreen(bb.x1, bb.y1); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.rect(hx0, hy0, hx1 - hx0, hy1 - hy0); ctx.clip("evenodd"); }
   if(cur){
     const [cx, cy] = toScreen(...targetPos(frame));
     for(let f = 0; f < 12; f++){ if(!opts.trail && f !== frame) continue; if(!activeFrames().includes(f) && f !== frame) continue; const [px, py] = targetPos(f), [gx, gy] = toScreen(px, py);
@@ -1079,12 +1185,18 @@ function draw(ts){
       ctx.beginPath(); ctx.moveTo(sx + dx*k, sy + dy*(k-L)); ctx.lineTo(sx + dx*k, sy + dy*k); ctx.lineTo(sx + dx*(k-L), sy + dy*k); ctx.stroke(); }
     if(layerOn.labels){ ctx.fillStyle = "#fafafa"; ctx.font = "500 12px system-ui,sans-serif"; ctx.fillText(T0.n, sx + k + 8, sy + 4); }
   }
+  ctx.restore();
   if(B.building && sel){ const p = posOf(sel, frame); camT.x = p[0]; camT.y = p[1]; }
   // scale bar text
   document.getElementById("scaleTxt").textContent = `${(80/cam.z*PX/60).toFixed(1)}′`; zVal.textContent = Math.round(camT.z*100) + "%";
+  const kh = KN.on && KN.hop;
+  if(kh){ const di = +kh.detector.slice(1) - 1;
+    document.getElementById("hudBr").innerHTML = `${kh.wl_um.toFixed(2)} µm<br>${knDay(kh.mjd_avg)} ${knHM(kh.mjd_avg)} UTC`;
+    document.getElementById("hudTl").textContent = `${DETS[di].n} · ${DETS[di].lo.toFixed(2)}–${DETS[di].hi.toFixed(2)} µm`; }
+  else
   document.getElementById("hudBr").innerHTML = cur ? `${opts.subtract ? "subtracted · " : ""}${WAVES[frame].toFixed(2)} µm<br>${fmtDate(frame)} · frame ${frame+1}/12` : "";
-  document.getElementById("hudTl").textContent = opts.band != null ? `${DETS[opts.band].n} · ${DETS[opts.band].lo.toFixed(2)}–${DETS[opts.band].hi.toFixed(2)} µm` : "";
-  if(AR.box && AR.step >= 0) document.getElementById("hudBr").innerHTML += `<br>area demo · visit ${AR.v + 1} of 2${AR.blink ? " · blinking" : ""}`;
+  if(!kh) document.getElementById("hudTl").textContent = opts.band != null ? `${DETS[opts.band].n} · ${DETS[opts.band].lo.toFixed(2)}–${DETS[opts.band].hi.toFixed(2)} µm` : "";
+  if(AR.box && AR.step >= 0 && !KN.on) document.getElementById("hudBr").innerHTML += `<br>area demo · visit ${AR.v + 1} of 2${AR.blink ? " · blinking" : ""}`;
 }
 function ring(x, y, r, col, dash){
   ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash(dash ? [3,3] : []);
@@ -1099,7 +1211,7 @@ function drawGrid(){
 
 /* interaction: drag to pan, wheel to zoom (around the cursor) */
 let drag = null;
-view.addEventListener("pointerdown", e => { if(e.target.closest("#bpane,#tpane,#kpane,#tCanvas")) return; if(arDown(e)) return;
+view.addEventListener("pointerdown", e => { if(e.target.closest("#bpane,#tpane,#kpane,#tCanvas")) return; if(arDown(e)) return; KN.tw = null;
   drag = {x:e.clientX, y:e.clientY, cx:camT.x, cy:camT.y}; view.classList.add("drag"); view.setPointerCapture(e.pointerId); });
 view.addEventListener("pointermove", e => {
   const b = view.getBoundingClientRect(), [wx, wy] = toWorld(e.clientX - b.left, e.clientY - b.top);
@@ -1112,7 +1224,7 @@ view.addEventListener("pointermove", e => {
   if(drag){ camT.x = drag.cx - (e.clientX - drag.x)/cam.z; camT.y = drag.cy - (e.clientY - drag.y)/cam.z; cam.x = camT.x; cam.y = camT.y; }
 });
 view.addEventListener("pointerup", e => { if(arUp(e)) return; drag = null; view.classList.remove("drag"); });
-view.addEventListener("wheel", e => { e.preventDefault(); if(e.target.closest("#bpane,#tpane,#kpane,#tCanvas")) return;
+view.addEventListener("wheel", e => { e.preventDefault(); if(e.target.closest("#bpane,#tpane,#kpane,#tCanvas")) return; KN.tw = null;
   const b = view.getBoundingClientRect(), sx = e.clientX - b.left, sy = e.clientY - b.top;
   const [bx, by] = toWorld(sx, sy), z = Math.min(4, Math.max(.25, camT.z * Math.exp(-e.deltaY*.0015)));
   camT.z = z; cam.z = z; cam.x = bx - (sx - W/2)/z; cam.y = by - (sy - H/2)/z; camT.x = cam.x; camT.y = cam.y;
@@ -1138,6 +1250,7 @@ function setFrame(f){
   document.getElementById("wl").textContent = WAVES[frame].toFixed(2);
   document.getElementById("fdate").textContent = fmtDate(frame);
   wgrid.set({color:wcol(WAVES[frame])});
+  if(KN.on) knSync();
 }
 const wgrid = GridLoader(document.getElementById("wdot"), {size:18, gap:1, rounded:true, color:"#4ade80", mode:"pulse", pattern:"plus-hollow", speed:"slow"});
 function startPlay(on){
@@ -1636,7 +1749,7 @@ function fillBuildUI(){
   $("bpTitle").textContent = "Building " + o.n; $("bpSub").textContent = o.cls || KIND_NAME[B.kind];
   $("bpSteps").innerHTML = plan.map((p, i) => `<li><span class="dot"><b>${i+1}</b><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="lb">${p[0]}</span><span class="bar"></span></li>`).join("");
 }
-function replay(){ B.t0 = performance.now(); B.done = false; B.last = B.t0; island.set("building"); }
+function replay(){ B.t0 = performance.now(); B.done = false; B.last = B.t0; clearTimeout(B.shiftT); setShifted(false); island.set("building"); }
 function loop(now){
   if(!B.building || !B.body) return; B.raf = requestAnimationFrame(loop);
   const t = (now - B.t0)/1000, dt = Math.min(.05, (now - B.last)/1000); B.last = now;
@@ -1644,35 +1757,74 @@ function loop(now){
   B.body.apply(P, t);
   if(!B.drag) B.rot.y += dt*.28;
   B.body.root.rotation.set(B.rot.x, B.rot.y, 0);
+  if(CU.mode === "canvas"){ const z0 = B.camera.position.z; B.camera.position.z = z0*.36; B.renderer.render(B.scene, B.camera); B.camera.position.z = z0; cuDraw(); }
   B.renderer.render(B.scene, B.camera); feelStep(now); if(FG.on) drawWave(now);
   const lis = $("bpSteps").children;
   for(let i = 0; i < lis.length; i++){ const p = P[i]; lis[i].classList.toggle("done", p >= 1); lis[i].classList.toggle("active", p > 0 && p < 1); lis[i].lastChild.style.transform = `scaleX(${p})`; }
-  if(!B.done && t > B.n*STAGE_S + .3){ B.done = true; island.run([["done",1900]]); }
+  if(!B.done && t > B.n*STAGE_S + .3){ B.done = true; island.run([["done",1900]]); clearTimeout(B.shiftT); B.shiftT = setTimeout(() => { if(B.building) setShifted(true); }, 650); }
+}
+/* The close-up (left half of the build split): stars get the flare close-up page (closeup-star.html) and planets and gas giants get the orbit camera page (closeup-orbit.html), both extracted from the realism preview; every other kind gets the same 3D body from a camera close to its surface. */
+const CU = {pane:$("cuPane"), frame:$("cuFrame"), canvas:$("cuCanvas"), tag:$("cuTag"), mode:null, orbit:false};
+const ORBIT_BY_NAME = {"Jupiter":"jup", "Saturn":"sat", "TRAPPIST-1 e":"t1e", "TRAPPIST-1 f":"t1f", "K2-18 b":"k218", "HD 189733 b":"hd", "Earth":"earth", "Kepler-186 f":"k186"};
+const ORBIT_BY_KIND = {rocky:"rivers", water:"earth", gas:"jup"};   // a generic demo world gets the nearest example world
+function orbitUrl(o, kind){ const id = ORBIT_BY_NAME[o.n] || ORBIT_BY_KIND[kind]; return id ? "closeup-orbit.html?preset=" + id : null; }
+function cuOpen(o, kind){
+  const ou = orbitUrl(o, kind); CU.orbit = !!ou && kind !== "star";
+  CU.mode = kind === "star" || CU.orbit ? "frame" : "canvas"; CU.pane.dataset.mode = CU.mode;
+  if(kind === "star"){ const u = "closeup-star.html?T=" + (o.T || 5772); if(CU.frame.getAttribute("src") !== u) CU.frame.src = u; CU.tag.textContent = "Close-up · a flare on the star's surface · illustrative (Default), not a measurement"; }
+  else if(CU.orbit){ if(CU.frame.getAttribute("src") !== ou) CU.frame.src = ou; CU.tag.textContent = "Close-up · from orbit, click the globe to look at a place · generated (Default)"; }
+  else { CU.frame.removeAttribute("src"); CU.tag.textContent = "Close-up · the same body seen from near its surface · generated (Default)"; }
+}
+/* Click the globe on the right while the orbit close-up is open: send that place (radians) to the orbit page. */
+(function(){
+  const el = bpCanvas.parentElement; let down = null;
+  el.addEventListener("pointerdown", e => { down = {x:e.clientX, y:e.clientY}; });
+  el.addEventListener("pointerup", e => {
+    const d0 = down; down = null; if(!d0 || FG.on || !CU.orbit || CU.mode !== "frame" || !B.body || !B.camera || !window.THREE) return;
+    if(Math.hypot(e.clientX - d0.x, e.clientY - d0.y) > 5) return;
+    const r = bpCanvas.getBoundingClientRect(); if(!r.width || !r.height) return;
+    const rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2((e.clientX - r.left)/r.width*2 - 1, -((e.clientY - r.top)/r.height*2 - 1)), B.camera);
+    B.body.root.updateMatrixWorld(true);
+    const hit = rc.intersectObject(B.body.root, true).map(h => B.body.root.worldToLocal(h.point.clone())).find(v => v.length() > .2 && v.length() < 1.3); if(!hit) return;
+    hit.normalize(); const w = CU.frame.contentWindow; if(w) w.postMessage({type:"orbit-goto", lat:Math.asin(Math.max(-1, Math.min(1, hit.y))), lon:Math.atan2(hit.z, hit.x)}, "*");
+  });
+})();
+function setShifted(on){ bpane.classList.toggle("shifted", on); if(on && CU.mode){ CU.pane.classList.add("open"); CU.pane.setAttribute("aria-hidden", "false"); } else { CU.pane.classList.remove("open"); CU.pane.setAttribute("aria-hidden", "true"); } }
+function popFromCross(){
+  if(!B.obj || !bpStage.animate) return; const r = bpStage.getBoundingClientRect(); if(!r.width) return;
+  let dx = 0, dy = 0; try{ const p = posOf(B.obj, frame), [gx, gy] = toScreen(p[0], p[1]); if(isFinite(gx) && isFinite(gy)){ dx = gx - (r.left + r.width/2); dy = gy - (r.top + r.height/2); } }catch(e){}
+  bpStage.animate([{transform:`translate(${dx}px,${dy}px) scale(.03)`, opacity:0},{opacity:1, offset:.25},{transform:"none", opacity:1}], {duration:1250, easing:"cubic-bezier(.34,1.28,.64,1)"});
+}
+function cuClose(){ CU.pane.classList.remove("open"); CU.pane.setAttribute("aria-hidden", "true"); CU.mode = null; CU.frame.removeAttribute("src"); }
+function cuDraw(){
+  const c = CU.canvas, dpr = Math.min(devicePixelRatio || 1, 2), w = Math.round(c.clientWidth*dpr), h = Math.round(c.clientHeight*dpr); if(!w || !h) return;
+  if(c.width !== w || c.height !== h){ c.width = w; c.height = h; }
+  const g = c.getContext("2d"), src = B.renderer.domElement, sw = src.width, sh = src.height; if(!sw || !sh) return;
+  g.fillStyle = "#000"; g.fillRect(0, 0, w, h);
+  const k = Math.max(w/sw, h/sh), dw = sw*k, dh = sh*k; g.drawImage(src, (w - dw)/2, (h - dh)/2, dw, dh);
 }
 function openBuild(o, opt){
   o = o || sel || cur; if(!o) return; if(AR.track) closeTrack(); B.quick = !!(opt && opt.feel);
   island.closeCard(); startPlay(false); tool = "sky"; markTool("sky");
   B.obj = o; B.kind = o.kind || "star"; B.building = true; B.seed = 3 + Math.floor((o.ra || o.x || 1) * 13) % 40;
-  document.body.classList.add("split"); $("view").classList.add("building"); bpane.classList.add("open"); bpane.setAttribute("aria-hidden", "false");
+  document.body.classList.add("split", "bsplit"); $("view").classList.add("building"); setShifted(false); bpane.classList.add("open"); bpane.setAttribute("aria-hidden", "false");
   history.replaceState(null, "", "#build"); camT.z = Math.max(camT.z, 1.5); fillBuildUI(); if(B.quick) $("bpTitle").textContent = o.n; island.set(B.quick ? "idle" : "building");
-  loading("bLoad", true);
+  loading("bLoad", true); cuOpen(o, B.kind);
   ensureThree(ok => {
     if(!ok){ loading("bLoad", false); bpMsg.hidden = false; bpMsg.textContent = "The 3D build needs the three.js script from the internet, and it could not load."; return; }
     try{ initGL(); }catch(err){ loading("bLoad", false); bpMsg.hidden = false; bpMsg.textContent = "The 3D build needs WebGL, which this browser could not start."; return; }
     if(!B.building) return;
-    loading("bLoad", false); bpMsg.hidden = true; sizeGL(); setBody(); replay();
-    if(B.quick){ B.t0 = performance.now() - 1e5; B.done = true; island.set("idle"); if(!FG.on) bpFeel.onclick(); }
+    loading("bLoad", false); bpMsg.hidden = true; sizeGL(); setBody(); replay(); if(!B.quick) requestAnimationFrame(popFromCross);
+    if(B.quick){ B.t0 = performance.now() - 1e5; B.done = true; island.set("idle"); setShifted(true); if(!FG.on) bpFeel.onclick(); }
     cancelAnimationFrame(B.raf); B.raf = requestAnimationFrame(loop);
   });
 }
 function closeBuild(){
-  if(!B.building) return; loading("bLoad", false); if(FG.on) bpFeel.onclick(); feelEnd(); SFX.stop(); B.building = false; cancelAnimationFrame(B.raf);
-  document.body.classList.remove("split"); $("view").classList.remove("building"); bpane.classList.remove("open"); bpane.setAttribute("aria-hidden", "true");
+  if(!B.building) return; loading("bLoad", false); setPop(null); feelEnd(); SFX.stop(); B.building = false; cancelAnimationFrame(B.raf);
+  document.body.classList.remove("split", "bsplit"); $("view").classList.remove("building"); clearTimeout(B.shiftT); bpane.classList.remove("open", "shifted"); bpane.setAttribute("aria-hidden", "true"); cuClose();
   history.replaceState(null, "", location.pathname + location.search); island.run([["idle",1]]); tool = "sky"; markTool("sky");
 }
 $("bpClose").onclick = closeBuild;
-$("bpReplay").onclick = () => { replay(); const ic = $("bpReplay").querySelector("svg"); if(ic && ic.animate) ic.animate([{rotate:"0deg"},{rotate:"-360deg"}], {duration:650, easing:"cubic-bezier(.34,1.2,.64,1)"}); };
-$("bpSeed").onclick = () => { B.seed = Math.floor(Math.random()*90) + 1; if(B.renderer){ setBody(); replay(); } };
 bpCanvas.parentElement.addEventListener("pointerdown", e => { if(FG.on){ const r = bpCanvas.getBoundingClientRect(); FG.down = true; FG.x = e.clientX - r.left; FG.y = e.clientY - r.top; FG.t = performance.now(); FG.last = null; SFX.rubStart(); e.currentTarget.setPointerCapture(e.pointerId); return; }
   B.drag = {x:e.clientX, y:e.clientY, rx:B.rot.x, ry:B.rot.y}; e.currentTarget.setPointerCapture(e.pointerId); });
 bpCanvas.parentElement.addEventListener("pointermove", e => { if(FG.on){ const r = bpCanvas.getBoundingClientRect(); FG.x = e.clientX - r.left; FG.y = e.clientY - r.top; if(!FG.down){ bpRing.style.transform = `translate(${FG.x}px,${FG.y}px)`; bpRing.classList.add("on"); } return; } if(!B.drag) return; B.rot.y = B.drag.ry + (e.clientX - B.drag.x)*.008; B.rot.x = Math.max(-1.2, Math.min(1.2, B.drag.rx + (e.clientY - B.drag.y)*.008)); });
@@ -1997,10 +2149,125 @@ function feelStep(now){
     Haptics.tick({type:"tick", intensity:Math.min(1, .25 + rough*.9), sharpness:sharp, duration:Math.round(8 + 14*(1 - sharp)), material:ocean ? "ocean" : mat, body:B.kind});
     bpRing.classList.add("tick"); requestAnimationFrame(() => requestAnimationFrame(() => bpRing.classList.remove("tick"))); }
 }
-bpFeel.onclick = () => {
-  FG.on = !FG.on; bpane.classList.toggle("feeling", FG.on); bpFeel.classList.toggle("on", FG.on); bpFeel.setAttribute("aria-pressed", String(FG.on)); bpStage.classList.toggle("feel", FG.on);
-  if(!FG.on){ bpRing.classList.remove("on"); SFX.rubStop(); Haptics.stop(); } else toast("Drag over the body to feel it");
+function feelSet(on){
+  FG.on = on; bpane.classList.toggle("feeling", on); bpFeel.classList.toggle("on", on); bpFeel.setAttribute("aria-pressed", String(on)); bpStage.classList.toggle("feel", on);
+  if(!on){ bpRing.classList.remove("on"); SFX.rubStop(); Haptics.stop(); }
+}
+/* One sense at a time: Feel or Hear it opens its panel under the buttons; the same button, Escape or the close button puts it away. */
+const bpHear = $("bpHear"), bpAcc = $("bpAcc"), bpPop = $("bpPop"), HR = {raf:0};
+/* Accuracy: how much of the picture rests on satellite data, on physics worked out from it, or on assumptions. The rows and weights mirror the app's backend table (backend/app/core/render/confidence.py, D-36): C = sum(w_i c_i) / sum(w_i), c = 1 measured or physics from measured values, 0.5 for model-dependent or physics with an assumed input, 0 for assumed, drawn or missing. The weights are placeholders until a sensitivity sweep exists. Nebulae and novae have no score. */
+const ACC_THRESHOLD = .25;
+const ACC_KIND = {
+  star:[["Temperature and colour","derived",30],["Radius","model_dependent",20],["Edge darkening","model_dependent",10],["Spectral class","measured",10],["Motion on the sky","measured",5],["Boiling cells","artistic",15],["Spots","inferred_from_analog",10]],
+  dwarf:[["Spectral class","measured",25],["Temperature","derived",20],["Radius","model_dependent",15],["Methane band depth","measured",15],["Colour","derived",5],["Motion on the sky","measured",5],["Cloud bands","artistic",15]],
+  asteroid:[["Shape","measured",40],["Size","measured",15],["Spin","measured",10],["Albedo","measured",10],["Spectral class","measured",10],["Surface colour map","missing",15]],
+  comet:[["Sun direction","derived",10],["Phase angle","derived",5],["Gas amounts","measured",25],["Coma size","model_dependent",10],["Nucleus size","model_dependent",10],["Nucleus shape","inferred_from_analog",15],["Tail","missing",5],["Nucleus surface","artistic",20]],
+  rocky:[["Radius","measured",15],["Mass","measured",10],["Orbit and tides","measured",10],["Temperature","derived_assumed",15],["Host star","measured",10],["Surface fluid and pressure","inferred_from_analog",15],["Plates and terrain","artistic",15],["Clouds and ice","artistic",10]],
+  gas:[["Radius","measured",15],["Mass","measured",5],["Orbit and tides","measured",10],["Temperature","measured",15],["Colour","derived",10],["Band structure","inferred_from_analog",20],["Storms","artistic",15],["Turbulence","artistic",10]]
 };
+ACC_KIND.water = ACC_KIND.rocky;
+const ACC_OBJ = {
+  "R Draconis":[["Spectral class","measured",15],["Pulsation period","derived",15],["Motion on the sky","measured",5],["Temperature and colour","missing",25],["Radius","missing",15],["Edge darkening","model_dependent",5],["Pulsation size","artistic",5],["Surface","artistic",15]]
+};
+/* The key measurement for the gate: any one of these rows must have data (not missing). */
+const ACC_KEY = {
+  star:["Temperature and colour","Radius","Spectral class"], dwarf:["Spectral class"], asteroid:["Shape"], comet:["Gas amounts","Coma size","Nucleus size","Nucleus shape"],
+  rocky:["Radius","Mass"], water:["Radius","Mass"], gas:["Radius","Mass"], "R Draconis":["Temperature and colour","Radius","Spectral class","Pulsation period"]
+};
+const ACC_CAT = {measured:"d", derived:"p", derived_assumed:"p", model_dependent:"p"}, ACC_C = {measured:1, derived:1, derived_assumed:.5, model_dependent:.5};
+const ACC_TAG = {measured:["Satellite data","d"], derived:["Physics","p"], derived_assumed:["Physics, one input assumed","p"], model_dependent:["Physics, from a model","p"], inferred_from_analog:["Assumed, from a similar object","a"], artistic:["Assumed, drawn","a"], missing:["Missing","a"]};
+/* KaTeX 0.16.11 from cdnjs, loaded the first time the popover opens. If it cannot load, the plain-text lines stay (never blank). */
+const KX = {state:"idle", cbs:[]};
+function ensureKatex(cb){
+  if(window.katex) return cb(true);
+  if(KX.state === "failed") return cb(false);
+  KX.cbs.push(cb); if(KX.state === "loading") return; KX.state = "loading";
+  const done = ok => { KX.state = ok ? "ready" : "failed"; KX.cbs.splice(0).forEach(f => f(ok)); };
+  const lk = document.createElement("link"); lk.rel = "stylesheet"; lk.href = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.css"; lk.integrity = "sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+"; lk.crossOrigin = "anonymous"; document.head.appendChild(lk);
+  const sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js"; sc.integrity = "sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg"; sc.crossOrigin = "anonymous";
+  sc.onload = () => done(!!window.katex); sc.onerror = () => done(false); document.head.appendChild(sc);
+}
+function accMath(){
+  document.querySelectorAll("#popAcc [data-tex]").forEach(el => {
+    try{ window.katex.render(el.dataset.tex, el, {displayMode:el.dataset.display === "1", throwOnError:false, output:"htmlAndMathml"}); el.classList.add("math-on"); }catch(e){}
+  });
+}
+function renderAcc(){
+  const o = B.obj || {}, rows = ACC_OBJ[o.n] || ACC_KIND[B.kind], keyLabels = ACC_KEY[ACC_OBJ[o.n] ? o.n : B.kind];
+  if(!rows){
+    $("popAcc").innerHTML = `<div class="pop-h"><b>Accuracy</b><span>${o.n || ""}</span></div><p class="acc-rules" style="margin:0!important">No score is set for this kind of object. It has no measurement that could stand for a key measurement, so the viewer shows what it can and says what it leaves out.</p>`;
+    return;
+  }
+  const W = rows.reduce((a, r) => a + r[2], 0), share = {d:0, p:0, a:0}; let sum = 0;
+  rows.forEach(r => { share[ACC_CAT[r[1]] || "a"] += r[2]; sum += (ACC_C[r[1]] || 0)*r[2]; });
+  const Cf = sum/W, C = Math.round(Cf*100), pct = k => Math.round(share[k]/W*100);
+  const keyOk = rows.some(r => keyLabels.includes(r[0]) && r[1] !== "missing"), scoreOk = Cf + 1e-9 >= ACC_THRESHOLD, pass = keyOk && scoreOk;
+  const band = Cf >= .75 ? "Mostly data" : Cf >= .5 ? "Part data, part assumed" : Cf >= ACC_THRESHOLD ? "Mostly assumed" : "Too little data";
+  const col = {d:"#4ade80", p:"#38bdf8", a:"#52525b"};
+  const fmtN = x => String(Math.round(x*10)/10), terms = rows.filter(r => (ACC_C[r[1]] || 0) > 0);
+  const cTex = {1:"1", .5:"\\tfrac{1}{2}"}, term = r => `${r[2]}\\cdot ${cTex[ACC_C[r[1]]]}`;
+  const subTex = `\\begin{array}{l}C=\\dfrac{${terms.map(term).join("+")}${terms.length < rows.length ? "+0" : ""}}{${W}}\\\\ \\phantom{C}=\\dfrac{${fmtN(sum)}}{${W}}=${(Math.round(Cf*100)/100).toFixed(2)}\\end{array}`;
+  const subTxt = `C = (${terms.map(r => r[2] + "·" + (ACC_C[r[1]] === 1 ? "1" : "0.5")).join(" + ")}${terms.length < rows.length ? " + 0" : ""}) / ${W} = ${fmtN(sum)} / ${W} = ${(Math.round(Cf*100)/100).toFixed(2)}`;
+  const gateTex = `\\begin{array}{l}\\text{3D body shown}\\iff\\\\ \\text{class known}\\wedge\\text{key measurement}\\wedge C\\ge ${ACC_THRESHOLD}\\end{array}`;
+  const tbl = `\\begin{array}{ll}c=1 & \\text{measured, or physics from measured values}\\\\ c=\\tfrac{1}{2} & \\text{model-dependent, or physics with an assumed input}\\\\ c=0 & \\text{assumed from a similar object, drawn, or missing}\\end{array}`;
+  const at = t => t.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  const yes = (v, t) => `<span class="acc-gv ${v ? "ok" : "no"}">${v ? "Yes" : "No"}</span> ${t}`;
+  $("popAcc").innerHTML = `<div class="pop-h"><b>Accuracy</b><span>${o.n || ""}</span></div>
+    <div class="acc-top"><span class="n">${C}%</span><span>${band}</span></div>
+    <div class="acc-bar" role="img" aria-label="Satellite data ${pct("d")} percent, physics ${pct("p")} percent, assumed ${pct("a")} percent">${["d","p","a"].map(k => `<i style="flex:${share[k]} 1 0;background:${col[k]}"></i>`).join("")}</div>
+    <div class="acc-key">
+      <span class="acc-sw" style="background:${col.d}"></span><span>Satellite data<small>measured by SPHEREx, Gaia and other archives</small></span><b>${pct("d")}%</b>
+      <span class="acc-sw" style="background:${col.p}"></span><span>Physics<small>worked out from the data with a formula</small></span><b>${pct("p")}%</b>
+      <span class="acc-sw" style="background:${col.a}"></span><span>Assumed<small>typical values, drawn detail, or missing</small></span><b>${pct("a")}%</b></div>
+    <div class="acc-math">
+      <div class="acc-tex" data-display="1" data-tex="C=\\dfrac{\\sum_i w_i\\,c_i}{\\sum_i w_i}">C = Σ wᵢ·cᵢ / Σ wᵢ</div>
+      <p class="acc-rules">w is how much a quantity changes the picture. c is how far the data narrows the range of this kind of object.</p>
+      <div class="acc-tex" data-display="1" data-tex="${at(tbl)}"><code class="acc-eq">c = 1: satellite data, or physics from measured values<br>c = 0.5: model-dependent, or physics with an assumed input<br>c = 0: assumed from a similar object, drawn, or missing</code></div>
+      <div class="acc-tex" data-display="1" data-tex="${at(subTex)}"><code class="acc-eq">${subTxt}</code></div>
+      <p class="acc-rules" style="margin-bottom:6px!important">Terms with c = 0 add nothing, so they are folded into the final + 0.</p>
+      <div class="acc-tex" data-display="1" data-tex="${at(gateTex)}"><code class="acc-eq">3D body shown only if: class known AND key measurement AND C ≥ ${ACC_THRESHOLD}</code></div>
+      <ul class="acc-gate"><li>${yes(true, "The kind of object is known.")}</li><li>${yes(keyOk, "At least one key measurement: " + keyLabels.join(", ").toLowerCase() + ".")}</li><li>${yes(scoreOk, "Score of at least " + Math.round(ACC_THRESHOLD*100) + "% (now " + C + "%).")}</li></ul>
+      <p class="acc-rules" style="margin-bottom:10px!important"><b>${pass ? "The 3D body is drawn." : "The 3D body is not drawn."}</b> This is how much of the picture rests on data. It is not the probability that the picture is correct.</p>
+    </div>
+    <table class="acc-tbl"><thead><tr><th>Quantity</th><th>Source</th><th>Points</th></tr></thead><tbody>${rows.map(r => { const t = ACC_TAG[r[1]]; return `<tr><td>${r[0]}</td><td><span class="acc-tag ${t[1]}">${t[0]}</span></td><td>${Math.round((ACC_C[r[1]] || 0)*r[2]*10)/10} / ${r[2]}</td></tr>`; }).join("")}</tbody></table>
+    <p class="acc-rules" style="margin:10px 0 0!important">Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them.</p>`;
+  ensureKatex(ok => { if(ok && bpPop.dataset.w === "acc") accMath(); });
+}
+function setPop(w){
+  feelSet(w === "feel");
+  if(w !== "hear"){ if(SFX.playing()) SFX.stop(); cancelAnimationFrame(HR.raf); }
+  bpPop.hidden = !w; bpPop.dataset.w = w || ""; $("popAcc").hidden = w !== "acc"; $("popFeel").hidden = w !== "feel"; $("popHear").hidden = w !== "hear";
+  bpAcc.classList.toggle("on", w === "acc"); bpAcc.setAttribute("aria-pressed", String(w === "acc")); bpAcc.setAttribute("aria-expanded", String(w === "acc"));
+  if(w === "acc") renderAcc();
+  bpHear.classList.toggle("on", w === "hear"); bpHear.setAttribute("aria-pressed", String(w === "hear")); bpHear.setAttribute("aria-expanded", String(w === "hear"));
+  bpFeel.setAttribute("aria-expanded", String(w === "feel"));
+  if(w === "hear") hearGo(true);
+}
+bpFeel.onclick = () => setPop(FG.on ? null : "feel");
+bpHear.onclick = () => setPop(bpHear.classList.contains("on") ? null : "hear");
+bpAcc.onclick = () => setPop(bpAcc.classList.contains("on") ? null : "acc");
+function drawHear(prog){
+  const c = $("hearCanvas"), w = c.clientWidth, h = c.clientHeight; if(!w || !h) return;
+  const dpr = Math.min(devicePixelRatio||1, 2); if(c.width !== Math.round(w*dpr) || c.height !== Math.round(h*dpr)){ c.width = Math.round(w*dpr); c.height = Math.round(h*dpr); }
+  const g = c.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
+  const {F, marks} = specFor(B.kind || "star"), X = wl => 8 + (wl - .75)/4.25*(w - 16), Y = v => h - 18 - Math.max(0, Math.min(1, v))*(h - 36);
+  g.strokeStyle = "#4ade80"; g.lineWidth = 1.8; g.lineJoin = "round"; g.beginPath();
+  for(let i = 0; i <= 120; i++){ const wl = .75 + i/120*4.25; g.lineTo(X(wl), Y(F(wl) + .012*Math.sin(i*1.9))); } g.stroke();
+  g.fillStyle = "#9aa4a9"; g.font = "10px ui-monospace,monospace"; g.textAlign = "left"; g.fillText("0.75 µm", 8, h - 5); g.textAlign = "right"; g.fillText("5 µm", w - 8, h - 5);
+  g.textAlign = "left"; g.fillStyle = "#fbbf24"; for(const [wl, t] of marks){ g.fillRect(X(wl) - .5, Y(F(wl)) - 6, 1, 5); g.fillText(t, Math.min(w - 40, X(wl) - 10), Y(F(wl)) - 9); }
+  if(prog != null){ const px = X(.75 + prog*4.25); g.strokeStyle = "#fafafa99"; g.lineWidth = 1; g.beginPath(); g.moveTo(px, 6); g.lineTo(px, h - 18); g.stroke();
+    g.fillStyle = "#fff"; g.beginPath(); g.arc(px, Y(F(.75 + prog*4.25)), 3.5, 0, 6.3); g.fill(); }
+}
+function hearGo(start){
+  const btn = $("hearGo");
+  if(SFX.playing() && !start){ SFX.stop(); btn.textContent = "Play"; cancelAnimationFrame(HR.raf); drawHear(); return; }
+  const k = B.kind || "star", {F, marks} = specFor(k), low = ["dwarf","asteroid","rocky","water","gas"].includes(k);
+  const bells = marks.map(([wl], i) => ({x:wl, f:low ? 196*(1 + .25*i) : 523*Math.pow(1.26, i), amp:.7}));
+  if(!SFX.sweep(F, .75, 5, bells, 6, () => { btn.textContent = "Play again"; cancelAnimationFrame(HR.raf); drawHear(); })){ btn.textContent = "No sound here"; drawHear(); return; }
+  btn.textContent = "Stop"; cancelAnimationFrame(HR.raf);
+  (function tick(){ const p = SFX.progress(); if(p === null){ drawHear(); return; } drawHear(p); HR.raf = requestAnimationFrame(tick); })();
+}
+$("hearGo").onclick = () => hearGo(false);
 /* the vibration as it would be felt: a wave whose height is the strength and whose speed is the pitch (60 to 250 Hz) */
 const WV = {amp:0, f:100, tf:100, target:0, spike:0, last:0, ph:0, hist:[], now:0};
 window.addEventListener("spherex:haptic", e => { const d = e.detail; if(!d) return; WV.now = performance.now();
@@ -2047,7 +2314,7 @@ const AR_STEPS = [
   ["Join what moves across visits", "3 groups"],
   ["Check known objects (SkyBoT)", "1 known"]];
 const stop = f => e => { e.stopPropagation(); f(e); };
-function arReset(){ clearInterval(AR.timer); arBlink(false); AR.box = null; AR.mode = "idle"; AR.step = -1; AR.running = false; AR.sel = -1; AR.selShow = false; view.classList.remove("boxing"); }
+function arReset(){ knOff(); clearInterval(AR.timer); arBlink(false); AR.box = null; AR.mode = "idle"; AR.step = -1; AR.running = false; AR.sel = -1; AR.selShow = false; view.classList.remove("boxing"); }
 function arStopDraw(){ if(AR.mode === "drawing"){ AR.mode = AR.box ? "set" : "idle"; AR.start = null; view.classList.remove("boxing"); } }
 function arNorm(a, b){ return {x0:Math.min(a[0], b[0]), y0:Math.min(a[1], b[1]), x1:Math.max(a[0], b[0]), y1:Math.max(a[1], b[1])}; }
 function arWorld(e){ const b = view.getBoundingClientRect(); return toWorld(e.clientX - b.left, e.clientY - b.top); }
@@ -2060,7 +2327,10 @@ function arUp(){ if(AR.mode !== "drawing" || !AR.start) return false; AR.start =
   arSet(); return true; }
 function arDefault(){ const [cx, cy] = toWorld(W/2, H*.66), hw = Math.min(W*.3, 230)/cam.z, hh = Math.min(H*.2, 140)/cam.z;
   AR.box = {x0:cx - hw, y0:cy - hh, x1:cx + hw, y1:cy + hh}; arSet(); }
-function arSet(){ AR.mode = "set"; view.classList.remove("boxing"); clearInterval(AR.timer); AR.step = -1; AR.running = false; arBlink(false); arGen(); openBoxCard(); }
+function arSet(){ AR.mode = "set"; view.classList.remove("boxing"); clearInterval(AR.timer); AR.step = -1; AR.running = false; arBlink(false); arGen();
+  // Known: the island searches first (SkyBoT, objects on file in this square), then shows what it found.
+  if(AR.after === "known"){ island.closeCard(); island.run([["searching", 1900, "Known objects in this square"], ["found", 1000, "1 known object: 433 Eros"]], () => openKnownCard()); }
+  else if(AR.after === "disc") openDiscoveryCard(); else openBoxCard(); }
 function arBlink(on){ AR.blink = on; clearInterval(AR.blinkT); if(on) AR.blinkT = setInterval(() => { AR.v ^= 1; }, 750); else AR.v = 1;
   const b = $("arBlink"); if(b) b.setAttribute("aria-pressed", String(on)); }
 function arGen(){
@@ -2085,7 +2355,7 @@ function arDraw(){
   ctx.strokeStyle = drawing ? "#4ade80aa" : "#4ade80"; ctx.lineWidth = 1.2; ctx.setLineDash(drawing ? [5, 4] : []);
   ctx.strokeRect(x0, y0, x1 - x0, y1 - y0); ctx.setLineDash([]);
   ctx.fillStyle = "#4ade80"; ctx.font = "500 11px ui-monospace,monospace"; ctx.fillText(arSize(), x0 + 1, y0 - 7);
-  if(AR.step < 0) return;
+  if(AR.step < 0 || KN.on) return;
   const O = layerOn.orph, C = layerOn.chains, v = AR.v, rr = 4.5 + Math.min(cam.z, 1.4)*2, joined = C && AR.step >= 3;
   if(O){
     if(AR.step < 1) AR.glitch.forEach(g => { if(g.v !== v) return; const [sx, sy] = toScreen(...g.p); ring(sx, sy, rr, wcol(g.w) + "dd", false); });
@@ -2112,25 +2382,28 @@ function arDraw(){
       ctx.fillText(txt, Math.max(8, Math.min(lx + 12, W - ctx.measureText(txt).width - 8)), ly - 10); }
   });
 }
-function arPick(e){
-  if(!AR.box || AR.step < 3 || !layerOn.chains) return false;
-  const b = view.getBoundingClientRect(); let best = -1, bd = 20;
-  AR.tracks.forEach((t, i) => t.pts.flat().forEach(q => { const [sx, sy] = toScreen(...q.p);
-    const d = Math.hypot(e.clientX - b.left - sx, e.clientY - b.top - sy); if(d < bd){ bd = d; best = i; } }));
-  if(best < 0) return false; openTrackCard(best); return true;
+function arPick(e){   // click a mover on the sky (Discovery results)
+  if(!KN.on || KN.mode !== "disc" || AR.step < 3 || !AR.mv.length) return false;
+  const b = view.getBoundingClientRect(); let best = -1, bd = 22;
+  AR.mv.forEach((m, i) => m.pts.forEach(q => { const [sx, sy] = toScreen(...knW(q)); const d = Math.hypot(e.clientX - b.left - sx, e.clientY - b.top - sy); if(d < bd){ bd = d; best = i; } }));
+  if(best < 0) return false; discOpenMover(best); return true;
 }
 function arRenderSteps(){
   const el = $("arSteps"); if(!el) return;
-  el.innerHTML = AR_STEPS.map(([a, n], k) => `<li class="${k <= AR.step ? "on" : AR.running && k === AR.step + 1 ? "now" : ""}"><i></i><span>${a}</span><small>${k <= AR.step ? n : ""}</small></li>`).join("");
+  if(el.children.length !== AR_STEPS.length) el.innerHTML = AR_STEPS.map(([a]) => `<li><i>${CHK}</i><span>${a}</span><small></small></li>`).join("");
+  [...el.children].forEach((li, k) => { const on = k <= AR.step, now = AR.running && k === AR.step + 1; li.className = on ? "on" : now ? "now" : ""; li.querySelector("small").textContent = on ? AR_STEPS[k][1] : "";
+    if(now){ if(!AR.ld){ AR.ld = document.createElement("span"); GridLoader(AR.ld, {size:14, gap:1, rounded:true, color:"green", mode:"pulse", pattern:"plus-hollow", speed:"fast"}); }
+      const host = li.querySelector("i"); if(AR.ld.parentNode !== host) host.appendChild(AR.ld); } });
+  if(AR.ld && !AR.running && AR.ld.parentNode) AR.ld.remove();
 }
 function arRenderList(){
   const list = $("arList"); if(!list) return; list.innerHTML = "";
-  AR.tracks.forEach((t, i) => { const live = AR.step >= 3, one = t.visits.length < 2, b = document.createElement("button");
-    b.type = "button"; b.className = "lk-row"; b.disabled = !live; b.style.opacity = live ? 1 : .4;
-    const chip = !live ? "" : AR.step < 4 ? '<span class="chip">checking</span>' : t.known ? `<span class="chip g">${t.known}</span>` : one ? '<span class="chip">possible</span>' : '<span class="chip a">unexplained</span>';
-    b.innerHTML = live ? `<b>${t.id}</b><span>${one ? "Seen in 1 visit" : "Moves across both visits"}<br><small>${t.visits.length*4} exposures</small></span>${chip}`
-      : `<b>${t.id}</b><span><small>waiting</small></span><span></span>`;
-    if(live) b.onclick = stop(() => openTrackCard(i)); list.appendChild(b); });
+  if(AR.step < 3) return;
+  AR.mv.forEach((m, i) => { const b = document.createElement("button"); b.type = "button"; b.className = "lk-row";
+    const chip = m.known ? (AR.step < 4 ? '<span class="chip">checking</span>' : `<span class="chip g">Known: ${m.known}</span>`) : m.pts.length < 2 ? '<span class="chip">Seen once</span>' : '<span class="chip a">Unexplained</span>';
+    b.innerHTML = `<b>${m.id}</b><span>${m.pts.length < 2 ? "Seen in 1 visit" : "Moves across both visits"}</span>${chip}`;
+    b.onclick = stop(() => discOpenMover(i)); list.appendChild(b); });
+  island.fit();
 }
 function arFit(){
   const b = AR.box, bw = b.x1 - b.x0, bh = b.y1 - b.y0;
@@ -2139,22 +2412,20 @@ function arFit(){
   camT.x = (b.x0 + b.x1)/2 - (sx - W/2)/camT.z; camT.y = (b.y0 + b.y1)/2 - (sy - H/2)/camT.z;
 }
 function arRun(){
-  clearInterval(AR.timer); AR.step = -1; AR.running = true; AR.selShow = false;
-  startPlay(false); setLayer("orph", true); setLayer("chains", true); arBlink(true); arFit(); arRenderSteps(); arRenderList(); island.status("Starting · " + AR_STEPS[0][0], true);
+  clearInterval(AR.timer); AR.step = -1; AR.running = true; AR.selShow = false; AR.sel = -1; arRenderSteps(); arRenderList(); island.status("Starting · " + AR_STEPS[0][0], true);
   AR.timer = setInterval(() => { AR.step++; arRenderSteps(); arRenderList();
     const nx = AR_STEPS[AR.step + 1]; island.status(nx ? `Step ${AR.step + 2} of ${AR_STEPS.length} · ${nx[0]}` : "3 movers found · 1 is 433 Eros", !!nx);
-    if(AR.step >= AR_STEPS.length - 1){ clearInterval(AR.timer); AR.running = false; arRenderSteps();
-      toast("3 movers: T1 is 433 Eros, found blind · T2 unexplained · T3 seen once"); } }, 1000);
+    if(AR.step >= AR_STEPS.length - 1){ clearInterval(AR.timer); AR.running = false; arRenderSteps(); toast("3 movers: T1 is 433 Eros, found blind · T2 unexplained · T3 seen once"); } }, 1000);
 }
 function openAreaCard(){
-  tool = "area"; markTool("area"); AR.mode = "drawing"; view.classList.add("boxing"); AR.selShow = false; lastCard = "area";
+  knOff(); tool = "area"; markTool("area"); AR.mode = "drawing"; view.classList.add("boxing"); AR.selShow = false; lastCard = "area";
   island.openCard({title:"Area search", sub:"Drag a square on the sky", width:380,
     html:`<div class="grp"><p>Drag a square over the part of the sky you want to search. Then choose how to search it.</p></div>
     <div class="row-btn wrap" style="margin-top:12px"><button class="btn ghost sm" id="arHere" type="button">Use a square in the middle</button>${AR.box ? '<button class="btn ghost sm" id="arKeep" type="button">Keep the last square</button>' : ""}</div>`,
     bind:b => { b.querySelector("#arHere").onclick = stop(arDefault); const k = b.querySelector("#arKeep"); if(k) k.onclick = stop(arSet); }});
 }
 function openBoxCard(){
-  tool = "area"; markTool("area"); AR.selShow = false;
+  knOff(); tool = "area"; markTool("area"); AR.selShow = false;
   island.openCard({title:"Area · " + arSize(), sub:"16 SPHEREx frames in 2 visits · 20–21 Mar 2026 (demo area)", width:408, reopen:openBoxCard,
     html:`<div class="ar-opts">
       <button class="ar-opt" id="arKnown" type="button">${AI["orbit"]}<b>Known objects</b><span>Follow asteroids and comets already on file that crossed this square.</span></button>
@@ -2164,25 +2435,68 @@ function openBoxCard(){
       b.querySelector("#arRedraw").onclick = stop(openAreaCard); }});
 }
 function openKnownCard(){
-  AR.from = "known"; AR.selShow = false; const m = movers[0];
+  knOff(); AR.from = "known"; AR.selShow = false; const m = movers[0];
   island.openCard({title:"Known objects", sub:"In this square · from SkyBoT", width:408, reopen:openKnownCard,
     html:`<div class="lk-list">
       <button class="lk-row" id="arEros" type="button"><b>433</b><span>Eros<br><small>asteroid · 16 frames in 2 visits · real SPHEREx data</small></span><span class="chip g">Track it</span></button>
       ${m ? `<button class="lk-row" id="arA" type="button"><b>A</b><span>${m.n}<br><small>demo body · sketch data</small></span><span class="chip">Open</span></button>` : ""}</div>
       <div class="row-btn wrap" style="margin-top:12px"><button class="btn ghost sm" id="arBack" type="button">Back</button></div>`,
-    bind:b => { b.querySelector("#arEros").onclick = stop(openTrack); const a = b.querySelector("#arA"); if(a) a.onclick = stop(() => { sel = m; showInfo(m); });
+    bind:b => { b.querySelector("#arEros").onclick = stop(openKnownEros); const a = b.querySelector("#arA"); if(a) a.onclick = stop(() => { sel = m; showInfo(m); });
       b.querySelector("#arBack").onclick = stop(openBoxCard); }});
 }
-function openDiscoveryCard(){
-  AR.from = "disc"; tool = "area"; markTool("area"); AR.selShow = false;
-  island.openCard({title:"Discovery", sub:"Area · " + arSize() + " · 2 visits", width:408, reopen:openDiscoveryCard,
-    html:`<div class="lk-note">Demo. Dots and counts are made up for this mock-up; only Eros's frames and path in Track are real. A track that matches nothing is "unexplained", never "a new asteroid".</div>
-      <ol class="ar-steps" id="arSteps"></ol>
-      <div class="row-btn wrap" style="margin-top:12px"><button class="btn sm" id="arRun" type="button">${AR.step >= 0 ? "Run again" : "Look for movers"}</button><button class="btn ghost sm" id="arBlink" type="button" aria-pressed="${AR.blink}">Blink the 2 visits</button><button class="btn ghost sm" id="arBack" type="button">Back</button></div>
+async function openDiscoveryCard(){
+  AR.from = "disc"; tool = "area"; markTool("area"); AR.selShow = false; AR.sel = -1;
+  if(KN.on && KN.mode === "disc") knCardOff();
+  else { knOff(); const ok = await knLoad();
+    if(!ok){ island.openCard({title:"Discovery", sub:"Area · " + arSize(), width:408, reopen:openDiscoveryCard,
+      html:`<div class="lk-note">The sky image for this view could not be loaded. Open this mock-up through its local server, not from a file.</div>
+        <div class="row-btn wrap" style="margin-top:12px"><button class="btn ghost sm" id="arBack" type="button">Back</button></div>`, bind:b => { b.querySelector("#arBack").onclick = stop(openBoxCard); }}); return; }
+    KN.on = true; KN.mode = "disc"; KN.card = false; knPlace(); discBuild(); knFly(knFit()); }
+  island.openCard({title:"Discovery", sub:"Area · " + arSize() + " · demo dots", width:408, reopen:openDiscoveryCard,
+    html:`<ol class="ar-steps" id="arSteps"></ol>
+      <div class="row-btn wrap" style="margin-top:12px"><button class="btn sm" id="arRun" type="button">${AR.step >= 0 ? "Run again" : "Look for movers"}</button><button class="btn ghost sm" id="arBack" type="button">Back</button></div>
       <div class="lk-list" id="arList"></div>`,
     bind:b => { b.querySelector("#arRun").onclick = stop(e => { e.currentTarget && (e.currentTarget.textContent = "Run again"); arRun(); });
-      b.querySelector("#arBlink").onclick = stop(() => arBlink(!AR.blink)); b.querySelector("#arBack").onclick = stop(() => { clearInterval(AR.timer); AR.running = false; openBoxCard(); });
+      b.querySelector("#arBack").onclick = stop(() => { clearInterval(AR.timer); AR.running = false; openBoxCard(); });
       arRenderSteps(); arRenderList(); }});
+}
+/* Discovery on the #track sky: demo dots appear per step; movers are drawn in sky-image pixels. T1 is Eros (real positions), T2 and T3 are made up. */
+function discBuild(){
+  const r = rng(77), X = () => 30 + r()*1220, Y = () => 30 + r()*660, hs = KN.hops, a = hs[0].wide_px, z = hs[hs.length - 1].wide_px;
+  AR.mv = [{id:"T1", known:"433 Eros", pts:[a, z], col:"#bae6fd", line:"#38bdf8"}, {id:"T2", known:null, pts:[[430, 540], [700, 330]], col:"#fde68a", line:"#fbbf24"}, {id:"T3", known:null, pts:[[1010, 560]], col:"#d4d4d8", line:"#a1a1aa"}];
+  AR.dots = []; for(let i = 0; i < 58; i++) AR.dots.push({p:[X(), Y()], k:"glitch"}); for(let i = 0; i < 141; i++) AR.dots.push({p:[X(), Y()], k:"star"});
+  for(let i = 0; i < 8; i++) AR.dots.push({p:[X(), Y()], k:"stray"}); AR.mv.forEach(m => m.pts.forEach(q => AR.dots.push({p:q, k:"mover"})));
+}
+function discDraw(P){
+  const st = AR.step; if(st < 0 || !AR.dots) return;
+  ctx.fillStyle = "rgba(228,228,231,.55)";
+  for(const d of AR.dots){ if(d.k === "glitch" ? st >= 1 : d.k === "star" ? st >= 2 : st >= 3) continue; const [x, y] = P(d.p); ctx.beginPath(); ctx.arc(x, y, 1.9, 0, 7); ctx.fill(); }
+  if(st < 3) return;
+  ctx.lineWidth = 2; ctx.lineCap = "round";
+  AR.mv.forEach((m, i) => { const on = AR.selShow && AR.sel === i, sp = m.pts.map(P);
+    if(sp.length > 1){ ctx.strokeStyle = on ? "#4ade80" : m.line; ctx.beginPath(); ctx.moveTo(...sp[0]); ctx.lineTo(...sp[1]); ctx.stroke(); }
+    sp.forEach(([x, y]) => { ctx.fillStyle = m.line; ctx.beginPath(); ctx.arc(x, y, 3.2, 0, 7); ctx.fill(); ctx.strokeStyle = "#fafafa"; ctx.lineWidth = 1; ctx.stroke(); ctx.lineWidth = 2; });
+    if(on){ const [x, y] = sp[sp.length - 1]; ctx.strokeStyle = "#fafafa"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.stroke(); ctx.strokeStyle = "rgba(250,250,250,.35)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, 15, 0, 7); ctx.stroke(); ctx.lineWidth = 2; }
+    if(!layerOn.labels) return;
+    const lab = m.known ? (st >= 4 ? `${m.id} · ${m.known}` : m.id) : m.pts.length < 2 ? `${m.id} · seen once` : m.id, mx = sp.reduce((a, q) => a + q[0], 0)/sp.length, my = sp.reduce((a, q) => a + q[1], 0)/sp.length;
+    ctx.font = "10.5px ui-monospace,monospace"; const w = ctx.measureText(lab).width + 8; ctx.fillStyle = "rgba(5,5,7,.75)"; ctx.fillRect(mx - w/2, my - 24, w, 14);
+    ctx.fillStyle = m.col; ctx.textAlign = "center"; ctx.fillText(lab, mx, my - 13.5); ctx.textAlign = "left"; });
+}
+async function discOpenMover(i){
+  AR.sel = i; AR.selShow = true; const m = AR.mv[i], title = m.known ? `${m.id} · ${m.known}` : m.id;
+  if(i === 0){ KN.det = null; KN.cutKey = ""; KN.card = true; const l = knList(); KN.hop = l[Math.round(frame/11*(l.length - 1))]; KN.t = KN.tt = KN.hop.mjd_avg;
+    knErosCard({title, back:openDiscoveryCard, reopen:() => discOpenMover(0)}); return; }
+  knCardOff(); const n = m.pts.length < 2 ? 4 : 8;
+  island.openCard({title, sub:m.pts.length < 2 ? "Seen once" : "Unexplained", width:408, reopen:() => discOpenMover(i), bleed:true,
+    html:`<div class="kn-cut"><div class="kn-demo">Demo mover: no frames in this mock-up</div>
+        <div class="over"><span class="over-l"><button class="close" id="knBack" type="button" aria-label="Back to the results" title="Back to the results"><svg class="ico" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><h2>${title}</h2></span><span class="over-btns"><button class="close" id="knMin" type="button" aria-label="Minimise" title="Minimise"><svg class="ico" viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button><button class="close" id="knX" type="button" aria-label="Close">${AI["x"]}</button></span></div>
+        <div class="cap"><i style="background:#6b6b75"></i>20 to 21 Mar 2026</div><div class="cap capr"><b>-</b><span>/ ${n}</span></div></div>
+      <dl class="kv"><dt>Wavelength</dt><dd>no frames</dd><dt>Taken</dt><dd>20 to 21 Mar 2026</dd></dl>
+      <div class="kn-ov opts kn-off" role="group" aria-label="Show on the image">${["Mask stars", "Predicted position", "Path", "Flagged pixels"].map(t => `<label class="opt"><input type="checkbox" disabled><span class="cb">${CHK}</span>${t}</label>`).join("")}</div>
+      <div class="kn-spec"><div class="kn-spec-h"><span>Wavelength</span><small>Brightness in each exposure</small></div><div class="kn-spec-none">No spectrum for a demo mover</div></div>
+      <details class="kn-det kn-off"><summary><span>Detectors</span><span>All</span></summary></details>`,
+    bind:b => { b.querySelector("#knBack").onclick = stop(openDiscoveryCard); b.querySelector("#knX").onclick = stop(() => { island.onClose && island.onClose(); island.closeCard(); });
+      b.querySelector("#knMin").onclick = stop(() => island.minimize()); }});
 }
 function openTrackCard(i){
   const t = AR.tracks[i], one = t.visits.length < 2, known = t.known && AR.step >= 4;
@@ -2200,6 +2514,191 @@ function openTrackCard(i){
       <div class="row-btn wrap">${known ? '<button class="btn" id="arTrack" type="button">Open in Track</button>' : ""}<button class="btn ghost" id="arBackD" type="button">Back to discovery</button></div>`,
     bind:b => { const k = b.querySelector("#arTrack"); if(k) k.onclick = stop(openTrack); b.querySelector("#arBackD").onclick = stop(openDiscoveryCard); }});
 }
+/* ============================================================
+   Known objects: follow one object across the drawn square.
+   The path, exposure squares, time ticks and the cutout are ported from the #track view
+   (chase-the-rock.html: real SPHEREx QR2 frames and the Horizons path of 433 Eros). The data is read
+   from that file. The path is laid on the sky at its true scale (1 SPHEREx pixel = 6.15") and centred
+   in the drawn square, clipped to it. Where it sits in the demo sky is made up; its shape is real.
+   ============================================================ */
+const KN = {sky:null, on:false, mode:"eros", card:false, D:null, loading:null, hops:[], track:[], S:5.625/6.15, rx:0, ry:0, bx:0, by:0,
+            t:0, tt:0, hop:null, ov:{mask:true, pred:true, path:true, flags:false}, det:null, tw:null, lt:0, cutKey:"", img:{}, flg:{}};
+const KN_MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const knMjd = s => Date.parse(s)/86400000 + 40587, knDate = m => new Date((m - 40587)*86400000), kp2 = n => String(n).padStart(2, "0");
+const knHM = m => { const d = knDate(m); return kp2(d.getUTCHours()) + ":" + kp2(d.getUTCMinutes()); };
+const knDay = m => { const d = knDate(m); return d.getUTCDate() + " " + KN_MON[d.getUTCMonth()]; };
+const knW = p => [KN.bx + (p[0] - KN.rx)*KN.S, KN.by + (p[1] - KN.ry)*KN.S];      // wide-image pixel to sky world
+function knLoad(){
+  if(KN.D) return Promise.resolve(true);
+  return KN.loading || (KN.loading = fetch("chase-the-rock.html").then(r => { if(!r.ok) throw 0; return r.text(); }).then(t => {
+    const m = t.match(/<script type="application\/json" id="sx-data">([\s\S]*?)<\/script>/); if(!m) throw 0;
+    const D = JSON.parse(m[1]); KN.track = D.track.map(p => ({...p, mjd:knMjd(p.t)}));
+    KN.hops = D.hops.slice().sort((a, b) => a.mjd_avg - b.mjd_avg || a.detector.localeCompare(b.detector)); KN.D = D; return true;
+  }).catch(() => { KN.loading = null; return false; }));
+}
+function knOff(){ const was = KN.on; KN.on = false; KN.card = false; KN.tw = null; KN.hop = null; if(was) setFrame(frame); }
+function knCardOff(){ if(!KN.card) return; KN.card = false; KN.hop = null; setFrame(frame); }
+function knPlace(){   // the #track sky image is fitted (same aspect) inside the drawn square, centred
+  const b = AR.box, W0 = KN.D.wide.w, H0 = KN.D.wide.h;
+  KN.S = Math.min((b.x1 - b.x0)/W0, (b.y1 - b.y0)/H0); KN.rx = W0/2; KN.ry = H0/2; KN.bx = (b.x0 + b.x1)/2; KN.by = (b.y0 + b.y1)/2;
+  if(!KN.sky){ KN.sky = new Image(); KN.sky.src = KN.D.wide.png; }
+}
+function knTrackAt(m){
+  const T = KN.track; if(m <= T[0].mjd) return T[0].px;
+  for(let i = 1; i < T.length; i++) if(m <= T[i].mjd){ const a = T[i - 1], b = T[i], f = (m - a.mjd)/(b.mjd - a.mjd);
+    return [a.px[0] + f*(b.px[0] - a.px[0]), a.px[1] + f*(b.px[1] - a.px[1])]; }
+  return T[T.length - 1].px;
+}
+/* Camera fit: the box of the path points and exposure squares that lie inside the drawn square, then scaled to the free
+   area left of the card between the bars (same area as arFit), with margin. Any square size works: a huge one just zooms in on the path. */
+function knSafe(){   // free rectangle (view px): below the player and its detector line, above the dock and zoom card, left of the card
+  const vr = view.getBoundingClientRect(), R = e => { if(!e) return null; const r = e.getBoundingClientRect(); return {l:r.left - vr.left, t:r.top - vr.top, r:r.right - vr.left, b:r.bottom - vr.top}; };
+  const pl = R(document.querySelector(".player")), hud = R($("hudTl")), dock = R(document.querySelector(".dock")), zc = R($("zIn").closest(".zoom")), M = 20;
+  const top = Math.max(pl ? pl.b : 0, hud ? hud.t + 16 : 0) + M + 12;      // 12 more for the size label above the square
+  const bot = Math.min(dock ? dock.t : H, zc ? zc.t : H, H) - M;
+  return {l:M, t:top, r:W - 408 - 16 - M, b:bot};
+}
+function knFit(){   // the WHOLE drawn square into the safe rectangle, by the limiting dimension
+  const b = AR.box, a = knSafe(), aw = Math.max(80, a.r - a.l), ah = Math.max(80, a.b - a.t);
+  const z = Math.min(12, Math.max(.03, Math.min(aw/(b.x1 - b.x0), ah/(b.y1 - b.y0)))), sx = a.l + aw/2, sy = a.t + ah/2;
+  return {z, x:(b.x0 + b.x1)/2 - (sx - W/2)/z, y:(b.y0 + b.y1)/2 - (sy - H/2)/z};
+}
+function knRefit(){ island.fit(); const to = knFit(); KN.tw = null; cam.x = camT.x = to.x; cam.y = camT.y = to.y; cam.z = camT.z = to.z; }
+function knFly(to){
+  if(REDUCED){ cam.x = camT.x = to.x; cam.y = camT.y = to.y; cam.z = camT.z = to.z; KN.tw = null; return; }
+  KN.tw = {t0:null, from:{x:cam.x, y:cam.y, z:cam.z}, to};
+}
+function knTween(ts){
+  const w = KN.tw; if(w.t0 === null) w.t0 = ts;
+  const u = Math.min(1, (ts - w.t0)/1000), e = u < .5 ? 4*u*u*u : 1 - Math.pow(-2*u + 2, 3)/2;
+  cam.x = w.from.x + (w.to.x - w.from.x)*e; cam.y = w.from.y + (w.to.y - w.from.y)*e; cam.z = w.from.z*Math.pow(w.to.z/w.from.z, e);
+  camT.x = cam.x; camT.y = cam.y; camT.z = cam.z; if(u >= 1) KN.tw = null;
+}
+function knTick(ts){   // the marker glides to the time of the current frame
+  const dt = Math.min(.1, (ts - (KN.lt || ts))/1000); KN.lt = ts; if(!KN.on) return;
+  KN.t += (KN.tt - KN.t)*(REDUCED ? 1 : 1 - Math.exp(-dt*5)); if(Math.abs(KN.tt - KN.t) < 1e-6) KN.t = KN.tt;
+}
+const knList = () => KN.det == null ? KN.hops : KN.hops.filter(h => +h.detector.slice(1) - 1 === KN.det);
+function knSync(){   // frame (global player) -> exposure -> time, cutout and wavelength
+  if(!KN.on || !KN.D || !KN.card) return; const l = knList(), h = l[Math.round(frame/11*(l.length - 1))]; KN.hop = h; KN.tt = h.mjd_avg;
+  const di = +h.detector.slice(1) - 1;
+  document.getElementById("wl").textContent = h.wl_um.toFixed(2);
+  const w = $("knWl"); if(w) w.innerHTML = `<i style="background:${wcol(h.wl_um)}"></i>${h.wl_um.toFixed(2)} µm · ${DETS[di].n}`;
+  const dd = $("knDate"); if(dd) dd.innerHTML = `<i style="background:${wcol(h.wl_um)}"></i>${knDay(h.mjd_avg)} ${knDate(h.mjd_avg).getUTCFullYear()}`;
+  const nn = $("knN"); if(nn) nn.innerHTML = `<b>${l.indexOf(h) + 1}</b><span>/ ${l.length}</span>`;
+  const t = $("knAt"); if(t) t.textContent = `${knDay(h.mjd_avg)} ${knHM(h.mjd_avg)} UTC · exposure ${h.exposure} of 4`;
+  if(KN.cutKey !== h.frame_id){ KN.cutKey = h.frame_id; knCut(); }
+  knSpec(h);
+}
+// Brightness against wavelength, one dot per exposure taken so far (the former #track spectrum, in the card's style).
+function knSpec(cur){
+  const svg = $("knSpec"); if(!svg) return;
+  const W = 360, H = 150, L = 30, R = 8, T = 10, B = 22, x0 = .75, x1 = 5;
+  const all = KN.hops, fmax = Math.max(...all.map(h => h.flux + (h.flux_err || 0))) * 1.08, fmin = Math.min(0, ...all.map(h => h.flux - (h.flux_err || 0)));
+  const X = l => L + (l - x0) / (x1 - x0) * (W - L - R), Y = f => T + (1 - (f - fmin) / (fmax - fmin)) * (H - T - B);
+  let g = `<rect x="0" y="0" width="${W}" height="${H}" rx="8" fill="#16191c"/>`;
+  [1, 2, 3, 4, 5].forEach(l => { g += `<line x1="${X(l)}" x2="${X(l)}" y1="${T}" y2="${H - B}" stroke="#262b30"/><text x="${X(l)}" y="${H - 7}" fill="#9aa4ab" font-size="10" text-anchor="middle">${l} µm</text>`; });
+  g += `<text x="6" y="${T + 8}" fill="#9aa4ab" font-size="9">MJy/sr</text>`;
+  const shown = all.filter(h => h.mjd_avg <= cur.mjd_avg + 1e-9);
+  shown.forEach(h => { const x = X(h.wl_um), y = Y(h.flux), c = wcol(h.wl_um), hollow = h.hw_flags && h.hw_flags.length;
+    if(h.flux_err) g += `<line x1="${x}" x2="${x}" y1="${Y(h.flux - h.flux_err)}" y2="${Y(h.flux + h.flux_err)}" stroke="${c}" stroke-opacity=".35"/>`;
+    g += hollow ? `<circle cx="${x}" cy="${y}" r="3.2" fill="none" stroke="${c}" stroke-width="1.4"/>` : `<circle cx="${x}" cy="${y}" r="3.2" fill="${c}"/>`;
+    if(h === cur) g += `<circle cx="${x}" cy="${y}" r="7" fill="none" stroke="#fafafa" stroke-width="1.4"/>`; });
+  svg.innerHTML = g;
+  svg.setAttribute("aria-label", `Brightness of Eros against wavelength, ${shown.length} of ${all.length} exposures: ` + shown.map(h => `${h.wl_um.toFixed(2)} µm ${h.flux.toFixed(0)}`).join("; "));
+}
+function knCompass(g, x, y, L){
+  g.strokeStyle = "#a1a1aa"; g.fillStyle = "#a1a1aa"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - L); g.moveTo(x, y); g.lineTo(x - L, y); g.stroke();
+  g.font = "600 10px ui-monospace,monospace"; g.textAlign = "center"; g.fillText("N", x, y - L - 4); g.fillText("E", x - L - 7, y + 3.5); g.textAlign = "left";
+}
+function knCut(){   // the SPHEREx cutout, ported from chase-the-rock.html drawZoom
+  const c = $("knCut"), h = KN.hop; if(!c || !h) return;
+  const cssW = c.clientWidth || 290, dpr = Math.min(devicePixelRatio || 1, 2); c.width = c.height = Math.round(cssW*dpr);
+  const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.fillStyle = "#000"; g.fillRect(0, 0, cssW, cssW);
+  let im = KN.img[h.frame_id]; if(!im){ im = KN.img[h.frame_id] = new Image(); im.onload = () => { if(KN.hop === h) knCut(); }; im.src = h.png; }
+  if(KN.ov.flags && !KN.flg[h.frame_id]){ const f = KN.flg[h.frame_id] = new Image(); f.onload = () => { if(KN.hop === h) knCut(); }; f.src = h.flags_png; }
+  const [e0, e1] = h.east, [n0, n1] = h.north, det = e0*n1 - n0*e1, inv = [[n1/det, -n0/det], [-e1/det, e0/det]];
+  const M = [[-inv[0][0], -inv[0][1]], [-inv[1][0], -inv[1][1]]];                      // north up, east left
+  const s = cssW/(Math.max(h.nx, h.ny) + 2), cx = (h.nx - 1)/2, cy = (h.ny - 1)/2, mid = cssW/2;
+  const P = (x, y) => { const dx = x - cx, dy = y - cy; return [mid + s*(M[0][0]*dx + M[0][1]*dy), mid + s*(M[1][0]*dx + M[1][1]*dy)]; };
+  if(im.complete && im.naturalWidth){ g.save(); g.setTransform(dpr*s*M[0][0], dpr*s*M[1][0], dpr*s*M[0][1], dpr*s*M[1][1], dpr*mid, dpr*mid);
+    g.translate(-(cx + .5), -(cy + .5)); g.imageSmoothingEnabled = false; g.drawImage(im, 0, 0); g.restore(); g.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  if(KN.ov.flags && KN.flg[h.frame_id] && KN.flg[h.frame_id].complete){ g.save(); g.setTransform(dpr*s*M[0][0], dpr*s*M[1][0], dpr*s*M[0][1], dpr*s*M[1][1], dpr*mid, dpr*mid); g.translate(-(cx + .5), -(cy + .5)); g.imageSmoothingEnabled = false; g.globalAlpha = .9; g.drawImage(KN.flg[h.frame_id], 0, 0); g.restore(); g.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  if(KN.ov.mask) for(const st of h.stars){ const [x, y] = P(st[0], st[1]), r = s*(st[2] > 60 ? 2 : 1.4);       // catalogue stars, masked
+    g.fillStyle = "rgba(17,17,20,.92)"; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.strokeStyle = "rgba(161,161,170,.3)"; g.lineWidth = 1; g.stroke(); }
+  if(KN.ov.path && h.seg.length > 1){ g.save(); g.beginPath(); g.rect(0, 0, cssW, cssW); g.clip(); g.setLineDash([6, 5]); g.strokeStyle = "rgba(56,189,248,.85)"; g.lineWidth = 1.6;
+    g.beginPath(); h.seg.forEach((p, j) => { const [x, y] = P(p[0], p[1]); j ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); g.restore(); g.setLineDash([]); }
+  if(KN.ov.pred){ const [x, y] = P(h.x, h.y), r = s*3.4; g.strokeStyle = "#4ade80"; g.lineWidth = 2; g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke();
+  g.beginPath(); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b]) => { g.moveTo(x + a*(r + 3), y + b*(r + 3)); g.lineTo(x + a*(r + 10), y + b*(r + 10)); }); g.stroke();
+  g.font = "600 12px system-ui,sans-serif"; g.fillStyle = "rgba(5,5,7,.85)"; g.fillRect(x + r + 8, y - r - 22, 44, 18); g.fillStyle = "#fafafa"; g.fillText("Eros", x + r + 13, y - r - 9); }
+  knCompass(g, cssW - 24, cssW - 50, 13);
+  c.setAttribute("aria-label", `SPHEREx cutout of 433 Eros at ${h.wl_um.toFixed(2)} micrometres, ${h.nx} by ${h.ny} pixels. Eros is ringed in green, its path is dashed, masked catalogue stars are grey circles.`);
+}
+function knDraw(){   // the path on the main sky, clipped to the drawn square; ported from chase-the-rock.html drawSky
+  if(!KN.on || !KN.D || !AR.box || (KN.mode === "eros" && !KN.hop)) return;
+  const b = AR.box, [x0, y0] = toScreen(b.x0, b.y0), [x1, y1] = toScreen(b.x1, b.y1), P = p => toScreen(...knW(p)), now = KN.t, T = KN.track;
+  ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
+  ctx.fillStyle = "#000"; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);                    // hides the mock-up's own sky inside the square
+  if(KN.sky && KN.sky.complete){ const [ix, iy] = P([0, 0]), [jx, jy] = P([KN.D.wide.w, KN.D.wide.h]); ctx.globalAlpha = .92; ctx.imageSmoothingEnabled = true; ctx.drawImage(KN.sky, ix, iy, jx - ix, jy - iy); ctx.globalAlpha = 1; }
+  if(KN.mode === "disc") discDraw(P); else {
+  ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.strokeStyle = "#38bdf8"; ctx.beginPath(); let started = false;
+  for(const p of T){ if(p.mjd > now) break; const [x, y] = P(p.px); started ? ctx.lineTo(x, y) : ctx.moveTo(x, y); started = true; }
+  const cur2 = knTrackAt(now); if(started){ const [x, y] = P(cur2); ctx.lineTo(x, y); } ctx.stroke();
+  ctx.setLineDash([5, 5]); ctx.strokeStyle = "rgba(56,189,248,.65)"; ctx.beginPath(); { const [x, y] = P(cur2); ctx.moveTo(x, y); }
+  for(const p of T){ if(p.mjd <= now) continue; const [x, y] = P(p.px); ctx.lineTo(x, y); } ctx.stroke(); ctx.setLineDash([]);
+  ctx.font = "10.5px ui-monospace,monospace";
+  for(const p of T){ const hr = knDate(p.mjd).getUTCHours(); if(hr % 6) continue; const [x, y] = P(p.px);
+    ctx.fillStyle = "#7dd3fc"; ctx.beginPath(); ctx.arc(x, y, 2.6, 0, 7); ctx.fill();
+    if(!layerOn.labels) continue; const lab = `${knDate(p.mjd).getUTCDate()} ${KN_MON[knDate(p.mjd).getUTCMonth()]} ${kp2(hr)}h`;
+    ctx.fillStyle = "rgba(5,5,7,.75)"; const w = ctx.measureText(lab).width + 8; ctx.fillRect(x - w/2, y - 22, w, 14); ctx.fillStyle = "#bae6fd"; ctx.textAlign = "center"; ctx.fillText(lab, x, y - 11.5); ctx.textAlign = "left"; }
+  const [ex, ey] = P(cur2); ctx.strokeStyle = "#fafafa"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ex, ey, 9, 0, 7); ctx.stroke();
+  ctx.strokeStyle = "rgba(250,250,250,.35)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(ex, ey, 15, 0, 7); ctx.stroke();
+  if(layerOn.labels){ ctx.font = "600 12px system-ui,sans-serif"; const lab = `Eros · ${knHM(now)} UTC`, lw = ctx.measureText(lab).width + 12;
+    ctx.fillStyle = "rgba(5,5,7,.85)"; ctx.fillRect(ex + 14, ey + 12, lw, 19); ctx.fillStyle = "#fafafa"; ctx.fillText(lab, ex + 20, ey + 25.5); }
+  }
+  ctx.restore();
+  ctx.strokeStyle = "#4ade80"; ctx.lineWidth = 1.2; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+}
+const wlColor = um => `hsl(${Math.round(270*(1 - Math.min(Math.max((um - .75)/4.25, 0), 1)))} 85% 62%)`;   // Rainbow Trails mapping, as in #track
+function knDetChips(){
+  const have = new Set(KN.hops.map(h => +h.detector.slice(1) - 1));
+  return DETS.map((d, i) => `<button type="button" class="det" role="radio" aria-checked="${KN.det === i}" data-i="${i}"${have.has(i) ? "" : ' disabled title="No Eros frame in this detector"'}>
+    <span class="rd"></span><span><b><i style="background:${d.c}"></i>${d.n}</b><small>${d.lo.toFixed(2)} to ${d.hi.toFixed(2)} µm</small></span></button>`).join("");
+}
+async function openKnownEros(){
+  AR.from = "known"; AR.selShow = false; AR.step = -1; tool = "area"; markTool("area"); startPlay(false);
+  const ok = await knLoad();
+  if(!ok){ island.openCard({title:"433 Eros", sub:"Known object · asteroid", width:408, reopen:openKnownEros,
+    html:`<div class="lk-note">Eros's real frames and path could not be loaded. Open this mock-up through its local server, not from a file.</div>
+      <div class="row-btn wrap" style="margin-top:12px"><button class="btn ghost sm" id="arBack" type="button">Back</button></div>`,
+    bind:b => { b.querySelector("#arBack").onclick = stop(openKnownCard); }}); return; }
+  KN.on = true; KN.mode = "eros"; KN.card = true; KN.det = null; KN.cutKey = ""; knPlace(); const l = knList(); KN.hop = l[Math.round(frame/11*(l.length - 1))]; KN.t = KN.tt = KN.hop.mjd_avg;
+  knFly(knFit());
+  knErosCard({reopen:openKnownEros});
+}
+function knErosCard(o){
+  const t = o.title || "433 Eros";
+  island.openCard({title:t, sub:"Known object · asteroid · from SkyBoT", width:408, reopen:o.reopen, bleed:true,
+    html:`<div class="kn-cut"><canvas id="knCut" role="img" aria-label="SPHEREx cutout"></canvas>
+        <div class="over"><span class="over-l">${o.back ? '<button class="close" id="knBack" type="button" aria-label="Back to the results" title="Back to the results"><svg class="ico" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>' : ""}<h2>${t}</h2></span><span class="over-btns"><button class="close" id="knMin" type="button" aria-label="Minimise" title="Minimise"><svg class="ico" viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button><button class="close" id="knX" type="button" aria-label="Close">${AI["x"]}</button></span></div>
+        <div class="cap" id="knDate"></div><div class="cap capr" id="knN"></div></div>
+      <dl class="kv"><dt>Wavelength</dt><dd id="knWl"></dd><dt>Taken</dt><dd id="knAt"></dd></dl>
+      <div class="kn-ov opts" role="group" aria-label="Show on the image">${[["mask","Mask stars"],["pred","Predicted position"],["path","Path"],["flags","Flagged pixels"]].map(([k, t]) => `<label class="opt"><input type="checkbox" class="kn-tg" data-k="${k}"${KN.ov[k] ? " checked" : ""}><span class="cb">${CHK}</span>${t}</label>`).join("")}</div>
+      <div class="kn-spec"><div class="kn-spec-h"><span>Wavelength</span><small>Eros's brightness in each exposure so far</small></div><svg id="knSpec" viewBox="0 0 360 150" role="img" aria-label="Brightness of Eros against wavelength"></svg></div>
+      <details class="kn-det" id="knDet"><summary><span>Detectors</span><span id="knDetV">${KN.det == null ? "All" : DETS[KN.det].n}</span></summary>
+        <div class="dets" role="radiogroup" aria-label="Detector">${knDetChips()}</div></details>
+      ${o.back ? "" : `<div class="kn-leg"><span><i></i>path so far</span><span><i class="d"></i>path to come</span><span><i class="dot"></i>every 6 h</span></div>`}`,
+    bind:b => {
+      b.querySelectorAll(".det").forEach(d => d.onclick = () => { if(d.disabled) return; const i = +d.dataset.i; KN.det = KN.det === i ? null : i;
+        b.querySelectorAll(".det").forEach(x => x.setAttribute("aria-checked", String(+x.dataset.i === KN.det))); b.querySelector("#knDetV").textContent = KN.det == null ? "All" : DETS[KN.det].n; knSync(); });
+      b.querySelectorAll(".kn-tg").forEach(t => t.onchange = () => { KN.ov[t.dataset.k] = t.checked; knCut(); });
+      b.querySelector("#knDet").addEventListener("toggle", () => island.fit());
+      if(o.back) b.querySelector("#knBack").onclick = stop(o.back);
+      b.querySelector("#knX").onclick = stop(() => { island.onClose && island.onClose(); island.closeCard(); });
+      b.querySelector("#knMin").onclick = stop(() => island.minimize()); },
+    after:() => knSync()});
+}
+
 const EMBED = `body{padding:0!important;background:#06060a!important}
 .page{max-width:none!important;gap:0!important}
 .intro,.notes,.rail,.objchip{display:none!important}
@@ -2212,7 +2711,7 @@ kFrame.addEventListener("load", () => {
   }catch(err){ /* opened from file://: the page shows as is, with its own header */ }
 });
 function openTrack(){
-  if(B.building) closeBuild(); if(TR.open) closeTrail(); island.closeCard(); startPlay(false); arBlink(false);
+  knOff(); if(B.building) closeBuild(); if(TR.open) closeTrail(); island.closeCard(); startPlay(false); arBlink(false);
   AR.track = true; tool = "area"; markTool("area");
   document.body.classList.add("split"); $("view").classList.add("tracking"); kpane.classList.add("open"); kpane.setAttribute("aria-hidden", "false");
   history.replaceState(null, "", "#track");
@@ -2237,7 +2736,7 @@ document.addEventListener("keydown", e => {
   if(e.key === " "){ e.preventDefault(); startPlay(!playing); return; }
   if(e.key === "ArrowRight"){ startPlay(false); setFrame(frame + 1); }
   if(e.key === "ArrowLeft"){ startPlay(false); setFrame(frame - 1); }
-  if(e.key === "Escape"){ if(AR.track){ closeTrack(); return; } if(AR.mode === "drawing"){ arStopDraw(); } if(TR.open){ closeTrail(); return; } if(B.building){ closeBuild(); return; } if(island.card){ island.onClose(); island.closeCard(); } }
+  if(e.key === "Escape"){ if(AR.track){ closeTrack(); return; } if(AR.mode === "drawing"){ arStopDraw(); } if(TR.open){ closeTrail(); return; } if(B.building){ if(!bpPop.hidden){ setPop(null); return; } closeBuild(); return; } if(island.card){ island.onClose(); island.closeCard(); } }
   const t = TOOLS.find(x => x.key === e.key); if(t) selectTool(t.id);
 });
 

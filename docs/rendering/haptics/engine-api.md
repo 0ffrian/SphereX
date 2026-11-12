@@ -2,6 +2,8 @@
 
 > **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.8 · **Implements:** [D-08, D-09, D-20, Q-19, Q-85](../../decisions/haptics-design.md), [D-10, Q-72, Q-133](../../decisions/haptics-sound.md), [Q-71, Q-73](../../decisions/haptics-built.md), [Q-132](../../decisions/platform-hosting.md) · **Read with:** [platform-encoding.md](platform-encoding.md) (R8.1–R8.3), [audio-pairing.md](audio-pairing.md) (R8.9), [wiring.md](wiring.md) (R8.8.1), [data-contract.md](../data-contract.md) (R3.4 `HapticProfile`)
 
+> **D-39 (12 Nov 2026), haptics cut:** the vibrate and Tauri drivers and `createHaptics({ vibrate: true })` are cut. **Still live, as the sound engine** (`frontend/src/sound/engine.ts`, `SoundEngine`, `createSoundEngine`): the event API, the honesty gate, the rate cap, the engine-owned trains (Q-71) and the proposed tone stream (Q-189), with the audio driver (`sound/voices.ts`) as the only driver. The contract types keep their `Haptic*` names until after the event. See [D-39](../../decisions/sound-ambience.md).
+
 ### R8.8 Engine API
 
 The types live in `frontend/src/contract/haptics.ts` (hand-written next to the generated contract, Q-19) and `haptics/haptics.ts` re-exports them. The engine is `haptics/haptics.ts`. The code below is the reference shape; at the event only the audio driver is in the engine (Q-132).

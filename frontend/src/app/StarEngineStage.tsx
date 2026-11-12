@@ -12,9 +12,11 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { Tag } from '@/contract';
 import { useAppStore } from '@/state/store';
-import { nudge } from '@/engine/stars/starPick';
+import { nudge, projectSurface, globeRot, GLOBE_TILT } from '@/engine/stars/starPick';
 import { placeText, useStarTarget } from './starTargetStore';
-import { useBuildControls, type BuildControl, type BuildControlsSpec } from './build/BuildControls';
+import { useStarChart } from './starChartStore';
+import { useStarView } from './starViewStore';
+import { useBuildControls, type BuildControl, type BuildControlsSpec, type BuildNote } from './build/BuildControls';
 import { cardToStar, type StarFromCard } from '@/engine/stars/cardToStar';
 import { FrameCap } from '@/viewer/render/quality';
 import { readyOrTimeout, STAR_READY_TIMEOUT_MS } from './engineWatchdog';
@@ -52,13 +54,13 @@ const READOUT_TAG: Record<string, Tag> = {
 };
 const LIGHT_LABEL: Record<StarLight, string> = {
   0: 'True colour',
-  2: 'Enhanced colour',
-  3: 'Observatory view',
+  2: 'Enhanced',
+  3: 'Observatory',
 };
-const SCALE_LABEL: Record<StarScaleView, string> = {
-  big: 'Whole star, larger detail',
-  true: 'Whole star, true scale',
-  close: 'Close-up',
+// The left pane is the close-up now, so the globe offers two views; the engine's 'close' view is not offered.
+const SCALE_LABEL: Partial<Record<StarScaleView, string>> = {
+  big: 'Larger detail',
+  true: 'True scale',
 };
 
 /**
@@ -207,6 +209,26 @@ function useStarEngine(
     bump();
   }, [engine, preset]);
 
+  // Light and field lines are one state for the globe and both close-ups (the Details controls write it here).
+  const light = useStarView((s) => s.light);
+  const lines = useStarView((s) => s.lines);
+  useEffect(() => {
+    if (!engine) return;
+    if (engine.light !== light) engine.setLight(light);
+    engine.setFieldLines(lines);
+    engine.draw();
+    bump();
+  }, [engine, light, lines]);
+
+  // The View pill reaches the close-up too (cell size: larger detail or true scale).
+  const scale = useStarView((s) => s.scale);
+  useEffect(() => {
+    if (!engine || engine.scale === scale) return;
+    engine.setScale(scale);
+    engine.draw();
+    bump();
+  }, [engine, scale]);
+
   return { hostRef, engine, failed, compiling: compiling && !failed, rev, bump };
 }
 
@@ -256,22 +278,74 @@ export function StarPreparing() {
   );
 }
 
-function starValuesNote(star: StarFromCard): BuildControl[] {
-  const out: BuildControl[] = [];
-  if (star.assumed.length)
-    out.push({
-      id: 'assumed',
-      kind: 'readout',
-      label: 'Filled in, not measured',
-      value: star.assumed.join('; '),
-      tag: 'model_dependent',
-    });
-  return out;
+/** The left close-up's zoom: wheel and two-finger pinch on the stage, and registration for the zoom bar. */
+function useCloseUpZoom(host: React.RefObject<HTMLDivElement | null>, engine: StarEngine | null, bump: () => void) {
+  useEffect(() => {
+    if (!engine) return;
+    useStarView.getState().setCloseUp(engine);
+    return () => {
+      if (useStarView.getState().closeUp === engine) useStarView.getState().setCloseUp(null);
+    };
+  }, [engine]);
+  useEffect(() => {
+    const el = host.current;
+    if (!el || !engine) return;
+    const apply = (k: number) => {
+      engine.setZoom(engine.zoom * k);
+      bump();
+    };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      apply(Math.exp(-e.deltaY * 0.0015));
+    };
+    const pts = new Map<number, { x: number; y: number }>();
+    let last = 0;
+    const dist = () => {
+      const [a, b] = [...pts.values()];
+      return Math.hypot(a!.x - b!.x, a!.y - b!.y);
+    };
+    const down = (e: PointerEvent) => {
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2) last = dist();
+    };
+    const move = (e: PointerEvent) => {
+      if (!pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2) {
+        const d = dist();
+        if (last > 0 && d > 0) apply(d / last);
+        last = d;
+      }
+    };
+    const up = (e: PointerEvent) => {
+      pts.delete(e.pointerId);
+      last = 0;
+    };
+    el.style.setProperty('touch-action', 'none');
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('pointerdown', down);
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+    };
+  }, [host, engine, bump]);
+}
+
+/** "0.19 R☉" for a small star, "281,341 km" never: the short form of the radius. */
+function sizeText(rsun: number): string {
+  return `${rsun < 10 ? rsun.toFixed(2) : Math.round(rsun).toLocaleString('en')} R\u2609`;
 }
 
 /** The prototype's "Star surface" stage, on the build pane's globe stage. */
 export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: () => void }) {
   const { hostRef, engine, failed, compiling, bump } = useStarEngine('globe', star, 500);
+  const target = useStarTarget((s) => s.target);
   // A new star starts looking at its strongest spot group, on the flare close-up.
   useEffect(() => useStarTarget.getState().reset(), [star.preset.id]);
   useEffect(() => {
@@ -288,124 +362,150 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
         kind: 'choice',
         label: 'Light',
         value: String(engine.light),
-        options: ([0, 2, 3] as StarLight[]).map((l) => ({
-          value: String(l),
-          label: LIGHT_LABEL[l],
-        })),
-        onChange: (v) => {
-          engine.setLight(Number(v) as StarLight);
-          bump();
-        },
+        options: ([0, 2, 3] as StarLight[]).map((l) => ({ value: String(l), label: LIGHT_LABEL[l] })),
+        onChange: (v) => useStarView.getState().setLight(Number(v) as StarLight),
       },
       {
         id: 'scale',
         kind: 'choice',
         label: 'View',
-        value: engine.scale,
+        value: engine.scale === 'close' ? 'true' : engine.scale,
         options: (Object.keys(SCALE_LABEL) as StarScaleView[]).map((s) => ({
           value: s,
-          label: SCALE_LABEL[s],
+          label: SCALE_LABEL[s] ?? s,
         })),
         onChange: (v) => {
           engine.setScale(v as StarScaleView);
-          bump();
-        },
-      },
-      {
-        id: 'pause',
-        kind: 'toggle',
-        label: 'Pause',
-        pressed: engine.paused,
-        onChange: (p) => {
-          engine.setPaused(p);
+          useStarView.getState().setScale(v as StarScaleView);
           bump();
         },
       },
       {
         id: 'lines',
         kind: 'toggle',
+        group: 'flare-actions',
         label: 'Field lines',
         pressed: engine.fieldLines,
-        onChange: (on) => {
-          engine.setFieldLines(on);
-          bump();
-        },
+        onChange: (on) => useStarView.getState().setLines(on),
       },
       {
         id: 'fire',
         kind: 'button',
+        group: 'flare-actions',
         label: 'Fire a big flare',
         disabled: !flares,
-        why: flares
-          ? undefined
-          : 'This star has no spot groups, so it has no sunspot-driven flares.',
-        tag: 'inferred_from_analog',
+        why: flares ? undefined : 'This star has no spot groups, so it has no sunspot-driven flares.',
         onClick: () => {
-          engine.fireFlare();
+          // The flare starts at the spot group the close-up is looking at (or the nearest one: a quiet place cannot flare).
+          const cu = useStarView.getState().closeUp;
+          const info = cu?.closeInfo();
+          const group = info && info.near >= 0 ? info.near : undefined;
+          engine.fireFlare(group);
+          cu?.fireFlare(group);
+          if (info && !info.active && info.nearAt) useStarTarget.getState().pick(info.nearAt);
+          // The prototype's button switches to Observatory view when it fires in true colour: keep the others in step.
+          useStarView.getState().setLight(engine.light);
           bump();
         },
       },
+      ...(target !== null
+        ? [
+            {
+              id: 'home',
+              kind: 'button',
+              label: 'Back to the active region',
+              onClick: () => useStarTarget.getState().home(),
+            } as BuildControl,
+          ]
+        : []),
+      { id: 'latest', kind: 'readout', slot: 'latest', label: 'Latest flare on this star', value: engine.latestFlare(), tag: 'inferred_from_analog' },
+      { id: 'k-teff', kind: 'readout', slot: 'key', label: 'Surface temperature', value: `${Math.round(star.teff.value).toLocaleString('en')} K`, tag: star.teff.tag },
+      { id: 'k-size', kind: 'readout', slot: 'key', label: 'Size', value: sizeText(star.radius.value), tag: star.radius.tag },
       {
-        id: 'latest',
+        id: 'k-rot',
         kind: 'readout',
-        label: 'Latest flare on this star',
-        value: engine.latestFlare(),
-        tag: 'inferred_from_analog',
-      },
-      {
-        id: 'rot',
-        kind: 'slider',
+        slot: 'key',
         label: 'Rotation period',
-        min: 0,
-        max: 1000,
-        step: 1,
-        value: rot.position,
-        valueText: rot.text,
+        value: rot.text,
         tag: star.rotation.tag,
-        disabled: !rot.used,
-        why: rot.used
-          ? star.rotation.note
-          : 'Not used for this star: it has no outer convection layer or is not a dwarf.',
-        onChange: (v) => {
-          engine.setRotationPosition(v);
-          bump();
-        },
       },
-      {
-        id: 'what',
-        kind: 'readout',
-        label: 'What you are seeing',
-        value: engine.caption() || engine.stageTag(),
-      },
-      ...engine.readouts().map((r): BuildControl => ({
-        id: `r-${r.label}`,
-        kind: 'readout',
-        label: r.label,
-        value: r.value,
-        tag: r.label === 'Surface temperature' ? star.teff.tag : READOUT_TAG[r.label],
-      })),
-      ...starValuesNote(star),
+      ...engine.readouts().filter((r) => r.label !== 'Surface temperature').map(
+        (r): BuildControl => ({
+          id: `r-${r.label}`,
+          kind: 'readout',
+          slot: r.label === 'Average magnetic field' ? 'key' : undefined,
+          label: r.label,
+          value: r.value,
+          tag: READOUT_TAG[r.label],
+        }),
+      ),
     ];
-    spec = { title: 'Star surface', controls, notes: engine.notes() };
+    // Key numbers come in a fixed order: the engine's own temperature and field rows are placed among ours.
+    const order = ['Surface temperature', 'Size', 'Rotation period', 'Average magnetic field'];
+    const keyed = controls.filter((c) => c.kind === 'readout' && c.slot === 'key');
+    const others = controls.filter((c) => !(c.kind === 'readout' && c.slot === 'key'));
+    keyed.sort((x, y) => order.indexOf(x.label) - order.indexOf(y.label));
+    const notes: BuildNote[] = [];
+    const filled = [...star.assumed];
+    if (rot.used && star.rotation.note) filled.push(`Rotation period: ${star.rotation.note}`);
+    if (filled.length) notes.push({ title: 'Filled in, not measured', lines: filled });
+    spec = { title: 'Star surface', controls: [...others, ...keyed], notes };
   }
   useBuildControls('star-surface', spec);
 
-  // Click a place: the left close-up moves there (the planets' globePick). Limb and space do nothing.
-  const down = useRef<{ x: number; y: number } | null>(null);
+  // Drag turns the star (yaw, by the engine's own clock `ST.time`, which sets its rotation: rot = 0.55 + time * 0.012).
+  // A click (moved under 5 px) picks the place under the pointer; the left close-up moves there (the planets' globePick).
+  const down = useRef<{ x: number; y: number; time: number; moved: boolean } | null>(null);
+  const marker = useRef<HTMLSpanElement>(null);
+  const clock = (): { time: number } | null => {
+    const st = (engine?.state as { ST?: { time: number } } | undefined)?.ST;
+    return st && typeof st.time === 'number' ? st : null;
+  };
+  const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = down.current;
+    const st = clock();
+    if (!d || !engine || !st || engine.scale === 'close') return;
+    if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) <= 5) return;
+    d.moved = true;
+    const b = e.currentTarget.getBoundingClientRect();
+    const discPx = b.height / (2 * engine.globeHalf()); // pixels per star radius
+    // Dragging right brings the surface to the right: the facing longitude (rot) goes down.
+    st.time = d.time - ((e.clientX - d.x) / discPx) / 0.012;
+    engine.draw();
+  };
   const onUp = (e: React.PointerEvent<HTMLDivElement>) => {
     const d = down.current;
     down.current = null;
-    if (
-      !d ||
-      !engine ||
-      engine.scale === 'close' ||
-      Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5
-    )
-      return;
+    if (!d || d.moved || !engine || engine.scale === 'close') return;
     const b = e.currentTarget.getBoundingClientRect();
     const p = engine.pick((e.clientX - b.left) / b.width, (e.clientY - b.top) / b.height);
     if (p) useStarTarget.getState().pick(p);
   };
+  // The marker for the picked place follows the star's turn; it hides on the far side.
+  const picked = useStarTarget((s) => s.target);
+  const hasFlares = engine?.hasFlares() ?? false;
+  useEffect(() => {
+    const el = marker.current;
+    if (!el || !engine) return;
+    let raf = 0;
+    const place = () => {
+      const st = clock();
+      const c = engine.layers[0];
+      // No pick yet: the close-up looks at the strongest spot group, so the ring marks that (as the planets' do).
+      const at = picked ?? (hasFlares ? engine.closeTarget() : null);
+      if (at && st && c && c.clientHeight && engine.scale !== 'close') {
+        const q = projectSurface(at, globeRot(st.time), GLOBE_TILT);
+        const aspect = c.clientWidth / c.clientHeight;
+        el.style.display = q.visible ? 'block' : 'none';
+        el.style.left = `${((q.x / (aspect * engine.globeHalf()) + 1) / 2) * 100}%`;
+        el.style.top = `${((1 - q.y / engine.globeHalf()) / 2) * 100}%`;
+      } else el.style.display = 'none';
+      raf = requestAnimationFrame(place);
+    };
+    raf = requestAnimationFrame(place);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, picked, hasFlares]);
   const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!engine) return;
     const step = (5 * Math.PI) / 180;
@@ -424,56 +524,86 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
 
   return (
     <div
-      ref={hostRef}
       className="absolute inset-0 bg-black"
+      style={{ touchAction: 'none', cursor: 'grab' }}
       tabIndex={0}
       role="application"
-      aria-label="Star globe. Click a place, or press the arrow keys, to look at that place in the close-up on the left."
+      aria-label="Star globe. Drag to turn the star. Click a place, or press the arrow keys, to look at that place in the close-up on the left."
       onPointerDown={(e) => {
-        down.current = { x: e.clientX, y: e.clientY };
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        down.current = { x: e.clientX, y: e.clientY, time: clock()?.time ?? 0, moved: false };
       }}
+      onPointerMove={onMove}
       onPointerUp={onUp}
+      onPointerCancel={() => {
+        down.current = null;
+      }}
       onKeyDown={onKey}
       data-testid="star-engine-globe"
       data-star={star.preset.label}
       data-preset={JSON.stringify(star.preset)}
     >
+      <div ref={hostRef} className="absolute inset-0" />
       {compiling && <StarPreparing />}
+      <span
+        ref={marker}
+        aria-hidden="true"
+        data-testid="star-pick-marker"
+        className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.6)]"
+        style={{ display: 'none' }}
+      />
     </div>
   );
 }
 
-// The chart of the prototype (its CH box and viewBox), drawn as SVG.
-const CH = { x0: 44, x1: 512, y0: 124, y1: 12 };
-const cx = (t: number) => CH.x0 + (CH.x1 - CH.x0) * t;
-const cy = (v: number) => CH.y0 + (CH.y1 - CH.y0) * v;
-const path = (a: number[]) =>
-  a.map((v, i) => `${i ? 'L' : 'M'}${cx(i / 240).toFixed(1)} ${cy(v).toFixed(1)}`).join('');
-
-/** The prototype's flare close-up with its light-curve chart, in the left pane. */
+/**
+ * The star's close-up, in the left pane: the engine's oblique flare/horizon camera over the CURRENT TARGET place (the
+ * strongest spot group by default; a click on the globe moves it, as for the planets). The engine drives the view from the
+ * star's own state there: its granulation, the spots near that place, loops and flares only where a spot group is. The
+ * light curve and player in Details follow the flare at the target.
+ */
 export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: () => void }) {
   const { hostRef, engine, failed, compiling, bump } = useStarEngine('closeup', star, 150);
+  useCloseUpZoom(hostRef, engine, bump);
+  const target = useStarTarget((s) => s.target);
+  const preset = star.preset;
   useEffect(() => {
     if (failed) onFail?.();
   }, [failed, onFail]);
+  // The target moves the camera (null = the strongest spot group).
+  useEffect(() => {
+    if (!engine) return;
+    engine.setCloseTarget(target);
+    bump();
+  }, [engine, target, preset, bump]);
 
   const flare = engine?.flare() ?? null;
   const chart = engine?.chart() ?? null;
+  const info = engine?.closeInfo() ?? null;
+  const at = engine ? engine.closeTarget() : null;
   let spec: BuildControlsSpec | null = null;
-  if (engine && flare) {
+  if (engine && flare && info) {
+    const quiet = !info.active;
     spec = {
-      title: 'Solar flare close-up',
+      title: 'Close-up',
       controls: [
+        {
+          id: 'where',
+          kind: 'readout',
+          slot: 'where',
+          label: 'Looking at',
+          value: `Looking at ${placeText(target ?? at)} \u00b7 ${quiet ? 'quiet' : info.flaring ? 'flaring' : 'spot group'}`,
+        },
         {
           id: 'kind',
           kind: 'choice',
+          slot: 'about',
           label: 'Flare type',
           value: flare.kind,
           options: [
             { value: 'closed', label: 'Closed' },
             { value: 'open', label: 'Open' },
           ],
-          tag: 'artistic',
           onChange: (v) => {
             engine.setFlareKind(v as 'closed' | 'open');
             bump();
@@ -482,6 +612,7 @@ export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: 
         {
           id: 'cls',
           kind: 'choice',
+          slot: 'about',
           label: 'Flare class',
           value: flare.cls,
           options: [
@@ -489,225 +620,61 @@ export function StarFlareStage({ star, onFail }: { star: StarFromCard; onFail?: 
             { value: 'm', label: 'M' },
             { value: 'x', label: 'X' },
           ],
-          tag: 'artistic',
           onChange: (v) => {
             engine.setFlareClass(v as 'c' | 'm' | 'x');
             bump();
           },
         },
         {
-          id: 'pause',
-          kind: 'toggle',
-          label: 'Pause the flare',
-          pressed: !flare.playing,
-          onChange: (p) => {
-            engine.setPaused(p);
-            bump();
-          },
+          id: 'stage',
+          kind: 'readout',
+          slot: 'about',
+          label: 'What is happening',
+          value: quiet
+            ? 'A quiet place: boiling cells only. No spot group is in view, so there are no loops and no flare can start here. Pick a spot group on the globe, or press Fire a big flare.'
+            : !info.auto
+              ? `${flare.caption} (a flare you chose; press Play for the live one)`
+              : info.flaring
+                ? flare.caption
+                : 'A spot group with its magnetic loops. No flare here right now; the star’s schedule will start one.',
         },
-        {
-          id: 'lines',
-          kind: 'toggle',
-          label: 'Flare field lines',
-          pressed: engine.fieldLines,
-          onChange: (on) => {
-            engine.setFieldLines(on);
-            bump();
-          },
-        },
-        {
-          id: 'time',
-          kind: 'slider',
-          label: 'Time since the start',
-          min: 0,
-          max: 1000,
-          step: 1,
-          value: Math.round(flare.t * 1000),
-          valueText: flare.minutes,
-          tag: 'artistic',
-          onChange: (v) => {
-            engine.setFlareTime(v / 1000);
-            bump();
-          },
-        },
-        { id: 'stage', kind: 'readout', label: 'What is happening', value: flare.caption },
       ],
       notes: engine.notes(),
     };
   }
   useBuildControls('star-flare', spec);
 
-  const scrub = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (!engine) return;
-    const b = e.currentTarget.getBoundingClientRect();
-    const px = ((e.clientX - b.left) / b.width) * 524;
-    engine.setFlareTime((px - CH.x0) / (CH.x1 - CH.x0));
-    bump();
-  };
+  // The light curve goes to the Details pane (StarEngineDetails), not over the picture.
+  const flareT = flare?.t;
+  useEffect(() => {
+    if (!engine || !chart || flareT === undefined) return;
+    useStarChart.getState().set({
+      soft: chart.soft,
+      hard: chart.hard,
+      t: flareT,
+      playing: flare?.playing ?? false,
+      setTime: (t) => {
+        engine.setFlareTime(t);
+        bump();
+      },
+      setPlaying: (p) => {
+        engine.setPaused(!p);
+        bump();
+      },
+    });
+    // `chart` is a new object each read; the curves change only with the flare kind and class.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, flareT, flare?.playing, flare?.kind, flare?.cls]);
+  useEffect(() => () => useStarChart.getState().set(null), []);
 
-  return (
-    <div className="absolute inset-0 bg-black" data-testid="star-engine-flare">
-      <div ref={hostRef} className="absolute inset-0" />
-      {compiling && <StarPreparing />}
-      {flare && (
-        <span
-          className="pointer-events-none absolute left-4 top-12 max-w-[calc(100%-2rem)] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300"
-          data-testid="flare-tag"
-        >
-          {flare.tag}
-        </span>
-      )}
-      {chart && flare && (
-        <div
-          className="absolute inset-x-3 bottom-[8.75rem] z-[2] rounded-lg border border-neutral-700 bg-neutral-900/85 p-2"
-          data-testid="flare-chart"
-        >
-          <div className="mb-1 flex flex-wrap items-center gap-3 text-xs text-neutral-300">
-            <span>Flare brightness over 60 minutes</span>
-            <span className="text-[#c98a08]">Soft X-rays (hot loops)</span>
-            <span className="text-[#2f9bd4]">Hard X-rays (fast electrons)</span>
-          </div>
-          <svg
-            viewBox="0 0 524 164"
-            role="img"
-            aria-label="Example flare light curve. Hard X-rays peak in short bursts during the rise of the soft X-rays, which then fade slowly. Tap or drag to move the time."
-            className="block max-h-24 w-full touch-none"
-            onPointerDown={(e) => {
-              e.currentTarget.setPointerCapture(e.pointerId);
-              scrub(e);
-            }}
-            onPointerMove={(e) => e.buttons && scrub(e)}
-          >
-            <title>Example flare brightness over 60 minutes</title>
-            {[0, 0.5, 1].map((v) => (
-              <g key={v}>
-                <line x1={CH.x0} x2={CH.x1} y1={cy(v)} y2={cy(v)} stroke="#2a2a30" />
-                <text
-                  x={CH.x0 - 8}
-                  y={cy(v) + 4}
-                  textAnchor="end"
-                  fill="#a1a1aa"
-                  fontSize="11"
-                  fontFamily="monospace"
-                >
-                  {v}
-                </text>
-              </g>
-            ))}
-            {[0, 15, 30, 45, 60].map((m) => (
-              <text
-                key={m}
-                x={cx(m / 60)}
-                y={CH.y0 + 18}
-                textAnchor="middle"
-                fill="#a1a1aa"
-                fontSize="11"
-                fontFamily="monospace"
-              >
-                {m}
-              </text>
-            ))}
-            <text x={CH.x1} y={CH.y0 + 34} textAnchor="end" fill="#a1a1aa" fontSize="11">
-              minutes
-            </text>
-            <path
-              d={path(chart.hard)}
-              fill="none"
-              stroke="#2f9bd4"
-              strokeWidth="2"
-              strokeLinejoin="round"
-            />
-            <path
-              d={path(chart.soft)}
-              fill="none"
-              stroke="#c98a08"
-              strokeWidth="2"
-              strokeLinejoin="round"
-            />
-            <line
-              x1={cx(flare.t)}
-              x2={cx(flare.t)}
-              y1={CH.y1}
-              y2={CH.y0}
-              stroke="#fafafa"
-              strokeWidth="1.5"
-            />
-            <circle
-              cx={cx(flare.t)}
-              cy={cy(chart.soft[Math.round(flare.t * 240)] ?? 0)}
-              r="4.5"
-              fill="#c98a08"
-              stroke="#111114"
-              strokeWidth="2"
-            />
-          </svg>
-          <p className="mt-1 text-xs text-neutral-400">
-            Example curve. Hard X-rays follow the rate of change of soft X-rays (the Neupert
-            effect).
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** The star's surface close-up (the artifact's `Close-up` view), centred where the globe was clicked. */
-export function StarSurfaceCloseUp({ star, onFail }: { star: StarFromCard; onFail?: () => void }) {
-  // Issue #93 W1 (0.5): the surface close-up keeps only its surface canvas (no plasma or line overlays).
-  const { hostRef, engine, failed, compiling, bump } = useStarEngine(
-    'globe',
-    star,
-    400,
-    'surface',
-    true,
-  );
-  const target = useStarTarget((s) => s.target);
-  const preset = star.preset;
-  useEffect(() => {
-    if (failed) onFail?.();
-  }, [failed, onFail]);
-  useEffect(() => {
-    if (!engine) return;
-    engine.setScale('close');
-  }, [engine, preset]);
-  useEffect(() => {
-    if (!engine) return;
-    engine.setCloseTarget(target);
-    bump();
-  }, [engine, target, preset, bump]);
-  const at = engine ? engine.closeTarget() : null;
-  useBuildControls(
-    'star-surface-close',
-    engine
-      ? {
-          title: 'Close-up on the star',
-          controls: [
-            {
-              id: 'at',
-              kind: 'readout',
-              label: 'Looking at',
-              value: placeText(target ?? at),
-              tag: target ? 'artistic' : 'inferred_from_analog',
-            },
-            {
-              id: 'home',
-              kind: 'button',
-              label: 'Back to the active region',
-              disabled: target === null,
-              why: target === null ? 'Already looking at the strongest spot group.' : undefined,
-              onClick: () => useStarTarget.getState().home(),
-            },
-          ],
-        }
-      : null,
-  );
   return (
     <div
-      ref={hostRef}
       className="absolute inset-0 bg-black"
-      data-testid="star-engine-surface"
+      data-testid="star-engine-flare"
       data-at={at ? `${at.lat.toFixed(4)},${at.lon.toFixed(4)}` : ''}
+      data-active={info ? String(info.active) : ''}
     >
+      <div ref={hostRef} className="absolute inset-0" />
       {compiling && <StarPreparing />}
     </div>
   );

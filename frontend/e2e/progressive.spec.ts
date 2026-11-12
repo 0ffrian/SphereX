@@ -19,39 +19,29 @@ test('a progressive object plays while its frames arrive, then completes', async
   await search(page, 'Synthetic progressive');
 
   // Never blank: the search state says where it is looking first.
-  await expect(page.getByTestId('loading')).toContainText(
-    'Searching the archive for SPHEREx frames at RA 30.00000°, Dec +30.00000°',
-  );
-  await expect(headline(page)).toHaveText(
-    'Fetching SPHEREx frames for this object from the archive… 4 of 31 ready.',
-  );
-  await expect(page.getByTestId('frames-progress-detail')).toContainText(
-    'The archive search found 31 frames: 4 ready to play, 26 still to download, 1 not usable',
-  );
-  await expect(counter(page)).toHaveText('Frame 1 of 4');
-  // The deferred count is in the progress box, not repeated in the refusal list.
-  await expect(page.getByTestId('missing')).not.toContainText('not downloaded yet');
+  await expect(page.getByTestId('loading')).toHaveText('Searching');
+  // The tab at the picture's bottom: ready / found (the sentences and the detail line are gone).
+  await expect(headline(page)).toHaveText('4 / 31');
+  await expect(page.getByTestId('frames-progress')).toHaveAttribute('data-phase', 'fetching');
+  await expect(counter(page)).toHaveText('1 / 4');
 
-  // The spectrum waits for the complete list.
-  await page.getByRole('button', { name: 'Show spectrum', exact: true }).click();
-  await expect(page.getByTestId('spectrum-waiting')).toContainText(
-    'The spectrum is measured once all frames have been downloaded',
-  );
+  // The spectrum is on the card and waits for the complete list: no chart yet.
+  await expect(page.getByTestId('spectrum-panel')).toContainText('Loading the spectrum');
+  await expect(page.getByTestId('spectrum-chart')).toHaveCount(0);
 
   // Playback works mid-load and is not reset by the next part.
   const play = page.getByTestId('play-pause');
   await expect(play).toBeEnabled();
   await play.click();
   await expect(play).toHaveText('Pause');
-  await expect(counter(page)).not.toHaveText(/^Frame 1 of/);
-  await expect(counter(page)).toHaveText(/ of 10$/, { timeout: 10_000 });
+  await expect(counter(page)).not.toHaveText(/^1 \//);
+  await expect(counter(page)).toHaveText(/ \/ 10$/, { timeout: 10_000 });
   await expect(play).toHaveText('Pause');
-  await expect(headline(page)).toContainText('10 of 31 ready');
+  await expect(headline(page)).toHaveText('10 / 31');
 
   // Complete: the progress box goes, the spectrum is measured on its own.
   await expect(page.getByTestId('frames-progress')).toHaveCount(0, { timeout: 15_000 });
-  await expect(counter(page)).toHaveText(/ of 30$/);
-  await expect(page.getByTestId('spectrum-waiting')).toHaveCount(0);
+  await expect(counter(page)).toHaveText(/ \/ 30$/);
   await expect(page.getByTestId('spectrum-table')).toBeAttached({ timeout: 10_000 });
   await expect(page.getByTestId('announcer')).toHaveText(
     /Finished fetching frames: 30 frames ready|Spectrum/,
@@ -63,39 +53,41 @@ test('a progressive object plays while its frames arrive, then completes', async
 test('Stop keeps the frames shown so far; Continue fetches the rest', async ({ page }) => {
   await page.goto('/');
   await search(page, 'Synthetic progressive');
-  await expect(headline(page)).toContainText('4 of 31 ready');
+  await expect(headline(page)).toHaveText('4 / 31');
   // The island grows into the panel in 0.6 s (issue #66), well inside a part's 1.2 s.
   await expect(page.getByTestId('island')).toHaveAttribute('data-arrived', '');
 
   const stop = page.getByTestId('frames-stop');
   await stop.focus();
   await page.keyboard.press('Enter'); // keyboard reachable (R9)
-  await expect(headline(page)).toHaveText('Stopped. 4 of 31 frames ready; 26 not downloaded.');
+  await expect(page.getByTestId('frames-progress')).toHaveAttribute('data-phase', 'stopped');
+  await expect(headline(page)).toHaveText('4 / 31');
+  await expect(page.getByTestId('frames-continue')).toBeVisible();
   await expect(page.getByTestId('announcer')).toHaveText('Stopped fetching frames. 4 of 31 ready.');
   // Nothing more arrives while stopped (a part takes 1.2 s).
   await page.waitForTimeout(3000);
-  await expect(counter(page)).toHaveText('Frame 1 of 4');
+  await expect(counter(page)).toHaveText('1 / 4');
   // The frames shown so far still play.
   await page.getByTestId('play-pause').click();
-  await expect(counter(page)).not.toHaveText('Frame 1 of 4');
+  await expect(counter(page)).not.toHaveText('1 / 4');
   await page.getByTestId('play-pause').click();
 
   await page.getByTestId('frames-continue').click();
-  await expect(headline(page)).toContainText('Fetching SPHEREx frames');
+  await expect(page.getByTestId('frames-progress')).toHaveAttribute('data-phase', 'fetching');
   await expect(page.getByTestId('frames-progress')).toHaveCount(0, { timeout: 15_000 });
-  await expect(counter(page)).toHaveText(/ of 30$/);
+  await expect(counter(page)).toHaveText(/ \/ 30$/);
 });
 
 test('a new search replaces a progressive load', async ({ page }) => {
   await page.goto('/');
   await search(page, 'Synthetic progressive');
-  await expect(headline(page)).toContainText('4 of 31 ready');
+  await expect(headline(page)).toHaveText('4 / 31');
   await search(page, 'RW Aur');
   await expect(page.getByTestId('object-name')).toHaveText('RW Aurigae');
-  await expect(counter(page)).toHaveText('Frame 1 of 24');
+  await expect(counter(page)).toHaveText('1 / 24');
   await page.waitForTimeout(3000);
   await expect(page.getByTestId('frames-progress')).toHaveCount(0);
-  await expect(counter(page)).toHaveText('Frame 1 of 24');
+  await expect(counter(page)).toHaveText('1 / 24');
 });
 
 test('cached spots get their own markers, a target is marked once', async ({ page }) => {
@@ -133,17 +125,17 @@ test('cached spots get their own markers, a target is marked once', async ({ pag
   await expect(cached.locator('.sx-marker-label')).toBeVisible();
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('search-input')).toHaveValue('45.00000,-15.00000');
-  await expect(counter(page)).toHaveText('Frame 1 of 12');
+  await expect(counter(page)).toHaveText('1 / 12');
   await expect(page.getByTestId('frames-progress')).toHaveCount(0);
 });
 
 test('a linked frame that has not arrived yet stays in the link, then opens', async ({ page }) => {
   const frame = 'synthetic-progressive-f012';
   await page.goto(`/#ra=30&dec=30&name=Synthetic+progressive&frame=${frame}`);
-  await expect(headline(page)).toContainText('4 of 31 ready');
-  await expect(counter(page)).toHaveText('Frame 1 of 4');
+  await expect(headline(page)).toHaveText('4 / 31');
+  await expect(counter(page)).toHaveText('1 / 4');
   // Copying or reloading the page meanwhile keeps the frame.
   expect(new URL(page.url()).hash).toContain(`frame=${frame}`);
-  await expect(counter(page)).toHaveText('Frame 13 of 18', { timeout: 10_000 });
+  await expect(counter(page)).toHaveText('13 / 18', { timeout: 10_000 });
   expect(new URL(page.url()).hash).toContain(`frame=${frame}`);
 });

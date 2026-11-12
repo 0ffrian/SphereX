@@ -32,6 +32,7 @@ Moving objects only: the path search of A4.1 (`backend/app/core/find/moving.py`,
 | `frames:cone_maxrec:<n>` | `n` cone answers hit `SX_MOVING_SIA_MAXREC`. A fixed object's own cut-off answer stays `frames:truncated` |
 | `frames:sparse_path:<n>` | at `n` cones the rate asked for a step below `SX_MOVING_MIN_STEP_H`, so the cones there are further apart than R / rate and a frame between them can be missed |
 | `frames:cone_failed:<n>` | `n` cones could not be fetched (not cached offline, or failed live). Incomplete |
+| `frames:cutout_failed:<n>` | `n` area cutout downloads failed (not cached offline, or upstream down). Incomplete, never stored or served ([Q-400](../decisions/moving-objects.md) (12)) |
 | `frames:search_deferred:<n>` | `n` Horizons or SIA calls are left to the object's job (Q-111); ask again, as for `cutouts:deferred`. Incomplete |
 | `frames:outside_window:<n>` | `n` frames found by the cones have a midpoint outside the ephemeris windows, so the object's position there is unknown |
 | `no_footprint:<frame_id>` | the frame has no usable `s_region`, so it could not be checked against the path (not the overlays' `footprint:<frame_id>`) |
@@ -70,8 +71,8 @@ Not a refusal: a point kept with dropped pixels is `flagged`, with `dropped_flag
 
 | Code | Meaning |
 |---|---|
-| `overlay:gaia`, `overlay:wise` | the catalogue cannot be served (failed cone, remembered `catalog_failure_ttl_s`), or the object moves (cones for movers: Q-143, to build); a mover's frames still get flag masks and cutout boxes ([Q-125](../decisions/moving-frames.md)) |
-| `overlay:<cat>:pending` | the cone is still running after `overlay_wait_s`; a later request has it |
+| `overlay:gaia`, `overlay:wise` | the catalogue cannot be served (failed cone, remembered `catalog_failure_ttl_s`); for a moving object, any visit's cone failed, or its frame list is incomplete for a reason other than deferred work ([A19.6](moving-objects/track.md#a196-star-list-for-movers), Q-403); a mover's frames still get flag masks and cutout boxes ([Q-125](../decisions/moving-frames.md)) |
+| `overlay:<cat>:pending` | the cone is still running after `overlay_wait_s`; a later request has it. For a moving object also: its frames are still deferred to the object's job, or the visit cones beyond the 8 a request may start (A19.6) |
 | `overlay:<cat>:truncated` | the cone hit the 5000-row cap (brightest first) |
 | `footprint:<frame_id>` | no usable `s_region` for the frame; for a mover, every frame, because its frame record does not carry `s_region` (Q-125; Track changes this, A19.3) |
 | `flags_mask:<frame_id>` | no FLAGS mask for the frame (`flags.png` answers 404 `flags_unavailable`) |
