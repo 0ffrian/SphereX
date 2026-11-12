@@ -94,10 +94,10 @@ export function unmatchedDotIds(dots: AreaDots | null, tracks: AreaTracks | null
   if (!dots || !tracks) return [];
   const have = new Set<string>();
   for (const v of dots.visits) for (const d of v.dots) have.add(d.dot_id);
-  const out: string[] = [];
+  const out = new Set<string>();
   for (const t of tracks.tracks)
-    for (const tl of t.tracklets) for (const id of tl.dot_ids) if (!have.has(id)) out.push(id);
-  return out;
+    for (const tl of t.tracklets) for (const id of tl.dot_ids) if (!have.has(id)) out.add(id);
+  return [...out];
 }
 
 async function part<T>(

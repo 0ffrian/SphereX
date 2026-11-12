@@ -308,8 +308,9 @@ export const useAreaStore = create<AreaState>()((set, get) => {
 /** What the island's pill calls the open card while it is minimised. */
 export function areaMiniTitle(s: Pick<AreaState, 'screen' | 'sel' | 'disc' | 'known'>): string {
   if (s.screen === 'eros') return '433 Eros (demo)';
-  // Only the demo's answers say "(demo)"; a prepared area's do not.
-  const tag = (s.screen === 'list' ? s.known?.demo : s.disc?.demo) === false ? '' : ' (demo)';
+  // Only an answer known to be the demo says "(demo)"; a prepared area's, one still loading or a
+  // refused one do not.
+  const tag = (s.screen === 'list' ? s.known?.demo : s.disc?.demo) === true ? ' (demo)' : '';
   if (s.screen === 'mover') {
     const m = s.disc?.movers[s.sel];
     return m ? `${m.known ? `${m.id} · ${m.known}` : m.id}${tag}` : 'Discovery';

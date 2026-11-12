@@ -18,7 +18,7 @@ Code paths are under `frontend/src/`. CSS is `index.css`. "Desktop" means wider 
 | **ObjectCard** | The data record from `GET /v1/objects/{id}/card` (D-02, D-16) | `contract/` types, `app/build/selectedBody.ts` | none | the object card |
 | **split pane** | The layout where the sky takes the left side and a pane the right | `app/App.tsx` (`data-split`) | `[data-split]` | |
 | **build pane** | The only occupant of the split pane today: the 3D view that moulds the body | `app/build/BuildPane.tsx` | `.sx-bp` | the removed floating viewer card (Q-113 item 2) |
-| **feature card** (built for Area, Q-406 (7)) | A tool's own card in the object card's slot, such as the Area cards of A18 | `app/shell/FeatureCard.tsx` (× only; Minimise is P9) | Area search (`app/sky/area/AreaCard.tsx`) | the object card (A21.5) |
+| **feature card** (proposed) | A tool's own card in the object card's slot, such as the Area cards of A18 | none yet | none yet | the object card (A21.5) |
 
 Other names: **rail** (`app/shell/ToolRail.tsx`, `.sx-rail`), **transport** (`app/shell/Transport.tsx`, `.sx-player`), **search pill** (`app/search/SearchBar.tsx`, `.sx-search`), **readout** (`app/shell/Readout.tsx`), **credit** (`.sx-sky-credit` in `app/sky/SkyPane.tsx`), **markers** and **brackets** (A21.6).
 
@@ -60,7 +60,7 @@ Other names: **rail** (`app/shell/ToolRail.tsx`, `.sx-rail`), **transport** (`ap
 | Bezel | build pane `.sx-bp` | 6 | above the bars; it stops at the insets so it does not overlap them |
 | Bezel | island `.sx-orb-wrap` | 40 | above everything; takes no clicks |
 
-**Sky layer slot** (built for Area, Q-406 (7); SkyPane's `layers` prop, with the SkyView in `SkyViewContext`): a tool's sky layer (A18.2) is a child of SkyPane placed after `.sx-sky-shade` and before `{children}` (object card, object panel), at z auto, so it paints over the fades and under the markers, panel, card and credit.
+**Sky layer slot** (proposed, Q-174): a tool's sky layer (A18.2) is a child of SkyPane placed after `.sx-sky-shade` and before `{children}` (object card, object panel), at z auto, so it paints over the fades and under the markers, panel, card and credit.
 
 ### A21.3 Phone width (≤ 640 px)
 

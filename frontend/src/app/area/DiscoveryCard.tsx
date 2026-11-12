@@ -21,6 +21,7 @@ function MoverChip({ m, step }: { m: DiscoveryMover; step: number }) {
   const v = m.track?.verdict;
   if (v === 'possible') return <span className="sx-chip">Possible</span>;
   if (v === 'unchecked') return <span className="sx-chip">Not checked</span>;
+  if (v === 'found_blind' && !m.known) return <span className="sx-chip" data-tone="ok">Matched on file</span>;
   if (m.known) return <span className="sx-chip" data-tone="ok">{`Known: ${m.known}`}</span>;
   if (m.visits < 2) return <span className="sx-chip">Seen once</span>;
   return (
@@ -56,7 +57,9 @@ export function DiscoveryCard() {
       : running && steps[nowStep]
         ? `Step ${nowStep + 1} of ${total}: ${steps[nowStep]!.label}`
         : step >= total - 1
-          ? `${disc?.movers.length ?? 0} movers found`
+          ? real && !real.tracks
+            ? 'The tracks could not be loaded'
+            : `${disc?.movers.length ?? 0} movers found`
           : '';
   return (
     <PanelCard

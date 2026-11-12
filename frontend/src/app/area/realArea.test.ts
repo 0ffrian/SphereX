@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiClient, ApiResult } from '@/app/api/client';
 import { ApiError } from '@/app/api/errors';
 import type { AreaBox } from '@/app/shell/areaStore';
-import { demoPlayerOn } from '@/app/shell/areaStore';
+import { areaMiniTitle, demoPlayerOn } from '@/app/shell/areaStore';
 import { createApiClient } from '@/app/api/client';
 import { setSkyApi } from '@/state/store';
 import { areaFixture, areaIndexFixture } from '@/test/areaFixtures';
@@ -91,7 +91,9 @@ describe('real area first', () => {
   });
 
   it('lists a part that did not load and does not draw it', async () => {
-    setSkyApi(fixtureApi({ areaTracks: () => Promise.reject(new ApiError('server', 'boom', 500)) }));
+    setSkyApi(
+      fixtureApi({ areaTracks: () => Promise.reject(new ApiError('server', 'boom', 500)) }),
+    );
     const r = await discoverIn(box(150, 10));
     expect(r.real?.tracks).toBeNull();
     expect(r.movers).toEqual([]);
@@ -159,5 +161,19 @@ describe('real area helpers', () => {
         disc: { real: {} } as never,
       }),
     ).toBe(false);
+  });
+
+  it('tags only a known demo answer "(demo)" in the minimised pill', () => {
+    const base = { screen: 'disc' as const, sel: -1, known: null };
+    expect(areaMiniTitle({ ...base, disc: { demo: true } as never })).toBe('Discovery (demo)');
+    expect(areaMiniTitle({ ...base, disc: { demo: false } as never })).toBe('Discovery');
+    expect(areaMiniTitle({ ...base, disc: null })).toBe('Discovery');
+  });
+
+  it('counts a track point missing from the dots once', () => {
+    const f = areaFixture('main');
+    const t = f.tracks.tracks[0]!;
+    t.tracklets[0]!.dot_ids.push('nowhere', 'nowhere');
+    expect(unmatchedDotIds(f.dots, f.tracks)).toEqual(['nowhere']);
   });
 });
