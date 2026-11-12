@@ -62,7 +62,7 @@ This table holds the reply shapes. The register of every route (built and planne
 | `GET /v1/objects/{id}/flags/{frame_id}.png` | RGBA mask from the cutout's FLAGS extension, colour per flag group; 404 `flags_unavailable` without a usable mask. A4.9 |
 | `GET /v1/objects/{id}/combine.png?op=add\|sub&a=&b=` | 8-bit grey PNG of A ± B on A's grid; metadata (both wavelengths, unit, stretch, `tag: "derived"`, formula) in the `X-SX-Combine` JSON header. A4.9, Q-54 |
 | `GET /data/shapes/{name}.glb` | A registered shape-model mesh (glTF binary, `model/gltf-binary`), metres, glTF +Y up (Q-61). Only names listed in `assets/shapes/registry.toml` are served; anything else is 404 |
-| `GET /v1/health` | `{status, offline, data_release}` |
+| `GET /v1/health` | `{status, offline, data_release, warm}`. `warm` is the start-up warm cache: `{state, total, done, failed}`, `state` one of `off` (`SX_PREFETCH_ON_START` unset), `running`, `finished` (every demo target tried; `failed` counts those not resolved or whose job failed) or `stopped` (issue #103, Q-409) |
 | `POST /v1/admin/objects/{id}/gemini-repaint[?refresh=true]` | Gemini artistic layer (beyond D-16, Q-122; A6.2). Admin only: `X-SX-Admin-Token` must equal `SX_ADMIN_TOKEN` (404 when unset, 403 when missing or wrong). Bakes if needed, asks Gemini, runs the D-07 edge check. Always 200 with `{id, status: "applied" \| "code", reason, detail, missing, model, edge_correlation, edge_correlation_min, cached_at, from_cache, checks, provenance}`, plus `label`, `size`, `layer` (D-32 `Layer`, tier 5) and `albedo_url` when applied. A first-stage card is refused (`measuring`) |
 | `GET /v1/objects/{id}/albedo-ai` | The same status body for the last applied repaint, checked against the bake the viewer shows; `stale` when the generator version, baker rules, seed or bake changed. Disk only |
 | `GET /v1/objects/{id}/albedo-ai.webp` | The checked AI albedo (`image/webp`, `X-SX-Layer-Tag: artistic`), or 404 `albedo_ai_unavailable` |
@@ -200,6 +200,7 @@ uv run python -m scripts.prefetch --refresh       # re-download resolve, SIA and
 uv run python -m scripts.smoke_offline --group test   # Done-when check: SX_OFFLINE=1, network blocked
 uv run python -m scripts.smoke_offline --group demo
 uv run python -m scripts.backup_cache             # zip the cache next to it
+uv run python -m scripts.preflight                # against a running backend: every demo row answers (issue #103)
 uv run python -m scripts.record_fixtures          # re-record tests/fixtures/cache (needs the internet)
 ```
 
@@ -209,6 +210,19 @@ uv run python -m scripts.record_fixtures          # re-record tests/fixtures/cac
   - They are plain cache entries recorded live by `record_fixtures`: three frames per target (MAXREC=3) at the default cutout size, about 3.3 MB in all (5 test targets, 3 demo objects).
   - `derived.*` entries are removed after recording, so the tests run the real SIA, cutout and WCS path.
   - The tests block every non-loopback socket.
+
+## Before going on stage
+
+On the A15, with the network unplugged (A10.2, issue #103):
+
+```bash
+cd backend
+SX_OFFLINE=1 SX_PREFETCH_ON_START=1 uv run uvicorn app.main:create_app --factory --host localhost --port 8000
+# second terminal:
+uv run python -m scripts.preflight --wait-warm 900
+```
+
+`scripts.preflight` waits until `/v1/health` reports the warm start `finished`, then, for every row of the demo search list (`SEARCH_LIST` in `scripts/bake_demo_pack.py`), every other `group = "demo"` target in `targets.toml` and 433 Eros, calls `resolve`, `card`, `render-params`, `frames`, `spectrum` and the first cutout PNG, printing the time of each call. It exits 1 on any non-200 answer (a 503 `offline_cache_miss` means the cache lacks that object: pre-fetch it with the internet on), a connection error, or a warm start that did not finish in time. A row with no frames (a catalogue-only exoplanet, a mover outside SPHEREx's windows) is reported, not failed. `--base` points it at another host, `--only NAME` checks one row. It talks HTTP only, so it sees what the browser sees; `scripts.smoke_offline` stays the in-process check of frames and cutouts.
 
 ## Layout
 
@@ -227,7 +241,7 @@ app/core/sky/     sky background: survey registry and layout, HEALPix NESTED, Hi
 app/core/area/    (Atish, A17) Area search Discovery: config ([[area]], starting values), frames, dots, day0
 app/core/composite/ (no D-17 owner yet) SPHEREx false-colour composite: config, select, grid, service
 assets/           A5.4 pre-baked assets, <type>/<id>.json (SX_ASSETS_DIR); the demo pack (Q-164) and its maps in assets/textures/
-scripts/          prefetch, smoke_offline, backup_cache, record_fixtures, generate_contract, sky_mirror, sky_bake, bake_demo_pack (`--check`, `--strict`)
+scripts/          prefetch, smoke_offline, preflight, backup_cache, record_fixtures, generate_contract, sky_mirror, sky_bake, bake_demo_pack (`--check`, `--strict`)
                   area_discovery (Area search precompute: `--area <id> --steps frames,dots --day0 <json>`; exit 0 done, 1 incomplete, 2 bad args;
                   exit not 0: leave AREA_TOOL_ENABLED off, Q-205)
 tests/            pytest; tests/fixtures/cache holds the recorded cache entries

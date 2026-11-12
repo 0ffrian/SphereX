@@ -24,6 +24,7 @@
     "backend:check": "uv --directory backend run ruff check . && uv --directory backend run ruff format --check . && uv --directory backend run mypy && uv --directory backend run pytest -q",
     "backend:prefetch": "uv --directory backend run python -m scripts.prefetch",
     "backend:smoke-offline": "uv --directory backend run python -m scripts.smoke_offline",
+    "backend:preflight": "uv --directory backend run python -m scripts.preflight",
     "backend:sky-mirror": "uv --directory backend run python -m scripts.sky_mirror",
     "backend:sky-bake": "uv --directory backend run python -m scripts.sky_bake",
     "contract:gen": "npm --prefix frontend run contract:gen && uv --directory backend run python -m scripts.generate_contract",
