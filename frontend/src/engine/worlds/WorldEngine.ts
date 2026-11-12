@@ -181,7 +181,7 @@ export class WorldEngine {
     return this.readyP;
   }
 
-  /** Programs this instance has submitted: 3 for a 'globe' engine (no fly shader), 4 otherwise. */
+  /** Programs this instance has submitted: 3 for a 'globe' (no fly shader) or 'fly' engine (no globe shader), 4 for 'both'. */
   programCount(): number {
     return (this.core.W.gl as CoreGL).programs();
   }
