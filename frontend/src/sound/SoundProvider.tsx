@@ -44,3 +44,17 @@ export function useSoundStatus(): SoundStatus {
   const s = useSound();
   return useSyncExternalStore(s.subscribe, s.getStatus);
 }
+
+const noSubscribe = () => () => {};
+const noStatus = () => null;
+
+/** The app's sound engine, or null outside `SoundProvider` (panels that also render in tests without it). */
+export function useOptionalSound(): AppSound | null {
+  return useContext(SoundContext);
+}
+
+/** The sound status, or null outside `SoundProvider`. */
+export function useOptionalSoundStatus(): SoundStatus | null {
+  const s = useOptionalSound();
+  return useSyncExternalStore(s ? s.subscribe : noSubscribe, s ? s.getStatus : noStatus);
+}

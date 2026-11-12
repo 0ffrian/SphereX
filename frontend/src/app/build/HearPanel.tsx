@@ -1,7 +1,8 @@
 // "Hear it" panel of the build pane (approved design, panels-preview.html). Two sounds:
 //   Atmosphere: the wind you would hear on the surface (artistic, shown as "Default"), from the card's measured
 //     surface pressure and temperature and the dominant gas (hearModel.atmosphereOf). Refused when an input is missing.
-//   Spectrum: the object's own SPHEREx spectrum played as pitch (measured), 0.75 to 5 um over about 9 s.
+//   Spectrum: the object's own SPHEREx spectrum (measured), as a Sweep (played as pitch, 0.75 to 5 um over
+//     about 9 s, on the shared pitch law, Q-446) or as a Chord (all 12 notes at once, R13.12, ChordPlayer).
 // One sound at a time. Leaving the tab, closing the panel or changing object stops it.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '@/state/store';
@@ -21,14 +22,21 @@ import {
   SPEC_POINTS,
 } from './hearModel';
 import { readWave, startSpectrum, waveSize, type SpectrumHandle } from './hearAudio';
+import { ChordPlayer } from '@/app/sound/ChordPlayer';
+import { useOptionalSound } from '@/sound/SoundProvider';
 
 type Mode = 'atmo' | 'spec';
+type Kind = 'sweep' | 'chord';
 type Playing = Mode | null;
 type Wind = WindMode;
 
 const MODE_OPTIONS = [
   { value: 'atmo', label: 'Atmosphere', testId: 'hear-mode-atmo' },
   { value: 'spec', label: 'Spectrum', testId: 'hear-mode-spec' },
+] as const;
+const KIND_OPTIONS = [
+  { value: 'sweep', label: 'Sweep', testId: 'hear-kind-sweep' },
+  { value: 'chord', label: 'Chord', testId: 'hear-kind-chord' },
 ] as const;
 const WIND_OPTIONS = [
   { value: 'calm', label: 'Calm' },
@@ -62,7 +70,13 @@ function PlayIcon({ playing }: { playing: boolean }) {
   );
 }
 
-function drawScope(cv: HTMLCanvasElement | null, cssHeight: number, active: boolean, gain: number, buf: Float32Array<ArrayBuffer> | null): void {
+function drawScope(
+  cv: HTMLCanvasElement | null,
+  cssHeight: number,
+  active: boolean,
+  gain: number,
+  buf: Float32Array<ArrayBuffer> | null,
+): void {
   if (!cv) return;
   const d = fit(cv, cssHeight);
   if (!d) return;
@@ -106,7 +120,8 @@ const SPEC_SCOPE_H = 44;
 const ATMO_H = 110;
 
 /** Q-430: how the spectrum sounds (long wavelength = low pitch, flux = loudness). */
-export const HEAR_SPEC_MAPPING = 'Short wavelengths sound high, long wavelengths low. Brighter is louder.';
+export const HEAR_SPEC_MAPPING =
+  'Short wavelengths sound high, long wavelengths low. Brighter is louder.';
 
 export function HearPanel({ active, name }: { active: boolean; name: string | undefined }) {
   const card = useAppStore((s) => s.card);
@@ -127,6 +142,10 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
   const defaultMode: Mode = atmo.ok ? 'atmo' : 'spec';
   const [chosen, setChosen] = useState<{ key: string; mode: Mode } | null>(null);
   const mode: Mode = chosen && chosen.key === objectKey ? chosen.mode : defaultMode;
+  const [chosenKind, setChosenKind] = useState<{ key: string; kind: Kind } | null>(null);
+  const kind: Kind = chosenKind && chosenKind.key === objectKey ? chosenKind.kind : 'sweep';
+  const sound = useOptionalSound();
+  const reply = spectrum.status === 'ready' ? spectrum.data : null;
   const [specPlaying, setSpecPlaying] = useState(false);
   const ambPlaying = useAmbienceStore((s) => s.playing && s.key === objectKey);
   const ambience = useAmbienceStore((s) => s.ambience && s.key === objectKey);
@@ -148,7 +167,8 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
   const stopSpecSound = useCallback(() => {
     specH.current?.stop();
     specH.current = null;
-  }, []);
+    sound?.stopChord('hear');
+  }, [sound]);
   const stopSpec = useCallback(() => {
     stopSpecSound();
     setSpecPlaying(false);
@@ -290,12 +310,26 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
     redrawIdle();
   }, [redrawIdle, pos, atmo.ok, curve]);
   useEffect(() => {
-    const els = [atmoCv.current, specCv.current, scopeCv.current].filter((e): e is HTMLCanvasElement => !!e);
+    const els = [atmoCv.current, specCv.current, scopeCv.current].filter(
+      (e): e is HTMLCanvasElement => !!e,
+    );
     if (typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(() => redrawIdle());
     els.forEach((e) => ro.observe(e));
     return () => ro.disconnect();
   }, [redrawIdle, mode, atmo.ok, curve]);
+
+  const setKind = (k: Kind) => {
+    if (k === kind) return;
+    stopSpec();
+    setChosenKind({ key: objectKey, kind: k });
+  };
+  const beforeChord = () => {
+    specH.current?.stop();
+    specH.current = null;
+    setSpecPlaying(false);
+    useAmbienceStore.getState().stop(); // one sound at a time: the chord ends the ambience
+  };
 
   const setMode = (m: Mode) => {
     if (m === mode) return;
@@ -346,7 +380,8 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
 
   const label = displayName(name);
   const spectrumLoading =
-    !curve && (spectrum.status === 'idle' || spectrum.status === 'waiting' || spectrum.status === 'loading');
+    !curve &&
+    (spectrum.status === 'idle' || spectrum.status === 'waiting' || spectrum.status === 'loading');
 
   return (
     <>
@@ -355,14 +390,26 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
         <span>{label}</span>
       </div>
       <div className="sx-hr">
-        <ToggleGroup<Mode> label="Sound" hideLabel options={MODE_OPTIONS} value={mode} onChange={setMode} testId="hear-mode" />
+        <ToggleGroup<Mode>
+          label="Sound"
+          hideLabel
+          options={MODE_OPTIONS}
+          value={mode}
+          onChange={setMode}
+          testId="hear-mode"
+        />
 
         <div hidden={mode !== 'atmo'} className="sx-hr-pane" data-testid="hear-atmo">
           {atmo.ok ? (
             <>
               <div className="sx-hr-viz">
                 <span className="sx-hr-cap">Wind at the surface</span>
-                <canvas ref={atmoCv} role="img" aria-label="Live waveform of the wind sound" data-testid="hear-atmo-canvas" />
+                <canvas
+                  ref={atmoCv}
+                  role="img"
+                  aria-label="Live waveform of the wind sound"
+                  data-testid="hear-atmo-canvas"
+                />
               </div>
               <div className="sx-hr-player">
                 <button
@@ -388,7 +435,12 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
                   />
                 </div>
               </div>
-              <SwitchRow label="Ambience" checked={ambience} onChange={toggleAmbience} testId="hear-ambience" />
+              <SwitchRow
+                label="Ambience"
+                checked={ambience}
+                onChange={toggleAmbience}
+                testId="hear-ambience"
+              />
               {ambience && (
                 <p className="sx-hr-hint" data-testid="hear-ambience-note">
                   Keeps playing when this panel is closed
@@ -400,7 +452,9 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
                   <span>Pressure</span>
                   <b>{formatPressure(atmo.model.P)}</b>
                 </div>
-                <div title={`Dominant gas (${atmo.model.gasTag}); surface temperature (${atmo.model.tTag})`}>
+                <div
+                  title={`Dominant gas (${atmo.model.gasTag}); surface temperature (${atmo.model.tTag})`}
+                >
                   <span>Air</span>
                   <b>
                     {atmo.model.gasLabel}, {Math.round(atmo.model.T)} K
@@ -414,7 +468,10 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
               <div className="sx-hr-reach">
                 <div className="sx-hr-reach-h">
                   <span className="sx-eyebrow">Highest pitch that carries</span>
-                  <span className="sx-hr-imag" title="The sound is an artist's impression (artistic)">
+                  <span
+                    className="sx-hr-imag"
+                    title="The sound is an artist's impression (artistic)"
+                  >
                     Default
                   </span>
                 </div>
@@ -448,34 +505,53 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
                   data-testid="hear-spec-canvas"
                 />
               </div>
-              <div className="sx-hr-player">
-                <button
-                  type="button"
-                  className="sx-hr-play"
-                  aria-pressed={playing === 'spec'}
-                  aria-label={playing === 'spec' ? 'Pause spectrum' : 'Play spectrum'}
-                  onClick={toggleSpec}
-                  data-testid="hear-spec-play"
-                >
-                  <PlayIcon playing={playing === 'spec'} />
-                </button>
-                <input
-                  type="range"
-                  min={0}
-                  max={1000}
-                  value={Math.round(pos * 1000)}
-                  onChange={(e) => scrub(Number(e.target.value))}
-                  aria-label="Position in the spectrum"
-                  data-testid="hear-spec-scrub"
+              <ToggleGroup<Kind>
+                label="Spectrum sound"
+                hideLabel
+                options={KIND_OPTIONS}
+                value={kind}
+                onChange={setKind}
+                testId="hear-kind"
+              />
+              {kind === 'chord' ? (
+                <ChordPlayer
+                  reply={reply}
+                  owner="hear"
+                  onBeforePlay={beforeChord}
+                  testId="hear-chord"
                 />
-                <span className="sx-hr-t">{lamAt(pos).toFixed(2)} &micro;m</span>
-              </div>
-              <p className="sx-hr-hint" data-testid="hear-spec-mapping">
-                {HEAR_SPEC_MAPPING}
-              </p>
-              <div className="sx-hr-viz">
-                <canvas ref={scopeCv} aria-hidden="true" />
-              </div>
+              ) : (
+                <>
+                  <div className="sx-hr-player">
+                    <button
+                      type="button"
+                      className="sx-hr-play"
+                      aria-pressed={playing === 'spec'}
+                      aria-label={playing === 'spec' ? 'Pause spectrum' : 'Play spectrum'}
+                      onClick={toggleSpec}
+                      data-testid="hear-spec-play"
+                    >
+                      <PlayIcon playing={playing === 'spec'} />
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1000}
+                      value={Math.round(pos * 1000)}
+                      onChange={(e) => scrub(Number(e.target.value))}
+                      aria-label="Position in the spectrum"
+                      data-testid="hear-spec-scrub"
+                    />
+                    <span className="sx-hr-t">{lamAt(pos).toFixed(2)} &micro;m</span>
+                  </div>
+                  <p className="sx-hr-hint" data-testid="hear-spec-mapping">
+                    {HEAR_SPEC_MAPPING}
+                  </p>
+                  <div className="sx-hr-viz">
+                    <canvas ref={scopeCv} aria-hidden="true" />
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <>
