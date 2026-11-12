@@ -16,7 +16,7 @@ flowchart TD
   Wait["Wait for a click (Q-73)"] --> Click{"Which click?"}
   Click -->|"Sound button (top bar)"| Unlock["unlockAudio(): create and resume the shared AudioContext; open the popover"]
   Click -->|"Listen, Track"| Unlock2["unlockAudio() inside the click, then play"]
-  Unlock --> Graph["First use of the context: graph made (events, spectrum, ambience buses; limiter −3 dB); ambience level = soundOn && ambienceOn ? ambienceVolume × volume : 0"]
+  Unlock --> Graph["Graph made on the first getBus or holdDuck for the context, not by the unlock itself (events, spectrum, ambience buses; limiter −3 dB); ambience level = soundOn && ambienceOn ? ambienceVolume × volume : 0"]
   Unlock2 --> Graph
   Graph --> Ready(("Ready: data sounds duck the ambience while they play"))
 ```

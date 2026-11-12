@@ -20,6 +20,10 @@ export class FakeParam {
     this.calls.push(['target', v, t]);
     return this;
   }
+  setValueCurveAtTime(v: ArrayLike<number>, t: number) {
+    this.calls.push(['curve', v.length, t]);
+    return this;
+  }
   cancelScheduledValues(t: number) {
     this.calls.push(['cancel', 0, t]);
     return this;
@@ -86,6 +90,16 @@ export class FakePanner extends FakeNode {
   readonly pan = new FakeParam();
   constructor(ctx: FakeAudioContext) {
     super(ctx, 'panner');
+  }
+}
+
+export class FakeAnalyser extends FakeNode {
+  fftSize = 2048;
+  constructor(ctx: FakeAudioContext) {
+    super(ctx, 'analyser');
+  }
+  getFloatTimeDomainData(out: Float32Array) {
+    out.fill(0);
   }
 }
 
@@ -159,6 +173,9 @@ export class FakeAudioContext extends EventTarget {
   }
   createBufferSource() {
     return new FakeSource(this, 'bufferSource');
+  }
+  createAnalyser() {
+    return new FakeAnalyser(this);
   }
   createBiquadFilter() {
     return new FakeFilter(this);

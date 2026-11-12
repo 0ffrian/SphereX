@@ -132,7 +132,6 @@ export class AudioDriver implements TrainCapableDriver {
   readonly supported: boolean;
   private readonly getContext: () => AudioContext | null;
   private vol = DEFAULT_VOLUME;
-  private offset = 0;
   // Reused across sounds, per context.
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -164,16 +163,10 @@ export class AudioDriver implements TrainCapableDriver {
     return this.vol;
   }
 
-  /** R8.9 offset: delay every sound by this many ms (when vibration is felt later than heard). */
-  setOffsetMs(ms: number): void {
-    this.offset = Number.isFinite(ms) && ms > 0 ? ms : 0;
-  }
-
-  get offsetMs(): number {
-    return this.offset;
-  }
-
-  /** `AudioContext.outputLatency` in seconds, or null where it is missing [verify on phones] (R12 #10). */
+  /**
+   * `AudioContext.outputLatency` in seconds, or null where it is missing (R12 #10). Its old UI
+   * (UnlockButton) went with D-39; kept for the sound-check page (#116, R13.9).
+   */
   outputLatency(): number | null {
     const ctx = this.getContext();
     const v = (ctx as { outputLatency?: number } | null)?.outputLatency;
@@ -232,7 +225,7 @@ export class AudioDriver implements TrainCapableDriver {
       a.engineMs = w.atMs;
       a.audioS = ctx.currentTime + AUDIO_LOOKAHEAD_S;
     }
-    const base = a.audioS + (w.atMs - a.engineMs) / 1000 + this.offset / 1000;
+    const base = a.audioS + (w.atMs - a.engineMs) / 1000;
     this.playOnsets(ctx, base, w.pulseOffsetsMs, w.resentCount, w, true);
   }
 
@@ -292,7 +285,7 @@ export class AudioDriver implements TrainCapableDriver {
     if (!this.supported) return;
     const ctx = this.ready();
     if (!ctx) return;
-    const base = ctx.currentTime + AUDIO_LOOKAHEAD_S + this.offset / 1000;
+    const base = ctx.currentTime + AUDIO_LOOKAHEAD_S;
     this.playOnsets(ctx, base, onsetsMs, 0, e, false);
   }
 

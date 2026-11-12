@@ -198,6 +198,7 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
       // R13.9: the ambience bus level follows the settings (ambienceVolume × volume, 0 when sound
       // or ambience is off). Events and spectrum apply `volume` themselves; T6's mixer must not
       // multiply the master volume into its bed gains again.
+      // One AppSound binds at a time (one SoundProvider): the level source is module-global.
       setAmbienceLevelSource(() => ambienceLevelFor(getSoundSettings()));
       const refresh = () => refreshAmbienceLevel(getAudioContext());
       refresh();

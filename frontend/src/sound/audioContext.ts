@@ -1,5 +1,5 @@
 // R8.9, D-10: the one shared AudioContext of the app. Created lazily, and only from a user gesture:
-// call `unlockAudio()` from a `click` handler (R8.9, the Touch-mode tap). The audio driver and the
+// call `unlockAudio()` from a `click` handler (R8.9, Q-73). The audio driver and the
 // sound modules (Listen sweep, imagined drive) all use it. Nothing here runs at import time.
 
 /** Makes a context; returns null when Web Audio is missing. Tests inject a fake one. */
@@ -46,7 +46,7 @@ let factoryOverridden = false;
 let shared: AudioContext | null = null;
 
 /**
- * Whether output has been unlocked, shared by every UnlockButton and the engine. `audio`: `none`
+ * Whether output has been unlocked, shared by the Sound popover, the engine and the panels. `audio`: `none`
  * when no AudioContext can be made here, `suspended` when one exists but is not running (not yet
  * resumed, or interrupted by the OS: a click must resume it), `running`.
  */

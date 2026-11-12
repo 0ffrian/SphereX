@@ -135,7 +135,6 @@ describe('scheduling (R8.9)', () => {
 
   it('train pulses are scheduled at explicit times; re-sent pulses are skipped', () => {
     const { ctx, driver } = setup();
-    driver.setOffsetMs(100);
     const w: TrainWindow = {
       rateHz: 20,
       strength: 1,
@@ -146,7 +145,7 @@ describe('scheduling (R8.9)', () => {
       trainSeq: 1,
     };
     driver.playTrain(w);
-    const base = AUDIO_LOOKAHEAD_S + 0.1;
+    const base = AUDIO_LOOKAHEAD_S;
     expect(ctx.sources().map((s) => s.startAt)).toEqual([base + 0.115, base + 0.165]);
   });
 

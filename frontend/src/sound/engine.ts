@@ -275,7 +275,7 @@ export class SoundEngine {
   }
 
   /**
-   * Whether a click has unlocked output (shared by every UnlockButton). Subscribe with
+   * Whether a click has unlocked output (shared by the Sound popover and the panels). Subscribe with
    * `subscribeUnlockState` (audioContext.ts) to follow changes.
    */
   get unlocked(): boolean {
