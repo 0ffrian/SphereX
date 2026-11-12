@@ -64,7 +64,7 @@ function translateXOf(el: HTMLElement): number {
   }
 }
 
-/** The transform that puts `el`'s centre on the island's and shrinks it to a pill (Q-456). */
+/** The transform that puts `el`'s centre on the island's and shrinks it to a pill (Q-457). */
 function towardIsland(el: HTMLElement): string {
   const island = document.querySelector<HTMLElement>('[data-testid="island"]');
   const r = el.getBoundingClientRect();
@@ -76,7 +76,7 @@ function towardIsland(el: HTMLElement): string {
 }
 
 /**
- * Minimise and restore the build view (Moon, 13 Nov 2026, Q-456), in animate-ui's style on `motion`:
+ * Minimise and restore the build view (Moon, 13 Nov 2026, Q-457), in animate-ui's style on `motion`:
  * the pane shrinks into the island and fades with a light blur, or grows back out of it on a spring.
  * Transform, opacity and filter only. `done` runs once the pane has gone (minimise). Reduced motion:
  * no animation. Returns a stop function.

@@ -1591,7 +1591,7 @@ body {
     left: 16px;
     padding: 0 14px 0 8px;
   }
-  /* Q-456: "Read paper" beside the zoom card: a paper icon that opens out to its label on hover or
+  /* Q-457: "Read paper" beside the zoom card: a paper icon that opens out to its label on hover or
      focus (the label is always in its accessible name). */
   .sx-paper {
     left: 174px;
@@ -4996,7 +4996,7 @@ body {
   color: var(--fg);
 }
 
-/* Q-455: the sound settings in the build view's Ambience dropdown (SoundControls, AmbiencePanel). */
+/* Q-456: the sound settings in the build view's Ambience dropdown (SoundControls, AmbiencePanel). */
 .sx-snd {
   display: flex;
   flex-direction: column;
@@ -5259,7 +5259,7 @@ body {
   color: var(--muted);
 }
 
-/* Q-456: a minimised build view stays mounted (no rebuild on restore) but is hidden and out of reach;
+/* Q-457: a minimised build view stays mounted (no rebuild on restore) but is hidden and out of reach;
    the island's pill brings it back. */
 .sx-bp-mini {
   display: contents;
@@ -5274,7 +5274,7 @@ body {
 .sx-paper:focus-visible {
   background: var(--glass-grain), var(--glass-hover);
 }
-/* Q-456: the island has nothing to say while a body is viewed, so it is not shown in the build view.
+/* Q-457: the island has nothing to say while a body is viewed, so it is not shown in the build view.
    Hidden, not removed: the minimise animation still flies to its place, and it shows again as the
    minimised pill (the build view is then no longer the split). */
 .sx-bezel[data-split] .sx-orb-wrap {

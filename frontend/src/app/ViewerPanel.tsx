@@ -816,7 +816,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
         </section>
         {/* Hear it (Atish's audio, Q-416): no header button since Q-450; Details opens it ("Hear it"
             row). Keep it mounted: the sound PRs route the sweep and the chord through this panel. */}
-        {/* Q-455: the Ambience dropdown (this body's atmosphere and the sound settings). */}
+        {/* Q-456: the Ambience dropdown (this body's atmosphere and the sound settings). */}
         <section hidden={pop !== 'amb'} data-testid="build-pop-amb">
           {pop === 'amb' && <AmbiencePanel name={plan?.name} />}
         </section>

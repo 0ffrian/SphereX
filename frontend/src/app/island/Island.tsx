@@ -54,7 +54,7 @@ export function Island() {
       ? (sky.resolved ? displayName(sky.resolved.name) || 'Flipbook' : 'Flipbook')
       : null,
   );
-  // Q-456: a minimised build view is a pill too, named after the body; a click brings it back.
+  // Q-457: a minimised build view is a pill too, named after the body; a click brings it back.
   const buildMini = useShellStore((s) =>
     s.build.open && s.buildMinimised
       ? (sky.resolved ? displayName(sky.resolved.name) || '3D view' : '3D view')

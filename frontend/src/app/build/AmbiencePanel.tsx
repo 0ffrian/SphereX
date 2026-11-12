@@ -1,4 +1,4 @@
-// The build view's Ambience dropdown (Moon, 12 Nov 2026, Q-455): the header's Ambience button opens
+// The build view's Ambience dropdown (Moon, 13 Nov 2026, Q-456): the header's Ambience button opens
 // it, in the same popover as Accuracy and Details (one at a time). It holds this body's Atmosphere
 // (the imagined wind, local synthesis, Q-416; refused with its reason when the card has no
 // atmosphere to hear) and the sound settings that used to sit in the sky's top bar (R13.9).

@@ -90,7 +90,7 @@ classDiagram
     update(changes)
   }
   class SoundSettings {
-    <<sound/ui/SoundSettings.tsx, build Ambience dropdown (Q-455)>>
+    <<sound/ui/SoundSettings.tsx, build Ambience dropdown (Q-456)>>
     click: unlock, open popover
   }
   class pitch {

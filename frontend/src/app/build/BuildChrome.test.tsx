@@ -57,7 +57,7 @@ describe('zoom bar', () => {
 });
 
 describe('dock', () => {
-  it('Read paper says the paper is not out yet, and links to it once it is (Q-456)', async () => {
+  it('Read paper says the paper is not out yet, and links to it once it is (Q-457)', async () => {
     await act(async () => root.render(<ReadPaper url={null} />));
     expect(q('build-paper').getAttribute('aria-disabled')).toBe('true');
     expect(q('build-paper').getAttribute('aria-label')).toContain(PAPER_PENDING);

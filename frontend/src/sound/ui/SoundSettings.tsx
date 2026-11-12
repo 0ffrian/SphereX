@@ -1,4 +1,4 @@
-// R13.9 / R13.10 (Q-441, Q-442; moved by Q-455): the sound settings. Since Q-455 (Moon, 12 Nov 2026)
+// R13.9 / R13.10 (Q-441, Q-442; moved by Q-456): the sound settings. Since Q-456 (Moon, 12 Nov 2026)
 // they are not a "Sound" button in the sky's top bar any more: the sound belongs to the generated
 // bodies, so these controls sit in the build view's Ambience dropdown (`build/AmbiencePanel.tsx`),
 // whose header button unlocks audio (Q-73: a user gesture, never on load). Sound on/off and volume,

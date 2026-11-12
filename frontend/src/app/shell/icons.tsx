@@ -6,7 +6,7 @@ const PATHS = {
   flipbook: 'M4 5h16v14H4z M4 9h16 M8 5v4 M16 5v4 M10 13l4 2-4 2z',
   spectrum: 'M2 12h2 M6 8v8 M10 4v16 M14 7v10 M18 10v4 M22 12h-2',
   viewer: 'M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z M12 12l8-4.5 M12 12v9 M12 12 4 7.5',
-  // A page with lines (lucide file-text): the build view's "Read paper" (Q-456).
+  // A page with lines (lucide file-text): the build view's "Read paper" (Q-457).
   paper: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z M14 2v4a2 2 0 0 0 2 2h4 M10 9H8 M16 13H8 M16 17H8',
   info: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z M12 16v-4 M12 8h.01',
   close: 'M18 6 6 18M6 6l12 12',

@@ -1,7 +1,7 @@
 // Issue #71 stream U (Q-294): the two floating panels of the mock-up's build view that sit at the
 // bottom of the screen: the zoom bar (bottom left, `.zoom`: minus, the zoom, plus), and beside it
-// "Read paper" (Q-456). The mock-up's tool dock is not drawn in the build view (Moon, 13 Nov 2026,
-// Q-456). Drawn only while the build is open, on a desktop width (a phone keeps the tab bar).
+// "Read paper" (Q-457). The mock-up's tool dock is not drawn in the build view (Moon, 13 Nov 2026,
+// Q-457). Drawn only while the build is open, on a desktop width (a phone keeps the tab bar).
 //   zoom bar   -> the 3D view (ViewerApp.zoom / resetView; the value is its own zoom, 100% = as opened)
 //   Read paper -> the paper on how the bodies are generated (PROCEDURAL_PAPER_URL), once published
 import { useEffect, useState } from 'react';
@@ -80,7 +80,7 @@ export function ZoomBar() {
 }
 
 /**
- * The paper on how the generated bodies are made (Moon, 13 Nov 2026, Q-456). The team is still
+ * The paper on how the generated bodies are made (Moon, 13 Nov 2026, Q-457). The team is still
  * writing it: set the link here when it is published. Until then the button says so and goes nowhere.
  */
 export const PROCEDURAL_PAPER_URL: string | null = null;
