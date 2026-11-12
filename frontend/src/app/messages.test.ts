@@ -5,6 +5,7 @@ import {
   layerName,
   pluralFrames,
   refusalShortLabel,
+  searchErrorMessage,
   spectrumAnnouncement,
   spectrumCoverageMessage,
   spectrumEmptyMessage,
@@ -380,5 +381,15 @@ describe('moving-object path search wording', () => {
     expect(one(['frames:cone_failed:1'])).toContain('1 archive search along the path failed');
     expect(one(['frames:outside_window:291'])).toContain('291 frames were taken outside');
     expect(one(['frames:search_deferred:3'])).toContain('still being searched');
+  });
+});
+
+describe('timeout wording (#102)', () => {
+  const timeout = { kind: 'timeout' as const, status: null, code: null, detail: null };
+  it('names the wait the request actually had', () => {
+    expect(searchErrorMessage({ ...timeout, timeoutMs: 25_000 }, 'x')).toMatch(/after 25 seconds/);
+  });
+  it('falls back to the long timeout when the error does not say', () => {
+    expect(searchErrorMessage(timeout, 'x')).toMatch(/after 90 seconds/);
   });
 });
