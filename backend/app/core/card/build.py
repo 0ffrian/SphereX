@@ -399,6 +399,9 @@ ARCHIVE_INSOL_FORMULA = (
 )
 
 
+ARCHIVE_ECC_LIMIT_ASSUMPTION = "archive limit flag: an upper or lower limit, not a measured value"
+
+
 def _eccentricity(row: Mapping[str, Any]) -> dict[str, Any]:
     """``orbit_ecc`` from ``pl_orbeccen``. Zero is a valid value, unlike the other archive columns.
     ASSUMPTION: an exact 0 with no uncertainty is a fit with e fixed at 0 (a circular orbit
@@ -414,6 +417,15 @@ def _eccentricity(row: Mapping[str, Any]) -> dict[str, Any]:
             "source": f"{ARCHIVE_CALC}, pl_orbeccen",
             "assumption": "the archive calculated pl_orbeccen itself (refstr CALCULATED_VALUE); "
             "its method for this column is not documented here, so it is not a measurement",
+        }
+    lim = _finite(row.get("pl_orbeccenlim"))
+    if lim is not None and lim != 0:
+        # Issue #93 A6: 51 Peg b's e is an upper limit (flag 1), Kepler-186 f's a lower one (-1).
+        return {
+            "value": x,
+            "tag": "model_dependent",
+            "source": f"{source}, pl_orbeccenlim = {lim:g}",
+            "assumption": ARCHIVE_ECC_LIMIT_ASSUMPTION,
         }
     err = _archive_errs(row, "pl_orbeccen")
     if x == 0 and err is None:

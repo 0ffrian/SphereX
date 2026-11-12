@@ -229,7 +229,8 @@ def test_a_small_planet_without_pl_rade_falls_back_to_pl_radj() -> None:
 
 
 def test_asset_version_is_bumped_for_the_new_fields() -> None:
-    assert ASSET_VERSION == "12"  # 12: #93 section 5 card fields and 3.5 (pl_eqt derived)
+    # 12: #93 section 5 card fields and 3.5 (pl_eqt derived); 13: #93 A2-A4, A6 data fixes
+    assert ASSET_VERSION == "13"
 
 
 def test_jupiter_radius_is_the_equatorial_one_defined_once() -> None:

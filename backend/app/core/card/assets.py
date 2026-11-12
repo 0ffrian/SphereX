@@ -69,7 +69,12 @@ ASSET_SOURCE = "derived.asset"
 #   full redistribution), never `measured`, so teq_K and the confidence scores change.
 #   Also #93 3.8: the confidence tables drop proper motion, score star rotation and count a
 #   giant's colour from Teq as model_dependent (stage 7).
-ASSET_VERSION = "12"
+# 13 (issue #93 A2, A3, A4, A6): the literature registry refuses 55 Cnc e's hotspot offset and
+#   carries Mercier et al. 2022 and the JWST variability in its day and night notes; HD 189733 b's
+#   offset is Knutson et al. 2012's (20.1 +/- 5.5 deg, derived) in place of Bell et al. 2021's; Gaia
+#   lum_flame is queried scaled by 1e6 (Barnard's Star 0.003398 L_sun with an err, not 0.003); an
+#   archive eccentricity with a limit flag (pl_orbeccenlim) is model_dependent.
+ASSET_VERSION = "13"
 AssetStatus = Literal["saved", "generated", "sketch"]
 FIELDS = ("card", "render_params", "textures", "generator_version", "seed", "created_at")
 OPTIONAL_FIELDS = ("asset_version", "inputs_sha256")

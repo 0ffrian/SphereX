@@ -266,12 +266,13 @@ note = "Spitzer IRAC 4.5 um. At 3.6 um the same paper gives 825 +/- 54 K. Night/
 [[value]]
 key = "simbad-hd-189733b"
 field = "hotspot_offset_deg"
-value = 33.7
-err = 2.5
-tag = "measured"
-citation = "Bell et al. 2021, MNRAS 504, 3316 (arXiv:2010.00687)"
-table = "Table 4, HD 189733b, preferred model Poly5: offset +33.7 (+2.5 / -2.2) deg east"
-note = "Spitzer IRAC 4.5 um reanalysis; err is the larger side of +2.5 / -2.2. Knutson et al. 2012 give the peak time in hours only"
+value = 20.1
+err = 5.5
+tag = "derived"
+citation = "Knutson et al. 2012, ApJ 754, 22 (arXiv:1206.6887)"
+table = "Sect. 4.3: flux maximum 2.98 +/- 0.82 h before the centre of the secondary eclipse at 4.5 um; P = 2.21857 d (Sect. 4.1)"
+formula = "offset_deg = hours x 360 / (P x 24) = 2.98 x 360 / (2.21857 x 24) = 20.15, shown as 20.1; err 0.82 h -> 5.5 deg"
+note = "Spitzer IRAC 4.5 um phase curve; the peak time converted to an angle east of the substellar point. Bell et al. 2021 (MNRAS 504, 3316) give 33.7 (+2.5 / -2.2) deg for the same band, but their Sect. 6.2 finds that for HD 189733 b the fitted error underpredicts the scatter between detector models by about 21 times (about 51 deg), so their tighter number is not used"
 
 [[value]]
 key = "simbad-wasp-39b"
@@ -301,7 +302,7 @@ err = 270.0
 tag = "measured"
 citation = "Demory et al. 2016, Nature 532, 207 (arXiv:1604.05725)"
 table = "Abstract: warmest hemisphere (centred on the hot spot) 2700 +/- 270 K at 4.5 um"
-note = "Spitzer IRAC 4.5 um phase curve. This is the hemisphere centred on the hot spot, 41 deg east of the substellar point, not the substellar day side. The JWST eclipses of Hu et al. 2024 (Nature 630, 609) were not read in full, so they are not used"
+note = "Spitzer IRAC 4.5 um phase curve. This is the hot-spot hemisphere (the hemisphere centred on the hot spot), not the substellar day side. Mercier et al. 2022 (AJ 164, 204) reanalysed the same Spitzer data and found a dayside of 3771 (+669 / -520) K and a nightside below 1649 K (2 sigma), so the two analyses disagree. JWST eclipses show the dayside changing from visit to visit (Hu et al. 2024, Nature 630, 609; Patel et al. 2024, A&A 690), so no single dayside temperature holds"
 
 [[value]]
 key = "simbad-rho01-cnc-e"
@@ -311,14 +312,9 @@ err = 400.0
 tag = "measured"
 citation = "Demory et al. 2016, Nature 532, 207 (arXiv:1604.05725)"
 table = "Abstract: nightside brightness temperature 1380 +/- 400 K"
-note = "Spitzer IRAC 4.5 um phase curve"
+note = "Spitzer IRAC 4.5 um phase curve. Mercier et al. 2022 (AJ 164, 204) reanalysed the same Spitzer data and found a nightside below 1649 K (2 sigma) and a dayside of 3771 (+669 / -520) K. JWST eclipses show the dayside changing from visit to visit (Hu et al. 2024, Nature 630, 609; Patel et al. 2024, A&A 690)"
 
-[[value]]
+[[refusal]]
 key = "simbad-rho01-cnc-e"
 field = "hotspot_offset_deg"
-value = 41.0
-err = 12.0
-tag = "measured"
-citation = "Demory et al. 2016, Nature 532, 207 (arXiv:1604.05725)"
-table = "Abstract: hot spot 41 +/- 12 degrees east of the substellar point"
-note = "Spitzer IRAC 4.5 um phase curve"
+reason = "two analyses of the same Spitzer data disagree: Demory et al. 2016 41 +/- 12 deg east, Mercier et al. 2022 -12 (+21 / -18) deg (AJ 164, 204)"

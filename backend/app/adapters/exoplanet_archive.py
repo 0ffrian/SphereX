@@ -47,6 +47,7 @@ VALUE_COLUMNS = (
     "pl_orbeccen",
     "pl_orbeccenerr1",
     "pl_orbeccenerr2",
+    "pl_orbeccenlim",
     "pl_insol",
     "pl_insolerr1",
     "pl_insolerr2",
@@ -86,7 +87,8 @@ REF_COLUMNS = (
 # needs st_age or the host-star references (issue #68, Q-150). Bump when COLUMNS changes.
 # 3 (issue #93 section 5 A-B): the eccentricity errors and reference, pl_insol and st_lum (checked
 # live against pscomppars on 2026-11-11: every column answers).
-COLUMNS_VERSION = "3"
+# 4 (issue #93 A6): pl_orbeccenlim, the limit flag (1 upper limit, -1 lower limit, 0 a value).
+COLUMNS_VERSION = "4"
 COLUMNS = VALUE_COLUMNS + REF_COLUMNS
 _REF_TEXT = re.compile(r">([^<]+)</a>")
 _PLANET_LETTER = re.compile(r"^(.*\S)([b-z])$")
