@@ -14,7 +14,7 @@ export interface MouldLiveState {
   buildSeq: number;
   startBuild(): number;
   /**
-   * The build whose mould show has played its last step (Colour) and started to fade (Q-451). The
+   * The build whose mould show has played its last step (Colour) and started to fade (Q-453). The
    * show is the one clock for the strip: that build ends on it instead of staging on afterwards
    * (which sent the strip back from Colour to Spots). Never a later build.
    */

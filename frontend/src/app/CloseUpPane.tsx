@@ -93,17 +93,23 @@ export function CloseUpPane() {
     !hidden &&
     kind !== null &&
     (engine || world || rockEngine ? !held : info !== null && info.mode !== null);
+  // Render-performance roadmap 0.7: once the fly view has been opened for this object, it stays
+  // mounted (paused) while the close-up is closed, so reopening skips the GL context, the fly-shader
+  // compile (22 to 43 s cold) and the 900-step spin-up. Another object (or preset) drops it: the
+  // key changes, and a null `world` (engines off, "Measured only", a failure) unmounts it.
+  const flyKey = world ? engineKey(cardId, world.preset.id) : null;
+  const [keptFly, setKeptFly] = useState<string | null>(null);
+  if (open && flyKey !== null && keptFly !== flyKey) setKeptFly(flyKey);
+  const mountFly = flyKey !== null && (open || keptFly === flyKey);
   const [, bump] = useReducer((n: number) => n + 1, 0);
-  // Q-450: the pane springs in first and its engine starts a couple of frames later, so starting the
-  // engine (a new WebGL context, shaders) never holds up the first frames of the slide. On close the
-  // picture stays until the fade has finished.
+  // Q-450: the star stages start a couple of frames after the pane springs in, so a new WebGL
+  // context never holds up the first frames of the slide, and they unmount once the fade has
+  // finished. The fly view does not use this: it follows `mountFly` above (kept mounted, paused).
   // `live` names the stage that is mounted, so a new object's stage never starts while the pane is closed.
-  const stageKey = world ? `world:${world.preset.id}` : engine ? `star:${engine.preset.id}` : `kind:${kind ?? ''}`;
+  const stageKey = engine ? `star:${engine.preset.id}` : `kind:${kind ?? ''}`;
   const [liveKey, setLiveKey] = useState<string | null>(null);
   useEffect(() => {
     if (open) return deferFrames(() => setLiveKey(stageKey));
-    // Merge rule with #122 (PR #107 review): once WorldFlyStage can pause, a world stage stays mounted
-    // and paused after close, so a reopen skips the shader compile; only other stages unmount here.
     const id = window.setTimeout(() => setLiveKey(null), 700);
     return () => window.clearTimeout(id);
   }, [open, stageKey]);
@@ -282,11 +288,12 @@ export function CloseUpPane() {
         />
       )}
       {kind === 'body' && <RockCloseUp active={open} />}
-      {world && live && (
+      {world && mountFly && (
         <WorldFlyStage
-          key={world.preset.id}
+          key={flyKey}
           world={world}
           reduced={reducedMotion}
+          paused={!open}
           onFail={() => useWorldStore.getState().fail(engineKey(cardId, world.preset.id))}
         />
       )}

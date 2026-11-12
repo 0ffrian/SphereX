@@ -91,11 +91,23 @@ def _stand_in(result: ObjectResult) -> bool:
     return result.prebuilt and "spectrum" in _missing(result)
 
 
+# Catalogue answers a live build can lose offline (a cold D-25 cache) while keeping its type.
+CATALOGUE_GAPS = frozenset({"catalogue", "star_catalogue", "exoplanet_archive"})
+
+
 def _measured_beats_pack(live: ObjectResult, pack: ObjectResult) -> bool:
-    """The live build replaces the pack when it has a measured spectrum and the same type. A
-    different type means the live build lost its catalogue answer (e.g. offline with only the
-    frames cached: a ``candidate`` sketch), so the pack's catalogue card is kept instead."""
-    return "spectrum" not in _missing(live) and live.card.get("type") == pack.card.get("type")
+    """The live build replaces the pack when it has a measured spectrum, the same type and no
+    catalogue gap the pack does not also have. A different type means the live build lost its
+    catalogue answer (e.g. offline with only the frames cached: a ``candidate`` sketch); a
+    catalogue gap of its own (issue #93 C1: offline with no cached Gaia cone, Barnard's star keeps
+    the type ``star`` but loses its Gaia values) is the same loss in a quieter form. In both cases
+    the pack's catalogue card is kept instead."""
+    gaps = (set(_missing(live)) & CATALOGUE_GAPS) - set(_missing(pack))
+    return (
+        "spectrum" not in _missing(live)
+        and not gaps
+        and live.card.get("type") == pack.card.get("type")
+    )
 
 
 @dataclass(frozen=True)
@@ -296,7 +308,7 @@ class ObjectPipeline:
             log.exception("object %s: live build failed, answering with the pack", obj.id)
             return saved
         if not _measured_beats_pack(live.result, saved):
-            log.info("object %s: live build has no spectrum or another type: the pack", obj.id)
+            log.info("object %s: live build lost to the pack (spectrum, type or catalogue)", obj.id)
             return saved
         if live.asset is not None:
             self.assets.put(live.asset)

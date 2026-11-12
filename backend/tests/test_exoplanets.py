@@ -241,7 +241,9 @@ def test_fixture_planets_offline(client: TestClient, name: str, want: str) -> No
         return
     assert card["radius_rjup"]["tag"] == "measured" and card["radius_rjup"]["value"] > 0
     assert "Exoplanet Archive" in card["radius_rjup"]["source"]
-    assert card["teq_K"]["tag"] in ("measured", "derived")
+    assert (
+        card["teq_K"]["tag"] == "derived"
+    )  # #93 3.5: an equilibrium temperature is never measured
     assert params["scale_m"] > 0
     assert "spectrum" in params["missing"]  # no SPHEREx frames recorded: null with a reason
 

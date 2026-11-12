@@ -11,6 +11,7 @@ import { formatWavelength } from '@/app/format';
 import { summarizeSpectrum, ALL_SATURATED } from '@/app/refusals';
 import { DataBadge, ProvenanceBadge } from '@/app/Badge';
 import { useAppStore } from '@/state/store';
+import { SpectrumSound } from '@/app/sound/SpectrumSound';
 
 const W = 400;
 const H = 170;
@@ -164,6 +165,8 @@ export function FlipbookSpectrum({ name }: { name: string }) {
           {sky.fixture ? <DataBadge fixture variant="tag" /> : <ProvenanceBadge tag="measured" variant="tag" />}
           <span data-testid="spectrum-caveat">Not absolute photometry: no aperture correction yet.</span>
         </div>
+        {/* R13.12, A8 (Q-446): hear it as a sweep or as a 12-note chord. */}
+        <SpectrumSound reply={data} />
         {/* R9: the text equivalent of the chart. */}
         {/* The wrapper is what is hidden: a table's <caption> is drawn outside the table's own box,
             so sr-only on the table left "Spectrum points of ..." on screen. */}

@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Engine bench: background compile</title>
+<!--
+  Issue #93 1.2: build a WorldEngine (role = globe | fly) and wait for whenReady() while measuring the longest gap
+  between main-thread timer callbacks (a frozen page shows as one long gap). Cold cache: a fresh profile per run.
+-->
+<script type="module">
+  const out = {};
+  window.__out = out;
+  try {
+    const Q = new URLSearchParams(location.search);
+    const { WorldEngine } = await import('/src/engine/worlds/WorldEngine.ts');
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'width:800px;height:500px;display:block';
+    document.body.appendChild(canvas);
+    const role = Q.get('role') || 'fly';
+    let last = performance.now(),
+      maxGap = 0,
+      ticking = true;
+    const beat = () => {
+      const now = performance.now();
+      maxGap = Math.max(maxGap, now - last);
+      last = now;
+      if (ticking) setTimeout(beat, 4);
+    };
+    setTimeout(beat, 4);
+    const t0 = performance.now();
+    const e = new WorldEngine(canvas, { role });
+    out.construct_ms = +(performance.now() - t0).toFixed(1);
+    await e.whenReady();
+    out.ready_ms = +(performance.now() - t0).toFixed(0);
+    out.programs = e.programCount();
+    ticking = false;
+    out.max_main_thread_gap_ms = +maxGap.toFixed(1);
+    const t1 = performance.now();
+    e.setPreset(Q.get('id') || 't1f');
+    out.setPreset_ms = +(performance.now() - t1).toFixed(0);
+  } catch (e) {
+    out.err = String(e && e.stack ? e.stack : e);
+  }
+  out.done = true;
+</script>

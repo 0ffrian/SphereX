@@ -1,12 +1,12 @@
 # Build split view and moulding
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R5.8 · **Implements:** [Q-113, Q-120](../decisions/shell-surfaces.md), [D-21](../decisions/contract-tags.md), [Q-49](../decisions/rendering-bodies.md), [D-34](../decisions/rendering-motion.md) · **Read with:** [display-rules.md](display-rules.md) (R5.3, R5.6, R5.7), [accessibility.md](accessibility.md) (R9), [sky-shell.md](../architecture/sky-shell.md) (A21, the shell around the pane)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R5.8 · **Implements:** [Q-113, Q-120](../decisions/shell-surfaces.md), [D-21](../decisions/contract-tags.md), [Q-49](../decisions/rendering-bodies.md), [D-34](../decisions/rendering-motion.md), [Q-339](../decisions/rendering-engines-tuning.md) · **Read with:** [display-rules.md](display-rules.md) (R5.3, R5.6, R5.7), [accessibility.md](accessibility.md) (R9), [sky-shell.md](../architecture/sky-shell.md) (A21, the shell around the pane)
 
 ### R5.8 Build split view and moulding
 
 > **Changed by [Q-415](../decisions/shell-surfaces.md) (PR #104):** the moulding animation shown for at least 5 s on every build (cached bodies too) is the mock-up's own generic body of the object's kind (`build/MouldAnimation.tsx`, `build/mouldBody.ts`), fed by the card's temperature, colour and elongation where present, on its own plain three `WebGLRenderer`. It is decorative and `aria-hidden`, seeded so it is deterministic, and the real render replaces it. This departs from "the moulding presents the real plan" below; the extra GL context is outside the D-03 and D-37 budget (open in Q-415).
 
-> **Changed by [Q-419, Q-450 and Q-451](../decisions/shell-surfaces.md) (PR #107, 12 Nov 2026):** the build view opens full width with no close-up; the close-up (left) and the shift to the right half come only when the user turns on **Explore** in the header (`closeUpStore.hidden` starts `true`; the choice then holds for the session). The header reads Accuracy, Ambience, Explore, Details, close; Hear it opens from a row in Details. The mould show is the strip's one clock: its end ends the build, every step lasts at least 0.7 s, and the steps only move forward (Q-451).
+> **Changed by [Q-419, Q-450 and Q-453](../decisions/shell-surfaces.md) (PR #107, 12 Nov 2026):** the build view opens full width with no close-up; the close-up (left) and the shift to the right half come only when the user turns on **Explore** in the header (`closeUpStore.hidden` starts `true`; the choice then holds for the session). The header reads Accuracy, Ambience, Explore, Details, close; Hear it opens from a row in Details. The mould show is the strip's one clock: its end ends the build, every step lasts at least 0.7 s, and the steps only move forward (Q-453).
 
 These are the presentation rules of the one 3D view (Q-113, as amended by Q-120). How a user reaches it from the sky (marker click, card, brackets, rail) is shell behaviour, specified in A21 ([sky-shell.md](../architecture/sky-shell.md)). Every R5 rule applies inside the pane.
 
@@ -22,7 +22,7 @@ These are the presentation rules of the one 3D view (Q-113, as amended by Q-120)
 
 **The moulding is a presentation of the real plan**
 
-- The moulding is never a second model. The body is planned and fully loaded first (card, params, plan, meshes, textures and the generated field, `ViewerApp.whenLoaded`) behind a loading state ("Looking up its 3D model…"). Only then do the steps play.
+- The moulding is never a second model. The body is planned and fully loaded first (card, params, plan, meshes, textures and the generated field, `ViewerApp.whenLoaded`) behind a loading state ("Looking up its 3D model…"). Only then do the steps play. When a D-37 world engine draws the body ([R5.9](engines.md#r59-prototype-engines-d-37)), the steps also wait for it: the phase is `'forming'`, the first step shows in progress, and the steps play from the start once the engine has compiled and formed the world (`onFormed`, Q-339). A failed engine ends the wait and the three.js path draws.
 - Each body type has the mock-up's steps (`viewer/mould/mouldSteps.ts`, `mouldKindOf`). A step reveals plan layers. `PlanContext.hold` holds the layers of later steps: they are not drawn and not listed in `missing`. The `tint` hold shows the colour as plain grey until its step.
 - Knobs run from their start value to 1, and value 1 is the normal render:
   - whole-body scale from 0.55 to 1, and a wireframe scaffold;

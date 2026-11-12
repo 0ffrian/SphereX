@@ -10,9 +10,11 @@
   },
   "teq_K": {
     "value": 217.7,
-    "tag": "measured",
+    "tag": "derived",
     "source": "synthetic fixture: real TRAPPIST-1 f value, NASA Exoplanet Archive PSCompPars pl_eqt (Ducrot et al. 2020, 2020A&A...640A.112D)",
-    "err": 2.1
+    "err": 2.1,
+    "formula": "Teq = T_star * sqrt(R_star / (2a)) * (1 - A)^(1/4), as computed in the cited paper",
+    "assumption": "the cited paper's own albedo and heat redistribution; an equilibrium temperature, not a measured one (#93 3.5)"
   },
   "mass_mearth": {
     "value": 1.039,

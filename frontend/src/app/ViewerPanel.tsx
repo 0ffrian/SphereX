@@ -56,8 +56,10 @@ import { useCloseUpStore } from './closeUpStore';
 import { StarEngineDetails, StarFlarePanel } from './StarFlarePanel';
 import { isEditableTarget } from './shell/shortcuts';
 import { RockStage } from './build/RockStage';
+import { enginesEnabled } from './enginesSwitch';
 import { StarGlobeStage, useEngineStar } from './StarEngineStage';
 import { WorldGlobeStage, useEngineWorld } from './WorldEngineStage';
+import { measuredReadouts } from '@/engine/worlds/cardToWorld';
 import { engineKey, useWorldStore } from './worldStore';
 import { MouldStrip, type StripHandle } from './build/MouldStrip';
 import { useMould, type MouldPhase } from './build/useMould';
@@ -164,7 +166,7 @@ export const IR_JETS_HINT =
 export const BUILD_POP_ID = 'bp-pop';
 const POP_LABEL: Record<PopId, string> = {
   acc: 'Accuracy',
-  feel: 'Feel it', // kept so the PopId type still maps; the Feel UI is not shown (Atish removes haptics)
+  feel: 'Feel it', // kept so the PopId type still maps; the Feel UI is not shown (haptics cut, D-39)
   hear: 'Hear it',
   details: 'Details',
 };
@@ -231,6 +233,8 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const storeCard = useAppStore((s) => s.card);
   const storeParams = useAppStore((s) => s.params);
   const card = blocked ? null : storeCard;
+  // Issue #93 C4: the engines kill switch, read once per mount (the query string changes only with a reload).
+  const [enginesOn] = useState(() => enginesEnabled());
   // Issue #71 stream X (D-37): the prototype's star engine draws star cards in the build pane; null keeps the TSL path.
   const engineStarCard = useEngineStar();
   // Issue #71 stream Y (D-37): the prototype's world engine draws planets and gas giants; null keeps the old path.
@@ -279,6 +283,13 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // Issue #71 F: the emissions view (comets with gas in both epochs) and its time. A new object closes it.
   const [emissions, setEmissions] = useState<{ key: string; jd: number } | null>(null);
   const emissionsRange = card && params?.type === 'comet' ? timeRange(card) : null;
+  // #93 A10 (D-21): a planet's eclipse and phase-curve values are card facts, shown at every honesty level, not
+  // only in the "+ Artistic" engine panel. Each follows the level like any other value: a measured value shows at
+  // "Measured only", a derived one (HD 189733 b's offset, converted from hours) from "+ Estimated" up.
+  const planetMeasured = useMemo(
+    () => (card ? measuredReadouts(card).filter((m) => isTagShown(honesty, m.tag)) : []),
+    [card, honesty],
+  );
   const emissionsJd =
     emissions && emissions.key === objectKey && emissionsRange ? emissions.jd : null;
   // Layers whose mesh or texture failed to load, per object. Keyed so a new object starts clean.
@@ -550,8 +561,28 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
       setAnnouncement(LEVEL_RAISED_ANNOUNCEMENT);
     }
   }, [waitForLevel, plan, paneSeq, honesty, setHonesty]);
+  // The prototype engines (star, world, rock) draw a generated surface: they mount only at "+ Artistic"
+  // (Atish's call on the PR #89 review, Q-287). At "Measured only" and "+ Estimated" the three.js path draws.
+  // The build pane has no Show control (Q-412); Build raises the level to + Artistic when the body has layers
+  // the level hides, which is what lets the engines draw.
+  // Issue #93 C4: `?engines=0` (remembered) turns them off at every level; the close-up pane follows, since it
+  // reads the engineStar / engineWorld published below and the rock view RockStage publishes.
+  const enginesShown = honesty === 'artistic' && enginesOn;
+  const engineStar =
+    pane && enginesShown && plan?.threeD && card && !blocked && engineStarCard && starFailedId !== engineKey(card.id, engineStarCard.preset.id)
+      ? engineStarCard
+      : null;
+  const engineWorld =
+    pane && enginesShown && plan?.threeD && card && !blocked && engineWorldCard && worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
+      ? engineWorldCard
+      : null;
+  // Issue #93: the build steps wait for a world engine to compile and form the planet (`hold`). The key of the
+  // world it formed; the engine reports it through WorldGlobeStage's onFormed. A failed engine unmounts (the
+  // three.js path draws), so it holds nothing.
+  const [formedKey, setFormedKey] = useState<string | null>(null);
   const mould = useMould({
     wait: waitForLevel,
+    hold: engineWorld !== null && formedKey !== engineKey(card?.id, engineWorld.preset.id),
     viewer: inPane ? viewer : null,
     card,
     params,
@@ -662,19 +693,6 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // it (`cuClose`). The viewer and plan go to a small store the pane reads. The toggle next to Feel
   // hides or shows it.
   const closeKind = pane ? closeUpKindOf(params?.type) : null;
-  // The prototype engines (star, world, rock) draw a generated surface: they mount only at "+ Artistic"
-  // (Atish's call on the PR #89 review, Q-287). At "Measured only" and "+ Estimated" the three.js path draws.
-  // The build pane has no Show control (Q-412); Build raises the level to + Artistic when the body has layers
-  // the level hides, which is what lets the engines draw.
-  const enginesShown = honesty === 'artistic';
-  const engineStar =
-    pane && enginesShown && plan?.threeD && card && !blocked && engineStarCard && starFailedId !== engineKey(card.id, engineStarCard.preset.id)
-      ? engineStarCard
-      : null;
-  const engineWorld =
-    pane && enginesShown && plan?.threeD && card && !blocked && engineWorldCard && worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
-      ? engineWorldCard
-      : null;
   // D-37: while an engine draws the body the three.js viewer builds and draws nothing under it.
   const engineOwns = engineStar !== null || engineWorld !== null || (enginesShown && rockOwns);
   useEffect(() => {
@@ -856,6 +874,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
               key={engineWorld.preset.id}
               world={engineWorld}
               onFail={() => useWorldStore.getState().fail(engineKey(card?.id, engineWorld.preset.id))}
+              onFormed={() => setFormedKey(engineKey(card?.id, engineWorld.preset.id))}
             />
           )}
           {!pane && params && plan?.threeD && (
@@ -1070,6 +1089,22 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                     <dt className="text-neutral-300">{r.label}</dt>
                     <dd className="text-neutral-100">
                       {r.value} {r.tag && <ProvenanceBadge tag={r.tag} fixture={objectIsFixture} />}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+
+            {planetMeasured.length > 0 && (
+              <dl
+                className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
+                data-testid="planet-measured"
+              >
+                {planetMeasured.map((m) => (
+                  <div key={m.field} className="contents">
+                    <dt className="text-neutral-300">{m.label}</dt>
+                    <dd className="text-neutral-100" title={m.source}>
+                      {m.value} <ProvenanceBadge tag={m.tag} fixture={objectIsFixture} />
                     </dd>
                   </div>
                 ))}
