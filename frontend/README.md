@@ -114,22 +114,20 @@ src/
     sky/                  (prototype) SkyPane (sky view, markers, picking), useTargetMarkers, readout feed
     spectrum/             SpectrumPanel, hand-rolled SVG SpectrumChart, scales
   test/           test-only helpers (fixtureFetch, sharedFixtures: loads shared/fixtures; fakeHaptics,
-                  fakeAudio, hapticRecorder: haptics fakes)
+                  fakeAudio, fakeSound: sound fakes)
   viewer/         (Moon)  ViewerApp, lighting, modes, honesty, scaleBar, altText, renderPlan + planCommon + planTypes (pure plan)
     renderers/            AsteroidMesh, AsteroidProcedural, Comet, BrownDwarf, Star (plan functions), build (plan to three.js), ShaderBody
     mould/                (issue #60) mouldSteps (pure steps, layers, progress, pose), MouldRig (apply / undo a pose)
     fields/               fieldWorker (D-12 shared field; file name [verify])
     sky/                  (prototype) SkyView (inside-out sky sphere, three r187), skyMath (pure: RA/Dec,
                           camera, picking, pan/zoom), surveys (which equirect to load)
-  haptics/        (Atish)  haptics (engine), audioContext, audioGraph, settings, calibration, platform,
-                  pitch, spectrumMapping, tuning (every tuning constant, D-13), profiles (buildHaptics,
-                  TouchHaptics), probe (TouchProbe)
+  sound/          (Atish)  engine, voices (audio driver), audioContext, audioGraph (buses, duck), settings,
+                           pitch, spectrumMapping, tuning, listenSweep, appSound, SoundProvider, ui/SoundSettings (D-39)
     drivers/              webVibrate, audio, tauri (stub, B-01)
     sources/              types, relief, heightMap, meshNormal, field, dataPulse, terrain, flow,
                           spectrum, lightcurve
     sound/                listenSweep (A8 Listen sweep)
     ui/                   PulseIndicator, UnlockButton, SpectrumHapticsPad, CalibrationWizard, HapticsSettings
-  hapticsTestPage/  dev-only haptics test page (/haptics-test.html on the dev server; not built)
   gpuProbe/         dev-only GPU probe (/gpu-probe.html on the dev server; not built)
   perf/             adapter report, frame stats and the `__sxPerf` recorder (fixtures build only)
 e2e/              Playwright smoke test and flipbook flow (fixtures mode)
@@ -141,13 +139,7 @@ Modules that are not built yet (now only the Tauri driver) export a single `*_PL
 
 ### Haptics test page
 
-`npm run dev` (or `npm run dev:phone` for HTTPS on a phone over the LAN), then open `/haptics-test.html`. It has synthetic inputs only, in three panels:
-
-- **Engine:** every event kind, level and tag, pulse trains at 1, 2, 4, 12 and 20 Hz, the output switches, the honesty state, the audio latency readout and the pulse indicator.
-- **Spectrum** (issue #10): a synthetic spectrum with a dip to feel with the spectrum pad, the calibration wizard and the settings.
-- **Texture** (issue #11): a feel pad per synthetic body (gas giant, water world, rocky world, procedural asteroid, comet coma, nebula), built through `buildHaptics` with its refusals listed, and the Listen sweep.
-
-Tap "Turn on vibration and sound" first. Debug a phone with `chrome://inspect`. The page is not a build input, so `vite build` never includes it.
+Deleted with the haptics (D-39, issue #111). The sound-check page (`sound-check.html`, R13.9) replaces it in #116.
 
 ### GPU probe page
 
