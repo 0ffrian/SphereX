@@ -46,6 +46,25 @@ describe('WorldEngine sound accessors', () => {
     expect(e.gasField()).toBeNull();
   });
 
+  it('reads the EB arrays on every call: a swapped EB.out2 or EB.out is what the next call returns', () => {
+    e.setPreset('earth');
+    const before = e.weatherFields()!;
+    const out2 = new Float32Array(before.out2.length).fill(0.25);
+    const out = new Float32Array(before.out.length).fill(280);
+    const [o2, o1] = [core.EB.out2, core.EB.out];
+    core.EB.out2 = out2;
+    core.EB.out = out;
+    try {
+      const after = e.weatherFields()!;
+      expect(after.out2).toBe(out2);
+      expect(after.out).toBe(out);
+      expect(after.out2[0]).toBe(0.25);
+    } finally {
+      core.EB.out2 = o2;
+      core.EB.out = o1;
+    }
+  });
+
   it('groundKm is core.groundKm (raw cell, clamped at sea level on ocean worlds)', () => {
     e.setPreset('earth');
     for (const [lo, la] of [

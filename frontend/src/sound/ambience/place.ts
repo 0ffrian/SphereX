@@ -274,10 +274,16 @@ export function samplePlace(
     head = fly.head;
   const w = worldFor(e, air, c);
   const ctx = w.ctx;
+  // The engine may swap its EB arrays (T, rain, out, out2) for a shared source's between ticks (#93 simulation merge),
+  // so no EB array reference is kept across calls: the weather is re-read here and the cached height ctx gets the
+  // current EB.out (the magma-sea T) before any height is computed.
+  const wf = e.weatherFields();
+  ctx.ebOut = wf ? wf.out : null;
+  ctx.ebNX = wf ? wf.NX : 0;
+  ctx.ebNY = wf ? wf.NY : 0;
   const H = heightsFor(e, air, c, w, lon, lat, head, opts.reuseFraction ?? REUSE_FRACTION);
   const { geo, hs, z } = H;
   const f = e.cpuFields();
-  const wf = e.weatherFields();
   const clim = f.climate as { NX: number; NY: number; T: Float32Array } | null;
   const hyd = f.hydro as Hydro | null;
   const lavaW = air.lavaWorld && !!hyd?.lava;
