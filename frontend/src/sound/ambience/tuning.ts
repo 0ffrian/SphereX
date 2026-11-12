@@ -216,6 +216,69 @@ export const CLOUD_BASE_DEFAULT_KM = 5;
 export const TINT_GREY: readonly [number, number, number] = [0.55, 0.55, 0.57];
 export const TINT_MIX = 0.7;
 
+// ---------- weather overlay (§8.5, issue #117). Presentation only: every value here is `artistic`. ----------
+/** §8.5: the overlay draws at most this often (every other frame at 60). */
+export const OVERLAY_MAX_FPS = 30;
+/** Red M7: the overlay is soft; it never draws above CSS resolution (the fly engine itself runs at DPR 1). */
+export const OVERLAY_DPR_CAP = 1;
+/** Blue 16 (ASSUMPTION): a weather snapshot older than this (s) is not drawn (tab hidden, ambience stopped). */
+export const OVERLAY_SNAPSHOT_STALE_S = 0.5;
+/** §8.5 rain layers: parallax per layer (spec), the depth of the near layer (m, artistic) and the layer shares. */
+export const RAIN_PARALLAX: readonly [number, number, number] = [1, 0.6, 0.35];
+export const RAIN_NEAR_M = 2;
+export const RAIN_LAYER_SHARE: readonly [number, number, number] = [0.25, 0.35, 0.4];
+/** Blue 18: widths (CSS px) and opacities per layer, raised for a projector [verify on the A15 + projector]. */
+export const RAIN_WIDTH_PX: readonly [number, number, number] = [2, 1.5, 1.5];
+export const RAIN_ALPHA: readonly [number, number, number] = [0.55, 0.4, 0.35];
+/** Blue 22: the streak lean is clamped to this (rad). */
+export const RAIN_LEAN_MAX_RAD = Math.PI / 3;
+/** §8.5 snow: flake size per layer (CSS px), lateral wobble amplitude (px at the near layer) and rate (rad/s). */
+export const SNOW_SIZE_PX: readonly [number, number, number] = [3, 2, 1.5];
+export const SNOW_WOBBLE_PX = 6;
+export const SNOW_WOBBLE_RAD_S = 1.3;
+/** §8.5 bolt: return strokes per group (coordinator H1: 2 to 3, never 4), their spacing, bright time and fade (s). */
+export const BOLT_STROKES_MIN = 2;
+export const BOLT_STROKES_MAX = 3;
+export const BOLT_STROKE_GAP_S = 0.05;
+export const BOLT_BRIGHT_S = 0.03;
+export const BOLT_FADE_S = 0.12;
+/** H5: a strike delivered later than this after its t0 shows no strokes, only the glow. */
+export const BOLT_LATE_S = 0.05;
+/** §8.5: white with a faint blue tint. Colour is not from data (the card has no gas composition). */
+export const BOLT_RGB: readonly [number, number, number] = [0.86, 0.91, 1];
+/** Bolt core and glow line widths (CSS px). */
+export const BOLT_CORE_PX = 2.5;
+export const BOLT_GLOW_PX = 8;
+/** Red 3: the bolt is clipped to the pane grown by this share of its height on every side. */
+export const BOLT_CLIP_MARGIN = 0.25;
+/** Blue 17: below this projected length (px) the bolt is not drawn, only its glow. */
+export const BOLT_MIN_PX = 12;
+/** Bolt shape: midpoint-displacement levels, lateral jitter (share of the segment length), branch count range. */
+export const BOLT_LEVELS = 3;
+export const BOLT_JITTER = 0.12;
+export const BOLT_BRANCHES: readonly [number, number] = [1, 2];
+/**
+ * H4 / WCAG 2.3.1: the small-area limit, 25% of a 10 degree field at 1024 x 768 (341 x 256 px = 21 824 px2),
+ * scaled to the pane. A bolt whose lit area is at or above it never restrikes (one flash per group).
+ */
+export const WCAG_SMALL_AREA_PX2 = 21824;
+export const WCAG_REF_PX2 = 1024 * 768;
+/** §8.5 glow: cloud glow 0.35 (spec), deck flicker and edge glow at FLASH_OPACITY; one pulse per group. */
+export const CLOUD_GLOW_OPACITY = 0.35;
+export const GLOW_ATTACK_S = 0.03;
+export const GLOW_FADE_S = 0.15;
+/** §8.5 safe glow (reduced motion or Flashes off): 1 s at 0.15 opacity, raised cosine. */
+export const SAFE_GLOW_OPACITY = 0.15;
+export const SAFE_GLOW_S = 1;
+/** Glow sizes: radial radius as a share of the pane height, edge glow width as a share of its width. */
+export const CLOUD_GLOW_R = 0.25;
+export const DECK_GLOW_R = 0.3;
+export const EDGE_GLOW_W = 0.15;
+/** H2: near plane in camera space, km. */
+export const NEAR_KM = 0.1;
+/** H3: the engine's drawn deck (core.js uCloudKm = max(zc, 0.3)). */
+export const DECK_MIN_KM = 0.3;
+
 // ---------- levels (§11) ----------
 /** C (ASSUMPTION): minimum slant distance, m (spec names D_MIN without a value). T4's place.ts uses the same value. */
 export const D_MIN_M = 1;
