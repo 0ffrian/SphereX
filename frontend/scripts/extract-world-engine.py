@@ -340,25 +340,14 @@ DEV93_PYRAMID = r'''// @deviation (#93 F1) the fly view's max-height pyramid (he
   };
   this.pyrBind = function () { if (!pF || pyrFor === pF) return; gl.useProgram(pF); if (uF.uPyr) gl.uniform1i(uF.uPyr, 11); if (uF.uPyrOn) gl.uniform1f(uF.uPyrOn, pyrOk); pyrFor = pF; };'''
 DEV93_FLY_HOOKS = r'''// @deviation (#93 F1) a new terrain also builds its max-height pyramid, and a fly draw first binds it (WorldGL.setPyramid,
-// pyrBind). Dev only: with window.__sxGpuTime set, each draw is timed on the GPU (EXT_disjoint_timer_query_webgl2) and
-// W.gpuMs holds the average (weight 0.1), W.gpuLast the last result and an array W.gpuLog, if the caller set one, every
-// result; a disjoint result is dropped. Off, it costs nothing.
+// pyrBind). GPU timing is the host's (WorldEngine's glTimer.ts, ?gputime=1, around the whole tick): a second timer query
+// here would nest inside it, which the extension does not allow.
 (function () {
-  var st = W.gl.setTerrain, dr = W.gl.draw, gl = canvas.getContext('webgl2'), tx = null, qs = [];
+  var st = W.gl.setTerrain, dr = W.gl.draw;
   W.gl.setTerrain = function (t) { st.call(W.gl, t); W.gl.setPyramid(t); };
   W.gl.draw = function () {
     if (W.fly) { W.gl.link(true); W.gl.pyrBind(); }
-    if (typeof window === 'undefined' || !window.__sxGpuTime) return dr.apply(W.gl, arguments);
-    tx = tx || gl.getExtension('EXT_disjoint_timer_query_webgl2');
-    if (!tx) return dr.apply(W.gl, arguments);
-    while (qs.length && gl.getQueryParameter(qs[0], gl.QUERY_RESULT_AVAILABLE)) {
-      var q = qs.shift();
-      if (!gl.getParameter(tx.GPU_DISJOINT_EXT)) { var ms = gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6; W.gpuLast = ms; W.gpuMs = W.gpuMs ? W.gpuMs * 0.9 + ms * 0.1 : ms; if (W.gpuLog) W.gpuLog.push(ms); }
-      gl.deleteQuery(q);
-    }
-    if (qs.length > 3) return dr.apply(W.gl, arguments);
-    var qq = gl.createQuery(); gl.beginQuery(tx.TIME_ELAPSED_EXT, qq);
-    try { return dr.apply(W.gl, arguments); } finally { gl.endQuery(tx.TIME_ELAPSED_EXT); qs.push(qq); }
+    return dr.apply(W.gl, arguments);
   };
 })();'''
 DEV93_FLY = r'''// @deviation (#93 F1) fly view ticket 1: a faster march over the same surface. heightPyramid.js builds, once per
