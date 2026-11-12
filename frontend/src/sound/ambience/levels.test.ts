@@ -1,6 +1,6 @@
 // §16 test 8: levels (R1 area integral, world scaling, presentation offset and caption, stage window).
 import { describe, expect, it } from 'vitest';
-import { CEILING_TEXT } from './captions';
+import { ceilingCaption, CEILING_TEXT } from './captions';
 import { earthAir, makeAir, makePlace, makeWind, marsAir, venusAir } from './fakeEngine.testutil';
 import { bedKey, cellWeight, flowOffsetDb, iRef, mixFrame, patternSamples, presentOffsetDb, stageGainDb } from './levels';
 import { SILENT_DB } from './tuning';
@@ -96,7 +96,9 @@ describe('presentation (§11.4, §11.7)', () => {
     const f = mixFrame(earthAir(), seaPlace(120), new Set([bedKey('S5', 0), bedKey('S1_land', 0)]));
     expect(f.silent).toBe(true);
     expect(f.beds.every((b) => b.gainDb === SILENT_DB)).toBe(true);
-    expect(f.caption.silentReason).toBe(CEILING_TEXT);
+    expect(f.caption.silentReason).toBe(ceilingCaption(earthAir()));
+    // Q-447: the exact §4.1 text, then the action with the derived height H ln(P0 / P_FLOOR), 2 significant figures
+    expect(f.caption.silentReason).toBe(`${CEILING_TEXT} Fly below about 97 km to hear it.`);
   });
   it('is deterministic, skips thunder, and keeps the previous caption object when unchanged', () => {
     const keys = new Set([bedKey('S1_land', 0), bedKey('S5', 0), bedKey('thunder', 0)]);

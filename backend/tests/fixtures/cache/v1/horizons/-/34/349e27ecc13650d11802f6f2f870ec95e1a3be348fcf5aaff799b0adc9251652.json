@@ -1,0 +1,19 @@
+{
+ "body_sha256": "2940025a8ada59c8e635658ebb2a093314ae7f3fccd37d3544867e8a133cb9a3",
+ "body_size": 5202,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-12T08:58:55.648Z",
+ "key": {
+  "query": {
+   "center": "500@399",
+   "command": "-163182",
+   "ephem_type": "VECTORS",
+   "tlist": "2461120.875231",
+   "vec_table": "2"
+  },
+  "release": "-",
+  "source": "horizons"
+ },
+ "status": 200,
+ "url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%27-163182%27&OBJ_DATA=NO&MAKE_EPHEM=YES&EPHEM_TYPE=VECTORS&CENTER=%27500%40399%27&TLIST_TYPE=JD&TLIST=%272461120.875231%27&VEC_TABLE=2&REF_PLANE=FRAME&OUT_UNITS=AU-D&CSV_FORMAT=YES"
+}
