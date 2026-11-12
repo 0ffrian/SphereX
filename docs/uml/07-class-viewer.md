@@ -290,7 +290,7 @@ classDiagram
     +honesty: HonestyState
     enginesShown = honesty is artistic, Q-287
     engineStar, engineWorld: the adapter result when shown and not failed for this object
-    planetMeasured: card readouts at every level, Q-379
+    planetMeasured: card readouts filtered by the honesty level, Q-379
   }
   class EngineStage {
     <<WorldGlobeStage, WorldFlyStage, StarEngineStage, RockStage, RockCloseUp>>
@@ -303,6 +303,9 @@ classDiagram
     createCore(canvas, role), role globe or fly or both (Q-339)
     the prototype's code with declared deviations
     +whenReady() Promise, shaders compiled in the background (issue #93)
+    +gpuMs() p50, p95, samples, dev only (glTimer.ts, Q-383)
+    fly role compiles 3 programs, no WORLD_FS (Q-384)
+    host loop capped at 60 Hz, engineHostCap (Q-386)
     +setOverrides(o) void
     +setFly(on) void
     +spinUp() void, wall-clock budget, not byte-identical
@@ -312,11 +315,54 @@ classDiagram
     <<engine/stars/StarEngine.ts>>
     four prototype slices run through new Function, needs unsafe-eval
     mode: globe or flare or surface close-up
+    surface: true keeps one canvas, one WebGL2 context (Q-381)
+    +whenReady() Promise, background compile (Q-381)
+    +pollReady() boolean
+    +pending() boolean, a compile still running
+    +dispose() void, never loseContext while compiling
   }
   class RockView {
     <<engine/rocks/RockView.ts>>
     wraps source.ts: rebuild, drag, loop, jets
-    releases its WebGL contexts on detach
+    releases its WebGL contexts on detach, after its compile is done
+    +whenReady(canvas) Promise, background compile (Q-382)
+    +whenDrawn(canvas) Promise
+    +whenBuilt() Promise, height map from the worker
+    +setBake(on, n) void, static, baked cube maps 1024 squared RGBA16F
+    pauses off screen, culls back faces
+  }
+  class Mirror {
+    <<engine/rocks/RockView.ts>>
+    the smaller canvas copies the larger
+    aspect ratios within 1 percent (Q-382)
+  }
+  class RockBuildWorker {
+    <<rockBuild.worker.ts, rockBuild.ts>>
+    +buildField(req) BuildResult, pure
+    newest request wins (Q-382)
+  }
+  class StillStarCache {
+    <<viewer/renderers/stillStarCache.ts>>
+    three.js star close-up, still star drawn once (Q-381)
+    +render(renderer) void
+    +dispose() void
+  }
+  class HeightPyramid {
+    <<engine/worlds/heightPyramid.js>>
+    +buildPyramid(t) HeightPyramid or null, 7 levels of ceilings
+    +pyramidCached(t) one build per terrain
+    FLY_FS steps over air above it (Q-384)
+  }
+  class FlyDraw {
+    <<WorldGL.flyDraw, core.js>>
+    camera still: static G-buffer, 3 RGBA32F targets
+    camera moving: straight to the canvas
+    gas giants never use it (Q-384)
+  }
+  class SimWorker {
+    <<pending, sim.worker.ts and simHost.ts on fix/93-wave2-sim>>
+    one simulation per world for globe and fly (Q-385)
+    merging, not on fix/93-engines yet
   }
   class CardToWorld {
     <<cardToWorld.ts>>
@@ -358,20 +404,26 @@ classDiagram
   EngineStage --> StarEngine : stars with a Teff
   EngineStage --> RockView : asteroids, comet nuclei
   WorldEngine ..> CardToWorld : preset from the card
-  ViewerPanel ..> CardToWorld : measuredReadouts, every honesty level
+  ViewerPanel ..> CardToWorld : measuredReadouts, filtered by the honesty level
   StarEngine ..> CardToStar : preset from the card
   RockView ..> CardToRock : preset from the card
   CardToWorld ..> Seed : card seeds
   CardToStar ..> Seed : card seeds
   CardToRock ..> Seed : card seeds
   WorldEngine ..> TerrainCache : globe and fly engines share one build (Q-341)
+  WorldEngine ..> HeightPyramid : fly march bound
+  WorldEngine *-- FlyDraw : fly view draw
+  WorldEngine ..> SimWorker : pending, follows the shared simulation
+  RockView *-- "0..1" Mirror : second pane, same aspect ratio
+  RockView ..> RockBuildWorker : height map off the main thread
   EngineStage ..> ViewerApp : fallback when refused, failed, context lost or no WebGL2
 ```
 
 ## Notes
 
 - D-37 engines (diagram 2): at + Artistic, a card the adapter accepts is drawn by the prototype's own engine on its own WebGL2 canvas, and `ViewerApp.setEngineOwned(true)` makes the three.js viewer build and draw nothing under it. At + Estimated and Measured only (Q-287), and when the adapter refuses the card, the engine fails or loses its context, or WebGL2 is missing, the three.js renderers of diagram 1 draw (`GasWorld`, `RockyWorld`, the orbit view, `ShaderBody`, `Star`, the asteroid and comet renderers). Engine frames are exempt from the byte-identical rule (R5.9). Review fixes: Q-329 to Q-331, Q-334, Q-335.
-- Issue #93 follow-up (diagram 2): `ViewerPanel` lists a planet card's eclipse and phase-curve readouts from `measuredReadouts` at every honesty level, each with its badge, not only in the engine panel at + Artistic (Q-379); `cardToWorld` takes the starlight from the card's insolation first (Q-375); `cardToStar` no longer carries a luminosity, because the turnover time reads the radius and temperature (Q-374).
+- Issue #93 follow-up (diagram 2): `ViewerPanel` lists a planet card's eclipse and phase-curve readouts from `measuredReadouts` at the honesty levels their tags allow (a `derived` one from + Estimated), each with its badge, not only in the engine panel at + Artistic (Q-379); `cardToWorld` takes the starlight from the card's insolation first (Q-375); `cardToStar` no longer carries a luminosity, because the turnover time reads the radius and temperature (Q-374).
+- Issue #93 performance waves (diagram 2, Q-381 to Q-386, [R5.9.1](../rendering/engines-performance.md#r591-engine-and-viewer-performance-issue-93-waves)): the star and rock engines compile in the background (`whenReady`; the rock view also `whenDrawn`, `whenBuilt`) behind 60 s watchdogs; the rock view bakes its surface into cube maps (`setBake`), copies one pane to the other when their shapes match (`Mirror`) and builds its height map in a worker; the fly view steps over a max-height pyramid (`heightPyramid.js`) and draws a static G-buffer while the camera is still (`WorldGL.flyDraw`); the three.js star close-up draws its still star once (`StillStarCache`, used by the star close-up, `app/StarCloseUp.tsx`). The shared simulation in a worker (`SimWorker`) is on `fix/93-wave2-sim`, merging (Q-385).
 - Issue #93 (D-38, diagram 2): a `WorldEngine` is created with a role (`globe`, `fly` or `both`), compiles its shaders in the background and is used after `whenReady()` resolves (Q-338, Q-339); the globe and fly engines of one world share one terrain build (`terrainCache.js`, Q-341); card worlds, stars and rocks take their noise offsets from `engine/seed.ts` (Q-347 to Q-353), the prototype's presets keep their scalar seeds.
 - Render core (issue #39): `ViewerApp` draws through a `RenderChain` (`render/pipeline.ts`); if the chain cannot be built it falls back to plain `renderer.render`. New content is compiled with `RenderChain.compileAsync` before it is swapped in (diagram [10](10-sequence-view-3d.md)). The quality level (low, medium or high, `render/quality.ts`) sets bloom resolution, anti-aliasing (TAAU or SMAA), noise octaves and volume steps. `FrameGovernor` only lowers the quality level; `setQualityTier` picks one by hand. `SimClock` (`render/clock.ts`) holds one sim time per moving process (the spin, and since issue #42 the processes `motion/planMotion.ts` states for stars, gas giants, brown dwarfs and worlds, Q-104) and the pause reasons shown in diagram [15](15-state-interaction.md). `renderStats`, `whenSettled` and `freezeClock` are test and tuning hooks; `timeLapses` lists each process with its shown speed-up. Motion and quality levels follow R5.7 and D-34; the implementation is Q-66 in [decisions](../decisions/README.md).
 - Tier labels (issue #42): the viewer panel (`app/ViewerPanel.tsx`, `tierText`) writes every process speed-up and layer tier as "tier N of 5, <meaning>" (for example "tier 3 of 5, worked out with a typical value"), so the D-32 tier is said in words next to it.

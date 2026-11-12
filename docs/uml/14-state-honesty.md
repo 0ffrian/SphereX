@@ -52,5 +52,5 @@ stateDiagram-v2
 - One state per badge (D-02, D-21): Measured, Estimated, Default (artistic). The toggle starts at **+ Estimated**, so everything shown on load is backed by data or a stated formula.
 - Every visible layer shows a tag chip in the legend. Each state change is announced through `aria-live="polite"` (rendering doc §9).
 - Acceptance test: in Measured only no layer with a tag other than `measured` is drawn, and procedural texture haptics are silent (rendering doc §11).
-- Card readouts are not layers: a planet's eclipse and phase-curve readouts are listed in every state with their badges (Q-379); whether text readouts should follow this filter is open there.
+- Card readouts are not layers, but they follow the same filter: a planet's eclipse and phase-curve readouts are listed with their badges in every state their tags allow, so a `derived` one is hidden in Measured only (Q-379, decided 12 Nov 2026).
 - Haptics use the same filter as the layers (D-21). Whether the comet field pulse, tagged `measured` + `model_dependent` (rendering doc §8.4), plays in Measured only is Q-17.
