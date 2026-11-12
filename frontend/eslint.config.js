@@ -38,8 +38,12 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
   },
   {
-    // src/sound/ambience/types.ts: the spec R13 App. B contract, copied verbatim (it types engine objects as any).
-    files: ['src/engine/**/*.{ts,d.ts}', 'src/sound/ambience/types.ts'],
+    files: ['src/engine/**/*.{ts,d.ts}'],
+    rules: { '@typescript-eslint/no-explicit-any': 'off' },
+  },
+  {
+    // Spec R13 App. B: the ambience contract is copied verbatim (its WorldEngineLike mirrors the engine's untyped fields).
+    files: ['src/sound/ambience/types.ts'],
     rules: { '@typescript-eslint/no-explicit-any': 'off' },
   },
   {

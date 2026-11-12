@@ -5,13 +5,13 @@ import type { Tag } from '@/contract';
 import { absorption, airAt, earthRef, lowpassHz, meanPathAir } from './air';
 import { caption } from './captions';
 import {
-  bandCenterHz, bedMembership, isGroundBed, isHarmonicBed, PRIORITY, surfDb, uSand, wavesPM, whitecapFraction,
+  bakeWind, bandCenterHz, bedMembership, isGroundBed, isHarmonicBed, PRIORITY, surfDb, uSand, wavesPM, whitecapFraction,
 } from './sources';
 import type { AirModel, BedLevel, BedSpec, MixFrame, Place, PlaceSample, SourceId } from './types';
 import {
-  BROADBAND_F, CNV_RAIN_DB, D_MIN_M, DB_PER_NP, EARTH_REF, G_PRESENT_MAX, IU_LAND, L_REF, L_TARGET, LP_F_MAX, PAN_MAX,
+  ABS_DEAD_DB, BROADBAND_F, CNV_RAIN_DB, FLOW_MIN_U, GAS_IU, PRESENCE_RANGE_DB, D_MIN_M, DB_PER_NP, EARTH_REF, G_PRESENT_MAX, IU_LAND, L_REF, L_TARGET, LP_F_MAX, PAN_MAX,
   REF_LISTENER_M, RIVER_S_REF, SILENT_DB, SNOW_DB, STAGE_HEADROOM_DB, STAGE_WINDOW_DB, STORM_RAIN_DB, U_E_REF,
-  U_REF_MIN, WATER_RHO, WHITECAP_MIN_U,
+  WATER_RHO, WHITECAP_MIN_U,
 } from './tuning';
 
 /** Provenance of everything the ambience plays (§2 rule 2). */
@@ -157,34 +157,44 @@ function flowWind(id: SourceId, place: Place): number {
   return w.Uz;
 }
 
-function defaultUref(id: SourceId, air: AirModel): number {
-  if (id === 'S9') return air.Vmax ?? 0;
-  if (air.gas) return air.Uscale;
-  return Math.max(air.Us, U_REF_MIN);
-}
-
-/** One presentation offset per world (§11.4): -10 log10(Z0/Z_E), clamped to ±30 dB. */
+/** One presentation offset per world (§11.4): -10 log10(Z0/Z_E), clamped to ±30 dB. Used for ground beds. */
 export function presentOffsetDb(air: AirModel): number {
   if (!air.airOK || !(air.Z0 > 0)) return 0;
-  const g = -10 * Math.log10(air.Z0 / earthRef().Z);
+  return clampG(-10 * Math.log10(air.Z0 / earthRef().Z));
+}
+
+/** R10: flow-noise beds (S1-S3, S9, S12) are raised by the impedance at the listener's height, Z(z) against Earth's surface. */
+export function flowOffsetDb(air: AirModel, z_km: number): number {
+  if (!air.airOK) return 0;
+  const Z = airAt(air, z_km).Z;
+  return Z > 0 ? clampG(-10 * Math.log10(Z / earthRef().Z)) : 0;
+}
+
+function clampG(g: number): number {
   return Math.max(-G_PRESENT_MAX, Math.min(G_PRESENT_MAX, g));
 }
 
-/** §11.7 stage window: L_pres = L_TARGET + clamp(L_true + G - L_TARGET, -24, +6); returns the gain in dB. */
+/** §11.7 stage window: L_pres = L_TARGET + clamp(L_true + G - L_TARGET, -24, +6); returns the gain in dB. Only for present beds (R8). */
 export function stageGainDb(trueDb: number, G: number): number {
   if (!Number.isFinite(trueDb)) return SILENT_DB;
-  const rel = Math.max(-STAGE_WINDOW_DB, Math.min(STAGE_HEADROOM_DB, trueDb + G - L_TARGET));
-  return rel;
+  return Math.max(-STAGE_WINDOW_DB, Math.min(STAGE_HEADROOM_DB, trueDb + G - L_TARGET));
 }
 
+/** A bed that is not present: gain SILENT_DB, which the mixer treats as linear 0 (R8: never lifted, never captioned). */
 function silentBed(id: SourceId, variant: number): BedLevel {
   return { id, variant, trueDb: SILENT_DB, gainDb: SILENT_DB, lowpassHz: LP_F_MAX, shelfDb: 0, pan: 0, playbackRate: 1, harmonic: isHarmonicBed(id) };
 }
 
+interface Cand { bed: BedLevel; G: number }
+
 /**
  * §10/§11 one mixer tick. `baked` holds bedKey(id, variant) of the beds ready to play; thunder is an event and is not
- * mixed here. `specs` (optional, same keys) supplies each bed's bake Uref and band centre; without it Uref falls back to
- * max(Us, 2) (rocky), Uscale (gas) or Vmax (S9), which only moves the S2/S3 playbackRate.
+ * mixed here (its true level is thunderParams().level_dB; the mixer applies presentOffsetDb and stageGainDb to it).
+ * `specs` (optional, same keys) supplies each bed's band centre; Uref is bakeWind(air, id) either way.
+ *
+ * R8 presence before presentation: a bed is present only if its source class is around the listener, its driver is
+ * non-zero (flow beds: wind >= 1 m/s), it is not absorption-dead (ground: area + broadband loss < 60 dB) and its true
+ * level is within 40 dB of the loudest present bed. Only present beds go through the stage window.
  */
 export function mixFrame(
   air: AirModel,
@@ -196,13 +206,23 @@ export function mixFrame(
   const f = place.features;
   const at = airAt(air, f.z_km);
   const silent = !air.airOK || at.silent;
-  const G = presentOffsetDb(air);
+  const Gground = presentOffsetDb(air);
+  const Gflow = flowOffsetDb(air, f.z_km);
   const E = earthRef();
   const { P: Pm, T: Tm } = meanPathAir(air, f.z_km);
   const snowFalling = f.precipPhase === 'snow' ? Math.max(0, Math.min(1, f.rainRate / 1.5)) : 0; // ASSUMPTION
   const shelf = -SNOW_DB * Math.max(f.snowCover, snowFalling);
 
-  // Land/sea share of the area around the listener splits the two wind rumble variants (ASSUMPTION).
+  const keys = [...baked].map((k) => {
+    const [id, v] = k.split('|');
+    return { id: id as SourceId, variant: Number(v), key: k };
+  });
+  keys.sort((a, b) => PRIORITY.indexOf(a.id) - PRIORITY.indexOf(b.id) || a.variant - b.variant);
+  const hasLand = keys.some((k) => k.id === 'S1_land');
+  const hasSea = keys.some((k) => k.id === 'S1_sea');
+
+  // Land/sea share of the area around the listener splits the two wind rumble variants (ASSUMPTION); when only one
+  // variant is baked it takes the whole share (blue F4c).
   let landW = 0;
   let seaW = 0;
   for (const s of place.samples) {
@@ -211,72 +231,86 @@ export function mixFrame(
     else landW += w;
   }
   const tot = landW + seaW || 1;
+  const landShare = hasSea ? landW / tot : 1;
+  const seaShare = hasLand ? seaW / tot : 1;
 
-  const keys = [...baked].map((k) => {
-    const [id, v] = k.split('|');
-    return { id: id as SourceId, variant: Number(v), key: k };
-  });
-  keys.sort((a, b) => PRIORITY.indexOf(a.id) - PRIORITY.indexOf(b.id) || a.variant - b.variant);
-
-  const beds: BedLevel[] = [];
+  const cands: (Cand | BedLevel)[] = [];
   for (const { id, variant, key } of keys) {
     if (!PRIORITY.includes(id) || id === 'thunder' || !Number.isFinite(variant)) continue;
     if (silent) {
-      beds.push(silentBed(id, variant));
+      cands.push(silentBed(id, variant));
       continue;
     }
     const spec = specs?.get(key);
-    const Uref = spec?.Uref ?? defaultUref(id, air);
+    const Uref = spec?.Uref ?? bakeWind(air, id);
     let trueDb: number;
     let lp = LP_F_MAX;
     let pan = 0;
     let playbackRate = 1;
     let shelfDb = 0;
+    let G = Gflow;
     if (isGroundBed(id)) {
       const fb = spec?.bandCenterHz ?? bandCenterHz(id, air, Uref);
       const alpha = absorption(fb, Pm, Tm, air.cls);
       const area = areaIntegral(id, place, Number.isFinite(alpha) ? alpha : 1e9);
       const drive = groundDriverDb(id, air, place);
       if (!(area.I > 0) || !Number.isFinite(drive)) {
-        beds.push(silentBed(id, variant));
+        cands.push(silentBed(id, variant));
         continue;
       }
       const Lrel = 10 * Math.log10(area.I / iRef(fb));
-      const broadband = -DB_PER_NP * absorption(BROADBAND_F, Pm, Tm, air.cls) * area.dEff;
+      // Blue F5a (Q- proposal): the broadband loss is evaluated at min(band centre, 250 Hz), so a low bed is not
+      // charged a 250 Hz loss on top of its own absorption.
+      const broadband = -DB_PER_NP * absorption(Math.min(fb, BROADBAND_F), Pm, Tm, air.cls) * area.dEff;
+      if (!(Lrel + broadband > -ABS_DEAD_DB)) {
+        cands.push(silentBed(id, variant));
+        continue;
+      }
       const world = 10 * Math.log10(at.Z / E.Z); // ΔL_world + the listener-height term, combined (§11.3)
       trueDb = drive + Lrel + broadband + world;
       lp = lowpassHz((fr) => absorption(fr, Pm, Tm, air.cls), area.dEff);
       pan = area.pan;
       shelfDb = shelf;
+      G = Gground;
     } else {
       const U = flowWind(id, place);
-      if (!(U > 0)) {
-        beds.push(silentBed(id, variant));
+      const share = id === 'S1_land' ? landShare : id === 'S1_sea' ? seaShare : 1;
+      if (!(U >= FLOW_MIN_U) || !(share > 0)) {
+        cands.push(silentBed(id, variant));
         continue;
       }
-      const hiss = id === 'S2' || id === 'S3';
-      if (hiss) {
+      if (id === 'S2' || id === 'S3') {
         trueDb = L_REF.wind + L_REF.hissRel + 3 * db(U / U_E_REF) + db(at.rho / at.c / (E.rho / E.c));
         if (id === 'S3') trueDb += db(Math.max(f.exposure, 0));
         playbackRate = Math.max(0.7, Math.min(1.4, U / Math.max(Uref, 1e-6)));
+      } else if (id === 'S12') {
+        // §11.3 flow noise against Earth at the same reference wind (blue F6); I_u as baked (GAS_IU).
+        const Iu = spec?.params.Iu ?? GAS_IU;
+        trueDb = L_REF.gas + 2 * db(U / U_E_REF) + db(at.rho / E.rho) + db(Iu / IU_LAND);
       } else {
-        const ref = id === 'S12' ? Math.max(Uref, 1e-6) : U_E_REF;
-        const Lref = id === 'S12' ? L_REF.gas : L_REF.wind;
-        trueDb = Lref + 2 * db(U / ref) + db(at.rho / E.rho) + db(f.wind.Iu / IU_LAND);
-        if (id === 'S1_land') trueDb += 10 * Math.log10(Math.max(landW / tot, 1e-12));
-        if (id === 'S1_sea') trueDb += 10 * Math.log10(Math.max(seaW / tot, 1e-12));
+        trueDb = L_REF.wind + 2 * db(U / U_E_REF) + db(at.rho / E.rho) + db(f.wind.Iu / IU_LAND) + 10 * Math.log10(share);
       }
     }
     if (!Number.isFinite(trueDb)) {
-      beds.push(silentBed(id, variant));
+      cands.push(silentBed(id, variant));
       continue;
     }
-    beds.push({ id, variant, trueDb, gainDb: stageGainDb(trueDb, G), lowpassHz: lp, shelfDb, pan, playbackRate, harmonic: isHarmonicBed(id) });
+    cands.push({ bed: { id, variant, trueDb, gainDb: SILENT_DB, lowpassHz: lp, shelfDb, pan, playbackRate, harmonic: isHarmonicBed(id) }, G });
   }
 
+  const live = cands.filter((c): c is Cand => 'bed' in c);
+  const loudest = live.reduce((m, c) => Math.max(m, c.bed.trueDb), -Infinity);
+  const beds = cands.map((c) => {
+    if (!('bed' in c)) return c;
+    if (c.bed.trueDb < loudest - PRESENCE_RANGE_DB) return silentBed(c.bed.id, c.bed.variant);
+    return { ...c.bed, gainDb: stageGainDb(c.bed.trueDb, c.G) };
+  });
+
+  // The caption's true-level note follows the offset of the loudest present bed (ground or flow, R10).
+  const top = live.find((c) => c.bed.trueDb === loudest);
   const frame: MixFrame = {
     beds,
-    presentOffsetDb: G,
+    presentOffsetDb: top ? top.G : Gground,
     silent,
     caption: { line: '', heard: [], levelNote: null, silentReason: null },
   };

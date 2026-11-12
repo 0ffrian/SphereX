@@ -15,6 +15,8 @@ export interface FakeEngineInit {
   state?: Partial<{ Ps: number; fluid: FluidKey; gas: boolean; locked: boolean }>;
   climate?: unknown;
   hydro?: unknown;
+  /** Cyclones present (weatherFields), for the R9 hurricane gate. */
+  cyclones?: number;
 }
 
 /** Engine model of the `earth` calibration preset (values of the order core.js worldModel gives; test inputs). */
@@ -35,7 +37,13 @@ export function makeFakeEngine(init: FakeEngineInit = {}): WorldEngineLike {
       climate: init.climate === undefined ? { stats: { ocean: 0.71, max: 295 } } : init.climate,
       hydro: init.hydro === undefined ? { n: 12, lava: false } : init.hydro,
     }),
-    weatherFields: () => null,
+    weatherFields: () =>
+      init.cyclones
+        ? {
+            NX: 1, NY: 1, iceH: new Float32Array(1), snow: new Float32Array(1), out: new Float32Array(4), out2: new Float32Array(4),
+            cyclones: Array.from({ length: init.cyclones }, () => ({ lon: 0, lat: 0.3, r: 0.05, s: 1 })),
+          }
+        : null,
     gasField: () => null,
     groundKm: () => 0,
     flyCameraBasis: () => null,

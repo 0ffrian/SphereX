@@ -7,7 +7,7 @@ import type { AirModel, BedSpec, Place, PlaceSample, Refusal, SourceId } from '.
 import {
   A_L, A_P, A_T, A_W, BED_N, BED_RATE, CRUST_WEIGHT, HISS_D_M, IU_LAND, IU_SEA, L_REF, PM_H, PM_T, RE_MIN, RIVER_Q_REF,
   ROSHKO_A, ROSHKO_B, ROSHKO_RE_MAX, SAND_A, SAND_CO2_COHESION, SAND_DP, SAND_RHO_ORGANIC, SAND_RHO_SILICATE,
-  SAND_U10_PER_USTAR, SPEEDUP, ST_HIGH, SURF_DB_H04, SURF_DB_H2, THUNDER_VARIANT_D_M, U_E_REF, U_REF_MIN,
+  SAND_U10_PER_USTAR, SPEEDUP, GAS_IU, ST_HIGH, SURF_DB_H04, SURF_DB_H2, THUNDER_VARIANT_D_M, U_E_REF, U_REF_MIN,
   U_WAVE_METHANE, U_WAVE_WATER, WHISTLE_D_M, WHITECAP_A, WHITECAP_B, WHITECAP_MIN_U, WHITECAP_RATE0, WHITECAP_RATE_U,
 } from './tuning';
 import { lightningRule, thunderParams } from './weather';
@@ -135,8 +135,9 @@ export function gates(air: AirModel, Uref: number): Record<SourceId, Gate> {
   const allThin = rocky && !hiss && !whistle;
   const surface = rocky && !air.lavaWorld && !!air.liquid && !air.liquid.viscous;
   const maxA = air.locked && !air.res32 ? A_L : Math.max(A_T, A_W, A_P);
-  // ASSUMPTION: "U10_max" = the largest of the bake wind, the strongest pattern wind with full hill speed-up, and Vmax.
-  const U10max = Math.max(Uref, air.Us * maxA * (1 + SPEEDUP), air.Vmax ?? 0);
+  // ASSUMPTION: "U10_max" = the larger of the bake wind and the strongest pattern wind with full hill speed-up
+  // (hurricanes are transient and excluded, red review 7).
+  const U10max = Math.max(Uref, air.Us * maxA * (1 + SPEEDUP));
   const rule = lightningRule(air, air.presetId);
   return {
     S1_land: ok(rocky),
@@ -146,7 +147,7 @@ export function gates(air: AirModel, Uref: number): Record<SourceId, Gate> {
     S4: ok(seaOK(air) && !refusedBy(air, 'S4') && Uref >= uWave(air), seaOK(air) ? SOURCE_TEXT.noWaves : null),
     S5: ok(seaOK(air) && !refusedBy(air, 'S5') && Uref >= uWave(air), seaOK(air) ? SOURCE_TEXT.noWaves : null),
     S6: ok(surface && !refusedBy(air, 'S6')),
-    S7: ok(surface && !refusedBy(air, 'S7') && air.oceanF > 0),
+    S7: ok(surface && !refusedBy(air, 'S7')),
     S8: ok(air.airOK && air.lavaWorld),
     S9: ok(rocky && air.Vmax !== null),
     S10: ok(rocky && U10max >= uSand(air), rocky ? SOURCE_TEXT.noSand : null),
@@ -246,11 +247,15 @@ export function isHarmonicBed(id: SourceId): boolean {
   return id === 'S1_land' || id === 'S1_sea' || id === 'S8' || id === 'S12' || id === 'thunder';
 }
 
-/** The bake wind U_ref (§9.4). */
-export function bakeWind(air: AirModel, place: Place, id: SourceId): number {
+/**
+ * The bake wind U_ref (§9.4), one value per world (blue S1): max(Us, 2) on rocky worlds, m.U on gas giants, Vmax for
+ * S9. ASSUMPTION: the spec's "U10 at the place the close-up opened" would make the bake depend on the spawn point;
+ * the world's own surface scale keeps it deterministic per world (Q- proposal). levels.ts uses the same function.
+ */
+export function bakeWind(air: AirModel, id: SourceId): number {
   if (id === 'S9') return air.Vmax ?? 0;
   if (air.gas) return air.Uscale;
-  return Math.max(place.features.wind.U10, U_REF_MIN);
+  return Math.max(air.Us, U_REF_MIN);
 }
 
 function paramsFor(id: SourceId, variant: number, air: AirModel, place: Place, Uref: number): Record<string, number> | null {
@@ -299,7 +304,7 @@ function paramsFor(id: SourceId, variant: number, air: AirModel, place: Place, U
       return p;
     }
     case 'S12':
-      return {};
+      return { Iu: GAS_IU };
     case 'thunder': {
       const d = THUNDER_VARIANT_D_M[variant] as number;
       const t = thunderParams(air, d);
@@ -323,9 +328,9 @@ export function selectBeds(air: AirModel, place: Place): { beds: BedSpec[]; refu
   if (air.refusals.some((r) => r.source === 'all')) return { beds: [], refusals };
 
   const beds: BedSpec[] = [];
-  const g = gates(air, bakeWind(air, place, 'S1_land'));
+  const g = gates(air, bakeWind(air, 'S1_land'));
   for (const id of PRIORITY) {
-    const Uref = bakeWind(air, place, id);
+    const Uref = bakeWind(air, id);
     const gate = id === 'S9' ? gates(air, Uref).S9 : g[id];
     if (!gate.pass) {
       if (gate.reason) addRefusal({ source: id === 'thunder' ? 'lightning' : id, reason: gate.reason });
