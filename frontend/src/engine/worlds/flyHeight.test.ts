@@ -344,12 +344,12 @@ describe('flyHeight: GPU parity (fixture recorded with scripts/engine-bench/flyh
       expect(rms(err)).toBeLessThanOrEqual(0.01);
       expect(maxAbs(err)).toBeLessThanOrEqual(0.05);
     };
-    // Q-434 (coordinator ruling, 12 Nov 2026): filter error RMS <= 0.01 km and max <= 0.05 km. The GPU's 9-tap
+    // Coordinator ruling (12 Nov 2026), to be recorded in Q-434 / R13.4 by #111/#121: filter error RMS <= 0.01 km and max <= 0.05 km. The GPU's 9-tap
     // Catmull-Rom (hardware-filtered half-float taps) differs from the exact 16-tap sum by up to 0.030 km on t1f+card's
     // steep texels (RMS 0.0047; RTX 4060 Ti, ANGLE D3D11). The nearest place sample is at least 500 m away
     // (R = clamp(4z + 2, 2, 400) km, inner ring 0.25 R), so a 30 m height difference cannot flip a sample's class audibly.
     it(
-      `filter parity ${w.world} hq=${w.hq}: RMS <= 0.01 km, max <= 0.05 km (Q-434)`,
+      `filter parity ${w.world} hq=${w.hq}: RMS <= 0.01 km, max <= 0.05 km (coordinator ruling 12 Nov, for Q-434)`,
       filterBar,
       30000,
     );

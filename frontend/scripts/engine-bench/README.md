@@ -74,6 +74,17 @@ Issue #93 regression fix (mountain heights):
   the luminance's high-pass part, and keeps each picture as a PNG data URL in `__out.png` for the driver to save. The
   metric is dominated by fine detail; compare the pictures for the mountains themselves.
 
+Issue #93 wave 2 (the planet simulation, F4, 1.9, 1.10; Q-385):
+
+- `sim.html?id=t1f&runs=ref,own,shared,worker`: a globe engine forms a world, then a fly engine opens on it and both
+  run, for each variant in turn (`ref` = an older engine from `/.bench-ref/worlds-base/`, each view with its own
+  simulation; `own`, `shared`, `worker` as `?sim=` in the app). Reports the time to form the globe and the fly view,
+  and per phase (forming, globe, both) the longest main-thread task, the 95th percentile frame callback, the frame
+  rate and the simulation tick on the main thread. `play` (s per phase), `w`, `h` (globe CSS size).
+- `simshots.html?id=t1f&runs=ref,worker`: pictures of the globe and the fly view while the world forms and once it has
+  formed, per variant, with the app's "Forming the planet…" cover; `__out.png` (save with `run.js --save DIR`) and
+  `__out.times`.
+
 Examples:
 
 ```sh

@@ -25,6 +25,15 @@ export interface SpectrumSample {
   pitch: number;
 }
 
+/** One usable point after the merge (R13.12 chord bins use points, never interpolated samples, Q-446). */
+export interface MappedPoint {
+  wavelengthUm: number;
+  /** Flux ÷ the largest usable flux (may be negative or 0 for a non-positive flux; not clamped). */
+  strength: number;
+  /** σ/flux: NaN when there is no finite positive σ; +Infinity when flux ≤ 0 with a σ. */
+  sigmaRatio: number;
+}
+
 export interface SpectrumMapping {
   /** No usable point (none left, or no positive flux): nothing can be felt or heard. */
   readonly empty: boolean;
@@ -38,6 +47,15 @@ export interface SpectrumMapping {
    * object in a pointermove handler.
    */
   sampleAt(lambdaUm: number, out?: SpectrumSample): SpectrumSample | null;
+  /** The usable points (flagged and non-finite dropped, equal λ merged), sorted by λ; [] when empty. */
+  points(): readonly MappedPoint[];
+}
+
+/** σ/flux of one point: NaN without a finite positive σ, +Infinity when flux ≤ 0 with a σ. */
+export function sigmaRatio(flux: number, error: number): number {
+  if (!Number.isFinite(error) || error <= 0) return NaN;
+  if (!(flux > 0)) return Infinity;
+  return error / flux;
 }
 
 export function isNoisy(flux: number, error: number): boolean {
@@ -95,12 +113,19 @@ export function buildSpectrumMapping(points: readonly SpectrumMappingPoint[]): S
   const lambda = new Float64Array(n);
   const norm = new Float64Array(n);
   const noisy = new Uint8Array(n);
+  const mapped: MappedPoint[] = [];
   for (let i = 0; i < n; i++) {
     const p = usable[i]!;
     lambda[i] = p.wavelength_um;
     norm[i] = Math.max(0, p.flux / maxFlux);
     noisy[i] = isNoisy(p.flux, p.error) ? 1 : 0;
+    mapped.push({
+      wavelengthUm: p.wavelength_um,
+      strength: p.flux / maxFlux,
+      sigmaRatio: sigmaRatio(p.flux, p.error),
+    });
   }
+  Object.freeze(mapped);
   const lambdaMinUm = n > 0 ? lambda[0]! : NaN;
   const lambdaMaxUm = n > 0 ? lambda[n - 1]! : NaN;
 
@@ -130,5 +155,5 @@ export function buildSpectrumMapping(points: readonly SpectrumMappingPoint[]): S
     return s;
   }
 
-  return { empty, lambdaMinUm, lambdaMaxUm, count: n, sampleAt };
+  return { empty, lambdaMinUm, lambdaMaxUm, count: n, sampleAt, points: () => mapped };
 }
