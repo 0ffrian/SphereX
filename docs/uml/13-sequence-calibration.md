@@ -1,5 +1,7 @@
 # 13 Sequence: first-use haptic calibration
 
+> **Cut by D-39 (12 Nov 2026).** Haptics and vibration calibration are deleted; this diagram is history only.
+
 The first-use calibration that sets the faintest pulse, the number of strength levels a person can tell apart, and the audio–vibration offset, stored per device. Drawn from rendering doc §8.7 and decisions D-09 and D-10, as built in issue #10 (`frontend/src/haptics/calibration.ts`, `haptics/ui/CalibrationWizard.tsx`). The tap-along method is Q-75 **[verify on phones]**.
 
 > **After the event (Q-132).** The event build runs on the A15 laptop with sound only, so this whole flow (vibration levels and the audio-vibration offset) applies only once phones are supported. At the event the settings are only sound on/off and volume ([R8.7](../rendering/haptics/calibration.md#r87-calibration-and-settings)).

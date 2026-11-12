@@ -4,7 +4,7 @@
 
 ## R12. Open items [verify]
 
-Every **[verify]** marker in the rendering spec has one row here. Numbers 1–18 never change, because code cites "R12 #n"; new items are appended. **When:** "event" items are checked on the A15 before 14 Nov; "after" items wait for phones and vibration (Q-132). Owners follow D-17: Moon for the viewer, Kevin for card values, Atish for the baker, classify and haptics and sound. A constant still marked [verify] may be used only under the Q-110 policy (proposed; upheld by Atish in Q-119): at tier 4 or 5, or at tier 3 once checked against a cited source.
+Every **[verify]** marker in the rendering spec has one row here. Numbers 1–18 never change, because code cites "R12 #n"; new items are appended. **When:** "event" items are checked on the A15 before 14 Nov; "after" items wait for phones and vibration (Q-132). Owners follow D-17: Moon for the viewer, Kevin for card values, Atish for the baker, classify and sound (haptics cut, D-39). Rows 7, 8 and 9 are moot after D-39. A constant still marked [verify] may be used only under the Q-110 policy (proposed; upheld by Atish in Q-119): at tier 4 or 5, or at tier 3 once checked against a cited source.
 
 | # | Item | Fragment | Owner | When | Resolved by |
 |---|---|---|---|---|---|
@@ -58,5 +58,16 @@ Every **[verify]** marker in the rendering spec has one row here. Numbers 1–18
 | 48 | Millibar rock-vapour atmospheres of lava worlds (Schaefer and Fegley 2009; Ito et al. 2015), the ground for the lava-world rule (Q-330) | R7.7 | Moon | event | the two papers |
 | 49 | Procyon A's radius 2.048 ± 0.025 R☉: the exact table in Kervella et al. 2004, A&A 413, 251 (Q-336) | R7.5 | Kevin | event | the paper's table |
 | 50 | Haser constants for water: v = 0.85 r_h^−0.5 km/s (Cochran and Schleicher 1993) and τ = 8.3 × 10⁴ s × r_h² (Huebner, Keady and Lyon 1992) (Q-333) | R7.3 | Moon | event | the two papers |
+| 51 | Liquids table: methane, N₂, CO₂ and ammonia-water densities and surface tensions (NIST); basalt density | R13.3 | Atish | event | NIST tables |
+| 52 | γ for water vapour and H₂/He at 100–170 K; H₂/He transport properties | R13.3 | Atish | event | cited tables |
+| 53 | CO₂ absorption between Mars and Venus (Gillier et al. 2024 table; Petculescu 2016) | R13.3 | Atish | event | the two papers |
+| 54 | Wave threshold over water; viscosity scaling of `U_wave` | R13.5 | Atish | event | a cited source |
+| 55 | Gust factors and integral time; hill speed-up (Jackson & Hunt 1975) | R13.4 | Atish | event | the papers |
+| 56 | Bolin & Åbom surf spectrum shape (paywalled) | R13.5 | Atish | event | the paper |
+| 57 | Mars saltation cohesion factor | R13.5 | Atish | event | a cited source |
+| 58 | Nystuen rain-rate coefficients (if used for finer rain levels); Titan raindrop size spread 4.75 to 6.6 mm (Appendix D R3) | R13.5 | Atish | event | the papers |
+| 59 | Whether `hM` (lava sea height) is reachable from the `WorldEngine` wrapper | R13.4 | Atish | event | reading the engine |
+| 60 | Bake time and memory on the A15 (measured) | R13.7 | Atish | event | a timing log on the A15 |
+| 61 | Harmonic branch (+18 dB drive, tanh(3x), −12 dB mix) heard through the A15 speakers and the venue PA; the 35 Hz ambience high-pass and the −3 dB limiter by ear | R13.9 | Atish | event | a listening check with `sound-check.html` (#116) |
 
 **Removed (resolved):** the "name [verify]" markers on `viewer/renderers/ShaderBody.ts` and `viewer/fields/fieldWorker.ts` (both files exist), and the self-signed certificate step for phones (moot for the event, Q-132; R11.3 keeps the phone procedure for after the event).

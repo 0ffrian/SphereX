@@ -2,6 +2,8 @@
 
 > **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.5, R8.6 · **Implements:** [D-12, D-20, Q-37, Q-78 to Q-82, Q-86](../../decisions/haptics-design.md), [Q-133](../../decisions/haptics-sound.md), [Q-76, Q-77, Q-83](../../decisions/haptics-built.md), [Q-103](../../decisions/rendering-kinds.md), [D-21](../../decisions/contract-tags.md) · **Read with:** [sources.md](sources.md) (R8.4), [audio-pairing.md](audio-pairing.md) (R8.9), [engine-api.md](engine-api.md) (R8.8)
 
+> **D-39 (12 Nov 2026), haptics cut:** the per-type touch profiles (R8.5) and the spectrum haptics pad (R8.6) are cut. **Still live:** R8.6's spectrum mapping rules as the Listen sweep uses them (quiet below 0.2 of the peak, noisy above σ/flux 0.3, pitch from λ, now long λ = low, [Q-430](../../decisions/sound-ambience.md)). See [D-39](../../decisions/sound-ambience.md).
+
 ### R8.5 Per-type haptic profile
 
 "Texture" is the body interaction: at the event, the body tone (R8.9.1, Q-133) plus the cues named; after the event, the ticks named also vibrate (**Proposed (Q-192)**).
