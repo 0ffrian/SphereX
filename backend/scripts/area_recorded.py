@@ -36,7 +36,7 @@ from app.core.area.dots import run_dots
 from app.core.area.frames import CutoutPlan, assemble
 from app.core.area.records import AreaFrames, FrameDots
 from app.core.find.stars import TRACK_CONE_FORMULA, StarCone
-from app.timefmt import parse_utc
+from app.timefmt import iso_utc_z, parse_utc
 
 FIXTURE_CACHE = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "cache"
 
@@ -78,6 +78,17 @@ def recorded_sia() -> tuple[list[SiaRow], list[str]]:
     return list(rows.values()), digests
 
 
+def recorded_sia_fetched() -> list[str]:
+    """The ISO-Z ``fetched_at`` of the two Eros cones (``AreaFrames.sia_fetched``)."""
+    out = []
+    for ra, dec in EROS_CONES:
+        for meta, _ in entries("irsa_sia"):
+            q = meta["key"]["query"]
+            if (q["ra"], q["dec"]) == (ra, dec):
+                out.append(iso_utc_z(parse_utc(str(meta["fetched_at"]))))
+    return out
+
+
 @lru_cache(maxsize=1)
 def recorded_cutouts() -> dict[str, tuple[str, bytes]]:
     """Frame id -> (cache key digest, body) of every recorded cutout (memoised; do not mutate)."""
@@ -102,7 +113,10 @@ def recorded_fetch(row: SiaRow, plan: CutoutPlan) -> tuple[str, bytes]:
 @lru_cache(maxsize=2)
 def _built(cfg: AreaConfig) -> tuple[AreaFrames, dict[str, bytes]]:
     rows, digests = recorded_sia()
-    return assemble(EROS_AREA, rows, recorded_fetch, cfg, workers=1, sia_digests=digests, n_cones=2)
+    return assemble(
+        EROS_AREA, rows, recorded_fetch, cfg, workers=1, sia_digests=digests,
+        sia_fetched=recorded_sia_fetched(), n_cones=2,
+    )  # fmt: skip
 
 
 def recorded_frames(
