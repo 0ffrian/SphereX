@@ -275,8 +275,9 @@ export function samplePlace(
   const w = worldFor(e, air, c);
   const ctx = w.ctx;
   // The engine may swap its EB arrays (T, rain, out, out2) for a shared source's between ticks (#93 simulation merge),
-  // so no EB array reference is kept across calls: the weather is re-read here and the cached height ctx gets the
-  // current EB.out (the magma-sea T) before any height is computed.
+  // so no EB array reference is kept across calls: the weather is re-read here, and the cached height ctx gets the
+  // current EB.out (the magma-sea T) for every height computed from now on. Heights reused from an earlier call (below)
+  // keep the magma level of that call until the next resample; the magma T changes slowly, so this is accepted.
   const wf = e.weatherFields();
   ctx.ebOut = wf ? wf.out : null;
   ctx.ebNX = wf ? wf.NX : 0;
@@ -356,18 +357,25 @@ function heightsFor(
   head: number,
   frac: number,
 ): Heights {
+  // ASSUMPTION (red 9): flyCamera puts the eye at ex * groundKm (the nearest raw cell) + alt above the radius, and the
+  // drawn surface is at ex * hKm, so the eye's gap above the drawn ground is alt + ex * (groundKm - hKm).
+  const zOf = (hc: number): number =>
+    Math.max(e.fly.alt + FLY_EX_ROCKY * (e.groundKm(lon, lat) - hc), D_MIN_M / 1000);
   const p = c.heights;
   if (p && p.world === w && frac > 0) {
+    // z (so R and the rings) follows fly.alt on every call (PR #122 review 1): reuse only while R and the foot point
+    // both stay within frac of R and the heading within 1 degree.
+    const z = zOf(p.hs[0]!);
+    const R = reachKm(z);
     const moved = angDist(lon, lat, p.lon, p.lat) * air.R_km;
     const turn = Math.abs(((((head - p.head + Math.PI) % TAU) + TAU) % TAU) - Math.PI);
-    if (moved < frac * p.R && turn < REUSE_HEAD_RAD) return p;
+    if (Math.abs(R - p.R) < frac * p.R && moved < frac * p.R && turn < REUSE_HEAD_RAD)
+      return { ...p, z };
   }
   const ctx = w.ctx;
   const { up } = localFrame(lon, lat);
   const hc = hKm(up, ctx);
-  // ASSUMPTION (red 9): flyCamera puts the eye at ex * groundKm (the nearest raw cell) + alt above the radius, and the
-  // drawn surface is at ex * hKm, so the eye's gap above the drawn ground is alt + ex * (groundKm - hKm).
-  const z = Math.max(e.fly.alt + FLY_EX_ROCKY * (e.groundKm(lon, lat) - hc), D_MIN_M / 1000);
+  const z = zOf(hc);
   const R = reachKm(z);
   const geo = ringGeometry(lon, lat, head, R, air.R_km);
   const hs = geo.map((g, n) => (n === 0 ? hc : hKm(g.dir, ctx)));
@@ -635,9 +643,10 @@ function gasPlace(
     const prof = gasProfile(m, { id: air.presetId, seed: air.seed, locked: air.locked }) as {
       u: (lat: number) => number;
     };
-    c.prof = { key: pkey, air, U: Number(m.U ?? 0), u: prof.u };
+    // refuse rather than invent: no model wind scale gives jetU null (windAt then reports no wind), never 0
+    c.prof = { key: pkey, air, U: Number.isFinite(m.U) ? Number(m.U) : NaN, u: prof.u };
   }
-  const jetU = c.prof.U * c.prof.u(lat);
+  const jetU = Number.isFinite(c.prof.U) ? c.prof.U * c.prof.u(lat) : null;
   const cnvG = clamp(stormNear, 0, 1);
   const ctxW: WindCtx = {
     exposure: 0,
