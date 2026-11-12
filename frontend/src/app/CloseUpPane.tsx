@@ -93,12 +93,15 @@ export function CloseUpPane() {
   // Q-420: the pane springs in first and its engine starts a couple of frames later, so starting the
   // engine (a new WebGL context, shaders) never holds up the first frames of the slide. On close the
   // picture stays until the fade has finished.
-  const [live, setLive] = useState(false);
+  // `live` names the stage that is mounted, so a new object's stage never starts while the pane is closed.
+  const stageKey = world ? `world:${world.preset.id}` : engine ? `star:${engine.preset.id}` : `kind:${kind ?? ''}`;
+  const [liveKey, setLiveKey] = useState<string | null>(null);
   useEffect(() => {
-    if (open) return deferFrames(() => setLive(true));
-    const id = window.setTimeout(() => setLive(false), 700);
+    if (open) return deferFrames(() => setLiveKey(stageKey));
+    const id = window.setTimeout(() => setLiveKey(null), 700);
     return () => window.clearTimeout(id);
-  }, [open]);
+  }, [open, stageKey]);
+  const live = liveKey === stageKey;
   const rootRef = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(open);
   useLayoutEffect(() => {
@@ -117,14 +120,25 @@ export function CloseUpPane() {
     // On a phone the pane is the top of the screen: it fades, it does not slide in from the left.
     const phone = window.matchMedia?.('(max-width: 640px)').matches ?? false;
     const away = 'translateX(-48px) scale(0.98)';
+    const here = 'translateX(0px) scale(1)';
+    // Start from where the pane is now: the inline values a stopped animation left, else the state
+    // it was in before the class changed (the stylesheet already shows the new state).
+    const fromOpacity = el.style.opacity !== '' ? Number(el.style.opacity) : open ? 0 : 1;
+    const fromTransform = el.style.transform || (open ? away : here);
     const a = open
-      ? animate(el, phone ? { opacity: [0, 1] } : { opacity: [0, 1], transform: [away, 'translateX(0px) scale(1)'] }, EXPLORE_SPRING)
-      : animate(el, phone ? { opacity: 0 } : { opacity: 0, transform: away }, { duration: 0.35, ease: [0.4, 0, 1, 1] });
+      ? animate(
+          el,
+          phone ? { opacity: [fromOpacity, 1] } : { opacity: [fromOpacity, 1], transform: [fromTransform, here] },
+          EXPLORE_SPRING,
+        )
+      : animate(
+          el,
+          phone ? { opacity: [fromOpacity, 0] } : { opacity: [fromOpacity, 0], transform: [fromTransform, away] },
+          { duration: 0.35, ease: [0.4, 0, 1, 1] },
+        );
     void a.finished.then(settle, () => {});
-    return () => {
-      a.stop();
-      settle();
-    };
+    // Stopped by the next change: its values stay inline for the next animation to start from.
+    return () => a.stop();
   }, [open]);
   const [about, setAbout] = useState(false);
   const focusRef = useRef<HTMLDivElement>(null);

@@ -4,7 +4,7 @@
 
 ### R8.9 Audio pairing (D-10)
 
-> **Changed by [Q-416](../../decisions/shell-surfaces.md) (PR #104):** the build pane's Hear it panel (`build/HearPanel.tsx`) plays **Atmosphere** (brown noise filtered by surface pressure, gusts by the wind level, a faint howl tied to the sound speed; tagged `artistic`) and a **spectrum sweep** (the measured spectrum as pitch, 880 Hz at the short end to 110 Hz at the long end, loudness from the flux). Gaps against this section until Atish wires it after merge: `build/hearAudio.ts` makes its own `AudioContext` with a 0.9 master gain and no limiter, not the shared bus and limiter. Feel it is gone from the panel (haptics dropped).
+> **Changed by [Q-416](../../decisions/shell-surfaces.md) (PR #104):** the build pane's Hear it panel (`build/HearPanel.tsx`) plays **Atmosphere** (brown noise filtered by surface pressure, gusts by the wind level, a faint howl tied to the sound speed; tagged `artistic`) and a **spectrum sweep** (the measured spectrum as pitch, 880 Hz at the short end to 110 Hz at the long end, loudness from the flux). Gaps against this section until Atish wires it after merge: `build/hearAudio.ts` makes its own `AudioContext` with a 0.9 master gain and no limiter, not the shared bus and limiter. Feel it is gone from the panel (haptics dropped). **Since [Q-420](../../decisions/shell-surfaces.md) (PR #107)** the Hear it panel is dormant (not reachable from the build header); the header's Ambience toggle is the reachable path.
 
 At the event the audio driver is the only output (Q-132). After the event it plays **alongside** the vibration wherever there is vibration. Every `HapticEvent` goes to every driver in the engine. On iPhone, iPad and desktop it is always the only output.
 

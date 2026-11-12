@@ -4664,8 +4664,37 @@ body {
   .sx-player,
   .sx-coords,
   .sx-area-hint,
+  .sx-credit-btn,
+  .sx-sky-credit,
+  .sx-fps-btn,
+  .sx-fps-menu,
   .sx-orb {
     background: Canvas;
+    backdrop-filter: none;
+  }
+  /* Pressed toggles and the chosen speed keep a visible mark when backgrounds are forced. */
+  .sx-bp-tool[aria-pressed='true'],
+  .sx-fps-item[aria-checked='true'] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+/* The user asked for less transparency: the solid surfaces, no blur. */
+@media (prefers-reduced-transparency: reduce) {
+  .sx-panel,
+  .sx-panel[data-bare],
+  .sx-island,
+  .sx-fl,
+  .sx-player,
+  .sx-coords,
+  .sx-area-hint,
+  .sx-credit-btn,
+  .sx-sky-credit,
+  .sx-fps-btn,
+  .sx-fps-menu,
+  .sx-orb {
+    background: var(--s1);
+    -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
 }
@@ -4744,12 +4773,10 @@ body {
   gap: 4px;
   font-size: 11px;
   line-height: 15px;
-  opacity: 0.75;
 }
 .sx-credit-tech {
   font-family: var(--font-mono);
   font-size: 10.5px;
-  opacity: 0.7;
 }
 
 /* The frame-rate menu after the player (FrameRate.tsx): a square glass button as tall as the player,
@@ -4782,7 +4809,8 @@ body {
 .sx-fps-btn span {
   font-size: 10px;
   line-height: 11px;
-  color: var(--muted);
+  color: var(--fg);
+  opacity: 0.8;
 }
 .sx-fps-btn:not([aria-disabled='true']):hover,
 .sx-fps-btn[aria-expanded='true'] {
@@ -4829,5 +4857,52 @@ body {
   color: var(--fg);
 }
 .sx-fps-item[aria-checked='true'] {
+  color: var(--fg);
+}
+
+/* Small text on the glass keeps its contrast over the brightest sky (the Galactic plane, nebula
+   cores): a soft dark shadow under it (design review of PR #107; Q-418's open contrast check). */
+:is(.sx-sky-credit, .sx-fps-btn, .sx-fps-menu, .sx-player, .sx-fl, .sx-coords) {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+/* Phone: the speed menu opens to the left of its button (it sits near the right edge), its rows
+   are 44 px to tap, and the sky's info button is 44 px too. */
+@media (max-width: 640px), (pointer: coarse) {
+  .sx-fps-menu {
+    left: auto;
+    right: 0;
+    max-width: calc(100vw - 16px);
+    transform-origin: top right;
+    gap: 0;
+  }
+  .sx-fps-item {
+    height: 44px;
+  }
+}
+@media (max-width: 640px) {
+  .sx-credit-btn {
+    width: 44px;
+    height: 44px;
+  }
+  .sx-sky-credit {
+    bottom: 60px;
+  }
+}
+
+/* Why Ambience has nothing to play, shown for a few seconds after a tap on the dimmed button. */
+.sx-bp-hint {
+  position: absolute;
+  top: 64px;
+  right: 24px;
+  z-index: 6;
+  max-width: min(22rem, calc(100% - 48px));
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-edge);
+  background: var(--glass-grain), var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  font-size: 12.5px;
+  line-height: 18px;
   color: var(--fg);
 }

@@ -156,8 +156,19 @@ export function BuildPane() {
   // Shown only where an atmosphere sound is possible (same refusal rules as the Hear it panel).
   const atmo = useMemo(() => atmosphereOf(card), [card]);
   const atmoOn = useAmbienceStore((s) => s.ambience && s.playing && s.key === (card?.id ?? ''));
+  // A tap on the dimmed Ambience says why there is nothing to hear (a touch screen shows no title).
+  const [atmoHint, setAtmoHint] = useState(false);
+  useEffect(() => {
+    if (!atmoHint) return;
+    const id = window.setTimeout(() => setAtmoHint(false), 4000);
+    return () => window.clearTimeout(id);
+  }, [atmoHint]);
   const toggleAtmo = (): void => {
-    if (!atmo.ok || !card) return;
+    if (!atmo.ok) {
+      setAtmoHint(true);
+      return;
+    }
+    if (!card) return;
     useAmbienceStore.getState().setAmbience(!atmoOn, atmo.model, card.id);
   };
   const renderPop = (b: (typeof POP_BUTTONS)[number]) => (
@@ -341,6 +352,11 @@ export function BuildPane() {
             </button>
           </div>
         </header>
+        {atmoHint && !atmo.ok && (
+          <p className="sx-bp-hint" role="status" data-testid="build-ambience-hint">
+            {atmo.line}
+          </p>
+        )}
         {bodyHere?.status === 'loading' ? (
           <div className="sx-bp-msg" data-testid="build-generating">
             <StatePill look={GENERATING_LOOK} word="Generating" />

@@ -10,15 +10,14 @@ export interface MouldLiveState {
   forming: boolean;
   /** Set while the animation drives the strip itself (a ready body's short show or the finish). */
   override: readonly number[] | null;
-  /**
-   * Set when the mould show has played its last step (Colour) and starts to fade (Q-421). The
-   * show is the one clock for the strip: the real build ends on it instead of staging on afterwards
-   * (which sent the strip back from Colour to Spots).
-   */
   /** The build now running (bumped by useMould at each start); a show remembers the one it covered. */
   buildSeq: number;
   startBuild(): number;
-  /** The build whose show has finished; only that build ends on it (never a later one). */
+  /**
+   * The build whose mould show has played its last step (Colour) and started to fade (Q-421). The
+   * show is the one clock for the strip: that build ends on it instead of staging on afterwards
+   * (which sent the strip back from Colour to Spots). Never a later build.
+   */
   shownFor: number;
   markShown(build: number): void;
   setOverride(p: readonly number[] | null): void;

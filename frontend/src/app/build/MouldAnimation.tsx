@@ -224,7 +224,7 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
   const [rushMs, setRushMs] = useState(CACHED_SHOW_MS);
   const [visible, setVisible] = useState(true);
   const startedAt = useRef(0);
-  /** The build this show covers (mouldLive.buildSeq when it came on); its end finishes only that build. */
+  /** The build this show covers; its end finishes only that build (-1: none). */
   const coveredBuild = useRef(-1);
   const stepsRef = useRef(steps);
   useEffect(() => {
@@ -245,6 +245,17 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
     idRef.current = id;
   });
   useEffect(() => clear, []);
+  // Which build this show covers. A build that starts while the show is on (the usual case: the
+  // pane opens, the show comes on while the viewer loads, then the build starts) is the one it
+  // covers. A build that starts once the show is already finishing (a Replay during the rush) is
+  // not: that show then covers no build, so its end cannot finish the new one early.
+  useEffect(
+    () =>
+      useMouldLive.subscribe((s, prev) => {
+        if (s.buildSeq !== prev.buildSeq) coveredBuild.current = stageRef.current === 'on' ? s.buildSeq : -1;
+      }),
+    [],
+  );
 
   useEffect(() => {
     const now = performance.now();
