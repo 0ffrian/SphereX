@@ -4155,12 +4155,17 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 16px;
+  /* The icon sits a little closer to the round end than the text does to the other (optical). */
+  padding: 8px 18px 8px 12px;
   border: 0;
   background: transparent;
   color: #fff;
   cursor: pointer;
   border-radius: 9999px;
+}
+/* The pill's button carries its own padding: the island's wrapper adds none, so it is not padded twice. */
+.sx-orb-in:has(> .sx-orb-mini) {
+  padding: 0;
 }
 .sx-orb-mini:focus-visible {
   outline: 2px solid var(--accent);

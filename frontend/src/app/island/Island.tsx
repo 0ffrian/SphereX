@@ -199,7 +199,7 @@ export function Island() {
       top: bezelH - pill.h - 16,
       width: pill.w,
       height: pill.h,
-      radius: Math.min(pill.h / 2, 24),
+      radius: pill.h / 2, // a true pill: fully round ends at any height
     };
   else if (corner)
     box = {
@@ -215,7 +215,7 @@ export function Island() {
       top,
       width: pill.w,
       height: pill.h,
-      radius: Math.min(pill.h / 2, 24),
+      radius: pill.h / 2, // a true pill: fully round ends at any height
     };
   else
     box = {
