@@ -38,6 +38,7 @@ from app.core.measure.config import (
     DEFAULT_CONFIG,
     MEASURE_VERSION,
     MeasureConfig,
+    config_for,
     method_dict,
     method_sha,
 )
@@ -145,7 +146,11 @@ def spectrum_key(release: str, object_id: str, frames_sha: str, cfg: MeasureConf
 
 def _point(f: FrameRecord, m: Measurement) -> tuple[dict[str, Any], dict[str, Any]]:
     reasons = sorted(
-        {*m.dropped_flags, *([NO_PROPER_MOTION] if NO_PROPER_MOTION in f.flags else [])}
+        {
+            *m.dropped_flags,
+            *(f"{n.lower()}_core" for n in m.core_flagged),  # outlier_core (Q-139)
+            *([NO_PROPER_MOTION] if NO_PROPER_MOTION in f.flags else []),
+        }
     )
     flagged = bool(reasons)
     spec = {
@@ -195,6 +200,7 @@ class SpectrumService:
         cutouts landed (issue #41), by frame id. Frames are measured in the pool when one is set,
         and the points are put in frame order afterwards, so finishing order never matters."""
         fr = frames if frames is not None else self.frames.get_frames(obj)
+        cfg = config_for(obj.moving, self.cfg)  # Q-139: OUTLIER on a mover's core is a flag
         release = self.ctx.settings.data_release
         complete = is_complete(fr.missing)
 
@@ -207,7 +213,7 @@ class SpectrumService:
                 if meta is not None and isinstance(meta.get("body_sha256"), str):
                     meta_shas[f.frame_id] = meta["body_sha256"]
             if len(meta_shas) == len(fr.frames):
-                key = spectrum_key(release, obj.id, frames_digest(fr, meta_shas), self.cfg)
+                key = spectrum_key(release, obj.id, frames_digest(fr, meta_shas), cfg)
                 hit = self.ctx.cache.get(key)
                 if hit is not None:
                     doc = json.loads(hit.body)
@@ -237,14 +243,15 @@ class SpectrumService:
             ):
                 pending[f.frame_id] = pre.future
             elif self.pool is not None:
-                pending[f.frame_id] = self.pool.submit(entry.body, f.x_fits0, f.y_fits0, self.cfg)
+                pending[f.frame_id] = self.pool.submit(entry.body, f.x_fits0, f.y_fits0, cfg)
             else:
-                pending[f.frame_id] = self._measure(entry.body, f)  # one body in memory at a time
+                # one body in memory at a time
+                pending[f.frame_id] = self._measure(entry.body, f, cfg)
         for f in fr.frames:
             job = pending.get(f.frame_id)
             if job is None:
                 continue
-            result = self._outcome(job, f, shas[f.frame_id])
+            result = self._outcome(job, f, shas[f.frame_id], cfg)
             if isinstance(result, Refusal):
                 refusals[f.frame_id] = result.reason
                 continue
@@ -270,11 +277,11 @@ class SpectrumService:
             "tag": "measured",
             "missing": sorted(missing),
             "data_release": release,
-            "method": {**method_dict(self.cfg), "reject_flags_absent": sorted(absent)},
+            "method": {**method_dict(cfg), "reject_flags_absent": sorted(absent)},
             "provenance": provenance(),
         }
         if complete and CUTOUT not in refusals.values():
-            key = spectrum_key(release, obj.id, frames_digest(fr, shas), self.cfg)
+            key = spectrum_key(release, obj.id, frames_digest(fr, shas), cfg)
             # ASSUMPTION: when every source was fetched live in this request (frames cached_at
             # is null), the stored entry dates itself now.
             earliest = fr.cached_at or utc_now()
@@ -287,7 +294,9 @@ class SpectrumService:
             )
         return SpectrumResult(body, fr.cached_at, False, tuple(f.frame_id for f in fr.frames))
 
-    def _outcome(self, job: Future[Outcome] | Outcome, f: FrameRecord, sha: str) -> Outcome:
+    def _outcome(
+        self, job: Future[Outcome] | Outcome, f: FrameRecord, sha: str, cfg: MeasureConfig
+    ) -> Outcome:
         if not isinstance(job, Future):
             return job
         try:
@@ -298,15 +307,15 @@ class SpectrumService:
             if entry is None or entry.meta.get("body_sha256") != sha:
                 # Only the bytes whose SHA-256 goes into the key may be measured.
                 return Refusal(CUTOUT, "cutout changed or no longer cached")
-            return self._measure(entry.body, f)
+            return self._measure(entry.body, f, cfg)
 
-    def _measure(self, body: bytes, f: FrameRecord) -> Measurement | Refusal:
+    def _measure(self, body: bytes, f: FrameRecord, cfg: MeasureConfig) -> Measurement | Refusal:
         try:
             hdul = wcs.open_fits(body)
         except (OSError, ValueError) as exc:
             return Refusal("cutout_unreadable", f"unreadable FITS: {exc}")
         with hdul:
-            return measure_frame(hdul, f.x_fits0, f.y_fits0, self.cfg)
+            return measure_frame(hdul, f.x_fits0, f.y_fits0, cfg)
 
 
 def report_targets(service: SpectrumService, objects: list[tuple[str, ResolvedObject]]) -> int:
