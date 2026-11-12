@@ -55,6 +55,8 @@ class WarmCache:
         self.aliases = aliases
         self.queries = queries
         self.done: list[str] = []  # object ids warmed, in order (for tests and the log)
+        self.failed: list[str] = []  # queries not resolved or whose job failed (issue #103)
+        self._finished = threading.Event()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -69,6 +71,25 @@ class WarmCache:
         if self._thread is not None:
             self._thread.join(timeout)
 
+    @property
+    def state(self) -> str:
+        """``running``, ``finished`` (every query tried, some may have failed) or ``stopped``
+        (shut down before the end). ``idle`` before ``start``."""
+        if self._finished.is_set():
+            return "finished"
+        if self._stop.is_set():
+            return "stopped"
+        return "running" if self._thread is not None else "idle"
+
+    def status(self) -> dict[str, object]:
+        """The ``warm`` block of ``/v1/health`` (issue #103)."""
+        return {
+            "state": self.state,
+            "total": len(self.queries),
+            "done": len(self.done),
+            "failed": len(self.failed),
+        }
+
     def _run(self) -> None:
         log.info("warm cache: %d targets", len(self.queries))
         for q in self.queries:
@@ -78,17 +99,24 @@ class WarmCache:
                 obj = resolve(self.ctx, q, self.aliases).obj
             except Exception as exc:  # NotFound, BadQuery, an outage: skip this target
                 log.warning("warm cache: %r not resolved: %s", q, exc)
+                self.failed.append(q)
                 continue
             job = self.pipeline.ensure_job(obj)
+            ok = True
             while not self._stop.is_set():
                 try:
                     if job.wait_final(timeout=1.0) is not None:
                         break
                 except Exception as exc:  # the job failed; the next request will retry it
                     log.warning("warm cache: %r failed: %s", q, exc)
+                    ok = False
                     break
             else:
                 return
-            self.done.append(obj.id)
-            log.info("warm cache: %s ready", obj.id)
-        log.info("warm cache: finished")
+            if ok:
+                self.done.append(obj.id)
+                log.info("warm cache: %s ready", obj.id)
+            else:
+                self.failed.append(q)
+        self._finished.set()
+        log.info("warm cache: finished (%d ready, %d failed)", len(self.done), len(self.failed))
