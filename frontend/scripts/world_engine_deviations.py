@@ -88,13 +88,15 @@ CORE_L1736_93_3_6 = r'''// @deviation L1736 (#93 3.6) a runaway greenhouse no lo
 // the post-runaway state. Its surface temperature depends on the steam column: about 1,500 K under 50 bar of steam and
 // about 1,800 K under 260 bar (one Earth ocean), from the radiative-convective models of Boukrouche et al. 2021
 // (ApJ 919, 130) as quoted by Dorn and Lichtenberg 2021 (ApJL 922, L4). The engine takes the steam pressure to be
-// the surface pressure Ps and interpolates in ln P through those two points, extrapolated outside them [verify]:
-// model_dependent. When that is hotter than the grey-greenhouse Ts, Ts takes it and tau is set so the grey model
-// balances there (the energy budget sees both); the scale height follows Ts. ebStep holds each cell's outgoing
-// radiation at olrLim until the cell reaches Tpost.
+// the surface pressure Ps and interpolates in ln P between those two points [verify]: model_dependent. (#93 A1) It is
+// never extrapolated: below 50 bar the models give no post-runaway temperature, so Tpost stays null (the runaway verdict
+// and its haze stand, the grey-greenhouse Ts is kept, no lava); above 260 bar it is held at 1,800 K. When Tpost is
+// hotter than the grey-greenhouse Ts, Ts takes it and tau is set so the grey model balances there (the energy budget
+// sees both); the scale height follows Ts. ebStep holds each cell's outgoing radiation at olrLim until the cell
+// reaches Tpost, and skips that cap when Tpost is null.
   var RUNAWAY = { olrLim: 282, P1: 50, T1: 1500, P2: 260, T2: 1800 }, Tpost = null;
-  if (runaway) {
-    Tpost = RUNAWAY.T1 + (RUNAWAY.T2 - RUNAWAY.T1) * Math.log(Ps / RUNAWAY.P1) / Math.log(RUNAWAY.P2 / RUNAWAY.P1);
+  if (runaway && Ps >= RUNAWAY.P1) {
+    Tpost = RUNAWAY.T1 + (RUNAWAY.T2 - RUNAWAY.T1) * Math.log(Math.min(Ps, RUNAWAY.P2) / RUNAWAY.P1) / Math.log(RUNAWAY.P2 / RUNAWAY.P1);
     if (Tpost > Ts) { Ts = Tpost; tau = (Math.pow(Ts / Teq, 4) - 1) / 0.75; H = Rg * Ts / gv; } else Tpost = null;
   }
 // @end-deviation'''
@@ -128,9 +130,21 @@ CORE_L2446_93_3_3 = r'''// @deviation L2446 (#93 3.3) the ORB[p.id] rename below
 // @end-deviation'''
 
 CORE_L2425_93_1_8 = r'''// @deviation L2425 (#93 1.8) the gas solver runs at most 3 steps a frame, so a giant that needs more (HD 189733 b about
-// 4.7 at 60 fps) runs slower than one day per second. The caption then says the real rate (at 60 fps) instead of the
-// prototype's fixed "one Earth day".
-  if (gas && W.timeSec >= 1000 && GS && GS.dt) { var need93 = W.timeSec / 60 / (p.Rj * 71492e3 / Math.max(m.U, 1)) / GS.dt; if (need93 > 3) W.cap = W.cap.replace('One second here is one Earth day', 'One second here is about ' + fmt(86400 * 3 / need93 / 3600, 0) + ' hours (the simulation runs at most 3 steps a frame)'); }
+// 4.7 at 60 fps) runs slower than one day per second. The caption then says the real rate instead of the prototype's
+// fixed "one Earth day". (#93 A7) The rate is taken at the measured frame rate, 1 / W.dt93 (the tick's frame-time
+// average; 60 fps before the first gas frame): the solver needs W.timeSec / tu / GS.dt steps a second and gets at most
+// 3 x fps, so one second shows W.timeSec x supplied / required (24 h x supplied / required for one day a second).
+// Hours are rounded to 1 h below 10 h and to 2 h above, and the shown value changes only when the new one is 15 %
+// away from it, so the caption does not flicker as the frame rate wobbles (worldUi runs every 20 ticks).
+  if (gas && W.timeSec >= 1000 && GS && GS.dt) {
+    var fps93 = W.dt93 ? 1 / W.dt93 : 60, req93 = W.timeSec / (p.Rj * 71492e3 / Math.max(m.U, 1)) / GS.dt, sup93 = 3 * fps93;
+    if (req93 > sup93) {
+      var h93 = W.timeSec / 3600 * sup93 / req93; h93 = h93 < 10 ? Math.max(1, Math.round(h93)) : 2 * Math.round(h93 / 2);
+      if (W.capH93 && Math.abs(h93 - W.capH93) < 0.15 * W.capH93) h93 = W.capH93;
+      W.capH93 = h93;
+      W.cap = W.cap.replace('One second here is one Earth day', 'One second here is about ' + h93 + ' hours (the simulation runs at most 3 steps a frame, so this follows the frame rate)');
+    } else W.capH93 = 0;
+  }
 // @end-deviation'''
 
 GAS_89_REVIEW_7_8 = r'''// @deviation (#89 review 7, 8) the renames below:

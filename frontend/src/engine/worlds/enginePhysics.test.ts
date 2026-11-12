@@ -182,22 +182,45 @@ describe('#93 3.6 runaway greenhouse', () => {
     expect(runawayInsolationLimit(5780, 5)).toBeCloseTo(1.188, 12);
   });
 
-  it('K2-18 b runs away to a hot surface, not a temperate one, and the energy budget follows it', () => {
+  it('the post-runaway temperature is never extrapolated: none below 50 bar, held at 1,800 K above 260 (#93 A1)', () => {
+    expect(postRunawayTs(8)).toBeNull();
+    expect(postRunawayTs(49.9)).toBeNull();
+    expect(postRunawayTs(50)).toBeCloseTo(1500, 9);
+    expect(postRunawayTs(100)).toBeCloseTo(1500 + (300 * Math.log(2)) / Math.log(5.2), 9); // about 1626 K
+    expect(postRunawayTs(260)).toBeCloseTo(1800, 9);
+    expect(postRunawayTs(500)).toBeCloseTo(1800, 9);
+  });
+
+  it('K2-18 b at its 8 bar setting is past the runaway limit but keeps the approved 401 K surface, no lava (#93 A1)', () => {
     const core = headlessCore();
     core.setPreset(preset('k218'));
     const m = core.W.m;
     expect(m.runaway).toBe(true);
     expect(m.state).toBe('vapour');
     expect(m.olrLim).toBe(282);
-    expect(m.Tpost).toBeCloseTo(postRunawayTs(8), 6);
-    expect(m.Ts).toBeGreaterThan(1000);
+    expect(m.Tpost).toBeNull();
+    expect(m.Ts).toBeGreaterThan(395);
+    expect(m.Ts).toBeLessThan(407);
+    // No Tpost, so ebStep never holds the outgoing radiation at the steam limit and the budget stays near Ts.
     core.ebStep(m, 120, 1.4);
     core.ebStats(m);
-    expect(core.EB.stats.mean).toBeGreaterThan(900);
+    expect(core.EB.stats.mean).toBeLessThan(700);
     core.W.m = m;
     core.worldUi();
     const hz = (core.W.rows as [string, string][]).find((r) => r[0] === 'Habitable zone');
     expect(hz?.[1]).toMatch(/runaway/);
+  });
+
+  it('with 50 bar or more of steam the engine does reach the post-runaway state and the budget follows it', () => {
+    const core = headlessCore();
+    core.setPreset({ ...preset('k218'), Ps: 100 });
+    const m = core.W.m;
+    expect(m.runaway).toBe(true);
+    expect(m.Tpost).toBeCloseTo(postRunawayTs(100)!, 6);
+    expect(m.Ts).toBeCloseTo(postRunawayTs(100)!, 6);
+    core.ebStep(m, 120, 1.4);
+    core.ebStats(m);
+    expect(core.EB.stats.mean).toBeGreaterThan(900);
   });
 
   it('the TypeScript model agrees: an ocean world past the edge runs away to the same temperature', () => {
@@ -219,7 +242,11 @@ describe('#93 3.6 runaway greenhouse', () => {
     const wet = tsWorldModel({ ...base, hasOcean: true })!;
     expect(dry.runaway).toBe(false);
     expect(wet.runaway).toBe(true);
-    expect(wet.Ts).toBeCloseTo(postRunawayTs(8), 6);
+    expect(wet.Tpost).toBeNull();
+    expect(wet.Ts).toBeCloseTo(dry.Ts, 6);
     expect(wet.olrLim).toBe(RUNAWAY_OLR_LIMIT);
+    const deep = tsWorldModel({ ...base, pressureBar: 100, hasOcean: true })!;
+    expect(deep.runaway).toBe(true);
+    expect(deep.Ts).toBeCloseTo(postRunawayTs(100)!, 6);
   });
 });

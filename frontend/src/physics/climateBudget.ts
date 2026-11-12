@@ -88,13 +88,16 @@ export const RUNAWAY_OLR_LIMIT = 282;
 /**
  * Post-runaway surface temperature against the steam pressure (#93 3.6): about 1,500 K under 50 bar and about
  * 1,800 K under 260 bar of steam (Boukrouche et al. 2021, ApJ 919, 130, as quoted by Dorn and Lichtenberg 2021,
- * ApJL 922, L4), interpolated in ln P through the two points and extrapolated outside them. The steam pressure is
- * taken to be the surface pressure. [verify] both points against Boukrouche et al. 2021; model_dependent.
+ * ApJL 922, L4), interpolated in ln P between the two points. The steam pressure is taken to be the surface
+ * pressure. [verify] both points against Boukrouche et al. 2021; model_dependent.
+ * Never extrapolated (#93 A1): below 50 bar the models give no post-runaway temperature, so this returns null (the
+ * runaway verdict stands and the grey-greenhouse Ts is kept); above 260 bar it is held at 1,800 K. Same rule as core.js.
  */
 export const POST_RUNAWAY = { P1: 50, T1: 1500, P2: 260, T2: 1800 } as const;
-export function postRunawayTs(pressureBar: number): number {
+export function postRunawayTs(pressureBar: number): number | null {
   const { P1, T1, P2, T2 } = POST_RUNAWAY;
-  return T1 + ((T2 - T1) * Math.log(pressureBar / P1)) / Math.log(P2 / P1);
+  if (!(pressureBar >= P1)) return null;
+  return T1 + ((T2 - T1) * Math.log(Math.min(pressureBar, P2) / P1)) / Math.log(P2 / P1);
 }
 
 /** Tags the same five as the app (D-02). */
@@ -232,7 +235,7 @@ export function worldModel(i: WorldInputs): WorldModel | null {
   if (runaway) {
     if (state !== 'supercritical') state = 'vapour';
     const tp = postRunawayTs(Ps);
-    if (tp > Ts) {
+    if (tp !== null && tp > Ts) {
       Tpost = tp;
       Ts = tp;
       tau = (Math.pow(Ts / Teq, 4) - 1) / 0.75;

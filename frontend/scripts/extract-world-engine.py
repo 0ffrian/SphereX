@@ -144,6 +144,9 @@ DEV93_SKIP_GLOBE = r'''// @deviation (#93 1.6) the fly engine's canvas is 1.67 t
 DEV93_GAS_CAP = r'''// @deviation (#93 1.8) at most 3 gas-solver steps per frame (was 8; GasSim.step costs about 4.5 ms), and a backlog of a
 // whole step or more is dropped, so a slow frame never schedules more work for the next one. A giant that needs more
 // than 3 steps a frame (HD 189733 b about 4.7 at 60 fps) then runs slower than one day per second.
+// (#93 A7) W.dt93 averages the frame time dtw (exponential, weight 0.05), so the caption (worldUi) can give the rate at
+// the frame rate this machine really draws, not at an assumed 60 fps.
+        W.dt93 = W.dt93 ? W.dt93 * 0.95 + dtw * 0.05 : dtw;
         while (W.simAcc >= GS.dt && n < 3) { GS.step(); acc += GS.dt; W.simAcc -= GS.dt; n++; }
         if (W.simAcc >= GS.dt) W.simAcc = 0;'''
 DEV93_TERRAIN = r'''// @deviation (#93 1.5) the renames below build the terrain and its river routing once per set of inputs for every engine
