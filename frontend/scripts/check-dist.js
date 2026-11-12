@@ -6,10 +6,11 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const MARKERS = ['SX_FIXTURE_MARKER', 'synthetic_fixture', 'synthetic-mover', 'SYNTHETIC_FLAG'];
-// The dev-only pages (haptics-test.html, gpu-probe.html) and the fixtures-only perf hook (__sxPerf)
-// must never ship.
-const TEST_PAGE_MARKERS = ['hapticsTestPage', '__sxPerf', 'SX_DEV_ONLY_GPU_PROBE', '__sxAreaLayer'];
-const TEST_PAGE_FILES = ['haptics-test.html', 'gpu-probe.html'];
+// The dev-only pages (gpu-probe.html, sound-check.html; haptics-test.html was deleted by D-39 and its marker kept)
+// and the fixtures-only perf hook (__sxPerf) must never ship. Every src/soundCheck module carries
+// SX_DEV_ONLY_SOUND_CHECK, so an accidental import of one into the app fails here too (#116).
+const TEST_PAGE_MARKERS = ['hapticsTestPage', '__sxPerf', 'SX_DEV_ONLY_GPU_PROBE', 'SX_DEV_ONLY_SOUND_CHECK'];
+const TEST_PAGE_FILES = ['haptics-test.html', 'gpu-probe.html', 'sound-check.html'];
 // Text in every file of shared/fixtures/. The flipbook's "synthetic fixture data" label must not match.
 const SHARED_FIXTURE_TEXT = /synthetic fixture[:.]/i;
 const dist = fileURLToPath(new URL('../dist', import.meta.url));

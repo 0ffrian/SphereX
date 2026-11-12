@@ -1,0 +1,18 @@
+{
+ "body_sha256": "22f8c48194e5106d14d902a6965ffbfd561b755e4e29aa08e50fe1ca85d2fe9b",
+ "body_size": 35552,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-12T08:59:01.899Z",
+ "key": {
+  "query": {
+   "dec": "13.42786",
+   "ep": "2461119.858988",
+   "ra": "91.23046",
+   "radius": "0.631525"
+  },
+  "release": "-",
+  "source": "skybot"
+ },
+ "status": 200,
+ "url": "https://ssp.imcce.fr/webservices/skybot/api/conesearch.php?-ep=2461119.858988&-ra=91.23046&-dec=13.42786&-rd=0.631525&-mime=json&-output=object&-loc=500&-filter=0&-objFilter=111&-from=ShiftSpectrum"
+}

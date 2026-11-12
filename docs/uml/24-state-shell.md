@@ -1,6 +1,6 @@
 # 24 State: app shell surfaces and the split pane
 
-Which shell surface shows, and how the user moves between them: the object panel, the object card, the build pane in the split pane, the island, and the proposed Track pane and feature cards. Drawn from [A21.4](../architecture/sky-shell.md#a214-tool-rail-and-toolid) (shell states as built, `setTool`, what a search does), [A21.5](../architecture/sky-shell-surfaces.md#a215-overlay-surfaces-island-object-panel-object-card) (island modes, object panel, object card, feature cards), [A21.6](../architecture/sky-shell-surfaces.md#a216-sky-interaction) (left click, right-click), [A21.8](../architecture/sky-shell-behaviour.md#a218-split-pane) (ways in and out, pane kinds), [A21.10](../architecture/sky-shell-behaviour.md#a2110-keyboard-and-escape) (Escape) and [A21.11](../architecture/sky-shell-behaviour.md#a2111-url-hash-and-history) (hash), and decisions Q-89, Q-113, Q-120, Q-121, Q-123 and Q-124. The names are those of the A21 Names table.
+Which shell surface shows, and how the user moves between them: the object panel, the object card, the build pane in the split pane, the island, and the proposed Track pane and feature cards. Drawn from [A21.4](../architecture/sky-shell.md#a214-tool-rail-and-toolid) (shell states as built, `setTool`, what a search does), [A21.5](../architecture/sky-shell-surfaces.md#a215-overlay-surfaces-island-object-panel-object-card) (island modes, object panel, object card, feature cards), [A21.6](../architecture/sky-shell-surfaces.md#a216-sky-interaction) (left click, right-click), [A21.8](../architecture/sky-shell-behaviour.md#a218-split-pane) (ways in and out, pane kinds), [A21.10](../architecture/sky-shell-behaviour.md#a2110-keyboard-and-escape) (Escape) and [A21.11](../architecture/sky-shell-behaviour.md#a2111-url-hash-and-history) (hash), and decisions Q-89, Q-113, Q-120, Q-121, Q-123 and Q-124. **Changed by D-38, Q-296 and Q-414 (PR #104):** the rail is replaced by the sky dock (Known objects, Discovery, Search; `app/shell/SkyDock.tsx`), so "rail X" in the diagram below means the matching way in now (see the notes); Known objects and Discovery answer from a prepared area of `/v1/areas` that holds the drawn area, else from the demo, which answers only in the prepared Eros area (Q-406, Q-414). The names are those of the A21 Names table.
 
 **Dashed states and the notes marked "proposed" are not decided and not built** (the pane kinds, the Track pane, the Area search tool, its feature cards and the island's `progress` mode; A21.5, A21.8, A21.11, A20.1, A18.4). Everything else is as built on main.
 
@@ -17,7 +17,7 @@ stateDiagram-v2
   state "Object card (cardRequested, tool sky)" as Card
   state "Split pane: build pane (build.open, hash build)" as BuildPane
   state "Split pane: Track pane (proposed, hash track)" as TrackPane
-  state "Area search tool with its feature card (proposed)" as AreaTool
+  state "Area tools from the dock: Known objects, Discovery (prepared area, else demo; Q-406)" as AreaTool
 
   SkyAlone --> Panel : left click on a marker, sky pick, typed search, rail Flipbook or Spectrum
   Panel --> SkyAlone : x or Escape (closePanel), rail Sky
@@ -32,8 +32,8 @@ stateDiagram-v2
   BuildPane --> SkyAlone : x, Escape, Back, or another rail tool
   BuildPane --> Panel : rail Flipbook or Spectrum
 
-  SkyAlone --> AreaTool : rail Area search (proposed)
-  AreaTool --> SkyAlone : x on the card, or another rail tool
+  SkyAlone --> AreaTool : dock Known objects or Discovery (tool area)
+  AreaTool --> SkyAlone : x on the card, or another tool
   AreaTool --> TrackPane : Track it (openPane track, tool stays area)
   Panel --> TrackPane : Track it on a moving object's panel (proposed, A19.2)
   SkyAlone --> TrackPane : a link with track (proposed)
@@ -87,6 +87,7 @@ stateDiagram-v2
 
 ## Notes
 
+- **Dock instead of rail** (D-38, Q-296): the dock holds Known objects, Discovery and Search. Flipbook opens with a search or a click on the sky; Spectrum and *Build it* sit in the object panel and the object card. Where the diagram says "rail Flipbook or Spectrum", "rail 3D viewer" or "rail Sky", read the object panel's own buttons, *Build it* and the close button. `ToolId` gains `'area'` (A21.4). The island grows into the area card as it does into the object panel (A21.5).
 - **Left click vs right-click** (Q-120): a left click on a marker drops the card request and searches the name, so the object panel opens; a right-click, long press or the ContextMenu key asks for the object card. A search with the build pane open changes nothing but the object under the pane (A21.4).
 - **Hash** (A21.11): the build pane writes `build` (pushed with the `sxBuild` mark; Back closes it). Proposed: `track=<object id>` for the Track pane with an `{ sxPane }` mark, and `area=` / `atrack=` for Area search; only one pane key is ever written.
 - **Escape** (A21.10): as built each surface has its own handler; one Escape owner with a fixed order (pane first) is proposed.

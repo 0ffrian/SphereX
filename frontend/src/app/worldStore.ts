@@ -18,6 +18,12 @@ interface WorldStoreState {
   world: CardToWorldOk | null;
   globe: WorldEngine | null;
   fly: WorldEngine | null;
+  /**
+   * Render-performance roadmap 0.7: the fly engine stays mounted while the close-up is closed, paused.
+   * A paused fly engine takes every control change (so it reopens in step) but is not redrawn.
+   */
+  flyPaused: boolean;
+  setFlyPaused(p: boolean): void;
   /** Everything applied since the world was loaded (the artifact's slider and pill state). */
   applied: EngineOverrides;
   playing: boolean;
@@ -46,6 +52,32 @@ export function drawReady(e: WorldEngine): boolean {
   return !(e.state().gas && e.spinup > 0);
 }
 
+/** Globe turn per CSS pixel of drag, radians, at zoom 1 (the artifact's value). */
+const DRAG_RAD_PER_PX = 0.006;
+
+/**
+ * The globe turn for a drag of (dx, dy) CSS pixels: the surface follows the hand, like grabbing a ball (issue #93
+ * regression fix). In the engine a larger yaw turns the surface to the left on screen and a larger pitch moves the
+ * front of the globe up (WORLD_FS: b = ry(rx(n, tilt + pitch), spin + yaw)), so both are subtracted. The Sun turns
+ * with the yaw (core.js rotates the light by -yaw), so the terminator stays where it is.
+ */
+export function globeTurn(s: { yaw: number; pitch: number; zoom: number }, dx: number, dy: number) {
+  return globeTurnBy(s, (dx * DRAG_RAD_PER_PX) / s.zoom, (dy * DRAG_RAD_PER_PX) / s.zoom);
+}
+
+/** Turn the globe so its surface moves right by `right` and down by `down` radians (pitch kept within +-1.4). */
+export function globeTurnBy(s: { yaw: number; pitch: number }, right: number, down: number) {
+  return { yaw: s.yaw - right, pitch: Math.max(-1.4, Math.min(1.4, s.pitch - down)) };
+}
+
+/** Arrow keys move the surface the way the arrow points, as a drag in that direction would. */
+export const GLOBE_KEYS: Record<string, [number, number]> = {
+  ArrowLeft: [-0.1, 0],
+  ArrowRight: [0.1, 0],
+  ArrowUp: [0, -0.1],
+  ArrowDown: [0, 0.1],
+};
+
 /**
  * What a failure belongs to: the card and the preset it maps to. A failure must not carry over to the
  * next object (the old flag was sticky), so every reader compares the key of what it is about to draw.
@@ -58,6 +90,8 @@ export const useWorldStore = create<WorldStoreState>((set, get) => ({
   world: null,
   globe: null,
   fly: null,
+  flyPaused: false,
+  setFlyPaused: (flyPaused) => set({ flyPaused }),
   applied: {},
   playing: true,
   target: null,
@@ -73,6 +107,9 @@ export const useWorldStore = create<WorldStoreState>((set, get) => ({
     const { globe, fly } = get();
     globe?.setOverrides(o);
     fly?.setOverrides(o);
+    // Issue #93 1.9: the simulation both views follow takes the change once, after the views (its key follows theirs).
+    for (const src of new Set([globe?.simSource, fly?.simSource]))
+      src?.setOverrides(o, (globe?.simSource === src ? globe : fly)?.simKey());
     set((s) => ({ applied: { ...s.applied, ...o }, rev: s.rev + 1 }));
     get().redraw();
   },
@@ -84,13 +121,13 @@ export const useWorldStore = create<WorldStoreState>((set, get) => ({
   },
   pick: (lon, lat) => set((s) => ({ target: { lon, lat, seq: (s.target?.seq ?? 0) + 1 } })),
   redraw: () => {
-    const { globe, fly } = get();
-    for (const e of [globe, fly]) if (e && drawReady(e)) e.draw();
+    const { globe, fly, flyPaused } = get();
+    for (const e of [globe, flyPaused ? null : fly]) if (e && drawReady(e)) e.draw();
   },
   bump: () => set((s) => ({ rev: s.rev + 1 })),
 }));
 
-/** The haptics' view of the world on screen: CPU arrays of the globe engine, or null when the engine is not drawing. */
+/** The world on screen for sound and queries (was the haptics' view, D-39): CPU arrays of the globe engine, or null when the engine is not drawing. */
 export function worldCpuFields() {
   return useWorldStore.getState().globe?.cpuFields() ?? null;
 }

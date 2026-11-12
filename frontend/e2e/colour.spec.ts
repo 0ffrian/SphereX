@@ -26,9 +26,13 @@ interface ScrollEl {
   scrollTop: number;
 }
 
-/** Hides the ring and the composite marker, which are coloured on purpose. */
+/**
+ * Hides what is coloured on purpose: the ring, the composite marker, the name and close tabs, the amber SYNTHETIC label and the
+ * wavelength dot in the picture's corner caption.
+ */
 const HIDE_MARKERS =
-  '[data-testid="object-ring"], [data-testid="composite-marker"] { visibility: hidden !important; }';
+  '[data-testid="object-ring"], [data-testid="composite-marker"], [data-testid="frame-viewer"] .fb-cap, ' +
+  '[data-testid="frame-viewer"] .fb-over, [data-testid="frame-viewer"] > span.pointer-events-none { visibility: hidden !important; }';
 
 /**
  * Largest channel spread max(R, G, B) − min(R, G, B) over the top half of an element's screenshot
@@ -96,7 +100,7 @@ test('Raw → Wavelength tint → SPHEREx composite → Raw', async ({ page }) =
   await page.goto('/');
   await search(page, 'Epsilon Indi B');
   const counter = page.getByTestId('frame-counter');
-  await expect(counter).toHaveText('Frame 1 of 24');
+  await expect(counter).toHaveText('1 / 24');
   await cutoutLoaded(page);
   // The panel is see-through until the island has arrived; the picture is measured after that.
   await expect(page.getByTestId('island')).toHaveAttribute('data-arrived', '');
@@ -104,21 +108,22 @@ test('Raw → Wavelength tint → SPHEREx composite → Raw', async ({ page }) =
   const viewer = page.getByTestId('frame-viewer');
   const panel = page.getByTestId('object-panel');
 
-  // Raw: grey pixels, Raw checked, no colour sub-choice.
-  const switcher = page.getByRole('radiogroup', { name: 'Picture' });
-  await expect(switcher.getByRole('radio', { name: 'Raw' })).toHaveAttribute(
-    'aria-checked',
+  // Raw: grey pixels, Raw pressed, no colour sub-choice.
+  const switcher = page.getByRole('group', { name: 'Picture' });
+  await expect(switcher.getByRole('button', { name: 'Raw' })).toHaveAttribute(
+    'aria-pressed',
     'true',
   );
-  await expect(page.getByRole('radiogroup', { name: 'Colour view' })).toHaveCount(0);
-  expect(await colourSpread(page, viewer)).toBeLessThanOrEqual(2);
-  await shot(page, panel, 'desktop-raw', page.getByTestId('colour-controls'));
+  await expect(page.getByRole('group', { name: 'Colour view' })).toHaveCount(0);
+  // Polled: the card fades in over the sky, which is coloured.
+  await expect.poll(() => colourSpread(page, viewer), { timeout: 15_000 }).toBeLessThanOrEqual(2);
+  await shot(page, panel, 'desktop-raw', page.getByTestId('colour-switch'));
 
   // Colour → Wavelength tint (the default view): the same pixels, multiplied by a colour.
-  await switcher.getByRole('radio', { name: 'Colour' }).click();
-  const views = page.getByRole('radiogroup', { name: 'Colour view' });
-  await expect(views.getByRole('radio', { name: 'Wavelength tint' })).toHaveAttribute(
-    'aria-checked',
+  await switcher.getByRole('button', { name: 'Colour' }).click();
+  const views = page.getByRole('group', { name: 'Colour view' });
+  await expect(views.getByRole('button', { name: 'Wavelength tint' })).toHaveAttribute(
+    'aria-pressed',
     'true',
   );
   await expect(page.getByTestId('tint-overlay')).toBeVisible();
@@ -127,7 +132,7 @@ test('Raw → Wavelength tint → SPHEREx composite → Raw', async ({ page }) =
   await expect(page.getByTestId('tint-legend-current')).toHaveText(/^This frame: \d\.\d{3} µm$/);
   await expect(page.getByTestId('cutout')).toHaveCSS('image-rendering', 'pixelated');
   expect(new URL(page.url()).hash).toContain('colour=tint');
-  await shot(page, panel, 'desktop-tint', page.getByTestId('colour-controls'));
+  await shot(page, panel, 'desktop-tint', page.getByTestId('colour-switch'));
 
   // Playback still advances, and the tint follows each frame's wavelength.
   const overlay = page.getByTestId('tint-overlay');
@@ -135,13 +140,13 @@ test('Raw → Wavelength tint → SPHEREx composite → Raw', async ({ page }) =
   const play = page.getByTestId('play-pause');
   await expect(play).toBeEnabled();
   await play.click();
-  await expect(counter).not.toHaveText('Frame 1 of 24', { timeout: 10_000 });
+  await expect(counter).not.toHaveText('1 / 24', { timeout: 10_000 });
   await play.click();
   await expect(play).toHaveText('Play');
   await expect(overlay).not.toHaveAttribute('data-wavelength', firstWl ?? '');
 
   // SPHEREx composite: one picture with its legend; the transport bar does not drive it.
-  await views.getByRole('radio', { name: 'SPHEREx composite' }).click();
+  await views.getByRole('button', { name: 'SPHEREx composite' }).click();
   const image = page.getByTestId('composite-image');
   await expect(image).toBeVisible({ timeout: 15_000 });
   await expect
@@ -164,11 +169,11 @@ test('Raw → Wavelength tint → SPHEREx composite → Raw', async ({ page }) =
     .poll(() => colourSpread(page, page.getByTestId('composite-viewer')), { timeout: 20_000 })
     .toBeGreaterThan(40);
   expect(new URL(page.url()).hash).toContain('colour=composite');
-  await shot(page, panel, 'desktop-composite', page.getByTestId('colour-controls'));
+  await shot(page, panel, 'desktop-composite', page.getByTestId('colour-switch'));
   await shot(page, null, 'desktop-composite-page');
 
   // Back to Raw: grey again, the transport restored.
-  await switcher.getByRole('radio', { name: 'Raw' }).click();
+  await switcher.getByRole('button', { name: 'Raw' }).click();
   await cutoutLoaded(page);
   await expect(page.getByTestId('tint-overlay')).toHaveCount(0);
   await expect
@@ -183,9 +188,9 @@ test('Raw → Wavelength tint → SPHEREx composite → Raw', async ({ page }) =
 test('a refused composite says why in plain words', async ({ page }) => {
   await page.goto('/');
   await search(page, 'R Dra');
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
-  await page.getByRole('radio', { name: 'Colour' }).click();
-  await page.getByRole('radio', { name: 'SPHEREx composite' }).click();
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
+  await page.getByRole('button', { name: 'Colour' }).click();
+  await page.getByRole('button', { name: 'SPHEREx composite' }).click();
   const box = page.getByTestId('composite-refused');
   await expect(box).toContainText('There is no SPHEREx colour composite for this object.');
   await expect(box).toContainText(
@@ -202,14 +207,14 @@ test('a link with colour=composite opens the composite; one without it stays raw
   await page.goto('/#name=Epsilon%20Indi%20B&colour=composite');
   // A cold load: resolve, frames, then the composite (slow with 4 workers on SwiftShader).
   await expect(page.getByTestId('composite-image')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByRole('radio', { name: 'SPHEREx composite' })).toHaveAttribute(
-    'aria-checked',
+  await expect(page.getByRole('button', { name: 'SPHEREx composite' })).toHaveAttribute(
+    'aria-pressed',
     'true',
   );
   await page.goto('/#name=RW%20Aur');
   await page.reload();
-  await expect(page.getByTestId('frame-counter')).toHaveText('Frame 1 of 24');
-  await expect(page.getByRole('radio', { name: 'Raw' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('frame-counter')).toHaveText('1 / 24');
+  await expect(page.getByRole('button', { name: 'Raw' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('composite')).toHaveCount(0);
 });
 
@@ -224,7 +229,7 @@ test.describe('phone width', () => {
       .poll(() => image.evaluate((el: { naturalWidth: number }) => el.naturalWidth))
       .toBe(64);
     for (const name of ['Raw', 'Colour', 'Wavelength tint', 'SPHEREx composite']) {
-      const box = await page.getByRole('radio', { name }).boundingBox();
+      const box = await page.getByRole('button', { name, exact: true }).boundingBox();
       expect(box!.height, name).toBeGreaterThanOrEqual(44);
     }
     const overflow = await page.evaluate(() => {

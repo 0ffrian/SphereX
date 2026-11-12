@@ -20,6 +20,9 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
 
   beforeEach(() => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    // Issue #93 C7: a focus counts as the user's only within USER_FOCUS_WINDOW_MS of the key before it. Under load the
+    // gap between the Tab keydown and focus() could exceed it and the list stayed shut: the clock stands still here.
+    vi.spyOn(performance, 'now').mockReturnValue(1_000);
     skySearch = vi.fn(() => Promise.resolve());
     useAppStore.setState({ skySearch } as never);
     host = document.createElement('div');
@@ -31,6 +34,7 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
   afterEach(() => {
     act(() => root.unmount());
     host.remove();
+    vi.restoreAllMocks();
   });
 
   const input = () => host.querySelector<HTMLInputElement>('[data-testid="search-input"]')!;
@@ -70,6 +74,7 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
     expect(options()).toHaveLength(ROWS);
     expect(names().slice(0, 3)).toEqual(["Barnard's Star", 'Epsilon Indi B', 'WISE 0855-0714']);
     expect(names()[15]).toBe('Crab Nebula');
+    expect(names()[16]).toBe('433 Eros'); // row 17, the Track MVP (#73)
     expect(input().getAttribute('aria-expanded')).toBe('true');
     expect(input().getAttribute('aria-controls')).toBe(listbox()!.id);
     expect(input().getAttribute('aria-activedescendant')).toBeNull();
@@ -215,14 +220,14 @@ describe('SearchBar (the demo list as an ARIA combobox)', () => {
 
   it('text that matches no row shows the hint and still submits through parseQuery', () => {
     focus();
-    type('433 Eros');
+    type('16 Psyche'); // not a row (433 Eros became row 17 in #73)
     expect(options()).toHaveLength(0);
     expect(host.textContent).toContain(NO_MATCH_HINT);
     expect(NO_MATCH_HINT).toBe('No demo object matches. Press Enter to search the catalogues.');
     key('Enter'); // no highlighted row: nothing is picked
     expect(skySearch).not.toHaveBeenCalled();
     act(() => host.querySelector('form')!.requestSubmit());
-    expect(skySearch).toHaveBeenCalledWith({ q: '433 Eros', kind: 'name', origin: 'input' });
+    expect(skySearch).toHaveBeenCalledWith({ q: '16 Psyche', kind: 'name', origin: 'input' });
     expect(listbox()).toBeNull(); // submit closes the list
   });
 

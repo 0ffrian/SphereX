@@ -4,6 +4,7 @@
 // does not hold comes from a class analog (inferred_from_analog; values from Bennu and Eros, the
 // prototype's own examples). A missing diameter refuses (D-32: the three.js viewer draws the body).
 // Pure: no DOM, no three.js, no clock. Same card and seed give the same preset.
+import { hashInt32, seedVec } from '../seed';
 import type { ObjectCard, Tag } from '@/contract';
 import { RP } from './source';
 
@@ -22,6 +23,13 @@ export interface RockPreset {
   rho: number;
   tint: [number, number, number];
   seed: number;
+  /**
+   * Card bodies only (#93 2.8): three integers in [0, 256) the shader adds to its noise position (seedVec of the card
+   * seed's hash). The artifact's bodies have none and keep their seed along (1, 1, 1). Artistic.
+   */
+  seed3?: [number, number, number];
+  /** Card bodies only: the card seed's 32-bit hash, for the crater and shape RNG and the per-crater variation. */
+  seedHash?: number;
   comet?: boolean;
 }
 
@@ -94,8 +102,8 @@ const ROCK_SEED_STEPS = ROCK_SEED_RANGE * 4096;
  * to a noise position), so the card's 32-bit seed is hashed (murmur3 finaliser) and folded into
  * [0, 97) in steps of 1/4096: about 400,000 values instead of 97, so two cards rarely share a field.
  * Deterministic. The prototype's own examples keep their own integer seeds (artifactPreset).
- * Note: the engine's crater RNG takes `seed * 31 + 7` as an integer, so craters alone repeat every
- * ~1/31 of a seed; the shader's noise offset takes the full value.
+ * Since #93 2.8 a card body also carries seed3 and seedHash (cardToRock), which the engine uses for its noise
+ * offset and its crater RNG instead; this value stays for display and as part of the body's cache key.
  */
 export function rockSeed(seed: number): number {
   let h = Math.floor(Math.abs(Number.isFinite(seed) ? seed : 0)) >>> 0;
@@ -256,6 +264,8 @@ export function cardToRock(
       rho,
       tint: [...tint] as [number, number, number],
       seed: rockSeed(opts.seed),
+      seed3: seedVec(hashInt32(opts.seed)),
+      seedHash: hashInt32(opts.seed),
       comet,
     },
     inputs: {

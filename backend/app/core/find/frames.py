@@ -104,6 +104,10 @@ class FrameRecord:
     access_url: str
     t_min_mjd: float
     t_max_mjd: float
+    # Issue #74 (A19.3): the frame's IRSA SIA footprint (``s_region`` vertices, ICRS degrees),
+    # kept so the overlays can serve it for a moving object, whose rows come from the path
+    # search's cones rather than one cone. ``None`` when IRSA gave none.
+    s_region: tuple[tuple[float, float], ...] | None = None
 
     def sia_row(self) -> SiaRow:
         return SiaRow(
@@ -115,7 +119,23 @@ class FrameRecord:
             t_max_mjd=self.t_max_mjd,
             em_min_um=self.em_min_um,
             em_max_um=self.em_max_um,
+            s_region=self.s_region,
         )
+
+    def key_doc(self) -> dict[str, Any]:
+        """The record as it enters derived cache keys (spectrum, composite): every field but
+        ``s_region``, which is display data, so a list stored before issue #74 (no
+        ``s_region``) and the same list rebuilt give the same keys."""
+        doc = asdict(self)
+        del doc["s_region"]
+        return doc
+
+    @classmethod
+    def from_stored(cls, doc: dict[str, Any]) -> FrameRecord:
+        """A record from a stored frame list (JSON gives lists where the record holds tuples)."""
+        region = doc.get("s_region")
+        fields = {**doc, "s_region": None if region is None else tuple(tuple(v) for v in region)}
+        return cls(**fields)
 
 
 @dataclass
@@ -290,7 +310,7 @@ class FrameService:
                 cached = doc.get("sources_earliest_fetched_at")
                 return FramesResult(
                     object_id=obj.id,
-                    frames=[FrameRecord(**f) for f in doc["frames"]],
+                    frames=[FrameRecord.from_stored(f) for f in doc["frames"]],
                     missing=list(doc["missing"]),
                     cached_at=parse_utc(cached) if cached else None,
                     has_proper_motion=has_pm,
@@ -475,6 +495,11 @@ class FrameService:
                 in_flight += submit_next()
         return built
 
+    def recently_failed(self, digest: str) -> bool:
+        """True when a live download under this cache key digest failed within
+        ``SX_LIVE_FAILURE_TTL_S`` (shared with ``/path``, issue #74)."""
+        return self._recently_failed(digest)
+
     def _recently_failed(self, digest: str) -> bool:
         ttl = self.ctx.settings.live_failure_ttl_s
         with self._failed_lock:
@@ -543,6 +568,7 @@ class FrameService:
             access_url=row.access_url,
             t_min_mjd=row.t_min_mjd,
             t_max_mjd=row.t_max_mjd,
+            s_region=row.s_region,
         )
         return rec, "", srv
 

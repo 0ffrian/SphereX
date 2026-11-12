@@ -131,7 +131,7 @@ export interface GridLoaderProps {
   /** Size preset or pixel value */
   size?: 'sm' | 'md' | 'lg' | 'xl' | number;
   /** Animation speed */
-  speed?: 'slow' | 'normal' | 'fast';
+  speed?: 'slow' | 'normal' | 'fast' | 'idle';
   /** Disable animation and show static pattern */
   static?: boolean;
 }
@@ -530,6 +530,8 @@ const SPEEDS: Record<string, number> = {
   fast: 400,
   normal: 800,
   slow: 1500,
+  // Shift & Spectrum addition (not in smoothui): the island's resting pulse, slower than 'slow'.
+  idle: 3000,
 };
 
 // Helper to resolve pattern to GridMatrix

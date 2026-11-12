@@ -1,0 +1,257 @@
+{
+  "asset_version": "13",
+  "card": {
+    "albedo": {
+      "err": 0.06,
+      "source": "JPL SBDB albedo (Veverka et al. (2000) Science v.289,pp.2088-2097)",
+      "tag": "measured",
+      "value": 0.25
+    },
+    "band_depth_3um": {
+      "source": "not available: no source in the pipeline yet (no band-depth rule in the specs)",
+      "tag": "measured",
+      "value": null
+    },
+    "diameter_km": {
+      "err": 0.06,
+      "source": "JPL SBDB diameter (Yeomans et al. (2000) Science v.289,pp.2085-2088)",
+      "tag": "measured",
+      "value": 16.84
+    },
+    "gaia_rgb": {
+      "formula": "Gaia DR3 colours to RGB (not computed)",
+      "source": "not available: the Gaia adapter is not built (A3.2)",
+      "tag": "derived",
+      "value": null
+    },
+    "id": "sbdb-20000433",
+    "lightcurve_amp_mag": {
+      "source": "not available: JPL SBDB gives no light-curve amplitude",
+      "tag": "measured",
+      "value": null
+    },
+    "name": "433 Eros (A898 PA)",
+    "phase_angle_deg": {
+      "source": "JPL Horizons quantity 24 (Sun-Target-Observer), observer SPHEREx 500@-163182, at 2026-11-14T00:00:00.000Z",
+      "tag": "measured",
+      "value": 18.6502
+    },
+    "rot_period_h": {
+      "source": "JPL SBDB rot_per (LCDB (Rev. 2023-October); Warner et al., 2009)",
+      "tag": "measured",
+      "value": 5.27
+    },
+    "shape_source": {
+      "source": "Gaskell, R.W., Gaskell Eros Shape Model V1.1, urn:nasa:pds:gaskell.ast-eros.shape-model, NASA Planetary Data System. DOI 10.26033/d0gq-9427, licence CC0-1.0",
+      "tag": "measured",
+      "value": "/data/shapes/eros-gaskell.glb"
+    },
+    "slope_075_25": {
+      "source": "not available: no source in the pipeline yet (no slope-fit rule in the specs)",
+      "tag": "measured",
+      "value": null
+    },
+    "spectral_class": {
+      "source": "JPL SBDB spec_B (SMASS taxonomy; EAR-A-5-DDR-TAXONOMY-V4.0)",
+      "tag": "measured",
+      "value": "S"
+    },
+    "spherex_rgb": {
+      "source": "not available: no SPHEREx spectrum for this object",
+      "tag": "measured",
+      "value": null
+    },
+    "sun_vector": {
+      "formula": "-r/|r|, r = heliocentric ICRF position from JPL Horizons VECTORS (CENTER 500@10) at 2026-11-14T00:00:00.000Z; frame ICRF (equatorial J2000), direction target to Sun",
+      "source": "JPL Horizons VECTORS, CENTER 500@10, at 2026-11-14T00:00:00.000Z",
+      "tag": "derived",
+      "value": [
+        -0.247800483,
+        0.861037599,
+        0.444082395
+      ]
+    },
+    "type": "asteroid_shape"
+  },
+  "created_at": "2025-10-01T00:00:00.000Z",
+  "generator_version": "p1-b4",
+  "inputs_sha256": "c73f3bd3f7e58b621893d02343575816cfd4e8594ad4d1423f16a4e3a9b45893",
+  "render_params": {
+    "alt_text": "433 Eros (A898 PA), Asteroid, 16.8 km across (measured), colour from a class palette, viewed at 18.7 degrees. Surface relief: measured.",
+    "confidence": {
+      "assumed_share": 0.1991,
+      "band": "mostly_data",
+      "estimated_share": 0.0,
+      "formula": "C = sum(w_i c_i) / sum(w_i): c is 1 for a measured value or a formula of measured values, a placeholder share for a model-dependent one, and 0 for an assumed, artistic or missing one; the w_i are placeholder weights (D-36, Q-221)",
+      "found": "Data for: Shape, size, spin, albedo and spectral class.",
+      "gate": {
+        "class_known": true,
+        "key_measurement": true,
+        "passed": true,
+        "score_ok": true
+      },
+      "inputs": [
+        {
+          "c": 1.0,
+          "fields": [
+            "shape_source"
+          ],
+          "id": "shape",
+          "label": "Shape",
+          "points": 40.0,
+          "tag": "measured",
+          "weight": 40
+        },
+        {
+          "c": 0.9929,
+          "fields": [
+            "diameter_km"
+          ],
+          "id": "size",
+          "label": "Size",
+          "points": 14.8931,
+          "tag": "measured",
+          "weight": 15
+        },
+        {
+          "c": 1.0,
+          "fields": [
+            "rot_period_h"
+          ],
+          "id": "spin",
+          "label": "Spin",
+          "points": 10.0,
+          "tag": "measured",
+          "weight": 10
+        },
+        {
+          "c": 0.52,
+          "fields": [
+            "albedo"
+          ],
+          "id": "albedo",
+          "label": "Albedo",
+          "points": 5.2,
+          "tag": "measured",
+          "weight": 10
+        },
+        {
+          "c": 1.0,
+          "fields": [
+            "spectral_class"
+          ],
+          "id": "spectral_class",
+          "label": "Spectral class",
+          "points": 10.0,
+          "tag": "measured",
+          "weight": 10
+        },
+        {
+          "c": 0.0,
+          "fields": [
+            "gaia_rgb",
+            "spherex_rgb"
+          ],
+          "id": "colour_map",
+          "label": "Surface colour map",
+          "points": 0.0,
+          "tag": "missing",
+          "weight": 15
+        }
+      ],
+      "measured_share": 0.8009,
+      "needed": "",
+      "note": "This is how much of the picture rests on data. It is not the probability that the picture is correct.",
+      "raise": "A better measurement of: surface colour map.",
+      "score": 0.8009,
+      "tag": "derived",
+      "threshold": 0.25,
+      "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
+    },
+    "generator_version": "p1-b4",
+    "haptics": {
+      "data": "none",
+      "data_tag": "artistic",
+      "params": {},
+      "texture": "mesh",
+      "texture_tag": "measured"
+    },
+    "id": "sbdb-20000433",
+    "layers": [
+      {
+        "description": "Shape model scaled to the diameter on the card (R7.1).",
+        "id": "mesh",
+        "requires": [
+          "shape_source",
+          "diameter_km"
+        ],
+        "tag": "measured",
+        "tier": 1
+      },
+      {
+        "description": "Rotation sped up, with the factor shown on screen (R7.1).",
+        "id": "spin",
+        "requires": [
+          "rot_period_h"
+        ],
+        "tag": "measured",
+        "tier": 1
+      },
+      {
+        "description": "Colour = base_rgb * brightness; display L = clamp(0.12 + 1.6 * albedo, 0.12, 0.8) (R6.2).",
+        "id": "material",
+        "requires": [
+          "spectral_class",
+          "albedo"
+        ],
+        "tag": "inferred_from_analog",
+        "tier": 4
+      }
+    ],
+    "lighting": {
+      "mode": "sun",
+      "phase_angle_deg": 18.6502,
+      "sun_dir": [
+        -0.247800483,
+        0.861037599,
+        0.444082395
+      ]
+    },
+    "missing": [
+      "spherex_ir",
+      "spectrum"
+    ],
+    "scale_m": 8420.0,
+    "seed": 3217193865,
+    "type": "asteroid_shape",
+    "view_modes": {
+      "spherex_ir": {
+        "available": false,
+        "badge": "SPHEREx infrared, whole-body average (false colour)",
+        "channels_um": [
+          3.0,
+          2.0,
+          1.0
+        ],
+        "rgb": null,
+        "source": "spherex_rgb"
+      },
+      "visible": {
+        "available": true,
+        "badge": "Estimated visible colour",
+        "rgb": {
+          "source": "R6.4 class palette S (no gaia_rgb)",
+          "tag": "inferred_from_analog",
+          "value": [
+            0.62,
+            0.55,
+            0.47
+          ]
+        },
+        "source": "class_palette"
+      }
+    }
+  },
+  "seed": 3217193865,
+  "textures": null
+}

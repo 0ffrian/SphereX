@@ -8,10 +8,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/state/store';
 import { useShellStore } from '@/app/shell/shellStore';
-import { useElapsedSeconds, SHOW_ELAPSED_AFTER_S } from '@/app/StatusBoxes';
+import { displayName } from '@/app/displayName';
+import { useElapsedSeconds } from '@/app/StatusBoxes';
 import GridLoader from './GridLoader';
-import { IDLE_LOOK, LOADER_BASE, THINKING_LOOK } from './loaderLooks';
-import { isThinking, thinkingRetry, thinkingSentence } from './islandText';
+import { FOUND_LOOK, IDLE_LOOK, LOADER_BASE, SEARCHING_LOOK, UPDATING_LOOK } from './loaderLooks';
+import { areaMiniTitle, useAreaStore } from '@/app/shell/areaStore';
+import { subscribeMotion } from '@/app/sky/skyMotion';
+import { isThinking } from './islandText';
 import { useIslandStore } from './islandStore';
 
 const CIRCLE = 52;
@@ -45,15 +48,61 @@ export function Island() {
 
   // Only a panel that opens after the island thought is travelled to; one opened from the rail
   // with nothing loading just shows, and the island stays at the top.
-  const inPanel = panelBox !== null && travels;
+  // A minimised card (an area card, or the Flipbook card): the island is a pill that holds its place.
+  const objMini = useShellStore((s) =>
+    s.minimised && (s.tool === 'flipbook' || s.tool === 'spectrum')
+      ? (sky.resolved ? displayName(sky.resolved.name) || 'Flipbook' : 'Flipbook')
+      : null,
+  );
+  const areaMiniOn = useAreaStore((s) => s.minimised) || objMini !== null;
+  const inPanel = panelBox !== null && travels && !areaMiniOn;
   const thinking = panelBox === null && isThinking(sky.status);
+  // While the sky view moves, the island shows "Updating" for a moment (a cue only; nothing loads).
+  const [moving, setMoving] = useState(false);
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const off = subscribeMotion(() => {
+      setMoving(true);
+      clearTimeout(t);
+      t = setTimeout(() => setMoving(false), 900);
+    });
+    return () => {
+      off();
+      clearTimeout(t);
+    };
+  }, []);
+  // The square tools (Known objects, Discovery): the island says what the dummy search is doing, and
+  // it holds the place of a minimised card (a click brings it back).
+  const areaSay = useAreaStore((s) => s.say);
+  const areaMini = useAreaStore((s) => (s.minimised ? areaMiniTitle(s) : null)) ?? objMini;
+  const areaRunning = useAreaStore((s) => s.running);
+  const restore = () => {
+    // The card grows out of the island again, as when it first opened.
+    setTravels(true);
+    if (objMini !== null) useShellStore.getState().setMinimised(false);
+    else useAreaStore.getState().setMinimised(false);
+  };
+  const miniRef = useRef<HTMLButtonElement>(null);
+  // Focus moves to the pill when a card is minimised, not again when its name changes.
+  const miniOn = areaMini !== null;
+  useEffect(() => {
+    if (miniOn) miniRef.current?.focus({ preventScroll: true });
+  }, [miniOn]);
+  const areaOn = areaSay !== null || areaMini !== null;
+  const updating = !thinking && !areaOn && moving && panelBox === null;
+  // The island travels into the area card once an area is set (after its Searching / found state),
+  // exactly as it does into the object panel; drawing an area is not a trip.
+  const areaTool = useShellStore((s) => s.tool === 'area');
+  const areaStaged = useAreaStore((s) => s.stage === 'set');
+  const areaSet = areaTool && areaStaged;
+  const pillOn = thinking || updating || areaOn;
   const panelTool = useShellStore((s) => s.tool === 'flipbook' || s.tool === 'spectrum');
   useEffect(() => {
     // Thinking starts a trip. It ends when the panel is closed, or when the search ended with no
     // panel to go to (a right-click card): a later panel from the rail has nothing to travel for.
-    if (thinking) setTravels(true);
+    if (thinking || areaSet) setTravels(true);
     else if (!panelTool) setTravels(false);
-  }, [thinking, panelTool, setTravels]);
+  }, [thinking, areaSet, panelTool, setTravels]);
   // While it thinks there is no panel to take an Escape, so the island takes it and leaves the tool
   // (a key that was already handled, such as Escape in the search field, is left alone).
   useEffect(() => {
@@ -66,18 +115,17 @@ export function Island() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [thinking]);
-  const sentence = thinking ? thinkingSentence(sky) : null;
-  const retry = thinking ? thinkingRetry(sky) : null;
   const seconds = useElapsedSeconds(thinking ? sky.startedAt : null);
-  const waiting = thinking && seconds >= SHOW_ELAPSED_AFTER_S;
+  // One word; after 20 s it says it is still going.
+  const word = thinking && seconds >= 20 ? 'Still searching' : 'Searching';
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const inRef = useRef<HTMLDivElement>(null);
   const [bezelW, setBezelW] = useState(0);
   const [bezelH, setBezelH] = useState(0);
-  // Issue #71 stream U (Q-298): while the build is open (desktop) it rests at the bottom right, as the mock-up's.
-  const buildOpen = useShellStore((s) => s.build.open);
-  const corner = buildOpen && !compact && bezelH > 0;
+  // Mock-up floating layout: on a desktop width it rests at the bottom right (the cards float there
+  // too, and it travels into the panel's box from there). A phone keeps it over the top of the sky.
+  const corner = !compact && bezelH > 0;
   const [top, setTop] = useState(TOP);
   const [ready, setReady] = useState(false);
   const [pill, setPill] = useState({ w: CIRCLE, h: CIRCLE });
@@ -117,9 +165,9 @@ export function Island() {
 
   // The pill's natural size for its text (the inner box sizes to its content, at most 340 px).
   useLayoutEffect(() => {
-    if (!thinking || !inRef.current) return;
-    setPill({ w: inRef.current.offsetWidth, h: Math.max(CIRCLE, inRef.current.offsetHeight) });
-  }, [thinking, sentence, retry, waiting]);
+    if (!pillOn || !inRef.current) return;
+    setPill({ w: inRef.current.offsetWidth, h: inRef.current.offsetHeight });
+  }, [pillOn, word, updating, areaSay?.text, areaMini]);
 
   // The panel shows once the island has got there.
   useEffect(() => {
@@ -133,8 +181,8 @@ export function Island() {
   }, [inPanel, arrived, reduced, setArrived]);
 
   let box: { left: number; top: number; width: number; height: number; radius: number };
-  if (panelBox) box = { ...panelBox, radius: 22 };
-  else if (corner && thinking)
+  if (panelBox && !areaMiniOn) box = { ...panelBox, radius: 10 };
+  else if (corner && pillOn)
     box = {
       left: bezelW - pill.w - 16,
       top: bezelH - pill.h - 16,
@@ -150,7 +198,7 @@ export function Island() {
       height: CIRCLE,
       radius: CIRCLE / 2,
     };
-  else if (thinking)
+  else if (pillOn)
     box = {
       left: (bezelW - pill.w) / 2,
       top,
@@ -167,7 +215,7 @@ export function Island() {
       radius: CIRCLE / 2,
     };
 
-  const mode = inPanel ? 'panel' : thinking ? 'thinking' : 'idle';
+  const mode = inPanel ? 'panel' : pillOn ? 'thinking' : 'idle';
   return (
     <div
       ref={wrapRef}
@@ -188,25 +236,56 @@ export function Island() {
       <div className="sx-orb-glow" aria-hidden="true" data-on={mode !== 'panel' ? '' : undefined} />
       <div className="sx-orb" style={{ borderRadius: box.radius }}>
         <div className="sx-orb-in" ref={inRef} data-mode={mode}>
-          {/* Moves only while it thinks (a progress indicator). At rest it is lit and still: WCAG
-              2.2.2 (nothing that starts by itself and moves for over 5 s), and no repaint of the
-              page every frame for a decoration (issue #66, Q-121). */}
-          {/* smoothui's loader is an <output aria-label="Loading">, a live region: hidden here, because the
-              island is decorative at rest and "Thinking" below says it while it thinks. */}
+          {/* Moves only while it searches (a progress indicator). At rest it is lit and still: WCAG
+              2.2.2, and no repaint of the page every frame for a decoration (issue #66, Q-121).
+              smoothui's loader is an <output aria-label="Loading">, a live region: hidden here, the
+              word beside it is the status. */}
+          {areaMini !== null ? (
+            <button
+              type="button"
+              ref={miniRef}
+              className="sx-orb-mini"
+              onClick={restore}
+              aria-label={`${areaMini}, minimised. Open it`}
+              title="Open"
+              data-testid="island-mini"
+            >
+              <span aria-hidden="true" className="contents">
+                <GridLoader
+                  {...(areaRunning ? SEARCHING_LOOK : FOUND_LOOK)}
+                  className="flex-none"
+                />
+              </span>
+              <span className="sx-orb-word">{areaMini}</span>
+            </button>
+          ) : (
           <span aria-hidden="true" className="contents">
-            <GridLoader {...LOADER_BASE} {...(thinking && !reduced ? THINKING_LOOK : IDLE_LOOK)} />
+            {thinking || areaSay?.kind === 'searching' ? (
+              <GridLoader {...SEARCHING_LOOK} className="flex-none" />
+            ) : areaSay?.kind === 'found' ? (
+              <GridLoader {...FOUND_LOOK} className="flex-none" />
+            ) : updating && !reduced ? (
+              <GridLoader {...UPDATING_LOOK} className="flex-none" />
+            ) : (
+              <GridLoader {...LOADER_BASE} {...IDLE_LOOK} />
+            )}
           </span>
+          )}
+          {areaSay && (
+            <span className="sx-orb-word" role="status" data-testid="area-island">
+              {areaSay.text}
+            </span>
+          )}
           {thinking && (
-            <div className="sx-orb-label" role="status">
-              <b>Thinking</b>
-              {sentence && (
-                <span data-testid="loading">
-                  {sentence}
-                  {waiting && <span className="sx-orb-wait"> Still waiting ({seconds} s)…</span>}
-                </span>
-              )}
-              {retry && <span data-testid="frames-retry">{retry}</span>}
-            </div>
+            <span className="sx-orb-word" role="status" data-testid="loading">
+              {word}
+            </span>
+          )}
+          {/* A visual cue while the view moves; not announced (nothing is loading). */}
+          {updating && (
+            <span className="sx-orb-word" aria-hidden="true" data-testid="island-updating">
+              Updating
+            </span>
           )}
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 **Project:** Shift & Spectrum, NASA Space Apps 2026, challenge "Planet X and SPHEREx"
 **Audience:** the team (Atish, Kevin and Moon, who is also called Munazir) and Claude Code. This spec lives in `docs/rendering/` (this index plus the fragments below) and is referenced from `CLAUDE.md`.
-**Status:** amended to 9 Nov 2026 (Q-132: the event is desktop Chrome on the A15 laptop, sound only; Q-133 body tone; Q-134 Track path sound). Items marked **[verify]** must be checked against real output before relying on them; every one is listed in [R12](open-items.md). Proposals marked **Q-188 to Q-194** wait for a decision entry.
+**Status:** amended to 12 Nov 2026 (D-39: haptics cut, the audio code in `frontend/src/sound/`; R13 the sound of a world; Q-430 pitch polarity). Before that, 9 Nov 2026 (Q-132: the event is desktop Chrome on the A15 laptop, sound only; Q-133 body tone; Q-134 Track path sound). Items marked **[verify]** must be checked against real output before relying on them; every one is listed in [R12](open-items.md). Proposals marked **Q-188 to Q-194** wait for a decision entry.
 **Precedence:** decisions in [decisions/](../decisions/README.md) override this doc. Decision IDs (D-xx), backlog IDs (B-xx) and question IDs (Q-xx) refer to that folder; its index names the topic file of each ID. Terms: [glossary](../architecture/glossary.md).
 
 The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into the fragments below. Section numbers are kept with an `R` prefix: "rendering doc §8.4" elsewhere means **R8.4** here. Load only the fragment a task needs.
@@ -16,6 +16,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | [type-selection.md](type-selection.md) | R3.3 | backend type selection (stage 3): SBDB, SIMBAD otypes, exoplanet thresholds |
 | [display-rules.md](display-rules.md) | R4, R5, R5.1–R5.7 | working on the viewer: display levels, lighting, view modes, honesty toggle, scale bar, performance budget and event target, interaction (Feel and Touch modes), motion, quality levels |
 | [engines.md](engines.md) | R5.9 | the D-37 prototype engines (world, star, rock) on raw WebGL2: when they draw (+ Artistic only), the three.js fallback, the determinism exemption, copied code and deviations, the unmeasured A15 frame rate |
+| [engines-performance.md](engines-performance.md) | R5.9.1 | the issue #93 performance waves: star, rock and fly compile and lifecycle, caches, the fly view's static G-buffer, the shared simulation (in a worker by default), the three.js viewer's resolution and bloom, the dev switches and bench pages |
 | [build-mould.md](build-mould.md) | R5.8 | the Build split view, the moulding steps, New seed and honesty while building |
 | [surface-generation.md](surface-generation.md) | R6, R6.1–R6.7 | baking height/normal/albedo maps (asteroids and brown dwarf bands): card→params rules, seed, noise, craters, Sobel normals, Gemini/depth paths, caching |
 | [renderers/asteroid.md](renderers/asteroid.md) | R7 (intro), R7.1, R7.2 | rendering `asteroid_shape` (433 Eros, the demo body) or `asteroid_procedural` (also holds the R7 intro rule on refused layers) |
@@ -24,13 +25,23 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | [renderers/stars.md](renderers/stars.md) | R7.5, R7.5.1–R7.5.5 | rendering `star`, `star_mira`, `star_ttauri`, and the star surface (spots, flares) |
 | [renderers/candidate.md](renderers/candidate.md) | R7.6 | handling `candidate` (no 3D) |
 | [renderers/shader-kinds.md](renderers/shader-kinds.md) | R7.7 | planets, gas giants (the shared CPU field), nebulae and novae (volumes, no haptics, Q-103) |
-| [haptics/platform-encoding.md](haptics/platform-encoding.md) | R8, R8.1–R8.3 | what each platform does (event: sound only on the A15), texture vs data haptics and the honesty rule for sounds, vibration patterns (after the event) |
-| [haptics/sources.md](haptics/sources.md) | R8.4 | implementing a source: height map, mesh, field, terrain, flow, band, data pulse, light curve; what feeds the body tone |
-| [haptics/profiles.md](haptics/profiles.md) | R8.5, R8.6 | mapping an object type to its texture/data haptics, or doing spectrum haptics |
-| [haptics/calibration.md](haptics/calibration.md) | R8.7 | haptics/sound settings (event); first-use vibration calibration (after the event) |
-| [haptics/engine-api.md](haptics/engine-api.md) | R8.8 | writing `HapticEngine`, drivers, trains or the tone stream (TS reference code) |
-| [haptics/wiring.md](haptics/wiring.md) | R8.8.1 | wiring the engine, Feel, the body tone, Listen and Track into the app (M5) |
-| [haptics/audio-pairing.md](haptics/audio-pairing.md) | R8.9, R8.9.1, R8.9.2 | writing the audio driver: timing, mapping, timbre by tag, Bluetooth latency; the body tone (Q-133); the Track path sound (Q-134) |
+| [renderers/world-engine.md](renderers/world-engine.md) | R7.7.1 | the D-37 world engine's values for planets and gas giants: card against preset, albedo, lava worlds, clouds, CO₂, giants and rings, and the issue #93 physics (critical points, saturation pressure, tides, runaway greenhouse) |
+| [haptics/platform-encoding.md](haptics/platform-encoding.md) | R8, R8.1–R8.3 | (haptic parts cut, D-39; the sound rules stay live, see its banner) what each platform does (event: sound only on the A15), texture vs data haptics and the honesty rule for sounds, vibration patterns (after the event) |
+| [haptics/sources.md](haptics/sources.md) | R8.4 | (haptic parts cut, D-39; the sound rules stay live, see its banner) implementing a source: height map, mesh, field, terrain, flow, band, data pulse, light curve; what feeds the body tone |
+| [haptics/profiles.md](haptics/profiles.md) | R8.5, R8.6 | (haptic parts cut, D-39; the sound rules stay live, see its banner) mapping an object type to its texture/data haptics, or doing spectrum haptics |
+| [haptics/calibration.md](haptics/calibration.md) | R8.7 | (haptic parts cut, D-39; the sound rules stay live, see its banner) haptics/sound settings (event); first-use vibration calibration (after the event) |
+| [haptics/engine-api.md](haptics/engine-api.md) | R8.8 | (haptic parts cut, D-39; the sound rules stay live, see its banner) writing `HapticEngine`, drivers, trains or the tone stream (TS reference code) |
+| [haptics/wiring.md](haptics/wiring.md) | R8.8.1 | (haptic parts cut, D-39; the sound rules stay live, see its banner) wiring the engine, Feel, the body tone, Listen and Track into the app (M5) |
+| [haptics/audio-pairing.md](haptics/audio-pairing.md) | R8.9, R8.9.1, R8.9.2 | (haptic parts cut, D-39; the sound rules stay live, see its banner) writing the audio driver: timing, mapping, timbre by tag, Bluetooth latency; the body tone (Q-133); the Track path sound (Q-134) |
+| [sound/overview.md](sound/overview.md) | R13, R13.1 | the flyover soundscape and weather: what it is, terms, rules (honesty, refusals, determinism, no vibration, sound only after a click), the spec section map |
+| [sound/inputs-air.md](sound/inputs-air.md) | R13.2, R13.3 | the engine and card inputs with their tags, the new wrapper accessors, air physics (γ, c, ρ, Z, P(z), T(z), absorption) |
+| [sound/place-wind.md](sound/place-wind.md) | R13.4 | the listener, the `hKm` port, the sample pattern and classes, place features, the planetary wind model, gas giants, the local frame |
+| [sound/sources-weather.md](sound/sources-weather.md) | R13.5, R13.6 | the sound sources and their physics gates; lightning, thunder and the weather overlay with flash safety |
+| [sound/bake-mix.md](sound/bake-mix.md) | R13.7, R13.8 | baking the beds in a worker (loops, seeds, budgets, re-bake), the 10 Hz mixer, levels, world scaling, presentation, pan |
+| [sound/buses-stage.md](sound/buses-stage.md) | R13.9 | the buses, the ambience duck, the master limiter, the sound settings and Sound popover, stage audibility, the harmonic branch (built in #111) |
+| [sound/ui-lifecycle.md](sound/ui-lifecycle.md) | R13.10 | the Sound chip, captions, "What you hear", reduced motion, the lifecycle state machine, the performance budgets |
+| [sound/files-tests.md](sound/files-tests.md) | R13.11 | the ambience files, the tests, every constant, what is out of scope, the verify list, the module contract and the Appendix D rulings |
+| [sound/chord-pitch.md](sound/chord-pitch.md) | R13.12 | the spectrum chord and the pitch polarity (long wavelength = low pitch, Q-430) |
 | [accessibility.md](accessibility.md) | R9 | alt text, aria-live, control sizes, reduced motion, focus, sound as an alternative |
 | [layout.md](layout.md) | R10 | finding where rendering, viewer and haptics code lives and who owns it |
 | [layout-repo.md](layout-repo.md) | R10.1 | where the rest of the repo lives (interim, until the architecture spec owns it) |
@@ -64,6 +75,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | R5.7 | Motion and time-lapse | [display-rules.md#r57-motion-and-time-lapse](display-rules.md#r57-motion-and-time-lapse) |
 | R5.8 | Build split view and moulding | [build-mould.md#r58-build-split-view-and-moulding](build-mould.md#r58-build-split-view-and-moulding) |
 | R5.9 | Prototype engines (D-37) | [engines.md#r59-prototype-engines-d-37](engines.md#r59-prototype-engines-d-37) |
+| R5.9.1 | Engine and viewer performance (issue #93 waves) | [engines-performance.md#r591-engine-and-viewer-performance-issue-93-waves](engines-performance.md#r591-engine-and-viewer-performance-issue-93-waves) |
 | R6 | Surface generation (backend, CPU) | [surface-generation.md#r6-surface-generation-backend-cpu](surface-generation.md#r6-surface-generation-backend-cpu) |
 | R6.1 | Strategy: height first, colour second | [surface-generation.md#r61-strategy-height-first-colour-second](surface-generation.md#r61-strategy-height-first-colour-second) |
 | R6.2 | Card → generator parameters (deterministic rules) | [surface-generation.md#r62-card--generator-parameters-deterministic-rules](surface-generation.md#r62-card--generator-parameters-deterministic-rules) |
@@ -85,6 +97,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | R7.5.5 | Flares and prominences | [renderers/stars.md#r755-flares-and-prominences](renderers/stars.md#r755-flares-and-prominences) |
 | R7.6 | `candidate` | [renderers/candidate.md#r76-candidate](renderers/candidate.md#r76-candidate) |
 | R7.7 | Shader-generated kinds: `planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova` | [renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova](renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova) |
+| R7.7.1 | World engine values | [renderers/world-engine.md#r771-world-engine-values](renderers/world-engine.md#r771-world-engine-values) |
 | R8 | Haptics | [haptics/platform-encoding.md#r8-haptics](haptics/platform-encoding.md#r8-haptics) |
 | R8.1 | Platform reality | [haptics/platform-encoding.md#r81-platform-reality](haptics/platform-encoding.md#r81-platform-reality) |
 | R8.2 | Two kinds of haptics (both labelled in the UI) | [haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui](haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui) |
@@ -106,4 +119,17 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | R11.2 | Visual review checklist | [reference/checklist.md#r112-visual-review-checklist](reference/checklist.md#r112-visual-review-checklist) |
 | R11.3 | Frame-time checks | [reference/frame-time.md#r113-frame-time-checks](reference/frame-time.md#r113-frame-time-checks) |
 | R11.4 | A15 event-machine checks | [reference/a15-checks.md#r114-a15-event-machine-checks](reference/a15-checks.md#r114-a15-event-machine-checks) |
+| R13 | Sound of a world (flyover soundscape and weather) | [sound/overview.md#r13-sound-of-a-world-flyover-soundscape-and-weather](sound/overview.md#r13-sound-of-a-world-flyover-soundscape-and-weather) |
+| R13.1 | Summary, terms and rules | [sound/overview.md#r131-summary-terms-and-rules](sound/overview.md#r131-summary-terms-and-rules) |
+| R13.2 | Inputs: every value, its source, its tag | [sound/inputs-air.md#r132-inputs-every-value-its-source-its-tag](sound/inputs-air.md#r132-inputs-every-value-its-source-its-tag) |
+| R13.3 | Air physics | [sound/inputs-air.md#r133-air-physics](sound/inputs-air.md#r133-air-physics) |
+| R13.4 | Listener, place sampling and wind | [sound/place-wind.md#r134-listener-place-sampling-and-wind](sound/place-wind.md#r134-listener-place-sampling-and-wind) |
+| R13.5 | Sound sources: gates, physics and character | [sound/sources-weather.md#r135-sound-sources-gates-physics-and-character](sound/sources-weather.md#r135-sound-sources-gates-physics-and-character) |
+| R13.6 | Weather | [sound/sources-weather.md#r136-weather](sound/sources-weather.md#r136-weather) |
+| R13.7 | Baking (worker) | [sound/bake-mix.md#r137-baking-worker](sound/bake-mix.md#r137-baking-worker) |
+| R13.8 | Live mixing and levels | [sound/bake-mix.md#r138-live-mixing-and-levels](sound/bake-mix.md#r138-live-mixing-and-levels) |
+| R13.9 | Buses, ducking, master, settings and stage audibility | [sound/buses-stage.md#r139-buses-ducking-master-settings-and-stage-audibility](sound/buses-stage.md#r139-buses-ducking-master-settings-and-stage-audibility) |
+| R13.10 | UI, captions, lifecycle and budgets | [sound/ui-lifecycle.md#r1310-ui-captions-lifecycle-and-budgets](sound/ui-lifecycle.md#r1310-ui-captions-lifecycle-and-budgets) |
+| R13.11 | Files, tests, constants and the module contract | [sound/files-tests.md#r1311-files-tests-constants-and-the-module-contract](sound/files-tests.md#r1311-files-tests-constants-and-the-module-contract) |
+| R13.12 | Spectrum chord and pitch polarity | [sound/chord-pitch.md#r1312-spectrum-chord-and-pitch-polarity](sound/chord-pitch.md#r1312-spectrum-chord-and-pitch-polarity) |
 | R12 | Open items [verify] | [open-items.md#r12-open-items-verify](open-items.md#r12-open-items-verify) |

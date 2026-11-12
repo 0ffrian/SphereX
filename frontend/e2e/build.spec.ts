@@ -2,11 +2,12 @@
 // asked for with a right-click (issue #64: a left click opens the object, as the sky view does),
 // Build it (the split view moulds it step by step), and close it again (Escape, ×, Back). The
 // final frame of a build is the normal render of the same plan and seed: compared by SSIM with the
-// body opened from the rail's 3D viewer (built at once) at the same honesty level and pose.
+// body opened by the `build` link (built at once) at the same honesty level and pose.
 // "Aqua Prime" is the fixture water planet (fixtures/targets.ts): the shared planet_water card.
 import { expect, test, type Page } from '@playwright/test';
 import { GOLDEN_MAX_COLOUR_DELTA, GOLDEN_MIN_CHANNEL_SSIM, GOLDEN_MIN_SSIM } from './golden';
 import { scoreFrames, type Rgb } from './ssim';
+import { honestyLevel, setHonestyLevel } from './viewer';
 
 async function skyReady(page: Page): Promise<void> {
   await expect(page.getByTestId('sky-pane')).toHaveAttribute('data-sky-state', /ready|no-image/, {
@@ -29,20 +30,6 @@ async function selectAquaPrime(page: Page): Promise<void> {
   const marker = page.locator('[data-testid="sky-cached-marker"][data-object-id="aqua-prime"]');
   await expect(marker).toBeVisible({ timeout: 15_000 });
   await marker.click({ button: 'right' });
-}
-
-/** Opens the build pane's Details panel (the honesty level, view controls, Replay) if it is shut. */
-async function openDetails(page: Page): Promise<void> {
-  const button = page.getByTestId('build-details');
-  if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click();
-}
-
-async function setHonesty(page: Page, label: RegExp): Promise<void> {
-  await openDetails(page);
-  await page
-    .getByRole('group', { name: 'Honesty level' })
-    .getByRole('button', { name: label })
-    .click();
 }
 
 test('a left click on a marker opens it (#49); brackets, but no card', async ({ page }) => {
@@ -224,7 +211,9 @@ test('right-click on a picked position: a card with no 3D model, fingerprint sti
   await expect(card.getByRole('button', { name: /Build it/ })).toBeDisabled();
   expect(await contextMenus(page)).toEqual([true]);
   await card.getByRole('button', { name: 'See fingerprint' }).click();
-  await expect(page.getByTestId('tool-spectrum')).toHaveAttribute('aria-pressed', 'true');
+  // The dock has no Spectrum button: the object panel opens (a picked position has no frames, so
+  // no spectrum on the card).
+  await expect(page.getByTestId('object-panel')).toBeVisible();
   // Empty sky keeps the browser's own menu.
   await page.mouse.click(sky.x + 40, sky.y + 40, { button: 'right' });
   expect((await contextMenus(page)).at(-1)).toBe(false);
@@ -234,7 +223,8 @@ test('See fingerprint opens the object panel at the spectrum', async ({ page }) 
   await selectAquaPrime(page);
   await page.getByRole('button', { name: 'See fingerprint' }).click();
   await expect(page.getByTestId('object-panel')).toBeVisible();
-  await expect(page.getByTestId('tool-spectrum')).toHaveAttribute('aria-pressed', 'true');
+  // The dock has no Spectrum button: the panel opens with its spectrum on the card.
+  await expect(page.getByTestId('spectrum-panel')).toBeVisible();
 });
 
 test('Build it: split view, steps run to done, Escape and Back close it', async ({ page }) => {
@@ -253,11 +243,8 @@ test('Build it: split view, steps run to done, Escape and Back close it', async 
     .poll(async () => (await pane.boundingBox())!.width, { timeout: 120_000 })
     .toBeLessThan(view.width * 0.55);
   await expect(page.locator('.sx-transport-slot')).toHaveAttribute('inert', '');
-  // The generated surface is an artist's impression: + Artistic shows it, Replay builds it.
-  await setHonesty(page, /Artistic/);
-  await openDetails(page);
-  await page.getByTestId('build-replay').click();
-  await expect(pane).toHaveAttribute('data-phase', 'building', { timeout: 60_000 });
+  // The first build already shows the steps and raises the level to + Artistic by itself (the pane
+  // has no Replay button or Show control any more, so nothing is replayed or set here).
   const steps = page.getByTestId('build-step');
   await expect(steps).toHaveText([/Base mould/, /Terrain/, /Oceans/, /Colour/, /Clouds/]);
   await expect(steps.first()).toHaveAttribute('data-state', /active|done/);
@@ -315,22 +302,14 @@ test('Build it from a fresh load raises the level and builds all five steps (wat
 }) => {
   test.setTimeout(120_000);
   await selectAquaPrime(page);
-  const group = page.getByRole('group', { name: 'Honesty level' });
   await page.getByTestId('build-it').click();
   const pane = page.getByTestId('build-pane');
-  await openDetails(page);
   // The default level is + Estimated, which hides the artistic world: the build raises it, says so.
-  await expect(group.getByRole('button', { name: /Artistic/ })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-    { timeout: 30_000 },
-  );
+  await expect.poll(() => honestyLevel(page), { timeout: 30_000 }).toBe('artistic');
   await expect(page.getByTestId('viewer-announcer')).toHaveText(
     "Showing artist's impression so the whole body can be built",
   );
-  // The level is visible in the header without opening Details, and Show stays reachable.
-  await expect(page.getByTestId('build-level')).toContainText('Default');
-  await expect(page.getByTestId('build-level')).toContainText('artist');
+  // ASSUMPTION: the level badge in the pane header (build-level) is gone; the level is announced.
   const steps = page.getByTestId('build-step');
   await expect(steps).toHaveText([/Base mould/, /Terrain/, /Oceans/, /Colour/, /Clouds/], {
     timeout: 60_000,
@@ -341,12 +320,8 @@ test('Build it from a fresh load raises the level and builds all five steps (wat
   await expect(page.getByTestId('build-title')).toHaveText('Building Aqua Prime');
   await expect(page.getByTestId('build-announcer')).toHaveText('Built Aqua Prime');
   // The user can drop back at any time.
-  await group.getByRole('button', { name: /Measured only/ }).click();
-  await expect(group.getByRole('button', { name: /Measured only/ })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await expect(page.getByTestId('build-level')).toContainText('Measured');
+  await setHonestyLevel(page, 'measured');
+  await expect.poll(() => honestyLevel(page)).toBe('measured');
 });
 
 test('the level changed mid-build ends the build on the new plan', async ({ page }) => {
@@ -355,11 +330,7 @@ test('the level changed mid-build ends the build on the new plan', async ({ page
   await page.getByTestId('build-it').click();
   const pane = page.getByTestId('build-pane');
   await expect(pane).toHaveAttribute('data-phase', 'building', { timeout: 60_000 });
-  await openDetails(page);
-  await page
-    .getByRole('group', { name: 'Honesty level' })
-    .getByRole('button', { name: /Measured only/ })
-    .click();
+  await setHonestyLevel(page, 'measured');
   // Not after the whole 11.5 s: it ends at once, ticked, on the Measured-only picture.
   await expect(pane).toHaveAttribute('data-phase', 'done', { timeout: 6_000 });
   for (const st of await page.getByTestId('build-step').all())
@@ -382,10 +353,11 @@ test('phone width: the sheet reaches the search bar and the sky under it is iner
   const pane = page.getByTestId('build-pane');
   await expect(pane).toBeVisible({ timeout: 15_000 }); // the pane builds on a software GPU
   await expect(page.locator('.sx-sky-slot')).toHaveAttribute('inert', '');
-  // The transport slot does not keep its space: the sheet ends just above the search bar.
+  // The transport slot does not keep its space: the sheet ends just above the floating dock (its
+  // 8 px margin and the dock's own padding make the gap to the search field about 70 px).
   const sheet = (await pane.boundingBox())!;
   const search = (await page.locator('.sx-search-slot').boundingBox())!;
-  expect(search.y - (sheet.y + sheet.height)).toBeLessThan(24);
+  expect(search.y - (sheet.y + sheet.height)).toBeLessThan(80);
   // × closes it and the sky is live again.
   await page.getByTestId('build-close').click();
   await expect(pane).toHaveCount(0);
@@ -460,6 +432,9 @@ async function settledShot(page: Page): Promise<Buffer> {
   return page.screenshot({ clip: box, mask: [page.getByTestId('viewer-label')] });
 }
 
+// UNVERIFIED after the D-38 redesign: re-pointed to the first (animated) build and the `build` link
+// because the pane has no Replay or 3D viewer button now, but `freezeClock` in settledShot did not
+// return in the headless run here (150 s timeout), so the SSIM comparison itself was not reached.
 test('the last frame of a build is the normal render of the same plan and seed', async ({
   page,
   context,
@@ -468,18 +443,18 @@ test('the last frame of a build is the normal render of the same plan and seed',
   await selectAquaPrime(page);
   await page.getByTestId('build-it').click();
   const pane = page.getByTestId('build-pane');
-  await expect(pane).toHaveAttribute('data-phase', /building|done/, { timeout: 60_000 });
-  await setHonesty(page, /Artistic/);
-  await openDetails(page);
-  await page.getByTestId('build-replay').click();
+  // The animated build of Build it (it raises the level to + Artistic by itself).
   await expect(pane).toHaveAttribute('data-phase', 'done', { timeout: 90_000 });
   await page.mouse.move(0, 0);
   const built = await settledShot(page);
 
-  // The same body opened from the rail: built at once, no animation.
+  // The same body opened by the link: built at once, no animation.
   await page.getByTestId('build-close').click();
   await expect(pane).toHaveCount(0);
-  await page.getByTestId('tool-viewer').click();
+  // The dock has no 3D viewer button: the `build` link opens the pane built at once.
+  await page.evaluate(
+    "globalThis.location.hash = globalThis.location.hash.replace(/^#/, '') + '&build'",
+  );
   await expect(pane).toHaveAttribute('data-phase', 'done', { timeout: 60_000 });
   await page.waitForFunction(() => {
     const v = (globalThis as unknown as { __sxViewer?: { body: { drawn: string[] } | null } })

@@ -1,11 +1,23 @@
 {
-  "asset_version": "11",
+  "asset_version": "13",
   "card": {
+    "dayside_temp_K": {
+      "err": 65.0,
+      "source": "literature: Kammer et al. 2015, ApJ 810, 118 (arXiv:1508.00902), Table 3: 4.5 um secondary eclipse, brightness temperature 1055 (+60 / -65) K (backend/assets/literature.toml). Spitzer IRAC 4.5 um, one eclipse; err is the larger side of +60 / -65; the brightness temperature uses a PHOENIX stellar model. At 3.6 um: 1213 (+58 / -62) K",
+      "tag": "measured",
+      "value": 1055.0
+    },
     "host_age_gyr": {
       "err": 4.0,
       "source": "NASA Exoplanet Archive PSCompPars st_age (Mancini et al. 2018)",
       "tag": "measured",
       "value": 8.5
+    },
+    "host_lum_lsun": {
+      "err": 0.03402777295662529,
+      "source": "NASA Exoplanet Archive PSCompPars st_lum, log10 L/L_sun converted as 10^st_lum (Panek et al. 2023)",
+      "tag": "measured",
+      "value": 0.744869171241254
     },
     "host_mass_msun": {
       "err": 0.047,
@@ -25,7 +37,18 @@
       "tag": "measured",
       "value": 5485.0
     },
+    "hotspot_offset_deg": {
+      "source": "not available: no published full-orbit phase curve of WASP-39 b (Spitzer or JWST) was found, so no hotspot offset is measured",
+      "tag": "measured",
+      "value": null
+    },
     "id": "simbad-wasp-39b",
+    "insolation_searth": {
+      "formula": "S / S_earth = (L_star / L_sun) / (a / au)^2, the flux at the planet computed by the reference from its host luminosity and orbit; not a direct measurement",
+      "source": "NASA Exoplanet Archive PSCompPars pl_insol (ExoFOP)",
+      "tag": "derived",
+      "value": 316.269
+    },
     "mass_mearth": {
       "err": 10.17056,
       "source": "NASA Exoplanet Archive PSCompPars pl_bmasse (Mancini et al. 2018)",
@@ -33,11 +56,22 @@
       "value": 89.31023
     },
     "name": "WASP-39 b",
+    "nightside_temp_K": {
+      "source": "not available: no published full-orbit phase curve of WASP-39 b (Spitzer or JWST) was found; the JWST Early Release Science observations are transits and eclipses",
+      "tag": "measured",
+      "value": null
+    },
     "orbit_au": {
       "err": 0.00082,
       "source": "NASA Exoplanet Archive PSCompPars pl_orbsmax (Mancini et al. 2018)",
       "tag": "measured",
       "value": 0.04828
+    },
+    "orbit_ecc": {
+      "assumption": "the reference gives e = 0 with no uncertainty, which means the orbit was fixed to a circle in its fit; read as an assumed circular orbit, not a measured eccentricity",
+      "source": "NASA Exoplanet Archive PSCompPars pl_orbeccen (Carter et al. 2024)",
+      "tag": "model_dependent",
+      "value": 0.0
     },
     "orbital_period_d": {
       "err": 3.4e-06,
@@ -60,21 +94,23 @@
       "value": 1.279
     },
     "teq_K": {
+      "assumption": "the cited paper's own albedo and heat redistribution (often zero Bond albedo and full redistribution; the Kepler KOI table assumes A = 0.3; the archive row does not say which); an equilibrium temperature, not a measured one",
+      "formula": "Teq = T_star * sqrt(R_star / (2a)) * (1 - A)^(1/4), as computed in the cited paper",
       "source": "NASA Exoplanet Archive PSCompPars pl_eqt (Mancini et al. 2018)",
-      "tag": "measured",
+      "tag": "derived",
       "value": 1166.0
     },
     "type": "gas_giant"
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "6bcb58e0c99ea61e98fd5710ac8ee20e0dc5e8408cf7791521da0a24baf6343a",
+  "inputs_sha256": "c73f3bd3f7e58b621893d02343575816cfd4e8594ad4d1423f16a4e3a9b45893",
   "render_params": {
     "alt_text": "WASP-39 b, Gas giant, 1.28 Jupiter radii (measured), colour family from the equilibrium temperature, lit by its star. Surface relief: illustrative.",
     "confidence": {
-      "assumed_share": 0.4725,
-      "band": "part_data",
-      "estimated_share": 0.1,
+      "assumed_share": 0.5975,
+      "band": "mostly_assumed",
+      "estimated_share": 0.125,
       "formula": "C = sum(w_i c_i) / sum(w_i): c is 1 for a measured value or a formula of measured values, a placeholder share for a model-dependent one, and 0 for an assumed, artistic or missing one; the w_i are placeholder weights (D-36, Q-221)",
       "found": "Data for: Radius, mass, orbit and tides, temperature and colour.",
       "gate": {
@@ -119,25 +155,25 @@
           "weight": 10
         },
         {
-          "c": 1.0,
+          "c": 0.5,
           "fields": [
             "teq_K"
           ],
           "id": "temperature",
           "label": "Temperature",
-          "points": 15.0,
-          "tag": "measured",
+          "points": 7.5,
+          "tag": "derived",
           "weight": 15
         },
         {
-          "c": 1.0,
+          "c": 0.5,
           "fields": [
             "teq_K"
           ],
           "id": "colour",
           "label": "Colour",
-          "points": 10.0,
-          "tag": "derived",
+          "points": 5.0,
+          "tag": "model_dependent",
           "weight": 10
         },
         {
@@ -168,11 +204,11 @@
           "weight": 10
         }
       ],
-      "measured_share": 0.4275,
+      "measured_share": 0.2775,
       "needed": "",
       "note": "This is how much of the picture rests on data. It is not the probability that the picture is correct.",
-      "raise": "A better measurement of: mass.",
-      "score": 0.5275,
+      "raise": "A better measurement of: temperature.",
+      "score": 0.4025,
       "tag": "derived",
       "threshold": 0.25,
       "weights_note": "Placeholder weights: they come from the approved prototype until a sensitivity sweep replaces them (D-36)."
@@ -180,7 +216,7 @@
     "generator_version": "p1-b4",
     "haptics": {
       "data": "teq_pulse",
-      "data_tag": "measured",
+      "data_tag": "derived",
       "params": {
         "maxRateHz": 12.0
       },

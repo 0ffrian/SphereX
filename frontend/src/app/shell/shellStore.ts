@@ -1,16 +1,9 @@
 // Shell UI state: which tool of the left rail is open, the selected body's card (issue #60) and
 // the build pane (issue #60). 'sky' is the sky view alone (no panel); 'flipbook' and 'spectrum'
-// open the object panel at that section; 'viewer' is the build pane opened from the rail; 'area'
-// is Area search (A18, issue #96): its feature card and sky layers.
+// open the object panel at that section; 'area' is the Discovery tool (draw an area on the sky); 'viewer' is the build pane opened from the rail.
 import { create } from 'zustand';
 
 export type ToolId = 'sky' | 'flipbook' | 'spectrum' | 'viewer' | 'area';
-
-/**
- * What a primary drag on the sky does (A21.6; Q-174, built ahead for Area, Q-406): `pan` moves the
- * view, `draw` sends the drag and a click to the registered draw handler (Area search's square).
- */
-export type PointerMode = 'pan' | 'draw';
 
 /** The 3D body of the selected object, loaded from `/card` and `/render-params` (D-16). */
 export type BodyLoad =
@@ -47,10 +40,13 @@ export interface ShellState {
    * opening the object panel drops the request, so closing the panel shows the sky, not the card.
    */
   cardRequested: boolean;
-  pointerMode: PointerMode;
-  /** Choosing any tool sets the pointer mode back to `pan`; Area search then sets `draw`. */
+  /**
+   * The object panel (the Flipbook card) is minimised into the island's pill (Moon, 12 Nov 2026):
+   * a click on the pill opens it again. Any other way of opening or leaving a panel clears it.
+   */
+  minimised: boolean;
+  setMinimised(on: boolean): void;
   setTool(tool: ToolId): void;
-  setPointerMode(mode: PointerMode): void;
   closePanel(): void;
   setBody(body: BodyLoad): void;
   /** Show the selected object's or position's card (leaves the object panel for the sky). */
@@ -68,15 +64,14 @@ export const useShellStore = create<ShellState>()((set) => ({
   body: { status: 'idle' },
   build: { open: false, animate: false, seq: 0, seedOffset: 0 },
   cardRequested: false,
-  pointerMode: 'pan',
+  minimised: false,
+  setMinimised: (minimised) => set((s) => (s.minimised === minimised ? s : { minimised })),
   setTool: (tool) =>
     set((s) => ({
       tool,
+      minimised: false,
       focusSeq: s.focusSeq + 1,
-      pointerMode: 'pan',
-      // Area search has its own card in the object card's slot, so a card request is dropped too.
-      cardRequested:
-        tool === 'flipbook' || tool === 'spectrum' || tool === 'area' ? false : s.cardRequested,
+      cardRequested: tool === 'flipbook' || tool === 'spectrum' ? false : s.cardRequested,
       // The rail's 3D viewer is the build pane, with the body already built (no animation).
       build:
         tool === 'viewer'
@@ -86,22 +81,21 @@ export const useShellStore = create<ShellState>()((set) => ({
             ? { ...s.build, open: false, seedOffset: 0 }
             : s.build,
     })),
-  setPointerMode: (pointerMode) => set({ pointerMode }),
-  closePanel: () => set({ tool: 'sky', pointerMode: 'pan' }),
+  closePanel: () => set({ tool: 'sky', minimised: false }),
   setBody: (body) => set({ body }),
   requestCard: () =>
     set((s) => ({
       cardRequested: true,
+      minimised: false,
       // The object panel steps aside so the card shows; an open build pane keeps the view.
       tool: s.build.open ? s.tool : 'sky',
-      pointerMode: 'pan',
     })),
   cancelCard: () => set({ cardRequested: false }),
   openBuild: (animate) =>
     set((s) => ({
       // The object panel steps aside: the sky takes the left half and the pane the right.
       tool: animate ? 'sky' : 'viewer',
-      pointerMode: 'pan',
+      minimised: false,
       build: { open: true, animate, seq: s.build.seq + 1, seedOffset: 0 },
     })),
   replayBuild: () => set((s) => ({ build: { ...s.build, animate: true, seq: s.build.seq + 1 } })),

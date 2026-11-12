@@ -8,8 +8,9 @@
 // mock-up's cuDraw does the same); this layer has the honesty caption (.sx-cu-tag, the
 // mock-up's .cu-tag), the controls and the input. Keyboard: arrows or W A S D move and turn, + and -
 // change the height, Page Up and Page Down tilt. Reduced motion: no automatic flying.
-import { useEffect, useReducer, useRef, useState } from 'react';
-import type { CloseUpInfo } from '@/viewer/ViewerApp';
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
+import { animate } from 'motion';
+import { deferFrames, EXPLORE_SPRING } from './build/exploreMotion';
 import { useCloseUpStore } from './closeUpStore';
 import { ORBIT_NOTE } from '@/viewer/orbit/orbitSources';
 import { altRange } from '@/viewer/orbit/orbitMath';
@@ -19,22 +20,19 @@ import { buttonClass, pressedClass } from './ui';
 // case-insensitive file system (Windows) would resolve `./StarCloseUp` to it.
 import { StarCloseUp } from './StarCloseUp.tsx';
 import { RockCloseUp } from './RockCloseUp';
-import { StarFlareStage, StarSurfaceCloseUp } from './StarEngineStage';
-import { placeText, useStarTarget } from './starTargetStore';
-import { STAR_CLOSEUP_TAG, useStarCloseUp } from './starCloseUp';
-import { WorldFlyStage, worldCaption } from './WorldEngineStage';
+import { StarFlareStage } from './StarEngineStage';
+import { useStarCloseUp } from './starCloseUp';
+import { WorldFlyStage } from './WorldEngineStage';
 import { engineKey, useWorldStore } from './worldStore';
-import { FLY_NOTE } from './worldNotes.generated';
 import { useAppStore } from '@/state/store';
 import { useRockStore } from './rockStore';
-
-/** The mock-up's cuTag for the flare close-up, true to the prototype: a Sun-like flare, not this star's own. */
-const ENGINE_CAPTION =
-  'Close-up · a flare at the edge of a Sun-like star, hydrogen-alpha with hot loops · illustrative (Default), not a measurement of this star';
 
 export type CloseUpKind = 'orbit' | 'star' | 'body';
 
 /** Which close-up an object type gets. */
+// Moon (11 Nov 2026): no on-render control bars. Height follows scroll, pinch and the zoom bar; the
+// layer list lives in Details. Kept behind this flag so the controls can come back.
+const SHOW_FLY_BAR = false as boolean;
 export function closeUpKindOf(type: string | null | undefined): CloseUpKind | null {
   switch (type) {
     case 'planet_rocky':
@@ -55,25 +53,12 @@ export function closeUpKindOf(type: string | null | undefined): CloseUpKind | nu
   }
 }
 
+/**
+ * The close-up's name per kind. Unused in the UI since Q-450 (the header toggle is always "Explore");
+ * kept on purpose for the Details row or a tooltip that names the view, and covered by its test.
+ */
 export function closeUpButtonLabel(kind: CloseUpKind | null): string {
   return kind === 'orbit' ? 'Surface view' : 'Close-up view';
-}
-
-/** The mock-up's caption for each kind (its `.cu-tag` wording: "Close-up · what · honesty"). */
-export function closeUpCaption(
-  kind: CloseUpKind,
-  info: CloseUpInfo | null,
-  gas: boolean,
-  starOk = false,
-): string {
-  if (kind === 'star')
-    return starOk ? STAR_CLOSEUP_TAG : 'Close-up · not available for this star (no surface model)';
-  if (kind === 'body')
-    return 'Close-up · the same body seen from near its surface · generated (Default)';
-  if (info?.refusal) return `Close-up · ${info.refusal}`;
-  return gas
-    ? 'Close-up · from orbit, click the globe to look at a place · generated from the solved winds (Default), not a photograph'
-    : 'Close-up · from orbit, click the globe to look at a place · generated from physics (Default), not a photograph';
 }
 
 export function CloseUpPane() {
@@ -91,8 +76,6 @@ export function CloseUpPane() {
   const starFailedId = useWorldStore((s) => s.starFailedId);
   // A failure belongs to the card and preset it happened on: the next object is tried afresh.
   const cardId = useAppStore((s) => s.card?.id);
-  const left = useStarTarget((s) => s.left);
-  const starTarget = useStarTarget((s) => s.target);
   const kind = closeUpKindOf(type);
   // Issue #71 stream X (D-37): a star the prototype's engine draws opens with the build, with the flare close-up.
   const engine =
@@ -110,7 +93,65 @@ export function CloseUpPane() {
     !hidden &&
     kind !== null &&
     (engine || world || rockEngine ? !held : info !== null && info.mode !== null);
+  // Render-performance roadmap 0.7: once the fly view has been opened for this object, it stays
+  // mounted (paused) while the close-up is closed, so reopening skips the GL context, the fly-shader
+  // compile (22 to 43 s cold) and the 900-step spin-up. Another object (or preset) drops it: the
+  // key changes, and a null `world` (engines off, "Measured only", a failure) unmounts it.
+  const flyKey = world ? engineKey(cardId, world.preset.id) : null;
+  const [keptFly, setKeptFly] = useState<string | null>(null);
+  if (open && flyKey !== null && keptFly !== flyKey) setKeptFly(flyKey);
+  const mountFly = flyKey !== null && (open || keptFly === flyKey);
   const [, bump] = useReducer((n: number) => n + 1, 0);
+  // Q-450: the star stages start a couple of frames after the pane springs in, so a new WebGL
+  // context never holds up the first frames of the slide, and they unmount once the fade has
+  // finished. The fly view does not use this: it follows `mountFly` above (kept mounted, paused).
+  // `live` names the stage that is mounted, so a new object's stage never starts while the pane is closed.
+  const stageKey = engine ? `star:${engine.preset.id}` : `kind:${kind ?? ''}`;
+  const [liveKey, setLiveKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (open) return deferFrames(() => setLiveKey(stageKey));
+    const id = window.setTimeout(() => setLiveKey(null), 700);
+    return () => window.clearTimeout(id);
+  }, [open, stageKey]);
+  const live = liveKey === stageKey;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const wasOpen = useRef(open);
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el || wasOpen.current === open) return;
+    wasOpen.current = open;
+    // When an animation ends, its inline styles go, so the stylesheet (and the phone layout) rules again.
+    const settle = () => {
+      el.style.removeProperty('opacity');
+      el.style.removeProperty('transform');
+    };
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      settle();
+      return;
+    }
+    // On a phone the pane is the top of the screen: it fades, it does not slide in from the left.
+    const phone = window.matchMedia?.('(max-width: 640px)').matches ?? false;
+    const away = 'translateX(-48px) scale(0.98)';
+    const here = 'translateX(0px) scale(1)';
+    // Start from where the pane is now: the inline values a stopped animation left, else the state
+    // it was in before the class changed (the stylesheet already shows the new state).
+    const fromOpacity = el.style.opacity !== '' ? Number(el.style.opacity) : open ? 0 : 1;
+    const fromTransform = el.style.transform || (open ? away : here);
+    const a = open
+      ? animate(
+          el,
+          phone ? { opacity: [fromOpacity, 1] } : { opacity: [fromOpacity, 1], transform: [fromTransform, here] },
+          EXPLORE_SPRING,
+        )
+      : animate(
+          el,
+          phone ? { opacity: [fromOpacity, 0] } : { opacity: [fromOpacity, 0], transform: [fromTransform, away] },
+          { duration: 0.35, ease: [0.4, 0, 1, 1] },
+        );
+    void a.finished.then(settle, () => {});
+    // Stopped by the next change: its values stay inline for the next animation to start from.
+    return () => a.stop();
+  }, [open]);
   const [about, setAbout] = useState(false);
   const focusRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -186,13 +227,6 @@ export function CloseUpPane() {
   }, [viewer, view, open, world]);
 
   if (!kind) return null;
-  const caption = world
-    ? worldCaption(world.preset.type === 'gas')
-    : engine
-      ? left === 'surface'
-        ? `Close-up · the star\u2019s surface at ${placeText(starTarget)} · generated (Default), not a photograph`
-        : ENGINE_CAPTION
-      : closeUpCaption(kind, info, gas, starProps !== null);
   const [lo, hi] = view ? altRange(view.kind) : [0, 1];
   const alt = view?.state.altKm ?? 0;
 
@@ -231,6 +265,7 @@ export function CloseUpPane() {
 
   return (
     <div
+      ref={rootRef}
       className={`sx-cu${open ? ' open' : ''}`}
       aria-hidden={open ? undefined : true}
       data-testid="closeup-pane"
@@ -253,76 +288,24 @@ export function CloseUpPane() {
         />
       )}
       {kind === 'body' && <RockCloseUp active={open} />}
-      {world && open && (
+      {world && mountFly && (
         <WorldFlyStage
-          key={world.preset.id}
+          key={flyKey}
           world={world}
           reduced={reducedMotion}
+          paused={!open}
           onFail={() => useWorldStore.getState().fail(engineKey(cardId, world.preset.id))}
         />
       )}
-      {engine && open && left === 'flare' && (
-        <StarFlareStage
-          key={engine.preset.id}
-          star={engine}
-          onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))}
-        />
+      {engine && live && (
+        <StarFlareStage key={engine.preset.id} star={engine} onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))} />
       )}
-      {engine && open && left === 'surface' && (
-        <StarSurfaceCloseUp
-          key={engine.preset.id}
-          star={engine}
-          onFail={() => useWorldStore.getState().failStar(engineKey(cardId, engine.preset.id))}
-        />
-      )}
-      {engine && open && (
-        <div
-          className="absolute right-3 top-3 z-[3] flex flex-wrap items-center gap-2"
-          role="group"
-          aria-label="Star close-up"
-        >
-          <button
-            type="button"
-            className={`${buttonClass} ${pressedClass}`}
-            aria-pressed={left === 'flare'}
-            onClick={() => useStarTarget.getState().show('flare')}
-          >
-            Flare close-up
-          </button>
-          <button
-            type="button"
-            className={`${buttonClass} ${pressedClass}`}
-            aria-pressed={left === 'surface'}
-            onClick={() => useStarTarget.getState().show('surface')}
-          >
-            Surface close-up
-          </button>
-          {left === 'surface' && (
-            <button
-              type="button"
-              className={buttonClass}
-              disabled={starTarget === null}
-              onClick={() => useStarTarget.getState().home()}
-            >
-              Back to the active region
-            </button>
-          )}
-        </div>
-      )}
-      {kind === 'star' && !engine && starProps && open && (
+      {kind === 'star' && !engine && starProps && live && (
         <div className="absolute inset-0 bg-black" data-testid="star-closeup">
           <StarCloseUp {...starProps} className="absolute inset-0" />
         </div>
       )}
-      <span className="sx-cu-tag" data-testid="closeup-caption">
-        {caption}
-        {world && open && (
-          <span className="mt-1 block text-[#c1c9cd]" data-testid="fly-note">
-            {FLY_NOTE}
-          </span>
-        )}
-      </span>
-      {view && !world && (
+      {SHOW_FLY_BAR && view && !world && (
         <div className="sx-cu-controls" role="group" aria-label="Surface view controls">
           <label htmlFor="orbit-alt" className="flex-1 basis-40">
             {gas ? 'Height above the clouds' : 'Height above the ground'}:{' '}
@@ -367,11 +350,8 @@ export function CloseUpPane() {
           </button>
         </div>
       )}
-      {view && !world && about && info?.resolved && (
-        <div
-          className="absolute inset-x-4 bottom-36 z-[3] max-h-[45%] overflow-auto rounded-lg border border-[#323a3e] bg-[#242729f2] p-3 text-xs text-neutral-200"
-          data-testid="orbit-layers"
-        >
+      {SHOW_FLY_BAR && view && !world && about && info?.resolved && (
+        <div className="absolute inset-x-4 bottom-36 z-[3] max-h-[45%] overflow-auto rounded-lg border border-[#323a3e] bg-[#242729f2] p-3 text-xs text-neutral-200" data-testid="orbit-layers">
           <p className="mb-2">{ORBIT_NOTE}</p>
           <ul className="flex flex-col gap-1">
             {info.resolved.layers.map((l) => (

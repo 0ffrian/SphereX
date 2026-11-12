@@ -6,11 +6,17 @@
 // setFly(true) the left 60% of the canvas is the fly view and the right 40% is the globe; with fly off the
 // globe fills the canvas. `view()` returns the pixel rectangles so a host can overlay or crop them
 // (or run two WorldEngine instances on two canvases, each with its own context, if it wants separate panes).
-import { createCore, type Core } from './core.js';
+import { createCore, type Core, type CoreGL } from './core.js';
 import { WP, FLUIDS } from './presets.js';
+import { GlGpuTimer } from './glTimer';
+import { applyOverrides, loadPreset, resetsWorld, simKey } from './engineControls';
+import { LocalSimSource, type SimFollower, type SimSource } from './simSource';
+import { applySimOp, applySimState, resyncSim } from './simFollow';
+import type { SimOp, SimSnapshot, SimState } from './simHost';
 import type {
   EngineOptions,
   EngineOverrides,
+  EngineRole,
   FluidKey,
   Readouts,
   SpinMode,
@@ -53,6 +59,76 @@ export interface CpuFields {
   hydro: any;
 }
 
+/** Issue #114 (sound spec §3.3): the energy budget's weather arrays, NX x NY cells, row 0 = south pole. */
+export interface WeatherFields {
+  NX: number;
+  NY: number;
+  /** EB.h, sea-ice thickness (engine units). */
+  iceH: Float32Array;
+  /** EB.s, frost and snow on land. */
+  snow: Float32Array;
+  /** EB.out, 4 per cell: T, smoothed ice, smoothed frost, relative humidity. */
+  out: Float32Array;
+  /** EB.out2, 4 per cell: rain / rainMax, ocean-current speed, u, v. */
+  out2: Float32Array;
+  /**
+   * The cyclones the clouds draw (EB.cyc, first 12, as cloudStep): centre where the vortex is drawn now (lon drifted
+   * by (W.step - born) * drift and wrapped as core.js does), radius r (rad), spin sign s.
+   */
+  cyclones: { lon: number; lat: number; r: number; s: number }[];
+}
+
+/** Issue #114 (§3.3, §8.5): the fly camera basis (body frame) and its drawing constants. */
+export interface FlyCameraBasis {
+  /**
+   * Eye position in planet radii (body frame): up * (1 + (ex * groundKm + alt) / rkm). A world point at height h km over
+   * the unit direction d is d * (1 + h * ex / rkm) (the shader's surfR; the cloud shell is 1 + cloudKm * ex / rkm).
+   */
+  cam: [number, number, number];
+  fwd: [number, number, number];
+  rt: [number, number, number];
+  up: [number, number, number];
+  /** Planet radius, km. */
+  rkm: number;
+  /** Vertical exaggeration of the drawn relief (3 rocky, 2 gas). */
+  ex: number;
+  /**
+   * tan of the half vertical field of view (FLY_FS: rd = fwd + q.x * fov * rt + q.y * fov * up, q.y in [-1, 1]); 0.62 is
+   * a 63.6 degree vertical view. The horizontal extent is fov * aspect, aspect = the fly pane's width / height.
+   */
+  fov: number;
+}
+
+/** The fly view's field of view: core.js draw sets `gl.uniform1f(uF.uFov, 0.62)`. */
+export const FLY_FOV = 0.62;
+
+/** Issue #114 (blue 13, for #117): where a body-frame point (planet radii) falls in the fly view. */
+export interface FlyProjection {
+  /** -1 (left edge) .. 1 (right edge) of the fly pane; outside that range the point is off screen. */
+  x: number;
+  /** -1 (bottom) .. 1 (top). */
+  y: number;
+  /** The point is in front of the eye. */
+  inFront: boolean;
+}
+
+/**
+ * Project a body-frame point (planet radii, see FlyCameraBasis.cam) into the fly view, inverting FLY_FS's ray
+ * rd = fwd + q.x * fov * rt + q.y * fov * up with q = (2 frag - res) / res.y. `aspect` is the fly pane's width / height
+ * (core draws the fly view into viewport (0, 0, round(0.6 w), h); not the canvas aspect). Visible: inFront and |x|, |y| <= 1.
+ */
+export function projectFly(
+  b: Pick<FlyCameraBasis, 'cam' | 'fwd' | 'rt' | 'up' | 'fov'>,
+  aspect: number,
+  p: readonly [number, number, number],
+): FlyProjection {
+  const v = [p[0] - b.cam[0], p[1] - b.cam[1], p[2] - b.cam[2]];
+  const dot = (a: readonly number[]) => v[0]! * a[0]! + v[1]! * a[1]! + v[2]! * a[2]!;
+  const a = dot(b.fwd);
+  if (!(a > 0)) return { x: NaN, y: NaN, inFront: false };
+  return { x: dot(b.rt) / (a * b.fov * aspect), y: dot(b.up) / (a * b.fov), inFront: true };
+}
+
 export interface EngineState {
   Tstar: number;
   orbit: number;
@@ -74,10 +150,31 @@ export interface EngineState {
   rotation: number;
 }
 
-export class WorldEngine {
+/** How often a disposed engine checks whether its shaders have finished compiling (UI pacing, ms). */
+export const DISPOSE_POLL_MS = 100;
+/**
+ * Longest a disposed engine waits for a compile still running (ms). After it the engine stops polling and drops the
+ * context to the browser without `loseContext()` (which would block on that compile); it goes with the canvas.
+ */
+export const DISPOSE_MAX_WAIT_MS = 180_000;
+
+export class WorldEngine implements SimFollower {
   private core: Core;
+  /**
+   * Issue #93 1.9, 1.10: the simulation this engine draws when it does not run its own (null: it runs its own, as the
+   * prototype does). See simSource.ts.
+   */
+  private sim: SimSource | null = null;
+  /** This core's own climate arrays; a followed simulation's arrays replace them while it is followed. */
+  private ownEb: Record<'T' | 'rain' | 'out' | 'out2', Float32Array>;
   private canvas: HTMLCanvasElement;
   private tickN = 0;
+  private isReady = false;
+  private readyP: Promise<void> | null = null;
+  private disposed = false;
+  private readonly role: EngineRole;
+  /** Roadmap 0.1, dev only: GPU time of each tick (null when off or unsupported). */
+  private readonly gpuTimer: GlGpuTimer | null;
   /** Live fly-camera state. Assigning a field takes effect at the next draw(). */
   readonly fly: FlyState;
 
@@ -92,8 +189,14 @@ export class WorldEngine {
         alpha: false,
         powerPreference: 'high-performance',
       });
-    this.core = createCore(canvas);
+    // Issue #93: the shaders are submitted here and compile in the background (see whenReady).
+    this.role = opts.role ?? 'both';
+    this.core = createCore(canvas, { role: this.role });
+    // The same context the core made (getContext returns it again); read-only timing around tick().
+    this.gpuTimer = opts.gpuTiming ? GlGpuTimer.create(canvas.getContext('webgl2')) : null;
     const W = this.core.W;
+    const EB = this.core.EB;
+    this.ownEb = { T: EB.T, rain: EB.rain, out: EB.out, out2: EB.out2 };
     this.fly = {
       get alt() {
         return W.flyAlt;
@@ -134,13 +237,48 @@ export class WorldEngine {
     };
   }
 
+  /**
+   * True once the shaders are compiled and linked. Never waits for the driver (KHR_parallel_shader_compile; without
+   * the extension it links at once, which waits as the prototype did). Throws the compile or link log.
+   */
+  pollReady(): boolean {
+    if (!this.isReady) this.isReady = (this.core.W.gl as CoreGL).poll();
+    return this.isReady;
+  }
+
+  /**
+   * Resolves when the shaders are linked, checking every 16 ms so the page keeps running meanwhile (issue #93: the fly
+   * shader took about 60 s on a cold ANGLE D3D11 cache). Rejects with the compile or link log. A host that loads a
+   * world before this resolves still works: the first step or draw links the programs, waiting for the driver.
+   */
+  whenReady(): Promise<void> {
+    if (!this.readyP)
+      this.readyP = new Promise<void>((resolve, reject) => {
+        const check = () => {
+          if (this.disposed)
+            return reject(new Error('world engine disposed before its shaders were ready'));
+          try {
+            if (this.pollReady()) resolve();
+            else setTimeout(check, 16);
+          } catch (err) {
+            reject(err instanceof Error ? err : new Error(String(err)));
+          }
+        };
+        check();
+      });
+    return this.readyP;
+  }
+
+  /** Programs this instance has submitted: 3 for a 'globe' (no fly shader) or 'fly' engine (no globe shader), 4 for 'both'. */
+  programCount(): number {
+    return (this.core.W.gl as CoreGL).programs();
+  }
+
   /** Load a world: a preset object, or the id of one of the prototype's example presets. Rebuilds terrain and spin-up. */
   setPreset(p: WorldPreset | string): void {
-    const pr = typeof p === 'string' ? WP.find((q) => q.id === p) : p;
-    if (!pr) throw new Error('unknown preset ' + String(p));
-    if (pr.ob) this.core.ORB[pr.id] = pr.ob;
-    if (pr.oceanF != null) this.core.OCEANF[pr.id] = pr.oceanF;
-    this.core.setPreset(pr);
+    this.restoreOwnEb();
+    loadPreset(this.core, p);
+    this.sim?.markStale(this);
   }
 
   /**
@@ -148,66 +286,22 @@ export class WorldEngine {
    * (as in the prototype); fluid, spin and tect rebuild the world; overlay, clouds, zoom, yaw, pitch only redraw.
    */
   setOverrides(o: EngineOverrides): void {
-    const c = this.core,
-      W = c.W;
-    let model = false,
-      reset = false;
-    if (o.Tstar != null) {
-      W.Tstar = o.Tstar;
-      model = true;
-    }
-    if (o.orbit != null) {
-      W.orbit = o.orbit;
-      model = true;
-    }
-    if (o.Ps != null) {
-      W.Ps = o.Ps;
-      model = true;
-    }
-    if (o.obl != null) {
-      W.obl = o.obl;
-      model = true;
-    }
-    if (o.ecc != null) {
-      W.ecc = o.ecc;
-      model = true;
-    }
-    if (o.co2 != null) {
-      W.co2Therm = o.co2;
-      model = true;
-    }
-    if (o.season != null) W.season = o.season;
-    if (o.overlay != null) W.overlay = o.overlay;
-    if (o.clouds != null) W.clouds = o.clouds;
-    if (o.zoom != null) W.zoom = o.zoom;
-    if (o.yaw != null) W.yaw = o.yaw;
-    if (o.pitch != null) W.pitch = o.pitch;
-    if (o.timeSec != null) {
-      W.timeSec = o.timeSec;
-      model = true;
-    }
-    if (o.fluid != null) {
-      W.fluid = o.fluid;
-      reset = true;
-    }
-    if (o.spin != null) {
-      W.spinMode = o.spin;
-      W.p = c.applySpin(W.base);
-      reset = true;
-    }
-    if (o.tect != null) {
-      W.tect = o.tect;
-      reset = true;
-    }
-    if (reset) c.resetWorld();
-    else if (model) {
-      W.m = c.worldModel();
-      c.worldUi();
-    }
+    const reset = resetsWorld(o);
+    // A rebuild runs here on this core's own arrays (never on a followed simulation's), then catches up.
+    if (reset) this.restoreOwnEb();
+    applyOverrides(this.core, o);
+    if (reset) this.sim?.markStale(this);
   }
 
   /** Switch the split fly view on or off (the prototype's Fly button). Aims the camera on entry. */
   setFly(on: boolean): void {
+    // Issue #93 B10: a globe-role engine has no fly program; flying would make the core link FLY_FS synchronously
+    // (a 35 s block on a cold ANGLE cache). Flying belongs to a 'fly' or 'both' engine, so the call is ignored.
+    if (on && this.role === 'globe') {
+      if (import.meta.env.DEV)
+        console.warn('WorldEngine.setFly(true) ignored on a globe-role engine');
+      return;
+    }
     const c = this.core,
       W = c.W;
     W.fly = on;
@@ -279,10 +373,34 @@ export class WorldEngine {
 
   /**
    * One page-loop frame of the prototype (dt seconds, capped like the prototype at 0.06): auto-flight, the
-   * simulation tick, the spin advance, the redraw (a gas giant is not drawn while it spins up) and the
-   * readout refresh every 20 ticks. The host calls this from requestAnimationFrame while the canvas is visible.
+   * simulation tick, the spin advance, the redraw and the readout refresh every 20 ticks. No world is drawn while it
+   * spins up: the prototype skipped only gas giants, but the app covers every world with the opaque "Forming" overlay
+   * then, so the frames were never seen (issue #93). The host calls this from requestAnimationFrame while the canvas is visible.
    */
   tick(dt: number): void {
+    const timer = this.gpuTimer;
+    if (!timer) return this.tickNow(dt);
+    timer.begin();
+    try {
+      this.tickNow(dt);
+    } finally {
+      timer.end();
+    }
+  }
+
+  /**
+   * GPU milliseconds per tick (roadmap 0.1, dev only), median and 95th percentile of the last 240,
+   * or null without timing (option off, no EXT_disjoint_timer_query_webgl2, or no sample yet).
+   */
+  gpuMs(): { p50: number; p95: number; samples: number } | null {
+    const s = this.gpuTimer?.stats;
+    const p50 = s?.percentile(0.5);
+    const p95 = s?.percentile(0.95);
+    if (!s || p50 == null || p95 == null) return null;
+    return { p50, p95, samples: s.count };
+  }
+
+  private tickNow(dt: number): void {
     const c = this.core,
       W = c.W;
     dt = Math.min(0.06, dt || 0);
@@ -292,11 +410,13 @@ export class WorldEngine {
       if (!W.playing) W.gl.draw(W.m);
     }
     if (W.playing || need) {
-      W.gl.tick(W.m, W.playing, dt);
+      // Issue #93 1.9, 1.10: a followed simulation steps once a frame for every view (the driving view runs or asks
+      // for the tick; the others replay its ops); W.spinup, the climate grids and the clouds come from it.
+      if (this.sim) this.sim.pump(this, W.playing, dt);
+      else W.gl.tick(W.m, W.playing, dt);
       if (W.playing)
         W.spin += W.m.gas ? (W.timeSec < 1000 ? dt * W.timeSec * W.m.Om : 0) : dt * 0.09;
-      const bld = W.m.gas && W.spinup > 0;
-      if (!bld) W.gl.draw(W.m);
+      if (W.spinup === 0) W.gl.draw(W.m);
       if (this.tickN++ % 20 === 0) c.worldUi();
     }
   }
@@ -309,6 +429,13 @@ export class WorldEngine {
    */
   spinUp(dt = 1 / 60, virtualClock = false): void {
     const W = this.core.W;
+    if (this.sim) {
+      // Issue #93 1.9: a shared simulation on this thread spins up the same way; a worker cannot be waited for here.
+      if (!(this.sim instanceof LocalSimSource))
+        throw new Error('spinUp needs the simulation on this thread (?sim=shared or own)');
+      this.sim.spinUpSync(this, dt, virtualClock);
+      return;
+    }
     const real = performance.now.bind(performance);
     let t = 0;
     if (virtualClock) performance.now = () => (t += 1);
@@ -386,6 +513,83 @@ export class WorldEngine {
   }
 
   /**
+   * Issue #114 (sound spec §3.3): the energy budget's weather arrays (references; do not write). Null until the budget is
+   * ready, and null on a gas giant: EB keeps the previous rocky world's state across a switch to a giant.
+   */
+  weatherFields(): WeatherFields | null {
+    const EB = this.core.EB;
+    if (!EB.ready || this.core.W.m?.gas) return null;
+    // core.js cloudStep draws the first 12 entries at lon + (W.step - born) * drift, wrapped with its 6.2832.
+    const step = this.core.W.step as number;
+    const cyc = (
+      (EB.cyc ?? []) as {
+        lon: number;
+        lat: number;
+        r: number;
+        s: number;
+        born?: number;
+        drift?: number;
+      }[]
+    )
+      .slice(0, 12)
+      .map((c) => {
+        const lon = c.lon + (step - (c.born ?? step)) * (c.drift ?? 0);
+        return {
+          lon: ((((lon + Math.PI) % 6.2832) + 6.2832) % 6.2832) - Math.PI,
+          lat: c.lat,
+          r: c.r,
+          s: c.s,
+        };
+      });
+    return {
+      NX: EB.NX,
+      NY: EB.NY,
+      iceH: EB.h,
+      snow: EB.s,
+      out: EB.out,
+      out2: EB.out2,
+      cyclones: cyc,
+    };
+  }
+
+  /**
+   * Issue #114 (§3.3): the gas simulation's field, 256 x 128 x [u, v, vorticity, storm stamp], row 0 = south pole,
+   * column 0 = lon -pi. `exportField(false)` rewrites the simulation's own buffer from the current state, so the array
+   * is live: the next call (or the next GPU upload) overwrites it. Null on rocky worlds (the simulation outlives a switch
+   * to a rocky world, so its field would be stale).
+   */
+  gasField(): Float32Array | null {
+    if (!this.core.W.m?.gas) return null;
+    const gs = this.core.getGS();
+    return gs ? (gs.exportField(false) as Float32Array) : null;
+  }
+
+  /** Issue #114 (§3.3): the raw terrain cell under (lon, lat) in km, clamped at sea level on ocean worlds (core.groundKm). */
+  groundKm(lon: number, lat: number): number {
+    return this.core.groundKm(lon, lat);
+  }
+
+  /**
+   * Issue #114 (§3.3, §8.5): the fly camera's basis, from core.flyCamera(m, 0, 0, [0, 0, 1]). Tilt, spin and the light
+   * vector change only the light direction, never the basis. Null before a world is loaded.
+   */
+  flyCameraBasis(): FlyCameraBasis | null {
+    const W = this.core.W;
+    if (!W.m || !W.p) return null;
+    const c = this.core.flyCamera(W.m, 0, 0, [0, 0, 1]);
+    const v3 = (v: number[]): [number, number, number] => [v[0]!, v[1]!, v[2]!];
+    return {
+      cam: v3(c.uCam),
+      fwd: v3(c.uFwd),
+      rt: v3(c.uRt),
+      up: v3(c.uUp),
+      rkm: c.rkm,
+      ex: c.ex,
+      fov: FLY_FOV,
+    };
+  }
+
+  /**
    * The prototype's current slider and pill values (what its controls would show), read from its own state.
    * Hosts use this to draw controls; the engine stays the single source of truth.
    */
@@ -418,9 +622,95 @@ export class WorldEngine {
     this.core.W.spin = other.core.W.spin;
   }
 
-  /** Release the GL context. */
+  /**
+   * Issue #93 1.9, 1.10: draw a simulation that another source runs (one for the globe and the fly view, on this
+   * thread or in a worker) instead of running one here. Call it once the shaders are ready (whenReady), after
+   * setPreset and the controls already applied; the engine catches up at its next tick (a formed world shows formed).
+   */
+  followSim(src: SimSource): void {
+    if (this.sim === src) return;
+    if (src.key !== this.simKey())
+      throw new Error(
+        'the simulation runs another world (' + src.key + ' vs ' + this.simKey() + ')',
+      );
+    this.sim?.detach(this);
+    this.sim = src;
+    src.attach(this);
+  }
+
+  /** The simulation this engine follows, or null when it runs its own. */
+  get simSource(): SimSource | null {
+    return this.sim;
+  }
+
+  /** What this engine's simulation depends on (engineControls.simKey). */
+  simKey(): string {
+    return simKey(this.core);
+  }
+
+  /** @internal SimFollower: replay one of the simulation's GPU-side calls in this context. */
+  simApply(op: SimOp): void {
+    applySimOp(this.core, op);
+  }
+
+  /** @internal SimFollower: the simulation's state after a tick. */
+  simState(s: SimState, T: Float32Array | null, rain: Float32Array | null): void {
+    applySimState(this.core, s, T, rain);
+  }
+
+  /** @internal SimFollower: catch up with the simulation at once. */
+  simResync(snap: SimSnapshot): void {
+    resyncSim(this.core, snap);
+  }
+
+  /** Put this core's own climate arrays back (before it rebuilds a world locally, or stops following). */
+  private restoreOwnEb(): void {
+    const EB = this.core.EB;
+    Object.assign(EB, this.ownEb);
+  }
+
+  /**
+   * Release the GL context. Issue #93 regression fix: `loseContext()` waits for every shader compile still running in
+   * the driver, so releasing an engine whose fly shader was still compiling froze the page for about 35 s on a cold
+   * ANGLE D3D11 cache (React's development double mount did this on every first open; closing the build early did it
+   * in production). While programs are still compiling the context is released once the driver reports them done
+   * (polled every DISPOSE_POLL_MS, never blocking). If the compile is still running after DISPOSE_MAX_WAIT_MS the
+   * engine gives up without calling `loseContext()` (issue #93 B1: calling it then would still block on that compile):
+   * polling stops (no timer keeps the engine alive), and once its host drops the engine the browser reclaims the
+   * context with the detached canvas.
+   */
   dispose(): void {
-    const gl = this.canvas.getContext('webgl2');
-    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    if (this.disposed) return;
+    this.disposed = true;
+    // Issue #93 1.9: the simulation stays with the other view, or is released with this, its last one.
+    this.sim?.detach(this);
+    this.sim = null;
+    try {
+      this.gpuTimer?.dispose();
+    } catch {
+      /* the context is already gone */
+    }
+    const lose = () => {
+      const gl = this.canvas.getContext('webgl2');
+      gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    };
+    const t0 = Date.now();
+    const settled = (): boolean => {
+      if (this.isReady) return true;
+      try {
+        return (this.core.W.gl as CoreGL).poll();
+      } catch {
+        return true; // a compile or link error: nothing is running any more
+      }
+    };
+    const tryLose = () => {
+      if (settled()) lose();
+      else if (Date.now() - t0 < DISPOSE_MAX_WAIT_MS) setTimeout(tryLose, DISPOSE_POLL_MS);
+      else if (import.meta.env.DEV)
+        console.warn(
+          'world engine: shaders still compiling after dispose; context left to the browser',
+        );
+    };
+    tryLose();
   }
 }

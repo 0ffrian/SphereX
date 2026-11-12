@@ -5,9 +5,7 @@
 // every point goes through the 3D projection, so a track across RA 0/360 is the short segment it
 // is, and a segment with an end behind the camera is skipped.
 import { raDecToScreen, type RaDec, type ScreenPoint, type SkyCamera } from '@/viewer/sky/skyMath';
-import type { Rect } from '@/app/sky/safeRect';
 import { boxCorners, type SkyBox, type SkySquare } from './geometry';
-import type { ScreenSquare } from './drawSquare';
 import {
   ACCENT,
   dotStyle,
@@ -19,6 +17,21 @@ import {
   type AreaScene,
   type SceneTrack,
 } from './scene';
+
+/** A pane-local rectangle in CSS px (labels are clamped to it). */
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** A square on screen while it is dragged: top-left corner and side, CSS px, pane-local. */
+export interface ScreenSquare {
+  x: number;
+  y: number;
+  side: number;
+}
 
 export type AreaCtx = Pick<
   CanvasRenderingContext2D,

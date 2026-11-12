@@ -8,6 +8,8 @@ from __future__ import annotations
 # Moving-object path search for the fixtures (issue #26). Not [verify] values: a deliberately
 # short window (2026-03-20 to 2026-03-21, where a live search on 7 Nov 2026 found SPHEREx frames
 # of 433 Eros), a tiny cone and a fixed 24 h step (min = max), so two cones and a small cache.
+# The window must equal Eros's `moving_windows` in targets.toml (issue #73), which replaces it
+# for Eros; test_moving.test_eros_target_window_equals_the_fixture_window keeps the two equal.
 FIXTURE_MOVING: dict[str, str] = {
     "moving_window_start": "2026-03-20T00:00:00Z",
     "moving_window_end": "2026-03-21T12:00:00Z",

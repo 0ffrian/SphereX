@@ -38,7 +38,7 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | [generators.md](generators.md) | A6–A6.3 | you work on how each type is drawn, triplanar mapping, the Gemini layer or offline jobs |
 | [physics.md](physics.md) | A7–A7.5 | you implement a physics rule or slider for planets, gas giants, brown dwarfs, asteroids or supernova remnants |
 | [sound-voice.md](sound-voice.md) | A8 | you work on the data sweep (Listen), the body tone, the Track path sound, imagined drive or the (backlog) voice |
-| [haptics.md](haptics.md) | A9–A9.5 | you need the summary of haptics: sound at the event, vibration after it, what is felt per type, the honesty rule |
+| [haptics.md](haptics.md) | A9–A9.5 | (cut by D-39; history) you need the summary of haptics: sound at the event, vibration after it, what is felt per type, the honesty rule |
 | [frontend-platform.md](frontend-platform.md) | A10–A10.2 | you set up the build, UI stack, three.js, state, backend stack, proxy, hosting or caching; check the performance budget; or run the event build on the A15 laptop |
 | [honesty-policy.md](honesty-policy.md) | A11–A11.1 | you add user-facing labels, badges, the honesty toggle, demo caveats or the blind-test demo |
 | [testing.md](testing.md) | A12 | you write or plan tests for any layer, or need the CI jobs |
@@ -47,8 +47,8 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | [glossary.md](glossary.md) | A15 | you meet an unfamiliar term |
 | [moving-objects/area-search.md](moving-objects/area-search.md) | A16–A16.6 | you work on Area search (Q-146): draw a square, then Known objects (hand-off to Track) or Discovery; scope, architecture, data flow, honesty rules, open items and measured Eros facts |
 | [moving-objects/area-plan.md](moving-objects/area-plan.md) | A16.7–A16.8 | you need the Area search tickets D1 to D3, the Day 0 gate and plan, or the four gated research checks D4 to D7 and why a reviewer wants them (A16.8) |
-| [moving-objects/area-backend.md](moving-objects/area-backend.md) | A17–A17.7 | you build the Discovery backend: area frames and visits, dots, glitches/stars/fixed dots, the parallax-aware join, the known-object check, planted movers, completeness and the control, export |
-| [moving-objects/area-contract.md](moving-objects/area-contract.md) | A17.8–A17.13 | you build or call `/v1/areas`, its schemas and fixtures, cache, offline and determinism, the compute budget, the rate-grid linker or the spectrum score |
+| [moving-objects/area-backend.md](moving-objects/area-backend.md) | A17–A17.5 | you build the Discovery backend: area frames and visits, dots, glitches/stars/fixed dots, the parallax-aware join, the known-object check |
+| [moving-objects/area-contract.md](moving-objects/area-contract.md) | A17.6–A17.13 | you build planted movers, completeness and the control, the export, or you build or call `/v1/areas`, its schemas and fixtures, cache, offline and determinism, the compute budget, the rate-grid linker or the spectrum score |
 | [moving-objects/area-ui.md](moving-objects/area-ui.md) | A18–A18.11 | you build Area search in the sky view: drawing, sky layers, visits and blink, feature cards and minimise, Result card, hand-off to Track, the Checks section, state, tests |
 | [moving-objects/track.md](moving-objects/track.md) | A19–A19.8 | you build Track data: scope, entry points, frame list, SPHEREx-centred positions, `/path`, star list and photometry for movers, extended sources |
 | [moving-objects/track-contract.md](moving-objects/track-contract.md) | A19.9–A19.15 | you build the Track export (ECSV), its refusal codes, provenance per value, cache and pre-fetch, contract, owners, tickets T1 to T4, tests |
@@ -109,7 +109,7 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | A7.4 | Asteroids | [physics.md#a74-asteroids](physics.md#a74-asteroids) |
 | A7.5 | Supernova remnants | [physics.md#a75-supernova-remnants](physics.md#a75-supernova-remnants) |
 | A8 | Sound and voice | [sound-voice.md#a8-sound-and-voice](sound-voice.md#a8-sound-and-voice) |
-| A9 | Haptics | [haptics.md#a9-haptics](haptics.md#a9-haptics) |
+| A9 | Haptics (cut, D-39) | [haptics.md#a9-haptics](haptics.md#a9-haptics) |
 | A9.1 | Platform (D-08) | [haptics.md#a91-platform-d-08](haptics.md#a91-platform-d-08) |
 | A9.2 | Strength and detail (D-09) | [haptics.md#a92-strength-and-detail-d-09](haptics.md#a92-strength-and-detail-d-09) |
 | A9.3 | Audio pairing (D-10) | [haptics.md#a93-audio-pairing-d-10](haptics.md#a93-audio-pairing-d-10) |
@@ -140,8 +140,8 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | A17.3 | Glitches, stars and fixed dots (`clean.py`) | [moving-objects/area-backend.md#a173-glitches-stars-and-fixed-dots-cleanpy](moving-objects/area-backend.md#a173-glitches-stars-and-fixed-dots-cleanpy) |
 | A17.4 | Join across visits (`join.py`) | [moving-objects/area-backend.md#a174-join-across-visits-joinpy](moving-objects/area-backend.md#a174-join-across-visits-joinpy) |
 | A17.5 | Known-object check (`match.py`) | [moving-objects/area-backend.md#a175-known-object-check-matchpy](moving-objects/area-backend.md#a175-known-object-check-matchpy) |
-| A17.6 | Injection, completeness and control | [moving-objects/area-backend.md#a176-injection-completeness-and-control](moving-objects/area-backend.md#a176-injection-completeness-and-control) |
-| A17.7 | Export | [moving-objects/area-backend.md#a177-export](moving-objects/area-backend.md#a177-export) |
+| A17.6 | Injection, completeness and control | [moving-objects/area-contract.md#a176-injection-completeness-and-control](moving-objects/area-contract.md#a176-injection-completeness-and-control) |
+| A17.7 | Export | [moving-objects/area-contract.md#a177-export](moving-objects/area-contract.md#a177-export) |
 | A17.8 | Endpoints | [moving-objects/area-contract.md#a178-endpoints](moving-objects/area-contract.md#a178-endpoints) |
 | A17.9 | Schemas and fixtures | [moving-objects/area-contract.md#a179-schemas-and-fixtures](moving-objects/area-contract.md#a179-schemas-and-fixtures) |
 | A17.10 | Cache, offline and determinism | [moving-objects/area-contract.md#a1710-cache-offline-and-determinism](moving-objects/area-contract.md#a1710-cache-offline-and-determinism) |

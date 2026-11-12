@@ -65,17 +65,13 @@ describe('dock', () => {
     expect(area.getAttribute('aria-label')).toMatch(/not available yet/i);
   });
 
-  it('the fingerprint opens Feel and closes it again; the sky button closes the build', async () => {
+  it('has no Feel button (removed on purpose); the sky button closes the build', async () => {
     const onPop = vi.fn();
     useShellStore.getState().openBuild(false);
     await act(async () => root.render(<BuildDock pop={null} onPop={onPop} />));
-    await act(async () => q('dock-feel').click());
-    expect(onPop).toHaveBeenLastCalledWith('feel');
-    await act(async () => root.render(<BuildDock pop="feel" onPop={onPop} />));
-    expect(q('dock-feel').getAttribute('aria-pressed')).toBe('true');
-    await act(async () => q('dock-feel').click());
-    expect(onPop).toHaveBeenLastCalledWith(null);
+    expect(host.querySelector('[data-testid="dock-feel"]')).toBeNull();
     await act(async () => q('dock-sky').click());
     expect(useShellStore.getState().build.open).toBe(false);
+    expect(onPop).not.toHaveBeenCalled();
   });
 });

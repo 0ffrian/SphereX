@@ -41,17 +41,17 @@
     "texture": "terrain",
     "texture_tag": "artistic",
     "data": "teq_pulse",
-    "data_tag": "measured",
+    "data_tag": "derived",
     "params": {
       "tau": 0.15,
       "maxRateHz": 12.0
     }
   },
   "confidence": {
-    "score": 0.5844,
-    "measured_share": 0.5844,
-    "estimated_share": 0.0,
-    "assumed_share": 0.4156,
+    "score": 0.5123,
+    "measured_share": 0.4373,
+    "estimated_share": 0.075,
+    "assumed_share": 0.4877,
     "threshold": 0.25,
     "band": "part_data",
     "gate": {
@@ -62,7 +62,7 @@
     },
     "found": "Data for: Radius, mass, orbit and tides, temperature and host star.",
     "needed": "",
-    "raise": "A better measurement of: mass.",
+    "raise": "A better measurement of: temperature.",
     "inputs": [
       {
         "id": "radius",
@@ -102,9 +102,9 @@
         "id": "temperature",
         "label": "Temperature",
         "weight": 15,
-        "c": 0.9807,
-        "tag": "measured",
-        "points": 14.7106,
+        "c": 0.5,
+        "tag": "derived",
+        "points": 7.5,
         "fields": [
           "teq_K"
         ]
