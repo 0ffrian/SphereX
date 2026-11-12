@@ -17,6 +17,7 @@ import {
   heightAtUv,
   hKm,
   hKmParts,
+  lavaInputs,
   makeFlyHeightCtx,
   terrainHalf,
   type FlyHeightCtx,
@@ -117,6 +118,11 @@ describe('flyHeight: the port follows the GLSL it was written from', () => {
       'gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, hd.RW, hd.RH, 0, gl.RGBA, gl.UNSIGNED_BYTE, hd.img)',
       'var card = !!p.seed3, s3 = card ? p.seed3 : [p.seed, p.seed, p.seed]',
       'gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);',
+      // WorldEngine.FLY_FOV and projectFly follow this (red 5)
+      'gl.uniform1f(uF.uFov, 0.62)',
+      // weatherFields() returns the cyclones where cloudStep draws them (red 1)
+      'lon = v.lon + (W.step - v.born) * v.drift; vArr[i * 4] = ((lon + Math.PI) % 6.2832 + 6.2832) % 6.2832 - Math.PI;',
+      'n = Math.min(vs0.length, 12)',
     ])
       expect(core.includes(s), s).toBe(true);
   });
@@ -229,6 +235,14 @@ interface FixtureWorld {
   H: number;
   dirs: Vec3[];
   gpu: [number, number, number, number][];
+  /** Lava worlds: EB.out channel 0 and pass 2, [GPU T, GPU hydro G, h before the magma mix, h] per direction. */
+  lava?: {
+    hM: number;
+    NX: number;
+    NY: number;
+    ebT: number[];
+    gpu2: [number, number, number, number][];
+  };
 }
 const FIXTURE = path.join(HERE, '__fixtures__', 'flyHeight.gpu.json');
 
@@ -243,29 +257,65 @@ describe('flyHeight: GPU parity (fixture recorded with scripts/engine-bench/flyh
     ? JSON.parse(fs.readFileSync(FIXTURE, 'utf8'))
     : { renderer: '', worlds: [] };
 
-  // Noise half: CPU hKm computed from the GPU's own filtered height e, against the GPU's hKm. No terrain needed.
+  it('the fixture covers an ocean world, a card world and a lava (dry) world', () => {
+    const names = new Set(fx.worlds.map((w) => w.world));
+    for (const n of ['earth', 't1f+card', 'lava']) expect(names.has(n), n).toBe(true);
+    expect(fx.worlds.some((w) => !w.ocean)).toBe(true);
+  });
+
+  /** The ctx the GPU used for a fixture world, without terrain (the noise half feeds the GPU's own e). */
+  const noiseCtx = (w: FixtureWorld): FlyHeightCtx => {
+    let ebOut: Float32Array | null = null;
+    if (w.lava) {
+      ebOut = new Float32Array(w.lava.NX * w.lava.NY * 4);
+      w.lava.ebT.forEach((T, i) => (ebOut![i * 4] = T));
+    }
+    return {
+      seed3: w.seed3.map(Math.fround) as Vec3,
+      h16: new Float32Array(1),
+      W: 1,
+      H: 1,
+      ocean: w.ocean,
+      lava: !!w.lava,
+      hM: w.lava ? Math.fround(w.lava.hM) : 0,
+      ebOut,
+      ebNX: w.lava?.NX ?? 0,
+      ebNY: w.lava?.NY ?? 0,
+      hydro: null,
+      hq: w.hq,
+      gas: false,
+    };
+  };
+
+  // Noise half: CPU hKm computed from the GPU's own filtered height e (and, on lava worlds, the GPU's hydro G), against
+  // the GPU's hKm. No terrain needed. The bars apply to the land rows: on ocean worlds most rows are the sea clamp,
+  // 0 against 0, which would dilute the RMS (red 3); the all-rows RMS is logged too.
   for (const w of fx.worlds)
-    it(`noise parity ${w.world} hq=${w.hq}: RMS <= 0.005 km, at most 2 of 64 above 0.02 km`, () => {
-      const ctx = {
-        seed3: w.seed3.map(Math.fround) as Vec3,
-        h16: new Float32Array(1),
-        W: 1,
-        H: 1,
-        ocean: w.ocean,
-        lava: false,
-        hM: 0,
-        ebOut: null,
-        ebNX: 0,
-        ebNY: 0,
-        hydro: null,
-        hq: w.hq,
-        gas: false,
-      } satisfies FlyHeightCtx;
-      const err = w.dirs.map((d, k) => hKmParts(d, ctx, w.gpu[k]![0]).h - w.gpu[k]![1]);
-      expect(rms(err)).toBeLessThanOrEqual(0.005);
-      expect(err.filter((x) => Math.abs(x) > 0.02).length).toBeLessThanOrEqual(2);
+    it(`noise parity ${w.world} hq=${w.hq}: land RMS <= 0.005 km, at most 2 land rows above 0.02 km`, () => {
+      const ctx = noiseCtx(w);
+      const err = w.dirs.map(
+        (d, k) =>
+          hKmParts(d, ctx, w.gpu[k]![0], w.lava ? w.lava.gpu2[k]![1] : undefined).h - w.gpu[k]![1],
+      );
+      const land = err.filter((_, k) => !(w.ocean && w.gpu[k]![1] === 0));
+      console.info(
+        `[flyHeight] noise ${w.world} hq=${w.hq}: land RMS ${rms(land).toExponential(2)} km over ${land.length} rows, all rows ${rms(err).toExponential(2)}`,
+      );
+      expect(land.length).toBeGreaterThanOrEqual(10);
+      expect(rms(land)).toBeLessThanOrEqual(0.005);
+      expect(land.filter((x) => Math.abs(x) > 0.02).length).toBeLessThanOrEqual(2);
     });
 
+  // Lava worlds: the half-float EB.out read (tex4) against the GPU's own read, and the magma sea it drives.
+  for (const w of fx.worlds.filter((q) => q.lava))
+    it(`magma sea ${w.world} hq=${w.hq}: tex4 T within 0.5 K of the GPU; the mix with the GPU's T and G matches`, () => {
+      const ctx = noiseCtx(w);
+      const L = w.lava!;
+      const dT = w.dirs.map((d, k) => lavaInputs(d, ctx).T - L.gpu2[k]![0]);
+      expect(maxAbs(dT)).toBeLessThanOrEqual(0.5);
+      expect(L.gpu2.some((g) => g[0] > 1500)).toBe(true); // the branch is live on this world
+      expect(L.gpu2.some((g) => g[2] !== g[3])).toBe(true); // and moves some heights
+    });
   // Filter half and total: the world's terrain rebuilt headless (the same pure buildTerrain the browser ran).
   const engines = new Map<string, WorldEngine>();
   const engineFor = (w: FixtureWorld): WorldEngine => {
@@ -302,6 +352,9 @@ describe('flyHeight: GPU parity (fixture recorded with scripts/engine-bench/flyh
       30000,
     );
 
+    // A lava world's total needs the live EB.out and hydro raster of the moment it was recorded; its noise and magma
+    // checks above replay those parts.
+    if (w.lava) continue;
     it(`total parity ${w.world} hq=${w.hq}: RMS <= 0.02 km, max <= 0.1 km (spec §6.1)`, () => {
       const e = engineFor(w);
       const ctx = makeFlyHeightCtx(e, w.seed3, { oceanF: w.ocean ? 1 : 0, hq: w.hq });

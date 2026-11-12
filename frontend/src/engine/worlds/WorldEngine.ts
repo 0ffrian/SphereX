@@ -67,12 +67,19 @@ export interface WeatherFields {
   out: Float32Array;
   /** EB.out2, 4 per cell: rain / rainMax, ocean-current speed, u, v. */
   out2: Float32Array;
-  /** EB.cyc (a copy): cyclone centre (rad), radius r (rad), spin sign s. */
+  /**
+   * The cyclones the clouds draw (EB.cyc, first 12, as cloudStep): centre where the vortex is drawn now (lon drifted
+   * by (W.step - born) * drift and wrapped as core.js does), radius r (rad), spin sign s.
+   */
   cyclones: { lon: number; lat: number; r: number; s: number }[];
 }
 
 /** Issue #114 (§3.3, §8.5): the fly camera basis (body frame) and its drawing constants. */
 export interface FlyCameraBasis {
+  /**
+   * Eye position in planet radii (body frame): up * (1 + (ex * groundKm + alt) / rkm). A world point at height h km over
+   * the unit direction d is d * (1 + h * ex / rkm) (the shader's surfR; the cloud shell is 1 + cloudKm * ex / rkm).
+   */
   cam: [number, number, number];
   fwd: [number, number, number];
   rt: [number, number, number];
@@ -81,12 +88,42 @@ export interface FlyCameraBasis {
   rkm: number;
   /** Vertical exaggeration of the drawn relief (3 rocky, 2 gas). */
   ex: number;
-  /** Vertical field of view, radians. */
+  /**
+   * tan of the half vertical field of view (FLY_FS: rd = fwd + q.x * fov * rt + q.y * fov * up, q.y in [-1, 1]); 0.62 is
+   * a 63.6 degree vertical view. The horizontal extent is fov * aspect, aspect = the fly pane's width / height.
+   */
   fov: number;
 }
 
 /** The fly view's field of view: core.js draw sets `gl.uniform1f(uF.uFov, 0.62)`. */
 export const FLY_FOV = 0.62;
+
+/** Issue #114 (blue 13, for #117): where a body-frame point (planet radii) falls in the fly view. */
+export interface FlyProjection {
+  /** -1 (left edge) .. 1 (right edge) of the fly pane; outside that range the point is off screen. */
+  x: number;
+  /** -1 (bottom) .. 1 (top). */
+  y: number;
+  /** The point is in front of the eye. */
+  inFront: boolean;
+}
+
+/**
+ * Project a body-frame point (planet radii, see FlyCameraBasis.cam) into the fly view, inverting FLY_FS's ray
+ * rd = fwd + q.x * fov * rt + q.y * fov * up with q = (2 frag - res) / res.y. `aspect` is the fly pane's width / height
+ * (core draws the fly view into viewport (0, 0, round(0.6 w), h); not the canvas aspect). Visible: inFront and |x|, |y| <= 1.
+ */
+export function projectFly(
+  b: Pick<FlyCameraBasis, 'cam' | 'fwd' | 'rt' | 'up' | 'fov'>,
+  aspect: number,
+  p: readonly [number, number, number],
+): FlyProjection {
+  const v = [p[0] - b.cam[0], p[1] - b.cam[1], p[2] - b.cam[2]];
+  const dot = (a: readonly number[]) => v[0]! * a[0]! + v[1]! * a[1]! + v[2]! * a[2]!;
+  const a = dot(b.fwd);
+  if (!(a > 0)) return { x: NaN, y: NaN, inFront: false };
+  return { x: dot(b.rt) / (a * b.fov * aspect), y: dot(b.up) / (a * b.fov), inFront: true };
+}
 
 export interface EngineState {
   Tstar: number;
@@ -512,7 +549,28 @@ export class WorldEngine {
   weatherFields(): WeatherFields | null {
     const EB = this.core.EB;
     if (!EB.ready || this.core.W.m?.gas) return null;
-    const cyc = (EB.cyc ?? []) as { lon: number; lat: number; r: number; s: number }[];
+    // core.js cloudStep draws the first 12 entries at lon + (W.step - born) * drift, wrapped with its 6.2832.
+    const step = this.core.W.step as number;
+    const cyc = (
+      (EB.cyc ?? []) as {
+        lon: number;
+        lat: number;
+        r: number;
+        s: number;
+        born?: number;
+        drift?: number;
+      }[]
+    )
+      .slice(0, 12)
+      .map((c) => {
+        const lon = c.lon + (step - (c.born ?? step)) * (c.drift ?? 0);
+        return {
+          lon: ((((lon + Math.PI) % 6.2832) + 6.2832) % 6.2832) - Math.PI,
+          lat: c.lat,
+          r: c.r,
+          s: c.s,
+        };
+      });
     return {
       NX: EB.NX,
       NY: EB.NY,
@@ -520,7 +578,7 @@ export class WorldEngine {
       snow: EB.s,
       out: EB.out,
       out2: EB.out2,
-      cyclones: cyc.map((c) => ({ lon: c.lon, lat: c.lat, r: c.r, s: c.s })),
+      cyclones: cyc,
     };
   }
 
