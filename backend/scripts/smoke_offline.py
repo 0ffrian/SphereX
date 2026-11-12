@@ -7,8 +7,13 @@ parameters carry no data gap.
 `--group` can be repeated; with none, every target is checked. Exit code 1 if any target has no
 frames, a cutout fails, the frames' `missing` lists anything other than a per-frame geometric
 refusal, or the render parameters' `missing` lists a data gap (see `data_gaps`). A moving
-object, or a target with `frames = false`, may honestly have no frames. The render parameters'
-asset status (generated, saved, ...) is printed for each target.
+object may honestly have no frames. A target with `frames = false` (a catalogue-only exoplanet)
+has no frame list by design: its `/frames` call and cutouts are skipped, but its render
+parameters are still checked for data gaps (a lost `exoplanet_archive` answer fails it). The
+render parameters' asset status (generated, saved, ...) is printed for each target.
+
+This checks the cache in-process. The go/no-go check before going on stage is
+`scripts.preflight`, against the running backend (issue #103); where they disagree, it counts.
 """
 
 from __future__ import annotations
@@ -84,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
     from fastapi.testclient import TestClient
 
     from app.core.find.frames import is_complete
+    from app.core.warm import frames_wanted
     from app.main import create_app
     from app.settings import Settings
 
@@ -100,12 +106,17 @@ def main(argv: list[str] | None = None) -> int:
                 ok = False
                 continue
             oid = r.json()["id"]
-            fr = client.get(f"/v1/objects/{oid}/frames")
-            body = fr.json()
-            if fr.status_code != 200:
-                print(f"  FAIL {t['name']}: frames {fr.status_code} {fr.text}")
-                ok = False
-                continue
+            frames_expected = frames_wanted(t)
+            # Issue #103: a frames = false target has no frame list in the cache (offline the
+            # call is a 503), so only /frames and the cutouts are skipped, not the gap check.
+            body: dict[str, Any] = {"frames": [], "missing": [], "cached_at": None}
+            if frames_expected:
+                fr = client.get(f"/v1/objects/{oid}/frames")
+                if fr.status_code != 200:
+                    print(f"  FAIL {t['name']}: frames {fr.status_code} {fr.text}")
+                    ok = False
+                    continue
+                body = fr.json()
             bad = 0
             for f in body["frames"]:
                 png = client.get(f["cutout_url"])
@@ -115,7 +126,6 @@ def main(argv: list[str] | None = None) -> int:
             # a frame edge, no wavelength) are honest refusals and are only reported.
             missing = [] if is_complete(body["missing"]) else body["missing"]
             moving = r.json()["moving"]
-            frames_expected = bool(t.get("frames", True))
             needs_frames = frames_expected and not moving
             rp = client.get(f"/v1/objects/{oid}/render-params")
             if rp.status_code != 200:
@@ -128,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
             ok = ok and bool(good)
             print(
                 f"  {'OK  ' if good else 'FAIL'} {t['name']:<16} {oid:<34}"
-                f" frames={len(body['frames'])} pngs_failed={bad}"
+                f" frames={len(body['frames']) if frames_expected else 'skipped'} pngs_failed={bad}"
                 f" missing={body['missing'][:3]} cached_at={body['cached_at']}"
                 f" asset={status} gaps={gaps}"
             )
