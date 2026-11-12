@@ -2,11 +2,14 @@
 // Built only from engine values (m.U, phiH, the lock flags, the climate temperatures and the cyclones); pure.
 // Local frame (contract amendment 3): the engine's flyCamera basis, bearings clockwise from north.
 import type { Tag } from '@/contract';
+import { compass8 } from './captions';
 import type { AirModel, PlaceFeatures, WindResult } from './types';
 import {
   A_L, A_P, A_T, A_W, COAST_FADE_KM, GAS_IU, CYCLONE_REACH, H_BL, H_EARTH_KM, I_U_MIN, K_BR, POLAR_EDGE_MAX, RELIEF_SAT_KM,
   SHELTER, SPEEDUP, U_MIN, Z0_LAND, Z0_SEA, Z_JET_EARTH,
 } from './tuning';
+
+export { compass8 };
 
 export type Vec3 = [number, number, number];
 type Kind = WindResult['parts'][number]['kind'];
@@ -59,13 +62,6 @@ export function fromDeg(ve: number, vn: number): number {
   if (ve === 0 && vn === 0) return 0;
   const to = (Math.atan2(ve, vn) * 180) / Math.PI;
   return (((to + 180) % 360) + 360) % 360;
-}
-
-const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'] as const;
-/** 8-point compass name for a bearing in degrees. */
-export function compass8(deg: number): (typeof COMPASS)[number] {
-  const i = Math.round((((deg % 360) + 360) % 360) / 45) % 8;
-  return COMPASS[i] as (typeof COMPASS)[number];
 }
 
 interface Pattern { pat: number; ve: number; vn: number; kind: Kind }

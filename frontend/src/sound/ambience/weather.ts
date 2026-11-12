@@ -4,6 +4,7 @@
 import type { Tag } from '@/contract';
 import { FLUIDS } from '@/engine/worlds/presets.js';
 import { absorption, airAt, earthRef, lowpassHz, meanPathAir } from './air';
+import { LIGHTNING_TEXT } from './captions';
 import { dropPhysics } from './liquids';
 import type { AirModel, Place, Strike, WeatherVisualFrame } from './types';
 import {
@@ -14,12 +15,7 @@ import {
   TINT_GREY, TINT_MIX,
 } from './tuning';
 
-/** §8.2 refusal strings (exact). */
-export const LIGHTNING_TEXT = {
-  titan: 'No lightning has ever been detected on Titan, so there is no thunder here.',
-  co2: 'Lightning on worlds like Venus and Mars is unconfirmed, so there is no thunder here.',
-  other: 'Lightning needs storm clouds of water or ammonia; there are none here.',
-} as const;
+export { LIGHTNING_TEXT };
 
 export interface LightningRule { allowed: boolean; tag: Tag | null; reason: string | null }
 
@@ -39,7 +35,8 @@ export function lightningRule(air: AirModel, presetId: string): LightningRule {
   }
   if (air.fluid === 'methane') return refuse(LIGHTNING_TEXT.titan);
   if (air.fluid === 'co2') return refuse(LIGHTNING_TEXT.co2);
-  if ((air.fluid === 'water' || air.fluid === 'ammoniaWater') && air.state === 'liquid') {
+  // Review L4: liquid is local (R7), so an eyeball world that rains can have storms.
+  if ((air.fluid === 'water' || air.fluid === 'ammoniaWater') && !!air.liquid && !air.liquid.viscous) {
     return { allowed: true, tag: 'inferred_from_analog', reason: null };
   }
   return refuse(LIGHTNING_TEXT.other);
@@ -100,7 +97,8 @@ export function thunderParams(air: AirModel, d_m: number, z_km = 0): ThunderPara
     fm_Hz: fm,
     dur_s: Math.min(THUNDER_BASE_S + d / (THUNDER_ROLL_K * air.c0), THUNDER_MAX_S),
     crack: d < THUNDER_CRACK_M ? 1 : 0,
-    level_dB: THUNDER_L1KM_DB - 20 * Math.log10(d / 1000) - lossDb + 10 * Math.log10(air.Z0 / Zr),
+    // Review L10: the listener-height impedance, as for the ground beds (§11.3).
+    level_dB: THUNDER_L1KM_DB - 20 * Math.log10(d / 1000) - lossDb + 10 * Math.log10(airAt(air, z_km).Z / Zr),
     lowpassHz: lowpassHz((f) => absorption(f, P, T, air.cls), d),
     absK2: absorption(1000, air.P0, air.T0, air.cls) / 1e6,
     tag: 'derived',

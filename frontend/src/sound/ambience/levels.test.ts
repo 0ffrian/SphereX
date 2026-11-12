@@ -60,20 +60,27 @@ describe('monotone levels', () => {
 });
 
 describe('presentation (§11.4, §11.7)', () => {
-  it('Mars-like air: the offset round-trips into the caption ("about 20 dB quieter ... raised")', () => {
+  it('the caption reports the true level of the loudest present bed against Earth, as the model computes it', () => {
     const air = marsAir();
     const G = presentOffsetDb(air);
     expect(G).toBeGreaterThan(19);
     expect(G).toBeLessThan(22);
-    const f = mixFrame(air, makePlace(0.3), new Set([bedKey('S1_land', 0)]));
+    const S1 = new Set([bedKey('S1_land', 0)]);
+    const f = mixFrame(air, makePlace(0.3), S1);
     // R10: the wind bed is raised by the impedance at the listener's height.
     expect(f.presentOffsetDb).toBe(flowOffsetDb(air, 0.3));
-    expect(f.caption.levelNote).toBe('Real level: about 20 dB quieter than on Earth (raised so you can hear it)');
-    expect(f.caption.line).toContain('real level about 20 dB quieter than Earth');
+    // The same wind bed (same U, I_u and share) on Earth at the surface: the reference the note compares with.
+    const earth = mixFrame(earthAir(), makePlace(0.002), S1);
+    const quieter = bed(earth, 'S1_land').trueDb - bed(f, 'S1_land').trueDb;
+    expect(quieter).toBeGreaterThan(30);
+    const n = Math.max(5, Math.round(quieter / 5) * 5);
+    expect(f.caption.levelNote).toBe(`Real level: about ${n} dB quieter than on Earth (raised so you can hear it)`);
+    expect(f.caption.line).toContain(`real level about ${n} dB quieter than Earth`);
   });
-  it('Venus-like air is louder and lowered; Earth gets no note', () => {
-    expect(mixFrame(venusAir(), makePlace(0.3), new Set()).caption.levelNote).toMatch(/louder than on Earth \(lowered\)$/);
-    expect(mixFrame(earthAir(), makePlace(0.3), new Set()).caption.levelNote).toBeNull();
+  it('Venus-like wind is louder and lowered; Earth gets no note', () => {
+    const S1 = new Set([bedKey('S1_land', 0)]);
+    expect(mixFrame(venusAir(), makePlace(0.3), S1).caption.levelNote).toMatch(/louder than on Earth \(lowered\)$/);
+    expect(mixFrame(earthAir(), makePlace(0.3), S1).caption.levelNote).toBeNull();
   });
   it('the stage window lifts a quiet bed to -24 dB, holds +6 dB headroom, never lifts silence', () => {
     expect(stageGainDb(20, 0)).toBe(-24);
@@ -130,5 +137,15 @@ describe('R8 presence before presentation', () => {
     const f = mixFrame(air, p, new Set([bedKey('S1_land', 0), bedKey('S3', 0)]));
     expect(bed(f, 'S3').gainDb).toBe(SILENT_DB);
     expect(f.caption.heard.map((h) => h.id)).toEqual(['S1_land']);
+  });
+
+  it('review L5: inside a hurricane the rumble carries only the background wind and the caption names the wind once', () => {
+    const air = earthAir({ Vmax: 70 });
+    const w = makeWind({ U10: 60, Uz: 60, parts: [{ kind: 'hurricane', U: 60 }, { kind: 'trade', U: 5 }] });
+    const p = makePlace(0.3, () => ({}), { wind: w });
+    const f = mixFrame(air, p, new Set([bedKey('S1_land', 0), bedKey('S9', 0)]));
+    const solo = mixFrame(air, p, new Set([bedKey('S1_land', 0)]));
+    expect(bed(f, 'S1_land').trueDb).toBeLessThan(bed(solo, 'S1_land').trueDb - 20);
+    expect(f.caption.heard.filter((h) => /hurricane/.test(h.phrase)).length).toBe(1);
   });
 });

@@ -9,7 +9,7 @@ export const LIQUIDS: Record<FluidKey | 'lava', LiquidProps> = {
   water: { name: 'water', rho: 998, sigma: 0.0728, viscous: false, tag: 'measured' },
   /** 94 K; rho [verify] (pure methane; a Titan lake is a methane-ethane-nitrogen mix). */
   methane: { name: 'methane', rho: 450, sigma: 0.0178, viscous: false, tag: 'inferred_from_analog' },
-  /** 240 K. */
+  /** 240 K: saturated liquid density 682 kg/m³ (NIST Chemistry WebBook, ammonia at its 239.8 K boiling point); sigma [verify]. */
   ammonia: { name: 'ammonia', rho: 682, sigma: 0.032, viscous: false, tag: 'measured' },
   /** Mixture; rho and sigma [verify]. */
   ammoniaWater: { name: 'ammonia-water', rho: 850, sigma: 0.05, viscous: false, tag: 'inferred_from_analog' },

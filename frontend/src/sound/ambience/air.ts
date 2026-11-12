@@ -155,3 +155,16 @@ export function lowpassHz(alphaOf: (f: number) => number, d_m: number): number {
   }
   return Math.exp((lo + hi) / 2);
 }
+
+/**
+ * The world term of a bed's true level against the same source on Earth's surface (§11.3), in dB, by the rule playback
+ * uses (R10). Ground sources (S4-S8, S10): 10 log10(Z(z)/Z_E). Flow rumble (S1, S9, S12): 20 log10(rho(z)/rho_E), as
+ * p ∝ rho I_u U². Flow hiss (S2, S3): 20 log10((rho/c)/(rho_E/c_E)), as p ∝ rho U³/c. Thunder is a ground source.
+ */
+export function bedWorldDb(air: AirModel, z_km: number, id: string): number {
+  const a = airAt(air, z_km);
+  const e = earthRef();
+  if (id === 'S2' || id === 'S3') return 20 * Math.log10(a.rho / a.c / (e.rho / e.c));
+  if (id === 'S1_land' || id === 'S1_sea' || id === 'S9' || id === 'S12') return 20 * Math.log10(a.rho / e.rho);
+  return 10 * Math.log10(a.Z / e.Z);
+}

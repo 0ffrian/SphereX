@@ -46,9 +46,4 @@ export default tseslint.config(
     files: ['src/sound/ambience/types.ts'],
     rules: { '@typescript-eslint/no-explicit-any': 'off' },
   },
-  {
-    // Spec R13 App. B: the ambience contract is copied verbatim (its WorldEngineLike mirrors the engine's untyped fields).
-    files: ['src/sound/ambience/types.ts'],
-    rules: { '@typescript-eslint/no-explicit-any': 'off' },
-  },
 );
