@@ -242,6 +242,8 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
     const now = performance.now();
     const cur = stageRef.current;
     const leave = () => {
+      // The show has reached its last step: the real build ends on it (one clock for the strip).
+      useMouldLive.getState().markShown();
       if (reduced) {
         seen.add(idRef.current);
         setSt('off');

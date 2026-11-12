@@ -20,6 +20,7 @@ import {
   stepProgress,
   type MouldScript,
 } from '@/viewer/mould/mouldSteps';
+import { useMouldLive } from './mouldLive';
 
 export type MouldPhase = 'idle' | 'loading' | 'building' | 'done';
 
@@ -101,6 +102,8 @@ export function useMould(inp: MouldInputs): MouldState {
       return;
     }
     const script = mouldScript(plan);
+    // The mould show (MouldOverlay) is the one clock for the strip: when it has finished, so has this build.
+    const shownAt = useMouldLive.getState().shownSeq;
     const finish = (settleTurn = false) => {
       viewer.setMould(null);
       // The newest plan (a honesty or mode change during the build ends on it).
@@ -164,6 +167,10 @@ export function useMould(inp: MouldInputs): MouldState {
         // screen): end at once on the new plan.
         if (latest.current.plan !== plan) {
           finish();
+          return;
+        }
+        if (useMouldLive.getState().shownSeq !== shownAt) {
+          finish(true);
           return;
         }
         const t = (now - t0) / 1000;
