@@ -4,6 +4,8 @@ import { defaultContext } from '../renderPlan';
 import { fixture } from './fixtures.testutil';
 import { STAR_CONFIG, planStar } from './Star';
 import { StarBody } from './StarBody';
+import { uploadUsed } from './StarPlasma';
+import { BufferAttribute } from 'three/webgpu';
 import { STREAK_BUDGET } from '@/physics/flares';
 
 const config = {
@@ -60,5 +62,37 @@ describe('plasma on the star', () => {
     expect(b.plasma!.group.visible).toBe(true);
     b.plasma!.setLines(false);
     expect(b.plasma!.group.visible).toBe(false);
+  });
+});
+
+describe('streak upload (issue #93 W1, render notes 0.6)', () => {
+  it('uploads only the floats in use, and nothing when nothing is drawn', () => {
+    const a = new BufferAttribute(new Float32Array(600), 3);
+    const v0 = a.version;
+    uploadUsed(a, 42);
+    expect(a.updateRanges).toEqual([{ start: 0, count: 42 }]);
+    expect(a.version).toBe(v0 + 1);
+    uploadUsed(a, 6);
+    expect(a.updateRanges).toEqual([{ start: 0, count: 6 }]);
+    uploadUsed(a, 0);
+    expect(a.updateRanges).toEqual([]);
+    expect(a.version).toBe(v0 + 2);
+    uploadUsed(a, 9999);
+    expect(a.updateRanges).toEqual([{ start: 0, count: 600 }]);
+  });
+
+  it('a star frame asks for the streaks it drew, not the whole budget', () => {
+    const b = body(plan({ starColour: 'enhanced' }));
+    b.setTime(() => 3e6);
+    const pl = b.plasma!;
+    const n = pl.streakCount;
+    expect(n).toBeGreaterThan(0);
+    const mesh = pl.group.children[0] as unknown as {
+      geometry: { attributes: Record<string, BufferAttribute> };
+    };
+    const { position, color } = mesh.geometry.attributes;
+    expect(position!.updateRanges).toEqual([{ start: 0, count: n * 6 }]);
+    expect(color!.updateRanges).toEqual([{ start: 0, count: n * 6 }]);
+    expect(n * 6).toBeLessThan(position!.array.length);
   });
 });
