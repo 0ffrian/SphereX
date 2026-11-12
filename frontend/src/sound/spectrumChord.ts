@@ -78,6 +78,11 @@ export interface ChordBin {
   /** Silent in that mode: no point, or under SPECTRUM_QUIET_THRESHOLD of the Data peak. */
   quiet: boolean;
   smoothQuiet: boolean;
+  /**
+   * |Data − Smooth| in dB for this note: null when it is silent in both modes, Infinity when it
+   * sounds in only one (the UI shows which notes the A/B changes).
+   */
+  abDiffDb: number | null;
   /** Mean of the points' σ/flux (each capped at 1); NaN when no point has a σ. */
   sigmaRatio: number;
   noisy: boolean;
@@ -112,6 +117,8 @@ export interface ChordPlan {
   smooth: ChordPartial[];
   /** Silent bins without data: `chord.bin.<i>.no-data`. */
   missing: string[];
+  /** The largest `abDiffDb` over the notes (0 when no note changes). */
+  maxAbDiffDb: number;
   seed: number;
 }
 
@@ -157,6 +164,8 @@ export function smoothStrengths(points: readonly MappedPoint[]): number[] {
   const logs = points.map((p) => (p.strength > 0 ? Math.log(p.strength) : -Infinity));
   return points.map((p) => {
     const l = p.wavelengthUm;
+    // Shrunk symmetrically, never reflected or extrapolated (Q-446): within 0.25 µm of either end the
+    // window is narrower, so Smooth removes less there (an end point is its own median).
     const half = Math.min(CHORD_SMOOTH_WINDOW_UM / 2, l - first, last - l);
     const win: number[] = [];
     for (let j = 0; j < n; j++) {
@@ -243,6 +252,12 @@ export function planChord(
       smoothLevelDb,
       quiet: levelDb === null,
       smoothQuiet: smoothLevelDb === null,
+      abDiffDb:
+        levelDb === null && smoothLevelDb === null
+          ? null
+          : levelDb === null || smoothLevelDb === null
+            ? Infinity
+            : Math.abs(levelDb - smoothLevelDb),
       sigmaRatio: ratio,
       noisy,
       beatHz: noisy ? PERIOD_CYCLES(beatRateHz(ratio)) / CHORD_LOOP_S : null,
@@ -281,6 +296,7 @@ export function planChord(
     data: partials((bin) => bin.levelDb),
     smooth: partials((bin) => bin.smoothLevelDb),
     missing,
+    maxAbDiffDb: bins.reduce((m, b) => Math.max(m, b.abDiffDb ?? 0), 0),
     seed,
   };
 }
@@ -423,6 +439,7 @@ export class SpectrumChord {
   private claim: SpectrumClaim | null = null;
   private unsubscribe: (() => void) | null = null;
   private unhook: (() => void) | null = null;
+  private unwatch: (() => void) | null = null;
   private active = false;
   private startAt = 0;
   private current: ChordMode | null = null;
@@ -531,9 +548,19 @@ export class SpectrumChord {
     // context runs, so a missed stop path cannot leave the ambience ducked.
     const safety = CHORD_LOOP_S + DUCK_SAFETY_S;
     this.duck = holdDuck(ctx, safety);
-    this.heartbeat = setInterval(() => {
-      if (this.active && this.ctx === ctx && ctx.state === 'running') this.duck?.extend(safety);
-    }, CHORD_LOOP_S * 1000);
+    // After a suspension longer than the safety, the hold has let go: take a new one (through the bus
+    // API, reference-counted) once the context runs again, so the resumed drone ducks the ambience.
+    const keepDuck = () => {
+      if (!this.active || this.ctx !== ctx || ctx.state !== 'running') return;
+      if (!this.duck || this.duck.released) this.duck = holdDuck(ctx, safety);
+      else this.duck.extend(safety);
+    };
+    this.heartbeat = setInterval(keepDuck, CHORD_LOOP_S * 1000);
+    const target = ctx as AudioContext & Partial<EventTarget>;
+    if (typeof target.addEventListener === 'function') {
+      target.addEventListener('statechange', keepDuck);
+      this.unwatch = () => target.removeEventListener?.('statechange', keepDuck);
+    }
 
     this.unsubscribe = this.settings.subscribe((next) => {
       if (!next.soundOn) {
@@ -626,6 +653,8 @@ export class SpectrumChord {
 
   private finish(): void {
     if (this.heartbeat !== null) clearInterval(this.heartbeat);
+    this.unwatch?.();
+    this.unwatch = null;
     this.heartbeat = null;
     this.duck?.release();
     this.duck = null;

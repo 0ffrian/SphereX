@@ -368,3 +368,36 @@ describe('the spectrum chord (R13.12, Q-446)', () => {
     expect(duckHolds(ctx.asAudioContext())).toBe(0);
   });
 });
+
+describe('the spectrum chord: unlock races (R13.12, Q-446)', () => {
+  it('the last click wins while the first unlock is pending (chord, then sweep)', async () => {
+    const sound = make();
+    sound.bind(honestySource());
+    const a = sound.chord(wise, { owner: 'hear' });
+    const b = sound.listen(wise);
+    expect(await a).toBe('stopped');
+    expect(await b).toBe('playing');
+    expect(sound.getStatus()).toMatchObject({ listening: true, chord: null });
+  });
+
+  it('the last click wins while the first unlock is pending (sweep, then chord)', async () => {
+    const sound = make();
+    sound.bind(honestySource());
+    const a = sound.listen(wise);
+    const b = sound.chord(wise, { owner: 'sky' });
+    expect(await a).toBe('stopped');
+    expect(await b).toBe('playing');
+    expect(sound.getStatus()).toMatchObject({ listening: false, chord: { owner: 'sky' } });
+  });
+
+  it("another panel's stopChord does not cancel a chord waiting for its unlock", async () => {
+    const sound = make();
+    sound.bind(honestySource());
+    const a = sound.chord(wise, { owner: 'sky' });
+    sound.stopChord('hear');
+    expect(await a).toBe('playing');
+    const b = sound.chord(wise, { owner: 'sky' });
+    sound.stopChord('sky');
+    expect(await b).toBe('stopped');
+  });
+});

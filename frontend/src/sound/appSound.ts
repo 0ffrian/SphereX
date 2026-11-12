@@ -151,6 +151,8 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
   const plans = new WeakMap<object, { tag: SpectrumReply['tag']; plan: ChordPlan | null }>();
   let chordOwner: string | null = null;
   let chordRun = 0;
+  /** The panel whose chord waits for its unlock (so another panel's `stopChord` cannot cancel it). */
+  let pendingOwner: string | null = null;
   const listeners = new Set<() => void>();
   let listenRun = 0;
   let cached: SoundStatus | null = null;
@@ -204,12 +206,15 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
     const honesty = engine.honesty;
     if (!isTagShown(honesty, plan.tag)) return 'hidden';
     const token = ++chordRun;
+    // The last click wins: a sweep still waiting for its unlock is cancelled now, not after ours.
+    listenRun++;
+    pendingOwner = opts.owner;
     // Synchronously, before any await: the unlock must run inside the click's user activation (Q-73).
     const running = await unlock();
+    if (token === chordRun) pendingOwner = null;
     if (token !== chordRun || page.isHidden()) return 'stopped';
     if (!getSoundSettings().soundOn) return 'sound-off';
     if (!running || getAudioContext()?.state !== 'running') return 'no-audio';
-    listenRun++; // a sweep still waiting for its unlock must not start over the chord
     if (chord.start(plan, opts.mode ?? 'data', engine.honesty)) {
       chordOwner = opts.owner;
       notify();
@@ -243,10 +248,12 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
       return 'hidden';
     }
     const token = ++listenRun;
+    // The last click wins: a chord still waiting for its unlock is cancelled now, not after ours.
+    chordRun++;
+    pendingOwner = null;
     // Synchronously, before any await: the unlock must run inside the click's user activation (Q-73).
     const running = await unlock();
     if (token !== listenRun || page.isHidden()) return 'stopped';
-    chordRun++; // a chord still waiting for its unlock must not start over the sweep
     if (!getSoundSettings().soundOn) return 'sound-off';
     if (!running || getAudioContext()?.state !== 'running') return 'no-audio';
     if (sweep.play(plan, engine.honesty)) {
@@ -275,8 +282,10 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
       return ok;
     },
     stopChord(owner) {
-      if (owner !== undefined && chordOwner !== null && owner !== chordOwner) return;
+      const holder = chordOwner ?? pendingOwner;
+      if (owner !== undefined && holder !== null && owner !== holder) return;
       chordRun++;
+      pendingOwner = null;
       chord.stop();
     },
     getStatus,

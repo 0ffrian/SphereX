@@ -170,3 +170,61 @@ describe('sky Spectrum panel: Sweep | Chord (A8, R13.12)', () => {
     expect(q('sky-chord-play')!.getAttribute('aria-pressed')).toBe('false');
   });
 });
+
+describe('chord strip and copy (code review, Q-446)', () => {
+  it('silent notes are short empty boxes; A/B changes are marked; the summary is visible', async () => {
+    // A deep narrow dip at 2.3 um (one note changes in Smooth) and a gap with no data (silent notes).
+    const pts = Array.from({ length: 60 }, (_, i) => {
+      const l = 0.8 + i * 0.05;
+      return {
+        frame_id: `g${i}`,
+        wavelength_um: l,
+        flux: Math.abs(l - 2.3) < 0.06 ? 0.02 : 1,
+        error: 0.01,
+        flagged: false,
+      };
+    });
+    const reply = { ...data, spectrum: pts as never };
+    await act(async () =>
+      root.render(
+        <SoundProvider sound={sound}>
+          <SpectrumSound reply={reply as never} />
+        </SoundProvider>,
+      ),
+    );
+    expect(q('sky-kind-hint')!.textContent).toMatch(/one wavelength at a time/);
+    await click('sky-kind-chord');
+    expect(q('sky-kind-hint')!.textContent).toMatch(/all at once/);
+    const bars = [...q('sky-chord-strip')!.querySelectorAll('i')];
+    const silent = bars.filter((b) => b.dataset.silent === 'true');
+    expect(silent.length).toBeGreaterThan(0);
+    for (const b of silent) expect(b.style.height).toBe('12%');
+    expect(host.querySelectorAll('[data-testid="sky-chord-ab-mark"]').length).toBeGreaterThan(0);
+    const summary = q('sky-chord-summary')!;
+    expect(summary.className).not.toContain('sr-only');
+    expect(summary.textContent).toMatch(/change between Data and Smooth by 1 dB or more/);
+  });
+
+  it('the disabled Smooth reason reads as an instruction', async () => {
+    useAppStore.setState({ honesty: 'measured' });
+    await renderHear();
+    await click('hear-kind-chord');
+    expect(q('hear-chord-smooth-why')!.textContent).toBe(
+      'Smooth is an estimate (smoothed data). Set honesty to + Estimated to use it.',
+    );
+  });
+
+  it('a new spectrum stops the chord that played the old one', async () => {
+    const view = (r: typeof data) => (
+      <SoundProvider sound={sound}>
+        <SpectrumSound reply={r as never} />
+      </SoundProvider>
+    );
+    await act(async () => root.render(view(data)));
+    await click('sky-kind-chord');
+    await click('sky-chord-play');
+    expect(sound.getStatus().chord?.owner).toBe('sky');
+    await act(async () => root.render(view({ ...data, spectrum: [...points] as never })));
+    expect(sound.getStatus().chord).toBeNull();
+  });
+});
